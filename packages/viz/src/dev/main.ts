@@ -302,6 +302,7 @@ import {
   plannedDayOf,
   resolvedBuildingOf,
   shiftRunConfigOf,
+  weekGrowthPerDayOf,
   tomorrowFactsOf,
   scenarioWeeksOf,
   weeksForSession,
@@ -6654,6 +6655,11 @@ function boot(ui: Elements, resources: BrowserResources): void {
        * was scheduled. That is #126's trap and #135's, said twice because both issues record it.
        */
       calendar: state.calendar,
+      /*
+       * The slope this week's building grows at, so the *Tomorrow* card's percentage is the one the
+       * run tomorrow will be grown by — § D1066. From `state` for `calendar`'s reason directly above.
+       */
+      growthPerDay: weekGrowthPerDayOf(resources, state),
       dispatcherName: profileById(resources, state.savedDispatchers, state.dispatcherId).name,
       /*
        * The run's own hour, not a flat 06:00 — issue #83. `DAY_START_S` survives as the fallback for
@@ -6708,6 +6714,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
       bookedOut: bookedOutCarsOf(planned.building, [...planned.dayCars.holds, ...planned.dayCars.windows]),
       /* § D1040 — so the header and tomorrow's card say what a mix-asking wrinkle did on this tower. */
       templateVariesMix: planned.templateVariesMix,
+      /* § D1057 — so the header and tomorrow's card name the episode's window on a whole day. */
+      wholeDayRun: planned.wholeDayRun,
       /*
        * **A pinned day's call** — wave AI, [§ D1029](../../../../DECISIONS.md). Asked of the day as
        * built where this shell kept it ({@link unpressedRecording}, the run the answer replaced) and

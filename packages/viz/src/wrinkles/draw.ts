@@ -41,8 +41,10 @@
  * does not space, and two days five apart colliding is exactly what a rotation rule forbids.
  */
 
+import type { RunHorizon } from '../shift/types.js';
 import type {
   DrawnWrinkle,
+  WholeDayPlacement,
   WrinkleAxis,
   WrinkleAxisValue,
   WrinkleDays,
@@ -64,14 +66,34 @@ export function dayKindOf(dayIdx: number): WrinkleDays {
 }
 
 /**
+ * Which kind of run a day is drawn for — `shift/types.ts#RunHorizon`, imported as a type only, so
+ * nothing of `shift/` (which imports this directory) is loaded at run time.
+ */
+export type DrawHorizon = RunHorizon;
+
+/**
  * The templates a given kind of day may draw, in file order.
  *
  * `campaign` templates are excluded from every pool on purpose: `breakdown` and `coach-party` are
  * the campaign's, reached by id through `campaign/incidents.ts#campaignEventFor`, and the week's
  * rota has never drawn them. `SHIFT_EVENT_IDS` said so in a comment; this says it in code.
+ *
+ * **On a whole day, a template whose placement is refused is not in the pool** — the week swarm's
+ * S2 condition, kept by [§ D1057](../../../../DECISIONS.md): a wrinkle that cannot be spliced
+ * honestly into the day is not drawn there, rather than drawn and then described as withheld.
+ * The pool is shorter by exactly those rows, so the rotation arithmetic below holds per horizon and
+ * `library.ts#assertRotates` checks both.
  */
-export function poolFor(library: WrinkleLibrary, kind: WrinkleDays): readonly WrinkleTemplate[] {
-  return library.templates.filter((template) => template.days === kind);
+export function poolFor(
+  library: WrinkleLibrary,
+  kind: WrinkleDays,
+  horizon: DrawHorizon = 'period',
+): readonly WrinkleTemplate[] {
+  return library.templates.filter(
+    (template) =>
+      template.days === kind &&
+      (horizon === 'period' || template.effect.wholeDay?.kind !== 'refused'),
+  );
 }
 
 /** A small deterministic mixer, so an axis's choice varies without varying the template's. */
@@ -83,6 +105,41 @@ function axisIndex(day: number, dayIdx: number, axis: WrinkleAxis): number {
   }
   const mixed = (Math.imul(day, 31) + Math.imul(dayIdx, 7) + (hash >>> 8)) >>> 0;
   return mixed % axis.values.length;
+}
+
+/** A placement with an axis value's window or level moved — `caterers`' *when*. */
+function placedWith(
+  placement: WholeDayPlacement | null | undefined,
+  value: WrinkleAxisValue,
+): WholeDayPlacement | null {
+  if (placement === undefined || placement === null) return null;
+  if (placement.kind === 'refused' || value.wholeDay === undefined) return placement;
+  return {
+    ...placement,
+    fromMin: value.wholeDay.fromMin ?? placement.fromMin,
+    toMin: value.wholeDay.toMin ?? placement.toMin,
+    intensity: value.wholeDay.intensity ?? placement.intensity,
+  };
+}
+
+/** `HH:MM` for clock minutes since midnight. */
+function clockText(minutes: number): string {
+  const hours = Math.floor(minutes / 60);
+  const rest = Math.round(minutes - hours * 60);
+  return `${String(hours).padStart(2, '0')}:${String(rest).padStart(2, '0')}`;
+}
+
+/**
+ * The whole-day note's `{episode}`: *"from 10:00 to 10:20"*, from the placement the splice uses, so
+ * the sentence and the run cannot name different times.
+ */
+function episodeWindowText(fromMin: number, toMin: number): string {
+  return `from ${clockText(fromMin)} to ${clockText(toMin)}`;
+}
+
+/* Collapse the double space a silent axis leaves behind, and trim the ends it can leave. */
+function tidy(note: string): string {
+  return note.replaceAll(/\s{2,}/g, ' ').replace(/\s+([.,])/g, '$1').trim();
 }
 
 function applyValue(effect: WrinkleEffect, value: WrinkleAxisValue): WrinkleEffect {
@@ -97,6 +154,7 @@ function applyValue(effect: WrinkleEffect, value: WrinkleAxisValue): WrinkleEffe
     carsOutOfService:
       value.carsOutOfService === undefined ? effect.carsOutOfService : value.carsOutOfService,
     derate: value.derate === undefined ? effect.derate : value.derate,
+    wholeDay: placedWith(effect.wholeDay, value),
   };
 }
 
@@ -112,21 +170,39 @@ export function composeWrinkle(
 ): DrawnWrinkle {
   let effect = template.effect;
   let note = template.note;
+  const placed = template.effect.wholeDay;
+  let dayNote = placed?.kind === 'episode' ? placed.note : '';
   const parts: string[] = [template.id];
   for (const [index, value] of chosen.entries()) {
     const axis = template.axes[index];
     if (axis === undefined) continue;
     effect = applyValue(effect, value);
     note = note.replaceAll(`{${axis.id}}`, value.label);
+    dayNote = dayNote.replaceAll(`{${axis.id}}`, value.label);
     parts.push(value.id);
   }
+  /*
+   * The whole-day note is composed here, beside the slice note, from the placement the axis values
+   * have already moved — so `{episode}` names the window the splice will write, § D1057.
+   */
+  const wholeDay = effect.wholeDay ?? null;
   return {
     id: parts.join(':'),
     templateId: template.id,
     name: template.name,
-    /* Collapse the double space a silent axis leaves behind, and trim the ends it can leave. */
-    note: note.replaceAll(/\s{2,}/g, ' ').replace(/\s+([.,])/g, '$1').trim(),
-    effect,
+    note: tidy(note),
+    effect:
+      wholeDay?.kind === 'episode'
+        ? {
+            ...effect,
+            wholeDay: {
+              ...wholeDay,
+              note: tidy(
+                dayNote.replace('{episode}', episodeWindowText(wholeDay.fromMin, wholeDay.toMin)),
+              ),
+            },
+          }
+        : effect,
   };
 }
 
@@ -148,9 +224,21 @@ export function everyWrinkle(library: WrinkleLibrary): readonly DrawnWrinkle[] {
  * `shift/calendar.ts#scheduledEventFor` promises its callers and what makes two players on day 3
  * meet the same wrinkle.
  */
-export function drawWrinkle(library: WrinkleLibrary, day: number, dayIdx: number): DrawnWrinkle {
+export function drawWrinkle(
+  library: WrinkleLibrary,
+  day: number,
+  dayIdx: number,
+  /*
+   * The kind of run the day is drawn for. `'whole-day'` leaves out a template whose whole-day
+   * placement is refused ({@link poolFor}); on the shipped library no drawable template is, and
+   * `shift/wholeDayEvents.test.ts` holds the two horizons' draws equal while that stays true, so a
+   * caller that does not pass the horizon cannot name a different wrinkle from the run until the
+   * day a refusal ships — and that test is where it is told.
+   */
+  horizon: DrawHorizon = 'period',
+): DrawnWrinkle {
   const kind = dayKindOf(dayIdx);
-  const pool = poolFor(library, kind);
+  const pool = poolFor(library, kind, horizon);
   if (pool.length === 0) {
     throw new Error(`wrinkles: the ${kind} pool is empty, so no day of that kind can be drawn.`);
   }

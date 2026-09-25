@@ -125,6 +125,7 @@ import { reportWindowNameOf } from './reportWindow.js';
 import { contractStatus } from './contracts.js';
 import { gaveUpBesideOf, goalPlainNameOf, horizonLabelOf, readGoals, wasDisplayOf } from './goals.js';
 import { growthFactor } from './growth.js';
+import { CONTRACT_LADDER } from './ladder.js';
 import { ENDLESS_CONTRACT_ID, wasGraded } from './week.js';
 import {
   DAY_START_S,
@@ -699,6 +700,22 @@ export interface DayReportInput {
    * is the same building on the same horizon, so it keeps the same mix. `undefined` is `false`.
    */
   readonly templateVariesMix?: boolean | undefined;
+  /**
+   * **The slope this week's building grows at**, for the forecast's *"+N % more tenants"* —
+   * [§ D1066](../../../../DECISIONS.md). `dev/state.ts#weekGrowthPerDayOf`, which is the reading the
+   * run grew its building by. `undefined` is the ladder's default slope, which is what every week
+   * with no re-derived rung grows at, so a caller that leaves it out is right wherever no rung
+   * declares one and the sentence is never left without a figure.
+   */
+  readonly growthPerDay?: number | undefined;
+  /**
+   * Whether this run is the building's whole authored day — `dev/state.ts#plannedDayOf`'s
+   * `wholeDayRun`. On such a run a mix-setting wrinkle with a placement was spliced as an episode,
+   * and the header and tomorrow's card quote the placement's note, which names the window
+   * ([§ D1057](../../../../DECISIONS.md)). Tomorrow is the same building on the same horizon.
+   * `undefined` is `false`.
+   */
+  readonly wholeDayRun?: boolean | undefined;
 }
 
 /**
@@ -742,7 +759,12 @@ function metaLinesFor(input: DayReportInput, dispatcherName: string, dayStartS: 
     `${recording.buildingName} · ${dispatcherName}`,
     `seed ${recording.seed} · ${clockRange(recording.startedAt, recording.endedAt, dayStartS)} · one replication`,
     ...(subject.kind === 'single-run' ? selectionLines(subject.selection) : []),
-    ...bookedLine(eventAsRun(input.event, input.templateVariesMix === true), subject, input.bookedOut ?? [], dayStartS),
+    ...bookedLine(
+      eventAsRun(input.event, input.templateVariesMix === true, input.wholeDayRun === true),
+      subject,
+      input.bookedOut ?? [],
+      dayStartS,
+    ),
     /*
      * The rules in force, before the attempt count and well before the intervention log —
      * `docs/20` defect 2. Config, so it belongs with what was asked for; see
@@ -1091,7 +1113,14 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
     streakLine: streakLineFor(judgement.verdict, week.streak),
     contractLine: contractLineFor(contract, week),
     cleared: week.cleared,
-    forecast: forecastFor(input.calendar, week.day, nextIdx, input.templateVariesMix === true),
+    forecast: forecastFor(
+      input.calendar,
+      week.day,
+      nextIdx,
+      input.templateVariesMix === true,
+      input.wholeDayRun === true,
+      input.growthPerDay ?? CONTRACT_LADDER.defaultGrowthPerDay,
+    ),
     taught: taughtFor(contract, week),
     nextDayName: weekdayOf(nextIdx),
   };
@@ -2638,7 +2667,10 @@ function contractLineFor(contract: ScenarioContract | undefined, week: WeekState
  * The design prints a flat *"+11% more tenants than today"*. It is 11 % of **day one**, not of
  * today, because growth is linear (`1 + 0.11 × (day − 1)`) — so on day 5 tomorrow is 7.6 % busier
  * than today, not 11 %. The true figure is computed rather than the constant repeated: a number on
- * a forecast card is a claim, and this one is checkable against `growthFactor`.
+ * a forecast card is a claim, and this one is checkable against `growthFactor`. Since
+ * [§ D1066](../../../../DECISIONS.md) the slope is the week's own (`perDay`), because a re-derived
+ * tower fills slower than the design's 0.11 and a card quoting the default over it would forecast a
+ * building the run will not build.
  *
  * ## The name is a claim too, and it was the wrong one — GitHub issue #135
  *
@@ -2657,9 +2689,15 @@ function forecastFor(
   day: number,
   nextIdx: number,
   templateVariesMix: boolean,
+  wholeDayRun: boolean,
+  perDay: number,
 ): ReportForecast {
-  const event = eventAsRun(scheduledEventFor(calendar, day + 1, nextIdx), templateVariesMix);
-  const increase = (growthFactor(day + 1) / growthFactor(day) - 1) * 100;
+  const event = eventAsRun(
+    scheduledEventFor(calendar, day + 1, nextIdx, wholeDayRun ? 'whole-day' : 'period'),
+    templateVariesMix,
+    wholeDayRun,
+  );
+  const increase = (growthFactor(day + 1, perDay) / growthFactor(day, perDay) - 1) * 100;
   return {
     name: event.name,
     note: event.note,

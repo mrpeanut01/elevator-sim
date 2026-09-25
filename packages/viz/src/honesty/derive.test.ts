@@ -43,6 +43,18 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
   Object.freeze([
     {
       reason:
+        'The whole-day splice — wave AJ lane AJ-B, § D1057. `shift/episode.ts#spliceEpisode` returns a ' +
+        'derived phase-list record and, where a day cannot hold an episode, a refusal with its reason. ' +
+        'The record’s `$comment` is a data comment nothing renders. The refusal reaches no screen: ' +
+        '`dev/state.ts#shiftRunConfigOf` throws it only for a drawn placement the day’s clock cannot ' +
+        'hold, and `shift/episode.test.ts` splices every shipped placement into every shipped whole ' +
+        'day on every run, so that state is a data fault the suite reddens on rather than a day. What ' +
+        'a player reads about an episode is the placement’s note, composed by `wrinkles/draw.ts` and ' +
+        'swept as `WRINKLES.*.wholeDay.note` in the event adapter.',
+      ids: ['shift/episode.ts#spliceEpisode'],
+    },
+    {
+      reason:
         'The session-shape spans — GitHub issue #559, § D753. `everyday/sittingShape.ts#SITTING_SPANS` is ' +
         'four records of two numbers each, in simulated seconds, and its only strings are the `source` ' +
         'field: the file each span was read from, for `sittingShape.test.ts` to assert it against. It is ' +
@@ -1802,6 +1814,17 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'refuses the right rungs, is asserted against the real `data/` rather than against its ' +
         'wording.',
       ids: ['shift/ladder.ts#contractLadderIssues'],
+    },
+    {
+      reason:
+        'The week census’s plumbing — wave AJ, § D1066 and § D1067. `shift/weekWay.ts#weekWayIssues` ' +
+        'is `contractLadderIssues`’ twin for `data/week-way.json`: its strings are content-author ' +
+        'refusals that `dev/data.ts` folds into `BrowserResources.warnings` and `shift/weekWay.test.ts` ' +
+        'turns into a failing test, and no screen renders one. `dev/state.ts#weekGrowthPerDayOf` ' +
+        'returns a number, and is derived only because `runRungOf` names the `shift-week` play mode ' +
+        'id, which is a switch value rather than a sentence. What a player reads from the census is ' +
+        '`wayThroughSentenceOf`, seeded by name in `honesty/surfaces.ts`.',
+      ids: ['shift/weekWay.ts#weekWayIssues', 'dev/state.ts#weekGrowthPerDayOf'],
     },
     {
       reason:

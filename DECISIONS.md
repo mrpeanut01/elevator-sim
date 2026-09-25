@@ -42475,6 +42475,8 @@ A Midtown week with Monday closed, a rush started, a reload: the front door open
 
 ## D966 — whether a demand template varies the mix is `core`'s answer on both paths, and a day that cannot simulate says so
 
+> **Status 2026-09-25: AMENDED by [§ D1057](#d1057)** — the predicate stands; a whole-day wrinkle's mix is now written into the template itself, so no drawn whole-day day reaches a withheld state either. See [`docs/39`](docs/39-decisions-in-force.md).
+
 **Date: 2026-09-24 · Owner: wave AH lane A · GitHub issue [#593](https://github.com/mrpeanut01/elevator-sim/issues/593) · Rules on: `shift/calendar.ts`'s bias refusal and `shift/events.ts`'s mix refusal, both written for `lunch-two-way`.**
 
 **Why an entry.** [§ D405](#d405)'s first ground: one predicate now decides for `dev/state.ts`, `shift/calendar.ts` and `shift/events.ts`, and the failure it could cause reaches `dev/main.ts`, `everyday/host.ts` and the stage.
@@ -43843,6 +43845,8 @@ including one it takes at 10:30.
 
 ## D1040 — a wrinkle's note says what the run does on a day whose template keeps its own mix
 
+> **Status 2026-09-25: AMENDED by [§ D1057](#d1057)** — on a whole authored day a mix-setting wrinkle is spliced into the day as an episode and its note names the window; `mixKeptSentenceOf` stays only where nothing is spliced (part of a day, a template that is not a day, a booking with no placement). See [`docs/39`](docs/39-decisions-in-force.md).
+
 **Date: 2026-09-25 · Owner: lane AI-E (wave AI) · The post-AH panel's A.md defect 5 · Rules on
 `data/wrinkles.json`'s `fire-drill` and `conference` notes and the `conference` axis labels,
 `packages/viz/src/shift/events.ts` (`mixKeptSentenceOf`, `eventAsRun`, the withheld line in
@@ -44312,3 +44316,308 @@ migrated and a car method at the event; each note retires on the both-ways test 
 The automatic weight-set selector and the rule arms still choose among weight vectors alone.
 `data/dispatcher-profiles.json`, `data/rush-house-runs.json` and every pinned press day are
 byte-identical. The record's `dispatcherProfileId` stays the profile the run started under.
+
+---
+
+## D1057 — a wrinkle that sets a mix is an episode inside a whole day, at a stated time, and one that cannot be placed is not drawn there
+
+> **Taken 2026-09-25 by agent sessions under delegated authority**, not by the product owner: a
+> three-member decision swarm (the player, honesty and engineering lenses; records `week-S1` to
+> `-S3`, the integrator's scratch notes, not in this repository), two to one with S1 and S3 for the
+> splice and S2 dissenting, S2's condition kept; built and measured by wave AJ lane AJ-B. A later
+> reader weighing this against a product-owner ruling should treat it as an agent ruling and say
+> so ([§ D626](#d626) is the cautionary case). **Amends [§ D1040](#d1040) and [§ D966](#d966)**;
+> neither is rewritten. The owner may reverse clauses 1, 2 and 4 together (below says what that
+> costs) and every placement in `data/wrinkles.json` individually.
+
+**Why an entry.** [§ D405](#d405)'s first two grounds: it moves two recorded decisions, and it binds
+`data/wrinkles.json`, `wrinkles/parse.ts`, `wrinkles/draw.ts`, `wrinkles/library.ts`, a new
+`shift/episode.ts`, `shift/events.ts`, `shift/calendar.ts`, `dev/state.ts`, `everyday/today.ts`,
+`everyday/briefScreen.ts`, `everyday/doorScreen.ts`, `shift/report.ts`, `dev/main.ts`,
+`honesty/surfaces.ts` and a new `data/wrinkle-census.json`.
+
+### What was wrong
+
+On a whole authored day (`office-day`, 08:00 to 18:00, the day thirteen contracts run in Scenario)
+`core` refuses a run-wide split beside a template that varies its own mix, so a wrinkle's mix was
+withheld, and its run-wide rate multiplier, authored for a thirty-minute slice where the slice
+roughly is the event, multiplied ten hours. The swarm measured the conference bit-identical to no
+wrinkle (65 of 65 and 130 of 130 configurations) and the fire drill as a day about 1.6 times busier
+(5 132 journeys against Tuesday's 2 844 on Midtown), clearing 0 of 65 on every tower. § D1040 made
+the sentence say so; this makes the day do what the sentence names.
+
+### The ruling
+
+1. **On a whole day, a mix-setting wrinkle is an episode spliced into the day's own phase list**
+   (`shift/episode.ts#spliceEpisode`): its clock window, its mix, and its level (a phase intensity
+   in `[0, 1]`, or the day's own), with a one-minute ramp at each edge (`core`'s rule 6, and
+   `evening-egress`'s 60 s precedent). Outside the window and its ramps every knot is the day's own.
+   **No run-wide multiplier is applied**; a placement may state that the whole day is lighter
+   (`dayRateMultiplier ≤ 1`: the three weekend templates and *Half the floor is off*), which is a
+   claim about the day and keeps the figure the slice had. The derived record keeps the day's id in
+   the run's own `trafficProfiles`, `authoring/patternSpec.ts`'s precedent. **`core` is untouched**
+   and its refusal in `planDemand` stands: the mix travels in the template, the one place `core`
+   accepts it.
+2. **The loader refuses a mix-setting template with no `wholeDay`** (`wrinkles/parse.ts`). A
+   placement names `from`, `to`, `intensity`, a `note` with `{episode}` in it, and a `reason`; or it
+   is `{ "refused": reason }`. It refuses a level above the peak, a whole-day multiplier above one, a
+   window that ends before it starts, and a placement on a template that sets no mix. Fifteen
+   templates are placed, each with its reason in the file; every reason says it is an uncited
+   assumption drafted on [§ D537](#d537)'s footing. `coach-party` is refused, because a career's
+   calendar books it and a career day runs no whole day.
+3. **S2's condition: a template that cannot be spliced honestly is not drawn on a whole day.**
+   `wrinkles/draw.ts#poolFor` leaves refused templates out of a whole day's pool, `drawWrinkle`,
+   `eventFor` and `calendar.ts#scheduledEventFor` take the horizon, and the run and the brief pass
+   it. `wrinkles.test.ts` shows the skip on a fixture (the one shipped refusal is drawn by no week),
+   and `wholeDayEvents.test.ts` holds the two horizons' draws equal on the shipped library, so the
+   callers that do not pass the horizon name the run's wrinkle until a drawable template is refused,
+   which is where they are told to.
+4. **The note is true of the spliced run.** On a whole day `events.ts#eventAsRun` quotes the
+   placement's note, composed with its window (*"from 10:00 to 10:20"*) from the numbers the splice
+   writes, on the brief's card, the lede, the report header and tomorrow's card. § D1040's
+   *withheld* sentence stays wherever nothing is spliced: part of a day, a template that is not a
+   day, a booking with no placement. `wholeDayEvents.test.ts`'s caption test reads the window out of
+   the sentence the brief draws and requires the run's own schedule (`planDemand` over the config
+   the product builds) to carry the wrinkle's mix across exactly that window and the ordinary day's
+   outside it, for all fifteen.
+5. **The census** (`shift/wrinkleCensus.sweep.test.ts`, `data/wrinkle-census.json`). Below.
+
+### The census
+
+Five whole-day office towers (`c2` Midtown, `c3` Secure, `c6` Chancery, `c9` Harbour Point, `c10`
+Ashgate) on **day 1**, as the Scenario press plays them (the whole authored day, the rung's fabric
+and booked car, no press), over **four crowds** (seeds `20 260 824 + 7 919 n`, `n` 0 to 3, § D468's
+sequence), each wrinkle at its template's first axis values and the unwrinkled day on the same four
+crowds. Four is what the box could afford: the census ran for about an hour and a half of wall clock
+on three workers under a load average of 16 to 64. Day 1 keeps the week's growth out of the comparison, because lane AJ-C is rebalancing it in
+the same wave.
+
+Each cell is *crowds of four the default standing order (`collective`) clears / crowds some shipped
+standing order clears*, then in brackets the legs `collective` delivered over the four crowds minus
+the unwrinkled day's, then any waits that crossed the give-up horizon under `collective`:
+
+| wrinkle | c2 | c3 | c6 | c9 | c10 |
+|---|---|---|---|---|---|
+| `ordinary` | 2 / 4 | 3 / 4, 1 past the horizon | 3 / 4 | 3 / 4 | 2 / 4 |
+| `fire-drill` | 1 / 4 (+967) | 2 / 4 (+1563) | 2 / 4 (+1234) | 4 / 4 (+1485) | 0 / 4 (+1685), 1 past the horizon |
+| `conference` | 1 / 4 (+154) | 3 / 4 (+605) | 3 / 4 (−43) | 3 / 4 (+110) | 4 / 4 (−833) |
+| `caterers` | 0 / 4 (+322) | 2 / 4 (+486) | 2 / 4 (+485) | 4 / 4 (+327) | 2 / 4 (+333) |
+| `goods-inward` | 2 / 4 (+445) | 2 / 4 (+819) | 3 / 4 (+469) | 4 / 4 (+612) | 2 / 4 (+179) |
+| `evacuation-drill` | 2 / 4 (+509) | 3 / 4 (+1208) | 4 / 4 (+989) | 4 / 4 (+1026) | 2 / 4 (+1171) |
+| `shift-change` | 0 / 4 (+1004) | 3 / 4 (+1487), 5 past the horizon | 3 / 4 (+1286), 1 past the horizon | 3 / 4 (+1374) | 1 / 4 (+1567) |
+| `contractors` | 0 / 0 (+154), 124 past the horizon | 1 / 3 (+739) | 0 / 2 (−43), 4 past the horizon | 0 / 3 (+110), 10 past the horizon | 0 / 1 (−913), 34 past the horizon |
+| `all-hands` | 0 / 2 (+930), 2 past the horizon | 1 / 2 (+1659) | 2 / 4 (+1302) | 2 / 3 (+1366) | 1 / 3 (+1198) |
+| `audit-day` | 1 / 4 (−17) | 1 / 4 (+660) | 2 / 3 (−7) | 3 / 4 (−175) | 2 / 4 (−573) |
+| `flu-day` | 4 / 4 (−2890) | 3 / 4 (−3390) | 4 / 4 (−3404) | 4 / 4 (−4598) | 4 / 4 (−5618) |
+| `open-day` | 2 / 4 (+997), 1 past the horizon | 1 / 3 (+1604) | 3 / 4 (+1246) | 1 / 4 (+1252) | 1 / 4 (+1058) |
+| `late-finish` | 1 / 4 (+1229) | 2 / 4 (+1771) | 1 / 4 (+1440) | 3 / 4 (+1426) | 1 / 4 (+1632) |
+| `weekend-works` | 3 / 4 (−4546) | 4 / 4 (−5216) | 4 / 4 (−5786) | 4 / 4 (−6930) | 3 / 4 (−8982) |
+| `weekend-move-out` | 1 / 3 (−3447), 6 past the horizon | 3 / 4 (−4306) | 3 / 4 (−4112) | 4 / 4 (−5610) | 1 / 3 (−5771), 14 past the horizon |
+| `weekend-event` | 4 / 4 (−2213) | 3 / 3 (−2072) | 3 / 4 (−1870) | 3 / 4 (−3436) | 4 / 4 (−3325) |
+
+Counts, and nothing beyond them: four crowds bound no rate, and no row is a claim that a wrinkle is
+harder or easier than another. Three things the table shows that a reader should not have to find:
+
+- **Where the episode adds people, the day carries more legs, not fewer**, and the waits past the
+  horizon stay at two or fewer on every surge day but `shift-change` on Secure (5). So no spliced
+  surge clears by driving riders away (`CLAUDE.md` § Statistical discipline).
+- **The days that lose legs are the lighter days by design**: `flu-day` and the three weekend
+  templates carry a whole-day multiplier below one, which is the day being lighter and is stated in
+  their notes. `audit-day` and the conference move only the mix at the day's own level, so their
+  legs move by a few hundred either way.
+- **`contractors` is the hard row, and the splice is the smaller half of it.** Its car was already
+  out 10:00 to 17:00 on a whole day before this ruling; on Midtown that car and the rung's booked car
+  together leave no crowd any standing order clears, with 124 waits past the horizon. The census does
+  not separate the car from the mix, and no mechanism is offered.
+
+`shift/wrinkleCensus.test.ts` asserts the file covers every tower, wrinkle and crowd, and re-derives
+Midtown's unwrinkled day and fire drill on the first crowd from the run on every run.
+
+### What it does not do
+
+It moves no bar, no growth figure and no rung; `GOAL_BARS` is untouched. It does not pace an
+episode below the peak level as an act: `actsOf` reads the spliced schedule, so an episode at the
+day's peak (the fire drill, the evacuation, the shift change, the all-hands, the late finish) is an
+act by construction and the stage plays it at the player's speed; the others are crossed at the
+between-peaks pace unless somebody is waiting, which is `everyday/stagePace.ts`'s rule and is not
+changed here. Calendar periods that bias the mix on a whole day (`moving-week`, `vacation`) still
+withhold it with their own sentence. No mechanism is offered for any count below.
+
+### What reversing it costs
+
+Reversing clauses 1, 2 and 4 together is `dev/state.ts`'s splice block and `eventAsRun`'s episode
+arm: the day goes back to § D1040's withheld mix and whole-day multiplier, and the placements become
+data nothing reads, which the loader would then have to stop requiring. Reversing a single placement
+is a data edit to its window, level or note, and the caption test and the census say what moved.
+
+## D1066 — the week's growth is data, per tower, re-derived by a census, and no bar moves
+
+> **Taken 2026-09-25 by agent sessions under delegated authority**, not by the product owner: the
+> week decision swarm's three members (the player, honesty and engineering lenses, whose records are
+> the integrator's scratch notes `week-S1` to `-S3` and are not in this repository), reconciled by
+> wave AJ's integrator, and built and measured by wave AJ lane AJ-C. A later reader weighing this
+> against a product-owner ruling should treat it as an agent ruling and say so, [§ D626](#d626)
+> being the cautionary case. **Owner-reversible:** the per-tower slopes (one line each in
+> `data/contract-ladder.json`) and the default's value; reversing a slope re-opens the wall this
+> entry measured and turns that tower's census rows stale, which `shift/weekWay.test.ts` reports.
+
+**Date: 2026-09-25 · Owner: lane AJ-C (wave AJ) · Rules on `data/contract-ladder.json`
+(`defaultGrowthPerDay`, a rung's `growthPerDay`), `shift/growth.ts` (the slope is an argument),
+`shift/types.ts` (`GROWTH_PER_DAY` deleted), `shift/ladder.ts` (`growthPerDayOf`,
+`GROWTH_PER_DAY_BOUNDS`, the slope checks in `contractLadderIssues`), `dev/state.ts`
+(`shiftRunConfigOf` grows by the rung's slope, `weekGrowthPerDayOf`), `shift/report.ts`'s forecast
+and `dev/main.ts`'s report input. Cites [§ D345](#d345), [§ D528](#d528),
+[§ D962](#d962), [§ D405](#d405).**
+
+**Why an entry.** [§ D405](#d405)'s first two grounds: it binds `data/`, `shift/`, `dev/` and the
+report, and it moves a recorded figure, the design's 11 % a day that `shift/types.ts`,
+`scope/surface.ts` and the report's forecast all stated.
+
+**What was wrong.** On a whole authored day, days 3 to 5 of Midtown Office were unwinnable as
+built. The swarm measured 0 clears in 390 runs (thirteen standing orders × ten crowds × three days),
+1 rescue in 72 presses, and 0 in 108 on Chancery House, Harbour Point and Ashgate. All three members
+found the same cause by different arms: held at day 2's population, days 4 and 5 cleared on 5 of 5
+and 4 of 5 crowds **at their own bars**, and one member's census went from 1, 1 and 0 of 65
+configurations on days 3 to 5 to 28, 28 and 25. The wall was `1 + 0.11 × (d − 1)`, a slope copied
+from the design prototype and never measured against a ten-hour day, which exposes a building to
+three peaks and a booked-out car rather than one half-hour.
+
+**The ruling.** Growth is demand and fabric ([§ D528](#d528)'s DC-R1 lists population beside floors
+and shafts), so the slope moves to data under invariant 7 and is re-derived per tower; the bars are
+not touched ([§ D345](#d345), `docs/43` § 6).
+
+1. `data/contract-ladder.json` carries `defaultGrowthPerDay: 0.11`, the design's value, for every
+   week with no rung of its own (the career, Endless, a replay on a building with no rung) and for
+   every contract the census has not re-derived. A rung may declare `growthPerDay`, bounded by
+   `GROWTH_PER_DAY_BOUNDS` (0 to the default: a slope is re-derived **down** to make a week
+   winnable, and a faster rung would be a difficulty dial nothing asked for).
+2. `shift/ladder.ts#growthPerDayOf` is the one reading. The run (`shiftRunConfigOf`), the report's
+   *"+N % more tenants than today"* (`weekGrowthPerDayOf`, handed in by `dev/main.ts`) and the census
+   all go through it, so no surface can describe a slope the run did not use. `growthFactor` takes
+   the slope as a required argument: a default there would be the moved constant back in code.
+3. A rung's slope is set by [§ D1067](#d1067)'s census and by nothing else. It is the largest slope
+   on a stated grid whose day 5, the hardest weekday (the most people against the hardest bars), the
+   census's tuning half found clearable by its chosen configuration on at least three quarters of
+   tuning crowds, with the standing order still missing. Held-out crowds are not consulted in the
+   choice, so the held-out measurement that follows is the first time the slope meets them.
+4. **The bars are pinned.** `shift/goals.test.ts` asserts `GOAL_BARS`, both energy bars included,
+   field for field, and what `goalsForDay` asks on every day of a week on both horizons. A change
+   that means to move a bar has to change that file in the same commit.
+
+**What was re-derived, measured.** The screen is day 5 under the census's tuning half (65 configurations on 2 crowds, the best 4 on 6
+more), at slopes 0.06, 0.04, 0.02 and, where none of those passed, 0. Chosen configuration's tuning
+clears out of 8, and the standing order's:
+
+| tower | 0.06 | 0.04 | 0.02 | 0 | slope set |
+|---|---|---|---|---|---|
+| Midtown Office (`c2`) | 2, standing 0 | 4, standing 0 | **7, standing 1** | not needed | **0.02** |
+| Secure Tower (`c3`) | 0, standing 0 | 0, standing 0 | 3, standing 0 | 5, standing 2 | **none: 0.11 kept** |
+
+**Midtown's slope is 0.02**: day 5 carries 1.08 of day 1's tenants rather than 1.44. The held-out
+measurement that followed admits all five of its unwrinkled weekdays (§ D1067). **Secure Tower's
+slope is not moved**, because no slope on the grid passes, not even a tower that does not fill:
+at 0 its day 5 clears 5 of 8 tuning crowds, and 64 of the screen's 130 runs miss on the queue goal
+alone. Its day 1, which no slope touches, fails DC-10 on held-out crowds too (10 of 20). A slope
+that cannot make the tower pass would move its later days without making one of them winnable, and
+the ruling says not to tune a tower toward a pass it cannot reach; its weekdays carry the failing sentence instead.
+Harbour Point is measured at 0.11 and not tuned, for the same reason: its days 2 to 5 fail the
+queue gate at every play the screen ran.
+
+**What it moves.** Every figure measured on days 2+ of a re-derived tower: those days now carry
+fewer people. Day 1 is untouched everywhere (`growthFactor(1, g)` is exactly 1), so every pin, every
+day-1 legibility row and every published day-1 miss rate is out of its reach. Nothing in the career
+or Free Play moves: neither stands on a rung.
+
+## D1067 — DC-10: a day of the week is winnable only when a census says so, and a day that fails says what was measured
+
+> **Taken 2026-09-25 by agent sessions under delegated authority**, the same swarm and the same
+> reconciliation as [§ D1066](#d1066). **Owner-reversible:** the thresholds and crowd counts in
+> `data/week-way.json`'s `protocol` block, the breather allowance, and the brief's sentence; the
+> sentence can be withdrawn by deleting the census rows it reads, and nothing else depends on it.
+> **Amends** `docs/33` § 4.3 (a new rule beside DC-4, which it does not replace, and W4's two levers
+> resolved to demand for the week) and reads [§ D729](#d729) (a crowd is a date) and [§ D1057](#d1057) (the wrinkled rows were measured with its episodes in the tree).
+
+**Date: 2026-09-25 · Owner: lane AJ-C (wave AJ) · Rules on `docs/33` § 4.3 (DC-10),
+`data/week-way.json`, `shift/weekWay.ts` (the rule, the interval, the staleness check and the
+sentence), `shift/weekWay.sweep.test.ts` (the census), `shift/weekWay.verify.test.ts` and
+`.github/workflows/deep-tiers.yml`'s `week-census` job (the weekly re-check), `everyday/today.ts`
+(`TodayRecord.wayThrough`), `everyday/briefView.ts` and `briefScreen.ts` (the brief's block),
+`dev/data.ts` (the census's issues as load warnings) and the honesty corpus's brief adapter. Cites
+[§ D914](#d914), [§ D973](#d973), [§ D227](#d227), [§ D256](#d256), [§ D405](#d405).**
+
+**Why an entry.** It adds a rule to `docs/33`, binds `data/`, `shift/`, `everyday/`, the honesty
+register and a workflow, and it is what [§ D1066](#d1066)'s slopes are re-derived against.
+
+**The rule.** `docs/33` DC-10 states it; in short, a (tower, day) is admitted when the one
+configuration chosen on tuning crowds clears it on held-out crowds with a two-sided 95 %
+Clopper-Pearson lower bound of at least a third; the standing order alone misses it on at least
+a third of those crowds, one declared breather a week excused; and **some screened play keeps every
+landing at or under the day's queue bar**. The third clause is the queue-bar swarm's feasibility
+gate (its player member's clause 4, relayed by the integrator), built as part of this rule rather
+than beside it: no office day is admitted where no reachable play can meet the queue goal, and
+the queue bar itself does not move (that swarm ruled one ladder on both horizons).
+
+**Why chosen and then measured.** The swarm's honesty member showed that the best configuration per
+crowd overstates what a player can do: chosen on five tuning crowds at 5 of 5, the same
+configuration cleared 3 of 5 held out. A player chooses before the crowd, so the census does too.
+The held-out crowds are the dates the product deals from 2026-10-01; the tuning crowds are dates in
+August, disjoint by construction and by `weekWayIssues`.
+
+**The budget, and why it is not the swarm's 50.** One member of the swarm proposed 50 held-out crowds. Measured on this lane's
+container, contended by other lanes at a load average of 16 to 67 on four cores, a whole day cost
+5 to 10 s and a census cell of about 200 whole days 16 to 33 minutes; a tower's five weekdays were
+1.5 to 2.5 hours. So the protocol is 8 tuning crowds (65 configurations on 2, the best 4 on 6 more)
+and **20 held out**, at which the smallest admitting count is **12 of 20 (60 %)** against 24 of 50
+(48 %) at the proposal: stricter per crowd, and coarser in what it resolves. `docs/33` DC-10 states
+the table and the cost. Raising the count is a data change and a census re-run.
+
+**Derived, never stored.** A row stores the per-crowd verdict strings; whether it is admitted is
+`dc10Of`'s arithmetic, so a row cannot claim *admitted* over counts that do not support it. A row
+measured at a slope the ladder no longer grows its tower at is stale: `weekWayIssues` names it,
+`dev/data.ts` reports it as a load warning, `shift/weekWay.test.ts` fails, and the brief draws
+nothing for it. Day 1 is exempt, since it is the same building at every slope.
+
+**What the brief says.** A day that fails carries one sentence under WHAT TODAY ASKS, headed *THIS
+DAY, MEASURED*, and it gives no advice: *"No standing order or press we measured cleared this day on
+20 crowds."*; *"The best standing order or press we found cleared this day on k of 20 crowds."*; or,
+for a day that asks too little, *"The tower's standing order, left alone, cleared this day on k of
+20 crowds we measured."*; and, first when it applies, for a day that fails the queue gate: *"No
+standing order or press we measured kept every landing to B people or fewer on this day: the
+fewest any of 130 runs reached was L."* Where the census measured the day without today's wrinkle, the sentence
+opens *Measured on this day of the week without today's wrinkle:*. It states a count over named
+crowds and nothing about today's, because today's may or may not be one of them. **No *what would
+make tomorrow better*:** nothing a census of a day with no way through measures licenses advice.
+
+**How it is kept true.** `shift/weekWay.test.ts` re-runs one held-out crowd of the first row on
+every suite run and requires both verdicts; `shift/weekWay.verify.test.ts` re-runs every crowd of
+every row weekly (`deep-tiers.yml`, job `week-census`) and a moved verdict is a finding, never an
+edit to the string.
+
+**What was measured.** **Midtown Office's week is winnable, and it asks something.** All five unwrinkled weekdays are
+admitted at slope 0.02, where the swarm measured 0 clears on days 3 to 5 at 0.11. Measured with
+lane AJ-B's episodes in the tree ([§ D1057](#d1057)), the fire drill and the conference days are
+admitted too, Saturday is the declared breather (the swarm's player member proposed Saturday before
+this census ran), and Sunday fails only the asks-something half: the standing order clears it on
+20 of 20 crowds. **Two wrinkled weekdays fail, and on the queue gate**: Tuesday's move-in (1 of 20;
+since [§ D1038](#d1038) it takes car C beside the rung's car D, so two of four cars are out over
+the lunch hours) and Friday's shaft out (0 of 20). Those are the wrinkles' fabric, which is not this
+ruling's to rebalance; their briefs now say which goal is out of reach.
+
+**Secure Tower and Harbour Point are not made winnable, and say so.** Secure Tower fails from day
+1, which no slope reaches (10 of 20); Harbour Point's day 1 is admitted (15 of 20) and its days 2 to
+5 fail the queue gate, day 4 as the queue-bar swarm's positive control predicted. Neither tower's
+slope is moved, and every failing day's brief carries its sentence. The full table, and which
+days pass the queue gate, is `docs/33` DC-10's.
+
+**What it does not settle.**
+- **The wrinkled week, except at Midtown.** Midtown's wrinkled days 2 to 7 were measured on a tree
+  carrying lane AJ-B's episodes ([§ D1057](#d1057)), merged into this lane for the purpose. Secure
+  Tower's and Harbour Point's rows are the unwrinkled day only, and the brief says so when it quotes
+  one over a wrinkled day. `WEEK_WAY_EVENTS=scheduled` re-runs them, and it is owed.
+- **Midtown's Sunday** asks nothing (the standing order clears 20 of 20), and Saturday already holds
+  the week's one breather. Rebalancing it is wrinkle content (its ×0.3 level), not a slope.
+- **The queue bar** is not this entry's. The queue-bar swarm ruled it unchanged on both horizons
+  while this lane worked; each row still records its queue-only held-out misses
+  (`queueOnlyMisses`) and the screen's lowest peak (`lowestPeakQueue`), so a later ruling can read
+  which days it would move.
+- **Days 8 and beyond**, and the towers named in `data/week-way.json`'s `unmeasured` block.

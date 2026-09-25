@@ -80,6 +80,7 @@ const TODAY: TodayRecord = {
   dayLength: undefined,
   driver: 'Steady hand',
   driverHeld: undefined,
+  wayThrough: undefined,
 };
 
 /** Building names by id, as the shipped documents carry them — the fixture for `nameOf` (GitHub issue #599). */

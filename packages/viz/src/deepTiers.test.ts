@@ -601,6 +601,41 @@ const TIERS: Readonly<Record<string, Tier>> = Object.freeze({
       'rung, a building or a dispatcher profile moves',
     scheduled: false,
   },
+  /*
+   * The week census — `docs/33` DC-10, § D1067 — in two files on purpose. The sweep chooses and
+   * measures and writes rows a person copies into `data/week-way.json`; it is a compute job, and
+   * scheduling it would re-derive figures nothing reads. The verify file re-runs every shipped row
+   * on its held-out crowds and fails on a moved verdict, which is a check, so it is scheduled. Two
+   * files rather than two blocks in one, because § 2 reads a file's gates as a conjunction and a
+   * scheduled step setting `WEEK_WAY_SWEEP` would run a multi-hour census every Sunday.
+   */
+  'packages/viz/src/shift/weekWay.sweep.test.ts': {
+    gates: ['WEEK_WAY_SWEEP'],
+    reason:
+      '§ D1067’s instrument — each whole-day tower’s weekdays under every shipped dispatcher with ' +
+      'and without a parking press on tuning crowds, the chosen configuration and the standing ' +
+      'order on held-out crowds. Not scheduled because it is a compute job: `weekWay.verify.test.ts` ' +
+      'checks what it wrote, weekly, and `weekWay.test.ts` re-runs one crowd of one row on every run',
+    scheduled: false,
+  },
+  'packages/viz/src/shift/weekWay.verify.test.ts': {
+    gates: ['WEEK_WAY_VERIFY'],
+    reason:
+      '§ D1067: every row of data/week-way.json re-run on its held-out crowds through the product’s ' +
+      'chain, and required to reproduce its per-crowd verdicts, so the brief never quotes a census ' +
+      'of a day the product no longer deals',
+    scheduled: true,
+  },
+  'packages/viz/src/shift/wrinkleCensus.sweep.test.ts': {
+    gates: ['WRINKLE_CENSUS'],
+    reason:
+      '§ D1057’s instrument — every wrinkle spliced as a whole-day episode on five whole-day towers ' +
+      'over a small crowd set, beside the unwrinkled day on the same crowds, which produced ' +
+      'data/wrinkle-census.json. Not scheduled because it is a compute job rather than a check: ' +
+      '`shift/wrinkleCensus.test.ts` re-derives a sample of the file from the run on every run. It ' +
+      'is re-run by hand when a placement, a rung, a building, the growth curve or a bar moves',
+    scheduled: false,
+  },
   'packages/viz/src/testCost.test.ts': {
     gates: ['TEST_COST_OUT'],
     reason:

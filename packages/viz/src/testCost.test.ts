@@ -300,7 +300,17 @@ const ABOVE_CEILING: ReadonlyMap<string, { readonly count: number; readonly tota
      * annotated at **six hours** (21 600 000 ms), the job with a sixth to spare rather than a
      * multiple of it. 158 100 000 + 21 600 000 = **179 700 000**. Nothing existing was raised.
      */
-    ['viz', { count: 112, totalMs: 179_700_000 }],
+    /*
+     * **112 → 113, and the one is named** — wave AJ lane AJ-B's `shift/wrinkleCensus.sweep.test.ts`,
+     * § D1057: every wrinkle spliced as a whole-day episode on five whole-day towers over a small
+     * crowd set, beside the unwrinkled day on the same crowds, under the default standing order and
+     * then every shipped order until one clears. Gated on `WRINKLE_CENSUS` and registered in
+     * `deepTiers.test.ts`, so it costs the default suite nothing. Annotated at **six hours**
+     * (21 600 000 ms), `stagePace.sweep.test.ts`'s bound, because the job measured in the lane ran
+     * for hours at load average 16–20. 179 700 000 + 21 600 000 = **201 300 000**. Nothing existing
+     * was raised.
+     */
+    ['viz', { count: 113, totalMs: 201_300_000 }],
     /*
      * **67 → 70, and the three are named** — GitHub issue #240's
      * `everyday/smallScreen.browser.test.ts`. Five of that file's eight annotations sit **at** this

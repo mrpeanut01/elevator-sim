@@ -31,12 +31,21 @@
  * - **`campaignDay.eventSharePct` is present and inside its declared range.** GitHub issue #564:
  *   the rate a contract day meets an event at is balance rather than mechanism, so it is authored
  *   in the document and its schema is {@link CAMPAIGN_DAY_EVENT_SHARE} here.
+ * - **A wrinkle that sets a mix declares where it sits on a whole day, or says why it cannot** —
+ *   [§ D1057](../../../../DECISIONS.md). `wholeDay` is an episode (a clock window, a level, a note
+ *   naming `{episode}`, and a reason) or `{ "refused": reason }`; a mix-setting template with
+ *   neither is refused here, because on a whole day its mix would otherwise be withheld and its
+ *   level would multiply ten hours. A template that sets no mix may not declare one — it would place
+ *   nothing. The level is a phase intensity, so it lies in `[0, 1]` (`core`'s rule 3); a whole-day
+ *   rate multiplier may only lighten the day, never raise it.
  */
 
 import type { DirectionalSplit } from '@elevator-sim/core/browser';
 import {
   WRINKLE_DAYS,
   type UnexpressibleWrinkle,
+  type WholeDayOverride,
+  type WholeDayPlacement,
   type WrinkleAxis,
   type WrinkleAxisValue,
   type WrinkleDays,
@@ -203,6 +212,87 @@ function effectOf(value: unknown, where: string, violations: string[]): WrinkleE
   return effect;
 }
 
+/** `"HH:MM"`, `00:00`…`24:00`, as clock minutes since midnight. */
+const CLOCK = /^([01][0-9]|2[0-4]):([0-5][0-9])$/u;
+
+function clockOf(value: unknown, where: string, violations: string[]): number {
+  const text = str(value, where);
+  const match = CLOCK.exec(text);
+  const minutes = match === null ? Number.NaN : Number(match[1]) * 60 + Number(match[2]);
+  if (!Number.isFinite(minutes) || minutes > 24 * 60) {
+    violations.push(`${where}: ${JSON.stringify(text)} is not a clock time between 00:00 and 24:00.`);
+    return 0;
+  }
+  return minutes;
+}
+
+function intensityOf(value: unknown, where: string, violations: string[]): number | 'authored' {
+  if (value === 'authored') return 'authored';
+  const intensity = num(value, where);
+  if (intensity < 0 || intensity > 1) {
+    violations.push(
+      `${where}: ${String(intensity)} is outside [0, 1]. It is a phase intensity, where 1 is the ` +
+        "day's own peak; a template cannot raise the building's rate (core's rule 3).",
+    );
+  }
+  return intensity;
+}
+
+function windowIssues(fromMin: number, toMin: number, where: string, violations: string[]): void {
+  if (!(fromMin < toMin)) {
+    violations.push(`${where}: the window ends at or before it starts, so it places nothing.`);
+  }
+}
+
+/** The parsed `wholeDay` of one template, or `null` where the document declares none. */
+function wholeDayOf(
+  value: unknown,
+  where: string,
+  violations: string[],
+): WholeDayPlacement | null {
+  if (value === undefined || value === null) return null;
+  const raw = record(value, where);
+  if ('refused' in raw) {
+    const reason = str(raw['refused'], `${where}.refused`);
+    if (reason.trim() === '') violations.push(`${where}.refused: a refusal says why.`);
+    return { kind: 'refused', reason };
+  }
+  const fromMin = clockOf(raw['from'], `${where}.from`, violations);
+  const toMin = clockOf(raw['to'], `${where}.to`, violations);
+  windowIssues(fromMin, toMin, where, violations);
+  const rate = raw['dayRateMultiplier'];
+  const dayRateMultiplier =
+    rate === undefined || rate === null ? null : num(rate, `${where}.dayRateMultiplier`);
+  if (dayRateMultiplier !== null && !(dayRateMultiplier > 0 && dayRateMultiplier <= 1)) {
+    violations.push(
+      `${where}.dayRateMultiplier: ${String(dayRateMultiplier)} must lie in (0, 1]. A surge is the ` +
+        'episode and never the whole day; only a lighter day may be stated across all of it.',
+    );
+  }
+  const reason = str(raw['reason'], `${where}.reason`);
+  if (reason.trim() === '') violations.push(`${where}.reason: a placement says why it is where it is.`);
+  return {
+    kind: 'episode',
+    fromMin,
+    toMin,
+    intensity: intensityOf(raw['intensity'], `${where}.intensity`, violations),
+    dayRateMultiplier,
+    note: str(raw['note'], `${where}.note`),
+    reason,
+  };
+}
+
+function wholeDayOverrideOf(value: unknown, where: string, violations: string[]): WholeDayOverride {
+  const raw = record(value, where);
+  return {
+    ...('from' in raw ? { fromMin: clockOf(raw['from'], `${where}.from`, violations) } : {}),
+    ...('to' in raw ? { toMin: clockOf(raw['to'], `${where}.to`, violations) } : {}),
+    ...('intensity' in raw
+      ? { intensity: intensityOf(raw['intensity'], `${where}.intensity`, violations) }
+      : {}),
+  };
+}
+
 function axisValueOf(value: unknown, where: string, violations: string[]): WrinkleAxisValue {
   const raw = record(value, where);
   const out: WrinkleAxisValue = {
@@ -230,6 +320,9 @@ function axisValueOf(value: unknown, where: string, violations: string[]): Wrink
       : {}),
     ...('derate' in raw
       ? { derate: derateOf(raw['derate'], `${where}.derate`, violations) }
+      : {}),
+    ...('wholeDay' in raw
+      ? { wholeDay: wholeDayOverrideOf(raw['wholeDay'], `${where}.wholeDay`, violations) }
       : {}),
   };
   return out;
@@ -284,14 +377,89 @@ function templateOf(value: unknown, index: number, violations: string[]): Wrinkl
     }
   }
 
+  const effect = effectOf(raw['effect'], `${at}.effect`, violations);
+  const wholeDay = wholeDayOf(raw['wholeDay'], `${at}.wholeDay`, violations);
+  wholeDayIssues(at, effect, axes, wholeDay, violations);
+
   return {
     id,
     name: str(raw['name'], `${at}.name`),
     note,
     days,
-    effect: effectOf(raw['effect'], `${at}.effect`, violations),
+    effect: { ...effect, wholeDay },
     axes,
   };
+}
+
+/**
+ * [§ D1057](../../../../DECISIONS.md)'s load-time rules for one template's whole-day placement.
+ *
+ * Mix-setting means the base effect **or any axis value** sets a split, because a drawn wrinkle is
+ * a template plus one value per axis and any of them can reach a whole day.
+ */
+function wholeDayIssues(
+  at: string,
+  effect: WrinkleEffect,
+  axes: readonly WrinkleAxis[],
+  wholeDay: WholeDayPlacement | null,
+  violations: string[],
+): void {
+  const setsMix =
+    effect.directionalSplit !== null ||
+    axes.some((axis) => axis.values.some((value) => (value.directionalSplit ?? null) !== null));
+  const overridden = axes.flatMap((axis) =>
+    axis.values.filter((value) => value.wholeDay !== undefined).map((value) => ({ axis, value })),
+  );
+  if (setsMix && wholeDay === null) {
+    violations.push(
+      `${at}: sets a mix of trips and declares no wholeDay placement. On a whole authored day its ` +
+        'mix would be withheld and any rate would multiply the whole day; place it as an episode ' +
+        '(from, to, intensity, note, reason) or refuse it with a reason, and it is not drawn there.',
+    );
+  }
+  if (!setsMix && wholeDay !== null) {
+    violations.push(`${at}: declares a wholeDay placement and sets no mix, so it would place nothing.`);
+  }
+  if (wholeDay === null || wholeDay.kind === 'refused') {
+    for (const { axis, value } of overridden) {
+      violations.push(
+        `${at}.axes.${axis.id}.${value.id}.wholeDay: moves a placement the template does not have.`,
+      );
+    }
+    return;
+  }
+  for (const { axis, value } of overridden) {
+    const from = value.wholeDay?.fromMin ?? wholeDay.fromMin;
+    const to = value.wholeDay?.toMin ?? wholeDay.toMin;
+    windowIssues(from, to, `${at}.axes.${axis.id}.${value.id}.wholeDay`, violations);
+  }
+  /* Both directions between the whole-day note's placeholders and what renders into them. */
+  const episodes = [...wholeDay.note.matchAll(/\{episode\}/gu)].length;
+  if (episodes !== 1) {
+    violations.push(
+      `${at}.wholeDay.note: names {episode} ${String(episodes)} times; it names it once, so the ` +
+        'brief says when the day changes.',
+    );
+  }
+  const axisIds = new Set(axes.map((axis) => axis.id));
+  const named = new Set<string>();
+  for (const match of wholeDay.note.matchAll(PLACEHOLDER)) {
+    const name = match[1] ?? '';
+    if (name === 'episode') continue;
+    named.add(name);
+    if (!axisIds.has(name)) {
+      violations.push(
+        `${at}.wholeDay.note: {${name}} names no axis, so it would reach a player unsubstituted.`,
+      );
+    }
+  }
+  for (const axis of axes) {
+    if (axis.values.some((v) => v.label !== '') && !named.has(axis.id)) {
+      violations.push(
+        `${at}.wholeDay.note: axis ${axis.id} carries labels the whole-day note never renders.`,
+      );
+    }
+  }
 }
 
 /** Parse and validate the whole document, collecting every violation before refusing. */

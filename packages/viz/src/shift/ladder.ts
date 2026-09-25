@@ -277,6 +277,19 @@ export interface ContractLadderRow {
    * GitHub issue **#587**, [§ D914](../../../../DECISIONS.md). See {@link ContractPressDay}.
    */
   readonly pressDay: ContractPressDay | undefined;
+  /**
+   * **How fast this tower fills over its week**, as a share of day 1's population added each day,
+   * or `undefined` for the ladder's {@link ContractLadder.defaultGrowthPerDay}.
+   *
+   * [§ D1066](../../../../DECISIONS.md). Population is fabric (`docs/33` DC-R1 lists it beside
+   * floors and shafts), and on a whole authored day the default slope was the wall: three separate
+   * measurements of Midtown Office found days 3–5 unwinnable at day-5 population and winnable at
+   * day 2's, with the bars untouched. So a whole-day tower's slope is re-derived by
+   * `shift/weekWay.sweep.test.ts` against `docs/33` DC-10, and what that census found is carried
+   * beside it in `data/week-way.json`. Read through {@link growthPerDayOf} and never directly, so
+   * the run, the report's forecast and the census cannot use two slopes.
+   */
+  readonly growthPerDay: number | undefined;
 }
 
 /**
@@ -398,7 +411,37 @@ export interface ContractPressCall {
 
 export interface ContractLadder {
   readonly version: number;
+  /**
+   * The week's growth wherever no rung declares its own — the career, Endless, a replay of a
+   * building with no rung, and every contract the week census has not re-derived. The design's
+   * `0.11` (`design.html` :1568), moved from `shift/types.ts` to data by
+   * [§ D1066](../../../../DECISIONS.md). `NaN` when the file carries none, so
+   * {@link contractLadderIssues} names the gap rather than a run quietly growing at a guess.
+   */
+  readonly defaultGrowthPerDay: number;
   readonly rows: readonly ContractLadderRow[];
+}
+
+/**
+ * What a growth slope may be. Zero is a tower that does not fill; the ceiling is the design's own
+ * slope, because [§ D1066](../../../../DECISIONS.md) re-derives slopes **down** from it to make a
+ * week winnable and a rung faster than the default would be a difficulty dial the census never
+ * asked for — `OCCUPANCY_BOUNDS`' reasoning, one field over.
+ */
+export const GROWTH_PER_DAY_BOUNDS = Object.freeze({ min: 0, max: 0.11 });
+
+/**
+ * **The slope a week on `rung` grows at** — the rung's own, or the ladder's default.
+ *
+ * The one reading, so `dev/state.ts#shiftRunConfigOf` (the run), `shift/report.ts`'s forecast (the
+ * sentence about tomorrow) and `shift/weekWay.sweep.test.ts` (the census that derived it) cannot
+ * disagree about how full tomorrow's tower is.
+ */
+export function growthPerDayOf(
+  rung: ContractLadderRow | undefined,
+  ladder: ContractLadder = CONTRACT_LADDER,
+): number {
+  return rung?.growthPerDay ?? ladder.defaultGrowthPerDay;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -695,6 +738,7 @@ export function parseContractLadder(input: unknown): ContractLadder {
   const rows = Array.isArray(record['contracts']) ? (record['contracts'] as unknown[]) : [];
   return Object.freeze({
     version: asNumber(record['version']) ?? 0,
+    defaultGrowthPerDay: asNumber(record['defaultGrowthPerDay']) ?? Number.NaN,
     rows: Object.freeze(
       rows.map((row) => {
         const entry = asRecord(row);
@@ -712,6 +756,8 @@ export function parseContractLadder(input: unknown): ContractLadder {
             note: asString(intent['note']),
           }),
           pressDay: pressDayOf(entry['pressDay']),
+          growthPerDay:
+            entry['growthPerDay'] === undefined ? undefined : (asNumber(entry['growthPerDay']) ?? Number.NaN),
         });
       }),
     ),
@@ -840,6 +886,25 @@ export function contractLadderIssues(
 ): readonly string[] {
   const issues: string[] = [];
   const declared = new Set(ladder.rows.map((row) => row.contractId));
+
+  // § D1066: the week's growth is data, bounded, and present — a missing default is refused by
+  // name rather than grown at a guess.
+  const slopeIssue = (slope: number, whose: string): void => {
+    if (
+      !Number.isFinite(slope) ||
+      slope < GROWTH_PER_DAY_BOUNDS.min ||
+      slope > GROWTH_PER_DAY_BOUNDS.max
+    ) {
+      issues.push(
+        `${whose} grows ${String(slope)} of day 1's population a day, outside ` +
+          `${String(GROWTH_PER_DAY_BOUNDS.min)}–${String(GROWTH_PER_DAY_BOUNDS.max)}`,
+      );
+    }
+  };
+  slopeIssue(ladder.defaultGrowthPerDay, 'the ladder’s defaultGrowthPerDay');
+  for (const row of ladder.rows) {
+    if (row.growthPerDay !== undefined) slopeIssue(row.growthPerDay, `ladder row ${row.contractId}`);
+  }
 
   // Both directions, so neither a contract with no rung nor a rung with no contract can hide.
   for (const contract of CONTRACTS) {

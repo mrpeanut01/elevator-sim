@@ -25,12 +25,23 @@ import { loadConfig, parseBuilding, resolveBuilding, type LoadedConfig } from '@
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { BUILDING_IDS, DATA_DIR, requireBuilding } from '../fixtures.test-helper.js';
-import { grownBuilding, growthFactor, scaledBuilding } from './growth.js';
+import { grownBuilding as grownAt, growthFactor as factorAt, scaledBuilding } from './growth.js';
+import { CONTRACT_LADDER } from './ladder.js';
 import { recordRun } from '../record/recordRun.js';
 import { RESOURCES, baseState } from '../scope/probes.test-helper.js';
 import { shiftRunConfigOf } from '../dev/state.js';
 
 let config: LoadedConfig;
+
+/**
+ * The ladder's default slope, which is what every assertion in this file was written against — the
+ * design's 0.11, moved to `data/contract-ladder.json` by § D1066. The two wrappers keep the
+ * arithmetic's call shape; the slope's own reading is `shift/ladder.ts#growthPerDayOf`.
+ */
+const DEFAULT = CONTRACT_LADDER.defaultGrowthPerDay;
+const growthFactor = (day: number): number => factorAt(day, DEFAULT);
+const grownBuilding = (building: Parameters<typeof grownAt>[0], day: number): ReturnType<typeof grownAt> =>
+  grownAt(building, day, DEFAULT);
 
 beforeAll(async () => {
   config = await loadConfig(DATA_DIR);
@@ -48,9 +59,13 @@ describe('growthFactor', () => {
     expect(growthFactor(1)).toBe(1);
   });
 
+  it('reads the design’s 0.11 as the ladder’s default, from data rather than from code (§ D1066)', () => {
+    expect(DEFAULT).toBe(0.11);
+  });
+
   it('is linear, not compounding', () => {
     // 1 + 0.11 × (day − 1). The compounding form would be ×7.26 at day 20 and would put 35 000
-    // people in Vertical City. See `types.ts` on GROWTH_PER_DAY.
+    // people in Vertical City. See `growth.ts`'s module docstring.
     expect(growthFactor(20)).toBeCloseTo(3.09, 10);
     expect(growthFactor(20)).toBeLessThan(1.11 ** 19);
   });
@@ -58,6 +73,11 @@ describe('growthFactor', () => {
   it('never shrinks a building, whatever day it is handed', () => {
     expect(growthFactor(0)).toBe(1);
     expect(growthFactor(-4)).toBe(1);
+  });
+
+  it('grows at the slope it is handed, and a slope of zero is a tower that does not fill', () => {
+    expect(factorAt(5, 0.03)).toBeCloseTo(1.12, 12);
+    expect(factorAt(5, 0)).toBe(1);
   });
 });
 

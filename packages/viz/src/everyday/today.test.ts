@@ -32,6 +32,7 @@ import { goalsForDay, readGoals } from '../shift/goals.js';
 import type { GoalReading, WeekState } from '../shift/types.js';
 import { admittedPressDayIds, ladderRowFor, ladderTowerConfig, rungFor } from '../shift/ladder.js';
 import { openWeek } from '../shift/week.js';
+import { dc10Of, wayThroughSentenceOf, WEEK_WAY, weekWayRowFor } from '../shift/weekWay.js';
 
 import { bookedOutCarsOf, carAbsencesOf } from '../shift/bookedOut.js';
 import { contractBuildings, todaysScenarioDayState } from '../shift/contractDay.test-helper.js';
@@ -95,6 +96,7 @@ const inputOf = (state: ViewerState): Parameters<typeof todayOf>[0] => ({
   horizon: 'whole-day',
   dayStartS: undefined,
   templateVariesMix: false,
+  wholeDayRun: false,
   dayCars: undefined,
   crowdIsToday: true,
   daySeed: 20_260_925n,
@@ -120,6 +122,7 @@ const recordFor = (
     horizon: 'period',
     dayStartS: undefined,
     templateVariesMix: false,
+    wholeDayRun: false,
     dayCars: undefined,
     crowdIsToday: true,
     daySeed: 20_260_925n,
@@ -243,6 +246,7 @@ describe('the tower’s own booked absence reaches the strip — issue #576, § 
       horizon: 'period',
       dayStartS: undefined,
       templateVariesMix: false,
+      wholeDayRun: false,
       dayCars: undefined,
       crowdIsToday: true,
       daySeed: 20_260_925n,
@@ -316,6 +320,7 @@ describe('the day’s cars, as the run will have them — N4, N5, § D1038, § D
       horizon,
       dayStartS: planned.startOfDayS,
       templateVariesMix: planned.templateVariesMix,
+      wholeDayRun: planned.wholeDayRun,
       dayCars: planned.dayCars,
       crowdIsToday: true,
       daySeed: 20_260_925n,
@@ -441,6 +446,7 @@ describe('the facts come from the resolved building', () => {
       horizon: 'period',
       dayStartS: undefined,
       templateVariesMix: false,
+      wholeDayRun: false,
       dayCars: undefined,
       crowdIsToday: true,
       daySeed: 20_260_925n,
@@ -516,6 +522,7 @@ describe('the rest of the record', () => {
       horizon: 'period',
       dayStartS: undefined,
       templateVariesMix: false,
+      wholeDayRun: false,
       dayCars: undefined,
       crowdIsToday: false,
       daySeed: 20_260_925n,
@@ -624,6 +631,7 @@ function briefOn(state: ViewerState): ReturnType<typeof todayOf> {
     horizon: 'period',
     dayStartS: undefined,
     templateVariesMix: false,
+    wholeDayRun: false,
     dayCars: undefined,
     crowdIsToday: true,
     daySeed: 20_260_925n,
@@ -789,6 +797,7 @@ describe('the moot sentence is drawn only over the run it was measured on — is
       horizon: 'horizon' in overrides ? overrides.horizon : press.horizon,
       dayStartS: undefined,
       templateVariesMix: false,
+      wholeDayRun: false,
       dayCars: undefined,
       crowdIsToday: false,
       daySeed: 20_260_925n,
@@ -843,6 +852,7 @@ describe('the brief holds the driver on an admitted pinned day under its standin
       calendar: NO_CALENDAR,
       dayStartS: undefined,
       templateVariesMix: false,
+      wholeDayRun: false,
       dayCars: undefined,
       building: resolvedBuildingOf(resources, state),
       buildingId: 'crown-hotel',
@@ -913,6 +923,7 @@ describe('a pinned first day says whose crowd it is, and how long it takes — �
       horizon: press.horizon,
       dayStartS: undefined,
       templateVariesMix: false,
+      wholeDayRun: false,
       dayCars: undefined,
       crowdIsToday: false,
       daySeed,
@@ -951,5 +962,36 @@ describe('a pinned first day says whose crowd it is, and how long it takes — �
     const slice = midtownPinned({ contractId: 'c8', buildingId: 'st-jude-hospital' });
     expect(slice.crowdIsPinned).toBe(true);
     expect(slice.dayLength).toBeUndefined();
+  });
+});
+
+describe('the week census’s sentence on the brief (§ D1067)', () => {
+  it('draws the sentence on every measured day DC-10 does not admit, and on no admitted day', () => {
+    /*
+     * Keyed on the (tower, day) the brief is about. The row it reads is the one measured under the
+     * wrinkle the day draws when the census has it, and the unwrinkled row otherwise — so the
+     * expectation asks `weekWayRowFor` for that row rather than assuming which it is.
+     */
+    const days = [...new Set(WEEK_WAY.rows.map((row) => `${row.contractId}/${String(row.day)}`))];
+    let drawn = 0;
+    for (const key of days) {
+      const [contractId = '', dayText = '0'] = key.split('/');
+      const day = Number(dayText);
+      const week = { ...openWeek(contractId), day, dayIdx: (day - 1) % 7 };
+      const state = { week, buildingId: contractId, seed: 20_261_001n } as unknown as ViewerState;
+      const record = todayOf({ ...inputOf(state), horizon: 'whole-day' });
+      const row = weekWayRowFor(contractId, day, record.wrinkle.id, 'whole-day');
+      expect(row, key).toBeDefined();
+      if (row === undefined) continue;
+      expect(record.wayThrough === undefined, key).toBe(dc10Of(row, WEEK_WAY.protocol).admitted);
+      expect(record.wayThrough, key).toBe(
+        wayThroughSentenceOf({ contractId, day, eventId: record.wrinkle.id, hasCalendar: false, horizon: 'whole-day' }),
+      );
+      if (record.wayThrough !== undefined) drawn += 1;
+      /* The slice is a different run from the one measured, so it draws nothing. */
+      expect(todayOf({ ...inputOf(state), horizon: 'period' }).wayThrough, key).toBeUndefined();
+    }
+    /* The census carries at least one day it does not admit, so the drawing arm is exercised. */
+    expect(drawn).toBeGreaterThan(0);
   });
 });

@@ -115,7 +115,13 @@ import {
   workshopLeversOf,
   WORKSHOP_COPY,
 } from '../everyday/workshopModel.js';
-import { briefBarModel, briefScreenViewOf, lockedForScore, raceAgainstCard } from '../everyday/briefView.js';
+import {
+  BRIEF_WAY_THROUGH_HEADING,
+  briefBarModel,
+  briefScreenViewOf,
+  lockedForScore,
+  raceAgainstCard,
+} from '../everyday/briefView.js';
 import { doorScreenViewOf, DAY_OFFSET_MIN, DOOR_STEPS, sameForEveryoneLine } from '../everyday/doorView.js';
 import { HOST_PENDING_REASON } from '../everyday/host.js';
 import {
@@ -245,6 +251,7 @@ import { stagePaceNoteOf, stagePaceOf } from '../everyday/stagePace.js';
 import { STAGE_CALL_COPY, stageCallCardOf } from '../everyday/stageCall.js';
 import type { PressCall } from '../shift/pressCall.js';
 import { PRESS_CALL_AGAIN, pressCallRowOf } from '../shift/callRow.js';
+import { wayThroughSentenceOf, WEEK_WAY } from '../shift/weekWay.js';
 import { admittedPressDayIds, pressDayFor } from '../shift/ladder.js';
 import { PRESS_DAY_DRIVER_HELD } from '../everyday/today.js';
 import { actsOf } from '../shift/dayLength.js';
@@ -4041,6 +4048,14 @@ const SHIFT_REPORT: SurfaceAdapter = {
     for (const wrinkle of everyWrinkle(WRINKLE_LIBRARY)) {
       seeds.push({ field: `WRINKLES.${wrinkle.id}.name`, text: wrinkle.name, role: 'label' });
       seeds.push({ field: `WRINKLES.${wrinkle.id}.note`, text: wrinkle.note, role: 'prose' });
+      /*
+       * The whole-day note, with its window composed in — § D1057. A spliced day's brief, lede,
+       * report header and tomorrow's card quote it, so every drawn value's own is swept.
+       */
+      const placed = wrinkle.effect.wholeDay;
+      if (placed?.kind === 'episode') {
+        seeds.push({ field: `WRINKLES.${wrinkle.id}.wholeDay.note`, text: placed.note, role: 'prose' });
+      }
     }
     for (const event of Object.values(SHIFT_EVENTS)) {
       seeds.push({ field: `SHIFT_EVENTS.${event.id}.name`, text: event.name, role: 'label' });
@@ -4052,6 +4067,11 @@ const SHIFT_REPORT: SurfaceAdapter = {
       const asRun = eventAsRun(event, true);
       if (asRun.note !== event.note) {
         seeds.push({ field: `SHIFT_EVENTS.${event.id}.note.mixKept`, text: asRun.note, role: 'prose' });
+      }
+      /* And as a whole authored day quotes it, where the event is spliced as an episode — § D1057. */
+      const asDay = eventAsRun(event, true, true);
+      if (asDay.note !== event.note && asDay.note !== asRun.note) {
+        seeds.push({ field: `SHIFT_EVENTS.${event.id}.note.wholeDay`, text: asDay.note, role: 'prose' });
       }
       if (trafficProfile === undefined) continue;
       /*
@@ -13091,6 +13111,7 @@ function pinnedFirstDayRecordOf(context: HonestyContext): TodayRecord | undefine
     horizon: press.horizon,
     dayStartS: undefined,
     templateVariesMix: false,
+    wholeDayRun: false,
     dayCars: undefined,
     crowdIsToday: false,
     daySeed: daySeed ?? CORPUS_DAY_SEED,
@@ -13186,11 +13207,37 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
      * name once per case below.
      */
     'everyday/today.ts#PRESS_DAY_DRIVER_HELD',
+    /*
+     * The week census's sentence on a day DC-10 does not admit, and its heading — § D1067. Drawn
+     * only on a whole-day Scenario day at the tower's own rung, which no corpus case is, so every
+     * shipped row's sentence is seeded by name below in both of its arms: measured under today's
+     * wrinkle, and measured without it.
+     */
+    'shift/weekWay.ts#wayThroughSentenceOf',
+    'everyday/briefView.ts#BRIEF_WAY_THROUGH_HEADING',
   ],
   render(context) {
     const seeds: TextSeed[] = [];
     const bundle = shiftBundleOf(context);
     seeds.push({ field: 'today.driverHeld', text: PRESS_DAY_DRIVER_HELD, role: 'prose' });
+    seeds.push({ field: 'brief.wayThrough.heading', text: BRIEF_WAY_THROUGH_HEADING, role: 'label' });
+    for (const row of WEEK_WAY.rows) {
+      for (const eventId of [row.eventId, 'another-wrinkle']) {
+        const sentence = wayThroughSentenceOf({
+          contractId: row.contractId,
+          day: row.day,
+          eventId,
+          hasCalendar: false,
+          horizon: WEEK_WAY.protocol.horizon,
+        });
+        if (sentence === undefined) continue;
+        seeds.push({
+          field: `brief.wayThrough.${row.contractId}.${String(row.day)}.${eventId === row.eventId ? 'measured' : 'other'}`,
+          text: sentence,
+          role: 'observation',
+        });
+      }
+    }
     /*
      * **A first session's pinned day, as the door and the brief draw it** — § D1047. One pinned day
      * record per case, on the first member of the first-day set, its pin's crowd and standing order
@@ -13248,6 +13295,7 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
          */
         dayStartS: undefined,
         templateVariesMix: false,
+        wholeDayRun: false,
         dayCars: undefined,
         /*
          * The day's crowd — § D729, § D730. Seeded `true` here and `false` below, because the
@@ -13295,6 +13343,7 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
           horizon: scenarioHorizonFor(context.trafficProfiles, context.building),
           dayStartS: undefined,
           templateVariesMix: false,
+          wholeDayRun: false,
           dayCars: undefined,
           crowdIsToday: false,
           daySeed: CORPUS_DAY_SEED,
@@ -13343,6 +13392,7 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
         horizon: scenarioHorizonFor(context.trafficProfiles, context.building),
         dayStartS: undefined,
         templateVariesMix: false,
+        wholeDayRun: false,
         dayCars: undefined,
         crowdIsToday: true,
         /* The day's own crowd, not a calendar reading — the first-session line's pinned arm, § D1047. */
@@ -13406,6 +13456,7 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
           horizon: scenarioHorizonFor(context.trafficProfiles, context.building),
           dayStartS: 8 * 3600,
           templateVariesMix: false,
+          wholeDayRun: false,
           dayCars: undefined,
           crowdIsToday: true,
           daySeed: CORPUS_DAY_SEED,

@@ -355,6 +355,7 @@ on:
           - difficulty-curve
           - survivor-counts
           - rush-house-runs
+          - week-census
           - honesty-deep
           - corpus-figures
           - benchmark
@@ -724,6 +725,34 @@ jobs:
           ELEVATOR_SIM_RUSH_HOUSE: deep
         run: npx vitest run --passWithNoTests=false --project viz src/everyday/rushHouseSweep.test.ts
 
+  # ---------------------------------------------------------------------------
+  # The week census — docs/33 DC-10, DECISIONS.md § D1067. Every row of `data/week-way.json` re-run
+  # on its held-out crowds through the path a Scenario day takes, and required to reproduce its
+  # per-crowd verdicts exactly. A moved verdict means something under the row moved (a profile, the
+  # day's template, a rung, a bar) and the brief is quoting a day the product no longer deals: the
+  # remedy is a census re-run (`shift/weekWay.sweep.test.ts`), never an edit to the string.
+  #
+  # A gate of its own (`WEEK_WAY_VERIFY`), on this file's argument for one job per tier. Two whole
+  # authored days per held-out crowd per row, measured at 2.5–10 s a day on the lane's contended
+  # container. The minutes below are a ceiling, not an expectation.
+  # ---------------------------------------------------------------------------
+  week-census:
+    name: week census — every DC-10 row on its held-out crowds
+    if: github.event_name == 'schedule' || inputs.tiers == 'all' || inputs.tiers == 'week-census'
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '26'
+          cache: npm
+      - run: npm ci
+      - name: Re-run every census row and match its verdicts
+        env:
+          WEEK_WAY_VERIFY: '1'
+        run: npx vitest run --passWithNoTests=false --project viz --testTimeout=10800000 src/shift/weekWay.verify.test.ts
+
   honesty-deep:
     name: honesty — the deep corpus
     # `schedule` named explicitly rather than leaned on `inputs` being empty: the `inputs`
@@ -1022,6 +1051,7 @@ jobs:
       - difficulty-curve
       - survivor-counts
       - rush-house-runs
+      - week-census
       - corpus-figures
       - benchmark-selection-sweep
       - benchmark-saturation-census
@@ -1081,6 +1111,7 @@ jobs:
       - honesty-deep
       - survivor-counts
       - rush-house-runs
+      - week-census
       - corpus-figures
       - benchmark-selection-sweep
       - benchmark-saturation-census

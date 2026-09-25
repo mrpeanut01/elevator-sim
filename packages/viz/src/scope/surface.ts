@@ -295,8 +295,8 @@ export const SCOPE_OF: Readonly<Record<SurfaceKey, ScopeEntry>> = Object.freeze(
   /* ------------------------------------------------------- viewer: the day boundary */
   'viewer.week': control(
     'between-days',
-    'The contract, the day, the streak and what has been banked. day drives grownBuilding’s 11 %/day ' +
-      'and eventFor’s twist, so it is a field that may move only as a day opens. It used to say the ' +
+    'The contract, the day, the streak and what has been banked. day drives grownBuilding’s growth (the ' +
+      'rung’s slope, or the ladder’s default) and eventFor’s twist, so it is a field that may move only as a day opens. It used to say the ' +
       'doors on tomorrow were the only thing that opened one, and GitHub issue #563 made that false: ' +
       'everyday/host.ts#runCampaignDay is a second writer of day, setting it from CampaignTower.day ' +
       'on the press that starts a contract day. The scope is unmoved and the second writer is why ' +
@@ -310,7 +310,7 @@ export const SCOPE_OF: Readonly<Record<SurfaceKey, ScopeEntry>> = Object.freeze(
       '(issue #107). Latent rather than a control, and the classification is the whole of what the ' +
       'field is for: shiftRunConfigOf never reads it, so parking a week moves no leg — and picking ' +
       'that assignment’s building again resumes it, which moves every leg, because its day is what ' +
-      'grownBuilding’s 11 %/day is applied to. A resumed day 4 is a different run from a fresh day 1, ' +
+      'grownBuilding’s growth is applied to. A resumed day 4 is a different run from a fresh day 1, ' +
       'and that is the assertion issue #107’s fix is proved by. Two writers now reach it and not one ' +
       '(issue #125): Free Play’s Start parks the week it displaces too, through ' +
       'dev/state.ts#withFreePlayWeek, so the same resume applies to a campaign week a free-play run ' +

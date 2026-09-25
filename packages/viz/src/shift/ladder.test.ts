@@ -38,6 +38,8 @@ import { scenarioHorizonFor } from './dayLength.js';
 import {
   CONTRACT_LADDER,
   contractLadderIssues,
+  GROWTH_PER_DAY_BOUNDS,
+  growthPerDayOf,
   ladderRowFor,
   ladderTowersOf,
   admittedPressDayIds,
@@ -137,9 +139,14 @@ describe('the shipped ladder is legal against the shipped data', () => {
        * the point of the check survives either way: the set is closed, so a key this table does not
        * name still fails. § D914 added the fifth, and it declares no bar either: a seed, two
        * `InterventionChange` kinds, a fraction and a list of shipped dispatcher ids. § D974 added
-       * `horizon`, which names the kind of run the pin was measured on and grades nothing.
+       * `horizon`, which names the kind of run the pin was measured on and grades nothing. § D1066
+       * added the optional `growthPerDay`, a slope of population — fabric, and no bar.
        */
-      expect(Object.keys(row).sort().filter((key) => key !== 'pressDay')).toEqual([
+      expect(
+        Object.keys(row)
+          .sort()
+          .filter((key) => key !== 'pressDay' && key !== 'growthPerDay'),
+      ).toEqual([
         'buildingId',
         'contractId',
         'demand',
@@ -264,6 +271,29 @@ describe('a rung’s booked absence reaches the run, and no other rung’s does 
     const declaring = CONTRACT_LADDER.rows.filter((row) => row.fabric.incidents.length > 0).length;
     expect(issues.length).toBe(declaring);
     for (const issue of issues) expect(issue).toContain('takes car Z out of');
+  });
+});
+
+describe('the week’s growth is data, bounded, and read in one place (§ D1066)', () => {
+  it('carries the design’s 0.11 as the default, and every rung’s slope inside the bounds', () => {
+    expect(CONTRACT_LADDER.defaultGrowthPerDay).toBe(0.11);
+    for (const row of CONTRACT_LADDER.rows) {
+      const slope = growthPerDayOf(row);
+      expect(slope, row.contractId).toBeGreaterThanOrEqual(GROWTH_PER_DAY_BOUNDS.min);
+      expect(slope, row.contractId).toBeLessThanOrEqual(GROWTH_PER_DAY_BOUNDS.max);
+    }
+    expect(growthPerDayOf(undefined)).toBe(CONTRACT_LADDER.defaultGrowthPerDay);
+  });
+
+  it('refuses a slope outside the bounds, and a ladder with no default, by name', () => {
+    const broken = {
+      ...CONTRACT_LADDER,
+      defaultGrowthPerDay: Number.NaN,
+      rows: CONTRACT_LADDER.rows.map((row) => (row.contractId === 'c2' ? { ...row, growthPerDay: 0.2 } : row)),
+    };
+    const issues = contractLadderIssues(broken, validationInput());
+    expect(issues.some((issue) => issue.includes('defaultGrowthPerDay'))).toBe(true);
+    expect(issues.some((issue) => issue.startsWith('ladder row c2 grows 0.2'))).toBe(true);
   });
 });
 

@@ -58,22 +58,32 @@
  *
  * So the factor is the seam. {@link growthFactor} still owns *what day 5 means*; only the arithmetic
  * of applying a factor is shared, and `growth.test.ts` pins the delegation so the two cannot drift.
+ *
+ * ## The slope is data, and it is per tower — [§ D1066](../../../../DECISIONS.md)
+ *
+ * The design's `0.11` was a constant in `shift/types.ts` until wave AJ. Three independent
+ * measurements of the whole-day week found it was the wall: at Midtown Office days 3–5 cleared
+ * nothing in 390 runs, and the same days at day 2's population cleared on most crowds, at their own
+ * bars. A slope that decides whether a day can be won is a tunable, and `CLAUDE.md` invariant 7 puts
+ * a tunable in `data/`. So the slope is an argument here, `data/contract-ladder.json` carries the
+ * default (`defaultGrowthPerDay`) and each rung's own (`growthPerDay`), and
+ * `shift/ladder.ts#growthPerDayOf` is the one reading of the two. This module stays the arithmetic
+ * and nothing else, so no caller can reach a slope without saying whose it is.
  */
 
 import { expandFloors, type BuildingConfig, type FloorConfig, type FloorRange } from '@elevator-sim/core/browser';
 
-import { GROWTH_PER_DAY } from './types.js';
-
 /**
- * How much bigger the building is on `day` than on day 1.
+ * How much bigger the building is on `day` than on day 1, at `perDay` of day 1's population a day.
  *
  * `1` on day 1 and on any day below it, so a caller that has not started a week yet gets the
- * shipped building rather than a shrunken one. Exported because the header's *"+11 % more tenants
- * than today"* line and the coach ribbon both want to state it, and re-deriving it there would be
- * two copies of one constant.
+ * shipped building rather than a shrunken one. Exported because the report's *"+N % more tenants
+ * than today"* line wants to state it, and re-deriving it there would be two copies of one
+ * expression. `perDay` is required rather than defaulted: a default here would be the constant
+ * § D1066 moved to `data/`, back in code under another name.
  */
-export function growthFactor(day: number): number {
-  return 1 + GROWTH_PER_DAY * Math.max(0, day - 1);
+export function growthFactor(day: number, perDay: number): number {
+  return 1 + perDay * Math.max(0, day - 1);
 }
 
 /**
@@ -87,8 +97,8 @@ export function growthFactor(day: number): number {
  * identity on the integers `data/` declares), which is why a day-1 shift is comparable with every
  * published figure.
  */
-export function grownBuilding(config: BuildingConfig, day: number): BuildingConfig {
-  return scaledBuilding(config, growthFactor(day));
+export function grownBuilding(config: BuildingConfig, day: number, perDay: number): BuildingConfig {
+  return scaledBuilding(config, growthFactor(day, perDay));
 }
 
 /**

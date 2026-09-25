@@ -11,7 +11,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { briefScreenViewOf, lockedForScore, raceAgainstCard, RECOMMENDED_CARDS,
+import { BRIEF_WAY_THROUGH_HEADING, briefScreenViewOf, lockedForScore, raceAgainstCard, RECOMMENDED_CARDS,
   SANDBOX_DOOR_LABEL,
 } from './briefView.js';
 import { GHOST_OPTIONS } from '../live/raceStrip.js';
@@ -43,6 +43,7 @@ const TODAY: TodayRecord = {
   dayLength: undefined,
   driver: 'Steady hand',
   driverHeld: undefined,
+  wayThrough: undefined,
 };
 
 const DISPATCHERS = [
@@ -271,6 +272,18 @@ describe('everything else on the card is the day record’s, unedited', () => {
     const view = viewOf();
     expect(view.asks.rows).toEqual(TODAY.asks);
     expect(view.asks.note).toMatch(/twenty people/);
+  });
+
+  it('carries the week census’s sentence under its own heading, and nothing where the record has none (§ D1067)', () => {
+    expect(viewOf().wayThrough).toBeUndefined();
+    const sentence = 'No standing order or press we measured cleared this day on 20 crowds.';
+    const view = briefScreenViewOf({
+      today: { ...TODAY, wayThrough: sentence },
+      dispatchers: DISPATCHERS,
+      savedIds: [],
+      selectedId: 'collective',
+    });
+    expect(view.wayThrough).toEqual({ heading: BRIEF_WAY_THROUGH_HEADING, sentence });
   });
 
   it('drops the load panel rather than inventing one when the day record has none', () => {

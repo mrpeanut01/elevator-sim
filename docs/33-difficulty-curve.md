@@ -1434,6 +1434,130 @@ DC-6 is what makes the order an order. Note what it does **not** say: it does no
 buildings to get bigger, or the demand to rise. `chancery-house` is 6 fast cars and `garden-apartments`
 is 2 hydraulic ones, and a contract can be harder with fewer people in it.
 
+> **DC-10.** A day of a whole-day week is **admitted as winnable** when, on held-out crowds, both
+> hold: **(a)** the one configuration chosen on separate tuning crowds, a standing order with no press
+> or with one parking press at a stated fraction of the day, clears it with a two-sided 95 %
+> Clopper-Pearson lower bound of at least one third; **(b)** the tower's standing order, left
+> alone, misses it on at least a third of those crowds; and **(c)** some configuration the tuning
+> screen ran kept every landing at or under the day's queue bar. A week may declare one breather
+> day, which skips (b). The bars never move to meet it.
+
+**Why it exists.** Three independent measurements of the whole-day week (wave AJ's decision swarm;
+the records are the integrator's scratch notes and are not in this repository) found Midtown
+Office's days 3 to 5 unwinnable as built: 0 clears in 390 runs over thirteen standing orders and ten
+crowds, and 1 rescue in 72 presses. Held at day 2's population with day 4's and day 5's own bars,
+the same days cleared on 5 of 5 and 4 of 5 crowds. The wall was the week's growth, `1 + 0.11 × (d −
+1)`, and not the ladder. W4 above permitted either lever; the swarm ruled 3 of 3 for demand, so
+[§ D1066](../DECISIONS.md) moved the slope into `data/contract-ladder.json` per tower and this rule
+is what a re-derived slope has to pass. `shift/goals.test.ts` pins `GOAL_BARS` and a whole week of
+what `goalsForDay` asks on both horizons, so "the bars never move" is a test.
+
+**Why the configuration is chosen on one set of crowds and measured on another.** The best of 65
+configurations on each crowd overstates what a player can do, because a player picks before the
+crowd is seen. `CLAUDE.md`'s tuning discipline says the same about seeds. So the census chooses on
+tuning crowds and measures that single choice on held-out ones, and every configuration in a round
+meets the same crowd (common random numbers). One of the swarm's members measured the difference at
+n = 5: the configuration chosen on five tuning crowds cleared 5 of 5 there and 3 of 5 held out.
+
+**Why (b).** A day the standing order clears on nearly every crowd asks the player nothing, which is
+DC-4's lower bound carried from day 1 to every day. The breather is the one day a week that may be
+restful on purpose, and it is declared in data rather than found after the fact.
+
+**Why (c), and why it is part of this rule rather than a second one.** The queue-bar swarm (wave AJ;
+records in the integrator's scratch notes) ruled that the queue goal keeps one ladder on both
+horizons and that the growth-day wall is demand's to fix, and asked for a feasibility gate: no
+Scenario office day ships where no reachable play meets the queue bar. (a) usually implies (c),
+since a configuration that clears held-out crowds met the queue bar on them, but not always: a
+day can fail (a) with the queue out of reach on every play, and the player is owed which goal it
+was. So (c) is read off the same screen (`lowestPeakQueue`, the lowest whole-day peak over every
+configuration on every screen crowd), and a day that fails it says so on its brief.
+
+**The protocol, and its cost** (`data/week-way.json`'s `protocol` block, read by
+`shift/weekWay.ts`, run by `shift/weekWay.sweep.test.ts`):
+
+| | value | why |
+|---|---|---|
+| crowds | dates: tuning from 2026-08-01, held out from 2026-10-01 | a crowd is a date ([§ D729](../DECISIONS.md)), so the held-out set is the crowds the product will deal next |
+| configurations | 13 shipped dispatchers × {no press, spread or park at 0.2 or 0.43 of the day} = 65 | the swarm's own set, and every one is reachable from the brief or the stage |
+| tuning | all 65 on 2 crowds, the best 4 on 6 more (8 crowds), the standing order on all 8 | the choice needs a screen wide enough to meet every dispatcher and deep enough to rank the finalists |
+| held out | 20 crowds, the chosen configuration and the standing order on each | 12 of 20 is the smallest count whose lower bound reaches a third |
+| (a) | two-sided 95 % Clopper-Pearson lower bound ≥ 1/3 | the lower edge of DC-4's band, as a bound rather than a point |
+| (b) | standing order misses ≥ 1/3 of held-out crowds | DC-4's lower bound on every non-breather day |
+| horizon | the whole authored day | the only horizon the week's walls were found on |
+
+**The budget is below the swarm's proposal, and that is a cost, stated.** One member proposed 50
+held-out crowds; at 50 the smallest admitting count is 24 (48 %), and at 20 it is 12 (60 %), so the
+reduced budget is **stricter** per crowd and coarser in what it can resolve. A cell costs about 200
+whole authored days: 130 in the screen, about 30 for the finalists and the standing order, and 40
+held out. Measured on this lane's container, shared with other lanes at a load average of 16 to 67
+on four cores, a whole day of Midtown at day 5 cost 7 to 9.4 s, so a cell was about half an hour
+and a tower's five weekdays about two and a half hours. At 50 held-out crowds a cell is about 260
+days. The census re-derives nothing on a schedule; `shift/weekWay.verify.test.ts` re-runs every
+shipped row's held-out crowds weekly (`.github/workflows/deep-tiers.yml`'s `week-census` job) and
+fails on any moved verdict.
+
+**The unwrinkled weekday first, and the wrinkled week where the budget reached.** Every weekday but
+Monday draws a wrinkle, and wave AJ's lane AJ-B rebuilt the mix-setting ones as timed episodes on a
+whole day ([§ D1057](../DECISIONS.md)) while this census ran. Each tower's rows are its days
+*without* the wrinkle (`eventId: "ordinary"`), because that is what a growth slope can be judged
+on; Midtown Office also carries its wrinkled days 2 to 7, measured with AJ-B's episodes merged in.
+The brief reads the row measured under today's wrinkle when there is one and the unwrinkled row
+otherwise, and says so when it does. `WEEK_WAY_EVENTS=scheduled` measures the wrinkled week for
+the other towers, and that re-run is owed.
+
+**A day that fails is not hidden.** Its brief carries one measured sentence
+(`shift/weekWay.ts#wayThroughSentenceOf`) naming how many of the held-out crowds cleared, and no
+advice: *"No standing order or press we measured cleared this day on 20 crowds."*, *"The best
+standing order or press we found cleared this day on k of 20 crowds."*, or, for a day that asks too
+little, how often the standing order cleared it alone. A day that fails (c) says that instead:
+*"No standing order or press we measured kept every landing to 26 people or fewer on this day: the
+fewest any of 130 runs reached was 31."*
+
+**What the first census found** (wave AJ, 2026-09-25; every row of `data/week-way.json`, with
+DC-10's arithmetic as `shift/weekWay.ts#dc10Of` applies it; the lower bound is two-sided 95 % and the
+queue bar is `goalsForDay`'s):
+
+| tower | day | wrinkle | slope | chosen on tuning | tuning | held out | lower bound | standing misses | queue: lowest / bar | queue-only misses | verdict |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| Midtown | 1 (Mon) | none | 0.11 | `predictive-balanced` + spread at 0.43 | 8/8 | 20/20 | 0.832 | 13/20 | 11 / 32 | 0 | **admitted** |
+| Midtown | 2 (Tue) | none | 0.02 | `predictive-balanced` + spread at 0.2 | 8/8 | 20/20 | 0.832 | 12/20 | 12 / 30 | 0 | **admitted** |
+| Midtown | 2 (Tue) | move-in:middle | 0.02 | `auction` + park at 0.2 | 0/8 | 1/20 | 0.001 | 20/20 | 33 / 30 | 0 | fails (c) queue out of reach, (a) no way through |
+| Midtown | 3 (Wed) | none | 0.02 | `predictive-balanced` + spread at 0.2 | 8/8 | 20/20 | 0.832 | 13/20 | 12 / 28 | 0 | **admitted** |
+| Midtown | 3 (Wed) | fire-drill:full | 0.02 | `predictive-balanced` + spread at 0.43 | 8/8 | 18/20 | 0.683 | 16/20 | 12 / 28 | 2 | **admitted** |
+| Midtown | 4 (Thu) | none | 0.02 | `predictive-balanced` | 7/8 | 15/20 | 0.509 | 18/20 | 12 / 26 | 3 | **admitted** |
+| Midtown | 4 (Thu) | conference:full-floor | 0.02 | `auction` + spread at 0.43 | 5/8 | 13/20 | 0.408 | 20/20 | 13 / 26 | 4 | **admitted** |
+| Midtown | 5 (Fri) | none | 0.02 | `predictive-balanced` | 7/8 | 13/20 | 0.408 | 18/20 | 12 / 24 | 4 | **admitted** |
+| Midtown | 5 (Fri) | shaft-out:most-of-day | 0.02 | `fairness-first` + park at 0.2 | 0/8 | 0/20 | 0.000 | 20/20 | 32 / 24 | 0 | fails (c) queue out of reach, (a) no way through |
+| Midtown | 6 (Sat) | weekend | 0.02 | `fairness-first` + spread at 0.43 | 8/8 | 20/20 | 0.832 | 0/20 | 6 / 22 | 0 | **admitted** (breather) |
+| Midtown | 7 (Sun) | weekend-quiet | 0.02 | `fairness-first` | 8/8 | 20/20 | 0.832 | 0/20 | 6 / 20 | 0 | fails (b) asks nothing |
+| Secure Tower | 1 (Mon) | none | 0.11 | `auction-multi-round` + spread at 0.43 | 7/8 | 10/20 | 0.272 | 14/20 | 16 / 32 | 8 | fails (a) no way through |
+| Secure Tower | 2 (Tue) | none | 0.11 | `fairness-first` + park at 0.2 | 1/8 | 6/20 | 0.119 | 19/20 | 28 / 30 | 12 | fails (a) no way through |
+| Secure Tower | 3 (Wed) | none | 0.11 | `auction-multi-round` + park at 0.2 | 0/8 | 0/20 | 0.000 | 20/20 | 34 / 28 | 15 | fails (c) queue out of reach, (a) no way through |
+| Secure Tower | 4 (Thu) | none | 0.11 | `auction-multi-round` + spread at 0.43 | 0/8 | 0/20 | 0.000 | 20/20 | 49 / 26 | 10 | fails (c) queue out of reach, (a) no way through |
+| Secure Tower | 5 (Fri) | none | 0.11 | `auction-multi-round` + park at 0.43 | 0/8 | 0/20 | 0.000 | 20/20 | 62 / 24 | 1 | fails (c) queue out of reach, (a) no way through |
+| Harbour Point | 1 (Mon) | none | 0.11 | `predictive-balanced` + park at 0.2 | 6/8 | 15/20 | 0.509 | 14/20 | 22 / 32 | 5 | **admitted** |
+| Harbour Point | 2 (Tue) | none | 0.11 | `predictive-balanced` | 2/8 | 2/20 | 0.012 | 20/20 | 42 / 30 | 18 | fails (c) queue out of reach, (a) no way through |
+| Harbour Point | 3 (Wed) | none | 0.11 | `predictive-balanced` + spread at 0.2 | 1/8 | 1/20 | 0.001 | 20/20 | 29 / 28 | 19 | fails (c) queue out of reach, (a) no way through |
+| Harbour Point | 4 (Thu) | none | 0.11 | `fairness-first` | 0/8 | 0/20 | 0.000 | 20/20 | 53 / 26 | 17 | fails (c) queue out of reach, (a) no way through |
+| Harbour Point | 5 (Fri) | none | 0.11 | `predictive-balanced` + park at 0.43 | 0/8 | 0/20 | 0.000 | 20/20 | 113 / 24 | 13 | fails (c) queue out of reach, (a) no way through |
+
+- **Midtown Office's week is winnable and asks something.** At slope 0.02 ([§ D1066](../DECISIONS.md))
+  all five unwrinkled weekdays are admitted, against 0 clears on days 3 to 5 at 0.11 in the swarm's
+  measurement. With lane AJ-B's episodes in the tree the fire drill and the conference are admitted
+  as well; Saturday is the declared breather and Sunday asks nothing.
+- **Two of Midtown's wrinkles are walls on the queue gate**: Tuesday's move-in, which since
+  [§ D1038](../DECISIONS.md) takes a second car beside the rung's, and Friday's shaft out. That is
+  the wrinkles' fabric, not the growth slope, and it is left for whoever balances the wrinkles.
+- **Secure Tower cannot be made to pass by its slope.** Its day 1, which no slope reaches, fails
+  (a) at 10 of 20, and at slope 0 its day 5 still clears only 5 of 8 tuning crowds with half the
+  screen missing on the queue alone. Its slope stays at the default and all five weekdays carry the
+  sentence: days 1 and 2 fail (a) with the queue in reach, days 3 to 5 fail the queue gate.
+- **Harbour Point is the queue gate's tower.** Day 1 is admitted (15 of 20); days 2 to 5 fail the
+  queue gate, day 4 among them as the queue-bar swarm's player member predicted (lowest peak over
+  every screened play 53 against a bar of 26). Measured at the default slope and not tuned, on the
+  ruling's own condition: a slope that cannot make a tower pass is not tuned toward one.
+- The other whole-day towers are named in the file's `unmeasured` block with the reason for each.
+
 ### 4.4 Day one, which is what #208 is governed by
 
 #208 asks that *"a new player sees a building visibly failing within 90 seconds of first load"*, and

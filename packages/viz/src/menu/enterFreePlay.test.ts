@@ -252,7 +252,8 @@ describe('starting free play on the campaign’s own building', () => {
      * four days changed nothing on screen.
      *
      * `week.day` drives `grownBuilding`'s `1 + 0.11 × (day − 1)` — `shift/growth.ts`, and the
-     * constant is `GROWTH_PER_DAY = 0.11` in `shift/types.ts` rather than the issue's word for it —
+     * constant was `GROWTH_PER_DAY = 0.11` in `shift/types.ts` (now `data/contract-ladder.json`'s
+     * `defaultGrowthPerDay`, § D1066) rather than the issue's word for it —
      * so day 4 is a building carrying 1.33× the tenants of day 1, and the two produce different
      * legs by construction. Both halves are required: the resumed run must **differ** from a fresh
      * day 1 (the fix does something) and must **equal** the run the player left (it does the right

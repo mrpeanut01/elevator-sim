@@ -1,5 +1,5 @@
 {
-  "$comment": "The wrinkle library — GitHub issue #159, GAMEPLAY_AND_NAVIGATION.md § 17. A day's twist is a row here rather than a literal in shift/events.ts, which is CLAUDE.md invariant 7 pointed at content. Every template's effect is expressed ONLY in fields the engine actually reads (arrivalRateMultiplier, directionalSplit, carsOutOfService, derate), because a template that named an effect nothing consumes would be a caption that lies about the picture under it — the defect shift/events.ts was written to prevent. Three of the six wrinkle kinds § 17 names are therefore NOT here and are recorded in `unexpressible` with the seam each one needs. The figures are DRAFTED, not measured: a wrinkle is game feel, and the ladder is the product owner's. See packages/viz/src/wrinkles/.",
+  "$comment": "The wrinkle library — GitHub issue #159, GAMEPLAY_AND_NAVIGATION.md § 17. A day's twist is a row here rather than a literal in shift/events.ts, which is CLAUDE.md invariant 7 pointed at content. Every template's effect is expressed ONLY in fields the engine actually reads (arrivalRateMultiplier, directionalSplit, carsOutOfService, derate), because a template that named an effect nothing consumes would be a caption that lies about the picture under it — the defect shift/events.ts was written to prevent. Three of the six wrinkle kinds § 17 names are therefore NOT here and are recorded in `unexpressible` with the seam each one needs. The figures are DRAFTED, not measured: a wrinkle is game feel, and the ladder is the product owner's. See packages/viz/src/wrinkles/. A template that sets a mix also declares `wholeDay`: where its episode sits on a whole authored day (a clock window, a level, a note naming the window, and the reason), or a refusal with its reason. On a whole day shift/episode.ts splices the episode into the day's own phase list and no run-wide multiplier is applied; a refused template is not drawn on a whole day. DECISIONS.md section D1057. The placements are drafted, not measured, on the same footing as the figures.",
   "version": 1,
   "campaignDay": {
     "$comment": "How often a CONTRACT day is something rather than nothing — GitHub issue #564. A career day consults its contract's calendar first and the wear clock second; on the days neither claims, this share decides whether the building has a day of its own drawn from the weekday pool. It is authored here rather than in code for CLAUDE.md invariant 7's reason, and its type, range and default are declared by packages/viz/src/wrinkles/parse.ts#CAMPAIGN_DAY_EVENT_SHARE (invariant 8). 20 per cent is derived rather than picked: see campaign/incidents.ts#CAMPAIGN_DAY_EVENT_SHARE_PCT for the arithmetic over a twenty-day contract.",
@@ -101,6 +101,13 @@
         "carsOutOfService": 0,
         "derate": null
       },
+      "wholeDay": {
+        "from": "10:00",
+        "to": "10:20",
+        "intensity": 1.0,
+        "note": "Twenty minutes where the whole building wants the lobby: {episode} most trips are on their way down, and the building is at or near its busiest. The rest of the day is the tower's own.",
+        "reason": "Twenty minutes is the design's own length for the drill (design.html's note; section D175 dropped it from the slice because a thirty-minute run could not hold a clock time). 10:00 sits in office-day's morning quiet (09:30-11:45), clear of all three cited peaks, and is where the week swarm's S3 measured it. Intensity 1.0 is the day's own peak level, the highest a phase may carry (core's rule 3): the slice's 1.6 is not carried over, because twenty minutes at 1.6 times the peak put Midtown past its capacity on 10 of 10 crowds in the swarm's S2 measurement. The partial value scales it by the slice's own ratio, 1.3/1.6, to 0.8. An uncited assumption, drafted for the owner on section D537's footing, not a citation."
+      },
       "axes": [
         {
           "id": "intensity",
@@ -113,7 +120,10 @@
             {
               "id": "partial",
               "label": "",
-              "arrivalRateMultiplier": 1.3
+              "arrivalRateMultiplier": 1.3,
+              "wholeDay": {
+                "intensity": 0.8
+              }
             }
           ]
         }
@@ -134,6 +144,13 @@
         },
         "carsOutOfService": 0,
         "derate": null
+      },
+      "wholeDay": {
+        "from": "13:15",
+        "to": "16:15",
+        "intensity": "authored",
+        "note": "{size} go floor to floor rather than through the lobby {episode}, the afternoon between lunch and the evening rush. The morning, lunch and the evening are the tower's own.",
+        "reason": "The design's own words were 'Interfloor traffic all afternoon'. office-day's afternoon between its cited lunch and evening periods is 13:15-16:15, flat at intensity 0.25 on 45/45/10, so the conference replaces no cited peak's mix. The level is the day's own: the slice moved only the mix and set no rate, and so does this. An uncited assumption, drafted for the owner on section D537's footing, not a citation."
       },
       "axes": [
         {
@@ -208,6 +225,9 @@
         },
         "carsOutOfService": 0,
         "derate": null
+      },
+      "wholeDay": {
+        "refused": "Coaches are booked only by a career's calendar (campaign/calendar.ts), and a career day runs no whole authored day (section D966), so there is no day to place them in and nobody could check a placement. Refused rather than guessed, so it is not drawn on a whole day."
       },
       "axes": []
     },
@@ -296,6 +316,13 @@
         "carsOutOfService": 0,
         "derate": null
       },
+      "wholeDay": {
+        "from": "08:05",
+        "to": "08:25",
+        "intensity": 0.25,
+        "note": "Trolleys and crates through the front door {when}, {episode}, most of it going up.",
+        "reason": "The note places the caterers against the morning rush, and office-day's cited up-peak ramp begins at 08:30. 'Before the rush' sits in the opening quiet at 0.25, the day's own between-peaks level, where the opening trickle is 0.05; 'right into the rush' runs 08:20-08:40 on the day's own ramp, which is already the cited peak, and ends before the hold at 08:42:30 so the peak and its mix stay as authored. The slice's 1.35 and 1.55 are not carried over. An uncited assumption, drafted for the owner on section D537's footing, not a citation."
+      },
       "axes": [
         {
           "id": "when",
@@ -308,7 +335,12 @@
             {
               "id": "into-the-rush",
               "label": "right into the rush",
-              "arrivalRateMultiplier": 1.55
+              "arrivalRateMultiplier": 1.55,
+              "wholeDay": {
+                "from": "08:20",
+                "to": "08:40",
+                "intensity": "authored"
+              }
             }
           ]
         }
@@ -330,6 +362,13 @@
         "carsOutOfService": 0,
         "derate": null
       },
+      "wholeDay": {
+        "from": "09:30",
+        "to": "11:45",
+        "intensity": 0.3,
+        "note": "Deliveries are being walked floor to floor rather than sent up once, {episode}.",
+        "reason": "The name says all morning; office-day's morning after its cited up-peak is 09:30-11:45, flat at 0.25. 0.3 is that level times the slice's own 1.15, rounded (0.2875). An uncited assumption, drafted for the owner on section D537's footing, not a citation."
+      },
       "axes": []
     },
     {
@@ -348,6 +387,13 @@
         "carsOutOfService": 0,
         "derate": null
       },
+      "wholeDay": {
+        "from": "15:00",
+        "to": "15:15",
+        "intensity": 1.0,
+        "note": "Nobody was told. The building empties {pace}, {episode}, and then the day carries on.",
+        "reason": "Unannounced, so placed away from the fire drill's morning slot and from every cited peak, in office-day's afternoon quiet (13:15-16:15). 'All at once' is fifteen minutes at the peak level; 'floor by floor' is half an hour at half of it, the same number of journeys spread twice as long. The slice's 1.8 and 1.4 are not carried over (core caps a phase at the peak). An uncited assumption, drafted for the owner on section D537's footing, not a citation."
+      },
       "axes": [
         {
           "id": "pace",
@@ -360,7 +406,11 @@
             {
               "id": "floor-by-floor",
               "label": "floor by floor",
-              "arrivalRateMultiplier": 1.4
+              "arrivalRateMultiplier": 1.4,
+              "wholeDay": {
+                "to": "15:30",
+                "intensity": 0.5
+              }
             }
           ]
         }
@@ -382,6 +432,13 @@
         "carsOutOfService": 0,
         "derate": null
       },
+      "wholeDay": {
+        "from": "14:00",
+        "to": "14:20",
+        "intensity": 1.0,
+        "note": "One crowd leaving as another arrives {episode}, and the lobby has to do both at once.",
+        "reason": "Placed mid-afternoon in office-day's quiet stretch. Its mix, 45/45/10, is the day's own between-peaks mix, so on a whole day this wrinkle is a level inside its window and nothing else, which is said here rather than hidden. 'Tight' is twenty minutes at the peak level; 'staggered' is forty minutes at half of it, the same journeys spread twice as long. An uncited assumption, drafted for the owner on section D537's footing, not a citation."
+      },
       "axes": [
         {
           "id": "overlap",
@@ -394,7 +451,11 @@
             {
               "id": "staggered",
               "label": "",
-              "arrivalRateMultiplier": 1.2
+              "arrivalRateMultiplier": 1.2,
+              "wholeDay": {
+                "to": "14:40",
+                "intensity": 0.5
+              }
             }
           ]
         }
@@ -450,6 +511,13 @@
           "toFraction": 0.9
         }
       },
+      "wholeDay": {
+        "from": "13:15",
+        "to": "16:15",
+        "intensity": "authored",
+        "note": "A fit-out crew is working upstairs — one car is theirs {window}, and {episode} more than half the trips in the building are between floors.",
+        "reason": "The crew's car is out on the template's own derate window (10:00-17:00, or 13:00-18:00 from midday, on a ten-hour day). The mix is placed in office-day's afternoon quiet, 13:15-16:15, which lies inside both windows and replaces no cited peak. The level is the day's own, because the slice set no rate. An uncited assumption, drafted for the owner on section D537's footing, not a citation."
+      },
       "axes": [
         {
           "id": "window",
@@ -492,6 +560,13 @@
         "carsOutOfService": 0,
         "derate": null
       },
+      "wholeDay": {
+        "from": "11:00",
+        "to": "11:20",
+        "intensity": 1.0,
+        "note": "Everybody is wanted on one floor at the same time: {episode} the building is as busy as at its peaks, and most trips are between floors or up from the lobby.",
+        "reason": "Late morning in office-day's quiet stretch, clear of the cited peaks. Twenty minutes at the peak level, the fire drill's length and level, so the two days differ in the mix and the hour rather than in size. The slice's 1.5 is not carried over. An uncited assumption, drafted for the owner on section D537's footing, not a citation."
+      },
       "axes": []
     },
     {
@@ -509,6 +584,13 @@
         },
         "carsOutOfService": 0,
         "derate": null
+      },
+      "wholeDay": {
+        "from": "09:30",
+        "to": "11:45",
+        "intensity": "authored",
+        "note": "Four of them, on every floor in turn, carrying boxes of paper: {episode} most trips in the building are between floors.",
+        "reason": "The morning after office-day's cited up-peak, 09:30-11:45, where the day is flat and replaces no cited mix. The level is the day's own; the slice's 1.1 is not carried over, because the auditors change where people go more than how many travel. An uncited assumption, drafted for the owner on section D537's footing, not a citation."
       },
       "axes": []
     },
@@ -528,6 +610,14 @@
         "carsOutOfService": 0,
         "derate": null
       },
+      "wholeDay": {
+        "from": "13:15",
+        "to": "16:15",
+        "intensity": "authored",
+        "dayRateMultiplier": 0.7,
+        "note": "Something is going round. Fewer people all day, and {episode} the ones who came in are moving about between floors.",
+        "reason": "The note's 'fewer people' is a claim about the whole day, so the slice's 0.7 stays on the whole day (a lighter day may be stated across all of it). The moving about is placed in office-day's afternoon quiet, 13:15-16:15, which replaces no cited peak's mix. An uncited assumption, drafted for the owner on section D537's footing, not a citation."
+      },
       "axes": []
     },
     {
@@ -546,6 +636,13 @@
         "carsOutOfService": 0,
         "derate": null
       },
+      "wholeDay": {
+        "from": "09:30",
+        "to": "11:45",
+        "intensity": 0.35,
+        "note": "Visitors {episode}, none of whom know which floor they want.",
+        "reason": "The morning after office-day's cited up-peak, 09:30-11:45. The level is that stretch's own 0.25 times the slice's multiplier: 1.4 for a busy turnout (0.35) and 1.15 for a quiet one (0.2875, rounded to 0.3). An uncited assumption, drafted for the owner on section D537's footing, not a citation."
+      },
       "axes": [
         {
           "id": "turnout",
@@ -558,7 +655,10 @@
             {
               "id": "quiet",
               "label": "",
-              "arrivalRateMultiplier": 1.15
+              "arrivalRateMultiplier": 1.15,
+              "wholeDay": {
+                "intensity": 0.3
+              }
             }
           ]
         }
@@ -579,6 +679,13 @@
         },
         "carsOutOfService": 0,
         "derate": null
+      },
+      "wholeDay": {
+        "from": "17:40",
+        "to": "18:00",
+        "intensity": 1.0,
+        "note": "A deadline upstairs means everybody leaves at once, late, and together: {episode} the building is as busy as its evening peak, and most trips are on their way down.",
+        "reason": "After office-day's cited evening hold (17:27:30-17:32:30), running to the day's close at 18:00; the ordinary evening peak stays as authored, so the late crowd leaves after it rather than instead of it. The peak level, because 'everybody' leaves; the slice's 1.3 is not carried over. An uncited assumption, drafted for the owner on section D537's footing, not a citation."
       },
       "axes": []
     },
@@ -658,6 +765,14 @@
           "toFraction": 0.9
         }
       },
+      "wholeDay": {
+        "from": "09:30",
+        "to": "16:15",
+        "intensity": "authored",
+        "dayRateMultiplier": 0.55,
+        "note": "Quiet on the landings and busy between floors {episode} — the works only happen when nobody is in.",
+        "reason": "A weekend on an office tower: the slice's 0.55 stays on the whole day, which is the weekend being lighter rather than the works being an event. The works' mix covers office-day's working hours between the morning and evening peaks, 09:30-16:15, lunch included, because a weekend lunch is not the cited weekday one. The works' car is out on the template's own derate window. An uncited assumption, drafted for the owner on section D537's footing, not a citation."
+      },
       "axes": []
     },
     {
@@ -680,6 +795,14 @@
           "toFraction": 0.75
         }
       },
+      "wholeDay": {
+        "from": "10:00",
+        "to": "15:00",
+        "intensity": "authored",
+        "dayRateMultiplier": 0.65,
+        "note": "One tenant is leaving: {episode} most trips are on their way down, with everything they own.",
+        "reason": "The slice's 0.65 stays on the whole day, the weekend being lighter. The move-out's mix is placed 10:00-15:00, inside the movers' own car window (09:30-15:30 on a ten-hour day). An uncited assumption, drafted for the owner on section D537's footing, not a citation."
+      },
       "axes": []
     },
     {
@@ -697,6 +820,14 @@
         },
         "carsOutOfService": 0,
         "derate": null
+      },
+      "wholeDay": {
+        "from": "10:00",
+        "to": "16:00",
+        "intensity": "authored",
+        "dayRateMultiplier": 0.8,
+        "note": "A booking on one of the upper floors — a thin, steady stream {episode}, most of it going up.",
+        "reason": "The slice's 0.8 stays on the whole day, the weekend being lighter. The booking's mix is placed across the middle of the day, 10:00-16:00. The slice's note says all of it goes up; the mix is 70/20/10, so this note says most. An uncited assumption, drafted for the owner on section D537's footing, not a citation."
       },
       "axes": []
     }

@@ -310,6 +310,31 @@ describe('the patch and the effect agree about what is written', () => {
     expect(patch.demand.arrivalRatePctPop5min).toBeGreaterThan(base().ratePctPop5min);
     expect(patch.withheld).toHaveLength(1);
   });
+
+  it('writes no split and no run-wide rate where the run splices the episode — § D1057', () => {
+    /* The drill's surge is its episode's level now, so the whole day keeps its own rate. */
+    const drill = shiftRunPatch({
+      event: SHIFT_EVENTS['fire-drill'],
+      building: requireBuilding(config, BUILDING_ID),
+      base: base(),
+      templateVariesMix: true,
+      spliced: true,
+    });
+    expect(drill.demand).toEqual({});
+    expect(drill.withheld).toEqual([]);
+    /* A placement that states a lighter whole day writes that, and only that. */
+    const flu = SHIFT_EVENTS['flu-day' as ShiftEventId];
+    const light = shiftRunPatch({
+      event: flu,
+      building: requireBuilding(config, BUILDING_ID),
+      base: base(),
+      templateVariesMix: true,
+      spliced: true,
+    });
+    expect(light.demand.directionalSplit).toBeUndefined();
+    expect(light.demand.arrivalRatePctPop5min).toBeCloseTo(base().ratePctPop5min * 0.7, 9);
+    expect(light.withheld).toEqual([]);
+  });
 });
 
 describe('every event reaches the simulator', () => {

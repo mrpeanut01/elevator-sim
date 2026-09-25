@@ -146,6 +146,12 @@ export interface BriefScreenView {
     readonly shared: string;
   };
   readonly asks: { readonly heading: string; readonly rows: readonly string[]; readonly note: string };
+  /**
+   * **What the week census measured about a day it could not admit**, or `undefined` —
+   * `docs/33` DC-10, [§ D1067](../../../../DECISIONS.md). `TodayRecord.wayThrough`, under a heading
+   * that says it is a measurement rather than a forecast of today's crowd.
+   */
+  readonly wayThrough: { readonly heading: string; readonly sentence: string } | undefined;
   readonly drivers: {
     readonly heading: string;
     /** The three § 6.2 recommends — the head of the same list the dropdown carries. */
@@ -193,6 +199,13 @@ export function briefBarModel(base: ActionBarModel, driver: string | undefined):
 
 /** The § 3.3 note's fixed half — one home, so the view and the bar cannot word it differently. */
 export const BRIEF_NOTE_LEAD = 'Running the lifts: ';
+
+/**
+ * The heading over the week census's sentence — § D1067. *Measured*, because the figure under it is
+ * a count over the crowds the census ran, not a prediction about today's. It does not say *other*
+ * crowds: the held-out set is the next dates the product deals, so today's may be one of them.
+ */
+export const BRIEF_WAY_THROUGH_HEADING = 'THIS DAY, MEASURED';
 
 /** What {@link briefScreenViewOf} is computed from. */
 export interface BriefScreenInput {
@@ -409,6 +422,10 @@ export function briefScreenViewOf(input: BriefScreenInput): BriefScreenView {
         'Nothing is graded until twenty people have turned up, so a quiet morning is read rather ' +
         'than marked.',
     },
+    wayThrough:
+      today.wayThrough === undefined
+        ? undefined
+        : { heading: BRIEF_WAY_THROUGH_HEADING, sentence: today.wayThrough },
     drivers: {
       heading: 'WHO DRIVES TODAY',
       cards: options.slice(0, RECOMMENDED_CARDS),

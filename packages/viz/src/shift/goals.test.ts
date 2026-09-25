@@ -167,6 +167,67 @@ describe('the bars harden with the day, and then stop', () => {
  * horizon allowance fails here rather than passing silently. `WORST_WAIT_WHOLE_DAY_FACTOR` carries
  * the measurement, the mechanism, and the refutation of the assumption that both maxima grow.
  */
+describe('the bars stand still while the week is made winnable (§ D1067)', () => {
+  /*
+   * **Wave AJ fixed the week with demand and never with the mark.** Three decision records measured
+   * days 3–5 of a whole-day week unwinnable as built, found the cause in the population's growth,
+   * and ruled 3 of 3 that the bars do not move — `docs/43` § 6 and § D345 forbid moving a bar to let
+   * the current state pass, and `docs/33` DC-R1 admits difficulty only as demand and fabric. So the
+   * growth slope moved to data (§ D1066) and a census re-derives it per tower (§ D1067).
+   *
+   * These two cases are what make "never the bars" a test rather than a promise. The constant is
+   * pinned field for field, and so is what it produces over a whole week on both horizons, because
+   * a bar can move through `goalsForDay`'s arithmetic without `GOAL_BARS` changing. A future change
+   * that means to move a bar has to change this file in the same commit, where a reviewer sees it.
+   */
+  it('pins GOAL_BARS, the energy bars included, to the values the week census was measured under', () => {
+    expect({ ...GOAL_BARS }).toEqual({
+      minuteMax: 84,
+      minuteBase: 58,
+      minutePerDay: 3,
+      carryMax: 96,
+      carryBase: 86,
+      carryPerDay: 1,
+      queueMin: 12,
+      queueBase: 34,
+      queuePerDay: 2,
+      worstMinS: 150,
+      worstBaseS: 240,
+      worstPerDayS: 10,
+      worstWholeDayFactor: 2,
+      energyPerLegMaxKJ: 80,
+      energyPerLegMaxWholeDayKJ: 350,
+    });
+  });
+
+  it('pins what a week asks, day by day, on both horizons', () => {
+    const asked = (over: 'period' | 'whole-day'): string[] =>
+      [1, 2, 3, 4, 5, 6, 7].map((day) =>
+        goalsForDay(day, over)
+          .map((goal) => `${goal.id}=${String(goal.bar)}`)
+          .join(' '),
+      );
+    expect(asked('whole-day')).toEqual([
+      'carry=87 minute=61 queue=32 worst-wait=460 energy=350',
+      'carry=88 minute=64 queue=30 worst-wait=440 energy=350',
+      'carry=89 minute=67 queue=28 worst-wait=420 energy=350',
+      'carry=90 minute=70 queue=26 worst-wait=400 energy=350',
+      'carry=91 minute=73 queue=24 worst-wait=380 energy=350',
+      'carry=92 minute=76 queue=22 worst-wait=360 energy=350',
+      'carry=93 minute=79 queue=20 worst-wait=340 energy=350',
+    ]);
+    expect(asked('period')).toEqual([
+      'carry=87 minute=61 queue=32 worst-wait=230 energy=80',
+      'carry=88 minute=64 queue=30 worst-wait=220 energy=80',
+      'carry=89 minute=67 queue=28 worst-wait=210 energy=80',
+      'carry=90 minute=70 queue=26 worst-wait=200 energy=80',
+      'carry=91 minute=73 queue=24 worst-wait=190 energy=80',
+      'carry=92 minute=76 queue=22 worst-wait=180 energy=80',
+      'carry=93 minute=79 queue=20 worst-wait=170 energy=80',
+    ]);
+  });
+});
+
 describe('what a whole day asks, against what a slice asks', () => {
   const barOf = (goals: readonly ShiftGoal[], id: string): number =>
     goals.find((goal) => goal.id === id)?.bar ?? Number.NaN;

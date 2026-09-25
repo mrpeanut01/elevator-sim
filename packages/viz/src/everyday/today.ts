@@ -51,6 +51,7 @@ import { firstSessionLineFor } from '../shift/firstSession.js';
 import { eventAsRun, eventCarChoice } from '../shift/events.js';
 import { carsToDerate } from '../shift/incidents.js';
 import { admittedPressDayIds, pressDayStanding } from '../shift/ladder.js';
+import { wayThroughSentenceOf } from '../shift/weekWay.js';
 import { clockOf, clockRange } from '../shift/report.js';
 import type { GoalReading, RunHorizon, ShiftEvent, WeekState, Weekday } from '../shift/types.js';
 import { weekdayOf } from '../shift/types.js';
@@ -209,6 +210,17 @@ export interface TodayRecord {
    * call is answered, and on every other day it is never drawn.
    */
   readonly driverHeld: string | undefined;
+  /**
+   * **What the week census found about a day it could not admit**, or `undefined` —
+   * `docs/33` DC-10, [§ D1067](../../../../DECISIONS.md) clause 4.
+   *
+   * `shift/weekWay.ts#wayThroughSentenceOf`, gated there on the census having measured this
+   * contract's day at the growth the tower runs at now, on the horizon the press will run and with
+   * no calendar over it. An admitted day and an unmeasured one both draw nothing. It states how many
+   * of the measured crowds cleared and gives no advice, because a measurement of a day with no way
+   * through licenses none.
+   */
+  readonly wayThrough: string | undefined;
 }
 
 /** {@link TodayRecord.driverHeld}'s sentence — no digit, the strip's own rule. */
@@ -258,6 +270,13 @@ export interface TodayInput {
    * reason: a default of `false` would print the fire drill's lobby rush over an all-day rise.
    */
   readonly templateVariesMix: boolean;
+  /**
+   * Whether the next run is the building's whole authored day — `host.dayAhead().wholeDayRun`. On
+   * such a day a mix-setting wrinkle with a placement is spliced as an episode, the draw is the
+   * whole day's, and the record quotes the placement's note, which names the window
+   * ([§ D1057](../../../../DECISIONS.md)). Required, {@link TodayInput.calendar}'s reason.
+   */
+  readonly wholeDayRun: boolean;
   /**
    * The cars today's event takes, as the next run takes them — `host.dayAhead().dayCars`, which is
    * `dev/state.ts#ShiftRunConfig.dayCars` — or `undefined` for a caller with no run to ask, in
@@ -815,8 +834,14 @@ export function todayOf(input: TodayInput): TodayRecord {
    * so; the name, the id and the effect are the wrinkle's either way.
    */
   const event = eventAsRun(
-    scheduledEventFor(input.calendar, week.day, week.dayIdx),
+    scheduledEventFor(
+      input.calendar,
+      week.day,
+      week.dayIdx,
+      input.wholeDayRun ? 'whole-day' : 'period',
+    ),
     input.templateVariesMix,
+    input.wholeDayRun,
   );
   const out = carsOutTodayOf(building, event, input.dayCars);
   /*
@@ -880,5 +905,12 @@ export function todayOf(input: TodayInput): TodayRecord {
     dayLength: dayLengthOf(input, event),
     driver: input.dispatcherName ?? EM_DASH,
     driverHeld: driverHeldOf(input, event),
+    wayThrough: wayThroughSentenceOf({
+      contractId: week.contractId,
+      day: week.day,
+      eventId: event.id,
+      hasCalendar: input.calendar !== null,
+      horizon: input.horizon,
+    }),
   };
 }

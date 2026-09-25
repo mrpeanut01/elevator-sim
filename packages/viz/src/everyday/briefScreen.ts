@@ -103,6 +103,7 @@ function mountBrief(
       building: dayAhead.building,
       dayStartS: dayAhead.startOfDayS,
       templateVariesMix: dayAhead.templateVariesMix,
+      wholeDayRun: dayAhead.wholeDayRun,
       dayCars: dayAhead.dayCars,
       buildingId: selection.buildingId,
       dispatcherName: data.dispatcherById(selection.dispatcherId)?.name,
@@ -346,6 +347,17 @@ function mountBrief(
     const asksNote = el(doc, 'p', undefined, view.asks.note);
     asksNote.style.cssText = `${QUIET};margin:9px 0 0`;
     asks.append(asksList, asksNote);
+    /*
+     * The week census's sentence, under the day's questions — `docs/33` DC-10, § D1067. Drawn only
+     * on a measured day that fails admission; the view decides, this only places it.
+     */
+    if (view.wayThrough !== undefined) {
+      const measuredHeading = el(doc, 'div', undefined, view.wayThrough.heading);
+      measuredHeading.style.cssText = `${EYEBROW};margin-top:12px`;
+      const measured = el(doc, 'p', 'everyday-brief-way-through', view.wayThrough.sentence);
+      measured.style.cssText = `${BODY};margin:6px 0 0`;
+      asks.append(measuredHeading, measured);
+    }
     column.append(asks);
 
     /* ---- who drives today — the one control here that writes ---- */

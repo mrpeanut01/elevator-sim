@@ -61,7 +61,8 @@ import { commissionableClasses } from '../commissioning/types.js';
 import { recordRun } from '../record/recordRun.js';
 import { runIdentityIssues } from '../scope/runIdentity.js';
 import { RESOURCES, baseState } from '../scope/probes.test-helper.js';
-import { shiftRunConfigOf, type ViewerState } from '../dev/state.js';
+import { shiftRunConfigOf, weekGrowthPerDayOf, type ViewerState } from '../dev/state.js';
+import { CONTRACT_LADDER } from './ladder.js';
 
 import {
   CALENDAR_PERIODS,
@@ -140,7 +141,7 @@ function planWith(state: ViewerState, period: CalendarPeriod | null): Plan {
   const authored = authoredConfig(state.buildingId);
   const specs = RESOURCES.elevatorSpecs;
 
-  const grown = grownBuilding(authored, state.week.day);
+  const grown = grownBuilding(authored, state.week.day, weekGrowthPerDayOf(RESOURCES, state));
   const grownResolved = resolveBuilding(parseBuilding(grown as unknown), specs);
 
   const calendarDay = calendarDayFor(period, state.week.day, state.week.dayIdx);
@@ -634,7 +635,7 @@ describe('a period outside its own days changes nothing, byte-identically', () =
  * -------------------------------------------------------------------------- */
 
 describe('what a period will not do', () => {
-  const building = (): BuildingConfig => grownBuilding(authoredConfig('midtown-office'), 1);
+  const building = (): BuildingConfig => grownBuilding(authoredConfig('midtown-office'), 1, CONTRACT_LADDER.defaultGrowthPerDay);
   const office = { incoming: 0.85, outgoing: 0.05, interfloor: 0.1 };
 
   it('will not set a mix under a template that varies the mix within the run', () => {
@@ -859,7 +860,7 @@ describe('what a period will not do', () => {
 });
 
 describe('the line describes what was applied, not what was asked for', () => {
-  const building = (): BuildingConfig => grownBuilding(authoredConfig('midtown-office'), 1);
+  const building = (): BuildingConfig => grownBuilding(authoredConfig('midtown-office'), 1, CONTRACT_LADDER.defaultGrowthPerDay);
   const office = { incoming: 0.85, outgoing: 0.05, interfloor: 0.1 };
 
   it('is empty when no period applies', () => {
@@ -979,7 +980,7 @@ describe('what a period asks of the run, and what reaches it — issue #140', ()
       demandTemplates: templates,
       runLengthS,
       templateChosenByPlayer,
-      building: grownBuilding(fabricOf(buildingId, shafts), 1),
+      building: grownBuilding(fabricOf(buildingId, shafts), 1, CONTRACT_LADDER.defaultGrowthPerDay),
       // The day's event goes into `shared` too — GitHub issue #272. Both functions decide
       // `goodsCars` by reserving against a real bank, and the cars the event has already taken are
       // part of that reservation; a caller that could hand them different events does not exist

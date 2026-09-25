@@ -15,7 +15,8 @@
 import { describe, expect, it } from 'vitest';
 
 import { RESOURCES, baseState, legsOf } from '../scope/probes.test-helper.js';
-import { initialState, shiftRunConfigOf, tomorrowFactsOf, type ViewerState } from '../dev/state.js';
+import { initialState, shiftRunConfigOf, tomorrowFactsOf, weekGrowthPerDayOf, type ViewerState } from '../dev/state.js';
+import { CONTRACT_LADDER } from './ladder.js';
 
 import { CALENDAR_PERIODS, periodOnDays } from './calendar.js';
 import { contractById } from './contracts.js';
@@ -294,8 +295,8 @@ describe('growth is shown as people, measured, and never as a constant', () => {
   it('states the share of *today*, which is not 11 % after day 1', () => {
     // Growth is linear — `1 + 0.11 × (day − 1)` — so day 5 → day 6 is 7.6 % of day 5, not 11 %.
     // The figure comes from the two counts, so this is true without the module knowing the rule.
-    const today = Math.round(1710 * growthFactor(5));
-    const tomorrow = Math.round(1710 * growthFactor(6));
+    const today = Math.round(1710 * growthFactor(5, CONTRACT_LADDER.defaultGrowthPerDay));
+    const tomorrow = Math.round(1710 * growthFactor(6, CONTRACT_LADDER.defaultGrowthPerDay));
     const row = rowIn(briefing({ populationToday: today, populationTomorrow: tomorrow }), 'tenants');
     expect(row.note).toContain('7.7 % of today');
     expect(row.note).not.toContain('11.0 %');
@@ -426,8 +427,9 @@ describe('the number on the beat is the number the next run has', () => {
     // would pass against the caption this feature exists to refuse, and prove nothing.
     const today = stateOn('midtown-office', 4);
     const todayPopulation = shiftRunConfigOf(RESOURCES, today).building.totalPopulation;
+    const slope = weekGrowthPerDayOf(RESOURCES, today);
     const multiplied = Math.round(
-      (todayPopulation * growthFactor(today.week.day + 1)) / growthFactor(today.week.day),
+      (todayPopulation * growthFactor(today.week.day + 1, slope)) / growthFactor(today.week.day, slope),
     );
     expect(tomorrowFactsOf(RESOURCES, today).population).not.toBe(multiplied);
   });
