@@ -298,7 +298,7 @@ function carCountOf(building: ResolvedBuilding): number {
  * the plate, and the building's service windows for the tower's sentence — each true of one
  * schedule and none of them of the run, which (until § D1038 merged the two windows) handed the
  * movers' car back at the rung's return. Everything below now reads this list, built once per
- * record from the run's own windows and the day's own car choice.
+ * record from the run's own spans and the day's own car choice.
  */
 interface CarOutToday {
   readonly carId: string;
@@ -307,11 +307,11 @@ interface CarOutToday {
   /** Held for the whole run (`carsOutOfService`), which travels beside the building, not on it. */
   readonly wholeRun: boolean;
   /**
-   * The run's own window for it, off the building's service events — or `undefined` when the
+   * The run's own span for it, off the building's service events — or `undefined` when the
    * building carries none for this car, which is a document not built for today's run (the
    * corpus and the unit fixtures pass the authored tower).
    */
-  readonly window: { readonly awayAtS: number; readonly backAtS: number | null } | undefined;
+  readonly span: { readonly awayAtS: number; readonly backAtS: number | null } | undefined;
   /** Out at the first instant, so a picture of the opening frame greys it. */
   readonly atOpen: boolean;
   /** Out for the whole run, so no count of *working* cars includes it. */
@@ -327,28 +327,28 @@ function carsOutTodayOf(
   const choice = eventCarChoice(event.effect, building);
   const holdIds = choice.holdCars.map((car) => car.carId);
   const derateIds = choice.derateCars.map((car) => car.carId);
-  const windows = new Map(carAbsencesOf(building).map((entry) => [entry.carId, entry]));
+  const spans = new Map(carAbsencesOf(building).map((entry) => [entry.carId, entry]));
   const { derate } = event.effect;
-  const ids = [...new Set([...holdIds, ...derateIds, ...windows.keys()])];
+  const ids = [...new Set([...holdIds, ...derateIds, ...spans.keys()])];
   return ids.map((carId): CarOutToday => {
     const wholeRun = holdIds.includes(carId);
     const byDerate = derateIds.includes(carId);
-    const entry = windows.get(carId);
-    const window = entry === undefined ? undefined : { awayAtS: entry.awayAtS, backAtS: entry.backAtS };
+    const entry = spans.get(carId);
+    const span = entry === undefined ? undefined : { awayAtS: entry.awayAtS, backAtS: entry.backAtS };
     /*
-     * A derate with no window on the building is described by its own fractions — the only other
+     * A derate with no span on the building is described by its own fractions — the only other
      * account of it there is — so the fixtures that pass an authored tower still get a plate that
      * counts the car the day takes.
      */
     const fromStart =
-      window !== undefined ? window.awayAtS === 0 : byDerate && derate !== null && derate.fromFraction <= 0;
+      span !== undefined ? span.awayAtS === 0 : byDerate && derate !== null && derate.fromFraction <= 0;
     const toEnd =
-      window !== undefined ? window.backAtS === null : byDerate && derate !== null && derate.toFraction >= 1;
+      span !== undefined ? span.backAtS === null : byDerate && derate !== null && derate.toFraction >= 1;
     return {
       carId,
       ofTheDay: wholeRun || byDerate,
       wholeRun,
-      window,
+      span,
       atOpen: wholeRun || fromStart,
       allDay: wholeRun || (fromStart && toEnd),
     };
@@ -356,18 +356,18 @@ function carsOutTodayOf(
 }
 
 /** `10:30–15:30`, `from the start of the day until 16:30`, `from 10:30 to the end of the day`, `all day`. */
-function windowPhrase(
-  window: { readonly awayAtS: number; readonly backAtS: number | null },
+function spanPhrase(
+  span: { readonly awayAtS: number; readonly backAtS: number | null },
   dayStartS: number,
 ): string {
-  if (window.awayAtS === 0) {
-    return window.backAtS === null
+  if (span.awayAtS === 0) {
+    return span.backAtS === null
       ? 'all day'
-      : `from the start of the day until ${clockOf(window.backAtS, dayStartS)}`;
+      : `from the start of the day until ${clockOf(span.backAtS, dayStartS)}`;
   }
-  return window.backAtS === null
-    ? `from ${clockOf(window.awayAtS, dayStartS)} to the end of the day`
-    : clockRange(window.awayAtS, window.backAtS, dayStartS);
+  return span.backAtS === null
+    ? `from ${clockOf(span.awayAtS, dayStartS)} to the end of the day`
+    : clockRange(span.awayAtS, span.backAtS, dayStartS);
 }
 
 /**
@@ -377,14 +377,14 @@ function windowPhrase(
  * take a car, and the *tower* may book one out part-way through every day it runs. They are
  * separate facts with separate causes, and a player meets them as one question — *which lifts will
  * I not have?* — so they share the badge. Since [§ D1038](../../../../DECISIONS.md) a car both take
- * is **one** car in one window, and it is described once: as the day's, with the run's window.
+ * is **one** car in one span, and it is described once: as the day's, with the run's span.
  *
  * **With the clock, since [§ D1039](../../../../DECISIONS.md).** The strip said *part-way through
  * today* and printed no time, on the ground that a time before the run is a figure whose only source
  * is a schedule the reader cannot see. The stage's pill and the report's header printed the times
  * from that very schedule, so the brief was the one surface keeping back a fact the other two gave;
  * printing it is how the reader gets to see the schedule. The times are the report's own expression
- * (`shift/report.ts#clockRange` over the run's windows), read off the run the next press produces
+ * (`shift/report.ts#clockRange` over the run's spans), read off the run the next press produces
  * (`host.dayAhead()`); with no known start of day the strip says what it said before, and no clock.
  */
 function outOfServiceOf(
@@ -400,16 +400,16 @@ function outOfServiceOf(
   if (days.length > 0) {
     /*
      * The event's note says *when* in the design's words and stays first; the sentence after it
-     * names the car and, where the run's window is known, the clock. It used to open *"Car D is out
+     * names the car and, where the run's span is known, the clock. It used to open *"Car D is out
      * of service today."* over a note that said the car rejoins, which is one of D.md's three.
      */
     sentences.push(event.note);
     for (const car of days) {
       if (car.wholeRun) {
         sentences.push(`Car ${car.carId} is the car it takes, out of service all day.`);
-      } else if (car.window !== undefined && dayStartS !== undefined) {
+      } else if (car.span !== undefined && dayStartS !== undefined) {
         sentences.push(
-          `Car ${car.carId} is the car it takes, out of passenger service ${windowPhrase(car.window, dayStartS)}.`,
+          `Car ${car.carId} is the car it takes, out of passenger service ${spanPhrase(car.span, dayStartS)}.`,
         );
       } else {
         sentences.push(`Car ${car.carId} is the car it takes.`);
@@ -417,11 +417,11 @@ function outOfServiceOf(
     }
   }
   for (const car of cars) {
-    if (car.ofTheDay || car.window === undefined) continue;
+    if (car.ofTheDay || car.span === undefined) continue;
     sentences.push(
       dayStartS !== undefined
-        ? `Car ${car.carId} is booked out of passenger service ${windowPhrase(car.window, dayStartS)}.`
-        : car.window.backAtS !== null
+        ? `Car ${car.carId} is booked out of passenger service ${spanPhrase(car.span, dayStartS)}.`
+        : car.span.backAtS !== null
           ? `Car ${car.carId} is booked out of passenger service part-way through today and comes back before the end.`
           : `Car ${car.carId} is booked out of passenger service part-way through today and does not come back.`,
     );
