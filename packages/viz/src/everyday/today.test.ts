@@ -87,6 +87,7 @@ const recordFor = (
     dispatcherNameOf: () => undefined,
     goals: pendingGoals(day),
     seed: 424_242n,
+    horizon: 'period',
     crowdIsToday: true,
     firstSession: false,
     units: 'metric',
@@ -205,6 +206,7 @@ describe('the tower’s own booked absence reaches the strip — issue #576, § 
       dispatcherNameOf: () => undefined,
       goals: pendingGoals(1),
       seed: state.seed,
+      horizon: 'period',
       crowdIsToday: true,
       firstSession: false,
       units: 'metric',
@@ -273,6 +275,7 @@ describe('the facts come from the resolved building', () => {
       dispatcherNameOf: () => undefined,
       goals: [],
       seed: 1n,
+      horizon: 'period',
       crowdIsToday: true,
       firstSession: false,
       units: 'metric',
@@ -343,6 +346,7 @@ describe('the rest of the record', () => {
       dispatcherNameOf: () => undefined,
       goals: pendingGoals(2),
       seed: 424_242n,
+      horizon: 'period',
       crowdIsToday: false,
       firstSession: false,
       units: 'metric',
@@ -441,6 +445,7 @@ function briefOn(state: ViewerState): ReturnType<typeof todayOf> {
     dispatcherNameOf: () => undefined,
     goals: pendingGoals(state.week.day),
     seed: state.seed,
+    horizon: 'period',
     crowdIsToday: true,
     firstSession: false,
     units: 'metric',
@@ -561,5 +566,71 @@ describe('the brief describes the building the run will use — issue #300', () 
     const state = stateOn('a-building-this-build-does-not-have', 3);
     expect(resolvedBuildingOf(RESOURCES_300, state)).toBeUndefined();
     expect(briefOn(state).facts).toEqual([]);
+  });
+});
+
+describe('the moot sentence is drawn only over the run it was measured on — issue #595, § D973', () => {
+  /**
+   * `c7`'s pin is the one § D914 measured on the horizon the product plays it on (a hotel has no
+   * authored whole day), so it is the case where every gate can be held true and then broken one at
+   * a time. The horizon gate is the one #595 added: five of the seven pins were taken on a
+   * thirty-minute slice of towers the Scenario press runs ten hours long, and the sentence was drawn
+   * on the seed alone.
+   */
+  function crownOn(overrides: {
+    readonly day?: number;
+    readonly seed?: bigint;
+    readonly horizon?: 'period' | 'whole-day' | undefined;
+    readonly calendar?: CalendarPeriod | null;
+  }): ReturnType<typeof todayOf> {
+    const press = ladderRowFor('c7')?.pressDay;
+    if (press === undefined) throw new Error('c7 pins no day');
+    const resources = resourcesWith('crown-hotel');
+    const day = overrides.day ?? 1;
+    const state: ViewerState = {
+      ...initialState(resources, BigInt(press.seedText)),
+      buildingId: 'crown-hotel',
+      shiftLengthS: 1800,
+      week: { ...openWeek('c7'), day, dayIdx: day - 1 },
+    };
+    const building = resolvedBuildingOf(resources, state);
+    if (building === undefined) throw new Error('crown-hotel did not resolve');
+    return todayOf({
+      week: state.week,
+      calendar: overrides.calendar ?? NO_CALENDAR,
+      building,
+      buildingId: 'crown-hotel',
+      dispatcherName: 'Steady hand',
+      dispatcherNameOf: (id) => `name of ${id}`,
+      goals: pendingGoals(day),
+      seed: overrides.seed ?? BigInt(press.seedText),
+      horizon: 'horizon' in overrides ? overrides.horizon : press.horizon,
+      crowdIsToday: false,
+      firstSession: false,
+      units: 'metric',
+    });
+  }
+
+  it('draws on the pinned day, on its crowd and its horizon', () => {
+    const sentence = crownOn({}).outOfService?.mootUnder ?? '';
+    expect(sentence).toContain('clear this day with no press at all');
+    /* Names, not ids — and no digit, the strip's own rule. */
+    expect(sentence).toContain('name of ');
+    expect(/\d/u.test(sentence), sentence).toBe(false);
+  });
+
+  it('is silent when the press would run the other horizon — the gate #595 added', () => {
+    const press = ladderRowFor('c7')?.pressDay;
+    const other = press?.horizon === 'period' ? 'whole-day' : 'period';
+    expect(crownOn({ horizon: other }).outOfService?.mootUnder).toBeUndefined();
+    expect(crownOn({ horizon: undefined }).outOfService?.mootUnder).toBeUndefined();
+  });
+
+  it('is silent on another crowd, on another day, and under a calendar period', () => {
+    expect(crownOn({ seed: 424_242n }).outOfService?.mootUnder).toBeUndefined();
+    expect(crownOn({ day: 2 }).outOfService?.mootUnder).toBeUndefined();
+    const period = Object.values(CALENDAR_PERIODS)[0];
+    if (period === undefined) throw new Error('no calendar period ships');
+    expect(crownOn({ calendar: periodOnDays(period, 1, 7) }).outOfService?.mootUnder).toBeUndefined();
   });
 });

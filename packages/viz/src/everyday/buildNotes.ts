@@ -247,9 +247,17 @@ export const EVERYDAY_SHELL_ABSENCES: readonly string[] = Object.freeze([
    *
    * The row leaves on the commit that gives the daily door a tower a day, and not before.
    */
-  'The tower is the day’s on your first day and your week’s after that — the crowd turns over every ' +
-    'day and everybody meets the same one, but a week runs a single tower, so nothing moves you to ' +
-    'the day’s tower once you have started. The door says which is which rather than claiming both.',
+  /*
+   * **Reworded by GitHub issue #595, § D973.** It read *"… so nothing moves you to the day’s tower
+   * once you have started"*, which the front door's tower picker (§ D912) made false: a player can
+   * move their week to any tower, the day's draw included. What is still absent is narrower and is
+   * what this now says — nothing draws a tower a day for a returning player, nothing names which
+   * tower today's draw would have been, and a week does not move unless the player moves it.
+   */
+  'The tower is the day’s draw on your first day and your week’s after that. The crowd turns over ' +
+    'every day and everybody meets the same one, but no tower is drawn for you after the first ' +
+    'day, and nothing names the tower today’s draw would have picked. The picker on the door moves ' +
+    'your week to any tower you choose; the door says which is which rather than claiming both.',
 ]);
 
 /**

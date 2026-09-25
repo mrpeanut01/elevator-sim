@@ -47,10 +47,10 @@ import type { ResolvedBuilding } from '@elevator-sim/core/browser';
 import { bookedOutCarsOf, wrinkleNoteOf } from '../shift/bookedOut.js';
 import type { CalendarPeriod } from '../shift/calendar.js';
 import { scheduledEventFor } from '../shift/calendar.js';
-import { FIRST_SESSION_LINE } from '../shift/firstSession.js';
+import { firstSessionLineFor } from '../shift/firstSession.js';
 import { carsToDerate } from '../shift/incidents.js';
-import { pressDayFor } from '../shift/ladder.js';
-import type { GoalReading, ShiftEvent, WeekState, Weekday } from '../shift/types.js';
+import { pressDayStanding } from '../shift/ladder.js';
+import type { GoalReading, RunHorizon, ShiftEvent, WeekState, Weekday } from '../shift/types.js';
 import { weekdayOf } from '../shift/types.js';
 
 import { countFigure, EM_DASH, groupThousands } from './figures.js';
@@ -76,8 +76,9 @@ export interface OutOfServiceStrip {
    * `<select>` and never learn that the day had a question in it — and the product said nothing.
    *
    * It is drawn **only on the day the census was measured on**: `ContractPressDay` pins a seed, and
-   * {@link mootSentenceOf} refuses to draw unless the week's contract, its day and its crowd are
-   * all that day's. A sentence about *this* day's dispatchers, drawn over a different crowd, would
+   * {@link mootSentenceOf} refuses to draw unless the week's contract, its day, its crowd, its
+   * wrinkle, its calendar and the horizon the press will run are all that day's (the last three since
+   * GitHub issue #595, [§ D973](../../../../DECISIONS.md)). A sentence about *this* day's dispatchers, drawn over a different crowd, would
    * be a measurement quoted about a run it was not taken on — which is the class
    * [§ D227](../../../../DECISIONS.md) is about, arriving through a cache of a different kind.
    */
@@ -213,6 +214,17 @@ export interface TodayInput {
   readonly goals: readonly GoalReading[];
   readonly seed: bigint;
   /**
+   * **The horizon the next run press will run this tower on** — `host.scenarioHorizon()`, GitHub
+   * issue #595, [§ D973](../../../../DECISIONS.md).
+   *
+   * Required, {@link TodayInput.calendar}'s reason: the moot sentence quotes a census taken on one
+   * horizon, and the same seed run on the other is a different day. A caller that forgot this would
+   * default to *whatever the pin says*, which is the defect — § D914's five office pins were taken
+   * on a thirty-minute slice while the Scenario press runs those towers ten hours long, and the
+   * sentence was drawn over the whole day on the seed alone.
+   */
+  readonly horizon: RunHorizon | undefined;
+  /**
    * Whether {@link seed} is the day’s crowd — `shift/dailySeed.ts#isDailySeed(seed, nowMs)`,
    * asked by the caller and passed in.
    *
@@ -328,11 +340,12 @@ function outOfServiceOf(
 /**
  * The moot-dispatcher sentence for this exact day, or `undefined`.
  *
- * ## The three gates, and each one is the difference between a measurement and a claim
+ * ## The gates, and each one is the difference between a measurement and a claim
  *
- * `ContractPressDay` is measured on **one contract, on day 1, at one seed** — so the sentence is
- * drawn when the week is on that contract, standing on day 1, with that crowd, and at no other
- * moment. A player on day 4 of Crown Hotel is playing a different day; a player with a `?seed=`
+ * `ContractPressDay` is measured on **one contract, on day 1, at one seed, on one horizon** — so the
+ * sentence is drawn when the week is on that contract, standing on day 1, with that crowd, about to
+ * be run on that horizon, and at no other moment. The horizon is GitHub issue #595's addition: the
+ * pin's seed run ten hours long is a different day from the same seed run for thirty minutes. A player on day 4 of Crown Hotel is playing a different day; a player with a `?seed=`
  * deep link is meeting a different crowd. Either would be this repository's oldest defect wearing
  * new words: a figure quoted about a run it was not taken on.
  *
@@ -349,13 +362,29 @@ function outOfServiceOf(
  * (`shift/pressLadder.test.ts`) than implied here.
  */
 function mootSentenceOf(
-  week: WeekState,
-  seed: bigint,
+  input: TodayInput,
+  event: ShiftEvent,
   nameOf: (id: string) => string | undefined,
 ): string | undefined {
-  const press = pressDayFor(week.contractId);
+  /*
+   * **Five gates now, not three, and the fourth is GitHub issue #595.** Contract, day and seed were
+   * checked here; the horizon was not, and on five of the seven pinned towers the Scenario press
+   * runs a ten-hour day where the census was taken over a thirty-minute slice — so the sentence was
+   * drawn, on the right seed, over a run it was not measured on. The wrinkle and the calendar are
+   * the fifth for the same reason: the census ran on the ordinary day with no calendar period, and
+   * either would make it a different day. All five are `shift/ladder.ts#pressDayStanding`'s, the
+   * predicate the picker offers the day by, so the two cannot disagree about which run is the
+   * pinned one ([§ D973](../../../../DECISIONS.md)).
+   */
+  const press = pressDayStanding({
+    contractId: input.week.contractId,
+    day: input.week.day,
+    eventId: event.id,
+    hasCalendar: input.calendar !== null,
+    seed: input.seed,
+    horizon: input.horizon,
+  });
   if (press === undefined) return undefined;
-  if (week.day !== 1 || seed.toString() !== press.seedText) return undefined;
   const names = press.mootUnder.map((id) => nameOf(id) ?? id);
   if (names.length === 0) return undefined;
   const last = names[names.length - 1] ?? '';
@@ -525,7 +554,7 @@ export function todayOf(input: TodayInput): TodayRecord {
     outOfService: outOfServiceOf(
       building,
       event,
-      mootSentenceOf(week, input.seed, input.dispatcherNameOf),
+      mootSentenceOf(input, event, input.dispatcherNameOf),
     ),
     /*
      * The same call the run makes, and the same call the strip's own badge half makes — one
@@ -541,7 +570,14 @@ export function todayOf(input: TodayInput): TodayRecord {
     asks: input.goals.map((reading) => reading.goal.label),
     seedLine: seedLineOf(input),
     crowdIsToday: input.crowdIsToday,
-    firstSessionLine: input.firstSession ? FIRST_SESSION_LINE : undefined,
+    /*
+     * Which arm is the draw's own answer rather than a guess about how the player arrived — GitHub
+     * issue #595: the picker and the pinned days both reach a legible first day the seed did not
+     * choose, and the first arm's *the same number opens the same tower* is false of both.
+     */
+    firstSessionLine: input.firstSession
+      ? firstSessionLineFor(week.contractId, input.seed)
+      : undefined,
     driver: input.dispatcherName ?? EM_DASH,
   };
 }

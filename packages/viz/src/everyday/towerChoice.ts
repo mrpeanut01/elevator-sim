@@ -51,9 +51,11 @@
  * `doorScreen.ts` mounts what this returns, and the honesty corpus drives it without a document.
  */
 
+import { scheduledEventFor, type CalendarPeriod } from '../shift/calendar.js';
 import { CONTRACTS } from '../shift/contracts.js';
-import { ladderRowFor } from '../shift/ladder.js';
-import type { WeekState } from '../shift/types.js';
+import { ladderRowFor, pressDayFor, pressDayStanding } from '../shift/ladder.js';
+import type { RunHorizon, WeekState } from '../shift/types.js';
+import { switchWeek } from '../shift/week.js';
 
 /** What pressing a row will do to the week — `shift/week.ts#WeekArrival`, said before the press. */
 export type TowerChoiceArrival = 'resume' | 'open' | 'standing';
@@ -86,6 +88,35 @@ export interface TowerChoiceRow {
   readonly booksACarOut: boolean;
 }
 
+/**
+ * **One pinned day a player can set up from here** — GitHub issue #595,
+ * [§ D973](../../../../DECISIONS.md).
+ *
+ * A row per contract whose rung pins a `ContractPressDay`, and only where the pin was
+ * measured on the horizon the Scenario press runs that tower on — which `contractLadderIssues`
+ * already requires of the data, and which is asked again here so a surface never offers a day the
+ * product would not run as it was measured.
+ */
+export interface PressDayChoiceRow {
+  readonly contractId: string;
+  /** `Scenario 6` — the contract's own label. */
+  readonly label: string;
+  readonly tower: string;
+  /** Whether a press sets the pinned day up. */
+  readonly available: boolean;
+  /** Whether the run standing now **is** the pinned day — then the row is inert. */
+  readonly standing: boolean;
+  /** What the press will do, or why it will not — drawn beside the row. */
+  readonly note: string;
+}
+
+export interface PressDayChoiceView {
+  readonly heading: string;
+  readonly lede: string;
+  readonly note: string;
+  readonly rows: readonly PressDayChoiceRow[];
+}
+
 export interface TowerChoiceView {
   readonly heading: string;
   /** What this control is for, above the rows. */
@@ -95,6 +126,8 @@ export interface TowerChoiceView {
   readonly rows: readonly TowerChoiceRow[];
   /** The tag a row with a mid-shift absence carries. */
   readonly incidentTag: string;
+  /** The days a press decides, as a second list under the towers — {@link PressDayChoiceView}. */
+  readonly pressDays: PressDayChoiceView;
 }
 
 export const TOWER_CHOICE_COPY = Object.freeze({
@@ -109,8 +142,133 @@ export const TOWER_CHOICE_COPY = Object.freeze({
   open: 'you have not played here — this opens a fresh week',
 });
 
+/**
+ * Every sentence the pinned-day list says — GitHub issue #595, [§ D973](../../../../DECISIONS.md).
+ *
+ * ## What the lede may claim, and it is exactly what `shift/pressLadder.test.ts` proves
+ *
+ * On each pinned day, under the tower's standing order and with the press made at the pinned
+ * moment: the day misses as built, one parking press clears it, the other parking press does not,
+ * and the press moves the legs. The lede says those four things and **not which press** — naming
+ * it would turn the day into a switch. It says *measured* because it is one day on one crowd, and
+ * § D914's fifty-seed measurement found a press flips a day's verdict in a minority of pairs with
+ * no tower's effect distinguishable from zero, so nothing here may read as a rule about a tower.
+ *
+ * *While the car is away* is the pinned moment in words: every pin presses at a fraction of the run
+ * inside the rung's own absence, `fromFraction` to `toFraction`, and a clock time printed here would
+ * be a figure with a schedule the reader cannot see behind it (`today.ts#outOfServiceOf`'s reason).
+ *
+ * ## A pin on the other horizon is listed and refused, by name
+ *
+ * A pin measured on the slice of a tower the Scenario press runs as a whole day is a measurement of
+ * a day no player can take (GitHub issue #595), so its row is drawn disabled with
+ * {@link PRESS_DAY_CHOICE_COPY}'s `otherHorizon` rather than hidden: a list that silently shrank
+ * would be a picker a player cannot read their options off, and the tower list's own selected row
+ * already sets that precedent.
+ *
+ * ## What choosing one costs, said before the press
+ *
+ * It moves the week exactly as the list above does (`resume`, never `restart`), sets the crowd to
+ * the pinned seed rather than the day's, and hands the day back to the tower's standing order,
+ * because the claim is only measured under that one. Choosing a tower from the list above puts the
+ * crowd back to the one the session had, so the pinned seed does not follow the player onto a
+ * tower it was never measured on.
+ */
+export const PRESS_DAY_CHOICE_COPY = Object.freeze({
+  heading: 'DAYS A PRESS DECIDES',
+  lede:
+    'On each of these a lift goes out part-way through the first day. Measured on one crowd under ' +
+    'the tower’s standing order, that day misses as built, one of the two parking presses clears ' +
+    'it and the other does not, with the press made while the car is away. Which one is for you ' +
+    'to find.',
+  note:
+    'Choosing one moves your week there the way the list above does, sets its first day up on the ' +
+    'crowd it was measured on rather than today’s, and hands the day back to the tower’s standing ' +
+    'order. Choosing a tower from the list above puts your crowd back.',
+  available: 'sets this tower’s first day up on the crowd it was measured on',
+  standing: 'the day you are set up to play',
+  pastFirstDay:
+    'your week here is past its first day, and this is a first day, so it cannot be set up on it',
+  notAsMeasured:
+    'the first day here would not run the way it was measured, so it is not offered',
+  otherHorizon:
+    'measured on a different length of day from the one this tower plays, so it is not offered ' +
+    'until it is measured on the day you would play',
+});
+
+/** What {@link pressDayChoiceOf} needs — the week, the parked weeks and the run's other three facts. */
+export interface PressDayChoiceInput {
+  readonly week: WeekState;
+  readonly parked: readonly WeekState[];
+  /** `ViewerState.seed` — the crowd the next press runs. */
+  readonly seed: bigint;
+  /** `ViewerState.calendar` — the measurement ran with none. */
+  readonly calendar: CalendarPeriod | null;
+  /** The horizon the Scenario press runs a building on — `shift/dayLength.ts#scenarioHorizonFor`. */
+  readonly horizonFor: (buildingId: string) => RunHorizon | undefined;
+}
+
+/**
+ * Whether pressing `contractId`'s pinned-day row sets the pinned day up, and the sentence that says
+ * so — the one answer the picker draws and `everyday/host.ts#playPressDay` obeys.
+ *
+ * The destination week is `switchWeek`'s own answer rather than a guess at it, so a row is offered
+ * exactly when the week the press would land on stands on a first day that draws the ordinary
+ * wrinkle, with no calendar, on the horizon the pin was measured on. `undefined` for a contract
+ * that pins no day.
+ */
+export function pressDayChoiceOf(
+  input: PressDayChoiceInput,
+  contractId: string,
+): { readonly available: boolean; readonly standing: boolean; readonly note: string } | undefined {
+  const press = pressDayFor(contractId);
+  const contract = CONTRACTS.find((candidate) => candidate.id === contractId);
+  if (press === undefined || contract === undefined) return undefined;
+  const horizon = input.horizonFor(contract.buildingId);
+  const eventOf = (week: WeekState): string =>
+    scheduledEventFor(input.calendar, week.day, week.dayIdx).id;
+  const standing =
+    input.week.contractId === contractId &&
+    pressDayStanding({
+      contractId,
+      day: input.week.day,
+      eventId: eventOf(input.week),
+      hasCalendar: input.calendar !== null,
+      seed: input.seed,
+      horizon,
+    }) !== undefined;
+  if (standing) return { available: false, standing, note: PRESS_DAY_CHOICE_COPY.standing };
+  if (horizon !== undefined && horizon !== press.horizon) {
+    return { available: false, standing, note: PRESS_DAY_CHOICE_COPY.otherHorizon };
+  }
+  const landing =
+    input.week.contractId === contractId
+      ? input.week
+      : switchWeek(input.week, input.parked, contractId, 'resume').week;
+  if (landing.day !== 1) {
+    return { available: false, standing, note: PRESS_DAY_CHOICE_COPY.pastFirstDay };
+  }
+  /*
+   * The same predicate the moot sentence draws on, asked of the run the press would leave standing:
+   * the landing week, the pinned seed. If it would not be the pinned day, the row says so rather
+   * than setting up something else under the pinned day's name.
+   */
+  const asMeasured =
+    pressDayStanding({
+      contractId,
+      day: landing.day,
+      eventId: eventOf(landing),
+      hasCalendar: input.calendar !== null,
+      seed: BigInt(press.seedText),
+      horizon,
+    }) !== undefined;
+  return asMeasured
+    ? { available: true, standing, note: PRESS_DAY_CHOICE_COPY.available }
+    : { available: false, standing, note: PRESS_DAY_CHOICE_COPY.notAsMeasured };
+}
+
 /** What {@link towerChoiceViewOf} needs. Threaded rather than imported, `today.ts`'s own idiom. */
-export interface TowerChoiceInput {
+export interface TowerChoiceInput extends PressDayChoiceInput {
   readonly week: WeekState;
   /** The weeks parked beside the live one — `ViewerState.parkedWeeks`. */
   readonly parked: readonly WeekState[];
@@ -146,11 +304,31 @@ export function towerChoiceViewOf(input: TowerChoiceInput): TowerChoiceView {
       booksACarOut: (ladderRowFor(contract.id)?.fabric.incidents.length ?? 0) > 0,
     };
   });
+  const pressRows = CONTRACTS.flatMap((contract): PressDayChoiceRow[] => {
+    const choice = pressDayChoiceOf(input, contract.id);
+    if (choice === undefined) return [];
+    return [
+      {
+        contractId: contract.id,
+        label: contract.label,
+        tower: input.nameOf(contract.buildingId) ?? contract.buildingId,
+        available: choice.available,
+        standing: choice.standing,
+        note: choice.note,
+      },
+    ];
+  });
   return {
     heading: TOWER_CHOICE_COPY.heading,
     lede: TOWER_CHOICE_COPY.lede,
     note: TOWER_CHOICE_COPY.note,
     rows: Object.freeze(rows),
     incidentTag: TOWER_CHOICE_COPY.incidentTag,
+    pressDays: {
+      heading: PRESS_DAY_CHOICE_COPY.heading,
+      lede: PRESS_DAY_CHOICE_COPY.lede,
+      note: PRESS_DAY_CHOICE_COPY.note,
+      rows: Object.freeze(pressRows),
+    },
   };
 }

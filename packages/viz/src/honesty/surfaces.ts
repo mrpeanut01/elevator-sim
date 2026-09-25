@@ -584,6 +584,9 @@ import { bestLineFor, goalsForDay, readGoal, readGoals, yesterdayLabelOf } from 
 import { shiftObservationsOf } from '../shift/observations.js';
 import { AFTER_PRESS_ROW_ID } from '../shift/afterPress.js';
 import { pressCounterfactualOf } from '../shift/counterfactual.js';
+import { scenarioHorizonFor } from '../shift/dayLength.js';
+import { CONTRACT_LADDER } from '../shift/ladder.js';
+import { FIRST_SESSION_LINE, FIRST_SESSION_LINE_CHOSEN } from '../shift/firstSession.js';
 import {
   averageWaitFigure,
   clockRange,
@@ -601,6 +604,7 @@ import {
   type GoalReading,
   type Observations,
   type ReportFigure,
+  type RunHorizon,
   type ScenarioContract,
   type ShiftEvent,
   type ShiftGoal,
@@ -12594,6 +12598,10 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
   covers: [
     'everyday/today.ts#todayOf',
     'shift/firstSession.ts#FIRST_SESSION_LINE',
+    /* The line's second arm, for a first day the draw did not choose — GitHub issue #595, § D973. */
+    'shift/firstSession.ts#FIRST_SESSION_LINE_CHOSEN',
+    /* The chooser between the two arms; both of its answers are seeded below. */
+    'shift/firstSession.ts#firstSessionLineFor',
     'everyday/doorView.ts#doorScreenViewOf',
     /* § 6.1's replay words — GitHub issue #177 item 1. The door's primary note carries both arms
        (a day inside the week, a chip from before it), and the bar and rail adapters carry the rest. */
@@ -12679,6 +12687,8 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
           context.dispatcherProfiles.profiles.find((profile) => profile.id === id)?.name,
         goals: entry.readings,
         seed: 424_242n,
+        /* The horizon the case's tower is pressed on — the moot sentence's fourth gate, § D973. */
+        horizon: scenarioHorizonFor(context.trafficProfiles, context.building),
         /*
          * The day's crowd — § D729, § D730. Seeded `true` here and `false` below, because the
          * seed line and the door's closing sentence both have two arms and the arm a developer
@@ -12720,6 +12730,7 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
             context.dispatcherProfiles.profiles.find((profile) => profile.id === id)?.name,
           goals: entry.readings,
           seed: 424_242n,
+          horizon: scenarioHorizonFor(context.trafficProfiles, context.building),
           crowdIsToday: false,
           firstSession: entry.week.day === 1 && entry.week.history.length === 0,
           units: 'metric',
@@ -12728,6 +12739,17 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
       });
       if (today.firstSessionLine !== undefined) {
         seeds.push({ field: `${at}.today.firstSession`, text: today.firstSessionLine, role: 'observation' });
+        /*
+         * **The other arm of the first-session line** — GitHub issue #595, § D973. Which arm a case
+         * draws depends on whether the seed's own draw opens this tower, and the pinned fixture
+         * seed decides that for every case at once; seeding only the drawn arm would leave the
+         * other — the one a player meets after the picker or a pinned day — unswept. The seed line's
+         * own second arm above is the precedent, and for its reason: `todayOf` is total in this
+         * field, so the arm is seeded as the line rather than as a second record.
+         */
+        const otherArm =
+          today.firstSessionLine === FIRST_SESSION_LINE ? FIRST_SESSION_LINE_CHOSEN : FIRST_SESSION_LINE;
+        seeds.push({ field: `${at}.today.firstSession.other`, text: otherArm, role: 'observation' });
       }
       for (const fact of today.facts) {
         seeds.push({ field: `${at}.today.fact.${fact.label}`, text: fact.value, role: 'observation' });
@@ -12752,6 +12774,7 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
           context.dispatcherProfiles.profiles.find((profile) => profile.id === id)?.name,
         goals: entry.readings,
         seed: 424_242n,
+        horizon: scenarioHorizonFor(context.trafficProfiles, context.building),
         crowdIsToday: true,
         firstSession: entry.week.day === 1 && entry.week.history.length === 0,
         units: 'imperial',
@@ -13252,7 +13275,15 @@ const EVERYDAY_SIGN_IN_LINK: SurfaceAdapter = {
  */
 const EVERYDAY_TOWER_CHOICE: SurfaceAdapter = {
   id: 'everyday/towerChoice.ts#towerChoiceViewOf',
-  covers: ['everyday/towerChoice.ts#towerChoiceViewOf', 'everyday/towerChoice.ts#TOWER_CHOICE_COPY'],
+  covers: [
+    'everyday/towerChoice.ts#towerChoiceViewOf',
+    'everyday/towerChoice.ts#TOWER_CHOICE_COPY',
+    /* The days a press decides, under the towers — GitHub issue #595, § D973. Every arm of the
+       row decision is seeded below: offered, standing, other horizon, past its first day, and not
+       as measured. */
+    'everyday/towerChoice.ts#PRESS_DAY_CHOICE_COPY',
+    'everyday/towerChoice.ts#pressDayChoiceOf',
+  ],
   render(context) {
     const seeds: TextSeed[] = [];
     /*
@@ -13267,8 +13298,34 @@ const EVERYDAY_TOWER_CHOICE: SurfaceAdapter = {
       ['fresh', []],
       ['parked', [openWeek('c2'), openWeek('c7')]],
     ];
+    /* The horizon the Scenario press runs each loaded tower on — the pinned rows' gate, § D973. */
+    const horizonFor = (buildingId: string): RunHorizon | undefined =>
+      scenarioHorizonFor(
+        context.trafficProfiles,
+        context.buildings.find((building) => building.id === buildingId),
+      );
+    const pressInput = { seed: 424_242n, calendar: null, horizonFor } as const;
     for (const [state, parked] of states) {
-      const view = towerChoiceViewOf({ week, parked, nameOf });
+      const view = towerChoiceViewOf({ week, parked, nameOf, ...pressInput });
+      /*
+       * **The pinned-day list** — GitHub issue #595, § D973. Every row here is a promise about the
+       * crowd the press sets, and the lede is a claim about a measurement, so both are swept.
+       */
+      seeds.push(
+        { field: `towers.${state}.pressDays.heading`, text: view.pressDays.heading, role: 'label' },
+        { field: `towers.${state}.pressDays.lede`, text: view.pressDays.lede, role: 'prose' },
+        { field: `towers.${state}.pressDays.note`, text: view.pressDays.note, role: 'prose' },
+      );
+      for (const row of view.pressDays.rows) {
+        seeds.push(
+          {
+            field: `towers.${state}.pressDays.${row.contractId}.name`,
+            text: `${row.label} · ${row.tower}`,
+            role: 'label',
+          },
+          { field: `towers.${state}.pressDays.${row.contractId}.note`, text: row.note, role: 'prose' },
+        );
+      }
       seeds.push(
         { field: `towers.${state}.heading`, text: view.heading, role: 'label' },
         { field: `towers.${state}.lede`, text: view.lede, role: 'prose' },
@@ -13289,6 +13346,38 @@ const EVERYDAY_TOWER_CHOICE: SurfaceAdapter = {
             role: 'prose',
           },
         );
+      }
+    }
+    /*
+     * **The pinned-day rows' other three arms** — standing on a pinned day, a week there past its
+     * first day, and a tower the build cannot resolve a horizon for. Only the row notes are seeded:
+     * every other string on these states is one the two states above already drew.
+     */
+    const firstPin = CONTRACT_LADDER.rows.find((row) => row.pressDay !== undefined);
+    const secondPin = CONTRACT_LADDER.rows.filter((row) => row.pressDay !== undefined)[1];
+    if (firstPin?.pressDay !== undefined && secondPin !== undefined) {
+      const extra: readonly (readonly [string, Parameters<typeof towerChoiceViewOf>[0]])[] = [
+        [
+          'pinned',
+          {
+            week: openWeek(firstPin.contractId),
+            parked: [{ ...openWeek(secondPin.contractId), day: 4 }],
+            nameOf,
+            seed: BigInt(firstPin.pressDay.seedText),
+            calendar: null,
+            horizonFor,
+          },
+        ],
+        ['unresolved', { week, parked: [], nameOf, seed: 424_242n, calendar: null, horizonFor: () => undefined }],
+      ];
+      for (const [state, input] of extra) {
+        for (const row of towerChoiceViewOf(input).pressDays.rows) {
+          seeds.push({
+            field: `towers.${state}.pressDays.${row.contractId}.note`,
+            text: row.note,
+            role: 'prose',
+          });
+        }
       }
     }
     return singleRun(this.id, seeds);

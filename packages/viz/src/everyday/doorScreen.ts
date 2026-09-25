@@ -29,7 +29,7 @@ import {
   EVERYDAY_TYPE as TYPE,
 } from './tokens.js';
 import type { EverydayState } from './types.js';
-import type { TowerChoiceView } from './towerChoice.js';
+import type { PressDayChoiceView, TowerChoiceView } from './towerChoice.js';
 import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.js';
 
 /**
@@ -61,6 +61,8 @@ function viewOf(context: EverydayScreenShellContext): DoorScreenView {
       dispatcherNameOf: (id) => host.dispatcherById(id)?.name,
       goals: host.goalsToday(),
       seed: host.seed(),
+      /* The horizon the next press runs — the moot sentence's fourth gate, GitHub issue #595. */
+      horizon: host.scenarioHorizon(),
       /*
        * Whether the run in front of the reader is on the day’s crowd — § D729, § D730.
        *
@@ -297,7 +299,9 @@ function mountDoor(
      * that says why the primary cannot act, and the bar's note column is 44ch wide and right
      * aligned. § 16 rule 6: it always says what it is short by, and it says it where the reader is.
      */
-    column.append(towerChoiceCard(document_, context.host.towerChoice()));
+    const choice = context.host.towerChoice();
+    column.append(towerChoiceCard(document_, choice));
+    if (choice.pressDays.rows.length > 0) column.append(pressDayCard(document_, choice.pressDays));
 
     const primaryNote = el(document_, 'p', 'everyday-door-primary-note', view.primary.note);
     primaryNote.style.cssText = [
@@ -382,6 +386,68 @@ function mountDoor(
         button.addEventListener('click', () => {
           context.host.chooseTower(row.contractId);
           /* The strip is a stepper, not a memory of one — a new week opens on its own today. */
+          dayOffset = 0;
+          render();
+          context.refreshBar();
+        });
+      }
+      list.append(button);
+    }
+    card.append(list);
+    return card;
+  }
+
+  /**
+   * **The days a press decides, as something a player can choose** — GitHub issue #595, § D973,
+   * `everyday/towerChoice.ts#pressDayChoiceOf`.
+   *
+   * Beside the tower list rather than inside it, because a row here does something a tower row does
+   * not: it sets the crowd as well as the week, and a player choosing a tower should not be able to
+   * do that by accident. Every word is `towerChoice.ts`'s. A row that cannot act is drawn disabled
+   * with its reason inside it and on `aria-describedby`, the tower list's own rule for its selected
+   * row (GitHub issue #262), so a refused day says why where the player is looking.
+   */
+  function pressDayCard(document_: Document, days: PressDayChoiceView): HTMLElement {
+    const card = el(document_, 'div', 'everyday-door-pressdays');
+    card.style.cssText = CARD;
+    const heading = el(document_, 'div', undefined, days.heading);
+    heading.style.cssText = EYEBROW;
+    const lede = el(document_, 'p', 'everyday-door-pressdays-lede', days.lede);
+    lede.style.cssText = `${BODY};margin:7px 0 0`;
+    const note = el(document_, 'p', 'everyday-door-pressdays-note', days.note);
+    note.style.cssText = `${QUIET};margin:5px 0 0`;
+    card.append(heading, lede, note);
+    const list = el(document_, 'div');
+    list.style.cssText = 'display:grid;gap:6px;margin-top:11px';
+    for (const row of days.rows) {
+      const button = el(document_, 'button', 'everyday-door-pressday');
+      button.type = 'button';
+      button.dataset['contract'] = row.contractId;
+      button.dataset['standing'] = row.standing ? 'true' : 'false';
+      button.disabled = !row.available;
+      button.setAttribute('aria-pressed', row.standing ? 'true' : 'false');
+      button.style.cssText = [
+        'display:block',
+        'width:100%',
+        'text-align:left',
+        'padding:8px 10px',
+        `border:1px solid ${row.standing ? C.terracotta : C.ruleLight}`,
+        `border-radius:${String(R.row)}px`,
+        `background:${row.standing ? C.amberWash : C.card}`,
+        `color:${C.ink}`,
+        `cursor:${row.available ? 'pointer' : 'default'}`,
+      ].join(';');
+      const name = el(document_, 'span', 'everyday-door-pressday-name', `${row.label} · ${row.tower}`);
+      name.style.cssText = 'display:block;font-size:12.5px;font-weight:600';
+      const why = el(document_, 'span', 'everyday-door-pressday-note', row.note);
+      why.style.cssText = `display:block;${QUIET};margin-top:2px`;
+      why.id = `everyday-door-pressday-${row.contractId}-note`;
+      button.setAttribute('aria-describedby', why.id);
+      if (!row.available) button.title = row.note;
+      button.append(name, why);
+      if (row.available) {
+        button.addEventListener('click', () => {
+          context.host.playPressDay(row.contractId);
           dayOffset = 0;
           render();
           context.refreshBar();

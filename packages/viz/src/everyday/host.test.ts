@@ -2443,6 +2443,22 @@ describe('GitHub issue #594 — the career parks the Scenario record and gives i
     expect(host.campaignDay()).toBeUndefined();
   });
 
+  it('a pinned day from the front door releases a standing career day too — added at integration', () => {
+    /*
+     * Lane A gave every Scenario press a release and lane B wrote a new one, `playPressDay`, without
+     * it; each was green alone. A pinned day read with the career's week standing would ask the
+     * career's record whether the row is available, and run on it.
+     */
+    const { h, host } = applyingHarness();
+    const tower = host.campaign().towers[0];
+    if (tower === undefined) throw new Error('the opening career holds no tower');
+    host.runCampaignDay(tower.id);
+    expect(host.campaignDay()).toBeDefined();
+    host.playPressDay('c7');
+    expect(host.campaignDay()).toBeUndefined();
+    expect(h.state.week.contractId).not.toBe(CAREER_CONTRACT_ID);
+  });
+
   it('is a no-op with no career day standing', () => {
     const { h, host } = applyingHarness();
     const before = h.calls.length;

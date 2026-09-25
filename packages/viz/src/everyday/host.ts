@@ -179,7 +179,12 @@ import { worksHeldCarRefsOf, worksHeldCarsOf } from '../campaign/works.js';
 import { everydayCareerStore, type CareerStore } from './careerStore.js';
 import { CAMPAIGN_DOCK_COPY, purseRefusalOf } from './campaignDock.js';
 import { CAREER_CONTRACT_ID, openCareer, switchWeek } from '../shift/week.js';
-import { towerChoiceViewOf, type TowerChoiceView } from './towerChoice.js';
+import {
+  pressDayChoiceOf,
+  towerChoiceViewOf,
+  type PressDayChoiceInput,
+  type TowerChoiceView,
+} from './towerChoice.js';
 import type { VizRecording } from '../contract/types.js';
 import { savedBuildingFrom, stateRunningSaved } from '../dev/buildingEditor.js';
 import type { BrowserResources } from '../dev/data.js';
@@ -209,8 +214,14 @@ import {
 } from '../mode/plainLevers.js';
 import type { CalendarPeriod } from '../shift/calendar.js';
 import { contractById, statLineOf } from '../shift/contracts.js';
-import { ladderTowersOf } from '../shift/ladder.js';
-import { runHorizonOf, wholeDayFor, wholeDayRun, type WholeDay } from '../shift/dayLength.js';
+import { ladderTowersOf, pressDayFor } from '../shift/ladder.js';
+import {
+  runHorizonOf,
+  scenarioHorizonFor,
+  wholeDayFor,
+  wholeDayRun,
+  type WholeDay,
+} from '../shift/dayLength.js';
 import { goalsForDay, readGoals } from '../shift/goals.js';
 import { shiftObservationsOf } from '../shift/observations.js';
 import type { ShapedDayReport } from '../shift/report.js';
@@ -827,6 +838,16 @@ export interface EverydayHost {
    * {@link EverydayHost.week} is a call and not a field.
    */
   towerChoice(): TowerChoiceView;
+
+  /**
+   * **The horizon the next Scenario run press will run the standing tower on** — GitHub issue
+   * #595, [§ D973](../../../../DECISIONS.md), `shift/dayLength.ts#scenarioHorizonFor`.
+   *
+   * Asked by the door and the brief before the press, so a sentence quoting a measurement taken on
+   * one horizon is never drawn over a run the press will take on the other. `undefined` for a
+   * building this build cannot resolve.
+   */
+  scenarioHorizon(): RunHorizon | undefined;
 
   /**
    * The calendar period the week is under, or `null` — `ViewerState.calendar`.
@@ -1847,6 +1868,15 @@ export interface EverydayHost {
    * same gate that block carries.
    */
   chooseTower(contractId: string): void;
+  /**
+   * **Set up a day whose verdict turns on a press** — GitHub issue #595,
+   * [§ D973](../../../../DECISIONS.md), `everyday/towerChoice.ts#pressDayChoiceOf`.
+   *
+   * Moves the week as {@link chooseTower} does, then writes the pinned seed and the tower's standing
+   * order, so the run the next press takes is the day `shift/pressLadder.test.ts` measured. Returns
+   * the row's own refusal and writes nothing when the week it would land on is not on that day.
+   */
+  playPressDay(contractId: string): string | undefined;
   /** The replay in progress, or `undefined`. */
   replay(): EverydayReplaySession | undefined;
   /** Leave the replay, putting the parked week and the run it interrupted back. A no-op outside one. */
@@ -2552,6 +2582,62 @@ export function createEverydayHost(
     const state = b.state();
     const moved = switchWeek(state.week, state.parkedWeeks, hold.contractId, 'resume');
     b.applyPatch({ ...hold.patch, week: moved.week, parkedWeeks: moved.parked });
+  };
+
+  /**
+   * The crowd the session had before a pinned day replaced it — GitHub issue #595, § D973.
+   *
+   * Written by {@link EverydayHost.playPressDay} on the first pinned day of a sitting and read back
+   * by {@link EverydayHost.chooseTower}, so choosing an ordinary tower after a pinned day puts the
+   * day's crowd (or the reader's own `?seed=`) back rather than running it on a seed that was
+   * measured on somebody else's first day. Captured once, on `careerSeedBase`'s reasoning: a second
+   * pinned day chosen from a first would otherwise record the first one's seed as the one to restore.
+   * Not persisted, and that is correct rather than cheap — a reload re-seeds from the date, which is
+   * the crowd this would have put back.
+   */
+  let pressDaySeedBase: bigint | undefined;
+
+  /** The horizon the Scenario press runs `buildingId` on — `dayLength.ts#scenarioHorizonFor`. */
+  const horizonForBuilding = (buildingId: string): RunHorizon | undefined =>
+    scenarioHorizonFor(
+      b.resources.trafficProfiles,
+      buildingConfigOf(b.resources, b.state().savedBuildings, buildingId),
+    );
+
+  /** What the picker and {@link EverydayHost.playPressDay} both ask of a state — one expression. */
+  const pressDayInputOf = (state: ViewerState): PressDayChoiceInput => ({
+    week: state.week,
+    parked: state.parkedWeeks,
+    seed: state.seed,
+    calendar: state.calendar,
+    horizonFor: horizonForBuilding,
+  });
+
+  /**
+   * The week, moved to `contractId` — what {@link EverydayHost.chooseTower} did before GitHub issue
+   * #595, lifted out unchanged so {@link EverydayHost.playPressDay} moves a week the same way rather
+   * than by a second copy of this block.
+   */
+  const moveWeekTo = (contractId: string): void => {
+    const contract = contractById(contractId);
+    if (contract === undefined) return;
+    if (b.state().week.contractId === contractId) return;
+    /*
+     * The day being left goes with the week being parked — `campaignAct`'s `take-offer` block,
+     * § D565's gate included: a filed day is cancelled and an unfiled one is marked as left
+     * unfinished, because telling a player their finished day was abandoned is an accusation the
+     * product has already spent a docstring on not making.
+     */
+    if (b.dayClosed()) b.cancelRun?.();
+    else b.abandonDay?.();
+    const moved = switchWeek(b.state().week, b.state().parkedWeeks, contractId, 'resume');
+    b.applyPatch({
+      week: moved.week,
+      parkedWeeks: moved.parked,
+      buildingId: contract.buildingId,
+      shiftLengthS: shiftLengthForContract(contractId),
+      windowStartS: null,
+    });
   };
 
   /** {@link EverydayHost.campaignDay}, as a local so `answerIncident` reads the same fold. */
@@ -3681,37 +3767,59 @@ export function createEverydayHost(
       }
       return outcome;
     },
-    towerChoice: () => {
-      const state = b.state();
-      return towerChoiceViewOf({
-        week: state.week,
-        parked: state.parkedWeeks,
+    towerChoice: () =>
+      towerChoiceViewOf({
+        ...pressDayInputOf(b.state()),
         nameOf: (buildingId) =>
           b.resources.buildings.find((building) => building.id === buildingId)?.name,
+      }),
+    scenarioHorizon: () => horizonForBuilding(b.state().buildingId),
+    playPressDay: (contractId) => {
+      /*
+       * A pinned day is a Scenario press, so it runs on the Scenario record — GitHub issue #594,
+       * {@link careerHold}. Released before the choice is read, because a standing career day's week
+       * is not the one the row's availability was drawn from. Added at wave AH's integration: lane A
+       * gave every Scenario press this line and lane B wrote this press, neither seeing the other.
+       */
+      releaseCareer();
+      const press = pressDayFor(contractId);
+      const choice = pressDayChoiceOf(pressDayInputOf(b.state()), contractId);
+      if (press === undefined || choice === undefined) return 'this tower pins no such day';
+      if (!choice.available) return choice.note;
+      /*
+       * The seed the session had, captured once and before anything is written — `careerSeedBase`'s
+       * shape and reason: a second pinned day chosen from a first must not capture the first one's
+       * seed as the crowd to put back.
+       */
+      pressDaySeedBase ??= b.state().seed;
+      moveWeekTo(contractId);
+      const next = withDispatcher(b.state(), b.resources, press.standingOrder);
+      b.applyPatch({
+        seed: BigInt(press.seedText),
+        dispatcherId: next.dispatcherId,
+        dispatcherSpec: next.dispatcherSpec,
+        editingDispatcherId: next.editingDispatcherId,
       });
+      notifyCampaign();
+      return undefined;
     },
     chooseTower: (contractId) => {
       const contract = contractById(contractId);
       if (contract === undefined) return;
       releaseCareer();
-      const state = b.state();
-      if (state.week.contractId === contractId) return;
       /*
-       * The day being left goes with the week being parked — `campaignAct`'s `take-offer` block,
-       * § D565's gate included: a filed day is cancelled and an unfiled one is marked as left
-       * unfinished, because telling a player their finished day was abandoned is an accusation the
-       * product has already spent a docstring on not making.
+       * **A pinned day's crowd does not follow the player to another tower** — GitHub issue #595,
+       * § D973. {@link EverydayHost.playPressDay} wrote a seed measured on one tower's first day;
+       * carried onto a tower chosen from the list, it would be a crowd nobody else has with no
+       * reason given. So it goes back to the one the session had — which is the day's, or a
+       * `?seed=` deep link, and in either case what the seed line was saying before.
        */
-      if (b.dayClosed()) b.cancelRun?.();
-      else b.abandonDay?.();
-      const moved = switchWeek(b.state().week, b.state().parkedWeeks, contractId, 'resume');
-      b.applyPatch({
-        week: moved.week,
-        parkedWeeks: moved.parked,
-        buildingId: contract.buildingId,
-        shiftLengthS: shiftLengthForContract(contractId),
-        windowStartS: null,
-      });
+      if (pressDaySeedBase !== undefined) {
+        const base = pressDaySeedBase;
+        pressDaySeedBase = undefined;
+        if (b.state().seed !== base) b.applyPatch({ seed: base });
+      }
+      moveWeekTo(contractId);
       notifyCampaign();
     },
     startReplay: (day) => {

@@ -70,8 +70,9 @@ export function firstSessionContractFor(seed: number | bigint): string {
  * Whether the week is a first day nobody has played on one of the legible towers — the derived
  * condition under which the door says why this tower (§ D476's shape: derived from the player's own
  * progress on every load, stored nowhere). It is true of a drawn first session and equally true of a
- * player who moved to one of them before playing a day, and {@link FIRST_SESSION_LINE} is worded
- * so that it is true in both cases.
+ * player who moved to one of them before playing a day. {@link FIRST_SESSION_LINE} said it was
+ * worded to be true in both cases and was not once the picker shipped, so the line now has two arms
+ * — see {@link FIRST_SESSION_LINE_CHOSEN} and {@link firstSessionLineFor} (GitHub issue #595).
  */
 export function isFirstDayOnALegibleTower(week: WeekState): boolean {
   return (
@@ -136,3 +137,33 @@ export const FIRST_SESSION_LINE =
   `A first day opens on one of the ${NUMBER_WORDS[ELIGIBLE_FIRST_CONTRACT_IDS.length] ?? String(ELIGIBLE_FIRST_CONTRACT_IDS.length)} towers whose day 1 puts somebody past a minute on a landing ` +
   `for two minutes together, measured over ${String(LEGIBILITY_SWEEP.length * LEGIBILITY_SWEEP_N)} days. The crowd number above is the draw, so the ` +
   'same number opens the same tower.';
+
+/**
+ * **The same line on a first day the draw did not choose** — GitHub issue #595,
+ * [§ D973](../../../../DECISIONS.md).
+ *
+ * {@link isFirstDayOnALegibleTower} is true of a player who moved their week to a legible tower
+ * with the picker (`everyday/towerChoice.ts`, § D912) as well as of a drawn first session, and its
+ * own docstring said {@link FIRST_SESSION_LINE} was worded to be true in both. **It was not, from
+ * the day the picker shipped**: *the crowd number above is the draw, so the same number opens the
+ * same tower* is false of a tower the player chose, because that number draws some other tower —
+ * and false again of a pinned day, whose crowd number was never the day's at all. So the line has
+ * two arms, and `everyday/today.ts#todayOf` picks between them by asking the draw itself
+ * ({@link firstSessionContractFor} over the seed the door prints) whether it would have opened this
+ * tower, which is exactly the condition under which the first arm's last sentence is true.
+ *
+ * The first sentence is shared, derived on the same terms, and stays true either way: the tower is
+ * one of the legible set whoever put the week there.
+ */
+export const FIRST_SESSION_LINE_CHOSEN =
+  `This first day is on one of the ${NUMBER_WORDS[ELIGIBLE_FIRST_CONTRACT_IDS.length] ?? String(ELIGIBLE_FIRST_CONTRACT_IDS.length)} towers whose day 1 puts somebody past a minute on a ` +
+  `landing for two minutes together, measured over ${String(LEGIBILITY_SWEEP.length * LEGIBILITY_SWEEP_N)} days. The week was moved here rather than ` +
+  'drawn, so the crowd number above is not what chose it.';
+
+/**
+ * Which of the two lines is true of a first day on `contractId` at `seed` — the draw asked
+ * directly, never inferred from how the player arrived.
+ */
+export function firstSessionLineFor(contractId: string, seed: bigint): string {
+  return firstSessionContractFor(seed) === contractId ? FIRST_SESSION_LINE : FIRST_SESSION_LINE_CHOSEN;
+}

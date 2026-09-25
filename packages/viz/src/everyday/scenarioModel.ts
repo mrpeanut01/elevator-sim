@@ -152,7 +152,17 @@ const ENTRIES: readonly ScenarioEntry[] = Object.freeze([
   Object.freeze({
     id: 'today',
     title: "Today's scenario",
-    blurb: 'One building, one day, one seed — the same day for everybody.',
+    /*
+     * GitHub issue #595, § D973. This read *"One building, one day, one seed — the same day for
+     * everybody"*, and the building half stopped being true when the front door's picker let a
+     * player move their week to any tower (§ D912): the crowd is the day's and everybody's, the
+     * building is whichever the player's week is on. And a pinned day chosen from the same door is
+     * a crowd of its own. So the blurb promises the crowd, says whose the building is, and says
+     * the door can change both rather than implying neither moves.
+     */
+    blurb:
+      'One day on one building. The crowd is the same for everybody today; the building is the one ' +
+      'your week is on, and the door lets you change it.',
     /*
      * Composed in `everyday/sittingShape.ts` from the contract day's own length and the rung the
      * stage opens on, never typed here — GitHub issue #559, which measured *"~3 min"* against a

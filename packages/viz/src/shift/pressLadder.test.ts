@@ -53,7 +53,12 @@ import { describe, expect, it } from 'vitest';
 import { parseBuilding, resolveBuilding, type RunInterventionConfig } from '@elevator-sim/core/browser';
 
 import type { BrowserResources } from '../dev/data.js';
-import { buildingConfigOf, shiftLengthForContract, shiftRunConfigOf } from '../dev/state.js';
+import {
+  buildingConfigOf,
+  shiftLengthForContract,
+  shiftRunConfigOf,
+  type ViewerState,
+} from '../dev/state.js';
 import { DATA_DIR } from '../fixtures.test-helper.js';
 import { observationsAt } from '../live/observations.js';
 import { recordRun } from '../record/recordRun.js';
@@ -63,7 +68,7 @@ import { AFTER_PRESS_ROW_ID, AFTER_PRESS_VERDICT_NOTE } from './afterPress.js';
 import { contractDayState } from './contractDay.test-helper.js';
 import { contractById, CONTRACTS } from './contracts.js';
 import { pressCounterfactualOf } from './counterfactual.js';
-import { runHorizonOf } from './dayLength.js';
+import { runHorizonOf, wholeDayFor, wholeDayRun } from './dayLength.js';
 import { SHIFT_EVENTS } from './events.js';
 import { goalsForDay, readGoals } from './goals.js';
 import { CONTRACT_LADDER, ladderRowFor, pressDayFor, type ContractPressDay } from './ladder.js';
@@ -99,6 +104,31 @@ interface Arm {
   readonly legs: readonly (readonly [string, string, number])[];
 }
 
+/**
+ * **The two window fields a pinned day runs at** — GitHub issue #595, [§ D973](../../../../DECISIONS.md).
+ *
+ * `{}` for a pin measured on the contract's slice, and `wholeDayRun(day)` for one measured on the
+ * whole authored day — which is `everyday/host.ts#startRun`'s own patch, so this file runs the day
+ * the Scenario press runs rather than the thirty minutes § D914 measured on every tower. A pin
+ * declaring `whole-day` on a building with no authored day is refused by `contractLadderIssues`
+ * before it could reach here; this throws rather than quietly falling back to the slice.
+ */
+function horizonOver(contractId: string, press: ContractPressDay | undefined): Partial<ViewerState> {
+  if (press === undefined || press.horizon === 'period') return {};
+  const contract = contractById(contractId);
+  const day = wholeDayFor(
+    RESOURCES_WITH_TOWERS.trafficProfiles,
+    buildingConfigOf(RESOURCES_WITH_TOWERS, [], contract?.buildingId ?? ''),
+  );
+  if (day === undefined) throw new Error(`${contractId} pins a whole day on a tower that has none`);
+  return wholeDayRun(day);
+}
+
+/** The run's length in seconds under the pin's horizon — what `pressAtFraction` is a fraction of. */
+function horizonLengthS(contractId: string): number {
+  return horizonOver(contractId, pressDayFor(contractId)).shiftLengthS ?? shiftLengthForContract(contractId);
+}
+
 /** One arm of one pinned day: the run, graded, and worded — `armOf`'s shape in the § D871 file. */
 function armOf(
   contractId: string,
@@ -108,7 +138,8 @@ function armOf(
 ): Arm {
   const contract = contractById(contractId);
   if (contract === undefined) throw new Error(`no contract ${contractId}`);
-  const shiftLengthS = shiftLengthForContract(contractId);
+  const over = horizonOver(contractId, pressDayFor(contractId));
+  const shiftLengthS = over.shiftLengthS ?? shiftLengthForContract(contractId);
   /*
    * **The pair, built together** — GitHub issue #584, § D961, [§ D963](../../../../DECISIONS.md).
    *
@@ -124,7 +155,7 @@ function armOf(
    * rung must not be measuring a drawn event; the helper pins `campaignEventId: 'ordinary'` for
    * that reason, which is `contractCurve.sweep.test.ts`'s own idiom kept in one place.
    */
-  const state = contractDayState(contractId, { seed, dispatcherId });
+  const state = contractDayState(contractId, { seed, dispatcherId, over });
   const plan = shiftRunConfigOf(RESOURCES_WITH_TOWERS, state);
   const { recording } = recordRun(
     { ...plan.config, interventions },
@@ -136,7 +167,11 @@ function armOf(
     buildingConfigOf(RESOURCES_WITH_TOWERS, state.savedBuildings, contract.buildingId),
     state,
   );
-  const plan_: ShiftPlan = { shiftLengthS, windowStartS: null, patternId: 'building' };
+  const plan_: ShiftPlan = {
+    shiftLengthS,
+    windowStartS: over.windowStartS ?? null,
+    patternId: 'building',
+  };
   const report = dayReportOf({
     recording,
     observations,
@@ -163,7 +198,11 @@ function missesAsBuilt(contractId: string, seed: bigint, dispatcherId: string): 
   const contract = contractById(contractId);
   if (contract === undefined) throw new Error(`no contract ${contractId}`);
   /* The pair, built together — issue #584, § D961; see {@link armOf} for why it is not by hand. */
-  const state = contractDayState(contractId, { seed, dispatcherId });
+  const state = contractDayState(contractId, {
+    seed,
+    dispatcherId,
+    over: horizonOver(contractId, pressDayFor(contractId)),
+  });
   const plan = shiftRunConfigOf(RESOURCES_WITH_TOWERS, state);
   const { recording } = recordRun(plan.config, {
     recordDecisions: false,
@@ -201,7 +240,7 @@ describe('the press ladder — every pinned day, in both directions', () => {
   for (const [contractId, press] of PINNED) {
     describe(contractId, () => {
       const seed = BigInt(press.seedText);
-      const atS = shiftLengthForContract(contractId) * press.pressAtFraction;
+      const atS = horizonLengthS(contractId) * press.pressAtFraction;
       const right: RunInterventionConfig = {
         atS,
         change: { kind: press.clearedBy } as RunInterventionConfig['change'],
