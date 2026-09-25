@@ -117,6 +117,7 @@ function briefOf(contractId: string, found: { readonly day: number; readonly day
       templateVariesMix: planned.templateVariesMix,
       dayCars: planned.dayCars,
       crowdIsToday: false,
+      daySeed: 20_260_925n,
       firstSession: false,
       units: 'metric',
     }),

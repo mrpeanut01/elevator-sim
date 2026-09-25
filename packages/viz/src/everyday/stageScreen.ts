@@ -1105,6 +1105,7 @@ function mountStage(
   interventionStamp.setAttribute('role', 'status');
   interventionStamp.style.cssText = `font:500 11.5px ${TYPE.mono};color:${C.warmGrey}`;
   const interventionRefusal = el(doc, 'span', 'everyday-stage-intervene-refusal');
+  interventionRefusal.id = 'everyday-stage-intervene-refusal';
   interventionRefusal.style.cssText = `font-size:11.5px;color:${C.label}`;
   /* The handover arm's note — drawn, not a title, because a reason a player cannot see is not one. */
   const interventionNote = el(doc, 'span', 'everyday-stage-intervene-note');
@@ -2099,6 +2100,16 @@ function mountStage(
      * that sentence, and this one is the instructions for a control that can.
      */
     switchPickerNote.textContent = sharedRefusal === undefined ? STAGE_SWITCH_PICKER_NOTE : '';
+    /*
+     * **And a picker the refusal disables is described by the refusal** — [§ D1047](../../../../DECISIONS.md).
+     * The note it pointed at is emptied on the line above, so a held picker announced as dimmed with
+     * no reason: `screenReaderWalkthrough.browser.test.ts`'s `disabled-says-why`, found the first time
+     * a bare load reached a pinned day's stage, which since § D1047 is every fresh device's first.
+     */
+    switchPicker.setAttribute(
+      'aria-describedby',
+      sharedRefusal === undefined ? switchPickerNote.id : interventionRefusal.id,
+    );
   }
 
   /** The handover arm re-asked from the live facts — for the picker, and for the mount. */

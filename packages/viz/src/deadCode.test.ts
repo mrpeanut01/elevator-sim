@@ -247,14 +247,11 @@ const PUBLIC_API_ONLY: Readonly<Record<string, string>> = Object.freeze({
    * feature work rather than an allowlist edit; § D118 closed fuzz's the same way.
    */
   /*
-   * -- § D1029's first-day set. Wave AI's press-moment lane exports it and guards it
-   * (`shift/firstSession.test.ts`: non-empty, every member legible and admitted, no fallback to
-   * the legible set) and was told in terms not to wire the first-session draw to it — the
-   * first-day lane does. This entry is the handover rather than a parking place: the staleness rule
-   * below fails the moment the draw calls it, and the entry goes on that commit.
+   * -- § D1029's first-day set stood here, exported and guarded by wave AI's press-moment lane and
+   * wired to nothing. § D1047 wired the first-session draw to it (`shift/firstSession.ts#
+   * firstSessionContractFor`, reached from `dev/state.ts#withFirstSession`), the staleness rule
+   * below went red on that commit exactly as the handover said it would, and the entry went with it.
    */
-  'shift/FIRST_DAY_CONTRACT_IDS':
-    '§ D1029’s legible ∩ admitted set, guarded by firstSession.test.ts; the first-day lane wires it',
   'wrinkles/gateLibrary':
     '§ 17’s content gate, swept over a library; its consumer is gate.test.ts, which drives it',
   /*

@@ -42,6 +42,9 @@ import { plannedDayOf } from '../dev/state.js';
 
 import { EM_DASH, groupThousands } from './figures.js';
 import { PRESS_DAY_DRIVER_HELD, TODAY_CHOICE_LINE, todayOf } from './today.js';
+import { pinnedDayLengthLineOf } from './firstDayLength.js';
+import { dailySeedFor } from '../shift/dailySeed.js';
+import { FIRST_SESSION_LINE_PINNED, firstSessionContractFor } from '../shift/firstSession.js';
 
 const DATA = new URL('../../../../data/', import.meta.url);
 const read = (path: string): unknown =>
@@ -94,6 +97,7 @@ const inputOf = (state: ViewerState): Parameters<typeof todayOf>[0] => ({
   templateVariesMix: false,
   dayCars: undefined,
   crowdIsToday: true,
+  daySeed: 20_260_925n,
   firstSession: false,
   units: 'metric',
 });
@@ -118,6 +122,7 @@ const recordFor = (
     templateVariesMix: false,
     dayCars: undefined,
     crowdIsToday: true,
+    daySeed: 20_260_925n,
     firstSession: false,
     units: 'metric',
   });
@@ -240,6 +245,7 @@ describe('the tower’s own booked absence reaches the strip — issue #576, § 
       templateVariesMix: false,
       dayCars: undefined,
       crowdIsToday: true,
+      daySeed: 20_260_925n,
       firstSession: false,
       units: 'metric',
     });
@@ -312,6 +318,7 @@ describe('the day’s cars, as the run will have them — N4, N5, § D1038, § D
       templateVariesMix: planned.templateVariesMix,
       dayCars: planned.dayCars,
       crowdIsToday: true,
+      daySeed: 20_260_925n,
       firstSession: false,
       units: 'metric',
     });
@@ -436,6 +443,7 @@ describe('the facts come from the resolved building', () => {
       templateVariesMix: false,
       dayCars: undefined,
       crowdIsToday: true,
+      daySeed: 20_260_925n,
       firstSession: false,
       units: 'metric',
     });
@@ -510,6 +518,7 @@ describe('the rest of the record', () => {
       templateVariesMix: false,
       dayCars: undefined,
       crowdIsToday: false,
+      daySeed: 20_260_925n,
       firstSession: false,
       units: 'metric',
     });
@@ -617,6 +626,7 @@ function briefOn(state: ViewerState): ReturnType<typeof todayOf> {
     templateVariesMix: false,
     dayCars: undefined,
     crowdIsToday: true,
+    daySeed: 20_260_925n,
     firstSession: false,
     units: 'metric',
   });
@@ -781,6 +791,7 @@ describe('the moot sentence is drawn only over the run it was measured on — is
       templateVariesMix: false,
       dayCars: undefined,
       crowdIsToday: false,
+      daySeed: 20_260_925n,
       firstSession: false,
       units: 'metric',
     });
@@ -842,6 +853,7 @@ describe('the brief holds the driver on an admitted pinned day under its standin
       seed: overrides.seed ?? BigInt(press.seedText),
       horizon: press.horizon,
       crowdIsToday: false,
+      daySeed: 20_260_925n,
       firstSession: false,
       units: 'metric',
     }).driverHeld;
@@ -857,5 +869,87 @@ describe('the brief holds the driver on an admitted pinned day under its standin
     /* A caller that names no driver holds nothing. */
     expect(crownHeld({})).toBeUndefined();
     expect(/\d/u.test(PRESS_DAY_DRIVER_HELD)).toBe(false);
+  });
+});
+
+describe('a pinned first day says whose crowd it is, and how long it takes — § D1047', () => {
+  /**
+   * `c2`'s pin, Midtown Office's whole day, dealt by the first date of 2026 whose draw deals `c2` —
+   * the state `dev/state.ts#withFirstSession` leaves a fresh device in, read as the brief reads it.
+   * The building document is the run's own (`resolvedBuildingOf`), so the moot sentence is drawn.
+   */
+  function midtownPinned(overrides: {
+    readonly seed?: bigint;
+    readonly dispatcherId?: string;
+    readonly contractId?: string;
+    readonly buildingId?: string;
+  }): ReturnType<typeof todayOf> {
+    const contractId = overrides.contractId ?? 'c2';
+    const buildingId = overrides.buildingId ?? 'midtown-office';
+    const press = ladderRowFor(contractId)?.pressDay;
+    if (press === undefined) throw new Error(`${contractId} pins no day`);
+    let daySeed = 0n;
+    for (let day = 0; day < 365 && daySeed === 0n; day += 1) {
+      const candidate = dailySeedFor(new Date(Date.UTC(2026, 0, 1) + day * 86_400_000).toISOString().slice(0, 10));
+      if (firstSessionContractFor(candidate) === contractId) daySeed = candidate;
+    }
+    const resources = resourcesWith(buildingId);
+    const seed = overrides.seed ?? BigInt(press.seedText);
+    const state: ViewerState = {
+      ...initialState(resources, seed),
+      buildingId,
+      week: openWeek(contractId),
+    };
+    return todayOf({
+      week: state.week,
+      calendar: NO_CALENDAR,
+      building: resolvedBuildingOf(resources, state),
+      buildingId,
+      dispatcherName: 'Steady hand',
+      dispatcherId: overrides.dispatcherId ?? press.standingOrder,
+      dispatcherNameOf: (id) => `name of ${id}`,
+      goals: pendingGoals(1),
+      seed,
+      horizon: press.horizon,
+      dayStartS: undefined,
+      templateVariesMix: false,
+      dayCars: undefined,
+      crowdIsToday: false,
+      daySeed,
+      firstSession: true,
+      units: 'metric',
+    });
+  }
+
+  it('labels the crowd as the pinned one, on the seed line and on the first-session line', () => {
+    const pinned = midtownPinned({});
+    expect(pinned.crowdIsPinned).toBe(true);
+    expect(pinned.seedLine).toContain('the pinned crowd this day was measured on, not the day’s');
+    expect(pinned.seedLine).not.toContain('of this run’s own');
+    expect(pinned.firstSessionLine).toBe(FIRST_SESSION_LINE_PINNED);
+    /* Another crowd on the same tower is not the pinned day, and says so the way it always did. */
+    const own = midtownPinned({ seed: 424_242n });
+    expect(own.crowdIsPinned).toBe(false);
+    expect(own.seedLine).toContain('a crowd of this run’s own, not the day’s');
+  });
+
+  it('says the moot census was measured on this crowd — never *today’s*, which a pin never is', () => {
+    const sentence = midtownPinned({}).outOfService?.mootUnder ?? '';
+    expect(sentence).toContain('Measured on this crowd');
+    expect(sentence).not.toContain('today’s crowd');
+  });
+
+  it('prints how long the whole day takes and when the call comes, derived — and only on the day as measured', () => {
+    const pinned = midtownPinned({});
+    expect(pinned.dayLength).toBe(pinnedDayLengthLineOf('c2'));
+    expect(pinned.dayLength).toMatch(/^A whole day: up to \d+ min of watching at 4×/u);
+    expect(pinned.dayLength).toContain('The stage stops once for its call');
+    /* Under another driver it is a day nobody measured; on another crowd it is not the pinned day. */
+    expect(midtownPinned({ dispatcherId: 'eta' }).dayLength).toBeUndefined();
+    expect(midtownPinned({ seed: 424_242n }).dayLength).toBeUndefined();
+    /* A slice is not a whole day: St Jude's pinned day is labelled as pinned and draws no length. */
+    const slice = midtownPinned({ contractId: 'c8', buildingId: 'st-jude-hospital' });
+    expect(slice.crowdIsPinned).toBe(true);
+    expect(slice.dayLength).toBeUndefined();
   });
 });

@@ -41,6 +41,8 @@ import {
   type ShippedSite,
 } from '../dev/browserTier.test-helper.js';
 import { pressDayFor } from '../shift/ladder.js';
+import { dailySeedAt } from '../shift/dailySeed.js';
+import { deviceNowMs } from '../shift/deviceDate.js';
 
 let site: ShippedSite;
 let browser: Browser;
@@ -77,6 +79,11 @@ async function atTheDoor(): Promise<Page> {
 /** Press a pinned day's row, and wait for the door to say it is standing. */
 async function choosePressDay(page: Page, contractId: string): Promise<void> {
   const row = `.everyday-door-pressday[data-contract="${contractId}"]`;
+  /*
+   * A fresh device is dealt a pinned day off the date since § D1047, so on the dates whose draw is
+   * this tower the row already reads *the day you are set up to play* and is correctly inert.
+   */
+  if ((await page.locator(`${row}[data-standing="true"]`).count()) > 0) return;
   expect(await page.isDisabled(row), `${contractId}'s row is offered on a fresh device`).toBe(false);
   await page.click(row);
   await page.waitForSelector(`${row}[data-standing="true"]`, { timeout: 30_000 });
@@ -143,7 +150,16 @@ describe.skipIf(!HAS_BROWSER)('a day a press decides is reachable from the front
       );
       const after = (await page.textContent('.everyday-door-seed')) ?? '';
       const crowdOf = (line: string): string => /crowd (\d+)/u.exec(line)?.[1] ?? '';
-      expect(crowdOf(after), 'the pinned crowd did not follow the player').toBe(crowdOf(before));
+      /*
+       * **The crowd put back is the day's, which since § D1047 is not the crowd the door opened on.**
+       * A fresh device is dealt its own pinned day (`before` is that pin's crowd), and the boot hands
+       * the host the date's crowd as the one to restore — so a player who leaves the pinned days for
+       * an ordinary tower lands on the day's crowd, not on a pin of either tower. Read off the date
+       * the page itself read, give or take a UTC midnight between the two reads.
+       */
+      expect(crowdOf(before)).not.toBe('');
+      expect(crowdOf(after), 'the pinned crowd did not follow the player').toBe(dailySeedAt(deviceNowMs()).toString());
+      expect(after).toContain('today’s date');
       expect(crowdOf(after)).not.toBe(pressDayFor('c7')?.seedText);
     } finally {
       await page.close();

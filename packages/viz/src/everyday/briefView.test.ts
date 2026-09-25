@@ -38,7 +38,9 @@ const TODAY: TodayRecord = {
   asks: ['Carry 90% of the people who turn up', 'Nobody waits longer than 120 s'],
   seedLine: 'tower chancery-house · crowd 424242 · today’s date, so everyone playing today meets this crowd',
   crowdIsToday: true,
+  crowdIsPinned: false,
   firstSessionLine: undefined,
+  dayLength: undefined,
   driver: 'Steady hand',
   driverHeld: undefined,
 };
@@ -157,6 +159,9 @@ describe('the two cards this build states rather than draws as a live control', 
     const card = raceAgainstCard();
     expect(isScreenBuilt('stage')).toBe(true);
     expect(card.what).toMatch(/second dispatcher/);
+    /* § D1047: the rival drives this run's crowd, which on a pinned first day is not today's. */
+    expect(card.what).toContain('a second copy of this run’s crowd');
+    expect(card.what).not.toMatch(/today’s crowd|today's crowd/u);
     expect(card.why).toMatch(/on the stage/);
     expect(card.why).not.toMatch(/one run at a time/);
     expect(card.why).not.toMatch(/[Nn]ot (built|here)/);

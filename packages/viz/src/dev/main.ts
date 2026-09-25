@@ -222,6 +222,7 @@ import { coachWeekLines, weekKeptLine } from '../shift/weekLabel.js';
 import { weekdayOf, type DayOutcome, type WeekState } from '../shift/types.js';
 import { dailySeedAt } from '../shift/dailySeed.js';
 import { deviceNowMs } from '../shift/deviceDate.js';
+import { isDealtPinnedDay } from '../shift/firstSession.js';
 
 import { savedProfilesOf } from '../batch/library.js';
 import { mountBatchPanel } from './batchPanel.js';
@@ -1887,13 +1888,23 @@ function boot(ui: Elements, resources: BrowserResources): void {
       if (restored.failure.kind !== 'absent') clearSession(sessionStore);
       /*
        * The first-ever load, and the third consumer of the same read — GitHub issue #208, § D475.
-       * A device with no session draws its first tower from the legible set on a named stream off
-       * the seed it was just given, unless the address named a building, which is the player's own
-       * choice and wins. Nothing is stored: a reload that finds a session finds the week the draw
-       * opened, and one that finds none draws again from a fresh seed, which is § D476's shape.
+       * A device with no session draws its first tower on a named stream off the seed it was just
+       * given — from the first-day set since § D1047 — unless the address named a building, which is
+       * the player's own choice and wins. Nothing is stored: a reload that finds a session finds the
+       * week the draw opened, and one that finds none draws again from the same date, which is
+       * § D476's shape.
        */
       else if (!new URLSearchParams(window.location.search).has('building')) {
-        state = withFirstSession(state, resources);
+        /*
+         * **And the day it deals is the tower's pinned day** — [§ D1047](../../../../DECISIONS.md).
+         * The pin's crowd and standing order, unless the address carried `?seed=`, whose crowd is
+         * the reader's and wins. The day's own crowd is not lost by this: the host is handed it as
+         * the crowd to put back (`initialPressDaySeedBase` below), re-derived from the date rather
+         * than kept anywhere.
+         */
+        state = withFirstSession(state, resources, {
+          crowdFromAddress: new URLSearchParams(window.location.search).has('seed'),
+        });
       }
       return;
     }
@@ -4232,6 +4243,20 @@ function boot(ui: Elements, resources: BrowserResources): void {
    */
   const everydayHostBindings: EverydayHostBindings = {
     resources,
+    /*
+     * **The crowd a first session's pinned day replaced** — [§ D1047](../../../../DECISIONS.md).
+     *
+     * The day's own, handed over exactly when the page opened on the pinned day the date deals:
+     * `shift/firstSession.ts#isDealtPinnedDay` over the state boot left standing. That covers the
+     * fresh device, and a reload that read the same day back from the address this page wrote
+     * (`?building=…&seed=<the pin>` skips the draw and lands on the same run), so choosing an
+     * ordinary tower afterwards — or opening tomorrow — puts the day's crowd back either way.
+     * Nothing is stored: both halves are functions of the date and the address.
+     */
+    initialPressDaySeedBase: (() => {
+      const daySeed = dailySeedAt(deviceNowMs());
+      return isDealtPinnedDay(state.week.contractId, state.seed, daySeed) ? daySeed : undefined;
+    })(),
     /*
      * #221's read half, composed here because it is client work: `boundaries.test.ts` permits
      * exactly two modules to hold a leaderboard client and a screen would be a third. `undefined`

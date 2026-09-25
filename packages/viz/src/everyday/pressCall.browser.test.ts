@@ -125,7 +125,13 @@ describe.skipIf(!HAS_BROWSER)('the stage calls a pinned day — § D1029', () =>
       await leaveTutorialIfOffered(page);
       await openEverydayDoor(page);
       const row = `.everyday-door-pressday[data-contract="${PRESS_DAY}"]`;
-      await page.click(row);
+      /*
+       * **Unless the date already dealt it** — [§ D1047](../../../../DECISIONS.md). A fresh device is
+       * now dealt a pinned day off the date, so on a date whose draw is St Jude's this row already
+       * reads *the day you are set up to play* and is drawn inert, and pressing it would wait for a
+       * control that is correctly disabled. Either way the day below is the same pinned day.
+       */
+      if ((await page.locator(`${row}[data-standing="true"]`).count()) === 0) await page.click(row);
       await page.waitForSelector(`${row}[data-standing="true"]`, { timeout: 30_000 });
       await startTheDayFromDoor(page);
 

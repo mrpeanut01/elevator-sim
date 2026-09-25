@@ -19,7 +19,7 @@ import { everydayProfileStore } from './profileStore.js';
 import type { EverydayScreenModule } from './screens.js';
 import { BODY, CARD, el, EYEBROW, LEDE, MONO, pill, QUIET, section, unavailableBand } from './screenDom.js';
 import { isFirstDayOnALegibleTower } from '../shift/firstSession.js';
-import { isDailySeed } from '../shift/dailySeed.js';
+import { dailySeedAt, isDailySeed } from '../shift/dailySeed.js';
 import { deviceNowMs } from '../shift/deviceDate.js';
 import { todayOf } from './today.js';
 import {
@@ -78,6 +78,8 @@ function viewOf(context: EverydayScreenShellContext): DoorScreenView {
        * which is § D227’s stale claim arriving through a cache instead of through a sentence.
        */
       crowdIsToday: isDailySeed(host.seed(), deviceNowMs()),
+      /* The day's own crowd, for the first-session line's pinned arm — § D1047. */
+      daySeed: dailySeedAt(deviceNowMs()),
       firstSession: isFirstDayOnALegibleTower(host.week()),
       /* § 15.1's `Units` row — read per draw, `settingsScreen.ts`'s own pattern with this store. */
       units: everydayProfileStore().units(),

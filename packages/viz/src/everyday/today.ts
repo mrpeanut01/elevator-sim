@@ -55,6 +55,7 @@ import { clockOf, clockRange } from '../shift/report.js';
 import type { GoalReading, RunHorizon, ShiftEvent, WeekState, Weekday } from '../shift/types.js';
 import { weekdayOf } from '../shift/types.js';
 
+import { pinnedDayLengthLineOf } from './firstDayLength.js';
 import { countFigure, EM_DASH, groupThousands } from './figures.js';
 import { speedFigure, type EverydayUnits } from './units.js';
 
@@ -173,10 +174,28 @@ export interface TodayRecord {
    */
   readonly crowdIsToday: boolean;
   /**
+   * **Whether this run is a pinned day on the crowd it was measured on** — `shift/ladder.ts#pressDayStanding`
+   * over the run about to be pressed, [§ D1047](../../../../DECISIONS.md).
+   *
+   * Echoed for {@link crowdIsToday}'s reason: the seed line and the door's closing sentence both say
+   * whose crowd this is, and since § D1047 a newcomer's first day is always one of these. The ruling's
+   * honesty member made *the day is labelled as a pinned crowd* a condition of dealing it, and *a
+   * crowd of this run's own* — the other arm's words — is true and says less than the player is
+   * owed: this crowd is shared with everybody who plays the same pinned day.
+   */
+  readonly crowdIsPinned: boolean;
+  /**
    * `shift/firstSession.ts`'s line on a first day nobody has played on a legible tower, or
    * `undefined` on every other day — GitHub issue #208, § D514.
    */
   readonly firstSessionLine: string | undefined;
+  /**
+   * **How long this pinned whole day takes to watch, and when its call comes**, or `undefined` —
+   * `firstDayLength.ts#pinnedDayLengthLineOf`, [§ D1047](../../../../DECISIONS.md). Drawn by the
+   * brief only on a pinned day as measured, where both figures are true of the run the press makes;
+   * a slice, and every day that is not its tower's pinned one, draw nothing.
+   */
+  readonly dayLength: string | undefined;
   /** Who drives, by name — or the em dash when the standing selection resolves to nothing. */
   readonly driver: string;
   /**
@@ -297,6 +316,16 @@ export interface TodayInput {
    * caller asks at render time rather than latching it at boot.
    */
   readonly crowdIsToday: boolean;
+  /**
+   * **The day's own crowd** — `shift/dailySeed.ts#dailySeedAt(nowMs)`, asked by the caller for
+   * {@link crowdIsToday}'s reason, [§ D1047](../../../../DECISIONS.md).
+   *
+   * The first-session line's pinned arm is true only where the draw **on this seed** deals the
+   * week's tower, and on a pinned first day {@link seed} is the pin's rather than the one the draw
+   * was taken from — so the chooser has to be handed the day's. Required: a default would have to be
+   * {@link seed}, which is exactly the number that cannot answer the question.
+   */
+  readonly daySeed: bigint;
   /**
    * How machine specifications read — § 15.1's `Units` row, GitHub issue #170,
    * [§ D448](../../../../DECISIONS.md).
@@ -530,6 +559,12 @@ function mootSentenceOf(
    * call row, where they are a fact about the day just played. What stays is the count, in words,
    * and whose order the day runs under — the visibility the first-day swarm's honesty member made a
    * condition of the press-day default.
+   *
+   * **On *this* crowd, not *today's*** — [§ D1047](../../../../DECISIONS.md). The gate above admits
+   * only the pin's seed, and a pin's seed is never the date's (`20276662` would be the sixty-second
+   * day of the sixty-sixth month), so *today's crowd* was false on every day this sentence could be
+   * drawn — and since § D1047 that is every newcomer's first brief, under a seed line saying the
+   * crowd is not the day's.
    */
   const standing = nameOf(press.standingOrder) ?? press.standingOrder;
   const others = press.mootUnder.length;
@@ -538,7 +573,7 @@ function mootSentenceOf(
       ? 'No other standing order clears it'
       : `${countWord(others, true)} other standing ${others === 1 ? 'order clears' : 'orders clear'} it`;
   return (
-    `This day runs under the tower’s standing order, ${standing}. Measured on today’s crowd, ` +
+    `This day runs under the tower’s standing order, ${standing}. Measured on this crowd, ` +
     `${count} with no press at all; the day’s report names ${others === 1 ? 'it' : 'them'}.`
   );
 }
@@ -747,11 +782,27 @@ function ledeOf(
  * **Neither arm names the tower as shared**, and that is [§ D730](../../../../DECISIONS.md)
  * rather than an omission. The tower is the one this player’s week was opened on.
  */
-function seedLineOf(input: TodayInput): string {
+function seedLineOf(input: TodayInput, crowdIsPinned: boolean): string {
   const crowd = `tower ${input.buildingId} · crowd ${input.seed.toString()}`;
-  return input.crowdIsToday
-    ? `${crowd} · today’s date, so everyone playing today meets this crowd`
-    : `${crowd} · a crowd of this run’s own, not the day’s`;
+  if (input.crowdIsToday) return `${crowd} · today’s date, so everyone playing today meets this crowd`;
+  /*
+   * **The third arm: a pinned crowd, labelled as one** — [§ D1047](../../../../DECISIONS.md). The
+   * ruling's honesty member made it a condition of dealing a newcomer a pinned day, and the second
+   * arm's *a crowd of this run's own* is true and says less than is so: everybody who plays this
+   * tower's pinned first day meets this crowd, which is the one it was measured on.
+   */
+  if (crowdIsPinned) return `${crowd} · the pinned crowd this day was measured on, not the day’s`;
+  return `${crowd} · a crowd of this run’s own, not the day’s`;
+}
+
+/**
+ * {@link TodayRecord.dayLength} — the pinned day as measured and admitted, under its standing order,
+ * which is `driverHeldOf`'s gate: the run the length and the call were measured on is that one, and
+ * the sentence is not drawn over a run somebody else is driving.
+ */
+function dayLengthOf(input: TodayInput, event: ShiftEvent): string | undefined {
+  if (driverHeldOf(input, event) === undefined) return undefined;
+  return pinnedDayLengthLineOf(input.week.contractId);
 }
 
 /** Today, from the week and the building. Pure and total: every arm answers something drawable. */
@@ -781,6 +832,15 @@ export function todayOf(input: TodayInput): TodayRecord {
       out.filter((car) => car.ofTheDay).map((car) => car.carId),
     ),
   );
+  const crowdIsPinned =
+    pressDayStanding({
+      contractId: week.contractId,
+      day: week.day,
+      eventId: event.id,
+      hasCalendar: input.calendar !== null,
+      seed: input.seed,
+      horizon: input.horizon,
+    }) !== undefined;
   return {
     day: week.day,
     weekday,
@@ -804,16 +864,20 @@ export function todayOf(input: TodayInput): TodayRecord {
     facts: factsOf(building, out, input.units),
     load: loadOf(building, out),
     asks: input.goals.map((reading) => reading.goal.label),
-    seedLine: seedLineOf(input),
+    seedLine: seedLineOf(input, crowdIsPinned),
     crowdIsToday: input.crowdIsToday,
+    crowdIsPinned,
     /*
      * Which arm is the draw's own answer rather than a guess about how the player arrived — GitHub
      * issue #595: the picker and the pinned days both reach a legible first day the seed did not
-     * choose, and the first arm's *the same number opens the same tower* is false of both.
+     * choose, and the first arm's *the same number opens the same tower* is false of both. Since
+     * § D1047 the draw is asked on the day's seed as well, because a first session's printed crowd is
+     * the pin's and the draw was taken from the date.
      */
     firstSessionLine: input.firstSession
-      ? firstSessionLineFor(week.contractId, input.seed)
+      ? firstSessionLineFor(week.contractId, input.seed, input.daySeed)
       : undefined,
+    dayLength: dayLengthOf(input, event),
     driver: input.dispatcherName ?? EM_DASH,
     driverHeld: driverHeldOf(input, event),
   };

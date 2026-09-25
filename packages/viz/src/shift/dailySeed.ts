@@ -80,10 +80,16 @@
  * `docs/37` § 4.3 carries the gameplay guide's three rotation rules — no tower twice in seven
  * days, no wrinkle template twice in fourteen, the pair never inside a month — and they are the
  * obvious third candidate for this derivation. Measured over 730 consecutive dates against the
- * **fifteen** eligible contracts, the draw below repeats a tower **inside seven days on 32.2 % of
- * days** and on **consecutive days 47 times** (34.4 % and 50 over fourteen, until § D991 re-measured
- * the legibility table on the day Today's scenario plays and `c14` joined the set), so it plainly does not satisfy rule 1, and that is
+ * **six** contracts of the first-day set, the draw repeats a tower **inside seven days on 66.2 % of
+ * days** and on **consecutive days 119 times**, so it plainly does not satisfy rule 1, and that is
  * stated here rather than glossed.
+ *
+ * **Those figures moved in the bad direction on 2026-09-25, and on purpose** —
+ * [§ D1047](../../../../DECISIONS.md). They read 32.2 % and 47 over the **fifteen** legible
+ * contracts (34.4 % and 50 over fourteen before § D991 re-measured the legibility table on the day
+ * Today's scenario plays). § D1047 narrowed the draw to the legible towers whose pinned press day
+ * § D1029 admits, which is § D525's never-built narrowing of § D514, and a set of six collides more
+ * often than a set of fifteen. Both figures are re-derived from the draw, never scaled.
  *
  * **Both figures are functions of the set's *length* and both moved on 2026-09-22**
  * ([§ D963](../../../../DECISIONS.md)). They read 42.2 % and 56 over **eleven** contracts until

@@ -589,6 +589,26 @@ describe('the run actions', () => {
     expect(moved?.interventions).toEqual([]);
   });
 
+  it('chooseTower after a boot that dealt a pinned first day puts the day’s crowd back — § D1047', () => {
+    /*
+     * A first session is dealt its pinned day by `dev/state.ts#withFirstSession`, not by
+     * `playPressDay`, so the host never captured the crowd to restore. The boot now hands it over as
+     * `initialPressDaySeedBase`; without it — the second host below — choosing an ordinary tower kept
+     * the pin's crowd, and the picker's *"puts your crowd back"* was false for every newcomer.
+     */
+    const pinnedSeed = BigInt(pressDayFor('c2')?.seedText ?? '0');
+    const daySeed = 20_260_925n;
+    const pinned: ViewerState = { ...base(), week: openWeek('c2'), buildingId: 'midtown-office', seed: pinnedSeed };
+    const other = CONTRACTS.find((contract) => contract.id !== 'c2');
+    if (other === undefined) throw new Error('the shipped contracts hold more than one tower');
+    const handed = harnessOf(pinned);
+    createEverydayHost({ ...handed.bindings, initialPressDaySeedBase: daySeed }).chooseTower(other.id);
+    expect(handed.patches.find((patch) => patch.seed !== undefined)?.seed).toBe(daySeed);
+    const bare = harnessOf(pinned);
+    createEverydayHost(bare.bindings).chooseTower(other.id);
+    expect(bare.patches.some((patch) => patch.seed !== undefined)).toBe(false);
+  });
+
   it('openTomorrow advances from a today the week has banked when no sheet stands — a reload (§ D1004)', () => {
     const banked = closeDay(base().week, outcomeOf({
       day: base().week.day,

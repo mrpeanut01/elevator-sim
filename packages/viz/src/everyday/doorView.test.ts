@@ -75,7 +75,9 @@ const TODAY: TodayRecord = {
   asks: [],
   seedLine: 'tower chancery-house · crowd 424242 · today’s date, so everyone playing today meets this crowd',
   crowdIsToday: true,
+  crowdIsPinned: false,
   firstSessionLine: undefined,
+  dayLength: undefined,
   driver: 'Steady hand',
   driverHeld: undefined,
 };
@@ -308,17 +310,42 @@ describe('the rest of § 6.1', () => {
      * The two arms are the two states that reach this screen: the day's crowd, and a crowd of the
      * run's own — a `?seed=` deep link, or a session left open past UTC midnight.
      */
-    const shared = sameForEveryoneLine(true);
-    const own = sameForEveryoneLine(false);
+    const shared = sameForEveryoneLine(true, false);
+    const own = sameForEveryoneLine(false, false);
     expect(shared).toContain('Everyone playing today meets the same crowd');
     expect(shared).toContain('today’s date');
     expect(own).toContain('nobody else is playing it');
     expect(own).not.toContain('Everyone');
-    // Neither arm says the tower is shared, because it is not — on either of them.
-    for (const line of [shared, own]) {
+    /*
+     * **The pinned arm — § D1047.** A pinned day's crowd is shared by everybody who opens that
+     * tower's pinned day, so *nobody else is playing it* was false of it; and the brief holds the
+     * standing order until the call is answered, so *the dispatcher is yours to bring* was too.
+     */
+    const pinned = sameForEveryoneLine(false, true);
+    expect(pinned).toContain('the crowd its day was measured on rather than the day’s');
+    expect(pinned).not.toContain('nobody else');
+    expect(pinned).not.toContain('yours to bring');
+    // No arm says the tower is shared, because it is not — on any of them.
+    for (const line of [shared, own, pinned]) {
       expect(line).toContain('The tower is the one your week is on');
       expect(line).not.toContain('the same tower');
     }
     expect(viewAt(0, false).sameForEveryone).toBe(shared);
+    expect(
+      doorScreenViewOf({
+        week: weekWith(1, []),
+        today: { ...TODAY, day: 1, crowdIsToday: false, crowdIsPinned: true },
+        dayOffset: 0,
+        dayClosed: false,
+        nameOf: NAME_OF,
+      }).sameForEveryone,
+    ).toBe(pinned);
+  });
+
+  it('names the pinned days as a crowd a player is on, not only one they choose — § D1047', () => {
+    /* A newcomer is dealt a pinned day without choosing it, so the rule's exception says *are on*. */
+    const rule = viewAt(0, false).rule;
+    expect(rule).toContain('unless you are on one of the days a press decides');
+    expect(rule).not.toContain('unless you choose');
   });
 });
