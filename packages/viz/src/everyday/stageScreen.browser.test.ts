@@ -1432,10 +1432,20 @@ async function untilRace(
   page: Page,
   wanted: (facts: RaceFacts) => boolean,
   timeoutMs: number,
+  /*
+   * Answer any call the day raises with *leave them*, which presses nothing — § D1138 gave an
+   * ordinary day up to three calls, and the stage stops at each until it is answered. A journey that
+   * plays a day through and is not about the call answers it the one way that leaves the run as it
+   * was, so the player's own control stays the only thing it pressed.
+   */
+  answerCalls = false,
 ): Promise<{ readonly held: boolean; readonly last: RaceFacts | null }> {
   const deadline = Date.now() + timeoutMs;
   let last: RaceFacts | null = null;
   for (;;) {
+    if (answerCalls && (await page.locator('.everyday-stage-call:not([hidden])').count()) > 0) {
+      await page.locator('.everyday-stage-call-answer[data-answer="leave"]').click();
+    }
     last = await raceFacts(page);
     if (last !== null && wanted(last)) return { held: true, last };
     if (Date.now() >= deadline) return { held: false, last };
@@ -1641,6 +1651,7 @@ describe.skipIf(!HAS_BROWSER)('the § 7.4 race — issue #226', () => {
       page,
       (facts) => sampleCount(facts.youPoints[0]) >= 20 && hasShape(facts.youPoints[0]),
       180_000,
+      true,
     );
     expect(
       played.held,

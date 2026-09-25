@@ -113,14 +113,45 @@ verdict:
   the run that first moved them was issues #127 and #137, the second of which fixed what the first
   found, and the arguments for that pair are in `honesty/surfaces.ts`, `honesty/run.ts`,
   `shift/types.ts#ReportFigure.count` and `dev/reportPanel.ts#DeltaRowView`. **The figures
-  below are wave AI's always-on reading and wave AH's deep one, both measured 2026-09-25 on the
-  integrated tree**; the paragraph above
+  below are wave AJ's, both tiers, measured 2026-09-25 on the integrated tree**; the paragraph above
   describes the wave that first moved this column and is kept as the dated record it is:
 
   | tier | cases | strings | simulations | surfaces | failing cases | verdict |
   |---|---|---|---|---|---|---|
-  | always-on | 49 | **886 906** | **606** | **67** | **0** | **green**, and the register is empty |
-  | deep (`ELEVATOR_SIM_HONESTY=deep`), **wave AH's reading; not re-measured in wave AI** | 60 | 1 090 548 | 4 710 | 65 | 0 | green at `e1d10ac`; unknown on wave AI's tree |
+  | always-on | 49 | **913 076** | **606** | **73** | **0** | **green**, and the register is empty |
+  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **1 140 993** | **4 710** | **74** | **0** | **green**, and the register is empty |
+
+  **Wave AJ's move is 534.08 strings a case always-on and 535.90 deep, with six surfaces in each
+  tier, every one forecast by name, and wave AI's owed deep reading is discharged.** Measured at
+  `1f7ae6f`; the tree was green in all six projects on that head and on the two test-only commits
+  after it (viz by directory, viz-browser **65 / 390**, core **3 012**, experiments **1 526**, cli
+  **179**, server **650**, `tsc -b` clean). The base, `main` at `58765c4`, reproduced wave AI's
+  always-on row exactly (886 906 / 67) and gave **wave AI's tree its first deep reading: 1 108 839 /
+  68 / 0 failing**, which is +18 291 (304.85 a case) and the same three surfaces over wave AH's deep
+  row. That run took 1 585 s on a quiet box; wave AI's was killed by the memory limit with ten agents
+  sharing the machine.
+
+  | | base `58765c4` | wave AJ | move | per case |
+  |---|---|---|---|---|
+  | always-on strings | 886 906 | **913 076** | **+26 170** | **534.08** |
+  | deep strings | 1 108 839 | **1 140 993** | **+32 154** | **535.90** |
+  | surfaces | 67 / 68 | **73 / 74** | **+6 / +6** | none |
+  | cases · simulations · failing cases | 49 / 60 · 606 / 4 710 · 0 | **unmoved** | **0** | none |
+
+  **The surface sets were diffed rather than the counts compared**, in both tiers: six added in each
+  and nothing removed. `dev/leftRail.ts#todaysShiftOf`, `live/raceStrip.ts#raceVerdictSlotAt` and
+  `shift/goals.ts#readGoals` are lane AJ-H's declared pairs; `everyday/stagePlay.ts#stagePlayViewOf`
+  is AJ-K's campaign page; `shift/dayCalls.ts#dayCallRowOf` and `#dayCallRecordOf` are the two sides
+  of AJ-L's call-row pair. Each lane named its surfaces before the measurement. **The string move is
+  not split between lanes**: eleven lanes changed words, several on the same producers, and a
+  division would be the quotient § D256 refuses. **The deep tier's one-surface lead survives**:
+  `campaign/judge.ts#judgeStage` is still the only surface in deep and not in always-on.
+
+  **One declared pair caught a defect at integration rather than in a lane.** AJ-H's `todays-shift`
+  pair compares the Engineer rail's day line with the brief's; on the merged tree it failed on a
+  whole-day wrinkle, because the rail had not been given AJ-B's whole-day flag and printed the
+  withheld-mix sentence while the brief printed the episode. That is § D362's reason for pairs
+  arriving one wave later.
 
   **Wave AI's move is 304.02 strings a case in the always-on tier, with three surfaces, and the
   deep tier was not measured this wave.** Measured at `412de16` on a head green in all six projects

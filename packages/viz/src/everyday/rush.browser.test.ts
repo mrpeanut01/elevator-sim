@@ -337,7 +337,10 @@ describe.skipIf(!HAS_BROWSER)('Endless rush — GitHub issue #220', () => {
        * half that stays true however a player reaches the figures.
        */
       expect(before.houseNote).toContain('first second');
-      expect(before.houseNote).toContain('handing the day over part-way through');
+      /* § D1048 reworded the handover clause when the switch began adopting the whole dispatcher;
+       * the claim it carries — a handed-over day is not what these rows measured — is unchanged. */
+      expect(before.houseNote).toContain('handed over part-way through');
+      expect(before.houseNote).toContain('is not what these rows measured');
 
       await page.selectOption('.everyday-rush-picker', 'nearest-car');
       const after = await page.evaluate(() => ({
