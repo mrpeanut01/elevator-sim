@@ -5,6 +5,7 @@ import {
   dispatchParameter,
 } from './parameters.js';
 import { COST_TERMS } from './terms/index.js';
+import { DOOR_PARAMETERS } from '../physics/doors/types.js';
 import { HARD_CONSTRAINT_IDS, HARD_CONSTRAINT_WORDS } from './types.js';
 import type { PlayerControlWords } from './types.js';
 
@@ -47,11 +48,22 @@ const CASUAL_REACHABLE: readonly string[] = Object.freeze([
   'selection.interfloorRateGain',
   'selection.downPeakRateGain',
   'selection.switchMargin',
+  // The fix-it editor's dials (§ D1000): every dimension of the schedule's idle-parking,
+  // dispatch-rules and dwell-policy rows is drawn on the Everyday fix-it screen, so each one it
+  // reaches carries words beside its row. The dwell rows are DOOR_PARAMETERS' and are pinned in
+  // the door block below.
+  'dispatch.assignmentMode',
+  'dispatch.splitThresholdPassengers',
+  'eligibility.allowOppositeDirectionPickup',
+  'eligibility.enRouteDiversion',
+  'answer.allowBypassIfSoleEligibleCar',
+  'idle.repositionThresholdS',
+  'idle.repositionEnergyWeight',
 ]);
 
 /** Every player-facing string a spec carries, for register checks. */
 function playerStringsOf(words: PlayerControlWords): readonly string[] {
-  return [words.name, words.effect, words.atZero, words.atFull].filter(
+  return [words.name, words.effect, words.atZero, words.atFull, ...Object.values(words.values ?? {})].filter(
     (text): text is string => text !== undefined,
   );
 }
@@ -188,5 +200,34 @@ describe('hard-constraint player words (issue #147 verbatim)', () => {
     expect(dispatchParameter('constraints.noDirectionReversal')?.player).toBe(
       HARD_CONSTRAINT_WORDS.noDirectionReversal,
     );
+  });
+});
+
+describe('categorical and door rows an Everyday select draws (§ D1000)', () => {
+  it('a categorical row with words names every one of its values, and nothing else', () => {
+    for (const row of DISPATCH_PARAMETERS) {
+      if (row.player === undefined || row.type !== 'categorical' || row.player.values === undefined) continue;
+      expect(Object.keys(row.player.values).sort(), row.id).toEqual([...(row.values ?? [])].sort());
+    }
+    expect(dispatchParameter('dispatch.assignmentMode')?.player?.values).toBeDefined();
+  });
+
+  it('the three dwell-policy rows carry words, ends and values, with no engine token', () => {
+    const reached = ['answer.dwellPolicy', 'answer.dwellAdaptationGain', 'answer.maxDwellS'];
+    const withWords = DOOR_PARAMETERS.filter((row) => row.player !== undefined).map((row) => row.id);
+    expect([...withWords].sort()).toEqual([...reached].sort());
+    for (const row of DOOR_PARAMETERS) {
+      if (row.player === undefined) continue;
+      if (row.type === 'continuous') {
+        expect(row.player.atZero, row.id).toBeDefined();
+        expect(row.player.atFull, row.id).toBeDefined();
+      }
+      if (row.type === 'categorical') {
+        expect(Object.keys(row.player.values ?? {}).sort(), row.id).toEqual([...(row.values ?? [])].sort());
+      }
+      for (const text of playerStringsOf(row.player)) {
+        expect(engineTokensIn(text), `${row.id}: "${text}"`).toEqual([]);
+      }
+    }
   });
 });

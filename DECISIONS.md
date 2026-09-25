@@ -38905,6 +38905,8 @@ This lane held **D701–D705** and spent **D701** only. **D702, D703, D704 and D
 
 ## D706 — The fix-case repair menu retires from the screen and not from the file: the diagnosed repair becomes the scenario's pinned witness, the decoys survive as prices, and all three retirements wait for the editor that can write the answers
 
+> **Status 2026-09-24: NARROWED by [§ D1001](#d1001), and its § 1 re-measured by [§ D1000](#d1000).** `tenant-floors` is offered as case-authored cohorts rather than a per-floor population control, and the editor now writes all eighteen answers; the retirement still waits on § 7's playtest. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken by an agent session under authority delegated by the session principal on 2026-09-19, not by the product owner.** It **narrows** [§ D525](#d525) clause 2 in one place, named in § 4 below, and conditions the rest of it on a measurement. `docs/39` § 2 carries the row and § D525 carries the marker, on this commit.
 
 **Date: 2026-09-19 · Narrows [§ D525](#d525) clause 2 · Reads it together with [§ D525](#d525) clause 3 · GitHub issues [#233](https://github.com/mrpeanut01/elevator-sim/issues/233), [#177](https://github.com/mrpeanut01/elevator-sim/issues/177) item 7 · Rules on: [`docs/38`](docs/38-what-the-game-is.md) § 2.1, [`docs/12`](docs/12-design-handoff.md) § 4.15, [`docs/39`](docs/39-decisions-in-force.md) §§ 2 and 3, [`docs/37`](docs/37-content-plan.md) § 5.2, `data/fixit-cases.json`, `data/price-schedule.json`, `packages/viz/src/fixit/parse.ts`, `packages/viz/src/fixit/types.ts`, `packages/viz/src/fixit/cases.test.ts`, `packages/viz/src/everyday/fixitScreen.ts`, `packages/viz/src/dev/fixitPanel.ts`.**
@@ -42556,3 +42558,108 @@ On day 1 of a whole-day tower the brief printed a 230 s worst wait and an 80 kJ 
 Issue #597 also records that the 350 kJ whole-day energy bar never failed across one assessor's twenty days. That is a single sitting rather than a measurement and nothing here moves the bar; § D962's derivation stands.
 
 This lane held **D982–D990** and spent **D982–D984**. **D985 to D990 are unspent**, and under [§ D404](#d404) and [§ D430](#d430) they become permanent holes once a later number is written above them; the integrator registers them in `documentation.test.ts#KNOWN_DECISION_HOLES`.
+
+---
+
+---
+
+## D1000 — the fix-it editor gains five of § D706's six change families, writes all eighteen answers leg for leg with the sixth, and the menu still does not retire
+
+**Date: 2026-09-24 · Owner: lane AH-E (wave AH) · GitHub issues [#566](https://github.com/mrpeanut01/elevator-sim/issues/566) and [#580](https://github.com/mrpeanut01/elevator-sim/issues/580) · Under [§ D706](#d706) clause 6 · Rules on: `packages/viz/src/fixit/families.ts`, `fixit/editorInputs.ts`, `fixit/engine.ts`, `fixit/run.ts`, `fixit/types.ts`, `everyday/fixitFamilies.ts`, `everyday/fixitScreenModel.ts`, `everyday/fixitScreen.ts`, `dev/fixitPanel.ts`, `honesty/surfaces.ts`, `core`'s `dispatch/parameters.ts` and `physics/doors/types.ts` player words.**
+
+**Why an entry.** [§ D405](#d405)'s first two grounds. It binds two surfaces, the honesty corpus, `core`'s declared player words and a guard figure five documents publish, none of which one module owns; and it moves two things already recorded — § D706 § 1's *one of eighteen* and § D869's *twelve of eighteen*, both of which it re-measures, and § D706 § 8's stale refusal of `predicted-demand`, which it takes rather than files.
+
+### 1. What the editor could write when this lane started
+
+Measured on `c56707a`. The editor drew five controls — speed and capacity steps, the zone-overlap stepper (widening only), the parking select over `stay`, `lobby` and `zone-center`, and the top-floor raise. Of § D706 § 1's six rows it drew **none whole**: `idle-parking` in part (three of five strategies; no floor, deadband or energy weight) and `rezone-bank` in part (a widened boundary, never a narrowed one, a moved car or a keyed one). **Strictly, one of eighteen** diagnosed answers was writable by the editor — `cars-that-always-go-home`, parking at `stay` — which is § D706 § 1's figure unmoved. On § D869's role-blind census, **twelve of eighteen** cleared on an editor route.
+
+### 2. What was built, and what proves each control
+
+Every family is priced by the schedule row a repair buying the same act already pays, through the same `covers` paths and the same dedupe, and every control is proved on the legs in `fixit/families.test.ts`:
+
+| schedule row | what the editor now writes | proved |
+|---|---|---|
+| `idle-parking` (0 u) | all five strategies — `predicted-demand` and `fixed-floor` join, § D706 § 8's refusal being false — plus the parking floor, the deadband and the energy weight as dials | `cases.test.ts`'s every-offered-strategy test, now over five; each dial on its pinned case and value |
+| `dispatch-rules` (2 u) | every dimension the row covers: assignment mode and split threshold, the cost-term weights, eligibility, the no-reversal constraint, the sole-car bypass | the same pinned table, twenty-five dials in all |
+| `dwell-policy` (3 u) | fixed or adaptive dwell, its gain and its ceiling — the ceiling's options filtered by core's own car-bound admission, so no option is one core refuses | the same |
+| `door-dwell` (2 u) | the hall-call and car-call hold, for every car or one car, over `core`'s declared ranges at half-second steps | every car on each side; one car alone |
+| `rezone-bank` (6 u, shared with the zoning stepper) | a car moved into another bank, into a bank of its own, out of service or back from works; the floors a bank serves; a bank re-plated where it weighs against something other than its plate | each press moves the legs; an unloadable redraw holds the Run press with one sentence instead of throwing |
+
+**The dials are the declared space, not a list.** `families.ts#dialGroupsOf` derives them from the three rows' `covers` against `collectSearchSpace()`, so a dimension added to one of those rows arrives with no edit — and fails `families.test.ts` until somebody proves it on the legs. One covered dimension is **not drawn**: `weights.dutyMismatch` moved no leg on any of the eighteen cases at either end of its range, because no building a fix case is set in declares a duty; `families.ts#INERT_DIALS` holds it with that reason and the test holds the register both ways. One more is never live: `weights.rideTime` is gated on a destination call type, which `destination-panels` sells and this editor does not, so it is never drawn and the test names it.
+
+**Words from beside the rows.** Every dial's name and ends are `core`'s — ten rows gained player words beside their declarations, three of them `DOOR_PARAMETERS`' and a categorical row's values now carry words (`PlayerControlWords.values`) — so no screen holds an id-to-prose table (GitHub issue #147), and `core/src/dispatch/playerWords.test.ts` pins the set both ways.
+
+**A dead dial is never charged.** A dial whose gate a later press closes is pruned (`families.ts#pruneDials`) by both surfaces, and `fixit/run.ts` refuses an unpruned one loudly rather than skipping it — a skipped dial would be a price for nothing.
+
+### 3. What the editor writes now
+
+**All eighteen**, leg for leg. `families.test.ts` builds each case's answer from the controls a player has and asserts, per case, that it buys the same schedule rows as the diagnosed repair at the same price, that its run is **identical on every leg** to the diagnosed repair's run, and that it clears both bars. Fifteen are written by the five families above; the other three are written by the tenancy row [§ D1001](#d1001) rules on.
+
+The role-blind census moves too: `theAnswerIsNotPrinted.test.ts` now tries the new families after every route it tried before, and **seventeen of eighteen** clear on an editor route. The one left, `express-that-stops-everywhere`, falls to its repair because its answer is a bank's floors redrawn and there is no role-blind way to choose a floor set; the editor writes it exactly in `families.test.ts`. **Two of the census's wins are the single-pair judge's noise, and the table says so**: `let-faster-than-the-lifts` first clears on fixed-floor parking at the top floor and `every-letter-says-nine` on a three-metre raise of the roof.
+
+### 4. Why the menu is still not retired
+
+§ D706 clause 6's condition — *the six priced change families … and demonstrates, per retiring case, that its answer is reachable and clears* — is **met in this branch**. The retirement is still not taken, on § D706's own § 7: *"a playtest of the built editor against a shipped case, taken before any repair row is deleted"*. That is a person playing it, and no lane can discharge it; a twenty-five-dial editor under a ninety-second turn is exactly the thing § 7 says no evidence in this repository reaches. So the menu, the decoys-as-menu and the kind-of-fix line all still ship, together, as § D706 requires, and the commit that retires them is the next one after that playtest. [§ D869](#d869)'s draw order and answer-key retirements are untouched.
+
+### 5. What moved in documents, and why
+
+A shared mount (`everyday/fixitFamilies.ts#mountFixitFamilies`) is one more statically swept DOM entry point, so `honesty/derive.test.ts`'s published figure moves from 40 to **41** (**20** mounts, 21 screen rows) at all five sites that carry it, as that test requires.
+
+### 6. The corpus, as a forecast rather than as the row
+
+[§ D343](#d343) puts the measurement on the integrator. **Surfaces: +0** — every new string enters the existing FIXIT adapter (`fixit/engine.ts#classifyOutcome`). **Strings: a floor of 1 094 a case in both tiers, and no per-case constant above it.** The floor is the part that does not depend on the case's building, counted term by term: the twenty-five dials other than the parking floor, each with its label, effect, *as it stands* entry and every option over the declared space, **1 016**; the three groups' heading and price line, open and at the budget, **12**; the parking-floor dial's label, effect and *as it stands*, **3**; the door hold on two targets without their per-car entries, **36**; § D1001's tenancy row in three arms, **15**; eight frame keys seeded by name because only a mount reads them, **8**; and two more parking strategies on each of the two seeded standing orders, **4**. Above it the count grows with each case's building — two door targets per car, the parking floor's options, and the banks block's cars, banks and floors — so the tiers' totals will not divide by their case counts, and a quotient would be § D256's refusal. The always-on tier was run on this branch after the seeding and reported no violation; that is a check, not the row.
+
+### 7. What this does not establish
+
+Whether the twenty-five-dial editor is playable in a ninety-second turn (§ D706 § 7). Whether any dial beyond its one pinned proof moves the legs on *every* case — the proof is per dial, not per case, and a dial may be inert on a building where its mechanism has nothing to act on, which is § D219's defect in a narrower form than the register above catches. And whether the single-pair judge's verdicts are stable under the perturbations these controls introduce — the § D1001 rulings measured that they are not, and filed it.
+
+### 8. Numbers spent
+
+This lane holds **D1000–D1008** and spends **D1000 and D1001**. D1000 is the first four-digit heading; `documentation.test.ts` and `citations.test.ts` were run on it and read it.
+
+---
+
+## D1001 — tenant-floors is offered in every fix case at its flat 2 u, and moves only the cohorts a case authors
+
+> **Taken 2026-09-24 by agent sessions under delegated authority**, not by the product owner. The
+> session principal's standing instruction for this wave is that decisions are taken by the swarm
+> rather than escalated, on [§ D729](#d729)'s form. Three decision agents ruled independently on
+> one measured question and two of them agreed; this lane implemented the majority and records the
+> dissent. A later reader weighing this against a product-owner ruling should treat it as an agent
+> ruling and say so.
+
+**Date: 2026-09-24 · Owner: lane AH-E (wave AH), implementing the ruling of decision agents TF-2 and TF-3 over DECIDE-3 · Under [§ D525](#d525), [§ D528](#d528), [§ D535](#d535) and [§ D706](#d706) · Rules on: `data/fixit-cases.json`, `data/price-schedule.json`'s `tenant-floors` note, `packages/viz/src/fixit/parse.ts`, `fixit/types.ts`, `fixit/engine.ts`, `fixit/run.ts`, `fixit/families.ts`, both fix-it surfaces, `honesty/surfaces.ts`.**
+
+**Why an entry.** All three of [§ D405](#d405)'s grounds: it binds a data schema, the parser, two surfaces and three cases' content; it moves something recorded — [§ D706](#d706) §§ 1 and 6 describe `tenant-floors` as a per-floor population control, and this replaces that with authored cohorts; and it reads an owner's clause in a way the owner may reverse (§ 4).
+
+### 1. The measurement
+
+`tenant-floors` (2 u, covers `building.floorPopulations[]`) is the row three answers live behind. Offered as a per-floor population dial it is nearly a universal answer. Measured on each case's own seed with the product's own judge: keeping a third of every floor's as-built headcount clears **14 of 18** on the explicit floors the shipped patch door could reach, and **17 of 18** once `floorRanges` floors are patched too — **14 of the 15** cases whose fault is not the crowd (all but `car-park-nobody-serves`). A 10 % cut already clears 7 of those 15. And because interfloor destinations are weighted by floor population, **any** population edit redraws the whole trace: removing one person from one floor scored *fixed* on 5 of the 15 wrong cases on their own seeds. So a crowd-changing press is also a re-roll.
+
+**No price separates the answers from the wrong clears**, and all three agents measured it. A flat price low enough to keep the three answers affordable (≤ 11 u) still leaves 9 of 15 wrong cases a clearing cut; a rate per person moved or per point of the building leaves 11; a per-scenario price in the fifteen must exceed 22 u to stop the leak at the bought +6 rung, which is a price nobody can pay — the prohibition in price's clothing [§ D535](#d535) names. The act that clears a wrong case is smaller than the act that clears a right one (twelve of fourteen wrong clears move fewer people than the smallest answer), so no price that rises with the size of the act can work.
+
+### 2. The ruling
+
+1. **The row is drawn on every fix case**, at the schedule's existing flat 2 u, **charged once per cohort moved**, with no new price figure.
+2. **It moves only what the case authors**: an optional `asBuilt.tenancy` of cohorts, each with an id, a name, its floors, a licensing reason, and a few **named positions**, each a per-floor headcount the watched window keeps. There is no free per-floor dial, and positions are discrete and authored because every value is a fresh redraw.
+3. **Authored on the three demand cases only**: `one-start-time` (floors 12–20; two start times at 45, three at 30), `every-letter-says-nine` (floor 1; half the letters moved at 350, four hundred moved at 300) and `let-faster-than-the-lifts` (the five bands; the clause invoked for half the new tenants, and for all of them at 44/34/36/26/12). The fifteen author none, and draw the row with one sentence — *nobody here has a start time the owner can ask them to move* — that says nothing more than the kept diagnosis already does.
+4. **`fixit/parse.ts` refuses** a tenancy on a case whose diagnosed repair moves nobody, a crowd-moving diagnosed repair with no tenancy, a witness that is not exactly one authored position, a position that raises a headcount or moves nobody, a cohort with no reason, and a floor that is not the building's or the cohort's. **Nothing derives a position from the witness at run time**, which would be [§ D869](#d869)'s answer key again.
+5. **`fixit/run.ts` expands `floorRanges`** through `core`'s `expandFloors` when a population names a range floor, so a cohort authored on a tall building later is not silently unpatchable.
+
+`families.test.ts` holds it on the legs over all eighteen cases: every authored position moves the run; on the fifteen, every press is refused and a state carrying a stale id anyway runs byte-identical and costs nothing; no case without a cohort can write a population from the editor and every case with one can; each witness clears on its case's seed; and **a one-person placebo on the same floors does not** — *not-enough* on all three.
+
+### 3. A copy defect fixed on the same commit
+
+`every-letter-says-nine` claimed what no run backs. Its reasoning said *"Print half the letters … and the surge halves with the paper"* and its result *"Half the letters now say half past … The landing clears between them"*. The witness keeps **300 of 700**, not half; keeping the literal half, 350, is *not-enough* on the shipped seed; and the moved 400-person sitting, run as its own window, scores *building-worse*. The claims now say what the runs support: four hundred letters move, this run watches the three hundred left at nine, and the half past sitting is not in this run.
+
+### 4. The one reading the owner may reverse
+
+[§ D528](#d528) clause 3 says per-scenario scarcity is *"a price, never a removed control"*. This ruling reads it as **allowing a row drawn inert because the scenario authors no crowd to move** — the building varies between scenarios, which [§ D525](#d525) clause 2 permits, and the zoning and elevation steppers already draw a zero ceiling where the fabric allows no move. **If the owner reads a drawn-but-inert row as a removed control, no measured option satisfies both § D528 and *no wrong-family clears*.** The owner then chooses between withholding `tenant-floors` from every scenario — [§ D535](#d535)'s form, which the schedule's own notes say is the owner's act alone, and which leaves the three demand cases with no way through until they are re-authored — and accepting a family that clears 14 of the 15 wrong cases. No measurement stands in for that choice.
+
+### 5. The dissent, and why it lost
+
+DECIDE-3 ruled for **two prices the schedule already carries**: the flat 2 u for floors a case-authored document covers, and `move-a-tenant`'s 20 u a floor everywhere else, with every crowd change applied by **thinning** the as-built trace on a named stream rather than redrawing it. The thinning half is right and is filed as its own issue; the lease half lost on measurement. At 20 u the fifteen still leak at the +6 rung — `bed-cars-locked-out`, `two-cars-out-wrong-month` and `every-deck-calls-itself-full` clear on their shipped seeds with a half cut — and DECIDE-3's own table left one or two wrong clears. A price that leaks at the bought rung is a price that sells the universal answer to anyone who buys the rung.
+
+### 6. What this does not decide
+
+Replacing trace redraws with thinning on a named stream, which may later require re-authoring `let-faster-than-the-lifts`; the fix-it single-pair judge's noise; and the campaign shop's `staggered-starts` row, which is the same near-universal shape. The coordinator files all three as issues. **§ D706's retirement**: `tenant-floors` no longer blocks it, and [§ D1000](#d1000) says what still does.

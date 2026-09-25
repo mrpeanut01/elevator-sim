@@ -51,7 +51,7 @@ beforeAll(async () => {
   if (!HAS_BROWSER) return;
   // The artifact players load, and not a `vite dev` server — GitHub issue #281, § D425.
   // A port of this file's own, `strictPort: false` — the tier's convention (see noteContrast).
-  site = await startShippedSite({ preview: { port: 5198, strictPort: false } });
+  site = await startShippedSite({ preview: { port: 5652, strictPort: false } });
   origin = site.origin;
   browser = await chromium.launch({ executablePath: CHROMIUM });
 }, 120_000);

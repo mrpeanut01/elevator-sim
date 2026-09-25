@@ -257,6 +257,21 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          * exact strings the product refuses to show into the corpus as if they were copy.
          */
         'fixit/types.ts#EDITOR_PARKING_STRATEGIES',
+        /*
+         * § D1000's ids and paths: the three schedule row ids the dials are grouped under, the one
+         * dimension id whose options are floors, the rezone target id for a car taken out, and the
+         * two functions returning `covers` paths. Dotted config paths and engine ids, on
+         * `editorPathsOf`'s ground above — a path is not a sentence, and § 16 rule 11 is why every
+         * one of them is mapped to a phrase before it is drawn. `INERT_DIALS`' reasons are this
+         * module's record of why a dial is not drawn, read by `families.test.ts` and by nobody on a
+         * screen.
+         */
+        'fixit/families.ts#DIAL_CHANGE_IDS',
+        'fixit/families.ts#PARKING_FLOOR_DIMENSION',
+        'fixit/families.ts#INERT_DIALS',
+        'fixit/families.ts#doorDwellPathsOf',
+        'fixit/families.ts#rezonePathsOf',
+        'fixit/types.ts#OUT_OF_SERVICE',
       ],
     },
     {
@@ -394,6 +409,13 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          */
         'everyday/caseStage.ts#mountCaseStage',
         'everyday/cutaway.ts#drawCutaway',
+        /*
+         * § D1000's five families' mount, shared by both fix-it surfaces. It builds selects and
+         * chips and needs a document; every word on it is `fixitScreenModel.ts`'s
+         * `fixitDialGroupsView`, `fixitDoorView` and `fixitRezoneView`, which the FIXIT adapter
+         * drives, plus `FIXIT_SCREEN_COPY`, which it iterates.
+         */
+        'everyday/fixitFamilies.ts#mountFixitFamilies',
         /*
          * The brief's elevation painter, shared with the campaign's tower screen since GitHub
          * issue #353. It paints wells and slabs onto a canvas and authors three floor marks and a
@@ -1570,6 +1592,24 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'fixit/engine.ts#stepZoneOverlap',
         'fixit/engine.ts#setParkingStrategy',
         'fixit/engine.ts#stepTopFloorRaise',
+        /*
+         * § D1000's five reducers, on the same ground: a `FixitState` in, a `FixitState` out,
+         * reaching prose only through `spendOf`'s schedule lookups. What a player reads about any
+         * of them is `fixitScreenModel.ts`'s dial, door and bank rows, which the FIXIT adapter
+         * drives. `fixitPlanRefusalOf` returns the loader's own diagnostic, which no surface draws —
+         * both surfaces draw `FIXIT_SCREEN_COPY.planRefused` in its place — and `applyRezone` and
+         * `editorInputsOf` hand ids, floors and core's own words onward to the model the adapter
+         * seeds; `keyedBankNameOf`, the one name `applyRezone` writes, is seeded there by name.
+         */
+        'fixit/engine.ts#setDial',
+        'fixit/engine.ts#setDoorDwell',
+        'fixit/engine.ts#setCarBank',
+        'fixit/engine.ts#toggleBankFloor',
+        'fixit/engine.ts#togglePlate',
+        'fixit/engine.ts#setTenancyPosition',
+        'fixit/run.ts#fixitPlanRefusalOf',
+        'fixit/families.ts#applyRezone',
+        'fixit/editorInputs.ts#editorInputsOf',
         'frame/overlay.ts#queueAt',
         'frame/overlay.ts#landingAssignmentsAt',
         'frame/sequence.ts#frameSequence',

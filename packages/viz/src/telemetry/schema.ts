@@ -194,6 +194,14 @@ export const CONTROL_KEYS = [
   'fixit-parking',
   /** The top-floor-raise stepper — § 10.3's elevation control, issue #422. */
   'fixit-elevation',
+  /** A dispatcher dial — the idle, assignment and dwell rows' settings, § D1000. */
+  'fixit-dial',
+  /** The door-hold selects — the schedule's `door-dwell` row, § D1000. */
+  'fixit-door',
+  /** Which bank a car runs in, which floors a bank serves, or a bank's plate — `rezone-bank`, § D1000. */
+  'fixit-rezone',
+  /** A tenancy cohort moved to one of its authored positions — `tenant-floors`, § D1001. */
+  'fixit-tenancy',
   /**
    * The wider-budget press — GitHub issue **#579**, [§ D911](../../../../DECISIONS.md).
    *

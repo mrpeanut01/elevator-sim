@@ -348,6 +348,14 @@ export const DISPATCH_PARAMETERS: readonly DispatchParameterSpec[] = [
     default: DISPATCH_DEFAULTS.assignmentMode,
     description:
       'One car per call, or several in parallel once a landing queue exceeds splitThresholdPassengers. Parallel service is what stops a heavy floor being drained one carload at a time.',
+    player: {
+      name: 'cars sent to one busy landing',
+      effect: 'one car per call, or several at once when a landing holds more people than one car clears',
+      values: {
+        'single-car': 'one car for each call',
+        'split-demand': 'more cars when the queue is long',
+      },
+    },
   },
   {
     id: 'dispatch.splitThresholdPassengers',
@@ -358,6 +366,10 @@ export const DISPATCH_PARAMETERS: readonly DispatchParameterSpec[] = [
     description:
       'Waiting count above which demand at one landing is split across cars; the number of cars is ceil(waiting / threshold), capped by how many are eligible.',
     activeWhen: { 'dispatch.assignmentMode': ['split-demand'] },
+    player: {
+      name: 'queue that calls another car',
+      effect: 'how many people must be waiting at one landing before a further car is sent there',
+    },
   },
 
   /* ---- stage 5: reassignment ---- */
@@ -407,6 +419,10 @@ export const DISPATCH_PARAMETERS: readonly DispatchParameterSpec[] = [
     default: DISPATCH_DEFAULTS.allowOppositeDirectionPickup,
     description:
       'Whether a car may take a call it will arrive at facing the wrong way — a down-travelling car answering an up call. Off is one half of conventional collective behaviour; the other half is constraints.noDirectionReversal.',
+    player: {
+      name: 'answer a call facing the wrong way',
+      effect: 'a car may be given a call it will reach while travelling the other way',
+    },
   },
   {
     id: 'eligibility.enRouteDiversion',
@@ -414,6 +430,10 @@ export const DISPATCH_PARAMETERS: readonly DispatchParameterSpec[] = [
     default: DISPATCH_DEFAULTS.enRouteDiversion,
     description:
       'Whether a car already in motion may have its run cut short to take a call on a floor it has not yet committed past. Off, a car is reachable only where it is already going, so a call raised on a floor it is about to fly through costs it a full reversal and conventional collective behaviour refuses it outright. On, the car is judged from its commit point — the last floor it can still decelerate into — and the kernel actually diverts it there.',
+    player: {
+      name: 'divert a car already moving',
+      effect: 'a car on its way somewhere may be sent to a call on a floor it has not yet passed',
+    },
   },
   {
     id: 'eligibility.maxLoadFactorForAssignment',
@@ -438,6 +458,10 @@ export const DISPATCH_PARAMETERS: readonly DispatchParameterSpec[] = [
     default: DISPATCH_DEFAULTS.allowBypassIfSoleEligibleCar,
     description:
       'Starvation guard: let a car bypassing on load answer anyway when it is the only car whose shaft reaches the floor. Owned by the dispatcher rather than the car because it depends on how many other cars exist, which no car can know.',
+    player: {
+      name: 'a full car still stops where only it reaches',
+      effect: 'a car loaded enough to pass landings by still answers a floor no other car serves',
+    },
   },
 
   /* ---- stage 7: repositioning ---- */
@@ -482,6 +506,12 @@ export const DISPATCH_PARAMETERS: readonly DispatchParameterSpec[] = [
     activeWhen: {
       'idle.parkingStrategy': ['lobby', 'zone-center', 'predicted-demand', 'fixed-floor'],
     },
+    player: {
+      name: 'saving an idle move must buy',
+      effect: 'an idle car only heads for its waiting floor when every call from there is answered this much sooner',
+      atZero: 'move for any saving at all',
+      atFull: 'move only for a saving of a whole minute',
+    },
   },
   {
     id: 'idle.repositionEnergyWeight',
@@ -493,6 +523,12 @@ export const DISPATCH_PARAMETERS: readonly DispatchParameterSpec[] = [
       'Exchange rate between anticipated waiting time and energy spent moving an empty car: the per-call net gain is the expected saving minus this times the seconds of travel, amortised over the calls the park is expected to answer. Both sides in seconds per call, so the subtraction is dimensionally honest. 0 ignores energy entirely; 2 makes a park whose saving equals its travel time exactly break even, which is the whole meaningful range.',
     activeWhen: {
       'idle.parkingStrategy': ['lobby', 'zone-center', 'predicted-demand', 'fixed-floor'],
+    },
+    player: {
+      name: 'what an empty trip costs',
+      effect: 'weighs the energy of moving an empty car against the waiting it saves',
+      atZero: 'move empty cars without counting the energy',
+      atFull: 'move an empty car only when the saving repays its whole trip',
     },
   },
 
