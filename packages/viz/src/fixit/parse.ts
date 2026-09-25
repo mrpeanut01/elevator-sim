@@ -5,8 +5,9 @@
  * violation is collected rather than the first thrown, and the rules a test would otherwise hold
  * in prose are mechanical here:
  *
- * - **§ 10.6 rule 2/3** — exactly one repair per role; the diagnosed fix costs 0–9 units; the new
- *   shaft costs 34 and is never affordable inside the case's own budget.
+ * - **§ 10.6 rule 2/3, as § D706 clause 2 relaxed it** — exactly one diagnosed repair, and at most
+ *   one of each other role; the diagnosed fix costs 0–9 units; a new shaft, where a case keeps one,
+ *   costs 34 plus its band and is never affordable inside the case's own budget.
  * - **§ 10.2** — the budget is 10–16 units.
  * - **R10** — no probability word in any player-facing string (`campaign/words.ts` owns the list).
  * - **GAMEPLAY § 16 rule 11** — no engine identifier in any player-facing string. The forbidden
@@ -416,11 +417,22 @@ function checkCase(where: string, entry: FixitCase, context: FixitContext): read
     );
   }
 
-  // The four roles, exactly once each.
+  /*
+   * **One diagnosed repair, and the other three roles optional** — [§ D706](../../../../DECISIONS.md)
+   * clause 2, relaxed on the commit that retired the menu ([§ D1020](../../../../DECISIONS.md)). The
+   * diagnosed repair is the case's pinned witness and is still exactly one; a costly fix, a cheap fix
+   * and a new shaft were the wrong rows of a menu nothing draws, so a case may keep each as an
+   * authored negative control — at most once, so a role still names one repair — or omit it.
+   */
   for (const role of ROLES) {
     const count = entry.repairs.filter((repair) => repair.role === role).length;
-    if (count !== 1) {
-      violations.push(`${where}: has ${String(count)} "${role}" repairs; § 10.6 rule 3 asks for exactly one.`);
+    if (role === 'diagnosed' ? count !== 1 : count > 1) {
+      violations.push(
+        `${where}: has ${String(count)} "${role}" repairs; ` +
+          (role === 'diagnosed'
+            ? 'a case needs exactly one diagnosed repair, its pinned witness (§ D706 clause 2).'
+            : 'a negative control is optional, and at most one of each (§ D706 clause 2).'),
+      );
     }
   }
   const diagnosed = entry.repairs.find((repair) => repair.role === 'diagnosed');

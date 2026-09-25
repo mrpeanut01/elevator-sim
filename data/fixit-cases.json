@@ -30,7 +30,7 @@
         "arrivalRatePctPop5min": 2
       },
       "asBuilt": {
-        "note": "Eight shuttles link the street to three sky lobbies; local banks hang off each lobby. The fault is in how it is configured, not in what it is made of.",
+        "note": "Eight shuttles link the street to three sky lobbies; local banks hang off each lobby.",
         "patch": {
           "dispatcher": {
             "idle": {
@@ -189,7 +189,7 @@
         "arrivalRatePctPop5min": 3
       },
       "asBuilt": {
-        "note": "Four cars split into a low-rise and a high-rise bank; the upper floors were re-let to a dense tenant after the split was drawn. The fault is in how it is configured, not in what it is made of.",
+        "note": "Four cars split into a low-rise and a high-rise bank; the upper floors were re-let to a dense tenant after the split was drawn.",
         "patch": {
           "building": {
             "floorPopulations": [
@@ -501,7 +501,7 @@
         "arrivalRatePctPop5min": 7
       },
       "asBuilt": {
-        "note": "Six floors, one bank, three identical cars. The fault is in how it is configured, not in what it is made of.",
+        "note": "Six floors, one bank, three identical cars.",
         "patch": {
           "building": {
             "addCars": [
@@ -652,7 +652,7 @@
         "arrivalRatePctPop5min": 7.8
       },
       "asBuilt": {
-        "note": "Five cars serve every floor from the dock to the top of the house, and the door dwell on all five is set to eleven seconds — the figure the luggage trolleys needed. The fault is in how it is configured, not in what it is made of.",
+        "note": "Five cars serve every floor from the dock to the top of the house, and the door dwell on all five is set to eleven seconds — the figure the luggage trolleys needed.",
         "patch": {
           "building": {
             "cars": [
@@ -817,7 +817,7 @@
         "arrivalRatePctPop5min": 5.5
       },
       "asBuilt": {
-        "note": "Four tower cars carry the flats above the sky lobby, and between calls every one of them is sent back down to the sky lobby to wait. The fault is in how it is configured, not in what it is made of.",
+        "note": "Four tower cars carry the flats above the sky lobby, and between calls every one of them is sent back down to the sky lobby to wait.",
         "patch": {
           "dispatcher": {
             "idle": {
@@ -971,7 +971,7 @@
         "arrivalRatePctPop5min": 1.8
       },
       "asBuilt": {
-        "note": "Four cars serve the tower, and exactly one of them — by the original fit-out contract — carries on down to the garage level, which half the building drives in through. The fault is in how it is configured, not in what it is made of.",
+        "note": "Four cars serve the tower, and exactly one of them — by the original fit-out contract — carries on down to the garage level, which half the building drives in through.",
         "patch": {
           "building": {
             "banks": [
@@ -1280,7 +1280,7 @@
         "arrivalRatePctPop5min": 5.2
       },
       "asBuilt": {
-        "note": "Three cars were built to run express to the upper zone; since commissioning they have answered every landing in the building. The fault is in how it is configured, not in what it is made of.",
+        "note": "Three cars were built to run express to the upper zone; since commissioning they have answered every landing in the building.",
         "patch": {
           "building": {
             "banks": [
@@ -1629,7 +1629,7 @@
         "arrivalRatePctPop5min": 6
       },
       "asBuilt": {
-        "note": "Five cars carry the whole hospital, and the two big trolley cars have their door hold set to twenty-five seconds — the time a supply cage needs — while the cages ride through the morning peak. The fault is in how it is configured, not in what it is made of.",
+        "note": "Five cars carry the whole hospital, and the two big trolley cars have their door hold set to twenty-five seconds — the time a supply cage needs — while the cages ride through the morning peak.",
         "patch": {
           "building": {
             "cars": [
@@ -1849,7 +1849,7 @@
         "arrivalRatePctPop5min": 3.7
       },
       "asBuilt": {
-        "note": "Seventeen hundred desks, four cars, and one contractual start time for every tenant in the tower. The fault is in how it is configured, not in what it is made of.",
+        "note": "Seventeen hundred desks, four cars, and one contractual start time for every tenant in the tower.",
         "patch": {},
         "tenancy": {
           "cohorts": [
@@ -2002,7 +2002,7 @@
           "id": "trim-the-dwell",
           "role": "cheap-fix",
           "name": "Trim the door dwell across the group",
-          "effect": "A second and a half off every stop moves the 32.8 s mean a little. The queue is the start time, not the doors.",
+          "effect": "A second and a half off every stop moves the 32.8 s mean, and over fifty mornings it takes a real share of the long waits away as well. The start time is not the only way through.",
           "patch": {
             "building": {
               "cars": [
@@ -2053,7 +2053,7 @@
         "arrivalRatePctPop5min": 9
       },
       "asBuilt": {
-        "note": "Outpatients runs every clinic from the first floor, and every appointment letter in the building says nine o'clock — seven hundred of them. The fault is in how it is configured, not in what it is made of.",
+        "note": "Outpatients runs every clinic from the first floor, and every appointment letter in the building says nine o'clock — seven hundred of them.",
         "patch": {
           "building": {
             "floorPopulations": [
@@ -2236,7 +2236,7 @@
         "arrivalRatePctPop5min": 6.5
       },
       "asBuilt": {
-        "note": "The ballroom floor is let to a conference of seven hundred, and when a session breaks they all press down within minutes — into a group configured for an ordinary hotel afternoon. The fault is in how it is configured, not in what it is made of.",
+        "note": "The ballroom floor is let to a conference of seven hundred, and when a session breaks they all press down within minutes — into a group configured for an ordinary hotel afternoon.",
         "patch": {
           "building": {
             "floorPopulations": [
@@ -2454,7 +2454,7 @@
         "arrivalRatePctPop5min": 9
       },
       "asBuilt": {
-        "note": "The two cars big enough for a bed were locked out of the surgical floors during last year's refurbishment, and the lockout was never lifted. The fault is in how it is configured, not in what it is made of.",
+        "note": "The two cars big enough for a bed were locked out of the surgical floors during last year's refurbishment, and the lockout was never lifted.",
         "patch": {
           "building": {
             "banks": [
@@ -2807,7 +2807,7 @@
         "arrivalRatePctPop5min": 3
       },
       "asBuilt": {
-        "note": "The upper-zone refit takes two of the three high cars out together, in the fullest month of the year. The scope of works is right; the calendar is not. The fault is in how it is configured, not in what it is made of.",
+        "note": "The upper-zone refit takes two of the three high cars out together, in the fullest month of the year. The scope of works is right; the calendar is not.",
         "patch": {
           "building": {
             "banks": [
@@ -3264,7 +3264,7 @@
         "arrivalRatePctPop5min": 4.5
       },
       "asBuilt": {
-        "note": "Eight double-deck shuttles link the street to the sky lobbies. At commissioning, each deck's load weighing was set to the car's plated figure divided by the eight cars of the bank — instead of by the two decks of the car. The fault is in how it is configured, not in what it is made of.",
+        "note": "Eight double-deck shuttles link the street to the sky lobbies. At commissioning, each deck's load weighing was set to the car's plated figure divided by the eight cars of the bank — instead of by the two decks of the car.",
         "patch": {
           "building": {
             "banks": [
@@ -4402,7 +4402,7 @@
         "arrivalRatePctPop5min": 6.8
       },
       "asBuilt": {
-        "note": "The third floor was relaunched as a restaurant and spa doing three hundred covers, above a ballroom and a reception that already fill the rank at lunch. The fault is in how it is configured, not in what it is made of.",
+        "note": "The third floor was relaunched as a restaurant and spa doing three hundred covers, above a ballroom and a reception that already fill the rank at lunch.",
         "patch": {
           "building": {
             "floorPopulations": [
@@ -4624,10 +4624,10 @@
       "run": {
         "seed": "20260840",
         "durationS": 1800,
-        "arrivalRatePctPop5min": 5
+        "arrivalRatePctPop5min": 6.25
       },
       "asBuilt": {
-        "note": "The tower cars answer the flats above the sky lobby, and the controller splits every waiting group across every car it can reach — press once, and whatever is free starts moving. The fault is in how it is configured, not in what it is made of.",
+        "note": "The tower cars answer the flats above the sky lobby, and the controller splits every waiting group across every car it can reach — press once, and whatever is free starts moving.",
         "patch": {
           "dispatcher": {
             "dispatch": {
@@ -4705,7 +4705,7 @@
       ],
       "diagnosis": {
         "text": "The controller splits even a two-person landing across two cars, so half the fleet's trips end at landings someone else has already cleared.",
-        "reasoning": "Sending everything is a setting — the splitting threshold on the commissioning sheet is one. Every wasted trip is a car that cannot answer the next call: 4 of 124 flat journeys waited over a minute against a 92 s worst, while the offices and shuttles below, on their own duty, are away inside a minute on 100.0 % of 427 journeys."
+        "reasoning": "Sending everything is a setting — the splitting threshold on the commissioning sheet is one. Every wasted trip is a car that cannot answer the next call: 15 of 143 flat journeys waited over a minute against a 130 s worst, while the offices and shuttles below, on their own duty, are away inside a minute on 99.8 % of 520 journeys."
       },
       "budgetUnits": 11,
       "repairs": [
@@ -4726,7 +4726,7 @@
           "id": "regear-tower-cars",
           "role": "costly-fix",
           "name": "Re-gear the four tower cars for another half metre per second",
-          "effect": "Every trip is quicker — including the empty ones behind the 92 s worst, of which there are just as many.",
+          "effect": "Every trip is quicker — including the empty ones behind the 130 s worst, of which there are just as many.",
           "patch": {
             "building": {
               "cars": [
@@ -4749,7 +4749,7 @@
           "id": "trim-tower-dwell",
           "role": "cheap-fix",
           "name": "Trim the tower cars' door dwell",
-          "effect": "A second and a half off every stop moves the 23.6 s mean a little. The empty trips are not doors.",
+          "effect": "A second and a half off every stop moves the 29.0 s mean a little. The empty trips are not doors.",
           "patch": {
             "building": {
               "cars": [
@@ -4803,7 +4803,7 @@
         "arrivalRatePctPop5min": 6.8
       },
       "asBuilt": {
-        "note": "A year of dense lettings put six hundred more people above an unchanged six-car group — a rise of 61 % on the population the two banks were sized for. The fault is in how it is configured, not in what it is made of.",
+        "note": "A year of dense lettings put six hundred more people above an unchanged six-car group — a rise of 61 % on the population the two banks were sized for.",
         "patch": {
           "building": {
             "floorPopulations": [
@@ -5200,7 +5200,7 @@
         "arrivalRatePctPop5min": 9.5
       },
       "asBuilt": {
-        "note": "The top floor became the residents' gym in January, and the block's two cars still spend every idle moment parked at the front door, the way they were set when the building opened. The fault is in how it is configured, not in what it is made of.",
+        "note": "The top floor became the residents' gym in January, and the block's two cars still spend every idle moment parked at the front door, the way they were set when the building opened.",
         "patch": {
           "dispatcher": {
             "idle": {
@@ -5281,7 +5281,7 @@
           "id": "replant-the-machines",
           "role": "costly-fix",
           "name": "Re-plant both machines for another half metre per second",
-          "effect": "Every climb is quicker, so the 80 s worst shortens — but the cars still start every gym run from the front door.",
+          "effect": "Every climb is quicker, so the 80 s worst shortens, and over fifty mornings the long waits at the gym fall with it. The cars still start every gym run from the front door.",
           "patch": {
             "building": {
               "cars": [

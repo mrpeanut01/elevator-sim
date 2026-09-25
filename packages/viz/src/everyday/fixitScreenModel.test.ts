@@ -45,7 +45,6 @@ import {
   fixitElevationRow,
   fixitMachineryRows,
   fixitParkingRow,
-  fixitRepairStateLine,
   fixitSpendSummary,
   fixitZoneRow,
 } from './fixitScreenModel.js';
@@ -104,6 +103,26 @@ describe('the case rail model', () => {
     expect(model.hint).toBe(COPY.railHint);
   });
 
+  /*
+   * [§ D1020](../../../../DECISIONS.md): a held case is a row with its reason and the HELD tag, never
+   * solved even if a stale solved set names it, and out of the count's denominator — the count is of
+   * the cases a player can fix.
+   */
+  it('draws a held case with its reason and leaves it out of {fixed}/{total}', () => {
+    const cases = [caseOf('a'), caseOf('b'), caseOf('c')];
+    const model = fixitCaseRailModel(
+      cases,
+      new Set(['a', 'b']),
+      'a',
+      (entry) => entry.buildingId,
+      (id) => (id === 'b' ? 'Held back. A reason.' : undefined),
+    );
+    expect(model.rows.map((row) => row.tag)).toEqual([COPY.solvedTag, COPY.heldTag, COPY.openTag]);
+    expect(model.rows.map((row) => row.heldReason)).toEqual([undefined, 'Held back. A reason.', undefined]);
+    expect(model.rows[1]?.solved).toBe(false);
+    expect(model.count).toBe('1/2 fixed');
+  });
+
   it('words the tower line from the building, floors counted rather than authored', () => {
     expect(buildingLineOf('Vertical City', 101)).toBe('Vertical City · 101 floors');
   });
@@ -126,6 +145,11 @@ describe('the § 3.3 refinement', () => {
     expect(fixitBarModel(FIXIT_BAR, view({})).primary.label).toBe(ready);
     expect(fixitBarModel(FIXIT_BAR, view({ ran: true })).primary.label).toBe(ran);
     expect(fixitBarModel(FIXIT_BAR, view({ solved: true })).primary.label).toBe(solved);
+    /* § D1020: while the other forty-nine mornings run, the relabel says so and the press waits. */
+    const checking = fixitBarModel(FIXIT_BAR, view({ running: true, checking: true }));
+    expect(checking.primary.label).toBe(COPY.checkingLabel);
+    expect(checking.primary.inert).toBe(COPY.checkingWhy);
+    expect(fixitBarModel(FIXIT_BAR, view({ running: true })).primary.label).toBe(COPY.runningLabel);
     // The left button is untouched: leaving is the shell's, and the row already names it.
     expect(fixitBarModel(FIXIT_BAR, view({})).leave).toEqual(FIXIT_BAR.leave);
   });
@@ -193,14 +217,12 @@ describe('the machinery rows', () => {
 });
 
 describe('the running total', () => {
-  it('splits spent from committed the way the prototype does, on the engine’s arithmetic', () => {
+  it('states what the whole order committed, on the engine’s arithmetic', () => {
     const entry = caseOf('spend', 14);
     const spend = spendOf(entry, { ...emptyFixitState(), speedSteps: 1 }, shippedPriceSchedule());
     const summary = fixitSpendSummary(entry, spend);
-    // Toggles only on the strip; the whole order on the card — both sums the engine's.
-    expect(summary.spentLine).toBe(
-      `${String(spend.repairUnits + spend.extraUnits)} of 14 units spent`,
-    );
+    // The repairs strip's spent line retired with the menu (§ D1020); the card's total stays.
+    expect(summary).not.toHaveProperty('spentLine');
     expect(summary.committedLine).toBe(`${String(spend.totalUnits)} of 14 u committed`);
     expect(summary.capitalLine).toBe(`${String(spend.machineryUnits)} u of steel`);
     expect(summary.overBudget).toBe(false);
@@ -213,16 +235,17 @@ describe('the running total', () => {
   });
 });
 
-describe('the repair state line', () => {
-  it('marks a selected row visibly, passes the engine’s refusal through, and defaults to within budget', () => {
-    expect(fixitRepairStateLine({ selected: true, refusal: undefined })).toBe(COPY.stateSelected);
-    expect(fixitRepairStateLine({ selected: true, refusal: undefined })).toContain('✓');
-    expect(
-      fixitRepairStateLine({ selected: false, refusal: 'short by 22 u — beyond a repair budget' }),
-    ).toBe('short by 22 u — beyond a repair budget');
-    expect(fixitRepairStateLine({ selected: false, refusal: undefined })).toBe(
-      COPY.stateAffordable,
-    );
+/*
+ * **The repair menu's words retired with the menu** — [§ D1020](../../../../DECISIONS.md), § D706
+ * clause 6. Held both ways: none of the four keys comes back, and the diagnosis's eyebrow — which
+ * § D706 clause 5 keeps — stays.
+ */
+describe('the retired menu', () => {
+  it('carries none of the menu’s four keys, and keeps the diagnosis', () => {
+    for (const key of ['repairsEyebrow', 'repairsHint', 'stateSelected', 'stateAffordable']) {
+      expect(Object.hasOwn(COPY, key), key).toBe(false);
+    }
+    expect(COPY.diagnosisEyebrow).toBe('THE DIAGNOSIS');
   });
 });
 
@@ -374,7 +397,8 @@ describe('the parking row', () => {
       expect(option.label.split(' ').length).toBeGreaterThan(1);
     }
     expect(row.options.map((option) => option.label)).toEqual([
-      COPY.parkingStanding,
+      /* § D1020: the standing strategy, named — the one a diagnosis about parking quotes. */
+      `${COPY.dialStanding} — ${COPY.parkingFixedFloor}`,
       COPY.parkingStay,
       COPY.parkingLobby,
       COPY.parkingZone,
@@ -555,6 +579,7 @@ describe('the five families, worded', () => {
         ],
         hallOptions: [4, 5],
         carOptions: [2, 3],
+        standing: { [EVERY_CAR]: { hall: undefined, car: 3 }, D: { hall: 11, car: 3 } },
       },
       { D: { hallCallS: 5 } },
       'D',
@@ -562,6 +587,24 @@ describe('the five families, worded', () => {
     expect(view.targets.map((option) => option.label)).toEqual([COPY.doorEveryCar, 'Car D · Main bank']);
     const [hall, car] = view.sides;
     expect(hall!.options.find((option) => option.selected)?.label).toBe('5.0 s');
-    expect(car!.options.find((option) => option.selected)?.label).toBe(COPY.doorStanding);
+    /* § D1020: *as it stands* prints the as-built hold — the eleven seconds a diagnosis quotes. */
+    expect(car!.options.find((option) => option.selected)?.label).toBe(`${COPY.dialStanding} — 3.0 s`);
+    expect(hall!.options[0]?.label).toBe(`${COPY.dialStanding} — 11.0 s`);
+  });
+
+  it('keeps the unfigured word where the cars disagree, because one figure would be false of some', () => {
+    const view = fixitDoorView(
+      {
+        row: row(true),
+        targets: [{ key: EVERY_CAR, carId: undefined, bankName: undefined }],
+        hallOptions: [4, 5],
+        carOptions: [2, 3],
+        standing: { [EVERY_CAR]: { hall: undefined, car: 3 } },
+      },
+      {},
+      EVERY_CAR,
+    );
+    expect(view.sides[0]!.options[0]?.label).toBe(COPY.doorStanding);
+    expect(view.sides[1]!.options[0]?.label).toBe(`${COPY.dialStanding} — 3.0 s`);
   });
 });

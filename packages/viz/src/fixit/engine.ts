@@ -447,21 +447,6 @@ export function toggleRepair(
   return { ...state, selectedRepairIds: [...state.selectedRepairIds, repairId] };
 }
 
-export function toggleExtra(
-  entry: FixitCase,
-  state: FixitState,
-  extraId: string,
-  schedule: PriceSchedule,
-): FixitState {
-  const extra = standingExtrasFrom(schedule).find((candidate) => candidate.id === extraId);
-  if (extra === undefined) return state;
-  if (state.selectedExtraIds.includes(extraId)) {
-    return { ...state, selectedExtraIds: state.selectedExtraIds.filter((id) => id !== extraId) };
-  }
-  if (!affordabilityOf(entry, state, extra.costUnits, schedule).selectable) return state;
-  return { ...state, selectedExtraIds: [...state.selectedExtraIds, extraId] };
-}
-
 /** Buy or return one +0.5 m/s step. Capped live at what the remaining budget allows (§ 10.3). */
 export function stepSpeed(
   entry: FixitCase,
@@ -799,7 +784,27 @@ export interface FixitMeasurement {
   readonly sameCrowd: boolean;
 }
 
-export type FixitOutcomeKind = 'fixed' | 'building-worse' | 'over-budget' | 'not-enough';
+/**
+ * § 10.4's four outcomes, and the two [§ D1020](../../../../DECISIONS.md) adds.
+ *
+ * `classifyOutcome` returns only the first four: it judges one pair, the letter's morning. The
+ * other two are `fixit/judge.ts`'s, and they exist because one morning can be luck:
+ *
+ * - `checking` — the letter's morning cleared both bars and the same order is running on the
+ *   forty-nine derived mornings. It wears no badge and banks nothing, because nothing is decided.
+ * - `cleared-once` — the letter's morning cleared and the fifty did not hold. No badge, no chimes,
+ *   nothing banked, and its screen says it cleared on this morning only.
+ *
+ * So `fixed` now means *cleared the gate and held over fifty mornings*, which is the only reading
+ * {@link fixedBadgeAfter} and both press sites give it.
+ */
+export type FixitOutcomeKind =
+  | 'fixed'
+  | 'building-worse'
+  | 'over-budget'
+  | 'not-enough'
+  | 'checking'
+  | 'cleared-once';
 
 export interface FixitRow {
   readonly label: string;
@@ -813,7 +818,12 @@ export interface FixitOutcome {
   readonly kind: FixitOutcomeKind;
   readonly head: string;
   readonly body: string;
-  readonly rows: readonly [FixitRow, FixitRow, FixitRow];
+  /**
+   * The three § 10.4 rows, and a fourth once the order has been run on the other mornings —
+   * `fixit/judge.ts#judgedOutcomeOf`. A tuple of three or four rather than an array, so a reader
+   * destructuring the first three keeps their types.
+   */
+  readonly rows: readonly [FixitRow, FixitRow, FixitRow] | readonly [FixitRow, FixitRow, FixitRow, FixitRow];
   readonly basis: string;
   /**
    * **Whose act the head and body describe** — [§ D1011](../../../../DECISIONS.md).
@@ -1227,86 +1237,11 @@ function awayText(pct: number | null, boarded: number): string {
   return pct === null ? 'nobody rode' : `${pct.toFixed(1)} % of ${String(boarded)} journeys`;
 }
 
-/**
- * **The order the repairs are drawn in, and it is not the order they are authored in** — GitHub
- * issue **#566**.
- *
- * `data/fixit-cases.json` lists every case's repairs in role order — `diagnosed`, `costly-fix`,
- * `cheap-fix`, `new-shaft` — which is convenient for an author and is an **answer key** for a
- * player: on all eighteen shipped cases the correct repair was the first row on the screen, in both
- * surfaces. That is `role` reaching a player-facing surface without anything ever rendering the
- * word, which is the tell `docs/38` § 2.1 retires and the one a phrase sweep cannot see.
- *
- * ## Why here rather than by reordering the file
- *
- * A reordered file fixes the eighteen cases that exist and nothing else: GitHub issue **#233**
- * authors sixteen more, to the same four-role shape (`fixit/parse.ts` still requires it), and each
- * one would arrive answer-first unless somebody remembered. Draw order is a presentation decision,
- * so it is taken once, here, over whatever the file holds.
- *
- * ## What the order is
- *
- * A stable FNV-1a hash of `caseId/repairId`, ascending. It is **deterministic** — the same case
- * draws the same order on every load, on both surfaces and for every player, so a screenshot, a
- * browser-tier index and a player's own memory of a case all stay true — and it carries **no
- * information about which repair is which**, because the input is two ids and nothing else. Over
- * the eighteen shipped cases the diagnosed repair lands first five times, second once, third six
- * times and last six times.
- *
- * It does not sort by price, which was the other candidate: the new shaft is the dearest on every
- * shipped case by construction, so a price sort would put a constant in the last row and hand back
- * a quarter of the tell.
+/*
+ * **Three functions left here on [§ D1020](../../../../DECISIONS.md)'s commit, with the menu they
+ * served**: `repairsInDrawOrder` (§ D869's hashed order, which kept the answer out of the first row
+ * of a menu nothing now draws), `repairRowOf` (a menu row's price and refusal) and `toggleExtra`
+ * (a standing extra's toggle). Each had no caller left outside its own tests, which is the defect
+ * `docs/05-roadmap.md`'s standing requirement names, so they were deleted rather than kept for a
+ * suite's convenience. `toggleRepair` stays: the tutorial selects its worked answer through it.
  */
-export function repairsInDrawOrder(entry: FixitCase): readonly FixitRepair[] {
-  return [...entry.repairs].sort(
-    (a, b) => drawKeyOf(entry.id, a.id) - drawKeyOf(entry.id, b.id) || (a.id < b.id ? -1 : 1),
-  );
-}
-
-/** FNV-1a over `caseId/repairId`, 32-bit. Stable across loads, platforms and builds. */
-function drawKeyOf(caseId: string, repairId: string): number {
-  let hash = 0x811c9dc5;
-  for (const unit of `${caseId}/${repairId}`) {
-    hash ^= unit.codePointAt(0) ?? 0;
-    hash = Math.imul(hash, 0x01000193) >>> 0;
-  }
-  return hash;
-}
-
-/**
- * The repair list rows the panel draws — name, price, effect, and § 10.2's refusal wording.
- *
- * ## The price line says *free* and no longer says what kind of fix it is — GitHub issue **#566**
- *
- * It read `'free — configuration'`, and the second word is `docs/38` § 2.1's *"printed line that
- * says what kind of fix it is"* wearing a price's clothes: *a line saying it is a setting, not a
- * shaft is a proposed fix with the price removed*. It was worse than a hint, because **no
- * non-diagnosed repair in `data/fixit-cases.json` costs nothing** — so in the four cases whose
- * diagnosed repair is free, the words *free — configuration* appeared on the answer and on nothing
- * else. `free` is the whole of what the row knows and the whole of what the player is owed; what
- * the change is made of is the thing they are here to work out.
- */
-export function repairRowOf(
-  entry: FixitCase,
-  state: FixitState,
-  repair: FixitRepair,
-  schedule: PriceSchedule,
-): {
-  readonly selected: boolean;
-  readonly selectable: boolean;
-  readonly priceLine: string;
-  readonly refusal: string | undefined;
-} {
-  const selected = state.selectedRepairIds.includes(repair.id);
-  const affordability = affordabilityOf(entry, state, repair.costUnits, schedule);
-  const selectable = selected || affordability.selectable;
-  return {
-    selected,
-    selectable,
-    priceLine: repair.costUnits === 0 ? 'free' : `${String(repair.costUnits)} u`,
-    refusal:
-      selected || affordability.selectable
-        ? undefined
-        : `short by ${String(affordability.shortByUnits)} u — beyond a repair budget`,
-  };
-}

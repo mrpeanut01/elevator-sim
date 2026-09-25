@@ -82,7 +82,6 @@ import {
   fixitRezoneView,
   fixitTenancyView,
   fixitZoneRow,
-  fixitRepairStateLine,
   fixitSpendSummary,
   fixitVerdictContextOf,
 } from '../everyday/fixitScreenModel.js';
@@ -301,23 +300,22 @@ import {
   parkingPriceUnits,
   topFloorRaisePriceUnits,
   zonePriceUnits,
-  standingExtrasFrom,
   budgetNoteOf,
   classifyOutcome,
   emptyFixitState,
-  repairRowOf,
   spendOf,
   stepSpeed,
-  toggleExtra,
-  toggleRepair,
   setDoorDwell,
   setParkingStrategy,
+  stepZoneOverlap,
   witnessStateOf,
   verdictIsStale,
   type FixitMeasurement,
   type FixitOutcome,
   type FixitVerdictContext,
 } from '../fixit/engine.js';
+import { checkingOutcomeOf, FIXIT_MORNINGS, judgedOutcomeOf, judgeReplication } from '../fixit/judge.js';
+import { HELD_FIX_CASES, heldReasonOf } from '../fixit/held.js';
 import { demandDisclosureOf } from '../fixit/parse.js';
 import { switchUnpostableReasonOf } from '../scope/switchWire.js';
 import {
@@ -326,6 +324,7 @@ import {
   measuredOf,
   standingParkingOf,
   type FixitResources,
+  type MorningReading,
 } from '../fixit/run.js';
 import type { FixitCase, FixitCases, FixitState } from '../fixit/types.js';
 import { EDITOR_PARKING_STRATEGIES, EVERY_CAR, KEYED_BANK } from '../fixit/types.js';
@@ -7206,9 +7205,20 @@ const FIXIT_COVERS: readonly string[] = [
   'everyday/fixitScreenModel.ts#fixitVerdictContextOf',
   'fixit/engine.ts#rowsBoughtOf',
   'fixit/engine.ts#budgetNoteOf',
-  'fixit/engine.ts#repairRowOf',
-  'fixit/engine.ts#standingExtrasFrom',
   'fixit/engine.ts#BASIS_LINE',
+  /*
+   * [§ D1020](../../../../DECISIONS.md)'s judge: the checking state, the fifty-morning verdict in
+   * both forms, `cleared-once` on both grounds, the replicated basis in both forms, and the held
+   * register's reasons with the rail row that draws them. `repairRowOf` and `standingExtrasFrom`
+   * left this list on the same commit, because the menu that drew them retired.
+   */
+  'fixit/judge.ts#checkingOutcomeOf',
+  'fixit/judge.ts#judgedOutcomeOf',
+  'fixit/judge.ts#replicationRowOf',
+  'fixit/judge.ts#JUDGE_COPY',
+  'fixit/judge.ts#REPLICATED_BASIS_LINE',
+  'fixit/judge.ts#REPLICATED_DEMAND_BASIS_LINE',
+  'fixit/held.ts#HELD_FIX_CASES',
   /*
    * GitHub issue #350's second basis line and the choice between the two: the outcome's `basis`
    * is `DEMAND_BASIS_LINE` on a selection that changes the crowd, and the adapter renders that
@@ -7224,12 +7234,9 @@ const FIXIT_COVERS: readonly string[] = [
    * that is only ever swept on one side is half a surface.
    */
   'fixit/parse.ts#demandDisclosureOf',
-  // Driven through the rows above: `repairRowOf` asks `affordabilityOf`, which sums `spendOf`,
-  // and the states the adapter renders are built by the two toggles rather than written by hand.
+  // The states the adapter renders are built by the editor's own reducers rather than written by
+  // hand; `spendOf` sums them.
   'fixit/engine.ts#spendOf',
-  'fixit/engine.ts#affordabilityOf',
-  'fixit/engine.ts#toggleRepair',
-  'fixit/engine.ts#toggleExtra',
   'fixit/run.ts#figureValuesOf',
   /*
    * The Everyday screen's pure half (GAMEPLAY § 10, `everyday/fixitScreen.ts` is the DOM half and
@@ -7250,7 +7257,6 @@ const FIXIT_COVERS: readonly string[] = [
   'everyday/fixitScreenModel.ts#fixitBudgetRungRow',
   'everyday/fixitScreenModel.ts#fixitElevationRow',
   'everyday/fixitScreenModel.ts#fixitSpendSummary',
-  'everyday/fixitScreenModel.ts#fixitRepairStateLine',
   /* § D1000's five families — the dials, the door hold and the banks, and the words under them. */
   'everyday/fixitScreenModel.ts#fixitDialGroupsView',
   'everyday/fixitScreenModel.ts#fixitDoorView',
@@ -7275,7 +7281,7 @@ function fixitSearchCase(context: HonestyContext): FixitCase {
     dispatcherProfileId: context.case.baselineProfileId,
     run: { seed: '1', durationS: context.case.durationS, arrivalRatePctPop5min: null },
     asBuilt: {
-      note: 'The fault is in how it is configured, not in what it is made of.',
+      note: 'Four cars in one bank, set up the way the building was commissioned.',
       patch: {},
     },
     complaint: {
@@ -7313,18 +7319,6 @@ function fixitSearchCase(context: HonestyContext): FixitCase {
   };
 }
 
-/**
- * The dearest repair a case offers — the one the refused arm below needs, asked for by the property
- * it needs rather than by an index (GitHub issue **#566**).
- *
- * Stable on a tie: the first of equal prices, which is what {@link fixitSearchCase} produces, since
- * its four repairs share one patch and therefore one price.
- */
-function dearestRepairOf(entry: FixitCase): FixitCase['repairs'][number] {
-  return entry.repairs.reduce((dearest, repair) =>
-    repair.costUnits > dearest.costUnits ? repair : dearest,
-  );
-}
 
 /**
  * **What a fix-it outcome credits, and what the run behind it carried** — [§ D1011](../../../../DECISIONS.md).
@@ -7425,11 +7419,11 @@ const FIXIT: SurfaceAdapter = {
     const schedule = shippedPriceSchedule();
     const entry = fixitSearchCase(context);
 
-    /* ---- the standing extras: every name and every line, authored in the engine ---- */
-    for (const extra of standingExtrasFrom(schedule)) {
-      seeds.push({ field: `extra.${extra.id}.name`, text: extra.name, role: 'label', provenance: 'authored' });
-      seeds.push({ field: `extra.${extra.id}.line`, text: extra.line, role: 'prose', provenance: 'authored' });
-    }
+    /*
+     * The standing extras and the repair rows are no longer seeded: the menu that drew them retired
+     * on [§ D1020](../../../../DECISIONS.md)'s commit, and a string no surface draws is not a
+     * surface's string.
+     */
 
     /* ---- the four figures, measured on the case's own run, both measure kinds ---- */
     for (const figure of figureValuesOf(entry, context.recording)) {
@@ -7451,18 +7445,11 @@ const FIXIT: SurfaceAdapter = {
       }
     }
 
-    /* ---- affordability and the budget notes, on states the reducers themselves build ---- */
+    /* ---- the budget notes, on states the editor's own reducers build ---- */
     const empty = emptyFixitState();
-    let spent = toggleRepair(entry, empty, 's-costly', schedule);
-    spent = toggleExtra(entry, spent, 'tenant-notices', schedule);
+    /* A setting that costs: a rezone, priced once — the no-machinery-not-free arm. */
+    const spent = stepZoneOverlap(entry, empty, 1, 2, schedule);
     for (const state of [empty, spent]) {
-      for (const repair of entry.repairs) {
-        const row = repairRowOf(entry, state, repair, schedule);
-        seeds.push({ field: `repair.${repair.id}.price`, text: row.priceLine, role: 'label' });
-        if (row.refusal !== undefined) {
-          seeds.push({ field: `repair.${repair.id}.refusal`, text: row.refusal, role: 'reason' });
-        }
-      }
       seeds.push({
         field: 'budget.note',
         text: budgetNoteOf(entry, spendOf(entry, state, schedule)),
@@ -7575,6 +7562,69 @@ const FIXIT: SurfaceAdapter = {
       });
     }
 
+    /*
+     * ---- the judge's arms — [§ D1020](../../../../DECISIONS.md) ----
+     *
+     * A gate that cleared, then the fifty mornings three ways: held, not held on the complaint, and
+     * not held on the rest. Each over both measure kinds, and the held arm over both crowds, so the
+     * fourth row's two unit forms and the replicated basis's two forms are all read. The mornings
+     * are fabricated readings, on this adapter's standing habit for arms a green pair cannot
+     * produce: the judge is arithmetic over readings, and what is under test is its words.
+     */
+    const clearing = (sameCrowd: boolean): FixitMeasurement => ({
+      ...flatSameCrowd(),
+      restAwayAfterPct: 95,
+      restDeltaPoints: 0,
+      sameCrowd,
+    });
+    const checkingOutcome = checkingOutcomeOf(classifyOutcome(entry, clearing(true), spendOf(entry, empty, schedule)));
+    seeds.push({ field: 'outcome.checking.head', text: checkingOutcome.head, role: 'label', provenance: 'authored' });
+    seeds.push({ field: 'outcome.checking.body', text: checkingOutcome.body, role: 'prose', provenance: 'authored' });
+    const mornings = (complaint: (i: number) => number, rest: (i: number) => number): MorningReading[] =>
+      Array.from({ length: FIXIT_MORNINGS }, (_, i) => ({ complaint: complaint(i), restAwayPct: rest(i), restBoarded: 120 }));
+    const asBuiltMornings = mornings((i) => 6 + (i % 3), () => 95);
+    for (const [judgedName, afterMornings] of [
+      ['held', mornings((i) => i % 2, () => 95)],
+      ['no-change', mornings((i) => 6 + ((i + 1) % 3), () => 95)],
+      ['rest-worse', mornings((i) => i % 2, (i) => 89 - (i % 2))],
+    ] as const) {
+      const replication = judgeReplication(asBuiltMornings, afterMornings);
+      for (const [name, subject] of [
+        ['long-waits', entry],
+        ['mean-wait', meanEntry],
+      ] as const) {
+        const judged = judgedOutcomeOf(
+          subject,
+          classifyOutcome(subject, clearing(true), spendOf(subject, empty, schedule)),
+          replication,
+        );
+        const where = `outcome.judged.${judgedName}.${name}`;
+        seeds.push({ field: `${where}.head`, text: judged.head, role: 'label', provenance: 'authored' });
+        seeds.push({ field: `${where}.body`, text: judged.body, role: 'prose' });
+        seeds.push({ field: `${where}.basis`, text: judged.basis, role: 'reason', provenance: 'authored' });
+        const row = judged.rows[3];
+        if (row !== undefined) {
+          seeds.push({
+            field: `${where}.row[3]`,
+            text: `${row.label}: ${row.before} → ${row.after} · ${row.verdict}`,
+            role: 'observation',
+            declaredCount: replication.reduction.n,
+            countShown: true,
+          });
+        }
+      }
+    }
+    seeds.push({
+      field: 'outcome.judged.demand.basis',
+      text: judgedOutcomeOf(
+        entry,
+        classifyOutcome(entry, clearing(false), spendOf(entry, empty, schedule)),
+        judgeReplication(asBuiltMornings, mornings((i) => i % 2, () => 95)),
+      ).basis,
+      role: 'reason',
+      provenance: 'authored',
+    });
+
     /* ================================================================== *
      * The Everyday screen's own words — GAMEPLAY § 10's screen chrome.
      *
@@ -7656,13 +7706,25 @@ const FIXIT: SurfaceAdapter = {
       });
     }
 
-    /* ---- the case rail: both tags, and the derived {fixed}/{total} on both sides of solved ---- */
-    for (const [where, solvedIds] of [
-      ['none-solved', new Set<string>()],
-      ['one-solved', new Set([entry.id])],
+    /*
+     * ---- the case rail: all three tags, and the derived {fixed}/{total} on both sides of solved ----
+     *
+     * The `held` arm draws every reason `fixit/held.ts` registers, beside a case the player can open,
+     * so the count's denominator — the cases offered — is read beside rows it leaves out
+     * ([§ D1020](../../../../DECISIONS.md)).
+     */
+    const heldCases: FixitCase[] = Object.keys(HELD_FIX_CASES).map((id) => ({ ...entry, id, name: `The held tower (${id})` }));
+    for (const [where, solvedIds, railCases] of [
+      ['none-solved', new Set<string>(), [entry]],
+      ['one-solved', new Set([entry.id]), [entry]],
+      ['held', new Set<string>(), [entry, ...heldCases]],
     ] as const) {
-      const rail = fixitCaseRailModel([entry], solvedIds, entry.id, () =>
-        buildingLineOf(context.buildingName, context.recording.floors.length),
+      const rail = fixitCaseRailModel(
+        railCases,
+        solvedIds,
+        entry.id,
+        () => buildingLineOf(context.buildingName, context.recording.floors.length),
+        heldReasonOf,
       );
       seeds.push({ field: `rail.${where}.heading`, text: rail.heading, role: 'label', provenance: 'authored' });
       seeds.push({ field: `rail.${where}.hint`, text: rail.hint, role: 'prose', provenance: 'authored' });
@@ -7675,12 +7737,15 @@ const FIXIT: SurfaceAdapter = {
         field: `rail.${where}.count`,
         text: rail.count,
         role: 'observation',
-        declaredCount: rail.rows.length,
+        declaredCount: rail.rows.filter((row) => row.heldReason === undefined).length,
         countShown: true,
       });
       for (const row of rail.rows) {
         seeds.push({ field: `rail.${where}.tag`, text: row.tag, role: 'label', provenance: 'authored' });
         seeds.push({ field: `rail.${where}.tower`, text: row.towerLine, role: 'observation' });
+        if (row.heldReason !== undefined) {
+          seeds.push({ field: `rail.${where}.held(${row.id})`, text: row.heldReason, role: 'reason', provenance: 'authored' });
+        }
       }
     }
 
@@ -7691,10 +7756,15 @@ const FIXIT: SurfaceAdapter = {
       ['ready', { ready: true, running: false, ran: false, solved: false }],
       ['ran', { ready: true, running: false, ran: true, solved: false }],
       ['running', { ready: true, running: true, ran: false, solved: false }],
+      /* § D1020: the letter's morning cleared and the other forty-nine are running. */
+      ['checking', { ready: true, running: true, ran: true, solved: false, checking: true }],
       ['solved', { ready: true, running: false, ran: true, solved: true }],
     ] as const) {
       const row = fixitBarModel(barBase, view);
       seeds.push({ field: `bar.${where}.primary`, text: row.primary.label, role: 'label', provenance: 'authored' });
+      if (where === 'checking' && row.primary.inert !== undefined) {
+        seeds.push({ field: `bar.${where}.inert`, text: row.primary.inert, role: 'reason', provenance: 'authored' });
+      }
       if (row.note !== undefined) {
         seeds.push({ field: `bar.${where}.note`, text: row.note, role: 'prose', provenance: 'authored' });
       }
@@ -7824,6 +7894,8 @@ const FIXIT: SurfaceAdapter = {
         'rezoneFloorsLabel',
         'tenancyEyebrow',
         'planRefused',
+        /* § D1020: the fold over the cost-term weights, drawn only by the same mount. */
+        'weightsFold',
       ] as const) {
         seeds.push({
           field: `families.${key}`,
@@ -7882,6 +7954,18 @@ const FIXIT: SurfaceAdapter = {
         ],
         hallOptions: doorDwellOptionsOf('hall'),
         carOptions: doorDwellOptionsOf('car'),
+        /*
+         * § D1020's *as it stands* figure, from the building's own cars — each car's hold, and the
+         * every-car arm's only where they agree, so both forms of the standing option are read.
+         */
+        standing: (() => {
+          const cars = context.building.banks.flatMap((bank) => bank.cars);
+          const out: Record<string, { hall: number | undefined; car: number | undefined }> = {
+            [EVERY_CAR]: { hall: undefined, car: cars[0]?.dwellCarCallS },
+          };
+          for (const car of cars) out[car.id] = { hall: car.dwellHallCallS, car: car.dwellCarCallS };
+          return out;
+        })(),
       };
       const firstCar = fabric.cars[0]?.id;
       for (const target of [EVERY_CAR, ...(firstCar === undefined ? [] : [firstCar])]) {
@@ -7996,36 +8080,12 @@ const FIXIT: SurfaceAdapter = {
     /* ---- the running total's two lines, on states the reducers built ---- */
     for (const [where, state] of [
       ['nothing', empty],
-      ['repairs', spent],
+      ['setting', spent],
       ['machinery', stepSpeed(entry, empty, 1, schedule)],
     ] as const) {
       const summary = fixitSpendSummary(entry, spendOf(entry, state, schedule));
-      seeds.push({ field: `spend.${where}.spent`, text: summary.spentLine, role: 'observation' });
       seeds.push({ field: `spend.${where}.committed`, text: summary.committedLine, role: 'observation' });
       seeds.push({ field: `spend.${where}.capital`, text: summary.capitalLine, role: 'observation' });
-    }
-
-    /* ---- the repair row's state word, all three arms ---- */
-    for (const [where, row] of [
-      ['selected', { selected: true, refusal: undefined }],
-      ['affordable', { selected: false, refusal: undefined }],
-      /*
-       * The **dearest** repair rather than `repairs[3]` — GitHub issue **#566**. The refused arm
-       * needs a repair the budget cannot take, and it reached one by index, which is true of
-       * {@link fixitSearchCase} only because that fixture happens to list its shaft last. Position
-       * stopped being a safe way to name a repair on the commit that gave the two fix-it surfaces
-       * a draw order (`fixit/engine.ts#repairsInDrawOrder`), so this asks for the property it
-       * actually needs. **The seeded string is unmoved**: on the fixture the four repairs share one
-       * patch and therefore one price, so index and property reach rows that are both affordable
-       * and the refusal is `undefined` either way.
-       */
-      ['refused', { selected: false, refusal: repairRowOf(entry, spent, dearestRepairOf(entry), schedule).refusal }],
-    ] as const) {
-      seeds.push({
-        field: `repair.state.${where}`,
-        text: fixitRepairStateLine(row),
-        role: where === 'refused' ? 'reason' : 'label',
-      });
     }
 
     return singleRun(this.id, seeds);
