@@ -256,9 +256,16 @@ export function mountCaseStage(doc: Document, input: CaseStageInput): CaseStage 
     panes.some((pane) => pane.recording.shafts.some((shaft) => shaft.bankId === bank.id)),
   );
   let shownBank: string | undefined;
+  /*
+   * The row is hidden through a plain wrapper, because the label's own inline `display:flex` would
+   * outrank the `[hidden]` rule and keep its box (`hiddenBox.test.ts`).
+   */
+  const bankBox = doc.createElement('div');
+  bankBox.className = `${input.classes.root}-banks`;
+  bankBox.hidden = true;
   const bankRow = doc.createElement('label');
-  bankRow.className = `${input.classes.root}-banks`;
-  bankRow.hidden = true;
+  bankRow.className = `${input.classes.root}-banks-row`;
+  bankBox.append(bankRow);
   bankRow.style.cssText = `display:flex;gap:8px;flex-wrap:wrap;align-items:baseline;margin:0 0 8px;font-size:12.5px;color:${C.inkSoft}`;
   const bankPicker = doc.createElement('select');
   bankPicker.className = `${input.classes.root}-bank`;
@@ -316,8 +323,8 @@ export function mountCaseStage(doc: Document, input: CaseStageInput): CaseStage 
   const paceText = doc.createElement('span');
   paceText.style.cssText = `color:${C.label}`;
   clockRow.append(clockText, paceText);
-  if (input.clockOf === undefined) root.append(head, note, bankRow, grid);
-  else root.append(head, note, clockRow, bankRow, grid);
+  if (input.clockOf === undefined) root.append(head, note, bankBox, grid);
+  else root.append(head, note, clockRow, bankBox, grid);
 
   /*
    * The transport runs on the longest pane, so neither run is cut short by the other's horizon. The
@@ -400,8 +407,8 @@ export function mountCaseStage(doc: Document, input: CaseStageInput): CaseStage 
           }),
         ),
       );
-      if (bankRow.hidden !== wholeFits) {
-        bankRow.hidden = wholeFits;
+      if (bankBox.hidden !== wholeFits) {
+        bankBox.hidden = wholeFits;
         if (wholeFits) {
           shownBank = undefined;
           bankPicker.value = '';

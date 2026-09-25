@@ -441,7 +441,8 @@ describe('the fix case stage block', () => {
     const row = nodes.find((node) => node.className === 'block-banks');
     /* One bank in play is no choice at all, so the row stays hidden with nothing in it. */
     expect(row?.hidden).toBe(true);
-    expect(row?.children).toEqual([]);
+    // The hidden state is the wrapper's (`hiddenBox.test.ts`); the row inside it holds nothing.
+    expect(nodes.find((node) => node.className === 'block-banks-row')?.children).toEqual([]);
     stage.dispose();
   });
 });
