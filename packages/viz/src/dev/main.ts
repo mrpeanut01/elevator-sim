@@ -6642,7 +6642,11 @@ function boot(ui: Elements, resources: BrowserResources): void {
        * building the legs on screen were simulated in, so the car the header names is the car the
        * kernel stood down. A recording carries no mid-run schedule, which is why this is passed.
        */
-      bookedOut: bookedOutCarsOf(resolvedBuildingOf(resources, state)),
+      /*
+       * With the day's event, so a car the day's own wrinkle takes is marked as the day's and the
+       * header's note does not say *the tower also books* it — § D1038, the post-AH panel's N5.
+       */
+      bookedOut: bookedOutCarsOf(resolvedBuildingOf(resources, state), event),
       /*
        * **The one caller with a player** — GitHub issue #70, and the second half of § D250's
        * one-field-and-one-caller fix.

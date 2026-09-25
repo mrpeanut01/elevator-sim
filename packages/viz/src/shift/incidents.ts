@@ -196,16 +196,48 @@ export function serviceEventsFor(
   incidents: readonly Incident[],
   runLengthS: number,
 ): readonly ServiceModeEventConfig[] {
-  const events: ServiceModeEventConfig[] = [];
+  /*
+   * **One car's windows are merged before they are emitted** — [§ D1038](../../../../DECISIONS.md),
+   * the post-AH panel's D.md N5. Two schedules can take the same car: a contract rung books car D
+   * out of a Midtown day between a quarter and a half of the way through it, and Tuesday's move-in
+   * takes the same car by the same total order between a quarter and three quarters. Emitted side
+   * by side, the rung's return at the half fired first and handed the movers' car back to
+   * passengers mid-move, so the run did neither thing either caption said — and the brief printed
+   * three accounts of car D, each true of one schedule and none of the run. A car in two windows is
+   * out for their union, which is what both authors meant and the only reading under which both
+   * captions are true of the run. One window per car is emitted exactly as it always was.
+   */
+  const windows = new Map<string, { readonly car: CarRef; readonly spans: { fromS: number; toS: number }[] }>();
   for (const incident of incidents) {
     const fromS = Math.round(clamp01(incident.fromFraction) * runLengthS);
-    events.push({ atS: fromS, carId: incident.car.carId, bankId: incident.car.bankId, mode: 'out-of-service' });
-    if (incident.toFraction >= 1) continue;
-    const toS = Math.round(clamp01(incident.toFraction) * runLengthS);
-    // A return at or before the departure is not a window; it is an incident that never happened,
-    // and emitting both would leave the car in whichever mode the tie-break happened to apply last.
-    if (toS <= fromS) continue;
-    events.push({ atS: toS, carId: incident.car.carId, bankId: incident.car.bankId, mode: 'in-service' });
+    let toS = Number.POSITIVE_INFINITY;
+    if (incident.toFraction < 1) {
+      const returnS = Math.round(clamp01(incident.toFraction) * runLengthS);
+      // A return at or before the departure is not a window: the car goes and nothing brings it
+      // back, and emitting both would leave it in whichever mode the tie-break applied last.
+      if (returnS > fromS) toS = returnS;
+    }
+    const key = JSON.stringify([incident.car.bankId, incident.car.carId]);
+    const entry = windows.get(key) ?? { car: incident.car, spans: [] };
+    entry.spans.push({ fromS, toS });
+    windows.set(key, entry);
+  }
+  const events: ServiceModeEventConfig[] = [];
+  for (const { car, spans } of windows.values()) {
+    spans.sort((a, b) => a.fromS - b.fromS);
+    const merged: { fromS: number; toS: number }[] = [];
+    for (const span of spans) {
+      const last = merged[merged.length - 1];
+      // Touching counts as overlapping: a return and a departure at the same second is no return.
+      if (last !== undefined && span.fromS <= last.toS) last.toS = Math.max(last.toS, span.toS);
+      else merged.push({ ...span });
+    }
+    for (const span of merged) {
+      events.push({ atS: span.fromS, carId: car.carId, bankId: car.bankId, mode: 'out-of-service' });
+      if (Number.isFinite(span.toS)) {
+        events.push({ atS: span.toS, carId: car.carId, bankId: car.bankId, mode: 'in-service' });
+      }
+    }
   }
   events.sort(
     (a, b) =>

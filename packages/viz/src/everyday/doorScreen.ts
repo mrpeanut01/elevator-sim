@@ -49,12 +49,15 @@ let lastView: DoorScreenView | undefined;
 function viewOf(context: EverydayScreenShellContext): DoorScreenView {
   const { host } = context;
   const selection = host.selection();
+  const dayAhead = host.dayAhead();
   return doorScreenViewOf({
     week: host.week(),
     today: todayOf({
       week: host.week(),
       calendar: host.calendarPeriod(),
-      building: host.resolvedBuilding(),
+      /* The run the next press produces, and its clock — § D1039, `briefScreen.ts#factsNow`'s. */
+      building: dayAhead.building,
+      dayStartS: dayAhead.startOfDayS,
       buildingId: selection.buildingId,
       dispatcherName: host.dispatcherById(selection.dispatcherId)?.name,
       /* Any profile's name, for the moot-dispatcher sentence — § D914. */

@@ -9119,13 +9119,21 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
       seeds.push({ field: `rush.band.${band.waves}.perMinute`, text: band.perMinute, role: 'observation' });
       seeds.push({ field: `rush.band.${band.waves}.against`, text: band.against, role: 'observation' });
     }
-    for (const fact of rushFactViews()) {
-      seeds.push({
-        field: `rush.fact.${fact.label}`,
-        text: fact.value,
-        role: fact.withheld ? 'label' : 'observation',
-      });
-      seeds.push({ field: `rush.fact.${fact.label}.label`, text: fact.label, role: 'prose' });
+    /*
+     * Both arms of the kept figure — the post-AH panel's N7. Before any round of this visit the
+     * facts refuse; after one they carry the result sheet's own wave and held time, which is a
+     * state a player reaches by pressing *Leave the rush* once, so it is swept by name here with a
+     * fixture round rather than left to a case that never plays one.
+     */
+    for (const best of [undefined, { wave: 9, heldS: 1538, held: '25:38', driverName: 'Steady hand then Contract-net auction' }]) {
+      for (const fact of rushFactViews(best)) {
+        seeds.push({
+          field: `rush.fact.${fact.label}`,
+          text: fact.value,
+          role: fact.withheld ? 'label' : 'observation',
+        });
+        seeds.push({ field: `rush.fact.${fact.label}.label`, text: fact.label, role: 'prose' });
+      }
     }
     /*
      * The house's standings on this case's building, in the order the screen draws them — GitHub
@@ -12690,6 +12698,11 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
         /* The horizon the case's tower is pressed on — the moot sentence's fourth gate, § D973. */
         horizon: scenarioHorizonFor(context.trafficProfiles, context.building),
         /*
+         * No clock: the corpus's towers carry no service windows (`run.ts#buildingFor` builds them
+         * without a rung), so the strip's clock arm is swept on the fixture record below instead.
+         */
+        dayStartS: undefined,
+        /*
          * The day's crowd — § D729, § D730. Seeded `true` here and `false` below, because the
          * seed line and the door's closing sentence both have two arms and the arm a developer
          * never sees is the one most likely to say something a run cannot support. A pinned
@@ -12731,6 +12744,7 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
           goals: entry.readings,
           seed: 424_242n,
           horizon: scenarioHorizonFor(context.trafficProfiles, context.building),
+          dayStartS: undefined,
           crowdIsToday: false,
           firstSession: entry.week.day === 1 && entry.week.history.length === 0,
           units: 'metric',
@@ -12775,6 +12789,7 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
         goals: entry.readings,
         seed: 424_242n,
         horizon: scenarioHorizonFor(context.trafficProfiles, context.building),
+        dayStartS: undefined,
         crowdIsToday: true,
         firstSession: entry.week.day === 1 && entry.week.history.length === 0,
         units: 'imperial',
@@ -12797,6 +12812,58 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
           text: today.outOfService.sentence,
           role: 'observation',
         });
+      }
+      /*
+       * **The strip with its clock, the plate and the lede over a booked tower** — § D1038 and
+       * § D1039. The corpus builds its towers with no service windows, so none of the three reaches a
+       * booked car on its own; the report adapter's fixture bookings are the precedent (§ D983). One
+       * record per case, on its first day: the case's first car comes back, its second does not,
+       * and its day's own wrinkle draws whatever car the run would take. A fixture as that one is —
+       * what is swept is the wording, not a claim that this run lost a car.
+       */
+      if (entry === bundle.days[0]) {
+        const cars = context.building.banks.flatMap((bank) => bank.cars.map((car) => ({ bankId: bank.id, carId: car.id })));
+        const [first, second] = cars;
+        const booked: ResolvedBuilding = {
+          ...context.building,
+          serviceEvents: [
+            ...(first === undefined
+              ? []
+              : [
+                  { atS: 450, bankId: first.bankId, carId: first.carId, mode: 'out-of-service' as const },
+                  { atS: 900, bankId: first.bankId, carId: first.carId, mode: 'in-service' as const },
+                ]),
+            ...(second === undefined
+              ? []
+              : [{ atS: 1080, bankId: second.bankId, carId: second.carId, mode: 'out-of-service' as const }]),
+          ],
+        };
+        const bookedToday = todayOf({
+          week: entry.week,
+          calendar: null,
+          building: booked,
+          buildingId: context.building.id,
+          dispatcherName: entry.report.metaLines[0],
+          dispatcherNameOf: () => undefined,
+          goals: entry.readings,
+          seed: 424_242n,
+          horizon: scenarioHorizonFor(context.trafficProfiles, context.building),
+          dayStartS: 8 * 3600,
+          crowdIsToday: true,
+          firstSession: false,
+          units: 'metric',
+        });
+        seeds.push({ field: `${at}.today.booked.lede`, text: bookedToday.lede, role: 'observation' });
+        seeds.push({ field: `${at}.today.booked.wrinkle`, text: bookedToday.wrinkleNote, role: 'observation' });
+        if (bookedToday.outOfService !== undefined) {
+          seeds.push({ field: `${at}.today.booked.outage`, text: bookedToday.outOfService.sentence, role: 'observation' });
+        }
+        for (const fact of bookedToday.facts) {
+          seeds.push({ field: `${at}.today.booked.fact.${fact.label}`, text: fact.value, role: 'observation' });
+        }
+        if (bookedToday.load !== undefined) {
+          seeds.push({ field: `${at}.today.booked.load.note`, text: bookedToday.load.note, role: 'observation' });
+        }
       }
       for (const ask of today.asks) {
         seeds.push({ field: `${at}.today.asks`, text: ask, role: 'label' });

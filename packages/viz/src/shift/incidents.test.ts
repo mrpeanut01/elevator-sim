@@ -107,6 +107,40 @@ describe('an incident is two service events', () => {
     expect(events.map((event) => event.mode)).toEqual(['out-of-service']);
   });
 
+  it('takes one car out for the union of two windows, not until the first return — § D1038', () => {
+    /*
+     * The post-AH panel's D.md N5. Midtown's rung books car D out between a quarter and a half of
+     * the day, and Tuesday's move-in takes car D between a quarter and three quarters. Emitted side
+     * by side, the rung's return fired at the half and handed the movers' car back mid-move. The
+     * two orders — rung first and day first — must give the same schedule.
+     */
+    const rung: Incident = { kind: 'maintenance', car, fromFraction: 0.25, toFraction: 0.5 };
+    const moveIn: Incident = { kind: 'maintenance', car, fromFraction: 0.25, toFraction: 0.75 };
+    const union = [
+      { atS: 9000, carId: 'D', bankId: 'main', mode: 'out-of-service' },
+      { atS: 27000, carId: 'D', bankId: 'main', mode: 'in-service' },
+    ];
+    expect(serviceEventsFor([rung, moveIn], 36000)).toEqual(union);
+    expect(serviceEventsFor([moveIn, rung], 36000)).toEqual(union);
+    /* A window from the start that covers the rung's is the start's: out at 0, back at its own end. */
+    const shaft: Incident = { kind: 'maintenance', car, fromFraction: 0, toFraction: 0.85 };
+    expect(serviceEventsFor([rung, shaft], 36000)).toEqual([
+      { atS: 0, carId: 'D', bankId: 'main', mode: 'out-of-service' },
+      { atS: 30600, carId: 'D', bankId: 'main', mode: 'in-service' },
+    ]);
+    /* Two windows that do not meet stay two, and another car is untouched by either. */
+    const late: Incident = { kind: 'maintenance', car, fromFraction: 0.8, toFraction: 0.9 };
+    const other: Incident = { kind: 'maintenance', car: { bankId: 'main', carId: 'C' }, fromFraction: 0.3, toFraction: 0.4 };
+    expect(serviceEventsFor([rung, late, other], 36000).map((e) => `${e.carId}@${String(e.atS)}:${e.mode}`)).toEqual([
+      'D@9000:out-of-service',
+      'C@10800:out-of-service',
+      'C@14400:in-service',
+      'D@18000:in-service',
+      'D@28800:out-of-service',
+      'D@32400:in-service',
+    ]);
+  });
+
   it('leaves a building alone when there is nothing to add', () => {
     // Identity, not a copy: `withIncidents` returning a fresh object would make every run's building
     // document a new value, and the building document is digested into a leaderboard board.

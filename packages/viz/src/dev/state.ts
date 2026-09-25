@@ -24,6 +24,7 @@
 
 import {
   parseBuilding,
+  planDemand,
   resolveBuilding,
   type BuildingConfig,
   type DispatcherProfile,
@@ -1726,6 +1727,58 @@ export function resolvedBuildingOf(
   return shiftRunConfigOf(resources, state).building;
 }
 
+/** What a run will be, read before it is pressed — {@link plannedDayOf}. */
+export interface PlannedDay {
+  /** {@link resolvedBuildingOf}'s answer: the building the kernel will be handed. */
+  readonly building: ResolvedBuilding | undefined;
+  /**
+   * Where the run's clock will start, seconds since midnight, or `undefined` when its template
+   * declares no hour (or the day cannot be planned) — the value the finished run carries as
+   * `SimulationResult.trace.startOfDayS`, which the stage's clock and the Day report's times read.
+   */
+  readonly startOfDayS: number | undefined;
+}
+
+/**
+ * **The building and the clock of the run `state` would produce** — [§ D1039](../../../../DECISIONS.md).
+ *
+ * The brief prints the times a car is booked out, and they have to be the times the stage and the
+ * report will print after the run. Both halves come from here rather than from a second derivation:
+ * the building is {@link shiftRunConfigOf}'s (so a service window's seconds are the run's), and the
+ * hour is `core`'s own `planDemand` over the same config — the arrival plan the trace is generated
+ * from, whose template carries the `startOfDayS` the trace then reports. `planDemand` builds no
+ * trace and draws nothing, so this is a document resolve and a plan, not a simulation.
+ *
+ * Total: a day `core` refuses to plan answers `undefined` for the hour, and the brief then prints no
+ * clock rather than a guessed one.
+ */
+export function plannedDayOf(resources: BrowserResources, state: ViewerState): PlannedDay {
+  if (buildingConfigOf(resources, state.savedBuildings, state.buildingId) === undefined) {
+    return { building: undefined, startOfDayS: undefined };
+  }
+  const plan = shiftRunConfigOf(resources, state);
+  const { config } = plan;
+  const demand = config.demand ?? {};
+  let startOfDayS: number | undefined;
+  try {
+    startOfDayS = planDemand({
+      building: config.building,
+      profiles: config.trafficProfiles,
+      ...(config.demandTemplate === undefined ? {} : { template: config.demandTemplate }),
+      ...(config.durationS === undefined ? {} : { templateOverrides: { durationS: config.durationS } }),
+      ...(config.windowStartS === undefined ? {} : { windowStartS: config.windowStartS }),
+      ...(config.windowEndS === undefined ? {} : { windowEndS: config.windowEndS }),
+      ...(demand.arrivalRatePctPop5min === undefined
+        ? {}
+        : { arrivalRatePctPop5min: demand.arrivalRatePctPop5min }),
+      ...(demand.directionalSplit === undefined ? {} : { directionalSplit: demand.directionalSplit }),
+    }).template.startOfDayS;
+  } catch {
+    startOfDayS = undefined;
+  }
+  return { building: plan.building, startOfDayS };
+}
+
 /** The building's display name, without loading the whole document to read it. */
 export function buildingNameOf(
   resources: BrowserResources,
@@ -2071,10 +2124,12 @@ export function shiftRunConfigOf(
      * `(atS, bankId, carId)` — and is written this way so the list reads the way a reader meets the
      * two facts: what this tower is, then what happened today.
      *
-     * Two entries naming the same car would schedule two `out-of-service` events on it, which
-     * `core` handles as a mode set twice; nothing here dedupes, because a rung naming a car is a
-     * declaration the contract's brief carries and silently dropping the day's draw over it would
-     * be the caption-that-does-not-describe-the-picture defect one field over.
+     * Two entries naming the same car are **merged, not deduped** — `serviceEventsFor` takes the
+     * car out for the union of its windows ([§ D1038](../../../../DECISIONS.md)). This paragraph
+     * used to say two `out-of-service` events were merely *a mode set twice*, which was true of the
+     * departures and missed the returns: the rung's return fired first and handed the day's car
+     * back mid-window, so neither caption described the run. Dropping either entry would be the
+     * caption-that-does-not-describe-the-picture defect one field over, and still is.
      */
     [...rungIncidents(rung), ...patch.incidents],
     state.shiftLengthS,

@@ -1981,6 +1981,49 @@ describe('a rush sitting — GitHub issue #372', () => {
     expect(host.rush()?.rounds).toHaveLength(2);
   });
 
+  it('records a round on the run its presses asked for, not the one still playing — post-AH panel A.md 4', () => {
+    /*
+     * A press re-simulates the day from the start on a worker while the old recording keeps
+     * playing. A round switched at 0:00 and skipped to its end was recorded on the run **before**
+     * the switch, so the sitting's row read *held 27:20, into wave 10* under a sheet reading
+     * *25:38, wave 9*. The two recordings here are two dispatchers on the same stream, so their
+     * outcomes differ and the case can tell which one the round was taken on.
+     */
+    const other = resources.dispatcherProfiles.profiles.find((profile) => profile.id !== base().dispatcherId);
+    if (other === undefined) throw new Error('the shelf holds one dispatcher');
+    const state = { ...base(), dispatcherId: other.id };
+    const patch = rushPatchOf(resources, state);
+    if (patch === undefined) throw new Error(state.buildingId);
+    const landed = recordRun(shiftRunConfigOf(resources, { ...state, ...patch } as ViewerState).config, {
+      recordDecisions: false,
+    }).recording;
+
+    let pending = false;
+    const h = harnessOf(base());
+    const host = createEverydayHost({ ...h.bindings, runPending: () => pending });
+    host.startRush();
+    h.state = { ...h.state, recording: rush };
+    const staleHold = host.rush()?.holdAtS ?? 0;
+    /* The press: a re-run is in flight, and the stale recording plays on to its line. */
+    pending = true;
+    host.endRush(staleHold);
+    expect(host.rush()?.rounds, 'a round was recorded on a run its presses did not produce').toHaveLength(0);
+    expect(host.rushBest()).toBeUndefined();
+
+    /* The re-run lands. The first read after it records the round on it. */
+    h.state = { ...h.state, recording: landed };
+    pending = false;
+    const [round] = host.rush()?.rounds ?? [];
+    expect(round?.outcome).toEqual(rushOutcomeOf(landed, staleHold));
+    expect(rushOutcomeOf(landed, staleHold).heldS).not.toBe(rushOutcomeOf(rush, staleHold).heldS);
+    /* Recorded once: another read is not another round. */
+    expect(host.rush()?.rounds).toHaveLength(1);
+    /* And the front's kept figure is the same round's, surviving the sitting. */
+    host.leaveRush();
+    expect(host.rushBest()?.wave).toBe(round?.outcome.wave);
+    expect(host.rushBest()?.heldS).toBe(round?.outcome.heldS);
+  });
+
   /**
    * **The round records what drove it and what was changed** — GitHub issue **#565**, third defect,
    * § D859.
