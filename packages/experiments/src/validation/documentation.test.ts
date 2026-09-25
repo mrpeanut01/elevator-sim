@@ -2205,7 +2205,15 @@ type DecisionReservation = {
  * Extended from D1137 to **D1146** on 2026-09-25 for lane AJ-L, the swarm's first-ranked ruling (the
  * call as the core loop). Committed on the integration branch before its worktree exists.
  */
-const OPEN_RESERVATION = { wave: 'AJ', from: 1048, to: 1146 } as DecisionReservation | null;
+/*
+ * **Wave AJ's reservation is CLOSED**, in the wave's own merge commit. Eleven blocks went out across
+ * D1048-D1146 (four at the wave's start, then the CI lane, the three defect lanes, the swarm's
+ * fix-it and campaign lanes and its call lane) and twenty-seven headings were spent. **Every number
+ * below the highest heading, D1138, that no lane spent comes back as a hole** and is registered in
+ * `KNOWN_DECISION_HOLES`; **D1139-D1146 are free rather than holed**, since nothing is written above
+ * them (§ D430), and the charter row moves to **D1139**.
+ */
+const OPEN_RESERVATION = null as DecisionReservation | null;
 /*
  * **Wave AC's reservation, D619-D620, is closed.** It opened on the pair wave AB left free.
  * GitHub issue #437 stage 2 wrote D619 first, on a lane that started from the same pre-#422 base as
@@ -3204,6 +3212,100 @@ const KNOWN_DECISION_HOLES: ReadonlyMap<number, string> = new Map([
   [1026, "wave AI's lane AI-C's block; unspent for § 1021's reason."],
   [1027, "wave AI's lane AI-C's block; unspent for § 1021's reason."],
   [1028, "wave AI's lane AI-C's block; unspent for § 1021's reason."],
+  [
+    1049,
+    "wave AJ's lane AJ-A held D1048-D1056 and spent D1048. Registered under D404 and D430.",
+  ],
+  [1050, "wave AJ's lane AJ-A's block; unspent for § 1049's reason."],
+  [1051, "wave AJ's lane AJ-A's block; unspent for § 1049's reason."],
+  [1052, "wave AJ's lane AJ-A's block; unspent for § 1049's reason."],
+  [1053, "wave AJ's lane AJ-A's block; unspent for § 1049's reason."],
+  [1054, "wave AJ's lane AJ-A's block; unspent for § 1049's reason."],
+  [1055, "wave AJ's lane AJ-A's block; unspent for § 1049's reason."],
+  [1056, "wave AJ's lane AJ-A's block; unspent for § 1049's reason."],
+  [
+    1058,
+    "wave AJ's lane AJ-B held D1057-D1065 and spent D1057. Registered under D404 and D430.",
+  ],
+  [1059, "wave AJ's lane AJ-B's block; unspent for § 1058's reason."],
+  [1060, "wave AJ's lane AJ-B's block; unspent for § 1058's reason."],
+  [1061, "wave AJ's lane AJ-B's block; unspent for § 1058's reason."],
+  [1062, "wave AJ's lane AJ-B's block; unspent for § 1058's reason."],
+  [1063, "wave AJ's lane AJ-B's block; unspent for § 1058's reason."],
+  [1064, "wave AJ's lane AJ-B's block; unspent for § 1058's reason."],
+  [1065, "wave AJ's lane AJ-B's block; unspent for § 1058's reason."],
+  [
+    1068,
+    "wave AJ's lane AJ-C held D1066-D1074 and spent D1066-D1067. Registered under D404 and D430.",
+  ],
+  [1069, "wave AJ's lane AJ-C's block; unspent for § 1068's reason."],
+  [1070, "wave AJ's lane AJ-C's block; unspent for § 1068's reason."],
+  [1071, "wave AJ's lane AJ-C's block; unspent for § 1068's reason."],
+  [1072, "wave AJ's lane AJ-C's block; unspent for § 1068's reason."],
+  [1073, "wave AJ's lane AJ-C's block; unspent for § 1068's reason."],
+  [1074, "wave AJ's lane AJ-C's block; unspent for § 1068's reason."],
+  [
+    1079,
+    "wave AJ's lane AJ-D held D1075-D1083 and spent D1075-D1078. Registered under D404 and D430.",
+  ],
+  [1080, "wave AJ's lane AJ-D's block; unspent for § 1079's reason."],
+  [1081, "wave AJ's lane AJ-D's block; unspent for § 1079's reason."],
+  [1082, "wave AJ's lane AJ-D's block; unspent for § 1079's reason."],
+  [1083, "wave AJ's lane AJ-D's block; unspent for § 1079's reason."],
+  [
+    1086,
+    "wave AJ's lane AJ-E held D1084-D1092 and spent D1084; D1085-D1088 were reallocated by the integrator to lane AJ-F, which spent D1085. Registered under D404 and D430.",
+  ],
+  [1087, "wave AJ's lane AJ-E's block; unspent for § 1086's reason."],
+  [1088, "wave AJ's lane AJ-E's block; unspent for § 1086's reason."],
+  [1089, "wave AJ's lane AJ-E's block; unspent for § 1086's reason."],
+  [1090, "wave AJ's lane AJ-E's block; unspent for § 1086's reason."],
+  [1091, "wave AJ's lane AJ-E's block; unspent for § 1086's reason."],
+  [1092, "wave AJ's lane AJ-E's block; unspent for § 1086's reason."],
+  [
+    1100,
+    "wave AJ's lane AJ-G held D1093-D1101 and spent D1093-D1099. Registered under D404 and D430.",
+  ],
+  [1101, "wave AJ's lane AJ-G's block; unspent for § 1100's reason."],
+  [
+    1108,
+    "wave AJ's lane AJ-H held D1102-D1110 and spent D1102-D1107. Registered under D404 and D430.",
+  ],
+  [1109, "wave AJ's lane AJ-H's block; unspent for § 1108's reason."],
+  [1110, "wave AJ's lane AJ-H's block; unspent for § 1108's reason."],
+  [
+    1112,
+    "wave AJ's lane AJ-I held D1111-D1119 and spent D1111. Registered under D404 and D430.",
+  ],
+  [1113, "wave AJ's lane AJ-I's block; unspent for § 1112's reason."],
+  [1114, "wave AJ's lane AJ-I's block; unspent for § 1112's reason."],
+  [1115, "wave AJ's lane AJ-I's block; unspent for § 1112's reason."],
+  [1116, "wave AJ's lane AJ-I's block; unspent for § 1112's reason."],
+  [1117, "wave AJ's lane AJ-I's block; unspent for § 1112's reason."],
+  [1118, "wave AJ's lane AJ-I's block; unspent for § 1112's reason."],
+  [1119, "wave AJ's lane AJ-I's block; unspent for § 1112's reason."],
+  [
+    1121,
+    "wave AJ's lane AJ-J held D1120-D1128 and spent D1120. Registered under D404 and D430.",
+  ],
+  [1122, "wave AJ's lane AJ-J's block; unspent for § 1121's reason."],
+  [1123, "wave AJ's lane AJ-J's block; unspent for § 1121's reason."],
+  [1124, "wave AJ's lane AJ-J's block; unspent for § 1121's reason."],
+  [1125, "wave AJ's lane AJ-J's block; unspent for § 1121's reason."],
+  [1126, "wave AJ's lane AJ-J's block; unspent for § 1121's reason."],
+  [1127, "wave AJ's lane AJ-J's block; unspent for § 1121's reason."],
+  [1128, "wave AJ's lane AJ-J's block; unspent for § 1121's reason."],
+  [
+    1130,
+    "wave AJ's lane AJ-K held D1129-D1137 and spent D1129. Registered under D404 and D430.",
+  ],
+  [1131, "wave AJ's lane AJ-K's block; unspent for § 1130's reason."],
+  [1132, "wave AJ's lane AJ-K's block; unspent for § 1130's reason."],
+  [1133, "wave AJ's lane AJ-K's block; unspent for § 1130's reason."],
+  [1134, "wave AJ's lane AJ-K's block; unspent for § 1130's reason."],
+  [1135, "wave AJ's lane AJ-K's block; unspent for § 1130's reason."],
+  [1136, "wave AJ's lane AJ-K's block; unspent for § 1130's reason."],
+  [1137, "wave AJ's lane AJ-K's block; unspent for § 1130's reason."],
   [
     1030,
     "wave AI's lane AI-D held D1029-D1037 and spent D1029. Registered under D404 and D430.",
