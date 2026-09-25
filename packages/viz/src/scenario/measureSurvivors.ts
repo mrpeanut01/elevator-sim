@@ -14,9 +14,10 @@
  *
  * ## Nothing here is a second runner, a second judge or a second definition of *clear*
  *
- * Every configuration goes through `campaign/stageSequence.ts#runStageToVerdict` — the shipped
- * sequence, the one `dev/campaignPanel.ts` calls — so a survivor is a configuration that clears the
- * scenario in exactly the sense the product means by it, and this module cannot drift from the
+ * Every configuration goes through `campaign/stagePress.ts#pressStage` — the one admission check a
+ * player's press is asked ([§ D1129](../../../../DECISIONS.md)), then
+ * `campaign/stageSequence.ts#runStageToVerdict`, the shipped sequence the panel calls — so a
+ * survivor is a configuration that clears the scenario in exactly the sense the product means by it, and this module cannot drift from the
  * panel. That is `stageRun.ts`'s founding argument, which this repository has now paid for at three
  * separate levels: *"the suite would have gone on passing if the panel had drifted … because the
  * suite was measuring a reimplementation of the call site."*
@@ -80,7 +81,8 @@ import type { SearchSpace } from '@elevator-sim/experiments/browser';
 import type { BatchReport } from '../batch/report.js';
 import type { BatchRequest, BatchResult } from '../batch/types.js';
 import type { StageReport } from '../campaign/judge.js';
-import { runStageToVerdict } from '../campaign/stageSequence.js';
+import { admitStageMove, pressStage, type StagePressInput } from '../campaign/stagePress.js';
+import type { StageSequenceOutcome } from '../campaign/stageSequence.js';
 import type { CampaignStage } from '../campaign/types.js';
 import type { PriceSchedule } from '../pricing/types.js';
 
@@ -300,15 +302,22 @@ export async function measureScenarioSurvivors(
   const reachable = reachableChangesOf(space, schedule);
 
   /* The countable stratum, played once. See the docstring on why once is enough. */
-  const dropdown = dropdownConfigurationsOf(space, schedule, baseline, profiles);
+  const dropdown = dropdownConfigurationsOf(space, schedule, baseline, profiles, building);
+  const admissionContext = { space, schedule, baseline, building, elevatorSpecs };
+  const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
   const dropdownJudged = new Map<string, JudgedConfiguration>();
   const dropdownUnbuildable: UnbuildableConfiguration[] = [];
   for (const configuration of dropdown) {
+    const profile = profileById.get(configuration.profileId);
+    if (profile === undefined) continue;
+    /* Played through the press itself, at an unbounded budget: the rungs are asked below. */
     const outcome = await playOrRefuse(() =>
-      runStageToVerdict({
+      pressed({
         stage,
         published,
-        candidateProfileId: configuration.profileId,
+        context: admissionContext,
+        move: { profile },
+        budgetUnits: Number.MAX_SAFE_INTEGER,
         run: (request) => run(request),
       }),
     );
@@ -344,7 +353,14 @@ export async function measureScenarioSurvivors(
     const judged: JudgedConfiguration[] = [];
     const unbuildable: UnbuildableConfiguration[] = [];
     for (const configuration of dropdown) {
-      if (configuration.units > rung.units) continue;
+      /*
+       * Affordability at this rung is the **one admission check**, asked at the rung's own units —
+       * `campaign/stagePress.ts#admitStageMove`, [§ D1129](../../../../DECISIONS.md) — so a survivor
+       * counted here is a move a player standing on this rung is admitted to press.
+       */
+      const profile = profileById.get(configuration.profileId);
+      if (profile === undefined) continue;
+      if (!admitStageMove(admissionContext, { profile }, rung.units).admitted) continue;
       const entry = dropdownJudged.get(configuration.profileId);
       if (entry === undefined) {
         const refused = dropdownUnbuildable.find((row) => row.name === configuration.profileId);
@@ -357,11 +373,15 @@ export async function measureScenarioSurvivors(
     for (const [index, configuration] of drawn.configurations.entries()) {
       const name = `edit-${String(index)}`;
       const outcome = await playOrRefuse(() =>
-        runStageToVerdict({
+        pressed({
           stage,
           published,
-          candidateProfileId: baseline.id,
-          edit: { baseProfileId: baseline.id, profileId: name, values: configuration.values },
+          context: admissionContext,
+          move: {
+            profile: baseline,
+            edit: { baseProfileId: baseline.id, profileId: name, values: configuration.values },
+          },
+          budgetUnits: rung.units,
           run: (request) => run(request),
         }),
       );
@@ -418,6 +438,21 @@ export async function measureScenarioSurvivors(
  * message is returned verbatim rather than classified, because classifying it would need a list of
  * what `core` refuses and that list is exactly what nobody has.
  */
+/**
+ * The player's press — `campaign/stagePress.ts#pressStage` — as the sweep consumes it: the judged
+ * sequence, or a throw carrying the admission's own sentence, which {@link playOrRefuse} records as
+ * an unplayable configuration. A census draw the press refuses is a disagreement between the sampler
+ * and the one admission check ([§ D1129](../../../../DECISIONS.md)); it is named in the table rather
+ * than counted either way.
+ */
+async function pressed(input: StagePressInput): Promise<StageSequenceOutcome> {
+  const press = await pressStage(input);
+  if (press.kind === 'refused') {
+    throw new Error(`refused by the stage's admission check: ${press.admission.sentence}`);
+  }
+  return press.outcome;
+}
+
 async function playOrRefuse(
   play: () => Promise<{ readonly verdict: StageReport; readonly report: BatchReport }>,
 ): Promise<{ readonly verdict: StageReport; readonly report: BatchReport } | string> {

@@ -43,6 +43,38 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
   Object.freeze([
     {
       reason:
+        'The stage press — wave AJ lane AJ-K, § D1129. `campaign/stagePress.ts#pressStage` is the one ' +
+        'admission check followed by the shipped sequence, and it is derived only through ' +
+        '`admitStageMove`, whose prose it returns inside `StagePress.admission` untouched. Every ' +
+        'sentence it can carry is that function’s, which `campaign/judge.ts#judgeStage`’s adapter ' +
+        'drives by name; its own throws are a mismatched edit and a building-less edit, programming ' +
+        'faults no surface draws.',
+      ids: ['campaign/stagePress.ts#pressStage'],
+    },
+    {
+      reason:
+        'The stage page’s move — wave AJ lane AJ-K, § D1129. `everyday/stagePlay.ts#stageMoveOf` ' +
+        'returns a `StageMove`, whose only composed string is the edit’s `profileId` ' +
+        '(`<profile>-parked-<strategy>`), a key the batch worker names the candidate arm’s resolved ' +
+        'dispatcher by. The stage page draws no profile id: its setting labels are each profile’s ' +
+        '`name` (asserted in `stagePlay.test.ts`), and the verdict lines it draws are the judge’s ' +
+        'headline and goal sentences, which name no arm.',
+      ids: ['everyday/stagePlay.ts#stageMoveOf'],
+    },
+    {
+      reason:
+        'The whole-day splice — wave AJ lane AJ-B, § D1057. `shift/episode.ts#spliceEpisode` returns a ' +
+        'derived phase-list record and, where a day cannot hold an episode, a refusal with its reason. ' +
+        'The record’s `$comment` is a data comment nothing renders. The refusal reaches no screen: ' +
+        '`dev/state.ts#shiftRunConfigOf` throws it only for a drawn placement the day’s clock cannot ' +
+        'hold, and `shift/episode.test.ts` splices every shipped placement into every shipped whole ' +
+        'day on every run, so that state is a data fault the suite reddens on rather than a day. What ' +
+        'a player reads about an episode is the placement’s note, composed by `wrinkles/draw.ts` and ' +
+        'swept as `WRINKLES.*.wholeDay.note` in the event adapter.',
+      ids: ['shift/episode.ts#spliceEpisode'],
+    },
+    {
+      reason:
         'The session-shape spans — GitHub issue #559, § D753. `everyday/sittingShape.ts#SITTING_SPANS` is ' +
         'four records of two numbers each, in simulated seconds, and its only strings are the `source` ' +
         'field: the file each span was read from, for `sittingShape.test.ts` to assert it against. It is ' +
@@ -416,6 +448,18 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          * drives, plus `FIXIT_SCREEN_COPY`, which it iterates.
          */
         'everyday/fixitFamilies.ts#mountFixitFamilies',
+        /*
+         * § D1129's stage page inside the fix-it screen. `mountStagePlay` builds selects and a
+         * verdict card and needs a document and a worker; every sentence it draws is
+         * `everyday/stagePlay.ts#stagePlayViewOf`'s, which the `EVERYDAY_STAGE_PLAY` adapter drives
+         * over every state the mount reaches, plus the judge's own sentences, which
+         * `campaign/judge.ts#judgeStage`'s adapter drives. What it authors itself is the load
+         * failure's detail. `stagePlayBar` is the fix-it row refined with `STAGE_PLAY_COPY`'s labels
+         * and reasons, every one of which that adapter seeds by name through the view; it is derived
+         * only because it reads the page's facts to pick among them.
+         */
+        'everyday/stagePlayScreen.ts#mountStagePlay',
+        'everyday/stagePlayScreen.ts#stagePlayBar',
         /*
          * The brief's elevation painter, shared with the campaign's tower screen since GitHub
          * issue #353. It paints wells and slabs onto a canvas and authors three floor marks and a
@@ -1549,6 +1593,14 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'Which floors keep a shared start time — GitHub issue #603, § D1078. ' +
+        '`startTimeFloorIdsOf` returns floor ids read off each floor’s traffic profile and prints ' +
+        'nothing; the sentence a player reads about a building with none is ' +
+        '`campaignModel.ts#SHOP_NO_START_TIME`, which the campaign adapter draws.',
+      ids: ['campaign/fitOut.ts#startTimeFloorIdsOf'],
+    },
+    {
+      reason:
         'Assertions that two runs met the same crowd — GitHub issue #350 — and the three sites ' +
         'that make them. `crowdDifferencesOf` returns sentences naming the first legs that differ, ' +
         '`sameCrowd` is the predicate over it, `assertSameCrowd` throws with the pair’s own name in ' +
@@ -1564,6 +1616,8 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'record/crowd.ts#crowdDifferencesOf',
         'record/crowd.ts#sameCrowd',
         'record/crowd.ts#assertSameCrowd',
+        /* GitHub issue #601, § D1076: the thinned half of the same check, in the same class. */
+        'record/crowd.ts#crowdAddedOf',
         'fixit/run.ts#assertPairMatchesRepairs',
         'scope/switchWire.ts#wireInterventionsOf',
         /*
@@ -1611,6 +1665,23 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'fixit/judge.ts#pressThroughTheJudge',
         'fixit/held.ts#heldReasonOf',
         'fixit/held.ts#isOffered',
+        /*
+         * [§ D1120](../../../../DECISIONS.md)'s two derived artifacts, on the same ground. The shipped
+         * as-built mornings are readings in and readings out, and the only sentences in the module
+         * are its loader's own refusals of a malformed file, which fire at import and no surface
+         * draws. The input digest is canonical JSON and hex. The route census is counts per case id,
+         * and `opensWithDiagnosis` a boolean off it; the sentence a player reads about a case the
+         * census opens is `fixitScreenModel.ts#diagnosisOpenedBecauseOf`'s, which the FIXIT adapter
+         * drives with the census's own counts.
+         */
+        'fixit/asBuiltMornings.ts#asBuiltMorningsDocumentOf',
+        'fixit/asBuiltMornings.ts#SHIPPED_AS_BUILT_MORNINGS',
+        'fixit/asBuiltMornings.ts#shippedAsBuiltMorningsOf',
+        'fixit/morningsInput.ts#morningsInputOf',
+        'fixit/morningsInput.ts#morningsInputHashOf',
+        'fixit/routeCensus.ts#ROUTE_CENSUS',
+        'fixit/routeCensus.ts#routeCensusOf',
+        'fixit/routeCensus.ts#opensWithDiagnosis',
         'fixit/engine.ts#affordabilityOf',
         'fixit/engine.ts#toggleRepair',
         /*
@@ -1805,6 +1876,17 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'The week census’s plumbing — wave AJ, § D1066 and § D1067. `shift/weekWay.ts#weekWayIssues` ' +
+        'is `contractLadderIssues`’ twin for `data/week-way.json`: its strings are content-author ' +
+        'refusals that `dev/data.ts` folds into `BrowserResources.warnings` and `shift/weekWay.test.ts` ' +
+        'turns into a failing test, and no screen renders one. `dev/state.ts#weekGrowthPerDayOf` ' +
+        'returns a number, and is derived only because `runRungOf` names the `shift-week` play mode ' +
+        'id, which is a switch value rather than a sentence. What a player reads from the census is ' +
+        '`wayThroughSentenceOf`, seeded by name in `honesty/surfaces.ts`.',
+      ids: ['shift/weekWay.ts#weekWayIssues', 'dev/state.ts#weekGrowthPerDayOf'],
+    },
+    {
+      reason:
         'The press-moment ruling’s plumbing — wave AI, § D1029. `admittedPressDayIds` and ' +
         '`pressDayMeasuredAs` return ids and a pin, and are derived only because they reach ' +
         '`contractLadderIssues`’ own call-block check, whose content-author strings the entry above ' +
@@ -1825,6 +1907,29 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'shift/pressCall.ts#PRESS_CALL_RULES',
         'shift/pressCall.ts#PRESS_CALL_MIN_WINDOW_S',
         'shift/callRow.ts#PRESS_CALL_ROW_ID',
+      ],
+    },
+    {
+      reason:
+        'The ordinary call’s plumbing — wave AJ, § D1138. `nextDayCallOf` returns an instant and ' +
+        'a rule id, `dayCallsOffered` and `dayCallAdmits` return booleans, `dayCallRecordOf` ' +
+        'returns counts, `dayCallRowIdOf` returns the row’s id (`day-call-1`, on ' +
+        '`PRESS_CALL_ROW_ID`’s precedent above), and `DAY_CALL_ANSWERS` is the three answer ids, ' +
+        'which the two-adjacent-words scanner reads as prose. `dev/state.ts#dayCallFactsOf` and ' +
+        '`dev/dayCallSession.ts#openDayCallSession` return a horizon, cars, a flag and a sequence of ' +
+        'runs, reaching prose only through `shiftRunConfigOf`’s withheld-reason strings, which that ' +
+        'function’s adapters sweep. What a player reads about an ordinary call is the stage card ' +
+        '(`everyday/stageCall.ts`, seeded by name) and the report row (`shift/dayCalls.ts#dayCallRowOf`, ' +
+        'seeded by the report adapter).',
+      ids: [
+        'shift/dayCalls.ts#nextDayCallOf',
+        'shift/dayCalls.ts#dayCallsOffered',
+        'shift/dayCalls.ts#dayCallAdmits',
+        'shift/dayCalls.ts#dayCallRecordOf',
+        'shift/dayCalls.ts#dayCallRowIdOf',
+        'shift/dayCalls.ts#DAY_CALL_ANSWERS',
+        'dev/state.ts#dayCallFactsOf',
+        'dev/dayCallSession.ts#openDayCallSession',
       ],
     },
     {
@@ -2150,6 +2255,19 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'A composition that authors no string — wave AJ integration. `dev/leftRail.ts#todaysShiftOf` ' +
+        'builds the Engineer rail’s day line from `shift/events.ts#eventAsRun` and the brief’s own ' +
+        '`wrinkleNameOf` and `wrinkleNoteOf`, so every word it can draw is somebody else’s; the ' +
+        'deriver collects it only because the run’s horizon tag, `whole-day`, reads as two ' +
+        'hyphenated words to `PROSE`. What holds it honest is the declared `todays-shift` pair in ' +
+        '`honesty/agreement.ts`, which compares its whole line — name and note — against the ' +
+        'brief’s, and which caught this function disagreeing with the brief on whole days when two ' +
+        'lanes merged. Over-collection is the safe direction, so this is classified rather than ' +
+        'the scan loosened.',
+      ids: ['dev/leftRail.ts#todaysShiftOf'],
+    },
+    {
+      reason:
         'The wire body for a posted run — GitHub issue #221. `runSubmissionOf` is ids, numbers and ' +
         'a seed: a building id, a dispatcher id, a demand template id, a duration, a window and ' +
         'the run’s rule rows, every one of them a key the server resolves against its own `data/`. ' +
@@ -2201,9 +2319,11 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'Since § D1047 two more read the stream and print nothing: `firstSessionDayFor` hands ' +
         '`withFirstSession` the drawn pin’s crowd and standing order, and `isDealtPinnedDay` is the ' +
         'predicate the line’s pinned arm and the boot’s seed base share — both answer with ids, ' +
-        'seeds and a boolean, and the line they choose is seeded by name.',
+        'seeds and a boolean, and the line they choose is seeded by name. Wave AJ’s ' +
+        '`firstDayDealOf` (§ D1096) is the boot’s question of the address and answers two booleans.',
       ids: [
         'shift/firstSession.ts#FIRST_SESSION_STREAM',
+        'shift/firstSession.ts#firstDayDealOf',
         'shift/firstSession.ts#firstSessionContractFor',
         'shift/firstSession.ts#firstSessionDayFor',
         'shift/firstSession.ts#isDealtPinnedDay',

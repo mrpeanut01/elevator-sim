@@ -316,7 +316,7 @@ function interventionUnreadableReason(
   if (!isInterventionKind(change['kind'])) {
     return `this build does not ship the intervention kind “${change['kind']}”`;
   }
-  if (change['kind'] === 'switch-dispatcher') {
+  if (change['kind'] === 'switch-dispatcher' || change['kind'] === 'adopt-dispatcher') {
     const profile = change['profile'] as
       | { readonly id?: unknown; readonly name?: unknown; readonly weights?: unknown }
       | null

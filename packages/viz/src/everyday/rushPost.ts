@@ -147,6 +147,36 @@ export const RUSH_POST_COPY = Object.freeze({
     'worth is not measured — that would take the same waves played again without it, and this ' +
     'sitting has only the round you played.',
   /*
+   * **The same note once the sitting holds more than one round** — wave AJ, § D1099. The line above
+   * says *this sitting has only the round you played*, and it stayed on round 1 after round 2 was
+   * listed under it (the post-AI panel's seat A, defect 7). Three arms, chosen by
+   * `roundLinesOf` from {@link RushRoundRecord.startKey}: no other round started where this one
+   * did; one did and pressed nothing, so the gap between the two is measured; or one did and was
+   * ended by hand, which crossed no line and so holds no figure to set beside this one.
+   */
+  changesNoteNoTwin:
+    'Each change is shown with the clock it landed on and what the round did after it. What it was ' +
+    'worth is not measured — that would take the same waves played again from the same start with ' +
+    'nothing changed, and no other round of this sitting is that.',
+  changesNoteTwinByHand: (label: string): string =>
+    `Each change is shown with the clock it landed on and what the round did after it. ${label} met ` +
+    'the same waves from the same start with nothing changed, but one of the two was ended by hand, ' +
+    'so the two holds are not set side by side.',
+  /**
+   * The measured arm. Both rounds met this sitting's crowd from one start and the rush is simulated
+   * deterministically, so the round with no press **is** this round without its changes, and the
+   * difference is exact for this crowd. It is said to be about this crowd and no other, because one
+   * crowd is one sample of the building's rushes.
+   */
+  changesNoteTwin: (label: string, twinHeld: string, twinWave: number, gap: string): string =>
+    `Each change is shown with the clock it landed on and what the round did after it. ${label} met ` +
+    `the same waves from the same start with nothing changed and held ${twinHeld}, into wave ` +
+    `${String(twinWave)}; with the changes this round ${gap}. That is one crowd, and another rush's ` +
+    'waves could answer differently.',
+  /** The gap in {@link RUSH_POST_COPY.changesNoteTwin}'s own words, signed from this round's side. */
+  twinGap: (deltaS: number, clock: string): string =>
+    deltaS > 0 ? `held ${clock} longer` : deltaS < 0 ? `held ${clock} less` : 'held exactly as long',
+  /*
    * **The unit is named on both figures**, which is § D530's rule about a price said in the
    * currency's own words applied to the money inside a mode: `data/rush-purse.json` declares
    * `unit: 'units'`, and a bare integer beside the word *purse* is a figure a player has to guess
@@ -185,7 +215,8 @@ export interface RushRoundLineView {
    */
   readonly changes: readonly string[];
   /**
-   * {@link RUSH_POST_COPY.changesNote} where {@link RushRoundLineView.changes} has entries,
+   * {@link RUSH_POST_COPY.changesNote}, or one of its three arms for a sitting of more than one round
+   * ({@link changesNoteOf}, § D1099), where {@link RushRoundLineView.changes} has entries;
    * `undefined` otherwise — a caption over an empty list is a caption over nothing.
    */
   readonly changesNote: string | undefined;
@@ -254,6 +285,40 @@ function changeLinesOf(round: RushRoundRecord): readonly string[] {
  * `replayRushSitting` answers for every round it verified, in order — and a list that matched on a
  * held time would be inventing an identity the wire does not carry.
  */
+/**
+ * The note under a round's changes — {@link RUSH_POST_COPY.changesNote} and its three arms for a
+ * sitting of more than one round (wave AJ, § D1099). `undefined` on a round with no changes.
+ *
+ * The comparison round is the first other round that started from the same
+ * {@link RushRoundRecord.startKey} and recorded no press. Nothing else qualifies: a round that
+ * started elsewhere is a different experiment, and a round with presses of its own is not *nothing
+ * changed*.
+ */
+function changesNoteOf(rounds: readonly RushRoundRecord[], index: number): string | undefined {
+  const round = rounds[index];
+  if (round === undefined || round.changes.length === 0) return undefined;
+  if (rounds.length <= 1) return RUSH_POST_COPY.changesNote;
+  const twinIndex =
+    round.startKey === undefined
+      ? -1
+      : rounds.findIndex(
+          (other, at) => at !== index && other.interventionCount === 0 && other.startKey === round.startKey,
+        );
+  const twin = rounds[twinIndex];
+  if (twin === undefined) return RUSH_POST_COPY.changesNoteNoTwin;
+  const label = RUSH_POST_COPY.roundLabel(twinIndex + 1);
+  if (twin.outcome.kind !== 'broke' || round.outcome.kind !== 'broke') {
+    return RUSH_POST_COPY.changesNoteTwinByHand(label);
+  }
+  const deltaS = round.outcome.heldS - twin.outcome.heldS;
+  return RUSH_POST_COPY.changesNoteTwin(
+    label,
+    heldClock(twin.outcome.heldS),
+    twin.outcome.wave,
+    RUSH_POST_COPY.twinGap(deltaS, heldClock(Math.abs(deltaS))),
+  );
+}
+
 function roundLinesOf(
   rounds: readonly RushRoundRecord[],
   replayed: readonly RushPostedRound[] | undefined,
@@ -274,7 +339,7 @@ function roundLinesOf(
           ? RUSH_POST_COPY.noPresses
           : RUSH_POST_COPY.presses(round.interventionCount),
       changes: changeLinesOf(round),
-      changesNote: round.changes.length === 0 ? undefined : RUSH_POST_COPY.changesNote,
+      changesNote: changesNoteOf(rounds, index),
       earned:
         answered === undefined
           ? undefined

@@ -56,6 +56,7 @@ import { loadConfig } from '@elevator-sim/core';
 import { collectSearchSpace } from '@elevator-sim/experiments/browser';
 
 import { runBatch } from '../batch/runBatch.js';
+import { censusInputHashOf } from './survivorInputs.test-helper.js';
 import { restrictedFloorIds } from '../access/zoning.js';
 import { parseCampaign, type CampaignContext } from '../campaign/parse.js';
 import type { Campaign } from '../campaign/types.js';
@@ -155,6 +156,8 @@ export async function loadSurvivorFixture(): Promise<SurvivorFixture> {
 export async function measurePublishedSurvivors(
   options: { readonly onScenario?: ((line: string) => void) | undefined } = {},
 ): Promise<PublishedSurvivors> {
+  /* Hashed before anything is measured, so the hash is of the inputs the run started from. */
+  const inputs = await censusInputHashOf(DATA_DIR);
   const config = await loadConfig(DATA_DIR);
   const { campaign, published } = await loadSurvivorFixture();
   const space = collectSearchSpace();
@@ -284,6 +287,8 @@ export async function measurePublishedSurvivors(
       unpricedDimensionCount: unpriced.length,
       withheldDimensionCount: withheld.length,
       declaredDimensionCount: space.parameters.length,
+      /* § D1129 clause 5: what the count was taken over, so a moved input reds always-on. */
+      inputHash: inputs.hash,
     },
     scenarios,
   };

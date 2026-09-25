@@ -1,0 +1,2727 @@
+{
+  "$comment": "Written by packages/viz/src/shift/wrinkleCensus.sweep.test.ts (WRINKLE_CENSUS=1) and re-derived in part by wrinkleCensus.test.ts on every run. DECISIONS.md section D1057. Day 1 of each contract as the Scenario press plays it (the whole authored day, the rung's fabric and booked car, no press), one row per crowd, the crowd being seed 20260824 + 7919 n. `ordinary` is the unwrinkled day on the same crowds; every other key is a wrinkle spliced as a whole-day episode at its template's first axis values. clearsDefault: every goalsForDay(1, 'whole-day') reading met under the default standing order. clearsAny: some shipped standing order met them all, searched in file order and stopped at the first. delivered and abandoned: under the default order. Counts only; no rate, interval or ranking is claimed.",
+  "crowds": 4,
+  "defaultDispatcher": "collective",
+  "cells": {
+    "c2/ordinary": [
+      {
+        "n": 0,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 2530,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 1,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 2597,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 2,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 2563,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 3,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 2483,
+        "abandoned": 0,
+        "failing": ""
+      }
+    ],
+    "c2/fire-drill": [
+      {
+        "n": 0,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 2817,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 1,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 2747,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 2,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 2803,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 3,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 2773,
+        "abandoned": 0,
+        "failing": ""
+      }
+    ],
+    "c2/conference": [
+      {
+        "n": 0,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 2518,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 1,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 2647,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 2,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 2575,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 3,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 2587,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      }
+    ],
+    "c2/caterers": [
+      {
+        "n": 0,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 2602,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 1,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 2615,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 2,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 2613,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 3,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 2665,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      }
+    ],
+    "c2/goods-inward": [
+      {
+        "n": 0,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 2633,
+        "abandoned": 0,
+        "failing": "queue+worst-wait"
+      },
+      {
+        "n": 1,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 2665,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 2,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 2635,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 3,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 2685,
+        "abandoned": 0,
+        "failing": ""
+      }
+    ],
+    "c2/evacuation-drill": [
+      {
+        "n": 0,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 2710,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 1,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 2653,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 2,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 2667,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 3,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 2652,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      }
+    ],
+    "c2/shift-change": [
+      {
+        "n": 0,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 2760,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 1,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 2851,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 2,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 2787,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 3,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 2779,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      }
+    ],
+    "c2/contractors": [
+      {
+        "n": 0,
+        "clearsDefault": false,
+        "clearsAny": false,
+        "delivered": 2518,
+        "abandoned": 58,
+        "failing": "queue+worst-wait"
+      },
+      {
+        "n": 1,
+        "clearsDefault": false,
+        "clearsAny": false,
+        "delivered": 2647,
+        "abandoned": 15,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 2,
+        "clearsDefault": false,
+        "clearsAny": false,
+        "delivered": 2575,
+        "abandoned": 21,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 3,
+        "clearsDefault": false,
+        "clearsAny": false,
+        "delivered": 2587,
+        "abandoned": 30,
+        "failing": "queue+worst-wait"
+      }
+    ],
+    "c2/all-hands": [
+      {
+        "n": 0,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 2750,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 1,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 2749,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 2,
+        "clearsDefault": false,
+        "clearsAny": false,
+        "delivered": 2736,
+        "abandoned": 2,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 3,
+        "clearsDefault": false,
+        "clearsAny": false,
+        "delivered": 2868,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      }
+    ],
+    "c2/audit-day": [
+      {
+        "n": 0,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 2642,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 1,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 2552,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 2,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 2517,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 3,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 2445,
+        "abandoned": 0,
+        "failing": ""
+      }
+    ],
+    "c2/flu-day": [
+      {
+        "n": 0,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 1855,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 1,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 1774,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 2,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 1910,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 3,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 1744,
+        "abandoned": 0,
+        "failing": ""
+      }
+    ],
+    "c2/open-day": [
+      {
+        "n": 0,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 2762,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 1,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 2778,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 2,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 2839,
+        "abandoned": 1,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 3,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 2791,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      }
+    ],
+    "c2/late-finish": [
+      {
+        "n": 0,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 2845,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 1,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 2779,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 2,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 2907,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 3,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 2871,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      }
+    ],
+    "c2/weekend-works": [
+      {
+        "n": 0,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 1393,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 1,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 1416,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 2,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 1413,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 3,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 1405,
+        "abandoned": 0,
+        "failing": ""
+      }
+    ],
+    "c2/weekend-move-out": [
+      {
+        "n": 0,
+        "clearsDefault": false,
+        "clearsAny": false,
+        "delivered": 1775,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 1,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 1737,
+        "abandoned": 6,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 2,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 1605,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 3,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 1609,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      }
+    ],
+    "c2/weekend-event": [
+      {
+        "n": 0,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 1994,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 1,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 2034,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 2,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 1984,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 3,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 1948,
+        "abandoned": 0,
+        "failing": ""
+      }
+    ],
+    "c3/ordinary": [
+      {
+        "n": 0,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 3999,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 1,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4084,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 2,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 4041,
+        "abandoned": 1,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 3,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 3918,
+        "abandoned": 0,
+        "failing": ""
+      }
+    ],
+    "c3/fire-drill": [
+      {
+        "n": 0,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4419,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 1,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 4423,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 2,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 4406,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 3,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4357,
+        "abandoned": 0,
+        "failing": ""
+      }
+    ],
+    "c3/conference": [
+      {
+        "n": 0,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4148,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 1,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 4242,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 2,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4195,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 3,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4062,
+        "abandoned": 0,
+        "failing": ""
+      }
+    ],
+    "c3/caterers": [
+      {
+        "n": 0,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4082,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 1,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4109,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 2,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 4240,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 3,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 4097,
+        "abandoned": 0,
+        "failing": "queue+worst-wait"
+      }
+    ],
+    "c3/goods-inward": [
+      {
+        "n": 0,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4286,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 1,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4237,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 2,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 4160,
+        "abandoned": 0,
+        "failing": "queue"
+      },
+      {
+        "n": 3,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 4178,
+        "abandoned": 0,
+        "failing": "queue"
+      }
+    ],
+    "c3/evacuation-drill": [
+      {
+        "n": 0,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4321,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 1,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4285,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 2,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4373,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 3,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 4271,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      }
+    ],
+    "c3/shift-change": [
+      {
+        "n": 0,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 4365,
+        "abandoned": 5,
+        "failing": "queue+worst-wait"
+      },
+      {
+        "n": 1,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4394,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 2,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4497,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 3,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4273,
+        "abandoned": 0,
+        "failing": ""
+      }
+    ],
+    "c3/contractors": [
+      {
+        "n": 0,
+        "clearsDefault": false,
+        "clearsAny": false,
+        "delivered": 4160,
+        "abandoned": 0,
+        "failing": "queue"
+      },
+      {
+        "n": 1,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4271,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 2,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 4281,
+        "abandoned": 0,
+        "failing": "queue+worst-wait"
+      },
+      {
+        "n": 3,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 4069,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      }
+    ],
+    "c3/all-hands": [
+      {
+        "n": 0,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 4379,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 1,
+        "clearsDefault": false,
+        "clearsAny": false,
+        "delivered": 4371,
+        "abandoned": 0,
+        "failing": "queue"
+      },
+      {
+        "n": 2,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4476,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 3,
+        "clearsDefault": false,
+        "clearsAny": false,
+        "delivered": 4475,
+        "abandoned": 0,
+        "failing": "queue+worst-wait"
+      }
+    ],
+    "c3/audit-day": [
+      {
+        "n": 0,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 4192,
+        "abandoned": 0,
+        "failing": "queue+worst-wait"
+      },
+      {
+        "n": 1,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 4128,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 2,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4273,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 3,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 4109,
+        "abandoned": 0,
+        "failing": "queue+worst-wait"
+      }
+    ],
+    "c3/flu-day": [
+      {
+        "n": 0,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 3132,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 1,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 3148,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 2,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 3248,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 3,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 3124,
+        "abandoned": 0,
+        "failing": ""
+      }
+    ],
+    "c3/open-day": [
+      {
+        "n": 0,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4424,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 1,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 4374,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 2,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 4474,
+        "abandoned": 0,
+        "failing": "queue"
+      },
+      {
+        "n": 3,
+        "clearsDefault": false,
+        "clearsAny": false,
+        "delivered": 4374,
+        "abandoned": 0,
+        "failing": "queue"
+      }
+    ],
+    "c3/late-finish": [
+      {
+        "n": 0,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 4523,
+        "abandoned": 0,
+        "failing": "queue"
+      },
+      {
+        "n": 1,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4414,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 2,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 4531,
+        "abandoned": 0,
+        "failing": "queue"
+      },
+      {
+        "n": 3,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4345,
+        "abandoned": 0,
+        "failing": ""
+      }
+    ],
+    "c3/weekend-works": [
+      {
+        "n": 0,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 2705,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 1,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 2706,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 2,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 2795,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 3,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 2620,
+        "abandoned": 0,
+        "failing": ""
+      }
+    ],
+    "c3/weekend-move-out": [
+      {
+        "n": 0,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 2972,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 1,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 2793,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 2,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 3084,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 3,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 2887,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      }
+    ],
+    "c3/weekend-event": [
+      {
+        "n": 0,
+        "clearsDefault": false,
+        "clearsAny": false,
+        "delivered": 3544,
+        "abandoned": 0,
+        "failing": "queue"
+      },
+      {
+        "n": 1,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 3506,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 2,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 3464,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 3,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 3456,
+        "abandoned": 0,
+        "failing": ""
+      }
+    ],
+    "c6/ordinary": [
+      {
+        "n": 0,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 3377,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 1,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 3572,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 2,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 3641,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 3,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 3413,
+        "abandoned": 0,
+        "failing": "queue"
+      }
+    ],
+    "c6/fire-drill": [
+      {
+        "n": 0,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 3761,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 1,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 3825,
+        "abandoned": 0,
+        "failing": "queue"
+      },
+      {
+        "n": 2,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 3954,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 3,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 3697,
+        "abandoned": 0,
+        "failing": "queue"
+      }
+    ],
+    "c6/conference": [
+      {
+        "n": 0,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 3412,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 1,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 3543,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 2,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 3608,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 3,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 3397,
+        "abandoned": 0,
+        "failing": "queue+worst-wait"
+      }
+    ],
+    "c6/caterers": [
+      {
+        "n": 0,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 3539,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 1,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 3677,
+        "abandoned": 0,
+        "failing": "queue"
+      },
+      {
+        "n": 2,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 3679,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 3,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 3593,
+        "abandoned": 0,
+        "failing": "queue+worst-wait"
+      }
+    ],
+    "c6/goods-inward": [
+      {
+        "n": 0,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 3523,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 1,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 3663,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 2,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 3725,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 3,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 3561,
+        "abandoned": 0,
+        "failing": "queue"
+      }
+    ],
+    "c6/evacuation-drill": [
+      {
+        "n": 0,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 3623,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 1,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 3798,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 2,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 3897,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 3,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 3674,
+        "abandoned": 0,
+        "failing": ""
+      }
+    ],
+    "c6/shift-change": [
+      {
+        "n": 0,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 3725,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 1,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 3870,
+        "abandoned": 1,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 2,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 3921,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 3,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 3773,
+        "abandoned": 0,
+        "failing": ""
+      }
+    ],
+    "c6/contractors": [
+      {
+        "n": 0,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 3412,
+        "abandoned": 3,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 1,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 3543,
+        "abandoned": 0,
+        "failing": "queue+worst-wait"
+      },
+      {
+        "n": 2,
+        "clearsDefault": false,
+        "clearsAny": false,
+        "delivered": 3608,
+        "abandoned": 1,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 3,
+        "clearsDefault": false,
+        "clearsAny": false,
+        "delivered": 3397,
+        "abandoned": 0,
+        "failing": "queue+worst-wait"
+      }
+    ],
+    "c6/all-hands": [
+      {
+        "n": 0,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 3698,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 1,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 3905,
+        "abandoned": 0,
+        "failing": "queue"
+      },
+      {
+        "n": 2,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 3863,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 3,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 3839,
+        "abandoned": 0,
+        "failing": "queue"
+      }
+    ],
+    "c6/audit-day": [
+      {
+        "n": 0,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 3436,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 1,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 3497,
+        "abandoned": 0,
+        "failing": "queue+worst-wait"
+      },
+      {
+        "n": 2,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 3681,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 3,
+        "clearsDefault": false,
+        "clearsAny": false,
+        "delivered": 3382,
+        "abandoned": 0,
+        "failing": "queue"
+      }
+    ],
+    "c6/flu-day": [
+      {
+        "n": 0,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 2603,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 1,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 2723,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 2,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 2604,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 3,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 2669,
+        "abandoned": 0,
+        "failing": ""
+      }
+    ],
+    "c6/open-day": [
+      {
+        "n": 0,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 3686,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 1,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 3906,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 2,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 3857,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 3,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 3800,
+        "abandoned": 0,
+        "failing": ""
+      }
+    ],
+    "c6/late-finish": [
+      {
+        "n": 0,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 3732,
+        "abandoned": 0,
+        "failing": "queue"
+      },
+      {
+        "n": 1,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 3888,
+        "abandoned": 0,
+        "failing": "queue"
+      },
+      {
+        "n": 2,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4006,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 3,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 3817,
+        "abandoned": 0,
+        "failing": "queue"
+      }
+    ],
+    "c6/weekend-works": [
+      {
+        "n": 0,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 2012,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 1,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 1985,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 2,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 2100,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 3,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 2120,
+        "abandoned": 0,
+        "failing": ""
+      }
+    ],
+    "c6/weekend-move-out": [
+      {
+        "n": 0,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 2486,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 1,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 2469,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 2,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 2499,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 3,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 2437,
+        "abandoned": 0,
+        "failing": ""
+      }
+    ],
+    "c6/weekend-event": [
+      {
+        "n": 0,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 2962,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 1,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 3142,
+        "abandoned": 0,
+        "failing": "queue"
+      },
+      {
+        "n": 2,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 2967,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 3,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 3062,
+        "abandoned": 0,
+        "failing": ""
+      }
+    ],
+    "c9/ordinary": [
+      {
+        "n": 0,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 3999,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 1,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4060,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 2,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4059,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 3,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 3928,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      }
+    ],
+    "c9/fire-drill": [
+      {
+        "n": 0,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4412,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 1,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4364,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 2,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4384,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 3,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4371,
+        "abandoned": 0,
+        "failing": ""
+      }
+    ],
+    "c9/conference": [
+      {
+        "n": 0,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4028,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 1,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4035,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 2,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4023,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 3,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 4070,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      }
+    ],
+    "c9/caterers": [
+      {
+        "n": 0,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4129,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 1,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4069,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 2,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4095,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 3,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4080,
+        "abandoned": 0,
+        "failing": ""
+      }
+    ],
+    "c9/goods-inward": [
+      {
+        "n": 0,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4123,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 1,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4129,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 2,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4232,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 3,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4174,
+        "abandoned": 0,
+        "failing": ""
+      }
+    ],
+    "c9/evacuation-drill": [
+      {
+        "n": 0,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4354,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 1,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4221,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 2,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4292,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 3,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4205,
+        "abandoned": 0,
+        "failing": ""
+      }
+    ],
+    "c9/shift-change": [
+      {
+        "n": 0,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 4296,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 1,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4413,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 2,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4431,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 3,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4280,
+        "abandoned": 0,
+        "failing": ""
+      }
+    ],
+    "c9/contractors": [
+      {
+        "n": 0,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 4028,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 1,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 4035,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 2,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 4023,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 3,
+        "clearsDefault": false,
+        "clearsAny": false,
+        "delivered": 4070,
+        "abandoned": 10,
+        "failing": "queue+worst-wait"
+      }
+    ],
+    "c9/all-hands": [
+      {
+        "n": 0,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4289,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 1,
+        "clearsDefault": false,
+        "clearsAny": false,
+        "delivered": 4363,
+        "abandoned": 0,
+        "failing": "queue"
+      },
+      {
+        "n": 2,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 4412,
+        "abandoned": 0,
+        "failing": "queue"
+      },
+      {
+        "n": 3,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4348,
+        "abandoned": 0,
+        "failing": ""
+      }
+    ],
+    "c9/audit-day": [
+      {
+        "n": 0,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 3945,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 1,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4000,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 2,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 4044,
+        "abandoned": 0,
+        "failing": "queue"
+      },
+      {
+        "n": 3,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 3882,
+        "abandoned": 0,
+        "failing": ""
+      }
+    ],
+    "c9/flu-day": [
+      {
+        "n": 0,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 2834,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 1,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 2907,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 2,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 2888,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 3,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 2819,
+        "abandoned": 0,
+        "failing": ""
+      }
+    ],
+    "c9/open-day": [
+      {
+        "n": 0,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4318,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 1,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 4344,
+        "abandoned": 0,
+        "failing": "queue"
+      },
+      {
+        "n": 2,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 4338,
+        "abandoned": 0,
+        "failing": "queue"
+      },
+      {
+        "n": 3,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 4298,
+        "abandoned": 0,
+        "failing": "queue"
+      }
+    ],
+    "c9/late-finish": [
+      {
+        "n": 0,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4389,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 1,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4384,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 2,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4334,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 3,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 4365,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      }
+    ],
+    "c9/weekend-works": [
+      {
+        "n": 0,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 2268,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 1,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 2243,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 2,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 2292,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 3,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 2313,
+        "abandoned": 0,
+        "failing": ""
+      }
+    ],
+    "c9/weekend-move-out": [
+      {
+        "n": 0,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 2582,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 1,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 2567,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 2,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 2648,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 3,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 2639,
+        "abandoned": 0,
+        "failing": ""
+      }
+    ],
+    "c9/weekend-event": [
+      {
+        "n": 0,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 3095,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 1,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 3243,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 2,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 3131,
+        "abandoned": 0,
+        "failing": "queue"
+      },
+      {
+        "n": 3,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 3141,
+        "abandoned": 0,
+        "failing": ""
+      }
+    ],
+    "c10/ordinary": [
+      {
+        "n": 0,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 4222,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 1,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 4195,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 2,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4155,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 3,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4343,
+        "abandoned": 0,
+        "failing": ""
+      }
+    ],
+    "c10/fire-drill": [
+      {
+        "n": 0,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 4620,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 1,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 4880,
+        "abandoned": 1,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 2,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 4556,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 3,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 4544,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      }
+    ],
+    "c10/conference": [
+      {
+        "n": 0,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 3999,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 1,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4034,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 2,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 3959,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 3,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4090,
+        "abandoned": 0,
+        "failing": ""
+      }
+    ],
+    "c10/caterers": [
+      {
+        "n": 0,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 4395,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 1,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4391,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 2,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4133,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 3,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 4329,
+        "abandoned": 0,
+        "failing": "queue"
+      }
+    ],
+    "c10/goods-inward": [
+      {
+        "n": 0,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 4216,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 1,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4354,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 2,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4227,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 3,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 4297,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      }
+    ],
+    "c10/evacuation-drill": [
+      {
+        "n": 0,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4442,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 1,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 4621,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 2,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4512,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 3,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 4511,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      }
+    ],
+    "c10/shift-change": [
+      {
+        "n": 0,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4494,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 1,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 4756,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 2,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 4537,
+        "abandoned": 0,
+        "failing": "queue"
+      },
+      {
+        "n": 3,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 4695,
+        "abandoned": 0,
+        "failing": "queue"
+      }
+    ],
+    "c10/contractors": [
+      {
+        "n": 0,
+        "clearsDefault": false,
+        "clearsAny": false,
+        "delivered": 3981,
+        "abandoned": 10,
+        "failing": "queue+worst-wait"
+      },
+      {
+        "n": 1,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 4011,
+        "abandoned": 2,
+        "failing": "queue+worst-wait"
+      },
+      {
+        "n": 2,
+        "clearsDefault": false,
+        "clearsAny": false,
+        "delivered": 3941,
+        "abandoned": 18,
+        "failing": "queue+worst-wait"
+      },
+      {
+        "n": 3,
+        "clearsDefault": false,
+        "clearsAny": false,
+        "delivered": 4069,
+        "abandoned": 4,
+        "failing": "queue+worst-wait"
+      }
+    ],
+    "c10/all-hands": [
+      {
+        "n": 0,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 4474,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 1,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4593,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 2,
+        "clearsDefault": false,
+        "clearsAny": false,
+        "delivered": 4510,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 3,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 4536,
+        "abandoned": 0,
+        "failing": "queue+worst-wait"
+      }
+    ],
+    "c10/audit-day": [
+      {
+        "n": 0,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 4053,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 1,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 4185,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 2,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 3989,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 3,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4115,
+        "abandoned": 0,
+        "failing": ""
+      }
+    ],
+    "c10/flu-day": [
+      {
+        "n": 0,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 2753,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 1,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 2852,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 2,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 2821,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 3,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 2871,
+        "abandoned": 0,
+        "failing": ""
+      }
+    ],
+    "c10/open-day": [
+      {
+        "n": 0,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4429,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 1,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 4523,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 2,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 4560,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 3,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 4461,
+        "abandoned": 0,
+        "failing": "queue"
+      }
+    ],
+    "c10/late-finish": [
+      {
+        "n": 0,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 4585,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 1,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 4711,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 2,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 4604,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 3,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 4647,
+        "abandoned": 0,
+        "failing": "queue+worst-wait"
+      }
+    ],
+    "c10/weekend-works": [
+      {
+        "n": 0,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 1948,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 1,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 1982,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 2,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 2098,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 3,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 1905,
+        "abandoned": 0,
+        "failing": ""
+      }
+    ],
+    "c10/weekend-move-out": [
+      {
+        "n": 0,
+        "clearsDefault": false,
+        "clearsAny": false,
+        "delivered": 2848,
+        "abandoned": 13,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 1,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 2800,
+        "abandoned": 0,
+        "failing": "worst-wait"
+      },
+      {
+        "n": 2,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 2830,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 3,
+        "clearsDefault": false,
+        "clearsAny": true,
+        "delivered": 2666,
+        "abandoned": 1,
+        "failing": "worst-wait"
+      }
+    ],
+    "c10/weekend-event": [
+      {
+        "n": 0,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 3412,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 1,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 3529,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 2,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 3292,
+        "abandoned": 0,
+        "failing": ""
+      },
+      {
+        "n": 3,
+        "clearsDefault": true,
+        "clearsAny": true,
+        "delivered": 3357,
+        "abandoned": 0,
+        "failing": ""
+      }
+    ]
+  }
+}

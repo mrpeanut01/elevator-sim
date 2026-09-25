@@ -95,6 +95,35 @@ describe('the morning pool', () => {
     expect(second?.map((r) => r.complaint)).toEqual([1, 2, 3]);
   });
 
+  it('reports each reading as it lands, and a handler that cancels stops the pool — § D1120', () => {
+    const workers: FakeWorker[] = [];
+    const runner = createOffThreadMornings({ spawn: () => { const w = fakeWorker(); workers.push(w); return w; }, workers: 2 });
+    const heard: number[] = [];
+    let done = 0;
+    runner.start({
+      configs: configs(49),
+      measure: MEASURE,
+      onReading: (index, reading) => {
+        heard.push(index);
+        expect(reading.complaint).toBe(index + 1);
+        if (heard.length === 10) runner.cancel();
+      },
+      onDone: () => {
+        done += 1;
+      },
+      onFailed: (m) => {
+        throw new Error(m);
+      },
+    });
+    drain(workers);
+    /* Ten heard, in the order the two workers answered, and nothing after the cancel. */
+    expect(heard).toHaveLength(10);
+    expect(new Set(heard).size).toBe(10);
+    expect(done).toBe(0);
+    expect(workers.every((worker) => worker.terminated)).toBe(true);
+    expect(runner.isRunning()).toBe(false);
+  });
+
   it('sizes the pool from the machine, leaving a core to the painting thread and one to the pair', () => {
     expect(morningWorkerCountOf(undefined)).toBe(1);
     expect(morningWorkerCountOf(2)).toBe(1);

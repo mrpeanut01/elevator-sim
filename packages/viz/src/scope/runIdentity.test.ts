@@ -1260,9 +1260,10 @@ describe('one derivation, the consumers that spell the set differently — S5, i
 
   /** A log entry of `kind`, carrying whatever that kind carries besides its instant. */
   function logEntry(kind: string): unknown {
-    if (kind !== 'switch-dispatcher') return { atS: 120, change: { kind } };
-    // The one carried kind that carries more than its instant: a shipped style, which
-    // `switchWireOf` resolves to an id plus rows.
+    if (kind !== 'switch-dispatcher' && kind !== 'adopt-dispatcher') return { atS: 120, change: { kind } };
+    // The two carried kinds that carry more than their instant — the weights-only handover and,
+    // since § D1048, the whole-dispatcher one: a shipped style, which `switchWireOf` resolves to an
+    // id plus rows.
     return { atS: 120, change: { kind, profile: RESOURCES.dispatcherProfiles.profiles[1] } };
   }
 

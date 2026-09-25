@@ -40,6 +40,8 @@ import type { InterventionChange } from '@elevator-sim/core/browser';
 
 import { PARK_CARS_LOBBY_LABEL, SPREAD_CARS_LABEL } from '../live/interventions.js';
 import { clockAt } from '../live/timeline.js';
+import { carsPhraseOf, type BookedOutCar } from '../shift/bookedOut.js';
+import { DAY_CALL_LEAVE_LABEL } from '../shift/dayCalls.js';
 import type { PressCall } from '../shift/pressCall.js';
 
 /** Every sentence the call draws. */
@@ -47,8 +49,15 @@ export const STAGE_CALL_COPY = Object.freeze({
   heading: 'THE DAY’S CALL',
   question: 'What do the cars that are left do?',
   minute: 'Somebody on a landing has waited a minute.',
-  leave: 'Leave them',
+  /* One label for both kinds of call and the ordinary call's report row — `shift/dayCalls.ts`. */
+  leave: DAY_CALL_LEAVE_LABEL,
   held: 'held until the stage stops for this day’s call',
+  /*
+   * § D1138: the pace note while the stage waits at an ordinary candidate whose two runs have not
+   * landed. It names what the stage is doing and nothing about the call, which may not be raised:
+   * the same words whether the answers will turn out to matter or not.
+   */
+  waiting: 'stopped while the day is run ahead from here',
 });
 
 /** One of the card's three answers. `change` is `undefined` for *leave them*. */
@@ -67,24 +76,41 @@ export interface StageCallCard {
 }
 
 /**
- * The card, for a call and the day's clock.
+ * The card, for a call, the day's clock and the run's booked-out cars.
  *
  * `dayStartS` is the host's, so the clocks here are the stage's own. The car's line says when it is
  * back because the stage's booked-out pill already says so from the moment it leaves (§ D983): the
  * card repeats a fact on the screen rather than adding one.
+ *
+ * **Every car that is out at the call is named**, not only the call's own — the post-AI panel's seat
+ * B, defect 5: on St Jude's pinned day cars D and E are both booked out 08:37–08:46, the pill above
+ * the stage says so, and the card said only *Car D is out*. `bookedOut` is
+ * `shift/bookedOut.ts#bookedOutCarsOf` over the run's own building, the same reading the pill draws;
+ * cars that come back at the same clock share one line.
  */
-export function stageCallCardOf(call: PressCall, dayStartS?: number | undefined): StageCallCard {
-  const facts: string[] = [
-    call.backAtS === null
-      ? `Car ${call.carId} is out of passenger service for the rest of the day.`
-      : `Car ${call.carId} is out of passenger service until ${clockAt(call.backAtS, dayStartS)}.`,
-  ];
+export function stageCallCardOf(
+  call: PressCall,
+  dayStartS: number | undefined,
+  bookedOut: readonly BookedOutCar[],
+): StageCallCard {
+  /*
+   * The car lines only where a car is out at the call. A pinned call is always inside its car's
+   * absence; an ordinary day's call ([§ D1138](../../../../DECISIONS.md)) is not gated on one, and
+   * says so only where one is — the same fact, never an invented one. Where one is, every car out
+   * at that instant is named ([§ D1107](../../../../DECISIONS.md)), not only the call's own.
+   */
+  const facts: string[] = call.carAway === false ? [] : [...awayLinesOf(call, bookedOut, dayStartS)];
   if (call.rule === 'first-minute-wait') facts.push(STAGE_CALL_COPY.minute);
   /*
    * The second rule's own fact, and only where there is a peak to name: on a slice the act is the
-   * whole run, and its start is the car leaving, which the line above already says.
+   * whole run, and its start is the car leaving, which the line above already says. On an ordinary
+   * day with no car out, the peak's start is the call, and the line is the call's only fact.
    */
-  if (call.rule === 'act-start' && call.act !== undefined && call.act.startS > call.awayAtS) {
+  if (
+    call.rule === 'act-start' &&
+    call.act !== undefined &&
+    (call.carAway === false || call.act.startS > call.awayAtS)
+  ) {
     facts.push(`The peak opened at ${clockAt(call.act.startS, dayStartS)}.`);
   }
   return Object.freeze({
@@ -96,6 +122,33 @@ export function stageCallCardOf(call: PressCall, dayStartS?: number | undefined)
       Object.freeze({ label: SPREAD_CARS_LABEL, change: Object.freeze({ kind: 'spread-cars' as const }) }),
       Object.freeze({ label: STAGE_CALL_COPY.leave, change: undefined }),
     ]),
+  });
+}
+
+/** One line per return time, naming every booked-out car that is away at the call. */
+function awayLinesOf(
+  call: PressCall,
+  bookedOut: readonly BookedOutCar[],
+  dayStartS: number | undefined,
+): readonly string[] {
+  const away = bookedOut.filter(
+    (car) => car.awayAtS <= call.atS && (car.backAtS === null || car.backAtS > call.atS),
+  );
+  const cars: readonly BookedOutCar[] = away.some((car) => car.carId === call.carId)
+    ? away
+    : [{ carId: call.carId, awayAtS: call.awayAtS, backAtS: call.backAtS }, ...away];
+  const byReturn = new Map<number | null, BookedOutCar[]>();
+  for (const car of [...cars].sort((a, b) => a.carId.localeCompare(b.carId))) {
+    const group = byReturn.get(car.backAtS) ?? [];
+    group.push(car);
+    byReturn.set(car.backAtS, group);
+  }
+  return [...byReturn.entries()].map(([backAtS, group]) => {
+    const phrase = carsPhraseOf(group);
+    const subject = `${phrase.charAt(0).toUpperCase()}${phrase.slice(1)} ${group.length === 1 ? 'is' : 'are'}`;
+    return backAtS === null
+      ? `${subject} out of passenger service for the rest of the day.`
+      : `${subject} out of passenger service until ${clockAt(backAtS, dayStartS)}.`;
   });
 }
 

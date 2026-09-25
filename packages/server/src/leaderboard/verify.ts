@@ -387,12 +387,15 @@ function interventionsFor(
 ): readonly RunInterventionConfig[] | 'unknown-dispatcher' {
   const log: RunInterventionConfig[] = [];
   for (const entry of run.interventions ?? []) {
-    if (entry.change.kind === 'switch-dispatcher') {
+    // Both handover kinds — the weights-only `switch-dispatcher` that stored runs carry, and the
+    // whole-dispatcher `adopt-dispatcher` the viewer has emitted since § D1048 — travel as the same
+    // id and rows and are rebuilt the same way; the kind is kept, because it is what the kernel reads.
+    if (entry.change.kind === 'switch-dispatcher' || entry.change.kind === 'adopt-dispatcher') {
       const shipped = resources.dispatcherProfilesById.get(entry.change.toProfileId);
       if (shipped === undefined) return 'unknown-dispatcher';
       log.push({
         atS: entry.atS,
-        change: { kind: 'switch-dispatcher', profile: profileWithRules(shipped, entry.change.ruleRows ?? []) },
+        change: { kind: entry.change.kind, profile: profileWithRules(shipped, entry.change.ruleRows ?? []) },
       });
     } else {
       log.push({ atS: entry.atS, change: { kind: entry.change.kind } });

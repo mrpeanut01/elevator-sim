@@ -76,8 +76,8 @@ import {
 import { carsToDerate, type BankedBuilding, type CarRef, type Incident } from './incidents.js';
 import type { EventEffect, ShiftEvent, ShiftEventId } from './types.js';
 import { WRINKLE_LIBRARY } from '../wrinkles/library.js';
-import { composeWrinkle, drawWrinkle } from '../wrinkles/draw.js';
-import type { WrinkleEffect } from '../wrinkles/types.js';
+import { composeWrinkle, drawWrinkle, type DrawHorizon } from '../wrinkles/draw.js';
+import type { WholeDayEpisode, WrinkleEffect } from '../wrinkles/types.js';
 
 /**
  * `traffic.arrivalRatePctPop5min`'s declared ceiling, from `core`'s own `TRAFFIC_PARAMETERS`.
@@ -132,20 +132,28 @@ export const MAX_ARRIVAL_RATE_PCT_POP_5MIN = 25;
  */
 export const SHIFT_EVENTS = Object.freeze(
   Object.fromEntries(
-    WRINKLE_LIBRARY.templates.map((template) => [
-      template.id,
-      Object.freeze({
-        id: template.id,
-        name: template.name,
-        /* The base note with every axis rendered at its first value, so a booked template reads
-         * as a sentence rather than as a sentence with a `{window}` in it. */
-        note: composeWrinkle(
-          template,
-          template.axes.map((axis) => axis.values[0] as (typeof axis.values)[number]),
-        ).note,
-        effect: effectOfWrinkle(template.effect),
-      } satisfies ShiftEvent),
-    ]),
+    WRINKLE_LIBRARY.templates.map((template) => {
+      /* The base note with every axis rendered at its first value, so a booked template reads
+       * as a sentence rather than as a sentence with a `{window}` in it. */
+      const composed = composeWrinkle(
+        template,
+        template.axes.map((axis) => axis.values[0] as (typeof axis.values)[number]),
+      );
+      return [
+        template.id,
+        Object.freeze({
+          id: template.id,
+          name: template.name,
+          note: composed.note,
+          /*
+           * The base effect, as before, with the **composed** whole-day placement — § D1057. Its
+           * note names `{episode}` and the axes, so it is only a sentence once composed, and the
+           * first axis values are the ones the note above was composed at.
+           */
+          effect: { ...effectOfWrinkle(template.effect), wholeDay: composed.effect.wholeDay ?? null },
+        } satisfies ShiftEvent),
+      ];
+    }),
   ),
 ) as Readonly<Record<ShiftEventId, ShiftEvent>>;
 
@@ -201,6 +209,7 @@ function effectOfWrinkle(effect: WrinkleEffect): EventEffect {
     carsOutOfService: effect.carsOutOfService,
     derate: effect.derate === null ? null : Object.freeze({ ...effect.derate }),
     writes: Object.freeze(writes),
+    wholeDay: effect.wholeDay ?? null,
   });
 }
 
@@ -244,8 +253,8 @@ export function eventById(id: string): ShiftEvent | undefined {
  * eleven callers and the one `briefView.ts` relies on when it says two players on day 3 meet the
  * same wrinkle.
  */
-export function eventFor(day: number, dayIdx: number): ShiftEvent {
-  const drawn = drawWrinkle(WRINKLE_LIBRARY, day, dayIdx);
+export function eventFor(day: number, dayIdx: number, horizon: DrawHorizon = 'period'): ShiftEvent {
+  const drawn = drawWrinkle(WRINKLE_LIBRARY, day, dayIdx, horizon);
   return { id: drawn.id, name: drawn.name, note: drawn.note, effect: effectOfWrinkle(drawn.effect) };
 }
 
@@ -362,18 +371,49 @@ export function mixKeptSentenceOf(event: ShiftEvent): string {
 }
 
 /**
- * The event as the run will have it — its note replaced by {@link mixKeptSentenceOf} where the
- * run's template keeps its own mix and the event asked for one, and the event itself everywhere
- * else. [§ D1040](../../../../DECISIONS.md).
+ * **The episode a whole authored day splices in for this event**, or `undefined` where it has none
+ * — [§ D1057](../../../../DECISIONS.md).
  *
- * `templateVariesMix` is {@link demandTemplateVariesMix}'s answer for the run, which is the same
- * question {@link shiftRunPatch} asks before it withholds the split, so the note is replaced on
- * exactly the runs whose mix was withheld.
+ * Only an event that sets a mix has one: its placement is where that mix sits in the day. A refused
+ * placement answers `undefined`, and so does an event with no placement at all (a hand-built event
+ * in a test, or one the loader has not seen), which leaves § D1040's sentence standing for it.
+ *
+ * The one predicate for *is this wrinkle spliced on a whole day*: `dev/state.ts#shiftRunConfigOf`
+ * splices on it and {@link eventAsRun} words the note on it, so the run and the sentence cannot
+ * disagree about which days carry an episode.
  */
-export function eventAsRun(event: ShiftEvent, templateVariesMix: boolean): ShiftEvent {
+export function wholeDayEpisodeOf(event: ShiftEvent): WholeDayEpisode | undefined {
+  const placed = event.effect.wholeDay;
+  if (event.effect.changesNothing || event.effect.directionalSplit === null) return undefined;
+  return placed?.kind === 'episode' ? placed : undefined;
+}
+
+/**
+ * The event as the run will have it — [§ D1040](../../../../DECISIONS.md), amended by
+ * [§ D1057](../../../../DECISIONS.md).
+ *
+ * - On a **whole authored day** where the event has an episode ({@link wholeDayEpisodeOf}), its note
+ *   is the placement's: the clock window and what changes inside it, composed from the numbers the
+ *   splice writes. The mix is real on that day, so § D1040's *withheld* sentence is not drawn.
+ * - On any other run whose template keeps its own mix and the event asked for one — a part of a
+ *   day, `lunch-two-way`, or a whole day for an event with no episode — the note is
+ *   {@link mixKeptSentenceOf}'s, because the mix was withheld there.
+ * - Everywhere else, the event itself.
+ *
+ * `templateVariesMix` is {@link demandTemplateVariesMix}'s answer for the run and `wholeDayRun`
+ * whether the run is the whole authored day (`dev/state.ts#PlannedDay.wholeDayRun`), the same two
+ * questions {@link shiftRunPatch}'s caller asks before it splices or withholds.
+ */
+export function eventAsRun(
+  event: ShiftEvent,
+  templateVariesMix: boolean,
+  wholeDayRun = false,
+): ShiftEvent {
   if (!templateVariesMix || event.effect.changesNothing || event.effect.directionalSplit === null) {
     return event;
   }
+  const episode = wholeDayRun ? wholeDayEpisodeOf(event) : undefined;
+  if (episode !== undefined) return { ...event, note: episode.note };
   return { ...event, note: mixKeptSentenceOf(event) };
 }
 
@@ -403,6 +443,15 @@ export interface ShiftRunPatchInput {
    * car rather than one the tower already has out over the same stretch. `undefined` is none.
    */
   readonly booked?: readonly Incident[] | undefined;
+  /**
+   * **The run splices this event's episode into its own day** — [§ D1057](../../../../DECISIONS.md).
+   * Set by `dev/state.ts#shiftRunConfigOf` exactly when it writes {@link wholeDayEpisodeOf}'s
+   * placement into the run's copy of the day. The mix then travels in the template, so no
+   * `directionalSplit` is written and nothing is withheld; and the run-wide multiplier, authored for
+   * a slice where the run roughly is the event, is **not** applied — the episode carries the level.
+   * A placement that states a lighter whole day (`dayRateMultiplier`) writes that instead.
+   */
+  readonly spliced?: boolean | undefined;
 }
 
 /** What a run builder applies. Both halves are values the simulator reads. */
@@ -451,14 +500,17 @@ export function shiftRunPatch(input: ShiftRunPatchInput): ShiftRunPatch {
     directionalSplit?: DirectionalSplit;
   } = {};
 
-  if (effect.arrivalRateMultiplier !== null) {
+  const episode = input.spliced === true ? wholeDayEpisodeOf(input.event) : undefined;
+  const rateMultiplier =
+    episode === undefined ? effect.arrivalRateMultiplier : episode.dayRateMultiplier;
+  if (rateMultiplier !== null) {
     demand.arrivalRatePctPop5min = Math.min(
       MAX_ARRIVAL_RATE_PCT_POP_5MIN,
-      input.base.ratePctPop5min * effect.arrivalRateMultiplier,
+      input.base.ratePctPop5min * rateMultiplier,
     );
   }
 
-  if (effect.directionalSplit !== null) {
+  if (effect.directionalSplit !== null && episode === undefined) {
     if (input.templateVariesMix === true) {
       /*
        * The player's words for `core`'s refusal — § D1040. This read *"the directional mix is set by

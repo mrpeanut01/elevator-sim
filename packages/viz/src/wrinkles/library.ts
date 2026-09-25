@@ -76,21 +76,24 @@ const ROTATION_HORIZON_DAYS = 28;
  * when day 1 was a Monday would be a rule about day 1.
  */
 function assertRotates(library: WrinkleLibrary): WrinkleLibrary {
-  for (let phase = 0; phase < 7; phase += 1) {
-    for (let start = 1; start <= ROTATION_HORIZON_DAYS; start += 1) {
-      const seen = new Map<string, number>();
-      for (let day = start; day < start + TEMPLATE_ROTATION_DAYS; day += 1) {
-        const drawn = drawWrinkle(library, day, (day - 1 + phase) % 7);
-        const earlier = seen.get(drawn.templateId);
-        if (earlier !== undefined) {
-          throw new Error(
-            `data/wrinkles.json breaks § 17's rotation: ${drawn.templateId} is drawn on day ` +
-              `${String(earlier)} and again on day ${String(day)}, inside ` +
-              `${String(TEMPLATE_ROTATION_DAYS)}. The pool for that kind of day is too small — a ` +
-              'template repeats after as many days of its own kind as the pool has rows.',
-          );
+  /* Both horizons: a whole day's pool leaves out refused templates, § D1057, and is shorter. */
+  for (const horizon of ['period', 'whole-day'] as const) {
+    for (let phase = 0; phase < 7; phase += 1) {
+      for (let start = 1; start <= ROTATION_HORIZON_DAYS; start += 1) {
+        const seen = new Map<string, number>();
+        for (let day = start; day < start + TEMPLATE_ROTATION_DAYS; day += 1) {
+          const drawn = drawWrinkle(library, day, (day - 1 + phase) % 7, horizon);
+          const earlier = seen.get(drawn.templateId);
+          if (earlier !== undefined) {
+            throw new Error(
+              `data/wrinkles.json breaks § 17's rotation: ${drawn.templateId} is drawn on day ` +
+                `${String(earlier)} and again on day ${String(day)}, inside ` +
+                `${String(TEMPLATE_ROTATION_DAYS)}. The pool for that kind of day is too small — a ` +
+                'template repeats after as many days of its own kind as the pool has rows.',
+            );
+          }
+          seen.set(drawn.templateId, day);
         }
-        seen.set(drawn.templateId, day);
       }
     }
   }

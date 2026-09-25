@@ -355,6 +355,9 @@ on:
           - difficulty-curve
           - survivor-counts
           - rush-house-runs
+          - fixit-as-built-mornings
+          - fixit-route-census
+          - week-census
           - honesty-deep
           - corpus-figures
           - benchmark
@@ -694,7 +697,7 @@ jobs:
       - name: Re-run the survivor sweep and match the pinned counts
         env:
           ELEVATOR_SIM_SURVIVORS: deep
-        run: npx vitest run --passWithNoTests=false --project viz --testTimeout=10800000 src/scenario/survivorSweep.test.ts
+        run: npx vitest run --passWithNoTests=false --project viz --testTimeout=10800000 src/scenario/survivorSweep.test.ts src/scenario/survivorReplay.test.ts
 
   # ---------------------------------------------------------------------------
   # The house's rush rows — GitHub issue #418, § D547. Every shipped dispatcher on every shipped
@@ -723,6 +726,86 @@ jobs:
         env:
           ELEVATOR_SIM_RUSH_HOUSE: deep
         run: npx vitest run --passWithNoTests=false --project viz src/everyday/rushHouseSweep.test.ts
+
+  # ---------------------------------------------------------------------------
+  # The fix-it judge's shipped as-built mornings — DECISIONS.md § D1120 clause 4. Every case's
+  # forty-nine derived as-built mornings re-run and matched to the bit against
+  # `data/fixit-as-built-mornings.json`. The always-on suite checks each row's input digest; this is
+  # what sees a change to core itself. A moved reading is a finding to report, never a number to edit.
+  #
+  # A gate of its own (`ELEVATOR_SIM_FIXIT_MORNINGS=deep`), on this file's argument for one job per
+  # tier. Measured 2026-09-25 on a shared four-core container at load 5 to 7: 18 cases in 105.9 s, the
+  # slowest 20.2 s. The minutes below are a ceiling, not an expectation.
+  # ---------------------------------------------------------------------------
+  fixit-as-built-mornings:
+    name: fix-it — the shipped as-built mornings reproduce
+    if: github.event_name == 'schedule' || inputs.tiers == 'all' || inputs.tiers == 'fixit-as-built-mornings'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '26'
+          cache: npm
+      - run: npm ci
+      - name: Re-run every as-built morning and match the shipped readings
+        env:
+          ELEVATOR_SIM_FIXIT_MORNINGS: deep
+        run: npx vitest run --passWithNoTests=false --project viz src/fixit/asBuiltMornings.sweep.test.ts
+
+  # ---------------------------------------------------------------------------
+  # The fix-it route census — DECISIONS.md § D1120 clause 1. Every role-blind route through every
+  # offered case pressed through the gate on the letter's morning, and the counts matched against
+  # `fixit/routeCensus.ts#ROUTE_CENSUS`, which decides which cases open with their diagnosis shown.
+  #
+  # A gate of its own (`ELEVATOR_SIM_FIXIT_ROUTES=deep`). Measured 2026-09-25 on a shared four-core
+  # container: 15 cases in 190 s, the slowest 92.8 s. The minutes below are a ceiling.
+  # ---------------------------------------------------------------------------
+  fixit-route-census:
+    name: fix-it — the route census reproduces
+    if: github.event_name == 'schedule' || inputs.tiers == 'all' || inputs.tiers == 'fixit-route-census'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '26'
+          cache: npm
+      - run: npm ci
+      - name: Press every route through the gate and match the census
+        env:
+          ELEVATOR_SIM_FIXIT_ROUTES: deep
+        run: npx vitest run --passWithNoTests=false --project viz src/fixit/routeCensus.sweep.test.ts
+
+  # ---------------------------------------------------------------------------
+  # The week census — docs/33 DC-10, DECISIONS.md § D1067. Every row of `data/week-way.json` re-run
+  # on its held-out crowds through the path a Scenario day takes, and required to reproduce its
+  # per-crowd verdicts exactly. A moved verdict means something under the row moved (a profile, the
+  # day's template, a rung, a bar) and the brief is quoting a day the product no longer deals: the
+  # remedy is a census re-run (`shift/weekWay.sweep.test.ts`), never an edit to the string.
+  #
+  # A gate of its own (`WEEK_WAY_VERIFY`), on this file's argument for one job per tier. Two whole
+  # authored days per held-out crowd per row, measured at 2.5–10 s a day on the lane's contended
+  # container. The minutes below are a ceiling, not an expectation.
+  # ---------------------------------------------------------------------------
+  week-census:
+    name: week census — every DC-10 row on its held-out crowds
+    if: github.event_name == 'schedule' || inputs.tiers == 'all' || inputs.tiers == 'week-census'
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '26'
+          cache: npm
+      - run: npm ci
+      - name: Re-run every census row and match its verdicts
+        env:
+          WEEK_WAY_VERIFY: '1'
+        run: npx vitest run --passWithNoTests=false --project viz --testTimeout=10800000 src/shift/weekWay.verify.test.ts
 
   honesty-deep:
     name: honesty — the deep corpus
@@ -1022,6 +1105,9 @@ jobs:
       - difficulty-curve
       - survivor-counts
       - rush-house-runs
+      - fixit-as-built-mornings
+      - fixit-route-census
+      - week-census
       - corpus-figures
       - benchmark-selection-sweep
       - benchmark-saturation-census
@@ -1081,6 +1167,9 @@ jobs:
       - honesty-deep
       - survivor-counts
       - rush-house-runs
+      - fixit-as-built-mornings
+      - fixit-route-census
+      - week-census
       - corpus-figures
       - benchmark-selection-sweep
       - benchmark-saturation-census

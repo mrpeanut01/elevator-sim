@@ -38,11 +38,17 @@ import { scenarioHorizonFor } from './dayLength.js';
 import {
   CONTRACT_LADDER,
   contractLadderIssues,
+  GROWTH_PER_DAY_BOUNDS,
+  growthPerDayOf,
   ladderRowFor,
   ladderTowersOf,
+  admittedPressDayIds,
   OCCUPANCY_BOUNDS,
+  pressDayFor,
+  pressDayMeasuredAs,
   rungIncidents,
   type ContractIncident,
+  type PressDayAttempt,
   type LadderValidationInput,
 } from './ladder.js';
 
@@ -133,9 +139,14 @@ describe('the shipped ladder is legal against the shipped data', () => {
        * the point of the check survives either way: the set is closed, so a key this table does not
        * name still fails. § D914 added the fifth, and it declares no bar either: a seed, two
        * `InterventionChange` kinds, a fraction and a list of shipped dispatcher ids. § D974 added
-       * `horizon`, which names the kind of run the pin was measured on and grades nothing.
+       * `horizon`, which names the kind of run the pin was measured on and grades nothing. § D1066
+       * added the optional `growthPerDay`, a slope of population — fabric, and no bar.
        */
-      expect(Object.keys(row).sort().filter((key) => key !== 'pressDay')).toEqual([
+      expect(
+        Object.keys(row)
+          .sort()
+          .filter((key) => key !== 'pressDay' && key !== 'growthPerDay'),
+      ).toEqual([
         'buildingId',
         'contractId',
         'demand',
@@ -260,6 +271,29 @@ describe('a rung’s booked absence reaches the run, and no other rung’s does 
     const declaring = CONTRACT_LADDER.rows.filter((row) => row.fabric.incidents.length > 0).length;
     expect(issues.length).toBe(declaring);
     for (const issue of issues) expect(issue).toContain('takes car Z out of');
+  });
+});
+
+describe('the week’s growth is data, bounded, and read in one place (§ D1066)', () => {
+  it('carries the design’s 0.11 as the default, and every rung’s slope inside the bounds', () => {
+    expect(CONTRACT_LADDER.defaultGrowthPerDay).toBe(0.11);
+    for (const row of CONTRACT_LADDER.rows) {
+      const slope = growthPerDayOf(row);
+      expect(slope, row.contractId).toBeGreaterThanOrEqual(GROWTH_PER_DAY_BOUNDS.min);
+      expect(slope, row.contractId).toBeLessThanOrEqual(GROWTH_PER_DAY_BOUNDS.max);
+    }
+    expect(growthPerDayOf(undefined)).toBe(CONTRACT_LADDER.defaultGrowthPerDay);
+  });
+
+  it('refuses a slope outside the bounds, and a ladder with no default, by name', () => {
+    const broken = {
+      ...CONTRACT_LADDER,
+      defaultGrowthPerDay: Number.NaN,
+      rows: CONTRACT_LADDER.rows.map((row) => (row.contractId === 'c2' ? { ...row, growthPerDay: 0.2 } : row)),
+    };
+    const issues = contractLadderIssues(broken, validationInput());
+    expect(issues.some((issue) => issue.includes('defaultGrowthPerDay'))).toBe(true);
+    expect(issues.some((issue) => issue.startsWith('ladder row c2 grows 0.2'))).toBe(true);
   });
 });
 
@@ -402,6 +436,57 @@ describe('DC-6 on the declaration', () => {
         targets[index] ?? 0,
         `${CONTRACTS[index]?.id ?? ''} after ${CONTRACTS[index - 1]?.id ?? ''}`,
       ).toBeGreaterThanOrEqual(targets[index - 1] ?? 0);
+    }
+  });
+});
+
+/**
+ * **A handover of either kind makes a pinned day one nobody measured** — § D1029 clause 6, checked
+ * for [§ D1048](../../../../DECISIONS.md)'s new kind.
+ *
+ * The whole-dispatcher handover is the one that matters here: wave AJ's week swarm measured a
+ * mid-day `adopt-dispatcher` to *Minimum estimated wait* clearing all five whole-day press days, so
+ * a press day that let one through would be a puzzle answered by a switch the pin never measured.
+ * The stage holds the handover until the call is answered (`everyday/stageScreen.ts#callHeld`, which
+ * is kind-blind, and `pressCall.browser.test.ts` presses against it), and this predicate is the
+ * second line: after the call, a handover on the record stops the day reading as the pinned one, so
+ * the call row and the report's pin claims are not drawn over it.
+ */
+describe('a handover on a pinned day is not the day that was measured — § D1029, § D1048', () => {
+  const [pinId] = admittedPressDayIds();
+  const press = pinId === undefined ? undefined : pressDayFor(pinId);
+  const callAtS = 1234;
+  const attempt = (interventions: PressDayAttempt['interventions']): PressDayAttempt => ({
+    contractId: pinId ?? '',
+    day: 1,
+    eventId: 'ordinary',
+    hasCalendar: false,
+    seed: BigInt(press?.seedText ?? '0'),
+    horizon: press?.horizon,
+    dispatcherId: press?.standingOrder ?? '',
+    interventions,
+  });
+
+  it('reads the pin with nothing pressed, and with the clearing answer at the call', () => {
+    expect(press, 'an admitted pin exists').toBeDefined();
+    expect(pressDayMeasuredAs(attempt([]), callAtS)).toBe(press);
+    expect(pressDayMeasuredAs(attempt([{ atS: callAtS, change: { kind: press?.clearedBy ?? '' } }]), callAtS)).toBe(press);
+  });
+
+  it('refuses the pin once either handover kind is on the record, at the call or anywhere else', () => {
+    for (const kind of ['adopt-dispatcher', 'switch-dispatcher']) {
+      expect(pressDayMeasuredAs(attempt([{ atS: callAtS, change: { kind } }]), callAtS), kind).toBeUndefined();
+      expect(pressDayMeasuredAs(attempt([{ atS: callAtS + 60, change: { kind } }]), callAtS), kind).toBeUndefined();
+      expect(
+        pressDayMeasuredAs(
+          attempt([
+            { atS: callAtS, change: { kind: press?.clearedBy ?? '' } },
+            { atS: callAtS + 60, change: { kind } },
+          ]),
+          callAtS,
+        ),
+        kind,
+      ).toBeUndefined();
     }
   });
 });

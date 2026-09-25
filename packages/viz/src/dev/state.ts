@@ -98,17 +98,21 @@ import {
   eventCarChoice,
   eventById,
   shiftRunPatch,
+  wholeDayEpisodeOf,
 } from '../shift/events.js';
 import {
+  growthPerDayOf,
   ladderTowerConfig,
   pressDayMeasuredAs,
+  pressDayStanding,
   rungFor,
   rungIncidents,
   type ContractPressDay,
 } from '../shift/ladder.js';
-import { bookedOutCarsOf } from '../shift/bookedOut.js';
+import { bookedOutCarsOf, type BookedOutCar } from '../shift/bookedOut.js';
 import { pressCallOf, type PressCall } from '../shift/pressCall.js';
 import { grownBuilding } from '../shift/growth.js';
+import { spliceEpisode, trafficProfilesWithRecord } from '../shift/episode.js';
 import { withIncidents } from '../shift/incidents.js';
 import { shiftReportWindowFor } from '../shift/reportWindow.js';
 import {
@@ -120,8 +124,9 @@ import {
   type CalendarPeriod,
 } from '../shift/calendar.js';
 import {
-  fittedArrivalRate,
   fittedBuilding,
+  fittedCrowdThinning,
+  startTimeFloorIdsOf,
   leversWithKit,
   profileWithKit,
   type CampaignFitOut,
@@ -142,7 +147,7 @@ import {
   switchWeek,
 } from '../shift/week.js';
 import type { TomorrowBriefing } from '../shift/tomorrow.js';
-import type { DayOutcome, ShiftEvent, ShiftEventId, WeekState } from '../shift/types.js';
+import type { DayOutcome, RunHorizon, ShiftEvent, ShiftEventId, WeekState } from '../shift/types.js';
 import type { ShapedDayReport } from '../shift/report.js';
 import type { PlayMode } from '../scope/types.js';
 
@@ -1836,6 +1841,35 @@ export function pressDayCallOf(
   return press === undefined ? undefined : { press, call };
 }
 
+/**
+ * **What an ordinary day's calls are asked under** — [§ D1138](../../../../DECISIONS.md), beside
+ * {@link pressDayCallOf} because both read the same facts off the same state.
+ *
+ * The run's horizon (a whole day's size gates its calls), the tower's own booked-out cars (a fact
+ * on the card), and whether the state is its tower's **pinned press day**: § D1138 clause 1 keeps
+ * that day's single § D1029 call unchanged, so a pinned day raises no ordinary call whether or not
+ * its pin is admitted. `undefined` when the state's building resolves to nothing.
+ */
+export function dayCallFactsOf(
+  resources: BrowserResources,
+  state: ViewerState,
+): { readonly horizon: RunHorizon; readonly bookedOut: readonly BookedOutCar[]; readonly pinned: boolean } | undefined {
+  const config = buildingConfigOf(resources, state.savedBuildings, state.buildingId);
+  if (config === undefined) return undefined;
+  const plan = shiftRunConfigOf(resources, state);
+  const horizon = runHorizonOf(resources.trafficProfiles, config, state);
+  const pinned =
+    pressDayStanding({
+      contractId: state.week.contractId,
+      day: state.week.day,
+      eventId: plan.event.id,
+      hasCalendar: state.calendar !== null,
+      seed: state.seed,
+      horizon,
+    }) !== undefined;
+  return { horizon, bookedOut: bookedOutCarsOf(plan.building), pinned };
+}
+
 /** What a run will be, read before it is pressed — {@link plannedDayOf}. */
 export interface PlannedDay {
   /** {@link resolvedBuildingOf}'s answer: the building the kernel will be handed. */
@@ -1853,6 +1887,12 @@ export interface PlannedDay {
    * ([§ D1040](../../../../DECISIONS.md)).
    */
   readonly templateVariesMix: boolean;
+  /**
+   * {@link ShiftRunConfig.wholeDayRun} for the same run: whether it is the building's whole
+   * authored day, so a mix-setting wrinkle with a placement is spliced as an episode and
+   * `events.ts#eventAsRun` quotes the placement's note ([§ D1057](../../../../DECISIONS.md)).
+   */
+  readonly wholeDayRun: boolean;
   /** {@link ShiftRunConfig.dayCars} for the same run — the cars today's event takes. */
   readonly dayCars: ShiftRunConfig['dayCars'];
 }
@@ -1872,7 +1912,13 @@ export interface PlannedDay {
  */
 export function plannedDayOf(resources: BrowserResources, state: ViewerState): PlannedDay {
   if (buildingConfigOf(resources, state.savedBuildings, state.buildingId) === undefined) {
-    return { building: undefined, startOfDayS: undefined, templateVariesMix: false, dayCars: { holds: [], windows: [] } };
+    return {
+      building: undefined,
+      startOfDayS: undefined,
+      templateVariesMix: false,
+      wholeDayRun: false,
+      dayCars: { holds: [], windows: [] },
+    };
   }
   const plan = shiftRunConfigOf(resources, state);
   const { config } = plan;
@@ -1898,6 +1944,7 @@ export function plannedDayOf(resources: BrowserResources, state: ViewerState): P
     building: plan.building,
     startOfDayS,
     dayCars: plan.dayCars,
+    wholeDayRun: plan.wholeDayRun,
     templateVariesMix:
       typeof config.demandTemplate === 'string'
         ? demandTemplateVariesMix(config.demandTemplate, config.trafficProfiles.demandTemplates)
@@ -1950,6 +1997,39 @@ export interface ShiftRunConfig {
   readonly dayCars: { readonly holds: readonly string[]; readonly windows: readonly string[] };
   /** Anything the shift patch refused to configure, with its reason. Shown, never swallowed. */
   readonly withheld: readonly string[];
+  /**
+   * Whether this run is the building's **whole authored day** — its template is the day
+   * `shift/dayLength.ts#wholeDayFor` names and the window is all of it. The horizon the day's
+   * wrinkle is drawn for, and the condition under which a mix-setting wrinkle is spliced as an
+   * episode rather than withheld ([§ D1057](../../../../DECISIONS.md)).
+   */
+  readonly wholeDayRun: boolean;
+  /**
+   * Where today's episode sits on the run's own clock, seconds after the run's start, or
+   * `undefined` when nothing was spliced. The same numbers the phase list carries.
+   */
+  readonly episode: { readonly startS: number; readonly endS: number } | undefined;
+}
+
+/**
+ * The rung a state's run stands on — `shift-week` only, and keyed on the contract **and** the
+ * building. {@link shiftRunConfigOf}'s own expression, lifted out so {@link weekGrowthPerDayOf}
+ * asks the same question the run does; its argument is the comment where the run reads it.
+ */
+function runRungOf(state: ViewerState, buildingId: string): ReturnType<typeof rungFor> {
+  return state.playMode === 'shift-week' ? rungFor(state.week.contractId, buildingId) : undefined;
+}
+
+/**
+ * **The slope the state's building grows at between days** — [§ D1066](../../../../DECISIONS.md).
+ *
+ * The run grows its fabric by it (`grownBuilding` in {@link shiftRunConfigOf}), and the report's
+ * *"+N % more tenants than today"* states it; one function so the sentence cannot describe a slope
+ * the run did not use. `dev/main.ts` hands it to `dayReportOf` beside the recording it describes.
+ */
+export function weekGrowthPerDayOf(resources: BrowserResources, state: ViewerState): number {
+  const authored = buildingConfigOf(resources, state.savedBuildings, state.buildingId);
+  return growthPerDayOf(runRungOf(state, authored?.id ?? state.buildingId));
 }
 
 /**
@@ -2032,8 +2112,7 @@ export function shiftRunConfigOf(
    * disagree, so keyed on the contract alone Scenario 1's rung would let Midtown Office at Garden
    * Apartments' occupancy.
    */
-  const rung =
-    state.playMode === 'shift-week' ? rungFor(state.week.contractId, authored.id) : undefined;
+  const rung = runRungOf(state, authored.id);
   /*
    * The tower the contract hands over — the rung's occupancy and its bank choices — through the one
    * derivation `shift/ladder.ts#ladderTowerConfig` holds, which is the same function the scenario
@@ -2060,8 +2139,12 @@ export function shiftRunConfigOf(
   const fabric = fittedBuilding(commissioned, state.campaignFitOut, specs);
 
   // 1 — grown to the day, then the dwell lever written onto the cars, then re-parsed so a grown
-  // building is validated like any other.
-  const grown = withDoorTiming(grownBuilding(fabric, state.week.day), doorTimingFor(state.levers));
+  // building is validated like any other. The slope is the rung's, or the ladder's default, through
+  // `growthPerDayOf` — the one reading the report's forecast shares (§ D1066).
+  const grown = withDoorTiming(
+    grownBuilding(fabric, state.week.day, growthPerDayOf(rung)),
+    doorTimingFor(state.levers),
+  );
   const building = resolveBuilding(parseBuilding(grown as unknown), specs);
 
   // 3 — the dispatcher, plus the levers, plus the weight-set selector, through the one
@@ -2087,6 +2170,22 @@ export function shiftRunConfigOf(
    */
   const calendarDay = calendarDayFor(state.calendar, state.week.day, state.week.dayIdx);
   /*
+   * Through {@link calendarAskInputOf} rather than spelled out here, and the two are the same
+   * expression: `state.freePlay?.demandTemplateId ?? pattern.demandTemplate` **is**
+   * `shiftDemandTemplateId`, which that helper is built on. What the helper adds is that the three
+   * fields `calendarPatch` is handed below and the three `scope/runIdentity.ts` decides a period's
+   * asks against are now one value rather than two copies of four expressions (issue #140).
+   *
+   * Read **before** the event since § D1057: whether the run is the whole authored day decides the
+   * horizon the day's wrinkle is drawn for, and whether a mix-setting wrinkle is spliced into it.
+   */
+  const askInput = calendarAskInputOf(resources, state, authored);
+  const authoredDay = wholeDayFor(resources.trafficProfiles, authored);
+  const wholeDayRun =
+    authoredDay !== undefined &&
+    askInput.demandTemplateId === authoredDay.templateId &&
+    runsWholeDay(authoredDay, state.shiftLengthS, state.windowStartS);
+  /*
    * **A campaign day's event is the campaign's** — GitHub issues #171 and #169 item 1, § D507.
    * `runCampaignDay` writes `campaignEventId` from the contract's calendar and § 8.3's odds, and
    * outside a campaign day the field is `undefined` and the week's calendar decides exactly as
@@ -2095,7 +2194,12 @@ export function shiftRunConfigOf(
    */
   const event =
     state.campaignEventId === undefined
-      ? scheduledEventFor(state.calendar, state.week.day, state.week.dayIdx)
+      ? scheduledEventFor(
+          state.calendar,
+          state.week.day,
+          state.week.dayIdx,
+          wholeDayRun ? 'whole-day' : 'period',
+        )
       : (eventById(state.campaignEventId) ?? SHIFT_EVENTS.ordinary);
   const spec = selectedPatternSpec(resources, state, authored);
   const pattern = spec === undefined ? { demandTemplate: 'rise-and-fall' as const, demand: {} } : demandFromSpec(spec);
@@ -2107,14 +2211,6 @@ export function shiftRunConfigOf(
    * A `null` rate passes nothing, which is what makes "the building's own profile" a real
    * selection rather than a reconstruction of one.
    */
-  /*
-   * Through {@link calendarAskInputOf} rather than spelled out here, and the two are the same
-   * expression: `state.freePlay?.demandTemplateId ?? pattern.demandTemplate` **is**
-   * `shiftDemandTemplateId`, which that helper is built on. What the helper adds is that the three
-   * fields `calendarPatch` is handed below and the three `scope/runIdentity.ts` decides a period's
-   * asks against are now one value rather than two copies of four expressions (issue #140).
-   */
-  const askInput = calendarAskInputOf(resources, state, authored);
   const demandTemplate = askInput.demandTemplateId as typeof pattern.demandTemplate;
   const rate = state.freePlay?.arrivalRatePctPop5min;
   /*
@@ -2142,28 +2238,14 @@ export function shiftRunConfigOf(
         : { ...pattern.demand, arrivalRatePctPop5min: rungRate }
       : { ...pattern.demand, arrivalRatePctPop5min: rate };
   /*
-   * § 8's `tenants` tier, applied to the rate the day would otherwise have run at.
-   *
-   * Two writes rather than one, because a rate can arrive here from two places and only one of them
-   * is on `demand`: `baseOf` falls back to the **building's own traffic profile** when the pattern
-   * asked for nothing, which is the campaign's own case, so a factor written onto `demand` alone
-   * would flatten a number that is not there. `fitBase` is what the day's event multiplies (a fire
-   * drill is five times a staggered morning, not the other way round) and `demand` is what runs when
-   * there is no event.
-   *
-   * Both are the identity at *nothing bought*: `fittedArrivalRate` returns its input at factor 1 and
-   * the spread is skipped, so `demand` is `asked` by object identity.
+   * § 8's `tenants` tier **no longer touches the rate** — GitHub issues #601 and #603, § D1078. It
+   * used to multiply the rate the day would otherwise have run at, which re-drew the whole trace;
+   * it is now a `crowdThinning` on the config below (`campaign/fitOut.ts#fittedCrowdThinning`), so
+   * the fitted day meets the as-built day's people less a third. `fitBase` is therefore the asked
+   * base whatever was bought, and it is still what the day's event multiplies.
    */
-  const askedBase = baseOf(resources, authored, asked);
-  const fitBase =
-    state.campaignFitOut === undefined || state.campaignFitOut.arrivalRateFactor === 1
-      ? askedBase
-      : {
-          ...askedBase,
-          ratePctPop5min: fittedArrivalRate(askedBase.ratePctPop5min, state.campaignFitOut),
-        };
-  const demand =
-    fitBase === askedBase ? asked : { ...asked, arrivalRatePctPop5min: fitBase.ratePctPop5min };
+  const fitBase = baseOf(resources, authored, asked);
+  const demand = asked;
   /*
    * Mean group size is not a `demand` option — it lives on the traffic profile, so a pattern that
    * moved it widens the file the run resolves against. See `patternSpec.ts`'s
@@ -2178,11 +2260,33 @@ export function shiftRunConfigOf(
    * here so the patch, the calendar's reservation and {@link ShiftRunConfig.dayCars} ask one list.
    */
   const booked = rungIncidents(rung);
+  /*
+   * **Today's wrinkle as an episode inside the day** — [§ D1057](../../../../DECISIONS.md). On the
+   * whole authored day, a wrinkle that sets a mix is written into the run's own copy of the day's
+   * phase list at its placement (`shift/episode.ts`), and the patch below then writes no split and
+   * no run-wide rate. The draw above left out any wrinkle whose placement is refused on a whole day,
+   * so a drawn one that the day's clock cannot hold is a data fault rather than a day: it throws with
+   * the reason, and `wholeDayEvents.test.ts` splices every placement into every whole day first.
+   */
+  const episode = wholeDayRun ? wholeDayEpisodeOf(event) : undefined;
+  const spliced = (() => {
+    if (episode === undefined || event.effect.directionalSplit === null) return undefined;
+    const record = trafficProfiles.demandTemplates.find((entry) => entry.id === demandTemplate);
+    if (record === undefined) return undefined;
+    const result = spliceEpisode(record, episode, event.effect.directionalSplit, event.name);
+    if (result.kind === 'refused') {
+      throw new Error(`${event.name} cannot be placed in ${record.id}: ${result.reason}`);
+    }
+    return result;
+  })();
+  const runProfiles =
+    spliced === undefined ? trafficProfiles : trafficProfilesWithRecord(trafficProfiles, spliced.record);
   const patch = shiftRunPatch({
     event,
     building,
     base: fitBase,
     booked,
+    spliced: spliced !== undefined,
     /*
      * `core`'s own answer, through `shift/events.ts#demandTemplateVariesMix` — GitHub issue #593.
      * This was `demandTemplate === 'lunch-two-way'`, a list of one, and `office-day` — the whole
@@ -2301,10 +2405,12 @@ export function shiftRunConfigOf(
       windows: patch.incidents.map((incident) => incident.car.carId),
     },
     withheld: [...patch.withheld, ...calendar.withheld],
+    wholeDayRun,
+    episode: spliced === undefined ? undefined : { startS: spliced.startS, endS: spliced.endS },
     config: {
       building: finalBuilding,
       dispatcherProfile,
-      trafficProfiles,
+      trafficProfiles: runProfiles,
       elevatorSpecs: specs,
       dispatcherProfiles,
       seed: state.seed,
@@ -2372,6 +2478,20 @@ export function shiftRunConfigOf(
         ...calendar.demand,
         ...(state.paramDemand === null ? {} : state.paramDemand),
       },
+      /*
+       * § 8's `tenants` L2, as a thinning of the day's own crowd — GitHub issues #601 and #603,
+       * § D1078. Over the start-time floors of the building the day actually runs on (the file the
+       * run resolves against decides which those are), after the event and the calendar have set
+       * the rate, and spread-or-omit so a tower that bought no tenancy runs the config it ran
+       * before.
+       */
+      ...(() => {
+        const thinning = fittedCrowdThinning(
+          startTimeFloorIdsOf(finalBuilding.floors, finalBuilding.trafficProfile, trafficProfiles),
+          state.campaignFitOut,
+        );
+        return thinning === undefined ? {} : { crowdThinning: thinning };
+      })(),
       /*
        * The Parameters tab's first applied schema — the audit's B4, and the first member of
        * `dev/parameterForm.ts`'s `APPLIED_SCHEMAS`.

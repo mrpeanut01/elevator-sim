@@ -36,9 +36,9 @@ import { fakeResult } from '../batch/fixtures.test-helper.js';
 import { batchReport } from '../batch/report.js';
 import type { BatchResult } from '../batch/types.js';
 import { briefingFor } from '../campaign/brief.js';
-import { admitProfile } from '../campaign/dimensions.js';
 import { judgeStage } from '../campaign/judge.js';
 import { parseCampaign, type CampaignContext } from '../campaign/parse.js';
+import { admitStageMove } from '../campaign/stagePress.js';
 import type { Campaign, CampaignStage } from '../campaign/types.js';
 import { probabilityWordIn } from '../campaign/words.js';
 import { DATA_DIR } from '../fixtures.test-helper.js';
@@ -204,8 +204,13 @@ function wiredSurfaces(): readonly { readonly name: string; readonly glossary: r
       }).glossary,
     },
     {
-      name: 'campaign/dimensions.ts#admitProfile',
-      glossary: admitProfile(space, profile('collective'), profile('eta'), []).glossary,
+      name: 'campaign/stagePress.ts#admitStageMove',
+      /* The control arm's sentence: the one that names the two arms, which is where a term is due. */
+      glossary: admitStageMove(
+        { space, schedule: shippedPriceSchedule(), baseline: profile('collective') },
+        { profile: profile('collective') },
+        0,
+      ).glossary,
     },
   ];
 }

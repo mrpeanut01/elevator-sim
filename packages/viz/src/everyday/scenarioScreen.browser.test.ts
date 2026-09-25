@@ -74,6 +74,18 @@ afterAll(async () => {
  * mounts before that and redraws when it lands. Waiting on `.everyday-scenario` alone would race
  * the redraw and read an empty path as a missing one.
  */
+/** Back to the hub from wherever the Everyday shell stands — the menu, or a screen inside Scenario. */
+async function scenarioHubFromAnywhere(page: Page): Promise<void> {
+  if ((await page.locator('.everyday-scenario-path-card').count()) > 0) return;
+  if ((await page.locator('.everyday-mode[data-screen="scenario"]').count()) === 0) {
+    await page.locator('.everyday-bar-leave').click();
+    await page.waitForSelector('.everyday-mode[data-screen], .everyday-scenario-path-card', { timeout: 15_000 });
+  }
+  if ((await page.locator('.everyday-scenario-path-card').count()) > 0) return;
+  await page.locator('.everyday-mode[data-screen="scenario"]').click();
+  await page.waitForSelector('.everyday-scenario-path-card', { timeout: 30_000 });
+}
+
 async function scenarioHub(page: Page): Promise<void> {
   await leaveTutorialIfOffered(page);
   await page.locator('.everyday-mode[data-screen="scenario"]').click();
@@ -81,7 +93,16 @@ async function scenarioHub(page: Page): Promise<void> {
 }
 
 describe.skipIf(!HAS_BROWSER)('the Scenario hub opens the stage that was pressed', () => {
-  it('puts each offered row’s own stage in the Engineer campaign picker', async () => {
+  /*
+   * **§ D1129 moved where a row opens, and the claim this case holds did not move.** A row opened
+   * its stage in the Engineer Lab (§ D787); since the swarm's Q3 ruling it opens it in the fix-it
+   * editor, in this world, and the Lab is one press further on, from the stage page's own link. So
+   * the case presses every offered row and requires that row's own stage to arrive **twice**: on
+   * the stage page, by its title and its building, and in the Lab's picker through the link —
+   * where the Engineer header must now name the stage's building rather than the Engineer run's,
+   * which is the interim half of the ruling (stage 1 used to open under *St Jude Hospital*).
+   */
+  it('opens each offered row’s own stage in the fix-it editor, and in the Lab from there', async () => {
     const page = await openPage(browser, { viewport: { width: 1400, height: 900 } });
     try {
       await page.goto(origin, { waitUntil: 'load' });
@@ -90,58 +111,47 @@ describe.skipIf(!HAS_BROWSER)('the Scenario hub opens the stage that was pressed
       const offered = await page.evaluate(() =>
         [...document.querySelectorAll<HTMLElement>('.everyday-scenario-path-card')]
           .filter((card) => card.dataset['playable'] === 'yes')
-          .map((card) => card.dataset['stage'] ?? ''),
+          .map((card) => ({
+            id: card.dataset['stage'] ?? '',
+            title: card.querySelector('.everyday-scenario-path-title')?.textContent ?? '',
+          })),
       );
-      /*
-       * Not a literal three. `scenario/ladder.ts` derives the offer from
-       * `data/scenario-survivors.json`, and GitHub issue #558's rebalance is expected to move which
-       * stages are offered — a case pinned to today's three would go red on a content change that
-       * is not a regression in anything this file is about. Two is the floor at which *different
-       * rows reach different stages* is a claim at all, and it is asserted rather than assumed
-       * because a hub that offered one row would make every expectation below vacuous.
-       */
+      /* Two is the floor at which *different rows reach different stages* is a claim at all. */
       expect(offered.length).toBeGreaterThanOrEqual(2);
-      expect(new Set(offered).size, 'the hub drew two rows for one stage').toBe(offered.length);
+      expect(new Set(offered.map((row) => row.id)).size, 'the hub drew two rows for one stage').toBe(offered.length);
 
       const arrived: string[] = [];
-      for (const stageId of offered) {
-        await page.locator(`.everyday-scenario-path-card[data-stage="${stageId}"] .everyday-scenario-path-head`).click();
-        /*
-         * The campaign panel is the tab the opener brings to the front, so its `hidden` coming off
-         * is the signal that both halves of the press landed — the swap (which clears the `inert`
-         * this shell holds) and `dev/main.ts`'s `context.openTab('campaign')`.
-         */
+      const inTheLab: string[] = [];
+      for (const row of offered) {
+        await page.locator(`.everyday-scenario-path-card[data-stage="${row.id}"] .everyday-scenario-path-head`).click();
+        await page.waitForSelector('.everyday-stage-play-title', { timeout: 60_000 });
+        arrived.push(await page.evaluate(() => document.querySelector('.everyday-stage-play-title')?.textContent ?? ''));
+        const building = await page.evaluate(
+          () => document.querySelector('.everyday-stage-play-building')?.textContent ?? '',
+        );
+
+        await page.locator('.everyday-stage-play-lab-link').click();
         await page.waitForFunction(
           () => document.querySelector('#panel-campaign')?.hasAttribute('hidden') === false,
           undefined,
           { timeout: 30_000 },
         );
-        arrived.push(
-          await page.evaluate(
-            () => document.querySelector<HTMLSelectElement>('#campaign-stage')?.value ?? '',
-          ),
+        inTheLab.push(
+          await page.evaluate(() => document.querySelector<HTMLSelectElement>('#campaign-stage')?.value ?? ''),
         );
-        /*
-         * The brief is drawn for the stage that was selected, not merely the picker set: the
-         * opener calls the panel's own `drawChosenStage`, which is the dropdown's handler, so an
-         * empty brief here would mean the value was written past the panel rather than through it.
-         */
-        expect(
-          (await page.evaluate(
-            () => document.querySelector<HTMLElement>('#campaign-brief')?.textContent ?? '',
-          )).trim().length,
-          `no brief drawn for ${stageId}`,
-        ).toBeGreaterThan(0);
+        /* The Engineer header names the stage's building while its tab is in front. */
+        const header = await page.evaluate(
+          () => document.querySelector('#building-name')?.textContent ?? '',
+        );
+        expect(building.startsWith(header.trim()), `the Lab's header reads "${header}" over ${row.id}`).toBe(true);
+
         await returnToEverydayMode(page);
-        await page.waitForSelector('.everyday-scenario-path-card', { timeout: 30_000 });
+        await scenarioHubFromAnywhere(page);
       }
 
-      /*
-       * **The claim, in the only form that fails against the defect.** Before § D787 this array was
-       * the same id `offered.length` times — whichever stage the picker opened on — so equality
-       * with `offered` is exactly the thing that was false.
-       */
-      expect(arrived).toEqual(offered);
+      /* **The claim, in the only form that fails against the defect.** */
+      expect(arrived).toEqual(offered.map((row) => row.title));
+      expect(inTheLab).toEqual(offered.map((row) => row.id));
     } finally {
       await page.close();
     }
@@ -183,8 +193,9 @@ describe.skipIf(!HAS_BROWSER)('the Scenario hub opens the stage that was pressed
          * **The literal narrowed in wave AF and the claim did not weaken** — GitHub issue #579,
          * § D911. It read *No screen in this build sells a wider budget*, which stopped being true
          * when the fix cases got a rung: a cleared case now earns, and the earning buys a wider
-         * budget there. It is still exactly true of **these ten**, which are played on the Engineer
-         * surface and have no budget control at all, so the sentence narrowed rather than went.
+         * budget there. It is still exactly true of **these ten**: they were played on the Engineer
+         * surface, and since § D1129 on the fix-it editor's stage page, which presses at the base
+         * rung and draws no budget control, so the sentence narrowed rather than went.
          *
          * The line above is the half that matters and is unchanged: these rows may not promise a
          * purchase, in `can be bought` or `chimes`, that the Scenario hub cannot deliver.

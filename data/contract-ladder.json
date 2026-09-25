@@ -1,6 +1,8 @@
 {
   "$comment": "THE CONTRACT LADDER — what each scenario is made of. GitHub issue #382, docs/33-difficulty-curve.md § 4.7, and packages/viz/src/shift/ladder.ts for the schema and the argument. Every field here is one of DC-R1's substrates: the crowd (demand, bounded by the building's own traffic profile), and the tower the contract hands the player (fabric — occupancy, and commissioning choices over the banks). THERE IS DELIBERATELY NO BAR, NO GOAL AND NO TIER IN THIS FILE: docs/33 § 4.3 and CLAUDE.md both forbid buying difficulty by moving the mark, and a field that does not exist cannot be authored. Every figure below was measured rather than chosen — the run is `CONTRACT_CURVE_SWEEP=1 CONTRACT_CURVE_SEEDS=50 CONTRACT_CURVE_OUT=<path> npx vitest run packages/viz/src/shift/contractCurve.sweep.test.ts` at seeds 20260824 + 7919n, day 1, dispatcher `collective`, and the table it produces is published in docs/33 § 4.7. `missRateTarget` is the DESIGN INTENT and never a measurement; three rows do not reach it and their notes say so with the probes attached. PROVENANCE, per the product owner's 2026-09-08 standing ruling on governed `data/` values: THESE FIGURES ARE AN AGENT'S PROPOSAL, drafted for the owner to accept, tighten or reject. The distinction that ruling asks for is drawn field by field. What is MEASURED is each row's resulting miss rate, at the run and seeds named above. What is CHOSEN is the target each row aims at and which substrate is moved to reach it — that is game feel, not a measurement, and no amount of sweeping makes it one. So a reader disagreeing with a number here is disagreeing with a judgement, not correcting an error, and the lever is one field in this file rather than anything in code.",
   "version": 1,
+  "$growthComment": "THE WEEK'S GROWTH, moved here from shift/types.ts#GROWTH_PER_DAY by DECISIONS.md \u00a7 D1066 (wave AJ). A week's building on day d carries 1 + g \u00d7 (d \u2212 1) of its day-1 population, linearly (shift/growth.ts argues the linear form). defaultGrowthPerDay is the design's own 0.11 (design.html :1568) and applies wherever a rung declares no growthPerDay of its own: the career, Endless, a replay on a building with no rung, and every contract the week census has not re-derived. A rung's growthPerDay is RE-DERIVED BY A CENSUS, never chosen: shift/weekWay.sweep.test.ts measures each weekday against docs/33 DC-10 and data/week-way.json carries what it found, with the growth each row was measured under so a slope moved here without a re-run is refused as stale by shift/weekWay.test.ts. Bounded by shift/ladder.ts#GROWTH_PER_DAY_BOUNDS. No bar moves with it (shift/goals.ts#GOAL_BARS is pinned by goals.test.ts).",
+  "defaultGrowthPerDay": 0.11,
   "contracts": [
     {
       "contractId": "c1",
@@ -19,6 +21,7 @@
     {
       "contractId": "c2",
       "buildingId": "midtown-office",
+      "growthPerDay": 0.02,
       "demand": {},
       "fabric": {
         "occupancy": 0.34,

@@ -101,7 +101,7 @@ import {
 import { SHIFT_EVENTS, demandTemplateVariesMix, eventCarChoice, eventFor } from './events.js';
 import { scaledBuilding } from './growth.js';
 import { carsToDerate, type CarRef, type Incident } from './incidents.js';
-import { weekdayOf, type ShiftEvent, type ShiftEventId, type Weekday } from './types.js';
+import { weekdayOf, type RunHorizon, type ShiftEvent, type ShiftEventId, type Weekday } from './types.js';
 
 /* -------------------------------------------------------------------------- *
  * A bias on the directional mix
@@ -603,10 +603,17 @@ export function scheduledEventFor(
   period: CalendarPeriod | null,
   day: number,
   dayIdx: number,
+  /*
+   * The kind of run the day is for — [§ D1057](../../../../DECISIONS.md). On a whole day the draw
+   * leaves out a wrinkle whose whole-day placement is refused (`wrinkles/draw.ts#poolFor`). A
+   * booking is the period's and is not redrawn. `'period'` by default, and on the shipped library
+   * the two draws agree on every day, which `wholeDayEvents.test.ts` holds.
+   */
+  horizon: RunHorizon = 'period',
 ): ShiftEvent {
   const today = calendarDayFor(period, day, dayIdx);
   const booked = today?.shift.eventId;
-  return booked == null ? eventFor(day, dayIdx) : SHIFT_EVENTS[booked];
+  return booked == null ? eventFor(day, dayIdx, horizon) : SHIFT_EVENTS[booked];
 }
 
 /* -------------------------------------------------------------------------- *

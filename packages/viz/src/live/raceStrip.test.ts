@@ -32,6 +32,7 @@ import {
   raceSlotsOf,
   raceStripViewOf,
   raceVerdictOf,
+  raceVerdictSlotAt,
   servedIdentically,
 } from './raceStrip.js';
 import { servedLeg, syntheticRecording, waitingLeg } from './synthetic.test-helper.js';
@@ -369,3 +370,45 @@ describe('no interval claim, ever', () => {
     }
   });
 });
+
+/**
+ * **The slot says the standing count at the playhead** — the post-AI panel's seat D, D7.
+ *
+ * On St Jude's call the header read 10 standing and the strip 6: both shells re-derive the strip
+ * only at a four-minute grid line, and the *nobody* slot is a live count. The slot is now answered
+ * at the playhead on every draw, and it is the header's `waitingNow` at every instant — here, over
+ * a recording whose standing count moves between grid lines, so the old cadence is visibly wrong.
+ */
+describe('raceVerdictSlotAt', () => {
+  const recording = syntheticRecording({
+    legs: [
+      servedLeg('a', 10, 20, 30),
+      waitingLeg('b', 250),
+      waitingLeg('c', 260),
+      servedLeg('d', 270, 300, 330),
+      waitingLeg('e', 400),
+    ],
+  });
+  const nobody = { pick: 'none' as const, recording: undefined, refusal: undefined, pending: false, watching: false };
+
+  it('reads the header’s standing count at every instant, where the grid-line view does not', () => {
+    let gridWasStale = false;
+    for (let t = recording.startedAt; t <= recording.endedAt; t += 7) {
+      const gridT = recording.startedAt + Math.floor((t - recording.startedAt) / RACE_SAMPLE_INTERVAL_S) * RACE_SAMPLE_INTERVAL_S;
+      const cached = raceSlotsOf(raceStripViewOf({ recording, ghost: undefined, simTimeS: gridT }), nobody, recording);
+      const live = raceVerdictSlotAt(cached, nobody, recording, t);
+      expect(live, `t=${String(t)}`).toBe(`${String(observationsAt(recording, t).waitingNow)} standing now`);
+      if (cached.verdict !== live) gridWasStale = true;
+    }
+    /* Non-vacuity: the cadence the shells used to draw at disagreed with the header somewhere. */
+    expect(gridWasStale).toBe(true);
+  });
+
+  it('leaves every other slot to raceSlotsOf — a refusal, a rival, a watched day', () => {
+    const slots = { verdict: 'held', note: '', rivalName: '' };
+    expect(raceVerdictSlotAt(slots, { ...nobody, watching: true }, recording, 300)).toBe('held');
+    expect(raceVerdictSlotAt(slots, { ...nobody, refusal: 'no' }, recording, 300)).toBe('held');
+    expect(raceVerdictSlotAt(slots, { ...nobody, pick: 'plain-baseline' }, recording, 300)).toBe('held');
+  });
+});
+

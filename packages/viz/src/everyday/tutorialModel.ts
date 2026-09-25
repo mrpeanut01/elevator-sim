@@ -134,11 +134,12 @@ export const TUTORIAL_CASE_ID = 'three-cars-one-cars-work';
  * -------------------------------------------------------------------------- */
 
 /**
- * Everything {@link tutorialIsDue} is allowed to look at, and it is deliberately three counts.
+ * Everything {@link tutorialIsDue} is allowed to look at, and it is deliberately four counts.
  *
  * Each is a quantity the player produced by playing and each already persists for its own reasons:
- * `WeekState.history` through `persist/session.ts`, and both progress lists through
- * `everyday/profile.ts`. **There is no field here that means *has seen the tutorial***, and the
+ * `WeekState.history` through `persist/session.ts`, both progress lists through
+ * `everyday/profile.ts`, and the career's own day counter through `campaign/careerPersist.ts`.
+ * **There is no field here that means *has seen the tutorial***, and the
  * absence is asserted rather than merely intended — `tutorialModel.test.ts` reads this module's
  * source and fails on a boolean in this interface, because that is the shape a stored flag would
  * arrive in.
@@ -150,18 +151,34 @@ export interface TutorialProgress {
   readonly solvedCases: number;
   /** `profileStore.progress().ratings.length` — dispatchers that have been through the forty. */
   readonly ratings: number;
+  /**
+   * `host.campaign().today - 1` — career days filed. GitHub issue #600, `DECISIONS.md` § D1077.
+   *
+   * The career keeps its own record (`campaign/careerPersist.ts`) and none of the three counts
+   * above reads it, so a player whose whole history was career days read as *played nothing yet*
+   * and met the first-visit landing page on every reload. `CampaignCareer.today` starts at 1 and
+   * `career.ts#fileDay` is the only thing that moves it, one per career day filed, so this is a
+   * count the player produced by playing and nothing stores it for the gate.
+   */
+  readonly careerDays: number;
 }
 
 /**
  * Whether the tutorial is due — *an empty week, no filed day*, and nothing else earned either.
  *
- * The last clause is not padding. A player who has never filed a day but has solved a fix case or
- * rated a dispatcher has met the product; handing them a walkthrough of the editor would be the
- * first-run screen arriving on a session that is not a first run. `filedDays` alone is the issue's
- * own wording; the two extra counts are what make it true of the player rather than of the week.
+ * The last clause is not padding. A player who has never filed a day but has solved a fix case,
+ * rated a dispatcher or filed a career day has met the product; handing them a walkthrough of the
+ * editor would be the first-run screen arriving on a session that is not a first run. `filedDays`
+ * alone is the issue's own wording; the three extra counts are what make it true of the player
+ * rather than of the week, and the career's was the one missing until GitHub issue #600.
  */
 export function tutorialIsDue(progress: TutorialProgress): boolean {
-  return progress.filedDays === 0 && progress.solvedCases === 0 && progress.ratings === 0;
+  return (
+    progress.filedDays === 0 &&
+    progress.solvedCases === 0 &&
+    progress.ratings === 0 &&
+    progress.careerDays === 0
+  );
 }
 
 /*
@@ -335,8 +352,13 @@ export const TUTORIAL_COPY = Object.freeze({
     'Both mornings have finished playing, side by side. The worked answer is under them.',
   complaintHeading: 'The letter',
   symptomHeading: 'What you are looking at',
+  /*
+   * *"the answer is yours"* was false while every fix case printed its diagnosis before play; it is
+   * true since [§ D1120](../../../../DECISIONS.md) clause 1 withheld it, and the sentence now says
+   * where the diagnosis went rather than leaving a reader to find it held back.
+   */
   workedWhy:
-    'This is a tutorial, so the answer is on the screen. From here on you get the building and the letter, and the answer is yours.',
+    'This is a tutorial, so the answer is on the screen. From here on you get the building and the letter, and the answer is yours: the diagnosis waits until you ask for it.',
   finish: 'Start playing',
   /* § D993: it read *"The day is filed and the main menu is next."* Nothing is filed now. */
   finishNote: 'Nothing is filed. The main menu is next, and the first day on your week is one you play.',

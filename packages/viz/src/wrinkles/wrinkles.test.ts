@@ -358,3 +358,110 @@ describe('the drawn schedule is pinned to this commit — § 17', () => {
     }
   });
 });
+
+describe('a wrinkle that sets a mix says where it sits on a whole day — § D1057', () => {
+  /** The fixture with one weekday template that sets a mix, placed or not as `wholeDay` says. */
+  const withMix = (wholeDay: unknown): Record<string, unknown> => {
+    const doc = wellFormed();
+    (doc['templates'] as Record<string, unknown>[]).push({
+      id: 'mixer',
+      name: 'Mixer',
+      note: 'Most trips go down.',
+      days: 'weekday',
+      effect: {
+        changesNothing: false,
+        arrivalRateMultiplier: 1.5,
+        directionalSplit: { incoming: 0.1, outgoing: 0.8, interfloor: 0.1 },
+        carsOutOfService: 0,
+        derate: null,
+      },
+      ...(wholeDay === undefined ? {} : { wholeDay }),
+      axes: [],
+    });
+    return doc;
+  };
+  const placement = (over: Record<string, unknown> = {}): Record<string, unknown> => ({
+    from: '10:00',
+    to: '10:20',
+    intensity: 1,
+    note: 'Most trips go down {episode}.',
+    reason: 'A fixture.',
+    ...over,
+  });
+
+  it('accepts a placed one and a refused one', () => {
+    expect(() => parseWrinkleLibrary(withMix(placement()))).not.toThrow();
+    expect(() => parseWrinkleLibrary(withMix({ refused: 'No day can hold it.' }))).not.toThrow();
+  });
+
+  it('refuses a mix-setting template with no placement — the loader half of the ruling', () => {
+    expect(() => parseWrinkleLibrary(withMix(undefined))).toThrow(
+      /sets a mix of trips and declares no wholeDay/u,
+    );
+  });
+
+  it('refuses a placement on a template that sets no mix, a level above the peak, and a surge across the day', () => {
+    const doc = wellFormed();
+    const templates = doc['templates'] as Record<string, unknown>[];
+    templates[0] = { ...templates[0], wholeDay: placement() };
+    expect(() => parseWrinkleLibrary(doc)).toThrow(/sets no mix, so it would place nothing/u);
+    expect(() => parseWrinkleLibrary(withMix(placement({ intensity: 1.6 })))).toThrow(
+      /outside \[0, 1\]/u,
+    );
+    expect(() => parseWrinkleLibrary(withMix(placement({ dayRateMultiplier: 1.6 })))).toThrow(
+      /must lie in \(0, 1\]/u,
+    );
+    expect(() => parseWrinkleLibrary(withMix(placement({ to: '09:00' })))).toThrow(
+      /ends at or before it starts/u,
+    );
+    expect(() => parseWrinkleLibrary(withMix(placement({ from: '25:00' })))).toThrow(
+      /not a clock time/u,
+    );
+    expect(() => parseWrinkleLibrary(withMix(placement({ note: 'No window named.' })))).toThrow(
+      /names \{episode\} 0 times/u,
+    );
+  });
+
+  it('composes the whole-day note with its window, from the numbers the splice uses', () => {
+    const library = parseWrinkleLibrary(withMix(placement()));
+    const mixer = library.templates.find((template) => template.id === 'mixer');
+    if (mixer === undefined) throw new Error('no mixer');
+    const placed = composeWrinkle(mixer, []).effect.wholeDay;
+    expect(placed?.kind === 'episode' ? placed.note : undefined).toBe(
+      'Most trips go down from 10:00 to 10:20.',
+    );
+  });
+
+  it('every shipped template that sets a mix is placed or refused, and fifteen are placed', () => {
+    const setsMix = WRINKLE_LIBRARY.templates.filter(
+      (template) => template.effect.directionalSplit !== null,
+    );
+    for (const template of setsMix) expect(template.effect.wholeDay, template.id).not.toBeNull();
+    expect(setsMix.filter((template) => template.effect.wholeDay?.kind === 'episode')).toHaveLength(15);
+    expect(
+      setsMix
+        .filter((template) => template.effect.wholeDay?.kind === 'refused')
+        .map((template) => template.id),
+    ).toEqual(['coach-party']);
+  });
+
+  it('does not draw a refused template on a whole day, and does on a slice — S2’s condition', () => {
+    /*
+     * The shipped library refuses only a career's template, which no week draws, so the condition
+     * is shown on a fixture: one weekday template refused on whole days. Over forty days the slice
+     * draws it and the whole day never does.
+     */
+    const library = parseWrinkleLibrary(withMix({ refused: 'No day can hold it.' }));
+    expect(poolFor(library, 'weekday', 'period').map((t) => t.id)).toContain('mixer');
+    expect(poolFor(library, 'weekday', 'whole-day').map((t) => t.id)).not.toContain('mixer');
+    const drawnOn = (horizon: 'period' | 'whole-day'): number => {
+      let count = 0;
+      for (let day = 1; day <= 40; day += 1) {
+        if (drawWrinkle(library, day, 0, horizon).templateId === 'mixer') count += 1;
+      }
+      return count;
+    };
+    expect(drawnOn('period')).toBeGreaterThan(0);
+    expect(drawnOn('whole-day')).toBe(0);
+  });
+});

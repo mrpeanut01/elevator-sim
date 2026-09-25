@@ -12,7 +12,8 @@
  * ## What "the same crowd" means here — and the leg it deliberately does not read
  *
  * Two recordings agree on the crowd when, for every **first** leg, both carry a leg with the same
- * `(passengerId, arrivedAt, originFloorId, finalDestinationFloorId)` — **in both directions**, so a leg
+ * `(passengerId, arrivedAt, originFloorId, finalDestinationFloorId)`, each read as the **journey's**
+ * where version 16 records that the route moved it (below) — **in both directions**, so a leg
  * on one side with no partner on the other is a difference whichever side it is on. What is
  * deliberately *not* compared is everything the dispatcher decides: `boardedAt`, `alightedAt`, the
  * car — **and every leg minted at a sky-lobby transfer**, which is the finding this module was
@@ -33,9 +34,22 @@
  * destination is a route, and a route is the building's. `VizLeg.finalDestinationFloorId` lands at
  * the same version for this reader.
  *
+ * **The arrival and the origin are the journey's rather than the first lift leg's**, and that is the
+ * same finding a third time — GitHub issue #605, `DECISIONS.md` § D1075. On `vertical-city` a rider
+ * for the upper deck walks in at `G` and rides the escalator to `2`, so their first lift leg starts at
+ * `2` 21.2 s after they arrived. A zoning edit that lets a local serve `G` sends them straight up
+ * instead, and on the fix-it case `every-deck-calls-itself-full` this module read 89 first lift legs
+ * as different people and refused the pair, with every one of 649 generated passengers identical on
+ * both sides.
+ * The escalator is a route, and a route is the building's; `VizLeg.journeyStartedAt`,
+ * `journeyOriginFloorId` and `journeyDestinationFloorId` (version 16) carry the generator's own
+ * values where the route moved them, and this module reads those.
+ *
  * Two runs of the same crowd under two dispatchers therefore differ on nothing this module reads,
  * which is what makes the check useful rather than tautological — and a run whose *generator*
- * output moved, which is what a population patch does, differs on the first legs themselves.
+ * output moved differs on the first legs themselves. A fix-it crowd change is the one shipped pair
+ * that differs on purpose, and since GitHub issue #601 it differs only by removal: the repaired run's
+ * crowd is the as-built crowd thinned, which {@link crowdAddedOf} holds.
  *
  * ## Non-vacuity is part of the contract
  *
@@ -71,18 +85,34 @@ function isFirstLeg(leg: VizLeg): boolean {
   return (leg.legIndex ?? 0) === 0;
 }
 
-/** The identity of a leg as the crowd knows it — nothing the dispatcher decided. */
+/** The identity of a leg as the crowd knows it — nothing the dispatcher or the route decided. */
 function crowdKeyOf(leg: VizLeg): string {
-  return `${leg.passengerId} ${String(leg.arrivedAt)} ${leg.originFloorId} ${goingTo(leg)}`;
+  return `${leg.passengerId} ${String(arrivedAt(leg))} ${comingFrom(leg)} ${goingTo(leg)}`;
 }
 
-/** Where the journey ends — the leg's own destination on a fixture that predates the field. */
+/**
+ * When the journey began — the generator's arrival, which is the leg's own unless the route opened
+ * with an escalator (version 16, GitHub issue #605). See the module docstring's *third* field.
+ */
+function arrivedAt(leg: VizLeg): number {
+  return leg.journeyStartedAt ?? leg.arrivedAt;
+}
+
+/** Where the journey began — the leg's own origin unless the route opened with an escalator. */
+function comingFrom(leg: VizLeg): string {
+  return leg.journeyOriginFloorId ?? leg.originFloorId;
+}
+
+/**
+ * Where the journey ends — the generator's destination when the route closes with an escalator, the
+ * lift terminus otherwise, and the leg's own destination on a fixture that predates both fields.
+ */
 function goingTo(leg: VizLeg): string {
-  return leg.finalDestinationFloorId ?? leg.destinationFloorId;
+  return leg.journeyDestinationFloorId ?? leg.finalDestinationFloorId ?? leg.destinationFloorId;
 }
 
 function describeLeg(leg: VizLeg): string {
-  return `passenger ${leg.passengerId} arriving at ${String(leg.arrivedAt)} s on ${leg.originFloorId} for ${goingTo(leg)}`;
+  return `passenger ${leg.passengerId} arriving at ${String(arrivedAt(leg))} s on ${comingFrom(leg)} for ${goingTo(leg)}`;
 }
 
 /**
@@ -129,6 +159,28 @@ export function crowdDifferencesOf(left: CrowdSource, right: CrowdSource): reado
     return [...differences.slice(0, CROWD_DIFFERENCE_LIMIT), `and ${String(rest)} more`];
   }
   return differences;
+}
+
+/**
+ * **Everyone the second run met that the first did not** — the half of {@link crowdDifferencesOf}
+ * a *thinned* pair must leave empty (GitHub issue #601, `DECISIONS.md` § D1076).
+ *
+ * A crowd change in fix-it removes people from the as-built trace rather than re-drawing it, so the
+ * repaired run's crowd is the as-built crowd less some people: every first leg on the right has a
+ * partner on the left with the same key, and legs only the left carries are the people the change
+ * moved. A leg only the right carries, or one whose arrival or floors moved, is a crowd the change
+ * did not thin but re-drew, and this names it. Capped as {@link crowdDifferencesOf} is.
+ */
+export function crowdAddedOf(left: CrowdSource, right: CrowdSource): readonly string[] {
+  const leftKeys = new Set(left.legs.filter(isFirstLeg).map(crowdKeyOf));
+  const added = right.legs
+    .filter(isFirstLeg)
+    .filter((leg) => !leftKeys.has(crowdKeyOf(leg)))
+    .map((leg) => `the second run carries ${describeLeg(leg)}, whom the first did not meet`);
+  if (added.length > CROWD_DIFFERENCE_LIMIT) {
+    return [...added.slice(0, CROWD_DIFFERENCE_LIMIT), `and ${String(added.length - CROWD_DIFFERENCE_LIMIT)} more`];
+  }
+  return added;
 }
 
 /** Whether the two recordings met the same crowd. `false` for two empty recordings — see above. */

@@ -74,6 +74,7 @@ import {
   raceLaneOf,
   raceSlotsOf,
   raceStripViewOf,
+  raceVerdictSlotAt,
   type GhostPick,
   type RaceStripView,
 } from '../live/raceStrip.js';
@@ -339,6 +340,8 @@ function mountStage(
   let playback: Playback | undefined;
   /** Display time of the last live-region write — see {@link STAGE_ANNOUNCE_MS}. */
   let lastAnnouncedMs = Number.NEGATIVE_INFINITY;
+  /** A stopped frame's sentence, waiting for the rate limit to lift — see `announce`. */
+  let pendingSay: number | undefined;
   let adopted: VizRecording | undefined;
   /**
    * **What stood on the host when this mount began** — GitHub issue **#548**, and it is latched
@@ -387,6 +390,15 @@ function mountStage(
    */
   let stageCall: PressCall | undefined;
   let callAnswered = false;
+  /*
+   * ---- § D1138's ordinary calls — wave AJ. One cell. ----
+   *
+   * The calls themselves are the host's (`everyday/host.ts#dayCallOnStage`), asked afresh each
+   * frame because they move as the player answers. This is only whether the transport is paused
+   * **waiting** at a call whose two runs have not landed yet, so the stage can play on by itself if
+   * that candidate turns out not to be raised.
+   */
+  let waitingOnCall = false;
   /* ---- § D344's sound — GitHub issue #258. Four cells, none of which a leg can read. ---- */
   /** The synthesised sink, built on the first frame that has something to play. */
   let audioSink: AudioSink | undefined;
@@ -1077,7 +1089,7 @@ function mountStage(
   }
   const switchButton = el(doc, 'button', 'everyday-stage-intervene');
   switchButton.type = 'button';
-  switchButton.dataset['interventionKind'] = 'switch-dispatcher';
+  switchButton.dataset['interventionKind'] = 'adopt-dispatcher';
   switchButton.style.cssText = ARM_BUTTON_CSS;
   /** The handover row as of the last {@link draw} — the model's, never composed here. */
   let switchRow: StageInterventionRow | undefined;
@@ -1293,6 +1305,14 @@ function mountStage(
    */
   const callCard = el(doc, 'div', 'everyday-stage-call');
   callCard.setAttribute('role', 'group');
+  /*
+   * **A destination rather than a stop on the tab order** — `docs/36` `AX-12`, *focus moves to what
+   * just happened*, and the post-AI playability panel's first finding in all four seats: the stage
+   * stopped for the call and the card was drawn below the fold with nothing sent to it, so a
+   * player saw a frozen clock. See {@link showCallCard} for when focus moves, and why only then.
+   */
+  callCard.tabIndex = -1;
+  callCard.setAttribute('aria-describedby', 'everyday-stage-call-question');
   callCard.hidden = true;
   callCard.style.cssText = [
     `border:1.5px solid ${C.ink}`,
@@ -1309,21 +1329,52 @@ function mountStage(
   callBody.style.cssText = 'display:grid;gap:7px';
   callCard.append(callBody);
   let callCardKey = '';
-  /** Show or hide the card. */
+  /**
+   * Show or hide the card — and, **on the frame it appears and on no other**, bring it into the
+   * screen region's view and put focus on it.
+   *
+   * `drawCall` runs on every paint, and `AX-12`'s second half is *never because of the render
+   * loop*: a focus written per frame would pull the keyboard back to the card every sixteen
+   * milliseconds and would steal it from anything the player moved to. So the move is keyed on the
+   * transition from hidden to shown, which is the stage stopping for the call — an event in the
+   * run, once per attempt — and a card already up is left alone. `nearest` rather than `start`,
+   * because the card sits directly under the header and is already in view at a desktop height;
+   * at a phone height it scrolls the region only as far as the card needs.
+   *
+   * After an answer the card leaves the document flow, and focus would fall to the body; it goes to
+   * the transport instead, which is what the answer set moving.
+   */
   function showCallCard(shown: boolean): void {
+    const appearing = shown && callCard.hidden;
+    const leaving = !shown && !callCard.hidden;
+    const hadFocus = leaving && callCard.contains(doc.activeElement);
     callCard.hidden = !shown;
+    if (appearing) {
+      callCard.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      callCard.focus({ preventScroll: true });
+    } else if (hadFocus) {
+      playButton.focus({ preventScroll: true });
+    }
   }
 
+  /*
+   * **The call card sits under the header and above the goals** — the post-AI playability panel,
+   * all four seats. It was appended after the building and its legend, which put it at y ≈ 1 060
+   * on a 900 px viewport and y ≈ 1 320 on a 844 px phone while the only sign above the fold was the
+   * transport's small grey *stopped for the day's call*. Here it is the next thing under the clock
+   * that stopped, which is where the eye already is. Hidden, it has no box, so every other screen
+   * state lays out exactly as it did.
+   */
   root.append(
     title,
     header,
+    callCard,
     goals,
     watchBand,
     alarm,
     alarmSay,
     stageRow,
     legend,
-    callCard,
     interventions,
     race,
   );
@@ -1409,11 +1460,18 @@ function mountStage(
       watchingSimPerRealS: stageSpeedAt(speedIndex).simPerRealS,
       longestStandingS,
       playerChoseSpeedAtS,
-      callAtS: callPending() ? stageCall?.atS : undefined,
+      callAtS: activeCall()?.call.atS,
     });
-    const note =
-      stagePaceNoteOf(answer, { acts: paceActs, simTimeS, dayStartS: host.dayStartS() }) ?? '';
+    /*
+     * § D1138: an ordinary call whose two runs have not landed stops the transport too, and says
+     * what it is waiting for rather than *stopped for the day's call* — the call may not be raised.
+     */
+    const waiting = answer.reason === 'call' && activeCall()?.raised === false;
+    const note = waiting
+      ? STAGE_CALL_COPY.waiting
+      : (stagePaceNoteOf(answer, { acts: paceActs, simTimeS, dayStartS: host.dayStartS() }) ?? '');
     if (paceNote.textContent !== note) paceNote.textContent = note;
+    if (answer.reason === 'call') waitingOnCall = waiting;
     /*
      * **The call stops the transport** — § D1029. At any rung, and after a chip press, because the
      * `'call'` reason outranks `'chosen'`. It pauses and never seeks (`docs/28` AD-S4): the frame it
@@ -1453,9 +1511,36 @@ function mountStage(
   function announce(recording: VizRecording, frame: Frame, dispatcherName: string): void {
     const sentence = describeFrame({ recording, frame, dispatcherName });
     canvas.setAttribute('aria-label', sentence);
-    const nowMs = systemClock().now();
-    if (nowMs - lastAnnouncedMs < STAGE_ANNOUNCE_MS) return;
-    lastAnnouncedMs = nowMs;
+    if (pendingSay !== undefined) {
+      view?.clearTimeout(pendingSay);
+      pendingSay = undefined;
+    }
+    if (description.textContent === sentence) return;
+    const waitMs = STAGE_ANNOUNCE_MS - (systemClock().now() - lastAnnouncedMs);
+    if (waitMs <= 0) {
+      say(sentence);
+      return;
+    }
+    /*
+     * **A stopped frame is said when the limit allows, not left for the next frame** — the post-AI
+     * panel's seat D, D7. A moving picture draws again inside the limit and the next frame past it
+     * says what is on screen then. A stopped one draws no next frame, so the region kept the last
+     * sentence it had been allowed to say: *7 legs waiting* on the paused frame of St Jude's call
+     * beside a header reading 10, and *at 23:42 of 30:00* on a day that had run out. So a stage that
+     * is not playing schedules the frame it stopped on for the moment the two-second limit lifts —
+     * the limit `screenReaderWalkthrough.browser.test.ts` holds, kept, and the stopped frame said
+     * within it. The next draw, or unmounting, cancels it.
+     */
+    if (playback?.state === 'playing') return;
+    pendingSay = view?.setTimeout(() => {
+      pendingSay = undefined;
+      if (alive) say(sentence);
+    }, waitMs);
+  }
+
+  /** One write to the live region, stamped for the rate limit. */
+  function say(sentence: string): void {
+    lastAnnouncedMs = systemClock().now();
     description.textContent = sentence;
   }
 
@@ -1490,38 +1575,91 @@ function mountStage(
     started = true;
     /* § D1029: a skip is the player's own answer to a call they have not been asked yet. */
     if (stageCall !== undefined) callAnswered = true;
+    /*
+     * § D1138: and to every ordinary call the day had left. A call whose card is up when the player
+     * skips is recorded as skipped, so the report still says the stage called there.
+     */
+    const ordinary = activeCall();
+    if (ordinary !== undefined && !ordinary.pinned) {
+      host.skipDayCalls(ordinary.raised && playback.simTimeS >= ordinary.call.atS);
+    }
+    waitingOnCall = false;
     playback.play();
     playback.seekTo(playback.recording.endedAt);
     syncTransport();
     requestFrame();
   }
 
-  /** Whether this attempt's call stands unanswered — the one reading pace, card and holds share. */
-  function callPending(): boolean {
-    return stageCall !== undefined && !callAnswered && watchingNow() === undefined;
-  }
-
-  /** The held reason for the parking presses and the handover, or `undefined` once answered. */
-  function callHeld(): string | undefined {
-    return callPending() ? STAGE_CALL_COPY.held : undefined;
+  /**
+   * **The call standing on this attempt**, of either kind — the one reading pace, card and holds
+   * share. The pinned day's § D1029 call while it is unanswered, else the ordinary day's next call
+   * from the host (§ D1138), which only the daily stage asks for. `raised: false` is an ordinary
+   * candidate whose runs have not landed: the stage waits at it but draws no card.
+   */
+  function activeCall():
+    | { readonly call: PressCall; readonly raised: boolean; readonly pinned: boolean }
+    | undefined {
+    if (watchingNow() !== undefined) return undefined;
+    if (stageCall !== undefined) {
+      return callAnswered ? undefined : { call: stageCall, raised: true, pinned: true };
+    }
+    if (context.ctx !== 'daily' || adopted === undefined || recomputingOver !== undefined) return undefined;
+    const next = host.dayCallOnStage(adopted);
+    return next === undefined ? undefined : { call: next.call, raised: next.raised, pinned: false };
   }
 
   /**
-   * **Answer the call** — § D1029. A press is stamped at the call second rather than at the
-   * playhead, because the stage may have stopped a frame past it; *leave them* presses nothing.
-   * Either way the day plays on from where it stopped.
+   * The held reason for the parking presses and the handover, or `undefined`. A pinned call holds
+   * them from the day's start until it is answered (§ D1029: the call is where that day's press is
+   * made). An ordinary call holds them only while its card is up, because an ordinary day's calls
+   * are not promised in advance and a hold that named one might name a call that is never raised.
+   */
+  function callHeld(): string | undefined {
+    const standing = activeCall();
+    if (standing === undefined) return undefined;
+    if (standing.pinned) return STAGE_CALL_COPY.held;
+    return standing.raised && (playback?.simTimeS ?? 0) >= standing.call.atS ? STAGE_CALL_COPY.held : undefined;
+  }
+
+  /**
+   * **Answer the call** — § D1029, and § D1138 for an ordinary one. A press is stamped at the call
+   * second rather than at the playhead, because the stage may have stopped a frame past it; *leave
+   * them* presses nothing. An ordinary call's press adopts the run the host already made for it, so
+   * the beat is the same one an intervention shows and ends on the same notification. Either way
+   * the day plays on from where it stopped.
    */
   function answerCall(change: InterventionChange | undefined): void {
-    const call = stageCall;
+    const standing = activeCall();
     const current = adopted;
-    if (call === undefined || current === undefined || playback === undefined || !callPending()) return;
-    callAnswered = true;
+    if (standing === undefined || !standing.raised || current === undefined || playback === undefined) return;
+    const call = standing.call;
     showCallCard(false);
     started = true;
-    if (change !== undefined) {
+    waitingOnCall = false;
+    if (standing.pinned) {
+      callAnswered = true;
+      if (change !== undefined) {
+        withRecomputeBeat(current, () => {
+          host.intervene(call.atS, change);
+        });
+      }
+    } else if (change === undefined) {
+      host.answerDayCall('leave');
+    } else {
+      const kind = change.kind === 'park-cars-lobby' ? 'park-cars-lobby' : 'spread-cars';
       withRecomputeBeat(current, () => {
-        host.intervene(call.atS, change);
+        host.answerDayCall(kind);
       });
+      /*
+       * The adoption is synchronous, so the beat has already ended on the new recording. If the host
+       * refused the answer (a run it did not make stands, or one is in flight), nothing was adopted
+       * and the beat would wait for a recording that is not coming: it ends here instead.
+       */
+      if (adopted === current) {
+        recomputingOver = undefined;
+        barFacts.recomputing = false;
+        context.refreshBar();
+      }
     }
     playback.play();
     syncTransport();
@@ -1530,19 +1668,39 @@ function mountStage(
 
   /** Show, hide or rebuild the card for the playhead. */
   function drawCall(simTimeS: number): void {
-    const call = stageCall;
+    const standing = activeCall();
+    const call = standing?.call;
+    /*
+     * § D1138: the stage stopped to wait for an ordinary candidate's runs, and they landed without
+     * raising it (or the day's calls ran out). Nothing stands at this instant any more, so the day
+     * plays on by itself — the player did not pause it, and a stage left paused here would be a
+     * stop with no call behind it.
+     */
+    if (waitingOnCall && playback !== undefined && (standing === undefined || standing.call.atS > simTimeS)) {
+      waitingOnCall = false;
+      playback.play();
+      syncTransport();
+      requestFrame();
+    }
     const showing =
+      standing !== undefined &&
+      standing.raised &&
       call !== undefined &&
-      watchingNow() === undefined &&
-      stageCallPhaseOf(call, simTimeS, callAnswered) === 'called';
+      stageCallPhaseOf(call, simTimeS, false) === 'called';
     if (!showing || call === undefined) {
       showCallCard(false);
       return;
     }
+    /* The wait is over and the call is raised: the note says what the stop now is. */
+    if (paceNote.textContent === STAGE_CALL_COPY.waiting) {
+      paceNote.textContent =
+        stagePaceNoteOf({ simPerRealS: stageSpeedAt(speedIndex).simPerRealS, reason: 'call' }, { acts: paceActs, simTimeS }) ?? '';
+    }
+    waitingOnCall = false;
     const key = `${String(call.atS)}|${call.rule}`;
     if (key !== callCardKey) {
       callCardKey = key;
-      const card = stageCallCardOf(call, host.dayStartS());
+      const card = stageCallCardOf(call, host.dayStartS(), bookedCars);
       const heading = el(doc, 'div', 'everyday-stage-call-heading', card.heading);
       heading.style.cssText = `font:600 11px ${TYPE.mono};letter-spacing:0.08em;color:${C.label}`;
       const facts = card.facts.map((fact) => {
@@ -1551,6 +1709,7 @@ function mountStage(
         return line;
       });
       const question = el(doc, 'p', 'everyday-stage-call-question', card.question);
+      question.id = 'everyday-stage-call-question';
       question.style.cssText = 'margin:2px 0 0;font-size:13.5px;font-weight:600';
       const row = el(doc, 'div');
       row.style.cssText = `display:flex;flex-wrap:wrap;gap:${String(GAP.row)}px`;
@@ -2077,7 +2236,7 @@ function mountStage(
    * page after the wider one had gone.
    */
   function applySwitchRow(view: StageInterventionView, sharedRefusal: string | undefined): void {
-    switchRow = view.rows.find((row) => row.change.kind === 'switch-dispatcher');
+    switchRow = view.rows.find((row) => row.change.kind === 'adopt-dispatcher');
     if (switchRow !== undefined) {
       switchButton.textContent = switchRow.label;
       switchButton.title = switchRow.refusal ?? switchRow.explains;
@@ -2801,7 +2960,17 @@ function mountStage(
      * is the spectator's reading of somebody else's run in the cell § 14.1 reserves for identity,
      * and the same figure is already in the header two rows up.
      */
-    raceVerdict.textContent = watchingNow()?.eyebrow ?? raceSlotVerdict;
+    /*
+     * The slot at the playhead rather than at the last grid line — the post-AI panel's seat D, D7:
+     * the header read 10 standing and this read 6 on one paused frame. See `raceVerdictSlotAt`.
+     */
+    const liveVerdict = raceVerdictSlotAt(
+      { verdict: raceSlotVerdict, note: '', rivalName: '' },
+      { pick: race.pick, recording: race.rival, refusal: race.refusal, pending: race.pending, watching },
+      recording,
+      simTimeS,
+    );
+    raceVerdict.textContent = watchingNow()?.eyebrow ?? liveVerdict;
   }
 
   /* ------------------------------------------------------------------ wire */
@@ -2872,6 +3041,8 @@ function mountStage(
   return {
     unmount: () => {
       alive = false;
+      if (pendingSay !== undefined) view?.clearTimeout(pendingSay);
+      pendingSay = undefined;
       if (pendingFrame !== undefined && view !== null && view !== undefined) {
         view.cancelAnimationFrame(pendingFrame);
       }

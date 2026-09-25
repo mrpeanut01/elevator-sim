@@ -192,7 +192,11 @@ export function campaignInputOf(host: EverydayHost): CampaignInput {
   for (const id of host.buildingIds()) {
     const config = host.buildingById(id);
     if (config === undefined) continue;
-    buildings.set(id, { name: config.name, spec: host.buildingSpecLine(id) });
+    buildings.set(id, {
+      name: config.name,
+      spec: host.buildingSpecLine(id),
+      startTimeFloors: host.buildingStartTimeFloors(id),
+    });
   }
   const run = host.runState();
   const career = host.campaign();

@@ -4,11 +4,11 @@
   "provenance": {
     "kind": "measured",
     "command": "ELEVATOR_SIM_SURVIVORS=deep ELEVATOR_SIM_REGENERATE_SURVIVORS=1 npx vitest run --project viz src/scenario/survivorSweep.test.ts",
-    "tree": "3ffa138",
-    "measuredAt": "2026-09-15",
+    "tree": "9bbbaf4",
+    "measuredAt": "2026-09-25",
     "masterSeed": 20260910,
     "sampleSize": 12,
-    "scope": "Every configuration is an edit of the scenario's own baseline dispatcher or a shipped profile picked in its place, priced by data/price-schedule.json. 10 of 34 priced changes can reach a scenario run at all — the rest price shafts, machines and fittings that campaign/stageRun.ts cannot apply — and 47 of 60 declared dimensions are priced, of which 46 are varied — weights.dutyMismatch is declared and priced by dispatch-rules, which covers dispatcher.weights, and is not varied on a building that declares no duty, which no scenario's building does, because a dial its building gives nothing to act on is not drawn (DECISIONS.md § D549) — and 13 are withheld from every scenario by data/price-schedule.json and varied by no configuration. A configuration differing only on an unpriced dimension is reachable at every rung, so counting it would make the budget inert.",
+    "scope": "Every configuration is an edit of the scenario's own baseline dispatcher or a shipped profile picked in its place, priced by data/price-schedule.json. 10 of 37 priced changes can reach a scenario run at all — the rest price shafts, machines and fittings that campaign/stageRun.ts cannot apply — and 47 of 60 declared dimensions are priced, of which 46 are varied — weights.dutyMismatch is declared and priced by dispatch-rules, which covers dispatcher.weights, and is not varied on a building that declares no duty, which no scenario's building does, because a dial its building gives nothing to act on is not drawn (DECISIONS.md § D549) — and 13 are withheld from every scenario by data/price-schedule.json and varied by no configuration. A configuration differing only on an unpriced dimension is reachable at every rung, so counting it would make the budget inert.",
     "reachableChangeIds": [
       "idle-parking",
       "dispatch-rules",
@@ -27,6 +27,7 @@
       "door-sensors",
       "advance-opening",
       "zone-the-tower",
+      "landing-panels",
       "full-destination",
       "cabin-pressurisation",
       "regenerative-drive",
@@ -36,10 +37,12 @@
       "staggered-starts",
       "move-a-tenant",
       "rezone-bank",
+      "raise-a-floor",
       "faster-machines",
       "larger-cars",
       "new-car",
       "fifth-car",
+      "shaft-area",
       "larger-car-step",
       "machines-4mps",
       "machines-5mps",
@@ -49,7 +52,8 @@
     ],
     "unpricedDimensionCount": 0,
     "withheldDimensionCount": 13,
-    "declaredDimensionCount": 60
+    "declaredDimensionCount": 60,
+    "inputHash": "a5854accf77da535243635a2492eba5f730bdbc5b9abf707279d97a5e69a8364"
   },
   "scenarios": [
     {
@@ -527,18 +531,18 @@
           "stepId": null,
           "units": 15,
           "chimesSpent": 0,
-          "examined": 24,
+          "examined": 23,
           "survivors": 0,
           "survivorNames": [],
           "unjudged": 0,
-          "suppressed": 5,
-          "unbuildable": 0,
+          "suppressed": 4,
+          "unbuildable": 1,
           "dropdown": {
             "examined": 12,
             "survivors": 0
           },
           "dials": {
-            "examined": 12,
+            "examined": 11,
             "survivors": 0
           },
           "perTier": {
@@ -547,7 +551,7 @@
               "survivors": 0
             },
             "equipment": {
-              "examined": 12,
+              "examined": 11,
               "survivors": 0
             }
           },
@@ -673,20 +677,20 @@
           "stepId": null,
           "units": 15,
           "chimesSpent": 0,
-          "examined": 24,
+          "examined": 23,
           "survivors": 1,
           "survivorNames": [
             "predictive-balanced"
           ],
           "unjudged": 0,
-          "suppressed": 24,
-          "unbuildable": 0,
+          "suppressed": 23,
+          "unbuildable": 1,
           "dropdown": {
             "examined": 12,
             "survivors": 1
           },
           "dials": {
-            "examined": 12,
+            "examined": 11,
             "survivors": 0
           },
           "perTier": {
@@ -695,7 +699,7 @@
               "survivors": 1
             },
             "equipment": {
-              "examined": 4,
+              "examined": 3,
               "survivors": 0
             }
           },
@@ -866,18 +870,18 @@
           "stepId": "equipment-rung",
           "units": 24,
           "chimesSpent": 9,
-          "examined": 24,
+          "examined": 23,
           "survivors": 0,
           "survivorNames": [],
           "unjudged": 0,
           "suppressed": 4,
-          "unbuildable": 0,
+          "unbuildable": 1,
           "dropdown": {
             "examined": 12,
             "survivors": 0
           },
           "dials": {
-            "examined": 12,
+            "examined": 11,
             "survivors": 0
           },
           "perTier": {
@@ -886,7 +890,7 @@
               "survivors": 0
             },
             "equipment": {
-              "examined": 10,
+              "examined": 9,
               "survivors": 0
             }
           },

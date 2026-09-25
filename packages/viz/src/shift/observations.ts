@@ -75,6 +75,10 @@ export function shiftObservationsOf(live: LiveObservations): Observations {
     // it in the same pass as `arrived` and `abandoned`, which is what stops one sheet holding two
     // answers to *how many did this building turn away* — issue #288, § D265, § D266.
     turnedAway: live.turnedAway,
+    // The accounting's other two parts, copied like `turnedAway` and derived nowhere else — see
+    // `Observations.standing`. `boarded − carried` is every leg in a car at the instant.
+    standing: live.waitingNow,
+    aboard: Math.max(0, live.boarded - live.carried),
     horizonS: live.horizonS,
     // `0` when nobody has arrived, for `minutePct`'s reason one case up: a goal is a comparison
     // and needs a number, and under the wake-up gate the value is never displayed and never

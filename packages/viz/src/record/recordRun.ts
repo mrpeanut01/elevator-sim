@@ -51,6 +51,7 @@ import {
   type Car,
   type CarMotion,
   type Direction,
+  type GeneratedPassenger,
   type PassengerRecord,
   type ResolvedBuilding,
   type ResolvedCar,
@@ -380,7 +381,12 @@ function describeRun(
   for (const journey of result.undelivered) {
     if (journey.structuralRefusal !== undefined) refusals.set(`${journey.journeyId}#${String(journey.legIndex)}`, journey.structuralRefusal);
   }
-  const legs = describeLegs(result.record.passengers, refusals);
+  /*
+   * Version 16, GitHub issue #605: the generator's own person behind each first leg, so a leg whose
+   * lift ride began after an escalator can say where and when the journey began.
+   */
+  const generated = new Map(result.trace.passengers.map((passenger) => [passenger.id, passenger] as const));
+  const legs = describeLegs(result.record.passengers, refusals, generated);
 
   const recording: {
     -readonly [K in keyof VizRecording]: VizRecording[K];
@@ -684,6 +690,7 @@ function loadSeries(result: SimulationResult): ReadonlyMap<string, CarLoadSeries
 function describeLegs(
   passengers: readonly PassengerRecord[],
   refusals: ReadonlyMap<string, string> = new Map(),
+  generated: ReadonlyMap<string, GeneratedPassenger> = new Map(),
 ): readonly VizLeg[] {
   const legs = passengers.map((passenger): VizLeg => {
     const leg: {
@@ -707,6 +714,19 @@ function describeLegs(
     if (passenger.credentialGroup !== undefined) leg.credentialGroup = passenger.credentialGroup;
     // Absent on every leg the building did not turn away, by the same rule the five above keep.
     if (passenger.refusedAt !== undefined) leg.refusedAt = passenger.refusedAt;
+    /*
+     * Version 16, GitHub issue #605, § D1075: the journey's own arrival, origin and destination, on a
+     * first leg and only where the route's escalator made them differ from the leg's. Absent
+     * everywhere else, so a building with no transport mode records what version 15 recorded.
+     */
+    const person = passenger.legIndex === 0 ? generated.get(passenger.passengerId) : undefined;
+    if (person !== undefined) {
+      if (person.arrivalTimeS !== passenger.arrivedAt) leg.journeyStartedAt = person.arrivalTimeS;
+      if (person.originFloorId !== passenger.originFloorId) leg.journeyOriginFloorId = person.originFloorId;
+      if (person.finalDestinationFloorId !== passenger.finalDestinationFloorId) {
+        leg.journeyDestinationFloorId = person.finalDestinationFloorId;
+      }
+    }
     // Version 12: joined by journey and leg index, absent on every leg `core` did not name.
     const structural = refusals.get(`${passenger.journeyId}#${String(passenger.legIndex)}`);
     if (structural !== undefined) leg.structuralRefusal = structural;

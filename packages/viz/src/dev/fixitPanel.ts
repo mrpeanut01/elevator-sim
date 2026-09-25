@@ -83,20 +83,28 @@ import {
   fixitPlanRefusalOf,
   fixitRunPlanOf,
   measuredOf,
-  morningReadingOf,
   standingParkingOf,
   topFloorRaiseCeilingOf,
   zoneOverlapCeilingOf,
 } from '../fixit/run.js';
 import { DEFAULT_DOOR_TARGET, mountFixitFamilies } from '../everyday/fixitFamilies.js';
-import { FIXIT_SCREEN_COPY, fixitParkingRow, fixitVerdictContextOf } from '../everyday/fixitScreenModel.js';
+import {
+  FIXIT_SCREEN_COPY,
+  fixitDiagnosisView,
+  fixitParkingRow,
+  fixitVerdictContextOf,
+} from '../everyday/fixitScreenModel.js';
 import { editorInputsOf, withPrunedDials } from '../fixit/editorInputs.js';
 import type { EditorParkingStrategy, FixitCase, FixitCases, FixitState } from '../fixit/types.js';
 import type { PriceSchedule } from '../pricing/types.js';
 import type { VizRecording } from '../contract/types.js';
 
 import { createOffThreadRunner } from './offThreadRuns.js';
-import { createFixitJudge, pressThroughTheJudge } from '../fixit/judge.js';
+import { createFixitJudge, pressThroughTheJudge, progressLineOf, type MorningProgress } from '../fixit/judge.js';
+import { shippedAsBuiltMorningsOf } from '../fixit/asBuiltMornings.js';
+import { routeCensusOf } from '../fixit/routeCensus.js';
+import { diagnosisShownSetOf, progressWithDiagnosisShown } from '../everyday/profile.js';
+import { everydayProfileStore } from '../everyday/profileStore.js';
 import { heldReasonOf, isOffered } from '../fixit/held.js';
 import { createOffThreadMornings, morningWorkerCountOf, type MorningWorkerLike } from './offThreadMornings.js';
 import type { ShiftWorkerLike } from './shiftRunner.js';
@@ -140,6 +148,8 @@ interface CaseSession {
   verdictState: FixitState | undefined;
   /** The diagnosed repair's own run on the case seed, asked for only after a fixed verdict — § D1011. */
   witness: VizRecording | undefined;
+  /** *Show the diagnosis* pressed in this sitting — § D1120 clause 1, the Everyday screen's rule. */
+  asked: boolean;
 }
 
 /*
@@ -200,6 +210,8 @@ function scheduleNow(): PriceSchedule {
       spawn: host.spawnMorningWorker,
       workers: morningWorkerCountOf(typeof navigator === 'undefined' ? undefined : navigator.hardwareConcurrency),
     }),
+    /* § D1120 clause 4: the as-built mornings ship with the build. */
+    { shipped: shippedAsBuiltMorningsOf },
   );
 
   /**
@@ -216,6 +228,8 @@ function scheduleNow(): PriceSchedule {
   let runFailure: string | undefined;
   /** The letter's morning cleared and the other mornings are running — § D1020. */
   let checking = false;
+  /** How far the running check has got — § D1120 clause 4, a count and nothing else. */
+  let checkProgress: MorningProgress | undefined;
 
   const sessionOf = (entry: FixitCase): CaseSession => {
     let session = sessions.get(entry.id);
@@ -228,6 +242,7 @@ function scheduleNow(): PriceSchedule {
         doorTarget: DEFAULT_DOOR_TARGET,
         verdictState: undefined,
         witness: undefined,
+        asked: false,
       };
       sessions.set(entry.id, session);
     }
@@ -457,10 +472,7 @@ function scheduleNow(): PriceSchedule {
                 }),
               ),
         ),
-        card([
-          el(doc, 'p', { text: entry.diagnosis.text, style: { margin: '0 0 0.5rem', 'font-weight': '600' } }),
-          el(doc, 'p', { text: entry.diagnosis.reasoning, style: { color: MUTED, margin: '0' } }),
-        ]),
+        diagnosisCard(entry, session),
         /*
          * The repair menu and the standing extras stood here as toggles. They retired on
          * [§ D1020](../../../../DECISIONS.md)'s commit, with the Everyday screen's, under § D706
@@ -520,8 +532,57 @@ function scheduleNow(): PriceSchedule {
             ]
           : []),
         ...(session.outcome === undefined ? [] : [outcomeCard(session.outcome)]),
+        /* § D1120 clause 4: the live count, and nothing pooled beside it. */
+        ...(checking && checkProgress !== undefined && session.outcome?.kind === 'checking'
+          ? [el(doc, 'p', { className: 'fixit-check-count', text: progressLineOf(checkProgress), style: { color: MUTED } })]
+          : []),
       ],
     });
+  }
+
+  /**
+   * The diagnosis — withheld until asked, since [§ D1120](../../../../DECISIONS.md) clause 1, in the
+   * words `fixitScreenModel.ts#fixitDiagnosisView` gives the Everyday screen. The press records the
+   * case in the same kept set the Everyday screen's row mark reads, so looking it up here is not a way
+   * round the mark.
+   */
+  function diagnosisCard(entry: FixitCase, session: CaseSession): HTMLElement {
+    const view = fixitDiagnosisView({
+      entry,
+      schedule: scheduleNow(),
+      asked: session.asked || diagnosisShownSetOf(everydayProfileStore().progress()).has(entry.id),
+      census: routeCensusOf(entry.id),
+      explained:
+        session.fixed &&
+        !verdictIsStale(session.verdictState ?? emptyFixitState(), session.state) &&
+        session.outcome?.kind === 'fixed' &&
+        session.outcome.attribution === 'diagnosis',
+    });
+    const children: HTMLElement[] = [];
+    if (view.text !== undefined) {
+      children.push(el(doc, 'p', { className: 'fixit-diagnosis-text', text: view.text, style: { margin: '0 0 0.5rem', 'font-weight': '600' } }));
+    }
+    children.push(el(doc, 'p', { className: 'fixit-diagnosis-note', text: view.note, style: { color: MUTED, margin: '0' } }));
+    if (view.because !== undefined) {
+      children.push(el(doc, 'p', { className: 'fixit-diagnosis-because', text: view.because, style: { color: MUTED, margin: '0.5rem 0 0' } }));
+    }
+    if (view.press !== undefined) {
+      const show = el(doc, 'button', { className: 'fixit-diagnosis-show', text: view.press, style: { ...buttonStyle(false), 'margin-top': '0.5rem' } });
+      show.addEventListener('click', () => {
+        session.asked = true;
+        if (!session.fixed) {
+          const store = everydayProfileStore();
+          const next = progressWithDiagnosisShown(store.progress(), entry.id);
+          if (next !== store.progress()) store.setProgress(next);
+        }
+        render();
+      });
+      children.push(show);
+    }
+    const box = card(children);
+    box.dataset['state'] = view.state;
+    box.classList.add('fixit-diagnosis');
+    return box;
   }
 
   function card(children: readonly (Node | null)[]): HTMLElement {
@@ -804,7 +865,6 @@ function scheduleNow(): PriceSchedule {
         switches: FIXIT_RUN_SWITCHES,
         pairRunner: runner,
         judge,
-        readingOf: morningReadingOf,
         classify: (before, after, done) => {
           // GitHub issue #350: the claim the basis line will make, checked on the legs first.
           assertPairMatchesRepairs(entry, pressed, before, after);
@@ -863,6 +923,7 @@ function scheduleNow(): PriceSchedule {
           session.outcome = outcome;
           session.verdictState = pressed;
           checking = outcome.kind === 'checking';
+          checkProgress = undefined;
           if (!checking) ask = undefined;
           // The badge follows the latest verdict, in both directions — `fixit/engine.ts#fixedBadgeAfter`
           // holds the argument (docs/20 defect 16: FIXED beside a 0 % outcome card is two verdicts
@@ -870,9 +931,16 @@ function scheduleNow(): PriceSchedule {
           session.fixed = fixedBadgeAfter(outcome);
           render();
         },
+        onProgress: (progress) => {
+          checkProgress = progress;
+          const line = root.querySelector('.fixit-check-count');
+          if (line !== null) line.textContent = progressLineOf(progress);
+          else render();
+        },
         onVerdict: (outcome) => {
           ask = undefined;
           checking = false;
+          checkProgress = undefined;
           session.outcome = outcome;
           session.verdictState = pressed;
           session.fixed = fixedBadgeAfter(outcome);

@@ -116,7 +116,8 @@ import { interventionLogOf } from '../live/interventions.js';
 
 import { afterPressBeatOf, type PairVerdicts } from './afterPress.js';
 import { pressCallRowOf, type PressCallRowInput } from './callRow.js';
-import { wrinkleNoteOf, type BookedOutCar } from './bookedOut.js';
+import { dayCallRowOf, type DayCallRecord } from './dayCalls.js';
+import { wrinkleNameOf, wrinkleNoteOf, type BookedOutCar } from './bookedOut.js';
 import type { PressCounterfactual } from './counterfactual.js';
 
 import { scheduledEventFor, type CalendarPeriod } from './calendar.js';
@@ -125,6 +126,7 @@ import { reportWindowNameOf } from './reportWindow.js';
 import { contractStatus } from './contracts.js';
 import { gaveUpBesideOf, goalPlainNameOf, horizonLabelOf, readGoals, wasDisplayOf } from './goals.js';
 import { growthFactor } from './growth.js';
+import { CONTRACT_LADDER } from './ladder.js';
 import { ENDLESS_CONTRACT_ID, wasGraded } from './week.js';
 import {
   DAY_START_S,
@@ -463,7 +465,21 @@ type WeekShapedField = 'streakLine' | 'contractLine' | 'cleared' | 'forecast' | 
 /** A day of a week: types.ts's {@link DayReport} exactly, plus the discriminator. */
 export interface WeekDayReport extends DayReport, ShapedOnlyFields {
   readonly of: 'week-day';
+  /**
+   * {@link PRACTICE_NOTE} on a practice close ([§ D1138](../../../../DECISIONS.md) clause 4), and
+   * absent on the close that banked. The report screens draw it under the verdict.
+   */
+  readonly practiceNote?: string | undefined;
 }
+
+/**
+ * **What a practice sheet says about itself** — [§ D1138](../../../../DECISIONS.md) clause 4. The
+ * first closed attempt at a day banks; this run is a later one. No digit, and nothing about which
+ * answer the player should have given.
+ */
+export const PRACTICE_NOTE =
+  'Practice. Your week keeps your first attempt at this day, so this run banks nothing: the streak, ' +
+  'the clean days and the day’s record stand as that attempt left them.';
 
 /**
  * One run, belonging to no week — the same figures, the same diagnosis, the same levers and the
@@ -692,6 +708,21 @@ export interface DayReportInput {
    */
   readonly pressCall?: Omit<PressCallRowInput, 'interventions'> | undefined;
   /**
+   * **This close is practice** — [§ D1138](../../../../DECISIONS.md) clause 4. The day had already
+   * closed once, so `shift/week.ts#closeDay` banked nothing from this run, and the sheet says so
+   * in its streak line and its meta block rather than congratulating or resetting a streak this
+   * run did not touch. Passed by `dev/main.ts#closeShift`, which knows the week before the close;
+   * `undefined` is `false`, the first close.
+   */
+  readonly practice?: boolean | undefined;
+  /**
+   * The ordinary day's calls, in the order they were raised — [§ D1138](../../../../DECISIONS.md)
+   * clause 3. One row each after § D1029's, from the three runs that admitted it
+   * (`shift/dayCalls.ts#DayCallRecord`). Passed by `dev/main.ts#closeShift` from the session that
+   * raised them; `undefined` and empty draw nothing.
+   */
+  readonly dayCalls?: readonly DayCallRecord[] | undefined;
+  /**
    * Whether this run's demand template kept its own mix of trips — `dev/state.ts#plannedDayOf`'s
    * `templateVariesMix` for the run's state. On such a run a wrinkle that asked for a mix did not
    * get one, and the header's note and tomorrow's card quote `events.ts#eventAsRun`'s account of
@@ -699,6 +730,22 @@ export interface DayReportInput {
    * is the same building on the same horizon, so it keeps the same mix. `undefined` is `false`.
    */
   readonly templateVariesMix?: boolean | undefined;
+  /**
+   * **The slope this week's building grows at**, for the forecast's *"+N % more tenants"* —
+   * [§ D1066](../../../../DECISIONS.md). `dev/state.ts#weekGrowthPerDayOf`, which is the reading the
+   * run grew its building by. `undefined` is the ladder's default slope, which is what every week
+   * with no re-derived rung grows at, so a caller that leaves it out is right wherever no rung
+   * declares one and the sentence is never left without a figure.
+   */
+  readonly growthPerDay?: number | undefined;
+  /**
+   * Whether this run is the building's whole authored day — `dev/state.ts#plannedDayOf`'s
+   * `wholeDayRun`. On such a run a mix-setting wrinkle with a placement was spliced as an episode,
+   * and the header and tomorrow's card quote the placement's note, which names the window
+   * ([§ D1057](../../../../DECISIONS.md)). Tomorrow is the same building on the same horizon.
+   * `undefined` is `false`.
+   */
+  readonly wholeDayRun?: boolean | undefined;
 }
 
 /**
@@ -720,7 +767,13 @@ export interface DayReportInput {
  * Absent on the first, because *"attempt 1"* on every sheet is noise that trains a reader to stop
  * reading the line — and the line only means anything by contrast.
  */
-function attemptLine(subject: ReportSubject, attempt: number): readonly string[] {
+function attemptLine(subject: ReportSubject, attempt: number, practice = false): readonly string[] {
+  /*
+   * § D1138 clause 4: a close of a day that had already closed banks nothing, and the identity block
+   * says so beside the attempt it was. A record-grown re-close keeps its attempt number, so it can be
+   * practice at attempt 1.
+   */
+  if (practice) return [attempt <= 1 ? 'practice at this day' : `attempt ${String(attempt)} at this day · practice`];
   if (attempt <= 1) return [];
   // *at this day* is a week's phrasing. A single run re-rolls a selection, not a Tuesday.
   const what = subject.kind === 'week-day' ? 'at this day' : 'at this selection';
@@ -742,7 +795,13 @@ function metaLinesFor(input: DayReportInput, dispatcherName: string, dayStartS: 
     `${recording.buildingName} · ${dispatcherName}`,
     `seed ${recording.seed} · ${clockRange(recording.startedAt, recording.endedAt, dayStartS)} · one replication`,
     ...(subject.kind === 'single-run' ? selectionLines(subject.selection) : []),
-    ...bookedLine(eventAsRun(input.event, input.templateVariesMix === true), subject, input.bookedOut ?? [], dayStartS),
+    ...bookedLine(
+      eventAsRun(input.event, input.templateVariesMix === true, input.wholeDayRun === true),
+      subject,
+      input.bookedOut ?? [],
+      dayStartS,
+      input.pressCall !== undefined,
+    ),
     /*
      * The rules in force, before the attempt count and well before the intervention log —
      * `docs/20` defect 2. Config, so it belongs with what was asked for; see
@@ -750,7 +809,7 @@ function metaLinesFor(input: DayReportInput, dispatcherName: string, dayStartS: 
      * An empty list prints nothing, exactly as an untouched day prints no intervention lines.
      */
     ...ruleLines(input.ruleRows ?? [], dispatcherName),
-    ...attemptLine(subject, week.attempt),
+    ...attemptLine(subject, week.attempt, input.practice === true && subject.kind === 'week-day'),
     /*
      * The intervention log, last — `docs/19` defect 10, and it is identity rather than a reading:
      * the run record is `{ seed, config, interventions[] }`, and a sheet that reproduces without
@@ -818,6 +877,7 @@ function bookedLine(
   subject: ReportSubject,
   bookedOut: readonly BookedOutCar[],
   dayStartS: SimTime,
+  calls: boolean,
 ): readonly string[] {
   if (subject.kind !== 'week-day') return [];
   // Printed on an ordinary day too. *"Nothing booked"* is an answer to the question, and a line that
@@ -830,7 +890,10 @@ function bookedLine(
   // car then gets a line of its own with the two clock times the run had — after the run, so the
   // schedule is the run's rather than a preview (`bookedOut.ts`' module docstring).
   return [
-    `${event.name} — ${wrinkleNoteOf(event, bookedOut)}`,
+    // The day's name as the brief and the Engineer rail print it — a pinned day the stage called is
+    // not headlined *An ordinary day* (the post-AI panel's seat B, defect 4). `pressCall` is the
+    // run's own answer: present exactly when `dev/state.ts#pressDayCallOf` found the call.
+    `${wrinkleNameOf(event, calls)} — ${wrinkleNoteOf(event, bookedOut)}`,
     ...bookedOut.map((car) =>
       car.backAtS === null
         ? `car ${car.carId} · out of passenger service from ${clockOf(car.awayAtS, dayStartS)}, not back before the end`
@@ -1057,6 +1120,13 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
       readings,
       input.bookedOut ?? [],
       input.pressCall,
+      input.subject.kind === 'week-day'
+        ? {
+            records: input.dayCalls ?? [],
+            gradeOf: (callObservations) =>
+              VERDICT_VOICE[verdictOf(readGoals(input.goals, callObservations))].line,
+          }
+        : undefined,
     ),
     levers: leversFor(recording, observations, summary, readings),
     smallPrint: smallPrintFor(dispatcherName, summary, dayStartS),
@@ -1085,13 +1155,26 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
   }
 
   const nextIdx = (week.dayIdx + 1) % 7;
+  const practice = input.practice === true;
   return {
     ...core,
     of: 'week-day',
-    streakLine: streakLineFor(judgement.verdict, week.streak),
+    /*
+     * § D1138 clause 4: a practice close moved no streak, so the streak sentence for this verdict
+     * would describe a change that did not happen. The practice sentence stands in its place.
+     */
+    streakLine: practice ? PRACTICE_NOTE : streakLineFor(judgement.verdict, week.streak),
+    ...(practice ? { practiceNote: PRACTICE_NOTE } : {}),
     contractLine: contractLineFor(contract, week),
     cleared: week.cleared,
-    forecast: forecastFor(input.calendar, week.day, nextIdx, input.templateVariesMix === true),
+    forecast: forecastFor(
+      input.calendar,
+      week.day,
+      nextIdx,
+      input.templateVariesMix === true,
+      input.wholeDayRun === true,
+      input.growthPerDay ?? CONTRACT_LADDER.defaultGrowthPerDay,
+    ),
     taught: taughtFor(contract, week),
     nextDayName: weekdayOf(nextIdx),
   };
@@ -1331,12 +1414,41 @@ function countsClause(observations: Observations): string {
 function clearedLede(summary: VizSummary, observations: Observations): string {
   if (summary.saturated) {
     return (
-      `Every goal met, on a day the queues never settled. ${countsClause(observations)}. The ` +
-      'backlog was still growing when the window closed, so the wait figure above is withheld ' +
-      'rather than published, and the cell says on which ground.'
+      `Every goal met, on a day the queues never settled. ${countsClause(observations)}.` +
+      `${accountClause(observations)} The backlog was still growing when the window closed, so the ` +
+      'wait figure above is withheld rather than published, and the cell says on which ground.'
     );
   }
-  return `A day it could handle. ${countsClause(observations)}.`;
+  return `A day it could handle. ${countsClause(observations)}.${accountClause(observations)}`;
+}
+
+/**
+ * **Where everybody who was not carried went** — the post-AI panel's seat D, top change 3.
+ *
+ * Every leg that arrived is in exactly one of four places when the day ends: carried, still in a car,
+ * still on a landing without having boarded, or turned away at a credential check (§ D265's fourth
+ * outcome). The lede printed the first and the arrivals, so *323 journeys of 329 offered* left six
+ * people nowhere, and the *Add a car* card then pointed at three of them — riders the building had
+ * turned away for their credential, whom no car could have carried. This names the other three
+ * places, in counts, and prints nothing when everybody was carried.
+ *
+ * *Had not boarded* rather than *were still waiting*: `VizLeg` carries no `abandonedAt`, so a rider
+ * who gave up and left is in the same count, and the words are true of both.
+ */
+function accountClause(observations: Observations): string {
+  const missing = observations.arrived - observations.carried;
+  if (missing <= 0) return '';
+  const parts = [
+    ...(observations.turnedAway === 0
+      ? []
+      : [`${String(observations.turnedAway)} ${observations.turnedAway === 1 ? 'was' : 'were'} turned away at a credential check`]),
+    ...(observations.aboard === 0
+      ? []
+      : [`${String(observations.aboard)} ${observations.aboard === 1 ? 'was' : 'were'} still in a car`]),
+    ...(observations.standing === 0 ? [] : [`${String(observations.standing)} had not boarded`]),
+  ];
+  if (parts.length === 0) return '';
+  return ` Of the ${String(missing)} not carried, ${listOf(parts)} when the day ended.`;
 }
 
 /**
@@ -1395,11 +1507,19 @@ function missedLede(
   readings: readonly GoalReading[],
 ): string {
   if (summary.saturated) {
+    /*
+     * It used to say *with N still standing when the window closed*, with N `summary.unservedCount`
+     * — legs of the window's cohort that had not boarded **when the run ended**, a different instant
+     * and a different population from the words. On the post-AI panel's seat D's Wednesday it read
+     * *0 still standing when the window closed* on a sheet whose worst wait ran on past the window
+     * and whose lever card said the backlog was still growing. The lede now says the growing backlog
+     * in the lever card's own words, and where the uncarried went through {@link accountClause}.
+     */
     return (
       `It did not cope. ${String(observations.arrived)} people asked for a lift and ` +
-      `${String(observations.carried)} got one, with ${String(summary.unservedCount)} still ` +
-      'standing when the window closed. That is a building being outrun, not a dispatcher having ' +
-      'a bad day — and it is fixable with the levers below.'
+      `${String(observations.carried)} got one, and the backlog was still growing when the window ` +
+      `closed.${accountClause(observations)} That is a building being outrun, not a dispatcher ` +
+      'having a bad day — and it is fixable with the levers below.'
     );
   }
   const unmet = readings.filter((reading) => reading.state === 'missed');
@@ -1415,8 +1535,8 @@ function missedLede(
    */
   const clause = unmet.length === 0 ? '' : ` — and ${listOf(unmet.map((reading) => `“${reading.goal.label}”`))} still went unmet`;
   return (
-    `Short of what the shift asked for. ${countsClause(observations)}${clause}. The banner below ` +
-    'is counting the same thing this sentence is.'
+    `Short of what the shift asked for. ${countsClause(observations)}${clause}.` +
+    `${accountClause(observations)} The banner below is counting the same thing this sentence is.`
   );
 }
 
@@ -1582,12 +1702,12 @@ function figuresFor(
       label: 'AWAY INSIDE A MINUTE',
       value: `${String(observations.minutePct)}%`,
       // R13: the share never travels without the count it was taken over.
-      note: `an observation, never suppressed — over ${legCount(observations.servedLegs, 'served leg')}`,
+      note: `an observation, never suppressed — over ${legCount(observations.servedLegs, 'served ride')}`,
       tone: observations.minutePct >= 75 ? 'good' : observations.minutePct >= 50 ? 'caution' : 'bad',
       axisOnly: false,
     },
     averageWaitFigure(summary),
-    worstWaitFigure(summary),
+    worstWaitFigure(observations),
     {
       id: 'deepest-queue',
       label: 'DEEPEST QUEUE',
@@ -1698,7 +1818,7 @@ export function averageWaitFigure(summary: VizSummary): ReportFigure {
     label: 'AVERAGE WAIT',
     value: `${summary.meanWaitS.toFixed(1)} s`,
     // R13 and § 7.4: a mean is not a figure without its window and its `n`.
-    note: `over ${legCount(summary.waitCount, 'leg')} in the ${reportWindowNameOf(summary.reportWindow.id)} window`,
+    note: `over ${legCount(summary.waitCount, 'ride')} in the ${reportWindowNameOf(summary.reportWindow.id)} window`,
     // The same denominator, structured, so it survives being carried off this grid. See above.
     count: summary.waitCount,
     tone: 'plain',
@@ -1819,42 +1939,43 @@ function turnedAwayClause(observations: Observations): string {
 }
 
 /**
- * The longest wait in the window, and the word that keeps it honest.
+ * The longest wait of the whole shift, and the word that keeps it honest.
  *
- * `longestWaitIsCensored` means the leg never boarded, so the number is a **lower bound** and the
- * sentence has to say *at least*. Drawing the censored and uncensored cases identically would put
- * the understatement precisely where the service is worst — `VizServiceLevel`'s own argument.
+ * `worstWaitIsCensored` means the rider had not boarded when the day ended, so the number is a
+ * **lower bound** and the sentence has to say *at least*. Drawing the censored and uncensored cases
+ * identically would put the understatement precisely where the service is worst —
+ * `VizServiceLevel`'s own argument.
  *
- * ## The window is named in the cell, not only in the small print — `docs/19` defect 3
+ * ## One worst wait on the sheet, the one the goal grades — § D1104
  *
- * This figure is `summary.serviceLevel.longestWaitS`, taken over the **reporting window**; the
- * goal row three blocks up grades `Observations.worstWaitS`, the **whole shift's** maximum. Every
- * shipped template narrows its window, so the two legitimately differ on the same sheet — 1 488 s
- * against 1 725 s on the audit's Midtown day — and the only reconciliation was the small print. A
- * reader who meets two “worst waits” four inches apart needs each labelled where it stands, so
- * the note carries the cell's own window inline and says which surface reads the whole shift.
+ * This cell used to read `summary.serviceLevel.longestWaitS`, the **reporting window's** maximum,
+ * while the goal row three blocks up graded `Observations.worstWaitS`, the **whole shift's**. Every
+ * shipped template narrows its window, so the two differed on one sheet — 1 488 s against 1 725 s on
+ * the audit's Midtown day, 178 s against 181 s on the post-AI panel's seat B's St Jude day — and
+ * `docs/19` defect 3's repair labelled each where it stood. The newcomer read two numbers anyway.
+ * The cell now reads the goal's own fold, rounded the goal's own way, so the two cannot differ; the
+ * window's worst is not published a second time. `honesty/agreement.ts`'s `worst-wait` pair holds it.
  */
-function worstWaitFigure(summary: VizSummary): ReportFigure {
-  const { longestWaitS, longestWaitIsCensored } = summary.serviceLevel;
-  if (longestWaitS === null) {
+function worstWaitFigure(observations: Observations): ReportFigure {
+  if (observations.arrived === 0) {
     return {
       id: 'worst-wait',
       label: 'WORST WAIT',
       value: NOT_RECORDED,
-      note: 'the reporting window held no arrivals',
+      note: 'nobody called a lift',
       tone: 'plain',
       axisOnly: false,
     };
   }
-  const windowClause = `the ${reportWindowNameOf(summary.reportWindow.id)} window’s worst — the goal row reads the whole shift`;
+  const shiftClause = 'the worst of the whole shift — the figure the goal row grades';
   return {
     id: 'worst-wait',
     label: 'WORST WAIT',
-    value: `${longestWaitIsCensored ? 'at least ' : ''}${longestWaitS.toFixed(0)} s`,
-    note: longestWaitIsCensored
-      ? `a rider who never boarded — a lower bound, not their wait; ${windowClause}`
-      : `one rider, and they remember it; ${windowClause}`,
-    tone: longestWaitS > LONG_WORST_WAIT_S ? 'bad' : 'plain',
+    value: `${observations.worstWaitIsCensored ? 'at least ' : ''}${observations.worstWaitS.toFixed(0)} s`,
+    note: observations.worstWaitIsCensored
+      ? `a rider who had not boarded when the day ended — a lower bound, not their wait; ${shiftClause}`
+      : `one rider, and they remember it; ${shiftClause}`,
+    tone: observations.worstWaitS > LONG_WORST_WAIT_S ? 'bad' : 'plain',
     axisOnly: false,
   };
 }
@@ -1944,7 +2065,11 @@ function energyFigures(summary: VizSummary): readonly ReportFigure[] {
         measured && energy.workPerServedLegKJ !== null
           ? `${energy.workPerServedLegKJ.toFixed(1)} kJ`
           : NOT_RECORDED,
-      note: `over ${legCount(energy.deliveredLegCount, 'delivered leg')} — a day that spends less by carrying fewer people has saved nothing`,
+      note:
+        `over ${legCount(energy.deliveredLegCount, 'delivered ride')} in the ` +
+        `${reportWindowNameOf(summary.reportWindow.id)} window — a count that small moves several-fold ` +
+        'from one day’s crowd to the next with nothing changed; a day that spends less by carrying ' +
+        'fewer people has saved nothing',
       tone: 'unranked',
       axisOnly: true,
     },
@@ -2027,6 +2152,10 @@ function diagnosisFor(
   readings: readonly GoalReading[],
   bookedOut: readonly BookedOutCar[],
   pressCall?: Omit<PressCallRowInput, 'interventions'> | undefined,
+  dayCalls?: {
+    readonly records: readonly DayCallRecord[];
+    readonly gradeOf: (observations: Observations) => string;
+  },
 ): readonly ReportDiagnosis[] {
   const at = observations.peakQueueAtS;
   const floorId = observations.peakQueueFloorId;
@@ -2149,7 +2278,24 @@ function diagnosisFor(
     pressCall === undefined
       ? undefined
       : pressCallRowOf({ ...pressCall, interventions }, (simTimeS) => clockOf(simTimeS, dayStartS));
-  return [...rows, ...(afterPress === undefined ? [] : [afterPress]), ...(callRow === undefined ? [] : [callRow])];
+  /*
+   * § D1138's rows, one per ordinary call, after § D1029's (a day has one kind or the other, never
+   * both). Graded by this sheet's grader against this sheet's goals, so a row's *Shift cleared* is
+   * the banner's vocabulary; a single-run sheet grades nothing and passes none (`pairVerdictsOf`'s
+   * reason).
+   */
+  const callRows =
+    dayCalls === undefined
+      ? []
+      : dayCalls.records.map((record, index) =>
+          dayCallRowOf(record, index + 1, dayCalls.gradeOf, (simTimeS) => clockOf(simTimeS, dayStartS)),
+        );
+  return [
+    ...rows,
+    ...(afterPress === undefined ? [] : [afterPress]),
+    ...(callRow === undefined ? [] : [callRow]),
+    ...callRows,
+  ];
 }
 
 /** `1 person` / `5 people` — the diagnosis rows' cohort word. */
@@ -2283,10 +2429,10 @@ function missedGoalRowOf(
       return {
         id,
         when: wholeRun,
-        what: `The work came to ${reading.display} for each of the ${String(recording.summary.energy.deliveredLegCount)} delivered legs`,
+        what: `The work came to ${reading.display} for each of the ${String(recording.summary.energy.deliveredLegCount)} delivered rides`,
         why:
-          `The energy goal asked for ${bar} kJ or less for each delivered leg. A day that spends ` +
-          'less by carrying fewer people has saved nothing, which is why the legs are the divisor.',
+          `The energy goal asked for ${bar} kJ or less for each delivered ride. A day that spends ` +
+          'less by carrying fewer people has saved nothing, which is why the rides are the divisor.',
         tone: 'bad',
       };
     default:
@@ -2495,9 +2641,18 @@ function leverPointersFor(
    * `campaign/judge.ts` had not done, and GitHub issue #295's F37 is the string a player read
    * because of it.
    */
-  if (summary.unservedCount > 0) {
-    const legs = summary.unservedCount;
-    outrun.push(`${String(legs)} leg${legs === 1 ? '' : 's'} never boarded at all`);
+  /*
+   * **Legs still on a landing at the end, and never the ones turned away** — the post-AI panel's
+   * seat D, D5. This read `summary.unservedCount`, which counts a leg the building **turned away at
+   * a credential check** as never boarded — it never did — so on St Jude's day 1 *Add a car* said
+   * *"Today points here: 3 legs never boarded at all"* about three riders no car could have
+   * carried, and the sheet never named them. `Observations.standing` is the landings at the end,
+   * with the refused taken out by `frame/overlay.ts#isWaitingAt`; the refused are named in the
+   * lede's account instead, where no lever points at them.
+   */
+  if (observations.standing > 0) {
+    const legs = observations.standing;
+    outrun.push(`${String(legs)} ride${legs === 1 ? '' : 's'} had not boarded when the day ended`);
   }
   if (observations.abandoned > 0) {
     /*
@@ -2638,7 +2793,10 @@ function contractLineFor(contract: ScenarioContract | undefined, week: WeekState
  * The design prints a flat *"+11% more tenants than today"*. It is 11 % of **day one**, not of
  * today, because growth is linear (`1 + 0.11 × (day − 1)`) — so on day 5 tomorrow is 7.6 % busier
  * than today, not 11 %. The true figure is computed rather than the constant repeated: a number on
- * a forecast card is a claim, and this one is checkable against `growthFactor`.
+ * a forecast card is a claim, and this one is checkable against `growthFactor`. Since
+ * [§ D1066](../../../../DECISIONS.md) the slope is the week's own (`perDay`), because a re-derived
+ * tower fills slower than the design's 0.11 and a card quoting the default over it would forecast a
+ * building the run will not build.
  *
  * ## The name is a claim too, and it was the wrong one — GitHub issue #135
  *
@@ -2657,9 +2815,15 @@ function forecastFor(
   day: number,
   nextIdx: number,
   templateVariesMix: boolean,
+  wholeDayRun: boolean,
+  perDay: number,
 ): ReportForecast {
-  const event = eventAsRun(scheduledEventFor(calendar, day + 1, nextIdx), templateVariesMix);
-  const increase = (growthFactor(day + 1) / growthFactor(day) - 1) * 100;
+  const event = eventAsRun(
+    scheduledEventFor(calendar, day + 1, nextIdx, wholeDayRun ? 'whole-day' : 'period'),
+    templateVariesMix,
+    wholeDayRun,
+  );
+  const increase = (growthFactor(day + 1, perDay) / growthFactor(day, perDay) - 1) * 100;
   return {
     name: event.name,
     note: event.note,

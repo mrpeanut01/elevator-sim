@@ -1112,6 +1112,24 @@ export interface DispatchPolicy {
    */
   adoptWeights?(weights: ReadonlyMap<string, number>): void;
 
+  /**
+   * Adopt a mid-run intervention's **whole resolved dispatcher** less the passenger model, and
+   * decide with it from this moment on — the seam behind `adopt-dispatcher`
+   * ([§ D1048](../../../../DECISIONS.md)).
+   *
+   * The kernel calls it exactly once per entry, at that entry's scheduled instant, with a config
+   * already resolved through `resolveDispatchConfig` and already checked at scheduling time to share
+   * the run's `callType` and `passengerAssignment` (and, for a bidding policy, its auction). Every
+   * stage from then on reads the new config at its decision time; the weights are pinned exactly as
+   * {@link adoptWeights} pins them, so a chooser the opening profile had stands down and none is
+   * started. Assignments already made stand: stage 5, under the **adopted** reassignment policy, is
+   * the only thing entitled to move one. `reset()` restores the opening config with the lifecycles.
+   *
+   * **Optional**, for {@link adoptWeights}' reason; a run whose log asks a policy without it to adopt
+   * says so in `warnings` and falls back to the weights alone.
+   */
+  adoptProfile?(config: ResolvedDispatchConfig): void;
+
   /** Forget every call. For reusing a policy across replications. */
   reset(): void;
 }

@@ -34,6 +34,8 @@ describe('StreamSet — required streams', () => {
       // GitHub issue #481: a journey's duty. Appended for the same reason, so the eleven above
       // keep the PCG parameters their golden vectors below pin.
       'duty',
+      // GitHub issue #601: which people a crowd reduction keeps. Appended for the same reason.
+      'thinning',
     ]);
   });
 
@@ -408,6 +410,15 @@ const GOLDEN_STREAMS: Readonly<Record<StreamName, GoldenVector>> = {
     initState: 15729102548481749012n,
     initSeq: 6038388547346923148n,
     firstDraws: [1374562018, 2748204689, 3432331392, 2500501789],
+  },
+  // GitHub issue #601, § D1076. Produced by an independent Python implementation of FNV-1a-64,
+  // SplitMix64 and `pcg_setseq_64_xsh_rr_32` written from the specifications, which reproduces the
+  // `arrivals` and `duty` rows above exactly before it was asked for this one; the twelve vectors
+  // above are the proof that adding the stream moved none of them.
+  thinning: {
+    initState: 3624780441678168225n,
+    initSeq: 14060201014912827326n,
+    firstDraws: [1582601546, 3870485798, 3833358654, 2414464927],
   },
 };
 

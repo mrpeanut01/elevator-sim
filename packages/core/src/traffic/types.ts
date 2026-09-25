@@ -1017,6 +1017,53 @@ export interface TrafficConfig {
    * its seed, and Tuesday is a copy of Monday. See {@link DayVariationConfig}.
    */
   readonly dayVariation?: DayVariationConfig | undefined;
+  /**
+   * Remove part of the crowd **from the trace this configuration would otherwise generate**,
+   * rather than generating a different crowd. GitHub issue #601, `DECISIONS.md` § D1076.
+   *
+   * Unset means the trace is exactly the one generated before this field existed, and the
+   * `thinning` stream is never consumed. See {@link CrowdThinning}.
+   */
+  readonly crowdThinning?: CrowdThinning | undefined;
+}
+
+/* -------------------------------------------------------------------------- *
+ * Crowd thinning (GitHub issue #601)
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **Fewer of the same people**, as a demand option — GitHub issue #601, `DECISIONS.md` § D1076.
+ *
+ * `keepShareByFloor[f]` is the share of the journeys whose {@link GeneratedPassenger.demandFloorId}
+ * is `f` that stay in the trace, in `[0, 1]`. A floor it does not name keeps everybody.
+ *
+ * ## Why this is not a population edit
+ *
+ * A floor's population reaches the trace through every source's rate and through the interfloor
+ * destination weights, so editing one population re-draws the whole trace: measured on the fix-it
+ * cases, removing one floor left **0** of 214, 233 and 245 untouched legs unchanged. Two arms
+ * that differ by a population edit therefore meet two different crowds, which is the thing
+ * `CLAUDE.md`'s common-random-numbers rule forbids a comparison to rest on.
+ *
+ * Thinning generates the trace the configuration describes, **then** draws one uniform per
+ * passenger in final trace order from the `thinning` stream and keeps the passenger when the draw
+ * falls under their demand floor's share. Every draw that built the trace has already been taken,
+ * so a kept passenger is the same object field for field — id, journey, batch, arrival, origin,
+ * destination, legs, mass, credential and duty. The draw is taken for every passenger, so the
+ * uniform a person gets does not depend on the shares, and two thinnings of one trace are nested:
+ * whoever a share of 0.5 keeps, a share of 0.8 keeps too.
+ *
+ * ## What it means, said rather than implied
+ *
+ * The journeys a floor's population generates are removed in proportion: that floor's arrivals,
+ * its departures and its own interfloor trips. **Visits to the floor by other floors' people are
+ * not removed, and nobody else's trips are re-weighted towards the floors that stayed**, which a
+ * re-drawn trace at the lower population would do through the interfloor weights. That is the
+ * meaning chosen: the people who stayed do exactly what they did. It is a crowd reduction and not
+ * a lower population, and a share above 1 is refused because thinning cannot add anybody.
+ */
+export interface CrowdThinning {
+  readonly keepShareByFloor: Readonly<Record<string, number>>;
 }
 
 /* -------------------------------------------------------------------------- *

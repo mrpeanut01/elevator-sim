@@ -74,14 +74,14 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { restrictedFloorIds } from '../access/zoning.js';
 import { runBatch } from '../batch/runBatch.js';
 import type { BatchResources } from '../batch/types.js';
-import { DATA_DIR, requireBuilding } from '../fixtures.test-helper.js';
+import { DATA_DIR, requireBuilding, requireDispatcher } from '../fixtures.test-helper.js';
 import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
 import { GOAL_KINDS, goalLabel } from '../scenario/goals.js';
 import type { PublishedGoalRates, PublishedScenario } from '../scenario/published.js';
 
 import type { StageReport } from './judge.js';
 import { parseCampaign, type CampaignContext } from './parse.js';
-import { runStageToVerdict } from './stageSequence.js';
+import { pressStage, stageUnitsAt } from './stagePress.js';
 import type { Campaign, CampaignStage } from './types.js';
 
 /**
@@ -184,12 +184,28 @@ describe('the headline names no goal, on every shipped dispatcher', () => {
 
   for (const profileId of SHIPPED_PROFILE_IDS) {
     it(`${profileId} — names no goal kind and no goal label`, async () => {
-      const { verdict } = await runStageToVerdict({
+      /*
+       * Through the player's press — `stagePress.ts#pressStage`, § D1129 — because the tally below
+       * certifies that a shipped dispatcher clears this stage, and a clear certified around the
+       * admission check is a clear no player can press. Every shipped profile is admitted at this
+       * stage's base rung, which is asserted rather than assumed: a refusal here fails the case.
+       */
+      const press = await pressStage({
         stage,
         published: publishedFor(stage),
-        candidateProfileId: profileId,
+        context: {
+          space: collectSearchSpace(),
+          schedule: shippedPriceSchedule(),
+          baseline: requireDispatcher(config, stage.dispatcher.startingProfileId),
+          building: requireBuilding(config, stage.building),
+          elevatorSpecs: config.elevatorSpecs,
+        },
+        move: { profile: requireDispatcher(config, profileId) },
+        budgetUnits: stageUnitsAt(stage, null),
         run: (request) => runBatch(request, resourcesFor(stage)),
       });
+      if (press.kind === 'refused') throw new Error(`${profileId} refused: ${press.admission.sentence}`);
+      const { verdict } = press.outcome;
       judged.push(profileId);
       if (verdict.cleared) clearedBy.push(profileId);
 

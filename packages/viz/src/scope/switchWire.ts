@@ -162,14 +162,16 @@ export function wireInterventionsOf(
     const change = entry.change;
     if (change.kind === 'park-cars-lobby') return { atS: entry.atS, change: { kind: 'park-cars-lobby' } };
     if (change.kind === 'spread-cars') return { atS: entry.atS, change: { kind: 'spread-cars' } };
-    if (change.kind === 'switch-dispatcher') {
+    // Both handover kinds (§ D1048): the same id and rows, and the kind kept, because it is what the
+    // server's kernel reads to decide how much of the dispatcher to hand over.
+    if (change.kind === 'switch-dispatcher' || change.kind === 'adopt-dispatcher') {
       const wire = switchWireOf(change.profile, shipped);
       if (wire === undefined) {
         throw new Error(
           `a handover to “${change.profile.name}” reached the wire, and runIdentityIssues should have refused it first`,
         );
       }
-      return { atS: entry.atS, change: { kind: 'switch-dispatcher', ...wire } };
+      return { atS: entry.atS, change: { kind: change.kind, ...wire } };
     }
     throw new Error(`an intervention of kind “${change.kind}” reached the wire, which does not carry it`);
   });

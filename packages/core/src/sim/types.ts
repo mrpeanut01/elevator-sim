@@ -57,6 +57,7 @@ import type {
   BatchSizeCurve,
   CredentialAssignment,
   CredentialGapOverride,
+  CrowdThinning,
   DutyDemandOverride,
   DayVariationConfig,
   DemandLevel,
@@ -448,6 +449,7 @@ export const INTERVENTION_KINDS = [
   'spread-cars',
   'equipment-change',
   'building-change',
+  'adopt-dispatcher',
 ] as const;
 
 /**
@@ -517,6 +519,24 @@ export function isInterventionKind(id: string): id is InterventionKind {
  * handover, which is what the report's intervention lines print. An explicit switch also pins the
  * vector: the profile's own weight-set selector and rule arms stop choosing from `atS` on, because
  * the player's hand outranks the detector — the gameplay guide's `mode: one`, entered mid-run.
+ * **It is kept exactly as it was** so every stored log and posted run that carries it replays
+ * bit-identically (invariant 5), and it is no longer what either shell's *Switch to X* press emits.
+ *
+ * `adopt-dispatcher` is that press since [§ D1048](../../../../DECISIONS.md): the rest of the run is
+ * handed to the target's **whole resolved dispatcher** except the two things a run cannot change
+ * part-way. At `atS` every bank's policy takes the target's weights, hard constraints, eligibility,
+ * the dispatch stage's timing, split, reassignment and commitment settings, the answer decision and
+ * the idle stage, resolved through the same `resolveDispatchConfig` the opening profile went
+ * through, and pins the weights exactly as `switch-dispatcher` does (the target's own chooser is
+ * not started and the opening one stands down). **The passenger model is never changed** — a target
+ * whose `dispatch.callType` or `dispatch.passengerAssignment` differs from the run's is **refused
+ * at scheduling time**, loudly, rather than half-adopted; so is a target whose bidding
+ * (`auction.aggregation` and its section) differs from the opening profile's, because that is a
+ * different controller rather than a setting of this one. What a run adopts and still cannot reach
+ * is named rather than hidden: the answer stage's car-level door timing and load threshold, and the
+ * demand model a predicted-demand park reads, are built with the cars and the predictors at
+ * construction and stay the opening profile's. `dispatch/selector.ts` § *Why only the weights
+ * switch* is the argument, narrowed for this kind to the passenger model alone.
  *
  * `answer-incident` is the campaign incident's answer (gameplay § 7.5, § 20.16), unified onto this
  * log because the dock's own copy says it is *"mechanically one instance of § 7.6"*. `atS` **is**
@@ -619,6 +639,15 @@ export type InterventionChange =
       readonly name: string;
       /** What it does to the fabric, at or after the press. The equipment arm's field exactly. */
       readonly serviceEvents: readonly ResolvedServiceEvent[];
+    }
+  | {
+      readonly kind: 'adopt-dispatcher';
+      /**
+       * The profile the rest of the run is handed to, whole and plain — `switch-dispatcher`'s field
+       * and its reason. What the kernel takes from it is the whole resolved dispatcher less the
+       * passenger model; see the docstring above.
+       */
+      readonly profile: DispatcherProfile;
     };
 
 /**
@@ -752,6 +781,17 @@ export interface SimulationConfig {
   readonly windowStartS?: number | undefined;
   /** End of the run's part of the template's period, seconds, exclusive. See {@link windowStartS}. */
   readonly windowEndS?: number | undefined;
+  /**
+   * Remove part of the crowd from the trace this configuration generates, rather than generating
+   * a different one — GitHub issue #601, `DECISIONS.md` § D1076. Handed to the generator as
+   * `TrafficConfig.crowdThinning`; see `traffic/types.ts#CrowdThinning`.
+   *
+   * On the run rather than on {@link demand} for {@link windowStartS}'s reason: it does not change
+   * what demand the building has, it changes which of the generated people this run keeps, and two
+   * runs that differ only here are the same crowd less some people. Absent means the trace is the
+   * one generated before this field existed, byte for byte.
+   */
+  readonly crowdThinning?: CrowdThinning | undefined;
   /**
    * Which window the summary is computed over.
    *

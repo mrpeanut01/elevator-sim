@@ -38,12 +38,13 @@
  * is worse — a player would learn their week's days are gone rather than that they are read-only.
  */
 
+import { dayWordsFor } from '../mode/glossary.js';
 import { HISTORY_DAYS } from '../shift/week.js';
 import type { DayOutcome, WeekState } from '../shift/types.js';
 import { weekdayOf } from '../shift/types.js';
 
 import { EM_DASH, percentFigure } from './figures.js';
-import { REPLAY_COPY, replayableDay } from './replay.js';
+import { recordOfDay, REPLAY_COPY, replayableDay } from './replay.js';
 import type { TodayRecord } from './today.js';
 import {
   WORLD_FIGURES_ABSENT,
@@ -127,6 +128,14 @@ export interface DoorScreenView {
   readonly chips: readonly DoorDayChip[];
   /** § 6.1's *One tower a day…* line, under the stepper. */
   readonly rule: string;
+  /**
+   * **What the day's own words mean, drawn under the rule** — the post-AI playability panel's
+   * newcomer seat, who met *a press*, *standing order* and *pinned crowd* on this screen with
+   * nothing saying what any of them was. Each is `mode/glossary.ts`'s one definition, chosen by
+   * `dayWordsFor` from the text this screen actually prints, so a word the door stops printing
+   * stops being defined here. Empty when the door prints none of them.
+   */
+  readonly words: readonly string[];
   readonly lede: string;
   readonly world: WorldBandView;
   readonly stepsHeading: string;
@@ -154,6 +163,12 @@ export interface DoorScreenInput {
    * its name.
    */
   readonly nameOf: (buildingId: string) => string | undefined;
+  /**
+   * The words the door's other cards print — the press-day card's heading, lede and note, which
+   * `towerChoice.ts` owns — so {@link DoorScreenView.words} is read off everything on the screen
+   * rather than off this view's half of it. Absent reads this view's own text only.
+   */
+  readonly alsoOnScreen?: readonly string[] | undefined;
 }
 
 /**
@@ -347,6 +362,16 @@ function noteFor(state: {
 }
 
 /**
+ * The line under *Run today again* — what the second attempt is, and which attempt the week keeps.
+ * Player-facing; swept by the corpus through the door adapter. It said *the one you close last*
+ * under [§ D1098](../../../../DECISIONS.md); [§ D1138](../../../../DECISIONS.md) clause 4 made the
+ * first closed attempt the one that banks, so it says that, as `shift/week.ts#closeDay` does it.
+ */
+export const RUN_TODAY_AGAIN_NOTE =
+  'Another attempt at the same day, on the same crowd and with no presses carried over. ' +
+  'It is practice: your week keeps your first attempt at this day, and this one banks nothing.';
+
+/**
  * § 3.3's primary for the selected day.
  *
  * Today is pressable and goes on to the brief. A past day inside the week is pressable too since
@@ -379,9 +404,15 @@ function primaryOf(input: DoorScreenInput, chips: readonly DoorDayChip[]): DoorP
         goes: 'tomorrow',
         again: {
           label: 'Run today again',
-          note:
-            'Another attempt at the same day, on the same crowd and with no presses carried over. ' +
-            'The week keeps the better one rather than banking both.',
+          /*
+           * **What the week keeps, said as `shift/week.ts#closeDay` does it** — wave AJ, § D1098
+           * and § D1138. This said *the week keeps the better one*, and the week did not: § D1098
+           * moved it to *the attempt you close last*, which was the arithmetic then. § D1138
+           * clause 4 then moved the arithmetic: the first closed attempt banks and a re-close is
+           * practice, because a retake after the report could otherwise bank the answer the report
+           * had just printed. The sentence follows the rule again.
+           */
+          note: RUN_TODAY_AGAIN_NOTE,
         },
       };
     }
@@ -402,7 +433,11 @@ function primaryOf(input: DoorScreenInput, chips: readonly DoorDayChip[]): DoorP
   if (chip?.day !== undefined && replayableDay(input.week, chip.day)) {
     return {
       label: 'Set up the replay',
-      note: REPLAY_COPY.doorNote(chip.day),
+      /* The promise is the record's to make — `replay.ts#replayedDayOfRecord`, § D1094. */
+      note:
+        recordOfDay(input.week, chip.day) === undefined
+          ? REPLAY_COPY.doorNoteNoRecord(chip.day)
+          : REPLAY_COPY.doorNote(chip.day),
       inert: false,
       goes: 'replay',
       again: undefined,
@@ -433,6 +468,16 @@ export function doorScreenViewOf(input: DoorScreenInput): DoorScreenView {
   const chips = chipsOf(clamped);
   const selected = chips.find((chip) => chip.offset === offset);
   const isReplay = offset !== 0;
+  const sameForEveryone = sameForEveryoneLine(input.today.crowdIsToday, input.today.crowdIsPinned);
+  const printed = [
+    DOOR_RULE,
+    input.today.lede,
+    ...DOOR_STEPS.map((step) => step.body),
+    input.today.seedLine,
+    input.today.firstSessionLine ?? '',
+    sameForEveryone,
+    ...(input.alsoOnScreen ?? []),
+  ];
   return {
     eyebrow: input.today.dayLabel,
     title: input.today.towerName,
@@ -450,6 +495,7 @@ export function doorScreenViewOf(input: DoorScreenInput): DoorScreenView {
     weekHeading: 'THE WEEK SO FAR',
     chips,
     rule: DOOR_RULE,
+    words: dayWordsFor(printed).map((entry) => entry.plain),
     lede: input.today.lede,
     world: WORLD_BAND,
     stepsHeading: 'WHAT THE JOB IS',
@@ -461,7 +507,7 @@ export function doorScreenViewOf(input: DoorScreenInput): DoorScreenView {
     },
     seedLine: input.today.seedLine,
     firstSessionLine: input.today.firstSessionLine,
-    sameForEveryone: sameForEveryoneLine(input.today.crowdIsToday, input.today.crowdIsPinned),
+    sameForEveryone,
     primary: primaryOf(clamped, chips),
   };
 }

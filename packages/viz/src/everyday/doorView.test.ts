@@ -16,9 +16,11 @@ import { describe, expect, it } from 'vitest';
 import { goalsForDay, readGoals } from '../shift/goals.js';
 import type { DayOutcome, GoalObservations, WeekState } from '../shift/types.js';
 import type { WatchRecord } from '../watch/types.js';
-import { HISTORY_DAYS, openWeek, outcomeOf } from '../shift/week.js';
+import { closeDay, HISTORY_DAYS, openWeek, outcomeOf } from '../shift/week.js';
 
-import { DAY_OFFSET_MIN, doorScreenViewOf, DOOR_STEPS, sameForEveryoneLine } from './doorView.js';
+import { GLOSSARY_TERMS } from '../mode/glossary.js';
+import { DAY_OFFSET_MIN, doorScreenViewOf, DOOR_STEPS, RUN_TODAY_AGAIN_NOTE, sameForEveryoneLine } from './doorView.js';
+import { PRESS_DAY_CHOICE_COPY } from './towerChoice.js';
 import { EM_DASH } from './figures.js';
 import type { TodayRecord } from './today.js';
 
@@ -68,6 +70,7 @@ const TODAY: TodayRecord = {
   towerName: 'Chancery House',
   lede: 'Fourteen floors and three lifts.',
   wrinkle: { id: 'ordinary', name: 'An ordinary day', note: 'Nothing booked.' } as TodayRecord['wrinkle'],
+  wrinkleName: 'An ordinary day',
   wrinkleNote: 'Nothing booked.',
   outOfService: undefined,
   facts: [],
@@ -80,6 +83,7 @@ const TODAY: TodayRecord = {
   dayLength: undefined,
   driver: 'Steady hand',
   driverHeld: undefined,
+  wayThrough: undefined,
 };
 
 /** Building names by id, as the shipped documents carry them — the fixture for `nameOf` (GitHub issue #599). */
@@ -215,6 +219,25 @@ describe('the § 3.3 primary, and the replay a past day earns — § D517', () =
     expect(view.primary.again?.note).toMatch(/no presses carried over/);
   });
 
+  it('says which attempt the week keeps, and it is the one closeDay keeps (§ D1098, § D1138)', () => {
+    /*
+     * The post-AI panel's seat A: *Run today again* said *the week keeps the better one*, and Friday
+     * kept 35 % over 36 %. The week is asked rather than described: close a day at one figure,
+     * re-close it at another, and read what the history holds. Since § D1138 it holds the first.
+     */
+    const first = { ...closedDay(5), minutePct: 36 };
+    const second = { ...closedDay(5), minutePct: 35 };
+    const week = closeDay(closeDay(weekWith(5, []), first), second);
+    expect(week.history.at(-1)?.minutePct, 'closeDay kept the first attempt, so the note must say so').toBe(36);
+
+    const note = viewAt(0, true).primary.again?.note ?? '';
+    expect(note).toBe(RUN_TODAY_AGAIN_NOTE);
+    expect(note).not.toMatch(/better one/u);
+    expect(note).not.toMatch(/close last/u);
+    expect(note).toMatch(/practice/u);
+    expect(note).toMatch(/first attempt/u);
+  });
+
   it('reads a closed today off the week as well as off the sitting — a reload keeps the day, not the run', () => {
     const banked = weekWith(5, [closedDay(1), closedDay(2), closedDay(3), closedDay(4), closedDay(5)]);
     const view = viewAt(0, false, banked);
@@ -348,4 +371,38 @@ describe('the rest of § 6.1', () => {
     expect(rule).toContain('unless you are on one of the days a press decides');
     expect(rule).not.toContain('unless you choose');
   });
+
+  /*
+   * The post-AI playability panel's newcomer seat met *a press*, *standing order* and *pinned
+   * crowd* on this screen with nothing saying what they were. The door now defines each under its
+   * rule, from `mode/glossary.ts` by reference, and only the ones it prints.
+   */
+  it('defines the day’s own words it prints, by the glossary’s own sentence, and no others', () => {
+    const plainOf = (id: string): string => {
+      const found = GLOSSARY_TERMS.find((entry) => entry.id === id);
+      if (found === undefined) throw new Error(`no glossary term ${id}`);
+      return found.plain;
+    };
+    /* An ordinary door prints *a press decides* in its rule and nothing about a pinned crowd. */
+    const ordinary = viewAt(0, false).words;
+    expect(ordinary[0]).toBe(plainOf('press'));
+    expect(ordinary).not.toContain(plainOf('pinned-crowd'));
+    expect(ordinary).not.toContain(plainOf('standing-order'));
+
+    /* A pinned day's door names its pinned day, and the press-day card names the standing order. */
+    const pinned = doorScreenViewOf({
+      week: weekWith(1, []),
+      today: { ...TODAY, day: 1, crowdIsToday: false, crowdIsPinned: true },
+      dayOffset: 0,
+      dayClosed: false,
+      nameOf: NAME_OF,
+      alsoOnScreen: [PRESS_DAY_CHOICE_COPY.heading, PRESS_DAY_CHOICE_COPY.ledeBefore],
+    }).words;
+    expect(pinned).toEqual([plainOf('press'), plainOf('standing-order'), plainOf('pinned-crowd')]);
+    /* Each definition names the word it defines, so a line read alone still says what it is about. */
+    expect(pinned[0]).toMatch(/^A press is/u);
+    expect(pinned[1]).toMatch(/^A standing order is/u);
+    expect(pinned[2]).toMatch(/^A pinned crowd is/u);
+  });
 });
+

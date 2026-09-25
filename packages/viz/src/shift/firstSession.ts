@@ -55,6 +55,7 @@
 
 import { Pcg32, deriveStreamSeed } from '@elevator-sim/core/browser';
 
+import { contractById } from './contracts.js';
 import { admittedPressDayIds, pressDayFor } from './ladder.js';
 import { LEGIBILITY_SWEEP } from './legibility.js';
 import type { WeekState } from './types.js';
@@ -313,4 +314,44 @@ export function isDealtPinnedDay(contractId: string, seed: bigint, daySeed: bigi
     FIRST_DAY_CONTRACT_IDS.includes(contractId) &&
     firstSessionContractFor(daySeed) === contractId
   );
+}
+
+/**
+ * **Whether a fresh device's address asks for anything the date does not already deal** — wave AJ,
+ * [§ D1096](../../../../DECISIONS.md), the post-AI panel's seat A, defect 3.
+ *
+ * `dev/main.ts`'s boot dealt a first session its pinned day only when the address carried no
+ * `?building=`, and handed the crowd to the address whenever it carried `?seed=`. Both were read as
+ * the reader's choice, and the address this page writes on a Scenario day is
+ * `?building=<the day's tower>&seed=<the date>` — so a newcomer who opened a link a player had
+ * copied on a later day of the same date got the date's crowd on the date's tower, with no pin, no
+ * call and no *"the pinned crowd"* on the brief, where the same newcomer at `/` got the pinned day.
+ * The address said nothing the date had not said; it was read as if it had.
+ *
+ * So the address is asked what it adds:
+ *
+ * - `seed` is the reader's crowd only when it is **not** the date's own (`daySeed`) and not the pin
+ *   of the day the date deals. Either one written back into an address is the day's, and a crowd
+ *   the date deals is not a choice: the second is the address this page writes on the pinned day
+ *   itself, so a newcomer handed it lands on the same pinned day, standing order and all.
+ * - `building` is the reader's tower only when it is **not** the tower the date's draw deals, or
+ *   when it comes with a crowd of the reader's own — a tower named beside another crowd is a run
+ *   the link describes, which the draw may not overrule by dealing some other tower off that crowd.
+ *
+ * The answer: `deal` is whether the boot deals a first day at all, and `crowdFromAddress` is what
+ * `dev/state.ts#withFirstSession` is told. A bare address, and one that only restates the date,
+ * deal the pinned day; `?seed=` alone deals on the reader's crowd as § D1047 ruled; a tower the date
+ * did not deal is the reader's, and opens as it always did. `null` fields are absent from the
+ * address, and a `seed` is the parsed value `deepLinkStateOf` would honour.
+ */
+export function firstDayDealOf(
+  address: { readonly building: string | null; readonly seed: bigint | null },
+  daySeed: bigint,
+): { readonly deal: boolean; readonly crowdFromAddress: boolean } {
+  const dealt = firstSessionDayFor(daySeed);
+  const crowdFromAddress = address.seed !== null && address.seed !== daySeed && address.seed !== dealt.seed;
+  if (address.building === null) return { deal: true, crowdFromAddress };
+  const dealtTower = contractById(dealt.contractId)?.buildingId;
+  if (address.building === dealtTower && !crowdFromAddress) return { deal: true, crowdFromAddress: false };
+  return { deal: false, crowdFromAddress };
 }

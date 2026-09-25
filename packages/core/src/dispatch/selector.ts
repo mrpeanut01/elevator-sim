@@ -72,6 +72,19 @@
  * not comparable with *themselves*. The acceptance question for Phase 6c
  * (`DECISIONS.md` § D126) asks for selection among *the cost-term weight vectors already
  * shipped*, and that is exactly the surface this file switches.
+ *
+ * **Amended for the player's handover, and for nothing else here** —
+ * [§ D1048](../../../../DECISIONS.md). This argument was also the reason the player's mid-day
+ * *Switch to X* press switched the weights alone, and there it made the button's label false: a
+ * dispatcher is its weights *and* its hard constraints, eligibility, dispatch-stage and answer
+ * settings, and handing over the vector left the opening profile's rules in force under the new
+ * name. Its load-bearing half is the **passenger model**, and the other stages are read per decision
+ * off the resolved config and never enter `comparabilityOf`. So the player's press is now
+ * `adopt-dispatcher`, which hands over everything but the passenger model (and the bidding, which is
+ * a different policy object rather than a setting), and **refuses** a target that would change
+ * either. The selector and the rule arms in this file are untouched: they still choose among weight
+ * vectors alone, for the Phase 6c reason above, and `switch-dispatcher` still means the weights alone
+ * for every record that carries it.
  */
 
 import {

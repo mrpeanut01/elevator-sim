@@ -33,6 +33,10 @@ import type { FixitCase, FixitState } from '../fixit/types.js';
 import { actionBarFor } from './actionBar.js';
 import {
   buildingLineOf,
+  checkStoppedLineOf,
+  diagnosisHintTextOf,
+  diagnosisOpenedBecauseOf,
+  fixitDiagnosisView,
   FIXIT_SCREEN_COPY as COPY,
   decodeFamilyValue,
   encodeFamilyValue,
@@ -606,5 +610,121 @@ describe('the five families, worded', () => {
     );
     expect(view.sides[0]!.options[0]?.label).toBe(COPY.doorStanding);
     expect(view.sides[1]!.options[0]?.label).toBe(`${COPY.dialStanding} — 3.0 s`);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * [§ D1120](../../../../DECISIONS.md) — the diagnosis withheld until asked, the row's mark, and the
+ * press that stops a check
+ * -------------------------------------------------------------------------- */
+
+/** A case whose diagnosed repair moves idle parking — priced under *Where idle cars wait*. */
+function diagnosedCase(id: string): FixitCase {
+  return {
+    ...caseOf(id),
+    repairs: [
+      {
+        id: 'spread',
+        role: 'diagnosed',
+        name: 'Spread the idle cars',
+        costUnits: 0,
+        effect: 'The cars wait apart.',
+        patch: { dispatcher: { idle: { parkingStrategy: 'zone-center' } } },
+      },
+    ],
+  };
+}
+
+describe('the diagnosis card — § D1120 clause 1', () => {
+  const schedule = shippedPriceSchedule();
+
+  it('withholds the diagnosis on a case’s first render: a free press, and no word of the cause', () => {
+    const entry = diagnosedCase('a');
+    const view = fixitDiagnosisView({ entry, schedule, asked: false, census: { routes: 20, clearing: 5 }, explained: false });
+    expect(view.state).toBe('withheld');
+    expect(view.press).toBe(COPY.diagnosisShow);
+    expect(view.text).toBeUndefined();
+    expect(view.because).toBeUndefined();
+    const drawn = [view.eyebrow, view.note, view.press].join(' ');
+    expect(drawn).not.toContain(entry.diagnosis.text);
+    expect(drawn).not.toContain(entry.diagnosis.reasoning);
+    expect(drawn).not.toContain('Where idle cars wait');
+    /* Free, and said to be free — `docs/38` § 2.4: chimes buy modifiers, never access. */
+    expect(COPY.diagnosisWithheld).toContain('costs nothing');
+    expect(COPY.diagnosisWithheld).not.toMatch(/chime/i);
+  });
+
+  it('shows, when asked, the measured witness — the priced row its diagnosed repair buys — and no mechanism', () => {
+    const entry = diagnosedCase('a');
+    const view = fixitDiagnosisView({ entry, schedule, asked: true, census: { routes: 20, clearing: 5 }, explained: false });
+    expect(view.state).toBe('shown');
+    expect(view.text).toBe(`${COPY.diagnosisHintLead} “Where idle cars wait”.`);
+    expect(diagnosisHintTextOf(entry, schedule)).toBe(view.text);
+    expect(view.note).toBe(COPY.diagnosisHintNote);
+    expect(`${view.text ?? ''} ${view.note}`).not.toContain(entry.diagnosis.text);
+    expect(`${view.text ?? ''} ${view.note}`).not.toContain(entry.diagnosis.reasoning);
+    expect(view.press).toBeUndefined();
+    expect(view.because).toBeUndefined();
+  });
+
+  it('opens a case whose census shows fewer than two clearing routes, and says why with the census’s counts', () => {
+    const entry = diagnosedCase('a');
+    const view = fixitDiagnosisView({ entry, schedule, asked: false, census: { routes: 34, clearing: 1 }, explained: false });
+    expect(view.state).toBe('shown');
+    expect(view.because).toBe(diagnosisOpenedBecauseOf({ routes: 34, clearing: 1 }));
+    expect(view.because).toContain('34 single changes tried');
+    expect(view.because).toContain('only one');
+    /* Two is a search, and stays withheld. */
+    expect(fixitDiagnosisView({ entry, schedule, asked: false, census: { routes: 34, clearing: 2 }, explained: false }).state).toBe(
+      'withheld',
+    );
+    /* A case the census does not cover is withheld like any other. */
+    expect(fixitDiagnosisView({ entry, schedule, asked: false, census: undefined, explained: false }).state).toBe('withheld');
+  });
+
+  it('prints the authored diagnosis only once a fixed verdict stands on the diagnosed repair’s own run', () => {
+    const entry = diagnosedCase('a');
+    const view = fixitDiagnosisView({ entry, schedule, asked: false, census: undefined, explained: true });
+    expect(view.state).toBe('explained');
+    expect(view.text).toBe(entry.diagnosis.text);
+    expect(view.note).toBe(entry.diagnosis.reasoning);
+  });
+
+  it('marks the row: on your own, with the diagnosis, or diagnosis shown — and nothing on a held or untouched case', () => {
+    const cases = [caseOf('own'), caseOf('helped'), caseOf('asked'), caseOf('untouched'), caseOf('held')];
+    const model = fixitCaseRailModel(
+      cases,
+      new Set(['own', 'helped', 'held']),
+      'own',
+      (entry) => entry.buildingId,
+      (id) => (id === 'held' ? 'Held back.' : undefined),
+      (id) => id === 'helped' || id === 'asked' || id === 'held',
+    );
+    expect(model.rows.map((row) => row.mark)).toEqual([
+      COPY.markOnOwn,
+      COPY.markWithDiagnosis,
+      COPY.markDiagnosisShown,
+      undefined,
+      undefined,
+    ]);
+  });
+
+  it('no longer promises a diagnosis on every case in the rail’s hint', () => {
+    expect(COPY.railHint).not.toContain('already diagnosed');
+  });
+});
+
+describe('the press that stops a check — § D1120 clause 4', () => {
+  it('gives the press back with a note saying it stops the check on the last order', () => {
+    const row = fixitBarModel(FIXIT_BAR, { ready: true, running: false, ran: true, solved: false, supersedes: true });
+    expect(row.primary.inert).toBeUndefined();
+    expect(row.note).toBe(COPY.noteSupersedes);
+    expect(fixitBarModel(FIXIT_BAR, { ready: true, running: false, ran: true, solved: false }).note).toBe(COPY.noteReady);
+  });
+
+  it('says where a stopped check stopped, and that it has no verdict', () => {
+    expect(checkStoppedLineOf(23, 49)).toBe(
+      'The check on your last order stopped at 23 of 49 mornings when you ran this one, and it has no verdict.',
+    );
   });
 });

@@ -681,6 +681,34 @@ describe('the run actions', () => {
     expect(h.patches[0]?.windowStartS).toBe(0);
   });
 
+  /**
+   * **The shared day's slice is its contract's, whatever the address said** — wave AJ, § D1095, the
+   * post-AI panel's seat D, D3. `garden-apartments` has no authored whole day, so the press used to
+   * write nothing and run whatever length stood: the address's `?duration=` among them.
+   */
+  it('runs the shared day at its contract’s length, not the length the address or the Engineer left', () => {
+    const daySeed = 20260925n;
+    const sized: ViewerState = { ...base(), seed: daySeed, shiftLengthS: 300, windowStartS: 600 };
+    const h = harnessOf(sized);
+    const host = createEverydayHost({ ...h.bindings, daySeed: () => daySeed });
+    host.startRun();
+    expect(h.patches[0]).toMatchObject({ shiftLengthS: shiftLengthForContract('c1'), windowStartS: null });
+
+    /* And a state already on its contract's slice is not repainted for nothing. */
+    const onSlice: ViewerState = { ...base(), seed: daySeed, shiftLengthS: shiftLengthForContract('c1'), windowStartS: null };
+    const quiet = harnessOf(onSlice);
+    createEverydayHost({ ...quiet.bindings, daySeed: () => daySeed }).startRun();
+    expect(quiet.calls).toEqual(['startRun']);
+  });
+
+  it('leaves a crowd the address chose at the length the address chose, because the link names the whole run', () => {
+    const linked: ViewerState = { ...base(), seed: 424242n, shiftLengthS: 300, windowStartS: null };
+    const h = harnessOf(linked);
+    createEverydayHost({ ...h.bindings, daySeed: () => 20260925n }).startRun();
+    expect(h.patches.every((patch) => patch.shiftLengthS === undefined)).toBe(true);
+    expect(h.calls).toEqual(['startRun']);
+  });
+
   it('opens tomorrow onto a day of the same kind, in one merge', () => {
     // Two patches would let a render see a week advanced onto a horizon it is not running yet.
     const closed: ViewerState = {
@@ -1203,6 +1231,26 @@ describe('filing the campaign day — issue #223', () => {
       expect(host.answerIncident(atS + 10, 'leave')).toBe(CAMPAIGN_DOCK_COPY.refusedAnswered);
       expect(pressed).toHaveLength(1);
     });
+  });
+
+  it('starts every career day with no presses, not only the first one (wave AJ, § D1093)', () => {
+    /*
+     * The post-AI panel's seat A, defect 1: a spread pressed on day 1 at 08:50 was on day 2's, 3's
+     * and 4's reports as *You spread the cars across the tower*. The press appends to the log through
+     * `intervene`, which this harness does not run, so the log a stage press leaves is staged on the
+     * state directly — exactly what `dev/main.ts#interveneAt` writes.
+     */
+    const h = campaignHarness(CLEAN);
+    const host = createEverydayHost(h.bindings);
+    host.runCampaignDay('c1');
+    const spread = { atS: 1200, change: { kind: 'spread-cars' } } as unknown as ViewerState['interventions'][number];
+    h.state = { ...h.state, interventions: [spread] };
+    host.closeDay();
+    expect(towerOf(host).day).toBe(2);
+
+    host.runCampaignDay('c1');
+    expect(h.state.interventions, 'day 2 was simulated under day 1’s press').toEqual([]);
+    expect(h.patches.at(-1)?.interventions).toEqual([]);
   });
 
   it('runs the day at the length this contract is graded over, whatever the state was left at', () => {
@@ -2135,6 +2183,30 @@ describe('a rush sitting — GitHub issue #372', () => {
     /* Both drivers, opening one first — the count beside them is unchanged. */
     expect(round?.drivers).toEqual([round?.dispatcherName, handedTo.name]);
     expect(round?.interventionCount).toBe(2);
+  });
+
+  it('keys two rounds from one start alike whatever was pressed, and a moved lever apart — wave AJ, § D1099', () => {
+    /*
+     * The round list sets a pressed round beside an untouched one only when both started from the
+     * same key, so the key must ignore the presses (the thing being compared) and see everything
+     * else a round could have started from differently.
+     */
+    const h = harnessOf(base());
+    const host = createEverydayHost(h.bindings);
+    playRound(h, host);
+    host.startRush();
+    h.state = { ...h.state, recording: rush, interventions: [{ atS: 120, change: { kind: 'park-cars-lobby' } }] };
+    host.endRush(host.rush()?.holdAtS ?? 0);
+    const [untouched, pressed] = host.rush()?.rounds ?? [];
+    expect(untouched?.startKey).toBeDefined();
+    expect(pressed?.startKey).toBe(untouched?.startKey);
+
+    host.startRush();
+    h.state = { ...h.state, interventions: [], levers: { ...h.state.levers, parking: !h.state.levers.parking } };
+    host.endRush(host.rush()?.holdAtS ?? 0);
+    const moved = host.rush()?.rounds[2];
+    expect(moved?.startKey).toBeDefined();
+    expect(moved?.startKey).not.toBe(untouched?.startKey);
   });
 
   it('ends the sitting when the rush is left, because a sitting is runs from an as-shipped start', () => {

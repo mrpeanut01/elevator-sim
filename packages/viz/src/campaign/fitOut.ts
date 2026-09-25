@@ -47,10 +47,12 @@ import {
   doorCycleWithSaving,
   parseLoadDivisor,
   type BuildingConfig,
+  type CrowdThinning,
   type DispatchStageConfig,
   type DispatcherProfile,
   type ElevatorSpecs,
   type FloorConfig,
+  type TrafficProfiles,
 } from '@elevator-sim/core/browser';
 
 import type { GroupLevers } from '../authoring/dispatcherSpec.js';
@@ -446,15 +448,60 @@ function tenantMovedDown(config: BuildingConfig): BuildingConfig {
  * -------------------------------------------------------------------------- */
 
 /**
- * The arrival rate the day runs at, once the tenants have been negotiated with.
+ * **The crowd the day meets, once the tenants have been negotiated with** — the same people as the
+ * day as built, a third fewer of them. GitHub issues #601 and #603, `DECISIONS.md` § D1078.
  *
- * Takes the rate the run would otherwise have used — `dev/state.ts#baseOf`'s answer, which is the
- * pattern's if one was chosen and the building's own profile at its typical level if not — so the
- * factor is applied to a real number rather than to a reconstruction of one.
+ * `tenants` L2's *"flattens the 08:40 peak by a third"* used to multiply the rate the day was
+ * generated at, and a different rate re-draws the whole trace: the fitted day and the day as built
+ * met two unrelated crowds, so whatever the tier did was measured through a re-roll. It is now
+ * `core`'s `crowdThinning` over every floor of the building the day runs on, at the tier's factor:
+ * each journey is kept with probability `arrivalRateFactor`, which is the same expected rate by
+ * construction — thinning a Poisson process by `p` is a Poisson process at `p` times the rate — and
+ * the kept people are the as-built day's people leg for leg.
+ *
+ * Applied after the day's event rather than before it, where the rate factor sat; the law is the
+ * same product either way (a fire drill on a staggered morning is five times two-thirds of the
+ * crowd), and the event now multiplies the as-built rate so the drill's own draw is not moved by
+ * the purchase either. `undefined` at *nothing bought*, so a tower that bought no tenancy runs the
+ * config it ran before this existed.
  */
-export function fittedArrivalRate(baseRatePct: number, fit: CampaignFitOut | undefined): number {
-  if (fit === undefined || fit.arrivalRateFactor === 1) return baseRatePct;
-  return baseRatePct * fit.arrivalRateFactor;
+export function fittedCrowdThinning(
+  startTimeFloorIds: readonly string[],
+  fit: CampaignFitOut | undefined,
+): CrowdThinning | undefined {
+  if (fit === undefined || fit.arrivalRateFactor === 1 || startTimeFloorIds.length === 0) return undefined;
+  return {
+    keepShareByFloor: Object.fromEntries(startTimeFloorIds.map((floorId) => [floorId, fit.arrivalRateFactor])),
+  };
+}
+
+/**
+ * **The floors whose people keep a shared start time** — the only crowd a stagger can move. GitHub
+ * issue #603, `DECISIONS.md` § D1078.
+ *
+ * A populated floor whose traffic profile's `governingPeak` is `up-peak`: the morning arrival peak
+ * that a start time makes and a staggered start time flattens. Read off `data/traffic-profiles.json`
+ * rather than off a list of profile names, so a profile added there brings its answer with it. The
+ * shipped profiles answer *office* for both office rows and nothing else: a hotel's and a hospital's
+ * governing peak is two-way and a block of flats' is the morning down-peak, and none of those has a
+ * start time a landlord can negotiate.
+ *
+ * `tenants` L2 thins these floors and no others, and is refused where there are none
+ * (`economy.ts#shopTierState`). Measured before this existed, the tier cleared missed career days on
+ * a hotel and a hospital as readily as on an office tower, because a rate cut removes whoever is
+ * there — the fix-it swarm's universal-answer shape (§ D1001), found in the career shop.
+ */
+export function startTimeFloorIdsOf(
+  floors: readonly Pick<FloorConfig, 'id' | 'population' | 'trafficProfile'>[],
+  buildingProfileId: string,
+  profiles: TrafficProfiles,
+): readonly string[] {
+  const upPeak = new Set(
+    profiles.profiles.filter((profile) => profile.governingPeak === 'up-peak').map((profile) => profile.id),
+  );
+  return floors
+    .filter((floor) => (floor.population ?? 0) > 0 && upPeak.has(floor.trafficProfile ?? buildingProfileId))
+    .map((floor) => floor.id);
 }
 
 /* -------------------------------------------------------------------------- *

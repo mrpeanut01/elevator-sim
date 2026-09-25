@@ -186,7 +186,7 @@ export const SCENARIO_LADDER_COPY = Object.freeze({
    * ids to arrive.
    */
   openNote:
-    'Opens this stage on the Engineer surface, which is where the stages are played. Clearing it there banks no chimes and does not reach a career yet.',
+    'Opens this stage in the fix-it editor, on its own building and at the budget it opens on. The first clear of it pays chimes and a second pays nothing. A clear unlocks nothing, because nothing on this path is locked: each stage is open, or held for the reason written on it.',
   /** A stage held back. Never the word unwinnable — see the module docstring. */
   heldLead: 'Held back:',
   /*
@@ -199,6 +199,13 @@ export const SCENARIO_LADDER_COPY = Object.freeze({
    */
   heldBody:
     'nothing that was tried at this budget got through, and the dials among them were a sample rather than everything there is — so a rare way through is missed here rather than ruled out. It is on the list because it is the next step on the path, and it is not offered to play until one is found or it says outright that there is none.',
+  /**
+   * **A stage whose count names ways through that its own admission check refuses** — § D1129
+   * clause 3. The check's sentence follows it, so the reader meets the price and the budget rather
+   * than a summary of them.
+   */
+  heldRefusedBody:
+    'the ways through its count names are refused by the stage’s own admission check at the budget it opens on, so none of them is a press you could make. The first refusal:',
   /*
    * **The refusal, on every row that has a rung above its base** — § D786.
    *
@@ -214,8 +221,9 @@ export const SCENARIO_LADDER_COPY = Object.freeze({
    * **Narrowed on the commit that made the blanket claim false** — GitHub issue #579, § D911,
    * § D227. It read *"No screen in this build sells a wider budget"*, exactly true until the
    * fix-a-building screen began selling one out of the device tally. It is **still true of these
-   * ten stages**, for a reason nothing in that wave changed: they are played on the Engineer
-   * surface, which has no budget control, so there is nowhere for a bought rung to be spent.
+   * ten stages**: § D1129 moved them from the Engineer surface into the fix-it editor, and the
+   * stage page there plays every press at the base rung and draws no budget control, so there is
+   * still nowhere for a bought rung to be spent.
    * Saying *these ten* rather than *no screen* is the difference between a refusal a reader can
    * check and one that has quietly stopped being true somewhere else.
    */
@@ -232,6 +240,15 @@ export interface ScenarioLadderInput {
   /** In play order. The array's order **is** the ladder, as `Campaign.stages` already is. */
   readonly stages: readonly LadderStage[];
   readonly survivors: PublishedSurvivors;
+  /**
+   * **Why a named way through is refused by the stage's own admission check**, or `undefined` —
+   * `campaign/stagePress.ts#routeRefusalsOf`, [§ D1129](../../../../DECISIONS.md) clause 3.
+   *
+   * A stage whose count names ways through, **every one** of which the check refuses, is held with
+   * the first refusal as its reason, because offering it would advertise a route no press can make.
+   * Absent answers nothing, which is how a caller holding no search space reads the table as it is.
+   */
+  readonly refusalOf?: ((stageId: string, routeName: string) => string | undefined) | undefined;
 }
 
 /** The base rung of a published scenario — `stepId: null`, the budget it opens on. */
@@ -308,7 +325,17 @@ export function scenarioLadderOf(input: ScenarioLadderInput): readonly ScenarioL
      * play rather than a thing to hide, so it is offered and its own sentence does the refusing
      * (`survivorSentenceFor` draws `diagnosisLead` in place of the count's verdict).
      */
-    const offered = scenario.diagnosis !== null || base.survivors > 0;
+    const counted = scenario.diagnosis !== null || base.survivors > 0;
+    /*
+     * § D1129 clause 3: a count is a way through only if a press is admitted to it. The census now
+     * asks the same check, so on a table regenerated since then no named route is refused; this is
+     * for a table that has aged under a moved price, profile or stage.
+     */
+    const refusals = base.survivorNames.map((name) => input.refusalOf?.(stage.id, name));
+    const allRefused =
+      scenario.diagnosis === null && refusals.length > 0 && refusals.every((reason) => reason !== undefined);
+    const offered = counted && !allRefused;
+    const firstRefusal = refusals.find((reason) => reason !== undefined);
     out.push(
       Object.freeze({
         id: stage.id,
@@ -323,7 +350,9 @@ export function scenarioLadderOf(input: ScenarioLadderInput): readonly ScenarioL
         offer: offered ? ('offered' as const) : ('held' as const),
         heldReason: offered
           ? undefined
-          : `${SCENARIO_LADDER_COPY.heldLead} ${SCENARIO_LADDER_COPY.heldBody}`,
+          : allRefused
+            ? `${SCENARIO_LADDER_COPY.heldLead} ${SCENARIO_LADDER_COPY.heldRefusedBody} ${firstRefusal ?? ''}`.trim()
+            : `${SCENARIO_LADDER_COPY.heldLead} ${SCENARIO_LADDER_COPY.heldBody}`,
         openNote: offered ? SCENARIO_LADDER_COPY.openNote : undefined,
       }),
     );

@@ -372,7 +372,11 @@ const PINNED: readonly Pinned[] = [
   {
     id: 'every-letter-says-nine',
     before: 10,
-    after: 0,
+    /*
+     * 0 until GitHub issue #601 (§ D1076): the witness's four hundred letters were a re-drawn
+     * crowd, and are now the as-built crowd thinned on floor 1, which leaves one long wait of ten.
+     */
+    after: 1,
     figureTexts: [
       '10 of 91 journeys',
       '114 s',
@@ -455,20 +459,28 @@ const PINNED: readonly Pinned[] = [
   },
   {
     id: 'let-faster-than-the-lifts',
-    before: 32,
-    after: 1,
     /*
-     * The healthy figure's denominator is **14 journeys**, and it is small on purpose rather than
+     * Re-authored by GitHub issue #601 (§ D1076) at 7.0 % a five minutes rather than 6.8, and never
+     * by moving a bar or searching seeds. Once the staggered-starts clause thins the as-built crowd
+     * instead of re-drawing it, the letter's own morning at 6.8 read the complaint gone and the rest
+     * 11.0 points worse (`building-worse`), on a rest of fourteen journeys; 6.6 and 7.0 both hold
+     * over fifty mornings with the +3 cm/s placebo refused, and 7.0 keeps a complaint of thirty
+     * long waits where 6.6 kept seven. Was 32 → 1 at 6.8 under the re-draw.
+     */
+    before: 30,
+    after: 5,
+    /*
+     * The healthy figure's denominator is **12 journeys**, and it is small on purpose rather than
      * by accident: the scope is every journey touching the lobby, so "the rest" is only the
      * floor-to-floor traffic, which is what a 61 %-overlet office tower has least of. The engine
      * prints the denominator beside the share for exactly this reason (`figureText`'s
-     * `rest-away-pct` arm), so the player reads *92.9 % of 14* rather than a bare percentage.
+     * `rest-away-pct` arm), so the player reads *75.0 % of 12* rather than a bare percentage.
      */
     figureTexts: [
-      '32 of 349 journeys',
-      '113 s',
-      '22.3 s over 349 boarded journeys',
-      '92.9 % of 14 journeys',
+      '30 of 381 journeys',
+      '128 s',
+      '23.1 s over 381 boarded journeys',
+      '75.0 % of 12 journeys',
     ],
   },
   {
@@ -785,7 +797,6 @@ function judgedPress(entry: FixitCase, state: FixitState, subject: FixitCase = e
     switches: FIXIT_RUN_SWITCHES,
     pairRunner,
     judge: createFixitJudge(mornings),
-    readingOf: morningReadingOf,
     classify: (before: VizRecording, after: VizRecording, done) => {
       // The surfaces' own check first — GitHub issue #350 — so this vouches for the chain they run.
       assertPairMatchesRepairs(subject, state, before, after);

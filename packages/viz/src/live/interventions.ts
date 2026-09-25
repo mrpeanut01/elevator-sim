@@ -21,8 +21,12 @@
  */
 
 import {
+  aggregationOf,
   bankRangeIsFixed,
+  DISPATCH_DEFAULTS,
   isServiceRangeEvent,
+  POLICY_DEFAULTS,
+  resolveDispatchConfig,
   RULE_ACTION_WORDS,
   type DispatcherProfile,
   type InterventionChange,
@@ -70,17 +74,98 @@ export function switchDispatcherLabelOf(name: string): string {
 }
 
 /**
- * What a switch does to the player's own choosers, said out loud — review finding 3, § D227's
- * rule that a behaviour nothing states is a refusal waiting to go stale. Adoption *pins*: from
- * the stamped instant the day scores with the new dispatcher's weights alone, and any rules or
- * pattern switching the player had running stand down for the rest of the run
- * (`dispatch/policy.ts#adoptWeights`). One sentence, always true of the mechanism, carried on
- * the switch control's title so the player reads it before pressing rather than deducing it
- * from a rule that stopped firing.
+ * What a switch does, said out loud — review finding 3, § D227's rule that a behaviour nothing
+ * states is a refusal waiting to go stale, and **rewritten by [§ D1048](../../../../DECISIONS.md)**
+ * because the press now does more than it used to say.
+ *
+ * It read *"from this moment the day runs on this dispatcher’s weights alone"*, which was true of
+ * `switch-dispatcher` and made the button's own label false: *Switch to Fairness first* handed the
+ * day collective's no-turning rule and collective's reassignment with Fairness first's two weights.
+ * Both shells now emit `adopt-dispatcher`, which hands over the whole dispatcher less the landing
+ * panels and the bidding (`dispatch/policy.ts#adoptProfile`), so the sentence names what that is in
+ * the player's words: whether a car may turn round for a call, whether a call it holds can be
+ * handed on, and where an idle car waits. Two further clauses are the parts that do **not** change
+ * hands, and both are mechanisms rather than advice: an assignment already made stands
+ * (`Simulation#onIntervention`), and the player's own rules or pattern switching stand down
+ * because the adopted weights are pinned. What a particular target cannot bring with it is its
+ * row's note, {@link switchNoteOf}, rather than a clause here, because it is not true of every row.
  */
 export const SWITCH_PINS_NOTE =
-  'from this moment the day runs on this dispatcher’s weights alone — any rules or pattern ' +
+  'from this moment the day runs as this dispatcher would run it, including when a car may turn ' +
+  'round, hand a call on or park — calls already given a car keep it, and any rules or pattern ' +
   'switching stand down for the rest of the day';
+
+/**
+ * **Why a handover to this dispatcher cannot be carried at all** — [§ D1048](../../../../DECISIONS.md).
+ *
+ * Two things about a dispatcher are fixed for the whole of a run and no handover can reach them,
+ * and a row whose target differs from the day's in either is refused with the reason on it rather
+ * than offered. Before this, both destination rows were **enabled and inert**: a handover to
+ * *Destination disclosure* or *Destination dispatch* moved 0 of 14 pinned-day legs, because the
+ * run keeps the landing it opened with and a destination term reads nothing at an up-and-down
+ * button. That is § D177's inert control, drawn as pressable. `everyday/stageHandover.test.ts` is
+ * the run that pins each refusal.
+ *
+ * - **The landing panels.** `dispatch.callType` and `dispatch.passengerAssignment` decide what a
+ *   rider tells the building and whether a panel names their car — the passenger model, which
+ *   `dispatch/selector.ts` § *Why only the weights switch* holds fixed for a run so its metrics stay
+ *   comparable with themselves. A target whose pair differs from the driver's is refused.
+ * - **The bidding.** `auction.aggregation` names a different kind of controller rather than a
+ *   setting of this one, and a run cannot change controller part-way. A target that bids where the
+ *   day does not, or does not where the day does, or bids under other rules, is refused.
+ *
+ * Both compared as **data**, off the fields the engine resolves them from (invariant 7): no profile
+ * id is named here, and a saved dispatcher with a panel is refused on the same ground as a shipped
+ * one.
+ */
+export const SWITCH_NEEDS_OTHER_PANELS =
+  'cannot take over part-way through the day: it needs different landing panels from the ones ' +
+  'today opened with, and how riders call a lift is fixed for the whole day';
+
+/** The bidding refusal, where the day does not bid and the target does. See {@link SWITCH_NEEDS_OTHER_PANELS}. */
+export const SWITCH_NEEDS_BIDDING =
+  'cannot take over part-way through the day: its cars bid for every call, and bidding cannot ' +
+  'start once the day is running';
+
+/** The bidding refusal, where the day bids and the target does not, or bids another way. */
+export const SWITCH_STOPS_BIDDING =
+  'cannot take over part-way through the day: today’s cars bid for every call, and the bidding ' +
+  'cannot stop or change once the day is running';
+
+/**
+ * The refusal a handover row carries on its target's own ground, or `undefined` when a handover
+ * can reach it. See {@link SWITCH_NEEDS_OTHER_PANELS} for the two grounds.
+ */
+export function switchRefusalOf(
+  target: DispatcherProfile,
+  driving: DispatcherProfile,
+): string | undefined {
+  if (landingModelOf(target) !== landingModelOf(driving)) return SWITCH_NEEDS_OTHER_PANELS;
+  const biddingNow = biddingOf(driving);
+  const biddingThen = biddingOf(target);
+  if (biddingNow === biddingThen) return undefined;
+  return biddingNow === undefined ? SWITCH_NEEDS_BIDDING : SWITCH_STOPS_BIDDING;
+}
+
+/** The pair that decides the passenger model, with the engine's own defaults applied. */
+function landingModelOf(profile: DispatcherProfile): string {
+  return `${profile.dispatch?.callType ?? DISPATCH_DEFAULTS.callType}\u0000${
+    profile.dispatch?.passengerAssignment ?? DISPATCH_DEFAULTS.passengerAssignment
+  }`;
+}
+
+/** The auction section, canonically, or `undefined` for the central argmin — which bids nothing. */
+function biddingOf(profile: DispatcherProfile): string | undefined {
+  if (aggregationOf(profile) === POLICY_DEFAULTS.aggregation) return undefined;
+  return canonicalOf(profile.auction ?? {});
+}
+
+/** A plain object with its keys sorted — key order is authoring noise rather than a difference. */
+function canonicalOf(value: object): string {
+  return JSON.stringify(
+    Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b))),
+  );
+}
 
 /**
  * Whether handing the day to `target` would genuinely change nothing.
@@ -102,15 +187,23 @@ export const SWITCH_PINS_NOTE =
  *
  * ## The three grounds, in the order they are decided
  *
- * 1. **A handover already on the log pins the answer.** From the stamped instant the run obeys that
- *    profile's vector alone (`dispatch/policy.ts#adoptWeights`, and {@link SWITCH_PINS_NOTE} is the
- *    sentence a player reads), so nothing about the player's *later* state can make a second
- *    handover to the same profile do anything. `latest === target.id` and no vector is consulted.
- * 2. **Otherwise the vectors are compared canonically.** Key order is authoring noise rather than a
- *    difference, so both sides are serialised with their keys sorted.
- * 3. **And a live chooser is itself a difference.** On a rules or selector profile the switch also
- *    stands the chooser down for the rest of the run, which is a change even at equal base weights —
- *    so an equal vector under `selection.policy !== 'off'` is *not* a no-op.
+ * What is compared on every ground is **the whole dispatcher a handover carries** — the target
+ * resolved as `Simulation#resolveAdoption` resolves it, less what a handover holds — rather than the
+ * weight vector, which is [§ D1048](../../../../DECISIONS.md)'s correction: *Minimum estimated wait*
+ * and collective share a vector and differ by a hard constraint, and the vector check refused the
+ * one handover the brief said clears the day. Key order is authoring noise, so every side is
+ * serialised with its keys sorted, and an authored default is the default.
+ *
+ * 1. **An `adopt-dispatcher` already on the log pins the answer.** From the stamped instant the run
+ *    obeys that dispatcher (`dispatch/policy.ts#adoptProfile`, and {@link SWITCH_PINS_NOTE} is the
+ *    sentence a player reads), so a second handover changes nothing exactly when the two targets
+ *    carry the same dispatcher. No driving profile is consulted.
+ * 2. **A weights-only `switch-dispatcher` on the log** — a stored record, since no shell emits one
+ *    now — leaves the driver's stages standing under that handover's weights, and that is what is
+ *    in force.
+ * 3. **Otherwise the driver is in force, and a live chooser is itself a difference.** On a rules or
+ *    selector profile the handover also stands the chooser down for the rest of the run, which is a
+ *    change even at an equal dispatcher.
  *
  * {@link SwitchNoopInput.driving} is a thunk and not a value, which is the one shape decision in
  * this signature. Ground 1 answers without it, and deriving the driving profile means walking the
@@ -127,22 +220,103 @@ export interface SwitchNoopInput {
 }
 
 export function switchChangesNothing(input: SwitchNoopInput): boolean {
-  let latest: string | undefined;
+  let latest: InterventionChange | undefined;
   for (const entry of input.interventions) {
-    if (entry.change.kind === 'switch-dispatcher') latest = entry.change.profile.id;
+    const kind = entry.change.kind;
+    if (kind === 'switch-dispatcher' || kind === 'adopt-dispatcher') latest = entry.change;
   }
-  if (latest !== undefined) return latest === input.target.id;
+  const target = adoptedOf(input.target);
+  if (latest?.kind === 'adopt-dispatcher') return adoptedOf(latest.profile) === target;
   const driving = input.driving();
-  return (
-    vectorOf(driving.weights) === vectorOf(input.target.weights) &&
-    (driving.selection?.policy ?? 'off') === 'off'
-  );
+  /*
+   * A weights-only handover already on the log — a stored or replayed record, since no shell emits
+   * one now — leaves the driver's stages standing under that handover's weights, pinned.
+   */
+  if (latest?.kind === 'switch-dispatcher') {
+    return adoptedOf({ ...driving, weights: latest.profile.weights }) === target;
+  }
+  return adoptedOf(driving) === target && (driving.selection?.policy ?? 'off') === 'off';
 }
 
-/** A profile's vector, canonically — key order is authoring noise, not a difference. */
-function vectorOf(weights: Readonly<Record<string, number>>): string {
-  return JSON.stringify(
-    Object.fromEntries(Object.entries(weights).sort(([a], [b]) => a.localeCompare(b))),
+/**
+ * Everything an `adopt-dispatcher` hands over, canonically — the target resolved exactly as
+ * `Simulation#resolveAdoption` resolves it (its chooser off, no rows), less the fields a handover
+ * holds: the id and name, the landing pair, and the chooser. Memoised per profile object, because
+ * both shells ask on frames and the host's driving profile is itself memoised by identity.
+ *
+ * **The resolved config and not the authored one**, which is [§ D1048](../../../../DECISIONS.md)'s
+ * correction to this function. It compared weight vectors, so collective and *Minimum estimated
+ * wait* — the same `waitTime: 1`, and one hard constraint apart — were *"already running"* each
+ * other, and the stage refused the one handover the brief said clears a pinned day.
+ */
+function adoptedOf(profile: DispatcherProfile): string {
+  const known = adoptedCache.get(profile);
+  if (known !== undefined) return known;
+  const resolved = resolveDispatchConfig({
+    ...profile,
+    selection: { ...(profile.selection ?? {}), policy: 'off' },
+    rules: undefined,
+  });
+  const { callType: _callType, passengerAssignment: _assignment, ...dispatch } = resolved.dispatch;
+  const key = JSON.stringify({
+    weights: [...resolved.weights.entries()],
+    constraints: resolved.declaredHardConstraints,
+    normalization: canonicalOf(resolved.normalization),
+    dispatch: canonicalOf(dispatch),
+    eligibility: canonicalOf(resolved.eligibility),
+    answer: canonicalOf(resolved.answer),
+    idle: canonicalOf(resolved.idle),
+  });
+  adoptedCache.set(profile, key);
+  return key;
+}
+const adoptedCache = new WeakMap<DispatcherProfile, string>();
+
+/**
+ * **What a handover to this target leaves as the day opened it**, or `undefined` when nothing —
+ * [§ D1048](../../../../DECISIONS.md). Drawn as the row's note, beside an enabled button.
+ *
+ * Two parts of a dispatcher are built with the day rather than read at each decision, so an
+ * `adopt-dispatcher` takes the rest and cannot take these; `everyday/stageHandover.test.ts` pins
+ * both by a run (a handover at 0:00 to a target with either differs from picking it before the day,
+ * and to a target with neither does not):
+ *
+ * - **the answer stage's car-level half** — how long doors wait, how often they reopen, and how
+ *   full a car is before it passes a landing are set on each car when it is built
+ *   (`model/car/car.ts`), so every `answer` field but the group-level sole-car override;
+ * - **the demand forecast's settings** — the arrival model a predicted-demand park reads is built
+ *   per bank from the opening profile's `idle.predictor*` fields.
+ *
+ * Compared as data against the day's own dispatcher, so the note appears only when the target
+ * would differ there, and never names a field.
+ */
+export function switchNoteOf(target: DispatcherProfile, driving: DispatcherProfile): string | undefined {
+  const notes: string[] = [];
+  if (carLevelAnswerOf(target) !== carLevelAnswerOf(driving)) notes.push(SWITCH_KEEPS_DOORS);
+  if (forecastOf(target) !== forecastOf(driving)) notes.push(SWITCH_KEEPS_FORECAST);
+  return notes.length === 0 ? undefined : notes.join('; ');
+}
+
+/** {@link switchNoteOf}'s door half. */
+export const SWITCH_KEEPS_DOORS =
+  'the cars keep the door timing they started the day with, and the load at which a full car ' +
+  'passes a landing — both are fixed when the day starts';
+
+/** {@link switchNoteOf}'s forecast half. */
+export const SWITCH_KEEPS_FORECAST =
+  'the cars keep the forecast of where people will call from that they started the day with — ' +
+  'it is set up when the day starts';
+
+function carLevelAnswerOf(profile: DispatcherProfile): string {
+  const { allowBypassIfSoleEligibleCar: _groupLevel, ...carLevel } = profile.answer ?? {};
+  return canonicalOf(carLevel);
+}
+
+function forecastOf(profile: DispatcherProfile): string {
+  return canonicalOf(
+    Object.fromEntries(
+      Object.entries(profile.idle ?? {}).filter(([key]) => key.startsWith('predictor')),
+    ),
   );
 }
 
@@ -185,8 +359,10 @@ export function stampVerbOf(change: InterventionChange): string {
       // The rule's sentence in the past tense — one vocabulary, see `SPREAD_CARS_LABEL`.
       return SPREAD_SENTENCE.replace(/^spread /u, 'spread ');
     case 'switch-dispatcher':
+    case 'adopt-dispatcher':
       // The handoff's own worked example, verbatim in shape: `09:14 · switched to Lobby anchor`
-      // (§ 7.6). The handoff wins every disagreement about copy.
+      // (§ 7.6). The handoff wins every disagreement about copy. One past tense for both handover
+      // kinds (§ D1048): the stamp names who took over, and the pins note says how much.
       return `switched to ${change.profile.name}`;
     case 'answer-incident':
       return `answered the incident — ${change.option}`;

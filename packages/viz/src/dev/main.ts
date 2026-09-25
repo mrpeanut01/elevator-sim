@@ -66,6 +66,7 @@ import { POST_RUN_COPY } from '../everyday/postRun.js';
 import { reportSignInLink } from '../everyday/signInLink.js';
 import { provideScenarioLadderFrom } from '../everyday/scenarioLadderPort.js';
 import { provideScenarioOpen } from '../everyday/scenarioOpenPort.js';
+import { routeRefusalsOf } from '../campaign/stagePress.js';
 import { everydaySwap, onEverydaySwapProvided } from '../everyday/swap.js';
 import {
   ENGINEER_RETURN_LABEL,
@@ -153,6 +154,7 @@ import {
   switchChangesNothing,
   SWITCH_PINS_NOTE,
   switchDispatcherLabelOf,
+  switchRefusalOf,
 } from '../live/interventions.js';
 import { patternReadoutAt } from '../live/patternReadout.js';
 import {
@@ -161,6 +163,8 @@ import {
   raceLaneOf,
   raceSlotsOf,
   raceStripViewOf,
+  raceVerdictSlotAt,
+  type RaceSlots,
   type GhostPick,
 } from '../live/raceStrip.js';
 import {
@@ -222,7 +226,7 @@ import { coachWeekLines, weekKeptLine } from '../shift/weekLabel.js';
 import { weekdayOf, type DayOutcome, type WeekState } from '../shift/types.js';
 import { dailySeedAt } from '../shift/dailySeed.js';
 import { deviceNowMs } from '../shift/deviceDate.js';
-import { isDealtPinnedDay } from '../shift/firstSession.js';
+import { firstDayDealOf, isDealtPinnedDay } from '../shift/firstSession.js';
 
 import { savedProfilesOf } from '../batch/library.js';
 import { mountBatchPanel } from './batchPanel.js';
@@ -238,6 +242,8 @@ import {
 } from './data.js';
 import { mountFixitPanel } from './fixitPanel.js';
 import { createOffThreadRunner, type OffThreadRun } from './offThreadRuns.js';
+import { openDayCallSession, type DayCallSession } from './dayCallSession.js';
+import { dayCallsOffered, type DayCallAnswer, type DayCallOnStage } from '../shift/dayCalls.js';
 import { WATCHING_HEADER_CLASS, mountWatchPanel } from './watchPanel.js';
 import { chip, el, fill, fillSelect, keyedFill, setHidden, setText } from './dom.js';
 import {
@@ -296,11 +302,13 @@ import {
   drivingProfileOf,
   initialState,
   withFirstSession,
+  dayCallFactsOf,
   pressDayCallOf,
   profileById,
   plannedDayOf,
   resolvedBuildingOf,
   shiftRunConfigOf,
+  weekGrowthPerDayOf,
   tomorrowFactsOf,
   scenarioWeeksOf,
   weeksForSession,
@@ -789,6 +797,16 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * first real state change onward the address follows the run, seed included.
    */
   let urlWritable = false;
+  /**
+   * Whether the Everyday shell is showing a screen whose run the address cannot name — wave AJ,
+   * [§ D1097](../../../../DECISIONS.md). Set through `EverydayHostBindings.holdAddress`; while it is
+   * `true` the bar is bare and {@link syncUrl} writes nothing. In memory only: a reload lands on the
+   * menu whatever screen was up, and the Scenario's crowd is re-derived from the date there, so a
+   * crowd only the address was carrying (a reader's `?seed=`, a picker's pinned day) does not survive
+   * a reload taken on the fix-it screen. That is the price of the bar not naming a tower the screen
+   * is not showing, and it is paid only on that screen.
+   */
+  let addressHeld = false;
   let playback: Playback | undefined;
   let building = resources.entries[0]?.resolved;
   let lastAnnouncedMs = 0;
@@ -1594,6 +1612,120 @@ function boot(ui: Elements, resources: BrowserResources): void {
    */
   const everydayWatchRunner = createOffThreadRunner({ spawn: spawnRunWorker });
 
+  /**
+   * **The ordinary day's calls** — [§ D1138](../../../../DECISIONS.md). Its own runner, for
+   * `everydayWatchRunner`'s reason: the two alternative runs a candidate call needs must not
+   * supersede the player's shift or the rival, nor be superseded by them.
+   *
+   * The session is opened lazily, the first time the Everyday stage asks about the run it opened on
+   * ({@link dayCallOnStage}), so a run nobody plays on the daily stage costs no lookahead. It is
+   * dropped by every fresh ask ({@link runShift} with cause `'player'`), so a retake, a new day or a
+   * new tower starts with no calls answered and no rows, and it is told about every run the record
+   * grew to by a press outside a call.
+   */
+  const dayCallRunner = createOffThreadRunner({ spawn: spawnRunWorker });
+  let dayCallSession: DayCallSession | undefined;
+  /** The run a session was refused on, so the refusal is asked once rather than once a frame. */
+  let dayCallRefusedOn: VizRecording | undefined;
+
+  function closeDayCalls(): void {
+    dayCallSession?.close();
+    dayCallSession = undefined;
+    dayCallRefusedOn = undefined;
+  }
+
+  /**
+   * The next ordinary call on `recording`, for the Everyday stage — § D1138. `undefined` on every run
+   * that is not the player's own scored week day as this shell simulated it, on a pinned press day
+   * (§ D1029's single call stands there), on a whole day too costly to call on, and once the day's
+   * calls are spent.
+   */
+  function dayCallOnStage(recording: VizRecording): DayCallOnStage | undefined {
+    if (recording !== state.recording || recording !== simulatedRecording) return undefined;
+    /* A re-simulation in flight is about to replace this run, so nothing is called on it. */
+    if (shiftInFlight) return undefined;
+    if (state.playMode !== 'shift-week' || watching !== undefined) return undefined;
+    if (contractById(state.week.contractId) === undefined) return undefined;
+    if (dayCallSession === undefined) {
+      if (dayCallRefusedOn === recording || state.interventions.length > 0) return undefined;
+      const facts = dayCallFactsOf(resources, state);
+      if (facts === undefined || facts.pinned || !dayCallsOffered(facts.horizon, recording.legs.length)) {
+        dayCallRefusedOn = recording;
+        return undefined;
+      }
+      dayCallSession = openDayCallSession(
+        {
+          planWith: (extra) => {
+            try {
+              const plan = shiftRunConfigOf(resources, {
+                ...state,
+                interventions: [...state.interventions, extra],
+              });
+              return {
+                config: plan.config,
+                outOfServiceCarIds: plan.outOfServiceCarIds,
+                // The shift's own switch, so an adopted answer is the run a re-simulation would make.
+                recordDecisions: true,
+              };
+            } catch {
+              return undefined;
+            }
+          },
+          simulate: (runs, done, failed) => {
+            dayCallRunner.start({ runs, onDone: done, onFailed: failed });
+          },
+          cancel: () => {
+            dayCallRunner.cancel();
+          },
+          changed: () => {
+            renderAll();
+          },
+        },
+        { recording, bookedOut: facts.bookedOut, horizon: facts.horizon },
+      );
+    } else if (dayCallSession.recording() !== recording) {
+      /* The record grew by a press outside a call: ask on from the latest press. */
+      const pressedAtS = state.interventions.reduce((latest, entry) => Math.max(latest, entry.atS), 0);
+      dayCallSession.grew(recording, pressedAtS);
+    }
+    return dayCallSession.onStage();
+  }
+
+  /**
+   * **Answer the raised call** — § D1138. A press adopts the run the session already made for it,
+   * exactly as an intervention's re-simulation would have been adopted: the log grows by one entry,
+   * the cause is `'intervention'`, and `applyShift` asserts the crowd is the same. No simulation
+   * happens here, which is S3's *no extra runs*.
+   */
+  function answerDayCall(answer: DayCallAnswer): void {
+    const session = dayCallSession;
+    /*
+     * Only over the run the session stands on, with nothing in flight: a press made outside the call
+     * has already grown the log, and the run this call made would not carry it.
+     */
+    if (session === undefined || shiftInFlight || session.recording() !== state.recording) return;
+    const answered = session.answer(answer, (adoption) => {
+      state = { ...state, interventions: [...state.interventions, adoption.entry] };
+      runCause = 'intervention';
+      settleRecompute();
+      applyShift(adoption.recording, runStartOfDayS, state.withheld);
+      playback?.seekTo(adoption.entry.atS);
+      /*
+       * And the rival re-races the run that replaced the one it raced, as `runShift`'s own callback
+       * does after an intervention: `applyShift` dropped the old race, and a strip left waiting
+       * would be waiting for a run nobody asked for.
+       */
+      try {
+        const plan = shiftRunConfigOf(resources, state);
+        lastShiftPlan = plan;
+        scheduleGhost(plan, adoption.recording);
+      } catch {
+        /* A state `shiftRunConfigOf` refuses has no rival to race; the day itself is already adopted. */
+      }
+    });
+    if (answered) renderAll();
+  }
+
   function runChallenge(): void {
     const view = challengeView.view;
     if (view === undefined) return;
@@ -1894,17 +2026,29 @@ function boot(ui: Elements, resources: BrowserResources): void {
        * week the draw opened, and one that finds none draws again from the same date, which is
        * § D476's shape.
        */
-      else if (!new URLSearchParams(window.location.search).has('building')) {
+      else {
         /*
          * **And the day it deals is the tower's pinned day** — [§ D1047](../../../../DECISIONS.md).
-         * The pin's crowd and standing order, unless the address carried `?seed=`, whose crowd is
-         * the reader's and wins. The day's own crowd is not lost by this: the host is handed it as
-         * the crowd to put back (`initialPressDaySeedBase` below), re-derived from the date rather
-         * than kept anywhere.
+         * The pin's crowd and standing order, unless the address carried a crowd of the reader's
+         * own, which wins. The day's own crowd is not lost by this: the host is handed it as the
+         * crowd to put back (`initialPressDaySeedBase` below), re-derived from the date rather than
+         * kept anywhere.
+         *
+         * **What the address adds is asked, not whether it has keys** — wave AJ, § D1096. An
+         * address naming the date's own crowd on the date's own tower is the one this page writes on
+         * a Scenario day; read as a choice, it cost a newcomer the pinned day.
+         * `shift/firstSession.ts#firstDayDealOf` carries the argument.
          */
-        state = withFirstSession(state, resources, {
-          crowdFromAddress: new URLSearchParams(window.location.search).has('seed'),
-        });
+        const params = new URLSearchParams(window.location.search);
+        const seedText = params.get('seed');
+        const deal = firstDayDealOf(
+          {
+            building: params.get('building'),
+            seed: seedText !== null && isSeedText(seedText) ? BigInt(seedText) : null,
+          },
+          dailySeedAt(deviceNowMs()),
+        );
+        if (deal.deal) state = withFirstSession(state, resources, { crowdFromAddress: deal.crowdFromAddress });
       }
       return;
     }
@@ -3246,6 +3390,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
   let lastShiftPlan: ShiftRunConfig | undefined;
   /** What the strip geometry was last drawn for — see {@link drawRaceStrip}'s keying. */
   let lastRaceKey = '';
+  /** The slots {@link lastRaceKey}'s drawing wrote — read by the per-frame verdict. */
+  let lastRaceSlots: RaceSlots = { verdict: '', note: '', rivalName: '' };
 
   /* ---------------------------------------------------------------------- *
    * Watching somebody else's run — GAMEPLAY § 14.1, ENGINE_CONTRACT § 1.5
@@ -3783,7 +3929,9 @@ function boot(ui: Elements, resources: BrowserResources): void {
   switchButton.addEventListener('click', () => {
     if (state.recording === undefined || playback === undefined) return;
     if (switchTarget === undefined) return;
-    interveneAt(playback.simTimeS, { kind: 'switch-dispatcher', profile: switchTarget });
+    // `adopt-dispatcher` since § D1048 — the label says *Switch to X*, and only the whole
+    // dispatcher makes that true.
+    interveneAt(playback.simTimeS, { kind: 'adopt-dispatcher', profile: switchTarget });
   });
 
   /** Memo per state object — the derivation walks the whole chain and this runs per frame. */
@@ -3803,11 +3951,15 @@ function boot(ui: Elements, resources: BrowserResources): void {
   const switchWouldChangeNothing = (viewState: ViewerState): boolean => {
     if (switchTarget === undefined) return true;
     if (switchNoopCache?.forState === viewState) return switchNoopCache.noop;
-    const noop = switchChangesNothing({
-      interventions: viewState.interventions,
-      target: switchTarget,
-      driving: () => drivingProfileOf(resources, viewState),
-    });
+    // § D1048: a target whose landing panels or bidding differ from the day's cannot be handed
+    // the day at all, and the button is disabled on that ground before the no-change one is asked.
+    const noop =
+      switchRefusalOf(switchTarget, drivingProfileOf(resources, viewState)) !== undefined ||
+      switchChangesNothing({
+        interventions: viewState.interventions,
+        target: switchTarget,
+        driving: () => drivingProfileOf(resources, viewState),
+      });
     switchNoopCache = { forState: viewState, noop };
     return noop;
   };
@@ -4139,7 +4291,19 @@ function boot(ui: Elements, resources: BrowserResources): void {
        * this line runs, so handing the path over only after the opener exists is what makes *a
        * drawn stage row always has a live opener* true by construction rather than by timing.
        */
-      provideScenarioLadderFrom(loaded.campaign.stages, loaded.survivors);
+      /*
+       * With the one admission check's answer for each named way through (§ D1129 clause 3), so a
+       * stage whose census names only routes a press is refused is held with the refusal rather
+       * than offered.
+       */
+      const refusals = routeRefusalsOf(loaded.campaign.stages, {
+        space: loaded.space,
+        schedule: resources.priceSchedule,
+        profiles: resources.dispatcherProfiles.profiles,
+        buildings: resources.buildings,
+        elevatorSpecs: resources.elevatorSpecs,
+      });
+      provideScenarioLadderFrom(loaded.campaign.stages, loaded.survivors, refusals);
     })
     .catch((error: unknown) => {
       setText(ui.campaign.error, error instanceof Error ? error.message : String(error));
@@ -4257,6 +4421,17 @@ function boot(ui: Elements, resources: BrowserResources): void {
       const daySeed = dailySeedAt(deviceNowMs());
       return isDealtPinnedDay(state.week.contractId, state.seed, daySeed) ? daySeed : undefined;
     })(),
+    /* The date's own crowd, read at the press — `EverydayHostBindings.daySeed`, § D1095. */
+    daySeed: () => dailySeedAt(deviceNowMs()),
+    holdAddress: (held) => {
+      if (addressHeld === held) return;
+      addressHeld = held;
+      if (!held) {
+        syncUrl();
+        return;
+      }
+      if (window.location.search !== '') window.history.replaceState(null, '', window.location.pathname);
+    },
     /*
      * #221's read half, composed here because it is client work: `boundaries.test.ts` permits
      * exactly two modules to hold a leaderboard client and a screen would be a third. `undefined`
@@ -4547,6 +4722,15 @@ function boot(ui: Elements, resources: BrowserResources): void {
     },
     intervene: (atS, change) => {
       interveneAt(atS, change);
+    },
+    /* § D1138 — the ordinary day's calls; the three functions carry the argument. */
+    dayCallOnStage: (recording) => dayCallOnStage(recording),
+    answerDayCall: (answer) => {
+      answerDayCall(answer);
+    },
+    skipDayCalls: (called) => {
+      dayCallSession?.skip(called);
+      renderAll();
     },
     closeDay: () => {
       closeShift();
@@ -5013,7 +5197,21 @@ function boot(ui: Elements, resources: BrowserResources): void {
        */
       watching === undefined ? '' : 'watching',
     ].join('|');
-    if (key === lastRaceKey) return;
+    /*
+     * The *nobody* pick's slot is a live count, so it is written at the playhead on every frame
+     * rather than at the grid line — the post-AI panel's seat D, D7. See `raceVerdictSlotAt`.
+     */
+    const rival = {
+      pick: ghostPick,
+      recording: ghost,
+      refusal: ghostRefusal,
+      pending: ghostInFlight,
+      watching: watching !== undefined,
+    };
+    if (key === lastRaceKey) {
+      setText(ui.race.verdict, raceVerdictSlotAt(lastRaceSlots, rival, recording, view.simTimeS));
+      return;
+    }
     lastRaceKey = key;
 
     const stripView = raceStripViewOf({ recording, ghost, simTimeS: view.simTimeS });
@@ -5039,7 +5237,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
       },
       recording,
     );
-    setText(ui.race.verdict, slots.verdict);
+    lastRaceSlots = slots;
+    setText(ui.race.verdict, raceVerdictSlotAt(slots, rival, recording, view.simTimeS));
     setText(ui.race.note, slots.note);
     setText(ui.race.footer, stripView.footer);
     setHidden(ui.race.ghostKey, stripView.ghost === undefined);
@@ -5257,6 +5456,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
    */
   function syncUrl(): void {
     if (!urlWritable) return;
+    /* A screen showing a run the address cannot name holds it bare — {@link addressHeld}, § D1097. */
+    if (addressHeld) return;
     /* A mode's run is not written over the Scenario's address — {@link addressFollowsRun}, § D1003. */
     if (!addressFollowsRun(state)) return;
     const search = deepLinkSearchOf(state, deepLinkDefaults);
@@ -5460,14 +5661,27 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * the reader was in.
      */
     if (ui.header.viewMode.value !== state.mode) ui.header.viewMode.value = state.mode;
-    setText(ui.header.buildingName, buildingNameOf(resources, state.savedBuildings, state.buildingId));
-    // `view.building`, not the boot-scope binding: the two differ exactly when there is no
-    // recording, which is the case § D234 is about. Reading the binding here is what put the
-    // tutorial's geometry under the next scenario's name.
-    setText(
-      ui.header.buildingSub,
-      view.building === undefined ? '' : statLineOf(view.building),
-    );
+    /*
+     * **A campaign stage is described by its own building** — [§ D1129](../../../../DECISIONS.md),
+     * the swarm's Q3 interim. With the campaign tab in front the page is about the stage on screen,
+     * which the Scenario hub opens by id, and a stage set in Garden Apartments was drawn under
+     * whatever building the Engineer run last held — *St Jude Hospital 13 floors · 5 cars*, seen by
+     * a post-wave-AI assessor. Every other tab describes the run, as before.
+     */
+    const stageBuilding = state.tab === 'campaign' ? campaign?.stageBuilding() : undefined;
+    if (stageBuilding !== undefined) {
+      setText(ui.header.buildingName, stageBuilding.name);
+      setText(ui.header.buildingSub, statLineOf(stageBuilding));
+    } else {
+      setText(ui.header.buildingName, buildingNameOf(resources, state.savedBuildings, state.buildingId));
+      // `view.building`, not the boot-scope binding: the two differ exactly when there is no
+      // recording, which is the case § D234 is about. Reading the binding here is what put the
+      // tutorial's geometry under the next scenario's name.
+      setText(
+        ui.header.buildingSub,
+        view.building === undefined ? '' : statLineOf(view.building),
+      );
+    }
     setText(
       ui.header.clock,
       view.recording === undefined
@@ -5883,6 +6097,11 @@ function boot(ui: Elements, resources: BrowserResources): void {
     // runner supersedes in-flight asks, and the latest ask is the one whose recording files. See
     // {@link runCause}; `'player'` is the default because every press but one means *a new ask*.
     runCause = cause;
+    /*
+     * A fresh ask is a fresh attempt, and an attempt's calls are its own — § D1138. An intervention
+     * is the same attempt's record growing, so its session stands and is told about the new run.
+     */
+    if (cause === 'player') closeDayCalls();
     setText(ui.transport.error, '');
     // A new ask is a new chance: the failure the stage is drawing belonged to the run this replaces.
     shiftFailure = undefined;
@@ -6584,11 +6803,24 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * docstring is where the one thing it gates is argued.
      */
     const week = closedWeekOf(state, outcome, runCause === 'intervention');
+    /*
+     * **A close of a day that had already closed is practice** — [§ D1138](../../../../DECISIONS.md)
+     * clause 4, read off the week before the close, which is the one question `closeDay` keys it on.
+     * Only where the mode owns a week: a Free Play sheet banks nothing on any close and says so in
+     * its own words.
+     */
+    const practice = week !== state.week && state.week.closedDay === state.week.day;
     filedReportInput = {
       recording,
       observations,
       goals,
       week,
+      practice,
+      /*
+       * § D1138 clause 3 — the ordinary day's calls, from the session that raised them over the run
+       * being filed. Nothing is printed about any call before this line runs.
+       */
+      dayCalls: dayCallSession?.records() ?? [],
       // The scenario this shift belongs to, not `undefined`. Passing nothing made the sheet say
       // *your own building — nothing is being banked* on the same day the banner cleared a
       // scenario and the rail counted the shift as banked: three panels, two answers.
@@ -6647,6 +6879,11 @@ function boot(ui: Elements, resources: BrowserResources): void {
        * was scheduled. That is #126's trap and #135's, said twice because both issues record it.
        */
       calendar: state.calendar,
+      /*
+       * The slope this week's building grows at, so the *Tomorrow* card's percentage is the one the
+       * run tomorrow will be grown by — § D1066. From `state` for `calendar`'s reason directly above.
+       */
+      growthPerDay: weekGrowthPerDayOf(resources, state),
       dispatcherName: profileById(resources, state.savedDispatchers, state.dispatcherId).name,
       /*
        * The run's own hour, not a flat 06:00 — issue #83. `DAY_START_S` survives as the fallback for
@@ -6701,6 +6938,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
       bookedOut: bookedOutCarsOf(planned.building, [...planned.dayCars.holds, ...planned.dayCars.windows]),
       /* § D1040 — so the header and tomorrow's card say what a mix-asking wrinkle did on this tower. */
       templateVariesMix: planned.templateVariesMix,
+      /* § D1057 — so the header and tomorrow's card name the episode's window on a whole day. */
+      wholeDayRun: planned.wholeDayRun,
       /*
        * **A pinned day's call** — wave AI, [§ D1029](../../../../DECISIONS.md). Asked of the day as
        * built where this shell kept it ({@link unpressedRecording}, the run the answer replaced) and

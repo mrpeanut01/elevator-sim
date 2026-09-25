@@ -34,6 +34,9 @@ import {
   PROGRESS_REFUSALS,
   saveEveryday,
   solvedCaseSetOf,
+  diagnosisShownSetOf,
+  progressWithDiagnosisShown,
+  progressWithSolvedCases,
   type EverydayProgress,
   loadDefaultSpeed,
   loadSound,
@@ -868,5 +871,52 @@ describe('the live store’s progress half', () => {
     expect(store.progress()).toEqual(EMPTY_EVERYDAY_PROGRESS);
     expect(store.progressNotice()).toContain('until this tab closes');
     expect(store.setProgress({ solvedCaseIds: ['leaky-lobby'], ratings: [] })).toBe(false);
+  });
+});
+
+describe('the diagnoses a player asked to see are kept — § D1120 clause 1', () => {
+  it('round-trips the asked set, and a rating written after it keeps it', () => {
+    const backing = memoryBacking();
+    const asked = progressWithDiagnosisShown({ solvedCaseIds: ['own'], ratings: [] }, 'helped');
+    expect(asked.diagnosisShownCaseIds).toEqual(['own', 'helped']);
+    const rated = everydayProgressWith(asked, savedRatingOf(entry('a', 40)));
+    expect(rated.diagnosisShownCaseIds).toEqual(['own', 'helped']);
+    saveEveryday(backing, DEFAULT_EVERYDAY_PROFILE, rated, 'metric');
+    const back = loadProgress(backing);
+    expect(back.notice).toBeNull();
+    expect([...diagnosisShownSetOf(back.progress)].sort()).toEqual(['helped', 'own']);
+  });
+
+  it('reads progress kept before § D1120 as every solved case having had its diagnosis on screen', () => {
+    /* Until § D1120 the diagnosis was printed on every case, so no kept clear was reached without it. */
+    const legacy: EverydayProgress = { solvedCaseIds: ['leaky-lobby'], ratings: [] };
+    expect([...diagnosisShownSetOf(legacy)]).toEqual(['leaky-lobby']);
+    /* Asking about a new case keeps that reading and adds to it, rather than forgetting it. */
+    expect(progressWithDiagnosisShown(legacy, 'new').diagnosisShownCaseIds).toEqual(['leaky-lobby', 'new']);
+    /* Once written, the field is the record: a case solved later without asking is not in it. */
+    const written: EverydayProgress = { solvedCaseIds: ['leaky-lobby', 'later'], ratings: [], diagnosisShownCaseIds: ['leaky-lobby'] };
+    expect(diagnosisShownSetOf(written).has('later')).toBe(false);
+    /* Asking twice changes nothing. */
+    expect(progressWithDiagnosisShown(written, 'leaky-lobby')).toBe(written);
+  });
+
+  it('freezes the legacy reading when the solved set is next written, so a new clear is not read as helped', () => {
+    const legacy: EverydayProgress = { solvedCaseIds: ['leaky-lobby'], ratings: [] };
+    const next = progressWithSolvedCases(legacy, ['leaky-lobby', 'on-my-own']);
+    expect(next.solvedCaseIds).toEqual(['leaky-lobby', 'on-my-own']);
+    expect([...diagnosisShownSetOf(next)]).toEqual(['leaky-lobby']);
+  });
+
+  it('refuses a kept set that is not a list of case ids', () => {
+    const backing = memoryBacking();
+    saveEveryday(
+      backing,
+      DEFAULT_EVERYDAY_PROFILE,
+      { solvedCaseIds: [], ratings: [], diagnosisShownCaseIds: [''] } as EverydayProgress,
+      'metric',
+    );
+    const back = loadProgress(backing);
+    expect(back.progress).toEqual(EMPTY_EVERYDAY_PROGRESS);
+    expect(back.notice).toBe(PROGRESS_REFUSALS.shape);
   });
 });

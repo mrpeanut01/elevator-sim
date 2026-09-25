@@ -58,7 +58,14 @@ const PRESS_CALL_ROW_NOTE =
  */
 export const PRESS_CALL_AGAIN = Object.freeze({
   label: 'Take this call again',
-  note: 'The same day on the same crowd, from an empty record — the stage stops at the call again.',
+  /*
+   * § D1138 clause 4: the retake is practice. It said only what the press does until the first
+   * closed attempt became the one that banks; a retake that banked let the answer this row prints
+   * be banked on the next attempt, which is seats B and D's quiz with its key on the next page.
+   */
+  note:
+    'The same day on the same crowd, from an empty record — the stage stops at the call again. ' +
+    'It is practice: your week keeps your first attempt at this day.',
 });
 
 /** Everything the row reads. The pin is admitted and the day was played as it was measured. */

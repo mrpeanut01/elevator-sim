@@ -160,6 +160,48 @@ describe('the sitting’s post block — GitHub issue #372', () => {
     expect(line?.changesNote).toContain('not measured');
   });
 
+  /**
+   * **The note stops saying the sitting has one round once it has two** — wave AJ, § D1099, the
+   * post-AI panel's seat A defect 7: round 1 pressed twice, round 2 *Run the rush again* with
+   * nothing pressed, and round 1's note still read *this sitting has only the round you played*.
+   */
+  it('compares a pressed round with an untouched round that started the same way, and says nothing past this crowd', () => {
+    const pressed = round({
+      changes: [{ atS: 900, verb: 'parked the cars in the lobby' }],
+      interventionCount: 1,
+      outcome: outcome('broke', 2796),
+      startKey: 'same-start',
+    });
+    const untouched = round({ outcome: outcome('broke', 3012), startKey: 'same-start' });
+    const [first, second] = rushPostViewOf({ ...ready, rounds: [pressed, untouched] }).rounds;
+    expect(first?.changesNote).not.toContain('only the round you played');
+    expect(first?.changesNote).toBe(
+      RUSH_POST_COPY.changesNoteTwin('Round 2', '50:12', outcome('broke', 3012).wave, 'held 3:36 less'),
+    );
+    expect(first?.changesNote).toContain('one crowd');
+    /* The gap's three words, signed from the pressed round's side. */
+    expect(RUSH_POST_COPY.twinGap(216, '3:36')).toBe('held 3:36 longer');
+    expect(RUSH_POST_COPY.twinGap(0, '0:00')).toBe('held exactly as long');
+    /* The untouched round has no changes, so it carries no note of its own. */
+    expect(second?.changesNote).toBeUndefined();
+  });
+
+  it('does not compare rounds that started differently, or set a hand-stopped round beside one that broke', () => {
+    const pressed = round({
+      changes: [{ atS: 900, verb: 'parked the cars in the lobby' }],
+      interventionCount: 1,
+      startKey: 'one-start',
+    });
+    const elsewhere = round({ startKey: 'another-start' });
+    const [line] = rushPostViewOf({ ...ready, rounds: [pressed, elsewhere] }).rounds;
+    expect(line?.changesNote).toBe(RUSH_POST_COPY.changesNoteNoTwin);
+    expect(line?.changesNote).not.toContain('only the round you played');
+
+    const byHand = round({ outcome: outcome('stopped', 1200), startKey: 'one-start' });
+    const [handLine] = rushPostViewOf({ ...ready, rounds: [pressed, byHand] }).rounds;
+    expect(handLine?.changesNote).toBe(RUSH_POST_COPY.changesNoteTwinByHand('Round 2'));
+  });
+
   it('draws no change list and no note on a round nobody touched', () => {
     const [line] = rushPostViewOf({ ...ready, rounds: [round()] }).rounds;
     expect(line?.changes).toEqual([]);

@@ -44,13 +44,14 @@
 
 import type { ResolvedBuilding } from '@elevator-sim/core/browser';
 
-import { bookedOutCarsOf, carAbsencesOf, wrinkleNoteOf } from '../shift/bookedOut.js';
+import { bookedOutCarsOf, carAbsencesOf, wrinkleNameOf, wrinkleNoteOf } from '../shift/bookedOut.js';
 import type { CalendarPeriod } from '../shift/calendar.js';
 import { scheduledEventFor } from '../shift/calendar.js';
 import { firstSessionLineFor } from '../shift/firstSession.js';
 import { eventAsRun, eventCarChoice } from '../shift/events.js';
 import { carsToDerate } from '../shift/incidents.js';
 import { admittedPressDayIds, pressDayStanding } from '../shift/ladder.js';
+import { wayThroughSentenceOf } from '../shift/weekWay.js';
 import { clockOf, clockRange } from '../shift/report.js';
 import type { GoalReading, RunHorizon, ShiftEvent, WeekState, Weekday } from '../shift/types.js';
 import { weekdayOf } from '../shift/types.js';
@@ -120,6 +121,13 @@ export interface TodayRecord {
   readonly lede: string;
   /** The day's event, quoted — total, because `scheduledEventFor` falls through to the schedule. */
   readonly wrinkle: ShiftEvent;
+  /**
+   * The day's name **as the brief prints it** — `shift/bookedOut.ts#wrinkleNameOf`: the event's own,
+   * except on an admitted pinned day, which the stage will call and which is not an ordinary day
+   * (the post-AI panel's seat B, defect 4). The Day report's header and the Engineer rail print the
+   * same name from the same function.
+   */
+  readonly wrinkleName: string;
   /**
    * The wrinkle's note **as the brief prints it** — `shift/bookedOut.ts#wrinkleNoteOf`, GitHub issue
    * #596 item 3, [§ D983](../../../../DECISIONS.md).
@@ -209,6 +217,17 @@ export interface TodayRecord {
    * call is answered, and on every other day it is never drawn.
    */
   readonly driverHeld: string | undefined;
+  /**
+   * **What the week census found about a day it could not admit**, or `undefined` —
+   * `docs/33` DC-10, [§ D1067](../../../../DECISIONS.md) clause 4.
+   *
+   * `shift/weekWay.ts#wayThroughSentenceOf`, gated there on the census having measured this
+   * contract's day at the growth the tower runs at now, on the horizon the press will run and with
+   * no calendar over it. An admitted day and an unmeasured one both draw nothing. It states how many
+   * of the measured crowds cleared and gives no advice, because a measurement of a day with no way
+   * through licenses none.
+   */
+  readonly wayThrough: string | undefined;
 }
 
 /** {@link TodayRecord.driverHeld}'s sentence — no digit, the strip's own rule. */
@@ -258,6 +277,13 @@ export interface TodayInput {
    * reason: a default of `false` would print the fire drill's lobby rush over an all-day rise.
    */
   readonly templateVariesMix: boolean;
+  /**
+   * Whether the next run is the building's whole authored day — `host.dayAhead().wholeDayRun`. On
+   * such a day a mix-setting wrinkle with a placement is spliced as an episode, the draw is the
+   * whole day's, and the record quotes the placement's note, which names the window
+   * ([§ D1057](../../../../DECISIONS.md)). Required, {@link TodayInput.calendar}'s reason.
+   */
+  readonly wholeDayRun: boolean;
   /**
    * The cars today's event takes, as the next run takes them — `host.dayAhead().dayCars`, which is
    * `dev/state.ts#ShiftRunConfig.dayCars` — or `undefined` for a caller with no run to ask, in
@@ -734,7 +760,7 @@ export const TODAY_CHOICE_LINE =
  */
 function ledeOf(
   building: ResolvedBuilding | undefined,
-  event: ShiftEvent,
+  name: string,
   note: string,
   out: readonly CarOutToday[],
 ): string {
@@ -751,7 +777,7 @@ function ledeOf(
   return (
     `${String(building.floors.length)} floors, ` +
     `${groupThousands(building.totalPopulation)} people and ${lifts}. ` +
-    `${event.name}: ${note} ` +
+    `${name}: ${note} ` +
     TODAY_CHOICE_LINE
   );
 }
@@ -815,8 +841,14 @@ export function todayOf(input: TodayInput): TodayRecord {
    * so; the name, the id and the effect are the wrinkle's either way.
    */
   const event = eventAsRun(
-    scheduledEventFor(input.calendar, week.day, week.dayIdx),
+    scheduledEventFor(
+      input.calendar,
+      week.day,
+      week.dayIdx,
+      input.wholeDayRun ? 'whole-day' : 'period',
+    ),
     input.templateVariesMix,
+    input.wholeDayRun,
   );
   const out = carsOutTodayOf(building, event, input.dayCars);
   /*
@@ -841,13 +873,19 @@ export function todayOf(input: TodayInput): TodayRecord {
       seed: input.seed,
       horizon: input.horizon,
     }) !== undefined;
+  /* The stage calls an admitted pinned day, and only that one — § D1029's own gate on the pin. */
+  const wrinkleName = wrinkleNameOf(
+    event,
+    crowdIsPinned && admittedPressDayIds().includes(week.contractId),
+  );
   return {
     day: week.day,
     weekday,
     dayLabel: `${weekday.toUpperCase()} · DAY ${String(week.day)}`,
     towerName: building?.name ?? input.buildingId,
-    lede: ledeOf(building, event, wrinkleNote, out),
+    lede: ledeOf(building, wrinkleName, wrinkleNote, out),
     wrinkle: event,
+    wrinkleName,
     wrinkleNote,
     outOfService: outOfServiceOf(
       out,
@@ -880,5 +918,12 @@ export function todayOf(input: TodayInput): TodayRecord {
     dayLength: dayLengthOf(input, event),
     driver: input.dispatcherName ?? EM_DASH,
     driverHeld: driverHeldOf(input, event),
+    wayThrough: wayThroughSentenceOf({
+      contractId: week.contractId,
+      day: week.day,
+      eventId: event.id,
+      hasCalendar: input.calendar !== null,
+      horizon: input.horizon,
+    }),
   };
 }

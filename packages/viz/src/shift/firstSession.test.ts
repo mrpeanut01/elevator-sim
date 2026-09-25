@@ -31,6 +31,7 @@ import {
   FIRST_SESSION_LINE_CHOSEN,
   FIRST_SESSION_LINE_PINNED,
   FIRST_SESSION_LINE_PINNED_BY_NUMBER,
+  firstDayDealOf,
   firstSessionDayFor,
   firstSessionLineFor,
   FIRST_SESSION_STREAM,
@@ -546,5 +547,37 @@ describe('the first scored day’s set — legible ∩ admitted, § D1029', () =
      */
     expect(FIRST_DAY_CONTRACT_IDS).not.toEqual(ELIGIBLE_FIRST_CONTRACT_IDS);
     expect(FIRST_DAY_CONTRACT_IDS.every((id) => admitted.includes(id))).toBe(true);
+  });
+});
+
+describe('what a fresh device’s address adds to the date — wave AJ, § D1096', () => {
+  /*
+   * The post-AI panel's seat A, defect 3: `?building=st-jude-hospital&seed=20260925&…` — the
+   * address this page writes on a Scenario day — handed a newcomer the date's crowd and no pinned
+   * day, where `/` dealt the pin. Asked over a date whose draw deals a real tower, found rather than
+   * assumed, so the case holds on any date the suite runs.
+   */
+  const daySeed = dailySeedFor('2026-09-25');
+  const dealt = contractById(firstSessionContractFor(daySeed))?.buildingId ?? '';
+  const other = CONTRACTS.find((contract) => contract.buildingId !== dealt)?.buildingId ?? '';
+
+  it('deals the pinned day to an address that only restates the date', () => {
+    expect(dealt).not.toBe('');
+    expect(firstDayDealOf({ building: null, seed: null }, daySeed)).toEqual({ deal: true, crowdFromAddress: false });
+    expect(firstDayDealOf({ building: null, seed: daySeed }, daySeed)).toEqual({ deal: true, crowdFromAddress: false });
+    expect(firstDayDealOf({ building: dealt, seed: daySeed }, daySeed)).toEqual({ deal: true, crowdFromAddress: false });
+    expect(firstDayDealOf({ building: dealt, seed: null }, daySeed)).toEqual({ deal: true, crowdFromAddress: false });
+    /* The address this page writes on the pinned day itself: the pin's crowd on the dealt tower. */
+    const pin = firstSessionDayFor(daySeed).seed;
+    expect(firstDayDealOf({ building: dealt, seed: pin }, daySeed)).toEqual({ deal: true, crowdFromAddress: false });
+  });
+
+  it('keeps the reader’s own crowd and the reader’s own tower as § D1047 ruled', () => {
+    /* `?seed=` alone: the draw on the reader's crowd, which is D1047's arm. */
+    expect(firstDayDealOf({ building: null, seed: 12345n }, daySeed)).toEqual({ deal: true, crowdFromAddress: true });
+    /* A tower the date did not deal is the reader's, and nothing is dealt over it. */
+    expect(firstDayDealOf({ building: other, seed: daySeed }, daySeed).deal).toBe(false);
+    /* The dealt tower beside a crowd of the reader's own is a run the link describes. */
+    expect(firstDayDealOf({ building: dealt, seed: 12345n }, daySeed)).toEqual({ deal: false, crowdFromAddress: true });
   });
 });

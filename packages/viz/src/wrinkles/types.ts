@@ -56,6 +56,74 @@ export interface WrinkleEffect {
     readonly fromFraction: number;
     readonly toFraction: number;
   } | null;
+  /**
+   * Where the wrinkle sits on a whole authored day — {@link WholeDayPlacement}. `null` on a
+   * wrinkle that sets no mix (it has nothing to place: its level and cars apply as they do on a
+   * slice). Optional in the type so a hand-built effect in a test reads as *no placement*; the
+   * loader always fills it, and refuses a mix-setting template that has none.
+   */
+  readonly wholeDay?: WholeDayPlacement | null;
+}
+
+/**
+ * **Where a mix-setting wrinkle sits on a whole authored day** — [§ D1057](../../../../DECISIONS.md),
+ * the week swarm's ruling S1 + S3 (2–1, S2's condition kept).
+ *
+ * On a slice the run *is* the episode, so the wrinkle's split applies to the whole run. On a whole
+ * day (`office-day`, ten hours) `core` refuses a run-wide split beside a template that varies its own
+ * mix, and a run-wide multiplier multiplies ten hours rather than the event. So a wrinkle that sets
+ * a mix declares where it sits in the day instead: a clock window, the level inside it, and the
+ * sentence that describes the day it makes. `shift/episode.ts#spliceEpisode` writes it into the
+ * run's own copy of the day's phase list, with 60 s ramps at each edge, and nothing outside the
+ * window moves.
+ *
+ * The times are **clock minutes since midnight** (authored as `"10:00"`), because the note names a
+ * clock time and the day template decides whether it contains it — a placement the day's clock
+ * cannot hold is refused by the splice, and a template whose placement is refused outright is not
+ * drawn on a whole day at all (S2's condition, {@link WholeDayRefusal}).
+ */
+export interface WholeDayEpisode {
+  readonly kind: 'episode';
+  /** Clock minutes since midnight at which the episode's mix and level begin. */
+  readonly fromMin: number;
+  /** Clock minutes since midnight at which they end. Strictly after {@link fromMin}. */
+  readonly toMin: number;
+  /**
+   * The level inside the window, as a phase intensity in `[0, 1]` (`1` is the day's own peak), or
+   * `'authored'` to keep the day's own level there and move only the mix.
+   */
+  readonly intensity: number | 'authored';
+  /**
+   * A multiplier on the **whole** day's rate, or `null` for none. Refused above `1` at load: a surge
+   * is an episode and never the whole day, which is the defect the placement exists to end (the
+   * shipped fire drill made a day 1.6 times busier). Below `1` it states that the whole day is
+   * lighter — a weekend, a day half the floor is off — which is a claim about the day rather than
+   * about the event, and it keeps the figure the slice always had.
+   */
+  readonly dayRateMultiplier: number | null;
+  /**
+   * The note on a whole day, with `{episode}` where the window is named (*"from 10:00 to 10:20"*)
+   * and the template's own axis placeholders. Replaces the slice note on a spliced run, so the
+   * brief says when and what, from the same numbers the splice used.
+   */
+  readonly note: string;
+  /** Why here, how long and how busy — an uncited assumption says so. Not player-facing. */
+  readonly reason: string;
+}
+
+/** A mix-setting wrinkle that cannot be placed honestly on a whole day, with the reason. */
+export interface WholeDayRefusal {
+  readonly kind: 'refused';
+  readonly reason: string;
+}
+
+export type WholeDayPlacement = WholeDayEpisode | WholeDayRefusal;
+
+/** What an axis value may move about a placement: when, and how busy. */
+export interface WholeDayOverride {
+  readonly fromMin?: number;
+  readonly toMin?: number;
+  readonly intensity?: number | 'authored';
 }
 
 /**
@@ -72,6 +140,8 @@ export interface WrinkleAxisValue {
   readonly directionalSplit?: DirectionalSplit | null;
   readonly carsOutOfService?: number;
   readonly derate?: WrinkleEffect['derate'];
+  /** Moves the template's whole-day window or level for this value — `caterers`' *when*. */
+  readonly wholeDay?: WholeDayOverride;
 }
 
 /** A parameter axis: § 17's *"a shaft out (which, from when, until when)"* made countable. */

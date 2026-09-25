@@ -160,12 +160,12 @@ import {
 } from '@elevator-sim/experiments/browser';
 
 import { dimensionIdsLiveOn } from '../authoring/dispatcherSpec.js';
-import { movedDimensions } from '../campaign/dimensions.js';
+import { admitStageMove } from '../campaign/stagePress.js';
 import { admitEditedVector, applyEdit, valuesFromProfile } from '../controls/editedProfile.js';
 import { purchaseUnits } from '../pricing/parse.js';
 import type { PriceSchedule, PricedChange } from '../pricing/types.js';
 
-import { admitPurchase, withholdingDimension } from './budget.js';
+import { withholdingDimension } from './budget.js';
 
 /* -------------------------------------------------------------------------- *
  * What the schedule prices that a scenario run can actually reach
@@ -415,15 +415,27 @@ export function dropdownConfigurationsOf(
   schedule: PriceSchedule,
   baseline: DispatcherProfile,
   profiles: readonly DispatcherProfile[],
+  /**
+   * The scenario's own building, so a dimension it gives nothing to act on is not counted as a move
+   * (§ D549) — the same rule the player's press is asked under. Optional for a caller pricing
+   * profiles in the abstract; `measureSurvivors.ts` always passes it.
+   */
+  building?: ResolvedBuilding,
 ): readonly DropdownConfiguration[] {
   const order = tierOrderOf(schedule);
   const byId = new Map(schedule.changes.map((change) => [change.id, change]));
+  const context = { space, schedule, baseline, building };
   const out: DropdownConfiguration[] = [];
   for (const candidate of profiles) {
     if (candidate.id === baseline.id) continue;
-    const moved = movedDimensions(space, baseline, candidate).map((dimension) => dimension.id);
-    if (moved.length === 0) continue;
-    const admission = admitPurchase(schedule, Number.MAX_SAFE_INTEGER, moved);
+    /*
+     * **The one admission check** — `campaign/stagePress.ts#admitStageMove`, [§ D1129](../../../../DECISIONS.md).
+     * Asked here at an unbounded budget, because this stratum prices a profile once and attributes
+     * it to every rung that affords it; `measureSurvivors.ts` asks the same function again at each
+     * rung's own units, so the census and a player's press are one question asked twice.
+     */
+    const admission = admitStageMove(context, { profile: candidate }, Number.MAX_SAFE_INTEGER);
+    if (admission.moved.length === 0) continue;
     if (admission.withheld.length > 0) continue;
     const bought = admission.changeIds
       .map((id) => byId.get(id))

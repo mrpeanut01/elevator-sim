@@ -166,8 +166,9 @@ import {
   DIFFICULTIES,
   contractIsLost,
   purseOf,
+  shopTierAt,
 } from '../campaign/economy.js';
-import { fitOutOf } from '../campaign/fitOut.js';
+import { fitOutOf, startTimeFloorIdsOf } from '../campaign/fitOut.js';
 import {
   answerChangeOf,
   campaignEventFor,
@@ -178,7 +179,7 @@ import {
 import { worksHeldCarRefsOf, worksHeldCarsOf } from '../campaign/works.js';
 import { everydayCareerStore, type CareerStore } from './careerStore.js';
 import { CAMPAIGN_DOCK_COPY, purseRefusalOf } from './campaignDock.js';
-import { CAREER_CONTRACT_ID, openCareer, switchWeek } from '../shift/week.js';
+import { CAREER_CONTRACT_ID, openCareer, REPLAY_CONTRACT_ID, switchWeek } from '../shift/week.js';
 import {
   pressDayChoiceOf,
   towerChoiceViewOf,
@@ -219,6 +220,7 @@ import type { CalendarPeriod } from '../shift/calendar.js';
 import { contractById, statLineOf } from '../shift/contracts.js';
 import { admittedPressDayIds, ladderTowersOf, pressDayFor } from '../shift/ladder.js';
 import type { PressCall } from '../shift/pressCall.js';
+import type { DayCallAnswer, DayCallOnStage } from '../shift/dayCalls.js';
 import {
   runHorizonOf,
   scenarioHorizonFor,
@@ -1055,6 +1057,14 @@ export interface EverydayHost {
   buildingSpecLine(id: string): string | undefined;
 
   /**
+   * How many of a building's floors keep a shared start time — `campaign/fitOut.ts#startTimeFloorIdsOf`
+   * on the tower {@link buildingSpecLine} describes, or `undefined` for a building this build cannot
+   * resolve. GitHub issue #603, `DECISIONS.md` § D1078: the career shop refuses staggered start
+   * times where it is `0`, and {@link campaignAct} refuses the press on the same count.
+   */
+  buildingStartTimeFloors(id: string): number | undefined;
+
+  /**
    * The career GAMEPLAY § 8's three campaign screens read — the whole record, as plain data.
    *
    * One object for all three screens, which is § 16 rule 14: *"the brief, the stage, the report and
@@ -1352,6 +1362,15 @@ export interface EverydayHost {
    * no-op with no career day standing. **Optional** on {@link runFailure}'s ground.
    */
   leaveCareer?(): void;
+
+  /**
+   * **Whether the address bar may describe the Scenario's run while this screen is up** — wave AJ,
+   * [§ D1097](../../../../DECISIONS.md), the post-AI panel's seat B. `false` while a screen that
+   * plays a run of its own is showing — the fix-it case — and `true` everywhere else. The shell calls
+   * it on every navigation; {@link EverydayHostBindings.holdAddress} does the writing. **Optional**
+   * on {@link leaveCareer}'s ground.
+   */
+  addressDescribesRun?(describes: boolean): void;
 
   /**
    * **The career's own filed days for one tower, newest last** — GitHub issue #594.
@@ -1918,6 +1937,22 @@ export interface EverydayHost {
    * is not standing on an admitted pinned day.
    */
   takeCallAgain(): string | undefined;
+  /**
+   * **The ordinary day's next call on `recording`**, or `undefined` — [§ D1138](../../../../DECISIONS.md).
+   *
+   * Where the next call is and whether it has been raised; never what its answers did, which the
+   * report prints at day close. `undefined` on a pinned press day (§ D1029's single call stands
+   * there, through {@link pressCallOnStage}), on any run that is not the player's own scored week
+   * day, and once the day's calls are spent. The daily stage asks it; no other context does.
+   */
+  dayCallOnStage(recording: VizRecording): DayCallOnStage | undefined;
+  /** Answer the raised ordinary call — a press adopts the run already made for it. § D1138. */
+  answerDayCall(answer: DayCallAnswer): void;
+  /**
+   * *Skip to the end* on a day with ordinary calls: every call left is answered. `called` is
+   * whether a call's card was up, which records that call as skipped. § D1138.
+   */
+  skipDayCalls(called: boolean): void;
   /** The replay in progress, or `undefined`. */
   replay(): EverydayReplaySession | undefined;
   /** Leave the replay, putting the parked week and the run it interrupted back. A no-op outside one. */
@@ -1968,6 +2003,13 @@ export interface EverydayHostBindings {
    * nothing to put back, and every test host is one of those.
    */
   readonly initialPressDaySeedBase?: bigint | undefined;
+  /**
+   * **The date's own crowd, now** — `shift/dailySeed.ts#dailySeedAt` at the device's clock, read by
+   * {@link dayPatchFor} to tell the shared day from a crowd the address chose (wave AJ, § D1095).
+   * Optional, and absent on every test host that does not name it: a host with no clock knows only
+   * the pinned crowds as shared, which is the conservative reading.
+   */
+  readonly daySeed?: (() => bigint) | undefined;
   /** The live state. Read fresh on every host call — never captured. */
   state(): ViewerState;
   /** The transport's playhead in simulated seconds, or the recording's start, or `0`. */
@@ -1993,6 +2035,12 @@ export interface EverydayHostBindings {
    * field, and a shell that omits it cancels nothing.
    */
   cancelRun?(): void;
+  /**
+   * Hold the address bar bare, or let it follow the run again — `dev/main.ts#syncUrl`'s gate, wave
+   * AJ, [§ D1097](../../../../DECISIONS.md). **Optional** on {@link cancelRun}'s ground: a binding
+   * literal that never shows a fix-it case holds nothing.
+   */
+  holdAddress?(held: boolean): void;
   /**
    * Whether the shift runner has a run of the player's in flight — `dev/main.ts`'s own flag, read
    * where it lives. See {@link EverydayHost.runPending} for what reads it and why. **Optional** on
@@ -2020,6 +2068,12 @@ export interface EverydayHostBindings {
    * a closed day — § 3.4's strip is drawn only while `runState().open` is true.
    */
   abandonDay?(): void;
+  /** § D1138 — `dev/main.ts#dayCallOnStage`. Optional: a host with no calls answers `undefined`. */
+  dayCallOnStage?(recording: VizRecording): DayCallOnStage | undefined;
+  /** § D1138 — `dev/main.ts#answerDayCall`. */
+  answerDayCall?(answer: DayCallAnswer): void;
+  /** § D1138 — the session's skip, then a re-render. */
+  skipDayCalls?(called: boolean): void;
   /**
    * § 1.4's *record growing*: append at `atS`, re-run with cause `'intervention'`, and seek the
    * shell's own transport to `atS` once the new recording is adopted. One implementation, shared
@@ -2278,14 +2332,59 @@ function dayFor(b: EverydayHostBindings): WholeDay | undefined {
  * `shift/dayLength.ts#wholeDayRun` carries the argument, and `core` refuses the rescaling override
  * on a day by name. A part's length is the period it names, which is § D286's own sentence.
  *
- * Returns `{}` for a building with no authored day, which is three of the eight shipped ones. An
- * empty patch is the honest answer there — their day is the slice it always was, and inventing a
- * day for a residential, hotel or hospital crowd out of an office one is the modelling claim
- * `dayLength.ts` refuses.
+ * A building with no authored day gets no whole day, because inventing one for a residential, hotel
+ * or hospital crowd out of an office one is the modelling claim `dayLength.ts` refuses. What it gets
+ * instead is its contract's slice on the shared day ({@link contractSliceFor}, § D1095); this
+ * paragraph used to say it got *the slice it always was*, which was whatever length stood.
  */
-function dayPatchFor(b: EverydayHostBindings): Partial<ViewerState> {
+function dayPatchFor(b: EverydayHostBindings, state: ViewerState = b.state()): Partial<ViewerState> {
+  /*
+   * A replay's day is the day's own record's — `everyday/replay.ts#replayPatchOf`, § D1094 — and
+   * `startReplay` wrote it before this press. The whole-day arm below would agree with a record
+   * this build filed and overwrite one an earlier build filed; neither is this press's to decide.
+   */
+  if (state.week.contractId === REPLAY_CONTRACT_ID) return {};
   const day = dayFor(b);
-  return day === undefined ? {} : wholeDayRun(day);
+  if (day !== undefined) return wholeDayRun(day);
+  return contractSliceFor(b, state);
+}
+
+/**
+ * **The shared day's slice, sized by its contract and never by the address** — wave AJ,
+ * [§ D1095](../../../../DECISIONS.md), the post-AI panel's seat D, D3.
+ *
+ * A tower with no authored whole day runs its contract's length as a slice, and this press used to
+ * write nothing there — *"their day is the slice it always was"* — which was true of nothing in
+ * particular: the slice was whatever `ViewerState.shiftLengthS` held, and three things write that
+ * field before a Scenario press. The address's `?duration=`, which `dev/main.ts#deepLinkSearchOf`
+ * writes whenever the week's contract length differs from `c1`'s hour, so every newcomer dealt a
+ * thirty-minute tower carried `duration=1800` in the bar from their first load. `initialState`'s
+ * `c1` hour, which a restored session keeps because `withBuilding` does not re-seed the length. And
+ * the Engineer's own length control. So one St Jude Wednesday on one crowd ran 08:30–09:00 with 461
+ * arrivals from the address a newcomer was handed and 08:30–09:30 with 873 from a bare `/`, both
+ * under *"anyone on this day of their week meets the same one"*, and two tabs banked both into one
+ * week.
+ *
+ * **Only for the shared day.** The contract's length is written when the crowd is the date's or a
+ * pin's — the day everybody meets. A crowd the address chose (`?seed=` other than today's) is a run
+ * the link describes, D1047's reader's crowd, and its length rides with it: a link names a whole run
+ * or it is *"a different run wearing the same address"*, which is `deepLinkStateOf`'s own rule.
+ * A sentinel week (sandbox, free play) names no contract and keeps whatever stands.
+ *
+ * Returns only the fields that differ, so a press over a state already on its contract's slice
+ * writes nothing and repaints nothing, on `startRun`'s own ground.
+ */
+function contractSliceFor(b: EverydayHostBindings, state: ViewerState): Partial<ViewerState> {
+  const contract = contractById(state.week.contractId);
+  if (contract === undefined) return {};
+  const pinned = pressDayFor(contract.id)?.seedText === state.seed.toString();
+  const dated = b.daySeed !== undefined && b.daySeed() === state.seed;
+  if (!pinned && !dated) return {};
+  const shiftLengthS = shiftLengthForContract(contract.id);
+  return {
+    ...(state.shiftLengthS === shiftLengthS ? {} : { shiftLengthS }),
+    ...(state.windowStartS === null ? {} : { windowStartS: null }),
+  };
 }
 
 /**
@@ -2379,6 +2478,24 @@ export function createEverydayHost(
   const restored = careerStore.load();
   let career: CampaignCareer = restored.career ?? openingCareer(b.state().dispatcherId);
   const careerLoadNotice: string | undefined = restored.notice;
+  /**
+   * A building's start-time floor count, on the tower the contract hands over — GitHub issue #603,
+   * § D1078. Memoised per id because the towers are resolved once per resources and the shop asks on
+   * every draw.
+   */
+  const startTimeFloorCounts = new Map<string, number | undefined>();
+  const startTimeFloorsOf = (id: string): number | undefined => {
+    if (!startTimeFloorCounts.has(id)) {
+      const resolved = ladderTowersOf(b.resources).find((building) => building.id === id);
+      startTimeFloorCounts.set(
+        id,
+        resolved === undefined
+          ? undefined
+          : startTimeFloorIdsOf(resolved.floors, resolved.trafficProfile, b.resources.trafficProfiles).length,
+      );
+    }
+    return startTimeFloorCounts.get(id);
+  };
   /**
    * Assign and persist together. One writer, so a lane that adds a fourth mutation site cannot
    * forget the save — which is how a career that persists on two of three paths ships.
@@ -2926,6 +3043,7 @@ export function createEverydayHost(
       const resolved = ladderTowersOf(b.resources).find((building) => building.id === id);
       return resolved === undefined ? undefined : statLineOf(resolved);
     },
+    buildingStartTimeFloors: (id) => startTimeFloorsOf(id),
     campaign: () => career,
     priceSchedule: () => bindings.resources.priceSchedule,
     careerNotice: () => careerLoadNotice,
@@ -3074,7 +3192,11 @@ export function createEverydayHost(
        * is `MountContext.update`, which re-renders, and a press that repainted every surface to
        * write no field would be doing work a player could see for a change nobody made.
        */
-      const day = dayFor(b);
+      /*
+       * The day's own shape — the whole authored day, a contract's slice on the shared day, or a
+       * replay's record left standing ({@link dayPatchFor}, § D1095).
+       */
+      const dayShape = dayPatchFor(b);
       /*
        * **And the kit comes off with the latch** — GitHub issue #181.
        *
@@ -3111,7 +3233,7 @@ export function createEverydayHost(
        */
       const logToClear = b.state().interventions.length === 0 ? {} : { interventions: [] };
       const patch = {
-        ...(day === undefined ? {} : wholeDayRun(day)),
+        ...dayShape,
         ...kitToClear,
         ...eventToClear,
         ...logToClear,
@@ -3254,10 +3376,12 @@ export function createEverydayHost(
       // running yet.
       // `campaignFitOut: undefined` unconditionally here, unlike in `startRun`: this patch is never
       // empty, so clearing a field that is already clear costs no render that was not happening.
+      /* The crowd first, so the shape is read against the crowd tomorrow meets — § D1095. */
+      const restore = pressDaySeedRestore();
       b.applyPatch({
         ...openTomorrowPatch(state.week),
-        ...dayPatchFor(b),
-        ...pressDaySeedRestore(),
+        ...dayPatchFor(b, { ...state, ...restore }),
+        ...restore,
         campaignFitOut: undefined,
         campaignEventId: undefined,
       });
@@ -3295,6 +3419,23 @@ export function createEverydayHost(
       b.applyPatch({ dispatcherSpec: applied.spec, levers: applied.levers });
     },
     campaignAct: (action) => {
+      /*
+       * The second lock on § D1078's refusal: the shop draws staggered start times dimmed on a
+       * building where nobody keeps a start time, and this refuses the press the same way the
+       * reducer refuses an unaffordable one, by moving nothing. The reducer holds no building, so
+       * the count is the host's.
+       */
+      if (action.kind === 'press-tier') {
+        const tower = towerById(career, action.towerId);
+        const tier = shopTierAt(action.categoryId, action.level);
+        if (
+          tower !== undefined &&
+          tier?.fits.arrivalRateFactor !== undefined &&
+          startTimeFloorsOf(tower.buildingId) === 0
+        ) {
+          return;
+        }
+      }
       const next = applyCampaignAction(career, action, bindings.resources.priceSchedule);
       /* A refused action moves nothing and notifies nobody: a redraw over an unchanged record
          would repaint a screen mid-interaction for no reason a player could see. */
@@ -3396,7 +3537,17 @@ export function createEverydayHost(
       const parking = switchWeek(b.state().week, b.state().parkedWeeks, CAREER_CONTRACT_ID, 'restart');
       const careerWeek = careerWeeks.get(tower.id) ?? openCareer();
       b.applyPatch({
-        ...(entering ? { interventions: [] } : {}),
+        /*
+         * **Every career day starts with no presses, not only the first** — wave AJ,
+         * [§ D1093](../../../../DECISIONS.md). This read `entering ? { interventions: [] } : {}`, so
+         * the log was cleared on the way into the career and on no press after it: a spread pressed
+         * at 08:50 on day 1 stood on the state when *Run day 2* was pressed, the day-2 run was
+         * simulated under it, and the day-2 report printed *You spread the cars across the tower*
+         * about a day nobody touched (the post-AI panel's seat A, defect 1, days 2 to 4). A career
+         * day is a run this press is starting, which is § D1002's own ground for the Scenario's
+         * `startRun`, so the log that stands here always belongs to some other run.
+         */
+        interventions: [],
         parkedWeeks: parking.parked,
         buildingId: tower.buildingId,
         dispatcherId: tower.dispatcherId,
@@ -3530,6 +3681,9 @@ export function createEverydayHost(
     },
     campaignDay: campaignDayFacts,
     leaveCareer: releaseCareer,
+    addressDescribesRun: (describes) => {
+      b.holdAddress?.(!describes);
+    },
     campaignHistory: (towerId) => careerWeeks.get(towerId)?.history ?? [],
     answerIncident: (atS, optionId) => {
       const facts = campaignDayFacts();
@@ -3988,6 +4142,13 @@ export function createEverydayHost(
       return undefined;
     },
     pressCallOnStage: (recording) => pressDayCallOf(b.resources, b.state(), recording)?.call,
+    dayCallOnStage: (recording) => b.dayCallOnStage?.(recording),
+    answerDayCall: (answer) => {
+      b.answerDayCall?.(answer);
+    },
+    skipDayCalls: (called) => {
+      b.skipDayCalls?.(called);
+    },
     takeCallAgain: () => {
       releaseCareer();
       const state = b.state();

@@ -56,6 +56,7 @@ import type {
   FigureSpec,
   FixitCase,
   FixitCases,
+  FixitResultCopy,
   FixitPatch,
   FixitRepair,
   FixitTenancy,
@@ -350,6 +351,7 @@ export function playerFacingStringsOf(entry: FixitCase): readonly (readonly [str
     ['its reasoning', entry.diagnosis.reasoning],
     ['the result head', entry.result.head],
     ['the result body', entry.result.body],
+    ...(entry.result.rest === undefined ? [] : [['the result rest line', entry.result.rest] as const]),
     ...(entry.asBuilt.tenancy?.cohorts ?? []).flatMap((cohort) => [
       [`tenancy "${cohort.id}" name`, cohort.name] as const,
       [`tenancy "${cohort.id}" reason`, cohort.reason] as const,
@@ -837,9 +839,34 @@ function decodeCase(
     repairs: decodeRepairs(raw['repairs'], where, violations, schedule, (bankId) =>
       bandByBank.get(`${str(raw['buildingId']) ?? ''}/${bankId}`),
     ),
-    result: { head: str(result['head']) ?? '', body: str(result['body']) ?? '' },
+    result: resultCopyOf(result, where, violations),
   };
 }
+
+/**
+ * The authored success copy, with the rest-of-building claim held apart — `types.ts#FixitResultCopy`.
+ *
+ * A head or body that says the rest of the building did not *notice* is refused here: that is a
+ * measured claim, and it goes in `rest`, which prints only where the fifty mornings agree with it.
+ */
+function resultCopyOf(result: Record<string, unknown>, where: string, violations: string[]): FixitResultCopy {
+  const head = str(result['head']) ?? '';
+  const body = str(result['body']) ?? '';
+  const rest = str(result['rest']);
+  for (const [label, text] of [['head', head], ['body', body]] as const) {
+    if (REST_CLAIM.test(text)) {
+      violations.push(
+        `${where}: the result ${label} says the rest of the building did not notice ("${text}"). ` +
+          'That is a claim the fifty-morning row measures; put it in "result.rest", which prints ' +
+          'only where the measurement agrees with it.',
+      );
+    }
+  }
+  return rest === undefined ? { head, body } : { head, body, rest };
+}
+
+/** A sentence about whether anybody else noticed — the claim `result.rest` exists to hold. */
+const REST_CLAIM = /\bnotic(?:e|ed|es|ing)\b/iu;
 
 /** § D1001's tenancy block: cohorts, each with named positions. Shape only; the rules are in `checkTenancy`. */
 function decodeTenancy(raw: unknown, at: string, violations: string[]): FixitTenancy {

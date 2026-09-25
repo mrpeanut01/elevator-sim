@@ -116,7 +116,8 @@
  * | {@link parseEngineeringBriefs}, {@link BRIEF_KINDS}, {@link BRIEF_KIND_SEAM} | `loadCampaign` in `src/dev/data.ts`, on the same context object it hands `parseCampaign` — GitHub issue **#227**. A brief **is** a scenario, so the only thing this validator adds is which of `docs/21` § 4's six challenges a scenario is, and the refusal that stops a challenge with no runner from shipping as an inert one |
  * | {@link editableIdsOf} | `src/dev/campaignPanel.ts`, `src/campaign/brief.ts` and `parse.ts`'s lever check. One answer to *"may I move this?"* |
  * | {@link briefingFor} | `src/dev/campaignPanel.ts`'s left column, redrawn on every stage change |
- * | {@link admitProfile}, {@link movedDimensions} | `src/dev/campaignPanel.ts` — a profile outside the stage's editable set is refused with the dimension named, before the batch |
+ * | {@link admitStageMove}, {@link stageUnitsAt}, {@link movedDimensions} | `src/dev/campaignPanel.ts`, `src/everyday/stagePlay.ts` and `src/scenario/survivorSpace.ts` + `measureSurvivors.ts` — **the one admission check**, § D1129: a move the stage's budget does not pay for is refused with its price named, before the batch, and the census counts only what it admits |
+ * | {@link pressStage} | `src/dev/campaignPanel.ts`'s pre-flight shares its check; `src/everyday/stagePlay.ts` and `src/scenario/measureSurvivors.ts` press through it, so a clear is certified only through the admission a player's press is asked |
  * | {@link judgeStage} | `src/campaign/stageSequence.ts#runStageToVerdict`, and `dev/campaignPanel.ts` through it — **twice per stage**, once per seed set, because a stage clears on the tuning batch *and* on seeds it was not tuned against |
  * | {@link batchRequestForStage}, {@link demonstrationConfigFor}, {@link stageReplicationSeed} | `src/campaign/stageSequence.ts#runStageToVerdict`, which builds **both** batches so the two can differ only in their seed set; `dev/campaignPanel.ts` and `campaign.test-helper.ts` reach them through it rather than assembling a second request — the shape § D159 calls *a fixture routing the test to the wrong code path*, one level up |
  * | {@link failStateCounts}, {@link evidenceFrom}, {@link failStateReports} | `src/dev/campaignPanel.ts` — § 5.3's four states, counted over the batch and diagnosed on one replayed replication |
@@ -577,13 +578,18 @@ export {
 
 export { PROBABILITY_WORDS, probabilityWordIn } from './campaign/words.js';
 
+export { movedDimensions, valueText, type MovedDimension } from './campaign/dimensions.js';
+
 export {
-  admitProfile,
-  movedDimensions,
-  valueText,
-  type MovedDimension,
-  type ProfileAdmission,
-} from './campaign/dimensions.js';
+  admitStageMove,
+  pressStage,
+  stageUnitsAt,
+  type StageAdmission,
+  type StageAdmissionContext,
+  type StageMove,
+  type StagePress,
+  type StagePressInput,
+} from './campaign/stagePress.js';
 
 export { briefingFor, type BriefedDimension, type BriefingInput, type StageBriefing } from './campaign/brief.js';
 

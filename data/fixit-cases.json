@@ -487,7 +487,8 @@
       ],
       "result": {
         "head": "The top floors are served like the rest.",
-        "body": "Two cars a side, drawn by headcount instead of floor count. The upper mean falls under a minute, and downstairs never noticed — the slack was theirs all along, and the figures on this page said so."
+        "body": "Two cars a side, drawn by headcount instead of floor count. The upper mean falls under a minute.",
+        "rest": "Downstairs never noticed — the slack was theirs all along, and the figures on this page said so."
       }
     },
     {
@@ -1615,7 +1616,8 @@
       ],
       "result": {
         "head": "The express passes the low zone again.",
-        "body": "Blanked landings restore the run the upper cars were built for. The low floors lose the cars they were borrowing, and their own three never notice the difference."
+        "body": "Blanked landings restore the run the upper cars were built for. The low floors lose the cars they were borrowing.",
+        "rest": "Their own three never notice the difference."
       }
     },
     {
@@ -4800,7 +4802,7 @@
       "run": {
         "seed": "20260841",
         "durationS": 1800,
-        "arrivalRatePctPop5min": 6.8
+        "arrivalRatePctPop5min": 7.0
       },
       "asBuilt": {
         "note": "A year of dense lettings put six hundred more people above an unchanged six-car group — a rise of 61 % on the population the two banks were sized for.",
@@ -5067,7 +5069,7 @@
       ],
       "diagnosis": {
         "text": "The group is genuinely undersized for the tower it now serves. Configuration buys the morning back; only a new shaft buys more.",
-        "reasoning": "32 of 349 lobby journeys waited over a minute against a 113 s worst. Between floors — the journeys that never touch the lobby — the building still works: away inside a minute on 92.9 % of 14 such journeys. The new tenants agreed staggered starts as a term of their leases; invoking that clause moves their arrivals out of the shared peak, and this run watches the morning it leaves behind. What it does not buy is growth: the next letting starts a capital conversation."
+        "reasoning": "30 of 381 lobby journeys waited over a minute against a 128 s worst. Between floors — the journeys that never touch the lobby — there are too few to say much: away inside a minute on 75.0 % of 12 such journeys. The new tenants agreed staggered starts as a term of their leases; invoking that clause moves their arrivals out of the shared peak, and this run watches the morning it leaves behind. What it does not buy is growth: the next letting starts a capital conversation."
       },
       "budgetUnits": 16,
       "repairs": [
@@ -5141,7 +5143,7 @@
           "id": "destination-panels",
           "role": "costly-fix",
           "name": "Destination panels in the lobby",
-          "effect": "Panels group the crowd by destination before it boards a car. Whether that moves the 22.3 s mean is a bench question; the free clause is not.",
+          "effect": "Panels group the crowd by destination before it boards a car. Whether that moves the 23.1 s mean is a bench question; the free clause is not.",
           "patch": {
             "dispatcher": {
               "dispatch": {
@@ -5155,7 +5157,7 @@
           "id": "reactive-dwell",
           "role": "cheap-fix",
           "name": "A dwell that reacts to what is boarding",
-          "effect": "Doors that close when boarding stops, instead of on a timer. It shaves at the 22.3 s mean; it does not shrink the crowd.",
+          "effect": "Doors that close when boarding stops, instead of on a timer. It shaves at the 23.1 s mean; it does not shrink the crowd.",
           "patch": {
             "dispatcher": {
               "answer": {

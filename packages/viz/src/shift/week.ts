@@ -422,53 +422,56 @@ export function wasGraded(readings: readonly GoalReading[]): boolean {
  *
  * ENGINE_CONTRACT § 1.4: an intervention is **the same run's record growing** — the log gains an
  * entry and the whole day is re-simulated from t = 0 — never a new run. So when the re-simulated
- * day files again, everything about the re-close is the ordinary replace (the figures moved, so
- * the banked contribution is recomputed and the history entry is replaced), **except the attempt
- * count**: a player who pressed *Run* once and parked once has made one attempt at the day, and a
- * sheet reading *"attempt 2 at this day"* is counting a change of mind as a retry.
+ * day files again **after the day has closed**, the attempt count does not move: a player who
+ * pressed *Run* once and parked once has made one attempt at the day, and a sheet reading
+ * *"attempt 2 at this day"* is counting a change of mind as a retry.
  *
  * `true` exactly when the run being filed is a re-simulation the current record's growth caused;
  * the caller is the one who knows, because the record itself cannot say — a retry of an unchanged
  * selection reproduces the same `{seed, config}` too (§ D223's own correction two paragraphs
- * down), so intent is the only discriminator there is. It gates **only** the attempt line: on a
- * first close it is irrelevant (`attempt` becomes 1 either way), and the replace semantics above
- * are deliberately untouched, because an intervention that turned a clean day into a missed one
- * must still un-bank it.
+ * down), so intent is the only discriminator there is. It gates **only** the attempt line. It used
+ * to leave the replace semantics alone so that an intervention turning a clean day missed would
+ * un-bank it; since [§ D1138](../../../../DECISIONS.md) there is no replace, and a re-close of a
+ * closed day is practice whatever its cause, because the day's report has already been read.
  */
 export function closeDay(week: WeekState, outcome: DayOutcome, recordGrew = false): WeekState {
   /*
-   * ## A day banks once, and a retry replays it rather than adding to it
+   * ## A day banks once, on its first close, and every later close of it is practice
    *
-   * `docs/16` § 5 clause 1. Before this, closing the same day twice ran the arithmetic twice: a
+   * `docs/16` § 5 clause 1 first: closing the same day twice used to run the arithmetic twice, so a
    * clean Monday closed three times banked three clean shifts and cleared a contract that needs
-   * three, without the doors ever opening on Tuesday. Nothing guarded it — `closeShift`'s only
-   * guard is `filedRunId`, which `adopt` clears on every run it takes on, so **every** press of
-   * *Run this shift* re-arms it, which is exactly what every control in the shell does when it is
-   * moved. (This sentence used to say a re-run's *recording id* is new by construction. It is not:
-   * `runId` is `building-profile-seed`, so re-running one selection produces the same id and the
-   * same recording. What re-arms the guard is `adopt`, not a fresh id — issue #16, § D223.)
+   * three without the doors ever opening on Tuesday. `closeShift`'s only guard is `filedRunId`, which
+   * `adopt` clears on every run it takes on, so every press of *Run this shift* re-arms it.
    *
-   * The fix is not to refuse the second close. A player who misses a day and re-runs it **should**
-   * be able to recover — the design is explicit that *"nothing here is a game over"* — and refusing
-   * would also make the sheet disagree with the run on screen. So the day's contribution is
-   * recomputed from {@link WeekState.banked}, the snapshot taken before the day was first closed.
-   * Re-closing therefore *replaces* the day's effect:
+   * The fix that stood until wave AJ replayed a retry from the snapshot taken before the first
+   * close: a missed Monday re-run clean went up by one, a clean one re-run missed came back down,
+   * and the week kept whichever attempt was closed last. **[§ D1138](../../../../DECISIONS.md)
+   * clause 4 replaces it: the first closed attempt at a day banks, and a close of a day that has
+   * already closed is practice.** The post-AI panel's seats B and D found why the replay rule could
+   * not stand once the call's report prints what each answer did on this crowd: *Take this call
+   * again* re-banked a missed day with the answer read off the sheet, which made the report a quiz
+   * whose key was on the next page and the front door's *"A run counts once"* false in effect.
    *
-   * | first attempt | this attempt | banked count |
-   * |---|---|---|
-   * | missed | clean | goes up by one — the recovery the design asks for |
-   * | clean | clean | unchanged — the exploit |
-   * | clean | missed | comes back down, because the day it was banked for is not clean any more |
+   * So a practice close changes nothing a score reads: not the streak, the clean run, the completed
+   * list, the best day or the history. It counts the attempt (so the sheet can say which one it is)
+   * and drops the award banner, which belongs to the report of the close that earned it. *Nothing
+   * here is a game over* still holds: the day is played again as practice, and tomorrow is a new
+   * crowd with new calls.
    *
-   * The third row is the one that needs `banked` to exist at all: without a snapshot there is no
-   * way to un-bank, and a rule that could only ever add would let a player bank a clean run and
-   * then keep the credit while re-running until the *picture* was prettier.
+   * The snapshot {@link WeekState.banked} is still written on the first close, for the week screen
+   * and for any rule that later needs the week as it stood before the day.
    */
   const retry = week.closedDay === outcome.day;
-  const base =
-    retry && week.banked !== null
-      ? week.banked
-      : { streak: week.streak, cleanRun: week.cleanRun, completed: week.completed };
+  if (retry) {
+    return {
+      ...week,
+      cleared: null,
+      // A re-close that the record's own growth caused is the same attempt continuing — see the
+      // `recordGrew` docstring. It is practice all the same: the day closed once already.
+      attempt: recordGrew ? week.attempt : week.attempt + 1,
+    };
+  }
+  const base = { streak: week.streak, cleanRun: week.cleanRun, completed: week.completed };
 
   /*
    * ## A day nobody judged costs nothing — § D234, issue #27
@@ -562,16 +565,10 @@ export function closeDay(week: WeekState, outcome: DayOutcome, recordGrew = fals
     bestMinutePct: posted ? Math.max(week.bestMinutePct, outcome.minutePct) : week.bestMinutePct,
     cleanRun: posted ? cleanRun : week.cleanRun,
     completed: clears && contract !== undefined ? [...base.completed, contract.id] : base.completed,
-    // A retry replaces the day it re-ran rather than appending a second entry for it — otherwise the
-    // seven-day sparkline would show Monday twice and the week would look a day longer than it is.
-    history: retry
-      ? [...week.history.slice(0, -1), outcome]
-      : [...week.history, outcome].slice(-HISTORY_DAYS),
+    // A practice close returned above, so this is the day's first close and appends it once.
+    history: [...week.history, outcome].slice(-HISTORY_DAYS),
     cleared,
-    // A re-close that the record's own growth caused is the same attempt continuing — see the
-    // `recordGrew` docstring. `Math.max(1, …)` is unreachable belt (a `retry` implies a first
-    // close set 1) and is not written, so a broken invariant would surface rather than be rounded.
-    attempt: retry ? (recordGrew ? week.attempt : week.attempt + 1) : 1,
+    attempt: 1,
     closedDay: outcome.day,
     banked: base,
   };

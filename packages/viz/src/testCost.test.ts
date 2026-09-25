@@ -300,7 +300,60 @@ const ABOVE_CEILING: ReadonlyMap<string, { readonly count: number; readonly tota
      * annotated at **six hours** (21 600 000 ms), the job with a sixth to spare rather than a
      * multiple of it. 158 100 000 + 21 600 000 = **179 700 000**. Nothing existing was raised.
      */
-    ['viz', { count: 112, totalMs: 179_700_000 }],
+    /*
+     * **112 → 113, and the one is named** — wave AJ lane AJ-B's `shift/wrinkleCensus.sweep.test.ts`,
+     * § D1057: every wrinkle spliced as a whole-day episode on five whole-day towers over a small
+     * crowd set, beside the unwrinkled day on the same crowds, under the default standing order and
+     * then every shipped order until one clears. Gated on `WRINKLE_CENSUS` and registered in
+     * `deepTiers.test.ts`, so it costs the default suite nothing. Annotated at **six hours**
+     * (21 600 000 ms), `stagePace.sweep.test.ts`'s bound, because the job measured in the lane ran
+     * for hours at load average 16–20. 179 700 000 + 21 600 000 = **201 300 000**. Nothing existing
+     * was raised.
+     */
+    /*
+     * **113 → 114, and the one is named** — wave AJ lane AJ-D's `campaign/shopTiers.sweep.test.ts`,
+     * GitHub issue #603, § D1078: every contract's career day 1 as built and under each of the
+     * shop's sixteen tiers alone. It is gated on `CAREER_SHOP_SWEEP` and registered in
+     * `deepTiers.test.ts`, so it costs the default suite nothing. Measured: **956 s for eight of the
+     * sixteen contracts at ten seeds** at load average 25–60, and the reference towers' days are
+     * several times longer, so sixteen contracts at ten seeds does not fit under four hours —
+     * annotated at **four hours** (14 400 000 ms), `contractCurve.sweep.test.ts`'s own bound, and
+     * run in slices by `CAREER_SHOP_ONLY` and `CAREER_SHOP_SEEDS` as § D1078's table was.
+     * 201 300 000 + 14 400 000 = **215 700 000**. Nothing existing was raised, and the lane's two
+     * other new files annotate at the ceiling rather than above it.
+     */
+    /*
+     * **114 → 116 and 215 700 000 → 244 500 000, both one file** — wave AJ lane AJ-F's
+     * `shift/queueBar.sweep.test.ts`, § D1085: the queue bar re-derived at the whole-day horizon.
+     * Gated on `QUEUE_BAR_SWEEP` and registered in `deepTiers.test.ts`, so the default suite pays
+     * nothing. Two cases, priced separately because they are separate jobs a hand-run selects with
+     * `-t`:
+     *
+     * - *derive*, **21 600 000 ms**: every whole-day contract × 25 seeds × both horizons. Its own
+     *   docstring prices it off the swarm's per-run wall clock under load: about 25 minutes for the
+     *   six game contracts (this lane ran that restriction beside a 10-seed *d106* in 2 241 s
+     *   at load 14 to 25), 23 for
+     *   `vertical-city`, and about **11 hours** for the six reference towers. Six hours is the
+     *   quiet-box share of that and is **not** a measured quiet-box figure, which is said rather
+     *   than implied; a loaded full run should raise `--testTimeout` on the command line rather
+     *   than this annotation.
+     * - *d106*, **7 200 000 ms**: thirteen dispatchers × 25 whole days on two office towers,
+     *   about an hour at the same load, extrapolated from the 10-seed run above.
+     *
+     * 215 700 000 + 21 600 000 + 7 200 000 = **244 500 000**. Nothing existing was raised.
+     */
+    /*
+     * **116 → 117 and 244 500 000 → 248 100 000, one case** — wave AJ lane AJ-K's
+     * `scenario/survivorReplay.test.ts`, § D1129 clause 5: every way through the survivor census
+     * names, pressed once through `campaign/stagePress.ts#pressStage` and required to clear. Gated on
+     * the census's own `ELEVATOR_SIM_SURVIVORS` and registered in `deepTiers.test.ts`, so the default
+     * suite pays only its always-on admission half, which runs nothing. Measured 72.3 s on this lane's
+     * box (stage 1 1 s, stage 3 50 s, stage 5 21 s, beside a load of about five); **3 600 000 ms** is
+     * the tier's scale on a hosted four-core runner, where the census's own stage 3 took 1 360 s in
+     * this lane's regeneration against 389 s quiet. 244 500 000 + 3 600 000 = **248 100 000**.
+     * Nothing existing was raised.
+     */
+    ['viz', { count: 117, totalMs: 248_100_000 }],
     /*
      * **67 → 70, and the three are named** — GitHub issue #240's
      * `everyday/smallScreen.browser.test.ts`. Five of that file's eight annotations sit **at** this

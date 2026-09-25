@@ -24,11 +24,14 @@ import {
 import {
   stageBandOf,
   stageCarPaintOf,
+  stageCarReadoutFits,
   stageCarReadoutOf,
   stageCarRestBarOf,
   stageCrowdCapOf,
   stageInkFor,
+  stageReadoutRoomOf,
   MAX_LANDING_FIGURES,
+  STAGE_CAR_READOUT_PX,
   STAGE_OUT_OF_SERVICE,
   type StageGeometry,
 } from './stageScreenModel.js';
@@ -301,6 +304,7 @@ export function drawCutaway(ctx: CanvasRenderingContext2D, input: CutawayInput):
   /* AD-S17. Derived once per paint from the record's own motions and door marks — never from a
      field on the frame, and never from a motion the playhead has not reached. */
   const restByCar = new Map(carRestsAt(recording, frame).map((rest) => [rest.carId, rest]));
+  const readoutRoom = stageReadoutRoomOf(g);
   for (const car of frame.cars) {
     const column = g.columns.find((candidate) => candidate.carId === car.carId);
     if (column === undefined || column.outOfService) continue;
@@ -342,10 +346,13 @@ export function drawCutaway(ctx: CanvasRenderingContext2D, input: CutawayInput):
       direction: car.direction,
     });
     ctx.fillStyle = C.warmGrey;
-    ctx.font = `500 8.5px ${TYPE.mono}`;
+    ctx.font = `500 ${String(STAGE_CAR_READOUT_PX)}px ${TYPE.mono}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
-    ctx.fillText(readout.occupancy, column.centreX, y - 1.5);
+    /* Only where it reads — `stageCarReadoutFits`; a narrow shaft keeps its car and loses its print. */
+    if (stageCarReadoutFits(readout.occupancy, readoutRoom)) {
+      ctx.fillText(readout.occupancy, column.centreX, y - 1.5);
+    }
     if (readout.direction !== undefined) {
       ctx.fillStyle = C.terracotta;
       ctx.font = `600 9px ${TYPE.mono}`;

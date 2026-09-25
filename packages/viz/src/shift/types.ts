@@ -68,6 +68,7 @@ import type { AwtInvalidGround, DirectionalSplit, SimTime } from '@elevator-sim/
 // scope table. `watch/types.ts` holds the shape; `watch/record.ts` holds the derivation, and
 // `DayOutcome.record` says why the two are apart.
 import type { WatchRecord } from '../watch/types.js';
+import type { WholeDayPlacement } from '../wrinkles/types.js';
 
 /* -------------------------------------------------------------------------- *
  * The week's calendar
@@ -277,6 +278,13 @@ export interface EventEffect {
    * `events.test.ts`'s cross-check that the struct and the patch agree. Empty for `ordinary`.
    */
   readonly writes: readonly string[];
+  /**
+   * Where the event sits on a whole authored day — `wrinkles/types.ts#WholeDayPlacement`,
+   * [§ D1057](../../../../DECISIONS.md). An episode is spliced into the day's own phase list by
+   * `shift/episode.ts` and replaces the run-wide split and rate; a refusal keeps the event out of a
+   * whole day's draw. Absent or `null` on an event that sets no mix, which has nothing to place.
+   */
+  readonly wholeDay?: WholeDayPlacement | null | undefined;
 }
 
 /** One day's twist: the design's name and note, plus what it does to the run. */
@@ -533,6 +541,19 @@ export interface Observations extends GoalObservations {
    * building whose riders are all correctly badged.
    */
   readonly turnedAway: number;
+  /**
+   * Legs still standing at a landing at the fold's instant — neither boarded nor turned away.
+   * `LiveObservations.waitingNow`, copied. At the run's end it is the **fourth** part of the
+   * accounting `report.ts#accountClause` prints: every leg that arrived was carried, is still in a
+   * car ({@link aboard}), is standing here, or was turned away ({@link turnedAway}) — the post-AI
+   * panel's seat D, whose Everyday report said *323 of 329 carried* and never said where six went.
+   *
+   * A rider who gave up and left is in this count, because `VizLeg` carries no `abandonedAt`; the
+   * sentence that prints it says *had not boarded*, which is true of both.
+   */
+  readonly standing: number;
+  /** Legs that had boarded and not yet alighted at the fold's instant — still in a car. */
+  readonly aboard: number;
   /** Where the deepest queue stood. `null` when no landing ever held anybody. */
   readonly peakQueueFloorId: string | null;
   /**
@@ -1023,15 +1044,13 @@ export interface DayReport {
  */
 export const WAKE_UP_ARRIVALS = 20;
 
-/**
- * Tenant growth per day, compounding **linearly** rather than geometrically: the design's own
- * `1 + 0.11 * (day - 1)` (`design.html` :1568), not `1.11 ** (day - 1)`.
- *
- * The difference is not pedantry. At day 20 the linear form is ×3.09 and the geometric one is
- * ×7.26, and Vertical City at 4 887 occupants would be carrying 35 000 people — a building that
- * cannot be simulated in a browser tab and was never what the design drew.
+/*
+ * `GROWTH_PER_DAY` lived here until wave AJ, as the design's `0.11` (`design.html` :1568). It is
+ * data now — `data/contract-ladder.json`'s `defaultGrowthPerDay` and each rung's `growthPerDay` —
+ * because it decides whether a whole-day week can be won ([§ D1066](../../../../DECISIONS.md)).
+ * The linear form (`1 + g × (day − 1)`, never `(1 + g) ^ (day − 1)`) is kept, and its argument is
+ * `shift/growth.ts`'s module docstring.
  */
-export const GROWTH_PER_DAY = 0.11;
 
 /**
  * The simulated second the shift clock calls 06:00 — `docs/12` § 4.1.

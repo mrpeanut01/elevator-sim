@@ -30,6 +30,7 @@
  * | `cars` L1 | inert | the fitted document really is 10 → 16 persons; two cars over an hour of a residential trickle never fill, so capacity binds on nothing | the same cell at 15 % of population per 5 min |
  * | `cars` L2 | inert | the same sparseness one rung up | `midtown-office` at 1 800 s, as built |
  * | `control` L2 | inert | Level-0 disclosure with two cars: this is `garden-apartments`' own documented collapse of the dispatcher menu, and § D112's finding that a destination which changes no decision is worth nothing | `midtown-office` at 1 800 s — and `control` L3, the Level-1 panel, moves at the campaign's own cell |
+ * | `tenants` L2 | inert, and **refused** on the shop row | a block of flats keeps no start time: its profile's governing peak is the morning down-peak, so `startTimeFloorIdsOf` names no floor and the stagger thins nobody (GitHub issue #603, § D1078) | `midtown-office`, where it thins every office floor by a third and keeps the as-built day's people |
  */
 
 import { readFileSync, readdirSync } from 'node:fs';
@@ -41,6 +42,7 @@ import { describe, expect, it } from 'vitest';
 import { mixedFleetBanks } from '../commissioning/choices.js';
 import { DATA_DIR } from '../fixtures.test-helper.js';
 import { RESOURCES, baseState, legsOf } from '../scope/probes.test-helper.js';
+import { recordRun } from '../record/recordRun.js';
 import { shiftRunConfigOf, drivingProfileOf, type ViewerState } from '../dev/state.js';
 import { DEFAULT_LEVERS } from '../authoring/dispatcherSpec.js';
 
@@ -51,8 +53,9 @@ import {
   MIN_DOOR_S,
   fitOutIsAsBuilt,
   fitOutOf,
-  fittedArrivalRate,
+  fittedCrowdThinning,
   fittedBuilding,
+  startTimeFloorIdsOf,
   leversWithKit,
   profileWithKit,
   type CampaignFitOut,
@@ -176,8 +179,8 @@ describe('a tower with nothing bought', () => {
     expect(profileWithKit(profile, undefined)).toBe(profile);
     expect(leversWithKit(DEFAULT_LEVERS, AS_BUILT)).toBe(DEFAULT_LEVERS);
     expect(leversWithKit(DEFAULT_LEVERS, undefined)).toBe(DEFAULT_LEVERS);
-    expect(fittedArrivalRate(5, AS_BUILT)).toBe(5);
-    expect(fittedArrivalRate(5, undefined)).toBe(5);
+    expect(fittedCrowdThinning(['G', '1'], AS_BUILT)).toBeUndefined();
+    expect(fittedCrowdThinning(['G', '1'], undefined)).toBeUndefined();
   });
 });
 
@@ -287,7 +290,7 @@ describe('the fold over § 8.2’s fitted levels', () => {
  * -------------------------------------------------------------------------- */
 
 /** The three cells the table in the module docstring names. Everything else must move. */
-const EMPTY_AT_THE_CONTRACT_CELL: readonly string[] = ['cars L1', 'cars L2', 'control L2'];
+const EMPTY_AT_THE_CONTRACT_CELL: readonly string[] = ['cars L1', 'cars L2', 'control L2', 'tenants L2'];
 
 describe('at garden-apartments over 3 600 s, buying a tier changes the legs', () => {
   const asBuilt = legsWith(undefined);
@@ -299,7 +302,7 @@ describe('at garden-apartments over 3 600 s, buying a tier changes the legs', ()
     });
   }
 
-  it('is thirteen of the sixteen, and the register of the other three is not stale', () => {
+  it('is twelve of the sixteen, and the register of the other four is not stale', () => {
     // Both directions, in `deadCode.test.ts`'s idiom: a cell that has started moving must leave the
     // register, or the register becomes decoration.
     for (const where of EMPTY_AT_THE_CONTRACT_CELL) {
@@ -308,7 +311,7 @@ describe('at garden-apartments over 3 600 s, buying a tier changes the legs', ()
       if (entry === undefined) continue;
       expect(legsWith(kit(entry.categoryId, entry.tier.level)), `${where} moves now`).toBe(asBuilt);
     }
-    expect(TIERS.length - EMPTY_AT_THE_CONTRACT_CELL.length).toBe(13);
+    expect(TIERS.length - EMPTY_AT_THE_CONTRACT_CELL.length).toBe(12);
   });
 });
 
@@ -513,9 +516,44 @@ describe('every figure in the table is the design’s own or the data’s own', 
     expect(bought.every((car) => car.capacityPersons === 16)).toBe(true);
   });
 
+  it('names the start-time floors from the profile’s governing peak, and none on a block of flats', () => {
+    const building = (id: string) => RESOURCES.buildings.find((candidate) => candidate.id === id)!;
+    const garden = building('garden-apartments');
+    const midtown = building('midtown-office');
+    expect(startTimeFloorIdsOf(garden.floors, garden.trafficProfile, RESOURCES.trafficProfiles)).toEqual([]);
+    const office = startTimeFloorIdsOf(midtown.floors, midtown.trafficProfile, RESOURCES.trafficProfiles);
+    expect(office.length).toBeGreaterThan(0);
+    expect(office).toEqual(midtown.floors.filter((floor) => floor.population > 0).map((floor) => floor.id));
+    expect(fittedCrowdThinning([], kit('tenants', 2))).toBeUndefined();
+  });
+
   it('flattens the peak by exactly the third the tier’s own sentence names', () => {
     expect(kit('tenants', 2).arrivalRateFactor).toBeCloseTo(2 / 3, 10);
-    expect(fittedArrivalRate(6, kit('tenants', 2))).toBeCloseTo(4, 10);
+    expect(fittedCrowdThinning(['G', '1'], kit('tenants', 2))?.keepShareByFloor).toEqual({
+      G: kit('tenants', 2).arrivalRateFactor,
+      '1': kit('tenants', 2).arrivalRateFactor,
+    });
+  });
+
+  it('meets the as-built day’s people less a third, rather than a re-drawn crowd (#601, #603)', () => {
+    /*
+     * § D1078, at `midtown-office` (the campaign's own cell keeps no start time, above). The day as
+     * built and the day with `tenants` L2 share the seed; every first leg the
+     * fitted day records is the as-built day's leg for the same passenger, arriving at the same
+     * instant on the same floor for the same place, and the fitted day records fewer of them.
+     * Under the rate factor this replaced, the two days shared almost nobody.
+     */
+    const first = (fit: CampaignFitOut | undefined) => {
+      const plan = shiftRunConfigOf(RESOURCES, stateWith(fit, { buildingId: 'midtown-office', shiftLengthS: 1800 }));
+      const legs = recordRun(plan.config, { recordDecisions: false, outOfServiceCarIds: plan.outOfServiceCarIds })
+        .recording.legs.filter((leg) => (leg.legIndex ?? 0) === 0);
+      return new Map(legs.map((leg) => [leg.passengerId, `${String(leg.arrivedAt)} ${leg.originFloorId} ${leg.finalDestinationFloorId ?? leg.destinationFloorId}`]));
+    };
+    const asBuilt = first(undefined);
+    const staggered = first(kit('tenants', 2));
+    expect(staggered.size).toBeLessThan(asBuilt.size);
+    expect(staggered.size).toBeGreaterThan(0);
+    for (const [id, key] of staggered) expect(asBuilt.get(id)).toBe(key);
   });
 });
 

@@ -105,6 +105,13 @@ export function createOffThreadMornings(options: OffThreadMorningsOptions): Morn
       }
       readings[message.index] = message.reading;
       landed += 1;
+      /*
+       * Each reading as it lands — [§ D1120](../../../../DECISIONS.md): the judge's live count, its
+       * per-morning marks and its futility looks all read this. The handler may cancel the pool (a
+       * look that finds the check futile does), so the ask is re-checked before anything else is fed.
+       */
+      ask.onReading?.(message.index, message.reading);
+      if (current !== ask) return;
       if (landed < ask.configs.length) {
         feed(worker);
         return;

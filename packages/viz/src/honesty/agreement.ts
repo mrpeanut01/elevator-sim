@@ -89,16 +89,26 @@
 
 import type { BrowserResources } from '../dev/data.js';
 import { SIGNED_OUT, signedIn, type AccountState } from '../menu/account.js';
-import { shiftGoalsOf } from '../dev/leftRail.js';
-import { buildingConfigOf, initialState, type ViewerState } from '../dev/state.js';
+import type { VizLeg, VizRecording } from '../contract/types.js';
+import { shiftGoalsOf, todaysShiftOf } from '../dev/leftRail.js';
+import { buildingConfigOf, initialState, plannedDayOf, type ViewerState } from '../dev/state.js';
+import { stageHeaderOf } from '../everyday/stageScreenModel.js';
+import { todayOf, type TodayRecord } from '../everyday/today.js';
+import { frameAt } from '../frame/frameAt.js';
+import { observationsAt } from '../live/observations.js';
+import { raceVerdictSlotAt } from '../live/raceStrip.js';
+import { describeFrame } from '../render/describeFrame.js';
+import { SHIFT_EVENTS } from '../shift/events.js';
+import { shiftObservationsOf } from '../shift/observations.js';
 import { briefAsksOf } from '../everyday/briefView.js';
 import { createEverydayHost, type EverydayHostBindings } from '../everyday/host.js';
 import { railFooter } from '../everyday/rail.js';
 import { settingsScreenViewOf } from '../everyday/settingsView.js';
 import { weekScreenViewOf } from '../everyday/weekView.js';
-import { wholeDayFor, wholeDayRun } from '../shift/dayLength.js';
+import { scenarioHorizonFor, wholeDayFor, wholeDayRun } from '../shift/dayLength.js';
 import { goalsForDay, readGoals } from '../shift/goals.js';
 import { pressCallRowOf } from '../shift/callRow.js';
+import { dayCallRecordOf, dayCallRowOf } from '../shift/dayCalls.js';
 import {
   admittedPressDayIds,
   CONTRACT_LADDER,
@@ -106,10 +116,10 @@ import {
   type ContractPressDay,
 } from '../shift/ladder.js';
 import type { PressCall } from '../shift/pressCall.js';
-import { clockOf } from '../shift/report.js';
+import { clockOf, dayReportOf } from '../shift/report.js';
 import { DAY_START_S } from '../shift/types.js';
 import { towerChoiceViewOf } from '../everyday/towerChoice.js';
-import type { GoalObservations, WeekState } from '../shift/types.js';
+import type { GoalObservations, Observations, ShiftGoal, WeekState } from '../shift/types.js';
 import { closeDay, outcomeOf } from '../shift/week.js';
 
 import type { HonestyContext } from './surfaces.js';
@@ -165,6 +175,18 @@ export interface AgreementView {
    * discriminating rather than a claim about one fixture — see {@link AGREEMENT_ARMS}.
    */
   readonly account: AccountState | undefined;
+  /**
+   * **The case's own run**, on the first view only (`day1/period`), and `undefined` on the others —
+   * wave AJ, the post-AI panel's seat D (D7) and seat B (defect 6).
+   *
+   * Every pair above is a function of the state, and the first two § D1102 pairs are not: a standing
+   * count on a paused frame and the worst wait on a filed sheet are figures **of a run**. The corpus
+   * already simulates one per case (`HonestyContext.recording`), so no simulation is added; it is
+   * carried on one view because it is one run, and a pair that read it on all six would print the
+   * same comparison six times. A pair that needs it reads `undefined` on the other views, which is
+   * the register's own *both sides silent: the pair does not apply* rather than a pass.
+   */
+  readonly recording?: VizRecording | undefined;
 }
 
 /**
@@ -446,7 +468,294 @@ export const AGREED_FIGURES: readonly AgreedFigure[] = Object.freeze<AgreedFigur
       },
     },
   },
+  {
+    id: 'standing-now',
+    figure: 'how many are standing at one instant — the stage header’s count and the race strip’s slot',
+    why:
+      'Wave AJ, the post-AI panel’s seat D, D7. On one paused frame at St Jude’s call the stage ' +
+      'header read **10** standing and the race strip beside it **6**, because the strip’s slot was ' +
+      'derived when the playhead crossed a four-minute grid line and the header at the playhead. A ' +
+      'frame may carry one standing count. The two sides are separate derivations — the header folds ' +
+      '`frame/overlay.ts#overlayAt`’s `waitingNow`, the slot walks the legs through `isWaitingAt` — ' +
+      'read at the same off-grid playheads across the case’s run, so a shell that went back to ' +
+      'answering the slot at the grid line, or a fold that stopped agreeing with the predicate, ' +
+      'publishes a count the other does not.',
+    left: {
+      surfaceId: 'everyday/stageScreenModel.ts#stageHeaderOf',
+      read: (view) => countsAtPlayheads(view.recording, (recording, t) => headerStandingAt(recording, t)),
+    },
+    right: {
+      surfaceId: 'live/raceStrip.ts#raceVerdictSlotAt',
+      read: (view) =>
+        countsAtPlayheads(view.recording, (recording, t) =>
+          /^(\d+) standing now$/u.exec(raceVerdictSlotAt(NO_SLOTS, NOBODY, recording, t))?.[1],
+        ),
+    },
+  },
+  {
+    id: 'standing-said',
+    figure: 'how many are standing at one instant — the stage header’s count and the sentence a screen reader says',
+    why:
+      'Wave AJ, the post-AI panel’s seat D, D7: the same paused frame whose header read 10 standing ' +
+      'said *7 legs waiting* to a screen reader. `render/describeFrame.ts` reads `Frame.totalWaiting`, ' +
+      'a step function over `core`’s progress samples, and the header folds the legs — two sources ' +
+      'for one count, which `frame/overlay.ts` says agree by construction and nothing across the ' +
+      'corpus held. The rate limit on the live region was the half the panel saw; this is the half ' +
+      'that would let the sentence be wrong even when it is current.',
+    left: {
+      surfaceId: 'everyday/stageScreenModel.ts#stageHeaderOf',
+      read: (view) => countsAtPlayheads(view.recording, (recording, t) => headerStandingAt(recording, t)),
+    },
+    right: {
+      surfaceId: 'render/describeFrame.ts#describeFrame',
+      read: (view) =>
+        countsAtPlayheads(view.recording, (recording, t) =>
+          / (\d+) legs waiting, /u.exec(describeFrame({ recording, frame: frameAt(recording, t) }))?.[1],
+        ),
+    },
+  },
+  {
+    id: 'worst-wait',
+    figure: 'the worst wait of the day — the report’s WORST WAIT card and the goal row that grades it',
+    why:
+      'Wave AJ, the post-AI panel’s seat B, defect 6, and § D1104. The card read **178 s** and the ' +
+      'goal row **181 s** on one sheet: the card was the reporting window’s maximum and the goal the ' +
+      'whole shift’s, and `docs/19` defect 3 had labelled each where it stood. A newcomer reads two ' +
+      'worst waits. The card now reads the goal’s own fold; this pair is what stops a later change ' +
+      'pointing it back at the window. Both sides are silent where the goal is not graded — under the ' +
+      'wake-up gate, or when the worst wait belongs to somebody still standing — because there the ' +
+      'goal row prints no figure to agree with.',
+    left: {
+      surfaceId: 'shift/report.ts#dayReportOf',
+      read: (view) => {
+        const run = gradedRunOf(view);
+        if (run === undefined) return undefined;
+        return dayReportOf({
+          recording: run.recording,
+          observations: run.observations,
+          goals: run.goals,
+          week: view.state.week,
+          contract: undefined,
+          event: SHIFT_EVENTS.ordinary,
+          plan: { shiftLengthS: run.recording.endedAt - run.recording.startedAt, windowStartS: null, patternId: 'building' },
+          calendar: null,
+          subject: { kind: 'week-day' },
+        }).figures.find((figure) => figure.id === 'worst-wait')?.value;
+      },
+    },
+    right: {
+      surfaceId: 'shift/goals.ts#readGoals',
+      read: (view) => {
+        const run = gradedRunOf(view);
+        if (run === undefined) return undefined;
+        return readGoals(run.goals, run.observations).find((reading) => reading.goal.id === 'worst-wait')?.display;
+      },
+    },
+  },
+  {
+    id: 'todays-shift',
+    figure: 'what today is called and what it books — the Engineer rail’s line and the Everyday brief’s wrinkle card',
+    why:
+      'Wave AJ, the post-AI panel’s seats C and D (D6) and seat B (defect 4). On St Jude’s day 1 the ' +
+      'Engineer rail read *An ordinary day — Nothing booked* one door from a brief saying cars D and E ' +
+      'are booked out 08:37–08:46, and both called a pinned day the stage will stop to call *an ' +
+      'ordinary day*. The brief had been repaired (§ D983) and the rail had not, because it read the ' +
+      'calendar’s event while the brief read the run. The left side is the rail’s own derivation ' +
+      '(`dev/leftRail.ts#todaysShiftOf`), the right the brief’s (`everyday/today.ts#todayOf` over the ' +
+      'building `dev/state.ts#plannedDayOf` hands the next run), and the whole line is compared — name ' +
+      'and note — because a fourth reader that forgot either half is the defect again.',
+    left: {
+      surfaceId: 'dev/leftRail.ts#todaysShiftOf',
+      read: (view) => {
+        const shift = todaysShiftOf(view.resources, view.state);
+        return `${shift.name} — ${shift.note}`;
+      },
+    },
+    right: {
+      surfaceId: 'everyday/today.ts#todayOf',
+      read: (view) => {
+        const today = briefTodayOf(view);
+        return `${today.wrinkleName} — ${today.wrinkleNote}`;
+      },
+    },
+  },
+  {
+    id: 'day-call-row',
+    figure: 'an ordinary call’s three ten-minute counts — the report’s call row and the runs it was counted on',
+    why:
+      'Wave AJ, [§ D1138](../../../../DECISIONS.md) clause 3. The row is the one place a player is ' +
+      'told what the answers they did not give did, and it may say only what its runs measured: on ' +
+      'this crowd, how many riders who arrived in the ten minutes from the call waited a minute or ' +
+      'more under each answer. The left side is the row as `shift/dayCalls.ts#dayCallRowOf` draws it ' +
+      'from a record the shipped `dayCallRecordOf` counted; the right side is the same three counts ' +
+      'taken straight off the runs’ legs by an expression written here, from the legs’ own boarding ' +
+      'and refusal times rather than through `isWaitingAt`. A row that counted legs where it says ' +
+      'riders, read the window’s far edge as inside, counted a rider the building turned away, or ' +
+      'printed its answers in another order would publish a count its runs do not hold, which is ' +
+      'the claim-past-its-runs defect the ruling names; the pair fails on any of them.',
+    left: {
+      surfaceId: 'shift/dayCalls.ts#dayCallRowOf',
+      read: () => {
+        const row = dayCallRowOf(
+          dayCallRecordOf({
+            atS: DAY_CALL_FIXTURE.atS,
+            windowEndS: DAY_CALL_FIXTURE.endS,
+            answer: 'spread-cars',
+            legs: DAY_CALL_FIXTURE.legs,
+            observations: DAY_CALL_FIXTURE.observations,
+          }),
+          1,
+          () => 'Shift cleared',
+          (simTimeS) => clockOf(simTimeS, DAY_START_S),
+        );
+        const counts = /: (\d+) with park[^,]*, (\d+) with spread[^.]* and (\d+) with leave/u.exec(row.why);
+        return counts === null ? undefined : `${String(counts[1])}/${String(counts[2])}/${String(counts[3])}`;
+      },
+    },
+    right: {
+      surfaceId: 'shift/dayCalls.ts#dayCallRecordOf',
+      read: () =>
+        DAY_CALL_ANSWER_ORDER.map((answer) => {
+          const riders = new Set<string>();
+          for (const leg of DAY_CALL_FIXTURE.legs[answer]) {
+            if (leg.arrivedAt < DAY_CALL_FIXTURE.atS || leg.arrivedAt >= DAY_CALL_FIXTURE.endS) continue;
+            /* Still standing a minute after arriving: neither boarded nor turned away by then. */
+            const ended = Math.min(leg.boardedAt ?? Infinity, leg.refusedAt ?? Infinity);
+            if (ended > leg.arrivedAt + 60) riders.add(leg.passengerId);
+          }
+          return String(riders.size);
+        }).join('/'),
+    },
+  },
 ]);
+
+/** The *nobody* pick with no rival and no refusal — the slot the standing pairs read. */
+const NOBODY = Object.freeze({
+  pick: 'none' as const,
+  recording: undefined,
+  refusal: undefined,
+  pending: false,
+  watching: false,
+});
+const NO_SLOTS = Object.freeze({ verdict: '', note: '', rivalName: '' });
+
+/**
+ * Nine playheads across the run, each a fraction of the way into its ninth of the span — so none
+ * sits on `live/raceStrip.ts#RACE_SAMPLE_INTERVAL_S`'s grid by construction, which is where a cached slot
+ * and a live one would agree by accident.
+ */
+function countsAtPlayheads(
+  recording: VizRecording | undefined,
+  countAt: (recording: VizRecording, t: number) => string | undefined,
+): string | undefined {
+  if (recording === undefined) return undefined;
+  const span = recording.endedAt - recording.startedAt;
+  const readings: string[] = [];
+  for (let k = 0; k < 9; k += 1) {
+    const t = recording.startedAt + (span * (k + 0.37)) / 9;
+    readings.push(`${clockOf(t, DAY_START_S)} ${countAt(recording, t) ?? '?'}`);
+  }
+  return readings.join(' · ');
+}
+
+/** The stage header's *standing right now* figure at a playhead. */
+function headerStandingAt(recording: VizRecording, t: number): string | undefined {
+  return stageHeaderOf({
+    simTimeS: t,
+    recording,
+    observations: observationsAt(recording, t),
+    dayStartS: undefined,
+    driverName: recording.dispatcherProfileId,
+  }).figures.find((figure) => figure.label === 'standing right now')?.value;
+}
+
+/**
+ * The run folded at its end, with the view's day's goals — or `undefined` where the worst-wait goal
+ * is not graded, which is where the goal row prints no figure.
+ */
+function gradedRunOf(
+  view: AgreementView,
+): { readonly recording: VizRecording; readonly observations: Observations; readonly goals: readonly ShiftGoal[] } | undefined {
+  const recording = view.recording;
+  if (recording === undefined) return undefined;
+  const observations = shiftObservationsOf(observationsAt(recording, recording.endedAt));
+  const goals = goalsForDay(view.state.week.day);
+  const reading = readGoals(goals, observations).find((entry) => entry.goal.id === 'worst-wait');
+  if (reading === undefined || reading.state === 'pending') return undefined;
+  return { recording, observations, goals };
+}
+
+/**
+ * The brief's day record for a view's state — `everyday/briefScreen.ts#factsNow`'s inputs, reached
+ * without a host: the building, clock, mix and day cars the next run is handed
+ * (`dev/state.ts#plannedDayOf`) and the horizon the next press runs (`scenarioHorizonFor`).
+ */
+function briefTodayOf(view: AgreementView): TodayRecord {
+  const { resources, state } = view;
+  const planned = plannedDayOf(resources, state);
+  return todayOf({
+    week: state.week,
+    calendar: state.calendar,
+    building: planned.building,
+    dayStartS: planned.startOfDayS,
+    templateVariesMix: planned.templateVariesMix,
+    wholeDayRun: planned.wholeDayRun,
+    dayCars: planned.dayCars,
+    buildingId: state.buildingId,
+    dispatcherName: undefined,
+    dispatcherId: state.dispatcherId,
+    dispatcherNameOf: () => undefined,
+    goals: [],
+    seed: state.seed,
+    horizon: scenarioHorizonFor(
+      resources.trafficProfiles,
+      buildingConfigOf(resources, state.savedBuildings, state.buildingId),
+    ),
+    crowdIsToday: false,
+    daySeed: state.seed,
+    firstSession: false,
+    units: 'metric',
+  });
+}
+
+/** The three answers in the row's order, spelled out here rather than read from `DAY_CALL_ANSWERS`. */
+const DAY_CALL_ANSWER_ORDER = ['park-cars-lobby', 'spread-cars', 'leave'] as const;
+
+/**
+ * The `day-call-row` fixture: three runs of one call, a call at 10:00 and its ten-minute window. Each
+ * run holds riders on both sides of every edge the count has — before the window, at its far edge,
+ * a wait of exactly a minute, a wait just short of one, a rider turned away, and one rider with two
+ * legs — so the two sides disagree on any of them if either reads it wrongly.
+ */
+const DAY_CALL_FIXTURE = (() => {
+  const atS = 7200;
+  const endS = atS + 600;
+  const leg = (passengerId: string, arrivedAt: number, boardedAt?: number, refusedAt?: number): VizLeg =>
+    ({
+      passengerId,
+      arrivedAt,
+      ...(boardedAt === undefined ? {} : { boardedAt }),
+      ...(refusedAt === undefined ? {} : { refusedAt }),
+    }) as unknown as VizLeg;
+  const base = [
+    leg('early', atS - 10, atS + 100),
+    leg('edge', endS, endS + 200),
+    leg('minute', atS + 30, atS + 90),
+    leg('short', atS + 40, atS + 99),
+    leg('refused', atS + 50, undefined, atS + 70),
+    leg('twice', atS + 60, atS + 200),
+    leg('twice', atS + 300, atS + 400),
+  ];
+  const legs = {
+    'park-cars-lobby': [...base, leg('p1', atS + 100, atS + 250)],
+    'spread-cars': [...base, leg('s1', atS + 100, atS + 130), leg('s2', atS + 120, atS + 300), leg('s3', atS + 500)],
+    leave: [...base, leg('l1', atS + 10, atS + 400), leg('l2', atS + 20, atS + 500)],
+  } as const;
+  /* The row's verdict clause is graded by the caller, and this pair's grader reads no fold. */
+  const unread = {} as Observations;
+  const observations = { 'park-cars-lobby': unread, 'spread-cars': unread, leave: unread };
+  return { atS, endS, legs, observations };
+})();
 
 /** Minutes in words — the right side of `press-call-window`, kept apart from the picker's own table. */
 const MINUTE_NAMES: readonly string[] = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
@@ -793,6 +1102,7 @@ export function agreementViews(
       resources,
       dayClosed: arm.dayClosed,
       account: arm.account,
+      ...(views.length === 0 ? { recording: context.recording } : {}),
     });
     if (day === undefined) continue;
     views.push({

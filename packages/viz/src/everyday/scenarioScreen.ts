@@ -53,9 +53,23 @@ import type { EverydayScreenModule } from './screens.js';
 import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.js';
 import { scenarioHubViewOf } from './scenarioModel.js';
 import { onScenarioLadderProvided, scenarioLadder } from './scenarioLadderPort.js';
-import { scenarioOpen } from './scenarioOpenPort.js';
+import { everydayDeviceChimeStore } from './chimeStore.js';
+import { closeStageInFixit, openStageInFixit } from './stagePlayScreen.js';
 import { el } from './screenDom.js';
 import { EVERYDAY_COLORS as C, EVERYDAY_RADII as R, EVERYDAY_TYPE as TYPE } from './tokens.js';
+
+/**
+ * The stages this device has been paid a clear for — § D1129 clause 4. Read off the device ledger,
+ * the record the pay line itself writes to, so the hub's mark and the award are one fact.
+ */
+function clearedStageIds(): ReadonlySet<string> {
+  return new Set(
+    everydayDeviceChimeStore()
+      .record()
+      .turns.filter((turn) => turn.completion === 'scenario-cleared')
+      .map((turn) => turn.key),
+  );
+}
 
 function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedEverydayScreen {
   const doc = host.ownerDocument;
@@ -67,7 +81,7 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
      * the state this screen was built in, redrawn — which is the defect `EverydayScreenHandle.reread`
      * exists one seam over to fix.
      */
-    const view = scenarioHubViewOf(scenarioLadder());
+    const view = scenarioHubViewOf(scenarioLadder(), clearedStageIds());
 
     const next = el(doc, 'div', 'everyday-scenario');
     next.style.cssText = `padding:30px 32px 34px;background:linear-gradient(160deg,${C.paper},${C.paperDeep} 65%,${C.paperDeeper});min-width:0`;
@@ -104,6 +118,8 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
 
       card.append(name, blurb, shape);
       card.addEventListener('click', () => {
+        /* *Fix a building* opens the cases, never a stage left open from the path (§ D1129). */
+        if (entry.screen === 'fixit') closeStageInFixit();
         context.go(entry.screen);
       });
       list.append(card);
@@ -241,24 +257,14 @@ function pathBlock(
       head.type = 'button';
       head.addEventListener('click', () => {
         /*
-         * **The swap first, then the stage — in that order and in one turn** — § D787, and the
-         * order is `everyday/reportScreen.ts`'s lever button's for its reason: `enterEngineer`
-         * clears the `inert` this shell holds over the other surface, so the tab the opener brings
-         * to the front is a live control rather than a covered one, and the focus it takes lands.
-         * `enterEngineer` is idempotent, which matters because a queued second click must not
-         * toggle the world.
-         *
-         * **The opener's `false` is not branched on, and that is a structural argument rather than
-         * an oversight.** It answers `false` only for an id the campaign panel cannot play, and a
-         * row cannot carry one: `scenario/ladder.ts#scenarioLadderOf` builds these rows from
-         * `loaded.campaign.stages`, and `dev/campaignPanel.ts`'s `playable` list opens with a
-         * spread of that same array from the same `loadCampaign` resolution. One document, one
-         * boot, one array — so a drawn row's id is in that list by construction. The port is still
-         * required to answer honestly, because the caller that one day holds an id from somewhere
-         * else must be able to find out; `scenarioScreen.test.ts` drives both answers.
+         * **The stage opens in the fix-it editor, in this world** — [§ D1129](../../../../DECISIONS.md),
+         * the swarm's Q3 ruling. This press used to swap to the Engineer surface and open the stage
+         * in the Lab (§ D787), which played it under another building's header, with a budget it did
+         * not show and an admission the hub's census did not share, and paid nothing for a clear.
+         * The Lab is still one press away, from the stage's own page.
          */
-        context.enterEngineer();
-        scenarioOpen()?.openStage(row.id);
+        openStageInFixit(row.id);
+        context.go('fixit');
       });
     }
 
@@ -285,6 +291,13 @@ function pathBlock(
 
     head.append(position, name, teaches);
     card.append(head, opening, shape, budget, ways);
+
+    if (row.cleared !== undefined) {
+      card.dataset.cleared = 'yes';
+      const done = el(doc, 'div', 'everyday-scenario-path-cleared', row.cleared);
+      done.style.cssText = `font:600 12px ${TYPE.body};color:${C.moss};margin:9px 0 0;max-width:58ch`;
+      card.append(done);
+    }
 
     const tail = row.playable ? row.note : row.refusal;
     if (tail !== undefined) {

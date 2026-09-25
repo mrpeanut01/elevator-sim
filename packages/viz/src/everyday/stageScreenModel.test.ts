@@ -34,6 +34,7 @@ import { requireBuilding } from '../fixtures.test-helper.js';
 import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
 import { WAIT_BANDS } from '../live/bands.js';
 import { observationsAt } from '../live/observations.js';
+import { SWITCH_KEEPS_DOORS, SWITCH_NEEDS_OTHER_PANELS } from '../live/interventions.js';
 import { syntheticRecording, servedLeg, waitingLeg } from '../live/synthetic.test-helper.js';
 import { syntheticFloor, syntheticShaft } from '../live/synthetic.test-helper.js';
 import { ManualClock } from '../playback/clock.js';
@@ -603,13 +604,14 @@ describe('§ 7.6 — the intervention control', () => {
     expect(offered.rows.map((row) => row.change.kind)).toEqual([
       'park-cars-lobby',
       'spread-cars',
-      'switch-dispatcher',
+      'adopt-dispatcher',
     ]);
   });
 
   it('carries the whole profile on the row, because that is what the record carries', () => {
     const handover = armsFor({ target: OTHER, driving: PLAIN }).rows.at(-1);
-    expect(handover?.change).toEqual({ kind: 'switch-dispatcher', profile: OTHER });
+    /* The whole dispatcher since § D1048 — the label says *Switch to*, and only this makes it true. */
+    expect(handover?.change).toEqual({ kind: 'adopt-dispatcher', profile: OTHER });
     /* The name, never the id — a player hands the day to somebody, not to a key in a data file. */
     expect(handover?.label).toContain('Lobby anchor');
     expect(handover?.label).not.toContain('other');
@@ -749,6 +751,36 @@ describe('§ 7.6 — the intervention control', () => {
     /* Handing to somebody else is still a change — the pin names one profile, not all of them. */
     const elsewhere = armsFor({ target: PLAIN, driving: PLAIN }, log);
     expect(elsewhere.rows.at(-1)?.refusal).toBeUndefined();
+  });
+
+  it('reads a whole-dispatcher handover on the log the same way — § D1048', () => {
+    const log: readonly RunInterventionConfig[] = [
+      { atS: 120, change: { kind: 'adopt-dispatcher', profile: OTHER } },
+    ];
+    expect(armsFor({ target: OTHER, driving: PLAIN }, log).rows.at(-1)?.refusal).toBe(STAGE_SWITCH_NO_CHANGE);
+    expect(armsFor({ target: PLAIN, driving: PLAIN }, log).rows.at(-1)?.refusal).toBeUndefined();
+  });
+
+  it('refuses a target whose landing panels differ, before asking whether it would change anything', () => {
+    const panels: DispatcherProfile = { ...OTHER, dispatch: { callType: 'destination-entry' } };
+    expect(armsFor({ target: panels, driving: PLAIN }).rows.at(-1)?.refusal).toBe(SWITCH_NEEDS_OTHER_PANELS);
+  });
+
+  it('notes, beside an enabled button, what a target cannot bring part-way — § D1048', () => {
+    const doors: DispatcherProfile = { ...OTHER, answer: { dwellPolicy: 'adaptive', maxDwellS: 10 } };
+    const row = armsFor({ target: doors, driving: PLAIN }).rows.at(-1);
+    expect(row?.refusal).toBeUndefined();
+    expect(row?.note).toBe(SWITCH_KEEPS_DOORS);
+    /* And both facts at once, with the unpostable sentence after the residual one. */
+    const both = stageInterventionsOf({
+      interventions: [],
+      simTimeS: 0,
+      hasRun: true,
+      dayClosed: false,
+      recomputing: false,
+      switchTo: { target: doors, driving: () => PLAIN, unpostable: 'A day handed to Lobby anchor cannot be posted.' },
+    }).rows.at(-1);
+    expect(both?.note).toBe(`${SWITCH_KEEPS_DOORS}. A day handed to Lobby anchor cannot be posted.`);
   });
 
   /**

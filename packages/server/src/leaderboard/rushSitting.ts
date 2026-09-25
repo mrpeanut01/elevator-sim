@@ -337,7 +337,8 @@ function nestedKeyIssues(round: Record<string, unknown>, where: string): string[
     const change = entry['change'];
     if (typeof change !== 'object' || change === null || Array.isArray(change)) continue;
     const fields = change as Record<string, unknown>;
-    const isSwitch = fields['kind'] === 'switch-dispatcher';
+    // Both handover kinds carry the same id and rows (§ D1048), so both are held to the same keys.
+    const isSwitch = fields['kind'] === 'switch-dispatcher' || fields['kind'] === 'adopt-dispatcher';
     issues.push(...keyIssues(fields, isSwitch ? SWITCH_KEYS : BARE_CHANGE_KEYS, `${at}.change`));
     if (!isSwitch) continue;
     // A missing or empty id is `submission.ts#interventionIssues`' refusal already; the length is this gate's.

@@ -338,6 +338,7 @@ function firstSessionFor(context: EverydayScreenShellContext): boolean {
     filedDays: context.host.week().history.length,
     solvedCases: progress.solvedCaseIds.length,
     ratings: progress.ratings.length,
+    careerDays: context.host.campaign().today - 1,
   });
 }
 

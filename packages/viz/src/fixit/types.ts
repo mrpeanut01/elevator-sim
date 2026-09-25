@@ -222,7 +222,26 @@ export interface FixitCase {
   readonly budgetUnits: number;
   readonly repairs: readonly FixitRepair[];
   /** The authored success copy — § 10.4's first outcome only; the other three are the engine's. */
-  readonly result: { readonly head: string; readonly body: string };
+  readonly result: FixitResultCopy;
+}
+
+/**
+ * The authored success copy, with its one claim about **the rest of the building** held apart.
+ *
+ * `rest` exists because two authored bodies said the rest of the building did not notice the fix
+ * (*"downstairs never noticed"*, *"their own three never notice the difference"*) and printed that
+ * above the card's own fifty-morning row, which showed the rest down by an interval that excluded
+ * zero — the post-AI panel's seat C, D2 and seat D, D8. How the rest fared is a measurement, and an
+ * authored sentence about it may only print where the measurement agrees:
+ * `fixit/judge.ts#judgedOutcomeOf` prints `rest` when the rest's fifty-morning interval contains
+ * zero, and the measured sentence in its place when it does not. The body may not carry that claim
+ * itself; `parse.ts` refuses a body that tries.
+ */
+export interface FixitResultCopy {
+  readonly head: string;
+  readonly body: string;
+  /** An authored claim that the rest of the building was untouched by the fix. Optional. */
+  readonly rest?: string | undefined;
 }
 
 export interface FixitCases {

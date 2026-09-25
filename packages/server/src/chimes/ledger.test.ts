@@ -458,9 +458,34 @@ describe('the turns a shipped build will pay for — loadChimeTurnBounds, issue 
       ] ?? []
     ).map((entry) => entry[field] ?? '');
 
-  it('reads every fix case and no week contract, and the rush’s waves, from data/', async () => {
+  it('reads every fix case, the offered campaign stages and no week contract, and the rush’s waves, from data/', async () => {
     const bounds = await loadChimeTurnBounds(DATA_DIR, profiles);
-    expect([...bounds.scenarioIds].sort()).toEqual([...idsIn('fixit-cases.json', 'cases', 'id')].sort());
+    /*
+     * § D1129 clause 4: a campaign stage the Scenario hub offers is cleared in Everyday and paid
+     * once, through this route. Offered is the survivor table's reading — a way through counted at
+     * the budget the stage opens on — so a held stage's id is still refused.
+     */
+    const table = JSON.parse(readFileSync(join(DATA_DIR, 'scenario-survivors.json'), 'utf8')) as {
+      readonly scenarios: readonly {
+        readonly id: string;
+        readonly diagnosis: string | null;
+        readonly steps: readonly { readonly stepId: string | null; readonly survivors: number }[];
+      }[];
+    };
+    const offered = table.scenarios
+      .filter(
+        (scenario) =>
+          scenario.diagnosis !== null ||
+          (scenario.steps.find((step) => step.stepId === null)?.survivors ?? 0) > 0,
+      )
+      .map((scenario) => scenario.id);
+    const held = table.scenarios.map((scenario) => scenario.id).filter((id) => !offered.includes(id));
+    expect(offered.length, 'no stage is offered, so the stage half tests nothing').toBeGreaterThan(0);
+    expect(held.length, 'no stage is held, so the refusal half tests nothing').toBeGreaterThan(0);
+    expect([...bounds.scenarioIds].sort()).toEqual(
+      [...idsIn('fixit-cases.json', 'cases', 'id'), ...idsIn('campaign.json', 'stages', 'id').filter((id) => offered.includes(id))].sort(),
+    );
+    for (const id of held) expect(bounds.scenarioIds.has(id), `${id} is held and was paid`).toBe(false);
     /*
      * Scenario-mode clears only — the owner's ruling of 2026-09-10, after the review of PR #505. A
      * daily-loop week contract's clear pays no scenario award, so no contract id may be one.

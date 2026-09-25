@@ -41,6 +41,7 @@
 import {
   rowsBoughtOf,
   standingExtrasFrom,
+  witnessStateOf,
   type FixitSpend,
   type FixitVerdictContext,
 } from '../fixit/engine.js';
@@ -55,6 +56,7 @@ import type {
 } from '../fixit/editorInputs.js';
 import { EDITOR_PARKING_STRATEGIES, EVERY_CAR, KEYED_BANK, OUT_OF_SERVICE } from '../fixit/types.js';
 import type { DialValue, EditorParkingStrategy, FixitCase, FixitExtra, FixitState } from '../fixit/types.js';
+import { DIAGNOSIS_OPEN_BELOW, type RouteCensusRow } from '../fixit/routeCensus.js';
 import type { ActionBarModel } from './actionBar.js';
 /* The currency's own words, from `data/chime-ledger.json` — § D530 authors them and no screen may. */
 import { CHIME_PRICES } from './chimesPanel.js';
@@ -73,9 +75,13 @@ import { CHIME_PRICES } from './chimesPanel.js';
  */
 export const FIXIT_SCREEN_COPY = Object.freeze({
   railHeading: 'BUILDINGS THAT NEED HELP',
+  /*
+   * *"already diagnosed"* left this line on [§ D1120](../../../../DECISIONS.md)'s commit: the diagnosis
+   * is held back until a player asks for it, so the list no longer promises one on every case.
+   */
   railHint:
-    'Each one is a real building with one thing wrong, already diagnosed. Decide what to spend, ' +
-    'put it right, and the tenants stop writing letters.',
+    'Each one is a real building with one thing wrong. Decide what to spend, put it right, and the ' +
+    'tenants stop writing letters. The diagnosis is there if you ask for it.',
   complaintEyebrow: 'THE COMPLAINT',
   asBuiltEyebrow: 'THE BUILDING AS IT STANDS',
   /*
@@ -88,6 +94,13 @@ export const FIXIT_SCREEN_COPY = Object.freeze({
   asBuiltStageNote:
     'The morning the letter is about, as the building runs today. The four figures below are read from this run and no other.',
   asBuiltStageSkip: 'Skip to the figures',
+  /*
+   * The bank view's label, on both played blocks — `caseStage.ts#CaseStageInput.banks`. Drawn only
+   * where the whole tower's car readouts do not fit a pane, so the first clause is true wherever it
+   * is read; the select beside it opens on `STAGE_CAMERAS`' own *Whole tower*, the stage's word for
+   * the same picture.
+   */
+  stageBankView: 'Too many cars to read at this size. Show one bank:',
   /*
    * The pair, played after a press — [§ D644](../../../../DECISIONS.md). Five strings: the block's
    * eyebrow, the sentence saying what the two panes are and where the verdict under them comes
@@ -109,6 +122,27 @@ export const FIXIT_SCREEN_COPY = Object.freeze({
   pairStageBeforeCaption: 'As it stands',
   pairStageAfterCaption: 'With your change',
   diagnosisEyebrow: 'THE DIAGNOSIS',
+  /*
+   * **The diagnosis, withheld until asked** — [§ D1120](../../../../DECISIONS.md) clause 1. A free
+   * press, never sold: `docs/38` § 2.4 spends chimes on modifiers and never on access, and a hint is
+   * access. Its use is marked on the case row, which is the only thing it costs.
+   */
+  diagnosisShow: 'Show the diagnosis',
+  diagnosisWithheld:
+    'Held back, so the search is yours. Asking costs nothing, and the case is then marked as fixed with the diagnosis rather than on your own.',
+  /*
+   * The hint is **the measured witness**, never the mechanism story: which priced change the case's
+   * diagnosed repair buys, and that it was run and held. `fixitDiagnosisView` composes the rows in.
+   * The authored explanation — `diagnosis.text` and `.reasoning`, which say why — is printed only
+   * once a fixed verdict stands on the diagnosed repair's own run (§ D1011's rule, one card along).
+   */
+  diagnosisHintLead: 'What has been measured to fix it is a change bought as',
+  diagnosisHintNote:
+    'Measured, not explained: that change clears the letter’s morning and holds across the forty-nine other mornings. Which setting to move, and how far, is still yours to find.',
+  /* The case row's standing mark — § D1120 clause 1. Not currency: it pays and costs nothing. */
+  markOnOwn: 'on your own',
+  markWithDiagnosis: 'with the diagnosis',
+  markDiagnosisShown: 'diagnosis shown',
   machinesEyebrow: 'THE MACHINES',
   /** The rail tag on a case whose pass conditions have held — § 10.1's `FIXED`. */
   solvedTag: 'FIXED',
@@ -142,6 +176,15 @@ export const FIXIT_SCREEN_COPY = Object.freeze({
   checkingLabel: 'Checking it on 49 more mornings…',
   checkingWhy:
     'It cleared on the letter’s morning, and one morning can be luck. The same order is running on forty-nine more; this finishes on its own.',
+  /*
+   * [§ D1120](../../../../DECISIONS.md) clause 4: the controls stay editable while the mornings run.
+   * An edit makes the pending verdict stale (`verdictStale` above), and the press comes back with this
+   * note, because pressing it stops the check on the last order — the latest ask wins, and a check
+   * that is stopped has no verdict.
+   */
+  noteSupersedes: 'Runs the order on screen now. The check still running on the last one stops there, with no verdict.',
+  /* What the controls say while the mornings run, beside the live count. */
+  checkingEditable: 'You can keep changing the order while it checks. The verdict below is about the order you ran.',
   /*
    * A case held from the list — § D1020. Its own reason is drawn beside the tag, and the reason is
    * `fixit/held.ts`'s, where the measurement that holds it is recorded.
@@ -275,6 +318,12 @@ export interface FixitCaseRailRow {
    * row is drawn with its reason and cannot be opened; it is never silently dropped.
    */
   readonly heldReason?: string | undefined;
+  /**
+   * **Whether the diagnosis played a part**, said on the row — [§ D1120](../../../../DECISIONS.md)
+   * clause 1: *on your own* or *with the diagnosis* on a fixed case, *diagnosis shown* on an open one
+   * the player asked about, and nothing otherwise. A standing mark, never a price.
+   */
+  readonly mark?: string | undefined;
 }
 
 export interface FixitCaseRailModel {
@@ -305,10 +354,12 @@ export function fixitCaseRailModel(
   selectedId: string | undefined,
   towerLineOf: (entry: FixitCase) => string,
   heldReasonOf: (caseId: string) => string | undefined = () => undefined,
+  diagnosisShownOf: (caseId: string) => boolean = () => false,
 ): FixitCaseRailModel {
   const rows: readonly FixitCaseRailRow[] = cases.map((entry) => {
     const heldReason = heldReasonOf(entry.id);
     const solved = heldReason === undefined && solvedIds.has(entry.id);
+    const shown = heldReason === undefined && diagnosisShownOf(entry.id);
     return {
       id: entry.id,
       name: entry.name,
@@ -322,6 +373,16 @@ export function fixitCaseRailModel(
             : FIXIT_SCREEN_COPY.openTag,
       active: entry.id === selectedId,
       heldReason,
+      mark:
+        heldReason !== undefined
+          ? undefined
+          : solved
+            ? shown
+              ? FIXIT_SCREEN_COPY.markWithDiagnosis
+              : FIXIT_SCREEN_COPY.markOnOwn
+            : shown
+              ? FIXIT_SCREEN_COPY.markDiagnosisShown
+              : undefined,
     };
   });
   const fixed = rows.filter((row) => row.solved).length;
@@ -351,6 +412,12 @@ export interface FixitBarView {
    * not checking.
    */
   readonly checking?: boolean;
+  /**
+   * A check is running on an order the player has since edited — [§ D1120](../../../../DECISIONS.md)
+   * clause 4. The press comes back, and its note says pressing it stops that check. Meaningful only
+   * while {@link running} is false.
+   */
+  readonly supersedes?: boolean;
 }
 
 /**
@@ -397,8 +464,89 @@ export function fixitBarModel(base: ActionBarModel, view: FixitBarView): ActionB
       label: (view.ran ? ranLabel : readyLabel) ?? base.primary.label,
       ...(view.ready ? {} : { inert: FIXIT_SCREEN_COPY.loading }),
     },
-    note: FIXIT_SCREEN_COPY.noteReady,
+    note: view.supersedes === true ? FIXIT_SCREEN_COPY.noteSupersedes : FIXIT_SCREEN_COPY.noteReady,
   };
+}
+
+/* -------------------------------------------------------------------------- *
+ * The diagnosis card — withheld, shown as the measured witness, or explained
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The diagnosis card, worded — [§ D1120](../../../../DECISIONS.md) clause 1.
+ *
+ * - **`withheld`**: the default. A press, free, and the sentence saying what asking costs (a mark).
+ * - **`shown`**: the player asked, or the case's census shows fewer than
+ *   `fixit/routeCensus.ts#DIAGNOSIS_OPEN_BELOW` routes clearing the letter's morning, in which case
+ *   {@link FixitDiagnosisView.because} says so with the census's own two counts. The text is the
+ *   **measured witness**: the priced rows the diagnosed repair buys, and that it clears and holds —
+ *   never the authored mechanism story.
+ * - **`explained`**: a fixed verdict stands on the diagnosed repair's own run, leg for leg, so the
+ *   authored result has already been printed (§ D1011) and the authored diagnosis beside it is true
+ *   of the run on screen. Only then.
+ */
+export interface FixitDiagnosisView {
+  readonly state: 'withheld' | 'shown' | 'explained';
+  readonly eyebrow: string;
+  /** The press on a withheld card. */
+  readonly press?: string | undefined;
+  readonly text?: string | undefined;
+  readonly note: string;
+  /** Why a case opened with its diagnosis shown, with the census's counts. */
+  readonly because?: string | undefined;
+}
+
+/** *"… of the 34 single changes tried on this case, one cleared the letter's morning."* */
+export function diagnosisOpenedBecauseOf(census: RouteCensusRow): string {
+  const cleared = census.clearing === 0 ? 'none' : census.clearing === 1 ? 'only one' : String(census.clearing);
+  return (
+    `Shown from the start: of the ${String(census.routes)} single changes tried on this case, ${cleared} ` +
+    'cleared the letter’s morning, so this case opens with its diagnosis.'
+  );
+}
+
+/** The hint's sentence: the diagnosed repair's schedule rows, in the schedule's own names. */
+export function diagnosisHintTextOf(entry: FixitCase, schedule: PriceSchedule): string {
+  const rows = rowsBoughtOf(entry, witnessStateOf(entry), schedule);
+  const named = rows.map((name) => `“${name}”`);
+  const joined = named.length <= 1 ? (named[0] ?? '') : `${named.slice(0, -1).join(', ')} and ${named.at(-1) ?? ''}`;
+  return `${FIXIT_SCREEN_COPY.diagnosisHintLead} ${joined}.`;
+}
+
+export function fixitDiagnosisView(input: {
+  readonly entry: FixitCase;
+  readonly schedule: PriceSchedule;
+  /** The player pressed *Show the diagnosis* on this case, in this sitting or a kept one. */
+  readonly asked: boolean;
+  /** The case's route census row, or `undefined` for a case the census does not cover. */
+  readonly census: RouteCensusRow | undefined;
+  /** A fixed verdict stands on the diagnosed repair's own run, for the order on screen. */
+  readonly explained: boolean;
+}): FixitDiagnosisView {
+  const eyebrow = FIXIT_SCREEN_COPY.diagnosisEyebrow;
+  if (input.explained) {
+    return { state: 'explained', eyebrow, text: input.entry.diagnosis.text, note: input.entry.diagnosis.reasoning };
+  }
+  const opens = input.census !== undefined && input.census.clearing < DIAGNOSIS_OPEN_BELOW;
+  if (input.asked || opens) {
+    return {
+      state: 'shown',
+      eyebrow,
+      text: diagnosisHintTextOf(input.entry, input.schedule),
+      note: FIXIT_SCREEN_COPY.diagnosisHintNote,
+      because: opens && input.census !== undefined ? diagnosisOpenedBecauseOf(input.census) : undefined,
+    };
+  }
+  return { state: 'withheld', eyebrow, press: FIXIT_SCREEN_COPY.diagnosisShow, note: FIXIT_SCREEN_COPY.diagnosisWithheld };
+}
+
+/**
+ * The line a stopped check leaves — [§ D1120](../../../../DECISIONS.md) clause 4, S1's sentence:
+ * a press made while the last order was still being checked stops that check, which then has no
+ * verdict, and says so with the count it reached.
+ */
+export function checkStoppedLineOf(landed: number, planned: number): string {
+  return `The check on your last order stopped at ${String(landed)} of ${String(planned)} mornings when you ran this one, and it has no verdict.`;
 }
 
 /** One machinery stepper row, worded. The prices are § 9's, read from the engine. */

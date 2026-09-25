@@ -175,6 +175,46 @@ export interface RushRoundRecord {
    * it — see the module docstring.
    */
   readonly unpostable: readonly string[];
+  /**
+   * **Everything the round started from, as one comparable string** — wave AJ, § D1099. Never on the
+   * wire; the round list reads it and nothing else does.
+   *
+   * Two rounds with the same key met the same crowd from the same start: the same building and
+   * kit, the same seed and stream, the same dispatcher document and rules, and the same levers. A
+   * rush is simulated deterministically from exactly those, so when one of the two recorded no
+   * press it **is** the other one's run without its changes, and the gap between their holds is a
+   * measurement on this crowd rather than a guess (`everyday/rushPost.ts#roundLinesOf`). The key
+   * errs toward inequality: every field a round could differ in that a press did not write is in
+   * it, so a lever moved between rounds is two starts rather than one.
+   *
+   * Optional because a record built without it (a fixture, or a producer that predates the field)
+   * is compared with nothing, which is the safe answer.
+   */
+  readonly startKey?: string;
+}
+
+/**
+ * {@link RushRoundRecord.startKey} for the state a round ran under. The seed is a `bigint` and is
+ * written as its digits; every other field is plain data.
+ */
+export function rushStartKeyOf(state: ViewerState): string {
+  return JSON.stringify({
+    buildingId: state.buildingId,
+    seed: state.seed.toString(),
+    freePlay: state.freePlay ?? null,
+    shiftLengthS: state.shiftLengthS,
+    windowStartS: state.windowStartS,
+    campaignFitOut: state.campaignFitOut ?? null,
+    dispatcherId: state.dispatcherId,
+    dispatcherSpec: state.dispatcherSpec,
+    ruleRows: state.ruleRows,
+    levers: state.levers,
+    selectorSpec: state.selectorSpec,
+    patience: state.patience,
+    paramDemand: state.paramDemand,
+    lobbyCrowding: state.lobbyCrowding,
+    runnerTunables: state.runnerTunables,
+  });
 }
 
 /**
@@ -213,7 +253,11 @@ export function rushRoundRecordOf(input: {
   const ordered = [...state.interventions].sort((a, b) => a.atS - b.atS);
   const drivers = [
     input.dispatcherName,
-    ...ordered.flatMap((entry) => (entry.change.kind === 'switch-dispatcher' ? [entry.change.profile.name] : [])),
+    ...ordered.flatMap((entry) =>
+      entry.change.kind === 'switch-dispatcher' || entry.change.kind === 'adopt-dispatcher'
+        ? [entry.change.profile.name]
+        : [],
+    ),
   ];
   return Object.freeze({
     dispatcherProfileId: state.dispatcherId,
@@ -226,6 +270,7 @@ export function rushRoundRecordOf(input: {
     holdS: holdAtS === undefined ? null : holdAtS - recording.startedAt,
     outcome: rushOutcomeOf(recording, input.endedAtS),
     unpostable: Object.freeze(unpostable),
+    startKey: rushStartKeyOf(state),
   });
 }
 
@@ -252,13 +297,13 @@ function wireRoundInterventions(
       carried.push({ atS: entry.atS, change: { kind: change.kind } });
       continue;
     }
-    if (change.kind === 'switch-dispatcher') {
+    if (change.kind === 'switch-dispatcher' || change.kind === 'adopt-dispatcher') {
       const target = switchWireOf(change.profile, shipped);
       if (target === undefined) {
         refusals.push(switchUnpostableReasonOf(change.profile, shipped) ?? '');
         continue;
       }
-      carried.push({ atS: entry.atS, change: { kind: 'switch-dispatcher', ...target } });
+      carried.push({ atS: entry.atS, change: { kind: change.kind, ...target } });
       continue;
     }
     /*

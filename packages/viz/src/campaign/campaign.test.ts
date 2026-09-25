@@ -49,13 +49,14 @@ import { describe, expect, it } from 'vitest';
 
 import { briefingFor } from './brief.js';
 import { useCampaignFixture } from './campaign.test-helper.js';
-import { admitProfile } from './dimensions.js';
+import { admitStageMove, stageUnitsAt } from './stagePress.js';
 import { batchRequestForStage, demonstrationConfigFor, stageReplicationSeed } from './stageRun.js';
 import { editableIdsOf, parseCampaign, playerFacingStrings, validateCampaign } from './parse.js';
-import { FAIL_STATES } from './types.js';
+import { FAIL_STATES, type CampaignStage } from './types.js';
 import { PROBABILITY_WORDS, playerSafeDescription, probabilityWordIn } from './words.js';
 import { GOAL_READS, isPerReplicationGoal, type GoalKind } from '../scenario/goals.js';
-import { withholdingDimension } from '../scenario/budget.js';
+import { rungsOf, withholdingDimension } from '../scenario/budget.js';
+import { dropdownConfigurationsOf } from '../scenario/survivorSpace.js';
 import { validatePublishedGoalRates } from '../scenario/published.js';
 import { dimensionIdsLiveOn } from '../authoring/dispatcherSpec.js';
 import { requireBuilding, withGoodsCar } from '../fixtures.test-helper.js';
@@ -408,43 +409,76 @@ describe('the guard fires — negative controls, applied to the shipped campaign
  * 4 — which dimensions the player may move, enforced
  * -------------------------------------------------------------------------- */
 
-describe('a stage judges only the changes it offered', () => {
-  it('admits a profile that stays inside the stage’s dials, and names what it moved', () => {
-    const { space } = fixture;
-    const stage = stageAt(0);
-    const admission = admitProfile(
-      space,
-      requireProfile(stage.dispatcher.startingProfileId),
-      requireProfile('nearest-car'),
-      editableIdsOf(stage.dispatcher.editable, space.ids, fixture.context.schedule),
-    );
-    expect(admission.admissible).toBe(true);
-    expect(admission.withinScope.map((moved) => moved.id)).toContain('weights.waitTime');
-    expect(admission.sentence).toContain('weights.waitTime');
+describe('a stage judges only the changes its budget pays for — the one admission check, § D1129', () => {
+  const contextOf = (stage: CampaignStage) => ({
+    space: fixture.space,
+    schedule: fixture.context.schedule,
+    baseline: requireProfile(stage.dispatcher.startingProfileId),
+    building: requireBuilding(fixture.config, stage.building),
+    elevatorSpecs: fixture.config.elevatorSpecs,
   });
 
-  it('refuses one that moves a dial the stage did not open, and names the dial', () => {
-    const { space } = fixture;
+  it('admits a profile the base rung pays for, and names what it moved and bought', () => {
     const stage = stageAt(0);
-    const admission = admitProfile(
-      space,
-      requireProfile(stage.dispatcher.startingProfileId),
-      requireProfile('energy-aware'),
-      editableIdsOf(stage.dispatcher.editable, space.ids, fixture.context.schedule),
-    );
-    expect(admission.admissible).toBe(false);
-    expect(admission.outOfScope.length).toBeGreaterThan(0);
-    expect(admission.sentence).toContain('this stage does not open');
+    const admission = admitStageMove(contextOf(stage), { profile: requireProfile('nearest-car') }, stageUnitsAt(stage, null));
+    expect(admission.admitted, admission.sentence).toBe(true);
+    expect(admission.moved.map((moved) => moved.id)).toContain('weights.waitTime');
+    expect(admission.sentence).toContain(`of the ${String(stageUnitsAt(stage, null))} units`);
+    /* Names, never ids: the sentence reaches the Lab, the hub and the stage page (internal-notation). */
+    expect(admission.sentence).toContain(requireProfile('nearest-car').name);
+    expect(admission.sentence).not.toContain('weights.waitTime');
   });
 
-  it('reports an unchanged choice as the control it is', () => {
-    const { space } = fixture;
+  it('refuses one the base rung cannot pay for, and names the price', () => {
+    const stage = stageAt(0);
+    const units = stageUnitsAt(stage, null);
+    const admission = admitStageMove(contextOf(stage), { profile: requireProfile('energy-aware') }, units);
+    expect(admission.admitted).toBe(false);
+    expect(admission.units).toBeGreaterThan(units);
+    expect(admission.reason).toContain(`the budget holds ${String(units)}`);
+    /* The same move is admitted on the rung that pays for it: the price refused it, not the dial. */
+    const bought = rungsOf(stage.budget).find((rung) => rung.units >= admission.units);
+    if (bought === undefined) throw new Error('no rung of stage 1 pays for energy-aware');
+    expect(admitStageMove(contextOf(stage), { profile: requireProfile('energy-aware') }, bought.units).admitted).toBe(true);
+  });
+
+  it('reports an unchanged choice as the control it is, at no cost', () => {
     const stage = stageAt(0);
     const profile = requireProfile(stage.dispatcher.startingProfileId);
-    const admission = admitProfile(space, profile, profile, editableIdsOf(stage.dispatcher.editable, space.ids, fixture.context.schedule));
-    expect(admission.admissible).toBe(true);
-    expect(admission.withinScope).toEqual([]);
-    expect(admission.sentence).toContain('the control this surface is meant to survive');
+    const admission = admitStageMove(contextOf(stage), { profile }, stageUnitsAt(stage, null));
+    expect(admission.admitted).toBe(true);
+    expect(admission.moved).toEqual([]);
+    expect(admission.units).toBe(0);
+    expect(admission.sentence).toContain('the control this stage is meant to survive');
+  });
+
+  it('is the census’s question: the dropdown the census counts at a rung is exactly what the check admits there', () => {
+    /*
+     * Both directions, every stage, every rung. `survivorSpace.ts#dropdownConfigurationsOf` prices
+     * each profile once and `measureSurvivors.ts` asks the check again per rung; a player's press asks
+     * the check. If the two populations could differ, the hub could name a way through the press
+     * refuses — which is the defect § D1129 closes.
+     */
+    let compared = 0;
+    for (const stage of fixture.campaign.stages) {
+      const context = contextOf(stage);
+      const profiles = fixture.config.dispatcherProfiles.profiles;
+      const census = dropdownConfigurationsOf(context.space, context.schedule, context.baseline, profiles, context.building);
+      for (const rung of rungsOf(stage.budget)) {
+        const counted = census
+          .filter((entry) => admitStageMove(context, { profile: requireProfile(entry.profileId) }, rung.units).admitted)
+          .map((entry) => entry.profileId);
+        const pressable = profiles
+          .filter((profile) => {
+            const admission = admitStageMove(context, { profile }, rung.units);
+            return admission.admitted && admission.moved.length > 0;
+          })
+          .map((profile) => profile.id);
+        expect(counted, `${stage.id} at ${String(rung.units)} units`).toEqual(pressable);
+        compared += pressable.length;
+      }
+    }
+    expect(compared).toBeGreaterThan(0);
   });
 
   /**

@@ -220,7 +220,18 @@ async function pairAndVerdict(page: Page): Promise<{
   readonly primaryLabel: string;
 }> {
   return page.evaluate(() => ({
-    text: document.querySelector('.everyday-fixit-pair')?.textContent ?? '',
+    /*
+     * The block's own words, without the bank view's option list: those are the building's bank
+     * names (*Zone 1 local …*), where a digit is part of a name rather than a figure the block
+     * states. The bank view's label is kept, so a figure written into it would still be caught.
+     */
+    text: (() => {
+      const block = document.querySelector('.everyday-fixit-pair');
+      if (block === null) return '';
+      const copy = block.cloneNode(true) as HTMLElement;
+      for (const picker of copy.querySelectorAll('.everyday-fixit-pair-bank')) picker.remove();
+      return copy.textContent ?? '';
+    })(),
     pairs: document.querySelectorAll('.everyday-fixit-pair').length,
     outcomes: document.querySelectorAll('.everyday-fixit-outcome').length,
     asBuiltStages: document.querySelectorAll('.everyday-fixit-stage').length,
@@ -821,7 +832,12 @@ describe.skipIf(!HAS_BROWSER)('the fourth mode tile opens § 10’s screen', () 
        * direct check below holds.
        */
       /* `repair` and `extra` left this list with the menu — § D1020. */
-      const allowed = /everyday-fixit-(case|step-up|step-down|budget-buy|floor-chip)/;
+      /*
+       * `diagnosis-show` joins from § D1120: the diagnosis is withheld until asked, and asking is one
+       * free press. It reveals one measured fact; it offers nothing to pick, which the check below
+       * holds for every other control.
+       */
+      const allowed = /everyday-fixit-(case|step-up|step-down|budget-buy|floor-chip|diagnosis-show)/;
       expect(controls.filter((className) => !allowed.test(className))).toEqual([]);
 
       /*
@@ -840,6 +856,8 @@ describe.skipIf(!HAS_BROWSER)('the fourth mode tile opens § 10’s screen', () 
         const root = document.querySelector('.everyday-fixit');
         return [...(root?.querySelectorAll('button, input, select') ?? [])]
           .map((node) => `${node.className} ${node.getAttribute('name') ?? ''}`)
+          /* The one reveal § D1120 added is exempt by its exact class, and nothing else is. */
+          .filter((face) => face.trim() !== 'everyday-fixit-diagnosis-show')
           .filter((face) => /guess|candidate|which-|cause-pick|diagnos/iu.test(face));
       });
       expect(quizLike, 'a control offering the diagnosis to pick is back on the fix screen').toEqual(

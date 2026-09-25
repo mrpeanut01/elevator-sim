@@ -58,6 +58,7 @@ export type {
   BatchSizeCurve,
   CredentialAssignment,
   CredentialGapOverride,
+  CrowdThinning,
   DutyDemandOverride,
   DayVariationConfig,
   DemandLevel,

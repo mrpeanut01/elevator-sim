@@ -1,0 +1,469 @@
+{
+  "$comment": "THE WEEK CENSUS, docs/33 DC-10 and DECISIONS.md § D1067 (wave AJ lane AJ-C). One row per (contract, day of the week, wrinkle) the census measured: the configuration chosen on the TUNING crowds (every shipped dispatcher with no press or one parking press at one of pressAtFractions of the day, screened on screenCount crowds, the best finalists on the rest), then that one configuration and the tower's standing order each run once on every HELD-OUT crowd. chosenVerdicts and standingVerdicts are one mark per held-out crowd in date order, C cleared and m missed, where missed means any goalsForDay(day, 'whole-day') goal not met. Whether a row is admitted is NOT stored: shift/weekWay.ts#dc10Of derives it from the marks and the protocol, so no row can say admitted over counts that do not support it. growthPerDay is the slope the tower was grown at when the row was measured; a row whose slope is not the ladder's current slope for that tower is stale and is refused by shift/weekWay.ts#weekWayIssues (day 1 excepted, being the same building at every slope). queueOnlyMisses counts held-out crowds the chosen configuration missed on the queue goal and nothing else, for the queue-bar ruling to read. eventId 'ordinary' is the UNWRINKLED day (campaignEventId ordinary); any other id is the wrinkle the week draws for that day at the whole-day horizon, measured with lane AJ-B's episode splice (§ D1057) in the tree. PROVENANCE: every mark is a measurement, run by `WEEK_WAY_SWEEP=1 WEEK_WAY_OUT=<file> WEEK_WAY_CONTRACTS=<ids> WEEK_WAY_DAYS=<days> [WEEK_WAY_EVENTS=scheduled] npx vitest run --project viz --maxWorkers=1 --testTimeout=36000000 packages/viz/src/shift/weekWay.sweep.test.ts` and copied row for row; the thresholds and crowd counts in the protocol block are CHOSEN, an agent's proposal for the owner to accept, tighten or reject, and docs/33 DC-10 gives the reasoning and the cost. shift/weekWay.verify.test.ts re-runs every row weekly (deep-tiers.yml, job week-census) and fails on a moved mark: the remedy is a census re-run, never an edit to a mark.",
+  "version": 1,
+  "protocol": {
+    "horizon": "whole-day",
+    "tuningFrom": "2026-08-01",
+    "tuningCount": 8,
+    "screenCount": 2,
+    "finalists": 4,
+    "heldOutFrom": "2026-10-01",
+    "heldOutCount": 20,
+    "pressKinds": [
+      "spread-cars",
+      "park-cars-lobby"
+    ],
+    "pressAtFractions": [
+      0.2,
+      0.43
+    ],
+    "standingOrder": "collective",
+    "confidence": 0.95,
+    "clearLowerBoundAtLeast": 0.3333333333333333,
+    "standingMissAtLeast": 0.3333333333333333,
+    "breathersPerWeek": 1
+  },
+  "rows": [
+    {
+      "contractId": "c2",
+      "day": 1,
+      "eventId": "ordinary",
+      "growthPerDay": 0.11,
+      "breather": false,
+      "chosen": {
+        "dispatcherId": "predictive-balanced",
+        "press": "spread-cars",
+        "atFraction": 0.43
+      },
+      "tuningClears": 8,
+      "tuningN": 8,
+      "chosenVerdicts": "CCCCCCCCCCCCCCCCCCCC",
+      "standingVerdicts": "CmmCmmmCmCCmmmmmmCCm",
+      "queueOnlyMisses": 0,
+      "lowestPeakQueue": 11,
+      "screenRuns": 130
+    },
+    {
+      "contractId": "c2",
+      "day": 2,
+      "eventId": "ordinary",
+      "growthPerDay": 0.02,
+      "breather": false,
+      "chosen": {
+        "dispatcherId": "predictive-balanced",
+        "press": "spread-cars",
+        "atFraction": 0.2
+      },
+      "tuningClears": 8,
+      "tuningN": 8,
+      "chosenVerdicts": "CCCCCCCCCCCCCCCCCCCC",
+      "standingVerdicts": "mmCCmmmCCmmCmCmCmmmC",
+      "queueOnlyMisses": 0,
+      "lowestPeakQueue": 12,
+      "screenRuns": 130
+    },
+    {
+      "contractId": "c2",
+      "day": 2,
+      "eventId": "move-in:middle",
+      "growthPerDay": 0.02,
+      "breather": false,
+      "chosen": {
+        "dispatcherId": "auction",
+        "press": "park-cars-lobby",
+        "atFraction": 0.2
+      },
+      "tuningClears": 0,
+      "tuningN": 8,
+      "chosenVerdicts": "mmmmmmmmmmmmmCmmmmmm",
+      "standingVerdicts": "mmmmmmmmmmmmmmmmmmmm",
+      "queueOnlyMisses": 0,
+      "lowestPeakQueue": 33,
+      "screenRuns": 130
+    },
+    {
+      "contractId": "c2",
+      "day": 3,
+      "eventId": "ordinary",
+      "growthPerDay": 0.02,
+      "breather": false,
+      "chosen": {
+        "dispatcherId": "predictive-balanced",
+        "press": "spread-cars",
+        "atFraction": 0.2
+      },
+      "tuningClears": 8,
+      "tuningN": 8,
+      "chosenVerdicts": "CCCCCCCCCCCCCCCCCCCC",
+      "standingVerdicts": "mmCCmmmmCmmCmCmCmmmC",
+      "queueOnlyMisses": 0,
+      "lowestPeakQueue": 12,
+      "screenRuns": 130
+    },
+    {
+      "contractId": "c2",
+      "day": 3,
+      "eventId": "fire-drill:full",
+      "growthPerDay": 0.02,
+      "breather": false,
+      "chosen": {
+        "dispatcherId": "predictive-balanced",
+        "press": "spread-cars",
+        "atFraction": 0.43
+      },
+      "tuningClears": 8,
+      "tuningN": 8,
+      "chosenVerdicts": "CCCCCCCCCCCCmmCCCCCC",
+      "standingVerdicts": "mmCmmCCmmmmmmmmmCmmm",
+      "queueOnlyMisses": 2,
+      "lowestPeakQueue": 12,
+      "screenRuns": 130
+    },
+    {
+      "contractId": "c2",
+      "day": 4,
+      "eventId": "ordinary",
+      "growthPerDay": 0.02,
+      "breather": false,
+      "chosen": {
+        "dispatcherId": "predictive-balanced",
+        "press": "",
+        "atFraction": 0
+      },
+      "tuningClears": 7,
+      "tuningN": 8,
+      "chosenVerdicts": "CCCCCCCCCmCCCmmmCCmC",
+      "standingVerdicts": "CmmmCmmmmmmmmmmmmmmm",
+      "queueOnlyMisses": 3,
+      "lowestPeakQueue": 12,
+      "screenRuns": 130
+    },
+    {
+      "contractId": "c2",
+      "day": 4,
+      "eventId": "conference:full-floor",
+      "growthPerDay": 0.02,
+      "breather": false,
+      "chosen": {
+        "dispatcherId": "auction",
+        "press": "spread-cars",
+        "atFraction": 0.43
+      },
+      "tuningClears": 5,
+      "tuningN": 8,
+      "chosenVerdicts": "CCCCmCCCCmCmCmmmCCCm",
+      "standingVerdicts": "mmmmmmmmmmmmmmmmmmmm",
+      "queueOnlyMisses": 4,
+      "lowestPeakQueue": 13,
+      "screenRuns": 130
+    },
+    {
+      "contractId": "c2",
+      "day": 5,
+      "eventId": "ordinary",
+      "growthPerDay": 0.02,
+      "breather": false,
+      "chosen": {
+        "dispatcherId": "predictive-balanced",
+        "press": "",
+        "atFraction": 0
+      },
+      "tuningClears": 7,
+      "tuningN": 8,
+      "chosenVerdicts": "CCCCCCCCCmCmmmmmCCmC",
+      "standingVerdicts": "CmmmCmmmmmmmmmmmmmmm",
+      "queueOnlyMisses": 4,
+      "lowestPeakQueue": 12,
+      "screenRuns": 130
+    },
+    {
+      "contractId": "c2",
+      "day": 5,
+      "eventId": "shaft-out:most-of-day",
+      "growthPerDay": 0.02,
+      "breather": false,
+      "chosen": {
+        "dispatcherId": "fairness-first",
+        "press": "park-cars-lobby",
+        "atFraction": 0.2
+      },
+      "tuningClears": 0,
+      "tuningN": 8,
+      "chosenVerdicts": "mmmmmmmmmmmmmmmmmmmm",
+      "standingVerdicts": "mmmmmmmmmmmmmmmmmmmm",
+      "queueOnlyMisses": 0,
+      "lowestPeakQueue": 32,
+      "screenRuns": 130
+    },
+    {
+      "contractId": "c2",
+      "day": 6,
+      "eventId": "weekend",
+      "growthPerDay": 0.02,
+      "breather": true,
+      "chosen": {
+        "dispatcherId": "fairness-first",
+        "press": "spread-cars",
+        "atFraction": 0.43
+      },
+      "tuningClears": 8,
+      "tuningN": 8,
+      "chosenVerdicts": "CCCCCCCCCCCCCCCCCCCC",
+      "standingVerdicts": "CCCCCCCCCCCCCCCCCCCC",
+      "queueOnlyMisses": 0,
+      "lowestPeakQueue": 6,
+      "screenRuns": 130
+    },
+    {
+      "contractId": "c2",
+      "day": 7,
+      "eventId": "weekend-quiet",
+      "growthPerDay": 0.02,
+      "breather": false,
+      "chosen": {
+        "dispatcherId": "fairness-first",
+        "press": "",
+        "atFraction": 0
+      },
+      "tuningClears": 8,
+      "tuningN": 8,
+      "chosenVerdicts": "CCCCCCCCCCCCCCCCCCCC",
+      "standingVerdicts": "CCCCCCCCCCCCCCCCCCCC",
+      "queueOnlyMisses": 0,
+      "lowestPeakQueue": 6,
+      "screenRuns": 130
+    },
+    {
+      "contractId": "c3",
+      "day": 1,
+      "eventId": "ordinary",
+      "growthPerDay": 0.11,
+      "breather": false,
+      "chosen": {
+        "dispatcherId": "auction-multi-round",
+        "press": "spread-cars",
+        "atFraction": 0.43
+      },
+      "tuningClears": 7,
+      "tuningN": 8,
+      "chosenVerdicts": "mmCCmmCCmCCCmmCmCmCm",
+      "standingVerdicts": "mmmmmCCCmCmmmmmmmmCC",
+      "queueOnlyMisses": 8,
+      "lowestPeakQueue": 16,
+      "screenRuns": 130
+    },
+    {
+      "contractId": "c3",
+      "day": 2,
+      "eventId": "ordinary",
+      "growthPerDay": 0.11,
+      "breather": false,
+      "chosen": {
+        "dispatcherId": "fairness-first",
+        "press": "park-cars-lobby",
+        "atFraction": 0.2
+      },
+      "tuningClears": 1,
+      "tuningN": 8,
+      "chosenVerdicts": "mmmmCCmCmCmCmmmmmmCm",
+      "standingVerdicts": "mmmmmmmmmmmmmmmmmmCm",
+      "queueOnlyMisses": 12,
+      "lowestPeakQueue": 28,
+      "screenRuns": 130
+    },
+    {
+      "contractId": "c3",
+      "day": 3,
+      "eventId": "ordinary",
+      "growthPerDay": 0.11,
+      "breather": false,
+      "chosen": {
+        "dispatcherId": "auction-multi-round",
+        "press": "park-cars-lobby",
+        "atFraction": 0.2
+      },
+      "tuningClears": 0,
+      "tuningN": 8,
+      "chosenVerdicts": "mmmmmmmmmmmmmmmmmmmm",
+      "standingVerdicts": "mmmmmmmmmmmmmmmmmmmm",
+      "queueOnlyMisses": 15,
+      "lowestPeakQueue": 34,
+      "screenRuns": 130
+    },
+    {
+      "contractId": "c3",
+      "day": 4,
+      "eventId": "ordinary",
+      "growthPerDay": 0.11,
+      "breather": false,
+      "chosen": {
+        "dispatcherId": "auction-multi-round",
+        "press": "spread-cars",
+        "atFraction": 0.43
+      },
+      "tuningClears": 0,
+      "tuningN": 8,
+      "chosenVerdicts": "mmmmmmmmmmmmmmmmmmmm",
+      "standingVerdicts": "mmmmmmmmmmmmmmmmmmmm",
+      "queueOnlyMisses": 10,
+      "lowestPeakQueue": 49,
+      "screenRuns": 130
+    },
+    {
+      "contractId": "c3",
+      "day": 5,
+      "eventId": "ordinary",
+      "growthPerDay": 0.11,
+      "breather": false,
+      "chosen": {
+        "dispatcherId": "auction-multi-round",
+        "press": "park-cars-lobby",
+        "atFraction": 0.43
+      },
+      "tuningClears": 0,
+      "tuningN": 8,
+      "chosenVerdicts": "mmmmmmmmmmmmmmmmmmmm",
+      "standingVerdicts": "mmmmmmmmmmmmmmmmmmmm",
+      "queueOnlyMisses": 1,
+      "lowestPeakQueue": 62,
+      "screenRuns": 130
+    },
+    {
+      "contractId": "c9",
+      "day": 1,
+      "eventId": "ordinary",
+      "growthPerDay": 0.11,
+      "breather": false,
+      "chosen": {
+        "dispatcherId": "predictive-balanced",
+        "press": "park-cars-lobby",
+        "atFraction": 0.2
+      },
+      "tuningClears": 6,
+      "tuningN": 8,
+      "chosenVerdicts": "CmCCmCCmmCCCCCCCCCCm",
+      "standingVerdicts": "mmCCmmmmmmmCCmmCCmmm",
+      "queueOnlyMisses": 5,
+      "lowestPeakQueue": 22,
+      "screenRuns": 130
+    },
+    {
+      "contractId": "c9",
+      "day": 2,
+      "eventId": "ordinary",
+      "growthPerDay": 0.11,
+      "breather": false,
+      "chosen": {
+        "dispatcherId": "predictive-balanced",
+        "press": "",
+        "atFraction": 0
+      },
+      "tuningClears": 2,
+      "tuningN": 8,
+      "chosenVerdicts": "mmmmmmmmmCmmmmmmmmCm",
+      "standingVerdicts": "mmmmmmmmmmmmmmmmmmmm",
+      "queueOnlyMisses": 18,
+      "lowestPeakQueue": 42,
+      "screenRuns": 130
+    },
+    {
+      "contractId": "c9",
+      "day": 3,
+      "eventId": "ordinary",
+      "growthPerDay": 0.11,
+      "breather": false,
+      "chosen": {
+        "dispatcherId": "predictive-balanced",
+        "press": "spread-cars",
+        "atFraction": 0.2
+      },
+      "tuningClears": 1,
+      "tuningN": 8,
+      "chosenVerdicts": "mmmmmmmmmCmmmmmmmmmm",
+      "standingVerdicts": "mmmmmmmmmmmmmmmmmmmm",
+      "queueOnlyMisses": 19,
+      "lowestPeakQueue": 29,
+      "screenRuns": 130
+    },
+    {
+      "contractId": "c9",
+      "day": 4,
+      "eventId": "ordinary",
+      "growthPerDay": 0.11,
+      "breather": false,
+      "chosen": {
+        "dispatcherId": "fairness-first",
+        "press": "",
+        "atFraction": 0
+      },
+      "tuningClears": 0,
+      "tuningN": 8,
+      "chosenVerdicts": "mmmmmmmmmmmmmmmmmmmm",
+      "standingVerdicts": "mmmmmmmmmmmmmmmmmmmm",
+      "queueOnlyMisses": 17,
+      "lowestPeakQueue": 53,
+      "screenRuns": 130
+    },
+    {
+      "contractId": "c9",
+      "day": 5,
+      "eventId": "ordinary",
+      "growthPerDay": 0.11,
+      "breather": false,
+      "chosen": {
+        "dispatcherId": "predictive-balanced",
+        "press": "park-cars-lobby",
+        "atFraction": 0.43
+      },
+      "tuningClears": 0,
+      "tuningN": 8,
+      "chosenVerdicts": "mmmmmmmmmmmmmmmmmmmm",
+      "standingVerdicts": "mmmmmmmmmmmmmmmmmmmm",
+      "queueOnlyMisses": 13,
+      "lowestPeakQueue": 113,
+      "screenRuns": 130
+    }
+  ],
+  "unmeasured": [
+    {
+      "contractId": "c6",
+      "reason": "Chancery House: not measured at this lane's budget (a tower's five weekdays are about two and a half hours of whole days on this container, contended). The week swarm found its day 4 infeasible on the queue goal under all 65 configurations on one crowd (lowest peak queue 73 against a bar of 26); measure it at the next census."
+    },
+    {
+      "contractId": "c10",
+      "reason": "Ashgate: not measured at this lane's budget; the week swarm measured days 3 to 5 at 0 clears over 6 dispatchers and 2 crowds as built. Owed to the next census."
+    },
+    {
+      "contractId": "c4",
+      "reason": "Mixed-Use High-Rise: not measured at this lane's budget, and its day 1 already misses under every shipped dispatcher once the energy bar is graded (docs/33 F7, #234), which no growth slope can move. Owed after #234."
+    },
+    {
+      "contractId": "c5",
+      "reason": "Vertical City: not measured at this lane's budget; a whole day of a 4 887-person tower costs several times Midtown's. Owed to the next census."
+    },
+    {
+      "contractId": "c11",
+      "reason": "CTF-class reference: a reference tower rather than an office Scenario the week plays first; not measured at this lane's budget. Owed to the next census."
+    },
+    {
+      "contractId": "c12",
+      "reason": "Shanghai-class reference: a reference tower; not measured at this lane's budget. Owed to the next census."
+    },
+    {
+      "contractId": "c13",
+      "reason": "Merdeka-class reference: a reference tower whose day 1 missed 150 of 150 whole days in the energy-bar derivation (§ D962); not measured at this lane's budget."
+    },
+    {
+      "contractId": "c14",
+      "reason": "One WTC-class reference: a reference tower; not measured at this lane's budget. Owed to the next census."
+    },
+    {
+      "contractId": "c15",
+      "reason": "Empire State-class reference: a reference tower; not measured at this lane's budget. Owed to the next census."
+    },
+    {
+      "contractId": "c16",
+      "reason": "Willis-class reference: a reference tower; not measured at this lane's budget. Owed to the next census."
+    }
+  ]
+}

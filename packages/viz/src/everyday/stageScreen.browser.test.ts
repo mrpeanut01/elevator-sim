@@ -908,7 +908,8 @@ describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
     const page = await coldLoad('midtown-office');
     await enterEverydayStage(page);
 
-    const SWITCH = '.everyday-stage-intervene[data-intervention-kind="switch-dispatcher"]';
+    /* The whole-dispatcher handover since § D1048 — the press the label names. */
+    const SWITCH = '.everyday-stage-intervene[data-intervention-kind="adopt-dispatcher"]';
     await page.waitForSelector('.everyday-stage-switch-pick', { timeout: 30_000 });
     /* The standing dispatcher is what the picker opens on — § 7.6's own *who is driving*. */
     const standing = await page.evaluate(
@@ -947,7 +948,7 @@ describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
     expect(await page.getAttribute(SWITCH, 'disabled')).not.toBe(null);
     /* § 7.6's fourth rule: it *says so*, in the refusal line, rather than only in a tooltip. */
     expect(await page.textContent('.everyday-stage-intervene-refusal')).toContain(
-      'already running',
+      'already runs this way',
     );
 
     /*
@@ -962,6 +963,22 @@ describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
 
     const beforePick = await runFingerprint(page);
     expect(beforePick).not.toBeNull();
+
+    /*
+     * **A destination row is refused on the page, with its reason** — § D1048. It used to arrive
+     * enabled and move no leg, which is the inert control § D177 ranks below no control at all.
+     * Selected here first so the refusal is read off the same button the handover then uses.
+     */
+    const panelled = other.find((value) => value.startsWith('destination-'));
+    if (panelled !== undefined && panelled !== standing) {
+      await page.selectOption('.everyday-stage-switch-pick', panelled);
+      await page.waitForFunction(
+        () => (document.querySelector('.everyday-stage-intervene-refusal')?.textContent ?? '').includes('landing panels'),
+        undefined,
+        { timeout: 30_000 },
+      );
+      expect(await page.getAttribute(SWITCH, 'disabled')).not.toBe(null);
+    }
 
     await page.selectOption('.everyday-stage-switch-pick', handTo);
     await page.waitForFunction(
@@ -1415,10 +1432,20 @@ async function untilRace(
   page: Page,
   wanted: (facts: RaceFacts) => boolean,
   timeoutMs: number,
+  /*
+   * Answer any call the day raises with *leave them*, which presses nothing — § D1138 gave an
+   * ordinary day up to three calls, and the stage stops at each until it is answered. A journey that
+   * plays a day through and is not about the call answers it the one way that leaves the run as it
+   * was, so the player's own control stays the only thing it pressed.
+   */
+  answerCalls = false,
 ): Promise<{ readonly held: boolean; readonly last: RaceFacts | null }> {
   const deadline = Date.now() + timeoutMs;
   let last: RaceFacts | null = null;
   for (;;) {
+    if (answerCalls && (await page.locator('.everyday-stage-call:not([hidden])').count()) > 0) {
+      await page.locator('.everyday-stage-call-answer[data-answer="leave"]').click();
+    }
     last = await raceFacts(page);
     if (last !== null && wanted(last)) return { held: true, last };
     if (Date.now() >= deadline) return { held: false, last };
@@ -1624,6 +1651,7 @@ describe.skipIf(!HAS_BROWSER)('the § 7.4 race — issue #226', () => {
       page,
       (facts) => sampleCount(facts.youPoints[0]) >= 20 && hasShape(facts.youPoints[0]),
       180_000,
+      true,
     );
     expect(
       played.held,

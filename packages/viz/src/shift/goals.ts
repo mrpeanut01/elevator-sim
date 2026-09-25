@@ -85,9 +85,59 @@ import {
  * Two of the four read a **share** (`carryPct`, `minutePct`) and two read a **maximum**
  * (`peakQueue`, `worstWaitS`). The obvious expectation is that both maxima grow with the horizon —
  * a maximum over twenty times the wall clock is a maximum over twenty times the opportunities — and
- * **for the queue that expectation is measured and refuted.** Ten seeds per cell, day 1, the
- * shipped defaults, thirty-minute `rise-and-fall` against the whole ten-hour `office-day`, median
- * `peakQueue`:
+ * **for the queue that expectation is measured and refuted**, on the towers as their contracts hand
+ * them over, by a three-member decision swarm that ruled three of three
+ * ([§ D1085](../../../../DECISIONS.md)). `peakQueue` is the deepest single landing over the **whole
+ * run** on both horizons (`live/observations.ts#sweepQueues`) and never reads the reporting window,
+ * so § D962's defect, one constant grading a window that grew from 300 s to 36 000 s, has no queue
+ * analogue: a whole day adds peaks to take the maximum over (lunch, on three of these towers), and
+ * nothing else.
+ *
+ * Day 1, `collective`, ordinary, seeds `20 260 824 + 7 919 n` for `n = 0…24`, each seed run as the
+ * contract's own 1 800 s slice and as the 36 000 s `office-day` Today's scenario plays, through
+ * `shiftRunConfigOf` → `recordRun` → `observationsAt(recording, recording.endedAt)`. Median
+ * `peakQueue` with p10 and p90, the seeds missing the day-1 bar of 32, and the paired whole − slice
+ * difference with its 95 % interval. The honesty and engineering members ran this cell with separate
+ * instruments and their 300 rows are identical:
+ *
+ * | contract | slice | whole day | misses, slice → whole | whole − slice, paired |
+ * |---|---|---|---|---|
+ * | c2 `midtown-office` | 18 [13, 27] | 23 [15, 32] | 1 → 3 | +3.6 [−0.1, +7.3] |
+ * | c3 `secure-tower` | 32 [25, 46] | 29 [22, 32] | 11 → 2 | **−5.4 [−10.2, −0.6]** |
+ * | c4 `mixed-use-high-rise` | 42 [30, 69] | 49 [32, 76] | 21 → 22 | +3.2 [−5.0, +11.4] |
+ * | c6 `chancery-house` | 29 [22, 49] | 29 [17, 43] | 11 → 9 | −3.2 [−9.7, +3.3] |
+ * | c9 `harbour-point` | 32 [22, 56] | 28 [22, 40] | 12 → 9 | −6.5 [−13.9, +0.9] |
+ * | c10 `ashgate` | 32 [21, 40] | 29 [21, 36] | 11 → 7 | −1.5 [−5.6, +2.6] |
+ * | **pooled, 150 pairs** | | | **67 → 52** | **−1.63 [−4.03, +0.76]** |
+ *
+ * No direction across towers (one of six reads deeper over the day, one shallower, four
+ * indistinguishable), and none pooled: the interval contains zero and the whole day is deeper on 62
+ * of 150 pairs. **So the queue bar does not move**, and a lane that had scaled both because both are
+ * maxima would have loosened a real test on no evidence. At the day-1 bar the whole day refuses
+ * **34.7 %** of these 150 runs against a pooled two-thirds point of **34.00**, which is § D468's
+ * one-third line to within a third of a standard error, and the five-goal day misses **52.7 %**,
+ * inside `docs/33` DC-4's band; the same bar refuses 44.7 % of the slices. The seven larger towers
+ * (`c5`, `c11` to `c16`) missed 32 on every run measured at both horizons, three to five whole days
+ * each, so the building decides their verdict and they are outside the pool: pooled over all thirteen as
+ * § D962 pooled, the two-thirds point is **271 people** and would grade nothing.
+ *
+ * **The wall on later days is growth, and it stands at both horizons.** Misses of the queue bar over
+ * the same six contracts, 150 runs a cell: day 2 (bar 30) 122 on the slice and 106 over the whole
+ * day; day 4 (bar 26) 149 and 149; day 7 (bar 20) 150 and 150. The peak roughly doubles by day 4
+ * while the ladder hardens, which is `docs/33` F5, and it is the demand side's to answer rather than
+ * this bar's (§ D1085).
+ *
+ * `queueBar.test.ts` pins one of these crowds at both horizons on every run (`c6`, `n = 0`: 43 on
+ * the slice, missed; 29 over the day, met) and `nearest-car` on the same day (128, missed, with
+ * every rider carried). `queueBar.sweep.test.ts` re-derives the table and asserts its four claims.
+ *
+ * ### The dated record this replaced
+ *
+ * The table below was the only measurement behind the queue's flatness until § D1085, and it is
+ * kept as the record of what was measured then. Ten seeds per cell, day 1, the shipped defaults,
+ * thirty-minute `rise-and-fall` against the whole ten-hour `office-day`, median `peakQueue`, on the
+ * towers **as built**, before `data/contract-ladder.json` handed any tower over at a rung. It no
+ * longer describes the game: Midtown as handed over reads 18 and 23, not 216 and 229.
  *
  * | building | slice | whole day |
  * |---|---|---|
@@ -96,13 +146,9 @@ import {
  * | Chancery House | 25 | **16** |
  * | Garden Apartments | 4 | 7 |
  *
- * No direction, let alone a factor — a deep queue is made by a peak, and a day contains the same
- * peaks a slice does. **So the queue bar does not move**, and a lane that had scaled both because
- * both are maxima would have loosened a real test on no evidence.
- *
  * The worst wait does move, and consistently: 1 522 → 2 804, 150 → 310, 79 → 161, 29 → 60 on the
- * same four cells — ratios of **1.84, 2.07, 2.04 and 2.07**. The mechanism is not extra sampling
- * either: a slice **truncates its own tail** and a day does not. A thirty-minute run ends while the
+ * dated record's four cells — ratios of **1.84, 2.07, 2.04 and 2.07**. The mechanism is not extra
+ * sampling either: a slice **truncates its own tail** and a day does not. A thirty-minute run ends while the
  * morning backlog is still draining, so the longest wait it can record is bounded by the run; the
  * day's morning backlog drains into a continuing 0.25 inter-peak flow and records what it actually
  * cost. The same dispatcher on the same building looks worse purely because you watched longer,
@@ -933,11 +979,11 @@ export function horizonLabelOf(horizonS: number): string {
  */
 const DENOMINATOR_CLAUSE: Readonly<Record<GoalObservationId, string>> = Object.freeze({
   carryPct: '',
-  minutePct: 'this share is over the legs that boarded',
+  minutePct: 'this share is over the rides that boarded',
   peakQueue: '',
   abandoned: '',
   worstWaitS: '',
-  loadedDepartures: 'a leg that never boarded made no trip',
+  loadedDepartures: 'a ride that never boarded made no trip',
   workPerServedLegKJ: '',
 });
 

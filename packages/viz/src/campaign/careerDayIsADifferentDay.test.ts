@@ -46,6 +46,7 @@ import {
 } from '../everyday/host.js';
 import { RESOURCES, baseState, legsOf } from '../scope/probes.test-helper.js';
 import { shiftRunConfigOf, tomorrowFactsOf, type ViewerState } from '../dev/state.js';
+import { CONTRACT_LADDER } from '../shift/ladder.js';
 import { growthFactor } from '../shift/growth.js';
 import { CAREER_CONTRACT_ID } from '../shift/week.js';
 import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
@@ -207,7 +208,9 @@ describe('the growth the report announces is the growth the morning delivers —
       week: { ...h.state().week, day: 2 },
     }).building.totalPopulation;
     expect(dayTwoPopulation).toBe(asIfDayTwo);
-    expect(growthFactor(2)).toBeGreaterThan(growthFactor(1));
+    expect(growthFactor(2, CONTRACT_LADDER.defaultGrowthPerDay)).toBeGreaterThan(
+      growthFactor(1, CONTRACT_LADDER.defaultGrowthPerDay),
+    );
   });
 
   it('is the same chain the promise is made from: last night’s announcement is this morning’s tower', () => {

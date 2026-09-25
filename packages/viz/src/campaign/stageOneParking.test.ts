@@ -56,9 +56,8 @@ import { loadConfig, type LoadedConfig } from '@elevator-sim/core';
 import { collectSearchSpace, type SearchSpace } from '@elevator-sim/experiments/browser';
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import { admitProfile } from './dimensions.js';
 import { editableIdsOf, parseCampaign, type CampaignContext } from './parse.js';
-import { runStageToVerdict } from './stageSequence.js';
+import { admitStageMove, pressStage, stageUnitsAt } from './stagePress.js';
 import { demonstrationConfigFor } from './stageRun.js';
 import type { Campaign, CampaignStage } from './types.js';
 import { restrictedFloorIds } from '../access/zoning.js';
@@ -194,16 +193,34 @@ function scenarioOf(stage: CampaignStage): PublishedScenario {
   return found;
 }
 
-/** Play the stage with an edited vector, through the shipped sequence. Both batches, or one. */
+/**
+ * Play the stage with an edited vector, **through the player's press** — `stagePress.ts#pressStage`,
+ * [§ D1129](../../../../DECISIONS.md): the one admission check at the base rung, then the shipped
+ * sequence. Both batches, or one. A refusal throws, because a witness the press refuses is not a
+ * witness however it would score.
+ */
 async function play(stage: CampaignStage, edit: EditedVector) {
   const resources = resourcesFor(stage);
-  return runStageToVerdict({
+  const press = await pressStage({
     stage,
     published: scenarioOf(stage),
-    candidateProfileId: stage.dispatcher.startingProfileId,
-    edit,
+    context: admissionContextOf(stage),
+    move: { profile: requireDispatcher(config, stage.dispatcher.startingProfileId), edit },
+    budgetUnits: stageUnitsAt(stage, null),
     run: (request) => runBatch(request, resources),
   });
+  if (press.kind === 'refused') throw new Error(`the press refused the witness: ${press.admission.sentence}`);
+  return press.outcome;
+}
+
+function admissionContextOf(stage: CampaignStage) {
+  return {
+    space,
+    schedule: shippedPriceSchedule(),
+    baseline: requireDispatcher(config, stage.dispatcher.startingProfileId),
+    building: requireBuilding(config, stage.building),
+    elevatorSpecs: config.elevatorSpecs,
+  };
 }
 
 describe('the stage opens the dial its building says decides it', () => {
@@ -223,27 +240,25 @@ describe('the stage opens the dial its building says decides it', () => {
     }
   });
 
-  it('did not widen what the dropdown offers, so DC-2 and DC-2b are where they were', () => {
+  /**
+   * **The witness is admitted by the one check, at the base rung, and is not free of it** —
+   * [§ D1129](../../../../DECISIONS.md). This case pinned that widening the stage's editable list
+   * changed nothing about which shipped profiles the stage admitted, which was a claim about
+   * `admitProfile`'s population; the list no longer decides admission, so that claim has no subject.
+   * What the press asks now is whether the base rung pays for the move, and the answer is asserted
+   * with the row that prices it named, so a price change that took the witness out of reach would
+   * be red here before it was red in the deep tier.
+   */
+  it('admits the witness at the base rung, priced at the row that sells parking', () => {
     const stage = subject();
-    const baseline = requireDispatcher(config, stage.dispatcher.startingProfileId);
-    const editable = editableIdsOf(stage.dispatcher.editable, space.ids, shippedPriceSchedule());
-    const withoutIdle = editable.filter((id) => !id.startsWith('idle.'));
-    const admittedUnder = (ids: readonly string[]): readonly string[] =>
-      [...config.dispatcherProfilesById.values()]
-        .filter((profile) => admitProfile(space, baseline, profile, ids).admissible)
-        .map((profile) => profile.id);
-
-    /*
-     * The claim `docs/33` § 3.3c publishes: opening the idle dimensions changed which *edits* a
-     * player may make and changed nothing about which shipped profiles the stage admits. DC-2 is a
-     * statement about that set and DC-2b is a statement about its size, so both are untouched by
-     * this lane and neither needed re-measuring.
-     */
-    expect(admittedUnder(editable)).toEqual(admittedUnder(withoutIdle));
-    expect(
-      admittedUnder(editable).filter((id) => id !== stage.dispatcher.startingProfileId).length,
-      'DC-2b: two admitted profiles other than the control',
-    ).toBeGreaterThanOrEqual(2);
+    const admission = admitStageMove(
+      admissionContextOf(stage),
+      { profile: requireDispatcher(config, stage.dispatcher.startingProfileId), edit: editOf(WITNESS, 'witness') },
+      stageUnitsAt(stage, null),
+    );
+    expect(admission.admitted, admission.sentence).toBe(true);
+    expect(admission.moved.map((dimension) => dimension.id)).toContain(PARKING_ID);
+    expect(admission.changeIds).toContain('idle-parking');
   });
 });
 
@@ -297,18 +312,10 @@ describe('the stage has a witness, and it is admissible here', () => {
     if (!resolved.ok) return;
 
     /*
-     * DC-3's first half is that the stage would *accept* the move. This is the clause that was red
-     * before the editable list was widened, and it is checked before the batches because a witness
-     * the panel refuses is not a witness however it scores.
+     * DC-3's first half is that the stage would *accept* the move — asked by `play`, which is the
+     * player's press and throws on a refusal (§ D1129), so a witness the panel refuses cannot reach
+     * the batches below.
      */
-    const admission = admitProfile(
-      space,
-      baseline,
-      resolved.profile,
-      editableIdsOf(stage.dispatcher.editable, space.ids, shippedPriceSchedule()),
-    );
-    expect(admission.admissible, admission.sentence).toBe(true);
-
     const outcome = await play(stage, edit);
     expect(outcome.verdict.metOnTuningSeeds, outcome.verdict.headline).toBe(true);
     /* DC-3b: the holdout batch ran and held. `cleared` is `false` while it is `null`. */

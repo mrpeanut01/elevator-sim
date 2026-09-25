@@ -49,12 +49,17 @@
 
 import { describe, expect, it } from 'vitest';
 
-import type { RunInterventionConfig } from '@elevator-sim/core/browser';
+import type { DispatcherProfile, RunInterventionConfig } from '@elevator-sim/core/browser';
 
 import { drivingProfileOf, profileById, shiftRunConfigOf, type ViewerState } from '../dev/state.js';
 import { recordRun } from '../record/recordRun.js';
 import { baseState, RESOURCES } from '../scope/probes.test-helper.js';
-import { stageInterventionsOf, STAGE_SWITCH_NO_CHANGE } from './stageScreenModel.js';
+import { SWITCH_NEEDS_BIDDING, SWITCH_NEEDS_OTHER_PANELS } from '../live/interventions.js';
+import {
+  stageInterventionsOf,
+  STAGE_SWITCH_NO_CHANGE,
+  type StageInterventionRow,
+} from './stageScreenModel.js';
 
 /* -------------------------------------------------------------------------- *
  * The operating point
@@ -123,7 +128,7 @@ function handoverFrom(state: ViewerState, targetId: string, atS: number): RunInt
      */
     switchTo: { target, driving: () => drivingProfileOf(RESOURCES, state) },
   });
-  const row = view.rows.find((entry) => entry.change.kind === 'switch-dispatcher');
+  const row = view.rows.find((entry) => entry.change.kind === 'adopt-dispatcher');
   if (row === undefined) throw new Error('the stage model offered no handover row');
   return { atS, change: row.change };
 }
@@ -207,13 +212,110 @@ describe('the stage’s handover reaches the run — GitHub issue #171', () => {
       recomputing: false,
       switchTo: { target, driving: () => target },
     });
-    const row = view.rows.find((entry) => entry.change.kind === 'switch-dispatcher');
+    const row = view.rows.find((entry) => entry.change.kind === 'adopt-dispatcher');
     expect(row?.refusal).toBe(STAGE_SWITCH_NO_CHANGE);
     const pressed = legsOf({
       ...plain,
       interventions: [{ atS: AT.atS, change: row?.change ?? { kind: 'park-cars-lobby' } }],
     });
     expect(pressed).toEqual(baseline);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * Every row the picker offers — § D1048
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **Every row the picker offers, enabled and moving the day or refused and pinned by a run** —
+ * [§ D1048](../../../../DECISIONS.md).
+ *
+ * The case above proves one handover reaches the run. What it could not see is the rows that were
+ * offered, enabled and inert: *Destination disclosure* and *Destination dispatch* moved 0 of 14
+ * pinned-day legs, because a destination term reads nothing at an up-and-down button and the run
+ * keeps the landing it opened with; and *Minimum estimated wait* was refused as *already running*
+ * because it shares collective's weights, while the brief said it clears the day. So every shipped
+ * profile is driven through the model's own row, and each row is exactly one of two things:
+ * **enabled, and the legs move**, or **refused, and a run shows what pressing it would have been**.
+ */
+describe('every handover the picker offers moves the day or says why not — § D1048', () => {
+  const plain = stageState();
+  const baseline = legsOf(plain);
+  const shelf = RESOURCES.dispatcherProfiles.profiles;
+  const rowFor = (targetId: string): StageInterventionRow => {
+    const view = stageInterventionsOf({
+      interventions: [],
+      simTimeS: AT.atS,
+      hasRun: true,
+      dayClosed: false,
+      recomputing: false,
+      switchTo: {
+        target: profileById(RESOURCES, [], targetId),
+        driving: () => drivingProfileOf(RESOURCES, plain),
+      },
+    });
+    const row = view.rows.find((entry) => entry.change.kind === 'adopt-dispatcher');
+    if (row === undefined) throw new Error('the stage model offered no handover row');
+    return row;
+  };
+  const pressed = (change: RunInterventionConfig['change']): readonly LegKey[] =>
+    legsOf({ ...plain, interventions: [{ atS: AT.atS, change }] });
+  /** A shipped profile with the fields named removed from its `dispatch` or its top level. */
+  const without = (id: string, strip: (profile: DispatcherProfile) => DispatcherProfile): DispatcherProfile =>
+    strip(profileById(RESOURCES, [], id));
+
+  it('moves the legs on every row it enables, and enables all but the standing order and the refusals', () => {
+    const enabled = shelf.filter((profile) => rowFor(profile.id).refusal === undefined).map((p) => p.id);
+    /*
+     * Minimum estimated wait is enabled now: it is collective without the no-turning rule, and the
+     * whole dispatcher carries the rule where the vector alone did not.
+     */
+    expect(enabled).toContain('eta');
+    expect(enabled.length).toBe(shelf.length - 5);
+    const inert = enabled.filter(
+      (id) => JSON.stringify(pressed(rowFor(id).change)) === JSON.stringify(baseline),
+    );
+    expect(inert).toEqual([]);
+  });
+
+  it('refuses the standing order itself, and pressed anyway it is the day it was', () => {
+    const row = rowFor(AT.driving);
+    expect(row.refusal).toBe(STAGE_SWITCH_NO_CHANGE);
+    expect(pressed(row.change)).toEqual(baseline);
+  });
+
+  it('refuses both destination rows — the run refuses them too, and without the panels each is ETA', () => {
+    const eta = pressed({ kind: 'adopt-dispatcher', profile: profileById(RESOURCES, [], 'eta') });
+    for (const id of ['destination-eta', 'destination-panel']) {
+      const row = rowFor(id);
+      expect(row.refusal, id).toBe(SWITCH_NEEDS_OTHER_PANELS);
+      /* Pressed anyway, the engine will not half-adopt it. */
+      expect(() => pressed(row.change), id).toThrow(/passenger model/u);
+      /*
+       * And what a handover *could* carry of it — everything but the panels — is Minimum estimated
+       * wait on the legs: the destination term reads nothing at an up-and-down button, so the rest of
+       * the dispatcher is another row on the same shelf under this one's name.
+       */
+      const carried = without(id, (profile) => ({ ...profile, dispatch: {} }));
+      expect(pressed({ kind: 'adopt-dispatcher', profile: carried }), id).toEqual(eta);
+    }
+  });
+
+  it('refuses both bidding rows — the run refuses them too, and without the bidding the two are one day', () => {
+    const sealed = rowFor('auction');
+    const rounds = rowFor('auction-multi-round');
+    expect(sealed.refusal).toBe(SWITCH_NEEDS_BIDDING);
+    expect(rounds.refusal).toBe(SWITCH_NEEDS_BIDDING);
+    expect(() => pressed(sealed.change)).toThrow(/bidding/u);
+    /*
+     * The bidding is the only thing that makes the two different dispatchers, and it is what a
+     * handover would have to leave behind — so the day either could hand over is neither of them.
+     */
+    const bare = (id: string): DispatcherProfile =>
+      without(id, ({ auction: _auction, ...rest }) => rest);
+    expect(pressed({ kind: 'adopt-dispatcher', profile: bare('auction-multi-round') })).toEqual(
+      pressed({ kind: 'adopt-dispatcher', profile: bare('auction') }),
+    );
   });
 });
 

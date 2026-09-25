@@ -186,6 +186,16 @@ const TIERS: Readonly<Record<string, Tier>> = Object.freeze({
       'sample size: 932 s over 480 judgements on a quiet ten-core box',
     scheduled: true,
   },
+  'packages/viz/src/scenario/survivorReplay.test.ts': {
+    gates: ['ELEVATOR_SIM_SURVIVORS'],
+    reason:
+      '§ D1129 clause 5, the swarm’s Q3 ruling (S3’s replay): every way through ' +
+      'data/scenario-survivors.json names, pressed once through campaign/stagePress.ts#pressStage — ' +
+      'the admission the Everyday stage page asks, then the stage’s own judge on both seed sets — ' +
+      'and required to clear. Its admission half runs always-on in the same file; the gate is the ' +
+      'census’s own, so the two share the survivors job and a stale name reds beside a moved count',
+    scheduled: true,
+  },
   'packages/viz/src/everyday/sittingClock.measure.test.ts': {
     gates: ['SITTING_OUT'],
     reason:
@@ -214,6 +224,24 @@ const TIERS: Readonly<Record<string, Tier>> = Object.freeze({
       'figure by figure against data/rush-house-runs.json. A gate of its own on this workflow’s ' +
       'argument for one job per tier. Measured 2026-09-11 on a shared ten-core box: 117 runs in ' +
       '137.5 s quiet and 189.8 s under load, one case per building, none near the 300 s ceiling',
+    scheduled: true,
+  },
+  'packages/viz/src/fixit/asBuiltMornings.sweep.test.ts': {
+    gates: ['ELEVATOR_SIM_FIXIT_MORNINGS'],
+    reason:
+      '§ D1120 clause 4: every fix case’s forty-nine as-built mornings re-run and matched to the bit ' +
+      'against data/fixit-as-built-mornings.json, the derived artifact that makes no press cold. The ' +
+      'always-on half is asBuiltMornings.test.ts, which checks every row’s input digest. Measured ' +
+      '2026-09-25 on the shared four-core container at load 5 to 7: 18 cases in 105.9 s',
+    scheduled: true,
+  },
+  'packages/viz/src/fixit/routeCensus.sweep.test.ts': {
+    gates: ['ELEVATOR_SIM_FIXIT_ROUTES'],
+    reason:
+      '§ D1120 clause 1: every role-blind route through every offered fix case pressed through the ' +
+      'gate, and the counts matched against fixit/routeCensus.ts#ROUTE_CENSUS, which decides which ' +
+      'cases open with their diagnosis shown. The always-on half re-derives the rows that open a ' +
+      'case. Measured 2026-09-25 on the shared four-core container: 15 cases in 190 s',
     scheduled: true,
   },
   'packages/experiments/src/fuzz/deep.test.ts': {
@@ -524,6 +552,31 @@ const TIERS: Readonly<Record<string, Tier>> = Object.freeze({
       'building moves',
     scheduled: false,
   },
+  'packages/viz/src/campaign/shopTiers.sweep.test.ts': {
+    gates: ['CAREER_SHOP_SWEEP'],
+    reason:
+      'GitHub issue #603’s instrument, § D1078 — every contract’s career day 1 as built and under ' +
+      'each of the shop’s sixteen tiers alone, over n base seeds of docs/33 § 4.6’s sequence, judged ' +
+      'by the career’s own day verdict. It produced § D1078’s table of which tiers clear which days. ' +
+      'Not scheduled because it is a compute job rather than a check: fitOut.test.ts pins the tier ' +
+      'that table was about on the legs on every run, and a nightly re-derivation would write ' +
+      'figures nothing reads. It is re-run by hand when a tier, a building or the career’s judge moves',
+    scheduled: false,
+  },
+  'packages/viz/src/everyday/dayCalls.sweep.test.ts': {
+    gates: ['DAY_CALLS_SWEEP'],
+    reason:
+      'Wave AJ’s instrument, § D1138 — every legible contract’s day 1 as Today’s scenario plays it, ' +
+      'eight crowds each, with the shipped call session asked of it and its calls answered in ' +
+      'rotation: how many calls a day raises, the day’s real length and decisions per real minute ' +
+      'under the stage’s pacing, and the as-built run’s legs and CPU time that the whole-day gate is ' +
+      'derived from. It produced § D1138’s published figures. Not scheduled because it is a compute ' +
+      'job rather than a check: dayCallSession.test.ts runs one real day through the same session on ' +
+      'every run and pins its admission, its adoption and its negative control, and a nightly ' +
+      're-derivation would write figures nothing reads. It is re-run by hand when the call rule, a ' +
+      'building, a demand template or the pace rule moves',
+    scheduled: false,
+  },
   'packages/viz/src/everyday/stagePace.sweep.test.ts': {
     gates: ['STAGE_PACE_SWEEP'],
     reason:
@@ -571,6 +624,19 @@ const TIERS: Readonly<Record<string, Tier>> = Object.freeze({
       'building, a demand template or the day’s length moves',
     scheduled: false,
   },
+  'packages/viz/src/shift/queueBar.sweep.test.ts': {
+    gates: ['QUEUE_BAR_SWEEP'],
+    reason:
+      '§ D1085’s instrument — the queue bar at the horizon the day runs: every contract with an ' +
+      'authored whole day, day 1, each seed as the slice and as the whole day, asserting the shipped ' +
+      'bar sits on § D468’s one-third line over the pool the building does not decide, the day ' +
+      'inside DC-4, the paired whole − slice interval not wholly above zero, and § D106’s arm over ' +
+      'all thirteen shipped dispatchers. Not scheduled because it is a compute job rather than a ' +
+      'check: `shift/queueBar.test.ts` pins one crowd at both horizons and under `nearest-car` on ' +
+      'every run, and `shift/goals.test.ts` asserts the ladder is horizon-blind. It is re-run by ' +
+      'hand when a rung, a building, a demand template or the queue ladder moves',
+    scheduled: false,
+  },
   /*
    * The first entry in this table whose file carries **two** gates opening **two different**
    * blocks, which is why `gates` is read here as a list of names rather than as a conjunction.
@@ -599,6 +665,41 @@ const TIERS: Readonly<Record<string, Tier>> = Object.freeze({
       'census from the run on every run and pins every rung that books a car out in both ' +
       'directions, so a profile that moved reddens the ordinary suite. It is re-run by hand when a ' +
       'rung, a building or a dispatcher profile moves',
+    scheduled: false,
+  },
+  /*
+   * The week census — `docs/33` DC-10, § D1067 — in two files on purpose. The sweep chooses and
+   * measures and writes rows a person copies into `data/week-way.json`; it is a compute job, and
+   * scheduling it would re-derive figures nothing reads. The verify file re-runs every shipped row
+   * on its held-out crowds and fails on a moved verdict, which is a check, so it is scheduled. Two
+   * files rather than two blocks in one, because § 2 reads a file's gates as a conjunction and a
+   * scheduled step setting `WEEK_WAY_SWEEP` would run a multi-hour census every Sunday.
+   */
+  'packages/viz/src/shift/weekWay.sweep.test.ts': {
+    gates: ['WEEK_WAY_SWEEP'],
+    reason:
+      '§ D1067’s instrument — each whole-day tower’s weekdays under every shipped dispatcher with ' +
+      'and without a parking press on tuning crowds, the chosen configuration and the standing ' +
+      'order on held-out crowds. Not scheduled because it is a compute job: `weekWay.verify.test.ts` ' +
+      'checks what it wrote, weekly, and `weekWay.test.ts` re-runs one crowd of one row on every run',
+    scheduled: false,
+  },
+  'packages/viz/src/shift/weekWay.verify.test.ts': {
+    gates: ['WEEK_WAY_VERIFY'],
+    reason:
+      '§ D1067: every row of data/week-way.json re-run on its held-out crowds through the product’s ' +
+      'chain, and required to reproduce its per-crowd verdicts, so the brief never quotes a census ' +
+      'of a day the product no longer deals',
+    scheduled: true,
+  },
+  'packages/viz/src/shift/wrinkleCensus.sweep.test.ts': {
+    gates: ['WRINKLE_CENSUS'],
+    reason:
+      '§ D1057’s instrument — every wrinkle spliced as a whole-day episode on five whole-day towers ' +
+      'over a small crowd set, beside the unwrinkled day on the same crowds, which produced ' +
+      'data/wrinkle-census.json. Not scheduled because it is a compute job rather than a check: ' +
+      '`shift/wrinkleCensus.test.ts` re-derives a sample of the file from the run on every run. It ' +
+      'is re-run by hand when a placement, a rung, a building, the growth curve or a bar moves',
     scheduled: false,
   },
   'packages/viz/src/testCost.test.ts': {

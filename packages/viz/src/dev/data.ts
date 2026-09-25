@@ -31,6 +31,7 @@ import { collectSearchSpace, type SearchSpace } from '@elevator-sim/experiments/
 import { restrictedFloorIds } from '../access/zoning.js';
 import { mixedFleetBanks } from '../commissioning/choices.js';
 import { scenarioHorizonFor } from '../shift/dayLength.js';
+import { WEEK_WAY, weekWayIssues } from '../shift/weekWay.js';
 import { CONTRACT_LADDER, contractLadderIssues } from '../shift/ladder.js';
 import { parseEngineeringBriefs, type EngineeringBriefs } from '../briefs/parse.js';
 import { parseCampaign } from '../campaign/parse.js';
@@ -262,6 +263,13 @@ export async function loadBrowserResources(): Promise<BrowserResources> {
       return [...declared];
     },
   }).map((issue) => `contract-ladder.json: ${issue}`);
+  /*
+   * The week census against the ladder it was measured on — `docs/33` DC-10, § D1067. A row taken
+   * at a growth slope the ladder no longer declares is stale, and the brief already draws nothing
+   * for it; this says why, beside the ladder's own issues and on the same warning footing.
+   * `shift/weekWay.test.ts` is where a stale row is a failing test.
+   */
+  const censusIssues = weekWayIssues(WEEK_WAY).map((issue) => `week-way.json: ${issue}`);
 
   return {
     priceSchedule,
@@ -274,6 +282,7 @@ export async function loadBrowserResources(): Promise<BrowserResources> {
     warnings: [
       ...warnings,
       ...ladderIssues,
+      ...censusIssues,
       ...buildings.flatMap((b) => b.warnings.map((w) => w.message)),
     ],
   };

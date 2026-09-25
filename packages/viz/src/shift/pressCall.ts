@@ -105,6 +105,13 @@ export interface PressCall {
   readonly backAtS: number | null;
   /** The act the car is away during, when the day has acts and one overlaps the absence. */
   readonly act: DayAct | undefined;
+  /**
+   * **Whether a booked-out car is away at the call** — `false` only on an ordinary day's call
+   * (`shift/dayCalls.ts`, [§ D1138](../../../../DECISIONS.md)), which is not gated on an absence and
+   * names a car only when one is out at that instant. Absent is `true`: a pinned call is always
+   * inside its car's absence, by rule 1's clause and rule 2's.
+   */
+  readonly carAway?: boolean | undefined;
 }
 
 /** Everything {@link pressCallOf} reads. Plain data from the run's own record. */
@@ -134,8 +141,13 @@ function actDuring(input: PressCallInput, awayAtS: number, backAtS: number): Day
 /**
  * The first instant in `[fromS, toS)` at which somebody standing on a landing has waited
  * {@link PRESS_CALL_WAIT_S}, or `undefined`. See the module docstring for why it is exact.
+ *
+ * Exported for `shift/dayCalls.ts`, the ordinary day's calls ([§ D1138](../../../../DECISIONS.md)),
+ * which asks the same question over each stretch of a day rather than over one car's absence: one
+ * threshold and one exact reading for both kinds of call, so the pinned call and an ordinary one
+ * cannot come to disagree about what *a minute-long wait* is.
  */
-function firstMinuteWaitIn(
+export function firstMinuteWaitIn(
   legs: readonly VizLeg[],
   fromS: number,
   toS: number,

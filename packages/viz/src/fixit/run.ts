@@ -39,6 +39,7 @@ import {
   parseBuilding,
   resolveBuilding,
   type BuildingConfig,
+  type CrowdThinning,
   type DispatcherProfile,
   type DispatcherProfiles,
   type ElevatorSpecs,
@@ -49,7 +50,7 @@ import {
 } from '@elevator-sim/core/browser';
 
 import type { VizLeg, VizRecording } from '../contract/types.js';
-import { assertSameCrowd, crowdDifferencesOf, sameCrowd } from '../record/crowd.js';
+import { assertSameCrowd, crowdAddedOf, crowdDifferencesOf, sameCrowd } from '../record/crowd.js';
 import { selectionKeepsTheCrowd, type FixitMeasurement } from './engine.js';
 import { applyRezone, doorDwellPatchesOf, profileWithDials, tenancyWatchedOf } from './families.js';
 import type { ComplaintMeasure, ComplaintScope, FigureSpec, FixitCase, FixitPatch, FixitState } from './types.js';
@@ -603,8 +604,9 @@ export function fixitRunPlanOf(
    */
   const authored = resources.entries.find((candidate) => candidate.resolved.id === entry.buildingId);
   const topFloorId = authored === undefined ? undefined : topFloorIdOf(authored.resolved);
+  const asBuilt = configOf(entry, [entry.asBuilt.patch], NO_EDITOR, resources);
   return {
-    asBuilt: configOf(entry, [entry.asBuilt.patch], NO_EDITOR, resources),
+    asBuilt,
     asRepaired: configOf(
       entry,
       [entry.asBuilt.patch, ...repairPatches, editorPatchOf(state, topFloorId, entry.asBuilt.tenancy)],
@@ -617,6 +619,7 @@ export function fixitRunPlanOf(
         dispatcherDials: state.dispatcherDials,
       },
       resources,
+      asBuilt.building,
     ),
   };
 }
@@ -681,11 +684,67 @@ const NO_EDITOR: EditorFabric = Object.freeze({
   dispatcherDials: {},
 });
 
+/**
+ * **A crowd change thins the as-built trace; it never re-draws it** — GitHub issue #601,
+ * `DECISIONS.md` § D1076.
+ *
+ * The case's own as-built patch writes its populations into the document, because that is the
+ * building the complaint is about. Every *later* population — a crowd-moving repair, an authored
+ * tenancy position — is taken off the patches before they reach the document and returned here as
+ * `core`'s `crowdThinning`: each named floor keeps `later / as-built` of the journeys its population
+ * generated, on the `thinning` stream, so the people who stay are the as-built run's people leg for
+ * leg. Written into the document instead, one person off one floor re-drew every interfloor weight
+ * and the pair met two different crowds: after removing one floor, 0 of 214, 0 of 233 and 0 of 245
+ * legs that never touched it survived (DECIDE-3's measurement, GitHub issue #601).
+ *
+ * `asBuilt` is `undefined` for the as-built config itself, which has no later patch to thin by. A
+ * later population above the as-built one is refused, because thinning removes people and cannot add
+ * any, and `fixit/parse.ts` already refuses a position that raises a headcount. Reading populations
+ * off the **resolved** as-built building is also what closes the `floorRanges` gap for these
+ * patches: a floor declared through a range has its population there like any other.
+ */
+function crowdThinningOf(
+  entry: FixitCase,
+  laterPatches: readonly FixitPatch[],
+  asBuilt: ResolvedBuilding,
+): CrowdThinning | undefined {
+  const target = new Map<string, number>();
+  for (const patch of laterPatches) {
+    for (const population of patch.building?.floorPopulations ?? []) {
+      for (const floorId of population.floorIds) target.set(floorId, population.population);
+    }
+  }
+  if (target.size === 0) return undefined;
+  const keepShareByFloor: Record<string, number> = {};
+  for (const [floorId, population] of target) {
+    const floor = asBuilt.floorsById.get(floorId);
+    if (floor === undefined) {
+      throw new Error(`fixit: case "${entry.id}" sets the population of floor "${floorId}", which this building does not declare as a floor.`);
+    }
+    if (population > floor.population) {
+      throw new Error(
+        `fixit: case "${entry.id}" raises floor "${floorId}" from ${String(floor.population)} to ${String(population)} people. A crowd change thins the as-built crowd and cannot add anybody to it.`,
+      );
+    }
+    if (population < floor.population) keepShareByFloor[floorId] = population / floor.population;
+  }
+  return Object.keys(keepShareByFloor).length === 0 ? undefined : { keepShareByFloor };
+}
+
+/** The patches with their populations taken off, for {@link crowdThinningOf}'s reason. */
+function withoutPopulations(patch: FixitPatch): FixitPatch {
+  const building = patch.building;
+  if (building?.floorPopulations === undefined) return patch;
+  const { floorPopulations: _moved, ...rest } = building;
+  return { ...patch, building: rest };
+}
+
 function configOf(
   entry: FixitCase,
   patches: readonly FixitPatch[],
   editor: EditorFabric,
   resources: FixitResources,
+  asBuiltBuilding?: ResolvedBuilding,
 ): SimulationConfig {
   const authored = resources.entries.find((candidate) => candidate.resolved.id === entry.buildingId);
   if (authored === undefined) {
@@ -698,8 +757,19 @@ function configOf(
     throw new Error(`fixit: case "${entry.id}" names dispatcher "${entry.dispatcherProfileId}", which this build does not ship.`);
   }
 
+  /*
+   * The first patch is always the case's as-built one (`fixitRunPlanOf` builds both lists that way);
+   * on the repaired side every patch after it has its populations moved into a thinning.
+   */
+  const [asBuiltPatch, ...laterPatches] = patches;
+  const crowdThinning =
+    asBuiltBuilding === undefined ? undefined : crowdThinningOf(entry, laterPatches, asBuiltBuilding);
+  const fabricPatches =
+    asBuiltBuilding === undefined || asBuiltPatch === undefined
+      ? patches
+      : [asBuiltPatch, ...laterPatches.map(withoutPopulations)];
   const doc = structuredClone(authored.config) as unknown as MutableBuildingDocument;
-  for (const patch of patches) {
+  for (const patch of fabricPatches) {
     if (patch.building !== undefined) applyBuildingPatch(doc, patch.building);
   }
   /*
@@ -744,6 +814,7 @@ function configOf(
     ...(entry.run.arrivalRatePctPop5min === null
       ? {}
       : { demand: { arrivalRatePctPop5min: entry.run.arrivalRatePctPop5min } }),
+    ...(crowdThinning === undefined ? {} : { crowdThinning }),
   };
 }
 
@@ -906,7 +977,8 @@ export function morningReadingOf(recording: VizRecording, measure: ComplaintMeas
  * sharing its crowd with no population patch means something other than population reached the
  * trace, and a population patch that left every leg in place means the repair the player bought
  * moved nobody. Called at both press sites on the commit the pair lands, before the outcome is
- * classified, so a red names the fix-it pair and the case.
+ * classified, so a red names the fix-it pair and the case. Since GitHub issue #601 a crowd change is
+ * also held to being a **thinning**: nobody on the repaired side the as-built side did not meet.
  */
 export function assertPairMatchesRepairs(
   entry: FixitCase,
@@ -922,6 +994,16 @@ export function assertPairMatchesRepairs(
   if (crowdDifferencesOf(before, after).length === 0) {
     throw new Error(
       `${pair} selected a repair that patches floorPopulations, and the two runs met the same crowd anyway — the repair moved nobody, so the sentence the outcome prints about it would be false.`,
+    );
+  }
+  /*
+   * GitHub issue #601, § D1076: a crowd change thins the as-built crowd, so everyone the repaired run
+   * met is somebody the as-built run met, on the same instant and floors.
+   */
+  const added = crowdAddedOf(before, after);
+  if (added.length > 0) {
+    throw new Error(
+      `${pair} changes the crowd by thinning it, and the second run met people the first did not: ${added.join('; ')}. A thinned crowd is the as-built crowd less some people, never a different one.`,
     );
   }
 }

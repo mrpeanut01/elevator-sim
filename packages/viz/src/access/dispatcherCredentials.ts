@@ -185,31 +185,31 @@ export interface AccessCompatibility {
  * the fixed simulator delivers everybody (§ D256). A message that had hard-coded it would have
  * shipped a defect's signature to the player.
  *
- * ## ⚠️ The warning's own middle clause is stale, and it is named here rather than quietly rewritten
+ * ## The middle clause said a refusal the engine no longer makes, and it is gone — § D1105
  *
- * The sentence below still tells the player that *"a call from any of those floors reaches every
+ * The sentence below used to tell the player that *"a call from any of those floors reaches every
  * car as an unbadged request, every car refuses it on access grounds, and the call is permanently
- * unassignable."* **That is § D254's deleted defect described as live behaviour.** A credential
- * governs where you may *go*, not where you may be *collected*; the pickup check and the
- * `accessDenied` reason are both gone, and conventional dispatch now serves every access-zoned
- * building this project ships at 100 % delivery — `eta` and `destination-eta-unpriced` are
- * bit-identical on 150 of 150 `secure-tower` replications (§ D256, § D279).
+ * unassignable"*, and that *"this building has no dispatcher that can serve those floors"*. **That
+ * was § D254's deleted defect described as live behaviour.** A credential governs where you may
+ * *go*, not where you may be *collected*; the pickup check and the `accessDenied` reason are both
+ * gone, and conventional dispatch serves calls from every access-zoned floor — `eta` and
+ * `destination-eta-unpriced` are bit-identical on 150 of 150 `secure-tower` replications (§ D256,
+ * § D279). The post-AI panel's seat D met it on St Jude: the Engineer panel called calls from LG, 2
+ * and 3 *permanently unassignable* in a run that had stacked floor 2 sixteen deep and drained it.
  *
- * **It is not corrected here, and the reason is that the honest correction is a product decision
- * rather than a wording one.** What survives is enforced by the *runner* per passenger against the
- * **destination** (`Simulation.#bankCanCarry`, `#carCanCarry`), which no choice of dispatcher
- * changes, plus § D265's credential gap, which is a property of the traffic model. The one
- * genuinely dispatcher-dependent refusal left is the **bare kiosk**, and it already has its own
- * sentence above. So the truthful message for a conventional profile may be *no message at all* —
- * which would empty this check of the purpose `docs/10` § 10.3 gives it, and § D256's rule is that
- * a re-design of that kind needs a criterion written before the numbers are read.
+ * This docstring used to leave the clause standing on the ground that the honest correction was a
+ * product decision rather than a wording one. § D1105 takes that decision: the warning now says what
+ * the run does, which is the code's own behaviour rather than a measurement — `Simulation` checks
+ * each rider's credential against **where they are going** (`#bankCanCarry`, `#carCanCarry`) and
+ * turns away a rider whose badge does not cover it — and it offers no mechanism for any figure.
+ * `dispatcherCredentials.test.ts` holds it against a run: on St Jude, under a profile that reads no
+ * credential, calls from the restricted floors are carried.
  *
- * **What may not happen is a second plausible sentence put in the gap.** `CLAUDE.md`'s rule for a
- * claim about *why* is measure it or say it is unmeasured, and this is the saying. The standing
- * requirement it sits under is the one for a stale *refusal* (§ D227): a control that writes
- * something may not claim it writes nothing, and — as here — a message may not claim a refusal the
- * engine no longer performs. `lockedOut.ts` names the same gap in the same directory for the same
- * reason.
+ * **What may still not happen is a second plausible sentence put in the gap.** `CLAUDE.md`'s rule
+ * for a claim about *why* is measure it or say it is unmeasured: nothing here says a credential-aware
+ * profile would carry more people, because on every shipped building that has been measured it does
+ * not (§ D256). The one genuinely dispatcher-dependent refusal left is the **bare kiosk**, and it
+ * keeps its own sentence.
  */
 export function checkAccessCompatibility(input: AccessCompatibilityInput): AccessCompatibility {
   const capability = credentialCapabilityOf(input.profile);
@@ -226,9 +226,7 @@ export function checkAccessCompatibility(input: AccessCompatibilityInput): Acces
   const zoneCount = (input.accessZones ?? []).length;
   const alternatives =
     aware.length === 0
-      ? 'None of the ' +
-        `${String(input.profiles.length)} dispatchers loaded here reads one, so this building has ` +
-        'no dispatcher that can serve those floors.'
+      ? `None of the ${String(input.profiles.length)} dispatchers loaded here reads one.`
       : `${String(aware.length)} of the ${String(input.profiles.length)} dispatchers loaded here do read a ` +
         `credential: ${aware.join(', ')}.`;
 
@@ -244,9 +242,9 @@ export function checkAccessCompatibility(input: AccessCompatibilityInput): Acces
       `${input.buildingName} has ${String(zoneCount)} access zone${zoneCount === 1 ? '' : 's'} ` +
       `covering ${String(restricted.length)} of its ${String(input.floorIds.length)} floors ` +
       `(${floorRunsOf(input.floorIds, restricted)}). ${input.profile.id} does not read credentials — ` +
-      `${capability.reason} — so a call from any of those floors reaches every car as an ` +
-      'unbadged request, every car refuses it on access grounds, and the call is permanently ' +
-      `unassignable.${kiosk} ${alternatives} ` +
+      `${capability.reason}. That does not stop a car collecting a call from those floors: the run ` +
+      'checks each rider’s credential against where they are going, and turns away a rider whose ' +
+      `badge does not cover it.${kiosk} ${alternatives} ` +
       'This states what the run will do; Run stays enabled.',
   });
 }
