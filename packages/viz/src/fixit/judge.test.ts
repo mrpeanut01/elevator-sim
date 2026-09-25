@@ -334,6 +334,29 @@ describe('a press asks for what its gate earned, and no more', () => {
     expect(drawn.map((o) => o.kind)).toEqual(['checking', 'fixed']);
   });
 
+  it('turns a classification that throws into a failed press rather than a press left running', () => {
+    const harness = fakes();
+    const failures: string[] = [];
+    const drawn: FixitOutcome[] = [];
+    pressThroughTheJudge({
+      entry: CASE,
+      plan: PLAN,
+      switches: SWITCHES,
+      pairRunner: harness.pair,
+      judge: createFixitJudge(harness.mornings),
+      readingOf: () => reading(6),
+      classify: () => {
+        throw new Error('the pair moved the crowd');
+      },
+      onGate: (outcome) => drawn.push(outcome),
+      onVerdict: (outcome) => drawn.push(outcome),
+      onFailed: (message) => failures.push(message),
+    });
+    expect(failures).toEqual(['the pair moved the crowd']);
+    expect(drawn).toEqual([]);
+    expect(harness.counted.morningAsks).toHaveLength(0);
+  });
+
   it('never lets a prepare supersede a press’s replication', () => {
     const harness = fakes();
     const judge = createFixitJudge(harness.mornings);

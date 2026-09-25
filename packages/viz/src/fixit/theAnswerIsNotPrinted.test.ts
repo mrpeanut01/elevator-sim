@@ -66,6 +66,7 @@ import {
 } from './families.js';
 import {
   FIXIT_RUN_SWITCHES,
+  assertPairMatchesRepairs,
   figureValuesOf,
   fixitPlanRefusalOf,
   fixitRunPlanOf,
@@ -454,7 +455,10 @@ function familyRoutesFor(entry: FixitCase, asBuilt: SimulationConfig): readonly 
  * `let-faster-than-the-lifts`' fixed floor at the top are the two wins § D1000 § 3 itself named as
  * the single pair's noise; the third, zone-centre parking on `every-deck-calls-itself-full`, is the
  * decision agents' own zone-centre finding. None of the three holds, and each case's first route that
- * does is a different one. **The cost**, measured 2026-09-25 at `702991b`: the whole enumeration took
+ * does is a different one. **One route is refused rather than judged**: `every-deck-calls-itself-full`'s
+ * zoning step moves the crowd without claiming to, which the surfaces' own check (GitHub issue #350)
+ * turns into a failed press, so it is no route through; the census found it holding before that check
+ * was added here, and a player pressing it saw *Running the day…* for good (§ D1020). **The cost**, measured 2026-09-25 at `702991b`: the whole enumeration took
  * 423 s of one vitest process under a load average of 9–14, and 236 s at 13 on the next sitting,
  * against this file's 600 s annotation. They are dated readings of a shared box, not a bound.
  */
@@ -472,7 +476,7 @@ const SOLVED_BY: readonly (readonly [string, string])[] = Object.freeze([
   ['everyone-leaves-at-once', 'held'],
   ['bed-cars-locked-out', 'zone:1'],
   ['two-cars-out-wrong-month', 'car:A->high'],
-  ['every-deck-calls-itself-full', 'zone:1'],
+  ['every-deck-calls-itself-full', 'capacity:1'],
   ['restaurant-above-the-ballroom', 'speed:1'],
   ['controller-sends-every-car', 'parking:zone-center+zone:3'],
   ['let-faster-than-the-lifts', 'tenancy:new-lettings=invoke-for-all'],
@@ -502,7 +506,12 @@ function syncJudge(): FixitJudge {
  * One press through the judge, with the letter's as-built run passed in so a case's routes share
  * it, and the judge shared across them so the forty-nine as-built mornings are run once a case.
  */
-function pressRoute(entry: FixitCase, state: FixitState, before: VizRecording, judge: FixitJudge): FixitOutcome {
+function pressRoute(
+  entry: FixitCase,
+  state: FixitState,
+  before: VizRecording,
+  judge: FixitJudge,
+): FixitOutcome | 'refused' {
   const schedule = shippedPriceSchedule();
   const pairRunner: PairRunner = {
     start(ask) {
@@ -510,7 +519,7 @@ function pressRoute(entry: FixitCase, state: FixitState, before: VizRecording, j
       ask.onDone([before, recordRun(ask.runs[1]!.config, FIXIT_RUN_SWITCHES).recording]);
     },
   };
-  let verdict: FixitOutcome | undefined;
+  let verdict: FixitOutcome | 'refused' | undefined;
   pressThroughTheJudge({
     entry,
     plan: fixitRunPlanOf(entry, state, resources),
@@ -518,15 +527,24 @@ function pressRoute(entry: FixitCase, state: FixitState, before: VizRecording, j
     pairRunner,
     judge,
     readingOf: morningReadingOf,
-    classify: (b, a, done) => done(classifyOutcome(entry, measuredOf(entry, b, a), spendOf(entry, state, schedule))),
+    /*
+     * The surfaces' own check first — GitHub issue #350: the pair's crowd claim held to its legs.
+     * A route whose pair moves the crowd without claiming to is one the product refuses with a
+     * failure line rather than a verdict, so it is no route through (`every-deck-calls-itself-full`'s
+     * zoning step is the one found, § D1020).
+     */
+    classify: (b, a, done) => {
+      assertPairMatchesRepairs(entry, state, b, a);
+      done(classifyOutcome(entry, measuredOf(entry, b, a), spendOf(entry, state, schedule)));
+    },
     onGate: (outcome) => {
       verdict = outcome;
     },
     onVerdict: (outcome) => {
       verdict = outcome;
     },
-    onFailed: (message) => {
-      throw new Error(message);
+    onFailed: () => {
+      verdict = 'refused';
     },
   });
   return verdict!;
@@ -549,6 +567,7 @@ describe('every offered case is solved without being told which repair is the an
         let winner = 'none';
         for (const route of routesFor(entry, asBuilt)) {
           const outcome = pressRoute(entry, route.state, before, judge);
+          if (outcome === 'refused') continue;
           if (outcome.kind === 'fixed') {
             winner = route.label;
             break;

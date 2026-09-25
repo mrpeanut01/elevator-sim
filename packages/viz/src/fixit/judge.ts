@@ -528,22 +528,36 @@ export function pressThroughTheJudge(press: JudgedPress): void {
     ],
     onDone: ([before, after]) => {
       if (before === undefined || after === undefined) return;
-      press.classify(before, after, (gate) => {
-        if (gate.kind !== 'fixed') {
-          press.onGate(gate, before, after);
-          return;
-        }
-        press.onGate(checkingOutcomeOf(gate), before, after);
-        const measure = entry.complaint.measure;
-        press.judge.replicate(
-          entry,
-          plan,
-          { before: press.readingOf(before, measure), after: press.readingOf(after, measure) },
-          (replication) => press.onVerdict(judgedOutcomeOf(entry, gate, replication)),
-          press.onFailed,
-        );
-      });
+      /*
+       * A classification that throws — the surfaces hold the pair's crowd claim to its legs first,
+       * and that check throws on a disagreement — is a failed press, said where the reader is. It
+       * used to escape the worker's callback, and the § 3.3 primary stayed *Running the day…* for
+       * good: measured on `every-deck-calls-itself-full`, whose zoning step moves the crowd.
+       */
+      try {
+        classifyThenJudge(before, after);
+      } catch (error) {
+        press.onFailed(error instanceof Error ? error.message : String(error));
+      }
     },
     onFailed: press.onFailed,
   });
+
+  function classifyThenJudge(before: VizRecording, after: VizRecording): void {
+    press.classify(before, after, (gate) => {
+      if (gate.kind !== 'fixed') {
+        press.onGate(gate, before, after);
+        return;
+      }
+      press.onGate(checkingOutcomeOf(gate), before, after);
+      const measure = entry.complaint.measure;
+      press.judge.replicate(
+        entry,
+        plan,
+        { before: press.readingOf(before, measure), after: press.readingOf(after, measure) },
+        (replication) => press.onVerdict(judgedOutcomeOf(entry, gate, replication)),
+        press.onFailed,
+      );
+    });
+  }
 }

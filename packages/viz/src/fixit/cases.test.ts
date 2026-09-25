@@ -698,8 +698,11 @@ function judgedPress(entry: FixitCase, state: FixitState, subject: FixitCase = e
     pairRunner,
     judge: createFixitJudge(mornings),
     readingOf: morningReadingOf,
-    classify: (before: VizRecording, after: VizRecording, done) =>
-      done(classifyOutcome(subject, measuredOf(subject, before, after), spendOf(subject, state, shippedPriceSchedule()))),
+    classify: (before: VizRecording, after: VizRecording, done) => {
+      // The surfaces' own check first — GitHub issue #350 — so this vouches for the chain they run.
+      assertPairMatchesRepairs(subject, state, before, after);
+      done(classifyOutcome(subject, measuredOf(subject, before, after), spendOf(subject, state, shippedPriceSchedule())));
+    },
     onGate: (outcome) => {
       verdict = outcome;
     },
