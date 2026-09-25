@@ -30,6 +30,15 @@
  * The verdicts are quoted off `shift/report.ts#dayReportOf` — the sheet a player reads — rather
  * than off a goal predicate, `pressDecidesTheDay.test.ts`'s own rule and for its reason.
  *
+ * ## Since wave AI the claim is made from the day's call, over a window — [§ D1029](../../../../DECISIONS.md)
+ *
+ * § D914 and § D974 proved each pin at one typed instant, `pressAtFraction`, and nothing asked what
+ * happened a minute either side. The instant is now derived — `shift/pressCall.ts#pressCallOf`, the
+ * one function the stage and the sweep call too — and every clause above is asked at the call, at
+ * the far edge of the window the pin was admitted on, and at a point between: seven runs a pin, the
+ * always-on half of `pressLadder.sweep.test.ts`'s call mode. A positive control runs the same check
+ * on a crowd it is known to fail on, so a check that had stopped biting would say so here.
+ *
  * ## The census, and why only one contract's is re-derived here
  *
  * {@link ContractPressDay.mootUnder} is a measurement over **thirteen** dispatchers per pinned day.
@@ -71,9 +80,18 @@ import { pressCounterfactualOf } from './counterfactual.js';
 import { runHorizonOf, scenarioHorizonFor, wholeDayFor, wholeDayRun } from './dayLength.js';
 import { SHIFT_EVENTS } from './events.js';
 import { goalsForDay, readGoals } from './goals.js';
-import { CONTRACT_LADDER, ladderRowFor, pressDayFor, type ContractPressDay } from './ladder.js';
+import {
+  admittedPressDayIds,
+  CONTRACT_LADDER,
+  ladderRowFor,
+  pressDayFor,
+  type ContractPressDay,
+} from './ladder.js';
+import { pressAt, pressDayArmOf, PRESS_DAY_RESOURCES } from './pressDay.test-helper.js';
+import { PRESS_CALL_MIN_WINDOW_S } from './pressCall.js';
+import { pressDayCallOf } from '../dev/state.js';
 import { shiftObservationsOf } from './observations.js';
-import { dayReportOf, type ShiftPlan } from './report.js';
+import { dayReportOf } from './report.js';
 import { openWeek } from './week.js';
 
 /**
@@ -124,75 +142,6 @@ function horizonOver(contractId: string, press: ContractPressDay | undefined): P
   return wholeDayRun(day);
 }
 
-/** The run's length in seconds under the pin's horizon — what `pressAtFraction` is a fraction of. */
-function horizonLengthS(contractId: string): number {
-  return horizonOver(contractId, pressDayFor(contractId)).shiftLengthS ?? shiftLengthForContract(contractId);
-}
-
-/** One arm of one pinned day: the run, graded, and worded — `armOf`'s shape in the § D871 file. */
-function armOf(
-  contractId: string,
-  seed: bigint,
-  dispatcherId: string,
-  interventions: readonly RunInterventionConfig[],
-): Arm {
-  const contract = contractById(contractId);
-  if (contract === undefined) throw new Error(`no contract ${contractId}`);
-  const over = horizonOver(contractId, pressDayFor(contractId));
-  const shiftLengthS = over.shiftLengthS ?? shiftLengthForContract(contractId);
-  /*
-   * **The pair, built together** — GitHub issue #584, § D961, [§ D963](../../../../DECISIONS.md).
-   *
-   * This file used to build the state by hand — `{ ...baseState(), buildingId: contract.buildingId,
-   * …, week: { ...base.week, contractId, day: 1 } }` — and, unlike the three sweeps #584 was filed
-   * about, it *did* move the week, so the pair agreed and the rung reached the run. What it did not
-   * have was the refusal: a state one edit away from the silent wrong answer, in the file whose
-   * whole subject is a rung. `contractDayState` builds the same state and throws on a mismatched
-   * pair, and the two were compared field for field over all seven pinned contracts before the
-   * swap — deep-equal, same keys — so no verdict, leg or census below moved with it.
-   *
-   * The day's *wrinkle* is a separate axis from the contract's own fabric, and a file about the
-   * rung must not be measuring a drawn event; the helper pins `campaignEventId: 'ordinary'` for
-   * that reason, which is `contractCurve.sweep.test.ts`'s own idiom kept in one place.
-   */
-  const state = contractDayState(contractId, { seed, dispatcherId, over });
-  const plan = shiftRunConfigOf(RESOURCES_WITH_TOWERS, state);
-  const { recording } = recordRun(
-    { ...plan.config, interventions },
-    { recordDecisions: false, outOfServiceCarIds: plan.outOfServiceCarIds },
-  );
-  const observations = shiftObservationsOf(observationsAt(recording, recording.endedAt));
-  const horizon = runHorizonOf(
-    RESOURCES_WITH_TOWERS.trafficProfiles,
-    buildingConfigOf(RESOURCES_WITH_TOWERS, state.savedBuildings, contract.buildingId),
-    state,
-  );
-  const plan_: ShiftPlan = {
-    shiftLengthS,
-    windowStartS: over.windowStartS ?? null,
-    patternId: 'building',
-  };
-  const report = dayReportOf({
-    recording,
-    observations,
-    goals: goalsForDay(1, horizon),
-    week: openWeek(contractId),
-    contract,
-    event: SHIFT_EVENTS.ordinary,
-    plan: plan_,
-    calendar: null,
-    subject: { kind: 'week-day' },
-  });
-  return {
-    verdictLine: report.verdictLine,
-    worstWaitS: observations.worstWaitS,
-    /* Passenger, car and the second they boarded — `probes.test-helper.ts#legsOf`'s own triple. */
-    legs: recording.legs.map(
-      (leg) => [leg.passengerId, leg.carId ?? '', leg.boardedAt ?? -1] as const,
-    ),
-  };
-}
-
 /** Whether this day, under `dispatcherId`, misses at least one goal with no press at all. */
 function missesAsBuilt(contractId: string, seed: bigint, dispatcherId: string): boolean {
   const contract = contractById(contractId);
@@ -219,7 +168,7 @@ function missesAsBuilt(contractId: string, seed: bigint, dispatcherId: string): 
   );
 }
 
-const legsOf = (arm: Arm): string => JSON.stringify(arm.legs);
+const legsOf = (arm: { readonly legs: Arm['legs'] }): string => JSON.stringify(arm.legs);
 
 describe('the press ladder — every pinned day, in both directions', () => {
   it('pins one on every rung that books a car out, and on no rung that does not', () => {
@@ -257,129 +206,157 @@ describe('the press ladder — every pinned day, in both directions', () => {
     expect(new Set(PINNED.map(([, press]) => press.horizon))).toEqual(new Set(['period', 'whole-day']));
   });
 
-  it('presses a whole day inside one of its peaks, where the stage plays at the player’s speed', () => {
+  it('admits exactly the pins whose call window meets the criterion, and refuses the rest by name', () => {
     /*
-     * GitHub issue #595, § D974, against wave AH's stage-pace ruling: on a whole-day run the
-     * stage crosses the hours between the day's peaks at thirty times and plays the peaks at the
-     * player's own speed. A press pinned between peaks is one a player makes in fast-forward — no
-     * more reachable than a press behind `?seed=`. So a whole-day pin must fall inside a peak.
-     *
-     * The peaks are derived here from the record rather than listed: maximal contiguous runs of
-     * phases whose `max(startIntensity, endIntensity)` reaches the day's own peak — the rule the
-     * ruling states for `shift/dayLength.ts`'s acts, which on `office-day` gives 08:30–09:00,
-     * 12:15–12:45 and 17:15–17:45. A first draft required *both* ends at the peak and found only the
-     * five-minute holds inside each act, which is narrower than the stage the ruling builds.
-     * Computed in this file because that function is another lane's; when it lands, this is the
-     * place to call it instead.
+     * § D1029's admitted set is derived from the data, never typed — `admittedPressDayIds`. Both
+     * directions: every admitted pin carries a call block at or over the floor and no refusal, and
+     * every pinned row outside the set says why in its own words.
      */
-    const whole = PINNED.filter(([, press]) => press.horizon === 'whole-day');
-    expect(whole.length, 'some pin is on a whole day, or this checks nothing').toBeGreaterThan(0);
-    for (const [contractId, press] of whole) {
-      const contract = contractById(contractId);
-      const day = wholeDayFor(
-        RESOURCES_WITH_TOWERS.trafficProfiles,
-        buildingConfigOf(RESOURCES_WITH_TOWERS, [], contract?.buildingId ?? ''),
-      );
-      const record = RESOURCES_WITH_TOWERS.trafficProfiles.demandTemplates.find(
-        (candidate) => candidate.id === day?.templateId,
-      );
-      const phases = record?.phases ?? [];
-      const peak = phases.reduce((top, phase) => Math.max(top, phase.startIntensity, phase.endIntensity), 0);
-      const held: (readonly [number, number])[] = [];
-      for (const phase of phases) {
-        if (Math.max(phase.startIntensity, phase.endIntensity) < peak) continue;
-        const last = held[held.length - 1];
-        if (last !== undefined && last[1] === phase.startMin * 60) {
-          held[held.length - 1] = [last[0], phase.endMin * 60];
-        } else {
-          held.push([phase.startMin * 60, phase.endMin * 60]);
-        }
+    const admitted = admittedPressDayIds();
+    expect(admitted.length, 'some pin is admitted, or nothing below checks a window').toBeGreaterThan(0);
+    for (const [contractId, press] of PINNED) {
+      if (admitted.includes(contractId)) {
+        expect(press.refused, contractId).toBeUndefined();
+        expect(press.call?.windowS ?? 0, contractId).toBeGreaterThanOrEqual(PRESS_CALL_MIN_WINDOW_S);
+      } else {
+        expect(press.refused?.trim().length ?? 0, `${contractId} is refused without a reason`).toBeGreaterThan(0);
       }
-      expect(held.length, `${contractId} has peaks to press in`).toBeGreaterThan(0);
-      const atS = (day?.periodS ?? 0) * press.pressAtFraction;
-      const inside = held.some(([fromS, toS]) => atS >= fromS && atS < toS);
-      expect(inside, `${contractId} presses at ${String(atS)} s, outside ${JSON.stringify(held)}`).toBe(true);
     }
   });
 
-
   for (const [contractId, press] of PINNED) {
+    if (press.refused !== undefined || press.call === undefined) continue;
+    const measured = press.call;
     describe(contractId, () => {
       const seed = BigInt(press.seedText);
-      const atS = horizonLengthS(contractId) * press.pressAtFraction;
-      const right: RunInterventionConfig = {
-        atS,
-        change: { kind: press.clearedBy } as RunInterventionConfig['change'],
-      };
-      const wrong: RunInterventionConfig = {
-        atS,
-        change: { kind: press.missedBy } as RunInterventionConfig['change'],
-      };
+      /*
+       * The window's two edges and a grid point between them — § D1029's always-on half. The far
+       * edge is the last tried moment the sweep found holding; the middle is the grid point nearest
+       * the window's centre.
+       */
+      const middle = Math.round(measured.windowS / 2 / measured.stepS) * measured.stepS;
+      const offsets = [0, middle, measured.windowS];
 
-      it('books a car out, misses as built, clears on one press and misses on the other', () => {
+      it('misses as built, calls where the data says, and holds both halves across its window', () => {
         expect(ladderRowFor(contractId)?.fabric.incidents.length).toBeGreaterThan(0);
 
-        const asBuilt = armOf(contractId, seed, press.standingOrder, []);
-        const cleared = armOf(contractId, seed, press.standingOrder, [right]);
-        const missed = armOf(contractId, seed, press.standingOrder, [wrong]);
+        const asBuilt = pressDayArmOf(contractId, seed, press.standingOrder, press.horizon, []);
+        expect(asBuilt.verdictLine(), `${contractId} as built`).toBe('Shift missed');
+        const call = asBuilt.call;
+        expect(call, `${contractId} has a call`).toBeDefined();
+        if (call === undefined) return;
+        expect(call.rule, `${contractId}'s call rule`).toBe(measured.rule);
+        /* The call falls while the car is away — `pressCallOf`'s own window, asked of the run. */
+        expect(call.atS).toBeGreaterThanOrEqual(call.awayAtS);
+        expect(call.atS).toBeLessThan(call.backAtS ?? asBuilt.recording.endedAt);
 
-        expect(asBuilt.verdictLine, `${contractId} as built`).toBe('Shift missed');
-        expect(cleared.verdictLine, `${contractId} under ${press.clearedBy}`).toBe('Shift cleared');
-        expect(missed.verdictLine, `${contractId} under ${press.missedBy}`).toBe('Shift missed');
-
-        /*
-         * On the legs, never a window statistic — § D177's own words. Both presses move the run;
-         * the one that clears is the one that moves it the right way, and a press that moved
-         * nothing at all would be § D227's first polarity arriving on a pinned day.
-         */
-        expect(legsOf(cleared), `${contractId} cleared arm`).not.toBe(legsOf(asBuilt));
-        expect(legsOf(missed), `${contractId} missed arm`).not.toBe(legsOf(asBuilt));
-
-        /*
-         * And the prefix is untouched: `core` schedules the change at `atS` and nothing that fired
-         * before it can observe it, so the press is a decision taken at a moment rather than a
-         * different day. Compared on the boardings that happened before the press.
-         */
-        const before = (arm: Arm): string =>
-          JSON.stringify(arm.legs.filter((leg) => leg[2] >= 0 && leg[2] < atS));
-        expect(before(cleared), `${contractId} prefix`).toBe(before(asBuilt));
-        expect(before(missed), `${contractId} prefix`).toBe(before(asBuilt));
-      });
+        for (const offset of offsets) {
+          const atS = call.atS + offset;
+          const cleared = pressDayArmOf(contractId, seed, press.standingOrder, press.horizon, pressAt(atS, press.clearedBy));
+          const missed = pressDayArmOf(contractId, seed, press.standingOrder, press.horizon, pressAt(atS, press.missedBy));
+          expect(cleared.verdictLine(), `${contractId} ${press.clearedBy} at +${String(offset)} s`).toBe('Shift cleared');
+          expect(missed.verdictLine(), `${contractId} ${press.missedBy} at +${String(offset)} s`).toBe('Shift missed');
+          if (offset !== 0) continue;
+          /*
+           * On the legs, never a window statistic — § D177's own words — and the prefix untouched:
+           * `core` schedules the change at `atS`, so the press is a decision taken at a moment rather
+           * than a different day. Asked at the call, where the stage stamps the answer.
+           */
+          expect(legsOf(cleared), `${contractId} cleared arm`).not.toBe(legsOf(asBuilt));
+          expect(legsOf(missed), `${contractId} missed arm`).not.toBe(legsOf(asBuilt));
+          const before = (arm: { readonly legs: Arm['legs'] }): string =>
+            JSON.stringify(arm.legs.filter((leg) => leg[2] >= 0 && leg[2] < atS));
+          expect(before(cleared), `${contractId} prefix`).toBe(before(asBuilt));
+          expect(before(missed), `${contractId} prefix`).toBe(before(asBuilt));
+        }
+      }, 300_000);
     });
   }
+
+  it('the check bites: on a crowd it is known to fail on, the call window does not hold', () => {
+    /*
+     * The positive control § D1029 asks for. Secure Tower's pin **before** wave AI — seed
+     * 20 482 556, spread the cars, graded whole — was § D974's; its call falls at 10:51 and the
+     * sweep found spread missing at every moment tried from it (`decide-ai` S2: *spread clears at
+     * 3 of 121*). Run through the very function the admitted pins pass, it must fail, or the pins
+     * above passing would say nothing.
+     */
+    const seed = 20_482_556n;
+    const asBuilt = pressDayArmOf('c3', seed, 'collective', 'whole-day', []);
+    expect(asBuilt.missed).toBe(true);
+    const call = asBuilt.call;
+    expect(call).toBeDefined();
+    if (call === undefined) return;
+    const cleared = pressDayArmOf('c3', seed, 'collective', 'whole-day', pressAt(call.atS, 'spread-cars'));
+    const missed = pressDayArmOf('c3', seed, 'collective', 'whole-day', pressAt(call.atS, 'park-cars-lobby'));
+    expect(!cleared.missed && missed.missed, 'the old c3 pin holds at its call').toBe(false);
+  }, 120_000);
+
+  it('the stage and the sweep name the same second, and the stage names none off the day as measured', () => {
+    /*
+     * One function, three callers — the ruling's first guard. The sweep's call is
+     * `pressDay.test-helper.ts#pressDayArmOf`'s, over the run's own building; the stage's is
+     * `dev/state.ts#pressDayCallOf`, which `everyday/host.ts#pressCallOnStage` answers with. Asked of
+     * the same run they must be the same second, and the stage's must refuse a day that is not the
+     * one measured: another driver, or a press before the call.
+     */
+    const [contractId] = admittedPressDayIds();
+    const press = pressDayFor(contractId);
+    expect(press, 'an admitted pin').toBeDefined();
+    if (contractId === undefined || press === undefined) return;
+    const seed = BigInt(press.seedText);
+    const swept = pressDayArmOf(contractId, seed, press.standingOrder, press.horizon, []);
+    const state = contractDayState(contractId, {
+      seed,
+      dispatcherId: press.standingOrder,
+      over: horizonOver(contractId, press),
+    });
+    const onStage = pressDayCallOf(PRESS_DAY_RESOURCES, state, swept.recording);
+    expect(onStage?.call.atS).toBe(swept.call?.atS);
+    expect(onStage?.press.seedText).toBe(press.seedText);
+    const other = RESOURCES_WITH_TOWERS.dispatcherProfiles.profiles.find((p) => p.id !== press.standingOrder);
+    expect(
+      pressDayCallOf(PRESS_DAY_RESOURCES, { ...state, dispatcherId: other?.id ?? 'eta' }, swept.recording),
+    ).toBeUndefined();
+    const early = (swept.call?.atS ?? 0) - 30;
+    expect(
+      pressDayCallOf(
+        PRESS_DAY_RESOURCES,
+        { ...state, interventions: pressAt(early, press.clearedBy) },
+        swept.recording,
+      ),
+    ).toBeUndefined();
+    /* And the answer at the call second is the day as measured. */
+    expect(
+      pressDayCallOf(
+        PRESS_DAY_RESOURCES,
+        { ...state, interventions: pressAt(swept.call?.atS ?? 0, press.clearedBy) },
+        swept.recording,
+      )?.call.atS,
+    ).toBe(swept.call?.atS);
+  }, 120_000);
 });
 
-/**
- * **The row that prints both runs' verdicts, on three crowds of one tower** — § D982.
- *
- * The decision agent's ruling pins three arms on `c7`, all with *spread the cars* at the rung's own
- * press second under the rung's standing order, and each is a clause of the ruling rather than a
- * variation on one:
- *
- * - **20 268 743**, the pinned day: the press clears a day that missed as built. The row must say
- *   so, naming the goal the unpressed run missed.
- * - **20 442 961**: the **same press, the same tower**, and a cleared day becomes a missed one. The
- *   row must say that as plainly as it says a win — and this arm is the run that pins
- *   `AFTER_PRESS_VERDICT_NOTE`'s premise, that two verdicts from one crowd say nothing about another
- *   crowd *even in this tower* (§ D227: a refusal is pinned by a run, never by another sentence).
- * - **20 260 824**: both runs clear, and nothing on the row connects them.
- *
- * Measured by the ruling's instrument (`sweep50.tsv`, 1 050 runs) and re-derived here on every run.
- */
 describe('the paired row’s verdicts — three crowds of c7, one press', () => {
   const contractId = 'c7';
-  const press = pressDayFor(contractId);
   const SPREAD_KIND = 'spread-cars';
+  /*
+   * § D982's own measurement, kept on its own footing. It was taken at the rung's press second as
+   * it then was — 0.28 of the slice — under the standing order; § D1029 replaced that typed instant
+   * with a derived call and may re-pin `c7` itself, and neither moves what this describe proves: the
+   * row's words, over three crowds, at one press. So the second and the order are this file's.
+   */
+  const PAIR_AT_FRACTION = 0.28;
+  const PAIR_ORDER = 'collective';
 
   function pairedRowOf(seed: bigint): string {
-    if (press === undefined) throw new Error('c7 pins no day');
     const contract = contractById(contractId);
     if (contract === undefined) throw new Error('no c7');
-    const atS = shiftLengthForContract(contractId) * press.pressAtFraction;
+    const atS = shiftLengthForContract(contractId) * PAIR_AT_FRACTION;
     const presses: readonly RunInterventionConfig[] = [
       { atS, change: { kind: SPREAD_KIND } as RunInterventionConfig['change'] },
     ];
-    const state = contractDayState(contractId, { seed, dispatcherId: press.standingOrder });
+    const state = contractDayState(contractId, { seed, dispatcherId: PAIR_ORDER });
     const plan = shiftRunConfigOf(RESOURCES_WITH_TOWERS, state);
     const run = (interventions: readonly RunInterventionConfig[]) =>
       recordRun(
@@ -414,9 +391,9 @@ describe('the paired row’s verdicts — three crowds of c7, one press', () => 
   const THIS = 'this run reads';
   const OTHER = 'the run without that press, over its own whole day, reads';
 
-  it('pins the rung it is about — c7, spread the cars, the day this file already proves', () => {
-    expect(press?.seedText).toBe('20268743');
-    expect(press?.clearedBy).toBe(SPREAD_KIND);
+  it('is about c7, a slice, whose standing order is the one it measured under', () => {
+    expect(pressDayFor(contractId)?.horizon).toBe('period');
+    expect(pressDayFor(contractId)?.standingOrder).toBe(PAIR_ORDER);
   });
 
   it('clears a missed day: 20 268 743 reads cleared, and the run without it missed on the worst wait', () => {
@@ -465,16 +442,15 @@ describe('the moot-dispatcher census — what the brief tells the player before 
     expect(cleared, contractId).toEqual([...press.mootUnder]);
   }, 120_000);
 
-  it('never lists the standing order, and the standing order misses on every pinned day', () => {
+  it('never lists the standing order — and the per-pin case above runs the day it misses on', () => {
+    /*
+     * The declaration's half. The run's half — the standing order misses as built — is the first
+     * clause of each admitted pin's case above, so it is not run twice (§ D1029 moved it there).
+     */
     for (const [contractId, press] of PINNED) {
-      /* The declaration's half — `contractLadderIssues` refuses it too, checked here in the run. */
       expect(press.mootUnder, contractId).not.toContain(press.standingOrder);
-      /* And the run's half: one simulation per pinned day, which is what makes it a check. */
-      expect(missesAsBuilt(contractId, BigInt(press.seedText), press.standingOrder), contractId).toBe(
-        true,
-      );
     }
-  }, 120_000);
+  });
 
   it('quotes a census that a player could act on — every named id is one they can select', () => {
     const shipped = new Set(

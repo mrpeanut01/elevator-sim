@@ -43,8 +43,15 @@
         "standingOrder": "collective",
         "clearedBy": "spread-cars",
         "missedBy": "park-cars-lobby",
-        "pressAtFraction": 0.43,
         "horizon": "whole-day",
+        "call": {
+          "rule": "first-minute-wait",
+          "windowS": 300,
+          "stepS": 10,
+          "searchedS": 300,
+          "tried": 36,
+          "holes": []
+        },
         "mootUnder": [
           "eta",
           "collective-enroute",
@@ -84,22 +91,22 @@
         "note": "Already inside the band as shipped, and the rung says so rather than moving it: 0.52 of 50 seeds at the standard-office profile's own typical, with the landing queue doing the discriminating on 23 of them. The rate is written out rather than left implicit so that a later change to the profile's typical is visible here as a change to this scenario, which is the whole reason a ladder exists — and writing the profile's own number is the identity, checked on the legs by ladder.test.ts. Fabric untouched. RE-MEASURED AND REBALANCED ON 2026-09-22. Car C of the low bank leaves between a quarter and a half of the way through the shift -- the low bank rather than the high one because it is the bank the lobby crowd meets. The absence took the rate to 0.78 of 50, outside DC-4 at the top, so the declared crowd goes from the office-standard typical of 12 to its declared MINIMUM of 11. Measured 0.53 of 30 there. The rate is still written out rather than left implicit, so a later change to the profile's typical is visible here as a change to this scenario. -- GitHub issue #587, DECISIONS.md section D914. A CAR IS BOOKED OUT OF PASSENGER SERVICE PART-WAY THROUGH THIS CONTRACT'S DAY, and the rung pins one day whose verdict the standing order misses and a reachable press clears. That is DC-R1's own fabric substrate (availability: a car out of service), declared on the contract rather than drawn as a wrinkle because shift/events.ts#eventFor is pure in (day, dayIdx) -- booking a car out on day 1 there books one out on all sixteen. NO BAR MOVED: shift/goals.ts#GOAL_BARS is byte-identical and this schema still has no place to author one. The day is proved in both directions by running it, in packages/viz/src/shift/pressLadder.test.ts: as built the standing order reads Shift missed, the pinned press reads Shift cleared, THE OTHER PARKING VERB STILL MISSES, the legs differ and the prefix before the press is identical. MOOTUNDER IS MEASURED, NEVER CHOSEN: every shipped dispatcher was run on this exact day as built and the ones that clear it with no press at all are listed, because switching dispatcher is a control on the same screen and a player who changes it makes the day moot -- everyday/today.ts draws that sentence on the brief, beside the select that does it. The instrument is shift/pressLadder.sweep.test.ts. PROVENANCE, per the owner's 2026-09-08 standing ruling: the verdicts, the miss rate and the census are MEASURED at the runs named here; which car leaves, when it leaves and which day is pinned are CHOSEN -- game feel, not a measurement."
       },
       "pressDay": {
-        "seedText": "20482556",
+        "seedText": "20308338",
         "standingOrder": "collective",
         "clearedBy": "spread-cars",
         "missedBy": "park-cars-lobby",
-        "pressAtFraction": 0.43,
         "horizon": "whole-day",
+        "call": {
+          "rule": "first-minute-wait",
+          "windowS": 300,
+          "stepS": 10,
+          "searchedS": 300,
+          "tried": 36,
+          "holes": []
+        },
         "mootUnder": [
           "eta",
-          "energy-aware",
-          "fairness-first",
-          "capacity-aware",
-          "predictive-balanced",
-          "auction",
-          "auction-multi-round",
-          "zoned-uppeak",
-          "destination-panel"
+          "auction"
         ]
       }
     },
@@ -163,17 +170,24 @@
         "note": "A day a player could not fail — 1 of 30 at four goals, 6 of 30 at five — on a building whose own card says it has more lift than it needs. The crowd is left at the prestige profile's typical, because raising it to the declared maximum of 17 % makes the day EASIER (0.07 over 30 seeds), the energy bar falling away faster than the wait bars bind. The fabric moves instead: five shafts rather than six, at 3.5 m/s rather than 5, still a gearless bank inside its declared 2.5-7.0 m/s band and still the building the card describes. Six shafts at 5 m/s measured 0.20, five at 5 m/s 0.30, four at 5 m/s 0.77 and five at 3.5 m/s 0.33; the last plus a six per cent occupancy lift measured 0.43 at 30 seeds and 0.36 of 50, docs/33 § 4.7. This is the scenario whose whole lesson is that spare cars are not a short interval, so taking one spare away is the lesson expressed as fabric — and five cars still leave the dispatcher a decision, which is what a one-car bank would not. RE-MEASURED AND REBALANCED ON 2026-09-22. Car E of the commissioned five-shaft bank leaves between a quarter and a half of the way through the shift. The absence alone took the day-1 miss rate to 0.76 of 50, outside DC-4 at the top, so the crowd came back to the office-prestige profile's declared MINIMUM of 15 % (it was 16, the typical) with the let unchanged at 1.06 -- measured 0.47 of 30 there, inside the band. The pair was bracketed: 15 % at 0.98 let reads 0.20 of 30, under the floor, so the two figures shipped are the ones between two measured misses. Both substrates are DC-R1's and no third kind of knob was reached for. -- GitHub issue #587, DECISIONS.md section D914. A CAR IS BOOKED OUT OF PASSENGER SERVICE PART-WAY THROUGH THIS CONTRACT'S DAY, and the rung pins one day whose verdict the standing order misses and a reachable press clears. That is DC-R1's own fabric substrate (availability: a car out of service), declared on the contract rather than drawn as a wrinkle because shift/events.ts#eventFor is pure in (day, dayIdx) -- booking a car out on day 1 there books one out on all sixteen. NO BAR MOVED: shift/goals.ts#GOAL_BARS is byte-identical and this schema still has no place to author one. The day is proved in both directions by running it, in packages/viz/src/shift/pressLadder.test.ts: as built the standing order reads Shift missed, the pinned press reads Shift cleared, THE OTHER PARKING VERB STILL MISSES, the legs differ and the prefix before the press is identical. MOOTUNDER IS MEASURED, NEVER CHOSEN: every shipped dispatcher was run on this exact day as built and the ones that clear it with no press at all are listed, because switching dispatcher is a control on the same screen and a player who changes it makes the day moot -- everyday/today.ts draws that sentence on the brief, beside the select that does it. The instrument is shift/pressLadder.sweep.test.ts. PROVENANCE, per the owner's 2026-09-08 standing ruling: the verdicts, the miss rate and the census are MEASURED at the runs named here; which car leaves, when it leaves and which day is pinned are CHOSEN -- game feel, not a measurement."
       },
       "pressDay": {
-        "seedText": "21100238",
+        "seedText": "20514232",
         "standingOrder": "collective",
-        "clearedBy": "spread-cars",
-        "missedBy": "park-cars-lobby",
-        "pressAtFraction": 0.43,
+        "clearedBy": "park-cars-lobby",
+        "missedBy": "spread-cars",
         "horizon": "whole-day",
+        "call": {
+          "rule": "first-minute-wait",
+          "windowS": 300,
+          "stepS": 10,
+          "searchedS": 300,
+          "tried": 36,
+          "holes": []
+        },
         "mootUnder": [
           "eta",
+          "collective-enroute",
           "fairness-first",
           "capacity-aware",
-          "predictive-balanced",
           "auction",
           "auction-multi-round",
           "zoned-uppeak",
@@ -206,13 +220,41 @@
         "note": "THE ONE DAY IN THIS LADDER WHOSE VERDICT TURNS ON A PRESS — GitHub issue #576, DECISIONS.md § D871. Two substrates move and neither is a bar. FABRIC: car D of the main bank is booked out of passenger service between a quarter and a half of the way through the shift — 450 s to 900 s of the 1 800 s day, scheduled maintenance on one of the four guest cars — which is DC-R1's own fabric row (availability: a car out of service), declared here because a drawn wrinkle is pure in (day, dayIdx) and would have booked a car out on every contract's day 1 rather than on this one. DEMAND: the rate goes 12 to 11, inside the hotel profile's declared 10-15, to put the as-built miss rate back inside DC-4's band after the car came out. MEASURED, at docs/33 § 4.6's cell exactly — day 1, collective, seeds 20260824 + 7919n, n = 0..49, the building's own 1 800 s: the as-built configuration misses 22 of 50, against 25 of 50 with this row reverted — BOTH SIDES RE-MEASURED on the same tree rather than one of them quoted, and the 25 is exactly what docs/33 4.7d published, so the base reproduces and this is a move rather than a correction. DC-4 holds either side. WHAT IS NEW is the second column: with one mid-run press at 504 s, spread the cars misses 20 of 50 (6 seeds rescued, 4 broken), hand the day to predictive-balanced misses 15 of 50 (12 rescued, 5 broken), and park the cars in the lobby misses 23 of 50 (3 rescued, 4 broken) — WORSE THAN PRESSING NOTHING, which is this contract's own lesson (there is no dominant direction in a hotel, so the lobby is the wrong verb) and is what makes the choice a choice rather than a switch. THE PINNED DAY is seed 20268743: as-built worst wait 303 s against a 230 s bar and the shift is missed, park in the lobby 311 s and it is still missed, spread the cars 215 s and it is CLEARED. packages/viz/src/shift/pressDecidesTheDay.test.ts runs both arms and fails if either direction stops holding. PROVENANCE, per the owner's 2026-09-08 standing ruling: the miss rates and the pinned day are MEASURED at the run named above; that this contract should be the one whose day turns on a press, and that the lift should be a guest car rather than the service lift, are CHOSEN — game feel, not a measurement. SIX MORE CONTRACTS CARRY THIS SHAPE SINCE 2026-09-22 -- GitHub issue #587, DECISIONS.md section D914 -- so this row is no longer the only one that books a car out, and the sentence above that called it the ONE day in this ladder is kept as the dated record it is. What is new here is the pressDay block: the seed, the verb that clears it, the verb that does not, and the shipped dispatchers that clear this exact day AS BUILT with no press at all, measured by running all thirteen. Eight of them do, which is why the brief now says so beside the dispatcher select rather than leaving a player to find out by accident. Neither the rate nor the absence moved."
       },
       "pressDay": {
-        "seedText": "20268743",
+        "seedText": "20324176",
         "standingOrder": "collective",
         "clearedBy": "spread-cars",
         "missedBy": "park-cars-lobby",
-        "pressAtFraction": 0.28,
         "horizon": "period",
+        "call": {
+          "rule": "first-minute-wait",
+          "windowS": 120,
+          "stepS": 10,
+          "searchedS": 300,
+          "tried": 18,
+          "holes": [
+            130,
+            140,
+            150,
+            160,
+            170,
+            180,
+            190,
+            200,
+            210,
+            220,
+            230,
+            240,
+            250,
+            260,
+            270,
+            280,
+            290,
+            300
+          ]
+        },
         "mootUnder": [
+          "eta",
+          "collective-enroute",
           "energy-aware",
           "fairness-first",
           "capacity-aware",
@@ -260,8 +302,15 @@
         "standingOrder": "collective",
         "clearedBy": "park-cars-lobby",
         "missedBy": "spread-cars",
-        "pressAtFraction": 0.28,
         "horizon": "period",
+        "call": {
+          "rule": "first-minute-wait",
+          "windowS": 300,
+          "stepS": 10,
+          "searchedS": 300,
+          "tried": 36,
+          "holes": []
+        },
         "mootUnder": [
           "eta",
           "energy-aware",
@@ -302,8 +351,20 @@
         "standingOrder": "collective",
         "clearedBy": "spread-cars",
         "missedBy": "park-cars-lobby",
-        "pressAtFraction": 0.43,
         "horizon": "whole-day",
+        "call": {
+          "rule": "first-minute-wait",
+          "windowS": 40,
+          "stepS": 10,
+          "searchedS": 300,
+          "tried": 10,
+          "holes": [
+            50,
+            120,
+            130
+          ]
+        },
+        "refused": "no crowd tried held for two minutes after the stage’s call, so this day is not offered",
         "mootUnder": [
           "eta",
           "collective-enroute",
@@ -347,8 +408,15 @@
         "standingOrder": "collective",
         "clearedBy": "park-cars-lobby",
         "missedBy": "spread-cars",
-        "pressAtFraction": 0.43,
         "horizon": "whole-day",
+        "call": {
+          "rule": "first-minute-wait",
+          "windowS": 300,
+          "stepS": 10,
+          "searchedS": 300,
+          "tried": 36,
+          "holes": []
+        },
         "mootUnder": [
           "eta",
           "energy-aware",

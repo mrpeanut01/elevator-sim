@@ -51,7 +51,7 @@ import { recordRun } from '../record/recordRun.js';
 import { servedLeg, syntheticRecording } from '../live/synthetic.test-helper.js';
 import { wholeDayFor, wholeDayRun } from '../shift/dayLength.js';
 import { GOAL_BARS } from '../shift/goals.js';
-import { nextDay } from '../shift/week.js';
+import { closeDay, nextDay, outcomeOf } from '../shift/week.js';
 import type { GoalReading } from '../shift/types.js';
 import type { ShapedDayReport } from '../shift/report.js';
 /* GitHub issue #245 — the predicate the façade carries the answer of, asked directly. */
@@ -560,6 +560,50 @@ describe('the run actions', () => {
     host.startRun();
     host.closeDay();
     expect(h.calls).toEqual(['startRun', 'closeDay']);
+  });
+
+  it('startRun clears a standing log before the press — a run it starts begins with no presses (§ D1002)', () => {
+    const withLog: ViewerState = {
+      ...base(),
+      recording: A_RECORDING,
+      interventions: [{ atS: 30, change: { kind: 'park-cars-lobby' } }],
+    };
+    const h = harnessOf(withLog);
+    createEverydayHost(h.bindings).startRun();
+    expect(h.calls).toEqual(['applyPatch', 'startRun']);
+    expect(h.patches[0]?.interventions).toEqual([]);
+  });
+
+  it('chooseTower takes the log with the week it moves — a press is stamped against one tower’s day (§ D1002)', () => {
+    const withLog: ViewerState = {
+      ...base(),
+      interventions: [{ atS: 30, change: { kind: 'park-cars-lobby' } }],
+    };
+    const other = CONTRACTS.find((contract) => contract.id !== withLog.week.contractId);
+    if (other === undefined) throw new Error('the shipped contracts hold more than one tower');
+    const h = harnessOf(withLog);
+    createEverydayHost(h.bindings).chooseTower(other.id);
+    const moved = h.patches.find((patch) => patch.week !== undefined);
+    expect(moved?.buildingId).toBe(other.buildingId);
+    expect(moved?.interventions).toEqual([]);
+  });
+
+  it('openTomorrow advances from a today the week has banked when no sheet stands — a reload (§ D1004)', () => {
+    const banked = closeDay(base().week, outcomeOf({
+      day: base().week.day,
+      dayIdx: base().week.dayIdx,
+      eventId: 'ordinary',
+      arrived: 10,
+      carried: 10,
+      minutePct: 90,
+      readings: [],
+      record: null,
+      recordRefusal: null,
+    }));
+    const h = harnessOf({ ...base(), week: banked });
+    createEverydayHost(h.bindings).openTomorrow();
+    expect(h.calls).toEqual(['applyPatch', 'openRunTab', 'startRun']);
+    expect(h.patches[0]?.week?.day).toBe(banked.day + 1);
   });
 
   it('openTomorrow refuses while no closed day’s sheet is standing', () => {

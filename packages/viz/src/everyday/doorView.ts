@@ -88,12 +88,25 @@ export interface WorldBandView {
 
 /** § 3.3's door primary, as this screen's state resolves it. */
 export interface DoorPrimaryView {
-  /** `Set up today` or `Set up the replay` — § 3.3's two variants, never a third. */
+  /**
+   * `Set up today`, `Set up the replay`, or — once today is closed — `Open the doors on Tuesday`
+   * ([§ D1004](../../../../DECISIONS.md)): the row's three variants, never a fourth.
+   */
   readonly label: string;
   /** The § 3.3 note, and on a past day the reason the button cannot act. */
   readonly note: string;
   /** True only on a chip from before this week began; a past day inside the week is pressable — § D517. */
   readonly inert: boolean;
+  /**
+   * Where the press goes: today's brief, a replay's, or tomorrow — `EverydayHost.openTomorrow`,
+   * the same press as the report's *Open the doors on …*. § D1004.
+   */
+  readonly goes: 'today' | 'replay' | 'tomorrow';
+  /**
+   * Today again, as another attempt — drawn beside the primary only while the primary opens
+   * tomorrow, because that is the one state in which the retry is no longer the primary. § D1004.
+   */
+  readonly again: { readonly label: string; readonly note: string } | undefined;
 }
 
 /** The whole screen, as data. */
@@ -294,13 +307,42 @@ function noteFor(state: {
  */
 function primaryOf(input: DoorScreenInput, chips: readonly DoorDayChip[]): DoorPrimaryView {
   if (input.dayOffset === 0) {
+    /*
+     * **A closed today opens tomorrow** — [§ D1004](../../../../DECISIONS.md), the post-AH panel's
+     * *no route to tomorrow from the front door*. Two assessors closed Monday, left the report,
+     * came back here, and met *Set up today* over a disabled `›`: the only press re-ran Monday, and
+     * Tuesday opened only by re-running and re-closing it to reach the report's own button. The
+     * week already says today is closed — its history carries the day, which is what the chip
+     * reads — so the door says it too, and the press is the report's *Open the doors on …*.
+     *
+     * Read off the history as well as `dayClosed`, because the two answer different questions:
+     * `dayClosed` is *the run on the stage was filed this sitting*, and a reload, or a second
+     * attempt pressed from the brief, leaves the day banked with no filed run standing. Either
+     * one is a closed today.
+     */
+    if (todayIsBanked(input)) {
+      const tomorrow = weekdayOf((input.week.dayIdx + 1) % 7);
+      return {
+        label: `Open the doors on ${tomorrow}`,
+        note:
+          `Today is closed and banked. This opens ${tomorrow}'s day and starts it; today stays in ` +
+          'your week as it is, and on the strip as a replay that does not count.',
+        inert: false,
+        goes: 'tomorrow',
+        again: {
+          label: 'Run today again',
+          note:
+            'Another attempt at the same day, on the same crowd and with no presses carried over. ' +
+            'The week keeps the better one rather than banking both.',
+        },
+      };
+    }
     return {
       label: 'Set up today',
-      note: input.dayClosed
-        ? 'Today is already closed. Running it again is another attempt at the same day, and the ' +
-          'week keeps the better one rather than banking both.'
-        : 'Pick who drives, then run it.',
+      note: 'Pick who drives, then run it.',
       inert: false,
+      goes: 'today',
+      again: undefined,
     };
   }
   /*
@@ -310,9 +352,30 @@ function primaryOf(input: DoorScreenInput, chips: readonly DoorDayChip[]): DoorP
    */
   const chip = chips.find((entry) => entry.offset === input.dayOffset);
   if (chip?.day !== undefined && replayableDay(input.week, chip.day)) {
-    return { label: 'Set up the replay', note: REPLAY_COPY.doorNote(chip.day), inert: false };
+    return {
+      label: 'Set up the replay',
+      note: REPLAY_COPY.doorNote(chip.day),
+      inert: false,
+      goes: 'replay',
+      again: undefined,
+    };
   }
-  return { label: 'Set up the replay', note: REPLAY_COPY.beforeTheWeek, inert: true };
+  return {
+    label: 'Set up the replay',
+    note: REPLAY_COPY.beforeTheWeek,
+    inert: true,
+    goes: 'replay',
+    again: undefined,
+  };
+}
+
+/**
+ * Whether today is closed — its outcome is in the week's history, or the run on the stage was filed
+ * this sitting. `everyday/weekView.ts` reads the same pair, so *Your week* and this door cannot
+ * disagree about the one day both draw ([§ D1004](../../../../DECISIONS.md)).
+ */
+export function todayIsBanked(input: Pick<DoorScreenInput, 'week' | 'dayClosed'>): boolean {
+  return input.dayClosed || input.week.history.some((entry) => entry.day === input.week.day);
 }
 
 /** § 6.1, resolved. Total: every arm answers something a player can read. */

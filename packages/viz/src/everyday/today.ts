@@ -49,7 +49,7 @@ import type { CalendarPeriod } from '../shift/calendar.js';
 import { scheduledEventFor } from '../shift/calendar.js';
 import { firstSessionLineFor } from '../shift/firstSession.js';
 import { carsToDerate } from '../shift/incidents.js';
-import { pressDayStanding } from '../shift/ladder.js';
+import { admittedPressDayIds, pressDayStanding } from '../shift/ladder.js';
 import type { GoalReading, RunHorizon, ShiftEvent, WeekState, Weekday } from '../shift/types.js';
 import { weekdayOf } from '../shift/types.js';
 
@@ -174,7 +174,23 @@ export interface TodayRecord {
   readonly firstSessionLine: string | undefined;
   /** Who drives, by name — or the em dash when the standing selection resolves to nothing. */
   readonly driver: string;
+  /**
+   * **Why the driver cannot be changed here**, or `undefined` when it can — wave AI,
+   * [§ D1029](../../../../DECISIONS.md).
+   *
+   * On an admitted pinned day, set up exactly as it was measured and driven by its standing order,
+   * the brief's cards and select are held: the day's press is made at the stage's call, and a
+   * different driver would be a day nobody measured (8 to 10 of 12 other orders clear these days
+   * with no press at all, which is what the census says). The hold is lifted on the stage once the
+   * call is answered, and on every other day it is never drawn.
+   */
+  readonly driverHeld: string | undefined;
 }
+
+/** {@link TodayRecord.driverHeld}'s sentence — no digit, the strip's own rule. */
+export const PRESS_DAY_DRIVER_HELD =
+  'This day is the tower’s own: its standing order drives until the stage’s call is answered. ' +
+  'Pick your own driver on any other day.';
 
 /** What {@link todayOf} needs. Every field is somebody else's fact, read rather than recomputed. */
 export interface TodayInput {
@@ -200,6 +216,12 @@ export interface TodayInput {
   readonly buildingId: string;
   /** The standing dispatcher's display name, or `undefined`. */
   readonly dispatcherName: string | undefined;
+  /**
+   * The standing dispatcher's id — for {@link TodayRecord.driverHeld}, which holds the driver only
+   * when it **is** the pin's standing order. Optional: a caller that draws no driver control passes
+   * nothing, and nothing is held.
+   */
+  readonly dispatcherId?: string | undefined;
   /**
    * Any shipped dispatcher's display name, by id — `host.dispatcherById(id)?.name`.
    *
@@ -385,14 +407,56 @@ function mootSentenceOf(
     horizon: input.horizon,
   });
   if (press === undefined) return undefined;
-  const names = press.mootUnder.map((id) => nameOf(id) ?? id);
-  if (names.length === 0) return undefined;
-  const last = names[names.length - 1] ?? '';
-  const list = names.length === 1 ? last : `${names.slice(0, -1).join(', ')} and ${last}`;
+  /*
+   * **One derived sentence now, and the list is the report's** — wave AI, [§ D1029](../../../../DECISIONS.md).
+   * The names used to be drawn here, one screen from the `<select>`, where they told a player the
+   * day's question could be skipped before they had met it; the ruling moved them to the report's
+   * call row, where they are a fact about the day just played. What stays is the count, in words,
+   * and whose order the day runs under — the visibility the first-day swarm's honesty member made a
+   * condition of the press-day default.
+   */
+  const standing = nameOf(press.standingOrder) ?? press.standingOrder;
+  const others = press.mootUnder.length;
+  const count =
+    others === 0
+      ? 'No other standing order clears it'
+      : `${countWord(others, true)} other standing ${others === 1 ? 'order clears' : 'orders clear'} it`;
   return (
-    `Measured on today’s crowd: ${list} clear this day with no press at all. Change who is ` +
-    'driving and the question this day is asking goes away with it.'
+    `This day runs under the tower’s standing order, ${standing}. Measured on today’s crowd, ` +
+    `${count} with no press at all; the day’s report names ${others === 1 ? 'it' : 'them'}.`
   );
+}
+
+/** A small count in words, for a strip that may carry no digit. Past twenty it is the digits' job. */
+function countWord(count: number, capital: boolean): string {
+  const words = [
+    'no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten',
+    'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen',
+    'nineteen', 'twenty',
+  ];
+  const word = words[count] ?? 'many';
+  return capital ? word.charAt(0).toUpperCase() + word.slice(1) : word;
+}
+
+/**
+ * {@link TodayRecord.driverHeld} — the pinned day as measured, admitted, and under its standing
+ * order. `pressDayStanding`'s five gates, and the two § D1029 adds for the brief: the pin is
+ * admitted, and the selection **is** the standing order (a selection that is not would not be held
+ * onto the wrong driver; the stage draws no call over it either).
+ */
+function driverHeldOf(input: TodayInput, event: ShiftEvent): string | undefined {
+  const press = pressDayStanding({
+    contractId: input.week.contractId,
+    day: input.week.day,
+    eventId: event.id,
+    hasCalendar: input.calendar !== null,
+    seed: input.seed,
+    horizon: input.horizon,
+  });
+  if (press === undefined) return undefined;
+  if (!admittedPressDayIds().includes(input.week.contractId)) return undefined;
+  if (input.dispatcherId === undefined || input.dispatcherId !== press.standingOrder) return undefined;
+  return PRESS_DAY_DRIVER_HELD;
 }
 
 /** § 6.2's five rows, from the resolved building. Empty when there is no document to read. */
@@ -579,5 +643,6 @@ export function todayOf(input: TodayInput): TodayRecord {
       ? firstSessionLineFor(week.contractId, input.seed)
       : undefined,
     driver: input.dispatcherName ?? EM_DASH,
+    driverHeld: driverHeldOf(input, event),
   };
 }

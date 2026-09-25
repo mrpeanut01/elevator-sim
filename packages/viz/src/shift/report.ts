@@ -115,6 +115,7 @@ import { fallbackLineOf, readbackOf, type RuleRow } from '../authoring/ruleSpec.
 import { interventionLogOf } from '../live/interventions.js';
 
 import { afterPressBeatOf, type PairVerdicts } from './afterPress.js';
+import { pressCallRowOf, type PressCallRowInput } from './callRow.js';
 import { wrinkleNoteOf, type BookedOutCar } from './bookedOut.js';
 import type { PressCounterfactual } from './counterfactual.js';
 
@@ -680,6 +681,14 @@ export interface DayReportInput {
    * that wait ({@link missedGoalRowsOf}).
    */
   readonly bookedOut?: readonly BookedOutCar[] | undefined;
+  /**
+   * **A pinned day's call, on the day it was played as measured** — wave AI, [§ D1029](../../../../DECISIONS.md).
+   *
+   * The pin and the call instant, passed only by `dev/main.ts#closeShift` and only when
+   * `dev/state.ts#pressDayCallOf` answers for the run being filed. `shift/callRow.ts` prints its row
+   * after § D982's pair; `undefined` on every other day, which draws nothing.
+   */
+  readonly pressCall?: Omit<PressCallRowInput, 'interventions'> | undefined;
 }
 
 /**
@@ -1037,6 +1046,7 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
       pairVerdictsOf(input, readings),
       readings,
       input.bookedOut ?? [],
+      input.pressCall,
     ),
     levers: leversFor(recording, observations, summary, readings),
     smallPrint: smallPrintFor(dispatcherName, summary, dayStartS),
@@ -1998,6 +2008,7 @@ function diagnosisFor(
   pairVerdicts: PairVerdicts | undefined,
   readings: readonly GoalReading[],
   bookedOut: readonly BookedOutCar[],
+  pressCall?: Omit<PressCallRowInput, 'interventions'> | undefined,
 ): readonly ReportDiagnosis[] {
   const at = observations.peakQueueAtS;
   const floorId = observations.peakQueueFloorId;
@@ -2115,7 +2126,12 @@ function diagnosisFor(
     }
   }
   const rows = [...lead, ...(queueLed ? [] : [queueRow]), phaseRow];
-  return afterPress === undefined ? rows : [...rows, afterPress];
+  /* § D1029's row, after § D982's pair: the call, the answer, and the pinned verdicts on this crowd. */
+  const callRow =
+    pressCall === undefined
+      ? undefined
+      : pressCallRowOf({ ...pressCall, interventions }, (simTimeS) => clockOf(simTimeS, dayStartS));
+  return [...rows, ...(afterPress === undefined ? [] : [afterPress]), ...(callRow === undefined ? [] : [callRow])];
 }
 
 /** `1 person` / `5 people` — the diagnosis rows' cohort word. */

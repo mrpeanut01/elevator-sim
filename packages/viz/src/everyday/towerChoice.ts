@@ -53,7 +53,14 @@
 
 import { scheduledEventFor, type CalendarPeriod } from '../shift/calendar.js';
 import { CONTRACTS } from '../shift/contracts.js';
-import { ladderRowFor, pressDayFor, pressDayStanding } from '../shift/ladder.js';
+import {
+  admittedPressDayIds,
+  CONTRACT_LADDER,
+  ladderRowFor,
+  pressDayFor,
+  pressDayStanding,
+  type ContractLadder,
+} from '../shift/ladder.js';
 import type { RunHorizon, WeekState } from '../shift/types.js';
 import { switchWeek } from '../shift/week.js';
 
@@ -147,16 +154,23 @@ export const TOWER_CHOICE_COPY = Object.freeze({
  *
  * ## What the lede may claim, and it is exactly what `shift/pressLadder.test.ts` proves
  *
- * On each pinned day, under the tower's standing order and with the press made at the pinned
- * moment: the day misses as built, one parking press clears it, the other parking press does not,
- * and the press moves the legs. The lede says those four things and **not which press** — naming
- * it would turn the day into a switch. It says *measured* because it is one day on one crowd, and
- * § D914's fifty-seed measurement found a press flips a day's verdict in a minority of pairs with
- * no tower's effect distinguishable from zero, so nothing here may read as a rule about a tower.
+ * On each admitted pinned day, under the tower's standing order: the day misses as built, the stage
+ * stops once to call for a press, and from that call one parking press clears the day and the other
+ * does not at every moment tried over the window the pin was admitted on. The lede says those
+ * things and **not which press** — naming it would turn the day into a switch. It says *measured*
+ * because it is one day on one crowd, and § D914's fifty-seed measurement found a press flips a
+ * day's verdict in a minority of pairs with no tower's effect distinguishable from zero, so nothing
+ * here may read as a rule about a tower.
  *
- * *While the car is away* is the pinned moment in words: every pin presses at a fraction of the run
- * inside the rung's own absence, `fromFraction` to `toFraction`, and a clock time printed here would
- * be a figure with a schedule the reader cannot see behind it (`today.ts#outOfServiceOf`'s reason).
+ * ## The clause it used to carry, and why it went — wave AI, [§ D1029](../../../../DECISIONS.md)
+ *
+ * It read *"with the press made while the car is away"*, and the docstring here called that *the
+ * pinned moment in words*. It was not: the pin was one instant, and measured over the car's
+ * absence the clearing press held throughout on two of the seven rows and failed for most of it on
+ * four (the ruling's honesty lens, § 2 of its record, measured on `e1d10ac`). The phrase is gone, and what
+ * replaced it is **derived** — {@link pressDayLedeOf} reads the shortest admitted window off the
+ * pinned data and says it in words, so the lede can claim no more time than the least of the rows
+ * under it was measured over. No digit, the surface's own rule: the minutes are spelled.
  *
  * ## A pin on the other horizon is listed and refused, by name
  *
@@ -176,11 +190,19 @@ export const TOWER_CHOICE_COPY = Object.freeze({
  */
 export const PRESS_DAY_CHOICE_COPY = Object.freeze({
   heading: 'DAYS A PRESS DECIDES',
-  lede:
-    'On each of these a lift goes out part-way through the first day. Measured on one crowd under ' +
-    'the tower’s standing order, that day misses as built, one of the two parking presses clears ' +
-    'it and the other does not, with the press made while the car is away. Which one is for you ' +
-    'to find.',
+  /** The lede's two halves either side of the derived window — see {@link pressDayLedeOf}. */
+  ledeBefore:
+    'On each of these a lift goes out part-way through the first day, and the stage stops once to ' +
+    'call for a press. Measured on one crowd under the tower’s standing order, that day misses as ' +
+    'built; from the call, one of the two parking presses cleared it and the other did not at every ' +
+    'moment tried over the ',
+  ledeAfter: ' after it. Which one is for you to find.',
+  /** Drawn in place of the lede when no row is admitted — a list with nothing to offer says so. */
+  ledeNone:
+    'No tower has a first day that holds for long enough after the stage’s call to be offered here.',
+  notAdmitted:
+    'measured on one crowd, the press did not hold for long enough after the stage’s call to be a ' +
+    'day you can play for, so it is not offered',
   note:
     'Choosing one moves your week there the way the list above does, sets its first day up on the ' +
     'crowd it was measured on rather than today’s, and hands the day back to the tower’s standing ' +
@@ -195,6 +217,31 @@ export const PRESS_DAY_CHOICE_COPY = Object.freeze({
     'measured on a different length of day from the one this tower plays, so it is not offered ' +
     'until it is measured on the day you would play',
 });
+
+/** Minutes in words, for a surface that may carry no digit. */
+const MINUTE_WORDS: readonly string[] = Object.freeze([
+  'zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten',
+]);
+
+/**
+ * **The lede, derived from the admitted windows** — [§ D1029](../../../../DECISIONS.md).
+ *
+ * The shortest window among the admitted pins, in whole minutes and in words, is the only span the
+ * lede may name: every row under it was measured over at least that long after its call, and no
+ * row over more than its own. `shift/ladder.ts#admittedPressDayIds` is the admitted set, so a pin
+ * that stops being admitted takes its window out of this sentence on the same commit.
+ */
+export function pressDayLedeOf(ladder: ContractLadder = CONTRACT_LADDER): string {
+  const admitted = admittedPressDayIds(ladder);
+  const windows = ladder.rows
+    .filter((row) => admitted.includes(row.contractId))
+    .map((row) => row.pressDay?.call?.windowS ?? 0);
+  if (windows.length === 0) return PRESS_DAY_CHOICE_COPY.ledeNone;
+  const minutes = Math.floor(Math.min(...windows) / 60);
+  const words = MINUTE_WORDS[minutes] ?? 'ten';
+  const span = minutes === 1 ? 'minute' : `${words} minutes`;
+  return `${PRESS_DAY_CHOICE_COPY.ledeBefore}${span}${PRESS_DAY_CHOICE_COPY.ledeAfter}`;
+}
 
 /** What {@link pressDayChoiceOf} needs — the week, the parked weeks and the run's other three facts. */
 export interface PressDayChoiceInput {
@@ -238,6 +285,14 @@ export function pressDayChoiceOf(
       horizon,
     }) !== undefined;
   if (standing) return { available: false, standing, note: PRESS_DAY_CHOICE_COPY.standing };
+  /*
+   * § D1029: a row the admission criterion refuses is drawn refused with its reason — the data's
+   * own sentence where it carries one, § D973's refused-row precedent — and never offered.
+   */
+  if (press.refused !== undefined) return { available: false, standing, note: press.refused };
+  if (!admittedPressDayIds().includes(contractId)) {
+    return { available: false, standing, note: PRESS_DAY_CHOICE_COPY.notAdmitted };
+  }
   if (horizon !== undefined && horizon !== press.horizon) {
     return { available: false, standing, note: PRESS_DAY_CHOICE_COPY.otherHorizon };
   }
@@ -326,7 +381,7 @@ export function towerChoiceViewOf(input: TowerChoiceInput): TowerChoiceView {
     incidentTag: TOWER_CHOICE_COPY.incidentTag,
     pressDays: {
       heading: PRESS_DAY_CHOICE_COPY.heading,
-      lede: PRESS_DAY_CHOICE_COPY.lede,
+      lede: pressDayLedeOf(),
       note: PRESS_DAY_CHOICE_COPY.note,
       rows: Object.freeze(pressRows),
     },

@@ -10,10 +10,11 @@
  * § 12.2 names four (day not closed · replay · sandbox · `noPost`) and says they combine. Two of
  * them reach this build:
  *
- * - **the day is not closed** — § 16 rule 1: *an unfinished thing shows `—`*, and `dayClosed` is
- *   set by *Close the day* alone. Today's card reads {@link EM_DASH} and *today · not closed yet*
- *   until it is, and the percentile line says there is nothing to place. This is a fact about
- *   **your own run** and it resolves the moment you close the day;
+ * - **the day is not closed** — § 16 rule 1: *an unfinished thing shows `—`*, and a closed day is
+ *   one the week's history carries, which *Close the day* alone writes. Today's card reads
+ *   {@link EM_DASH} and *today · not closed yet* until it is, and the percentile line says there is
+ *   nothing to place. This is a fact about **your own run** and it resolves the moment you close
+ *   the day — and stays resolved across a reload, which is § D1004;
  * - **the world is unreachable** — § 16 rule 15, `everyday/world.ts`. This is a fact about
  *   **other players** and it does not resolve at all in this build.
  *
@@ -39,7 +40,7 @@ import { wasGraded } from '../shift/week.js';
 import type { DayOutcome, WeekState } from '../shift/types.js';
 import { weekdayOf } from '../shift/types.js';
 
-import type { WorldBandView } from './doorView.js';
+import { todayIsBanked, type WorldBandView } from './doorView.js';
 import { EM_DASH, percentFigure } from './figures.js';
 import {
   percentileLine,
@@ -139,7 +140,12 @@ export interface WeekScreenInput {
   readonly week: WeekState;
   /** The building the standing selection points at, for today's card when it has no record yet. */
   readonly towerToday: string;
-  /** `host.runState().dayClosed` — § 16 rule 1's one authority for *today is finished*. */
+  /**
+   * `host.runState().dayClosed` — *the run on the stage was filed this sitting*. Since
+   * [§ D1004](../../../../DECISIONS.md) it is not the one authority for *today is finished*: an
+   * outcome in the week's history is too, and a card reads that. This decides only what is about
+   * the sitting — whether today's card can open a sheet.
+   */
   readonly dayClosed: boolean;
   /**
    * Whether a filed sheet is standing — `host.lastReport() !== undefined`.
@@ -187,13 +193,21 @@ function cardsOf(input: WeekScreenInput): readonly WeekDayCard[] {
     const isToday = offset === 0;
     const closed = day < 1 ? undefined : byDay.get(day);
     /*
-     * § 16 rule 1, and the one place it is easy to lose: a closed record for today is not enough.
-     * `dayClosed` is *the run on the stage has been filed*, and it is what **Close the day** sets;
-     * a week restored from storage can carry today's outcome from a previous sitting while the
-     * stage holds no filed run. Both must hold, or the card would publish a figure for a day this
-     * sitting has not finished.
+     * § 16 rule 1 — *an unfinished thing shows `—`* — read off the week, which is where a finished
+     * day is recorded. [§ D1004](../../../../DECISIONS.md).
+     *
+     * This used to require `dayClosed` as well for today's card — *the run on the stage has been
+     * filed* — on the ground that a week restored from storage can carry today's outcome while the
+     * stage holds no filed run, and a card drawn then would publish a figure for a day *this
+     * sitting* had not finished. The ground was about the sitting and the card is about the week,
+     * and the post-AH panel found where they part: a Thursday the report called *banked* read
+     * *today · not closed yet* here after a reload or a second attempt, while the front door's chip,
+     * reading the same history, said *today* with its score, and the tally said *No day of this week
+     * has been closed yet* after Monday was. An outcome in `history` **is** a closed day — nothing
+     * else writes one — so the card shows it, and what stays gated on the sitting is the one thing
+     * that is about the sitting: {@link WeekDayCard.readable}, which needs the sheet.
      */
-    const show = closed !== undefined && (!isToday || input.dayClosed);
+    const show = closed !== undefined;
     const verdict = show && closed !== undefined ? verdictOf(closed) : undefined;
     cards.push({
       weekday: day < 1 ? EM_DASH : shortWeekday(week.dayIdx + offset),
@@ -212,7 +226,8 @@ function cardsOf(input: WeekScreenInput): readonly WeekDayCard[] {
                 : VERDICT_NOTE[verdict],
       verdict,
       isToday,
-      readable: isToday && show && input.sheetStanding,
+      /* The sitting's own question, and the one place `dayClosed` still decides — § D1004. */
+      readable: isToday && show && input.dayClosed && input.sheetStanding,
     });
   }
   return Object.freeze(cards);
@@ -317,6 +332,8 @@ const BOARD_RULES: readonly { readonly title: string; readonly body: string }[] 
 export function weekScreenViewOf(input: WeekScreenInput): WeekScreenView {
   const cards = cardsOf(input);
   const tally = tallyOf(cards);
+  /* Today closed, by the week or by the sitting — `doorView.ts#todayIsBanked`, so the door agrees. */
+  const todayClosed = todayIsBanked(input);
   return {
     eyebrow: 'ELEVATOR SIM · EVERYDAY MODE',
     title: 'Your week',
@@ -325,7 +342,7 @@ export function weekScreenViewOf(input: WeekScreenInput): WeekScreenView {
     tally,
     percentile: {
       heading: 'WHERE YOU LANDED TODAY',
-      line: percentileLine(input.dayClosed),
+      line: percentileLine(todayClosed),
     },
     world: {
       label: WORLD_FIGURES_LABEL,
@@ -336,7 +353,9 @@ export function weekScreenViewOf(input: WeekScreenInput): WeekScreenView {
       'Share of today’s players, not a ranking. A popular style is not a proven one.',
     readNote: cards.some((card) => card.readable)
       ? 'Today’s card opens the account of it.'
-      : 'A day opens its own account once it has been closed.',
+      : todayClosed
+        ? 'Today is closed, and the week keeps it. Its account is no longer standing — a reload or a later run takes the sheet.'
+        : 'A day opens its own account once it has been closed.',
     board: {
       heading: 'TODAY’S BOARD, AND WHAT MAY SHARE ONE',
       refusal: DAILY_BOARD_POINTER,

@@ -98,6 +98,17 @@ import { settingsScreenViewOf } from '../everyday/settingsView.js';
 import { weekScreenViewOf } from '../everyday/weekView.js';
 import { wholeDayFor, wholeDayRun } from '../shift/dayLength.js';
 import { goalsForDay, readGoals } from '../shift/goals.js';
+import { pressCallRowOf } from '../shift/callRow.js';
+import {
+  admittedPressDayIds,
+  CONTRACT_LADDER,
+  pressDayFor,
+  type ContractPressDay,
+} from '../shift/ladder.js';
+import type { PressCall } from '../shift/pressCall.js';
+import { clockOf } from '../shift/report.js';
+import { DAY_START_S } from '../shift/types.js';
+import { towerChoiceViewOf } from '../everyday/towerChoice.js';
 import type { GoalObservations, WeekState } from '../shift/types.js';
 import { closeDay, outcomeOf } from '../shift/week.js';
 
@@ -213,7 +224,7 @@ export interface AgreedFigure {
  * absences on every case and passed for the wrong reason. See {@link withTodayFiled} and
  * {@link AGREEMENT_ARMS}.
  */
-export const AGREED_FIGURES: readonly AgreedFigure[] = Object.freeze([
+export const AGREED_FIGURES: readonly AgreedFigure[] = Object.freeze<AgreedFigure[]>([
   {
     id: 'today-asks',
     figure: "what today asks — the four goal bars, as each shell's rail publishes them",
@@ -279,10 +290,10 @@ export const AGREED_FIGURES: readonly AgreedFigure[] = Object.freeze([
       'to hold — so the refusal was the only string that line could render. Both screens are one ' +
       'click apart in the same rail, about the same week, and the fix pointed the card at the ' +
       'store that keeps days. What holds it there is not the fix: the two lines are **separate ' +
-      'derivations** over one `WeekState`, and they gate today’s figure differently — ' +
-      '`rail.ts#careerLineOf` asks whether any day in the `HISTORY_DAYS` window is `day < ' +
-      'week.day || dayClosed`, and `weekView.ts#streakLineOf` takes a count off cards whose own ' +
-      'gate is `!isToday || dayClosed`. Five asserted unit weeks in `rail.test.ts` hold the two ' +
+      'derivations** over one `WeekState`, and they gate today’s figure separately — ' +
+      '`rail.ts#careerLineOf` asks whether any day in the `HISTORY_DAYS` window is in the history, ' +
+      'and `weekView.ts#streakLineOf` takes a count off cards whose own gate is the same history ' +
+      '(both read the sitting’s `dayClosed` until § D1004). Five asserted unit weeks in `rail.test.ts` hold the two ' +
       'equal, which is a claim about five weeks; this is the claim over every case in the corpus, ' +
       'and it is the one a player reading both surfaces on one frame is actually owed. The whole ' +
       'line is compared rather than the streak alone, because the withheld arm — `best —` — is ' +
@@ -293,7 +304,7 @@ export const AGREED_FIGURES: readonly AgreedFigure[] = Object.freeze([
         hasACareer(view)
           ? railFooter(
               { screen: 'menu', ctx: 'daily' },
-              { week: view.state.week, dayClosed: view.dayClosed },
+              { week: view.state.week },
             ).identity.streak
           : undefined,
     },
@@ -356,7 +367,109 @@ export const AGREED_FIGURES: readonly AgreedFigure[] = Object.freeze([
         }).you.nameValue,
     },
   },
+  {
+    id: 'press-call-window',
+    figure: 'how long after the stage’s call a pinned day was tried — the door’s lede and the pinned data',
+    why:
+      'Wave AI, [§ D1029](../../../../DECISIONS.md). The door’s lede used to say *with the press made ' +
+      'while the car is away*, a span in words over a measurement of one instant, and it was false on ' +
+      'four of the seven rows it stood above. The lede now names a span again — the minutes after the ' +
+      'stage’s call over which every admitted row was tried and held — and that span is a claim about ' +
+      'the pinned data or it is nothing. The left side is the lede as the picker draws it, reached ' +
+      'through `towerChoiceViewOf`; the right is the shortest admitted window read straight off ' +
+      '`data/contract-ladder.json` through the admitted set. A lede typed as a literal, a lede ' +
+      'derived from a refused row, or a window that moved in the data while the sentence did not, ' +
+      'each publishes a span the other side does not, which is the § D227 defect this pair exists ' +
+      'to catch before a player reads it.',
+    left: {
+      surfaceId: 'everyday/towerChoice.ts#towerChoiceViewOf',
+      read: (view) =>
+        minutesPhraseIn(
+          towerChoiceViewOf({
+            week: view.state.week,
+            parked: view.state.parkedWeeks,
+            seed: view.state.seed,
+            calendar: view.state.calendar,
+            horizonFor: () => undefined,
+            nameOf: () => undefined,
+          }).pressDays.lede,
+        ),
+    },
+    right: {
+      surfaceId: 'shift/ladder.ts#admittedPressDayIds',
+      read: () => {
+        const admitted = admittedPressDayIds();
+        const windows = CONTRACT_LADDER.rows
+          .filter((row) => admitted.includes(row.contractId))
+          .map((row) => row.pressDay?.call?.windowS ?? 0);
+        if (windows.length === 0) return undefined;
+        const minutes = Math.floor(Math.min(...windows) / 60);
+        return minutes === 1 ? 'minute' : `${MINUTE_NAMES[minutes] ?? String(minutes)} minutes`;
+      },
+    },
+  },
+  {
+    id: 'press-call-row',
+    figure: 'a pinned day’s tried count and clock range — the report’s call row and the pinned data',
+    why:
+      'Wave AI, [§ D1029](../../../../DECISIONS.md). The report’s call row is the one place a player ' +
+      'is told how a pinned day read under the answer they did not choose, and it may say so only as ' +
+      '*on this crowd, tried at N moments from A to B*, with N and the range read off the pin’s own ' +
+      '`call` block. A row that composed its count or its range from anything else — a grid spacing ' +
+      'assumed rather than stored, a window rounded, a literal left behind by a re-pin — would print ' +
+      'a measurement the sweep never took, beside a verdict it did. The left side is the row as ' +
+      '`shift/callRow.ts#pressCallRowOf` draws it for the first admitted pin at a fixture call; the ' +
+      'right side is the same figure composed straight from `data/contract-ladder.json`. They must ' +
+      'read the same, on every state, or the row is quoting somebody else’s measurement.',
+    left: {
+      surfaceId: 'shift/callRow.ts#pressCallRowOf',
+      read: () => {
+        const pin = firstAdmittedPin();
+        if (pin === undefined) return undefined;
+        const row = pressCallRowOf(
+          { press: pin, call: FIXTURE_CALL, interventions: [], nameOf: () => undefined },
+          (simTimeS) => clockOf(simTimeS, DAY_START_S),
+        );
+        return /at \d+ moments from \d\d:\d\d to \d\d:\d\d/u.exec(row?.why ?? '')?.[0];
+      },
+    },
+    right: {
+      surfaceId: 'shift/ladder.ts#CONTRACT_LADDER',
+      read: () => {
+        const measured = firstAdmittedPin()?.call;
+        if (measured === undefined) return undefined;
+        return (
+          `at ${String(measured.tried)} moments from ${clockOf(FIXTURE_CALL.atS, DAY_START_S)} ` +
+          `to ${clockOf(FIXTURE_CALL.atS + measured.windowS, DAY_START_S)}`
+        );
+      },
+    },
+  },
 ]);
+
+/** Minutes in words — the right side of `press-call-window`, kept apart from the picker's own table. */
+const MINUTE_NAMES: readonly string[] = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
+
+/** The span phrase in a lede — `five minutes`, `minute` — or `undefined` where it names none. */
+function minutesPhraseIn(lede: string): string | undefined {
+  return /over the ((?:[a-z]+ minutes)|minute) after it/u.exec(lede)?.[1];
+}
+
+/** The first admitted pin, or `undefined` on a ladder that admits none. */
+function firstAdmittedPin(): ContractPressDay | undefined {
+  const [id] = admittedPressDayIds();
+  return id === undefined ? undefined : pressDayFor(id);
+}
+
+/** A call at the day's 10:00, on car `A` — the fixture `press-call-row`'s two sides are read at. */
+const FIXTURE_CALL: PressCall = Object.freeze({
+  atS: 7200,
+  rule: 'first-minute-wait',
+  carId: 'A',
+  awayAtS: 7000,
+  backAtS: 9000,
+  act: undefined,
+});
 
 /**
  * Whether the `career-line` contract **applies** to this state — the pair's one scoping rule.
@@ -565,8 +678,14 @@ export function withTodayFiled(week: WeekState): WeekState {
  * | arm | week | `dayClosed` | what the pair sees |
  * |---|---|---|---|
  * | `day1` | nothing closed | `false` | the pair does not apply — see {@link hasACareer} |
- * | `day4` | today filed | `false` | both publish, and both must **withhold** today's figure |
+ * | `day4` | today filed | `false` | both publish, and both must **release** today's figure |
  * | `day4-filed` | today filed | `true` | both publish, and both must **release** it |
+ *
+ * **The `day4` row read *withhold* until [§ D1004](../../../../DECISIONS.md)**, when both
+ * derivations stopped asking the sitting and started asking the week: a day in the history is a
+ * closed day whether or not this sitting filed the run. The arm is kept, because it is now the state
+ * in which a derivation that went back to the sitting would disagree with one that did not —
+ * `agreement.test.ts`'s negative control is exactly that regression.
  *
  * **The account moves with the arm too, and it is a second dimension carried without a second axis**
  * — [§ D490](../../../../DECISIONS.md), GitHub issue #332. The three arms carry signed out, signed
@@ -582,11 +701,11 @@ export function withTodayFiled(week: WeekState): WeekState {
  * | `day4` | the mint, `displayNameChosen: false` | both must **still** publish this device's name |
  * | `day4-filed` | named | both publish the account's |
  *
- * The last two are one week with the axis flipped, which is what makes them a test of the *gate*
- * rather than of the arithmetic: the rail asks `history.some(day => day.day < week.day ||
- * dayClosed)` and Your week counts cards whose `show` is `!isToday || dayClosed`, and those are two
- * expressions that happen to agree. A pair driven only on a state where both release would go green
- * on a rail that had forgotten the gate entirely.
+ * The last two are one week with the sitting's axis flipped, which is what makes them a test of the
+ * *gate* rather than of the arithmetic: the rail asks whether any day of the window is in the
+ * history and Your week counts cards whose `show` is the same history, two expressions that happen
+ * to agree, and since § D1004 neither reads `dayClosed`. A pair driven only on the filed arm would go
+ * green on a derivation that had gone back to withholding today until the sitting files it.
  *
  * **The arm id is the first segment of `AgreementView.id`** — see that field for why the horizon
  * has to stay the second.

@@ -89,7 +89,7 @@ import type { DisclosureMode } from '../live/types.js';
 import type { ViewMode } from '../mode/types.js';
 import { contractById, contractForBuilding, CONTRACTS } from '../shift/contracts.js';
 import { firstSessionContractFor } from '../shift/firstSession.js';
-import { runsWholeDay, wholeDayFor } from '../shift/dayLength.js';
+import { actsOf, runHorizonOf, runsWholeDay, wholeDayFor } from '../shift/dayLength.js';
 import {
   SHIFT_EVENTS,
   baseDemandOf,
@@ -97,7 +97,15 @@ import {
   eventById,
   shiftRunPatch,
 } from '../shift/events.js';
-import { ladderTowerConfig, rungFor, rungIncidents } from '../shift/ladder.js';
+import {
+  ladderTowerConfig,
+  pressDayMeasuredAs,
+  rungFor,
+  rungIncidents,
+  type ContractPressDay,
+} from '../shift/ladder.js';
+import { bookedOutCarsOf } from '../shift/bookedOut.js';
+import { pressCallOf, type PressCall } from '../shift/pressCall.js';
 import { grownBuilding } from '../shift/growth.js';
 import { withIncidents } from '../shift/incidents.js';
 import { shiftReportWindowFor } from '../shift/reportWindow.js';
@@ -573,16 +581,28 @@ export interface ViewerState {
    * The log is a fact about **this day's run**, so it lives and dies with the day rather than
    * with the session:
    *
-   * - **It survives a plain re-run of the same day** — levers moved, patience set, the Run
-   *   button pressed again. The contract's whole point is that the record replays: a re-run that
-   *   silently dropped the log would put a different day on screen under the same stamp.
-   * - **It clears when the day changes** — *Open the doors on tomorrow* (`dev/reportPanel.ts`),
-   *   taking the next assignment, starting a scenario, and `enterFreePlay`, each of which
-   *   already clears `outOfServiceCarIds` on the same argument: a run inheriting Thursday's
-   *   intervention would not be the run the screen just described.
-   * - **It clears when the building changes** ({@link withBuilding}) — an intervention is
-   *   stamped against one day in one tower, and the contract's own line is that changing the
-   *   tower is a different kind of act than changing your mind.
+   * - **It survives a plain re-run of the same day on this surface** — levers moved, patience
+   *   set, the Engineer shell's Run button pressed again. The contract's whole point is that the
+   *   record replays: a re-run that silently dropped the log would put a different day on screen
+   *   under the same stamp.
+   * - **It clears on every run the Everyday product starts** — `everyday/host.ts`'s `startRun`,
+   *   which is *Start the day* on the brief and every other Everyday press that starts a run
+   *   rather than growing one ([§ D1002](../../../../DECISIONS.md)). The Everyday product has no
+   *   *re-run with the log*: its stage presses append through `interveneAt`, and every other run
+   *   it starts is an attempt, which is the with-and-without experiment only if it begins clean.
+   *   The panel measured what inheriting it cost: a press on one tower's day credited to the
+   *   player on another tower's untouched day, and five earlier presses applied under a stage
+   *   that showed one.
+   * - **It clears when the day changes** — *Open the doors on tomorrow* (`dev/reportPanel.ts`,
+   *   and `everyday/host.ts#openTomorrowPatch`), taking the next assignment, starting a scenario,
+   *   and `enterFreePlay`, each of which already clears `outOfServiceCarIds` on the same
+   *   argument: a run inheriting Thursday's intervention would not be the run the screen just
+   *   described. A replay starts with none and puts the parked day's log back with its recording
+   *   (`everyday/replay.ts`); a rush and a career day hold it the same way.
+   * - **It clears when the building changes** ({@link withBuilding}, and the Everyday front
+   *   door's `moveWeekTo`) — an intervention is stamped against one day in one tower, and the
+   *   contract's own line is that changing the tower is a different kind of act than changing
+   *   your mind.
    *
    * It deliberately survives a **seed** change: the log is part of the record being re-rolled,
    * and re-rolling the crowd under the same change of mind is a legitimate question to ask. What
@@ -1724,6 +1744,58 @@ export function resolvedBuildingOf(
     return undefined;
   }
   return shiftRunConfigOf(resources, state).building;
+}
+
+/**
+ * **A pinned day's call, on the run on screen** — [§ D1029](../../../../DECISIONS.md).
+ *
+ * The call instant (`shift/pressCall.ts#pressCallOf`) asked of `recording` in the building the
+ * state's run was built in, and the pin, both only when the state is that pinned day exactly as it
+ * was measured (`shift/ladder.ts#pressDayMeasuredAs`): the contract's day 1 on the pinned crowd and
+ * horizon, the ordinary wrinkle with no calendar, driven by the standing order, with nothing
+ * pressed but an answer at the call second. `undefined` on every other run, which is every run but
+ * one per admitted tower.
+ *
+ * Here because both callers hold a `ViewerState` and the resources, and a second derivation of the
+ * attempt's facts is how the stage and the report would come to disagree about one run:
+ * `everyday/host.ts#pressCallOnStage` asks it for the stage, `dev/main.ts#closeShift` for the
+ * report's call row.
+ */
+export function pressDayCallOf(
+  resources: BrowserResources,
+  state: ViewerState,
+  recording: VizRecording,
+): { readonly press: ContractPressDay; readonly call: PressCall } | undefined {
+  if (buildingConfigOf(resources, state.savedBuildings, state.buildingId) === undefined) return undefined;
+  const plan = shiftRunConfigOf(resources, state);
+  const horizon = runHorizonOf(
+    resources.trafficProfiles,
+    buildingConfigOf(resources, state.savedBuildings, state.buildingId),
+    state,
+  );
+  const call = pressCallOf({
+    legs: recording.legs,
+    bookedOut: bookedOutCarsOf(plan.building),
+    horizon,
+    acts: actsOf(recording.demandPhases),
+    startedAt: recording.startedAt,
+    endedAt: recording.endedAt,
+  });
+  if (call === undefined) return undefined;
+  const press = pressDayMeasuredAs(
+    {
+      contractId: state.week.contractId,
+      day: state.week.day,
+      eventId: plan.event.id,
+      hasCalendar: state.calendar !== null,
+      seed: state.seed,
+      horizon,
+      dispatcherId: state.dispatcherId,
+      interventions: state.interventions,
+    },
+    call.atS,
+  );
+  return press === undefined ? undefined : { press, call };
 }
 
 /** The building's display name, without loading the whole document to read it. */

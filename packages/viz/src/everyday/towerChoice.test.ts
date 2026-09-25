@@ -13,13 +13,14 @@ import { contractBuildings } from '../shift/contractDay.test-helper.js';
 import { CONTRACTS } from '../shift/contracts.js';
 import { scenarioHorizonFor } from '../shift/dayLength.js';
 import { CALENDAR_PERIODS, periodOnDays } from '../shift/calendar.js';
-import { CONTRACT_LADDER, ladderRowFor, pressDayFor } from '../shift/ladder.js';
+import { admittedPressDayIds, CONTRACT_LADDER, ladderRowFor, pressDayFor } from '../shift/ladder.js';
 import { openWeek } from '../shift/week.js';
 import type { RunHorizon, WeekState } from '../shift/types.js';
 
 import {
   PRESS_DAY_CHOICE_COPY,
   pressDayChoiceOf,
+  pressDayLedeOf,
   TOWER_CHOICE_COPY,
   towerChoiceViewOf,
 } from './towerChoice.js';
@@ -144,19 +145,33 @@ describe('the surface publishes no figure', () => {
 });
 
 describe('the days a press decides are offered from the picker — issue #595, § D973', () => {
-  const PINNED = CONTRACT_LADDER.rows.filter((row) => row.pressDay !== undefined);
+  /* § D1029: a pinned row is offered only when it is admitted; the rest are drawn refused. */
+  const ADMITTED = admittedPressDayIds();
+  const PINNED = CONTRACT_LADDER.rows.filter(
+    (row) => row.pressDay !== undefined && ADMITTED.includes(row.contractId),
+  );
+  const REFUSED = CONTRACT_LADDER.rows.filter(
+    (row) => row.pressDay !== undefined && !ADMITTED.includes(row.contractId),
+  );
 
-  it('lists exactly the contracts that pin a day, and offers each on a fresh week', () => {
+  it('lists every contract that pins a day, offers the admitted ones and refuses the rest by reason', () => {
     const view = viewOn(openWeek('c1'));
     expect(view.pressDays.rows.map((row) => row.contractId)).toEqual(
       CONTRACTS.filter((contract) => pressDayFor(contract.id) !== undefined).map((c) => c.id),
     );
-    expect(PINNED.length, 'some rung pins a day, or this list is about nothing').toBeGreaterThan(0);
+    expect(PINNED.length, 'some rung pins an admitted day, or this list is about nothing').toBeGreaterThan(0);
     for (const row of view.pressDays.rows) {
-      expect(row.available, row.contractId).toBe(true);
       expect(row.standing, row.contractId).toBe(false);
-      expect(row.note).toBe(PRESS_DAY_CHOICE_COPY.available);
+      if (ADMITTED.includes(row.contractId)) {
+        expect(row.available, row.contractId).toBe(true);
+        expect(row.note).toBe(PRESS_DAY_CHOICE_COPY.available);
+      } else {
+        expect(row.available, row.contractId).toBe(false);
+        expect(row.note).toBe(pressDayFor(row.contractId)?.refused ?? PRESS_DAY_CHOICE_COPY.notAdmitted);
+      }
     }
+    /* The refused arm is reached by the shipped data or by nothing — say which. */
+    expect(REFUSED.length + PINNED.length).toBe(view.pressDays.rows.length);
   });
 
   it('marks the pinned day standing once the week is on it with the pinned crowd, and not before', () => {
@@ -196,12 +211,14 @@ describe('the days a press decides are offered from the picker — issue #595, �
      */
     const flipped = (buildingId: string): RunHorizon =>
       pinnedHorizon(buildingId) === 'whole-day' ? 'period' : 'whole-day';
-    for (const row of viewOn(openWeek('c1'), [], 424_242n, flipped).pressDays.rows) {
+    /* The admitted rows — a refused one says its refusal first, § D1029, and is never offered. */
+    const admitted = (row: { readonly contractId: string }): boolean => ADMITTED.includes(row.contractId);
+    for (const row of viewOn(openWeek('c1'), [], 424_242n, flipped).pressDays.rows.filter(admitted)) {
       expect(row.available, row.contractId).toBe(false);
       expect(row.note).toBe(PRESS_DAY_CHOICE_COPY.otherHorizon);
     }
     /* And a tower this build cannot resolve a horizon for is not offered either. */
-    for (const row of viewOn(openWeek('c1'), [], 424_242n, () => undefined).pressDays.rows) {
+    for (const row of viewOn(openWeek('c1'), [], 424_242n, () => undefined).pressDays.rows.filter(admitted)) {
       expect(row.available, row.contractId).toBe(false);
       expect(row.note).toBe(PRESS_DAY_CHOICE_COPY.notAsMeasured);
     }
@@ -229,6 +246,7 @@ describe('the days a press decides are offered from the picker — issue #595, �
       horizonFor,
     });
     const offered = view.pressDays.rows.filter((row) => row.available).map((row) => row.contractId);
+    /* `PINNED` here is the admitted rows — § D1029 — so a refused row is not expected offered. */
     const agreeing = PINNED.filter((row) => {
       const contract = CONTRACTS.find((candidate) => candidate.id === row.contractId);
       return row.pressDay?.horizon === horizonFor(contract?.buildingId ?? '');
@@ -264,5 +282,41 @@ describe('the days a press decides are offered from the picker — issue #595, �
         quiet?.id ?? '',
       ),
     ).toBeUndefined();
+  });
+});
+
+describe('the lede is derived from the admitted windows — § D1029', () => {
+  it('is the derivation, and never carries the clause it replaced', () => {
+    const view = viewOn(openWeek('c1'));
+    expect(view.pressDays.lede).toBe(pressDayLedeOf());
+    /*
+     * G6: *while the car is away* was measured false on four of seven rows and went on the commit
+     * that derived this; no span-shaped phrase may come back unless the derivation writes it.
+     */
+    for (const phrase of ['while the car is away', 'any time', 'during']) {
+      expect(view.pressDays.lede.includes(phrase), phrase).toBe(false);
+    }
+  });
+
+  it('names the shortest admitted window in words, and moves when a window does', () => {
+    const windows = CONTRACT_LADDER.rows
+      .filter((row) => admittedPressDayIds().includes(row.contractId))
+      .map((row) => row.pressDay?.call?.windowS ?? 0);
+    const minutes = Math.floor(Math.min(...windows) / 60);
+    const words = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
+    expect(pressDayLedeOf()).toContain(minutes === 1 ? 'the minute after' : `the ${String(words[minutes])} minutes after`);
+    /* Edge: a ladder whose shortest admitted window is exactly the floor says two minutes. */
+    const narrowed = {
+      ...CONTRACT_LADDER,
+      rows: CONTRACT_LADDER.rows.map((row) =>
+        row.pressDay?.call === undefined
+          ? row
+          : { ...row, pressDay: { ...row.pressDay, call: { ...row.pressDay.call, windowS: 120, holes: [130] } } },
+      ),
+    };
+    expect(pressDayLedeOf(narrowed)).toContain('the two minutes after');
+    /* And a ladder with nothing admitted says so rather than promising a window. */
+    const none = { ...CONTRACT_LADDER, rows: CONTRACT_LADDER.rows.map((row) => ({ ...row, pressDay: undefined })) };
+    expect(pressDayLedeOf(none)).toBe(PRESS_DAY_CHOICE_COPY.ledeNone);
   });
 });
