@@ -2161,7 +2161,13 @@ type DecisionReservation = {
  * and are registered in `KNOWN_DECISION_HOLES`; **D1002-D1008 are free rather than holed**, since
  * nothing is written above them (§ D430), and the charter row moves to **D1002**.
  */
-const OPEN_RESERVATION = null as DecisionReservation | null;
+/*
+ * **Wave AI is OPEN and reserves D1002-D1046**, five blocks of nine, against the post-AH panel:
+ * P1 5, P2 5, P3 5.5, P4 5, honesty 6.5, termination answer **no** four times out of four.
+ * Committed before any lane worktree exists, as wave AG's accounting requires, and closed in the
+ * wave's own merge commit.
+ */
+const OPEN_RESERVATION = { wave: 'AI', from: 1002, to: 1046 } as DecisionReservation | null;
 /*
  * **Wave AC's reservation, D619-D620, is closed.** It opened on the pair wave AB left free.
  * GitHub issue #437 stage 2 wrote D619 first, on a lane that started from the same pre-#422 base as
