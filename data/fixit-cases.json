@@ -2002,7 +2002,7 @@
           "id": "trim-the-dwell",
           "role": "cheap-fix",
           "name": "Trim the door dwell across the group",
-          "effect": "A second and a half off every stop moves the 32.8 s mean a little. The queue is the start time, not the doors.",
+          "effect": "A second and a half off every stop moves the 32.8 s mean, and over fifty mornings it takes a real share of the long waits away as well. The start time is not the only way through.",
           "patch": {
             "building": {
               "cars": [
@@ -5281,7 +5281,7 @@
           "id": "replant-the-machines",
           "role": "costly-fix",
           "name": "Re-plant both machines for another half metre per second",
-          "effect": "Every climb is quicker, so the 80 s worst shortens — but the cars still start every gym run from the front door.",
+          "effect": "Every climb is quicker, so the 80 s worst shortens, and over fifty mornings the long waits at the gym fall with it. The cars still start every gym run from the front door.",
           "patch": {
             "building": {
               "cars": [

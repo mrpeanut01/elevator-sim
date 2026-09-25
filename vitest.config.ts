@@ -112,9 +112,9 @@ const alias = {
  * | | `viz` | `viz-browser` |
  * |---|---|---|
  * | ceiling | 300 000 ms | 120 000 ms |
- * | annotations | 525 | 205 |
+ * | annotations | 526 | 205 |
  * | above its own ceiling | **112** | **91** |
- * | at its own ceiling | 219 | 111 |
+ * | at its own ceiling | 220 | 111 |
  * | above 300 000 ms | 112 | 7 |
  *
  * **The last two rows disagree for the browser tier, and that disagreement is a second finding.**
@@ -159,7 +159,7 @@ const alias = {
  * had drifted within a day of being written: it read *"`packages/viz` carries **555** timeout
  * annotations in all, of which **182** sit exactly at 300 000 ms"*, which was exact on `13e7b93`
  * and is not exact here. Derived on this tree, and re-derived on every run of `testCost.test.ts`
- * rather than typed: `packages/viz` carries **730** timeout annotations in all, of which **256**
+ * rather than typed: `packages/viz` carries **731** timeout annotations in all, of which **257**
  * sit exactly at 300 000 ms. Removing them would be 185 edits whose only effect is to make those
  * sites depend silently on a line in another file. A site that knows it runs a simulation is
  * allowed to say so.

@@ -906,8 +906,8 @@ eighteen. `fixit/engine.ts#repairsInDrawOrder` shuffles the rows deterministical
 **Corrected a third time 2026-09-25: the retirement landed** ([§ D1020](../DECISIONS.md), GitHub
 issue #602). Both conditions § D706 clause 6 set are met — the editor writes every answer (§ D1000)
 and each offered case's answer clears, now judged over **fifty mornings** rather than one pair, which
-four cases' answers do not survive; those four are **held** from the list with their reasons rather
-than shipped under a judge that cannot tell their answers from luck. So the repair list and the five
+four cases' answers did not survive; one was re-authored on demand and three are **held** from the
+list with their reasons rather than shipped under a judge that cannot tell their answers from luck. So the repair list and the five
 extras left both surfaces, the kind-of-fix sentence left all eighteen notes, and
 `repairsInDrawOrder` went with the menu it ordered. The *twelve of eighteen* above, and § D1000's
 later *seventeen*, were counted under the single pair; `theAnswerIsNotPrinted.test.ts` re-pins the

@@ -36,7 +36,7 @@ export interface MorningWorkerLike {
   terminate(): void;
 }
 
-/** The pool's ceiling. Four keeps a laptop's painting thread its own core with room to spare. */
+/** The pool's ceiling, whatever the machine. */
 export const MAX_MORNING_WORKERS = 4;
 
 export interface OffThreadMorningsOptions {
@@ -45,9 +45,16 @@ export interface OffThreadMorningsOptions {
   readonly workers: number;
 }
 
+/**
+ * How many workers a machine gets: its cores less **two** — one for the painting thread and one for
+ * the pair's own worker, which `offThreadRuns` keeps warm beside this pool — never fewer than one.
+ * Cores less one was the first draft and the browser tier caught it: on a four-core box the three
+ * morning workers and the pair's worker took every core, and the Engineer panel's frame sampler saw
+ * the page stop painting for a second.
+ */
 export function morningWorkerCountOf(hardwareConcurrency: number | undefined): number {
   const cores = hardwareConcurrency ?? 2;
-  return Math.max(1, Math.min(MAX_MORNING_WORKERS, cores - 1));
+  return Math.max(1, Math.min(MAX_MORNING_WORKERS, cores - 2));
 }
 
 export function createOffThreadMornings(options: OffThreadMorningsOptions): MorningRunner {

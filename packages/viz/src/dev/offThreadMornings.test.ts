@@ -95,10 +95,10 @@ describe('the morning pool', () => {
     expect(second?.map((r) => r.complaint)).toEqual([1, 2, 3]);
   });
 
-  it('sizes the pool from the machine, leaving the painting thread a core', () => {
+  it('sizes the pool from the machine, leaving a core to the painting thread and one to the pair', () => {
     expect(morningWorkerCountOf(undefined)).toBe(1);
     expect(morningWorkerCountOf(2)).toBe(1);
-    expect(morningWorkerCountOf(4)).toBe(3);
+    expect(morningWorkerCountOf(4)).toBe(2);
     expect(morningWorkerCountOf(16)).toBe(MAX_MORNING_WORKERS);
   });
 });

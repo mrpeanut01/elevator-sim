@@ -7627,6 +7627,8 @@ const FIXIT: SurfaceAdapter = {
         'rezoneFloorsLabel',
         'tenancyEyebrow',
         'planRefused',
+        /* § D1020: the fold over the cost-term weights, drawn only by the same mount. */
+        'weightsFold',
       ] as const) {
         seeds.push({
           field: `families.${key}`,

@@ -497,8 +497,9 @@ describe.skipIf(!HAS_BROWSER)('the fourth mode tile opens § 10’s screen', () 
       const solved = outcome.primary?.label === 'Next building';
       expect(solved || outcome.primary?.label === 'Run it again').toBe(true);
       expect(outcome.tags.filter((tag) => tag === 'FIXED')).toHaveLength(solved ? 1 : 0);
+      /* Out of the cases offered: a held case's row is drawn and is not in the total (§ D1020). */
       expect(outcome.count).toBe(
-        `${String(solved ? 1 : 0)}/${String(outcome.tags.length)} fixed`,
+        `${String(solved ? 1 : 0)}/${String(outcome.tags.filter((tag) => tag !== 'HELD').length)} fixed`,
       );
     } finally {
       await page.close();

@@ -455,8 +455,8 @@ function familyRoutesFor(entry: FixitCase, asBuilt: SimulationConfig): readonly 
  * the single pair's noise; the third, zone-centre parking on `every-deck-calls-itself-full`, is the
  * decision agents' own zone-centre finding. None of the three holds, and each case's first route that
  * does is a different one. **The cost**, measured 2026-09-25 at `702991b`: the whole enumeration took
- * 423 s of one vitest process under a load average of 9–14, against this file's 600 s annotation.
- * It is a dated reading of a shared box, not a bound.
+ * 423 s of one vitest process under a load average of 9–14, and 236 s at 13 on the next sitting,
+ * against this file's 600 s annotation. They are dated readings of a shared box, not a bound.
  */
 const SOLVED_BY: readonly (readonly [string, string])[] = Object.freeze([
   ['sleeping-sky-lobby', 'parking:stay'],
@@ -474,7 +474,7 @@ const SOLVED_BY: readonly (readonly [string, string])[] = Object.freeze([
   ['two-cars-out-wrong-month', 'car:A->high'],
   ['every-deck-calls-itself-full', 'zone:1'],
   ['restaurant-above-the-ballroom', 'speed:1'],
-  ['controller-sends-every-car', 'held'],
+  ['controller-sends-every-car', 'parking:zone-center+zone:3'],
   ['let-faster-than-the-lifts', 'tenancy:new-lettings=invoke-for-all'],
   ['gym-on-the-top-floor', 'held'],
 ]);
@@ -585,7 +585,7 @@ describe('every offered case is solved without being told which repair is the an
     const editor = SOLVED_BY.filter(([, route]) => route !== 'held' && !route.startsWith('answer:'));
     const witness = SOLVED_BY.filter(([, route]) => route.startsWith('answer:'));
     const held = SOLVED_BY.filter(([, route]) => route === 'held');
-    expect([editor.length, witness.length, held.length]).toEqual([13, 1, 4]);
+    expect([editor.length, witness.length, held.length]).toEqual([14, 1, 3]);
     expect(SOLVED_BY.some(([, route]) => route.startsWith('repair:')), 'the menu retired').toBe(false);
   });
 });

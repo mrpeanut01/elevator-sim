@@ -59,7 +59,6 @@ import { pairedDifferenceEstimate } from '@elevator-sim/experiments/browser';
 
 import type { VizRecording } from '../contract/types.js';
 import {
-  BASIS_LINE,
   DEMAND_BASIS_LINE,
   REST_DROP_LIMIT_POINTS,
   type FixitOutcome,
@@ -226,7 +225,7 @@ function reductionClause(measure: ComplaintMeasure, replication: FixitReplicatio
   if (!Number.isFinite(reduction.mean)) {
     return `the complaint could be read on only ${String(reduction.n)} of ${String(replication.mornings)} mornings, which is no interval at all`;
   }
-  const digits = measure.kind === 'long-waits' ? 1 : 1;
+  const digits = 1;
   const direction = reduction.mean >= 0 ? 'fell by' : 'rose by';
   const span = `95 % interval ${signed(reduction.lower, digits)} to ${signed(reduction.upper, digits)}`;
   const tail = replication.complaintHolds ? 'which is not no change' : 'which cannot be told from no change';
@@ -268,7 +267,12 @@ export function replicationRowOf(entry: FixitCase, replication: FixitReplication
  */
 export function checkingOutcomeOf(gate: FixitOutcome): FixitOutcome {
   if (gate.kind !== 'fixed') return gate;
+  /*
+   * Spread from the gate, so any field the classification carries beside the five below — whose
+   * run the narration is about, say — travels with it rather than being dropped by this wrapper.
+   */
   return {
+    ...gate,
     kind: 'checking',
     head: JUDGE_COPY.checkingHead,
     body: JUDGE_COPY.checkingBody,
@@ -295,6 +299,7 @@ export function judgedOutcomeOf(entry: FixitCase, gate: FixitOutcome, replicatio
     ? `Over fifty mornings ${restClause(replication)}.`
     : `Over fifty mornings ${reductionClause(measure, replication)}.`;
   return {
+    ...gate,
     kind: 'cleared-once',
     head: JUDGE_COPY.clearedOnceHead,
     body: `${why} ${JUDGE_COPY.clearedOnceClosing}`,
@@ -542,6 +547,3 @@ export function pressThroughTheJudge(press: JudgedPress): void {
     onFailed: press.onFailed,
   });
 }
-
-/** The basis line a pair verdict prints — re-exported so a surface need not know which form it is. */
-export { BASIS_LINE };

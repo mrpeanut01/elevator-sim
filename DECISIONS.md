@@ -38912,7 +38912,7 @@ This lane held **D701–D705** and spent **D701** only. **D702, D703, D704 and D
 
 ## D706 — The fix-case repair menu retires from the screen and not from the file: the diagnosed repair becomes the scenario's pinned witness, the decoys survive as prices, and all three retirements wait for the editor that can write the answers
 
-> **Status 2026-09-25: CONDITIONS REFINED AND MET by [§ D1020](#d1020)** (an agent ruling). Clause 6's *"clears"* is judged over fifty mornings rather than one pair, four cases whose answers do not clear are held from the list, and the menu, the decoys-as-rows and the kind-of-fix line retired together on that commit; § 7's playtest was taken. See [`docs/39`](docs/39-decisions-in-force.md).
+> **Status 2026-09-25: CONDITIONS REFINED AND MET by [§ D1020](#d1020)** (an agent ruling). Clause 6's *"clears"* is judged over fifty mornings rather than one pair, three cases whose answers do not clear are held from the list and a fourth is re-authored on demand, and the menu, the decoys-as-rows and the kind-of-fix line retired together on that commit; § 7's playtest was taken. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Status 2026-09-24: NARROWED by [§ D1001](#d1001), and its § 1 re-measured by [§ D1000](#d1000).** `tenant-floors` is offered as case-authored cohorts rather than a per-floor population control, and the editor now writes all eighteen answers; the retirement still waits on § 7's playtest. See [`docs/39`](docs/39-decisions-in-force.md).
 
