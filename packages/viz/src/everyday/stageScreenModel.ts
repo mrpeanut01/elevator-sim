@@ -285,6 +285,10 @@ export const STAGE_SPEEDS: readonly [StageSpeed, ...StageSpeed[]] = Object.freez
  * is no longer played at one rung — `everyday/stagePace.ts` plays its three peaks at this default
  * and crosses the hours between them at `30×`, so the quiet head is 60 real seconds again and the
  * day 40–51 minutes on the game's own towers (1 h 49 at most on a reference tower, measured). This constant is still what a whole day's peaks open at.
+ * A scored day has since been paced by who is waiting rather than by its peaks
+ * ([§ D1169](../../../../DECISIONS.md)) and skips the quiet between them
+ * ([§ D1212](../../../../DECISIONS.md)), so the figures in the sentence above are § D991's, dated;
+ * `everyday/sittingShape.ts` carries the current ones.
  *
  * **A paragraph that stood here is deleted rather than updated** ([§ D753](../../../../DECISIONS.md)).
  * It named five player-facing session shapes as outstanding and said correcting them was not this

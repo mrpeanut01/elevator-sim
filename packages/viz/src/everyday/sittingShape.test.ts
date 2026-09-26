@@ -199,12 +199,18 @@ describe('every advertised length is the day the tile actually opens', () => {
     const days = dayCensus().filter((row) => row.actsS !== undefined);
     expect(days.length).toBeGreaterThan(0);
     for (const measured of [WHOLE_DAY_LONGEST, WHOLE_DAY_LONGEST_GAME_TOWER]) {
-      for (const row of days) {
-        expect(row.scenarioS, row.id).toBe(measured.periodS);
-        expect(measured.slowS, row.id).toBeGreaterThanOrEqual(row.actsS ?? 0);
-      }
+      for (const row of days) expect(row.scenarioS, row.id).toBe(measured.periodS);
       expect(measured.recordedS).toBeGreaterThanOrEqual(measured.periodS);
     }
+    /* § D991's rule played every act slow; the long end was measured under it. */
+    for (const row of days) expect(WHOLE_DAY_LONGEST.slowS, row.id).toBeGreaterThanOrEqual(row.actsS ?? 0);
+    /*
+     * § D1212: the game towers' day is measured as a scored day plays, so its slow part is only the
+     * stretches with somebody waiting, and what it skips lies outside them and inside the day.
+     */
+    const skipped = WHOLE_DAY_LONGEST_GAME_TOWER.skippedS ?? 0;
+    expect(skipped).toBeGreaterThan(0);
+    expect(WHOLE_DAY_LONGEST_GAME_TOWER.slowS + skipped).toBeLessThanOrEqual(WHOLE_DAY_LONGEST_GAME_TOWER.recordedS);
     expect(SITTING_SPANS.contractDay.pacedDay).toBe(WHOLE_DAY_LONGEST);
     expect(pacedDayRealS(WHOLE_DAY_LONGEST, RUNG.simPerRealS)).toBeGreaterThanOrEqual(
       pacedDayRealS(WHOLE_DAY_LONGEST_GAME_TOWER, RUNG.simPerRealS),

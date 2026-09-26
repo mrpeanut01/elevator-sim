@@ -1865,6 +1865,16 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'Answers a boolean, and authors nothing — § D1212. `stageSkipApplies` is derived for ' +
+        '`stagePaceOf`’s reason above: it compares against the `whole-day` member of ' +
+        '`shift/types.ts#RunHorizon`, whose hyphen the two-adjacent-words scanner reads as a phrase. ' +
+        'What a player reads about a skip is `STAGE_SKIP_BEAT_NOTE` and `stageSkipLineOf`, both ' +
+        'seeded by the stage adapter; that the gate is right is asserted in ' +
+        '`everyday/stagePace.test.ts`, in both directions and through the real `Playback`.',
+      ids: ['everyday/stagePace.ts#stageSkipApplies'],
+    },
+    {
+      reason:
         'The same union tag as `runHorizonOf` above, and for its reason: both return a member of ' +
         '`shift/types.ts#RunHorizon` (or, for a malformed `data/` value, the empty string a loader ' +
         'check names), and are derived only because `whole-day` reads to the two-adjacent-words ' +

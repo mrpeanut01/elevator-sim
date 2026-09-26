@@ -47502,7 +47502,9 @@ the one crowd every newcomer plays.
    the day again, three runs bound nothing (the honesty lens measured the *keep* branch at 30.4 real
    minutes against a bound of 29.2), so it now says *about N min*, from the middle of the three runs,
    and *the stage stops first for its call …, and may stop again later in the day*, promising no count.
-   Midtown's reads *about 29 min*. `firstDayLength.test.ts` re-derives every row on every run, and
+   Midtown's read *about 29 min* on this lane's tree, and reads *about 15 min* once
+   [§ D1212](#d1212)'s skip, integrated in the same wave, is measured with it (the table below is
+   § D1169's pacing, before the skip). `firstDayLength.test.ts` re-derives every row on every run, and
    says *once* only where the day's calls are gated off, which no shipped pin is.
    `everyday/towerChoice.ts`'s pinned-day lede and `mode/glossary.ts`'s *press* entry drop *once* too.
 4. **Recorded, not changed**: once a later call on a pinned day is answered with a press, the log is no
@@ -47523,8 +47525,8 @@ pinned call and opens the session after it, on the newcomer's Monday (`c2`, crow
 The pinned call is the day's only decision before (its standing order is part of the pin, so the brief
 asks no driver); after, the pinned call and the calls that follow it. The morning peak asks nothing on
 any branch because the pinned call comes after it.
-**The brief's *about 29 min* is the middle of the three runs with nothing pressed after the call, and
-it is not a bound**: the rotation branches above ran 25.6 to 27.3 real minutes, because each later
+**The brief's *about 29 min* (*about 15 min* with § D1212's skip) is the middle of the three runs
+with nothing pressed after the call, and it is not a bound**: the rotation branches above ran 25.6 to 27.3 real minutes, because each later
 press cleared some of the day's slow stretches, and a player who presses nothing more meets
 29.2 to 29.6.
 
@@ -47654,3 +47656,97 @@ effect, no *will*, *next* or *after*, and the card's four ban lists hold on ever
 longest wait `overlayAt(...).longestCurrentWaitS`; the same line off a run that differs only after the
 call; every figure in it one of the frame's counts; five arms against the ban lists and a forward-word
 list. Red before: all four cases failed on `c2ca845`, which has no such line.
+
+---
+
+## D1212 — between a scored whole day's peaks, the quiet is skipped
+
+> **Taken 2026-09-26 by an agent session under delegated authority** (swarm DN, ruling § Q1 (c),
+> three of three on skipping only where nobody has waited a minute, the seek being the integrator's
+> synthesis of the three lenses; built and measured by wave AL lane AL-D), not by the product owner.
+> A later reader weighing this against a product-owner ruling should treat it as an agent ruling and
+> say so. **Amends [§ D1169](#d1169) clause 1** (*nothing after the playhead is read*) for one
+> purpose; nothing is rewritten. **Owner-reversible**: the skip itself, the two-second beat
+> (`everyday/stagePace.ts#SKIP_BEAT_REAL_S`), and where it applies (between two peaks only).
+
+**Why an entry.** [§ D405](#d405)'s first two grounds: it moves a recorded ruling, and it binds
+`everyday/stagePace.ts`, `everyday/stageScreen.ts`, `everyday/sittingShape.ts`,
+`everyday/firstDayLength.ts`, the honesty corpus's stage adapter and two documents that quote the
+day's length.
+
+**What was wrong.** Under § D1169 a Midtown day took a median 27.0 real minutes at `4×` with 0.184
+decisions a real minute and a longest gap of 15.3 minutes (§ D1166's figures, reproduced below).
+Swarm DN's engineering lens measured about seventy per cent of that as the stage crossing an empty
+building at `30×`, most of it in the hours between the peaks, where no call can fall.
+
+**The ruling.**
+
+1. **A peak is an act**: `shift/dayLength.ts#actsOf` over the recording's authored phases, the
+   maximal runs of phases that touch the day's peak intensity, which is what § D991 read. On
+   `office-day` they are 08:30, 12:15 and 17:15, half an hour each. *Between peaks* is after one act
+   has ended and before the next has started; the half hour before the first and the quarter hour
+   after the last are played as § D1169 plays them.
+2. **On a scored whole day, between two peaks, while § D1169 reads `fast`** (nobody on a landing has
+   waited a minute, and no chip stands), the stage plays a beat of two real seconds and then
+   **seeks** to the earliest of: the first instant anybody reaches a minute, read off the legs
+   (`firstMinuteWaitFrom`, the frame's own `isWaitingAt` predicate); the next call the stage would
+   stop at, raised or still being asked; and the next peak's start. It lands on that instant, so it
+   never passes a call or a wait. A stretch shorter than two beats is played rather than skipped.
+3. **The player sees it and can stop it.** During the beat one line reads *nobody on a landing has
+   waited a minute: skipping ahead · pause or pick a speed to watch it*, naming no instant ahead.
+   Pausing stops it; so does any speed chip, which is § D1169's *your speed until somebody next
+   waits a minute*. Once it lands the line reads, for example, *skipped 09:01–09:37: nobody on a
+   landing waited a minute*, both times at or before the playhead.
+4. **Only the playhead moves.** The run, the goals, the census, the house and the report are the
+   whole day's, as they are after *Skip to the end*. Inside a peak § D1169 is unchanged, and a
+   replay, a watched run, a slice and the Rush are not skipped.
+5. § D1169 clause 1's *nothing after the playhead is read* now has one exception: where the skip
+   lands. The beat names nothing ahead and the line is drawn once the stage is there.
+
+**Measured.** `everyday/stageSkip.sweep.test.ts` (`STAGE_SKIP_SWEEP=1`): Midtown Office (`c2`), the
+whole authored day, days 1 to 5 with the wrinkle the week deals each (`scheduledEventFor`), the
+census crowds `20 260 824 + 7 919 n`, `n` 0 to 7, under `collective`, the shipped
+`openDayCallSession` answered in `dayCalls.sweep.test.ts`'s rotation (crowd 2 of day 1 is the
+newcomer's pinned day, its one call answered *leave them*). Real time is read off the ended run's
+legs by `stagePace.test-helper.ts#scoredDayPlayOf`, before (§ D1169 alone) and after (with this
+skip), every candidate the session asked counted as a stop, nothing added for answering. Decisions
+are § D1166's measure: the brief's choice of driver plus the day's calls.
+
+| Midtown, medians over 8 crowds | real minutes, before | after (range) | decisions a real minute, before | after | longest gap, before | after |
+|---|---|---|---|---|---|---|
+| day 1, ordinary | 27.0 | **11.9** (10.8 to 14.5) | 0.169 | **0.379** | 16.0 min | **7.2 min** |
+| day 2, move-in | 28.6 | **13.7** (11.6 to 15.6) | 0.198 | **0.432** | 17.0 min | **7.2 min** |
+| day 3, fire drill | 30.2 | **16.0** (12.9 to 17.6) | 0.207 | **0.408** | 20.5 min | **8.8 min** |
+| day 4, conference | 28.5 | **13.3** (12.5 to 18.7) | 0.141 | **0.302** | 25.1 min | **9.9 min** |
+| day 5, shaft out | 29.6 | **15.3** (14.2 to 20.0) | 0.138 | **0.273** | 24.6 min | **10.4 min** |
+| all 40 days | 28.8 | **14.2** (10.8 to 20.0) | 0.157 | **0.344** | 18.2 min | **8.3 min** |
+
+**The instrument reproduces the shipped figures first**: over day 1's seven unpinned crowds it reads
+§ D1166's published 27.0 minutes, 0.184 decisions a minute and a 15.3-minute longest gap exactly;
+with the skip those read **11.8**, **0.386** and **6.5**. The calls are the base tree's; lane AL-C's
+calls across the whole day, measured separately, move the decisions and not the minutes except
+where a new call falls in a quiet stretch and splits a skip. The swarm estimated 9.4 minutes (S3,
+with AL-C's calls, cutting booked-out windows too), 12.6 (S1) and 14.8 (S2); the shipped rule reads
+11.9 on day 1 and 14.2 over the week, and what is left is almost all the slow part: somebody on a
+landing past a minute, played at `4×`.
+
+`everyday/stagePace.test.ts` plays Midtown's day (seed `20 260 824`) through the real `Playback`
+frame by frame both ways: 27.0 and 12.0 real minutes, each within a minute of the legs' reading,
+every skip between two peaks, and a day answered at two calls placed in quiet stretches is the same
+run leg for leg with and without the skip (with a positive control that the presses change the run).
+`stagePace.browser.test.ts` meets it on the shipped bundle: a pause stops a coming skip, the next one
+lands and leaves its line, and a chip stops the one after.
+
+**What moved with it.** A pinned whole day's brief sentence (`firstDayLength.test.ts`): about 10 to
+15 minutes of watching across the four pins, the call about 2 to 5 minutes in (it read up to 26 to 30,
+and 6 to 9). Measured on the tree carrying [§ D1204](#d1204) too, so the figure is *about* the middle of
+the three runs the call can leave rather than *up to* the longest, and the sentence says the quiet
+between peaks is skipped. The ordinary calls § D1204 opens after the pinned one do not move it: on a
+whole day `shift/dayCalls.ts#nextDayCallOf` draws every candidate inside a peak, and the skip cuts only
+between peaks, so a later stop never splits a skip. The game
+towers' longest day, re-measured as a scored day now plays over their fifty seeds each
+(`stagePace.sweep.test.ts`, which also reproduced the § D991 figure it replaces, `c5` seed 39, to the
+millisecond): `c5` seed 33, **34 minutes** at `4×`, which the hub's *Today's scenario* row now
+quotes in place of 51. The row's long end, 1 h 49, is a reference tower's measured under § D991 and
+stays an upper bound: re-measuring six reference towers at fifty seeds is hours of machine time and
+was not taken.

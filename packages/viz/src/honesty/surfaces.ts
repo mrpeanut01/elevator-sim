@@ -252,7 +252,14 @@ import {
   tutorialWalkthroughViewOf,
   tutorialWorkedAnswerOf,
 } from '../everyday/tutorialModel.js';
-import { stagePaceNoteOf, stagePaceOf } from '../everyday/stagePace.js';
+import {
+  STAGE_SKIP_BEAT_NOTE,
+  stagePaceNoteOf,
+  stagePaceOf,
+  stageSkipApplies,
+  stageSkipLineOf,
+  stageSkipOf,
+} from '../everyday/stagePace.js';
 import { STAGE_CALL_COPY, stageCallCardOf, stageCallPresentOf, stageEndDayOf } from '../everyday/stageCall.js';
 import type { PressCall } from '../shift/pressCall.js';
 import { PRESS_CALL_AGAIN, pressCallRowOf } from '../shift/callRow.js';
@@ -11855,6 +11862,13 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
      */
     'everyday/stagePace.ts#stagePaceNoteOf',
     /*
+     * § D1212's skip between a scored whole day's peaks: the beat's note, and the line a skip leaves
+     * at the playhead it lands on. Seeded below once per case on a fixture skip, and at every sampled
+     * playhead where the rule would skip, drawn where the skip lands.
+     */
+    'everyday/stagePace.ts#STAGE_SKIP_BEAT_NOTE',
+    'everyday/stagePace.ts#stageSkipLineOf',
+    /*
      * § D1029's call — the card over both rules and the hold the parking presses carry before it.
      * Seeded once per case below on fixture calls on the case's own first car, the corpus building
      * no contract rung (`run.ts#buildingFor`), so no case plays a pinned day as measured.
@@ -12386,6 +12400,21 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
           seeds.push({ field: `stage.pace(${reason})`, text: note, role: 'label', playhead: atPlayhead(recording, recording.startedAt) });
         }
       }
+      /*
+       * § D1212: the beat's note, and a skip's line drawn where it lands. The fixture skip crosses
+       * the first third of the run and is drawn at its end, so the line names only instants at or
+       * before the playhead; the sampled loop below adds every skip the rule would take on this run.
+       */
+      seeds.push({ field: 'stage.skip.beat', text: STAGE_SKIP_BEAT_NOTE, role: 'label' });
+      {
+        const landsAtS = recording.startedAt + span / 3;
+        seeds.push({
+          field: 'stage.skip.line',
+          text: stageSkipLineOf({ fromS: recording.startedAt, toS: landsAtS, until: 'peak' }),
+          role: 'label',
+          playhead: atPlayhead(recording, landsAtS),
+        });
+      }
     }
 
     for (const at of sampleTimes(recording)) {
@@ -12436,6 +12465,24 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
         const scoredNote = stagePaceNoteOf(scored, { acts, simTimeS: at });
         if (scoredNote !== undefined) {
           seeds.push({ field: `stage(@${stamp}s).pace(scored)`, text: scoredNote, role: 'label', playhead: atPlayhead(recording, at) });
+        }
+        /* § D1212: where a scored whole day would skip from here, the line it leaves, drawn where it lands. */
+        if (stageSkipApplies({ horizon: 'whole-day', scored: true, acts, simTimeS: at, reason: scored.reason })) {
+          const skip = stageSkipOf({
+            acts,
+            legs: recording.legs,
+            simTimeS: at,
+            armedAtS: Number.NEGATIVE_INFINITY,
+            simPerRealS: scored.simPerRealS,
+          });
+          if (skip !== undefined) {
+            seeds.push({
+              field: `stage(@${stamp}s).skip`,
+              text: stageSkipLineOf(skip),
+              role: 'label',
+              playhead: atPlayhead(recording, skip.toS),
+            });
+          }
         }
       }
       /*

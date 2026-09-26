@@ -133,6 +133,78 @@ describe.skipIf(!HAS_BROWSER)('§ D1169 — a scored day is paced by the tutoria
     }
   }, 300_000);
 
+  /*
+   * § D1212 on the stage a player uses: between a whole day's peaks, while nobody has waited a
+   * minute, the stage shows a beat's note, then seeks and leaves one line saying what it skipped. A
+   * pause during the beat stops it, and so does a chip. The day is the date's crowd, so the times are
+   * read off the line rather than written here.
+   */
+  it('skips the quiet between peaks with a line saying what it skipped, and a pause or a chip stops a skip that is coming', async () => {
+    const page = await playDayOn('c2');
+    try {
+      const skipLine = async (): Promise<string> => (await page.textContent('.everyday-stage-skip-line')) ?? '';
+      const clock = async (): Promise<string> => (await page.textContent('.everyday-stage-clock')) ?? '';
+      const untilSkipLine = async (prefix: string, timeout: number): Promise<void> => {
+        await page.waitForFunction(
+          (wanted) => {
+            const leave = document.querySelector<HTMLButtonElement>(
+              '.everyday-stage-call:not([hidden]) .everyday-stage-call-answer[data-answer="leave"]',
+            );
+            leave?.click();
+            return (document.querySelector('.everyday-stage-skip-line')?.textContent ?? '').startsWith(wanted);
+          },
+          prefix,
+          { timeout, polling: 50 },
+        );
+      };
+      const BEAT = 'nobody on a landing has waited a minute: skipping ahead';
+
+      /*
+       * The first beat comes after the morning peak. To reach it sooner, `30×` is pressed while
+       * somebody waits, which § D1169 makes the rung every wait plays at and leaves the skip alone.
+       */
+      await untilNote(page, 'at your speed', 240_000);
+      await page.click('.everyday-stage-speed:text-is("30×")');
+      /* A pause stops a coming skip where it stands. */
+      await untilSkipLine(BEAT, 480_000);
+      await page.click('.everyday-stage-play');
+      expect(await skipLine()).toBe('');
+      const pausedAt = await clock();
+      await page.waitForTimeout(3_000);
+      expect(await clock(), 'the skip went ahead under a pause').toBe(pausedAt);
+
+      /* Play again: a fresh beat, and then the seek, and the line it leaves. */
+      await page.click('.everyday-stage-play');
+      await untilSkipLine('skipped ', 30_000);
+      const line = await skipLine();
+      expect(line).toMatch(/^skipped \d\d:\d\d–\d\d:\d\d: nobody on a landing waited a minute$/u);
+      /* It skipped from where the stage stood, to where it now stands. */
+      expect(line.slice('skipped '.length, 'skipped '.length + 5) >= pausedAt).toBe(true);
+
+      /* The next beat, stopped by a chip: the player's speed until somebody waits, and no skip. */
+      await untilSkipLine(BEAT, 480_000);
+      await page.click('.everyday-stage-speed:text-is("30×")');
+      await untilNote(page, 'your speed, 30×', 5_000);
+      expect(await skipLine(), 'the chip did not stop the skip').toBe(line);
+      /*
+       * For as long as the chip stands, no beat and no skip. It stands until somebody next waits a
+       * minute (§ D1169), after which the next quiet stretch may be skipped again, so the line is
+       * read only while the note still says the speed is the player's.
+       */
+      for (let read = 0; read < 25; read += 1) {
+        const [note, now] = await page.evaluate(() => [
+          document.querySelector('.everyday-stage-pace')?.textContent ?? '',
+          document.querySelector('.everyday-stage-skip-line')?.textContent ?? '',
+        ]);
+        if (!note.startsWith('your speed')) break;
+        expect(now, 'a skip came while the chip stood').toBe(line);
+        await page.waitForTimeout(100);
+      }
+    } finally {
+      await page.close();
+    }
+  }, 900_000);
+
   it('paces a contract that plays a slice by the same rule, where § D991 left it at one rung', async () => {
     /* Crown Hotel's crowd has no authored day in `data/`, so Today's scenario plays its slice. */
     const page = await playDayOn('c7');

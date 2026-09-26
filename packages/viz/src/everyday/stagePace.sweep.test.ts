@@ -50,6 +50,7 @@ import { LEGIBILITY_SWEEP, LEGIBILITY_WINDOW_S, legibilityOf } from '../shift/le
 import { WHOLE_DAY_LONGEST, WHOLE_DAY_LONGEST_GAME_TOWER, type PacedDay } from './sittingShape.js';
 
 import { BETWEEN_PEAKS_SIM_PER_REAL_S, PACE_HOLD_WAIT_S } from './stagePace.js';
+import { scoredDayPlayOf } from './stagePace.test-helper.js';
 import { DEFAULT_STAGE_SIM_PER_REAL_S } from './stageScreenModel.js';
 
 const SEEDS = Number(process.env['STAGE_PACE_SEEDS'] ?? '50');
@@ -98,11 +99,19 @@ describe.runIf(process.env['STAGE_PACE_SWEEP'] === '1')('§ D512 on the whole da
     const measured: Record<string, { legibleOf50: number; longest: number[] }> = {};
     let longestDay: PacedDay | undefined;
     let longestGameDay: PacedDay | undefined;
+    let longestGameDayOf = '';
     const realOf = (day: PacedDay): number =>
-      day.slowS / W + (day.recordedS - day.slowS) / Math.max(W, BETWEEN_PEAKS_SIM_PER_REAL_S);
+      day.slowS / W + (day.recordedS - day.slowS - (day.skippedS ?? 0)) / Math.max(W, BETWEEN_PEAKS_SIM_PER_REAL_S);
+    /*
+     * § D1212: the game towers' longest day is measured as a scored day now plays — § D1169's slow
+     * set (somebody past a minute, the acts no longer slow of themselves) and the quiet between
+     * peaks skipped — with no call, since a call stops the stage and its pause is the player's.
+     */
+    const gameTowersRun = new Set<string>();
     const rows: string[] = ['contract\tbuilding\thorizon\tn\tlegibleSim\tlegibleReal\tlongestS\tlegibleAtS\tlegibleAtRealS\tdayRealS\tflatRealS\tslowS\tperiodS'];
     for (const contract of CONTRACTS) {
       if (ONLY !== undefined && !ONLY.includes(contract.id)) continue;
+      if (!contract.buildingId.endsWith('-class-reference')) gameTowersRun.add(contract.id);
       for (let n = FROM; n < SEEDS; n += 1) {
         const { state, horizon } = todaysScenarioDayState(resources, contract.id, { seed: seedAt(n) });
         const plan = shiftRunConfigOf(resources, state);
@@ -170,12 +179,34 @@ describe.runIf(process.env['STAGE_PACE_SWEEP'] === '1')('§ D512 on the whole da
           };
           if (longestDay === undefined || realOf(pacedDay) > realOf(longestDay)) longestDay = pacedDay;
           if (!contract.buildingId.endsWith('-class-reference')) {
-            if (longestGameDay === undefined || realOf(pacedDay) > realOf(longestGameDay)) longestGameDay = pacedDay;
+            const scored = scoredDayPlayOf({
+              legs: recording.legs,
+              acts,
+              startedAt: recording.startedAt,
+              endedAt: recording.endedAt,
+              stopsAtS: [],
+              watchingSimPerRealS: W,
+              skip: true,
+            });
+            const scoredDay: PacedDay = {
+              periodS: WHOLE_DAY_LONGEST.periodS,
+              recordedS: pacedDay.recordedS,
+              slowS: Number(scored.slowS.toFixed(3)),
+              skippedS: Number(scored.skippedS.toFixed(3)),
+            };
+            if (longestGameDay === undefined || realOf(scoredDay) > realOf(longestGameDay)) {
+              longestGameDay = scoredDay;
+              longestGameDayOf = `${contract.id} n=${String(n)}`;
+            }
           }
         }
       }
     }
     expect(rows.length).toBeGreaterThan(1);
+    const longestOut = process.env['STAGE_PACE_LONGEST_OUT'];
+    if (longestOut !== undefined) {
+      writeFileSync(longestOut, `${JSON.stringify({ longestDay, longestGameDay, longestGameDayOf }, null, 2)}\n`);
+    }
     /*
      * At the published budget over every contract, the constants this sweep produced must agree
      * with it: § D512's whole-day table in `shift/legibility.ts` and the two longest paced days in
@@ -191,6 +222,10 @@ describe.runIf(process.env['STAGE_PACE_SWEEP'] === '1')('§ D512 on the whole da
         });
       }
       expect(longestDay).toEqual(WHOLE_DAY_LONGEST);
+    }
+    /* The game towers' constant needs only the game towers, so a run of those alone can refuse it. */
+    const gameTowers = CONTRACTS.filter((contract) => !contract.buildingId.endsWith('-class-reference'));
+    if (SEEDS === 50 && FROM === 0 && gameTowers.every((contract) => gameTowersRun.has(contract.id))) {
       expect(longestGameDay).toEqual(WHOLE_DAY_LONGEST_GAME_TOWER);
     }
   }, 21_600_000);

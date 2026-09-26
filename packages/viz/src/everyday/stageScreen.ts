@@ -126,7 +126,15 @@ import { carAbsencesOf, type BookedOutCar } from '../shift/bookedOut.js';
 /* GitHub issue #592, § D991 — the whole day's acts and the pace rule over them. */
 import { actsOf, type DayAct } from '../shift/dayLength.js';
 import type { RunHorizon } from '../shift/types.js';
-import { stagePaceNoteOf, stagePaceOf, type StagePaceReason } from './stagePace.js';
+import {
+  STAGE_SKIP_BEAT_NOTE,
+  stagePaceNoteOf,
+  stagePaceOf,
+  stageSkipApplies,
+  stageSkipLineOf,
+  stageSkipOf,
+  type StagePaceReason,
+} from './stagePace.js';
 /* Wave AI, § D1029 — the pinned day's call. */
 import type { DayCallDriverNames } from '../shift/dayCalls.js';
 import type { PressCall } from '../shift/pressCall.js';
@@ -397,6 +405,16 @@ function mountStage(
   /** When a chip was pressed on this day — § D991 clause 2 as § D1029 amends it. */
   let playerChoseSpeedAtS: number | undefined;
   /*
+   * ---- § D1212's skip between a scored whole day's peaks. Three cells, reset in `adopt`. ----
+   *
+   * `skipArmedAtS` is where the beat before a skip began, or `undefined` when no skip is coming;
+   * `skipLandedAtS` is where the last skip landed, so the frame it lands on does not start another
+   * beat; `skipLine` is the line the last skip left, which the strip keeps until the next one.
+   */
+  let skipArmedAtS: number | undefined;
+  let skipLandedAtS: number | undefined;
+  let skipLine = '';
+  /*
    * ---- § D1029's call — wave AI. Two cells, both set in `adopt`. ----
    *
    * `stageCall` is latched once per attempt, from the recording the attempt opened on, and only
@@ -650,6 +668,16 @@ function mountStage(
   const paceNote = el(doc, 'span', 'everyday-stage-pace');
   paceNote.style.cssText = `align-self:center;font:500 11px ${TYPE.mono};color:${C.warmGrey}`;
   speeds.append(paceNote);
+  /*
+   * § D1212's line — the beat's note while a skip is coming, and then what the skip passed over.
+   * Its own element beside the pace note, because the pace note says why the transport is at its
+   * rung and this says where the playhead went; one line doing both would be rewritten every frame.
+   * Polite, so a reader hears a skip once, when it lands.
+   */
+  const skipNote = el(doc, 'span', 'everyday-stage-skip-line');
+  skipNote.setAttribute('aria-live', 'polite');
+  skipNote.style.cssText = `align-self:center;font:500 11px ${TYPE.mono};color:${C.warmGrey}`;
+  speeds.append(skipNote);
 
   const cameras = el(doc, 'div', 'everyday-stage-cameras');
   /*
@@ -1478,8 +1506,11 @@ function mountStage(
 
   function togglePlay(): void {
     if (playback === undefined) return;
-    if (playback.state === 'playing') playback.pause();
-    else {
+    if (playback.state === 'playing') {
+      playback.pause();
+      /* § D1212: a pause stops a skip that is coming; *Play* starts a fresh beat. */
+      dropSkipBeat();
+    } else {
       started = true;
       /*
        * The one place a player gesture reaches the sound — GitHub issue #258. A browser suspends
@@ -1530,7 +1561,11 @@ function mountStage(
      * moving, so nothing is re-paced under it: the chip and the note keep what they last said, and
      * on a day nobody has started that is the rung the player set and no note at all.
      */
-    if (playback.state !== 'playing') return;
+    if (playback.state !== 'playing') {
+      /* § D1212: whatever stopped the transport stopped a skip that was coming. */
+      dropSkipBeat();
+      return;
+    }
     const answer = stagePaceOf({
       horizon: paceHorizon,
       acts: paceActs,
@@ -1562,6 +1597,7 @@ function mountStage(
      */
     if (answer.reason === 'call') {
       playback.pause();
+      dropSkipBeat();
       /*
        * **And the frame it stops on is the call's** — [§ D1153](../../../../DECISIONS.md), the post-AJ
        * panel's seat D (H10). At a fast rung the frame the pause lands on is a few simulated seconds
@@ -1584,6 +1620,62 @@ function mountStage(
       playback.setSpeed(answer.simPerRealS);
       syncTransport();
     }
+    skipBetweenPeaks(simTimeS, answer.reason);
+  }
+
+  /**
+   * **Skip the quiet between a scored whole day's peaks** — [§ D1212](../../../../DECISIONS.md),
+   * `everyday/stagePace.ts#stageSkipOf`'s rule.
+   *
+   * Asked from {@link pace} on every playing frame. Where the rule applies, the first frame starts
+   * a beat and writes its note; once the beat is over the playhead is moved to the instant the rule
+   * reads off the recording, and the line says what was passed over. Anything that ends the stretch
+   * first (somebody waits a minute, a chip is pressed, the stage stops for a call, a re-simulation
+   * begins) drops the beat, and a pause drops it too because `pace` is not asked while paused.
+   *
+   * It moves the playhead and nothing else, as *Skip to the end* does: the recording was made whole
+   * before the stage drew a frame, so the report, the goals and every figure read the same run.
+   */
+  function skipBetweenPeaks(simTimeS: number, reason: StagePaceReason): void {
+    const recording = adopted;
+    if (playback === undefined || recording === undefined) return;
+    const applies =
+      recomputingOver === undefined &&
+      !skipping &&
+      !(skipLandedAtS !== undefined && Math.abs(simTimeS - skipLandedAtS) < 1) &&
+      stageSkipApplies({ horizon: paceHorizon, scored: paceScored, acts: paceActs, simTimeS, reason });
+    if (!applies) {
+      dropSkipBeat();
+      return;
+    }
+    if (skipArmedAtS === undefined || simTimeS < skipArmedAtS) {
+      skipArmedAtS = simTimeS;
+      if (skipNote.textContent !== STAGE_SKIP_BEAT_NOTE) skipNote.textContent = STAGE_SKIP_BEAT_NOTE;
+      return;
+    }
+    const skip = stageSkipOf({
+      acts: paceActs,
+      legs: recording.legs,
+      simTimeS,
+      armedAtS: skipArmedAtS,
+      simPerRealS: playback.speed,
+      stopAtS: activeCall()?.call.atS,
+    });
+    if (skip === undefined) return;
+    skipArmedAtS = undefined;
+    skipLandedAtS = skip.toS;
+    skipLine = stageSkipLineOf(skip, host.dayStartS());
+    skipNote.textContent = skipLine;
+    playback.seekTo(skip.toS);
+    syncTransport();
+    requestFrame();
+  }
+
+  /** A beat that will not end in a skip: the note goes back to the last skip's line, or to nothing. */
+  function dropSkipBeat(): void {
+    if (skipArmedAtS === undefined) return;
+    skipArmedAtS = undefined;
+    if (skipNote.textContent !== skipLine) skipNote.textContent = skipLine;
   }
 
   /**
@@ -2141,6 +2233,13 @@ function mountStage(
     paceActs = actsOf(recording.demandPhases);
     paceScored = context.ctx === 'daily';
     if (resumeAtS === undefined) lastPaceReason = undefined;
+    /* § D1212: a fresh day has skipped nothing; a re-simulation keeps the line it had. */
+    skipArmedAtS = undefined;
+    if (resumeAtS === undefined) {
+      skipLandedAtS = undefined;
+      skipLine = '';
+      skipNote.textContent = '';
+    }
     /*
      * A new recording is a new building — GitHub issue #258. The crossover is the old tower's
      * doors and the remembered frame is the old tower's cars, so both are dropped rather than
