@@ -47546,6 +47546,8 @@ a second card before the report.
 
 ## D1205 — calls across the whole day: two a peak, no question twice in ten minutes, and who drives asked again after a handover
 
+> **Status 2026-09-26: EXTENDED by [§ D1265](#d1265)** (an agent ruling). The day's wrinkle, where it has a window clear of every peak, is searched like a peak and holds one call, which is not counted against the day's six. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-09-26 by agent sessions under delegated authority** (swarm DN, ruling § Q1(b): the
 > cap and spacing three of three, two a peak two of three with S2 for three while a later peak is
 > unsearched, the ten-minute rule S1 and S3, *keep* holds the peak S1 and S2, the re-ask after a
@@ -47666,6 +47668,8 @@ call; every figure in it one of the frame's counts; five arms against the ban li
 list. Red before: all four cases failed on `c2ca845`, which has no such line.
 
 ## D1212 — between a scored whole day's peaks, the quiet is skipped
+
+> **Status 2026-09-26: AMENDED by [§ D1266](#d1266)** (an agent ruling). The skip runs anywhere in a scored whole day while nobody on a landing has waited a minute, not only between two peaks; where it lands is unchanged, plus the day's end after the last peak. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Taken 2026-09-26 by an agent session under delegated authority** (swarm DN, ruling § Q1 (c),
 > three of three on skipping only where nobody has waited a minute, the seek being the integrator's
@@ -48273,6 +48277,98 @@ it. Shown red on a 130-word row added to each document.
 **Not done.** Correcting the § D343 citations; shortening the older rows, which are records; and any
 measurement of how much the lighter file changes a lane's cost, which is unmeasured.
 
+## D1239 — the one attempt is final: the Engineer surface shows it only to its reach and never files it, and a close reads the week this device has stored
+
+> **Taken 2026-09-26 by agent sessions under delegated authority** (wave AM, lane AM-B, on the
+> post-AL panel's seat D, defects D1 to D3), not by the product owner, and to be read as an agent
+> ruling; [§ D626](#d626) is the cautionary case. **Amends [§ D1218](#d1218)**, whose clause 4 kept
+> a close from the Engineer surface as practice and whose *What it does not reach* left the Engineer
+> transport and presses unheld. Owner-reversible clauses: holding the Engineer transport at the
+> attempt's reach rather than offering *Switch to Engineer* as leaving the day; refusing the Engineer
+> surface's presses on the attempt's run; and making every Engineer close practice while any
+> attempt stands on this device.
+
+**Why an entry.** [§ D405](#d405)'s first two grounds. It moves a recorded ruling (§ D1218) and binds
+`playback/playback.ts`, `dev/main.ts`, `everyday/host.ts`, `shift/attempt.ts`, `shift/banking.ts`,
+`shift/report.ts` and `persist/attempt.ts`.
+
+**What was wrong.** Seat D, three ways past § D1218's one attempt. **D1**: with a call held on the
+stage, the Engineer transport behind the cover had played on at ×60, so *Switch to Engineer* showed
+the unanswered branch's future, and a click at the timeline's end filed the scored day with the call
+never answered; back on the stage the call's buttons stood beside *the day is filed*. **The building
+change**: on the Engineer surface mid-attempt, another building's card put that tower's Monday on
+screen and its end filed and banked it, with no brief and no calls, and paid nothing (D3). **D2**:
+two tabs each closed one counted day, and the second close banked and wrote its week over the first.
+Reproduced on the base bundle by `everyday/attemptIsFinal.browser.test.ts`, red in all three cases.
+
+**The ruling.**
+
+1. **The Engineer transport is held at the attempt's reach.** While the standing attempt's run is
+   the Engineer's, its playhead cannot pass the furthest instant the stage has shown
+   (`Playback.setReach`): a scrub, a seek and a playing transport stop there, and it reads *ended*
+   only where the reach is the run's end. The status line says so once
+   (`shift/banking.ts#ATTEMPT_SHOWN_TO_ITS_REACH`).
+2. **The attempt closes only by its own stage.** `closeShift` files the attempt's run only from
+   `EverydayHost.closeDay`; the Engineer surface's end of run, `Ctrl`+`Enter`, Day report tab and
+   export refuse with `ATTEMPT_CLOSES_ON_ITS_STAGE`, and its three press buttons press nothing on
+   that run.
+3. **While an attempt stands on any of this device's weeks, an Engineer close banks nothing into
+   any week.** The same day's other run keeps § D1218's `'attempt'` ground and words; any other week
+   closes as practice with `shift/report.ts#PRACTICE_ENGINEER_NOTE` and stays on its day.
+4. **A close reads the stored week.** Where the week this device has stored has filed the day the
+   tab holds open (`shift/attempt.ts#dayFiledElsewhere`), the close is practice with
+   `PRACTICE_OTHER_TAB_NOTE`, the tab takes the stored weeks and attempts, the save writes nothing
+   over the first close, and nothing is paid (`everyday/host.ts#fileScenarioDay` skips a practice
+   sheet).
+
+**What holds it.** `playback/playback.test.ts` (the reach: held, followed, clamped, let go),
+`shift/attempt.test.ts` (a day filed elsewhere, a rolled week, a stale week that is not a filing, an
+attempt on a parked week), `shift/report.test.ts` (the two notes), and
+`everyday/attemptIsFinal.browser.test.ts` on the built bundle: red on `0911d63` in all three cases,
+green after (its two tabs come from `dev/browserTier.test-helper.ts#openTwoTabs`, one context
+watched by the tier's collector). Three of `everyday/autoFile.browser.test.ts`'s controls filed the
+stage's own attempt from the Engineer surface, which this entry forbids; they now read the refusal's
+sentence and file the Engineer's own run instead, and the rail-row control files the day by its own
+close.
+
+**What it does not reach.** A stored week that has rolled round to the same day number with nothing
+filed reads as this day still open. The Engineer rail's own goal ticks mid-day are unchanged.
+
+## D1240 — the stage's record of a scored day: the pinned call's row, a skip that stops at each call's clock, current status lines, a practice line, and a close question that focuses the safe answer
+
+> **Taken 2026-09-26 by agent sessions under delegated authority** (wave AM, lane AM-B, on the
+> post-AL panel's seats B and D), not by the product owner, and to be read as an agent ruling.
+> **Amends [§ D1189](#d1189)**'s *focus moves to the first* and **extends [§ D1219](#d1219)** to the
+> pinned call. Owner-reversible clauses: the pinned call's counts beside its census, and the words
+> of the hold and the practice line.
+
+**Why an entry.** It amends a recorded ruling (§ D1189) and binds `everyday/stageScreen.ts`,
+`everyday/stageCall.ts`, `shift/callRow.ts`, `shift/report.ts`, `dev/state.ts` and `dev/main.ts`.
+
+**What was wrong, and the ruling.**
+
+1. **The pinned call had no row.** § D1029 measured it across moments for its verdicts and never
+   ran its answers forward, so *What the calls did* skipped the one call the day turns on; and its
+   report row vanished whenever a later call was answered with a press, because the row refused any
+   log longer than its answer. Now the day is run twice more from the pinned call's second when it
+   is answered or skipped, counted by § D1138's `dayCallRecordOf`; the stage prints its row on
+   § D1219's timing and the report's pinned row carries the counts. Only presses at or before the
+   call second are the day as measured, and a later press adds *The runs named here had nothing
+   pressed after the call.* The record is kept with the attempt.
+2. **A skip ran past a call.** Pressed during an answer's re-simulation, *Skip to the end* ran the
+   day out and the next call came up under the end's clock. The skip now waits out the
+   re-simulation and goes on from there, and a card drawn past its own second puts the playhead back
+   on it, as the pace already does (§ D1153).
+3. **Stale lines.** The pace note is cleared at the day's end; while a card is up the strip's hold
+   reads *held while the call is up: its answers are on the card* rather than *held until the stage
+   stops for this day's call*.
+4. **A practice stage says so**, in the brief's sentence for the ground its close will print.
+5. **The close's question focuses *Back to the call***, so two presses of `Enter` cannot end a day.
+
+**What holds it.** `shift/callRow.test.ts` (a later press keeps the row, the counts' framing, both
+through § D982's ban lists) and `everyday/stageRecord.browser.test.ts` on the built bundle, whose
+soft assertions named all eight defects red on `0911d63` and none after.
+
 ## D1246 — the weekend comes off the main path: a census week closes at the later of Friday and its last counted day
 
 > **Taken 2026-09-26 by agent sessions under delegated authority** (wave AM, lane AM-C, on swarm
@@ -48402,215 +48498,6 @@ brief) and `everyday/dailyLoop.browser.test.ts`.
 
 **Tests.** `shift/tomorrow.test.ts` (no streak on any arm), `shift/report.test.ts` (no unlock
 promised), `everyday/reportView.test.ts` (the note names the brief).
-
----
-
-## D1239 — the one attempt is final: the Engineer surface shows it only to its reach and never files it, and a close reads the week this device has stored
-
-> **Taken 2026-09-26 by agent sessions under delegated authority** (wave AM, lane AM-B, on the
-> post-AL panel's seat D, defects D1 to D3), not by the product owner, and to be read as an agent
-> ruling; [§ D626](#d626) is the cautionary case. **Amends [§ D1218](#d1218)**, whose clause 4 kept
-> a close from the Engineer surface as practice and whose *What it does not reach* left the Engineer
-> transport and presses unheld. Owner-reversible clauses: holding the Engineer transport at the
-> attempt's reach rather than offering *Switch to Engineer* as leaving the day; refusing the Engineer
-> surface's presses on the attempt's run; and making every Engineer close practice while any
-> attempt stands on this device.
-
-**Why an entry.** [§ D405](#d405)'s first two grounds. It moves a recorded ruling (§ D1218) and binds
-`playback/playback.ts`, `dev/main.ts`, `everyday/host.ts`, `shift/attempt.ts`, `shift/banking.ts`,
-`shift/report.ts` and `persist/attempt.ts`.
-
-**What was wrong.** Seat D, three ways past § D1218's one attempt. **D1**: with a call held on the
-stage, the Engineer transport behind the cover had played on at ×60, so *Switch to Engineer* showed
-the unanswered branch's future, and a click at the timeline's end filed the scored day with the call
-never answered; back on the stage the call's buttons stood beside *the day is filed*. **The building
-change**: on the Engineer surface mid-attempt, another building's card put that tower's Monday on
-screen and its end filed and banked it, with no brief and no calls, and paid nothing (D3). **D2**:
-two tabs each closed one counted day, and the second close banked and wrote its week over the first.
-Reproduced on the base bundle by `everyday/attemptIsFinal.browser.test.ts`, red in all three cases.
-
-**The ruling.**
-
-1. **The Engineer transport is held at the attempt's reach.** While the standing attempt's run is
-   the Engineer's, its playhead cannot pass the furthest instant the stage has shown
-   (`Playback.setReach`): a scrub, a seek and a playing transport stop there, and it reads *ended*
-   only where the reach is the run's end. The status line says so once
-   (`shift/banking.ts#ATTEMPT_SHOWN_TO_ITS_REACH`).
-2. **The attempt closes only by its own stage.** `closeShift` files the attempt's run only from
-   `EverydayHost.closeDay`; the Engineer surface's end of run, `Ctrl`+`Enter`, Day report tab and
-   export refuse with `ATTEMPT_CLOSES_ON_ITS_STAGE`, and its three press buttons press nothing on
-   that run.
-3. **While an attempt stands on any of this device's weeks, an Engineer close banks nothing into
-   any week.** The same day's other run keeps § D1218's `'attempt'` ground and words; any other week
-   closes as practice with `shift/report.ts#PRACTICE_ENGINEER_NOTE` and stays on its day.
-4. **A close reads the stored week.** Where the week this device has stored has filed the day the
-   tab holds open (`shift/attempt.ts#dayFiledElsewhere`), the close is practice with
-   `PRACTICE_OTHER_TAB_NOTE`, the tab takes the stored weeks and attempts, the save writes nothing
-   over the first close, and nothing is paid (`everyday/host.ts#fileScenarioDay` skips a practice
-   sheet).
-
-**What holds it.** `playback/playback.test.ts` (the reach: held, followed, clamped, let go),
-`shift/attempt.test.ts` (a day filed elsewhere, a rolled week, a stale week that is not a filing, an
-attempt on a parked week), `shift/report.test.ts` (the two notes), and
-`everyday/attemptIsFinal.browser.test.ts` on the built bundle: red on `0911d63` in all three cases,
-green after (its two tabs come from `dev/browserTier.test-helper.ts#openTwoTabs`, one context
-watched by the tier's collector). Three of `everyday/autoFile.browser.test.ts`'s controls filed the
-stage's own attempt from the Engineer surface, which this entry forbids; they now read the refusal's
-sentence and file the Engineer's own run instead, and the rail-row control files the day by its own
-close.
-
-**What it does not reach.** A stored week that has rolled round to the same day number with nothing
-filed reads as this day still open. The Engineer rail's own goal ticks mid-day are unchanged.
-
-## D1240 — the stage's record of a scored day: the pinned call's row, a skip that stops at each call's clock, current status lines, a practice line, and a close question that focuses the safe answer
-
-> **Taken 2026-09-26 by agent sessions under delegated authority** (wave AM, lane AM-B, on the
-> post-AL panel's seats B and D), not by the product owner, and to be read as an agent ruling.
-> **Amends [§ D1189](#d1189)**'s *focus moves to the first* and **extends [§ D1219](#d1219)** to the
-> pinned call. Owner-reversible clauses: the pinned call's counts beside its census, and the words
-> of the hold and the practice line.
-
-**Why an entry.** It amends a recorded ruling (§ D1189) and binds `everyday/stageScreen.ts`,
-`everyday/stageCall.ts`, `shift/callRow.ts`, `shift/report.ts`, `dev/state.ts` and `dev/main.ts`.
-
-**What was wrong, and the ruling.**
-
-1. **The pinned call had no row.** § D1029 measured it across moments for its verdicts and never
-   ran its answers forward, so *What the calls did* skipped the one call the day turns on; and its
-   report row vanished whenever a later call was answered with a press, because the row refused any
-   log longer than its answer. Now the day is run twice more from the pinned call's second when it
-   is answered or skipped, counted by § D1138's `dayCallRecordOf`; the stage prints its row on
-   § D1219's timing and the report's pinned row carries the counts. Only presses at or before the
-   call second are the day as measured, and a later press adds *The runs named here had nothing
-   pressed after the call.* The record is kept with the attempt.
-2. **A skip ran past a call.** Pressed during an answer's re-simulation, *Skip to the end* ran the
-   day out and the next call came up under the end's clock. The skip now waits out the
-   re-simulation and goes on from there, and a card drawn past its own second puts the playhead back
-   on it, as the pace already does (§ D1153).
-3. **Stale lines.** The pace note is cleared at the day's end; while a card is up the strip's hold
-   reads *held while the call is up: its answers are on the card* rather than *held until the stage
-   stops for this day's call*.
-4. **A practice stage says so**, in the brief's sentence for the ground its close will print.
-5. **The close's question focuses *Back to the call***, so two presses of `Enter` cannot end a day.
-
-**What holds it.** `shift/callRow.test.ts` (a later press keeps the row, the counts' framing, both
-through § D982's ban lists) and `everyday/stageRecord.browser.test.ts` on the built bundle, whose
-soft assertions named all eight defects red on `0911d63` and none after.
-
----
-
-## D1258 — Chancery House and Ashgate grow at 0, and the week census measures both weeks: Monday to Thursday and Monday to Wednesday count, and both Fridays are walls
-
-> **Taken 2026-09-26 by agent sessions under delegated authority** (wave AM, lane AM-E, on swarm
-> DO's ruling § 3, three of three), not by the product owner. **Owner-reversible**: slope 0 on both
-> rungs. The marks are measurements and are not reversible by ruling; the remedy for a moved mark
-> is a census re-run.
-
-**Why an entry.** It moves two rungs' growth in `data/contract-ladder.json` ([§ D1066](#d1066)),
-adds eighteen rows to `data/week-way.json` ([§ D1067](#d1067)), and so changes what the week
-stake, the brief and the tower picker say about two towers (§ D1176, § D1179).
-
-**The slope.** Swarm DO's S3 screened day 5 on DC-10's tuning half: at Midtown's 0.02 Chancery
-House (`c6`) cleared 3 of 8 and Ashgate (`c10`) 2 of 8; at 0 both cleared 6 of 8, § D1066's pass
-mark. Both rungs now declare `growthPerDay: 0`, the floor of `GROWTH_PER_DAY_BOUNDS`, so no gentler
-slope was open. Their weeks do not grow; a day differs from Monday by its bars and its wrinkle.
-
-**The census.** DC-10's full protocol at slope 0, by the documented command
-(`WEEK_WAY_SWEEP=1 WEEK_WAY_CONTRACTS=<id> WEEK_WAY_DAYS=1,2,3,4,5`, then
-`WEEK_WAY_EVENTS=scheduled WEEK_WAY_DAYS=2,3,4,5`, one worker), eighteen cells of 200 runs, 3 600
-runs and 9 972 cell-seconds on a shared container at load 5 to 82. The rows are copied from the
-sweep's output line for line; `docs/33` DC-10's table carries every one. As dealt:
-
-| tower | Mon | Tue (move-in) | Wed (fire drill) | Thu (conference) | Fri (shaft out) | counted | target | met at the earliest |
-|---|---|---|---|---|---|---|---|---|
-| Chancery House | 16/20 | 14/20 | 17/20 | 16/20 | **8/20** | 4 | 3 | Wednesday |
-| Ashgate | 17/20 | 16/20 | 12/20 | **9/20** | **5/20** | 3 | 2 | Tuesday |
-
-Each figure is the held-out clears of the configuration chosen on tuning crowds; bold fails DC-10's
-(a). Every admitted day's standing order misses at least 8 of 20, and no day fails the queue gate.
-Plain, Chancery House's Thursday also fails (11 of 20) and Ashgate's passes (13 of 20); both
-Fridays fail plain (8 and 10). The move-in Tuesday reproduces the plain Tuesday mark for mark on
-both towers, as at Midtown (§ D1180 clause 4). **No mechanism is offered** for Chancery House's
-conference Thursday clearing more crowds than its plain one.
-
-**What it moves.** Both towers leave the census's `unmeasured` block. Their weeks now carry a
-derived target (§ D1176) in place of `needClean`, and each refused day draws its measured sentence
-on the brief. Both weeks meet § D1178's admission (day 1 counts, the target is below the counted
-days), and both targets can be met before Thursday, so § D1259 offers neither and § D1260 deals
-neither to a newcomer.
-
-**Tests.** `shift/weekWay.test.ts` (well formed and current against the ladder, every weekday of a
-measured tower present), `shift/weekWay.test.ts#a re-derived slope reaches the run` (day 5's
-population on both rungs is day 1's, and not the default's), and `shift/nextTower.test.ts`, which
-pins the counted days, targets and earliest days above. `shift/weekWay.verify.test.ts` re-runs every
-row weekly.
-
-## D1259 — a held week's close offers the next tower whose week meets every rule the first tower's does, and locks nothing
-
-> **Taken 2026-09-26 by agent sessions under delegated authority** (wave AM, lane AM-E, on swarm
-> DO's ruling § 3, three of three), not by the product owner. **Owner-reversible**: the offer
-> itself; that it is the sheet's primary rather than a second button; the ladder order with its
-> wrap; *held* meaning the week's target was met; and, deciding today's outcome, carrying
-> [§ D1180](#d1180)'s Thursday check to the offered tower.
-
-**Why an entry.** It changes the one button on the week's sheet ([§ D1227](#d1227)) and reads two
-week rulings ([§ D1178](#d1178), § D1180) for a purpose they were not written for.
-
-**The ruling.** A week is *held* when its sheet's target was met. At that close only, the sheet
-names the next tower, in `CONTRACTS` order (DC-6's ladder) after the tower just held, wrapping to
-the lowest rung, never the tower itself, whose week (1) § D1178 admits
-(`shift/weekStake.ts#weekAdmitsANewcomer`: day 1 counts and the week has room for one miss) and
-(2) cannot be won before Thursday, § D1180's check on the first tower. Its press, *Play Ashgate's
-week* for instance, is the bar's primary and runs the front door's own `chooseTower`, so the week
-left behind is parked with its sheet exactly as the picker parks it; *Start next week here* stays in
-the sheet as the second press. The sentence names the next tower's counted days and target and says
-the tower just held stays open from *This week's tower*. A week that was not held keeps *Start next
-week* and offers nothing. Nothing is locked or unlocked by any of it, and no string it draws
-contains *lock*.
-
-**What is offered today: Midtown Office, from below it.** § D1258's census admits Chancery House's
-and Ashgate's weeks by rule (1) and both fail rule (2), their targets met at the earliest on
-Wednesday and Tuesday. Rule (2) is carried because a week won by Wednesday is the complaint § D1180
-was taken to remove, and a tower offered as the next step should be no thinner a week than the
-first. So Midtown is the one tower whose week meets both: a held week on Chancery House, Harbour
-Point or Ashgate offers Midtown, and a held Midtown week offers nothing and keeps *Start next week*.
-Without rule (2) a held Midtown week would offer Ashgate. A further tower is offered on the commit a
-census row admits a week that meets both rules; no tower is named in code.
-
-**Tests.** `shift/nextTower.test.ts` over built censuses (the order and its wrap, a refused and an
-unmeasured tower skipped, the Thursday rule, no offer on a week not held or with no target, no
-*lock* in any drawn string) and over the shipped one (neither tower offered, and why, and Midtown offered from Chancery House, Harbour Point and Ashgate);
-`everyday/weekView.test.ts` (a held Chancery House week offers Midtown as the primary, a held
-Midtown week and a missed one keep *Start next week*); `everyday/weekSurvives.browser.test.ts` reads whichever arm the sheet draws. The honesty
-corpus seeds the label and the sentence per census tower that has an onward tower, and the second
-press's label.
-
-**Not established.** No browser case presses the onward button: the browser tier has no fixture for
-a held week, and the one tower offered today is offered from towers a browser case does not hold a
-week on.
-
-## D1260 — a newcomer's first week stays on Midtown Office while the census admits more weeks
-
-> **Taken 2026-09-26 by agent sessions under delegated authority** (wave AM, lane AM-E, on the lane
-> brief's clause 3 and swarm DO's ruling § 3), not by the product owner. **Owner-reversible**: the
-> one-member list; widening it restores § D1178's widening.
-
-**Why an entry.** It amends [§ D1178](#d1178)'s *a tower joins the set on the commit its census row
-admits it*, which § D1258's rows would otherwise have carried out for two towers.
-
-**The ruling.** `shift/firstSession.ts#FIRST_DAY_CONTRACT_IDS` is also held inside
-`NEWCOMER_WEEK_TOWER_IDS`, which names Midtown Office alone. It is typed, and its docstring says so;
-the three derived halves still filter it, so a Midtown pin or week that stopped being admitted would
-empty the set and the draw would throw with no fallback. § D1180's derived check, *the target
-cannot be met before Thursday on any tower a newcomer is dealt*, now iterates that set rather than
-every tower § D1178 admits, which is what its text named.
-
-**Tests.** `shift/firstSession.test.ts#a newcomer still starts on Midtown Office`: four hundred dates
-draw Midtown while § D1178 admits two more towers. Red before, with § D1258's rows and without the
-list: the set read `c2, c6, c10`. `shift/weekStake.test.ts`'s Thursday check reads the first-day
-set.
-
----
 
 ## D1252 — each week of a tower is dealt its own wrinkle order, authored as data and dealt only where the week census admits every day of it
 
@@ -48754,3 +48641,372 @@ it is new in order and not in kind; a fourth kind of week needs templates the ce
 admitted (`two-cars-down`, `all-hands` and `quiet-morning` are unmeasured on Midtown, and
 `contractors` could not be cleared on the wrinkle census). No order was screened on any tower but
 Midtown. The weekend is unchanged and still repeats weekly.
+
+## D1258 — Chancery House and Ashgate grow at 0, and the week census measures both weeks: Monday to Thursday and Monday to Wednesday count, and both Fridays are walls
+
+> **Taken 2026-09-26 by agent sessions under delegated authority** (wave AM, lane AM-E, on swarm
+> DO's ruling § 3, three of three), not by the product owner. **Owner-reversible**: slope 0 on both
+> rungs. The marks are measurements and are not reversible by ruling; the remedy for a moved mark
+> is a census re-run.
+
+**Why an entry.** It moves two rungs' growth in `data/contract-ladder.json` ([§ D1066](#d1066)),
+adds eighteen rows to `data/week-way.json` ([§ D1067](#d1067)), and so changes what the week
+stake, the brief and the tower picker say about two towers (§ D1176, § D1179).
+
+**The slope.** Swarm DO's S3 screened day 5 on DC-10's tuning half: at Midtown's 0.02 Chancery
+House (`c6`) cleared 3 of 8 and Ashgate (`c10`) 2 of 8; at 0 both cleared 6 of 8, § D1066's pass
+mark. Both rungs now declare `growthPerDay: 0`, the floor of `GROWTH_PER_DAY_BOUNDS`, so no gentler
+slope was open. Their weeks do not grow; a day differs from Monday by its bars and its wrinkle.
+
+**The census.** DC-10's full protocol at slope 0, by the documented command
+(`WEEK_WAY_SWEEP=1 WEEK_WAY_CONTRACTS=<id> WEEK_WAY_DAYS=1,2,3,4,5`, then
+`WEEK_WAY_EVENTS=scheduled WEEK_WAY_DAYS=2,3,4,5`, one worker), eighteen cells of 200 runs, 3 600
+runs and 9 972 cell-seconds on a shared container at load 5 to 82. The rows are copied from the
+sweep's output line for line; `docs/33` DC-10's table carries every one. As dealt:
+
+| tower | Mon | Tue (move-in) | Wed (fire drill) | Thu (conference) | Fri (shaft out) | counted | target | met at the earliest |
+|---|---|---|---|---|---|---|---|---|
+| Chancery House | 16/20 | 14/20 | 17/20 | 16/20 | **8/20** | 4 | 3 | Wednesday |
+| Ashgate | 17/20 | 16/20 | 12/20 | **9/20** | **5/20** | 3 | 2 | Tuesday |
+
+Each figure is the held-out clears of the configuration chosen on tuning crowds; bold fails DC-10's
+(a). Every admitted day's standing order misses at least 8 of 20, and no day fails the queue gate.
+Plain, Chancery House's Thursday also fails (11 of 20) and Ashgate's passes (13 of 20); both
+Fridays fail plain (8 and 10). The move-in Tuesday reproduces the plain Tuesday mark for mark on
+both towers, as at Midtown (§ D1180 clause 4). **No mechanism is offered** for Chancery House's
+conference Thursday clearing more crowds than its plain one.
+
+**What it moves.** Both towers leave the census's `unmeasured` block. Their weeks now carry a
+derived target (§ D1176) in place of `needClean`, and each refused day draws its measured sentence
+on the brief. Both weeks meet § D1178's admission (day 1 counts, the target is below the counted
+days), and both targets can be met before Thursday, so § D1259 offers neither and § D1260 deals
+neither to a newcomer.
+
+**Tests.** `shift/weekWay.test.ts` (well formed and current against the ladder, every weekday of a
+measured tower present), `shift/weekWay.test.ts#a re-derived slope reaches the run` (day 5's
+population on both rungs is day 1's, and not the default's), and `shift/nextTower.test.ts`, which
+pins the counted days, targets and earliest days above. `shift/weekWay.verify.test.ts` re-runs every
+row weekly.
+
+## D1259 — a held week's close offers the next tower whose week meets every rule the first tower's does, and locks nothing
+
+> **Taken 2026-09-26 by agent sessions under delegated authority** (wave AM, lane AM-E, on swarm
+> DO's ruling § 3, three of three), not by the product owner. **Owner-reversible**: the offer
+> itself; that it is the sheet's primary rather than a second button; the ladder order with its
+> wrap; *held* meaning the week's target was met; and, deciding today's outcome, carrying
+> [§ D1180](#d1180)'s Thursday check to the offered tower.
+
+**Why an entry.** It changes the one button on the week's sheet ([§ D1227](#d1227)) and reads two
+week rulings ([§ D1178](#d1178), § D1180) for a purpose they were not written for.
+
+**The ruling.** A week is *held* when its sheet's target was met. At that close only, the sheet
+names the next tower, in `CONTRACTS` order (DC-6's ladder) after the tower just held, wrapping to
+the lowest rung, never the tower itself, whose week (1) § D1178 admits
+(`shift/weekStake.ts#weekAdmitsANewcomer`: day 1 counts and the week has room for one miss) and
+(2) cannot be won before Thursday, § D1180's check on the first tower. Its press, *Play Ashgate's
+week* for instance, is the bar's primary and runs the front door's own `chooseTower`, so the week
+left behind is parked with its sheet exactly as the picker parks it; *Start next week here* stays in
+the sheet as the second press. The sentence names the next tower's counted days and target and says
+the tower just held stays open from *This week's tower*. A week that was not held keeps *Start next
+week* and offers nothing. Nothing is locked or unlocked by any of it, and no string it draws
+contains *lock*.
+
+**What is offered today: Midtown Office, from below it.** § D1258's census admits Chancery House's
+and Ashgate's weeks by rule (1) and both fail rule (2), their targets met at the earliest on
+Wednesday and Tuesday. Rule (2) is carried because a week won by Wednesday is the complaint § D1180
+was taken to remove, and a tower offered as the next step should be no thinner a week than the
+first. So Midtown is the one tower whose week meets both: a held week on Chancery House, Harbour
+Point or Ashgate offers Midtown, and a held Midtown week offers nothing and keeps *Start next week*.
+Without rule (2) a held Midtown week would offer Ashgate. A further tower is offered on the commit a
+census row admits a week that meets both rules; no tower is named in code.
+
+**Tests.** `shift/nextTower.test.ts` over built censuses (the order and its wrap, a refused and an
+unmeasured tower skipped, the Thursday rule, no offer on a week not held or with no target, no
+*lock* in any drawn string) and over the shipped one (neither tower offered, and why, and Midtown offered from Chancery House, Harbour Point and Ashgate);
+`everyday/weekView.test.ts` (a held Chancery House week offers Midtown as the primary, a held
+Midtown week and a missed one keep *Start next week*); `everyday/weekSurvives.browser.test.ts` reads whichever arm the sheet draws. The honesty
+corpus seeds the label and the sentence per census tower that has an onward tower, and the second
+press's label.
+
+**Not established.** No browser case presses the onward button: the browser tier has no fixture for
+a held week, and the one tower offered today is offered from towers a browser case does not hold a
+week on.
+
+## D1260 — a newcomer's first week stays on Midtown Office while the census admits more weeks
+
+> **Taken 2026-09-26 by agent sessions under delegated authority** (wave AM, lane AM-E, on the lane
+> brief's clause 3 and swarm DO's ruling § 3), not by the product owner. **Owner-reversible**: the
+> one-member list; widening it restores § D1178's widening.
+
+**Why an entry.** It amends [§ D1178](#d1178)'s *a tower joins the set on the commit its census row
+admits it*, which § D1258's rows would otherwise have carried out for two towers.
+
+**The ruling.** `shift/firstSession.ts#FIRST_DAY_CONTRACT_IDS` is also held inside
+`NEWCOMER_WEEK_TOWER_IDS`, which names Midtown Office alone. It is typed, and its docstring says so;
+the three derived halves still filter it, so a Midtown pin or week that stopped being admitted would
+empty the set and the draw would throw with no fallback. § D1180's derived check, *the target
+cannot be met before Thursday on any tower a newcomer is dealt*, now iterates that set rather than
+every tower § D1178 admits, which is what its text named.
+
+**Tests.** `shift/firstSession.test.ts#a newcomer still starts on Midtown Office`: four hundred dates
+draw Midtown while § D1178 admits two more towers. Red before, with § D1258's rows and without the
+list: the set read `c2, c6, c10`. `shift/weekStake.test.ts`'s Thursday check reads the first-day
+set.
+
+## D1264 — the flip census: on Midtown's week a call's other answer loses the day on most crowds, and almost always by handing the day to another driver
+
+> **Taken 2026-09-26 by agent sessions under delegated authority** (swarm DO, ruling § 4's *a flip
+> census: for each call, how often the other answer flips the day's verdict on its crowd; publish
+> it*, three lenses reconciled by wave AM's integrator; built and measured by wave AM lane AM-F), not
+> by the product owner. A later reader weighing this against a product-owner ruling should treat it
+> as an agent ruling and say so. **It moves no bar and no rule**: it is the measurement the ruling
+> said a later tightening would stand on. **Owner-reversible**: the crowds, the policies measured and
+> what counts as a flip.
+
+**Why an entry.** [§ D405](#d405)'s third ground: the ruling asked for the figure to be published,
+and the close's *the call that decided it* (lane AM-C) and any later tightening of Midtown's week
+read it. No code reads it, so it is published here and in the instrument's output only, and no data
+file is pinned.
+
+**What is measured.** `everyday/callFlip.sweep.test.ts` (`CALL_FLIP_SWEEP=1`), through
+`everyday/sittingBot.test-helper.ts#playScoredDay`: Midtown Office (`c2`), the whole authored day,
+days 1 to 5 each with the wrinkle the week deals it, on **the census crowds**, the twenty held-out
+crowds `data/week-way.json` admitted Midtown's week on (`protocol.heldOutFrom`, twenty dates). Each
+day is played through the shipped `dev/dayCallSession.ts#openDayCallSession` with every call answered
+by a fixed policy. Every raised call's record already carries its three runs, each with every press
+before the call and nothing after it; each is graded with the day's own goals. A call **flips** the
+day where the three verdicts are not all the same; it **could lose** the day where the answer given
+cleared and another missed, and **could save** it where the answer given missed and another cleared.
+Those are facts of three runs of one crowd, the report row's footing (§ D1138 clause 3), and a later
+call can still move the day's final verdict.
+
+**The baseline, swarm DO's player member's policy**: *Fairness first* at the brief, *keep who
+drives*, *park the cars* when asked where they go. It cleared 13 of 13 days in that seat's two weeks.
+
+| day, wrinkle | days cleared | calls | flip the day | could lose | could save | crowds with a call that could lose | median real minutes |
+|---|---|---|---|---|---|---|---|
+| 1, ordinary | 19 of 20 | 88 | 26 | 26 | 0 | 15 of 20 | 5.3 |
+| 2, move-in | 20 of 20 | 94 | 32 | 32 | 0 | 18 of 20 | 6.7 |
+| 3, fire drill | 19 of 20 | 104 | 46 | 45 | 1 | 17 of 20 | 8.1 |
+| 4, conference | 14 of 20 | 67 | 41 | 37 | 4 | 14 of 20 | 7.9 |
+| 5, shaft out | 10 of 20 | 89 | 36 | 30 | 6 | 9 of 20 | 9.8 |
+| **all** | **82 of 100** | **442** | **181** | **170** | **11** | **73 of 100** | **7.6** |
+
+**By question.** The driver question was raised 300 times and flipped the day 167 times, 163 of them
+where handing the day to *Conventional collective* or *Minimum estimated wait* would have lost a day
+*Fairness first* cleared. The placement question was raised 142 times and flipped the day 14 times,
+7 each way. Real minutes are the ended run at `4×` with § D1266's skip.
+
+**The house**, *Conventional collective* with every call answered *leave them*, is the tower's
+standing order untouched, so its day verdicts are the census's own standing marks: **7, 8, 4, 0 and
+2 of 20**. On day 1's twenty crowds it raised 85 calls, 36 of which flipped the day: 32 could have
+saved it and 4 could have lost it, and 12 of its 13 missed days had a call whose other answer would
+have cleared. Days 2 to 5 were measured on fifteen days of the first four crowds only (69 calls, 27
+flipping, 23 could save and 4 could lose), and are not a census.
+
+**What this says, and what it does not.**
+
+1. **13 of 13 does not survive the census crowds.** The same policy cleared 82 of 100 days and met
+   the week's target of 4 of 5 on 14 of the 20 crowds, read as a week of one crowd a day. Thursday's
+   conference and Friday's shaft are where it misses: 6 and 10 of 20, against 13 and 12 for the
+   configuration the week census chose and 0 and 2 for the house.
+2. **Calls that can lose the day exist on 73 of 100 days**, which is the ruling's precondition for a
+   call worth watching. Almost all of them are the driver question, and on this policy the losing
+   answer is always the other driver: a player who has found *Fairness first* is never shown a call
+   whose *keep* loses. The placement question almost never decides a day either way.
+3. **No floor is published and none is set.** The ruling asks that a floor be published before it is
+   measured; none was proposed before this run, so this table is the measurement a proposal would
+   stand on, and the § D1067 thresholds are untouched. No bar moved (the ruling refuses it this wave).
+4. **No mechanism is offered** for why *Fairness first* wins the driver question here; that is
+   unmeasured.
+
+**Not established.** The house on days 2 to 5 at twenty crowds; any other fixed policy on the census
+crowds (the sitting bot, [§ D1267](#d1267), carries two more); any tower but Midtown.
+
+## D1265 — the day's wrinkle is a stretch the stage may call in: one call, admitted by § D1138's rule, outside the day's six
+
+> **Taken 2026-09-26 by agent sessions under delegated authority** (swarm DO, ruling § 4's *where the
+> engine supports it, a wrinkle's own question, admitted by § D1138's rule; the wrinkle must not pass
+> inside a skip with no call*, reconciled by wave AM's integrator; the mechanism is lane AM-F's), not
+> by the product owner. A later reader weighing this against a product-owner ruling should treat it
+> as an agent ruling and say so. **Extends [§ D1138](#d1138) clause 1 and [§ D1205](#d1205)**, and
+> keeps [§ D1166](#d1166)'s cap of six for the peaks. **Owner-reversible**: the one call
+> (`shift/dayCalls.ts#DAY_CALL_PER_WRINKLE`), keeping it outside the six, and which wrinkles have a
+> window.
+
+**Why an entry.** [§ D405](#d405)'s first two grounds: it amends two recorded rulings and binds
+`shift/dayCalls.ts`, `shift/pressCall.ts`, `dev/dayCallSession.ts`, `dev/state.ts`, `dev/main.ts`,
+`everyday/stageCall.ts` and the honesty corpus's stage adapter.
+
+**What was wrong.** On a whole day every candidate call lies inside a peak (§ D1138), and the three
+of Midtown's five wrinkles that have a clock all lie between peaks: Tuesday's move-in takes car C
+13:30 to 16:00, Thursday's conference runs 13:15 to 16:15, Friday's shaft takes car C 09:00 to
+12:00. So those wrinkles could raise nothing, and § D1212's skip crossed them. Swarm DO's player
+member met the conference as *295 s straight across the wrinkle, which asked nothing*. (The fire
+drill's episode is at the day's peak level, so it is an act of its own and was already called in.)
+
+**The ruling.**
+
+1. **Where the wrinkle is** is read off the run's own plan (`dev/state.ts#dayCallWrinkleOf`): a
+   spliced episode's clock, or the day's own windowed car, never the tower's booking; an ordinary
+   day, a whole-shift hold and a wrinkle that changes the crowd all day have none.
+2. **Where it lies clear of every peak it is one more stretch to search**, in time order with the
+   peaks: the first minute-long wait inside it, else its start (`wrinkle-start`, a third rule for an
+   ordinary call only). A wrinkle overlapping a peak is not a second stretch.
+3. **Admission is § D1138's, unchanged**: the same three runs from the instant and the same spread
+   of the ten-minute counts, on either question.
+4. **At most one raised call in the wrinkle, and it is not counted against the day's six**, so a
+   wrinkle between the peaks cannot spend the evening's calls. A day's tries grow by two where it has
+   a window.
+5. **The card says so from the schedule**: *Move-in day: under way since 13:30.*, beside the car
+   line where the wrinkle took a car. Nothing ahead of the call.
+6. **The skip cannot pass it**: the wrinkle's candidate is the next stop the session holds, and
+   § D1212's skip lands on the next stop, so where a call would be admitted the stage is there to ask
+   it.
+
+**Measured**, on [§ D1264](#d1264)'s run (the census crowds, *Fairness first*, keep, park): a call
+was raised in the wrinkle on **6 of 20** Tuesdays, **1 of 20** Thursdays (at the conference's start)
+and **18 of 20** Fridays, 25 in all, 21 of them the driver question; **9 flipped the day** (1, 1 and
+7), 8 could have lost it and 1 could have saved it. None of those calls could be raised before this
+entry. Tests: `shift/dayCalls.test.ts` (a candidate at the wrinkle's start between two peaks where
+the peaks' rule finds none; a wait inside it first; no stretch where it overlaps a peak, has no
+length or the day is a slice), `dev/dayCallSession.test.ts` (one call in the wrinkle and still two in
+every peak, seven in all against a cap of six; none between the peaks without it; a resumed session
+counts it as an unbroken one does), `dev/dayCallWrinkle.test.ts` (the windows on Midtown's days 1 to
+5), `everyday/stageCall.test.ts` (the card's line). The first three were red before the change.
+
+**A question of the wrinkle's own, not built.** The ruling's example was the move-in: *hold a car for
+the movers*. The engine can carry it (an `answer-incident` of service events moving the movers'
+window), and it is refused here on a measurement: the week census's Tuesday rows read **the same
+twenty marks with the move-in and without it**, under the standing order and under the chosen
+configuration (`data/week-way.json`, day 2), so on Midtown the movers' car does not decide the day
+and a question about it would be a control that changes nothing a player is graded on. The wrinkle's
+stretch asks the questions that do reach the day.
+
+## D1266 — the skip runs anywhere in a scored whole day where nobody has waited a minute
+
+> **Taken 2026-09-26 by agent sessions under delegated authority** (swarm DO, ruling § 4's *a careful
+> Midtown day at or under 8 real minutes, without passing a call or a minute wait*, reconciled by wave
+> AM's integrator; the mechanism is lane AM-F's), not by the product owner. A later reader weighing
+> this against a product-owner ruling should treat it as an agent ruling and say so. **Amends
+> [§ D1212](#d1212) clauses 2 and 4** (*between two peaks* only; *inside a peak, before the first and
+> after the last, § D1169 is unchanged*). **Owner-reversible**: where the skip applies (setting
+> `everyday/stagePace.ts#stageSkipApplies` back to the gaps between peaks restores § D1212 exactly),
+> and the eight-minute target, which is the ruling's.
+
+**Why an entry.** [§ D405](#d405)'s first two grounds: it amends a recorded ruling and binds
+`everyday/stagePace.ts`, `everyday/stageScreen.ts`, `everyday/firstDayLength.ts` (the brief's
+sentence and its re-measured table) and the published rhythm.
+
+**What was left after § D1212.** A Midtown day at `4×` is the watching rung wherever somebody on a
+landing has waited a minute and `30×` everywhere else, less the gaps between peaks that § D1212
+skips. What remained at `30×` was the half hour before the first peak, the stretches inside a peak
+where nobody had waited a minute, and the quarter hour after the last: on day 1 of the crowd
+`20 260 824` about four of a nine-and-a-half-minute day. The rest is minute waits played at the
+player's rung, which the ruling's constraint keeps.
+
+**The ruling.** On a scored whole day, **anywhere** the stage reads `fast` (nobody on a landing has
+waited a minute, no chip standing), it plays § D1212's two-second beat and then seeks to the earliest
+of the first instant anybody reaches a minute, the next call the stage would stop at, the next peak's
+start, and, after the last peak, the day's end. Every landing is § D1212's except the last, so it
+passes no call and no minute's wait; a peak still opens on the stage because its start is a landing;
+a pause or a chip still stops a coming skip; the line still names only what is past. A day with no
+peaks in its schedule is not skipped, and nothing but a scored whole day is.
+
+**Measured.** `everyday/stageSkip.sweep.test.ts` (§ D1212's instrument: Midtown days 1 to 5 with
+each day's wrinkle, crowds `20 260 824 + 7 919 n`, `n` 0 to 7, `collective` with the calls answered in
+rotation), which now also reports § D1212's skip on the same tree, so the step is read off one run:
+
+| Midtown, medians over 8 crowds | no skip (§ D1169) | § D1212, between peaks | **§ D1266, anywhere** (range) |
+|---|---|---|---|
+| day 1, ordinary | 25.9 | 10.6 | **7.6** (6.2 to 11.9) |
+| day 2, move-in | 26.4 | 11.2 | **8.5** (7.2 to 10.8) |
+| day 3, fire drill | 28.4 | 13.9 | **10.9** (9.3 to 14.8) |
+| day 4, conference | 27.6 | 12.5 | **9.8** (8.0 to 11.4) |
+| day 5, shaft out | 29.0 | 14.5 | **11.8** (11.2 to 14.0) |
+| all 40 days | 27.9 | 12.9 | **10.1** |
+
+Real minutes at `4×`, the pause at a stop not counted. Decisions a real minute, medians, 0.530 →
+0.692; the longest gap between two decisions 4.0 → 3.4 minutes. This tree's § D1212 column reads
+10.6 on day 1 where § D1212 published 11.9, because wave AL's calls across the day and
+[§ D1265](#d1265)'s wrinkle calls both landed since.
+
+**A careful day**, the ruling's measure, is [§ D1264](#d1264)'s run: *Fairness first*, keep, park, on
+the twenty census crowds, which clears 82 of 100 days. Its median day is **7.6 real minutes**, and
+57 of the 100 are at or under eight; by day 5.3, 6.7, 8.1, 7.9 and 9.8. **The target is met at the
+median over the week and on Monday, Tuesday and Thursday, and missed on Wednesday and Friday** by the
+minute waits a harder day holds, which are played at the player's rung and which this entry does not
+touch. A day played with the answers in rotation, clearing less, is longer (10.1).
+
+**Tests.** `everyday/stagePace.test.ts`: the skip applies before the first peak, inside one and after
+the last (red before: all three read `false`); after the last peak it lands on the day's end and,
+without the end, plays the tail (red before); the real `Playback` played frame by frame agrees with
+the legs' reading within a minute and the skip count exactly, every skip passes no wait and lands at
+or before the next peak's start, and at least one skip falls before the first peak or inside one.
+`firstDayLength.test.ts` re-measures the four pinned days (Midtown's brief now reads *about 12 min*,
+from 15) and holds the sentence, which now says *wherever nobody on a landing has waited a minute the
+stage skips ahead* in place of naming the gaps. `stagePace.browser.test.ts` follows the widened skip.
+
+**Not re-measured.** `everyday/sittingShape.ts`'s *34 min at most on the game's own towers* and its
+*the quiet between peaks skipped* were measured under § D1212; the skip only ever removes time, so
+both stay true as an upper bound and an understatement, and re-measuring fifty seeds of every tower
+is left to the next run of `stagePace.sweep.test.ts`.
+
+## D1267 — the sitting bot: three weeks of Midtown under three fixed policies, and what each holds
+
+> **Taken 2026-09-26 by agent sessions under delegated authority** (swarm DO, ruling § 4's *a sitting
+> bot that plays whole sittings with a fixed policy, as a gated test instrument, for the score-8
+> tests; report what the fixed policies achieve over three weeks*, reconciled by wave AM's
+> integrator; built and measured by wave AM lane AM-F), not by the product owner. A later reader
+> weighing this against a product-owner ruling should treat it as an agent ruling and say so. **It
+> moves no bar, no rule and no player surface**: it is an instrument and its first reading.
+> **Owner-reversible**: the policies it plays, the tower, the three sittings and three weeks.
+
+**Why an entry.** [§ D405](#d405)'s first and third grounds: it registers a gated tier in
+`deepTiers.test.ts`, which this lane does not own, and [§ D1264](#d1264) and the score-8 tests read
+its figures.
+
+**What it runs.** `everyday/sittingBot.sweep.test.ts` (`SITTING_BOT_SWEEP=1`), on the engine
+[§ D1264](#d1264)'s census stands on (`everyday/sittingBot.test-helper.ts#playScoredDay`). A
+sitting is one date; each is played for three weeks on Midtown Office (`c2`) from
+`shift/week.ts#openWeek`, moved on by the product's own `nextDay`, on the crowds one device is dealt
+(`shift/weekRecord.ts#dealtCrowdOf`'s rule: the date's crowd first, then `derivedCrowdOf`). Only the
+five counted days are played, and a week is held at the deal's target of **4 clean days of 5**. Every
+day is the whole authored day with the wrinkle the week deals, through the shipped call session,
+graded by the rail's goals. The run read here: three sittings (2026-11-02, 03 and 04, dates no census
+uses), three policies on the same crowds, 135 days. Its first 28 rows reproduced a run killed earlier
+to the character.
+
+| policy (brief driver; answer to *who drives*; answer to *where the cars go*) | clean days | weeks held | calls a day | calls flipping the day | real minutes a day, mean (median; range) | days at or under 8 min |
+|---|---|---|---|---|---|---|
+| *Fairness first*; keep; park (swarm DO's player member) | **40 of 45** | **8 of 9** | 4.49 | 93 | **7.8** (7.5; 4.5 to 14.3) | 27 of 45 |
+| *Fairness first*; keep; spread | **41 of 45** | **9 of 9** | 4.51 | 84 | **7.8** (7.7; 4.4 to 13.6) | 23 of 45 |
+| the house: *Conventional collective*; leave; leave | **11 of 45** | **0 of 9** | 4.07 | 83 | **14.6** (14.0; 9.6 to 23.2) | 0 of 45 |
+
+Real minutes are the ended run at the default rung with [§ D1266](#d1266)'s skip, the pause at a
+call not counted. A sitting of three weeks is 113 to 122 real minutes under either *Fairness first*
+policy and 213 to 224 under the house.
+
+**What this says, and what it does not.**
+
+1. **A fixed policy still holds Midtown's week.** Both *Fairness first* policies held 17 of 18 weeks
+   between them over three sittings, and the one week lost (the sitting of 2026-11-03, week 2, under park) missed
+   by one day. Swarm DO's finding that one fixed policy wins survives a second set of crowds: that is the
+   score-8 test's failing condition, measured.
+2. **The two *Fairness first* policies are not ranked.** They gave the same verdict on 44 of the 45
+   days; the one they split is the fire drill the park policy lost. Nothing here says which placement
+   answer is better, and no interval is offered.
+3. **Where they lose, it is Friday's shaft and mostly with nothing to decide.** Six of the nine missed
+   days are day 5, and on all six the stage raised one call that flipped nothing: the day was lost
+   with no call that could have saved it. The other three are a fire drill whose six calls all
+   flipped the day, and one conference, missed under both policies, with three calls and no flip.
+4. **The house loses 34 of 45 days and never holds a week**, mostly on the worst wait (31 of its
+   missed goals) and the queue (12). No house day cleared where the park policy missed.
+5. **Pacing, beside [§ D1266](#d1266).** A day played by either *Fairness first* policy is 7.8 real
+   minutes at the mean over these three sittings, inside the ruling's eight; Friday's is about ten.
+   The house's day is nearly twice as long because its minute waits are played at the player's rung.
+
+**Not established.** Any policy that answers a call by what the stage shows rather than by a fixed
+rule; any tower but Midtown; more than three sittings (the sweep's default of eight was not run);
+which answer a flipping call's other runs favoured, which the bot records only as a flip and the
+census ([§ D1264](#d1264)) records in full.

@@ -150,6 +150,42 @@ describe('the card', () => {
   });
 
   /*
+   * § D1265, wave AM lane AM-F: a call drawn inside the day's wrinkle says which wrinkle and since
+   * when, from the schedule, and nothing else new: the same heading, question and answers, and the
+   * car line where the wrinkle took a car. A peak call draws no such line.
+   */
+  it('names the day’s wrinkle and when it began on a call drawn inside it, and nowhere else', () => {
+    const car = [{ carId: 'C', awayAtS: 19_800, backAtS: 28_800 }];
+    const start: PressCall = {
+      atS: 19_800,
+      rule: 'wrinkle-start',
+      carId: 'C',
+      awayAtS: 19_800,
+      backAtS: 28_800,
+      act: { startS: 19_800, endS: 28_800 },
+      carAway: true,
+      wrinkle: { name: 'Move-in day', startS: 19_800 },
+    };
+    const inside: PressCall = { ...start, atS: 21_000, rule: 'first-minute-wait' };
+    const startCard = stageCallCardOf(start, DAY_START_S, car);
+    expect(startCard.facts.at(-1)).toBe('Move-in day: under way since 13:30.');
+    /* The car line comes first, as on every call with a car out; no peak line on a wrinkle's start. */
+    expect(startCard.facts[0]).toMatch(/^Car C\b/u);
+    expect(startCard.facts.some((fact) => /peak/iu.test(fact))).toBe(false);
+    expect(stageCallCardOf(inside, DAY_START_S, car).facts).toContain('Move-in day: under way since 13:30.');
+    expect(stageCallCardOf(inside, DAY_START_S, car).facts).toContain(STAGE_CALL_COPY.minute);
+    const { wrinkle: _dropped, ...peakCall } = inside;
+    expect(stageCallCardOf(peakCall, DAY_START_S, car).facts.some((fact) => fact.includes('under way'))).toBe(false);
+    for (const call of [start, inside]) {
+      const card = stageCallCardOf(call, DAY_START_S, car);
+      expect([card.heading, card.question]).toEqual([STAGE_CALL_COPY.heading, STAGE_CALL_COPY.question]);
+      for (const text of [card.heading, ...card.facts, card.question, ...card.options.map((option) => option.label)]) {
+        for (const [what, pattern] of BANNED) expect(pattern.test(text), `${what}: ${text}`).toBe(false);
+      }
+    }
+  });
+
+  /*
    * § D1150, the post-AJ panel's seats A (D4) and D (H6): *What do the cars that are left do?* at
    * 08:36 on Midtown's Monday, with car D out only from 10:30. The question names a car being away,
    * so it is asked exactly where the card's own facts name one — on either kind of call.

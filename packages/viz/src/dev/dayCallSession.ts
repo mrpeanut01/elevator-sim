@@ -64,11 +64,13 @@ import {
   DAY_CALL_MAX,
   DAY_CALL_MAX_TRIES,
   DAY_CALL_PER_PEAK,
+  DAY_CALL_PER_WRINKLE,
   DAY_CALL_REPEAT_S,
   DAY_CALL_SPACING_S,
   dayCallAdmits,
   dayCallChangeOf,
   dayCallDriversOf,
+  dayCallIsWrinkle,
   dayCallLostGoalOf,
   dayCallRecordOf,
   dayCallSearchFrom,
@@ -80,6 +82,7 @@ import {
   type DayCallQuestion,
   type DayCallRecord,
   type DayCallsQuiet,
+  type DayCallWrinkle,
 } from '../shift/dayCalls.js';
 import { goalPlainNameOf, readGoals } from '../shift/goals.js';
 import { shiftObservationsOf } from '../shift/observations.js';
@@ -146,6 +149,14 @@ export interface DayCallSessionOpening {
    * goes on from the spacing after the last of them. Absent, the session opens at the day's start.
    */
   readonly resume?: DayCallResume | undefined;
+  /**
+   * **The day's wrinkle, where it has a window** — `dev/state.ts#dayCallFactsOf`'s reading of the
+   * run's own plan, wave AM lane AM-F, [§ D1265](../../../../DECISIONS.md). On a whole day where it
+   * lies clear of every peak it is searched as one more stretch, holds at most
+   * {@link DAY_CALL_PER_WRINKLE} raised call, and its call is not counted against
+   * {@link DAY_CALL_MAX}. Absent, the day is searched in its peaks alone, as before.
+   */
+  readonly wrinkle?: DayCallWrinkle | undefined;
 }
 
 /** A pressing answer's run, and the log entry it was made with. */
@@ -312,8 +323,27 @@ export function openDayCallSession(
       acts: actsOf(recording.demandPhases),
       startedAt: recording.startedAt,
       endedAt: recording.endedAt,
+      wrinkle: opening.wrinkle,
     };
   }
+
+  /*
+   * § D1265: a call raised inside the day's wrinkle is the wrinkle's own, so it is not counted
+   * against the day's cap of six. Read off the record's instant against the opening's window, which
+   * a resumed session is opened with too, so a resume counts exactly as an unbroken session does.
+   */
+  const wrinkleWindow = opening.wrinkle;
+  function inWrinkle(atS: number): boolean {
+    return (
+      opening.horizon === 'whole-day' &&
+      wrinkleWindow !== undefined &&
+      atS >= wrinkleWindow.startS &&
+      atS < wrinkleWindow.endS &&
+      !actsOf(standing.demandPhases).some((act) => atS >= act.startS && atS < act.endS)
+    );
+  }
+  /* Each asked candidate in the wrinkle may cost a try; its one call gets two more. */
+  const maxTries = DAY_CALL_MAX_TRIES + (wrinkleWindow === undefined ? 0 : 2 * DAY_CALL_PER_WRINKLE);
 
   function stop(): void {
     done = true;
@@ -344,16 +374,21 @@ export function openDayCallSession(
   function askNext(): void {
     pending = undefined;
     if (done) return;
-    if (records.length >= DAY_CALL_MAX || asked >= DAY_CALL_MAX_TRIES) {
+    const peakCalls = records.filter((record) => !inWrinkle(record.atS)).length;
+    if (peakCalls >= DAY_CALL_MAX || asked >= maxTries) {
       ending ??= 'finished';
       stop();
       return;
     }
     let call = nextDayCallOf(inputOf(standing), searchFromS);
-    /* § D1205: a peak that has raised its two asks nothing more; the search moves to the next. */
+    /*
+     * § D1205: a peak that has raised its two asks nothing more; the search moves to the next. The
+     * day's wrinkle is held to its one (§ D1265), the same way.
+     */
     while (call?.act !== undefined) {
       const peakS = call.act.startS;
-      if (raisedInPeak.filter((startS) => startS === peakS).length < DAY_CALL_PER_PEAK) break;
+      const cap = dayCallIsWrinkle(call) ? DAY_CALL_PER_WRINKLE : DAY_CALL_PER_PEAK;
+      if (raisedInPeak.filter((startS) => startS === peakS).length < cap) break;
       searchFromS = call.act.endS;
       call = nextDayCallOf(inputOf(standing), searchFromS);
     }

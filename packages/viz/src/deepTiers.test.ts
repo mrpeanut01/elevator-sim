@@ -593,6 +593,29 @@ const TIERS: Readonly<Record<string, Tier>> = Object.freeze({
       'is re-run by hand when the skip rule, the call rule, a building or a demand template moves',
     scheduled: false,
   },
+  'packages/viz/src/everyday/callFlip.sweep.test.ts': {
+    gates: ['CALL_FLIP_SWEEP'],
+    reason:
+      'Wave AM’s instrument, § D1264 — Midtown’s days 1 to 5 with each day’s own wrinkle over the ' +
+      'week census’s held-out crowds, played by the sitting bot’s fixed policies through the shipped ' +
+      'call session, and every raised call’s three runs graded with the day’s goals: how often the ' +
+      'other answer flips the day’s verdict on its crowd. It produced § D1264’s published table. Not ' +
+      'scheduled because it is a compute job rather than a check: dayCallSession.test.ts pins the ' +
+      'session and its records on every run, and a nightly re-derivation would write figures nothing ' +
+      'reads. It is re-run by hand when the call rule, a building, a demand template or a goal bar moves',
+    scheduled: false,
+  },
+  'packages/viz/src/everyday/sittingBot.sweep.test.ts': {
+    gates: ['SITTING_BOT_SWEEP'],
+    reason:
+      'Wave AM’s instrument, § D1267, swarm DO’s score-8 test — whole sittings on one tower, three ' +
+      'weeks of counted days rolled by the product’s own nextDay on the crowds one device is dealt, ' +
+      'each day played by a fixed policy through the shipped call session: which fixed policies clear ' +
+      'which weeks, and a day’s real length at the default rung. Not scheduled because it is a compute ' +
+      'job rather than a check, on the same argument as the two sweeps beside it; it is re-run by hand ' +
+      'when a week order, the call rule, a building or a goal bar moves',
+    scheduled: false,
+  },
   'packages/viz/src/everyday/stagePace.sweep.test.ts': {
     gates: ['STAGE_PACE_SWEEP'],
     reason:

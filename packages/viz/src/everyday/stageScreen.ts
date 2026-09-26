@@ -1698,7 +1698,8 @@ function mountStage(
   }
 
   /**
-   * **Skip the quiet between a scored whole day's peaks** — [§ D1212](../../../../DECISIONS.md),
+   * **Skip the quiet of a scored whole day** — [§ D1212](../../../../DECISIONS.md), which skipped
+   * between its peaks, widened by [§ D1266](../../../../DECISIONS.md) to anywhere in the day;
    * `everyday/stagePace.ts#stageSkipOf`'s rule.
    *
    * Asked from {@link pace} on every playing frame. Where the rule applies, the first frame starts
@@ -1734,6 +1735,8 @@ function mountStage(
       armedAtS: skipArmedAtS,
       simPerRealS: playback.speed,
       stopAtS: activeCall()?.call.atS,
+      /* § D1266: after the last peak the skip may land on the day's end. */
+      endedAt: recording.endedAt,
     });
     if (skip === undefined) return;
     skipArmedAtS = undefined;

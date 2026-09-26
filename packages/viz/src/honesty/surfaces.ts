@@ -11989,6 +11989,7 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
      */
     'everyday/stageCall.ts#stageCallCardOf',
     'everyday/stageCall.ts#STAGE_CALL_COPY',
+    'everyday/stageCall.ts#stageCallWrinkleLineOf',
     /*
      * Wave AL, lane AL-E, § D1219: each answered call's row on the stage once its window can be
      * observed. Seeded below over a call on this case's own run at a playhead the call plus 660 s
@@ -12442,6 +12443,21 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
         { atS: act.startS, rule: 'act-start', carId, awayAtS, backAtS: null, act },
         /* § D1150: an ordinary call with no car out, whose question is about all the cars. */
         { atS: recording.startedAt + span * 0.15, rule: 'first-minute-wait', carId: '', awayAtS: recording.startedAt + span * 0.15, backAtS: null, act: undefined, carAway: false },
+        /*
+         * § D1265: an ordinary call at the start of the day's wrinkle, clear of the peaks, with the
+         * wrinkle's own name and clock on its card. Named from `SHIFT_EVENTS`' move-in, the wrinkle
+         * Midtown's Tuesday deals, so the line is the one a player meets.
+         */
+        {
+          atS: recording.startedAt + span * 0.7,
+          rule: 'wrinkle-start',
+          carId: '',
+          awayAtS: recording.startedAt + span * 0.7,
+          backAtS: null,
+          act: { startS: recording.startedAt + span * 0.7, endS: recording.startedAt + span * 0.8 },
+          carAway: false,
+          wrinkle: { name: SHIFT_EVENTS['move-in']?.name ?? 'Move-in day', startS: recording.startedAt + span * 0.7 },
+        },
       ];
       /* Two cars out together where the building has two, so the plural line is swept too. */
       const secondCarId = recording.shafts[1]?.carId;

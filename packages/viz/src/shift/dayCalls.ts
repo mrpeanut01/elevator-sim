@@ -327,6 +327,48 @@ export interface DayCallOnStage {
   readonly drivers?: DayCallDriverNames | undefined;
 }
 
+/**
+ * **The day's wrinkle, as a stretch the stage may call in** — wave AM, lane AM-F,
+ * [§ D1265](../../../../DECISIONS.md), swarm DO § 4's *a wrinkle's own call, inside its window*.
+ *
+ * Where the day's wrinkle is: the car it takes, from when to when (a move-in, a shaft out), or its
+ * episode on the day's clock (a conference). `dev/state.ts#dayCallFactsOf` reads it off the run's
+ * own plan, so it is the schedule the run was built from and nothing measured after the playhead.
+ * `name` is the wrinkle's own name, `shift/types.ts#ShiftEvent.name`, for the card.
+ */
+export interface DayCallWrinkle {
+  readonly startS: SimTime;
+  readonly endS: SimTime;
+  readonly name: string;
+}
+
+/**
+ * **At most one raised call in the day's wrinkle** — [§ D1265](../../../../DECISIONS.md). The
+ * wrinkle's own call; a crowded wrinkle does not become a peak of its own. It is **not** counted
+ * against {@link DAY_CALL_MAX}, so a wrinkle between the peaks cannot spend the evening's calls.
+ * Owner-reversible: it is this one constant.
+ */
+export const DAY_CALL_PER_WRINKLE = 1;
+
+/**
+ * **Whether a whole day's wrinkle is a stretch of its own to call in**: it lies clear of every peak.
+ * A wrinkle that overlaps a peak (the fire drill, whose episode is at the day's peak level and so is
+ * an act of its own, `shift/dayLength.ts#actsOf`) is already called in as that peak, and a window of
+ * no length is no stretch.
+ */
+export function dayCallWrinkleWindowOf(
+  wrinkle: DayCallWrinkle | undefined,
+  acts: readonly DayAct[],
+): DayCallWrinkle | undefined {
+  if (wrinkle === undefined || !(wrinkle.endS > wrinkle.startS)) return undefined;
+  return acts.some((act) => act.startS < wrinkle.endS && wrinkle.startS < act.endS) ? undefined : wrinkle;
+}
+
+/** Whether `call` was drawn inside the day's wrinkle rather than a peak. */
+export function dayCallIsWrinkle(call: Pick<PressCall, 'wrinkle'>): boolean {
+  return call.wrinkle !== undefined;
+}
+
 /** Everything a candidate is derived from. Plain data from the run's own record. */
 export interface DayCallInput {
   /** The run on the stage — every press before the candidate is in it, and none after. */
@@ -338,6 +380,11 @@ export interface DayCallInput {
   readonly acts: readonly DayAct[];
   readonly startedAt: SimTime;
   readonly endedAt: SimTime;
+  /**
+   * The day's wrinkle, where it has a window ({@link DayCallWrinkle}); read only on a whole day, and
+   * only where it lies clear of every peak ({@link dayCallWrinkleWindowOf}).
+   */
+  readonly wrinkle?: DayCallWrinkle | undefined;
 }
 
 /**
@@ -364,14 +411,22 @@ function carAwayAt(bookedOut: readonly BookedOutCar[], atS: SimTime): BookedOutC
  *
  * - **A whole day**: the first peak that ends after `fromS`. Inside it, rule 1 from
  *   `max(fromS, peak start)`; failing that, the peak's start, when that is not already past. A peak
- *   with neither yields to the next.
+ *   with neither yields to the next. **The day's wrinkle is searched as one more stretch** where it
+ *   lies clear of every peak ([§ D1265](../../../../DECISIONS.md)): rule 1 inside it, and failing
+ *   that its start (`wrinkle-start`), in time order with the peaks. Its calls carry the wrinkle as
+ *   their `act`, so the session holds them to {@link DAY_CALL_PER_WRINKLE}.
  * - **A slice**: rule 1 from `fromS`, and only while at least {@link DAY_CALL_SPACING_S} of the run
  *   is left to answer into. No rule 2: a slice's one act is the whole run, and its start is the
  *   stage opening, which is not a moment to call.
  */
 export function nextDayCallOf(input: DayCallInput, fromS: SimTime): PressCall | undefined {
   const lastS = input.endedAt - DAY_CALL_SPACING_S;
-  const callAt = (atS: SimTime, rule: PressCallRule, act: DayAct | undefined): PressCall => {
+  const callAt = (
+    atS: SimTime,
+    rule: PressCallRule,
+    act: DayAct | undefined,
+    wrinkle?: DayCallWrinkle | undefined,
+  ): PressCall => {
     const car = carAwayAt(input.bookedOut, atS);
     return Object.freeze({
       atS,
@@ -381,18 +436,25 @@ export function nextDayCallOf(input: DayCallInput, fromS: SimTime): PressCall | 
       backAtS: car === undefined ? null : car.backAtS,
       act,
       carAway: car !== undefined,
+      ...(wrinkle === undefined ? {} : { wrinkle: Object.freeze({ name: wrinkle.name, startS: wrinkle.startS }) }),
     });
   };
   if (input.horizon === 'whole-day') {
-    const acts = [...input.acts].sort((a, b) => a.startS - b.startS);
-    for (const act of acts) {
+    const wrinkle = dayCallWrinkleWindowOf(input.wrinkle, input.acts);
+    const stretches: { readonly act: DayAct; readonly wrinkle: DayCallWrinkle | undefined }[] = [
+      ...input.acts.map((act) => ({ act, wrinkle: undefined })),
+      ...(wrinkle === undefined ? [] : [{ act: { startS: wrinkle.startS, endS: wrinkle.endS }, wrinkle }]),
+    ].sort((a, b) => a.act.startS - b.act.startS);
+    for (const { act, wrinkle: within } of stretches) {
       if (act.endS <= fromS) continue;
       const from = Math.max(fromS, act.startS);
       const until = Math.min(act.endS, lastS);
       if (!(from < until)) continue;
       const waited = firstMinuteWaitIn(input.legs, from, until);
-      if (waited !== undefined) return callAt(waited, 'first-minute-wait', act);
-      if (act.startS >= fromS && act.startS < until) return callAt(act.startS, 'act-start', act);
+      if (waited !== undefined) return callAt(waited, 'first-minute-wait', act, within);
+      if (act.startS >= fromS && act.startS < until) {
+        return callAt(act.startS, within === undefined ? 'act-start' : 'wrinkle-start', act, within);
+      }
     }
     return undefined;
   }

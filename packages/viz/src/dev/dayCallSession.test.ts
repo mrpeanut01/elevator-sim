@@ -26,12 +26,14 @@ import {
   DAY_CALL_MAX,
   DAY_CALL_MAX_TRIES,
   DAY_CALL_PER_PEAK,
+  DAY_CALL_PER_WRINKLE,
   DAY_CALL_REPEAT_S,
   DAY_CALL_SPACING_S,
   dayCallAdmits,
   dayCallDriversOf,
   longWaitRidersIn,
   type DayCallAnswer,
+  type DayCallWrinkle,
 } from '../shift/dayCalls.js';
 import { goalsForDay } from '../shift/goals.js';
 import type { PressCall } from '../shift/pressCall.js';
@@ -511,7 +513,7 @@ function calmBetween(recording: VizRecording, fromS: number, toS: number): VizRe
 const peakIndexOf = (atS: number): number => PEAKS.findIndex(([from, to]) => from <= atS && atS < to);
 
 /** Park empties the landings; spread and every handover leave the day as it was. */
-function placementSessionOn(day: VizRecording, pinnedCall?: PressCall) {
+function placementSessionOn(day: VizRecording, pinnedCall?: PressCall, wrinkle?: DayCallWrinkle) {
   return openDayCallSession(
     {
       planWith: fakePlan,
@@ -521,9 +523,67 @@ function placementSessionOn(day: VizRecording, pinnedCall?: PressCall) {
       cancel: () => {},
       changed: () => {},
     },
-    { recording: day, bookedOut: [], horizon: 'whole-day', pinnedCall },
+    { recording: day, bookedOut: [], horizon: 'whole-day', pinnedCall, wrinkle },
   );
 }
+
+describe('wave AM: the day’s wrinkle asks once, outside the day’s cap — § D1265', () => {
+  /* Between the first two peaks, where no peak rule reaches. */
+  const wrinkle: DayCallWrinkle = { startS: 2000, endS: 2800, name: 'Move-in day' };
+  const inWrinkle = (atS: number): boolean => atS >= wrinkle.startS && atS < wrinkle.endS;
+
+  it('raises one call in the wrinkle and still two in every peak, so the evening keeps its calls', () => {
+    const session = placementSessionOn(threePeakDay(), undefined, wrinkle);
+    const raised: { atS: number; wrinkle: string | undefined }[] = [];
+    for (let call = session.onStage(); call?.raised === true; call = session.onStage()) {
+      raised.push({ atS: call.call.atS, wrinkle: call.call.wrinkle?.name });
+      session.answer('leave', () => {});
+    }
+    const clocks = session.records().map((record) => record.atS);
+    expect(clocks.filter(inWrinkle).length).toBe(DAY_CALL_PER_WRINKLE);
+    expect(PEAKS.map((_, index) => clocks.filter((atS) => peakIndexOf(atS) === index).length)).toEqual([
+      DAY_CALL_PER_PEAK,
+      DAY_CALL_PER_PEAK,
+      DAY_CALL_PER_PEAK,
+    ]);
+    /* Six in the peaks is the day's cap, and the wrinkle's one is on top of it. */
+    expect(clocks.length).toBe(DAY_CALL_MAX + DAY_CALL_PER_WRINKLE);
+    /* The card is told the call is the wrinkle's, and only that one. */
+    expect(raised.filter((call) => call.wrinkle !== undefined).map((call) => call.atS)).toEqual(clocks.filter(inWrinkle));
+  });
+
+  it('asks nothing between the peaks without it — the negative control', () => {
+    const session = placementSessionOn(threePeakDay());
+    while (session.onStage()?.raised === true) session.answer('leave', () => {});
+    expect(session.records().filter((record) => inWrinkle(record.atS))).toEqual([]);
+  });
+
+  it('a resumed session counts the wrinkle’s call as an unbroken one does', () => {
+    const unbroken = placementSessionOn(threePeakDay(), undefined, wrinkle);
+    while (unbroken.onStage()?.raised === true) unbroken.answer('leave', () => {});
+    const first = placementSessionOn(threePeakDay(), undefined, wrinkle);
+    /* Answer up to and including the wrinkle's call, then resume from the snapshot. */
+    for (let call = first.onStage(); call?.raised === true; call = first.onStage()) {
+      const at = call.call.atS;
+      first.answer('leave', () => {});
+      if (inWrinkle(at)) break;
+    }
+    const resumed = openDayCallSession(
+      {
+        planWith: fakePlan,
+        simulate: (runs, done) => {
+          const day = threePeakDay();
+          done(runs.map((run) => (pressOf(run).change.kind === 'park-cars-lobby' ? calmAfter(day, pressOf(run).atS) : day)));
+        },
+        cancel: () => {},
+        changed: () => {},
+      },
+      { recording: threePeakDay(), bookedOut: [], horizon: 'whole-day', wrinkle, resume: first.snapshot() },
+    );
+    while (resumed.onStage()?.raised === true) resumed.answer('leave', () => {});
+    expect(resumed.records().map((record) => record.atS)).toEqual(unbroken.records().map((record) => record.atS));
+  });
+});
 
 describe('wave AL: calls across the whole day — § D1205', () => {
   const profiles = (): readonly DispatcherProfile[] => PRESS_DAY_RESOURCES.dispatcherProfiles.profiles;

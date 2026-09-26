@@ -2123,6 +2123,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
           pinnedCall: facts.pinned ? pinnedCall : undefined,
           /* § D1218: where a resumed attempt's session stood, § D1205's memory with it. */
           resume,
+          /* § D1265: the day's wrinkle, a stretch of its own to call in where it is clear of the peaks. */
+          wrinkle: facts.wrinkle,
         },
       );
     } else if (dayCallSession.recording() !== recording) {

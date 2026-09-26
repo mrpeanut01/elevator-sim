@@ -28,9 +28,9 @@ export interface ScoredDayPlay {
 
 /**
  * **How long a scored whole day takes to watch, from its legs** — § D1169's pacing with § D1212's
- * skip, as the stage plays it with no chip pressed: the watching rung while somebody on a landing
- * has waited a minute, the fast rung otherwise, and between two peaks every quiet stretch of at least
- * two beats played for one beat and then skipped to its end. `stopsAtS` are the instants the stage
+ * skip as § D1266 widened it, as the stage plays it with no chip pressed: the watching rung while
+ * somebody on a landing has waited a minute, the fast rung otherwise, and anywhere in the day every
+ * quiet stretch of at least two beats played for one beat and then skipped to its end. `stopsAtS` are the instants the stage
  * stops at (the calls it raises and the candidates it waits at), which end a stretch as they end a
  * skip. `skip: false` is § D1169's day without the skip, the *before* of § D1212's measurement. The
  * pause at a stop is the player's and is not counted.
@@ -45,7 +45,13 @@ export function scoredDayPlayOf(input: {
   readonly endedAt: number;
   readonly stopsAtS: readonly number[];
   readonly watchingSimPerRealS: number;
-  readonly skip: boolean;
+  /**
+   * `true` is the skip as the stage takes it now, anywhere in the day ([§ D1266](../../../../DECISIONS.md));
+   * `'between-peaks'` is [§ D1212](../../../../DECISIONS.md)'s skip as it shipped, only between two
+   * peaks, kept so a sweep can publish the step from one to the other on one tree; `false` is
+   * § D1169's day with no skip.
+   */
+  readonly skip: boolean | 'between-peaks';
   readonly untilS?: number | undefined;
 }): ScoredDayPlay {
   const until = Math.min(input.untilS ?? input.endedAt, input.endedAt);
@@ -71,27 +77,32 @@ export function scoredDayPlayOf(input: {
   for (const [a, b] of slow) slowS += overlap(a, b, input.startedAt, until);
   let skippedS = 0;
   let skips = 0;
-  if (input.skip) {
-    const acts = [...input.acts].sort((a, b) => a.startS - b.startS);
-    for (let i = 0; i + 1 < acts.length; i += 1) {
-      const gapFrom = acts[i]!.endS;
-      const gapTo = acts[i + 1]!.startS;
-      /* The gap, less the slow set, cut at every stop: the stretches the stage enters fast. */
-      const cuts = [gapFrom, gapTo];
-      for (const [a, b] of slow) {
-        if (b > gapFrom && a < gapTo) cuts.push(Math.max(a, gapFrom), Math.min(b, gapTo));
-      }
-      for (const stop of input.stopsAtS) if (stop > gapFrom && stop < gapTo) cuts.push(stop);
-      const edges = [...new Set(cuts)].sort((a, b) => a - b);
-      for (let j = 0; j + 1 < edges.length; j += 1) {
-        const x = edges[j]!;
-        const y = edges[j + 1]!;
-        const mid = (x + y) / 2;
-        if (slow.some(([a, b]) => mid >= a && mid < b)) continue;
-        if (y - x < 2 * beatSimS) continue;
-        if (x + beatSimS < until) skips += 1;
-        skippedS += overlap(x + beatSimS, y, input.startedAt, until);
-      }
+  /*
+   * The ranges the skip may cross: the whole day since § D1266, landing on a peak's start, a stop or
+   * the run's end; only the gaps between two peaks under § D1212 as it shipped.
+   */
+  const acts = [...input.acts].sort((a, b) => a.startS - b.startS);
+  const ranges: [number, number][] = [];
+  if (input.skip === 'between-peaks') {
+    for (let i = 0; i + 1 < acts.length; i += 1) ranges.push([acts[i]!.endS, acts[i + 1]!.startS]);
+  } else if (input.skip && acts.length > 0) {
+    ranges.push([input.startedAt, input.endedAt]);
+  }
+  for (const [from, to] of ranges) {
+    /* The range, less the slow set, cut at every stop and every peak's start: the stretches the stage enters fast. */
+    const cuts = [from, to];
+    for (const [a, b] of slow) if (b > from && a < to) cuts.push(Math.max(a, from), Math.min(b, to));
+    for (const stop of input.stopsAtS) if (stop > from && stop < to) cuts.push(stop);
+    for (const act of acts) if (act.startS > from && act.startS < to) cuts.push(act.startS);
+    const edges = [...new Set(cuts)].sort((a, b) => a - b);
+    for (let j = 0; j + 1 < edges.length; j += 1) {
+      const x = edges[j]!;
+      const y = edges[j + 1]!;
+      const mid = (x + y) / 2;
+      if (slow.some(([a, b]) => mid >= a && mid < b)) continue;
+      if (y - x < 2 * beatSimS) continue;
+      if (x + beatSimS < until) skips += 1;
+      skippedS += overlap(x + beatSimS, y, input.startedAt, until);
     }
   }
   const spanS = until - input.startedAt;

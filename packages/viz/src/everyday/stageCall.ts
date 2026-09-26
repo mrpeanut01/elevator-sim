@@ -230,6 +230,12 @@ export function stageCallCardOf(
   ) {
     facts.push(`The peak opened at ${clockAt(call.act.startS, dayStartS)}.`);
   }
+  /*
+   * § D1265: a call drawn inside the day's wrinkle says so, from the schedule the run was built on:
+   * the wrinkle's name and when it began. At its start that is the call's only fact besides the car
+   * line; inside it, beside the minute line.
+   */
+  if (call.wrinkle !== undefined) facts.push(stageCallWrinkleLineOf(call.wrinkle, dayStartS));
   if (present !== undefined) facts.push(presentLineOf(present));
   if (drivers !== undefined) {
     return Object.freeze({
@@ -261,6 +267,19 @@ export function stageCallCardOf(
       Object.freeze({ label: STAGE_CALL_COPY.leave, change: undefined, answer: 'leave' as const }),
     ]),
   });
+}
+
+/**
+ * **The card's line for a call drawn inside the day's wrinkle** — wave AM, lane AM-F,
+ * [§ D1265](../../../../DECISIONS.md). The wrinkle's own name and the clock it began at, both from
+ * the schedule the run was built on: *Move-in day: under way since 13:30.* Nothing about what the
+ * wrinkle will do next.
+ */
+export function stageCallWrinkleLineOf(
+  wrinkle: { readonly name: string; readonly startS: number },
+  dayStartS: number | undefined,
+): string {
+  return `${wrinkle.name}: under way since ${clockAt(wrinkle.startS, dayStartS)}.`;
 }
 
 /** One line per return time, naming every booked-out car that is away at the call. */

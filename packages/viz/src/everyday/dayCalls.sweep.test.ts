@@ -210,6 +210,8 @@ describe.runIf(process.env['DAY_CALLS_SWEEP'] === '1')('§ D1166–§ D1169, § 
                   horizon: facts.horizon,
                   goals: shiftGoalsOf(state, resources),
                   drivers: pair === undefined ? undefined : { profiles: resources.dispatcherProfiles.profiles, driving },
+                  /* § D1265: the day's wrinkle, as `dev/main.ts` opens the session with it. */
+                  wrinkle: facts.wrinkle,
                   pinnedCall: facts.pinned ? pinned : undefined,
                 },
               );
