@@ -79,6 +79,7 @@ import type {
 import type { ViewMode } from '../mode/types.js';
 import { MOOD_GLYPH, buildingMood, moodObservationsOf, type BuildingMood } from '../render/mood.js';
 import { contractById } from '../shift/contracts.js';
+import { weekNeedOf } from '../shift/weekStake.js';
 import { bookedOutCarsOf, wrinkleNameOf, wrinkleNoteOf } from '../shift/bookedOut.js';
 import { scheduledEventFor } from '../shift/calendar.js';
 import { eventAsRun } from '../shift/events.js';
@@ -523,9 +524,10 @@ export function runFiguresOf(week: WeekState): readonly RunFigure[] {
     },
     {
       value:
-        contract === undefined
+        /* The derived target where the week census speaks, and `—` for a week with none — § D1176. */
+        contract === undefined || weekNeedOf(contract) === 0
           ? PENDING_DISPLAY
-          : `${String(week.cleanRun)}/${String(contract.needClean)}`,
+          : `${String(week.cleanRun)}/${String(weekNeedOf(contract))}`,
       label: 'banked this scenario',
       color: BANKED,
     },

@@ -112,6 +112,7 @@ import type { VizRecording } from '../contract/types.js';
 import { measuredOf } from '../fixit/run.js';
 import type { FigureSpec, FixitCase } from '../fixit/types.js';
 import type { WeekState } from '../shift/types.js';
+import { daysWerePlayedOn } from '../shift/weekStake.js';
 import { plainLeversOf } from '../mode/plainLevers.js';
 import { PACE_HOLD_WAIT_S } from './stagePace.js';
 import {
@@ -177,8 +178,18 @@ export interface TutorialProgress {
  * [§ D1143](../../../../DECISIONS.md). Derived on every ask from what `persist/session.ts` already
  * restores (`week` and `parkedWeeks`); nothing new is stored, which is § 3.5.
  */
-export function filedDaysOf(weeks: readonly Pick<WeekState, 'history'>[]): number {
-  return weeks.reduce((sum, week) => sum + week.history.length, 0);
+export function filedDaysOf(
+  weeks: readonly Pick<WeekState, 'history' | 'bestMinutePct' | 'streak'>[],
+): number {
+  /*
+   * A week that rolled over (§ D1177) has an empty history and was played: it counts as at least
+   * one day filed, because at least seven were. `shift/weekStake.ts#daysWerePlayedOn` says how it
+   * is told apart from a fresh week.
+   */
+  return weeks.reduce(
+    (sum, week) => sum + Math.max(week.history.length, daysWerePlayedOn(week) ? 1 : 0),
+    0,
+  );
 }
 
 /**

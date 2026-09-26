@@ -1889,6 +1889,27 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'The week stake’s plumbing — wave AK, § D1176 to § D1178. `WEEK_LENGTH` is a number, derived ' +
+        'only because the region after it declares `DayStakeReason`’s switch values. `weekDealOf`, ' +
+        '`dayCountsToward`, `countedCleanOf`, `weekNeedOf`, `weekHasClosed`, `weekRollsOver` and ' +
+        '`weekAdmitsANewcomer` return a deal, counts or booleans: a dealt day carries a sentence, and ' +
+        'what a player reads of it is `dayStakeSentenceOf`, which the week adapter seeds for every ' +
+        'census tower. `houseRecordOf` returns a run record for the shell’s house run. What a player ' +
+        'reads from the module is seeded by name in `honesty/surfaces.ts#seedWeekStake`.',
+      ids: [
+        'shift/weekStake.ts#WEEK_LENGTH',
+        'shift/weekStake.ts#weekDealOf',
+        'shift/weekStake.ts#dayCountsToward',
+        'shift/weekStake.ts#countedCleanOf',
+        'shift/weekStake.ts#weekNeedOf',
+        'shift/weekStake.ts#weekHasClosed',
+        'shift/weekStake.ts#weekRollsOver',
+        'shift/weekStake.ts#weekAdmitsANewcomer',
+        'shift/weekStake.ts#houseRecordOf',
+      ],
+    },
+    {
+      reason:
         'The press-moment ruling’s plumbing — wave AI, § D1029. `admittedPressDayIds` and ' +
         '`pressDayMeasuredAs` return ids and a pin, and are derived only because they reach ' +
         '`contractLadderIssues`’ own call-block check, whose content-author strings the entry above ' +

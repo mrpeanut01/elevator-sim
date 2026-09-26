@@ -146,9 +146,12 @@ describe('the objective line counts what has been banked', () => {
       scenarioCardsOf(CONTRACTS, week, buildings).map((card) => [card.contractId, card]),
     );
     expect(byId.get('c2')?.objective).toBe('Clear 2 shifts — 1 of 2 banked');
-    // `c3` asks for three since issue #382 re-attached `needClean` to the new positions — the same
-    // 1, 2, 2, 2, 3, 3, 3, 3 ladder, on a ramp that no longer falls in the middle.
-    expect(byId.get('c3')?.objective).toBe('Clear 3 shifts');
+    /*
+     * `c3` asked for three since issue #382. Since § D1176 a tower the week census measured reads
+     * its target off the census, and Secure Tower's week counts no day, so it has none and says so
+     * rather than asking for three days that cannot bank. `c2`'s two above is the census's too.
+     */
+    expect(byId.get('c3')?.objective).toBe('No day of this week counts toward a target');
     expect(byId.get('c1')?.objective).toBe('Clear 1 shift');
   });
 

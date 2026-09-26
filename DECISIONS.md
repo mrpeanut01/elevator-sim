@@ -43956,6 +43956,8 @@ does not take it.
 
 ## D1047 — a newcomer's first scored day is a pinned press day, drawn off the date from the legible towers § D1029 admits, and nothing is stored
 
+> **Status 2026-09-26: NARROWED by [§ D1178](#d1178)** (an agent ruling). The first-day set is also filtered to towers whose week the census admits, which leaves Midtown Office alone.
+
 > **Status 2026-09-26: NARROWED by [§ D1141](#d1141)** (an agent ruling). A `?seed=` still deals a newcomer's crowd and may begin a week; it may not enter a week under way, where its run is practice. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Status 2026-09-25: AMENDED by [§ D1096](#d1096)** (an agent ruling). An address that only restates the date, its crowd or the tower its draw deals, deals the pinned day as a bare one does; a `?seed=` other than the date's still wins. See [`docs/39`](docs/39-decisions-in-force.md).
@@ -44414,6 +44416,8 @@ day-1 legibility row and every published day-1 miss rate is out of its reach. No
 or Free Play moves: neither stands on a rung.
 
 ## D1067 — DC-10: a day of the week is winnable only when a census says so, and a day that fails says what was measured
+
+> **Status 2026-09-26: AMENDED by [§ D1176](#d1176)** (an agent ruling). The census also decides which days count toward a week's target: a contested day counts, a declared breather does not.
 
 > **Taken 2026-09-25 by agent sessions under delegated authority**, the same swarm and the same
 > reconciliation as [§ D1066](#d1066). **Owner-reversible:** the thresholds and crowd counts in
@@ -46718,3 +46722,121 @@ rather than measured, and the long end is `sittingShape.ts#WHOLE_DAY_LONGEST`, m
 § D991. Since this rule's slow stretches are a subset of § D991's on every recording, that figure is
 now an upper bound rather than the longest day; the sixteen-contract re-measurement that would make
 it the longest again was not taken in wave AK.
+
+---
+
+## D1176 — only contested days count toward a census week, and its target is derived: counted days dealt, minus one
+
+> **Taken 2026-09-26 by agent sessions under delegated authority** (wave AK, lane AK-E, on swarm
+> DL's Q2 ruling, 3-0 on clause 1), not by the product owner. Owner-reversible clauses: *minus
+> one*; that a declared breather does not count; that a tower whose week counts no day has no
+> target rather than its authored one.
+
+**Date: 2026-09-26 · Owner: lane AK-E (wave AK) · The post-AJ panel's seat A (the week's target was
+met by Wednesday, and Saturday and Sunday could not be lost) · Rules on `shift/weekStake.ts`,
+`shift/week.ts#closeDay`, and the six readers of `contract.needClean` (`shift/report.ts`,
+`shift/tomorrow.ts`, `dev/scenariosPanel.ts`, `dev/leftRail.ts`). Amends [§ D1067](#d1067)'s reach:
+DC-10 now decides what counts, as well as what the brief says.**
+
+**Why an entry.** It moves a recorded, authored figure (`needClean`) on every tower the week census
+measured, and it binds the report, the rail, the scenario cards and the brief, none of which the
+census module owns.
+
+**What was wrong.** Midtown's `needClean` of 2 was authored. Swarm member S2 built the fourteen
+weeks the census's held-out crowds allow and found the standing order, left alone, banked two clean
+days on 14 of 14 of them, because Saturday and Sunday clear 20 of 20 crowds untouched. A player who
+pressed nothing met the week's target.
+
+**The ruling.**
+
+1. A day of a tower's week **counts** when the census measured that day as it is dealt (the same
+   day, the same wrinkle, at the slope the tower grows at now) and found it contested: DC-10's way
+   through and queue gate hold, and the standing order, left alone, misses at least a third of the
+   held-out crowds. A declared breather does not buy the second half here: it is admitted so a week
+   may have a quiet day, and a quiet day is one no play decides.
+2. Only a counted day banks toward the scenario. The streak is unchanged: it is about every day
+   played. A day that does not count is still dealt and played, and the brief and the week strip
+   each say in one sentence, with no advice, that it does not count and why.
+3. The target is the counted days dealt minus one, and at least one. A week with no counted day has
+   no target and says so. It is derived on every read and stored nowhere.
+4. Where the census does not speak for a tower (every slice tower and every whole-day tower in its
+   `unmeasured` block), nothing changes: every clean day counts toward the authored `needClean`.
+
+**Measured, off the shipped census.** Midtown's week as dealt counts Monday, Wednesday and Thursday:
+**2 of 3**. Tuesday's move-in and Friday's shaft-out fail the queue gate; Saturday and Sunday are
+cleared 20 of 20 left alone. Its unwrinkled week counts five days: **4 of 5**, S3's figure. Harbour
+Point counts day 1 alone, **1 of 1**. Secure Tower counts no day, so it has no target and cannot
+clear its scenario until a census admits one of its days; its card says so. Two of three on
+Midtown can be met by Wednesday, which the ruling's S1 recorded as the cost of a three-day week; the
+fix it named, re-authoring Tuesday's and Friday's wrinkles so more days are contested, is deferred.
+
+**Tested.** `shift/weekStake.test.ts` derives every measured tower's deal from the census and pins
+Midtown's two figures; `shift/week.test.ts` holds that a counted day banks, an uncounted one does
+not, and Midtown clears on two counted days and not on its weekend (red on the base tree, four of
+fifty-four).
+
+## D1177 — a census week closes on a sheet beside the house, on the same crowds, and rolls into a new week on the same tower
+
+> **Taken 2026-09-26 by agent sessions under delegated authority** (wave AK, lane AK-E, on swarm
+> DL's Q2 ruling, 3-0 on clause 3), not by the product owner. Owner-reversible clauses: the house
+> as the census's standing order untouched; that the closed week's days leave the history on the
+> roll.
+
+**Date: 2026-09-26 · Owner: lane AK-E (wave AK) · Rules on `shift/weekStake.ts#weekSheetOf`,
+`shift/week.ts#nextDay`, `shift/report.ts`'s forecast and *what this taught*,
+`everyday/weekView.ts`, and the house runs in `dev/main.ts`. Cites [§ D1176](#d1176),
+[§ D1138](#d1138).**
+
+**Why an entry.** It ends a week, which `week.ts#nextDay` never did, and the house runs are a new
+simulation the shell makes on the player's behalf.
+
+**The ruling.**
+
+1. A week the census speaks for **closes** once its last dealt day, day 7, is filed. Your week then
+   draws a sheet: your clean counted days, *Your week: 2 of the 3 counted days clean*; beside them
+   the house's, *The tower's standing order, left alone on the same crowds, cleared 1*; the target,
+   met or not; and a note that it is a tally over the crowds the player played, with the same
+   passengers on both sides, and not a ranking of dispatchers. It carries no interval, because it
+   claims nothing past these seven crowds.
+2. **The house** is the census's standing order with nothing pressed, no rule rows and no held car,
+   on each counted day's own record: the same seed, building and day, so common random numbers by
+   construction. A day that ran it untouched is its own house and costs nothing. Every other counted
+   day costs one run, off the painting thread, graded against the goals that day was graded
+   against. A run that has not answered reads *still being run*; a day the house cannot be run on
+   (no record of its crowd, a record this build cannot replay, or a run that failed) is named and
+   not counted for the house.
+3. The day report on the closing day says where the sheet is, and its tomorrow card says *a new
+   week: the tower as handed*.
+4. **The week rolls.** The morning after day 7 is day 1 of a new week on the same tower, counted
+   from zero, with every scenario cleared, the streak and the best day kept. Nothing is locked. The
+   closed week's days leave the history, because the history is keyed by day number and cannot hold
+   two Mondays, and with them the door's replay of those days; that loss is owner-reversible. The
+   two first-visit gates (the door's first-day line and the landing page) read a rolled week as
+   played, off the streak and best day it keeps (`shift/weekStake.ts#daysWerePlayedOn`), so a
+   returning player is not sent back to the walkthrough.
+
+**Tested.** `shift/weekStake.test.ts` (the sheet's rows and lines, its three house states and the
+roll), `everyday/weekView.test.ts` (the sheet reaches the week screen with the shell's readings),
+`shift/report.test.ts` (the closing day's two lines).
+
+## D1178 — a newcomer's first week is on a tower whose week the census admits
+
+> **Taken 2026-09-26 by agent sessions under delegated authority** (wave AK, lane AK-E, on swarm
+> DL's Q2 ruling, 3-0 on clause 4), not by the product owner. Owner-reversible clause: the
+> admission rule, day 1 counts and the week has room for one miss.
+
+**Date: 2026-09-26 · Owner: lane AK-E (wave AK) · Rules on `shift/firstSession.ts#FIRST_DAY_CONTRACT_IDS`
+and its line, and moves `shift/dailySeed.ts`'s rotation figures. Amends [§ D1047](#d1047).**
+
+**Why an entry.** It narrows § D1047's first-day set and moves figures that set's docstring publishes.
+
+**The ruling.** § D1047's set (legible, and a pinned press day § D1029 admits) is filtered to towers
+whose week the census admits: day 1 counts toward the week (§ D1176), and the target is below the
+counted days, so the week survives one miss. On the shipped census that is Midtown Office alone, so
+every date deals it. The draw, its stream and its pinned day are unchanged, and a tower joins the
+set on the commit its census row admits it. The door's line reads *the one tower* rather than a
+count, and names the week's half of the definition.
+
+**Moved.** `shift/dailySeed.ts`'s rotation figures go to their ceiling, 99.9 % and 729 (were 66.2 %
+and 119): with one member every date after the first repeats it, which is the ruling's intent rather
+than a collision rate.

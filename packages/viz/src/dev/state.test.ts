@@ -31,6 +31,7 @@ import { patternIsDirty, specFromTrafficProfile } from '../authoring/patternSpec
 import { asBuiltChoices, withBankChoice } from '../commissioning/choices.js';
 import { commissionableClasses } from '../commissioning/types.js';
 import { recordRun } from '../record/recordRun.js';
+import { scheduledEventFor } from '../shift/calendar.js';
 import { contractById, contractForBuilding } from '../shift/contracts.js';
 import { goalsForDay } from '../shift/goals.js';
 import { SANDBOX_CONTRACT_ID, closeDay, outcomeOf } from '../shift/week.js';
@@ -288,7 +289,11 @@ describe('withBuilding', () => {
           recordRefusal: null,
           day,
           dayIdx: (day - 1) % 7,
-          eventId: 'ordinary',
+          /*
+           * The wrinkle the day is dealt: since § D1176 only a day the week census measured as it
+           * is dealt counts toward Midtown’s target, and an `ordinary` Tuesday is not that day.
+           */
+          eventId: scheduledEventFor(null, day, (day - 1) % 7, 'whole-day').id,
           arrived: 40,
           carried: 40,
           minutePct: 100,

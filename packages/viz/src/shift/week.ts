@@ -40,6 +40,7 @@
 import type { WatchRecord } from '../watch/types.js';
 
 import { CONTRACTS, contractById, FIRST_CONTRACT_ID, nextContract } from './contracts.js';
+import { dayCountsToward, weekNeedOf, weekRollsOver } from './weekStake.js';
 import {
   weekdayOf,
   type ClearedAward,
@@ -493,7 +494,14 @@ export function closeDay(week: WeekState, outcome: DayOutcome, recordGrew = fals
     : wasGraded(outcome.readings)
       ? 0
       : base.streak;
-  const cleanRun = outcome.allMet ? base.cleanRun + 1 : base.cleanRun;
+  /*
+   * **Only a day that counts banks toward the scenario** — [§ D1176](../../../../DECISIONS.md).
+   * Where the week census speaks for the tower, a day counts when the census measured it as dealt
+   * and found it contested; everywhere else every clean day counts, as it always did
+   * (`weekStake.ts#dayCountsToward`). The streak is untouched: it is about every day played.
+   */
+  const counts = dayCountsToward(week.contractId, outcome);
+  const cleanRun = outcome.allMet && counts ? base.cleanRun + 1 : base.cleanRun;
   const contract = contractById(week.contractId);
 
   /*
@@ -537,9 +545,16 @@ export function closeDay(week: WeekState, outcome: DayOutcome, recordGrew = fals
    */
   const posted = week.contractId !== SANDBOX_CONTRACT_ID;
 
+  /*
+   * The target is derived where the census speaks and authored where it does not — § D1176,
+   * `weekStake.ts#weekNeedOf`. A week with no counted day has a target of zero, which is *no
+   * target*, and clears nothing.
+   */
+  const need = contract === undefined ? 0 : weekNeedOf(contract);
   const clears =
     contract !== undefined &&
-    cleanRun >= contract.needClean &&
+    need > 0 &&
+    cleanRun >= need &&
     !base.completed.includes(contract.id);
 
   const cleared: ClearedAward | null =
@@ -582,6 +597,22 @@ export function closeDay(week: WeekState, outcome: DayOutcome, recordGrew = fals
  * did on Monday.
  */
 export function nextDay(week: WeekState): WeekState {
+  /*
+   * **The week ends, and a new one opens on the same tower** — [§ D1177](../../../../DECISIONS.md).
+   * Where the week census speaks for the tower, the morning after its last dealt day is day 1 of
+   * a fresh week: the tower as handed, nothing counted yet, the days the census measured dealt
+   * again. What the player has is kept: every scenario cleared, the streak and the best day.
+   * Nothing is locked. The closed week's days leave the history with it, because a history keyed
+   * by day number cannot hold two Mondays (`everyday/weekView.ts` keys its cards by day).
+   */
+  if (weekRollsOver(week)) {
+    return {
+      ...openWeek(week.contractId),
+      completed: week.completed,
+      streak: week.streak,
+      bestMinutePct: week.bestMinutePct,
+    };
+  }
   return {
     ...week,
     day: week.day + 1,

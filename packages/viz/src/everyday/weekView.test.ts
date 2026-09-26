@@ -15,7 +15,9 @@ import { describe, expect, it } from 'vitest';
 import { goalsForDay, readGoals } from '../shift/goals.js';
 import type { DayOutcome, GoalObservations, WeekState } from '../shift/types.js';
 import type { WatchRecord } from '../watch/types.js';
+import { scheduledEventFor } from '../shift/calendar.js';
 import { openWeek, outcomeOf, wasGraded } from '../shift/week.js';
+import { weekDealOf } from '../shift/weekStake.js';
 
 import { EM_DASH } from './figures.js';
 import { verdictOf, WEEK_CARDS, weekScreenViewOf } from './weekView.js';
@@ -271,5 +273,67 @@ describe('the rest of § 14', () => {
 
   it('captions the style split as a share and not a ranking', () => {
     expect(viewOf(weekWith(1, []), false).splitCaption).toContain('not a ranking');
+  });
+});
+
+describe('the week’s stake on the strip, and its sheet at the close — § D1176, § D1177', () => {
+  /** A Midtown day drawing the wrinkle it is dealt, with a record whose driver is `dispatcherId`. */
+  const midtownDay = (day: number, observed: GoalObservations, dispatcherId = 'collective'): DayOutcome => ({
+    ...dayOf(day, observed),
+    eventId: scheduledEventFor(null, day, (day - 1) % 7, 'whole-day').id,
+    record: {
+      buildingId: 'midtown-office',
+      dispatcherId,
+      interventions: [],
+      ruleRows: [],
+      outOfServiceCarIds: [],
+    } as unknown as WatchRecord,
+  });
+  const midtown = (day: number, history: readonly DayOutcome[]): WeekState => ({
+    ...weekWith(day, history),
+    contractId: 'c2',
+    closedDay: history.some((entry) => entry.day === day) ? day : null,
+  });
+
+  it('marks the days that do not count on their cards, and says why under the strip in the brief’s sentence', () => {
+    const view = viewOf(midtown(3, [midtownDay(1, MET), midtownDay(2, MET)]), false);
+    expect(view.stake).toBe('This week’s target: 2 of 3 counted days clean. 1 so far.');
+    expect(
+      view.cards.filter((card) => card.day !== undefined).map((card) => [card.weekday, card.counts, card.note]),
+    ).toEqual([
+      ['MON', true, 'clean day'],
+      ['TUE', false, 'clean day · not counted'],
+      ['WED', true, 'today · not closed yet'],
+    ]);
+    expect(view.notCounted).toEqual([{ weekday: 'TUE', sentence: weekDealOf('c2')?.days[1]?.sentence }]);
+    expect(view.notCounted[0]?.sentence).toMatch(/^This day does not count toward the week: /u);
+    expect(view.sheet).toBeUndefined();
+  });
+
+  it('draws nothing new on a week the census does not speak for', () => {
+    const view = viewOf(weekWith(3, [dayOf(1, MET), dayOf(2, MET)]), false);
+    expect(view.stake).toBeUndefined();
+    expect(view.notCounted).toEqual([]);
+    expect(view.sheet).toBeUndefined();
+    expect(view.cards.every((card) => card.counts === undefined)).toBe(true);
+  });
+
+  it('draws the sheet once the last dealt day is filed, with the shell’s house readings beside yours', () => {
+    const history = [1, 2, 3, 4, 5, 6, 7].map((day) =>
+      midtownDay(day, day === 1 || day === 4 ? MET : MISSED, day === 4 ? 'eta' : 'collective'),
+    );
+    const input = {
+      week: midtown(7, history),
+      towerToday: 'Midtown Office',
+      nameOf: NAME_OF,
+      dayClosed: true,
+      sheetStanding: true,
+    };
+    const view = weekScreenViewOf({ ...input, house: (day) => (day === 4 ? 'missed' : undefined) });
+    expect(view.sheet?.yoursLine).toBe('Your week: 2 of the 3 counted days clean.');
+    expect(view.sheet?.houseLine).toBe('The tower’s standing order, left alone on the same crowds, cleared 1.');
+    expect(view.sheet?.targetLine).toBe('Target 2: met.');
+    // With no house answered yet for the run it needs, the sheet says so rather than counting it.
+    expect(weekScreenViewOf(input).sheet?.houseLine).toMatch(/still being run/u);
   });
 });

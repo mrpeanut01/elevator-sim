@@ -53,6 +53,7 @@ import { eventAsRun, eventCarChoice } from '../shift/events.js';
 import { carsToDerate } from '../shift/incidents.js';
 import { admittedPressDayIds, pressDayStanding } from '../shift/ladder.js';
 import { wayThroughSentenceOf } from '../shift/weekWay.js';
+import { dayStakeSentenceOf, weekStakeLineOf } from '../shift/weekStake.js';
 import { clockOf, clockRange } from '../shift/report.js';
 import type { GoalReading, RunHorizon, ShiftEvent, WeekState, Weekday } from '../shift/types.js';
 import { weekdayOf } from '../shift/types.js';
@@ -229,6 +230,14 @@ export interface TodayRecord {
    * through licenses none.
    */
   readonly wayThrough: string | undefined;
+  /**
+   * **The week's stake, and whether this day is part of it**, or `undefined` where the week census
+   * does not speak for the tower — swarm DL's Q2, [§ D1176](../../../../DECISIONS.md).
+   * `line` is `shift/weekStake.ts#weekStakeLineOf` (*k of N*, and how many so far); `day` is
+   * `#dayStakeSentenceOf`, one sentence with no advice saying whether today counts and, where it
+   * does not, why. `day` is `undefined` on a week standing past its last day.
+   */
+  readonly weekStake: { readonly line: string; readonly day: string | undefined } | undefined;
 }
 
 /** {@link TodayRecord.driverHeld}'s sentence — no digit, the strip's own rule. */
@@ -935,5 +944,13 @@ export function todayOf(input: TodayInput): TodayRecord {
       hasCalendar: input.calendar !== null,
       horizon: input.horizon,
     }),
+    weekStake: weekStakeOf(week, event.id),
   };
+}
+
+/** {@link TodayRecord.weekStake} — § D1176, read off the census through `shift/weekStake.ts`. */
+function weekStakeOf(week: WeekState, eventId: string): TodayRecord['weekStake'] {
+  const line = weekStakeLineOf(week);
+  if (line === undefined) return undefined;
+  return { line, day: dayStakeSentenceOf(week.contractId, week.day, eventId) };
 }

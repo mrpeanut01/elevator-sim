@@ -84,6 +84,7 @@ const TODAY: TodayRecord = {
   driver: 'Steady hand',
   driverHeld: undefined,
   wayThrough: undefined,
+  weekStake: undefined,
 };
 
 /** Building names by id, as the shipped documents carry them — the fixture for `nameOf` (GitHub issue #599). */

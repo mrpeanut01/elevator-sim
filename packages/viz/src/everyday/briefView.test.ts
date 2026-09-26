@@ -11,11 +11,12 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { BRIEF_WAY_THROUGH_HEADING, briefScreenViewOf, lockedForScore, raceAgainstCard, RECOMMENDED_CARDS,
+import { BRIEF_WAY_THROUGH_HEADING, BRIEF_WEEK_HEADING, briefScreenViewOf, lockedForScore, raceAgainstCard, RECOMMENDED_CARDS,
   SANDBOX_DOOR_LABEL,
 } from './briefView.js';
 import { GHOST_OPTIONS } from '../live/raceStrip.js';
 import { isScreenBuilt } from './screens.js';
+import { DAY_COUNTS_SENTENCE } from '../shift/weekStake.js';
 import type { TodayRecord } from './today.js';
 
 const TODAY: TodayRecord = {
@@ -45,6 +46,7 @@ const TODAY: TodayRecord = {
   driver: 'Steady hand',
   driverHeld: undefined,
   wayThrough: undefined,
+  weekStake: undefined,
 };
 
 const DISPATCHERS = [
@@ -285,6 +287,18 @@ describe('everything else on the card is the day record’s, unedited', () => {
       selectedId: 'collective',
     });
     expect(view.wayThrough).toEqual({ heading: BRIEF_WAY_THROUGH_HEADING, sentence });
+  });
+
+  it('carries the week’s stake and whether today counts under its own heading, and nothing where the census is silent (§ D1176)', () => {
+    expect(viewOf().week).toBeUndefined();
+    const stake = { line: 'This week’s target: 2 of 3 counted days clean. 0 so far.', day: DAY_COUNTS_SENTENCE };
+    const view = briefScreenViewOf({
+      today: { ...TODAY, weekStake: stake },
+      dispatchers: DISPATCHERS,
+      savedIds: [],
+      selectedId: 'collective',
+    });
+    expect(view.week).toEqual({ heading: BRIEF_WEEK_HEADING, line: stake.line, day: stake.day });
   });
 
   it('drops the load panel rather than inventing one when the day record has none', () => {

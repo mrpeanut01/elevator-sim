@@ -243,6 +243,7 @@ import type {
   WeekState,
 } from '../shift/types.js';
 import { nextDay } from '../shift/week.js';
+import type { HouseReading } from '../shift/weekStake.js';
 /* GitHub issue #245's honest half — see {@link EverydayHost.runCarriedBySelection}. */
 import { runIdentityIssues } from '../scope/runIdentity.js';
 import {
@@ -949,6 +950,14 @@ export interface EverydayHost {
 
   /** The most recently closed day's record, or `undefined` before any day has closed. */
   lastOutcome(): DayOutcome | undefined;
+
+  /**
+   * **The house's reading on a counted day of a closed week** — the tower's standing order, left
+   * alone on that day's own crowd, [§ D1177](../../../../DECISIONS.md). `undefined` until the
+   * shell's run answers, and for every day that did not need one (`shift/weekStake.ts#houseNeedOf`
+   * reads those off the day itself).
+   */
+  weekHouse(day: number): HouseReading | undefined;
 
   /**
    * What the standing config points at — the ids the next run will be built from.
@@ -2041,6 +2050,13 @@ export interface EverydayHostBindings {
    * the pinned crowds as shared, which is the conservative reading.
    */
   readonly daySeed?: (() => bigint) | undefined;
+  /**
+   * The house's reading on a counted day of the closed week — `dev/main.ts`'s house runs,
+   * [§ D1177](../../../../DECISIONS.md). Optional on {@link daySeed}'s ground: a test host that
+   * never closes a census week has nothing to answer, and a shell that omits it answers nothing,
+   * which the week sheet reads as *still being run*.
+   */
+  readonly weekHouse?: ((day: number) => HouseReading | undefined) | undefined;
   /** The live state. Read fresh on every host call — never captured. */
   state(): ViewerState;
   /** The transport's playhead in simulated seconds, or the recording's start, or `0`. */
@@ -3053,6 +3069,7 @@ export function createEverydayHost(
       readGoals(goalsForDay(b.state().week.day, horizonAheadOf(b)), NO_RUN_OBSERVATIONS),
     lastReport: () => b.state().report,
     lastOutcome: () => b.state().week.history.at(-1),
+    weekHouse: (day) => b.weekHouse?.(day),
     selection: () => {
       const state = b.state();
       return { buildingId: state.buildingId, dispatcherId: state.dispatcherId, pattern: state.pattern };

@@ -46,6 +46,7 @@ import { CONTRACTS, contractStatus, statLineOf } from '../shift/contracts.js';
 import { ladderTowersOf } from '../shift/ladder.js';
 import type { ContractStatus, ScenarioContract, WeekState } from '../shift/types.js';
 import { switchWeek } from '../shift/week.js';
+import { weekNeedOf, WEEK_WITHOUT_COUNTED_DAYS_SHORT } from '../shift/weekStake.js';
 
 import { el, fill } from './dom.js';
 import type { MountContext, Panel, ViewAt } from './mountTypes.js';
@@ -233,14 +234,17 @@ function objectiveOf(
   status: ContractStatus,
 ): string {
   if (status === 'cleared') return 'Cleared';
-  const plural = contract.needClean === 1 ? '' : 's';
+  /* The derived target where the week census speaks — § D1176, `weekStake.ts#weekNeedOf`. */
+  const need = weekNeedOf(contract);
+  if (need === 0) return `${WEEK_WITHOUT_COUNTED_DAYS_SHORT.charAt(0).toUpperCase()}${WEEK_WITHOUT_COUNTED_DAYS_SHORT.slice(1)}`;
+  const plural = need === 1 ? '' : 's';
   // SC-05 (§ D198): `cleanRun` can outrun `needClean` on a week that kept playing, and the line
   // would count "2 of 1". Clamped on the display only — the week's own count is not touched.
   const banked =
     status === 'current'
-      ? ` — ${String(Math.min(week.cleanRun, contract.needClean))} of ${String(contract.needClean)} banked`
+      ? ` — ${String(Math.min(week.cleanRun, need))} of ${String(need)} banked`
       : '';
-  return `Clear ${String(contract.needClean)} shift${plural}${banked}`;
+  return `Clear ${String(need)} shift${plural}${banked}`;
 }
 
 /**

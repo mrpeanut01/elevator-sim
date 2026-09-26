@@ -97,8 +97,14 @@ describe('the pinned whole day’s length and its call — § D1047', () => {
   it('covers exactly the admitted whole-day pins, which are exactly the whole-day first days', () => {
     const wholeDayPins = admittedPressDayIds().filter((id) => pressDayFor(id)?.horizon === 'whole-day');
     expect(PINNED_DAY_LENGTHS.map((row) => row.contractId)).toEqual(wholeDayPins);
-    /* Every admitted whole-day pin is also a first day, so the brief draws the line wherever the draw can deal one. */
-    for (const id of wholeDayPins) expect(FIRST_DAY_CONTRACT_IDS, id).toContain(id);
+    /*
+     * Every whole-day first day is an admitted whole-day pin, so the brief draws the line wherever
+     * the draw can deal one. It read the other way until § D1178 filtered the first-day set by the
+     * week census: the rows stay for every admitted pin, because the picker still reaches them.
+     */
+    for (const id of FIRST_DAY_CONTRACT_IDS) {
+      if (pressDayFor(id)?.horizon === 'whole-day') expect(wholeDayPins, id).toContain(id);
+    }
     expect(wholeDayPins.length, 'no whole day is left to describe, so this file asserts nothing').toBeGreaterThan(0);
   });
 

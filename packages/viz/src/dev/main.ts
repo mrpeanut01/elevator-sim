@@ -220,7 +220,14 @@ import {
   type DayReportInput,
   type ShapedDayReport,
 } from '../shift/report.js';
-import { HISTORY_DAYS, MODE_WEEK_CONTRACT_IDS, outcomeOf } from '../shift/week.js';
+import { HISTORY_DAYS, MODE_WEEK_CONTRACT_IDS, outcomeOf, wasGraded } from '../shift/week.js';
+import {
+  dayCountsToward,
+  houseNeedOf,
+  houseRecordOf,
+  weekHasClosed,
+  type HouseReading,
+} from '../shift/weekStake.js';
 import { tomorrowBriefingOf, type TomorrowBriefing } from '../shift/tomorrow.js';
 import { coachWeekLines, weekKeptLine } from '../shift/weekLabel.js';
 import { weekdayOf, type DayOutcome, type WeekState } from '../shift/types.js';
@@ -326,7 +333,7 @@ import {
   type ViewerState,
 } from './state.js';
 import { ghostPlanOf, plainBaselineOf } from './ghostRun.js';
-import { recordRefusalFor, watchRecordOf } from '../watch/record.js';
+import { recordRefusalFor, recordUnreadableReason, watchRecordOf, watchRunPlanOf } from '../watch/record.js';
 import type { WatchableRun } from '../watch/types.js';
 import type { WatchingView } from '../watch/view.js';
 import {
@@ -1639,6 +1646,87 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * grew to by a press outside a call.
    */
   const dayCallRunner = createOffThreadRunner({ spawn: spawnRunWorker });
+
+  /**
+   * **The house on a closed week** — [§ D1177](../../../../DECISIONS.md). Its own runner, for
+   * `dayCallRunner`'s reason: the runs a closed week's sheet needs must not supersede a shift, a
+   * call or a watch press, nor be superseded by them.
+   *
+   * The house is the tower's standing order, left alone, on each counted day's own crowd. A day that
+   * ran it untouched is its own house (`shift/weekStake.ts#houseNeedOf`) and costs nothing; every
+   * other counted day costs one run, of the day's own record with the driver, the presses, the rule
+   * rows and the held cars taken out (`#houseRecordOf`) — the same seed, so the same passengers. It
+   * is graded against the goals **the day was graded against**, read off the day's own readings,
+   * so the two sides of the sheet answer one question.
+   *
+   * Asked lazily, the first time a screen reads the sheet of a week that has closed, and kept by the
+   * week it was asked for: nothing is stored, and a reload re-runs it.
+   */
+  const houseRunner = createOffThreadRunner({ spawn: spawnRunWorker });
+  let weekHouse: { readonly key: string; readonly readings: Map<number, HouseReading> } | undefined;
+
+  /** Which closed week a set of house readings belongs to: its tower and each day's crowd. */
+  function weekHouseKey(week: WeekState): string {
+    return [week.contractId, ...week.history.map((entry) => `${String(entry.day)}:${entry.record?.seed ?? '-'}`)].join('|');
+  }
+
+  function weekHouseReadingOf(day: number): HouseReading | undefined {
+    const week = state.week;
+    if (!weekHasClosed(week)) return undefined;
+    const key = weekHouseKey(week);
+    if (weekHouse?.key !== key) askWeekHouse(week, key);
+    return weekHouse?.readings.get(day);
+  }
+
+  function askWeekHouse(week: WeekState, key: string): void {
+    const readings = new Map<number, HouseReading>();
+    weekHouse = { key, readings };
+    const needs = week.history.flatMap((entry) => {
+      const record = entry.record;
+      if (record === null || !dayCountsToward(week.contractId, entry) || houseNeedOf(entry) !== 'run') return [];
+      /* A record this build cannot replay is no record of the crowd for the house either. */
+      if (recordUnreadableReason(record, resources) !== null) {
+        readings.set(entry.day, 'unrecorded');
+        return [];
+      }
+      return [{ entry, record }];
+    });
+    const runs = needs.map(({ record }) => {
+      const plan = watchRunPlanOf(state, resources, houseRecordOf(record));
+      return { config: plan.config, outOfServiceCarIds: plan.outOfServiceCarIds, recordDecisions: false };
+    });
+    const [first, ...rest] = runs;
+    if (first === undefined) return;
+    houseRunner.start({
+      runs: [first, ...rest],
+      onDone: (recordings) => {
+        if (weekHouse?.key !== key) return;
+        recordings.forEach((recording, index) => {
+          const entry = needs[index]?.entry;
+          if (entry === undefined) return;
+          const graded = readGoals(
+            entry.readings.map((reading) => reading.goal),
+            shiftObservationsOf(observationsAt(recording, recording.endedAt)),
+          );
+          readings.set(
+            entry.day,
+            !wasGraded(graded)
+              ? 'ungraded'
+              : graded.every((reading) => reading.state === 'met')
+                ? 'cleared'
+                : 'missed',
+          );
+        });
+        renderAll();
+      },
+      /* A run that threw: those days could not be run on their own crowd, and the sheet says so. */
+      onFailed: () => {
+        if (weekHouse?.key !== key) return;
+        for (const { entry } of needs) if (!readings.has(entry.day)) readings.set(entry.day, 'unrecorded');
+        renderAll();
+      },
+    });
+  }
   let dayCallSession: DayCallSession | undefined;
   /** The run a session was refused on, so the refusal is asked once rather than once a frame. */
   let dayCallRefusedOn: VizRecording | undefined;
@@ -4471,6 +4559,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
    */
   const everydayHostBindings: EverydayHostBindings = {
     resources,
+    /* § D1177 — the house on a closed week's counted days, run off this thread when first read. */
+    weekHouse: weekHouseReadingOf,
     /*
      * **The crowd a first session's pinned day replaced** — [§ D1047](../../../../DECISIONS.md).
      *

@@ -75,6 +75,7 @@
  * example of an in-scope Engineer change.
  */
 
+import { weekNeedOf, WEEK_WITHOUT_COUNTED_DAYS_SHORT } from './weekStake.js';
 import {
   weekdayOf,
   type DayOutcome,
@@ -410,8 +411,11 @@ function nextRowsOf(input: TomorrowInput): readonly TomorrowRow[] {
  * already.
  */
 function bankedTowardOf(week: WeekState, contract: ScenarioContract): string {
-  const banked = Math.min(week.cleanRun, contract.needClean);
-  return `${count(banked)} of ${count(contract.needClean)} clean shifts banked`;
+  /* The derived target where the week census speaks — § D1176, `weekStake.ts#weekNeedOf`. */
+  const need = weekNeedOf(contract);
+  if (need === 0) return WEEK_WITHOUT_COUNTED_DAYS_SHORT;
+  const banked = Math.min(week.cleanRun, need);
+  return `${count(banked)} of ${count(need)} clean shifts banked`;
 }
 
 /**

@@ -34,6 +34,7 @@ import { admittedPressDayIds, ladderRowFor, ladderTowerConfig, rungFor } from '.
 import { openWeek, outcomeOf } from '../shift/week.js';
 import type { WatchRecord } from '../watch/types.js';
 import { dc10Of, wayThroughSentenceOf, WEEK_WAY, weekWayRowFor } from '../shift/weekWay.js';
+import { DAY_COUNTS_SENTENCE, dayStakeSentenceOf } from '../shift/weekStake.js';
 
 import { bookedOutCarsOf, carAbsencesOf } from '../shift/bookedOut.js';
 import { contractBuildings, todaysScenarioDayState } from '../shift/contractDay.test-helper.js';
@@ -1014,5 +1015,25 @@ describe('the week census’s sentence on the brief (§ D1067)', () => {
     }
     /* The census carries at least one day it does not admit, so the drawing arm is exercised. */
     expect(drawn).toBeGreaterThan(0);
+  });
+});
+
+describe('the week’s stake on the brief (§ D1176)', () => {
+  it('says on each of Midtown’s seven days whether the day counts, in the census’s sentence', () => {
+    const counted: number[] = [];
+    for (let day = 1; day <= 7; day += 1) {
+      const week = { ...openWeek('c2'), day, dayIdx: (day - 1) % 7 };
+      const state = { week, buildingId: 'midtown-office', seed: 20_261_001n } as unknown as ViewerState;
+      const record = todayOf({ ...inputOf(state), horizon: 'whole-day' });
+      expect(record.weekStake?.line).toBe('This week’s target: 2 of 3 counted days clean. 0 so far.');
+      expect(record.weekStake?.day).toBe(dayStakeSentenceOf('c2', day, record.wrinkle.id));
+      if (record.weekStake?.day === DAY_COUNTS_SENTENCE) counted.push(day);
+    }
+    expect(counted).toEqual([1, 3, 4]);
+  });
+
+  it('draws nothing on a tower the census does not speak for', () => {
+    const state = { week: openWeek('c1'), buildingId: 'garden-apartments', seed: 1n } as unknown as ViewerState;
+    expect(todayOf(inputOf(state)).weekStake).toBeUndefined();
   });
 });

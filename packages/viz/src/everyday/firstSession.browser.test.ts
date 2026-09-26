@@ -113,8 +113,12 @@ describe.skipIf(!HAS_BROWSER)('the first session’s tower — GitHub issue #208
        * check is that the fallback was **not** taken — the count reaches the sentence as a word.
        * The other numerals in the line (`day 1`, the sweep's day count) are licensed and stay.
        */
-      expect(FIRST_DAY_CONTRACT_IDS.length).toBeGreaterThan(1);
-      expect(FIRST_SESSION_LINE).toContain(' towers whose day 1 ');
+      /*
+       * Since § D1178 the set can be one tower, which the line reads as *the one tower* rather
+       * than as a count; both forms put the count in words.
+       */
+      expect(FIRST_DAY_CONTRACT_IDS.length).toBeGreaterThan(0);
+      expect(FIRST_SESSION_LINE).toMatch(/ (the one tower|towers) whose day 1 /u);
       expect(FIRST_SESSION_LINE).not.toContain(
         `${String(FIRST_DAY_CONTRACT_IDS.length)} towers`,
       );

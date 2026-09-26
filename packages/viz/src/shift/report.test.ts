@@ -76,7 +76,8 @@ import {
   type WeekDayReport,
 } from './report.js';
 import { reportWindowNameOf } from './reportWindow.js';
-import { closeDay, openEndless, openWeek, outcomeOf } from './week.js';
+import { closeDay, nextDay, openEndless, openWeek, outcomeOf } from './week.js';
+import { WEEK_CLOSED_LINE } from './weekStake.js';
 import {
   DAY_START_S,
   WAKE_UP_ARRIVALS,
@@ -164,7 +165,11 @@ function reportOf(
       recordRefusal: null,
       day,
       dayIdx: opened.dayIdx,
-      eventId: 'ordinary',
+      /*
+       * The wrinkle the day is dealt, so the fixture is a day of the week as it is dealt — since
+       * § D1176 only such a day counts toward a census week's target (`weekStake.ts`).
+       */
+      eventId: eventFor(day, opened.dayIdx, 'whole-day').id,
       arrived: observations.arrived,
       carried: observations.carried,
       minutePct: observations.minutePct,
@@ -1325,8 +1330,12 @@ describe('the rest of the sheet', () => {
        * case above.
        */
       for (const day of [1, 2, 3, 4, 5, 6, 7]) {
-        const nextIdx = day % 7;
-        const willRun = scheduledEventFor(movingWeek, day + 1, nextIdx);
+        /*
+         * Tomorrow as `dev/state.ts` plans it: `nextDay` of today's week, which on a census tower's
+         * last day is day 1 of a new week (§ D1177) rather than day 8.
+         */
+        const tomorrow = nextDay({ ...openWeek('c2'), day, dayIdx: (day - 1) % 7 });
+        const willRun = scheduledEventFor(movingWeek, tomorrow.day, tomorrow.dayIdx);
         expect(reportOf(clean, day, movingWeek).forecast.name, `day ${String(day)}`).toBe(
           willRun.name,
         );
@@ -1362,6 +1371,16 @@ describe('the rest of the sheet', () => {
     expect(report.smallPrint).toContain('50 or more paired runs');
     expect(report.smallPrint).toContain('confidence interval that excludes zero');
     expect(report.smallPrint).toContain(clean.dispatcherProfileId.toLowerCase());
+  });
+
+  it('closes a census week on its last day, points at its sheet and forecasts a new week — § D1177', () => {
+    const sunday = reportOf(clean, 7);
+    expect(sunday.taught).toBe(WEEK_CLOSED_LINE);
+    expect(sunday.forecast.demand).toMatch(/^A new week: the tower as handed, \d+\.\d% fewer tenants than today$/u);
+    expect(sunday.nextDayName).toBe('Monday');
+    // Saturday closes a day and not the week.
+    expect(reportOf(clean, 6).taught).not.toBe(WEEK_CLOSED_LINE);
+    expect(reportOf(clean, 6).forecast.demand).toMatch(/^\+\d+\.\d% more tenants than today$/u);
   });
 
   it('says what is banked, and what is left to bank', () => {

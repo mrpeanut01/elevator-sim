@@ -119,6 +119,7 @@ import {
 } from '../everyday/workshopModel.js';
 import {
   BRIEF_WAY_THROUGH_HEADING,
+  BRIEF_WEEK_HEADING,
   briefBarModel,
   briefScreenViewOf,
   lockedForScore,
@@ -741,6 +742,18 @@ import {
   outcomeOf,
 } from '../shift/week.js';
 import { coachWeekLines, weekKeptLine } from '../shift/weekLabel.js';
+import {
+  DAY_UNMEASURED_SENTENCE,
+  dayStakeSentenceOf,
+  WEEK_CLOSED_LINE,
+  houseStandingOrder,
+  weekDealOf,
+  weekSheetOf,
+  weekStakeLineOf,
+  WEEK_WITHOUT_COUNTED_DAYS_SHORT,
+  type HouseReading,
+} from '../shift/weekStake.js';
+import { WATCH_RECORD_VERSION, type WatchRecord } from '../watch/types.js';
 
 import type { WaitBandBasis } from '../live/types.js';
 
@@ -13771,11 +13784,32 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
      */
     'shift/weekWay.ts#wayThroughSentenceOf',
     'everyday/briefView.ts#BRIEF_WAY_THROUGH_HEADING',
+    /*
+     * The week's stake, its days and its sheet — wave AK, § D1176 and § D1177. Drawn only on a
+     * Scenario week on a tower the week census speaks for, and at the sheet's close, which no
+     * corpus case's own week reaches (`run.ts#buildingFor` builds no rung, and a case is one day),
+     * so seeded below once per case: every census tower's stake line and every dealt day's
+     * sentence, and Midtown's week closed on the case's own readings under the house's three
+     * states — unanswered, answered, and days that kept no record of their crowd.
+     */
+    'shift/weekStake.ts#weekStakeLineOf',
+    'shift/weekStake.ts#dayStakeSentenceOf',
+    'shift/weekStake.ts#DAY_COUNTS_SENTENCE',
+    'shift/weekStake.ts#DAY_UNMEASURED_SENTENCE',
+    'shift/weekStake.ts#WEEK_WITHOUT_COUNTED_DAYS',
+    'shift/weekStake.ts#WEEK_WITHOUT_COUNTED_DAYS_SHORT',
+    'shift/weekStake.ts#weekSheetOf',
+    'shift/weekStake.ts#WEEK_SHEET_HEADING',
+    'shift/weekStake.ts#WEEK_SHEET_NOTE',
+    'shift/weekStake.ts#WEEK_SHEET_ROLL_LINE',
+    'shift/weekStake.ts#WEEK_CLOSED_LINE',
+    'everyday/briefView.ts#BRIEF_WEEK_HEADING',
   ],
   render(context) {
     const seeds: TextSeed[] = [];
     const bundle = shiftBundleOf(context);
     seeds.push({ field: 'today.driverHeld', text: PRESS_DAY_DRIVER_HELD, role: 'prose' });
+    seedWeekStake(seeds, bundle.observations);
     seeds.push({ field: 'brief.wayThrough.heading', text: BRIEF_WAY_THROUGH_HEADING, role: 'label' });
     for (const row of WEEK_WAY.rows) {
       for (const eventId of [row.eventId, 'another-wrinkle']) {
@@ -16494,3 +16528,91 @@ export function suppressionOf(recording: VizRecording): boolean {
 }
 
 export { batchReport, evidenceFrom };
+
+/**
+ * **The week's stake, its days and its sheet, seeded once per case** — wave AK, § D1176 and
+ * § D1177. See the covering adapter's `covers` for why they are seeded rather than reached.
+ *
+ * Every census tower's stake line (the *k of N*, and the no-target line where the week counts no
+ * day) and every dealt day's sentence; then Midtown Office's week closed seven days running on this
+ * case's own readings, so the sheet's figures are the case's rather than a fixture's, under the
+ * house's three states.
+ */
+function seedWeekStake(seeds: TextSeed[], observations: Observations): void {
+  seeds.push({ field: 'brief.week.heading', text: BRIEF_WEEK_HEADING, role: 'label' });
+  seeds.push({ field: 'week.stake.short', text: WEEK_WITHOUT_COUNTED_DAYS_SHORT, role: 'reason' });
+  seeds.push({ field: 'week.day.unmeasured', text: DAY_UNMEASURED_SENTENCE, role: 'reason' });
+  seeds.push({ field: 'week.closed', text: WEEK_CLOSED_LINE, role: 'prose' });
+  for (const contract of CONTRACTS) {
+    const deal = weekDealOf(contract.id);
+    if (deal === undefined) continue;
+    const line = weekStakeLineOf(openWeek(contract.id));
+    if (line !== undefined) seeds.push({ field: `week.stake.${contract.id}`, text: line, role: 'observation' });
+    for (const dealt of deal.days) {
+      const sentence = dayStakeSentenceOf(contract.id, dealt.day, dealt.eventId) ?? '';
+      seeds.push({ field: `week.day.${contract.id}.${String(dealt.day)}`, text: sentence, role: 'observation' });
+    }
+  }
+  const standing = houseStandingOrder();
+  const arms: readonly (readonly [
+    string,
+    (day: number) => WatchRecord | null,
+    (day: number) => HouseReading | undefined,
+  ])[] = [
+    ['unrecorded', () => null, () => undefined],
+    ['pending', (day) => weekStakeRecord(day, 'another-driver'), () => undefined],
+    ['answered', (day) => weekStakeRecord(day, day === 1 ? standing : 'another-driver'), () => 'missed'],
+  ];
+  for (const [arm, recordOf, houseOf] of arms) {
+    let week = openWeek('c2');
+    for (let day = 1; day <= 7; day += 1) {
+      const dayIdx = (day - 1) % 7;
+      week = closeDay(
+        week,
+        outcomeOf({
+          record: recordOf(day),
+          recordRefusal: null,
+          day,
+          dayIdx,
+          eventId: scheduledEventFor(null, day, dayIdx, 'whole-day').id,
+          arrived: observations.arrived,
+          carried: observations.carried,
+          minutePct: observations.minutePct,
+          readings: readGoals(goalsForDay(day), observations),
+        }),
+      );
+      if (day < 7) week = nextDay(week);
+    }
+    const sheet = weekSheetOf(week, houseOf);
+    if (sheet === undefined) continue;
+    const at = `week.sheet.${arm}`;
+    seeds.push({ field: `${at}.heading`, text: sheet.heading, role: 'label' });
+    seeds.push({ field: `${at}.yours`, text: sheet.yoursLine, role: 'observation' });
+    seeds.push({ field: `${at}.house`, text: sheet.houseLine, role: 'observation' });
+    seeds.push({ field: `${at}.target`, text: sheet.targetLine, role: 'observation' });
+    seeds.push({ field: `${at}.note`, text: sheet.note, role: 'prose' });
+    seeds.push({ field: `${at}.roll`, text: sheet.rollLine, role: 'prose' });
+    seeds.push({ field: `${at}.stake`, text: weekStakeLineOf(week) ?? '', role: 'observation' });
+  }
+}
+
+/** A run record for a day of Midtown's week in {@link seedWeekStake}: the dispatcher is all that varies. */
+function weekStakeRecord(day: number, dispatcherId: string): WatchRecord {
+  return {
+    version: WATCH_RECORD_VERSION,
+    seed: String(day),
+    buildingId: 'midtown-office',
+    dispatcherId,
+    pattern: 'building',
+    demandTemplateId: null,
+    arrivalRatePctPop5min: null,
+    shiftLengthS: 36_000,
+    windowStartS: null,
+    day,
+    dayIdx: (day - 1) % 7,
+    outOfServiceCarIds: [],
+    interventions: [],
+    ruleRows: [],
+    rungContractId: null,
+  };
+}

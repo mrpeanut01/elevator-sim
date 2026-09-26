@@ -80,9 +80,14 @@
  * `docs/37` § 4.3 carries the gameplay guide's three rotation rules — no tower twice in seven
  * days, no wrinkle template twice in fourteen, the pair never inside a month — and they are the
  * obvious third candidate for this derivation. Measured over 730 consecutive dates against the
- * **six** contracts of the first-day set, the draw repeats a tower **inside seven days on 66.2 % of
- * days** and on **consecutive days 119 times**, so it plainly does not satisfy rule 1, and that is
- * stated here rather than glossed.
+ * **one** contract of the first-day set, the draw repeats a tower **inside seven days on 99.9 % of
+ * days** and on **consecutive days 729 times** — every date after the first — so it plainly does
+ * not satisfy rule 1, and that is stated here rather than glossed.
+ *
+ * **They moved to their ceiling on 2026-09-26** — [§ D1178](../../../../DECISIONS.md). They read
+ * 66.2 % and 119 over the six-member set; the week census's filter left Midtown Office alone, so
+ * every date deals it. That is the ruling's intent (a newcomer's first week is Midtown) rather than
+ * a collision rate, and the figures widen again on the commit a second tower's week is admitted.
  *
  * **Those figures moved in the bad direction on 2026-09-25, and on purpose** —
  * [§ D1047](../../../../DECISIONS.md). They read 32.2 % and 47 over the **fifteen** legible

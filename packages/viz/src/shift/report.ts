@@ -133,7 +133,8 @@ import { contractStatus } from './contracts.js';
 import { gaveUpBesideOf, goalPlainNameOf, horizonLabelOf, readGoals, wasDisplayOf } from './goals.js';
 import { growthFactor } from './growth.js';
 import { CONTRACT_LADDER } from './ladder.js';
-import { ENDLESS_CONTRACT_ID, wasGraded } from './week.js';
+import { ENDLESS_CONTRACT_ID, nextDay, wasGraded } from './week.js';
+import { WEEK_CLOSED_LINE, weekHasClosed, weekNeedOf, WEEK_WITHOUT_COUNTED_DAYS_SHORT } from './weekStake.js';
 import {
   DAY_START_S,
   WAKE_UP_ARRIVALS,
@@ -1218,8 +1219,7 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
     cleared: week.cleared,
     forecast: forecastFor(
       input.calendar,
-      week.day,
-      nextIdx,
+      week,
       input.templateVariesMix === true,
       input.wholeDayRun === true,
       input.growthPerDay ?? CONTRACT_LADDER.defaultGrowthPerDay,
@@ -2863,10 +2863,13 @@ function contractLineFor(contract: ScenarioContract | undefined, week: WeekState
   }
   // SC-05/DR-09 (§ D198): `cleanRun` keeps counting on a contract already cleared, so the raw
   // figure can read "2 of 1". The clamp is on the display only — the data keeps its truth.
-  const banked = Math.min(week.cleanRun, contract.needClean);
+  /* The derived target where the week census speaks — § D1176, `weekStake.ts#weekNeedOf`. */
+  const need = weekNeedOf(contract);
+  if (need === 0) return `${contract.label} — ${contract.title} · ${WEEK_WITHOUT_COUNTED_DAYS_SHORT}`;
+  const banked = Math.min(week.cleanRun, need);
   return (
     `${contract.label} — ${contract.title} · ${String(banked)} of ` +
-    `${String(contract.needClean)} clean shifts banked`
+    `${String(need)} clean shifts banked`
   );
 }
 
@@ -2895,22 +2898,30 @@ function contractLineFor(contract: ScenarioContract | undefined, week: WeekState
  */
 function forecastFor(
   calendar: CalendarPeriod | null,
-  day: number,
-  nextIdx: number,
+  week: WeekState,
   templateVariesMix: boolean,
   wholeDayRun: boolean,
   perDay: number,
 ): ReportForecast {
+  /*
+   * Tomorrow is `week.ts#nextDay`'s answer rather than `day + 1`, because since
+   * [§ D1177](../../../../DECISIONS.md) the morning after a census week's last day is day 1 of a
+   * new week — the tower as handed, so fewer tenants than today rather than more.
+   */
+  const tomorrow = nextDay(week);
   const event = eventAsRun(
-    scheduledEventFor(calendar, day + 1, nextIdx, wholeDayRun ? 'whole-day' : 'period'),
+    scheduledEventFor(calendar, tomorrow.day, tomorrow.dayIdx, wholeDayRun ? 'whole-day' : 'period'),
     templateVariesMix,
     wholeDayRun,
   );
-  const increase = (growthFactor(day + 1, perDay) / growthFactor(day, perDay) - 1) * 100;
+  const change = (growthFactor(tomorrow.day, perDay) / growthFactor(week.day, perDay) - 1) * 100;
   return {
     name: event.name,
     note: event.note,
-    demand: `+${increase.toFixed(1)}% more tenants than today`,
+    demand:
+      change < 0
+        ? `A new week: the tower as handed, ${(-change).toFixed(1)}% fewer tenants than today`
+        : `+${change.toFixed(1)}% more tenants than today`,
   };
 }
 
@@ -2931,6 +2942,8 @@ function forecastFor(
  */
 function taughtFor(contract: ScenarioContract | undefined, week: WeekState): string {
   if (week.cleared !== null) return `Cleared: ${week.cleared.reward}.`;
+  /* § D1177: the last dealt day of a census week closes the week, and its sheet is on Your week. */
+  if (weekHasClosed(week)) return WEEK_CLOSED_LINE;
   if (contract === undefined) {
     return 'A building you drew yourself. Nothing banks here — the sheet is the whole reward.';
   }
@@ -2940,7 +2953,11 @@ function taughtFor(contract: ScenarioContract | undefined, week: WeekState): str
       'Nothing more banks against it — days here keep the streak, and the sheet is the reward now.'
     );
   }
-  const left = Math.max(0, contract.needClean - week.cleanRun);
+  const need = weekNeedOf(contract);
+  if (need === 0) {
+    return `No day of this week counts toward ${contract.label}, so nothing banks toward it this week.`;
+  }
+  const left = Math.max(0, need - week.cleanRun);
   return (
     `Bank ${String(left)} more clean shift${left === 1 ? '' : 's'} on this building and the next ` +
     `assignment opens: ${contract.reward}.`
