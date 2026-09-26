@@ -704,6 +704,19 @@ export function dayCallRowOf(
 }
 
 /**
+ * **An answer as a call's row names it** — the placement answer's own button words, or, on a driver
+ * call, who drove from the call under it. Exported for the close's *call that decided it*
+ * (`shift/dayClose.ts#decidingCallLineOf`, wave AM, lane AM-C), so that sentence and the row name
+ * an answer the same way.
+ */
+export function dayCallAnswerWordsOf(record: DayCallRecord, answer: DayCallAnswer): string {
+  const names = record.drivers;
+  return (record.question ?? 'placement') === 'driver' && names !== undefined
+    ? driverWordsOf(answer, names)
+    : answerWordsOf(answer);
+}
+
+/**
  * **A call's three counts, in the row's own words** — the one sentence the report's row
  * ({@link dayCallRowOf}) and the stage's mid-day row (`everyday/stageCallRow.ts`, wave AL, lane
  * AL-E, [§ D1219](../../../../DECISIONS.md)) both print, so the two cannot count or order the

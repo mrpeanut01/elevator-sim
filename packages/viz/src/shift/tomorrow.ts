@@ -57,11 +57,9 @@
  *    [§ D266](../../../../DECISIONS.md) and [§ D106](../../../../DECISIONS.md) both exist to
  *    prevent. So the day's counts are printed as *what they are* — legs offered and legs
  *    carried — and the difference between them is **never named as an outcome**.
- * 3. **The streak is the one the week holds.** {@link TomorrowInput.week} is the week *after*
- *    `closeDay` has run, so `week.streak` is already the arithmetic `week.ts` did, including
- *    § D234's rule that an ungraded day costs nothing. Nothing is recomputed here; the row states
- *    the number and names which of the three things happened to it, keyed off the same
- *    `allMet`/`wasGraded` pair `closeDay` branched on.
+ * 3. **No streak.** The beat printed `WeekState.streak` under `STREAK` until wave AM
+ *    ([§ D1250](../../../../DECISIONS.md)); `docs/38` § 2.4 says no streak exists, so the row is
+ *    gone and the close leads with the week against the house instead.
  * 4. **No whole-run figure at a playhead short of `endedAt`.** The beat is built by `closeShift`,
  *    which folds observations at `recording.endedAt`, and every value it holds is fixed at that
  *    instant — nothing here reads a playhead, so there is no playhead at which it could be
@@ -143,6 +141,13 @@ export interface TomorrowBriefing {
    * period and dropped the refusal would be promising a day the run will not deliver.
    */
   readonly withheld: readonly string[];
+  /**
+   * The two measured populations the tenants row is drawn from — today's building and tomorrow's,
+   * each resolved through the run's own chain. Carried as counts so the close's *tomorrow* card
+   * (`shift/dayClose.ts`, [§ D1249](../../../../DECISIONS.md)) states the same move-ins as this row
+   * rather than a second derivation of them. `undefined` when no day has closed.
+   */
+  readonly population?: { readonly today: number; readonly tomorrow: number } | undefined;
 }
 
 /** Everything the beat needs. Every field is measured by somebody else and copied here. */
@@ -197,7 +202,7 @@ export interface TomorrowInput {
 export function tomorrowBriefingOf(input: TomorrowInput): TomorrowBriefing {
   const { closed, week, verdict } = input;
   const groups: TomorrowGroup[] = [
-    { id: 'closed', caption: 'What just happened', rows: closedRowsOf(closed, verdict, week) },
+    { id: 'closed', caption: 'What just happened', rows: closedRowsOf(closed, verdict) },
     { id: 'changed', caption: 'What changed overnight', rows: changedRowsOf(input) },
     { id: 'next', caption: 'What tomorrow is under', rows: nextRowsOf(input) },
   ];
@@ -207,6 +212,7 @@ export function tomorrowBriefingOf(input: TomorrowInput): TomorrowBriefing {
     // scale, and `dev/reportPanel.ts`'s own *a slot with nothing to say is hidden, not emptied*.
     groups: groups.filter((group) => group.rows.length > 0),
     withheld: input.withheldTomorrow,
+    ...(closed === null ? {} : { population: { today: input.populationToday, tomorrow: input.populationTomorrow } }),
   };
 }
 
@@ -247,7 +253,14 @@ function weekdayAfter(week: WeekState): string {
 }
 
 /**
- * What just happened — two rows, and neither of them is a mean.
+ * What just happened — one row, and it is not a mean.
+ *
+ * **It had a second row, `STREAK`, and it is gone** — wave AM, lane AM-C, swarm DO's § 1 ruling
+ * ([§ D1250](../../../../DECISIONS.md)). `docs/38` § 2.4 says *no streak exists*, and this beat
+ * printed one on every close, under the same eyebrow a real-time streak would use. The count it
+ * stated is still `WeekState.streak`, kept by `closeDay` and read by the rail and the week screen in
+ * their own words (*N days running*); what the close leads with now is the week against the house
+ * (`shift/dayClose.ts`), which is the stake the ruling names.
  *
  * The counts row prints **legs offered** and **legs carried** with the words on them, because
  * those are the two quantities {@link DayOutcome} genuinely holds. It does not subtract them and
@@ -258,7 +271,6 @@ function weekdayAfter(week: WeekState): string {
 function closedRowsOf(
   closed: DayOutcome | null,
   verdict: 'cleared' | 'missed' | 'ungraded' | null,
-  week: WeekState,
 ): readonly TomorrowRow[] {
   if (closed === null || verdict === null) return [];
   return [
@@ -271,51 +283,7 @@ function closedRowsOf(
         'whole shift. Waiting, abandoned and turned away are four different outcomes and this ' +
         'line counts none of them; the sheet above is where the day is judged.',
     },
-    {
-      id: 'streak',
-      label: 'STREAK',
-      value: streakValueOf(week.streak),
-      note: streakNoteOf(verdict, closed, week),
-    },
   ];
-}
-
-/** `4 days` / `1 day` / `none`. Never `0 days`, which reads as a quantity somebody lost. */
-function streakValueOf(streak: number): string {
-  if (streak === 0) return 'none';
-  return streak === 1 ? '1 clean day' : `${count(streak)} clean days`;
-}
-
-/**
- * Which of the three things happened to the streak, in `closeDay`'s own three arms.
- *
- * Keyed on the verdict rather than on `allMet`, so the sentence and the arithmetic cannot come
- * apart: `closeDay` adds one when `allMet`, resets to zero when the day was graded and missed,
- * and **leaves it alone** when nothing was graded (§ D234). The third arm is the one worth the
- * words — a play-tester who carried 18 of 18 was told *"Streak reset"* about a day nobody looked
- * at, and a beat that said the same would re-ship the sentence that finding removed.
- */
-function streakNoteOf(
-  verdict: 'cleared' | 'missed' | 'ungraded',
-  closed: DayOutcome,
-  week: WeekState,
-): string {
-  switch (verdict) {
-    case 'cleared':
-      return `${closed.weekday} met every goal, so it counted.`;
-    case 'missed':
-      return `${closed.weekday} missed a goal, so the streak went back to none. What is banked stays banked: ${bankedPhrase(week)}.`;
-    case 'ungraded':
-      return (
-        `${closed.weekday} was never graded — too few arrivals to read a goal against — so the ` +
-        'streak is where it was. Unjudged is not passed, and it is not failed either.'
-      );
-  }
-}
-
-/** `2 clean shifts banked` — the count `closeDay` wrote, unclamped and uninterpreted. */
-function bankedPhrase(week: WeekState): string {
-  return week.cleanRun === 1 ? '1 clean shift' : `${count(week.cleanRun)} clean shifts`;
 }
 
 /**

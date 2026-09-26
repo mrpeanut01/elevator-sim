@@ -183,12 +183,14 @@ describe.skipIf(!HAS_BROWSER)('the daily loop is walkable end to end', () => {
 
       await page.locator('.everyday-week-card-open').click();
       await page.waitForSelector('.everyday-report', { timeout: 15_000 });
-      expect(await page.textContent('.everyday-bar-primary')).toBe('Your week');
+      /* Swarm DO § 1 (§ D1249): the daily close's primary is the press into tomorrow. */
+      expect(await page.textContent('.everyday-bar-primary')).toMatch(/^Open the doors on /u);
       // And a filed sheet, not the empty one: the loop produced an account of the day it ran.
       expect(await page.locator('.everyday-report-empty').count()).toBe(0);
       expect(await page.locator('.everyday-report-figures .everyday-figure').count()).toBeGreaterThan(0);
 
-      await page.locator('.everyday-bar-primary').click();
+      /* *Your week* is the close's secondary press now, beside the one into tomorrow. */
+      await page.locator('.everyday-report-close-week').click();
       await page.waitForSelector('.everyday-week', { timeout: 15_000 });
     } finally {
       await page.close();
@@ -475,8 +477,8 @@ describe.skipIf(!HAS_BROWSER)('the daily loop is walkable end to end', () => {
       expect(
         await page.locator('.everyday-report-figures .everyday-figure').count(),
       ).toBeGreaterThan(0);
-      // § 3.3's daily report row, which is how the shell says which screen this is.
-      expect(await page.textContent('.everyday-bar-primary')).toBe('Your week');
+      // § 3.3's daily report row, whose primary is the press into tomorrow since swarm DO § 1 (§ D1249).
+      expect(await page.textContent('.everyday-bar-primary')).toMatch(/^Open the doors on /u);
       // And step 4 of four is where the player now stands: the timeline's last stop is `current`,
       // which is the one state the shell draws neither faint nor pressable.
       expect(await page.textContent('.everyday-bar-timeline')).toContain('4 How it went');

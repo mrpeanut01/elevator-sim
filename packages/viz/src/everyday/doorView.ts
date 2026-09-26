@@ -408,8 +408,9 @@ function primaryOf(input: DoorScreenInput, chips: readonly DoorDayChip[]): DoorP
       return {
         label: `Open the doors on ${tomorrow}`,
         note:
-          `Today is closed and banked. This opens ${tomorrow}'s day and starts it; today stays in ` +
-          'your week as it is, and on the strip as a replay that does not count.',
+          /* *…and starts it* was false: the press opens the brief, where the day starts (§ D1218, § D1250). */
+          `Today is closed and banked. This opens ${tomorrow}'s brief, where you start the day; today ` +
+          'stays in your week as it is, and on the strip as a replay that does not count.',
         inert: false,
         goes: 'tomorrow',
         again: {

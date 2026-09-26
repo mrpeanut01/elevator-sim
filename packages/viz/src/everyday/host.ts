@@ -247,10 +247,11 @@ import {
   type ScenarioContract,
   type WeekState,
 } from '../shift/types.js';
-import { nextDay } from '../shift/week.js';
+import { nextDay, rollWeek } from '../shift/week.js';
 import {
   countedCleanOf,
   dayCountsToward,
+  weekClosedByThisClose,
   weekDealOf,
   weekHasClosed,
   type HouseReading,
@@ -978,10 +979,11 @@ export interface EverydayHost {
   lastOutcome(): DayOutcome | undefined;
 
   /**
-   * **The house's reading on a counted day of a closed week** — the tower's standing order, left
+   * **The house's reading on a counted day of the live week** — the tower's standing order, left
    * alone on that day's own crowd, [§ D1177](../../../../DECISIONS.md). `undefined` until the
    * shell's run answers, and for every day that did not need one (`shift/weekStake.ts#houseNeedOf`
-   * reads those off the day itself).
+   * reads those off the day itself). Read by the week's sheet and, since wave AM, by every counted
+   * close's *today against the house* ([§ D1247](../../../../DECISIONS.md)).
    */
   weekHouse(day: number): HouseReading | undefined;
 
@@ -1600,6 +1602,15 @@ export interface EverydayHost {
    * the same fact — the report on its sheet, the door on the week's history.
    */
   openTomorrow(): void;
+
+  /**
+   * **Start next week** — the week sheet's primary, [§ D1246](../../../../DECISIONS.md). Rolls a
+   * closed week to day 1 of the next (`shift/week.ts#rollWeek`) and opens its brief, whichever day
+   * the week stands on: since the weekend came off the main path, the sheet stands from the last
+   * counted weekday, and Saturday and Sunday are played only through {@link openTomorrow}. A no-op
+   * while the week has not closed (`shift/weekStake.ts#weekHasClosed`).
+   */
+  openNextWeek(): void;
 
   /**
    * § 7.6's intervention: append `change` to today's record at `atS` and re-simulate from t = 0.
@@ -2453,9 +2464,9 @@ const NO_RUN_OBSERVATIONS: GoalObservations = Object.freeze({
  * replay onto a different day. That press is pinned by `reportPanel.test.ts`'s exactly-once text
  * guards, which is why this is a sibling composition here rather than an import there.
  */
-function openTomorrowPatch(week: WeekState): Partial<ViewerState> {
+function openTomorrowPatch(week: WeekState, roll = false): Partial<ViewerState> {
   return {
-    week: nextDay(week),
+    week: roll ? rollWeek(week) : nextDay(week),
     recording: undefined,
     report: undefined,
     tomorrow: undefined,
@@ -2819,12 +2830,71 @@ export function createEverydayHost(
         records = recordsWithDateCrowd(records, week.contractId, seedText);
       }
       const deal = weekDealOf(week.contractId);
-      if (deal !== undefined && weekHasClosed(week)) {
+      /* Once per week: at the close of the path's last day, and not again on a weekend day after it — § D1246. */
+      if (deal !== undefined && weekClosedByThisClose(week)) {
         records = recordsWithClosedWeek(records, week.contractId, countedCleanOf(week), deal.target);
       }
       if (records !== before) port.write(records);
     }
     if (filed.allMet && dayCountsToward(week.contractId, filed)) bankTurn({ completion: 'career-day-paid' });
+  };
+  /**
+   * Tomorrow, or with `roll` day 1 of the next week — {@link EverydayHost.openTomorrow} and
+   * {@link EverydayHost.openNextWeek}, one composition so the two presses cannot deal a crowd or a
+   * horizon differently ([§ D1246](../../../../DECISIONS.md)).
+   */
+  const advanceDay = (roll: boolean): void => {
+    releaseCareer();
+    const state = b.state();
+    /*
+     * Nothing to advance from — see the interface docstring. The screens gate their primaries on
+     * the same fact, so this early return is the API refusing what the controls never offer.
+     *
+     * **A sheet standing, or today banked in the week** — [§ D1004](../../../../DECISIONS.md). The
+     * report's button is drawn over a sheet; the front door's is drawn over the week, whose history
+     * carries today once it is closed, and a reload keeps the week and drops the sheet. A day the
+     * week already holds is a day there is something to advance from, whichever screen asks.
+     */
+    const todayBanked = state.week.history.some((entry) => entry.day === state.week.day);
+    /*
+     * **A sheet that closed nothing is not a sheet to advance from** — wave AL, lane AL-A, under
+     * [§ D1141](../../../../DECISIONS.md). A run on a link's crowd is practice and leaves the week
+     * on its day (`shift/report.ts#dayStaysOpen`); its sheet stood here all the same, so this
+     * press moved the week past a counted day the sheet itself said stays open (the post-AK
+     * panel's seat D, H2). The report no longer offers the button; this is the API refusing it.
+     */
+    const sheetClosedToday =
+      state.report !== undefined && !(state.report.of === 'week-day' && state.report.dayStaysOpen === true);
+    if (!sheetClosedToday && !todayBanked) return;
+    // Tomorrow is a day of the same kind today was — the whole-day patch rides in the same merge
+    // rather than in a second one, so no render sees a week advanced onto a horizon it is not
+    // running yet.
+    // `campaignFitOut: undefined` unconditionally here, unlike in `startRun`: this patch is never
+    // empty, so clearing a field that is already clear costs no render that was not happening.
+    /* The crowd first, so the shape is read against the crowd tomorrow meets — § D1095. */
+    const restore = pressDaySeedRestore();
+    const tomorrow = openTomorrowPatch(state.week, roll);
+    /*
+     * **And tomorrow's crowd is dealt, never re-dealt** — lane AL-F, [§ D1229](../../../../DECISIONS.md).
+     * A week played in one sitting met the date's crowd on every day of it and again on every day
+     * of the next week (the post-AK panel's seat D). Tomorrow is dealt the date's crowd if this
+     * device has not filed it on this tower, and the crowd derived from the date, the day and the
+     * weeks closed if it has (`shift/weekRecord.ts#dealtCrowdOf`).
+     */
+    const dealt = dealPatchFor(b, { ...state, ...restore, ...tomorrow } as ViewerState);
+    b.applyPatch({
+      ...tomorrow,
+      ...dayPatchFor(b, { ...state, ...restore, ...tomorrow, ...dealt } as ViewerState),
+      ...restore,
+      ...dealt,
+      campaignFitOut: undefined,
+      campaignEventId: undefined,
+    });
+    b.openRunTab();
+    // § 6's tomorrow, for the same reason `startRun` clears it — {@link campaignDayTowerId}.
+    campaignDayTowerId = undefined;
+    campaignDayIncident = undefined;
+    b.startRun();
   };
   /** The rush in progress — GitHub issue #220. Host-scoped like the career: a rush is not a day. */
   /**
@@ -3691,57 +3761,11 @@ export function createEverydayHost(
       b.intervene(atS, change);
     },
     openTomorrow: () => {
-      releaseCareer();
-      const state = b.state();
-      /*
-       * Nothing to advance from — see the interface docstring. The screens gate their primaries on
-       * the same fact, so this early return is the API refusing what the controls never offer.
-       *
-       * **A sheet standing, or today banked in the week** — [§ D1004](../../../../DECISIONS.md). The
-       * report's button is drawn over a sheet; the front door's is drawn over the week, whose history
-       * carries today once it is closed, and a reload keeps the week and drops the sheet. A day the
-       * week already holds is a day there is something to advance from, whichever screen asks.
-       */
-      const todayBanked = state.week.history.some((entry) => entry.day === state.week.day);
-      /*
-       * **A sheet that closed nothing is not a sheet to advance from** — wave AL, lane AL-A, under
-       * [§ D1141](../../../../DECISIONS.md). A run on a link's crowd is practice and leaves the week
-       * on its day (`shift/report.ts#dayStaysOpen`); its sheet stood here all the same, so this
-       * press moved the week past a counted day the sheet itself said stays open (the post-AK
-       * panel's seat D, H2). The report no longer offers the button; this is the API refusing it.
-       */
-      const sheetClosedToday =
-        state.report !== undefined && !(state.report.of === 'week-day' && state.report.dayStaysOpen === true);
-      if (!sheetClosedToday && !todayBanked) return;
-      // Tomorrow is a day of the same kind today was — the whole-day patch rides in the same merge
-      // rather than in a second one, so no render sees a week advanced onto a horizon it is not
-      // running yet.
-      // `campaignFitOut: undefined` unconditionally here, unlike in `startRun`: this patch is never
-      // empty, so clearing a field that is already clear costs no render that was not happening.
-      /* The crowd first, so the shape is read against the crowd tomorrow meets — § D1095. */
-      const restore = pressDaySeedRestore();
-      const tomorrow = openTomorrowPatch(state.week);
-      /*
-       * **And tomorrow's crowd is dealt, never re-dealt** — lane AL-F, [§ D1229](../../../../DECISIONS.md).
-       * A week played in one sitting met the date's crowd on every day of it and again on every day
-       * of the next week (the post-AK panel's seat D). Tomorrow is dealt the date's crowd if this
-       * device has not filed it on this tower, and the crowd derived from the date, the day and the
-       * weeks closed if it has (`shift/weekRecord.ts#dealtCrowdOf`).
-       */
-      const dealt = dealPatchFor(b, { ...state, ...restore, ...tomorrow } as ViewerState);
-      b.applyPatch({
-        ...tomorrow,
-        ...dayPatchFor(b, { ...state, ...restore, ...tomorrow, ...dealt } as ViewerState),
-        ...restore,
-        ...dealt,
-        campaignFitOut: undefined,
-        campaignEventId: undefined,
-      });
-      b.openRunTab();
-      // § 6's tomorrow, for the same reason `startRun` clears it — {@link campaignDayTowerId}.
-      campaignDayTowerId = undefined;
-      campaignDayIncident = undefined;
-      b.startRun();
+      advanceDay(false);
+    },
+    openNextWeek: () => {
+      if (!weekHasClosed(b.state().week)) return;
+      advanceDay(true);
     },
     setDispatcher: (dispatcherId) => {
       const state = b.state();

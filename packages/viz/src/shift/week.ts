@@ -605,14 +605,7 @@ export function nextDay(week: WeekState): WeekState {
    * Nothing is locked. The closed week's days leave the history with it, because a history keyed
    * by day number cannot hold two Mondays (`everyday/weekView.ts` keys its cards by day).
    */
-  if (weekRollsOver(week)) {
-    return {
-      ...openWeek(week.contractId),
-      completed: week.completed,
-      streak: week.streak,
-      bestMinutePct: week.bestMinutePct,
-    };
-  }
+  if (weekRollsOver(week)) return rollWeek(week);
   return {
     ...week,
     day: week.day + 1,
@@ -623,6 +616,22 @@ export function nextDay(week: WeekState): WeekState {
     attempt: 0,
     closedDay: null,
     banked: null,
+  };
+}
+
+/**
+ * **Day 1 of a new week on the same tower** — § D1177's roll, which {@link nextDay} takes from the
+ * week's last day, and which *Start next week* takes from the week's sheet as soon as the sheet
+ * stands ([§ D1246](../../../../DECISIONS.md): the weekend comes off the main path, so the sheet
+ * stands from the last counted weekday and the weekend is played only by choice). What the player
+ * has is kept: every scenario cleared, the streak and the best day.
+ */
+export function rollWeek(week: WeekState): WeekState {
+  return {
+    ...openWeek(week.contractId),
+    completed: week.completed,
+    streak: week.streak,
+    bestMinutePct: week.bestMinutePct,
   };
 }
 

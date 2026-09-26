@@ -159,10 +159,20 @@ function mountWeek(
   }
 
   /**
-   * *Start next week* — the Sunday screen's one press, § D1227. `openTomorrow` rolls a closed week
-   * (§ D1177) and deals its first day's crowd (§ D1229); the brief is where a day is set up.
+   * *Start next week* — the sheet's one primary, § D1227. `openNextWeek` rolls a closed week
+   * (§ D1177) from whichever day it stands on, since the weekend came off the main path (§ D1246),
+   * and deals its first day's crowd (§ D1229); the brief is where a day is set up.
    */
   function startNextWeek(): void {
+    context.host.openNextWeek();
+    context.go('brief');
+  }
+
+  /**
+   * *Play Saturday* — the weekend, off the main path and still playable (§ D1246). `openTomorrow`
+   * advances one day without rolling, and the brief is where the day is set up.
+   */
+  function playWeekendDay(): void {
     context.host.openTomorrow();
     context.go('brief');
   }
@@ -222,6 +232,28 @@ function mountWeek(
       const roll = el(doc, 'p', 'everyday-week-sheet-roll', view.sheet.rollLine);
       roll.style.cssText = `${QUIET};margin:0;max-width:74ch`;
       sheet.body.append(note, roll);
+      /* The weekend, off the main path and still playable — § D1246. The bar's primary is *Start next week*. */
+      const weekend = view.sheet.weekend;
+      if (weekend !== undefined) {
+        const row = el(doc, 'div', 'everyday-week-weekend');
+        row.style.cssText = 'display:flex;align-items:center;gap:11px;flex-wrap:wrap';
+        const press = el(doc, 'button', 'everyday-week-weekend-play', weekend.label);
+        press.type = 'button';
+        press.style.cssText = [
+          'cursor:pointer',
+          'background:transparent',
+          `border:1px solid ${C.rule}`,
+          `border-radius:${String(R.pill)}px`,
+          `color:${C.ink}`,
+          'padding:7px 14px',
+          'font-size:13px',
+        ].join(';');
+        press.addEventListener('click', playWeekendDay);
+        const why = el(doc, 'span', 'everyday-week-weekend-note', weekend.note);
+        why.style.cssText = `${QUIET};max-width:60ch`;
+        row.append(press, why);
+        sheet.body.append(row);
+      }
       if (view.record !== undefined) {
         const record = el(doc, 'p', 'everyday-week-record', view.record);
         record.style.cssText = `${QUIET};margin:0;max-width:74ch`;

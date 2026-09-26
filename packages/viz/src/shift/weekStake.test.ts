@@ -18,19 +18,22 @@ import { describe, expect, it } from 'vitest';
 
 import { CONTRACTS, contractById } from './contracts.js';
 import { goalsForDay, readGoals } from './goals.js';
-import { closeDay, nextDay, openWeek, outcomeOf } from './week.js';
+import { closeDay, nextDay, openWeek, outcomeOf, rollWeek } from './week.js';
 import {
   countedCleanOf,
   DAY_COUNTS_SENTENCE,
   daysWerePlayedOn,
   dayCountsToward,
   houseNeedOf,
+  houseReadingOfDay,
   houseRecordOf,
   houseStandingOrder,
   weekAdmitsANewcomer,
   weekDealOf,
+  weekClosedByThisClose,
   weekHasClosed,
   weekNeedOf,
+  weekPathEndOf,
   weekRollsOver,
   weekSheetOf,
   weekStakeLineOf,
@@ -42,6 +45,8 @@ import {
   WEEK_HELD_NOTE,
   WEEK_LENGTH,
   WEEK_SHEET_NOTE,
+  WEEKEND_NOTE,
+  WORKING_DAYS,
   type DealtDay,
   type HouseReading,
   type WeekDeal,
@@ -323,6 +328,57 @@ describe('the week closes and rolls — § D1177', () => {
     expect(weekHasClosed(week)).toBe(false);
     week = closeDay(week, dayOn(week, true));
     expect(weekHasClosed(week)).toBe(true);
+  });
+
+  it('closes Midtown’s week at Friday, its last counted day, so the weekend is off the main path — § D1246', () => {
+    const deal = weekDealOf('c2');
+    expect(deal === undefined ? undefined : weekPathEndOf(deal)).toBe(5);
+    let week = openWeek('c2');
+    for (let day = 1; day < 5; day += 1) {
+      week = closeDay(week, dayOn(week, true));
+      expect(weekHasClosed(week), String(day)).toBe(false);
+      week = nextDay(week);
+    }
+    week = closeDay(week, dayOn(week, true));
+    expect([week.day, weekHasClosed(week), weekClosedByThisClose(week)]).toEqual([5, true, true]);
+    expect(weekSheetOf(week, () => undefined)?.weekend).toEqual({
+      weekday: 'Saturday',
+      label: 'Play Saturday',
+      note: WEEKEND_NOTE,
+    });
+    // The weekend stays playable: Saturday opens on a press, and its close stands on the closed week.
+    week = nextDay(week);
+    expect([week.day, weekHasClosed(week)]).toEqual([6, false]);
+    week = closeDay(week, dayOn(week, true));
+    expect([weekHasClosed(week), weekClosedByThisClose(week)]).toEqual([true, false]);
+    expect(weekSheetOf(week, () => undefined)?.weekend?.weekday).toBe('Sunday');
+    week = closeDay(nextDay(week), dayOn(nextDay(week), false));
+    expect(weekSheetOf(week, () => undefined)?.weekend).toBeUndefined();
+    // Start next week rolls from Friday as from Sunday, keeping what a roll keeps.
+    const rolled = rollWeek({ ...week, streak: 3 });
+    expect([rolled.day, rolled.history.length, rolled.streak]).toEqual([1, 0, 3]);
+  });
+
+  it('keeps the weekdays on the path where a week counts only Monday, and never ends it before Friday', () => {
+    for (const contract of CONTRACTS) {
+      const deal = weekDealOf(contract.id);
+      if (deal === undefined) continue;
+      const lastCounted = deal.days.filter((day) => day.counts).at(-1)?.day ?? 0;
+      expect(weekPathEndOf(deal), contract.id).toBe(Math.max(WORKING_DAYS, lastCounted));
+    }
+  });
+
+  it('reads the house on a closed day the way the sheet does — the one join both surfaces use', () => {
+    const week = playWeek('c2', [1, 2], (day) => (day === 2 ? record(day, { dispatcherId: 'eta' }) : day === 3 ? null : record(day)));
+    const byDay = (day: number): DayOutcome => week.history.find((entry) => entry.day === day) as DayOutcome;
+    expect(houseReadingOfDay(byDay(1), () => 'missed')).toBe('cleared');
+    expect(houseReadingOfDay(byDay(2), () => undefined)).toBe('pending');
+    expect(houseReadingOfDay(byDay(2), () => 'missed')).toBe('missed');
+    expect(houseReadingOfDay(byDay(3), () => 'cleared')).toBe('unrecorded');
+    const sheet = weekSheetOf(week, () => 'missed');
+    for (const day of [1, 2, 3]) {
+      expect(sheet?.rows[day - 1]?.house, String(day)).toBe(houseReadingOfDay(byDay(day), () => 'missed'));
+    }
   });
 
   it('never closes a week the census does not speak for', () => {

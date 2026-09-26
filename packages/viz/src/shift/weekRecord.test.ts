@@ -13,7 +13,7 @@ import { closeDay, nextDay, openWeek, outcomeOf } from './week.js';
 import { goalsForDay, readGoals } from './goals.js';
 import { scheduledEventFor } from './calendar.js';
 import { practiceGroundOf } from './scoredCrowd.js';
-import { countedCleanOf, weekDealOf, weekHasClosed } from './weekStake.js';
+import { countedCleanOf, weekClosedByThisClose, weekDealOf } from './weekStake.js';
 import {
   dealtCrowdOf,
   derivedCrowdOf,
@@ -85,7 +85,7 @@ function fileOn(week: WeekState, seed: bigint): WeekState {
 function recordClose(records: readonly WeekRecord[], week: WeekState, seed: bigint, date: bigint): readonly WeekRecord[] {
   let next = seed === date ? recordsWithDateCrowd(records, week.contractId, seed.toString()) : records;
   const deal = weekDealOf(week.contractId);
-  if (deal !== undefined && weekHasClosed(week)) {
+  if (deal !== undefined && weekClosedByThisClose(week)) {
     next = recordsWithClosedWeek(next, week.contractId, countedCleanOf(week), deal.target);
   }
   return next;

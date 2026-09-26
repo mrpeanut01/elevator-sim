@@ -453,14 +453,52 @@ export function weekOfferOf(contractId: string, census: WeekWay = WEEK_WAY): Wee
 }
 
 /**
- * Whether the week has closed: the census speaks for its tower and its last dealt day has been
- * filed. The sheet is drawn from here until the week rolls.
+ * **The weekdays: the days a week's main path always holds** — wave AM, lane AM-C, swarm DO's § 1
+ * ruling, [§ D1246](../../../../DECISIONS.md). Saturday and Sunday are day 6 and day 7.
+ */
+export const WORKING_DAYS = 5;
+
+/**
+ * **The last day of a week's main path** — [§ D1246](../../../../DECISIONS.md), swarm DO's § 1
+ * ruling: *the weekend comes off the main path, and the week's sheet appears at the last counted
+ * day's close*. The later of Friday and the week's last counted day, so a tower that counts a
+ * Saturday keeps it on the path, and a tower that counts only Monday (Harbour Point) keeps its
+ * weekdays: the ruling took the weekend off the path, and left the weekdays on it.
+ *
+ * On Midtown Office, the one tower whose week the census contests, the last counted day **is**
+ * Friday, so the two readings of the ruling are the same day there.
+ */
+export function weekPathEndOf(deal: WeekDeal): number {
+  const lastCounted = deal.days.reduce((last, day) => (day.counts ? Math.max(last, day.day) : last), 0);
+  return Math.max(WORKING_DAYS, lastCounted);
+}
+
+/**
+ * Whether the week has closed: the census speaks for its tower, the last day of its main path
+ * ({@link weekPathEndOf}) has been filed, and the day the week stands on is filed. The sheet is
+ * drawn from here until the week rolls, and again after each weekend day the player chooses to
+ * close ([§ D1246](../../../../DECISIONS.md); it was day 7 alone under § D1177).
  */
 export function weekHasClosed(
   week: Pick<WeekState, 'contractId' | 'day' | 'closedDay'>,
   census: WeekWay = WEEK_WAY,
 ): boolean {
-  return weekDealOf(week.contractId, census) !== undefined && week.day >= WEEK_LENGTH && week.closedDay === week.day;
+  const deal = weekDealOf(week.contractId, census);
+  return deal !== undefined && week.day >= weekPathEndOf(deal) && week.closedDay === week.day;
+}
+
+/**
+ * **Whether this close is the one that closed the week** — the last day of the main path, just
+ * filed ([§ D1246](../../../../DECISIONS.md)). A weekend day closed after it stands on a closed week
+ * and did not close it, so the tower's record of weeks (`everyday/host.ts#fileScenarioDay`) counts
+ * the week once.
+ */
+export function weekClosedByThisClose(
+  week: Pick<WeekState, 'contractId' | 'day' | 'closedDay'>,
+  census: WeekWay = WEEK_WAY,
+): boolean {
+  const deal = weekDealOf(week.contractId, census);
+  return deal !== undefined && weekHasClosed(week, census) && week.day === weekPathEndOf(deal);
 }
 
 /**
@@ -601,6 +639,12 @@ export interface WeekSheetView {
   readonly note: string;
   /** What happens tomorrow. */
   readonly rollLine: string;
+  /**
+   * The days after the week's main path, still to play and counting toward nothing — wave AM,
+   * lane AM-C ([§ D1246](../../../../DECISIONS.md)). `undefined` once the week stands on its last
+   * day. The week screen draws it as a secondary press beside *Start next week*.
+   */
+  readonly weekend: WeekendOffer | undefined;
   readonly rows: readonly WeekSheetRow[];
   /** Your clean counted days, and the house's, as counts — the figures the two lines print. */
   readonly yours: number;
@@ -610,6 +654,20 @@ export interface WeekSheetView {
 }
 
 export const WEEK_SHEET_HEADING = 'THE WEEK, CLOSED';
+
+/** The weekend, offered off the main path — {@link WeekSheetView.weekend}. */
+export interface WeekendOffer {
+  /** The day the press opens: `Saturday`. */
+  readonly weekday: string;
+  /** `Play Saturday`. */
+  readonly label: string;
+  readonly note: string;
+}
+
+/** What the weekend offer says under its press. No digit: it is a rule, and the census row is the brief's. */
+export const WEEKEND_NOTE =
+  'The rest of this week counts toward no target and is not run against the house. It stays open to ' +
+  'play, one day at a time, from here.';
 
 /** § D1177's scope sentence: a tally over these crowds, never a ranking. */
 export const WEEK_SHEET_NOTE =
@@ -622,16 +680,44 @@ export const WEEK_SHEET_NOTE =
  */
 export const WEEK_CLOSED_LINE =
   'This week has closed. Its sheet, with the tower’s standing order beside you on the same crowds, ' +
-  'is on Your week, and tomorrow opens a new week on this tower.';
+  'is on Your week, and the next week on this tower starts from there.';
 
+/**
+ * *Tomorrow opens a new week* stood here, and since [§ D1246](../../../../DECISIONS.md) the sheet
+ * stands from the last day of the main path, when the day after it may be a weekend day the player
+ * chooses to play. What opens the new week is the press, so the line names the press.
+ */
 export const WEEK_SHEET_ROLL_LINE =
-  'Tomorrow opens a new week on this tower, counted from zero. Nothing is locked, and a scenario ' +
-  'you have cleared stays cleared.';
+  'Start next week opens a new week on this tower, counted from zero. Nothing is locked, and a ' +
+  'scenario you have cleared stays cleared.';
 
-function verdictOfOutcome(outcome: DayOutcome): 'cleared' | 'missed' | 'ungraded' {
+/**
+ * A closed day's verdict as the sheet's cells read it. Exported for the close's own house line
+ * (`shift/dayClose.ts`, [§ D1247](../../../../DECISIONS.md)), so the two surfaces that state
+ * today's result against the house grade *you* the same way.
+ */
+export function dayVerdictOf(outcome: DayOutcome): 'cleared' | 'missed' | 'ungraded' {
   const graded = outcome.readings.length > 0 && outcome.readings.every((reading) => reading.state !== 'pending');
   if (!graded) return 'ungraded';
   return outcome.allMet ? 'cleared' : 'missed';
+}
+
+/**
+ * **The house's reading on one closed day**, the one join the sheet and the close both read — wave
+ * AM, lane AM-C ([§ D1247](../../../../DECISIONS.md)). A day whose own run was the standing order
+ * untouched is its own house, read off the day at no cost; a day that kept no record of its crowd
+ * could not be run; every other day reads the shell's run, *still being run* until it answers.
+ * Asked of a counted day only: the house is not run on a day that does not count.
+ */
+export function houseReadingOfDay(
+  outcome: DayOutcome,
+  houseOf: (day: number) => HouseReading | undefined,
+  census: WeekWay = WEEK_WAY,
+): HouseReading {
+  const need = houseNeedOf(outcome, census);
+  if (need === 'own') return dayVerdictOf(outcome);
+  if (need === 'unrecorded') return 'unrecorded';
+  return houseOf(outcome.day) ?? 'pending';
 }
 
 /**
@@ -650,21 +736,9 @@ export function weekSheetOf(
   const rows: WeekSheetRow[] = deal.days.map((dealt) => {
     const outcome = byDay.get(dealt.day);
     const counts = outcome === undefined ? dealt.counts : dayCountsToward(week.contractId, outcome, census);
-    let house: HouseReading | undefined;
-    if (counts) {
-      if (outcome === undefined) house = undefined;
-      else {
-        const need = houseNeedOf(outcome, census);
-        house =
-          need === 'own'
-            ? verdictOfOutcome(outcome)
-            : need === 'unrecorded'
-              ? 'unrecorded'
-              : (houseOf(dealt.day) ?? 'pending');
-      }
-    }
+    const house = counts && outcome !== undefined ? houseReadingOfDay(outcome, houseOf, census) : undefined;
     const weekday = weekdayOf(dealt.dayIdx).slice(0, 3).toUpperCase();
-    const yours: SheetVerdict = outcome === undefined ? 'not played' : verdictOfOutcome(outcome);
+    const yours: SheetVerdict = outcome === undefined ? 'not played' : dayVerdictOf(outcome);
     return {
       weekday,
       day: dealt.day,
@@ -700,12 +774,20 @@ export function weekSheetOf(
         : `Target ${String(deal.target)}: ${yours >= deal.target ? 'met' : 'not met'}.`,
     note: WEEK_SHEET_NOTE,
     rollLine: WEEK_SHEET_ROLL_LINE,
+    weekend: weekendOfferOf(week),
     rows: Object.freeze(rows),
     yours,
     house,
     counted,
     target: deal.target,
   };
+}
+
+/** The day after the one the week stands on, while the week has one — {@link WeekSheetView.weekend}. */
+function weekendOfferOf(week: Pick<WeekState, 'day' | 'dayIdx'>): WeekendOffer | undefined {
+  if (week.day >= WEEK_LENGTH) return undefined;
+  const weekday = weekdayOf(week.dayIdx + 1);
+  return { weekday, label: `Play ${weekday}`, note: WEEKEND_NOTE };
 }
 
 /* -------------------------------------------------------------------------- *

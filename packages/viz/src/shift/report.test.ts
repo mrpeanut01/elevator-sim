@@ -1416,9 +1416,32 @@ describe('the rest of the sheet', () => {
     expect(sunday.taught).toBe(WEEK_CLOSED_LINE);
     expect(sunday.forecast.demand).toMatch(/^A new week: the tower as handed, \d+\.\d% fewer tenants than today$/u);
     expect(sunday.nextDayName).toBe('Monday');
-    // Saturday closes a day and not the week.
-    expect(reportOf(clean, 6).taught).not.toBe(WEEK_CLOSED_LINE);
+    // Saturday stands on a week already closed on Friday — § D1246 — and the card still names Sunday.
+    expect(reportOf(clean, 6).taught).toBe(WEEK_CLOSED_LINE);
     expect(reportOf(clean, 6).forecast.demand).toMatch(/^\+\d+\.\d% more tenants than today$/u);
+  });
+
+  it('closes Midtown’s week at its last counted day, Friday, and not before — § D1246', () => {
+    const friday = reportOf(clean, 5);
+    expect(friday.taught).toBe(WEEK_CLOSED_LINE);
+    expect(friday.weekClosed).toBe(true);
+    expect(reportOf(clean, 4).taught).not.toBe(WEEK_CLOSED_LINE);
+    expect(reportOf(clean, 4).weekClosed).toBeUndefined();
+    // The Engineer card still names the literal tomorrow; the close's own card names the path's next day.
+    expect(friday.nextDayName).toBe('Saturday');
+    expect(friday.onward?.newWeek).toBe(true);
+    expect([friday.onward?.day, friday.onward?.weekday]).toEqual([1, 'Monday']);
+    expect(friday.onward?.demand).toMatch(/^A new week: the tower as handed/u);
+    const thursday = reportOf(clean, 4);
+    expect([thursday.onward?.day, thursday.onward?.weekday, thursday.onward?.newWeek]).toEqual([5, 'Friday', false]);
+    expect(thursday.onward?.name).toBe(thursday.forecast.name);
+  });
+
+  it('promises no unlock of what is already open — § D1250', () => {
+    for (const day of [1, 2, 3, 4]) {
+      const taught = reportOf(clean, day).taught;
+      expect(taught, String(day)).not.toContain('next assignment opens');
+    }
   });
 
   it('says what is banked, and what is left to bank', () => {

@@ -48264,3 +48264,133 @@ it. Shown red on a 130-word row added to each document.
 
 **Not done.** Correcting the § D343 citations; shortening the older rows, which are records; and any
 measurement of how much the lighter file changes a lane's cost, which is unmeasured.
+
+## D1246 — the weekend comes off the main path: a census week closes at the later of Friday and its last counted day
+
+> **Taken 2026-09-26 by agent sessions under delegated authority** (wave AM, lane AM-C, on swarm
+> DO's § 1 ruling, three of three, S2 and S3), not by the product owner. It amends [§ D1177](#d1177)
+> clause 1 (the week closes on day 7) and [§ D1227](#d1227) clause 2 (*Start next week* on Sunday's
+> sheet). **Owner-reversible**: the weekend off the main path, and *the later of Friday and the last
+> counted day* as its end.
+
+**Why an entry.** It moves two recorded rulings and binds `shift/weekStake.ts`, `shift/week.ts`,
+`everyday/host.ts`, the week screen and the report.
+
+**What was wrong.** Saturday and Sunday count toward nothing on every census tower (the standing
+order clears them on 20 of 20 held-out crowds), and the week's sheet waited for Sunday, so the week's
+stake resolved two days before its ending and the post-AL panel's seats pressed through the weekend
+with *Skip to the end*.
+
+**The ruling.**
+
+1. **A census week's main path ends at `weekStake.ts#weekPathEndOf`**: the later of Friday
+   (`WORKING_DAYS`) and the week's last counted day. On Midtown Office that is Friday, which is
+   also its last counted day, so the ruling's two readings agree there; Harbour Point, which counts
+   Monday alone, keeps its weekdays on the path.
+2. **`weekHasClosed` reads from that day.** The close of that day leads to the week's sheet
+   ([§ D1227](#d1227)'s *See the week against the house*), and so does the close of a weekend day
+   played after it. The tower's record of weeks counts the week once, at the path's end
+   (`weekClosedByThisClose`).
+3. **The sheet's primary, *Start next week*, rolls the week from whichever day it stands on**
+   (`week.ts#rollWeek`, `EverydayHost.openNextWeek`). `nextDay` still rolls only from day 7.
+4. **The weekend stays playable**, one press on the sheet (*Play Saturday*, then *Play Sunday*),
+   counting toward no target and never run against the house (`weekStake.ts#WEEKEND_NOTE`); the
+   close that closed the week says so under tomorrow's card (`dayClose.ts#DAY_CLOSE_WEEKEND_LINE`).
+
+**Tests.** `shift/weekStake.test.ts` (Friday closes Midtown's week and Thursday does not; the sheet
+offers Saturday and then Sunday; the path end on every census tower), `shift/report.test.ts`,
+`shift/weekRecord.test.ts` (one record per week across three weeks), and
+`everyday/weekSurvives.browser.test.ts` (seven Midtown days, the weekend reached from the sheet).
+
+## D1247 — every counted close leads with today against the house, the week's tally and the week's arithmetic
+
+> **Taken 2026-09-26 by agent sessions under delegated authority** (wave AM, lane AM-C, swarm DO's
+> § 1 ruling items 1 and 3), not by the product owner. It extends [§ D1177](#d1177)'s house from
+> the week's sheet to every counted close, and [§ D1226](#d1226)'s target mark to every close.
+> **Owner-reversible**: the tally's words (*you N, the house M*) and the lead's order.
+
+**Why an entry.** It reads the house runs `dev/main.ts#askWeekHouse` starts ([§ D1227](#d1227) clause
+3) on a second surface, and declares a new honesty pair.
+
+**The ruling.** The daily report's close leads, above the figures, with
+`shift/dayClose.ts#dayCloseOf`: *Today against the house: you cleared it; the tower's standing
+order, left alone on the same crowd, missed it*, reading *is still being run* until the run answers
+and naming the day that ran the standing order untouched as its own house; *This week so far: you N,
+the house M, clean over the same K counted days*; and the week's arithmetic, *The week needs k of the
+n counted days left*, *Target met … the days left still count against the house*, or *The target is
+out of reach … The tally against the house is still open*, so every counted close keeps a stake.
+The house reading is the sheet's own join (`weekStake.ts#houseReadingOfDay`), and
+`dev/main.ts#weekHouseReadingOf` answers for any closed day of a census week rather than only a
+closed week. **The `house-today` pair** (`honesty/agreement.ts`) holds the close's line and the
+sheet's cell for the same day equal, since both now state it one press apart.
+
+**Tests.** `shift/dayClose.test.ts` (the house's five readings, the tally, the arithmetic's three
+states, nothing where the census does not speak), `honesty/agreement.test.ts`.
+
+## D1248 — the close names the call that decided the day, or says plainly that none did
+
+> **Taken 2026-09-26 by agent sessions under delegated authority** (wave AM, lane AM-C, swarm DO's
+> § 1 ruling item 2), not by the product owner. **Owner-reversible**: naming the latest deciding
+> call rather than all of them.
+
+**Why an entry.** It adds a claim across [§ D1138](#d1138)'s call rows, which until now each spoke
+only of their own call.
+
+**The ruling.** A call decided the day when one of its other answers, run on this crowd from the call
+with every earlier press kept and nothing pressed after (the row's own three runs, graded by the
+report's own grader), reads a different verdict from the day that was filed. The close names the
+latest such call, *where you chose …: on this crowd, the day run from 17:25 with … and nothing
+pressed after it read Shift missed*, and counts any earlier ones; a pinned press day played as
+measured ([§ D1029](#d1029)) is read the same way off its measured pair. Where calls were raised and
+none flipped, *No call decided today: …*; where none was raised, *No call decided today: the stage
+raised none.* A day nobody graded draws neither. The sentence names *nothing pressed after it*
+because the filed day may carry later presses those runs do not; it states what the runs read and
+never that the other answer is better.
+
+**Tests.** `shift/dayClose.test.ts`.
+
+## D1249 — the close says tomorrow in full, and its press into tomorrow is the report's primary
+
+> **Taken 2026-09-26 by agent sessions under delegated authority** (wave AM, lane AM-C, swarm DO's
+> § 1 ruling items 4 and 5), not by the product owner. It amends the guide's § 3.3 report row
+> (inverted, primary *Your week*) on the daily flow only. **Owner-reversible**: the census count on
+> the close, and the primary.
+
+**What was wrong.** The post-AL panel's seat A found *Open the doors on Tuesday* about 3 900 px down
+the sheet, under *Return to Main Menu*, and the Everyday sheet never named tomorrow's wrinkle
+(`shift/report.ts#forecastFor` was drawn on the Engineer panel only).
+
+**The ruling.** The close's tomorrow card names the next day on the main path
+(`WeekDayReport.onward`, derived as `forecastFor` derives the run; the next week's Monday on the close
+that closed the week, with the weekend line of [§ D1246](#d1246)): its wrinkle and note, which carries
+its clock window where it has one; the move-ins from the beat's two measured populations
+(`TomorrowBriefing.population`); whether it counts, the census's own sentence; and *The census ran
+Tuesday on 20 crowds: left alone, the tower's standing order cleared it on 8 of them* (Midtown's Tuesday as `data/week-way.json` holds it), a count over census crowds and never a forecast of the player's day. Under it, *Open the
+doors on Tuesday* with *Your week* and *Main menu* beside it, and the pinned bar's primary is the same
+press at full emphasis. The card and the press sit on the first screen at 1440 × 900 and 390 × 844.
+
+**Tests.** `shift/dayClose.test.ts`, `everyday/reportView.test.ts`,
+`everyday/dayClose.browser.test.ts` (both viewports, the bar's primary, the press lands on the
+brief) and `everyday/dailyLoop.browser.test.ts`.
+
+## D1250 — four false sentences on the path between days are withdrawn
+
+> **Taken 2026-09-26 by agent sessions under delegated authority** (wave AM, lane AM-C, swarm DO's
+> § 1 ruling, S2's list), not by the product owner.
+
+**Why an entry.** The copy is spread over five modules and one of the four contradicts `docs/38`.
+
+1. *Opens tomorrow's day and starts it* (report) and *This opens Wednesday's day and starts it*
+   (door): the press opens the brief, where the day's one scored attempt starts at *Start the day*
+   ([§ D1218](#d1218)). Both now say the brief.
+2. *Bank N more clean shifts on this building and the next assignment opens: …*
+   (`shift/report.ts#taughtFor`) promised to open things already open. Withdrawn, not softened: *Bank
+   N more clean shifts on this building to clear ⟨scenario⟩.*
+3. The Scenario tile's *retry as often as you like*, beside a day that is one scored attempt: *one
+   scored attempt a day, and replays as practice*.
+4. The between-day beat's **STREAK** row, which `docs/38` § 2.4's *no streak exists* contradicts, is
+   removed, and the practice note no longer names a streak. `WeekState.streak` is kept and read by the
+   rail and the week screen as *N days running*; the Engineer panel's streak sentence is unchanged.
+
+**Tests.** `shift/tomorrow.test.ts` (no streak on any arm), `shift/report.test.ts` (no unlock
+promised), `everyday/reportView.test.ts` (the note names the brief).

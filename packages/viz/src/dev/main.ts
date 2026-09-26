@@ -229,7 +229,6 @@ import {
   houseNeedOf,
   houseRecordOf,
   weekDealOf,
-  weekHasClosed,
   type HouseReading,
 } from '../shift/weekStake.js';
 import { tomorrowBriefingOf, type TomorrowBriefing } from '../shift/tomorrow.js';
@@ -1688,9 +1687,15 @@ function boot(ui: Elements, resources: BrowserResources): void {
     return `${contractId}|${String(entry.day)}|${entry.record?.seed ?? '-'}`;
   }
 
+  /**
+   * The house's reading on a closed day of the live week. Read on every counted close now, not only
+   * on a closed week's sheet: the close leads with today against the house and the week's tally
+   * (wave AM, lane AM-C, [§ D1247](../../../../DECISIONS.md)), from the run {@link askWeekHouse}
+   * started as the day closed.
+   */
   function weekHouseReadingOf(day: number): HouseReading | undefined {
     const week = state.week;
-    if (!weekHasClosed(week)) return undefined;
+    if (weekDealOf(week.contractId) === undefined) return undefined;
     const entry = week.history.find((candidate) => candidate.day === day);
     if (entry === undefined) return undefined;
     askWeekHouse(week);

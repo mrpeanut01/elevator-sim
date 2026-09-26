@@ -226,57 +226,26 @@ describe('the day’s counts are counts, and nothing is folded into anything', (
 });
 
 /* -------------------------------------------------------------------------- *
- * A streak is a claim — the three arms `closeDay` actually has
+ * No streak — § D1250
  * -------------------------------------------------------------------------- */
 
-describe('the streak is the one the week holds', () => {
-  it('counts a clean day', () => {
-    const week = closedWeek(1, CLEAN);
-    expect(week.streak).toBe(1);
-    expect(rowIn(briefing({ week, verdict: 'cleared' }), 'streak').value).toBe('1 clean day');
+describe('the beat prints no streak — docs/38 § 2.4, § D1250', () => {
+  it('has no STREAK row and no word *streak* on any arm of the verdict', () => {
+    for (const [week, verdict] of [
+      [closedWeek(1, CLEAN), 'cleared'],
+      [closedWeek(1, POOR), 'missed'],
+      [closedWeek(3, QUIET), 'ungraded'],
+    ] as const) {
+      const beat = briefing({ week, verdict });
+      expect(beat.groups.flatMap((group) => group.rows).map((row) => row.id)).not.toContain('streak');
+      expect(allText(beat).toLowerCase(), verdict).not.toContain('streak');
+    }
   });
 
-  it('resets on a graded day that missed, and says what survives', () => {
-    const week = closedWeek(1, POOR);
-    expect(week.streak).toBe(0);
-    const row = rowIn(briefing({ week, verdict: 'missed' }), 'streak');
-    expect(row.value).toBe('none');
-    // `cleanRun` does **not** move on a missed day (`week.ts` rule 1) and the note says so, because
-    // a reader told only *"streak: none"* concludes they lost the assignment as well.
-    expect(row.note).toContain('What is banked stays banked');
-  });
-
-  it('leaves an ungraded day alone, and does not say a streak was reset — § D234', () => {
-    /*
-     * The sentence this pins is the one issue #27 removed from the report: a play-tester who
-     * carried 18 of 18 with 100 % away inside a minute was told *"Shift missed. Streak reset."*
-     * about a day nobody looked at. A beat that re-introduced the wording would re-ship the
-     * defect on a new surface, which is exactly how a corrected claim goes stale.
-     */
-    const week = closedWeek(3, QUIET);
-    const row = rowIn(briefing({ week, verdict: 'ungraded' }), 'streak');
-    expect(row.note).toContain('never graded');
-    expect(row.note.toLowerCase()).not.toContain('reset');
-    expect(row.note).toContain('Unjudged is not passed, and it is not failed either.');
-  });
-
-  it('never reads “0 clean days”, which is a quantity nobody had', () => {
-    expect(rowIn(briefing({ week: closedWeek(1, POOR), verdict: 'missed' }), 'streak').value).toBe(
-      'none',
-    );
-  });
-
-  it('takes the verdict rather than re-deriving one — issue #53', () => {
-    /*
-     * The guard on *carried from the report rather than recomputed*. Handing the beat a verdict
-     * that disagrees with `allMet` must produce the **verdict's** sentence, because the sheet's
-     * judgement is the product's one judgement. A beat that quietly preferred `allMet` would be a
-     * second computation of it, and two computations of one judgement is the defect that put
-     * *"A day it could handle"* over *"Shift missed"* on one screen.
-     */
-    const week = closedWeek(1, CLEAN);
-    expect(week.history.at(-1)?.allMet).toBe(true);
-    expect(rowIn(briefing({ week, verdict: 'missed' }), 'streak').note).toContain('missed a goal');
+  it('carries the two measured populations the tenants row reads, for the close’s tomorrow card', () => {
+    const beat = briefing({ populationToday: 1710, populationTomorrow: 1898 });
+    expect(beat.population).toEqual({ today: 1710, tomorrow: 1898 });
+    expect(rowIn(beat, 'tenants').value).toBe('1,710 → 1,898');
   });
 });
 

@@ -333,6 +333,57 @@ describe('what this screen adds on top of the sheet', () => {
   });
 
   /*
+   * Wave AM, lane AM-C, swarm DO's § 1 ruling (§ D1246 to § D1250). The daily close leads with the
+   * week against the house and tomorrow; the note under the onward press says what it does.
+   */
+  it('says the onward press opens the brief, and never that it starts the day — § D1250', () => {
+    const note = viewOf().tomorrow?.note ?? '';
+    expect(note).toContain('brief');
+    expect(note).not.toContain('starts it');
+  });
+
+  it('leads a daily close with the week against the house and tomorrow, and draws no lead elsewhere', () => {
+    let week = openWeek('c2');
+    week = closeDay(
+      week,
+      outcomeOf({
+        day: 1,
+        dayIdx: 0,
+        eventId: 'ordinary',
+        arrived: 400,
+        carried: 380,
+        minutePct: 90,
+        readings: [],
+        record: null,
+        recordRefusal: null,
+      }),
+    );
+    const onward = {
+      day: 2,
+      dayIdx: 1,
+      weekday: 'Tuesday',
+      eventId: 'move-in:past-halfway',
+      name: 'Move-in day',
+      note: 'A tenant is hauling boxes up.',
+      demand: '+2.0% more tenants than today',
+      newWeek: false,
+    };
+    const report = sheetOf({ onward, decidingCall: 'No call decided today: the stage raised none.' });
+    const view = viewOf({ report, week, house: () => 'missed' });
+    expect(view.close?.tomorrow.heading).toBe('TOMORROW · TUESDAY, DAY 2');
+    expect(view.close?.tomorrow.wrinkle).toBe('Move-in day: A tenant is hauling boxes up.');
+    expect(view.close?.call).toBe('No call decided today: the stage raised none.');
+    expect(view.close?.arithmetic).toBeDefined();
+    expect(view.secondary).toEqual({ week: 'Your week', menu: 'Main menu' });
+    // No week handed in (every caller but the daily report), a career sheet, or a practice close: no lead.
+    expect(viewOf({ report }).close).toBeUndefined();
+    expect(
+      viewOf({ report, week, career: { buildingName: 'Garden Apartments', day: 4, canRunAnother: true } }).close,
+    ).toBeUndefined();
+    expect(viewOf({ report: sheetOf({ onward, practiceNote: 'Practice.' }), week }).close).toBeUndefined();
+  });
+
+  /*
    * GitHub issue #577. The unit half of the fix — `campaignJourney.browser.test.ts` holds the half
    * that matters, because the defect was a composition of three correct modules and only the crumbs
    * after the press can show it. What is worth pinning here is that the **daily arm is reached by

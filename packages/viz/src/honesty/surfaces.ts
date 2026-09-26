@@ -192,7 +192,15 @@ import {
   type SupportInput,
   type SupportRun,
 } from '../everyday/support.js';
-import { FIGURE_NOTE_HANDLE, everydayReportViewOf, WEEK_SHEET_STEP } from '../everyday/reportView.js';
+import { FIGURE_NOTE_HANDLE, everydayReportViewOf, REPORT_SECONDARY, WEEK_SHEET_STEP } from '../everyday/reportView.js';
+import {
+  DAY_CLOSE_HEADING,
+  DAY_CLOSE_WEEKEND_LINE,
+  dayCloseOf,
+  NO_CALL_DECIDED_LINE,
+  NO_CALL_RAISED_LINE,
+  type DayCloseView,
+} from '../shift/dayClose.js';
 // GitHub issue #221's post block — the decision, seeded in all seven states by the report adapter.
 import { postRunViewOf } from '../everyday/postRun.js';
 import { CHIMES_PANEL_COPY } from '../everyday/chimesPanel.js';
@@ -771,6 +779,7 @@ import {
   weekStakeLineOf,
   weekTargetMetLineOf,
   WEEK_WITHOUT_COUNTED_DAYS_SHORT,
+  WEEKEND_NOTE,
   type DealtDay,
   type HouseReading,
   type WeekDeal,
@@ -14102,6 +14111,21 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
      */
     'shift/weekStake.ts#weekTargetMetLineOf',
     'everyday/reportView.ts#WEEK_SHEET_STEP',
+    /*
+     * Wave AM, lane AM-C (§ D1246 to § D1249): the close's lead, its two secondary presses, the
+     * weekend offered off the main path, and the call sentence's words for an answer. Seeded over
+     * each case's own filed sheet in the report states above and over Midtown's week, day by day,
+     * in `seedDayClose`, because the lead's census lines speak only on a census tower.
+     */
+    'shift/dayClose.ts#dayCloseOf',
+    'shift/dayClose.ts#decidingCallLineOf',
+    'shift/dayClose.ts#DAY_CLOSE_HEADING',
+    'shift/dayClose.ts#DAY_CLOSE_WEEKEND_LINE',
+    'shift/dayClose.ts#NO_CALL_DECIDED_LINE',
+    'shift/dayClose.ts#NO_CALL_RAISED_LINE',
+    'shift/dayCalls.ts#dayCallAnswerWordsOf',
+    'everyday/reportView.ts#REPORT_SECONDARY',
+    'shift/weekStake.ts#WEEKEND_NOTE',
     'everyday/weekView.ts#WEEK_START_NEXT_LABEL',
     'shift/weekRecord.ts#weekRecordLineOf',
     'everyday/continueWeek.ts#continueWeekEntryOf',
@@ -14112,6 +14136,7 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     const bundle = shiftBundleOf(context);
     seeds.push({ field: 'today.driverHeld', text: PRESS_DAY_DRIVER_HELD, role: 'prose' });
     seedWeekStake(seeds, bundle.observations);
+    seedDayClose(seeds, context, bundle);
     seeds.push({ field: 'brief.wayThrough.heading', text: BRIEF_WAY_THROUGH_HEADING, role: 'label' });
     for (const row of WEEK_WAY.rows) {
       for (const eventId of [row.eventId, 'another-wrinkle']) {
@@ -14710,6 +14735,29 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
         if (view.staleNote !== undefined) {
           seeds.push({ field: `${where}.stale`, text: view.staleNote, role: 'reason' });
         }
+      }
+      /*
+       * **The close's lead** — wave AM, lane AM-C (§ D1246 to § D1249). The filed sheet over the
+       * case's own week, under the house's three answers: not yet, clean and missed. On a tower the
+       * census does not speak for the lead is the call and tomorrow alone, which is itself a state
+       * a player reaches; Midtown's week, where every line speaks, is seeded in `seedDayClose`.
+       */
+      for (const [label, house] of [
+        ['pending', undefined],
+        ['cleared', 'cleared'],
+        ['missed', 'missed'],
+      ] as const) {
+        const view = everydayReportViewOf({
+          report: entry.report,
+          previous: undefined,
+          overnight: undefined,
+          newerRunOnStage: false,
+          week: entry.week,
+          house: () => house,
+        });
+        seedDayCloseView(seeds, `${at}.report.close.${label}`, view.close);
+        seeds.push({ field: `${at}.report.close.${label}.week`, text: view.secondary.week, role: 'label' });
+        seeds.push({ field: `${at}.report.close.${label}.menu`, text: view.secondary.menu, role: 'label' });
       }
     }
 
@@ -17039,6 +17087,105 @@ function seedWeekStake(seeds: TextSeed[], observations: Observations): void {
   ] as const) {
     seeds.push({ field: `week.record.${arm}`, text: weekRecordLineOf(record) ?? '', role: 'observation' });
   }
+}
+
+/** One close's lead, seeded field by field — {@link seedDayClose} and the report states. */
+function seedDayCloseView(seeds: TextSeed[], at: string, close: DayCloseView | undefined): void {
+  if (close === undefined) return;
+  seeds.push({ field: `${at}.heading`, text: DAY_CLOSE_HEADING, role: 'label' });
+  if (close.house !== undefined) seeds.push({ field: `${at}.house`, text: close.house, role: 'observation' });
+  if (close.tally !== undefined) seeds.push({ field: `${at}.tally`, text: close.tally, role: 'observation' });
+  if (close.call !== undefined) seeds.push({ field: `${at}.call`, text: close.call, role: 'observation' });
+  if (close.arithmetic !== undefined) seeds.push({ field: `${at}.arithmetic`, text: close.arithmetic, role: 'observation' });
+  seeds.push({ field: `${at}.tomorrow.heading`, text: close.tomorrow.heading, role: 'label' });
+  seeds.push({ field: `${at}.tomorrow.wrinkle`, text: close.tomorrow.wrinkle, role: 'prose' });
+  seeds.push({ field: `${at}.tomorrow.moveIns`, text: close.tomorrow.moveIns, role: 'observation' });
+  if (close.tomorrow.counts !== undefined) seeds.push({ field: `${at}.tomorrow.counts`, text: close.tomorrow.counts, role: 'reason' });
+  if (close.tomorrow.census !== undefined) seeds.push({ field: `${at}.tomorrow.census`, text: close.tomorrow.census, role: 'observation' });
+  if (close.tomorrow.weekend !== undefined) seeds.push({ field: `${at}.tomorrow.weekend`, text: close.tomorrow.weekend, role: 'prose' });
+}
+
+/**
+ * **The close's lead over Midtown Office's week, day by day** — wave AM, lane AM-C (§ D1246 to
+ * § D1249). Midtown is the one tower whose week the census contests, so it is the one on which every
+ * line of the lead speaks: the house in each of its answers, the tally, the arithmetic in its three
+ * states (open, met, out of reach) and tomorrow's census count. The week is closed day by day on the
+ * case's own readings, or on readings forced to miss for the first two days, and each close's sheet
+ * is the case's own recording filed as that day, so every tomorrow card is `report.ts`'s own.
+ */
+function seedDayClose(seeds: TextSeed[], context: HonestyContext, bundle: ShiftBundle): void {
+  const { observations } = bundle;
+  const missed: Observations = { ...observations, peakQueue: Number.MAX_SAFE_INTEGER };
+  const standing = houseStandingOrder();
+  for (const [arm, missFirst] of [
+    ['asRead', 0],
+    ['lost', 2],
+  ] as const) {
+    let week = openWeek('c2');
+    for (let day = 1; day <= 5; day += 1) {
+      if (day > 1) week = nextDay(week);
+      const dayIdx = day - 1;
+      const event = scheduledEventFor(null, day, dayIdx, 'whole-day');
+      const goals = goalsForDay(day, 'whole-day');
+      const read = day <= missFirst ? missed : observations;
+      week = closeDay(
+        week,
+        outcomeOf({
+          record: weekStakeRecord(day, day === 1 ? standing : 'another-driver'),
+          recordRefusal: null,
+          day,
+          dayIdx,
+          eventId: event.id,
+          arrived: read.arrived,
+          carried: read.carried,
+          minutePct: read.minutePct,
+          readings: readGoals(goals, read),
+        }),
+      );
+      const report = dayReportOf({
+        recording: context.recording,
+        observations,
+        goals,
+        week,
+        contract: contractById('c2'),
+        event,
+        calendar: null,
+        subject: { kind: 'week-day' },
+        plan: planFor(context),
+        dispatcherName: bundle.dispatcherName,
+        dayStartS: DAY_START_S,
+        wholeDayRun: true,
+      });
+      if (report.of !== 'week-day') continue;
+      for (const [house, houseOf] of [
+        ['pending', () => undefined],
+        ['answered', (at: number) => (at % 2 === 0 ? 'missed' : 'cleared')],
+      ] as const) {
+        /*
+         * The two populations are the pair swarm DO's S2 read off Midtown's day 1 and day 2
+         * buildings on the shipped bundle (589 → 608); the corpus resolves no second building here,
+         * and the sentence's shape, not its count, is what this seeds.
+         */
+        const close = dayCloseOf({ week, report, houseOf, population: { today: 589, tomorrow: 608 } });
+        seedDayCloseView(seeds, `week.close.${arm}.day${String(day)}.${house}`, close);
+      }
+    }
+    const sheet = weekSheetOf(week, () => 'missed');
+    if (sheet?.weekend !== undefined) {
+      seeds.push({ field: `week.sheet.${arm}.weekend.label`, text: sheet.weekend.label, role: 'label' });
+      seeds.push({ field: `week.sheet.${arm}.weekend.note`, text: sheet.weekend.note, role: 'prose' });
+    }
+  }
+  for (const [label, line] of [
+    ['decided', NO_CALL_DECIDED_LINE],
+    ['raised', NO_CALL_RAISED_LINE],
+  ] as const) {
+    seeds.push({ field: `week.close.noCall.${label}`, text: line, role: 'reason' });
+  }
+  seeds.push({ field: 'week.close.weekend', text: DAY_CLOSE_WEEKEND_LINE, role: 'prose' });
+  seeds.push({ field: 'week.close.weekendNote', text: WEEKEND_NOTE, role: 'prose' });
+  seeds.push({ field: 'week.close.secondary.week', text: REPORT_SECONDARY.week, role: 'label' });
+  seeds.push({ field: 'week.close.secondary.menu', text: REPORT_SECONDARY.menu, role: 'label' });
 }
 
 /** A run record for a day of Midtown's week in {@link seedWeekStake}: the dispatcher is all that varies. */

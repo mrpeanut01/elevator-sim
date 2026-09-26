@@ -1933,9 +1933,11 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         '`weekAdmitsANewcomer` return a deal, counts or booleans: a dealt day carries a sentence, and ' +
         'what a player reads of it is `dayStakeSentenceOf`, which the week adapter seeds for every ' +
         'census tower. `houseRecordOf` returns a run record for the shell’s house run. What a player ' +
-        'reads from the module is seeded by name in `honesty/surfaces.ts#seedWeekStake`.',
+        'reads from the module is seeded by name in `honesty/surfaces.ts#seedWeekStake`. ' +
+        '`weekClosedByThisClose` (wave AM, § D1246) is a boolean for the tower’s record of weeks.',
       ids: [
         'shift/weekStake.ts#WEEK_LENGTH',
+        'shift/weekStake.ts#weekClosedByThisClose',
         'shift/weekStake.ts#weekDealOf',
         'shift/weekStake.ts#dayCountsToward',
         'shift/weekStake.ts#countedCleanOf',

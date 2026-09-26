@@ -133,7 +133,8 @@ import { contractStatus } from './contracts.js';
 import { gaveUpBesideOf, goalPlainNameOf, horizonLabelOf, readGoals, wasDisplayOf } from './goals.js';
 import { growthFactor } from './growth.js';
 import { CONTRACT_LADDER } from './ladder.js';
-import { ENDLESS_CONTRACT_ID, nextDay, wasGraded } from './week.js';
+import { ENDLESS_CONTRACT_ID, nextDay, rollWeek, wasGraded } from './week.js';
+import { decidingCallLineOf, type DecidingPinnedCall } from './dayClose.js';
 import {
   WEEK_CLOSED_LINE,
   weekDealOf,
@@ -508,6 +509,33 @@ export interface WeekDayReport extends DayReport, ShapedOnlyFields {
    * opens the week's sheet rather than tomorrow. Absent otherwise.
    */
   readonly weekClosed?: boolean | undefined;
+  /**
+   * **The next day on the week's main path** — wave AM, lane AM-C, swarm DO's § 1 ruling item 4
+   * ([§ D1249](../../../../DECISIONS.md)). Tomorrow, or, on a close that closed the week, day 1 of
+   * the next week, because the weekend is off the path ([§ D1246](../../../../DECISIONS.md)). Its
+   * name, note and tenants line are {@link forecastFor}'s, derived as the run it describes is.
+   */
+  readonly onward?: ReportOnward | undefined;
+  /**
+   * **The call that decided today**, or the plain sentence that none did —
+   * `shift/dayClose.ts#decidingCallLineOf` over this sheet's own call runs, graded by this sheet's
+   * grader ([§ D1248](../../../../DECISIONS.md)). Absent on a day nobody graded.
+   */
+  readonly decidingCall?: string | undefined;
+}
+
+/** The next day on the main path, as {@link WeekDayReport.onward} carries it. */
+export interface ReportOnward {
+  readonly day: number;
+  readonly dayIdx: number;
+  readonly weekday: string;
+  /** The wrinkle the day is dealt, as its run will be built. */
+  readonly eventId: string;
+  readonly name: string;
+  readonly note: string;
+  readonly demand: string;
+  /** Whether the next day on the path opens a new week. */
+  readonly newWeek: boolean;
 }
 
 /**
@@ -516,8 +544,8 @@ export interface WeekDayReport extends DayReport, ShapedOnlyFields {
  * answer the player should have given.
  */
 export const PRACTICE_NOTE =
-  'Practice. Your week keeps your first attempt at this day, so this run banks nothing: the streak, ' +
-  'the clean days and the day’s record stand as that attempt left them.';
+  'Practice. Your week keeps your first attempt at this day, so this run banks nothing: the clean ' +
+  'days and the day’s record stand as that attempt left them.';
 
 /**
  * **What a practice sheet says when its crowd made it practice** — wave AK,
@@ -1269,6 +1297,30 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
 
   const nextIdx = (week.dayIdx + 1) % 7;
   const practice = input.practice === true;
+  /* The next day on the main path — § D1246: a closed week's next day is the next week's first. */
+  const pathNext = weekHasClosed(week) ? rollWeek(week) : nextDay(week);
+  const onwardEvent = scheduledEventFor(
+    input.calendar,
+    pathNext.day,
+    pathNext.dayIdx,
+    input.wholeDayRun === true ? 'whole-day' : 'period',
+  );
+  const onwardForecast = forecastFor(
+    input.calendar,
+    week,
+    input.templateVariesMix === true,
+    input.wholeDayRun === true,
+    input.growthPerDay ?? CONTRACT_LADDER.defaultGrowthPerDay,
+    pathNext,
+  );
+  const decidingCall = decidingCallLineOf({
+    verdict: judgement.verdict,
+    records: input.dayCalls ?? [],
+    pinned: decidingPinnedOf(input),
+    verdictOf: (callObservations) => verdictOf(readGoals(input.goals, callObservations)),
+    lineOf: (verdict) => VERDICT_VOICE[verdict].line,
+    clockOf: (simTimeS) => clockOf(simTimeS, dayStartS),
+  });
   const practiceNote =
     input.practiceAttempt === true
       ? PRACTICE_ATTEMPT_NOTE
@@ -1297,6 +1349,35 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
     ),
     taught: taughtFor(contract, week),
     nextDayName: weekdayOf(nextIdx),
+    onward: {
+      day: pathNext.day,
+      dayIdx: pathNext.dayIdx,
+      weekday: weekdayOf(pathNext.dayIdx),
+      eventId: onwardEvent.id,
+      name: onwardForecast.name,
+      note: onwardForecast.note,
+      demand: onwardForecast.demand,
+      newWeek: pathNext.day <= week.day,
+    },
+    ...(decidingCall === undefined ? {} : { decidingCall }),
+  };
+}
+
+/**
+ * The pinned press day's call in the terms {@link decidingCallLineOf} reads, or `undefined` where
+ * the call row would not print — the same gate, asked of `callRow.ts#pressCallRowOf` itself, so the
+ * close names a pinned call exactly where the sheet's row describes one.
+ */
+function decidingPinnedOf(input: DayReportInput): DecidingPinnedCall | undefined {
+  const pressCall = input.pressCall;
+  if (pressCall === undefined) return undefined;
+  const interventions = input.interventions ?? [];
+  if (pressCallRowOf({ ...pressCall, interventions }, (simTimeS) => String(simTimeS)) === undefined) return undefined;
+  return {
+    atS: pressCall.call.atS,
+    clearedBy: pressCall.press.clearedBy,
+    missedBy: pressCall.press.missedBy,
+    answered: interventions[0]?.change.kind,
   };
 }
 
@@ -2989,13 +3070,14 @@ function forecastFor(
   templateVariesMix: boolean,
   wholeDayRun: boolean,
   perDay: number,
-): ReportForecast {
   /*
    * Tomorrow is `week.ts#nextDay`'s answer rather than `day + 1`, because since
    * [§ D1177](../../../../DECISIONS.md) the morning after a census week's last day is day 1 of a
-   * new week — the tower as handed, so fewer tenants than today rather than more.
+   * new week — the tower as handed, so fewer tenants than today rather than more. The close's own
+   * card passes the next day on the main path instead ([§ D1246](../../../../DECISIONS.md)).
    */
-  const tomorrow = nextDay(week);
+  tomorrow: WeekState = nextDay(week),
+): ReportForecast {
   const event = eventAsRun(
     scheduledEventFor(calendar, tomorrow.day, tomorrow.dayIdx, wholeDayRun ? 'whole-day' : 'period'),
     templateVariesMix,
@@ -3056,10 +3138,14 @@ function taughtFor(contract: ScenarioContract | undefined, week: WeekState): str
     return `No day of this week counts toward ${contract.label}, so nothing banks toward it this week.`;
   }
   const left = Math.max(0, need - week.cleanRun);
-  return (
-    `Bank ${String(left)} more clean shift${left === 1 ? '' : 's'} on this building and the next ` +
-    `assignment opens: ${contract.reward}.`
-  );
+  /*
+   * *…and the next assignment opens: <reward>* stood here, and it promised to open things that are
+   * already open: every dispatcher is offered from the start and commissioning adds shafts at any
+   * time (swarm DO's S2, sentence 2). Withdrawn rather than softened, on `docs/38`'s *nothing is
+   * locked* ([§ D1250](../../../../DECISIONS.md)): the line says what banking does, which is clear
+   * the scenario.
+   */
+  return `Bank ${String(left)} more clean shift${left === 1 ? '' : 's'} on this building to clear ${contract.label}.`;
 }
 
 /**
