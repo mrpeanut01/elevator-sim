@@ -46553,3 +46553,168 @@ independent of the others.
 **Measured.** `fixit/zoningKeepsTheCrowd.test.ts` holds the Midtown pair (trips changed, crowd
 differs, the strict check refuses it without the plan and passes it with, the basis is the routes
 line with no passenger id or time in it) and the Vertical City sweep with the plan passed.
+
+## D1166 — a day keeps asking: calls five minutes apart inside a peak, up to six a day
+
+> **Taken 2026-09-26 by agent sessions under delegated authority**, not by the product owner: the
+> decide-al swarm (the player, honesty and engineering lenses, whose records are the integrator's
+> scratch notes and are not in this repository), reconciled by wave AK's integrator (ruling § Q1,
+> clause 3, two of three; the player lens dissented for no cap at all), and built and measured by
+> wave AK lane AK-D. A later reader weighing this against a product-owner ruling should treat it as
+> an agent ruling and say so; [§ D626](#d626) is the cautionary case. **Amends [§ D1138](#d1138)
+> clause 1** (*one stretch per peak on a whole day* and *up to three calls*); nothing is rewritten.
+> Owner-reversible clauses: the cap of six (`shift/dayCalls.ts#DAY_CALL_MAX`), and the five-minute
+> spacing inside a peak.
+
+**Why an entry.** [§ D405](#d405)'s first two grounds: it moves a recorded ruling, and it binds
+`shift/dayCalls.ts`, `dev/dayCallSession.ts`, `dev/main.ts` and the published rhythm figures.
+
+**What was wrong.** § D1138 raised at most one call per peak on a whole day and jumped the search to
+the peak's end once a call was raised. A peak that stayed crowded after its call asked nothing
+more, and a Midtown day played at the default rung asked **0.098 questions a real minute with a
+longest silence of 17.4 minutes** (measured below, the same figure § D1138 published).
+
+**The ruling.** After a candidate, raised or refused, the search moves on by
+`DAY_CALL_SPACING_S` (300 s) on both horizons (`dayCallSearchFrom`). On a whole day candidates still
+lie inside the peaks. At most six calls a day and twelve candidates. Admission, the card and the
+row are § D1138's, unchanged.
+
+**Measured.** `everyday/dayCalls.sweep.test.ts` (`DAY_CALLS_SWEEP=1`), the eight legible contracts
+(`c1`, `c2`, `c3`, `c6`, `c7`, `c8`, `c9`, `c10`) × crowds `20 260 824 + 7 919 n`, `n` 0 to 7, day 1
+under `collective`, answers in rotation on each question, with this entry, [§ D1167](#d1167),
+[§ D1168](#d1168) and [§ D1169](#d1169) together, since that is the day a player now meets. Real time
+is § D1169's pacing at `4×`, the stage's own derivation, with no time added for answering.
+
+| Midtown day 1, seven unpinned crowds | before (base `aa2e2a2`) | after |
+|---|---|---|
+| real minutes, median | 40.5 | **27.0** (25.9 to 29.1) |
+| decisions a real minute, median | 0.098 | **0.184** (0.116 to 0.259) |
+| longest gap, median | 17.4 min | **15.3 min** (10.4 to 23.0) |
+| calls a day, median | 3 | 4 |
+
+The median gap between two decisions after the change is **1.3 minutes** (the median over days of each day's median). The decision count is the brief's one choice of driver plus the day's calls, § D1138's own measure.
+The swarm's engineering lens measured 0.087 to 0.195 and a 13.2-minute longest gap on its own
+instrument; this tree reads 0.098 to 0.184 and 15.3 on the shipped session. **The longest gap stays
+long**: it is the stretch between two peaks where nobody waits a minute, crossed at `30×`, where no
+call can honestly fall.
+
+Over all 61 unpinned days: **53 raise at least one call (87 %)**, against § D1138's 46 of 61; every
+whole day raises one (38 of 38, a mean of 4.16, against 2.21), 15 of 23 slices do, and the eight that
+raise none are Garden Apartments', where nobody waits a minute. 185 calls in all; **10 days reach the
+cap of six**. Per tower, median decisions a real minute: Ashgate 0.266, Secure Tower 0.224, Harbour
+0.191, Midtown 0.184, Chancery 0.178; the Crown and St Jude slices 1.31 and 0.99 over days of 2.5 real
+minutes. The lookahead costs a median 20.7 s of CPU a whole day on a worker (at most 35.8 s) and 0.8 s
+a slice, against § D1138's 11.4 s.
+
+## D1167 — where the parking answers are alike, the stage asks who drives
+
+> **Taken 2026-09-26 by agent sessions under delegated authority** (the decide-al swarm, ruling § Q1
+> clause 2, three of three; built by wave AK lane AK-D), not by the product owner. **Amends
+> [§ D1138](#d1138) clause 1**'s three answers, and uses [§ D1048](#d1048)'s `adopt-dispatcher`
+> unchanged. Owner-reversible clause: the offer list the pair is taken from
+> (`shift/dayCalls.ts#DAY_CALL_DRIVER_OFFER`).
+
+**Why an entry.** It adds a question to a recorded ruling's card and row, and binds
+`shift/dayCalls.ts`, `dev/dayCallSession.ts`, `dev/main.ts`, `everyday/stageCall.ts`,
+`everyday/stageScreen.ts`, `everyday/host.ts` and the honesty register.
+
+**What was wrong.** At a crowded landing no car is idle, so *park*, *spread* and *leave them* leave
+the next ten minutes alike and § D1138 refuses the call. The swarm measured the day's biggest crowds
+getting no call for that reason, while a handover to another dispatcher changed the same ten
+minutes by a median of 35 riders.
+
+**The ruling.**
+
+1. At a candidate where the placement question is refused, and the day has not been handed over,
+   the day is run twice more from the same instant, each handing the rest of the day to one of the
+   tower's pair through `adopt-dispatcher`. The call is raised when those two runs and the run
+   standing differ by § D1138's threshold, unchanged (`dayCallAdmits`).
+2. **The pair is fixed before the day starts**: the first two of Conventional collective, Minimum
+   estimated wait and Fairness first that differ from the dispatcher the day opened with and that a
+   handover can reach (`dayCallDriversOf`, reading `switchRefusalOf` and `switchChangesNothing`).
+   A day opened on a landing panel has no pair and is never asked.
+3. The card keeps the placement card's heading and facts and asks *Who drives the rest of the day?*
+   with *Switch to A*, *Switch to B* and *Keep X driving*, in that order, whether the call turns out
+   to matter or not.
+4. The report's row names each count by who drove from the call, in the card's order, and the day's
+   verdict only where the three split; the placement row's ban lists hold on it, with a ranking list
+   added, so two dispatchers on one crowd read as a count on that crowd and never a ranking. A
+   declared pair, `day-call-driver-row`, holds the counts to the runs' legs.
+5. After any handover, by a call or by the player, the driver question is not asked again that day.
+
+**Measured.** Of the sweep's 185 calls ([§ D1166](#d1166)), **46 are driver calls**, on 41 of the 53
+days that raise any. `dev/dayCallSession.test.ts` holds common random numbers for the handover on a
+real Crown Hotel crowd: every passenger (id, arrival, origin, destination, mass) is the same under
+the handover as under the standing order, every leg boarded before the call is identical, and the
+run differs after it.
+
+## D1168 — no call once the day is lost, and *End the day*
+
+> **Taken 2026-09-26 by agent sessions under delegated authority** (the decide-al swarm, ruling § Q1
+> clause 4, two of three; the player lens would raise the call and say so; built by wave AK lane
+> AK-D), not by the product owner. **Narrows [§ D371](#d371)** for one case, and amends
+> [§ D1138](#d1138) clause 1. Owner-reversible clauses: the no-call rule and *End the day*.
+
+**Why an entry.** It narrows a recorded ruling about mid-run verdicts and binds
+`shift/dayCalls.ts`, `dev/dayCallSession.ts`, `dev/main.ts`, `shift/report.ts`,
+`everyday/stageCall.ts`, `everyday/stageScreen.ts` and `everyday/host.ts`.
+
+**What was wrong.** The swarm found 51 and 65 calls raised after the worst-wait goal had already
+failed on the run on the stage, and at none of them did the answers split the day's verdict: both
+the queue goal and the worst-wait goal grade a maximum, so once missed they stay missed.
+
+**The ruling.**
+
+1. Before a candidate is asked, the run standing is read at its instant with the day's own goals,
+   the rail's reading (`dayCallLostGoalOf`). Where the queue goal or the worst-wait goal reads
+   missed, the day asks nothing more. A day with no call then says, at its close, when and on which
+   goal the asking stopped, and that from there no answer could change whether the day cleared.
+2. From the same reading at the playhead the stage offers **End the day**, whose note names the goal
+   and no figure. Pressed, it records the instant, stops the calls, moves the playhead to the run's
+   end and files the day as the stage's primary does; the report carries *You ended the day early,
+   at hh:mm* and says the figures are the whole day's, which they are, since the run was recorded
+   whole before the stage drew a frame. A pinned day's unanswered call is answered first.
+3. **§ D371 is narrowed, not reversed.** A goal still carries no mid-run glyph; the one verdict the
+   stage states before the end is that a maximum already past its bar is past it, which no later
+   frame can withdraw.
+
+**Measured.** 16 of the sweep's 61 days stopped asking this way ([§ D1166](#d1166)).
+`dayCalls.browser.test.ts` meets it on the shipped bundle: Crown Hotel on 2026-10-05, played with
+every call left, offers *End the day* (by 960 s on the run as built, measured in Node), raises no call
+after it, and files a report that says when.
+
+## D1169 — a scored day is paced by the tutorial's hold rule
+
+> **Taken 2026-09-26 by agent sessions under delegated authority** (the decide-al swarm, ruling § Q1
+> clause 1, three of three; built by wave AK lane AK-D), not by the product owner. **Amends
+> [§ D991](#d991)** on every scored day and [§ D1029](#d1029)'s chip clause there. Owner-reversible
+> clauses: the fast rung (`30×`), and pacing inside a peak.
+
+**Why an entry.** It moves a recorded ruling and binds `everyday/stagePace.ts`,
+`everyday/stageScreen.ts`, `everyday/sittingShape.ts`, `everyday/firstDayLength.ts` and three
+documents that quote the day's length.
+
+**What was wrong.** § D991 played a whole day's peaks at the player's rung whether anybody was
+waiting or not, and played a slice at one rung, so the stage spent most of a sitting on idle cars.
+
+**The ruling.**
+
+1. On a scored day, a week's day on the daily stage, slice or whole day, the stage plays at the
+   player's rung while somebody on a landing has waited a minute on the present frame, and at `30×`
+   (or the player's rung, if faster) otherwise. Nothing after the playhead is read. `90×` waits for a
+   cue-budget derivation of its own, by § D354's method.
+2. The note beside the chips says which, in one line: *fast-forwarding at 30× while nobody on a
+   landing has waited a minute*, or *at your speed, 4×, while somebody on a landing has waited over a
+   minute*.
+3. A chip pressed while somebody waits is the rung every later wait plays at. A chip pressed while
+   fast holds until somebody next waits a minute, and says so.
+4. Calls still stop the transport. A replay and a watched run keep § D991's rule.
+
+**What moved with it.** A pinned whole day's brief sentence was re-measured
+(`firstDayLength.test.ts`): up to 26 to 30 minutes of watching, the call about 6 to 9 minutes in.
+The hub's *Today's scenario* figure reads *1 min-1 h 49 a day at 4×, and 30× wherever nobody on a
+landing has waited a minute*: the short end is the floor a day nobody waits in would take, derived
+rather than measured, and the long end is `sittingShape.ts#WHOLE_DAY_LONGEST`, measured under
+§ D991. Since this rule's slow stretches are a subset of § D991's on every recording, that figure is
+now an upper bound rather than the longest day; the sixteen-contract re-measurement that would make
+it the longest again was not taken in wave AK.

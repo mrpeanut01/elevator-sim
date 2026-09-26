@@ -1922,14 +1922,27 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'runs, reaching prose only through `shiftRunConfigOf`’s withheld-reason strings, which that ' +
         'function’s adapters sweep. What a player reads about an ordinary call is the stage card ' +
         '(`everyday/stageCall.ts`, seeded by name) and the report row (`shift/dayCalls.ts#dayCallRowOf`, ' +
-        'seeded by the report adapter).',
+        'seeded by the report adapter). Wave AK (§ D1166 to § D1168) adds more of the same kind: ' +
+        '`DAY_CALL_DRIVER_ANSWERS` and `dayCallAnswersOf` are answer ids, `DAY_CALL_DRIVER_OFFER` is ' +
+        'three profile ids and `dayCallDriversOf` returns profiles, whose names reach a player only ' +
+        'through the card and the row; `dayCallChangeOf` returns an intervention, ' +
+        '`DAY_CALL_FINAL_GOAL_IDS` is two goal ids, `dayCallLostGoalOf` returns a reading, and ' +
+        '`DAY_ENDED_EARLY_ROW_ID` is a row id. `dayCallAdmits` left this list when it stopped ' +
+        'reading `DAY_CALL_ANSWERS`.',
       ids: [
         'shift/dayCalls.ts#nextDayCallOf',
         'shift/dayCalls.ts#dayCallsOffered',
-        'shift/dayCalls.ts#dayCallAdmits',
         'shift/dayCalls.ts#dayCallRecordOf',
         'shift/dayCalls.ts#dayCallRowIdOf',
         'shift/dayCalls.ts#DAY_CALL_ANSWERS',
+        'shift/dayCalls.ts#DAY_CALL_DRIVER_ANSWERS',
+        'shift/dayCalls.ts#dayCallAnswersOf',
+        'shift/dayCalls.ts#DAY_CALL_DRIVER_OFFER',
+        'shift/dayCalls.ts#dayCallDriversOf',
+        'shift/dayCalls.ts#dayCallChangeOf',
+        'shift/dayCalls.ts#DAY_CALL_FINAL_GOAL_IDS',
+        'shift/dayCalls.ts#dayCallLostGoalOf',
+        'shift/dayCalls.ts#DAY_ENDED_EARLY_ROW_ID',
         'dev/state.ts#dayCallFactsOf',
         'dev/dayCallSession.ts#openDayCallSession',
       ],

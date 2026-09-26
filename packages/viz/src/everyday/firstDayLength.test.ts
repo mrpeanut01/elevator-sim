@@ -28,8 +28,11 @@ import { pacedDayRealS } from './sittingShape.js';
 import { PACE_HOLD_WAIT_S } from './stagePace.js';
 import { DEFAULT_STAGE_SIM_PER_REAL_S } from './stageScreenModel.js';
 
-/** § D991's slow set — the acts and every stretch with somebody past a minute on a landing. */
-function slowIntervalsOf(recording: VizRecording, acts: readonly DayAct[]): [number, number][] {
+/**
+ * § D1169's slow set on a scored day — every stretch with somebody past a minute on a landing. The
+ * acts are no longer slow of themselves: a pinned day is a week's day, paced by the tutorial's rule.
+ */
+function slowIntervalsOf(recording: VizRecording): [number, number][] {
   const raw: [number, number][] = [];
   for (const leg of recording.legs) {
     const left = leg.refusedAt ?? leg.boardedAt ?? recording.endedAt;
@@ -37,7 +40,6 @@ function slowIntervalsOf(recording: VizRecording, acts: readonly DayAct[]): [num
     if (left <= from || !isWaitingAt(leg, from)) continue;
     raw.push([from, left]);
   }
-  for (const act of acts) raw.push([act.startS, act.endS]);
   const sorted = raw.filter(([a, b]) => b > a).sort((x, y) => x[0] - y[0]);
   const merged: [number, number][] = [];
   for (const [a, b] of sorted) {
@@ -69,7 +71,7 @@ function measure(contractId: string): PinnedDayLength {
     pressDayArmOf(contractId, seed, press.standingOrder, press.horizon, pressAt(call.atS, press.missedBy)),
   ].map((arm) => {
     const { recording } = arm;
-    const slow = slowIntervalsOf(recording, acts);
+    const slow = slowIntervalsOf(recording);
     return {
       recordedS: Number((recording.endedAt - recording.startedAt).toFixed(3)),
       slowS: slowWithin(slow, recording.startedAt, recording.endedAt),
@@ -79,7 +81,7 @@ function measure(contractId: string): PinnedDayLength {
   const realOf = (arm: { recordedS: number; slowS: number }): number =>
     pacedDayRealS({ periodS: arm.recordedS, ...arm }, DEFAULT_STAGE_SIM_PER_REAL_S);
   const longest = arms.reduce((best, arm) => (realOf(arm) > realOf(best) ? arm : best));
-  const slow = slowIntervalsOf(asBuilt.recording, acts);
+  const slow = slowIntervalsOf(asBuilt.recording);
   return {
     contractId,
     callAtS: Number(call.atS.toFixed(3)),
@@ -111,7 +113,9 @@ describe('the pinned whole day’s length and its call — § D1047', () => {
   it('draws a sentence with no answer in it, for every row and for nothing else', () => {
     for (const row of PINNED_DAY_LENGTHS) {
       const line = pinnedDayLengthLineOf(row.contractId) ?? '';
-      expect(line, row.contractId).toMatch(/^A whole day: up to \d+ min of watching at 4×, the hours between peaks at 30×\. /u);
+      expect(line, row.contractId).toMatch(
+        /^A whole day: up to \d+ min of watching at 4×, and 30× wherever nobody on a landing has waited a minute\. /u,
+      );
       expect(line).toMatch(/about \d+ min in\.$/u);
       /* § D529 clause 4: no verb, no hint which answer, no word that the moment decides. */
       expect(line).not.toMatch(/\b(park|spread|lobby|clears?|miss(es)?|decid\w*|now)\b/iu);

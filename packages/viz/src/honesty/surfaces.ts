@@ -250,10 +250,26 @@ import {
   tutorialWorkedAnswerOf,
 } from '../everyday/tutorialModel.js';
 import { stagePaceNoteOf, stagePaceOf } from '../everyday/stagePace.js';
-import { STAGE_CALL_COPY, stageCallCardOf } from '../everyday/stageCall.js';
+import { STAGE_CALL_COPY, stageCallCardOf, stageEndDayOf } from '../everyday/stageCall.js';
 import type { PressCall } from '../shift/pressCall.js';
 import { PRESS_CALL_AGAIN, pressCallRowOf } from '../shift/callRow.js';
-import { dayCallRecordOf, dayCallsQuietSentenceOf, dayCallWindowEndOf, type DayCallsQuiet } from '../shift/dayCalls.js';
+import {
+  dayCallRecordOf,
+  dayCallsQuietSentenceOf,
+  dayCallWindowEndOf,
+  type DayCallDriverNames,
+  type DayCallsQuiet,
+} from '../shift/dayCalls.js';
+
+/**
+ * The driver question's fixture names — § D1167's offer list as the shipped profiles name them, the
+ * pair a day opened on `collective` is offered. What is swept is the card's and the row's wording.
+ */
+const DAY_CALL_FIXTURE_DRIVERS: DayCallDriverNames = Object.freeze({
+  'driver-a': 'Minimum estimated wait',
+  'driver-b': 'Fairness first',
+  leave: 'Conventional collective',
+});
 import { wayThroughSentenceOf, WEEK_WAY } from '../shift/weekWay.js';
 import { admittedPressDayIds, pressDayFor } from '../shift/ladder.js';
 import { PRESS_DAY_DRIVER_HELD } from '../everyday/today.js';
@@ -632,7 +648,7 @@ import { wrinkleNameOf } from '../shift/bookedOut.js';
 import { baseDemandOf, eventAsRun, SHIFT_EVENTS, shiftRunPatch } from '../shift/events.js';
 import { everyWrinkle } from '../wrinkles/draw.js';
 import { WRINKLE_LIBRARY } from '../wrinkles/library.js';
-import { bestLineFor, goalsForDay, readGoal, readGoals, yesterdayLabelOf } from '../shift/goals.js';
+import { bestLineFor, goalPlainNameOf, goalsForDay, readGoal, readGoals, yesterdayLabelOf } from '../shift/goals.js';
 import { shiftObservationsOf } from '../shift/observations.js';
 import { AFTER_PRESS_ROW_ID } from '../shift/afterPress.js';
 import { lastPressInRun, pressCounterfactualOf } from '../shift/counterfactual.js';
@@ -3382,20 +3398,43 @@ function shiftBundleOf(context: HonestyContext): ShiftBundle {
      * run's is one of them), so the arm that names a split verdict is reached wherever the two runs
      * grade apart; the other two are graded on one fold, so the arm that names none is reached too.
      */
-    const dayCalls = (['park-cars-lobby', 'leave', 'skipped'] as const).map((answer, index) => {
-      const atS = recording.startedAt + span * (0.2 + 0.2 * index);
-      return dayCallRecordOf({
-        atS,
-        windowEndS: dayCallWindowEndOf(atS, recording.endedAt),
-        answer,
-        legs: { 'park-cars-lobby': recording.legs, 'spread-cars': comparison.legs, leave: recording.legs },
-        observations: {
-          'park-cars-lobby': observations,
-          'spread-cars': index === 0 ? comparisonObservations : observations,
-          leave: observations,
-        },
-      });
-    });
+    const dayCalls = [
+      ...(['park-cars-lobby', 'leave', 'skipped'] as const).map((answer, index) => {
+        const atS = recording.startedAt + span * (0.2 + 0.2 * index);
+        return dayCallRecordOf({
+          atS,
+          windowEndS: dayCallWindowEndOf(atS, recording.endedAt),
+          answer,
+          legs: { 'park-cars-lobby': recording.legs, 'spread-cars': comparison.legs, leave: recording.legs },
+          observations: {
+            'park-cars-lobby': observations,
+            'spread-cars': index === 0 ? comparisonObservations : observations,
+            leave: observations,
+          },
+        });
+      }),
+      /*
+       * § D1167's driver call, in the same fixture shape: the second of the pair's run is the
+       * candidate's, so the split-verdict arm is reached where the two grade apart. The names are
+       * the three the offer list holds, as the shipped profiles name them.
+       */
+      ...(['driver-a', 'leave'] as const).map((answer, index) => {
+        const atS = recording.startedAt + span * (0.3 + 0.2 * index);
+        return dayCallRecordOf({
+          atS,
+          windowEndS: dayCallWindowEndOf(atS, recording.endedAt),
+          answer,
+          question: 'driver',
+          drivers: DAY_CALL_FIXTURE_DRIVERS,
+          legs: { 'driver-a': recording.legs, 'driver-b': comparison.legs, leave: recording.legs },
+          observations: {
+            'driver-a': observations,
+            'driver-b': index === 0 ? comparisonObservations : observations,
+            leave: observations,
+          },
+        });
+      }),
+    ];
     const pairedAgainstCandidate = dayReportOf({
       ...reportInput,
       pressCounterfactual:
@@ -3404,6 +3443,8 @@ function shiftBundleOf(context: HonestyContext): ShiftBundle {
           : { ...selfPair, wholeRunObservations: comparisonObservations },
       bookedOut: fixtureBookings,
       dayCalls,
+      /* § D1168's row, at the half-way point: what is swept is its wording. */
+      dayEndedEarlyAtS: recording.startedAt + span * 0.5,
     }) as WeekDayReport;
     /*
      * The four sheets a **pairing** needs — issue #127, and each is one axis away from `report`.
@@ -3642,6 +3683,12 @@ const SHIFT_REPORT: SurfaceAdapter = {
     'shift/dayCalls.ts#dayCallRowOf',
     'shift/dayCalls.ts#DAY_CALL_ROW_NOTE',
     'shift/dayCalls.ts#DAY_CALL_LEAVE_LABEL',
+    /*
+     * Wave AK: § D1167's driver row and § D1168's ended-early row, both on the same sheet — the
+     * driver call's two records and the ended instant are seeded on `pairedAgainstCandidate`.
+     */
+    'shift/dayCalls.ts#DAY_CALL_DRIVER_COPY',
+    'shift/dayCalls.ts#dayEndedEarlyRowOf',
     /* § D1152's quiet day, seeded on its seven arms below. */
     'shift/dayCalls.ts#dayCallsQuietSentenceOf',
     'shift/report.ts#PRACTICE_NOTE',
@@ -3764,9 +3811,24 @@ const SHIFT_REPORT: SurfaceAdapter = {
         ['skipped', { kind: 'asked', refused: 0, ending: 'skipped' }],
         ['asking', { kind: 'asked', refused: 1, ending: 'asking' }],
         ['not-offered', { kind: 'not-offered' }],
+        /* § D1168: the asking stopped where a goal whose miss is final already read missed. */
+        [
+          'lost',
+          {
+            kind: 'asked',
+            refused: 1,
+            ending: 'lost',
+            lostAtS: recording.startedAt + (recording.endedAt - recording.startedAt) / 2,
+            lostGoal: goalPlainNameOf(goalsForDay(1).find((goal) => goal.id === 'queue')!),
+          },
+        ],
       ];
       for (const [arm, account] of quiet) {
-        seeds.push({ field: `dayCallsQuiet(${arm})`, text: dayCallsQuietSentenceOf(account), role: 'prose' });
+        seeds.push({
+          field: `dayCallsQuiet(${arm})`,
+          text: dayCallsQuietSentenceOf(account, (simTimeS) => clockOf(simTimeS, DAY_START_S)),
+          role: 'prose',
+        });
       }
     }
 
@@ -11662,6 +11724,12 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
      */
     'everyday/stageCall.ts#stageCallCardOf',
     'everyday/stageCall.ts#STAGE_CALL_COPY',
+    /*
+     * § D1168's *End the day*: seeded below on readings where the queue goal reads missed, at the
+     * playhead it would be drawn at, and never where the day can still clear.
+     */
+    'everyday/stageCall.ts#STAGE_END_DAY_COPY',
+    'everyday/stageCall.ts#stageEndDayOf',
     /* Pillar 3's strip — GitHub issue #277, § D470. Driven at every sample time below. */
     'everyday/stageScreenModel.ts#stageGoalsOf',
     /*
@@ -12108,6 +12176,28 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
         { carId, awayAtS, backAtS: recording.startedAt + span * 0.5 },
         ...(secondCarId === undefined ? [] : [{ carId: secondCarId, awayAtS, backAtS: recording.startedAt + span * 0.5 }]),
       ];
+      /* § D1167: the driver question on the ordinary call's card, over the offer list's own names. */
+      {
+        const call = calls[2]!;
+        const card = stageCallCardOf(call, undefined, [], DAY_CALL_FIXTURE_DRIVERS);
+        const at = 'stage.call(driver)';
+        seeds.push({ field: `${at}.question`, text: card.question, role: 'prose' });
+        for (const option of card.options) {
+          seeds.push({ field: `${at}.option(${option.answer})`, text: option.label, role: 'label' });
+        }
+      }
+      /* § D1168: *End the day*, where the landing-queue goal already reads missed at mid-run. */
+      {
+        const at = recording.startedAt + span * 0.5;
+        const readings = readGoals(goalsForDay(1), shiftObservationsOf(observationsAt(recording, at))).map((reading) =>
+          reading.goal.id === 'queue' ? { ...reading, state: 'missed' as const } : reading,
+        );
+        const end = stageEndDayOf(readings);
+        if (end !== undefined) {
+          seeds.push({ field: 'stage.endDay.label', text: end.label, role: 'label' });
+          seeds.push({ field: 'stage.endDay.note', text: end.note, role: 'prose', playhead: atPlayhead(recording, at) });
+        }
+      }
       for (const call of calls) {
         const card = stageCallCardOf(call, undefined, call.backAtS === null ? [] : bookedOut);
         const at = `stage.call(${call.rule}${call.carAway === false ? ',none-out' : ''})`;
@@ -12138,7 +12228,7 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
        * card is up, and `chosen`, since § D1029 bounded to the next act boundary.
        */
       const acts = actsOf(recording.demandPhases);
-      for (const reason of ['call', 'chosen'] as const) {
+      for (const reason of ['call', 'chosen', 'yours'] as const) {
         const note = stagePaceNoteOf(
           { simPerRealS: DEFAULT_STAGE_SIM_PER_REAL_S, reason },
           { acts, simTimeS: recording.startedAt },
@@ -12183,6 +12273,20 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
         const note = stagePaceNoteOf(pace, { acts, simTimeS: at });
         if (note !== undefined) {
           seeds.push({ field: `stage(@${stamp}s).pace`, text: note, role: 'label', playhead: atPlayhead(recording, at) });
+        }
+        /* § D1169: the same instant on a scored day, paced by the tutorial's rule. */
+        const scored = stagePaceOf({
+          horizon: 'period',
+          acts,
+          simTimeS: at,
+          watchingSimPerRealS: DEFAULT_STAGE_SIM_PER_REAL_S,
+          longestStandingS: observations.longestCurrentWaitS,
+          playerChoseSpeedAtS: undefined,
+          scored: true,
+        });
+        const scoredNote = stagePaceNoteOf(scored, { acts, simTimeS: at });
+        if (scoredNote !== undefined) {
+          seeds.push({ field: `stage(@${stamp}s).pace(scored)`, text: scoredNote, role: 'label', playhead: atPlayhead(recording, at) });
         }
       }
       /*

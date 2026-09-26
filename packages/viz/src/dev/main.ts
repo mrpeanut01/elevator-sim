@@ -244,7 +244,13 @@ import {
 import { mountFixitPanel } from './fixitPanel.js';
 import { createOffThreadRunner, type OffThreadRun } from './offThreadRuns.js';
 import { openDayCallSession, type DayCallSession } from './dayCallSession.js';
-import { dayCallsOffered, type DayCallAnswer, type DayCallOnStage, type DayCallsQuiet } from '../shift/dayCalls.js';
+import {
+  dayCallDriversOf,
+  dayCallsOffered,
+  type DayCallAnswer,
+  type DayCallOnStage,
+  type DayCallsQuiet,
+} from '../shift/dayCalls.js';
 import { WATCHING_HEADER_CLASS, mountWatchPanel } from './watchPanel.js';
 import { chip, el, fill, fillSelect, keyedFill, setHidden, setText } from './dom.js';
 import {
@@ -1641,12 +1647,26 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * day too busy to call on (§ D1138 clause 5) — what § D1152's quiet row says instead of a call.
    */
   let dayCallsNotOffered = false;
+  /** Where *End the day* was pressed on this attempt — [§ D1168](../../../../DECISIONS.md) — for the report's row. */
+  let dayEndedEarlyAtS: number | undefined;
 
   function closeDayCalls(): void {
     dayCallSession?.close();
     dayCallSession = undefined;
     dayCallRefusedOn = undefined;
     dayCallsNotOffered = false;
+    dayEndedEarlyAtS = undefined;
+  }
+
+  /**
+   * *End the day* — [§ D1168](../../../../DECISIONS.md). The instant is kept for the report's row,
+   * and the day's calls stop as a skip stops them; the stage files the day next, on the run already
+   * recorded, so the sheet's figures are the whole day's.
+   */
+  function endDayEarly(atS: number): void {
+    if (state.recording === undefined || state.recording !== simulatedRecording) return;
+    dayEndedEarlyAtS = atS;
+    dayCallSession?.skip(false);
   }
 
   /** § D1152 — what the report says on a day that raised no ordinary call, or nothing. */
@@ -1675,6 +1695,12 @@ function boot(ui: Elements, resources: BrowserResources): void {
         dayCallsNotOffered = facts !== undefined && !facts.pinned;
         return undefined;
       }
+      /*
+       * § D1167's pair, fixed from the dispatcher the day opened with, and § D1168's goals, the ones
+       * the rail reads (`dev/leftRail.ts#shiftGoalsOf`, the same expression `closeShift` grades by).
+       */
+      const driving = drivingProfileOf(resources, state);
+      const pair = dayCallDriversOf(resources.dispatcherProfiles.profiles, driving);
       dayCallSession = openDayCallSession(
         {
           planWith: (extra) => {
@@ -1703,12 +1729,21 @@ function boot(ui: Elements, resources: BrowserResources): void {
             renderAll();
           },
         },
-        { recording, bookedOut: facts.bookedOut, horizon: facts.horizon },
+        {
+          recording,
+          bookedOut: facts.bookedOut,
+          horizon: facts.horizon,
+          goals: shiftGoalsOf(state, resources),
+          drivers: pair === undefined ? undefined : { pair, drivingName: driving.name },
+        },
       );
     } else if (dayCallSession.recording() !== recording) {
       /* The record grew by a press outside a call: ask on from the latest press. */
       const pressedAtS = state.interventions.reduce((latest, entry) => Math.max(latest, entry.atS), 0);
-      dayCallSession.grew(recording, pressedAtS);
+      const handedOver = state.interventions.some(
+        (entry) => entry.change.kind === 'adopt-dispatcher' || entry.change.kind === 'switch-dispatcher',
+      );
+      dayCallSession.grew(recording, pressedAtS, handedOver);
     }
     return dayCallSession.onStage();
   }
@@ -4757,6 +4792,10 @@ function boot(ui: Elements, resources: BrowserResources): void {
     answerDayCall: (answer) => {
       answerDayCall(answer);
     },
+    endDayEarly: (atS) => {
+      endDayEarly(atS);
+      renderAll();
+    },
     skipDayCalls: (called) => {
       dayCallSession?.skip(called);
       renderAll();
@@ -6873,6 +6912,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
       dayCalls: dayCallSession?.records() ?? [],
       /* § D1152 — the one sentence a day with no call gets at its close. */
       dayCallsQuiet: dayCallsQuietForReport(),
+      /* § D1168 — where *End the day* was pressed, for the row that says so. */
+      ...(dayEndedEarlyAtS === undefined ? {} : { dayEndedEarlyAtS }),
       // The scenario this shift belongs to, not `undefined`. Passing nothing made the sheet say
       // *your own building — nothing is being banked* on the same day the banner cleared a
       // scenario and the rail counted the shift as banked: three panels, two answers.

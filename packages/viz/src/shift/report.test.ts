@@ -740,7 +740,7 @@ describe('WORST WAIT states its censoring', () => {
     });
     const rows = quiet.diagnosis.filter((row) => row.id === 'day-calls-none');
     expect(rows).toHaveLength(1);
-    expect(rows[0]?.why).toMatch(/^The stage raised no call today\. It ran the day three ways from 3 moments/u);
+    expect(rows[0]?.why).toMatch(/^The stage raised no call today\. It ran the day ahead under each answer it could offer from 3 moments/u);
     /* No account from the shell, no row: a run nobody asked the stage about says nothing. */
     expect(reportWith(observationsOfRun(clean)).diagnosis.some((row) => row.id === 'day-calls-none')).toBe(false);
   });

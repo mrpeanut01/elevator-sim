@@ -14,9 +14,10 @@
  *
  * {@link PINNED_DAY_LENGTHS} is **measured**: for every admitted whole-day pin, the pinned crowd under
  * its standing order through the shipped builder, the call asked of that run by
- * `shift/pressCall.ts#pressCallOf` — the one function the stage asks — and § D991's pacing read off
- * the legs exactly as `everyday/stagePace.sweep.test.ts` reads it (the acts, and every stretch with
- * somebody past a minute on a landing, at the watching rung; the rest at the between-peaks rung).
+ * `shift/pressCall.ts#pressCallOf` — the one function the stage asks — and the stage's pacing read
+ * off the legs: since [§ D1169](../../../../DECISIONS.md) a pinned day is paced as every scored day
+ * is, every stretch with somebody past a minute on a landing at the watching rung and the rest at
+ * the fast rung, so the acts are no longer slow of themselves (they were under § D991).
  * `firstDayLength.test.ts` re-runs every row on every suite run and refuses the table the day a run
  * disagrees, and asserts that the table's contracts **are** the whole-day members of the admitted
  * set, so a re-pin or a new pin cannot leave a stale row or a missing one.
@@ -71,38 +72,38 @@ export const PINNED_DAY_LENGTHS: readonly PinnedDayLength[] = Object.freeze([
   {
     contractId: 'c2',
     callAtS: 9613.907,
-    toCallSlowS: 1873.146,
+    toCallSlowS: 644.207,
     peaks: 3,
     peaksBefore: 1,
     inPeak: false,
-    longest: { recordedS: 36000, slowS: 5845.052 },
+    longest: { recordedS: 36000, slowS: 2655.116 },
   },
   {
     contractId: 'c3',
     callAtS: 9929.738,
-    toCallSlowS: 1817.138,
+    toCallSlowS: 439.626,
     peaks: 3,
     peaksBefore: 1,
     inPeak: false,
-    longest: { recordedS: 36000, slowS: 5698.984 },
+    longest: { recordedS: 36000, slowS: 2754.88 },
   },
   {
     contractId: 'c6',
     callAtS: 9809.566,
-    toCallSlowS: 1807.222,
+    toCallSlowS: 107.664,
     peaks: 3,
     peaksBefore: 1,
     inPeak: false,
-    longest: { recordedS: 36000, slowS: 5446.463 },
+    longest: { recordedS: 36000, slowS: 1545.408 },
   },
   {
     contractId: 'c10',
     callAtS: 12509.792,
-    toCallSlowS: 1806.234,
+    toCallSlowS: 575.532,
     peaks: 3,
     peaksBefore: 1,
     inPeak: false,
-    longest: { recordedS: 36046.787, slowS: 5570.571 },
+    longest: { recordedS: 36062.614, slowS: 2335.866 },
   },
 ]);
 
@@ -144,8 +145,8 @@ export function pinnedDayLengthLineOf(contractId: string): string | undefined {
     pacedDayRealS({ periodS: row.callAtS, recordedS: row.callAtS, slowS: row.toCallSlowS }, rung.simPerRealS) / 60,
   );
   return (
-    `A whole day: up to ${String(dayMin)} min of watching at ${rung.label}, the hours between peaks at ` +
-    `${betweenRungLabel()}. The stage stops once for its call ${positionOf(row)}, about ` +
+    `A whole day: up to ${String(dayMin)} min of watching at ${rung.label}, and ${betweenRungLabel()} ` +
+    `wherever nobody on a landing has waited a minute. The stage stops once for its call ${positionOf(row)}, about ` +
     `${String(toCallMin)} min in.`
   );
 }

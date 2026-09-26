@@ -664,6 +664,62 @@ export const AGREED_FIGURES: readonly AgreedFigure[] = Object.freeze<AgreedFigur
         }).join('/'),
     },
   },
+  {
+    id: 'day-call-driver-row',
+    figure: 'a driver call’s three ten-minute counts — the report’s row and the runs it was counted on',
+    why:
+      'Wave AK, [§ D1167](../../../../DECISIONS.md). The driver question’s row names each answer by ' +
+      'who drove from the call, and must still say only what its runs measured, in the card’s order: ' +
+      'the first of the pair, the second, and the dispatcher kept. The left side is the row as ' +
+      '`dayCallRowOf` draws it from a driver record the shipped `dayCallRecordOf` counted, over the ' +
+      'same edge-case legs as `day-call-row`; the right side counts the same legs by the expression ' +
+      'written there. A row that printed a pair’s counts against the wrong names, or in another ' +
+      'order, would publish a comparison of two dispatchers its runs do not hold.',
+    left: {
+      surfaceId: 'shift/dayCalls.ts#dayCallRowOf',
+      read: () => {
+        const row = dayCallRowOf(
+          dayCallRecordOf({
+            atS: DAY_CALL_FIXTURE.atS,
+            windowEndS: DAY_CALL_FIXTURE.endS,
+            answer: 'driver-b',
+            question: 'driver',
+            drivers: { 'driver-a': 'Driver A', 'driver-b': 'Driver B', leave: 'Driver K' },
+            legs: {
+              'driver-a': DAY_CALL_FIXTURE.legs['park-cars-lobby'],
+              'driver-b': DAY_CALL_FIXTURE.legs['spread-cars'],
+              leave: DAY_CALL_FIXTURE.legs.leave,
+            },
+            observations: {
+              'driver-a': DAY_CALL_FIXTURE.observations['park-cars-lobby'],
+              'driver-b': DAY_CALL_FIXTURE.observations['spread-cars'],
+              leave: DAY_CALL_FIXTURE.observations.leave,
+            },
+          }),
+          1,
+          () => 'Shift cleared',
+          (simTimeS) => clockOf(simTimeS, DAY_START_S),
+        );
+        const counts = /: (\d+) with Driver A driving, (\d+) with Driver B driving and (\d+) with Driver K still driving/u.exec(
+          row.why,
+        );
+        return counts === null ? undefined : `${String(counts[1])}/${String(counts[2])}/${String(counts[3])}`;
+      },
+    },
+    right: {
+      surfaceId: 'shift/dayCalls.ts#dayCallRecordOf',
+      read: () =>
+        DAY_CALL_ANSWER_ORDER.map((answer) => {
+          const riders = new Set<string>();
+          for (const leg of DAY_CALL_FIXTURE.legs[answer]) {
+            if (leg.arrivedAt < DAY_CALL_FIXTURE.atS || leg.arrivedAt >= DAY_CALL_FIXTURE.endS) continue;
+            const ended = Math.min(leg.boardedAt ?? Infinity, leg.refusedAt ?? Infinity);
+            if (ended > leg.arrivedAt + 60) riders.add(leg.passengerId);
+          }
+          return String(riders.size);
+        }).join('/'),
+    },
+  },
 ]);
 
 /** The *nobody* pick with no rival and no refusal — the slot the standing pairs read. */

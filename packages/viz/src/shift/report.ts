@@ -116,7 +116,13 @@ import { interventionLogOf } from '../live/interventions.js';
 
 import { afterPressBeatOf, type PairVerdicts } from './afterPress.js';
 import { pressCallRowOf, type PressCallRowInput } from './callRow.js';
-import { dayCallRowOf, dayCallsQuietSentenceOf, type DayCallRecord, type DayCallsQuiet } from './dayCalls.js';
+import {
+  dayCallRowOf,
+  dayCallsQuietSentenceOf,
+  dayEndedEarlyRowOf,
+  type DayCallRecord,
+  type DayCallsQuiet,
+} from './dayCalls.js';
 import { wrinkleNameOf, wrinkleNoteOf, type BookedOutCar } from './bookedOut.js';
 import type { PressCounterfactual } from './counterfactual.js';
 
@@ -749,6 +755,12 @@ export interface DayReportInput {
    */
   readonly dayCallsQuiet?: DayCallsQuiet | undefined;
   /**
+   * Where the player pressed *End the day* — [§ D1168](../../../../DECISIONS.md), offered only once a
+   * goal whose miss is final read missed on the stage. The day is filed on the run already recorded,
+   * so every figure is the whole day's; the sheet carries one row saying when the watching stopped.
+   */
+  readonly dayEndedEarlyAtS?: SimTime | undefined;
+  /**
    * Whether this run's demand template kept its own mix of trips — `dev/state.ts#plannedDayOf`'s
    * `templateVariesMix` for the run's state. On such a run a wrinkle that asked for a mix did not
    * get one, and the header's note and tomorrow's card quote `events.ts#eventAsRun`'s account of
@@ -1158,6 +1170,7 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
         ? {
             records: input.dayCalls ?? [],
             quiet: input.dayCallsQuiet,
+            endedEarlyAtS: input.dayEndedEarlyAtS,
             gradeOf: (callObservations) =>
               VERDICT_VOICE[verdictOf(readGoals(input.goals, callObservations))].line,
           }
@@ -2193,6 +2206,7 @@ function diagnosisFor(
   dayCalls?: {
     readonly records: readonly DayCallRecord[];
     readonly quiet?: DayCallsQuiet | undefined;
+    readonly endedEarlyAtS?: SimTime | undefined;
     readonly gradeOf: (observations: Observations) => string;
   },
 ): readonly ReportDiagnosis[] {
@@ -2339,16 +2353,22 @@ function diagnosisFor(
           id: 'day-calls-none',
           when: clockRange(recording.startedAt, recording.endedAt, dayStartS),
           what: 'No call today',
-          why: dayCallsQuietSentenceOf(dayCalls.quiet),
+          why: dayCallsQuietSentenceOf(dayCalls.quiet, (simTimeS) => clockOf(simTimeS, dayStartS)),
           tone: 'plain',
         }
       : undefined;
+  /* § D1168: a day the player ended early says when, and that the figures are the whole day's. */
+  const endedRow =
+    dayCalls?.endedEarlyAtS === undefined
+      ? undefined
+      : dayEndedEarlyRowOf(dayCalls.endedEarlyAtS, (simTimeS) => clockOf(simTimeS, dayStartS));
   return [
     ...rows,
     ...(afterPress === undefined ? [] : [afterPress]),
     ...(callRow === undefined ? [] : [callRow]),
     ...callRows,
     ...(quietRow === undefined ? [] : [quietRow]),
+    ...(endedRow === undefined ? [] : [endedRow]),
   ];
 }
 

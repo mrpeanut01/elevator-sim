@@ -1973,6 +1973,12 @@ export interface EverydayHost {
    */
   skipDayCalls(called: boolean): void;
   /**
+   * *End the day* at `atS` — [§ D1168](../../../../DECISIONS.md). The stage offers it only once a
+   * goal whose miss is final reads missed at the playhead; this records the instant for the report's
+   * row and stops the day's calls. The stage then files the day as its own primary does.
+   */
+  endDayEarly(atS: number): void;
+  /**
    * *Skip to the end* pressed with a pinned day's call card up — [§ D1151](../../../../DECISIONS.md).
    * The attempt's call is recorded as skipped, so the report says so rather than *nothing was
    * pressed*, which is a different thing a player can do (*leave them*).
@@ -2099,6 +2105,8 @@ export interface EverydayHostBindings {
   answerDayCall?(answer: DayCallAnswer): void;
   /** § D1138 — the session's skip, then a re-render. */
   skipDayCalls?(called: boolean): void;
+  /** § D1168 — `dev/main.ts#endDayEarly`. */
+  endDayEarly?(atS: number): void;
   /** § D1151 — `dev/main.ts`'s pinned call, recorded as skipped for this attempt. */
   skipPressCall?(): void;
   /**
@@ -4190,6 +4198,9 @@ export function createEverydayHost(
     },
     skipDayCalls: (called) => {
       b.skipDayCalls?.(called);
+    },
+    endDayEarly: (atS) => {
+      b.endDayEarly?.(atS);
     },
     skipPressCall: () => {
       b.skipPressCall?.();

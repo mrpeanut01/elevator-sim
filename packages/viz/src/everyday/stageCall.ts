@@ -38,11 +38,19 @@
 
 import type { InterventionChange } from '@elevator-sim/core/browser';
 
-import { PARK_CARS_LOBBY_LABEL, SPREAD_CARS_LABEL } from '../live/interventions.js';
+import { PARK_CARS_LOBBY_LABEL, SPREAD_CARS_LABEL, switchDispatcherLabelOf } from '../live/interventions.js';
 import { clockAt } from '../live/timeline.js';
 import { carsPhraseOf, type BookedOutCar } from '../shift/bookedOut.js';
-import { DAY_CALL_LEAVE_LABEL } from '../shift/dayCalls.js';
+import {
+  DAY_CALL_DRIVER_COPY,
+  DAY_CALL_LEAVE_LABEL,
+  dayCallLostGoalOf,
+  type DayCallAnswer,
+  type DayCallDriverNames,
+} from '../shift/dayCalls.js';
+import { goalPlainNameOf } from '../shift/goals.js';
 import type { PressCall } from '../shift/pressCall.js';
+import type { GoalReading } from '../shift/types.js';
 
 /** Every sentence the call draws. */
 export const STAGE_CALL_COPY = Object.freeze({
@@ -67,10 +75,15 @@ export const STAGE_CALL_COPY = Object.freeze({
   waiting: 'stopped while the day is run ahead from here',
 });
 
-/** One of the card's three answers. `change` is `undefined` for *leave them*. */
+/**
+ * One of the card's three answers. `change` is `undefined` for *leave them* and for every driver
+ * answer, whose handover the session already made; `answer` is what an ordinary call's session is
+ * told ([§ D1167](../../../../DECISIONS.md)).
+ */
 export interface StageCallOption {
   readonly label: string;
   readonly change: InterventionChange | undefined;
+  readonly answer: DayCallAnswer;
 }
 
 export interface StageCallCard {
@@ -99,6 +112,12 @@ export function stageCallCardOf(
   call: PressCall,
   dayStartS: number | undefined,
   bookedOut: readonly BookedOutCar[],
+  /**
+   * The driver question's names, when the call asks who drives — [§ D1167](../../../../DECISIONS.md).
+   * The heading and the facts are the placement card's, so the card says the same whether the call
+   * turns out to matter or not; only the question and its three answers differ, in a fixed order.
+   */
+  drivers?: DayCallDriverNames | undefined,
 ): StageCallCard {
   /*
    * The car lines only where a car is out at the call. A pinned call is always inside its car's
@@ -121,14 +140,34 @@ export function stageCallCardOf(
   ) {
     facts.push(`The peak opened at ${clockAt(call.act.startS, dayStartS)}.`);
   }
+  if (drivers !== undefined) {
+    return Object.freeze({
+      heading: STAGE_CALL_COPY.heading,
+      facts: Object.freeze(facts),
+      question: DAY_CALL_DRIVER_COPY.question,
+      options: Object.freeze([
+        Object.freeze({ label: switchDispatcherLabelOf(drivers['driver-a']), change: undefined, answer: 'driver-a' as const }),
+        Object.freeze({ label: switchDispatcherLabelOf(drivers['driver-b']), change: undefined, answer: 'driver-b' as const }),
+        Object.freeze({ label: DAY_CALL_DRIVER_COPY.keep(drivers.leave), change: undefined, answer: 'leave' as const }),
+      ]),
+    });
+  }
   return Object.freeze({
     heading: STAGE_CALL_COPY.heading,
     facts: Object.freeze(facts),
     question: away.length > 0 ? STAGE_CALL_COPY.question : STAGE_CALL_COPY.questionAllCars,
     options: Object.freeze([
-      Object.freeze({ label: PARK_CARS_LOBBY_LABEL, change: Object.freeze({ kind: 'park-cars-lobby' as const }) }),
-      Object.freeze({ label: SPREAD_CARS_LABEL, change: Object.freeze({ kind: 'spread-cars' as const }) }),
-      Object.freeze({ label: STAGE_CALL_COPY.leave, change: undefined }),
+      Object.freeze({
+        label: PARK_CARS_LOBBY_LABEL,
+        change: Object.freeze({ kind: 'park-cars-lobby' as const }),
+        answer: 'park-cars-lobby' as const,
+      }),
+      Object.freeze({
+        label: SPREAD_CARS_LABEL,
+        change: Object.freeze({ kind: 'spread-cars' as const }),
+        answer: 'spread-cars' as const,
+      }),
+      Object.freeze({ label: STAGE_CALL_COPY.leave, change: undefined, answer: 'leave' as const }),
     ]),
   });
 }
@@ -172,4 +211,31 @@ export type StageCallPhase = 'coming' | 'called' | 'answered';
 export function stageCallPhaseOf(call: PressCall, simTimeS: number, answered: boolean): StageCallPhase {
   if (answered) return 'answered';
   return simTimeS >= call.atS ? 'called' : 'coming';
+}
+
+/**
+ * **End the day** — [§ D1168](../../../../DECISIONS.md), the decide-al ruling's Q1 clause 4.
+ *
+ * Offered on a scored day once the queue goal or the worst-wait goal already reads missed at the
+ * playhead ({@link stageEndDayOf}). Both grade a maximum, so the day cannot clear from there, and the
+ * stage raises no more calls; the button lets the player stop watching. Pressed, it files the day on
+ * the run already recorded, as *Skip to the end* would at the end, and the report carries a row that
+ * says when. The note names the goal and no figure: the strip beside it already draws the figure
+ * against its bar.
+ */
+export const STAGE_END_DAY_COPY = Object.freeze({
+  label: 'End the day',
+  note: (goal: string): string =>
+    `${goal.charAt(0).toUpperCase()}${goal.slice(1)} is already past its bar, and it cannot come back ` +
+    'under it today. Ending now files the whole day as it runs from here, with nothing more pressed.',
+});
+
+/** The *End the day* control's words, or `undefined` while the day can still clear. */
+export function stageEndDayOf(
+  readings: readonly GoalReading[],
+): { readonly label: string; readonly note: string } | undefined {
+  const lost = dayCallLostGoalOf(readings);
+  return lost === undefined
+    ? undefined
+    : Object.freeze({ label: STAGE_END_DAY_COPY.label, note: STAGE_END_DAY_COPY.note(goalPlainNameOf(lost.goal)) });
 }

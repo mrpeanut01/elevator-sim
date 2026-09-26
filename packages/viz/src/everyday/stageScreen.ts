@@ -126,10 +126,17 @@ import { carAbsencesOf, type BookedOutCar } from '../shift/bookedOut.js';
 /* GitHub issue #592, § D991 — the whole day's acts and the pace rule over them. */
 import { actsOf, type DayAct } from '../shift/dayLength.js';
 import type { RunHorizon } from '../shift/types.js';
-import { stagePaceNoteOf, stagePaceOf } from './stagePace.js';
+import { stagePaceNoteOf, stagePaceOf, type StagePaceReason } from './stagePace.js';
 /* Wave AI, § D1029 — the pinned day's call. */
+import type { DayCallDriverNames } from '../shift/dayCalls.js';
 import type { PressCall } from '../shift/pressCall.js';
-import { STAGE_CALL_COPY, stageCallCardOf, stageCallPhaseOf } from './stageCall.js';
+import {
+  STAGE_CALL_COPY,
+  stageCallCardOf,
+  stageCallPhaseOf,
+  stageEndDayOf,
+  type StageCallOption,
+} from './stageCall.js';
 /* GitHub issue #340: the two beat-1 events. The recorder is a no-op until consent is granted. */
 import { everydayTelemetry } from './telemetryPort.js';
 import { telemetryRunPointerOf } from '../telemetry/schema.js';
@@ -379,6 +386,13 @@ function mountStage(
    */
   let paceHorizon: RunHorizon = 'period';
   let paceActs: readonly DayAct[] = [];
+  /**
+   * Whether this is a scored day — a week's day on the daily stage, slice or whole day — which
+   * [§ D1169](../../../../DECISIONS.md) paces by the tutorial's hold rule rather than by the peaks.
+   */
+  let paceScored = false;
+  /** The reason the last paced frame gave, so a chip press knows whether the stage was fast. */
+  let lastPaceReason: StagePaceReason | undefined;
   /** When a chip was pressed on this day — § D991 clause 2 as § D1029 amends it. */
   let playerChoseSpeedAtS: number | undefined;
   /*
@@ -613,6 +627,19 @@ function mountStage(
    * positions are one picture, and a chip that changed nothing would be a lie in a strip.
    */
   speeds.append(skipButton);
+  /*
+   * **End the day** — [§ D1168](../../../../DECISIONS.md). Drawn only on a scored day whose queue or
+   * worst-wait goal already reads missed at the playhead ({@link drawEndDay}), where the day cannot
+   * clear and the stage asks nothing more. Beside the skip, because it is the same kind of control:
+   * it moves no run, and files the day on the recording already made.
+   */
+  const endDayButton = el(doc, 'button', 'everyday-stage-end-day');
+  endDayButton.type = 'button';
+  endDayButton.style.display = 'none';
+  endDayButton.addEventListener('click', () => {
+    endTheDay();
+  });
+  speeds.append(endDayButton);
   /*
    * § D991's note — why the transport is at the rung it is, on a whole day. Empty on every other
    * run, where nothing is paced. Written by {@link pace} on change only.
@@ -1432,7 +1459,12 @@ function mountStage(
      * § D991: a chip press is the player's — until the next act boundary since § D1029, which is
      * `stagePace.ts#chipStands`'s rule; the stage paces again from there.
      */
-    playerChoseSpeedAtS = playback?.simTimeS ?? 0;
+    /*
+     * § D1169: on a scored day a chip pressed while somebody has waited a minute is the rung the
+     * stage keeps for every such stretch, and nothing more; pressed while it is fast, it stands until
+     * somebody next waits a minute.
+     */
+    playerChoseSpeedAtS = paceScored && lastPaceReason === 'watching' ? undefined : (playback?.simTimeS ?? 0);
     playback?.setSpeed(stageSpeedAt(index).simPerRealS);
     syncTransport();
     requestFrame();
@@ -1467,7 +1499,11 @@ function mountStage(
       longestStandingS,
       playerChoseSpeedAtS,
       callAtS: activeCall()?.call.atS,
+      scored: paceScored,
     });
+    lastPaceReason = answer.reason;
+    /* § D1169: a chip pressed while fast stands until somebody next waits a minute, and not past it. */
+    if (answer.reason === 'watching') playerChoseSpeedAtS = undefined;
     /*
      * § D1138: an ordinary call whose two runs have not landed stops the transport too, and says
      * what it is waiting for rather than *stopped for the day's call* — the call may not be raised.
@@ -1644,7 +1680,13 @@ function mountStage(
    * candidate whose runs have not landed: the stage waits at it but draws no card.
    */
   function activeCall():
-    | { readonly call: PressCall; readonly raised: boolean; readonly pinned: boolean }
+    | {
+        readonly call: PressCall;
+        readonly raised: boolean;
+        readonly pinned: boolean;
+        /** § D1167: present when the raised call asks who drives. */
+        readonly drivers?: DayCallDriverNames | undefined;
+      }
     | undefined {
     if (watchingNow() !== undefined) return undefined;
     if (stageCall !== undefined) {
@@ -1652,7 +1694,10 @@ function mountStage(
     }
     if (context.ctx !== 'daily' || adopted === undefined || recomputingOver !== undefined) return undefined;
     const next = host.dayCallOnStage(adopted);
-    return next === undefined ? undefined : { call: next.call, raised: next.raised, pinned: false };
+    if (next === undefined) return undefined;
+    return next.question === 'driver'
+      ? { call: next.call, raised: next.raised, pinned: false, drivers: next.drivers }
+      : { call: next.call, raised: next.raised, pinned: false };
   }
 
   /**
@@ -1675,7 +1720,8 @@ function mountStage(
    * the beat is the same one an intervention shows and ends on the same notification. Either way
    * the day plays on from where it stopped.
    */
-  function answerCall(change: InterventionChange | undefined): void {
+  function answerCall(option: StageCallOption): void {
+    const change = option.change;
     const standing = activeCall();
     const current = adopted;
     if (standing === undefined || !standing.raised || current === undefined || playback === undefined) return;
@@ -1690,12 +1736,12 @@ function mountStage(
           host.intervene(call.atS, change);
         });
       }
-    } else if (change === undefined) {
+    } else if (option.answer === 'leave') {
       host.answerDayCall('leave');
     } else {
-      const kind = change.kind === 'park-cars-lobby' ? 'park-cars-lobby' : 'spread-cars';
+      /* § D1167: a driver answer adopts the handover run the session made, as a parking answer does. */
       withRecomputeBeat(current, () => {
-        host.answerDayCall(kind);
+        host.answerDayCall(option.answer);
       });
       /*
        * The adoption is synchronous, so the beat has already ended on the new recording. If the host
@@ -1751,10 +1797,10 @@ function mountStage(
     waitingOnCall = false;
     /* § D1151: the skip has arrived at a call; the next press of it is the player's answer. */
     skipping = false;
-    const key = `${String(call.atS)}|${call.rule}`;
+    const key = `${String(call.atS)}|${call.rule}|${standing.drivers === undefined ? 'placement' : 'driver'}`;
     if (key !== callCardKey) {
       callCardKey = key;
-      const card = stageCallCardOf(call, host.dayStartS(), bookedCars);
+      const card = stageCallCardOf(call, host.dayStartS(), bookedCars, standing.drivers);
       const heading = el(doc, 'div', 'everyday-stage-call-heading', card.heading);
       heading.style.cssText = `font:600 11px ${TYPE.mono};letter-spacing:0.08em;color:${C.label}`;
       const facts = card.facts.map((fact) => {
@@ -1770,10 +1816,10 @@ function mountStage(
       for (const option of card.options) {
         const button = el(doc, 'button', 'everyday-stage-call-answer', option.label);
         button.type = 'button';
-        button.dataset['answer'] = option.change?.kind ?? 'leave';
+        button.dataset['answer'] = option.answer;
         button.style.cssText = ARM_BUTTON_CSS;
         button.addEventListener('click', () => {
-          answerCall(option.change);
+          answerCall(option);
         });
         row.append(button);
       }
@@ -2047,6 +2093,8 @@ function mountStage(
      */
     paceHorizon = context.ctx !== 'rush' ? host.runHorizon() : 'period';
     paceActs = actsOf(recording.demandPhases);
+    paceScored = context.ctx === 'daily';
+    if (resumeAtS === undefined) lastPaceReason = undefined;
     /*
      * A new recording is a new building — GitHub issue #258. The crossover is the old tower's
      * doors and the remembered frame is the old tower's cars, so both are dropped rather than
@@ -2501,6 +2549,7 @@ function mountStage(
     drivingName.textContent = watching?.dispatcherName ?? head.driverName;
     drawFigures(head.figures);
     drawGoals(recording, simTimeS, watching);
+    drawEndDay(recording, simTimeS, watching);
     /* A rush asks nothing of the day: § 9.2 has no brief and no goals to grade. */
     goals.style.display = context.ctx === 'rush' ? 'none' : '';
     drawWatching(watching);
@@ -2758,6 +2807,80 @@ function mountStage(
       box.append(value, label);
       watchFigures.append(box);
     }
+  }
+
+  /**
+   * **End the day, where the day is already lost** — [§ D1168](../../../../DECISIONS.md). A scored
+   * day's own run, not a watched one, and not once it has run out: from the rail's own readings at
+   * this playhead, the control appears when the queue or the worst-wait goal reads missed, and its
+   * note names that goal. Nothing after the playhead is read.
+   */
+  function drawEndDay(recording: VizRecording, simTimeS: number, watching: WatchingView | undefined): void {
+    const view =
+      context.ctx === 'daily' &&
+      watching === undefined &&
+      playback?.state !== 'ended' &&
+      simTimeS < recording.endedAt &&
+      /* A pinned day's call still standing is § D1029's to answer first; the control waits for it. */
+      activeCall()?.pinned !== true
+        ? stageEndDayOf(host.goalsAt(simTimeS))
+        : undefined;
+    if (view === undefined) {
+      if (endDayButton.style.display !== 'none') endDayButton.style.display = 'none';
+      return;
+    }
+    if (endDayButton.textContent !== view.label) endDayButton.textContent = view.label;
+    if (endDayButton.title !== view.note) endDayButton.title = view.note;
+    if (endDayButton.style.display === 'none') {
+      endDayButton.style.cssText = [
+        'background:transparent',
+        `border:1px solid ${C.rule}`,
+        `border-radius:${String(R.control)}px`,
+        'padding:5px 9px',
+        `font:500 11px ${TYPE.mono}`,
+        `color:${C.ink}`,
+        'cursor:pointer',
+      ].join(';');
+    }
+  }
+
+  /**
+   * *End the day* pressed — [§ D1168](../../../../DECISIONS.md). Checked again at the press, from the
+   * same readings, so a stale button files nothing; then the host keeps the instant for the report's
+   * row and stops the day's calls, the playhead goes to the recording's end, and the day is filed
+   * exactly as the stage's own primary files it.
+   */
+  /**
+   * File the day and open what the filing lands on — the tail of the stage's primary, shared with
+   * *End the day* so the two cannot file differently.
+   */
+  function fileDay(): void {
+    playback?.pause();
+    host.closeDay();
+    syncTransport();
+    const landing = stageFilingLandsOn(context.ctx, {
+      dayClosed: host.runState().dayClosed,
+      hasReport: host.lastReport() !== undefined,
+    });
+    if (landing !== undefined) context.go(landing);
+  }
+
+  function endTheDay(): void {
+    const recording = adopted;
+    if (playback === undefined || recording === undefined || context.ctx !== 'daily') return;
+    if (activeCall()?.pinned === true) return;
+    const atS = playback.simTimeS;
+    if (stageEndDayOf(host.goalsAt(atS)) === undefined) return;
+    started = true;
+    skipping = false;
+    waitingOnCall = false;
+    showCallCard(false);
+    host.endDayEarly(atS);
+    playback.play();
+    playback.seekTo(recording.endedAt);
+    syncTransport();
+    requestFrame();
+    fileDay();
   }
 
   /**
@@ -3176,14 +3299,7 @@ function mountStage(
         context.go('report');
         return;
       }
-      playback?.pause();
-      host.closeDay();
-      syncTransport();
-      const landing = stageFilingLandsOn(context.ctx, {
-        dayClosed: host.runState().dayClosed,
-        hasReport: host.lastReport() !== undefined,
-      });
-      if (landing !== undefined) context.go(landing);
+      fileDay();
     },
   };
 }

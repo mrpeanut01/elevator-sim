@@ -15,19 +15,22 @@
  * - a run that lands after the record grew under it is dropped.
  */
 
-import type { RunInterventionConfig } from '@elevator-sim/core/browser';
+import type { DispatcherProfile, RunInterventionConfig } from '@elevator-sim/core/browser';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import type { VizRecording } from '../contract/types.js';
 import { recordRun } from '../record/recordRun.js';
 import { todaysScenarioDayState } from '../shift/contractDay.test-helper.js';
 import {
+  DAY_CALL_MAX,
   DAY_CALL_MAX_TRIES,
   DAY_CALL_SPACING_S,
   dayCallAdmits,
+  dayCallDriversOf,
   longWaitRidersIn,
   type DayCallAnswer,
 } from '../shift/dayCalls.js';
+import { goalsForDay } from '../shift/goals.js';
 import { PRESS_DAY_RESOURCES } from '../shift/pressDay.test-helper.js';
 
 import { openDayCallSession } from './dayCallSession.js';
@@ -234,5 +237,225 @@ describe('an ordinary day’s calls on a real crowd', () => {
     expect(session.recording()).toBe(grown);
     /* And the next candidate is asked no sooner than the spacing after the player's own press. */
     expect(session.onStage()?.call.atS ?? Infinity).toBeGreaterThanOrEqual(pressedAtS + DAY_CALL_SPACING_S);
+  });
+});
+
+/*
+ * ---- Wave AK: § D1166 (spacing and the cap), § D1167 (the driver question), § D1168 (no call once lost) ----
+ *
+ * The session only reads a recording's legs, its clock and its phase schedule, so these cases hand it
+ * runs built from the real one by hand: `calmAfter` is the day with every rider who arrives after the
+ * call boarded within a second, so its ten-minute count is zero and a call is admitted wherever the
+ * real run's count is three or more. That separates the session's sequencing, which these cases hold,
+ * from the simulator's answers, which the cases above hold on real runs.
+ */
+
+/** Every rider arriving at or after `atS` boards a second later: nobody waits a minute. */
+function calmAfter(recording: VizRecording, atS: number): VizRecording {
+  return {
+    ...recording,
+    legs: recording.legs.map((leg) =>
+      leg.arrivedAt < atS ? leg : { ...leg, boardedAt: leg.arrivedAt + 1, refusedAt: undefined },
+    ),
+  } as VizRecording;
+}
+
+/** The same run, read as a whole day whose one peak is the whole run. */
+function asOnePeakDay(recording: VizRecording): VizRecording {
+  return {
+    ...recording,
+    demandPhases: [
+      {
+        id: '0-hold',
+        kind: 'hold',
+        label: 'peak',
+        startS: recording.startedAt,
+        endS: recording.endedAt,
+        startIntensity: 1,
+        endIntensity: 1,
+      },
+    ],
+  } as unknown as VizRecording;
+}
+
+/** A plan that carries only the press it was planned with, so the fake simulator can read it. */
+function fakePlan(extra: RunInterventionConfig): OffThreadRun {
+  return { config: { interventions: [extra] } } as unknown as OffThreadRun;
+}
+const pressOf = (run: OffThreadRun): RunInterventionConfig =>
+  (run.config.interventions ?? [])[0] as RunInterventionConfig;
+
+describe('wave AK: a day that keeps asking', () => {
+  const pair = (): readonly [DispatcherProfile, DispatcherProfile] => {
+    const profiles = PRESS_DAY_RESOURCES.dispatcherProfiles.profiles;
+    const collective = profiles.find((profile) => profile.id === 'collective')!;
+    return dayCallDriversOf(profiles, collective)!;
+  };
+
+  it('asks again inside one peak, five minutes after a raised call, up to the cap — § D1166', () => {
+    const day = asOnePeakDay(built);
+    const session = openDayCallSession(
+      {
+        planWith: fakePlan,
+        simulate: (runs, done) => {
+          done(runs.map((run) => (pressOf(run).change.kind === 'park-cars-lobby' ? calmAfter(day, pressOf(run).atS) : day)));
+        },
+        cancel: () => {},
+        changed: () => {},
+      },
+      { recording: day, bookedOut: [], horizon: 'whole-day' },
+    );
+    while (session.onStage()?.raised === true) session.answer('leave', () => {});
+    const clocks = session.records().map((record) => record.atS);
+    expect(clocks.length, 'a second call in the same peak').toBeGreaterThanOrEqual(2);
+    expect(clocks.length).toBeLessThanOrEqual(DAY_CALL_MAX);
+    for (let k = 1; k < clocks.length; k += 1) {
+      expect(clocks[k]! - clocks[k - 1]!).toBeGreaterThanOrEqual(DAY_CALL_SPACING_S);
+    }
+  });
+
+  it('asks who drives only where the placement question is refused, and hands the day over through adopt-dispatcher — § D1167', () => {
+    const drivers = pair();
+    const asked: string[] = [];
+    let log: RunInterventionConfig[] = [];
+    const session = openDayCallSession(
+      {
+        planWith: fakePlan,
+        simulate: (runs, done) => {
+          asked.push(runs.map((run) => pressOf(run).change.kind).join('+'));
+          /* The parking answers change nothing here; the second of the pair empties the landings. */
+          done(
+            runs.map((run) => {
+              const press = pressOf(run);
+              return press.change.kind === 'adopt-dispatcher' && press.change.profile === drivers[1]
+                ? calmAfter(built, press.atS)
+                : { ...built };
+            }),
+          );
+        },
+        cancel: () => {},
+        changed: () => {},
+      },
+      {
+        recording: built,
+        bookedOut: [],
+        horizon: 'period',
+        drivers: { pair: drivers, drivingName: 'Conventional collective' },
+      },
+    );
+    const call = session.onStage();
+    expect(call?.raised).toBe(true);
+    expect(call?.question).toBe('driver');
+    expect(call?.drivers).toEqual({
+      'driver-a': drivers[0].name,
+      'driver-b': drivers[1].name,
+      leave: 'Conventional collective',
+    });
+    expect(asked.slice(0, 2)).toEqual(['park-cars-lobby+spread-cars', 'adopt-dispatcher+adopt-dispatcher']);
+    /* An answer from the other question is refused. */
+    expect(session.answer('park-cars-lobby', () => {})).toBe(false);
+    expect(
+      session.answer('driver-a', (adoption) => {
+        log = [...log, adoption.entry];
+      }),
+    ).toBe(true);
+    expect(log).toEqual([{ atS: call!.call.atS, change: { kind: 'adopt-dispatcher', profile: drivers[0] } }]);
+    const [record] = session.records();
+    expect(record?.question).toBe('driver');
+    expect(Object.keys(record?.counts ?? {}).sort()).toEqual(['driver-a', 'driver-b', 'leave']);
+    expect(record?.counts['driver-b']).toBe(0);
+    /* Once handed over, the driver question is not asked again, so a refused placement raises nothing. */
+    const after = asked.slice(2);
+    expect(after.length, 'the day went on asking the placement question').toBeGreaterThan(0);
+    expect(after.every((kinds) => kinds === 'park-cars-lobby+spread-cars')).toBe(true);
+    expect(session.onStage()).toBeUndefined();
+  });
+
+  it('asks the placement question where it is admitted, and runs no handover for it', () => {
+    const asked: string[] = [];
+    const session = openDayCallSession(
+      {
+        planWith: fakePlan,
+        simulate: (runs, done) => {
+          asked.push(runs.map((run) => pressOf(run).change.kind).join('+'));
+          done(runs.map((run) => (pressOf(run).change.kind === 'park-cars-lobby' ? calmAfter(built, pressOf(run).atS) : built)));
+        },
+        cancel: () => {},
+        changed: () => {},
+      },
+      { recording: built, bookedOut: [], horizon: 'period', drivers: { pair: pair(), drivingName: 'Conventional collective' } },
+    );
+    expect(session.onStage()?.question).toBe('placement');
+    expect(asked).toEqual(['park-cars-lobby+spread-cars']);
+  });
+
+  it('raises nothing once a goal whose miss is final reads missed, and says when — § D1168', () => {
+    /* Somebody is standing at every candidate, so a landing-queue bar of zero already reads missed there. */
+    const strict = goalsForDay(1).map((goal) => (goal.id === 'queue' ? { ...goal, bar: 0 } : goal));
+    let asks = 0;
+    const session = openDayCallSession(
+      {
+        planWith: fakePlan,
+        simulate: (runs, done) => {
+          asks += 1;
+          done(runs.map((run) => calmAfter(built, pressOf(run).atS)));
+        },
+        cancel: () => {},
+        changed: () => {},
+      },
+      { recording: built, bookedOut: [], horizon: 'period', goals: strict },
+    );
+    expect(session.onStage()).toBeUndefined();
+    expect(asks).toBe(0);
+    const quiet = session.quiet();
+    expect(quiet.kind === 'asked' && quiet.ending).toBe('lost');
+    expect(quiet.kind === 'asked' && quiet.ending === 'lost' && quiet.lostGoal).toBe('the landing-queue goal');
+  });
+
+  it('asks as before where the same goals still read met — the negative control', () => {
+    const lenient = goalsForDay(1).map((goal) => (goal.id === 'worst-wait' || goal.id === 'queue' ? { ...goal, bar: 1e9 } : goal));
+    const session = openDayCallSession(
+      {
+        planWith: fakePlan,
+        simulate: (runs, done) => {
+          done(runs.map((run) => calmAfter(built, pressOf(run).atS)));
+        },
+        cancel: () => {},
+        changed: () => {},
+      },
+      { recording: built, bookedOut: [], horizon: 'period', goals: lenient },
+    );
+    expect(session.onStage()?.raised).toBe(true);
+  });
+
+  it('meets the same passengers under a handover, and differs from the standing order only after it — common random numbers', () => {
+    const facts = dayCallFactsOf(PRESS_DAY_RESOURCES, state)!;
+    const session = openDayCallSession(
+      {
+        planWith: (extra) => planOf([extra]),
+        simulate: (runs, done) => {
+          done(runs.map(run));
+        },
+        cancel: () => {},
+        changed: () => {},
+      },
+      { recording: built, bookedOut: facts.bookedOut, horizon: facts.horizon },
+    );
+    const atS = session.onStage()!.call.atS;
+    session.close();
+    const [, fairness] = pair();
+    const handOver = planOf([{ atS, change: { kind: 'adopt-dispatcher', profile: fairness } }]);
+    const asBuilt = planOf([]);
+    const handed = recordRun(handOver.config, { recordDecisions: false, outOfServiceCarIds: handOver.outOfServiceCarIds });
+    const kept = recordRun(asBuilt.config, { recordDecisions: false, outOfServiceCarIds: asBuilt.outOfServiceCarIds });
+    const person = (p: (typeof kept.result.trace.passengers)[number]): string =>
+      `${p.id} ${String(p.arrivalTimeS)} ${p.originFloorId} ${p.finalDestinationFloorId} ${String(p.massKg)}`;
+    expect(handed.result.trace.passengers.length).toBeGreaterThan(0);
+    expect(handed.result.trace.passengers.map(person)).toEqual(kept.result.trace.passengers.map(person));
+    const before = (legs: VizRecording['legs']) =>
+      legs.filter((leg) => leg.boardedAt !== undefined && leg.boardedAt < atS).map(keyOf).sort();
+    expect(before(handed.recording.legs)).toEqual(before(kept.recording.legs));
+    /* Move the control and require the run to change: the handover is not inert on this crowd. */
+    expect(handed.recording.legs.map(keyOf)).not.toEqual(kept.recording.legs.map(keyOf));
   });
 });
