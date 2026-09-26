@@ -19,6 +19,23 @@ after this split; the entries below are older than the cap and are registered th
 The always-on row is measured on the integrated head; the deep row is read from the nightly
 `corpus-figures` job in [`.github/workflows/deep-tiers.yml`](../.github/workflows/deep-tiers.yml).
 
+## Wave AM
+
+**Wave AM's move is 304.41 strings a case always-on, with two surfaces.** The base, `main` at
+`838100b`, reproduced wave AL's always-on row to the string. Measured at `f3e8137`; the deep tier
+was not measured locally and is read from the nightly job (§ D1236).
+
+| | base `838100b` | wave AM | move | per case |
+|---|---|---|---|---|
+| always-on strings | 926 377 | **941 293** | **+14 916** | **304.41** |
+| always-on surfaces | 75 | **77** | **+2** | none |
+| cases · simulations · failing cases | 49 · 606 · 0 | **unmoved** | **0** | none |
+
+**The surface sets were diffed**: `shift/dayClose.ts#dayCloseOf` and `shift/weekStake.ts#weekSheetOf`
+were added, both within lane AM-C's forecast of one or two, and nothing was removed. Lane AM-D's
+forecast surface did not appear. The lanes' floors sum to about 234 a case; the move is not split
+between them (§ D256).
+
 ## Wave AL
 
 **Wave AL's move is 142.24 strings a case always-on and 143.87 deep, with one surface in each,
