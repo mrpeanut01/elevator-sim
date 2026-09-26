@@ -539,10 +539,13 @@ function readEnvelope(store: SessionStore): EnvelopeRead {
   return {
     ok: true,
     version,
-    session: withRecordRungs(
-      withRecordRefusals(
-        withDayRecords(
-          withParkedWeeks(withWindowStart(record['session'], version), version),
+    session: withWeekOrdinals(
+      withRecordRungs(
+        withRecordRefusals(
+          withDayRecords(
+            withParkedWeeks(withWindowStart(record['session'], version), version),
+            version,
+          ),
           version,
         ),
         version,
@@ -714,6 +717,28 @@ function withRecordRungs(session: unknown, version: number): unknown {
     ...session,
     week: withHistoryRungs(session['week']),
     ...(Array.isArray(parked) ? { parkedWeeks: parked.map(withHistoryRungs) } : {}),
+  };
+}
+
+/**
+ * A version 1–10 `session`, its week and every parked week given the one key version 11 added —
+ * wave AM, lane AM-D, [§ D1252](../../../../DECISIONS.md), and `types.ts`'s version-11 paragraph.
+ *
+ * `WeekState.week: 1`, and the absence determines it: every build that wrote those bytes dealt
+ * every week week 1's wrinkle order, so 1 is the order the stored week was being dealt. A week that
+ * already carries the key, or is not an object, is returned untouched, for
+ * {@link withWindowStart}'s stated reason.
+ */
+function withWeekOrdinals(session: unknown, version: number): unknown {
+  if (version >= 11) return session;
+  if (!isPlainRecord(session)) return session;
+  const withOrdinal = (week: unknown): unknown =>
+    isPlainRecord(week) && !('week' in week) ? { ...week, week: 1 } : week;
+  const parked = session['parkedWeeks'];
+  return {
+    ...session,
+    week: withOrdinal(session['week']),
+    ...(Array.isArray(parked) ? { parkedWeeks: parked.map(withOrdinal) } : {}),
   };
 }
 

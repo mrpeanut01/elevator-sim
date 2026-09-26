@@ -789,6 +789,18 @@ export interface ClearedAward {
  */
 export interface WeekState {
   readonly contractId: string;
+  /**
+   * **Which week of this tower this is**, 1-based — wave AM, lane AM-D,
+   * [§ D1252](../../../../DECISIONS.md). `openWeek` starts at 1 and `week.ts#nextDay`'s roll adds
+   * one, so a week opened by taking a scenario is week 1 and the week after it is week 2.
+   *
+   * It picks the wrinkle order the week is dealt (`shift/weekOrders.ts#weekOrderFor`), and through
+   * that which days count and the week's target (`shift/weekStake.ts#weekDealOf`). No crowd reads
+   * it, and it is not a streak. A session saved before the
+   * field existed restores as week 1, which is the only order those builds ever dealt
+   * (`persist/session.ts#withWeekOrdinals`).
+   */
+  readonly week: number;
   /** 1-based. Growth is `1 + 0.11 × (day − 1)`, so day 1 is the building as shipped. */
   readonly day: number;
   /** Index into {@link WEEKDAYS}. */

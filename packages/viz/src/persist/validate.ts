@@ -227,11 +227,16 @@ function isOneOf(allowed: readonly unknown[], what: string): FieldCheck {
  *
  * Both directions, and the extra-key arm is argued in the module docstring.
  */
-function isObjectOf(checks: Readonly<Record<string, FieldCheck>>, what: string): FieldCheck {
+function isObjectOf(
+  checks: Readonly<Record<string, FieldCheck>>,
+  what: string,
+  /* Keys whose absence is itself a value — `WatchRecord.week`'s week 1. Checked when present. */
+  optional: readonly string[] = [],
+): FieldCheck {
   const expected = Object.keys(checks).sort();
   return (value, path) => {
     if (!isPlainObject(value)) return at(path, `is ${typeName(value)}, not ${what}`);
-    const missing = expected.filter((key) => !(key in value));
+    const missing = expected.filter((key) => !(key in value) && !optional.includes(key));
     if (missing.length > 0) return at(path, `is missing ${missing.join(', ')}`);
     const extra = Object.keys(value).filter((key) => !expected.includes(key));
     if (extra.length > 0) {
@@ -242,6 +247,7 @@ function isObjectOf(checks: Readonly<Record<string, FieldCheck>>, what: string):
       );
     }
     for (const key of expected) {
+      if (!(key in value)) continue;
       const check = checks[key];
       const issue = check?.(value[key], `${path}.${key}`);
       if (issue !== undefined) return issue;
@@ -404,7 +410,12 @@ const WATCH_RECORD_CHECKS: Readonly<Record<keyof WatchRecord, FieldCheck>> = Obj
    * it for the record's building is `watch/record.ts#recordUnreadableReason`'s to say, as a row.
    */
   rungContractId: nullOr(isNonEmptyString),
+  // Which week of its tower, from 2; absent is week 1 — lane AM-D, § D1252. Optional, see below.
+  week: isIntegerAtLeast(2),
 });
+
+/** The {@link WATCH_RECORD_CHECKS} keys a record may leave out: `week`, whose absence is week 1. */
+const WATCH_RECORD_OPTIONAL: readonly string[] = Object.freeze(['week']);
 
 const OUTCOME_CHECKS: Readonly<Record<keyof DayOutcome, FieldCheck>> = Object.freeze({
   day: isIntegerAtLeast(1),
@@ -441,7 +452,7 @@ const OUTCOME_CHECKS: Readonly<Record<keyof DayOutcome, FieldCheck>> = Object.fr
   // `null` is a day that cannot be re-asked — see `shift/types.ts#DayOutcome.record` for the two
   // different days that carry one, and `session.ts#withDayRecords` for why a version 1–5 envelope
   // arrives here with the key already present and `null`.
-  record: nullOr(isObjectOf(WATCH_RECORD_CHECKS, 'a run record')),
+  record: nullOr(isObjectOf(WATCH_RECORD_CHECKS, 'a run record', WATCH_RECORD_OPTIONAL)),
   /*
    * Why there is no record, or `null` — `docs/20` defect 1. A sentence rather than a code, and
    * `shift/types.ts#DayOutcome.recordRefusal` argues why; here it only has to be a string or the
@@ -468,6 +479,9 @@ const BANKED_CHECKS: Readonly<Record<keyof NonNullable<WeekState['banked']>, Fie
 
 const WEEK_CHECKS: Readonly<Record<keyof WeekState, FieldCheck>> = Object.freeze({
   contractId: isNonEmptyString,
+  // Which week of the tower, from 1 — lane AM-D, § D1252. `session.ts#withWeekOrdinals` gives an
+  // envelope from before version 11 its only value, 1.
+  week: isIntegerAtLeast(1),
   day: isIntegerAtLeast(1),
   dayIdx: isIntegerWithin(0, WEEKDAYS.length - 1),
   streak: isIntegerAtLeast(0),

@@ -3097,7 +3097,7 @@ function contractLineFor(contract: ScenarioContract | undefined, week: WeekState
   // SC-05/DR-09 (§ D198): `cleanRun` keeps counting on a contract already cleared, so the raw
   // figure can read "2 of 1". The clamp is on the display only — the data keeps its truth.
   /* The derived target where the week census speaks — § D1176, `weekStake.ts#weekNeedOf`. */
-  const need = weekNeedOf(contract);
+  const need = weekNeedOf(contract, undefined, week.week);
   if (need === 0) return `${contract.label} — ${contract.title} · ${WEEK_WITHOUT_COUNTED_DAYS_SHORT}`;
   const banked = Math.min(week.cleanRun, need);
   return (
@@ -3144,7 +3144,7 @@ function forecastFor(
   tomorrow: WeekState = nextDay(week),
 ): ReportForecast {
   const event = eventAsRun(
-    scheduledEventFor(calendar, tomorrow.day, tomorrow.dayIdx, wholeDayRun ? 'whole-day' : 'period'),
+    scheduledEventFor(calendar, tomorrow.day, tomorrow.dayIdx, wholeDayRun ? 'whole-day' : 'period', tomorrow),
     templateVariesMix,
     wholeDayRun,
   );
@@ -3198,7 +3198,7 @@ function taughtFor(contract: ScenarioContract | undefined, week: WeekState): str
       'Nothing more banks against it — days here keep the streak, and the sheet is the reward now.'
     );
   }
-  const need = weekNeedOf(contract);
+  const need = weekNeedOf(contract, undefined, week.week);
   if (need === 0) {
     return `No day of this week counts toward ${contract.label}, so nothing banks toward it this week.`;
   }

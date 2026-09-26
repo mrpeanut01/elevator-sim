@@ -269,7 +269,7 @@ function countedDays(count: number): string {
 function houseLineOf(week: WeekState, houseOf: DayCloseInput['houseOf'], census: WeekWay): string | undefined {
   const today = week.history.find((entry) => entry.day === week.day);
   if (today === undefined) return undefined;
-  if (!dayCountsToward(week.contractId, today, census)) {
+  if (!dayCountsToward(week, today, census)) {
     return `${today.weekday} does not count toward the week, so the house was not run on it.`;
   }
   const yours = dayVerdictOf(today);
@@ -288,7 +288,7 @@ function houseLineOf(week: WeekState, houseOf: DayCloseInput['houseOf'], census:
 
 /** Item 1's tally, over the counted days closed so far. */
 function tallyOf(week: WeekState, houseOf: DayCloseInput['houseOf'], census: WeekWay): string | undefined {
-  const counted = week.history.filter((entry) => dayCountsToward(week.contractId, entry, census));
+  const counted = week.history.filter((entry) => dayCountsToward(week, entry, census));
   if (counted.length === 0) return undefined;
   const readings = counted.map((entry) => houseReadingOfDay(entry, houseOf, census));
   const yours = countedCleanOf(week, census);
@@ -306,7 +306,7 @@ function tallyOf(week: WeekState, houseOf: DayCloseInput['houseOf'], census: Wee
 
 /** Item 3. */
 function arithmeticOf(week: WeekState, census: WeekWay): string | undefined {
-  const deal = weekDealOf(week.contractId, census);
+  const deal = weekDealOf(week, census);
   if (deal === undefined || deal.target === 0) return undefined;
   const clean = countedCleanOf(week, census);
   const left = deal.days.filter((day) => day.counts && day.day > week.day).length;
@@ -340,7 +340,7 @@ function moveInsOf(population: { readonly today: number; readonly tomorrow: numb
 function tomorrowOf(input: DayCloseInput, census: WeekWay): DayCloseTomorrow {
   const { week, report } = input;
   const onward = report.onward;
-  const deal = weekDealOf(week.contractId, census);
+  const deal = weekDealOf(week, census);
   const day = onward?.day ?? week.day + 1;
   const weekday = onward?.weekday ?? weekdayOf(week.dayIdx + 1);
   const newWeek = onward?.newWeek === true;
@@ -352,7 +352,7 @@ function tomorrowOf(input: DayCloseInput, census: WeekWay): DayCloseTomorrow {
     !newWeek && input.population !== undefined
       ? moveInsOf(input.population)
       : `${onward?.demand ?? report.forecast.demand}.`;
-  const counts = onward === undefined ? undefined : dayStakeSentenceOf(week.contractId, day, onward.eventId, census);
+  const counts = onward === undefined ? undefined : dayStakeSentenceOf(week, day, onward.eventId, census);
   const dealt = deal?.days[day - 1];
   const row = onward !== undefined && dealt?.eventId === onward.eventId ? dealt.row : undefined;
   const censusLine =
@@ -385,7 +385,7 @@ export function dayCloseOf(input: DayCloseInput, census: WeekWay = WEEK_WAY): Da
   const { week, report } = input;
   if (report.practiceNote !== undefined || report.dayStaysOpen === true) return undefined;
   if (week.closedDay !== week.day) return undefined;
-  const speaks = weekDealOf(week.contractId, census) !== undefined;
+  const speaks = weekDealOf(week, census) !== undefined;
   return {
     house: speaks ? houseLineOf(week, input.houseOf, census) : undefined,
     tally: speaks ? tallyOf(week, input.houseOf, census) : undefined,

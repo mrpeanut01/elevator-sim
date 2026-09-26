@@ -974,7 +974,7 @@ describe('each tower’s record of closed weeks is kept — lane AL-F, § D1229 
    */
   it('round-trips the records, reads progress kept before the field as none, and refuses a malformed one', () => {
     const backing = memoryBacking();
-    const records = [{ contractId: 'c2', closed: 2, met: 1, best: 4, dateCrowd: '20260926' }];
+    const records = [{ contractId: 'c2', closed: 2, met: 1, best: 4, dateCrowd: '20260926', held: 1 }];
     const kept = progressWithWeekRecords(EMPTY_EVERYDAY_PROGRESS, records);
     expect(progressWithWeekRecords(kept, records)).toBe(kept);
     saveEveryday(backing, DEFAULT_EVERYDAY_PROFILE, kept, 'metric');
@@ -987,6 +987,8 @@ describe('each tower’s record of closed weeks is kept — lane AL-F, § D1229 
       { contractId: 'c2', closed: -1, met: 0, best: 0 },
       { contractId: 'c2', closed: 1, met: 0.5, best: 0 },
       { contractId: 'c2', closed: 1, met: 0, best: 0, dateCrowd: 'soon' },
+      /* Weeks held — lane AM-D, § D1253. */
+      { contractId: 'c2', closed: 1, met: 0, best: 0, held: -1 },
     ]) {
       const refused = memoryBacking();
       saveEveryday(

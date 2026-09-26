@@ -48609,3 +48609,148 @@ every tower § D1178 admits, which is what its text named.
 draw Midtown while § D1178 admits two more towers. Red before, with § D1258's rows and without the
 list: the set read `c2, c6, c10`. `shift/weekStake.test.ts`'s Thursday check reads the first-day
 set.
+
+---
+
+## D1252 — each week of a tower is dealt its own wrinkle order, authored as data and dealt only where the week census admits every day of it
+
+> **Taken 2026-09-26 by agent sessions under delegated authority**, carrying out swarm DO's ruling
+> § 2 (*the next week is new*, 2–1, S1 dissenting for carried growth) as wave AM's lane AM-D. The
+> ruling is the swarm's; the shape below is the lane's. A later reader weighing this against a
+> product-owner ruling should treat the shape as an agent ruling and say so; [§ D626](#d626) is the
+> cautionary case. **Owner-reversible**: escalation by kind rather than by carried growth; the
+> weekend left unauthored; the cycle back to week 1 after the last admitted order; and the
+> rotation kept only between neighbouring weeks.
+
+**Why an entry.** [§ D405](#d405)'s first ground: it binds `data/contract-ladder.json`,
+`data/week-way.json`'s census, the persisted session's shape (version 11) and every surface that
+names a day's wrinkle, none of which `shift/weekOrders.ts` owns.
+
+**What was wrong.** [§ D1177](#d1177)'s roll reopened a closed week at day 1, and a day's wrinkle
+is the draw over `(day, dayIdx)`, so week 2 dealt week 1's five weekday wrinkles to the day (swarm
+DO's S3). Eighteen weekday templates ship and the week reached five.
+
+**1. `WeekState.week`.** A week knows which week of its tower it is: `openWeek` starts at 1 and the
+roll adds one. A session saved before this is read as week 1, which is the order every earlier
+build dealt (`persist/session.ts#withWeekOrdinals`, envelope version 11).
+
+**2. Orders are data.** A ladder rung may carry `weekOrders`: five drawn ids, Monday to Friday.
+Week `n` is dealt entry `(n − 1) mod k` of *week 1's draw, then each authored order the census
+admits, in file order*. The weekend is not authored and keeps the draw, because it counts toward no
+target ([§ D1176](#d1176)). A calendar booking still wins over an order as it wins over the draw.
+`calendar.ts#scheduledEventFor` takes the week and is still the one composition every run and every
+sentence about the day reads, so the run, the brief, the rail, the report's tomorrow card, the
+reproducibility gate and the week stake cannot deal two different wrinkles.
+
+**3. An order is dealt only where the census admits every day of it.** Each of its five days needs
+a current row in `data/week-way.json` under exactly the wrinkle it names, and `docs/33` DC-10
+admits each row. A refused or unmeasured order stays authored with its refusal readable
+(`weekOrderAdmissionOf`) and is not dealt. The census measures an order's day by handing the run
+the drawn id (`weekWay.sweep.test.ts`'s `WEEK_WAY_CELLS`), and `weekOrders.test.ts` holds that the
+run built that way is the run the week deals.
+
+**4. Which days count, and the target, are the week's.** `weekStake.ts` now takes a week where it
+took a contract id: a clean day counts when the census row for the day *as this week deals it*
+says contested, and the target is derived from this week's counted days. A contract id alone still
+means week 1, so the hub's offer and the newcomer rule read the tower's first week.
+
+**5. Rotation.** Neighbouring weeks in the cycle, the wrap to week 1 included, may share no
+template, and `weekOrderIssues` refuses the ladder where they do. Fourteen days between two weeks
+is not kept: with week 1's five templates and eleven usable others, a cycle of four cannot keep it
+without dealing week 1 again. Before this, every roll broke the rule at seven days.
+
+**Two defects the change would have made, closed with it.** A run record (`watch/types.ts`)
+re-derived its day's wrinkle from the day and the weekday alone, so a week-2 day re-asked for the
+watch gate or the house would have run week 1's wrinkle. It now carries `week` from week 2
+(`watchRecordOf`, `stateFromWatchRecord`); absence is week 1, so every earlier record and every
+week-1 record keeps its shape-3 bytes and no record version moves. And the Engineer shell's house
+readings were keyed by tower, day and crowd; two weeks can now deal one day on one crowd under two
+wrinkles, so the key carries the wrinkle (`dev/main.ts#houseKeyOf`).
+
+## D1253 — weeks held on this tower: a run of met weeks, ended by a missed one, kept on the device's record and drawn on the week's sheet and the door
+
+> **Taken 2026-09-26 by agent sessions under delegated authority**, carrying out swarm DO's ruling
+> § 2 (the chase S1 asked for, kept without carried growth) as wave AM's lane AM-D. A later reader
+> weighing this against a product-owner ruling should treat the shape as an agent ruling and say
+> so; [§ D626](#d626) is the cautionary case. **Owner-reversible**: that the run is shown at all;
+> its wording; that a week with no target ends it; and reading an older record's run as unknown.
+
+**Why an entry.** [§ D405](#d405)'s first ground: it adds a field to the device's kept progress
+(`everyday/profile.ts`) and a line to two screens that `shift/weekRecord.ts` does not own, and
+`docs/38` § 2.4 refuses a streak, so the entry says why this is not one.
+
+**The rule.** `WeekRecord.held` counts the closed weeks in a row, on one tower, whose clean counted
+days reached the target; a closed week that did not reach it sets the count to 0, and a week with no
+target is never met ([§ D1230](#d1230)), so it ends a run too. It is written where the record is,
+at the Everyday close of a week (`everyday/host.ts#fileScenarioDay`).
+
+**Why it is not a streak.** It counts weeks closed, never days or dates: no clock runs on it, it
+does not decay, and a player who closes one week a month holds the same run as one who closes four
+in a sitting. It buys nothing, opens nothing and prices nothing. The line says both in its own
+words: *"A missed week ends the run. It buys nothing, and no clock runs on it: a week counts when
+you close it, however long that takes."*
+
+**An older record.** A record written before this carries no run, and its counts settle it only
+where every closed week met (the run is all of them) or none did (0). Between those the order was
+not kept, so nothing is drawn and the next close counts from 0: the run can be understated once and
+is never overstated.
+
+**Where it is drawn.** The week's sheet, beside the tower's record (`everyday/weekView.ts`), and the
+door's foot (`everyday/doorView.ts`), once a week on the tower has closed.
+
+**Not done.** A week closed in the Engineer shell is not counted into the record, as
+[§ D1230](#d1230) already states for the record itself.
+
+## D1254 — Midtown Office's weeks 2 to 4: five orders authored, three admitted by the week census and dealt, two refused and kept
+
+> **Taken 2026-09-26 by agent sessions under delegated authority**, as wave AM's lane AM-D under
+> [§ D1252](#d1252). The measurements are the census's; which wrinkles were tried, and on which
+> days, is the lane's choice. A later reader weighing this against a product-owner ruling should
+> treat it as an agent ruling and say so; [§ D626](#d626) is the cautionary case.
+> **Owner-reversible**: the five orders and their order; keeping the refused two in the data.
+
+**Why an entry.** [§ D405](#d405)'s first ground: seventeen rows join `data/week-way.json` and five
+orders join `data/contract-ladder.json`, and the census entry ([§ D1067](#d1067)) is where a reader
+looks for what a row was measured under.
+
+**What was measured.** Each cell is one (day, wrinkle) of Midtown Office at the day's own growth,
+run by the command `weekWay.sweep.test.ts` documents with `WEEK_WAY_CELLS` naming the drawn id, on
+the shipped protocol unchanged: 65 configurations screened on 2 tuning crowds, 4 finalists on 6
+more, then the chosen configuration and `collective` left alone on the 20 held-out crowds. 17 cells,
+3 400 whole days, 2.3 hours of machine time in all (two cells ran while the box was at load 80, so
+the per-cell time is not a figure to quote). The rows were copied from the run's output by script,
+row for row.
+
+| day | wrinkle | chosen clears / 20 | `collective` misses / 20 | DC-10 |
+|---|---|---|---|---|
+| 1 | caterers, before the rush | 19 | 10 | admitted |
+| 1 | shift change, tight | 20 | 15 | admitted |
+| 1 | late finish | 20 | 12 | admitted |
+| 1 | audit day | 19 | 11 | admitted |
+| 2 | goods inward | 19 | 16 | admitted |
+| 2 | open day, busy | 18 | 16 | admitted |
+| 2 | evacuation drill, all at once | 19 | 17 | admitted |
+| 2 | lift service, mid shift | **1** | 20 | **refused**: no way through, and no screened play met the queue bar |
+| 3 | evacuation drill, all at once | 18 | 17 | admitted |
+| 3 | conference, full floor | 17 | 17 | admitted |
+| 3 | caterers, before the rush | 18 | 17 | admitted |
+| 4 | audit day | 13 | 18 | admitted |
+| 4 | fire drill, full | 13 | 20 | admitted |
+| 4 | goods inward | 15 | 19 | admitted |
+| 5 | late finish | 14 | 19 | admitted |
+| 5 | move-in, past halfway | 13 | 18 | admitted |
+| 5 | audit day | **10** | 20 | **refused**: the lower bound on 10 of 20 is under a third |
+
+**The orders.** Week 2 deals caterers, goods inward, the evacuation drill, audit day and the late
+finish; week 3 the shift change, open day, the conference, the fire drill and the move-in; week 4
+audit day, the evacuation drill, caterers, goods inward and the late finish. All three are admitted
+on every day, every weekday of each counts, so each week's target is 4 of 5 as week 1's is, and the
+cycle is weeks 1 to 4. `midtown-lift-service` (a lift service on Tuesday) and `midtown-audit-friday`
+(audit day on Friday) are refused on the days in the table and are not dealt; they stay in the data
+so the refusal can be read. Seven of the thirteen weekday templates week 1 never dealt are now dealt.
+
+**What this does not establish.** Week 4 deals week 2's five templates on four different days, so
+it is new in order and not in kind; a fourth kind of week needs templates the census has not yet
+admitted (`two-cars-down`, `all-hands` and `quiet-morning` are unmeasured on Midtown, and
+`contractors` could not be cleared on the wrinkle census). No order was screened on any tower but
+Midtown. The weekend is unchanged and still repeats weekly.

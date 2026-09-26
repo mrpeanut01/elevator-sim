@@ -105,7 +105,8 @@ import { WATCH_RECORD_VERSION, type WatchRecord } from './types.js';
  * string-sliced.
  */
 export const WATCH_RECORD_CARRIES: Readonly<Record<string, string>> = Object.freeze({
-  'viewer.week': 'WatchRecord.day and .dayIdx — growth.ts re-derives the growth, events.ts#eventFor the event',
+  'viewer.week':
+    'WatchRecord.day, .dayIdx and .week — growth.ts re-derives the growth, calendar.ts#scheduledEventFor the event',
   'viewer.interventions': 'WatchRecord.interventions, in press order — contract § 1.4',
   'viewer.outOfServiceCarIds': 'WatchRecord.outOfServiceCarIds',
   /*
@@ -176,6 +177,8 @@ export function watchRecordOf(
     windowStartS: state.windowStartS,
     day: state.week.day,
     dayIdx: state.week.dayIdx,
+    /* Which week of the tower, from 2 only: absence is week 1 — § D1252, `types.ts#WatchRecord.week`. */
+    ...(state.week.week > 1 ? { week: state.week.week } : {}),
     outOfServiceCarIds: [...state.outOfServiceCarIds],
     interventions: state.interventions.map((entry) => ({ atS: entry.atS, change: entry.change })),
     /*
@@ -537,8 +540,8 @@ export function stateFromWatchRecord(
     patience: null,
     week:
       record.rungContractId === null
-        ? { ...base.week, day: record.day, dayIdx: record.dayIdx }
-        : { ...openWeek(record.rungContractId), day: record.day, dayIdx: record.dayIdx },
+        ? { ...base.week, week: record.week ?? 1, day: record.day, dayIdx: record.dayIdx }
+        : { ...openWeek(record.rungContractId), week: record.week ?? 1, day: record.day, dayIdx: record.dayIdx },
     savedDispatchers: [],
     savedPatterns: [],
     savedClasses: [],

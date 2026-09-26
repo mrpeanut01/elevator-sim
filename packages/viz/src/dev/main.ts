@@ -1701,7 +1701,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
 
   /** One counted day's crowd: its tower, its day and its seed. */
   function houseKeyOf(contractId: string, entry: DayOutcome): string {
-    return `${contractId}|${String(entry.day)}|${entry.record?.seed ?? '-'}`;
+    /* The wrinkle is in the key: since § D1252 two weeks can deal one day on one crowd under two wrinkles. */
+    return `${contractId}|${String(entry.day)}|${entry.eventId}|${entry.record?.seed ?? '-'}`;
   }
 
   /**
@@ -1712,7 +1713,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
    */
   function weekHouseReadingOf(day: number): HouseReading | undefined {
     const week = state.week;
-    if (weekDealOf(week.contractId) === undefined) return undefined;
+    if (weekDealOf(week) === undefined) return undefined;
     const entry = week.history.find((candidate) => candidate.day === day);
     if (entry === undefined) return undefined;
     askWeekHouse(week);
@@ -1721,10 +1722,10 @@ function boot(ui: Elements, resources: BrowserResources): void {
 
   /** Start the house on every counted day of `week` that needs a run and has no reading yet. */
   function askWeekHouse(week: WeekState): void {
-    if (weekDealOf(week.contractId) === undefined) return;
+    if (weekDealOf(week) === undefined) return;
     const needs = week.history.flatMap((entry) => {
       const record = entry.record;
-      if (record === null || !dayCountsToward(week.contractId, entry) || houseNeedOf(entry) !== 'run') return [];
+      if (record === null || !dayCountsToward(week, entry) || houseNeedOf(entry) !== 'run') return [];
       const key = houseKeyOf(week.contractId, entry);
       if (houseReadings.has(key)) return [];
       /* A record this build cannot replay is no record of the crowd for the house either. */
@@ -7523,7 +7524,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * week-day arm, where a wrong id makes a calendar-overridden day pair with an ordinary one as
      * one question — the exact comparison § D311 built the basis to refuse.
      */
-    const event = scheduledEventFor(state.calendar, state.week.day, state.week.dayIdx);
+    const event = scheduledEventFor(state.calendar, state.week.day, state.week.dayIdx, 'period', state.week);
     /*
      * The run this sheet reports, read back the way the brief read it before the press — its
      * building's windows, the cars the day's event took and whether its template kept its mix

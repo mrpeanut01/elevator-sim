@@ -743,8 +743,11 @@ function progressIssue(value: unknown): string | undefined {
     if (!Array.isArray(weeks)) return 'the saved record of weeks is not a list';
     for (const entry of weeks as readonly unknown[]) {
       if (typeof entry !== 'object' || entry === null) return 'a week record is not an entry';
-      const { contractId, closed, met, best, dateCrowd } = entry as Record<string, unknown>;
+      const { contractId, closed, met, best, dateCrowd, held } = entry as Record<string, unknown>;
       if (typeof contractId !== 'string' || contractId === '') return 'a week record has no tower';
+      if (held !== undefined && (typeof held !== 'number' || !Number.isInteger(held) || held < 0)) {
+        return 'a week record is not a whole count';
+      }
       for (const count of [closed, met, best]) {
         if (typeof count !== 'number' || !Number.isInteger(count) || count < 0) return 'a week record is not a whole count';
       }
@@ -809,6 +812,7 @@ export function loadProgress(store: SessionStore): EverydayProgressStatus {
                   met: entry.met,
                   best: entry.best,
                   ...(entry.dateCrowd === undefined ? {} : { dateCrowd: entry.dateCrowd }),
+                  ...(entry.held === undefined ? {} : { held: entry.held }),
                 }),
               ),
             ),

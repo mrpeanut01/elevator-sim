@@ -105,6 +105,8 @@ function viewOf(context: EverydayScreenShellContext): DoorScreenView {
     dayClosed: host.runState().dayClosed,
     nameOf: (buildingId) => host.buildingById(buildingId)?.name,
     alsoOnScreen: pressDayTextsOf(host.towerChoice().pressDays),
+    /* Weeks held on this tower — § D1253. */
+    record: host.weekRecord(),
   });
 }
 
@@ -286,6 +288,12 @@ function mountDoor(
       const drawn = el(document_, 'p', 'everyday-door-first-session', view.firstSessionLine);
       drawn.style.cssText = `${BODY};margin:10px 0 0;max-width:70ch`;
       foot.append(drawn);
+    }
+    /* Weeks held on this tower, once a week on it has closed — § D1253. */
+    if (view.weeksHeld !== undefined) {
+      const held = el(document_, 'p', 'everyday-door-weeks-held', view.weeksHeld);
+      held.style.cssText = `${BODY};margin:10px 0 0;max-width:70ch`;
+      foot.append(held);
     }
     column.append(foot);
     return column;

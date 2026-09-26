@@ -22,6 +22,28 @@
       "contractId": "c2",
       "buildingId": "midtown-office",
       "growthPerDay": 0.02,
+      "weekOrders": [
+        {
+          "id": "midtown-week-2",
+          "days": ["caterers:before-the-rush", "goods-inward", "evacuation-drill:all-at-once", "audit-day", "late-finish"]
+        },
+        {
+          "id": "midtown-week-3",
+          "days": ["shift-change:tight", "open-day:busy", "conference:full-floor", "fire-drill:full", "move-in:past-halfway"]
+        },
+        {
+          "id": "midtown-lift-service",
+          "days": ["late-finish", "lift-service:mid-shift", "caterers:before-the-rush", "goods-inward", "audit-day"]
+        },
+        {
+          "id": "midtown-audit-friday",
+          "days": ["late-finish", "evacuation-drill:all-at-once", "caterers:before-the-rush", "goods-inward", "audit-day"]
+        },
+        {
+          "id": "midtown-week-4",
+          "days": ["audit-day", "evacuation-drill:all-at-once", "caterers:before-the-rush", "goods-inward", "late-finish"]
+        }
+      ],
       "demand": {},
       "fabric": {
         "occupancy": 0.34,

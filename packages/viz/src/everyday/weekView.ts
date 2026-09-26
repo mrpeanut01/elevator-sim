@@ -48,7 +48,7 @@ import {
   type WeekSheetView,
 } from '../shift/weekStake.js';
 import type { DayOutcome, WeekState } from '../shift/types.js';
-import { weekRecordLineOf, type WeekRecord } from '../shift/weekRecord.js';
+import { weekRecordLineOf, weeksHeldLineOf, type WeekRecord } from '../shift/weekRecord.js';
 import { weekdayOf } from '../shift/types.js';
 
 import { todayIsBanked, type WorldBandView } from './doorView.js';
@@ -179,6 +179,11 @@ export interface WeekScreenView {
    */
   readonly onward: NextTowerOffer | undefined;
   /**
+   * **Weeks held on this tower**, one line — `shift/weekRecord.ts#weeksHeldLineOf`, lane AM-D
+   * ([§ D1253](../../../../DECISIONS.md)) — or `undefined` before a week on it has closed.
+   */
+  readonly held: string | undefined;
+  /**
    * The screen's one button while the week's sheet stands — the onward tower's label where a held
    * week offers one, {@link WEEK_START_NEXT_LABEL} otherwise — and `undefined` when no sheet
    * stands, when the button is the week row's own (§ 3.3).
@@ -292,12 +297,12 @@ function cardsOf(input: WeekScreenInput): readonly WeekDayCard[] {
     const show = closed !== undefined;
     const verdict = show && closed !== undefined ? verdictOf(closed) : undefined;
     /* § D1176: whether the day counts toward the week, off the day as it closed or as it is dealt. */
-    const dealt = day < 1 ? undefined : weekDealOf(week.contractId)?.days[day - 1];
+    const dealt = day < 1 ? undefined : weekDealOf(week)?.days[day - 1];
     const counts =
       dealt === undefined
         ? undefined
         : closed !== undefined
-          ? dayCountsToward(week.contractId, closed)
+          ? dayCountsToward(week, closed)
           : dealt.counts;
     const uncounted = counts === false ? ' · not counted' : '';
     cards.push({
@@ -467,6 +472,7 @@ export function weekScreenViewOf(input: WeekScreenInput): WeekScreenView {
     sheet,
     record: input.record === undefined ? undefined : weekRecordLineOf(input.record),
     onward,
+    held: input.record === undefined ? undefined : weeksHeldLineOf(input.record),
     primary: sheet === undefined ? undefined : (onward?.label ?? WEEK_START_NEXT_LABEL),
   };
 }
@@ -479,7 +485,7 @@ function notCountedOf(
   week: WeekState,
   cards: readonly WeekDayCard[],
 ): readonly { readonly weekday: string; readonly sentence: string }[] {
-  const deal = weekDealOf(week.contractId);
+  const deal = weekDealOf(week);
   if (deal === undefined) return [];
   const byDay = new Map<number, DayOutcome>(week.history.map((entry) => [entry.day, entry]));
   const out: { readonly weekday: string; readonly sentence: string }[] = [];

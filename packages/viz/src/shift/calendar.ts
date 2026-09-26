@@ -98,10 +98,11 @@ import {
   type SimulationDemandOptions,
 } from '@elevator-sim/core/browser';
 
-import { SHIFT_EVENTS, demandTemplateVariesMix, eventCarChoice, eventFor } from './events.js';
+import { SHIFT_EVENTS, demandTemplateVariesMix, eventCarChoice, eventFor, eventOfDrawnId } from './events.js';
 import { scaledBuilding } from './growth.js';
 import { carsToDerate, type CarRef, type Incident } from './incidents.js';
 import { weekdayOf, type RunHorizon, type ShiftEvent, type ShiftEventId, type Weekday } from './types.js';
+import { orderedWrinkleIdFor, type WeekOrderKey } from './weekOrders.js';
 
 /* -------------------------------------------------------------------------- *
  * A bias on the directional mix
@@ -610,10 +611,22 @@ export function scheduledEventFor(
    * the two draws agree on every day, which `wholeDayEvents.test.ts` holds.
    */
   horizon: RunHorizon = 'period',
+  /*
+   * The week the day belongs to — wave AM, lane AM-D, [§ D1252](../../../../DECISIONS.md). Where
+   * the tower's census admits an authored wrinkle order for this week, a weekday is dealt that
+   * order's wrinkle (`weekOrders.ts#orderedWrinkleIdFor`) instead of the draw; week 1, the weekend
+   * and every tower with no admitted order keep the draw. Omitted, the day is dealt as week 1's,
+   * which is what a caller with no week (a Free Play run, the census's own week-1 cells) means. A
+   * calendar booking still wins, as it wins over the draw.
+   */
+  week?: WeekOrderKey,
 ): ShiftEvent {
   const today = calendarDayFor(period, day, dayIdx);
   const booked = today?.shift.eventId;
-  return booked == null ? eventFor(day, dayIdx, horizon) : SHIFT_EVENTS[booked];
+  if (booked != null) return SHIFT_EVENTS[booked];
+  const ordered = week === undefined ? undefined : orderedWrinkleIdFor(week, day, dayIdx);
+  const dealt = ordered === undefined ? undefined : eventOfDrawnId(ordered);
+  return dealt ?? eventFor(day, dayIdx, horizon);
 }
 
 /* -------------------------------------------------------------------------- *

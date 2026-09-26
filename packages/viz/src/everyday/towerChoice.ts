@@ -287,7 +287,7 @@ export function pressDayChoiceOf(
   if (press === undefined || contract === undefined) return undefined;
   const horizon = input.horizonFor(contract.buildingId);
   const eventOf = (week: WeekState): string =>
-    scheduledEventFor(input.calendar, week.day, week.dayIdx).id;
+    scheduledEventFor(input.calendar, week.day, week.dayIdx, 'period', week).id;
   const standing =
     input.week.contractId === contractId &&
     pressDayStanding({

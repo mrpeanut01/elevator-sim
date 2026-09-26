@@ -97,6 +97,7 @@ import {
   demandTemplateVariesMix,
   eventCarChoice,
   eventById,
+  eventOfDrawnId,
   shiftRunPatch,
   wholeDayEpisodeOf,
 } from '../shift/events.js';
@@ -2275,8 +2276,17 @@ export function shiftRunConfigOf(
           state.week.day,
           state.week.dayIdx,
           wholeDayRun ? 'whole-day' : 'period',
+          state.week,
         )
-      : (eventById(state.campaignEventId) ?? SHIFT_EVENTS.ordinary);
+      : /*
+         * A whole drawn id first, so a day handed one named wrinkle (`caterers:before-the-rush`)
+         * runs that wrinkle's axis values rather than its template's base: the week census hands a
+         * run an authored week order's day this way (lane AM-D, § D1252). A template id reads the
+         * same through either lookup, so a campaign day is unchanged.
+         */
+        (eventOfDrawnId(state.campaignEventId) ??
+        eventById(state.campaignEventId) ??
+        SHIFT_EVENTS.ordinary);
   const spec = selectedPatternSpec(resources, state, authored);
   const pattern = spec === undefined ? { demandTemplate: 'rise-and-fall' as const, demand: {} } : demandFromSpec(spec);
   /*

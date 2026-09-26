@@ -447,6 +447,19 @@ const STEP_DOWN: Readonly<Record<number, StepDown>> = Object.freeze({
       return envelope;
     },
   },
+  11: {
+    // Wave AM, lane AM-D, § D1252: a week knows which week of its tower it is.
+    removes: 'WeekState.week',
+    undo: (envelope) => {
+      const session = envelope['session'];
+      if (!isRecord(session)) return envelope;
+      const parked = Array.isArray(session['parkedWeeks']) ? (session['parkedWeeks'] as unknown[]) : [];
+      for (const week of [session['week'], ...parked]) {
+        if (isRecord(week)) delete week['week'];
+      }
+      return envelope;
+    },
+  },
 });
 
 /**
@@ -551,6 +564,11 @@ describe('the session slot — every version this build has ever written', () =>
             // Shape 2 by that pass, then shape 3 by version 10's below.
             expect(day.record.version, 'the completed record is a current-shape record').toBe(3);
           }
+        }
+      }
+      if (version < 11) {
+        for (const week of [snapshot.week, ...snapshot.parkedWeeks]) {
+          expect(week.week, 'every build before version 11 dealt every week week 1’s order').toBe(1);
         }
       }
       if (version < 10) {

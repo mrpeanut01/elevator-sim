@@ -305,11 +305,23 @@ function mountWeek(
         record.style.cssText = `${QUIET};margin:0;max-width:74ch`;
         sheet.body.append(record);
       }
+      /* Weeks held on this tower, beside the record it is kept in — § D1253. */
+      if (view.held !== undefined) {
+        const held = el(doc, 'p', 'everyday-week-held', view.held);
+        held.style.cssText = `${QUIET};margin:0;max-width:74ch`;
+        sheet.body.append(held);
+      }
       root.append(sheet.root);
-    } else if (view.record !== undefined) {
-      const record = el(doc, 'p', 'everyday-week-record', view.record);
-      record.style.cssText = `${QUIET};margin:8px 0 0;max-width:74ch`;
-      root.append(record);
+    } else {
+      for (const [className, text] of [
+        ['everyday-week-record', view.record],
+        ['everyday-week-held', view.held],
+      ] as const) {
+        if (text === undefined) continue;
+        const line = el(doc, 'p', className, text);
+        line.style.cssText = `${QUIET};margin:8px 0 0;max-width:74ch`;
+        root.append(line);
+      }
     }
 
     /* ---- the seven cards ---- */

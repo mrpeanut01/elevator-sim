@@ -306,6 +306,7 @@ export function openReplay(day: number, dayIdx: number, history: readonly DayOut
 export function openWeek(contractId: string = FIRST_CONTRACT_ID): WeekState {
   return {
     contractId,
+    week: 1,
     day: 1,
     dayIdx: 0,
     streak: 0,
@@ -500,7 +501,7 @@ export function closeDay(week: WeekState, outcome: DayOutcome, recordGrew = fals
    * and found it contested; everywhere else every clean day counts, as it always did
    * (`weekStake.ts#dayCountsToward`). The streak is untouched: it is about every day played.
    */
-  const counts = dayCountsToward(week.contractId, outcome);
+  const counts = dayCountsToward(week, outcome);
   const cleanRun = outcome.allMet && counts ? base.cleanRun + 1 : base.cleanRun;
   const contract = contractById(week.contractId);
 
@@ -550,7 +551,7 @@ export function closeDay(week: WeekState, outcome: DayOutcome, recordGrew = fals
    * `weekStake.ts#weekNeedOf`. A week with no counted day has a target of zero, which is *no
    * target*, and clears nothing.
    */
-  const need = contract === undefined ? 0 : weekNeedOf(contract);
+  const need = contract === undefined ? 0 : weekNeedOf(contract, undefined, week.week);
   const clears =
     contract !== undefined &&
     need > 0 &&
@@ -562,6 +563,7 @@ export function closeDay(week: WeekState, outcome: DayOutcome, recordGrew = fals
 
   return {
     contractId: week.contractId,
+    week: week.week,
     day: week.day,
     dayIdx: week.dayIdx,
     streak: posted ? streak : week.streak,
@@ -629,6 +631,12 @@ export function nextDay(week: WeekState): WeekState {
 export function rollWeek(week: WeekState): WeekState {
   return {
     ...openWeek(week.contractId),
+    /*
+     * The next week is the next one, and it is dealt its own wrinkle order — wave AM, lane AM-D,
+     * [§ D1252](../../../../DECISIONS.md). The roll used to reopen week 1, so week 2 re-dealt
+     * week 1's five wrinkles to the day (swarm DO's S3).
+     */
+    week: week.week + 1,
     completed: week.completed,
     streak: week.streak,
     bestMinutePct: week.bestMinutePct,

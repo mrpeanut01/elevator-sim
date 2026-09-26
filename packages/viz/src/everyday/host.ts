@@ -2846,14 +2846,14 @@ export function createEverydayHost(
       if (date !== undefined && seedText === date.toString()) {
         records = recordsWithDateCrowd(records, week.contractId, seedText);
       }
-      const deal = weekDealOf(week.contractId);
+      const deal = weekDealOf(week);
       /* Once per week: at the close of the path's last day, and not again on a weekend day after it — § D1246. */
       if (deal !== undefined && weekClosedByThisClose(week)) {
         records = recordsWithClosedWeek(records, week.contractId, countedCleanOf(week), deal.target);
       }
       if (records !== before) port.write(records);
     }
-    if (filed.allMet && dayCountsToward(week.contractId, filed)) bankTurn({ completion: 'career-day-paid' });
+    if (filed.allMet && dayCountsToward(week, filed)) bankTurn({ completion: 'career-day-paid' });
   };
   /**
    * Tomorrow, or with `roll` day 1 of the next week — {@link EverydayHost.openTomorrow} and

@@ -43,7 +43,7 @@ export function continueWeekEntryOf(week: WeekState, towerName: string): Continu
       goes: 'week',
     };
   }
-  const deal = weekDealOf(week.contractId);
+  const deal = weekDealOf(week);
   const tally =
     deal === undefined || deal.target === 0
       ? ''

@@ -50,6 +50,7 @@
  */
 
 import { scheduledEventFor } from './calendar.js';
+import { weekOrderIndexOf } from './weekOrders.js';
 import { dc10Of, WEEK_WAY, weekWayRowFor, type WeekWay, type WeekWayRow } from './weekWay.js';
 import { weekdayOf, type DayOutcome, type ScenarioContract, type WeekState } from './types.js';
 import type { WatchRecord } from '../watch/types.js';
@@ -135,19 +136,40 @@ function standingMissesEnough(row: WeekWayRow, census: WeekWay): boolean {
 }
 
 /**
- * Which wrinkle a day of the week is dealt: the shipped draw, with no calendar over it. A test may
- * pass another dealing — the unwrinkled week S3 measured 4 of 5 on — and nothing shipped does.
+ * Which wrinkle a day of the week is dealt: the shipped draw, with no calendar over it, for the
+ * week `week` of the tower. A test may pass another dealing — the unwrinkled week S3 measured 4 of
+ * 5 on — and nothing shipped does.
  */
-export type WeekDealing = (day: number, dayIdx: number, census: WeekWay) => string;
+export type WeekDealing = (day: number, dayIdx: number, census: WeekWay, week: WeekKey) => string;
+
+/**
+ * **A tower's week, for the functions below**: a contract id alone means its first week, and a
+ * week (anything carrying `contractId` and `week`) means that week of it — wave AM, lane AM-D,
+ * [§ D1252](../../../../DECISIONS.md). Each week is dealt its own wrinkle order
+ * (`weekOrders.ts`), so which days count and the target are a week's, and a caller holding a
+ * `WeekState` passes it rather than its contract id.
+ */
+export type WeekOn = string | Pick<WeekState, 'contractId' | 'week'>;
+
+/** A {@link WeekOn}, resolved. */
+export interface WeekKey {
+  readonly contractId: string;
+  readonly week: number;
+}
+
+function keyOf(on: WeekOn): WeekKey {
+  return typeof on === 'string' ? { contractId: on, week: 1 } : { contractId: on.contractId, week: on.week };
+}
 
 /** The shipped dealing — `calendar.ts#scheduledEventFor`, the expression every run is built from. */
-const DEALT: WeekDealing = (day, dayIdx, census) =>
-  scheduledEventFor(null, day, dayIdx, census.protocol.horizon).id;
+const DEALT: WeekDealing = (day, dayIdx, census, week) =>
+  scheduledEventFor(null, day, dayIdx, census.protocol.horizon, week).id;
 
-function dealtDayOf(contractId: string, day: number, census: WeekWay, dealing: WeekDealing): DealtDay {
+function dealtDayOf(key: WeekKey, day: number, census: WeekWay, dealing: WeekDealing): DealtDay {
+  const contractId = key.contractId;
   const dayIdx = (day - 1) % 7;
   const horizon = census.protocol.horizon;
-  const eventId = dealing(day, dayIdx, census);
+  const eventId = dealing(day, dayIdx, census, key);
   const found = weekWayRowFor(contractId, day, eventId, horizon, census);
   /* The day as it is dealt: a row measured without today's wrinkle describes a different day. */
   const row = found?.eventId === eventId ? found : undefined;
@@ -178,37 +200,42 @@ export function weekTargetFor(counted: number): number {
 const DEALS = new WeakMap<WeekWay, Map<string, WeekDeal | undefined>>();
 
 /**
- * A contract's week as the census deals it, or `undefined` where the census has not measured the
- * tower at all — see the module docstring on what stays unchanged there.
+ * A tower's week as the census deals it, or `undefined` where the census has not measured the
+ * tower at all — see the module docstring on what stays unchanged there. `on` is a contract id
+ * (its first week) or a week ({@link WeekOn}).
  *
  * Measured means the census holds a current day-1 row for the tower: `weekWay.test.ts` requires
  * every measured tower to carry days 1 to 5 unwrinkled, so day 1 is the one row every measured
  * tower has.
  */
 export function weekDealOf(
-  contractId: string,
+  on: WeekOn,
   census: WeekWay = WEEK_WAY,
   dealing: WeekDealing = DEALT,
 ): WeekDeal | undefined {
-  if (dealing !== DEALT) return dealOf(contractId, census, dealing);
+  const key = keyOf(on);
+  if (dealing !== DEALT) return dealOf(key, census, dealing);
   let cache = DEALS.get(census);
   if (cache === undefined) {
     cache = new Map();
     DEALS.set(census, cache);
   }
-  if (cache.has(contractId)) return cache.get(contractId);
-  const deal = dealOf(contractId, census, dealing);
-  cache.set(contractId, deal);
+  /* Weeks dealt the same order are the same deal, so the cache is keyed by the order dealt. */
+  const slot = `${key.contractId}/${String(weekOrderIndexOf(key))}`;
+  if (cache.has(slot)) return cache.get(slot);
+  const deal = dealOf(key, census, dealing);
+  cache.set(slot, deal);
   return deal;
 }
 
-function dealOf(contractId: string, census: WeekWay, dealing: WeekDealing): WeekDeal | undefined {
+function dealOf(key: WeekKey, census: WeekWay, dealing: WeekDealing): WeekDeal | undefined {
+  const contractId = key.contractId;
   const measured =
     weekWayRowFor(contractId, 1, 'ordinary', census.protocol.horizon, census) !== undefined;
   let deal: WeekDeal | undefined;
   if (measured) {
     const days = Object.freeze(
-      Array.from({ length: WEEK_LENGTH }, (_, index) => dealtDayOf(contractId, index + 1, census, dealing)),
+      Array.from({ length: WEEK_LENGTH }, (_, index) => dealtDayOf(key, index + 1, census, dealing)),
     );
     const counted = days.filter((entry) => entry.counts).length;
     deal = Object.freeze({ contractId, days, counted, target: weekTargetFor(counted) });
@@ -218,10 +245,11 @@ function dealOf(contractId: string, census: WeekWay, dealing: WeekDealing): Week
 
 /**
  * What a week on this tower needs to clear its scenario: the census's derived target where the
- * census speaks, and the authored `needClean` everywhere else.
+ * census speaks, and the authored `needClean` everywhere else. `week` is which week of the tower
+ * (1 when omitted), because each week is dealt its own order and so counts its own days.
  */
-export function weekNeedOf(contract: ScenarioContract, census: WeekWay = WEEK_WAY): number {
-  return weekDealOf(contract.id, census)?.target ?? contract.needClean;
+export function weekNeedOf(contract: ScenarioContract, census: WeekWay = WEEK_WAY, week = 1): number {
+  return weekDealOf({ contractId: contract.id, week }, census)?.target ?? contract.needClean;
 }
 
 /**
@@ -230,11 +258,11 @@ export function weekNeedOf(contract: ScenarioContract, census: WeekWay = WEEK_WA
  * other wrinkle (a calendar period over it, say) is not the day the census measured.
  */
 export function dayCountsToward(
-  contractId: string,
+  on: WeekOn,
   outcome: Pick<DayOutcome, 'day' | 'eventId'>,
   census: WeekWay = WEEK_WAY,
 ): boolean {
-  const deal = weekDealOf(contractId, census);
+  const deal = weekDealOf(on, census);
   if (deal === undefined) return true;
   const dealt = deal.days[outcome.day - 1];
   return dealt !== undefined && dealt.counts && dealt.eventId === outcome.eventId;
@@ -246,19 +274,22 @@ export function dayCountsToward(
  * drew some other wrinkle than the one it is dealt is not the day the census measured.
  */
 export function dayStakeSentenceOf(
-  contractId: string,
+  on: WeekOn,
   day: number,
   eventId: string,
   census: WeekWay = WEEK_WAY,
 ): string | undefined {
-  const dealt = weekDealOf(contractId, census)?.days[day - 1];
+  const dealt = weekDealOf(on, census)?.days[day - 1];
   if (dealt === undefined) return undefined;
   return dealt.eventId === eventId ? dealt.sentence : DAY_UNMEASURED_SENTENCE;
 }
 
 /** Clean counted days in the week's history. */
-export function countedCleanOf(week: Pick<WeekState, 'contractId' | 'history'>, census: WeekWay = WEEK_WAY): number {
-  return week.history.filter((entry) => entry.allMet && dayCountsToward(week.contractId, entry, census)).length;
+export function countedCleanOf(
+  week: Pick<WeekState, 'contractId' | 'week' | 'history'>,
+  census: WeekWay = WEEK_WAY,
+): number {
+  return week.history.filter((entry) => entry.allMet && dayCountsToward(week, entry, census)).length;
 }
 
 /**
@@ -270,10 +301,10 @@ export function countedCleanOf(week: Pick<WeekState, 'contractId' | 'history'>, 
  * (swarm DM's ruling (a), [§ D1179](../../../../DECISIONS.md)).
  */
 export function weekStakeLineOf(
-  week: Pick<WeekState, 'contractId' | 'history'>,
+  week: Pick<WeekState, 'contractId' | 'week' | 'history'>,
   census: WeekWay = WEEK_WAY,
 ): string | undefined {
-  const deal = weekDealOf(week.contractId, census);
+  const deal = weekDealOf(week, census);
   if (deal === undefined) return undefined;
   if (deal.counted === 0) return weekHeldReasonOf(deal);
   const clean = countedCleanOf(week, census);
@@ -303,14 +334,14 @@ export function weekStakeLineOf(
  * target.
  */
 export function weekTargetMetDayOf(
-  week: Pick<WeekState, 'contractId' | 'history'>,
+  week: Pick<WeekState, 'contractId' | 'week' | 'history'>,
   census: WeekWay = WEEK_WAY,
 ): DayOutcome | undefined {
-  const deal = weekDealOf(week.contractId, census);
+  const deal = weekDealOf(week, census);
   if (deal === undefined || deal.target === 0) return undefined;
   let clean = 0;
   for (const entry of [...week.history].sort((a, b) => a.day - b.day)) {
-    if (!entry.allMet || !dayCountsToward(week.contractId, entry, census)) continue;
+    if (!entry.allMet || !dayCountsToward(week, entry, census)) continue;
     clean += 1;
     if (clean === deal.target) return entry;
   }
@@ -326,10 +357,10 @@ export function weekTargetMetDayOf(
  * It says nothing about the house, which has not been asked yet on every day but the last.
  */
 export function weekTargetMetLineOf(
-  week: Pick<WeekState, 'contractId' | 'history' | 'closedDay'>,
+  week: Pick<WeekState, 'contractId' | 'week' | 'history' | 'closedDay'>,
   census: WeekWay = WEEK_WAY,
 ): string | undefined {
-  const deal = weekDealOf(week.contractId, census);
+  const deal = weekDealOf(week, census);
   const metOn = weekTargetMetDayOf(week, census);
   if (deal === undefined || metOn === undefined || metOn.day !== week.closedDay) return undefined;
   return (
@@ -480,10 +511,10 @@ export function weekPathEndOf(deal: WeekDeal): number {
  * close ([§ D1246](../../../../DECISIONS.md); it was day 7 alone under § D1177).
  */
 export function weekHasClosed(
-  week: Pick<WeekState, 'contractId' | 'day' | 'closedDay'>,
+  week: Pick<WeekState, 'contractId' | 'week' | 'day' | 'closedDay'>,
   census: WeekWay = WEEK_WAY,
 ): boolean {
-  const deal = weekDealOf(week.contractId, census);
+  const deal = weekDealOf(week, census);
   return deal !== undefined && week.day >= weekPathEndOf(deal) && week.closedDay === week.day;
 }
 
@@ -494,10 +525,10 @@ export function weekHasClosed(
  * the week once.
  */
 export function weekClosedByThisClose(
-  week: Pick<WeekState, 'contractId' | 'day' | 'closedDay'>,
+  week: Pick<WeekState, 'contractId' | 'week' | 'day' | 'closedDay'>,
   census: WeekWay = WEEK_WAY,
 ): boolean {
-  const deal = weekDealOf(week.contractId, census);
+  const deal = weekDealOf(week, census);
   return deal !== undefined && weekHasClosed(week, census) && week.day === weekPathEndOf(deal);
 }
 
@@ -730,12 +761,12 @@ export function weekSheetOf(
   houseOf: (day: number) => HouseReading | undefined,
   census: WeekWay = WEEK_WAY,
 ): WeekSheetView | undefined {
-  const deal = weekDealOf(week.contractId, census);
+  const deal = weekDealOf(week, census);
   if (deal === undefined || !weekHasClosed(week, census)) return undefined;
   const byDay = new Map(week.history.map((entry) => [entry.day, entry]));
   const rows: WeekSheetRow[] = deal.days.map((dealt) => {
     const outcome = byDay.get(dealt.day);
-    const counts = outcome === undefined ? dealt.counts : dayCountsToward(week.contractId, outcome, census);
+    const counts = outcome === undefined ? dealt.counts : dayCountsToward(week, outcome, census);
     const house = counts && outcome !== undefined ? houseReadingOfDay(outcome, houseOf, census) : undefined;
     const weekday = weekdayOf(dealt.dayIdx).slice(0, 3).toUpperCase();
     const yours: SheetVerdict = outcome === undefined ? 'not played' : dayVerdictOf(outcome);

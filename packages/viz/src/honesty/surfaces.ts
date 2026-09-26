@@ -791,7 +791,7 @@ import {
   type WeekDeal,
 } from '../shift/weekStake.js';
 import { PRACTICE_DAY_SENTENCES } from '../shift/scoredCrowd.js';
-import { derivedCrowdOf, weekRecordLineOf } from '../shift/weekRecord.js';
+import { derivedCrowdOf, weekRecordLineOf, weeksHeldLineOf } from '../shift/weekRecord.js';
 import { CONTINUE_WEEK_TITLE, continueWeekEntryOf } from '../everyday/continueWeek.js';
 import { WATCH_RECORD_VERSION, type WatchRecord } from '../watch/types.js';
 
@@ -14191,6 +14191,8 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     'shift/weekStake.ts#WEEKEND_NOTE',
     'everyday/weekView.ts#WEEK_START_NEXT_LABEL',
     'shift/weekRecord.ts#weekRecordLineOf',
+    /* Weeks held on this tower — lane AM-D, § D1253: the run's two arms, drawn on the sheet and the door. */
+    'shift/weekRecord.ts#weeksHeldLineOf',
     'everyday/continueWeek.ts#continueWeekEntryOf',
     'everyday/continueWeek.ts#CONTINUE_WEEK_TITLE',
     /* Lane AM-E (§ D1259): a held week's next tower, seeded in `seedWeekStake` for the same reason. */
@@ -17172,6 +17174,13 @@ function seedWeekStake(
     ['several', { contractId: 'c2', closed: 3, met: 2, best: 5 }],
   ] as const) {
     seeds.push({ field: `week.record.${arm}`, text: weekRecordLineOf(record) ?? '', role: 'observation' });
+  }
+  /* Weeks held on this tower — § D1253: a run ended by a missed week, and a run of two. */
+  for (const [arm, record] of [
+    ['ended', { contractId: 'c2', closed: 2, met: 1, best: 4, held: 0 }],
+    ['running', { contractId: 'c2', closed: 3, met: 2, best: 5, held: 2 }],
+  ] as const) {
+    seeds.push({ field: `week.held.${arm}`, text: weeksHeldLineOf(record) ?? '', role: 'observation' });
   }
 }
 

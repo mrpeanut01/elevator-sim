@@ -236,7 +236,7 @@ function headlineOf(closed: DayOutcome | null, week: WeekState, contract: Scenar
    * the week keeps it, and that is all that happened. A clean day that counts is *banked*, which is
    * exactly the day `closeDay` adds to `cleanRun`.
    */
-  const banked = contract !== undefined && closed.allMet && dayCountsToward(week.contractId, closed);
+  const banked = contract !== undefined && closed.allMet && dayCountsToward(week, closed);
   return `${closed.weekday} is ${banked ? 'banked' : 'filed'}. ${weekdayAfter(week)} opens.`;
 }
 
@@ -398,7 +398,7 @@ function nextRowsOf(input: TomorrowInput): readonly TomorrowRow[] {
  */
 function bankedTowardOf(week: WeekState, contract: ScenarioContract): string {
   /* The derived target where the week census speaks — § D1176, `weekStake.ts#weekNeedOf`. */
-  const need = weekNeedOf(contract);
+  const need = weekNeedOf(contract, undefined, week.week);
   if (need === 0) return WEEK_WITHOUT_COUNTED_DAYS_SHORT;
   const banked = Math.min(week.cleanRun, need);
   return week.cleanRun >= need

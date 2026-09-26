@@ -40,6 +40,7 @@
 
 import { dayWordsFor } from '../mode/glossary.js';
 import { HISTORY_DAYS } from '../shift/week.js';
+import { weeksHeldLineOf, type WeekRecord } from '../shift/weekRecord.js';
 import type { DayOutcome, WeekState } from '../shift/types.js';
 import { weekdayOf } from '../shift/types.js';
 
@@ -145,6 +146,11 @@ export interface DoorScreenView {
   readonly seedLine: string;
   /** Why this tower, on a first day nobody has played on a legible one; `undefined` otherwise. */
   readonly firstSessionLine: string | undefined;
+  /**
+   * **Weeks held on this tower** — `shift/weekRecord.ts#weeksHeldLineOf`, lane AM-D
+   * ([§ D1253](../../../../DECISIONS.md)) — or `undefined` before a week on it has closed.
+   */
+  readonly weeksHeld: string | undefined;
   readonly sameForEveryone: string;
   readonly primary: DoorPrimaryView;
 }
@@ -169,6 +175,8 @@ export interface DoorScreenInput {
    * rather than off this view's half of it. Absent reads this view's own text only.
    */
   readonly alsoOnScreen?: readonly string[] | undefined;
+  /** The week's tower's record of closed weeks — `EverydayHost.weekRecord()`. Absent draws no run. */
+  readonly record?: WeekRecord | undefined;
 }
 
 /**
@@ -531,6 +539,7 @@ export function doorScreenViewOf(input: DoorScreenInput): DoorScreenView {
     },
     seedLine: input.today.seedLine,
     firstSessionLine: input.today.firstSessionLine,
+    weeksHeld: input.record === undefined ? undefined : weeksHeldLineOf(input.record),
     sameForEveryone,
     primary: primaryOf(clamped, chips),
   };

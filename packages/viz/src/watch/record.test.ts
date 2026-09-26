@@ -385,6 +385,20 @@ describe('a record replays the run it was taken from', () => {
     expect(rebuilt.week.day).toBe(record.day);
     expect(stateFromWatchRecord(loaded, RESOURCES, { ...record, rungContractId: null }).playMode).toBe('free-play');
   }, 60_000);
+
+  it('carries which week of its tower the day was, from week 2, and re-asks it as that week — § D1252', () => {
+    /* Each week of a census tower is dealt its own wrinkle order, so the week is part of the day. */
+    const weekOne = watchRecordOf(baseState(), RESOURCES);
+    expect(weekOne === undefined ? 'no record' : 'week' in weekOne).toBe(false);
+    const later = { ...baseState(), week: { ...baseState().week, week: 3 } };
+    const record = watchRecordOf(later, RESOURCES);
+    expect(record?.week).toBe(3);
+    if (record === undefined) return;
+    expect(stateFromWatchRecord(baseState(), RESOURCES, record).week.week).toBe(3);
+    expect(stateFromWatchRecord(baseState(), RESOURCES, { ...record, rungContractId: null }).week.week).toBe(3);
+    const { week: _dropped, ...asWeekOne } = record;
+    expect(stateFromWatchRecord(later, RESOURCES, asWeekOne).week.week).toBe(1);
+  });
 });
 
 describe('the reproduction gate', () => {
