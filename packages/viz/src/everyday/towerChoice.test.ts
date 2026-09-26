@@ -152,9 +152,15 @@ describe('a tower whose week counts no day holds its scenario, and stays a press
     }
     expect(view.rows.filter((row) => row.scenario === 'held').map((row) => row.contractId)).toEqual(['c3']);
     const secure = view.rows.find((row) => row.contractId === 'c3');
-    expect(secure?.scenarioLine).toMatch(/held back/u);
+    /*
+     * The words say what pressing the row does, since the row is a press (lane AL-B, seat C D4 and
+     * seat D H8). Red before the fix: the line read *"its scenario is held back"* and *"Nothing is
+     * locked"*, and nothing in it said that choosing the tower plays its week.
+     */
+    expect(secure?.scenarioLine).not.toMatch(/held back/u);
+    expect(secure?.scenarioLine).toMatch(/no scenario clear to win/u);
     expect(secure?.scenarioLine).toMatch(/not been measured as they are dealt/u);
-    expect(secure?.scenarioLine).toMatch(/Nothing is locked/u);
+    expect(secure?.scenarioLine).toMatch(/Choosing this tower still plays its week/u);
     // Harbour Point is offered at one of one, and its row names the day.
     const harbour = view.rows.find((row) => row.contractId === 'c9');
     expect(harbour?.scenario).toBe('offered');

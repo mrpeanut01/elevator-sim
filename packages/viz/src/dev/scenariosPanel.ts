@@ -234,10 +234,12 @@ function statusDressing(status: ContractStatus): {
 }
 
 /**
- * The objective on a card whose scenario is held — [§ D1179](../../../../DECISIONS.md), § D1129's
- * *Held back:* lead. The reason is {@link ScenarioCardView.offerLine}, drawn under it.
+ * The objective on a card whose scenario is held — [§ D1179](../../../../DECISIONS.md). It read
+ * § D1129's *Held back:* lead until lane AL-B: the card is a press that plays the week, and *held
+ * back* read as the tower being held (the post-AK panel's seat C D4). The reason is
+ * {@link ScenarioCardView.offerLine}, drawn under it.
  */
-export const SCENARIO_HELD_OBJECTIVE = 'Held back: this week offers no clear';
+export const SCENARIO_HELD_OBJECTIVE = 'No clear to win this week: choosing it still plays the week';
 
 /** `Clear 2 shifts — 1 of 2 banked`, the design's own sentence (`design.html` :2675). */
 function objectiveOf(

@@ -660,10 +660,27 @@ export const RUSH_RESULT_COPY = Object.freeze({
     `It held for ${held} before forty people had been standing over two minutes at once; ${String(arrived)} had arrived by then.`,
   stoppedLede: 'This run does not have a breaking point to report. It was ended by hand while the building was still clearing what arrived.',
   beatComfortable: 'The first waves cleared between cars, the way a normal morning does.',
-  beatTrend: (saturation: VizSaturation): string =>
-    saturation.verdict === 'diverging-queue'
-      ? `Then the queue stopped emptying between cars: over the ${heldClock(saturation.windowEndS - saturation.windowStartS)} the sheet's trend test measures, it grew ${saturation.slopePersonsPerMinute.toFixed(1)} people a minute, read at ${String(saturation.sampleCount)} samples.`
-      : `The sheet's trend test over the whole run does not call the queue divergent (${saturation.verdict}, ${String(saturation.sampleCount)} samples), which is what a line reached and then cleared looks like.`,
+  /**
+   * **The trend beat names the horizon it was fitted over, and the rush's own beside it** — lane
+   * AL-B, the post-AK panel's seat D H7. `core`'s trend test is fitted over the recording's whole
+   * reporting window, which is the generated climb rather than the rush: a round that broke at
+   * 27:20 read *"over the 90:00 the sheet's trend test measures"*, a horizon the player never
+   * reached. PM-RU3 forbids refitting it over the rush alone, so where the window runs past the
+   * moment the rush ended, the sentence says both: the climb it was fitted over, and how long this
+   * rush held. `endedS` is {@link RushOutcome.atS}, the simulated second the rush ended at.
+   */
+  beatTrend: (saturation: VizSaturation, endedS: number, held: string): string => {
+    const fitted = heldClock(saturation.windowEndS - saturation.windowStartS);
+    const pastTheRun = saturation.windowEndS > endedS;
+    if (saturation.verdict === 'diverging-queue') {
+      return pastTheRun
+        ? `Then the queue stopped emptying between cars. The sheet's trend test is fitted over the whole generated climb, ${fitted}, which runs on past the ${held} this rush held: over that climb the queue grew ${saturation.slopePersonsPerMinute.toFixed(1)} people a minute, read at ${String(saturation.sampleCount)} samples.`
+        : `Then the queue stopped emptying between cars: over the ${fitted} the sheet's trend test measures, it grew ${saturation.slopePersonsPerMinute.toFixed(1)} people a minute, read at ${String(saturation.sampleCount)} samples.`;
+    }
+    return pastTheRun
+      ? `The sheet's trend test, fitted over the whole generated climb (${fitted}, past the ${held} this rush held), does not call the queue divergent (${saturation.verdict}, ${String(saturation.sampleCount)} samples).`
+      : `The sheet's trend test over the whole run does not call the queue divergent (${saturation.verdict}, ${String(saturation.sampleCount)} samples), which is what a line reached and then cleared looks like.`;
+  },
   beatTrendAbsent: 'This recording carries no trend test, so where the queue began to diverge is not on it.',
   beatBroke: (held: string): string => `At ${held} held, forty people had been over two minutes at once, and the rush ended there.`,
   /**
@@ -709,7 +726,7 @@ export const RUSH_RESULT_COPY = Object.freeze({
 export function rushResultViewOf(outcome: RushOutcome, disclosure: string | undefined): RushResultView {
   const held = heldClock(outcome.heldS);
   const broke = outcome.kind === 'broke';
-  const trend = outcome.saturation === undefined ? RUSH_RESULT_COPY.beatTrendAbsent : RUSH_RESULT_COPY.beatTrend(outcome.saturation);
+  const trend = outcome.saturation === undefined ? RUSH_RESULT_COPY.beatTrendAbsent : RUSH_RESULT_COPY.beatTrend(outcome.saturation, outcome.atS, held);
   const where = RUSH_RESULT_COPY.beatWhere(outcome.where, outcome.overLine);
   return {
     eyebrow: RUSH_RESULT_COPY.eyebrow,

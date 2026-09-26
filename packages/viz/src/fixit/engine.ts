@@ -516,7 +516,9 @@ export function stepZoneOverlap(
   const next = state.zoneOverlapFloors + delta;
   if (next < 0 || next > ceiling) return state;
   if (state.zoneOverlapFloors === 0 && next > 0) {
-    if (!affordabilityOf(entry, state, zonePriceUnits(schedule), schedule).selectable) return state;
+    /* A rezone the banks' selects already bought is the same charge, so the step adds nothing (seat D H5). */
+    const cost = rezonePathsOf(state).length > 0 ? 0 : zonePriceUnits(schedule);
+    if (!affordabilityOf(entry, state, cost, schedule).selectable) return state;
   }
   return { ...state, zoneOverlapFloors: next };
 }

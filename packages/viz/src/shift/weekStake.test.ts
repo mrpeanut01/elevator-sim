@@ -268,7 +268,7 @@ describe('the target is derived — § D1176 clause 2', () => {
     const secure = contractById('c3');
     expect(secure === undefined ? -1 : weekNeedOf(secure)).toBe(0);
     expect(weekStakeLineOf(openWeek('c3'))).toBe(
-      'No day of this week counts toward a target yet, so its scenario is held back. Monday was ' +
+      'No day of this week counts toward a target yet, so this week has no scenario clear to win. Monday was ' +
         'measured as it is dealt and does not count, and the other six days have not been measured ' +
         'as they are dealt.',
     );
@@ -519,15 +519,15 @@ describe('a week that counts no day holds its scenario — § D1179, swarm DM’
       days: template.days.map((day) => ({ ...day, counts: false, reason: reasonOf(day) })),
     });
     expect(weekHeldReasonOf(shaped(() => 'queue'))).toBe(
-      'No day of this week counts toward a target, so its scenario is held back: all seven days ' +
+      'No day of this week counts toward a target, so this week has no scenario clear to win: all seven days ' +
         'were measured as they are dealt, and none of them counts.',
     );
     expect(weekHeldReasonOf(shaped(() => 'unmeasured'))).toBe(
-      'No day of this week counts toward a target yet, so its scenario is held back: none of its ' +
+      'No day of this week counts toward a target yet, so this week has no scenario clear to win: none of its ' +
         'seven days has been measured as it is dealt.',
     );
     expect(weekHeldReasonOf(shaped((day) => (day.day <= 3 ? 'no-way-through' : 'unmeasured')))).toBe(
-      'No day of this week counts toward a target yet, so its scenario is held back. Monday, ' +
+      'No day of this week counts toward a target yet, so this week has no scenario clear to win. Monday, ' +
         'Tuesday and Wednesday were measured as they are dealt and do not count, and the other four ' +
         'days have not been measured as they are dealt.',
     );

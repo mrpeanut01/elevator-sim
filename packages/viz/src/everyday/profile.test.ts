@@ -37,6 +37,8 @@ import {
   diagnosisShownSetOf,
   progressWithDiagnosisShown,
   progressWithSolvedCases,
+  fixSpentUnitsOf,
+  progressWithFixSpent,
   type EverydayProgress,
   loadDefaultSpeed,
   loadSound,
@@ -918,5 +920,47 @@ describe('the diagnoses a player asked to see are kept — § D1120 clause 1', (
     const back = loadProgress(backing);
     expect(back.progress).toEqual(EMPTY_EVERYDAY_PROGRESS);
     expect(back.notice).toBe(PROGRESS_REFUSALS.shape);
+  });
+});
+
+describe('what the order that fixed a case cost is kept — lane AL-B, seat C D5', () => {
+  /*
+   * The post-AK panel's seat C D5: a fixed case showed its par until a reload and never after,
+   * because the fixing order's cost lived in the session. Red before the fix: the progress had no
+   * field for it, so there was nothing for a reload to read.
+   */
+  it('round-trips a fix cost, keeps it through a rating and a new solved set, and replaces it on a new fix', () => {
+    const backing = memoryBacking();
+    const fixed = progressWithFixSpent(progressWithSolvedCases(EMPTY_EVERYDAY_PROGRESS, ['let-faster']), 'let-faster', 2);
+    expect(fixSpentUnitsOf(fixed, 'let-faster')).toBe(2);
+    expect(fixSpentUnitsOf(fixed, 'other')).toBeUndefined();
+    const rated = everydayProgressWith(fixed, savedRatingOf(entry('a', 40)));
+    const more = progressWithSolvedCases(rated, ['let-faster', 'other']);
+    expect(fixSpentUnitsOf(more, 'let-faster')).toBe(2);
+    saveEveryday(backing, DEFAULT_EVERYDAY_PROFILE, more, 'metric');
+    const back = loadProgress(backing);
+    expect(back.notice).toBeNull();
+    expect(fixSpentUnitsOf(back.progress, 'let-faster')).toBe(2);
+    /* A later fixed verdict at another price is the one the card last showed. */
+    const again = progressWithFixSpent(back.progress, 'let-faster', 6);
+    expect(fixSpentUnitsOf(again, 'let-faster')).toBe(6);
+    expect(again.fixSpent).toHaveLength(1);
+    expect(progressWithFixSpent(again, 'let-faster', 6)).toBe(again);
+  });
+
+  it('reads progress kept before the field as no cost recorded, and refuses a malformed one', () => {
+    expect(fixSpentUnitsOf({ solvedCaseIds: ['old'], ratings: [] }, 'old')).toBeUndefined();
+    for (const bad of [{ caseId: '', units: 2 }, { caseId: 'x', units: -1 }, { caseId: 'x', units: 1.5 }, 'x']) {
+      const backing = memoryBacking();
+      saveEveryday(
+        backing,
+        DEFAULT_EVERYDAY_PROFILE,
+        { solvedCaseIds: ['x'], ratings: [], fixSpent: [bad] } as unknown as EverydayProgress,
+        'metric',
+      );
+      const back = loadProgress(backing);
+      expect(back.progress).toEqual(EMPTY_EVERYDAY_PROGRESS);
+      expect(back.notice).toBe(PROGRESS_REFUSALS.shape);
+    }
   });
 });

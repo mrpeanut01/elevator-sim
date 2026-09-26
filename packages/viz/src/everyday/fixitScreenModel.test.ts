@@ -51,6 +51,7 @@ import {
   fixitParkingRow,
   fixitSpendSummary,
   fixitZoneRow,
+  pairStageNoteOf,
 } from './fixitScreenModel.js';
 
 /** A minimal case — enough shape for the model, no claim about any shipped file. */
@@ -166,6 +167,38 @@ describe('the § 3.3 refinement', () => {
       expect(model.primary.label).not.toContain('⟨');
     }
     expect(fixitBarModel(FIXIT_BAR, view({})).note).toBe(COPY.noteReady);
+  });
+
+  it('puts the par on a fixed row and on no open one (lane AL-B, seat C D5)', () => {
+    const cases = [caseOf('a'), caseOf('b')];
+    const rail = fixitCaseRailModel(cases, new Set(['a']), 'a', () => 'tower', undefined, undefined, (id) => `par for ${id}`);
+    expect(rail.rows.find((r) => r.id === 'a')?.par).toBe('par for a');
+    expect(rail.rows.find((r) => r.id === 'b')?.par).toBeUndefined();
+  });
+
+  it('does not promise a mark on a case that is already fixed (lane AL-B, seat C D5)', () => {
+    const entry = caseOf('a');
+    const schedule = shippedPriceSchedule();
+    const open = fixitDiagnosisView({ entry, schedule, asked: false, census: undefined, explained: false });
+    expect(open.note).toBe(COPY.diagnosisWithheld);
+    const fixed = fixitDiagnosisView({ entry, schedule, asked: false, census: undefined, explained: false, fixed: true });
+    expect(fixed.state).toBe('withheld');
+    expect(fixed.note).toBe(COPY.diagnosisWithheldFixed);
+    expect(fixed.note).not.toMatch(/marked as fixed with the diagnosis/);
+  });
+
+  it('names the crowd the pair actually met, one note per basis (lane AL-B, seat D H4)', () => {
+    expect(pairStageNoteOf({ sameCrowd: true })).toBe(COPY.pairStageNote);
+    expect(pairStageNoteOf({ sameCrowd: false, crowdRedrawn: false })).toBe(COPY.pairStageNoteThinned);
+    expect(pairStageNoteOf({ sameCrowd: false, crowdRedrawn: true })).toBe(COPY.pairStageNoteRedrawn);
+    expect(COPY.pairStageNote).toContain('the same crowd');
+    for (const note of [COPY.pairStageNoteThinned, COPY.pairStageNoteRedrawn]) {
+      expect(note).not.toMatch(/same morning and the same crowd/);
+    }
+    expect(COPY.pairStageNoteThinned).toContain('the same crowd less the people it moved');
+    expect(COPY.pairStageNoteRedrawn).toContain('not the same crowd twice');
+    // Before the run nothing is known about the crowd, so the note claims only the morning.
+    expect(COPY.noteReady).not.toMatch(/crowd/);
   });
 
   it('applies the § 3.3 solved inversion the row ships uninverted, with the row’s own way out', () => {
@@ -544,6 +577,8 @@ describe('the five families, worded', () => {
   it('offers a car every other bank, a bank of its own and out of service, and never its own bank', () => {
     const view = fixitRezoneView({
       row: row(true),
+      boughtByZoneStep: false,
+      boughtByBanks: true,
       floorOrder: ['G', '2', '3'],
       cars: [
         { id: 'A', standingBankId: 'low', doubleDeck: false, homeFloors: ['G', '2'], target: 'low' },

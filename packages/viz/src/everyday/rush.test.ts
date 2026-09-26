@@ -142,6 +142,25 @@ describe('the hold line — forty past two minutes at once, read at the stream�
     /* The trend test is quoted from the recording, never computed here. */
     expect(brokeView.account[1]).toContain('people a minute');
     expect(brokeView.account[1]).toContain(`${String(broke.saturation?.sampleCount ?? 0)} samples`);
+    /*
+     * **The horizon named is the rush's** — lane AL-B, seat D H7. The trend test is fitted over the
+     * whole generated climb, which runs past the moment this rush broke; the beat used to name only
+     * the climb (*"over the 90:00 the sheet's trend test measures"*) on a round that held 27:20.
+     * Red before the fix: the beat carried the window's clock and not the held one.
+     */
+    const window = broke.saturation!;
+    expect(window.windowEndS).toBeGreaterThan(broke.atS);
+    expect(brokeView.account[1]).toContain(`the ${heldClock(broke.heldS)} this rush held`);
+    expect(brokeView.account[1]).toContain('whole generated climb');
+    expect(brokeView.account[1]).not.toMatch(/over the [\d:]+ the sheet's trend test measures/u);
+    /* Where the window ends inside the rush, the one horizon it names is inside the run. */
+    const inside = { ...broke, saturation: { ...window, windowEndS: broke.atS } };
+    expect(rushResultViewOf(inside, undefined).account[1]).toMatch(/over the [\d:]+ the sheet's trend test measures/u);
+    expect(rushResultViewOf(inside, undefined).account[1]).not.toContain('generated climb');
+    /* And the quiet verdict, fitted past the rush, says the same about its window. */
+    const quiet = { ...broke, saturation: { ...window, verdict: 'stable' as const } };
+    expect(rushResultViewOf(quiet, undefined).account[1]).toContain(`past the ${heldClock(broke.heldS)} this rush held`);
+    expect(rushResultViewOf(quiet, undefined).account[1]).not.toContain('whole run');
     const stoppedView = rushResultViewOf(stopped, undefined);
     expect(stoppedView.account).toHaveLength(2);
     expect(stoppedView.footer).toContain('not posted');

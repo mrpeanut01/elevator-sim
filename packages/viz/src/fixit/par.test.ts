@@ -11,7 +11,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { isOffered } from './held.js';
-import { FIXIT_PAR, FIXIT_PAR_COPY, fixitParLineOf } from './par.js';
+import { FIXIT_PAR, FIXIT_PAR_COPY, fixitParLineOf, fixitParTagOf } from './par.js';
 import { measureFixitPar } from './par.test-helper.js';
 import { fixitResourcesFromDisk, shippedFixitCases } from './resources.test-helper.js';
 import { ROUTE_CENSUS } from './routeCensus.js';
@@ -80,5 +80,18 @@ describe('the par line says what it is and pays nothing', () => {
     expect(fixitParLineOf('no-such-case', 0)).toBeUndefined();
     const none = Object.entries(FIXIT_PAR).find(([, row]) => row.units === null);
     if (none !== undefined) expect(fixitParLineOf(none[0], 0)).toBeUndefined();
+  });
+});
+
+describe('the par after a reload, and on the case list — lane AL-B, seat C D5', () => {
+  it('draws the par with no comparison where the fix cost was not kept, and a short form for the list', () => {
+    const [id, row] = Object.entries(FIXIT_PAR).find(([, candidate]) => candidate.units !== null && candidate.units > 0)!;
+    const unrecorded = fixitParLineOf(id, undefined)!;
+    expect(unrecorded).toContain(`cost ${String(row.units)} units.`);
+    expect(unrecorded).toContain(FIXIT_PAR_COPY.unrecorded);
+    expect(unrecorded).not.toMatch(/Yours cost/);
+    expect(fixitParTagOf(id, row.units!)).toBe(`par ${String(row.units)} u · yours ${String(row.units)} u`);
+    expect(fixitParTagOf(id, undefined)).toBe(`par ${String(row.units)} u`);
+    expect(fixitParTagOf('no-such-case', 0)).toBeUndefined();
   });
 });

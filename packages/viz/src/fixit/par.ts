@@ -78,6 +78,14 @@ export const FIXIT_PAR_COPY = Object.freeze({
   under: 'Yours cost less than any fix we tried.',
   same: 'Yours cost the same.',
   pays: 'Matching it or beating it pays nothing extra.',
+  /*
+   * A case fixed before its cost was kept on this device (lane AL-B, seat C D5): the par is still
+   * drawn, and the comparison is withheld rather than guessed.
+   */
+  unrecorded: 'What your fix cost was not kept on this device, so it is not compared.',
+  /* The case list's short form, on a fixed row. */
+  tagPar: 'par',
+  tagYours: 'yours',
 });
 
 function unitsOf(units: number): string {
@@ -91,11 +99,13 @@ function unitsOf(units: number): string {
  * the spent row's own figure. The sentence names the sample (*we tried*) and the judge (*the same
  * forty-nine mornings*), gives both prices, and says it pays nothing.
  */
-export function fixitParLineOf(caseId: string, spentUnits: number): string | undefined {
+export function fixitParLineOf(caseId: string, spentUnits: number | undefined): string | undefined {
   const row = fixitParOf(caseId);
   if (row === undefined || row.units === null) return undefined;
   const comparison =
-    spentUnits < row.units
+    spentUnits === undefined
+      ? FIXIT_PAR_COPY.unrecorded
+      : spentUnits < row.units
       ? FIXIT_PAR_COPY.under
       : spentUnits === row.units
         ? FIXIT_PAR_COPY.same
@@ -104,4 +114,17 @@ export function fixitParLineOf(caseId: string, spentUnits: number): string | und
     `The cheapest change we tried that fixes this letter, judged on the same forty-nine mornings, ` +
     `cost ${unitsOf(row.units)}. ${comparison} ${FIXIT_PAR_COPY.pays}`
   );
+}
+
+/**
+ * **The par on the case list's fixed row** — lane AL-B, the post-AK panel's seat C D5: *"The list
+ * card says only FIXED · on your own, with no par."* The short form of {@link fixitParLineOf}:
+ * *par 2 u · yours 2 u*, or *par 2 u* where the fix's cost was not kept. `undefined` where the case
+ * has no par.
+ */
+export function fixitParTagOf(caseId: string, spentUnits: number | undefined): string | undefined {
+  const row = fixitParOf(caseId);
+  if (row === undefined || row.units === null) return undefined;
+  const par = `${FIXIT_PAR_COPY.tagPar} ${String(row.units)} u`;
+  return spentUnits === undefined ? par : `${par} · ${FIXIT_PAR_COPY.tagYours} ${String(spentUnits)} u`;
 }

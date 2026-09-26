@@ -105,6 +105,7 @@ import { createOffThreadRunner } from './offThreadRuns.js';
 import { createFixitJudge, pressThroughTheJudge, progressLineOf, type MorningProgress } from '../fixit/judge.js';
 import { shippedAsBuiltMorningsOf } from '../fixit/asBuiltMornings.js';
 import { routeCensusOf } from '../fixit/routeCensus.js';
+import { rezonePathsOf } from '../fixit/families.js';
 import { diagnosisShownSetOf, progressWithDiagnosisShown } from '../everyday/profile.js';
 import { everydayProfileStore } from '../everyday/profileStore.js';
 import { heldReasonOf, isOffered } from '../fixit/held.js';
@@ -573,6 +574,8 @@ function scheduleNow(): PriceSchedule {
         !verdictIsStale(session.verdictState ?? emptyFixitState(), session.state) &&
         session.outcome?.kind === 'fixed' &&
         session.outcome.attribution === 'diagnosis',
+      /* On a fixed case asking marks nothing (below), so the card must not say it would (seat C D5). */
+      fixed: session.fixed,
     });
     const children: HTMLElement[] = [];
     if (view.text !== undefined) {
@@ -703,9 +706,19 @@ function scheduleNow(): PriceSchedule {
     if (ceiling <= 0) return null;
     const floors = session.state.zoneOverlapFloors;
     const price = zonePriceUnits(scheduleNow());
-    const canBuy = affordabilityOf(entry, session.state, price, scheduleNow()).selectable;
+    /*
+     * The banks' selects buy the same `rezone-bank` row, charged once (lane AL-B, the post-AK panel's
+     * seat D H5): where they already have, the step adds nothing, and the price says which pays.
+     */
+    const banksBought = rezonePathsOf(session.state).length > 0;
+    const canBuy = affordabilityOf(entry, session.state, banksBought ? 0 : price, scheduleNow()).selectable;
     const atCeiling = floors >= ceiling;
     const atBudget = floors === 0 && !canBuy;
+    const priced = !banksBought
+      ? `${String(price)} u once, whatever it moves`
+      : floors === 0
+        ? '0 u more, the rezone drawn under the banks already pays for this'
+        : `${String(price)} u, one charge with the rezone drawn under the banks, not two`;
     const minus = el(doc, 'button', { text: '−', style: buttonStyle(false) });
     const plus = el(doc, 'button', { text: '+', style: buttonStyle(false) });
     minus.disabled = floors === 0;
@@ -728,7 +741,7 @@ function scheduleNow(): PriceSchedule {
         plus,
         el(doc, 'span', {
           text:
-            `Bank overlap · ${String(price)} u once, whatever it moves · ` +
+            `Bank overlap · ${priced} · ` +
             `${floors === 0 ? 'the boundaries as drawn' : `+${String(floors)} ${floors === 1 ? 'floor' : 'floors'} each side`}${suffix}`,
           style: { color: MUTED },
         }),

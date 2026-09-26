@@ -84,6 +84,8 @@ import {
   fixitRezoneView,
   fixitTenancyView,
   fixitZoneRow,
+  fixitGroupHeader,
+  pairStageNoteOf,
   fixitSpendSummary,
   fixitVerdictContextOf,
 } from '../everyday/fixitScreenModel.js';
@@ -352,7 +354,7 @@ import {
   type FixitOutcome,
   type FixitVerdictContext,
 } from '../fixit/engine.js';
-import { FIXIT_PAR, fixitParLineOf } from '../fixit/par.js';
+import { FIXIT_PAR, fixitParLineOf, fixitParTagOf } from '../fixit/par.js';
 import {
   checkingOutcomeOf,
   DERIVED_MORNINGS,
@@ -7565,6 +7567,8 @@ const FIXIT_COVERS: readonly string[] = [
   /* § D1184: the par on a fixed card, in its three comparisons, seeded below on a case with a priced par. */
   'fixit/par.ts#FIXIT_PAR_COPY',
   'fixit/par.ts#fixitParLineOf',
+  /* The case list's short par (lane AL-B, seat C D5), seeded beside the line below. */
+  'fixit/par.ts#fixitParTagOf',
   'fixit/judge.ts#REPLICATED_ROUTES_BASIS_LINE',
   'fixit/judge.ts#FUTILITY_ROUTES_BASIS_LINE',
   'fixit/judge.ts#progressLineOf',
@@ -7603,6 +7607,8 @@ const FIXIT_COVERS: readonly string[] = [
    * adjacent prose words); it is rendered below anyway, inside the rail rows.
    */
   'everyday/fixitScreenModel.ts#FIXIT_SCREEN_COPY',
+  /* The pair stage's note, one per crowd the legs say the pair met (lane AL-B, seat D H4). */
+  'everyday/fixitScreenModel.ts#pairStageNoteOf',
   'everyday/fixitScreenModel.ts#fixitCaseRailModel',
   'everyday/fixitScreenModel.ts#fixitBarModel',
   'everyday/fixitScreenModel.ts#fixitMachineryRows',
@@ -7926,6 +7932,13 @@ const FIXIT: SurfaceAdapter = {
           provenance: 'authored',
         });
       }
+      /*
+       * Lane AL-B, seat C D5: the par after a reload, where the fix's cost may not have been kept,
+       * and the case list's short form in both states.
+       */
+      seeds.push({ field: 'outcome.par.unrecorded', text: fixitParLineOf(parCase, undefined) ?? '', role: 'prose', provenance: 'authored' });
+      seeds.push({ field: 'rail.par.kept', text: fixitParTagOf(parCase, parRow.units ?? 0) ?? '', role: 'label' });
+      seeds.push({ field: 'rail.par.unrecorded', text: fixitParTagOf(parCase, undefined) ?? '', role: 'label' });
     }
     const short = classifyOutcome(
       entry,
@@ -8139,6 +8152,13 @@ const FIXIT: SurfaceAdapter = {
         seeds.push({ field: `diagnosis.${where}.because`, text: view.because, role: 'observation', declaredCount: census?.routes ?? 0, countShown: true });
       }
     }
+    /* Withheld on a case already fixed, where asking marks nothing — lane AL-B, seat C D5. */
+    {
+      const view = fixitDiagnosisView({ entry, schedule, asked: false, census: undefined, explained: false, fixed: true });
+      seeds.push({ field: 'diagnosis.withheld-fixed.eyebrow', text: view.eyebrow, role: 'label', provenance: 'authored' });
+      seeds.push({ field: 'diagnosis.withheld-fixed.note', text: view.note, role: 'prose' });
+      if (view.press !== undefined) seeds.push({ field: 'diagnosis.withheld-fixed.press', text: view.press, role: 'label', provenance: 'authored' });
+    }
 
     /* ================================================================== *
      * The Everyday screen's own words — GAMEPLAY § 10's screen chrome.
@@ -8172,6 +8192,9 @@ const FIXIT: SurfaceAdapter = {
      */
     seeds.push({ field: 'pair.eyebrow', text: FIXIT_SCREEN_COPY.pairStageEyebrow, role: 'label', provenance: 'authored' });
     seeds.push({ field: 'pair.note', text: FIXIT_SCREEN_COPY.pairStageNote, role: 'prose', provenance: 'authored' });
+    /* The two other crowds a pair can meet, through the chooser the mount calls (lane AL-B, seat D H4). */
+    seeds.push({ field: 'pair.note.thinned', text: pairStageNoteOf({ sameCrowd: false, crowdRedrawn: false }), role: 'prose', provenance: 'authored' });
+    seeds.push({ field: 'pair.note.redrawn', text: pairStageNoteOf({ sameCrowd: false, crowdRedrawn: true }), role: 'prose', provenance: 'authored' });
     seeds.push({ field: 'pair.skip', text: FIXIT_SCREEN_COPY.pairStageSkip, role: 'label', provenance: 'authored' });
     seeds.push({ field: 'pair.before', text: FIXIT_SCREEN_COPY.pairStageBeforeCaption, role: 'label', provenance: 'authored' });
     seeds.push({ field: 'pair.after', text: FIXIT_SCREEN_COPY.pairStageAfterCaption, role: 'label', provenance: 'authored' });
@@ -8351,6 +8374,24 @@ const FIXIT: SurfaceAdapter = {
       ['no-ceiling', empty, 0, true],
     ] as const) {
       const row = fixitZoneRow(zoneState, ceiling, affordable, zonePriceUnits(schedule));
+      if (row === null) continue;
+      seeds.push({ field: `zones.${where}.label`, text: row.label, role: 'label', provenance: 'authored' });
+      seeds.push({ field: `zones.${where}.readout`, text: row.readout, role: 'observation' });
+      seeds.push({ field: `zones.${where}.priced`, text: row.priced, role: 'label' });
+      if (row.stepUpRefusal !== undefined) {
+        seeds.push({ field: `zones.${where}.refusal`, text: row.stepUpRefusal, role: 'reason' });
+      }
+    }
+    /*
+     * The two arms where the banks' selects already buy the rezone the step buys — lane AL-B, seat
+     * D H5: the step costs nothing more, or both are in the order and share one charge. The banks'
+     * heading carries the mirror of each, seeded with the rezone view below.
+     */
+    for (const [where, zoneState] of [
+      ['covered-by-banks', empty],
+      ['shared-with-banks', { ...empty, zoneOverlapFloors: 1 }],
+    ] as const) {
+      const row = fixitZoneRow(zoneState, 2, true, zonePriceUnits(schedule), true);
       if (row === null) continue;
       seeds.push({ field: `zones.${where}.label`, text: row.label, role: 'label', provenance: 'authored' });
       seeds.push({ field: `zones.${where}.readout`, text: row.readout, role: 'observation' });
@@ -8579,6 +8620,8 @@ const FIXIT: SurfaceAdapter = {
         const keyed = cars.find((car) => car.target === KEYED_BANK);
         const view = fixitRezoneView({
           row: rowOf('rezone-bank', true),
+          boughtByZoneStep: false,
+          boughtByBanks: keyedCar !== undefined,
           floorOrder: fabric.floorOrder,
           cars,
           banks:
@@ -8617,6 +8660,15 @@ const FIXIT: SurfaceAdapter = {
             seeds.push({ field: `banks.${where}.bank(${bank.key}).plate(${option.value})`, text: option.label, role: 'label', provenance: 'authored' });
           }
         }
+      }
+      /*
+       * The banks' heading in its three price states — lane AL-B, seat D H5: priced alone, covered
+       * by the zoning step, and sharing one charge with it. The heading's name is seeded by the
+       * family groups above; only the price differs between the arms.
+       */
+      for (const [where, zoneStep] of [['alone', undefined], ['covered', 'covers'], ['shared', 'shares']] as const) {
+        const header = fixitGroupHeader(rowOf('rezone-bank', true), zoneStep);
+        seeds.push({ field: `banks.header.${where}.priced`, text: header.priced, role: 'label' });
       }
     }
 

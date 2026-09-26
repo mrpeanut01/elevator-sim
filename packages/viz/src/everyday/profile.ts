@@ -213,6 +213,24 @@ export interface EverydayProgress {
    * because until then it always was. {@link diagnosisShownSetOf} reads an absent field that way.
    */
   readonly diagnosisShownCaseIds?: readonly string[];
+  /**
+   * **What the order that fixed each case cost**, in the schedule's units — lane AL-B, the post-AK
+   * panel's seat C D5. [§ D1184](../../../../DECISIONS.md)'s par line compares the par with the cost
+   * of the order the fixed verdict measured; that order lived in the session, so a reload drew a
+   * fixed case with no par at all. Kept here, one entry per case, overwritten by the next fixed
+   * verdict on the same case (the one the fixed card last showed).
+   *
+   * **Optional, and its absence means *not recorded***: a case fixed before this field existed has
+   * no cost here, and the par is then drawn without a comparison rather than with a guessed one
+   * ({@link fixSpentUnitsOf} returns `undefined`).
+   */
+  readonly fixSpent?: readonly FixSpent[];
+}
+
+/** One fixed case's cost — {@link EverydayProgress.fixSpent}. A list entry, for `JSON.stringify`. */
+export interface FixSpent {
+  readonly caseId: string;
+  readonly units: number;
 }
 
 /** A player who has earned nothing yet — and what every refusal falls back to. */
@@ -257,6 +275,23 @@ export function progressWithSolvedCases(progress: EverydayProgress, solvedCaseId
   return { ...progress, solvedCaseIds, diagnosisShownCaseIds: [...diagnosisShownSetOf(progress)] };
 }
 
+/** What the order that fixed `caseId` cost, or `undefined` where no cost was kept (seat C D5). */
+export function fixSpentUnitsOf(progress: EverydayProgress, caseId: string): number | undefined {
+  return progress.fixSpent?.find((entry) => entry.caseId === caseId)?.units;
+}
+
+/**
+ * Progress with `caseId`'s fix cost set to `units`, replacing any it held — seat C D5. Returns the
+ * same object when that is already the kept figure.
+ */
+export function progressWithFixSpent(progress: EverydayProgress, caseId: string, units: number): EverydayProgress {
+  if (fixSpentUnitsOf(progress, caseId) === units) return progress;
+  return {
+    ...progress,
+    fixSpent: [...(progress.fixSpent ?? []).filter((entry) => entry.caseId !== caseId), { caseId, units }],
+  };
+}
+
 /**
  * Progress with one dispatcher's rating replacing whatever it held for that dispatcher.
  *
@@ -276,6 +311,7 @@ export function everydayProgressWith(
       rating,
     ],
     ...(progress.diagnosisShownCaseIds === undefined ? {} : { diagnosisShownCaseIds: progress.diagnosisShownCaseIds }),
+    ...(progress.fixSpent === undefined ? {} : { fixSpent: progress.fixSpent }),
   };
 }
 
@@ -664,6 +700,16 @@ function progressIssue(value: unknown): string | undefined {
       if (typeof id !== 'string' || id === '') return 'a diagnosis shown has no case id';
     }
   }
+  const spent = record['fixSpent'];
+  if (spent !== undefined) {
+    if (!Array.isArray(spent)) return 'the saved list of fix costs is not a list';
+    for (const entry of spent as readonly unknown[]) {
+      if (typeof entry !== 'object' || entry === null) return 'a fix cost is not an entry';
+      const { caseId, units } = entry as Record<string, unknown>;
+      if (typeof caseId !== 'string' || caseId === '') return 'a fix cost has no case id';
+      if (typeof units !== 'number' || !Number.isInteger(units) || units < 0) return 'a fix cost is not a whole number of units';
+    }
+  }
   const ratings = record['ratings'];
   if (!Array.isArray(ratings)) return 'the saved progress carries no list of ratings';
   for (const rating of ratings as readonly unknown[]) {
@@ -706,6 +752,9 @@ export function loadProgress(store: SessionStore): EverydayProgressStatus {
       ...(progress.diagnosisShownCaseIds === undefined
         ? {}
         : { diagnosisShownCaseIds: Object.freeze([...progress.diagnosisShownCaseIds]) }),
+      ...(progress.fixSpent === undefined
+        ? {}
+        : { fixSpent: Object.freeze(progress.fixSpent.map((entry) => Object.freeze({ caseId: entry.caseId, units: entry.units }))) }),
     }),
     notice: null,
   };

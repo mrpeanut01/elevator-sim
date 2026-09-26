@@ -46861,6 +46861,8 @@ than a collision rate.
 
 ## D1179 — a census week that counts no day holds its scenario's clear, with a reason that tells a day refused from a day not yet measured
 
+> **Status 2026-09-26: AMENDED by [§ D1196](#d1196)** (agent ruling). The reason's lead reads *so this week has no scenario clear to win* and the note says *Choosing this tower still plays its week*; the hold is unchanged. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-09-26 by agent sessions under delegated authority** (wave AK, lane AK-G, on swarm
 > DM's ruling (a): the hold two of three, S1 and S3, with S2 dissenting for the census first; the
 > true reason three of three, S2's condition; Harbour Point offered at 1 of 1 two of three, S2's
@@ -47139,6 +47141,8 @@ bundle and presses each into the fix-it editor and the Lab.
 
 ## D1184 — a fixed case shows its par: the cheapest change we tried that fixes the letter on the same forty-nine mornings, and it pays nothing
 
+> **Status 2026-09-26: EXTENDED by [§ D1197](#d1197)** (agent ruling). The par is also drawn on a fixed case after a reload, from the fixing order's cost kept on the device, and on the case list's fixed row. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-09-26 by agent sessions under delegated authority**, not by the product owner: the
 > `decide-al` swarm's Q3 ruling, clause 4 (S1's form; S3 preferred follow-up letters, deferred),
 > reconciled by wave AK's integrator and built by lane AK-F. A later reader weighing this against a
@@ -47338,3 +47342,110 @@ on `WatchRunPlan`, so the hour and the cars are the watched run's, never the spe
 The pill is drawn on a replay from those cars. `watch/filedDay.test.ts` holds both equal to the live
 day's on Midtown's week, and `everyday/dayControls.browser.test.ts` replays a banked day on the built
 bundle and was red before (06:10 against 08:40).
+
+## D1195 — a Casual dispatcher card names its dispatcher in words, and the profile id stays in the Engineer register
+
+> **Taken 2026-09-26 by an agent session under delegated authority** (wave AL, lane AL-B, on the
+> post-AK panel's seat B D11), not by the product owner. A later reader weighing this against a
+> product-owner ruling should treat it as an agent ruling and say so; [§ D626](#d626) is the
+> cautionary case. **Owner-reversible**: keeping the id in the Engineer register at all, and the
+> reading of [§ D299](#d299) § 2 below.
+
+**Why an entry.** It narrows a rule `dev/rightRail.test.ts` held as [§ D299](#d299) § 2 stated as an
+equality (*both registers carry every string*), and it reaches the Everyday brief's driver cards,
+which read the same card.
+
+**What was wrong.** Every dispatcher card's tooltip ended *Profile id `eta`.* in both registers,
+and the Engineer surface opens in the Casual register by default (`dev/state.ts`), so a player met
+`eta` and `zoned-uppeak` on cards whose titles already name the dispatchers in words. The building
+cards' tooltips read *Building id `…`.* the same way, and the auction profiles' behaviour sentence,
+which is a Casual card's face, carried the aggregation's id in backticks.
+
+**The ruling.**
+
+1. **The Casual register names a dispatcher in words only.** Its `help` is the behaviour sentence
+   and the weight vector, with no profile id; a building card in that register has no id tooltip.
+2. **The Engineer register keeps the id**, because [§ D299](#d299) § 1 forbids that surface saying
+   less, and the id is the data file's key and the command line's argument.
+3. **§ D299 § 2 is read as *every sentence*, not *every identifier*.** Casual still reaches the
+   authored blurb, the behaviour sentence and the full weight vector; an id is a key rather than a
+   capability, and Casual differs from Engineer in vocabulary, which § D299 § 2 permits.
+4. The auction behaviour sentence says *the cars bid for the call and the group takes the best bid,
+   over N bidding rounds* with no id; the Engineer's vector clause still names the aggregation.
+
+**Not done.** The weight vector a Casual card discloses still names hard-constraint and aggregation
+ids inside its clause (`dispatcherBlurbOf`), which `rightRail.test.ts` pins byte for byte as the
+Engineer's face. Rewording that disclosure for Casual is a second vocabulary for the vector, and is
+left open.
+
+**Tests.** `dev/rightRail.test.ts`: the id in every Engineer card's `help`, and no `Profile id` and no
+backtick anywhere on any Casual card, over every shipped profile. Red before: both registers carried
+the id.
+
+## D1196 — a tower whose week counts no day says what choosing it does, and names the clear as what is withheld
+
+> **Taken 2026-09-26 by an agent session under delegated authority** (wave AL, lane AL-B, on the
+> post-AK panel's seat C D4 and seat D H8), not by the product owner. It rewords
+> [§ D1179](#d1179) clause 3, whose wording that entry names owner-reversible. **Owner-reversible**:
+> the words *no scenario clear to win* and *Choosing this tower still plays its week*.
+
+**Why an entry.** It moves a recorded ruling's wording ([§ D1179](#d1179) clauses 2 and 3) on the
+tower picker, the brief, the week strip and the Engineer Scenarios card.
+
+**What was wrong.** Secure Tower's row read *"No day of this week counts toward a target yet, so its
+scenario is held back"*, and one click on the same row moved the week there and opened the brief.
+Two seats read *held back* as the tower being held from them. What § D1179 withholds is only the
+clear, and the row did not say what pressing it does.
+
+**The ruling.**
+
+1. The reason's lead reads *"… so this week has no scenario clear to win"* in all three arms of
+   `shift/weekStake.ts#weekHeldReasonOf`; the rest of the sentence (days refused apart from days not
+   yet measured, *yet* while any is unmeasured) is unchanged.
+2. `WEEK_HELD_NOTE` reads *"Choosing this tower still plays its week: every day is dealt, played and
+   graded, and the week closes on its sheet. A clear is offered once a day of it is measured as
+   dealt and counts."*
+3. The Engineer card's objective reads *"No clear to win this week: choosing it still plays the
+   week"* in place of *Held back: this week offers no clear*.
+4. Nothing about the hold moves: which towers are held, the census rule and Harbour Point's 1 of 1
+   are § D1179's.
+
+**Tests.** `everyday/towerChoice.test.ts` (no *held back*, the clear named, the press said),
+`everyday/towerChoice.browser.test.ts` (the same on the built bundle, and the row still moves the
+week), `shift/weekStake.test.ts` (every arm's new lead) and `dev/scenariosPanel.test.ts`.
+
+## D1197 — a fixed case shows its par on every load, on the case and on its row
+
+> **Taken 2026-09-26 by an agent session under delegated authority** (wave AL, lane AL-B, on the
+> post-AK panel's seat C D5), not by the product owner. It extends [§ D1184](#d1184) clause 1, whose
+> *whether it is drawn on every fixed case* that entry names owner-reversible. **Owner-reversible**:
+> the par on the case list's row, and the sentence drawn where the fix's cost was not kept.
+
+**Why an entry.** It adds to what [§ D1184](#d1184)'s fixed card draws, adds a field to the device's
+kept progress (`everyday/profile.ts`), and changes the withheld diagnosis card [§ D1120](#d1120)
+clause 1 worded.
+
+**What was wrong.** The par was computed from the order the fixed verdict measured, which lived in
+the session. After a reload a fixed case opened with no verdict and no par, the list said only
+*FIXED · on your own*, and the diagnosis card still offered *"the case is then marked as fixed with
+the diagnosis rather than on your own"* on a case whose mark asking can no longer change.
+
+**The ruling.**
+
+1. **The fixing order's cost is kept** on the device, one entry per case (`EverydayProgress.fixSpent`),
+   written in the same store write as the solved set and overwritten by the next fixed verdict on
+   the case. Optional: progress kept before it reads as *not recorded*.
+2. **A fixed case this sitting has not run draws its par** (`everyday-fixit-par-kept`), comparing the
+   kept cost; where no cost was kept, the par is drawn and the comparison is withheld (*"What your
+   fix cost was not kept on this device, so it is not compared."*).
+3. **The case list's fixed row carries the par's short form**, *par 2 u · yours 2 u*, or *par 2 u*.
+4. **On a fixed case the withheld diagnosis promises no mark**: *"Held back. This case is already
+   fixed on your own, and asking now costs nothing and does not change that mark."*
+5. As in § D1184, the par pays nothing and moves no verdict.
+
+**Tests.** `everyday/profile.test.ts` (the cost round-trips, survives a rating and a new solved set,
+is replaced by a new fix, and a malformed one is refused), `fixit/par.test.ts` (the unrecorded arm and
+the short form), `everyday/fixitScreenModel.test.ts` (par on a fixed row only; the fixed diagnosis
+note) and `everyday/fixitVerdict.browser.test.ts` (fix, reload, reopen: the par, the row's par and no
+promised mark, on the built bundle). Red before: the browser case timed out waiting for a par after
+the reload.

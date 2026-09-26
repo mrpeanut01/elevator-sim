@@ -333,11 +333,16 @@ export function weekHeldReasonOf(deal: WeekDeal): string {
   const total = countWord(deal.days.length);
   if (unmeasured === 0) {
     return (
-      'No day of this week counts toward a target, so its scenario is held back: all ' +
+      'No day of this week counts toward a target, so this week has no scenario clear to win: all ' +
       `${total} days were measured as they are dealt, and none of them counts.`
     );
   }
-  const lead = 'No day of this week counts toward a target yet, so its scenario is held back';
+  /*
+   * *Held back* stood here, and a player read it as the tower being held from them while the row
+   * beside it opened the week on a press (the post-AK panel's seat C D4 and seat D H8). What is
+   * withheld is only the clear, so the sentence names the clear (lane AL-B).
+   */
+  const lead = 'No day of this week counts toward a target yet, so this week has no scenario clear to win';
   if (measured.length === 0) {
     return `${lead}: none of its ${total} days has been measured as it is dealt.`;
   }
@@ -351,10 +356,14 @@ export function weekHeldReasonOf(deal: WeekDeal): string {
   );
 }
 
-/** What a held scenario still is: nothing about the tower or its week is locked (§ D1129's footing). */
+/**
+ * What choosing a held tower still does: nothing about the tower or its week is locked (§ D1129's
+ * footing). It says what the press does, first, because the row it sits in is a press (lane AL-B,
+ * the post-AK panel's seat C D4 and seat D H8).
+ */
 export const WEEK_HELD_NOTE =
-  'Nothing is locked: the week is dealt and played, every day is graded, and the week closes on its ' +
-  'sheet. The hold lifts when a day of it is measured as dealt and counts.';
+  'Choosing this tower still plays its week: every day is dealt, played and graded, and the week ' +
+  'closes on its sheet. A clear is offered once a day of it is measured as dealt and counts.';
 
 /** What the hub draws for a census tower's scenario: offered, or held with its reason. */
 export interface WeekOffer {
