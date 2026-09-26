@@ -54,6 +54,7 @@
 import { displayNameIssueOf, type AccountState } from '../menu/account.js';
 import { savedRatingIssue, type SavedRating } from '../gauntlet/ladder.js';
 import type { SessionStore } from '../persist/types.js';
+import type { WeekRecord } from '../shift/weekRecord.js';
 /*
  * The stage's pure half, for the ladder and its default — the arrow runs one way, as it does for
  * `settingsView.ts`: `stageScreenModel.ts` has never imported this module.
@@ -225,6 +226,28 @@ export interface EverydayProgress {
    * ({@link fixSpentUnitsOf} returns `undefined`).
    */
   readonly fixSpent?: readonly FixSpent[];
+  /**
+   * **Each tower's record of closed weeks** — `shift/weekRecord.ts`, wave AL, lane AL-F
+   * ([§ D1230](../../../../DECISIONS.md)). Weeks closed, weeks met, the best week, and the last date
+   * crowd a scored day on the tower was filed on, which is what keeps a new week's crowds new
+   * ([§ D1229](../../../../DECISIONS.md)). Kept here rather than on the session's week because
+   * § D1177's roll empties the week, and this is what outlives the roll.
+   *
+   * **Optional, and its absence means *no week closed yet***, which is every device before this
+   * field and every device that has not closed one.
+   */
+  readonly weekRecords?: readonly WeekRecord[];
+}
+
+/** The records kept on this device, or none. */
+export function weekRecordsOf(progress: EverydayProgress): readonly WeekRecord[] {
+  return progress.weekRecords ?? [];
+}
+
+/** Progress with its week records replaced. Returns the same object when nothing changed. */
+export function progressWithWeekRecords(progress: EverydayProgress, records: readonly WeekRecord[]): EverydayProgress {
+  if (records === progress.weekRecords) return progress;
+  return { ...progress, weekRecords: records };
 }
 
 /** One fixed case's cost — {@link EverydayProgress.fixSpent}. A list entry, for `JSON.stringify`. */
@@ -710,6 +733,21 @@ function progressIssue(value: unknown): string | undefined {
       if (typeof units !== 'number' || !Number.isInteger(units) || units < 0) return 'a fix cost is not a whole number of units';
     }
   }
+  const weeks = record['weekRecords'];
+  if (weeks !== undefined) {
+    if (!Array.isArray(weeks)) return 'the saved record of weeks is not a list';
+    for (const entry of weeks as readonly unknown[]) {
+      if (typeof entry !== 'object' || entry === null) return 'a week record is not an entry';
+      const { contractId, closed, met, best, dateCrowd } = entry as Record<string, unknown>;
+      if (typeof contractId !== 'string' || contractId === '') return 'a week record has no tower';
+      for (const count of [closed, met, best]) {
+        if (typeof count !== 'number' || !Number.isInteger(count) || count < 0) return 'a week record is not a whole count';
+      }
+      if (dateCrowd !== undefined && (typeof dateCrowd !== 'string' || !/^\d+$/u.test(dateCrowd))) {
+        return 'a week record’s crowd is not a crowd';
+      }
+    }
+  }
   const ratings = record['ratings'];
   if (!Array.isArray(ratings)) return 'the saved progress carries no list of ratings';
   for (const rating of ratings as readonly unknown[]) {
@@ -755,6 +793,21 @@ export function loadProgress(store: SessionStore): EverydayProgressStatus {
       ...(progress.fixSpent === undefined
         ? {}
         : { fixSpent: Object.freeze(progress.fixSpent.map((entry) => Object.freeze({ caseId: entry.caseId, units: entry.units }))) }),
+      ...(progress.weekRecords === undefined
+        ? {}
+        : {
+            weekRecords: Object.freeze(
+              progress.weekRecords.map((entry) =>
+                Object.freeze({
+                  contractId: entry.contractId,
+                  closed: entry.closed,
+                  met: entry.met,
+                  best: entry.best,
+                  ...(entry.dateCrowd === undefined ? {} : { dateCrowd: entry.dateCrowd }),
+                }),
+              ),
+            ),
+          }),
     }),
     notice: null,
   };

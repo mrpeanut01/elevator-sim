@@ -244,7 +244,21 @@ import type {
   WeekState,
 } from '../shift/types.js';
 import { nextDay } from '../shift/week.js';
-import type { HouseReading } from '../shift/weekStake.js';
+import {
+  countedCleanOf,
+  dayCountsToward,
+  weekDealOf,
+  weekHasClosed,
+  type HouseReading,
+} from '../shift/weekStake.js';
+import {
+  dealtCrowdOf,
+  isDerivedCrowdOn,
+  recordsWithClosedWeek,
+  recordsWithDateCrowd,
+  weekRecordFor,
+  type WeekRecord,
+} from '../shift/weekRecord.js';
 /* GitHub issue #245's honest half — see {@link EverydayHost.runCarriedBySelection}. */
 import { runIdentityIssues } from '../scope/runIdentity.js';
 import {
@@ -966,6 +980,19 @@ export interface EverydayHost {
    * reads those off the day itself).
    */
   weekHouse(day: number): HouseReading | undefined;
+
+  /**
+   * **The live week's tower's record of closed weeks** — `shift/weekRecord.ts`, lane AL-F
+   * ([§ D1230](../../../../DECISIONS.md)). A record with nothing closed where none is kept.
+   */
+  weekRecord(): WeekRecord;
+
+  /**
+   * **The crowd today's scored day is dealt** — `shift/weekRecord.ts#dealtCrowdOf`, lane AL-F
+   * ([§ D1229](../../../../DECISIONS.md)). What the door and the brief compare the standing seed
+   * with to say whose crowd it is; `undefined` where the shell has no clock.
+   */
+  dayCrowd(): bigint | undefined;
 
   /**
    * What the standing config points at — the ids the next run will be built from.
@@ -2038,6 +2065,12 @@ export interface EverydayHost {
   subscribe(listener: () => void): () => void;
 }
 
+/** Where the week records live — {@link EverydayHostBindings.weekRecords}. */
+export interface WeekRecordPort {
+  read(): readonly WeekRecord[];
+  write(records: readonly WeekRecord[]): void;
+}
+
 /**
  * What `dev/main.ts`'s boot closure supplies — raw facts and raw presses, so every derivation
  * above them lives in {@link createEverydayHost} where it is testable without a document.
@@ -2067,6 +2100,13 @@ export interface EverydayHostBindings {
    * which the week sheet reads as *still being run*.
    */
   readonly weekHouse?: ((day: number) => HouseReading | undefined) | undefined;
+  /**
+   * **Each tower's record of closed weeks**, read and written — `shift/weekRecord.ts`, lane AL-F
+   * ([§ D1229](../../../../DECISIONS.md), [§ D1230](../../../../DECISIONS.md)). `dev/main.ts` keeps
+   * it in the Everyday profile store. Optional on {@link daySeed}'s ground: a test host with no
+   * record deals every week as a first week, and closes write nowhere.
+   */
+  readonly weekRecords?: WeekRecordPort | undefined;
   /** The live state. Read fresh on every host call — never captured. */
   state(): ViewerState;
   /** The transport's playhead in simulated seconds, or the recording's start, or `0`. */
@@ -2420,6 +2460,32 @@ function dayPatchFor(b: EverydayHostBindings, state: ViewerState = b.state()): P
 }
 
 /**
+ * **The crowd `week`'s day is dealt**, or `undefined` where no clock is to hand —
+ * `shift/weekRecord.ts#dealtCrowdOf` over the date's crowd and the tower's record (§ D1229).
+ */
+function dealtCrowdFor(b: EverydayHostBindings, week: WeekState): bigint | undefined {
+  const date = b.daySeed?.();
+  if (date === undefined) return undefined;
+  return dealtCrowdOf(week, weekRecordFor(b.weekRecords?.read() ?? [], week.contractId), date);
+}
+
+/**
+ * **The seed patch that deals today's crowd**, or `{}` — lane AL-F, [§ D1229](../../../../DECISIONS.md).
+ *
+ * Only a week on a scenario, and only over a seed that is a crowd of the day itself: the date's, or
+ * one derived from it. A pinned day's crowd and a crowd the address chose are the player's or the
+ * pin's, and this leaves them standing (§ D1047, § D1141).
+ */
+function dealPatchFor(b: EverydayHostBindings, state: ViewerState): { readonly seed?: bigint } {
+  if (contractById(state.week.contractId) === undefined) return {};
+  const date = b.daySeed?.();
+  if (date === undefined) return {};
+  if (state.seed !== date && !isDerivedCrowdOn(state.seed, date)) return {};
+  const dealt = dealtCrowdFor(b, state.week);
+  return dealt === undefined || dealt === state.seed ? {} : { seed: dealt };
+}
+
+/**
  * **The shared day's slice, sized by its contract and never by the address** — wave AJ,
  * [§ D1095](../../../../DECISIONS.md), the post-AI panel's seat D, D3.
  *
@@ -2447,8 +2513,12 @@ function dayPatchFor(b: EverydayHostBindings, state: ViewerState = b.state()): P
 function contractSliceFor(b: EverydayHostBindings, state: ViewerState): Partial<ViewerState> {
   const contract = contractById(state.week.contractId);
   if (contract === undefined) return {};
-  /* The shared day's one predicate — `shift/scoredCrowd.ts`, which the close reads too (§ D1141). */
-  if (!crowdIsShared(contract.id, state.seed, b.daySeed?.())) return {};
+  /*
+   * The shared day's one predicate — `shift/scoredCrowd.ts`, which the close reads too (§ D1141) —
+   * with the day's dealt crowd as the shared one, so a day dealt a derived crowd (§ D1229) is a
+   * shared day too.
+   */
+  if (!crowdIsShared(contract.id, state.seed, dealtCrowdFor(b, state.week) ?? b.daySeed?.())) return {};
   const shiftLengthS = shiftLengthForContract(contract.id);
   return {
     ...(state.shiftLengthS === shiftLengthS ? {} : { shiftLengthS }),
@@ -2642,6 +2712,49 @@ export function createEverydayHost(
         /* A rejected promise is a binding fault rather than an answer; the tally keeps the last real one. */
       },
     );
+  };
+  /**
+   * **What a Scenario day's first close files beside the week** — wave AL, lane AL-F, swarm DN's
+   * Q2.5 to Q2.7 ([§ D1229](../../../../DECISIONS.md), [§ D1230](../../../../DECISIONS.md),
+   * [§ D1231](../../../../DECISIONS.md)).
+   *
+   * `historyBefore` is the week's history before `b.closeDay()`. A close that appended nothing (a
+   * practice close, § D1138 clause 4, or a link's crowd, § D1141) files nothing here either, so each
+   * of the three below happens once per day of a week at most:
+   *
+   * 1. **The date's crowd, noted on the tower's record**, when the day was filed on it, so no later
+   *    day on this device is dealt it again (`shift/weekRecord.ts#dealtCrowdOf`).
+   * 2. **The week, counted on the record**, when this close closed it: weeks closed, weeks met, and
+   *    the best week. It buys nothing.
+   * 3. **A counted day that cleared pays `career-day-paid`, once.** `docs/38` § 1: *everything you
+   *    finish earns chimes, in every mode*, and `data/chime-ledger.json`'s own note said a week
+   *    contract's days *"already pay earn-career-day"*. They did not: this close returned before
+   *    any bank on every day that was not a Career day (swarm DN's S2, M7). A missed day and a day
+   *    that does not count pay nothing, as a missed Career day pays nothing; there is no separate
+   *    week award. Fire and forget, on {@link bankTurn}'s own terms.
+   */
+  const fileScenarioDay = (historyBefore: readonly DayOutcome[]): void => {
+    const week = b.state().week;
+    if (contractById(week.contractId) === undefined) return;
+    if (week.history === historyBefore || week.closedDay !== week.day) return;
+    const filed = week.history.find((entry) => entry.day === week.day);
+    if (filed === undefined) return;
+    const port = b.weekRecords;
+    if (port !== undefined) {
+      const before = port.read();
+      let records = before;
+      const date = b.daySeed?.();
+      const seedText = filed.record?.seed;
+      if (date !== undefined && seedText === date.toString()) {
+        records = recordsWithDateCrowd(records, week.contractId, seedText);
+      }
+      const deal = weekDealOf(week.contractId);
+      if (deal !== undefined && weekHasClosed(week)) {
+        records = recordsWithClosedWeek(records, week.contractId, countedCleanOf(week), deal.target);
+      }
+      if (records !== before) port.write(records);
+    }
+    if (filed.allMet && dayCountsToward(week.contractId, filed)) bankTurn({ completion: 'career-day-paid' });
   };
   /** The rush in progress — GitHub issue #220. Host-scoped like the career: a rush is not a day. */
   /**
@@ -3083,6 +3196,8 @@ export function createEverydayHost(
     lastReport: () => b.state().report,
     lastOutcome: () => b.state().week.history.at(-1),
     weekHouse: (day) => b.weekHouse?.(day),
+    weekRecord: () => weekRecordFor(b.weekRecords?.read() ?? [], b.state().week.contractId),
+    dayCrowd: () => dealtCrowdFor(b, b.state().week),
     selection: () => {
       const state = b.state();
       return { buildingId: state.buildingId, dispatcherId: state.dispatcherId, pattern: state.pattern };
@@ -3275,6 +3390,14 @@ export function createEverydayHost(
        * The day's own shape — the whole authored day, a contract's slice on the shared day, or a
        * replay's record left standing ({@link dayPatchFor}, § D1095).
        */
+      /*
+       * **The day's dealt crowd first** — lane AL-F, [§ D1229](../../../../DECISIONS.md). A reload
+       * or a tower chosen elsewhere can leave the date's crowd standing on a day this device has
+       * already filed it on this tower; the press deals the day its own. Before the shape, which
+       * reads the crowd (§ D1095).
+       */
+      const dealt = dealPatchFor(b, b.state());
+      if (dealt.seed !== undefined) b.applyPatch(dealt);
       const dayShape = dayPatchFor(b);
       /*
        * **And the kit comes off with the latch** — GitHub issue #181.
@@ -3356,7 +3479,9 @@ export function createEverydayHost(
     closeDay: () => {
       const towerId = campaignDayTowerId;
       const closedBefore = b.dayClosed();
+      const historyBefore = b.state().week.history;
       b.closeDay();
+      if (!closedBefore && b.dayClosed()) fileScenarioDay(historyBefore);
       if (towerId === undefined || closedBefore || !b.dayClosed()) return;
       campaignDayTowerId = undefined;
       campaignDayIncident = undefined;
@@ -3466,10 +3591,20 @@ export function createEverydayHost(
       // empty, so clearing a field that is already clear costs no render that was not happening.
       /* The crowd first, so the shape is read against the crowd tomorrow meets — § D1095. */
       const restore = pressDaySeedRestore();
+      const tomorrow = openTomorrowPatch(state.week);
+      /*
+       * **And tomorrow's crowd is dealt, never re-dealt** — lane AL-F, [§ D1229](../../../../DECISIONS.md).
+       * A week played in one sitting met the date's crowd on every day of it and again on every day
+       * of the next week (the post-AK panel's seat D). Tomorrow is dealt the date's crowd if this
+       * device has not filed it on this tower, and the crowd derived from the date, the day and the
+       * weeks closed if it has (`shift/weekRecord.ts#dealtCrowdOf`).
+       */
+      const dealt = dealPatchFor(b, { ...state, ...restore, ...tomorrow } as ViewerState);
       b.applyPatch({
-        ...openTomorrowPatch(state.week),
-        ...dayPatchFor(b, { ...state, ...restore }),
+        ...tomorrow,
+        ...dayPatchFor(b, { ...state, ...restore, ...tomorrow, ...dealt } as ViewerState),
         ...restore,
+        ...dealt,
         campaignFitOut: undefined,
         campaignEventId: undefined,
       });
@@ -4300,6 +4435,9 @@ export function createEverydayHost(
       const restore = pressDaySeedRestore();
       if (restore.seed !== undefined) b.applyPatch(restore);
       moveWeekTo(contractId);
+      /* The tower's week is dealt its own day's crowd — § D1229, {@link dealPatchFor}. */
+      const dealt = dealPatchFor(b, b.state());
+      if (dealt.seed !== undefined) b.applyPatch(dealt);
       notifyCampaign();
     },
     startReplay: (day) => {

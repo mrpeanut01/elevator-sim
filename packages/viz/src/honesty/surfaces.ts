@@ -192,7 +192,7 @@ import {
   type SupportInput,
   type SupportRun,
 } from '../everyday/support.js';
-import { FIGURE_NOTE_HANDLE, everydayReportViewOf } from '../everyday/reportView.js';
+import { FIGURE_NOTE_HANDLE, everydayReportViewOf, WEEK_SHEET_STEP } from '../everyday/reportView.js';
 // GitHub issue #221's post block — the decision, seeded in all seven states by the report adapter.
 import { postRunViewOf } from '../everyday/postRun.js';
 import { CHIMES_PANEL_COPY } from '../everyday/chimesPanel.js';
@@ -286,7 +286,7 @@ import { PRESS_DAY_DRIVER_HELD } from '../everyday/today.js';
 import { actsOf } from '../shift/dayLength.js';
 import { rushTutorialWorkedAnswerOf } from '../everyday/rushScreenModel.js';
 import { WORKED_ANSWER_COPY, type WorkedAnswerFacts, type WorkedAnswerView } from '../everyday/workedAnswer.js';
-import { weekScreenViewOf } from '../everyday/weekView.js';
+import { WEEK_START_NEXT_LABEL, weekScreenViewOf } from '../everyday/weekView.js';
 import { percentileLine, WORLD_FIGURES_ABSENT, WORLD_FIGURES_LABEL, WORLD_FIGURES_REASON } from '../everyday/world.js';
 import type { GoalObservations } from '../shift/types.js';
 import { buildingView, contractView, towersView } from '../everyday/campaignModel.js';
@@ -764,12 +764,15 @@ import {
   weekOfferOf,
   weekSheetOf,
   weekStakeLineOf,
+  weekTargetMetLineOf,
   WEEK_WITHOUT_COUNTED_DAYS_SHORT,
   type DealtDay,
   type HouseReading,
   type WeekDeal,
 } from '../shift/weekStake.js';
 import { PRACTICE_DAY_SENTENCES } from '../shift/scoredCrowd.js';
+import { derivedCrowdOf, weekRecordLineOf } from '../shift/weekRecord.js';
+import { CONTINUE_WEEK_TITLE, continueWeekEntryOf } from '../everyday/continueWeek.js';
 import { WATCH_RECORD_VERSION, type WatchRecord } from '../watch/types.js';
 
 import type { WaitBandBasis } from '../live/types.js';
@@ -14000,6 +14003,19 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     'shift/weekStake.ts#WEEK_SHEET_ROLL_LINE',
     'shift/weekStake.ts#WEEK_CLOSED_LINE',
     'everyday/briefView.ts#BRIEF_WEEK_HEADING',
+    /*
+     * Wave AL, lane AL-F (§ D1226 to § D1230): the target's mark on the close that met it, the
+     * report's step into the closed week's sheet, the Sunday screen's button, the tower's record of
+     * closed weeks and the mode picker's entry back into a week. Each is drawn only on a Scenario
+     * week the census speaks for, at a close no corpus case's one day reaches, so each is seeded in
+     * `seedWeekStake` over Midtown's week played on the case's own readings.
+     */
+    'shift/weekStake.ts#weekTargetMetLineOf',
+    'everyday/reportView.ts#WEEK_SHEET_STEP',
+    'everyday/weekView.ts#WEEK_START_NEXT_LABEL',
+    'shift/weekRecord.ts#weekRecordLineOf',
+    'everyday/continueWeek.ts#continueWeekEntryOf',
+    'everyday/continueWeek.ts#CONTINUE_WEEK_TITLE',
   ],
   render(context) {
     const seeds: TextSeed[] = [];
@@ -14038,6 +14054,35 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
         if (pinnedToday.firstSessionLine !== undefined) {
           seeds.push({ field: 'today.pinned.firstSession', text: pinnedToday.firstSessionLine, role: 'observation' });
         }
+      }
+      /*
+       * The seed line's derived arm — lane AL-F, § D1229: a day dealt the crowd derived from the date,
+       * the day and the weeks closed, because this device filed the date's own crowd on the tower.
+       */
+      {
+        const dealt = derivedCrowdOf(CORPUS_DAY_SEED, 2, 1);
+        const derivedToday = todayOf({
+          week: { ...openWeek('c2'), day: 2, dayIdx: 1 },
+          calendar: null,
+          building: undefined,
+          buildingId: 'midtown-office',
+          dispatcherName: undefined,
+          dispatcherId: 'collective',
+          dispatcherNameOf: (id) => context.dispatcherProfiles.profiles.find((profile) => profile.id === id)?.name,
+          goals: [],
+          seed: dealt,
+          horizon: undefined,
+          dayStartS: undefined,
+          templateVariesMix: false,
+          wholeDayRun: false,
+          dayCars: undefined,
+          crowdIsToday: false,
+          daySeed: CORPUS_DAY_SEED,
+          dealtCrowd: dealt,
+          firstSession: false,
+          units: 'metric',
+        });
+        seeds.push({ field: 'today.derived.seed', text: derivedToday.seedLine, role: 'label' });
       }
       /* The fourth arm — a pin whose own number draws its tower, reached through `?seed=` (§ D1047). */
       seeds.push({
@@ -14574,6 +14619,8 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
         role: 'prose',
       });
     }
+    /* And a fourth since lane AL-F, § D1229 — a crowd derived from the date. */
+    seeds.push({ field: 'door.same.derived', text: sameForEveryoneLine(false, false, true), role: 'prose' });
     /*
      * Both arms of § 3.3's brief note — the named one and the fallback. The fallback is seeded
      * because it is what a bar drawn before the screen knows its driver says, and a sentence no
@@ -16817,6 +16864,48 @@ function seedWeekStake(seeds: TextSeed[], observations: Observations): void {
     seeds.push({ field: `${at}.note`, text: sheet.note, role: 'prose' });
     seeds.push({ field: `${at}.roll`, text: sheet.rollLine, role: 'prose' });
     seeds.push({ field: `${at}.stake`, text: weekStakeLineOf(week) ?? '', role: 'observation' });
+    /* Lane AL-F: the sheet's seven cells, the entry back into the closed week, and its record. */
+    for (const row of sheet.rows) seeds.push({ field: `${at}.row(${row.weekday})`, text: row.line, role: 'observation' });
+    const entry = continueWeekEntryOf(week, 'Midtown Office');
+    if (entry !== undefined) seeds.push({ field: `${at}.continue`, text: entry.line, role: 'observation' });
+  }
+  /*
+   * Lane AL-F (§ D1226, § D1228): the week closed day by day on the case's own readings, so the
+   * target's mark is drawn on the close that met it, and the mode picker's entry in each state the
+   * week passes through. Only where the case's readings clear; a missed week marks nothing.
+   */
+  let week = openWeek('c2');
+  for (let day = 1; day <= 7; day += 1) {
+    const dayIdx = (day - 1) % 7;
+    week = closeDay(
+      week,
+      outcomeOf({
+        record: null,
+        recordRefusal: null,
+        day,
+        dayIdx,
+        eventId: scheduledEventFor(null, day, dayIdx, 'whole-day').id,
+        arrived: observations.arrived,
+        carried: observations.carried,
+        minutePct: observations.minutePct,
+        readings: readGoals(goalsForDay(day), observations),
+      }),
+    );
+    const mark = weekTargetMetLineOf(week);
+    if (mark !== undefined) seeds.push({ field: `week.mark.day${String(day)}`, text: mark, role: 'observation' });
+    const entry = continueWeekEntryOf(week, 'Midtown Office');
+    if (entry !== undefined) seeds.push({ field: `week.continue.day${String(day)}`, text: entry.line, role: 'observation' });
+    if (day < 7) week = nextDay(week);
+  }
+  seeds.push({ field: 'week.continue.title', text: CONTINUE_WEEK_TITLE, role: 'label' });
+  seeds.push({ field: 'week.sheetStep.label', text: WEEK_SHEET_STEP.label, role: 'label' });
+  seeds.push({ field: 'week.sheetStep.note', text: WEEK_SHEET_STEP.note, role: 'prose' });
+  seeds.push({ field: 'week.startNext', text: WEEK_START_NEXT_LABEL, role: 'label' });
+  for (const [arm, record] of [
+    ['one', { contractId: 'c2', closed: 1, met: 0, best: 3 }],
+    ['several', { contractId: 'c2', closed: 3, met: 2, best: 5 }],
+  ] as const) {
+    seeds.push({ field: `week.record.${arm}`, text: weekRecordLineOf(record) ?? '', role: 'observation' });
   }
 }
 

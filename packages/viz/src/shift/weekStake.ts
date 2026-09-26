@@ -277,16 +277,64 @@ export function weekStakeLineOf(
   if (deal === undefined) return undefined;
   if (deal.counted === 0) return weekHeldReasonOf(deal);
   const clean = countedCleanOf(week, census);
+  /* The day the target was met, once it has been — the day's report said so first (lane AL-F). */
+  const metOn = weekTargetMetDayOf(week, census);
+  const met = metOn === undefined ? '' : ` Met on ${metOn.weekday}.`;
   const only = deal.counted === 1 ? deal.days.find((day) => day.counts) : undefined;
   if (only !== undefined) {
     return (
       `This week’s target: 1 of 1 counted day clean, and the one day that counts is ` +
-      `${weekdayOf(only.dayIdx)}. ${String(clean)} so far.`
+      `${weekdayOf(only.dayIdx)}. ${String(clean)} so far.${met}`
     );
   }
   return (
     `This week’s target: ${String(deal.target)} of ${String(deal.counted)} counted days clean. ` +
-    `${String(clean)} so far.`
+    `${String(clean)} so far.${met}`
+  );
+}
+
+/**
+ * **The day this week's target was met**, or `undefined` while it has not been — wave AL, lane
+ * AL-F, swarm DN's Q2.2 ([§ D1226](../../../../DECISIONS.md)).
+ *
+ * Read off the history in day order: the counted clean day on which the count first reached the
+ * target. A banked day never changes (§ D1138 clause 4), so once met a week stays met and the day
+ * it was met on does not move. `undefined` where the census does not speak or the week has no
+ * target.
+ */
+export function weekTargetMetDayOf(
+  week: Pick<WeekState, 'contractId' | 'history'>,
+  census: WeekWay = WEEK_WAY,
+): DayOutcome | undefined {
+  const deal = weekDealOf(week.contractId, census);
+  if (deal === undefined || deal.target === 0) return undefined;
+  let clean = 0;
+  for (const entry of [...week.history].sort((a, b) => a.day - b.day)) {
+    if (!entry.allMet || !dayCountsToward(week.contractId, entry, census)) continue;
+    clean += 1;
+    if (clean === deal.target) return entry;
+  }
+  return undefined;
+}
+
+/**
+ * **The target marked on the day it is met** — swarm DN's Q2.2, [§ D1226](../../../../DECISIONS.md).
+ *
+ * The post-AK panel's seats A, B and D met Midtown's target on a weekday and no screen said so
+ * until Sunday's sheet. This is the sentence the report of that close leads with, and it is drawn
+ * on that close only: the day just closed (`closedDay`) is the day the count reached the target.
+ * It says nothing about the house, which has not been asked yet on every day but the last.
+ */
+export function weekTargetMetLineOf(
+  week: Pick<WeekState, 'contractId' | 'history' | 'closedDay'>,
+  census: WeekWay = WEEK_WAY,
+): string | undefined {
+  const deal = weekDealOf(week.contractId, census);
+  const metOn = weekTargetMetDayOf(week, census);
+  if (deal === undefined || metOn === undefined || metOn.day !== week.closedDay) return undefined;
+  return (
+    `This week’s target is met, on ${metOn.weekday}: ${String(deal.target)} clean counted ` +
+    `${deal.target === 1 ? 'day' : 'days'}, and it asks for ${String(deal.target)} of ${String(deal.counted)}.`
   );
 }
 
@@ -511,6 +559,34 @@ export interface WeekSheetRow {
   readonly yours: SheetVerdict;
   /** `undefined` on a day that does not count: the house is asked only about counted days. */
   readonly house: HouseReading | undefined;
+  /**
+   * The row as the Sunday screen draws it — *MON · counts · you: clean · the house: missed* — so
+   * the seven cells are words the corpus reads rather than words a mount composes (lane AL-F).
+   */
+  readonly line: string;
+}
+
+/** A player's verdict in a sheet cell. */
+const YOURS_WORDS: Readonly<Record<SheetVerdict, string>> = Object.freeze({
+  cleared: 'clean',
+  missed: 'missed',
+  ungraded: 'not graded',
+  'not played': 'not played',
+});
+
+/** The house's reading in a sheet cell: *still being run* until its run has answered. */
+const HOUSE_WORDS: Readonly<Record<HouseReading, string>> = Object.freeze({
+  cleared: 'clean',
+  missed: 'missed',
+  ungraded: 'not graded',
+  pending: 'still being run',
+  unrecorded: 'could not be run on this crowd',
+});
+
+function sheetRowLineOf(weekday: string, counts: boolean, yours: SheetVerdict, house: HouseReading | undefined): string {
+  if (!counts) return `${weekday} · does not count · you: ${YOURS_WORDS[yours]}`;
+  const houseWords = house === undefined ? 'not asked' : HOUSE_WORDS[house];
+  return `${weekday} · counts · you: ${YOURS_WORDS[yours]} · the house: ${houseWords}`;
 }
 
 export interface WeekSheetView {
@@ -587,12 +663,15 @@ export function weekSheetOf(
               : (houseOf(dealt.day) ?? 'pending');
       }
     }
+    const weekday = weekdayOf(dealt.dayIdx).slice(0, 3).toUpperCase();
+    const yours: SheetVerdict = outcome === undefined ? 'not played' : verdictOfOutcome(outcome);
     return {
-      weekday: weekdayOf(dealt.dayIdx).slice(0, 3).toUpperCase(),
+      weekday,
       day: dealt.day,
       counts,
-      yours: outcome === undefined ? 'not played' : verdictOfOutcome(outcome),
+      yours,
       house,
+      line: sheetRowLineOf(weekday, counts, yours, house),
     };
   });
   const countedRows = rows.filter((row) => row.counts);

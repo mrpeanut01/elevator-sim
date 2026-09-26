@@ -227,6 +227,7 @@ import {
   dayCountsToward,
   houseNeedOf,
   houseRecordOf,
+  weekDealOf,
   weekHasClosed,
   type HouseReading,
 } from '../shift/weekStake.js';
@@ -234,6 +235,9 @@ import { tomorrowBriefingOf, type TomorrowBriefing } from '../shift/tomorrow.js'
 import { coachWeekLines, weekKeptLine } from '../shift/weekLabel.js';
 import { weekdayOf, type DayOutcome, type WeekState } from '../shift/types.js';
 import { dailySeedAt } from '../shift/dailySeed.js';
+import { dealtCrowdOf, weekRecordFor } from '../shift/weekRecord.js';
+import { progressWithWeekRecords, weekRecordsOf } from '../everyday/profile.js';
+import { everydayProfileStore } from '../everyday/profileStore.js';
 import { deviceNowMs } from '../shift/deviceDate.js';
 import { practiceGroundOf } from '../shift/scoredCrowd.js';
 import { firstDayDealOf, isDealtPinnedDay } from '../shift/firstSession.js';
@@ -1662,38 +1666,52 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * is graded against the goals **the day was graded against**, read off the day's own readings,
    * so the two sides of the sheet answer one question.
    *
-   * Asked lazily, the first time a screen reads the sheet of a week that has closed, and kept by the
-   * week it was asked for: nothing is stored, and a reload re-runs it.
+   * **Asked as each counted day closes** — lane AL-F, swarm DN's Q2.3 ([§ D1227](../../../../DECISIONS.md)).
+   * It was asked the first time a screen read the sheet of a closed week, so the sheet's house line
+   * read *still being run* for ten to thirty seconds on the screen the week closes onto (the post-AK
+   * panel's seats A, B and D). A run costs the same whenever it is made, so each day's is started
+   * by {@link closeShift} as that day closes, and the sheet is ready when the last day's close
+   * opens it. A reading is kept per day's crowd (tower, day, seed), so a later day's ask does not
+   * throw an earlier one away; a reading the sheet asks for and nobody asked yet (after a reload,
+   * which keeps nothing) is asked then, as before.
    */
   const houseRunner = createOffThreadRunner({ spawn: spawnRunWorker });
-  let weekHouse: { readonly key: string; readonly readings: Map<number, HouseReading> } | undefined;
+  const houseReadings = new Map<string, HouseReading>();
+  /** The keys of the house ask in flight, joined — so a render asking again does not restart it. */
+  let houseAsked: string | undefined;
 
-  /** Which closed week a set of house readings belongs to: its tower and each day's crowd. */
-  function weekHouseKey(week: WeekState): string {
-    return [week.contractId, ...week.history.map((entry) => `${String(entry.day)}:${entry.record?.seed ?? '-'}`)].join('|');
+  /** One counted day's crowd: its tower, its day and its seed. */
+  function houseKeyOf(contractId: string, entry: DayOutcome): string {
+    return `${contractId}|${String(entry.day)}|${entry.record?.seed ?? '-'}`;
   }
 
   function weekHouseReadingOf(day: number): HouseReading | undefined {
     const week = state.week;
     if (!weekHasClosed(week)) return undefined;
-    const key = weekHouseKey(week);
-    if (weekHouse?.key !== key) askWeekHouse(week, key);
-    return weekHouse?.readings.get(day);
+    const entry = week.history.find((candidate) => candidate.day === day);
+    if (entry === undefined) return undefined;
+    askWeekHouse(week);
+    return houseReadings.get(houseKeyOf(week.contractId, entry));
   }
 
-  function askWeekHouse(week: WeekState, key: string): void {
-    const readings = new Map<number, HouseReading>();
-    weekHouse = { key, readings };
+  /** Start the house on every counted day of `week` that needs a run and has no reading yet. */
+  function askWeekHouse(week: WeekState): void {
+    if (weekDealOf(week.contractId) === undefined) return;
     const needs = week.history.flatMap((entry) => {
       const record = entry.record;
       if (record === null || !dayCountsToward(week.contractId, entry) || houseNeedOf(entry) !== 'run') return [];
+      const key = houseKeyOf(week.contractId, entry);
+      if (houseReadings.has(key)) return [];
       /* A record this build cannot replay is no record of the crowd for the house either. */
       if (recordUnreadableReason(record, resources) !== null) {
-        readings.set(entry.day, 'unrecorded');
+        houseReadings.set(key, 'unrecorded');
         return [];
       }
-      return [{ entry, record }];
+      return [{ entry, record, key }];
     });
+    const asked = needs.map((need) => need.key).join(',');
+    if (needs.length === 0 || asked === houseAsked) return;
+    houseAsked = asked;
     const runs = needs.map(({ record }) => {
       const plan = watchRunPlanOf(state, resources, houseRecordOf(record));
       return { config: plan.config, outOfServiceCarIds: plan.outOfServiceCarIds, recordDecisions: false };
@@ -1703,16 +1721,16 @@ function boot(ui: Elements, resources: BrowserResources): void {
     houseRunner.start({
       runs: [first, ...rest],
       onDone: (recordings) => {
-        if (weekHouse?.key !== key) return;
+        if (houseAsked === asked) houseAsked = undefined;
         recordings.forEach((recording, index) => {
-          const entry = needs[index]?.entry;
-          if (entry === undefined) return;
+          const need = needs[index];
+          if (need === undefined) return;
           const graded = readGoals(
-            entry.readings.map((reading) => reading.goal),
+            need.entry.readings.map((reading) => reading.goal),
             shiftObservationsOf(observationsAt(recording, recording.endedAt)),
           );
-          readings.set(
-            entry.day,
+          houseReadings.set(
+            need.key,
             !wasGraded(graded)
               ? 'ungraded'
               : graded.every((reading) => reading.state === 'met')
@@ -1724,8 +1742,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
       },
       /* A run that threw: those days could not be run on their own crowd, and the sheet says so. */
       onFailed: () => {
-        if (weekHouse?.key !== key) return;
-        for (const { entry } of needs) if (!readings.has(entry.day)) readings.set(entry.day, 'unrecorded');
+        if (houseAsked === asked) houseAsked = undefined;
+        for (const { key } of needs) if (!houseReadings.has(key)) houseReadings.set(key, 'unrecorded');
         renderAll();
       },
     });
@@ -2259,6 +2277,19 @@ function boot(ui: Elements, resources: BrowserResources): void {
      */
     const contract = contractById(weeks.week.contractId);
     if (contract !== undefined) state = withBuilding(state, resources, contract.buildingId);
+    /*
+     * **And the restored day is dealt its own crowd** — lane AL-F, [§ D1229](../../../../DECISIONS.md).
+     * Boot seeds the date's crowd; a restored week that has already filed it on this tower (Monday
+     * played, Tuesday standing) is dealt the crowd derived from the date, the day and the weeks
+     * closed, so the brief names the crowd the day will run on. A crowd the address chose is not
+     * the date's and is left standing.
+     */
+    const dateSeed = dailySeedAt(deviceNowMs());
+    if (contract !== undefined && state.seed === dateSeed) {
+      const records = weekRecordsOf(everydayProfileStore().progress());
+      const dealt = dealtCrowdOf(state.week, weekRecordFor(records, state.week.contractId), dateSeed);
+      if (dealt !== state.seed) state = { ...state, seed: dealt };
+    }
   }
 
   /**
@@ -4613,6 +4644,14 @@ function boot(ui: Elements, resources: BrowserResources): void {
     })(),
     /* The date's own crowd, read at the press — `EverydayHostBindings.daySeed`, § D1095. */
     daySeed: () => dailySeedAt(deviceNowMs()),
+    /* Each tower's record of closed weeks, kept with Everyday's progress — § D1229, § D1230. */
+    weekRecords: {
+      read: () => weekRecordsOf(everydayProfileStore().progress()),
+      write: (records) => {
+        const store = everydayProfileStore();
+        store.setProgress(progressWithWeekRecords(store.progress(), records));
+      },
+    },
     holdAddress: (held) => {
       if (addressHeld === held) return;
       addressHeld = held;
@@ -6298,7 +6337,17 @@ function boot(ui: Elements, resources: BrowserResources): void {
     // runner supersedes in-flight asks, and the latest ask is the one whose recording files. See
     // {@link runCause}; `'player'` is the default because every press but one means *a new ask*.
     runCause = cause;
-    if (cause === 'player') runDaySeed = dailySeedAt(deviceNowMs());
+    /*
+     * The crowd this press's day is dealt — lane AL-F, [§ D1229](../../../../DECISIONS.md) — so a day
+     * dealt a derived crowd is a shared day to the close's practice rule, as the date's crowd is.
+     */
+    if (cause === 'player') {
+      runDaySeed = dealtCrowdOf(
+        state.week,
+        weekRecordFor(weekRecordsOf(everydayProfileStore().progress()), state.week.contractId),
+        dailySeedAt(deviceNowMs()),
+      );
+    }
     /*
      * A fresh ask is a fresh attempt, and an attempt's calls are its own — § D1138. An intervention
      * is the same attempt's record growing, so its session stands and is told about the new run.
@@ -7042,6 +7091,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
     const crowdPractice = practiceGround === 'crowd';
     const week = crowdPractice ? state.week : closedWeekOf(state, outcome, runCause === 'intervention');
     const practice = practiceGround !== undefined;
+    /* The house on this day's crowd starts as the day closes, so the week's sheet is ready — § D1227. */
+    if (!practice) askWeekHouse(week);
     filedReportInput = {
       recording,
       observations,

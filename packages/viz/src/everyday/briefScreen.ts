@@ -131,6 +131,8 @@ function mountBrief(
       crowdIsToday: isDailySeed(data.seed(), deviceNowMs()),
       /* The day's own crowd, for the first-session line's pinned arm — § D1047. */
       daySeed: dailySeedAt(deviceNowMs()),
+      /* The crowd today is dealt — § D1229, `EverydayHost.dayCrowd`. */
+      dealtCrowd: data.dayCrowd(),
       firstSession: isFirstDayOnALegibleTower(data.week()),
       /* § 15.1's `Units` row — read per draw, `settingsScreen.ts`'s own pattern with this store. */
       units: everydayProfileStore().units(),

@@ -134,7 +134,14 @@ import { gaveUpBesideOf, goalPlainNameOf, horizonLabelOf, readGoals, wasDisplayO
 import { growthFactor } from './growth.js';
 import { CONTRACT_LADDER } from './ladder.js';
 import { ENDLESS_CONTRACT_ID, nextDay, wasGraded } from './week.js';
-import { WEEK_CLOSED_LINE, weekHasClosed, weekNeedOf, WEEK_WITHOUT_COUNTED_DAYS_SHORT } from './weekStake.js';
+import {
+  WEEK_CLOSED_LINE,
+  weekDealOf,
+  weekHasClosed,
+  weekNeedOf,
+  weekTargetMetLineOf,
+  WEEK_WITHOUT_COUNTED_DAYS_SHORT,
+} from './weekStake.js';
 import {
   DAY_START_S,
   WAKE_UP_ARRIVALS,
@@ -487,6 +494,19 @@ export interface WeekDayReport extends DayReport, ShapedOnlyFields {
    * off a sheet whose own sentence says the week stays on this day. Absent otherwise.
    */
   readonly dayStaysOpen?: boolean | undefined;
+  /**
+   * **The target marked on the day it is met** — `weekStake.ts#weekTargetMetLineOf`, swarm DN's
+   * Q2.2, [§ D1226](../../../../DECISIONS.md). Present on the close whose day brought the week's
+   * clean counted days to its target, and absent on every other close, a practice one included:
+   * a practice close banks nothing, so it met nothing.
+   */
+  readonly weekMark?: string | undefined;
+  /**
+   * **This close closed the week** — `weekStake.ts#weekHasClosed` on the week after it, lane AL-F
+   * (swarm DN's Q2.3, [§ D1227](../../../../DECISIONS.md)). The Everyday report's one button then
+   * opens the week's sheet rather than tomorrow. Absent otherwise.
+   */
+  readonly weekClosed?: boolean | undefined;
 }
 
 /**
@@ -1242,6 +1262,7 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
     streakLine: practice ? practiceNote : streakLineFor(judgement.verdict, week.streak),
     ...(practice ? { practiceNote } : {}),
     ...(practice && input.practiceCrowd !== undefined ? { dayStaysOpen: true } : {}),
+    ...weekMarksOf(week, practice),
     contractLine: contractLineFor(contract, week),
     cleared: week.cleared,
     forecast: forecastFor(
@@ -1253,6 +1274,22 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
     ),
     taught: taughtFor(contract, week),
     nextDayName: weekdayOf(nextIdx),
+  };
+}
+
+/**
+ * The two week marks a close can carry — {@link WeekDayReport.weekMark} and
+ * {@link WeekDayReport.weekClosed}. A practice close carries no mark, because it banked nothing;
+ * a practice close of the week's last day still leads to the sheet, which is standing.
+ */
+function weekMarksOf(
+  week: WeekState,
+  practice: boolean,
+): { readonly weekMark?: string; readonly weekClosed?: boolean } {
+  const mark = practice ? undefined : weekTargetMetLineOf(week);
+  return {
+    ...(mark === undefined ? {} : { weekMark: mark }),
+    ...(weekHasClosed(week) ? { weekClosed: true } : {}),
   };
 }
 
@@ -2975,6 +3012,17 @@ function taughtFor(contract: ScenarioContract | undefined, week: WeekState): str
     return 'A building you drew yourself. Nothing banks here — the sheet is the whole reward.';
   }
   if (contractStatus(week, contract.id) === 'cleared') {
+    /*
+     * A week the census deals still has a target after its scenario is cleared, and meeting it
+     * still counts, toward the tower's record of weeks (lane AL-F, § D1230). *Nothing more banks*
+     * was false of every such week after the first.
+     */
+    if (weekDealOf(contract.id) !== undefined) {
+      return (
+        `${contract.label} is already cleared, and its reward is open: ${contract.reward}. ` +
+        'This week’s target still counts, toward your record of weeks on this tower.'
+      );
+    }
     return (
       `${contract.label} is already cleared, and its reward is open: ${contract.reward}. ` +
       'Nothing more banks against it — days here keep the streak, and the sheet is the reward now.'

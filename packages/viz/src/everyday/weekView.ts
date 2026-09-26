@@ -47,6 +47,7 @@ import {
   type WeekSheetView,
 } from '../shift/weekStake.js';
 import type { DayOutcome, WeekState } from '../shift/types.js';
+import { weekRecordLineOf, type WeekRecord } from '../shift/weekRecord.js';
 import { weekdayOf } from '../shift/types.js';
 
 import { todayIsBanked, type WorldBandView } from './doorView.js';
@@ -164,7 +165,24 @@ export interface WeekScreenView {
    * or `undefined` before the last dealt day is filed and wherever the census does not speak.
    */
   readonly sheet: WeekSheetView | undefined;
+  /**
+   * **The tower's record of closed weeks**, one line — `shift/weekRecord.ts#weekRecordLineOf`, lane
+   * AL-F ([§ D1230](../../../../DECISIONS.md)) — or `undefined` before a week on it has closed.
+   */
+  readonly record: string | undefined;
+  /**
+   * The screen's one button while the week's sheet stands — {@link WEEK_START_NEXT_LABEL} — and
+   * `undefined` otherwise, when the button is the week row's own (§ 3.3).
+   */
+  readonly primary: string | undefined;
 }
+
+/**
+ * **The Sunday screen's one button** — swarm DN's Q2.3, lane AL-F ([§ D1227](../../../../DECISIONS.md)).
+ * While the week's sheet stands, the week has nothing left to play, and the next press is the next
+ * week: the same tower, counted from zero, on crowds this device has not filed.
+ */
+export const WEEK_START_NEXT_LABEL = 'Start next week';
 
 /** What {@link weekScreenViewOf} is computed from. */
 export interface WeekScreenInput {
@@ -205,6 +223,11 @@ export interface WeekScreenInput {
    * rather than counting a run that has not happened.
    */
   readonly house?: (day: number) => HouseReading | undefined;
+  /**
+   * The tower's record of closed weeks — `EverydayHost.weekRecord`, § D1230. Optional: absent, the
+   * screen says nothing about a record, which is what a tower with none gets anyway.
+   */
+  readonly record?: WeekRecord | undefined;
 }
 
 /** How many cards § 14 draws. Seven, and `HISTORY_DAYS` is the same seven one layer down. */
@@ -401,6 +424,7 @@ export function weekScreenViewOf(input: WeekScreenInput): WeekScreenView {
   const tally = tallyOf(cards);
   /* Today closed, by the week or by the sitting — `doorView.ts#todayIsBanked`, so the door agrees. */
   const todayClosed = todayIsBanked(input);
+  const sheet = weekSheetOf(input.week, input.house ?? (() => undefined));
   return {
     eyebrow: 'ELEVATOR SIM · EVERYDAY MODE',
     title: 'Your week',
@@ -430,7 +454,9 @@ export function weekScreenViewOf(input: WeekScreenInput): WeekScreenView {
     },
     stake: weekStakeLineOf(input.week),
     notCounted: notCountedOf(input.week, cards),
-    sheet: weekSheetOf(input.week, input.house ?? (() => undefined)),
+    sheet,
+    record: input.record === undefined ? undefined : weekRecordLineOf(input.record),
+    primary: sheet === undefined ? undefined : WEEK_START_NEXT_LABEL,
   };
 }
 

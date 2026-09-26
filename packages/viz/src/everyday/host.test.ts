@@ -53,6 +53,9 @@ import { servedLeg, syntheticRecording } from '../live/synthetic.test-helper.js'
 import { wholeDayFor, wholeDayRun } from '../shift/dayLength.js';
 import { GOAL_BARS } from '../shift/goals.js';
 import { closeDay, nextDay, outcomeOf } from '../shift/week.js';
+import { goalsForDay as goalsOfDay, readGoals } from '../shift/goals.js';
+import { scheduledEventFor } from '../shift/calendar.js';
+import { derivedCrowdOf, type WeekRecord } from '../shift/weekRecord.js';
 import type { GoalReading } from '../shift/types.js';
 import type { ShapedDayReport } from '../shift/report.js';
 /* GitHub issue #245 — the predicate the façade carries the answer of, asked directly. */
@@ -2689,5 +2692,135 @@ describe('GitHub issue #594 — the career parks the Scenario record and gives i
     const before = h.calls.length;
     host.leaveCareer?.();
     expect(h.calls.length).toBe(before);
+  });
+});
+
+/**
+ * **A Scenario week's days pay, are recorded, and are dealt new crowds** — wave AL, lane AL-F,
+ * swarm DN's Q2.5 to Q2.7 (§ D1229, § D1230, § D1231).
+ *
+ * The close is driven the way `dev/main.ts#closeShift` drives it: the week gains the day through
+ * `shift/week.ts#closeDay` and the run is then filed. Red on the base: `closeDay` returned before any
+ * bank on every day that was not a Career day, so a cleared counted Monday posted nothing.
+ */
+describe('a Scenario week’s days pay once, are recorded, and are dealt new crowds — lane AL-F', () => {
+  const DATE = 20_260_926n;
+
+  function outcome(week: ViewerState['week'], clean: boolean, seed: bigint): ReturnType<typeof outcomeOf> {
+    const observations = {
+      arrived: 400,
+      carryPct: clean ? 100 : 10,
+      minutePct: clean ? 100 : 10,
+      peakQueue: clean ? 0 : 99,
+      abandoned: clean ? 0 : 9,
+      abandonedCarried: 0,
+      horizonS: 900,
+      worstWaitS: clean ? 40 : 940,
+      worstWaitIsCensored: false,
+      workPerServedLegKJ: clean ? 41.2 : 260.5,
+    };
+    return outcomeOf({
+      day: week.day,
+      dayIdx: week.dayIdx,
+      eventId: scheduledEventFor(null, week.day, week.dayIdx, 'whole-day').id,
+      arrived: 400,
+      carried: clean ? 400 : 40,
+      minutePct: observations.minutePct,
+      readings: readGoals(goalsOfDay(week.day), observations),
+      record: { seed: seed.toString() } as unknown as WatchRecord,
+      recordRefusal: null,
+    });
+  }
+
+  /** A host on a week whose close files the standing day as `next` says. */
+  function scenario(contractId = 'c2') {
+    const h = harnessOf({ ...base(), week: openWeek(contractId), seed: DATE });
+    let closed = false;
+    let records: readonly WeekRecord[] = [];
+    const next = { clean: true };
+    const host = createEverydayHost({
+      ...h.bindings,
+      dayClosed: () => closed,
+      daySeed: () => DATE,
+      weekRecords: {
+        read: () => records,
+        write: (written) => {
+          records = written;
+        },
+      },
+      applyPatch: (patch) => {
+        h.state = { ...h.state, ...patch };
+      },
+      closeDay: () => {
+        h.state = { ...h.state, week: closeDay(h.state.week, outcome(h.state.week, next.clean, h.state.seed)) };
+        closed = true;
+      },
+    });
+    return {
+      h,
+      host,
+      next,
+      records: () => records,
+      /* A later close of the same day, which `closeShift` files as practice. */
+      reopen: () => {
+        closed = false;
+      },
+      tomorrow: () => {
+        host.openTomorrow();
+        closed = false;
+      },
+    };
+  }
+
+  it('pays a counted day that cleared, once, and nothing for its practice close or a missed day', () => {
+    const s = scenario();
+    s.host.closeDay();
+    expect(s.h.banked).toEqual([{ completion: 'career-day-paid' }]);
+    s.reopen();
+    s.host.closeDay();
+    expect(s.h.banked, 'a practice close paid').toHaveLength(1);
+    s.tomorrow();
+    s.next.clean = false;
+    s.host.closeDay();
+    expect(s.h.banked, 'a missed day paid').toHaveLength(1);
+  });
+
+  it('pays nothing for a clean day that does not count, nor on a week on no scenario', () => {
+    const s = scenario();
+    for (let day = 1; day <= 5; day += 1) {
+      s.host.closeDay();
+      s.tomorrow();
+    }
+    expect(s.h.banked).toHaveLength(5);
+    s.host.closeDay(); // Saturday: clean, and it does not count on Midtown's week.
+    expect(s.h.banked).toHaveLength(5);
+    const sandbox = scenario('sandbox');
+    sandbox.host.closeDay();
+    expect(sandbox.h.banked).toEqual([]);
+  });
+
+  it('deals the next day on the same date a crowd derived from the date, never the one it filed', () => {
+    const s = scenario();
+    s.host.closeDay();
+    expect(s.records().find((entry) => entry.contractId === 'c2')?.dateCrowd).toBe(DATE.toString());
+    s.tomorrow();
+    expect(s.h.state.week.day).toBe(2);
+    expect(s.h.state.seed).toBe(derivedCrowdOf(DATE, 2, 0));
+    expect(s.host.dayCrowd()).toBe(derivedCrowdOf(DATE, 2, 0));
+  });
+
+  it('counts the closed week on the tower’s record, and deals the next week crowds of its own', () => {
+    const s = scenario();
+    const seen = new Set<string>();
+    for (let day = 1; day <= 7; day += 1) {
+      seen.add(s.h.state.seed.toString());
+      s.host.closeDay();
+      if (day < 7) s.tomorrow();
+    }
+    expect(s.host.weekRecord()).toMatchObject({ contractId: 'c2', closed: 1, met: 1, best: 5 });
+    s.tomorrow();
+    expect(s.h.state.week.day).toBe(1);
+    expect(seen.has(s.h.state.seed.toString()), 'the next week re-dealt a crowd this device filed').toBe(false);
+    expect(s.h.state.seed).toBe(derivedCrowdOf(DATE, 1, 1));
   });
 });

@@ -37,6 +37,8 @@ import {
   weekHeldReasonOf,
   weekOfferOf,
   weekTargetFor,
+  weekTargetMetDayOf,
+  weekTargetMetLineOf,
   WEEK_HELD_NOTE,
   WEEK_LENGTH,
   WEEK_SHEET_NOTE,
@@ -587,5 +589,66 @@ describe('a newcomer’s first week — § D1178', () => {
     expect(weekAdmitsANewcomer('c3')).toBe(false);
     // A tower the census has not measured is not admitted by default.
     expect(weekAdmitsANewcomer('c8')).toBe(false);
+  });
+});
+
+describe('the target marked on the day it is met — swarm DN’s Q2.2, § D1226', () => {
+  /** Midtown's week closed day by day, clean on `clean`, stopping after `through`. */
+  function playThrough(clean: readonly number[], through: number): WeekState {
+    let week = openWeek('c2');
+    for (let day = 1; day <= through; day += 1) {
+      week = closeDay(week, dayOn(week, clean.includes(day)));
+      if (day < through) week = nextDay(week);
+    }
+    return week;
+  }
+
+  it('says so on the close that reaches the target, and on no close before or after it', () => {
+    // Target 4 of 5; Monday, Tuesday and Wednesday clean, Thursday missed, Friday clean meets it.
+    const clean = [1, 2, 3, 5, 6];
+    const lines = [1, 2, 3, 4, 5, 6, 7].map((through) => weekTargetMetLineOf(playThrough(clean, through)));
+    expect(lines.map((line) => line !== undefined)).toEqual([false, false, false, false, true, false, false]);
+    expect(lines[4]).toBe(
+      'This week’s target is met, on Friday: 4 clean counted days, and it asks for 4 of 5.',
+    );
+  });
+
+  it('names the same day on the strip for the rest of the week, and never before it', () => {
+    const clean = [1, 2, 3, 4];
+    expect(weekTargetMetDayOf(playThrough(clean, 3))).toBeUndefined();
+    expect(weekStakeLineOf(playThrough(clean, 3))).toBe('This week’s target: 4 of 5 counted days clean. 3 so far.');
+    expect(weekTargetMetDayOf(playThrough(clean, 6))?.weekday).toBe('Thursday');
+    expect(weekStakeLineOf(playThrough(clean, 6))).toBe(
+      'This week’s target: 4 of 5 counted days clean. 4 so far. Met on Thursday.',
+    );
+  });
+
+  it('is never drawn where the census does not speak or the week has no target', () => {
+    expect(weekTargetMetLineOf(fileAll('c1'))).toBeUndefined();
+    expect(weekTargetMetLineOf(playWeek('c3', [1, 2, 3, 4, 5, 6, 7]))).toBeUndefined();
+  });
+
+  /** A slice tower's week, every day clean. */
+  function fileAll(contractId: string): WeekState {
+    let week = openWeek(contractId);
+    week = closeDay(week, dayOn(week, true));
+    return week;
+  }
+});
+
+describe('the Sunday sheet’s seven cells are words — § D1227', () => {
+  it('draws each day as the sheet counts it, the house beside a counted day only', () => {
+    // Tuesday and Wednesday were driven by somebody else, so the house needs a run on each; only
+    // Tuesday's has answered. Monday and Thursday ran the standing order and are their own house.
+    const week = playWeek('c2', [1, 2, 3, 6], (day) =>
+      record(day, day === 2 || day === 3 ? { dispatcherId: 'another-driver' } : {}),
+    );
+    const sheet = weekSheetOf(week, (day) => (day === 2 ? 'missed' : undefined));
+    const lines = sheet?.rows.map((row) => row.line);
+    expect(lines?.[0]).toBe('MON · counts · you: clean · the house: clean');
+    expect(lines?.[1]).toBe('TUE · counts · you: clean · the house: missed');
+    expect(lines?.[2]).toBe('WED · counts · you: clean · the house: still being run');
+    expect(lines?.[3]).toBe('THU · counts · you: missed · the house: missed');
+    expect(lines?.[5]).toBe('SAT · does not count · you: clean');
   });
 });

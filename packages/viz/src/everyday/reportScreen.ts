@@ -597,6 +597,12 @@ function mountReportScreen(
       practice.style.cssText = `${QUIET};margin:10px 0 0;max-width:74ch`;
       head.append(practice);
     }
+    /* The week's target, marked on the close that met it — swarm DN's Q2.2, § D1226. */
+    if (view.weekMark !== undefined) {
+      const mark = el(doc, 'p', 'everyday-report-week-mark', view.weekMark);
+      mark.style.cssText = `font:600 14px ${TYPE.heading};margin:10px 0 0;max-width:74ch;color:${C.moss}`;
+      head.append(mark);
+    }
     root.append(head);
 
     if (view.staleNote !== undefined) {
@@ -903,6 +909,11 @@ function mountReportScreen(
        */
       const step = view.tomorrow;
       button.addEventListener('click', () => {
+        /* The close that closed the week opens its sheet — swarm DN's Q2.3, § D1227. */
+        if (step.goes === 'week-sheet') {
+          context.go('week');
+          return;
+        }
         if (step.goes === 'career-day') {
           const tower = openTowerOf(context.host.campaign());
           if (tower === undefined) return;

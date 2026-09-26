@@ -1939,6 +1939,20 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'The week’s record and its crowds, plumbing only — wave AL, lane AL-F, § D1226 and § D1229. ' +
+        '`weekTargetMetDayOf` returns a filed day, whose weekday a player reads through ' +
+        '`weekTargetMetLineOf` and `weekStakeLineOf`, both seeded by the week adapter. ' +
+        '`derivedCrowdOf` and `dealtCrowdOf` return a seed: the digits a player reads are the seed ' +
+        'line’s, which prints the run’s crowd whatever dealt it and whose derived arm the door adapter ' +
+        'seeds by name.',
+      ids: [
+        'shift/weekStake.ts#weekTargetMetDayOf',
+        'shift/weekRecord.ts#derivedCrowdOf',
+        'shift/weekRecord.ts#dealtCrowdOf',
+      ],
+    },
+    {
+      reason:
         'The press-moment ruling’s plumbing — wave AI, § D1029. `admittedPressDayIds` and ' +
         '`pressDayMeasuredAs` return ids and a pin, and are derived only because they reach ' +
         '`contractLadderIssues`’ own call-block check, whose content-author strings the entry above ' +

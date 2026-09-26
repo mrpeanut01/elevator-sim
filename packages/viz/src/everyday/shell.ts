@@ -66,6 +66,8 @@ import { BUILD_NOTES_POINTER } from './buildNotes.js';
 import { HOST_PENDING_REASON } from './host.js';
 import type { EverydayHost, EverydayHostSlot } from './host.js';
 import { EVERYDAY_MODES, isPlayable } from './modes.js';
+import { continueWeekEntryOf } from './continueWeek.js';
+import { contractById } from '../shift/contracts.js';
 import { everydayAccount, onEverydayAccount } from './accountPort.js';
 import { everydayProfileStore } from './profileStore.js';
 import { filedDaysOf, tutorialIsDue } from './tutorialModel.js';
@@ -2532,8 +2534,50 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
 
     const list = el(doc, 'div');
     list.style.cssText = `display:flex;flex-direction:column;gap:${String(GAP.row + 2)}px;max-width:640px`;
+    const resume = continueWeekTile();
+    if (resume !== undefined) list.append(resume);
     for (const mode of EVERYDAY_MODES) list.append(modeTile(mode));
     screenRegion.append(list, buildNotesPointer());
+  }
+
+  /**
+   * *Continue your week* — swarm DN's Q2.4, lane AL-F, [§ D1228](../../../../DECISIONS.md). One
+   * entry above the tiles while a Scenario week is under way, derived from the week on every draw
+   * (`everyday/continueWeek.ts`), so nothing is stored for it and the page still opens here (§ 3.5).
+   * The press is the Scenario tile's commitment with the week's own destination: the front door for
+   * a day to play, or the week's sheet where the week has closed.
+   */
+  function continueWeekTile(): HTMLElement | undefined {
+    if (dataHost === undefined) return undefined;
+    const week = dataHost.week();
+    const buildingId = contractById(week.contractId)?.buildingId;
+    const towerName = buildingId === undefined ? '' : (dataHost.buildingById(buildingId)?.name ?? buildingId);
+    const entry = continueWeekEntryOf(week, towerName);
+    if (entry === undefined) return undefined;
+    const tile = el(doc, 'button', 'everyday-continue-week');
+    tile.type = 'button';
+    tile.setAttribute('data-screen', entry.goes);
+    tile.style.cssText = [
+      'text-align:left',
+      'display:block',
+      'width:100%',
+      'padding:14px 16px',
+      `border:1.5px solid ${C.ink}`,
+      `border-radius:${String(R.tile)}px`,
+      `background:${C.amberWash}`,
+      `color:${C.ink}`,
+      'cursor:pointer',
+    ].join(';');
+    const title = el(doc, 'div', undefined, entry.title);
+    title.style.cssText = `font:600 15px ${TYPE.heading}`;
+    const line = el(doc, 'div', 'everyday-continue-week-line', entry.line);
+    line.style.cssText = `font-size:13px;color:${C.inkSoft};margin-top:3px`;
+    tile.append(title, line);
+    tile.addEventListener('click', () => {
+      state = { ...state, modePick: 'scenario', ctx: 'daily' };
+      go(entry.goes);
+    });
+    return tile;
   }
 
   /**

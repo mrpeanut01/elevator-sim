@@ -2342,6 +2342,29 @@ describe('the ordinary day’s calls and a practice close — § D1138', () => {
     expect(banked.streakLine).not.toBe(PRACTICE_NOTE);
   });
 
+  it('marks the week’s target on the close that met it, and not on a practice close of the same day — § D1226', () => {
+    /* WEEK stands on Thursday; Monday to Thursday clean on Midtown's week, whose target is 4 of 5. */
+    const history = [1, 2, 3, 4].map((day) =>
+      outcomeOf({
+        day,
+        dayIdx: day - 1,
+        eventId: scheduledEventFor(null, day, day - 1, 'whole-day').id,
+        arrived: 400,
+        carried: 400,
+        minutePct: 100,
+        readings: readGoals(goalsForDay(day), { ...passing(), minutePct: 100 }),
+        record: null,
+        recordRefusal: null,
+      }),
+    );
+    const met = { ...WEEK, contractId: 'c2', day: 4, dayIdx: 3, closedDay: 4, attempt: 1, history };
+    expect(weekDay(sheet({ week: met })).weekMark).toBe(
+      'This week’s target is met, on Thursday: 4 clean counted days, and it asks for 4 of 5.',
+    );
+    expect(weekDay(sheet({ week: { ...met, attempt: 2 }, practice: true })).weekMark).toBeUndefined();
+    expect(weekDay(sheet({ week: { ...met, history: history.slice(0, 3), closedDay: 3, day: 3, dayIdx: 2 } })).weekMark).toBeUndefined();
+  });
+
   it('says a run on a crowd other than the day’s shared one is practice for that reason — § D1141', () => {
     /* The week has not closed the day at all, so *your week keeps your first attempt* would be false. */
     const byCrowd = weekDay(sheet({ practice: true, practiceCrowd: 777n, week: { ...WEEK, attempt: 1, closedDay: null } }));

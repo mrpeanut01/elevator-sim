@@ -43,6 +43,7 @@
  */
 
 import { PRACTICE_DAY_SENTENCES, practiceGroundOf, type PracticeGround } from '../shift/scoredCrowd.js';
+import { isDerivedCrowdOn } from '../shift/weekRecord.js';
 import type { ResolvedBuilding } from '@elevator-sim/core/browser';
 
 import { bookedOutCarsOf, carAbsencesOf, wrinkleNameOf, wrinkleNoteOf } from '../shift/bookedOut.js';
@@ -194,6 +195,14 @@ export interface TodayRecord {
    * owed: this crowd is shared with everybody who plays the same pinned day.
    */
   readonly crowdIsPinned: boolean;
+  /**
+   * **Whether this run is on a crowd derived from the date** — lane AL-F,
+   * [§ D1229](../../../../DECISIONS.md): today's own crowd is filed on this tower already, and the
+   * day is dealt the one derived from the date, the day and the weeks closed. Echoed for
+   * {@link crowdIsToday}'s reason: the seed line and the door's closing sentence both say whose
+   * crowd it is.
+   */
+  readonly crowdIsDerived?: boolean | undefined;
   /**
    * `shift/firstSession.ts`'s line on a first day nobody has played on a legible tower, or
    * `undefined` on every other day — GitHub issue #208, § D514.
@@ -362,6 +371,13 @@ export interface TodayInput {
    * {@link seed}, which is exactly the number that cannot answer the question.
    */
   readonly daySeed: bigint;
+  /**
+   * **The crowd today's scored day is dealt**, where the shell deals one — `EverydayHost.dayCrowd`,
+   * lane AL-F, [§ D1229](../../../../DECISIONS.md). The date's crowd until this device has filed it
+   * on this tower, and the crowd derived from the date, the day and the weeks closed after. Optional:
+   * absent, the date's crowd is the day's, which is what every caller before § D1229 meant.
+   */
+  readonly dealtCrowd?: bigint | undefined;
   /**
    * How machine specifications read — § 15.1's `Units` row, GitHub issue #170,
    * [§ D448](../../../../DECISIONS.md).
@@ -818,6 +834,11 @@ function ledeOf(
  * **Neither arm names the tower as shared**, and that is [§ D730](../../../../DECISIONS.md)
  * rather than an omission. The tower is the one this player’s week was opened on.
  */
+/** {@link TodayRecord.crowdIsDerived}: the run's crowd is the one the day is dealt, and it is derived. */
+function crowdIsDerivedOf(input: TodayInput): boolean {
+  return input.dealtCrowd !== undefined && input.seed === input.dealtCrowd && isDerivedCrowdOn(input.seed, input.daySeed);
+}
+
 function seedLineOf(input: TodayInput, crowdIsPinned: boolean, practice: PracticeGround | undefined): string {
   const crowd = `tower ${input.buildingId} · crowd ${input.seed.toString()}`;
   if (input.crowdIsToday) return `${crowd} · today’s date, so everyone playing today meets this crowd`;
@@ -828,6 +849,18 @@ function seedLineOf(input: TodayInput, crowdIsPinned: boolean, practice: Practic
    * tower's pinned first day meets this crowd, which is the one it was measured on.
    */
   if (crowdIsPinned) return `${crowd} · the pinned crowd this day was measured on, not the day’s`;
+  /*
+   * **The fourth arm: a crowd derived from the date** — lane AL-F, [§ D1229](../../../../DECISIONS.md).
+   * This device has filed today's date crowd on this tower already, so a further day dealt today
+   * meets the crowd derived from the date, the day of the week and the weeks closed. It is the same
+   * for everyone who reaches that day of that week today, and it is not the date's board's crowd.
+   */
+  if (crowdIsDerivedOf(input)) {
+    return (
+      `${crowd} · today’s date, then the day of the week, then the weeks you have closed here: ` +
+      'you have played today’s own crowd on this tower, so this day is dealt a new one'
+    );
+  }
   /*
    * **And on a scenario's week, what that costs** — wave AK, [§ D1141](../../../../DECISIONS.md).
    * A run on a crowd other than the day's shared one, on a week already under way on another crowd,
@@ -855,7 +888,7 @@ export function todayOf(input: TodayInput): TodayRecord {
   const { week, building } = input;
   const weekday = weekdayOf(week.dayIdx);
   /* Whether this run banks, decided once and read by both lines that say so — the seed line and the week block. */
-  const practice = practiceGroundOf(week, input.seed, input.daySeed);
+  const practice = practiceGroundOf(week, input.seed, input.dealtCrowd ?? input.daySeed);
   /*
    * The event as the run will have it — § D1040. Its note is the wrinkle's own on every day but one
    * whose template keeps its own mix, where the wrinkle's mix is withheld by `core` and the note says
@@ -926,6 +959,7 @@ export function todayOf(input: TodayInput): TodayRecord {
     seedLine: seedLineOf(input, crowdIsPinned, practice),
     crowdIsToday: input.crowdIsToday,
     crowdIsPinned,
+    crowdIsDerived: crowdIsDerivedOf(input),
     /*
      * Which arm is the draw's own answer rather than a guess about how the player arrived — GitHub
      * issue #595: the picker and the pinned days both reach a legible first day the seed did not

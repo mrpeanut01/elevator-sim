@@ -157,10 +157,27 @@ describe.skipIf(!HAS_BROWSER)('GitHub issue #593 — a Scenario week plays from 
           await page.locator('.everyday-report-tomorrow').click();
           await page.waitForSelector('.everyday-brief', { timeout: 15_000 });
         }
-        /* Seven days closed, each offering the next — Tuesday through Monday, in the week's order. */
+        /*
+         * Seven days closed, each offering the next, in the week's order. On a week the census
+         * speaks for (Midtown's), Sunday's close closes the week, and its one button opens the
+         * week's sheet rather than Monday — swarm DN's Q2.3, § D1227 — whose own primary then
+         * starts the next week on the brief. Garden Apartments' week has no ending and offers
+         * Monday.
+         */
         expect(reached).toHaveLength(7);
-        expect(reached.every((label) => label.startsWith('Open the doors on'))).toBe(true);
-        expect(new Set(reached).size).toBe(7);
+        const closesAWeek = building === 'midtown-office';
+        const offersNext = closesAWeek ? reached.slice(0, 6) : reached;
+        expect(offersNext.every((label) => label.startsWith('Open the doors on'))).toBe(true);
+        expect(new Set(offersNext).size).toBe(offersNext.length);
+        if (closesAWeek) {
+          expect(reached[6]).toBe('See the week against the house');
+          await page.locator('.everyday-report-tomorrow').click();
+          await page.waitForSelector('.everyday-week-sheet', { timeout: 15_000 });
+          expect((await page.locator('.everyday-week-sheet-row').count())).toBe(7);
+          expect(await textOf(page, '.everyday-bar-primary')).toContain('Start next week');
+          await page.locator('.everyday-bar-primary').click();
+          await page.waitForSelector('.everyday-brief', { timeout: 15_000 });
+        }
       } finally {
         await page.close();
       }
@@ -182,6 +199,15 @@ describe.skipIf(!HAS_BROWSER)('GitHub issue #594 — no mode but Scenario writes
       expect(await waitForToday(page)).toBe('ready');
       await page.locator('.everyday-bar-primary').click();
       await page.waitForSelector('.everyday-report', { timeout: 30_000 });
+      await toModes(page);
+      /*
+       * The mode picker offers the week back — swarm DN's Q2.4, § D1228 — naming the tower and the
+       * day standing, and its press opens the front door on that week.
+       */
+      await page.waitForSelector('.everyday-continue-week', { timeout: 15_000 });
+      expect(await textOf(page, '.everyday-continue-week')).toContain('Midtown Office, Monday filed, Tuesday next');
+      await page.locator('.everyday-continue-week').click();
+      await page.waitForSelector('.everyday-door', { timeout: 15_000 });
       await toModes(page);
       const before = await weekAtTheDoor(page);
       /*

@@ -77,7 +77,12 @@ import type { EverydayScreen, EverydayState, RunContext } from './types.js';
  */
 const BANKED_TURN: Readonly<Record<BankedTurn, string>> = Object.freeze({
   'scenario-cleared': 'scenario cleared',
-  'career-day-paid': 'contract day filed',
+  /*
+   * *Contract day filed* until wave AL: since [§ D1231](../../../../DECISIONS.md) a Scenario week's
+   * counted day that clears pays this completion too, and a Scenario day is not a contract's. What
+   * both have in common is the turn: a day that cleared, filed once.
+   */
+  'career-day-paid': 'cleared day filed',
   'rush-wave-survived': 'rush waves banked',
 });
 

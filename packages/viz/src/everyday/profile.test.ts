@@ -38,6 +38,8 @@ import {
   progressWithDiagnosisShown,
   progressWithSolvedCases,
   fixSpentUnitsOf,
+  progressWithWeekRecords,
+  weekRecordsOf,
   progressWithFixSpent,
   type EverydayProgress,
   loadDefaultSpeed,
@@ -961,6 +963,39 @@ describe('what the order that fixed a case cost is kept — lane AL-B, seat C D5
       const back = loadProgress(backing);
       expect(back.progress).toEqual(EMPTY_EVERYDAY_PROGRESS);
       expect(back.notice).toBe(PROGRESS_REFUSALS.shape);
+    }
+  });
+});
+
+describe('each tower’s record of closed weeks is kept — lane AL-F, § D1229 and § D1230', () => {
+  /*
+   * The record outlives § D1177's roll, which empties the week, so it is kept with the rest of what
+   * this device has earned. Red before: the progress had no field for it.
+   */
+  it('round-trips the records, reads progress kept before the field as none, and refuses a malformed one', () => {
+    const backing = memoryBacking();
+    const records = [{ contractId: 'c2', closed: 2, met: 1, best: 4, dateCrowd: '20260926' }];
+    const kept = progressWithWeekRecords(EMPTY_EVERYDAY_PROGRESS, records);
+    expect(progressWithWeekRecords(kept, records)).toBe(kept);
+    saveEveryday(backing, DEFAULT_EVERYDAY_PROFILE, kept, 'metric');
+    const back = loadProgress(backing);
+    expect(back.notice).toBeNull();
+    expect(weekRecordsOf(back.progress)).toEqual(records);
+    expect(weekRecordsOf({ solvedCaseIds: [], ratings: [] })).toEqual([]);
+    for (const bad of [
+      { contractId: '', closed: 1, met: 0, best: 0 },
+      { contractId: 'c2', closed: -1, met: 0, best: 0 },
+      { contractId: 'c2', closed: 1, met: 0.5, best: 0 },
+      { contractId: 'c2', closed: 1, met: 0, best: 0, dateCrowd: 'soon' },
+    ]) {
+      const refused = memoryBacking();
+      saveEveryday(
+        refused,
+        DEFAULT_EVERYDAY_PROFILE,
+        { solvedCaseIds: [], ratings: [], weekRecords: [bad] } as unknown as EverydayProgress,
+        'metric',
+      );
+      expect(loadProgress(refused).notice, JSON.stringify(bad)).toBe(PROGRESS_REFUSALS.shape);
     }
   });
 });

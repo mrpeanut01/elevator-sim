@@ -75,7 +75,7 @@
  * example of an in-scope Engineer change.
  */
 
-import { weekNeedOf, WEEK_WITHOUT_COUNTED_DAYS_SHORT } from './weekStake.js';
+import { dayCountsToward, weekNeedOf, WEEK_WITHOUT_COUNTED_DAYS_SHORT } from './weekStake.js';
 import {
   weekdayOf,
   type DayOutcome,
@@ -128,7 +128,10 @@ export interface TomorrowGroup {
  * happened beside a count from one that has.
  */
 export interface TomorrowBriefing {
-  /** `Monday is banked. Tuesday opens.` — names both days and claims nothing about either. */
+  /**
+   * `Monday is banked. Tuesday opens.` on a clean counted day, `Monday is filed.` on every other —
+   * names both days and claims nothing about how either went beyond what the count did.
+   */
   readonly headline: string;
   /** The questions that have an answer, in the order a reader asks them. Empty groups are dropped. */
   readonly groups: readonly TomorrowGroup[];
@@ -199,7 +202,7 @@ export function tomorrowBriefingOf(input: TomorrowInput): TomorrowBriefing {
     { id: 'next', caption: 'What tomorrow is under', rows: nextRowsOf(input) },
   ];
   return {
-    headline: headlineOf(closed, week),
+    headline: headlineOf(closed, week, input.contract),
     // A question with no answer is dropped rather than drawn empty — `docs/10` R3 at the layout's
     // scale, and `dev/reportPanel.ts`'s own *a slot with nothing to say is hidden, not emptied*.
     groups: groups.filter((group) => group.rows.length > 0),
@@ -210,15 +213,25 @@ export function tomorrowBriefingOf(input: TomorrowInput): TomorrowBriefing {
 /**
  * `Monday is banked. Tuesday opens.`
  *
- * It names the two days and asserts nothing about either — *banked* is `closeDay`'s own word for
- * what happened to the day regardless of how it went, and the design is explicit that the banked
- * count survives a missed day (`week.ts` rule 1). A headline reading *"Monday cleared"* would be
- * a fourth site stating the verdict, which is exactly what {@link TomorrowInput.verdict} exists
- * to stop.
+ * It names the two days and says what the close did to the count, never how the day went: a
+ * headline reading *"Monday cleared"* would be a fourth site stating the verdict, which is exactly
+ * what {@link TomorrowInput.verdict} exists to stop. *Banked* used to be said of every day,
+ * missed ones included, on the reading that the banked count survives a missed day; the count does
+ * survive, but a missed day adds nothing to it, so the word was false of the day it named (swarm
+ * DN's Q2.2). A clean day that does not count is *filed* too, which is why the verdict alone could
+ * not have chosen the word.
  */
-function headlineOf(closed: DayOutcome | null, week: WeekState): string {
+function headlineOf(closed: DayOutcome | null, week: WeekState, contract: ScenarioContract | undefined): string {
   if (closed === null) return 'No day has closed yet — nothing has changed overnight.';
-  return `${closed.weekday} is banked. ${weekdayAfter(week)} opens.`;
+  /*
+   * **Banked only where something was** — wave AL, lane AL-F, swarm DN's Q2.2 (S2's list of where
+   * the word was false, [§ D1226](../../../../DECISIONS.md)). A missed day, a day that does not
+   * count toward the week and a day on no scenario add nothing to any count, so the day is *filed*:
+   * the week keeps it, and that is all that happened. A clean day that counts is *banked*, which is
+   * exactly the day `closeDay` adds to `cleanRun`.
+   */
+  const banked = contract !== undefined && closed.allMet && dayCountsToward(week.contractId, closed);
+  return `${closed.weekday} is ${banked ? 'banked' : 'filed'}. ${weekdayAfter(week)} opens.`;
 }
 
 /**
@@ -391,9 +404,14 @@ function nextRowsOf(input: TomorrowInput): readonly TomorrowRow[] {
     });
   }
   if (input.contract !== undefined) {
+    /*
+     * *STILL TO BANK* stood over *4 of 4 clean shifts banked* on the day the target was met, which
+     * says there is something left when there is not (swarm DN's Q2.2, S2). The label names what
+     * the figure is, and the figure says when the target is met.
+     */
     rows.push({
       id: 'contract',
-      label: 'STILL TO BANK',
+      label: 'BANKED',
       value: bankedTowardOf(input.week, input.contract),
       note: input.contract.reward,
     });
@@ -415,7 +433,9 @@ function bankedTowardOf(week: WeekState, contract: ScenarioContract): string {
   const need = weekNeedOf(contract);
   if (need === 0) return WEEK_WITHOUT_COUNTED_DAYS_SHORT;
   const banked = Math.min(week.cleanRun, need);
-  return `${count(banked)} of ${count(need)} clean shifts banked`;
+  return week.cleanRun >= need
+    ? `${count(banked)} of ${count(need)} clean shifts banked: the target is met`
+    : `${count(banked)} of ${count(need)} clean shifts banked`;
 }
 
 /**

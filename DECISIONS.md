@@ -47750,3 +47750,169 @@ millisecond): `c5` seed 33, **34 minutes** at `4×`, which the hub's *Today's sc
 quotes in place of 51. The row's long end, 1 h 49, is a reference tower's measured under § D991 and
 stays an upper bound: re-measuring six reference towers at fifty seeds is hours of machine time and
 was not taken.
+
+---
+
+## D1226 — the week's target is marked on the day it is met, and *banked* is said only of a day that banked
+
+> **Taken 2026-09-26 by agent sessions under delegated authority** (wave AL, lane AL-F, on swarm DN's
+> Q2 ruling, item 2, three of three), not by the product owner. It adds to what [§ D1177](#d1177)'s
+> week draws before its close. **Owner-reversible**: the wording of the mark, and *filed* in place of
+> *banked* on a day that added nothing to the count.
+
+**Why an entry.** It changes words on four surfaces no one module owns: the Everyday report's head,
+the between-day beat (`shift/tomorrow.ts`), the week strip's stake line and the report's *what this
+taught* card.
+
+**What was wrong.** The post-AK panel's seats A, B and D met Midtown's target on a weekday and no
+screen said so until Sunday's sheet. Swarm DN's S2 listed where the week's words were false: the beat
+said *Monday is banked* of a missed day, which added nothing to any count, and on the day the target
+was met it drew *STILL TO BANK* over *4 of 4 clean shifts banked*. On a cleared scenario's later
+weeks the report said *Nothing more banks against it* while the strip still counted the week's target.
+
+**The ruling.**
+
+1. **The close whose day brings the week's clean counted days to its target** carries one line under
+   the verdict: *This week's target is met, on Thursday: 4 clean counted days, and it asks for 4 of
+   5.* It is drawn on that close only, never on a practice close, and says nothing about the house,
+   which has not been asked on any day but the last (`shift/weekStake.ts#weekTargetMetLineOf`).
+2. **The strip's stake line keeps the day** once met: *4 so far. Met on Thursday.*
+3. **The beat's headline says *banked* only of a clean day that counts** on a scenario week, which
+   is exactly the day `closeDay` adds to `cleanRun`, and *filed* of every other day.
+4. **The beat's count is labelled *BANKED*** and says *the target is met* once it is; *STILL TO BANK*
+   is withdrawn.
+5. **A cleared scenario's later census weeks** say *This week's target still counts, toward your
+   record of weeks on this tower* ([§ D1230](#d1230)).
+
+**Tests.** `shift/weekStake.test.ts` (the mark on exactly the close that met it over a week with a
+miss, the strip's day), `shift/tomorrow.test.ts` (*filed* for a missed day and a day on no scenario,
+no *STILL TO BANK* in either state), `shift/report.test.ts` (the mark on the close, none on its
+practice close or the day before) and `everyday/reportView.test.ts`. Red before: the first three
+imported functions or asserted words that did not exist.
+
+## D1227 — the week closes onto its sheet, and each day's house run starts as that day closes
+
+> **Taken 2026-09-26 by agent sessions under delegated authority** (wave AL, lane AL-F, on swarm DN's
+> Q2 ruling, item 3, three of three), not by the product owner. It amends [§ D1177](#d1177)'s
+> *asked lazily, the first time a screen reads the sheet*. **Owner-reversible**: the report's one
+> button on the closing day, and the sheet leading *Your week*.
+
+**Why an entry.** It moves a recorded ruling's mechanism ([§ D1177](#d1177)) and binds the report
+screen, the week screen and `dev/main.ts`'s house runs.
+
+**What was wrong.** The sheet was drawn on *Your week*, under the strip and the tally, a screen the
+panel's seats reached by accident; the closing day's report offered *Open the doors on Monday*,
+which rolled the week before the player saw its sheet. The house was asked the first time the sheet
+was read, so its line read *still being run* for ten to thirty seconds.
+
+**The ruling.**
+
+1. **The close that closes the week** leads to the sheet: its one button reads *See the week against
+   the house* and opens *Your week* (`everyday/reportView.ts#WEEK_SHEET_STEP`).
+2. **The sheet leads the screen** while it stands, with its seven cells as words (*MON · counts ·
+   you: clean · the house: missed*), and the bar's primary reads *Start next week*, which rolls the
+   week and opens the brief. § D1177's content is unchanged.
+3. **Each counted day's house run is started by the close of that day** (`dev/main.ts#askWeekHouse`),
+   kept per day's crowd (tower, day, seed) so a later ask does not discard an earlier reading. A
+   reading nobody asked yet, after a reload, is asked when the sheet reads it, as before.
+
+**Tests.** `shift/weekStake.test.ts` (the cells, the house's four states), `everyday/weekView.test.ts`
+(*Start next week* while the sheet stands and not before) and `everyday/reportView.test.ts` (the
+step on a closing sheet, a career sheet unchanged).
+
+## D1228 — the mode picker offers *Continue your week* while a week is under way
+
+> **Taken 2026-09-26 by agent sessions under delegated authority** (wave AL, lane AL-F, on swarm DN's
+> Q2 ruling, item 4, three of three), not by the product owner. **Owner-reversible**: the entry, its
+> place above the tiles, and its words.
+
+**Why an entry.** It adds an entry to the front door § D525 laid out, and the shell's § 3.5 rule
+(no remembered entry screen) is what it has to satisfy.
+
+**The ruling.** One entry above the mode tiles, drawn exactly while a Scenario week has a day filed
+and has not rolled, derived from the restored week on every draw and stored nowhere
+(`everyday/continueWeek.ts`). It names the tower, the day standing and the clean counted days so far
+against the target where the census speaks; it opens the front door, or the week's sheet once the
+week has closed. The page still opens on the picker.
+
+**Tests.** `everyday/continueWeek.test.ts`: absent before a filed day and on a week on no scenario,
+the words on an open and a closed week, and no count where the census does not speak.
+
+## D1229 — a new week is new: a crowd this device has filed on a tower is not dealt again
+
+> **Taken 2026-09-26 by agent sessions under delegated authority** (wave AL, lane AL-F, on swarm DN's
+> Q2 ruling, item 5, three of three), not by the product owner. It narrows [§ D729](#d729) for a
+> Scenario week. **Owner-reversible**: the derivation's form, and dealing on the date's first scored
+> day the date's own crowd.
+
+**Why an entry.** It narrows a recorded ruling ([§ D729](#d729)), binds the host, the boot and the
+close's practice rule, and adds a field to the device's kept progress.
+
+**What was wrong.** A crowd was the date's digits whatever the device had played that date, so a
+week binged in one sitting met one crowd on all seven days and met it again next week, with last
+week's call rows already printed (seat D, 2 529 journeys twice).
+
+**The ruling.**
+
+1. **The first scored day this device files on a tower on a date meets the date's crowd**, which is
+   everyone's and posts to the date's board.
+2. **Every further day dealt on that date meets the crowd derived from the date, the day of the week
+   and the weeks closed on the tower**: the date's digits, then the day, then the weeks closed
+   (`shift/weekRecord.ts#dealtCrowdOf`). It is the same for everyone who reaches that day of that
+   week on that date, is never a date's crowd, and posts to no daily board. A closed day keeps the
+   crowd it was filed on.
+3. **Dealt when the day is set up**: on *Open the doors*, on choosing a tower, on *Start the day* and
+   on a restored session at boot, so the brief names the crowd the day will run on. A pinned crowd and
+   a crowd the address chose are left standing.
+4. **The dealt crowd is a shared crowd** to the close's practice rule ([§ D1141](#d1141)) and to the
+   Scenario press's length ([§ D1095](#d1095)). The seed line and the door say where it came from.
+5. **Wrinkle orders are unchanged.**
+
+**What it cannot see.** A week closed in the Engineer shell is not counted on the record, so a second
+week closed there on the same date would meet the first week's derived crowds.
+
+**Tests.** `shift/weekRecord.test.ts` (the date's crowd first, a derived one after, the next date's own,
+and no filed crowd dealt again over three weeks in one sitting and a week across dates) and
+`everyday/host.test.ts` (*Open the doors* deals the derived crowd, and the next week's first day is
+dealt one of its own).
+
+## D1230 — a closed week carries forward a record of weeks, and it buys nothing
+
+> **Taken 2026-09-26 by agent sessions under delegated authority** (wave AL, lane AL-F, on swarm DN's
+> Q2 ruling, item 6, three of three), not by the product owner. **Owner-reversible**: what the
+> record counts and where it is drawn.
+
+**Why an entry.** It adds a field to the device's kept progress and a line to the week screen, and
+it is the carry-forward § D1177's roll left out.
+
+**The ruling.** Each tower's record holds weeks closed, weeks whose target was met, and the most clean
+counted days in one closed week, written by the Everyday close of a week's last day
+(`EverydayProgress.weekRecords`). It opens nothing, prices nothing, never decays and carries no streak
+(`docs/38` § 2.4). *Your week* draws it as one line once a week on the tower has closed.
+
+**Tests.** `shift/weekRecord.test.ts`, `everyday/profile.test.ts` (round trip, old progress as none,
+malformed refused), `everyday/weekView.test.ts` and `everyday/host.test.ts` (a closed week counted).
+
+## D1231 — a Scenario week's counted day that clears pays `career-day-paid`, once
+
+> **Taken 2026-09-26 by agent sessions under delegated authority** (wave AL, lane AL-F, on swarm DN's
+> Q2 ruling, item 7, three of three; no separate week award, two of three). It makes true the premise
+> of [§ D533](#d533)'s second ruling, which is the product owner's, and changes neither ruling.
+> **Owner-reversible, and owner-reserved under § D533**: whether a Scenario day pays at all.
+
+**Why an entry.** It binds the host's close and corrects two notes in `data/chime-ledger.json`, and
+the ruling it rests on is the owner's.
+
+**What was wrong.** `docs/38` § 1 says *everything you finish earns chimes, in every mode*, and
+§ D533's second ruling kept a week contract's clear from paying a scenario award because *contract
+days keep paying `earn-career-day`*. They did not: `everyday/host.ts#closeDay` returned before any
+bank on every day that was not a Career day (swarm DN's S2, M7), so a Scenario day paid nothing.
+
+**The ruling.** The first close of a Scenario week's day that counts toward the week and cleared
+posts `career-day-paid`, fire and forget. A practice close, a missed day, a day that does not count
+and a week on no scenario post nothing, and there is no award for a week. The server's rule is
+unchanged: a contract day carries no turn key, so the close banking once per day is the bound. The
+rail's line for the turn reads *cleared day filed*, true of both kinds of paid day.
+
+**Tests.** `everyday/host.test.ts`: one post for a cleared counted Monday, none for its practice close,
+a missed day, a clean Saturday or a sandbox day. Red before: nothing was posted.

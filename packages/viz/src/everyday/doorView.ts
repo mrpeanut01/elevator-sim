@@ -255,7 +255,7 @@ export const DOOR_STEPS: readonly DoorStep[] = Object.freeze([
  * until the stage's call is answered (§ D1029) — so the pinned arm says whose crowd it is and leaves
  * the driver to the brief, which states the hold beside the control it holds.
  */
-export function sameForEveryoneLine(crowdIsToday: boolean, crowdIsPinned: boolean): string {
+export function sameForEveryoneLine(crowdIsToday: boolean, crowdIsPinned: boolean, crowdIsDerived = false): string {
   if (crowdIsToday) {
     return (
       'Everyone playing today meets the same crowd — the number above is today’s date, and the ' +
@@ -267,6 +267,18 @@ export function sameForEveryoneLine(crowdIsToday: boolean, crowdIsPinned: boolea
     return (
       'This run is on the crowd its day was measured on rather than the day’s, and everyone who ' +
       'opens this tower’s pinned day meets the same one. The tower is the one your week is on.'
+    );
+  }
+  /*
+   * **A fourth arm, for a crowd derived from the date** — lane AL-F, [§ D1229](../../../../DECISIONS.md).
+   * *Nobody else is playing it* is not known of it: anyone who reaches the same day of the same
+   * week today is dealt the same one. What is true is where it came from and that it is new here.
+   */
+  if (crowdIsDerived) {
+    return (
+      'You have played today’s own crowd on this tower already, so this day is dealt a new one, ' +
+      'made from today’s date, the day of the week and the weeks you have closed here. It is not ' +
+      'on today’s board. The tower is the one your week is on, and the dispatcher is yours to bring.'
     );
   }
   return (
@@ -475,7 +487,11 @@ export function doorScreenViewOf(input: DoorScreenInput): DoorScreenView {
   const chips = chipsOf(clamped);
   const selected = chips.find((chip) => chip.offset === offset);
   const isReplay = offset !== 0;
-  const sameForEveryone = sameForEveryoneLine(input.today.crowdIsToday, input.today.crowdIsPinned);
+  const sameForEveryone = sameForEveryoneLine(
+    input.today.crowdIsToday,
+    input.today.crowdIsPinned,
+    input.today.crowdIsDerived === true,
+  );
   const printed = [
     DOOR_RULE,
     input.today.lede,
