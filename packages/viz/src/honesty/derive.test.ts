@@ -2618,10 +2618,15 @@ describe('the count of statically swept DOM entry points is derived, not transcr
   const REPO = fileURLToPath(new URL('../../../../', import.meta.url));
 
   /**
-   * The five files carrying the six sites, every one of which must state the figure.
+   * The six files carrying the seven sites, every one of which must state the figure.
    *
-   * `docs/05-roadmap.md` holds two of the six; this gate reads whole files, so a document that
+   * `docs/05-roadmap.md` holds two of the seven; this gate reads whole files, so a document that
    * carries the claim twice is one entry here and both of its sentences are checked.
+   *
+   * **`docs/45-status-record.md` joined on 2026-09-26 (§ D1236).** Phase 9's named-gaps paragraph
+   * was split out of `CLAUDE.md` into that record verbatim, figure and decomposition included, and
+   * `CLAUDE.md` kept a shorter statement of the same gap with the same figure. Both are read, so the
+   * copy that moved cannot keep a count the one that stayed has corrected.
    */
   const CLAIM_SITES: readonly string[] = Object.freeze([
     'CLAUDE.md',
@@ -2629,6 +2634,7 @@ describe('the count of statically swept DOM entry points is derived, not transcr
     'docs/05-roadmap.md',
     'docs/14-building-behaviour-contract.md',
     'docs/18-everyday-mode-tree-audit.md',
+    'docs/45-status-record.md',
   ]);
 
   /** The total, in the one noun phrase every site is required to carry. */

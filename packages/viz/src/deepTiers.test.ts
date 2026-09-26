@@ -975,4 +975,27 @@ describe('§ 3 — the workflow keeps the shape that made this safe', () => {
       /git\s+(commit|push)/u,
     );
   });
+
+  it('puts both tiers on the run summary, because the deep row is read from this job (§ D1236)', () => {
+    /*
+     * § D1236 stopped the integrator measuring the deep tier each wave: `CLAUDE.md`'s deep row is
+     * carried from the first nightly run of `corpus-figures` after a wave merges. That only works if
+     * a person can read the figures there, so the job must write each tier's file to the summary
+     * page and must still do it, and still upload, when a tier's vitest call has failed. The job's
+     * own lines are cut out first: the `report` job writes a summary too, and a match on the whole
+     * file would pass on that.
+     */
+    const lines = workflow().split('\n');
+    const start = lines.findIndex((line) => /^\s{2}corpus-figures:\s*$/u.test(line));
+    expect(start, 'no corpus-figures job, so the deep row has nowhere to come from').toBeGreaterThan(0);
+    const end = lines.findIndex((line, at) => at > start && /^\s{2}[a-z][a-z0-9-]*:\s*$/u.test(line));
+    const job = lines.slice(start, end === -1 ? undefined : end).join('\n');
+    expect(job, 'the corpus figures must reach the run summary').toMatch(/GITHUB_STEP_SUMMARY/u);
+    expect(job, 'both tiers’ files must be the summary’s source').toMatch(/corpus-\$tier\.txt/u);
+    expect(
+      job,
+      'the summary and the upload must run when a tier failed, since a timed-out tier still wrote',
+    ).toMatch(/if: always\(\)\n\s+run: \|\n\s+\{\n\s+echo "## Corpus figures"/u);
+    expect(job).toMatch(/if: always\(\)\n\s+with:\n\s+name: corpus-figures/u);
+  });
 });

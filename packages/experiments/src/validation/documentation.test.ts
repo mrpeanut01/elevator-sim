@@ -431,14 +431,19 @@ const proseFiles = (): readonly string[] =>
  * scan covers what the project publishes as its documentation, and § D281's rule is that a decision
  * record preserves superseded text as history. The root files that also quote it are named in
  * § D284 and are not this lane's to edit.
+ *
+ * **`CLAUDE.md`'s entry moved to `docs/45-status-record.md` under § D1236**, with the paragraph it
+ * guards: that paragraph was split out of `CLAUDE.md` verbatim, withdrawal and all, and `CLAUDE.md`
+ * now states the rule without quoting the withdrawn destination. The anchor follows the sentence;
+ * the check is unchanged.
  */
 const WITHDRAWN_DESTINATION_SITES: readonly string[] = Object.freeze([
-  "CLAUDE.md",
   "docs/01-architecture.md",
   "docs/05-roadmap.md",
   "docs/07-handoff.md",
   "docs/08-review-findings.md",
   "docs/09-destination-dispatch-contract.md",
+  "docs/45-status-record.md",
 ]);
 
 describe("the refuted access-control mechanism stays refuted (DECISIONS.md § D60)", () => {
@@ -3454,6 +3459,11 @@ const KNOWN_DECISION_HOLES: ReadonlyMap<number, string> = new Map([
  * all). The last one is worth its own sentence: this ratchet counts a discussion of the marker as a
  * use of it, which is why the convention for writing about it is to name it rather than utter it —
  * see § D405. Over-counting is the safe direction for a ratchet; under-counting is not.
+ *
+ * **The Phase 9 row's site moved, and the count did not.** § D1236 split that row's history out of
+ * `CLAUDE.md` into `docs/44-honesty-corpus-log.md` verbatim, so the one marker still in it is now
+ * counted there. A move is a move: the walk reads `docs/` as it read the root, and the ceiling is
+ * unchanged.
  */
 const DECISION_DEBT_CEILING = 4;
 
@@ -3874,5 +3884,182 @@ describe("DECISIONS.md D526 clause 6 — no purchase, price, store or conversion
     ]) {
       expect(PURCHASE_MACHINERY.test(code(allowed)), allowed).toBe(false);
     }
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * § D1236 — a wave's row is short (the owner's instruction of 2026-09-26)
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **A wave's row in `docs/05-roadmap.md` and its entry in `docs/44-honesty-corpus-log.md` are each at
+ * most about 120 words of prose**, tables excluded, because the owner judged that each wave's
+ * bookkeeping had come to outweigh its building (§ D1236). The figures go in a table and the
+ * reasoning goes in a decision entry or the lane's own docstring.
+ *
+ * **Counted, not estimated.** A word is a whitespace-separated token carrying a letter or a digit,
+ * after {@link plain} strips emphasis, so a link's target and a table's pipes add nothing a reader
+ * would call a word. In `docs/05` the row's first cell is its label and is not counted; in `docs/44`
+ * every line beginning `|` is a table line and is not counted.
+ *
+ * **The rows written before the cap are registered by name rather than shortened.** They are
+ * records, and § D1236 moved them rather than rewriting them. The register is held in both
+ * directions, on `honesty.test.ts`'s `OUTSTANDING` rule: a registered row that no longer exists, or
+ * that has come under the cap, must leave the register on the commit that did it, or the register
+ * becomes a place a long row can hide.
+ */
+const WAVE_ROW_WORD_CAP = 120;
+
+/** A token a reader would count as a word. */
+const proseWordCount = (text: string): number =>
+  plain(text)
+    .split(" ")
+    .filter((token) => /[\p{L}\p{N}]/u.test(token)).length;
+
+/** The wave a `docs/05` table row's label names, or `null` for a row about something else. */
+const WAVE_ROW_LABEL = /\bwaves? ([A-Z]{1,2}(?:-\d+)?)\b/u;
+
+/** `docs/05`'s wave rows written before § D1236, by the wave id their label names. */
+const LONG_ROADMAP_WAVE_ROWS: readonly string[] = Object.freeze([
+  "AC-2",
+  "AD",
+  "AE",
+  "AF",
+  "AG",
+  "AH",
+  "AI",
+  "AJ",
+  "AK",
+  "AL",
+]);
+
+/**
+ * `docs/44`'s entries written before § D1236 and over the cap, by heading. Wave AL's is the one
+ * older entry already under it, so it is not here.
+ */
+const LONG_CORPUS_LOG_ENTRIES: readonly string[] = Object.freeze([
+  "Wave AK",
+  "Wave AJ",
+  "Wave AI",
+  "Wave AH",
+  "Wave AG",
+  "Wave AF",
+  "Wave AE",
+  "Wave AD",
+  "Wave AC-2",
+  "Wave AB",
+  "Wave AA",
+  "Wave Z",
+  "Wave Y",
+  "Wave X",
+  "Wave W",
+  "Wave V",
+  "Wave U",
+  "Wave T",
+  "Wave S",
+  "Wave R",
+  "Waves P and Q",
+  "Wave O",
+  "Waves L and M",
+  "Wave K",
+  "Wave J",
+  "Wave I",
+  "Wave H",
+  "Wave G",
+  "Waves E and F, measured 2026-08-29",
+  "Wave B, measured 2026-08-25, and the ninth property of 2026-08-24",
+]);
+
+/**
+ * `docs/44`'s headings that are not a wave's entry: the three oldest passages of the Phase 9 row,
+ * which record several waves or none. Every other heading must name its wave, so a new entry cannot
+ * leave the cap's reach by being headed some other way.
+ */
+const CORPUS_LOG_LEGACY_HEADINGS: readonly string[] = Object.freeze([
+  "The Everyday-and-Engineer wave, measured 2026-08-13",
+  "The earliest entries: the 2026-08-09 measurement, wave 18, and issues #127 and #137",
+  "The row's opening paragraph, as it stood when this log was split out",
+]);
+
+describe("a wave's row is short (§ D1236)", () => {
+  const roadmapWaveRows = (): ReadonlyMap<string, number> => {
+    const rows = new Map<string, number>();
+    for (const line of read("docs", "05-roadmap.md").split("\n")) {
+      if (!line.startsWith("|")) continue;
+      const cells = line.split("|");
+      const wave = WAVE_ROW_LABEL.exec(cells[1] ?? "")?.[1];
+      if (wave === undefined) continue;
+      rows.set(wave, proseWordCount(cells.slice(2).join(" ")));
+    }
+    return rows;
+  };
+
+  const corpusLogEntries = (): ReadonlyMap<string, number> => {
+    const entries = new Map<string, number>();
+    for (const section of read("docs", "44-honesty-corpus-log.md").split(/^## /mu).slice(1)) {
+      const [heading = "", ...body] = section.split("\n");
+      const prose = body.filter((line) => !line.trimStart().startsWith("|")).join("\n");
+      entries.set(heading.trim(), proseWordCount(prose));
+    }
+    return entries;
+  };
+
+  it("finds the rows it caps, so an empty parse cannot pass", () => {
+    expect(roadmapWaveRows().size, "no wave rows found in docs/05-roadmap.md").toBeGreaterThan(5);
+    expect(corpusLogEntries().size, "no entries found in docs/44").toBeGreaterThan(5);
+    expect(proseWordCount("**Wave AM's move** is [§ D1](../DECISIONS.md) — 4.00 a case")).toBe(8);
+  });
+
+  it("holds every wave row in docs/05-roadmap.md written since to about 120 words", () => {
+    const over = [...roadmapWaveRows()]
+      .filter(([wave, words]) => words > WAVE_ROW_WORD_CAP && !LONG_ROADMAP_WAVE_ROWS.includes(wave))
+      .map(([wave, words]) => `wave ${wave}: ${String(words)} words`);
+    expect(
+      over,
+      `a wave's row in docs/05-roadmap.md is at most ${String(WAVE_ROW_WORD_CAP)} words of prose, ` +
+        "its label excluded (§ D1236). Put the figures in docs/44's table and the reasoning in a " +
+        "decision entry or a docstring, and point at them.",
+    ).toEqual([]);
+  });
+
+  it("holds every docs/44 entry written since to about 120 words, and every heading names a wave", () => {
+    const entries = corpusLogEntries();
+    const unheaded = [...entries.keys()].filter(
+      (heading) => !/^Waves? /u.test(heading) && !CORPUS_LOG_LEGACY_HEADINGS.includes(heading),
+    );
+    expect(
+      unheaded,
+      "a docs/44 entry is headed `## Wave XX`, so the cap can find it (§ D1236)",
+    ).toEqual([]);
+    const over = [...entries]
+      .filter(
+        ([heading, words]) =>
+          /^Waves? /u.test(heading) &&
+          words > WAVE_ROW_WORD_CAP &&
+          !LONG_CORPUS_LOG_ENTRIES.includes(heading),
+      )
+      .map(([heading, words]) => `${heading}: ${String(words)} words`);
+    expect(
+      over,
+      `a docs/44 entry is at most ${String(WAVE_ROW_WORD_CAP)} words of prose, tables excluded ` +
+        "(§ D1236). The table carries the figures; the reasoning goes in a decision entry.",
+    ).toEqual([]);
+  });
+
+  it("keeps the registers of older rows true in both directions", () => {
+    const rows = roadmapWaveRows();
+    const staleRows = LONG_ROADMAP_WAVE_ROWS.filter(
+      (wave) => (rows.get(wave) ?? 0) <= WAVE_ROW_WORD_CAP,
+    );
+    const entries = corpusLogEntries();
+    const staleEntries = LONG_CORPUS_LOG_ENTRIES.filter(
+      (heading) => (entries.get(heading) ?? 0) <= WAVE_ROW_WORD_CAP,
+    );
+    const missingLegacy = CORPUS_LOG_LEGACY_HEADINGS.filter((heading) => !entries.has(heading));
+    expect(
+      [...staleRows.map((wave) => `docs/05 wave ${wave}`), ...staleEntries, ...missingLegacy],
+      "registered as an older long row, and it is gone or now under the cap. Delete it from the " +
+        "register on the commit that did it, or the register becomes a place a long row can hide.",
+    ).toEqual([]);
   });
 });
