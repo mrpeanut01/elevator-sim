@@ -118,6 +118,7 @@ describe('opening a week', () => {
     const week = openWeek('c2');
     expect(week).toEqual({
       contractId: 'c2',
+      week: 1,
       day: 1,
       dayIdx: 0,
       streak: 0,
@@ -850,6 +851,8 @@ describe('a week with a stake and an ending — § D1176, § D1177', () => {
     expect(rolled.completed).toEqual(['c1']);
     expect(rolled.streak).toBe(4);
     expect(rolled.bestMinutePct).toBe(90);
+    // § D1252: the roll is the next week of the tower, so it is dealt the next order.
+    expect([week.week, rolled.week]).toEqual([1, 2]);
   });
 
   it('leaves every week the census does not speak for rolling on past day 7, as before', () => {

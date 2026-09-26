@@ -18,8 +18,9 @@
  * off the legs: since [§ D1169](../../../../DECISIONS.md) a pinned day is paced as every scored day
  * is, every stretch with somebody past a minute on a landing at the watching rung and the rest at
  * the fast rung, so the acts are no longer slow of themselves (they were under § D991); and since
- * [§ D1212](../../../../DECISIONS.md) the quiet between its peaks is skipped, up to the call and
- * after it, by `stagePace.test-helper.ts#scoredDayPlayOf`, the stage's own rule read off the legs.
+ * [§ D1212](../../../../DECISIONS.md) the quiet between its peaks is skipped, and since
+ * [§ D1266](../../../../DECISIONS.md) every quiet stretch of the day, up to the call and after it, by
+ * `stagePace.test-helper.ts#scoredDayPlayOf`, the stage's own rule read off the legs.
  * `firstDayLength.test.ts` re-runs every row on every suite run and refuses the table the day a run
  * disagrees, and asserts that the table's contracts **are** the whole-day members of the admitted
  * set, so a re-pin or a new pin cannot leave a stale row or a missing one.
@@ -54,8 +55,7 @@
  */
 
 import { pacedDayRealS } from './sittingShape.js';
-import { BETWEEN_PEAKS_SIM_PER_REAL_S } from './stagePace.js';
-import { DEFAULT_STAGE_SPEED_INDEX, STAGE_SPEEDS, stageSpeedAt } from './stageScreenModel.js';
+import { DEFAULT_STAGE_SPEED_INDEX, stageSpeedAt } from './stageScreenModel.js';
 
 /** One admitted whole-day pin, as the stage would play it. Seconds are simulated. */
 export interface PinnedDayLength {
@@ -64,7 +64,7 @@ export interface PinnedDayLength {
   readonly callAtS: number;
   /** Simulated seconds before the call that § D1169 plays at the watching rung. */
   readonly toCallSlowS: number;
-  /** Simulated seconds before the call that § D1212 skips between the peaks. */
+  /** Simulated seconds before the call that the skip crosses (§ D1212, widened by § D1266). */
   readonly toCallSkippedS: number;
   /** How many of the day's peaks (`actsOf`) there are, and how many end at or before the call. */
   readonly peaks: number;
@@ -92,57 +92,50 @@ export const PINNED_DAY_LENGTHS: readonly PinnedDayLength[] = Object.freeze([
     contractId: 'c2',
     callAtS: 9613.907,
     toCallSlowS: 644.207,
-    toCallSkippedS: 5685.554,
+    toCallSkippedS: 8363.364,
     peaks: 3,
     peaksBefore: 1,
     inPeak: false,
-    middle: { recordedS: 36000, slowS: 2572.237, skippedS: 26606.717 },
+    middle: { recordedS: 36000, slowS: 2572.237, skippedS: 31341.541 },
     asksOn: true,
   },
   {
     contractId: 'c3',
     callAtS: 9929.738,
     toCallSlowS: 439.626,
-    toCallSkippedS: 6192.6,
+    toCallSkippedS: 8813.316,
     peaks: 3,
     peaksBefore: 1,
     inPeak: false,
-    middle: { recordedS: 36000, slowS: 2505.895, skippedS: 26481.852 },
+    middle: { recordedS: 36000, slowS: 2486.097, skippedS: 30915.987 },
     asksOn: true,
   },
   {
     contractId: 'c6',
     callAtS: 9809.566,
     toCallSlowS: 107.664,
-    toCallSkippedS: 6082.344,
+    toCallSkippedS: 9343.602,
     peaks: 3,
     peaksBefore: 1,
     inPeak: false,
-    middle: { recordedS: 36000, slowS: 1475.277, skippedS: 27493.537 },
+    middle: { recordedS: 36000, slowS: 1475.277, skippedS: 33262.791 },
     asksOn: true,
   },
   {
     contractId: 'c10',
     callAtS: 12509.792,
     toCallSlowS: 575.532,
-    toCallSkippedS: 8783.558,
+    toCallSkippedS: 11293.007,
     peaks: 3,
     peaksBefore: 1,
     inPeak: false,
-    middle: { recordedS: 36062.614, slowS: 2164.072, skippedS: 27171.447 },
+    middle: { recordedS: 36062.614, slowS: 2164.072, skippedS: 31988.836 },
     asksOn: true,
   },
 ]);
 
 const ORDINALS: readonly string[] = Object.freeze(['first', 'second', 'third', 'fourth', 'fifth', 'sixth']);
 const COUNTS: readonly string[] = Object.freeze(['no', 'one', 'two', 'three', 'four', 'five', 'six']);
-
-/** The between-peaks rung's own chip label — § D354's rule that a label is its multiplier. */
-function betweenRungLabel(): string {
-  const rung = STAGE_SPEEDS.find((speed) => speed.simPerRealS === BETWEEN_PEAKS_SIM_PER_REAL_S);
-  if (rung === undefined) throw new Error('firstDayLength: the between-peaks rung is not on the ladder');
-  return rung.label;
-}
 
 /** Where the call falls against the day's peaks, in words — derived from the row, never named. */
 function positionOf(row: PinnedDayLength): string {
@@ -159,8 +152,10 @@ function positionOf(row: PinnedDayLength): string {
  * row — a slice, a refused pin, a tower that pins nothing. Player-facing; swept by the corpus.
  * Re-derived by [§ D1204](../../../../DECISIONS.md): *about* the middle arm rather than *up to* the
  * longest, and the stage stops *first* for its call where the day asks on after it; and by
- * [§ D1212](../../../../DECISIONS.md): the quiet between peaks is skipped, and said to be. Both hold
- * at once in the table — the later calls fall inside peaks, where nothing is skipped.
+ * [§ D1212](../../../../DECISIONS.md): the quiet between peaks is skipped, and said to be; since
+ * [§ D1266](../../../../DECISIONS.md) the skip runs wherever nobody on a landing has waited a minute,
+ * before the first peak, inside one and after the last as well as between, and the sentence says so
+ * without naming the rung it beats at.
  */
 export function pinnedDayLengthLineOf(contractId: string): string | undefined {
   const row = PINNED_DAY_LENGTHS.find((entry) => entry.contractId === contractId);
@@ -175,8 +170,8 @@ export function pinnedDayLengthLineOf(contractId: string): string | undefined {
   );
   const call = `for its call ${positionOf(row)}, about ${String(toCallMin)} min in`;
   return (
-    `A whole day: about ${String(dayMin)} min of watching at ${rung.label}, ${betweenRungLabel()} ` +
-    `wherever nobody on a landing has waited a minute, and the quiet between peaks skipped. ` +
+    `A whole day: about ${String(dayMin)} min of watching at ${rung.label}, and wherever nobody on a ` +
+    `landing has waited a minute the stage skips ahead. ` +
     (row.asksOn ? `The stage stops first ${call}, and may stop again later in the day.` : `The stage stops once ${call}.`)
   );
 }

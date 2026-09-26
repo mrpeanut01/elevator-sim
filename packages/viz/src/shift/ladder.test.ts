@@ -140,12 +140,14 @@ describe('the shipped ladder is legal against the shipped data', () => {
        * name still fails. § D914 added the fifth, and it declares no bar either: a seed, two
        * `InterventionChange` kinds, a fraction and a list of shipped dispatcher ids. § D974 added
        * `horizon`, which names the kind of run the pin was measured on and grades nothing. § D1066
-       * added the optional `growthPerDay`, a slope of population — fabric, and no bar.
+       * added the optional `growthPerDay`, a slope of population — fabric, and no bar. § D1252
+       * added the optional `weekOrders`, which names wrinkles by drawn id and grades nothing: whether
+       * a day counts and the target are still the census's.
        */
       expect(
         Object.keys(row)
           .sort()
-          .filter((key) => key !== 'pressDay' && key !== 'growthPerDay'),
+          .filter((key) => key !== 'pressDay' && key !== 'growthPerDay' && key !== 'weekOrders'),
       ).toEqual([
         'buildingId',
         'contractId',

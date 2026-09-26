@@ -10,6 +10,7 @@
  * cards a reader can count, so a card that changes changes the count.
  */
 
+import { nextAdmittedTowerAfter, nextTowerOfferOf } from '../shift/nextTower.js';
 import { describe, expect, it } from 'vitest';
 
 import { goalsForDay, readGoals } from '../shift/goals.js';
@@ -358,7 +359,9 @@ describe('the week’s stake on the strip, and its sheet at the close — § D11
       dayClosed: true,
       sheetStanding: true,
     });
-    expect(closed.primary).toBe(WEEK_START_NEXT_LABEL);
+    /* Every day clean holds the week, so a tower the census admits after Midtown is the next step. */
+    expect(closed.onward).toEqual(nextTowerOfferOf('c2', closed.sheet, NAME_OF));
+    expect(closed.primary).toBe(closed.onward?.label ?? WEEK_START_NEXT_LABEL);
     const open = weekScreenViewOf({
       week: midtown(4, history.slice(0, 4)),
       towerToday: 'Midtown Office',
@@ -367,6 +370,56 @@ describe('the week’s stake on the strip, and its sheet at the close — § D11
       sheetStanding: true,
     });
     expect(open.primary).toBeUndefined();
+    expect(open.onward).toBeUndefined();
+  });
+
+  /*
+   * Swarm DO § 3, lane AM-E (§ D1259): only a held week offers the next tower. A week that missed
+   * its target keeps *Start next week* as its one button, and offers no other tower.
+   */
+  it('offers the next tower only when the week was held', () => {
+    const missed = weekScreenViewOf({
+      week: midtown(7, [1, 2, 3, 4, 5, 6, 7].map((day) => midtownDay(day, day <= 3 ? MET : MISSED, 'collective'))),
+      towerToday: 'Midtown Office',
+      nameOf: NAME_OF,
+      dayClosed: true,
+      sheetStanding: true,
+    });
+    expect(missed.sheet?.targetLine).toBe('Target 4: not met.');
+    expect(missed.onward).toBeUndefined();
+    expect(missed.primary).toBe(WEEK_START_NEXT_LABEL);
+    const held = weekScreenViewOf({
+      week: midtown(7, [1, 2, 3, 4, 5, 6, 7].map((day) => midtownDay(day, day === 5 ? MISSED : MET, 'collective'))),
+      towerToday: 'Midtown Office',
+      nameOf: NAME_OF,
+      dayClosed: true,
+      sheetStanding: true,
+    });
+    expect(held.sheet?.targetLine).toBe('Target 4: met.');
+    const next = nextAdmittedTowerAfter('c2');
+    if (next === undefined) {
+      expect(held.onward).toBeUndefined();
+      expect(held.primary).toBe(WEEK_START_NEXT_LABEL);
+    } else {
+      expect(held.onward?.contractId).toBe(next);
+      expect(held.primary).toBe(held.onward?.label);
+      expect(held.primary).not.toBe(WEEK_START_NEXT_LABEL);
+    }
+    /*
+     * On the shipped census the one tower offered is Midtown (§ D1258, § D1259): a Chancery House
+     * week held Monday to Thursday offers it, as the primary, with the next week here in the sheet.
+     */
+    const chancery = weekScreenViewOf({
+      week: { ...midtown(7, [1, 2, 3, 4, 5, 6, 7].map((day) => midtownDay(day, day === 5 ? MISSED : MET, 'collective'))), contractId: 'c6' },
+      towerToday: 'Chancery House',
+      nameOf: NAME_OF,
+      dayClosed: true,
+      sheetStanding: true,
+    });
+    expect(chancery.sheet?.targetLine).toBe('Target 3: met.');
+    expect(chancery.onward?.contractId).toBe('c2');
+    expect(chancery.primary).toBe('Play Midtown Office’s week');
+    expect(chancery.onward?.stayLabel).toBe('Start next week here');
   });
 
   it('draws the tower’s record of closed weeks, and nothing where none has closed', () => {

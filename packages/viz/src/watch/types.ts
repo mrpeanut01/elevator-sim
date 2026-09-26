@@ -159,6 +159,15 @@ export interface WatchRecord {
    * stored beside the pair is a second answer that can disagree with it.
    */
   readonly dayIdx: number;
+  /**
+   * **Which week of its tower the day was dealt as**, from 2, or absent for week 1 — wave AM, lane
+   * AM-D, [§ D1252](../../../../DECISIONS.md). Each week of a census tower is dealt its own wrinkle
+   * order, so the day's event is re-derived from the week, the day and the weekday together, and a
+   * week-2 day replayed as week 1 would run week 1's wrinkle. Absent rather than `1` so that every
+   * week-1 record, and every record written before weeks were counted, stays exactly the shape-3
+   * record it was: absence is week 1, which is the only week those builds dealt.
+   */
+  readonly week?: number;
   /** Cars the player held out of service, sorted. `[]` for a run that held none. */
   readonly outOfServiceCarIds: readonly string[];
   /** The mid-run interventions, in press order — contract § 1.4. `[]` for a run with none. */

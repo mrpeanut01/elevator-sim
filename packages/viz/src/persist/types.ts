@@ -308,8 +308,20 @@ export const SESSION_KEY = 'elevator-sim.session';
  * - **Can an older build read what this one writes?** No: a version-9 reader meets
  *   `rungContractId` inside a record and refuses the envelope as *damaged*. Refusing it as *newer*
  *   is true — § D408, its sixth application.
+ *
+ * ## Version 11 adds `WeekState.week`, and its absence determines it
+ *
+ * Wave AM, lane AM-D, [§ D1252](../../../../DECISIONS.md). A week now knows which week of its
+ * tower it is, because each week is dealt its own wrinkle order. The two questions:
+ *
+ * - **Does the absence determine the value?** Yes. Every build that wrote a version-10 envelope or
+ *   older dealt every week week 1's order, so `1` is the order those weeks were dealt, and
+ *   `session.ts#withWeekOrdinals` writes it into the week and every parked week. The next roll
+ *   deals week 2.
+ * - **Can an older build read what this one writes?** No: a version-10 reader meets `week` on the
+ *   week and refuses the envelope as *damaged*. Refusing it as *newer* is true — § D408.
  */
-export const SESSION_SCHEMA_VERSION = 10;
+export const SESSION_SCHEMA_VERSION = 11;
 
 /**
  * Every envelope shape this build can read, newest last.
@@ -320,7 +332,7 @@ export const SESSION_SCHEMA_VERSION = 10;
  * since the last deploy.
  */
 export const SESSION_SCHEMA_VERSIONS_READ: readonly number[] = Object.freeze([
-  1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
+  1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
 ]);
 
 /* -------------------------------------------------------------------------- *

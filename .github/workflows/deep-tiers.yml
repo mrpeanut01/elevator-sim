@@ -849,6 +849,12 @@ jobs:
   # It **publishes nothing**. The figures land as an artifact for a person to read and carry into
   # CLAUDE.md with the tree they were measured on beside them, which is the half of RISKS.md R38 that
   # no deriver can do for anybody. A workflow that edited that row would be a pin maintaining itself.
+  #
+  # **Since § D1236 this job is where the deep row comes from.** The integrator measures only the
+  # always-on tier on a wave's integrated head; `CLAUDE.md`'s deep row is carried from the first
+  # nightly run of this job after the wave merges. So the headline of both tiers is written to the
+  # run's summary page as well as to the artifact, with the commit it is true of, which makes it
+  # readable without a download. Carried by a person, as before: nothing here edits the tree.
   # ---------------------------------------------------------------------------
   corpus-figures:
     name: corpus figures — § D343, both tiers, one sitting
@@ -935,6 +941,7 @@ jobs:
       # taken on is the thing R38 exists to stop. The artifact is the whole answer, not a pointer
       # to a log line a reporter may have swallowed.
       - name: Name the tree the figures are true of
+        if: always()
         run: |
           {
             echo "measured on : ${{ github.sha }}"
@@ -942,7 +949,31 @@ jobs:
             echo "workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           } > "${{ runner.temp }}/corpus-provenance.txt"
 
+      # § D1236: the deep row is read from this job rather than re-measured per wave, so each
+      # tier's headline goes where a reader meets it first, beside the commit it is true of.
+      # `always()` here and on the two steps around it, because a tier whose vitest call timed out
+      # has still written complete figures (`measure.corpus.test.ts`'s timeout note says why), and
+      # the file's own `cases` line says whether it is complete. A tier that wrote nothing says so.
+      - name: Put each tier's figures on the run's summary
+        if: always()
+        run: |
+          {
+            echo "## Corpus figures"
+            echo
+            echo "Measured on \`${{ github.sha }}\`. The whole files, surface sets included, are the \`corpus-figures\` artifact."
+            for tier in always-on deep; do
+              file="${{ runner.temp }}/corpus-$tier.txt"
+              echo
+              echo "### $tier"
+              echo
+              echo '```'
+              if [ -f "$file" ]; then sed '/^SURFACE SET:/,$d' "$file"; else echo "no figures were written"; fi
+              echo '```'
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
         with:
           name: corpus-figures
           path: |

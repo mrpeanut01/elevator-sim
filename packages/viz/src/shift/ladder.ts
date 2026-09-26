@@ -290,6 +290,30 @@ export interface ContractLadderRow {
    * the run, the report's forecast and the census cannot use two slopes.
    */
   readonly growthPerDay: number | undefined;
+  /**
+   * **The wrinkle orders this tower's later weeks are dealt**, in the order they are dealt — wave
+   * AM, lane AM-D, [§ D1252](../../../../DECISIONS.md). Empty for a rung that authors none, which
+   * deals every week the draw week 1 gets.
+   *
+   * Authored here and admitted elsewhere: `shift/weekOrders.ts` deals an order only once the week
+   * census (`data/week-way.json`) holds a current row for every one of its days under exactly the
+   * wrinkle it names, and `docs/33` DC-10 admits each row. An order the census refuses stays in the
+   * data with its refusal readable and is not dealt.
+   */
+  readonly weekOrders: readonly ContractWeekOrder[];
+}
+
+/**
+ * **One authored week's wrinkles, Monday to Friday** — [§ D1252](../../../../DECISIONS.md).
+ *
+ * `days` is five drawn ids (`wrinkles/draw.ts#wrinkleOfDrawnId` reads each one back), one per
+ * weekday, day 1 first. The weekend is not authored: Saturday and Sunday keep the draw week 1 gets,
+ * because they count toward no week's target (§ D1176) and the census has measured them only as
+ * drawn. `id` names the order in the census's refusals and the tests; no player sees it.
+ */
+export interface ContractWeekOrder {
+  readonly id: string;
+  readonly days: readonly string[];
 }
 
 /**
@@ -733,6 +757,21 @@ function bankChoiceOf(value: unknown): BankChoice {
  * the viewer through `dev/data.ts`'s fetch and are not available at module-init time.
  * `pricing/parse.ts`'s split, and its reason.
  */
+/** Structure only; `shift/weekOrders.ts#weekOrderIssues` names what is wrong with an order. */
+function weekOrdersOf(value: unknown): readonly ContractWeekOrder[] {
+  if (!Array.isArray(value)) return Object.freeze([]);
+  return Object.freeze(
+    value.map((raw) => {
+      const order = asRecord(raw);
+      const days = Array.isArray(order['days']) ? (order['days'] as unknown[]) : [];
+      return Object.freeze({
+        id: asString(order['id']),
+        days: Object.freeze(days.map((day) => asString(day))),
+      });
+    }),
+  );
+}
+
 export function parseContractLadder(input: unknown): ContractLadder {
   const record = asRecord(input);
   const rows = Array.isArray(record['contracts']) ? (record['contracts'] as unknown[]) : [];
@@ -758,6 +797,7 @@ export function parseContractLadder(input: unknown): ContractLadder {
           pressDay: pressDayOf(entry['pressDay']),
           growthPerDay:
             entry['growthPerDay'] === undefined ? undefined : (asNumber(entry['growthPerDay']) ?? Number.NaN),
+          weekOrders: weekOrdersOf(entry['weekOrders']),
         });
       }),
     ),

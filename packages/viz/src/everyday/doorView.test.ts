@@ -16,6 +16,7 @@ import { describe, expect, it } from 'vitest';
 import { goalsForDay, readGoals } from '../shift/goals.js';
 import type { DayOutcome, GoalObservations, WeekState } from '../shift/types.js';
 import type { WatchRecord } from '../watch/types.js';
+import type { WeekRecord } from '../shift/weekRecord.js';
 import { closeDay, HISTORY_DAYS, openWeek, outcomeOf } from '../shift/week.js';
 
 import { GLOSSARY_TERMS } from '../mode/glossary.js';
@@ -422,3 +423,17 @@ describe('the rest of § 6.1', () => {
   });
 });
 
+
+describe('weeks held on this tower — lane AM-D, § D1253', () => {
+  it('is drawn once a week on the tower has closed, and says it buys nothing and runs on no clock', () => {
+    const week = weekWith(5, [closedDay(1), closedDay(2), closedDay(3), closedDay(4)]);
+    const at = (record?: WeekRecord): string | undefined =>
+      doorScreenViewOf({ week, today: { ...TODAY, day: week.day }, dayOffset: 0, dayClosed: false, nameOf: NAME_OF, record })
+        .weeksHeld;
+    expect(at()).toBeUndefined();
+    expect(at({ contractId: 'c2', closed: 0, met: 0, best: 0 })).toBeUndefined();
+    const line = at({ contractId: 'c2', closed: 3, met: 3, best: 5, held: 3 });
+    expect(line).toMatch(/^Weeks held on this tower: 3 in a row/u);
+    expect(line).toContain('It buys nothing, and no clock runs on it');
+  });
+});

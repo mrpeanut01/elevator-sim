@@ -40,7 +40,7 @@ import {
   isDealtPinnedDay,
   isFirstDayOnALegibleTower,
 } from './firstSession.js';
-import { FIRST_DAY_CONTRACT_IDS } from './firstSession.js';
+import { FIRST_DAY_CONTRACT_IDS, NEWCOMER_WEEK_TOWER_IDS } from './firstSession.js';
 import { admittedPressDayIds, pressDayFor, pressDayStanding } from './ladder.js';
 import { LEGIBILITY_SWEEP, legibilityOf } from './legibility.js';
 import { openWeek } from './week.js';
@@ -560,7 +560,9 @@ describe('the first scored day’s set — legible ∩ admitted ∩ week admitte
   it('is exactly the intersection, in contract order — never the legible set as a fallback', () => {
     const admitted = admittedPressDayIds();
     expect(FIRST_DAY_CONTRACT_IDS).toEqual(
-      ELIGIBLE_FIRST_CONTRACT_IDS.filter((id) => admitted.includes(id) && weekAdmitsANewcomer(id)),
+      ELIGIBLE_FIRST_CONTRACT_IDS.filter(
+        (id) => NEWCOMER_WEEK_TOWER_IDS.includes(id) && admitted.includes(id) && weekAdmitsANewcomer(id),
+      ),
     );
     /* The week half is not decoration: without it the set is wider. */
     expect(ELIGIBLE_FIRST_CONTRACT_IDS.filter((id) => admitted.includes(id)).length).toBeGreaterThan(
@@ -572,6 +574,24 @@ describe('the first scored day’s set — legible ∩ admitted ∩ week admitte
      */
     expect(FIRST_DAY_CONTRACT_IDS).not.toEqual(ELIGIBLE_FIRST_CONTRACT_IDS);
     expect(FIRST_DAY_CONTRACT_IDS.every((id) => admitted.includes(id))).toBe(true);
+  });
+});
+
+describe('a newcomer still starts on Midtown Office — lane AM-E, § D1260', () => {
+  it('draws Midtown on every date, whichever other towers the week census admits', () => {
+    /*
+     * Swarm DO § 3: a tower whose week the census admits after Midtown is offered at a held week's
+     * close, never dealt as a first week. So the draw does not widen with the census (§ D1178's
+     * widening clause, amended), and the week half and the newcomer list are both real filters.
+     */
+    expect(NEWCOMER_WEEK_TOWER_IDS).toEqual(['c2']);
+    expect(FIRST_DAY_CONTRACT_IDS).toEqual(['c2']);
+    for (let n = 0; n < 400; n += 1) expect(firstSessionContractFor(20_260_926 + n * 7_919)).toBe('c2');
+    const widened = CONTRACTS.filter((contract) => weekAdmitsANewcomer(contract.id)).map((contract) => contract.id);
+    expect(widened).toContain('c2');
+    for (const id of widened) {
+      if (id !== 'c2') expect(FIRST_DAY_CONTRACT_IDS, id).not.toContain(id);
+    }
   });
 });
 

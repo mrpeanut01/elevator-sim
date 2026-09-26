@@ -18,6 +18,7 @@
 
 import { describe, expect, it } from 'vitest';
 
+import { scheduledEventFor } from './calendar.js';
 import { WEEK_WAY } from './weekWay.js';
 import { crowdSeeds, standingConfig, weekWayCell } from './weekWay.test-helper.js';
 
@@ -31,10 +32,18 @@ describe.runIf(process.env['WEEK_WAY_VERIFY'] === '1')('every census row, re-run
   for (const row of rows) {
     it(`${row.contractId} day ${String(row.day)} (${row.eventId}) reproduces both verdict strings`, () => {
       const scheduled = row.eventId !== 'ordinary';
+      /*
+       * A row measured under a wrinkle week 1 does not draw on that day is an authored week order's
+       * (lane AM-D, § D1252), and is re-run under exactly that wrinkle, as the census measured it.
+       */
+      const drawn = scheduledEventFor(null, row.day, (row.day - 1) % 7, WEEK_WAY.protocol.horizon).id;
+      const eventId = scheduled && row.eventId !== drawn ? row.eventId : undefined;
       const mark = (cleared: boolean): string => (cleared ? 'C' : 'm');
-      const chosen = seeds.map((seed) => mark(weekWayCell(row.contractId, row.day, seed, row.chosen, scheduled).cleared)).join('');
+      const chosen = seeds
+        .map((seed) => mark(weekWayCell(row.contractId, row.day, seed, row.chosen, scheduled, eventId).cleared))
+        .join('');
       const standing = seeds
-        .map((seed) => mark(weekWayCell(row.contractId, row.day, seed, standingConfig(), scheduled).cleared))
+        .map((seed) => mark(weekWayCell(row.contractId, row.day, seed, standingConfig(), scheduled, eventId).cleared))
         .join('');
       expect(chosen).toBe(row.chosenVerdicts);
       expect(standing).toBe(row.standingVerdicts);

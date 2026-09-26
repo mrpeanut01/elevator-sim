@@ -75,10 +75,12 @@ import {
   FIGURE_NOTE_HANDLE,
   everydayReportViewOf,
   figureNotePartsOf,
+  type EverydayOnwardStep,
   type EverydayReportCareer,
   type EverydayReportView,
   type HonestyPart,
 } from './reportView.js';
+import { DAY_CLOSE_HEADING, type DayCloseView } from '../shift/dayClose.js';
 import { openTowerOf } from '../campaign/career.js';
 /* GitHub issue #577: `fileDay`'s twenty-day month, read rather than restated. */
 import { CONTRACT_DAYS } from '../campaign/economy.js';
@@ -217,6 +219,14 @@ function mountReportScreen(
       newerRunOnStage: report !== undefined && run.hasRun && !run.dayClosed,
       panelNames: panelNamesOf(doc),
       career: careerOnwardOf(),
+      /*
+       * The close's lead reads the live week and the house's runs — wave AM, lane AM-C,
+       * § D1246 to § D1249. The daily flow only: a replay's sheet and a career day's are not a
+       * week's close, and a watched run is somebody else's.
+       */
+      ...(context.ctx === 'daily'
+        ? { week: data.week(), house: (day: number) => data.weekHouse(day) }
+        : {}),
     });
   }
 
@@ -276,6 +286,12 @@ function mountReportScreen(
       return;
     }
     const view = viewNow();
+    /* What the bar's primary presses and says — see {@link reportOnward}. */
+    const onwardBefore = reportOnward;
+    reportOnward = context.ctx === 'daily' ? view.tomorrow : undefined;
+    if (reportOnward !== onwardBefore && (reportOnward?.label !== onwardBefore?.label || reportOnward?.goes !== onwardBefore?.goes)) {
+      context.refreshBar();
+    }
     root.replaceChildren();
     if (!view.filed) {
       const empty = el(doc, 'div', 'everyday-report-empty');
@@ -587,7 +603,15 @@ function mountReportScreen(
     }
     const lede = el(doc, 'p', 'everyday-report-lede', sheet.lede);
     lede.style.cssText = `${LEDE};margin:12px 0 0`;
-    head.append(meta, title, verdict, lede);
+    head.append(meta, title, verdict);
+    /*
+     * **The close leads, and tomorrow is on the first screen** — wave AM, lane AM-C, swarm DO's
+     * § 1 ruling. Between the verdict and the lede, so a reader meets today against the house, the
+     * call that decided it, the week's arithmetic, tomorrow and the press into it before any figure.
+     */
+    const closeBlock = view.close === undefined ? undefined : drawClose(view, view.close);
+    if (closeBlock !== undefined) head.append(closeBlock);
+    head.append(lede);
     /*
      * § D1138 clause 4 — a practice close says so under the verdict, where the player reads whether
      * the day cleared, because *Shift cleared* on a practice run banks nothing.
@@ -597,8 +621,12 @@ function mountReportScreen(
       practice.style.cssText = `${QUIET};margin:10px 0 0;max-width:74ch`;
       head.append(practice);
     }
-    /* The week's target, marked on the close that met it — swarm DN's Q2.2, § D1226. */
-    if (view.weekMark !== undefined) {
+    /*
+     * The week's target, marked on the close that met it — swarm DN's Q2.2, § D1226. Where the
+     * close's lead is drawn its arithmetic says the same thing in its place, so the mark is not
+     * drawn twice (§ D1249).
+     */
+    if (view.weekMark !== undefined && view.close?.arithmetic === undefined) {
       const mark = el(doc, 'p', 'everyday-report-week-mark', view.weekMark);
       mark.style.cssText = `font:600 14px ${TYPE.heading};margin:10px 0 0;max-width:74ch;color:${C.moss}`;
       head.append(mark);
@@ -877,8 +905,8 @@ function mountReportScreen(
     postBlock = drawPostBlock();
     root.append(postBlock);
 
-    /* ---- one button into tomorrow ---- */
-    if (view.tomorrow !== undefined) {
+    /* ---- one button into tomorrow, where the close's lead has not already drawn it ---- */
+    if (view.tomorrow !== undefined && view.close === undefined) {
       const onward = el(doc, 'div');
       onward.style.cssText = 'margin-top:20px;display:flex;align-items:center;gap:13px;flex-wrap:wrap';
       const button = el(doc, 'button', 'everyday-report-tomorrow', view.tomorrow.label);
@@ -909,26 +937,138 @@ function mountReportScreen(
        */
       const step = view.tomorrow;
       button.addEventListener('click', () => {
-        /* The close that closed the week opens its sheet — swarm DN's Q2.3, § D1227. */
-        if (step.goes === 'week-sheet') {
-          context.go('week');
-          return;
-        }
-        if (step.goes === 'career-day') {
-          const tower = openTowerOf(context.host.campaign());
-          if (tower === undefined) return;
-          context.host.runCampaignDay(tower.id);
-          context.go('stage');
-          return;
-        }
-        context.host.openTomorrow();
-        context.go('brief');
+        pressOnward(step);
       });
       const note = el(doc, 'span', undefined, view.tomorrow.note);
       note.style.cssText = QUIET;
       onward.append(button, note);
       root.append(onward);
     }
+  }
+
+  /**
+   * **The onward press, in whichever flow the sheet belongs to** — one function for the close's
+   * button, the bottom button and the pinned bar's primary, so the three cannot go to three places.
+   *
+   * Two destinations keyed on the step's own discriminator, GitHub issue #577: this handler was
+   * `openTomorrow()` and `go('brief')` unconditionally, on a sheet whose label already said *Open
+   * the doors on Tuesday* at the end of a **career** day. The career arm is the **same** pair of
+   * calls the contract sheet's own primary makes (`campaignScreens.ts`), rather than a second way to
+   * start a career day. The close that closed the week opens its sheet — swarm DN's Q2.3, § D1227.
+   */
+  function pressOnward(step: EverydayOnwardStep): void {
+    if (step.goes === 'week-sheet') {
+      context.go('week');
+      return;
+    }
+    if (step.goes === 'career-day') {
+      const tower = openTowerOf(context.host.campaign());
+      if (tower === undefined) return;
+      context.host.runCampaignDay(tower.id);
+      context.go('stage');
+      return;
+    }
+    context.host.openTomorrow();
+    context.go('brief');
+  }
+
+  /**
+   * **The close's lead** — wave AM, lane AM-C, swarm DO's § 1 ruling, in its order: today against
+   * the house and the week's tally, the call that decided it, the week's arithmetic, tomorrow in
+   * full, and the onward press with *Your week* and the menu beside it. Every word is
+   * `shift/dayClose.ts`'s through `reportView.ts`; this draws them and owns the three presses.
+   *
+   * Compact on purpose: the ruling's test is that tomorrow and its press are on the first screen at
+   * 1440 × 900 and at 390 × 844 (`reportScreen.browser.test.ts`), so the block is one card of short
+   * paragraphs at the body size, with tomorrow as a card inside it.
+   */
+  function drawClose(view: EverydayReportView, close: DayCloseView): HTMLElement {
+    const block = el(doc, 'section', 'everyday-report-close');
+    block.style.cssText = `${CARD};margin-top:10px;padding:12px 14px;display:grid;gap:5px`;
+    const eyebrow = el(doc, 'div', 'everyday-report-close-heading', DAY_CLOSE_HEADING);
+    eyebrow.style.cssText = EYEBROW;
+    block.append(eyebrow);
+    for (const [cls, text, strong] of [
+      ['everyday-report-close-house', close.house, true],
+      ['everyday-report-close-tally', close.tally, false],
+      ['everyday-report-close-call', close.call, false],
+      ['everyday-report-close-arithmetic', close.arithmetic, true],
+    ] as const) {
+      if (text === undefined) continue;
+      const line = el(doc, 'p', cls, text);
+      line.style.cssText = `${BODY};margin:0;max-width:78ch${strong ? `;color:${C.ink};font-weight:600` : ''}`;
+      block.append(line);
+    }
+    const tomorrow = el(doc, 'div', 'everyday-report-close-tomorrow');
+    tomorrow.style.cssText = `${WELL};padding:8px 11px;display:grid;gap:3px;margin-top:2px`;
+    const heading = el(doc, 'div', 'everyday-report-close-tomorrow-heading', close.tomorrow.heading);
+    heading.style.cssText = EYEBROW;
+    tomorrow.append(heading);
+    for (const [cls, text] of [
+      ['everyday-report-close-wrinkle', close.tomorrow.wrinkle],
+      ['everyday-report-close-movein', close.tomorrow.moveIns],
+      ['everyday-report-close-counts', close.tomorrow.counts],
+      ['everyday-report-close-census', close.tomorrow.census],
+      ['everyday-report-close-weekend', close.tomorrow.weekend],
+    ] as const) {
+      if (text === undefined) continue;
+      const line = el(doc, 'p', cls, text);
+      line.style.cssText = `${cls === 'everyday-report-close-wrinkle' ? BODY : QUIET};margin:0;max-width:78ch`;
+      tomorrow.append(line);
+    }
+    block.append(tomorrow);
+    const presses = el(doc, 'div', 'everyday-report-close-presses');
+    presses.style.cssText = 'display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:2px';
+    const step = view.tomorrow;
+    if (step !== undefined) {
+      const onward = el(doc, 'button', 'everyday-report-tomorrow', step.label);
+      onward.type = 'button';
+      onward.title = step.note;
+      onward.style.cssText = [
+        'cursor:pointer',
+        'border:0',
+        `border-radius:${String(R.pill)}px`,
+        `background:${C.sun}`,
+        `color:${C.ink}`,
+        'padding:9px 18px',
+        'font-size:14px',
+        'font-weight:600',
+      ].join(';');
+      onward.addEventListener('click', () => {
+        pressOnward(step);
+      });
+      presses.append(onward);
+    }
+    const secondary = (cls: string, label: string, press: () => void): void => {
+      const button = el(doc, 'button', cls, label);
+      button.type = 'button';
+      button.style.cssText = [
+        'cursor:pointer',
+        'background:transparent',
+        `border:1px solid ${C.rule}`,
+        `border-radius:${String(R.pill)}px`,
+        `color:${C.ink}`,
+        'padding:8px 14px',
+        'font-size:13px',
+      ].join(';');
+      button.addEventListener('click', press);
+      presses.append(button);
+    };
+    if (step?.goes !== 'week-sheet') {
+      secondary('everyday-report-close-week', view.secondary.week, () => {
+        context.go('week');
+      });
+    }
+    secondary('everyday-report-close-menu', view.secondary.menu, () => {
+      context.go('menu');
+    });
+    block.append(presses);
+    if (step !== undefined) {
+      const note = el(doc, 'p', 'everyday-report-close-onward-note', step.note);
+      note.style.cssText = `${QUIET};margin:0;max-width:78ch`;
+      block.append(note);
+    }
+    return block;
   }
 
   /**
@@ -1181,6 +1321,7 @@ function mountReportScreen(
     unmount: () => {
       alive = false;
       reportBuildingName = undefined;
+      reportOnward = undefined;
       stopListening();
       stopAccount();
     },
@@ -1210,6 +1351,17 @@ function mountReportScreen(
         context.go('door');
         return;
       }
+      /*
+       * **The daily close's primary is the onward step** — wave AM, lane AM-C, swarm DO's § 1
+       * ruling: *Open the doors on ⟨day⟩*, or on the close that closed the week *See the week
+       * against the house*, with *Your week* and the menu secondary. It was *Your week*, and the
+       * seat that found tomorrow found it about 3 900 px down, under *Return to Main Menu*.
+       */
+      const step = reportOnward;
+      if (context.ctx === 'daily' && step !== undefined) {
+        pressOnward(step);
+        return;
+      }
       context.go(context.ctx === 'campaign' ? 'building' : 'week');
     },
   };
@@ -1225,6 +1377,13 @@ function mountReportScreen(
 let reportBuildingName: string | undefined;
 
 /**
+ * The daily close's onward step, for § 3.3's report primary — wave AM, lane AM-C. Module scope for
+ * {@link reportBuildingName}'s reason: `bar()` is called by the shell outside the mount closure.
+ * Written by every render of a daily sheet, and cleared on unmount.
+ */
+let reportOnward: EverydayOnwardStep | undefined;
+
+/**
  * § 3.3's report row with the campaign primary's `⟨building⟩` substituted.
  *
  * The daily row carries no marker and comes back untouched. Found by `screens.test.ts`'s
@@ -1234,6 +1393,24 @@ let reportBuildingName: string | undefined;
  */
 function reportBar(state: EverydayState): ActionBarModel {
   const base = actionBarFor(state);
+  /*
+   * The daily close's primary is its onward step, drawn at full emphasis — swarm DO's § 1 ruling,
+   * [§ D1249](../../../../DECISIONS.md). § 3.3 inverts every report (the way out loud, the primary
+   * quiet), and on the daily close that inversion is what buried tomorrow; it stands on every other
+   * flow and on a daily sheet with nothing to advance to.
+   */
+  if (state.ctx === 'daily' && reportOnward !== undefined) {
+    return {
+      ...base,
+      primary: { ...base.primary, label: reportOnward.label },
+      /*
+       * No note in the bar: the press's note is drawn under the close's own button, and on a
+       * 390 px phone a two-line note in the pinned bar costs the first screen the tomorrow card.
+       */
+      note: undefined,
+      inverted: false,
+    };
+  }
   if (!base.primary.label.includes('⟨')) return base;
   return {
     ...base,

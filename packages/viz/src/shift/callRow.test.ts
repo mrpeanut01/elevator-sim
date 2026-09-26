@@ -13,7 +13,7 @@ import { describe, expect, it } from 'vitest';
 import { SPREAD_CARS_LABEL } from '../live/interventions.js';
 
 import { clockOf } from './report.js';
-import { PRESS_CALL_AGAIN, PRESS_CALL_ROW_ID, pressCallRowOf } from './callRow.js';
+import { PRESS_CALL_AGAIN, PRESS_CALL_LATER_NOTE, PRESS_CALL_ROW_ID, pressCallRowOf } from './callRow.js';
 import type { ContractPressDay } from './ladder.js';
 import type { PressCall } from './pressCall.js';
 
@@ -65,6 +65,21 @@ describe('the call row', () => {
     ['the clearing press', rowOf(at(CALL.atS, 'spread-cars'))],
     ['the other press', rowOf(at(CALL.atS, 'park-cars-lobby'))],
     ['nothing pressed', rowOf([])],
+    /* § D1239's two new clauses: a later call's press, and the call's three counts. */
+    ['a later press', rowOf([...at(CALL.atS, 'spread-cars'), ...at(CALL.atS + 660, 'park-cars-lobby')])],
+    [
+      'the counts',
+      pressCallRowOf(
+        {
+          press: PRESS,
+          call: CALL,
+          interventions: at(CALL.atS, 'park-cars-lobby'),
+          nameOf: (id) => names[id],
+          countsLine: 'Riders who arrived from 10:40 to 10:50 and waited a minute or more: 20 with park the cars in the lobby, 26 with spread the cars across the tower and 22 with leave them.',
+        },
+        clock,
+      ),
+    ],
   ] as const;
 
   it('draws on every arm, with its own id, at the call’s clock, and plain', () => {
@@ -133,9 +148,28 @@ describe('the call row', () => {
     expect(rowOf([], narrow)?.why).toContain('Tried on to 10:45, 3 of the later moments did not read that way.');
   });
 
+  it('keeps the row where a later call was answered with a press, and says those runs carried none — § D1239', () => {
+    /* The post-AL panel's seats B and D: the pinned row vanished from every day whose later calls pressed. */
+    const later = rowOf([...at(CALL.atS, 'spread-cars'), ...at(CALL.atS + 660, 'park-cars-lobby')]);
+    expect(later?.what).toContain('you spread');
+    expect(later?.why).toContain(PRESS_CALL_LATER_NOTE);
+    expect(rowOf(at(CALL.atS, 'spread-cars'))?.why).not.toContain(PRESS_CALL_LATER_NOTE);
+  });
+
+  it('prints the call’s three counts where the shell ran them, in the ordinary rows’ framing — § D1239', () => {
+    const line = 'Riders who arrived from 10:40 to 10:50 and waited a minute or more: 20 with park the cars in the lobby, 26 with spread the cars across the tower and 22 with leave them.';
+    const row = pressCallRowOf(
+      { press: PRESS, call: CALL, interventions: at(CALL.atS, 'spread-cars'), nameOf: (id) => names[id], countsLine: line },
+      clock,
+    );
+    expect(row?.why).toContain(`with nothing pressed after it. ${line}`);
+    expect(rowOf(at(CALL.atS, 'spread-cars'))?.why).not.toContain('Riders who arrived');
+  });
+
   it('refuses a log that is not the day as measured — two presses, another second, another kind', () => {
-    expect(rowOf([...at(CALL.atS, 'spread-cars'), ...at(CALL.atS + 60, 'park-cars-lobby')])).toBeUndefined();
-    expect(rowOf(at(CALL.atS + 1, 'spread-cars'))).toBeUndefined();
+    expect(rowOf([...at(CALL.atS - 60, 'park-cars-lobby'), ...at(CALL.atS, 'spread-cars')])).toBeUndefined();
+    /* A press after the call second is a later press (§ D1239): the call itself pressed nothing. */
+    expect(rowOf(at(CALL.atS + 1, 'spread-cars'))?.what).toBe('The stage called the day, and nothing was pressed at the call');
     expect(rowOf(at(CALL.atS, 'rezone-bank'))).toBeUndefined();
     expect(rowOf([], { ...PRESS, refused: 'not offered' })).toBeUndefined();
   });

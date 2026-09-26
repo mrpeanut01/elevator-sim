@@ -235,6 +235,19 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'The authored week orders’ plumbing: wave AM, lane AM-D, § D1252. ' +
+        '`wrinkles/draw.ts#wrinkleOfDrawnId` and `shift/events.ts#eventOfDrawnId` read a drawn id ' +
+        'back into the wrinkle and the event it names, on exactly `eventById`’s ground above: the ' +
+        'only prose the classifier reaches is `composeWrinkle`’s note and `effectOfWrinkle`’s ' +
+        '`writes` paths, and every concrete wrinkle’s name and note is already seeded through ' +
+        '`everyWrinkle`. `shift/weekOrders.ts#weekOrderIssues` is `weekWayIssues`’ twin for the ' +
+        'ladder’s `weekOrders`: content-author refusals that `dev/data.ts` folds into ' +
+        '`BrowserResources.warnings` and `shift/weekOrders.test.ts` turns into a failing test, and no ' +
+        'screen renders one.',
+      ids: ['wrinkles/draw.ts#wrinkleOfDrawnId', 'shift/events.ts#eventOfDrawnId', 'shift/weekOrders.ts#weekOrderIssues'],
+    },
+    {
+      reason:
         'The price schedule’s parser, validator and lookups — GitHub issue #366. Every literal in ' +
         'these is a **load-time refusal addressed to whoever authored `data/price-schedule.json`** ' +
         '("the new shaft costs 12 u; data/price-schedule.json prices it 34"), or a config path, or ' +
@@ -1933,9 +1946,11 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         '`weekAdmitsANewcomer` return a deal, counts or booleans: a dealt day carries a sentence, and ' +
         'what a player reads of it is `dayStakeSentenceOf`, which the week adapter seeds for every ' +
         'census tower. `houseRecordOf` returns a run record for the shell’s house run. What a player ' +
-        'reads from the module is seeded by name in `honesty/surfaces.ts#seedWeekStake`.',
+        'reads from the module is seeded by name in `honesty/surfaces.ts#seedWeekStake`. ' +
+        '`weekClosedByThisClose` (wave AM, § D1246) is a boolean for the tower’s record of weeks.',
       ids: [
         'shift/weekStake.ts#WEEK_LENGTH',
+        'shift/weekStake.ts#weekClosedByThisClose',
         'shift/weekStake.ts#weekDealOf',
         'shift/weekStake.ts#dayCountsToward',
         'shift/weekStake.ts#countedCleanOf',
@@ -2261,15 +2276,15 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
-        'The device chime ledger\u2019s record, its two storage keys and its reducers \u2014 GitHub ' +
-        'issue #579, DECISIONS.md \u00a7 D911, \u00a7 D711 clauses 1\u20136. None of them authors a ' +
+        'The device chime ledger’s record, its two storage keys and its reducers \u2014 GitHub ' +
+        'issue #579, DECISIONS.md § D911, § D711 clauses 1\u20136. None of them authors a ' +
         'string a player reads. `DEVICE_CHIMES_KEY` and `DEVICE_CHIMES_QUARANTINE_KEY` are the ' +
-        '`localStorage` slots, on `campaign/careerPersist.ts`\u2019 two keys\u2019 own ground one ' +
+        '`localStorage` slots, on `campaign/careerPersist.ts`’ two keys’ own ground one ' +
         'entry below; `withTurn`, `turnKeyOf`, `boughtStepIdOf` and `decodeDeviceChimes` are the ' +
-        'record\u2019s arithmetic and its envelope, and the deriver collected them because ' +
+        'record’s arithmetic and its envelope, and the deriver collected them because ' +
         '`literalsIn` scans comments and these carry long ones. **What a player actually reads off ' +
         'this tally is driven rather than excluded**: the balance line and the home note through ' +
-        '`everyday/chimesPanel.ts` on the Settings surface, and the rung\u2019s four sentences ' +
+        '`everyday/chimesPanel.ts` on the Settings surface, and the rung’s four sentences ' +
         'through `everyday/fixitScreenModel.ts#fixitBudgetRungRow` on the fix-it one. This module ' +
         'decides what the number is; it decides no sentence about it.',
       ids: [
@@ -2284,7 +2299,7 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     {
       reason:
         'One rung of a scenario budget, decoded \u2014 GitHub issue #579. It is ' +
-        '`scenario/budget.ts#decodeScenarioBudget`\u2019s own exclusion three lines up, narrowed to ' +
+        '`scenario/budget.ts#decodeScenarioBudget`’s own exclusion three lines up, narrowed to ' +
         'the step: the violations it collects are **author-facing**, printed at load for whoever is ' +
         'editing `data/campaign.json` or `data/fixit-cases.json`, and no player ever meets one ' +
         'because a file that fails them does not ship. It became its own export when the fix cases ' +
@@ -2295,8 +2310,8 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     {
       reason:
         'Two storage keys — GitHub issue #375. `CAREER_STORAGE_KEY` is the `localStorage` slot the ' +
-        'career is written under, and `CAREER_QUARANTINE_KEY` is where a *refused* career\u2019s bytes ' +
-        'are set aside so the refusal\u2019s promise is kept. Neither is prose and no surface draws ' +
+        'career is written under, and `CAREER_QUARANTINE_KEY` is where a *refused* career’s bytes ' +
+        'are set aside so the refusal’s promise is kept. Neither is prose and no surface draws ' +
         'either: they are the identifiers ' +
         '`everyday/careerStore.ts` addresses the slot with. The refusal *sentences* in the same ' +
         'file are player-facing and are driven rather than excluded — `decodeCareer` is the ' +
@@ -2618,10 +2633,15 @@ describe('the count of statically swept DOM entry points is derived, not transcr
   const REPO = fileURLToPath(new URL('../../../../', import.meta.url));
 
   /**
-   * The five files carrying the six sites, every one of which must state the figure.
+   * The six files carrying the seven sites, every one of which must state the figure.
    *
-   * `docs/05-roadmap.md` holds two of the six; this gate reads whole files, so a document that
+   * `docs/05-roadmap.md` holds two of the seven; this gate reads whole files, so a document that
    * carries the claim twice is one entry here and both of its sentences are checked.
+   *
+   * **`docs/45-status-record.md` joined on 2026-09-26 (§ D1236).** Phase 9's named-gaps paragraph
+   * was split out of `CLAUDE.md` into that record verbatim, figure and decomposition included, and
+   * `CLAUDE.md` kept a shorter statement of the same gap with the same figure. Both are read, so the
+   * copy that moved cannot keep a count the one that stayed has corrected.
    */
   const CLAIM_SITES: readonly string[] = Object.freeze([
     'CLAUDE.md',
@@ -2629,6 +2649,7 @@ describe('the count of statically swept DOM entry points is derived, not transcr
     'docs/05-roadmap.md',
     'docs/14-building-behaviour-contract.md',
     'docs/18-everyday-mode-tree-audit.md',
+    'docs/45-status-record.md',
   ]);
 
   /** The total, in the one noun phrase every site is required to carry. */

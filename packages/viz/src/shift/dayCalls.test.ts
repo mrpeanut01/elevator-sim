@@ -20,6 +20,9 @@ import {
   DAY_CALL_LONG_WAIT_S,
   DAY_CALL_MAX,
   DAY_CALL_MAX_TRIES,
+  DAY_CALL_PER_WRINKLE,
+  dayCallIsWrinkle,
+  dayCallWrinkleWindowOf,
   DAY_ENDED_EARLY_ROW_ID,
   dayCallChangeOf,
   dayCallDriversOf,
@@ -133,6 +136,50 @@ describe('the candidate instant', () => {
     const first = nextDayCallOf(day, 0)!;
     expect(dayCallSearchFrom(first)).toBe(first.atS + DAY_CALL_SPACING_S);
     expect(nextDayCallOf(day, dayCallSearchFrom(first))?.atS).toBe(1960);
+  });
+});
+
+describe('the day’s wrinkle as a stretch of its own — § D1265', () => {
+  const acts = [
+    { startS: 1000, endS: 3000 },
+    { startS: 10_000, endS: 12_000 },
+  ];
+  const wrinkle = { startS: 5000, endS: 8000, name: 'Move-in day' };
+
+  it('asks at the wrinkle’s start between two peaks, where no peak rule could', () => {
+    const legs = [leg('a', 1500, 1520)];
+    const without = input(legs, { horizon: 'whole-day', acts, endedAt: 36_000 });
+    const withIt = input(legs, { horizon: 'whole-day', acts, endedAt: 36_000, wrinkle });
+    /* Red before § D1265: nothing between the peaks is a candidate, so the search goes to the lunch peak. */
+    expect(nextDayCallOf(without, 3000)?.atS).toBe(10_000);
+    const call = nextDayCallOf(withIt, 3000);
+    expect([call?.atS, call?.rule, call?.act?.startS]).toEqual([5000, 'wrinkle-start', 5000]);
+    expect(call?.wrinkle).toEqual({ name: 'Move-in day', startS: 5000 });
+    expect(dayCallIsWrinkle(call!)).toBe(true);
+    /* After it, the search goes on to the next peak as before. */
+    const next = nextDayCallOf(withIt, dayCallSearchFrom(call!));
+    expect([next?.atS, next?.rule, next?.wrinkle]).toEqual([10_000, 'act-start', undefined]);
+  });
+
+  it('asks at the first minute-long wait inside the wrinkle before its start rule, and carries the wrinkle', () => {
+    const day = input([leg('a', 6000, 6200)], { horizon: 'whole-day', acts, endedAt: 36_000, wrinkle });
+    const call = nextDayCallOf(day, 5001);
+    expect([call?.atS, call?.rule, call?.wrinkle?.name]).toEqual([6060, 'first-minute-wait', 'Move-in day']);
+  });
+
+  it('is no stretch of its own where it overlaps a peak, has no length, or the day is a slice', () => {
+    expect(dayCallWrinkleWindowOf({ startS: 2500, endS: 4000, name: 'x' }, acts)).toBeUndefined();
+    expect(dayCallWrinkleWindowOf({ startS: 5000, endS: 5000, name: 'x' }, acts)).toBeUndefined();
+    expect(dayCallWrinkleWindowOf(wrinkle, acts)).toEqual(wrinkle);
+    const slice = input([leg('a', 1500, 1520)], { wrinkle: { startS: 100, endS: 900, name: 'x' } });
+    expect(nextDayCallOf(slice, 0)).toBeUndefined();
+    /* A peak call never carries the wrinkle. */
+    const peak = nextDayCallOf(input([], { horizon: 'whole-day', acts, endedAt: 36_000, wrinkle }), 0);
+    expect([peak?.atS, peak?.rule, peak?.wrinkle]).toEqual([1000, 'act-start', undefined]);
+  });
+
+  it('holds one call, outside the day’s cap of six', () => {
+    expect(DAY_CALL_PER_WRINKLE).toBe(1);
   });
 });
 

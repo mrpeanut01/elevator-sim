@@ -61,10 +61,16 @@
  * the next call the stage would stop at, and the next peak's start. It lands on that instant
  * exactly, so nothing the stage would have stopped for is passed, and it says what it skipped in one
  * line ({@link stageSkipLineOf}). A **peak** is an act, `shift/dayLength.ts#actsOf` over the
- * recording's authored phases, the same acts § D991 read: *between* is after one act has ended and
- * before the next has started, so the half hour before the first peak and the tail after the last
- * are played as § D1169 plays them. Inside a peak nothing changes. The skip moves the playhead and
- * nothing else, so the run, the goals, the census and the report are the whole day's.
+ * recording's authored phases, the same acts § D991 read. The skip moves the playhead and nothing
+ * else, so the run, the goals, the census and the report are the whole day's.
+ *
+ * **Since wave AM the skip runs anywhere in the day** ([§ D1266](../../../../DECISIONS.md), lane
+ * AM-F, swarm DO § 4's *a careful Midtown day at or under eight real minutes*): the half hour before
+ * the first peak, a peak's stretches where nobody has waited a minute, and the tail after the last
+ * peak are crossed the same way, landing on the same three instants and, after the last peak, on
+ * the day's end. § D1212 kept those at `30×`, and they were most of what was left: on Midtown's day 1
+ * about four real minutes of a twelve-minute day. A peak still opens on the stage, because its start
+ * is a place the skip lands, and inside it the stage still slows the moment anybody waits a minute.
  *
  * This is the one rule in this module that reads the recording after the playhead, and it reads it
  * only to choose where to land: the beat's note names no instant ahead, and the line is drawn once
@@ -342,21 +348,6 @@ export function stagePaceNoteOf(
 export const SKIP_BEAT_REAL_S = 2;
 
 /**
- * **The next peak, when the playhead is between two of the day's peaks** — after one act has ended
- * and before the next has started — or `undefined` inside a peak, before the first and after the
- * last. The acts are `shift/dayLength.ts#actsOf`'s, the authored phases that touch the day's peak.
- */
-export function nextPeakFromBetween(acts: readonly DayAct[], simTimeS: number): DayAct | undefined {
-  if (actAt(acts, simTimeS) !== undefined) return undefined;
-  if (!acts.some((act) => act.endS <= simTimeS)) return undefined;
-  let next: DayAct | undefined;
-  for (const act of acts) {
-    if (act.startS > simTimeS && (next === undefined || act.startS < next.startS)) next = act;
-  }
-  return next;
-}
-
-/**
  * **The first instant at or after `fromS` at which somebody on a landing has waited
  * {@link PACE_HOLD_WAIT_S}**, read off the legs, or `undefined` when nobody does again.
  *
@@ -388,22 +379,23 @@ export interface StageSkipGate {
 }
 
 /**
- * **Whether the stage is in a stretch it skips** — a scored whole day, between two peaks, and
- * § D1169's `fast`: nobody on a landing has waited a minute and no chip is standing. `yours` (a chip
- * pressed while fast), `watching`, `call` and every unscored reason answer `false`, which is how a
- * speed chip stops a skip that is coming.
+ * **Whether the stage is in a stretch it skips** — a scored whole day and § D1169's `fast`: nobody
+ * on a landing has waited a minute and no chip is standing. `yours` (a chip pressed while fast),
+ * `watching`, `call` and every unscored reason answer `false`, which is how a speed chip stops a skip
+ * that is coming.
+ *
+ * **Anywhere in the day since wave AM** ([§ D1266](../../../../DECISIONS.md), lane AM-F), where
+ * § D1212 skipped only between two peaks: the half hour before the first peak, a peak's stretches
+ * where nobody has waited a minute, and the tail after the last peak are crossed the same way. The
+ * skip still lands on the first minute's wait, the next call and the next peak's start, so it passes
+ * none of them. A day with no peaks in its schedule is not skipped.
  */
 export function stageSkipApplies(gate: StageSkipGate): boolean {
-  return (
-    gate.scored &&
-    gate.horizon === 'whole-day' &&
-    gate.reason === 'fast' &&
-    nextPeakFromBetween(gate.acts, gate.simTimeS) !== undefined
-  );
+  return gate.scored && gate.horizon === 'whole-day' && gate.reason === 'fast' && gate.acts.length > 0;
 }
 
-/** Why a skip stopped where it did. */
-export type StageSkipUntil = 'wait' | 'call' | 'peak';
+/** Why a skip stopped where it did. `end` is the day's own end, after the last peak. */
+export type StageSkipUntil = 'wait' | 'call' | 'peak' | 'end';
 
 /** One skip: the playhead moves from `fromS` to `toS`, and the line names both. */
 export interface StageSkip {
@@ -424,24 +416,47 @@ export interface StageSkipInput {
   readonly simPerRealS: number;
   /** The next call the stage would stop at, raised or still being asked, or `undefined`. */
   readonly stopAtS?: number | undefined;
+  /**
+   * The run's end, where the stage may land after the last peak ([§ D1266](../../../../DECISIONS.md)).
+   * Absent, a stretch with no peak ahead of it is played rather than skipped.
+   */
+  readonly endedAt?: number | undefined;
+}
+
+/** The first peak that starts after `simTimeS`, or `undefined`. */
+export function nextPeakStartAfter(acts: readonly DayAct[], simTimeS: number): DayAct | undefined {
+  let next: DayAct | undefined;
+  for (const act of acts) {
+    if (act.startS > simTimeS && (next === undefined || act.startS < next.startS)) next = act;
+  }
+  return next;
 }
 
 /**
  * **Where the stage seeks to, once the beat is over** — [§ D1212](../../../../DECISIONS.md) — or
  * `undefined` while the beat lasts, and where the stretch left is shorter than one more beat.
  *
- * The earliest of the first instant anybody reaches a minute, the next call and the next peak's
- * start. Call it only where {@link stageSkipApplies} holds; outside a stretch between peaks it
- * answers `undefined`.
+ * The earliest of the first instant anybody reaches a minute, the next call, the next peak's start
+ * and, after the last peak, the run's end ([§ D1266](../../../../DECISIONS.md): the skip runs
+ * anywhere in a scored whole day, not only between two peaks). Call it only where
+ * {@link stageSkipApplies} holds.
  */
 export function stageSkipOf(input: StageSkipInput): StageSkip | undefined {
   const beatSimS = SKIP_BEAT_REAL_S * input.simPerRealS;
   const now = input.simTimeS;
   if (now - input.armedAtS < beatSimS) return undefined;
-  const peak = nextPeakFromBetween(input.acts, now);
-  if (peak === undefined) return undefined;
-  let toS = peak.startS;
-  let until: StageSkipUntil = 'peak';
+  const peak = nextPeakStartAfter(input.acts, now);
+  let toS: number;
+  let until: StageSkipUntil;
+  if (peak !== undefined) {
+    toS = peak.startS;
+    until = 'peak';
+  } else if (input.endedAt !== undefined && input.endedAt > now) {
+    toS = input.endedAt;
+    until = 'end';
+  } else {
+    return undefined;
+  }
   const wait = firstMinuteWaitFrom(input.legs, now);
   if (wait !== undefined && wait < toS) {
     toS = wait;

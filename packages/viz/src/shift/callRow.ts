@@ -74,12 +74,33 @@ export const PRESS_CALL_AGAIN = Object.freeze({
  */
 export const PRESS_CALL_SKIPPED_WHAT = 'The stage called the day, and the day was skipped to its end';
 
+/** § D1239: said where the day's later calls were answered with a press, which the pinned runs leave out. */
+export const PRESS_CALL_LATER_NOTE = 'The runs named here had nothing pressed after the call.';
+
+/** § D1239: the counts sentence under the pinned census, in the ordinary rows' framing. */
+function countsOf(line: string | undefined): string {
+  if (line === undefined) return '';
+  return ` The day was also run three ways from the call, with nothing pressed after it. ${line}`;
+}
+
 /** Everything the row reads. The pin is admitted and the day was played as it was measured. */
 export interface PressCallRowInput {
   readonly press: ContractPressDay;
   readonly call: PressCall;
-  /** The run's log — empty, or the one answer at the call second. */
+  /**
+   * The run's log — empty, or the one answer at the call second, and since
+   * [§ D1204](../../../../DECISIONS.md) the later calls' answers after it. Only what stands at or
+   * before the call second is the day as measured; a later press leaves the row standing and is
+   * named as not in its runs (wave AM, lane AM-B, [§ D1239](../../../../DECISIONS.md): the row had
+   * vanished from every pinned day whose later calls were answered with a press).
+   */
   readonly interventions: readonly RunInterventionConfig[];
+  /**
+   * The call's three counts in the ordinary rows' own sentence (`shift/dayCalls.ts#dayCallCountsLineOf`),
+   * where the shell ran the call's three answers from its second — § D1239, the post-AL panel's
+   * seats B and D. Absent where it did not, and the row then carries the census alone.
+   */
+  readonly countsLine?: string | undefined;
   /** A profile's display name, for the census. */
   readonly nameOf: (dispatcherId: string) => string | undefined;
   /**
@@ -112,9 +133,11 @@ export function pressCallRowOf(
   input: PressCallRowInput,
   clockOf: (simTimeS: SimTime) => string,
 ): ReportDiagnosis | undefined {
-  const { press, call, interventions } = input;
+  const { press, call } = input;
   const measured = press.call;
   if (measured === undefined || press.refused !== undefined) return undefined;
+  const interventions = input.interventions.filter((entry) => entry.atS <= call.atS);
+  const pressedLater = interventions.length < input.interventions.length;
   if (interventions.length > 1) return undefined;
   const answer = interventions[0];
   if (answer !== undefined) {
@@ -157,9 +180,11 @@ export function pressCallRowOf(
       answer === undefined
         ? input.skipped === true
           ? PRESS_CALL_SKIPPED_WHAT
-          : 'The stage called the day, and nothing was pressed'
+          : pressedLater
+            ? 'The stage called the day, and nothing was pressed at the call'
+            : 'The stage called the day, and nothing was pressed'
         : `The stage called the day, and you ${stampVerbOf(answer.change)} at the call`,
-    why: `${pinned}${past}${census} ${PRESS_CALL_ROW_NOTE}`,
+    why: `${pinned}${past}${census}${countsOf(input.countsLine)}${pressedLater ? ` ${PRESS_CALL_LATER_NOTE}` : ''} ${PRESS_CALL_ROW_NOTE}`,
     tone: 'plain',
   };
 }

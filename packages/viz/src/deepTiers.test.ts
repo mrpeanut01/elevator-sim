@@ -593,6 +593,29 @@ const TIERS: Readonly<Record<string, Tier>> = Object.freeze({
       'is re-run by hand when the skip rule, the call rule, a building or a demand template moves',
     scheduled: false,
   },
+  'packages/viz/src/everyday/callFlip.sweep.test.ts': {
+    gates: ['CALL_FLIP_SWEEP'],
+    reason:
+      'Wave AM’s instrument, § D1264 — Midtown’s days 1 to 5 with each day’s own wrinkle over the ' +
+      'week census’s held-out crowds, played by the sitting bot’s fixed policies through the shipped ' +
+      'call session, and every raised call’s three runs graded with the day’s goals: how often the ' +
+      'other answer flips the day’s verdict on its crowd. It produced § D1264’s published table. Not ' +
+      'scheduled because it is a compute job rather than a check: dayCallSession.test.ts pins the ' +
+      'session and its records on every run, and a nightly re-derivation would write figures nothing ' +
+      'reads. It is re-run by hand when the call rule, a building, a demand template or a goal bar moves',
+    scheduled: false,
+  },
+  'packages/viz/src/everyday/sittingBot.sweep.test.ts': {
+    gates: ['SITTING_BOT_SWEEP'],
+    reason:
+      'Wave AM’s instrument, § D1267, swarm DO’s score-8 test — whole sittings on one tower, three ' +
+      'weeks of counted days rolled by the product’s own nextDay on the crowds one device is dealt, ' +
+      'each day played by a fixed policy through the shipped call session: which fixed policies clear ' +
+      'which weeks, and a day’s real length at the default rung. Not scheduled because it is a compute ' +
+      'job rather than a check, on the same argument as the two sweeps beside it; it is re-run by hand ' +
+      'when a week order, the call rule, a building or a goal bar moves',
+    scheduled: false,
+  },
   'packages/viz/src/everyday/stagePace.sweep.test.ts': {
     gates: ['STAGE_PACE_SWEEP'],
     reason:
@@ -974,5 +997,28 @@ describe('§ 3 — the workflow keeps the shape that made this safe', () => {
     expect(source, 'the corpus job must not write to the tree it measured').not.toMatch(
       /git\s+(commit|push)/u,
     );
+  });
+
+  it('puts both tiers on the run summary, because the deep row is read from this job (§ D1236)', () => {
+    /*
+     * § D1236 stopped the integrator measuring the deep tier each wave: `CLAUDE.md`'s deep row is
+     * carried from the first nightly run of `corpus-figures` after a wave merges. That only works if
+     * a person can read the figures there, so the job must write each tier's file to the summary
+     * page and must still do it, and still upload, when a tier's vitest call has failed. The job's
+     * own lines are cut out first: the `report` job writes a summary too, and a match on the whole
+     * file would pass on that.
+     */
+    const lines = workflow().split('\n');
+    const start = lines.findIndex((line) => /^\s{2}corpus-figures:\s*$/u.test(line));
+    expect(start, 'no corpus-figures job, so the deep row has nowhere to come from').toBeGreaterThan(0);
+    const end = lines.findIndex((line, at) => at > start && /^\s{2}[a-z][a-z0-9-]*:\s*$/u.test(line));
+    const job = lines.slice(start, end === -1 ? undefined : end).join('\n');
+    expect(job, 'the corpus figures must reach the run summary').toMatch(/GITHUB_STEP_SUMMARY/u);
+    expect(job, 'both tiers’ files must be the summary’s source').toMatch(/corpus-\$tier\.txt/u);
+    expect(
+      job,
+      'the summary and the upload must run when a tier failed, since a timed-out tier still wrote',
+    ).toMatch(/if: always\(\)\n\s+run: \|\n\s+\{\n\s+echo "## Corpus figures"/u);
+    expect(job).toMatch(/if: always\(\)\n\s+with:\n\s+name: corpus-figures/u);
   });
 });

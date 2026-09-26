@@ -41,7 +41,7 @@ import {
   SKIP_BEAT_REAL_S,
   STAGE_SKIP_BEAT_NOTE,
   firstMinuteWaitFrom,
-  nextPeakFromBetween,
+  nextPeakStartAfter,
   stagePaceNoteOf,
   stagePaceOf,
   stageSkipApplies,
@@ -455,7 +455,7 @@ describe('a scored day — § D1169', () => {
  * minute, the next call or the next peak's start, read exactly off the recording; inside a peak
  * § D1169 is unchanged, and the playhead is the only thing that moves.
  */
-describe('the skip between a scored whole day’s peaks — § D1212', () => {
+describe('the skip across a scored whole day’s quiet — § D1212, widened by § D1266', () => {
   const FAST = BETWEEN_PEAKS_SIM_PER_REAL_S;
   const BEAT_SIM_S = SKIP_BEAT_REAL_S * FAST;
 
@@ -486,38 +486,57 @@ describe('the skip between a scored whole day’s peaks — § D1212', () => {
       armedAtS: t - BEAT_SIM_S,
       simPerRealS: FAST,
       stopAtS,
+      endedAt: day.endedAt,
     });
 
-  it('reads a peak as an act of the authored phases, and applies only between two of them', () => {
+  it('reads a peak as an act of the authored phases, and applies anywhere in the day while fast (§ D1266)', () => {
     const acts = actsOf(day.demandPhases);
     /* The acts are the three the first describe block pins: 08:30, 12:15 and 17:15, half an hour each. */
-    expect(nextPeakFromBetween(acts, 900), 'before the first peak').toBeUndefined();
-    expect(nextPeakFromBetween(acts, 2000), 'inside the morning peak').toBeUndefined();
-    expect(nextPeakFromBetween(acts, 3600)?.startS, 'the morning peak has just ended').toBe(15300);
-    expect(nextPeakFromBetween(acts, 9000)?.startS).toBe(15300);
-    expect(nextPeakFromBetween(acts, 16000), 'inside lunch').toBeUndefined();
-    expect(nextPeakFromBetween(acts, 24000)?.startS).toBe(33300);
-    expect(nextPeakFromBetween(acts, 35500), 'after the last peak').toBeUndefined();
+    expect(nextPeakStartAfter(acts, 900)?.startS, 'before the first peak').toBe(1800);
+    expect(nextPeakStartAfter(acts, 2000)?.startS, 'inside the morning peak').toBe(15300);
+    expect(nextPeakStartAfter(acts, 9000)?.startS).toBe(15300);
+    expect(nextPeakStartAfter(acts, 16000)?.startS, 'inside lunch').toBe(33300);
+    expect(nextPeakStartAfter(acts, 35500), 'after the last peak').toBeUndefined();
 
     const gate = { horizon: 'whole-day' as const, scored: true, acts, simTimeS: 9000, reason: 'fast' as const };
-    expect(stageSkipApplies(gate)).toBe(true);
-    /* Every other reason, every other horizon, an unscored day, and outside the gaps: no skip. */
+    /* § D1212 skipped only between two peaks; § D1266 skips before the first, inside one and after the last too. */
+    for (const simTimeS of [900, 2000, 9000, 16000, 35500]) {
+      expect(stageSkipApplies({ ...gate, simTimeS }), String(simTimeS)).toBe(true);
+    }
+    /* Every other reason, every other horizon, an unscored day, and a day with no peaks: no skip. */
     for (const reason of ['yours', 'watching', 'call', 'between', 'held', 'act', 'chosen', 'unmanaged'] as const) {
       expect(stageSkipApplies({ ...gate, reason }), reason).toBe(false);
     }
     expect(stageSkipApplies({ ...gate, horizon: 'period' }), 'a slice').toBe(false);
     expect(stageSkipApplies({ ...gate, scored: false }), 'a replay or a watched run').toBe(false);
-    for (const simTimeS of [900, 2000, 16000, 35500]) {
-      expect(stageSkipApplies({ ...gate, simTimeS }), String(simTimeS)).toBe(false);
+    expect(stageSkipApplies({ ...gate, acts: [] }), 'a day with no peaks').toBe(false);
+  });
+
+  it('after the last peak lands on the day’s end, and plays the tail where it is not given the end', () => {
+    const acts = actsOf(day.demandPhases);
+    const held = heldOf(day);
+    const lastPeakEnd = Math.max(...acts.map((act) => act.endS));
+    let checked = 0;
+    for (let t = lastPeakEnd; t < day.endedAt; t += 30) {
+      if (held.some(([a, b]) => t >= a && t < b)) continue;
+      const skip = skipAt(t);
+      if (skip === undefined) continue;
+      checked += 1;
+      expect(held.some(([a, b]) => a < skip.toS && b > skip.fromS), `${String(t)} passes a wait`).toBe(false);
+      if (skip.until === 'end') expect(skip.toS).toBe(day.endedAt);
+      else expect(skip.until).toBe('wait');
+      /* Without the run's end there is nowhere to land after the last peak. */
+      const noEnd = stageSkipOf({ acts, legs: day.legs, simTimeS: t, armedAtS: t - BEAT_SIM_S, simPerRealS: FAST });
+      if (skip.until === 'end') expect(noEnd).toBeUndefined();
     }
+    expect(checked).toBeGreaterThan(0);
   });
 
   it('lands exactly where somebody first reaches a minute or the next peak starts, and passes nobody at a minute', () => {
     const acts = actsOf(day.demandPhases);
     const held = heldOf(day);
     const seen = new Set<string>();
-    for (let t = 3600; t < 33300; t += 300) {
-      if (nextPeakFromBetween(acts, t) === undefined) continue;
+    for (let t = 0; t < 33300; t += 300) {
       if (held.some(([a, b]) => t >= a && t < b)) continue;
       const skip = skipAt(t);
       if (skip === undefined) continue;
@@ -531,7 +550,7 @@ describe('the skip between a scored whole day’s peaks — § D1212', () => {
         expect(waitBandsAt(day, skip.toS + 1e-6).longestCurrentWaitS).toBeGreaterThanOrEqual(PACE_HOLD_WAIT_S);
       } else {
         expect(skip.until).toBe('peak');
-        expect(skip.toS).toBe(nextPeakFromBetween(acts, t)?.startS);
+        expect(skip.toS).toBe(nextPeakStartAfter(acts, t)?.startS);
       }
     }
     /* The day exercises both ends, or this case asserts less than it says. */
@@ -624,6 +643,7 @@ describe('the skip between a scored whole day’s peaks — § D1212', () => {
           armedAtS,
           simPerRealS: playback.speed,
           stopAtS: stop,
+          endedAt: recording.endedAt,
         });
         if (taken !== undefined) {
           skips.push(taken);
@@ -658,11 +678,22 @@ describe('the skip between a scored whole day’s peaks — § D1212', () => {
     expect(withSkip.skips.length).toBe(model(true).skips);
     /* The skip is worth having on this day: more than a third of § D1169's day goes. */
     expect(withSkip.realS).toBeLessThan(without.realS * (2 / 3));
-    /* And it never skips inside a peak, before the first or after the last. */
+    /*
+     * § D1266: it skips anywhere, and still passes no wait and no peak's start: every skip lands at
+     * or before the next peak's start, or the day's end after the last peak.
+     */
+    const held = heldOf(day);
     for (const taken of withSkip.skips) {
-      expect(nextPeakFromBetween(acts, taken.fromS), String(taken.fromS)).toBeDefined();
-      expect(taken.toS).toBeLessThanOrEqual(nextPeakFromBetween(acts, taken.fromS)!.startS);
+      expect(held.some(([a, b]) => a < taken.toS && b > taken.fromS), String(taken.fromS)).toBe(false);
+      expect(taken.toS).toBeLessThanOrEqual(nextPeakStartAfter(acts, taken.fromS)?.startS ?? day.endedAt);
     }
+    /* And it does skip where § D1212 did not: before the first peak or inside one. */
+    const firstPeak = Math.min(...acts.map((act) => act.startS));
+    expect(
+      withSkip.skips.some(
+        (taken) => taken.fromS < firstPeak || acts.some((act) => taken.fromS >= act.startS && taken.fromS < act.endS),
+      ),
+    ).toBe(true);
     expect(withSkip.endedAtS).toBe(day.endedAt);
   });
 

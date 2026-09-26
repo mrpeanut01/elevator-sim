@@ -45,6 +45,12 @@ export interface WeekWayVerdict {
  * `scheduled` runs the wrinkle the week draws for that day (`shift/calendar.ts#scheduledEventFor`);
  * without it the day is the unwrinkled one (`campaignEventId: 'ordinary'`), which is what the
  * shipped rows measure.
+ *
+ * `eventId`, when given, is a whole drawn id and wins over both: the day runs exactly that wrinkle,
+ * handed to the run through `campaignEventId`, which `dev/state.ts#shiftRunConfigOf` reads through
+ * `events.ts#eventOfDrawnId`. That is how an authored week order's day is measured before the
+ * census admits it (lane AM-D, § D1252); `weekOrders.test.ts` holds that the run built this way is
+ * the run the week deals once the order is admitted.
  */
 export function weekWayCell(
   contractId: string,
@@ -52,6 +58,7 @@ export function weekWayCell(
   seed: bigint,
   config: WeekWayConfig,
   scheduled = false,
+  eventId?: string,
 ): WeekWayVerdict {
   const resources = WEEK_WAY_RESOURCES;
   const contract = contractById(contractId);
@@ -66,7 +73,11 @@ export function weekWayCell(
     over: {
       ...horizonFields,
       week: { ...openWeek(contractId), day, dayIdx: (day - 1) % 7 },
-      ...(scheduled ? { campaignEventId: undefined } : {}),
+      ...(eventId !== undefined
+        ? { campaignEventId: eventId }
+        : scheduled
+          ? { campaignEventId: undefined }
+          : {}),
     },
   });
   const plan = shiftRunConfigOf(resources, state);

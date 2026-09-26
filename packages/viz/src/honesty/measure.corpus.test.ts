@@ -45,6 +45,17 @@
  *
  * Then publish the pair with the tree they were measured on beside them, which is the half of R38
  * a deriver cannot do for you.
+ *
+ * ## Who takes which tier, since § D1236
+ *
+ * **The always-on tier is taken by the integrator on the integrated head, every wave.** The deep
+ * tier is **not** taken per wave any more: `.github/workflows/deep-tiers.yml`'s `corpus-figures`
+ * job runs both commands above on `main` every night, writes each tier's headline and the commit it
+ * is true of to the run's job summary, and uploads the whole files as the `corpus-figures`
+ * artifact. `CLAUDE.md`'s deep row is republished from the first nightly run after a wave merges,
+ * and names the commit it describes until then. It is part of the owner's instruction to lighten
+ * each wave (§ D1236): a deep run costs twenty-odd minutes of a shared box, and wave AI's was
+ * killed by the memory limit before it finished.
  */
 import { beforeAll, describe, it } from 'vitest';
 import { writeFileSync } from 'node:fs';

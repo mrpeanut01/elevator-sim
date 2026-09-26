@@ -493,7 +493,11 @@ export const SITTING_SHAPES = Object.freeze({
    * `caseStage.ts` ships a skip on every run a case plays. Naming the length without the escape
    * would be true and would misinform, which is the P2 half of what this module is for.
    */
-  scenarioMode: `${sittingLengthPhrase(SCENARIO_HUB_SPAN)}, skippable · retry as often as you like`,
+  /*
+   * *retry as often as you like* stood here, beside a week whose scored day is one attempt (§ D1218)
+   * and whose later runs are practice (§ D1138 clause 4) — swarm DO's S2, sentence 3, § D1250.
+   */
+  scenarioMode: `${sittingLengthPhrase(SCENARIO_HUB_SPAN)}, skippable · one scored attempt a day, and replays as practice`,
   /** The Career tile. The lose condition is the handoff's and is kept word for word. */
   careerMode: `${sittingLengthPhrase(SITTING_SPANS.careerDay, 'a building-day')} · three lost contracts ends the career`,
   /**

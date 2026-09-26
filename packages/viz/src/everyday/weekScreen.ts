@@ -50,6 +50,7 @@ import type { ActionBarModel } from './actionBar.js';
 import { actionBarFor } from './actionBar.js';
 import { WEEK_START_NEXT_LABEL, weekScreenViewOf, type WeekDayCard, type WeekScreenView } from './weekView.js';
 import { weekHasClosed } from '../shift/weekStake.js';
+import type { NextTowerOffer } from '../shift/nextTower.js';
 import type { EverydayScreenModule } from './screens.js';
 import {
   BODY,
@@ -100,6 +101,13 @@ let todayIsClosed = false;
  */
 let weekSheetStands = false;
 
+/**
+ * The held week's onward tower, while its sheet stands — `shift/nextTower.ts`, lane AM-E
+ * ([§ D1259](../../../../DECISIONS.md)). Module state for {@link weekSheetStands}'s reason: the
+ * bar's primary is the next tower's press rather than *Start next week* while it holds.
+ */
+let onwardTower: NextTowerOffer | undefined;
+
 /** A card's ink, by verdict. § 19's moss for cleared, alarm for missed, faint for unjudged. */
 function inkFor(card: WeekDayCard): string {
   if (card.verdict === 'cleared') return C.moss;
@@ -145,7 +153,7 @@ function mountWeek(
     const dayClosed = data.runState().dayClosed;
     todayIsClosed = dayClosed;
     weekSheetStands = weekHasClosed(data.week());
-    return weekScreenViewOf({
+    const view = weekScreenViewOf({
       week: data.week(),
       towerToday: data.resolvedBuilding()?.name ?? data.selection().buildingId,
       nameOf: (buildingId) => data.buildingById(buildingId)?.name,
@@ -156,14 +164,37 @@ function mountWeek(
       /* The tower's record of closed weeks — § D1230. */
       record: data.weekRecord(),
     });
+    onwardTower = weekSheetStands ? view.onward : undefined;
+    return view;
   }
 
   /**
-   * *Start next week* — the Sunday screen's one press, § D1227. `openTomorrow` rolls a closed week
-   * (§ D1177) and deals its first day's crowd (§ D1229); the brief is where a day is set up.
+   * *Start next week* — the sheet's one primary, § D1227. `openNextWeek` rolls a closed week
+   * (§ D1177) from whichever day it stands on, since the weekend came off the main path (§ D1246),
+   * and deals its first day's crowd (§ D1229); the brief is where a day is set up.
    */
   function startNextWeek(): void {
+    context.host.openNextWeek();
+    context.go('brief');
+  }
+
+  /**
+   * *Play Saturday* — the weekend, off the main path and still playable (§ D1246). `openTomorrow`
+   * advances one day without rolling, and the brief is where the day is set up.
+   */
+  function playWeekendDay(): void {
     context.host.openTomorrow();
+    context.go('brief');
+  }
+
+  /**
+   * *Play Chancery House’s week* — a held week's onward press, lane AM-E
+   * ([§ D1259](../../../../DECISIONS.md)). The front door's own tower press, `chooseTower`, so the
+   * tower is reached by the one path every tower is reached by; the week left behind is parked with
+   * its sheet, as the front door parks it. The brief is where a day is set up, as for the next week.
+   */
+  function takeOnwardTower(offer: NextTowerOffer): void {
+    context.host.chooseTower(offer.contractId);
     context.go('brief');
   }
 
@@ -222,16 +253,75 @@ function mountWeek(
       const roll = el(doc, 'p', 'everyday-week-sheet-roll', view.sheet.rollLine);
       roll.style.cssText = `${QUIET};margin:0;max-width:74ch`;
       sheet.body.append(note, roll);
+      /* The weekend, off the main path and still playable — § D1246. The bar's primary is *Start next week*. */
+      const weekend = view.sheet.weekend;
+      if (weekend !== undefined) {
+        const row = el(doc, 'div', 'everyday-week-weekend');
+        row.style.cssText = 'display:flex;align-items:center;gap:11px;flex-wrap:wrap';
+        const press = el(doc, 'button', 'everyday-week-weekend-play', weekend.label);
+        press.type = 'button';
+        press.style.cssText = [
+          'cursor:pointer',
+          'background:transparent',
+          `border:1px solid ${C.rule}`,
+          `border-radius:${String(R.pill)}px`,
+          `color:${C.ink}`,
+          'padding:7px 14px',
+          'font-size:13px',
+        ].join(';');
+        press.addEventListener('click', playWeekendDay);
+        const why = el(doc, 'span', 'everyday-week-weekend-note', weekend.note);
+        why.style.cssText = `${QUIET};max-width:60ch`;
+        row.append(press, why);
+        sheet.body.append(row);
+      }
+      /*
+       * A held week's next tower, and the press that stays — lane AM-E, § D1259. The onward press
+       * is the bar's primary; this block names it and carries the other way on, so neither is a
+       * hidden choice.
+       */
+      if (view.onward !== undefined) {
+        const onward = el(doc, 'p', 'everyday-week-sheet-onward', view.onward.line);
+        onward.style.cssText = `${BODY};margin:0;max-width:74ch`;
+        const stay = el(doc, 'button', 'everyday-week-sheet-stay', view.onward.stayLabel);
+        stay.type = 'button';
+        stay.style.cssText = [
+          'justify-self:start',
+          'cursor:pointer',
+          `border:1px solid ${C.ruleLight}`,
+          'background:transparent',
+          `border-radius:${String(R.row)}px`,
+          'padding:7px 13px',
+          `color:${C.ink}`,
+          'font-size:13px',
+        ].join(';');
+        stay.addEventListener('click', () => {
+          startNextWeek();
+        });
+        sheet.body.append(onward, stay);
+      }
       if (view.record !== undefined) {
         const record = el(doc, 'p', 'everyday-week-record', view.record);
         record.style.cssText = `${QUIET};margin:0;max-width:74ch`;
         sheet.body.append(record);
       }
+      /* Weeks held on this tower, beside the record it is kept in — § D1253. */
+      if (view.held !== undefined) {
+        const held = el(doc, 'p', 'everyday-week-held', view.held);
+        held.style.cssText = `${QUIET};margin:0;max-width:74ch`;
+        sheet.body.append(held);
+      }
       root.append(sheet.root);
-    } else if (view.record !== undefined) {
-      const record = el(doc, 'p', 'everyday-week-record', view.record);
-      record.style.cssText = `${QUIET};margin:8px 0 0;max-width:74ch`;
-      root.append(record);
+    } else {
+      for (const [className, text] of [
+        ['everyday-week-record', view.record],
+        ['everyday-week-held', view.held],
+      ] as const) {
+        if (text === undefined) continue;
+        const line = el(doc, 'p', className, text);
+        line.style.cssText = `${QUIET};margin:8px 0 0;max-width:74ch`;
+        root.append(line);
+      }
     }
 
     /* ---- the seven cards ---- */
@@ -501,7 +591,9 @@ function mountWeek(
      */
     primary: () => {
       if (weekHasClosed(context.host.week())) {
-        startNextWeek();
+        const offer = onwardTower;
+        if (offer !== undefined) takeOnwardTower(offer);
+        else startNextWeek();
         return;
       }
       context.go('door');
@@ -519,7 +611,9 @@ function mountWeek(
  */
 function weekBar(state: EverydayState): ActionBarModel {
   const base = actionBarFor(state);
-  if (weekSheetStands) return { ...base, primary: { ...base.primary, label: WEEK_START_NEXT_LABEL } };
+  if (weekSheetStands) {
+    return { ...base, primary: { ...base.primary, label: onwardTower?.label ?? WEEK_START_NEXT_LABEL } };
+  }
   const label = base.primary.variants[todayIsClosed ? 1 : 0] ?? base.primary.label;
   return { ...base, primary: { ...base.primary, label } };
 }

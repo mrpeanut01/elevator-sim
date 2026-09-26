@@ -86,8 +86,14 @@ const PRESS_CALL_WAIT_S: number = (() => {
  */
 export const PRESS_CALL_MIN_WINDOW_S = 120;
 
-/** Which of the two rules produced the instant. */
-export type PressCallRule = 'first-minute-wait' | 'act-start';
+/**
+ * Which rule produced the instant. `wrinkle-start` is an ordinary day's call only, at the start of
+ * the day's wrinkle where it lies clear of every peak (`shift/dayCalls.ts`,
+ * [§ D1265](../../../../DECISIONS.md)); a pinned call is only ever one of the first two, which is
+ * why {@link PRESS_CALL_RULES}, the list a pinned call's authored rule is checked against, does not
+ * carry it.
+ */
+export type PressCallRule = 'first-minute-wait' | 'act-start' | 'wrinkle-start';
 
 export const PRESS_CALL_RULES: readonly PressCallRule[] = Object.freeze([
   'first-minute-wait',
@@ -112,6 +118,12 @@ export interface PressCall {
    * inside its car's absence, by rule 1's clause and rule 2's.
    */
   readonly carAway?: boolean | undefined;
+  /**
+   * **The day's wrinkle, when the call was drawn inside it** rather than inside a peak — its name
+   * and its start on the day's clock, for the card's line ([§ D1265](../../../../DECISIONS.md)).
+   * Absent on a pinned call and on every call drawn in a peak.
+   */
+  readonly wrinkle?: { readonly name: string; readonly startS: number } | undefined;
 }
 
 /** Everything {@link pressCallOf} reads. Plain data from the run's own record. */

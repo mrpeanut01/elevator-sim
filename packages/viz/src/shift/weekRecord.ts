@@ -54,6 +54,13 @@ export interface WeekRecord {
   readonly met: number;
   /** The most clean counted days in one closed week. */
   readonly best: number;
+  /**
+   * **Weeks held on this tower**: the closed weeks in a row, most recent last, whose target was
+   * met; a closed week that missed its target sets it to 0 — wave AM, lane AM-D,
+   * [§ D1253](../../../../DECISIONS.md). Absent on a record written before it existed; read it
+   * through {@link weeksHeldOf}.
+   */
+  readonly held?: number;
   /** The last date crowd a scored day on this tower was filed on, as decimal digits. */
   readonly dateCrowd?: string;
 }
@@ -61,6 +68,20 @@ export interface WeekRecord {
 /** The record for a tower that has none: nothing closed. */
 export function weekRecordFor(records: readonly WeekRecord[], contractId: string): WeekRecord {
   return records.find((entry) => entry.contractId === contractId) ?? { contractId, closed: 0, met: 0, best: 0 };
+}
+
+/**
+ * **Weeks held on this tower, in a row** — [§ D1253](../../../../DECISIONS.md).
+ *
+ * A record written before the run was kept carries none, and its counts settle it in two cases
+ * only: every closed week met (the run is all of them) and none met (the run is 0). Between those
+ * the order of the met weeks was not kept, so the run is `undefined`: nothing draws it, and the
+ * next close counts from 0, which can understate a run and never overstates one.
+ */
+export function weeksHeldOf(record: WeekRecord): number | undefined {
+  if (record.held !== undefined) return record.held;
+  if (record.met === record.closed) return record.met;
+  return record.met === 0 ? 0 : undefined;
 }
 
 function withRecord(records: readonly WeekRecord[], next: WeekRecord): readonly WeekRecord[] {
@@ -78,11 +99,14 @@ export function recordsWithClosedWeek(
   target: number,
 ): readonly WeekRecord[] {
   const record = weekRecordFor(records, contractId);
+  const met = target > 0 && clean >= target;
   return withRecord(records, {
     ...record,
     closed: record.closed + 1,
-    met: record.met + (target > 0 && clean >= target ? 1 : 0),
+    met: record.met + (met ? 1 : 0),
     best: Math.max(record.best, clean),
+    /* A met week extends the run and a missed one ends it — § D1253. */
+    held: met ? (weeksHeldOf(record) ?? 0) + 1 : 0,
   });
 }
 
@@ -149,4 +173,27 @@ export function weekRecordLineOf(record: WeekRecord): string | undefined {
     `Your record on this tower: ${weeks}, ${String(record.met)} with the target met, and the most ` +
     `clean counted days in one week is ${String(record.best)}.`
   );
+}
+
+/**
+ * What the run of weeks held is and is not, said beside it wherever it is drawn —
+ * [§ D1253](../../../../DECISIONS.md): it buys nothing, and no clock runs on it.
+ */
+const WEEKS_HELD_NOTE =
+  'A missed week ends the run. It buys nothing, and no clock runs on it: a week counts when you ' +
+  'close it, however long that takes.';
+
+/**
+ * **Weeks held on this tower, as one line**, or `undefined` before a week on it has closed or
+ * where an older record did not keep the run ({@link weeksHeldOf}) —
+ * [§ D1253](../../../../DECISIONS.md), swarm DO's § 2. Drawn on the week's sheet and on the door.
+ */
+export function weeksHeldLineOf(record: WeekRecord): string | undefined {
+  const held = weeksHeldOf(record);
+  if (record.closed === 0 || held === undefined) return undefined;
+  const run =
+    held === 0
+      ? 'Weeks held on this tower: none in a row, because the last week closed here missed its target.'
+      : `Weeks held on this tower: ${String(held)} in a row, each with its target met.`;
+  return `${run} ${WEEKS_HELD_NOTE}`;
 }

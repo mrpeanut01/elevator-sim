@@ -154,28 +154,52 @@ describe.skipIf(!HAS_BROWSER)('GitHub issue #593 — a Scenario week plays from 
           reached.push(await textOf(page, '.everyday-report-tomorrow'));
           if (day === 7) break;
           /* The report's own way into tomorrow — `openTomorrow`, then the brief. */
-          await page.locator('.everyday-report-tomorrow').click();
+          await page.locator('.everyday-report-tomorrow').first().click();
+          if (reached.at(-1) === 'See the week against the house') {
+            /*
+             * The weekend is off the main path (§ D1246): the close that closed the week opens its
+             * sheet, and the weekend day is one press on the sheet, counting toward nothing.
+             */
+            await page.waitForSelector('.everyday-week-sheet', { timeout: 15_000 });
+            await page.locator('.everyday-week-weekend-play').click();
+          }
           await page.waitForSelector('.everyday-brief', { timeout: 15_000 });
         }
         /*
-         * Seven days closed, each offering the next, in the week's order. On a week the census
-         * speaks for (Midtown's), Sunday's close closes the week, and its one button opens the
-         * week's sheet rather than Monday — swarm DN's Q2.3, § D1227 — whose own primary then
-         * starts the next week on the brief. Garden Apartments' week has no ending and offers
-         * Monday.
+         * Seven days closed, in the week's order. On a week the census speaks for (Midtown's),
+         * Friday's close closes the week (§ D1246, the weekend off the main path), and every close
+         * from there opens the week's sheet rather than the next day — swarm DN's Q2.3, § D1227 —
+         * whose own primary starts the next week on the brief, while Saturday and Sunday are one
+         * press each on the sheet. Garden Apartments' week has no ending and offers Monday.
          */
         expect(reached).toHaveLength(7);
         const closesAWeek = building === 'midtown-office';
-        const offersNext = closesAWeek ? reached.slice(0, 6) : reached;
+        const offersNext = closesAWeek ? reached.slice(0, 4) : reached;
         expect(offersNext.every((label) => label.startsWith('Open the doors on'))).toBe(true);
         expect(new Set(offersNext).size).toBe(offersNext.length);
         if (closesAWeek) {
-          expect(reached[6]).toBe('See the week against the house');
+          expect(reached.slice(4)).toEqual([
+            'See the week against the house',
+            'See the week against the house',
+            'See the week against the house',
+          ]);
           await page.locator('.everyday-report-tomorrow').click();
           await page.waitForSelector('.everyday-week-sheet', { timeout: 15_000 });
           expect((await page.locator('.everyday-week-sheet-row').count())).toBe(7);
-          expect(await textOf(page, '.everyday-bar-primary')).toContain('Start next week');
-          await page.locator('.everyday-bar-primary').click();
+          /*
+           * A held week's sheet offers the next tower as its primary and keeps *Start next week
+           * here* in the sheet (lane AM-E, § D1259); a week that was not held keeps *Start next
+           * week*. The untouched standing order rarely holds Midtown's week, so both arms are read
+           * off the page rather than assumed, and the press taken is the one that stays.
+           */
+          if ((await page.locator('.everyday-week-sheet-onward').count()) > 0) {
+            expect(await textOf(page, '.everyday-bar-primary')).toMatch(/Play .+’s week/u);
+            expect(await textOf(page, '.everyday-week-sheet-stay')).toBe('Start next week here');
+            await page.locator('.everyday-week-sheet-stay').click();
+          } else {
+            expect(await textOf(page, '.everyday-bar-primary')).toContain('Start next week');
+            await page.locator('.everyday-bar-primary').click();
+          }
           await page.waitForSelector('.everyday-brief', { timeout: 15_000 });
         }
       } finally {

@@ -33,6 +33,11 @@
  *   (`shift/calendar.ts#scheduledEventFor`) instead of the ordinary day. **That is the re-run owed
  *   once wave AJ's wrinkle episodes land**: the shipped rows are the unwrinkled weekday.
  *
+ * - `WEEK_WAY_CELLS=2=goods-inward;3=evacuation-drill:all-at-once` measures named (day, wrinkle)
+ *   cells instead of `WEEK_WAY_DAYS`: each day runs exactly the drawn id after its `=`. That is how
+ *   an authored week order (`data/contract-ladder.json`'s `weekOrders`, lane AM-D, § D1252) is
+ *   measured, one row per day of the order, before the census admits it.
+ *
  * `WEEK_WAY_CONTRACTS`, `WEEK_WAY_DAYS` and `WEEK_WAY_OUT` name the cells and the file. It writes a
  * file because vitest intercepts `console.log` (`pressLadder.sweep.test.ts` records the trap).
  *
@@ -94,7 +99,15 @@ describe.runIf(process.env['WEEK_WAY_SWEEP'] === '1')('the week census', () => {
     const stage = process.env['WEEK_WAY_STAGE'] === 'screen' ? 'screen' : 'full';
     const scheduled = process.env['WEEK_WAY_EVENTS'] === 'scheduled';
     const contracts = (process.env['WEEK_WAY_CONTRACTS'] ?? 'c2').split(',');
-    const days = (process.env['WEEK_WAY_DAYS'] ?? '1,2,3,4,5').split(',').map(Number);
+    /* `[day, drawn id or undefined]`: a named wrinkle from `WEEK_WAY_CELLS`, or the day as dealt. */
+    const named = process.env['WEEK_WAY_CELLS'];
+    const cells: readonly (readonly [number, string | undefined])[] =
+      named === undefined
+        ? (process.env['WEEK_WAY_DAYS'] ?? '1,2,3,4,5').split(',').map((day) => [Number(day), undefined] as const)
+        : named.split(';').map((entry) => {
+            const [day = '', eventId = ''] = entry.split('=');
+            return [Number(day), eventId] as const;
+          });
     /*
      * The protocol is the data file's; the four counts may be narrowed for a smoke run or a growth
      * screen, and a row taken that way fails `weekWayIssues`' count check, so it cannot be shipped.
@@ -114,13 +127,13 @@ describe.runIf(process.env['WEEK_WAY_SWEEP'] === '1')('the week census', () => {
 
     for (const contractId of contracts) {
       const slope = growthPerDayOf(ladderRowFor(contractId));
-      for (const day of days) {
+      for (const [day, eventId] of cells) {
         const started = performance.now();
         let runs = 0;
         const tally = new Map<string, { clears: number; worst: number; n: number }>();
         const cell = (config: WeekWayConfig, seed: bigint): Verdict => {
           runs += 1;
-          const verdict = runDay(contractId, day, seed, config, scheduled);
+          const verdict = runDay(contractId, day, seed, config, scheduled, eventId);
           const entry = tally.get(keyOf(config)) ?? { clears: 0, worst: 0, n: 0 };
           tally.set(keyOf(config), {
             clears: entry.clears + (verdict.cleared ? 1 : 0),
@@ -166,7 +179,9 @@ describe.runIf(process.env['WEEK_WAY_SWEEP'] === '1')('the week census', () => {
         const head = {
           contractId,
           day,
-          eventId: scheduled ? scheduledEventFor(null, day, (day - 1) % 7, WEEK_WAY.protocol.horizon).id : 'ordinary',
+          eventId:
+            eventId ??
+            (scheduled ? scheduledEventFor(null, day, (day - 1) % 7, WEEK_WAY.protocol.horizon).id : 'ordinary'),
           growthPerDay: slope,
           chosen,
           tuningClears: chosenTuning?.clears ?? 0,
@@ -192,7 +207,7 @@ describe.runIf(process.env['WEEK_WAY_SWEEP'] === '1')('the week census', () => {
         const heldOutFailing: string[] = [];
         for (const seed of heldOutSeeds) {
           runs += 1;
-          const mine = runDay(contractId, day, seed, chosen, scheduled);
+          const mine = runDay(contractId, day, seed, chosen, scheduled, eventId);
           chosenVerdicts += mine.cleared ? 'C' : 'm';
           if (mine.failing.length === 1 && mine.failing[0] === 'queue') queueOnlyMisses += 1;
           heldOutFailing.push(mine.failing.join('+'));
@@ -200,7 +215,7 @@ describe.runIf(process.env['WEEK_WAY_SWEEP'] === '1')('the week census', () => {
             standingVerdicts += mine.cleared ? 'C' : 'm';
           } else {
             runs += 1;
-            standingVerdicts += runDay(contractId, day, seed, standing, scheduled).cleared ? 'C' : 'm';
+            standingVerdicts += runDay(contractId, day, seed, standing, scheduled, eventId).cleared ? 'C' : 'm';
           }
         }
         appendFileSync(

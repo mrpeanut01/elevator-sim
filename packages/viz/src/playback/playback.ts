@@ -68,6 +68,8 @@ export class Playback {
   #playing: boolean;
   /** Where the playhead sits while paused. Meaningless while playing — the anchor decides. */
   #pausedAtS: SimTime;
+  /** The furthest instant this transport may show, or `null` for the run's own end. See {@link setReach}. */
+  #reach: SimTime | null;
 
   constructor(recording: VizRecording, clock: DisplayClock, options: PlaybackOptions = {}) {
     const speed = options.speed ?? DEFAULT_SPEED;
@@ -75,6 +77,7 @@ export class Playback {
     this.recording = recording;
     this.#clock = clock;
     this.#loopWindow = null;
+    this.#reach = null;
     const start = this.#clampSim(options.startAtS ?? recording.startedAt);
     this.#pausedAtS = start;
     this.#anchor = { atDisplayMs: clock.now(), atSimTimeS: start, speed };
@@ -146,6 +149,29 @@ export class Playback {
     this.#loopWindow = { fromS, toS };
   }
 
+  /** The instant {@link setReach} holds the playhead at, or `null` where only the run's end does. */
+  get reach(): SimTime | null {
+    return this.#reach;
+  }
+
+  /**
+   * **The furthest instant this transport may show** — wave AM, lane AM-B,
+   * [§ D1239](../../../../DECISIONS.md), the post-AL panel's seat D (D1).
+   *
+   * A scored attempt's run is simulated whole before the stage shows a frame of it, so a second
+   * transport over the same recording can show what the stage has not: the Engineer surface did,
+   * reading a held call's unanswered future and filing the day from its end. With a reach set the
+   * playhead is clamped to it: a seek, a scrub and a playing transport all stop there, and a playing
+   * one follows the reach as it grows. `ended` is read only where the reach is the run's own end, so
+   * a transport held short of it can never be the end-of-run edge a viewer files a day off.
+   *
+   * `null` lets go. A playhead already past a newly set reach is pulled back to it.
+   */
+  setReach(atS: SimTime | null): void {
+    this.#reach = atS === null ? null : this.#clampSim(atS);
+    if (this.#reach !== null && this.simTimeS > this.#reach) this.seekTo(this.#reach);
+  }
+
   /**
    * `ended` is a *derived* state, not a flag: it is what "playing, and the playhead has reached
    * the end" is called. So a viewer that seeks backwards from the end is playing again without
@@ -153,13 +179,14 @@ export class Playback {
    */
   get state(): PlaybackState {
     if (!this.#playing) return 'paused';
+    if (this.#limit() < this.recording.endedAt) return 'playing';
     return this.#rawSimTime() >= this.recording.endedAt ? 'ended' : 'playing';
   }
 
   /** Simulated seconds, clamped into the recording. */
   get simTimeS(): SimTime {
     if (!this.#playing) return this.#pausedAtS;
-    return this.#clampSim(this.#rawSimTime());
+    return Math.min(this.#clampSim(this.#rawSimTime()), this.#limit());
   }
 
   /** Fraction of the run elapsed, 0 to 1. `0` for a zero-length recording. */
@@ -199,7 +226,7 @@ export class Playback {
 
   /** Jump the playhead. Legal in either state, and does not start or stop playback. */
   seekTo(simTimeS: SimTime): void {
-    const target = this.#clampSim(simTimeS);
+    const target = Math.min(this.#clampSim(simTimeS), this.#limit());
     this.#pausedAtS = target;
     this.#anchor = reanchor(this.#anchor, this.#clock.now(), target);
   }
@@ -248,6 +275,10 @@ export class Playback {
    */
   #advance(): SimTime {
     if (!this.#playing) return this.#pausedAtS;
+    return Math.min(this.#advanceToEnd(), this.#limit());
+  }
+
+  #advanceToEnd(): SimTime {
     const raw = this.#rawSimTime();
     const span = this.#loopWindow;
     const wrapAt = span?.toS ?? this.recording.endedAt;
@@ -258,6 +289,11 @@ export class Playback {
     }
     this.#anchor = reanchor(this.#anchor, this.#clock.now(), span.fromS);
     return span.fromS;
+  }
+
+  /** Where the playhead must stop: the reach, or the run's end. */
+  #limit(): SimTime {
+    return this.#reach ?? this.recording.endedAt;
   }
 
   #rawSimTime(): SimTime {

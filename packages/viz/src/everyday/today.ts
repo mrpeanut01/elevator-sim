@@ -900,6 +900,7 @@ export function todayOf(input: TodayInput): TodayRecord {
       week.day,
       week.dayIdx,
       input.wholeDayRun ? 'whole-day' : 'period',
+      week,
     ),
     input.templateVariesMix,
     input.wholeDayRun,
@@ -1000,6 +1001,6 @@ function weekStakeOf(
 ): TodayRecord['weekStake'] {
   const line = weekStakeLineOf(week);
   if (line === undefined) return undefined;
-  const dealt = dayStakeSentenceOf(week.contractId, week.day, eventId);
+  const dealt = dayStakeSentenceOf(week, week.day, eventId);
   return { line, day: practice === undefined || dealt === undefined ? dealt : PRACTICE_DAY_SENTENCES[practice] };
 }

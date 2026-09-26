@@ -177,6 +177,8 @@ function recordOf(raw: unknown, where: string): WatchRecord {
      * and `record.ts#recordUnreadableReason` refuses one this build does not ship for the building.
      */
     rungContractId: asNullableString(entry['rungContractId'], `${where}.rungContractId`),
+    /* Which week of its tower — § D1252. Absent is week 1, which every shipped reference run is. */
+    ...(entry['week'] === undefined ? {} : { week: asNumber(entry['week'], `${where}.week`) }),
   };
 }
 

@@ -525,9 +525,9 @@ export function runFiguresOf(week: WeekState): readonly RunFigure[] {
     {
       value:
         /* The derived target where the week census speaks, and `—` for a week with none — § D1176. */
-        contract === undefined || weekNeedOf(contract) === 0
+        contract === undefined || weekNeedOf(contract, undefined, week.week) === 0
           ? PENDING_DISPLAY
-          : `${String(week.cleanRun)}/${String(weekNeedOf(contract))}`,
+          : `${String(week.cleanRun)}/${String(weekNeedOf(contract, undefined, week.week))}`,
       label: 'banked this scenario',
       color: BANKED,
     },
@@ -704,6 +704,7 @@ export function todaysShiftOf(resources: BrowserResources, state: ViewerState): 
       week.day,
       week.dayIdx,
       planned.wholeDayRun ? 'whole-day' : 'period',
+      week,
     ),
     planned.templateVariesMix,
     planned.wholeDayRun,

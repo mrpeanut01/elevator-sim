@@ -80,6 +80,11 @@ function attemptIssue(value: unknown): string | undefined {
     if (typeof entry['change']['kind'] !== 'string') return 'an intervention names no change';
   }
   if (value['record'] !== null && !isObject(value['record'])) return 'record is not a record';
+  /* § D1239: the pinned call's counted record, shallow for the calls' records' reason. */
+  const pinned = value['pinnedCall'];
+  if (pinned !== undefined && !(isObject(pinned) && isNumber(pinned['atS']) && isObject(pinned['counts']))) {
+    return 'pinnedCall is not a call record';
+  }
   const calls = value['calls'];
   if (calls !== null) {
     if (!isObject(calls)) return 'calls is not a session';

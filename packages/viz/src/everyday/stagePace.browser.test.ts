@@ -134,48 +134,56 @@ describe.skipIf(!HAS_BROWSER)('§ D1169 — a scored day is paced by the tutoria
   }, 300_000);
 
   /*
-   * § D1212 on the stage a player uses: between a whole day's peaks, while nobody has waited a
-   * minute, the stage shows a beat's note, then seeks and leaves one line saying what it skipped. A
-   * pause during the beat stops it, and so does a chip. The day is the date's crowd, so the times are
-   * read off the line rather than written here.
+   * § D1212 on the stage a player uses, widened by § D1266 to anywhere in the day: while nobody has
+   * waited a minute, the stage shows a beat's note, then seeks and leaves one line saying what it
+   * skipped. A pause during the beat stops it, and so does a chip. The day is the date's crowd, so the
+   * times are read off the line rather than written here.
    */
-  it('skips the quiet between peaks with a line saying what it skipped, and a pause or a chip stops a skip that is coming', async () => {
+  it('skips the quiet with a line saying what it skipped, and a pause or a chip stops a skip that is coming', async () => {
     const page = await playDayOn('c2');
     try {
       const skipLine = async (): Promise<string> => (await page.textContent('.everyday-stage-skip-line')) ?? '';
       const clock = async (): Promise<string> => (await page.textContent('.everyday-stage-clock')) ?? '';
-      const untilSkipLine = async (prefix: string, timeout: number): Promise<void> => {
+      /* `other`: a line standing already (an earlier skip's) does not count as the one awaited. */
+      const untilSkipLine = async (prefix: string, timeout: number, other?: string): Promise<void> => {
         await page.waitForFunction(
-          (wanted) => {
+          ([wanted, stale]) => {
             const leave = document.querySelector<HTMLButtonElement>(
               '.everyday-stage-call:not([hidden]) .everyday-stage-call-answer[data-answer="leave"]',
             );
             leave?.click();
-            return (document.querySelector('.everyday-stage-skip-line')?.textContent ?? '').startsWith(wanted);
+            const now = document.querySelector('.everyday-stage-skip-line')?.textContent ?? '';
+            return now.startsWith(wanted) && now !== stale;
           },
-          prefix,
+          [prefix, other ?? null] as const,
           { timeout, polling: 50 },
         );
       };
       const BEAT = 'nobody on a landing has waited a minute: skipping ahead';
 
       /*
-       * The first beat comes after the morning peak. To reach it sooner, `30×` is pressed while
-       * somebody waits, which § D1169 makes the rung every wait plays at and leaves the skip alone.
+       * Since § D1266 the first beat can come before the first peak, and a skip may already have
+       * left its line by the time somebody waits. `30×` is pressed while somebody waits, which
+       * § D1169 makes the rung every wait plays at and leaves the skip alone, so the next beat comes
+       * sooner.
        */
       await untilNote(page, 'at your speed', 240_000);
       await page.click('.everyday-stage-speed:text-is("30×")');
-      /* A pause stops a coming skip where it stands. */
+      /* A pause stops a coming skip where it stands: the beat's note goes, and no seek follows. */
       await untilSkipLine(BEAT, 480_000);
       await page.click('.everyday-stage-play');
-      expect(await skipLine()).toBe('');
+      const standing = await skipLine();
+      expect(standing).not.toContain('skipping ahead');
       const pausedAt = await clock();
       await page.waitForTimeout(3_000);
       expect(await clock(), 'the skip went ahead under a pause').toBe(pausedAt);
 
-      /* Play again: a fresh beat, and then the seek, and the line it leaves. */
+      /*
+       * Play again: a fresh beat, and then the seek, and the line it leaves. Since § D1266 an earlier
+       * skip's line may be standing at the pause, so the line awaited is a new one.
+       */
       await page.click('.everyday-stage-play');
-      await untilSkipLine('skipped ', 30_000);
+      await untilSkipLine('skipped ', 30_000, standing);
       const line = await skipLine();
       expect(line).toMatch(/^skipped \d\d:\d\d–\d\d:\d\d: nobody on a landing waited a minute$/u);
       /* It skipped from where the stage stood, to where it now stands. */

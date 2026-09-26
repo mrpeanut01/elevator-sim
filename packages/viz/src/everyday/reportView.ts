@@ -89,6 +89,9 @@ import { reportViewOf } from '../dev/reportPanel.js';
 import type { TabName } from '../dev/elementMap.js';
 import type { ShapedDayReport } from '../shift/report.js';
 import type { TomorrowBriefing } from '../shift/tomorrow.js';
+import { dayCloseOf, type DayCloseView } from '../shift/dayClose.js';
+import type { WeekState } from '../shift/types.js';
+import type { HouseReading } from '../shift/weekStake.js';
 
 /**
  * Where a lever's press goes — GitHub issue #213, the owner's ruling on it, and GAMEPLAY § 6.5.
@@ -269,7 +272,23 @@ export interface EverydayReportView {
    * close.
    */
   readonly weekMark: string | undefined;
+  /**
+   * **What the close leads with** — wave AM, lane AM-C, swarm DO's § 1 ruling
+   * ([§ D1246](../../../../DECISIONS.md) to [§ D1249](../../../../DECISIONS.md)): today against the
+   * house with the week's tally, the call that decided it, the week's arithmetic and tomorrow in
+   * full, drawn above the figures with the onward press under it. `undefined` where the input
+   * carries no week (every caller but the daily report) and on a practice close.
+   */
+  readonly close: DayCloseView | undefined;
+  /**
+   * The two secondary presses beside the onward one on the close: *Your week* and the menu. Words
+   * only; `reportScreen.ts` owns where each goes.
+   */
+  readonly secondary: { readonly week: string; readonly menu: string };
 }
+
+/** The close's two secondary presses — {@link EverydayReportView.secondary}. */
+export const REPORT_SECONDARY = Object.freeze({ week: 'Your week', menu: 'Main menu' });
 
 /** What {@link everydayReportViewOf} is computed from. */
 export interface EverydayReportInput {
@@ -310,6 +329,14 @@ export interface EverydayReportInput {
    * one* — a second counter is the drift `runCampaignDay`'s own docstring refuses.
    */
   readonly career?: EverydayReportCareer | undefined;
+  /**
+   * The live week the sheet stands on, for the close's lead ({@link EverydayReportView.close}).
+   * Supplied by `reportScreen.ts` on the daily flow only; absent everywhere else, which draws no
+   * lead, so every existing caller is unchanged.
+   */
+  readonly week?: WeekState | undefined;
+  /** The shell's house runs per counted day — `EverydayHost.weekHouse`. Read only with {@link week}. */
+  readonly house?: ((day: number) => HouseReading | undefined) | undefined;
 }
 
 /** What a career sheet's onward step is drawn from — {@link EverydayReportInput.career}. */
@@ -604,10 +631,15 @@ function onwardStepOf(
       goes: 'career-day',
     };
   }
+  /*
+   * *Opens tomorrow's day and starts it* stood here, and the press opens tomorrow's brief: the day's
+   * one scored attempt starts at *Start the day* there (§ D1218), so the note said a thing the press
+   * does not do (swarm DO's S2, sentence 1; the post-AL panel's seats A, B and D).
+   */
   return canAdvance
     ? {
         label: nextDayLabel,
-        note: 'Opens tomorrow’s day and starts it. Today stays in your week exactly as it is.',
+        note: 'Opens tomorrow’s brief, where you set the day up and start it. Today stays in your week exactly as it is.',
         goes: 'daily-tomorrow',
       }
     : undefined;
@@ -681,5 +713,15 @@ export function everydayReportViewOf(input: EverydayReportInput): EverydayReport
       : undefined,
     practiceNote: framing.kind === 'week-day' ? framing.practiceNote : undefined,
     weekMark: framing.kind === 'week-day' ? framing.weekMark : undefined,
+    close:
+      input.week === undefined || input.report?.of !== 'week-day' || input.career !== undefined
+        ? undefined
+        : dayCloseOf({
+            week: input.week,
+            report: input.report,
+            houseOf: input.house ?? (() => undefined),
+            population: input.overnight?.population,
+          }),
+    secondary: REPORT_SECONDARY,
   };
 }

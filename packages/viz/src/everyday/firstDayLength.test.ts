@@ -41,10 +41,11 @@ function measure(contractId: string): PinnedDayLength {
   /*
    * § D1169's pacing and § D1212's skip, read off the legs by the stage's own rule, with the stage
    * stopping at the call: nothing is skipped past it. The pinned call is the only stop passed in,
-   * and that is exact rather than short under § D1204: the ordinary calls the day asks after it are
-   * candidates `shift/dayCalls.ts#nextDayCallOf` draws **inside a peak** on a whole day, and the
-   * skip cuts only **between** peaks, so a later stop cannot split a skip. Nothing is pressed after
-   * the call on these three runs (§ D1204's *middle, with nothing pressed after*).
+   * and since § D1266 widened the skip to the whole day it is short by at most one beat (two real
+   * seconds) for each later stop that falls in a stretch the skip would cross: the ordinary calls
+   * the day asks after the pinned one are not known to this measurement. The sentence rounds to the
+   * minute and says *about*. Nothing is pressed after the call on these three runs (§ D1204's
+   * *middle, with nothing pressed after*).
    */
   const played = (recording: typeof asBuilt.recording, untilS?: number) =>
     scoredDayPlayOf({
@@ -118,7 +119,7 @@ describe('the pinned whole day’s length and its call — § D1047', () => {
     for (const row of PINNED_DAY_LENGTHS) {
       const line = pinnedDayLengthLineOf(row.contractId) ?? '';
       expect(line, row.contractId).toMatch(
-        /^A whole day: about \d+ min of watching at 4×, 30× wherever nobody on a landing has waited a minute, and the quiet between peaks skipped\. /u,
+        /^A whole day: about \d+ min of watching at 4×, and wherever nobody on a landing has waited a minute the stage skips ahead\. /u,
       );
       /*
        * § D1204: a day that asks on after its call says the stage stops there *first*, and promises

@@ -121,7 +121,12 @@ import { clockOf, dayReportOf, smallPrintFor } from '../shift/report.js';
 import { DAY_START_S } from '../shift/types.js';
 import { towerChoiceViewOf } from '../everyday/towerChoice.js';
 import type { GoalObservations, Observations, ShiftGoal, WeekState } from '../shift/types.js';
-import { closeDay, outcomeOf } from '../shift/week.js';
+import { closeDay, nextDay, openWeek, outcomeOf } from '../shift/week.js';
+import { scheduledEventFor } from '../shift/calendar.js';
+import { dayCloseOf } from '../shift/dayClose.js';
+import type { WeekDayReport } from '../shift/report.js';
+import { houseStandingOrder, weekSheetOf, type HouseReading } from '../shift/weekStake.js';
+import { WATCH_RECORD_VERSION, type WatchRecord } from '../watch/types.js';
 
 import type { HonestyContext } from './surfaces.js';
 import type { HonestyViolation, RenderedText } from './types.js';
@@ -771,7 +776,134 @@ export const AGREED_FIGURES: readonly AgreedFigure[] = Object.freeze<AgreedFigur
         }).join('/'),
     },
   },
+  {
+    id: 'house-today',
+    figure: 'today against the house — the close’s lead and the week’s sheet, on the close that closed the week',
+    why:
+      'Wave AM, lane AM-C, [§ D1247](../../../../DECISIONS.md): every counted close now leads with ' +
+      'today’s result beside the tower’s standing order left alone on the same crowd, and the close ' +
+      'that closes the week opens the sheet whose cell for the same day states the same two verdicts. ' +
+      'Two surfaces now state one result against the house, one press apart, and a reader who meets ' +
+      '*you cleared it; the house missed it* on the close and *you: clean · the house: clean* on the ' +
+      'sheet is told two things about one crowd. The left side reads the close’s sentence as ' +
+      '`shift/dayClose.ts#dayCloseOf` words it, including the arm where the day ran the standing ' +
+      'order untouched and is its own house; the right side reads the sheet’s cell as ' +
+      '`shift/weekStake.ts#weekSheetOf` fills it. Both are asked of Midtown Office’s week closed on ' +
+      'Friday under four Fridays: its own house, a house run that answered each way, one still ' +
+      'running, and a Friday that kept no record of its crowd.',
+    left: {
+      surfaceId: 'shift/dayClose.ts#dayCloseOf',
+      read: () =>
+        HOUSE_TODAY_FIXTURES.map(({ week, houseOf }) => {
+          const line = dayCloseOf({ week, report: HOUSE_TODAY_SHEET, houseOf })?.house;
+          if (line === undefined) return '?';
+          const own = /your day is the house’s, and it (cleared|missed|was not graded)/u.exec(line);
+          if (own !== null) return `${CLOSE_WORD[own[1] ?? ''] ?? '?'}/${CLOSE_WORD[own[1] ?? ''] ?? '?'}`;
+          const pair = /you (cleared it|missed it|were not graded); .* same crowd, (cleared it|missed it|was not graded|is still being run|could not be run on it)\./u.exec(line);
+          return pair === null ? '?' : `${CLOSE_WORD[pair[1] ?? ''] ?? '?'}/${CLOSE_WORD[pair[2] ?? ''] ?? '?'}`;
+        }).join(' '),
+    },
+    right: {
+      surfaceId: 'shift/weekStake.ts#weekSheetOf',
+      read: () =>
+        HOUSE_TODAY_FIXTURES.map(({ week, houseOf }) => {
+          const row = weekSheetOf(week, houseOf)?.rows.find((entry) => entry.day === week.day);
+          return row === undefined ? '?' : `${row.yours}/${row.house ?? 'not asked'}`;
+        }).join(' '),
+    },
+  },
 ]);
+
+/** The close's words for a verdict, as the sheet's cell names it — the `house-today` pair's reading. */
+const CLOSE_WORD: Readonly<Record<string, string>> = Object.freeze({
+  'cleared it': 'cleared',
+  cleared: 'cleared',
+  'missed it': 'missed',
+  missed: 'missed',
+  'were not graded': 'ungraded',
+  'was not graded': 'ungraded',
+  'is still being run': 'pending',
+  'could not be run on it': 'unrecorded',
+});
+
+/**
+ * The sheet the close is read over in the `house-today` pair. The lead's house line reads the week
+ * and the house alone; the sheet contributes only its tomorrow card, which the pair does not read.
+ */
+const HOUSE_TODAY_SHEET = Object.freeze({
+  of: 'week-day',
+  forecast: { name: '', note: '', demand: '' },
+}) as unknown as WeekDayReport;
+
+/**
+ * Midtown Office's week closed on Friday, its last counted day, under four Fridays — the
+ * `house-today` pair's states. Monday to Thursday are the same in all four; Friday differs in whose
+ * run it was and in what the house's run answered.
+ */
+const HOUSE_TODAY_FIXTURES: readonly {
+  readonly week: WeekState;
+  readonly houseOf: (day: number) => HouseReading | undefined;
+}[] = (() => {
+  const recordFor = (day: number, dispatcherId: string): WatchRecord =>
+    ({
+      version: WATCH_RECORD_VERSION,
+      seed: String(20_261_001 + day),
+      buildingId: 'midtown-office',
+      dispatcherId,
+      pattern: 'building',
+      demandTemplateId: null,
+      arrivalRatePctPop5min: null,
+      shiftLengthS: 36_000,
+      windowStartS: null,
+      day,
+      dayIdx: (day - 1) % 7,
+      outOfServiceCarIds: [],
+      interventions: [],
+      ruleRows: [],
+      rungContractId: null,
+    }) as unknown as WatchRecord;
+  const met = {
+    arrived: 400,
+    carryPct: 100,
+    minutePct: 100,
+    peakQueue: 0,
+    abandoned: 0,
+    abandonedCarried: 0,
+    horizonS: 900,
+    worstWaitS: 40,
+    worstWaitIsCensored: false,
+    workPerServedLegKJ: 41.2,
+  };
+  const weekWith = (friday: WatchRecord | null, fridayClean: boolean): WeekState => {
+    let week = openWeek('c2');
+    for (let day = 1; day <= 5; day += 1) {
+      if (day > 1) week = nextDay(week);
+      const clean = day === 5 ? fridayClean : day % 2 === 1;
+      week = closeDay(
+        week,
+        outcomeOf({
+          day,
+          dayIdx: day - 1,
+          eventId: scheduledEventFor(null, day, day - 1, 'whole-day').id,
+          arrived: 400,
+          carried: 380,
+          minutePct: clean ? 90 : 40,
+          readings: readGoals(goalsForDay(day), clean ? met : { ...met, peakQueue: 999, worstWaitS: 5000 }),
+          record: day === 5 ? friday : recordFor(day, 'eta'),
+          recordRefusal: null,
+        }),
+      );
+    }
+    return week;
+  };
+  return Object.freeze([
+    { week: weekWith(recordFor(5, houseStandingOrder()), true), houseOf: () => 'missed' as const },
+    { week: weekWith(recordFor(5, 'eta'), true), houseOf: (day: number) => (day === 5 ? 'missed' : 'cleared') },
+    { week: weekWith(recordFor(5, 'eta'), false), houseOf: (day: number) => (day === 5 ? 'cleared' : undefined) },
+    { week: weekWith(recordFor(5, 'eta'), true), houseOf: () => undefined },
+    { week: weekWith(null, false), houseOf: () => 'cleared' as const },
+  ]);
+})();
 
 /** The *nobody* pick with no rival and no refusal — the slot the standing pairs read. */
 const NOBODY = Object.freeze({

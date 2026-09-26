@@ -76,7 +76,7 @@ import {
 import { carsToDerate, type BankedBuilding, type CarRef, type Incident } from './incidents.js';
 import type { EventEffect, ShiftEvent, ShiftEventId } from './types.js';
 import { WRINKLE_LIBRARY } from '../wrinkles/library.js';
-import { composeWrinkle, drawWrinkle, type DrawHorizon } from '../wrinkles/draw.js';
+import { composeWrinkle, drawWrinkle, wrinkleOfDrawnId, type DrawHorizon } from '../wrinkles/draw.js';
 import type { WholeDayEpisode, WrinkleEffect } from '../wrinkles/types.js';
 
 /**
@@ -255,6 +255,26 @@ export function eventById(id: string): ShiftEvent | undefined {
  */
 export function eventFor(day: number, dayIdx: number, horizon: DrawHorizon = 'period'): ShiftEvent {
   const drawn = drawWrinkle(WRINKLE_LIBRARY, day, dayIdx, horizon);
+  return { id: drawn.id, name: drawn.name, note: drawn.note, effect: effectOfWrinkle(drawn.effect) };
+}
+
+/**
+ * **The event a drawn id names, exactly as {@link eventFor} would deal it**, or `undefined` for an
+ * id that is not a whole drawn id — wave AM, lane AM-D, [§ D1252](../../../../DECISIONS.md).
+ *
+ * The difference from {@link eventById} is the axes. `eventById('move-in:past-halfway')` answers
+ * the `move-in` template at its base effect, which is what a calendar booking means; this answers
+ * the move-in whose window is past halfway, which is what an authored week order means when it
+ * names that id for a day. A template with no axes is the same event either way, and
+ * `weekOrders.test.ts` holds that.
+ *
+ * Its non-test callers are `shift/calendar.ts#scheduledEventFor`, when the week deals an authored
+ * order, and `dev/state.ts#shiftRunConfigOf`, whose campaign-event branch reads a drawn id through
+ * it first so the week census (`shift/weekWay.test-helper.ts`) can hand a run one named wrinkle.
+ */
+export function eventOfDrawnId(drawnId: string): ShiftEvent | undefined {
+  const drawn = wrinkleOfDrawnId(WRINKLE_LIBRARY, drawnId);
+  if (drawn === undefined) return undefined;
   return { id: drawn.id, name: drawn.name, note: drawn.note, effect: effectOfWrinkle(drawn.effect) };
 }
 

@@ -13,7 +13,7 @@ import { closeDay, nextDay, openWeek, outcomeOf } from './week.js';
 import { goalsForDay, readGoals } from './goals.js';
 import { scheduledEventFor } from './calendar.js';
 import { practiceGroundOf } from './scoredCrowd.js';
-import { countedCleanOf, weekDealOf, weekHasClosed } from './weekStake.js';
+import { countedCleanOf, weekClosedByThisClose, weekDealOf } from './weekStake.js';
 import {
   dealtCrowdOf,
   derivedCrowdOf,
@@ -22,6 +22,8 @@ import {
   recordsWithDateCrowd,
   weekRecordFor,
   weekRecordLineOf,
+  weeksHeldLineOf,
+  weeksHeldOf,
   type WeekRecord,
 } from './weekRecord.js';
 import type { WeekState } from './types.js';
@@ -56,7 +58,7 @@ function fileOn(week: WeekState, seed: bigint): WeekState {
     outcomeOf({
       day: week.day,
       dayIdx: week.dayIdx,
-      eventId: scheduledEventFor(null, week.day, week.dayIdx, 'whole-day').id,
+      eventId: scheduledEventFor(null, week.day, week.dayIdx, 'whole-day', week).id,
       arrived: 400,
       carried: 400,
       minutePct: 100,
@@ -84,8 +86,8 @@ function fileOn(week: WeekState, seed: bigint): WeekState {
  */
 function recordClose(records: readonly WeekRecord[], week: WeekState, seed: bigint, date: bigint): readonly WeekRecord[] {
   let next = seed === date ? recordsWithDateCrowd(records, week.contractId, seed.toString()) : records;
-  const deal = weekDealOf(week.contractId);
-  if (deal !== undefined && weekHasClosed(week)) {
+  const deal = weekDealOf(week);
+  if (deal !== undefined && weekClosedByThisClose(week)) {
     next = recordsWithClosedWeek(next, week.contractId, countedCleanOf(week), deal.target);
   }
   return next;
@@ -157,6 +159,39 @@ describe('the record carries forward and buys nothing — § D1230', () => {
   it('never counts a week with no target as met', () => {
     const record = weekRecordFor(recordsWithClosedWeek([], 'c9', 0, 0), 'c9');
     expect([record.closed, record.met]).toEqual([1, 0]);
+  });
+
+  it('holds weeks in a row: a met week extends the run, a missed one ends it — § D1253', () => {
+    const run = (targets: readonly [number, number][]): WeekRecord => {
+      let records: readonly WeekRecord[] = [];
+      for (const [clean, target] of targets) records = recordsWithClosedWeek(records, 'c2', clean, target);
+      return weekRecordFor(records, 'c2');
+    };
+    expect(weeksHeldLineOf(weekRecordFor([], 'c2'))).toBeUndefined();
+    expect(weeksHeldOf(run([[4, 4], [5, 4]]))).toBe(2);
+    expect(weeksHeldOf(run([[4, 4], [5, 4], [3, 4]]))).toBe(0);
+    expect(weeksHeldOf(run([[4, 4], [2, 4], [4, 4]]))).toBe(1);
+    /* A week with no target is never held, so it ends a run as a missed week does. */
+    expect(weeksHeldOf(run([[4, 4], [0, 0]]))).toBe(0);
+    expect(weeksHeldLineOf(run([[4, 4], [5, 4]]))).toBe(
+      'Weeks held on this tower: 2 in a row, each with its target met. A missed week ends the run. ' +
+        'It buys nothing, and no clock runs on it: a week counts when you close it, however long that takes.',
+    );
+    expect(weeksHeldLineOf(run([[4, 4], [3, 4]]))).toBe(
+      'Weeks held on this tower: none in a row, because the last week closed here missed its target. ' +
+        'A missed week ends the run. It buys nothing, and no clock runs on it: a week counts when you ' +
+        'close it, however long that takes.',
+    );
+  });
+
+  it('reads an older record’s run only where its counts settle it, and never overstates one', () => {
+    const older = (closed: number, met: number): WeekRecord => ({ contractId: 'c2', closed, met, best: 4 });
+    expect(weeksHeldOf(older(3, 3))).toBe(3);
+    expect(weeksHeldOf(older(3, 0))).toBe(0);
+    expect(weeksHeldOf(older(3, 2))).toBeUndefined();
+    expect(weeksHeldLineOf(older(3, 2))).toBeUndefined();
+    /* The next close counts from 0 where the run was not kept. */
+    expect(weeksHeldOf(weekRecordFor(recordsWithClosedWeek([older(3, 2)], 'c2', 4, 4), 'c2'))).toBe(1);
   });
 
   it('keeps one line per tower', () => {

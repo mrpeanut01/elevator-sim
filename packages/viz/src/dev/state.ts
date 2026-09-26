@@ -97,6 +97,7 @@ import {
   demandTemplateVariesMix,
   eventCarChoice,
   eventById,
+  eventOfDrawnId,
   shiftRunPatch,
   wholeDayEpisodeOf,
 } from '../shift/events.js';
@@ -110,7 +111,7 @@ import {
   type ContractPressDay,
 } from '../shift/ladder.js';
 import { bookedOutCarsOf, carAbsencesOf, type BookedOutCar } from '../shift/bookedOut.js';
-import { dayCallsOffered } from '../shift/dayCalls.js';
+import { dayCallsOffered, type DayCallWrinkle } from '../shift/dayCalls.js';
 import { pressCallOf, type PressCall } from '../shift/pressCall.js';
 import { grownBuilding } from '../shift/growth.js';
 import { spliceEpisode, trafficProfilesWithRecord } from '../shift/episode.js';
@@ -1835,7 +1836,12 @@ export function pressDayCallOf(
       seed: state.seed,
       horizon,
       dispatcherId: state.dispatcherId,
-      interventions: state.interventions,
+      /*
+       * The day as measured is the log up to the call second. Since § D1204 a pinned day asks on
+       * after its call, and a later call answered with a press would otherwise unmeasure the pinned
+       * one (wave AM, lane AM-B, § D1239: the row vanished from the report on exactly those days).
+       */
+      interventions: state.interventions.filter((entry) => entry.atS <= call.atS),
     },
     call.atS,
   );
@@ -1854,7 +1860,15 @@ export function pressDayCallOf(
 export function dayCallFactsOf(
   resources: BrowserResources,
   state: ViewerState,
-): { readonly horizon: RunHorizon; readonly bookedOut: readonly BookedOutCar[]; readonly pinned: boolean } | undefined {
+):
+  | {
+      readonly horizon: RunHorizon;
+      readonly bookedOut: readonly BookedOutCar[];
+      readonly pinned: boolean;
+      /** The day's wrinkle as a stretch the session may call in — {@link dayCallWrinkleOf}. */
+      readonly wrinkle: DayCallWrinkle | undefined;
+    }
+  | undefined {
   const config = buildingConfigOf(resources, state.savedBuildings, state.buildingId);
   if (config === undefined) return undefined;
   const plan = shiftRunConfigOf(resources, state);
@@ -1869,7 +1883,34 @@ export function dayCallFactsOf(
       horizon,
     }) !== undefined;
   /* § D1149: the card's car line names a car out from the first instant too. A fact on the card, never a gate. */
-  return { horizon, bookedOut: carAbsencesOf(plan.building), pinned };
+  return { horizon, bookedOut: carAbsencesOf(plan.building), pinned, wrinkle: dayCallWrinkleOf(plan) };
+}
+
+/**
+ * **Where the day's wrinkle is, on the run's own clock** — wave AM, lane AM-F,
+ * [§ D1265](../../../../DECISIONS.md): the stretch `dev/dayCallSession.ts` may call in besides the
+ * peaks. Read off the run's plan, the schedule the run was built from:
+ *
+ * - a wrinkle spliced as an episode (a conference) is its episode, `ShiftRunConfig.episode`;
+ * - a wrinkle that takes a car for part of the day (a move-in, a shaft out) is that car's absence,
+ *   the car named in `ShiftRunConfig.dayCars.windows` — the day's own car, never the tower's booking;
+ * - anything else (an ordinary day, a whole-shift hold, a day whose wrinkle changes the crowd all
+ *   day) has no window, and `undefined`.
+ *
+ * Only a whole day reads it (`shift/dayCalls.ts#nextDayCallOf`), and only where it lies clear of
+ * every peak (`#dayCallWrinkleWindowOf`).
+ */
+export function dayCallWrinkleOf(plan: ShiftRunConfig): DayCallWrinkle | undefined {
+  if (plan.event.effect.changesNothing) return undefined;
+  if (plan.episode !== undefined) {
+    return Object.freeze({ startS: plan.episode.startS, endS: plan.episode.endS, name: plan.event.name });
+  }
+  const windowCars = new Set(plan.dayCars.windows);
+  const absence = carAbsencesOf(plan.building)
+    .filter((entry) => windowCars.has(entry.carId))
+    .sort((a, b) => a.awayAtS - b.awayAtS)[0];
+  if (absence === undefined || absence.backAtS === null) return undefined;
+  return Object.freeze({ startS: absence.awayAtS, endS: absence.backAtS, name: plan.event.name });
 }
 
 /**
@@ -2270,8 +2311,17 @@ export function shiftRunConfigOf(
           state.week.day,
           state.week.dayIdx,
           wholeDayRun ? 'whole-day' : 'period',
+          state.week,
         )
-      : (eventById(state.campaignEventId) ?? SHIFT_EVENTS.ordinary);
+      : /*
+         * A whole drawn id first, so a day handed one named wrinkle (`caterers:before-the-rush`)
+         * runs that wrinkle's axis values rather than its template's base: the week census hands a
+         * run an authored week order's day this way (lane AM-D, § D1252). A template id reads the
+         * same through either lookup, so a campaign day is unchanged.
+         */
+        (eventOfDrawnId(state.campaignEventId) ??
+        eventById(state.campaignEventId) ??
+        SHIFT_EVENTS.ordinary);
   const spec = selectedPatternSpec(resources, state, authored);
   const pattern = spec === undefined ? { demandTemplate: 'rise-and-fall' as const, demand: {} } : demandFromSpec(spec);
   /*

@@ -192,7 +192,16 @@ import {
   type SupportInput,
   type SupportRun,
 } from '../everyday/support.js';
-import { FIGURE_NOTE_HANDLE, everydayReportViewOf, WEEK_SHEET_STEP } from '../everyday/reportView.js';
+import { FIGURE_NOTE_HANDLE, everydayReportViewOf, REPORT_SECONDARY, WEEK_SHEET_STEP } from '../everyday/reportView.js';
+import {
+  DAY_CLOSE_HEADING,
+  DAY_CLOSE_WEEKEND_LINE,
+  dayCloseOf,
+  NO_CALL_DECIDED_LINE,
+  NO_CALL_RAISED_LINE,
+  type DayCloseView,
+} from '../shift/dayClose.js';
+import { NEXT_TOWER_STAY_LABEL, nextTowerOfferOf } from '../shift/nextTower.js';
 // GitHub issue #221's post block — the decision, seeded in all seven states by the report adapter.
 import { postRunViewOf } from '../everyday/postRun.js';
 import { CHIMES_PANEL_COPY } from '../everyday/chimesPanel.js';
@@ -266,6 +275,7 @@ import { DAY_ATTEMPT_COPY, resumeLabelOf } from '../shift/attempt.js';
 import type { PressCall } from '../shift/pressCall.js';
 import { PRESS_CALL_AGAIN, pressCallRowOf } from '../shift/callRow.js';
 import {
+  dayCallCountsLineOf,
   dayCallRecordOf,
   dayCallsQuietSentenceOf,
   dayCallWindowEndOf,
@@ -657,7 +667,9 @@ import { CONTRACTS, contractById, contractForBuilding, nextContract, statLineOf 
 import {
   bankingRefusalFor,
   LEFT_UNFINISHED_CANNOT_BANK,
+  ATTEMPT_CLOSES_ON_ITS_STAGE,
   ATTEMPT_LEFT_CANNOT_BANK,
+  ATTEMPT_SHOWN_TO_ITS_REACH,
   LOADED_RUN_CANNOT_BANK,
   UNCHOSEN_RUN_CANNOT_BANK,
 } from '../shift/banking.js';
@@ -688,6 +700,8 @@ import {
   NOT_RECORDED,
   PRACTICE_CROWD_NOTE,
   PRACTICE_ATTEMPT_NOTE,
+  PRACTICE_ENGINEER_NOTE,
+  PRACTICE_OTHER_TAB_NOTE,
   type DayReportInput,
   type ShapedDayReport,
   type ShiftPlan,
@@ -771,12 +785,13 @@ import {
   weekStakeLineOf,
   weekTargetMetLineOf,
   WEEK_WITHOUT_COUNTED_DAYS_SHORT,
+  WEEKEND_NOTE,
   type DealtDay,
   type HouseReading,
   type WeekDeal,
 } from '../shift/weekStake.js';
 import { PRACTICE_DAY_SENTENCES } from '../shift/scoredCrowd.js';
-import { derivedCrowdOf, weekRecordLineOf } from '../shift/weekRecord.js';
+import { derivedCrowdOf, weekRecordLineOf, weeksHeldLineOf } from '../shift/weekRecord.js';
 import { CONTINUE_WEEK_TITLE, continueWeekEntryOf } from '../everyday/continueWeek.js';
 import { WATCH_RECORD_VERSION, type WatchRecord } from '../watch/types.js';
 
@@ -2227,6 +2242,9 @@ const REPLAY: SurfaceAdapter = {
     'shift/banking.ts#LEFT_UNFINISHED_CANNOT_BANK',
     /* § D1218 — an attempt left for later, which no other surface files meanwhile. */
     'shift/banking.ts#ATTEMPT_LEFT_CANNOT_BANK',
+    /* Wave AM, lane AM-B, § D1239 — a scored attempt is played and closed on its own stage. */
+    'shift/banking.ts#ATTEMPT_CLOSES_ON_ITS_STAGE',
+    'shift/banking.ts#ATTEMPT_SHOWN_TO_ITS_REACH',
   ],
   render(context) {
     const verdict = verifyReplay(context.recording, context.recording);
@@ -2272,6 +2290,19 @@ const REPLAY: SurfaceAdapter = {
       {
         field: 'attemptLeftCannotBank',
         text: ATTEMPT_LEFT_CANNOT_BANK,
+        role: 'reason',
+        provenance: 'authored',
+      },
+      /* The fifth and its transport line — § D1239's attempt, closed and shown only by its stage. */
+      {
+        field: 'attemptClosesOnItsStage',
+        text: ATTEMPT_CLOSES_ON_ITS_STAGE,
+        role: 'reason',
+        provenance: 'authored',
+      },
+      {
+        field: 'attemptShownToItsReach',
+        text: ATTEMPT_SHOWN_TO_ITS_REACH,
         role: 'reason',
         provenance: 'authored',
       },
@@ -3773,6 +3804,14 @@ const SHIFT_REPORT: SurfaceAdapter = {
      * through `dayCallRowOf` on the same sheet.
      */
     'shift/report.ts#PRACTICE_ATTEMPT_NOTE',
+    /*
+     * Wave AM, lane AM-B, § D1239: the practice notes for a close from the Engineer surface while an
+     * attempt stands and for a close another tab beat, by name beside `PRACTICE_ATTEMPT_NOTE` for its
+     * reason; and the pinned row's later-press sentence and counts, on two more arms below.
+     */
+    'shift/report.ts#PRACTICE_ENGINEER_NOTE',
+    'shift/report.ts#PRACTICE_OTHER_TAB_NOTE',
+    'shift/callRow.ts#PRESS_CALL_LATER_NOTE',
     'shift/dayCalls.ts#dayCallCountsLineOf',
     'shift/goals.ts#GOAL_PLAIN_NAMES',
     'shift/goals.ts#goalPlainNameOf',
@@ -3844,13 +3883,37 @@ const SHIFT_REPORT: SurfaceAdapter = {
           act: undefined,
         };
         /* § D1151: and the fourth arm, a skip with the card up, which is not *nothing was pressed*. */
-        const answers: readonly (readonly [string, readonly RunInterventionConfig[], boolean])[] = [
+        /*
+         * § D1239: the call's three counts, in a fixture record counted by the shipped builder over
+         * this case's own legs (the stand-in the ordinary rows' fixture uses), and a later call's press.
+         */
+        const pinnedCounts = dayCallCountsLineOf(
+          dayCallRecordOf({
+            atS: call.atS,
+            windowEndS: dayCallWindowEndOf(call.atS, recording.endedAt),
+            answer: 'leave',
+            legs: { 'park-cars-lobby': recording.legs, 'spread-cars': recording.legs, leave: recording.legs },
+            observations: {
+              'park-cars-lobby': bundle.observations,
+              'spread-cars': bundle.observations,
+              leave: bundle.observations,
+            },
+          }),
+          (simTimeS) => clockOf(simTimeS, DAY_START_S),
+        );
+        const pressedAt = (atS: number, kind: string): RunInterventionConfig => ({
+          atS,
+          change: { kind } as RunInterventionConfig['change'],
+        });
+        const answers: readonly (readonly [string, readonly RunInterventionConfig[], boolean, string?])[] = [
           ['none', [], false],
           ['skipped', [], true],
-          [pin.clearedBy, [{ atS: call.atS, change: { kind: pin.clearedBy } as RunInterventionConfig['change'] }], false],
-          [pin.missedBy, [{ atS: call.atS, change: { kind: pin.missedBy } as RunInterventionConfig['change'] }], false],
+          [pin.clearedBy, [pressedAt(call.atS, pin.clearedBy)], false],
+          [pin.missedBy, [pressedAt(call.atS, pin.missedBy)], false],
+          ['counted', [pressedAt(call.atS, pin.clearedBy)], false, pinnedCounts],
+          ['later', [pressedAt(call.atS, pin.missedBy), pressedAt(call.atS + 660, pin.clearedBy)], false],
         ];
-        for (const [answer, interventions, skipped] of answers) {
+        for (const [answer, interventions, skipped, countsLine] of answers) {
           const row = pressCallRowOf(
             {
               press: pin,
@@ -3858,6 +3921,7 @@ const SHIFT_REPORT: SurfaceAdapter = {
               interventions,
               nameOf: (id) => context.dispatcherProfiles.profiles.find((profile) => profile.id === id)?.name,
               skipped,
+              countsLine,
             },
             (simTimeS) => clockOf(simTimeS, DAY_START_S),
           );
@@ -4078,6 +4142,9 @@ const SHIFT_REPORT: SurfaceAdapter = {
       seeds.push({ field: `${at}.practiceCrowdNote`, text: PRACTICE_CROWD_NOTE, role: 'prose' });
       /* § D1218's practice-while-an-attempt-stands note, by name — see the `covers` entry above. */
       seeds.push({ field: `${at}.practiceAttemptNote`, text: PRACTICE_ATTEMPT_NOTE, role: 'prose' });
+      /* § D1239's two practice notes, by name — see the `covers` entries above. */
+      seeds.push({ field: `${at}.practiceEngineerNote`, text: PRACTICE_ENGINEER_NOTE, role: 'prose' });
+      seeds.push({ field: `${at}.practiceOtherTabNote`, text: PRACTICE_OTHER_TAB_NOTE, role: 'prose' });
       /* Wave AL: the title line after a handover, on the run's own clock. */
       seeds.push({
         field: `${at}.driversLine(handover)`,
@@ -11922,6 +11989,7 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
      */
     'everyday/stageCall.ts#stageCallCardOf',
     'everyday/stageCall.ts#STAGE_CALL_COPY',
+    'everyday/stageCall.ts#stageCallWrinkleLineOf',
     /*
      * Wave AL, lane AL-E, § D1219: each answered call's row on the stage once its window can be
      * observed. Seeded below over a call on this case's own run at a playhead the call plus 660 s
@@ -12375,6 +12443,21 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
         { atS: act.startS, rule: 'act-start', carId, awayAtS, backAtS: null, act },
         /* § D1150: an ordinary call with no car out, whose question is about all the cars. */
         { atS: recording.startedAt + span * 0.15, rule: 'first-minute-wait', carId: '', awayAtS: recording.startedAt + span * 0.15, backAtS: null, act: undefined, carAway: false },
+        /*
+         * § D1265: an ordinary call at the start of the day's wrinkle, clear of the peaks, with the
+         * wrinkle's own name and clock on its card. Named from `SHIFT_EVENTS`' move-in, the wrinkle
+         * Midtown's Tuesday deals, so the line is the one a player meets.
+         */
+        {
+          atS: recording.startedAt + span * 0.7,
+          rule: 'wrinkle-start',
+          carId: '',
+          awayAtS: recording.startedAt + span * 0.7,
+          backAtS: null,
+          act: { startS: recording.startedAt + span * 0.7, endS: recording.startedAt + span * 0.8 },
+          carAway: false,
+          wrinkle: { name: SHIFT_EVENTS['move-in']?.name ?? 'Move-in day', startS: recording.startedAt + span * 0.7 },
+        },
       ];
       /* Two cars out together where the building has two, so the plural line is swept too. */
       const secondCarId = recording.shafts[1]?.carId;
@@ -12425,6 +12508,11 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
         }
       }
       seeds.push({ field: 'stage.call.held', text: STAGE_CALL_COPY.held, role: 'label' });
+      /* Wave AM, lane AM-B, § D1239 — the hold while a card is up, and a practice run's line on the stage. */
+      seeds.push({ field: 'stage.call.heldAtCall', text: STAGE_CALL_COPY.heldAtCall, role: 'label' });
+      for (const [ground, sentence] of Object.entries(PRACTICE_DAY_SENTENCES)) {
+        seeds.push({ field: `stage.practice(${ground})`, text: sentence, role: 'prose' });
+      }
       /* § D1219 — the stage's mid-day call row, on this case's own legs; see the `covers` entry. */
       {
         const callAtS = recording.startedAt + 60;
@@ -14102,16 +14190,39 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
      */
     'shift/weekStake.ts#weekTargetMetLineOf',
     'everyday/reportView.ts#WEEK_SHEET_STEP',
+    /*
+     * Wave AM, lane AM-C (§ D1246 to § D1249): the close's lead, its two secondary presses, the
+     * weekend offered off the main path, and the call sentence's words for an answer. Seeded over
+     * each case's own filed sheet in the report states above and over Midtown's week, day by day,
+     * in `seedDayClose`, because the lead's census lines speak only on a census tower.
+     */
+    'shift/dayClose.ts#dayCloseOf',
+    'shift/dayClose.ts#decidingCallLineOf',
+    'shift/dayClose.ts#DAY_CLOSE_HEADING',
+    'shift/dayClose.ts#DAY_CLOSE_WEEKEND_LINE',
+    'shift/dayClose.ts#NO_CALL_DECIDED_LINE',
+    'shift/dayClose.ts#NO_CALL_RAISED_LINE',
+    'shift/dayCalls.ts#dayCallAnswerWordsOf',
+    'everyday/reportView.ts#REPORT_SECONDARY',
+    'shift/weekStake.ts#WEEKEND_NOTE',
     'everyday/weekView.ts#WEEK_START_NEXT_LABEL',
     'shift/weekRecord.ts#weekRecordLineOf',
+    /* Weeks held on this tower — lane AM-D, § D1253: the run's two arms, drawn on the sheet and the door. */
+    'shift/weekRecord.ts#weeksHeldLineOf',
     'everyday/continueWeek.ts#continueWeekEntryOf',
     'everyday/continueWeek.ts#CONTINUE_WEEK_TITLE',
+    /* Lane AM-E (§ D1259): a held week's next tower, seeded in `seedWeekStake` for the same reason. */
+    'shift/nextTower.ts#nextTowerOfferOf',
+    'shift/nextTower.ts#NEXT_TOWER_STAY_LABEL',
   ],
   render(context) {
     const seeds: TextSeed[] = [];
     const bundle = shiftBundleOf(context);
     seeds.push({ field: 'today.driverHeld', text: PRESS_DAY_DRIVER_HELD, role: 'prose' });
-    seedWeekStake(seeds, bundle.observations);
+    seedWeekStake(seeds, bundle.observations, (buildingId) =>
+      context.buildings.find((building) => building.id === buildingId)?.name,
+    );
+    seedDayClose(seeds, context, bundle);
     seeds.push({ field: 'brief.wayThrough.heading', text: BRIEF_WAY_THROUGH_HEADING, role: 'label' });
     for (const row of WEEK_WAY.rows) {
       for (const eventId of [row.eventId, 'another-wrinkle']) {
@@ -14710,6 +14821,29 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
         if (view.staleNote !== undefined) {
           seeds.push({ field: `${where}.stale`, text: view.staleNote, role: 'reason' });
         }
+      }
+      /*
+       * **The close's lead** — wave AM, lane AM-C (§ D1246 to § D1249). The filed sheet over the
+       * case's own week, under the house's three answers: not yet, clean and missed. On a tower the
+       * census does not speak for the lead is the call and tomorrow alone, which is itself a state
+       * a player reaches; Midtown's week, where every line speaks, is seeded in `seedDayClose`.
+       */
+      for (const [label, house] of [
+        ['pending', undefined],
+        ['cleared', 'cleared'],
+        ['missed', 'missed'],
+      ] as const) {
+        const view = everydayReportViewOf({
+          report: entry.report,
+          previous: undefined,
+          overnight: undefined,
+          newerRunOnStage: false,
+          week: entry.week,
+          house: () => house,
+        });
+        seedDayCloseView(seeds, `${at}.report.close.${label}`, view.close);
+        seeds.push({ field: `${at}.report.close.${label}.week`, text: view.secondary.week, role: 'label' });
+        seeds.push({ field: `${at}.report.close.${label}.menu`, text: view.secondary.menu, role: 'label' });
       }
     }
 
@@ -16916,7 +17050,11 @@ export { batchReport, evidenceFrom };
  * case's own readings, so the sheet's figures are the case's rather than a fixture's, under the
  * house's three states.
  */
-function seedWeekStake(seeds: TextSeed[], observations: Observations): void {
+function seedWeekStake(
+  seeds: TextSeed[],
+  observations: Observations,
+  nameOf: (buildingId: string) => string | undefined,
+): void {
   seeds.push({ field: 'brief.week.heading', text: BRIEF_WEEK_HEADING, role: 'label' });
   seeds.push({ field: 'week.stake.short', text: WEEK_WITHOUT_COUNTED_DAYS_SHORT, role: 'reason' });
   seeds.push({ field: 'week.day.unmeasured', text: DAY_UNMEASURED_SENTENCE, role: 'reason' });
@@ -17033,12 +17171,132 @@ function seedWeekStake(seeds: TextSeed[], observations: Observations): void {
   seeds.push({ field: 'week.sheetStep.label', text: WEEK_SHEET_STEP.label, role: 'label' });
   seeds.push({ field: 'week.sheetStep.note', text: WEEK_SHEET_STEP.note, role: 'prose' });
   seeds.push({ field: 'week.startNext', text: WEEK_START_NEXT_LABEL, role: 'label' });
+  /*
+   * Lane AM-E (§ D1259): a held week's sheet offers the next tower the census admits. Drawn only at
+   * a held week's close, which no corpus case's one day reaches, so it is seeded here for every
+   * census tower whose week has a target, held at exactly that target.
+   */
+  for (const contract of CONTRACTS) {
+    const deal = weekDealOf(contract.id);
+    if (deal === undefined || deal.target === 0) continue;
+    const offer = nextTowerOfferOf(contract.id, { yours: deal.target, target: deal.target }, nameOf);
+    if (offer === undefined) continue;
+    seeds.push({ field: `week.onward.${contract.id}.label`, text: offer.label, role: 'label' });
+    seeds.push({ field: `week.onward.${contract.id}.line`, text: offer.line, role: 'observation' });
+  }
+  seeds.push({ field: 'week.onward.stay', text: NEXT_TOWER_STAY_LABEL, role: 'label' });
   for (const [arm, record] of [
     ['one', { contractId: 'c2', closed: 1, met: 0, best: 3 }],
     ['several', { contractId: 'c2', closed: 3, met: 2, best: 5 }],
   ] as const) {
     seeds.push({ field: `week.record.${arm}`, text: weekRecordLineOf(record) ?? '', role: 'observation' });
   }
+  /* Weeks held on this tower — § D1253: a run ended by a missed week, and a run of two. */
+  for (const [arm, record] of [
+    ['ended', { contractId: 'c2', closed: 2, met: 1, best: 4, held: 0 }],
+    ['running', { contractId: 'c2', closed: 3, met: 2, best: 5, held: 2 }],
+  ] as const) {
+    seeds.push({ field: `week.held.${arm}`, text: weeksHeldLineOf(record) ?? '', role: 'observation' });
+  }
+}
+
+/** One close's lead, seeded field by field — {@link seedDayClose} and the report states. */
+function seedDayCloseView(seeds: TextSeed[], at: string, close: DayCloseView | undefined): void {
+  if (close === undefined) return;
+  seeds.push({ field: `${at}.heading`, text: DAY_CLOSE_HEADING, role: 'label' });
+  if (close.house !== undefined) seeds.push({ field: `${at}.house`, text: close.house, role: 'observation' });
+  if (close.tally !== undefined) seeds.push({ field: `${at}.tally`, text: close.tally, role: 'observation' });
+  if (close.call !== undefined) seeds.push({ field: `${at}.call`, text: close.call, role: 'observation' });
+  if (close.arithmetic !== undefined) seeds.push({ field: `${at}.arithmetic`, text: close.arithmetic, role: 'observation' });
+  seeds.push({ field: `${at}.tomorrow.heading`, text: close.tomorrow.heading, role: 'label' });
+  seeds.push({ field: `${at}.tomorrow.wrinkle`, text: close.tomorrow.wrinkle, role: 'prose' });
+  seeds.push({ field: `${at}.tomorrow.moveIns`, text: close.tomorrow.moveIns, role: 'observation' });
+  if (close.tomorrow.counts !== undefined) seeds.push({ field: `${at}.tomorrow.counts`, text: close.tomorrow.counts, role: 'reason' });
+  if (close.tomorrow.census !== undefined) seeds.push({ field: `${at}.tomorrow.census`, text: close.tomorrow.census, role: 'observation' });
+  if (close.tomorrow.weekend !== undefined) seeds.push({ field: `${at}.tomorrow.weekend`, text: close.tomorrow.weekend, role: 'prose' });
+}
+
+/**
+ * **The close's lead over Midtown Office's week, day by day** — wave AM, lane AM-C (§ D1246 to
+ * § D1249). Midtown is the one tower whose week the census contests, so it is the one on which every
+ * line of the lead speaks: the house in each of its answers, the tally, the arithmetic in its three
+ * states (open, met, out of reach) and tomorrow's census count. The week is closed day by day on the
+ * case's own readings, or on readings forced to miss for the first two days, and each close's sheet
+ * is the case's own recording filed as that day, so every tomorrow card is `report.ts`'s own.
+ */
+function seedDayClose(seeds: TextSeed[], context: HonestyContext, bundle: ShiftBundle): void {
+  const { observations } = bundle;
+  const missed: Observations = { ...observations, peakQueue: Number.MAX_SAFE_INTEGER };
+  const standing = houseStandingOrder();
+  for (const [arm, missFirst] of [
+    ['asRead', 0],
+    ['lost', 2],
+  ] as const) {
+    let week = openWeek('c2');
+    for (let day = 1; day <= 5; day += 1) {
+      if (day > 1) week = nextDay(week);
+      const dayIdx = day - 1;
+      const event = scheduledEventFor(null, day, dayIdx, 'whole-day');
+      const goals = goalsForDay(day, 'whole-day');
+      const read = day <= missFirst ? missed : observations;
+      week = closeDay(
+        week,
+        outcomeOf({
+          record: weekStakeRecord(day, day === 1 ? standing : 'another-driver'),
+          recordRefusal: null,
+          day,
+          dayIdx,
+          eventId: event.id,
+          arrived: read.arrived,
+          carried: read.carried,
+          minutePct: read.minutePct,
+          readings: readGoals(goals, read),
+        }),
+      );
+      const report = dayReportOf({
+        recording: context.recording,
+        observations,
+        goals,
+        week,
+        contract: contractById('c2'),
+        event,
+        calendar: null,
+        subject: { kind: 'week-day' },
+        plan: planFor(context),
+        dispatcherName: bundle.dispatcherName,
+        dayStartS: DAY_START_S,
+        wholeDayRun: true,
+      });
+      if (report.of !== 'week-day') continue;
+      for (const [house, houseOf] of [
+        ['pending', () => undefined],
+        ['answered', (at: number) => (at % 2 === 0 ? 'missed' : 'cleared')],
+      ] as const) {
+        /*
+         * The two populations are the pair swarm DO's S2 read off Midtown's day 1 and day 2
+         * buildings on the shipped bundle (589 → 608); the corpus resolves no second building here,
+         * and the sentence's shape, not its count, is what this seeds.
+         */
+        const close = dayCloseOf({ week, report, houseOf, population: { today: 589, tomorrow: 608 } });
+        seedDayCloseView(seeds, `week.close.${arm}.day${String(day)}.${house}`, close);
+      }
+    }
+    const sheet = weekSheetOf(week, () => 'missed');
+    if (sheet?.weekend !== undefined) {
+      seeds.push({ field: `week.sheet.${arm}.weekend.label`, text: sheet.weekend.label, role: 'label' });
+      seeds.push({ field: `week.sheet.${arm}.weekend.note`, text: sheet.weekend.note, role: 'prose' });
+    }
+  }
+  for (const [label, line] of [
+    ['decided', NO_CALL_DECIDED_LINE],
+    ['raised', NO_CALL_RAISED_LINE],
+  ] as const) {
+    seeds.push({ field: `week.close.noCall.${label}`, text: line, role: 'reason' });
+  }
+  seeds.push({ field: 'week.close.weekend', text: DAY_CLOSE_WEEKEND_LINE, role: 'prose' });
+  seeds.push({ field: 'week.close.weekendNote', text: WEEKEND_NOTE, role: 'prose' });
+  seeds.push({ field: 'week.close.secondary.week', text: REPORT_SECONDARY.week, role: 'label' });
+  seeds.push({ field: 'week.close.secondary.menu', text: REPORT_SECONDARY.menu, role: 'label' });
 }
 
 /** A run record for a day of Midtown's week in {@link seedWeekStake}: the dispatcher is all that varies. */

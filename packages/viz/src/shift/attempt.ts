@@ -100,6 +100,12 @@ export interface DayAttempt {
   readonly pressCallSkipped: boolean;
   /** The ordinary day's calls as they stood, or `null` where the session was never opened. */
   readonly calls: DayCallResume | null;
+  /**
+   * A pinned day's call, counted from its three runs as an ordinary call is (wave AM, lane AM-B,
+   * [§ D1239](../../../../DECISIONS.md)), so a resumed attempt still prints its row. Absent on an
+   * attempt whose pinned call has not been answered, or whose runs have not landed.
+   */
+  readonly pinnedCall?: DayCallRecord | undefined;
 }
 
 /**
@@ -117,6 +123,54 @@ export function attemptStandsOn(
   }
   if (week.closedDay === attempt.day) return false;
   return !week.history.some((entry) => entry.day === attempt.day);
+}
+
+/**
+ * **The attempt standing on any of `weeks`**, the live week or a parked one — wave AM, lane AM-B,
+ * [§ D1239](../../../../DECISIONS.md), the post-AL panel's seat D. Seat D changed the Engineer
+ * surface's building mid-attempt and scrubbed the new tower's run to its end, and that filed and
+ * banked a Chancery House Monday while the Midtown attempt stood parked. While this answers an
+ * attempt, a run closed from the Engineer surface banks nothing into any week
+ * (`dev/main.ts#closeShift`). `undefined` where none stands.
+ */
+export function attemptStandingAmong(
+  attempts: ReadonlyMap<string, DayAttempt>,
+  weeks: readonly Pick<WeekState, 'contractId' | 'day' | 'dayIdx' | 'closedDay' | 'history'>[],
+): DayAttempt | undefined {
+  for (const week of weeks) {
+    const attempt = attempts.get(week.contractId);
+    if (attemptStandsOn(attempt, week)) return attempt;
+  }
+  return undefined;
+}
+
+/**
+ * **Whether the week this device has stored has filed the day `held` still holds open** — § D1239,
+ * the post-AL panel's seat D (D2). Two tabs each held Wednesday open; the first closed it and banked,
+ * and the second closed it from its own memory of the week, banked again and wrote its week over the
+ * first. The close now reads `stored` (the same tower's week as this device's storage holds it at
+ * the close) and a day it has filed is practice in this tab.
+ *
+ * Filed elsewhere: `stored` holds the day in its history or as its closed day, or has moved past it
+ * (opened a later day, or rolled over into a new week whose day number is lower). `false` where this
+ * tab has filed the day itself, where `stored` is absent or of another tower, and where `stored` is
+ * this tab's own week. A stored week *behind* this tab's (a later day of it written over by a stale
+ * tab) is not read as a filing: only a later day, or a rolled week whose history is empty. **Not
+ * reached**: a stored week that has rolled over and come back round to this day with nothing filed,
+ * which reads as this day still open.
+ */
+export function dayFiledElsewhere(
+  held: Pick<WeekState, 'contractId' | 'day' | 'dayIdx' | 'closedDay' | 'history'>,
+  stored: Pick<WeekState, 'contractId' | 'day' | 'dayIdx' | 'closedDay' | 'history'> | undefined,
+): boolean {
+  if (stored === undefined || stored.contractId !== held.contractId) return false;
+  const holds = (week: typeof held): boolean =>
+    week.history.some((entry) => entry.day === held.day && entry.dayIdx === held.dayIdx);
+  if (held.closedDay === held.day || holds(held)) return false;
+  if (stored.day === held.day && stored.dayIdx === held.dayIdx) return stored.closedDay === held.day || holds(stored);
+  /* Gone on to a later day of the same week, or rolled into a new one, whose history starts empty. */
+  if (stored.day > held.day) return true;
+  return stored.history.length === 0 && held.history.length > 0;
 }
 
 /** `attempt` with {@link DayAttempt.shownToS} moved on to `atS` where that is further; never back. */

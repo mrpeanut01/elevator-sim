@@ -31,6 +31,7 @@ import { collectSearchSpace, type SearchSpace } from '@elevator-sim/experiments/
 import { restrictedFloorIds } from '../access/zoning.js';
 import { mixedFleetBanks } from '../commissioning/choices.js';
 import { scenarioHorizonFor } from '../shift/dayLength.js';
+import { weekOrderIssues } from '../shift/weekOrders.js';
 import { WEEK_WAY, weekWayIssues } from '../shift/weekWay.js';
 import { CONTRACT_LADDER, contractLadderIssues } from '../shift/ladder.js';
 import { parseEngineeringBriefs, type EngineeringBriefs } from '../briefs/parse.js';
@@ -269,7 +270,11 @@ export async function loadBrowserResources(): Promise<BrowserResources> {
    * for it; this says why, beside the ladder's own issues and on the same warning footing.
    * `shift/weekWay.test.ts` is where a stale row is a failing test.
    */
-  const censusIssues = weekWayIssues(WEEK_WAY).map((issue) => `week-way.json: ${issue}`);
+  const censusIssues = [
+    ...weekWayIssues(WEEK_WAY).map((issue) => `week-way.json: ${issue}`),
+    /* The authored week orders — lane AM-D, § D1252. `shift/weekOrders.test.ts` is where one is a failing test. */
+    ...weekOrderIssues().map((issue) => `contract-ladder.json: ${issue}`),
+  ];
 
   return {
     priceSchedule,

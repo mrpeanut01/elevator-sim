@@ -262,3 +262,29 @@ export function drawWrinkle(
   );
   return composeWrinkle(template, chosen);
 }
+
+/**
+ * **The wrinkle a drawn id names, exactly**, or `undefined` — wave AM, lane AM-D,
+ * [§ D1252](../../../../DECISIONS.md).
+ *
+ * A drawn id is a template id followed by one value id per axis, in axis order, joined by `:`
+ * (`shaft-out:morning`, `ordinary`), which is what {@link composeWrinkle} writes. This reads one
+ * back: the template, and every axis at the named value. An id that names a template and fewer or
+ * more values than it has axes is not a drawn id and answers `undefined` rather than guessing the
+ * missing values, because a guessed axis is a different day from the one written down.
+ *
+ * Its caller is `shift/events.ts#eventOfDrawnId`, which the authored week orders
+ * (`shift/weekOrders.ts`) deal through.
+ */
+export function wrinkleOfDrawnId(library: WrinkleLibrary, drawnId: string): DrawnWrinkle | undefined {
+  const [templateId = '', ...valueIds] = drawnId.split(':');
+  const template = library.templates.find((entry) => entry.id === templateId);
+  if (template === undefined || valueIds.length !== template.axes.length) return undefined;
+  const chosen: WrinkleAxisValue[] = [];
+  for (const [index, axis] of template.axes.entries()) {
+    const value = axis.values.find((entry) => entry.id === valueIds[index]);
+    if (value === undefined) return undefined;
+    chosen.push(value);
+  }
+  return composeWrinkle(template, chosen);
+}
