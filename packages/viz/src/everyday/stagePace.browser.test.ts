@@ -51,7 +51,12 @@ async function playDayOn(contractId: string): Promise<Page> {
   const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
   await page.goto(origin, { waitUntil: 'domcontentloaded' });
   await openEverydayDoor(page);
-  await page.click(`.everyday-door-tower[data-contract="${contractId}"]`);
+  /*
+   * The tower may already be the week standing: since § D1178 a newcomer's first week is Midtown, and
+   * the door draws the week you are playing as a selected, disabled row. Press it only when it is not.
+   */
+  const tower = page.locator(`.everyday-door-tower[data-contract="${contractId}"]`);
+  if ((await tower.getAttribute('data-selected')) !== 'true') await tower.click();
   await page.waitForSelector(`.everyday-door-tower[data-contract="${contractId}"][data-selected="true"]`, {
     timeout: 30_000,
   });
