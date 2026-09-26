@@ -210,8 +210,21 @@ import { DEFAULT_LEVERS } from '../authoring/dispatcherSpec.js';
 import { runIdentityIssues } from '../scope/runIdentity.js';
 import { demandFromSpec, specFromTrafficProfile } from '../authoring/patternSpec.js';
 import { contractById, statLineOf } from '../shift/contracts.js';
-import { ATTEMPT_LEFT_CANNOT_BANK, bankingRefusalFor, UNCHOSEN_RUN_CANNOT_BANK } from '../shift/banking.js';
-import { attemptResumeAtS, attemptShownTo, attemptStandsOn, type DayAttempt } from '../shift/attempt.js';
+import {
+  ATTEMPT_CLOSES_ON_ITS_STAGE,
+  ATTEMPT_LEFT_CANNOT_BANK,
+  ATTEMPT_SHOWN_TO_ITS_REACH,
+  bankingRefusalFor,
+  UNCHOSEN_RUN_CANNOT_BANK,
+} from '../shift/banking.js';
+import {
+  attemptResumeAtS,
+  attemptShownTo,
+  attemptStandingAmong,
+  attemptStandsOn,
+  dayFiledElsewhere,
+  type DayAttempt,
+} from '../shift/attempt.js';
 import { shiftObservationsOf } from '../shift/observations.js';
 import { pressCounterfactualOf } from '../shift/counterfactual.js';
 import { carAbsencesOf, type BookedOutCar } from '../shift/bookedOut.js';
@@ -223,7 +236,7 @@ import {
   type DayReportInput,
   type ShapedDayReport,
 } from '../shift/report.js';
-import { HISTORY_DAYS, MODE_WEEK_CONTRACT_IDS, outcomeOf, wasGraded } from '../shift/week.js';
+import { HISTORY_DAYS, MODE_WEEK_CONTRACT_IDS, outcomeOf, switchWeek, wasGraded } from '../shift/week.js';
 import {
   dayCountsToward,
   houseNeedOf,
@@ -258,9 +271,13 @@ import { mountFixitPanel } from './fixitPanel.js';
 import { createOffThreadRunner, type OffThreadRun } from './offThreadRuns.js';
 import { openDayCallSession, type DayCallSession } from './dayCallSession.js';
 import {
+  dayCallChangeOf,
   dayCallDriversOf,
+  dayCallRecordOf,
+  dayCallWindowEndOf,
   type DayCallAnswer,
   type DayCallOnStage,
+  type DayCallRecord,
   type DayCallsQuiet,
 } from '../shift/dayCalls.js';
 import type { PressCall } from '../shift/pressCall.js';
@@ -1801,6 +1818,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
   let dayAttempts: ReadonlyMap<string, DayAttempt> = new Map();
   /** The recording that is the standing attempt's latest run, while it is in memory. */
   let attemptRecording: VizRecording | undefined;
+  /** The run `holdAtTheAttemptsReach` last said its line about, so it is said once a run — § D1239. */
+  let heldRunId: string | undefined;
   /**
    * What the next `'player'` ask is for — set by {@link beginDayAttempt} and
    * {@link resumeDayAttempt} on the line before their `runShift`, and latched by `runShift` into
@@ -1855,6 +1874,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
       ...attempt,
       ...(onScreen && dayCallSession !== undefined ? { calls: dayCallSession.snapshot() } : {}),
       ...(onScreen && pressCallSkipped ? { pressCallSkipped: true, pinnedCallDone: true } : {}),
+      ...(onScreen && pinnedCallCounts !== undefined ? { pinnedCall: pinnedCallCounts } : {}),
       ...change,
     });
   }
@@ -1982,6 +2002,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
     /* The attempt's own day and its pinned call's state, which a fresh ask would have reset. */
     runDaySeed = BigInt(attempt.daySeed);
     pressCallSkipped = attempt.pressCallSkipped;
+    /* § D1239: the pinned call's record, which the fresh ask above dropped. */
+    pinnedCallCounts = attempt.pinnedCall;
     return true;
   }
 
@@ -3805,13 +3827,96 @@ function boot(ui: Elements, resources: BrowserResources): void {
   ): DayReportInput['pressCall'] => {
     const measured = pressDayCallOf(resources, state, asBuilt);
     if (measured === undefined) return undefined;
+    const counted = pinnedCallRecordNow();
     return {
       press: measured.press,
       call: measured.call,
       nameOf: (id) => profileById(resources, state.savedDispatchers, id).name,
-      skipped: pressCallSkipped && state.interventions.length === 0,
+      skipped: pressCallSkipped && !state.interventions.some((entry) => entry.atS <= measured.call.atS),
+      ...(counted !== undefined && counted.atS === measured.call.atS ? { counts: counted } : {}),
     };
   };
+
+  /**
+   * **A pinned day's call, counted as an ordinary call is** — wave AM, lane AM-B,
+   * [§ D1239](../../../../DECISIONS.md), the post-AL panel's seats B and D. The pinned Monday's call
+   * is the one the day turns on, and it was the one call that never got a *What the calls did* row:
+   * § D1029 measured it across moments for its verdicts and never ran its three answers forward
+   * from the call second. When it is answered or skipped, the day is run twice more from that
+   * second, *park the cars in the lobby* and *spread the cars across the tower*, with every earlier
+   * press kept; *leave them* is the run on screen, which the answer has not yet replaced. The
+   * record is § D1138's (`shift/dayCalls.ts#dayCallRecordOf`), so the stage's row and the sheet's
+   * sentence count exactly as an ordinary call's do. Its own runner, for {@link houseRunner}'s
+   * reason: the ordinary calls the answer opens must not supersede it, nor it them.
+   */
+  const pinnedCallRunner = createOffThreadRunner({ spawn: spawnRunWorker });
+  /** The pinned call's counted record, with no answer stamped — see {@link pinnedCallRecordNow}. */
+  let pinnedCallCounts: DayCallRecord | undefined;
+  /** The ask in flight on {@link pinnedCallRunner}, so a landing a fresh ask replaced is dropped. */
+  let pinnedCallAsk: object | undefined;
+
+  function measurePinnedCall(): void {
+    const leave = state.recording;
+    if (leave === undefined || leave !== simulatedRecording || !advancesTheWeek(state.playMode)) return;
+    const measured = pressDayCallOf(resources, state, leave);
+    if (measured === undefined || pinnedCallCounts?.atS === measured.call.atS) return;
+    const atS = measured.call.atS;
+    const planned = (answer: 'park-cars-lobby' | 'spread-cars'): OffThreadRun | undefined => {
+      const change = dayCallChangeOf(answer);
+      if (change === undefined) return undefined;
+      try {
+        const plan = shiftRunConfigOf(resources, { ...state, interventions: [...state.interventions, { atS, change }] });
+        return { config: plan.config, outOfServiceCarIds: plan.outOfServiceCarIds, recordDecisions: true };
+      } catch {
+        return undefined;
+      }
+    };
+    const park = planned('park-cars-lobby');
+    const spread = planned('spread-cars');
+    if (park === undefined || spread === undefined) return;
+    const ask = {};
+    pinnedCallAsk = ask;
+    pinnedCallRunner.start({
+      runs: [park, spread],
+      onDone: (recordings) => {
+        if (pinnedCallAsk !== ask) return;
+        pinnedCallAsk = undefined;
+        const [parked, spreadOut] = recordings;
+        if (parked === undefined || spreadOut === undefined) return;
+        const whole = (recording: VizRecording) => shiftObservationsOf(observationsAt(recording, recording.endedAt));
+        pinnedCallCounts = dayCallRecordOf({
+          atS,
+          windowEndS: dayCallWindowEndOf(atS, leave.endedAt),
+          answer: 'leave',
+          legs: { 'park-cars-lobby': parked.legs, 'spread-cars': spreadOut.legs, leave: leave.legs },
+          observations: { 'park-cars-lobby': whole(parked), 'spread-cars': whole(spreadOut), leave: whole(leave) },
+        });
+        /* Part of the attempt, so a resumed one still prints the row. */
+        writeAttempt();
+        renderAll();
+      },
+      onFailed: () => {
+        if (pinnedCallAsk === ask) pinnedCallAsk = undefined;
+      },
+    });
+  }
+
+  /** {@link pinnedCallCounts} stamped with what the player did at the call: the press at its second, a skip, or nothing. */
+  function pinnedCallRecordNow(): DayCallRecord | undefined {
+    const counted = pinnedCallCounts;
+    if (counted === undefined) return undefined;
+    const pressed = state.interventions.find((entry) => entry.atS === counted.atS)?.change.kind;
+    const answer: DayCallRecord['answer'] =
+      pressed === 'park-cars-lobby' || pressed === 'spread-cars' ? pressed : pressCallSkipped ? 'skipped' : 'leave';
+    return Object.freeze({ ...counted, answer });
+  }
+
+  /** A fresh ask drops the pinned call's record and whatever was being run for it. */
+  function forgetPinnedCall(): void {
+    pinnedCallCounts = undefined;
+    pinnedCallAsk = undefined;
+    pinnedCallRunner.cancel();
+  }
   /** Whether the job in flight on {@link shiftRunner} is the rival's — see {@link scheduleGhost}. */
   let ghostInFlight = false;
   /**
@@ -4385,16 +4490,30 @@ function boot(ui: Elements, resources: BrowserResources): void {
     }, 'intervention');
   }
 
+  /**
+   * § D1239: the Engineer surface's three presses refuse a scored attempt's run. Its playhead can sit
+   * behind the stage's, so a press here would grow the attempt with hindsight; the attempt is pressed
+   * on its own stage, whose presses reach {@link interveneAt} through the host rather than here.
+   */
+  function attemptRefusesEngineerPress(): boolean {
+    if (!attemptOnScreen()) return false;
+    setText(ui.transport.status, ATTEMPT_CLOSES_ON_ITS_STAGE);
+    return true;
+  }
+
   interventionButton.addEventListener('click', () => {
     if (state.recording === undefined || playback === undefined) return;
+    if (attemptRefusesEngineerPress()) return;
     interveneAt(playback.simTimeS, { kind: 'park-cars-lobby' });
   });
   spreadButton.addEventListener('click', () => {
     if (state.recording === undefined || playback === undefined) return;
+    if (attemptRefusesEngineerPress()) return;
     interveneAt(playback.simTimeS, { kind: 'spread-cars' });
   });
   switchButton.addEventListener('click', () => {
     if (state.recording === undefined || playback === undefined) return;
+    if (attemptRefusesEngineerPress()) return;
     if (switchTarget === undefined) return;
     // `adopt-dispatcher` since § D1048 — the label says *Switch to X*, and only the whole
     // dispatcher makes that true.
@@ -5215,6 +5334,17 @@ function boot(ui: Elements, resources: BrowserResources): void {
       if (attempt === undefined || recording !== attemptRecording || recording !== state.recording) return undefined;
       return attemptResumeAtS(attempt, recording.startedAt, recording.endedAt);
     },
+    /* § D1239 — the ground the close would print, asked of the run standing now. */
+    practiceOnStage: () => {
+      if (!advancesTheWeek(state.playMode) || state.recording === undefined || watching !== undefined) return undefined;
+      const attempt = standingAttempt();
+      return practiceGroundOf(
+        state.week,
+        state.seed,
+        runDaySeed,
+        attempt !== undefined && state.recording !== attemptRecording,
+      );
+    },
     noteAttemptShown: (recording, atS) => {
       noteAttemptShown(recording, atS);
     },
@@ -5222,15 +5352,21 @@ function boot(ui: Elements, resources: BrowserResources): void {
       recording === attemptRecording && attemptOnScreen() && standingAttempt()?.pinnedCallDone === true,
     notePinnedCallDone: () => {
       if (attemptOnScreen()) writeAttempt({ pinnedCallDone: true });
+      /* § D1239 — before the answer's press replaces the run, which is the call's *leave them*. */
+      measurePinnedCall();
     },
     /*
      * § D1219 — the calls this session has recorded, for the stage's mid-day rows, while the session
      * stands on the run the stage is drawing; nothing on any other run.
      */
-    dayCallRecordsOn: (recording) =>
-      dayCallSession !== undefined && recording === state.recording && dayCallSession.recording() === recording
-        ? dayCallSession.records()
-        : [],
+    dayCallRecordsOn: (recording) => {
+      if (recording !== state.recording) return [];
+      /* § D1239: the pinned call's row first, on whichever run its answer led to. */
+      const pinned = pinnedCallRecordNow();
+      const ordinary =
+        dayCallSession !== undefined && dayCallSession.recording() === recording ? dayCallSession.records() : [];
+      return pinned === undefined ? ordinary : [pinned, ...ordinary];
+    },
     leaveDayAttempt: () => {
       if (standingAttempt() === undefined) return false;
       attemptLeft = true;
@@ -5257,9 +5393,12 @@ function boot(ui: Elements, resources: BrowserResources): void {
     skipPressCall: () => {
       pressCallSkipped = true;
       if (attemptOnScreen()) writeAttempt({ pressCallSkipped: true, pinnedCallDone: true });
+      /* § D1239 — a skip at the call is an answer too, and its row counts all three. */
+      measurePinnedCall();
     },
     closeDay: () => {
-      closeShift();
+      /* § D1239 — the Everyday stage's own close, the only one that files a scored attempt. */
+      closeShift('stage');
     },
     openRunTab: () => {
       context.openTab('run');
@@ -5928,7 +6067,43 @@ function boot(ui: Elements, resources: BrowserResources): void {
     return everydaySwap()?.hasThePage() !== true;
   }
 
+  /**
+   * **The Engineer transport never shows a scored attempt past where its stage has reached** — wave
+   * AM, lane AM-B, [§ D1239](../../../../DECISIONS.md), the post-AL panel's seat D (D1). With a call
+   * held on the Everyday stage, the transport behind the cover had run an hour on at ×60, and
+   * *Switch to Engineer* showed the unanswered branch's future; scrubbing it to its end filed the day
+   * with the call never answered. The attempt's run is held at the attempt's reach
+   * (`playback/playback.ts#Playback.setReach`), which the stage moves on as it plays; any other run
+   * is let go. Asked every frame, so the reach follows the stage and a new run starts unheld.
+   */
+  function holdAtTheAttemptsReach(): void {
+    if (playback === undefined) return;
+    const attempt = advancesTheWeek(state.playMode) ? standingAttempt() : undefined;
+    const held = attempt !== undefined && playback.recording === attemptRecording;
+    const reach = held ? Math.max(attempt.shownToS, playback.recording.startedAt) : null;
+    if (playback.reach !== reach) playback.setReach(reach);
+    if (!held || heldRunId === playback.recording.runId + String(playback.recording.startedAt)) return;
+    heldRunId = playback.recording.runId + String(playback.recording.startedAt);
+    setText(ui.transport.status, ATTEMPT_SHOWN_TO_ITS_REACH);
+  }
+
+  /**
+   * The weeks this device has stored, with this tab's tower on screen, where the stored copy of this
+   * tab's week has filed the day this tab holds open (`shift/attempt.ts#dayFiledElsewhere`) —
+   * § D1239, seat D (D2). `undefined` otherwise, and where nothing readable is stored.
+   */
+  function storedWeekIfDayFiledElsewhere(): { readonly week: WeekState; readonly parked: readonly WeekState[] } | undefined {
+    const stored = loadSession(sessionStore);
+    if (!stored.ok) return undefined;
+    const weeks = scenarioWeeksOf({ week: stored.snapshot.week, parkedWeeks: stored.snapshot.parkedWeeks });
+    const contractId = state.week.contractId;
+    const mine = [weeks.week, ...weeks.parkedWeeks].find((entry) => entry.contractId === contractId);
+    if (!dayFiledElsewhere(state.week, mine)) return undefined;
+    return switchWeek(weeks.week, weeks.parkedWeeks, contractId, 'resume');
+  }
+
   function tick(now: number): void {
+    holdAtTheAttemptsReach();
     if (playback !== undefined && state.tab === 'run') {
       renderLive();
       if (now - lastAnnouncedMs > ANNOUNCE_MS) {
@@ -6644,6 +6819,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
     if (cause === 'player') {
       closeDayCalls();
       pressCallSkipped = false;
+      forgetPinnedCall();
     }
     setText(ui.transport.error, '');
     // A new ask is a new chance: the failure the stage is drawing belonged to the run this replaces.
@@ -7246,7 +7422,14 @@ function boot(ui: Elements, resources: BrowserResources): void {
     });
   }
 
-  function closeShift(): void {
+  /**
+   * `via` is who pressed: `'stage'` is the Everyday stage's own close (`EverydayHost.closeDay`), and
+   * every other caller is the Engineer surface's — its end-of-run edge, `Ctrl`+`Enter`, its Day report
+   * tab and its export press. Wave AM, lane AM-B, [§ D1239](../../../../DECISIONS.md): a scored
+   * attempt closes only by its own stage, and while one stands on this device an Engineer close banks
+   * nothing into any week.
+   */
+  function closeShift(via: 'stage' | 'engineer' = 'engineer'): void {
     const recording = state.recording;
     if (recording === undefined || filedRunId === recording.runId) return;
     /*
@@ -7284,12 +7467,41 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * [§ D1218](../../../../DECISIONS.md). An attempt left through § 3.4's strip waits for the stage;
      * any other run of its day closes as practice below and leaves the day open for it.
      */
+    /*
+     * **The week this device has stored, read at the close rather than remembered** — wave AM, lane
+     * AM-B, [§ D1239](../../../../DECISIONS.md), the post-AL panel's seat D (D2). Two tabs each held
+     * Wednesday open; one closed it and banked, the other closed it from its own memory of the week,
+     * banked again and wrote its week over the first. Where the stored week has filed the day this
+     * tab holds open, this tab takes the stored weeks and the stored attempts, and the close below is
+     * practice and says so.
+     */
+    const filedElsewhere = advancesTheWeek(state.playMode) ? storedWeekIfDayFiledElsewhere() : undefined;
+    if (filedElsewhere !== undefined) {
+      dayAttempts = loadAttempts(sessionStore);
+      attemptRecording = undefined;
+    }
     const attemptStanding = advancesTheWeek(state.playMode) ? standingAttempt() : undefined;
     const isTheAttempt = attemptStanding !== undefined && recording === attemptRecording;
     if (isTheAttempt && attemptLeft) {
       setText(ui.transport.status, ATTEMPT_LEFT_CANNOT_BANK);
       return;
     }
+    /* § D1239: a scored attempt is filed by its own stage's close, never from the Engineer surface. */
+    if (isTheAttempt && via !== 'stage') {
+      setText(ui.transport.status, ATTEMPT_CLOSES_ON_ITS_STAGE);
+      return;
+    }
+    /*
+     * § D1239, seat D's building change mid-attempt: while an attempt stands on any of this device's
+     * weeks, an Engineer close of another run banks nothing into any week. The same day's other run is
+     * already practice on § D1218's `'attempt'` ground below, and keeps that sheet's words.
+     */
+    const engineerPractice =
+      via !== 'stage' &&
+      attemptStanding === undefined &&
+      advancesTheWeek(state.playMode) &&
+      contractById(state.week.contractId) !== undefined &&
+      attemptStandingAmong(dayAttempts, [state.week, ...state.parkedWeeks]) !== undefined;
     filedRunId = recording.runId;
     // This sitting now has a filed sheet, so the empty state's previous-sitting sentence retires —
     // see {@link filedThisSitting}. Written at the latch rather than at the save, because the fact
@@ -7393,9 +7605,14 @@ function boot(ui: Elements, resources: BrowserResources): void {
     const crowdPractice = practiceGround === 'crowd';
     /* § D1218: a run that is not the standing attempt leaves the week on its day, as a link's crowd does. */
     const attemptPractice = practiceGround === 'attempt';
+    /* § D1239: another tab filed the day, or an attempt stands while the Engineer surface closes. */
+    const otherTabPractice = filedElsewhere !== undefined;
+    const elsewherePractice = otherTabPractice || (engineerPractice && practiceGround === undefined);
     const week =
-      crowdPractice || attemptPractice ? state.week : closedWeekOf(state, outcome, runCause === 'intervention');
-    const practice = practiceGround !== undefined;
+      crowdPractice || attemptPractice || elsewherePractice
+        ? state.week
+        : closedWeekOf(state, outcome, runCause === 'intervention');
+    const practice = practiceGround !== undefined || elsewherePractice;
     /* The house on this day's crowd starts as the day closes, so the week's sheet is ready — § D1227. */
     if (!practice) askWeekHouse(week);
     filedReportInput = {
@@ -7407,6 +7624,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
       /* Which ground made it practice, so the sheet says the true one — § D1141. */
       ...(crowdPractice ? { practiceCrowd: state.seed } : {}),
       ...(attemptPractice ? { practiceAttempt: true } : {}),
+      ...(otherTabPractice ? { practiceOtherTab: true } : elsewherePractice ? { practiceEngineer: true } : {}),
       /*
        * § D1138 clause 3 — the ordinary day's calls, from the session that raised them over the run
        * being filed. Nothing is printed about any call before this line runs.
@@ -7589,6 +7807,11 @@ function boot(ui: Elements, resources: BrowserResources): void {
       setAttempt(attemptStanding.contractId, undefined);
     }
     state = { ...state, week, report, tomorrow };
+    /*
+     * § D1239: the sheet was shaped from the week this tab held, and it names that day; the week the
+     * tab now keeps is the one another tab stored, so the save below does not write over its close.
+     */
+    if (filedElsewhere !== undefined) state = { ...state, week: filedElsewhere.week, parkedWeeks: filedElsewhere.parked };
     /*
      * **The sheet opens itself only over a reader who is not doing something else** — § D233,
      * issue #67.

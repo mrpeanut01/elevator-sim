@@ -136,6 +136,29 @@ export const ATTEMPT_LEFT_CANNOT_BANK =
   'resume it from the day’s brief and close it on the stage';
 
 /**
+ * Why a scored attempt is not filed from the Engineer surface even when it is on screen — wave AM,
+ * lane AM-B, [§ D1239](../../../../DECISIONS.md), the post-AL panel's seat D (D1). The Engineer
+ * transport over the attempt's run is held at the instant the stage has shown
+ * (`playback/playback.ts#Playback.setReach`), and the attempt closes by its own close on the stage:
+ * *Close the day*, *End the day* or the day's end there. The Engineer surface's end-of-run close,
+ * its `Ctrl`+`Enter`, its Day report tab and its export press file nothing of it, and its three
+ * press buttons press nothing on it: a press there would land at the Engineer playhead, which may
+ * sit behind the stage's, and grow the attempt's record with hindsight.
+ */
+export const ATTEMPT_CLOSES_ON_ITS_STAGE =
+  'this run is your attempt at a scored day in Everyday Mode, so it is not pressed or filed from ' +
+  'here — it is played and closed on its own stage there';
+
+/**
+ * The Engineer transport's line while it is held at a scored attempt's reach — § D1239. Said once,
+ * when the hold first binds a run, on the same status line the refusals above land on.
+ */
+export const ATTEMPT_SHOWN_TO_ITS_REACH =
+  'this run is your attempt at a scored day in Everyday Mode, so it is shown here only as far as ' +
+  'its stage has played';
+
+
+/**
  * The refusal, or `null` when the run on screen **is** the run this shell simulated.
  *
  * ## Reference identity, and the finding that forced it

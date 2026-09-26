@@ -369,3 +369,55 @@ describe('Playback', () => {
     expect(run()).toBe(run());
   });
 });
+
+/*
+ * A reach: the furthest instant the transport may show — wave AM, lane AM-B, § D1239. The Engineer
+ * surface's transport over a scored attempt's run is held at the instant the Everyday stage has
+ * shown, so it can never run ahead of a held call (the post-AL panel's seat D, D1).
+ */
+describe('Playback — a reach it may not pass (§ D1239)', () => {
+  const make = (options?: ConstructorParameters<typeof Playback>[2]): [Playback, ManualClock] => {
+    const clock = new ManualClock(0);
+    return [new Playback(RECORDING, clock, options), clock];
+  };
+
+  it('holds a playing transport at its reach, never reads `ended` short of the run’s end, and follows a reach that grows', () => {
+    const [playback, clock] = make({ speed: 10, autoplay: true });
+    playback.setReach(40);
+    clock.advance(10_000);
+    expect(playback.simTimeS).toBe(40);
+    expect(playback.frame().simTimeS).toBe(40);
+    expect(playback.state).toBe('playing');
+    playback.setReach(60);
+    expect(playback.simTimeS).toBe(60);
+    expect(playback.state).not.toBe('ended');
+  });
+
+  it('clamps a seek and a scrub to the reach, and pulls back a playhead already past it', () => {
+    const [playback] = make({ speed: 10 });
+    playback.seekTo(90);
+    playback.setReach(30);
+    expect(playback.simTimeS).toBe(30);
+    playback.seekTo(1e9);
+    expect(playback.simTimeS).toBe(30);
+    playback.seekToProgress(1);
+    expect(playback.simTimeS).toBe(30);
+    playback.seekTo(10);
+    expect(playback.simTimeS).toBe(10);
+  });
+
+  it('reads `ended` only where the reach is the run’s own end, and lets go when cleared', () => {
+    const [playback, clock] = make({ speed: 10, autoplay: true });
+    playback.setReach(100);
+    clock.advance(20_000);
+    expect(playback.state).toBe('ended');
+    const [held, heldClock] = make({ speed: 10, autoplay: true });
+    held.setReach(50);
+    heldClock.advance(20_000);
+    expect(held.simTimeS).toBe(50);
+    held.setReach(null);
+    expect(held.reach).toBeNull();
+    held.seekTo(100);
+    expect(held.state).toBe('ended');
+  });
+});

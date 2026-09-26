@@ -297,6 +297,28 @@ export async function openPage(browser: Browser, options?: BrowserContextOptions
   return page;
 }
 
+/**
+ * **Two tabs of the same device** — two pages in one browser context, so they share that origin's
+ * storage as two tabs do, each watched by the same collector as {@link openPage}'s. Wave AM, lane
+ * AM-B, [§ D1239](../../../../DECISIONS.md): two tabs closing one scored day. A page `openPage`
+ * mints owns its context and cannot open a second page in it, which is why this mints the context.
+ * `close` closes both.
+ */
+export async function openTwoTabs(
+  browser: Browser,
+  options?: BrowserContextOptions,
+): Promise<{ readonly tabs: readonly [Page, Page]; readonly close: () => Promise<void> }> {
+  const context = await browser.newContext(options);
+  const watched = async (): Promise<Page> => {
+    const tab = await context.newPage();
+    tab.on('pageerror', (error: Error) => THROWN.push(describeThrow(error)));
+    return tab;
+  };
+  const first = await watched();
+  const second = await watched();
+  return { tabs: [first, second], close: () => context.close() };
+}
+
 /* ========================================================================== *
  * Reaching the menu — GitHub issue #142's first part
  * ========================================================================== */

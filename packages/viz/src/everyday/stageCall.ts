@@ -76,6 +76,12 @@ export const STAGE_CALL_COPY = Object.freeze({
   leave: DAY_CALL_LEAVE_LABEL,
   held: 'held until the stage stops for this day’s call',
   /*
+   * Wave AM, lane AM-B, § D1239, the post-AL panel's seats B and D: *held until the stage stops for
+   * this day's call* stood beside the strip with the stage already stopped at a call and the card
+   * up. While a card is up the presses are its answers.
+   */
+  heldAtCall: 'held while the call is up: its answers are on the card',
+  /*
    * § D1138: the pace note while the stage waits at an ordinary candidate whose two runs have not
    * landed. It names what the stage is doing and nothing about the call, which may not be raised:
    * the same words whether the answers will turn out to matter or not.

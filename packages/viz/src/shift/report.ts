@@ -117,6 +117,7 @@ import { driversLineOf, driverStretchesOf, interventionLogOf } from '../live/int
 import { afterPressBeatOf, type PairVerdicts } from './afterPress.js';
 import { pressCallRowOf, type PressCallRowInput } from './callRow.js';
 import {
+  dayCallCountsLineOf,
   dayCallRowOf,
   dayCallsQuietSentenceOf,
   dayEndedEarlyRowOf,
@@ -569,6 +570,28 @@ export const PRACTICE_ATTEMPT_NOTE =
   'this day, and it banks that attempt when you close it on the stage.';
 
 /**
+ * **What a practice sheet says when it was closed from the Engineer surface while a scored attempt
+ * stands** — wave AM, lane AM-B, [§ D1239](../../../../DECISIONS.md), the post-AL panel's seat D. A
+ * building changed on the Engineer surface mid-attempt put another tower's day on screen, and its
+ * close filed and banked that day while the attempt stood. While an attempt stands on this device,
+ * a run closed from the Engineer surface banks nothing into any week. No digit, for
+ * {@link PRACTICE_NOTE}'s reason.
+ */
+export const PRACTICE_ENGINEER_NOTE =
+  'Practice. A scored day of yours is under way in Everyday Mode, so a run closed on this surface ' +
+  'banks nothing into any week until that day is closed on its own stage.';
+
+/**
+ * **What a practice sheet says when another tab had already closed the day** — § D1239, seat D
+ * (D2). The close read this device's stored week and found the day filed there, so this run banks
+ * nothing and the week this tab now holds is the stored one. No digit, for {@link PRACTICE_NOTE}'s
+ * reason.
+ */
+export const PRACTICE_OTHER_TAB_NOTE =
+  'Practice. This day was already closed in another tab or window, and your week keeps that close, ' +
+  'so this run banks nothing.';
+
+/**
  * One run, belonging to no week — the same figures, the same diagnosis, the same levers and the
  * same small print, with the week's five statements **absent** and two single-run ones in their
  * place. See the module docstring.
@@ -578,6 +601,15 @@ export interface SingleRunReport extends ReportCore {
 }
 
 export type { ReportNextStep };
+
+/**
+ * A pinned day's call as the sheet is handed it — § D1029's row input, and since wave AM, lane AM-B
+ * ([§ D1239](../../../../DECISIONS.md)), the call's three counts where the shell ran its answers
+ * from the call second, which the row prints in the ordinary rows' own sentence.
+ */
+export type PressCallReportInput = Omit<PressCallRowInput, 'interventions' | 'countsLine'> & {
+  readonly counts?: DayCallRecord | undefined;
+};
 
 /** A filed sheet, of either shape. Narrow on {@link WeekDayReport.of}. */
 export type ShapedDayReport = WeekDayReport | SingleRunReport;
@@ -794,7 +826,7 @@ export interface DayReportInput {
    * `dev/state.ts#pressDayCallOf` answers for the run being filed. `shift/callRow.ts` prints its row
    * after § D982's pair; `undefined` on every other day, which draws nothing.
    */
-  readonly pressCall?: Omit<PressCallRowInput, 'interventions'> | undefined;
+  readonly pressCall?: PressCallReportInput | undefined;
   /**
    * **This close is practice** — [§ D1138](../../../../DECISIONS.md) clause 4. The day had already
    * closed once, so `shift/week.ts#closeDay` banked nothing from this run, and the sheet says so
@@ -817,6 +849,18 @@ export interface DayReportInput {
    * {@link PRACTICE_ATTEMPT_NOTE}, and the day stays open as it does for {@link practiceCrowd}.
    */
   readonly practiceAttempt?: boolean | undefined;
+  /**
+   * **Closed from the Engineer surface while a scored attempt stands on this device** —
+   * [§ D1239](../../../../DECISIONS.md). The sheet says {@link PRACTICE_ENGINEER_NOTE}, and the day
+   * stays open as it does for {@link practiceCrowd}.
+   */
+  readonly practiceEngineer?: boolean | undefined;
+  /**
+   * **Another tab had already closed the day** — § D1239. The sheet says
+   * {@link PRACTICE_OTHER_TAB_NOTE} and offers no next day: the week the tab now holds is the one
+   * the other tab wrote, which has already been moved on or can be from the door.
+   */
+  readonly practiceOtherTab?: boolean | undefined;
   /**
    * The ordinary day's calls, in the order they were raised — [§ D1138](../../../../DECISIONS.md)
    * clause 3. One row each after § D1029's, from the three runs that admitted it
@@ -1322,11 +1366,15 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
     clockOf: (simTimeS) => clockOf(simTimeS, dayStartS),
   });
   const practiceNote =
-    input.practiceAttempt === true
-      ? PRACTICE_ATTEMPT_NOTE
-      : input.practiceCrowd === undefined
-        ? PRACTICE_NOTE
-        : PRACTICE_CROWD_NOTE;
+    input.practiceOtherTab === true
+      ? PRACTICE_OTHER_TAB_NOTE
+      : input.practiceEngineer === true
+        ? PRACTICE_ENGINEER_NOTE
+        : input.practiceAttempt === true
+          ? PRACTICE_ATTEMPT_NOTE
+          : input.practiceCrowd === undefined
+            ? PRACTICE_NOTE
+            : PRACTICE_CROWD_NOTE;
   return {
     ...core,
     of: 'week-day',
@@ -1336,7 +1384,14 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
      */
     streakLine: practice ? practiceNote : streakLineFor(judgement.verdict, week.streak),
     ...(practice ? { practiceNote } : {}),
-    ...(practice && (input.practiceCrowd !== undefined || input.practiceAttempt === true) ? { dayStaysOpen: true } : {}),
+    /* § D1239: an Engineer close under a standing attempt leaves the week where it was, as the two above do; a close another tab beat holds a week this tab did not move, so it offers no next day either. */
+    ...(practice &&
+    (input.practiceCrowd !== undefined ||
+      input.practiceAttempt === true ||
+      input.practiceEngineer === true ||
+      input.practiceOtherTab === true)
+      ? { dayStaysOpen: true }
+      : {}),
     ...weekMarksOf(week, practice),
     contractLine: contractLineFor(contract, week),
     cleared: week.cleared,
@@ -2370,7 +2425,7 @@ function diagnosisFor(
   pairVerdicts: PairVerdicts | undefined,
   readings: readonly GoalReading[],
   bookedOut: readonly BookedOutCar[],
-  pressCall?: Omit<PressCallRowInput, 'interventions'> | undefined,
+  pressCall?: PressCallReportInput | undefined,
   dayCalls?: {
     readonly records: readonly DayCallRecord[];
     readonly quiet?: DayCallsQuiet | undefined;
@@ -2498,7 +2553,17 @@ function diagnosisFor(
   const callRow =
     pressCall === undefined
       ? undefined
-      : pressCallRowOf({ ...pressCall, interventions }, (simTimeS) => clockOf(simTimeS, dayStartS));
+      : pressCallRowOf(
+          {
+            ...pressCall,
+            interventions,
+            countsLine:
+              pressCall.counts === undefined
+                ? undefined
+                : dayCallCountsLineOf(pressCall.counts, (simTimeS) => clockOf(simTimeS, dayStartS)),
+          },
+          (simTimeS) => clockOf(simTimeS, dayStartS),
+        );
   /*
    * § D1138's rows, one per ordinary call, after § D1029's (a pinned day has both since § D1204, its
    * pinned row first). Graded by this sheet's grader against this sheet's goals, so a row's

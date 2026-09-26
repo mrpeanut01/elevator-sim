@@ -274,6 +274,7 @@ import { DAY_ATTEMPT_COPY, resumeLabelOf } from '../shift/attempt.js';
 import type { PressCall } from '../shift/pressCall.js';
 import { PRESS_CALL_AGAIN, pressCallRowOf } from '../shift/callRow.js';
 import {
+  dayCallCountsLineOf,
   dayCallRecordOf,
   dayCallsQuietSentenceOf,
   dayCallWindowEndOf,
@@ -665,7 +666,9 @@ import { CONTRACTS, contractById, contractForBuilding, nextContract, statLineOf 
 import {
   bankingRefusalFor,
   LEFT_UNFINISHED_CANNOT_BANK,
+  ATTEMPT_CLOSES_ON_ITS_STAGE,
   ATTEMPT_LEFT_CANNOT_BANK,
+  ATTEMPT_SHOWN_TO_ITS_REACH,
   LOADED_RUN_CANNOT_BANK,
   UNCHOSEN_RUN_CANNOT_BANK,
 } from '../shift/banking.js';
@@ -696,6 +699,8 @@ import {
   NOT_RECORDED,
   PRACTICE_CROWD_NOTE,
   PRACTICE_ATTEMPT_NOTE,
+  PRACTICE_ENGINEER_NOTE,
+  PRACTICE_OTHER_TAB_NOTE,
   type DayReportInput,
   type ShapedDayReport,
   type ShiftPlan,
@@ -2236,6 +2241,9 @@ const REPLAY: SurfaceAdapter = {
     'shift/banking.ts#LEFT_UNFINISHED_CANNOT_BANK',
     /* § D1218 — an attempt left for later, which no other surface files meanwhile. */
     'shift/banking.ts#ATTEMPT_LEFT_CANNOT_BANK',
+    /* Wave AM, lane AM-B, § D1239 — a scored attempt is played and closed on its own stage. */
+    'shift/banking.ts#ATTEMPT_CLOSES_ON_ITS_STAGE',
+    'shift/banking.ts#ATTEMPT_SHOWN_TO_ITS_REACH',
   ],
   render(context) {
     const verdict = verifyReplay(context.recording, context.recording);
@@ -2281,6 +2289,19 @@ const REPLAY: SurfaceAdapter = {
       {
         field: 'attemptLeftCannotBank',
         text: ATTEMPT_LEFT_CANNOT_BANK,
+        role: 'reason',
+        provenance: 'authored',
+      },
+      /* The fifth and its transport line — § D1239's attempt, closed and shown only by its stage. */
+      {
+        field: 'attemptClosesOnItsStage',
+        text: ATTEMPT_CLOSES_ON_ITS_STAGE,
+        role: 'reason',
+        provenance: 'authored',
+      },
+      {
+        field: 'attemptShownToItsReach',
+        text: ATTEMPT_SHOWN_TO_ITS_REACH,
         role: 'reason',
         provenance: 'authored',
       },
@@ -3782,6 +3803,14 @@ const SHIFT_REPORT: SurfaceAdapter = {
      * through `dayCallRowOf` on the same sheet.
      */
     'shift/report.ts#PRACTICE_ATTEMPT_NOTE',
+    /*
+     * Wave AM, lane AM-B, § D1239: the practice notes for a close from the Engineer surface while an
+     * attempt stands and for a close another tab beat, by name beside `PRACTICE_ATTEMPT_NOTE` for its
+     * reason; and the pinned row's later-press sentence and counts, on two more arms below.
+     */
+    'shift/report.ts#PRACTICE_ENGINEER_NOTE',
+    'shift/report.ts#PRACTICE_OTHER_TAB_NOTE',
+    'shift/callRow.ts#PRESS_CALL_LATER_NOTE',
     'shift/dayCalls.ts#dayCallCountsLineOf',
     'shift/goals.ts#GOAL_PLAIN_NAMES',
     'shift/goals.ts#goalPlainNameOf',
@@ -3853,13 +3882,37 @@ const SHIFT_REPORT: SurfaceAdapter = {
           act: undefined,
         };
         /* § D1151: and the fourth arm, a skip with the card up, which is not *nothing was pressed*. */
-        const answers: readonly (readonly [string, readonly RunInterventionConfig[], boolean])[] = [
+        /*
+         * § D1239: the call's three counts, in a fixture record counted by the shipped builder over
+         * this case's own legs (the stand-in the ordinary rows' fixture uses), and a later call's press.
+         */
+        const pinnedCounts = dayCallCountsLineOf(
+          dayCallRecordOf({
+            atS: call.atS,
+            windowEndS: dayCallWindowEndOf(call.atS, recording.endedAt),
+            answer: 'leave',
+            legs: { 'park-cars-lobby': recording.legs, 'spread-cars': recording.legs, leave: recording.legs },
+            observations: {
+              'park-cars-lobby': bundle.observations,
+              'spread-cars': bundle.observations,
+              leave: bundle.observations,
+            },
+          }),
+          (simTimeS) => clockOf(simTimeS, DAY_START_S),
+        );
+        const pressedAt = (atS: number, kind: string): RunInterventionConfig => ({
+          atS,
+          change: { kind } as RunInterventionConfig['change'],
+        });
+        const answers: readonly (readonly [string, readonly RunInterventionConfig[], boolean, string?])[] = [
           ['none', [], false],
           ['skipped', [], true],
-          [pin.clearedBy, [{ atS: call.atS, change: { kind: pin.clearedBy } as RunInterventionConfig['change'] }], false],
-          [pin.missedBy, [{ atS: call.atS, change: { kind: pin.missedBy } as RunInterventionConfig['change'] }], false],
+          [pin.clearedBy, [pressedAt(call.atS, pin.clearedBy)], false],
+          [pin.missedBy, [pressedAt(call.atS, pin.missedBy)], false],
+          ['counted', [pressedAt(call.atS, pin.clearedBy)], false, pinnedCounts],
+          ['later', [pressedAt(call.atS, pin.missedBy), pressedAt(call.atS + 660, pin.clearedBy)], false],
         ];
-        for (const [answer, interventions, skipped] of answers) {
+        for (const [answer, interventions, skipped, countsLine] of answers) {
           const row = pressCallRowOf(
             {
               press: pin,
@@ -3867,6 +3920,7 @@ const SHIFT_REPORT: SurfaceAdapter = {
               interventions,
               nameOf: (id) => context.dispatcherProfiles.profiles.find((profile) => profile.id === id)?.name,
               skipped,
+              countsLine,
             },
             (simTimeS) => clockOf(simTimeS, DAY_START_S),
           );
@@ -4087,6 +4141,9 @@ const SHIFT_REPORT: SurfaceAdapter = {
       seeds.push({ field: `${at}.practiceCrowdNote`, text: PRACTICE_CROWD_NOTE, role: 'prose' });
       /* § D1218's practice-while-an-attempt-stands note, by name — see the `covers` entry above. */
       seeds.push({ field: `${at}.practiceAttemptNote`, text: PRACTICE_ATTEMPT_NOTE, role: 'prose' });
+      /* § D1239's two practice notes, by name — see the `covers` entries above. */
+      seeds.push({ field: `${at}.practiceEngineerNote`, text: PRACTICE_ENGINEER_NOTE, role: 'prose' });
+      seeds.push({ field: `${at}.practiceOtherTabNote`, text: PRACTICE_OTHER_TAB_NOTE, role: 'prose' });
       /* Wave AL: the title line after a handover, on the run's own clock. */
       seeds.push({
         field: `${at}.driversLine(handover)`,
@@ -12434,6 +12491,11 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
         }
       }
       seeds.push({ field: 'stage.call.held', text: STAGE_CALL_COPY.held, role: 'label' });
+      /* Wave AM, lane AM-B, § D1239 — the hold while a card is up, and a practice run's line on the stage. */
+      seeds.push({ field: 'stage.call.heldAtCall', text: STAGE_CALL_COPY.heldAtCall, role: 'label' });
+      for (const [ground, sentence] of Object.entries(PRACTICE_DAY_SENTENCES)) {
+        seeds.push({ field: `stage.practice(${ground})`, text: sentence, role: 'prose' });
+      }
       /* § D1219 — the stage's mid-day call row, on this case's own legs; see the `covers` entry. */
       {
         const callAtS = recording.startedAt + 60;

@@ -588,6 +588,23 @@ function mountStage(
   driving.append(drivingEyebrow, drivingDot, drivingName);
 
   /*
+   * **A practice run says so on the stage** — wave AM, lane AM-B, [§ D1239](../../../../DECISIONS.md),
+   * the post-AL panel's seat D (D6). The stage of *Take this call again* and of *Run today again*
+   * looked exactly like the scored day's, and only the report said the run banked nothing. The
+   * sentence is the brief's for the ground the close will print (`EverydayHost.practiceOnStage`);
+   * down on a run that banks.
+   */
+  const practiceLine = el(doc, 'span', 'everyday-stage-practice');
+  practiceLine.style.cssText = [
+    `border:1px solid ${C.rule}`,
+    `border-radius:${String(R.pill)}px`,
+    'padding:3px 10px',
+    'font-size:12px',
+    `color:${C.inkSoft}`,
+    'display:none',
+  ].join(';');
+
+  /*
    * **Every strip in this header wraps, and that is one answer to GitHub issue #240 rather than
    * four.** The header itself has wrapped since it was written; its *children* did not, and a
    * `display:flex` row that cannot wrap has a min-content width equal to the sum of its items —
@@ -758,7 +775,7 @@ function mountStage(
   }
   syncCamera();
 
-  header.append(clock, phase, nextPhase, bookedPill, driving, figures, playButton, speeds, cameras, floorJump);
+  header.append(clock, phase, nextPhase, bookedPill, driving, practiceLine, figures, playButton, speeds, cameras, floorJump);
 
   /*
    * **Pillar 3's strip** — GitHub issue **#277**, [§ D470](../../../../DECISIONS.md).
@@ -1615,6 +1632,12 @@ function mountStage(
     if (playback.state !== 'playing') {
       /* § D1212: whatever stopped the transport stopped a skip that was coming. */
       dropSkipBeat();
+      /*
+       * **At the day's end nothing is being paced** — § D1239, the post-AL panel's seats B and D:
+       * *stopped for the day's call* and *fast-forwarding at 30×* stood under an 18:00 clock after a
+       * skip had run the day out. The bar says the day has run out; the note says nothing more.
+       */
+      if (playback.simTimeS >= playback.recording.endedAt && paceNote.textContent !== '') paceNote.textContent = '';
       return;
     }
     const answer = stagePaceOf({
@@ -1828,6 +1851,16 @@ function mountStage(
      * is not raised does not hand the player back a day playing at their rung.
      */
     const standing = activeCall();
+    /*
+     * **And across a re-simulation** — wave AM, lane AM-B, § D1239, the post-AL panel's seat B: an
+     * answer's re-simulation hides the day's next call until its run lands, and a skip pressed in
+     * that beat ran to the day's end, so the next card came up under an 18:00 clock beside *the day
+     * has run out*. The skip is carried across the beat, and {@link adopt} takes it on.
+     */
+    if (standing === undefined && recomputingOver !== undefined) {
+      skipping = true;
+      return;
+    }
     if (standing !== undefined && (playback.simTimeS < standing.call.atS || !standing.raised)) {
       skipping = true;
       if (playback.simTimeS < standing.call.atS) {
@@ -1896,8 +1929,10 @@ function mountStage(
   function callHeld(): string | undefined {
     const standing = activeCall();
     if (standing === undefined) return undefined;
-    if (standing.pinned) return STAGE_CALL_COPY.held;
-    return standing.raised && (playback?.simTimeS ?? 0) >= standing.call.atS ? STAGE_CALL_COPY.held : undefined;
+    const atCall = standing.raised && (playback?.simTimeS ?? 0) >= standing.call.atS;
+    /* § D1239: once the stage has stopped at the call, the hold says the card is where the presses are. */
+    if (atCall) return STAGE_CALL_COPY.heldAtCall;
+    return standing.pinned ? STAGE_CALL_COPY.held : undefined;
   }
 
   /**
@@ -1976,6 +2011,22 @@ function mountStage(
     if (!showing || call === undefined) {
       showCallCard(false);
       return;
+    }
+    /*
+     * **The card is drawn at its own clock** — § D1239, the post-AL panel's seat B. A call raised
+     * after the transport had run on (to the day's end, after a skip) came up under the end's clock,
+     * *18:00*, with *the day has run out* on the bar. The playhead goes back to the call second and
+     * the transport stops there, as the pace stops it at a call (§ D1153): the picture is the one
+     * the question is asked over, and the skip that ran past it did not answer it.
+     */
+    if (playback !== undefined && playback.simTimeS > call.atS + 1) {
+      playback.pause();
+      playback.seekTo(call.atS);
+      const stopNote =
+        stagePaceNoteOf({ simPerRealS: stageSpeedAt(speedIndex).simPerRealS, reason: 'call' }, { acts: paceActs, simTimeS: call.atS }) ?? '';
+      if (paceNote.textContent !== stopNote) paceNote.textContent = stopNote;
+      syncTransport();
+      requestFrame();
     }
     /* The wait is over and the call is raised: the note says what the stop now is. */
     if (paceNote.textContent === STAGE_CALL_COPY.waiting) {
@@ -2343,6 +2394,8 @@ function mountStage(
     raceView = undefined;
     syncTransport();
     requestFrame();
+    /* § D1239: a skip pressed while this run was being made goes on from here, to the next call or the end. */
+    if (resumeAtS !== undefined && skipping) skipToEnd();
   }
 
   /**
@@ -2802,6 +2855,11 @@ function mountStage(
       watching === undefined
         ? head.driverName
         : driverNameAt(host.watching()?.run.record?.interventions ?? [], simTimeS, watching.dispatcherName);
+    /* § D1239: the practice sentence, on the player's own daily run only. */
+    const practice = context.ctx === 'daily' && watching === undefined ? host.practiceOnStage?.() : undefined;
+    if (practiceLine.textContent !== (practice ?? '')) practiceLine.textContent = practice ?? '';
+    const practiceDisplay = practice === undefined ? 'none' : '';
+    if (practiceLine.style.display !== practiceDisplay) practiceLine.style.display = practiceDisplay;
     drawFigures(head.figures);
     drawGoals(recording, simTimeS, watching);
     drawEndDay(recording, simTimeS, watching);
@@ -3109,11 +3167,17 @@ function mountStage(
    * File the day and open what the filing lands on — the tail of the stage's primary, shared with
    * *End the day* so the two cannot file differently.
    */
-  /** Put the close's question up under the call, and focus its first button — see the primary. */
+  /**
+   * Put the close's question up under the call, and focus *Back to the call* — see the primary.
+   * Wave AM, lane AM-B, [§ D1239](../../../../DECISIONS.md), amending [§ D1189](../../../../DECISIONS.md)'s
+   * *focus moves to the first*: with focus on *Close the day as it stands*, two presses of `Enter`
+   * ended a scored day with its call unanswered (the post-AL panel's seat B). The safe button takes
+   * focus, so closing takes a deliberate second choice.
+   */
   function askBeforeClosing(): void {
     closeAsk.hidden = false;
     closeAsk.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-    closeAskFile.focus({ preventScroll: true });
+    closeAskBack.focus({ preventScroll: true });
   }
 
   function fileDay(): void {
@@ -3569,7 +3633,8 @@ function mountStage(
       /*
        * **A call is up: ask once before filing** — wave AL, lane AL-A, the post-AK panel's seat B
        * (D1). The first press puts {@link closeAsk}'s question under the card's answers and moves
-       * focus to its first button; a second press of this primary, or that button, files. Nothing is
+       * focus to *Back to the call* (§ D1239); a second press of this primary, or *Close the day as
+       * it stands*, files. Nothing is
        * asked with no card up, because then there is no answer to skip.
        */
       if (!callCard.hidden && closeAsk.hidden) {

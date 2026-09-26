@@ -1835,7 +1835,12 @@ export function pressDayCallOf(
       seed: state.seed,
       horizon,
       dispatcherId: state.dispatcherId,
-      interventions: state.interventions,
+      /*
+       * The day as measured is the log up to the call second. Since § D1204 a pinned day asks on
+       * after its call, and a later call answered with a press would otherwise unmeasure the pinned
+       * one (wave AM, lane AM-B, § D1239: the row vanished from the report on exactly those days).
+       */
+      interventions: state.interventions.filter((entry) => entry.atS <= call.atS),
     },
     call.atS,
   );

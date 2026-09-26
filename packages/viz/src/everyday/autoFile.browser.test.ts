@@ -89,6 +89,7 @@ import { openingCareer } from '../campaign/career.js';
 import { CAREER_STORAGE_KEY, encodeCareer } from '../campaign/careerPersist.js';
 import { STAGE_DAY_OVER, STAGE_SPEEDS, stageBarModelOf } from './stageScreenModel.js';
 import { DAY_ATTEMPT_COPY } from '../shift/attempt.js';
+import { ATTEMPT_CLOSES_ON_ITS_STAGE, ATTEMPT_SHOWN_TO_ITS_REACH } from '../shift/banking.js';
 
 /** The run the address asks for, in simulated seconds. See the module docstring. */
 const RUN_S = 300;
@@ -390,10 +391,24 @@ describe.skipIf(!HAS_BROWSER)('the day nobody closed', () => {
    * swap comfortably earlier than the end rather than a race with it.
    */
   it('closes a day that ran out after the player crossed into the Engineer world', async () => {
+    /*
+     * **Since § D1239 (wave AM, lane AM-B) the day started on the stage is a scored attempt, and the
+     * Engineer transport is held at the stage's reach and files none of it** — the post-AL panel's
+     * seat D (D1). So the day that crosses into the Engineer world and runs out there is the
+     * Engineer's own run, pressed there, while the attempt stands; it closes on its transport
+     * reaching the end, as practice. The edge this case tells apart is unchanged: a rule reading
+     * *nothing files while an Everyday day stands* would leave it open, and this case goes red.
+     */
     const page = await coldLoad(LONG_RUN_S);
     try {
       await enterEverydayStage(page);
       await enterEngineerStage(page);
+      await page.waitForFunction(
+        (line) => document.getElementById('status')?.textContent === line,
+        ATTEMPT_SHOWN_TO_ITS_REACH,
+        { timeout: 10_000 },
+      );
+      await page.click('#run');
       await page.waitForFunction(
         (note) => document.querySelector('.everyday-bar-note')?.textContent === note,
         FILED_NOTE,
@@ -416,6 +431,18 @@ describe.skipIf(!HAS_BROWSER)('the day nobody closed', () => {
     try {
       await enterEverydayStage(page);
       await enterEngineerStage(page);
+      /* § D1239: on the stage's own attempt the shortcut is refused, and says why. */
+      await page.keyboard.press('Control+Enter');
+      expect(await page.textContent('#status')).toBe(ATTEMPT_CLOSES_ON_ITS_STAGE);
+      expect(await page.evaluate(() => document.querySelector('.everyday-bar-note')?.textContent ?? '')).not.toBe(FILED_NOTE);
+      /* On the Engineer's own run it files at once. */
+      await page.click('#run');
+      await page.waitForFunction((label) => document.getElementById('run')?.textContent === label, RUN_IDLE, {
+        timeout: 120_000,
+      });
+      await page.evaluate(() => {
+        (document.activeElement as HTMLElement | null)?.blur();
+      });
       await page.keyboard.press('Control+Enter');
       await page.waitForFunction(
         (note) => document.querySelector('.everyday-bar-note')?.textContent === note,
@@ -554,10 +581,11 @@ describe.skipIf(!HAS_BROWSER)('a day left unfinished — GitHub issue #526 item 
   it('and a day walked away from by a rail row, where no strip promised anything, still files — the control', async () => {
     /*
      * The instrument's positive half, and the boundary's. A rail row leaves the stage with no question
-     * asked, so the day is still the player's and the same press files it; `replay.browser.test.ts`'s
-     * #522 control depends on exactly that. Were the refusal drawn on every leave rather than on the
-     * one the strip confirms, this case goes red, and without it the two above would pass on a build
-     * where the press files nothing at all.
+     * asked, so the day is still the player's. Since § D1239 (wave AM, lane AM-B) the attempt that day
+     * began is filed only by its own stage's close, so the Engineer press reaches `closeShift` and is
+     * refused there for **that** reason (`ATTEMPT_CLOSES_ON_ITS_STAGE`) rather than for the strip's
+     * (`ATTEMPT_LEFT_CANNOT_BANK`); which sentence it reads is what tells this case from a press that
+     * files nothing at all. The day then files by its own close, which is the positive control.
      */
     const page = await coldLoad();
     try {
@@ -566,8 +594,35 @@ describe.skipIf(!HAS_BROWSER)('a day left unfinished — GitHub issue #526 item 
       await page.waitForSelector('.everyday-week', { timeout: 15_000 });
       await page.locator('.everyday-rail-menu').click();
       await page.waitForSelector('.everyday-mode[data-screen]', { timeout: 15_000 });
-      const scores = await scoresAfterEngineerClose(page);
-      expect(figuresIn(scores).length).toBeGreaterThan(0);
+      await enterEngineerStage(page);
+      await page.evaluate(() => {
+        (document.activeElement as HTMLElement | null)?.blur();
+      });
+      await page.keyboard.press('Control+Enter');
+      expect(await page.textContent('#status')).toBe(ATTEMPT_CLOSES_ON_ITS_STAGE);
+      await returnToEverydayMode(page);
+      await openEverydayDoor(page);
+      expect(figuresIn(await doorScores(page))).toEqual([]);
+
+      /* The day's own close still files it: resumed from the brief, closed on the stage. */
+      await page.locator('.everyday-bar-primary').click();
+      await page.waitForSelector('.everyday-brief', { timeout: 15_000 });
+      expect(await page.textContent('.everyday-bar-primary')).toMatch(/^Resume /u);
+      await page.locator('.everyday-bar-primary').click();
+      await page.waitForFunction(
+        () => (document.querySelector('.everyday-bar-primary')?.textContent ?? '').includes('Close the day'),
+        undefined,
+        { timeout: 120_000 },
+      );
+      await page.locator('.everyday-bar-primary').click();
+      if ((await page.locator('.everyday-stage-call-confirm:not([hidden])').count()) > 0) {
+        await page.locator('.everyday-stage-call-confirm-file').click();
+      }
+      await page.waitForSelector('.everyday-report', { timeout: 60_000 });
+      await page.locator('.everyday-rail-menu').click();
+      await page.waitForSelector('.everyday-mode[data-screen]', { timeout: 15_000 });
+      await openEverydayDoor(page);
+      expect(figuresIn(await doorScores(page)).length).toBeGreaterThan(0);
     } finally {
       await page.close();
     }

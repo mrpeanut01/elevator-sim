@@ -47311,6 +47311,8 @@ A replay names its driver at the playhead from the watched record's own log.
 
 ## D1189 — *Close the day* asks once while a call is up, and the report takes focus after a close
 
+> **Status 2026-09-26: AMENDED by [§ D1240](#d1240)** (an agent ruling). The question now focuses *Back to the call*; a second press of the primary or *Close the day as it stands* files. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-09-26 by an agent session under delegated authority** (wave AL, lane AL-A), not by
 > the product owner, and to be read as an agent ruling. **Owner-reversible**: that the question is
 > asked at all, and its words (`everyday/stageCall.ts#STAGE_CALL_COPY.closeAsk` and the three keys
@@ -47754,6 +47756,8 @@ stays an upper bound: re-measuring six reference towers at fifty seeds is hours 
 was not taken.
 
 ## D1218 — one attempt per scored day: it starts at *Start the day*, leaving resumes it, and it is the only run of that day the week banks
+
+> **Status 2026-09-26: AMENDED by [§ D1239](#d1239)** (an agent ruling). The Engineer transport is held at the attempt's reach, the attempt is filed only by its own stage's close, an Engineer close banks nothing into any week while an attempt stands, and a close reads the week this device has stored. See [`docs/39`](docs/39-decisions-in-force.md).
 
 **Status (wave AL integration):** the resumed session's snapshot carries § D1205's per-peak counts, the 600 s repeat memory, the *keep* switch-off and the driver the pair is re-derived from, and leaves out the call in hand, so a resumed attempt raises exactly the calls an unbroken one would (`dev/dayCallSession.test.ts`, *a resumed session raises what an unbroken one would*). The attempt and the close read one dealt crowd (`dev/main.ts#dealtDaySeedNow`), so § D1229's derived crowds and this rule agree.
 
@@ -48394,3 +48398,97 @@ brief) and `everyday/dailyLoop.browser.test.ts`.
 
 **Tests.** `shift/tomorrow.test.ts` (no streak on any arm), `shift/report.test.ts` (no unlock
 promised), `everyday/reportView.test.ts` (the note names the brief).
+
+---
+
+## D1239 — the one attempt is final: the Engineer surface shows it only to its reach and never files it, and a close reads the week this device has stored
+
+> **Taken 2026-09-26 by agent sessions under delegated authority** (wave AM, lane AM-B, on the
+> post-AL panel's seat D, defects D1 to D3), not by the product owner, and to be read as an agent
+> ruling; [§ D626](#d626) is the cautionary case. **Amends [§ D1218](#d1218)**, whose clause 4 kept
+> a close from the Engineer surface as practice and whose *What it does not reach* left the Engineer
+> transport and presses unheld. Owner-reversible clauses: holding the Engineer transport at the
+> attempt's reach rather than offering *Switch to Engineer* as leaving the day; refusing the Engineer
+> surface's presses on the attempt's run; and making every Engineer close practice while any
+> attempt stands on this device.
+
+**Why an entry.** [§ D405](#d405)'s first two grounds. It moves a recorded ruling (§ D1218) and binds
+`playback/playback.ts`, `dev/main.ts`, `everyday/host.ts`, `shift/attempt.ts`, `shift/banking.ts`,
+`shift/report.ts` and `persist/attempt.ts`.
+
+**What was wrong.** Seat D, three ways past § D1218's one attempt. **D1**: with a call held on the
+stage, the Engineer transport behind the cover had played on at ×60, so *Switch to Engineer* showed
+the unanswered branch's future, and a click at the timeline's end filed the scored day with the call
+never answered; back on the stage the call's buttons stood beside *the day is filed*. **The building
+change**: on the Engineer surface mid-attempt, another building's card put that tower's Monday on
+screen and its end filed and banked it, with no brief and no calls, and paid nothing (D3). **D2**:
+two tabs each closed one counted day, and the second close banked and wrote its week over the first.
+Reproduced on the base bundle by `everyday/attemptIsFinal.browser.test.ts`, red in all three cases.
+
+**The ruling.**
+
+1. **The Engineer transport is held at the attempt's reach.** While the standing attempt's run is
+   the Engineer's, its playhead cannot pass the furthest instant the stage has shown
+   (`Playback.setReach`): a scrub, a seek and a playing transport stop there, and it reads *ended*
+   only where the reach is the run's end. The status line says so once
+   (`shift/banking.ts#ATTEMPT_SHOWN_TO_ITS_REACH`).
+2. **The attempt closes only by its own stage.** `closeShift` files the attempt's run only from
+   `EverydayHost.closeDay`; the Engineer surface's end of run, `Ctrl`+`Enter`, Day report tab and
+   export refuse with `ATTEMPT_CLOSES_ON_ITS_STAGE`, and its three press buttons press nothing on
+   that run.
+3. **While an attempt stands on any of this device's weeks, an Engineer close banks nothing into
+   any week.** The same day's other run keeps § D1218's `'attempt'` ground and words; any other week
+   closes as practice with `shift/report.ts#PRACTICE_ENGINEER_NOTE` and stays on its day.
+4. **A close reads the stored week.** Where the week this device has stored has filed the day the
+   tab holds open (`shift/attempt.ts#dayFiledElsewhere`), the close is practice with
+   `PRACTICE_OTHER_TAB_NOTE`, the tab takes the stored weeks and attempts, the save writes nothing
+   over the first close, and nothing is paid (`everyday/host.ts#fileScenarioDay` skips a practice
+   sheet).
+
+**What holds it.** `playback/playback.test.ts` (the reach: held, followed, clamped, let go),
+`shift/attempt.test.ts` (a day filed elsewhere, a rolled week, a stale week that is not a filing, an
+attempt on a parked week), `shift/report.test.ts` (the two notes), and
+`everyday/attemptIsFinal.browser.test.ts` on the built bundle: red on `0911d63` in all three cases,
+green after (its two tabs come from `dev/browserTier.test-helper.ts#openTwoTabs`, one context
+watched by the tier's collector). Three of `everyday/autoFile.browser.test.ts`'s controls filed the
+stage's own attempt from the Engineer surface, which this entry forbids; they now read the refusal's
+sentence and file the Engineer's own run instead, and the rail-row control files the day by its own
+close.
+
+**What it does not reach.** A stored week that has rolled round to the same day number with nothing
+filed reads as this day still open. The Engineer rail's own goal ticks mid-day are unchanged.
+
+## D1240 — the stage's record of a scored day: the pinned call's row, a skip that stops at each call's clock, current status lines, a practice line, and a close question that focuses the safe answer
+
+> **Taken 2026-09-26 by agent sessions under delegated authority** (wave AM, lane AM-B, on the
+> post-AL panel's seats B and D), not by the product owner, and to be read as an agent ruling.
+> **Amends [§ D1189](#d1189)**'s *focus moves to the first* and **extends [§ D1219](#d1219)** to the
+> pinned call. Owner-reversible clauses: the pinned call's counts beside its census, and the words
+> of the hold and the practice line.
+
+**Why an entry.** It amends a recorded ruling (§ D1189) and binds `everyday/stageScreen.ts`,
+`everyday/stageCall.ts`, `shift/callRow.ts`, `shift/report.ts`, `dev/state.ts` and `dev/main.ts`.
+
+**What was wrong, and the ruling.**
+
+1. **The pinned call had no row.** § D1029 measured it across moments for its verdicts and never
+   ran its answers forward, so *What the calls did* skipped the one call the day turns on; and its
+   report row vanished whenever a later call was answered with a press, because the row refused any
+   log longer than its answer. Now the day is run twice more from the pinned call's second when it
+   is answered or skipped, counted by § D1138's `dayCallRecordOf`; the stage prints its row on
+   § D1219's timing and the report's pinned row carries the counts. Only presses at or before the
+   call second are the day as measured, and a later press adds *The runs named here had nothing
+   pressed after the call.* The record is kept with the attempt.
+2. **A skip ran past a call.** Pressed during an answer's re-simulation, *Skip to the end* ran the
+   day out and the next call came up under the end's clock. The skip now waits out the
+   re-simulation and goes on from there, and a card drawn past its own second puts the playhead back
+   on it, as the pace already does (§ D1153).
+3. **Stale lines.** The pace note is cleared at the day's end; while a card is up the strip's hold
+   reads *held while the call is up: its answers are on the card* rather than *held until the stage
+   stops for this day's call*.
+4. **A practice stage says so**, in the brief's sentence for the ground its close will print.
+5. **The close's question focuses *Back to the call***, so two presses of `Enter` cannot end a day.
+
+**What holds it.** `shift/callRow.test.ts` (a later press keeps the row, the counts' framing, both
+through § D982's ban lists) and `everyday/stageRecord.browser.test.ts` on the built bundle, whose
+soft assertions named all eight defects red on `0911d63` and none after.

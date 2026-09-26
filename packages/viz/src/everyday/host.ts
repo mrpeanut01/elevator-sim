@@ -221,7 +221,7 @@ import type { BookedOutCar } from '../shift/bookedOut.js';
 import type { CalendarPeriod } from '../shift/calendar.js';
 import { contractById, statLineOf } from '../shift/contracts.js';
 import { admittedPressDayIds, ladderTowersOf, pressDayFor } from '../shift/ladder.js';
-import { crowdIsShared } from '../shift/scoredCrowd.js';
+import { crowdIsShared, PRACTICE_DAY_SENTENCES, type PracticeGround } from '../shift/scoredCrowd.js';
 import { callOpeningOf, watchedCallOpeningOf } from './callOpening.js';
 import type { PressCall } from '../shift/pressCall.js';
 import type { DayCallAnswer, DayCallOnStage, DayCallRecord } from '../shift/dayCalls.js';
@@ -1564,6 +1564,14 @@ export interface EverydayHost {
    */
   attemptResumeAtS(recording: VizRecording): number | undefined;
 
+  /**
+   * The sentence a practice run's stage carries, or `undefined` on a run that banks — wave AM, lane
+   * AM-B, [§ D1239](../../../../DECISIONS.md), the post-AL panel's seat D (D6): the stage of *Take
+   * this call again* said nothing about being practice, and only its report did. The words are the
+   * brief's (`shift/scoredCrowd.ts#PRACTICE_DAY_SENTENCES`), on the ground the close will print.
+   */
+  practiceOnStage?(): string | undefined;
+
   /** The stage has shown `recording` up to `atS` — § D1218, kept for a resume. */
   noteShown(recording: VizRecording, atS: number): void;
 
@@ -2192,6 +2200,8 @@ export interface EverydayHostBindings {
   dayAttempt?(): DayAttempt | undefined;
   /** § D1218 — where the stage opens the attempt's run, or `undefined`. */
   attemptResumeAtS?(recording: VizRecording): number | undefined;
+  /** § D1239 — the ground the run on the stage would close as practice on, or `undefined` where it banks. */
+  practiceOnStage?(): PracticeGround | undefined;
   /** § D1218 — the stage's reach on the attempt's run. */
   noteAttemptShown?(recording: VizRecording, atS: number): void;
   /** § D1218 — whether the attempt on `recording` is past its pinned call. */
@@ -2817,6 +2827,13 @@ export function createEverydayHost(
   const fileScenarioDay = (historyBefore: readonly DayOutcome[]): void => {
     const week = b.state().week;
     if (contractById(week.contractId) === undefined) return;
+    /*
+     * § D1239: a practice sheet filed nothing, whatever the week reads now. A close another tab beat
+     * leaves this tab holding the week that tab stored, whose history has grown by the day that tab
+     * filed and paid for, so the history test below would pay it a second time.
+     */
+    const sheet = b.state().report;
+    if (sheet?.of === 'week-day' && sheet.practiceNote !== undefined) return;
     if (week.history === historyBefore || week.closedDay !== week.day) return;
     const filed = week.history.find((entry) => entry.day === week.day);
     if (filed === undefined) return;
@@ -3629,6 +3646,10 @@ export function createEverydayHost(
       return attempt === undefined ? undefined : { weekday: weekdayOf(attempt.dayIdx) };
     },
     attemptResumeAtS: (recording) => b.attemptResumeAtS?.(recording),
+    practiceOnStage: () => {
+      const ground = b.practiceOnStage?.();
+      return ground === undefined ? undefined : PRACTICE_DAY_SENTENCES[ground];
+    },
     noteShown: (recording, atS) => {
       b.noteAttemptShown?.(recording, atS);
     },

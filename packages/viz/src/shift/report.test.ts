@@ -61,7 +61,9 @@ const observationsOfRun = (recording: Parameters<typeof observationsAt>[0]) =>
 import {
   NOT_RECORDED,
   PRACTICE_CROWD_NOTE,
+  PRACTICE_ENGINEER_NOTE,
   PRACTICE_NOTE,
+  PRACTICE_OTHER_TAB_NOTE,
   WITHHELD,
   averageWaitFigure,
   clockOf,
@@ -2395,5 +2397,20 @@ describe('the ordinary day’s calls and a practice close — § D1138', () => {
     expect(byCrowd.streakLine).toBe(PRACTICE_CROWD_NOTE);
     expect(byCrowd.practiceNote).not.toMatch(/first attempt/u);
     expect(byCrowd.practiceNote).not.toMatch(/\d/u);
+  });
+
+  it('says a close from the Engineer surface under a standing attempt, and a close another tab beat, are practice for those reasons — § D1239', () => {
+    const open = { ...WEEK, attempt: 1, closedDay: null };
+    const engineer = weekDay(sheet({ practice: true, practiceEngineer: true, week: open }));
+    expect(engineer.practiceNote).toBe(PRACTICE_ENGINEER_NOTE);
+    expect(engineer.streakLine).toBe(PRACTICE_ENGINEER_NOTE);
+    expect(engineer.dayStaysOpen).toBe(true);
+    const otherTab = weekDay(sheet({ practice: true, practiceOtherTab: true, week: open }));
+    expect(otherTab.practiceNote).toBe(PRACTICE_OTHER_TAB_NOTE);
+    expect(otherTab.dayStaysOpen).toBe(true);
+    for (const note of [PRACTICE_ENGINEER_NOTE, PRACTICE_OTHER_TAB_NOTE]) {
+      expect(note).toMatch(/^Practice\./u);
+      expect(note).not.toMatch(/\d/u);
+    }
   });
 });
