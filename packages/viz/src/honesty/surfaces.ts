@@ -3055,7 +3055,11 @@ const CAMPAIGN: SurfaceAdapter = {
         role: 'goal',
         declaredCount: replications,
         countShown: goal.sentence.includes(String(replications)),
-        goal: { rateShown: /\b\d+\s*(?:of|\/)\s*\d+\b/.test(goal.sentence), seeds: replications },
+        goal: {
+          kind: goal.kind,
+          rateShown: /\b\d+\s*(?:of|\/)\s*\d+\b/.test(goal.sentence),
+          seeds: replications,
+        },
       });
       seeds.push({ field: `judge.goals.${goal.kind}.note`, text: goal.note, role: 'reason' });
     }
