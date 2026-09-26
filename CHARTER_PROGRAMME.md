@@ -76,7 +76,7 @@ Measured on this tree at `c8fd6fa`, before any charter work:
 | Test suite | **440 files / 440 passed · 8 688 passed, 11 skipped (8 699)** · green |
 | Browser tier | **ran** — 25 of the 440 files; `ELEVATOR_SIM_CHROMIUM` pointed at the container's Chromium |
 | Wall clock | 3 771 s (62 m 52 s) — **contended, not comparable**; see the caveat below |
-| Next free decision number | **D1139** — no wave is open. **Take your numbers from your dispatch brief, never from this row**: it is the integrator's input and is stale while a wave runs, which is why two lanes reading it once both computed § D336. Wave AJ held D1048–D1146 in eleven blocks, spent twenty-seven headings, registered the unspent numbers below D1138 as holes and closed its reservation in its own merge commit; D1139–D1146 were free rather than holed (§ D430). A wave's merge commit closes every reservation it opened, the fix block included. |
+| Next free decision number | **D1186** — no wave is open. **Take your numbers from your dispatch brief, never from this row**: it is the integrator's input and is stale while a wave runs, which is why two lanes reading it once both computed § D336. Wave AK held D1139–D1190 in six blocks, spent twenty-eight headings, registered the unspent numbers below D1185 as holes and closed its reservation in its own merge commit; D1186–D1190 are free rather than holed (§ D430). A wave's merge commit closes every reservation it opened, the fix block included. |
 **The skip count is 11, and it is the number this programme was told to watch.** All eleven are
 deep-tier opt-ins behind `describe.skipIf(!DEEP)` / `!deepRequested()` in `packages/experiments`
 (`matrixCensus`, `collectiveAdoption`, `fuzz/deep`, `perfScaling`, `perfSweep`, `goldenRuns`,

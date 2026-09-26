@@ -116,7 +116,7 @@ import {
   type ContractPressDay,
 } from '../shift/ladder.js';
 import type { PressCall } from '../shift/pressCall.js';
-import { clockOf, dayReportOf } from '../shift/report.js';
+import { clockOf, dayReportOf, smallPrintFor } from '../shift/report.js';
 import { DAY_START_S } from '../shift/types.js';
 import { towerChoiceViewOf } from '../everyday/towerChoice.js';
 import type { GoalObservations, Observations, ShiftGoal, WeekState } from '../shift/types.js';
@@ -527,21 +527,7 @@ export const AGREED_FIGURES: readonly AgreedFigure[] = Object.freeze<AgreedFigur
       'goal row prints no figure to agree with.',
     left: {
       surfaceId: 'shift/report.ts#dayReportOf',
-      read: (view) => {
-        const run = gradedRunOf(view);
-        if (run === undefined) return undefined;
-        return dayReportOf({
-          recording: run.recording,
-          observations: run.observations,
-          goals: run.goals,
-          week: view.state.week,
-          contract: undefined,
-          event: SHIFT_EVENTS.ordinary,
-          plan: { shiftLengthS: run.recording.endedAt - run.recording.startedAt, windowStartS: null, patternId: 'building' },
-          calendar: null,
-          subject: { kind: 'week-day' },
-        }).figures.find((figure) => figure.id === 'worst-wait')?.value;
-      },
+      read: (view) => gradedReportOf(view)?.figures.find((figure) => figure.id === 'worst-wait')?.value,
     },
     right: {
       surfaceId: 'shift/goals.ts#readGoals',
@@ -549,6 +535,57 @@ export const AGREED_FIGURES: readonly AgreedFigure[] = Object.freeze<AgreedFigur
         const run = gradedRunOf(view);
         if (run === undefined) return undefined;
         return readGoals(run.goals, run.observations).find((reading) => reading.goal.id === 'worst-wait')?.display;
+      },
+    },
+  },
+  {
+    id: 'worst-wait-lever',
+    figure: 'the worst wait of the day — the *Weight fairness up* lever card and the goal row that grades it',
+    why:
+      'Wave AK, the post-AJ panel’s seats B (H2) and D (H4), and § D1148. After § D1104 moved the ' +
+      'WORST WAIT card to the goal’s whole-shift fold, the lever card two blocks down still read ' +
+      '`summary.serviceLevel.longestWaitS`, the reporting window’s maximum, and printed *one still ' +
+      'waited 178 s* on the sheet whose card and goal row said 181 s. The `worst-wait` pair compared ' +
+      'the card with the goal and nothing compared the lever, which is how one sheet came to carry ' +
+      'two worst waits again. Both sides are read only where the lever points at the day, which is ' +
+      'the only state on which the card publishes a wait at all.',
+    left: {
+      surfaceId: 'shift/report.ts#dayReportOf',
+      read: (view) => leverWorstWaitOf(gradedReportOf(view)),
+    },
+    right: {
+      surfaceId: 'shift/goals.ts#readGoals',
+      read: (view) => {
+        const run = gradedRunOf(view);
+        if (run === undefined || !fairnessLeverPointed(gradedReportOf(view))) return undefined;
+        return readGoals(run.goals, run.observations).find((reading) => reading.goal.id === 'worst-wait')?.display;
+      },
+    },
+  },
+  {
+    id: 'worst-wait-scope',
+    figure: 'the span the day’s worst wait is taken over — the WORST WAIT card’s note and the report’s fold-out',
+    why:
+      'Wave AK, the post-AJ panel’s seat B (H1), and § D1148. The card says *the worst of the whole ' +
+      'shift — the figure the goal row grades* and the fold-out a reader opens when two figures ' +
+      'disagree said *the means and the WORST WAIT figure are over that window and nothing else*. ' +
+      'Each read true of the tree it was written on; § D1104 moved the card and the paragraph that ' +
+      'reconciles the sheet’s two spans stayed where it was. Compared as the span each names, so a ' +
+      'later change to either side’s wording that moves the figure between spans is caught.',
+    left: {
+      surfaceId: 'shift/report.ts#dayReportOf',
+      read: (view) => {
+        const note = gradedReportOf(view)?.figures.find((figure) => figure.id === 'worst-wait')?.note;
+        if (note === undefined) return undefined;
+        return spanNamedIn(note);
+      },
+    },
+    right: {
+      surfaceId: 'shift/report.ts#smallPrintFor',
+      read: (view) => {
+        const run = gradedRunOf(view);
+        if (run === undefined) return undefined;
+        return worstWaitSpanInSmallPrint(smallPrintFor(run.recording.dispatcherProfileId, run.recording.summary, DAY_START_S));
       },
     },
   },
@@ -627,6 +664,62 @@ export const AGREED_FIGURES: readonly AgreedFigure[] = Object.freeze<AgreedFigur
         }).join('/'),
     },
   },
+  {
+    id: 'day-call-driver-row',
+    figure: 'a driver call’s three ten-minute counts — the report’s row and the runs it was counted on',
+    why:
+      'Wave AK, [§ D1167](../../../../DECISIONS.md). The driver question’s row names each answer by ' +
+      'who drove from the call, and must still say only what its runs measured, in the card’s order: ' +
+      'the first of the pair, the second, and the dispatcher kept. The left side is the row as ' +
+      '`dayCallRowOf` draws it from a driver record the shipped `dayCallRecordOf` counted, over the ' +
+      'same edge-case legs as `day-call-row`; the right side counts the same legs by the expression ' +
+      'written there. A row that printed a pair’s counts against the wrong names, or in another ' +
+      'order, would publish a comparison of two dispatchers its runs do not hold.',
+    left: {
+      surfaceId: 'shift/dayCalls.ts#dayCallRowOf',
+      read: () => {
+        const row = dayCallRowOf(
+          dayCallRecordOf({
+            atS: DAY_CALL_FIXTURE.atS,
+            windowEndS: DAY_CALL_FIXTURE.endS,
+            answer: 'driver-b',
+            question: 'driver',
+            drivers: { 'driver-a': 'Driver A', 'driver-b': 'Driver B', leave: 'Driver K' },
+            legs: {
+              'driver-a': DAY_CALL_FIXTURE.legs['park-cars-lobby'],
+              'driver-b': DAY_CALL_FIXTURE.legs['spread-cars'],
+              leave: DAY_CALL_FIXTURE.legs.leave,
+            },
+            observations: {
+              'driver-a': DAY_CALL_FIXTURE.observations['park-cars-lobby'],
+              'driver-b': DAY_CALL_FIXTURE.observations['spread-cars'],
+              leave: DAY_CALL_FIXTURE.observations.leave,
+            },
+          }),
+          1,
+          () => 'Shift cleared',
+          (simTimeS) => clockOf(simTimeS, DAY_START_S),
+        );
+        const counts = /: (\d+) with Driver A driving, (\d+) with Driver B driving and (\d+) with Driver K still driving/u.exec(
+          row.why,
+        );
+        return counts === null ? undefined : `${String(counts[1])}/${String(counts[2])}/${String(counts[3])}`;
+      },
+    },
+    right: {
+      surfaceId: 'shift/dayCalls.ts#dayCallRecordOf',
+      read: () =>
+        DAY_CALL_ANSWER_ORDER.map((answer) => {
+          const riders = new Set<string>();
+          for (const leg of DAY_CALL_FIXTURE.legs[answer]) {
+            if (leg.arrivedAt < DAY_CALL_FIXTURE.atS || leg.arrivedAt >= DAY_CALL_FIXTURE.endS) continue;
+            const ended = Math.min(leg.boardedAt ?? Infinity, leg.refusedAt ?? Infinity);
+            if (ended > leg.arrivedAt + 60) riders.add(leg.passengerId);
+          }
+          return String(riders.size);
+        }).join('/'),
+    },
+  },
 ]);
 
 /** The *nobody* pick with no rival and no refusal — the slot the standing pairs read. */
@@ -683,6 +776,59 @@ function gradedRunOf(
   const reading = readGoals(goals, observations).find((entry) => entry.goal.id === 'worst-wait');
   if (reading === undefined || reading.state === 'pending') return undefined;
   return { recording, observations, goals };
+}
+
+/**
+ * The Day report of a graded run, as the `worst-wait` pairs read it — `undefined` where the goal
+ * is not graded. Built once per view: every pair reading a sheet reads the same sheet.
+ */
+const gradedReports = new WeakMap<AgreementView, ReturnType<typeof dayReportOf> | null>();
+function gradedReportOf(view: AgreementView): ReturnType<typeof dayReportOf> | undefined {
+  const cached = gradedReports.get(view);
+  if (cached !== undefined) return cached ?? undefined;
+  const run = gradedRunOf(view);
+  const report =
+    run === undefined
+      ? null
+      : dayReportOf({
+          recording: run.recording,
+          observations: run.observations,
+          goals: run.goals,
+          week: view.state.week,
+          contract: undefined,
+          event: SHIFT_EVENTS.ordinary,
+          plan: { shiftLengthS: run.recording.endedAt - run.recording.startedAt, windowStartS: null, patternId: 'building' },
+          calendar: null,
+          subject: { kind: 'week-day' },
+        });
+  gradedReports.set(view, report);
+  return report ?? undefined;
+}
+
+/** Whether the sheet's *Weight fairness up* card is pointed at by the day. */
+function fairnessLeverPointed(report: ReturnType<typeof dayReportOf> | undefined): boolean {
+  const lever = report?.levers.find((entry) => entry.id === 'weight-fairness');
+  return lever !== undefined && lever.body.startsWith('Today points here:');
+}
+
+/** The wait the pointed *Weight fairness up* card quotes, in the goal row's own form. */
+function leverWorstWaitOf(report: ReturnType<typeof dayReportOf> | undefined): string | undefined {
+  if (!fairnessLeverPointed(report)) return undefined;
+  const body = report?.levers.find((entry) => entry.id === 'weight-fairness')?.body ?? '';
+  return /one still waited (?:at least )?(\d+ s)/u.exec(body)?.[1] ?? 'no wait quoted';
+}
+
+/** The span the fold-out puts the WORST WAIT figure in: the clause the words sit in. */
+function worstWaitSpanInSmallPrint(smallPrint: string): string {
+  const clause = smallPrint.split(/;|\. /u).find((part) => part.includes('WORST WAIT'));
+  return clause === undefined ? 'unnamed' : spanNamedIn(clause);
+}
+
+/** Which of the sheet's two spans a sentence names: the whole shift, the reporting window, or neither. */
+function spanNamedIn(text: string): string {
+  if (text.includes('whole shift')) return 'the whole shift';
+  if (text.includes('window')) return 'the window';
+  return 'unnamed';
 }
 
 /**

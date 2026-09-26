@@ -63,6 +63,19 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'The page’s parked moves under their published names — § D1183. `parkedMoveOf`, ' +
+        '`namedStageMoveOf` and `stagePageMovesOf` compose and read back `<profile>-parked-<value>`, ' +
+        'the key the survivor census publishes a page choice under and the batch worker names the ' +
+        'candidate arm by. No surface draws it: the hub prints the survivor sentence’s counts, never ' +
+        'a survivor’s name, and the stage page draws profile names and the parking row’s own words.',
+      ids: [
+        'everyday/stagePlay.ts#parkedMoveOf',
+        'everyday/stagePlay.ts#namedStageMoveOf',
+        'everyday/stagePlay.ts#stagePageMovesOf',
+      ],
+    },
+    {
+      reason:
         'The whole-day splice — wave AJ lane AJ-B, § D1057. `shift/episode.ts#spliceEpisode` returns a ' +
         'derived phase-list record and, where a day cannot hold an episode, a refusal with its reason. ' +
         'The record’s `$comment` is a data comment nothing renders. The refusal reaches no screen: ' +
@@ -1126,7 +1139,7 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'watch/record.ts#WATCH_RECORD_CARRIES',
         'watch/record.ts#watchRecordIssues',
         'watch/record.ts#watchRecordOf',
-        'watch/record.ts#watchRunConfigOf',
+        'watch/record.ts#watchRunPlanOf',
         'watch/reference.ts#FIXTURE_MARKER',
         'watch/reference.ts#parseReferenceRuns',
         'watch/reproduce.ts#reproductionDrift',
@@ -1682,6 +1695,12 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'fixit/routeCensus.ts#ROUTE_CENSUS',
         'fixit/routeCensus.ts#routeCensusOf',
         'fixit/routeCensus.ts#opensWithDiagnosis',
+        /*
+         * § D1184's par table is units and counts per case id, on the census's ground above; the
+         * sentence a player reads is `fixit/par.ts#fixitParLineOf`'s, which the FIXIT adapter drives.
+         */
+        'fixit/par.ts#FIXIT_PAR',
+        'fixit/par.ts#fixitParOf',
         'fixit/engine.ts#affordabilityOf',
         'fixit/engine.ts#toggleRepair',
         /*
@@ -1881,9 +1900,32 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'refusals that `dev/data.ts` folds into `BrowserResources.warnings` and `shift/weekWay.test.ts` ' +
         'turns into a failing test, and no screen renders one. `dev/state.ts#weekGrowthPerDayOf` ' +
         'returns a number, and is derived only because `runRungOf` names the `shift-week` play mode ' +
-        'id, which is a switch value rather than a sentence. What a player reads from the census is ' +
-        '`wayThroughSentenceOf`, seeded by name in `honesty/surfaces.ts`.',
-      ids: ['shift/weekWay.ts#weekWayIssues', 'dev/state.ts#weekGrowthPerDayOf'],
+        'id, which is a switch value rather than a sentence. `dev/state.ts#runRungContractIdOf` ' +
+        '(wave AK, § D1139) returns a contract id for a run record through the same `runRungOf`, on ' +
+        'the same ground. What a player reads from the census is `wayThroughSentenceOf`, seeded by ' +
+        'name in `honesty/surfaces.ts`.',
+      ids: ['shift/weekWay.ts#weekWayIssues', 'dev/state.ts#weekGrowthPerDayOf', 'dev/state.ts#runRungContractIdOf'],
+    },
+    {
+      reason:
+        'The week stake’s plumbing — wave AK, § D1176 to § D1178. `WEEK_LENGTH` is a number, derived ' +
+        'only because the region after it declares `DayStakeReason`’s switch values. `weekDealOf`, ' +
+        '`dayCountsToward`, `countedCleanOf`, `weekNeedOf`, `weekHasClosed`, `weekRollsOver` and ' +
+        '`weekAdmitsANewcomer` return a deal, counts or booleans: a dealt day carries a sentence, and ' +
+        'what a player reads of it is `dayStakeSentenceOf`, which the week adapter seeds for every ' +
+        'census tower. `houseRecordOf` returns a run record for the shell’s house run. What a player ' +
+        'reads from the module is seeded by name in `honesty/surfaces.ts#seedWeekStake`.',
+      ids: [
+        'shift/weekStake.ts#WEEK_LENGTH',
+        'shift/weekStake.ts#weekDealOf',
+        'shift/weekStake.ts#dayCountsToward',
+        'shift/weekStake.ts#countedCleanOf',
+        'shift/weekStake.ts#weekNeedOf',
+        'shift/weekStake.ts#weekHasClosed',
+        'shift/weekStake.ts#weekRollsOver',
+        'shift/weekStake.ts#weekAdmitsANewcomer',
+        'shift/weekStake.ts#houseRecordOf',
+      ],
     },
     {
       reason:
@@ -1920,14 +1962,27 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'runs, reaching prose only through `shiftRunConfigOf`’s withheld-reason strings, which that ' +
         'function’s adapters sweep. What a player reads about an ordinary call is the stage card ' +
         '(`everyday/stageCall.ts`, seeded by name) and the report row (`shift/dayCalls.ts#dayCallRowOf`, ' +
-        'seeded by the report adapter).',
+        'seeded by the report adapter). Wave AK (§ D1166 to § D1168) adds more of the same kind: ' +
+        '`DAY_CALL_DRIVER_ANSWERS` and `dayCallAnswersOf` are answer ids, `DAY_CALL_DRIVER_OFFER` is ' +
+        'three profile ids and `dayCallDriversOf` returns profiles, whose names reach a player only ' +
+        'through the card and the row; `dayCallChangeOf` returns an intervention, ' +
+        '`DAY_CALL_FINAL_GOAL_IDS` is two goal ids, `dayCallLostGoalOf` returns a reading, and ' +
+        '`DAY_ENDED_EARLY_ROW_ID` is a row id. `dayCallAdmits` left this list when it stopped ' +
+        'reading `DAY_CALL_ANSWERS`.',
       ids: [
         'shift/dayCalls.ts#nextDayCallOf',
         'shift/dayCalls.ts#dayCallsOffered',
-        'shift/dayCalls.ts#dayCallAdmits',
         'shift/dayCalls.ts#dayCallRecordOf',
         'shift/dayCalls.ts#dayCallRowIdOf',
         'shift/dayCalls.ts#DAY_CALL_ANSWERS',
+        'shift/dayCalls.ts#DAY_CALL_DRIVER_ANSWERS',
+        'shift/dayCalls.ts#dayCallAnswersOf',
+        'shift/dayCalls.ts#DAY_CALL_DRIVER_OFFER',
+        'shift/dayCalls.ts#dayCallDriversOf',
+        'shift/dayCalls.ts#dayCallChangeOf',
+        'shift/dayCalls.ts#DAY_CALL_FINAL_GOAL_IDS',
+        'shift/dayCalls.ts#dayCallLostGoalOf',
+        'shift/dayCalls.ts#DAY_ENDED_EARLY_ROW_ID',
         'dev/state.ts#dayCallFactsOf',
         'dev/dayCallSession.ts#openDayCallSession',
       ],

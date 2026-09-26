@@ -50,6 +50,7 @@ import { el } from './screenDom.js';
 import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.js';
 import {
   STAGE_PLAY_COPY as COPY,
+  namedStageMoveOf,
   stageFactsOf,
   stageMoveOf,
   stagePlayViewOf,
@@ -182,6 +183,8 @@ function stageContextOf(data: Loaded, stageId: string):
     profiles,
     buildings: data.resources.buildings,
     elevatorSpecs: data.resources.elevatorSpecs,
+    /* § D1183: a way through the census found on this page is published under the page's own name. */
+    moveNamed: (name: string) => namedStageMoveOf(name, profiles, data.campaign.space),
   };
   /* The hub's own derivation, so this page holds a stage exactly when the hub's row does. */
   const rung = scenarioLadderOf({

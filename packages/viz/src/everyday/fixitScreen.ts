@@ -20,7 +20,7 @@
  * `dev/fixitPanel.ts` draws the same engine inside the Engineer shell. The two agree on
  * everything the machinery decides — the same `classifyOutcome`, the same judge
  * (`fixit/judge.ts#pressThroughTheJudge`, [§ D1020](../../../../DECISIONS.md)), the same
- * `fixedBadgeAfter` rule (the badge follows the latest run; see the press handler) — and on the
+ * `fixedBadgeAfter` rule (a case once fixed stays fixed, § D1157; see the press handler) — and on the
  * accessibility contract `docs/20` defect 16 set: a toggle says its state in `aria-pressed`
  * **and** in a visible mark, because a background colour alone was neither.
  *
@@ -121,9 +121,9 @@
  * - **The per-case selections and the cached as-built runs are still session-local**, and
  *   deliberately: a `FixitState` is a working draft a player is in the middle of, and a
  *   `RecordedRun` is megabytes of legs. Neither is progress; both end with the tab, as before.
- * - **The badge still follows the latest run in both directions** (`fixit/engine.ts#fixedBadgeAfter`,
- *   `docs/20` defect 16). A restored case arrives badged and is re-badged by the next run it has,
- *   including out of FIXED — restoring the badge does not make it a high-water mark.
+ * - **A restored badge is kept like any other** (`fixit/engine.ts#fixedBadgeAfter`,
+ *   [§ D1157](../../../../DECISIONS.md)). A case once fixed stays fixed, restored or not, and a
+ *   later run that does not clear is drawn as that run's result under `FIX_KEPT_LINE`.
  *
  * ## Data, loaded through the same doors
  *
@@ -143,6 +143,7 @@ import {
   editorPricingFrom,
   emptyFixitState,
   fixedBadgeAfter,
+  fixKeptLineOf,
   budgetNoteOf,
   parkingPriceUnits,
   setParkingStrategy,
@@ -180,6 +181,7 @@ import {
 } from '../fixit/judge.js';
 import { shippedAsBuiltMorningsOf } from '../fixit/asBuiltMornings.js';
 import { opensWithDiagnosis, routeCensusOf } from '../fixit/routeCensus.js';
+import { fixitParLineOf } from '../fixit/par.js';
 import { heldReasonOf, isOffered } from '../fixit/held.js';
 import { createOffThreadMornings, morningWorkerCountOf } from '../dev/offThreadMornings.js';
 import type {
@@ -488,6 +490,17 @@ function askDiagnosis(entry: FixitCase, session: CaseSession): void {
 let ask: string | undefined;
 /** A run that threw, said where the reader is. Cleared by the next ask. */
 let runFailure: string | undefined;
+/**
+ * The thrown message behind {@link runFailure}, for a bug report and never for the page's text —
+ * `FIXIT_SCREEN_COPY.runFailed` says why. Carried on the failure paragraph's `data-fault`.
+ */
+let runFault: string | undefined;
+
+/** A run threw: the player's sentence goes on the page and the message goes on the attribute. */
+function failedWith(message: string): void {
+  runFailure = COPY.runFailed;
+  runFault = message;
+}
 
 /**
  * The mount a landed run should redraw — the live one, not the one that asked.
@@ -550,8 +563,8 @@ function ensureRestored(): void {
  * Write the solved set back.
  *
  * The whole set on every change rather than one id, because the slot holds one value and `write`
- * replaces it whole — and because the set shrinks as well as grows: a case that stops being FIXED
- * has to stop being stored, which an append-only write could not express.
+ * replaces it whole. Since [§ D1157](../../../../DECISIONS.md) a verdict only ever adds to the set,
+ * because a case once fixed stays fixed.
  *
  * Spread over the store's current progress rather than built fresh, so the ratings beside it are
  * carried through: two payloads in one value, and a writer that supplied only its own half would
@@ -653,6 +666,7 @@ function measureAsBuilt(loadedFixit: LoadedFixit, entry: FixitCase): void {
   if (ask === key || ask?.endsWith(':press') === true) return;
   ask = key;
   runFailure = undefined;
+  runFault = undefined;
   const plan = fixitRunPlanOf(entry, emptyFixitState(), loadedFixit.resources);
   /*
    * The judge's forty-nine as-built mornings — § D1020 — which ship with the build since § D1120, so
@@ -670,7 +684,7 @@ function measureAsBuilt(loadedFixit: LoadedFixit, entry: FixitCase): void {
     },
     onFailed: (message) => {
       ask = undefined;
-      runFailure = message;
+      failedWith(message);
       live?.redraw();
     },
   });
@@ -1103,6 +1117,7 @@ function mountFixit(
     if (runFailure !== undefined) {
       const failed = el(doc, 'p', 'everyday-fixit-run-failed');
       failed.textContent = `The day could not be run: ${runFailure}`;
+      if (runFault !== undefined) failed.dataset['fault'] = runFault;
       failed.style.cssText = `color:${C.alarm};font-size:13px;max-width:70ch;margin:10px 0 0`;
       main.append(failed);
     }
@@ -1243,7 +1258,27 @@ function mountFixit(
         stale.style.cssText = `margin:18px 0 0;font-size:13px;line-height:1.5;color:${C.alarm};max-width:80ch`;
         main.append(stale);
       }
+      /* § D1157: on a case already fixed, a run that did not fix it is that run's result. */
+      const kept = fixKeptLineOf(session.fixed, session.outcome);
+      if (kept !== undefined) {
+        const keptLine = el(doc, 'p', 'everyday-fixit-fix-kept', kept);
+        keptLine.style.cssText = `margin:18px 0 0;font-size:13px;line-height:1.5;color:${C.moss};max-width:80ch`;
+        main.append(keptLine);
+      }
       const card = outcomeCard(session.outcome);
+      /*
+       * § D1184: on a fixed card, the cheapest change the route census tried that fixes this letter on
+       * the same forty-nine mornings, beside what the order this verdict measured cost. It pays nothing.
+       */
+      if (session.outcome.kind === 'fixed') {
+        const measured = session.verdictState ?? session.state;
+        const par = fixitParLineOf(entry.id, spendOf(entry, measured, loadedFixit.cases.schedule).totalUnits);
+        if (par !== undefined) {
+          const parLine = el(doc, 'p', 'everyday-fixit-par', par);
+          parLine.style.cssText = `font-size:12.5px;line-height:1.5;color:${C.inkSoft};margin:8px 0 0`;
+          card.append(parLine);
+        }
+      }
       /* § D1120 clause 4: the live count and the marks, under the checking card and nowhere else. */
       if (session.outcome.kind === 'checking' && checking && checkingCaseId === entry.id) card.append(progressBlock());
       main.append(card);
@@ -1864,6 +1899,7 @@ function mountFixit(
      */
     if (fixitPlanRefusalOf(entry, session.state, resources) !== undefined) {
       runFailure = COPY.planRefused;
+      runFault = undefined;
       render();
       return;
     }
@@ -1892,6 +1928,7 @@ function mountFixit(
     }
     ask = `${entry.id}:press`;
     runFailure = undefined;
+    runFault = undefined;
     running = true;
     context.refreshBar();
     render();
@@ -1907,19 +1944,16 @@ function mountFixit(
       // The order this verdict is about, so an edit after it is drawn as stale (§ D1011).
       session.verdictState = pressed;
       /*
-       * The FIXED badge follows the **latest** verdict, in both directions — never a high-water
-       * mark. `docs/20` defect 16 is the argument: the Engineer panel latched on the first fixed
-       * outcome and nothing cleared it, so a case stayed badged FIXED beside an outcome card reading
-       * *"9 waits → 9 waits · 0 % of it went away"* — two verdicts about one case on one screen.
-       * The badge, the § 3.3 primary and the outcome card all read this one verdict.
+       * **A case once fixed stays fixed** — [§ D1157](../../../../DECISIONS.md). Only a
+       * fifty-morning `fixed` earns the badge; `checking` and `cleared-once` do not earn it and, on
+       * a case already fixed, do not take it away. A later run that does not clear is drawn as that
+       * run's result under `FIX_KEPT_LINE`, which is what answers `docs/20` defect 16's *two
+       * verdicts on one screen* now that the badge no longer follows the latest run down.
        *
        * The rule itself lives in `fixit/engine.ts#fixedBadgeAfter`, which both this screen and the
        * Engineer panel consume, so the two surfaces cannot come to disagree about what FIXED means.
-       * Only a fifty-morning `fixed` wears it; `checking` and `cleared-once` do not.
        */
-      session.fixed = fixedBadgeAfter(outcome);
-      // In both directions — see `keepSolved`. A case that has just stopped being FIXED stops
-      // being kept, or a reload would restore a badge this run has already taken away.
+      session.fixed = fixedBadgeAfter(outcome, session.fixed);
       keepSolved();
       /*
        * **And the ledger hears about a case this verdict fixed** — GitHub issue #499. A fix case is
@@ -1938,7 +1972,7 @@ function mountFixit(
        * screen is still the wrong place for it. `everyday/rail.ts#bankedLineOf` carries the
        * argument; this call answers nothing to this closure.
        */
-      if (session.fixed) scenarioHost.bankScenarioClear(entry.id);
+      if (outcome.kind === 'fixed') scenarioHost.bankScenarioClear(entry.id);
     };
     pressThroughTheJudge({
       entry,
@@ -1953,7 +1987,7 @@ function mountFixit(
        */
       classify: (before, after, done) => {
         // GitHub issue #350: the claim the basis line will make, checked on the legs first.
-        assertPairMatchesRepairs(entry, pressed, before, after);
+        assertPairMatchesRepairs(entry, pressed, before, after, plan);
         const measurement = measuredOf(entry, before, after);
         const answer = (witnessRun: boolean): void => {
           done(
@@ -2063,7 +2097,7 @@ function mountFixit(
         checking = false;
         checkingCaseId = undefined;
         checkProgress = undefined;
-        runFailure = message;
+        failedWith(message);
         live?.redraw();
         live?.refreshBar();
       },

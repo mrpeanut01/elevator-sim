@@ -152,6 +152,13 @@ export interface BriefScreenView {
    * that says it is a measurement rather than a forecast of today's crowd.
    */
   readonly wayThrough: { readonly heading: string; readonly sentence: string } | undefined;
+  /**
+   * **The week's stake and whether today is part of it**, or `undefined` where the week census does
+   * not speak for the tower — `TodayRecord.weekStake`, [§ D1176](../../../../DECISIONS.md).
+   */
+  readonly week:
+    | { readonly heading: string; readonly line: string; readonly day: string | undefined }
+    | undefined;
   readonly drivers: {
     readonly heading: string;
     /** The three § 6.2 recommends — the head of the same list the dropdown carries. */
@@ -206,6 +213,9 @@ export const BRIEF_NOTE_LEAD = 'Running the lifts: ';
  * crowds: the held-out set is the next dates the product deals, so today's may be one of them.
  */
 export const BRIEF_WAY_THROUGH_HEADING = 'THIS DAY, MEASURED';
+
+/** The heading over the week's stake on the brief — § D1176. */
+export const BRIEF_WEEK_HEADING = 'THIS WEEK';
 
 /** What {@link briefScreenViewOf} is computed from. */
 export interface BriefScreenInput {
@@ -426,6 +436,10 @@ export function briefScreenViewOf(input: BriefScreenInput): BriefScreenView {
       today.wayThrough === undefined
         ? undefined
         : { heading: BRIEF_WAY_THROUGH_HEADING, sentence: today.wayThrough },
+    week:
+      today.weekStake === undefined
+        ? undefined
+        : { heading: BRIEF_WEEK_HEADING, line: today.weekStake.line, day: today.weekStake.day },
     drivers: {
       heading: 'WHO DRIVES TODAY',
       cards: options.slice(0, RECOMMENDED_CARDS),

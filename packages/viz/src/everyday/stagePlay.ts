@@ -44,17 +44,71 @@
 
 import type { DispatcherProfile, ResolvedBuilding } from '@elevator-sim/core/browser';
 import { valuesFromProfile } from '../controls/editedProfile.js';
-import { admitStageMove, stageUnitsAt, type StageAdmission, type StageAdmissionContext, type StageMove } from '../campaign/stagePress.js';
+import {
+  admitStageMove,
+  stageUnitsAt,
+  type StageAdmission,
+  type StageAdmissionContext,
+  type StageMove,
+} from '../campaign/stagePress.js';
 import type { StageReport } from '../campaign/judge.js';
 import type { CampaignStage } from '../campaign/types.js';
 import { emptyFixitState, parkingPriceUnits } from '../fixit/engine.js';
 import type { EditorParkingStrategy } from '../fixit/types.js';
 import type { PriceSchedule } from '../pricing/types.js';
+import { isPerReplicationGoal } from '../scenario/goals.js';
 import { statLineOf } from '../shift/contracts.js';
 import { fixitParkingRow, type FixitParkingRow } from './fixitScreenModel.js';
 
 /** The dimension the parking select writes. The fix-it editor's own control, one id. */
 const PARKING_DIMENSION = 'idle.parkingStrategy';
+
+/** The separator between a profile id and a parking value in a parked move's published name. */
+const PARKED = '-parked-';
+
+/**
+ * The move this page makes for a profile picked by name with idle cars parked at `parking`.
+ *
+ * The bare profile where `parking` is what that profile already does, so a choice that moves nothing
+ * is not dressed as an edit, and otherwise the profile with one dial on it, named
+ * `<profile>-parked-<value>`. That name is what the survivor census publishes for a way through the
+ * page found (§ D1183), and {@link namedStageMoveOf} reads it back, so the hub, the replay and this
+ * page all mean one move by it.
+ */
+export function parkedMoveOf(profile: DispatcherProfile, parking: string, space: StageAdmissionContext['space']): StageMove {
+  const standing = valuesFromProfile(space, profile).get(PARKING_DIMENSION);
+  if (standing === parking) return { profile };
+  return {
+    profile,
+    edit: {
+      baseProfileId: profile.id,
+      profileId: `${profile.id}${PARKED}${parking}`,
+      values: { [PARKING_DIMENSION]: parking },
+    },
+  };
+}
+
+/**
+ * The move a published way-through name stands for, where the name alone says: a shipped profile by
+ * its id, or a parked move by {@link parkedMoveOf}'s name. `undefined` for anything else, which on
+ * the shipped table is a drawn dial configuration (`edit-<n>`), whose values are not in its name.
+ * `campaign/stagePress.ts#routeRefusalsOf` is handed this as its `moveNamed`.
+ */
+export function namedStageMoveOf(
+  name: string,
+  profiles: readonly DispatcherProfile[],
+  space: StageAdmissionContext['space'],
+): StageMove | undefined {
+  const profile = profiles.find((entry) => entry.id === name);
+  if (profile !== undefined) return { profile };
+  const at = name.lastIndexOf(PARKED);
+  if (at <= 0) return undefined;
+  const parkedProfile = profiles.find((entry) => entry.id === name.slice(0, at));
+  const parking = name.slice(at + PARKED.length);
+  if (parkedProfile === undefined || parking === '') return undefined;
+  const move = parkedMoveOf(parkedProfile, parking, space);
+  return move.edit === undefined ? undefined : move;
+}
 
 /**
  * Parking strategies this screen does not offer, and why. `fixed-floor` needs a floor chosen beside
@@ -91,6 +145,14 @@ export const STAGE_PLAY_COPY = Object.freeze({
   missedHead: 'Not cleared.',
   goalMet: 'met',
   goalMissed: 'missed',
+  /*
+   * **A per-run goal's mark names the bar, not the outcome** (§ D1185). Its bar is relative: the
+   * player's setting passes on at least as many runs as the shipped setting did on the same crowds.
+   * A bare *met* beside *everyone delivered* read as *everyone was delivered* at 5 of 50 runs, so
+   * the mark says the bar was reached, which is what the label beside it defines.
+   */
+  goalBarReached: 'bar reached',
+  goalBarNotReached: 'bar not reached',
   goalUnjudged: 'not judged',
   holdoutNotRun:
     'The held-back crowds were not run: a goal missed on the stage’s own crowds cannot be recovered on others.',
@@ -161,7 +223,13 @@ export interface StagePlayFacts {
 /** A verdict as the screen draws it. The sentences are the judge's own. */
 export interface StagePlayVerdictFacts {
   readonly headline: string;
-  readonly goals: readonly { readonly label: string; readonly met: boolean | null; readonly sentence: string }[];
+  readonly goals: readonly {
+    readonly label: string;
+    readonly met: boolean | null;
+    readonly sentence: string;
+    /** Judged run by run against the shipped setting's own count, so its bar is relative. */
+    readonly perRun: boolean;
+  }[];
   readonly holdoutSentence: string | null;
   readonly metOnTuningSeeds: boolean;
   readonly cleared: boolean;
@@ -223,16 +291,54 @@ export function stageMoveOf(
   const profile = profiles.find((entry) => entry.id === choice.profileId);
   if (profile === undefined) return undefined;
   if (choice.parking === null) return { profile };
-  const standing = valuesFromProfile(context.space, profile).get(PARKING_DIMENSION);
-  if (standing === choice.parking) return { profile };
-  return {
-    profile,
-    edit: {
-      baseProfileId: profile.id,
-      profileId: `${profile.id}-parked-${choice.parking}`,
-      values: { [PARKING_DIMENSION]: choice.parking },
-    },
-  };
+  return parkedMoveOf(profile, choice.parking, context.space);
+}
+
+/** The parking values this page's select offers under a profile: the fix-it row's, less {@link NOT_OFFERED_HERE}. */
+function offeredParkingOf(
+  profile: DispatcherProfile,
+  space: StageAdmissionContext['space'],
+  schedule: PriceSchedule,
+): readonly EditorParkingStrategy[] {
+  const standing = String(valuesFromProfile(space, profile).get(PARKING_DIMENSION) ?? '');
+  const row = fixitParkingRow(emptyFixitState(), standing, parkingPriceUnits(schedule));
+  return row.options
+    .map((option) => option.value)
+    .filter((value): value is EditorParkingStrategy => value !== null && !NOT_OFFERED_HERE.has(value));
+}
+
+/** One move the page can make that the dispatcher list alone cannot: a profile with idle cars parked elsewhere. */
+export interface StagePageMove {
+  /** {@link parkedMoveOf}'s name for it, which is what the survivor census publishes. */
+  readonly name: string;
+  readonly move: StageMove;
+}
+
+/**
+ * **Every choice this page offers that is not a profile picked alone** — the survivor census's
+ * `page` stratum, [§ D1183](../../../../DECISIONS.md).
+ *
+ * The page draws two controls: a standing order by name and where idle cars wait. A name alone is
+ * the census's dropdown stratum already, and the stage's own profile with nothing moved is the
+ * control, so what is left is every profile under every parking value the select offers beneath it,
+ * each as the move {@link stageMoveOf} makes. Read off the page's own row rather than listed, so a
+ * value the page stops offering leaves the census on the same commit. Deduplicated by name; a value
+ * equal to what the profile already does is not offered, because the row drops it.
+ */
+export function stagePageMovesOf(
+  profiles: readonly DispatcherProfile[],
+  space: StageAdmissionContext['space'],
+  schedule: PriceSchedule,
+): readonly StagePageMove[] {
+  const out = new Map<string, StagePageMove>();
+  for (const profile of profiles) {
+    for (const parking of offeredParkingOf(profile, space, schedule)) {
+      const move = parkedMoveOf(profile, parking, space);
+      if (move.edit === undefined) continue;
+      out.set(move.edit.profileId, { name: move.edit.profileId, move });
+    }
+  }
+  return [...out.values()];
 }
 
 function admissionFactsOf(admission: StageAdmission): StagePlayAdmissionFacts {
@@ -311,7 +417,12 @@ export function stageFactsOf(input: StageFactsInput): StagePlayFacts {
 export function verdictFactsOf(report: StageReport, paid: StagePlayVerdictFacts['paid']): StagePlayVerdictFacts {
   return {
     headline: report.headline,
-    goals: report.goals.map((goal) => ({ label: goal.label, met: goal.met, sentence: goal.sentence })),
+    goals: report.goals.map((goal) => ({
+      label: goal.label,
+      met: goal.met,
+      sentence: goal.sentence,
+      perRun: isPerReplicationGoal(goal.kind),
+    })),
     holdoutSentence: report.holdout?.sentence ?? null,
     metOnTuningSeeds: report.metOnTuningSeeds,
     cleared: report.cleared,
@@ -384,7 +495,15 @@ function verdictViewOf(facts: StagePlayFacts, verdict: StagePlayVerdictFacts, st
     goals: verdict.goals.map((goal) => ({
       label: goal.label,
       mark:
-        goal.met === null ? STAGE_PLAY_COPY.goalUnjudged : goal.met ? STAGE_PLAY_COPY.goalMet : STAGE_PLAY_COPY.goalMissed,
+        goal.met === null
+          ? STAGE_PLAY_COPY.goalUnjudged
+          : goal.perRun
+            ? goal.met
+              ? STAGE_PLAY_COPY.goalBarReached
+              : STAGE_PLAY_COPY.goalBarNotReached
+            : goal.met
+              ? STAGE_PLAY_COPY.goalMet
+              : STAGE_PLAY_COPY.goalMissed,
       sentence: goal.sentence,
     })),
     holdout: verdict.holdoutSentence ?? STAGE_PLAY_COPY.holdoutNotRun,

@@ -334,6 +334,12 @@ export interface RenderedText {
     | {
         readonly rateShown: boolean;
         readonly seeds: number;
+        /**
+         * The goal's kind id, where the producer has it. The rate rule's exemption for kinds R12 never
+         * judges reads this rather than the drawn words, which stopped carrying the id when § D1154
+         * named goals in words.
+         */
+        readonly kind?: string | undefined;
       }
     | undefined;
   /**

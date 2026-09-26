@@ -65,6 +65,7 @@ import { everydayDeviceChimeStore } from '../everyday/chimeStore.js';
 import { POST_RUN_COPY } from '../everyday/postRun.js';
 import { reportSignInLink } from '../everyday/signInLink.js';
 import { provideScenarioLadderFrom } from '../everyday/scenarioLadderPort.js';
+import { namedStageMoveOf } from '../everyday/stagePlay.js';
 import { provideScenarioOpen } from '../everyday/scenarioOpenPort.js';
 import { routeRefusalsOf } from '../campaign/stagePress.js';
 import { everydaySwap, onEverydaySwapProvided } from '../everyday/swap.js';
@@ -211,7 +212,7 @@ import { contractById, statLineOf } from '../shift/contracts.js';
 import { bankingRefusalFor, UNCHOSEN_RUN_CANNOT_BANK } from '../shift/banking.js';
 import { shiftObservationsOf } from '../shift/observations.js';
 import { pressCounterfactualOf } from '../shift/counterfactual.js';
-import { bookedOutCarsOf } from '../shift/bookedOut.js';
+import { carAbsencesOf } from '../shift/bookedOut.js';
 import { readGoals } from '../shift/goals.js';
 import {
   clockOf,
@@ -220,12 +221,20 @@ import {
   type DayReportInput,
   type ShapedDayReport,
 } from '../shift/report.js';
-import { HISTORY_DAYS, MODE_WEEK_CONTRACT_IDS, outcomeOf } from '../shift/week.js';
+import { HISTORY_DAYS, MODE_WEEK_CONTRACT_IDS, outcomeOf, wasGraded } from '../shift/week.js';
+import {
+  dayCountsToward,
+  houseNeedOf,
+  houseRecordOf,
+  weekHasClosed,
+  type HouseReading,
+} from '../shift/weekStake.js';
 import { tomorrowBriefingOf, type TomorrowBriefing } from '../shift/tomorrow.js';
 import { coachWeekLines, weekKeptLine } from '../shift/weekLabel.js';
 import { weekdayOf, type DayOutcome, type WeekState } from '../shift/types.js';
 import { dailySeedAt } from '../shift/dailySeed.js';
 import { deviceNowMs } from '../shift/deviceDate.js';
+import { crowdMakesPractice } from '../shift/scoredCrowd.js';
 import { firstDayDealOf, isDealtPinnedDay } from '../shift/firstSession.js';
 
 import { savedProfilesOf } from '../batch/library.js';
@@ -243,7 +252,13 @@ import {
 import { mountFixitPanel } from './fixitPanel.js';
 import { createOffThreadRunner, type OffThreadRun } from './offThreadRuns.js';
 import { openDayCallSession, type DayCallSession } from './dayCallSession.js';
-import { dayCallsOffered, type DayCallAnswer, type DayCallOnStage } from '../shift/dayCalls.js';
+import {
+  dayCallDriversOf,
+  dayCallsOffered,
+  type DayCallAnswer,
+  type DayCallOnStage,
+  type DayCallsQuiet,
+} from '../shift/dayCalls.js';
 import { WATCHING_HEADER_CLASS, mountWatchPanel } from './watchPanel.js';
 import { chip, el, fill, fillSelect, keyedFill, setHidden, setText } from './dom.js';
 import {
@@ -296,6 +311,7 @@ import {
   shiftSubmittedSelection,
   runSubmissionOf,
   closedWeekOf,
+  advancesTheWeek,
   specsWithSaved,
   buildingNameOf,
   disclosureOf,
@@ -318,7 +334,7 @@ import {
   type ViewerState,
 } from './state.js';
 import { ghostPlanOf, plainBaselineOf } from './ghostRun.js';
-import { recordRefusalFor, watchRecordOf } from '../watch/record.js';
+import { recordRefusalFor, recordUnreadableReason, watchRecordOf, watchRunPlanOf } from '../watch/record.js';
 import type { WatchableRun } from '../watch/types.js';
 import type { WatchingView } from '../watch/view.js';
 import {
@@ -863,6 +879,13 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * § D311 is what happens when two of them share a flag.
    */
   let runCause: 'player' | 'intervention' = 'player';
+  /**
+   * **The date's crowd at the moment the run was asked for** — wave AK, [§ D1141](../../../../DECISIONS.md).
+   * Latched by {@link runShift} on a player's ask and read by {@link closeShift}, so a day pressed
+   * before UTC midnight and closed after it is judged against the date it was pressed on. Held for
+   * the session only: it is a fact about one run, and nothing stores it.
+   */
+  let runDaySeed: bigint = dailySeedAt(deviceNowMs());
   /**
    * The run **this shell simulated**, as opposed to the run on screen — GitHub issue #136.
    *
@@ -1624,14 +1647,121 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * grew to by a press outside a call.
    */
   const dayCallRunner = createOffThreadRunner({ spawn: spawnRunWorker });
+
+  /**
+   * **The house on a closed week** — [§ D1177](../../../../DECISIONS.md). Its own runner, for
+   * `dayCallRunner`'s reason: the runs a closed week's sheet needs must not supersede a shift, a
+   * call or a watch press, nor be superseded by them.
+   *
+   * The house is the tower's standing order, left alone, on each counted day's own crowd. A day that
+   * ran it untouched is its own house (`shift/weekStake.ts#houseNeedOf`) and costs nothing; every
+   * other counted day costs one run, of the day's own record with the driver, the presses, the rule
+   * rows and the held cars taken out (`#houseRecordOf`) — the same seed, so the same passengers. It
+   * is graded against the goals **the day was graded against**, read off the day's own readings,
+   * so the two sides of the sheet answer one question.
+   *
+   * Asked lazily, the first time a screen reads the sheet of a week that has closed, and kept by the
+   * week it was asked for: nothing is stored, and a reload re-runs it.
+   */
+  const houseRunner = createOffThreadRunner({ spawn: spawnRunWorker });
+  let weekHouse: { readonly key: string; readonly readings: Map<number, HouseReading> } | undefined;
+
+  /** Which closed week a set of house readings belongs to: its tower and each day's crowd. */
+  function weekHouseKey(week: WeekState): string {
+    return [week.contractId, ...week.history.map((entry) => `${String(entry.day)}:${entry.record?.seed ?? '-'}`)].join('|');
+  }
+
+  function weekHouseReadingOf(day: number): HouseReading | undefined {
+    const week = state.week;
+    if (!weekHasClosed(week)) return undefined;
+    const key = weekHouseKey(week);
+    if (weekHouse?.key !== key) askWeekHouse(week, key);
+    return weekHouse?.readings.get(day);
+  }
+
+  function askWeekHouse(week: WeekState, key: string): void {
+    const readings = new Map<number, HouseReading>();
+    weekHouse = { key, readings };
+    const needs = week.history.flatMap((entry) => {
+      const record = entry.record;
+      if (record === null || !dayCountsToward(week.contractId, entry) || houseNeedOf(entry) !== 'run') return [];
+      /* A record this build cannot replay is no record of the crowd for the house either. */
+      if (recordUnreadableReason(record, resources) !== null) {
+        readings.set(entry.day, 'unrecorded');
+        return [];
+      }
+      return [{ entry, record }];
+    });
+    const runs = needs.map(({ record }) => {
+      const plan = watchRunPlanOf(state, resources, houseRecordOf(record));
+      return { config: plan.config, outOfServiceCarIds: plan.outOfServiceCarIds, recordDecisions: false };
+    });
+    const [first, ...rest] = runs;
+    if (first === undefined) return;
+    houseRunner.start({
+      runs: [first, ...rest],
+      onDone: (recordings) => {
+        if (weekHouse?.key !== key) return;
+        recordings.forEach((recording, index) => {
+          const entry = needs[index]?.entry;
+          if (entry === undefined) return;
+          const graded = readGoals(
+            entry.readings.map((reading) => reading.goal),
+            shiftObservationsOf(observationsAt(recording, recording.endedAt)),
+          );
+          readings.set(
+            entry.day,
+            !wasGraded(graded)
+              ? 'ungraded'
+              : graded.every((reading) => reading.state === 'met')
+                ? 'cleared'
+                : 'missed',
+          );
+        });
+        renderAll();
+      },
+      /* A run that threw: those days could not be run on their own crowd, and the sheet says so. */
+      onFailed: () => {
+        if (weekHouse?.key !== key) return;
+        for (const { entry } of needs) if (!readings.has(entry.day)) readings.set(entry.day, 'unrecorded');
+        renderAll();
+      },
+    });
+  }
   let dayCallSession: DayCallSession | undefined;
   /** The run a session was refused on, so the refusal is asked once rather than once a frame. */
   let dayCallRefusedOn: VizRecording | undefined;
+  /**
+   * Whether the stage asked about this attempt's run and was refused because the day is a whole
+   * day too busy to call on (§ D1138 clause 5) — what § D1152's quiet row says instead of a call.
+   */
+  let dayCallsNotOffered = false;
+  /** Where *End the day* was pressed on this attempt — [§ D1168](../../../../DECISIONS.md) — for the report's row. */
+  let dayEndedEarlyAtS: number | undefined;
 
   function closeDayCalls(): void {
     dayCallSession?.close();
     dayCallSession = undefined;
     dayCallRefusedOn = undefined;
+    dayCallsNotOffered = false;
+    dayEndedEarlyAtS = undefined;
+  }
+
+  /**
+   * *End the day* — [§ D1168](../../../../DECISIONS.md). The instant is kept for the report's row,
+   * and the day's calls stop as a skip stops them; the stage files the day next, on the run already
+   * recorded, so the sheet's figures are the whole day's.
+   */
+  function endDayEarly(atS: number): void {
+    if (state.recording === undefined || state.recording !== simulatedRecording) return;
+    dayEndedEarlyAtS = atS;
+    dayCallSession?.skip(false);
+  }
+
+  /** § D1152 — what the report says on a day that raised no ordinary call, or nothing. */
+  function dayCallsQuietForReport(): DayCallsQuiet | undefined {
+    if (dayCallSession !== undefined) return dayCallSession.quiet();
+    return dayCallsNotOffered ? { kind: 'not-offered' } : undefined;
   }
 
   /**
@@ -1651,8 +1781,15 @@ function boot(ui: Elements, resources: BrowserResources): void {
       const facts = dayCallFactsOf(resources, state);
       if (facts === undefined || facts.pinned || !dayCallsOffered(facts.horizon, recording.legs.length)) {
         dayCallRefusedOn = recording;
+        dayCallsNotOffered = facts !== undefined && !facts.pinned;
         return undefined;
       }
+      /*
+       * § D1167's pair, fixed from the dispatcher the day opened with, and § D1168's goals, the ones
+       * the rail reads (`dev/leftRail.ts#shiftGoalsOf`, the same expression `closeShift` grades by).
+       */
+      const driving = drivingProfileOf(resources, state);
+      const pair = dayCallDriversOf(resources.dispatcherProfiles.profiles, driving);
       dayCallSession = openDayCallSession(
         {
           planWith: (extra) => {
@@ -1681,12 +1818,21 @@ function boot(ui: Elements, resources: BrowserResources): void {
             renderAll();
           },
         },
-        { recording, bookedOut: facts.bookedOut, horizon: facts.horizon },
+        {
+          recording,
+          bookedOut: facts.bookedOut,
+          horizon: facts.horizon,
+          goals: shiftGoalsOf(state, resources),
+          drivers: pair === undefined ? undefined : { pair, drivingName: driving.name },
+        },
       );
     } else if (dayCallSession.recording() !== recording) {
       /* The record grew by a press outside a call: ask on from the latest press. */
       const pressedAtS = state.interventions.reduce((latest, entry) => Math.max(latest, entry.atS), 0);
-      dayCallSession.grew(recording, pressedAtS);
+      const handedOver = state.interventions.some(
+        (entry) => entry.change.kind === 'adopt-dispatcher' || entry.change.kind === 'switch-dispatcher',
+      );
+      dayCallSession.grew(recording, pressedAtS, handedOver);
     }
     return dayCallSession.onStage();
   }
@@ -3340,6 +3486,12 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * The report's call row input for the state standing now — `dev/state.ts#pressDayCallOf`, with
    * the census's names resolved the way every other dispatcher name on the sheet is. § D1029.
    */
+  /**
+   * Whether this attempt's pinned call was skipped — *Skip to the end* pressed with its card up,
+   * [§ D1151](../../../../DECISIONS.md). Cleared by every fresh ask, as the ordinary calls' session
+   * is, so a retake starts with its call unanswered.
+   */
+  let pressCallSkipped = false;
   const pressCallForReport = (
     asBuilt: VizRecording,
   ): DayReportInput['pressCall'] => {
@@ -3349,6 +3501,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
       press: measured.press,
       call: measured.call,
       nameOf: (id) => profileById(resources, state.savedDispatchers, id).name,
+      skipped: pressCallSkipped && state.interventions.length === 0,
     };
   };
   /** Whether the job in flight on {@link shiftRunner} is the rival's — see {@link scheduleGhost}. */
@@ -4302,6 +4455,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
         profiles: resources.dispatcherProfiles.profiles,
         buildings: resources.buildings,
         elevatorSpecs: resources.elevatorSpecs,
+        /* § D1183: the stage page's own choices are published under its own names. */
+        moveNamed: (name) => namedStageMoveOf(name, resources.dispatcherProfiles.profiles, loaded.space),
       });
       provideScenarioLadderFrom(loaded.campaign.stages, loaded.survivors, refusals);
     })
@@ -4407,6 +4562,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
    */
   const everydayHostBindings: EverydayHostBindings = {
     resources,
+    /* § D1177 — the house on a closed week's counted days, run off this thread when first read. */
+    weekHouse: weekHouseReadingOf,
     /*
      * **The crowd a first session's pinned day replaced** — [§ D1047](../../../../DECISIONS.md).
      *
@@ -4728,9 +4885,16 @@ function boot(ui: Elements, resources: BrowserResources): void {
     answerDayCall: (answer) => {
       answerDayCall(answer);
     },
+    endDayEarly: (atS) => {
+      endDayEarly(atS);
+      renderAll();
+    },
     skipDayCalls: (called) => {
       dayCallSession?.skip(called);
       renderAll();
+    },
+    skipPressCall: () => {
+      pressCallSkipped = true;
     },
     closeDay: () => {
       closeShift();
@@ -4789,9 +4953,10 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * so `false` would hand the stage a different replay than the gate compared, and this gate's
      * whole job is deciding whether a record reproduces.
      */
-    simulateRecord: (config, done, failed) => {
+    simulateRecord: (config, done, failed, outOfServiceCarIds) => {
       everydayWatchRunner.start({
-        runs: [{ config, outOfServiceCarIds: [], recordDecisions: true }],
+        /* The record's held cars beside the config — `watch/library.ts#WatchGate`, § D1139. */
+        runs: [{ config, outOfServiceCarIds, recordDecisions: true }],
         onDone: ([recording]) => {
           if (recording !== undefined) done(recording);
         },
@@ -6097,11 +6262,15 @@ function boot(ui: Elements, resources: BrowserResources): void {
     // runner supersedes in-flight asks, and the latest ask is the one whose recording files. See
     // {@link runCause}; `'player'` is the default because every press but one means *a new ask*.
     runCause = cause;
+    if (cause === 'player') runDaySeed = dailySeedAt(deviceNowMs());
     /*
      * A fresh ask is a fresh attempt, and an attempt's calls are its own — § D1138. An intervention
      * is the same attempt's record growing, so its session stands and is told about the new run.
      */
-    if (cause === 'player') closeDayCalls();
+    if (cause === 'player') {
+      closeDayCalls();
+      pressCallSkipped = false;
+    }
     setText(ui.transport.error, '');
     // A new ask is a new chance: the failure the stage is drawing belonged to the run this replaces.
     shiftFailure = undefined;
@@ -6802,25 +6971,42 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * counting an attempt; {@link runCause} is where the intent was latched and `closeDay`'s
      * docstring is where the one thing it gates is argued.
      */
-    const week = closedWeekOf(state, outcome, runCause === 'intervention');
+    /*
+     * **A run on a crowd that is not the day's shared one is practice** — wave AK,
+     * [§ D1141](../../../../DECISIONS.md), `shift/scoredCrowd.ts`. A link's `?seed=` may begin a
+     * week and may not enter one: on a week already under way on another crowd, the day is not
+     * closed into the week, so it banks nothing, moves no streak and stays open for its shared
+     * crowd. Only where the mode owns a week, and only on a week on a scenario; the date is the one
+     * latched at the press.
+     */
+    const crowdPractice =
+      advancesTheWeek(state.playMode) && crowdMakesPractice(state.week, state.seed, runDaySeed);
+    const week = crowdPractice ? state.week : closedWeekOf(state, outcome, runCause === 'intervention');
     /*
      * **A close of a day that had already closed is practice** — [§ D1138](../../../../DECISIONS.md)
      * clause 4, read off the week before the close, which is the one question `closeDay` keys it on.
      * Only where the mode owns a week: a Free Play sheet banks nothing on any close and says so in
      * its own words.
      */
-    const practice = week !== state.week && state.week.closedDay === state.week.day;
+    const practice =
+      crowdPractice || (week !== state.week && state.week.closedDay === state.week.day);
     filedReportInput = {
       recording,
       observations,
       goals,
       week,
       practice,
+      /* Which ground made it practice, so the sheet says the true one — § D1141. */
+      ...(crowdPractice ? { practiceCrowd: state.seed } : {}),
       /*
        * § D1138 clause 3 — the ordinary day's calls, from the session that raised them over the run
        * being filed. Nothing is printed about any call before this line runs.
        */
       dayCalls: dayCallSession?.records() ?? [],
+      /* § D1152 — the one sentence a day with no call gets at its close. */
+      dayCallsQuiet: dayCallsQuietForReport(),
+      /* § D1168 — where *End the day* was pressed, for the row that says so. */
+      ...(dayEndedEarlyAtS === undefined ? {} : { dayEndedEarlyAtS }),
       // The scenario this shift belongs to, not `undefined`. Passing nothing made the sheet say
       // *your own building — nothing is being banked* on the same day the banner cleared a
       // scenario and the rail counted the shift as banked: three panels, two answers.
@@ -6935,7 +7121,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
        * With the cars the day's event took, so the header's note says *the tower also books* only
        * of the tower's — § D1038, the post-AH panel's N5.
        */
-      bookedOut: bookedOutCarsOf(planned.building, [...planned.dayCars.holds, ...planned.dayCars.windows]),
+      /* § D1149: every car that was out, one out from the first instant included. */
+      bookedOut: carAbsencesOf(planned.building, [...planned.dayCars.holds, ...planned.dayCars.windows]),
       /* § D1040 — so the header and tomorrow's card say what a mix-asking wrinkle did on this tower. */
       templateVariesMix: planned.templateVariesMix,
       /* § D1057 — so the header and tomorrow's card name the episode's window on a whole day. */

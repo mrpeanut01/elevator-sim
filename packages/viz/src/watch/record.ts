@@ -77,12 +77,15 @@ import type { BrowserResources } from '../dev/data.js';
 import {
   buildingConfigOf,
   profileById,
+  runRungContractIdOf,
   shiftRunConfigOf,
   type ViewerState,
 } from '../dev/state.js';
 import { runIdentityIssues } from '../scope/runIdentity.js';
 import type { ScopeIssue } from '../scope/types.js';
 import { calendarDayFor } from '../shift/calendar.js';
+import { openWeek } from '../shift/week.js';
+import { ladderRowFor } from '../shift/ladder.js';
 
 import { WATCH_RECORD_VERSION, type WatchRecord } from './types.js';
 
@@ -184,6 +187,12 @@ export function watchRecordOf(
       then: row.then,
       ...(row.thenValue === undefined ? {} : { thenValue: row.thenValue }),
     })),
+    /*
+     * The rung the run stood on — shape 3, [§ D1139](../../../../DECISIONS.md). Read through the
+     * function `shiftRunConfigOf` builds the tower from, so the record names the rung the legs were
+     * simulated on rather than the week the day happened to be filed into.
+     */
+    rungContractId: runRungContractIdOf(resources, state),
   };
 }
 
@@ -242,6 +251,17 @@ export function recordUnreadableReason(
     !resources.trafficProfiles.profiles.some((p) => p.id === record.pattern)
   ) {
     return `this build does not ship the arrival pattern “${record.pattern}”`;
+  }
+  /*
+   * The rung, on the ids' footing — § D1139. A record naming a scenario whose rung this build does
+   * not ship for that building cannot be re-asked on the tower it ran, and re-asking it on the tower
+   * as authored is the defect the field exists to close.
+   */
+  if (
+    record.rungContractId !== null &&
+    ladderRowFor(record.rungContractId)?.buildingId !== record.buildingId
+  ) {
+    return `this build does not ship the scenario “${record.rungContractId}” for “${record.buildingId}”`;
   }
   /*
    * The intervention log, kind and payload — on the ids' footing, and on the promise
@@ -472,12 +492,19 @@ export function stateFromWatchRecord(
   return {
     ...base,
     /*
-     * `free-play`, and it is a statement about ownership rather than a convenience. `advancesTheWeek`
-     * is false for it, so nothing this state reaches can close a day into a week — the second lock
-     * behind `bankingRefusalFor`'s identity gate, and the one that holds even if a future caller
-     * forgets to keep the watched recording out of `simulatedRecording`.
+     * `free-play` for a record that ran on no rung, and it is a statement about ownership rather
+     * than a convenience. `advancesTheWeek` is false for it, so nothing this state reaches can close
+     * a day into a week — the second lock behind `bankingRefusalFor`'s identity gate.
+     *
+     * **`shift-week` on a fresh week of the rung's own contract for a record that ran on one** —
+     * wave AK, [§ D1139](../../../../DECISIONS.md). `shiftRunConfigOf` hands a rung only to a week's
+     * day, so this is the one way to re-ask the tower the day actually ran; re-asking it as authored
+     * made every banked Scenario day fail its own replay. The week is `openWeek`'s, never the
+     * spectator's, so a close on it could reach no history the player owns; and the lock this arm
+     * gives up is held instead by {@link watchRunPlanOf} being this state's only non-test reader,
+     * which hands back a run and never a state.
      */
-    playMode: 'free-play',
+    playMode: record.rungContractId === null ? 'free-play' : 'shift-week',
     calendar: null,
     commissioning: [],
     buildingId: record.buildingId,
@@ -506,7 +533,10 @@ export function stateFromWatchRecord(
      */
     ruleRows: record.ruleRows.map((row) => ({ ...row })),
     patience: null,
-    week: { ...base.week, day: record.day, dayIdx: record.dayIdx },
+    week:
+      record.rungContractId === null
+        ? { ...base.week, day: record.day, dayIdx: record.dayIdx }
+        : { ...openWeek(record.rungContractId), day: record.day, dayIdx: record.dayIdx },
     savedDispatchers: [],
     savedPatterns: [],
     savedClasses: [],
@@ -526,17 +556,29 @@ export function stateFromWatchRecord(
 }
 
 /**
- * The simulator's question for a record — {@link stateFromWatchRecord} through the one function that
- * decides what a run is.
+ * **What the watch gate simulates: the config and the cars held beside it** — wave AK,
+ * [§ D1139](../../../../DECISIONS.md).
  *
- * A thin wrapper with a real job: it is the single place a caller can reach a watched run's config,
- * so `dev/main.ts` and the reproduction gate cannot assemble it two ways. The `building`
- * round-trip below it is `shiftRunConfigOf`'s own and is not repeated here.
+ * `shiftRunConfigOf` returns `outOfServiceCarIds` **beside** the config rather than inside it, and
+ * `dev/main.ts#runShift` hands the two to `recordRun` separately (`scope/probes.test-helper.ts#legsOf`
+ * argues why at length). Both watch gates used to take only the config and simulate with no held
+ * car, so a day the player filed with a car held re-simulated with every car in service and was
+ * refused as a different run. The gate carries this pair now, and so does every runner it hands it to.
+ *
+ * It is the single place a caller can reach a watched run's question, so `dev/main.ts` and the
+ * reproduction gate cannot assemble it two ways; it replaced `watchRunConfigOf`, which returned the
+ * config alone and was the shape that dropped the held cars.
  */
-export function watchRunConfigOf(
+export interface WatchRunPlan {
+  readonly config: SimulationConfig;
+  readonly outOfServiceCarIds: readonly string[];
+}
+
+export function watchRunPlanOf(
   base: ViewerState,
   resources: BrowserResources,
   record: WatchRecord,
-): SimulationConfig {
-  return shiftRunConfigOf(resources, stateFromWatchRecord(base, resources, record)).config;
+): WatchRunPlan {
+  const plan = shiftRunConfigOf(resources, stateFromWatchRecord(base, resources, record));
+  return { config: plan.config, outOfServiceCarIds: plan.outOfServiceCarIds };
 }

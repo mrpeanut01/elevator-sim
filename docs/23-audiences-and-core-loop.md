@@ -394,7 +394,9 @@ five when asking a mode what it serves.
    top**.
    Measured against a wall clock rather than divided ([§ D753](../DECISIONS.md), GitHub issue
    #559): a fix-a-building case is **13-23 min a case at 4×** and a tower day is
-   **8 min-1 h 49 a day at 4×**, with the hours between the day's peaks played at `30×`. **The
+   **1 min-1 h 49 a day at 4×**, played at `30×` wherever nobody on a landing has waited a minute
+   (since [§ D1169](../DECISIONS.md) the short end is the floor a day nobody waits in would take, and
+   the long end is an upper bound measured under § D991's pacing). **The
    tower-day figure read *8-15 min* until [§ D946](../DECISIONS.md)**, and the factor read *four*:
    thirteen of the sixteen contracts run the authored ten-hour `office-day` rather than a
    thirty-minute slice, and the old figure was right for the three contracts whose crowd `data/`
@@ -491,7 +493,7 @@ the handoff it is named in § 4.1 rather than smoothed over.
 
 | Mode | Length (**measured**, handoff's in brackets) | The loop (handoff) | Beats emphasised | Why it exists separately | Retry costs |
 |---|---|---|---|---|---|
-| **Today's tower** | 8 min-1 h 49 a day at 4× (~3 min) | one day, one score, once a day | **1 and 5** | It is the only container where the verdict is against *other people's* runs on the same seed rather than against your own previous attempt. It makes the loop social | one per day |
+| **Today's tower** | 1 min-1 h 49 a day at 4× (~3 min) | one day, one score, once a day | **1 and 5** | It is the only container where the verdict is against *other people's* runs on the same seed rather than against your own previous attempt. It makes the loop social | one per day |
 | **Campaign** | ongoing, 8-15 min a building-day at 4× (~2 min) | clear days, spend units, keep contracts | **3**, by pricing it | The only container that makes a change *cost* something and persist past the day. It turns the retry from free into a decision | units, and a works night |
 | **Endless rush** | 4-23 min at 4× (~5 min) | one climbing day until it stops draining | **1 only** — see § 3.4 | It answers *where does this configuration break*, which no other mode asks. A calibration instrument, not a turn of the loop | nothing — no retry exists |
 | **Fix a building** | 13-23 min a case at 4× (~5 min) | diagnose, reconfigure, re-run, pass or retry | **all five, on one screen** | The only container where the diagnosis is given and the play is what to do about it — and the only one that closes without navigating | free, and it says so |

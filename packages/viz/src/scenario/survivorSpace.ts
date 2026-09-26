@@ -160,7 +160,7 @@ import {
 } from '@elevator-sim/experiments/browser';
 
 import { dimensionIdsLiveOn } from '../authoring/dispatcherSpec.js';
-import { admitStageMove } from '../campaign/stagePress.js';
+import { admitStageMove, type StageMove } from '../campaign/stagePress.js';
 import { admitEditedVector, applyEdit, valuesFromProfile } from '../controls/editedProfile.js';
 import { purchaseUnits } from '../pricing/parse.js';
 import type { PriceSchedule, PricedChange } from '../pricing/types.js';
@@ -457,6 +457,87 @@ export function dropdownConfigurationsOf(
     });
   }
   return out;
+}
+
+/* -------------------------------------------------------------------------- *
+ * The third stratum: the stage page's own choices
+ * -------------------------------------------------------------------------- */
+
+/** A move the stage page offers, by the name the census publishes it under. */
+export interface NamedStageMove {
+  readonly name: string;
+  readonly move: StageMove;
+}
+
+/** One page choice the census will play: the move, and what the one check charges for it. */
+export interface PageConfiguration {
+  readonly name: string;
+  readonly move: StageMove;
+  readonly changeIds: readonly string[];
+  readonly tier: string;
+  readonly units: number;
+}
+
+/**
+ * **The stage page's own choices, priced** — the survivor census's `page` stratum,
+ * [§ D1183](../../../../DECISIONS.md).
+ *
+ * The page (`everyday/stagePlay.ts`) offers a standing order by name and where idle cars wait. The
+ * name alone is {@link dropdownConfigurationsOf}'s stratum; this is the rest of the page, which the
+ * caller supplies as named moves (`stagePlay.ts#stagePageMovesOf`, so the list is the page's own
+ * and `scenario/` does not import a screen). Each is priced once by
+ * `campaign/stagePress.ts#admitStageMove` at an unbounded budget, as the dropdown is, and
+ * `measureSurvivors.ts` asks the same check again at each rung's own units.
+ *
+ * **A census, like the dropdown**: the page offers a finite list and every member is played, so its
+ * zero is exact. Left out, and not counted either way: a move that changes nothing on this
+ * building (the control), a move touching a withheld dimension (§ D535), and a move `core` refuses
+ * to resolve on this building, which the check reports and the caller records as unbuildable.
+ */
+export function pageConfigurationsOf(
+  space: SearchSpace,
+  schedule: PriceSchedule,
+  baseline: DispatcherProfile,
+  moves: readonly NamedStageMove[],
+  building: ResolvedBuilding,
+  elevatorSpecs: ElevatorSpecs | undefined,
+): { readonly configurations: readonly PageConfiguration[]; readonly unresolved: readonly { readonly name: string; readonly reason: string }[] } {
+  const order = tierOrderOf(schedule);
+  const byId = new Map(schedule.changes.map((change) => [change.id, change]));
+  const context = { space, schedule, baseline, building, elevatorSpecs };
+  const configurations: PageConfiguration[] = [];
+  const unresolved: { name: string; reason: string }[] = [];
+  const seen = new Set<string>();
+  for (const { name, move } of moves) {
+    if (seen.has(name)) continue;
+    seen.add(name);
+    const admission = admitStageMove(context, move, Number.MAX_SAFE_INTEGER);
+    if (admission.candidate === undefined) {
+      unresolved.push({ name, reason: admission.reason ?? admission.sentence });
+      continue;
+    }
+    if (admission.moved.length === 0) continue;
+    if (admission.withheld.length > 0) continue;
+    const bought = admission.changeIds
+      .map((id) => byId.get(id))
+      .filter((change): change is PricedChange => change !== undefined);
+    configurations.push({
+      name,
+      move,
+      changeIds: admission.changeIds,
+      tier: dearestTierOf(
+        bought.map((change) => ({
+          changeId: change.id,
+          tier: change.tier,
+          priceUnits: purchaseUnits(change),
+          dimensionIds: [],
+        })),
+        order,
+      ),
+      units: admission.units,
+    });
+  }
+  return { configurations, unresolved };
 }
 
 /* -------------------------------------------------------------------------- *

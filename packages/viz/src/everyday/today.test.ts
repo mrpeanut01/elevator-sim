@@ -31,8 +31,10 @@ import { carsToDerate } from '../shift/incidents.js';
 import { goalsForDay, readGoals } from '../shift/goals.js';
 import type { GoalReading, WeekState } from '../shift/types.js';
 import { admittedPressDayIds, ladderRowFor, ladderTowerConfig, rungFor } from '../shift/ladder.js';
-import { openWeek } from '../shift/week.js';
+import { openWeek, outcomeOf } from '../shift/week.js';
+import type { WatchRecord } from '../watch/types.js';
 import { dc10Of, wayThroughSentenceOf, WEEK_WAY, weekWayRowFor } from '../shift/weekWay.js';
+import { DAY_COUNTS_SENTENCE, dayStakeSentenceOf } from '../shift/weekStake.js';
 
 import { bookedOutCarsOf, carAbsencesOf } from '../shift/bookedOut.js';
 import { contractBuildings, todaysScenarioDayState } from '../shift/contractDay.test-helper.js';
@@ -510,7 +512,7 @@ describe('the rest of the record', () => {
      * be § D729's defect surviving inside its own repair — so the claim is conditional, and the
      * refusing arm is a fact the player wants rather than a hedge: nothing is comparing this run.
      */
-    const own = todayOf({
+    const ownInput: Parameters<typeof todayOf>[0] = {
       week: weekOn(2, 1),
       calendar: NO_CALENDAR,
       building: midtown,
@@ -528,9 +530,29 @@ describe('the rest of the record', () => {
       daySeed: 20_260_925n,
       firstSession: false,
       units: 'metric',
-    });
+    };
+    const own = todayOf(ownInput);
     expect(own.seedLine).toBe('tower midtown-office · crowd 424242 · a crowd of this run’s own, not the day’s');
     expect(own.seedLine).not.toContain('everyone');
+    /*
+     * § D1141: on a week already under way on another crowd, the line says before the press that the
+     * week keeps none of this run. A week with nothing banked is begun by it, and says nothing more.
+     */
+    const underWay = todayOf({
+      ...ownInput,
+      week: {
+        ...weekOn(2, 1),
+        history: [
+          outcomeOf({
+            day: 1, dayIdx: 0, eventId: 'ordinary', readings: [], minutePct: 80, carried: 10, arrived: 10,
+            record: { seed: '20260924' } as unknown as WatchRecord, recordRefusal: null,
+          }),
+        ],
+      },
+    });
+    expect(underWay.seedLine).toBe(
+      'tower midtown-office · crowd 424242 · a crowd of this run’s own, not the day’s, so this run is practice and banks nothing into your week',
+    );
     expect(own.crowdIsToday).toBe(false);
     expect(recordFor(midtown, 2, 1).crowdIsToday).toBe(true);
   });
@@ -993,5 +1015,25 @@ describe('the week census’s sentence on the brief (§ D1067)', () => {
     }
     /* The census carries at least one day it does not admit, so the drawing arm is exercised. */
     expect(drawn).toBeGreaterThan(0);
+  });
+});
+
+describe('the week’s stake on the brief (§ D1176)', () => {
+  it('says on each of Midtown’s seven days whether the day counts, in the census’s sentence', () => {
+    const counted: number[] = [];
+    for (let day = 1; day <= 7; day += 1) {
+      const week = { ...openWeek('c2'), day, dayIdx: (day - 1) % 7 };
+      const state = { week, buildingId: 'midtown-office', seed: 20_261_001n } as unknown as ViewerState;
+      const record = todayOf({ ...inputOf(state), horizon: 'whole-day' });
+      expect(record.weekStake?.line).toBe('This week’s target: 4 of 5 counted days clean. 0 so far.');
+      expect(record.weekStake?.day).toBe(dayStakeSentenceOf('c2', day, record.wrinkle.id));
+      if (record.weekStake?.day === DAY_COUNTS_SENTENCE) counted.push(day);
+    }
+    expect(counted).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it('draws nothing on a tower the census does not speak for', () => {
+    const state = { week: openWeek('c1'), buildingId: 'garden-apartments', seed: 1n } as unknown as ViewerState;
+    expect(todayOf(inputOf(state)).weekStake).toBeUndefined();
   });
 });

@@ -68,6 +68,12 @@ export const PRESS_CALL_AGAIN = Object.freeze({
     'It is practice: your week keeps your first attempt at this day.',
 });
 
+/**
+ * The row's headline when the call was skipped — § D1151. The ordinary call row's own words
+ * (`shift/dayCalls.ts#dayCallRowOf`), so one skip reads the same on either kind of day.
+ */
+export const PRESS_CALL_SKIPPED_WHAT = 'The stage called the day, and the day was skipped to its end';
+
 /** Everything the row reads. The pin is admitted and the day was played as it was measured. */
 export interface PressCallRowInput {
   readonly press: ContractPressDay;
@@ -76,6 +82,12 @@ export interface PressCallRowInput {
   readonly interventions: readonly RunInterventionConfig[];
   /** A profile's display name, for the census. */
   readonly nameOf: (dispatcherId: string) => string | undefined;
+  /**
+   * Whether the player pressed *Skip to the end* with the call's card up — [§ D1151](../../../../DECISIONS.md).
+   * Read only where nothing was pressed: the row then says the day was skipped past the call, in
+   * the ordinary call row's words, rather than *nothing was pressed*.
+   */
+  readonly skipped?: boolean | undefined;
 }
 
 /** A parking verb's own button words, lower-cased for the middle of a sentence. */
@@ -143,7 +155,9 @@ export function pressCallRowOf(
     when: at,
     what:
       answer === undefined
-        ? 'The stage called the day, and nothing was pressed'
+        ? input.skipped === true
+          ? PRESS_CALL_SKIPPED_WHAT
+          : 'The stage called the day, and nothing was pressed'
         : `The stage called the day, and you ${stampVerbOf(answer.change)} at the call`,
     why: `${pinned}${past}${census} ${PRESS_CALL_ROW_NOTE}`,
     tone: 'plain',

@@ -127,9 +127,14 @@ describe('stage 2, played on an edited weight vector — the thing a dropdown co
     expect(missed.map((goal) => goal.kind).sort()).toEqual(['beat-the-baseline', 'long-waits-under']);
     expect(holdout.goals.filter((goal) => goal.met === null)).toEqual([]);
 
-    // The player is told which of the two seed sets refused it, in the headline, in words.
+    /*
+     * The player is told which of the two seed sets refused it, in the headline, in words, and
+     * never by the set's id (§ D1159, the post-AJ panel's seat C: `holdout-20260731 (seed …)` was
+     * the one sentence on the page a player could not read).
+     */
     expect(played.verdict.headline).toContain('Not cleared');
-    expect(played.verdict.headline).toContain(stage.holdoutSeeds.name);
+    expect(played.verdict.headline).toContain('held-back crowds');
+    expect(played.verdict.headline).not.toContain(stage.holdoutSeeds.name);
     expect(played.verdict.headline).toContain('not a ranking of dispatchers');
 
     /*

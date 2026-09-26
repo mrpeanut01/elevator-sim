@@ -455,6 +455,16 @@ function mountDoor(
       button.setAttribute('aria-describedby', arrival.id);
       if (row.selected) button.title = row.arrivalNote;
       button.append(name, why, arrival);
+      /*
+       * A census tower's scenario held, or its one counting day — § D1179. Drawn inside the row,
+       * which stays a press: only the scenario's clear is held, never the tower.
+       */
+      if (row.scenarioLine !== undefined) {
+        const held = el(document_, 'span', 'everyday-door-tower-scenario', row.scenarioLine);
+        held.dataset['scenario'] = row.scenario ?? '';
+        held.style.cssText = `display:block;${QUIET};margin-top:2px`;
+        button.append(held);
+      }
       if (!row.selected) {
         button.addEventListener('click', () => {
           context.host.chooseTower(row.contractId);

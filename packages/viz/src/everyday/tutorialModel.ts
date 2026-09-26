@@ -111,6 +111,8 @@ import type { DispatcherSpec, GroupLevers } from '../authoring/dispatcherSpec.js
 import type { VizRecording } from '../contract/types.js';
 import { measuredOf } from '../fixit/run.js';
 import type { FigureSpec, FixitCase } from '../fixit/types.js';
+import type { WeekState } from '../shift/types.js';
+import { daysWerePlayedOn } from '../shift/weekStake.js';
 import { plainLeversOf } from '../mode/plainLevers.js';
 import { PACE_HOLD_WAIT_S } from './stagePace.js';
 import {
@@ -145,7 +147,15 @@ export const TUTORIAL_CASE_ID = 'three-cars-one-cars-work';
  * arrive in.
  */
 export interface TutorialProgress {
-  /** `host.week().history.length` — days filed. § D476's *no filed day*. */
+  /**
+   * Days filed in **every** week this device holds — {@link filedDaysOf}, § D476's *no filed day*.
+   *
+   * It was `host.week().history.length`, the standing week's alone, and the post-AJ panel's seat A
+   * met what that missed: closing St Jude's Monday and moving the week to Midtown Office parks the
+   * week that holds the day, so a reload read an empty week, *played nothing yet*, and put a
+   * returning player back on the landing page and into the walkthrough (wave AK,
+   * [§ D1143](../../../../DECISIONS.md)).
+   */
   readonly filedDays: number;
   /** `profileStore.progress().solvedCaseIds.length` — fix cases whose pass conditions have held. */
   readonly solvedCases: number;
@@ -161,6 +171,25 @@ export interface TutorialProgress {
    * count the player produced by playing and nothing stores it for the gate.
    */
   readonly careerDays: number;
+}
+
+/**
+ * **The days filed across the standing week and every parked one** — wave AK,
+ * [§ D1143](../../../../DECISIONS.md). Derived on every ask from what `persist/session.ts` already
+ * restores (`week` and `parkedWeeks`); nothing new is stored, which is § 3.5.
+ */
+export function filedDaysOf(
+  weeks: readonly Pick<WeekState, 'history' | 'bestMinutePct' | 'streak'>[],
+): number {
+  /*
+   * A week that rolled over (§ D1177) has an empty history and was played: it counts as at least
+   * one day filed, because at least seven were. `shift/weekStake.ts#daysWerePlayedOn` says how it
+   * is told apart from a fresh week.
+   */
+  return weeks.reduce(
+    (sum, week) => sum + Math.max(week.history.length, daysWerePlayedOn(week) ? 1 : 0),
+    0,
+  );
 }
 
 /**

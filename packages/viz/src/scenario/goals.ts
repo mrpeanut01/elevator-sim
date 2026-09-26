@@ -179,11 +179,34 @@ export interface GoalSpec {
   readonly threshold: number | null;
 }
 
-/** `long-waits-under (≤ 10 %)` — the form the reader and the published table both use. */
+/**
+ * **Each kind's name in a player's words** — [§ D1154](../../../../DECISIONS.md), the post-AJ
+ * panel's seats A (D10), C (D7) and D (H9). The stage verdict printed `deliver-everyone · met`,
+ * `beat-the-baseline · met. beat-the-baseline: …` — the data file's ids, on a player's screen. Each
+ * name says what one run is asked, and nothing about the bar it is judged against: a campaign goal's
+ * bar is the shipped setting's own count, and the sentence beside the name is what says so.
+ *
+ * `mode/glossary.ts` lists each name beside its kind in `appearsAs`, so every screen that prints a
+ * label still reaches the definition.
+ */
+export const GOAL_NAMES: Readonly<Record<GoalKind, string>> = {
+  'deliver-everyone': 'everyone delivered',
+  'no-divergence': 'queues settled',
+  'nobody-abandoned': 'nobody past the give-up line',
+  'answer-the-demand': 'kept up with arrivals',
+  'long-waits-under': 'long waits kept under',
+  'everyone-can-get-there': 'everyone can reach their floor',
+  'beat-the-baseline': 'ahead of the building’s own setting',
+};
+
+/**
+ * `long waits kept under 10 %` — the one reader every surface that names a goal uses: the campaign's
+ * stage verdict and brief, the Lab and Compare rows, and the rate sentences. The kind's id stays in
+ * the data and in an author's error; it is not a word a player is shown (§ D1154).
+ */
 export function goalLabel(spec: GoalSpec): string {
-  return spec.threshold === null
-    ? spec.kind
-    : `${spec.kind} (≤ ${String(spec.threshold)} %)`;
+  const name = GOAL_NAMES[spec.kind];
+  return spec.threshold === null ? name : `${name} ${String(spec.threshold)} %`;
 }
 
 /* -------------------------------------------------------------------------- *

@@ -18,7 +18,7 @@ import { switchWireOf } from '../scope/switchWire.js';
 import { watchGateBefore } from './library.js';
 import { checkedRunForTest } from './gate.test-helper.js';
 import { postedLogOf, postedRunOf, postedSubtitleOf } from './posted.js';
-import { watchRunConfigOf } from './record.js';
+import { watchRunPlanOf } from './record.js';
 import { CLAIM_EPSILON, claimDrift, claimOf, claimRefusalFor } from './reproduce.js';
 import { watchingStrings, watchingViewOf } from './view.js';
 
@@ -50,7 +50,7 @@ function entryOf(overrides: Partial<BoardEntry> = {}, run: Partial<BoardEntry['r
 function measuredEntry(entry: BoardEntry): BoardEntry {
   const record = postedRunOf(entry, 1, RESOURCES).record;
   if (record === null) throw new Error('a posted row carries a record');
-  const recording = recordRun(watchRunConfigOf(baseState(), RESOURCES, record)).recording;
+  const recording = recordRun(watchRunPlanOf(baseState(), RESOURCES, record).config).recording;
   const claim = claimOf(recording);
   return {
     ...entry,
@@ -189,7 +189,7 @@ describe('a board row as a watchable run — GitHub issue #337', () => {
   it('never quotes a first-person word in the claim refusal', () => {
     const refusal = claimRefusalFor(
       { awtS: 1, wt95S: 2, ttdMeanS: 3, pctOverLongWait: 4, awtIsValid: true, legs: 5 },
-      recordRun(watchRunConfigOf(baseState(), RESOURCES, postedRunOf(entryOf(), 1, RESOURCES).record ?? (() => { throw new Error('record'); })())).recording,
+      recordRun(watchRunPlanOf(baseState(), RESOURCES, postedRunOf(entryOf(), 1, RESOURCES).record ?? (() => { throw new Error('record'); })()).config).recording,
     );
     expect(refusal).not.toBeNull();
     expect(refusal).not.toMatch(/\b(you|your|yours)\b/iu);

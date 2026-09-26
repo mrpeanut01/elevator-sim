@@ -32,15 +32,15 @@ describe('the goal block', () => {
     const report = goalReport(fakeResult({ replications: 50 }));
     expect(report.withheld).toHaveLength(2);
     const text = report.withheld.map((item) => `${item.label}: ${item.reason}`).join('\n');
-    expect(text).toContain('everyone-can-get-there');
+    expect(text).toContain('everyone can reach their floor');
     expect(text).toMatch(/credential/i);
-    expect(text).toContain('beat-the-baseline');
+    expect(text).toContain('ahead of the building’s own setting');
     expect(text).toMatch(/difference between two arms/i);
   });
 
   it('calls a constant a fact about the configuration rather than a win', () => {
     const report = goalReport(resultWith([]));
-    const divergence = report.rows.find((row) => row.label === 'no-divergence');
+    const divergence = report.rows.find((row) => row.label === 'queues settled');
     expect(divergence?.rateClass).toBe('constant-pass');
     expect(divergence?.disposition).toBe('configuration-fact');
     expect(divergence?.sentence).toContain('50 of 50');
@@ -48,7 +48,7 @@ describe('the goal block', () => {
 
   it('calls a mixed rate a batch goal and states the fraction', () => {
     const report = goalReport(resultWith([0, 1, 2, 3, 4, 5, 6]));
-    const divergence = report.rows.find((row) => row.label === 'no-divergence');
+    const divergence = report.rows.find((row) => row.label === 'queues settled');
     expect(divergence?.disposition).toBe('batch');
     expect(divergence?.sentence).toContain('43 of 50');
   });

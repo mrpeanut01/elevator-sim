@@ -418,7 +418,7 @@ export function mountWatchPanel(host: WatchPanelHost): WatchPanel {
        * synchronous gate produced, and the reproduction check downstream compares recordings.
        * `dev/offThreadRuns.ts` requires the field for exactly this reason.
        */
-      runs: [{ config: gate.config, recordDecisions: true, outOfServiceCarIds: [] }],
+      runs: [{ config: gate.config, recordDecisions: true, outOfServiceCarIds: gate.outOfServiceCarIds }],
       onDone: ([recording]) => {
         checking = undefined;
         if (recording === undefined) return;

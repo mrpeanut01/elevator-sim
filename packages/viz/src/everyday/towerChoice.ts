@@ -63,6 +63,7 @@ import {
 } from '../shift/ladder.js';
 import type { RunHorizon, WeekState } from '../shift/types.js';
 import { switchWeek } from '../shift/week.js';
+import { weekOfferOf } from '../shift/weekStake.js';
 
 /** What pressing a row will do to the week — `shift/week.ts#WeekArrival`, said before the press. */
 export type TowerChoiceArrival = 'resume' | 'open' | 'standing';
@@ -93,6 +94,19 @@ export interface TowerChoiceRow {
    * instant printed here would be a figure whose only source is a schedule the reader cannot see.
    */
   readonly booksACarOut: boolean;
+  /**
+   * **Whether this tower's scenario clear is offered or held** — swarm DM's ruling (a),
+   * [§ D1179](../../../../DECISIONS.md), read off `shift/weekStake.ts#weekOfferOf` rather than
+   * typed. `undefined` where the week census does not speak for the tower. A held row is still a
+   * press: only the scenario's clear is held, and the week it opens runs and closes like any other.
+   */
+  readonly scenario: 'offered' | 'held' | undefined;
+  /**
+   * The line drawn beside the row where there is something to say: why the scenario is held, or
+   * which one day of the week counts. Words only, with its counts spelled, so the surface keeps its
+   * no-digit rule.
+   */
+  readonly scenarioLine: string | undefined;
 }
 
 /**
@@ -357,6 +371,7 @@ export function towerChoiceViewOf(input: TowerChoiceInput): TowerChoiceView {
   const parkedIds = new Set(input.parked.filter(weekHasBeenPlayed).map((entry) => entry.contractId));
   const rows = CONTRACTS.map((contract): TowerChoiceRow => {
     const selected = contract.id === input.week.contractId;
+    const offer = weekOfferOf(contract.id);
     const arrival: TowerChoiceArrival = selected
       ? 'standing'
       : parkedIds.has(contract.id)
@@ -371,6 +386,8 @@ export function towerChoiceViewOf(input: TowerChoiceInput): TowerChoiceView {
       arrival,
       arrivalNote: TOWER_CHOICE_COPY[arrival],
       booksACarOut: (ladderRowFor(contract.id)?.fabric.incidents.length ?? 0) > 0,
+      scenario: offer?.offer,
+      scenarioLine: offer?.line,
     };
   });
   const pressRows = CONTRACTS.flatMap((contract): PressDayChoiceRow[] => {

@@ -41,6 +41,12 @@
  * to plan CI against**; 1 900 s is what a contended one looks like and is recorded so the next
  * reader does not read it as the tier having doubled.
  *
+ * **Re-run on 2026-09-26 for § D1183 at 5 728 s**, with the stage page's own choices added as a
+ * third stratum (21 to 39 more configurations a rung, each a scenario's full batch once and
+ * attributed to every rung that affords it), one worker on the shared four-core container at a load
+ * average of 4 to 12. `stage-3-overwhelmed` took 2 652 s of it. Every dropdown and dial count and
+ * name reproduced; what moved is the page stratum and the counts it adds to.
+ *
  * A hosted four-core runner is slower again, which is why this lives behind
  * `ELEVATOR_SIM_SURVIVORS=deep` and runs on the nightly `deep-tiers.yml` schedule rather than
  * on a pull request.
@@ -63,6 +69,7 @@ import type { Campaign } from '../campaign/types.js';
 import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
 import { DATA_DIR, requireBuilding } from '../fixtures.test-helper.js';
 import { dimensionIdsLiveOn } from '../authoring/dispatcherSpec.js';
+import { stagePageMovesOf } from '../everyday/stagePlay.js';
 
 import { measureScenarioSurvivors, type SurvivorTally } from './measureSurvivors.js';
 import type { PublishedGoalRates } from './published.js';
@@ -191,6 +198,8 @@ export async function measurePublishedSurvivors(
       building: resources.building,
       elevatorSpecs: resources.elevatorSpecs,
       profiles: config.dispatcherProfiles.profiles,
+      /* § D1183: the stage page's own choices, read off the page's own rows. */
+      pageMoves: stagePageMovesOf(config.dispatcherProfiles.profiles, space, schedule),
       sampleSize: SURVIVOR_SAMPLE_SIZE,
       masterSeed: SURVIVOR_MASTER_SEED,
       run: (request) => runBatch(request, resources),
@@ -273,7 +282,8 @@ export async function measurePublishedSurvivors(
       sampleSize: SURVIVOR_SAMPLE_SIZE,
       scope:
         `Every configuration is an edit of the scenario's own baseline dispatcher or a shipped ` +
-        `profile picked in its place, priced by data/price-schedule.json. ` +
+        `profile picked in its place, alone or with idle cars parked where the stage page offers, ` +
+        `priced by data/price-schedule.json. ` +
         `${String(reachable.length)} of ${String(schedule.changes.length)} priced changes can ` +
         `reach a scenario run at all — the rest price shafts, machines and fittings that ` +
         `campaign/stageRun.ts cannot apply — and ` +
@@ -306,7 +316,9 @@ export function publishedStepFor(tally: SurvivorTally): PublishedSurvivorStep {
     unjudged: tally.unjudged,
     suppressed: tally.suppressed,
     unbuildable: tally.unbuildable.length,
+    metOnTuning: tally.metOnTuning,
     dropdown: tally.dropdown,
+    page: tally.page,
     dials: tally.dials,
     perTier: tally.perTier,
     sampling: tally.sampling,

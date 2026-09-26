@@ -36,7 +36,7 @@ import { MIN_REPLICATION_BUDGET } from '../batch/report.js';
 import { probabilityWordIn } from '../campaign/words.js';
 import { observationsAt } from '../live/observations.js';
 import type { LiveObservations } from '../live/types.js';
-import { GOAL_JUDGEMENT, GOAL_KINDS } from '../scenario/goals.js';
+import { GOAL_JUDGEMENT, GOAL_KINDS, GOAL_NAMES } from '../scenario/goals.js';
 import { MIN_SEEDS_PER_GOAL } from '../scenario/published.js';
 import { checkSurfacesAgree } from './agreement.js';
 import { PLAYER_FACING_SURFACES, type HonestyContext } from './surfaces.js';
@@ -829,8 +829,20 @@ function checkGoalWithoutRate(
   );
 
   for (const goal of goals) {
-    // A goal R12 never reached is not a goal R12 can refuse. See NOT_RATE_JUDGED.
-    if (NOT_RATE_JUDGED.some((kind) => goal.text.includes(kind))) continue;
+    /*
+     * A goal R12 never reached is not a goal R12 can refuse. See NOT_RATE_JUDGED. The kind is read
+     * from the producer where it supplies one, and otherwise from the words: the id, or since
+     * § D1154 the name a player is shown. Wave AK's deep tier found the words-only form refusing
+     * `beat-the-baseline` on every stage verdict once the id left the sentence, 22 cases in 60.
+     */
+    const exempt =
+      (goal.goal?.kind !== undefined && NOT_RATE_JUDGED.includes(goal.goal.kind)) ||
+      NOT_RATE_JUDGED.some(
+        (kind) =>
+          goal.text.includes(kind) ||
+          goal.text.includes(GOAL_NAMES[kind as keyof typeof GOAL_NAMES]),
+      );
+    if (exempt) continue;
     const rate = goal.goal;
     if (rate === undefined || !rate.rateShown) {
       found.push(

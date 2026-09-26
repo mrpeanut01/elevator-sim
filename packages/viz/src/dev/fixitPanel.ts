@@ -61,6 +61,8 @@ import {
   classifyOutcome,
   emptyFixitState,
   fixedBadgeAfter,
+  fixKeptLineOf,
+  FIX_KEPT_LINE,
   parkingPriceUnits,
   setParkingStrategy,
   spendOf,
@@ -166,6 +168,13 @@ const MUTED = 'var(--dim)';
 const BAD = 'var(--bad)';
 const GOOD = 'var(--ok)';
 
+
+/** Put a thrown message on a failure line's `data-fault`, off the page's text. */
+function withFault(node: HTMLElement, fault: string | undefined): HTMLElement {
+  if (fault !== undefined) node.dataset['fault'] = fault;
+  return node;
+}
+
 export function mountFixitPanel(host: FixitPanelHost): FixitPanel {
   const doc = host.document;
   const root = el(doc, 'div', {
@@ -226,6 +235,8 @@ function scheduleNow(): PriceSchedule {
   let ask: string | undefined;
   /** A failed run, said where the reader is rather than swallowed. Cleared by the next ask. */
   let runFailure: string | undefined;
+  /** The thrown message behind `runFailure`, kept off the page — `FIXIT_SCREEN_COPY.runFailed`. */
+  let runFault: string | undefined;
   /** The letter's morning cleared and the other mornings are running — § D1020. */
   let checking = false;
   /** How far the running check has got — § D1120 clause 4, a count and nothing else. */
@@ -400,6 +411,7 @@ function scheduleNow(): PriceSchedule {
     if (ask === key || ask?.endsWith(':press') === true) return;
     ask = key;
     runFailure = undefined;
+    runFault = undefined;
     const plan = fixitRunPlanOf(entry, emptyFixitState(), host.resources);
     /* The judge's forty-nine as-built mornings, off-thread while the figures are drawn — § D1020. */
     judge.prepare(entry, plan.asBuilt);
@@ -412,7 +424,8 @@ function scheduleNow(): PriceSchedule {
       },
       onFailed: (message) => {
         ask = undefined;
-        runFailure = message;
+        runFailure = FIXIT_SCREEN_COPY.runFailed;
+          runFault = message;
         render();
       },
     });
@@ -531,6 +544,9 @@ function scheduleNow(): PriceSchedule {
               }),
             ]
           : []),
+        ...(session.outcome === undefined || fixKeptLineOf(session.fixed, session.outcome) === undefined
+          ? []
+          : [el(doc, 'p', { className: 'fixit-fix-kept', text: FIX_KEPT_LINE, style: { color: MUTED, margin: '0.5rem 0' } })]),
         ...(session.outcome === undefined ? [] : [outcomeCard(session.outcome)]),
         /* § D1120 clause 4: the live count, and nothing pooled beside it. */
         ...(checking && checkProgress !== undefined && session.outcome?.kind === 'checking'
@@ -841,11 +857,13 @@ function scheduleNow(): PriceSchedule {
       /* An order the loader would refuse is said, never thrown from a click — § D1000. */
       if (fixitPlanRefusalOf(entry, session.state, host.resources) !== undefined) {
         runFailure = FIXIT_SCREEN_COPY.planRefused;
+        runFault = undefined;
         render();
         return;
       }
       ask = `${entry.id}:press`;
       runFailure = undefined;
+      runFault = undefined;
       // The order and the spend are bound here rather than read in the callback: the outcome is
       // classified against the order the press was made in, not against one the player edited
       // meanwhile — and an edit made meanwhile is drawn as stale the moment the verdict lands.
@@ -867,7 +885,7 @@ function scheduleNow(): PriceSchedule {
         judge,
         classify: (before, after, done) => {
           // GitHub issue #350: the claim the basis line will make, checked on the legs first.
-          assertPairMatchesRepairs(entry, pressed, before, after);
+          assertPairMatchesRepairs(entry, pressed, before, after, plan);
           const measurement = measuredOf(entry, before, after);
           const answer = (witnessRun: boolean): void => {
             done(
@@ -925,10 +943,9 @@ function scheduleNow(): PriceSchedule {
           checking = outcome.kind === 'checking';
           checkProgress = undefined;
           if (!checking) ask = undefined;
-          // The badge follows the latest verdict, in both directions — `fixit/engine.ts#fixedBadgeAfter`
-          // holds the argument (docs/20 defect 16: FIXED beside a 0 % outcome card is two verdicts
-          // about one case on one screen). `checking` wears none.
-          session.fixed = fixedBadgeAfter(outcome);
+          // A case once fixed stays fixed — `fixit/engine.ts#fixedBadgeAfter`, § D1157. A later run
+          // that does not clear is drawn as that run's result under `FIX_KEPT_LINE`.
+          session.fixed = fixedBadgeAfter(outcome, session.fixed);
           render();
         },
         onProgress: (progress) => {
@@ -943,13 +960,14 @@ function scheduleNow(): PriceSchedule {
           checkProgress = undefined;
           session.outcome = outcome;
           session.verdictState = pressed;
-          session.fixed = fixedBadgeAfter(outcome);
+          session.fixed = fixedBadgeAfter(outcome, session.fixed);
           render();
         },
         onFailed: (message) => {
           ask = undefined;
           checking = false;
-          runFailure = message;
+          runFailure = FIXIT_SCREEN_COPY.runFailed;
+          runFault = message;
           render();
         },
       });
@@ -961,11 +979,14 @@ function scheduleNow(): PriceSchedule {
         ...(runFailure === undefined
           ? []
           : [
-              el(doc, 'p', {
-                className: 'fixit-run-failed',
-                text: `The day could not be run: ${runFailure}`,
-                style: { color: BAD, margin: '0 0 0.5rem' },
-              }),
+              withFault(
+                el(doc, 'p', {
+                  className: 'fixit-run-failed',
+                  text: `The day could not be run: ${runFailure}`,
+                  style: { color: BAD, margin: '0 0 0.5rem' },
+                }),
+                runFault,
+              ),
             ]),
       ],
     });

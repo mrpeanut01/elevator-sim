@@ -27,7 +27,7 @@
           "tuning": null,
           "holdout": null,
           "holdoutAgrees": null,
-          "reason": "beat-the-baseline: Judged on a difference between two arms, so no single run answers it and there is no across-seed pass rate to take. It ships as a batch goal, which is what § 5.2 already made it, and R12 — a rule about goals judged on one run — does not reach it."
+          "reason": "ahead of the building’s own setting: Judged on a difference between two arms, so no single run answers it and there is no across-seed pass rate to take. It ships as a batch goal, which is what § 5.2 already made it, and R12 — a rule about goals judged on one run — does not reach it."
         }
       ],
       "configurationFacts": [
@@ -50,7 +50,7 @@
             "rateClass": "constant-pass"
           },
           "holdoutAgrees": true,
-          "reason": "deliver-everyone: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
+          "reason": "everyone delivered: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
         },
         {
           "kind": "no-divergence",
@@ -71,7 +71,7 @@
             "rateClass": "constant-pass"
           },
           "holdoutAgrees": true,
-          "reason": "no-divergence: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
+          "reason": "queues settled: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
         },
         {
           "kind": "nobody-abandoned",
@@ -92,7 +92,7 @@
             "rateClass": "constant-pass"
           },
           "holdoutAgrees": true,
-          "reason": "nobody-abandoned: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
+          "reason": "nobody past the give-up line: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
         },
         {
           "kind": "answer-the-demand",
@@ -113,7 +113,7 @@
             "rateClass": "constant-pass"
           },
           "holdoutAgrees": true,
-          "reason": "answer-the-demand: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
+          "reason": "kept up with arrivals: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
         },
         {
           "kind": "long-waits-under",
@@ -134,7 +134,7 @@
             "rateClass": "constant-pass"
           },
           "holdoutAgrees": true,
-          "reason": "long-waits-under (≤ 10 %): a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
+          "reason": "long waits kept under 10 %: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
         }
       ],
       "withheld": [
@@ -145,7 +145,7 @@
           "tuning": null,
           "holdout": null,
           "holdoutAgrees": null,
-          "reason": "everyone-can-get-there: Not judgeable from what a run records. A recording carries no credential on a leg, so it cannot tell a call nobody answered from a call nobody was allowed to answer — and scoring the second as though it were the first is exactly the wrong number this goal exists to catch."
+          "reason": "everyone can reach their floor: Not judgeable from what a run records. A recording carries no credential on a leg, so it cannot tell a call nobody answered from a call nobody was allowed to answer — and scoring the second as though it were the first is exactly the wrong number this goal exists to catch."
         }
       ]
     },
@@ -186,7 +186,7 @@
             "rateClass": "variable"
           },
           "holdoutAgrees": true,
-          "reason": "answer-the-demand: a batch goal, judged over the scenario's replications — 24 of 50 on the tuning seeds and 20 of 50 on the holdout seeds."
+          "reason": "kept up with arrivals: a batch goal, judged over the scenario's replications — 24 of 50 on the tuning seeds and 20 of 50 on the holdout seeds."
         },
         {
           "kind": "long-waits-under",
@@ -207,7 +207,7 @@
             "rateClass": "variable"
           },
           "holdoutAgrees": true,
-          "reason": "long-waits-under (≤ 10 %): a batch goal, judged over the scenario's replications — 41 of 50 on the tuning seeds and 45 of 50 on the holdout seeds."
+          "reason": "long waits kept under 10 %: a batch goal, judged over the scenario's replications — 41 of 50 on the tuning seeds and 45 of 50 on the holdout seeds."
         },
         {
           "kind": "beat-the-baseline",
@@ -216,7 +216,7 @@
           "tuning": null,
           "holdout": null,
           "holdoutAgrees": null,
-          "reason": "beat-the-baseline: Judged on a difference between two arms, so no single run answers it and there is no across-seed pass rate to take. It ships as a batch goal, which is what § 5.2 already made it, and R12 — a rule about goals judged on one run — does not reach it."
+          "reason": "ahead of the building’s own setting: Judged on a difference between two arms, so no single run answers it and there is no across-seed pass rate to take. It ships as a batch goal, which is what § 5.2 already made it, and R12 — a rule about goals judged on one run — does not reach it."
         }
       ],
       "configurationFacts": [
@@ -239,7 +239,7 @@
             "rateClass": "constant-pass"
           },
           "holdoutAgrees": true,
-          "reason": "deliver-everyone: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
+          "reason": "everyone delivered: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
         },
         {
           "kind": "no-divergence",
@@ -260,7 +260,7 @@
             "rateClass": "constant-pass"
           },
           "holdoutAgrees": true,
-          "reason": "no-divergence: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
+          "reason": "queues settled: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
         },
         {
           "kind": "nobody-abandoned",
@@ -281,7 +281,7 @@
             "rateClass": "constant-pass"
           },
           "holdoutAgrees": true,
-          "reason": "nobody-abandoned: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
+          "reason": "nobody past the give-up line: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
         }
       ],
       "withheld": [
@@ -292,7 +292,7 @@
           "tuning": null,
           "holdout": null,
           "holdoutAgrees": null,
-          "reason": "everyone-can-get-there: Not judgeable from what a run records. A recording carries no credential on a leg, so it cannot tell a call nobody answered from a call nobody was allowed to answer — and scoring the second as though it were the first is exactly the wrong number this goal exists to catch."
+          "reason": "everyone can reach their floor: Not judgeable from what a run records. A recording carries no credential on a leg, so it cannot tell a call nobody answered from a call nobody was allowed to answer — and scoring the second as though it were the first is exactly the wrong number this goal exists to catch."
         }
       ]
     },
@@ -333,7 +333,7 @@
             "rateClass": "variable"
           },
           "holdoutAgrees": true,
-          "reason": "nobody-abandoned: a batch goal, judged over the scenario's replications — 28 of 50 on the tuning seeds and 29 of 50 on the holdout seeds."
+          "reason": "nobody past the give-up line: a batch goal, judged over the scenario's replications — 28 of 50 on the tuning seeds and 29 of 50 on the holdout seeds."
         },
         {
           "kind": "beat-the-baseline",
@@ -342,7 +342,7 @@
           "tuning": null,
           "holdout": null,
           "holdoutAgrees": null,
-          "reason": "beat-the-baseline: Judged on a difference between two arms, so no single run answers it and there is no across-seed pass rate to take. It ships as a batch goal, which is what § 5.2 already made it, and R12 — a rule about goals judged on one run — does not reach it."
+          "reason": "ahead of the building’s own setting: Judged on a difference between two arms, so no single run answers it and there is no across-seed pass rate to take. It ships as a batch goal, which is what § 5.2 already made it, and R12 — a rule about goals judged on one run — does not reach it."
         }
       ],
       "configurationFacts": [
@@ -365,7 +365,7 @@
             "rateClass": "constant-pass"
           },
           "holdoutAgrees": true,
-          "reason": "deliver-everyone: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
+          "reason": "everyone delivered: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
         },
         {
           "kind": "no-divergence",
@@ -386,7 +386,7 @@
             "rateClass": "constant-fail"
           },
           "holdoutAgrees": true,
-          "reason": "no-divergence: a fact about this configuration, not a goal — 0 of 50 on the tuning seeds and 0 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
+          "reason": "queues settled: a fact about this configuration, not a goal — 0 of 50 on the tuning seeds and 0 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
         },
         {
           "kind": "answer-the-demand",
@@ -407,7 +407,7 @@
             "rateClass": "constant-fail"
           },
           "holdoutAgrees": true,
-          "reason": "answer-the-demand: a fact about this configuration, not a goal — 0 of 50 on the tuning seeds and 0 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
+          "reason": "kept up with arrivals: a fact about this configuration, not a goal — 0 of 50 on the tuning seeds and 0 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
         },
         {
           "kind": "long-waits-under",
@@ -428,7 +428,7 @@
             "rateClass": "constant-fail"
           },
           "holdoutAgrees": true,
-          "reason": "long-waits-under (≤ 10 %): a fact about this configuration, not a goal — 0 of 50 on the tuning seeds and 0 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
+          "reason": "long waits kept under 10 %: a fact about this configuration, not a goal — 0 of 50 on the tuning seeds and 0 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
         }
       ],
       "withheld": [
@@ -439,7 +439,7 @@
           "tuning": null,
           "holdout": null,
           "holdoutAgrees": null,
-          "reason": "everyone-can-get-there: Not judgeable from what a run records. A recording carries no credential on a leg, so it cannot tell a call nobody answered from a call nobody was allowed to answer — and scoring the second as though it were the first is exactly the wrong number this goal exists to catch."
+          "reason": "everyone can reach their floor: Not judgeable from what a run records. A recording carries no credential on a leg, so it cannot tell a call nobody answered from a call nobody was allowed to answer — and scoring the second as though it were the first is exactly the wrong number this goal exists to catch."
         }
       ]
     },
@@ -480,7 +480,7 @@
             "rateClass": "variable"
           },
           "holdoutAgrees": true,
-          "reason": "deliver-everyone: a batch goal, judged over the scenario's replications — 36 of 50 on the tuning seeds and 34 of 50 on the holdout seeds."
+          "reason": "everyone delivered: a batch goal, judged over the scenario's replications — 36 of 50 on the tuning seeds and 34 of 50 on the holdout seeds."
         },
         {
           "kind": "answer-the-demand",
@@ -501,7 +501,7 @@
             "rateClass": "variable"
           },
           "holdoutAgrees": true,
-          "reason": "answer-the-demand: a batch goal, judged over the scenario's replications — 19 of 50 on the tuning seeds and 20 of 50 on the holdout seeds."
+          "reason": "kept up with arrivals: a batch goal, judged over the scenario's replications — 19 of 50 on the tuning seeds and 20 of 50 on the holdout seeds."
         },
         {
           "kind": "beat-the-baseline",
@@ -510,7 +510,7 @@
           "tuning": null,
           "holdout": null,
           "holdoutAgrees": null,
-          "reason": "beat-the-baseline: Judged on a difference between two arms, so no single run answers it and there is no across-seed pass rate to take. It ships as a batch goal, which is what § 5.2 already made it, and R12 — a rule about goals judged on one run — does not reach it."
+          "reason": "ahead of the building’s own setting: Judged on a difference between two arms, so no single run answers it and there is no across-seed pass rate to take. It ships as a batch goal, which is what § 5.2 already made it, and R12 — a rule about goals judged on one run — does not reach it."
         }
       ],
       "configurationFacts": [
@@ -533,7 +533,7 @@
             "rateClass": "constant-pass"
           },
           "holdoutAgrees": true,
-          "reason": "no-divergence: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
+          "reason": "queues settled: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
         },
         {
           "kind": "nobody-abandoned",
@@ -554,7 +554,7 @@
             "rateClass": "constant-pass"
           },
           "holdoutAgrees": true,
-          "reason": "nobody-abandoned: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
+          "reason": "nobody past the give-up line: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
         },
         {
           "kind": "long-waits-under",
@@ -575,7 +575,7 @@
             "rateClass": "constant-pass"
           },
           "holdoutAgrees": true,
-          "reason": "long-waits-under (≤ 10 %): a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
+          "reason": "long waits kept under 10 %: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
         }
       ],
       "withheld": [
@@ -586,7 +586,7 @@
           "tuning": null,
           "holdout": null,
           "holdoutAgrees": null,
-          "reason": "everyone-can-get-there: Not judgeable from what a run records. A recording carries no credential on a leg, so it cannot tell a call nobody answered from a call nobody was allowed to answer — and scoring the second as though it were the first is exactly the wrong number this goal exists to catch."
+          "reason": "everyone can reach their floor: Not judgeable from what a run records. A recording carries no credential on a leg, so it cannot tell a call nobody answered from a call nobody was allowed to answer — and scoring the second as though it were the first is exactly the wrong number this goal exists to catch."
         }
       ]
     },
@@ -627,7 +627,7 @@
             "rateClass": "variable"
           },
           "holdoutAgrees": true,
-          "reason": "deliver-everyone: a batch goal, judged over the scenario's replications — 5 of 50 on the tuning seeds and 11 of 50 on the holdout seeds."
+          "reason": "everyone delivered: a batch goal, judged over the scenario's replications — 5 of 50 on the tuning seeds and 11 of 50 on the holdout seeds."
         },
         {
           "kind": "no-divergence",
@@ -648,7 +648,7 @@
             "rateClass": "variable"
           },
           "holdoutAgrees": true,
-          "reason": "no-divergence: a batch goal, judged over the scenario's replications — 45 of 50 on the tuning seeds and 46 of 50 on the holdout seeds."
+          "reason": "queues settled: a batch goal, judged over the scenario's replications — 45 of 50 on the tuning seeds and 46 of 50 on the holdout seeds."
         },
         {
           "kind": "answer-the-demand",
@@ -669,7 +669,7 @@
             "rateClass": "variable"
           },
           "holdoutAgrees": true,
-          "reason": "answer-the-demand: a batch goal, judged over the scenario's replications — 5 of 50 on the tuning seeds and 9 of 50 on the holdout seeds."
+          "reason": "kept up with arrivals: a batch goal, judged over the scenario's replications — 5 of 50 on the tuning seeds and 9 of 50 on the holdout seeds."
         },
         {
           "kind": "long-waits-under",
@@ -690,7 +690,7 @@
             "rateClass": "variable"
           },
           "holdoutAgrees": true,
-          "reason": "long-waits-under (≤ 10 %): a batch goal, judged over the scenario's replications — 14 of 50 on the tuning seeds and 12 of 50 on the holdout seeds."
+          "reason": "long waits kept under 10 %: a batch goal, judged over the scenario's replications — 14 of 50 on the tuning seeds and 12 of 50 on the holdout seeds."
         },
         {
           "kind": "beat-the-baseline",
@@ -699,7 +699,7 @@
           "tuning": null,
           "holdout": null,
           "holdoutAgrees": null,
-          "reason": "beat-the-baseline: Judged on a difference between two arms, so no single run answers it and there is no across-seed pass rate to take. It ships as a batch goal, which is what § 5.2 already made it, and R12 — a rule about goals judged on one run — does not reach it."
+          "reason": "ahead of the building’s own setting: Judged on a difference between two arms, so no single run answers it and there is no across-seed pass rate to take. It ships as a batch goal, which is what § 5.2 already made it, and R12 — a rule about goals judged on one run — does not reach it."
         }
       ],
       "configurationFacts": [
@@ -722,7 +722,7 @@
             "rateClass": "constant-pass"
           },
           "holdoutAgrees": true,
-          "reason": "nobody-abandoned: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
+          "reason": "nobody past the give-up line: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
         }
       ],
       "withheld": [
@@ -733,7 +733,7 @@
           "tuning": null,
           "holdout": null,
           "holdoutAgrees": null,
-          "reason": "everyone-can-get-there: Not judgeable from what a run records. A recording carries no credential on a leg, so it cannot tell a call nobody answered from a call nobody was allowed to answer — and scoring the second as though it were the first is exactly the wrong number this goal exists to catch."
+          "reason": "everyone can reach their floor: Not judgeable from what a run records. A recording carries no credential on a leg, so it cannot tell a call nobody answered from a call nobody was allowed to answer — and scoring the second as though it were the first is exactly the wrong number this goal exists to catch."
         }
       ]
     },
@@ -774,7 +774,7 @@
             "rateClass": "variable"
           },
           "holdoutAgrees": true,
-          "reason": "deliver-everyone: a batch goal, judged over the scenario's replications — 40 of 50 on the tuning seeds and 46 of 50 on the holdout seeds."
+          "reason": "everyone delivered: a batch goal, judged over the scenario's replications — 40 of 50 on the tuning seeds and 46 of 50 on the holdout seeds."
         },
         {
           "kind": "answer-the-demand",
@@ -795,7 +795,7 @@
             "rateClass": "variable"
           },
           "holdoutAgrees": true,
-          "reason": "answer-the-demand: a batch goal, judged over the scenario's replications — 31 of 50 on the tuning seeds and 25 of 50 on the holdout seeds."
+          "reason": "kept up with arrivals: a batch goal, judged over the scenario's replications — 31 of 50 on the tuning seeds and 25 of 50 on the holdout seeds."
         },
         {
           "kind": "beat-the-baseline",
@@ -804,7 +804,7 @@
           "tuning": null,
           "holdout": null,
           "holdoutAgrees": null,
-          "reason": "beat-the-baseline: Judged on a difference between two arms, so no single run answers it and there is no across-seed pass rate to take. It ships as a batch goal, which is what § 5.2 already made it, and R12 — a rule about goals judged on one run — does not reach it."
+          "reason": "ahead of the building’s own setting: Judged on a difference between two arms, so no single run answers it and there is no across-seed pass rate to take. It ships as a batch goal, which is what § 5.2 already made it, and R12 — a rule about goals judged on one run — does not reach it."
         }
       ],
       "configurationFacts": [
@@ -827,7 +827,7 @@
             "rateClass": "constant-pass"
           },
           "holdoutAgrees": true,
-          "reason": "no-divergence: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
+          "reason": "queues settled: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
         },
         {
           "kind": "nobody-abandoned",
@@ -848,7 +848,7 @@
             "rateClass": "constant-pass"
           },
           "holdoutAgrees": true,
-          "reason": "nobody-abandoned: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
+          "reason": "nobody past the give-up line: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
         },
         {
           "kind": "long-waits-under",
@@ -869,7 +869,7 @@
             "rateClass": "constant-pass"
           },
           "holdoutAgrees": true,
-          "reason": "long-waits-under (≤ 10 %): a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
+          "reason": "long waits kept under 10 %: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
         }
       ],
       "withheld": [
@@ -880,7 +880,7 @@
           "tuning": null,
           "holdout": null,
           "holdoutAgrees": null,
-          "reason": "everyone-can-get-there: Not judgeable from what a run records. A recording carries no credential on a leg, so it cannot tell a call nobody answered from a call nobody was allowed to answer — and scoring the second as though it were the first is exactly the wrong number this goal exists to catch."
+          "reason": "everyone can reach their floor: Not judgeable from what a run records. A recording carries no credential on a leg, so it cannot tell a call nobody answered from a call nobody was allowed to answer — and scoring the second as though it were the first is exactly the wrong number this goal exists to catch."
         }
       ]
     },
@@ -921,7 +921,7 @@
             "rateClass": "variable"
           },
           "holdoutAgrees": true,
-          "reason": "answer-the-demand: a batch goal, judged over the scenario's replications — 31 of 50 on the tuning seeds and 26 of 50 on the holdout seeds."
+          "reason": "kept up with arrivals: a batch goal, judged over the scenario's replications — 31 of 50 on the tuning seeds and 26 of 50 on the holdout seeds."
         },
         {
           "kind": "beat-the-baseline",
@@ -930,7 +930,7 @@
           "tuning": null,
           "holdout": null,
           "holdoutAgrees": null,
-          "reason": "beat-the-baseline: Judged on a difference between two arms, so no single run answers it and there is no across-seed pass rate to take. It ships as a batch goal, which is what § 5.2 already made it, and R12 — a rule about goals judged on one run — does not reach it."
+          "reason": "ahead of the building’s own setting: Judged on a difference between two arms, so no single run answers it and there is no across-seed pass rate to take. It ships as a batch goal, which is what § 5.2 already made it, and R12 — a rule about goals judged on one run — does not reach it."
         }
       ],
       "configurationFacts": [
@@ -953,7 +953,7 @@
             "rateClass": "constant-pass"
           },
           "holdoutAgrees": true,
-          "reason": "deliver-everyone: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
+          "reason": "everyone delivered: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
         },
         {
           "kind": "no-divergence",
@@ -974,7 +974,7 @@
             "rateClass": "constant-pass"
           },
           "holdoutAgrees": true,
-          "reason": "no-divergence: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
+          "reason": "queues settled: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
         },
         {
           "kind": "nobody-abandoned",
@@ -995,7 +995,7 @@
             "rateClass": "constant-pass"
           },
           "holdoutAgrees": true,
-          "reason": "nobody-abandoned: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
+          "reason": "nobody past the give-up line: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
         },
         {
           "kind": "long-waits-under",
@@ -1016,7 +1016,7 @@
             "rateClass": "constant-pass"
           },
           "holdoutAgrees": true,
-          "reason": "long-waits-under (≤ 10 %): a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
+          "reason": "long waits kept under 10 %: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
         }
       ],
       "withheld": [
@@ -1027,7 +1027,7 @@
           "tuning": null,
           "holdout": null,
           "holdoutAgrees": null,
-          "reason": "everyone-can-get-there: Not judgeable from what a run records. A recording carries no credential on a leg, so it cannot tell a call nobody answered from a call nobody was allowed to answer — and scoring the second as though it were the first is exactly the wrong number this goal exists to catch."
+          "reason": "everyone can reach their floor: Not judgeable from what a run records. A recording carries no credential on a leg, so it cannot tell a call nobody answered from a call nobody was allowed to answer — and scoring the second as though it were the first is exactly the wrong number this goal exists to catch."
         }
       ]
     },
@@ -1068,7 +1068,7 @@
             "rateClass": "variable"
           },
           "holdoutAgrees": true,
-          "reason": "answer-the-demand: a batch goal, judged over the scenario's replications — 32 of 50 on the tuning seeds and 30 of 50 on the holdout seeds."
+          "reason": "kept up with arrivals: a batch goal, judged over the scenario's replications — 32 of 50 on the tuning seeds and 30 of 50 on the holdout seeds."
         },
         {
           "kind": "beat-the-baseline",
@@ -1077,7 +1077,7 @@
           "tuning": null,
           "holdout": null,
           "holdoutAgrees": null,
-          "reason": "beat-the-baseline: Judged on a difference between two arms, so no single run answers it and there is no across-seed pass rate to take. It ships as a batch goal, which is what § 5.2 already made it, and R12 — a rule about goals judged on one run — does not reach it."
+          "reason": "ahead of the building’s own setting: Judged on a difference between two arms, so no single run answers it and there is no across-seed pass rate to take. It ships as a batch goal, which is what § 5.2 already made it, and R12 — a rule about goals judged on one run — does not reach it."
         }
       ],
       "configurationFacts": [
@@ -1100,7 +1100,7 @@
             "rateClass": "constant-pass"
           },
           "holdoutAgrees": true,
-          "reason": "deliver-everyone: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
+          "reason": "everyone delivered: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
         },
         {
           "kind": "no-divergence",
@@ -1121,7 +1121,7 @@
             "rateClass": "constant-pass"
           },
           "holdoutAgrees": true,
-          "reason": "no-divergence: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
+          "reason": "queues settled: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
         },
         {
           "kind": "nobody-abandoned",
@@ -1142,7 +1142,7 @@
             "rateClass": "constant-pass"
           },
           "holdoutAgrees": true,
-          "reason": "nobody-abandoned: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
+          "reason": "nobody past the give-up line: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
         },
         {
           "kind": "long-waits-under",
@@ -1163,7 +1163,7 @@
             "rateClass": "constant-pass"
           },
           "holdoutAgrees": true,
-          "reason": "long-waits-under (≤ 10 %): a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
+          "reason": "long waits kept under 10 %: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
         }
       ],
       "withheld": [
@@ -1174,7 +1174,7 @@
           "tuning": null,
           "holdout": null,
           "holdoutAgrees": null,
-          "reason": "everyone-can-get-there: Not judgeable from what a run records. A recording carries no credential on a leg, so it cannot tell a call nobody answered from a call nobody was allowed to answer — and scoring the second as though it were the first is exactly the wrong number this goal exists to catch."
+          "reason": "everyone can reach their floor: Not judgeable from what a run records. A recording carries no credential on a leg, so it cannot tell a call nobody answered from a call nobody was allowed to answer — and scoring the second as though it were the first is exactly the wrong number this goal exists to catch."
         }
       ]
     },
@@ -1215,7 +1215,7 @@
             "rateClass": "variable"
           },
           "holdoutAgrees": true,
-          "reason": "answer-the-demand: a batch goal, judged over the scenario's replications — 40 of 50 on the tuning seeds and 42 of 50 on the holdout seeds."
+          "reason": "kept up with arrivals: a batch goal, judged over the scenario's replications — 40 of 50 on the tuning seeds and 42 of 50 on the holdout seeds."
         },
         {
           "kind": "beat-the-baseline",
@@ -1224,7 +1224,7 @@
           "tuning": null,
           "holdout": null,
           "holdoutAgrees": null,
-          "reason": "beat-the-baseline: Judged on a difference between two arms, so no single run answers it and there is no across-seed pass rate to take. It ships as a batch goal, which is what § 5.2 already made it, and R12 — a rule about goals judged on one run — does not reach it."
+          "reason": "ahead of the building’s own setting: Judged on a difference between two arms, so no single run answers it and there is no across-seed pass rate to take. It ships as a batch goal, which is what § 5.2 already made it, and R12 — a rule about goals judged on one run — does not reach it."
         }
       ],
       "configurationFacts": [
@@ -1247,7 +1247,7 @@
             "rateClass": "constant-pass"
           },
           "holdoutAgrees": true,
-          "reason": "no-divergence: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
+          "reason": "queues settled: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
         },
         {
           "kind": "nobody-abandoned",
@@ -1268,7 +1268,7 @@
             "rateClass": "constant-pass"
           },
           "holdoutAgrees": true,
-          "reason": "nobody-abandoned: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
+          "reason": "nobody past the give-up line: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
         }
       ],
       "withheld": [
@@ -1291,7 +1291,7 @@
             "rateClass": "constant-pass"
           },
           "holdoutAgrees": false,
-          "reason": "deliver-everyone: withheld. It passed 47 of 50 on the tuning seeds and 50 of 50 on the holdout seeds, which are two different kinds of answer (variable against constant-pass). A classification that does not survive a disjoint seed set is not one to ship a level on."
+          "reason": "everyone delivered: withheld. It passed 47 of 50 on the tuning seeds and 50 of 50 on the holdout seeds, which are two different kinds of answer (variable against constant-pass). A classification that does not survive a disjoint seed set is not one to ship a level on."
         },
         {
           "kind": "long-waits-under",
@@ -1312,7 +1312,7 @@
             "rateClass": "variable"
           },
           "holdoutAgrees": false,
-          "reason": "long-waits-under (≤ 10 %): withheld. It passed 50 of 50 on the tuning seeds and 49 of 50 on the holdout seeds, which are two different kinds of answer (constant-pass against variable). A classification that does not survive a disjoint seed set is not one to ship a level on."
+          "reason": "long waits kept under 10 %: withheld. It passed 50 of 50 on the tuning seeds and 49 of 50 on the holdout seeds, which are two different kinds of answer (constant-pass against variable). A classification that does not survive a disjoint seed set is not one to ship a level on."
         },
         {
           "kind": "everyone-can-get-there",
@@ -1321,7 +1321,7 @@
           "tuning": null,
           "holdout": null,
           "holdoutAgrees": null,
-          "reason": "everyone-can-get-there: Not judgeable from what a run records. A recording carries no credential on a leg, so it cannot tell a call nobody answered from a call nobody was allowed to answer — and scoring the second as though it were the first is exactly the wrong number this goal exists to catch."
+          "reason": "everyone can reach their floor: Not judgeable from what a run records. A recording carries no credential on a leg, so it cannot tell a call nobody answered from a call nobody was allowed to answer — and scoring the second as though it were the first is exactly the wrong number this goal exists to catch."
         }
       ]
     },
@@ -1362,7 +1362,7 @@
             "rateClass": "variable"
           },
           "holdoutAgrees": true,
-          "reason": "deliver-everyone: a batch goal, judged over the scenario's replications — 41 of 50 on the tuning seeds and 41 of 50 on the holdout seeds."
+          "reason": "everyone delivered: a batch goal, judged over the scenario's replications — 41 of 50 on the tuning seeds and 41 of 50 on the holdout seeds."
         },
         {
           "kind": "answer-the-demand",
@@ -1383,7 +1383,7 @@
             "rateClass": "variable"
           },
           "holdoutAgrees": true,
-          "reason": "answer-the-demand: a batch goal, judged over the scenario's replications — 32 of 50 on the tuning seeds and 30 of 50 on the holdout seeds."
+          "reason": "kept up with arrivals: a batch goal, judged over the scenario's replications — 32 of 50 on the tuning seeds and 30 of 50 on the holdout seeds."
         },
         {
           "kind": "beat-the-baseline",
@@ -1392,7 +1392,7 @@
           "tuning": null,
           "holdout": null,
           "holdoutAgrees": null,
-          "reason": "beat-the-baseline: Judged on a difference between two arms, so no single run answers it and there is no across-seed pass rate to take. It ships as a batch goal, which is what § 5.2 already made it, and R12 — a rule about goals judged on one run — does not reach it."
+          "reason": "ahead of the building’s own setting: Judged on a difference between two arms, so no single run answers it and there is no across-seed pass rate to take. It ships as a batch goal, which is what § 5.2 already made it, and R12 — a rule about goals judged on one run — does not reach it."
         }
       ],
       "configurationFacts": [
@@ -1415,7 +1415,7 @@
             "rateClass": "constant-pass"
           },
           "holdoutAgrees": true,
-          "reason": "no-divergence: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
+          "reason": "queues settled: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
         },
         {
           "kind": "nobody-abandoned",
@@ -1436,7 +1436,7 @@
             "rateClass": "constant-pass"
           },
           "holdoutAgrees": true,
-          "reason": "nobody-abandoned: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
+          "reason": "nobody past the give-up line: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
         },
         {
           "kind": "long-waits-under",
@@ -1457,7 +1457,7 @@
             "rateClass": "constant-pass"
           },
           "holdoutAgrees": true,
-          "reason": "long-waits-under (≤ 10 %): a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
+          "reason": "long waits kept under 10 %: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
         }
       ],
       "withheld": [
@@ -1468,7 +1468,7 @@
           "tuning": null,
           "holdout": null,
           "holdoutAgrees": null,
-          "reason": "everyone-can-get-there: Not judgeable from what a run records. A recording carries no credential on a leg, so it cannot tell a call nobody answered from a call nobody was allowed to answer — and scoring the second as though it were the first is exactly the wrong number this goal exists to catch."
+          "reason": "everyone can reach their floor: Not judgeable from what a run records. A recording carries no credential on a leg, so it cannot tell a call nobody answered from a call nobody was allowed to answer — and scoring the second as though it were the first is exactly the wrong number this goal exists to catch."
         }
       ]
     },
@@ -1509,7 +1509,7 @@
             "rateClass": "variable"
           },
           "holdoutAgrees": true,
-          "reason": "answer-the-demand: a batch goal, judged over the scenario's replications — 31 of 50 on the tuning seeds and 32 of 50 on the holdout seeds."
+          "reason": "kept up with arrivals: a batch goal, judged over the scenario's replications — 31 of 50 on the tuning seeds and 32 of 50 on the holdout seeds."
         },
         {
           "kind": "beat-the-baseline",
@@ -1518,7 +1518,7 @@
           "tuning": null,
           "holdout": null,
           "holdoutAgrees": null,
-          "reason": "beat-the-baseline: Judged on a difference between two arms, so no single run answers it and there is no across-seed pass rate to take. It ships as a batch goal, which is what § 5.2 already made it, and R12 — a rule about goals judged on one run — does not reach it."
+          "reason": "ahead of the building’s own setting: Judged on a difference between two arms, so no single run answers it and there is no across-seed pass rate to take. It ships as a batch goal, which is what § 5.2 already made it, and R12 — a rule about goals judged on one run — does not reach it."
         }
       ],
       "configurationFacts": [
@@ -1541,7 +1541,7 @@
             "rateClass": "constant-pass"
           },
           "holdoutAgrees": true,
-          "reason": "deliver-everyone: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
+          "reason": "everyone delivered: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
         },
         {
           "kind": "no-divergence",
@@ -1562,7 +1562,7 @@
             "rateClass": "constant-pass"
           },
           "holdoutAgrees": true,
-          "reason": "no-divergence: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
+          "reason": "queues settled: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
         },
         {
           "kind": "nobody-abandoned",
@@ -1583,7 +1583,7 @@
             "rateClass": "constant-pass"
           },
           "holdoutAgrees": true,
-          "reason": "nobody-abandoned: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
+          "reason": "nobody past the give-up line: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
         }
       ],
       "withheld": [
@@ -1606,7 +1606,7 @@
             "rateClass": "constant-pass"
           },
           "holdoutAgrees": false,
-          "reason": "long-waits-under (≤ 10 %): withheld. It passed 49 of 50 on the tuning seeds and 50 of 50 on the holdout seeds, which are two different kinds of answer (variable against constant-pass). A classification that does not survive a disjoint seed set is not one to ship a level on."
+          "reason": "long waits kept under 10 %: withheld. It passed 49 of 50 on the tuning seeds and 50 of 50 on the holdout seeds, which are two different kinds of answer (variable against constant-pass). A classification that does not survive a disjoint seed set is not one to ship a level on."
         },
         {
           "kind": "everyone-can-get-there",
@@ -1615,7 +1615,7 @@
           "tuning": null,
           "holdout": null,
           "holdoutAgrees": null,
-          "reason": "everyone-can-get-there: Not judgeable from what a run records. A recording carries no credential on a leg, so it cannot tell a call nobody answered from a call nobody was allowed to answer — and scoring the second as though it were the first is exactly the wrong number this goal exists to catch."
+          "reason": "everyone can reach their floor: Not judgeable from what a run records. A recording carries no credential on a leg, so it cannot tell a call nobody answered from a call nobody was allowed to answer — and scoring the second as though it were the first is exactly the wrong number this goal exists to catch."
         }
       ]
     },
@@ -1656,7 +1656,7 @@
             "rateClass": "variable"
           },
           "holdoutAgrees": true,
-          "reason": "deliver-everyone: a batch goal, judged over the scenario's replications — 4 of 50 on the tuning seeds and 5 of 50 on the holdout seeds."
+          "reason": "everyone delivered: a batch goal, judged over the scenario's replications — 4 of 50 on the tuning seeds and 5 of 50 on the holdout seeds."
         },
         {
           "kind": "no-divergence",
@@ -1677,7 +1677,7 @@
             "rateClass": "variable"
           },
           "holdoutAgrees": true,
-          "reason": "no-divergence: a batch goal, judged over the scenario's replications — 36 of 50 on the tuning seeds and 35 of 50 on the holdout seeds."
+          "reason": "queues settled: a batch goal, judged over the scenario's replications — 36 of 50 on the tuning seeds and 35 of 50 on the holdout seeds."
         },
         {
           "kind": "answer-the-demand",
@@ -1698,7 +1698,7 @@
             "rateClass": "variable"
           },
           "holdoutAgrees": true,
-          "reason": "answer-the-demand: a batch goal, judged over the scenario's replications — 6 of 50 on the tuning seeds and 7 of 50 on the holdout seeds."
+          "reason": "kept up with arrivals: a batch goal, judged over the scenario's replications — 6 of 50 on the tuning seeds and 7 of 50 on the holdout seeds."
         },
         {
           "kind": "long-waits-under",
@@ -1719,7 +1719,7 @@
             "rateClass": "variable"
           },
           "holdoutAgrees": true,
-          "reason": "long-waits-under (≤ 10 %): a batch goal, judged over the scenario's replications — 14 of 50 on the tuning seeds and 19 of 50 on the holdout seeds."
+          "reason": "long waits kept under 10 %: a batch goal, judged over the scenario's replications — 14 of 50 on the tuning seeds and 19 of 50 on the holdout seeds."
         },
         {
           "kind": "beat-the-baseline",
@@ -1728,7 +1728,7 @@
           "tuning": null,
           "holdout": null,
           "holdoutAgrees": null,
-          "reason": "beat-the-baseline: Judged on a difference between two arms, so no single run answers it and there is no across-seed pass rate to take. It ships as a batch goal, which is what § 5.2 already made it, and R12 — a rule about goals judged on one run — does not reach it."
+          "reason": "ahead of the building’s own setting: Judged on a difference between two arms, so no single run answers it and there is no across-seed pass rate to take. It ships as a batch goal, which is what § 5.2 already made it, and R12 — a rule about goals judged on one run — does not reach it."
         }
       ],
       "configurationFacts": [
@@ -1751,7 +1751,7 @@
             "rateClass": "constant-pass"
           },
           "holdoutAgrees": true,
-          "reason": "nobody-abandoned: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
+          "reason": "nobody past the give-up line: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
         }
       ],
       "withheld": [
@@ -1762,7 +1762,7 @@
           "tuning": null,
           "holdout": null,
           "holdoutAgrees": null,
-          "reason": "everyone-can-get-there: Not judgeable from what a run records. A recording carries no credential on a leg, so it cannot tell a call nobody answered from a call nobody was allowed to answer — and scoring the second as though it were the first is exactly the wrong number this goal exists to catch."
+          "reason": "everyone can reach their floor: Not judgeable from what a run records. A recording carries no credential on a leg, so it cannot tell a call nobody answered from a call nobody was allowed to answer — and scoring the second as though it were the first is exactly the wrong number this goal exists to catch."
         }
       ]
     }

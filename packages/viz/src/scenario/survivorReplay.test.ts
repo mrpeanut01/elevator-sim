@@ -32,6 +32,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { runBatch } from '../batch/runBatch.js';
 import { admitStageMove, pressStage, type StageAdmissionContext, type StageMove } from '../campaign/stagePress.js';
 import type { CampaignStage } from '../campaign/types.js';
+import { namedStageMoveOf } from '../everyday/stagePlay.js';
 import { DATA_DIR, requireBuilding } from '../fixtures.test-helper.js';
 import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
 import type { PublishedGoalRates } from './published.js';
@@ -69,12 +70,14 @@ function contextOf(stage: CampaignStage): StageAdmissionContext {
 }
 
 /**
- * The move a published survivor name stands for: a shipped profile by id, or a drawn dial
- * configuration re-drawn from the rung's own published sampler seed.
+ * The move a published survivor name stands for: a shipped profile by id, a page choice by its
+ * parked name (§ D1183), or a drawn dial configuration re-drawn from the rung's own published
+ * sampler seed.
  */
 function moveOf(stage: CampaignStage, step: PublishedSurvivorStep, name: string): StageMove {
-  const profile = config.dispatcherProfilesById.get(name);
-  if (profile !== undefined) return { profile };
+  /* A shipped profile, or one of the stage page's own choices under its published name (§ D1183). */
+  const named = namedStageMoveOf(name, config.dispatcherProfiles.profiles, space);
+  if (named !== undefined) return named;
   const index = /^edit-(\d+)$/u.exec(name)?.[1];
   if (index === undefined) throw new Error(`${stage.id}: the table names "${name}", which is neither a profile nor a draw`);
   const context = contextOf(stage);

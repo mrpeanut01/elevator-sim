@@ -266,22 +266,65 @@ describe.skipIf(!HAS_BROWSER)('the stage calls a pinned day — § D1029', () =>
       expect(report).toContain('The stage called the day');
       expect(report).toContain('On this crowd');
 
-      /* ---- Take this call again: the same day, from an empty record ---- */
+      /*
+       * ---- Take this call again: the same day, from an empty record, opened at the call ----
+       *
+       * Wave AK, § D1140, the post-AJ panel's seat A: the retake used to re-open the day at its
+       * start, paused, for a call ten simulated minutes in. It now opens half a minute before the
+       * call, playing, at the stage's default speed; so the card is up within seconds, where from
+       * the start at that speed it would take minutes, and the stop is the same instant as before.
+       */
       await page.locator('.everyday-report-call-again-press').click();
-      await waitForToday(page);
+      await page.waitForFunction(
+        () =>
+          (document.querySelector<HTMLCanvasElement>('.everyday-stage-canvas')?.width ?? 0) > 0 &&
+          /^\d{2}:\d{2}$/u.test(document.querySelector('.everyday-stage-clock')?.textContent ?? ''),
+        undefined,
+        { timeout: 120_000 },
+      );
+      const minutesOf = (clock: string): number => {
+        const [h, m] = clock.split(':').map(Number);
+        return (h ?? 0) * 60 + (m ?? 0);
+      };
+      const callClock = clockAtCall.split(' | ')[0] ?? '';
+      const opened = await textOf(page, '.everyday-stage-clock');
+      expect(
+        minutesOf(callClock) - minutesOf(opened),
+        `the retake opened at ${opened}, not just before the call at ${callClock}`,
+      ).toBeLessThanOrEqual(2);
       const again = await parkingHeld(page);
       expect(again.held, 'the second attempt started with the first one’s answer standing').toBe(true);
       expect(await textOf(page, '.everyday-stage-stamp'), 'a press is stamped on a fresh attempt').toBe('');
+      await page.waitForSelector('.everyday-stage-call:not([hidden])', { timeout: 60_000 });
+      /*
+       * The clock only, and to the minute: the canvas's sentence also names the speed, and the first
+       * attempt stopped at 600×, where one frame can carry the playhead past the call second's minute.
+       */
+      const retakeStop = await textOf(page, '.everyday-stage-clock');
+      expect(
+        Math.abs(minutesOf(retakeStop) - minutesOf(callClock)),
+        `the retake stopped at ${retakeStop}, not at the call at ${callClock}`,
+      ).toBeLessThanOrEqual(1);
+      /*
+       * **A skip with the card up is the answer** — § D1151, the post-AJ panel's seat D (H1). *Skip to
+       * the end* on this day used to run past the day's only call, bank the day as missed and say
+       * *nothing was pressed*. The retake now opens just before the call (§ D1140), so the card is
+       * already up when the player reaches for the skip, with the day not over; the skip is the
+       * player's answer, and the report says the call was skipped.
+       */
+      expect(await page.locator('.everyday-stage-skip').isDisabled(), 'the day ran out past its call').toBe(false);
       await page.locator('.everyday-stage-skip').click();
       await page.waitForFunction(
-        () => (document.querySelector('.everyday-bar-primary')?.textContent ?? '').includes('Close the day'),
+        () => document.querySelector<HTMLButtonElement>('.everyday-stage-skip')?.disabled === true,
         undefined,
         { timeout: 60_000 },
       );
+      expect(await page.locator('.everyday-stage-call').isHidden(), 'the card stayed up after the skip answered it').toBe(true);
       await page.locator('.everyday-bar-primary').click();
       await page.waitForSelector('.everyday-report', { timeout: 60_000 });
       const second = await textOf(page, '.everyday-report');
-      expect(second).toContain('nothing was pressed');
+      expect(second).toContain('The stage called the day, and the day was skipped to its end');
+      expect(second).not.toContain('nothing was pressed');
       /* § D1138 clause 4: the retake is practice, and says so on its own sheet. */
       expect(second).toContain('Practice. Your week keeps your first attempt at this day');
       expect(second).not.toMatch(/\d{2}:\d{2} · (parked the cars in the lobby|spread the cars across the tower)/u);

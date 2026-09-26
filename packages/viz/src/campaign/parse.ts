@@ -380,7 +380,12 @@ function checkGoals(
 
     if (!shippable.has(goal.kind)) {
       violations.push(
-        `${where}: declares goal "${goalLabel(goal)}", which is not in this stage's measured ` +
+        /*
+         * The kind's id, which is what an author types and what the table is keyed by, with the
+         * player's name beside it (§ D1154 keeps the id in an author's error; § D1185).
+         */
+        `${where}: declares goal "${goal.kind}"${goal.threshold === null ? '' : ` at ${String(goal.threshold)} %`} ` +
+          `(shown to players as "${goalLabel(goal)}"), which is not in this stage's measured ` +
           '"goals" bucket in data/scenario-goals.json. R12: a goal ships with its across-seed ' +
           'rate published beside it, or it does not ship — and a constant is a fact for the ' +
           'brief, not a goal.',

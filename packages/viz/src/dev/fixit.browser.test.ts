@@ -8,7 +8,8 @@
  * out), and both findings were about what a reader perceives: a toggle whose only state signal was
  * a background colour, and a dark room inside a light product. The toggles were the repair menu's,
  * which retired on § D1020's commit; that case now holds the retirement itself. The third half of the defect — the
- * FIXED badge surviving a failing run — is a pure rule and is driven in `fixit/engine.test.ts`
+ * FIXED badge and a failing run (reversed by § D1157: the badge now stays, and the card says the run is
+ * that run's result) — is a pure rule and is driven in `fixit/engine.test.ts`
  * (`fixedBadgeAfter`), with the panel's assignment pinned at the source there; a browser replay of
  * it would cost four simulations to re-prove a one-line pure function.
  *

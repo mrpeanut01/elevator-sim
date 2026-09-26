@@ -183,7 +183,9 @@ const TIERS: Readonly<Record<string, Tier>> = Object.freeze({
       'the counts matched against data/scenario-survivors.json. A gate of its own rather than ' +
       'ELEVATOR_SIM_DEEP, on this workflow’s own argument for nine jobs — a re-run after a fix ' +
       'should not also pay for the dropdown sweep beside it. Measured 2026-09-10 at the shipped ' +
-      'sample size: 932 s over 480 judgements on a quiet ten-core box',
+      'sample size: 932 s over 480 judgements on a quiet ten-core box. § D1183 added the stage ' +
+      'page\u2019s own choices as a third stratum: re-measured 2026-09-26 at 5 728 s on the shared ' +
+      'four-core container at load 4 to 12',
     scheduled: true,
   },
   'packages/viz/src/scenario/survivorReplay.test.ts': {
@@ -241,7 +243,9 @@ const TIERS: Readonly<Record<string, Tier>> = Object.freeze({
       '§ D1120 clause 1: every role-blind route through every offered fix case pressed through the ' +
       'gate, and the counts matched against fixit/routeCensus.ts#ROUTE_CENSUS, which decides which ' +
       'cases open with their diagnosis shown. The always-on half re-derives the rows that open a ' +
-      'case. Measured 2026-09-25 on the shared four-core container: 15 cases in 190 s',
+      'case. Measured 2026-09-25 on the shared four-core container: 15 cases in 190 s. Since § D1184 ' +
+      'it also judges each case\u2019s clearing routes on the forty-nine mornings, cheapest first, and ' +
+      'matches the par against fixit/par.ts#FIXIT_PAR',
     scheduled: true,
   },
   'packages/experiments/src/fuzz/deep.test.ts': {

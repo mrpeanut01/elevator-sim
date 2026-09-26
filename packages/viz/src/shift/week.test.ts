@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
+import { scheduledEventFor } from './calendar.js';
 import { CONTRACTS } from './contracts.js';
 import { readGoals } from './goals.js';
 import { goalsForDay } from './goals.js';
@@ -784,5 +785,76 @@ describe('a sandbox day leaves the scoreboard where it found it — GitHub issue
     const after = closeDay(week, day(week, 'met', 100));
     expect(after.cleared).toBeNull();
     expect(after.completed).toEqual(week.completed);
+  });
+});
+
+describe('a week with a stake and an ending — § D1176, § D1177', () => {
+  /** A clean or missed day drawing the wrinkle it is dealt, which is what the census measured. */
+  function dealtDay(week: WeekState, kind: 'met' | 'missed'): DayOutcome {
+    return { ...day(week, kind), eventId: scheduledEventFor(null, week.day, week.dayIdx, 'whole-day').id };
+  }
+
+  it('banks a clean day toward the scenario only where the census counts it, and keeps the streak either way', () => {
+    // Midtown's Saturday is the declared breather, which no play decides: played, not counted.
+    let week = openWeek('c2');
+    for (let index = 0; index < 5; index += 1) week = nextDay(week);
+    expect(week.day).toBe(6);
+    week = closeDay(week, dealtDay(week, 'met'));
+    expect(week.cleanRun).toBe(0);
+    expect(week.streak).toBe(1);
+    // Its Tuesday, the move-in moved off the lunch peak by § D1180, counts.
+    let tuesday = nextDay(openWeek('c2'));
+    tuesday = closeDay(tuesday, dealtDay(tuesday, 'met'));
+    expect(tuesday.cleanRun).toBe(1);
+  });
+
+  it('clears Midtown on its derived target, four counted days, and not on the weekend no play decides', () => {
+    let week = openWeek('c2');
+    for (const kind of ['missed', 'missed', 'missed', 'missed', 'missed', 'met', 'met'] as const) {
+      week = closeDay(week, dealtDay(week, kind));
+      if (week.day < 7) week = nextDay(week);
+    }
+    // Two clean days, Saturday and Sunday, and neither counts.
+    expect(week.cleanRun).toBe(0);
+    expect(week.completed).toEqual([]);
+
+    week = openWeek('c2');
+    for (let index = 0; index < 3; index += 1) {
+      week = closeDay(week, dealtDay(week, 'met')); // Monday to Wednesday
+      expect(week.completed).toEqual([]);
+      week = nextDay(week);
+    }
+    // Three counted days clean by Wednesday is one short: the target cannot be met before Thursday.
+    expect(week.cleanRun).toBe(3);
+    week = closeDay(week, dealtDay(week, 'met')); // Thursday
+    expect(week.cleanRun).toBe(4);
+    expect(week.completed).toEqual(['c2']);
+  });
+
+  it('never clears a tower whose week counts no day', () => {
+    let week = openWeek('c3');
+    for (let index = 0; index < 7; index += 1) {
+      week = closeDay(week, dealtDay(week, 'met'));
+      if (index < 6) week = nextDay(week);
+    }
+    expect(week.cleanRun).toBe(0);
+    expect(week.completed).toEqual([]);
+  });
+
+  it('opens a new week on the same tower after the last day, keeping what was cleared', () => {
+    let week: WeekState = { ...openWeek('c2'), completed: ['c1'], streak: 3, bestMinutePct: 88 };
+    for (let index = 0; index < 6; index += 1) week = nextDay(week);
+    expect([week.day, week.dayIdx]).toEqual([7, 6]);
+    const rolled = nextDay(closeDay(week, dealtDay(week, 'met')));
+    expect([rolled.day, rolled.dayIdx, rolled.cleanRun, rolled.history.length]).toEqual([1, 0, 0, 0]);
+    expect(rolled.completed).toEqual(['c1']);
+    expect(rolled.streak).toBe(4);
+    expect(rolled.bestMinutePct).toBe(90);
+  });
+
+  it('leaves every week the census does not speak for rolling on past day 7, as before', () => {
+    let week = openWeek('c1');
+    for (let index = 0; index < 7; index += 1) week = nextDay(week);
+    expect(week.day).toBe(8);
   });
 });

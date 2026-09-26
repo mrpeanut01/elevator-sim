@@ -44,6 +44,7 @@ import { FIRST_DAY_CONTRACT_IDS } from './firstSession.js';
 import { admittedPressDayIds, pressDayFor, pressDayStanding } from './ladder.js';
 import { LEGIBILITY_SWEEP, legibilityOf } from './legibility.js';
 import { openWeek } from './week.js';
+import { weekAdmitsANewcomer } from './weekStake.js';
 
 describe('the eligible set — § D512’s table read by arithmetic', () => {
   it('is every contract legible on more than a third of fifty seeds, in contract order', () => {
@@ -252,7 +253,14 @@ describe('the draw — a named stream off the session’s seed', () => {
     const selfDrawing = FIRST_DAY_CONTRACT_IDS.filter(
       (id) => firstSessionContractFor(BigInt(pressDayFor(id)?.seedText ?? '0')) === id,
     );
-    expect(selfDrawing).toEqual(['c8', 'c10']);
+    /*
+     * **Since § D1178 the set is one tower, and every number draws it** — so its pin draws its own
+     * tower and so does every date, which makes its pin the dealt pinned day on every date and this
+     * arm unreachable while the set holds one member. The loop below skips on exactly that ground
+     * (`notTheDate` draws it too). The arm is kept, because the draw widens the day a second tower's
+     * week is admitted, and the two pins this literal named then (`c8`, `c10`) are recorded here.
+     */
+    expect(selfDrawing).toEqual(['c2']);
     for (const id of selfDrawing) {
       const pin = BigInt(pressDayFor(id)?.seedText ?? '0');
       const notTheDate = dailySeedFor('2026-09-25');
@@ -298,14 +306,21 @@ describe('the door’s line — derived from the week, never stored', () => {
     ];
     /* § D1047: the drawn arms count the set the draw is over, which is the first-day set. */
     for (const line of [FIRST_SESSION_LINE, FIRST_SESSION_LINE_PINNED]) {
-      expect(line).toContain(`${words[FIRST_DAY_CONTRACT_IDS.length] ?? ''} towers`);
+      /* § D1178 took the set to one member, where the sentence reads *the one tower*. */
+      expect(line).toContain(
+        FIRST_DAY_CONTRACT_IDS.length === 1
+          ? 'the one tower whose day 1'
+          : `one of the ${words[FIRST_DAY_CONTRACT_IDS.length] ?? ''} towers`,
+      );
+      /* § D1178's half of the definition, in the same sentence as the other two. */
+      expect(line).toContain('at least two days that play decides, day 1 among them');
       expect(line).toContain(`${String(LEGIBILITY_SWEEP.length * LEGIBILITY_SWEEP_N)} days`);
       expect(line).not.toMatch(/\b(you|your|yours)\b/iu);
       /* § D529 clause 4: no worked answer outside the tutorial — neither verb, nor which one. */
       expect(line).not.toMatch(/\b(park|parking|spread|lobby)\b/iu);
     }
     expect(FIRST_SESSION_LINE_CHOSEN).toContain(`${words[ELIGIBLE_FIRST_CONTRACT_IDS.length] ?? ''} towers`);
-    expect(FIRST_DAY_CONTRACT_IDS.length).toBeGreaterThan(1);
+    expect(FIRST_DAY_CONTRACT_IDS.length).toBeGreaterThan(0);
     // Non-vacuity: the set is neither empty nor past the word list, so neither `toContain` above
     // is asserting the presence of a bare ` towers`.
     expect(ELIGIBLE_FIRST_CONTRACT_IDS.length).toBeGreaterThan(1);
@@ -510,7 +525,7 @@ describe('the line has two arms, and the draw picks between them — issue #595,
   });
 });
 
-describe('the first scored day’s set — legible ∩ admitted, § D1029', () => {
+describe('the first scored day’s set — legible ∩ admitted ∩ week admitted, § D1029 and § D1178', () => {
   it('is non-empty, and every member is legible and admitted', () => {
     expect(FIRST_DAY_CONTRACT_IDS.length, 'no tower is both legible and admitted').toBeGreaterThan(0);
     for (const id of FIRST_DAY_CONTRACT_IDS) {
@@ -519,14 +534,18 @@ describe('the first scored day’s set — legible ∩ admitted, § D1029', () =
     }
   });
 
-  it('is, on this data, the six § D1029 admitted — and each pin is measured on the day the Scenario press plays', () => {
+  it('is, on this data, Midtown alone — and each pin is measured on the day the Scenario press plays', () => {
     /*
      * The ghost check: the literal is here so a move is seen and explained on the commit that makes
      * it, not so the set is typed — the case below derives it. And § D1047's guard that every
      * member's pin carries the horizon `scenarioHorizonFor` runs its building on: a pin measured on a
      * slice and dealt on a whole day would be a day nobody measured.
      */
-    expect(FIRST_DAY_CONTRACT_IDS).toEqual(['c2', 'c3', 'c6', 'c7', 'c8', 'c10']);
+    /*
+     * It was the six § D1029 admitted, `c2 c3 c6 c7 c8 c10`, until § D1178 filtered the set by the
+     * week census: `c3`'s week counts no day, and `c6`, `c7`, `c8` and `c10` have not been censused.
+     */
+    expect(FIRST_DAY_CONTRACT_IDS).toEqual(['c2']);
     const resources = contractBuildings();
     for (const id of FIRST_DAY_CONTRACT_IDS) {
       const horizon = scenarioHorizonFor(
@@ -540,7 +559,13 @@ describe('the first scored day’s set — legible ∩ admitted, § D1029', () =
 
   it('is exactly the intersection, in contract order — never the legible set as a fallback', () => {
     const admitted = admittedPressDayIds();
-    expect(FIRST_DAY_CONTRACT_IDS).toEqual(ELIGIBLE_FIRST_CONTRACT_IDS.filter((id) => admitted.includes(id)));
+    expect(FIRST_DAY_CONTRACT_IDS).toEqual(
+      ELIGIBLE_FIRST_CONTRACT_IDS.filter((id) => admitted.includes(id) && weekAdmitsANewcomer(id)),
+    );
+    /* The week half is not decoration: without it the set is wider. */
+    expect(ELIGIBLE_FIRST_CONTRACT_IDS.filter((id) => admitted.includes(id)).length).toBeGreaterThan(
+      FIRST_DAY_CONTRACT_IDS.length,
+    );
     /*
      * The fallback the guard exists to refuse: the legible set standing in for the intersection.
      * Some legible tower pins no day, so the two cannot be equal unless something substituted one.

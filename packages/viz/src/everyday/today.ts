@@ -42,6 +42,7 @@
  * own words that whether the crowd is comfortable is the day's to show. GitHub issue #208.
  */
 
+import { crowdMakesPractice } from '../shift/scoredCrowd.js';
 import type { ResolvedBuilding } from '@elevator-sim/core/browser';
 
 import { bookedOutCarsOf, carAbsencesOf, wrinkleNameOf, wrinkleNoteOf } from '../shift/bookedOut.js';
@@ -52,6 +53,7 @@ import { eventAsRun, eventCarChoice } from '../shift/events.js';
 import { carsToDerate } from '../shift/incidents.js';
 import { admittedPressDayIds, pressDayStanding } from '../shift/ladder.js';
 import { wayThroughSentenceOf } from '../shift/weekWay.js';
+import { dayStakeSentenceOf, weekStakeLineOf } from '../shift/weekStake.js';
 import { clockOf, clockRange } from '../shift/report.js';
 import type { GoalReading, RunHorizon, ShiftEvent, WeekState, Weekday } from '../shift/types.js';
 import { weekdayOf } from '../shift/types.js';
@@ -228,6 +230,14 @@ export interface TodayRecord {
    * through licenses none.
    */
   readonly wayThrough: string | undefined;
+  /**
+   * **The week's stake, and whether this day is part of it**, or `undefined` where the week census
+   * does not speak for the tower — swarm DL's Q2, [§ D1176](../../../../DECISIONS.md).
+   * `line` is `shift/weekStake.ts#weekStakeLineOf` (*k of N*, and how many so far); `day` is
+   * `#dayStakeSentenceOf`, one sentence with no advice saying whether today counts and, where it
+   * does not, why. `day` is `undefined` on a week standing past its last day.
+   */
+  readonly weekStake: { readonly line: string; readonly day: string | undefined } | undefined;
 }
 
 /** {@link TodayRecord.driverHeld}'s sentence — no digit, the strip's own rule. */
@@ -818,7 +828,16 @@ function seedLineOf(input: TodayInput, crowdIsPinned: boolean): string {
    * tower's pinned first day meets this crowd, which is the one it was measured on.
    */
   if (crowdIsPinned) return `${crowd} · the pinned crowd this day was measured on, not the day’s`;
-  return `${crowd} · a crowd of this run’s own, not the day’s`;
+  /*
+   * **And on a scenario's week, what that costs** — wave AK, [§ D1141](../../../../DECISIONS.md).
+   * A run on a crowd other than the day's shared one, on a week already under way on another crowd,
+   * is practice and the week does not move (`shift/scoredCrowd.ts`), so the line says so before the
+   * press rather than the sheet after it.
+   */
+  const own = `${crowd} · a crowd of this run’s own, not the day’s`;
+  return crowdMakesPractice(input.week, input.seed, input.daySeed)
+    ? `${own}, so this run is practice and banks nothing into your week`
+    : own;
 }
 
 /**
@@ -925,5 +944,13 @@ export function todayOf(input: TodayInput): TodayRecord {
       hasCalendar: input.calendar !== null,
       horizon: input.horizon,
     }),
+    weekStake: weekStakeOf(week, event.id),
   };
+}
+
+/** {@link TodayRecord.weekStake} — § D1176, read off the census through `shift/weekStake.ts`. */
+function weekStakeOf(week: WeekState, eventId: string): TodayRecord['weekStake'] {
+  const line = weekStakeLineOf(week);
+  if (line === undefined) return undefined;
+  return { line, day: dayStakeSentenceOf(week.contractId, week.day, eventId) };
 }

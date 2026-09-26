@@ -367,6 +367,22 @@ function mountBrief(
       measured.style.cssText = `${BODY};margin:6px 0 0`;
       asks.append(measuredHeading, measured);
     }
+    /*
+     * The week's stake and whether today counts toward it — § D1176. Drawn only where the week
+     * census speaks for the tower; the view decides, this only places it.
+     */
+    if (view.week !== undefined) {
+      const weekHeading = el(doc, 'div', undefined, view.week.heading);
+      weekHeading.style.cssText = `${EYEBROW};margin-top:12px`;
+      const weekLine = el(doc, 'p', 'everyday-brief-week', view.week.line);
+      weekLine.style.cssText = `${BODY};margin:6px 0 0`;
+      asks.append(weekHeading, weekLine);
+      if (view.week.day !== undefined) {
+        const dayLine = el(doc, 'p', 'everyday-brief-week-day', view.week.day);
+        dayLine.style.cssText = `${BODY};margin:4px 0 0`;
+        asks.append(dayLine);
+      }
+    }
     column.append(asks);
 
     /* ---- who drives today — the one control here that writes ---- */

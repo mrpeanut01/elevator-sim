@@ -681,12 +681,17 @@ jobs:
   # sweep is 932 s over 480 judgements, very unevenly spread — `stage-3-overwhelmed` alone takes
   # 389 s and `stage-1-first-call` 4 s. A hosted four-core runner is slower, and a ceiling that has
   # to be raised after a red run has already cost the week it was meant to save.
+  #
+  # DECISIONS.md § D1183 added the stage page's own choices as a third stratum (up to 39 more
+  # configurations a scenario) and 79 named routes for the replay. Re-measured 2026-09-26 on the
+  # shared four-core container at load 4 to 12: the regeneration took 5 728 s, `stage-3-overwhelmed`
+  # alone 2 652 s. The ceiling moves from 180 to 240 minutes for that reason, on the same commit.
   # ---------------------------------------------------------------------------
   survivor-counts:
     name: survivors — every scenario at every rung it declares
     if: github.event_name == 'schedule' || inputs.tiers == 'all' || inputs.tiers == 'survivor-counts'
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 240
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -758,6 +763,8 @@ jobs:
   # The fix-it route census — DECISIONS.md § D1120 clause 1. Every role-blind route through every
   # offered case pressed through the gate on the letter's morning, and the counts matched against
   # `fixit/routeCensus.ts#ROUTE_CENSUS`, which decides which cases open with their diagnosis shown.
+  # Since DECISIONS.md § D1184 the same job judges each case's clearing routes on the forty-nine
+  # mornings, cheapest first, and matches the par against `fixit/par.ts#FIXIT_PAR`.
   #
   # A gate of its own (`ELEVATOR_SIM_FIXIT_ROUTES=deep`). Measured 2026-09-25 on a shared four-core
   # container: 15 cases in 190 s, the slowest 92.8 s. The minutes below are a ceiling.

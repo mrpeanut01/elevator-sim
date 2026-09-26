@@ -746,6 +746,19 @@ export const DEMAND_BASIS_LINE =
   'one run before, one run after — and the repair changed who arrives, so the second run meets the same crowd less the people it moved. Enough to see a repair this size; not enough to split hairs.';
 
 /**
+ * The basis line for a pair whose order **changed which trips the lifts can carry** — [§ D1160](../../../../DECISIONS.md),
+ * the post-AJ panel's seat C D1.
+ *
+ * The traffic generator draws a crowd only over trips some chain of banks can carry, so an order
+ * that opens or closes one (one floor of zone overlap on a building whose banks meet only at the
+ * lobby) meets a crowd drawn for the building as changed. That used to reach the player as a raw
+ * assertion naming passengers and floating-point arrival times; it is the model working, and this
+ * says so in the words the other two basis lines use. Chosen from the legs, like the others.
+ */
+export const ROUTES_BASIS_LINE =
+  'one run before, one run after — and your order changes which trips the lifts can carry, so the second run meets a crowd drawn for the building as you changed it rather than the same crowd twice. Enough to see a repair this size; not enough to split hairs.';
+
+/**
  * Whether a repair changes **who arrives** rather than what carries them — the one patch field that
  * reaches the passenger trace. `fixit/parse.ts` permits it on the diagnosed repair alone (a
  * purchase cannot move people), so on a shipped case this is true of at most the diagnosed one.
@@ -785,6 +798,12 @@ export interface FixitMeasurement {
    * issue #350. Decides which basis line the outcome prints; see {@link DEMAND_BASIS_LINE}.
    */
   readonly sameCrowd: boolean;
+  /**
+   * The second run met people the first did not — a crowd **re-drawn** for a building whose trips
+   * the order changed, rather than thinned by a repair that moves people (§ D1160). Read off
+   * the legs by `run.ts#measuredOf`; absent means `false`. Picks {@link ROUTES_BASIS_LINE}.
+   */
+  readonly crowdRedrawn?: boolean | undefined;
 }
 
 /**
@@ -861,8 +880,11 @@ export interface FixitOutcome {
  * - **`changes`** — the order's changes, worded by the surface in `core`'s player words. The engine
  *   does not word them because the words belong beside the controls that set them
  *   (`everyday/fixitScreenModel.ts#fixitOrderLinesOf`).
- * - **`bought`** — the price-schedule rows the order bought, by their player names
- *   ({@link rowsBoughtOf}).
+ *
+ * **`bought` left on [§ D1158](../../../../DECISIONS.md)'s commit.** It printed the schedule rows
+ * the order bought, and a row's player name is the price group's (*Where idle cars wait*, *Trim the
+ * door dwell*), so *"What it bought: Where idle cars wait"* repeated the change it followed. The
+ * Spent row already says what was committed; the body now says what the change did.
  *
  * The object is S3's shape — one fourth argument rather than three — so a later field (a
  * replication, a panel of mornings) is added to it rather than to the signature.
@@ -870,29 +892,28 @@ export interface FixitOutcome {
 export interface FixitVerdictContext {
   readonly witnessRun: boolean;
   readonly changes: readonly string[];
-  readonly bought: readonly string[];
 }
 
 /*
- * The composed fixed verdict's words — § D1011. Four strings, and the care in them is about **what
- * they do not say**: no mechanism, because a plausible sentence in place of a measurement is what
- * [§ D256](../../../../DECISIONS.md) refuses, and no claim that the order *is* or *is not* the
- * diagnosed change — only that the run is not the one the diagnosis describes, which is the fact
- * the leg comparison established.
+ * The composed fixed verdict's words — § D1011, reworded by [§ D1158](../../../../DECISIONS.md). The
+ * care in them is about **what they do not say**: no mechanism, because a plausible sentence in
+ * place of a measurement is what [§ D256](../../../../DECISIONS.md) refuses. § D1158 took out the
+ * sentence that disclaimed the verdict in the player's face (*"The diagnosis describes a different
+ * run, so its explanation is not printed here"*, printed even where the player had set exactly the
+ * group the diagnosis names) and the *What it bought* line that repeated the change; in their place
+ * is what the change did, read off the rows the card already draws.
  */
 /** The head of a fixed verdict on a run that is not the diagnosed repair's. */
 export const FIXED_BY_ORDER_HEAD = 'Fixed, by your own order.';
 /** Leads the list of the player's changes. */
 export const FIXED_BY_ORDER_CHANGES_LEAD = 'What you changed:';
-/** Leads the list of schedule rows bought. */
-export const FIXED_BY_ORDER_BOUGHT_LEAD = 'What it bought:';
+/** Leads what the change did, from the complaint row and the rest-of-building row. */
+export const FIXED_BY_ORDER_DID_LEAD = 'What it did:';
 /**
- * The closing sentence. The second half is the ruling's player member's line, kept verbatim (S1):
- * the runs show the change clears the bars; they do not show why.
+ * The closing sentence, the ruling's player member's line kept verbatim (S1): the runs show the
+ * change clears the bars; they do not show why.
  */
-export const FIXED_BY_ORDER_CLOSE =
-  'The rows below are measured on this order. The diagnosis describes a different run, so its ' +
-  'explanation is not printed here. These runs say your change works; they do not say why.';
+export const FIXED_BY_ORDER_CLOSE = 'These runs say your change works; they do not say why.';
 
 /**
  * The state that **is** the diagnosed repair — the pinned witness § D706 clause 1 makes of it.
@@ -991,22 +1012,37 @@ export function verdictIsStale(verdictState: FixitState | undefined, current: Fi
 }
 
 /**
- * Whether the case wears the FIXED badge after this run — `docs/20` defect 16's second finding.
+ * Whether the case wears the FIXED badge after this run — [§ D1157](../../../../DECISIONS.md).
  *
- * **A statement about the latest run, never a high-water mark.** The panel latched
- * `session.fixed = true` on the first fixed outcome and nothing cleared it, so a case stayed
- * badged FIXED beside an outcome card reading *"9 waits → 9 waits · 0 % of it went away"* — two
- * verdicts about one case on one screen. The badge and the outcome card now come from the same
- * run.
+ * **A case once fixed stays fixed.** The badge is the player's clear, and a clear is banked: the
+ * rail's count, the profile's solved set and the chime the fix paid all hang on it. Until § D1157
+ * this was *"a statement about the latest run, never a high-water mark"* (`docs/20` defect 16), so a
+ * player who fixed a case and then probed a cheaper order watched FIXED turn back to OPEN, the rail
+ * drop from 6/15 to 5/15 and the case leave the solved set — the post-AJ panel's seat C met it on
+ * three cases, and during a forty-nine-morning check on an already-fixed case the count dipped by
+ * one until the verdict landed. Probing is the search this mode is built to reward, and it was
+ * being punished.
  *
- * The contrast that makes this a rule rather than a taste: `WeekState.bestMinutePct` *is* a
- * high-water mark, deliberately — it is worded as *an observation about what the building has
- * been seen to do*. FIXED is not an observation about history; it is the rail's summary of
- * *where this case stands*, and a case whose current configuration fails its own complaint does
- * not stand fixed. A player who wants the badge back re-runs the configuration that earned it.
+ * Defect 16's own concern survives, and it is answered on the card rather than by the badge: a
+ * FIXED badge beside an outcome card reading *"9 waits → 9 waits"* was two verdicts about one case
+ * on one screen. So a run that does not fix a fixed case draws {@link FIX_KEPT_LINE} over its card,
+ * which says the card is that run's result and the fix stands. `fixedBefore` is the badge the case
+ * wore before this run; omitted, the badge is this run's alone.
  */
-export function fixedBadgeAfter(outcome: FixitOutcome): boolean {
-  return outcome.kind === 'fixed';
+export function fixedBadgeAfter(outcome: FixitOutcome, fixedBefore = false): boolean {
+  return fixedBefore || outcome.kind === 'fixed';
+}
+
+/**
+ * The line over a run's card when the case was already fixed and this run did not fix it —
+ * [§ D1157](../../../../DECISIONS.md). The card is the run's result; the fix is the player's.
+ */
+export const FIX_KEPT_LINE =
+  'This case stays fixed: an order of yours fixed it, and a run that does not clear takes nothing away. The result below is about the order you just ran.';
+
+/** {@link FIX_KEPT_LINE} where it applies — a fixed case, and a run that did not fix it — or `undefined`. */
+export function fixKeptLineOf(fixedBefore: boolean, outcome: FixitOutcome): string | undefined {
+  return fixedBefore && outcome.kind !== 'fixed' ? FIX_KEPT_LINE : undefined;
 }
 
 /**
@@ -1052,7 +1088,8 @@ export function fixedBadgeAfter(outcome: FixitOutcome): boolean {
  */
 /** Which basis the pair earned — read off the measurement, never off the patch. */
 function basisOf(measurement: FixitMeasurement): string {
-  return measurement.sameCrowd ? BASIS_LINE : DEMAND_BASIS_LINE;
+  if (measurement.sameCrowd) return BASIS_LINE;
+  return measurement.crowdRedrawn === true ? ROUTES_BASIS_LINE : DEMAND_BASIS_LINE;
 }
 
 /**
@@ -1090,7 +1127,7 @@ export function classifyOutcome(
       return {
         kind: 'fixed',
         head: entry.result.head,
-        body: `${entry.result.body}${spentAnywayClause(entry, spend)}`,
+        body: `${entry.result.body}${witnessOrderClause(entry, spend)}`,
         rows,
         basis: basisOf(measurement),
         attribution: 'diagnosis',
@@ -1099,7 +1136,7 @@ export function classifyOutcome(
     return {
       kind: 'fixed',
       head: FIXED_BY_ORDER_HEAD,
-      body: composedFixedBody(verdict),
+      body: composedFixedBody(verdict, complaintRow, restRow, measurement),
       rows,
       basis: basisOf(measurement),
       attribution: 'order',
@@ -1158,56 +1195,63 @@ function complaintGrew(measurement: FixitMeasurement): boolean {
 }
 
 /**
- * The composed fixed body — § D1011. The changes and the rows, each as one sentence and each
- * omitted when empty rather than drawn as *"What you changed: ."*; then the close, always.
+ * The composed fixed body — § D1011, § D1158. The changes, then what the change did, each omitted
+ * when there is nothing to say rather than drawn as *"What you changed: ."*; then the close, always.
+ *
+ * *What it did* is the complaint row's own before and after, and the rest-of-building row's where
+ * anybody else rode: figures the card prints under it, so the sentence makes no claim the rows do
+ * not.
  */
-function composedFixedBody(verdict: FixitVerdictContext | undefined): string {
+function composedFixedBody(
+  verdict: FixitVerdictContext | undefined,
+  complaint: FixitRow,
+  rest: FixitRow,
+  measurement: FixitMeasurement,
+): string {
   const parts: string[] = [];
   if (verdict !== undefined && verdict.changes.length > 0) {
     parts.push(`${FIXED_BY_ORDER_CHANGES_LEAD} ${verdict.changes.join('; ')}.`);
   }
-  if (verdict !== undefined && verdict.bought.length > 0) {
-    parts.push(`${FIXED_BY_ORDER_BOUGHT_LEAD} ${verdict.bought.join('; ')}.`);
-  }
+  const others =
+    measurement.restDeltaPoints === null
+      ? ''
+      : `, and everyone else away inside a minute went from ${rest.before} to ${rest.after}`;
+  parts.push(`${FIXED_BY_ORDER_DID_LEAD} the complaint went from ${complaint.before} to ${complaint.after}${others}.`);
   parts.push(FIXED_BY_ORDER_CLOSE);
   return parts.join(' ');
 }
 
 /**
- * What the authored *fixed* copy cannot know: that the player bought things anyway — `docs/20`
- * defect 8.
+ * What the authored *fixed* copy cannot know about the order that reproduced it — `docs/20` defect
+ * 8, reworded by [§ D1158](../../../../DECISIONS.md).
  *
- * ## The sentence this exists to stop being false
+ * This arm prints only where the player's after-run is **leg for leg** the diagnosed repair's
+ * (§ D1011), so the authored words are exactly as true of the player's change as of the repair they
+ * were written for. The clause used to open *"That is about the repair, not about your order"*,
+ * which disclaimed the player's own repair in their face (the post-AJ panel's seat C, D4, on six
+ * cases). It now says the opposite, which is the fact the leg comparison established.
  *
- * Two of the shipped cases end their result body with a punchline about the fix having been free:
- * *"**Nothing was bought**: the cars were always enough — they were parked in the wrong place."*
- * That is the best moment in the product and it is true **of the repair**. It is not true of the
- * order: the audit reached it having also ticked 11 u of repairs that changed nothing, and read the
- * punchline directly above a Spent row saying `budget 12 u → 11 u`.
+ * Two of the shipped cases end their body with a punchline about the fix having been free (*"Nothing
+ * was bought: the cars were always enough"*), true of the repair and not of an order that also
+ * ticked things that changed nothing. So where the order committed more than the diagnosed repair
+ * costs, the clause says how much more, and that the run was the same: a cost comparison and a leg
+ * comparison, both measured, with no claim about which of the player's settings did the work.
  *
- * ## Why a clause after it rather than an edit to it
- *
- * The body is authored in `data/fixit-cases.json`, per case, in the tenant's voice, and the claim
- * takes a different form in each (*"Nothing was bought — the third car was never the problem"*).
- * Rewriting arbitrary prose from here is not available, and CLAUDE.md invariant 7 puts the copy in
- * `data/` deliberately. What is available is to say the fact the authored sentence is silent about,
- * derived from the spend the same panel is drawing, and to say it **as a correction** so the two
- * sentences read as one statement rather than as a contradiction — *the fix was free; your order was
- * not* is coherent, *nothing was bought / 11 u committed* is not.
- *
- * Empty at zero spend, which is the case the authored punchline was written for and the case the
- * audit's own best moment was: nothing is appended, and the copy comes back byte-identical to what
- * it has always been. So a case whose player bought nothing cannot tell this function exists.
+ * Empty at zero spend, so a case whose player bought nothing reads its authored copy byte for byte.
  */
-function spentAnywayClause(entry: FixitCase, spend: FixitSpend): string {
+function witnessOrderClause(entry: FixitCase, spend: FixitSpend): string {
   if (spend.totalUnits <= 0) return '';
+  const yours = ' Your run is that run, leg for leg, so the words above are about your change.';
+  const repairUnits = entry.repairs.find((repair) => repair.role === 'diagnosed')?.costUnits ?? 0;
+  const more = spend.totalUnits - repairUnits;
+  if (more <= 0) return yours;
   const machinery =
     spend.machineryUnits > 0
       ? `, ${String(spend.machineryUnits)} u of it machinery`
       : ', none of it machinery';
   return (
-    ` That is about the repair, not about your order: you committed ${String(spend.totalUnits)} of ` +
-    `${String(entry.budgetUnits)} u${machinery}, and this run does not say what any of it bought.`
+    `${yours} Your order committed ${String(spend.totalUnits)} of ${String(entry.budgetUnits)} u` +
+    `${machinery}: ${String(more)} u more than that repair costs, for the same run.`
   );
 }
 
@@ -1265,7 +1309,7 @@ function complaintDeltaText(kind: 'long-waits' | 'mean-wait', delta: number): st
 
 function complaintText(kind: 'long-waits' | 'mean-wait', value: number, boarded: number): string {
   return kind === 'long-waits'
-    ? `${String(value)} waits`
+    ? `${String(value)} ${value === 1 ? 'wait' : 'waits'}`
     : `${value.toFixed(1)} s over ${String(boarded)} boarded journeys`;
 }
 

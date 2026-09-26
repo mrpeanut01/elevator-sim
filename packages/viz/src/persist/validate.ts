@@ -399,6 +399,11 @@ const WATCH_RECORD_CHECKS: Readonly<Record<keyof WatchRecord, FieldCheck>> = Obj
    * it was wrong.
    */
   ruleRows: isArrayOf(isDocument('a rule row'), 32, 'rule rows'),
+  /*
+   * The rung the run stood on — shape 3, § D1139. An id, checked as one; whether this build ships
+   * it for the record's building is `watch/record.ts#recordUnreadableReason`'s to say, as a row.
+   */
+  rungContractId: nullOr(isNonEmptyString),
 });
 
 const OUTCOME_CHECKS: Readonly<Record<keyof DayOutcome, FieldCheck>> = Object.freeze({

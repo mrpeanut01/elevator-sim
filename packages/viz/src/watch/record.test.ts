@@ -45,7 +45,7 @@ import {
   stateFromWatchRecord,
   watchRecordIssues,
   watchRecordOf,
-  watchRunConfigOf,
+  watchRunPlanOf,
 } from './record.js';
 import { postedResultOf, reproductionDrift } from './reproduce.js';
 import type { WatchRecord, WatchableRun } from './types.js';
@@ -150,9 +150,9 @@ describe('the watch record', () => {
     expect(record?.ruleRows).toHaveLength(1);
     if (record === undefined) return;
 
-    const withRules = recordRun(watchRunConfigOf(withRule, RESOURCES, record)).recording;
+    const withRules = recordRun(watchRunPlanOf(withRule, RESOURCES, record).config).recording;
     const without = recordRun(
-      watchRunConfigOf(withRule, RESOURCES, { ...record, ruleRows: [] }),
+      watchRunPlanOf(withRule, RESOURCES, { ...record, ruleRows: [] }).config,
     ).recording;
     expect(legsOf(withRules)).not.toBe(legsOf(without));
     // And the replay is the run the player's own state produced, which is the whole claim.
@@ -318,7 +318,7 @@ describe('a record replays the run it was taken from', () => {
     const record = watchRecordOf(state, RESOURCES);
     expect(record).toBeDefined();
     if (record === undefined) return;
-    const replayed = recordRun(watchRunConfigOf(state, RESOURCES, record)).recording;
+    const replayed = recordRun(watchRunPlanOf(state, RESOURCES, record).config).recording;
     // § D177's comparison: a mean can be unchanged for a run that is entirely different.
     expect(legsOf(replayed)).toBe(legsOf(original));
   }, 60_000);
@@ -339,9 +339,9 @@ describe('a record replays the run it was taken from', () => {
     expect(record?.interventions).toHaveLength(1);
     if (record === undefined) return;
 
-    const withIt = recordRun(watchRunConfigOf(withLog, RESOURCES, record)).recording;
+    const withIt = recordRun(watchRunPlanOf(withLog, RESOURCES, record).config).recording;
     const without = recordRun(
-      watchRunConfigOf(withLog, RESOURCES, { ...record, interventions: [] }),
+      watchRunPlanOf(withLog, RESOURCES, { ...record, interventions: [] }).config,
     ).recording;
     // The measured half of `CARRY_CHECKS.interventions`' sentence — *a replay without it is a
     // different run* — rather than a restatement of it.
@@ -367,14 +367,23 @@ describe('a record replays the run it was taken from', () => {
       patience: { distribution: 'exponential' as const, meanS: 90 },
       outOfServiceCarIds: ['main-1'],
     };
-    expect(legsOf(recordRun(watchRunConfigOf(loaded, RESOURCES, record)).recording)).toBe(
-      legsOf(recordRun(watchRunConfigOf(baseState(), RESOURCES, record)).recording),
+    expect(legsOf(recordRun(watchRunPlanOf(loaded, RESOURCES, record).config).recording)).toBe(
+      legsOf(recordRun(watchRunPlanOf(baseState(), RESOURCES, record).config).recording),
     );
     // And the reconstructed state says so rather than only behaving so.
     const rebuilt = stateFromWatchRecord(loaded, RESOURCES, record);
     expect(rebuilt.patience).toBeNull();
     expect(rebuilt.outOfServiceCarIds).toEqual(record.outOfServiceCarIds);
-    expect(rebuilt.playMode).toBe('free-play');
+    /*
+     * The mode follows the record's rung — § D1139. A day on a rung is re-asked on a **fresh** week
+     * of that rung's contract, never on the spectator's week; a day on none runs as Free Play.
+     */
+    expect(record.rungContractId).toBe('c1');
+    expect(rebuilt.playMode).toBe('shift-week');
+    expect(rebuilt.week.contractId).toBe('c1');
+    expect(rebuilt.week.history).toEqual([]);
+    expect(rebuilt.week.day).toBe(record.day);
+    expect(stateFromWatchRecord(loaded, RESOURCES, { ...record, rungContractId: null }).playMode).toBe('free-play');
   }, 60_000);
 });
 
@@ -396,7 +405,7 @@ describe('the reproduction gate', () => {
     const record = watchRecordOf(baseState(), RESOURCES);
     expect(record).toBeDefined();
     if (record === undefined) return;
-    const recording = recordRun(watchRunConfigOf(baseState(), RESOURCES, record)).recording;
+    const recording = recordRun(watchRunPlanOf(baseState(), RESOURCES, record).config).recording;
     const checked = checkedRunForTest(
       rowFor(record, recording),
       RESOURCES,
@@ -411,7 +420,7 @@ describe('the reproduction gate', () => {
     const record = watchRecordOf(baseState(), RESOURCES);
     expect(record).toBeDefined();
     if (record === undefined) return;
-    const recording = recordRun(watchRunConfigOf(baseState(), RESOURCES, record)).recording;
+    const recording = recordRun(watchRunPlanOf(baseState(), RESOURCES, record).config).recording;
     const row = rowFor(record, recording);
     const rowPosted = postedResultOf(recording);
     const stale: WatchableRun = {
@@ -437,7 +446,7 @@ describe('the reproduction gate', () => {
   it('refuses a record naming something this build does not ship', () => {
     const record = watchRecordOf(baseState(), RESOURCES);
     if (record === undefined) return;
-    const recording = recordRun(watchRunConfigOf(baseState(), RESOURCES, record)).recording;
+    const recording = recordRun(watchRunPlanOf(baseState(), RESOURCES, record).config).recording;
     const checked = checkedRunForTest(
       rowFor({ ...record, buildingId: 'no-such-tower' }, recording),
       RESOURCES,

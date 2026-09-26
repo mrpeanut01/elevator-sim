@@ -386,6 +386,13 @@ const PUBLIC_API_ONLY: Readonly<Record<string, string>> = Object.freeze({
     'the bound this measurement is taken under, published on the table and asserted by the guard',
   'scenario/withheldDimensionIds':
     'what no scenario sells (#467, § D535), counted onto the table and partitioned by the guard',
+  /*
+   * § D1183: the stage page's own choices, as the census's `page` stratum presses them. Read off
+   * the page's own select so the stratum and the page cannot drift; its caller is the regeneration
+   * driver, and `everyday/stagePlay.test.ts` holds it equal to what the select offers.
+   */
+  'everyday/stagePageMovesOf':
+    'the page stratum’s population (§ D1183); its caller is the regeneration driver',
   'scenario/CANDIDATE_SCENARIOS':
     'the driver’s and the guard’s shared scenario list (goalReport imports only CANDIDATE_GOALS)',
   /*

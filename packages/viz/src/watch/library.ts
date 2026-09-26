@@ -49,7 +49,7 @@ import type { SimulationConfig } from '@elevator-sim/core/browser';
 import { WEEKDAYS, type DayOutcome } from '../shift/types.js';
 import type { WeekState } from '../shift/types.js';
 
-import { recordUnreadableReason, watchRunConfigOf } from './record.js';
+import { recordUnreadableReason, watchRunPlanOf } from './record.js';
 import { claimRefusalFor, postedResultOf, reproductionRefusalFor } from './reproduce.js';
 import type { WatchableRun } from './types.js';
 
@@ -242,7 +242,16 @@ export interface CheckedRun {
  */
 export type WatchGate =
   | { readonly kind: 'settled'; readonly checked: CheckedRun }
-  | { readonly kind: 'simulate'; readonly config: SimulationConfig };
+  | {
+      readonly kind: 'simulate';
+      readonly config: SimulationConfig;
+      /**
+       * The cars held out of service beside the config — `record.ts#WatchRunPlan`, wave AK,
+       * [§ D1139](../../../../DECISIONS.md). Every runner the gate is handed to passes them to
+       * `recordRun`, because a held car travels beside the config and never inside it.
+       */
+      readonly outOfServiceCarIds: readonly string[];
+    };
 
 export function watchGateBefore(
   run: WatchableRun,
@@ -264,7 +273,8 @@ export function watchGateBefore(
     };
   }
 
-  return { kind: 'simulate', config: watchRunConfigOf(base, resources, run.record) };
+  const plan = watchRunPlanOf(base, resources, run.record);
+  return { kind: 'simulate', config: plan.config, outOfServiceCarIds: plan.outOfServiceCarIds };
 }
 
 /**

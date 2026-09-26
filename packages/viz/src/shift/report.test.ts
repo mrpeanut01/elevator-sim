@@ -60,6 +60,7 @@ const observationsOfRun = (recording: Parameters<typeof observationsAt>[0]) =>
   shiftObservationsOf(observationsAt(recording, recording.endedAt));
 import {
   NOT_RECORDED,
+  PRACTICE_CROWD_NOTE,
   PRACTICE_NOTE,
   WITHHELD,
   averageWaitFigure,
@@ -75,7 +76,8 @@ import {
   type WeekDayReport,
 } from './report.js';
 import { reportWindowNameOf } from './reportWindow.js';
-import { closeDay, openEndless, openWeek, outcomeOf } from './week.js';
+import { closeDay, nextDay, openEndless, openWeek, outcomeOf } from './week.js';
+import { WEEK_CLOSED_LINE } from './weekStake.js';
 import {
   DAY_START_S,
   WAKE_UP_ARRIVALS,
@@ -163,7 +165,11 @@ function reportOf(
       recordRefusal: null,
       day,
       dayIdx: opened.dayIdx,
-      eventId: 'ordinary',
+      /*
+       * The wrinkle the day is dealt, so the fixture is a day of the week as it is dealt — since
+       * § D1176 only such a day counts toward a census week's target (`weekStake.ts`).
+       */
+      eventId: eventFor(day, opened.dayIdx, 'whole-day').id,
       arrived: observations.arrived,
       carried: observations.carried,
       minutePct: observations.minutePct,
@@ -694,6 +700,54 @@ describe('WORST WAIT states its censoring', () => {
     expect(cell.note).not.toContain('window');
     /* The engine's id stays off the player's sheet — the post-AH panel's L3. */
     expect(cell.note).not.toContain(saturated.summary.reportWindow.id);
+  });
+
+  /**
+   * **Every worst wait on the sheet is that one figure** — § D1148, the post-AJ panel's seats B
+   * (H1, H2) and D (H4). § D1104 moved the card and left the *Weight fairness up* card reading the
+   * reporting window's maximum (*one still waited 178 s* under a 181 s card) and the fold-out saying
+   * the WORST WAIT figure was over the window. Asserted on a run whose window's worst is not its
+   * shift's, so the lever quoting either would be told apart.
+   */
+  it('quotes the card’s figure on the lever card and puts it in the whole shift in the fold-out', () => {
+    const base = observationsOfRun(clean);
+    const shiftWorst = 181;
+    expect(Math.round(clean.summary.serviceLevel.longestWaitS ?? 0)).not.toBe(shiftWorst);
+    const report = reportWith({ ...base, worstWaitS: shiftWorst, worstWaitIsCensored: false, minutePct: 100 });
+    expect(figure(report, 'worst-wait').value).toBe(`${String(shiftWorst)} s`);
+    const lever = report.levers.find((entry) => entry.id === 'weight-fairness');
+    expect(lever?.body).toContain(`one still waited ${String(shiftWorst)} s`);
+    for (const match of JSON.stringify(report).matchAll(/waited (?:at least )?(\d+) s/gu)) {
+      expect(match[1], match[0]).toBe(String(shiftWorst));
+    }
+    const clause = report.smallPrint.split(/;|\. /u).find((part) => part.includes('WORST WAIT')) ?? '';
+    expect(clause).toContain('whole shift');
+    expect(clause).not.toContain('window');
+  });
+
+  /*
+   * § D1152, the post-AJ panel's seat B (U1): a day that raised no call said nothing about it.
+   * The row is drawn from the session's account and only when no call row is.
+   */
+  it('says a day raised no call, in one row, only when the day had none', () => {
+    const quiet = dayReportOf({
+      recording: clean,
+      observations: observationsOfRun(clean),
+      goals: goalsForDay(4),
+      week: openWeek('c2'),
+      contract: contractById('c2'),
+      event: SHIFT_EVENTS.ordinary,
+      plan: PLAN,
+      calendar: null,
+      subject: { kind: 'week-day' },
+      dayCalls: [],
+      dayCallsQuiet: { kind: 'asked', refused: 3, ending: 'finished' },
+    });
+    const rows = quiet.diagnosis.filter((row) => row.id === 'day-calls-none');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.why).toMatch(/^The stage raised no call today\. It ran the day ahead under each answer it could offer from 3 moments/u);
+    /* No account from the shell, no row: a run nobody asked the stage about says nothing. */
+    expect(reportWith(observationsOfRun(clean)).diagnosis.some((row) => row.id === 'day-calls-none')).toBe(false);
   });
 
   it('reads "not recorded" — never 0 s — when nobody called a lift', () => {
@@ -1276,8 +1330,12 @@ describe('the rest of the sheet', () => {
        * case above.
        */
       for (const day of [1, 2, 3, 4, 5, 6, 7]) {
-        const nextIdx = day % 7;
-        const willRun = scheduledEventFor(movingWeek, day + 1, nextIdx);
+        /*
+         * Tomorrow as `dev/state.ts` plans it: `nextDay` of today's week, which on a census tower's
+         * last day is day 1 of a new week (§ D1177) rather than day 8.
+         */
+        const tomorrow = nextDay({ ...openWeek('c2'), day, dayIdx: (day - 1) % 7 });
+        const willRun = scheduledEventFor(movingWeek, tomorrow.day, tomorrow.dayIdx);
         expect(reportOf(clean, day, movingWeek).forecast.name, `day ${String(day)}`).toBe(
           willRun.name,
         );
@@ -1315,6 +1373,16 @@ describe('the rest of the sheet', () => {
     expect(report.smallPrint).toContain(clean.dispatcherProfileId.toLowerCase());
   });
 
+  it('closes a census week on its last day, points at its sheet and forecasts a new week — § D1177', () => {
+    const sunday = reportOf(clean, 7);
+    expect(sunday.taught).toBe(WEEK_CLOSED_LINE);
+    expect(sunday.forecast.demand).toMatch(/^A new week: the tower as handed, \d+\.\d% fewer tenants than today$/u);
+    expect(sunday.nextDayName).toBe('Monday');
+    // Saturday closes a day and not the week.
+    expect(reportOf(clean, 6).taught).not.toBe(WEEK_CLOSED_LINE);
+    expect(reportOf(clean, 6).forecast.demand).toMatch(/^\+\d+\.\d% more tenants than today$/u);
+  });
+
   it('says what is banked, and what is left to bank', () => {
     const report = reportOf(clean);
     /*
@@ -1327,7 +1395,8 @@ describe('the rest of the sheet', () => {
      */
     expect(report.contractLine).toContain(`${contractById('c2')?.label ?? ''} — The morning rush`);
     expect(report.contractLine).toContain('clean shifts banked');
-    expect(report.taught).toContain('Bank 1 more clean shift');
+    // Midtown's census target is four since § D1180 counted its Tuesday and Friday.
+    expect(report.taught).toContain('Bank 3 more clean shifts');
   });
 
   it('never claims more banked than the contract asks — SC-05/DR-09', () => {
@@ -1346,7 +1415,7 @@ describe('the rest of the sheet', () => {
         subject: { kind: 'week-day' },
       }),
     );
-    expect(report.contractLine).toContain('2 of 2 clean shifts banked');
+    expect(report.contractLine).toContain('4 of 4 clean shifts banked');
     expect(report.contractLine).not.toContain('5 of');
   });
 
@@ -2233,5 +2302,14 @@ describe('the ordinary day’s calls and a practice close — § D1138', () => {
     const banked = weekDay(sheet({ week: { ...WEEK, attempt: 1, closedDay: 4 } }));
     expect(banked.practiceNote).toBeUndefined();
     expect(banked.streakLine).not.toBe(PRACTICE_NOTE);
+  });
+
+  it('says a run on a crowd other than the day’s shared one is practice for that reason — § D1141', () => {
+    /* The week has not closed the day at all, so *your week keeps your first attempt* would be false. */
+    const byCrowd = weekDay(sheet({ practice: true, practiceCrowd: 777n, week: { ...WEEK, attempt: 1, closedDay: null } }));
+    expect(byCrowd.practiceNote).toBe(PRACTICE_CROWD_NOTE);
+    expect(byCrowd.streakLine).toBe(PRACTICE_CROWD_NOTE);
+    expect(byCrowd.practiceNote).not.toMatch(/first attempt/u);
+    expect(byCrowd.practiceNote).not.toMatch(/\d/u);
   });
 });

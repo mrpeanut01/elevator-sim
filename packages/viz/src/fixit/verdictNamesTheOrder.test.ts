@@ -13,9 +13,8 @@
  * against the diagnosed repair's own run.
  *
  * **What each route must now read.** A fixed outcome, a head that is not the authored head, a body
- * that carries **no sentence** of the authored body, names every schedule row the order bought by
- * its player name, names the order's changes, and ends on the close that says the runs show the
- * change works and not why.
+ * that carries **no sentence** of the authored body, names the order's changes and what they did
+ * (§ D1158), and ends on the close that says the runs show the change works and not why.
  *
  * **The negative control, in both directions.** Forcing `witnessRun: true` on the same route's run
  * must bring the authored words back — otherwise the assertions above would pass on an engine that
@@ -32,6 +31,7 @@ import { recordRun } from '../record/recordRun.js';
 import { editorInputsOf } from './editorInputs.js';
 import {
   FIXED_BY_ORDER_CLOSE,
+  FIXED_BY_ORDER_DID_LEAD,
   FIXED_BY_ORDER_HEAD,
   classifyOutcome,
   rowsBoughtOf,
@@ -177,10 +177,13 @@ describe('a fixed verdict over a route the diagnosis does not name is composed f
       }
       expect(`${outcome.head} ${outcome.body}`).not.toContain(route.printed);
 
-      /* Every row the order bought, by its player name, and every change in the control's words. */
-      const bought = rowsBoughtOf(entry, judged.state, shippedPriceSchedule());
-      expect(bought.length).toBeGreaterThan(0);
-      for (const row of bought) expect(outcome.body).toContain(row);
+      /*
+       * Every change in the control's words, and what it did (§ D1158: the rows bought left the
+       * body, because a row's name repeated the change it followed).
+       */
+      expect(rowsBoughtOf(entry, judged.state, shippedPriceSchedule()).length).toBeGreaterThan(0);
+      expect(outcome.body).toContain(FIXED_BY_ORDER_DID_LEAD);
+      expect(outcome.body).not.toContain('describes a different run');
       expect(judged.context.changes.length).toBeGreaterThan(0);
       for (const change of judged.context.changes) expect(outcome.body).toContain(change);
       expect(outcome.body.endsWith(FIXED_BY_ORDER_CLOSE)).toBe(true);
@@ -230,6 +233,7 @@ describe('a fixed verdict over a route the diagnosis does not name is composed f
     );
     expect(outcome.kind).toBe('fixed');
     expect(outcome.head).toBe(FIXED_BY_ORDER_HEAD);
-    expect(outcome.body).toBe(FIXED_BY_ORDER_CLOSE);
+    expect(outcome.body.startsWith(FIXED_BY_ORDER_DID_LEAD)).toBe(true);
+    expect(outcome.body.endsWith(FIXED_BY_ORDER_CLOSE)).toBe(true);
   });
 });

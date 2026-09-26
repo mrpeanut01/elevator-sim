@@ -37,6 +37,15 @@
  */
 
 import { wasGraded } from '../shift/week.js';
+import {
+  DAY_UNMEASURED_SENTENCE,
+  dayCountsToward,
+  weekDealOf,
+  weekSheetOf,
+  weekStakeLineOf,
+  type HouseReading,
+  type WeekSheetView,
+} from '../shift/weekStake.js';
 import type { DayOutcome, WeekState } from '../shift/types.js';
 import { weekdayOf } from '../shift/types.js';
 
@@ -67,6 +76,13 @@ export interface WeekDayCard {
   /** `undefined` on every unclosed day — nothing to colour, because nothing was judged. */
   readonly verdict: WeekDayVerdict | undefined;
   readonly isToday: boolean;
+  /**
+   * Whether the day counts toward the week's target — [§ D1176](../../../../DECISIONS.md) — or
+   * `undefined` where the week census does not speak for the tower (every clean day counts there,
+   * so there is nothing to mark). A card that does not count says so in {@link note}, and the
+   * sentence saying why is {@link WeekScreenView.notCounted}'s.
+   */
+  readonly counts: boolean | undefined;
   /**
    * Whether this card opens the sheet that accounts for it — *How it went*.
    *
@@ -133,6 +149,21 @@ export interface WeekScreenView {
   /** What the strip's one openable card does, or why none is open. Never a bare clickable card. */
   readonly readNote: string;
   readonly board: BoardRelationView;
+  /**
+   * **The week's target, *k of N***, or `undefined` where the week census does not speak —
+   * `shift/weekStake.ts#weekStakeLineOf`, [§ D1176](../../../../DECISIONS.md).
+   */
+  readonly stake: string | undefined;
+  /**
+   * The strip's days that do not count, each with the one sentence saying why — the same sentence
+   * the brief draws on that day. Empty where every day counts or the census does not speak.
+   */
+  readonly notCounted: readonly { readonly weekday: string; readonly sentence: string }[];
+  /**
+   * **The week's sheet at its close**, beside the house — [§ D1177](../../../../DECISIONS.md) —
+   * or `undefined` before the last dealt day is filed and wherever the census does not speak.
+   */
+  readonly sheet: WeekSheetView | undefined;
 }
 
 /** What {@link weekScreenViewOf} is computed from. */
@@ -166,6 +197,14 @@ export interface WeekScreenInput {
    * the sheet while the week keeps the day. See {@link WeekDayCard.readable}.
    */
   readonly sheetStanding: boolean;
+  /**
+   * The house's reading on a counted day that needed a run of its own — the shell's measurement,
+   * `dev/main.ts`'s house runs, [§ D1177](../../../../DECISIONS.md). A day whose own run was the
+   * house's is read off the day by `shift/weekStake.ts#weekSheetOf` and never asked here. Optional,
+   * and absent means *nothing has answered yet*: the sheet then says the house is still being run
+   * rather than counting a run that has not happened.
+   */
+  readonly house?: (day: number) => HouseReading | undefined;
 }
 
 /** How many cards § 14 draws. Seven, and `HISTORY_DAYS` is the same seven one layer down. */
@@ -220,6 +259,15 @@ function cardsOf(input: WeekScreenInput): readonly WeekDayCard[] {
      */
     const show = closed !== undefined;
     const verdict = show && closed !== undefined ? verdictOf(closed) : undefined;
+    /* § D1176: whether the day counts toward the week, off the day as it closed or as it is dealt. */
+    const dealt = day < 1 ? undefined : weekDealOf(week.contractId)?.days[day - 1];
+    const counts =
+      dealt === undefined
+        ? undefined
+        : closed !== undefined
+          ? dayCountsToward(week.contractId, closed)
+          : dealt.counts;
+    const uncounted = counts === false ? ' · not counted' : '';
     cards.push({
       weekday: day < 1 ? EM_DASH : shortWeekday(week.dayIdx + offset),
       day: day < 1 ? undefined : day,
@@ -233,15 +281,18 @@ function cardsOf(input: WeekScreenInput): readonly WeekDayCard[] {
       note:
         day < 1
           ? 'before this week'
-          : isToday && !show
-            ? 'today · not closed yet'
-            : verdict === undefined
-              ? 'not played'
-              : isToday
-                ? `today · ${VERDICT_NOTE[verdict]}`
-                : VERDICT_NOTE[verdict],
+          : `${
+              isToday && !show
+                ? 'today · not closed yet'
+                : verdict === undefined
+                  ? 'not played'
+                  : isToday
+                    ? `today · ${VERDICT_NOTE[verdict]}`
+                    : VERDICT_NOTE[verdict]
+            }${uncounted}`,
       verdict,
       isToday,
+      counts,
       /* The sitting's own question, and the one place `dayClosed` still decides — § D1004. */
       readable: isToday && show && input.dayClosed && input.sheetStanding,
     });
@@ -377,5 +428,36 @@ export function weekScreenViewOf(input: WeekScreenInput): WeekScreenView {
       refusal: DAILY_BOARD_POINTER,
       rules: BOARD_RULES,
     },
+    stake: weekStakeLineOf(input.week),
+    notCounted: notCountedOf(input.week, cards),
+    sheet: weekSheetOf(input.week, input.house ?? (() => undefined)),
   };
+}
+
+/**
+ * The strip's days that do not count, with the sentence saying why — § D1176. The sentence is the
+ * dealt day's, or the one for a day that closed under some other wrinkle than it is dealt.
+ */
+function notCountedOf(
+  week: WeekState,
+  cards: readonly WeekDayCard[],
+): readonly { readonly weekday: string; readonly sentence: string }[] {
+  const deal = weekDealOf(week.contractId);
+  if (deal === undefined) return [];
+  const byDay = new Map<number, DayOutcome>(week.history.map((entry) => [entry.day, entry]));
+  const out: { readonly weekday: string; readonly sentence: string }[] = [];
+  for (const card of cards) {
+    if (card.counts !== false || card.day === undefined) continue;
+    const dealt = deal.days[card.day - 1];
+    if (dealt === undefined) continue;
+    const closed = byDay.get(card.day);
+    out.push({
+      weekday: card.weekday,
+      sentence:
+        closed === undefined || closed.eventId === dealt.eventId
+          ? dealt.sentence
+          : DAY_UNMEASURED_SENTENCE,
+    });
+  }
+  return Object.freeze(out);
 }

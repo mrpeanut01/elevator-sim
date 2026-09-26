@@ -171,6 +171,12 @@ function recordOf(raw: unknown, where: string): WatchRecord {
      * rather than a comment claiming it.
      */
     ruleRows: asRuleRows(entry['ruleRows'], `${where}.ruleRows`),
+    /*
+     * The rung — shape 3, § D1139. Every shipped reference run is a run of the building as
+     * authored, so the file carries `null`; an id here would be re-asked on that scenario's tower,
+     * and `record.ts#recordUnreadableReason` refuses one this build does not ship for the building.
+     */
+    rungContractId: asNullableString(entry['rungContractId'], `${where}.rungContractId`),
   };
 }
 

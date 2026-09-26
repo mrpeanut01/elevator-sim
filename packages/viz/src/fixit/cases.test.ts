@@ -690,7 +690,6 @@ describe.each(PINNED)('case $id', (pinned) => {
       const outcome = classifyOutcome(entry, measurement, spendOf(entry, state, shippedPriceSchedule()), {
         witnessRun: true,
         changes: [],
-        bought: [],
       });
       expect(outcome.kind).toBe('fixed');
       expect(outcome.head).toBe(entry.result.head);

@@ -40,6 +40,17 @@
  * - **Whether a pinned day's call stands unanswered** — `shift/pressCall.ts`, § D1029. The one
  *   reason that stops the transport rather than choosing its speed.
  *
+ * ## A scored day is paced by the tutorial's rule instead — [§ D1169](../../../../DECISIONS.md)
+ *
+ * Wave AK's decide-al ruling (Q1 clause 1) put the tutorial's hold rule on every scored day, the
+ * week's days on the daily stage, slices and whole days alike: **fast while nobody on a landing has
+ * waited a minute, the player's rung while somebody has**, read off the present frame and nothing
+ * else ({@link StagePaceInput.scored}). The peaks are no longer slow of themselves, because a peak
+ * where nobody is waiting has nothing to watch and a slice between two waits had four minutes of
+ * idle cars at `4×`. The fast rung stays {@link BETWEEN_PEAKS_SIM_PER_REAL_S}, the derived one;
+ * `90×` waits for its own cue-budget derivation. Everything below is the unscored path, which a
+ * replay and a watched run still take.
+ *
  * ## Where it applies, and the one place it must not
  *
  * **Only when `shift/dayLength.ts#runHorizonOf` answers `'whole-day'`.** Everything else — a
@@ -110,7 +121,29 @@ export const PACE_HOLD_WAIT_S: number = (() => {
  * - `between` — between peaks with nobody past it; {@link BETWEEN_PEAKS_SIM_PER_REAL_S} or the
  *   player's rung, whichever is faster.
  */
-export type StagePaceReason = 'call' | 'unmanaged' | 'chosen' | 'act' | 'held' | 'between';
+export type StagePaceReason =
+  | 'call'
+  | 'unmanaged'
+  | 'chosen'
+  | 'act'
+  | 'held'
+  | 'between'
+  | ScoredPaceReason;
+
+/**
+ * **A scored day's three reasons** — [§ D1169](../../../../DECISIONS.md), the decide-al ruling's Q1
+ * clause 1, which puts the tutorial's hold rule on every scored day (the week's days, slices and
+ * whole days alike) in place of § D991's peaks.
+ *
+ * - `watching` — somebody on a landing has waited past {@link PACE_HOLD_WAIT_S} on the present
+ *   frame; the player's rung.
+ * - `fast` — nobody has; {@link BETWEEN_PEAKS_SIM_PER_REAL_S} or the player's rung, whichever is
+ *   faster. Peaks are no exception: a peak where nobody has waited a minute is crossed fast too.
+ * - `yours` — the player pressed a chip while the stage was fast; their rung until somebody next
+ *   waits a minute ({@link StagePaceInput.playerChoseSpeedAtS}). A chip pressed while `watching` is
+ *   the rung `watching` plays at, so it is kept for every later stretch with somebody waiting.
+ */
+export type ScoredPaceReason = 'watching' | 'fast' | 'yours';
 
 export interface StagePace {
   readonly simPerRealS: number;
@@ -144,6 +177,14 @@ export interface StagePaceInput {
    * instant, or `undefined` on every other day and once the call is answered.
    */
   readonly callAtS?: number | undefined;
+  /**
+   * **A scored day** — a week's day on the daily stage, whichever its horizon ([§ D1169](../../../../DECISIONS.md)).
+   * The acts and the horizon are not read: the stage is fast while nobody on a landing has waited a
+   * minute, and at the player's rung while somebody has. On a scored day
+   * {@link playerChoseSpeedAtS} is a chip pressed **while fast**, and the stage clears it when
+   * somebody next waits a minute, so it stands exactly until then.
+   */
+  readonly scored?: boolean | undefined;
 }
 
 /** The act boundary after `fromS` — a peak opening or closing — or `undefined` when none remains. */
@@ -179,6 +220,16 @@ export function stagePaceOf(input: StagePaceInput): StagePace {
   const watching = input.watchingSimPerRealS;
   if (input.callAtS !== undefined && input.simTimeS >= input.callAtS) {
     return { simPerRealS: watching, reason: 'call' };
+  }
+  if (input.scored === true) {
+    /* § D1169: the tutorial's rule, on the present frame only. */
+    if (input.longestStandingS !== undefined && input.longestStandingS >= PACE_HOLD_WAIT_S) {
+      return { simPerRealS: watching, reason: 'watching' };
+    }
+    if (input.playerChoseSpeedAtS !== undefined && input.simTimeS >= input.playerChoseSpeedAtS) {
+      return { simPerRealS: watching, reason: 'yours' };
+    }
+    return { simPerRealS: Math.max(watching, BETWEEN_PEAKS_SIM_PER_REAL_S), reason: 'fast' };
   }
   if (input.horizon !== 'whole-day' || input.acts.length === 0) {
     return { simPerRealS: watching, reason: 'unmanaged' };
@@ -243,5 +294,12 @@ export function stagePaceNoteOf(
         ? `after the last peak, at ${rung} to the end of the day`
         : `between peaks at ${rung}, next peak at ${clockAt(next.startS, context.dayStartS)}`;
     }
+    /* § D1169: a scored day's three, each one line and each a fact of the present frame. */
+    case 'fast':
+      return `fast-forwarding at ${rung} while nobody on a landing has waited a minute`;
+    case 'watching':
+      return `at your speed, ${rung}, while somebody on a landing has waited over a minute`;
+    case 'yours':
+      return `your speed, ${rung}, until somebody on a landing has waited a minute`;
   }
 }

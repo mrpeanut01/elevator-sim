@@ -15,6 +15,7 @@ import { scenarioHorizonFor } from '../shift/dayLength.js';
 import { CALENDAR_PERIODS, periodOnDays } from '../shift/calendar.js';
 import { admittedPressDayIds, CONTRACT_LADDER, ladderRowFor, pressDayFor } from '../shift/ladder.js';
 import { openWeek } from '../shift/week.js';
+import { weekDealOf, weekOfferOf } from '../shift/weekStake.js';
 import type { RunHorizon, WeekState } from '../shift/types.js';
 
 import {
@@ -137,6 +138,32 @@ describe('the rows that carry a day whose verdict turns on a press are findable'
   });
 });
 
+describe('a tower whose week counts no day holds its scenario, and stays a press — § D1179', () => {
+  it('holds exactly where the week census counts no day, and says why beside the row', () => {
+    const view = viewOn(openWeek('c1'), []);
+    for (const row of view.rows) {
+      const deal = weekDealOf(row.contractId);
+      const offer = weekOfferOf(row.contractId);
+      expect(row.scenario, row.contractId).toBe(offer?.offer);
+      expect(row.scenarioLine, row.contractId).toBe(offer?.line);
+      expect(row.scenario === 'held', row.contractId).toBe(deal !== undefined && deal.counted === 0);
+      // Only the scenario's clear is held: the tower is pressable like any other row.
+      expect(row.arrival, row.contractId).toBe(row.selected ? 'standing' : 'open');
+    }
+    expect(view.rows.filter((row) => row.scenario === 'held').map((row) => row.contractId)).toEqual(['c3']);
+    const secure = view.rows.find((row) => row.contractId === 'c3');
+    expect(secure?.scenarioLine).toMatch(/held back/u);
+    expect(secure?.scenarioLine).toMatch(/not been measured as they are dealt/u);
+    expect(secure?.scenarioLine).toMatch(/Nothing is locked/u);
+    // Harbour Point is offered at one of one, and its row names the day.
+    const harbour = view.rows.find((row) => row.contractId === 'c9');
+    expect(harbour?.scenario).toBe('offered');
+    expect(harbour?.scenarioLine).toContain('Monday');
+    // A tower the census does not speak for draws nothing new.
+    expect(view.rows.find((row) => row.contractId === 'c1')?.scenarioLine).toBeUndefined();
+  });
+});
+
 describe('the surface publishes no figure', () => {
   it('draws no digit outside the scenario labels the contracts themselves author', () => {
     /*
@@ -151,7 +178,7 @@ describe('the surface publishes no figure', () => {
       view.lede,
       view.note,
       view.incidentTag,
-      ...view.rows.flatMap((row) => [row.tower, row.teaches, row.arrivalNote]),
+      ...view.rows.flatMap((row) => [row.tower, row.teaches, row.arrivalNote, row.scenarioLine ?? '']),
       view.pressDays.heading,
       view.pressDays.lede,
       view.pressDays.note,

@@ -148,7 +148,11 @@ export function carsPhraseOf(cars: readonly BookedOutCar[]): string {
  * wrinkle whose window starts after the first instant was read back as *the tower's* booking.
  */
 export function wrinkleNoteOf(event: ShiftEvent, bookedOut: readonly BookedOutCar[]): string {
-  const towers = bookedOut.filter((car) => car.ofTheDay !== true);
+  /*
+   * `awayAtS > 0` as well since § D1149: the report's header is handed {@link carAbsencesOf} now,
+   * and this sentence says *part-way through the day*, which a car out from the first instant is not.
+   */
+  const towers = bookedOut.filter((car) => car.ofTheDay !== true && car.awayAtS > 0);
   if (towers.length === 0) return event.note;
   const which = carsPhraseOf(towers);
   if (event.id === 'ordinary') {

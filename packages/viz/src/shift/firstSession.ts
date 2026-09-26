@@ -58,6 +58,7 @@ import { Pcg32, deriveStreamSeed } from '@elevator-sim/core/browser';
 import { contractById } from './contracts.js';
 import { admittedPressDayIds, pressDayFor } from './ladder.js';
 import { LEGIBILITY_SWEEP } from './legibility.js';
+import { daysWerePlayedOn, weekAdmitsANewcomer } from './weekStake.js';
 import type { WeekState } from './types.js';
 
 /** The stream name the draw derives from the session's seed. */
@@ -88,8 +89,21 @@ export const ELIGIBLE_FIRST_CONTRACT_IDS: readonly string[] = Object.freeze(
  * rather than quietly drawing from the legible set, and `firstSession.test.ts` fails first.
  */
 export const FIRST_DAY_CONTRACT_IDS: readonly string[] = Object.freeze(
-  ELIGIBLE_FIRST_CONTRACT_IDS.filter((id) => admittedPressDayIds().includes(id)),
+  ELIGIBLE_FIRST_CONTRACT_IDS.filter(
+    (id) => admittedPressDayIds().includes(id) && weekAdmitsANewcomer(id),
+  ),
 );
+
+/*
+ * **And a third half since [§ D1178](../../../../DECISIONS.md): the tower's week.** Swarm DL's Q2
+ * ruled 3–0 that a newcomer's first *week* is dealt on a tower the week census (`docs/33` DC-10)
+ * admits, because St Jude's, which the draw dealt on 2026-09-26, had never been censused and
+ * measured one contested day of five once it was (S2's W3). `shift/weekStake.ts#weekAdmitsANewcomer`
+ * reads it off the census: day 1 counts toward the week, and the week has room for one miss. On the
+ * shipped census that leaves Midtown Office alone, so every date deals it; a tower joins on the
+ * commit its census row admits it, and the draw widens with it. Still guarded non-empty with no
+ * fallback.
+ */
 
 /**
  * The contract a first session drawn from `seed` opens on — one of {@link FIRST_DAY_CONTRACT_IDS}.
@@ -142,7 +156,8 @@ export function firstSessionDayFor(daySeed: number | bigint): {
 export function isFirstDayOnALegibleTower(week: WeekState): boolean {
   return (
     week.day === 1 &&
-    week.history.length === 0 &&
+    /* Not a week that rolled over after a closed one — § D1177, `weekStake.ts#daysWerePlayedOn`. */
+    !daysWerePlayedOn(week) &&
     week.attempt === 0 &&
     ELIGIBLE_FIRST_CONTRACT_IDS.includes(week.contractId)
   );
@@ -196,10 +211,18 @@ function countWord(count: number): string {
  * the tutorial and nowhere else, so which press clears is the stage's to find out.
  */
 const FIRST_DAY_SET_CLAUSE =
-  `A first day opens on one of the ${countWord(FIRST_DAY_CONTRACT_IDS.length)} towers whose day 1 puts somebody past a minute on a landing ` +
+  `A first day opens on ${towersPhrase(FIRST_DAY_CONTRACT_IDS.length)} whose day 1 puts somebody past a minute on a landing ` +
   `for two minutes together, measured over ${String(LEGIBILITY_SWEEP.length * LEGIBILITY_SWEEP_N)} days, and where a car is booked out part-way ` +
   'through day 1 and, on one crowd, one answer to the stage’s call was measured to clear the day and the ' +
-  'other to miss it.';
+  'other to miss it. Its week was measured to have at least two days that play decides, day 1 among them.';
+
+/**
+ * *the one tower* or *one of the six towers* — the set's own length, as a word, in the number the
+ * sentence needs. § D1178 took the set to one member, where *one of the one towers* is not English.
+ */
+function towersPhrase(count: number): string {
+  return count === 1 ? 'the one tower' : `one of the ${countWord(count)} towers`;
+}
 
 /**
  * The door's line under the seed on a first day drawn from the crowd it is played on. Player-facing;

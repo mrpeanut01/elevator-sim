@@ -65,20 +65,20 @@
     {
       "contractId": "c2",
       "day": 2,
-      "eventId": "move-in:middle",
+      "eventId": "move-in:past-halfway",
       "growthPerDay": 0.02,
       "breather": false,
       "chosen": {
-        "dispatcherId": "auction",
-        "press": "park-cars-lobby",
+        "dispatcherId": "predictive-balanced",
+        "press": "spread-cars",
         "atFraction": 0.2
       },
-      "tuningClears": 0,
+      "tuningClears": 8,
       "tuningN": 8,
-      "chosenVerdicts": "mmmmmmmmmmmmmCmmmmmm",
-      "standingVerdicts": "mmmmmmmmmmmmmmmmmmmm",
+      "chosenVerdicts": "CCCCCCCCCCCCCCCCCCCC",
+      "standingVerdicts": "mmCCmmmCCmmCmCmCmmmC",
       "queueOnlyMisses": 0,
-      "lowestPeakQueue": 33,
+      "lowestPeakQueue": 12,
       "screenRuns": 130
     },
     {
@@ -179,20 +179,20 @@
     {
       "contractId": "c2",
       "day": 5,
-      "eventId": "shaft-out:most-of-day",
+      "eventId": "shaft-out:before-halfway",
       "growthPerDay": 0.02,
       "breather": false,
       "chosen": {
-        "dispatcherId": "fairness-first",
-        "press": "park-cars-lobby",
-        "atFraction": 0.2
+        "dispatcherId": "predictive-balanced",
+        "press": "",
+        "atFraction": 0
       },
-      "tuningClears": 0,
+      "tuningClears": 7,
       "tuningN": 8,
-      "chosenVerdicts": "mmmmmmmmmmmmmmmmmmmm",
-      "standingVerdicts": "mmmmmmmmmmmmmmmmmmmm",
-      "queueOnlyMisses": 0,
-      "lowestPeakQueue": 32,
+      "chosenVerdicts": "CCCCCCCCCmCmmmmmCCmC",
+      "standingVerdicts": "CmmmCmmmmmmmmmmmmmmm",
+      "queueOnlyMisses": 4,
+      "lowestPeakQueue": 12,
       "screenRuns": 130
     },
     {

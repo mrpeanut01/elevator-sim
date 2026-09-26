@@ -39,7 +39,7 @@ import {
   eventFor,
   shiftRunPatch,
 } from './events.js';
-import { shiftRunConfigOf } from '../dev/state.js';
+import { shiftRunConfigOf, type ViewerState } from '../dev/state.js';
 import { contractBuildings, todaysScenarioDayState } from './contractDay.test-helper.js';
 import { scheduledEventFor } from './calendar.js';
 import { serviceEventsFor, type Incident } from './incidents.js';
@@ -543,10 +543,10 @@ describe('which car is held is a decision, not a draw', () => {
  * **A day's car is not a car the tower already has out** — [§ D1038](../../../../DECISIONS.md), the
  * week swarm's ruling S1 § 1 on the post-AH panel's N5.
  *
- * Midtown's Tuesday `move-in:middle` picked car D by `carsToDerate`'s order, and the rung books car D
- * out 10:30–13:00; the two schedules collapsed into the rung's and the swarm measured the run
- * identical to an ordinary Tuesday on all 95 configurations, under a brief promising a car tied up
- * through the middle of the shift.
+ * Midtown's Tuesday `move-in:middle` (retired by § D1180; it ran 0.25–0.75 of the shift) picked car
+ * D by `carsToDerate`'s order, and the rung books car D out 10:30–13:00; the two schedules collapsed
+ * into the rung's and the swarm measured the run identical to an ordinary Tuesday on all 95
+ * configurations, under a brief promising a car tied up through the middle of the shift.
  */
 describe('the tower’s bookings are spoken for — § D1038', () => {
   const booked = (carId: string, fromFraction: number, toFraction: number): Incident => ({
@@ -563,10 +563,26 @@ describe('the tower’s bookings are spoken for — § D1038', () => {
     const spoken = eventCarChoice(derate, fourCars, [booked('D', 0.25, 0.5)]);
     expect(spoken.derateCars.map((car) => car.carId)).toEqual(['C']);
     expect(spoken.derateSpokenFor).toBe(1);
-    /* A booking that does not meet the window is not in its way. */
+    /*
+     * A booking that does not meet the window still keeps the day off that car wherever another
+     * can be spared (§ D1180), so the day's car is never also the tower's; it counts as no
+     * collision, because the choice with nothing booked would not have met it.
+     */
     const apart = eventCarChoice(derate, fourCars, [booked('D', 0.8, 0.9)]);
-    expect(apart.derateCars.map((car) => car.carId)).toEqual(['D']);
+    expect(apart.derateCars.map((car) => car.carId)).toEqual(['C']);
     expect(apart.derateSpokenFor).toBe(0);
+  });
+
+  it('falls back to a booked car that does not meet the window only where no other can be spared — § D1180', () => {
+    const twoCars = { banks: [{ id: 'main', cars: ['A', 'B'].map((id) => ({ id })) }] };
+    // A bank keeps one car in service, so of two cars one may go: B, booked apart, is the only one.
+    const apart = eventCarChoice(derate, twoCars, [booked('A', 0.8, 0.9), booked('B', 0.8, 0.9)]);
+    expect(apart.derateCars).toHaveLength(1);
+    expect(apart.derateShortfall).toBe(0);
+    // Where the booking meets the window, that car is spoken for whatever else is short.
+    const met = eventCarChoice(derate, twoCars, [booked('A', 0.3, 0.4), booked('B', 0.3, 0.4)]);
+    expect(met.derateCars).toEqual([]);
+    expect(met.derateShortfall).toBe(1);
   });
 
   it('withholds the window, with its reason, where the building cannot spare another car', () => {
@@ -588,17 +604,45 @@ describe('the tower’s bookings are spoken for — § D1038', () => {
     expect(patch.withheld.join(' ')).toContain('The tower has its own car booked out over the same stretch');
   });
 
-  it('makes Midtown’s Tuesday a different day from an ordinary Tuesday, on the legs', () => {
+  /*
+   * **The re-authored windows still change the run** — swarm DM's ruling (b) clause 3,
+   * [§ D1180](../../../../DECISIONS.md). Moved off the lunch peak (Tuesday's move-in to 0.55–0.8 of
+   * the shift, Friday's shaft-out to 0.1–0.4), both days' held-out verdicts match the plain day's
+   * crowd for crowd, so the verdict no longer tells the wrinkle apart from an ordinary day. This is
+   * what still does: the legs, compared on the run rather than on a window statistic.
+   */
+  const legsOf = (run: VizRecording): string =>
+    JSON.stringify(run.legs.map((leg) => [leg.arrivedAt, leg.boardedAt ?? null, leg.alightedAt ?? null]));
+  const dayOfWeek = (day: number): { resources: ReturnType<typeof contractBuildings>; state: ViewerState } => {
     const resources = contractBuildings();
     const { state: first } = todaysScenarioDayState(resources, 'c2', { seed: 20_260_925n });
-    const tuesday = { ...first, campaignEventId: undefined, week: { ...first.week, day: 2, dayIdx: 1 } };
-    expect(scheduledEventFor(null, 2, 1).id).toBe('move-in:middle');
+    return {
+      resources,
+      state: { ...first, campaignEventId: undefined, week: { ...first.week, day, dayIdx: day - 1 } },
+    };
+  };
+
+  it('makes Midtown’s Tuesday a different day from an ordinary Tuesday, on the legs', () => {
+    const { resources, state: tuesday } = dayOfWeek(2);
+    expect(scheduledEventFor(null, 2, 1).id).toBe('move-in:past-halfway');
     const moveIn = shiftRunConfigOf(resources, tuesday);
     const ordinary = shiftRunConfigOf(resources, { ...tuesday, campaignEventId: 'ordinary' });
+    // Off the rung's booking (car D, 0.25–0.5 of the day), and still not car D: a booked car is
+    // spoken for all day wherever the building can spare another (§ D1180).
     expect(moveIn.dayCars.windows).toEqual(['C']);
-    const legsOf = (run: VizRecording): string =>
-      JSON.stringify(run.legs.map((leg) => [leg.arrivedAt, leg.boardedAt ?? null, leg.alightedAt ?? null]));
     const a = recordRun(moveIn.config, { recordDecisions: false }).recording;
+    const b = recordRun(ordinary.config, { recordDecisions: false }).recording;
+    expect(legsOf(a)).not.toBe(legsOf(b));
+  });
+
+  it('makes Midtown’s Friday a different day from an ordinary Friday, on the legs', () => {
+    const { resources, state: friday } = dayOfWeek(5);
+    expect(scheduledEventFor(null, 5, 4).id).toBe('shaft-out:before-halfway');
+    const shaftOut = shiftRunConfigOf(resources, friday);
+    const ordinary = shiftRunConfigOf(resources, { ...friday, campaignEventId: 'ordinary' });
+    // 0.1–0.4 meets the rung's booking of car D, so the shaft-out takes another car (§ D1038).
+    expect(shaftOut.dayCars.windows).toEqual(['C']);
+    const a = recordRun(shaftOut.config, { recordDecisions: false }).recording;
     const b = recordRun(ordinary.config, { recordDecisions: false }).recording;
     expect(legsOf(a)).not.toBe(legsOf(b));
   });

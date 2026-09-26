@@ -79,6 +79,7 @@ import { pairedDifferenceEstimate } from '@elevator-sim/experiments/browser';
 import type { VizRecording } from '../contract/types.js';
 import {
   DEMAND_BASIS_LINE,
+  ROUTES_BASIS_LINE,
   REST_DROP_LIMIT_POINTS,
   type FixitOutcome,
   type FixitRow,
@@ -372,6 +373,17 @@ export const FUTILITY_BASIS_LINE =
 export const FUTILITY_DEMAND_BASIS_LINE =
   'one run before and one after on the letter’s morning, which is the gate, then the same order on the derived mornings in turn, each beside the building as it stands with that morning’s crowd less the people the change moved — looked at after ten, twenty, thirty and forty, and stopped at the first look where the complaint was no lower on average.';
 
+/**
+ * The same, for an order that changes which trips the lifts can carry: each morning's second run
+ * meets a crowd drawn for the building as changed (§ D1160, `engine.ts#ROUTES_BASIS_LINE`).
+ */
+export const REPLICATED_ROUTES_BASIS_LINE =
+  'one run before and one after on the letter’s morning, which is the gate, then the same order on forty-nine more mornings, each run beside the building as it stands — and the order changes which trips the lifts can carry, so each morning’s second run meets a crowd drawn for the building as you changed it. Fixed only where the drop holds across those forty-nine.';
+
+/** The futility form of {@link REPLICATED_ROUTES_BASIS_LINE}. */
+export const FUTILITY_ROUTES_BASIS_LINE =
+  'one run before and one after on the letter’s morning, which is the gate, then the same order on the derived mornings in turn, each beside the building as it stands with a crowd drawn for the building as you changed it — looked at after ten, twenty, thirty and forty, and stopped at the first look where the complaint was no lower on average.';
+
 export const JUDGE_COPY = Object.freeze({
   checkingHead: 'It cleared on the letter’s morning. Now checking it on forty-nine more.',
   checkingBody:
@@ -412,8 +424,11 @@ export function markTitleOf(index: number, mark: MorningMark | undefined): strin
 
 function basisAfterReplication(gate: FixitOutcome, replication: FixitReplication): string {
   const demand = gate.basis === DEMAND_BASIS_LINE;
-  if (replication.stoppedAt !== undefined) return demand ? FUTILITY_DEMAND_BASIS_LINE : FUTILITY_BASIS_LINE;
-  return demand ? REPLICATED_DEMAND_BASIS_LINE : REPLICATED_BASIS_LINE;
+  const routes = gate.basis === ROUTES_BASIS_LINE;
+  if (replication.stoppedAt !== undefined) {
+    return routes ? FUTILITY_ROUTES_BASIS_LINE : demand ? FUTILITY_DEMAND_BASIS_LINE : FUTILITY_BASIS_LINE;
+  }
+  return routes ? REPLICATED_ROUTES_BASIS_LINE : demand ? REPLICATED_DEMAND_BASIS_LINE : REPLICATED_BASIS_LINE;
 }
 
 function signed(value: number, digits: number): string {
@@ -546,7 +561,7 @@ export function judgedOutcomeOf(entry: FixitCase, gate: FixitOutcome, replicatio
  * prints: a claim about nobody is not a claim.
  *
  * The line goes straight after the authored body and before anything the engine appended to it
- * (`engine.ts#spentAnywayClause`), which is where the authored sentence stood before it was split out.
+ * (`engine.ts#witnessOrderClause`), which is where the authored sentence stood before it was split out.
  */
 function bodyWithRestOf(entry: FixitCase, gate: FixitOutcome, replication: FixitReplication): string {
   const authored = entry.result.rest;

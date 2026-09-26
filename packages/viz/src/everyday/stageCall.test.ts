@@ -12,7 +12,10 @@ import { WAIT_BANDS } from '../live/bands.js';
 import { PARK_CARS_LOBBY_LABEL, SPREAD_CARS_LABEL } from '../live/interventions.js';
 import type { PressCall } from '../shift/pressCall.js';
 
-import { STAGE_CALL_COPY, stageCallCardOf, stageCallPhaseOf } from './stageCall.js';
+import { goalsForDay } from '../shift/goals.js';
+import type { GoalReading } from '../shift/types.js';
+
+import { STAGE_CALL_COPY, STAGE_END_DAY_COPY, stageCallCardOf, stageCallPhaseOf, stageEndDayOf } from './stageCall.js';
 import { PACE_HOLD_WAIT_S } from './stagePace.js';
 
 const DAY_START_S = 8 * 3600;
@@ -119,14 +122,35 @@ describe('the card', () => {
     for (const call of [minute, peak]) {
       const card = stageCallCardOf(call, DAY_START_S, []);
       const pinned = stageCallCardOf(CALLS[0]!, DAY_START_S, []);
-      expect([card.heading, card.question, card.options.map((option) => option.label)]).toEqual([
+      expect([card.heading, card.options.map((option) => option.label)]).toEqual([
         pinned.heading,
-        pinned.question,
         pinned.options.map((option) => option.label),
       ]);
+      /* § D1150: with no car out the question is about the cars, not the ones that are left. */
+      expect(card.question).toBe(STAGE_CALL_COPY.questionAllCars);
       for (const text of wordsOf(call)) {
         for (const [what, pattern] of BANNED) expect(pattern.test(text), `${what}: ${text}`).toBe(false);
       }
+    }
+  });
+
+  /*
+   * § D1150, the post-AJ panel's seats A (D4) and D (H6): *What do the cars that are left do?* at
+   * 08:36 on Midtown's Monday, with car D out only from 10:30. The question names a car being away,
+   * so it is asked exactly where the card's own facts name one — on either kind of call.
+   */
+  it('asks about the cars that are left only where the card names a car that is out', () => {
+    const noneOut: PressCall = { atS: 2160, rule: 'first-minute-wait', carId: '', awayAtS: 2160, backAtS: null, act: undefined, carAway: false };
+    const later = [{ carId: 'D', awayAtS: 9000, backAtS: 18000 }];
+    expect(stageCallCardOf(noneOut, DAY_START_S, later).question).toBe('What do the cars do?');
+    expect(stageCallCardOf(noneOut, DAY_START_S, later).facts.join(' ')).not.toContain('Car D');
+    const pinned = stageCallCardOf(CALLS[0]!, DAY_START_S, []);
+    expect(pinned.facts.some((fact) => /out of passenger service/u.test(fact))).toBe(true);
+    expect(pinned.question).toBe('What do the cars that are left do?');
+    for (const call of [noneOut, CALLS[0]!]) {
+      const card = stageCallCardOf(call, DAY_START_S, later);
+      const named = card.facts.some((fact) => /out of passenger service/u.test(fact));
+      expect(card.question.includes('that are left'), card.facts.join(' ')).toBe(named);
     }
   });
 
@@ -146,5 +170,69 @@ describe('the phase', () => {
     expect(stageCallPhaseOf(call, call.atS + 600, false)).toBe('called');
     expect(stageCallPhaseOf(call, call.atS - 1, true)).toBe('answered');
     expect(stageCallPhaseOf(call, call.atS + 1, true)).toBe('answered');
+  });
+});
+
+/**
+ * **The driver question's card** — [§ D1167](../../../../DECISIONS.md). The placement card's heading
+ * and facts, its own question and three answers in a fixed order, and the same four refusals.
+ */
+describe('the driver question’s card', () => {
+  const drivers = { 'driver-a': 'Minimum estimated wait', 'driver-b': 'Fairness first', leave: 'Conventional collective' };
+
+  it('keeps the placement card’s heading and facts, and asks who drives, in a fixed order', () => {
+    for (const call of CALLS) {
+      const placement = stageCallCardOf(call, DAY_START_S, []);
+      const driver = stageCallCardOf(call, DAY_START_S, [], drivers);
+      expect(driver.heading).toBe(placement.heading);
+      expect(driver.facts).toEqual(placement.facts);
+      expect(driver.question).toBe('Who drives the rest of the day?');
+      expect(driver.options.map((option) => [option.label, option.answer])).toEqual([
+        ['Switch to Minimum estimated wait', 'driver-a'],
+        ['Switch to Fairness first', 'driver-b'],
+        ['Keep Conventional collective driving', 'leave'],
+      ]);
+    }
+  });
+
+  it('draws no countdown, no now, no decisive word and no hint', () => {
+    for (const call of CALLS) {
+      const card = stageCallCardOf(call, DAY_START_S, [], drivers);
+      for (const text of [card.question, ...card.options.map((option) => option.label)]) {
+        for (const [what, pattern] of BANNED) expect(pattern.test(text), `${what}: ${text}`).toBe(false);
+      }
+    }
+  });
+});
+
+/**
+ * ***End the day*** — [§ D1168](../../../../DECISIONS.md). Offered only where a goal whose miss is
+ * final reads missed on the readings at the playhead; its note names the goal and carries no figure.
+ */
+describe('End the day', () => {
+  const goals = goalsForDay(1);
+  const readingsWith = (id: string, state: 'met' | 'missed' | 'pending'): GoalReading[] =>
+    goals.map((goal) => ({ goal, state: goal.id === id ? state : 'pending' }) as unknown as GoalReading);
+
+  it('is offered where the landing-queue or worst-wait goal reads missed, and names it', () => {
+    expect(stageEndDayOf(readingsWith('queue', 'missed'))).toEqual({
+      label: 'End the day',
+      note:
+        'The landing-queue goal is already past its bar, and it cannot come back under it today. Ending now ' +
+        'files the whole day as it runs from here, with nothing more pressed.',
+    });
+    expect(stageEndDayOf(readingsWith('worst-wait', 'missed'))?.note).toMatch(/^The worst-wait goal is already past its bar/u);
+  });
+
+  it('is not offered while the day can still clear — the negative control', () => {
+    expect(stageEndDayOf(readingsWith('minute', 'missed'))).toBeUndefined();
+    expect(stageEndDayOf(readingsWith('queue', 'met'))).toBeUndefined();
+    expect(stageEndDayOf(readingsWith('worst-wait', 'pending'))).toBeUndefined();
+  });
+
+  it('carries no figure, so it grades nothing the strip beside it does not already draw', () => {
+    const view = stageEndDayOf(readingsWith('queue', 'missed'))!;
+    expect(/\d/u.test(`${view.label} ${view.note}`)).toBe(false);
+    expect(STAGE_END_DAY_COPY.label).toBe('End the day');
   });
 });

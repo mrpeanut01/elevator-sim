@@ -1530,13 +1530,13 @@ queue bar is `goalsForDay`'s):
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | Midtown | 1 (Mon) | none | 0.11 | `predictive-balanced` + spread at 0.43 | 8/8 | 20/20 | 0.832 | 13/20 | 11 / 32 | 0 | **admitted** |
 | Midtown | 2 (Tue) | none | 0.02 | `predictive-balanced` + spread at 0.2 | 8/8 | 20/20 | 0.832 | 12/20 | 12 / 30 | 0 | **admitted** |
-| Midtown | 2 (Tue) | move-in:middle | 0.02 | `auction` + park at 0.2 | 0/8 | 1/20 | 0.001 | 20/20 | 33 / 30 | 0 | fails (c) queue out of reach, (a) no way through |
+| Midtown | 2 (Tue) | move-in:past-halfway | 0.02 | `predictive-balanced` + spread at 0.2 | 8/8 | 20/20 | 0.832 | 12/20 | 12 / 30 | 0 | **admitted** (re-measured, § D1180) |
 | Midtown | 3 (Wed) | none | 0.02 | `predictive-balanced` + spread at 0.2 | 8/8 | 20/20 | 0.832 | 13/20 | 12 / 28 | 0 | **admitted** |
 | Midtown | 3 (Wed) | fire-drill:full | 0.02 | `predictive-balanced` + spread at 0.43 | 8/8 | 18/20 | 0.683 | 16/20 | 12 / 28 | 2 | **admitted** |
 | Midtown | 4 (Thu) | none | 0.02 | `predictive-balanced` | 7/8 | 15/20 | 0.509 | 18/20 | 12 / 26 | 3 | **admitted** |
 | Midtown | 4 (Thu) | conference:full-floor | 0.02 | `auction` + spread at 0.43 | 5/8 | 13/20 | 0.408 | 20/20 | 13 / 26 | 4 | **admitted** |
 | Midtown | 5 (Fri) | none | 0.02 | `predictive-balanced` | 7/8 | 13/20 | 0.408 | 18/20 | 12 / 24 | 4 | **admitted** |
-| Midtown | 5 (Fri) | shaft-out:most-of-day | 0.02 | `fairness-first` + park at 0.2 | 0/8 | 0/20 | 0.000 | 20/20 | 32 / 24 | 0 | fails (c) queue out of reach, (a) no way through |
+| Midtown | 5 (Fri) | shaft-out:before-halfway | 0.02 | `predictive-balanced` | 7/8 | 13/20 | 0.408 | 18/20 | 12 / 24 | 4 | **admitted** (re-measured, § D1180) |
 | Midtown | 6 (Sat) | weekend | 0.02 | `fairness-first` + spread at 0.43 | 8/8 | 20/20 | 0.832 | 0/20 | 6 / 22 | 0 | **admitted** (breather) |
 | Midtown | 7 (Sun) | weekend-quiet | 0.02 | `fairness-first` | 8/8 | 20/20 | 0.832 | 0/20 | 6 / 20 | 0 | fails (b) asks nothing |
 | Secure Tower | 1 (Mon) | none | 0.11 | `auction-multi-round` + spread at 0.43 | 7/8 | 10/20 | 0.272 | 14/20 | 16 / 32 | 8 | fails (a) no way through |
@@ -1554,9 +1554,19 @@ queue bar is `goalsForDay`'s):
   all five unwrinkled weekdays are admitted, against 0 clears on days 3 to 5 at 0.11 in the swarm's
   measurement. With lane AJ-B's episodes in the tree the fire drill and the conference are admitted
   as well; Saturday is the declared breather and Sunday asks nothing.
-- **Two of Midtown's wrinkles are walls on the queue gate**: Tuesday's move-in, which since
-  [§ D1038](../DECISIONS.md) takes a second car beside the rung's, and Friday's shaft out. That is
-  the wrinkles' fabric, not the growth slope, and it is left for whoever balances the wrinkles.
+- **Two of Midtown's wrinkles were walls on the queue gate, and are not since
+  [§ D1180](../DECISIONS.md).** As first measured, Tuesday's move-in (`move-in:middle`, 0.25 to 0.75
+  of the shift) cleared 1 of 20 held-out crowds with the lowest peak queue 33 against a bar of 30,
+  and Friday's shaft out (`shaft-out:most-of-day`, 0 to 0.85) cleared 0 of 20 with 32 against 24.
+  Both took a second car across the 12:15 lunch peak while the rung already had car D out
+  10:30 to 13:00 (since [§ D1038](../DECISIONS.md) a booked car is spoken for). Swarm DM's ruling
+  moved the two windows off the peak, to 13:30 to 16:00 (0.55 to 0.8) and 09:00 to 12:00 (0.1 to
+  0.4) on a whole day, and this census re-measured both as dealt: the rows above. **Both moved
+  days' held-out verdicts equal the plain day's, crowd for crowd, for the chosen play and for the
+  standing order** (40 of 40 marks each), so the wrinkle now changes the run and the waits
+  (`shift/events.test.ts` holds that on the legs) and not the verdict, and no note may call either
+  day harder. With every weekday counted, Midtown's week reads 4 of 5 as dealt, and its target
+  cannot be met before Thursday.
 - **Secure Tower cannot be made to pass by its slope.** Its day 1, which no slope reaches, fails
   (a) at 10 of 20, and at slope 0 its day 5 still clears only 5 of 8 tuning crowds with half the
   screen missing on the queue alone. Its slope stays at the default and all five weekdays carry the

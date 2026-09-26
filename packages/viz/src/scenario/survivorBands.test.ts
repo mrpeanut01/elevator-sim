@@ -76,17 +76,23 @@ import type { PublishedSurvivorScenario, PublishedSurvivors } from './survivors.
  * earlier ways through were closed, and a table drawn on another seed could read stage 7 inside again
  * with nothing in the campaign moved.
  *
+ * **Re-read on 2026-09-26 after § D1183 put the stage page's own choices into the count**, which
+ * moved five rows. Stage 1 (12 of 39) and stage 6 (3 of 63) are now inside and leave the register.
+ * Stages 7 (18 of 63) and 8 (11 of 39) cross from below to **above**: the page's choices clear them
+ * at many prices, several free, which is the § D1183 re-authoring item (their budgets bind nothing)
+ * seen from the band. Stage 2 is still below at 5 of 39. Stages 3 (4 of 39) and 5 (2 of 62) stay
+ * inside, now with page survivors beside their dropdown ones. The paragraphs above are the dated
+ * record of the 2026-09-10 reading and are kept as that.
+ *
  * The owner approved the band as drafted on 2026-09-10, so every entry is a scenario outside an
  * approved band. If the band moves, this register moves with it on the same commit, and that is the
  * band moving rather than a scenario.
  */
 const OUTSIDE_THEIR_BAND: Readonly<Record<string, OutsideVerdict>> = Object.freeze({
-  'stage-1-first-call': 'below',
   'stage-2-morning-rush': 'below',
   'stage-4-two-banks': 'below',
-  'stage-6-the-tall-one': 'below',
-  'stage-7-prove-it': 'below',
-  'stage-8-the-headline-address': 'below',
+  'stage-7-prove-it': 'above',
+  'stage-8-the-headline-address': 'above',
   'stage-9-both-ways-at-once': 'below-over-suppressed-runs',
   'stage-10-the-bed-and-the-visitor': 'below-over-suppressed-runs',
 });

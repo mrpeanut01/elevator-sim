@@ -105,6 +105,35 @@ describe.skipIf(!HAS_BROWSER)('the week’s tower is a control a player can pres
     }
   }, 120_000);
 
+  it('draws Secure Tower’s scenario as held, with its reason, and the row still moves the week — § D1179', async () => {
+    /*
+     * Swarm DM's ruling (a): a tower whose week the census counts no day of has its scenario's
+     * clear held, and nothing else. So the reason is read where a player reads it, inside the row,
+     * and the row is pressed and required to move the week, which is what *nothing is locked* means
+     * on this surface.
+     */
+    const page = await atTheDoor();
+    try {
+      const held = page.locator('.everyday-door-tower[data-contract="c3"] .everyday-door-tower-scenario');
+      expect(await held.getAttribute('data-scenario')).toBe('held');
+      const reason = (await held.textContent()) ?? '';
+      expect(reason).toContain('held back');
+      expect(reason).toContain('have not been measured as they are dealt');
+      expect(reason).not.toMatch(/\b(cannot|unwinnable)\b|found none/iu);
+      await page.click('.everyday-door-tower[data-contract="c3"]');
+      await page.waitForSelector('.everyday-door-tower[data-contract="c3"][data-selected="true"]', {
+        timeout: 30_000,
+      });
+      expect(await selectedContract(page)).toBe('c3');
+      /* Harbour Point stays offered, and its row names its one counting day. */
+      const harbour = page.locator('.everyday-door-tower[data-contract="c9"] .everyday-door-tower-scenario');
+      expect(await harbour.getAttribute('data-scenario')).toBe('offered');
+      expect((await harbour.textContent()) ?? '').toContain('Monday');
+    } finally {
+      await page.close();
+    }
+  }, 120_000);
+
   it('moves the week to Crown Hotel when its row is pressed, and says so afterwards', async () => {
     /*
      * `c7` by name, because it is the contract the finding is about: the day whose verdict turns on

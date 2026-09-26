@@ -320,3 +320,119 @@ describe('R6: the drain clause reads the present frame and nothing after it', ()
     }
   });
 });
+
+/**
+ * **A scored day is paced by the tutorial's hold rule** — [§ D1169](../../../../DECISIONS.md), the
+ * decide-al ruling's Q1 clause 1. Fast while nobody on a landing has waited a minute, at the
+ * player's rung while somebody has, on the present frame only, peaks and slices included.
+ */
+describe('a scored day — § D1169', () => {
+  const scored = (t: number, over: Partial<StagePaceInput> = {}): StagePaceInput => inputAt(day, t, { scored: true, ...over });
+
+  /** The stretches somebody on a landing has waited past a minute — the rule's slow set, read off the legs. */
+  function heldSeconds(recording: VizRecording): number {
+    const spans: [number, number][] = [];
+    for (const leg of recording.legs) {
+      const left = leg.refusedAt ?? leg.boardedAt ?? recording.endedAt;
+      const from = leg.arrivedAt + PACE_HOLD_WAIT_S;
+      if (left > from) spans.push([from, left]);
+    }
+    spans.sort((a, b) => a[0] - b[0]);
+    let total = 0;
+    let cursor = -Infinity;
+    for (const [a, b] of spans) {
+      const from = Math.max(a, cursor);
+      if (b > from) total += b - from;
+      cursor = Math.max(cursor, b);
+    }
+    return total;
+  }
+
+  it('crosses a peak fast where nobody has waited a minute, and plays it at the player’s rung where somebody has', () => {
+    const [morning] = actsOf(day.demandPhases);
+    const inPeakQuiet = stagePaceOf(scored(morning!.startS + 60, { longestStandingS: 10 }));
+    expect(inPeakQuiet).toEqual({ simPerRealS: BETWEEN_PEAKS_SIM_PER_REAL_S, reason: 'fast' });
+    const inPeakHeld = stagePaceOf(scored(morning!.startS + 60, { longestStandingS: PACE_HOLD_WAIT_S }));
+    expect(inPeakHeld).toEqual({ simPerRealS: WATCHING, reason: 'watching' });
+    /* § D991's rule, the unscored path, still plays that peak at the player's rung. */
+    expect(stagePaceOf(inputAt(day, morning!.startS + 60, { longestStandingS: 10 })).reason).toBe('act');
+  });
+
+  it('paces a slice the same way, where § D991 left a slice at one rung', () => {
+    expect(stagePaceOf(scored(600, { horizon: 'period', longestStandingS: undefined })).reason).toBe('fast');
+    expect(stagePaceOf(scored(600, { horizon: 'period', longestStandingS: 75 })).reason).toBe('watching');
+    expect(stagePaceOf(inputAt(day, 600, { horizon: 'period' })).reason).toBe('unmanaged');
+  });
+
+  it('keeps a chip pressed while fast until somebody waits a minute, and a faster chosen rung throughout', () => {
+    expect(stagePaceOf(scored(9000, { playerChoseSpeedAtS: 8900, longestStandingS: 5 }))).toEqual({
+      simPerRealS: WATCHING,
+      reason: 'yours',
+    });
+    /* A wait past a minute outranks the chip; the stage clears the chip there (`stageScreen.ts#pace`). */
+    expect(stagePaceOf(scored(9000, { playerChoseSpeedAtS: 8900, longestStandingS: 61 })).reason).toBe('watching');
+    /* A rung faster than the fast rung is never slowed down. */
+    expect(stagePaceOf(scored(9000, { watchingSimPerRealS: 90, longestStandingS: undefined })).simPerRealS).toBe(90);
+  });
+
+  it('still stops for a pinned call', () => {
+    expect(stagePaceOf(scored(15_700, { callAtS: 15_700 })).reason).toBe('call');
+  });
+
+  it('says what it is doing in one line, from the present frame', () => {
+    const acts = actsOf(day.demandPhases);
+    expect(stagePaceNoteOf({ simPerRealS: 30, reason: 'fast' }, { acts, simTimeS: 0 })).toBe(
+      'fast-forwarding at 30× while nobody on a landing has waited a minute',
+    );
+    expect(stagePaceNoteOf({ simPerRealS: 4, reason: 'watching' }, { acts, simTimeS: 0 })).toBe(
+      'at your speed, 4×, while somebody on a landing has waited over a minute',
+    );
+    expect(stagePaceNoteOf({ simPerRealS: 4, reason: 'yours' }, { acts, simTimeS: 0 })).toBe(
+      'your speed, 4×, until somebody on a landing has waited a minute',
+    );
+  });
+
+  it('reads the present frame and nothing after it — R6', () => {
+    for (let t = 1200; t < day.endedAt; t += 1500) {
+      const cut = {
+        ...day,
+        legs: day.legs
+          .filter((leg) => leg.arrivedAt <= t)
+          .map((leg) => ({
+            ...leg,
+            boardedAt: leg.boardedAt !== undefined && leg.boardedAt <= t ? leg.boardedAt : undefined,
+            refusedAt: leg.refusedAt !== undefined && leg.refusedAt <= t ? leg.refusedAt : undefined,
+          })),
+      } as VizRecording;
+      expect(
+        stagePaceOf(scored(t, { longestStandingS: observationsAt(cut, t).longestCurrentWaitS })),
+        String(t),
+      ).toEqual(stagePaceOf(scored(t)));
+    }
+  });
+
+  it('plays Midtown’s whole day in the real transport in the time its held stretches predict, well under § D991’s', () => {
+    const clock = new ManualClock();
+    const playback = new Playback(day, clock, { speed: WATCHING, autoplay: true });
+    while (playback.state !== 'ended') {
+      const t = playback.simTimeS;
+      const answer = stagePaceOf(scored(t, { longestStandingS: waitBandsAt(day, t).longestCurrentWaitS }));
+      if (playback.speed !== answer.simPerRealS) playback.setSpeed(answer.simPerRealS);
+      clock.advance(FRAME_MS);
+    }
+    const realS = clock.now() / 1000;
+    const slowS = heldSeconds(day);
+    const predicted = pacedDayRealS({ periodS: 36000, recordedS: day.endedAt - day.startedAt, slowS }, WATCHING);
+    /*
+     * A pace change lands on the next half-second frame, which at 30× overshoots by up to fifteen
+     * simulated seconds, and this rule changes pace far more often than § D991's did (every time a
+     * landing crosses a minute, not four times a day), so the tolerance is a minute rather than half
+     * of one. A rule that disagreed with its own slow set would miss by many minutes.
+     */
+    expect(Math.abs(realS - predicted)).toBeLessThan(60);
+    /* § D991 read this seed at 2 415.5 real seconds; the acts are no longer slow of themselves. */
+    expect(realS).toBeLessThan(2415.5 - 5 * 60);
+    /* And no faster than the whole day crossed at the fast rung. */
+    expect(realS).toBeGreaterThanOrEqual((day.endedAt - day.startedAt) / BETWEEN_PEAKS_SIM_PER_REAL_S - 15);
+  });
+});

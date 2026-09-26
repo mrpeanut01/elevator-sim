@@ -31,6 +31,7 @@ import { patternIsDirty, specFromTrafficProfile } from '../authoring/patternSpec
 import { asBuiltChoices, withBankChoice } from '../commissioning/choices.js';
 import { commissionableClasses } from '../commissioning/types.js';
 import { recordRun } from '../record/recordRun.js';
+import { scheduledEventFor } from '../shift/calendar.js';
 import { contractById, contractForBuilding } from '../shift/contracts.js';
 import { goalsForDay } from '../shift/goals.js';
 import { SANDBOX_CONTRACT_ID, closeDay, outcomeOf } from '../shift/week.js';
@@ -268,8 +269,9 @@ describe('withBuilding', () => {
      * arriving through the campaign's front door: draw a two-floor tower with sixteen cars, run
      * clean days, clear the scenarios.
      *
-     * The negative control is the same three days on the scenario's **own** building, which must
+     * The negative control is the same four days on the scenario's **own** building, which must
      * still clear — otherwise this test would pass against a `closeDay` that had stopped banking.
+     * Four, because Midtown's census target is four of five since § D1180; three used to clear it.
      */
     const readings = (day: number): readonly GoalReading[] =>
       goalsForDay(day).map((goal) => ({
@@ -288,7 +290,11 @@ describe('withBuilding', () => {
           recordRefusal: null,
           day,
           dayIdx: (day - 1) % 7,
-          eventId: 'ordinary',
+          /*
+           * The wrinkle the day is dealt: since § D1176 only a day the week census measured as it
+           * is dealt counts toward Midtown’s target, and an `ordinary` Tuesday is not that day.
+           */
+          eventId: scheduledEventFor(null, day, (day - 1) % 7, 'whole-day').id,
           arrived: 40,
           carried: 40,
           minutePct: 100,
@@ -297,13 +303,13 @@ describe('withBuilding', () => {
       );
 
     let sandbox = withBuilding(drawnBuildingOnScenarioTwo(), resources, 'bld-1').week;
-    for (let day = 1; day <= 3; day += 1) sandbox = cleanDay(sandbox, day);
+    for (let day = 1; day <= 4; day += 1) sandbox = cleanDay(sandbox, day);
     expect(sandbox.cleared).toBeNull();
     expect(sandbox.completed).toEqual([]);
 
     let real = withBuilding(base(), resources, 'midtown-office').week;
     const contractId = real.contractId;
-    for (let day = 1; day <= 3; day += 1) real = cleanDay(real, day);
+    for (let day = 1; day <= 4; day += 1) real = cleanDay(real, day);
     expect(real.completed).toContain(contractId);
   });
 

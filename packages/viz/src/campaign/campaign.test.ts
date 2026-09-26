@@ -252,7 +252,7 @@ describe('every shipped goal came from the measured table', () => {
       expect(briefing.facts).toHaveLength(entry.configurationFacts.length);
       expect(briefing.withheld).toHaveLength(entry.withheld.length);
       /* `everyone-can-get-there` is published as withheld and must reach the reader as withheld. */
-      expect(briefing.withheld.join(' ')).toContain('everyone-can-get-there');
+      expect(briefing.withheld.join(' ')).toContain('everyone can reach their floor');
     }
   });
 });
@@ -276,6 +276,13 @@ describe('the guard fires — negative controls, applied to the shipped campaign
       });
     });
     expect(violations.join('\n')).toContain('is not in this stage\'s measured "goals" bucket');
+    /*
+     * § D1185: the author reads the kind's id, which is what `data/` is keyed by, with the player's
+     * name beside it rather than in its place (§ D1154 keeps the id in an author's error).
+     */
+    expect(violations.join('\n')).toContain(
+      'declares goal "nobody-abandoned" (shown to players as "nobody past the give-up line")',
+    );
   });
 
   it('catches a measured goal dropped by hand', () => {

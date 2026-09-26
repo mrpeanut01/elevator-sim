@@ -175,7 +175,17 @@ describe('every advertised length is the day the tile actually opens', () => {
     expect(top).toBeGreaterThan(90);
     expect(SITTING_SHAPES.contractDay).toContain(`${String(Math.floor(top / 60))} h`);
     expect(SITTING_SHAPES.contractDay).not.toContain('2 h 30');
-    expect(SITTING_SHAPES.contractDay).toContain(`between peaks at ${String(BETWEEN_PEAKS_SIM_PER_REAL_S)}×`);
+    expect(SITTING_SHAPES.contractDay).toContain(
+      `and ${String(BETWEEN_PEAKS_SIM_PER_REAL_S)}× wherever nobody on a landing has waited a minute`,
+    );
+    /*
+     * § D1169: every scored day is paced by the tutorial's rule, a slice included, so the short end
+     * is the floor — the shortest day crossed at the fast rung — and not the slice at one rung.
+     */
+    const low = SITTING_SPANS.contractDay.lowSimS;
+    expect(SITTING_SPANS.contractDay.scoredShortEnd).toBe(true);
+    expect(watchedRealS(SITTING_SPANS.contractDay, low, RUNG.simPerRealS)).toBe(low / BETWEEN_PEAKS_SIM_PER_REAL_S);
+    expect(SITTING_SHAPES.contractDay).toMatch(new RegExp(`^${String(Math.ceil(low / BETWEEN_PEAKS_SIM_PER_REAL_S / 60))} min-`, 'u'));
     expect(SITTING_SHAPES.contractDay).toContain('at most on the game’s own towers');
   });
 

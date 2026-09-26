@@ -142,6 +142,8 @@ function mountWeek(
       nameOf: (buildingId) => data.buildingById(buildingId)?.name,
       dayClosed,
       sheetStanding: data.lastReport() !== undefined,
+      /* The house's runs, measured by the shell when the week closes — § D1177. */
+      house: (day) => data.weekHouse(day),
     });
   }
 
@@ -158,6 +160,12 @@ function mountWeek(
     const streak = el(doc, 'div', 'everyday-week-streak', view.streakLine);
     streak.style.cssText = `${MONO(12.5, C.label)};margin-top:8px`;
     root.append(eyebrow, title, streak);
+    /* The week's target, *k of N* — § D1176. Only where the week census speaks for the tower. */
+    if (view.stake !== undefined) {
+      const stake = el(doc, 'p', 'everyday-week-stake', view.stake);
+      stake.style.cssText = `${BODY};margin:8px 0 0`;
+      root.append(stake);
+    }
 
     /* ---- the seven cards ---- */
     const strip = el(doc, 'div', 'everyday-week-strip');
@@ -216,6 +224,34 @@ function mountWeek(
     const readNote = el(doc, 'p', 'everyday-week-read-note', view.readNote);
     readNote.style.cssText = `${QUIET};margin:4px 0 0`;
     root.append(tally, readNote);
+    /* Each day on the strip that does not count, and why, in the brief's own sentence — § D1176. */
+    for (const entry of view.notCounted) {
+      const line = el(doc, 'p', 'everyday-week-not-counted', `${entry.weekday} · ${entry.sentence}`);
+      line.style.cssText = `${QUIET};margin:4px 0 0`;
+      root.append(line);
+    }
+
+    /* ---- the week's sheet at its close, beside the house — § D1177 ---- */
+    if (view.sheet !== undefined) {
+      const sheet = section(doc, view.sheet.heading);
+      sheet.body.className = 'everyday-week-sheet';
+      sheet.body.style.cssText = `${CARD};display:grid;gap:8px`;
+      for (const [cls, text] of [
+        ['everyday-week-sheet-yours', view.sheet.yoursLine],
+        ['everyday-week-sheet-house', view.sheet.houseLine],
+        ['everyday-week-sheet-target', view.sheet.targetLine],
+      ] as const) {
+        const line = el(doc, 'p', cls, text);
+        line.style.cssText = `${BODY};margin:0`;
+        sheet.body.append(line);
+      }
+      const note = el(doc, 'p', 'everyday-week-sheet-note', view.sheet.note);
+      note.style.cssText = `${QUIET};margin:0;max-width:74ch`;
+      const roll = el(doc, 'p', 'everyday-week-sheet-roll', view.sheet.rollLine);
+      roll.style.cssText = `${QUIET};margin:0;max-width:74ch`;
+      sheet.body.append(note, roll);
+      root.append(sheet.root);
+    }
 
     /* ---- where you landed today: your own withheld state, not the world's ---- */
     const percentile = el(doc, 'div', 'everyday-week-percentile');

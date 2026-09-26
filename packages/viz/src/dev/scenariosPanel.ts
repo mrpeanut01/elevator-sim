@@ -46,6 +46,7 @@ import { CONTRACTS, contractStatus, statLineOf } from '../shift/contracts.js';
 import { ladderTowersOf } from '../shift/ladder.js';
 import type { ContractStatus, ScenarioContract, WeekState } from '../shift/types.js';
 import { switchWeek } from '../shift/week.js';
+import { weekNeedOf, weekOfferOf } from '../shift/weekStake.js';
 
 import { el, fill } from './dom.js';
 import type { MountContext, Panel, ViewAt } from './mountTypes.js';
@@ -186,8 +187,14 @@ export interface ScenarioCardView {
   readonly brief: string;
   /** `6 floors · 2 cars · 0.63 m/s · 120 people` — `statLineOf`, never a literal. § 4.4. */
   readonly statLine: string;
-  /** `Clear 2 shifts — 1 of 2 banked`, or `Cleared`. */
+  /** `Clear 2 shifts — 1 of 2 banked`, `Cleared`, or {@link SCENARIO_HELD_OBJECTIVE}. */
   readonly objective: string;
+  /**
+   * The line under the objective where the week census has something to say about the offer — why
+   * the scenario is held, or which one day of its week counts. `shift/weekStake.ts#weekOfferOf`,
+   * [§ D1179](../../../../DECISIONS.md); `undefined` everywhere else.
+   */
+  readonly offerLine: string | undefined;
   /** What clearing it hands back. The contract's own sentence. */
   readonly reward: string;
   /** `Teaches zoning, and calls nobody may legally answer`. */
@@ -226,6 +233,12 @@ function statusDressing(status: ContractStatus): {
   }
 }
 
+/**
+ * The objective on a card whose scenario is held — [§ D1179](../../../../DECISIONS.md), § D1129's
+ * *Held back:* lead. The reason is {@link ScenarioCardView.offerLine}, drawn under it.
+ */
+export const SCENARIO_HELD_OBJECTIVE = 'Held back: this week offers no clear';
+
 /** `Clear 2 shifts — 1 of 2 banked`, the design's own sentence (`design.html` :2675). */
 function objectiveOf(
   contract: ScenarioContract,
@@ -233,14 +246,21 @@ function objectiveOf(
   status: ContractStatus,
 ): string {
   if (status === 'cleared') return 'Cleared';
-  const plural = contract.needClean === 1 ? '' : 's';
+  /*
+   * A census week that counts no day holds its scenario's clear — § D1179. The card stays a press:
+   * the week it opens runs and closes on its sheet, and only the clear is not offered.
+   */
+  if (weekOfferOf(contract.id)?.offer === 'held') return SCENARIO_HELD_OBJECTIVE;
+  /* The derived target where the week census speaks — § D1176, `weekStake.ts#weekNeedOf`. */
+  const need = weekNeedOf(contract);
+  const plural = need === 1 ? '' : 's';
   // SC-05 (§ D198): `cleanRun` can outrun `needClean` on a week that kept playing, and the line
   // would count "2 of 1". Clamped on the display only — the week's own count is not touched.
   const banked =
     status === 'current'
-      ? ` — ${String(Math.min(week.cleanRun, contract.needClean))} of ${String(contract.needClean)} banked`
+      ? ` — ${String(Math.min(week.cleanRun, need))} of ${String(need)} banked`
       : '';
-  return `Clear ${String(contract.needClean)} shift${plural}${banked}`;
+  return `Clear ${String(need)} shift${plural}${banked}`;
 }
 
 /**
@@ -272,6 +292,7 @@ export function scenarioCardsOf(
           statLineOf(building)
         : `no building “${contract.buildingId}” is loaded — nothing to describe`,
       objective: objectiveOf(contract, week, status),
+      offerLine: status === 'cleared' ? undefined : weekOfferOf(contract.id)?.line,
       /*
        * The design puts `'Teaches: ' + c.teaches` in this slot and `'Teaches ' + c.teaches` in the
        * next one, which prints the same sentence twice. `ScenarioContract` carries both a `reward`
@@ -442,6 +463,9 @@ export function mountScenarios(list: HTMLElement, context: MountContext): Panel 
       children: [
         el(doc, 'span', { text: card.statLine, style: { color: 'var(--dimmer)' } }),
         el(doc, 'span', { text: card.objective, style: { color: 'var(--accent-soft)' } }),
+        ...(card.offerLine === undefined
+          ? []
+          : [el(doc, 'span', { text: card.offerLine, style: { color: 'var(--dimmer)' } })]),
         el(doc, 'span', { text: card.reward, style: { color: 'var(--measured)' } }),
         el(doc, 'span', { text: card.teaches, style: { color: 'var(--dimmer)' } }),
       ],

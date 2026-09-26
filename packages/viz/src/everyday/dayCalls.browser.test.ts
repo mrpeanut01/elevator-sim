@@ -21,6 +21,12 @@
  * shipped session before this case was written (calls at 549 s and 1 174 s into the slice). A slice,
  * so each of the call's two runs takes a fraction of a second.
  *
+ * **Since wave AK the same day asks who drives in between** ([§ D1167](../../../../DECISIONS.md)):
+ * the candidate after the first call refuses the placement question and raises the driver
+ * question, so the second card the player meets asks *Who drives the rest of the day?*. The first
+ * case answers every call it meets, placement by *spread* then *park* and the driver question by
+ * *keep*, and holds the same claims over both kinds of card and both kinds of row.
+ *
  * Gate: without `ELEVATOR_SIM_CHROMIUM` every case here skips and the file reports a pass, which is
  * why the tier is run with it set and the case count is what is read. Port 5749. Both cases run at
  * the project's own timeout and add no annotation: measured at about 35 s each on a box at load 7.
@@ -79,12 +85,22 @@ async function waitForToday(page: Page): Promise<void> {
   );
 }
 
-/** Close the day from wherever the stage is, skipping what is left, and wait for the report. */
+/**
+ * Close the day from wherever the stage is, skipping what is left, and wait for the report. Since
+ * § D1151 a skip stops at each call it has not had an answer to, so it is pressed until the day
+ * has run out — each press with a card up is that call's answer, recorded as skipped.
+ */
 async function closeTheDay(page: Page): Promise<string> {
-  await page.evaluate(() => {
-    const skip = document.querySelector<HTMLButtonElement>('.everyday-stage-skip');
-    if (skip !== null && !skip.disabled) skip.click();
-  });
+  await page.waitForFunction(
+    () => {
+      const skip = document.querySelector<HTMLButtonElement>('.everyday-stage-skip');
+      if (skip === null || skip.disabled) return true;
+      skip.click();
+      return false;
+    },
+    undefined,
+    { timeout: 180_000, polling: 500 },
+  );
   await page.waitForFunction(
     () => (document.querySelector('.everyday-bar-primary')?.textContent ?? '').includes('Close the day'),
     undefined,
@@ -119,9 +135,9 @@ async function storedDay(page: Page, day: number): Promise<unknown> {
   );
 }
 
-/** A fresh page, its clock held on {@link DATE}, on Crown Hotel's day from the door's tower list. */
-async function onCrownsOrdinaryDay(page: Page): Promise<void> {
-  await page.clock.setFixedTime(new Date(`${DATE}T12:00:00Z`));
+/** A fresh page, its clock held on `date`, on Crown Hotel's day from the door's tower list. */
+async function onCrownsOrdinaryDay(page: Page, date: string = DATE): Promise<void> {
+  await page.clock.setFixedTime(new Date(`${date}T12:00:00Z`));
   await page.goto(origin, { waitUntil: 'load' });
   await page.waitForFunction(
     () => document.querySelector<HTMLElement>('.menu-overlay')?.hidden === true,
@@ -146,7 +162,10 @@ async function nextCall(page: Page): Promise<string> {
 }
 
 /** Answer the card on screen with `answer`, and wait for a press's run to be on the stage. */
-async function answer(page: Page, kind: 'park-cars-lobby' | 'spread-cars' | 'leave'): Promise<void> {
+async function answer(
+  page: Page,
+  kind: 'park-cars-lobby' | 'spread-cars' | 'leave' | 'driver-a' | 'driver-b',
+): Promise<void> {
   await page.locator(`.everyday-stage-call-answer[data-answer="${kind}"]`).click();
   await page.waitForSelector('.everyday-stage-call[hidden]', { state: 'attached', timeout: 60_000 });
 }
@@ -171,7 +190,8 @@ describe.skipIf(!HAS_BROWSER)('an ordinary day’s calls — § D1138', () => {
 
       /* ---- the first call: the card, its words, and nothing about the answers ---- */
       const first = await nextCall(page);
-      expect(first).toContain('What do the cars that are left do?');
+      /* § D1150: the question names cars that are left only where the card names a car that is out. */
+      expect(first).toContain(first.includes('out of passenger service') ? 'What do the cars that are left do?' : 'What do the cars do?');
       /* AJ-I's placement and focus, on an ordinary call: in the shell's scroller's view, and focused. */
       const placed = await page.evaluate(() => {
         const card = document.querySelector<HTMLElement>('.everyday-stage-call');
@@ -190,22 +210,49 @@ describe.skipIf(!HAS_BROWSER)('an ordinary day’s calls — § D1138', () => {
       expect(await textOf(page, '.everyday-stage-play'), 'the transport did not stop at the call').toContain('Play');
       await answer(page, 'spread-cars');
 
-      /* ---- the second call ---- */
-      const second = await nextCall(page);
-      expect(second).toContain('What do the cars that are left do?');
-      expect(second).not.toMatch(/\d+ with|Shift (cleared|missed)/u);
-      /* Still no row anywhere on the page before the close. */
-      expect(await page.locator('.everyday-report').count()).toBe(0);
-      await answer(page, 'park-cars-lobby');
+      /*
+       * ---- every later call: placement answered *park*, the driver question *keep* ----
+       *
+       * § D1167: the day now asks who drives between its placement calls, so the second card may ask
+       * either question. Each card is read for the same refusals before it is answered.
+       */
+      let placementsAnswered = 1;
+      let driversAnswered = 0;
+      for (let k = 0; k < 6; k += 1) {
+        const up = await page
+          .waitForSelector('.everyday-stage-call:not([hidden])', { timeout: 60_000 })
+          .then(() => true)
+          .catch(() => false);
+        if (!up) break;
+        const card = await textOf(page, '.everyday-stage-call');
+        expect(card).not.toMatch(/\d+ with|Shift (cleared|missed)|\bOn this crowd\b/u);
+        /* Still no row anywhere on the page before the close. */
+        expect(await page.locator('.everyday-report').count()).toBe(0);
+        if (card.includes('Who drives the rest of the day?')) {
+          expect(card).toMatch(/Switch to .+Switch to .+Keep .+ driving/u);
+          await answer(page, 'leave');
+          driversAnswered += 1;
+        } else {
+          expect(card).toContain(card.includes('out of passenger service') ? 'What do the cars that are left do?' : 'What do the cars do?');
+          await answer(page, 'park-cars-lobby');
+          placementsAnswered += 1;
+        }
+        if (placementsAnswered >= 2 && driversAnswered >= 1) break;
+      }
+      expect(placementsAnswered + driversAnswered, 'the day called fewer than twice').toBeGreaterThanOrEqual(2);
 
       /* ---- the close: one row per call, on this crowd, with its three counts ---- */
       const report = await closeTheDay(page);
-      const rows = report.match(/The stage called the day, and you/gu) ?? [];
-      expect(rows.length, report).toBeGreaterThanOrEqual(2);
+      const rows = report.match(/The stage (called the day|asked who drives), and you/gu) ?? [];
+      expect(rows.length, report).toBeGreaterThanOrEqual(placementsAnswered + driversAnswered);
       expect(report).toContain('you spread the cars across the tower');
-      expect(report).toContain('you parked the cars in the lobby');
       expect(report).toMatch(/On this crowd the day was run three ways from the call/u);
       expect(report).toMatch(/\d+ with park the cars in the lobby, \d+ with spread the cars across the tower and \d+ with leave them/u);
+      if (placementsAnswered >= 2) expect(report).toContain('you parked the cars in the lobby');
+      if (driversAnswered >= 1) {
+        expect(report).toMatch(/you kept Conventional collective driving/u);
+        expect(report).toMatch(/\d+ with .+ driving, \d+ with .+ driving and \d+ with Conventional collective still driving/u);
+      }
       expect(report).not.toContain(PRACTICE_NOTE);
     } finally {
       await page.close();
@@ -243,11 +290,59 @@ describe.skipIf(!HAS_BROWSER)('an ordinary day’s calls — § D1138', () => {
         .waitForSelector('.everyday-stage-call:not([hidden])', { timeout: 120_000 })
         .then(() => true)
         .catch(() => false);
-      if (called) await answer(page, 'park-cars-lobby');
+      if (called) {
+        const card = await textOf(page, '.everyday-stage-call');
+        await answer(page, card.includes('Who drives the rest of the day?') ? 'driver-a' : 'park-cars-lobby');
+      }
       const practice = await closeTheDay(page);
       expect(practice).toContain(PRACTICE_NOTE);
       expect(practice).toContain('practice');
       expect(await storedDay(page, 1), 'the retake changed the banked day').toEqual(banked);
+    } finally {
+      await page.close();
+    }
+  });
+
+  /*
+   * **No call once the day is lost, and *End the day*** — [§ D1168](../../../../DECISIONS.md).
+   *
+   * On **2026-10-05** Crown Hotel's day 1 as built reads its landing-queue or worst-wait goal missed
+   * by 960 s into the slice (measured in Node over the shipped goals, every thirty seconds, on the
+   * run a player who answers every call *leave them* keeps on the stage). From there the stage raises
+   * no call and offers *End the day*; pressed, it files the day, and the report says when.
+   */
+  it('offers End the day once a goal whose miss is final reads missed, raises nothing after it, and files the day', async () => {
+    const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
+    try {
+      await onCrownsOrdinaryDay(page, '2026-10-05');
+      expect(await page.locator('.everyday-stage-end-day:visible').count(), 'offered before the day began').toBe(0);
+      await page.locator('.everyday-stage-speed', { hasText: '30×' }).click();
+      await page.locator('.everyday-stage-start').click();
+      /* Every call on the way is answered *leave them*, so the run on the stage is the day as built. */
+      await page.waitForFunction(
+        () => {
+          const leave = document.querySelector<HTMLButtonElement>(
+            '.everyday-stage-call:not([hidden]) .everyday-stage-call-answer[data-answer="leave"]',
+          );
+          leave?.click();
+          return document.querySelector<HTMLElement>('.everyday-stage-end-day')?.checkVisibility() === true;
+        },
+        undefined,
+        { timeout: 180_000, polling: 100 },
+      );
+      const note = (await page.getAttribute('.everyday-stage-end-day', 'title')) ?? '';
+      expect(note).toMatch(/^The (landing-queue|worst-wait) goal is already past its bar, and it cannot come back under it today\./u);
+      expect(/\d/u.test(note), note).toBe(false);
+      const clock = await textOf(page, '.everyday-stage-clock');
+      /* From here the stage raises no call: none is drawn in the seconds the day plays on. */
+      await page.waitForTimeout(3000);
+      expect(await page.locator('.everyday-stage-call:not([hidden])').count(), 'a call after the day was lost').toBe(0);
+      await page.locator('.everyday-stage-end-day').click();
+      await page.waitForSelector('.everyday-report', { timeout: 60_000 });
+      const report = await textOf(page, '.everyday-report');
+      expect(report).toMatch(/You ended the day early, at \d{2}:\d{2}/u);
+      expect(report).toContain('the figures on this sheet are the whole day’s');
+      expect(clock).toMatch(/^\d{2}:\d{2}$/u);
     } finally {
       await page.close();
     }

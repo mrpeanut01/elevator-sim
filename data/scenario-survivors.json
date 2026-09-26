@@ -4,11 +4,11 @@
   "provenance": {
     "kind": "measured",
     "command": "ELEVATOR_SIM_SURVIVORS=deep ELEVATOR_SIM_REGENERATE_SURVIVORS=1 npx vitest run --project viz src/scenario/survivorSweep.test.ts",
-    "tree": "9bbbaf4",
-    "measuredAt": "2026-09-25",
+    "tree": "e4dd241",
+    "measuredAt": "2026-09-26",
     "masterSeed": 20260910,
     "sampleSize": 12,
-    "scope": "Every configuration is an edit of the scenario's own baseline dispatcher or a shipped profile picked in its place, priced by data/price-schedule.json. 10 of 37 priced changes can reach a scenario run at all — the rest price shafts, machines and fittings that campaign/stageRun.ts cannot apply — and 47 of 60 declared dimensions are priced, of which 46 are varied — weights.dutyMismatch is declared and priced by dispatch-rules, which covers dispatcher.weights, and is not varied on a building that declares no duty, which no scenario's building does, because a dial its building gives nothing to act on is not drawn (DECISIONS.md § D549) — and 13 are withheld from every scenario by data/price-schedule.json and varied by no configuration. A configuration differing only on an unpriced dimension is reachable at every rung, so counting it would make the budget inert.",
+    "scope": "Every configuration is an edit of the scenario's own baseline dispatcher or a shipped profile picked in its place, alone or with idle cars parked where the stage page offers, priced by data/price-schedule.json. 10 of 37 priced changes can reach a scenario run at all — the rest price shafts, machines and fittings that campaign/stageRun.ts cannot apply — and 47 of 60 declared dimensions are priced, of which 46 are varied — weights.dutyMismatch is declared and priced by dispatch-rules, which covers dispatcher.weights, and is not varied on a building that declares no duty, which no scenario's building does, because a dial its building gives nothing to act on is not drawn (DECISIONS.md § D549) — and 13 are withheld from every scenario by data/price-schedule.json and varied by no configuration. A configuration differing only on an unpriced dimension is reachable at every rung, so counting it would make the budget inert.",
     "reachableChangeIds": [
       "idle-parking",
       "dispatch-rules",
@@ -53,7 +53,7 @@
     "unpricedDimensionCount": 0,
     "withheldDimensionCount": 13,
     "declaredDimensionCount": 60,
-    "inputHash": "a5854accf77da535243635a2492eba5f730bdbc5b9abf707279d97a5e69a8364"
+    "inputHash": "f9e8fdbe314e30ce5d9d0367c843fbc8fd8459dee1e6bc3489339aaca292beef"
   },
   "scenarios": [
     {
@@ -81,17 +81,33 @@
           "stepId": null,
           "units": 4,
           "chimesSpent": 0,
-          "examined": 18,
-          "survivors": 1,
+          "examined": 39,
+          "survivors": 12,
           "survivorNames": [
-            "zoned-uppeak"
+            "zoned-uppeak",
+            "nearest-car-parked-zone-center",
+            "eta-parked-zone-center",
+            "eta-parked-predicted-demand",
+            "collective-parked-zone-center",
+            "collective-enroute-parked-zone-center",
+            "collective-enroute-parked-predicted-demand",
+            "fairness-first-parked-zone-center",
+            "fairness-first-parked-predicted-demand",
+            "capacity-aware-parked-zone-center",
+            "capacity-aware-parked-predicted-demand",
+            "zoned-uppeak-parked-predicted-demand"
           ],
           "unjudged": 0,
           "suppressed": 3,
           "unbuildable": 0,
+          "metOnTuning": 13,
           "dropdown": {
             "examined": 6,
             "survivors": 1
+          },
+          "page": {
+            "examined": 21,
+            "survivors": 11
           },
           "dials": {
             "examined": 12,
@@ -99,8 +115,8 @@
           },
           "perTier": {
             "dispatcher": {
-              "examined": 16,
-              "survivors": 1
+              "examined": 37,
+              "survivors": 12
             },
             "equipment": {
               "examined": 2,
@@ -124,17 +140,44 @@
           "stepId": "equipment-rung",
           "units": 24,
           "chimesSpent": 20,
-          "examined": 24,
-          "survivors": 1,
+          "examined": 63,
+          "survivors": 23,
           "survivorNames": [
-            "zoned-uppeak"
+            "zoned-uppeak",
+            "nearest-car-parked-zone-center",
+            "eta-parked-zone-center",
+            "eta-parked-predicted-demand",
+            "collective-parked-zone-center",
+            "collective-enroute-parked-zone-center",
+            "collective-enroute-parked-predicted-demand",
+            "energy-aware-parked-zone-center",
+            "energy-aware-parked-predicted-demand",
+            "fairness-first-parked-zone-center",
+            "fairness-first-parked-predicted-demand",
+            "capacity-aware-parked-zone-center",
+            "capacity-aware-parked-predicted-demand",
+            "predictive-balanced-parked-zone-center",
+            "auction-parked-zone-center",
+            "auction-parked-predicted-demand",
+            "auction-multi-round-parked-zone-center",
+            "auction-multi-round-parked-predicted-demand",
+            "zoned-uppeak-parked-predicted-demand",
+            "destination-eta-parked-zone-center",
+            "destination-eta-parked-predicted-demand",
+            "destination-panel-parked-zone-center",
+            "destination-panel-parked-predicted-demand"
           ],
           "unjudged": 0,
           "suppressed": 3,
           "unbuildable": 0,
+          "metOnTuning": 24,
           "dropdown": {
             "examined": 12,
             "survivors": 1
+          },
+          "page": {
+            "examined": 39,
+            "survivors": 22
           },
           "dials": {
             "examined": 12,
@@ -142,12 +185,12 @@
           },
           "perTier": {
             "dispatcher": {
-              "examined": 12,
-              "survivors": 1
+              "examined": 45,
+              "survivors": 19
             },
             "equipment": {
-              "examined": 12,
-              "survivors": 0
+              "examined": 18,
+              "survivors": 4
             }
           },
           "sampling": {
@@ -167,17 +210,44 @@
           "stepId": "building-rung",
           "units": 54,
           "chimesSpent": 50,
-          "examined": 24,
-          "survivors": 1,
+          "examined": 63,
+          "survivors": 23,
           "survivorNames": [
-            "zoned-uppeak"
+            "zoned-uppeak",
+            "nearest-car-parked-zone-center",
+            "eta-parked-zone-center",
+            "eta-parked-predicted-demand",
+            "collective-parked-zone-center",
+            "collective-enroute-parked-zone-center",
+            "collective-enroute-parked-predicted-demand",
+            "energy-aware-parked-zone-center",
+            "energy-aware-parked-predicted-demand",
+            "fairness-first-parked-zone-center",
+            "fairness-first-parked-predicted-demand",
+            "capacity-aware-parked-zone-center",
+            "capacity-aware-parked-predicted-demand",
+            "predictive-balanced-parked-zone-center",
+            "auction-parked-zone-center",
+            "auction-parked-predicted-demand",
+            "auction-multi-round-parked-zone-center",
+            "auction-multi-round-parked-predicted-demand",
+            "zoned-uppeak-parked-predicted-demand",
+            "destination-eta-parked-zone-center",
+            "destination-eta-parked-predicted-demand",
+            "destination-panel-parked-zone-center",
+            "destination-panel-parked-predicted-demand"
           ],
           "unjudged": 0,
           "suppressed": 4,
           "unbuildable": 0,
+          "metOnTuning": 24,
           "dropdown": {
             "examined": 12,
             "survivors": 1
+          },
+          "page": {
+            "examined": 39,
+            "survivors": 22
           },
           "dials": {
             "examined": 12,
@@ -185,12 +255,12 @@
           },
           "perTier": {
             "dispatcher": {
-              "examined": 18,
-              "survivors": 1
+              "examined": 51,
+              "survivors": 19
             },
             "equipment": {
-              "examined": 6,
-              "survivors": 0
+              "examined": 12,
+              "survivors": 4
             }
           },
           "sampling": {
@@ -233,15 +303,26 @@
           "stepId": null,
           "units": 4,
           "chimesSpent": 0,
-          "examined": 18,
-          "survivors": 0,
-          "survivorNames": [],
+          "examined": 39,
+          "survivors": 5,
+          "survivorNames": [
+            "eta-parked-lobby",
+            "fairness-first-parked-lobby",
+            "fairness-first-parked-zone-center",
+            "capacity-aware-parked-lobby",
+            "capacity-aware-parked-zone-center"
+          ],
           "unjudged": 0,
-          "suppressed": 6,
+          "suppressed": 15,
           "unbuildable": 0,
+          "metOnTuning": 7,
           "dropdown": {
             "examined": 6,
             "survivors": 0
+          },
+          "page": {
+            "examined": 21,
+            "survivors": 5
           },
           "dials": {
             "examined": 12,
@@ -249,8 +330,8 @@
           },
           "perTier": {
             "dispatcher": {
-              "examined": 15,
-              "survivors": 0
+              "examined": 36,
+              "survivors": 5
             },
             "equipment": {
               "examined": 3,
@@ -274,15 +355,29 @@
           "stepId": "equipment-rung",
           "units": 24,
           "chimesSpent": 20,
-          "examined": 24,
-          "survivors": 0,
-          "survivorNames": [],
+          "examined": 63,
+          "survivors": 8,
+          "survivorNames": [
+            "eta-parked-lobby",
+            "fairness-first-parked-lobby",
+            "fairness-first-parked-zone-center",
+            "capacity-aware-parked-lobby",
+            "capacity-aware-parked-zone-center",
+            "predictive-balanced-parked-lobby",
+            "auction-parked-lobby",
+            "destination-eta-parked-lobby"
+          ],
           "unjudged": 1,
-          "suppressed": 7,
+          "suppressed": 19,
           "unbuildable": 0,
+          "metOnTuning": 26,
           "dropdown": {
             "examined": 12,
             "survivors": 0
+          },
+          "page": {
+            "examined": 39,
+            "survivors": 8
           },
           "dials": {
             "examined": 12,
@@ -290,12 +385,12 @@
           },
           "perTier": {
             "dispatcher": {
-              "examined": 12,
-              "survivors": 0
+              "examined": 45,
+              "survivors": 7
             },
             "equipment": {
-              "examined": 12,
-              "survivors": 0
+              "examined": 18,
+              "survivors": 1
             }
           },
           "sampling": {
@@ -315,15 +410,29 @@
           "stepId": "building-rung",
           "units": 54,
           "chimesSpent": 50,
-          "examined": 24,
-          "survivors": 0,
-          "survivorNames": [],
+          "examined": 63,
+          "survivors": 8,
+          "survivorNames": [
+            "eta-parked-lobby",
+            "fairness-first-parked-lobby",
+            "fairness-first-parked-zone-center",
+            "capacity-aware-parked-lobby",
+            "capacity-aware-parked-zone-center",
+            "predictive-balanced-parked-lobby",
+            "auction-parked-lobby",
+            "destination-eta-parked-lobby"
+          ],
           "unjudged": 1,
-          "suppressed": 6,
+          "suppressed": 18,
           "unbuildable": 0,
+          "metOnTuning": 25,
           "dropdown": {
             "examined": 12,
             "survivors": 0
+          },
+          "page": {
+            "examined": 39,
+            "survivors": 8
           },
           "dials": {
             "examined": 12,
@@ -331,12 +440,12 @@
           },
           "perTier": {
             "dispatcher": {
-              "examined": 11,
-              "survivors": 0
+              "examined": 44,
+              "survivors": 7
             },
             "equipment": {
-              "examined": 13,
-              "survivors": 0
+              "examined": 19,
+              "survivors": 1
             }
           },
           "sampling": {
@@ -379,17 +488,25 @@
           "stepId": null,
           "units": 4,
           "chimesSpent": 0,
-          "examined": 18,
-          "survivors": 1,
+          "examined": 39,
+          "survivors": 4,
           "survivorNames": [
-            "fairness-first"
+            "fairness-first",
+            "fairness-first-parked-lobby",
+            "fairness-first-parked-zone-center",
+            "fairness-first-parked-predicted-demand"
           ],
           "unjudged": 0,
-          "suppressed": 18,
+          "suppressed": 39,
           "unbuildable": 0,
+          "metOnTuning": 4,
           "dropdown": {
             "examined": 6,
             "survivors": 1
+          },
+          "page": {
+            "examined": 21,
+            "survivors": 3
           },
           "dials": {
             "examined": 12,
@@ -397,8 +514,8 @@
           },
           "perTier": {
             "dispatcher": {
-              "examined": 16,
-              "survivors": 1
+              "examined": 37,
+              "survivors": 4
             },
             "equipment": {
               "examined": 2,
@@ -422,17 +539,25 @@
           "stepId": "equipment-rung",
           "units": 24,
           "chimesSpent": 20,
-          "examined": 24,
-          "survivors": 1,
+          "examined": 63,
+          "survivors": 4,
           "survivorNames": [
-            "fairness-first"
+            "fairness-first",
+            "fairness-first-parked-lobby",
+            "fairness-first-parked-zone-center",
+            "fairness-first-parked-predicted-demand"
           ],
           "unjudged": 0,
-          "suppressed": 24,
+          "suppressed": 63,
           "unbuildable": 0,
+          "metOnTuning": 4,
           "dropdown": {
             "examined": 12,
             "survivors": 1
+          },
+          "page": {
+            "examined": 39,
+            "survivors": 3
           },
           "dials": {
             "examined": 12,
@@ -440,11 +565,11 @@
           },
           "perTier": {
             "dispatcher": {
-              "examined": 12,
-              "survivors": 1
+              "examined": 45,
+              "survivors": 4
             },
             "equipment": {
-              "examined": 12,
+              "examined": 18,
               "survivors": 0
             }
           },
@@ -465,17 +590,25 @@
           "stepId": "building-rung",
           "units": 54,
           "chimesSpent": 50,
-          "examined": 24,
-          "survivors": 1,
+          "examined": 63,
+          "survivors": 4,
           "survivorNames": [
-            "fairness-first"
+            "fairness-first",
+            "fairness-first-parked-lobby",
+            "fairness-first-parked-zone-center",
+            "fairness-first-parked-predicted-demand"
           ],
           "unjudged": 0,
-          "suppressed": 24,
+          "suppressed": 63,
           "unbuildable": 0,
+          "metOnTuning": 4,
           "dropdown": {
             "examined": 12,
             "survivors": 1
+          },
+          "page": {
+            "examined": 39,
+            "survivors": 3
           },
           "dials": {
             "examined": 12,
@@ -483,11 +616,11 @@
           },
           "perTier": {
             "dispatcher": {
-              "examined": 12,
-              "survivors": 1
+              "examined": 45,
+              "survivors": 4
             },
             "equipment": {
-              "examined": 12,
+              "examined": 18,
               "survivors": 0
             }
           },
@@ -531,14 +664,19 @@
           "stepId": null,
           "units": 15,
           "chimesSpent": 0,
-          "examined": 23,
+          "examined": 62,
           "survivors": 0,
           "survivorNames": [],
           "unjudged": 0,
-          "suppressed": 4,
+          "suppressed": 17,
           "unbuildable": 1,
+          "metOnTuning": 16,
           "dropdown": {
             "examined": 12,
+            "survivors": 0
+          },
+          "page": {
+            "examined": 39,
             "survivors": 0
           },
           "dials": {
@@ -547,11 +685,11 @@
           },
           "perTier": {
             "dispatcher": {
-              "examined": 12,
+              "examined": 45,
               "survivors": 0
             },
             "equipment": {
-              "examined": 11,
+              "examined": 17,
               "survivors": 0
             }
           },
@@ -572,14 +710,19 @@
           "stepId": "equipment-rung",
           "units": 24,
           "chimesSpent": 9,
-          "examined": 24,
+          "examined": 63,
           "survivors": 0,
           "survivorNames": [],
           "unjudged": 0,
-          "suppressed": 4,
+          "suppressed": 17,
           "unbuildable": 0,
+          "metOnTuning": 15,
           "dropdown": {
             "examined": 12,
+            "survivors": 0
+          },
+          "page": {
+            "examined": 39,
             "survivors": 0
           },
           "dials": {
@@ -588,11 +731,11 @@
           },
           "perTier": {
             "dispatcher": {
-              "examined": 13,
+              "examined": 46,
               "survivors": 0
             },
             "equipment": {
-              "examined": 11,
+              "examined": 17,
               "survivors": 0
             }
           },
@@ -613,14 +756,19 @@
           "stepId": "building-rung",
           "units": 54,
           "chimesSpent": 39,
-          "examined": 24,
+          "examined": 63,
           "survivors": 0,
           "survivorNames": [],
           "unjudged": 0,
-          "suppressed": 5,
+          "suppressed": 18,
           "unbuildable": 0,
+          "metOnTuning": 15,
           "dropdown": {
             "examined": 12,
+            "survivors": 0
+          },
+          "page": {
+            "examined": 39,
             "survivors": 0
           },
           "dials": {
@@ -629,11 +777,11 @@
           },
           "perTier": {
             "dispatcher": {
-              "examined": 15,
+              "examined": 48,
               "survivors": 0
             },
             "equipment": {
-              "examined": 9,
+              "examined": 15,
               "survivors": 0
             }
           },
@@ -677,16 +825,22 @@
           "stepId": null,
           "units": 15,
           "chimesSpent": 0,
-          "examined": 23,
-          "survivors": 1,
+          "examined": 62,
+          "survivors": 2,
           "survivorNames": [
-            "predictive-balanced"
+            "predictive-balanced",
+            "predictive-balanced-parked-stay"
           ],
           "unjudged": 0,
-          "suppressed": 23,
+          "suppressed": 62,
           "unbuildable": 1,
+          "metOnTuning": 22,
           "dropdown": {
             "examined": 12,
+            "survivors": 1
+          },
+          "page": {
+            "examined": 39,
             "survivors": 1
           },
           "dials": {
@@ -695,11 +849,11 @@
           },
           "perTier": {
             "dispatcher": {
-              "examined": 20,
-              "survivors": 1
+              "examined": 53,
+              "survivors": 2
             },
             "equipment": {
-              "examined": 3,
+              "examined": 9,
               "survivors": 0
             }
           },
@@ -720,16 +874,22 @@
           "stepId": "equipment-rung",
           "units": 24,
           "chimesSpent": 9,
-          "examined": 24,
-          "survivors": 1,
+          "examined": 63,
+          "survivors": 2,
           "survivorNames": [
-            "predictive-balanced"
+            "predictive-balanced",
+            "predictive-balanced-parked-stay"
           ],
           "unjudged": 0,
-          "suppressed": 24,
+          "suppressed": 63,
           "unbuildable": 0,
+          "metOnTuning": 24,
           "dropdown": {
             "examined": 12,
+            "survivors": 1
+          },
+          "page": {
+            "examined": 39,
             "survivors": 1
           },
           "dials": {
@@ -738,11 +898,11 @@
           },
           "perTier": {
             "dispatcher": {
-              "examined": 13,
-              "survivors": 1
+              "examined": 46,
+              "survivors": 2
             },
             "equipment": {
-              "examined": 11,
+              "examined": 17,
               "survivors": 0
             }
           },
@@ -763,16 +923,22 @@
           "stepId": "building-rung",
           "units": 54,
           "chimesSpent": 39,
-          "examined": 24,
-          "survivors": 1,
+          "examined": 63,
+          "survivors": 2,
           "survivorNames": [
-            "predictive-balanced"
+            "predictive-balanced",
+            "predictive-balanced-parked-stay"
           ],
           "unjudged": 0,
-          "suppressed": 24,
+          "suppressed": 63,
           "unbuildable": 0,
+          "metOnTuning": 21,
           "dropdown": {
             "examined": 12,
+            "survivors": 1
+          },
+          "page": {
+            "examined": 39,
             "survivors": 1
           },
           "dials": {
@@ -781,11 +947,11 @@
           },
           "perTier": {
             "dispatcher": {
-              "examined": 16,
-              "survivors": 1
+              "examined": 49,
+              "survivors": 2
             },
             "equipment": {
-              "examined": 8,
+              "examined": 14,
               "survivors": 0
             }
           },
@@ -829,15 +995,24 @@
           "stepId": null,
           "units": 15,
           "chimesSpent": 0,
-          "examined": 24,
-          "survivors": 0,
-          "survivorNames": [],
+          "examined": 63,
+          "survivors": 3,
+          "survivorNames": [
+            "collective-parked-zone-center",
+            "capacity-aware-parked-zone-center",
+            "destination-eta-parked-zone-center"
+          ],
           "unjudged": 0,
           "suppressed": 3,
           "unbuildable": 0,
+          "metOnTuning": 9,
           "dropdown": {
             "examined": 12,
             "survivors": 0
+          },
+          "page": {
+            "examined": 39,
+            "survivors": 3
           },
           "dials": {
             "examined": 12,
@@ -845,12 +1020,12 @@
           },
           "perTier": {
             "dispatcher": {
-              "examined": 19,
-              "survivors": 0
+              "examined": 52,
+              "survivors": 2
             },
             "equipment": {
-              "examined": 5,
-              "survivors": 0
+              "examined": 11,
+              "survivors": 1
             }
           },
           "sampling": {
@@ -870,15 +1045,24 @@
           "stepId": "equipment-rung",
           "units": 24,
           "chimesSpent": 9,
-          "examined": 23,
-          "survivors": 0,
-          "survivorNames": [],
+          "examined": 62,
+          "survivors": 3,
+          "survivorNames": [
+            "collective-parked-zone-center",
+            "capacity-aware-parked-zone-center",
+            "destination-eta-parked-zone-center"
+          ],
           "unjudged": 0,
           "suppressed": 4,
           "unbuildable": 1,
+          "metOnTuning": 10,
           "dropdown": {
             "examined": 12,
             "survivors": 0
+          },
+          "page": {
+            "examined": 39,
+            "survivors": 3
           },
           "dials": {
             "examined": 11,
@@ -886,12 +1070,12 @@
           },
           "perTier": {
             "dispatcher": {
-              "examined": 14,
-              "survivors": 0
+              "examined": 47,
+              "survivors": 2
             },
             "equipment": {
-              "examined": 9,
-              "survivors": 0
+              "examined": 15,
+              "survivors": 1
             }
           },
           "sampling": {
@@ -911,15 +1095,24 @@
           "stepId": "building-rung",
           "units": 54,
           "chimesSpent": 39,
-          "examined": 24,
-          "survivors": 0,
-          "survivorNames": [],
+          "examined": 63,
+          "survivors": 3,
+          "survivorNames": [
+            "collective-parked-zone-center",
+            "capacity-aware-parked-zone-center",
+            "destination-eta-parked-zone-center"
+          ],
           "unjudged": 0,
           "suppressed": 2,
           "unbuildable": 0,
+          "metOnTuning": 9,
           "dropdown": {
             "examined": 12,
             "survivors": 0
+          },
+          "page": {
+            "examined": 39,
+            "survivors": 3
           },
           "dials": {
             "examined": 12,
@@ -927,12 +1120,12 @@
           },
           "perTier": {
             "dispatcher": {
-              "examined": 13,
-              "survivors": 0
+              "examined": 46,
+              "survivors": 2
             },
             "equipment": {
-              "examined": 11,
-              "survivors": 0
+              "examined": 17,
+              "survivors": 1
             }
           },
           "sampling": {
@@ -975,15 +1168,39 @@
           "stepId": null,
           "units": 15,
           "chimesSpent": 0,
-          "examined": 24,
-          "survivors": 0,
-          "survivorNames": [],
+          "examined": 63,
+          "survivors": 18,
+          "survivorNames": [
+            "eta-parked-lobby",
+            "eta-parked-zone-center",
+            "collective-parked-lobby",
+            "collective-enroute-parked-lobby",
+            "energy-aware-parked-lobby",
+            "fairness-first-parked-lobby",
+            "fairness-first-parked-zone-center",
+            "capacity-aware-parked-lobby",
+            "capacity-aware-parked-zone-center",
+            "predictive-balanced-parked-lobby",
+            "auction-parked-lobby",
+            "auction-parked-zone-center",
+            "auction-multi-round-parked-lobby",
+            "auction-multi-round-parked-zone-center",
+            "zoned-uppeak-parked-lobby",
+            "destination-eta-parked-lobby",
+            "destination-eta-parked-zone-center",
+            "destination-panel-parked-lobby"
+          ],
           "unjudged": 0,
           "suppressed": 1,
           "unbuildable": 0,
+          "metOnTuning": 19,
           "dropdown": {
             "examined": 12,
             "survivors": 0
+          },
+          "page": {
+            "examined": 39,
+            "survivors": 18
           },
           "dials": {
             "examined": 12,
@@ -991,12 +1208,12 @@
           },
           "perTier": {
             "dispatcher": {
-              "examined": 13,
-              "survivors": 0
+              "examined": 46,
+              "survivors": 15
             },
             "equipment": {
-              "examined": 11,
-              "survivors": 0
+              "examined": 17,
+              "survivors": 3
             }
           },
           "sampling": {
@@ -1016,15 +1233,39 @@
           "stepId": "equipment-rung",
           "units": 24,
           "chimesSpent": 9,
-          "examined": 24,
-          "survivors": 0,
-          "survivorNames": [],
+          "examined": 63,
+          "survivors": 18,
+          "survivorNames": [
+            "eta-parked-lobby",
+            "eta-parked-zone-center",
+            "collective-parked-lobby",
+            "collective-enroute-parked-lobby",
+            "energy-aware-parked-lobby",
+            "fairness-first-parked-lobby",
+            "fairness-first-parked-zone-center",
+            "capacity-aware-parked-lobby",
+            "capacity-aware-parked-zone-center",
+            "predictive-balanced-parked-lobby",
+            "auction-parked-lobby",
+            "auction-parked-zone-center",
+            "auction-multi-round-parked-lobby",
+            "auction-multi-round-parked-zone-center",
+            "zoned-uppeak-parked-lobby",
+            "destination-eta-parked-lobby",
+            "destination-eta-parked-zone-center",
+            "destination-panel-parked-lobby"
+          ],
           "unjudged": 0,
           "suppressed": 2,
           "unbuildable": 0,
+          "metOnTuning": 19,
           "dropdown": {
             "examined": 12,
             "survivors": 0
+          },
+          "page": {
+            "examined": 39,
+            "survivors": 18
           },
           "dials": {
             "examined": 12,
@@ -1032,12 +1273,12 @@
           },
           "perTier": {
             "dispatcher": {
-              "examined": 15,
-              "survivors": 0
+              "examined": 48,
+              "survivors": 15
             },
             "equipment": {
-              "examined": 9,
-              "survivors": 0
+              "examined": 15,
+              "survivors": 3
             }
           },
           "sampling": {
@@ -1057,15 +1298,39 @@
           "stepId": "building-rung",
           "units": 54,
           "chimesSpent": 39,
-          "examined": 24,
-          "survivors": 0,
-          "survivorNames": [],
+          "examined": 63,
+          "survivors": 18,
+          "survivorNames": [
+            "eta-parked-lobby",
+            "eta-parked-zone-center",
+            "collective-parked-lobby",
+            "collective-enroute-parked-lobby",
+            "energy-aware-parked-lobby",
+            "fairness-first-parked-lobby",
+            "fairness-first-parked-zone-center",
+            "capacity-aware-parked-lobby",
+            "capacity-aware-parked-zone-center",
+            "predictive-balanced-parked-lobby",
+            "auction-parked-lobby",
+            "auction-parked-zone-center",
+            "auction-multi-round-parked-lobby",
+            "auction-multi-round-parked-zone-center",
+            "zoned-uppeak-parked-lobby",
+            "destination-eta-parked-lobby",
+            "destination-eta-parked-zone-center",
+            "destination-panel-parked-lobby"
+          ],
           "unjudged": 0,
           "suppressed": 0,
           "unbuildable": 0,
+          "metOnTuning": 18,
           "dropdown": {
             "examined": 12,
             "survivors": 0
+          },
+          "page": {
+            "examined": 39,
+            "survivors": 18
           },
           "dials": {
             "examined": 12,
@@ -1073,12 +1338,12 @@
           },
           "perTier": {
             "dispatcher": {
-              "examined": 12,
-              "survivors": 0
+              "examined": 45,
+              "survivors": 15
             },
             "equipment": {
-              "examined": 12,
-              "survivors": 0
+              "examined": 18,
+              "survivors": 3
             }
           },
           "sampling": {
@@ -1121,15 +1386,32 @@
           "stepId": null,
           "units": 4,
           "chimesSpent": 0,
-          "examined": 18,
-          "survivors": 0,
-          "survivorNames": [],
+          "examined": 39,
+          "survivors": 11,
+          "survivorNames": [
+            "eta-parked-lobby",
+            "eta-parked-zone-center",
+            "collective-parked-lobby",
+            "collective-parked-zone-center",
+            "collective-enroute-parked-lobby",
+            "collective-enroute-parked-zone-center",
+            "fairness-first-parked-lobby",
+            "fairness-first-parked-zone-center",
+            "capacity-aware-parked-lobby",
+            "capacity-aware-parked-zone-center",
+            "zoned-uppeak-parked-lobby"
+          ],
           "unjudged": 0,
           "suppressed": 1,
           "unbuildable": 0,
+          "metOnTuning": 15,
           "dropdown": {
             "examined": 6,
             "survivors": 0
+          },
+          "page": {
+            "examined": 21,
+            "survivors": 11
           },
           "dials": {
             "examined": 12,
@@ -1137,8 +1419,8 @@
           },
           "perTier": {
             "dispatcher": {
-              "examined": 14,
-              "survivors": 0
+              "examined": 35,
+              "survivors": 11
             },
             "equipment": {
               "examined": 4,
@@ -1162,15 +1444,42 @@
           "stepId": "equipment-rung",
           "units": 24,
           "chimesSpent": 20,
-          "examined": 24,
-          "survivors": 0,
-          "survivorNames": [],
+          "examined": 63,
+          "survivors": 21,
+          "survivorNames": [
+            "eta-parked-lobby",
+            "eta-parked-zone-center",
+            "collective-parked-lobby",
+            "collective-parked-zone-center",
+            "collective-enroute-parked-lobby",
+            "collective-enroute-parked-zone-center",
+            "energy-aware-parked-lobby",
+            "fairness-first-parked-lobby",
+            "fairness-first-parked-zone-center",
+            "capacity-aware-parked-lobby",
+            "capacity-aware-parked-zone-center",
+            "predictive-balanced-parked-lobby",
+            "auction-parked-lobby",
+            "auction-parked-zone-center",
+            "auction-multi-round-parked-lobby",
+            "auction-multi-round-parked-zone-center",
+            "zoned-uppeak-parked-lobby",
+            "destination-eta-parked-lobby",
+            "destination-eta-parked-zone-center",
+            "destination-panel-parked-lobby",
+            "destination-panel-parked-zone-center"
+          ],
           "unjudged": 0,
           "suppressed": 2,
           "unbuildable": 0,
+          "metOnTuning": 25,
           "dropdown": {
             "examined": 12,
             "survivors": 0
+          },
+          "page": {
+            "examined": 39,
+            "survivors": 21
           },
           "dials": {
             "examined": 12,
@@ -1178,12 +1487,12 @@
           },
           "perTier": {
             "dispatcher": {
-              "examined": 15,
-              "survivors": 0
+              "examined": 48,
+              "survivors": 17
             },
             "equipment": {
-              "examined": 9,
-              "survivors": 0
+              "examined": 15,
+              "survivors": 4
             }
           },
           "sampling": {
@@ -1203,15 +1512,42 @@
           "stepId": "building-rung",
           "units": 54,
           "chimesSpent": 50,
-          "examined": 24,
-          "survivors": 0,
-          "survivorNames": [],
+          "examined": 63,
+          "survivors": 21,
+          "survivorNames": [
+            "eta-parked-lobby",
+            "eta-parked-zone-center",
+            "collective-parked-lobby",
+            "collective-parked-zone-center",
+            "collective-enroute-parked-lobby",
+            "collective-enroute-parked-zone-center",
+            "energy-aware-parked-lobby",
+            "fairness-first-parked-lobby",
+            "fairness-first-parked-zone-center",
+            "capacity-aware-parked-lobby",
+            "capacity-aware-parked-zone-center",
+            "predictive-balanced-parked-lobby",
+            "auction-parked-lobby",
+            "auction-parked-zone-center",
+            "auction-multi-round-parked-lobby",
+            "auction-multi-round-parked-zone-center",
+            "zoned-uppeak-parked-lobby",
+            "destination-eta-parked-lobby",
+            "destination-eta-parked-zone-center",
+            "destination-panel-parked-lobby",
+            "destination-panel-parked-zone-center"
+          ],
           "unjudged": 0,
           "suppressed": 3,
           "unbuildable": 0,
+          "metOnTuning": 25,
           "dropdown": {
             "examined": 12,
             "survivors": 0
+          },
+          "page": {
+            "examined": 39,
+            "survivors": 21
           },
           "dials": {
             "examined": 12,
@@ -1219,12 +1555,12 @@
           },
           "perTier": {
             "dispatcher": {
-              "examined": 14,
-              "survivors": 0
+              "examined": 47,
+              "survivors": 17
             },
             "equipment": {
-              "examined": 10,
-              "survivors": 0
+              "examined": 16,
+              "survivors": 4
             }
           },
           "sampling": {
@@ -1267,14 +1603,19 @@
           "stepId": null,
           "units": 15,
           "chimesSpent": 0,
-          "examined": 24,
+          "examined": 63,
           "survivors": 0,
           "survivorNames": [],
           "unjudged": 0,
-          "suppressed": 24,
+          "suppressed": 63,
           "unbuildable": 0,
+          "metOnTuning": 0,
           "dropdown": {
             "examined": 12,
+            "survivors": 0
+          },
+          "page": {
+            "examined": 39,
             "survivors": 0
           },
           "dials": {
@@ -1283,11 +1624,11 @@
           },
           "perTier": {
             "dispatcher": {
-              "examined": 19,
+              "examined": 52,
               "survivors": 0
             },
             "equipment": {
-              "examined": 5,
+              "examined": 11,
               "survivors": 0
             }
           },
@@ -1308,14 +1649,19 @@
           "stepId": "equipment-rung",
           "units": 24,
           "chimesSpent": 9,
-          "examined": 24,
+          "examined": 63,
           "survivors": 0,
           "survivorNames": [],
           "unjudged": 0,
-          "suppressed": 24,
+          "suppressed": 63,
           "unbuildable": 0,
+          "metOnTuning": 0,
           "dropdown": {
             "examined": 12,
+            "survivors": 0
+          },
+          "page": {
+            "examined": 39,
             "survivors": 0
           },
           "dials": {
@@ -1324,11 +1670,11 @@
           },
           "perTier": {
             "dispatcher": {
-              "examined": 14,
+              "examined": 47,
               "survivors": 0
             },
             "equipment": {
-              "examined": 10,
+              "examined": 16,
               "survivors": 0
             }
           },
@@ -1349,14 +1695,19 @@
           "stepId": "building-rung",
           "units": 54,
           "chimesSpent": 39,
-          "examined": 24,
+          "examined": 63,
           "survivors": 0,
           "survivorNames": [],
           "unjudged": 0,
-          "suppressed": 24,
+          "suppressed": 63,
           "unbuildable": 0,
+          "metOnTuning": 0,
           "dropdown": {
             "examined": 12,
+            "survivors": 0
+          },
+          "page": {
+            "examined": 39,
             "survivors": 0
           },
           "dials": {
@@ -1365,11 +1716,11 @@
           },
           "perTier": {
             "dispatcher": {
-              "examined": 15,
+              "examined": 48,
               "survivors": 0
             },
             "equipment": {
-              "examined": 9,
+              "examined": 15,
               "survivors": 0
             }
           },
@@ -1413,14 +1764,19 @@
           "stepId": null,
           "units": 15,
           "chimesSpent": 0,
-          "examined": 24,
+          "examined": 63,
           "survivors": 0,
           "survivorNames": [],
           "unjudged": 0,
-          "suppressed": 24,
+          "suppressed": 63,
           "unbuildable": 0,
+          "metOnTuning": 0,
           "dropdown": {
             "examined": 12,
+            "survivors": 0
+          },
+          "page": {
+            "examined": 39,
             "survivors": 0
           },
           "dials": {
@@ -1429,11 +1785,11 @@
           },
           "perTier": {
             "dispatcher": {
-              "examined": 18,
+              "examined": 51,
               "survivors": 0
             },
             "equipment": {
-              "examined": 6,
+              "examined": 12,
               "survivors": 0
             }
           },
@@ -1454,14 +1810,19 @@
           "stepId": "equipment-rung",
           "units": 24,
           "chimesSpent": 9,
-          "examined": 24,
+          "examined": 63,
           "survivors": 0,
           "survivorNames": [],
           "unjudged": 0,
-          "suppressed": 24,
+          "suppressed": 63,
           "unbuildable": 0,
+          "metOnTuning": 0,
           "dropdown": {
             "examined": 12,
+            "survivors": 0
+          },
+          "page": {
+            "examined": 39,
             "survivors": 0
           },
           "dials": {
@@ -1470,11 +1831,11 @@
           },
           "perTier": {
             "dispatcher": {
-              "examined": 14,
+              "examined": 47,
               "survivors": 0
             },
             "equipment": {
-              "examined": 10,
+              "examined": 16,
               "survivors": 0
             }
           },
@@ -1495,14 +1856,19 @@
           "stepId": "building-rung",
           "units": 54,
           "chimesSpent": 39,
-          "examined": 24,
+          "examined": 63,
           "survivors": 0,
           "survivorNames": [],
           "unjudged": 0,
-          "suppressed": 24,
+          "suppressed": 63,
           "unbuildable": 0,
+          "metOnTuning": 0,
           "dropdown": {
             "examined": 12,
+            "survivors": 0
+          },
+          "page": {
+            "examined": 39,
             "survivors": 0
           },
           "dials": {
@@ -1511,11 +1877,11 @@
           },
           "perTier": {
             "dispatcher": {
-              "examined": 16,
+              "examined": 49,
               "survivors": 0
             },
             "equipment": {
-              "examined": 8,
+              "examined": 14,
               "survivors": 0
             }
           },

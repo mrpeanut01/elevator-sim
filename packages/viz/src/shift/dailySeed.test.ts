@@ -200,9 +200,9 @@ describe('the rotation rules `docs/37` § 4.3 states, measured rather than assum
      */
     expect(
       FIRST_DAY_CONTRACT_IDS,
-      'dailySeed.ts publishes its two figures measured over these six contracts — re-measure and ' +
+      'dailySeed.ts publishes its two figures measured over this one contract — re-measure and ' +
         'move both if the first-day set has changed',
-    ).toEqual(['c2', 'c3', 'c6', 'c7', 'c8', 'c10']);
+    ).toEqual(['c2']);
 
     const draws = twoYearsOfDraws();
     const lastSeenAt = new Map<string, number>();
@@ -239,10 +239,14 @@ describe('the rotation rules `docs/37` § 4.3 states, measured rather than assum
      * is not built — one draw per device, so no rotation has an observer — is unchanged by the
      * set's size, and the figure is published so issue #159's generator inherits it as a measurement.
      */
-    expect(insideSeven).toBe(483);
-    expect(consecutive).toBe(119);
-    // 483 / 730 = 66.2 %, the figure `dailySeed.ts`'s docstring publishes.
-    expect(Math.round((1000 * insideSeven) / draws.length) / 10).toBe(66.2);
+    /*
+     * **And to the ceiling on 2026-09-26** — [§ D1178](../../../../DECISIONS.md): the week census's
+     * filter left one member, so every date after the first repeats it. 483 and 119 before.
+     */
+    expect(insideSeven).toBe(729);
+    expect(consecutive).toBe(729);
+    // 729 / 730 = 99.9 %, the figure `dailySeed.ts`'s docstring publishes.
+    expect(Math.round((1000 * insideSeven) / draws.length) / 10).toBe(99.9);
   });
 
   it('draws only from the first-day set, whatever the date — and reaches every member', () => {

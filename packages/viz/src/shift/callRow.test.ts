@@ -90,6 +90,27 @@ describe('the call row', () => {
     }
   });
 
+  /*
+   * § D1151, the post-AJ panel's seat D (H1): a player who pressed *Skip to the end* with the card
+   * up was told *nothing was pressed*, which is what *leave them* files too. The row says the day
+   * was skipped, in the ordinary call row's own words, and the pinned verdicts are unchanged.
+   */
+  it('says the call was skipped when it was, and only then', () => {
+    const skipped = pressCallRowOf(
+      { press: PRESS, call: CALL, interventions: [], nameOf: (id) => names[id], skipped: true },
+      clock,
+    );
+    expect(skipped?.what).toBe('The stage called the day, and the day was skipped to its end');
+    expect(skipped?.what).not.toContain('nothing was pressed');
+    expect(skipped?.why).toBe(rowOf([])?.why);
+    /* A press at the call is an answer, whatever the flag says. */
+    const pressed = pressCallRowOf(
+      { press: PRESS, call: CALL, interventions: at(CALL.atS, 'spread-cars'), nameOf: (id) => names[id], skipped: true },
+      clock,
+    );
+    expect(pressed?.what).toContain('you spread');
+  });
+
   it('says none of § D982’s words, and no mechanism or cross-crowd word', () => {
     for (const [arm, row] of ARMS) {
       const text = `${row?.what ?? ''} ${row?.why ?? ''}`;

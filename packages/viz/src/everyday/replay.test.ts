@@ -133,7 +133,7 @@ describe('a replay meets the crowd its day had, not the crowd standing now', () 
   const recorded = (day: number, dayIdx: number, seed: bigint, shiftLengthS: number): DayOutcome => ({
     ...outcome(day, dayIdx),
     record: {
-      version: 2,
+      version: 3,
       seed: seed.toString(),
       buildingId: baseState().buildingId,
       dispatcherId: baseState().dispatcherId,
@@ -147,6 +147,7 @@ describe('a replay meets the crowd its day had, not the crowd standing now', () 
       outOfServiceCarIds: [],
       interventions: [],
       ruleRows: [],
+      rungContractId: null,
     } as unknown as WatchRecord,
     recordRefusal: null,
   });

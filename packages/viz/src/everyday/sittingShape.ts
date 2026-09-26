@@ -117,6 +117,14 @@ export interface SittingSpan {
    * than `periodS / rung`. Absent on every span that plays at one rung, which is all the others.
    */
   readonly pacedDay?: PacedDay | undefined;
+  /**
+   * **Present when the span's short end is a scored day the stage paces** — [§ D1169](../../../../DECISIONS.md).
+   * Since wave AK every scored day, a slice as much as a whole day, is played at the watching rung
+   * only while somebody on a landing has waited a minute and at the fast rung otherwise, so how
+   * long its short end takes to watch depends on the run. What can be derived without the run is
+   * the floor: the whole span crossed at the fast rung. The short end is quoted as that floor.
+   */
+  readonly scoredShortEnd?: boolean | undefined;
 }
 
 /**
@@ -173,11 +181,14 @@ function spanOf(values: readonly number[], source: string): SittingSpan {
 /** The union of two spans — the shortest sitting either offers to the longest either offers. */
 function unionOf(left: SittingSpan, right: SittingSpan): SittingSpan {
   const pacedDay = left.pacedDay ?? right.pacedDay;
+  /* The short end is the shorter span's, so its pacing comes with it (§ D1169). */
+  const scoredShortEnd = (left.lowSimS <= right.lowSimS ? left : right).scoredShortEnd === true;
   return Object.freeze({
     lowSimS: Math.min(left.lowSimS, right.lowSimS),
     highSimS: Math.max(left.highSimS, right.highSimS),
     source: `${left.source}; ${right.source}`,
     ...(pacedDay === undefined ? {} : { pacedDay }),
+    ...(scoredShortEnd ? { scoredShortEnd } : {}),
   });
 }
 
@@ -186,9 +197,12 @@ function unionOf(left: SittingSpan, right: SittingSpan): SittingSpan {
  * day the stage paces, which is {@link pacedDayRealS}.
  */
 export function watchedRealS(span: SittingSpan, simS: number, simPerRealS: number): number {
-  return span.pacedDay !== undefined && simS === span.pacedDay.periodS
-    ? pacedDayRealS(span.pacedDay, simPerRealS)
-    : simS / simPerRealS;
+  if (span.pacedDay !== undefined && simS === span.pacedDay.periodS) return pacedDayRealS(span.pacedDay, simPerRealS);
+  /* § D1169: a scored day's short end, crossed at the fast rung at best — the floor, not a figure. */
+  if (span.scoredShortEnd === true && simS === span.lowSimS) {
+    return simS / Math.max(simPerRealS, BETWEEN_PEAKS_SIM_PER_REAL_S);
+  }
+  return simS / simPerRealS;
 }
 
 /**
@@ -226,6 +240,15 @@ const AUTHORED_DAY_PERIOD_S = 36000;
  * ruling's *about forty* is true of the game's towers and false of the reference towers, and a tile
  * that published it would be § D946's defect one axis over. The sweep refuses this constant at the
  * published budget the day a fresh measurement disagrees.
+ */
+/*
+ * **Both constants below were measured under § D991's rule, and since [§ D1169](../../../../DECISIONS.md)
+ * they are upper bounds rather than the longest day.** § D991 played a whole day's acts at the
+ * watching rung and § D1169 does not: its slow set is only the stretches with somebody past a minute
+ * on a landing, which § D991's slow set contains on every recording. So on the same recording a
+ * scored day never takes longer to watch than § D991 took, and a figure quoted as *at most* stays
+ * true. It is no longer the longest day, and the re-measurement over sixteen contracts × fifty seeds
+ * (hours of reference-tower runs) was not taken in wave AK; that is recorded in § D1169.
  */
 export const WHOLE_DAY_LONGEST: PacedDay = Object.freeze({
   periodS: AUTHORED_DAY_PERIOD_S,
@@ -287,7 +310,14 @@ export const SITTING_SPANS = Object.freeze({
    * Quoting the slice alone is what shipped.
    */
   contractDay: unionOf(
-    spanOf(CONTRACTS.map(contractRunLengthS), 'packages/viz/src/shift/contracts.ts'),
+    /*
+     * § D1169: a slice is a scored day too, paced by the tutorial's rule, so its short end is the
+     * floor a slice nobody waits a minute on would take, rather than the slice at one rung.
+     */
+    Object.freeze({
+      ...spanOf(CONTRACTS.map(contractRunLengthS), 'packages/viz/src/shift/contracts.ts'),
+      scoredShortEnd: true,
+    }),
     Object.freeze({
       ...spanOf([AUTHORED_DAY_PERIOD_S], 'data/traffic-profiles.json, through shift/dayLength.ts#wholeDayFor'),
       /*
@@ -394,10 +424,8 @@ export function sittingLengthPhrase(span: SittingSpan, noun = ''): string {
   const highRealS = watchedRealS(span, span.highSimS, rung.simPerRealS);
   if (highRealS < 60) return `under a minute${of} at ${rung.label}`;
   /* One rounding, up, whichever way the end is watched — rule 2. A paced whole day is § D991's. */
-  const minutesOf = (simS: number): number =>
-    span.pacedDay !== undefined && simS === span.pacedDay.periodS
-      ? Math.ceil(pacedDayRealS(span.pacedDay, rung.simPerRealS) / 60)
-      : sittingMinutes(simS, rung.simPerRealS);
+  /* Real seconds at one real second a second, so `sittingMinutes`' ceiling is the only rounding. */
+  const minutesOf = (simS: number): number => sittingMinutes(watchedRealS(span, simS, rung.simPerRealS), 1);
   const low = minutesOf(span.lowSimS);
   const high = minutesOf(span.highSimS);
   const figure =
@@ -464,7 +492,7 @@ export const SITTING_SHAPES = Object.freeze({
    * one of the game's own towers read a figure more than twice what they will watch: the second
    * clause is {@link WHOLE_DAY_LONGEST_GAME_TOWER}, measured on the same sweep.
    */
-  contractDay: `${sittingLengthPhrase(SITTING_SPANS.contractDay, 'a day')}, the hours between peaks at ${betweenRungLabel()}; ${String(Math.ceil(pacedDayRealS(WHOLE_DAY_LONGEST_GAME_TOWER, openingRung().simPerRealS) / 60))} min at most on the game’s own towers — the long end is a reference tower’s · no losing — a day is a score, not a pass`,
+  contractDay: `${sittingLengthPhrase(SITTING_SPANS.contractDay, 'a day')}, and ${betweenRungLabel()} wherever nobody on a landing has waited a minute; ${String(Math.ceil(pacedDayRealS(WHOLE_DAY_LONGEST_GAME_TOWER, openingRung().simPerRealS) / 60))} min at most on the game’s own towers — the long end is a reference tower’s · no losing — a day is a score, not a pass`,
   /** The hub's *Fix a building* row. */
   fixCase: `${sittingLengthPhrase(SITTING_SPANS.fixCase, 'a case')}, skippable · retry as often as you like`,
 });

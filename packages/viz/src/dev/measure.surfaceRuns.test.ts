@@ -95,7 +95,7 @@ import { fixitRunPlanOf } from '../fixit/run.js';
 import type { FixitCase, FixitState } from '../fixit/types.js';
 import { MAX_CHALLENGE_SEEDS, challengeRunConfigs, type ChallengeView } from '../menu/challenge.js';
 import { recordRun } from '../record/recordRun.js';
-import { watchRecordOf, watchRunConfigOf } from '../watch/record.js';
+import { watchRecordOf, watchRunPlanOf } from '../watch/record.js';
 import { parseReferenceRuns } from '../watch/reference.js';
 
 import type { BrowserResources } from './data.js';
@@ -329,7 +329,7 @@ describe.skipIf(OUT === undefined)('what a surface’s runs cost the painting th
 
       /*
        * **Watch.** One run per press, on the record the row was filed with — `watch/library.ts`'s
-       * gate is what runs it, and `watchRunConfigOf` is the config it runs. The shipped reference
+       * gate is what runs it, and `watchRunPlanOf` is the config it runs. The shipped reference
        * runs are the rows a first visit offers, so they are the population a player meets.
        */
       const references = parseReferenceRuns(dataFile('reference-runs.json'), (id) =>
@@ -338,7 +338,7 @@ describe.skipIf(OUT === undefined)('what a surface’s runs cost the painting th
       for (const run of references) {
         const record = run.record;
         if (record === null) continue;
-        const config = watchRunConfigOf(baseState(), RESOURCES, record);
+        const config = watchRunPlanOf(baseState(), RESOURCES, record).config;
         const recorded = timed(() => recordRun(config));
         rows.push({
           surface: 'watch/press',
@@ -368,7 +368,7 @@ describe.skipIf(OUT === undefined)('what a surface’s runs cost the painting th
         RESOURCES,
       );
       if (worstRecord !== undefined) {
-        const config = watchRunConfigOf(baseState(), RESOURCES, worstRecord);
+        const config = watchRunPlanOf(baseState(), RESOURCES, worstRecord).config;
         const recorded = timed(() => recordRun(config));
         rows.push({
           surface: 'watch/press',
