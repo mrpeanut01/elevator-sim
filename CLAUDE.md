@@ -133,7 +133,7 @@ two labels.
 
 **The viewer is built to a design handoff**, vendored at [`docs/design/`](docs/design/) and
 extracted in [`docs/12-design-handoff.md`](docs/12-design-handoff.md)
-([§ D174](DECISIONS.md)–[§ D179](DECISIONS.md)). **The handoff wins every disagreement about what the
+([§ D174](DECISIONS.md) to [§ D179](DECISIONS.md)). **The handoff wins every disagreement about what the
 screen looks like, and the simulator wins every disagreement about what a number means**: the
 prototype's toy simulator is not a source for any figure.
 
@@ -320,6 +320,16 @@ cite why.
 - If you hit a decision the docs don't cover, record it in the relevant doc rather than
   only in a commit message.
 - Do not weaken an acceptance criterion to make a phase pass. Raise it instead.
+- **Per-wave local verification is the guards, the touched directories and the always-on corpus;
+  CI is the full six-project run** ([§ D1236](DECISIONS.md)). A lane runs the files it touched, their
+  neighbours, and the guards (`testCost`, `boundaries`, `deadCode`, `honesty/derive`,
+  `documentation`, `citations`); the integrator adds the always-on corpus on the integrated head
+  and leaves the whole of every project to the pull request's CI. The integrator still does not
+  merge on red.
+- **A wave's row is short.** Its row in [`docs/05-roadmap.md`](docs/05-roadmap.md) and its entry in
+  [`docs/44`](docs/44-honesty-corpus-log.md) are each at most about 120 words of prose, tables
+  excluded; the reasoning belongs in a decision entry or a docstring, and `documentation.test.ts`
+  holds both caps.
 - **One push per wave, not one per commit.** Commit as often as you like; push when the wave is
   ready. Every push to a **pull request branch** cancels the CI run in flight (`ci.yml:127` sets
   `cancel-in-progress: ${{ github.event_name == 'pull_request' }}`) and starts a fresh suite
@@ -343,16 +353,6 @@ cite why.
   **cancelled rather than passed**. Acting on any of them would have meant declaring CI green while
   it was still running. **This is discipline and not a gate** — nothing enforces it, which is why it
   is written where it will be read rather than asserted somewhere a test could pretend to check it.
-- **Per-wave local verification is the guards, the touched directories and the always-on corpus;
-  CI is the full six-project run** ([§ D1236](DECISIONS.md)). A lane runs the files it touched, their
-  neighbours, and the guards (`testCost`, `boundaries`, `deadCode`, `honesty/derive`,
-  `documentation`, `citations`); the integrator adds the always-on corpus on the integrated head
-  and leaves the whole of every project to the pull request's CI. The integrator still does not
-  merge on red.
-- **A wave's row is short.** Its row in [`docs/05-roadmap.md`](docs/05-roadmap.md) and its entry in
-  [`docs/44`](docs/44-honesty-corpus-log.md) are each at most about 120 words of prose, tables
-  excluded; the reasoning belongs in a decision entry or a docstring, and `documentation.test.ts`
-  holds both caps.
 
 **Two things that look like the fix for that and are not, so nobody spends an afternoon on them.**
 `paths-ignore` on `**.md` would be **wrong**: `validation/documentation.test.ts`,

@@ -88,7 +88,7 @@ The standing decisions those three rest on, unchanged and cited rather than rest
 | [§ D299](../DECISIONS.md) | Two products over one engine; Everyday is a door, never a subset; named play styles are an entry point, never a ceiling |
 | [§ D456](../DECISIONS.md) | The pillars are constraints on a session and not the reason for it; not at the expense of game play |
 | [§ D345](../DECISIONS.md) | Difficulty may raise the stakes and may not move the bar |
-| [§ D343](../DECISIONS.md) | The honesty corpus is measured once, after integration, on the integrator |
+| [§ D343](../DECISIONS.md) | The honesty corpus is measured once, after integration, on the integrator. **Amended by [§ D1236](../DECISIONS.md)**: the deep row now comes from the nightly job; see § 2 |
 | [§ D366](../DECISIONS.md) | No entry-screen override survives a reload |
 | [§ D372](../DECISIONS.md) | Stage 1 gets a building authored to be failable; `garden-apartments` is left alone |
 | [§ D400](../DECISIONS.md), [§ D401](../DECISIONS.md) | A campaign day files and runs the length its contract is graded over |
@@ -188,6 +188,7 @@ the same thing in one sentence.
 | [§ D914](../DECISIONS.md), [§ D974](../DECISIONS.md) | A pin is a seed, two verbs and a typed instant (`pressAtFraction`), proved at that instant; the moot census is drawn on the brief | **Amended.** The instant is derived by `shift/pressCall.ts#pressCallOf` and `pressAtFraction` is deleted; a pin is admitted only over a window of at least 120 simulated seconds from its call (`ContractPressDay.call`); `c3`, `c6`, `c7` and `c9` were re-pinned or refused by that criterion; the census moved to the report | § D1029 |
 | [§ D973](../DECISIONS.md) | The door's lede promises the press *made while the car is away*; `pressDayStanding` gates every press claim | **Amended.** The clause is withdrawn as measured false on four of seven rows and the lede is derived from the shortest admitted window; a refused row is drawn with its reason; `pressDayMeasuredAs` (standing order + this attempt's own answer at the call) gates the call and its report row, while `pressDayStanding` still gates the census | § D1029 |
 | [§ D991](../DECISIONS.md) clause 2 | A speed chip is the player's for the rest of the day | **Amended.** A chip lasts until the next act boundary, and a pinned day's `'call'` reason outranks it | § D1029 |
+| `docs/39` § 1's [§ D343](../DECISIONS.md) row | The honesty corpus is measured once, after integration, on the integrator, both tiers in one sitting | **Amended.** The integrator measures the always-on tier on the integrated head each wave; `CLAUDE.md`'s deep row is republished from the first nightly run of `deep-tiers.yml`'s `corpus-figures` job after the wave merges, which writes both tiers to its run summary. The rule is cited as § D343 across the tree and that heading records a different rule, so it is stated in full in § D1236. *Taken by agent sessions under delegated authority, on the owner's instruction to lighten each wave* | § D1236 |
 | [§ D1001](../DECISIONS.md) § 2 and § 6 | Positions are discrete because *every value is a fresh redraw*; replacing re-draws with thinning is undecided | **Amended.** A crowd change thins the as-built crowd on the `thinning` stream; the positions stay discrete and authored, for the diagnosis's reason rather than the re-draw's | § D1076 |
 | `data/fixit-cases.json`, `let-faster-than-the-lifts` | The case runs at 6.8 % a five minutes | **Re-authored at 7.0.** Under thinning, the witness left the rest 11.0 points worse on the letter's morning at 6.8 (on fourteen journeys); at 7.0 it clears the letter and holds over fifty mornings, the placebo refused. The copy's four figures are re-pinned from the run | § D1076 |
 | [§ D476](../DECISIONS.md), as amended by [§ D993](../DECISIONS.md) | The first-visit gate reads days filed, fix cases solved and dispatchers rated | **Amended.** It reads career days filed as well, so a career-only player is not sent to the landing page | § D1077 |
@@ -303,7 +304,9 @@ and a status line to the entry, and does not edit the entry's text.
 [`CLAUDE.md`](../CLAUDE.md) is not tidied by this page. Its status section describes the four-tile
 front door and the modes by their old names in several paragraphs, and it is a project file whose
 rewrite is the owner's; a pointer to this page sits at its top so nobody builds against those
-paragraphs without seeing it.
+paragraphs without seeing it. **Since [§ D1236](../DECISIONS.md) those paragraphs are in
+[`45-status-record.md`](45-status-record.md)**, moved verbatim on the owner's instruction to
+lighten each wave, and `CLAUDE.md` states each rule once.
 
 ## 5. The marker's shape
 

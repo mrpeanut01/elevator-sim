@@ -6,8 +6,8 @@ itself keeps only the current figures, the method rules this history taught, and
 Everything below is the row's wave-by-wave text as it stood at `7e54a14`, moved verbatim, newest
 first. The only edits are these: the headings, which name the wave each passage records; the two
 spaces of list indentation each line carried inside the row; and relative link targets, rewritten
-so they still resolve from `docs/`. Sentences that say *above*, *below*
-or *this row* meant the Phase 9 row when they were written, and are left as written.
+so they still resolve from `docs/`. Sentences that say *above*, *below* or *this row* meant the
+Phase 9 row when they were written, and are left as written.
 
 **How to add an entry.** One entry per wave, headed `## Wave XX`, newest first, placed above the
 entry for the wave before it. At most **120 words of prose**, tables excluded; the figures go in the

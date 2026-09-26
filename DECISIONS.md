@@ -48196,3 +48196,71 @@ holdout, so none is a way through.
 through no earlier stage named (S2's second clause); stage 8's is `zoned-uppeak-parked-lobby`.
 **Not done:** stage 6's budget item, recorded by the ruling and left; the deep DC-2 tier over the
 whole ladder.
+
+## D1236 — each wave's bookkeeping is lightened: `CLAUDE.md` keeps rules and current figures, the deep corpus row comes from the nightly job, and a wave's row is capped at about 120 words
+
+> **Taken 2026-09-26 by agent sessions under delegated authority**, carrying out the product
+> owner's instruction of the same day that verification and bookkeeping now outweigh building in
+> each wave and must be lightened. The instruction is the owner's; the shape below is lane AM-A's,
+> built to wave AM's brief. A later reader weighing this against a product-owner ruling should
+> treat the shape as an agent ruling and say so; [§ D626](#d626) is the cautionary case.
+> **Owner-reversible**: which text left `CLAUDE.md` and where it went; the deep row read from the
+> nightly job instead of an integrator's run; the per-wave local verification set; and the
+> 120-word cap with its register of older rows.
+
+**Why an entry.** [§ D405](#d405)'s first and second grounds: it moves text out of `CLAUDE.md`,
+which every lane reads, binds four tests that read documents and one workflow, and amends the
+corpus measurement rule `docs/39` § 1 lists as in force.
+
+**1. `CLAUDE.md` keeps instructions, verdicts, named gaps and current figures.** The largest single
+cost of a wave was that file: **156 091 bytes, 2 055 lines**, loaded into every agent on every lane,
+four fifths of it the Phase 9 row's wave-by-wave corpus history and long status narrative. It is now
+**28 792 bytes, 381 lines**. Nothing was deleted. The corpus history went verbatim, newest first, to
+[`docs/44-honesty-corpus-log.md`](docs/44-honesty-corpus-log.md) (104 663 bytes, one heading per
+wave), and the rest of the status narrative (Phase 6's row with every interval, Phase 9's named gaps
+in full, the energy bar's derivation, the two shells, the handoff, the dead seams) went verbatim to
+[`docs/45-status-record.md`](docs/45-status-record.md) (35 016 bytes). A script checked it line by
+line: every non-blank line of the old file is in one of the three, except the one sentence the move
+made false (the game-layer paragraph's *"this file's status section has not yet been rewritten"*),
+which `docs/45` quotes. The only edits to moved text are headings, two spaces of list indentation,
+and relative link targets rewritten to resolve from `docs/`. The invariants, statistical
+discipline, oracle, modeling rules, conventions, reference data and working agreements are
+unchanged apart from the two agreements below.
+
+**Every check that read a moved claim now reads where it lives, and none was weakened.**
+`documentation.test.ts#WITHDRAWN_DESTINATION_SITES` swaps `CLAUDE.md` for `docs/45`, because the
+H-ACCESS-1 paragraph moved there whole and `CLAUDE.md` now states the rule without quoting the
+withdrawn destination. `honesty/derive.test.ts`'s DOM-entry-point `CLAIM_SITES` **adds** `docs/45`
+and keeps `CLAUDE.md`, since both now state the figure. The decision-debt ratchet's one Phase 9 site
+is counted in `docs/44` and its ceiling is unmoved at 4. The ten wave rows of `docs/05-roadmap.md`
+that pointed at *`CLAUDE.md`'s Phase 9 row* for their figures now point at `docs/44`. The phase
+status sentence `documentation.test.ts` parses is untouched.
+
+**2. The deep row is read from the nightly job.** The corpus rule was: both tiers, once, after
+integration, on the integrator. It is amended to: **the always-on tier is measured on the
+integrated head each wave; the deep row is republished from the first nightly run of
+`.github/workflows/deep-tiers.yml`'s `corpus-figures` job after the wave merges**, and names the
+commit it describes until then. That job already measured both tiers on `main` and uploaded them as
+an artifact; it now also writes each tier's headline, beside the commit, to the run's summary page,
+and the summary and upload run under `always()` because a tier whose vitest call timed out has still
+written complete figures. `deepTiers.test.ts` holds the step (red on the base workflow, green after).
+**The rule's usual citation is wrong, and this entry does not fix that.** `docs/39` § 1,
+`measure.corpus.test.ts`, `deep-tiers.yml` and many lane records cite § D343 for *once, after
+integration*, and § D343's heading records the series-citation convention and carries no such rule.
+The tree holds 122 citations of § D343 and which of them mean the corpus rule was not counted. The
+rule now lives here.
+
+**3. Per-wave local verification** is the guards (`testCost`, `boundaries`, `deadCode`,
+`honesty/derive`, `documentation`, `citations`), the touched directories and the always-on corpus;
+**CI is the full six-project run**, and the integrator still does not merge on red. Written into
+`CLAUDE.md`'s working agreements beside the one-push-per-wave rule, which stands.
+
+**4. A wave's row is at most about 120 words of prose**, in `docs/05-roadmap.md` (label excluded)
+and in `docs/44` (tables excluded). `documentation.test.ts`'s *a wave's row is short* holds it for
+every row written after this entry, requires every `docs/44` heading to name its wave, and
+registers the older rows by name in both directions: ten roadmap rows (AC-2 to AL) and thirty log
+entries, every one of them over the cap. Wave AL's log entry is the one older entry already under
+it. Shown red on a 130-word row added to each document.
+
+**Not done.** Correcting the § D343 citations; shortening the older rows, which are records; and any
+measurement of how much the lighter file changes a lane's cost, which is unmeasured.
