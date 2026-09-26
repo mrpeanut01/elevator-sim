@@ -19,7 +19,9 @@ import { CONTRACTS, statLineOf } from '../shift/contracts.js';
 import type { WeekState } from '../shift/types.js';
 import { openWeek } from '../shift/week.js';
 
-import { FALLBACK_ART, SCENARIO_ART, scenarioCardsOf } from './scenariosPanel.js';
+import { weekOfferOf } from '../shift/weekStake.js';
+
+import { FALLBACK_ART, SCENARIO_ART, SCENARIO_HELD_OBJECTIVE, scenarioCardsOf } from './scenariosPanel.js';
 
 let config: LoadedConfig;
 let buildings: readonly ResolvedBuilding[];
@@ -145,14 +147,31 @@ describe('the objective line counts what has been banked', () => {
     const byId = new Map(
       scenarioCardsOf(CONTRACTS, week, buildings).map((card) => [card.contractId, card]),
     );
-    expect(byId.get('c2')?.objective).toBe('Clear 2 shifts — 1 of 2 banked');
+    // The census's target since § D1180 moved Tuesday and Friday into Midtown's counted days.
+    expect(byId.get('c2')?.objective).toBe('Clear 4 shifts — 1 of 4 banked');
     /*
      * `c3` asked for three since issue #382. Since § D1176 a tower the week census measured reads
-     * its target off the census, and Secure Tower's week counts no day, so it has none and says so
-     * rather than asking for three days that cannot bank. `c2`'s two above is the census's too.
+     * its target off the census, and Secure Tower's week counts no day, so since § D1179 its
+     * scenario is held back, with the reason under the objective.
      */
-    expect(byId.get('c3')?.objective).toBe('No day of this week counts toward a target');
+    expect(byId.get('c3')?.objective).toBe(SCENARIO_HELD_OBJECTIVE);
     expect(byId.get('c1')?.objective).toBe('Clear 1 shift');
+  });
+
+  it('holds the scenario on every card whose week counts no day, and only there — § D1179', () => {
+    const cards = scenarioCardsOf(CONTRACTS, weekOn('c1'), buildings);
+    for (const card of cards) {
+      const offer = weekOfferOf(card.contractId);
+      expect(card.objective === SCENARIO_HELD_OBJECTIVE, card.contractId).toBe(offer?.offer === 'held');
+      expect(card.offerLine, card.contractId).toBe(offer?.line);
+      // Held or not, the card is a press: only the clear is held, never the tower.
+      expect(card.resolved, card.contractId).toBe(true);
+    }
+    expect(cards.filter((card) => card.objective === SCENARIO_HELD_OBJECTIVE).map((card) => card.contractId)).toEqual([
+      'c3',
+    ]);
+    // Harbour Point stays offered at one of one, and its line says which day.
+    expect(cards.find((card) => card.contractId === 'c9')?.offerLine).toContain('Monday');
   });
 
   it('reads "Cleared" once it has been', () => {

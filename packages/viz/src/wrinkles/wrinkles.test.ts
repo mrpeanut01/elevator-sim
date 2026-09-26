@@ -311,10 +311,10 @@ describe('the drawn schedule is pinned to this commit — § 17', () => {
    */
   const FIRST_FOUR_WEEKS: readonly string[] = [
     'ordinary',
-    'move-in:middle',
+    'move-in:past-halfway',
     'fire-drill:full',
     'conference:full-floor',
-    'shaft-out:most-of-day',
+    'shaft-out:before-halfway',
     'weekend',
     'weekend-quiet',
     'goods-inward',
@@ -332,7 +332,7 @@ describe('the drawn schedule is pinned to this commit — § 17', () => {
     'weekend-event',
     'weekend',
     'conference:half-floor',
-    'shaft-out:most-of-day',
+    'shaft-out:before-halfway',
     'two-cars-down',
     'caterers:into-the-rush',
     'goods-inward',

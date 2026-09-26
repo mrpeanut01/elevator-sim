@@ -27,8 +27,11 @@
  *    not count either"*).
  *
  * The **target** is the counted days dealt, minus one, and at least one: S3's rule, which gives
- * S2's *2 of 3* and S1's *k of 3* on a three-day week and *4 of 5* on Midtown's unwrinkled week. A
- * tower whose week has no counted day has no target, and says so; it is not given one.
+ * S2's *2 of 3* and S1's *k of 3* on a three-day week and *4 of 5* on Midtown's week, which since
+ * [§ D1180](../../../../DECISIONS.md) moved its Tuesday and Friday wrinkles off the lunch peak is
+ * its week as dealt as well as unwrinkled. A tower whose week has no counted day has no target,
+ * and says so; it is not given one, and its scenario's clear is held with the reason
+ * ({@link weekOfferOf}, [§ D1179](../../../../DECISIONS.md)).
  *
  * ## Where the census does not speak, nothing changes
  *
@@ -261,6 +264,10 @@ export function countedCleanOf(week: Pick<WeekState, 'contractId' | 'history'>, 
 /**
  * **The week's target, as *k of N***, or `undefined` where the census does not speak. One line for
  * the brief and for the week strip, with the clean counted days so far.
+ *
+ * A week with no counted day draws {@link weekHeldReasonOf}'s sentence instead, and a week with one
+ * names the day, because *1 of 1* alone does not say that six days of the week decide nothing
+ * (swarm DM's ruling (a), [§ D1179](../../../../DECISIONS.md)).
  */
 export function weekStakeLineOf(
   week: Pick<WeekState, 'contractId' | 'history'>,
@@ -268,21 +275,125 @@ export function weekStakeLineOf(
 ): string | undefined {
   const deal = weekDealOf(week.contractId, census);
   if (deal === undefined) return undefined;
-  if (deal.counted === 0) return WEEK_WITHOUT_COUNTED_DAYS;
+  if (deal.counted === 0) return weekHeldReasonOf(deal);
   const clean = countedCleanOf(week, census);
+  const only = deal.counted === 1 ? deal.days.find((day) => day.counts) : undefined;
+  if (only !== undefined) {
+    return (
+      `This week’s target: 1 of 1 counted day clean, and the one day that counts is ` +
+      `${weekdayOf(only.dayIdx)}. ${String(clean)} so far.`
+    );
+  }
   return (
     `This week’s target: ${String(deal.target)} of ${String(deal.counted)} counted days clean. ` +
     `${String(clean)} so far.`
   );
 }
 
-/** The stake line on a tower the census measured and found no day of its week a player decides. */
-export const WEEK_WITHOUT_COUNTED_DAYS =
-  'No day of this week counts toward a target: the census found none a player decides, so this ' +
-  'week has no target and cannot clear its scenario.';
-
 /** The same absence, short enough for a banked line on the sheet, the beat and the rail's card. */
 export const WEEK_WITHOUT_COUNTED_DAYS_SHORT = 'no day of this week counts toward a target';
+
+/* -------------------------------------------------------------------------- *
+ * A week that counts no day: its scenario is held — § D1179
+ * -------------------------------------------------------------------------- */
+
+/** Counts in words: the tower picker draws no digit, and a week has seven days. */
+const COUNT_WORDS: readonly string[] = Object.freeze([
+  'no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven',
+]);
+
+function countWord(count: number): string {
+  return COUNT_WORDS[count] ?? String(count);
+}
+
+/** `Monday`, `Monday and Friday`, `Monday, Tuesday and Friday`. */
+function dayList(days: readonly DealtDay[]): string {
+  const names = days.map((day) => weekdayOf(day.dayIdx));
+  if (names.length <= 1) return names.join('');
+  return `${names.slice(0, -1).join(', ')} and ${names.at(-1) ?? ''}`;
+}
+
+/**
+ * **Why a week that counts no day holds its scenario**, as one or two sentences — swarm DM's
+ * ruling (a), [§ D1179](../../../../DECISIONS.md), S2's condition.
+ *
+ * It names the days the census **measured as dealt and refused** apart from the days it **has not
+ * measured as dealt**, because the two are different claims: a refused day carries a count over
+ * named crowds, and an unmeasured day carries nothing at all. So it never says *cannot*,
+ * *unwinnable* or *found none* about a day nobody measured, and says *yet* wherever a day is still
+ * unmeasured, since a census row that admits one lifts the hold ({@link weekOfferOf}). Where every
+ * day was measured it says that, and says none counts, which is then a measurement.
+ *
+ * The per-day reason (why Monday does not count) is the day's own {@link DealtDay.sentence}; this
+ * sentence is about the week and does not repeat seven of them.
+ */
+export function weekHeldReasonOf(deal: WeekDeal): string {
+  const measured = deal.days.filter((day) => day.reason !== 'unmeasured');
+  const unmeasured = deal.days.length - measured.length;
+  const total = countWord(deal.days.length);
+  if (unmeasured === 0) {
+    return (
+      'No day of this week counts toward a target, so its scenario is held back: all ' +
+      `${total} days were measured as they are dealt, and none of them counts.`
+    );
+  }
+  const lead = 'No day of this week counts toward a target yet, so its scenario is held back';
+  if (measured.length === 0) {
+    return `${lead}: none of its ${total} days has been measured as it is dealt.`;
+  }
+  const plural = measured.length > 1;
+  const others = countWord(unmeasured);
+  return (
+    `${lead}. ${dayList(measured)} ${plural ? 'were' : 'was'} measured as ` +
+    `${plural ? 'they are' : 'it is'} dealt and ${plural ? 'do' : 'does'} not count, and the other ` +
+    `${others} ${unmeasured === 1 ? 'day has' : 'days have'} not been measured as ` +
+    `${unmeasured === 1 ? 'it is' : 'they are'} dealt.`
+  );
+}
+
+/** What a held scenario still is: nothing about the tower or its week is locked (§ D1129's footing). */
+export const WEEK_HELD_NOTE =
+  'Nothing is locked: the week is dealt and played, every day is graded, and the week closes on its ' +
+  'sheet. The hold lifts when a day of it is measured as dealt and counts.';
+
+/** What the hub draws for a census tower's scenario: offered, or held with its reason. */
+export interface WeekOffer {
+  readonly offer: 'offered' | 'held';
+  /**
+   * The line beside the scenario: the hold's reason and {@link WEEK_HELD_NOTE} where held; the one
+   * day that counts where the week counts exactly one; `undefined` otherwise.
+   */
+  readonly line: string | undefined;
+}
+
+/**
+ * **Whether a tower's scenario clear is offered, derived from its week** — swarm DM's ruling (a),
+ * [§ D1179](../../../../DECISIONS.md), in the shape § D1129 holds a campaign stage: listed, with its
+ * reason, and never called unwinnable.
+ *
+ * Held exactly when the census deals the week and counts no day of it; `undefined` where the census
+ * does not speak for the tower (its week keeps `needClean`, and nothing about its offer changes).
+ * Read on every call, so a census row that admits a day releases the hold on the commit that adds
+ * it, with no edit here. **Only the offer to clear is held**: the tower stays pressable from the
+ * picker and the Scenarios list, its week runs, and it closes on its sheet like any other.
+ *
+ * A week that counts one day stays offered at *1 of 1* (the ruling's clause 3, S2's no-clamp rule
+ * recorded as the dissent) and its line says which day, because the target alone hides it.
+ */
+export function weekOfferOf(contractId: string, census: WeekWay = WEEK_WAY): WeekOffer | undefined {
+  const deal = weekDealOf(contractId, census);
+  if (deal === undefined) return undefined;
+  if (deal.counted === 0) {
+    return { offer: 'held', line: `${weekHeldReasonOf(deal)} ${WEEK_HELD_NOTE}` };
+  }
+  const only = deal.counted === 1 ? deal.days.find((day) => day.counts) : undefined;
+  if (only === undefined) return { offer: 'offered', line: undefined };
+  const name = weekdayOf(only.dayIdx);
+  return {
+    offer: 'offered',
+    line: `One day of this week counts toward its target, ${name}, so the target is one clean ${name}.`,
+  };
+}
 
 /**
  * Whether the week has closed: the census speaks for its tower and its last dealt day has been

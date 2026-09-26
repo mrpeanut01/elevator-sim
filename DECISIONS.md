@@ -43801,6 +43801,8 @@ are pins and their windows only. `GOAL_BARS` is byte-identical.
 
 ## D1038 — a day's wrinkle does not take a car the tower already books over the same stretch, and a day's own car is never *also* the tower's
 
+> **Status 2026-09-26: AMENDED by [§ D1180](#d1180)** (an agent ruling). A booked car is spoken for all day wherever the building can spare another, not only over an overlapping stretch, so the title's second half holds on a window that misses the booking too; the overlap rule is the fallback where no other car can be spared. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Implements an agent ruling under delegated authority** — the week decision swarm's member S1,
 > § 1 (*"One defect found on the way is ruled here"*), relayed by the wave AI coordinator. It is not
 > a product-owner ruling.
@@ -44420,6 +44422,8 @@ or Free Play moves: neither stands on a rung.
 ## D1067 — DC-10: a day of the week is winnable only when a census says so, and a day that fails says what was measured
 
 > **Status 2026-09-26: AMENDED by [§ D1176](#d1176)** (an agent ruling). The census also decides which days count toward a week's target: a contested day counts, a declared breather does not.
+
+> **Status 2026-09-26: TWO ROWS RE-MEASURED by [§ D1180](#d1180)** (an agent ruling). Midtown's wrinkled Tuesday and Friday, refused here on the queue gate, were re-authored off the lunch peak and are admitted; the rows this entry measured are superseded in `data/week-way.json` and recorded in `docs/33` DC-10.
 
 > **Taken 2026-09-25 by agent sessions under delegated authority**, the same swarm and the same
 > reconciliation as [§ D1066](#d1066). **Owner-reversible:** the thresholds and crowd counts in
@@ -46735,6 +46739,8 @@ it the longest again was not taken in wave AK.
 
 ## D1176 — only contested days count toward a census week, and its target is derived: counted days dealt, minus one
 
+> **Status 2026-09-26: AMENDED by [§ D1179](#d1179) and [§ D1180](#d1180)** (agent rulings). A week that counts no day holds its scenario's clear with a reason that tells a refused day from an unmeasured one, replacing this entry's *cannot clear its scenario* line; and Midtown's week reads 4 of 5 as dealt since Tuesday's and Friday's wrinkles moved off the lunch peak. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-09-26 by agent sessions under delegated authority** (wave AK, lane AK-E, on swarm
 > DL's Q2 ruling, 3-0 on clause 1), not by the product owner. Owner-reversible clauses: *minus
 > one*; that a declared breather does not count; that a tower whose week counts no day has no
@@ -46848,6 +46854,191 @@ count, and names the week's half of the definition.
 **Moved.** `shift/dailySeed.ts`'s rotation figures go to their ceiling, 99.9 % and 729 (were 66.2 %
 and 119): with one member every date after the first repeats it, which is the ruling's intent rather
 than a collision rate.
+
+## D1179 — a census week that counts no day holds its scenario's clear, with a reason that tells a day refused from a day not yet measured
+
+> **Taken 2026-09-26 by agent sessions under delegated authority** (wave AK, lane AK-G, on swarm
+> DM's ruling (a): the hold two of three, S1 and S3, with S2 dissenting for the census first; the
+> true reason three of three, S2's condition; Harbour Point offered at 1 of 1 two of three, S2's
+> no-clamp rule recorded as the dissent), not by the product owner. Owner-reversible clauses: the
+> hold threshold (no counted day, rather than fewer than two, which would also hold Harbour Point);
+> keeping Harbour Point offered at 1 of 1; the reason's wording.
+
+**Date: 2026-09-26 · Owner: lane AK-G (wave AK) · Rules on `shift/weekStake.ts` (`weekOfferOf`,
+`weekHeldReasonOf`, `WEEK_HELD_NOTE`, the stake line), `everyday/towerChoice.ts` and
+`everyday/doorScreen.ts` (the tower picker's row), `dev/scenariosPanel.ts` (the scenario card) and
+the honesty corpus's week, tower and scenario adapters. Amends [§ D1176](#d1176)'s measured
+paragraph and carries [§ D1129](#d1129)'s held-stage shape to a tower's week.**
+
+**Why an entry.** It binds two player surfaces and the Engineer panel, none of which the week
+module owns, and it withdraws a sentence § D1176 shipped.
+
+**What was wrong.** § D1176 gave a week that counts no day the line *"No day of this week counts
+toward a target: the census found none a player decides, so this week has no target and cannot
+clear its scenario."* On the only such tower, Secure Tower (`c3`), the census measured Monday as
+dealt and refused it (10 of 20 held-out crowds, fails DC-10's way through), and its Tuesday to
+Sunday **have no census row as dealt at all**: `data/week-way.json` holds only unwrinkled rows for
+`c3`, and every day after Monday is dealt a wrinkle. So *found none* was false of six of its seven
+days (swarm DM's S2, measured with `weekDealOf` at `b45d628`), and *cannot* is a claim about days
+nobody measured.
+
+**The ruling.**
+
+1. **Held, and derived.** Where the census deals a tower's week and counts no day of it, the
+   tower's scenario clear is held in the places that offer it: the tower picker's row on the door
+   and the Scenarios card. `shift/weekStake.ts#weekOfferOf` answers it on every read from
+   `weekDealOf`, so a census row that admits a day lifts the hold on the commit that adds it, with
+   no edit anywhere else. Where the census does not speak for a tower, nothing changes.
+2. **Nothing is locked.** The tower stays a press on both surfaces; its week is dealt, played,
+   graded, closes on its sheet (*This week had no target.*) and rolls, exactly as before. Only the
+   offer to clear is withheld, and a clear pays flat chimes and unlocks nothing (§ D1129), so no
+   access is lost. The row says so beside the reason: *Nothing is locked: the week is dealt and
+   played, every day is graded, and the week closes on its sheet. The hold lifts when a day of it is
+   measured as dealt and counts.*
+3. **The reason tells a refused day from an unmeasured one.** `weekHeldReasonOf` names the days the
+   census measured as dealt and refused apart from the days it has not measured as dealt, says
+   *yet* while any day is unmeasured, and never says *cannot*, *unwinnable* or *found none* of a day
+   nobody measured. On Secure Tower it reads: *No day of this week counts toward a target yet, so
+   its scenario is held back. Monday was measured as it is dealt and does not count, and the other
+   six days have not been measured as they are dealt.* The same sentence replaces § D1176's line on
+   the brief and the week strip; the per-day *not counted* sentences already distinguished the two,
+   and are unchanged.
+4. **A week that counts one day stays offered, and says which.** Harbour Point (`c9`) counts
+   Monday alone and keeps its target of 1 of 1. Its stake line reads *This week's target: 1 of 1
+   counted day clean, and the one day that counts is Monday*, and the picker and the card add *One
+   day of this week counts toward its target, Monday, so the target is one clean Monday.*
+5. **Refused:** the fixed `needClean` fallback that § D1176 retired (three of three), hiding the
+   card, and any wording that reads as a lock or an unlock.
+
+**Measured, off the shipped census.** Held: `c3` alone. Offered at 1 of 1: `c9`. Offered: `c2`.
+Every other tower is outside the census and unchanged.
+
+**Tested.** `shift/weekStake.test.ts`: held exactly where the census counts no day, over every
+contract in both directions (`c3` today); the reason's three arms and Secure Tower's sentence; no
+banned word on any stake line, offer line or day sentence of a measured tower with an unmeasured day;
+an injected census admitting `c3`'s Monday lifts the hold to 1 of 1 with no other edit; Harbour's
+line; and the held week dealt, closed on its sheet and rolled. `everyday/towerChoice.test.ts` and
+`dev/scenariosPanel.test.ts`: the row and the card follow `weekOfferOf` over every contract, stay a
+press, and the picker still draws no digit. `everyday/towerChoice.browser.test.ts` reads Secure
+Tower's held row and Harbour Point's day on the built bundle, and presses the held row and finds the
+week moved to it.
+
+**Not settled.** The owed wrinkled census for Secure Tower and Harbour Point (S2: 3 to 7 machine
+hours), Harbour Point's slope screen, and re-authoring Secure Tower's fabric (2 to 3 lane-days) are
+deferred by the ruling. Until the first runs, the hold says *yet* and means it.
+
+## D1180 — Tuesday's move-in and Friday's shaft-out move off the lunch peak, the census admits both, and Midtown's week reads 4 of 5 as dealt
+
+> **Taken 2026-09-26 by agent sessions under delegated authority** (wave AK, lane AK-G, on swarm
+> DM's ruling (b), three of three on re-authoring in this wave, with S3's windows and S2's condition
+> that the census admit both), not by the product owner. Owner-reversible clauses: the two windows
+> and their labels; that a wrinkle may leave a day's verdict unchanged; *minus one* (still
+> § D1176's); Sunday's role, which this entry leaves alone.
+
+**Date: 2026-09-26 · Owner: lane AK-G (wave AK) · Rules on `data/wrinkles.json` (`move-in`'s and
+`shaft-out`'s notes, and one window value of each), `data/week-way.json` (two rows), `docs/33`
+DC-10's table, and the pins in `shift/weekStake.test.ts`, `shift/week.test.ts`,
+`shift/events.test.ts`, `shift/bookedOut.test.ts`, `wrinkles/wrinkles.test.ts`,
+`everyday/weekView.test.ts`, `everyday/today.test.ts`, `everyday/briefView.test.ts` and
+`dev/scenariosPanel.test.ts`. Amends [§ D1176](#d1176)'s measured paragraph and
+[§ D1067](#d1067)'s two refused wrinkled Midtown rows.**
+
+**Why an entry.** It changes shared content every tower draws, moves two census rows, and moves a
+figure § D1176 published (Midtown's 2 of 3).
+
+**What was wrong.** Midtown's week as dealt counted Monday, Wednesday and Thursday, so its target of
+2 of 3 could be met by Wednesday, which is the post-AJ panel's seat A complaint. Tuesday's and
+Friday's wrinkles failed DC-10's queue gate for one reason: the rung books car D out 10:30 to 13:00,
+and `move-in:middle` (0.25 to 0.75 of the shift, 10:30 to 15:30 on a whole day) and
+`shaft-out:most-of-day` (0 to 0.85, 08:00 to 16:30) each took a second car across the 12:15 lunch
+peak. S3 measured every window covering that peak clearing 0 of 14, and every window off it 9 to 12
+of 14.
+
+**The ruling.**
+
+1. **Two windows move, in place, under new ids.** `move-in`'s `middle` becomes `past-halfway`,
+   0.55 to 0.8 of the shift (13:30 to 16:00 on a whole day), labelled *from a little past halfway
+   through the shift until four fifths of the way through*. `shaft-out`'s `most-of-day` becomes
+   `before-halfway`, 0.1 to 0.4 (09:00 to 12:00), labelled *from a tenth of the way through the
+   shift until four tenths of the way through*. The values keep their positions in their axes, so
+   the draw's arithmetic is unchanged and only the days that drew the old values move. The labels
+   are fractions of the shift rather than S3's clock words because the same value is drawn on a
+   slice too, where *the early afternoon* would be false; the brief already prints the clock times
+   off the run (§ D1039). The old ids leave every row and pin.
+2. **The notes say when the car is out and what it does to waits, and claim no harder day.** Move-in:
+   *one car is tied up {window}, and until it rejoins everybody waits for the cars that are left.*
+   Shaft-out: *Maintenance have a car {window}, and until it is back everybody waits for the cars
+   that are left.* Both describe the mechanism, and neither says the day is harder, because the
+   census below says it is not.
+3. **Shipped only because the census admitted both.** Re-measured on DC-10's full protocol with the
+   census's own documented command (`WEEK_WAY_SWEEP=1 WEEK_WAY_EVENTS=scheduled
+   WEEK_WAY_CONTRACTS=c2 WEEK_WAY_DAYS=2,5`, one worker, 234 s and 250 s, 200 runs each) and copied
+   row for row:
+
+   | day | wrinkle | chosen on tuning | tuning | held out | lower bound | standing misses | queue lowest / bar | verdict |
+   |---|---|---|---|---|---|---|---|---|
+   | 2 (Tue) | `move-in:past-halfway` | `predictive-balanced` + spread at 0.2 | 8/8 | 20/20 | 0.832 | 12/20 | 12 / 30 | admitted, contested |
+   | 5 (Fri) | `shaft-out:before-halfway` | `predictive-balanced` | 7/8 | 13/20 | 0.408 | 18/20 | 12 / 24 | admitted, contested |
+
+   Both reproduce S3's figures exactly. Tuesday was measured twice: first under § D1038's overlap
+   rule, where the move-in took car D, and again (244 s) under clause 7 below, where it takes car C;
+   the two rows agree mark for mark, finalists and screen included, and the second is the one
+   shipped. The rows they replace read 1 of 20 (lowest queue 33 against 30) and 0 of 20 (32 against
+   24).
+4. **The verdict matches the plain day, crowd for crowd.** On both days the chosen play's and the
+   standing order's held-out verdict strings are identical to the unwrinkled day's rows (40 of 40
+   marks on each day). So the moved wrinkle changes the run and the waits and not the verdict; a
+   test requires it to change the legs against the plain day, and the notes may not call either day
+   harder (`shift/weekStake.test.ts` holds both the equality and the wording).
+5. **Midtown's week reads 4 of 5 as dealt**, Monday to Friday counted and the weekend not, the
+   same five days as its unwrinkled week. The target cannot be met before Thursday, and a derived
+   test requires that of every tower a newcomer can be dealt (§ D1178's set: Midtown alone).
+6. **Sunday is left alone** (three of three).
+7. **A car the tower books is spoken for all day wherever another can be spared**
+   (`shift/events.ts#eventCarChoice`), which carries out [§ D1038](#d1038)'s own title, *a day's
+   own car is never also the tower's*. § D1038's body skipped a booked car only over an
+   overlapping stretch, and while every shipped window met Midtown's booking the two readings could
+   not part. Moved to 0.55 to 0.8, the move-in no longer meets car D's 10:30 to 13:00, and the
+   overlap rule gave it car D: out at 10:30, back at 13:00, out again at 13:30. The run was right
+   and the brief was not, because `shift/bookedOut.ts#carAbsencesOf` reads one absence a car and so
+   called the rung's morning *the car it takes*. A window now skips every booked car first, and
+   falls back to the overlap rule only where that leaves it short, so every shortfall and every
+   withheld sentence stays where it was. Measured over every rung tower, both horizons, days 1 to 28
+   and the four long-week days that draw these values: the choice moves on day 2 (the move-in) at
+   `c2` (car C, not D), `c6` (D, not E), `c8` (C, not E), `c9` (E, not F) and `c10` (C, not D), and
+   on day 12 (`contractors:afternoon`, 0.5 to 1.0, which met a 0.25 to 0.5 booking at a single
+   instant and so took the booked car before this entry) at `c2`, `c6`, `c9` and `c10`, and on days
+   110 and 128 wherever day 2 moved. Nothing else moves. Midtown's Tuesday census row is the run
+   under this rule; the earlier reading under the overlap rule (car D taking both windows) is
+   recorded in item 3.
+
+**What moved, tower by tower.** The draw ignores the tower, so on **every** tower the same days
+move, on both horizons: any week's day 2 (`move-in:past-halfway`) and days 5 and 23
+(`shaft-out:before-halfway`), and on a week that runs past its seventh day, days 110, 128, 236, 254,
+362 and 380 (move-in) and 131, 149, 257, 275 and 383 (shaft-out), counted over days 1 to 400.
+- **Measured as dealt:** Midtown Office (`c2`) days 2 and 5, above. Its weeks roll after day 7
+  (§ D1177), so days 12 and 23 are never dealt there, and neither is Harbour Point's day 12.
+- **Unmeasured as dealt:** Secure Tower (`c3`) and Harbour Point (`c9`) days 2 and 5, which were
+  unmeasured as dealt before this change too (§ D1179), and every day of every other tower, none of
+  which the census measures. Those towers' weeks run past day 7, so their day 23 moves as well, and
+  on `c6` and `c10` so does day 12's car (clause 7).
+- **Not moved:** the career's runs. A career day, and a calendar booking, reads a weekday template
+  at its base effect (`shift/events.ts#SHIFT_EVENTS`, `campaign/incidents.ts`), not a drawn axis
+  value, and a career day stands on no rung, so it books nothing for clause 7 to read; its move-in
+  and shaft-out notes carry the new wording of item 2, composed at each axis's first value, which
+  neither window edit touched. **Not enumerated:** a calendar booking on a rung tower goes through
+  the same car choice, and the enumeration in clause 7 ran with no calendar over the day.
+
+**Tested.** The census rows pass `weekWayIssues` (`shift/weekWay.test.ts`). `shift/events.test.ts`
+requires both moved days to differ from the plain day on the legs, and pins which car each takes:
+car C on both, Tuesday's by clause 7 and Friday's because its window still meets the rung's
+booking (§ D1038); a unit case holds clause 7's fallback where no other car can be spared.
+`wrinkles/wrinkles.test.ts` pins the drawn schedule. `shift/bookedOut.test.ts`'s premise, a car
+out from the first instant, is kept on `shaft-out:morning` rather than Friday.
+
+**Not settled.** Friday's held-out count is 13 of 20 (lower bound 0.408), a bare admission, and
+the ruling's figure that best play meets 4 of 5 on about 83 % of weeks treats the days as
+independent: it is arithmetic on the census, not a measurement of players.
 
 ## D1183 — the survivor census counts the stage page's own choices, and stages 2, 6, 7 and 8 open
 

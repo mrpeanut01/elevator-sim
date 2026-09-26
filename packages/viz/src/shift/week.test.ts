@@ -795,14 +795,20 @@ describe('a week with a stake and an ending — § D1176, § D1177', () => {
   }
 
   it('banks a clean day toward the scenario only where the census counts it, and keeps the streak either way', () => {
-    // Midtown's Tuesday is the move-in, which the census's queue gate refuses: played, not counted.
-    let week = nextDay(openWeek('c2'));
+    // Midtown's Saturday is the declared breather, which no play decides: played, not counted.
+    let week = openWeek('c2');
+    for (let index = 0; index < 5; index += 1) week = nextDay(week);
+    expect(week.day).toBe(6);
     week = closeDay(week, dealtDay(week, 'met'));
     expect(week.cleanRun).toBe(0);
     expect(week.streak).toBe(1);
+    // Its Tuesday, the move-in moved off the lunch peak by § D1180, counts.
+    let tuesday = nextDay(openWeek('c2'));
+    tuesday = closeDay(tuesday, dealtDay(tuesday, 'met'));
+    expect(tuesday.cleanRun).toBe(1);
   });
 
-  it('clears Midtown on its derived target, two counted days, and not on the weekend no play decides', () => {
+  it('clears Midtown on its derived target, four counted days, and not on the weekend no play decides', () => {
     let week = openWeek('c2');
     for (const kind of ['missed', 'missed', 'missed', 'missed', 'missed', 'met', 'met'] as const) {
       week = closeDay(week, dealtDay(week, kind));
@@ -813,11 +819,15 @@ describe('a week with a stake and an ending — § D1176, § D1177', () => {
     expect(week.completed).toEqual([]);
 
     week = openWeek('c2');
-    week = closeDay(week, dealtDay(week, 'met')); // Monday
-    expect(week.completed).toEqual([]);
-    week = nextDay(nextDay(week));
-    week = closeDay(week, dealtDay(week, 'met')); // Wednesday
-    expect(week.cleanRun).toBe(2);
+    for (let index = 0; index < 3; index += 1) {
+      week = closeDay(week, dealtDay(week, 'met')); // Monday to Wednesday
+      expect(week.completed).toEqual([]);
+      week = nextDay(week);
+    }
+    // Three counted days clean by Wednesday is one short: the target cannot be met before Thursday.
+    expect(week.cleanRun).toBe(3);
+    week = closeDay(week, dealtDay(week, 'met')); // Thursday
+    expect(week.cleanRun).toBe(4);
     expect(week.completed).toEqual(['c2']);
   });
 

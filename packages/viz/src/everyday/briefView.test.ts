@@ -291,7 +291,7 @@ describe('everything else on the card is the day record’s, unedited', () => {
 
   it('carries the week’s stake and whether today counts under its own heading, and nothing where the census is silent (§ D1176)', () => {
     expect(viewOf().week).toBeUndefined();
-    const stake = { line: 'This week’s target: 2 of 3 counted days clean. 0 so far.', day: DAY_COUNTS_SENTENCE };
+    const stake = { line: 'This week’s target: 4 of 5 counted days clean. 0 so far.', day: DAY_COUNTS_SENTENCE };
     const view = briefScreenViewOf({
       today: { ...TODAY, weekStake: stake },
       dispatchers: DISPATCHERS,

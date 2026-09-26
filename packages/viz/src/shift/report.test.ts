@@ -1395,7 +1395,8 @@ describe('the rest of the sheet', () => {
      */
     expect(report.contractLine).toContain(`${contractById('c2')?.label ?? ''} — The morning rush`);
     expect(report.contractLine).toContain('clean shifts banked');
-    expect(report.taught).toContain('Bank 1 more clean shift');
+    // Midtown's census target is four since § D1180 counted its Tuesday and Friday.
+    expect(report.taught).toContain('Bank 3 more clean shifts');
   });
 
   it('never claims more banked than the contract asks — SC-05/DR-09', () => {
@@ -1414,7 +1415,7 @@ describe('the rest of the sheet', () => {
         subject: { kind: 'week-day' },
       }),
     );
-    expect(report.contractLine).toContain('2 of 2 clean shifts banked');
+    expect(report.contractLine).toContain('4 of 4 clean shifts banked');
     expect(report.contractLine).not.toContain('5 of');
   });
 

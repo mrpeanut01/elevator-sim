@@ -296,16 +296,24 @@ describe('the week’s stake on the strip, and its sheet at the close — § D11
   });
 
   it('marks the days that do not count on their cards, and says why under the strip in the brief’s sentence', () => {
-    const view = viewOf(midtown(3, [midtownDay(1, MET), midtownDay(2, MET)]), false);
-    expect(view.stake).toBe('This week’s target: 2 of 3 counted days clean. 1 so far.');
+    // Since § D1180 every Midtown weekday counts as dealt, so the days that do not are the weekend.
+    const view = viewOf(midtown(7, [1, 2, 3, 4, 5, 6].map((day) => midtownDay(day, MET))), false);
+    expect(view.stake).toBe('This week’s target: 4 of 5 counted days clean. 5 so far.');
     expect(
       view.cards.filter((card) => card.day !== undefined).map((card) => [card.weekday, card.counts, card.note]),
     ).toEqual([
       ['MON', true, 'clean day'],
-      ['TUE', false, 'clean day · not counted'],
-      ['WED', true, 'today · not closed yet'],
+      ['TUE', true, 'clean day'],
+      ['WED', true, 'clean day'],
+      ['THU', true, 'clean day'],
+      ['FRI', true, 'clean day'],
+      ['SAT', false, 'clean day · not counted'],
+      ['SUN', false, 'today · not closed yet · not counted'],
     ]);
-    expect(view.notCounted).toEqual([{ weekday: 'TUE', sentence: weekDealOf('c2')?.days[1]?.sentence }]);
+    expect(view.notCounted).toEqual([
+      { weekday: 'SAT', sentence: weekDealOf('c2')?.days[5]?.sentence },
+      { weekday: 'SUN', sentence: weekDealOf('c2')?.days[6]?.sentence },
+    ]);
     expect(view.notCounted[0]?.sentence).toMatch(/^This day does not count toward the week: /u);
     expect(view.sheet).toBeUndefined();
   });
@@ -330,9 +338,9 @@ describe('the week’s stake on the strip, and its sheet at the close — § D11
       sheetStanding: true,
     };
     const view = weekScreenViewOf({ ...input, house: (day) => (day === 4 ? 'missed' : undefined) });
-    expect(view.sheet?.yoursLine).toBe('Your week: 2 of the 3 counted days clean.');
+    expect(view.sheet?.yoursLine).toBe('Your week: 2 of the 5 counted days clean.');
     expect(view.sheet?.houseLine).toBe('The tower’s standing order, left alone on the same crowds, cleared 1.');
-    expect(view.sheet?.targetLine).toBe('Target 2: met.');
+    expect(view.sheet?.targetLine).toBe('Target 4: not met.');
     // With no house answered yet for the run it needs, the sheet says so rather than counting it.
     expect(weekScreenViewOf(input).sheet?.houseLine).toMatch(/still being run/u);
   });

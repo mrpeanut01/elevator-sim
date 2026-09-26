@@ -643,12 +643,14 @@ export function eventCarChoice(
   building: BankedBuilding,
   /*
    * **The tower's own bookings are spoken for** — [§ D1038](../../../../DECISIONS.md), the week
-   * swarm's ruling S1 § 1 on the post-AH panel's N5. Midtown's Tuesday `move-in:middle` picked car D
-   * by this function's total order, and the rung already books car D out 10:30–13:00; the two
+   * swarm's ruling S1 § 1 on the post-AH panel's N5. Midtown's Tuesday `move-in:middle` (a window
+   * § D1180 has since moved off the lunch peak, as `move-in:past-halfway`) picked car D by this
+   * function's total order, and the rung already books car D out 10:30–13:00; the two
    * schedules collapsed into the rung's, so the run was identical to an ordinary Tuesday on all 95
    * configurations the swarm measured while the brief promised a car tied up through the middle of
-   * the shift. A whole-shift hold skips every booked car; a window skips a booked car whose window
-   * overlaps its own. What is left is chosen by the same order, and a building that cannot spare a
+   * the shift. A whole-shift hold skips every booked car; a window skips every booked car where the
+   * building can spare another, and otherwise a booked car whose window overlaps its own (§ D1180).
+   * What is left is chosen by the same order, and a building that cannot spare a
    * car reports the shortfall, which {@link shiftRunPatch} words. `calendarPatch` passes the same
    * list, so the goods car it reserves around the day's choice is reserved around this one.
    */
@@ -677,7 +679,20 @@ export function eventCarChoice(
   const overlapping = booked
     .filter((entry) => entry.fromFraction < derate.toFraction && derate.fromFraction < entry.toFraction)
     .map((entry) => entry.car);
-  const choice = carsToDerate(withoutCars(building, overlapping), derate.cars);
+  /*
+   * **A car the tower books is spoken for all day wherever the building can spare another** —
+   * [§ D1180](../../../../DECISIONS.md), carrying out § D1038's own title (*a day's own car is never
+   * also the tower's*). Its body skipped a booked car only over an overlapping stretch, and while
+   * every shipped window met the rung's booking the two readings could not part. § D1180 moved
+   * Midtown's Tuesday move-in to 0.55–0.8, clear of car D's 0.25–0.5, and the overlap rule then
+   * gave the move-in car D: out at 10:30, back at 13:00, out again at 13:30. The run was right and
+   * the words were not — `bookedOut.ts#carAbsencesOf` reads one absence a car, so the brief called
+   * the rung's morning *the car it takes*. So a window first skips every booked car, and falls back
+   * to the overlap rule only where that leaves it short, which keeps every shortfall exactly where
+   * it was.
+   */
+  const apart = carsToDerate(withoutCars(building, booked.map((entry) => entry.car)), derate.cars);
+  const choice = apart.shortfall === 0 ? apart : carsToDerate(withoutCars(building, overlapping), derate.cars);
   const unbooked = carsToDerate(building, derate.cars);
   return {
     ...held,

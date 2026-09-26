@@ -37,7 +37,7 @@
     {
       "id": "move-in",
       "name": "Move-in day",
-      "note": "A tenant is hauling boxes up — one car is tied up {window}, then rejoins.",
+      "note": "A tenant is hauling boxes up — one car is tied up {window}, and until it rejoins everybody waits for the cars that are left.",
       "days": "weekday",
       "effect": {
         "changesNothing": false,
@@ -73,12 +73,12 @@
               }
             },
             {
-              "id": "middle",
-              "label": "through the middle of the shift",
+              "id": "past-halfway",
+              "label": "from a little past halfway through the shift until four fifths of the way through",
               "derate": {
                 "cars": 1,
-                "fromFraction": 0.25,
-                "toFraction": 0.75
+                "fromFraction": 0.55,
+                "toFraction": 0.8
               }
             }
           ]
@@ -234,7 +234,7 @@
     {
       "id": "shaft-out",
       "name": "A shaft is out",
-      "note": "Maintenance have a car {window}. The rest of the group covers.",
+      "note": "Maintenance have a car {window}, and until it is back everybody waits for the cars that are left.",
       "days": "weekday",
       "effect": {
         "changesNothing": false,
@@ -270,12 +270,12 @@
               }
             },
             {
-              "id": "most-of-day",
-              "label": "for all but the last stretch of the shift",
+              "id": "before-halfway",
+              "label": "from a tenth of the way through the shift until four tenths of the way through",
               "derate": {
                 "cars": 1,
-                "fromFraction": 0,
-                "toFraction": 0.85
+                "fromFraction": 0.1,
+                "toFraction": 0.4
               }
             }
           ]

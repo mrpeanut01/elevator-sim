@@ -1025,11 +1025,11 @@ describe('the week’s stake on the brief (§ D1176)', () => {
       const week = { ...openWeek('c2'), day, dayIdx: (day - 1) % 7 };
       const state = { week, buildingId: 'midtown-office', seed: 20_261_001n } as unknown as ViewerState;
       const record = todayOf({ ...inputOf(state), horizon: 'whole-day' });
-      expect(record.weekStake?.line).toBe('This week’s target: 2 of 3 counted days clean. 0 so far.');
+      expect(record.weekStake?.line).toBe('This week’s target: 4 of 5 counted days clean. 0 so far.');
       expect(record.weekStake?.day).toBe(dayStakeSentenceOf('c2', day, record.wrinkle.id));
       if (record.weekStake?.day === DAY_COUNTS_SENTENCE) counted.push(day);
     }
-    expect(counted).toEqual([1, 3, 4]);
+    expect(counted).toEqual([1, 2, 3, 4, 5]);
   });
 
   it('draws nothing on a tower the census does not speak for', () => {

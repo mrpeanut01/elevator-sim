@@ -749,10 +749,14 @@ import {
   WEEK_CLOSED_LINE,
   houseStandingOrder,
   weekDealOf,
+  weekHeldReasonOf,
+  weekOfferOf,
   weekSheetOf,
   weekStakeLineOf,
   WEEK_WITHOUT_COUNTED_DAYS_SHORT,
+  type DealtDay,
   type HouseReading,
+  type WeekDeal,
 } from '../shift/weekStake.js';
 import { WATCH_RECORD_VERSION, type WatchRecord } from '../watch/types.js';
 
@@ -5443,7 +5447,7 @@ const REPORT_PANEL: SurfaceAdapter = {
  */
 const SCENARIOS: SurfaceAdapter = {
   id: 'dev/scenariosPanel.ts#scenarioCardsOf',
-  covers: ['dev/scenariosPanel.ts#scenarioCardsOf'],
+  covers: ['dev/scenariosPanel.ts#scenarioCardsOf', 'dev/scenariosPanel.ts#SCENARIO_HELD_OBJECTIVE'],
   render(context) {
     const seeds: TextSeed[] = [];
     const week = shiftBundleOf(context).days[0]?.banked ?? openWeek();
@@ -5470,6 +5474,9 @@ const SCENARIOS: SurfaceAdapter = {
           text: card.objective,
           role: 'observation',
         });
+        if (card.offerLine !== undefined) {
+          seeds.push({ field: `${label}.${card.contractId}.offer`, text: card.offerLine, role: 'reason' });
+        }
         seeds.push({ field: `${label}.${card.contractId}.reward`, text: card.reward, role: 'label' });
         seeds.push({ field: `${label}.${card.contractId}.teaches`, text: card.teaches, role: 'prose' });
         seeds.push({ field: `${label}.${card.contractId}.help`, text: card.help, role: 'label' });
@@ -13820,8 +13827,15 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     'shift/weekStake.ts#dayStakeSentenceOf',
     'shift/weekStake.ts#DAY_COUNTS_SENTENCE',
     'shift/weekStake.ts#DAY_UNMEASURED_SENTENCE',
-    'shift/weekStake.ts#WEEK_WITHOUT_COUNTED_DAYS',
     'shift/weekStake.ts#WEEK_WITHOUT_COUNTED_DAYS_SHORT',
+    /*
+     * A week that counts no day holds its scenario — § D1179. The reason and the hub's line are
+     * seeded per census tower below, and the reason's other arms (every day measured, none, and
+     * more than one measured) over synthetic deals, because no shipped tower draws them today.
+     */
+    'shift/weekStake.ts#weekHeldReasonOf',
+    'shift/weekStake.ts#weekOfferOf',
+    'shift/weekStake.ts#WEEK_HELD_NOTE',
     'shift/weekStake.ts#weekSheetOf',
     'shift/weekStake.ts#WEEK_SHEET_HEADING',
     'shift/weekStake.ts#WEEK_SHEET_NOTE',
@@ -14670,6 +14684,9 @@ const EVERYDAY_TOWER_CHOICE: SurfaceAdapter = {
             role: 'prose',
           },
         );
+        if (row.scenarioLine !== undefined) {
+          seeds.push({ field: `towers.${state}.${row.contractId}.scenario`, text: row.scenarioLine, role: 'reason' });
+        }
       }
     }
     /*
@@ -16575,6 +16592,28 @@ function seedWeekStake(seeds: TextSeed[], observations: Observations): void {
     for (const dealt of deal.days) {
       const sentence = dayStakeSentenceOf(contract.id, dealt.day, dealt.eventId) ?? '';
       seeds.push({ field: `week.day.${contract.id}.${String(dealt.day)}`, text: sentence, role: 'observation' });
+    }
+    const offer = weekOfferOf(contract.id)?.line;
+    if (offer !== undefined) seeds.push({ field: `week.offer.${contract.id}`, text: offer, role: 'reason' });
+  }
+  /* The held reason's three arms no shipped tower draws: every day measured, none, and two. */
+  const template = CONTRACTS.map((contract) => weekDealOf(contract.id)).find(
+    (deal): deal is WeekDeal => deal !== undefined,
+  );
+  if (template !== undefined) {
+    const shaped = (reasonOf: (day: DealtDay) => DealtDay['reason']): WeekDeal => ({
+      ...template,
+      counted: 0,
+      target: 0,
+      days: template.days.map((day) => ({ ...day, counts: false, reason: reasonOf(day) })),
+    });
+    const arms: readonly (readonly [string, (day: DealtDay) => DealtDay['reason']])[] = [
+      ['allMeasured', () => 'queue'],
+      ['noneMeasured', () => 'unmeasured'],
+      ['twoMeasured', (day) => (day.day <= 2 ? 'no-way-through' : 'unmeasured')],
+    ];
+    for (const [arm, reasonOf] of arms) {
+      seeds.push({ field: `week.held.${arm}`, text: weekHeldReasonOf(shaped(reasonOf)), role: 'reason' });
     }
   }
   const standing = houseStandingOrder();

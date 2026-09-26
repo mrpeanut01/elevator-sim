@@ -196,9 +196,13 @@ describe('the Day report of Crown Hotel’s pinned day, as built', () => {
  * passenger service from the start of the day until 16:30; the stage's pills, the report's header
  * and the worst-wait row named only car D, because all three read `bookedOutCarsOf`, which drops a
  * car out from the first instant. They read `carAbsencesOf` now.
+ *
+ * Friday no longer draws that window: § D1180 moved it to 0.1–0.4 of the shift, which starts after
+ * the first instant. The premise is a car out from the first instant, so the day is pinned to the
+ * shaft-out's `morning` value (0–0.5), which still takes one and meets the rung's car D booking.
  */
-describe('Midtown’s Friday, where the day takes a car from the first instant', () => {
-  const friday = contractDayState('c2', { seed: 20_260_925n, over: { campaignEventId: 'shaft-out:most-of-day' } });
+describe('a Midtown Friday whose shaft-out takes a car from the first instant', () => {
+  const friday = contractDayState('c2', { seed: 20_260_925n, over: { campaignEventId: 'shaft-out:morning' } });
   const run = shiftRunConfigOf(RES, friday);
   const dayCarIds = [...run.dayCars.holds, ...run.dayCars.windows];
   const out = carAbsencesOf(run.building, dayCarIds);
