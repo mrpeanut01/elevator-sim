@@ -544,6 +544,9 @@ function shippedModules(): ReadonlyMap<string, string> {
  * suite exists to catch arriving on a fifth surface.
  */
 const FOLDS_WITHOUT_DRAWING: Readonly<Record<string, string>> = Object.freeze({
+  'dev/dayCallSession.ts':
+    'reads the queue and worst-wait goals at the playhead only to stop asking once one already ' +
+    'reads missed (§ D1168). It draws no row; the rail and the report are where the goal is drawn.',
   'dev/main.ts':
     'files the readings into `outcomeOf` on close. It draws no row; `dev/leftRail.ts` and ' +
     '`dev/reportPanel.ts` are where this shell puts a goal on screen.',
