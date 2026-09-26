@@ -2219,13 +2219,14 @@ type DecisionReservation = {
  * them (§ D430), and the charter row moves to **D1139**.
  */
 /*
- * **Wave AM is OPEN and reserves D1236-D1270**: a process lane that lightens each wave's overhead
- * (the owner's instruction of 2026-09-26), then the lanes a swarm's ruling on the hook makes
- * necessary. Committed on `am-base` before any lane worktree exists, and closed in the wave's own
- * merge commit. Wave AL left D1236-D1240 free rather than holed (§ D430), so this block opens over
- * them.
+ * **Wave AM's reservation, D1236-D1270, is closed** in the wave's own merge commit. A process lane
+ * that lightened each wave's overhead (the owner's instruction of 2026-09-26) and five lanes on the
+ * hook spent eighteen headings. **Every number below the highest heading, D1267, that no lane spent
+ * comes back as a hole** and is registered in `KNOWN_DECISION_HOLES`; **D1268-D1270 are free rather
+ * than holed**, since nothing is written above them (§ D430), and the charter row moves to
+ * **D1268**.
  */
-const OPEN_RESERVATION = { wave: 'AM', from: 1236, to: 1270 } as DecisionReservation | null;
+const OPEN_RESERVATION = null as DecisionReservation | null;
 /*
  * **Wave AC's reservation, D619-D620, is closed.** It opened on the pair wave AB left free.
  * GitHub issue #437 stage 2 wrote D619 first, on a lane that started from the same pre-#422 base as
@@ -3397,6 +3398,35 @@ const KNOWN_DECISION_HOLES: ReadonlyMap<number, string> = new Map([
     1232,
     "wave AL's lane AL-F held D1226-D1232 and spent D1226-D1231. Registered under D404 and D430.",
   ],
+  [
+    1237,
+    "wave AM's lane AM-A held D1236-D1238 and spent D1236. Registered under D404 and D430.",
+  ],
+  [1238, "wave AM's lane AM-A's block; unspent for § 1237's reason."],
+  [
+    1241,
+    "wave AM's lane AM-B held D1239-D1245 and spent D1239-D1240. Registered under D404 and D430.",
+  ],
+  [1242, "wave AM's lane AM-B's block; unspent for § 1241's reason."],
+  [1243, "wave AM's lane AM-B's block; unspent for § 1241's reason."],
+  [1244, "wave AM's lane AM-B's block; unspent for § 1241's reason."],
+  [1245, "wave AM's lane AM-B's block; unspent for § 1241's reason."],
+  [
+    1251,
+    "wave AM's lane AM-C held D1246-D1251 and spent D1246-D1250. Registered under D404 and D430.",
+  ],
+  [
+    1255,
+    "wave AM's lane AM-D held D1252-D1257 and spent D1252-D1254. Registered under D404 and D430.",
+  ],
+  [1256, "wave AM's lane AM-D's block; unspent for § 1255's reason."],
+  [1257, "wave AM's lane AM-D's block; unspent for § 1255's reason."],
+  [
+    1261,
+    "wave AM's lane AM-E held D1258-D1263 and spent D1258-D1260. Registered under D404 and D430.",
+  ],
+  [1262, "wave AM's lane AM-E's block; unspent for § 1261's reason."],
+  [1263, "wave AM's lane AM-E's block; unspent for § 1261's reason."],
   [
     1030,
     "wave AI's lane AI-D held D1029-D1037 and spent D1029. Registered under D404 and D430.",
