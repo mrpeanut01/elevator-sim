@@ -128,32 +128,24 @@ function contextOf(): SurvivorContext {
  * silence its own guard.
  */
 const UNWINNABLE_AS_MEASURED: Readonly<Record<string, string>> = Object.freeze({
-  'stage-2-morning-rush':
-    '0 of 18 at the base rung and 0 of 24 at both bought rungs; 6 or 7 configurations a rung ran ' +
-    'a batch that refused its own mean, and at each bought rung one could not be judged at all.',
-  'stage-4-two-banks': '0 of 24 at every rung; 4 or 5 a rung suppressed.',
-  'stage-6-the-tall-one': '0 of 24 at every rung; 2 to 4 a rung suppressed.',
-  'stage-7-prove-it':
-    '0 of 24 at every rung; 0 to 2 a rung suppressed. New with GitHub issue #467, and the shape ' +
-    'is the sample rather than the stage: before it the dial half cleared 2 of 12 at the base rung ' +
-    'and 1 of 12 at the building rung, and #467 widened what a draw can buy from four reachable ' +
-    'priced changes to ten, so each rung’s twelve draws now land on a much larger space. Zero of ' +
-    'twelve bounds the dial share at about a quarter; it is not a finding that nothing gets ' +
-    'through. The suppression read 1 to 3 a rung until GitHub issue #234 moved this stage’s demand ' +
-    'from 1.5 to 1.25 %pop/5 min (DECISIONS.md § D611): re-measured, every rung is one lower — ' +
-    '2 → 1, 3 → 2 and 1 → 0 — which is what a lighter morning does, and it moved nothing else. ' +
-    'The other nine scenarios came back byte-identical on the same run.',
-  'stage-8-the-headline-address':
-    '0 of 18 at the base rung and 0 of 24 at both bought ones, with 1 to 3 a rung suppressed. It ' +
-    'was the one row here with nothing suppressed anywhere until GitHub issue #467 redrew the dial ' +
-    'sample; every row on this register now carries some.',
+  /*
+   * § D1183: the page stratum emptied four rows of this register on the commit that regenerated the
+   * table with it. Stages 2, 6, 7 and 8 now count 5 of 39, 3 of 63, 18 of 63 and 11 of 39 at the base
+   * rung, every survivor one of the stage page's own choices (a profile with idle cars parked
+   * elsewhere), and all four are offered. The three below are what is left.
+   */
+  'stage-4-two-banks':
+    '0 of 62 at the base rung and 0 of 63 at both bought ones. Sixteen configurations at the base ' +
+    'rung meet every goal on the stage’s own crowds and none on the crowds held back; 17 or 18 a ' +
+    'rung suppressed.',
   'stage-9-both-ways-at-once':
-    '0 of 24 at every rung, with **every** examined configuration suppressed — 24 of 24 three ' +
-    'times over. Read the count beside that: on this scenario no configuration produced a ' +
-    'quotable mean, so a zero here says less about the ways through than the other six do.',
+    '0 of 63 at every rung, with **every** examined configuration suppressed — 63 of 63 three ' +
+    'times over — and none meets every goal even on the stage’s own crowds. Read the count beside ' +
+    'that: on this scenario no configuration produced a quotable mean, so a zero here says less ' +
+    'about the ways through than the other two do.',
   'stage-10-the-bed-and-the-visitor':
-    '0 of 24 at every rung, and every examined configuration suppressed — the same shape as ' +
-    'stage 9 and the same caveat.',
+    '0 of 63 at every rung, every examined configuration suppressed and none meeting every goal ' +
+    'even on the stage’s own crowds — the same shape as stage 9 and the same caveat.',
 });
 
 /**
@@ -171,19 +163,12 @@ const UNWINNABLE_AS_MEASURED: Readonly<Record<string, string>> = Object.freeze({
  * the one place to change when it rules.
  */
 const FIRST_HOUR_SINGLE_SURVIVOR: Readonly<Record<string, string>> = Object.freeze({
-  'stage-1-first-call':
-    'one at every rung, and it is `zoned-uppeak` from the dropdown rather than a dial: 1 of 18 at ' +
-    'the base rung and 1 of 24 at both bought ones, with the dial half at 0 of 12 throughout. The ' +
-    'base rung read 1 of 20 until GitHub issue #467 priced the auction dials, which put `auction` ' +
-    'and `auction-multi-round` at 6 u and out of a 4 u budget.',
-  'stage-3-overwhelmed':
-    'one at every rung, `fairness-first` from the dropdown, with the dial half at 0 of 12 ' +
-    'throughout — and every examined configuration suppressed at every rung, 18 of 18 and 24 of 24 ' +
-    'twice, which is what an overwhelmed building looks like from here. The equipment rung read 0 ' +
-    'of 11 until issue #475 stopped the sampler drawing a vector this tower cannot be built with; ' +
-    'the redrawn twelfth cleared nothing, so the one survivor here is the same one it always was. ' +
-    'GitHub issue #467 priced `fairness-first` at 4 u, its reassignment dials beside its weights, ' +
-    'and the 4 u base still affords it.',
+  /*
+   * **Empty since § D1183**, and kept empty rather than deleted: a register that is empty is a state
+   * that must keep being checked. Stage 1 read one survivor at every rung (`zoned-uppeak`) and stage
+   * 3 one (`fairness-first`); with the stage page's own choices counted, stage 1 reads 12 of 39 at
+   * the base rung and stage 3 reads 4 of 39, so neither is a first-hour single survivor any longer.
+   */
 });
 
 /**
@@ -258,6 +243,7 @@ function clearSurvivors(step: WritableStep): void {
   step.survivors = 0;
   step.survivorNames = [];
   step.dropdown.survivors = 0;
+  step.page.survivors = 0;
   step.dials.survivors = 0;
   for (const cell of Object.values(step.perTier)) cell.survivors = 0;
 }
@@ -836,7 +822,23 @@ describe('the guard fires on the defect each clause was written for', () => {
       const step = firstStep(firstScenario(mutated));
       step.examined = step.examined + 1;
     });
-    expect(violations.some((line) => line.includes('the two strata examined'))).toBe(true);
+    expect(violations.some((line) => line.includes('the three strata examined'))).toBe(true);
+  });
+
+  it('refuses a count whose page stratum is left out of the sum — § D1183', () => {
+    const violations = mutate((mutated) => {
+      const step = firstStep(firstScenario(mutated));
+      step.page.examined += 1;
+    });
+    expect(violations.some((line) => line.includes('the three strata examined'))).toBe(true);
+  });
+
+  it('refuses a count that met the stage’s own crowds fewer times than it cleared — § D1183', () => {
+    const violations = mutate((mutated) => {
+      const step = firstStep(firstScenario(mutated));
+      step.metOnTuning = step.survivors - 1;
+    });
+    expect(violations.some((line) => line.includes('met the stage\'s own crowds'))).toBe(true);
   });
 
   it('refuses a count whose per-tier table does not add up to it', () => {
@@ -896,7 +898,7 @@ describe('the guard fires on the defect each clause was written for', () => {
       const top = scenario.steps.at(-1);
       if (top === undefined) throw new Error('a scenario with no steps');
       top.dropdown.examined = 0;
-      top.examined = top.dials.examined;
+      top.examined = top.page.examined + top.dials.examined;
     });
     expect(violations.some((line) => line.includes('census that shrinks'))).toBe(true);
   });

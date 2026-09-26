@@ -281,3 +281,65 @@ describe('the ordered path', () => {
     expect(rungs[0]?.position).toBe(2);
   });
 });
+
+describe('the stage page is counted, and a held stage says which half stopped it — § D1183', () => {
+  it('offers the four stages the page reaches and holds the three it does not, on the shipped table', () => {
+    /*
+     * The swarm's Q3 ruling as a reading of the regenerated table: S3 pressed the page's own choices
+     * and found holdout-confirmed ways through stages 2, 6, 7 and 8, which the dial sample had
+     * missed. Named here because the ruling named them; the rule itself is the derivation above.
+     */
+    const offer = new Map(ladder().map((rung) => [rung.id, rung.offer]));
+    for (const id of ['stage-2-morning-rush', 'stage-6-the-tall-one', 'stage-7-prove-it', 'stage-8-the-headline-address']) {
+      expect(offer.get(id), id).toBe('offered');
+      const base = survivors.scenarios.find((row) => row.id === id)?.steps.find((step) => step.stepId === null);
+      expect(base?.page.survivors, `${id}: its way through is on the page`).toBeGreaterThan(0);
+    }
+    for (const id of ['stage-4-two-banks', 'stage-9-both-ways-at-once', 'stage-10-the-bed-and-the-visitor']) {
+      expect(offer.get(id), id).toBe('held');
+    }
+  });
+
+  it('holds stage 4 on the held-back crowds and stages 9 and 10 on their own, in words, from the counts', () => {
+    const reason = new Map(ladder().map((rung) => [rung.id, rung.heldReason ?? '']));
+    expect(reason.get('stage-4-two-banks')).toMatch(/^Held back: \d+ of the \d+ ways tried at this budget met every goal on the stage’s own crowds, and none of them met every goal again on the crowds held back\./u);
+    for (const id of ['stage-9-both-ways-at-once', 'stage-10-the-bed-and-the-visitor']) {
+      expect(reason.get(id), id).toMatch(/^Held back: None of the \d+ ways tried at this budget met every goal even on the stage’s own crowds\./u);
+    }
+  });
+
+  it('reads the reason off metOnTuning, in both arms, on a synthetic table', () => {
+    const id = campaign.stages[0]!.id;
+    const withBase = (metOnTuning: number): PublishedSurvivors => ({
+      ...survivors,
+      scenarios: survivors.scenarios.map((row) =>
+        row.id !== id
+          ? row
+          : {
+              ...row,
+              diagnosis: null,
+              steps: row.steps.map((step) =>
+                step.stepId !== null
+                  ? step
+                  : {
+                      ...step,
+                      survivors: 0,
+                      survivorNames: [],
+                      metOnTuning,
+                      dropdown: { ...step.dropdown, survivors: 0 },
+                      page: { ...step.page, survivors: 0 },
+                      dials: { ...step.dials, survivors: 0 },
+                    },
+              ),
+            },
+      ),
+    });
+    const read = (metOnTuning: number) =>
+      scenarioLadderOf({ stages: campaign.stages, survivors: withBase(metOnTuning) }).find((rung) => rung.id === id)!;
+    expect(read(3).offer).toBe('held');
+    expect(read(3).heldReason).toContain('3 of the ');
+    expect(read(3).heldReason).toContain('none of them met every goal again on the crowds held back');
+    expect(read(0).heldReason).toContain('met every goal even on the stage’s own crowds');
+    expect(read(0).heldReason).toContain(SCENARIO_LADDER_COPY.heldBody);
+  });
+});

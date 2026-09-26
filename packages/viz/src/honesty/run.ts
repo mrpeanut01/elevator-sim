@@ -44,6 +44,7 @@ import { credentialCapabilityOf } from '../access/dispatcherCredentials.js';
 import { recordRun } from '../record/recordRun.js';
 import type { PublishedScenario } from '../scenario/published.js';
 import { routeRefusalsOf } from '../campaign/stagePress.js';
+import { namedStageMoveOf } from '../everyday/stagePlay.js';
 import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
 import { scenarioLadderOf } from '../scenario/ladder.js';
 import type { PublishedSurvivors } from '../scenario/survivors.js';
@@ -497,6 +498,7 @@ export function contextFor(honestyCase: HonestyCase, resources: HonestyResources
                 profiles: resources.dispatcherProfiles.profiles,
                 buildings: [...resources.buildingsById.values()],
                 elevatorSpecs: resources.elevatorSpecs,
+                moveNamed: (name) => namedStageMoveOf(name, resources.dispatcherProfiles.profiles, resources.space),
               },
             ),
           }),

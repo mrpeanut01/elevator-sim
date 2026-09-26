@@ -91,6 +91,8 @@ import type { PublishedScenario } from './published.js';
 import {
   bundleSpaceOf,
   dropdownConfigurationsOf,
+  pageConfigurationsOf,
+  type NamedStageMove,
   reachableChangesOf,
   sampleReachableConfigurations,
   samplerSeedFor,
@@ -102,9 +104,15 @@ import {
 
 /** One configuration's verdict, kept so a survivor can be named rather than only counted. */
 export interface JudgedConfiguration {
-  /** `'dropdown'` for a shipped profile picked by name; `'dials'` for a drawn edit. */
-  readonly stratum: 'dropdown' | 'dials';
-  /** What the configuration is called in the published record — a profile id, or `edit-<n>`. */
+  /**
+   * `'dropdown'` for a shipped profile picked by name; `'page'` for one of the stage page's own
+   * choices that the name alone does not make (§ D1183); `'dials'` for a drawn edit.
+   */
+  readonly stratum: 'dropdown' | 'page' | 'dials';
+  /**
+   * What the configuration is called in the published record — a profile id, a parked move
+   * (`<profile>-parked-<value>`, `campaign/stagePress.ts#parkedMoveOf`), or `edit-<n>`.
+   */
   readonly name: string;
   /** The dearest price tier the configuration reached. */
   readonly tier: string;
@@ -181,8 +189,17 @@ export interface SurvivorTally {
   readonly unjudged: number;
   /** Of {@link examined}, how many ran a batch that refused its own mean somewhere. */
   readonly suppressed: number;
+  /**
+   * Of {@link examined}, how many met every goal on the stage's own (tuning) crowds, whatever the
+   * held-back crowds then said. Always at least {@link survivors}. It is what lets a held stage say
+   * *which* half stopped it (§ D1183): met on the tuning crowds and refused by the holdout, or not
+   * met even on the tuning crowds.
+   */
+  readonly metOnTuning: number;
   /** The dropdown stratum, taken exhaustively. DC-2's replacement reads this. */
   readonly dropdown: SurvivorCounts;
+  /** The stage page's own choices past a name alone, taken exhaustively (§ D1183). */
+  readonly page: SurvivorCounts;
   /** The dial stratum, sampled. {@link SurvivorTally.sampling} says how. */
   readonly dials: SurvivorCounts;
   /** Examined and survivors, split by the dearest price tier the configuration reached. */
@@ -249,6 +266,12 @@ export interface MeasureSurvivorsInput {
   readonly baseline: DispatcherProfile;
   /** Every shipped profile, so the dropdown stratum is a population rather than a selection. */
   readonly profiles: readonly DispatcherProfile[];
+  /**
+   * **The stage page's own choices**, as the page offers them — `everyday/stagePlay.ts#stagePageMovesOf`,
+   * [§ D1183](../../../../DECISIONS.md). Supplied by the caller so `scenario/` imports no screen.
+   * Absent measures no page stratum, which is what a table taken before § D1183 was.
+   */
+  readonly pageMoves?: readonly NamedStageMove[] | undefined;
   /** Distinct dial configurations to draw at each rung. `survivors.ts` says why the figure is what it is. */
   readonly sampleSize: number;
   /** The master seed every cell's sampler seed derives from. Pinned in the published table. */
@@ -335,8 +358,51 @@ export async function measureScenarioSurvivors(
     input.onConfiguration?.(null, entry);
   }
 
+  /*
+   * The page stratum, played once for the same reason as the dropdown: a move's verdict does not
+   * depend on the rung, only its affordability does. A move no rung affords is not played at all,
+   * since no rung would count it.
+   */
+  const rungs = rungsOf(stage.budget);
+  const widest = rungs.reduce((most, rung) => Math.max(most, rung.units), 0);
+  const page = pageConfigurationsOf(space, schedule, baseline, input.pageMoves ?? [], building, elevatorSpecs);
+  const pageJudged = new Map<string, JudgedConfiguration>();
+  /* A page choice `core` will not resolve on this building has no price, so it is unplayable at every rung. */
+  const pageUnresolved: readonly UnbuildableConfiguration[] = page.unresolved.map((row) => ({
+    name: row.name,
+    tier: 'none',
+    changeIds: [],
+    reason: row.reason,
+  }));
+  const pageUnbuildable: UnbuildableConfiguration[] = [];
+  for (const configuration of page.configurations) {
+    if (configuration.units > widest) continue;
+    const outcome = await playOrRefuse(() =>
+      pressed({
+        stage,
+        published,
+        context: admissionContext,
+        move: configuration.move,
+        budgetUnits: Number.MAX_SAFE_INTEGER,
+        run: (request) => run(request),
+      }),
+    );
+    if (typeof outcome === 'string') {
+      pageUnbuildable.push({
+        name: configuration.name,
+        tier: configuration.tier,
+        changeIds: configuration.changeIds,
+        reason: outcome,
+      });
+      continue;
+    }
+    const entry = judgedFrom('page', configuration.name, configuration, outcome);
+    pageJudged.set(configuration.name, entry);
+    input.onConfiguration?.(null, entry);
+  }
+
   const out: SurvivorTally[] = [];
-  for (const rung of rungsOf(stage.budget)) {
+  for (const rung of rungs) {
     const seed = samplerSeedFor(masterSeed, stage.id, rung.stepId);
     const bundleSpace = bundleSpaceOf(space, reachable, rung.units);
     const drawn = sampleReachableConfigurations({
@@ -364,6 +430,19 @@ export async function measureScenarioSurvivors(
       const entry = dropdownJudged.get(configuration.profileId);
       if (entry === undefined) {
         const refused = dropdownUnbuildable.find((row) => row.name === configuration.profileId);
+        if (refused !== undefined) unbuildable.push(refused);
+        continue;
+      }
+      judged.push(entry);
+    }
+
+    /* The page's choices, attributed to this rung exactly where the one check admits them here. */
+    unbuildable.push(...pageUnresolved);
+    for (const configuration of page.configurations) {
+      if (!admitStageMove(admissionContext, configuration.move, rung.units).admitted) continue;
+      const entry = pageJudged.get(configuration.name);
+      if (entry === undefined) {
+        const refused = pageUnbuildable.find((row) => row.name === configuration.name);
         if (refused !== undefined) unbuildable.push(refused);
         continue;
       }
@@ -407,7 +486,9 @@ export async function measureScenarioSurvivors(
       survivors: judged.filter((entry) => entry.cleared).length,
       unjudged: judged.filter((entry) => entry.unjudged).length,
       suppressed: judged.filter((entry) => entry.suppressed).length,
+      metOnTuning: judged.filter((entry) => entry.metOnTuningSeeds).length,
       dropdown: countsOf(judged.filter((entry) => entry.stratum === 'dropdown')),
+      page: countsOf(judged.filter((entry) => entry.stratum === 'page')),
       dials: countsOf(judged.filter((entry) => entry.stratum === 'dials')),
       perTier: perTierOf(judged),
       judged,
@@ -464,7 +545,7 @@ async function playOrRefuse(
 }
 
 function judgedFrom(
-  stratum: 'dropdown' | 'dials',
+  stratum: JudgedConfiguration['stratum'],
   name: string,
   configuration: {
     readonly tier: string;

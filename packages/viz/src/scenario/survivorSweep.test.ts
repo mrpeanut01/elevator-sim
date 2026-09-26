@@ -90,7 +90,9 @@ function summaryOf(step: PublishedSurvivorStep): string {
   return (
     `${String(step.survivors)}/${String(step.examined)} ` +
     `dropdown ${String(step.dropdown.survivors)}/${String(step.dropdown.examined)} ` +
+    `page ${String(step.page.survivors)}/${String(step.page.examined)} ` +
     `dials ${String(step.dials.survivors)}/${String(step.dials.examined)} ` +
+    `met on tuning ${String(step.metOnTuning)} ` +
     `unjudged ${String(step.unjudged)} suppressed ${String(step.suppressed)} ` +
     `unbuildable ${String(step.unbuildable)} ` +
     `[${[...step.survivorNames].sort().join(' ')}]`

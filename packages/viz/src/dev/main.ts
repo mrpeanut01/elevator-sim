@@ -65,6 +65,7 @@ import { everydayDeviceChimeStore } from '../everyday/chimeStore.js';
 import { POST_RUN_COPY } from '../everyday/postRun.js';
 import { reportSignInLink } from '../everyday/signInLink.js';
 import { provideScenarioLadderFrom } from '../everyday/scenarioLadderPort.js';
+import { namedStageMoveOf } from '../everyday/stagePlay.js';
 import { provideScenarioOpen } from '../everyday/scenarioOpenPort.js';
 import { routeRefusalsOf } from '../campaign/stagePress.js';
 import { everydaySwap, onEverydaySwapProvided } from '../everyday/swap.js';
@@ -4454,6 +4455,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
         profiles: resources.dispatcherProfiles.profiles,
         buildings: resources.buildings,
         elevatorSpecs: resources.elevatorSpecs,
+        /* § D1183: the stage page's own choices are published under its own names. */
+        moveNamed: (name) => namedStageMoveOf(name, resources.dispatcherProfiles.profiles, loaded.space),
       });
       provideScenarioLadderFrom(loaded.campaign.stages, loaded.survivors, refusals);
     })

@@ -118,6 +118,19 @@ describe.skipIf(!HAS_BROWSER)('the Scenario hub opens the stage that was pressed
       );
       /* Two is the floor at which *different rows reach different stages* is a claim at all. */
       expect(offered.length).toBeGreaterThanOrEqual(2);
+      /*
+       * § D1183: the census counts the stage page's own choices, so the four stages it found ways
+       * through on are offered on the built bundle, beside the three that were already.
+       */
+      expect(offered.map((row) => row.id)).toEqual([
+        'stage-1-first-call',
+        'stage-2-morning-rush',
+        'stage-3-overwhelmed',
+        'stage-5-credentials',
+        'stage-6-the-tall-one',
+        'stage-7-prove-it',
+        'stage-8-the-headline-address',
+      ]);
       expect(new Set(offered.map((row) => row.id)).size, 'the hub drew two rows for one stage').toBe(offered.length);
 
       const arrived: string[] = [];

@@ -352,6 +352,7 @@ import {
   type FixitOutcome,
   type FixitVerdictContext,
 } from '../fixit/engine.js';
+import { FIXIT_PAR, fixitParLineOf } from '../fixit/par.js';
 import {
   checkingOutcomeOf,
   DERIVED_MORNINGS,
@@ -7521,6 +7522,9 @@ const FIXIT_COVERS: readonly string[] = [
   /* § D1157: a case once fixed stays fixed, and a later run that does not clear says so over its card. */
   'fixit/engine.ts#FIX_KEPT_LINE',
   'fixit/engine.ts#fixKeptLineOf',
+  /* § D1184: the par on a fixed card, in its three comparisons, seeded below on a case with a priced par. */
+  'fixit/par.ts#FIXIT_PAR_COPY',
+  'fixit/par.ts#fixitParLineOf',
   'fixit/judge.ts#REPLICATED_ROUTES_BASIS_LINE',
   'fixit/judge.ts#FUTILITY_ROUTES_BASIS_LINE',
   'fixit/judge.ts#progressLineOf',
@@ -7863,6 +7867,26 @@ const FIXIT: SurfaceAdapter = {
       role: 'prose',
       provenance: 'authored',
     });
+    /*
+     * § D1184: the par line, drawn only on a fixed card. The synthetic case has no par row, so it is
+     * rendered on the first shipped case whose par is priced, under, at and over it.
+     */
+    const priced = Object.entries(FIXIT_PAR).find(([, row]) => row.units !== null && row.units > 0);
+    if (priced !== undefined) {
+      const [parCase, parRow] = priced;
+      for (const [arm, spent] of [
+        ['under', (parRow.units ?? 0) - 1],
+        ['same', parRow.units ?? 0],
+        ['over', (parRow.units ?? 0) + 2],
+      ] as const) {
+        seeds.push({
+          field: `outcome.par.${arm}`,
+          text: fixitParLineOf(parCase, spent) ?? '',
+          role: 'prose',
+          provenance: 'authored',
+        });
+      }
+    }
     const short = classifyOutcome(
       entry,
       { ...flat, complaintGonePct: 30, restDeltaPoints: 0 },

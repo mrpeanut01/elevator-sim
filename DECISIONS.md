@@ -37478,6 +37478,8 @@ had been written past D640 — and this entry is what closes that window on D644
 
 ## D649 — The ten campaign stages reach the Scenario hub as the ordered path they were authored to be; a stage with no measured way through is **listed with its count and not offered**, and the register row saying the two schemas were separate is deleted as a correction
 
+> **Status 2026-09-26: AMENDED by [§ D1183](#d1183).** The count also presses the stage page's own choices, so stages 2, 6, 7 and 8 are offered; a held row says from the counts which half of the judge stopped it. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Status 2026-09-25: AMENDED by [§ D1129](#d1129).** The stages play in the fix-it editor and a first clear pays, so the register half this entry kept (*played on the Engineer surface, a clear there banks nothing*) is gone; a stage is also held when the one admission check refuses every way through its count names. See [`docs/39`](docs/39-decisions-in-force.md).
 
 **Date: 2026-09-19 · Owner: this session, on the session principal's explicit delegated authority (recorded here rather than attributed to an unnamed "product owner", per [§ D227](#d227)'s stale-attribution class and the standing rule that an agent lane may not manufacture a human) · Rules on: `packages/viz/src/scenario/ladder.ts` (new), `packages/viz/src/everyday/scenarioLadderPort.ts` (new), `packages/viz/src/everyday/scenarioModel.ts`, `packages/viz/src/everyday/scenarioScreen.ts`, `packages/viz/src/dev/data.ts`, `packages/viz/src/dev/main.ts`, `packages/viz/src/honesty/run.ts`, `packages/viz/src/honesty/surfaces.ts`, `packages/viz/vite.config.ts`, `docs/39-decisions-in-force.md`.**
@@ -45538,6 +45540,8 @@ are unchanged; a decision swarm is ruling on those. No mechanic is renamed.
 
 ## D1120 — a fix case is a search: the diagnosis waits until asked, the interval reads the forty-nine derived mornings, a check stops early only to say not fixed, and the wait is a count
 
+> **Status 2026-09-26: EXTENDED by [§ D1184](#d1184).** A fixed card also shows the par, the cheapest change the route census tried that fixes the letter on the same forty-nine mornings; it pays nothing. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-09-25 by agent sessions under delegated authority**, not by the product owner: a
 > three-member decision swarm (S1 the player's lens, S2 honesty's, S3 engineering's) ruled
 > independently on the post-AI panel's second question, *fixing a building as a search, and the
@@ -45799,6 +45803,8 @@ This lane held **D1120-D1128** and spent **D1120 only**. D1121 to D1128 are unsp
 permanent holes under [§ D404](#d404) once a later lane writes above them.
 
 ## D1129 — a campaign stage has one admission check, shared by the census, the Lab and play; stages are played from the hub in the fix-it editor, and a clear pays once and unlocks nothing
+
+> **Status 2026-09-26: AMENDED by [§ D1183](#d1183).** The census has a third stratum, the stage page's own choices, admitted through this entry's one check; stages 2, 6, 7 and 8 open, and a parked route name is read back and asked the check. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Taken 2026-09-25 by agent sessions under delegated authority**, not by the product owner: a
 > three-member decision swarm (the player, honesty and engineering lenses, S1 to S3, whose records
@@ -46392,6 +46398,8 @@ unchanged; the browser tier holds the header against the press row.
 
 ## D1154 — a goal is named in words on every surface, and its data id stays in the data
 
+> **Status 2026-09-26: AMENDED by [§ D1185](#d1185).** The author's *not in the measured bucket* error names the kind's id with the player's name beside it. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-09-26 by agent sessions under delegated authority** (wave AK, lane AK-B), not by the
 > product owner. Owner-reversible clause: the seven names.
 
@@ -46485,6 +46493,8 @@ row's player name is the price group's.
 false routes to the composed arm with *What it did* and without the disclaimer.
 
 ## D1159 — a campaign goal is named for the bar it is judged against, the held-back crowds are named as crowds, and stage 3's brief says how it clears
+
+> **Status 2026-09-26: AMENDED by [§ D1185](#d1185).** On the stage page a per-run goal is marked *bar reached* or *bar not reached*, never a bare *met*. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Taken 2026-09-26 by an agent session under delegated authority** (wave AK, lane AK-C), not by
 > the product owner, on the post-AJ panel's seats A (D10), C (D7, D8) and D (H9). Lane AK-B's
@@ -46723,8 +46733,6 @@ rather than measured, and the long end is `sittingShape.ts#WHOLE_DAY_LONGEST`, m
 now an upper bound rather than the longest day; the sixteen-contract re-measurement that would make
 it the longest again was not taken in wave AK.
 
----
-
 ## D1176 — only contested days count toward a census week, and its target is derived: counted days dealt, minus one
 
 > **Taken 2026-09-26 by agent sessions under delegated authority** (wave AK, lane AK-E, on swarm
@@ -46840,3 +46848,173 @@ count, and names the week's half of the definition.
 **Moved.** `shift/dailySeed.ts`'s rotation figures go to their ceiling, 99.9 % and 729 (were 66.2 %
 and 119): with one member every date after the first repeats it, which is the ruling's intent rather
 than a collision rate.
+
+## D1183 — the survivor census counts the stage page's own choices, and stages 2, 6, 7 and 8 open
+
+> **Taken 2026-09-26 by agent sessions under delegated authority**, not by the product owner: the
+> `decide-al` swarm's Q3 ruling, clauses 1 to 3 (S3's measurement overriding S1's and S2's readings,
+> three of three on refusing a chime-bought budget), reconciled by wave AK's integrator and built by
+> lane AK-F. A later reader weighing this against a product-owner ruling should treat it as an agent
+> ruling and say so; [§ D626](#d626) is the cautionary case. **It moves no bar, no price and no
+> budget.** It amends [§ D1129](#d1129) clause 3's census and [§ D649](#d649)'s held row.
+> **Owner-reversible**: offering stages whose cheapest clear is free; pricing idle parking above 0;
+> declared diagnoses for stages 9 and 10.
+
+**Why an entry.** [§ D405](#d405)'s first and second grounds: it changes what `data/scenario-survivors.json`
+publishes (a third stratum and a count the held rows read), which the Scenario hub, the stage page,
+the server's earn route (`chimes/ledger.ts#offeredStageIdsIn`, which pays an offered stage once) and
+the honesty corpus all read; and it moves two recorded rulings.
+
+### What was wrong
+
+The census counted two strata: the thirteen shipped profiles picked by name (a census) and twelve
+drawn dial configurations a rung (a sample). It never pressed the stage page's own control space,
+a standing order by name **with** where idle cars wait, which § D1129 ships and prices at 0 units
+for the parking half. S3 pressed that space (52 choices a stage) through `pressStage` and the holdout
+and found holdout-confirmed ways through four stages the hub held.
+
+### The ruling
+
+1. **A third stratum, `page`: a census.** `everyday/stagePlay.ts#stagePageMovesOf` reads the page's
+   own select, profile by profile (the fix-it parking row less `fixed-floor`), and names each move
+   that is not a name alone `<profile>-parked-<value>` (`parkedMoveOf`). `scenario/survivorSpace.ts#pageConfigurationsOf`
+   prices each through `campaign/stagePress.ts#admitStageMove`, and `measureSurvivors.ts` plays each
+   once through `pressStage` (tuning, then holdout) and attributes it to every rung the check admits
+   it at, as the dropdown is. The regenerator passes the moves in, so `scenario/` imports no screen.
+2. **Every step publishes `page` and `metOnTuning`** (how many examined met every goal on the
+   stage's own crowds). `survivors.ts#validatePublishedSurvivors` sums three strata and bounds
+   `metOnTuning` between the survivors and the examined. The survivor sentence names the three
+   parts and says the first two are counts.
+3. **A stage is offered through the one check when any page choice clears both seed sets**, by the
+   rule § D649 already reads (base-rung survivors above zero). `routeRefusalsOf` reads a parked name
+   back through the caller's `moveNamed` and asks the check of it, so an aged table naming a parked
+   route the check now refuses still holds its stage.
+4. **A held row says which half stopped it, from the counts** (`ladder.ts#heldMeasurementOf`):
+   *"k of the n ways tried at this budget met every goal on the stage's own crowds, and none of them
+   met every goal again on the crowds held back."*, or *"None of the n ways tried at this budget met
+   every goal even on the stage's own crowds."*, then the sample caveat. It never says unwinnable.
+5. **No chime-bought budget** (three of three): no stage was blocked by price.
+
+### Measured
+
+`ELEVATOR_SIM_SURVIVORS=deep ELEVATOR_SIM_REGENERATE_SURVIVORS=1 npx vitest run --project viz
+src/scenario/survivorSweep.test.ts`, 5 728 s in one process on the shared four-core container at a
+load average of 4 to 12, `provenance.tree` `e4dd241`. **Every dropdown and dial count, survivor name
+and unbuildable count reproduced**; the input hash moved (`a5854acc…` to `f9e8fdbe…`), which is the
+`survivorInputs.test.ts` red on this wave's base closing. Base rung, before → after:
+
+| stage | before | after | page | met on tuning | offer |
+|---|---|---|---|---|---|
+| 1 First call | 1 of 18 | 12 of 39 | 11 of 21 | 13 | offered |
+| 2 Morning rush | 0 of 18 | **5 of 39** | 5 of 21 | 7 | **opens** |
+| 3 Overwhelmed | 1 of 18 | 4 of 39 | 3 of 21 | 4 | offered |
+| 4 Two banks | 0 of 23 | 0 of 62 | 0 of 39 | 16 | held: meets the stage's crowds, never the held-back ones |
+| 5 Credentials | 1 of 23 | 2 of 62 | 1 of 39 | 22 | offered |
+| 6 The tall one | 0 of 24 | **3 of 63** | 3 of 39 | 9 | **opens** |
+| 7 Prove it | 0 of 24 | **18 of 63** | 18 of 39 | 19 | **opens** |
+| 8 Headline address | 0 of 18 | **11 of 39** | 11 of 21 | 15 | **opens** |
+| 9 Both ways | 0 of 24 | 0 of 63 | 0 of 39 | 0 | held: nothing meets even the stage's crowds |
+| 10 Bed and visitor | 0 of 24 | 0 of 63 | 0 of 39 | 0 | held: nothing meets even the stage's crowds |
+
+S3's four counts (5, 3, 18, 11) reproduce exactly. The registers moved with the table:
+`survivors.test.ts`'s zero-count register keeps 4, 9 and 10 and its first-hour single-survivor
+register is empty (stages 1 and 3 no longer read one); `survivorBands.test.ts` drops stages 1 and 6
+(now inside) and moves stages 7 and 8 from *below* to **above** their bands.
+
+### A re-authoring item, recorded and not done
+
+**The budget binds nothing on stages 6, 7 and 8**, and on stage 1: each has a way through at
+**0 units**, the stage's own standing order with idle cars parked at the lobby or the zone centre
+(`collective-parked-zone-center` on 1 and 6, `collective-parked-lobby` on 7 and 8), because the price
+schedule charges nothing for where idle cars wait. A budget that constrains nothing is a price
+question for the owner, and stages 7 and 8 now sit above their approved bands for the same reason.
+This entry changes no budget, no price and no band.
+
+### Not established
+
+- No mechanism is offered for why a parking change clears these stages where the dial sample did
+  not ([§ D256](#d256)); the counts are the claim.
+- The stage page's run time for these stages on a hosted runner is not measured.
+
+**The replay.** `ELEVATOR_SIM_SURVIVORS=deep npx vitest run --project viz src/scenario/survivorReplay.test.ts`:
+all **79** named ways through, parked names read back by `stagePlay.ts#namedStageMoveOf`, admitted
+and **cleared through `pressStage`** on both seed sets, 474 s in one process on the same container.
+`everyday/scenarioScreen.browser.test.ts` finds stages 1, 2, 3, 5, 6, 7 and 8 offered on the built
+bundle and presses each into the fix-it editor and the Lab.
+
+## D1184 — a fixed case shows its par: the cheapest change we tried that fixes the letter on the same forty-nine mornings, and it pays nothing
+
+> **Taken 2026-09-26 by agent sessions under delegated authority**, not by the product owner: the
+> `decide-al` swarm's Q3 ruling, clause 4 (S1's form; S3 preferred follow-up letters, deferred),
+> reconciled by wave AK's integrator and built by lane AK-F. A later reader weighing this against a
+> product-owner ruling should treat it as an agent ruling and say so; [§ D626](#d626) is the
+> cautionary case. **Owner-reversible**: the par line itself, and whether it is drawn on every fixed
+> case or only where the census found more than one price.
+
+**Why an entry.** [§ D405](#d405)'s first and second grounds: it binds the Everyday fix-it screen
+(`everyday/fixitScreen.ts`), the route census's nightly job (`fixit/routeCensus.sweep.test.ts`,
+`.github/workflows/deep-tiers.yml`) and the honesty corpus, and it adds to what [§ D1120](#d1120)'s
+fixed card says.
+
+**The ruling.**
+
+1. **A fixed card shows the par**: *"The cheapest change we tried that fixes this letter, judged on
+   the same forty-nine mornings, cost P units."*, then *"Yours cost less than any fix we tried."*,
+   *"Yours cost the same."* or *"Yours cost Q units."*, then *"Matching it or beating it pays
+   nothing extra."* (`fixit/par.ts#fixitParLineOf`). Drawn only beside a *fixed* verdict, priced at
+   the order that verdict measured (`engine.ts#spendOf`, the spent row's own figure).
+2. **The par is a minimum over the census's sample, judged as a press is judged.** The route
+   census's clearing routes (`routes.test-helper.ts#routesFor`, gate on the letter's morning), taken
+   cheapest first through the forty-nine derived mornings with the judge's own futility looks, until
+   one holds (`fixit/par.test-helper.ts`). So the sentence says *we tried*, never *the cheapest*.
+3. **It pays nothing and moves no verdict.** The chime award for a fixed case is unchanged, and a
+   case is fixed at any price inside its budget, as before.
+4. **No route is named.** The table pins units and a count; the route that set each par is printed
+   by the sweep and not written into the shipped module, because a route label is the answer the
+   card must not print (`theAnswerIsNotPrinted.test.ts`'s ground).
+
+**Measured** (`ELEVATOR_SIM_FIXIT_ROUTES=deep FIXIT_ROUTES_OUT=… npx vitest run --project viz
+src/fixit/routeCensus.sweep.test.ts`, 317 s in one process on the lane's container, beside the
+survivor regeneration): the census reproduced on all fifteen cases. Pars: **0 units** on
+`sleeping-sky-lobby` and `three-cars-one-cars-work`; **2** on seven cases; **6** on six. Thirteen
+pars are the cheapest gate-clearing route, held at the first judgement; on `bed-cars-locked-out`
+(two judged) and `every-deck-calls-itself-full` (three judged) a cheaper gate clear was refused by
+the forty-nine mornings. **The swarm's S3 reading of seven cases with a free clearing route is not
+reproduced here**: under this tree's prices only two cases have a free route that clears the gate.
+S1 and S3 measured on trees before lane AK-C's shown-price fix (`fixit/shownPriceIsCharged.test.ts`,
+this wave) landed; whether that fix is the difference is not established, and no mechanism is
+offered ([§ D256](#d256)).
+
+**Tests.** `fixit/par.test.ts` (always on): one row per censused case, a par only where the census
+has a clearing route, the par of `three-cars-one-cars-work` re-derived through the mornings, and the
+line's words in all three comparisons. `routeCensus.sweep.test.ts` re-derives every par nightly.
+`everyday/fixitVerdict.browser.test.ts` reads the par and *pays nothing extra* on a fixed card on
+the built bundle.
+
+**Not done.** The Engineer fix-it panel (`dev/fixitPanel.ts`) draws no par. Follow-up letters
+(S3's form) are not built.
+
+## D1185 — a per-run campaign goal's mark names its bar, and an author's goal error names the kind's id
+
+> **Taken 2026-09-26 by an agent session under delegated authority** (wave AK, lane AK-F), not by
+> the product owner: the two campaign-copy items [§ D1154](#d1154) left over and [§ D1159](#d1159)
+> did not reach. **Owner-reversible**: the words *bar reached* and *bar not reached*.
+
+**Why an entry.** It moves a recorded rule's wording on the stage page ([§ D1159](#d1159)) and
+narrows [§ D1154](#d1154)'s `goalLabel` in the one caller that is not a player's.
+
+**The ruling.**
+
+1. On the stage page, a goal judged run by run against the shipped setting's own count
+   (`scenario/goals.ts#isPerReplicationGoal`) is marked **bar reached** or **bar not reached**,
+   never a bare *met*. The label beside it already names the bar (*on at least as many runs as the
+   shipped setting*); a bare *met* after *everyone delivered* still read as *everyone was delivered*
+   at 5 of 50 runs. *Measurably ahead of the shipped setting*, judged by an interval, keeps *met* and
+   *missed*.
+2. `campaign/parse.ts`'s *not in this stage's measured goals bucket* error names the kind's id
+   (and threshold), which is what `data/` is keyed by, with the player's name beside it:
+   *declares goal "nobody-abandoned" (shown to players as "nobody past the give-up line")*. Since
+   § D1154 it printed the player's name alone, which an author cannot find in the file.
+
+**Tests.** `everyday/stagePlay.test.ts` (both marks on a per-run goal, *met* on the interval goal)
+and `campaign/campaign.test.ts` (the error's id and name).

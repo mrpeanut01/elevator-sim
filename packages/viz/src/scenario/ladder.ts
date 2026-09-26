@@ -198,7 +198,7 @@ export const SCENARIO_LADDER_COPY = Object.freeze({
    * happening rather than a hypothetical. So the row says what a zero here is and is not.
    */
   heldBody:
-    'nothing that was tried at this budget got through, and the dials among them were a sample rather than everything there is — so a rare way through is missed here rather than ruled out. It is on the list because it is the next step on the path, and it is not offered to play until one is found or it says outright that there is none.',
+    'The dials among them were a sample rather than everything there is, so a rare way through is missed here rather than ruled out. It is on the list because it is the next step on the path, and it is not offered to play until one is found or it says outright that there is none.',
   /**
    * **A stage whose count names ways through that its own admission check refuses** — § D1129
    * clause 3. The check's sentence follows it, so the reader meets the price and the budget rather
@@ -249,6 +249,26 @@ export interface ScenarioLadderInput {
    * Absent answers nothing, which is how a caller holding no search space reads the table as it is.
    */
   readonly refusalOf?: ((stageId: string, routeName: string) => string | undefined) | undefined;
+}
+
+/**
+ * **Which half of the judge stopped a held stage**, as a count off its base rung — [§ D1183](../../../../DECISIONS.md).
+ *
+ * A clear needs the stage's own crowds and then the crowds held back, so a stage nothing clears is
+ * held for one of two measured reasons, and the row says which: some of what was tried met every
+ * goal on the stage's own crowds and none of those held on the others, or nothing tried met every
+ * goal even on the stage's own crowds. Both are counts over `examined`, named with it, and neither
+ * says a way through does not exist.
+ */
+function heldMeasurementOf(step: PublishedSurvivorStep): string {
+  const tried = `${String(step.examined)} ${step.examined === 1 ? 'way' : 'ways'} tried at this budget`;
+  if (step.metOnTuning > 0) {
+    return (
+      `${String(step.metOnTuning)} of the ${tried} met every goal on the stage’s own crowds, ` +
+      'and none of them met every goal again on the crowds held back.'
+    );
+  }
+  return `None of the ${tried} met every goal even on the stage’s own crowds.`;
 }
 
 /** The base rung of a published scenario — `stepId: null`, the budget it opens on. */
@@ -352,7 +372,7 @@ export function scenarioLadderOf(input: ScenarioLadderInput): readonly ScenarioL
           ? undefined
           : allRefused
             ? `${SCENARIO_LADDER_COPY.heldLead} ${SCENARIO_LADDER_COPY.heldRefusedBody} ${firstRefusal ?? ''}`.trim()
-            : `${SCENARIO_LADDER_COPY.heldLead} ${SCENARIO_LADDER_COPY.heldBody}`,
+            : `${SCENARIO_LADDER_COPY.heldLead} ${heldMeasurementOf(base)} ${SCENARIO_LADDER_COPY.heldBody}`,
         openNote: offered ? SCENARIO_LADDER_COPY.openNote : undefined,
       }),
     );

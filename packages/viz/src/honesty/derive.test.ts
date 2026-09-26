@@ -63,6 +63,19 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'The page’s parked moves under their published names — § D1183. `parkedMoveOf`, ' +
+        '`namedStageMoveOf` and `stagePageMovesOf` compose and read back `<profile>-parked-<value>`, ' +
+        'the key the survivor census publishes a page choice under and the batch worker names the ' +
+        'candidate arm by. No surface draws it: the hub prints the survivor sentence’s counts, never ' +
+        'a survivor’s name, and the stage page draws profile names and the parking row’s own words.',
+      ids: [
+        'everyday/stagePlay.ts#parkedMoveOf',
+        'everyday/stagePlay.ts#namedStageMoveOf',
+        'everyday/stagePlay.ts#stagePageMovesOf',
+      ],
+    },
+    {
+      reason:
         'The whole-day splice — wave AJ lane AJ-B, § D1057. `shift/episode.ts#spliceEpisode` returns a ' +
         'derived phase-list record and, where a day cannot hold an episode, a refusal with its reason. ' +
         'The record’s `$comment` is a data comment nothing renders. The refusal reaches no screen: ' +
@@ -1682,6 +1695,12 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'fixit/routeCensus.ts#ROUTE_CENSUS',
         'fixit/routeCensus.ts#routeCensusOf',
         'fixit/routeCensus.ts#opensWithDiagnosis',
+        /*
+         * § D1184's par table is units and counts per case id, on the census's ground above; the
+         * sentence a player reads is `fixit/par.ts#fixitParLineOf`'s, which the FIXIT adapter drives.
+         */
+        'fixit/par.ts#FIXIT_PAR',
+        'fixit/par.ts#fixitParOf',
         'fixit/engine.ts#affordabilityOf',
         'fixit/engine.ts#toggleRepair',
         /*

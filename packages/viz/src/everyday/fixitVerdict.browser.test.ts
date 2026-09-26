@@ -28,6 +28,7 @@ import {
   startShippedSite,
   type ShippedSite,
 } from '../dev/browserTier.test-helper.js';
+import { FIXIT_PAR, FIXIT_PAR_COPY } from '../fixit/par.js';
 
 let site: ShippedSite;
 let browser: Browser;
@@ -105,6 +106,11 @@ describe.skipIf(!HAS_BROWSER)('a fixed verdict on the shipped bundle — § D101
       expect(fixed.card).not.toContain('What it bought');
       expect(fixed.card).not.toContain('describes a different run');
       expect(fixed.card).toContain('they do not say why');
+      /* § D1184: the par, the cheapest change the census tried that fixes this letter, and it pays nothing. */
+      expect(fixed.card).toContain(
+        `The cheapest change we tried that fixes this letter, judged on the same forty-nine mornings, cost ${String(FIXIT_PAR['two-cars-out-wrong-month']?.units)} units.`,
+      );
+      expect(fixed.card).toContain(FIXIT_PAR_COPY.pays);
       expect(fixed.stale).toBeNull();
       expect(fixed.primary).toBe('Next building');
 

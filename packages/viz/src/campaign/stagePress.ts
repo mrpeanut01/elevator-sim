@@ -315,6 +315,14 @@ export interface StageRouteResources {
   readonly profiles: readonly DispatcherProfile[];
   readonly buildings: readonly ResolvedBuilding[];
   readonly elevatorSpecs: ElevatorSpecs | undefined;
+  /**
+   * **The move a published name stands for**, where the name alone says — § D1183. The survivor
+   * census publishes the stage page's own choices under `everyday/stagePlay.ts#parkedMoveOf`'s
+   * names, and that module reads them back (`namedStageMoveOf`); passed in, because a dimension id
+   * is a literal this directory does not write. Absent reads a shipped profile by its id and nothing
+   * else.
+   */
+  readonly moveNamed?: ((name: string) => StageMove | undefined) | undefined;
 }
 
 /** Answers why a named route is refused on a stage's base rung, or `undefined` when it is not. */
@@ -332,9 +340,12 @@ export type RouteRefusal = (stageId: string, routeName: string) => string | unde
  * (`scenario/ladder.ts#scenarioLadderOf`) rather than offering a way through nobody can press,
  * which is the defect a post-wave-AI assessor found on stages 1 and 5.
  *
- * A name that is not a shipped profile is a drawn dial configuration (`edit-<n>`) and is answered
- * `undefined`: its values are not in the table, and the census pressed it through this same check
- * when it was drawn. Asked at the **base rung**, because that is the rung the hub's count is taken at.
+ * A parked move — the stage page's two controls together — is read back from its name by the
+ * caller's {@link StageRouteResources.moveNamed} and asked the same question (§ D1183). A name that
+ * resolves to nothing is a drawn dial
+ * configuration (`edit-<n>`) and is answered `undefined`: its values are not in the table, and the
+ * census pressed it through this same check when it was drawn. Asked at the **base rung**, because
+ * that is the rung the hub's count is taken at.
  */
 export function routeRefusalsOf(
   stages: readonly CampaignStage[],
@@ -345,18 +356,22 @@ export function routeRefusalsOf(
   return (stageId, routeName) => {
     const stage = stagesById.get(stageId);
     const profile = profilesById.get(routeName);
-    if (stage === undefined || profile === undefined) return undefined;
+    const move = profile !== undefined ? { profile } : resources.moveNamed?.(routeName);
+    if (stage === undefined || move === undefined) return undefined;
     const baseline = profilesById.get(stage.dispatcher.startingProfileId);
     if (baseline === undefined) return 'the stage’s own starting setting is not in this build’s data.';
+    const building = resources.buildings.find((entry) => entry.id === stage.building);
+    /* An edited move is admissible only on a building (GitHub issue #475); without one, nothing is asked. */
+    if (move.edit !== undefined && building === undefined) return undefined;
     const admission = admitStageMove(
       {
         space: resources.space,
         schedule: resources.schedule,
         baseline,
-        building: resources.buildings.find((building) => building.id === stage.building),
+        building,
         elevatorSpecs: resources.elevatorSpecs,
       },
-      { profile },
+      move,
       stageUnitsAt(stage, null),
     );
     return admission.admitted ? undefined : admission.sentence;

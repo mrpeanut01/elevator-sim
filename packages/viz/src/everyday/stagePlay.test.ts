@@ -24,7 +24,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { restrictedFloorIds } from '../access/zoning.js';
 import { parseCampaign, type CampaignContext } from '../campaign/parse.js';
 import { batchRequestForStage, demonstrationConfigFor } from '../campaign/stageRun.js';
-import { admitStageMove, stageUnitsAt } from '../campaign/stagePress.js';
+import { admitStageMove, routeRefusalsOf, stageUnitsAt } from '../campaign/stagePress.js';
 import type { CampaignStage } from '../campaign/types.js';
 import { DATA_DIR, requireBuilding } from '../fixtures.test-helper.js';
 import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
@@ -34,8 +34,11 @@ import type { PublishedSurvivors } from '../scenario/survivors.js';
 import {
   STAGE_PLAY_COPY,
   stageFactsOf,
+  namedStageMoveOf,
   stageMoveOf,
+  stagePageMovesOf,
   stagePlayViewOf,
+  verdictFactsOf,
   type StagePlayChoice,
   type StagePlayVerdictFacts,
 } from './stagePlay.js';
@@ -221,7 +224,7 @@ describe('the two controls reach the run, compared on the legs — CLAUDE.md’s
 describe('a clear pays once, flat, and unlocks nothing — § D1129 clause 4', () => {
   const verdict = (cleared: boolean, paid: StagePlayVerdictFacts['paid']): StagePlayVerdictFacts => ({
     headline: 'judge headline',
-    goals: [{ label: 'Beat the baseline', met: cleared, sentence: 'judge sentence' }],
+    goals: [{ label: 'Beat the baseline', met: cleared, sentence: 'judge sentence', perRun: false }],
     holdoutSentence: cleared ? 'held on the held-back crowds' : null,
     metOnTuningSeeds: cleared,
     cleared,
@@ -256,5 +259,75 @@ describe('a held stage is drawn with its reason — § D1129 clause 3', () => {
       { kind: 'idle' },
     );
     expect(view.held).toBe(`${STAGE_PLAY_COPY.heldHead}: the reason`);
+  });
+});
+
+describe('the page’s own choices, as the survivor census presses them — § D1183', () => {
+  it('is every profile under every place for idle cars the page offers beneath it, and nothing a name alone makes', () => {
+    const profiles = config.dispatcherProfiles.profiles;
+    const moves = stagePageMovesOf(profiles, space, shippedPriceSchedule());
+    const stage = stageAt(0);
+    /* Read the page's own select, profile by profile, rather than restating what it offers. */
+    const offered = profiles.flatMap((profile) =>
+      factsOf(stage, { profileId: profile.id, parking: null })
+        .parking.options.map((option) => option.value)
+        .filter((value): value is NonNullable<StagePlayChoice['parking']> => value !== null)
+        .map((parking) => stageMoveOf({ profileId: profile.id, parking }, profiles, { space }))
+        .filter((move) => move?.edit !== undefined)
+        .map((move) => move?.edit?.profileId ?? ''),
+    );
+    expect(moves.map((move) => move.name).sort()).toEqual([...new Set(offered)].sort());
+    expect(moves.length, 'the page offers nothing past a name, so the stratum is empty').toBeGreaterThan(0);
+    for (const { name, move } of moves) {
+      expect(move.edit?.profileId, name).toBe(name);
+      expect(Object.keys(move.edit?.values ?? {}), name).toEqual(['idle.parkingStrategy']);
+      expect(move.edit?.values['idle.parkingStrategy'], name).not.toBe('fixed-floor');
+    }
+  });
+
+  it('reads a published name back to the move it names, and answers nothing for a draw', () => {
+    const profiles = config.dispatcherProfiles.profiles;
+    for (const { name, move } of stagePageMovesOf(profiles, space, shippedPriceSchedule())) {
+      expect(namedStageMoveOf(name, profiles, space), name).toEqual(move);
+    }
+    expect(namedStageMoveOf('zoned-uppeak', profiles, space)?.edit).toBeUndefined();
+    expect(namedStageMoveOf('edit-3', profiles, space)).toBeUndefined();
+    expect(namedStageMoveOf('no-such-profile-parked-lobby', profiles, space)).toBeUndefined();
+  });
+
+  it('asks the one check of a parked name, so a table naming one it now refuses is held', () => {
+    const stage = stageAt(0);
+    const refusalOf = routeRefusalsOf(stages, {
+      space,
+      schedule: shippedPriceSchedule(),
+      profiles: config.dispatcherProfiles.profiles,
+      buildings: [requireBuilding(config, stage.building)],
+      elevatorSpecs: config.elevatorSpecs,
+      moveNamed: (name) => namedStageMoveOf(name, config.dispatcherProfiles.profiles, space),
+    });
+    /* Stage 1 opens on 4 units; a destination panel costs 15, parked or not. */
+    expect(refusalOf(stage.id, 'destination-panel-parked-lobby')).toMatch(/15 units against the 4/u);
+    expect(refusalOf(stage.id, `${stage.dispatcher.startingProfileId}-parked-zone-center`)).toBeUndefined();
+  });
+});
+
+describe('a per-run goal’s mark names its bar — § D1185', () => {
+  const report = (kind: 'deliver-everyone' | 'beat-the-baseline', met: boolean) =>
+    ({
+      headline: 'h',
+      cleared: met,
+      metOnTuningSeeds: met,
+      holdout: undefined,
+      goals: [{ kind, label: 'label', met, reproduced: null, sentence: 's', note: 'n' }],
+    }) as unknown as Parameters<typeof verdictFactsOf>[0];
+
+  it('reads bar reached on a goal judged against the shipped setting’s count, never a bare met', () => {
+    const facts = factsOf(stageAt(0), { profileId: 'zoned-uppeak', parking: null });
+    for (const met of [true, false]) {
+      const view = stagePlayViewOf(facts, { kind: 'judged', verdict: verdictFactsOf(report('deliver-everyone', met), undefined), stale: false });
+      expect(view.verdict?.goals[0]?.mark).toBe(met ? STAGE_PLAY_COPY.goalBarReached : STAGE_PLAY_COPY.goalBarNotReached);
+    }
+    const interval = stagePlayViewOf(facts, { kind: 'judged', verdict: verdictFactsOf(report('beat-the-baseline', true), undefined), stale: false });
+    expect(interval.verdict?.goals[0]?.mark).toBe(STAGE_PLAY_COPY.goalMet);
   });
 });

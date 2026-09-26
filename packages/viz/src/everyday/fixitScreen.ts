@@ -181,6 +181,7 @@ import {
 } from '../fixit/judge.js';
 import { shippedAsBuiltMorningsOf } from '../fixit/asBuiltMornings.js';
 import { opensWithDiagnosis, routeCensusOf } from '../fixit/routeCensus.js';
+import { fixitParLineOf } from '../fixit/par.js';
 import { heldReasonOf, isOffered } from '../fixit/held.js';
 import { createOffThreadMornings, morningWorkerCountOf } from '../dev/offThreadMornings.js';
 import type {
@@ -1265,6 +1266,19 @@ function mountFixit(
         main.append(keptLine);
       }
       const card = outcomeCard(session.outcome);
+      /*
+       * § D1184: on a fixed card, the cheapest change the route census tried that fixes this letter on
+       * the same forty-nine mornings, beside what the order this verdict measured cost. It pays nothing.
+       */
+      if (session.outcome.kind === 'fixed') {
+        const measured = session.verdictState ?? session.state;
+        const par = fixitParLineOf(entry.id, spendOf(entry, measured, loadedFixit.cases.schedule).totalUnits);
+        if (par !== undefined) {
+          const parLine = el(doc, 'p', 'everyday-fixit-par', par);
+          parLine.style.cssText = `font-size:12.5px;line-height:1.5;color:${C.inkSoft};margin:8px 0 0`;
+          card.append(parLine);
+        }
+      }
       /* § D1120 clause 4: the live count and the marks, under the checking card and nowhere else. */
       if (session.outcome.kind === 'checking' && checking && checkingCaseId === entry.id) card.append(progressBlock());
       main.append(card);

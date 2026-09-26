@@ -54,15 +54,20 @@
  * denominator, and {@link survivorSentenceFor} is written so a player cannot: it says how many ways
  * in were tried before it says how many got through.
  *
- * ## Two strata, and only one of them is a sample
+ * ## Three strata, and only one of them is a sample
  *
  * Issue #367 asks that *"where the space is too large to enumerate … the count is a sample and says
- * so on its own face."* Measured, the shipped ladder splits in two rather than by tier:
+ * so on its own face."* Measured, the shipped ladder splits by kind rather than by tier:
  *
  * - **The dropdown** is a **census**. Thirteen shipped profiles is a population; every one the rung
  *   can afford is played. `dropdown.survivors` is therefore exact, and it is the number DC-2's
  *   replacement reads — *no stage clears from the dispatcher dropdown alone* is a statement about
  *   this column (GitHub issue #365's comment, positions one and two exempt).
+ * - **The page** is a **census** too ([§ D1183](../../../../DECISIONS.md)): every shipped profile
+ *   under every place for idle cars to wait that the stage page offers beneath it, less the ones a
+ *   name alone already makes. Added because a sample of twelve dial draws kept missing what the
+ *   page ships: a sweep of the page's 52 choices found holdout-confirmed ways through four stages
+ *   the table then held (the swarm's Q3 ruling, S3's measurement).
  * - **The dials** are a **sample**, at every rung including the base. That is stronger than #367
  *   expected — it asks for sampling at the building tier — and it is measured rather than assumed:
  *   `survivorSpace.ts#bundleSpaceOf` reports the space uncountable as soon as an affordable bundle
@@ -209,8 +214,20 @@ export interface PublishedSurvivorStep {
    * published.
    */
   readonly unbuildable: number;
+  /**
+   * Of {@link examined}, how many met every goal on the stage's own (tuning) crowds, whatever the
+   * held-back crowds then said. At least {@link survivors}. A held stage's reason is read off it
+   * (`ladder.ts`, [§ D1183](../../../../DECISIONS.md)): some met the stage's crowds and none held on
+   * the held-back ones, or none met even the stage's crowds.
+   */
+  readonly metOnTuning: number;
   /** The census half. Exact. */
   readonly dropdown: SurvivorCounts;
+  /**
+   * The stage page's own choices past a name alone: every shipped profile under every place for idle
+   * cars to wait the page offers ([§ D1183](../../../../DECISIONS.md)). A census, so exact.
+   */
+  readonly page: SurvivorCounts;
   /** The sampled half. {@link sampling} says how. */
   readonly dials: SurvivorCounts;
   /** Examined and survivors by the dearest price tier reached — issue #367's per-tier clause. */
@@ -443,8 +460,9 @@ function logGamma(z: number): number {
 /** Every string the survivor count draws on a scenario. One place, so no screen invents a second. */
 export const SURVIVOR_COPY = Object.freeze({
   heading: 'Ways through',
-  censusNote: 'The settings you can pick by name were all tried. That half is a count, not an estimate.',
-  sampleNote: 'The dials were drawn at random from what this budget buys, so that half is a sample.',
+  censusNote:
+    'Every setting you can pick by name was tried, alone and with each place for idle cars to wait. Those are counts, not estimates.',
+  sampleNote: 'The dials were drawn at random from what this budget buys, so that part is a sample.',
   diagnosisLead: 'Nothing gets through this one as it stands, and that is the point:',
   unbuildableNote:
     'A setting this tower cannot be built with is not counted either way — it is neither a way through nor a failed attempt.',
@@ -492,14 +510,15 @@ export function survivorSentenceFor(
         : `${String(step.survivors)} got through`;
   const split =
     `${String(step.dropdown.survivors)} of ${String(step.dropdown.examined)} came from the ` +
-    `settings you can pick by name, and ${String(step.dials.survivors)} of ` +
-    `${String(step.dials.examined)} from the dials.`;
+    `settings you can pick by name, ${String(step.page.survivors)} of ` +
+    `${String(step.page.examined)} from those settings with idle cars waiting somewhere else, and ` +
+    `${String(step.dials.survivors)} of ${String(step.dials.examined)} from the dials.`;
   /*
-   * The census note always applies — the dropdown half is a population, at every rung. The sample
-   * note is added only where the dial half really is a sample, so a rung that ever becomes
-   * enumerable stops claiming an uncertainty it does not have. Both notes, not one: the two halves
-   * of this count are different kinds of number, and a reader told only *"this is a sample"* would
-   * put an interval round a census.
+   * The census note always applies — the dropdown and the page's own choices are populations, at
+   * every rung. The sample note is added only where the dial part really is a sample, so a rung that
+   * ever becomes enumerable stops claiming an uncertainty it does not have. Both notes, not one: the
+   * parts of this count are different kinds of number, and a reader told only *"this is a sample"*
+   * would put an interval round a census.
    */
   const method = step.sampling.method === 'sampled' ? ` ${SURVIVOR_COPY.sampleNote}` : '';
   return `${SURVIVOR_COPY.heading}: ${tried} and ${through}. ${split} ${SURVIVOR_COPY.censusNote}${method}`;
@@ -822,15 +841,23 @@ function checkStep(at: string, step: PublishedSurvivorStep): readonly string[] {
         `${String(step.survivors)}. A count whose members cannot be listed cannot be checked.`,
     );
   }
-  if (step.dropdown.examined + step.dials.examined !== step.examined) {
+  if (step.dropdown.examined + step.page.examined + step.dials.examined !== step.examined) {
     out.push(
-      `${at}: the two strata examined ${String(step.dropdown.examined)} and ` +
-        `${String(step.dials.examined)} and the cell says ${String(step.examined)}.`,
+      `${at}: the three strata examined ${String(step.dropdown.examined)}, ` +
+        `${String(step.page.examined)} and ${String(step.dials.examined)} and the cell says ` +
+        `${String(step.examined)}.`,
     );
   }
-  if (step.dropdown.survivors + step.dials.survivors !== step.survivors) {
+  if (step.dropdown.survivors + step.page.survivors + step.dials.survivors !== step.survivors) {
     out.push(
-      `${at}: the two strata's survivors do not sum to the cell's count.`,
+      `${at}: the three strata's survivors do not sum to the cell's count.`,
+    );
+  }
+  if (step.metOnTuning < step.survivors || step.metOnTuning > step.examined) {
+    out.push(
+      `${at}: ${String(step.metOnTuning)} met the stage's own crowds, against ${String(step.survivors)} ` +
+        `that cleared and ${String(step.examined)} examined. A clear needs the stage's own crowds first, ` +
+        'so the count that met them sits between the two.',
     );
   }
   const tierExamined = Object.values(step.perTier).reduce((sum, cell) => sum + cell.examined, 0);
