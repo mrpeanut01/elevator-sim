@@ -43,7 +43,7 @@ import { restrictedFloorIds } from '../access/zoning.js';
 import { credentialCapabilityOf } from '../access/dispatcherCredentials.js';
 import { recordRun } from '../record/recordRun.js';
 import type { PublishedScenario } from '../scenario/published.js';
-import { routeRefusalsOf } from '../campaign/stagePress.js';
+import { routeRefusalsOf, routeUnitsOf } from '../campaign/stagePress.js';
 import { namedStageMoveOf } from '../everyday/stagePlay.js';
 import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
 import { scenarioLadderOf } from '../scenario/ladder.js';
@@ -491,6 +491,18 @@ export function contextFor(honestyCase: HonestyCase, resources: HonestyResources
             survivors: resources.survivors,
             /* § D1129 clause 3: the one admission check's answer for each named way through. */
             refusalOf: routeRefusalsOf(
+              [...resources.stagesById.values()].map((entry) => entry.stage),
+              {
+                space: resources.space,
+                schedule: shippedPriceSchedule(),
+                profiles: resources.dispatcherProfiles.profiles,
+                buildings: [...resources.buildingsById.values()],
+                elevatorSpecs: resources.elevatorSpecs,
+                moveNamed: (name) => namedStageMoveOf(name, resources.dispatcherProfiles.profiles, resources.space),
+              },
+            ),
+            /* § D1234: the same check read for its price, so a cleared row's par mark is swept too. */
+            unitsOf: routeUnitsOf(
               [...resources.stagesById.values()].map((entry) => entry.stage),
               {
                 space: resources.space,

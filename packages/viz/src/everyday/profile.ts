@@ -224,6 +224,11 @@ export interface EverydayProgress {
    * **Optional, and its absence means *not recorded***: a case fixed before this field existed has
    * no cost here, and the par is then drawn without a comparison rather than with a guessed one
    * ({@link fixSpentUnitsOf} returns `undefined`).
+   *
+   * **Keyed by scenario id, and a campaign stage is one** — [§ D1234](../../../../DECISIONS.md). The
+   * stage page files a cleared stage's cost here under the stage's id, the same key its
+   * `scenario-cleared` turn is filed under, so the hub's par mark reads one record for both kinds
+   * of scenario. A fix case id and a stage id never coincide (`campaign/`'s ids start `stage-`).
    */
   readonly fixSpent?: readonly FixSpent[];
   /**

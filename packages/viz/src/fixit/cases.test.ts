@@ -533,9 +533,10 @@ const AUTHORED_FACTS: Readonly<Record<string, Readonly<Record<string, string>>>>
   }),
 
   /*
-   * The fifteen catalogue cases declare **eight** facts between them, and seven are the same kind:
-   * the floor the letter-writer lives or works on. That is the shape rule 6 predicts — a case whose
-   * copy quotes its own run needs no third-party numbers — and the one exception is named below.
+   * The fifteen catalogue cases declare **seven** facts between them, all of the same kind: the
+   * floor the letter-writer lives or works on. That is the shape rule 6 predicts — a case whose
+   * copy quotes its own run needs no third-party numbers. There was an eighth, a population rise,
+   * and it left with the as-built line that quoted it (§ D1233, note below).
    */
   'cars-that-always-go-home': Object.freeze({
     '52': 'a floor of the case’s building — the letter-writer’s own floor',
@@ -555,13 +556,11 @@ const AUTHORED_FACTS: Readonly<Record<string, Readonly<Record<string, string>>>>
   'let-faster-than-the-lifts': Object.freeze({
     '19': 'a floor of the case’s building — the letter-writer’s own floor',
     /*
-     * The one fact in these fifteen that is not a floor id. It is arithmetic over the case's own
-     * as-built patch against the shipped building, checkable by hand: the building document totals
-     * 992 people, the as-built floor populations total 1,601, and 1,601 / 992 is a rise of 61.4 %.
-     * It is the fault rather than a reading of it — the same footing as the zoning case's two
-     * served headcounts above.
+     * A second entry, `61` (the population rise the as-built patch encodes, 1,601 people against
+     * the building document's 992), left with the as-built line that quoted it: § D1233 rewrote
+     * that line to say what the building is rather than what is wrong with it, and the rise was
+     * the fault.
      */
-    '61': 'the population rise the as-built patch encodes: 1,601 people against the building document’s 992',
   }),
   'gym-on-the-top-floor': Object.freeze({
     '5': 'a floor of the case’s building — the letter-writer’s own floor',

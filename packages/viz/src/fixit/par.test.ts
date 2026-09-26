@@ -11,6 +11,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { isOffered } from './held.js';
+import { PAR_MARK_COPY } from '../scenario/par.js';
 import { FIXIT_PAR, FIXIT_PAR_COPY, fixitParLineOf, fixitParTagOf } from './par.js';
 import { measureFixitPar } from './par.test-helper.js';
 import { fixitResourcesFromDisk, shippedFixitCases } from './resources.test-helper.js';
@@ -71,9 +72,31 @@ describe('the par line says what it is and pays nothing', () => {
     expect(fixitParLineOf(id, row.units! + 3)).toContain(`Yours cost ${String(row.units! + 3)} units.`);
   });
 
-  it('says a free par as a free par', () => {
+  /*
+   * § D1234: a free fix beside a free par is not compared, because every fix that buys nothing
+   * would match it. A dearer fix still reads the line, since a free way through is news to it.
+   */
+  it('draws no par where a free fix meets a free par, and says a free par to a dearer fix', () => {
     expect(free, 'no case has a free par').toBeDefined();
-    expect(fixitParLineOf(free![0], 0)).toContain('cost 0 units. Yours cost the same.');
+    expect(fixitParLineOf(free![0], 0)).toBeUndefined();
+    expect(fixitParTagOf(free![0], 0)).toBeUndefined();
+    const dearer = fixitParLineOf(free![0], 2)!;
+    expect(dearer).toContain('cost 0 units. Yours cost 2 units.');
+    expect(dearer).not.toMatch(/\b(?:At|Under) par\b/u);
+    expect(fixitParTagOf(free![0], 2)).toBe('par 0 u · yours 2 u');
+    expect(fixitParLineOf(free![0], undefined)).toContain('cost 0 units.');
+  });
+
+  it('marks a fix at par or under it, pays nothing for either, and marks nothing above it', () => {
+    const [id, row] = priced!;
+    const units = row.units!;
+    expect(fixitParLineOf(id, units)!.startsWith(PAR_MARK_COPY.at)).toBe(true);
+    expect(fixitParLineOf(id, units - 1)!.startsWith(PAR_MARK_COPY.under)).toBe(true);
+    expect(fixitParLineOf(id, units + 1)).not.toMatch(/\b(?:At|Under) par\b/u);
+    for (const spent of [units - 1, units]) expect(fixitParLineOf(id, spent)).toContain(FIXIT_PAR_COPY.pays);
+    expect(fixitParTagOf(id, units)).toBe(`par ${String(units)} u · yours ${String(units)} u · at par`);
+    expect(fixitParTagOf(id, units - 1)).toBe(`par ${String(units)} u · yours ${String(units - 1)} u · under par`);
+    expect(fixitParTagOf(id, units + 1)).toBe(`par ${String(units)} u · yours ${String(units + 1)} u`);
   });
 
   it('draws nothing for a case with no par or no row', () => {
@@ -90,7 +113,7 @@ describe('the par after a reload, and on the case list — lane AL-B, seat C D5'
     expect(unrecorded).toContain(`cost ${String(row.units)} units.`);
     expect(unrecorded).toContain(FIXIT_PAR_COPY.unrecorded);
     expect(unrecorded).not.toMatch(/Yours cost/);
-    expect(fixitParTagOf(id, row.units!)).toBe(`par ${String(row.units)} u · yours ${String(row.units)} u`);
+    expect(fixitParTagOf(id, row.units!)).toBe(`par ${String(row.units)} u · yours ${String(row.units)} u · at par`);
     expect(fixitParTagOf(id, undefined)).toBe(`par ${String(row.units)} u`);
     expect(fixitParTagOf('no-such-case', 0)).toBeUndefined();
   });

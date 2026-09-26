@@ -149,8 +149,19 @@ export interface ScenarioLadderRung {
   readonly shape: string;
   /** What it opens on, what sits above that, and which rung the count below is taken at — § D786. */
   readonly budgetLine: string;
-  /** {@link survivorSentenceFor} on the base rung, verbatim. The count in the player's words. */
+  /**
+   * {@link survivorSentenceFor} on the base rung, verbatim, at its `'total'` reveal: the count and
+   * its `k`, without the split by kind of choice, which is the stage's answer ([§ D1233](../../../../DECISIONS.md)).
+   */
   readonly waysThrough: string;
+  /** The same sentence at its `'split'` reveal, which the hub draws once the device holds the stage's clear. */
+  readonly waysThroughCleared: string;
+  /**
+   * **The stage's par**: the cheapest of the base rung's named ways through, as the one admission
+   * check prices it — [§ D1234](../../../../DECISIONS.md). `undefined` where no named way through is
+   * priced, which includes every caller that passes no {@link ScenarioLadderInput.unitsOf}.
+   */
+  readonly parUnits: number | undefined;
   readonly offer: ScenarioOffer;
   /** Why it is held. Present exactly when {@link offer} is `held`. */
   readonly heldReason: string | undefined;
@@ -249,6 +260,12 @@ export interface ScenarioLadderInput {
    * Absent answers nothing, which is how a caller holding no search space reads the table as it is.
    */
   readonly refusalOf?: ((stageId: string, routeName: string) => string | undefined) | undefined;
+  /**
+   * **What a named way through costs at the budget the stage opens on**, or `undefined` —
+   * `campaign/stagePress.ts#routeUnitsOf`, the same check {@link refusalOf} asks. The par is the
+   * cheapest answer over the base rung's survivor names ([§ D1234](../../../../DECISIONS.md)).
+   */
+  readonly unitsOf?: ((stageId: string, routeName: string) => number | undefined) | undefined;
 }
 
 /**
@@ -356,6 +373,10 @@ export function scenarioLadderOf(input: ScenarioLadderInput): readonly ScenarioL
       scenario.diagnosis === null && refusals.length > 0 && refusals.every((reason) => reason !== undefined);
     const offered = counted && !allRefused;
     const firstRefusal = refusals.find((reason) => reason !== undefined);
+    const priced = base.survivorNames
+      .map((name) => input.unitsOf?.(stage.id, name))
+      .filter((units): units is number => units !== undefined);
+    const parUnits = priced.length === 0 ? undefined : Math.min(...priced);
     out.push(
       Object.freeze({
         id: stage.id,
@@ -366,7 +387,9 @@ export function scenarioLadderOf(input: ScenarioLadderInput): readonly ScenarioL
         buildingId: stage.building,
         shape: shapeOf(stage),
         budgetLine: budgetLineOf(stage.budget),
-        waysThrough: survivorSentenceFor(scenario, base),
+        waysThrough: survivorSentenceFor(scenario, base, 'total'),
+        waysThroughCleared: survivorSentenceFor(scenario, base, 'split'),
+        parUnits,
         offer: offered ? ('offered' as const) : ('held' as const),
         heldReason: offered
           ? undefined

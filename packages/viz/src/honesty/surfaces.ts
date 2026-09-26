@@ -364,6 +364,7 @@ import {
   type FixitVerdictContext,
 } from '../fixit/engine.js';
 import { FIXIT_PAR, fixitParLineOf, fixitParTagOf } from '../fixit/par.js';
+import { PAR_MARK_COPY } from '../scenario/par.js';
 import {
   checkingOutcomeOf,
   DERIVED_MORNINGS,
@@ -7602,6 +7603,8 @@ const FIXIT_COVERS: readonly string[] = [
   'fixit/par.ts#fixitParLineOf',
   /* The case list's short par (lane AL-B, seat C D5), seeded beside the line below. */
   'fixit/par.ts#fixitParTagOf',
+  /* § D1234: the par mark's words, shared with the hub's stage rows, seeded by key below. */
+  'scenario/par.ts#PAR_MARK_COPY',
   'fixit/judge.ts#REPLICATED_ROUTES_BASIS_LINE',
   'fixit/judge.ts#FUTILITY_ROUTES_BASIS_LINE',
   'fixit/judge.ts#progressLineOf',
@@ -7972,6 +7975,10 @@ const FIXIT: SurfaceAdapter = {
       seeds.push({ field: 'outcome.par.unrecorded', text: fixitParLineOf(parCase, undefined) ?? '', role: 'prose', provenance: 'authored' });
       seeds.push({ field: 'rail.par.kept', text: fixitParTagOf(parCase, parRow.units ?? 0) ?? '', role: 'label' });
       seeds.push({ field: 'rail.par.unrecorded', text: fixitParTagOf(parCase, undefined) ?? '', role: 'label' });
+    }
+    /* § D1234: the mark's own words, by key, so the under-par tag is swept as well as the at-par one. */
+    for (const [key, text] of Object.entries(PAR_MARK_COPY)) {
+      seeds.push({ field: `par.mark.${key}`, text, role: 'label' });
     }
     const short = classifyOutcome(
       entry,
@@ -14005,6 +14012,13 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
      * path this adapter seeds, so its sentence reaches `row.refusal` exactly as it would on screen.
      */
     'campaign/stagePress.ts#routeRefusalsOf',
+    /*
+     * § D1234: the same check read for its price. `honesty/run.ts` hands it to `scenarioLadderOf`
+     * beside the refusals, so a cleared row's par mark, seeded below, carries the price it prices.
+     * Its one sentence is the missing-baseline refusal it shares with `routeRefusalsOf`, which
+     * reaches this screen through that function and never through this one.
+     */
+    'campaign/stagePress.ts#routeUnitsOf',
     'everyday/weekView.ts#weekScreenViewOf',
     'everyday/reportView.ts#everydayReportViewOf',
     /* GitHub issue #211: the handle on a folded card note, seeded once — the note itself is the producer's whole string. */
@@ -14476,12 +14490,45 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
           });
           /* § D1129 clause 4: a row's mark once this device has been paid its clear — one row, once. */
           const firstId = path.rows[0]?.id;
-          const cleared =
+          const clearedRow =
             firstId === undefined
               ? undefined
-              : scenarioHubViewOf(context.scenarioPath, new Set([firstId])).path?.rows[0]?.cleared;
+              : scenarioHubViewOf(context.scenarioPath, new Set([firstId])).path?.rows[0];
+          const cleared = clearedRow?.cleared;
           if (cleared !== undefined) {
             seeds.push({ field: `${arm}.scenario.path.cleared`, text: cleared, role: 'prose' });
+          }
+          /*
+           * § D1233: the count a cleared row draws, with the split by kind of choice the row holds
+           * back until then. Seeded on the same one row, with the same `k` in the same box.
+           */
+          if (clearedRow !== undefined && firstId !== undefined) {
+            seeds.push({
+              field: `${arm}.scenario.path.cleared.ways`,
+              text: clearedRow.waysThrough,
+              role: 'observation',
+              declaredCount: examinedFor(context, firstId),
+              countShown: clearedRow.waysThrough.includes(String(examinedFor(context, firstId))),
+            });
+          }
+          /*
+           * § D1234: the par mark, at and under par, on the first stage whose par is priced. A free
+           * par is never marked, so a path with none priced seeds nothing here.
+           */
+          const pricedRung = context.scenarioPath.find((rung) => rung.parUnits !== undefined && rung.parUnits > 0);
+          if (pricedRung?.parUnits !== undefined) {
+            const par = pricedRung.parUnits;
+            for (const [mark, spent] of [
+              ['at', par],
+              ['under', par - 1],
+            ] as const) {
+              const row = scenarioHubViewOf(context.scenarioPath, new Set([pricedRung.id]), () => spent).path?.rows.find(
+                (candidate) => candidate.id === pricedRung.id,
+              );
+              if (row?.parMark !== undefined) {
+                seeds.push({ field: `${arm}.scenario.path.par.${mark}`, text: row.parMark, role: 'prose' });
+              }
+            }
           }
           for (const row of path.rows) {
             const at = `${arm}.scenario.path.${row.id}`;
@@ -16238,6 +16285,15 @@ const SURVIVORS: SurfaceAdapter = {
           /* The `k` the count is over, in the same sentence as the count — R13 clause one. */
           declaredCount: step.examined,
           countShown: text.includes(String(step.examined)),
+        });
+        /* § D1233: the same count with its split, which a cleared stage's row draws. */
+        const split = survivorSentenceFor(scenario, step, 'split');
+        seeds.push({
+          field: `${at}.count.split`,
+          text: split,
+          role: 'observation',
+          declaredCount: step.examined,
+          countShown: split.includes(String(step.examined)),
         });
       }
     }

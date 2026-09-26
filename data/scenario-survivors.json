@@ -4,7 +4,7 @@
   "provenance": {
     "kind": "measured",
     "command": "ELEVATOR_SIM_SURVIVORS=deep ELEVATOR_SIM_REGENERATE_SURVIVORS=1 npx vitest run --project viz src/scenario/survivorSweep.test.ts",
-    "tree": "c2ca845",
+    "tree": "2cb0ab0",
     "measuredAt": "2026-09-26",
     "masterSeed": 20260910,
     "sampleSize": 12,
@@ -53,7 +53,7 @@
     "unpricedDimensionCount": 0,
     "withheldDimensionCount": 13,
     "declaredDimensionCount": 60,
-    "inputHash": "c26e8aa63a6cf4e90910fbd0f51a46da2be8b042798edd48ccd90f77357f0708"
+    "inputHash": "20c8fc6400d8950e6923ca3cf909cbc40b335db9b5793a009ed077c6409ce9b6"
   },
   "scenarios": [
     {
@@ -1149,7 +1149,7 @@
       "ladderPosition": 7,
       "inFirstHour": false,
       "buildingId": "midtown-office",
-      "baselineProfileId": "collective",
+      "baselineProfileId": "zoned-uppeak",
       "durationS": 900,
       "replications": 50,
       "tuningSeeds": {
@@ -1169,38 +1169,31 @@
           "units": 15,
           "chimesSpent": 0,
           "examined": 63,
-          "survivors": 18,
+          "survivors": 11,
           "survivorNames": [
             "eta-parked-lobby",
             "eta-parked-zone-center",
             "collective-parked-lobby",
             "collective-enroute-parked-lobby",
             "energy-aware-parked-lobby",
-            "fairness-first-parked-lobby",
-            "fairness-first-parked-zone-center",
             "capacity-aware-parked-lobby",
-            "capacity-aware-parked-zone-center",
             "predictive-balanced-parked-lobby",
             "auction-parked-lobby",
-            "auction-parked-zone-center",
             "auction-multi-round-parked-lobby",
-            "auction-multi-round-parked-zone-center",
-            "zoned-uppeak-parked-lobby",
             "destination-eta-parked-lobby",
-            "destination-eta-parked-zone-center",
-            "destination-panel-parked-lobby"
+            "destination-eta-parked-zone-center"
           ],
-          "unjudged": 0,
+          "unjudged": 1,
           "suppressed": 1,
           "unbuildable": 0,
-          "metOnTuning": 19,
+          "metOnTuning": 22,
           "dropdown": {
             "examined": 12,
             "survivors": 0
           },
           "page": {
             "examined": 39,
-            "survivors": 18
+            "survivors": 11
           },
           "dials": {
             "examined": 12,
@@ -1209,11 +1202,11 @@
           "perTier": {
             "dispatcher": {
               "examined": 46,
-              "survivors": 15
+              "survivors": 9
             },
             "equipment": {
               "examined": 17,
-              "survivors": 3
+              "survivors": 2
             }
           },
           "sampling": {
@@ -1234,38 +1227,31 @@
           "units": 24,
           "chimesSpent": 9,
           "examined": 63,
-          "survivors": 18,
+          "survivors": 11,
           "survivorNames": [
             "eta-parked-lobby",
             "eta-parked-zone-center",
             "collective-parked-lobby",
             "collective-enroute-parked-lobby",
             "energy-aware-parked-lobby",
-            "fairness-first-parked-lobby",
-            "fairness-first-parked-zone-center",
             "capacity-aware-parked-lobby",
-            "capacity-aware-parked-zone-center",
             "predictive-balanced-parked-lobby",
             "auction-parked-lobby",
-            "auction-parked-zone-center",
             "auction-multi-round-parked-lobby",
-            "auction-multi-round-parked-zone-center",
-            "zoned-uppeak-parked-lobby",
             "destination-eta-parked-lobby",
-            "destination-eta-parked-zone-center",
-            "destination-panel-parked-lobby"
+            "destination-eta-parked-zone-center"
           ],
           "unjudged": 0,
           "suppressed": 2,
           "unbuildable": 0,
-          "metOnTuning": 19,
+          "metOnTuning": 22,
           "dropdown": {
             "examined": 12,
             "survivors": 0
           },
           "page": {
             "examined": 39,
-            "survivors": 18
+            "survivors": 11
           },
           "dials": {
             "examined": 12,
@@ -1274,11 +1260,11 @@
           "perTier": {
             "dispatcher": {
               "examined": 48,
-              "survivors": 15
+              "survivors": 9
             },
             "equipment": {
               "examined": 15,
-              "survivors": 3
+              "survivors": 2
             }
           },
           "sampling": {
@@ -1299,38 +1285,31 @@
           "units": 54,
           "chimesSpent": 39,
           "examined": 63,
-          "survivors": 18,
+          "survivors": 11,
           "survivorNames": [
             "eta-parked-lobby",
             "eta-parked-zone-center",
             "collective-parked-lobby",
             "collective-enroute-parked-lobby",
             "energy-aware-parked-lobby",
-            "fairness-first-parked-lobby",
-            "fairness-first-parked-zone-center",
             "capacity-aware-parked-lobby",
-            "capacity-aware-parked-zone-center",
             "predictive-balanced-parked-lobby",
             "auction-parked-lobby",
-            "auction-parked-zone-center",
             "auction-multi-round-parked-lobby",
-            "auction-multi-round-parked-zone-center",
-            "zoned-uppeak-parked-lobby",
             "destination-eta-parked-lobby",
-            "destination-eta-parked-zone-center",
-            "destination-panel-parked-lobby"
+            "destination-eta-parked-zone-center"
           ],
           "unjudged": 0,
           "suppressed": 0,
           "unbuildable": 0,
-          "metOnTuning": 18,
+          "metOnTuning": 21,
           "dropdown": {
             "examined": 12,
             "survivors": 0
           },
           "page": {
             "examined": 39,
-            "survivors": 18
+            "survivors": 11
           },
           "dials": {
             "examined": 12,
@@ -1339,11 +1318,11 @@
           "perTier": {
             "dispatcher": {
               "examined": 45,
-              "survivors": 15
+              "survivors": 9
             },
             "equipment": {
               "examined": 18,
-              "survivors": 3
+              "survivors": 2
             }
           },
           "sampling": {
@@ -1367,7 +1346,7 @@
       "ladderPosition": 8,
       "inFirstHour": false,
       "buildingId": "chancery-house",
-      "baselineProfileId": "collective",
+      "baselineProfileId": "zoned-uppeak",
       "durationS": 900,
       "replications": 50,
       "tuningSeeds": {
@@ -1387,31 +1366,26 @@
           "units": 4,
           "chimesSpent": 0,
           "examined": 39,
-          "survivors": 11,
+          "survivors": 6,
           "survivorNames": [
             "eta-parked-lobby",
-            "eta-parked-zone-center",
             "collective-parked-lobby",
-            "collective-parked-zone-center",
             "collective-enroute-parked-lobby",
-            "collective-enroute-parked-zone-center",
             "fairness-first-parked-lobby",
-            "fairness-first-parked-zone-center",
             "capacity-aware-parked-lobby",
-            "capacity-aware-parked-zone-center",
             "zoned-uppeak-parked-lobby"
           ],
           "unjudged": 0,
           "suppressed": 1,
           "unbuildable": 0,
-          "metOnTuning": 15,
+          "metOnTuning": 7,
           "dropdown": {
             "examined": 6,
             "survivors": 0
           },
           "page": {
             "examined": 21,
-            "survivors": 11
+            "survivors": 6
           },
           "dials": {
             "examined": 12,
@@ -1420,7 +1394,7 @@
           "perTier": {
             "dispatcher": {
               "examined": 35,
-              "survivors": 11
+              "survivors": 6
             },
             "equipment": {
               "examined": 4,
@@ -1434,9 +1408,9 @@
             "seed": 2104205868,
             "bundles": 47,
             "enumerable": false,
-            "draws": 14,
+            "draws": 13,
             "refusedDraws": 0,
-            "inertDraws": 2,
+            "inertDraws": 1,
             "duplicateDraws": 0
           }
         },
@@ -1445,41 +1419,32 @@
           "units": 24,
           "chimesSpent": 20,
           "examined": 63,
-          "survivors": 21,
+          "survivors": 12,
           "survivorNames": [
             "eta-parked-lobby",
-            "eta-parked-zone-center",
             "collective-parked-lobby",
-            "collective-parked-zone-center",
             "collective-enroute-parked-lobby",
-            "collective-enroute-parked-zone-center",
             "energy-aware-parked-lobby",
             "fairness-first-parked-lobby",
-            "fairness-first-parked-zone-center",
             "capacity-aware-parked-lobby",
-            "capacity-aware-parked-zone-center",
             "predictive-balanced-parked-lobby",
             "auction-parked-lobby",
-            "auction-parked-zone-center",
             "auction-multi-round-parked-lobby",
-            "auction-multi-round-parked-zone-center",
             "zoned-uppeak-parked-lobby",
             "destination-eta-parked-lobby",
-            "destination-eta-parked-zone-center",
-            "destination-panel-parked-lobby",
-            "destination-panel-parked-zone-center"
+            "destination-panel-parked-lobby"
           ],
           "unjudged": 0,
           "suppressed": 2,
           "unbuildable": 0,
-          "metOnTuning": 25,
+          "metOnTuning": 13,
           "dropdown": {
             "examined": 12,
             "survivors": 0
           },
           "page": {
             "examined": 39,
-            "survivors": 21
+            "survivors": 12
           },
           "dials": {
             "examined": 12,
@@ -1488,11 +1453,11 @@
           "perTier": {
             "dispatcher": {
               "examined": 48,
-              "survivors": 17
+              "survivors": 10
             },
             "equipment": {
               "examined": 15,
-              "survivors": 4
+              "survivors": 2
             }
           },
           "sampling": {
@@ -1502,9 +1467,9 @@
             "seed": 2097791607,
             "bundles": 909,
             "enumerable": false,
-            "draws": 15,
+            "draws": 14,
             "refusedDraws": 2,
-            "inertDraws": 1,
+            "inertDraws": 0,
             "duplicateDraws": 0
           }
         },
@@ -1513,41 +1478,32 @@
           "units": 54,
           "chimesSpent": 50,
           "examined": 63,
-          "survivors": 21,
+          "survivors": 12,
           "survivorNames": [
             "eta-parked-lobby",
-            "eta-parked-zone-center",
             "collective-parked-lobby",
-            "collective-parked-zone-center",
             "collective-enroute-parked-lobby",
-            "collective-enroute-parked-zone-center",
             "energy-aware-parked-lobby",
             "fairness-first-parked-lobby",
-            "fairness-first-parked-zone-center",
             "capacity-aware-parked-lobby",
-            "capacity-aware-parked-zone-center",
             "predictive-balanced-parked-lobby",
             "auction-parked-lobby",
-            "auction-parked-zone-center",
             "auction-multi-round-parked-lobby",
-            "auction-multi-round-parked-zone-center",
             "zoned-uppeak-parked-lobby",
             "destination-eta-parked-lobby",
-            "destination-eta-parked-zone-center",
-            "destination-panel-parked-lobby",
-            "destination-panel-parked-zone-center"
+            "destination-panel-parked-lobby"
           ],
           "unjudged": 0,
           "suppressed": 3,
           "unbuildable": 0,
-          "metOnTuning": 25,
+          "metOnTuning": 13,
           "dropdown": {
             "examined": 12,
             "survivors": 0
           },
           "page": {
             "examined": 39,
-            "survivors": 21
+            "survivors": 12
           },
           "dials": {
             "examined": 12,
@@ -1556,11 +1512,11 @@
           "perTier": {
             "dispatcher": {
               "examined": 47,
-              "survivors": 17
+              "survivors": 10
             },
             "equipment": {
               "examined": 16,
-              "survivors": 4
+              "survivors": 2
             }
           },
           "sampling": {

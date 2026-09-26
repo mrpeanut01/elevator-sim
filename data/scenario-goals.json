@@ -888,7 +888,7 @@
       "id": "stage-7-prove-it",
       "name": "Tune it",
       "buildingId": "midtown-office",
-      "dispatcherProfileId": "collective",
+      "dispatcherProfileId": "zoned-uppeak",
       "durationS": 900,
       "arrivalRatePctPop5min": 1.25,
       "tuningSeeds": {
@@ -908,20 +908,41 @@
           "disposition": "batch",
           "tuning": {
             "n": 50,
-            "passes": 31,
-            "fails": 19,
+            "passes": 33,
+            "fails": 17,
             "unmeasured": 0,
             "rateClass": "variable"
           },
           "holdout": {
             "n": 50,
-            "passes": 26,
-            "fails": 24,
+            "passes": 33,
+            "fails": 17,
             "unmeasured": 0,
             "rateClass": "variable"
           },
           "holdoutAgrees": true,
-          "reason": "kept up with arrivals: a batch goal, judged over the scenario's replications — 31 of 50 on the tuning seeds and 26 of 50 on the holdout seeds."
+          "reason": "kept up with arrivals: a batch goal, judged over the scenario's replications — 33 of 50 on the tuning seeds and 33 of 50 on the holdout seeds."
+        },
+        {
+          "kind": "long-waits-under",
+          "threshold": 10,
+          "disposition": "batch",
+          "tuning": {
+            "n": 50,
+            "passes": 43,
+            "fails": 7,
+            "unmeasured": 0,
+            "rateClass": "variable"
+          },
+          "holdout": {
+            "n": 50,
+            "passes": 49,
+            "fails": 1,
+            "unmeasured": 0,
+            "rateClass": "variable"
+          },
+          "holdoutAgrees": true,
+          "reason": "long waits kept under 10 %: a batch goal, judged over the scenario's replications — 43 of 50 on the tuning seeds and 49 of 50 on the holdout seeds."
         },
         {
           "kind": "beat-the-baseline",
@@ -996,27 +1017,6 @@
           },
           "holdoutAgrees": true,
           "reason": "nobody past the give-up line: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
-        },
-        {
-          "kind": "long-waits-under",
-          "threshold": 10,
-          "disposition": "configuration-fact",
-          "tuning": {
-            "n": 50,
-            "passes": 50,
-            "fails": 0,
-            "unmeasured": 0,
-            "rateClass": "constant-pass"
-          },
-          "holdout": {
-            "n": 50,
-            "passes": 50,
-            "fails": 0,
-            "unmeasured": 0,
-            "rateClass": "constant-pass"
-          },
-          "holdoutAgrees": true,
-          "reason": "long waits kept under 10 %: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
         }
       ],
       "withheld": [
@@ -1035,7 +1035,7 @@
       "id": "stage-8-the-headline-address",
       "name": "The headline address",
       "buildingId": "chancery-house",
-      "dispatcherProfileId": "collective",
+      "dispatcherProfileId": "zoned-uppeak",
       "durationS": 900,
       "arrivalRatePctPop5min": 3,
       "tuningSeeds": {
@@ -1055,20 +1055,20 @@
           "disposition": "batch",
           "tuning": {
             "n": 50,
-            "passes": 32,
-            "fails": 18,
+            "passes": 38,
+            "fails": 12,
             "unmeasured": 0,
             "rateClass": "variable"
           },
           "holdout": {
             "n": 50,
-            "passes": 30,
-            "fails": 20,
+            "passes": 40,
+            "fails": 10,
             "unmeasured": 0,
             "rateClass": "variable"
           },
           "holdoutAgrees": true,
-          "reason": "kept up with arrivals: a batch goal, judged over the scenario's replications — 32 of 50 on the tuning seeds and 30 of 50 on the holdout seeds."
+          "reason": "kept up with arrivals: a batch goal, judged over the scenario's replications — 38 of 50 on the tuning seeds and 40 of 50 on the holdout seeds."
         },
         {
           "kind": "beat-the-baseline",

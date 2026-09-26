@@ -223,7 +223,8 @@ const BRIEF_SCENARIOS: readonly GoalScenario[] = [
  * whose bank holds cars of unlike speed and capacity, so it asks whether a dispatcher notices that
  * two of its five cars are the wrong car for an ordinary hall call.
  *
- * `collective` throughout rather than the viewer's default: `docs/07` § 4 calls `nearest-car`
+ * `collective` on eight of the ten rather than the viewer's default (stages 7 and 8 start on
+ * `zoned-uppeak`, for the reason written beside them): `docs/07` § 4 calls `nearest-car`
  * *"a poor reference arm — the only profile that saturates"* at the benchmark operating points,
  * and stage 5 is the one place a deliberately unsuitable dispatcher is the lesson (§ 2.8: on
  * Secure Tower a dispatcher that cannot read a credential leaves a third of riders unserved, and
@@ -246,8 +247,19 @@ export const CANDIDATE_SCENARIOS: readonly GoalScenario[] = [
    * rather than authored. `answer-the-demand` stays `variable` on both seed sets (31/50 and
    * 26/50), so the stage keeps a failable non-comparative goal and DC-1 is untouched.
    */
-  stage('stage-7-prove-it', 'Tune it', 'midtown-office', 'collective', 1.25),
-  stage('stage-8-the-headline-address', 'The headline address', 'chancery-house', 'collective', 3),
+  /*
+   * **`zoned-uppeak` rather than `collective` on stages 7 and 8, and it is the only field this file
+   * moved** — wave AL's re-authoring against the criterion written first
+   * (`scenario/stagesStandAlone.test.ts`, [§ D1235](../../../../DECISIONS.md)). Under `collective`
+   * every one of stage 2's five ways through cleared both stages, so neither asked for anything
+   * stage 2 had not already answered in full. Starting them on an up-peak order whose idle cars
+   * already wait mid-zone leaves some of stage 2's answers short of the baseline, which is the
+   * whole of the authored change; demand, horizon and seeds are as they were. Stage 7's
+   * `long-waits-under` became live under the new setting, so `data/campaign.json` declares it there,
+   * because `campaign/parse.ts` refuses a stage that leaves out a goal this table measures as live.
+   */
+  stage('stage-7-prove-it', 'Tune it', 'midtown-office', 'zoned-uppeak', 1.25),
+  stage('stage-8-the-headline-address', 'The headline address', 'chancery-house', 'zoned-uppeak', 3),
   stage('stage-9-both-ways-at-once', 'Both ways at once', 'crown-hotel', 'collective', 2.5),
   stage('stage-10-the-bed-and-the-visitor', 'The bed and the visitor', 'st-jude-hospital', 'collective', 2),
   ...BRIEF_SCENARIOS,

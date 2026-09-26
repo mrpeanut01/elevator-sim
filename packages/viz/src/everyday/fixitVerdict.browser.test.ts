@@ -29,6 +29,7 @@ import {
   type ShippedSite,
 } from '../dev/browserTier.test-helper.js';
 import { FIXIT_PAR, FIXIT_PAR_COPY } from '../fixit/par.js';
+import { PAR_MARK_COPY } from '../scenario/par.js';
 
 let site: ShippedSite;
 let browser: Browser;
@@ -195,7 +196,9 @@ describe.skipIf(!HAS_BROWSER)('a fixed verdict on the shipped bundle — § D101
       }));
       expect(kept.par).toContain(`cost ${String(par)} units.`);
       expect(kept.par).toContain(FIXIT_PAR_COPY.same);
-      expect(kept.row).toBe(`par ${String(par)} u · yours ${String(par)} u`);
+      /* § D1234: a fix at a priced par carries the mark, on the row and at the head of the line. */
+      expect(kept.row).toBe(`par ${String(par)} u · yours ${String(par)} u · at par`);
+      expect(kept.par.startsWith(PAR_MARK_COPY.at)).toBe(true);
       expect(kept.withheld).not.toContain('marked as fixed with the diagnosis');
     } finally {
       await page.close();

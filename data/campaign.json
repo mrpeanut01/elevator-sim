@@ -694,7 +694,7 @@
       "name": "Tune it",
       "teaches": "that an improvement you cannot measure is not one",
       "brief": [
-        "Back to Midtown Office, at a level where both settings still stand behind their own numbers.",
+        "Back to Midtown Office, which starts this time on operational zoning for the up-peak, at a level where both settings still stand behind their own numbers.",
         "The stage page moves the standing order and where idle cars wait, the Engineer surface moves every dial the budget reaches, and the bar is no longer whether something looked better: it is a paired interval over fifty runs, on the difference itself, that does not contain zero.",
         "Tune on the seeds you are given. The holdout set exists so that a gain living only in these passenger traces has somewhere to fail."
       ],
@@ -704,7 +704,7 @@
       },
       "durationS": 900,
       "dispatcher": {
-        "startingProfileId": "collective",
+        "startingProfileId": "zoned-uppeak",
         "editable": {
           "mode": "every-declared-dimension"
         }
@@ -724,6 +724,10 @@
         {
           "kind": "answer-the-demand",
           "threshold": null
+        },
+        {
+          "kind": "long-waits-under",
+          "threshold": 10
         },
         {
           "kind": "beat-the-baseline",
@@ -796,7 +800,7 @@
       },
       "durationS": 900,
       "dispatcher": {
-        "startingProfileId": "collective",
+        "startingProfileId": "zoned-uppeak",
         "editable": {
           "mode": "listed",
           "ids": [

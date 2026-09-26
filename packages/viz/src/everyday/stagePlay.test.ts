@@ -24,7 +24,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { restrictedFloorIds } from '../access/zoning.js';
 import { parseCampaign, type CampaignContext } from '../campaign/parse.js';
 import { batchRequestForStage, demonstrationConfigFor } from '../campaign/stageRun.js';
-import { admitStageMove, routeRefusalsOf, stageUnitsAt } from '../campaign/stagePress.js';
+import { admitStageMove, routeRefusalsOf, routeUnitsOf, stageUnitsAt } from '../campaign/stagePress.js';
 import type { CampaignStage } from '../campaign/types.js';
 import { DATA_DIR, requireBuilding } from '../fixtures.test-helper.js';
 import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
@@ -308,6 +308,35 @@ describe('the page’s own choices, as the survivor census presses them — § D
     /* Stage 1 opens on 4 units; a destination panel costs 15, parked or not. */
     expect(refusalOf(stage.id, 'destination-panel-parked-lobby')).toMatch(/15 units against the 4/u);
     expect(refusalOf(stage.id, `${stage.dispatcher.startingProfileId}-parked-zone-center`)).toBeUndefined();
+  });
+
+  /* § D1234: the same check read for its price, which is what a stage's par is the minimum of. */
+  it('prices a named route by the one check, and prices nothing it refuses', () => {
+    const stage = stageAt(0);
+    const resources = {
+      space,
+      schedule: shippedPriceSchedule(),
+      profiles: config.dispatcherProfiles.profiles,
+      buildings: [requireBuilding(config, stage.building)],
+      elevatorSpecs: config.elevatorSpecs,
+      moveNamed: (name: string) => namedStageMoveOf(name, config.dispatcherProfiles.profiles, space),
+    };
+    const unitsOf = routeUnitsOf(stages, resources);
+    const refusalOf = routeRefusalsOf(stages, resources);
+    expect(unitsOf(stage.id, 'destination-panel-parked-lobby')).toBeUndefined();
+    const parked = `${stage.dispatcher.startingProfileId}-parked-zone-center`;
+    expect(refusalOf(stage.id, parked)).toBeUndefined();
+    expect(unitsOf(stage.id, parked)).toBe(0);
+    expect(unitsOf(stage.id, 'edit-3')).toBeUndefined();
+    const context = {
+      space,
+      schedule: shippedPriceSchedule(),
+      baseline: config.dispatcherProfilesById.get(stage.dispatcher.startingProfileId)!,
+      building: requireBuilding(config, stage.building),
+      elevatorSpecs: config.elevatorSpecs,
+    };
+    const eta = config.dispatcherProfilesById.get('eta')!;
+    expect(unitsOf(stage.id, 'eta')).toBe(admitStageMove(context, { profile: eta }, stageUnitsAt(stage, null)).units);
   });
 });
 

@@ -30,8 +30,18 @@
  * on, that every offered case has a row and that a row's par never sits where the census found no
  * clearing route.
  *
+ * ## The mark, and where nothing is drawn — [§ D1234](../../../../DECISIONS.md)
+ *
+ * A fixed case at or under its par carries `scenario/par.ts`'s mark, on the fixed card's line and on
+ * the case list's row. **Where the par is free and the fix bought nothing, neither the line nor the
+ * row's par is drawn**: a free par is matched by every fix that buys nothing, so the comparison
+ * records nothing about this player's order. A fix that spent more than a free par still reads the
+ * line, because that a free fix exists is news to that player.
+ *
  * Pure. No DOM, no data read.
  */
+
+import { PAR_MARK_COPY, parMarkOf } from '../scenario/par.js';
 
 /** One case's par. `units` is `null` where no clearing route the sample tried held on the mornings. */
 export interface FixitParRow {
@@ -102,6 +112,10 @@ function unitsOf(units: number): string {
 export function fixitParLineOf(caseId: string, spentUnits: number | undefined): string | undefined {
   const row = fixitParOf(caseId);
   if (row === undefined || row.units === null) return undefined;
+  /* § D1234: a free fix beside a free par is not compared, since every free fix would match it. */
+  if (row.units === 0 && spentUnits === 0) return undefined;
+  const mark = parMarkOf(row.units, spentUnits);
+  const lead = mark === undefined ? '' : `${PAR_MARK_COPY[mark]} `;
   const comparison =
     spentUnits === undefined
       ? FIXIT_PAR_COPY.unrecorded
@@ -111,7 +125,7 @@ export function fixitParLineOf(caseId: string, spentUnits: number | undefined): 
         ? FIXIT_PAR_COPY.same
         : `Yours cost ${unitsOf(spentUnits)}.`;
   return (
-    `The cheapest change we tried that fixes this letter, judged on the same forty-nine mornings, ` +
+    `${lead}The cheapest change we tried that fixes this letter, judged on the same forty-nine mornings, ` +
     `cost ${unitsOf(row.units)}. ${comparison} ${FIXIT_PAR_COPY.pays}`
   );
 }
@@ -125,6 +139,11 @@ export function fixitParLineOf(caseId: string, spentUnits: number | undefined): 
 export function fixitParTagOf(caseId: string, spentUnits: number | undefined): string | undefined {
   const row = fixitParOf(caseId);
   if (row === undefined || row.units === null) return undefined;
+  /* § D1234: nothing to compare where a free fix meets a free par. */
+  if (row.units === 0 && spentUnits === 0) return undefined;
   const par = `${FIXIT_PAR_COPY.tagPar} ${String(row.units)} u`;
-  return spentUnits === undefined ? par : `${par} · ${FIXIT_PAR_COPY.tagYours} ${String(spentUnits)} u`;
+  if (spentUnits === undefined) return par;
+  const mark = parMarkOf(row.units, spentUnits);
+  const tagged = `${par} · ${FIXIT_PAR_COPY.tagYours} ${String(spentUnits)} u`;
+  return mark === undefined ? tagged : `${tagged} · ${mark === 'at' ? PAR_MARK_COPY.tagAt : PAR_MARK_COPY.tagUnder}`;
 }

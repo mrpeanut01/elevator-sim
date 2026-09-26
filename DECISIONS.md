@@ -48027,3 +48027,172 @@ rail's line for the turn reads *cleared day filed*, true of both kinds of paid d
 
 **Tests.** `everyday/host.test.ts`: one post for a cleared counted Monday, none for its practice close,
 a missed day, a clean Saturday or a sandbox day. Red before: nothing was posted.
+
+## D1233 — the hub shows a stage's total ways through until it is cleared, and a fix case's as-built line names no fault
+
+> **Taken 2026-09-26 by agent sessions under delegated authority**, not by the product owner: the
+> `decide-an` swarm's Q3 ruling item 1 (three of three: S1 player, S2 honesty, S3 engineering),
+> reconciled by wave AL's integrator and built by lane AL-G. A later reader weighing this against a
+> product-owner ruling should treat it as an agent ruling and say so; [§ D626](#d626) is the
+> cautionary case. **Owner-reversible**: the pre-clear sentence's words, and whether the split
+> returns after a clear or never.
+
+**Why an entry.** [§ D405](#d405)'s first and second grounds: it binds the survivor sentence
+(`scenario/survivors.ts`), the ladder and the Scenario hub (`scenario/ladder.ts`,
+`everyday/scenarioModel.ts`), the fix-it content (`data/fixit-cases.json`) and the honesty corpus,
+and it changes what [§ D1183](#d1183)'s hub row and [§ D1120](#d1120)'s as-built block draw.
+
+**What was wrong.** Two places printed the answer above the question.
+
+1. **The hub's split by kind of choice.** On stage 2 the row read *"0 of 6 came from the settings you
+   can pick by name, 5 of 21 from those settings with idle cars waiting somewhere else, and 0 of 12
+   from the dials"*. Measured by S3, 52 of the 55 base-rung ways through on the seven offered stages
+   park idle cars, and stages 2, 6, 7 and 8 have none that does not, so the split named the lever.
+2. **The fix-it as-built line**, drawn under the complaint and before the diagnosis is asked for,
+   named the cause on most cases: *"the door dwell on all five is set to eleven seconds, the figure
+   the luggage trolleys needed"*, *"the lockout was never lifted"*, *"divided by the eight cars of
+   the bank instead of by the two decks of the car"*. The three members counted 12, 13 and 16 of 18;
+   this lane's reading is 16, and it is the one the test holds. So [§ D1120](#d1120)'s *the diagnosis
+   waits until asked* held for the button and not for the screen.
+
+**The ruling.**
+
+1. **Before a clear the hub row draws the total only**: the count over its `k`, the census and
+   sample notes, and *"Which kind of choice the ways through came from is shown once you have cleared
+   it."* (`survivors.ts#survivorSentenceFor` at its `'total'` reveal). **After the device holds the
+   stage's clear it draws the split** (`'split'`, the sentence it drew before). The count stays on
+   the face, which `docs/38` § 2.1 asks for.
+2. **The as-built line says what the building is**: its cars, banks, floors and who uses them.
+   Sixteen lines were rewritten; the two that already named no cause (`sleeping-sky-lobby`,
+   `three-cars-one-cars-work`) were kept. The complaint is untouched, because a tenant reports what
+   they see, and the diagnosis keeps the cause. `let-faster-than-the-lifts`'s population rise left
+   with its line, and with it `fixit/cases.test.ts`'s one declared non-floor fact.
+3. **Held by a list, per case**, in `fixit/asBuiltNamesNoFault.test.ts`: each case names the words
+   that would say its cause (the setting the diagnosed repair changes, its standing value, and the
+   clause saying why it is wrong), every shipped case must have an entry, and the sixteen retired
+   lines, quoted verbatim, must each match their own case's words. An automatic overlap between the
+   note and the diagnosis was tried first and did not separate fabric from fault.
+
+**Not done.** The symptom line drawn beside the note (for example *"doors held eleven seconds at
+every stop, on every car"*) is an observation of the run and was left as it is; whether some of
+those name the cause too is not established here. Stage 8's brief sentence *"where the spare cars
+wait between bursts is"* (S3's item) is unchanged.
+
+**Tests.** `scenario/survivors.test.ts` (every shipped cell: the total holds the split back and
+names that it does; the split carries each part), `scenario/ladder.test.ts` (the rung carries both
+forms), `everyday/scenarioModel.test.ts` (an uncleared row draws the total and a cleared row the
+split), `fixit/asBuiltNamesNoFault.test.ts` (three cases above). Red before: the survivor sentence
+had no `'total'` form and the hub drew the split on every row; the as-built rule fails on sixteen
+cases against the retired lines, which is its own control arm.
+
+## D1234 — a clear at or under its par carries a mark, on fix cases and on cleared stages, and a free par is never marked
+
+> **Taken 2026-09-26 by agent sessions under delegated authority**, not by the product owner: the
+> `decide-an` swarm's Q3 ruling item 3 (S1 and S3 proposed the mark, S2 set its limit), reconciled by
+> wave AL's integrator and built by lane AL-G. A later reader weighing this against a product-owner
+> ruling should treat it as an agent ruling and say so; [§ D626](#d626) is the cautionary case.
+> **Owner-reversible**: the marks themselves, their words, and the free-par rule.
+
+**Why an entry.** [§ D405](#d405)'s first and second grounds: it amends [§ D1184](#d1184) and
+[§ D1197](#d1197)'s par line and row, gives the Scenario hub a second mark beside
+[§ D1129](#d1129) clause 4's *cleared*, and widens what the device's kept progress records.
+
+**The ruling.**
+
+1. **The mark** (`scenario/par.ts#parMarkOf`): *at par* where the clear cost what the par costs,
+   *under par* where it cost less, and nothing above it. **It pays nothing and unlocks nothing**:
+   `docs/38` § 2.4's flat award per completed turn is unchanged, and [§ D1184](#d1184) clause 3 stands.
+2. **Never on a free par** (S2): a par of 0 units is met by every clear that buys nothing, so a mark
+   there records nothing about the player. On a fix case where a free fix meets a free par, the par
+   line and the row's par are not drawn either; a fix that cost more than a free par still reads the
+   line, since a free way through is news to that player.
+3. **Fix cases.** The fixed card's par line opens with *At par.* or *Under par.*, and the case list's
+   row reads *par 2 u · yours 2 u · at par* (`fixit/par.ts`).
+4. **Campaign stages.** A stage's par is the cheapest of its base rung's named ways through, priced
+   by the one admission check (`campaign/stagePress.ts#routeUnitsOf`, the same question
+   `routeRefusalsOf` asks), over the census's names; a drawn dial configuration has no values in the
+   table and is not priced. The stage page keeps what a clearing press cost under the stage's id, in
+   the record fix cases keep theirs in (`EverydayProgress.fixSpent`, now keyed by scenario id), and a
+   cleared hub row whose kept cost is at or under a priced par carries the mark with both prices and
+   *Matching it or beating it pays nothing extra.*
+
+**Where it can show today**, priced on the table this lane regenerated ([§ D1235](#d1235)): stage 2
+at 2 units, stage 3 at 4, stage 5 at 9 and stage 7 at 2. Stages 1, 6 and 8 have a free par and carry
+no mark; stages 4, 9 and 10 have no way through and no par. Of the eighteen fix cases, the two with a
+free par carry no mark.
+
+**Tests.** `scenario/par.test.ts` (every arm of the rule), `fixit/par.test.ts` (the free-par
+absence, the mark on the line and the row, nothing above par), `everyday/stagePlay.test.ts`
+(`routeUnitsOf` prices what the check admits and nothing it refuses), `scenario/ladder.test.ts` (the
+par is the minimum over priced names, and absent without pricing), `everyday/scenarioModel.test.ts`
+(the hub row's mark at, under, above, before a clear, without a kept cost, and on a free par), and
+`everyday/fixitVerdict.browser.test.ts` (a fix at a priced par reads *at par* on its row after a
+reload, on the built bundle).
+
+## D1235 — no earlier stage's whole set of ways through may clear a later stage, and stages 7 and 8 start on `zoned-uppeak` to meet it
+
+> **Taken 2026-09-26 by agent sessions under delegated authority**, not by the product owner: the
+> `decide-an` swarm's Q3 ruling item 2 (S1 and S2 on the criterion, S3's census as the
+> measurement), reconciled by wave AL's integrator and built and measured by lane AL-G. A later
+> reader weighing this against a product-owner ruling should treat it as an agent ruling and say
+> so; [§ D626](#d626) is the cautionary case. **Owner-reversible**: the criterion, the choice of
+> starting setting on both stages, and stage 7's added goal.
+
+**Why an entry.** [§ D405](#d405)'s first and second grounds: it moves `data/campaign.json`,
+`data/scenario-goals.json` and `data/scenario-survivors.json`, binds the campaign's register tests
+(`campaign/difficultyCurve.test.ts`, `scenario/survivorBands.test.ts`) and `docs/10` § M30, and
+changes what [§ D1183](#d1183) found on stages 7 and 8.
+
+**The criterion, written first** (`scenario/stagesStandAlone.test.ts`, committed red before any data
+moved): for every pair of stages in path order where the earlier one's base rung names at least one
+way through, that set of names is not contained in the later stage's base-rung survivor names. The
+base rung only, because no screen sells these stages a wider budget; an earlier stage with no way
+through is skipped, because the empty set is in every set. **Red on the base at exactly two pairs**:
+stage 2's five ways through cleared stage 7 and stage 8. Green on every other pair.
+
+**Measured first with parking withheld** (S3's plan: `idle-parking` taken out of the schedule, the
+stage page's parked choices withdrawn, 48 dial draws, base rung, the census's own press and judge).
+Stage 7: **0 of 58**, two dial draws meeting the tuning seeds and refused on the holdout. Stage 8:
+**2 of 53**, both dial draws past the twelfth, so a census at the published `k = 12` would have held
+it. **Withholding parking would have left both stages held, so it is not what shipped.** A higher
+demand on stage 8 (4 %) left all of stage 2's ways through clearing it.
+
+**What shipped: one authored field on each stage.** `dispatcher.startingProfileId` moves from
+`collective` to `zoned-uppeak` (an up-peak order whose idle cars already wait mid-zone) on stages 7
+and 8, mirrored in `scenario/candidates.ts`. Demand, horizon, seeds and budget are unchanged. Two
+things follow and were not authored: every goal cell on both stages was re-measured under the new
+baseline (`ELEVATOR_SIM_REGENERATE_GOAL_RATES=1`), and stage 7's `long-waits-under` became a live
+batch goal there (43/50, 49/50), so stage 7 now declares it, because `campaign/parse.ts` refuses a
+stage that leaves out a goal the table measures as live. Stage 7's brief says it starts on
+operational zoning for the up-peak.
+
+**Regenerated with the documented command** (`ELEVATOR_SIM_SURVIVORS=deep
+ELEVATOR_SIM_REGENERATE_SURVIVORS=1 npx vitest run --project viz src/scenario/survivorSweep.test.ts`,
+7 494 s in one worker on a shared container, tree `2cb0ab0`). **Only stages 7 and 8 moved**; every
+count and name on the other eight stages reproduced, and the input hash now matches the tree.
+
+| stage, rung | before | after |
+|---|---|---|
+| 7, every rung | 18 of 63, all on the page | **11 of 63**, all on the page |
+| 8, base | 11 of 39 | **6 of 39** |
+| 8, equipment and building | 21 of 63 | **12 of 63** |
+
+Stage 7 no longer names `fairness-first-parked-lobby`, `fairness-first-parked-zone-center` or
+`capacity-aware-parked-zone-center`, and stage 8 no longer names either zone-centre way from stage 2,
+so the criterion is green on every pair. Stage 7 met every bar on the tuning seeds with 22
+configurations and held on the holdout with 11, which is its own lesson (*a gain living only in
+these passenger traces has somewhere to fail*). **Both stay offered.** The cheapest named way
+through is now **2 units** on stage 7 (it was 0, [§ D1183](#d1183)) and still **0** on stage 8
+(`zoned-uppeak-parked-lobby`). Both stages are still above their approved survivor bands (stage 7
+0.17 against 0.15, stage 8 0.15 against 0.10) and stay on `survivorBands.test.ts`'s register.
+
+**DC-2, recorded rather than rebalanced.** Read off the lane's own per-stage census (the same press
+and judge as the deep DC-2 tier, which was not re-run): stage 8's two dropdown rows (`eta`,
+`fairness-first`) leave `DROPDOWN_CLEARS`, and stage 7 gains three (`auction-multi-round`,
+`collective-enroute`, `predictive-balanced`), each meeting on the tuning seeds and refused on the
+holdout, so none is a way through.
+
+**Also true and not asserted:** each stage past the first with an answer now has at least one way
+through no earlier stage named (S2's second clause); stage 8's is `zoned-uppeak-parked-lobby`.
+**Not done:** stage 6's budget item, recorded by the ruling and left; the deep DC-2 tier over the
+whole ladder.

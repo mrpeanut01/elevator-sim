@@ -67,7 +67,7 @@ import { reportSignInLink } from '../everyday/signInLink.js';
 import { provideScenarioLadderFrom } from '../everyday/scenarioLadderPort.js';
 import { namedStageMoveOf } from '../everyday/stagePlay.js';
 import { provideScenarioOpen } from '../everyday/scenarioOpenPort.js';
-import { routeRefusalsOf } from '../campaign/stagePress.js';
+import { routeRefusalsOf, routeUnitsOf } from '../campaign/stagePress.js';
 import { everydaySwap, onEverydaySwapProvided } from '../everyday/swap.js';
 import {
   ENGINEER_RETURN_LABEL,
@@ -4758,16 +4758,19 @@ function boot(ui: Elements, resources: BrowserResources): void {
        * stage whose census names only routes a press is refused is held with the refusal rather
        * than offered.
        */
-      const refusals = routeRefusalsOf(loaded.campaign.stages, {
+      const routeResources = {
         space: loaded.space,
         schedule: resources.priceSchedule,
         profiles: resources.dispatcherProfiles.profiles,
         buildings: resources.buildings,
         elevatorSpecs: resources.elevatorSpecs,
         /* § D1183: the stage page's own choices are published under its own names. */
-        moveNamed: (name) => namedStageMoveOf(name, resources.dispatcherProfiles.profiles, loaded.space),
-      });
-      provideScenarioLadderFrom(loaded.campaign.stages, loaded.survivors, refusals);
+        moveNamed: (name: string) => namedStageMoveOf(name, resources.dispatcherProfiles.profiles, loaded.space),
+      };
+      const refusals = routeRefusalsOf(loaded.campaign.stages, routeResources);
+      /* § D1234: the same check read for its price, so a cleared stage's row can carry its par mark. */
+      const units = routeUnitsOf(loaded.campaign.stages, routeResources);
+      provideScenarioLadderFrom(loaded.campaign.stages, loaded.survivors, refusals, units);
     })
     .catch((error: unknown) => {
       setText(ui.campaign.error, error instanceof Error ? error.message : String(error));

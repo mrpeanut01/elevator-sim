@@ -54,6 +54,8 @@ import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.
 import { scenarioHubViewOf } from './scenarioModel.js';
 import { onScenarioLadderProvided, scenarioLadder } from './scenarioLadderPort.js';
 import { everydayDeviceChimeStore } from './chimeStore.js';
+import { fixSpentUnitsOf } from './profile.js';
+import { everydayProfileStore } from './profileStore.js';
 import { closeStageInFixit, openStageInFixit } from './stagePlayScreen.js';
 import { el } from './screenDom.js';
 import { EVERYDAY_COLORS as C, EVERYDAY_RADII as R, EVERYDAY_TYPE as TYPE } from './tokens.js';
@@ -81,7 +83,9 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
      * the state this screen was built in, redrawn — which is the defect `EverydayScreenHandle.reread`
      * exists one seam over to fix.
      */
-    const view = scenarioHubViewOf(scenarioLadder(), clearedStageIds());
+    /* § D1234: the kept cost of each stage's clear, which the row's par mark compares. */
+    const progress = everydayProfileStore().progress();
+    const view = scenarioHubViewOf(scenarioLadder(), clearedStageIds(), (stageId) => fixSpentUnitsOf(progress, stageId));
 
     const next = el(doc, 'div', 'everyday-scenario');
     next.style.cssText = `padding:30px 32px 34px;background:linear-gradient(160deg,${C.paper},${C.paperDeep} 65%,${C.paperDeeper});min-width:0`;
@@ -297,6 +301,11 @@ function pathBlock(
       const done = el(doc, 'div', 'everyday-scenario-path-cleared', row.cleared);
       done.style.cssText = `font:600 12px ${TYPE.body};color:${C.moss};margin:9px 0 0;max-width:58ch`;
       card.append(done);
+    }
+    if (row.parMark !== undefined) {
+      const mark = el(doc, 'div', 'everyday-scenario-path-par', row.parMark);
+      mark.style.cssText = `font-size:12.5px;line-height:1.5;color:${C.inkSoft};margin:5px 0 0;max-width:58ch`;
+      card.append(mark);
     }
 
     const tail = row.playable ? row.note : row.refusal;

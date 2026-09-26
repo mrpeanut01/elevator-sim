@@ -189,7 +189,7 @@
         "arrivalRatePctPop5min": 3
       },
       "asBuilt": {
-        "note": "Four cars split into a low-rise and a high-rise bank; the upper floors were re-let to a dense tenant after the split was drawn.",
+        "note": "Four cars in two banks: a low-rise bank for the floors up to the eleventh, and a high-rise bank for the floors above it.",
         "patch": {
           "building": {
             "floorPopulations": [
@@ -653,7 +653,7 @@
         "arrivalRatePctPop5min": 7.8
       },
       "asBuilt": {
-        "note": "Five cars serve every floor from the dock to the top of the house, and the door dwell on all five is set to eleven seconds — the figure the luggage trolleys needed.",
+        "note": "Five cars serve every floor of the hotel, from the dock to the top of the house.",
         "patch": {
           "building": {
             "cars": [
@@ -818,7 +818,7 @@
         "arrivalRatePctPop5min": 5.5
       },
       "asBuilt": {
-        "note": "Four tower cars carry the flats above the sky lobby, and between calls every one of them is sent back down to the sky lobby to wait.",
+        "note": "Four tower cars carry the flats above the sky lobby.",
         "patch": {
           "dispatcher": {
             "idle": {
@@ -972,7 +972,7 @@
         "arrivalRatePctPop5min": 1.8
       },
       "asBuilt": {
-        "note": "Four cars serve the tower, and exactly one of them — by the original fit-out contract — carries on down to the garage level, which half the building drives in through.",
+        "note": "Four cars serve the tower, and half the building drives in through the garage level.",
         "patch": {
           "building": {
             "banks": [
@@ -1281,7 +1281,7 @@
         "arrivalRatePctPop5min": 5.2
       },
       "asBuilt": {
-        "note": "Three cars were built to run express to the upper zone; since commissioning they have answered every landing in the building.",
+        "note": "Six cars in two banks of three: one bank for the floors up to the fifteenth, and one built for the upper zone above it.",
         "patch": {
           "building": {
             "banks": [
@@ -1631,7 +1631,7 @@
         "arrivalRatePctPop5min": 6
       },
       "asBuilt": {
-        "note": "Five cars carry the whole hospital, and the two big trolley cars have their door hold set to twenty-five seconds — the time a supply cage needs — while the cages ride through the morning peak.",
+        "note": "Five cars carry the whole hospital, and two of them are the big cars the porters' trolleys use.",
         "patch": {
           "building": {
             "cars": [
@@ -1851,7 +1851,7 @@
         "arrivalRatePctPop5min": 3.7
       },
       "asBuilt": {
-        "note": "Seventeen hundred desks, four cars, and one contractual start time for every tenant in the tower.",
+        "note": "Seventeen hundred desks in the tower, served by four cars.",
         "patch": {},
         "tenancy": {
           "cohorts": [
@@ -2055,7 +2055,7 @@
         "arrivalRatePctPop5min": 9
       },
       "asBuilt": {
-        "note": "Outpatients runs every clinic from the first floor, and every appointment letter in the building says nine o'clock — seven hundred of them.",
+        "note": "Outpatients runs every clinic from the first floor, seven hundred appointments a morning.",
         "patch": {
           "building": {
             "floorPopulations": [
@@ -2238,7 +2238,7 @@
         "arrivalRatePctPop5min": 6.5
       },
       "asBuilt": {
-        "note": "The ballroom floor is let to a conference of seven hundred, and when a session breaks they all press down within minutes — into a group configured for an ordinary hotel afternoon.",
+        "note": "The ballroom floor is let to a conference of seven hundred, and when a session breaks they all press down within minutes.",
         "patch": {
           "building": {
             "floorPopulations": [
@@ -2456,7 +2456,7 @@
         "arrivalRatePctPop5min": 9
       },
       "asBuilt": {
-        "note": "The two cars big enough for a bed were locked out of the surgical floors during last year's refurbishment, and the lockout was never lifted.",
+        "note": "Five cars carry the hospital, and two of them are big enough for a bed.",
         "patch": {
           "building": {
             "banks": [
@@ -2809,7 +2809,7 @@
         "arrivalRatePctPop5min": 3
       },
       "asBuilt": {
-        "note": "The upper-zone refit takes two of the three high cars out together, in the fullest month of the year. The scope of works is right; the calendar is not.",
+        "note": "The upper zone is served by its own bank of three cars, and a refit of that bank is under way.",
         "patch": {
           "building": {
             "banks": [
@@ -3266,7 +3266,7 @@
         "arrivalRatePctPop5min": 4.5
       },
       "asBuilt": {
-        "note": "Eight double-deck shuttles link the street to the sky lobbies. At commissioning, each deck's load weighing was set to the car's plated figure divided by the eight cars of the bank — instead of by the two decks of the car.",
+        "note": "Eight double-deck shuttles link the street to the sky lobbies.",
         "patch": {
           "building": {
             "banks": [
@@ -4404,7 +4404,7 @@
         "arrivalRatePctPop5min": 6.8
       },
       "asBuilt": {
-        "note": "The third floor was relaunched as a restaurant and spa doing three hundred covers, above a ballroom and a reception that already fill the rank at lunch.",
+        "note": "The third floor was relaunched as a restaurant and spa doing three hundred covers, above the ballroom and the reception.",
         "patch": {
           "building": {
             "floorPopulations": [
@@ -4629,7 +4629,7 @@
         "arrivalRatePctPop5min": 6.25
       },
       "asBuilt": {
-        "note": "The tower cars answer the flats above the sky lobby, and the controller splits every waiting group across every car it can reach — press once, and whatever is free starts moving.",
+        "note": "The tower cars answer the flats above the sky lobby.",
         "patch": {
           "dispatcher": {
             "dispatch": {
@@ -4805,7 +4805,7 @@
         "arrivalRatePctPop5min": 7.0
       },
       "asBuilt": {
-        "note": "A year of dense lettings put six hundred more people above an unchanged six-car group — a rise of 61 % on the population the two banks were sized for.",
+        "note": "Six cars in two banks serve the tower, one for the lower floors and one for the upper.",
         "patch": {
           "building": {
             "floorPopulations": [
@@ -5202,7 +5202,7 @@
         "arrivalRatePctPop5min": 9.5
       },
       "asBuilt": {
-        "note": "The top floor became the residents' gym in January, and the block's two cars still spend every idle moment parked at the front door, the way they were set when the building opened.",
+        "note": "Six floors and two cars, and the top floor became the residents' gym in January.",
         "patch": {
           "dispatcher": {
             "idle": {

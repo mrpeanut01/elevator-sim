@@ -203,6 +203,8 @@ describe('the ordered path', () => {
       const base = scenario?.steps.find((step) => step.stepId === null);
       if (scenario === undefined || base === undefined) throw new Error(`no row for ${rung.id}`);
       expect(rung.waysThrough, rung.id).toBe(survivorSentenceFor(scenario, base));
+      /* § D1233: the split waits for a clear, and the cleared form is the same count with it. */
+      expect(rung.waysThroughCleared, rung.id).toBe(survivorSentenceFor(scenario, base, 'split'));
       // …and it is not any other rung's sentence, which is what makes the clause above bite.
       for (const step of scenario.steps) {
         if (step.stepId === null) continue;
@@ -279,6 +281,28 @@ describe('the ordered path', () => {
     // …and the positions still count the path rather than the survivors, so a dropped row does not
     // silently renumber the ones after it into a different ladder.
     expect(rungs[0]?.position).toBe(2);
+  });
+});
+
+describe('a stage’s par is the cheapest named way through the check prices — § D1234', () => {
+  it('takes the minimum over the base rung’s priced names, and has none where nothing is priced', () => {
+    const answered = survivors.scenarios.find(
+      (scenario) => (scenario.steps.find((step) => step.stepId === null)?.survivorNames.length ?? 0) > 1,
+    );
+    if (answered === undefined) throw new Error('no stage names two ways through');
+    const names = answered.steps.find((step) => step.stepId === null)!.survivorNames;
+    /* A price per name, by position, so the cheapest is the last name and the first is left unpriced. */
+    const price = new Map(names.map((name, index) => [name, index === 0 ? undefined : 10 - index]));
+    const rungs = scenarioLadderOf({
+      stages: campaign.stages,
+      survivors,
+      unitsOf: (stageId, name) => (stageId === answered.id ? price.get(name) : undefined),
+    });
+    const rung = rungs.find((entry) => entry.id === answered.id)!;
+    expect(rung.parUnits).toBe(10 - (names.length - 1));
+    for (const other of rungs.filter((entry) => entry.id !== answered.id)) expect(other.parUnits, other.id).toBeUndefined();
+    /* No pricing passed, no par — the hub then draws no mark. */
+    for (const entry of ladder()) expect(entry.parUnits, entry.id).toBeUndefined();
   });
 });
 
