@@ -536,10 +536,19 @@ export function stageBookedOutOf(input: {
 }): readonly string[] {
   return input.bookedOut.map((car) => {
     const away = clockAt(car.awayAtS, input.dayStartS);
+    /*
+     * § D1149: the stage reads `carAbsencesOf` now, so a car the day takes from the first instant
+     * has a pill too — Midtown's Friday, where car C was out until 16:30 and the stage named only
+     * car D. It has no leaving time to print, so the pill says when it comes back.
+     */
     const span =
-      car.backAtS === null
-        ? `booked out from ${away}`
-        : `booked out ${away}–${clockAt(car.backAtS, input.dayStartS)}`;
+      car.awayAtS <= 0
+        ? car.backAtS === null
+          ? 'out all day'
+          : `out until ${clockAt(car.backAtS, input.dayStartS)}`
+        : car.backAtS === null
+          ? `booked out from ${away}`
+          : `booked out ${away}–${clockAt(car.backAtS, input.dayStartS)}`;
     const where =
       input.simTimeS < car.awayAtS
         ? 'still running'
@@ -1666,7 +1675,15 @@ export const STAGE_DAY_OVER = 'the day has run out — the stage will not move a
  */
 export const STAGE_SKIP_COPY = Object.freeze({
   label: 'Skip to the end',
-  note: 'Runs the picture out to the end of the day. It changes nothing about the day itself — the same people, the same waits, the same report.',
+  /*
+   * § D1151: the skip stops at a call that has not been answered, and says so on its own face. A
+   * second press with the card up leaves the cars as they are and is recorded as a skip.
+   */
+  note:
+    'Runs the picture out to the end of the day, stopping at any call the stage has not had your ' +
+    'answer to. Pressed while a call is up, it leaves the cars as they are, runs on to the end, and ' +
+    'the report says the call was skipped. Nothing else about the day changes: the same people and ' +
+    'the same waits.',
   doneReason: 'the day has already run out, so there is nothing left to skip',
   pendingReason: 'the day is still being simulated — there is nothing to run out yet',
 });

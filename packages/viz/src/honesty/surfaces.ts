@@ -253,7 +253,7 @@ import { stagePaceNoteOf, stagePaceOf } from '../everyday/stagePace.js';
 import { STAGE_CALL_COPY, stageCallCardOf } from '../everyday/stageCall.js';
 import type { PressCall } from '../shift/pressCall.js';
 import { PRESS_CALL_AGAIN, pressCallRowOf } from '../shift/callRow.js';
-import { dayCallRecordOf, dayCallWindowEndOf } from '../shift/dayCalls.js';
+import { dayCallRecordOf, dayCallsQuietSentenceOf, dayCallWindowEndOf, type DayCallsQuiet } from '../shift/dayCalls.js';
 import { wayThroughSentenceOf, WEEK_WAY } from '../shift/weekWay.js';
 import { admittedPressDayIds, pressDayFor } from '../shift/ladder.js';
 import { PRESS_DAY_DRIVER_HELD } from '../everyday/today.js';
@@ -2357,6 +2357,8 @@ const GOAL_REPORT: SurfaceAdapter = {
   covers: [
     'scenario/goalReport.ts#goalReport',
     'scenario/goals.ts#goalLabel',
+    /* § D1154: the names `goalLabel` prints, reached through it on every kind below. */
+    'scenario/goals.ts#GOAL_NAMES',
     'scenario/goals.ts#GOAL_BLOCKER',
     'scenario/goals.ts#measureGoalRate',
     'scenario/goals.ts#judgeReplication',
@@ -3362,11 +3364,15 @@ function shiftBundleOf(context: HonestyContext): ShiftBundle {
      * is: what is swept is the wording, not a claim that this run lost a car.
      */
     const span = recording.endedAt - recording.startedAt;
-    const fixtureBookings = recording.shafts.slice(0, 2).map((shaft, index) => ({
-      carId: shaft.carId,
-      awayAtS: recording.startedAt + span * 0.25,
-      backAtS: index === 0 ? recording.startedAt + span * 0.5 : null,
-    }));
+    const fixtureBookings = [
+      ...recording.shafts.slice(0, 2).map((shaft, index) => ({
+        carId: shaft.carId,
+        awayAtS: recording.startedAt + span * 0.25,
+        backAtS: index === 0 ? recording.startedAt + span * 0.5 : null,
+      })),
+      /* § D1149: a car out from the first instant, which the header and the cause row now name. */
+      ...recording.shafts.slice(2, 3).map((shaft) => ({ carId: shaft.carId, awayAtS: 0, backAtS: recording.startedAt + span * 0.5 })),
+    ];
     /*
      * § D1138's ordinary calls, on the same sheet — three calls, one per way a call can be left:
      * a press, *leave them*, and a skip with the card up. Each record is counted by the shipped
@@ -3573,6 +3579,8 @@ const SHIFT_REPORT: SurfaceAdapter = {
   id: 'shift/report.ts#dayReportOf',
   covers: [
     'shift/report.ts#dayReportOf',
+    /* § D1148: the fold-out, exported for the `worst-wait-scope` pair and drawn by `dayReportOf` here. */
+    'shift/report.ts#smallPrintFor',
     /*
      * The riders who were left standing, and the caption's own horizon label — GitHub issue #456,
      * § D106 at the renderer. Claimed here because this adapter renders them: the sentence is
@@ -3623,6 +3631,8 @@ const SHIFT_REPORT: SurfaceAdapter = {
      * three answers — the corpus runs no pinned day, so `dayReportOf` never draws it here.
      */
     'shift/callRow.ts#pressCallRowOf',
+    /* § D1151: the skipped arm's headline, seeded on its own arm below. */
+    'shift/callRow.ts#PRESS_CALL_SKIPPED_WHAT',
     'shift/callRow.ts#PRESS_CALL_AGAIN',
     /*
      * § D1138's ordinary call rows and the practice sheet. Seeded once per case below on
@@ -3632,6 +3642,8 @@ const SHIFT_REPORT: SurfaceAdapter = {
     'shift/dayCalls.ts#dayCallRowOf',
     'shift/dayCalls.ts#DAY_CALL_ROW_NOTE',
     'shift/dayCalls.ts#DAY_CALL_LEAVE_LABEL',
+    /* § D1152's quiet day, seeded on its seven arms below. */
+    'shift/dayCalls.ts#dayCallsQuietSentenceOf',
     'shift/report.ts#PRACTICE_NOTE',
     /*
      * Wave AK, § D1141: the practice sheet's note when the crowd made it practice — a link's crowd
@@ -3708,18 +3720,21 @@ const SHIFT_REPORT: SurfaceAdapter = {
           backAtS: recording.startedAt + span * 0.5,
           act: undefined,
         };
-        const answers: readonly (readonly [string, readonly RunInterventionConfig[]])[] = [
-          ['none', []],
-          [pin.clearedBy, [{ atS: call.atS, change: { kind: pin.clearedBy } as RunInterventionConfig['change'] }]],
-          [pin.missedBy, [{ atS: call.atS, change: { kind: pin.missedBy } as RunInterventionConfig['change'] }]],
+        /* § D1151: and the fourth arm, a skip with the card up, which is not *nothing was pressed*. */
+        const answers: readonly (readonly [string, readonly RunInterventionConfig[], boolean])[] = [
+          ['none', [], false],
+          ['skipped', [], true],
+          [pin.clearedBy, [{ atS: call.atS, change: { kind: pin.clearedBy } as RunInterventionConfig['change'] }], false],
+          [pin.missedBy, [{ atS: call.atS, change: { kind: pin.missedBy } as RunInterventionConfig['change'] }], false],
         ];
-        for (const [answer, interventions] of answers) {
+        for (const [answer, interventions, skipped] of answers) {
           const row = pressCallRowOf(
             {
               press: pin,
               call,
               interventions,
               nameOf: (id) => context.dispatcherProfiles.profiles.find((profile) => profile.id === id)?.name,
+              skipped,
             },
             (simTimeS) => clockOf(simTimeS, DAY_START_S),
           );
@@ -3730,6 +3745,28 @@ const SHIFT_REPORT: SurfaceAdapter = {
         }
         seeds.push({ field: 'callRow.again.label', text: PRESS_CALL_AGAIN.label, role: 'label' });
         seeds.push({ field: 'callRow.again.note', text: PRESS_CALL_AGAIN.note, role: 'prose' });
+      }
+    }
+
+    /*
+     * ---- § D1152's quiet day, on every way asking can end ----
+     *
+     * The corpus runs no ordinary call session, so the sheet it builds never draws this row; the
+     * sentence is seeded on each of its arms directly, with the refusal count this case's own run
+     * would give if every candidate a quarter of the run apart were turned down.
+     */
+    {
+      const quiet: readonly (readonly [string, DayCallsQuiet])[] = [
+        ['refused', { kind: 'asked', refused: 3, ending: 'finished' }],
+        ['refused-once', { kind: 'asked', refused: 1, ending: 'finished' }],
+        ['no-moment', { kind: 'asked', refused: 0, ending: 'finished' }],
+        ['failed', { kind: 'asked', refused: 1, ending: 'failed' }],
+        ['skipped', { kind: 'asked', refused: 0, ending: 'skipped' }],
+        ['asking', { kind: 'asked', refused: 1, ending: 'asking' }],
+        ['not-offered', { kind: 'not-offered' }],
+      ];
+      for (const [arm, account] of quiet) {
+        seeds.push({ field: `dayCallsQuiet(${arm})`, text: dayCallsQuietSentenceOf(account), role: 'prose' });
       }
     }
 
@@ -12062,6 +12099,8 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
       const calls: readonly PressCall[] = [
         { atS: recording.startedAt + span * 0.3, rule: 'first-minute-wait', carId, awayAtS, backAtS: recording.startedAt + span * 0.5, act },
         { atS: act.startS, rule: 'act-start', carId, awayAtS, backAtS: null, act },
+        /* § D1150: an ordinary call with no car out, whose question is about all the cars. */
+        { atS: recording.startedAt + span * 0.15, rule: 'first-minute-wait', carId: '', awayAtS: recording.startedAt + span * 0.15, backAtS: null, act: undefined, carAway: false },
       ];
       /* Two cars out together where the building has two, so the plural line is swept too. */
       const secondCarId = recording.shafts[1]?.carId;
@@ -12071,7 +12110,7 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
       ];
       for (const call of calls) {
         const card = stageCallCardOf(call, undefined, call.backAtS === null ? [] : bookedOut);
-        const at = `stage.call(${call.rule})`;
+        const at = `stage.call(${call.rule}${call.carAway === false ? ',none-out' : ''})`;
         const playhead = atPlayhead(recording, call.atS);
         seeds.push({ field: `${at}.heading`, text: card.heading, role: 'label' });
         for (const [index, fact] of card.facts.entries()) {
@@ -12167,11 +12206,15 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
        */
       const stageSpan = recording.endedAt - recording.startedAt;
       for (const [index, line] of stageBookedOutOf({
-        bookedOut: recording.shafts.slice(0, 2).map((shaft, which) => ({
-          carId: shaft.carId,
-          awayAtS: recording.startedAt + stageSpan * 0.25,
-          backAtS: which === 0 ? recording.startedAt + stageSpan * 0.5 : null,
-        })),
+        bookedOut: [
+          ...recording.shafts.slice(0, 2).map((shaft, which) => ({
+            carId: shaft.carId,
+            awayAtS: recording.startedAt + stageSpan * 0.25,
+            backAtS: which === 0 ? recording.startedAt + stageSpan * 0.5 : null,
+          })),
+          /* § D1149: a car out from the first instant, which the pill now draws. */
+          ...recording.shafts.slice(2, 3).map((shaft) => ({ carId: shaft.carId, awayAtS: 0, backAtS: recording.startedAt + stageSpan * 0.5 })),
+        ],
         simTimeS: at,
       }).entries()) {
         seeds.push({

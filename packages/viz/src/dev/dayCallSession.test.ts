@@ -160,6 +160,27 @@ describe('an ordinary day’s calls on a real crowd', () => {
     expect(session.records()).toEqual([]);
     expect(asks).toBeGreaterThan(0);
     expect(asks).toBeLessThanOrEqual(DAY_CALL_MAX_TRIES);
+    /* § D1152: the quiet day's account is the session's own count, and it finished asking. */
+    expect(session.quiet()).toEqual({ kind: 'asked', refused: asks, ending: 'finished' });
+  });
+
+  it('says it is still asking while a candidate’s runs are in flight, and failed when one could not be made — § D1152', () => {
+    const facts = dayCallFactsOf(PRESS_DAY_RESOURCES, state)!;
+    let fail: ((message: string) => void) | undefined;
+    const session = openDayCallSession(
+      {
+        planWith: (extra) => planOf([extra]),
+        simulate: (_runs, _done, failed) => {
+          fail = failed;
+        },
+        cancel: () => {},
+        changed: () => {},
+      },
+      { recording: built, bookedOut: facts.bookedOut, horizon: facts.horizon },
+    );
+    expect(session.quiet()).toEqual({ kind: 'asked', refused: 0, ending: 'asking' });
+    fail?.('worker gone');
+    expect(session.quiet()).toEqual({ kind: 'asked', refused: 0, ending: 'failed' });
   });
 
   it('records a skip with the card up as skipped, and asks nothing after it', () => {

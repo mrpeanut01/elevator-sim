@@ -211,7 +211,7 @@ import { contractById, statLineOf } from '../shift/contracts.js';
 import { bankingRefusalFor, UNCHOSEN_RUN_CANNOT_BANK } from '../shift/banking.js';
 import { shiftObservationsOf } from '../shift/observations.js';
 import { pressCounterfactualOf } from '../shift/counterfactual.js';
-import { bookedOutCarsOf } from '../shift/bookedOut.js';
+import { carAbsencesOf } from '../shift/bookedOut.js';
 import { readGoals } from '../shift/goals.js';
 import {
   clockOf,
@@ -244,7 +244,7 @@ import {
 import { mountFixitPanel } from './fixitPanel.js';
 import { createOffThreadRunner, type OffThreadRun } from './offThreadRuns.js';
 import { openDayCallSession, type DayCallSession } from './dayCallSession.js';
-import { dayCallsOffered, type DayCallAnswer, type DayCallOnStage } from '../shift/dayCalls.js';
+import { dayCallsOffered, type DayCallAnswer, type DayCallOnStage, type DayCallsQuiet } from '../shift/dayCalls.js';
 import { WATCHING_HEADER_CLASS, mountWatchPanel } from './watchPanel.js';
 import { chip, el, fill, fillSelect, keyedFill, setHidden, setText } from './dom.js';
 import {
@@ -1636,11 +1636,23 @@ function boot(ui: Elements, resources: BrowserResources): void {
   let dayCallSession: DayCallSession | undefined;
   /** The run a session was refused on, so the refusal is asked once rather than once a frame. */
   let dayCallRefusedOn: VizRecording | undefined;
+  /**
+   * Whether the stage asked about this attempt's run and was refused because the day is a whole
+   * day too busy to call on (§ D1138 clause 5) — what § D1152's quiet row says instead of a call.
+   */
+  let dayCallsNotOffered = false;
 
   function closeDayCalls(): void {
     dayCallSession?.close();
     dayCallSession = undefined;
     dayCallRefusedOn = undefined;
+    dayCallsNotOffered = false;
+  }
+
+  /** § D1152 — what the report says on a day that raised no ordinary call, or nothing. */
+  function dayCallsQuietForReport(): DayCallsQuiet | undefined {
+    if (dayCallSession !== undefined) return dayCallSession.quiet();
+    return dayCallsNotOffered ? { kind: 'not-offered' } : undefined;
   }
 
   /**
@@ -1660,6 +1672,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
       const facts = dayCallFactsOf(resources, state);
       if (facts === undefined || facts.pinned || !dayCallsOffered(facts.horizon, recording.legs.length)) {
         dayCallRefusedOn = recording;
+        dayCallsNotOffered = facts !== undefined && !facts.pinned;
         return undefined;
       }
       dayCallSession = openDayCallSession(
@@ -3349,6 +3362,12 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * The report's call row input for the state standing now — `dev/state.ts#pressDayCallOf`, with
    * the census's names resolved the way every other dispatcher name on the sheet is. § D1029.
    */
+  /**
+   * Whether this attempt's pinned call was skipped — *Skip to the end* pressed with its card up,
+   * [§ D1151](../../../../DECISIONS.md). Cleared by every fresh ask, as the ordinary calls' session
+   * is, so a retake starts with its call unanswered.
+   */
+  let pressCallSkipped = false;
   const pressCallForReport = (
     asBuilt: VizRecording,
   ): DayReportInput['pressCall'] => {
@@ -3358,6 +3377,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
       press: measured.press,
       call: measured.call,
       nameOf: (id) => profileById(resources, state.savedDispatchers, id).name,
+      skipped: pressCallSkipped && state.interventions.length === 0,
     };
   };
   /** Whether the job in flight on {@link shiftRunner} is the rival's — see {@link scheduleGhost}. */
@@ -4741,6 +4761,9 @@ function boot(ui: Elements, resources: BrowserResources): void {
       dayCallSession?.skip(called);
       renderAll();
     },
+    skipPressCall: () => {
+      pressCallSkipped = true;
+    },
     closeDay: () => {
       closeShift();
     },
@@ -6112,7 +6135,10 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * A fresh ask is a fresh attempt, and an attempt's calls are its own — § D1138. An intervention
      * is the same attempt's record growing, so its session stands and is told about the new run.
      */
-    if (cause === 'player') closeDayCalls();
+    if (cause === 'player') {
+      closeDayCalls();
+      pressCallSkipped = false;
+    }
     setText(ui.transport.error, '');
     // A new ask is a new chance: the failure the stage is drawing belonged to the run this replaces.
     shiftFailure = undefined;
@@ -6845,6 +6871,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
        * being filed. Nothing is printed about any call before this line runs.
        */
       dayCalls: dayCallSession?.records() ?? [],
+      /* § D1152 — the one sentence a day with no call gets at its close. */
+      dayCallsQuiet: dayCallsQuietForReport(),
       // The scenario this shift belongs to, not `undefined`. Passing nothing made the sheet say
       // *your own building — nothing is being banked* on the same day the banner cleared a
       // scenario and the rail counted the shift as banked: three panels, two answers.
@@ -6959,7 +6987,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
        * With the cars the day's event took, so the header's note says *the tower also books* only
        * of the tower's — § D1038, the post-AH panel's N5.
        */
-      bookedOut: bookedOutCarsOf(planned.building, [...planned.dayCars.holds, ...planned.dayCars.windows]),
+      /* § D1149: every car that was out, one out from the first instant included. */
+      bookedOut: carAbsencesOf(planned.building, [...planned.dayCars.holds, ...planned.dayCars.windows]),
       /* § D1040 — so the header and tomorrow's card say what a mix-asking wrinkle did on this tower. */
       templateVariesMix: planned.templateVariesMix,
       /* § D1057 — so the header and tomorrow's card name the episode's window on a whole day. */

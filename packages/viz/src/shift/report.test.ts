@@ -697,6 +697,54 @@ describe('WORST WAIT states its censoring', () => {
     expect(cell.note).not.toContain(saturated.summary.reportWindow.id);
   });
 
+  /**
+   * **Every worst wait on the sheet is that one figure** — § D1148, the post-AJ panel's seats B
+   * (H1, H2) and D (H4). § D1104 moved the card and left the *Weight fairness up* card reading the
+   * reporting window's maximum (*one still waited 178 s* under a 181 s card) and the fold-out saying
+   * the WORST WAIT figure was over the window. Asserted on a run whose window's worst is not its
+   * shift's, so the lever quoting either would be told apart.
+   */
+  it('quotes the card’s figure on the lever card and puts it in the whole shift in the fold-out', () => {
+    const base = observationsOfRun(clean);
+    const shiftWorst = 181;
+    expect(Math.round(clean.summary.serviceLevel.longestWaitS ?? 0)).not.toBe(shiftWorst);
+    const report = reportWith({ ...base, worstWaitS: shiftWorst, worstWaitIsCensored: false, minutePct: 100 });
+    expect(figure(report, 'worst-wait').value).toBe(`${String(shiftWorst)} s`);
+    const lever = report.levers.find((entry) => entry.id === 'weight-fairness');
+    expect(lever?.body).toContain(`one still waited ${String(shiftWorst)} s`);
+    for (const match of JSON.stringify(report).matchAll(/waited (?:at least )?(\d+) s/gu)) {
+      expect(match[1], match[0]).toBe(String(shiftWorst));
+    }
+    const clause = report.smallPrint.split(/;|\. /u).find((part) => part.includes('WORST WAIT')) ?? '';
+    expect(clause).toContain('whole shift');
+    expect(clause).not.toContain('window');
+  });
+
+  /*
+   * § D1152, the post-AJ panel's seat B (U1): a day that raised no call said nothing about it.
+   * The row is drawn from the session's account and only when no call row is.
+   */
+  it('says a day raised no call, in one row, only when the day had none', () => {
+    const quiet = dayReportOf({
+      recording: clean,
+      observations: observationsOfRun(clean),
+      goals: goalsForDay(4),
+      week: openWeek('c2'),
+      contract: contractById('c2'),
+      event: SHIFT_EVENTS.ordinary,
+      plan: PLAN,
+      calendar: null,
+      subject: { kind: 'week-day' },
+      dayCalls: [],
+      dayCallsQuiet: { kind: 'asked', refused: 3, ending: 'finished' },
+    });
+    const rows = quiet.diagnosis.filter((row) => row.id === 'day-calls-none');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.why).toMatch(/^The stage raised no call today\. It ran the day three ways from 3 moments/u);
+    /* No account from the shell, no row: a run nobody asked the stage about says nothing. */
+    expect(reportWith(observationsOfRun(clean)).diagnosis.some((row) => row.id === 'day-calls-none')).toBe(false);
+  });
+
   it('reads "not recorded" — never 0 s — when nobody called a lift', () => {
     expect(
       figure(reportWith({ ...observationsOfRun(clean), arrived: 0, carried: 0, worstWaitS: 0 }), 'worst-wait').value,

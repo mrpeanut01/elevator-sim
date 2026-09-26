@@ -130,6 +130,19 @@ describe('a Casual note leads the engineer’s note and never replaces it', () =
     );
   });
 
+  /*
+   * § D1153, the post-AJ panel's seat D (H8): the lead defined the line as the point a rider *gives
+   * up*, over a note saying every one of them *is inside CARRIED*. The definition may not claim the
+   * riders past the line left, because on a run with no patience none did.
+   */
+  it('defines the give-up line without contradicting a cell whose riders were all carried', () => {
+    const definition = glossaryPlain('abandonment-horizon');
+    expect(definition).not.toMatch(/having given up|gave up/u);
+    expect(definition).toMatch(/may still be carried/u);
+    const note = casualNoteFor(cell('stairs'));
+    if (note.includes('inside CARRIED')) expect(note).not.toMatch(/having given up rather than/u);
+  });
+
   it('marks the seam between the two registers — docs/19 defect 8', () => {
     /*
      * The engineer's notes are grid captions, not sentences — *"waited past the 15-minute

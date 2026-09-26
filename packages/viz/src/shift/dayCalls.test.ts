@@ -20,7 +20,9 @@ import {
   DAY_CALL_WINDOW_S,
   dayCallAdmits,
   dayCallRowOf,
+  dayCallsQuietSentenceOf,
   dayCallSearchFrom,
+  DAY_CALL_MIN_SPREAD,
   dayCallsOffered,
   dayCallWindowEndOf,
   longWaitRidersIn,
@@ -239,5 +241,45 @@ describe('the report’s row for a call', () => {
 
   it('lists the answers in the stage’s fixed order, never ranked by their counts', () => {
     expect(DAY_CALL_ANSWERS).toEqual(['park-cars-lobby', 'spread-cars', 'leave']);
+  });
+});
+
+/**
+ * **A day with no call says so at its close** — [§ D1152](../../../../DECISIONS.md), the post-AJ
+ * panel's seat B (U1): two quiet days and no word about them, even afterwards. One sentence per
+ * way asking can end, each true of what the session saw and nothing past it.
+ */
+describe('the quiet day’s sentence', () => {
+  const ARMS = [
+    ['turned down', dayCallsQuietSentenceOf({ kind: 'asked', refused: 4, ending: 'finished' })],
+    ['turned down once', dayCallsQuietSentenceOf({ kind: 'asked', refused: 1, ending: 'finished' })],
+    ['no moment', dayCallsQuietSentenceOf({ kind: 'asked', refused: 0, ending: 'finished' })],
+    ['failed', dayCallsQuietSentenceOf({ kind: 'asked', refused: 2, ending: 'failed' })],
+    ['skipped', dayCallsQuietSentenceOf({ kind: 'asked', refused: 0, ending: 'skipped' })],
+    ['closed early', dayCallsQuietSentenceOf({ kind: 'asked', refused: 1, ending: 'asking' })],
+    ['not offered', dayCallsQuietSentenceOf({ kind: 'not-offered' })],
+  ] as const;
+
+  it('says the stage raised no call, on every arm', () => {
+    for (const [arm, text] of ARMS) expect(text, arm).toMatch(/^The stage raised no call/u);
+  });
+
+  it('quotes the session’s own count and the admission rule it turned them down on', () => {
+    expect(ARMS[0][1]).toContain('from 4 moments');
+    expect(ARMS[1][1]).toContain('from one moment');
+    expect(ARMS[0][1]).toContain(`at least ${String(DAY_CALL_MIN_SPREAD)} riders apart, and a tenth of the largest`);
+    expect(ARMS[2][1]).toContain('found no moment to ask');
+  });
+
+  it('claims nothing it did not see: no count where it did not finish, nothing about another day', () => {
+    for (const arm of ['failed', 'skipped', 'closed early', 'not offered']) {
+      const text = ARMS.find(([name]) => name === arm)?.[1] ?? '';
+      expect(/\d/u.test(text), `${arm}: ${text}`).toBe(false);
+    }
+    for (const [arm, text] of ARMS) {
+      for (const phrase of [...CAUSAL, ...ESTIMATE, ...MECHANISM, ...GENERAL, 'tomorrow', 'next day']) {
+        expect(says(text, phrase), `${arm}: ${phrase}`).toBe(false);
+      }
+    }
   });
 });

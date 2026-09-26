@@ -239,10 +239,19 @@ export const GLOSSARY_TERMS: readonly GlossaryTerm[] = Object.freeze([
     term: 'abandonment horizon',
     /* *Give-up line* is the Day report's name for the same point — see the day's own words below. */
     appearsAs: ['abandonment horizon', 'give-up line'],
+    /*
+     * **The line is a wait, and whether anybody leaves at it is the run's** — [§ D1153](../../../../DECISIONS.md),
+     * the post-AJ panel's seat D (H8). This read *"the point at which this simulator counts a rider
+     * as having given up rather than gone on waiting"*, and the Day report drew it as the lead of a
+     * cell whose own note said *every one of them is inside CARRIED*: a definition saying they gave
+     * up, over a count saying a car came for all of them. On a run whose riders have no patience
+     * nobody leaves; the count is of waits that crossed the line. The definition now says both.
+     */
     plain:
-      'The point at which this simulator counts a rider as having given up rather than gone on ' +
-      'waiting. Riders leaving pulls the longest waits out of the sample, so an average that ' +
-      'ignored them would flatter the run — which is why the count is published next to the wait ' +
+      'The wait past which this simulator treats a rider as having waited too long. Where riders ' +
+      'on a run have no patience nobody leaves at it, so a rider past it may still be carried; ' +
+      'where some do leave, they take the longest waits out of the sample and an average that ' +
+      'ignored them would flatter the run, which is why the count is published next to the wait ' +
       'and never folded into it.',
   }),
   Object.freeze({
@@ -330,7 +339,8 @@ export const GLOSSARY_TERMS: readonly GlossaryTerm[] = Object.freeze([
   Object.freeze({
     id: 'goal-answer-the-demand',
     term: 'answer-the-demand',
-    appearsAs: ['answer-the-demand'],
+    /* § D1154: the name `scenario/goals.ts#goalLabel` prints, beside the kind an author writes. */
+    appearsAs: ['answer-the-demand', 'kept up with arrivals'],
     plain:
       'The lifts got at least as many people away in five minutes as turned up in them. It is the ' +
       'pair of bars on the demand row: when the second one is shorter, the building is losing ' +
@@ -339,7 +349,8 @@ export const GLOSSARY_TERMS: readonly GlossaryTerm[] = Object.freeze([
   Object.freeze({
     id: 'goal-no-divergence',
     term: 'no-divergence',
-    appearsAs: ['no-divergence'],
+    /* § D1154: the name `scenario/goals.ts#goalLabel` prints, beside the kind an author writes. */
+    appearsAs: ['no-divergence', 'queues settled'],
     plain:
       'The queues settled instead of growing without bound. It is the same check that decides ' +
       'whether the run may publish an average wait at all.',
@@ -347,13 +358,15 @@ export const GLOSSARY_TERMS: readonly GlossaryTerm[] = Object.freeze([
   Object.freeze({
     id: 'goal-deliver-everyone',
     term: 'deliver-everyone',
-    appearsAs: ['deliver-everyone'],
+    /* § D1154: the name `scenario/goals.ts#goalLabel` prints, beside the kind an author writes. */
+    appearsAs: ['deliver-everyone', 'everyone delivered'],
     plain: 'Nobody was still waiting or still riding when the clock stopped.',
   }),
   Object.freeze({
     id: 'goal-nobody-abandoned',
     term: 'nobody-abandoned',
-    appearsAs: ['nobody-abandoned'],
+    /* § D1154: the name `scenario/goals.ts#goalLabel` prints, beside the kind an author writes. */
+    appearsAs: ['nobody-abandoned', 'nobody past the give-up line'],
     plain:
       'Nobody waited past the point this simulator counts as giving up. One person is enough to ' +
       'fail it — it is a floor, not an average.',
@@ -361,7 +374,8 @@ export const GLOSSARY_TERMS: readonly GlossaryTerm[] = Object.freeze([
   Object.freeze({
     id: 'goal-long-waits-under',
     term: 'long-waits-under',
-    appearsAs: ['long-waits-under'],
+    /* § D1154: the name `scenario/goals.ts#goalLabel` prints, beside the kind an author writes. */
+    appearsAs: ['long-waits-under', 'long waits kept under'],
     plain:
       'At most this share of rides waited longer than the building calls acceptable. The figure ' +
       'in brackets is that share of rides, not a wait in seconds.',
@@ -369,7 +383,8 @@ export const GLOSSARY_TERMS: readonly GlossaryTerm[] = Object.freeze([
   Object.freeze({
     id: 'goal-everyone-can-get-there',
     term: 'everyone-can-get-there',
-    appearsAs: ['everyone-can-get-there'],
+    /* § D1154: the name `scenario/goals.ts#goalLabel` prints, beside the kind an author writes. */
+    appearsAs: ['everyone-can-get-there', 'everyone can reach their floor'],
     plain:
       'Whether every rider could reach the floor they wanted. A recording carries no pass or ' +
       'badge on a journey, so it cannot tell a call nobody answered from a call nobody was ' +
@@ -378,7 +393,8 @@ export const GLOSSARY_TERMS: readonly GlossaryTerm[] = Object.freeze([
   Object.freeze({
     id: 'goal-beat-the-baseline',
     term: 'beat-the-baseline',
-    appearsAs: ['beat-the-baseline'],
+    /* § D1154: the name `scenario/goals.ts#goalLabel` prints, beside the kind an author writes. */
+    appearsAs: ['beat-the-baseline', 'ahead of the building’s own setting'],
     plain:
       'Your setting is measured against the one the stage started from, on the same passengers. ' +
       'It is reached when at least one measure separates the two by a range that excludes zero, ' +

@@ -109,7 +109,7 @@ import {
   rungIncidents,
   type ContractPressDay,
 } from '../shift/ladder.js';
-import { bookedOutCarsOf, type BookedOutCar } from '../shift/bookedOut.js';
+import { bookedOutCarsOf, carAbsencesOf, type BookedOutCar } from '../shift/bookedOut.js';
 import { pressCallOf, type PressCall } from '../shift/pressCall.js';
 import { grownBuilding } from '../shift/growth.js';
 import { spliceEpisode, trafficProfilesWithRecord } from '../shift/episode.js';
@@ -1867,7 +1867,8 @@ export function dayCallFactsOf(
       seed: state.seed,
       horizon,
     }) !== undefined;
-  return { horizon, bookedOut: bookedOutCarsOf(plan.building), pinned };
+  /* § D1149: the card's car line names a car out from the first instant too. A fact on the card, never a gate. */
+  return { horizon, bookedOut: carAbsencesOf(plan.building), pinned };
 }
 
 /** What a run will be, read before it is pressed — {@link plannedDayOf}. */

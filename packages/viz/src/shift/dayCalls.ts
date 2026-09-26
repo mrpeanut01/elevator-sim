@@ -59,6 +59,7 @@ import { PARK_CARS_LOBBY_LABEL, SPREAD_CARS_LABEL, stampVerbOf } from '../live/i
 import { WAIT_BANDS } from '../live/bands.js';
 
 import type { BookedOutCar } from './bookedOut.js';
+import { PRESS_CALL_SKIPPED_WHAT } from './callRow.js';
 import type { DayAct } from './dayLength.js';
 import { firstMinuteWaitIn, type PressCall, type PressCallRule } from './pressCall.js';
 import type { Observations, ReportDiagnosis, RunHorizon } from './types.js';
@@ -384,6 +385,57 @@ function listOf(parts: readonly string[]): string {
 }
 
 /**
+ * **What a day with no call did instead** — [§ D1152](../../../../DECISIONS.md), the post-AJ panel's
+ * seat B (U1). Two of that seat's three scored days raised no call and nothing said so, even at the
+ * close; the seat thought it had missed one. § D1138 refuses a line on the brief forecasting a
+ * quiet day, and this is not one: it is said after the day, of the run that was played.
+ *
+ * - `not-offered` — the day is a whole day too busy for the stage to ask on (§ D1138 clause 5).
+ * - `asked` — the ordinary calls' session ran on this attempt; `refused` is how many candidate
+ *   moments it ran three ways and turned down, and `ending` how its asking stopped: `finished` (no
+ *   moment left, or the day's cap), `failed` (a run it needed could not be made), `skipped` (the day
+ *   was skipped past the calls), or `asking` (the day was closed while candidates were still ahead).
+ */
+export type DayCallsQuiet =
+  | { readonly kind: 'not-offered' }
+  | {
+      readonly kind: 'asked';
+      readonly refused: number;
+      readonly ending: 'finished' | 'failed' | 'skipped' | 'asking';
+    };
+
+/**
+ * **The one sentence a day with no call gets at its close** — § D1152. Only what the session saw:
+ * the count of moments it turned down and the admission rule it turned them down on, never a
+ * forecast about another day and never a claim that a call would have mattered.
+ */
+export function dayCallsQuietSentenceOf(quiet: DayCallsQuiet): string {
+  const head = 'The stage raised no call today.';
+  if (quiet.kind === 'not-offered') {
+    return `${head} It does not stop to ask on a whole day with as many trips as this one.`;
+  }
+  switch (quiet.ending) {
+    case 'asking':
+      return 'The stage raised no call before the day was closed.';
+    case 'skipped':
+      return `${head} The day was skipped to its end before one was raised.`;
+    case 'failed':
+      return `${head} A run it needed in order to ask could not be made.`;
+    case 'finished':
+      break;
+  }
+  if (quiet.refused === 0) {
+    return `${head} It found no moment to ask on this run: nobody on a landing had waited a minute with time left in the day to answer.`;
+  }
+  const moments = quiet.refused === 1 ? 'one moment' : `${String(quiet.refused)} moments`;
+  return (
+    `${head} It ran the day three ways from ${moments}, and each time the three answers left ` +
+    'close to the same number of riders waiting a minute or more over the next ten minutes. A call ' +
+    `needs those counts at least ${String(DAY_CALL_MIN_SPREAD)} riders apart, and a tenth of the largest of them.`
+  );
+}
+
+/**
  * The closing clause on every call row — what its facts are about and what they are not. The same
  * sentence as § D1029's pinned row, because it is the same kind of claim.
  */
@@ -411,7 +463,7 @@ export function dayCallRowOf(
   const to = clockOf(record.windowEndS);
   const what =
     record.answer === 'skipped'
-      ? 'The stage called the day, and the day was skipped to its end'
+      ? PRESS_CALL_SKIPPED_WHAT
       : record.answer === 'leave'
         ? 'The stage called the day, and you left the cars as they were'
         : `The stage called the day, and you ${stampVerbOf({ kind: record.answer } as Parameters<typeof stampVerbOf>[0])}`;

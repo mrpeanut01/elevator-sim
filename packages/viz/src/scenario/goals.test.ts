@@ -318,8 +318,21 @@ describe('the sentences a reader gets', () => {
   });
 
   it('name the threshold when the goal has one, because the rate is a function of it', () => {
-    expect(goalLabel(LONG_WAITS)).toBe('long-waits-under (≤ 10 %)');
-    expect(goalLabel(DIVERGE)).toBe('no-divergence');
+    expect(goalLabel(LONG_WAITS)).toBe('long waits kept under 10 %');
+    expect(goalLabel(DIVERGE)).toBe('queues settled');
+  });
+
+  /*
+   * § D1154, the post-AJ panel's seats A, C and D: the stage verdict printed `deliver-everyone ·
+   * met` and `beat-the-baseline: …`. No label a surface prints is a data id.
+   */
+  it('names every kind in words, never by its id', () => {
+    for (const kind of GOAL_KINDS) {
+      for (const threshold of [null, 20] as const) {
+        const label = goalLabel({ kind, threshold } as GoalSpec);
+        for (const id of GOAL_KINDS) expect(label, kind).not.toContain(id);
+      }
+    }
   });
 });
 

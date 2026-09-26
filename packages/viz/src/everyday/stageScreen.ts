@@ -122,7 +122,7 @@ import {
   type StageSwitchTarget,
 } from './stageScreenModel.js';
 import { everydayProfileStore } from './profileStore.js';
-import { bookedOutCarsOf, type BookedOutCar } from '../shift/bookedOut.js';
+import { carAbsencesOf, type BookedOutCar } from '../shift/bookedOut.js';
 /* GitHub issue #592, § D991 — the whole day's acts and the pace rule over them. */
 import { actsOf, type DayAct } from '../shift/dayLength.js';
 import type { RunHorizon } from '../shift/types.js';
@@ -399,6 +399,12 @@ function mountStage(
    * that candidate turns out not to be raised.
    */
   let waitingOnCall = false;
+  /**
+   * Whether the player pressed *Skip to the end* and the stage is running to the next call on their
+   * behalf — § D1151. Cleared when a card is drawn (the skip has arrived) and on the skip that runs
+   * the day out.
+   */
+  let skipping = false;
   /* ---- § D344's sound — GitHub issue #258. Four cells, none of which a leg can read. ---- */
   /** The synthesised sink, built on the first frame that has something to play. */
   let audioSink: AudioSink | undefined;
@@ -1480,6 +1486,21 @@ function mountStage(
      */
     if (answer.reason === 'call') {
       playback.pause();
+      /*
+       * **And the frame it stops on is the call's** — [§ D1153](../../../../DECISIONS.md), the post-AJ
+       * panel's seat D (H10). At a fast rung the frame the pause lands on is a few simulated seconds
+       * past the call, while the answer is stamped at the call second: the header read *12
+       * standing* on the stopped frame and the report's press row *11 standing* at the stamp, both
+       * right, one instant apart. The playhead is put back on the call second, so the clock, the
+       * header, the strip and the card describe the instant the press is filed at. It moves the
+       * playhead within the stop and nothing else: where the stage stops and at what speed it runs
+       * are unchanged.
+       */
+      const callAtS = activeCall()?.call.atS;
+      if (callAtS !== undefined && playback.simTimeS > callAtS) {
+        playback.seekTo(callAtS);
+        requestFrame();
+      }
       syncTransport();
       return;
     }
@@ -1573,15 +1594,41 @@ function mountStage(
      * harmless.
      */
     started = true;
-    /* § D1029: a skip is the player's own answer to a call they have not been asked yet. */
-    if (stageCall !== undefined) callAnswered = true;
     /*
-     * § D1138: and to every ordinary call the day had left. A call whose card is up when the player
-     * skips is recorded as skipped, so the report still says the stage called there.
+     * **A skip stops at a call that has not been answered** — [§ D1151](../../../../DECISIONS.md),
+     * which amends § D1029's *a skip is the player's own answer to a call they have not been asked
+     * yet* and § D1138's *a skip answers every call the day had left*. The post-AJ panel's seat D
+     * (H1) pressed *Skip to the end* on a newcomer's first day and the stage ran past the day's only
+     * call; the day banked as missed and the report said *nothing was pressed*. So a skip runs the
+     * picture to the next call standing and the stage stops there as it would at any rung, with the
+     * card up. Pressed again with the card up, it is the player's answer: the call is recorded as
+     * skipped and the day runs to its end.
+     *
+     * An ordinary candidate whose two runs have not landed is waited at, exactly as the stage waits
+     * at one while playing; {@link skipping} carries the press across the wait, so a candidate that
+     * is not raised does not hand the player back a day playing at their rung.
      */
-    const ordinary = activeCall();
-    if (ordinary !== undefined && !ordinary.pinned) {
-      host.skipDayCalls(ordinary.raised && playback.simTimeS >= ordinary.call.atS);
+    const standing = activeCall();
+    if (standing !== undefined && (playback.simTimeS < standing.call.atS || !standing.raised)) {
+      skipping = true;
+      if (playback.simTimeS < standing.call.atS) {
+        playback.play();
+        playback.seekTo(standing.call.atS);
+        syncTransport();
+        requestFrame();
+      }
+      return;
+    }
+    skipping = false;
+    if (standing !== undefined) {
+      if (standing.pinned) {
+        callAnswered = true;
+        host.skipPressCall();
+      } else {
+        /* The card is up: that call is recorded as skipped, and the day asks no more. */
+        host.skipDayCalls(true);
+      }
+      showCallCard(false);
     }
     waitingOnCall = false;
     playback.play();
@@ -1678,6 +1725,11 @@ function mountStage(
      */
     if (waitingOnCall && playback !== undefined && (standing === undefined || standing.call.atS > simTimeS)) {
       waitingOnCall = false;
+      /* § D1151: a skip that was waiting here goes on to the next call, or to the end. */
+      if (skipping) {
+        skipToEnd();
+        return;
+      }
       playback.play();
       syncTransport();
       requestFrame();
@@ -1697,6 +1749,8 @@ function mountStage(
         stagePaceNoteOf({ simPerRealS: stageSpeedAt(speedIndex).simPerRealS, reason: 'call' }, { acts: paceActs, simTimeS }) ?? '';
     }
     waitingOnCall = false;
+    /* § D1151: the skip has arrived at a call; the next press of it is the player's answer. */
+    skipping = false;
     const key = `${String(call.atS)}|${call.rule}`;
     if (key !== callCardKey) {
       callCardKey = key;
@@ -1981,6 +2035,7 @@ function mountStage(
       stageCall =
         context.ctx === 'watch' || context.ctx === 'rush' ? undefined : host.pressCallOnStage(recording);
       callAnswered = host.interventions().length > 0;
+      skipping = false;
     } else if (host.interventions().length > 0) {
       callAnswered = true;
     }
@@ -2434,7 +2489,8 @@ function mountStage(
     if (recording !== bookedFor) {
       bookedFor = recording;
       const building = host.resolvedBuilding();
-      bookedCars = building?.id === recording.buildingId ? bookedOutCarsOf(building) : [];
+      /* § D1149: every window, a car out from the first instant included — the pill and the call card both read this. */
+      bookedCars = building?.id === recording.buildingId ? carAbsencesOf(building) : [];
     }
     const booked =
       watching === undefined && context.ctx !== 'rush'

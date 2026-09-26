@@ -305,16 +305,26 @@ describe.skipIf(!HAS_BROWSER)('the stage calls a pinned day — § D1029', () =>
         Math.abs(minutesOf(retakeStop) - minutesOf(callClock)),
         `the retake stopped at ${retakeStop}, not at the call at ${callClock}`,
       ).toBeLessThanOrEqual(1);
+      /*
+       * **A skip with the card up is the answer** — § D1151, the post-AJ panel's seat D (H1). *Skip to
+       * the end* on this day used to run past the day's only call, bank the day as missed and say
+       * *nothing was pressed*. The retake now opens just before the call (§ D1140), so the card is
+       * already up when the player reaches for the skip, with the day not over; the skip is the
+       * player's answer, and the report says the call was skipped.
+       */
+      expect(await page.locator('.everyday-stage-skip').isDisabled(), 'the day ran out past its call').toBe(false);
       await page.locator('.everyday-stage-skip').click();
       await page.waitForFunction(
-        () => (document.querySelector('.everyday-bar-primary')?.textContent ?? '').includes('Close the day'),
+        () => document.querySelector<HTMLButtonElement>('.everyday-stage-skip')?.disabled === true,
         undefined,
         { timeout: 60_000 },
       );
+      expect(await page.locator('.everyday-stage-call').isHidden(), 'the card stayed up after the skip answered it').toBe(true);
       await page.locator('.everyday-bar-primary').click();
       await page.waitForSelector('.everyday-report', { timeout: 60_000 });
       const second = await textOf(page, '.everyday-report');
-      expect(second).toContain('nothing was pressed');
+      expect(second).toContain('The stage called the day, and the day was skipped to its end');
+      expect(second).not.toContain('nothing was pressed');
       /* § D1138 clause 4: the retake is practice, and says so on its own sheet. */
       expect(second).toContain('Practice. Your week keeps your first attempt at this day');
       expect(second).not.toMatch(/\d{2}:\d{2} · (parked the cars in the lobby|spread the cars across the tower)/u);

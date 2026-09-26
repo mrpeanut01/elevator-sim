@@ -252,7 +252,7 @@ describe('every shipped goal came from the measured table', () => {
       expect(briefing.facts).toHaveLength(entry.configurationFacts.length);
       expect(briefing.withheld).toHaveLength(entry.withheld.length);
       /* `everyone-can-get-there` is published as withheld and must reach the reader as withheld. */
-      expect(briefing.withheld.join(' ')).toContain('everyone-can-get-there');
+      expect(briefing.withheld.join(' ')).toContain('everyone can reach their floor');
     }
   });
 });

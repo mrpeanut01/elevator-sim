@@ -52,6 +52,7 @@ import {
   type DayCallAnswer,
   type DayCallOnStage,
   type DayCallRecord,
+  type DayCallsQuiet,
 } from '../shift/dayCalls.js';
 import { shiftObservationsOf } from '../shift/observations.js';
 import type { PressCall } from '../shift/pressCall.js';
@@ -133,6 +134,12 @@ export interface DayCallSession {
   readonly grew: (recording: VizRecording, pressedAtS: number) => void;
   /** The raised and answered calls, in order — what the report reads at day close. */
   readonly records: () => readonly DayCallRecord[];
+  /**
+   * What the session did on a day that raised nothing — [§ D1152](../../../../DECISIONS.md). How
+   * many candidates it asked and turned down, and whether it finished asking, so the report can
+   * say in one sentence why the day had no call and say nothing it did not see.
+   */
+  readonly quiet: () => DayCallsQuiet;
   /** Stop asking and drop whatever is in flight. */
   readonly close: () => void;
 }
@@ -151,6 +158,9 @@ export function openDayCallSession(
   let searchFromS = standing.startedAt;
   let asked = 0;
   let done = false;
+  /* § D1152's account of a quiet day: candidates turned down, and how asking ended. */
+  let refused = 0;
+  let ending: 'finished' | 'failed' | 'skipped' | undefined;
   let pending: Pending | undefined;
   const records: DayCallRecord[] = [];
 
@@ -175,11 +185,13 @@ export function openDayCallSession(
     pending = undefined;
     if (done) return;
     if (records.length >= DAY_CALL_MAX || asked >= DAY_CALL_MAX_TRIES) {
+      ending ??= 'finished';
       stop();
       return;
     }
     const call = nextDayCallOf(inputOf(standing), searchFromS);
     if (call === undefined) {
+      ending ??= 'finished';
       stop();
       return;
     }
@@ -189,6 +201,7 @@ export function openDayCallSession(
     const parkRun = deps.planWith(park);
     const spreadRun = deps.planWith(spread);
     if (parkRun === undefined || spreadRun === undefined) {
+      ending = 'failed';
       stop();
       return;
     }
@@ -202,6 +215,7 @@ export function openDayCallSession(
         if (pending !== asking || standing !== leave) return;
         const [parked, spreadOut] = recordings;
         if (parked === undefined || spreadOut === undefined) {
+          ending = 'failed';
           stop();
           deps.changed();
           return;
@@ -218,6 +232,7 @@ export function openDayCallSession(
           },
         });
         if (!dayCallAdmits(counted.counts)) {
+          refused += 1;
           searchFromS = dayCallSearchFrom(call, false);
           askNext();
           deps.changed();
@@ -234,6 +249,7 @@ export function openDayCallSession(
       () => {
         /* A run that failed is a call nobody can stand behind, so the day asks no more. */
         if (pending !== asking) return;
+        ending = 'failed';
         stop();
         deps.changed();
       },
@@ -270,6 +286,7 @@ export function openDayCallSession(
         const record = recordOf(raised, 'skipped');
         if (record !== undefined) records.push(record);
       }
+      ending ??= 'skipped';
       stop();
     },
     grew: (recording, pressedAtS) => {
@@ -285,6 +302,12 @@ export function openDayCallSession(
       askNext();
     },
     records: () => records,
+    quiet: () =>
+      Object.freeze({
+        kind: 'asked' as const,
+        refused,
+        ending: done ? (ending ?? 'finished') : ('asking' as const),
+      }),
     close: stop,
   };
 }

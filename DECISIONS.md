@@ -46239,7 +46239,176 @@ week and every parked one, which `persist/session.ts` already restores; `Everyda
 reads them. Nothing new is stored (GAMEPLAY § 3.5). `everyday/tutorialModel.test.ts` and the browser
 reload case were red before. D1144 to D1147 are unspent.
 
----
+## D1148 — every worst wait on the Day report is the one the goal row grades, and two declared pairs hold it
+
+> **Taken 2026-09-26 by agent sessions under delegated authority** (wave AK, lane AK-B), not by the
+> product owner. Owner-reversible clause: whether the reporting window's worst wait is published
+> anywhere on the sheet, which [§ D1104](#d1104) already made owner-reversible and this entry does not
+> change.
+
+**Date: 2026-09-26 · Owner: lane AK-B (wave AK) · The post-AJ panel's seats B (H1, H2) and D (H4) ·
+Rules on `packages/viz/src/shift/report.ts#leverPointersFor` and `#smallPrintFor`, and on
+`honesty/agreement.ts#AGREED_FIGURES`. Extends [§ D1104](#d1104).**
+
+**Why an entry.** It carries a recorded ruling to two surfaces it left behind, and it adds two pairs
+to the honesty register, which is not this sheet's module.
+
+**What was wrong.** § D1104 moved the WORST WAIT card to the whole shift. The *Weight fairness up*
+lever card still read `summary.serviceLevel.longestWaitS`, the reporting window's maximum, and
+printed *one still waited 178 s* under a card and a goal row reading 181 s. The fold-out still said
+*the means and the WORST WAIT figure are over that window*. The `worst-wait` pair compared the card
+with the goal and nothing else, so the regression passed every check.
+
+**The ruling.** The lever reads `Observations.worstWaitS` and `worstWaitIsCensored`, the card's own
+figure, and fires on it. The fold-out puts the WORST WAIT figure among the whole-shift counts and
+says only the means are over the window. Two pairs join the register: `worst-wait-lever` (the lever
+card's quoted wait against the goal row, read only where the lever points at the day) and
+`worst-wait-scope` (the span the card's note names against the span `smallPrintFor` names).
+`smallPrintFor` is exported so the second pair has a side of its own.
+
+## D1149 — every car that was out is named wherever a cause is given, one out from the first instant included
+
+> **Taken 2026-09-26 by agent sessions under delegated authority** (wave AK, lane AK-B), not by the
+> product owner. No owner-reversible clause: it is a correction.
+
+**Date: 2026-09-26 · Owner: lane AK-B (wave AK) · The post-AJ panel's seat D (H5) · Rules on
+`everyday/stageScreen.ts`'s booked-out pill and call card, `dev/main.ts#closeShift`'s report input,
+`dev/state.ts#dayCallFactsOf`, `shift/report.ts#bookedLine` and `shift/bookedOut.ts#wrinkleNoteOf`.
+Amends [§ D983](#d983) and [§ D1107](#d1107).**
+
+**Why an entry.** § D983 named `bookedOutCarsOf` as the one reading the stage, the report and the
+call card share, and this moves three of them off it.
+
+**What was wrong.** On Midtown's Friday (`shaft-out:most-of-day`) the brief said car C was out of
+passenger service from the start of the day until 16:30. The stage's pills, the report's header and
+the worst-wait row named only car D, because `bookedOutCarsOf` drops a car that leaves at the first
+instant. The brief read `carAbsencesOf` and said so; the rest did not.
+
+**The ruling.** Every surface that gives a cause reads `carAbsencesOf`: the stage's pill and call
+card, the report's header lines and its worst-wait row, and the ordinary call's car fact. A car out
+from the first instant reads *out until 16:30* on the pill and *out of passenger service from the
+start of the day until 16:30* on the header. `wrinkleNoteOf` keeps its *part-way through the day*
+sentence to cars that leave after the first instant. The pinned call's own derivation
+(`dev/state.ts#pressDayCallOf`) still reads `bookedOutCarsOf`, so no call's instant or admission
+moves.
+
+## D1150 — the call asks about *the cars that are left* only where a car is out
+
+> **Taken 2026-09-26 by agent sessions under delegated authority** (wave AK, lane AK-B), not by the
+> product owner. Owner-reversible clause: the wording of the question with no car out.
+
+**Date: 2026-09-26 · Owner: lane AK-B (wave AK) · The post-AJ panel's seats A (D4) and D (H6) ·
+Rules on `everyday/stageCall.ts#stageCallCardOf`. Amends [§ D1138](#d1138) clause 2's *the card is
+the pinned call's card*.**
+
+**Why an entry.** § D1138 clause 2 says an ordinary call's card is the pinned call's card; its
+question now depends on the card's own facts.
+
+**What was wrong.** *What do the cars that are left do?* was asked at 08:36 on Midtown's Monday, with
+car D out only from 10:30, and on St Jude's Tuesday after every car was back.
+
+**The ruling.** The question names cars that are left exactly when the card names a car that is out
+at the call; otherwise it reads *What do the cars do?* The card is still identical whether the call
+turns out to matter or not, which is what clause 2 protects.
+
+## D1151 — *Skip to the end* stops at a call that has not been answered, and a skip at a call is recorded as one
+
+> **Taken 2026-09-26 by agent sessions under delegated authority** (wave AK, lane AK-B), not by the
+> product owner. Owner-reversible clause: whether a second press with the card up skips only that
+> call or, as ruled, the rest of the day's calls too.
+
+**Date: 2026-09-26 · Owner: lane AK-B (wave AK) · The post-AJ panel's seat D (H1) · Rules on
+`everyday/stageScreen.ts#skipToEnd`, `everyday/host.ts#skipPressCall`, `dev/main.ts` and
+`shift/callRow.ts#pressCallRowOf`. Amends [§ D1029](#d1029)'s *a skip is the player's own answer to a
+call they have not been asked yet* and [§ D1138](#d1138)'s *a skip answers every call the day had
+left*.**
+
+**Why an entry.** It amends two recorded rulings.
+
+**What was wrong.** On a newcomer's first day, *Skip to the end* ran past the day's only call. The day
+banked as missed, and the report said *The stage called the day, and nothing was pressed*. *Take this
+call again* is practice, so the one real attempt was gone.
+
+**The ruling.** A skip runs the picture to the next call standing and the stage stops there with the
+card up, at any rung. An ordinary candidate whose runs have not landed is waited at as it is while
+playing, and the skip carries on if the candidate is not raised. A skip pressed with the card up is
+the player's answer: the call is recorded as skipped, the day's remaining ordinary calls are not
+asked (§ D1138's rule, now reached only from a raised card), and the day runs to its end. The
+pinned call's row reads *The stage called the day, and the day was skipped to its end*, the ordinary
+row's words, where it read *nothing was pressed*. The skip button's note says so. Call admission and
+the transport's speed are unchanged.
+
+## D1152 — a day that raised no call says so at its close, in one sentence true of the run
+
+> **Taken 2026-09-26 by agent sessions under delegated authority** (wave AK, lane AK-B), not by the
+> product owner. Owner-reversible clause: whether the row is drawn at all.
+
+**Date: 2026-09-26 · Owner: lane AK-B (wave AK) · The post-AJ panel's seat B (U1) · Rules on
+`shift/dayCalls.ts#dayCallsQuietSentenceOf`, `dev/dayCallSession.ts#quiet`, `dev/main.ts` and
+`shift/report.ts`'s diagnosis. Cites [§ D1138](#d1138).**
+
+**Why an entry.** It adds a row to the Day report from the ordinary calls' session, which the report
+does not own.
+
+**What was wrong.** Two of seat B's three scored days raised no call and neither the stage nor the
+report said so. The seat thought it had missed one. § D1138 refuses a brief line forecasting a quiet
+day, and this is not one.
+
+**The ruling.** At the close, a day the Everyday stage asked about and that raised no call carries
+one row, *No call today*, whose sentence is what the session saw: how many moments it ran three ways
+and turned down, with the admission rule it turned them down on; or that it found no moment to ask;
+or that the day is a whole day too busy to call on; or that a run it needed failed; or that the day
+was closed before it finished asking. It names no other day and claims nothing a call would have
+done. A run nobody asked the stage about gets no row.
+
+## D1153 — the give-up line is a wait, and the frame the stage stops on is the call's second
+
+> **Taken 2026-09-26 by agent sessions under delegated authority** (wave AK, lane AK-B), not by the
+> product owner. Owner-reversible clause: putting the playhead back on the call second at the stop.
+
+**Date: 2026-09-26 · Owner: lane AK-B (wave AK) · The post-AJ panel's seat D (H8, H10) · Rules on
+`mode/glossary.ts`'s `abandonment-horizon` and on `everyday/stageScreen.ts#pace`'s call stop.
+Amends [§ D1029](#d1029)'s *it pauses and never seeks*.**
+
+**Why an entry.** The glossary sentence is read by the Casual report's lead, and the stop amends a
+recorded ruling.
+
+**What was wrong.** The definition said the line is *the point at which this simulator counts a rider
+as having given up rather than gone on waiting*, over a cell whose note said every one of them *is
+inside CARRIED*. And on St Jude's call the header read 12 standing on the stopped frame while the
+report's press row read 11: at a fast rung the frame the pause lands on is seconds past the call
+second the answer is stamped at. No declared pair could see it, because the standing pairs read both
+sides at one playhead and this is two instants.
+
+**The ruling.** The definition says the line is a wait, that on a run with no patience nobody leaves
+at it and a rider past it may still be carried, and why the count sits beside the wait. At the call
+stop the playhead is put back on the call second, so the clock, the header, the strip, the card and
+the report's press row describe one instant. Where the stage stops and how fast it runs are
+unchanged; the browser tier holds the header against the press row.
+
+## D1154 — a goal is named in words on every surface, and its data id stays in the data
+
+> **Taken 2026-09-26 by agent sessions under delegated authority** (wave AK, lane AK-B), not by the
+> product owner. Owner-reversible clause: the seven names.
+
+**Date: 2026-09-26 · Owner: lane AK-B (wave AK) · The post-AJ panel's seats A (D10), C (D7) and D
+(H9) · Rules on `scenario/goals.ts#goalLabel` and `#GOAL_NAMES`, and on `mode/glossary.ts`'s goal
+entries.**
+
+**Why an entry.** `goalLabel` is shared by the campaign's verdict and brief, the Lab, Compare and the
+rate sentences, none of which this module owns.
+
+**What was wrong.** The stage verdict printed `deliver-everyone · met` and `beat-the-baseline · met.
+beat-the-baseline: …`, the data file's ids on a player's screen.
+
+**The ruling.** `goalLabel` prints each kind's name in words (*everyone delivered*, *queues settled*,
+*nobody past the give-up line*, *kept up with arrivals*, *long waits kept under 10 %*, *everyone can
+reach their floor*, *ahead of the building's own setting*), and the glossary lists each name beside
+its kind so every screen that prints one still reaches the definition. A name says what one run is
+asked and nothing about the bar. **What this does not fix**, and lane AK-C owns: the verdict's mark
+*met* beside a per-run goal whose bar is the shipped setting's own count reads as an absolute claim
+(*everyone delivered · met* at 5 of 50 runs), and the holdout sentence's `holdout-20260731 (seed
+20260731)`. Both are campaign copy in `campaign/judge.ts` and `everyday/stagePlay.ts`.
 
 ## D1157 — a fix case once fixed stays fixed, and a later run that does not clear is that run's result
 

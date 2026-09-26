@@ -21,7 +21,9 @@ import { observationsAt } from '../live/observations.js';
 import { recordRun } from '../record/recordRun.js';
 import { RESOURCES } from '../scope/probes.test-helper.js';
 
-import { bookedOutCarsOf, wrinkleNoteOf } from './bookedOut.js';
+import { bookedOutCarsOf, carAbsencesOf, wrinkleNoteOf } from './bookedOut.js';
+import { stageBookedOutOf } from '../everyday/stageScreenModel.js';
+import { stageCallCardOf } from '../everyday/stageCall.js';
 import { contractDayState } from './contractDay.test-helper.js';
 import { contractById, CONTRACTS } from './contracts.js';
 import { runHorizonOf } from './dayLength.js';
@@ -185,5 +187,119 @@ describe('the Day report of Crown Hotel’s pinned day, as built', () => {
     const overlaps = (car?.awayAtS ?? 0) < to && back > from;
     const why = report.diagnosis[0]?.why ?? '';
     expect(why.includes('Car D was booked out of passenger service'), why).toBe(overlaps);
+  });
+});
+
+/**
+ * **Every car that was out is named wherever a cause is given** — § D1149, the post-AJ panel's
+ * seat D (H5). On Midtown's Friday (`shaft-out:most-of-day`) the brief said car C was out of
+ * passenger service from the start of the day until 16:30; the stage's pills, the report's header
+ * and the worst-wait row named only car D, because all three read `bookedOutCarsOf`, which drops a
+ * car out from the first instant. They read `carAbsencesOf` now.
+ */
+describe('Midtown’s Friday, where the day takes a car from the first instant', () => {
+  const friday = contractDayState('c2', { seed: 20_260_925n, over: { campaignEventId: 'shaft-out:most-of-day' } });
+  const run = shiftRunConfigOf(RES, friday);
+  const dayCarIds = [...run.dayCars.holds, ...run.dayCars.windows];
+  const out = carAbsencesOf(run.building, dayCarIds);
+  const fromStart = out.filter((car) => car.awayAtS <= 0);
+
+  it('has a car out from the first instant, which the part-way reader drops — the premise', () => {
+    expect(fromStart.length, 'the shaft-out day took no car from the start').toBeGreaterThan(0);
+    const partWay = bookedOutCarsOf(run.building).map((car) => car.carId);
+    for (const car of fromStart) expect(partWay).not.toContain(car.carId);
+  });
+
+  it('draws a pill for it on the stage', () => {
+    const pills = stageBookedOutOf({ bookedOut: out, simTimeS: 60, dayStartS: 8 * 3600 });
+    for (const car of fromStart) {
+      const pill = pills.find((line) => line.startsWith(`Car ${car.carId} `));
+      expect(pill, pills.join(' | ')).toBeDefined();
+      expect(pill).toContain('out now');
+      expect(pill).not.toContain('booked out 08:00');
+    }
+  });
+
+  it('names it on the call card at a call while it is out', () => {
+    const [car] = fromStart;
+    if (car === undefined) throw new Error('no car out from the start');
+    const card = stageCallCardOf(
+      { atS: 600, rule: 'first-minute-wait', carId: car.carId, awayAtS: car.awayAtS, backAtS: car.backAtS, act: undefined, carAway: true },
+      8 * 3600,
+      out,
+    );
+    expect(card.facts.join(' ')).toMatch(new RegExp(`Cars? (?:[A-Z], )*(?:[A-Z] and )?${car.carId}\\b|Cars? ${car.carId}\\b`, 'u'));
+  });
+
+  it('names it on the report’s header, and on the worst-wait row when it was out for that wait', () => {
+    const { recording } = recordRun(run.config, { recordDecisions: false, outOfServiceCarIds: run.outOfServiceCarIds });
+    const report = dayReportOf({
+      recording,
+      observations: shiftObservationsOf(observationsAt(recording, recording.endedAt)),
+      goals: goalsForDay(5),
+      week: { ...openWeek('c2'), day: 5, dayIdx: 4 },
+      contract: contractById('c2'),
+      event: run.event,
+      plan: { shiftLengthS: shiftLengthForContract('c2'), windowStartS: null, patternId: 'building' },
+      calendar: null,
+      subject: { kind: 'week-day' },
+      bookedOut: out,
+    });
+    const header = report.metaLines.join('\n');
+    for (const car of fromStart) {
+      expect(header).toContain(`car ${car.carId} · out of passenger service from the start of the day`);
+    }
+    /* The wrinkle's sentence does not call the day's own car the tower's. */
+    for (const car of fromStart) expect(header).not.toMatch(new RegExp(`also books[^.]*\\b${car.carId}\\b`, 'u'));
+    /*
+     * The row, asked exactly where the car was out for the worst wait — the interval located here
+     * off the legs, as the c7 case above locates it. On this seed the slice's worst wait comes
+     * after the car is back, so the clause is asserted absent; the report fixture below asserts
+     * the present arm on a car out from the first instant.
+     */
+    const worst = report.diagnosis.find((row) => row.id === 'missed-worst-wait');
+    let from = 0;
+    let to = 0;
+    for (const leg of recording.legs) {
+      const end = leg.boardedAt ?? leg.refusedAt ?? recording.endedAt;
+      if (end - leg.arrivedAt > to - from) {
+        from = leg.arrivedAt;
+        to = end;
+      }
+    }
+    if (worst !== undefined && worst.when !== '—') {
+      for (const car of fromStart) {
+        const overlaps = car.awayAtS < to && (car.backAtS ?? Number.POSITIVE_INFINITY) > from;
+        expect(worst.why.includes(`Car ${car.carId} was booked out of passenger service`), worst.why).toBe(overlaps);
+      }
+    }
+    /* And the present arm, on the same sheet's inputs with the car out for the whole run. */
+    const wholeRun = out.map((car) => (fromStart.includes(car) ? { ...car, backAtS: null } : car));
+    const held = dayReportOf({
+      recording,
+      observations: shiftObservationsOf(observationsAt(recording, recording.endedAt)),
+      goals: goalsForDay(5),
+      week: { ...openWeek('c2'), day: 5, dayIdx: 4 },
+      contract: contractById('c2'),
+      event: run.event,
+      plan: { shiftLengthS: shiftLengthForContract('c2'), windowStartS: null, patternId: 'building' },
+      calendar: null,
+      subject: { kind: 'week-day' },
+      bookedOut: wholeRun,
+    });
+    const heldRow = held.diagnosis.find((row) => row.id === 'missed-worst-wait');
+    if (heldRow !== undefined && heldRow.when !== '—') {
+      for (const car of fromStart) expect(heldRow.why).toContain(`Car ${car.carId} was booked out of passenger service for all of that wait`);
+    }
+  });
+
+  it('is read by every shell that gives a cause — none of them reads the part-way reader', () => {
+    const read = (file: string): string => readFileSync(join(DATA_DIR, '..', 'packages', 'viz', 'src', file), 'utf8');
+    const main = read('dev/main.ts');
+    expect(main).not.toMatch(/bookedOut: bookedOutCarsOf\(/u);
+    expect(read('everyday/stageScreen.ts')).not.toContain('bookedOutCarsOf(');
+    const facts = /export function dayCallFactsOf[\s\S]*?\n\}\n/u.exec(read('dev/state.ts'))?.[0] ?? '';
+    expect(facts).toContain('carAbsencesOf(');
+    expect(facts).not.toContain('bookedOutCarsOf(');
   });
 });

@@ -48,6 +48,13 @@ import type { PressCall } from '../shift/pressCall.js';
 export const STAGE_CALL_COPY = Object.freeze({
   heading: 'THE DAY’S CALL',
   question: 'What do the cars that are left do?',
+  /*
+   * § D1150, the post-AJ panel's seats A (D4) and D (H6): the question above was asked at 08:36 on
+   * Midtown's Monday with car D out only from 10:30, and on St Jude's Tuesday after every car was
+   * back. *The cars that are left* is a fact about a car being away, so it is asked only where the
+   * card names one; with none out the question is about the cars, all of them.
+   */
+  questionAllCars: 'What do the cars do?',
   minute: 'Somebody on a landing has waited a minute.',
   /* One label for both kinds of call and the ordinary call's report row — `shift/dayCalls.ts`. */
   leave: DAY_CALL_LEAVE_LABEL,
@@ -99,7 +106,8 @@ export function stageCallCardOf(
    * says so only where one is — the same fact, never an invented one. Where one is, every car out
    * at that instant is named ([§ D1107](../../../../DECISIONS.md)), not only the call's own.
    */
-  const facts: string[] = call.carAway === false ? [] : [...awayLinesOf(call, bookedOut, dayStartS)];
+  const away = call.carAway === false ? [] : awayLinesOf(call, bookedOut, dayStartS);
+  const facts: string[] = [...away];
   if (call.rule === 'first-minute-wait') facts.push(STAGE_CALL_COPY.minute);
   /*
    * The second rule's own fact, and only where there is a peak to name: on a slice the act is the
@@ -116,7 +124,7 @@ export function stageCallCardOf(
   return Object.freeze({
     heading: STAGE_CALL_COPY.heading,
     facts: Object.freeze(facts),
-    question: STAGE_CALL_COPY.question,
+    question: away.length > 0 ? STAGE_CALL_COPY.question : STAGE_CALL_COPY.questionAllCars,
     options: Object.freeze([
       Object.freeze({ label: PARK_CARS_LOBBY_LABEL, change: Object.freeze({ kind: 'park-cars-lobby' as const }) }),
       Object.freeze({ label: SPREAD_CARS_LABEL, change: Object.freeze({ kind: 'spread-cars' as const }) }),

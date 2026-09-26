@@ -79,12 +79,22 @@ async function waitForToday(page: Page): Promise<void> {
   );
 }
 
-/** Close the day from wherever the stage is, skipping what is left, and wait for the report. */
+/**
+ * Close the day from wherever the stage is, skipping what is left, and wait for the report. Since
+ * § D1151 a skip stops at each call it has not had an answer to, so it is pressed until the day
+ * has run out — each press with a card up is that call's answer, recorded as skipped.
+ */
 async function closeTheDay(page: Page): Promise<string> {
-  await page.evaluate(() => {
-    const skip = document.querySelector<HTMLButtonElement>('.everyday-stage-skip');
-    if (skip !== null && !skip.disabled) skip.click();
-  });
+  await page.waitForFunction(
+    () => {
+      const skip = document.querySelector<HTMLButtonElement>('.everyday-stage-skip');
+      if (skip === null || skip.disabled) return true;
+      skip.click();
+      return false;
+    },
+    undefined,
+    { timeout: 180_000, polling: 500 },
+  );
   await page.waitForFunction(
     () => (document.querySelector('.everyday-bar-primary')?.textContent ?? '').includes('Close the day'),
     undefined,
@@ -171,7 +181,8 @@ describe.skipIf(!HAS_BROWSER)('an ordinary day’s calls — § D1138', () => {
 
       /* ---- the first call: the card, its words, and nothing about the answers ---- */
       const first = await nextCall(page);
-      expect(first).toContain('What do the cars that are left do?');
+      /* § D1150: the question names cars that are left only where the card names a car that is out. */
+      expect(first).toContain(first.includes('out of passenger service') ? 'What do the cars that are left do?' : 'What do the cars do?');
       /* AJ-I's placement and focus, on an ordinary call: in the shell's scroller's view, and focused. */
       const placed = await page.evaluate(() => {
         const card = document.querySelector<HTMLElement>('.everyday-stage-call');
@@ -192,7 +203,7 @@ describe.skipIf(!HAS_BROWSER)('an ordinary day’s calls — § D1138', () => {
 
       /* ---- the second call ---- */
       const second = await nextCall(page);
-      expect(second).toContain('What do the cars that are left do?');
+      expect(second).toContain(second.includes('out of passenger service') ? 'What do the cars that are left do?' : 'What do the cars do?');
       expect(second).not.toMatch(/\d+ with|Shift (cleared|missed)/u);
       /* Still no row anywhere on the page before the close. */
       expect(await page.locator('.everyday-report').count()).toBe(0);

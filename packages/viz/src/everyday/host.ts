@@ -1972,6 +1972,12 @@ export interface EverydayHost {
    * whether a call's card was up, which records that call as skipped. § D1138.
    */
   skipDayCalls(called: boolean): void;
+  /**
+   * *Skip to the end* pressed with a pinned day's call card up — [§ D1151](../../../../DECISIONS.md).
+   * The attempt's call is recorded as skipped, so the report says so rather than *nothing was
+   * pressed*, which is a different thing a player can do (*leave them*).
+   */
+  skipPressCall(): void;
   /** The replay in progress, or `undefined`. */
   replay(): EverydayReplaySession | undefined;
   /** Leave the replay, putting the parked week and the run it interrupted back. A no-op outside one. */
@@ -2093,6 +2099,8 @@ export interface EverydayHostBindings {
   answerDayCall?(answer: DayCallAnswer): void;
   /** § D1138 — the session's skip, then a re-render. */
   skipDayCalls?(called: boolean): void;
+  /** § D1151 — `dev/main.ts`'s pinned call, recorded as skipped for this attempt. */
+  skipPressCall?(): void;
   /**
    * § 1.4's *record growing*: append at `atS`, re-run with cause `'intervention'`, and seek the
    * shell's own transport to `atS` once the new recording is adopted. One implementation, shared
@@ -4182,6 +4190,9 @@ export function createEverydayHost(
     },
     skipDayCalls: (called) => {
       b.skipDayCalls?.(called);
+    },
+    skipPressCall: () => {
+      b.skipPressCall?.();
     },
     takeCallAgain: () => {
       releaseCareer();

@@ -415,6 +415,59 @@ describe('wave AJ’s pairs go red on the defects they were declared for', () =>
   });
 });
 
+/**
+ * **Wave AK's two worst-wait pairs** — [§ D1148](../../../../DECISIONS.md), the post-AJ panel's
+ * seats B and D. Each is reverted to the sheet the panel read, and must go red on it; and each is
+ * required to render on at least one fixture case, or it is watching nothing.
+ */
+describe('wave AK’s worst-wait pairs go red on the sheet the post-AJ panel read', () => {
+  const pair = (id: string): AgreedFigure => {
+    const declared = AGREED_FIGURES.find((figure) => figure.id === id);
+    if (declared === undefined) throw new Error(`the ${id} pair is gone — this case is about nothing`);
+    return declared;
+  };
+
+  it('worst-wait-scope: a fold-out that puts WORST WAIT in the window disagrees with the card', () => {
+    const declared = pair('worst-wait-scope');
+    const shipped = readings([declared]);
+    expect(shipped.length, 'the scope pair rendered on no fixture case').toBeGreaterThan(0);
+    expect(contexts.flatMap((each) => checkSurfacesAgree(each.context, renderAgreements(each.context, each.resources, [declared])))).toEqual([]);
+    /* The fold-out as it shipped at `67599fe`. */
+    const reverted: AgreedFigure = {
+      ...declared,
+      right: {
+        surfaceId: declared.right.surfaceId,
+        read: (view) =>
+          declared.right.read(view) === undefined ? undefined : 'the window',
+      },
+    };
+    const found = contexts.flatMap((each) => checkSurfacesAgree(each.context, renderAgreements(each.context, each.resources, [reverted])));
+    expect(found.length).toBeGreaterThan(0);
+    expect(found[0]?.message).toContain('the whole shift');
+  });
+
+  it('worst-wait-lever: a lever card that quotes the reporting window disagrees with the goal row', () => {
+    const declared = pair('worst-wait-lever');
+    const shipped = readings([declared]);
+    expect(shipped.length, 'the lever pair rendered on no fixture case — the lever never pointed').toBeGreaterThan(0);
+    expect(contexts.flatMap((each) => checkSurfacesAgree(each.context, renderAgreements(each.context, each.resources, [declared])))).toEqual([]);
+    /* The lever as it shipped at `67599fe`: the window's maximum, wherever the lever points. */
+    const reverted: AgreedFigure = {
+      ...declared,
+      left: {
+        surfaceId: declared.left.surfaceId,
+        read: (view) => {
+          if (declared.left.read(view) === undefined) return undefined;
+          const longest = view.recording?.summary.serviceLevel.longestWaitS;
+          return longest === null || longest === undefined ? undefined : `${longest.toFixed(0)} s`;
+        },
+      },
+    };
+    const found = contexts.flatMap((each) => checkSurfacesAgree(each.context, renderAgreements(each.context, each.resources, [reverted])));
+    expect(found.length).toBeGreaterThan(0);
+  });
+});
+
 describe('the register is watching something', () => {
   it('declares a pair at all, and renders it, or every clause here is vacuous', () => {
     expect(

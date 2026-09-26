@@ -119,14 +119,35 @@ describe('the card', () => {
     for (const call of [minute, peak]) {
       const card = stageCallCardOf(call, DAY_START_S, []);
       const pinned = stageCallCardOf(CALLS[0]!, DAY_START_S, []);
-      expect([card.heading, card.question, card.options.map((option) => option.label)]).toEqual([
+      expect([card.heading, card.options.map((option) => option.label)]).toEqual([
         pinned.heading,
-        pinned.question,
         pinned.options.map((option) => option.label),
       ]);
+      /* § D1150: with no car out the question is about the cars, not the ones that are left. */
+      expect(card.question).toBe(STAGE_CALL_COPY.questionAllCars);
       for (const text of wordsOf(call)) {
         for (const [what, pattern] of BANNED) expect(pattern.test(text), `${what}: ${text}`).toBe(false);
       }
+    }
+  });
+
+  /*
+   * § D1150, the post-AJ panel's seats A (D4) and D (H6): *What do the cars that are left do?* at
+   * 08:36 on Midtown's Monday, with car D out only from 10:30. The question names a car being away,
+   * so it is asked exactly where the card's own facts name one — on either kind of call.
+   */
+  it('asks about the cars that are left only where the card names a car that is out', () => {
+    const noneOut: PressCall = { atS: 2160, rule: 'first-minute-wait', carId: '', awayAtS: 2160, backAtS: null, act: undefined, carAway: false };
+    const later = [{ carId: 'D', awayAtS: 9000, backAtS: 18000 }];
+    expect(stageCallCardOf(noneOut, DAY_START_S, later).question).toBe('What do the cars do?');
+    expect(stageCallCardOf(noneOut, DAY_START_S, later).facts.join(' ')).not.toContain('Car D');
+    const pinned = stageCallCardOf(CALLS[0]!, DAY_START_S, []);
+    expect(pinned.facts.some((fact) => /out of passenger service/u.test(fact))).toBe(true);
+    expect(pinned.question).toBe('What do the cars that are left do?');
+    for (const call of [noneOut, CALLS[0]!]) {
+      const card = stageCallCardOf(call, DAY_START_S, later);
+      const named = card.facts.some((fact) => /out of passenger service/u.test(fact));
+      expect(card.question.includes('that are left'), card.facts.join(' ')).toBe(named);
     }
   });
 

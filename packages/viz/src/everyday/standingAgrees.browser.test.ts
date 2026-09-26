@@ -136,6 +136,39 @@ describe.skipIf(!HAS_BROWSER)('a stopped frame carries one standing count — wa
       expect(counts.strip, 'the race strip').toBe(counts.header);
       expect(counts.said, 'the screen reader’s live region').toBe(counts.header);
       expect(counts.label, 'the canvas’s accessible name').toBe(counts.header);
+
+      /*
+       * **And the report's press row, which reads the stamp's instant** — § D1153, the post-AJ
+       * panel's seat D (H10): the stopped frame read 12 and the press row *11 people standing*,
+       * because at a fast rung the frame the stage stopped on was seconds past the call second the
+       * answer is stamped at. No pair in `honesty/agreement.ts` could see it: the standing pairs
+       * read both of their sides at one playhead, and this is two instants.
+       */
+      await page.locator('.everyday-stage-call-answer[data-answer="park-cars-lobby"]').click();
+      await page.waitForFunction(
+        () => {
+          const line = document.querySelector('.everyday-stage-intervene-refusal')?.textContent ?? '';
+          const stamp = document.querySelector('.everyday-stage-stamp')?.textContent ?? '';
+          return !line.includes('recomputing') && stamp !== '';
+        },
+        undefined,
+        { timeout: 240_000 },
+      );
+      await page.evaluate(() => {
+        const skip = document.querySelector<HTMLButtonElement>('.everyday-stage-skip');
+        if (skip !== null && !skip.disabled) skip.click();
+      });
+      await page.waitForFunction(
+        () => document.querySelector<HTMLButtonElement>('.everyday-stage-skip')?.disabled === true,
+        undefined,
+        { timeout: 60_000 },
+      );
+      await page.locator('.everyday-bar-primary').click();
+      await page.waitForSelector('.everyday-report', { timeout: 60_000 });
+      const report = await textOf(page, '.everyday-report');
+      const pressRow = /parked the cars in the lobby, with (\d+) (?:person|people) standing at the landings/u.exec(report);
+      expect(pressRow, 'the report has no press row').not.toBeNull();
+      expect(pressRow?.[1], 'the report’s press row and the frame the stage stopped on').toBe(counts.header);
     } finally {
       await page.close();
     }
