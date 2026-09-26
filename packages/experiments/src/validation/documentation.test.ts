@@ -2214,14 +2214,12 @@ type DecisionReservation = {
  * them (§ D430), and the charter row moves to **D1139**.
  */
 /*
- * **Wave AK is OPEN and reserves D1139-D1190**: D1139-D1165 in three blocks of nine for the defect
- * lanes, extended by D1166-D1190 for the three lanes swarm DL's ruling on pacing, the week and the
- * campaign made necessary. The first three blocks went to the defect lanes the
- * post-AJ panel's findings made necessary (medians P1 5, P2 6, P3 6, P4 4.5, honesty 7; termination
- * **no** four times out of four). Committed on `ak-base` before any lane worktree exists, and closed
- * in the wave's own merge commit.
+ * **Wave AK closed its reservation in its own merge commit.** It held D1139-D1190 (three blocks of
+ * nine for the defect lanes, then an extension for the lanes swarms DL and DM made necessary) and
+ * spent twenty-eight headings. The unspent numbers below D1185 are holes in `KNOWN_DECISION_HOLES`;
+ * D1186-D1190 are free rather than holed (§ D430).
  */
-const OPEN_RESERVATION = { wave: 'AK', from: 1139, to: 1190 } as DecisionReservation | null;
+const OPEN_RESERVATION = null as DecisionReservation | null;
 /*
  * **Wave AC's reservation, D619-D620, is closed.** It opened on the pair wave AB left free.
  * GitHub issue #437 stage 2 wrote D619 first, on a lane that started from the same pre-#422 base as
@@ -3314,6 +3312,40 @@ const KNOWN_DECISION_HOLES: ReadonlyMap<number, string> = new Map([
   [1135, "wave AJ's lane AJ-K's block; unspent for § 1130's reason."],
   [1136, "wave AJ's lane AJ-K's block; unspent for § 1130's reason."],
   [1137, "wave AJ's lane AJ-K's block; unspent for § 1130's reason."],
+  [
+    1144,
+    "wave AK's lane AK-A held D1139-D1147 and spent D1139-D1143. Registered under D404 and D430.",
+  ],
+  [1145, "wave AK's lane AK-A's block; unspent for § 1144's reason."],
+  [1146, "wave AK's lane AK-A's block; unspent for § 1144's reason."],
+  [1147, "wave AK's lane AK-A's block; unspent for § 1144's reason."],
+  [
+    1155,
+    "wave AK's lane AK-B held D1148-D1156 and spent D1148-D1154. Registered under D404 and D430.",
+  ],
+  [1156, "wave AK's lane AK-B's block; unspent for § 1155's reason."],
+  [
+    1161,
+    "wave AK's lane AK-C held D1157-D1165 and spent D1157-D1160. Registered under D404 and D430.",
+  ],
+  [1162, "wave AK's lane AK-C's block; unspent for § 1161's reason."],
+  [1163, "wave AK's lane AK-C's block; unspent for § 1161's reason."],
+  [1164, "wave AK's lane AK-C's block; unspent for § 1161's reason."],
+  [1165, "wave AK's lane AK-C's block; unspent for § 1161's reason."],
+  [
+    1170,
+    "wave AK's lane AK-D held D1166-D1175 and spent D1166-D1169. Registered under D404 and D430.",
+  ],
+  [1171, "wave AK's lane AK-D's block; unspent for § 1170's reason."],
+  [1172, "wave AK's lane AK-D's block; unspent for § 1170's reason."],
+  [1173, "wave AK's lane AK-D's block; unspent for § 1170's reason."],
+  [1174, "wave AK's lane AK-D's block; unspent for § 1170's reason."],
+  [1175, "wave AK's lane AK-D's block; unspent for § 1170's reason."],
+  [
+    1181,
+    "wave AK's lane AK-E and AK-G held D1176-D1182 and spent D1176-D1180. Registered under D404 and D430.",
+  ],
+  [1182, "wave AK's lane AK-E and AK-G's block; unspent for § 1181's reason."],
   [
     1030,
     "wave AI's lane AI-D held D1029-D1037 and spent D1029. Registered under D404 and D430.",
