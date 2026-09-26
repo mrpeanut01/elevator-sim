@@ -581,6 +581,18 @@ const TIERS: Readonly<Record<string, Tier>> = Object.freeze({
       'building, a demand template or the pace rule moves',
     scheduled: false,
   },
+  'packages/viz/src/everyday/stageSkip.sweep.test.ts': {
+    gates: ['STAGE_SKIP_SWEEP'],
+    reason:
+      'Wave AL’s instrument, § D1212 — Midtown’s days 1 to 5 with each day’s own scheduled wrinkle ' +
+      'over the census crowds, with the shipped call session answered in rotation, played with and ' +
+      'without the skip between peaks: each day’s real length, decisions per real minute and longest ' +
+      'gap. It produced § D1212’s published table. Not scheduled because it is a compute job rather ' +
+      'than a check: stagePace.test.ts pins the skip rule, its landing points and identical legs with ' +
+      'and without it on every run, and a nightly re-derivation would write figures nothing reads. It ' +
+      'is re-run by hand when the skip rule, the call rule, a building or a demand template moves',
+    scheduled: false,
+  },
   'packages/viz/src/everyday/stagePace.sweep.test.ts': {
     gates: ['STAGE_PACE_SWEEP'],
     reason:
