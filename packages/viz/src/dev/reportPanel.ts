@@ -453,6 +453,10 @@ export interface WeekFramingView {
   readonly nextDayLabel: string;
   /** Whether the two CTAs do anything. Nothing to advance from before a day has been filed. */
   readonly canAdvance: boolean;
+  /** `shift/report.ts`'s target-met line on the close that met it, and absent otherwise — § D1226. */
+  readonly weekMark?: string | undefined;
+  /** This close closed the week — § D1227. Absent otherwise. */
+  readonly weekClosed?: boolean | undefined;
 }
 
 /**
@@ -1444,13 +1448,20 @@ function framingOf(report: ShapedDayReport): FramingView {
   return {
     kind: 'week-day',
     ...(report.practiceNote === undefined ? {} : { practiceNote: report.practiceNote }),
+    ...(report.weekMark === undefined ? {} : { weekMark: report.weekMark }),
+    ...(report.weekClosed === true ? { weekClosed: true } : {}),
     streakLine: report.streakLine,
     contractLine: report.contractLine,
     cleared: clearedBannerOf(report.cleared),
     forecast: report.forecast,
     taught: report.taught,
     nextDayLabel: `Open the doors on ${report.nextDayName}`,
-    canAdvance: true,
+    /*
+     * A close on a link's crowd closed nothing into the week (§ D1141), so tomorrow is not the next
+     * day of anything: the button that advanced from it skipped a counted day under a sentence
+     * saying the week stays put (the post-AK panel's seat D, H2). `shift/report.ts#dayStaysOpen`.
+     */
+    canAdvance: report.dayStaysOpen !== true,
   };
 }
 

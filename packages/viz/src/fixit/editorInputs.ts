@@ -34,6 +34,7 @@ import {
   playerWordsOfDimension,
   pruneDials,
   rezoneFabricOf,
+  rezonePathsOf,
   standingDialValuesOf,
   type DialOption,
   type RezoneBank,
@@ -97,6 +98,14 @@ export interface RezoneBankInput extends RezoneBank {
 
 export interface RezoneInput {
   readonly row: RowPurchase;
+  /**
+   * **Which controls in the order buy the row** — lane AL-B, the post-AK panel's seat D H5. The
+   * zoning step and the banks' own selects both resolve to `rezone-bank`, which the schedule
+   * charges once however it is drawn; a surface that prices each at the row's figure shows two
+   * prices for one charge. The two flags let the words say which control already pays.
+   */
+  readonly boughtByZoneStep: boolean;
+  readonly boughtByBanks: boolean;
   readonly floorOrder: readonly string[];
   readonly cars: readonly (RezoneCar & { readonly target: string })[];
   readonly banks: readonly RezoneBankInput[];
@@ -268,11 +277,9 @@ function computeEditorInputs(
     carOptions: doorDwellOptionsOf('car'),
   };
 
-  const rezoneBought =
-    Object.keys(state.carBanks).length > 0 ||
-    Object.keys(state.bankFloors).length > 0 ||
-    state.platedBankIds.length > 0 ||
-    state.zoneOverlapFloors > 0;
+  const boughtByBanks = rezonePathsOf(state).length > 0;
+  const boughtByZoneStep = state.zoneOverlapFloors > 0;
+  const rezoneBought = boughtByBanks || boughtByZoneStep;
   const banks: RezoneBankInput[] = fabric.banks.map((bank) => ({
     ...bank,
     standingFloors: bank.servesFloors,
@@ -299,6 +306,8 @@ function computeEditorInputs(
   }
   const rezone: RezoneInput = {
     row: rowPurchase(entry, state, schedule, 'rezone-bank', rezoneBought),
+    boughtByZoneStep,
+    boughtByBanks,
     floorOrder: fabric.floorOrder,
     cars: fabric.cars.map((car) => ({ ...car, target: state.carBanks[car.id] ?? car.standingBankId })),
     banks,

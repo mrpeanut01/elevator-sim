@@ -113,13 +113,30 @@ verdict:
   the run that first moved them was issues #127 and #137, the second of which fixed what the first
   found, and the arguments for that pair are in `honesty/surfaces.ts`, `honesty/run.ts`,
   `shift/types.ts#ReportFigure.count` and `dev/reportPanel.ts#DeltaRowView`. **The figures
-  below are wave AK's, both tiers, measured 2026-09-26 on the integrated tree**; the paragraph above
+  below are wave AL's, both tiers, measured 2026-09-26 on the integrated tree**; the paragraph above
   describes the wave that first moved this column and is kept as the dated record it is:
 
   | tier | cases | strings | simulations | surfaces | failing cases | verdict |
   |---|---|---|---|---|---|---|
-  | always-on | 49 | **919 407** | **606** | **74** | **0** | **green**, and the register is empty |
-  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **1 148 854** | **4 710** | **75** | **0** | **green**, and the register is empty |
+  | always-on | 49 | **926 377** | **606** | **75** | **0** | **green**, and the register is empty |
+  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **1 157 486** | **4 710** | **76** | **0** | **green**, and the register is empty |
+
+  **Wave AL's move is 142.24 strings a case always-on and 143.87 deep, with one surface in each,
+  forecast by name.** The base, `main` at `cb28ba5`, reproduced wave AK's row to the string in both
+  tiers, the eighth consecutive wave. Measured at `eff454b`, on a head green in all six projects
+  (viz by directory, viz-browser **69 / 407**, core **3 012**, experiments **1 526**, cli **179**,
+  server **650** on a quiet box, `tsc -b` clean).
+
+  | | base `cb28ba5` | wave AL | move | per case |
+  |---|---|---|---|---|
+  | always-on strings | 919 407 | **926 377** | **+6 970** | **142.24** |
+  | deep strings | 1 148 854 | **1 157 486** | **+8 632** | **143.87** |
+  | surfaces | 74 / 75 | **75 / 76** | **+1 / +1** | none |
+  | cases · simulations · failing cases | 49 / 60 · 606 / 4 710 · 0 | **unmoved** | **0** | none |
+
+  **The surface sets were diffed**: one added in each tier, `everyday/stageCallRow.ts#stageCallRowsOf`,
+  the left side of lane AL-E's declared pair, and nothing removed. Seven lanes published floors
+  summing to about 121 a case; the move is above every floor and is not split between them (§ D256).
 
   **Wave AK's move is 129.20 strings a case always-on and 131.02 deep, with one surface in each,
   and the deep tier found a defect the lanes could not see.** The base, `main` at `67599fe`,

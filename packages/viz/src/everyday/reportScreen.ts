@@ -597,6 +597,12 @@ function mountReportScreen(
       practice.style.cssText = `${QUIET};margin:10px 0 0;max-width:74ch`;
       head.append(practice);
     }
+    /* The week's target, marked on the close that met it — swarm DN's Q2.2, § D1226. */
+    if (view.weekMark !== undefined) {
+      const mark = el(doc, 'p', 'everyday-report-week-mark', view.weekMark);
+      mark.style.cssText = `font:600 14px ${TYPE.heading};margin:10px 0 0;max-width:74ch;color:${C.moss}`;
+      head.append(mark);
+    }
     root.append(head);
 
     if (view.staleNote !== undefined) {
@@ -903,6 +909,11 @@ function mountReportScreen(
        */
       const step = view.tomorrow;
       button.addEventListener('click', () => {
+        /* The close that closed the week opens its sheet — swarm DN's Q2.3, § D1227. */
+        if (step.goes === 'week-sheet') {
+          context.go('week');
+          return;
+        }
         if (step.goes === 'career-day') {
           const tower = openTowerOf(context.host.campaign());
           if (tower === undefined) return;
@@ -1127,8 +1138,29 @@ function mountReportScreen(
     return cell;
   }
 
+  /**
+   * **Focus lands on the sheet when it has nowhere else to be** — wave AL, lane AL-A, the post-AK
+   * panel's seat B (D8). *Close the day* is the bar's primary, the shell redraws the bar on the way
+   * here, and the pressed button goes with it; so a keyboard player's focus fell to the page body
+   * and the next Tab started from the top of the document. Only a lost focus is moved: a press that
+   * left focus somewhere on the page keeps it there, which is `docs/36` `AX-12`'s *never because
+   * of the render loop*.
+   */
+  function keepFocus(): void {
+    const active = doc.activeElement;
+    if (active !== null && active !== doc.body) return;
+    const heading = root.querySelector<HTMLElement>('h1');
+    if (heading === null) return;
+    heading.tabIndex = -1;
+    heading.focus({ preventScroll: true });
+  }
+
   render();
-  const stopListening = context.host.subscribe(render);
+  keepFocus();
+  const stopListening = context.host.subscribe(() => {
+    render();
+    keepFocus();
+  });
   /*
    * The account, heard on its own channel — `everyday/accountPort.ts`. The host's `onChange` is
    * drained by `renderAll()` and no account path calls it, so signing in on the settings screen and

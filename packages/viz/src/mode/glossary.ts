@@ -465,7 +465,7 @@ export const GLOSSARY_TERMS: readonly GlossaryTerm[] = Object.freeze([
     plain:
       'A press is something you do to a day while it plays: park the cars in the lobby, spread ' +
       'them across the tower, or hand the day to another dispatcher. On a day a press decides, the ' +
-      'stage stops once to ask for one, and the answer is what the day turns on.',
+      'stage stops to ask for one, and the answer is what the day turns on.',
   }),
   Object.freeze({
     id: 'standing-order',

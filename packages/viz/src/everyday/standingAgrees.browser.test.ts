@@ -154,14 +154,19 @@ describe.skipIf(!HAS_BROWSER)('a stopped frame carries one standing count — wa
         undefined,
         { timeout: 240_000 },
       );
-      await page.evaluate(() => {
-        const skip = document.querySelector<HTMLButtonElement>('.everyday-stage-skip');
-        if (skip !== null && !skip.disabled) skip.click();
-      });
+      /*
+       * Skipped until the day runs out: since § D1204 the pinned day asks on after its call, and a
+       * skip with a later card up skips that call, pressing nothing, so the press row stays this one.
+       */
       await page.waitForFunction(
-        () => document.querySelector<HTMLButtonElement>('.everyday-stage-skip')?.disabled === true,
+        () => {
+          const skip = document.querySelector<HTMLButtonElement>('.everyday-stage-skip');
+          if (skip === null || skip.disabled) return true;
+          skip.click();
+          return false;
+        },
         undefined,
-        { timeout: 60_000 },
+        { timeout: 120_000, polling: 500 },
       );
       await page.locator('.everyday-bar-primary').click();
       await page.waitForSelector('.everyday-report', { timeout: 60_000 });

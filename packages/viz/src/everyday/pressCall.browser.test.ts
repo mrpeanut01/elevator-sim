@@ -103,11 +103,21 @@ async function recomputed(page: Page): Promise<void> {
  * between this file and the box, not a finding about the product.
  */
 async function skipIfAnythingIsLeft(page: Page): Promise<void> {
-  /* Read and pressed in one page turn, so the day cannot end between the two. */
-  await page.evaluate(() => {
-    const skip = document.querySelector<HTMLButtonElement>('.everyday-stage-skip');
-    if (skip !== null && !skip.disabled) skip.click();
-  });
+  /*
+   * Read and pressed in one page turn, so the day cannot end between the two — and pressed until the
+   * day has run out: since § D1204 the pinned day asks on after its call, so a skip may stop at a
+   * later card, and the next press with that card up skips it (recorded as skipped, pressing nothing).
+   */
+  await page.waitForFunction(
+    () => {
+      const skip = document.querySelector<HTMLButtonElement>('.everyday-stage-skip');
+      if (skip === null || skip.disabled) return true;
+      skip.click();
+      return false;
+    },
+    undefined,
+    { timeout: 240_000, polling: 500 },
+  );
 }
 
 /** Whether both parking presses are held, and the reason the page gives. */

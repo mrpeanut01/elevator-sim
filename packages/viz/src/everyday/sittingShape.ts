@@ -139,6 +139,12 @@ export interface PacedDay {
   readonly periodS: number;
   readonly recordedS: number;
   readonly slowS: number;
+  /**
+   * **Simulated seconds the stage skips and never draws** — [§ D1212](../../../../DECISIONS.md), the
+   * quiet between a scored whole day's peaks, measured by `stagePace.test-helper.ts#scoredDayPlayOf` at the
+   * opening rung. Absent on a day measured before the skip, which is then an upper bound.
+   */
+  readonly skippedS?: number | undefined;
 }
 
 /**
@@ -148,10 +154,15 @@ export interface PacedDay {
  * Exact for the day it is handed, and derivable from the rung — rule 1 — because a day's slow part
  * is a property of its recording, not of the speed it is played at: the stage holds the watching
  * rung while somebody has waited past a minute **whatever** that rung is.
+ *
+ * Since [§ D1212](../../../../DECISIONS.md) a day may carry {@link PacedDay.skippedS}, the quiet
+ * between peaks the stage seeks over, which costs no real time. Its beats are in the fast part. It
+ * was measured at the opening rung, where every figure here is quoted; at a rung above the fast one
+ * the beat covers more of the day and this is short by at most two real seconds a skip.
  */
 export function pacedDayRealS(day: PacedDay, watchingSimPerRealS: number): number {
   const between = Math.max(watchingSimPerRealS, BETWEEN_PEAKS_SIM_PER_REAL_S);
-  return day.slowS / watchingSimPerRealS + (day.recordedS - day.slowS) / between;
+  return day.slowS / watchingSimPerRealS + (day.recordedS - day.slowS - (day.skippedS ?? 0)) / between;
 }
 
 /**
@@ -258,14 +269,23 @@ export const WHOLE_DAY_LONGEST: PacedDay = Object.freeze({
 
 /**
  * **The longest whole day on the game's own towers** — the contracts whose buildings are not
- * `*-class-reference`: `c5` (Vertical City), seed `n = 39`, on the same sweep. Quoted on the hub row beside the
- * long end, because the reference towers set that end and a player on a game tower would otherwise
- * read a figure more than twice what they will watch.
+ * `*-class-reference`. Quoted on the hub row beside the long end, because the reference towers set
+ * that end and a player on a game tower would otherwise read a figure several times what they will
+ * watch.
+ *
+ * **Measured as a scored day now plays** ([§ D1212](../../../../DECISIONS.md)): § D1169's slow set,
+ * somebody on a landing past a minute, and the quiet between peaks skipped, read off the legs by
+ * `stagePace.test-helper.ts#scoredDayPlayOf` over the same fifty seeds of every game tower's day 1.
+ * Measured so on 2026-09-26: `c5` (Vertical City), seed `n = 33`, 34 real minutes at `4×`. It read
+ * `c5`, seed `n = 39`, 8 486 s slow and nothing skipped, 51 minutes, while it was measured under
+ * § D991, and that run reproduced the § D991 figure exactly, which is the check on the instrument.
+ * `stagePace.sweep.test.ts` refuses it at that budget the day a run of the game towers disagrees.
  */
 export const WHOLE_DAY_LONGEST_GAME_TOWER: PacedDay = Object.freeze({
   periodS: AUTHORED_DAY_PERIOD_S,
-  recordedS: 36413.148,
-  slowS: 8486.048,
+  recordedS: 36198.67,
+  slowS: 7195.86,
+  skippedS: 23220.401,
 });
 
 /**
@@ -492,7 +512,7 @@ export const SITTING_SHAPES = Object.freeze({
    * one of the game's own towers read a figure more than twice what they will watch: the second
    * clause is {@link WHOLE_DAY_LONGEST_GAME_TOWER}, measured on the same sweep.
    */
-  contractDay: `${sittingLengthPhrase(SITTING_SPANS.contractDay, 'a day')}, and ${betweenRungLabel()} wherever nobody on a landing has waited a minute; ${String(Math.ceil(pacedDayRealS(WHOLE_DAY_LONGEST_GAME_TOWER, openingRung().simPerRealS) / 60))} min at most on the game’s own towers — the long end is a reference tower’s · no losing — a day is a score, not a pass`,
+  contractDay: `${sittingLengthPhrase(SITTING_SPANS.contractDay, 'a day')}, and ${betweenRungLabel()} wherever nobody on a landing has waited a minute, the quiet between peaks skipped; ${String(Math.ceil(pacedDayRealS(WHOLE_DAY_LONGEST_GAME_TOWER, openingRung().simPerRealS) / 60))} min at most on the game’s own towers — the long end is a reference tower’s · no losing — a day is a score, not a pass`,
   /** The hub's *Fix a building* row. */
   fixCase: `${sittingLengthPhrase(SITTING_SPANS.fixCase, 'a case')}, skippable · retry as often as you like`,
 });

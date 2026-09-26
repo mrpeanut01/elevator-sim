@@ -181,7 +181,7 @@ import {
 } from '../fixit/judge.js';
 import { shippedAsBuiltMorningsOf } from '../fixit/asBuiltMornings.js';
 import { opensWithDiagnosis, routeCensusOf } from '../fixit/routeCensus.js';
-import { fixitParLineOf } from '../fixit/par.js';
+import { fixitParLineOf, fixitParTagOf } from '../fixit/par.js';
 import { heldReasonOf, isOffered } from '../fixit/held.js';
 import { createOffThreadMornings, morningWorkerCountOf } from '../dev/offThreadMornings.js';
 import type {
@@ -193,7 +193,7 @@ import type {
 import type { PriceSchedule } from '../pricing/types.js';
 import type { VizRecording } from '../contract/types.js';
 import { mountCaseStage, type CaseStage, type CaseStageBank } from './caseStage.js';
-import { keyedBankIdOf, keyedBankNameOf } from '../fixit/families.js';
+import { keyedBankIdOf, keyedBankNameOf, rezonePathsOf } from '../fixit/families.js';
 import { STAGE_CAMERAS } from './stageScreenModel.js';
 
 /** The bank view's first option — the stage camera's own word for the whole picture. */
@@ -218,6 +218,7 @@ import {
   fixitSpendSummary,
   fixitVerdictContextOf,
   fixitZoneRow,
+  pairStageNoteOf,
   type FixitElevationRow,
   type FixitSpendSummary,
   type FixitZoneRow,
@@ -226,7 +227,14 @@ import { caseAtRung, nextBudgetStepOf } from '../fixit/budgetRungs.js';
 import { everydayDeviceChimeStore } from './chimeStore.js';
 import { CHIME_PRICES } from './chimesPanel.js';
 import { boughtStepIdOf } from './deviceChimes.js';
-import { diagnosisShownSetOf, progressWithDiagnosisShown, progressWithSolvedCases, solvedCaseSetOf } from './profile.js';
+import {
+  diagnosisShownSetOf,
+  fixSpentUnitsOf,
+  progressWithDiagnosisShown,
+  progressWithFixSpent,
+  progressWithSolvedCases,
+  solvedCaseSetOf,
+} from './profile.js';
 import { everydayProfileStore } from './profileStore.js';
 import type { EverydayScreenModule } from './screens.js';
 /* GitHub issue #340: beat 3, from the four presses this screen offers. A no-op without consent. */
@@ -574,10 +582,15 @@ function ensureRestored(): void {
  * `progressNotice()`'s to say and the rail draws it on the very next render, which this caller
  * always performs — so a second reading here would be the same fact told twice.
  */
-function keepSolved(): void {
+function keepSolved(fixed?: { readonly caseId: string; readonly units: number }): void {
   const store = everydayProfileStore();
   /* § D1120: the kept diagnoses are frozen as they stood, so a new clear is not read as a helped one. */
-  store.setProgress(progressWithSolvedCases(store.progress(), [...solvedIds()]));
+  const solved = progressWithSolvedCases(store.progress(), [...solvedIds()]);
+  /*
+   * And what the fixing order cost, so the par can compare it on every later load — lane AL-B, the
+   * post-AK panel's seat C D5. In the same write as the solved set, so the two cannot disagree.
+   */
+  store.setProgress(fixed === undefined ? solved : progressWithFixSpent(solved, fixed.caseId, fixed.units));
 }
 
 function sessionOf(entry: FixitCase): CaseSession {
@@ -843,6 +856,8 @@ function mountFixit(
       towerLineOf(loadedFixit),
       heldReasonOf,
       diagnosisShownOf,
+      /* Seat C D5: the par on a fixed row, from the kept cost of the order that fixed it. */
+      (caseId) => fixitParTagOf(caseId, fixSpentUnitsOf(everydayProfileStore().progress(), caseId)),
     );
     const rail = el(doc, 'div', 'everyday-fixit-rail');
     rail.style.cssText = [
@@ -918,6 +933,11 @@ function mountFixit(
         const mark = el(doc, 'span', 'everyday-fixit-case-mark', row.mark);
         mark.style.cssText = `${MONO(10, C.warmGrey)}`;
         button.append(mark);
+      }
+      if (row.par !== undefined) {
+        const par = el(doc, 'span', 'everyday-fixit-case-par', row.par);
+        par.style.cssText = `${MONO(10, C.warmGrey)}`;
+        button.append(par);
       }
       if (row.heldReason !== undefined) {
         const reason = el(doc, 'span', 'everyday-fixit-held-reason', row.heldReason);
@@ -1134,6 +1154,8 @@ function mountFixit(
       census: routeCensusOf(entry.id),
       explained:
         settledNow(session) && session.outcome?.kind === 'fixed' && session.outcome.attribution === 'diagnosis',
+      /* Seat C D5: on a fixed case asking marks nothing, and the card must not say it would. */
+      fixed: session.fixed,
     });
     const diagnosis = el(doc, 'div', 'everyday-fixit-diagnosis');
     diagnosis.dataset['state'] = view.state;
@@ -1222,7 +1244,8 @@ function mountFixit(
         speedSimPerRealS: everydayProfileStore().defaultSpeed(),
         copy: {
           eyebrow: COPY.pairStageEyebrow,
-          note: COPY.pairStageNote,
+          /* Chosen from the legs, as the basis line under the verdict is (seat D H4). */
+          note: pairStageNoteOf(measuredOf(entry, before, after)),
           skip: COPY.pairStageSkip,
           bankView: COPY.stageBankView,
           bankViewWhole: WHOLE_TOWER,
@@ -1247,6 +1270,20 @@ function mountFixit(
       const stopped = el(doc, 'p', 'everyday-fixit-check-stopped', session.stoppedLine);
       stopped.style.cssText = `margin:18px 0 0;font-size:13px;line-height:1.5;color:${C.warmGrey};max-width:80ch`;
       main.append(stopped);
+    }
+    /*
+     * **A fixed case this sitting has not run still shows its par** — lane AL-B, the post-AK
+     * panel's seat C D5, § D1184 on every load. A restored session carries no outcome (see
+     * {@link ensureRestored}), so the par used to vanish with the reload; it is drawn from the kept
+     * cost of the order that fixed the case, and without a comparison where no cost was kept.
+     */
+    if (session.outcome === undefined && session.fixed) {
+      const par = fixitParLineOf(entry.id, fixSpentUnitsOf(everydayProfileStore().progress(), entry.id));
+      if (par !== undefined) {
+        const parLine = el(doc, 'p', 'everyday-fixit-par everyday-fixit-par-kept', par);
+        parLine.style.cssText = `font-size:12.5px;line-height:1.5;color:${C.inkSoft};margin:18px 0 0;max-width:80ch`;
+        main.append(parLine);
+      }
     }
     if (session.outcome !== undefined) {
       /*
@@ -1494,11 +1531,14 @@ function mountFixit(
 
     /* § 10.3's zones and parking — GitHub issue #422, on the same card and the same budget. */
     const fabric = editorFabricOf(loadedFixit, entry);
+    /* Where the banks' selects already buy the rezone, the step costs nothing more (seat D H5). */
+    const banksBought = rezonePathsOf(session.state).length > 0;
     const zone = fixitZoneRow(
       session.state,
       fabric.ceiling,
-      affordabilityOf(entry, session.state, zonePriceUnits(scheduleNow()), scheduleNow()).selectable,
+      affordabilityOf(entry, session.state, banksBought ? 0 : zonePriceUnits(scheduleNow()), scheduleNow()).selectable,
       zonePriceUnits(scheduleNow()),
+      banksBought,
     );
     if (zone !== null) body.append(zoneLine(entry, session, zone, fabric.ceiling));
     /* The parking select is drawn beside its floor, inside the families card below — § D1020. */
@@ -1954,7 +1994,7 @@ function mountFixit(
        * Engineer panel consume, so the two surfaces cannot come to disagree about what FIXED means.
        */
       session.fixed = fixedBadgeAfter(outcome, session.fixed);
-      keepSolved();
+      keepSolved(outcome.kind === 'fixed' ? { caseId: entry.id, units: spend.totalUnits } : undefined);
       /*
        * **And the ledger hears about a case this verdict fixed** — GitHub issue #499. A fix case is
        * Scenario content (`docs/38` § 2.1, § D525), and the badge is the clear being filed:

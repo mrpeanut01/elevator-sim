@@ -481,7 +481,16 @@ const ABOVE_CEILING: ReadonlyMap<string, { readonly count: number; readonly tota
      * — two attempts on the shipped bundle, which is what no unit tier can see. Nothing existing was
      * raised: 25 560 000 + 300 000 = **25 860 000**.
      */
-    ['viz-browser', { count: 97, totalMs: 25_860_000 }],
+    /*
+     * **97 → 98, and the one is named** — wave AL lane AL-D's case in
+     * `everyday/stagePace.browser.test.ts` at 900 000 ms (§ D1212): it plays Midtown's whole day on
+     * the shipped bundle through the morning peak to the first skip between peaks, pauses a skip
+     * that is coming, lets the next one land and reads its line, then stops a third with a chip. The
+     * day's crowd is the date's, so where the first quiet stretch falls is the run's, and the case
+     * waits for it rather than for a clock. Nothing existing was raised:
+     * 25 860 000 + 900 000 = **26 760 000**.
+     */
+    ['viz-browser', { count: 98, totalMs: 26_760_000 }],
   ]);
 
 /**

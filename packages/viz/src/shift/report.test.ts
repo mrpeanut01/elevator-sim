@@ -1182,6 +1182,44 @@ describe('the rest of the sheet', () => {
     expect(sheet(undefined)).toEqual(sheet([]));
   });
 
+  it('names who drove when on the title line, and every driver in the small print — wave AL', () => {
+    /*
+     * The post-AK panel's seats B and C: after *Switch to Fairness first* at 08:48 the report was
+     * titled *MIDTOWN OFFICE · MINIMUM ESTIMATED WAIT* and said it *cannot tell you that minimum
+     * estimated wait is better*, over its own log line *08:48 · switched to Fairness first*.
+     */
+    const fair = { id: 'fairness-first', name: 'Fairness first', weights: { waitTime: 1 } };
+    const shaped = dayReportOf({
+      recording: clean,
+      observations: observationsOfRun(clean),
+      goals: goalsForDay(4),
+      week: openWeek('c2'),
+      contract: contractById('c2'),
+      event: SHIFT_EVENTS.ordinary,
+      plan: PLAN,
+      calendar: null,
+      subject: { kind: 'week-day' },
+      dispatcherName: 'Minimum estimated wait',
+      interventions: [{ atS: 2 * 3600 + 48 * 60, change: { kind: 'adopt-dispatcher', profile: fair } }],
+    });
+    expect(shaped.metaLines[0]).toBe(`${clean.buildingName} · Minimum estimated wait, then Fairness first from 08:48`);
+    expect(shaped.smallPrint).toContain('cannot tell you that minimum estimated wait or fairness first is better');
+    /* An untouched day keeps its one name. */
+    const untouched = dayReportOf({
+      recording: clean,
+      observations: observationsOfRun(clean),
+      goals: goalsForDay(4),
+      week: openWeek('c2'),
+      contract: contractById('c2'),
+      event: SHIFT_EVENTS.ordinary,
+      plan: PLAN,
+      calendar: null,
+      subject: { kind: 'week-day' },
+      dispatcherName: 'Minimum estimated wait',
+    });
+    expect(untouched.metaLines[0]).toBe(`${clean.buildingName} · Minimum estimated wait`);
+  });
+
   it('names the rules the run was driven by, in the editor’s own readback — docs/20 defect 2', () => {
     /*
      * The audit's finding: a rule governed the run, the stage header named it live for forty
@@ -2302,6 +2340,29 @@ describe('the ordinary day’s calls and a practice close — § D1138', () => {
     const banked = weekDay(sheet({ week: { ...WEEK, attempt: 1, closedDay: 4 } }));
     expect(banked.practiceNote).toBeUndefined();
     expect(banked.streakLine).not.toBe(PRACTICE_NOTE);
+  });
+
+  it('marks the week’s target on the close that met it, and not on a practice close of the same day — § D1226', () => {
+    /* WEEK stands on Thursday; Monday to Thursday clean on Midtown's week, whose target is 4 of 5. */
+    const history = [1, 2, 3, 4].map((day) =>
+      outcomeOf({
+        day,
+        dayIdx: day - 1,
+        eventId: scheduledEventFor(null, day, day - 1, 'whole-day').id,
+        arrived: 400,
+        carried: 400,
+        minutePct: 100,
+        readings: readGoals(goalsForDay(day), { ...passing(), minutePct: 100 }),
+        record: null,
+        recordRefusal: null,
+      }),
+    );
+    const met = { ...WEEK, contractId: 'c2', day: 4, dayIdx: 3, closedDay: 4, attempt: 1, history };
+    expect(weekDay(sheet({ week: met })).weekMark).toBe(
+      'This week’s target is met, on Thursday: 4 clean counted days, and it asks for 4 of 5.',
+    );
+    expect(weekDay(sheet({ week: { ...met, attempt: 2 }, practice: true })).weekMark).toBeUndefined();
+    expect(weekDay(sheet({ week: { ...met, history: history.slice(0, 3), closedDay: 3, day: 3, dayIdx: 2 } })).weekMark).toBeUndefined();
   });
 
   it('says a run on a crowd other than the day’s shared one is practice for that reason — § D1141', () => {

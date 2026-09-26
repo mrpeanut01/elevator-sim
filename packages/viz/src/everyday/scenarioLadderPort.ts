@@ -75,6 +75,8 @@ export function provideScenarioLadderFrom(
   stages: readonly LadderStage[],
   survivors: PublishedSurvivors,
   refusalOf?: (stageId: string, routeName: string) => string | undefined,
+  /* § D1234: what each named way through costs, so a cleared row can carry its par mark. */
+  unitsOf?: (stageId: string, routeName: string) => number | undefined,
 ): void {
-  provideScenarioLadder(scenarioLadderOf({ stages, survivors, refusalOf }));
+  provideScenarioLadder(scenarioLadderOf({ stages, survivors, refusalOf, unitsOf }));
 }

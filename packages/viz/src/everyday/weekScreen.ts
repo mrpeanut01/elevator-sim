@@ -48,7 +48,8 @@
 
 import type { ActionBarModel } from './actionBar.js';
 import { actionBarFor } from './actionBar.js';
-import { weekScreenViewOf, type WeekDayCard, type WeekScreenView } from './weekView.js';
+import { WEEK_START_NEXT_LABEL, weekScreenViewOf, type WeekDayCard, type WeekScreenView } from './weekView.js';
+import { weekHasClosed } from '../shift/weekStake.js';
 import type { EverydayScreenModule } from './screens.js';
 import {
   BODY,
@@ -91,6 +92,13 @@ import { REFERENCE_RUN_LINE } from '../watch/view.js';
  * refinement can see. Written on every render, so it is never older than the screen.
  */
 let todayIsClosed = false;
+
+/**
+ * Whether the week's sheet stands — the week has closed and not yet rolled. Module state for
+ * {@link todayIsClosed}'s reason: while it holds, the bar's primary is the Sunday screen's
+ * *Start next week* rather than the week row's door (§ D1227).
+ */
+let weekSheetStands = false;
 
 /** A card's ink, by verdict. § 19's moss for cleared, alarm for missed, faint for unjudged. */
 function inkFor(card: WeekDayCard): string {
@@ -136,15 +144,27 @@ function mountWeek(
     const data = context.host;
     const dayClosed = data.runState().dayClosed;
     todayIsClosed = dayClosed;
+    weekSheetStands = weekHasClosed(data.week());
     return weekScreenViewOf({
       week: data.week(),
       towerToday: data.resolvedBuilding()?.name ?? data.selection().buildingId,
       nameOf: (buildingId) => data.buildingById(buildingId)?.name,
       dayClosed,
       sheetStanding: data.lastReport() !== undefined,
-      /* The house's runs, measured by the shell when the week closes — § D1177. */
+      /* The house's runs, measured by the shell as each day closes — § D1177, § D1227. */
       house: (day) => data.weekHouse(day),
+      /* The tower's record of closed weeks — § D1230. */
+      record: data.weekRecord(),
     });
+  }
+
+  /**
+   * *Start next week* — the Sunday screen's one press, § D1227. `openTomorrow` rolls a closed week
+   * (§ D1177) and deals its first day's crowd (§ D1229); the brief is where a day is set up.
+   */
+  function startNextWeek(): void {
+    context.host.openTomorrow();
+    context.go('brief');
   }
 
   function render(): void {
@@ -165,6 +185,53 @@ function mountWeek(
       const stake = el(doc, 'p', 'everyday-week-stake', view.stake);
       stake.style.cssText = `${BODY};margin:8px 0 0`;
       root.append(stake);
+    }
+
+    /*
+     * ---- the week's sheet at its close, beside the house — § D1177 ----
+     *
+     * **First on the screen, and the screen the last close opens** — swarm DN's Q2.3, lane AL-F,
+     * [§ D1227](../../../../DECISIONS.md). It sat under the strip, the tally and the not-counted
+     * lines, on a screen reached only through *Your week*; the close that closes the week now
+     * opens this screen, so its sheet leads, with its seven cells; the pinned bar's primary is the
+     * one button into the next week ({@link weekBar}).
+     */
+    if (view.sheet !== undefined) {
+      const sheet = section(doc, view.sheet.heading);
+      sheet.body.className = 'everyday-week-sheet';
+      sheet.body.style.cssText = `${CARD};display:grid;gap:8px`;
+      for (const [cls, text] of [
+        ['everyday-week-sheet-yours', view.sheet.yoursLine],
+        ['everyday-week-sheet-house', view.sheet.houseLine],
+        ['everyday-week-sheet-target', view.sheet.targetLine],
+      ] as const) {
+        const line = el(doc, 'p', cls, text);
+        line.style.cssText = `${BODY};margin:0`;
+        sheet.body.append(line);
+      }
+      const rows = el(doc, 'ul', 'everyday-week-sheet-rows');
+      rows.style.cssText = `list-style:none;margin:0;padding:0;display:grid;gap:3px`;
+      for (const row of view.sheet.rows) {
+        const item = el(doc, 'li', 'everyday-week-sheet-row', row.line);
+        item.style.cssText = MONO(11.5, row.counts ? C.ink : C.faint);
+        rows.append(item);
+      }
+      sheet.body.append(rows);
+      const note = el(doc, 'p', 'everyday-week-sheet-note', view.sheet.note);
+      note.style.cssText = `${QUIET};margin:0;max-width:74ch`;
+      const roll = el(doc, 'p', 'everyday-week-sheet-roll', view.sheet.rollLine);
+      roll.style.cssText = `${QUIET};margin:0;max-width:74ch`;
+      sheet.body.append(note, roll);
+      if (view.record !== undefined) {
+        const record = el(doc, 'p', 'everyday-week-record', view.record);
+        record.style.cssText = `${QUIET};margin:0;max-width:74ch`;
+        sheet.body.append(record);
+      }
+      root.append(sheet.root);
+    } else if (view.record !== undefined) {
+      const record = el(doc, 'p', 'everyday-week-record', view.record);
+      record.style.cssText = `${QUIET};margin:8px 0 0;max-width:74ch`;
+      root.append(record);
     }
 
     /* ---- the seven cards ---- */
@@ -229,28 +296,6 @@ function mountWeek(
       const line = el(doc, 'p', 'everyday-week-not-counted', `${entry.weekday} · ${entry.sentence}`);
       line.style.cssText = `${QUIET};margin:4px 0 0`;
       root.append(line);
-    }
-
-    /* ---- the week's sheet at its close, beside the house — § D1177 ---- */
-    if (view.sheet !== undefined) {
-      const sheet = section(doc, view.sheet.heading);
-      sheet.body.className = 'everyday-week-sheet';
-      sheet.body.style.cssText = `${CARD};display:grid;gap:8px`;
-      for (const [cls, text] of [
-        ['everyday-week-sheet-yours', view.sheet.yoursLine],
-        ['everyday-week-sheet-house', view.sheet.houseLine],
-        ['everyday-week-sheet-target', view.sheet.targetLine],
-      ] as const) {
-        const line = el(doc, 'p', cls, text);
-        line.style.cssText = `${BODY};margin:0`;
-        sheet.body.append(line);
-      }
-      const note = el(doc, 'p', 'everyday-week-sheet-note', view.sheet.note);
-      note.style.cssText = `${QUIET};margin:0;max-width:74ch`;
-      const roll = el(doc, 'p', 'everyday-week-sheet-roll', view.sheet.rollLine);
-      roll.style.cssText = `${QUIET};margin:0;max-width:74ch`;
-      sheet.body.append(note, roll);
-      root.append(sheet.root);
     }
 
     /* ---- where you landed today: your own withheld state, not the world's ---- */
@@ -455,6 +500,10 @@ function mountWeek(
      * the label a promise the destination does not keep (§ 16 rule 4).
      */
     primary: () => {
+      if (weekHasClosed(context.host.week())) {
+        startNextWeek();
+        return;
+      }
       context.go('door');
     },
   };
@@ -470,6 +519,7 @@ function mountWeek(
  */
 function weekBar(state: EverydayState): ActionBarModel {
   const base = actionBarFor(state);
+  if (weekSheetStands) return { ...base, primary: { ...base.primary, label: WEEK_START_NEXT_LABEL } };
   const label = base.primary.variants[todayIsClosed ? 1 : 0] ?? base.primary.label;
   return { ...base, primary: { ...base.primary, label } };
 }

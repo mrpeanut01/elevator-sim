@@ -610,8 +610,8 @@ describe('the acknowledgement a finished turn gets', () => {
       { screen: 'menu', ctx: 'daily' },
       { banked: { turn: 'career-day-paid', answer: { kind: 'balance', chimes: 3 } } },
     ).banked;
-    expect(unreachable).toContain('contract day filed');
-    expect(banked).toContain('contract day filed');
+    expect(unreachable).toContain('cleared day filed');
+    expect(banked).toContain('cleared day filed');
     expect(unreachable).not.toBe(banked);
   });
 

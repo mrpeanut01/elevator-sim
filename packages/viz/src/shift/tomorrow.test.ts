@@ -351,8 +351,27 @@ describe('what tomorrow is under', () => {
     const week = { ...closedWeek(1, CLEAN), cleanRun: 9 };
     const beat = briefing({ week, contract });
     expect(rowIn(beat, 'contract').value).toBe(
-      `${String(contract?.needClean ?? 0)} of ${String(contract?.needClean ?? 0)} clean shifts banked`,
+      `${String(contract?.needClean ?? 0)} of ${String(contract?.needClean ?? 0)} clean shifts banked: the target is met`,
     );
+  });
+
+  it('labels the count as what it is, and never as something still to bank once it is met — § D1226', () => {
+    // S2's list: *STILL TO BANK 4 of 4 … banked* stood on the day the target was met.
+    const met = briefing({ week: { ...closedWeek(1, CLEAN), cleanRun: 9 } });
+    expect(allText(met)).not.toContain('STILL TO BANK');
+    const open = briefing({ week: { ...closedWeek(1, CLEAN), cleanRun: 0 } });
+    expect(rowIn(open, 'contract').value).not.toContain('the target is met');
+    expect(allText(open)).not.toContain('STILL TO BANK');
+  });
+
+  it('says a missed day was filed, not banked — § D1226', () => {
+    // A missed day adds nothing to the count, so *banked* was false of the day it named (S2).
+    expect(briefing({ week: closedWeek(1, POOR), verdict: 'missed' }).headline).toBe(
+      'Monday is filed. Tuesday opens.',
+    );
+    // A day on no scenario banks nothing either.
+    expect(briefing({ week: closedWeek(1, CLEAN, 'sandbox') }).headline).toBe('Monday is filed. Tuesday opens.');
+    expect(briefing().headline).toBe('Monday is banked. Tuesday opens.');
   });
 
   it('carries tomorrow’s refusals rather than swallowing them', () => {

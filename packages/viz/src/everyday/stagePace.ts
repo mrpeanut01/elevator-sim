@@ -51,6 +51,26 @@
  * `90×` waits for its own cue-budget derivation. Everything below is the unscored path, which a
  * replay and a watched run still take.
  *
+ * ## Between a scored whole day's peaks, the quiet is skipped — [§ D1212](../../../../DECISIONS.md)
+ *
+ * Swarm DN's ruling (Q1 (c)) found about seventy per cent of a 27-minute Midtown day was the stage
+ * crossing an empty building at `30×`. So on a scored whole day, **between two of its peaks**, while
+ * nobody on a landing has waited a minute, the stage plays a short beat ({@link SKIP_BEAT_REAL_S}) and
+ * then **seeks** to the earliest of three instants read off the run's own recording
+ * ({@link stageSkipOf}): the first instant anybody reaches a minute ({@link firstMinuteWaitFrom}),
+ * the next call the stage would stop at, and the next peak's start. It lands on that instant
+ * exactly, so nothing the stage would have stopped for is passed, and it says what it skipped in one
+ * line ({@link stageSkipLineOf}). A **peak** is an act, `shift/dayLength.ts#actsOf` over the
+ * recording's authored phases, the same acts § D991 read: *between* is after one act has ended and
+ * before the next has started, so the half hour before the first peak and the tail after the last
+ * are played as § D1169 plays them. Inside a peak nothing changes. The skip moves the playhead and
+ * nothing else, so the run, the goals, the census and the report are the whole day's.
+ *
+ * This is the one rule in this module that reads the recording after the playhead, and it reads it
+ * only to choose where to land: the beat's note names no instant ahead, and the line is drawn once
+ * the stage is there, naming a stretch that is then in the past. § D1212 amends § D1169 clause 1's
+ * *nothing after the playhead is read* for that one purpose.
+ *
  * ## Where it applies, and the one place it must not
  *
  * **Only when `shift/dayLength.ts#runHorizonOf` answers `'whole-day'`.** Everything else — a
@@ -70,6 +90,8 @@
  * same commit.
  */
 
+import type { VizLeg } from '../contract/types.js';
+import { isWaitingAt } from '../frame/overlay.js';
 import { WAIT_BANDS } from '../live/bands.js';
 import { clockAt } from '../live/timeline.js';
 import type { DayAct } from '../shift/dayLength.js';
@@ -302,4 +324,151 @@ export function stagePaceNoteOf(
     case 'yours':
       return `your speed, ${rung}, until somebody on a landing has waited a minute`;
   }
+}
+
+/*
+ * ---- § D1212: the quiet between a scored whole day's peaks is skipped. ----
+ */
+
+/**
+ * **The beat before a skip, in real seconds** — [§ D1212](../../../../DECISIONS.md).
+ *
+ * The stage plays this long at the fast rung, with {@link STAGE_SKIP_BEAT_NOTE} up, before it seeks,
+ * so a player sees the skip coming and can stop it: pause, or any speed chip (which is § D1169's
+ * *your speed until somebody next waits a minute*, and the skip does not apply to it). A stretch
+ * shorter than two beats is simply played, because a seek that saves less than the beat it waited
+ * for saves nothing. Owner-reversible: `0` would seek at once and leave nothing to interrupt.
+ */
+export const SKIP_BEAT_REAL_S = 2;
+
+/**
+ * **The next peak, when the playhead is between two of the day's peaks** — after one act has ended
+ * and before the next has started — or `undefined` inside a peak, before the first and after the
+ * last. The acts are `shift/dayLength.ts#actsOf`'s, the authored phases that touch the day's peak.
+ */
+export function nextPeakFromBetween(acts: readonly DayAct[], simTimeS: number): DayAct | undefined {
+  if (actAt(acts, simTimeS) !== undefined) return undefined;
+  if (!acts.some((act) => act.endS <= simTimeS)) return undefined;
+  let next: DayAct | undefined;
+  for (const act of acts) {
+    if (act.startS > simTimeS && (next === undefined || act.startS < next.startS)) next = act;
+  }
+  return next;
+}
+
+/**
+ * **The first instant at or after `fromS` at which somebody on a landing has waited
+ * {@link PACE_HOLD_WAIT_S}**, read off the legs, or `undefined` when nobody does again.
+ *
+ * The instant {@link stagePaceOf}'s `watching` begins on the present frame's reading: a leg is past a
+ * minute from `arrivedAt + PACE_HOLD_WAIT_S` for as long as it is still waiting
+ * (`frame/overlay.ts#isWaitingAt`, the predicate the frame's longest wait is folded with). A leg
+ * already past a minute at `fromS` answers `fromS`. `legs` are in arrival order, as every recording
+ * holds them, so the scan stops at the first leg that could not beat the best found.
+ */
+export function firstMinuteWaitFrom(legs: readonly VizLeg[], fromS: number): number | undefined {
+  let best: number | undefined;
+  for (const leg of legs) {
+    const reaches = leg.arrivedAt + PACE_HOLD_WAIT_S;
+    if (best !== undefined && reaches > best) break;
+    const at = Math.max(reaches, fromS);
+    if (isWaitingAt(leg, at) && (best === undefined || at < best)) best = at;
+  }
+  return best;
+}
+
+/** What {@link stageSkipApplies} reads: the pace the stage is at, on which day. */
+export interface StageSkipGate {
+  readonly horizon: RunHorizon;
+  readonly scored: boolean;
+  readonly acts: readonly DayAct[];
+  readonly simTimeS: number;
+  /** The reason {@link stagePaceOf} gave at this frame. */
+  readonly reason: StagePaceReason;
+}
+
+/**
+ * **Whether the stage is in a stretch it skips** — a scored whole day, between two peaks, and
+ * § D1169's `fast`: nobody on a landing has waited a minute and no chip is standing. `yours` (a chip
+ * pressed while fast), `watching`, `call` and every unscored reason answer `false`, which is how a
+ * speed chip stops a skip that is coming.
+ */
+export function stageSkipApplies(gate: StageSkipGate): boolean {
+  return (
+    gate.scored &&
+    gate.horizon === 'whole-day' &&
+    gate.reason === 'fast' &&
+    nextPeakFromBetween(gate.acts, gate.simTimeS) !== undefined
+  );
+}
+
+/** Why a skip stopped where it did. */
+export type StageSkipUntil = 'wait' | 'call' | 'peak';
+
+/** One skip: the playhead moves from `fromS` to `toS`, and the line names both. */
+export interface StageSkip {
+  readonly fromS: number;
+  readonly toS: number;
+  readonly until: StageSkipUntil;
+}
+
+/** Everything {@link stageSkipOf} reads. */
+export interface StageSkipInput {
+  readonly acts: readonly DayAct[];
+  /** The recording's legs, in arrival order. */
+  readonly legs: readonly VizLeg[];
+  readonly simTimeS: number;
+  /** Where the beat began: the playhead at the first frame {@link stageSkipApplies} held. */
+  readonly armedAtS: number;
+  /** The transport's speed through the beat, the fast rung. */
+  readonly simPerRealS: number;
+  /** The next call the stage would stop at, raised or still being asked, or `undefined`. */
+  readonly stopAtS?: number | undefined;
+}
+
+/**
+ * **Where the stage seeks to, once the beat is over** — [§ D1212](../../../../DECISIONS.md) — or
+ * `undefined` while the beat lasts, and where the stretch left is shorter than one more beat.
+ *
+ * The earliest of the first instant anybody reaches a minute, the next call and the next peak's
+ * start. Call it only where {@link stageSkipApplies} holds; outside a stretch between peaks it
+ * answers `undefined`.
+ */
+export function stageSkipOf(input: StageSkipInput): StageSkip | undefined {
+  const beatSimS = SKIP_BEAT_REAL_S * input.simPerRealS;
+  const now = input.simTimeS;
+  if (now - input.armedAtS < beatSimS) return undefined;
+  const peak = nextPeakFromBetween(input.acts, now);
+  if (peak === undefined) return undefined;
+  let toS = peak.startS;
+  let until: StageSkipUntil = 'peak';
+  const wait = firstMinuteWaitFrom(input.legs, now);
+  if (wait !== undefined && wait < toS) {
+    toS = wait;
+    until = 'wait';
+  }
+  const stop = input.stopAtS;
+  if (stop !== undefined && stop >= now && stop < toS) {
+    toS = stop;
+    until = 'call';
+  }
+  if (toS - now < beatSimS) return undefined;
+  return Object.freeze({ fromS: now, toS, until });
+}
+
+/**
+ * **The beat's note** — drawn while the stage is about to skip. It names no instant ahead: where the
+ * skip lands is read off the recording, and saying it before the stage is there would publish the
+ * run's future (R6). It says how to stop the skip, since that is the one thing the beat is for.
+ */
+export const STAGE_SKIP_BEAT_NOTE =
+  'nobody on a landing has waited a minute: skipping ahead · pause or pick a speed to watch it';
+
+/**
+ * **The one line a skip leaves** — *skipped 09:40–11:50: nobody on a landing waited a minute* —
+ * drawn once the stage has landed, so both times are at or before the playhead. The two clocks are
+ * the run's own (`live/timeline.ts#clockAt` with the run's hour).
+ */
+export function stageSkipLineOf(skip: StageSkip, dayStartS?: number | undefined): string {
+  return `skipped ${clockAt(skip.fromS, dayStartS)}–${clockAt(skip.toS, dayStartS)}: nobody on a landing waited a minute`;
 }

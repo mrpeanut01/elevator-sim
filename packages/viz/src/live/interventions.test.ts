@@ -26,6 +26,9 @@ import type { PricedChange } from '../pricing/types.js';
 
 import {
   admitWorks,
+  driverNameAt,
+  driversLineOf,
+  driverStretchesOf,
   interventionLogOf,
   interventionStampOf,
   PARK_CARS_LOBBY_LABEL,
@@ -149,6 +152,59 @@ describe('interventionStampOf', () => {
     // Contract § 1.4: above ~400 ms, a beat rather than a freeze. The words live here so the
     // sweep drives them; dev/main.ts only decides when the threshold has genuinely passed.
     expect(RECOMPUTING_BEAT).toBe('recomputing the day…');
+  });
+});
+
+/*
+ * Wave AL, lane AL-A, the post-AK panel's seats B and C: after a handover the stage's `DRIVING` cell
+ * and the report's title kept naming the dispatcher the day was configured with.
+ */
+describe('who drove which stretch — driverStretchesOf, driverNameAt, driversLineOf', () => {
+  const FAIR: DispatcherProfile = { id: 'fairness-first', name: 'Fairness first', weights: {} };
+  const ADOPT_FAIR = { kind: 'adopt-dispatcher', profile: FAIR } as const;
+  const at0848 = 2 * 3600 + 48 * 60;
+
+  it('names the configured dispatcher before the handover and the new one from it', () => {
+    const log = [{ atS: at0848, change: ADOPT_FAIR }];
+    expect(driverNameAt(log, at0848 - 1, 'Minimum estimated wait')).toBe('Minimum estimated wait');
+    expect(driverNameAt(log, at0848, 'Minimum estimated wait')).toBe('Fairness first');
+    expect(driverNameAt(log, 12 * 3600, 'Minimum estimated wait')).toBe('Fairness first');
+  });
+
+  it('reads a stored weights-only handover too, and ignores presses that hand nothing over', () => {
+    const log = [
+      { atS: 60, change: PARK },
+      { atS: AT_0914, change: SWITCH },
+    ];
+    expect(driverNameAt(log, AT_0914 + 1, 'Conventional collective')).toBe('Steady hand');
+    expect(driverStretchesOf(log, 'Conventional collective').map((stretch) => stretch.name)).toEqual([
+      'Conventional collective',
+      'Steady hand',
+    ]);
+  });
+
+  it('opens no stretch for a handover to the dispatcher already driving, and holds time order', () => {
+    const log = [
+      { atS: 5 * 3600, change: { kind: 'adopt-dispatcher', profile: STEADY } as const },
+      { atS: at0848, change: ADOPT_FAIR },
+      { atS: at0848 + 60, change: ADOPT_FAIR },
+    ];
+    expect(driverStretchesOf(log, 'Conventional collective')).toEqual([
+      { fromS: undefined, name: 'Conventional collective' },
+      { fromS: at0848, name: 'Fairness first' },
+      { fromS: 5 * 3600, name: 'Steady hand' },
+    ]);
+  });
+
+  it('says who drove when, on the run’s own clock', () => {
+    expect(driversLineOf([], 'Conventional collective')).toBe('Conventional collective');
+    expect(driversLineOf([{ atS: at0848, change: ADOPT_FAIR }], 'Minimum estimated wait')).toBe(
+      'Minimum estimated wait, then Fairness first from 08:48',
+    );
+    /* A whole day that begins at 08:00 puts the same press at 10:48. */
+    expect(driversLineOf([{ atS: at0848, change: ADOPT_FAIR }], 'Minimum estimated wait', 8 * 3600)).toBe(
+      'Minimum estimated wait, then Fairness first from 10:48',
+    );
   });
 });
 

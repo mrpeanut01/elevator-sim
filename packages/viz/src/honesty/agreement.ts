@@ -109,6 +109,7 @@ import { scenarioHorizonFor, wholeDayFor, wholeDayRun } from '../shift/dayLength
 import { goalsForDay, readGoals } from '../shift/goals.js';
 import { pressCallRowOf } from '../shift/callRow.js';
 import { dayCallRecordOf, dayCallRowOf } from '../shift/dayCalls.js';
+import { stageCallRowsOf } from '../everyday/stageCallRow.js';
 import {
   admittedPressDayIds,
   CONTRACT_LADDER,
@@ -713,6 +714,56 @@ export const AGREED_FIGURES: readonly AgreedFigure[] = Object.freeze<AgreedFigur
           const riders = new Set<string>();
           for (const leg of DAY_CALL_FIXTURE.legs[answer]) {
             if (leg.arrivedAt < DAY_CALL_FIXTURE.atS || leg.arrivedAt >= DAY_CALL_FIXTURE.endS) continue;
+            const ended = Math.min(leg.boardedAt ?? Infinity, leg.refusedAt ?? Infinity);
+            if (ended > leg.arrivedAt + 60) riders.add(leg.passengerId);
+          }
+          return String(riders.size);
+        }).join('/'),
+    },
+  },
+  {
+    id: 'day-call-stage-row',
+    figure: 'an ordinary call’s three ten-minute counts — the stage’s mid-day row and the runs it was counted on',
+    why:
+      'Wave AL, lane AL-E, [§ D1219](../../../../DECISIONS.md), which amends § D1138 clause 3: each ' +
+      'call’s row now also prints on the stage once its window can be observed, a minute after the ' +
+      'window closes. The stage row is the report row’s counts in the report row’s words, so it must ' +
+      'hold the same three counts the runs’ legs hold. The left side is the row as ' +
+      '`everyday/stageCallRow.ts#stageCallRowsOf` draws it at the call plus 660 s from a record the ' +
+      'shipped `dayCallRecordOf` counted, over `day-call-row`’s edge-case legs; the right side counts ' +
+      'the same legs by the expression written there. A stage row that counted anything else, or drew ' +
+      'before the window’s last rider had settled, would publish a count its runs do not hold.',
+    left: {
+      surfaceId: 'everyday/stageCallRow.ts#stageCallRowsOf',
+      read: () => {
+        const [row] = stageCallRowsOf({
+          records: [
+            dayCallRecordOf({
+              atS: DAY_CALL_FIXTURE.atS,
+              windowEndS: DAY_CALL_FIXTURE.endS,
+              answer: 'spread-cars',
+              legs: DAY_CALL_FIXTURE.legs,
+              observations: DAY_CALL_FIXTURE.observations,
+            }),
+          ],
+          playheadS: DAY_CALL_FIXTURE.atS + 660,
+          endedAt: DAY_CALL_FIXTURE.endS + 3600,
+          log: [],
+          clockOf: (simTimeS) => clockOf(simTimeS, DAY_START_S),
+        });
+        if (row === undefined) return undefined;
+        const counts = /: (\d+) with park[^,]*, (\d+) with spread[^.]* and (\d+) with leave/u.exec(row.counts);
+        return counts === null ? undefined : `${String(counts[1])}/${String(counts[2])}/${String(counts[3])}`;
+      },
+    },
+    right: {
+      surfaceId: 'shift/dayCalls.ts#dayCallRecordOf',
+      read: () =>
+        DAY_CALL_ANSWER_ORDER.map((answer) => {
+          const riders = new Set<string>();
+          for (const leg of DAY_CALL_FIXTURE.legs[answer]) {
+            if (leg.arrivedAt < DAY_CALL_FIXTURE.atS || leg.arrivedAt >= DAY_CALL_FIXTURE.endS) continue;
+            /* Still standing a minute after arriving: neither boarded nor turned away by then. */
             const ended = Math.min(leg.boardedAt ?? Infinity, leg.refusedAt ?? Infinity);
             if (ended > leg.arrivedAt + 60) riders.add(leg.passengerId);
           }

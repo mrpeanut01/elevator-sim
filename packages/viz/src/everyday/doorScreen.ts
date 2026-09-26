@@ -95,6 +95,8 @@ function viewOf(context: EverydayScreenShellContext): DoorScreenView {
       crowdIsToday: isDailySeed(host.seed(), deviceNowMs()),
       /* The day's own crowd, for the first-session line's pinned arm — § D1047. */
       daySeed: dailySeedAt(deviceNowMs()),
+      /* The crowd today is dealt — § D1229, `EverydayHost.dayCrowd`. */
+      dealtCrowd: host.dayCrowd(),
       firstSession: isFirstDayOnALegibleTower(host.week()),
       /* § 15.1's `Units` row — read per draw, `settingsScreen.ts`'s own pattern with this store. */
       units: everydayProfileStore().units(),

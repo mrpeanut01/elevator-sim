@@ -106,7 +106,7 @@
       "brief": [
         "Midtown Office at two and a half percent of its population arriving every five minutes: busy, and still under the level at which it stops coping.",
         "Two counts matter here \u2014 how many people arrived, and how many were carried \u2014 and the gap between them is the thing a dispatcher can move.",
-        "This is the first stage where a number changes when you change a dial."
+        "This is the first stage where a number changes when you change a setting."
       ],
       "building": "midtown-office",
       "traffic": {
@@ -563,7 +563,7 @@
       "brief": [
         "Vertical City is a hundred floors served by banks that each reach a slice of it, with sky lobbies where journeys change hands.",
         "At this scale the shape of the building sets the outcome more than the weight vector does, and this stage is where that stops being an assertion.",
-        "Everything the other stages opened is open here. See how far the dials get you."
+        "Everything the other stages opened is open here: the standing order and where idle cars wait on the stage page, and every dial the budget reaches on the Engineer surface."
       ],
       "building": "vertical-city",
       "traffic": {
@@ -694,8 +694,8 @@
       "name": "Tune it",
       "teaches": "that an improvement you cannot measure is not one",
       "brief": [
-        "Back to Midtown Office, at a level where both settings still stand behind their own numbers.",
-        "Every dimension a scenario sells is yours to move, and the bar is no longer whether something looked better: it is a paired interval over fifty runs, on the difference itself, that does not contain zero.",
+        "Back to Midtown Office, which starts this time on operational zoning for the up-peak, at a level where both settings still stand behind their own numbers.",
+        "The stage page moves the standing order and where idle cars wait, the Engineer surface moves every dial the budget reaches, and the bar is no longer whether something looked better: it is a paired interval over fifty runs, on the difference itself, that does not contain zero.",
         "Tune on the seeds you are given. The holdout set exists so that a gain living only in these passenger traces has somewhere to fail."
       ],
       "building": "midtown-office",
@@ -704,7 +704,7 @@
       },
       "durationS": 900,
       "dispatcher": {
-        "startingProfileId": "collective",
+        "startingProfileId": "zoned-uppeak",
         "editable": {
           "mode": "every-declared-dimension"
         }
@@ -724,6 +724,10 @@
         {
           "kind": "answer-the-demand",
           "threshold": null
+        },
+        {
+          "kind": "long-waits-under",
+          "threshold": 10
         },
         {
           "kind": "beat-the-baseline",
@@ -787,8 +791,8 @@
       "teaches": "that spare cars are not the same as a short interval",
       "brief": [
         "Nineteen floors, 612 people, six cars at 5 m/s \u2014 the smallest crowd in the campaign on the tightest promise.",
-        "This is the only building here with more lift than it needs, and it still has to earn a 25 s interval. Capacity is not the constraint; where the spare cars wait between bursts is.",
-        "Watch the energy figure beside the wait. A car that drives more to be in the right place has spent something, and this is the stage where that trade is visible."
+        "This is the only building here with more lift than it needs, and the stage still asks it to keep up with arrivals and to come out ahead of the building\u2019s own setting. Capacity is not the constraint; where the spare cars wait between bursts is.",
+        "Energy is not one of this stage\u2019s goals, so the verdict does not charge a car for driving more to be in the right place."
       ],
       "building": "chancery-house",
       "traffic": {
@@ -796,7 +800,7 @@
       },
       "durationS": 900,
       "dispatcher": {
-        "startingProfileId": "collective",
+        "startingProfileId": "zoned-uppeak",
         "editable": {
           "mode": "listed",
           "ids": [

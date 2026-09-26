@@ -27,6 +27,7 @@ import { parseCampaign, type CampaignContext } from '../campaign/parse.js';
 import type { Campaign } from '../campaign/types.js';
 import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
 import { scenarioLadderOf, type ScenarioLadderRung } from '../scenario/ladder.js';
+import { PAR_MARK_COPY } from '../scenario/par.js';
 import type { PublishedGoalRates } from '../scenario/published.js';
 import type { PublishedSurvivors } from '../scenario/survivors.js';
 import { DATA_DIR } from '../fixtures.test-helper.js';
@@ -210,6 +211,57 @@ describe('the Scenario hub', () => {
       expect(row.waysThrough.trim(), row.id).not.toBe('');
       expect(row.waysThrough, row.id).toContain('Ways through');
     }
+  });
+
+  /**
+   * **The answer waits for the clear** — [§ D1233](../../../../DECISIONS.md). An uncleared row draws
+   * the total only; the same row, once the device holds its clear, draws the split by kind of
+   * choice, which on stages 2, 6, 7 and 8 was the lever itself.
+   */
+  it('draws the total before a clear and the split by kind of choice after it', () => {
+    const splitLead = 'came from the settings you can pick by name';
+    const before = scenarioHubViewOf(path).path?.rows ?? [];
+    const allIds = new Set(before.map((row) => row.id));
+    const after = scenarioHubViewOf(path, allIds).path?.rows ?? [];
+    expect(before.length).toBeGreaterThan(0);
+    for (const [index, row] of before.entries()) {
+      const rung = path.find((entry) => entry.id === row.id);
+      if (rung === undefined) throw new Error(row.id);
+      expect(row.waysThrough, row.id).toBe(rung.waysThrough);
+      expect(row.waysThrough, row.id).not.toContain(splitLead);
+      expect(after[index]?.waysThrough, row.id).toBe(rung.waysThroughCleared);
+    }
+    /* Non-vacuity: some cleared row does draw the split, so the clause above had something to hide. */
+    expect(after.some((row) => row.waysThrough.includes(splitLead))).toBe(true);
+  });
+
+  /**
+   * **The par mark on a cleared row** — [§ D1234](../../../../DECISIONS.md). At or under a priced par
+   * a cleared row carries the mark, with both prices and the words that it pays nothing; above the
+   * par, on a free par, before a clear, and where no cost was kept, it carries none.
+   */
+  it('marks a cleared stage at or under its par, and nowhere else', () => {
+    const rung = path[0];
+    if (rung === undefined) throw new Error('no path');
+    const priced = [{ ...rung, parUnits: 4 }];
+    const cleared = new Set([rung.id]);
+    const markOf = (rungs: readonly ScenarioLadderRung[], ids: ReadonlySet<string>, spent: number | undefined) =>
+      scenarioHubViewOf(rungs, ids, () => spent).path?.rows[0]?.parMark;
+    const at = markOf(priced, cleared, 4);
+    expect(at).toBeDefined();
+    expect(at!.startsWith(PAR_MARK_COPY.at)).toBe(true);
+    expect(at).toContain('4 units');
+    expect(at).toContain(SCENARIO_COPY.parPays);
+    const under = markOf(priced, cleared, 2);
+    expect(under!.startsWith(PAR_MARK_COPY.under)).toBe(true);
+    expect(under).toContain('2 units');
+    expect(under).toContain('4 units');
+    expect(markOf(priced, cleared, 6)).toBeUndefined();
+    expect(markOf(priced, new Set(), 4)).toBeUndefined();
+    expect(markOf(priced, cleared, undefined)).toBeUndefined();
+    /* A free par is met by every clear that buys nothing, so it is never marked. */
+    expect(markOf([{ ...rung, parUnits: 0 }], cleared, 0)).toBeUndefined();
+    expect(markOf([{ ...rung, parUnits: undefined }], cleared, 0)).toBeUndefined();
   });
 
   it('counts the held stages in the register rather than writing the number down', () => {

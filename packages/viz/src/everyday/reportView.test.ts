@@ -54,6 +54,7 @@ import {
   type EverydayReportView,
   type HonestyPart,
   FIGURE_NOTE_HANDLE,
+  WEEK_SHEET_STEP,
   figureNotePartsOf,
 } from './reportView.js';
 
@@ -292,6 +293,43 @@ describe('what this screen adds on top of the sheet', () => {
     expect(viewOf().tomorrow?.label).toBe('Open the doors on Wednesday');
     expect(viewOf().tomorrow?.goes).toBe('daily-tomorrow');
     expect(viewOf({ report: undefined }).tomorrow).toBeUndefined();
+  });
+
+  /*
+   * Wave AL, lane AL-A, the post-AK panel's seat D (H2), under § D1141. A run on a link's crowd is
+   * practice and closes nothing into the week, and its sheet still offered *Open the doors on
+   * Thursday*: pressed, it skipped the counted Wednesday the sentence above it said stays open.
+   */
+  it('offers no button into tomorrow on a sheet whose crowd kept the day open, and keeps it on a retake’s', () => {
+    const open = viewOf({ report: sheetOf({ practiceNote: 'Practice.', dayStaysOpen: true }) });
+    expect(open.tomorrow).toBeUndefined();
+    expect(open.sheet.framing.kind === 'week-day' && open.sheet.framing.canAdvance).toBe(false);
+    /* A retake's practice close follows a close that banked, so its week has a real next day. */
+    const retake = viewOf({ report: sheetOf({ practiceNote: 'Practice.' }) });
+    expect(retake.tomorrow?.label).toBe('Open the doors on Wednesday');
+  });
+
+  /*
+   * Swarm DN's Q2.2 and Q2.3, lane AL-F (§ D1226, § D1227). The close that meets the week's target
+   * carries its line under the verdict, and the close that closes the week leads to its sheet rather
+   * than to a tomorrow that would roll the week under the player unseen.
+   */
+  it('carries the target’s mark on the close that met it, and nothing on any other', () => {
+    const mark = 'This week’s target is met, on Thursday: 4 clean counted days, and it asks for 4 of 5.';
+    expect(viewOf({ report: sheetOf({ weekMark: mark }) }).weekMark).toBe(mark);
+    expect(viewOf().weekMark).toBeUndefined();
+  });
+
+  it('opens the week’s sheet from the close that closed the week', () => {
+    const closing = viewOf({ report: sheetOf({ weekClosed: true }) });
+    expect(closing.tomorrow).toEqual(WEEK_SHEET_STEP);
+    expect(closing.tomorrow?.goes).toBe('week-sheet');
+    // A career sheet keeps its own onward step whatever the week standing behind it says.
+    const career = viewOf({
+      report: sheetOf({ weekClosed: true }),
+      career: { buildingName: 'Garden Apartments', day: 4, canRunAnother: true },
+    });
+    expect(career.tomorrow?.goes).toBe('career-day');
   });
 
   /*

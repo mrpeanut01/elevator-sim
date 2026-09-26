@@ -46,6 +46,7 @@
  * gate), so this card prints `ShiftGoal.label` and never a value.
  */
 
+import { DAY_ATTEMPT_COPY, resumeLabelOf } from '../shift/attempt.js';
 import { TODAY_ASKS_HEADING } from '../shift/goals.js';
 
 import type { GoalReading } from '../shift/types.js';
@@ -198,7 +199,23 @@ export interface BriefScreenView {
  * screen knows its driver says what is running without naming it, which is a smaller claim and not
  * a placeholder.
  */
-export function briefBarModel(base: ActionBarModel, driver: string | undefined): ActionBarModel {
+export function briefBarModel(
+  base: ActionBarModel,
+  driver: string | undefined,
+  attemptWeekday?: string,
+): ActionBarModel {
+  /*
+   * **An attempt standing on the day is resumed, never started again** — [§ D1218](../../../../DECISIONS.md).
+   * The primary is the table's second variant with the weekday filled in, and the note says what the
+   * press keeps rather than who drives, since the driver is the attempt's and cannot move here.
+   */
+  if (attemptWeekday !== undefined) {
+    return {
+      ...base,
+      primary: { ...base.primary, label: resumeLabelOf(attemptWeekday) },
+      note: DAY_ATTEMPT_COPY.resumeNote,
+    };
+  }
   const note =
     driver === undefined ? 'Running the lifts.' : `${BRIEF_NOTE_LEAD}${driver}`;
   return { ...base, note };
@@ -229,6 +246,13 @@ export interface BriefScreenInput {
   /** The ids the reader saved — `host.savedDispatchers()`, so the list can mark them. */
   readonly savedIds: readonly string[];
   readonly selectedId: string;
+  /**
+   * The weekday of the attempt standing on this day, or `undefined` — wave AL, lane AL-E,
+   * [§ D1218](../../../../DECISIONS.md). Where one stands the driver is held under
+   * `shift/attempt.ts#DAY_ATTEMPT_COPY.driverHeld`, because the attempt keeps the driver it began
+   * with and a handover is the stage's to make.
+   */
+  readonly attemptWeekday?: string | undefined;
 }
 
 /** How many style cards § 6.2 puts above the dropdown. */
@@ -450,7 +474,7 @@ export function briefScreenViewOf(input: BriefScreenInput): BriefScreenView {
        * in it eventually contradicted something.
        */
       count: `${String(options.length)} to choose from · ${String(mine)} of yours`,
-      held: today.driverHeld,
+      held: input.attemptWeekday === undefined ? today.driverHeld : DAY_ATTEMPT_COPY.driverHeld,
     },
     ghost: raceAgainstCard(),
     locked: lockedForScore(today.crowdIsToday),

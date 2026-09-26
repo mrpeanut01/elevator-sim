@@ -67,6 +67,7 @@ import {
 } from './stageScreenModel.js';
 import { REST_BAR_MIN_PX } from '../render/carRest.js';
 import { EVERYDAY_COLORS } from './tokens.js';
+import { DAY_ATTEMPT_COPY } from '../shift/attempt.js';
 
 /**
  * § 3.3's own cell, imported rather than transcribed.
@@ -1047,7 +1048,8 @@ describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
        puts the bar back untouched. */
     await page.click('.everyday-bar-leave');
     await page.waitForSelector('.everyday-bar-confirm-stay');
-    expect(await page.textContent('.everyday-bar-question')).toBe('Leave the day unfinished?');
+    /* § D1218: the day's attempt stands, so the strip keeps it and says so. */
+    expect(await page.textContent('.everyday-bar-question')).toBe(DAY_ATTEMPT_COPY.leaveQuestion);
     await page.click('.everyday-bar-confirm-stay');
     expect(await page.textContent('.everyday-bar-primary')).toBe('Close the day');
 

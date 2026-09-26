@@ -53,7 +53,11 @@ import { servedLeg, syntheticRecording } from '../live/synthetic.test-helper.js'
 import { wholeDayFor, wholeDayRun } from '../shift/dayLength.js';
 import { GOAL_BARS } from '../shift/goals.js';
 import { closeDay, nextDay, outcomeOf } from '../shift/week.js';
+import { goalsForDay as goalsOfDay, readGoals } from '../shift/goals.js';
+import { scheduledEventFor } from '../shift/calendar.js';
+import { derivedCrowdOf, type WeekRecord } from '../shift/weekRecord.js';
 import type { GoalReading } from '../shift/types.js';
+import type { DayAttempt } from '../shift/attempt.js';
 import type { ShapedDayReport } from '../shift/report.js';
 /* GitHub issue #245 — the predicate the façade carries the answer of, asked directly. */
 import { runIdentityIssues } from '../scope/runIdentity.js';
@@ -625,6 +629,18 @@ describe('the run actions', () => {
     createEverydayHost(h.bindings).openTomorrow();
     expect(h.calls).toEqual(['applyPatch', 'openRunTab', 'startRun']);
     expect(h.patches[0]?.week?.day).toBe(banked.day + 1);
+  });
+
+  it('openTomorrow refuses from a sheet whose crowd kept the day open — § D1141, the post-AK panel’s seat D (H2)', () => {
+    const practice = { ...A_REPORT, of: 'week-day', dayStaysOpen: true } as unknown as ShapedDayReport;
+    const h = harnessOf({ ...base(), recording: A_RECORDING, report: practice });
+    createEverydayHost(h.bindings).openTomorrow();
+    expect(h.calls).toEqual([]);
+    /* The same sheet from a retake, whose day the week already holds, still advances. */
+    const retake = { ...A_REPORT, of: 'week-day' } as unknown as ShapedDayReport;
+    const again = harnessOf({ ...base(), recording: A_RECORDING, report: retake });
+    createEverydayHost(again.bindings).openTomorrow();
+    expect(again.calls).toEqual(['applyPatch', 'openRunTab', 'startRun']);
   });
 
   it('openTomorrow refuses while no closed day’s sheet is standing', () => {
@@ -2677,5 +2693,258 @@ describe('GitHub issue #594 — the career parks the Scenario record and gives i
     const before = h.calls.length;
     host.leaveCareer?.();
     expect(h.calls.length).toBe(before);
+  });
+});
+
+/**
+ * **A Scenario week's days pay, are recorded, and are dealt new crowds** — wave AL, lane AL-F,
+ * swarm DN's Q2.5 to Q2.7 (§ D1229, § D1230, § D1231).
+ *
+ * The close is driven the way `dev/main.ts#closeShift` drives it: the week gains the day through
+ * `shift/week.ts#closeDay` and the run is then filed. Red on the base: `closeDay` returned before any
+ * bank on every day that was not a Career day, so a cleared counted Monday posted nothing.
+ */
+describe('a Scenario week’s days pay once, are recorded, and are dealt new crowds — lane AL-F', () => {
+  const DATE = 20_260_926n;
+
+  function outcome(week: ViewerState['week'], clean: boolean, seed: bigint): ReturnType<typeof outcomeOf> {
+    const observations = {
+      arrived: 400,
+      carryPct: clean ? 100 : 10,
+      minutePct: clean ? 100 : 10,
+      peakQueue: clean ? 0 : 99,
+      abandoned: clean ? 0 : 9,
+      abandonedCarried: 0,
+      horizonS: 900,
+      worstWaitS: clean ? 40 : 940,
+      worstWaitIsCensored: false,
+      workPerServedLegKJ: clean ? 41.2 : 260.5,
+    };
+    return outcomeOf({
+      day: week.day,
+      dayIdx: week.dayIdx,
+      eventId: scheduledEventFor(null, week.day, week.dayIdx, 'whole-day').id,
+      arrived: 400,
+      carried: clean ? 400 : 40,
+      minutePct: observations.minutePct,
+      readings: readGoals(goalsOfDay(week.day), observations),
+      record: { seed: seed.toString() } as unknown as WatchRecord,
+      recordRefusal: null,
+    });
+  }
+
+  /** A host on a week whose close files the standing day as `next` says. */
+  function scenario(contractId = 'c2') {
+    const h = harnessOf({ ...base(), week: openWeek(contractId), seed: DATE });
+    let closed = false;
+    let records: readonly WeekRecord[] = [];
+    const next = { clean: true };
+    const host = createEverydayHost({
+      ...h.bindings,
+      dayClosed: () => closed,
+      daySeed: () => DATE,
+      weekRecords: {
+        read: () => records,
+        write: (written) => {
+          records = written;
+        },
+      },
+      applyPatch: (patch) => {
+        h.state = { ...h.state, ...patch };
+      },
+      closeDay: () => {
+        h.state = { ...h.state, week: closeDay(h.state.week, outcome(h.state.week, next.clean, h.state.seed)) };
+        closed = true;
+      },
+    });
+    return {
+      h,
+      host,
+      next,
+      records: () => records,
+      /* A later close of the same day, which `closeShift` files as practice. */
+      reopen: () => {
+        closed = false;
+      },
+      tomorrow: () => {
+        host.openTomorrow();
+        closed = false;
+      },
+    };
+  }
+
+  it('pays a counted day that cleared, once, and nothing for its practice close or a missed day', () => {
+    const s = scenario();
+    s.host.closeDay();
+    expect(s.h.banked).toEqual([{ completion: 'career-day-paid' }]);
+    s.reopen();
+    s.host.closeDay();
+    expect(s.h.banked, 'a practice close paid').toHaveLength(1);
+    s.tomorrow();
+    s.next.clean = false;
+    s.host.closeDay();
+    expect(s.h.banked, 'a missed day paid').toHaveLength(1);
+  });
+
+  it('pays nothing for a clean day that does not count, nor on a week on no scenario', () => {
+    const s = scenario();
+    for (let day = 1; day <= 5; day += 1) {
+      s.host.closeDay();
+      s.tomorrow();
+    }
+    expect(s.h.banked).toHaveLength(5);
+    s.host.closeDay(); // Saturday: clean, and it does not count on Midtown's week.
+    expect(s.h.banked).toHaveLength(5);
+    const sandbox = scenario('sandbox');
+    sandbox.host.closeDay();
+    expect(sandbox.h.banked).toEqual([]);
+  });
+
+  it('pays nothing for a close filed as practice on the attempt’s ground, which leaves the week on its day — § D1218 with § D1231', () => {
+    /*
+     * Wave AL's integration: `dev/main.ts#closeShift` files a close of a run other than the standing
+     * attempt as practice (`practiceGroundOf`'s `'attempt'`) and leaves `state.week` as it was, so the
+     * history does not grow and `fileScenarioDay` posts nothing — the day stays open for the attempt,
+     * whose own close is the one that pays.
+     */
+    const h = harnessOf({ ...base(), week: openWeek('c2'), seed: DATE });
+    let closed = false;
+    const host = createEverydayHost({
+      ...h.bindings,
+      dayClosed: () => closed,
+      daySeed: () => DATE,
+      weekRecords: { read: () => [], write: () => {} },
+      closeDay: () => {
+        closed = true;
+      },
+    });
+    host.closeDay();
+    expect(closed).toBe(true);
+    expect(h.banked).toEqual([]);
+  });
+
+  it('deals the next day on the same date a crowd derived from the date, never the one it filed', () => {
+    const s = scenario();
+    s.host.closeDay();
+    expect(s.records().find((entry) => entry.contractId === 'c2')?.dateCrowd).toBe(DATE.toString());
+    s.tomorrow();
+    expect(s.h.state.week.day).toBe(2);
+    expect(s.h.state.seed).toBe(derivedCrowdOf(DATE, 2, 0));
+    expect(s.host.dayCrowd()).toBe(derivedCrowdOf(DATE, 2, 0));
+  });
+
+  it('counts the closed week on the tower’s record, and deals the next week crowds of its own', () => {
+    const s = scenario();
+    const seen = new Set<string>();
+    for (let day = 1; day <= 7; day += 1) {
+      seen.add(s.h.state.seed.toString());
+      s.host.closeDay();
+      if (day < 7) s.tomorrow();
+    }
+    expect(s.host.weekRecord()).toMatchObject({ contractId: 'c2', closed: 1, met: 1, best: 5 });
+    s.tomorrow();
+    expect(s.h.state.week.day).toBe(1);
+    expect(seen.has(s.h.state.seed.toString()), 'the next week re-dealt a crowd this device filed').toBe(false);
+    expect(s.h.state.seed).toBe(derivedCrowdOf(DATE, 1, 1));
+  });
+});
+
+/*
+ * Wave AL, lane AL-E, § D1218: the brief's *Start the day* and the stage's entry press are
+ * `playDay`, which begins the day's one attempt and, where one already stands, resumes it rather
+ * than starting the day again. Seat D's hole was the second *Start the day* on an unclosed day; the
+ * host is where that press now forks.
+ */
+describe('one attempt per scored day — § D1218', () => {
+  const ATTEMPT: DayAttempt = {
+    contractId: 'c1',
+    day: 1,
+    dayIdx: 0,
+    seed: '20260812',
+    daySeed: '20260812',
+    dispatcherId: 'nearest-car',
+    interventions: [],
+    record: null,
+    shownToS: 1800,
+    pinnedCallDone: false,
+    pressCallSkipped: false,
+    calls: null,
+  };
+
+  it('begins the attempt on the run it presses where none stands, clearing the log as startRun does', () => {
+    const h = harnessOf({ ...base(), recording: A_RECORDING, interventions: [{ atS: 30, change: { kind: 'park-cars-lobby' } }] });
+    const bindings: EverydayHostBindings = {
+      ...h.bindings,
+      beginDayAttempt: () => {
+        h.calls.push('beginDayAttempt');
+      },
+      dayAttempt: () => undefined,
+    };
+    const host = createEverydayHost(bindings);
+    expect(host.dayAttempt()).toBeUndefined();
+    host.playDay();
+    expect(h.calls).toEqual(['applyPatch', 'beginDayAttempt']);
+    expect(h.patches[0]?.interventions).toEqual([]);
+  });
+
+  it('resumes an attempt that stands and starts nothing, so the brief cannot rewind the day', () => {
+    const h = harnessOf(base());
+    const resumed: Partial<ViewerState>[] = [];
+    const bindings: EverydayHostBindings = {
+      ...h.bindings,
+      beginDayAttempt: () => {
+        h.calls.push('beginDayAttempt');
+      },
+      dayAttempt: () => ATTEMPT,
+      resumeDayAttempt: (shape) => {
+        h.calls.push('resumeDayAttempt');
+        resumed.push(shape);
+        return true;
+      },
+    };
+    const host = createEverydayHost(bindings);
+    expect(host.dayAttempt()).toEqual({ weekday: 'Monday' });
+    host.playDay();
+    expect(h.calls).toEqual(['resumeDayAttempt']);
+    expect(resumed).toHaveLength(1);
+    /* `startRun` itself is unchanged: the designer's and the tuner's runs still start a run. */
+    host.startRun();
+    expect(h.calls).toEqual(['resumeDayAttempt', 'startRun']);
+  });
+
+  it('starts afresh where the attempt could not be resumed exactly', () => {
+    const h = harnessOf(base());
+    const bindings: EverydayHostBindings = {
+      ...h.bindings,
+      beginDayAttempt: () => {
+        h.calls.push('beginDayAttempt');
+      },
+      dayAttempt: () => ATTEMPT,
+      resumeDayAttempt: () => {
+        h.calls.push('resumeDayAttempt');
+        return false;
+      },
+    };
+    createEverydayHost(bindings).playDay();
+    expect(h.calls.at(0)).toBe('resumeDayAttempt');
+    expect(h.calls.at(-1)).toBe('beginDayAttempt');
+  });
+
+  it('keeps an attempt on § 3.4’s leave and abandons only a day with none standing', () => {
+    const h = harnessOf(base());
+    let standing = true;
+    const bindings: EverydayHostBindings = {
+      ...h.bindings,
+      leaveDayAttempt: () => {
+        h.calls.push('leaveDayAttempt');
+        return standing;
+      },
+    };
+    const host = createEverydayHost(bindings);
+    host.leaveDayUnfinished();
+    expect(h.calls).toEqual(['leaveDayAttempt']);
+    standing = false;
+    host.leaveDayUnfinished();
+    expect(h.calls).toEqual(['leaveDayAttempt', 'leaveDayAttempt', 'abandonDay']);
   });
 });

@@ -39,6 +39,7 @@ import {
   type FixitResources,
 } from './run.js';
 import type { FixitCases } from './types.js';
+import { FIXIT_SCREEN_COPY, pairStageNoteOf } from '../everyday/fixitScreenModel.js';
 
 const SUITE_TIMEOUT = 300_000;
 
@@ -137,6 +138,19 @@ describe('a zoning step that opens trips on midtown re-draws the crowd, and says
       expect(outcome.basis).toBe(ROUTES_BASIS_LINE);
       // Plain words: no passenger id, no arrival time, no case id.
       expect(outcome.basis).not.toMatch(/\bp\d+|\d+\.\d{3,}|zoning-starves/);
+
+      /*
+       * **The note over the two panes says the same thing** — lane AL-B, seat D H4. It read *"The
+       * same morning and the same crowd"* above this very pair, whose basis line and journey counts
+       * said otherwise. Red before the fix: the screen drew `pairStageNote` whatever the legs said.
+       */
+      const note = pairStageNoteOf(measurement);
+      expect(note).toBe(FIXIT_SCREEN_COPY.pairStageNoteRedrawn);
+      expect(note).not.toContain('same crowd,');
+      expect(note).not.toMatch(/and the same crowd/);
+      expect(note).toContain('a crowd drawn for the building as you changed it');
+      // And the press's own note, read before the run, claims no crowd at all.
+      expect(FIXIT_SCREEN_COPY.noteReady).not.toMatch(/same crowd/);
     },
     SUITE_TIMEOUT,
   );

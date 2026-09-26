@@ -45,6 +45,8 @@ import { scenarioLadderOf } from '../scenario/ladder.js';
 import { actionBarFor, type ActionBarModel } from './actionBar.js';
 import { everydayDeviceChimeStore } from './chimeStore.js';
 import { CHIME_AWARDS } from './deviceChimes.js';
+import { progressWithFixSpent } from './profile.js';
+import { everydayProfileStore } from './profileStore.js';
 import { scenarioOpen } from './scenarioOpenPort.js';
 import { el } from './screenDom.js';
 import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.js';
@@ -312,6 +314,13 @@ function press(data: Loaded, stageId: string, context: EverydayScreenShellContex
             .turns.some((turn) => turn.completion === 'scenario-cleared' && turn.key === found.stage.id);
           host.bankScenarioClear(found.stage.id);
           paid = before ? 'again' : 'first';
+          /*
+           * § D1234: keep what this clear's order cost, under the stage's id, so the hub row can
+           * compare it with the stage's par after a reload. The fix-it list's record, one list for
+           * every scenario a clear is filed under.
+           */
+          const store = everydayProfileStore();
+          store.setProgress(progressWithFixSpent(store.progress(), found.stage.id, result.admission.units));
         }
         session.phase = { kind: 'judged', verdict: verdictFactsOf(report, paid), stale: false };
       }

@@ -291,12 +291,18 @@ export function dispatcherCardOf(
   /*
    * § D508: the authored sentence takes the Casual face when there is one, and the derived
    * behaviour sentence moves behind the disclosure beside the vector rather than leaving — both
-   * registers still carry every string, which is § D299 § 2 and what `rightRail.test.ts` asserts.
+   * registers still carry every sentence, which is § D299 § 2 and what `rightRail.test.ts` asserts.
+   *
+   * **The profile id is the Engineer register's alone** — lane AL-B, the post-AK panel's seat B D11,
+   * `DECISIONS.md` § D1195. The Casual tooltip read *"Profile id `eta`"* on a card whose title
+   * already names the dispatcher in words; an id is the data file's key and the command line's
+   * argument, which is a practitioner's reference rather than a word a player is told. The Engineer
+   * register keeps it, because § D299 § 1 forbids that surface saying less.
    */
   return mode === 'basic'
     ? authored === undefined
-      ? { sub: behaviour, help: `${vector} ${identity}` }
-      : { sub: authored, help: `${behaviour} ${vector} ${identity}` }
+      ? { sub: behaviour, help: vector }
+      : { sub: authored, help: `${behaviour} ${vector}` }
     : { sub: vector, help: `${authored === undefined ? '' : `${authored} `}${behaviour} ${identity}` };
 }
 
@@ -646,9 +652,14 @@ function mechanismSentencesOf(profile: DispatcherProfile): readonly string[] {
   const auction = profile.auction;
   if (auction !== undefined) {
     const rounds = auction.rounds ?? 1;
+    /*
+     * In words, with no id: the aggregation's id (`contract-net`) sat in backticks here, which is the
+     * behaviour sentence a Casual card shows (lane AL-B, seat B D11, § D1195). The Engineer's vector
+     * clause below still names it, as the data file's own key.
+     */
     sentences.push(
-      `The cars bid for the call and the group takes the best bid — \`${auction.aggregation ?? 'central-argmin'}\`, ` +
-        `over ${String(rounds)} bidding round${rounds === 1 ? '' : 's'} — rather than the group ` +
+      `The cars bid for the call and the group takes the best bid, ` +
+        `over ${String(rounds)} bidding round${rounds === 1 ? '' : 's'}, rather than the group ` +
         'scoring them itself.',
     );
   }
@@ -1878,7 +1889,8 @@ export function mountRightRail(ui: RightRailElements, context: MountContext): Pa
               title: card.label,
               sub: card.sub,
               selected: id === state.buildingId,
-              help: `Building id \`${id}\`.`,
+              /* The id is the Engineer register's alone, as on the dispatcher cards (§ D1195). */
+              help: state.mode === 'basic' ? undefined : `Building id \`${id}\`.`,
               onPick: () => {
                 /*
                  * `withBuilding`, not a `buildingId` patch — the same hole as the dispatcher card

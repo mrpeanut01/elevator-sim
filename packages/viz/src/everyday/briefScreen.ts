@@ -131,6 +131,8 @@ function mountBrief(
       crowdIsToday: isDailySeed(data.seed(), deviceNowMs()),
       /* The day's own crowd, for the first-session line's pinned arm — § D1047. */
       daySeed: dailySeedAt(deviceNowMs()),
+      /* The crowd today is dealt — § D1229, `EverydayHost.dayCrowd`. */
+      dealtCrowd: data.dayCrowd(),
       firstSession: isFirstDayOnALegibleTower(data.week()),
       /* § 15.1's `Units` row — read per draw, `settingsScreen.ts`'s own pattern with this store. */
       units: everydayProfileStore().units(),
@@ -155,6 +157,8 @@ function mountBrief(
         })),
         savedIds: [...savedIds],
         selectedId: selection.dispatcherId,
+        /* § D1218 — an attempt standing on this day holds the driver it began with. */
+        attemptWeekday: context.host.dayAttempt()?.weekday,
       }),
     };
   }
@@ -165,6 +169,7 @@ function mountBrief(
     // What the § 3.3 note names — see {@link briefDriver}. Set on every draw, so a dispatcher
     // changed on this screen moves the bar's sentence with the card the reader pressed.
     briefDriver = today.driver;
+    briefAttemptWeekday = context.host.dayAttempt()?.weekday;
     root.replaceChildren();
     const left = leftColumn(view);
     const right = rightColumn(view);
@@ -536,6 +541,7 @@ function mountBrief(
     unmount: () => {
       alive = false;
       briefDriver = undefined;
+      briefAttemptWeekday = undefined;
       stopListening();
       view?.removeEventListener('resize', onResize);
     },
@@ -559,7 +565,12 @@ function mountBrief(
      * arrives.
      */
     primary: () => {
-      context.host.startRun();
+      /*
+       * `playDay` rather than `startRun` since wave AL, lane AL-E ([§ D1218](../../../../DECISIONS.md)):
+       * the press begins the day's one attempt, and where one already stands it resumes it, so this
+       * screen can no longer rewind a day the stage has shown.
+       */
+      context.host.playDay();
       context.go('stage');
     },
   };
@@ -593,9 +604,12 @@ function drawTodaysElevation(canvas: HTMLCanvasElement, building: ResolvedBuildi
  */
 let briefDriver: string | undefined;
 
+/** The weekday of the attempt standing on the day the last draw described — § D1218, {@link briefBar}. */
+let briefAttemptWeekday: string | undefined;
+
 /** § 3.3's brief row with this run's dispatcher named — see {@link briefBarModel} for the defect. */
 function briefBar(state: EverydayState): ActionBarModel {
-  return briefBarModel(actionBarFor(state), briefDriver);
+  return briefBarModel(actionBarFor(state), briefDriver, briefAttemptWeekday);
 }
 
 export const BRIEF_SCREEN: EverydayScreenModule = {

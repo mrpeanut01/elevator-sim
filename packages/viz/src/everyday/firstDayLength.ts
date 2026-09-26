@@ -17,7 +17,9 @@
  * `shift/pressCall.ts#pressCallOf` — the one function the stage asks — and the stage's pacing read
  * off the legs: since [§ D1169](../../../../DECISIONS.md) a pinned day is paced as every scored day
  * is, every stretch with somebody past a minute on a landing at the watching rung and the rest at
- * the fast rung, so the acts are no longer slow of themselves (they were under § D991).
+ * the fast rung, so the acts are no longer slow of themselves (they were under § D991); and since
+ * [§ D1212](../../../../DECISIONS.md) the quiet between its peaks is skipped, up to the call and
+ * after it, by `stagePace.test-helper.ts#scoredDayPlayOf`, the stage's own rule read off the legs.
  * `firstDayLength.test.ts` re-runs every row on every suite run and refuses the table the day a run
  * disagrees, and asserts that the table's contracts **are** the whole-day members of the admitted
  * set, so a re-pin or a new pin cannot leave a stale row or a missing one.
@@ -26,12 +28,19 @@
  * stage's opening rung — § D753 rule 1, the rung read rather than transcribed — so a move of either
  * rung moves this sentence on the same commit.
  *
- * ## Three things it is careful not to say
+ * ## Four things it is careful not to say
  *
- * - **The day's length is the longest of the three runs the call can leave** — nothing pressed, the
- *   clearing press, the other one — rounded **up** (`sittingShape.ts`'s rule 2), and the sentence says
- *   *up to*. A press moves the day's end by the minutes its riders take to drain, and a figure off the
- *   unpressed run alone would be short for a player who answers.
+ * - **The day's length is the middle of the three runs the call can leave** — nothing pressed, the
+ *   clearing press, the other one — rounded to the minute, and the sentence says *about*. It said
+ *   *up to* the longest of the three until [§ D1204](../../../../DECISIONS.md) opened the day's
+ *   ordinary calls after the pinned one: from then on every later answer moves the day's slow
+ *   stretches again, the branches multiply, and no bound over three runs bounds them (the decide-an
+ *   panel's honesty member measured the *keep* branch at 30.4 real minutes against a bound of
+ *   29.2, both under § D1169 before the skip). *About* is what three runs support, and the spread
+ *   the branches actually reach is published with § D1204 rather than here.
+ * - **The stage stops *first* for its call, not *once***, where the day's ordinary calls are
+ *   offered after it (`asksOn`, § D1138 clause 5's size gate read off the as-built run) — and the
+ *   sentence promises no count of later stops, because the calls are raised by what the day does.
  * - **The pause at the call is not counted.** It is the player's own dwell, which `sittingShape.ts`
  *   refuses to invent a figure for; the sentence says *of watching*.
  * - **Where the call falls is derived from the day's own peaks, not named.** The tiebreak that asked
@@ -53,15 +62,25 @@ export interface PinnedDayLength {
   readonly contractId: string;
   /** `pressCallOf` over the as-built run — seconds from the start of the day. */
   readonly callAtS: number;
-  /** Simulated seconds before the call that § D991 plays at the watching rung. */
+  /** Simulated seconds before the call that § D1169 plays at the watching rung. */
   readonly toCallSlowS: number;
+  /** Simulated seconds before the call that § D1212 skips between the peaks. */
+  readonly toCallSkippedS: number;
   /** How many of the day's peaks (`actsOf`) there are, and how many end at or before the call. */
   readonly peaks: number;
   readonly peaksBefore: number;
   /** Whether the call falls inside a peak. */
   readonly inPeak: boolean;
-  /** The longest of the three runs the call can leave, as a recording's length and its slow part. */
-  readonly longest: { readonly recordedS: number; readonly slowS: number };
+  /**
+   * The middle of the three runs the call can leave, by paced length, as a recording's length, its
+   * slow part and what § D1212 skips — [§ D1204](../../../../DECISIONS.md).
+   */
+  readonly middle: { readonly recordedS: number; readonly slowS: number; readonly skippedS: number };
+  /**
+   * Whether the day asks on after its call — `shift/dayCalls.ts#dayCallsOffered` over the as-built
+   * run's legs, the gate `dev/state.ts#dayCallsOpenOn` reads ([§ D1204](../../../../DECISIONS.md)).
+   */
+  readonly asksOn: boolean;
 }
 
 /**
@@ -73,37 +92,45 @@ export const PINNED_DAY_LENGTHS: readonly PinnedDayLength[] = Object.freeze([
     contractId: 'c2',
     callAtS: 9613.907,
     toCallSlowS: 644.207,
+    toCallSkippedS: 5685.554,
     peaks: 3,
     peaksBefore: 1,
     inPeak: false,
-    longest: { recordedS: 36000, slowS: 2655.116 },
+    middle: { recordedS: 36000, slowS: 2572.237, skippedS: 26606.717 },
+    asksOn: true,
   },
   {
     contractId: 'c3',
     callAtS: 9929.738,
     toCallSlowS: 439.626,
+    toCallSkippedS: 6192.6,
     peaks: 3,
     peaksBefore: 1,
     inPeak: false,
-    longest: { recordedS: 36000, slowS: 2754.88 },
+    middle: { recordedS: 36000, slowS: 2505.895, skippedS: 26481.852 },
+    asksOn: true,
   },
   {
     contractId: 'c6',
     callAtS: 9809.566,
     toCallSlowS: 107.664,
+    toCallSkippedS: 6082.344,
     peaks: 3,
     peaksBefore: 1,
     inPeak: false,
-    longest: { recordedS: 36000, slowS: 1545.408 },
+    middle: { recordedS: 36000, slowS: 1475.277, skippedS: 27493.537 },
+    asksOn: true,
   },
   {
     contractId: 'c10',
     callAtS: 12509.792,
     toCallSlowS: 575.532,
+    toCallSkippedS: 8783.558,
     peaks: 3,
     peaksBefore: 1,
     inPeak: false,
-    longest: { recordedS: 36062.614, slowS: 2335.866 },
+    middle: { recordedS: 36062.614, slowS: 2164.072, skippedS: 27171.447 },
+    asksOn: true,
   },
 ]);
 
@@ -130,23 +157,26 @@ function positionOf(row: PinnedDayLength): string {
 /**
  * **The brief's sentence for a pinned whole day**, or `undefined` for a contract with no measured
  * row — a slice, a refused pin, a tower that pins nothing. Player-facing; swept by the corpus.
+ * Re-derived by [§ D1204](../../../../DECISIONS.md): *about* the middle arm rather than *up to* the
+ * longest, and the stage stops *first* for its call where the day asks on after it; and by
+ * [§ D1212](../../../../DECISIONS.md): the quiet between peaks is skipped, and said to be. Both hold
+ * at once in the table — the later calls fall inside peaks, where nothing is skipped.
  */
 export function pinnedDayLengthLineOf(contractId: string): string | undefined {
   const row = PINNED_DAY_LENGTHS.find((entry) => entry.contractId === contractId);
   if (row === undefined) return undefined;
   const rung = stageSpeedAt(DEFAULT_STAGE_SPEED_INDEX);
-  const dayMin = Math.ceil(
+  const dayMin = Math.round(pacedDayRealS({ periodS: row.middle.recordedS, ...row.middle }, rung.simPerRealS) / 60);
+  const toCallMin = Math.round(
     pacedDayRealS(
-      { periodS: row.longest.recordedS, recordedS: row.longest.recordedS, slowS: row.longest.slowS },
+      { periodS: row.callAtS, recordedS: row.callAtS, slowS: row.toCallSlowS, skippedS: row.toCallSkippedS },
       rung.simPerRealS,
     ) / 60,
   );
-  const toCallMin = Math.round(
-    pacedDayRealS({ periodS: row.callAtS, recordedS: row.callAtS, slowS: row.toCallSlowS }, rung.simPerRealS) / 60,
-  );
+  const call = `for its call ${positionOf(row)}, about ${String(toCallMin)} min in`;
   return (
-    `A whole day: up to ${String(dayMin)} min of watching at ${rung.label}, and ${betweenRungLabel()} ` +
-    `wherever nobody on a landing has waited a minute. The stage stops once for its call ${positionOf(row)}, about ` +
-    `${String(toCallMin)} min in.`
+    `A whole day: about ${String(dayMin)} min of watching at ${rung.label}, ${betweenRungLabel()} ` +
+    `wherever nobody on a landing has waited a minute, and the quiet between peaks skipped. ` +
+    (row.asksOn ? `The stage stops first ${call}, and may stop again later in the day.` : `The stage stops once ${call}.`)
   );
 }

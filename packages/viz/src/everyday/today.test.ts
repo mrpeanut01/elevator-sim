@@ -35,6 +35,7 @@ import { openWeek, outcomeOf } from '../shift/week.js';
 import type { WatchRecord } from '../watch/types.js';
 import { dc10Of, wayThroughSentenceOf, WEEK_WAY, weekWayRowFor } from '../shift/weekWay.js';
 import { DAY_COUNTS_SENTENCE, dayStakeSentenceOf } from '../shift/weekStake.js';
+import { PRACTICE_DAY_SENTENCES } from '../shift/scoredCrowd.js';
 
 import { bookedOutCarsOf, carAbsencesOf } from '../shift/bookedOut.js';
 import { contractBuildings, todaysScenarioDayState } from '../shift/contractDay.test-helper.js';
@@ -538,21 +539,33 @@ describe('the rest of the record', () => {
      * § D1141: on a week already under way on another crowd, the line says before the press that the
      * week keeps none of this run. A week with nothing banked is begun by it, and says nothing more.
      */
-    const underWay = todayOf({
-      ...ownInput,
-      week: {
-        ...weekOn(2, 1),
-        history: [
-          outcomeOf({
-            day: 1, dayIdx: 0, eventId: 'ordinary', readings: [], minutePct: 80, carried: 10, arrived: 10,
-            record: { seed: '20260924' } as unknown as WatchRecord, recordRefusal: null,
-          }),
-        ],
-      },
-    });
+    /* Midtown's own week (`c2`), which the week census speaks for, so the week block is drawn. */
+    const underWayWeek: WeekState = {
+      ...openWeek('c2'),
+      day: 2,
+      dayIdx: 1,
+      history: [
+        outcomeOf({
+          day: 1, dayIdx: 0, eventId: 'ordinary', readings: [], minutePct: 80, carried: 10, arrived: 10,
+          record: { seed: '20260924' } as unknown as WatchRecord, recordRefusal: null,
+        }),
+      ],
+    };
+    const underWay = todayOf({ ...ownInput, week: underWayWeek });
     expect(underWay.seedLine).toBe(
       'tower midtown-office · crowd 424242 · a crowd of this run’s own, not the day’s, so this run is practice and banks nothing into your week',
     );
+    /*
+     * Wave AL, lane AL-A, the post-AK panel's seat D (H3): the same brief's week block said *This
+     * day counts toward the week.* under that line. Both now read `practiceGroundOf` once.
+     */
+    const dealt = todayOf({ ...ownInput, seed: 20_260_925n, week: underWayWeek }).weekStake?.day;
+    expect(dealt, 'the census speaks for this day, so the check below is not vacuous').toBeDefined();
+    expect(underWay.weekStake?.day).toBe(PRACTICE_DAY_SENTENCES.crowd);
+    expect(underWay.weekStake?.day).not.toBe(DAY_COUNTS_SENTENCE);
+    /* A retake of a day the week already closed says the other ground, in the same block. */
+    const retake = todayOf({ ...ownInput, seed: 20_260_925n, week: { ...underWayWeek, closedDay: 2 } });
+    expect(retake.weekStake?.day).toBe(PRACTICE_DAY_SENTENCES.retake);
     expect(own.crowdIsToday).toBe(false);
     expect(recordFor(midtown, 2, 1).crowdIsToday).toBe(true);
   });
@@ -975,8 +988,8 @@ describe('a pinned first day says whose crowd it is, and how long it takes — �
   it('prints how long the whole day takes and when the call comes, derived — and only on the day as measured', () => {
     const pinned = midtownPinned({});
     expect(pinned.dayLength).toBe(pinnedDayLengthLineOf('c2'));
-    expect(pinned.dayLength).toMatch(/^A whole day: up to \d+ min of watching at 4×/u);
-    expect(pinned.dayLength).toContain('The stage stops once for its call');
+    expect(pinned.dayLength).toMatch(/^A whole day: about \d+ min of watching at 4×/u);
+    expect(pinned.dayLength).toContain('The stage stops first for its call');
     /* Under another driver it is a day nobody measured; on another crowd it is not the pinned day. */
     expect(midtownPinned({ dispatcherId: 'eta' }).dayLength).toBeUndefined();
     expect(midtownPinned({ seed: 424_242n }).dayLength).toBeUndefined();

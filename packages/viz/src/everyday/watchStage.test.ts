@@ -31,7 +31,7 @@ import { describe, expect, it } from 'vitest';
 
 import { firstPersonWordsIn } from '../watch/view.js';
 
-import { WATCHING_NOTE } from './actionBar.js';
+import { WATCHING_NOTE, WATCHING_NOTE_OWN } from './actionBar.js';
 import type { EverydayState } from './types.js';
 import {
   everydayWatchingCopyOf,
@@ -113,6 +113,17 @@ describe('the Everyday watching surface', () => {
    * The other direction, which is what stops the grep above from being satisfiable by deleting
    * words: the sentences have to still be there and still say what they were written to say.
    */
+  /* Wave AL, lane AL-A, § D1186: the player's own replay read *Their record, replayed*. */
+  it('speaks to the owner on a replay of the player’s own day, and keeps the spectator’s note otherwise', () => {
+    const own = watchStageBarOf(WATCHING, { ...BAR_STATES[0], owner: 'player' });
+    expect(own.note).toBe(WATCHING_NOTE_OWN);
+    expect(own.note).not.toMatch(/\btheir\b/iu);
+    expect(watchStageBarOf(WATCHING, { ...BAR_STATES[0], owner: 'other' }).note).toBe(WATCHING_NOTE);
+    /* A refusal still outranks the note on either owner's replay. */
+    const refused = watchStageBarOf(WATCHING, { hasReplay: false, playRefusal: undefined, owner: 'player' });
+    expect(refused.note).not.toBe(WATCHING_NOTE_OWN);
+  });
+
   it('keeps the § 3.3 row a watching row, with the guide’s two controls on it', () => {
     const bar = watchStageBarOf(WATCHING, BAR_STATES[0]);
     expect(bar.leave.label).toBe('⤺ Stop watching');

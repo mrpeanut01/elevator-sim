@@ -67,7 +67,7 @@ import { reportSignInLink } from '../everyday/signInLink.js';
 import { provideScenarioLadderFrom } from '../everyday/scenarioLadderPort.js';
 import { namedStageMoveOf } from '../everyday/stagePlay.js';
 import { provideScenarioOpen } from '../everyday/scenarioOpenPort.js';
-import { routeRefusalsOf } from '../campaign/stagePress.js';
+import { routeRefusalsOf, routeUnitsOf } from '../campaign/stagePress.js';
 import { everydaySwap, onEverydaySwapProvided } from '../everyday/swap.js';
 import {
   ENGINEER_RETURN_LABEL,
@@ -148,6 +148,7 @@ import { WAIT_BANDS, waitBandsAt } from '../live/bands.js';
 import { observationsAt } from '../live/observations.js';
 import type { WaitBandDefinition, WaitBands } from '../live/types.js';
 import {
+  driverNameAt,
   interventionStampOf,
   PARK_CARS_LOBBY_LABEL,
   SPREAD_CARS_LABEL,
@@ -209,10 +210,11 @@ import { DEFAULT_LEVERS } from '../authoring/dispatcherSpec.js';
 import { runIdentityIssues } from '../scope/runIdentity.js';
 import { demandFromSpec, specFromTrafficProfile } from '../authoring/patternSpec.js';
 import { contractById, statLineOf } from '../shift/contracts.js';
-import { bankingRefusalFor, UNCHOSEN_RUN_CANNOT_BANK } from '../shift/banking.js';
+import { ATTEMPT_LEFT_CANNOT_BANK, bankingRefusalFor, UNCHOSEN_RUN_CANNOT_BANK } from '../shift/banking.js';
+import { attemptResumeAtS, attemptShownTo, attemptStandsOn, type DayAttempt } from '../shift/attempt.js';
 import { shiftObservationsOf } from '../shift/observations.js';
 import { pressCounterfactualOf } from '../shift/counterfactual.js';
-import { carAbsencesOf } from '../shift/bookedOut.js';
+import { carAbsencesOf, type BookedOutCar } from '../shift/bookedOut.js';
 import { readGoals } from '../shift/goals.js';
 import {
   clockOf,
@@ -226,6 +228,7 @@ import {
   dayCountsToward,
   houseNeedOf,
   houseRecordOf,
+  weekDealOf,
   weekHasClosed,
   type HouseReading,
 } from '../shift/weekStake.js';
@@ -233,8 +236,11 @@ import { tomorrowBriefingOf, type TomorrowBriefing } from '../shift/tomorrow.js'
 import { coachWeekLines, weekKeptLine } from '../shift/weekLabel.js';
 import { weekdayOf, type DayOutcome, type WeekState } from '../shift/types.js';
 import { dailySeedAt } from '../shift/dailySeed.js';
+import { dealtCrowdOf, weekRecordFor } from '../shift/weekRecord.js';
+import { progressWithWeekRecords, weekRecordsOf } from '../everyday/profile.js';
+import { everydayProfileStore } from '../everyday/profileStore.js';
 import { deviceNowMs } from '../shift/deviceDate.js';
-import { crowdMakesPractice } from '../shift/scoredCrowd.js';
+import { practiceGroundOf } from '../shift/scoredCrowd.js';
 import { firstDayDealOf, isDealtPinnedDay } from '../shift/firstSession.js';
 
 import { savedProfilesOf } from '../batch/library.js';
@@ -254,11 +260,11 @@ import { createOffThreadRunner, type OffThreadRun } from './offThreadRuns.js';
 import { openDayCallSession, type DayCallSession } from './dayCallSession.js';
 import {
   dayCallDriversOf,
-  dayCallsOffered,
   type DayCallAnswer,
   type DayCallOnStage,
   type DayCallsQuiet,
 } from '../shift/dayCalls.js';
+import type { PressCall } from '../shift/pressCall.js';
 import { WATCHING_HEADER_CLASS, mountWatchPanel } from './watchPanel.js';
 import { chip, el, fill, fillSelect, keyedFill, setHidden, setText } from './dom.js';
 import {
@@ -302,6 +308,7 @@ import {
   saveSession,
 } from '../persist/session.js';
 import type { SessionStore } from '../persist/types.js';
+import { loadAttempts, saveAttempts } from '../persist/attempt.js';
 import type { MountContext, Panel, UnfiledSheetFacts, ViewAt } from './mountTypes.js';
 import {
   allBuildingIds,
@@ -319,6 +326,7 @@ import {
   initialState,
   withFirstSession,
   dayCallFactsOf,
+  dayCallsOpenOn,
   pressDayCallOf,
   profileById,
   plannedDayOf,
@@ -329,6 +337,7 @@ import {
   scenarioWeeksOf,
   weeksForSession,
   withBuilding,
+  withDispatcher,
   type PatternSelection,
   type ShiftRunConfig,
   type ViewerState,
@@ -1660,38 +1669,52 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * is graded against the goals **the day was graded against**, read off the day's own readings,
    * so the two sides of the sheet answer one question.
    *
-   * Asked lazily, the first time a screen reads the sheet of a week that has closed, and kept by the
-   * week it was asked for: nothing is stored, and a reload re-runs it.
+   * **Asked as each counted day closes** — lane AL-F, swarm DN's Q2.3 ([§ D1227](../../../../DECISIONS.md)).
+   * It was asked the first time a screen read the sheet of a closed week, so the sheet's house line
+   * read *still being run* for ten to thirty seconds on the screen the week closes onto (the post-AK
+   * panel's seats A, B and D). A run costs the same whenever it is made, so each day's is started
+   * by {@link closeShift} as that day closes, and the sheet is ready when the last day's close
+   * opens it. A reading is kept per day's crowd (tower, day, seed), so a later day's ask does not
+   * throw an earlier one away; a reading the sheet asks for and nobody asked yet (after a reload,
+   * which keeps nothing) is asked then, as before.
    */
   const houseRunner = createOffThreadRunner({ spawn: spawnRunWorker });
-  let weekHouse: { readonly key: string; readonly readings: Map<number, HouseReading> } | undefined;
+  const houseReadings = new Map<string, HouseReading>();
+  /** The keys of the house ask in flight, joined — so a render asking again does not restart it. */
+  let houseAsked: string | undefined;
 
-  /** Which closed week a set of house readings belongs to: its tower and each day's crowd. */
-  function weekHouseKey(week: WeekState): string {
-    return [week.contractId, ...week.history.map((entry) => `${String(entry.day)}:${entry.record?.seed ?? '-'}`)].join('|');
+  /** One counted day's crowd: its tower, its day and its seed. */
+  function houseKeyOf(contractId: string, entry: DayOutcome): string {
+    return `${contractId}|${String(entry.day)}|${entry.record?.seed ?? '-'}`;
   }
 
   function weekHouseReadingOf(day: number): HouseReading | undefined {
     const week = state.week;
     if (!weekHasClosed(week)) return undefined;
-    const key = weekHouseKey(week);
-    if (weekHouse?.key !== key) askWeekHouse(week, key);
-    return weekHouse?.readings.get(day);
+    const entry = week.history.find((candidate) => candidate.day === day);
+    if (entry === undefined) return undefined;
+    askWeekHouse(week);
+    return houseReadings.get(houseKeyOf(week.contractId, entry));
   }
 
-  function askWeekHouse(week: WeekState, key: string): void {
-    const readings = new Map<number, HouseReading>();
-    weekHouse = { key, readings };
+  /** Start the house on every counted day of `week` that needs a run and has no reading yet. */
+  function askWeekHouse(week: WeekState): void {
+    if (weekDealOf(week.contractId) === undefined) return;
     const needs = week.history.flatMap((entry) => {
       const record = entry.record;
       if (record === null || !dayCountsToward(week.contractId, entry) || houseNeedOf(entry) !== 'run') return [];
+      const key = houseKeyOf(week.contractId, entry);
+      if (houseReadings.has(key)) return [];
       /* A record this build cannot replay is no record of the crowd for the house either. */
       if (recordUnreadableReason(record, resources) !== null) {
-        readings.set(entry.day, 'unrecorded');
+        houseReadings.set(key, 'unrecorded');
         return [];
       }
-      return [{ entry, record }];
+      return [{ entry, record, key }];
     });
+    const asked = needs.map((need) => need.key).join(',');
+    if (needs.length === 0 || asked === houseAsked) return;
+    houseAsked = asked;
     const runs = needs.map(({ record }) => {
       const plan = watchRunPlanOf(state, resources, houseRecordOf(record));
       return { config: plan.config, outOfServiceCarIds: plan.outOfServiceCarIds, recordDecisions: false };
@@ -1701,16 +1724,16 @@ function boot(ui: Elements, resources: BrowserResources): void {
     houseRunner.start({
       runs: [first, ...rest],
       onDone: (recordings) => {
-        if (weekHouse?.key !== key) return;
+        if (houseAsked === asked) houseAsked = undefined;
         recordings.forEach((recording, index) => {
-          const entry = needs[index]?.entry;
-          if (entry === undefined) return;
+          const need = needs[index];
+          if (need === undefined) return;
           const graded = readGoals(
-            entry.readings.map((reading) => reading.goal),
+            need.entry.readings.map((reading) => reading.goal),
             shiftObservationsOf(observationsAt(recording, recording.endedAt)),
           );
-          readings.set(
-            entry.day,
+          houseReadings.set(
+            need.key,
             !wasGraded(graded)
               ? 'ungraded'
               : graded.every((reading) => reading.state === 'met')
@@ -1722,15 +1745,19 @@ function boot(ui: Elements, resources: BrowserResources): void {
       },
       /* A run that threw: those days could not be run on their own crowd, and the sheet says so. */
       onFailed: () => {
-        if (weekHouse?.key !== key) return;
-        for (const { entry } of needs) if (!readings.has(entry.day)) readings.set(entry.day, 'unrecorded');
+        if (houseAsked === asked) houseAsked = undefined;
+        for (const { key } of needs) if (!houseReadings.has(key)) houseReadings.set(key, 'unrecorded');
         renderAll();
       },
     });
   }
   let dayCallSession: DayCallSession | undefined;
-  /** The run a session was refused on, so the refusal is asked once rather than once a frame. */
-  let dayCallRefusedOn: VizRecording | undefined;
+  /**
+   * The run a session was refused on, and the pinned call it was asked after, so the refusal is
+   * asked once rather than once a frame — and asked again once a pinned day's call is answered
+   * (§ D1204).
+   */
+  let dayCallRefusedOn: { readonly recording: VizRecording; readonly pinnedAtS: number | undefined } | undefined;
   /**
    * Whether the stage asked about this attempt's run and was refused because the day is a whole
    * day too busy to call on (§ D1138 clause 5) — what § D1152's quiet row says instead of a call.
@@ -1758,6 +1785,223 @@ function boot(ui: Elements, resources: BrowserResources): void {
     dayCallSession?.skip(false);
   }
 
+  /* ---------------------------------------------------------------------- *
+   * One attempt per scored day — wave AL, lane AL-E, [§ D1218](../../../../DECISIONS.md)
+   * ---------------------------------------------------------------------- */
+
+  /**
+   * The attempts standing on this device's scored days, by contract — `shift/attempt.ts` is the
+   * rule, `persist/attempt.ts` the slot. Read once at boot beside the session.
+   */
+  let dayAttempts: ReadonlyMap<string, DayAttempt> = new Map();
+  /** The recording that is the standing attempt's latest run, while it is in memory. */
+  let attemptRecording: VizRecording | undefined;
+  /**
+   * What the next `'player'` ask is for — set by {@link beginDayAttempt} and
+   * {@link resumeDayAttempt} on the line before their `runShift`, and latched by `runShift` into
+   * {@link attemptAsk}, so a later ask that supersedes it carries nothing.
+   */
+  let nextAttemptAsk: 'begin' | 'resume' | undefined;
+  /** The ask in flight whose landing becomes the attempt's run. */
+  let attemptAsk: 'begin' | 'resume' | undefined;
+  /**
+   * Left through § 3.4's strip. The attempt is kept for the brief to resume, so no other surface
+   * files it meanwhile (`shift/banking.ts#ATTEMPT_LEFT_CANNOT_BANK`); resuming clears it.
+   */
+  let attemptLeft = false;
+  /** The `shownToS` last written to the device, so a frame writes only when the day has moved on. */
+  let attemptSavedShownS = Number.NEGATIVE_INFINITY;
+  /**
+   * How far the stage may move on before its reach is written again, in simulated seconds. A skip
+   * moves it by hours and writes at once; played at 30× a minute is about two real seconds.
+   */
+  const ATTEMPT_WRITE_EVERY_S = 60;
+
+  /** The attempt standing on the week's own day, or `undefined`. */
+  function standingAttempt(): DayAttempt | undefined {
+    const attempt = dayAttempts.get(state.week.contractId);
+    return attemptStandsOn(attempt, state.week) ? attempt : undefined;
+  }
+
+  /** Whether the run on the stage is the standing attempt's own. */
+  function attemptOnScreen(): boolean {
+    return standingAttempt() !== undefined && state.recording !== undefined && state.recording === attemptRecording;
+  }
+
+  /** Put `attempt` in the week's slot, or clear it, and write the slot. */
+  function setAttempt(contractId: string, attempt: DayAttempt | undefined): void {
+    const next = new Map(dayAttempts);
+    if (attempt === undefined) next.delete(contractId);
+    else next.set(contractId, attempt);
+    dayAttempts = next;
+    attemptSavedShownS = attempt?.shownToS ?? Number.NEGATIVE_INFINITY;
+    if (!sessionSealed) saveAttempts(sessionStore, dayAttempts);
+  }
+
+  /**
+   * Write the standing attempt with `change`, folding in where its calls stand when its run is the
+   * one on the stage — the session is this attempt's only while it stands on the attempt's run.
+   */
+  function writeAttempt(change: Partial<DayAttempt> = {}): void {
+    const attempt = standingAttempt();
+    if (attempt === undefined) return;
+    const onScreen = attemptOnScreen();
+    setAttempt(attempt.contractId, {
+      ...attempt,
+      ...(onScreen && dayCallSession !== undefined ? { calls: dayCallSession.snapshot() } : {}),
+      ...(onScreen && pressCallSkipped ? { pressCallSkipped: true, pinnedCallDone: true } : {}),
+      ...change,
+    });
+  }
+
+  /**
+   * A run landed: make it the attempt's where it is — the run an attempt began or resumed as, or
+   * the attempt's own record growing by a press or an answer. Called from `applyShift` while
+   * `state.recording` is still the run being replaced.
+   */
+  function noteAttemptLanding(recording: VizRecording): void {
+    const ask = attemptAsk;
+    attemptAsk = undefined;
+    if (ask === 'begin') {
+      attemptRecording = recording;
+      attemptLeft = false;
+      setAttempt(state.week.contractId, {
+        contractId: state.week.contractId,
+        day: state.week.day,
+        dayIdx: state.week.dayIdx,
+        seed: state.seed.toString(),
+        daySeed: runDaySeed.toString(),
+        dispatcherId: state.dispatcherId,
+        interventions: state.interventions.map((entry) => ({ atS: entry.atS, change: entry.change })),
+        record: watchRecordOf(state, resources) ?? null,
+        shownToS: recording.startedAt,
+        pinnedCallDone: false,
+        pressCallSkipped: false,
+        calls: null,
+      });
+      return;
+    }
+    if (ask === 'resume') {
+      if (standingAttempt() !== undefined) attemptRecording = recording;
+      attemptLeft = false;
+      return;
+    }
+    const attempt = standingAttempt();
+    if (
+      runCause === 'intervention' &&
+      attempt !== undefined &&
+      attemptRecording !== undefined &&
+      state.recording === attemptRecording
+    ) {
+      attemptRecording = recording;
+      setAttempt(attempt.contractId, {
+        ...attempt,
+        interventions: state.interventions.map((entry) => ({ atS: entry.atS, change: entry.change })),
+      });
+    }
+  }
+
+  /**
+   * **The crowd a press today deals the week's day** — lane AL-F, [§ D1229](../../../../DECISIONS.md),
+   * `shift/weekRecord.ts#dealtCrowdOf` over the date's crowd and the tower's record of weeks. One
+   * expression for both readers, `runShift`'s latch and {@link beginDayAttempt}, so the attempt rule
+   * (§ D1218) and the close's practice rule agree on which crowd is the day's.
+   */
+  function dealtDaySeedNow(): bigint {
+    return dealtCrowdOf(
+      state.week,
+      weekRecordFor(weekRecordsOf(everydayProfileStore().progress()), state.week.contractId),
+      dailySeedAt(deviceNowMs()),
+    );
+  }
+
+  /**
+   * *Start the day* on a scored week day: the run the brief asked for, and, where the day counts
+   * and nothing stands on it, the attempt that run begins. A day the week has closed, a link's
+   * crowd on a week under way and a week on no scenario begin none, so their close is § D1138's
+   * or § D1141's practice exactly as before.
+   */
+  function beginDayAttempt(): void {
+    /*
+     * The day's crowd as the close will read it — {@link dealtDaySeedNow}, the value `runShift`
+     * latches into {@link runDaySeed} — so a day dealt a derived crowd (§ D1229) begins the attempt
+     * its close will bank, rather than being refused here as a crowd other than the date's.
+     */
+    const counts =
+      advancesTheWeek(state.playMode) &&
+      contractById(state.week.contractId) !== undefined &&
+      standingAttempt() === undefined &&
+      practiceGroundOf(state.week, state.seed, dealtDaySeedNow()) === undefined;
+    nextAttemptAsk = counts ? 'begin' : undefined;
+    context.runShift();
+  }
+
+  /**
+   * *Resume ⟨day⟩*: the standing attempt back on the stage. In memory it is already there and
+   * nothing runs; after a reload, or once another run replaced it, it is re-simulated from its own
+   * crowd, driver and press log over `dayShape` (the host's `dayPatchFor`, the day's own length),
+   * which is the same run by determinism. A week that has moved under the attempt (the run it
+   * describes is no longer the one this state would make) drops it rather than resume a different
+   * run: `false` then, and the caller starts the day afresh.
+   */
+  function resumeDayAttempt(dayShape: Partial<ViewerState>): boolean {
+    const attempt = standingAttempt();
+    if (attempt === undefined) return false;
+    attemptLeft = false;
+    if (attemptOnScreen()) {
+      renderAll();
+      return true;
+    }
+    const handed = withDispatcher({ ...state, ...dayShape }, resources, attempt.dispatcherId);
+    const patch: Partial<ViewerState> = {
+      ...dayShape,
+      dispatcherId: handed.dispatcherId,
+      dispatcherSpec: handed.dispatcherSpec,
+      editingDispatcherId: handed.editingDispatcherId,
+      seed: BigInt(attempt.seed),
+      interventions: attempt.interventions.map((entry) => ({ atS: entry.atS, change: entry.change })),
+      ...(attempt.record === null ? {} : { outOfServiceCarIds: [...attempt.record.outOfServiceCarIds] }),
+    };
+    if (attempt.record !== null) {
+      const asked = watchRecordOf({ ...state, ...patch }, resources);
+      const runOf = (record: NonNullable<DayAttempt['record']>): string =>
+        JSON.stringify({ ...record, interventions: [] });
+      if (asked !== undefined && runOf(asked) !== runOf(attempt.record)) {
+        setAttempt(attempt.contractId, undefined);
+        return false;
+      }
+    }
+    context.update(patch);
+    nextAttemptAsk = 'resume';
+    context.runShift();
+    /* The attempt's own day and its pinned call's state, which a fresh ask would have reset. */
+    runDaySeed = BigInt(attempt.daySeed);
+    pressCallSkipped = attempt.pressCallSkipped;
+    return true;
+  }
+
+  /** The stage has shown `recording` to `atS`; kept, and written each {@link ATTEMPT_WRITE_EVERY_S}. */
+  function noteAttemptShown(recording: VizRecording, atS: number): void {
+    if (recording !== state.recording || !attemptOnScreen()) return;
+    const attempt = standingAttempt();
+    if (attempt === undefined) return;
+    const moved = attemptShownTo(attempt, atS);
+    if (moved === attempt) return;
+    if (moved.shownToS - attemptSavedShownS >= ATTEMPT_WRITE_EVERY_S) {
+      writeAttempt({ shownToS: moved.shownToS });
+      return;
+    }
+    dayAttempts = new Map(dayAttempts).set(attempt.contractId, moved);
+  }
+
+  /*
+   * A reload or a closed tab writes where the stage had reached, so the resumed attempt opens
+   * there rather than up to a minute of the day earlier.
+   */
+  window.addEventListener('pagehide', () => {
+    writeAttempt();
+  });
+
   /** § D1152 — what the report says on a day that raised no ordinary call, or nothing. */
   function dayCallsQuietForReport(): DayCallsQuiet | undefined {
     if (dayCallSession !== undefined) return dayCallSession.quiet();
@@ -1766,27 +2010,50 @@ function boot(ui: Elements, resources: BrowserResources): void {
 
   /**
    * The next ordinary call on `recording`, for the Everyday stage — § D1138. `undefined` on every run
-   * that is not the player's own scored week day as this shell simulated it, on a pinned press day
-   * (§ D1029's single call stands there), on a whole day too costly to call on, and once the day's
-   * calls are spent.
+   * that is not the player's own scored week day as this shell simulated it, on a whole day too
+   * costly to call on, and once the day's calls are spent. On a pinned press day, `undefined` until
+   * the stage hands in the pinned call its player answered (`pinnedCall`), and from then on the
+   * day's ordinary calls, searched from five minutes after it ([§ D1204](../../../../DECISIONS.md)).
+   * The gate is `dev/state.ts#dayCallsOpenOn`.
    */
-  function dayCallOnStage(recording: VizRecording): DayCallOnStage | undefined {
+  function dayCallOnStage(recording: VizRecording, pinnedCall?: PressCall): DayCallOnStage | undefined {
     if (recording !== state.recording || recording !== simulatedRecording) return undefined;
     /* A re-simulation in flight is about to replace this run, so nothing is called on it. */
     if (shiftInFlight) return undefined;
     if (state.playMode !== 'shift-week' || watching !== undefined) return undefined;
     if (contractById(state.week.contractId) === undefined) return undefined;
     if (dayCallSession === undefined) {
-      if (dayCallRefusedOn === recording || state.interventions.length > 0) return undefined;
+      /*
+       * § D1218: a resumed attempt's run carries its presses already, and its session opens where
+       * the attempt left it rather than at the day's start — the gate asked once, when that session
+       * first opened, and a snapshot is its answer. Any other run is asked at the gate, which shuts
+       * on a press no call made (§ D1204, `dev/state.ts#dayCallsOpenOn`).
+       */
+      const resume = recording === attemptRecording ? standingAttempt()?.calls ?? undefined : undefined;
+      if (dayCallRefusedOn?.recording === recording && dayCallRefusedOn.pinnedAtS === pinnedCall?.atS) return undefined;
       const facts = dayCallFactsOf(resources, state);
-      if (facts === undefined || facts.pinned || !dayCallsOffered(facts.horizon, recording.legs.length)) {
-        dayCallRefusedOn = recording;
-        dayCallsNotOffered = facts !== undefined && !facts.pinned;
+      const gate =
+        resume !== undefined
+          ? facts === undefined
+            ? 'shut'
+            : 'open'
+          : dayCallsOpenOn({
+              facts,
+              legs: recording.legs.length,
+              interventions: state.interventions,
+              pinnedCall,
+              pinnedCallSkipped: pressCallSkipped,
+            });
+      if (gate !== 'open' || facts === undefined) {
+        dayCallRefusedOn = { recording, pinnedAtS: pinnedCall?.atS };
+        if (gate === 'not-offered') dayCallsNotOffered = true;
         return undefined;
       }
       /*
-       * § D1167's pair, fixed from the dispatcher the day opened with, and § D1168's goals, the ones
-       * the rail reads (`dev/leftRail.ts#shiftGoalsOf`, the same expression `closeShift` grades by).
+       * § D1167's pair, taken from the dispatcher the day opened with and re-derived by the session
+       * after every handover (§ D1205) — from the snapshot's driver on a resume (§ D1218) — and
+       * § D1168's goals, the ones the rail reads (`dev/leftRail.ts#shiftGoalsOf`, the same
+       * expression `closeShift` grades by).
        */
       const driving = drivingProfileOf(resources, state);
       const pair = dayCallDriversOf(resources.dispatcherProfiles.profiles, driving);
@@ -1823,16 +2090,30 @@ function boot(ui: Elements, resources: BrowserResources): void {
           bookedOut: facts.bookedOut,
           horizon: facts.horizon,
           goals: shiftGoalsOf(state, resources),
-          drivers: pair === undefined ? undefined : { pair, drivingName: driving.name },
+          drivers: pair === undefined ? undefined : { profiles: resources.dispatcherProfiles.profiles, driving },
+          /* § D1204: on a pinned day, the call its player answered — the search starts after it. */
+          pinnedCall: facts.pinned ? pinnedCall : undefined,
+          /* § D1218: where a resumed attempt's session stood, § D1205's memory with it. */
+          resume,
         },
       );
     } else if (dayCallSession.recording() !== recording) {
       /* The record grew by a press outside a call: ask on from the latest press. */
       const pressedAtS = state.interventions.reduce((latest, entry) => Math.max(latest, entry.atS), 0);
-      const handedOver = state.interventions.some(
+      const handovers = state.interventions.filter(
         (entry) => entry.change.kind === 'adopt-dispatcher' || entry.change.kind === 'switch-dispatcher',
       );
-      dayCallSession.grew(recording, pressedAtS, handedOver);
+      /*
+       * § D1205: the driver question's pair is re-derived from whoever drives after the latest
+       * handover. A stored weights-only handover names no whole dispatcher, so it ends the question.
+       */
+      const latest = handovers.at(-1)?.change;
+      dayCallSession.grew(
+        recording,
+        pressedAtS,
+        handovers.length > 0,
+        latest?.kind === 'adopt-dispatcher' ? latest.profile : undefined,
+      );
     }
     return dayCallSession.onStage();
   }
@@ -1869,7 +2150,11 @@ function boot(ui: Elements, resources: BrowserResources): void {
         /* A state `shiftRunConfigOf` refuses has no rival to race; the day itself is already adopted. */
       }
     });
-    if (answered) renderAll();
+    if (answered) {
+      /* § D1218 — the answer is part of the attempt, so a reload finds it answered. */
+      writeAttempt();
+      renderAll();
+    }
   }
 
   function runChallenge(): void {
@@ -2149,6 +2434,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
     libraryNotice = libraryNoticeFor(restoredLibrary.dropped);
 
     const restored = loadSession(sessionStore);
+    /* § D1218 — the attempts left standing on this device, read beside the week they stand on. */
+    dayAttempts = loadAttempts(sessionStore);
     if (!restored.ok) {
       /*
        * Told, not swallowed. This branch cleared the unreadable slot and started fresh in silence,
@@ -2232,6 +2519,19 @@ function boot(ui: Elements, resources: BrowserResources): void {
      */
     const contract = contractById(weeks.week.contractId);
     if (contract !== undefined) state = withBuilding(state, resources, contract.buildingId);
+    /*
+     * **And the restored day is dealt its own crowd** — lane AL-F, [§ D1229](../../../../DECISIONS.md).
+     * Boot seeds the date's crowd; a restored week that has already filed it on this tower (Monday
+     * played, Tuesday standing) is dealt the crowd derived from the date, the day and the weeks
+     * closed, so the brief names the crowd the day will run on. A crowd the address chose is not
+     * the date's and is left standing.
+     */
+    const dateSeed = dailySeedAt(deviceNowMs());
+    if (contract !== undefined && state.seed === dateSeed) {
+      const records = weekRecordsOf(everydayProfileStore().progress());
+      const dealt = dealtCrowdOf(state.week, weekRecordFor(records, state.week.contractId), dateSeed);
+      if (dealt !== state.seed) state = { ...state, seed: dealt };
+    }
   }
 
   /**
@@ -3167,6 +3467,9 @@ function boot(ui: Elements, resources: BrowserResources): void {
     clearSavedSession: () => {
       // Seal first, then remove — the order is the whole point; see the port's docstring.
       sessionSealed = true;
+      /* § D1218 — an attempt is part of what the player asked to forget. */
+      dayAttempts = new Map();
+      saveAttempts(sessionStore, dayAttempts);
       return clearSession(sessionStore);
     },
     reloadPage: () => {
@@ -3615,7 +3918,13 @@ function boot(ui: Elements, resources: BrowserResources): void {
 
   /** The run being watched and what to put back, or `undefined` when nobody is being watched. */
   let watching:
-    | { readonly run: WatchableRun; readonly view: WatchingView; readonly before: WatchedBefore }
+    | {
+        readonly run: WatchableRun;
+        readonly view: WatchingView;
+        readonly before: WatchedBefore;
+        /** The watched run's own cars out — `watch/record.ts#WatchRunPlan.bookedOut`. */
+        readonly bookedOut: readonly BookedOutCar[];
+      }
     | undefined;
 
   /**
@@ -4449,16 +4758,19 @@ function boot(ui: Elements, resources: BrowserResources): void {
        * stage whose census names only routes a press is refused is held with the refusal rather
        * than offered.
        */
-      const refusals = routeRefusalsOf(loaded.campaign.stages, {
+      const routeResources = {
         space: loaded.space,
         schedule: resources.priceSchedule,
         profiles: resources.dispatcherProfiles.profiles,
         buildings: resources.buildings,
         elevatorSpecs: resources.elevatorSpecs,
         /* § D1183: the stage page's own choices are published under its own names. */
-        moveNamed: (name) => namedStageMoveOf(name, resources.dispatcherProfiles.profiles, loaded.space),
-      });
-      provideScenarioLadderFrom(loaded.campaign.stages, loaded.survivors, refusals);
+        moveNamed: (name: string) => namedStageMoveOf(name, resources.dispatcherProfiles.profiles, loaded.space),
+      };
+      const refusals = routeRefusalsOf(loaded.campaign.stages, routeResources);
+      /* § D1234: the same check read for its price, so a cleared stage's row can carry its par mark. */
+      const units = routeUnitsOf(loaded.campaign.stages, routeResources);
+      provideScenarioLadderFrom(loaded.campaign.stages, loaded.survivors, refusals, units);
     })
     .catch((error: unknown) => {
       setText(ui.campaign.error, error instanceof Error ? error.message : String(error));
@@ -4580,6 +4892,14 @@ function boot(ui: Elements, resources: BrowserResources): void {
     })(),
     /* The date's own crowd, read at the press — `EverydayHostBindings.daySeed`, § D1095. */
     daySeed: () => dailySeedAt(deviceNowMs()),
+    /* Each tower's record of closed weeks, kept with Everyday's progress — § D1229, § D1230. */
+    weekRecords: {
+      read: () => weekRecordsOf(everydayProfileStore().progress()),
+      write: (records) => {
+        const store = everydayProfileStore();
+        store.setProgress(progressWithWeekRecords(store.progress(), records));
+      },
+    },
     holdAddress: (held) => {
       if (addressHeld === held) return;
       addressHeld = held;
@@ -4866,6 +5186,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
      */
     cancelRun: () => {
       shiftRunner.cancel();
+      attemptAsk = undefined;
     },
     /*
      * GitHub issue #526 items 1 and 2 — `everyday/host.ts#leaveDayUnfinished` and its `take-offer`. The
@@ -4875,13 +5196,47 @@ function boot(ui: Elements, resources: BrowserResources): void {
      */
     abandonDay: () => {
       shiftRunner.cancel();
+      attemptAsk = undefined;
       abandonedRecording = state.recording;
+    },
+    /* § D1218 — the Everyday host's attempt, `shift/attempt.ts`; the closure's functions carry the argument. */
+    beginDayAttempt: () => {
+      beginDayAttempt();
+    },
+    resumeDayAttempt: (dayShape) => resumeDayAttempt(dayShape),
+    dayAttempt: () => standingAttempt(),
+    attemptResumeAtS: (recording) => {
+      const attempt = standingAttempt();
+      if (attempt === undefined || recording !== attemptRecording || recording !== state.recording) return undefined;
+      return attemptResumeAtS(attempt, recording.startedAt, recording.endedAt);
+    },
+    noteAttemptShown: (recording, atS) => {
+      noteAttemptShown(recording, atS);
+    },
+    pinnedCallDone: (recording) =>
+      recording === attemptRecording && attemptOnScreen() && standingAttempt()?.pinnedCallDone === true,
+    notePinnedCallDone: () => {
+      if (attemptOnScreen()) writeAttempt({ pinnedCallDone: true });
+    },
+    /*
+     * § D1219 — the calls this session has recorded, for the stage's mid-day rows, while the session
+     * stands on the run the stage is drawing; nothing on any other run.
+     */
+    dayCallRecordsOn: (recording) =>
+      dayCallSession !== undefined && recording === state.recording && dayCallSession.recording() === recording
+        ? dayCallSession.records()
+        : [],
+    leaveDayAttempt: () => {
+      if (standingAttempt() === undefined) return false;
+      attemptLeft = true;
+      writeAttempt();
+      return true;
     },
     intervene: (atS, change) => {
       interveneAt(atS, change);
     },
     /* § D1138 — the ordinary day's calls; the three functions carry the argument. */
-    dayCallOnStage: (recording) => dayCallOnStage(recording),
+    dayCallOnStage: (recording, pinnedCall) => dayCallOnStage(recording, pinnedCall),
     answerDayCall: (answer) => {
       answerDayCall(answer);
     },
@@ -4891,10 +5246,12 @@ function boot(ui: Elements, resources: BrowserResources): void {
     },
     skipDayCalls: (called) => {
       dayCallSession?.skip(called);
+      writeAttempt();
       renderAll();
     },
     skipPressCall: () => {
       pressCallSkipped = true;
+      if (attemptOnScreen()) writeAttempt({ pressCallSkipped: true, pinnedCallDone: true });
     },
     closeDay: () => {
       closeShift();
@@ -4973,7 +5330,9 @@ function boot(ui: Elements, resources: BrowserResources): void {
       playThisCrowd(run);
     },
     watching: () =>
-      watching === undefined ? undefined : { run: watching.run, view: watching.view },
+      watching === undefined
+        ? undefined
+        : { run: watching.run, view: watching.view, bookedOut: watching.bookedOut },
     onChange: (listener) => {
       everydayHostListeners.push(listener);
       return () => {
@@ -5392,6 +5751,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
         recording: ghost,
         refusal: ghostRefusal,
         pending: ghostInFlight,
+        watchingOwn: watching?.view.owner === 'player',
         /*
          * § 14.1, and this is the cell the sweep actually caught. The picker above is hidden while
          * watching, so the forbidden word was never the option list here — it was the **note**,
@@ -6262,7 +6622,16 @@ function boot(ui: Elements, resources: BrowserResources): void {
     // runner supersedes in-flight asks, and the latest ask is the one whose recording files. See
     // {@link runCause}; `'player'` is the default because every press but one means *a new ask*.
     runCause = cause;
-    if (cause === 'player') runDaySeed = dailySeedAt(deviceNowMs());
+    /*
+     * The crowd this press's day is dealt — lane AL-F, [§ D1229](../../../../DECISIONS.md) — so a day
+     * dealt a derived crowd is a shared day to the close's practice rule, as the date's crowd is.
+     */
+    if (cause === 'player') {
+      runDaySeed = dealtDaySeedNow();
+      /* § D1218: this ask begins or resumes the day's attempt only where the press said so. */
+      attemptAsk = nextAttemptAsk;
+      nextAttemptAsk = undefined;
+    }
     /*
      * A fresh ask is a fresh attempt, and an attempt's calls are its own — § D1138. An intervention
      * is the same attempt's record growing, so its session stands and is told about the new run.
@@ -6369,6 +6738,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
     startOfDayS: number | undefined,
     withheld: readonly string[],
   ): void {
+    /* § D1218 — before `state.recording` moves, so the attempt's own growth can be told apart. */
+    noteAttemptLanding(recording);
     // The template's own hour, moved on by the window when the run is a part of a day. Absent for
     // `constant-iso`, which declares none — omission means *this has no hour*, never *midnight*.
     runStartOfDayS = startOfDayS;
@@ -6461,9 +6832,17 @@ function boot(ui: Elements, resources: BrowserResources): void {
    */
   function enterWatch(run: WatchableRun, view: WatchingView, recording: VizRecording): void {
     if (watching !== undefined) return;
+    /*
+     * The watched run's own hour and cars out, from the record the gate simulated — wave AL, lane
+     * AL-A. Read before `state` is replaced, because `watchRunPlanOf` takes the player's state as the
+     * shape it rebuilds the record's run from (as `watchGateBefore` did a moment ago). A row with no
+     * record was never simulated and cannot reach here; the guard keeps the arm total.
+     */
+    const watchedPlan = run.record === null ? undefined : watchRunPlanOf(state, resources, run.record);
     watching = {
       run,
       view,
+      bookedOut: watchedPlan?.bookedOut ?? [],
       before: {
         state,
         ghostRecording,
@@ -6501,12 +6880,15 @@ function boot(ui: Elements, resources: BrowserResources): void {
     unpressedRecording = undefined;
     lastRaceKey = '';
     /*
-     * The watched run's own start-of-day hour is not known here — the record carries the
-     * configuration, and `runStartOfDayS` is produced by the runner. `undefined` is the honest
-     * answer and is what the header already draws for a template that declares no hour: an
-     * omission means *this has no hour*, never *midnight*.
+     * **The watched run's own start-of-day hour** — wave AL, lane AL-A, the post-AK panel's seats B
+     * and D. This read `undefined` on the ground that the hour is produced by the runner and the
+     * record carries only the configuration; the clock then fell back to a flat 06:00, and a replay
+     * of a whole day that began at 08:00 read 08:40 for a 10:40 press. The configuration is enough:
+     * `dev/state.ts#startOfDayOfConfig` is `core`'s own plan over it, the value the trace reports,
+     * and `watch/filedDay.test.ts` holds it equal to the hour the filed run's brief read. `undefined`
+     * still means what it meant, for a template that declares no hour.
      */
-    runStartOfDayS = undefined;
+    runStartOfDayS = watchedPlan?.startOfDayS;
     /*
      * Through `watch/session.ts` rather than spelled out here — § 14.1's *"`dayClosed` is
      * untouched, and so is your own day's state"* is a checkable claim, and a claim living in a
@@ -6892,6 +7274,17 @@ function boot(ui: Elements, resources: BrowserResources): void {
       setText(ui.transport.status, cannotBank);
       return;
     }
+    /*
+     * **The standing attempt, and whether this run is it** — wave AL, lane AL-E,
+     * [§ D1218](../../../../DECISIONS.md). An attempt left through § 3.4's strip waits for the stage;
+     * any other run of its day closes as practice below and leaves the day open for it.
+     */
+    const attemptStanding = advancesTheWeek(state.playMode) ? standingAttempt() : undefined;
+    const isTheAttempt = attemptStanding !== undefined && recording === attemptRecording;
+    if (isTheAttempt && attemptLeft) {
+      setText(ui.transport.status, ATTEMPT_LEFT_CANNOT_BANK);
+      return;
+    }
     filedRunId = recording.runId;
     // This sitting now has a filed sheet, so the empty state's previous-sitting sentence retires —
     // see {@link filedThisSitting}. Written at the latch rather than at the save, because the fact
@@ -6979,17 +7372,27 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * crowd. Only where the mode owns a week, and only on a week on a scenario; the date is the one
      * latched at the press.
      */
-    const crowdPractice =
-      advancesTheWeek(state.playMode) && crowdMakesPractice(state.week, state.seed, runDaySeed);
-    const week = crowdPractice ? state.week : closedWeekOf(state, outcome, runCause === 'intervention');
     /*
      * **A close of a day that had already closed is practice** — [§ D1138](../../../../DECISIONS.md)
      * clause 4, read off the week before the close, which is the one question `closeDay` keys it on.
      * Only where the mode owns a week: a Free Play sheet banks nothing on any close and says so in
      * its own words.
+     *
+     * Both grounds are `shift/scoredCrowd.ts#practiceGroundOf`'s, the function the brief's seed line
+     * and week block read before the press (wave AL, lane AL-A), so the brief cannot say *counts*
+     * over a run this close files as practice.
      */
-    const practice =
-      crowdPractice || (week !== state.week && state.week.closedDay === state.week.day);
+    const practiceGround = advancesTheWeek(state.playMode)
+      ? practiceGroundOf(state.week, state.seed, runDaySeed, attemptStanding !== undefined && !isTheAttempt)
+      : undefined;
+    const crowdPractice = practiceGround === 'crowd';
+    /* § D1218: a run that is not the standing attempt leaves the week on its day, as a link's crowd does. */
+    const attemptPractice = practiceGround === 'attempt';
+    const week =
+      crowdPractice || attemptPractice ? state.week : closedWeekOf(state, outcome, runCause === 'intervention');
+    const practice = practiceGround !== undefined;
+    /* The house on this day's crowd starts as the day closes, so the week's sheet is ready — § D1227. */
+    if (!practice) askWeekHouse(week);
     filedReportInput = {
       recording,
       observations,
@@ -6998,6 +7401,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
       practice,
       /* Which ground made it practice, so the sheet says the true one — § D1141. */
       ...(crowdPractice ? { practiceCrowd: state.seed } : {}),
+      ...(attemptPractice ? { practiceAttempt: true } : {}),
       /*
        * § D1138 clause 3 — the ordinary day's calls, from the session that raised them over the run
        * being filed. Nothing is printed about any call before this line runs.
@@ -7174,6 +7578,11 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * it again inside a handler that `openTab` called would be the same write twice, which is how a
      * navigation ends up fighting itself.
      */
+    /* § D1218 — the attempt is filed: the week now holds its day, and nothing stands on it. */
+    if (isTheAttempt && week !== state.week) {
+      attemptRecording = undefined;
+      setAttempt(attemptStanding.contractId, undefined);
+    }
     state = { ...state, week, report, tomorrow };
     /*
      * **The sheet opens itself only over a reader who is not doing something else** — § D233,
@@ -7223,11 +7632,20 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * Read from `state.savedDispatchers` at call time rather than captured, because the reader can
    * save a profile — and rename one — while a recording is on screen.
    */
-  function dispatcherNameOf(recording: VizRecording): string {
+  /**
+   * The dispatcher driving `recording` at `simTimeS` — the configured one until a handover on the
+   * run's own log, then whoever it was handed to (wave AL, lane AL-A; the post-AK panel's seats B
+   * and C found the Everyday header naming the configured dispatcher all day after a handover, and
+   * this canvas said the same). The log is the watched record's while watching and the player's
+   * own otherwise; `live/interventions.ts#driverNameAt` is the one reading of it.
+   */
+  function dispatcherNameOf(recording: VizRecording, simTimeS: number): string {
     const found = allDispatchers(resources, state.savedDispatchers).find(
       (profile) => profile.id === recording.dispatcherProfileId,
     );
-    return found?.name ?? recording.dispatcherProfileId;
+    const configured = found?.name ?? recording.dispatcherProfileId;
+    const log = watching !== undefined ? (watching.run.record?.interventions ?? []) : state.interventions;
+    return driverNameAt(log, simTimeS, configured);
   }
 
   function drawStage(): void {
@@ -7304,7 +7722,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
       theme: stageTheme,
       recording,
       frame,
-      dispatcherName: dispatcherNameOf(recording),
+      dispatcherName: dispatcherNameOf(recording, frame.simTimeS),
       layout,
       selection: selectionFor(assignments),
       unservedFloorIds: unservedFloorsOf(recording),
@@ -7338,7 +7756,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
     }
     canvas.setAttribute(
       'aria-label',
-      describeFrame({ recording, frame, dispatcherName: dispatcherNameOf(recording) }),
+      describeFrame({ recording, frame, dispatcherName: dispatcherNameOf(recording, frame.simTimeS) }),
     );
   }
 
@@ -7397,12 +7815,13 @@ function boot(ui: Elements, resources: BrowserResources): void {
   function announce(): void {
     const recording = state.recording;
     if (recording === undefined || playback === undefined) return;
+    const frame = playback.frame();
     setText(
       ui.stage.description,
       describeFrame({
         recording,
-        frame: playback.frame(),
-        dispatcherName: dispatcherNameOf(recording),
+        frame,
+        dispatcherName: dispatcherNameOf(recording, frame.simTimeS),
       }),
     );
   }

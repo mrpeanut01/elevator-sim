@@ -41,6 +41,8 @@ import {
   REPLAY_PILL_VERB,
   STOP_WATCHING_LABEL,
   firstPersonWordsIn,
+  WATCH_DISPATCHER_EYEBROWS,
+  watchOwnerOf,
   postedFiguresOf,
   watchingStrings,
   watchingViewOf,
@@ -81,13 +83,31 @@ function runOf(overrides: Partial<WatchableRun> = {}): WatchableRun {
 }
 
 describe('the watching view', () => {
-  it('says none of you, your or yours on any surface it draws', () => {
-    for (const source of ['filed-day', 'reference', 'posted-run'] as const) {
+  it('says none of you, your or yours on any surface it draws of somebody else’s run', () => {
+    for (const source of ['reference', 'posted-run'] as const) {
       const view = watchingViewOf(runOf({ source }), 'Steady hand');
+      expect(view.owner).toBe('other');
       for (const text of watchingStrings(view)) {
         expect(firstPersonWordsIn(text), `“${text}” is first-person on a watched run`).toEqual([]);
       }
     }
+  });
+
+  /*
+   * Wave AL, lane AL-A, § D1186 — the post-AK panel's seat B (D5): the player's own replay read
+   * *THEIR DISPATCHER*. A day this device filed is the player's, so its cells speak to its owner and
+   * none of them calls it somebody else's.
+   */
+  it('speaks to the owner of a day this device filed, and never calls it theirs', () => {
+    const view = watchingViewOf(runOf({ source: 'filed-day' }), 'Steady hand');
+    expect(view.owner).toBe('player');
+    expect(view.dispatcherEyebrow).toBe(WATCH_DISPATCHER_EYEBROWS.player);
+    for (const text of watchingStrings(view)) {
+      expect(text, `“${text}” calls the player’s own day somebody else’s`).not.toMatch(/\b(their|theirs|somebody else)\b/iu);
+    }
+    expect(watchOwnerOf({ source: 'filed-day' })).toBe('player');
+    expect(watchOwnerOf({ source: 'reference' })).toBe('other');
+    expect(watchOwnerOf({ source: 'posted-run' })).toBe('other');
   });
 
   /*
@@ -246,6 +266,8 @@ describe('the watching view', () => {
         // `headerTone` is a token the shell switches on rather than text a reader sees. It is the
         // one string field deliberately outside the corpus, and it is named rather than skipped.
         if (key === 'headerTone') continue;
+        // `owner` is the same kind of token — § D1186's switch, never drawn.
+        if (key === 'owner') continue;
         if (!walked.has(value)) missing.push(key);
       }
     }

@@ -117,7 +117,9 @@ describe.skipIf(!HAS_BROWSER)('the week’s tower is a control a player can pres
       const held = page.locator('.everyday-door-tower[data-contract="c3"] .everyday-door-tower-scenario');
       expect(await held.getAttribute('data-scenario')).toBe('held');
       const reason = (await held.textContent()) ?? '';
-      expect(reason).toContain('held back');
+      expect(reason).not.toContain('held back');
+      expect(reason).toContain('no scenario clear to win');
+      expect(reason).toContain('Choosing this tower still plays its week');
       expect(reason).toContain('have not been measured as they are dealt');
       expect(reason).not.toMatch(/\b(cannot|unwinnable)\b|found none/iu);
       await page.click('.everyday-door-tower[data-contract="c3"]');

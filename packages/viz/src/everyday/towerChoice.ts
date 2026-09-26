@@ -169,7 +169,7 @@ export const TOWER_CHOICE_COPY = Object.freeze({
  * ## What the lede may claim, and it is exactly what `shift/pressLadder.test.ts` proves
  *
  * On each admitted pinned day, under the tower's standing order: the day misses as built, the stage
- * stops once to call for a press, and from that call one parking press clears the day and the other
+ * stops to call for a press, and from that call one parking press clears the day and the other
  * does not at every moment tried over the window the pin was admitted on. The lede says those
  * things and **not which press** — naming it would turn the day into a switch. It says *measured*
  * because it is one day on one crowd, and § D914's fifty-seed measurement found a press flips a
@@ -206,7 +206,7 @@ export const PRESS_DAY_CHOICE_COPY = Object.freeze({
   heading: 'DAYS A PRESS DECIDES',
   /** The lede's two halves either side of the derived window — see {@link pressDayLedeOf}. */
   ledeBefore:
-    'On each of these a lift goes out part-way through the first day, and the stage stops once to ' +
+    'On each of these a lift goes out part-way through the first day, and the stage stops to ' +
     'call for a press. Measured on one crowd under the tower’s standing order, that day misses as ' +
     'built; from the call, one of the two parking presses cleared it and the other did not at every ' +
     'moment tried over the ',

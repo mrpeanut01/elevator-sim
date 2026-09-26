@@ -112,7 +112,7 @@ import type { RunInterventionConfig, SimTime } from '@elevator-sim/core/browser'
 
 import type { VizRecording, VizSummary } from '../contract/types.js';
 import { fallbackLineOf, readbackOf, type RuleRow } from '../authoring/ruleSpec.js';
-import { interventionLogOf } from '../live/interventions.js';
+import { driversLineOf, driverStretchesOf, interventionLogOf } from '../live/interventions.js';
 
 import { afterPressBeatOf, type PairVerdicts } from './afterPress.js';
 import { pressCallRowOf, type PressCallRowInput } from './callRow.js';
@@ -134,7 +134,14 @@ import { gaveUpBesideOf, goalPlainNameOf, horizonLabelOf, readGoals, wasDisplayO
 import { growthFactor } from './growth.js';
 import { CONTRACT_LADDER } from './ladder.js';
 import { ENDLESS_CONTRACT_ID, nextDay, wasGraded } from './week.js';
-import { WEEK_CLOSED_LINE, weekHasClosed, weekNeedOf, WEEK_WITHOUT_COUNTED_DAYS_SHORT } from './weekStake.js';
+import {
+  WEEK_CLOSED_LINE,
+  weekDealOf,
+  weekHasClosed,
+  weekNeedOf,
+  weekTargetMetLineOf,
+  WEEK_WITHOUT_COUNTED_DAYS_SHORT,
+} from './weekStake.js';
 import {
   DAY_START_S,
   WAKE_UP_ARRIVALS,
@@ -477,6 +484,30 @@ export interface WeekDayReport extends DayReport, ShapedOnlyFields {
    * absent on the close that banked. The report screens draw it under the verdict.
    */
   readonly practiceNote?: string | undefined;
+  /**
+   * **The close did not close the day into the week**, so the week stands on this day and there is
+   * nothing to advance from — wave AL, lane AL-A, the post-AK panel's seat D (H2), under
+   * [§ D1141](../../../../DECISIONS.md). `true` only where the crowd made the run practice
+   * ({@link DayReportInput.practiceCrowd}) or an attempt at the day still stands
+   * ({@link DayReportInput.practiceAttempt}, [§ D1218](../../../../DECISIONS.md)): a retake's practice close follows a close that did bank,
+   * so its week holds the day and tomorrow is a real next day. Both report surfaces read it through
+   * `dev/reportPanel.ts#framingOf`'s `canAdvance`, which is what takes *Open the doors on Wednesday*
+   * off a sheet whose own sentence says the week stays on this day. Absent otherwise.
+   */
+  readonly dayStaysOpen?: boolean | undefined;
+  /**
+   * **The target marked on the day it is met** — `weekStake.ts#weekTargetMetLineOf`, swarm DN's
+   * Q2.2, [§ D1226](../../../../DECISIONS.md). Present on the close whose day brought the week's
+   * clean counted days to its target, and absent on every other close, a practice one included:
+   * a practice close banks nothing, so it met nothing.
+   */
+  readonly weekMark?: string | undefined;
+  /**
+   * **This close closed the week** — `weekStake.ts#weekHasClosed` on the week after it, lane AL-F
+   * (swarm DN's Q2.3, [§ D1227](../../../../DECISIONS.md)). The Everyday report's one button then
+   * opens the week's sheet rather than tomorrow. Absent otherwise.
+   */
+  readonly weekClosed?: boolean | undefined;
 }
 
 /**
@@ -497,6 +528,17 @@ export const PRACTICE_NOTE =
 export const PRACTICE_CROWD_NOTE =
   'Practice. This run met a crowd other than the day’s shared one, so it banks nothing: your week ' +
   'stays on this day, and the day still counts when you play it on the day’s own crowd.';
+
+/**
+ * **What a practice sheet says when an attempt at the day is still open** — wave AL, lane AL-E,
+ * [§ D1218](../../../../DECISIONS.md), `shift/attempt.ts`. The day's attempt began at *Start the
+ * day* and stands unclosed; this run is another run of the same day (the Engineer surface's own, or
+ * a run started while the attempt was parked), so the week keeps the day open for the attempt. No
+ * digit, for {@link PRACTICE_NOTE}'s reason.
+ */
+export const PRACTICE_ATTEMPT_NOTE =
+  'Practice. Your attempt at this day is still open, so this run banks nothing: your week stays on ' +
+  'this day, and it banks that attempt when you close it on the stage.';
 
 /**
  * One run, belonging to no week — the same figures, the same diagnosis, the same levers and the
@@ -742,6 +784,12 @@ export interface DayReportInput {
    */
   readonly practiceCrowd?: bigint | undefined;
   /**
+   * **An attempt at the day stands and this run is not it** — [§ D1218](../../../../DECISIONS.md).
+   * Passed by `dev/main.ts#closeShift` beside {@link practice}; the sheet says
+   * {@link PRACTICE_ATTEMPT_NOTE}, and the day stays open as it does for {@link practiceCrowd}.
+   */
+  readonly practiceAttempt?: boolean | undefined;
+  /**
    * The ordinary day's calls, in the order they were raised — [§ D1138](../../../../DECISIONS.md)
    * clause 3. One row each after § D1029's, from the three runs that admitted it
    * (`shift/dayCalls.ts#DayCallRecord`). Passed by `dev/main.ts#closeShift` from the session that
@@ -831,7 +879,12 @@ function attemptLine(subject: ReportSubject, attempt: number, practice = false):
 function metaLinesFor(input: DayReportInput, dispatcherName: string, dayStartS: SimTime): readonly string[] {
   const { recording, subject, week } = input;
   return [
-    `${recording.buildingName} · ${dispatcherName}`,
+    /*
+     * Who drove, and from when — wave AL, lane AL-A, the post-AK panel's seats B and C. This read
+     * the configured dispatcher alone, so a day handed to *Fairness first* at 08:48 was titled
+     * *MIDTOWN OFFICE · MINIMUM ESTIMATED WAIT* above its own log line saying so.
+     */
+    `${recording.buildingName} · ${driversLineOf(input.interventions ?? [], dispatcherName, dayStartS)}`,
     `seed ${recording.seed} · ${clockRange(recording.startedAt, recording.endedAt, dayStartS)} · one replication`,
     ...(subject.kind === 'single-run' ? selectionLines(subject.selection) : []),
     ...bookedLine(
@@ -1178,7 +1231,18 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
         : undefined,
     ),
     levers: leversFor(recording, observations, summary, readings),
-    smallPrint: smallPrintFor(dispatcherName, summary, dayStartS),
+    /*
+     * Every dispatcher that drove a stretch of the day, because the sentence is about what one day
+     * cannot say of each of them — wave AL, lane AL-A. Naming only the configured one after a
+     * handover said something about a dispatcher that had stopped driving at 08:48.
+     */
+    smallPrint: smallPrintFor(
+      [...new Set(driverStretchesOf(input.interventions ?? [], dispatcherName).map((stretch) => stretch.name))].join(
+        ' or ',
+      ),
+      summary,
+      dayStartS,
+    ),
   };
 
   if (subject.kind === 'single-run') {
@@ -1205,7 +1269,12 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
 
   const nextIdx = (week.dayIdx + 1) % 7;
   const practice = input.practice === true;
-  const practiceNote = input.practiceCrowd === undefined ? PRACTICE_NOTE : PRACTICE_CROWD_NOTE;
+  const practiceNote =
+    input.practiceAttempt === true
+      ? PRACTICE_ATTEMPT_NOTE
+      : input.practiceCrowd === undefined
+        ? PRACTICE_NOTE
+        : PRACTICE_CROWD_NOTE;
   return {
     ...core,
     of: 'week-day',
@@ -1215,6 +1284,8 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
      */
     streakLine: practice ? practiceNote : streakLineFor(judgement.verdict, week.streak),
     ...(practice ? { practiceNote } : {}),
+    ...(practice && (input.practiceCrowd !== undefined || input.practiceAttempt === true) ? { dayStaysOpen: true } : {}),
+    ...weekMarksOf(week, practice),
     contractLine: contractLineFor(contract, week),
     cleared: week.cleared,
     forecast: forecastFor(
@@ -1226,6 +1297,22 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
     ),
     taught: taughtFor(contract, week),
     nextDayName: weekdayOf(nextIdx),
+  };
+}
+
+/**
+ * The two week marks a close can carry — {@link WeekDayReport.weekMark} and
+ * {@link WeekDayReport.weekClosed}. A practice close carries no mark, because it banked nothing;
+ * a practice close of the week's last day still leads to the sheet, which is standing.
+ */
+function weekMarksOf(
+  week: WeekState,
+  practice: boolean,
+): { readonly weekMark?: string; readonly weekClosed?: boolean } {
+  const mark = practice ? undefined : weekTargetMetLineOf(week);
+  return {
+    ...(mark === undefined ? {} : { weekMark: mark }),
+    ...(weekHasClosed(week) ? { weekClosed: true } : {}),
   };
 }
 
@@ -2332,9 +2419,9 @@ function diagnosisFor(
       ? undefined
       : pressCallRowOf({ ...pressCall, interventions }, (simTimeS) => clockOf(simTimeS, dayStartS));
   /*
-   * § D1138's rows, one per ordinary call, after § D1029's (a day has one kind or the other, never
-   * both). Graded by this sheet's grader against this sheet's goals, so a row's *Shift cleared* is
-   * the banner's vocabulary; a single-run sheet grades nothing and passes none (`pairVerdictsOf`'s
+   * § D1138's rows, one per ordinary call, after § D1029's (a pinned day has both since § D1204, its
+   * pinned row first). Graded by this sheet's grader against this sheet's goals, so a row's
+   * *Shift cleared* is the banner's vocabulary; a single-run sheet grades nothing and passes none (`pairVerdictsOf`'s
    * reason).
    */
   const callRows =
@@ -2948,6 +3035,17 @@ function taughtFor(contract: ScenarioContract | undefined, week: WeekState): str
     return 'A building you drew yourself. Nothing banks here — the sheet is the whole reward.';
   }
   if (contractStatus(week, contract.id) === 'cleared') {
+    /*
+     * A week the census deals still has a target after its scenario is cleared, and meeting it
+     * still counts, toward the tower's record of weeks (lane AL-F, § D1230). *Nothing more banks*
+     * was false of every such week after the first.
+     */
+    if (weekDealOf(contract.id) !== undefined) {
+      return (
+        `${contract.label} is already cleared, and its reward is open: ${contract.reward}. ` +
+        'This week’s target still counts, toward your record of weeks on this tower.'
+      );
+    }
     return (
       `${contract.label} is already cleared, and its reward is open: ${contract.reward}. ` +
       'Nothing more banks against it — days here keep the streak, and the sheet is the reward now.'

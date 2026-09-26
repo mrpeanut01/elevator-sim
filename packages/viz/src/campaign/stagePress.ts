@@ -351,6 +351,41 @@ export function routeRefusalsOf(
   stages: readonly CampaignStage[],
   resources: StageRouteResources,
 ): RouteRefusal {
+  const admit = routeAdmissionOf(stages, resources);
+  return (stageId, routeName) => {
+    const answer = admit(stageId, routeName);
+    if (answer === undefined) return undefined;
+    if (typeof answer === 'string') return answer;
+    return answer.admitted ? undefined : answer.sentence;
+  };
+}
+
+/** What a named route costs on a stage's base rung, or `undefined` where the check does not admit it. */
+export type RouteUnits = (stageId: string, routeName: string) => number | undefined;
+
+/**
+ * **What each way through the census names costs at the budget the stage opens on** — the par's
+ * input, [§ D1234](../../../../DECISIONS.md). The same check {@link routeRefusalsOf} asks, read for
+ * its price: `undefined` where the route is refused, where the name is a drawn dial configuration
+ * whose values the table does not carry, or where the stage cannot be built here.
+ */
+export function routeUnitsOf(stages: readonly CampaignStage[], resources: StageRouteResources): RouteUnits {
+  const admit = routeAdmissionOf(stages, resources);
+  return (stageId, routeName) => {
+    const answer = admit(stageId, routeName);
+    if (answer === undefined || typeof answer === 'string' || !answer.admitted) return undefined;
+    return answer.units;
+  };
+}
+
+/**
+ * The one check, asked of a named route at a stage's base rung: the admission, a sentence where the
+ * stage's own starting setting is missing, or `undefined` where nothing can be asked.
+ */
+function routeAdmissionOf(
+  stages: readonly CampaignStage[],
+  resources: StageRouteResources,
+): (stageId: string, routeName: string) => StageAdmission | string | undefined {
   const stagesById = new Map(stages.map((stage) => [stage.id, stage]));
   const profilesById = new Map(resources.profiles.map((profile) => [profile.id, profile]));
   return (stageId, routeName) => {
@@ -363,7 +398,7 @@ export function routeRefusalsOf(
     const building = resources.buildings.find((entry) => entry.id === stage.building);
     /* An edited move is admissible only on a building (GitHub issue #475); without one, nothing is asked. */
     if (move.edit !== undefined && building === undefined) return undefined;
-    const admission = admitStageMove(
+    return admitStageMove(
       {
         space: resources.space,
         schedule: resources.schedule,
@@ -374,6 +409,5 @@ export function routeRefusalsOf(
       move,
       stageUnitsAt(stage, null),
     );
-    return admission.admitted ? undefined : admission.sentence;
   };
 }

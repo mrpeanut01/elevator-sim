@@ -29,6 +29,7 @@ import {
   type ShippedSite,
 } from '../dev/browserTier.test-helper.js';
 import { FIXIT_PAR, FIXIT_PAR_COPY } from '../fixit/par.js';
+import { PAR_MARK_COPY } from '../scenario/par.js';
 
 let site: ShippedSite;
 let browser: Browser;
@@ -156,6 +157,54 @@ describe.skipIf(!HAS_BROWSER)('a fixed verdict on the shipped bundle — § D101
     }
   }, 120_000);
 
+  it('a fixed case shows its par after a reload, on the case and on its row — lane AL-B, seat C D5', async () => {
+    /*
+     * The post-AK panel's seat C D5: fix a case, reload, reopen it, and the par is gone; the row
+     * said only *FIXED · on your own*. Red before the fix: no `.everyday-fixit-par` after the reload
+     * and no par on the row.
+     */
+    const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
+    try {
+      await openTwoCarsOut(page);
+      await page.locator('.everyday-fixit-car-A select').selectOption('high');
+      await page.locator('.everyday-bar-primary').click();
+      await page.waitForFunction(
+        () => (document.querySelector('.everyday-bar-primary')?.textContent ?? '') === 'Next building',
+        undefined,
+        { timeout: 120_000 },
+      );
+      const par = FIXIT_PAR['two-cars-out-wrong-month']?.units ?? -1;
+      await page.reload({ waitUntil: 'load' });
+      await page.waitForFunction(
+        () => document.querySelector<HTMLElement>('.menu-overlay')?.hidden === true,
+        undefined,
+        { timeout: 30_000 },
+      );
+      await openScenarioEntry(page, 'fix-a-building');
+      await page.waitForFunction(() => document.querySelectorAll('.everyday-fixit-case').length > 0, undefined, {
+        timeout: 60_000,
+      });
+      const row = page.locator('.everyday-fixit-case', { hasText: 'Two cars out in the wrong month' });
+      await row.click();
+      await page.waitForSelector('.everyday-fixit-par', { timeout: 60_000 });
+      const kept = await page.evaluate(() => ({
+        par: document.querySelector('.everyday-fixit-par')?.textContent ?? '',
+        row: [...document.querySelectorAll('.everyday-fixit-case')]
+          .find((candidate) => (candidate.textContent ?? '').includes('Two cars out in the wrong month'))
+          ?.querySelector('.everyday-fixit-case-par')?.textContent ?? '',
+        withheld: document.querySelector('.everyday-fixit-diagnosis-note')?.textContent ?? '',
+      }));
+      expect(kept.par).toContain(`cost ${String(par)} units.`);
+      expect(kept.par).toContain(FIXIT_PAR_COPY.same);
+      /* § D1234: a fix at a priced par carries the mark, on the row and at the head of the line. */
+      expect(kept.row).toBe(`par ${String(par)} u · yours ${String(par)} u · at par`);
+      expect(kept.par.startsWith(PAR_MARK_COPY.at)).toBe(true);
+      expect(kept.withheld).not.toContain('marked as fixed with the diagnosis');
+    } finally {
+      await page.close();
+    }
+  }, 120_000);
+
   it('a zoning step that opens trips on Midtown runs to a verdict and names the re-drawn crowd — § D1160', async () => {
     /*
      * The post-AJ panel's seat C D1, on the bundle: *Zoning that starves the top*, one press of the
@@ -196,6 +245,10 @@ describe.skipIf(!HAS_BROWSER)('a fixed verdict on the shipped bundle — § D101
       }));
       expect(landed.failed).toBeNull();
       expect(landed.card).toContain('changes which trips the lifts can carry');
+      /* Lane AL-B, seat D H4: the note over the two panes names the same crowd the basis line does. */
+      const pairNote = await page.evaluate(() => document.querySelector('.everyday-fixit-pair')?.textContent ?? '');
+      expect(pairNote).toContain('a crowd drawn for the building as you changed it');
+      expect(pairNote).not.toMatch(/same morning and the same crowd/i);
       expect(landed.card).not.toMatch(/passenger p\d+|claims both runs/);
     } finally {
       await page.close();

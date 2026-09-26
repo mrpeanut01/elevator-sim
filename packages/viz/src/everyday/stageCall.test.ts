@@ -6,7 +6,14 @@
  * is the stage's own held beat.
  */
 
-import { describe, expect, it } from 'vitest';
+import { loadConfig } from '@elevator-sim/core';
+import { beforeAll, describe, expect, it } from 'vitest';
+
+import type { VizRecording } from '../contract/types.js';
+import { DATA_DIR, fixtureConfig } from '../fixtures.test-helper.js';
+import { overlayAt } from '../frame/overlay.js';
+import { observationsAt } from '../live/observations.js';
+import { recordRun } from '../record/recordRun.js';
 
 import { WAIT_BANDS } from '../live/bands.js';
 import { PARK_CARS_LOBBY_LABEL, SPREAD_CARS_LABEL } from '../live/interventions.js';
@@ -15,7 +22,15 @@ import type { PressCall } from '../shift/pressCall.js';
 import { goalsForDay } from '../shift/goals.js';
 import type { GoalReading } from '../shift/types.js';
 
-import { STAGE_CALL_COPY, STAGE_END_DAY_COPY, stageCallCardOf, stageCallPhaseOf, stageEndDayOf } from './stageCall.js';
+import {
+  STAGE_CALL_COPY,
+  STAGE_END_DAY_COPY,
+  stageCallCardOf,
+  stageCallPhaseOf,
+  stageCallPresentOf,
+  stageEndDayOf,
+  type StageCallPresent,
+} from './stageCall.js';
 import { PACE_HOLD_WAIT_S } from './stagePace.js';
 
 const DAY_START_S = 8 * 3600;
@@ -234,5 +249,89 @@ describe('End the day', () => {
     const view = stageEndDayOf(readingsWith('queue', 'missed'))!;
     expect(/\d/u.test(`${view.label} ${view.note}`)).toBe(false);
     expect(STAGE_END_DAY_COPY.label).toBe('End the day');
+  });
+});
+
+/**
+ * **The card's present-tense line** — wave AL, lane AL-C, [§ D1206](../../../../DECISIONS.md), the
+ * decide-an ruling's Q1(d) first half: how many stand, where the most stand, the longest wait — read
+ * off the run at the call second and never ahead of it, and held to the card's ban lists.
+ */
+describe('the present-tense line — § D1206', () => {
+  let recording: VizRecording;
+  beforeAll(async () => {
+    const config = await loadConfig(DATA_DIR);
+    const base = fixtureConfig(config, { buildingId: 'midtown-office', durationS: 900, onTimeout: 'report' });
+    recording = recordRun({ ...base, demand: { arrivalRatePctPop5min: 14 } }, { recordDecisions: false }).recording;
+  });
+
+  /** An instant somebody has waited a minute, which is where a first-minute call stands. */
+  function busyInstant(): number {
+    for (let atS = recording.startedAt + 60; atS < recording.endedAt; atS += 5) {
+      if (observationsAt(recording, atS).waitingNow >= 3 && (overlayAt(recording, atS).longestCurrentWaitS ?? 0) >= 60) return atS;
+    }
+    throw new Error('the fixture never has three standing with a minute waited');
+  }
+
+  it('counts what the header counts: everybody standing, and the longest wait among them', () => {
+    const atS = busyInstant();
+    const present = stageCallPresentOf(recording, atS);
+    expect(present.standing).toBe(observationsAt(recording, atS).waitingNow);
+    expect(present.floors.reduce((sum, floor) => sum + floor.standing, 0)).toBe(present.standing);
+    expect(present.longestS).toBeCloseTo(overlayAt(recording, atS).longestCurrentWaitS ?? Number.NaN, 6);
+  });
+
+  it('reads nothing after the call: the same line off a run that differs only after it', () => {
+    const atS = busyInstant();
+    const after = {
+      ...recording,
+      legs: recording.legs.map((leg) =>
+        leg.arrivedAt <= atS ? leg : { ...leg, boardedAt: leg.arrivedAt + 1, refusedAt: undefined },
+      ),
+    } as VizRecording;
+    expect(stageCallPresentOf(after, atS)).toEqual(stageCallPresentOf(recording, atS));
+    const [call] = CALLS;
+    const line = (run: VizRecording) => stageCallCardOf({ ...call!, atS }, DAY_START_S, [], undefined, stageCallPresentOf(run, atS)).facts.at(-1);
+    expect(line(after)).toBe(line(recording));
+  });
+
+  it('is the card’s last fact on either question, with nothing but counts of the frame in it', () => {
+    const atS = busyInstant();
+    const present = stageCallPresentOf(recording, atS);
+    const [call] = CALLS;
+    const placement = stageCallCardOf({ ...call!, atS }, DAY_START_S, [], undefined, present);
+    const driver = stageCallCardOf({ ...call!, atS }, DAY_START_S, [], { 'driver-a': 'A', 'driver-b': 'B', leave: 'C' }, present);
+    const line = placement.facts.at(-1)!;
+    expect(driver.facts.at(-1)).toBe(line);
+    expect(placement.facts.length).toBe(stageCallCardOf({ ...call!, atS }, DAY_START_S, []).facts.length + 1);
+    /* Every figure in it is one of the frame's counts: the standing, the floors, the most, the longest. */
+    const most = Math.max(...present.floors.map((floor) => floor.standing));
+    const allowed = new Set(
+      [present.standing, present.floors.length, most, Math.round(present.longestS ?? 0)].map(String),
+    );
+    for (const figure of line.match(/(?<!floor )\b\d+/gu) ?? []) expect(allowed.has(figure), `${figure} in “${line}”`).toBe(true);
+  });
+
+  it('holds the card’s ban lists on every arm it can draw', () => {
+    const arms: StageCallPresent[] = [
+      { standing: 0, floors: [], longestS: undefined },
+      { standing: 1, floors: [{ label: 'Lobby', standing: 1 }], longestS: 64.4 },
+      { standing: 5, floors: [{ label: 'Lobby', standing: 5 }], longestS: 71 },
+      { standing: 9, floors: [{ label: 'Lobby', standing: 6 }, { label: 'floor 4', standing: 2 }, { label: 'floor 7', standing: 1 }], longestS: 88.2 },
+      { standing: 8, floors: [{ label: 'Lobby', standing: 4 }, { label: 'floor 4', standing: 4 }], longestS: 120 },
+    ];
+    const lines = arms.map((present) => stageCallCardOf(CALLS[0]!, DAY_START_S, [], undefined, present).facts.at(-1)!);
+    expect(lines).toEqual([
+      'Nobody is standing at the landings.',
+      'One person is standing, at Lobby, and has waited 64 s.',
+      '5 people are standing, all at Lobby. The longest of them has waited 71 s.',
+      '9 people are standing on 3 floors, the most at Lobby (6). The longest of them has waited 88 s.',
+      '8 people are standing on 2 floors, 4 each at Lobby and floor 4. The longest of them has waited 120 s.',
+    ]);
+    for (const text of lines) {
+      for (const [what, pattern] of BANNED) expect(pattern.test(text), `${what}: ${text}`).toBe(false);
+      /* No forward figure: nothing about what follows, what an answer does, or a count ahead. */
+      expect(text).not.toMatch(/\b(will|would|next|ahead|expect\w*|forecast|if you|after)\b/iu);
+    }
   });
 });

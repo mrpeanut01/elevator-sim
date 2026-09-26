@@ -20,7 +20,7 @@ import { openWeek, outcomeOf, wasGraded } from '../shift/week.js';
 import { weekDealOf } from '../shift/weekStake.js';
 
 import { EM_DASH } from './figures.js';
-import { verdictOf, WEEK_CARDS, weekScreenViewOf } from './weekView.js';
+import { verdictOf, WEEK_CARDS, WEEK_START_NEXT_LABEL, weekScreenViewOf } from './weekView.js';
 
 const MET: GoalObservations = {
   arrived: 400,
@@ -298,7 +298,7 @@ describe('the week’s stake on the strip, and its sheet at the close — § D11
   it('marks the days that do not count on their cards, and says why under the strip in the brief’s sentence', () => {
     // Since § D1180 every Midtown weekday counts as dealt, so the days that do not are the weekend.
     const view = viewOf(midtown(7, [1, 2, 3, 4, 5, 6].map((day) => midtownDay(day, MET))), false);
-    expect(view.stake).toBe('This week’s target: 4 of 5 counted days clean. 5 so far.');
+    expect(view.stake).toBe('This week’s target: 4 of 5 counted days clean. 5 so far. Met on Thursday.');
     expect(
       view.cards.filter((card) => card.day !== undefined).map((card) => [card.weekday, card.counts, card.note]),
     ).toEqual([
@@ -343,5 +343,38 @@ describe('the week’s stake on the strip, and its sheet at the close — § D11
     expect(view.sheet?.targetLine).toBe('Target 4: not met.');
     // With no house answered yet for the run it needs, the sheet says so rather than counting it.
     expect(weekScreenViewOf(input).sheet?.houseLine).toMatch(/still being run/u);
+  });
+
+  /*
+   * Swarm DN's Q2.3 and Q2.6, lane AL-F (§ D1227, § D1230): while the sheet stands the screen's one
+   * button starts the next week, and the tower's record of closed weeks is drawn where one is kept.
+   */
+  it('offers the next week while the sheet stands, and the week row’s own button otherwise', () => {
+    const history = [1, 2, 3, 4, 5, 6, 7].map((day) => midtownDay(day, MET, 'collective'));
+    const closed = weekScreenViewOf({
+      week: midtown(7, history),
+      towerToday: 'Midtown Office',
+      nameOf: NAME_OF,
+      dayClosed: true,
+      sheetStanding: true,
+    });
+    expect(closed.primary).toBe(WEEK_START_NEXT_LABEL);
+    const open = weekScreenViewOf({
+      week: midtown(4, history.slice(0, 4)),
+      towerToday: 'Midtown Office',
+      nameOf: NAME_OF,
+      dayClosed: true,
+      sheetStanding: true,
+    });
+    expect(open.primary).toBeUndefined();
+  });
+
+  it('draws the tower’s record of closed weeks, and nothing where none has closed', () => {
+    const input = { week: midtown(2, []), towerToday: 'Midtown Office', nameOf: NAME_OF, dayClosed: false, sheetStanding: false };
+    expect(weekScreenViewOf(input).record).toBeUndefined();
+    expect(weekScreenViewOf({ ...input, record: { contractId: 'c2', closed: 0, met: 0, best: 0 } }).record).toBeUndefined();
+    expect(weekScreenViewOf({ ...input, record: { contractId: 'c2', closed: 3, met: 2, best: 5 } }).record).toBe(
+      'Your record on this tower: 3 weeks closed, 2 with the target met, and the most clean counted days in one week is 5.',
+    );
   });
 });

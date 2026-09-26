@@ -466,7 +466,22 @@ export const SURVIVOR_COPY = Object.freeze({
   diagnosisLead: 'Nothing gets through this one as it stands, and that is the point:',
   unbuildableNote:
     'A setting this tower cannot be built with is not counted either way — it is neither a way through nor a failed attempt.',
+  /**
+   * **Drawn in place of the split until the stage is cleared** — [§ D1233](../../../../DECISIONS.md),
+   * swarm DN's Q3 ruling item 1. The split by kind of choice was the answer: on stage 2 it read
+   * *0 of 6 by name, 5 of 21 with idle cars waiting somewhere else*, which names the lever.
+   */
+  splitHeldNote: 'Which kind of choice the ways through came from is shown once you have cleared it.',
 });
+
+/**
+ * How much of the count a sentence may say — [§ D1233](../../../../DECISIONS.md).
+ *
+ * `'total'` is the count and its `k` with the method notes, and it is what a player meets before a
+ * clear. `'split'` adds how many ways through each kind of choice produced, which is the answer to
+ * the stage, so it is drawn only once the device holds that stage's clear.
+ */
+export type SurvivorReveal = 'total' | 'split';
 
 /**
  * What a scenario says about its own difficulty, in the player's words.
@@ -486,6 +501,7 @@ export const SURVIVOR_COPY = Object.freeze({
 export function survivorSentenceFor(
   scenario: PublishedSurvivorScenario,
   step: PublishedSurvivorStep,
+  reveal: SurvivorReveal = 'total',
 ): string {
   if (step.examined === 0) {
     return (
@@ -521,6 +537,14 @@ export function survivorSentenceFor(
    * would put an interval round a census.
    */
   const method = step.sampling.method === 'sampled' ? ` ${SURVIVOR_COPY.sampleNote}` : '';
+  /*
+   * § D1233: before a clear the parts are not counted out, because which part the ways through
+   * came from is the stage's answer. The method notes stay, so a reader still knows the total mixes
+   * a census with a sample, and a zero still reads as *none found* rather than *none there*.
+   */
+  if (reveal === 'total') {
+    return `${SURVIVOR_COPY.heading}: ${tried} and ${through}. ${SURVIVOR_COPY.censusNote}${method} ${SURVIVOR_COPY.splitHeldNote}`;
+  }
   return `${SURVIVOR_COPY.heading}: ${tried} and ${through}. ${split} ${SURVIVOR_COPY.censusNote}${method}`;
 }
 

@@ -750,6 +750,15 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'The attempts slot — wave AL, lane AL-E, § D1218. `ATTEMPT_KEY` is a storage key, ' +
+        '`loadAttempts` returns the attempts it could read and drops the rest in silence, and ' +
+        '`saveAttempts` returns whether the store took the write. None of them returns a sentence, ' +
+        'and what a player reads about an attempt is `shift/attempt.ts#DAY_ATTEMPT_COPY`, which the ' +
+        '`EVERYDAY_MENU` adapter seeds by name.',
+      ids: ['persist/attempt.ts#ATTEMPT_KEY', 'persist/attempt.ts#loadAttempts', 'persist/attempt.ts#saveAttempts'],
+    },
+    {
+      reason:
         'The Everyday shell\'s boot seam: two CSS selectors and the functions that press what they ' +
         'find. No player reads any of it. The two `ENGINEER_*` selectors are ' +
         '`document.querySelector` arguments — derived only because the two-adjacent-words scanner ' +
@@ -1865,6 +1874,16 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'Answers a boolean, and authors nothing — § D1212. `stageSkipApplies` is derived for ' +
+        '`stagePaceOf`’s reason above: it compares against the `whole-day` member of ' +
+        '`shift/types.ts#RunHorizon`, whose hyphen the two-adjacent-words scanner reads as a phrase. ' +
+        'What a player reads about a skip is `STAGE_SKIP_BEAT_NOTE` and `stageSkipLineOf`, both ' +
+        'seeded by the stage adapter; that the gate is right is asserted in ' +
+        '`everyday/stagePace.test.ts`, in both directions and through the real `Playback`.',
+      ids: ['everyday/stagePace.ts#stageSkipApplies'],
+    },
+    {
+      reason:
         'The same union tag as `runHorizonOf` above, and for its reason: both return a member of ' +
         '`shift/types.ts#RunHorizon` (or, for a malformed `data/` value, the empty string a loader ' +
         'check names), and are derived only because `whole-day` reads to the two-adjacent-words ' +
@@ -1929,6 +1948,20 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'The week’s record and its crowds, plumbing only — wave AL, lane AL-F, § D1226 and § D1229. ' +
+        '`weekTargetMetDayOf` returns a filed day, whose weekday a player reads through ' +
+        '`weekTargetMetLineOf` and `weekStakeLineOf`, both seeded by the week adapter. ' +
+        '`derivedCrowdOf` and `dealtCrowdOf` return a seed: the digits a player reads are the seed ' +
+        'line’s, which prints the run’s crowd whatever dealt it and whose derived arm the door adapter ' +
+        'seeds by name.',
+      ids: [
+        'shift/weekStake.ts#weekTargetMetDayOf',
+        'shift/weekRecord.ts#derivedCrowdOf',
+        'shift/weekRecord.ts#dealtCrowdOf',
+      ],
+    },
+    {
+      reason:
         'The press-moment ruling’s plumbing — wave AI, § D1029. `admittedPressDayIds` and ' +
         '`pressDayMeasuredAs` return ids and a pin, and are derived only because they reach ' +
         '`contractLadderIssues`’ own call-block check, whose content-author strings the entry above ' +
@@ -1968,7 +2001,9 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'through the card and the row; `dayCallChangeOf` returns an intervention, ' +
         '`DAY_CALL_FINAL_GOAL_IDS` is two goal ids, `dayCallLostGoalOf` returns a reading, and ' +
         '`DAY_ENDED_EARLY_ROW_ID` is a row id. `dayCallAdmits` left this list when it stopped ' +
-        'reading `DAY_CALL_ANSWERS`.',
+        'reading `DAY_CALL_ANSWERS`.' +
+        ' Wave AL (§ D1204) adds `dev/state.ts#dayCallsOpenOn`, the gate `dev/main.ts#dayCallOnStage` ' +
+        'asks, which returns one of three gate ids (`open`, `not-offered`, `shut`) and no word a player reads.',
       ids: [
         'shift/dayCalls.ts#nextDayCallOf',
         'shift/dayCalls.ts#dayCallsOffered',
@@ -1984,6 +2019,7 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'shift/dayCalls.ts#dayCallLostGoalOf',
         'shift/dayCalls.ts#DAY_ENDED_EARLY_ROW_ID',
         'dev/state.ts#dayCallFactsOf',
+        'dev/state.ts#dayCallsOpenOn',
         'dev/dayCallSession.ts#openDayCallSession',
       ],
     },

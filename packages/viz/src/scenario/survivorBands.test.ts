@@ -84,6 +84,11 @@ import type { PublishedSurvivorScenario, PublishedSurvivors } from './survivors.
  * inside, now with page survivors beside their dropdown ones. The paragraphs above are the dated
  * record of the 2026-09-10 reading and are kept as that.
  *
+ * **Stages 7 and 8 moved toward their bands and are still above them** after wave AL started both on
+ * `zoned-uppeak` ([§ D1235](../../../../DECISIONS.md)): stage 7 reads 11 of 63 (0.17 against a 0.15
+ * ceiling) and stage 8 reads 6 of 39 (0.15 against 0.10). The re-authoring was done against the
+ * stand-alone criterion rather than against the band, so neither row leaves this register.
+ *
  * The owner approved the band as drafted on 2026-09-10, so every entry is a scenario outside an
  * approved band. If the band moves, this register moves with it on the same commit, and that is the
  * band moving rather than a scenario.

@@ -430,12 +430,23 @@ const DC2B_SHORT: ReadonlySet<string> = new Set<string>([]);
  * survivor table counts none of them; they are DC-2 breaches all the same, and stage 8's two are at
  * position eight, which § D528 clause 2 reaches. Recorded here as measured rather than rebalanced:
  * the rebalance is `docs/33` C2's, by demand or fabric and never by a bar.
+ *
+ * **Stages 7 and 8 moved when wave AL started them on `zoned-uppeak`** ([§ D1235](../../../../DECISIONS.md)).
+ * Read off the lane's own census of both stages under the new starting setting, the stage's goals and
+ * both seed sets, played through `measureSurvivors.ts#measureScenarioSurvivors` (the same press and
+ * judge this tier plays), not off this file's deep tier, which was not re-run: stage 8's two rows
+ * leave, since neither `eta` nor `fairness-first` meets every bar on the tuning seeds against the new
+ * baseline, and stage 7 gains three, `auction-multi-round`, `collective-enroute` and
+ * `predictive-balanced`, each meeting every bar on the tuning seeds and refused on the holdout. That
+ * is the stage's own lesson (*a gain living only in these passenger traces has somewhere to fail*)
+ * arriving from the dropdown, and it is a DC-2 breach at position seven all the same, recorded rather
+ * than rebalanced.
  */
 const DROPDOWN_CLEARS: Readonly<Record<string, readonly string[]>> = Object.freeze({
   'stage-1-first-call': ['zoned-uppeak'],
   'stage-3-overwhelmed': ['fairness-first'],
   'stage-5-credentials': ['auction', 'capacity-aware', 'energy-aware', 'eta', 'fairness-first', 'predictive-balanced'],
-  'stage-8-the-headline-address': ['eta', 'fairness-first'],
+  'stage-7-prove-it': ['auction-multi-round', 'collective-enroute', 'predictive-balanced'],
 });
 
 /**
@@ -461,7 +472,8 @@ const DROPDOWN_CLEARS: Readonly<Record<string, readonly string[]>> = Object.free
  */
 const DROPDOWN_CLEARS_REFUSED_ON_HOLDOUT: Readonly<Record<string, readonly string[]>> = Object.freeze({
   'stage-5-credentials': ['auction', 'capacity-aware', 'energy-aware', 'eta', 'fairness-first'],
-  'stage-8-the-headline-address': ['eta', 'fairness-first'],
+  /* § D1235: under `zoned-uppeak` all three meet on the tuning seeds and none holds on the holdout. */
+  'stage-7-prove-it': ['auction-multi-round', 'collective-enroute', 'predictive-balanced'],
 });
 
 /**

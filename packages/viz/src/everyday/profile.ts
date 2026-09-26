@@ -54,6 +54,7 @@
 import { displayNameIssueOf, type AccountState } from '../menu/account.js';
 import { savedRatingIssue, type SavedRating } from '../gauntlet/ladder.js';
 import type { SessionStore } from '../persist/types.js';
+import type { WeekRecord } from '../shift/weekRecord.js';
 /*
  * The stage's pure half, for the ladder and its default — the arrow runs one way, as it does for
  * `settingsView.ts`: `stageScreenModel.ts` has never imported this module.
@@ -213,6 +214,51 @@ export interface EverydayProgress {
    * because until then it always was. {@link diagnosisShownSetOf} reads an absent field that way.
    */
   readonly diagnosisShownCaseIds?: readonly string[];
+  /**
+   * **What the order that fixed each case cost**, in the schedule's units — lane AL-B, the post-AK
+   * panel's seat C D5. [§ D1184](../../../../DECISIONS.md)'s par line compares the par with the cost
+   * of the order the fixed verdict measured; that order lived in the session, so a reload drew a
+   * fixed case with no par at all. Kept here, one entry per case, overwritten by the next fixed
+   * verdict on the same case (the one the fixed card last showed).
+   *
+   * **Optional, and its absence means *not recorded***: a case fixed before this field existed has
+   * no cost here, and the par is then drawn without a comparison rather than with a guessed one
+   * ({@link fixSpentUnitsOf} returns `undefined`).
+   *
+   * **Keyed by scenario id, and a campaign stage is one** — [§ D1234](../../../../DECISIONS.md). The
+   * stage page files a cleared stage's cost here under the stage's id, the same key its
+   * `scenario-cleared` turn is filed under, so the hub's par mark reads one record for both kinds
+   * of scenario. A fix case id and a stage id never coincide (`campaign/`'s ids start `stage-`).
+   */
+  readonly fixSpent?: readonly FixSpent[];
+  /**
+   * **Each tower's record of closed weeks** — `shift/weekRecord.ts`, wave AL, lane AL-F
+   * ([§ D1230](../../../../DECISIONS.md)). Weeks closed, weeks met, the best week, and the last date
+   * crowd a scored day on the tower was filed on, which is what keeps a new week's crowds new
+   * ([§ D1229](../../../../DECISIONS.md)). Kept here rather than on the session's week because
+   * § D1177's roll empties the week, and this is what outlives the roll.
+   *
+   * **Optional, and its absence means *no week closed yet***, which is every device before this
+   * field and every device that has not closed one.
+   */
+  readonly weekRecords?: readonly WeekRecord[];
+}
+
+/** The records kept on this device, or none. */
+export function weekRecordsOf(progress: EverydayProgress): readonly WeekRecord[] {
+  return progress.weekRecords ?? [];
+}
+
+/** Progress with its week records replaced. Returns the same object when nothing changed. */
+export function progressWithWeekRecords(progress: EverydayProgress, records: readonly WeekRecord[]): EverydayProgress {
+  if (records === progress.weekRecords) return progress;
+  return { ...progress, weekRecords: records };
+}
+
+/** One fixed case's cost — {@link EverydayProgress.fixSpent}. A list entry, for `JSON.stringify`. */
+export interface FixSpent {
+  readonly caseId: string;
+  readonly units: number;
 }
 
 /** A player who has earned nothing yet — and what every refusal falls back to. */
@@ -257,6 +303,23 @@ export function progressWithSolvedCases(progress: EverydayProgress, solvedCaseId
   return { ...progress, solvedCaseIds, diagnosisShownCaseIds: [...diagnosisShownSetOf(progress)] };
 }
 
+/** What the order that fixed `caseId` cost, or `undefined` where no cost was kept (seat C D5). */
+export function fixSpentUnitsOf(progress: EverydayProgress, caseId: string): number | undefined {
+  return progress.fixSpent?.find((entry) => entry.caseId === caseId)?.units;
+}
+
+/**
+ * Progress with `caseId`'s fix cost set to `units`, replacing any it held — seat C D5. Returns the
+ * same object when that is already the kept figure.
+ */
+export function progressWithFixSpent(progress: EverydayProgress, caseId: string, units: number): EverydayProgress {
+  if (fixSpentUnitsOf(progress, caseId) === units) return progress;
+  return {
+    ...progress,
+    fixSpent: [...(progress.fixSpent ?? []).filter((entry) => entry.caseId !== caseId), { caseId, units }],
+  };
+}
+
 /**
  * Progress with one dispatcher's rating replacing whatever it held for that dispatcher.
  *
@@ -276,6 +339,7 @@ export function everydayProgressWith(
       rating,
     ],
     ...(progress.diagnosisShownCaseIds === undefined ? {} : { diagnosisShownCaseIds: progress.diagnosisShownCaseIds }),
+    ...(progress.fixSpent === undefined ? {} : { fixSpent: progress.fixSpent }),
   };
 }
 
@@ -664,6 +728,31 @@ function progressIssue(value: unknown): string | undefined {
       if (typeof id !== 'string' || id === '') return 'a diagnosis shown has no case id';
     }
   }
+  const spent = record['fixSpent'];
+  if (spent !== undefined) {
+    if (!Array.isArray(spent)) return 'the saved list of fix costs is not a list';
+    for (const entry of spent as readonly unknown[]) {
+      if (typeof entry !== 'object' || entry === null) return 'a fix cost is not an entry';
+      const { caseId, units } = entry as Record<string, unknown>;
+      if (typeof caseId !== 'string' || caseId === '') return 'a fix cost has no case id';
+      if (typeof units !== 'number' || !Number.isInteger(units) || units < 0) return 'a fix cost is not a whole number of units';
+    }
+  }
+  const weeks = record['weekRecords'];
+  if (weeks !== undefined) {
+    if (!Array.isArray(weeks)) return 'the saved record of weeks is not a list';
+    for (const entry of weeks as readonly unknown[]) {
+      if (typeof entry !== 'object' || entry === null) return 'a week record is not an entry';
+      const { contractId, closed, met, best, dateCrowd } = entry as Record<string, unknown>;
+      if (typeof contractId !== 'string' || contractId === '') return 'a week record has no tower';
+      for (const count of [closed, met, best]) {
+        if (typeof count !== 'number' || !Number.isInteger(count) || count < 0) return 'a week record is not a whole count';
+      }
+      if (dateCrowd !== undefined && (typeof dateCrowd !== 'string' || !/^\d+$/u.test(dateCrowd))) {
+        return 'a week record’s crowd is not a crowd';
+      }
+    }
+  }
   const ratings = record['ratings'];
   if (!Array.isArray(ratings)) return 'the saved progress carries no list of ratings';
   for (const rating of ratings as readonly unknown[]) {
@@ -706,6 +795,24 @@ export function loadProgress(store: SessionStore): EverydayProgressStatus {
       ...(progress.diagnosisShownCaseIds === undefined
         ? {}
         : { diagnosisShownCaseIds: Object.freeze([...progress.diagnosisShownCaseIds]) }),
+      ...(progress.fixSpent === undefined
+        ? {}
+        : { fixSpent: Object.freeze(progress.fixSpent.map((entry) => Object.freeze({ caseId: entry.caseId, units: entry.units }))) }),
+      ...(progress.weekRecords === undefined
+        ? {}
+        : {
+            weekRecords: Object.freeze(
+              progress.weekRecords.map((entry) =>
+                Object.freeze({
+                  contractId: entry.contractId,
+                  closed: entry.closed,
+                  met: entry.met,
+                  best: entry.best,
+                  ...(entry.dateCrowd === undefined ? {} : { dateCrowd: entry.dateCrowd }),
+                }),
+              ),
+            ),
+          }),
     }),
     notice: null,
   };

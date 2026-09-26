@@ -79,10 +79,12 @@ import {
   profileById,
   runRungContractIdOf,
   shiftRunConfigOf,
+  startOfDayOfConfig,
   type ViewerState,
 } from '../dev/state.js';
 import { runIdentityIssues } from '../scope/runIdentity.js';
 import type { ScopeIssue } from '../scope/types.js';
+import { carAbsencesOf, type BookedOutCar } from '../shift/bookedOut.js';
 import { calendarDayFor } from '../shift/calendar.js';
 import { openWeek } from '../shift/week.js';
 import { ladderRowFor } from '../shift/ladder.js';
@@ -572,6 +574,18 @@ export function stateFromWatchRecord(
 export interface WatchRunPlan {
   readonly config: SimulationConfig;
   readonly outOfServiceCarIds: readonly string[];
+  /**
+   * **The watched run's own hour and its own cars out** — wave AL, lane AL-A, the post-AK panel's
+   * seats B and D. The replay's clock fell back to 06:00 because nothing handed the shell the
+   * watched run's start of day, so a whole day that began at 08:00 read 08:40 for a 10:40 press;
+   * and the car-out pill was switched off while watching, so car D stood idle at floor 20 with
+   * nothing saying why. Both are read here off the run the gate simulates rather than off the
+   * spectator's state: `dev/state.ts#startOfDayOfConfig` over this config, and
+   * `shift/bookedOut.ts#carAbsencesOf` over the building `shiftRunConfigOf` resolved for it, which
+   * is the derivation the live stage's pill reads for a run of the player's own.
+   */
+  readonly startOfDayS: number | undefined;
+  readonly bookedOut: readonly BookedOutCar[];
 }
 
 export function watchRunPlanOf(
@@ -580,5 +594,10 @@ export function watchRunPlanOf(
   record: WatchRecord,
 ): WatchRunPlan {
   const plan = shiftRunConfigOf(resources, stateFromWatchRecord(base, resources, record));
-  return { config: plan.config, outOfServiceCarIds: plan.outOfServiceCarIds };
+  return {
+    config: plan.config,
+    outOfServiceCarIds: plan.outOfServiceCarIds,
+    startOfDayS: startOfDayOfConfig(plan.config),
+    bookedOut: carAbsencesOf(plan.building),
+  };
 }

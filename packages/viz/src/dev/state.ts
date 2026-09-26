@@ -110,6 +110,7 @@ import {
   type ContractPressDay,
 } from '../shift/ladder.js';
 import { bookedOutCarsOf, carAbsencesOf, type BookedOutCar } from '../shift/bookedOut.js';
+import { dayCallsOffered } from '../shift/dayCalls.js';
 import { pressCallOf, type PressCall } from '../shift/pressCall.js';
 import { grownBuilding } from '../shift/growth.js';
 import { spliceEpisode, trafficProfilesWithRecord } from '../shift/episode.js';
@@ -1871,6 +1872,45 @@ export function dayCallFactsOf(
   return { horizon, bookedOut: carAbsencesOf(plan.building), pinned };
 }
 
+/**
+ * **Whether an attempt's ordinary calls may open** — the gate `dev/main.ts#dayCallOnStage` asks
+ * before it opens a session, moved here so it is a pure function a Node test can ask
+ * ([§ D1204](../../../../DECISIONS.md)).
+ *
+ * - `'open'`: the session may open now.
+ * - `'not-offered'`: a whole day too busy to call on (§ D1138 clause 5) — what § D1152's quiet row
+ *   says instead of a call. Never on a pinned day, which has its own call and its own row.
+ * - `'shut'`: anything else — no facts, a press already on the log that no call made, or a pinned
+ *   day whose call is still standing or was skipped.
+ *
+ * **A pinned day opens after its call** (§ D1204, which reverses § D1138's owner-reversible clause
+ * *no ordinary calls on a pinned press day*). `pinnedCall` is that day's § D1029 call once this
+ * attempt has answered it, and `undefined` while it stands; the log may then hold the answer and
+ * nothing else — at most one entry, stamped at the call second — because a press anywhere else is
+ * a day the session was not opened on. A skip with the pinned card up answers every call the day
+ * had left, as it does on an ordinary day, so a skipped pinned day stays shut.
+ */
+export function dayCallsOpenOn(input: {
+  readonly facts: { readonly horizon: RunHorizon; readonly pinned: boolean } | undefined;
+  /** The as-built run's legs, for § D1138 clause 5. */
+  readonly legs: number;
+  readonly interventions: readonly { readonly atS: number }[];
+  /** The pinned day's call, once this attempt answered it. */
+  readonly pinnedCall?: { readonly atS: number } | undefined;
+  /** Whether *Skip to the end* was pressed with the pinned card up — § D1151. */
+  readonly pinnedCallSkipped: boolean;
+}): 'open' | 'not-offered' | 'shut' {
+  const { facts, pinnedCall } = input;
+  if (facts === undefined) return 'shut';
+  if (facts.pinned) {
+    if (pinnedCall === undefined || input.pinnedCallSkipped) return 'shut';
+    if (input.interventions.length > 1 || input.interventions.some((entry) => entry.atS !== pinnedCall.atS)) return 'shut';
+    return dayCallsOffered(facts.horizon, input.legs) ? 'open' : 'shut';
+  }
+  if (!dayCallsOffered(facts.horizon, input.legs)) return 'not-offered';
+  return input.interventions.length === 0 ? 'open' : 'shut';
+}
+
 /** What a run will be, read before it is pressed — {@link plannedDayOf}. */
 export interface PlannedDay {
   /** {@link resolvedBuildingOf}'s answer: the building the kernel will be handed. */
@@ -1899,6 +1939,38 @@ export interface PlannedDay {
 }
 
 /**
+ * **Where a config's clock starts**, seconds since midnight, or `undefined` when its template
+ * declares no hour or `core` refuses to plan it — the value the finished run carries as
+ * `SimulationResult.trace.startOfDayS`. `core`'s own `planDemand` over the config: a document
+ * resolve and a plan, never a simulation.
+ *
+ * Split out of {@link plannedDayOf} for the replay (wave AL, lane AL-A): `dev/main.ts#enterWatch`
+ * set the watched run's hour to `undefined`, so its clock fell back to 06:00 and a replay of a
+ * day that began at 08:00 read 08:40 for a 10:40 press (the post-AK panel's seats B and D).
+ * `watch/record.ts#watchRunPlanOf` reads this over the config the gate simulates, so the hour is
+ * the watched run's own rather than the spectator's selection.
+ */
+export function startOfDayOfConfig(config: SimulationConfig): number | undefined {
+  const demand = config.demand ?? {};
+  try {
+    return planDemand({
+      building: config.building,
+      profiles: config.trafficProfiles,
+      ...(config.demandTemplate === undefined ? {} : { template: config.demandTemplate }),
+      ...(config.durationS === undefined ? {} : { templateOverrides: { durationS: config.durationS } }),
+      ...(config.windowStartS === undefined ? {} : { windowStartS: config.windowStartS }),
+      ...(config.windowEndS === undefined ? {} : { windowEndS: config.windowEndS }),
+      ...(demand.arrivalRatePctPop5min === undefined
+        ? {}
+        : { arrivalRatePctPop5min: demand.arrivalRatePctPop5min }),
+      ...(demand.directionalSplit === undefined ? {} : { directionalSplit: demand.directionalSplit }),
+    }).template.startOfDayS;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * **The building and the clock of the run `state` would produce** — [§ D1039](../../../../DECISIONS.md).
  *
  * The brief prints the times a car is booked out, and they have to be the times the stage and the
@@ -1923,27 +1995,9 @@ export function plannedDayOf(resources: BrowserResources, state: ViewerState): P
   }
   const plan = shiftRunConfigOf(resources, state);
   const { config } = plan;
-  const demand = config.demand ?? {};
-  let startOfDayS: number | undefined;
-  try {
-    startOfDayS = planDemand({
-      building: config.building,
-      profiles: config.trafficProfiles,
-      ...(config.demandTemplate === undefined ? {} : { template: config.demandTemplate }),
-      ...(config.durationS === undefined ? {} : { templateOverrides: { durationS: config.durationS } }),
-      ...(config.windowStartS === undefined ? {} : { windowStartS: config.windowStartS }),
-      ...(config.windowEndS === undefined ? {} : { windowEndS: config.windowEndS }),
-      ...(demand.arrivalRatePctPop5min === undefined
-        ? {}
-        : { arrivalRatePctPop5min: demand.arrivalRatePctPop5min }),
-      ...(demand.directionalSplit === undefined ? {} : { directionalSplit: demand.directionalSplit }),
-    }).template.startOfDayS;
-  } catch {
-    startOfDayS = undefined;
-  }
   return {
     building: plan.building,
-    startOfDayS,
+    startOfDayS: startOfDayOfConfig(config),
     dayCars: plan.dayCars,
     wholeDayRun: plan.wholeDayRun,
     templateVariesMix:

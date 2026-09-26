@@ -126,17 +126,27 @@ import { carAbsencesOf, type BookedOutCar } from '../shift/bookedOut.js';
 /* GitHub issue #592, § D991 — the whole day's acts and the pace rule over them. */
 import { actsOf, type DayAct } from '../shift/dayLength.js';
 import type { RunHorizon } from '../shift/types.js';
-import { stagePaceNoteOf, stagePaceOf, type StagePaceReason } from './stagePace.js';
+import {
+  STAGE_SKIP_BEAT_NOTE,
+  stagePaceNoteOf,
+  stagePaceOf,
+  stageSkipApplies,
+  stageSkipLineOf,
+  stageSkipOf,
+  type StagePaceReason,
+} from './stagePace.js';
 /* Wave AI, § D1029 — the pinned day's call. */
 import type { DayCallDriverNames } from '../shift/dayCalls.js';
 import type { PressCall } from '../shift/pressCall.js';
 import {
   STAGE_CALL_COPY,
   stageCallCardOf,
+  stageCallPresentOf,
   stageCallPhaseOf,
   stageEndDayOf,
   type StageCallOption,
 } from './stageCall.js';
+import { STAGE_CALL_ROWS_HEADING } from './stageCallRow.js';
 /* GitHub issue #340: the two beat-1 events. The recorder is a no-op until consent is granted. */
 import { everydayTelemetry } from './telemetryPort.js';
 import { telemetryRunPointerOf } from '../telemetry/schema.js';
@@ -165,8 +175,8 @@ import {
   watchStageBarOf,
   SPECTATOR_MAKES_NO_CHANGES,
 } from './watchStage.js';
-import type { WatchingView } from '../watch/view.js';
-import { interventionLogOf } from '../live/interventions.js';
+import type { WatchingView, WatchOwner } from '../watch/view.js';
+import { driverNameAt, interventionLogOf } from '../live/interventions.js';
 import { campaignDockViewOf, type CampaignDockView } from './campaignDock.js';
 
 /* -------------------------------------------------------------------------- *
@@ -216,7 +226,7 @@ let alarmDrawn = false;
  * the four above, and cleared when the watch ends: a stale refusal is worse than none
  * (§ D227), and this one would sit on a *player's own* day claiming it belonged to somebody else.
  */
-const watchFacts: { hasReplay: boolean; playRefusal: string | undefined } = {
+const watchFacts: { hasReplay: boolean; playRefusal: string | undefined; owner?: WatchOwner | undefined } = {
   hasReplay: false,
   playRefusal: undefined,
 };
@@ -396,6 +406,16 @@ function mountStage(
   /** When a chip was pressed on this day — § D991 clause 2 as § D1029 amends it. */
   let playerChoseSpeedAtS: number | undefined;
   /*
+   * ---- § D1212's skip between a scored whole day's peaks. Three cells, reset in `adopt`. ----
+   *
+   * `skipArmedAtS` is where the beat before a skip began, or `undefined` when no skip is coming;
+   * `skipLandedAtS` is where the last skip landed, so the frame it lands on does not start another
+   * beat; `skipLine` is the line the last skip left, which the strip keeps until the next one.
+   */
+  let skipArmedAtS: number | undefined;
+  let skipLandedAtS: number | undefined;
+  let skipLine = '';
+  /*
    * ---- § D1029's call — wave AI. Two cells, both set in `adopt`. ----
    *
    * `stageCall` is latched once per attempt, from the recording the attempt opened on, and only
@@ -551,6 +571,8 @@ function mountStage(
   ].join(';');
   /* Read once per recording, not per frame — `resolvedBuilding()` resolves the whole run config. */
   let bookedFor: VizRecording | undefined;
+  /* Whether {@link bookedCars} was read for a watched run — the spectator state can arrive a frame after its recording. */
+  let bookedWatching = false;
   let bookedCars: readonly BookedOutCar[] = [];
 
   const driving = el(doc, 'span', 'everyday-stage-driving');
@@ -647,6 +669,16 @@ function mountStage(
   const paceNote = el(doc, 'span', 'everyday-stage-pace');
   paceNote.style.cssText = `align-self:center;font:500 11px ${TYPE.mono};color:${C.warmGrey}`;
   speeds.append(paceNote);
+  /*
+   * § D1212's line — the beat's note while a skip is coming, and then what the skip passed over.
+   * Its own element beside the pace note, because the pace note says why the transport is at its
+   * rung and this says where the playhead went; one line doing both would be rewritten every frame.
+   * Polite, so a reader hears a skip once, when it lands.
+   */
+  const skipNote = el(doc, 'span', 'everyday-stage-skip-line');
+  skipNote.setAttribute('aria-live', 'polite');
+  skipNote.style.cssText = `align-self:center;font:500 11px ${TYPE.mono};color:${C.warmGrey}`;
+  speeds.append(skipNote);
 
   const cameras = el(doc, 'div', 'everyday-stage-cameras');
   /*
@@ -973,6 +1005,7 @@ function mountStage(
     const careerDay = context.ctx === 'campaign' ? host.campaignDay() : undefined;
     if (careerDay !== undefined) host.runCampaignDay(careerDay.tower.id);
     else if (context.ctx === 'rush') host.startRush();
+    else if (context.ctx === 'daily') host.playDay();
     else host.startRun();
     syncTransport();
   });
@@ -1360,7 +1393,42 @@ function mountStage(
    */
   const callBody = el(doc, 'div', 'everyday-stage-call-body');
   callBody.style.cssText = 'display:grid;gap:7px';
-  callCard.append(callBody);
+  /*
+   * **The close asks once while a call is up** — wave AL, lane AL-A, the post-AK panel's seat B
+   * (D1). § 3.3's *Close the day* filed the day as it stood, unanswered, on the first press; on a
+   * phone it is the largest button on the screen. The ask sits inside the card, under its answers,
+   * so the question and the choice it would skip are read together. Hidden by its attribute alone
+   * (its layout is on an inner row), for `callBody`'s reason above. Words: `STAGE_CALL_COPY`.
+   */
+  const closeAsk = el(doc, 'div', 'everyday-stage-call-confirm');
+  closeAsk.hidden = true;
+  closeAsk.setAttribute('role', 'group');
+  closeAsk.setAttribute('aria-label', STAGE_CALL_COPY.closeAsk);
+  const closeAskInner = el(doc, 'div');
+  closeAskInner.style.cssText = `display:grid;gap:7px;margin-top:10px;padding-top:10px;border-top:1px solid ${C.rule}`;
+  const closeAskQuestion = el(doc, 'p', 'everyday-stage-call-confirm-question', STAGE_CALL_COPY.closeAsk);
+  closeAskQuestion.style.cssText = 'margin:0;font-size:13.5px;font-weight:600';
+  const closeAskConsequence = el(doc, 'p', undefined, STAGE_CALL_COPY.closeConsequence);
+  closeAskConsequence.style.cssText = `margin:0;font-size:13px;line-height:1.45;color:${C.inkSoft}`;
+  const closeAskRow = el(doc, 'div');
+  closeAskRow.style.cssText = `display:flex;flex-wrap:wrap;gap:${String(GAP.row)}px`;
+  const closeAskFile = el(doc, 'button', 'everyday-stage-call-confirm-file', STAGE_CALL_COPY.closeFile);
+  closeAskFile.type = 'button';
+  closeAskFile.style.cssText = ARM_BUTTON_CSS;
+  const closeAskBack = el(doc, 'button', 'everyday-stage-call-confirm-back', STAGE_CALL_COPY.closeBack);
+  closeAskBack.type = 'button';
+  closeAskBack.style.cssText = ARM_BUTTON_CSS;
+  closeAskFile.addEventListener('click', () => {
+    fileDay();
+  });
+  closeAskBack.addEventListener('click', () => {
+    closeAsk.hidden = true;
+    callCard.focus({ preventScroll: true });
+  });
+  closeAskRow.append(closeAskFile, closeAskBack);
+  closeAskInner.append(closeAskQuestion, closeAskConsequence, closeAskRow);
+  closeAsk.append(closeAskInner);
+  callCard.append(callBody, closeAsk);
   let callCardKey = '';
   /**
    * Show or hide the card — and, **on the frame it appears and on no other**, bring it into the
@@ -1382,12 +1450,62 @@ function mountStage(
     const leaving = !shown && !callCard.hidden;
     const hadFocus = leaving && callCard.contains(doc.activeElement);
     callCard.hidden = !shown;
+    /* The close's question belongs to the call it would skip, and goes with it. */
+    if (!shown) closeAsk.hidden = true;
     if (appearing) {
       callCard.scrollIntoView({ block: 'nearest', inline: 'nearest' });
       callCard.focus({ preventScroll: true });
     } else if (hadFocus) {
       playButton.focus({ preventScroll: true });
     }
+  }
+
+  /*
+   * **Each answered call's row, once its window can be observed** — wave AL, lane AL-E,
+   * [§ D1219](../../../../DECISIONS.md). Counts only, in the report row's own words, from the call
+   * plus 660 s; the words and the timing are `everyday/stageCallRow.ts`'s, and this decides only
+   * where they go. Hidden by its attribute alone, with the layout on an inner body, for
+   * `callBody`'s reason above.
+   */
+  const callRows = el(doc, 'section', 'everyday-stage-call-rows');
+  callRows.hidden = true;
+  callRows.setAttribute('aria-label', STAGE_CALL_ROWS_HEADING);
+  callRows.style.cssText = [
+    `border:1px solid ${C.rule}`,
+    `border-radius:${String(R.row)}px`,
+    `background:${C.card}`,
+    'padding:10px 14px',
+  ].join(';');
+  let callRowsKey = '';
+  /** Redraw the rows when the set due at the playhead changes, and at no other frame. */
+  function drawCallRows(recording: VizRecording, simTimeS: number): void {
+    const rows =
+      context.ctx === 'daily' && watchingNow() === undefined ? host.dayCallRowsAt(recording, simTimeS) : [];
+    const key = rows.map((row) => `${row.id}|${row.counts}|${row.note}`).join('\n');
+    if (key === callRowsKey) return;
+    callRowsKey = key;
+    callRows.replaceChildren();
+    callRows.hidden = rows.length === 0;
+    if (rows.length === 0) return;
+    const body = el(doc, 'div', 'everyday-stage-call-rows-body');
+    body.style.cssText = 'display:grid;gap:8px';
+    const heading = el(doc, 'div', 'everyday-stage-call-rows-heading', STAGE_CALL_ROWS_HEADING);
+    heading.style.cssText = `font-size:10.5px;letter-spacing:0.08em;color:${C.label}`;
+    body.append(heading);
+    for (const row of rows) {
+      const item = el(doc, 'div', 'everyday-stage-call-row');
+      item.dataset['row'] = row.id;
+      item.style.cssText = 'display:grid;gap:3px';
+      const title = el(doc, 'p', 'everyday-stage-call-row-heading', row.heading);
+      title.style.cssText = 'margin:0;font-size:13px;font-weight:600';
+      const counts = el(doc, 'p', 'everyday-stage-call-row-counts', row.counts);
+      counts.style.cssText = 'margin:0;font-size:13px;line-height:1.45';
+      const note = el(doc, 'p', 'everyday-stage-call-row-note', row.note);
+      note.style.cssText = `margin:0;font-size:12px;line-height:1.45;color:${C.inkSoft}`;
+      item.append(title, counts, note);
+      body.append(item);
+    }
+    callRows.append(body);
   }
 
   /*
@@ -1402,6 +1520,7 @@ function mountStage(
     title,
     header,
     callCard,
+    callRows,
     goals,
     watchBand,
     alarm,
@@ -1438,8 +1557,11 @@ function mountStage(
 
   function togglePlay(): void {
     if (playback === undefined) return;
-    if (playback.state === 'playing') playback.pause();
-    else {
+    if (playback.state === 'playing') {
+      playback.pause();
+      /* § D1212: a pause stops a skip that is coming; *Play* starts a fresh beat. */
+      dropSkipBeat();
+    } else {
       started = true;
       /*
        * The one place a player gesture reaches the sound — GitHub issue #258. A browser suspends
@@ -1490,7 +1612,11 @@ function mountStage(
      * moving, so nothing is re-paced under it: the chip and the note keep what they last said, and
      * on a day nobody has started that is the rung the player set and no note at all.
      */
-    if (playback.state !== 'playing') return;
+    if (playback.state !== 'playing') {
+      /* § D1212: whatever stopped the transport stopped a skip that was coming. */
+      dropSkipBeat();
+      return;
+    }
     const answer = stagePaceOf({
       horizon: paceHorizon,
       acts: paceActs,
@@ -1522,6 +1648,7 @@ function mountStage(
      */
     if (answer.reason === 'call') {
       playback.pause();
+      dropSkipBeat();
       /*
        * **And the frame it stops on is the call's** — [§ D1153](../../../../DECISIONS.md), the post-AJ
        * panel's seat D (H10). At a fast rung the frame the pause lands on is a few simulated seconds
@@ -1544,6 +1671,62 @@ function mountStage(
       playback.setSpeed(answer.simPerRealS);
       syncTransport();
     }
+    skipBetweenPeaks(simTimeS, answer.reason);
+  }
+
+  /**
+   * **Skip the quiet between a scored whole day's peaks** — [§ D1212](../../../../DECISIONS.md),
+   * `everyday/stagePace.ts#stageSkipOf`'s rule.
+   *
+   * Asked from {@link pace} on every playing frame. Where the rule applies, the first frame starts
+   * a beat and writes its note; once the beat is over the playhead is moved to the instant the rule
+   * reads off the recording, and the line says what was passed over. Anything that ends the stretch
+   * first (somebody waits a minute, a chip is pressed, the stage stops for a call, a re-simulation
+   * begins) drops the beat, and a pause drops it too because `pace` is not asked while paused.
+   *
+   * It moves the playhead and nothing else, as *Skip to the end* does: the recording was made whole
+   * before the stage drew a frame, so the report, the goals and every figure read the same run.
+   */
+  function skipBetweenPeaks(simTimeS: number, reason: StagePaceReason): void {
+    const recording = adopted;
+    if (playback === undefined || recording === undefined) return;
+    const applies =
+      recomputingOver === undefined &&
+      !skipping &&
+      !(skipLandedAtS !== undefined && Math.abs(simTimeS - skipLandedAtS) < 1) &&
+      stageSkipApplies({ horizon: paceHorizon, scored: paceScored, acts: paceActs, simTimeS, reason });
+    if (!applies) {
+      dropSkipBeat();
+      return;
+    }
+    if (skipArmedAtS === undefined || simTimeS < skipArmedAtS) {
+      skipArmedAtS = simTimeS;
+      if (skipNote.textContent !== STAGE_SKIP_BEAT_NOTE) skipNote.textContent = STAGE_SKIP_BEAT_NOTE;
+      return;
+    }
+    const skip = stageSkipOf({
+      acts: paceActs,
+      legs: recording.legs,
+      simTimeS,
+      armedAtS: skipArmedAtS,
+      simPerRealS: playback.speed,
+      stopAtS: activeCall()?.call.atS,
+    });
+    if (skip === undefined) return;
+    skipArmedAtS = undefined;
+    skipLandedAtS = skip.toS;
+    skipLine = stageSkipLineOf(skip, host.dayStartS());
+    skipNote.textContent = skipLine;
+    playback.seekTo(skip.toS);
+    syncTransport();
+    requestFrame();
+  }
+
+  /** A beat that will not end in a skip: the note goes back to the last skip's line, or to nothing. */
+  function dropSkipBeat(): void {
+    if (skipArmedAtS === undefined) return;
+    skipArmedAtS = undefined;
+    if (skipNote.textContent !== skipLine) skipNote.textContent = skipLine;
   }
 
   /**
@@ -1676,7 +1859,8 @@ function mountStage(
   /**
    * **The call standing on this attempt**, of either kind — the one reading pace, card and holds
    * share. The pinned day's § D1029 call while it is unanswered, else the ordinary day's next call
-   * from the host (§ D1138), which only the daily stage asks for. `raised: false` is an ordinary
+   * from the host (§ D1138), which only the daily stage asks for — on a pinned day too, once its
+   * call is answered ([§ D1204](../../../../DECISIONS.md)). `raised: false` is an ordinary
    * candidate whose runs have not landed: the stage waits at it but draws no card.
    */
   function activeCall():
@@ -1689,11 +1873,14 @@ function mountStage(
       }
     | undefined {
     if (watchingNow() !== undefined) return undefined;
-    if (stageCall !== undefined) {
-      return callAnswered ? undefined : { call: stageCall, raised: true, pinned: true };
-    }
+    if (stageCall !== undefined && !callAnswered) return { call: stageCall, raised: true, pinned: true };
     if (context.ctx !== 'daily' || adopted === undefined || recomputingOver !== undefined) return undefined;
-    const next = host.dayCallOnStage(adopted);
+    /*
+     * § D1204: once the pinned call is answered, the day asks on. The host opens the ordinary
+     * session after it, searched from five minutes past it, and refuses it where the call was
+     * skipped — so a skip with the pinned card up still answers every call the day had left.
+     */
+    const next = host.dayCallOnStage(adopted, stageCall);
     if (next === undefined) return undefined;
     return next.question === 'driver'
       ? { call: next.call, raised: next.raised, pinned: false, drivers: next.drivers }
@@ -1731,6 +1918,7 @@ function mountStage(
     waitingOnCall = false;
     if (standing.pinned) {
       callAnswered = true;
+      host.notePinnedCallDone();
       if (change !== undefined) {
         withRecomputeBeat(current, () => {
           host.intervene(call.atS, change);
@@ -1800,7 +1988,9 @@ function mountStage(
     const key = `${String(call.atS)}|${call.rule}|${standing.drivers === undefined ? 'placement' : 'driver'}`;
     if (key !== callCardKey) {
       callCardKey = key;
-      const card = stageCallCardOf(call, host.dayStartS(), bookedCars, standing.drivers);
+      /* § D1206: who stands at the call second, read off the run on the stage and nothing after it. */
+      const present = adopted === undefined ? undefined : stageCallPresentOf(adopted, call.atS);
+      const card = stageCallCardOf(call, host.dayStartS(), bookedCars, standing.drivers, present);
       const heading = el(doc, 'div', 'everyday-stage-call-heading', card.heading);
       heading.style.cssText = `font:600 11px ${TYPE.mono};letter-spacing:0.08em;color:${C.label}`;
       const facts = card.facts.map((fact) => {
@@ -2080,7 +2270,8 @@ function mountStage(
     if (resumeAtS === undefined) {
       stageCall =
         context.ctx === 'watch' || context.ctx === 'rush' ? undefined : host.pressCallOnStage(recording);
-      callAnswered = host.interventions().length > 0;
+      /* § D1218: a resumed attempt that answered its pinned call with *leave them* pressed nothing. */
+      callAnswered = host.interventions().length > 0 || host.pinnedCallDone(recording);
       skipping = false;
     } else if (host.interventions().length > 0) {
       callAnswered = true;
@@ -2095,6 +2286,13 @@ function mountStage(
     paceActs = actsOf(recording.demandPhases);
     paceScored = context.ctx === 'daily';
     if (resumeAtS === undefined) lastPaceReason = undefined;
+    /* § D1212: a fresh day has skipped nothing; a re-simulation keeps the line it had. */
+    skipArmedAtS = undefined;
+    if (resumeAtS === undefined) {
+      skipLandedAtS = undefined;
+      skipLine = '';
+      skipNote.textContent = '';
+    }
     /*
      * A new recording is a new building — GitHub issue #258. The crossover is the old tower's
      * doors and the remembered frame is the old tower's cars, so both are dropped rather than
@@ -2111,7 +2309,19 @@ function mountStage(
      * paused mid-morning with no `Start` would be a stop nobody asked for.
      */
     const openAtS = resumeAtS === undefined ? host.openingAtS(recording) : undefined;
-    const startAtS = resumeAtS ?? openAtS;
+    /*
+     * **A resumed attempt opens where it had reached, paused** — wave AL, lane AL-E,
+     * [§ D1218](../../../../DECISIONS.md). A fresh mount over the day's attempt (the brief, the door,
+     * a menu or a reload between) used to open at the day's start with § 7.3's *Start* up, which let
+     * a day watched to its end be played again from its opening with every answer known. The
+     * attempt's furthest shown instant is the host's; `undefined` for any other run and for an
+     * attempt that never left its start, which opens as a fresh day does.
+     */
+    const resumedAtS =
+      resumeAtS === undefined && openAtS === undefined && context.ctx === 'daily'
+        ? host.attemptResumeAtS(recording)
+        : undefined;
+    const startAtS = resumeAtS ?? openAtS ?? resumedAtS;
     playback = new Playback(recording, systemClock(), {
       speed: stageSpeedAt(speedIndex).simPerRealS,
       ...(startAtS === undefined ? {} : { startAtS }),
@@ -2120,6 +2330,14 @@ function mountStage(
     if (openAtS !== undefined) {
       started = true;
       playback.play();
+    }
+    if (resumedAtS !== undefined) {
+      started = true;
+      /*
+       * An attempt left at its end is resumed at its end: playing, so the transport reads `ended`
+       * exactly as {@link skipToEnd} leaves it, and § 3.3's row offers the close rather than a skip.
+       */
+      if (resumedAtS >= recording.endedAt) playback.play();
     }
     raceKeyDrawn = '';
     raceView = undefined;
@@ -2175,6 +2393,8 @@ function mountStage(
      */
     const session = context.ctx === 'watch' ? host.watching() : undefined;
     watchFacts.hasReplay = session !== undefined && adopted !== undefined;
+    /* Whose record it is, so the row's note speaks to its owner — § D1186. */
+    watchFacts.owner = session?.view.owner;
     watchFacts.playRefusal =
       session === undefined
         ? undefined
@@ -2480,9 +2700,13 @@ function mountStage(
     const recording = adopted;
     if (recording === undefined || playback === undefined) return;
     const simTimeS = playback.simTimeS;
+    /* § D1218 — how far the day's attempt has been shown, so leaving and coming back resumes here. */
+    if (context.ctx === 'daily') host.noteShown(recording, simTimeS);
     const observations: LiveObservations = observationsAt(recording, simTimeS);
     pace(simTimeS, observations.longestCurrentWaitS);
     drawCall(playback.simTimeS);
+    /* § D1219 — the rows due at the frame drawn. */
+    drawCallRows(recording, simTimeS);
     /*
      * Hoisted out of the canvas branch below for GitHub issue #258. It was computed only over a
      * laid-out canvas, which is correct for a picture and wrong for a sound: the cues are the
@@ -2494,7 +2718,20 @@ function mountStage(
     const labelOf = (id: string): string =>
       recording.floors.find((floor) => floor.id === id)?.label ?? id;
 
-    const driverName = host.dispatcherById(recording.dispatcherProfileId)?.name ?? recording.dispatcherProfileId;
+    /*
+     * **Who is driving at this playhead**, not who the day was configured with — wave AL, lane AL-A,
+     * the post-AK panel's seats B and C. After a handover the header kept naming the configured
+     * dispatcher until the end of the day (daily and rush alike), beside a log saying the day had
+     * been handed over. `live/interventions.ts#driverNameAt` reads the run's own log: the player's
+     * on their own day, and the watched record's on a replay ([§ D1188](../../../../DECISIONS.md)).
+     */
+    const configuredName =
+      host.dispatcherById(recording.dispatcherProfileId)?.name ?? recording.dispatcherProfileId;
+    const driverName = driverNameAt(
+      watchingNow() === undefined ? host.interventions() : (host.watching()?.run.record?.interventions ?? []),
+      simTimeS,
+      configuredName,
+    );
     announce(recording, frame, driverName);
     /*
      * § 9.2, GitHub issue #220: in the `rush` context the clock is held time and the pill is the
@@ -2534,19 +2771,37 @@ function mountStage(
      * § D983. The player's own building, and only on the player's own run: a watched record is
      * somebody else's day in somebody else's tower, and a rush books nothing.
      */
-    if (recording !== bookedFor) {
+    /*
+     * **A watched run names its own cars out** — wave AL, lane AL-A, the post-AK panel's seat D (H1).
+     * The pill was switched off while watching, on the ground that a watched record is somebody
+     * else's tower; so a replay of the player's own day showed car D standing idle at floor 20 with
+     * nothing saying it was booked out. The watched run's cars come from the run the gate simulated
+     * (`watch/record.ts#WatchRunPlan.bookedOut`), never from the spectator's selection, and its hour
+     * is the watched run's too (`host.dayStartS()` reads it while watching).
+     */
+    if (recording !== bookedFor || (watching !== undefined) !== bookedWatching) {
       bookedFor = recording;
+      bookedWatching = watching !== undefined;
       const building = host.resolvedBuilding();
       /* § D1149: every window, a car out from the first instant included — the pill and the call card both read this. */
-      bookedCars = building?.id === recording.buildingId ? carAbsencesOf(building) : [];
+      bookedCars =
+        watching !== undefined
+          ? (host.watching()?.bookedOut ?? [])
+          : building?.id === recording.buildingId
+            ? carAbsencesOf(building)
+            : [];
     }
     const booked =
-      watching === undefined && context.ctx !== 'rush'
+      context.ctx !== 'rush'
         ? stageBookedOutOf({ bookedOut: bookedCars, simTimeS, dayStartS: host.dayStartS() })
         : [];
     bookedPill.textContent = booked.join('   ');
     bookedPill.style.display = booked.length === 0 ? 'none' : '';
-    drivingName.textContent = watching?.dispatcherName ?? head.driverName;
+    /* A watched record's handovers are on its own log, so a replay names its driver at the playhead too (§ D1188). */
+    drivingName.textContent =
+      watching === undefined
+        ? head.driverName
+        : driverNameAt(host.watching()?.run.record?.interventions ?? [], simTimeS, watching.dispatcherName);
     drawFigures(head.figures);
     drawGoals(recording, simTimeS, watching);
     drawEndDay(recording, simTimeS, watching);
@@ -2854,7 +3109,15 @@ function mountStage(
    * File the day and open what the filing lands on — the tail of the stage's primary, shared with
    * *End the day* so the two cannot file differently.
    */
+  /** Put the close's question up under the call, and focus its first button — see the primary. */
+  function askBeforeClosing(): void {
+    closeAsk.hidden = false;
+    closeAsk.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    closeAskFile.focus({ preventScroll: true });
+  }
+
   function fileDay(): void {
+    closeAsk.hidden = true;
     playback?.pause();
     host.closeDay();
     syncTransport();
@@ -3105,6 +3368,7 @@ function mountStage(
           refusal: race.refusal,
           pending: race.pending,
           watching,
+          watchingOwn: watchingNow()?.owner === 'player',
         },
         recording,
       );
@@ -3220,6 +3484,8 @@ function mountStage(
   const pressTheDay = (): void => {
     const careerDay = context.ctx === 'campaign' ? host.campaignDay() : undefined;
     if (careerDay !== undefined) host.runCampaignDay(careerDay.tower.id);
+    /* § D1218: the daily day's own press resumes an attempt standing on it rather than rewinding it. */
+    else if (context.ctx === 'daily') host.playDay();
     else if (context.ctx !== 'campaign') host.startRun();
   };
   if (context.ctx !== 'watch' && context.ctx !== 'rush' && !host.runPending() && stageEntryStartsARun(host.runState())) pressTheDay();
@@ -3258,6 +3524,7 @@ function mountStage(
        */
       watchFacts.hasReplay = false;
       watchFacts.playRefusal = undefined;
+      watchFacts.owner = undefined;
     },
     /**
      * § 3.3's primary on the stage: *Close the day* — *stops the clock and writes the report*.
@@ -3297,6 +3564,16 @@ function mountStage(
         playback?.pause();
         host.endRush(playback?.simTimeS ?? adopted?.startedAt ?? 0);
         context.go('report');
+        return;
+      }
+      /*
+       * **A call is up: ask once before filing** — wave AL, lane AL-A, the post-AK panel's seat B
+       * (D1). The first press puts {@link closeAsk}'s question under the card's answers and moves
+       * focus to its first button; a second press of this primary, or that button, files. Nothing is
+       * asked with no card up, because then there is no answer to skip.
+       */
+      if (!callCard.hidden && closeAsk.hidden) {
+        askBeforeClosing();
         return;
       }
       fileDay();

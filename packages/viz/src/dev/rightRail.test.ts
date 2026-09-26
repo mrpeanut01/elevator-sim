@@ -261,7 +261,9 @@ describe('the dispatcher list’s words', () => {
         expect(all).toContain(dispatcherBlurbOf(entry));
         expect(all).toContain(dispatcherBehaviourOf(entry, shipped));
         expect(all).toContain(entry.blurb ?? '\u0000');
-        expect(all).toContain(`Profile id \`${entry.id}\``);
+        /* The id is the Engineer register's alone — § D1195, seat B D11. */
+        if (mode === 'advanced') expect(all).toContain(`Profile id \`${entry.id}\``);
+        else expect(all).not.toContain(`\`${entry.id}\``);
       }
     }
   });
@@ -1101,14 +1103,19 @@ describe('Engineer is pinned whole — § D299 § 1, in the file it is about', (
     }
   });
 
-  it('keeps the profile id reachable in both registers, which is what `help` was for', () => {
+  it('keeps the profile id in the Engineer register and names it in the Casual one only in words — § D1195', () => {
+    /*
+     * The post-AK panel's seat B D11: the Casual card's tooltip read *"Profile id `eta`"*. Red
+     * before the fix: the id was in both registers' `help`. The Engineer register keeps it, because
+     * § D299 § 1 forbids that surface saying less.
+     */
     const profiles = config.dispatcherProfiles.profiles;
     for (const entry of profiles) {
-      for (const mode of ['basic', 'advanced'] as const) {
-        expect(dispatcherCardOf(entry, profiles, mode).help, `${entry.id}/${mode}`).toContain(
-          `Profile id \`${entry.id}\``,
-        );
-      }
+      expect(dispatcherCardOf(entry, profiles, 'advanced').help, `${entry.id}/advanced`).toContain(
+        `Profile id \`${entry.id}\``,
+      );
+      const casual = dispatcherCardOf(entry, profiles, 'basic');
+      expect(`${casual.sub} ${casual.help}`, `${entry.id}/basic`).not.toMatch(/Profile id|`/u);
     }
   });
 

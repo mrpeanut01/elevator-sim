@@ -115,9 +115,23 @@ export const FIXIT_SCREEN_COPY = Object.freeze({
    * a figure without its count rather than only a wrong figure.
    */
   pairStageEyebrow: 'WATCH WHAT YOU CHANGED',
+  /*
+   * **Three notes, one per crowd the pair can meet** — lane AL-B, the post-AK panel's seat D H4.
+   * The note used to say *the same crowd* on every pair, while the basis line under the verdict on
+   * the same screen said, for a zoning step that opens trips, *a crowd drawn for the building as
+   * you changed it* — and the counts beside it read 132 → 133 journeys. Chosen from the legs by
+   * {@link pairStageNoteOf}, exactly as `fixit/engine.ts#basisOf` chooses the basis line, so the
+   * note and the line cannot disagree about one pair.
+   */
   pairStageNote:
     'The same morning and the same crowd, played once on each building — as it stands on the left, ' +
     'with your change on the right. The verdict below starts from these two runs, and a change that clears this morning is then run on forty-nine more before it is called fixed.',
+  pairStageNoteThinned:
+    'The same morning, played once on each building — as it stands on the left, with your change on the right. ' +
+    'Your change moves who arrives, so the right-hand run meets the same crowd less the people it moved. The verdict below starts from these two runs, and a change that clears this morning is then run on forty-nine more before it is called fixed.',
+  pairStageNoteRedrawn:
+    'The same morning, played once on each building — as it stands on the left, with your change on the right. ' +
+    'Your change alters which trips the lifts can carry, so the right-hand run meets a crowd drawn for the building as you changed it, not the same crowd twice. The verdict below starts from these two runs, and a change that clears this morning is then run on forty-nine more before it is called fixed.',
   pairStageSkip: 'Skip to the verdict',
   pairStageBeforeCaption: 'As it stands',
   pairStageAfterCaption: 'With your change',
@@ -130,6 +144,12 @@ export const FIXIT_SCREEN_COPY = Object.freeze({
   diagnosisShow: 'Show the diagnosis',
   diagnosisWithheld:
     'Held back, so the search is yours. Asking costs nothing, and the case is then marked as fixed with the diagnosis rather than on your own.',
+  /*
+   * The same card on a case already fixed — seat C D5. Asking then marks nothing
+   * (`fixitScreen.ts#askDiagnosis` returns before the write), so the sentence above would be false.
+   */
+  diagnosisWithheldFixed:
+    'Held back. This case is already fixed on your own, and asking now costs nothing and does not change that mark.',
   /*
    * The hint is **the measured witness**, never the mechanism story: which priced change the case's
    * diagnosed repair buys, and that it was run and held. `fixitDiagnosisView` composes the rows in.
@@ -148,8 +168,13 @@ export const FIXIT_SCREEN_COPY = Object.freeze({
   solvedTag: 'FIXED',
   openTag: 'OPEN',
   /** § 3.3's note for the fixit row — the guide's cell reads `⟨what the run will measure⟩`. */
+  /*
+   * Said before the run, so it claims only what every run keeps: the letter's morning. Whether the
+   * crowd is the same is read off the legs afterwards ({@link pairStageNoteOf}); it used to read
+   * *Runs the same crowd again*, which a zoning step that opens trips makes false (seat D H4).
+   */
   noteReady:
-    'Runs the same crowd again with everything you have changed, and scores the whole building.',
+    'Runs the letter’s morning again with everything you have changed, and scores the whole building.',
   noteSolved: 'This one is settled. There are more buildings than you have afternoons.',
   /*
    * **A verdict that no longer describes the order on screen** — [§ D1011](../../../../DECISIONS.md),
@@ -208,6 +233,16 @@ export const FIXIT_SCREEN_COPY = Object.freeze({
   zonesAtCeiling:
     'The banks already reach as far into each other as this building lets them; the next floor up belongs to no shaft.',
   zonesPriced: 'once, whatever it moves',
+  /*
+   * **One rezone, two controls** — lane AL-B, the post-AK panel's seat D H5. The zoning step and
+   * the banks' selects both buy `rezone-bank`, which is charged once however it is drawn. Each
+   * control's price now says when the other already pays, so the prices on the screen add up to the
+   * charge in the header.
+   */
+  zonesCoveredByBanks: 'the rezone drawn under The banks already pays for this',
+  zonesSharedWithBanks: 'one charge with the rezone drawn under The banks, not two',
+  groupCoveredByZones: 'Where the banks overlap already pays for this group',
+  groupSharedWithZones: 'one charge with Where the banks overlap, not two',
   /* Section 10.3's parking. */
   parkingLabel: 'Where idle cars wait',
   parkingStanding: 'as the standing order has it',
@@ -333,6 +368,8 @@ export interface FixitCaseRailRow {
    * the player asked about, and nothing otherwise. A standing mark, never a price.
    */
   readonly mark?: string | undefined;
+  /** The par on a fixed row, `fixit/par.ts#fixitParTagOf`'s — seat C D5. Absent on an open row. */
+  readonly par?: string | undefined;
 }
 
 export interface FixitCaseRailModel {
@@ -344,6 +381,18 @@ export interface FixitCaseRailModel {
   readonly count: string;
   readonly rows: readonly FixitCaseRailRow[];
   readonly hint: string;
+}
+
+/**
+ * **The pair stage's note, chosen from the legs** — lane AL-B (seat D H4).
+ *
+ * Takes the two crowd facts `fixit/run.ts#measuredOf` reads off the recordings, the same two that
+ * pick the verdict's basis line (`fixit/engine.ts#basisOf`), so the sentence above the two panes
+ * and the sentence under the verdict always describe the same crowd.
+ */
+export function pairStageNoteOf(crowd: { readonly sameCrowd: boolean; readonly crowdRedrawn?: boolean | undefined }): string {
+  if (crowd.sameCrowd) return FIXIT_SCREEN_COPY.pairStageNote;
+  return crowd.crowdRedrawn === true ? FIXIT_SCREEN_COPY.pairStageNoteRedrawn : FIXIT_SCREEN_COPY.pairStageNoteThinned;
 }
 
 /** The rail row's second line — display name and floor count, the prototype's `tower` cell. */
@@ -364,6 +413,8 @@ export function fixitCaseRailModel(
   towerLineOf: (entry: FixitCase) => string,
   heldReasonOf: (caseId: string) => string | undefined = () => undefined,
   diagnosisShownOf: (caseId: string) => boolean = () => false,
+  /** A fixed case's par tag (seat C D5); asked only of a fixed row. */
+  parOf: (caseId: string) => string | undefined = () => undefined,
 ): FixitCaseRailModel {
   const rows: readonly FixitCaseRailRow[] = cases.map((entry) => {
     const heldReason = heldReasonOf(entry.id);
@@ -392,6 +443,7 @@ export function fixitCaseRailModel(
             : shown
               ? FIXIT_SCREEN_COPY.markDiagnosisShown
               : undefined,
+      par: solved ? parOf(entry.id) : undefined,
     };
   });
   const fixed = rows.filter((row) => row.solved).length;
@@ -531,6 +583,8 @@ export function fixitDiagnosisView(input: {
   readonly census: RouteCensusRow | undefined;
   /** A fixed verdict stands on the diagnosed repair's own run, for the order on screen. */
   readonly explained: boolean;
+  /** The case is already fixed, so asking marks nothing — seat C D5. */
+  readonly fixed?: boolean | undefined;
 }): FixitDiagnosisView {
   const eyebrow = FIXIT_SCREEN_COPY.diagnosisEyebrow;
   if (input.explained) {
@@ -546,7 +600,12 @@ export function fixitDiagnosisView(input: {
       because: opens && input.census !== undefined ? diagnosisOpenedBecauseOf(input.census) : undefined,
     };
   }
-  return { state: 'withheld', eyebrow, press: FIXIT_SCREEN_COPY.diagnosisShow, note: FIXIT_SCREEN_COPY.diagnosisWithheld };
+  return {
+    state: 'withheld',
+    eyebrow,
+    press: FIXIT_SCREEN_COPY.diagnosisShow,
+    note: input.fixed === true ? FIXIT_SCREEN_COPY.diagnosisWithheldFixed : FIXIT_SCREEN_COPY.diagnosisWithheld,
+  };
 }
 
 /**
@@ -654,11 +713,20 @@ export function fixitZoneRow(
   ceiling: number,
   canBuy: boolean,
   priceUnits: number,
+  /**
+   * The banks' own selects already buy `rezone-bank` (`fixit/families.ts#rezonePathsOf`), which is
+   * the row this step buys — seat D H5. The step then costs nothing more, and the price says so.
+   */
+  banksBought = false,
 ): FixitZoneRow | null {
   if (ceiling <= 0) return null;
   const atCeiling = state.zoneOverlapFloors >= ceiling;
-  const atBudget = state.zoneOverlapFloors === 0 && !canBuy;
-  const price = `${String(priceUnits)} u ${FIXIT_SCREEN_COPY.zonesPriced}`;
+  const atBudget = !banksBought && state.zoneOverlapFloors === 0 && !canBuy;
+  const price = !banksBought
+    ? `${String(priceUnits)} u ${FIXIT_SCREEN_COPY.zonesPriced}`
+    : state.zoneOverlapFloors === 0
+      ? `0 u more · ${FIXIT_SCREEN_COPY.zonesCoveredByBanks}`
+      : `${String(priceUnits)} u · ${FIXIT_SCREEN_COPY.zonesSharedWithBanks}`;
   return {
     key: 'zones',
     label: FIXIT_SCREEN_COPY.zonesLabel,
@@ -954,10 +1022,23 @@ export function decodeFamilyValue(value: string): DialValue | null {
   return value === '' ? null : (JSON.parse(value) as DialValue);
 }
 
-/** The heading over a family group: its schedule row's name and what the row costs, once. */
-export function fixitGroupHeader(row: RowPurchase): FixitGroupHeader {
+/**
+ * The heading over a family group: its schedule row's name and what the row costs, once.
+ *
+ * `zoneStep` is for the banks' group alone, whose row the zoning step also buys (seat D H5):
+ * `'covers'` where the step pays and the group's own selects have bought nothing, `'shares'` where
+ * both are in the order. Either way the heading says so, so the two prices are not read as two
+ * charges.
+ */
+export function fixitGroupHeader(row: RowPurchase, zoneStep?: 'covers' | 'shares'): FixitGroupHeader {
   const priced =
-    row.units === 0 ? FIXIT_SCREEN_COPY.parkingFree : `${String(row.units)} u ${FIXIT_SCREEN_COPY.groupPricedOnce}`;
+    row.units === 0
+      ? FIXIT_SCREEN_COPY.parkingFree
+      : zoneStep === 'covers'
+        ? `0 u more · ${FIXIT_SCREEN_COPY.groupCoveredByZones}`
+        : zoneStep === 'shares'
+          ? `${String(row.units)} u · ${FIXIT_SCREEN_COPY.groupSharedWithZones}`
+          : `${String(row.units)} u ${FIXIT_SCREEN_COPY.groupPricedOnce}`;
   const atBudget = !row.affordable;
   return {
     heading: row.name,
@@ -1098,7 +1179,10 @@ export function fixitRezoneView(input: RezoneInput): FixitRezoneView {
   const plainBanks = input.banks.filter((bank) => !bank.keyed);
   const nameOf = new Map(input.banks.map((bank) => [bank.id, bank.name]));
   return {
-    header: fixitGroupHeader(input.row),
+    header: fixitGroupHeader(
+      input.row,
+      !input.boughtByZoneStep ? undefined : input.boughtByBanks ? 'shares' : 'covers',
+    ),
     cars: input.cars.map((car) => {
       const standingLabel =
         car.standingBankId === OUT_OF_SERVICE

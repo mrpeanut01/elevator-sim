@@ -199,8 +199,22 @@ export interface EverydayOnwardStep {
    * function down: the label is a *rendering* of this decision, and reading the destination back
    * out of a string makes where a button goes depend on how it is worded.
    */
-  readonly goes: 'daily-tomorrow' | 'career-day';
+  readonly goes: 'daily-tomorrow' | 'career-day' | 'week-sheet';
 }
+
+/**
+ * **The one button on the close that closes the week** — swarm DN's Q2.3, lane AL-F,
+ * [§ D1227](../../../../DECISIONS.md). The week's sheet was reachable only through *Your week*, a
+ * screen the post-AK panel's seats found by accident, and its house line read *still being run*
+ * for ten to thirty seconds because the house was asked only when the sheet was first read. The
+ * close that closes the week now leads to the sheet, and each day's house run starts as that day
+ * closes (`dev/main.ts#askWeekHouse`), so the sheet is ready when it is opened.
+ */
+export const WEEK_SHEET_STEP: EverydayOnwardStep = Object.freeze({
+  label: 'See the week against the house',
+  note: 'Opens this week’s sheet: your counted days beside the tower’s standing order on the same crowds. The next week starts from there.',
+  goes: 'week-sheet',
+});
 
 /** The whole screen, as data. */
 export interface EverydayReportView {
@@ -249,6 +263,12 @@ export interface EverydayReportView {
    * attempt that banked.
    */
   readonly practiceNote: string | undefined;
+  /**
+   * `shift/report.ts`'s target-met line on the close whose day met the week's target, drawn under
+   * the verdict — swarm DN's Q2.2, [§ D1226](../../../../DECISIONS.md). `undefined` on every other
+   * close.
+   */
+  readonly weekMark: string | undefined;
 }
 
 /** What {@link everydayReportViewOf} is computed from. */
@@ -560,6 +580,7 @@ function onwardStepOf(
   filed: boolean,
   canAdvance: boolean,
   nextDayLabel: string,
+  weekClosed = false,
 ): EverydayOnwardStep | undefined {
   /*
    * An unfiled sheet advances from nothing, on either flow. The screen returns before this block
@@ -569,6 +590,7 @@ function onwardStepOf(
    * `canAdvance`, so it has to carry it here.
    */
   if (!filed) return undefined;
+  if (weekClosed && career === undefined) return WEEK_SHEET_STEP;
   if (career !== undefined) {
     if (!career.canRunAnother) return undefined;
     return {
@@ -651,11 +673,13 @@ export function everydayReportViewOf(input: EverydayReportInput): EverydayReport
       sheet.filed,
       canAdvance,
       framing.kind === 'week-day' ? framing.nextDayLabel : '',
+      framing.kind === 'week-day' && framing.weekClosed === true,
     ),
     staleNote: input.newerRunOnStage
       ? 'A newer run is standing on the stage and has not been closed. This sheet is the last day ' +
         'you closed, not that run — close the day to replace it.'
       : undefined,
     practiceNote: framing.kind === 'week-day' ? framing.practiceNote : undefined,
+    weekMark: framing.kind === 'week-day' ? framing.weekMark : undefined,
   };
 }

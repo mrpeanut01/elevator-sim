@@ -163,7 +163,17 @@ async function skipAndClose(page: Page): Promise<void> {
     { timeout: 60_000 },
   );
   await page.locator('.everyday-bar-primary').click();
-  await page.waitForSelector('.everyday-report', { timeout: 60_000 });
+  /*
+   * A skip stops at an unanswered call with its card up (§ D1151), and since wave AL's § D1189
+   * *Close the day* then asks once, inside the card, before it files the day as it stands. These
+   * cases are about which presses a sheet credits, not about the call, so the ask is answered with
+   * *file it*, which is the press the old single click made.
+   */
+  await page.waitForSelector('.everyday-report, .everyday-stage-call-confirm:not([hidden])', { timeout: 60_000 });
+  if ((await page.locator('.everyday-report').count()) === 0) {
+    await page.locator('.everyday-stage-call-confirm-file').click();
+    await page.waitForSelector('.everyday-report', { timeout: 60_000 });
+  }
 }
 
 /** The presses the report credits to this run, as the sheet prints them. */

@@ -14,7 +14,9 @@
 import { describe, expect, it } from 'vitest';
 
 import type { VizRecording } from '../contract/types.js';
-import { buildingConfigOf, shiftRunConfigOf, type ViewerState } from '../dev/state.js';
+import { buildingConfigOf, plannedDayOf, shiftRunConfigOf, type ViewerState } from '../dev/state.js';
+import { DAY_START_S } from '../live/timeline.js';
+import { carAbsencesOf } from '../shift/bookedOut.js';
 import { shiftGoalsOf } from '../dev/leftRail.js';
 import { observationsAt } from '../live/observations.js';
 import { recordRun } from '../record/recordRun.js';
@@ -26,7 +28,7 @@ import { closeDay, openWeek, outcomeOf } from '../shift/week.js';
 
 import { checkedRunForTest } from './gate.test-helper.js';
 import { filedDayRuns, watchGateBefore } from './library.js';
-import { watchRecordOf } from './record.js';
+import { watchRecordOf, watchRunPlanOf } from './record.js';
 
 function legsOf(recording: VizRecording): string {
   return JSON.stringify(
@@ -87,5 +89,38 @@ describe('a banked Scenario day replays leg for leg — § D1139', () => {
     if (replay === undefined) throw new Error(checked.run.blocked?.reason ?? 'no replay');
     expect(replay.legs.length).toBe(filed.legs.length);
     expect(legsOf(replay)).toBe(legsOf(filed));
+  });
+});
+
+/**
+ * **A replay reads the watched day's own clock and its own cars out** — wave AL, lane AL-A, the
+ * post-AK panel's seats B and D. `dev/main.ts#enterWatch` set the watched run's hour to `undefined`,
+ * so a whole day that began at 08:00 replayed on a 06:00 clock (08:40 for a 10:40 press), and the
+ * stage switched the car-out pill off while watching. The plan the gate simulates now carries both,
+ * and they must be the values the live day read: `plannedDayOf`'s hour (the brief's and the
+ * stage's) and `carAbsencesOf` over the building the live run resolved (the pill's).
+ */
+describe('a replay reads its own day’s clock and cars out — wave AL', () => {
+  it('carries the watched run’s start of day and its booked cars, equal to the live day’s', () => {
+    let checkedADayWithACarOut = false;
+    for (const day of [1, 2, 3, 4, 5]) {
+      const played: ViewerState = {
+        ...wednesdayAtMidtown(),
+        week: { ...openWeek('c2'), day, dayIdx: day - 1 },
+        outOfServiceCarIds: [],
+        interventions: [],
+      };
+      const record = watchRecordOf(played, RESOURCES);
+      if (record === undefined) throw new Error(`day ${String(day)} files no record`);
+      const plan = watchRunPlanOf(baseState(), RESOURCES, record);
+      const live = plannedDayOf(RESOURCES, played);
+      expect(plan.startOfDayS, `day ${String(day)}`).toBe(live.startOfDayS);
+      /* The defect's own figure: the whole day starts later than the 06:00 the replay fell back to. */
+      expect(plan.startOfDayS, `day ${String(day)}`).not.toBe(DAY_START_S);
+      const liveBooked = carAbsencesOf(shiftRunConfigOf(RESOURCES, played).building);
+      expect(plan.bookedOut, `day ${String(day)}`).toEqual(liveBooked);
+      if (liveBooked.length > 0) checkedADayWithACarOut = true;
+    }
+    expect(checkedADayWithACarOut, 'no Midtown day of the five books a car out, so the pill half checked nothing').toBe(true);
   });
 });

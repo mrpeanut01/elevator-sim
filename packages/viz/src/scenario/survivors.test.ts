@@ -930,6 +930,39 @@ describe('the count reaches a player as a count, never as a score', () => {
     }
   });
 
+  /**
+   * **The total before a clear, the split after it** — [§ D1233](../../../../DECISIONS.md), swarm
+   * DN's Q3 ruling item 1. The split by kind of choice named the lever: on stage 2 it read *0 of 6
+   * from the settings you can pick by name, 5 of 21 from those settings with idle cars waiting
+   * somewhere else*. The total keeps its `k` and the method notes, and says the split is held.
+   */
+  it('holds the split by kind of choice back until a clear, on every shipped cell', () => {
+    const splitLead = 'came from the settings you can pick by name';
+    for (const scenario of table.scenarios) {
+      if (scenario.diagnosis !== null) continue;
+      for (const step of scenario.steps) {
+        if (step.examined === 0) continue;
+        const at = `${scenario.id}#${step.stepId ?? 'base'}`;
+        const total = survivorSentenceFor(scenario, step);
+        expect(total, at).toBe(survivorSentenceFor(scenario, step, 'total'));
+        expect(total, at).not.toContain(splitLead);
+        expect(total, at).not.toContain('from the dials.');
+        expect(total, at).toContain(SURVIVOR_COPY.splitHeldNote);
+        expect(total, at).toContain(SURVIVOR_COPY.censusNote);
+        const split = survivorSentenceFor(scenario, step, 'split');
+        expect(split, at).toContain(splitLead);
+        expect(split, at).toContain(
+          `${String(step.page.survivors)} of ${String(step.page.examined)} from those settings`,
+        );
+        expect(split, at).not.toContain(SURVIVOR_COPY.splitHeldNote);
+        /* Both carry the same count over the same k. */
+        for (const sentence of [total, split]) {
+          expect(sentence, at).toContain(`${String(step.examined)} ways in were tried`);
+        }
+      }
+    }
+  });
+
   it('says a cell that examined nothing said nothing, rather than printing a zero', () => {
     const scenario = firstScenario(clone());
     const step = firstStep(scenario);

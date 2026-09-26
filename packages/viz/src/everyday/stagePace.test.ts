@@ -31,14 +31,26 @@ import { legibilityOf } from '../shift/legibility.js';
 import { contractBuildings, contractDayState } from '../shift/contractDay.test-helper.js';
 import { actsOf, runHorizonOf, wholeDayFor, wholeDayRun } from '../shift/dayLength.js';
 
+import { clockAt } from '../live/timeline.js';
+import { dayCallChangeOf } from '../shift/dayCalls.js';
+
 import { pacedDayRealS } from './sittingShape.js';
 import {
   BETWEEN_PEAKS_SIM_PER_REAL_S,
   PACE_HOLD_WAIT_S,
+  SKIP_BEAT_REAL_S,
+  STAGE_SKIP_BEAT_NOTE,
+  firstMinuteWaitFrom,
+  nextPeakFromBetween,
   stagePaceNoteOf,
   stagePaceOf,
+  stageSkipApplies,
+  stageSkipLineOf,
+  stageSkipOf,
   type StagePaceInput,
+  type StageSkip,
 } from './stagePace.js';
+import { scoredDayPlayOf } from './stagePace.test-helper.js';
 import { DEFAULT_STAGE_SIM_PER_REAL_S, STAGE_SPEEDS } from './stageScreenModel.js';
 
 /** Simulated seconds of act in a day. */
@@ -434,5 +446,261 @@ describe('a scored day — § D1169', () => {
     expect(realS).toBeLessThan(2415.5 - 5 * 60);
     /* And no faster than the whole day crossed at the fast rung. */
     expect(realS).toBeGreaterThanOrEqual((day.endedAt - day.startedAt) / BETWEEN_PEAKS_SIM_PER_REAL_S - 15);
+  });
+});
+
+/**
+ * **Between a scored whole day's peaks, the quiet is skipped** — [§ D1212](../../../../DECISIONS.md),
+ * swarm DN's Q1 (c). The stage plays a beat, then seeks to the first instant anybody reaches a
+ * minute, the next call or the next peak's start, read exactly off the recording; inside a peak
+ * § D1169 is unchanged, and the playhead is the only thing that moves.
+ */
+describe('the skip between a scored whole day’s peaks — § D1212', () => {
+  const FAST = BETWEEN_PEAKS_SIM_PER_REAL_S;
+  const BEAT_SIM_S = SKIP_BEAT_REAL_S * FAST;
+
+  /** Every stretch with somebody past a minute, merged: the slow set, read off the legs directly. */
+  function heldOf(recording: VizRecording): [number, number][] {
+    const spans: [number, number][] = [];
+    for (const leg of recording.legs) {
+      const left = leg.refusedAt ?? leg.boardedAt ?? recording.endedAt;
+      const from = leg.arrivedAt + PACE_HOLD_WAIT_S;
+      if (left > from) spans.push([from, left]);
+    }
+    spans.sort((a, b) => a[0] - b[0]);
+    const merged: [number, number][] = [];
+    for (const [a, b] of spans) {
+      const last = merged[merged.length - 1];
+      if (last !== undefined && a <= last[1]) last[1] = Math.max(last[1], b);
+      else merged.push([a, b]);
+    }
+    return merged;
+  }
+
+  /** The skip the stage would take at `t` with the beat already played. */
+  const skipAt = (t: number, stopAtS?: number): StageSkip | undefined =>
+    stageSkipOf({
+      acts: actsOf(day.demandPhases),
+      legs: day.legs,
+      simTimeS: t,
+      armedAtS: t - BEAT_SIM_S,
+      simPerRealS: FAST,
+      stopAtS,
+    });
+
+  it('reads a peak as an act of the authored phases, and applies only between two of them', () => {
+    const acts = actsOf(day.demandPhases);
+    /* The acts are the three the first describe block pins: 08:30, 12:15 and 17:15, half an hour each. */
+    expect(nextPeakFromBetween(acts, 900), 'before the first peak').toBeUndefined();
+    expect(nextPeakFromBetween(acts, 2000), 'inside the morning peak').toBeUndefined();
+    expect(nextPeakFromBetween(acts, 3600)?.startS, 'the morning peak has just ended').toBe(15300);
+    expect(nextPeakFromBetween(acts, 9000)?.startS).toBe(15300);
+    expect(nextPeakFromBetween(acts, 16000), 'inside lunch').toBeUndefined();
+    expect(nextPeakFromBetween(acts, 24000)?.startS).toBe(33300);
+    expect(nextPeakFromBetween(acts, 35500), 'after the last peak').toBeUndefined();
+
+    const gate = { horizon: 'whole-day' as const, scored: true, acts, simTimeS: 9000, reason: 'fast' as const };
+    expect(stageSkipApplies(gate)).toBe(true);
+    /* Every other reason, every other horizon, an unscored day, and outside the gaps: no skip. */
+    for (const reason of ['yours', 'watching', 'call', 'between', 'held', 'act', 'chosen', 'unmanaged'] as const) {
+      expect(stageSkipApplies({ ...gate, reason }), reason).toBe(false);
+    }
+    expect(stageSkipApplies({ ...gate, horizon: 'period' }), 'a slice').toBe(false);
+    expect(stageSkipApplies({ ...gate, scored: false }), 'a replay or a watched run').toBe(false);
+    for (const simTimeS of [900, 2000, 16000, 35500]) {
+      expect(stageSkipApplies({ ...gate, simTimeS }), String(simTimeS)).toBe(false);
+    }
+  });
+
+  it('lands exactly where somebody first reaches a minute or the next peak starts, and passes nobody at a minute', () => {
+    const acts = actsOf(day.demandPhases);
+    const held = heldOf(day);
+    const seen = new Set<string>();
+    for (let t = 3600; t < 33300; t += 300) {
+      if (nextPeakFromBetween(acts, t) === undefined) continue;
+      if (held.some(([a, b]) => t >= a && t < b)) continue;
+      const skip = skipAt(t);
+      if (skip === undefined) continue;
+      seen.add(skip.until);
+      /* Nothing it passes over had anybody at a minute. */
+      expect(held.some(([a, b]) => a < skip.toS && b > skip.fromS), `${String(t)} passes a wait`).toBe(false);
+      if (skip.until === 'wait') {
+        /* And where it lands, somebody has just reached one: a held stretch starts exactly there. */
+        expect(held.some(([a]) => a === skip.toS), `${String(t)} lands on no wait`).toBe(true);
+        expect(firstMinuteWaitFrom(day.legs, t)).toBe(skip.toS);
+        expect(waitBandsAt(day, skip.toS + 1e-6).longestCurrentWaitS).toBeGreaterThanOrEqual(PACE_HOLD_WAIT_S);
+      } else {
+        expect(skip.until).toBe('peak');
+        expect(skip.toS).toBe(nextPeakFromBetween(acts, t)?.startS);
+      }
+    }
+    /* The day exercises both ends, or this case asserts less than it says. */
+    expect([...seen].sort()).toEqual(['peak', 'wait']);
+  });
+
+  it('stops at a call and never passes one', () => {
+    const t = quietInstant();
+    const free = skipAt(t);
+    if (free === undefined) throw new Error('no skip at the quiet instant');
+    const call = (t + free.toS) / 2;
+    expect(skipAt(t, call)).toEqual({ fromS: t, toS: call, until: 'call' });
+    /* A call already behind the playhead, or beyond where the skip lands, changes nothing. */
+    expect(skipAt(t, t - 10)).toEqual(free);
+    expect(skipAt(t, free.toS + 10)).toEqual(free);
+  });
+
+  it('plays a beat first, and plays a stretch shorter than two beats rather than skipping it', () => {
+    const t = quietInstant();
+    const base = { acts: actsOf(day.demandPhases), legs: day.legs, simTimeS: t, simPerRealS: FAST };
+    expect(stageSkipOf({ ...base, armedAtS: t })).toBeUndefined();
+    expect(stageSkipOf({ ...base, armedAtS: t - BEAT_SIM_S + 1 })).toBeUndefined();
+    expect(stageSkipOf({ ...base, armedAtS: t - BEAT_SIM_S })).toBeDefined();
+    const target = skipAt(t)!.toS;
+    /* One beat short of where it would land, there is nothing worth skipping. */
+    expect(skipAt(target - BEAT_SIM_S + 1)).toBeUndefined();
+  });
+
+  it('names no instant ahead while it is coming, and only past instants once it has landed', () => {
+    expect(STAGE_SKIP_BEAT_NOTE).not.toMatch(/\d/u);
+    const skip = skipAt(quietInstant())!;
+    const line = stageSkipLineOf(skip, 8 * 3600);
+    expect(line).toMatch(/^skipped \d\d:\d\d–\d\d:\d\d: nobody on a landing waited a minute$/u);
+    /* The later clock is where the stage now stands: nothing after the playhead is named. */
+    expect(line).toContain(`–${clockAt(skip.toS, 8 * 3600)}:`);
+  });
+
+  /** An instant between the first two peaks where nobody has waited a minute and a skip is due. */
+  function quietInstant(): number {
+    const held = heldOf(day);
+    for (let t = 3700; t < 15300; t += 60) {
+      if (held.some(([a, b]) => t >= a && t < b)) continue;
+      const skip = skipAt(t);
+      if (skip !== undefined && skip.toS - t > 20 * BEAT_SIM_S) return t;
+    }
+    throw new Error('Midtown’s morning gap has no quiet stretch to skip');
+  }
+
+  /**
+   * The stage's frame loop, over the real transport: § D1169's pace, § D1212's skip exactly as
+   * `stageScreen.ts#skipBetweenPeaks` asks it, and a stop at each of `stops` that puts the playhead on
+   * the stop's second (§ D1153) and records it. The pause at a stop is the player's and costs nothing.
+   */
+  function play(recording: VizRecording, stops: readonly number[], skip: boolean) {
+    const clock = new ManualClock();
+    const playback = new Playback(recording, clock, { speed: WATCHING, autoplay: true });
+    const acts = actsOf(recording.demandPhases);
+    const pending = [...stops].sort((a, b) => a - b);
+    const stoppedAt: number[] = [];
+    const skips: StageSkip[] = [];
+    let armedAtS: number | undefined;
+    let landedAtS: number | undefined;
+    while (playback.state !== 'ended') {
+      const t = playback.simTimeS;
+      const stop = pending[0];
+      const answer = stagePaceOf({
+        ...inputAt(recording, t, { longestStandingS: waitBandsAt(recording, t).longestCurrentWaitS }),
+        scored: true,
+        callAtS: stop,
+      });
+      if (answer.reason === 'call' && stop !== undefined) {
+        if (playback.simTimeS > stop) playback.seekTo(stop);
+        stoppedAt.push(playback.simTimeS);
+        pending.shift();
+        armedAtS = undefined;
+        continue;
+      }
+      if (playback.speed !== answer.simPerRealS) playback.setSpeed(answer.simPerRealS);
+      const applies =
+        skip &&
+        !(landedAtS !== undefined && Math.abs(t - landedAtS) < 1) &&
+        stageSkipApplies({ horizon: 'whole-day', scored: true, acts, simTimeS: t, reason: answer.reason });
+      if (!applies) armedAtS = undefined;
+      else if (armedAtS === undefined) armedAtS = t;
+      else {
+        const taken = stageSkipOf({
+          acts,
+          legs: recording.legs,
+          simTimeS: t,
+          armedAtS,
+          simPerRealS: playback.speed,
+          stopAtS: stop,
+        });
+        if (taken !== undefined) {
+          skips.push(taken);
+          landedAtS = taken.toS;
+          armedAtS = undefined;
+          playback.seekTo(taken.toS);
+          continue;
+        }
+      }
+      clock.advance(FRAME_MS);
+    }
+    return { realS: clock.now() / 1000, stoppedAt, skips, endedAtS: playback.simTimeS };
+  }
+
+  it('plays Midtown’s day in the time its legs predict, both ways, and the skip takes most of the quiet out', () => {
+    const acts = actsOf(day.demandPhases);
+    const model = (skip: boolean) =>
+      scoredDayPlayOf({
+        legs: day.legs,
+        acts,
+        startedAt: day.startedAt,
+        endedAt: day.endedAt,
+        stopsAtS: [],
+        watchingSimPerRealS: WATCHING,
+        skip,
+      });
+    const without = play(day, [], false);
+    const withSkip = play(day, [], true);
+    /* Half-second frames: a pace change or the end of a beat lands up to a frame late. */
+    expect(Math.abs(without.realS - model(false).realS)).toBeLessThan(60);
+    expect(Math.abs(withSkip.realS - model(true).realS)).toBeLessThan(60);
+    expect(withSkip.skips.length).toBe(model(true).skips);
+    /* The skip is worth having on this day: more than a third of § D1169's day goes. */
+    expect(withSkip.realS).toBeLessThan(without.realS * (2 / 3));
+    /* And it never skips inside a peak, before the first or after the last. */
+    for (const taken of withSkip.skips) {
+      expect(nextPeakFromBetween(acts, taken.fromS), String(taken.fromS)).toBeDefined();
+      expect(taken.toS).toBeLessThanOrEqual(nextPeakFromBetween(acts, taken.fromS)!.startS);
+    }
+    expect(withSkip.endedAtS).toBe(day.endedAt);
+  });
+
+  /*
+   * The ruling's one hard condition: the run, the goals, the census and the report stay the whole
+   * day's. The skip moves the playhead and cannot touch the recording, so what could move is where
+   * the stage stops for a call — and an answer is stamped where the stage stops. So the day is played
+   * both ways with two calls inside long quiet stretches, a press is filed at each stop exactly where
+   * the stage stood, and the day re-simulated with those presses must be the same run, leg for leg.
+   */
+  it('stops at every call on the same second with and without the skip, so a day answered either way is the same run', () => {
+    const before = structuredClone(day.legs);
+    const t = quietInstant();
+    const free = skipAt(t)!;
+    const stops = [(t + free.toS) / 2, 24_000];
+    const withSkip = play(day, stops, true);
+    const without = play(day, stops, false);
+    expect(withSkip.stoppedAt).toEqual(stops);
+    expect(without.stoppedAt).toEqual(stops);
+    /* A skip landed on the first call rather than running past it. */
+    expect(withSkip.skips.some((taken) => taken.until === 'call' && taken.toS === stops[0])).toBe(true);
+    /* Playing it touched nothing the report reads. */
+    expect(day.legs).toEqual(before);
+
+    const change = dayCallChangeOf('park-cars-lobby');
+    if (change === undefined) throw new Error('parking has no change');
+    const answered = (at: readonly number[]) => {
+      const plan = shiftRunConfigOf(RESOURCES, {
+        ...dayState,
+        interventions: at.map((atS) => ({ atS, change })),
+      });
+      return recordRun(plan.config, { recordDecisions: false, outOfServiceCarIds: plan.outOfServiceCarIds }).recording;
+    };
+    const skipped = answered(withSkip.stoppedAt);
+    const watched = answered(without.stoppedAt);
+    expect(skipped.legs).toEqual(watched.legs);
+    expect(observationsAt(skipped, skipped.endedAt)).toEqual(observationsAt(watched, watched.endedAt));
+    /* Positive control: the presses do change the run, so equal legs are not equal by accident. */
+    expect(skipped.legs).not.toEqual(day.legs);
   });
 });

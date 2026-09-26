@@ -47,6 +47,7 @@
  * the path off `scenarioLadderPort.ts`, and the honesty corpus sweeps it without a document.
  */
 import { ladderOfferCounts, SCENARIO_LADDER_COPY, type ScenarioLadderRung } from '../scenario/ladder.js';
+import { PAR_MARK_COPY, parMarkOf } from '../scenario/par.js';
 import { SITTING_SHAPES } from './sittingShape.js';
 import type { EverydayScreen } from './types.js';
 
@@ -85,7 +86,11 @@ export interface ScenarioPathRow {
   readonly shape: string;
   /** What the budget opens on and what chimes can buy, with the rung the count is taken at. */
   readonly budgetLine: string;
-  /** The measured count, in `scenario/survivors.ts`'s own words. Never paraphrased here. */
+  /**
+   * The measured count, in `scenario/survivors.ts`'s own words. Never paraphrased here. The total
+   * alone until this device holds the stage's clear, and the split by kind of choice after it,
+   * because the split is the stage's answer ([§ D1233](../../../../DECISIONS.md)).
+   */
   readonly waysThrough: string;
   /** `true` where the row is a press. `false` where it is a row with a reason. */
   readonly playable: boolean;
@@ -99,6 +104,12 @@ export interface ScenarioPathRow {
    * row and says the award has been paid; it opens nothing, because nothing on the path is locked.
    */
   readonly cleared: string | undefined;
+  /**
+   * **The par mark on a cleared row** — [§ D1234](../../../../DECISIONS.md). Present exactly when the
+   * row is cleared, the stage has a priced par, and the kept cost of the clear is at or under it.
+   * It pays nothing, and it is never drawn on a free par, which every clear that buys nothing meets.
+   */
+  readonly parMark: string | undefined;
 }
 
 /** The ordered path, drawn over the entries, or its absence. */
@@ -145,7 +156,28 @@ export const SCENARIO_COPY = Object.freeze({
     'The ten stages on the path are read from the campaign’s own file, and this page has not been handed it. Reload if it does not appear.',
   /** § D1129 clause 4: a cleared stage's row. It pays once and unlocks nothing, and says both. */
   cleared: 'Cleared on this device. Its chimes are paid, and clearing it again pays nothing.',
+  /** § D1234: what a par mark on a stage row is measured against, and that it pays nothing. */
+  parBasis: 'the cheapest way through the census found on this stage’s page',
+  parPays: 'Matching it or beating it pays nothing extra.',
 });
+
+function unitsText(units: number): string {
+  return `${String(units)} ${units === 1 ? 'unit' : 'units'}`;
+}
+
+/**
+ * The par mark's sentence, or `undefined` where the clear earns none — `scenario/par.ts#parMarkOf`
+ * decides, this words it. Both prices are given, so the mark is checkable on its own face.
+ */
+function parMarkLineOf(parUnits: number | undefined, spentUnits: number | undefined): string | undefined {
+  const mark = parMarkOf(parUnits, spentUnits);
+  if (mark === undefined || parUnits === undefined || spentUnits === undefined) return undefined;
+  const comparison =
+    mark === 'at'
+      ? `Your clear cost ${unitsText(spentUnits)}, the same as ${SCENARIO_COPY.parBasis}.`
+      : `Your clear cost ${unitsText(spentUnits)}, less than the ${unitsText(parUnits)} of ${SCENARIO_COPY.parBasis}.`;
+  return `${PAR_MARK_COPY[mark]} ${comparison} ${SCENARIO_COPY.parPays}`;
+}
 
 /**
  * The two sources that ship as a single press. Frozen rather than derived: each row's `screen` is a
@@ -262,8 +294,13 @@ function heldRegisterLine(rows: readonly ScenarioPathRow[]): string | undefined 
 }
 
 /** One path row, worded. The figures are the ladder's; this chooses only which of them are drawn. */
-function pathRowOf(rung: ScenarioLadderRung, clearedIds: ReadonlySet<string>): ScenarioPathRow {
+function pathRowOf(
+  rung: ScenarioLadderRung,
+  clearedIds: ReadonlySet<string>,
+  spentOf: (stageId: string) => number | undefined,
+): ScenarioPathRow {
   const playable = rung.offer === 'offered';
+  const cleared = clearedIds.has(rung.id);
   return Object.freeze({
     id: rung.id,
     position: rung.position,
@@ -272,17 +309,22 @@ function pathRowOf(rung: ScenarioLadderRung, clearedIds: ReadonlySet<string>): S
     openingLine: rung.openingLine,
     shape: rung.shape,
     budgetLine: rung.budgetLine,
-    waysThrough: rung.waysThrough,
+    waysThrough: cleared ? rung.waysThroughCleared : rung.waysThrough,
     playable,
     note: playable ? rung.openNote : undefined,
     refusal: playable ? undefined : rung.heldReason,
-    cleared: clearedIds.has(rung.id) ? SCENARIO_COPY.cleared : undefined,
+    cleared: cleared ? SCENARIO_COPY.cleared : undefined,
+    parMark: cleared ? parMarkLineOf(rung.parUnits, spentOf(rung.id)) : undefined,
   });
 }
 
 /** The path, worded — or `undefined` where none was provided. */
-function pathViewOf(rungs: readonly ScenarioLadderRung[], clearedIds: ReadonlySet<string>): ScenarioPathView {
-  const rows = rungs.map((rung) => pathRowOf(rung, clearedIds));
+function pathViewOf(
+  rungs: readonly ScenarioLadderRung[],
+  clearedIds: ReadonlySet<string>,
+  spentOf: (stageId: string) => number | undefined,
+): ScenarioPathView {
+  const rows = rungs.map((rung) => pathRowOf(rung, clearedIds, spentOf));
   const counts = ladderOfferCounts(rungs);
   return Object.freeze({
     heading: SCENARIO_LADDER_COPY.heading,
@@ -311,8 +353,13 @@ export function scenarioHubViewOf(
   path?: readonly ScenarioLadderRung[],
   /** Stage ids this device holds a `scenario-cleared` turn for — `everyday/deviceChimes.ts`'s record. */
   clearedIds: ReadonlySet<string> = new Set(),
+  /**
+   * What the kept clear of a stage cost, in units — `everyday/profile.ts#fixSpentUnitsOf`, keyed by
+   * scenario id. `undefined` where no cost was kept, and then no par mark is drawn (§ D1234).
+   */
+  spentOf: (stageId: string) => number | undefined = () => undefined,
 ): ScenarioHubView {
-  const view = path === undefined ? undefined : pathViewOf(path, clearedIds);
+  const view = path === undefined ? undefined : pathViewOf(path, clearedIds, spentOf);
   const held = view === undefined ? undefined : heldRegisterLine(view.rows);
   return Object.freeze({
     eyebrow: SCENARIO_COPY.eyebrow,
