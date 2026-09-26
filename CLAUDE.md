@@ -113,13 +113,38 @@ verdict:
   the run that first moved them was issues #127 and #137, the second of which fixed what the first
   found, and the arguments for that pair are in `honesty/surfaces.ts`, `honesty/run.ts`,
   `shift/types.ts#ReportFigure.count` and `dev/reportPanel.ts#DeltaRowView`. **The figures
-  below are wave AJ's, both tiers, measured 2026-09-25 on the integrated tree**; the paragraph above
+  below are wave AK's, both tiers, measured 2026-09-26 on the integrated tree**; the paragraph above
   describes the wave that first moved this column and is kept as the dated record it is:
 
   | tier | cases | strings | simulations | surfaces | failing cases | verdict |
   |---|---|---|---|---|---|---|
-  | always-on | 49 | **913 076** | **606** | **73** | **0** | **green**, and the register is empty |
-  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **1 140 993** | **4 710** | **74** | **0** | **green**, and the register is empty |
+  | always-on | 49 | **919 407** | **606** | **74** | **0** | **green**, and the register is empty |
+  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **1 148 854** | **4 710** | **75** | **0** | **green**, and the register is empty |
+
+  **Wave AK's move is 129.20 strings a case always-on and 131.02 deep, with one surface in each,
+  and the deep tier found a defect the lanes could not see.** The base, `main` at `67599fe`,
+  reproduced wave AJ's row to the string in both tiers, the seventh consecutive wave. Measured at
+  `e5c9000`, on a head green in all six projects (viz by directory, viz-browser **66 / 397**, core
+  **3 012**, experiments **1 526**, cli **179**, server **650**, `tsc -b` clean).
+
+  | | base `67599fe` | wave AK | move | per case |
+  |---|---|---|---|---|
+  | always-on strings | 913 076 | **919 407** | **+6 331** | **129.20** |
+  | deep strings | 1 140 993 | **1 148 854** | **+7 861** | **131.02** |
+  | surfaces | 73 / 74 | **74 / 75** | **+1 / +1** | none |
+  | cases · simulations · failing cases | 49 / 60 · 606 / 4 710 · 0 | **unmoved** | **0** | none |
+
+  **The surface sets were diffed**: one added in each tier, `shift/report.ts#smallPrintFor`, which
+  lane AK-B forecast by name, and nothing removed. The lanes published floors summing to about 106 a
+  case, below the move, and the move is not split between them (§ D256).
+
+  **The first deep reading on the integrated tree failed 22 of 60 cases**, all
+  `goal-without-rate` on `campaign/judge.ts#judgeStage`, the surface only the deep tier reaches.
+  R12's check exempted the goal kinds it never judges by finding the kind's id in the drawn
+  sentence; § D1154 and § D1159 named goals in words, so the id left the sentence and the exemption
+  stopped matching. No lane could see it: each ran the always-on tier. The goal seeds now carry
+  their kind and the check reads it (`honesty/goalRateExemption.test.ts`), and the figures above are
+  the re-measurement on the fixed head.
 
   **Wave AJ's move is 534.08 strings a case always-on and 535.90 deep, with six surfaces in each
   tier, every one forecast by name, and wave AI's owed deep reading is discharged.** Measured at
