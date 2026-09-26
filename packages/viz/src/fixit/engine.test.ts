@@ -26,6 +26,8 @@ import {
   classifyOutcome,
   emptyFixitState,
   fixedBadgeAfter,
+  fixKeptLineOf,
+  FIX_KEPT_LINE,
   spendOf,
   editorPathsOf,
   parkingPriceUnits,
@@ -257,7 +259,6 @@ describe('the four outcomes — § 10.4, copy verbatim', () => {
     const outcome = classifyOutcome(CASE, MEASURED, spendOf(CASE, emptyFixitState(), shippedPriceSchedule()), {
       witnessRun: true,
       changes: [],
-      bought: [],
     });
     expect(outcome.kind).toBe('fixed');
     expect(outcome.head).toBe('Fixed head.');
@@ -458,14 +459,19 @@ describe('a verdict may not claim more than the run measured — docs/20 defect 
   });
 
   /* The two arms below are about the authored body, so they are the witness's run — § D1011. */
-  const WITNESS = { witnessRun: true, changes: [], bought: [] } as const;
+  const WITNESS = { witnessRun: true, changes: [] } as const;
 
   it('leaves the authored “nothing was bought” punchline alone when nothing was bought', () => {
     const outcome = classifyOutcome(CASE, MEASURED, spendOf(CASE, emptyFixitState(), shippedPriceSchedule()), WITNESS);
     expect(outcome.body).toBe('Fixed body.');
   });
 
-  it('corrects it when the player did buy, naming the committed total', () => {
+  it('says the words are about the player’s change, and what the order committed beyond the repair — § D1158', () => {
+    /*
+     * The post-AJ panel's seat C, D4: on a witness run the clause read *"That is about the repair,
+     * not about your order"*, disclaiming the player's own repair. Red before § D1158: the first
+     * `toContain` below failed and the `not.toContain` held the old words.
+     */
     const outcome = classifyOutcome(
       CASE,
       MEASURED,
@@ -479,11 +485,16 @@ describe('a verdict may not claim more than the run measured — docs/20 defect 
       WITNESS,
     );
     expect(outcome.kind).toBe('fixed');
-    // The authored sentence survives; what follows it is the fact it is silent about.
+    // The authored sentence survives; what follows it is about the player's change.
     expect(outcome.body.startsWith('Fixed body.')).toBe(true);
-    expect(outcome.body).toContain('about the repair, not about your order');
-    expect(outcome.body).toContain('11 of 12 u');
-    expect(outcome.body).toContain('none of it machinery');
+    expect(outcome.body).toContain('the words above are about your change');
+    expect(outcome.body).not.toContain('not about your order');
+    const diagnosed = CASE.repairs.find((repair) => repair.role === 'diagnosed')?.costUnits ?? 0;
+    if (diagnosed < 11) {
+      expect(outcome.body).toContain('11 of 12 u');
+      expect(outcome.body).toContain('none of it machinery');
+      expect(outcome.body).toContain(`${String(11 - diagnosed)} u more than that repair costs, for the same run`);
+    }
   });
 });
 
@@ -497,17 +508,22 @@ describe('the fixed verdict names the order unless the run is the witness’s �
     const outcome = classifyOutcome(CASE, MEASURED, spendOf(CASE, emptyFixitState(), shippedPriceSchedule()), {
       witnessRun: false,
       changes: ['Where idle cars wait — in the middle of its own zone', 'Car A runs in High bank'],
-      bought: ['Where idle cars wait', 'Rezone a bank'],
     });
     expect(outcome.kind).toBe('fixed');
     expect(outcome.attribution).toBe('order');
     expect(outcome.head).toBe(FIXED_BY_ORDER_HEAD);
+    /*
+     * § D1158, the post-AJ panel's seat C D4 and D5: no disclaimer of the player's own run, and no
+     * *What it bought* repeating the price group; what the change did, from the rows under it.
+     */
     expect(outcome.body).toBe(
       'What you changed: Where idle cars wait — in the middle of its own zone; Car A runs in High bank. ' +
-        'What it bought: Where idle cars wait; Rezone a bank. ' +
+        'What it did: the complaint went from 10 waits to 1 wait, and everyone else away inside a minute went from 96.0 % of 100 journeys to 95.0 % of 100 journeys. ' +
         FIXED_BY_ORDER_CLOSE,
     );
     expect(outcome.body).not.toContain('Fixed body.');
+    expect(outcome.body).not.toContain('describes a different run');
+    expect(outcome.body).not.toContain('What it bought');
   });
 
   it('declares whose act every outcome kind describes', () => {
@@ -531,18 +547,18 @@ describe('the fixed verdict names the order unless the run is the witness’s �
   });
 });
 
-describe('the FIXED badge follows the latest run — docs/20 defect 16', () => {
+describe('a case once fixed stays fixed — § D1157, reversing docs/20 defect 16', () => {
   /*
-   * The audit's repro: fix the case (badge FIXED), then buy the do-nothing pair and run again to
-   * "9 waits → 9 waits · 0 % of it went away" — and the rail still read FIXED beside it. The badge
-   * is the rail's summary of where the case *stands*, not an observation about its history (that
-   * contrast — `WeekState.bestMinutePct` is a high-water mark on purpose — is argued on
-   * `fixedBadgeAfter` itself), so a later run of the same case decides it in both directions.
+   * The post-AJ panel's seat C, D2: fix *The express that stops everywhere*, change the door hold,
+   * run it again, and the rail went FIXED → OPEN, the count 6/15 → 5/15, and the case left the
+   * solved set. Red before § D1157: `fixedBadgeAfter` took the latest run alone, so the three
+   * assertions on `fixedBefore = true` below read `false`.
    */
-  it('is true exactly for a fixed outcome, and false for each of the other three kinds', () => {
+  it('is true for a fixed outcome, and false for each of the other three kinds on a case not yet fixed', () => {
     const fixed = classifyOutcome(CASE, MEASURED, spendOf(CASE, emptyFixitState(), shippedPriceSchedule()));
     expect(fixed.kind).toBe('fixed');
     expect(fixedBadgeAfter(fixed)).toBe(true);
+    expect(fixKeptLineOf(false, fixed)).toBeUndefined();
 
     const notEnough = classifyOutcome(
       CASE,
@@ -569,22 +585,27 @@ describe('the FIXED badge follows the latest run — docs/20 defect 16', () => {
     });
     expect(refused.kind).toBe('over-budget');
     expect(fixedBadgeAfter(refused)).toBe(false);
+
+    /* And on a case already fixed, none of the three takes the badge away; each says why. */
+    for (const later of [notEnough, worse, refused]) {
+      expect(fixedBadgeAfter(later, true)).toBe(true);
+      expect(fixKeptLineOf(true, later)).toBe(FIX_KEPT_LINE);
+    }
+    expect(fixKeptLineOf(true, fixed)).toBeUndefined();
   });
 
-  it('is what the panel assigns — no one-way latch survives in the mount', async () => {
+  it('is what both surfaces assign, with the badge the case already wore', async () => {
     /*
-     * The wiring pin, `reportPanel.test.ts`'s binding-site idiom: the rule being right is
-     * worthless if `dev/fixitPanel.ts` still latches. The defect's exact line is asserted absent
-     * and the assignment through the rule asserted present.
+     * The wiring pin, `reportPanel.test.ts`'s binding-site idiom: the rule being right is worthless
+     * if a mount still assigns the latest run alone.
      */
     const { readFile } = await import('node:fs/promises');
     const { fileURLToPath } = await import('node:url');
-    const panel = await readFile(
-      fileURLToPath(new URL('../dev/fixitPanel.ts', import.meta.url)),
-      'utf8',
-    );
-    expect(panel).toContain('session.fixed = fixedBadgeAfter(outcome);');
-    expect(panel).not.toContain("if (outcome.kind === 'fixed') session.fixed = true;");
+    for (const where of ['../dev/fixitPanel.ts', '../everyday/fixitScreen.ts']) {
+      const source = await readFile(fileURLToPath(new URL(where, import.meta.url)), 'utf8');
+      expect(source).toContain('session.fixed = fixedBadgeAfter(outcome, session.fixed);');
+      expect(source).not.toContain('session.fixed = fixedBadgeAfter(outcome);');
+    }
   });
 });
 

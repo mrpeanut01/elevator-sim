@@ -265,6 +265,15 @@ export const FIXIT_SCREEN_COPY = Object.freeze({
     'Nobody here has a start time the owner can ask them to move, so this row has nothing to stagger.',
   tenancyAsItStands: 'as it stands — everyone on the same clock',
   tenancyPricedEach: 'a tenancy',
+  /**
+   * What the player reads when a run throws — [§ D1160](../../../../DECISIONS.md), the post-AJ panel's seat C D1. A
+   * throw here is a fault in the game rather than in the order (the one seat C met was a crowd
+   * check refusing a zoning step it should have allowed), so the raw message, which named
+   * passengers and floating-point arrival times, never reaches the page: it rides on the
+   * paragraph's `data-fault` for a bug report, and the words say what the player can do.
+   */
+  runFailed:
+    'the run stopped on a fault in the game rather than in your order, so there is no verdict and nothing is banked. Try the order again, or a different one.',
   planRefused:
     'The building would not run as drawn — a bank may have been left with no car, or with one floor to stop at. Put the last change back and run again.',
   /** Why *buy one more step* refuses — § 10.3's budget cap, said on the control. */
@@ -865,7 +874,6 @@ export function fixitVerdictContextOf(input: {
       inputs: input.inputs,
       extras: standingExtrasFrom(input.schedule),
     }),
-    bought: rowsBoughtOf(input.entry, input.state, input.schedule),
   };
 }
 

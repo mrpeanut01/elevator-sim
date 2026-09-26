@@ -21,7 +21,7 @@
 import { editableIdsOf } from './parse.js';
 import { playerSafeDescription } from './words.js';
 import type { CampaignStage } from './types.js';
-import { goalLabel } from '../scenario/goals.js';
+import { stageGoalNameOf } from './judge.js';
 import type { PriceSchedule } from '../pricing/types.js';
 import type { PublishedScenario } from '../scenario/published.js';
 import { glossaryFor, type GlossaryTerm } from '../mode/glossary.js';
@@ -113,7 +113,7 @@ export function briefingFor(input: BriefingInput): StageBriefing {
       const counts = record?.tuning;
       const holdoutCounts = record?.holdout;
       if (counts === undefined || counts === null) {
-        return `${goalLabel(spec)} — judged on the difference between the two settings, by a paired interval that has to exclude zero.`;
+        return `${stageGoalNameOf(spec)} — judged on the difference between the two settings, by a paired interval that has to exclude zero.`;
       }
       const holdoutClause =
         holdoutCounts === undefined || holdoutCounts === null
@@ -121,7 +121,7 @@ export function briefingFor(input: BriefingInput): StageBriefing {
           : ` It passed ${String(holdoutCounts.passes)} of ${String(holdoutCounts.n)} on the ` +
             `holdout seeds, and that count is the second bar — the one your setting has not seen.`;
       return (
-        `${goalLabel(spec)} — judged over ${String(stage.replications)} runs. The shipped setting ` +
+        `${stageGoalNameOf(spec)} — judged over ${String(stage.replications)} runs. The shipped setting ` +
         `passed ${String(counts.passes)} of ${String(counts.n)} on these seeds, and that count is the bar.` +
         holdoutClause
       );

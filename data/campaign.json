@@ -219,8 +219,8 @@
       "teaches": "saturation, and why a diverging queue has no average",
       "brief": [
         "The same building at the demand it actually ships with.",
-        "It cannot be won as configured, and that is the point: the queues grow faster than the cars empty them, so the tool refuses to average a wait that never settles.",
-        "Your job here is to read the refusal and say where the building broke, not to beat it."
+        "As the building stands, the queues grow faster than the cars empty them on every one of the stage's runs, so the tool refuses to average a wait that never settles.",
+        "Read that refusal to see where the building breaks, then look for a standing order that breaks it less: the stage is cleared by an order measurably better than the shipped one, on the stage's crowds and again on crowds you did not tune against."
       ],
       "building": "midtown-office",
       "traffic": {

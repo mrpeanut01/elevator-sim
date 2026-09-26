@@ -322,6 +322,7 @@ import {
   zonePriceUnits,
   budgetNoteOf,
   classifyOutcome,
+  fixKeptLineOf,
   emptyFixitState,
   spendOf,
   stepSpeed,
@@ -2902,6 +2903,7 @@ const CAMPAIGN: SurfaceAdapter = {
   id: 'campaign/judge.ts#judgeStage',
   covers: [
     'campaign/judge.ts#judgeStage',
+    'campaign/judge.ts#stageGoalNameOf',
     'campaign/brief.ts#briefingFor',
     'campaign/failStates.ts#failStateReports',
     'campaign/failStates.ts#failStateCounts',
@@ -7372,7 +7374,7 @@ const FIXIT_COVERS: readonly string[] = [
    */
   'fixit/engine.ts#FIXED_BY_ORDER_HEAD',
   'fixit/engine.ts#FIXED_BY_ORDER_CHANGES_LEAD',
-  'fixit/engine.ts#FIXED_BY_ORDER_BOUGHT_LEAD',
+  'fixit/engine.ts#FIXED_BY_ORDER_DID_LEAD',
   'fixit/engine.ts#FIXED_BY_ORDER_CLOSE',
   'everyday/fixitScreenModel.ts#fixitOrderLinesOf',
   'everyday/fixitScreenModel.ts#fixitVerdictContextOf',
@@ -7398,6 +7400,17 @@ const FIXIT_COVERS: readonly string[] = [
    */
   'fixit/judge.ts#FUTILITY_BASIS_LINE',
   'fixit/judge.ts#FUTILITY_DEMAND_BASIS_LINE',
+  /*
+   * § D1160: the third basis, for an order that changes which trips the lifts can carry and
+   * so re-draws the crowd (seat C's D1). Rendered below by classifying a measurement whose
+   * `crowdRedrawn` is true, at the gate, replicated and futile.
+   */
+  'fixit/engine.ts#ROUTES_BASIS_LINE',
+  /* § D1157: a case once fixed stays fixed, and a later run that does not clear says so over its card. */
+  'fixit/engine.ts#FIX_KEPT_LINE',
+  'fixit/engine.ts#fixKeptLineOf',
+  'fixit/judge.ts#REPLICATED_ROUTES_BASIS_LINE',
+  'fixit/judge.ts#FUTILITY_ROUTES_BASIS_LINE',
   'fixit/judge.ts#progressLineOf',
   'fixit/judge.ts#markTitleOf',
   'everyday/fixitScreenModel.ts#fixitDiagnosisView',
@@ -7725,7 +7738,19 @@ const FIXIT: SurfaceAdapter = {
       role: 'reason',
       provenance: 'authored',
     });
+    seeds.push({
+      field: 'outcome.routes.basis',
+      text: classifyOutcome(entry, { ...flatSameCrowd(), sameCrowd: false, crowdRedrawn: true }, spendOf(entry, empty, schedule)).basis,
+      role: 'reason',
+      provenance: 'authored',
+    });
     const worse = classifyOutcome(entry, flat, spendOf(entry, empty, schedule));
+    seeds.push({
+      field: 'outcome.fixKept',
+      text: fixKeptLineOf(true, worse) ?? '',
+      role: 'prose',
+      provenance: 'authored',
+    });
     const short = classifyOutcome(
       entry,
       { ...flat, complaintGonePct: 30, restDeltaPoints: 0 },
@@ -7778,6 +7803,13 @@ const FIXIT: SurfaceAdapter = {
         attribution: { credits: ['edit-after-verdict'], carried: ['edit-after-verdict'] },
       });
     }
+    /* § D1160: a run that threw, as the screen words it; the thrown message never reaches the page. */
+    seeds.push({
+      field: 'run.failed',
+      text: `The day could not be run: ${FIXIT_SCREEN_COPY.runFailed}`,
+      role: 'reason',
+      provenance: 'authored',
+    });
 
     /*
      * ---- the judge's arms — [§ D1020](../../../../DECISIONS.md) ----
@@ -7788,11 +7820,12 @@ const FIXIT: SurfaceAdapter = {
      * are fabricated readings, on this adapter's standing habit for arms a green pair cannot
      * produce: the judge is arithmetic over readings, and what is under test is its words.
      */
-    const clearing = (sameCrowd: boolean): FixitMeasurement => ({
+    const clearing = (sameCrowd: boolean, crowdRedrawn = false): FixitMeasurement => ({
       ...flatSameCrowd(),
       restAwayAfterPct: 95,
       restDeltaPoints: 0,
       sameCrowd,
+      crowdRedrawn,
     });
     const checkingOutcome = checkingOutcomeOf(classifyOutcome(entry, clearing(true), spendOf(entry, empty, schedule)));
     seeds.push({ field: 'outcome.checking.head', text: checkingOutcome.head, role: 'label', provenance: 'authored' });
@@ -7831,6 +7864,16 @@ const FIXIT: SurfaceAdapter = {
         }
       }
     }
+    seeds.push({
+      field: 'outcome.judged.routes.basis',
+      text: judgedOutcomeOf(
+        entry,
+        classifyOutcome(entry, clearing(false, true), spendOf(entry, empty, schedule)),
+        judgeReplication(asBuiltMornings, mornings((i) => i % 2, () => 95)),
+      ).basis,
+      role: 'reason',
+      provenance: 'authored',
+    });
     seeds.push({
       field: 'outcome.judged.demand.basis',
       text: judgedOutcomeOf(
@@ -7871,6 +7914,12 @@ const FIXIT: SurfaceAdapter = {
         });
       }
     }
+    seeds.push({
+      field: 'outcome.judged.futile.routes.basis',
+      text: judgedOutcomeOf(entry, classifyOutcome(entry, clearing(false, true), spendOf(entry, empty, schedule)), futile).basis,
+      role: 'reason',
+      provenance: 'authored',
+    });
     seeds.push({
       field: 'outcome.judged.futile.demand.basis',
       text: judgedOutcomeOf(entry, classifyOutcome(entry, clearing(false), spendOf(entry, empty, schedule)), futile).basis,

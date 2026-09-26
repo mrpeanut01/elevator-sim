@@ -38,6 +38,7 @@ import {
   expandFloors,
   parseBuilding,
   resolveBuilding,
+  RoutePlanner,
   type BuildingConfig,
   type CrowdThinning,
   type DispatcherProfile,
@@ -920,6 +921,7 @@ export function measuredOf(
   const a = readingsOf(after, measure);
   const complaintBefore = complaintValueOf(b, measure);
   const complaintAfter = complaintValueOf(a, measure);
+  const same = sameCrowd(before, after);
   const gone =
     complaintBefore === null || complaintBefore <= 0 || complaintAfter === null
       ? null
@@ -936,7 +938,13 @@ export function measuredOf(
     restBoardedAfter: a.restBoarded,
     restDeltaPoints:
       b.restAwayPct === null || a.restAwayPct === null ? null : a.restAwayPct - b.restAwayPct,
-    sameCrowd: sameCrowd(before, after),
+    sameCrowd: same,
+    /*
+     * Read off the legs, like `sameCrowd`: a crowd the second run met people in that the first did
+     * not is a re-drawn one rather than a thinned one, and only a change to the building's trips
+     * can produce it (`assertPairMatchesRepairs` holds that). It picks the basis line.
+     */
+    crowdRedrawn: !same && crowdAddedOf(before, after).length > 0,
   };
 }
 
@@ -985,8 +993,23 @@ export function assertPairMatchesRepairs(
   state: FixitState,
   before: VizRecording,
   after: VizRecording,
+  plan?: FixitRunPlan,
 ): void {
   const pair = `the fix-it pair on case "${entry.id}"`;
+  /*
+   * **A change to which trips the lifts can carry re-draws the crowd, and that is not a defect** —
+   * [§ D1160](../../../../DECISIONS.md), the post-AJ panel's seat C D1. The traffic generator removes every trip no chain
+   * of banks can carry and shares its demand over the trips that remain
+   * (`core/traffic/generator.ts`, *Conservation, when a trip turns out to be impossible*). So on
+   * `zoning-starves-the-top`, whose two banks meet only at the lobby and the car park, one floor of
+   * overlap opens trips between the low floors and the high ones, the destination tables change,
+   * and the repaired run meets a crowd drawn for the building as rezoned: passenger p19 on floor 2
+   * went to 10 as built and to 18 after. That is the model working. The press site passes its
+   * plan, and where the two buildings do not carry the same trips the pair makes no crowd claim at
+   * all; the basis line is then read off the legs (`engine.ts#ROUTES_BASIS_LINE`). A caller that
+   * passes no plan gets the strict check, which is every test that pairs two runs by hand.
+   */
+  if (plan !== undefined && tripsTheRoutesChangeOf(plan) > 0) return;
   if (selectionKeepsTheCrowd(entry, state)) {
     assertSameCrowd(before, after, pair);
     return;
@@ -1006,6 +1029,45 @@ export function assertPairMatchesRepairs(
       `${pair} changes the crowd by thinning it, and the second run met people the first did not: ${added.join('; ')}. A thinned crowd is the as-built crowd less some people, never a different one.`,
     );
   }
+}
+
+/**
+ * **How many trips one building can carry and the other cannot** — the ordered floor pairs whose
+ * route exists on one side of the plan and not on the other, or whose route has a lift leg on one
+ * side and none on the other. `0` when the order leaves the building's routes alone, which is every
+ * order that touches no bank's floors.
+ *
+ * Read with `core`'s own `RoutePlanner`, the one the traffic generator asks, so *"the lifts can
+ * carry this trip"* means here exactly what it means when the crowd is drawn. Feasibility only, and
+ * deliberately: on `vertical-city` a zoning step turns an escalator-then-lift journey into a lift
+ * journey, which moves a route and moves nobody (§ D1075), and a count over route *shapes* would
+ * have given up the crowd check on the one tower where it has already caught a defect.
+ */
+export function tripsTheRoutesChangeOf(plan: FixitRunPlan): number {
+  const asBuilt = plan.asBuilt.building;
+  const asRepaired = plan.asRepaired.building;
+  if (asBuilt === asRepaired) return 0;
+  const floors = asBuilt.floors.map((floor) => floor.id);
+  const repairedFloors = new Set(asRepaired.floors.map((floor) => floor.id));
+  const before = RoutePlanner.forBuilding(asBuilt);
+  const after = RoutePlanner.forBuilding(asRepaired);
+  /* 0: no route; 1: a route with no lift leg, which is not lift demand; 2: a lift trip. */
+  const carried = (planner: RoutePlanner, from: string, to: string): number => {
+    const route = planner.plan(from, to);
+    return route === undefined ? 0 : route.elevatorLegCount === 0 ? 1 : 2;
+  };
+  let changed = 0;
+  for (const from of floors) {
+    for (const to of floors) {
+      if (from === to) continue;
+      if (!repairedFloors.has(from) || !repairedFloors.has(to)) {
+        changed += 1;
+        continue;
+      }
+      if (carried(before, from, to) !== carried(after, from, to)) changed += 1;
+    }
+  }
+  return changed;
 }
 
 /* -------------------------------------------------------------------------- *

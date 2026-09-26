@@ -55,7 +55,7 @@ import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
 import { GOAL_KINDS, goalLabel } from '../scenario/goals.js';
 import type { PublishedGoalRates, PublishedScenario } from '../scenario/published.js';
 
-import { judgeStage } from './judge.js';
+import { judgeStage, stageGoalNameOf } from './judge.js';
 import { parseCampaign, type CampaignContext } from './parse.js';
 import {
   batchRequestForStage,
@@ -417,5 +417,75 @@ describe('a stage is judged on seeds the player could not have tuned against', (
     });
     expect(judged.holdout?.sentence).not.toContain('validates nothing');
     expect(judged.holdout?.goals.length).toBe(stage.goals.length);
+  });
+});
+
+/**
+ * **A campaign goal is named in plain words for what it grades** — § D1159, the post-AJ panel's
+ * seats A, C and D.
+ *
+ * Three seats read `deliver-everyone · met` beside *"your setting passed 5 of 50 runs"*, and
+ * `holdout-20260731 (seed 20260731)` on the stage verdict. Red before § D1159: the verdict's labels
+ * were the `data/` kinds and the holdout sentence named its seed set, so the second and third
+ * assertions below failed on every stage; and stage 3's brief said it *"cannot be won"* on a stage a
+ * seat cleared and was paid for.
+ */
+describe('a campaign goal is named for what it grades, in plain words — § D1159', () => {
+  /** A `data/` id: any goal kind, or a seed set's name. */
+  const ID = new RegExp(`${GOAL_KINDS.join('|')}|holdout-\\d|tuning-\\d`);
+
+  it('names every goal on every stage without its id, and a count goal for its relative bar', () => {
+    let named = 0;
+    for (const stage of campaign.stages) {
+      for (const spec of stage.goals) {
+        const name = stageGoalNameOf(spec);
+        named += 1;
+        expect(name, spec.kind).not.toMatch(ID);
+        if (spec.kind !== 'beat-the-baseline') {
+          expect(name, spec.kind).toContain('at least as many runs as the shipped setting');
+        }
+      }
+    }
+    expect(named).toBeGreaterThan(campaign.stages.length);
+  });
+
+  it('prints the plain names on the verdict, and names no seed set in the holdout sentence', () => {
+    for (const stage of campaign.stages) {
+      const result = emptyResult(stage);
+      const holdout: BatchResult = { ...result, seed: stage.holdoutSeeds.seed };
+      const verdict = judgeStage({
+        stage,
+        published: publishedFor(stage),
+        result,
+        report: batchReport(result),
+        holdout: { result: holdout, report: batchReport(holdout) },
+      });
+      for (const [index, goal] of verdict.goals.entries()) {
+        const spec = stage.goals[index];
+        expect(spec).toBeDefined();
+        if (spec === undefined) continue;
+        expect(goal.label).toBe(stageGoalNameOf(spec));
+        expect(goal.label, stage.id).not.toMatch(ID);
+        expect(goal.sentence, stage.id).not.toMatch(ID);
+      }
+      const sentence = verdict.holdout?.sentence ?? '';
+      expect(sentence, stage.id).not.toContain(stage.holdoutSeeds.name);
+      expect(sentence, stage.id).not.toContain('(seed ');
+      expect(sentence, stage.id).toContain('held-back crowds');
+    }
+  });
+
+  it('stage 3’s brief no longer says it cannot be won, and its “every run” is the published table', () => {
+    const stage = campaign.stages.find((candidate) => candidate.id === 'stage-3-overwhelmed');
+    expect(stage).toBeDefined();
+    if (stage === undefined) return;
+    const brief = stage.brief.join(' ');
+    expect(brief).not.toMatch(/cannot be won|not to beat it/);
+    expect(brief).toContain('on every one of the stage');
+    /* The claim, pinned to the measurement: the shipped setting's queues diverge on 50 of 50 runs, both seed sets. */
+    const divergence = publishedFor(stage).configurationFacts.find((record) => record.kind === 'no-divergence');
+    expect(divergence?.tuning?.passes).toBe(0);
+    expect(divergence?.holdout?.passes).toBe(0);
+    expect(divergence?.tuning?.n).toBe(stage.replications);
   });
 });

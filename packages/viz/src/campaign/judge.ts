@@ -107,7 +107,6 @@
 import type { BatchComparisonRow, BatchReport } from '../batch/report.js';
 import type { BatchResult } from '../batch/types.js';
 import {
-  goalLabel,
   asPerReplicationGoal,
   measureGoalRate,
   type PerReplicationGoalSpec,
@@ -314,13 +313,13 @@ function judgeGoalsOf(
     // load, so no shipped campaign reaches here; it is handled rather than assumed away because
     // the stage's other goals should still be judged.
     if (narrowed.missingThreshold) {
-      const label = goalLabel(spec);
+      const label = stageGoalNameOf(spec);
       return {
         kind: spec.kind,
         label,
         met: null,
         reproduced: null,
-        sentence: `${label}: declares no threshold, so there is no ceiling to judge a wait against.`,
+        sentence: 'This goal declares no threshold, so there is no ceiling to judge a wait against.',
         note:
           'The kind is judgeable on one run; this instance of it is not. A campaign file is ' +
           'refused at load for this, so seeing it here means the stage was assembled in memory.',
@@ -374,15 +373,56 @@ function holdoutVerdictFor(
     goals,
     held,
     sentence: held
-      ? `The holdout set ${seeds.name} (seed ${seeds.seed}) agrees: all ${String(goals.length)} ` +
+      ? `The held-back crowds agree: all ${String(goals.length)} ` +
         `${plural(goals.length, 'goal', 'goals')} reached over ${runs} this setting was not tuned ` +
         'against.'
-      : `The holdout set ${seeds.name} (seed ${seeds.seed}) does not agree: ${String(met)} of ` +
+      : `The held-back crowds do not agree: ${String(met)} of ` +
         `${String(goals.length)} ${plural(goals.length, 'goal', 'goals')} reached over ${runs} ` +
         'this setting was not tuned against.' +
-        `${tail} A gain that does not survive a disjoint seed set is a fit to fifty passenger ` +
-        'populations rather than a better way of running the building.',
+        `${tail} A gain that does not survive crowds it was not tuned against is a fit to fifty ` +
+        'crowds rather than a better way of running the building.',
   };
+}
+
+/**
+ * **A campaign goal, named in plain words for what it grades** — [§ D1159](../../../../DECISIONS.md),
+ * the post-AJ panel's seats A, C and D.
+ *
+ * The stage page and the Engineer campaign panel both printed a goal as its `data/` kind:
+ * *"deliver-everyone · met"*, and under it *"deliver-everyone: your setting passed 5 of 50 runs;
+ * the shipped setting passed 5 of 50 … The bar is reached."* Two defects in one line. The id is an
+ * id. And the name is an absolute where the bar is relative: a count goal is met when the player's
+ * setting passes **at least as many** runs as the shipped setting did on the same crowds
+ * ({@link judgeCountGoal}), so a stage where the shipped setting delivers everyone on 5 of 50 runs
+ * is met at 5 of 50, and a name promising *everyone delivered* read as a lie to three seats.
+ *
+ * So every per-run goal is named for its relative bar, and `beat-the-baseline` for the interval it
+ * asks for. `everyone-can-get-there` is named although no shipped stage can carry it, because a
+ * switch over every kind is how a new kind is made to arrive with a name. Where `data/` gives a
+ * threshold, the name carries it. The words before the comma are lane AK-B's
+ * `scenario/goals.ts#GOAL_NAMES` (wave AK), which names what one run is asked on every surface; this
+ * adds the bar a campaign judges it against, which only the campaign has.
+ */
+export function stageGoalNameOf(spec: GoalSpec): string {
+  const asMany = 'on at least as many runs as the shipped setting';
+  switch (spec.kind) {
+    case 'deliver-everyone':
+      return `Everyone delivered, ${asMany}`;
+    case 'no-divergence':
+      return `Queues settled, ${asMany}`;
+    case 'nobody-abandoned':
+      return `Nobody past the give-up line, ${asMany}`;
+    case 'answer-the-demand':
+      return `Kept up with arrivals, ${asMany}`;
+    case 'long-waits-under':
+      return spec.threshold === null
+        ? `Long waits kept down, ${asMany}`
+        : `Long waits kept under ${String(spec.threshold)} %, ${asMany}`;
+    case 'beat-the-baseline':
+      return 'Measurably ahead of the shipped setting';
+    case 'everyone-can-get-there':
+      return 'Everyone can reach their floor';
+  }
 }
 
 /* -------------------------------------------------------------------------- *
@@ -421,7 +461,7 @@ function judgeCountGoal(
   candidateArm: Arm,
   seedSet: StageSeedSet,
 ): StageGoalVerdict {
-  const label = goalLabel(spec);
+  const label = stageGoalNameOf(spec);
   const record = published.goals.find((entry) => entry.kind === spec.kind);
   const rate = publishedRateFor(record, seedSet);
   const target = rate?.passes ?? null;
@@ -436,7 +476,7 @@ function judgeCountGoal(
       label,
       met: null,
       reproduced: null,
-      sentence: `${label}: this stage has no published count for it, so there is no bar to judge against.`,
+      sentence: 'This stage has no published count for this goal, so there is no bar to judge against.',
       note:
         'R12: a goal ships with its across-seed rate published beside it. Without one there is ' +
         'nothing to compare a batch with, and a bar invented here would be the author being ' +
@@ -453,7 +493,7 @@ function judgeCountGoal(
       label,
       met: null,
       reproduced: null,
-      sentence: `${label}: this batch produced no runs to judge.`,
+      sentence: 'This batch produced no runs to judge.',
       note: 'A goal is a fraction of replications, and there were none.',
     };
   }
@@ -466,7 +506,7 @@ function judgeCountGoal(
       met: null,
       reproduced,
       sentence:
-        `${label}: not judged. The shipped setting scored ${String(baseline.passes)} of ` +
+        `This goal was not judged. The shipped setting scored ${String(baseline.passes)} of ` +
         `${String(baseline.n)} in this batch and the published table records ` +
         `${String(target)} of ${String(publishedN)} for it on these same seeds.`,
       note:
@@ -485,7 +525,7 @@ function judgeCountGoal(
       label,
       met: null,
       reproduced,
-      sentence: `${label}: not judged. ${candidate.sentence}`,
+      sentence: `This goal was not judged. ${candidate.sentence}`,
       note:
         'The runs that could be judged are not counted on their own: the ones that fall out are ' +
         'the hard ones, and a rate over the survivors would understate the difficulty behind an ' +
@@ -500,7 +540,7 @@ function judgeCountGoal(
     met,
     reproduced,
     sentence:
-      `${label}: your setting passed ${String(candidate.passes)} of ${String(candidate.n)} ` +
+      `Your setting passed ${String(candidate.passes)} of ${String(candidate.n)} ` +
       `${runsAre}; the shipped setting passed ${String(target)} of ${String(publishedN)} on the ` +
       `same passenger populations. ${met ? 'The bar is reached.' : 'The bar is not reached.'}`,
     /*
@@ -517,8 +557,8 @@ function judgeCountGoal(
       'with the stage and measured before you played it, not a number chosen while judging you. ' +
       'Both arms saw the same passengers, so the two counts are paired. A count is not an ' +
       'interval: a couple of runs either way is inside what a batch of this size scatters by, and ' +
-      'the goal that answers “is it actually better” is beat-the-baseline, which needs an interval ' +
-      `that excludes zero.${
+      'the goal that answers “is it actually better” is the one asking for your setting to be ' +
+      `measurably better, which needs an interval that excludes zero.${
         seedSet === 'tuning'
           ? ''
           : ' These are the runs your setting was not tuned against, which is the half that ' +
@@ -546,7 +586,7 @@ function rateOf(spec: PerReplicationGoalSpec, arm: Arm): GoalRate | null {
  * Energy is not in the test at all, because `favours` is `null` on every `axis` row (**R11**).
  */
 function judgeComparisonGoal(spec: GoalSpec, report: BatchReport): StageGoalVerdict {
-  const label = goalLabel(spec);
+  const label = stageGoalNameOf(spec);
   const comparison = report.comparisons[0];
   if (comparison === undefined) {
     return {
@@ -554,7 +594,7 @@ function judgeComparisonGoal(spec: GoalSpec, report: BatchReport): StageGoalVerd
       label,
       met: null,
       reproduced: null,
-      sentence: `${label}: there is only one arm in this batch, so there is no difference to take.`,
+      sentence: 'There is only one arm in this batch, so there is no difference to take.',
       note: 'A comparison needs two arms that saw the same passengers.',
     };
   }
@@ -580,7 +620,7 @@ function judgeComparisonGoal(spec: GoalSpec, report: BatchReport): StageGoalVerd
     label,
     met,
     reproduced: null,
-    sentence: `${label}: ${comparisonSentence(report.replications, ahead, behind, underBudget)}`,
+    sentence: comparisonSentence(report.replications, ahead, behind, underBudget),
     note:
       `${suppressionClause(suppressed, report.replications)} Energy is not in this test: it is an ` +
       'axis and never a score, and the arm that spends least is routinely the arm that carried ' +
@@ -611,24 +651,24 @@ function comparisonSentence(
         'nothing: this batch is below the project’s replication budget.';
   if (ahead.length === 0 && behind.length === 0) {
     return (
-      `in ${runs}, no measure separated the two settings — every interval on the difference ` +
+      `In ${runs}, no measure separated the two settings — every interval on the difference ` +
       `included zero, or had no number to form one. The two are not ordered.${budgetClause}`
     );
   }
   if (behind.length === 0) {
     return (
-      `in ${runs}, your setting came out ahead on ${names(ahead)} — the interval on the ` +
+      `In ${runs}, your setting came out ahead on ${names(ahead)} — the interval on the ` +
       'difference excludes zero — and no measure resolved against it. The bar is reached.'
     );
   }
   if (ahead.length === 0) {
     return (
-      `in ${runs}, your setting came out behind on ${names(behind)}, and ahead on nothing that ` +
+      `In ${runs}, your setting came out behind on ${names(behind)}, and ahead on nothing that ` +
       'resolved. The bar is not reached.'
     );
   }
   return (
-    `in ${runs}, your setting came out ahead on ${names(ahead)} and behind on ${names(behind)}. ` +
+    `In ${runs}, your setting came out ahead on ${names(ahead)} and behind on ${names(behind)}. ` +
     'That is a move along the front rather than a win, so the bar is not reached.'
   );
 }

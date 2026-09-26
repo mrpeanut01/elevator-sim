@@ -602,12 +602,30 @@ export function priceOf(schedule: PriceSchedule, changeId: string): PricedChange
   return found;
 }
 
-/** Which change prices a config path, or `undefined` where nothing does. */
+/**
+ * Which change prices a config path, or `undefined` where nothing does.
+ *
+ * **A `covers` entry prices its own path and everything under it**, and the longest entry that
+ * matches wins. That is how `scenario/survivorSpace.ts#dimensionsCoveredBy` has always read the
+ * same field, and it is how the fix-it editor *draws* a dial: `dispatch-rules` covers
+ * `dispatcher.weights`, so the `weights.loadFactor` dial is drawn under that row's *"2 u once for
+ * the group"*. This function used to match a path only when a `covers` entry spelled it exactly,
+ * so that dial, and every other dial under a section-level entry, was drawn at 2 u and charged 0 u
+ * (the post-AJ panel's seat C, D3; `fixit/shownPriceIsCharged.test.ts`). The draw and the charge
+ * now read `covers` one way.
+ */
 export function changeCovering(
   schedule: PriceSchedule,
   path: string,
 ): PricedChange | undefined {
-  return schedule.changes.find((change) => change.covers.includes(path));
+  let best: { readonly change: PricedChange; readonly length: number } | undefined;
+  for (const change of schedule.changes) {
+    for (const cover of change.covers) {
+      if (path !== cover && !path.startsWith(`${cover}.`)) continue;
+      if (best === undefined || cover.length > best.length) best = { change, length: cover.length };
+    }
+  }
+  return best?.change;
 }
 
 /**

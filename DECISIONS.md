@@ -29021,6 +29021,8 @@ looks like; § 8.1 draws two inline selects and this build draws two.
 
 ## D433 — earned progress goes in the Everyday slot, not the Engineer session, and a refusal to restore it is a sentence
 
+> **Status 2026-09-26: AMENDED by [§ D1157](#d1157)** (an agent ruling). A case once fixed stays fixed: the badge no longer follows the latest run down, and a later run that does not clear is drawn as that run's result. See [`docs/39`](docs/39-decisions-in-force.md).
+
 **Date: 2026-09-01 · Owner: wave J lane B, GitHub issue #224 · Extends [§ D402](#d402)'s reading of
 what the Everyday store is for.**
 
@@ -43174,6 +43176,8 @@ The door adapter seeds *Run today again* and its note on the four door renders a
 
 ## D1011 — a fixed fix-it verdict prints the diagnosis's words only over the diagnosis's own run, goes stale on an edit, and an eleventh honesty property holds every string that credits an act to the run that carried it
 
+> **Status 2026-09-26: AMENDED by [§ D1158](#d1158)** (an agent ruling). On the witness's run the clause after the authored words says they are about the player's change; on any other fixed run the body says what the change did, and the disclaimer and the *What it bought* line are gone. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Status 2026-09-25: AMENDED by [§ D1106](#d1106).** A claim about the rest of the building is held apart in `result.rest` and prints only where the fifty mornings agree with it. See [`docs/39`](docs/39-decisions-in-force.md).
 
 ---
@@ -44558,6 +44562,8 @@ The judge's catch around the pair check stays: a throw at the press is still a f
 never a hang, which is wave AI's fix and is correct whatever this one does.
 
 ## D1076 — a fix-it crowd change thins the as-built crowd on a named stream, and never re-draws it
+
+> **Status 2026-09-26: AMENDED by [§ D1160](#d1160)** (an agent ruling). An order that changes which trips the lifts can carry meets a crowd drawn for the building as changed, and the verdict's basis says so; every other crowd change is still a thinning. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Taken 2026-09-25 by an agent session under delegated authority** (wave AJ, lane AJ-D),
 > implementing the half of DECIDE-3's dissent in [§ D1001](#d1001) § 5 that § D1001 § 6 filed as
@@ -46232,3 +46238,149 @@ Office, met the landing page, and *Start playing* opened the walkthrough again.
 week and every parked one, which `persist/session.ts` already restores; `EverydayHost.parkedWeeks`
 reads them. Nothing new is stored (GAMEPLAY § 3.5). `everyday/tutorialModel.test.ts` and the browser
 reload case were red before. D1144 to D1147 are unspent.
+
+---
+
+## D1157 — a fix case once fixed stays fixed, and a later run that does not clear is that run's result
+
+> **Taken 2026-09-26 by an agent session under delegated authority** (wave AK, lane AK-C), not by
+> the product owner, on the post-AJ panel's seat C (D2, and its top change 2). **Amends
+> [§ D433](#d433)'s sentence that the badge *"still follows the latest run in both directions"*** and
+> reverses the rule `fixit/engine.ts#fixedBadgeAfter` carried for `docs/20` defect 16. The
+> owner-reversible clause is the rule itself: a badge that follows the latest run is one argument
+> away.
+
+**Why an entry.** [§ D405](#d405)'s first two grounds. It moves a recorded rule, and it binds
+`everyday/fixitScreen.ts`, `dev/fixitPanel.ts` and the profile's solved set, none of which
+`fixit/engine.ts` owns.
+
+**What was wrong.** A player who fixed a case and then probed a cheaper or different order saw the
+case go from FIXED back to OPEN, the rail's count drop by one and the case leave the stored solved
+set. Seat C met it on three cases. During the forty-nine-morning check on a case already fixed, the
+count also dipped by one until the verdict landed, because the gate's `checking` outcome wore no
+badge. Probing a solved case is the search this mode rewards, and it was being punished. The
+campaign already did the opposite: a failing rerun keeps *Cleared on this device*.
+
+**The ruling.** `fixedBadgeAfter(outcome, fixedBefore)` returns `fixedBefore || outcome.kind ===
+'fixed'`. Only a fifty-morning `fixed` earns the badge; nothing takes it away. Defect 16's concern
+was two verdicts about one case on one screen (FIXED beside a card reading *9 waits → 9 waits*), and
+it is answered on the card: a run that does not fix a fixed case draws `FIX_KEPT_LINE` over its
+card, *"This case stays fixed: an order of yours fixed it, and a run that does not clear takes
+nothing away. The result below is about the order you just ran."* The chime is filed only on a run
+whose own outcome is `fixed`, as before; the server pays a scenario once.
+
+**What it does not touch.** What *fixed* means, the judge, the chime award, the bar's *Next
+building* rule for an unedited order, and the campaign.
+
+**Measured.** `fixit/engine.test.ts` holds the rule over all four outcome kinds in both states and
+pins both surfaces' assignment at the source.
+
+## D1158 — a fixed verdict's words are about the player's change: no disclaimer of their own run, and what the change did rather than what it bought
+
+> **Taken 2026-09-26 by an agent session under delegated authority** (wave AK, lane AK-C), not by
+> the product owner, on the post-AJ panel's seat C (D4 and D5). **Amends [§ D1011](#d1011)'s
+> composed arm and its witness-run clause.** § D1011's rule, that authored words print only over the
+> diagnosed repair's own run, is unchanged.
+
+**Why an entry.** It moves the wording of a recorded ruling, and it binds
+`everyday/fixitScreenModel.ts#fixitVerdictContextOf` and the honesty register.
+
+**What was wrong.** On six family-match fixes the witness-run body ended *"That is about the repair,
+not about your order: you committed N u … and this run does not say what any of it bought"*, on a
+run that was, leg for leg, the repair's own run: the player's order was the repair. On five other
+fixes the composed body closed *"The diagnosis describes a different run, so its explanation is not
+printed here"*, including on a case where the player had set exactly the group the diagnosis names.
+And *"What it bought: Where idle cars wait"* repeated the change it followed, because a schedule
+row's player name is the price group's.
+
+**The ruling.**
+
+1. **On the witness's run** the authored words stand, and where the order committed anything the
+   clause says *"Your run is that run, leg for leg, so the words above are about your change."*
+   Where the order committed more than the diagnosed repair costs, it adds the order's total and how
+   much more than the repair, *"for the same run"*: a cost comparison and a leg comparison, both
+   measured, and no claim about which setting did the work. At zero spend the authored copy prints
+   byte for byte, as before.
+2. **On any other fixed run** the body is what the player changed, then *"What it did:"* the
+   complaint row's own before and after and, where anybody else rode, the rest-of-building row's,
+   then *"These runs say your change works; they do not say why."* The disclaimer and the *What it
+   bought* line are gone, and `FixitVerdictContext.bought` with them. The Spent row still says what
+   was committed.
+3. A long-wait count of one reads *1 wait*.
+
+**Measured.** `engine.test.ts` pins both arms' words; `verdictNamesTheOrder.test.ts` holds the six
+false routes to the composed arm with *What it did* and without the disclaimer.
+
+## D1159 — a campaign goal is named for the bar it is judged against, the held-back crowds are named as crowds, and stage 3's brief says how it clears
+
+> **Taken 2026-09-26 by an agent session under delegated authority** (wave AK, lane AK-C), not by
+> the product owner, on the post-AJ panel's seats A (D10), C (D7, D8) and D (H9). Lane AK-B's
+> entry in this wave names each goal kind in words on every surface (`scenario/goals.ts#GOAL_NAMES`);
+> this entry is the campaign's half, which that entry leaves to this lane by name. The owner-reversible clause is the wording.
+
+**Why an entry.** It binds `campaign/brief.ts`, `everyday/stagePlay.ts`, `dev/campaignPanel.ts`
+(which print the judge's labels and sentences) and `data/campaign.json`.
+
+**What was wrong.** The stage verdict printed `deliver-everyone · met` beside *"your setting passed
+5 of 50 runs"*: an id, and an absolute name on a relative bar, because a count goal is met when the
+player's setting passes at least as many runs as the shipped setting did on the same crowds. The
+holdout sentence printed `holdout-20260731 (seed 20260731)`. And stage 3's brief said *"It cannot be
+won as configured … not to beat it"* on a stage seat C cleared and was paid for.
+
+**The ruling.**
+
+1. `campaign/judge.ts#stageGoalNameOf` names each goal for what it grades. A per-run goal is its
+   `GOAL_NAMES` words plus *"on at least as many runs as the shipped setting"*; `beat-the-baseline` is
+   *"Measurably ahead of the shipped setting"*. The verdict's labels and the brief's goal lines use
+   it, and a goal's sentence no longer repeats the label, which both surfaces draw beside it.
+2. The holdout sentence says *"The held-back crowds agree"* or *"do not agree"*. The Engineer panel's
+   seed lines and the refusal of a batch that is not the holdout set keep their seeds, which are
+   what a replay needs.
+3. Stage 3's brief now says that as the building stands the queues grow faster than the cars empty
+   them *"on every one of the stage's runs"*, which is the published table (`no-divergence` passes 0
+   of 50 on both seed sets), and that the stage is cleared by an order measurably better than the
+   shipped one on its crowds and on held-back ones.
+
+**What it does not touch.** No stage is made playable, no clear's pay moves, and no bar or rate
+changes. `judge.test.ts` pins the three clauses.
+
+## D1160 — an order that changes which trips the lifts can carry meets a crowd drawn for the building as changed, and a run that throws says so in plain words
+
+> **Taken 2026-09-26 by an agent session under delegated authority** (wave AK, lane AK-C), not by
+> the product owner, on the post-AJ panel's seat C (D1). **Amends [§ D1076](#d1076)**: a fix-it crowd
+> change is a thinning, except where the order changes the building's trips, where it is a re-draw
+> and is named as one. The owner-reversible clause is the choice to re-draw rather than hold the
+> as-built trace fixed, which would need a trace the core run cannot yet be handed.
+
+**Why an entry.** It moves a recorded rule and binds `everyday/fixitScreen.ts`, `dev/fixitPanel.ts`
+and the honesty register.
+
+**What was wrong.** On `zoning-starves-the-top`, one floor of zone overlap failed on every press
+with a raw assertion naming passengers and floating-point arrival times. The assertion was wrong,
+and the model was right. Midtown's two banks there meet only at the lobby and the car park, so a
+trip from floor 2 to floor 18 has no chain of banks as built, and the traffic generator shares its
+demand over the trips that remain. One floor of overlap opens trips between the low floors and the
+high ones, so the repaired run meets a crowd drawn for the building as rezoned: passenger p19 on
+floor 2 went to 10 as built and to 18 after. § D1075 fixed the Vertical City version of this check,
+where a zoning step moved routes and moved nobody; this case moves people.
+
+**The ruling.**
+
+1. `fixit/run.ts#tripsTheRoutesChangeOf` counts the floor pairs whose route exists, or has a lift
+   leg, on one side of the plan and not the other, read with `core`'s own `RoutePlanner`. Where it
+   is above zero, `assertPairMatchesRepairs` makes no crowd claim; where it is zero, the strict
+   check stands, and on both Vertical City cases it is zero at every zone rung.
+2. A crowd the second run met people in that the first did not is re-drawn (`crowdRedrawn`, read
+   off the legs), and the verdict's basis says so: `ROUTES_BASIS_LINE` and its replicated and
+   futility forms.
+3. A run that throws shows *"The day could not be run: the run stopped on a fault in the game rather
+   than in your order, so there is no verdict and nothing is banked."* The thrown message rides on
+   the paragraph's `data-fault` for a bug report, on both fix-it surfaces.
+
+**Statistics.** The forty-nine mornings are still paired by seed; under a re-drawn crowd the pairing
+is weaker than common random numbers and the interval stays valid, because each morning's pair is
+independent of the others.
+
+**Measured.** `fixit/zoningKeepsTheCrowd.test.ts` holds the Midtown pair (trips changed, crowd
+differs, the strict check refuses it without the plan and passes it with, the basis is the routes
+line with no passenger id or time in it) and the Vertical City sweep with the plan passed.
