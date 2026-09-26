@@ -4,8 +4,8 @@
   "provenance": {
     "kind": "measured",
     "command": "ELEVATOR_SIM_SURVIVORS=deep ELEVATOR_SIM_REGENERATE_SURVIVORS=1 npx vitest run --project viz src/scenario/survivorSweep.test.ts",
-    "tree": "9bbbaf4",
-    "measuredAt": "2026-09-25",
+    "tree": "aa2e2a2",
+    "measuredAt": "2026-09-26",
     "masterSeed": 20260910,
     "sampleSize": 12,
     "scope": "Every configuration is an edit of the scenario's own baseline dispatcher or a shipped profile picked in its place, priced by data/price-schedule.json. 10 of 37 priced changes can reach a scenario run at all — the rest price shafts, machines and fittings that campaign/stageRun.ts cannot apply — and 47 of 60 declared dimensions are priced, of which 46 are varied — weights.dutyMismatch is declared and priced by dispatch-rules, which covers dispatcher.weights, and is not varied on a building that declares no duty, which no scenario's building does, because a dial its building gives nothing to act on is not drawn (DECISIONS.md § D549) — and 13 are withheld from every scenario by data/price-schedule.json and varied by no configuration. A configuration differing only on an unpriced dimension is reachable at every rung, so counting it would make the budget inert.",
@@ -53,7 +53,7 @@
     "unpricedDimensionCount": 0,
     "withheldDimensionCount": 13,
     "declaredDimensionCount": 60,
-    "inputHash": "a5854accf77da535243635a2492eba5f730bdbc5b9abf707279d97a5e69a8364"
+    "inputHash": "f9e8fdbe314e30ce5d9d0367c843fbc8fd8459dee1e6bc3489339aaca292beef"
   },
   "scenarios": [
     {
