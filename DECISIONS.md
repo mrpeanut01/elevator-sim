@@ -43647,6 +43647,8 @@ integrator registers them in `documentation.test.ts#KNOWN_DECISION_HOLES`.
 
 ## D1029 — the press becomes a call: the stage stops once at an instant it can name, a pin is admitted only over a window from it, and the day runs under its standing order until the call is answered
 
+> **Status 2026-09-26: CARD EXTENDED by [§ D1206](#d1206), AND NO LONGER THE DAY'S ONLY STOP by [§ D1204](#d1204)** (agent rulings). The card also says who is standing at the call second; after the call is answered the day's ordinary calls open. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Status 2026-09-26: CLAUSE 7 AMENDED by [§ D1140](#d1140)** (an agent ruling). *Take this call again* opens half a minute before the call, playing, rather than at the start of the day. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Status 2026-09-25: AMENDED by [§ D1107](#d1107).** The card names every booked-out car away at the call, and the called day is named for the call. See [`docs/39`](docs/39-decisions-in-force.md).
@@ -43963,6 +43965,8 @@ day showed. Whether that is the suggestion clause 4 forbids is the owner's readi
 does not take it.
 
 ## D1047 — a newcomer's first scored day is a pinned press day, drawn off the date from the legible towers § D1029 admits, and nothing is stored
+
+> **Status 2026-09-26: BRIEF SENTENCE RE-DERIVED by [§ D1204](#d1204)** (an agent ruling). The whole day's length is *about* the middle of the three runs its call can leave, and the stage stops *first* for its call and may stop again later in the day. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Status 2026-09-26: NARROWED by [§ D1178](#d1178)** (an agent ruling). The first-day set is also filtered to towers whose week the census admits, which leaves Midtown Office alone.
 
@@ -45949,6 +45953,8 @@ unspent, and whether each is free or a hole is the integrator's call at close ([
 
 ## D1138 — the call is the core loop of every scored day: up to three calls, admitted by what their answers do to the next ten minutes, rows only at the close, and the first closed attempt banks
 
+> **Status 2026-09-26: OWNER-REVERSIBLE CLAUSE REVERSED by [§ D1204](#d1204)** (an agent ruling). A pinned press day opens its ordinary calls after its § D1029 call is answered, searched from five minutes after it; and every call's card gains a line saying who is standing ([§ D1206](#d1206)). See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-09-25 by agent sessions under delegated authority**, not by the product owner: the
 > post-AI decision swarm (the player, honesty and engineering lenses, whose records are the
 > integrator's scratch notes *decide-ak S1* to *S3* with their raw data, and are not in this
@@ -46578,6 +46584,8 @@ line with no passenger id or time in it) and the Vertical City sweep with the pl
 
 ## D1166 — a day keeps asking: calls five minutes apart inside a peak, up to six a day
 
+> **Status 2026-09-26: AMENDED by [§ D1205](#d1205)** (an agent ruling). A peak of a whole day raises at most two calls and no question is raised again within ten simulated minutes; the cap of six and the five-minute spacing stand. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-09-26 by agent sessions under delegated authority**, not by the product owner: the
 > decide-al swarm (the player, honesty and engineering lenses, whose records are the integrator's
 > scratch notes and are not in this repository), reconciled by wave AK's integrator (ruling § Q1,
@@ -46629,6 +46637,8 @@ minutes. The lookahead costs a median 20.7 s of CPU a whole day on a worker (at 
 a slice, against § D1138's 11.4 s.
 
 ## D1167 — where the parking answers are alike, the stage asks who drives
+
+> **Status 2026-09-26: CLAUSE 5 LIFTED by [§ D1205](#d1205)** (an agent ruling). After a handover the pair is re-derived from the dispatcher now driving and the driver question may be asked again; after *keep* it is not asked again in that peak. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Taken 2026-09-26 by agent sessions under delegated authority** (the decide-al swarm, ruling § Q1
 > clause 2, three of three; built by wave AK lane AK-D), not by the product owner. **Amends
@@ -47449,3 +47459,198 @@ the short form), `everyday/fixitScreenModel.test.ts` (par on a fixed row only; t
 note) and `everyday/fixitVerdict.browser.test.ts` (fix, reload, reopen: the par, the row's par and no
 promised mark, on the built bundle). Red before: the browser case timed out waiting for a par after
 the reload.
+
+## D1204 — a pinned day asks after its call
+
+> **Taken 2026-09-26 by agent sessions under delegated authority**, not by the product owner: swarm
+> DN (the player, honesty and engineering lenses, whose records are the integrator's scratch notes
+> *decide-an S1* to *S3* and are not in this repository), reconciled by wave AL's integrator (ruling
+> § Q1(a), three of three), and built and measured by wave AL lane AL-C. A later reader weighing this
+> against a product-owner ruling should treat it as an agent ruling and say so; [§ D626](#d626) is
+> the cautionary case. **Reverses [§ D1138](#d1138)'s owner-reversible clause** *no ordinary calls on
+> a pinned press day*, re-derives [§ D1047](#d1047)'s brief sentence, and widens the population
+> [§ D1166](#d1166)'s rhythm was published over; nothing is rewritten. Owner-reversible clauses: the
+> reversal itself (the gate), and the five minutes the search waits after the pinned call.
+
+**Why an entry.** [§ D405](#d405)'s first two grounds: it reverses a recorded clause, and it binds
+`dev/state.ts`, `dev/main.ts`, `dev/dayCallSession.ts`, `everyday/host.ts`,
+`everyday/stageScreen.ts`, `everyday/firstDayLength.ts`, `everyday/towerChoice.ts`,
+`mode/glossary.ts` and the published rhythm.
+
+**What was wrong.** A fresh device is dealt Midtown Office's pinned press day (§ D1047 and
+[§ D1178](#d1178) make it the only Monday a newcomer meets). That day asked its one § D1029 call about
+eight minutes in and then nothing for about twenty-two real minutes, because § D1138's clause kept the
+ordinary session shut on a pinned day, and the driver question lives only inside that session. The
+missing-calls diagnosis measured it to the minute against the assessor's 29.7-minute day, and found
+§ D1166's published rhythm had been taken over Midtown's seven unpinned crowds, leaving out exactly
+the one crowd every newcomer plays.
+
+**The ruling.**
+
+1. **The gate is one pure function**, `dev/state.ts#dayCallsOpenOn`, which `dev/main.ts#dayCallOnStage`
+   asks before it opens a session. On a pinned day it opens only once the stage hands in the pinned
+   call its player answered, with the log holding that answer and nothing else (at most one entry,
+   stamped at the call second). While the pinned call stands it is shut; after *Skip to the end* with
+   the pinned card up it stays shut, because that skip answers every call the day had left, as it does
+   on an ordinary day. An ordinary day's gate is § D1138's, unchanged.
+2. **The session searches from five minutes after the pinned call** (`DAY_CALL_SPACING_S`, as after any
+   raised call), and counts the pinned call as a placement call for [§ D1205](#d1205)'s ten-minute
+   rule and, where it falls inside a peak, as one of that peak's two. On every shipped whole-day pin it
+   falls between the first two peaks (`PINNED_DAY_LENGTHS.inPeak`).
+3. **The brief's sentence is re-derived.** It said *up to N min of watching* (the longest of the three
+   runs the pinned call can leave) and *the stage stops once for its call*. Once later answers move
+   the day again, three runs bound nothing (the honesty lens measured the *keep* branch at 30.4 real
+   minutes against a bound of 29.2), so it now says *about N min*, from the middle of the three runs,
+   and *the stage stops first for its call …, and may stop again later in the day*, promising no count.
+   Midtown's reads *about 29 min*. `firstDayLength.test.ts` re-derives every row on every run, and
+   says *once* only where the day's calls are gated off, which no shipped pin is.
+   `everyday/towerChoice.ts`'s pinned-day lede and `mode/glossary.ts`'s *press* entry drop *once* too.
+4. **Recorded, not changed**: once a later call on a pinned day is answered with a press, the log is no
+   longer the day as measured, so `shift/ladder.ts#pressDayMeasuredAs` clause 4 drops the pinned call's
+   report row, exactly as after a press the player makes by hand. The later calls' own rows stand.
+
+**Measured.** `everyday/dayCalls.sweep.test.ts`, which now plays a pinned day once per answer to its
+pinned call and opens the session after it, on the newcomer's Monday (`c2`, crowd 20 276 662):
+
+| newcomer's Monday (`c2`, crowd 20 276 662) | before | after, by the pinned answer: *spread* / *park* / *leave them* |
+|---|---|---|
+| ordinary calls after the pinned one | 0 | 4 / 4 / 4, three of them who drives on each |
+| calls in the morning + lunch + evening peaks | 0 + 0 + 0 | 0 + 2 + 2 on each |
+| real minutes | 29.2 / 29.6 / 29.3 | 25.6 / 27.3 / 26.3 |
+| decisions a real minute | 0.034 on each | 0.195 / 0.183 / 0.190 |
+| longest gap between two decisions | 21.5 / 21.9 / 21.6 min | 10.5 / 12.7 / 12.5 min |
+
+The pinned call is the day's only decision before (its standing order is part of the pin, so the brief
+asks no driver); after, the pinned call and the calls that follow it. The morning peak asks nothing on
+any branch because the pinned call comes after it.
+**The brief's *about 29 min* is the middle of the three runs with nothing pressed after the call, and
+it is not a bound**: the rotation branches above ran 25.6 to 27.3 real minutes, because each later
+press cleared some of the day's slow stretches, and a player who presses nothing more meets
+29.2 to 29.6.
+
+`dev/pinnedDayAsksOn.test.ts` holds the gate in both directions and, on real runs, a later call under
+each of the three answers, at least five minutes after the pinned one, with the driver question on at
+least one branch. `dayCalls.browser.test.ts` walks it on the shipped bundle: a fresh device on
+2026-09-26, *Skip to the end* to the pinned call, *leave them*, and a second *Skip to the end* stops at
+a second card before the report.
+
+## D1205 — calls across the whole day: two a peak, no question twice in ten minutes, and who drives asked again after a handover
+
+> **Taken 2026-09-26 by agent sessions under delegated authority** (swarm DN, ruling § Q1(b): the
+> cap and spacing three of three, two a peak two of three with S2 for three while a later peak is
+> unsearched, the ten-minute rule S1 and S3, *keep* holds the peak S1 and S2, the re-ask after a
+> handover S3; built and measured by wave AL lane AL-C), not by the product owner. **Amends
+> [§ D1166](#d1166)** (a peak may raise at most two, and a question waits ten minutes) and **lifts
+> [§ D1167](#d1167) clause 5** (*after any handover the driver question is not asked again that day*).
+> Owner-reversible clauses: two a peak (`shift/dayCalls.ts#DAY_CALL_PER_PEAK`), the ten minutes
+> (`DAY_CALL_REPEAT_S`), *keep* holding the peak, and the re-ask.
+
+**Why an entry.** It moves two recorded rulings and binds `shift/dayCalls.ts`,
+`dev/dayCallSession.ts`, `dev/main.ts` and the published rhythm.
+
+**What was wrong.** The swarm's engineering lens measured Midtown day 1 under the shipped rules at
+16 + 18 + 8 calls over the three peaks of ten branches, an evening call on six, and 42 of 44 refused
+candidates refused because parking could not matter (every car busy) while the driver question had
+already been spent by a handover. The biggest crowds of the day were asked nothing, and a crowded
+morning could spend the cap before the evening.
+
+**The ruling.** Keep the cap of six and the five-minute spacing, and add, in the session:
+
+1. **At most two raised calls in one peak** of a whole day; a peak that has raised its two asks nothing
+   more and the search moves to the next. A slice's calls carry no peak and keep the day's cap alone.
+2. **No question is raised again within ten simulated minutes** of the last time it was raised. A
+   candidate whose placement question is held asks the driver question instead where that is not held
+   too; a candidate where both are held costs no run and is not counted as asked.
+3. **After *keep who drives*, no driver question for the rest of that peak.**
+4. **After a handover, the driver question may be asked again**, with the pair re-derived by
+   `dayCallDriversOf` from the dispatcher now driving, so *keep* always names who drives and the pair
+   never offers them. That holds for a handover the player makes on the stage too, where the shell
+   names the dispatcher; after a stored weights-only handover, which names no whole dispatcher, the
+   question stops for the day.
+
+Admission (`dayCallAdmits`), the cards and the rows are § D1138's and § D1167's, unchanged.
+
+**Tests.** `dev/dayCallSession.test.ts`, on a synthetic three-peak day: two calls in each peak where
+every candidate would admit one; consecutive calls of one question at least ten minutes apart; after
+*keep* no driver call in that peak and one in the next; after a handover a second driver call ten
+minutes on whose pair excludes the new driver and whose *keep* names it; the player's own handover
+re-derives the pair where the shell names the dispatcher and ends the question where it cannot.
+All five were red on `c2ca845`. Two older cases moved with the rule rather than being weakened: the
+Crown Hotel slice raises one call where it raised two, and § D1166's *a second call in the same peak*
+is held on the three-peak day, ten minutes on.
+
+**Measured.** `everyday/dayCalls.sweep.test.ts` (`DAY_CALLS_SWEEP=1 DAY_CALLS_CONTRACTS=c2
+DAY_CALLS_DAYS=1,2,3,4,5`), Midtown Office days 1 to 5 × crowds `20 260 824 + 7 919 n`, `n` 0 to 7,
+under `collective`, answers in rotation, § D1169's pacing at `4×` with no time added for answering;
+*before* is the session as it stood at `c2ca845` (§ D1166 to § D1168, no calls after a pinned call),
+*after* is this entry with [§ D1204](#d1204). **The sweep now deals the wrinkle the week deals each
+day** (the week at that day and weekday and no campaign event, `shift/weekWay.test-helper.ts`'s
+scheduled cell): until this entry it moved `week.day` over a state pinned to `ordinary`, which dealt
+days 2 and 3, and 4 and 5, as one day (the decide-an panel's S1 and S2 both found it). The days
+dealt: day 1 ordinary, day 2 `move-in:past-halfway`, day 3 `fire-drill:full`, day 4 `conference:full-floor` and day 5 `shaft-out:before-halfway`, five distinct days.
+
+| Midtown days 1 to 5, eight crowds each, 42 rows | before | after |
+|---|---|---|
+| decisions a real minute, median | 0.152 (0.034 to 0.259) | **0.225** (0.094 to 0.285) |
+| the same, unpinned rows only | 0.160 | **0.230** |
+| longest gap between two decisions, median | 18.9 min (10.4 to 30.8) | **12.7 min** (9.9 to 29.8) |
+| median gap, median over rows | 1.4 min | 2.2 min |
+| real minutes, median | 28.9 | 27.6 |
+| calls a day, median | 3 | 5 |
+| calls in the morning + lunch + evening peaks, all rows | 99 + 37 + 18 | **74 + 75 + 54** |
+| rows with a call in every peak | 11 of 42 | **32 of 42** |
+| driver calls | 37 | 140 |
+| rows whose asking § D1168 stopped | 13 | 7 |
+
+By day, decisions a real minute and the longest gap, medians, before → after: day 1 (the seven
+unpinned crowds) 0.184 → 0.259 and 15.3 → 11.5 min, which reproduces § D1166's published 0.184 and
+15.3 on the before side; day 1 with the newcomer's three branches 0.152 → 0.232; day 2 0.198 → 0.244
+and 17.0 → 12.3; day 3 0.207 → 0.246 and 20.5 → 13.4; day 4 0.141 → 0.218 and 25.1 → 13.3; day 5
+0.138 → 0.215 and 24.6 → 13.3. The swarm's engineering lens estimated 0.239 on day 1's ten branches
+under its variant V7; this tree reads 0.232 on the same ten.
+
+**What moved and what did not.** The calls moved out of the morning: before, a morning peak spent
+the cap and the evening was asked on 13 of 42 rows; after, 32 of 42 rows are asked in every peak.
+The median gap between decisions grew a little because the calls no longer bunch five minutes apart
+at the start of the day; the longest gap fell by six minutes at the median. **The longest gap still
+reaches about thirty minutes on the rows whose asking § D1168 stopped** (the day already lost), which
+this entry does not touch, and the stretch between two peaks where nobody waits a minute is still
+crossed at `30×` with nothing to ask. Shortening that stretch is the ruling's Q1(c) and another
+lane's. Pacing is unchanged here.
+
+**Cost.** The lookahead's CPU a row, median, read 14.5 s before and 16.9 s after, both on this box at
+a load average between 17 and 51 with other lanes' runs competing for memory, so they are readings of
+a loaded machine rather than of the change; § D1166's 20.7 s envelope was taken on a quieter one.
+
+## D1206 — the call's card says who is standing
+
+> **Taken 2026-09-26 by agent sessions under delegated authority** (swarm DN, ruling § Q1(d), first
+> half, three of three; built by wave AL lane AL-C), not by the product owner. **Extends
+> [§ D1029](#d1029)'s card and [§ D1138](#d1138) clause 2** by one fact; the ruling's second half,
+> each call's row mid-day, waits for the one-attempt rule and is not built here. Owner-reversible
+> clause: the line's fields.
+
+**Why an entry.** It adds a fact to a card two recorded rulings fixed the contents of, and binds
+`everyday/stageCall.ts`, `everyday/stageScreen.ts` and the honesty corpus.
+
+**What was wrong.** The card said a car was out, somebody had waited a minute, or a peak had opened,
+and nothing about the crowd the question was about. The swarm measured that where most of the
+standing crowd was at the lobby at the call, *park* beat *spread* on 5 of 5 (a small sample), so the
+frame informs a judgement, while any honest forward figure at the call is one of its three counts and
+so the answer key (S2: the frame predicts the best answer no better than *always park*, 67 against 66
+of 113).
+
+**The ruling.** Every call's card, pinned or ordinary, on either question, gains one last fact: how
+many are standing, on how many floors, where the most stand, and the longest wait among them, for
+example *9 people are standing on 3 floors, the most at Lobby (6). The longest of them has waited
+88 s.* It is read by `everyday/stageCall.ts#stageCallPresentOf` off the run on the stage at the call
+second, from `frame/overlay.ts#queueAt`, the fold the stage's landing glyphs draw, so its count is
+the header's *standing right now*. The three runs a call compares are identical to that second, so it
+carries nothing a lookahead measured. **No forward figure of any kind**: no count ahead, no answer's
+effect, no *will*, *next* or *after*, and the card's four ban lists hold on every arm
+(`stageCall.test.ts`). A floor whose label is a bare number is said as *floor 4*.
+
+**Tests.** `everyday/stageCall.test.ts`: the count equals `observationsAt(...).waitingNow` and the
+longest wait `overlayAt(...).longestCurrentWaitS`; the same line off a run that differs only after the
+call; every figure in it one of the frame's counts; five arms against the ban lists and a forward-word
+list. Red before: all four cases failed on `c2ca845`, which has no such line.

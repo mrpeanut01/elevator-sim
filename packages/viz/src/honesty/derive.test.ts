@@ -1968,7 +1968,9 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'through the card and the row; `dayCallChangeOf` returns an intervention, ' +
         '`DAY_CALL_FINAL_GOAL_IDS` is two goal ids, `dayCallLostGoalOf` returns a reading, and ' +
         '`DAY_ENDED_EARLY_ROW_ID` is a row id. `dayCallAdmits` left this list when it stopped ' +
-        'reading `DAY_CALL_ANSWERS`.',
+        'reading `DAY_CALL_ANSWERS`.' +
+        ' Wave AL (§ D1204) adds `dev/state.ts#dayCallsOpenOn`, the gate `dev/main.ts#dayCallOnStage` ' +
+        'asks, which returns one of three gate ids (`open`, `not-offered`, `shut`) and no word a player reads.',
       ids: [
         'shift/dayCalls.ts#nextDayCallOf',
         'shift/dayCalls.ts#dayCallsOffered',
@@ -1984,6 +1986,7 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'shift/dayCalls.ts#dayCallLostGoalOf',
         'shift/dayCalls.ts#DAY_ENDED_EARLY_ROW_ID',
         'dev/state.ts#dayCallFactsOf',
+        'dev/state.ts#dayCallsOpenOn',
         'dev/dayCallSession.ts#openDayCallSession',
       ],
     },

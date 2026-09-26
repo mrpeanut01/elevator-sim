@@ -1977,11 +1977,13 @@ export interface EverydayHost {
    * **The ordinary day's next call on `recording`**, or `undefined` — [§ D1138](../../../../DECISIONS.md).
    *
    * Where the next call is and whether it has been raised; never what its answers did, which the
-   * report prints at day close. `undefined` on a pinned press day (§ D1029's single call stands
-   * there, through {@link pressCallOnStage}), on any run that is not the player's own scored week
-   * day, and once the day's calls are spent. The daily stage asks it; no other context does.
+   * report prints at day close. `undefined` on any run that is not the player's own scored week day,
+   * and once the day's calls are spent. On a pinned press day, `undefined` until the stage hands in
+   * `pinnedCall`, the § D1029 call (through {@link pressCallOnStage}) this attempt answered, and the
+   * day's ordinary calls after it from then on ([§ D1204](../../../../DECISIONS.md)). The daily stage
+   * asks it; no other context does.
    */
-  dayCallOnStage(recording: VizRecording): DayCallOnStage | undefined;
+  dayCallOnStage(recording: VizRecording, pinnedCall?: PressCall): DayCallOnStage | undefined;
   /** Answer the raised ordinary call — a press adopts the run already made for it. § D1138. */
   answerDayCall(answer: DayCallAnswer): void;
   /**
@@ -2123,8 +2125,11 @@ export interface EverydayHostBindings {
    * a closed day — § 3.4's strip is drawn only while `runState().open` is true.
    */
   abandonDay?(): void;
-  /** § D1138 — `dev/main.ts#dayCallOnStage`. Optional: a host with no calls answers `undefined`. */
-  dayCallOnStage?(recording: VizRecording): DayCallOnStage | undefined;
+  /**
+   * § D1138 — `dev/main.ts#dayCallOnStage`. Optional: a host with no calls answers `undefined`.
+   * `pinnedCall` is a pinned day's answered call, after which that day asks on (§ D1204).
+   */
+  dayCallOnStage?(recording: VizRecording, pinnedCall?: PressCall): DayCallOnStage | undefined;
   /** § D1138 — `dev/main.ts#answerDayCall`. */
   answerDayCall?(answer: DayCallAnswer): void;
   /** § D1138 — the session's skip, then a re-render. */
@@ -4226,7 +4231,7 @@ export function createEverydayHost(
       return undefined;
     },
     pressCallOnStage: (recording) => pressDayCallOf(b.resources, b.state(), recording)?.call,
-    dayCallOnStage: (recording) => b.dayCallOnStage?.(recording),
+    dayCallOnStage: (recording, pinnedCall) => b.dayCallOnStage?.(recording, pinnedCall),
     answerDayCall: (answer) => {
       b.answerDayCall?.(answer);
     },

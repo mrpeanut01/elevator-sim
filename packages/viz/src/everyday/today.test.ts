@@ -988,8 +988,8 @@ describe('a pinned first day says whose crowd it is, and how long it takes — �
   it('prints how long the whole day takes and when the call comes, derived — and only on the day as measured', () => {
     const pinned = midtownPinned({});
     expect(pinned.dayLength).toBe(pinnedDayLengthLineOf('c2'));
-    expect(pinned.dayLength).toMatch(/^A whole day: up to \d+ min of watching at 4×/u);
-    expect(pinned.dayLength).toContain('The stage stops once for its call');
+    expect(pinned.dayLength).toMatch(/^A whole day: about \d+ min of watching at 4×/u);
+    expect(pinned.dayLength).toContain('The stage stops first for its call');
     /* Under another driver it is a day nobody measured; on another crowd it is not the pinned day. */
     expect(midtownPinned({ dispatcherId: 'eta' }).dayLength).toBeUndefined();
     expect(midtownPinned({ seed: 424_242n }).dayLength).toBeUndefined();

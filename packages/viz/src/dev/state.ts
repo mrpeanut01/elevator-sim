@@ -110,6 +110,7 @@ import {
   type ContractPressDay,
 } from '../shift/ladder.js';
 import { bookedOutCarsOf, carAbsencesOf, type BookedOutCar } from '../shift/bookedOut.js';
+import { dayCallsOffered } from '../shift/dayCalls.js';
 import { pressCallOf, type PressCall } from '../shift/pressCall.js';
 import { grownBuilding } from '../shift/growth.js';
 import { spliceEpisode, trafficProfilesWithRecord } from '../shift/episode.js';
@@ -1869,6 +1870,45 @@ export function dayCallFactsOf(
     }) !== undefined;
   /* § D1149: the card's car line names a car out from the first instant too. A fact on the card, never a gate. */
   return { horizon, bookedOut: carAbsencesOf(plan.building), pinned };
+}
+
+/**
+ * **Whether an attempt's ordinary calls may open** — the gate `dev/main.ts#dayCallOnStage` asks
+ * before it opens a session, moved here so it is a pure function a Node test can ask
+ * ([§ D1204](../../../../DECISIONS.md)).
+ *
+ * - `'open'`: the session may open now.
+ * - `'not-offered'`: a whole day too busy to call on (§ D1138 clause 5) — what § D1152's quiet row
+ *   says instead of a call. Never on a pinned day, which has its own call and its own row.
+ * - `'shut'`: anything else — no facts, a press already on the log that no call made, or a pinned
+ *   day whose call is still standing or was skipped.
+ *
+ * **A pinned day opens after its call** (§ D1204, which reverses § D1138's owner-reversible clause
+ * *no ordinary calls on a pinned press day*). `pinnedCall` is that day's § D1029 call once this
+ * attempt has answered it, and `undefined` while it stands; the log may then hold the answer and
+ * nothing else — at most one entry, stamped at the call second — because a press anywhere else is
+ * a day the session was not opened on. A skip with the pinned card up answers every call the day
+ * had left, as it does on an ordinary day, so a skipped pinned day stays shut.
+ */
+export function dayCallsOpenOn(input: {
+  readonly facts: { readonly horizon: RunHorizon; readonly pinned: boolean } | undefined;
+  /** The as-built run's legs, for § D1138 clause 5. */
+  readonly legs: number;
+  readonly interventions: readonly { readonly atS: number }[];
+  /** The pinned day's call, once this attempt answered it. */
+  readonly pinnedCall?: { readonly atS: number } | undefined;
+  /** Whether *Skip to the end* was pressed with the pinned card up — § D1151. */
+  readonly pinnedCallSkipped: boolean;
+}): 'open' | 'not-offered' | 'shut' {
+  const { facts, pinnedCall } = input;
+  if (facts === undefined) return 'shut';
+  if (facts.pinned) {
+    if (pinnedCall === undefined || input.pinnedCallSkipped) return 'shut';
+    if (input.interventions.length > 1 || input.interventions.some((entry) => entry.atS !== pinnedCall.atS)) return 'shut';
+    return dayCallsOffered(facts.horizon, input.legs) ? 'open' : 'shut';
+  }
+  if (!dayCallsOffered(facts.horizon, input.legs)) return 'not-offered';
+  return input.interventions.length === 0 ? 'open' : 'shut';
 }
 
 /** What a run will be, read before it is pressed — {@link plannedDayOf}. */

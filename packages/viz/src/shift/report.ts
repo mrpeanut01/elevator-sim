@@ -2359,9 +2359,9 @@ function diagnosisFor(
       ? undefined
       : pressCallRowOf({ ...pressCall, interventions }, (simTimeS) => clockOf(simTimeS, dayStartS));
   /*
-   * § D1138's rows, one per ordinary call, after § D1029's (a day has one kind or the other, never
-   * both). Graded by this sheet's grader against this sheet's goals, so a row's *Shift cleared* is
-   * the banner's vocabulary; a single-run sheet grades nothing and passes none (`pairVerdictsOf`'s
+   * § D1138's rows, one per ordinary call, after § D1029's (a pinned day has both since § D1204, its
+   * pinned row first). Graded by this sheet's grader against this sheet's goals, so a row's
+   * *Shift cleared* is the banner's vocabulary; a single-run sheet grades nothing and passes none (`pairVerdictsOf`'s
    * reason).
    */
   const callRows =

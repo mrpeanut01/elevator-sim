@@ -255,11 +255,11 @@ import { createOffThreadRunner, type OffThreadRun } from './offThreadRuns.js';
 import { openDayCallSession, type DayCallSession } from './dayCallSession.js';
 import {
   dayCallDriversOf,
-  dayCallsOffered,
   type DayCallAnswer,
   type DayCallOnStage,
   type DayCallsQuiet,
 } from '../shift/dayCalls.js';
+import type { PressCall } from '../shift/pressCall.js';
 import { WATCHING_HEADER_CLASS, mountWatchPanel } from './watchPanel.js';
 import { chip, el, fill, fillSelect, keyedFill, setHidden, setText } from './dom.js';
 import {
@@ -320,6 +320,7 @@ import {
   initialState,
   withFirstSession,
   dayCallFactsOf,
+  dayCallsOpenOn,
   pressDayCallOf,
   profileById,
   plannedDayOf,
@@ -1730,8 +1731,12 @@ function boot(ui: Elements, resources: BrowserResources): void {
     });
   }
   let dayCallSession: DayCallSession | undefined;
-  /** The run a session was refused on, so the refusal is asked once rather than once a frame. */
-  let dayCallRefusedOn: VizRecording | undefined;
+  /**
+   * The run a session was refused on, and the pinned call it was asked after, so the refusal is
+   * asked once rather than once a frame — and asked again once a pinned day's call is answered
+   * (§ D1204).
+   */
+  let dayCallRefusedOn: { readonly recording: VizRecording; readonly pinnedAtS: number | undefined } | undefined;
   /**
    * Whether the stage asked about this attempt's run and was refused because the day is a whole
    * day too busy to call on (§ D1138 clause 5) — what § D1152's quiet row says instead of a call.
@@ -1767,22 +1772,31 @@ function boot(ui: Elements, resources: BrowserResources): void {
 
   /**
    * The next ordinary call on `recording`, for the Everyday stage — § D1138. `undefined` on every run
-   * that is not the player's own scored week day as this shell simulated it, on a pinned press day
-   * (§ D1029's single call stands there), on a whole day too costly to call on, and once the day's
-   * calls are spent.
+   * that is not the player's own scored week day as this shell simulated it, on a whole day too
+   * costly to call on, and once the day's calls are spent. On a pinned press day, `undefined` until
+   * the stage hands in the pinned call its player answered (`pinnedCall`), and from then on the
+   * day's ordinary calls, searched from five minutes after it ([§ D1204](../../../../DECISIONS.md)).
+   * The gate is `dev/state.ts#dayCallsOpenOn`.
    */
-  function dayCallOnStage(recording: VizRecording): DayCallOnStage | undefined {
+  function dayCallOnStage(recording: VizRecording, pinnedCall?: PressCall): DayCallOnStage | undefined {
     if (recording !== state.recording || recording !== simulatedRecording) return undefined;
     /* A re-simulation in flight is about to replace this run, so nothing is called on it. */
     if (shiftInFlight) return undefined;
     if (state.playMode !== 'shift-week' || watching !== undefined) return undefined;
     if (contractById(state.week.contractId) === undefined) return undefined;
     if (dayCallSession === undefined) {
-      if (dayCallRefusedOn === recording || state.interventions.length > 0) return undefined;
+      if (dayCallRefusedOn?.recording === recording && dayCallRefusedOn.pinnedAtS === pinnedCall?.atS) return undefined;
       const facts = dayCallFactsOf(resources, state);
-      if (facts === undefined || facts.pinned || !dayCallsOffered(facts.horizon, recording.legs.length)) {
-        dayCallRefusedOn = recording;
-        dayCallsNotOffered = facts !== undefined && !facts.pinned;
+      const gate = dayCallsOpenOn({
+        facts,
+        legs: recording.legs.length,
+        interventions: state.interventions,
+        pinnedCall,
+        pinnedCallSkipped: pressCallSkipped,
+      });
+      if (gate !== 'open' || facts === undefined) {
+        dayCallRefusedOn = { recording, pinnedAtS: pinnedCall?.atS };
+        if (gate === 'not-offered') dayCallsNotOffered = true;
         return undefined;
       }
       /*
@@ -1824,16 +1838,28 @@ function boot(ui: Elements, resources: BrowserResources): void {
           bookedOut: facts.bookedOut,
           horizon: facts.horizon,
           goals: shiftGoalsOf(state, resources),
-          drivers: pair === undefined ? undefined : { pair, drivingName: driving.name },
+          drivers: pair === undefined ? undefined : { profiles: resources.dispatcherProfiles.profiles, driving },
+          /* § D1204: on a pinned day, the call its player answered — the search starts after it. */
+          pinnedCall: facts.pinned ? pinnedCall : undefined,
         },
       );
     } else if (dayCallSession.recording() !== recording) {
       /* The record grew by a press outside a call: ask on from the latest press. */
       const pressedAtS = state.interventions.reduce((latest, entry) => Math.max(latest, entry.atS), 0);
-      const handedOver = state.interventions.some(
+      const handovers = state.interventions.filter(
         (entry) => entry.change.kind === 'adopt-dispatcher' || entry.change.kind === 'switch-dispatcher',
       );
-      dayCallSession.grew(recording, pressedAtS, handedOver);
+      /*
+       * § D1205: the driver question's pair is re-derived from whoever drives after the latest
+       * handover. A stored weights-only handover names no whole dispatcher, so it ends the question.
+       */
+      const latest = handovers.at(-1)?.change;
+      dayCallSession.grew(
+        recording,
+        pressedAtS,
+        handovers.length > 0,
+        latest?.kind === 'adopt-dispatcher' ? latest.profile : undefined,
+      );
     }
     return dayCallSession.onStage();
   }
@@ -4888,7 +4914,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
       interveneAt(atS, change);
     },
     /* § D1138 — the ordinary day's calls; the three functions carry the argument. */
-    dayCallOnStage: (recording) => dayCallOnStage(recording),
+    dayCallOnStage: (recording, pinnedCall) => dayCallOnStage(recording, pinnedCall),
     answerDayCall: (answer) => {
       answerDayCall(answer);
     },

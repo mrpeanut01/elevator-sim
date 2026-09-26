@@ -18,6 +18,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { VizRecording } from '../contract/types.js';
 import { isWaitingAt } from '../frame/overlay.js';
+import { dayCallsOffered } from '../shift/dayCalls.js';
 import { actsOf, type DayAct } from '../shift/dayLength.js';
 import { admittedPressDayIds, pressDayFor } from '../shift/ladder.js';
 import { pressAt, pressDayArmOf } from '../shift/pressDay.test-helper.js';
@@ -77,10 +78,10 @@ function measure(contractId: string): PinnedDayLength {
       slowS: slowWithin(slow, recording.startedAt, recording.endedAt),
     };
   });
-  /* Longest as the stage would play it — `sittingShape.ts#pacedDayRealS` at the opening rung. */
+  /* The middle arm as the stage would play it — `sittingShape.ts#pacedDayRealS` at the opening rung (§ D1204). */
   const realOf = (arm: { recordedS: number; slowS: number }): number =>
     pacedDayRealS({ periodS: arm.recordedS, ...arm }, DEFAULT_STAGE_SIM_PER_REAL_S);
-  const longest = arms.reduce((best, arm) => (realOf(arm) > realOf(best) ? arm : best));
+  const middle = [...arms].sort((a, b) => realOf(a) - realOf(b))[1]!;
   const slow = slowIntervalsOf(asBuilt.recording);
   return {
     contractId,
@@ -89,7 +90,8 @@ function measure(contractId: string): PinnedDayLength {
     peaks: acts.length,
     peaksBefore: acts.filter((act) => act.endS <= call.atS).length,
     inPeak: acts.some((act) => act.startS <= call.atS && call.atS < act.endS),
-    longest,
+    middle,
+    asksOn: dayCallsOffered('whole-day', asBuilt.recording.legs.length),
   };
 }
 
@@ -108,7 +110,7 @@ describe('the pinned whole day’s length and its call — § D1047', () => {
     expect(wholeDayPins.length, 'no whole day is left to describe, so this file asserts nothing').toBeGreaterThan(0);
   });
 
-  it('reproduces every row from a run — the call, the pacing before it, and the longest of the three arms', () => {
+  it('reproduces every row from a run — the call, the pacing before it, the middle of the three arms, and whether it asks on', () => {
     const wholeDayPins = admittedPressDayIds().filter((id) => pressDayFor(id)?.horizon === 'whole-day');
     const measured = wholeDayPins.map(measure);
     const out = process.env['FIRST_DAY_LENGTH_OUT'];
@@ -120,9 +122,19 @@ describe('the pinned whole day’s length and its call — § D1047', () => {
     for (const row of PINNED_DAY_LENGTHS) {
       const line = pinnedDayLengthLineOf(row.contractId) ?? '';
       expect(line, row.contractId).toMatch(
-        /^A whole day: up to \d+ min of watching at 4×, and 30× wherever nobody on a landing has waited a minute\. /u,
+        /^A whole day: about \d+ min of watching at 4×, and 30× wherever nobody on a landing has waited a minute\. /u,
       );
-      expect(line).toMatch(/about \d+ min in\.$/u);
+      /*
+       * § D1204: a day that asks on after its call says the stage stops there *first*, and promises
+       * no count of later stops; *once* is said only where the day's ordinary calls are gated off.
+       */
+      if (row.asksOn) {
+        expect(line).toMatch(/The stage stops first for its call .*, about \d+ min in, and may stop again later in the day\.$/u);
+        expect(line).not.toMatch(/\bonce\b/u);
+      } else {
+        expect(line).toMatch(/The stage stops once for its call .*, about \d+ min in\.$/u);
+      }
+      expect(line).not.toMatch(/\bup to\b|\b\d+ (more )?(calls|stops|times)\b/u);
       /* § D529 clause 4: no verb, no hint which answer, no word that the moment decides. */
       expect(line).not.toMatch(/\b(park|spread|lobby|clears?|miss(es)?|decid\w*|now)\b/iu);
       /* The tiebreak's *lunch act* is refused where the measurement contradicts it. */

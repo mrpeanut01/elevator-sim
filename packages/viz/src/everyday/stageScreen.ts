@@ -133,6 +133,7 @@ import type { PressCall } from '../shift/pressCall.js';
 import {
   STAGE_CALL_COPY,
   stageCallCardOf,
+  stageCallPresentOf,
   stageCallPhaseOf,
   stageEndDayOf,
   type StageCallOption,
@@ -1715,7 +1716,8 @@ function mountStage(
   /**
    * **The call standing on this attempt**, of either kind — the one reading pace, card and holds
    * share. The pinned day's § D1029 call while it is unanswered, else the ordinary day's next call
-   * from the host (§ D1138), which only the daily stage asks for. `raised: false` is an ordinary
+   * from the host (§ D1138), which only the daily stage asks for — on a pinned day too, once its
+   * call is answered ([§ D1204](../../../../DECISIONS.md)). `raised: false` is an ordinary
    * candidate whose runs have not landed: the stage waits at it but draws no card.
    */
   function activeCall():
@@ -1728,11 +1730,14 @@ function mountStage(
       }
     | undefined {
     if (watchingNow() !== undefined) return undefined;
-    if (stageCall !== undefined) {
-      return callAnswered ? undefined : { call: stageCall, raised: true, pinned: true };
-    }
+    if (stageCall !== undefined && !callAnswered) return { call: stageCall, raised: true, pinned: true };
     if (context.ctx !== 'daily' || adopted === undefined || recomputingOver !== undefined) return undefined;
-    const next = host.dayCallOnStage(adopted);
+    /*
+     * § D1204: once the pinned call is answered, the day asks on. The host opens the ordinary
+     * session after it, searched from five minutes past it, and refuses it where the call was
+     * skipped — so a skip with the pinned card up still answers every call the day had left.
+     */
+    const next = host.dayCallOnStage(adopted, stageCall);
     if (next === undefined) return undefined;
     return next.question === 'driver'
       ? { call: next.call, raised: next.raised, pinned: false, drivers: next.drivers }
@@ -1839,7 +1844,9 @@ function mountStage(
     const key = `${String(call.atS)}|${call.rule}|${standing.drivers === undefined ? 'placement' : 'driver'}`;
     if (key !== callCardKey) {
       callCardKey = key;
-      const card = stageCallCardOf(call, host.dayStartS(), bookedCars, standing.drivers);
+      /* § D1206: who stands at the call second, read off the run on the stage and nothing after it. */
+      const present = adopted === undefined ? undefined : stageCallPresentOf(adopted, call.atS);
+      const card = stageCallCardOf(call, host.dayStartS(), bookedCars, standing.drivers, present);
       const heading = el(doc, 'div', 'everyday-stage-call-heading', card.heading);
       heading.style.cssText = `font:600 11px ${TYPE.mono};letter-spacing:0.08em;color:${C.label}`;
       const facts = card.facts.map((fact) => {

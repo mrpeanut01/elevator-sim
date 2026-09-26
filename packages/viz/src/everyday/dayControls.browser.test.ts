@@ -151,10 +151,21 @@ async function recomputed(page: Page): Promise<void> {
 }
 
 async function skipIfAnythingIsLeft(page: Page): Promise<void> {
-  await page.evaluate(() => {
-    const skip = document.querySelector<HTMLButtonElement>('.everyday-stage-skip');
-    if (skip !== null && !skip.disabled) skip.click();
-  });
+  /*
+   * Pressed until the day has run out: since § D1204 the pinned day asks on after its call, so a
+   * skip may stop at a later card, and the next press with that card up skips it (recorded as
+   * skipped, pressing nothing).
+   */
+  await page.waitForFunction(
+    () => {
+      const skip = document.querySelector<HTMLButtonElement>('.everyday-stage-skip');
+      if (skip === null || skip.disabled) return true;
+      skip.click();
+      return false;
+    },
+    undefined,
+    { timeout: 240_000, polling: 500 },
+  );
 }
 
 async function closeTheDay(page: Page): Promise<string> {

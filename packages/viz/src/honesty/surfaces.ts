@@ -253,7 +253,7 @@ import {
   tutorialWorkedAnswerOf,
 } from '../everyday/tutorialModel.js';
 import { stagePaceNoteOf, stagePaceOf } from '../everyday/stagePace.js';
-import { STAGE_CALL_COPY, stageCallCardOf, stageEndDayOf } from '../everyday/stageCall.js';
+import { STAGE_CALL_COPY, stageCallCardOf, stageCallPresentOf, stageEndDayOf } from '../everyday/stageCall.js';
 import type { PressCall } from '../shift/pressCall.js';
 import { PRESS_CALL_AGAIN, pressCallRowOf } from '../shift/callRow.js';
 import {
@@ -12336,7 +12336,14 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
         }
       }
       for (const call of calls) {
-        const card = stageCallCardOf(call, undefined, call.backAtS === null ? [] : bookedOut);
+        /* § D1206: the present-tense line, read off this case's run at the call second. */
+        const card = stageCallCardOf(
+          call,
+          undefined,
+          call.backAtS === null ? [] : bookedOut,
+          undefined,
+          stageCallPresentOf(recording, call.atS),
+        );
         const at = `stage.call(${call.rule}${call.carAway === false ? ',none-out' : ''})`;
         const playhead = atPlayhead(recording, call.atS);
         seeds.push({ field: `${at}.heading`, text: card.heading, role: 'label' });

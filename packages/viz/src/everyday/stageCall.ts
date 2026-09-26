@@ -5,7 +5,7 @@
  * ## What the call is
  *
  * On a pinned press day, played exactly as it was measured (`shift/ladder.ts#pressDayMeasuredAs`),
- * the stage stops once, at `shift/pressCall.ts#pressCallOf`'s instant, and offers three answers:
+ * the stage stops first at `shift/pressCall.ts#pressCallOf`'s instant, and offers three answers:
  * the two parking presses and *leave them*. Before the call both parking presses and the mid-day
  * handover are drawn disabled with {@link STAGE_CALL_COPY}'s `held` reason; the answer is stamped at
  * the call second, whatever frame the stage stopped on. `everyday/stageScreen.ts` mounts it and
@@ -17,6 +17,12 @@
  * **a landing has waited a minute** (the first rule's trigger) and **the peak has opened** (the
  * second's). Each is a fact the stage already draws — the booked-out pill, the wait bands, the pace
  * note's act — so the card names nothing a player could not have read off the frame.
+ *
+ * Since [§ D1206](../../../../DECISIONS.md) a fourth, on every call of either kind: **who is
+ * standing** — how many, on how many floors, where the most are, and the longest wait among them,
+ * read off the stage's own landing fold at the call second ({@link stageCallPresentOf}). It is the
+ * frame counted rather than a figure about what follows, and the decide-an ruling refused every
+ * forward figure because any honest one is one of the call's three counts, which are the answer.
  *
  * Refused, by the reconciliation and pinned by `stageCall.test.ts` on every arm:
  *
@@ -38,6 +44,8 @@
 
 import type { InterventionChange } from '@elevator-sim/core/browser';
 
+import type { VizRecording } from '../contract/types.js';
+import { queueAt } from '../frame/overlay.js';
 import { PARK_CARS_LOBBY_LABEL, SPREAD_CARS_LABEL, switchDispatcherLabelOf } from '../live/interventions.js';
 import { clockAt } from '../live/timeline.js';
 import { carsPhraseOf, type BookedOutCar } from '../shift/bookedOut.js';
@@ -86,6 +94,66 @@ export const STAGE_CALL_COPY = Object.freeze({
 });
 
 /**
+ * **Who is standing at the landings at the call's instant** — wave AL, lane AL-C,
+ * [§ D1206](../../../../DECISIONS.md), the decide-an ruling's Q1(d) first half.
+ *
+ * Read off the run on the stage at the call second and nothing after it: `frame/overlay.ts#queueAt`,
+ * the fold the stage's own landing glyphs draw, whose total is the header's *standing right now*. The
+ * three runs a call compares are identical up to that second, so this reads the same off any of
+ * them, and it carries nothing a lookahead measured.
+ */
+export interface StageCallPresent {
+  /** Everybody standing at a landing. */
+  readonly standing: number;
+  /** The floors with somebody standing, in the building's order: label and head count. */
+  readonly floors: readonly { readonly label: string; readonly standing: number }[];
+  /** The longest anybody standing has waited, seconds; `undefined` when nobody stands. */
+  readonly longestS: number | undefined;
+}
+
+/** {@link StageCallPresent} for `recording` at `atS` — the stage's own fold, at the call second. */
+export function stageCallPresentOf(recording: VizRecording, atS: number): StageCallPresent {
+  const queues = queueAt(recording, atS).filter((queue) => queue.total > 0);
+  /* The floor's own label where it has one (*Lobby*); a bare number is said as *floor 4*. */
+  const labelOf = (id: string): string => {
+    const label = recording.floors.find((floor) => floor.id === id)?.label ?? id;
+    return /^\d+$/u.test(label) ? `floor ${label}` : label;
+  };
+  return Object.freeze({
+    standing: queues.reduce((sum, queue) => sum + queue.total, 0),
+    floors: Object.freeze(queues.map((queue) => Object.freeze({ label: labelOf(queue.floorId), standing: queue.total }))),
+    longestS: queues.length === 0 ? undefined : Math.max(...queues.map((queue) => queue.oldestWaitS)),
+  });
+}
+
+/**
+ * The card's present-tense line — how many stand, where the most stand, and the longest wait —
+ * [§ D1206](../../../../DECISIONS.md). A count of the frame and no figure about what follows: no
+ * answer's effect, no count ahead, nothing the three runs differ in (§ D1138 clause 2).
+ */
+function presentLineOf(present: StageCallPresent): string {
+  const { standing, floors } = present;
+  const waited = `${String(Math.round(present.longestS ?? 0))} s`;
+  if (standing === 0 || floors.length === 0) return 'Nobody is standing at the landings.';
+  if (standing === 1) return `One person is standing, at ${floors[0]!.label}, and has waited ${waited}.`;
+  const longest = `The longest of them has waited ${waited}.`;
+  if (floors.length === 1) return `${String(standing)} people are standing, all at ${floors[0]!.label}. ${longest}`;
+  const most = Math.max(...floors.map((floor) => floor.standing));
+  const fullest = floors.filter((floor) => floor.standing === most).map((floor) => floor.label);
+  const where =
+    fullest.length === 1
+      ? `the most at ${fullest[0]!} (${String(most)})`
+      : `${String(most)} each at ${listOfLabels(fullest)}`;
+  return `${String(standing)} people are standing on ${String(floors.length)} floors, ${where}. ${longest}`;
+}
+
+/** `a`, `a and b`, `a, b and c`. */
+function listOfLabels(parts: readonly string[]): string {
+  if (parts.length <= 1) return parts[0] ?? '';
+  return `${parts.slice(0, -1).join(', ')} and ${String(parts[parts.length - 1])}`;
+}
+
+/**
  * One of the card's three answers. `change` is `undefined` for *leave them* and for every driver
  * answer, whose handover the session already made; `answer` is what an ordinary call's session is
  * told ([§ D1167](../../../../DECISIONS.md)).
@@ -128,6 +196,12 @@ export function stageCallCardOf(
    * turns out to matter or not; only the question and its three answers differ, in a fixed order.
    */
   drivers?: DayCallDriverNames | undefined,
+  /**
+   * Who stands at the landings at the call second ({@link stageCallPresentOf}) — the card's last
+   * fact, on either question ([§ D1206](../../../../DECISIONS.md)). Absent, the card draws the
+   * ruling's three facts only.
+   */
+  present?: StageCallPresent | undefined,
 ): StageCallCard {
   /*
    * The car lines only where a car is out at the call. A pinned call is always inside its car's
@@ -150,6 +224,7 @@ export function stageCallCardOf(
   ) {
     facts.push(`The peak opened at ${clockAt(call.act.startS, dayStartS)}.`);
   }
+  if (present !== undefined) facts.push(presentLineOf(present));
   if (drivers !== undefined) {
     return Object.freeze({
       heading: STAGE_CALL_COPY.heading,

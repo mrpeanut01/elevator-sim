@@ -3,7 +3,8 @@
  *
  * One Crown Hotel slice at an unpinned crowd (`20 260 824`, `n` 0), run the way the Scenario press
  * runs it, with the session's two runs made synchronously by the shipped `recordRun`. The day
- * raises two calls; the cases below hold what each of them is:
+ * raises one call since § D1205's ten-minute rule (two before it); the cases below hold what each
+ * is:
  *
  * - a call is raised only where its three runs' ten-minute counts differ by the threshold, and the
  *   counts the report will print are recomputed here from the runs themselves;
@@ -24,6 +25,8 @@ import { todaysScenarioDayState } from '../shift/contractDay.test-helper.js';
 import {
   DAY_CALL_MAX,
   DAY_CALL_MAX_TRIES,
+  DAY_CALL_PER_PEAK,
+  DAY_CALL_REPEAT_S,
   DAY_CALL_SPACING_S,
   dayCallAdmits,
   dayCallDriversOf,
@@ -31,6 +34,7 @@ import {
   type DayCallAnswer,
 } from '../shift/dayCalls.js';
 import { goalsForDay } from '../shift/goals.js';
+import type { PressCall } from '../shift/pressCall.js';
 import { PRESS_DAY_RESOURCES } from '../shift/pressDay.test-helper.js';
 
 import { openDayCallSession } from './dayCallSession.js';
@@ -97,7 +101,8 @@ describe('an ordinary day’s calls on a real crowd', () => {
       });
     }
     const records = session.records();
-    expect(records.length).toBeGreaterThanOrEqual(2);
+    /* Two calls under § D1166's five-minute spacing; one since § D1205's ten-minute rule on this slice. */
+    expect(records.length).toBeGreaterThanOrEqual(1);
     for (const [index, record] of records.entries()) {
       const runs = made.get(record.atS);
       expect(runs, `call ${String(index + 1)} was made from its own two runs`).toBeDefined();
@@ -260,24 +265,6 @@ function calmAfter(recording: VizRecording, atS: number): VizRecording {
   } as VizRecording;
 }
 
-/** The same run, read as a whole day whose one peak is the whole run. */
-function asOnePeakDay(recording: VizRecording): VizRecording {
-  return {
-    ...recording,
-    demandPhases: [
-      {
-        id: '0-hold',
-        kind: 'hold',
-        label: 'peak',
-        startS: recording.startedAt,
-        endS: recording.endedAt,
-        startIntensity: 1,
-        endIntensity: 1,
-      },
-    ],
-  } as unknown as VizRecording;
-}
-
 /** A plan that carries only the press it was planned with, so the fake simulator can read it. */
 function fakePlan(extra: RunInterventionConfig): OffThreadRun {
   return { config: { interventions: [extra] } } as unknown as OffThreadRun;
@@ -286,28 +273,21 @@ const pressOf = (run: OffThreadRun): RunInterventionConfig =>
   (run.config.interventions ?? [])[0] as RunInterventionConfig;
 
 describe('wave AK: a day that keeps asking', () => {
-  const pair = (): readonly [DispatcherProfile, DispatcherProfile] => {
-    const profiles = PRESS_DAY_RESOURCES.dispatcherProfiles.profiles;
-    const collective = profiles.find((profile) => profile.id === 'collective')!;
-    return dayCallDriversOf(profiles, collective)!;
-  };
+  const collectiveProfile = (): DispatcherProfile =>
+    PRESS_DAY_RESOURCES.dispatcherProfiles.profiles.find((profile) => profile.id === 'collective')!;
+  const pair = (): readonly [DispatcherProfile, DispatcherProfile] =>
+    dayCallDriversOf(PRESS_DAY_RESOURCES.dispatcherProfiles.profiles, collectiveProfile())!;
 
-  it('asks again inside one peak, five minutes after a raised call, up to the cap — § D1166', () => {
-    const day = asOnePeakDay(built);
-    const session = openDayCallSession(
-      {
-        planWith: fakePlan,
-        simulate: (runs, done) => {
-          done(runs.map((run) => (pressOf(run).change.kind === 'park-cars-lobby' ? calmAfter(day, pressOf(run).atS) : day)));
-        },
-        cancel: () => {},
-        changed: () => {},
-      },
-      { recording: day, bookedOut: [], horizon: 'whole-day' },
-    );
+  it('asks again inside one peak after a raised call rather than jumping to its end — § D1166, as § D1205 spaces it', () => {
+    /*
+     * § D1166's claim, on the three-peak day below: the first peak asks a second time. Since
+     * § D1205 the second placement call waits ten minutes rather than five, and the peak stops at two.
+     */
+    const session = placementSessionOn(threePeakDay());
     while (session.onStage()?.raised === true) session.answer('leave', () => {});
     const clocks = session.records().map((record) => record.atS);
-    expect(clocks.length, 'a second call in the same peak').toBeGreaterThanOrEqual(2);
+    const first = clocks.filter((atS) => peakIndexOf(atS) === 0);
+    expect(first.length, 'a second call in the same peak').toBe(2);
     expect(clocks.length).toBeLessThanOrEqual(DAY_CALL_MAX);
     for (let k = 1; k < clocks.length; k += 1) {
       expect(clocks[k]! - clocks[k - 1]!).toBeGreaterThanOrEqual(DAY_CALL_SPACING_S);
@@ -340,7 +320,7 @@ describe('wave AK: a day that keeps asking', () => {
         recording: built,
         bookedOut: [],
         horizon: 'period',
-        drivers: { pair: drivers, drivingName: 'Conventional collective' },
+        drivers: { profiles: PRESS_DAY_RESOURCES.dispatcherProfiles.profiles, driving: collectiveProfile() },
       },
     );
     const call = session.onStage();
@@ -349,7 +329,7 @@ describe('wave AK: a day that keeps asking', () => {
     expect(call?.drivers).toEqual({
       'driver-a': drivers[0].name,
       'driver-b': drivers[1].name,
-      leave: 'Conventional collective',
+      leave: collectiveProfile().name,
     });
     expect(asked.slice(0, 2)).toEqual(['park-cars-lobby+spread-cars', 'adopt-dispatcher+adopt-dispatcher']);
     /* An answer from the other question is refused. */
@@ -364,11 +344,20 @@ describe('wave AK: a day that keeps asking', () => {
     expect(record?.question).toBe('driver');
     expect(Object.keys(record?.counts ?? {}).sort()).toEqual(['driver-a', 'driver-b', 'leave']);
     expect(record?.counts['driver-b']).toBe(0);
-    /* Once handed over, the driver question is not asked again, so a refused placement raises nothing. */
+    /*
+     * § D1205 lifted § D1167 clause 5: a handover no longer ends the driver question. The day goes
+     * on asking the placement question, and the driver question comes back no sooner than ten
+     * minutes after the last one, with the pair re-derived from the dispatcher now driving.
+     */
     const after = asked.slice(2);
     expect(after.length, 'the day went on asking the placement question').toBeGreaterThan(0);
-    expect(after.every((kinds) => kinds === 'park-cars-lobby+spread-cars')).toBe(true);
-    expect(session.onStage()).toBeUndefined();
+    const next = session.onStage();
+    if (next?.raised === true) {
+      expect(next.question).toBe('driver');
+      expect(next.call.atS - call!.call.atS).toBeGreaterThanOrEqual(DAY_CALL_REPEAT_S);
+      expect(next.drivers?.leave).toBe(drivers[0].name);
+      expect([next.drivers?.['driver-a'], next.drivers?.['driver-b']]).not.toContain(drivers[0].name);
+    }
   });
 
   it('asks the placement question where it is admitted, and runs no handover for it', () => {
@@ -383,7 +372,12 @@ describe('wave AK: a day that keeps asking', () => {
         cancel: () => {},
         changed: () => {},
       },
-      { recording: built, bookedOut: [], horizon: 'period', drivers: { pair: pair(), drivingName: 'Conventional collective' } },
+      {
+        recording: built,
+        bookedOut: [],
+        horizon: 'period',
+        drivers: { profiles: PRESS_DAY_RESOURCES.dispatcherProfiles.profiles, driving: collectiveProfile() },
+      },
     );
     expect(session.onStage()?.question).toBe('placement');
     expect(asked).toEqual(['park-cars-lobby+spread-cars']);
@@ -457,5 +451,210 @@ describe('wave AK: a day that keeps asking', () => {
     expect(before(handed.recording.legs)).toEqual(before(kept.recording.legs));
     /* Move the control and require the run to change: the handover is not inert on this crowd. */
     expect(handed.recording.legs.map(keyOf)).not.toEqual(kept.recording.legs.map(keyOf));
+  });
+});
+
+/*
+ * ---- Wave AL, lane AL-C: § D1204 (a pinned day asks after its call) and § D1205 (the whole day) ----
+ *
+ * A synthetic two-hour whole day with three peaks, so every rule can be held without a simulator:
+ * somebody arrives every twenty seconds all day and boards ninety seconds later, so a candidate
+ * stands wherever the search looks, and each answer's run is built from that day by hand.
+ */
+
+const PEAKS: readonly (readonly [number, number])[] = [
+  [600, 1800],
+  [3000, 4200],
+  [5400, 6600],
+];
+
+/** The three-peak day: one rider every 20 s from 0 to 7 200 s, each boarding 90 s after arriving. */
+function threePeakDay(): VizRecording {
+  const template = built.legs[0]!;
+  const legs: VizRecording['legs'][number][] = [];
+  for (let k = 0; k * 20 < 7200; k += 1) {
+    const arrivedAt = k * 20;
+    legs.push({
+      ...template,
+      passengerId: `p${String(k).padStart(4, '0')}`,
+      legIndex: 0,
+      arrivedAt,
+      boardedAt: arrivedAt + 90,
+      alightedAt: arrivedAt + 120,
+      refusedAt: undefined,
+    });
+  }
+  const phase = (startS: number, endS: number, intensity: number) => ({
+    id: `phase-${String(startS)}`,
+    kind: 'hold',
+    label: intensity === 1 ? 'peak' : 'lull',
+    startS,
+    endS,
+    startIntensity: intensity,
+    endIntensity: intensity,
+  });
+  const edges = [0, ...PEAKS.flat(), 7200];
+  const phases = edges.slice(1).map((endS, index) => phase(edges[index]!, endS, index % 2 === 1 ? 1 : 0.2));
+  return { ...built, startedAt: 0, endedAt: 7200, legs, demandPhases: phases } as unknown as VizRecording;
+}
+
+/** Every rider arriving in `[fromS, toS)` boards a second later; everybody else as they were. */
+function calmBetween(recording: VizRecording, fromS: number, toS: number): VizRecording {
+  return {
+    ...recording,
+    legs: recording.legs.map((leg) =>
+      leg.arrivedAt < fromS || leg.arrivedAt >= toS ? leg : { ...leg, boardedAt: leg.arrivedAt + 1, refusedAt: undefined },
+    ),
+  } as VizRecording;
+}
+
+const peakIndexOf = (atS: number): number => PEAKS.findIndex(([from, to]) => from <= atS && atS < to);
+
+/** Park empties the landings; spread and every handover leave the day as it was. */
+function placementSessionOn(day: VizRecording, pinnedCall?: PressCall) {
+  return openDayCallSession(
+    {
+      planWith: fakePlan,
+      simulate: (runs, done) => {
+        done(runs.map((run) => (pressOf(run).change.kind === 'park-cars-lobby' ? calmAfter(day, pressOf(run).atS) : day)));
+      },
+      cancel: () => {},
+      changed: () => {},
+    },
+    { recording: day, bookedOut: [], horizon: 'whole-day', pinnedCall },
+  );
+}
+
+describe('wave AL: calls across the whole day — § D1205', () => {
+  const profiles = (): readonly DispatcherProfile[] => PRESS_DAY_RESOURCES.dispatcherProfiles.profiles;
+  const byId = (id: string): DispatcherProfile => profiles().find((profile) => profile.id === id)!;
+
+  /**
+   * Parking changes nothing; a handover to a dispatcher in `calm` empties the landings for the ten
+   * minutes after it, and the day is as it was from then on — so the run a handover leaves still
+   * has candidates in it, as a real one does.
+   */
+  function driverSession(day: VizRecording, calm: readonly string[], asked: string[] = []) {
+    return openDayCallSession(
+      {
+        planWith: fakePlan,
+        simulate: (runs, done) => {
+          asked.push(runs.map((run) => pressOf(run).change.kind).join('+'));
+          done(
+            runs.map((run) => {
+              const press = pressOf(run);
+              return press.change.kind === 'adopt-dispatcher' && calm.includes(press.change.profile.id)
+                ? calmBetween(day, press.atS, press.atS + DAY_CALL_REPEAT_S)
+                : day;
+            }),
+          );
+        },
+        cancel: () => {},
+        changed: () => {},
+      },
+      {
+        recording: day,
+        bookedOut: [],
+        horizon: 'whole-day',
+        drivers: { profiles: profiles(), driving: byId('collective') },
+      },
+    );
+  }
+
+  it('raises at most two calls in a peak, so every peak of the day is asked', () => {
+    const session = placementSessionOn(threePeakDay());
+    while (session.onStage()?.raised === true) session.answer('leave', () => {});
+    const clocks = session.records().map((record) => record.atS);
+    const perPeak = PEAKS.map((_, index) => clocks.filter((atS) => peakIndexOf(atS) === index).length);
+    expect(perPeak).toEqual([DAY_CALL_PER_PEAK, DAY_CALL_PER_PEAK, DAY_CALL_PER_PEAK]);
+    expect(clocks.length).toBeLessThanOrEqual(DAY_CALL_MAX);
+  });
+
+  it('never raises the same question twice inside ten minutes', () => {
+    const session = placementSessionOn(threePeakDay());
+    while (session.onStage()?.raised === true) session.answer('leave', () => {});
+    const clocks = session.records().map((record) => record.atS);
+    expect(clocks.length).toBeGreaterThan(1);
+    for (let k = 1; k < clocks.length; k += 1) {
+      expect(clocks[k]! - clocks[k - 1]!, `calls ${String(k)} and ${String(k + 1)}`).toBeGreaterThanOrEqual(
+        DAY_CALL_REPEAT_S,
+      );
+    }
+  });
+
+  it('asks nothing more of who drives in a peak once the player kept the driver, and asks again in the next', () => {
+    const session = driverSession(threePeakDay(), ['eta', 'fairness-first']);
+    const first = session.onStage();
+    expect(first?.question).toBe('driver');
+    session.answer('leave', () => {});
+    const later: { atS: number; question: string | undefined }[] = [];
+    for (let call = session.onStage(); call?.raised === true; call = session.onStage()) {
+      later.push({ atS: call.call.atS, question: call.question });
+      session.answer('leave', () => {});
+    }
+    expect(
+      later.filter((call) => call.question === 'driver' && peakIndexOf(call.atS) === peakIndexOf(first!.call.atS)),
+    ).toEqual([]);
+    /* *Keep* holds one peak, not the day. */
+    expect(later.some((call) => call.question === 'driver' && peakIndexOf(call.atS) === 1)).toBe(true);
+  });
+
+  it('asks who drives again after a handover, with the pair re-derived from the new driver', () => {
+    const session = driverSession(threePeakDay(), ['eta', 'fairness-first']);
+    const first = session.onStage();
+    expect(first?.drivers).toEqual({
+      'driver-a': byId('eta').name,
+      'driver-b': byId('fairness-first').name,
+      leave: byId('collective').name,
+    });
+    const handedTo: RunInterventionConfig[] = [];
+    session.answer('driver-b', (adoption) => {
+      handedTo.push(adoption.entry);
+    });
+    expect(handedTo).toEqual([
+      { atS: first!.call.atS, change: { kind: 'adopt-dispatcher', profile: byId('fairness-first') } },
+    ]);
+    const second = session.onStage();
+    expect(second?.raised).toBe(true);
+    expect(second?.question).toBe('driver');
+    expect(second!.call.atS - first!.call.atS).toBeGreaterThanOrEqual(DAY_CALL_REPEAT_S);
+    /* The pair never offers the dispatcher driving, and *keep* names it. */
+    expect(second?.drivers).toEqual({
+      'driver-a': byId('collective').name,
+      'driver-b': byId('eta').name,
+      leave: byId('fairness-first').name,
+    });
+    /* And the second call's record carries the names it was asked with. */
+    session.answer('leave', () => {});
+    expect(session.records()[1]?.drivers).toEqual(second?.drivers);
+  });
+
+  it('re-derives the pair after the player’s own handover where the shell names the driver, and stops where it cannot', () => {
+    const day = threePeakDay();
+    const named = driverSession(day, ['collective', 'eta']);
+    named.grew({ ...day } as VizRecording, 100, true, byId('fairness-first'));
+    const call = named.onStage();
+    expect(call?.question).toBe('driver');
+    expect(call?.drivers?.leave).toBe(byId('fairness-first').name);
+    const unnamed = driverSession(day, ['collective', 'eta', 'fairness-first']);
+    unnamed.grew({ ...day } as VizRecording, 100, true);
+    expect(unnamed.onStage()).toBeUndefined();
+  });
+});
+
+describe('wave AL: a pinned day asks after its call — § D1204', () => {
+  it('searches from five minutes after the pinned call, and counts it as its peak’s first placement call', () => {
+    const pinned: PressCall = { atS: 700, rule: 'first-minute-wait', carId: 'A', awayAtS: 650, backAtS: 900, act: undefined };
+    const session = placementSessionOn(threePeakDay(), pinned);
+    while (session.onStage()?.raised === true) session.answer('leave', () => {});
+    const clocks = session.records().map((record) => record.atS);
+    expect(clocks[0]).toBeGreaterThanOrEqual(pinned.atS + DAY_CALL_REPEAT_S);
+    expect(clocks.filter((atS) => peakIndexOf(atS) === 0)).toHaveLength(DAY_CALL_PER_PEAK - 1);
+    expect(clocks.filter((atS) => peakIndexOf(atS) === 2).length).toBeGreaterThan(0);
+  });
+
+  it('searches an ordinary day from its start — the negative control', () => {
+    const session = placementSessionOn(threePeakDay());
+    expect(session.onStage()?.call.atS).toBe(PEAKS[0]![0]);
   });
 });

@@ -12,6 +12,9 @@
  * 2. Having closed that day, the player takes it again from the door's *Run today again*. The second
  *    report says it is practice, and the week's stored record of the day is the first attempt's,
  *    unchanged — what the retake did banks nothing.
+ * 3. A fresh device's dealt Monday, Midtown Office's pinned day, asks again after its pinned call
+ *    ([§ D1204](../../../../DECISIONS.md)), and its card says who is standing
+ *    ([§ D1206](../../../../DECISIONS.md)). A fourth case holds § D1168's *End the day*.
  *
  * ## Why the date is fixed and which date
  *
@@ -298,6 +301,52 @@ describe.skipIf(!HAS_BROWSER)('an ordinary day’s calls — § D1138', () => {
       expect(practice).toContain(PRACTICE_NOTE);
       expect(practice).toContain('practice');
       expect(await storedDay(page, 1), 'the retake changed the banked day').toEqual(banked);
+    } finally {
+      await page.close();
+    }
+  });
+
+  /*
+   * **The newcomer's Monday keeps asking after its call** — wave AL, lane AL-C,
+   * [§ D1204](../../../../DECISIONS.md). A fresh device on **2026-09-26** is dealt Midtown Office's
+   * pinned day (the missing-calls diagnosis measured the deal on that date). *Skip to the end* stops
+   * at the pinned call (§ D1151); the call is answered *leave them*; a second *Skip to the end* must
+   * then stop at a second card before the day ends. Before § D1204 it ran the day out and filed it,
+   * because the ordinary session never opened on a pinned day.
+   */
+  it('stops at a second card after the pinned call on a fresh device’s dealt Monday — § D1204', async () => {
+    const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
+    try {
+      await page.clock.setFixedTime(new Date('2026-09-26T12:00:00Z'));
+      await page.goto(origin, { waitUntil: 'load' });
+      await page.waitForFunction(
+        () => document.querySelector<HTMLElement>('.menu-overlay')?.hidden === true,
+        undefined,
+        { timeout: 30_000 },
+      );
+      await leaveTutorialIfOffered(page);
+      await openEverydayDoor(page);
+      expect(await textOf(page, '.everyday-screen'), 'the date no longer deals the pinned Monday').toContain(
+        'the pinned crowd this day was measured on',
+      );
+      await page.locator('.everyday-bar-primary').click();
+      await page.waitForSelector('.everyday-brief', { timeout: 15_000 });
+      await page.locator('.everyday-bar-primary').click();
+      await waitForToday(page);
+      await page.locator('.everyday-stage-skip').click();
+      const pinnedCard = await nextCall(page);
+      expect(pinnedCard).toContain('What do the cars');
+      await answer(page, 'leave');
+      await page.locator('.everyday-stage-skip').click();
+      const second = await nextCall(page);
+      /* Either question may be asked; it is a card with three answers, and nothing of their effect. */
+      expect(await page.locator('.everyday-stage-call:not([hidden]) .everyday-stage-call-answer').count()).toBe(3);
+      expect(second).not.toMatch(/\d+ with|Shift (cleared|missed)|\bOn this crowd\b/u);
+      /* § D1206: the card says who stands at the call, as a count of the frame. */
+      expect(second).toMatch(/standing|Nobody is standing/u);
+      const report = await closeTheDay(page);
+      expect(report).toContain('The stage called the day');
+      expect(report).toMatch(/The stage (called the day|asked who drives), and the day was skipped to its end/u);
     } finally {
       await page.close();
     }

@@ -41,9 +41,11 @@
  * ## Two questions, one card grammar — [§ D1167](../../../../DECISIONS.md)
  *
  * A candidate asks the **placement** question first: *park*, *spread*, *leave them*. Where its three
- * counts do not reach the threshold, and the day has not yet been handed over, it asks the
- * **driver** question from the same instant: hand the rest of the day to one of the tower's pair
- * ({@link dayCallDriversOf}), or keep the dispatcher driving now. Both are admitted by one rule
+ * counts do not reach the threshold, it asks the **driver** question from the same instant: hand the
+ * rest of the day to one of the pair ({@link dayCallDriversOf}), or keep the dispatcher driving now.
+ * Since [§ D1205](../../../../DECISIONS.md) the pair is re-derived from whoever drives after a
+ * handover, so the question may be asked again; after *keep* it is not asked again in that peak,
+ * and neither question is raised twice within {@link DAY_CALL_REPEAT_S}. Both are admitted by one rule
  * ({@link dayCallAdmits}, unchanged), drawn on one card and reported in one row grammar. The
  * swarm's members measured why the second question exists: at a crowded landing no car is idle, so
  * the three parking answers leave the next ten minutes alike, while a handover reaches the busy
@@ -162,6 +164,29 @@ export const DAY_CALL_MIN_SPREAD = 3;
 export const DAY_CALL_SPREAD_SHARE = 0.1;
 
 /**
+ * **At most two raised calls in one peak of a whole day** — wave AL, lane AL-C,
+ * [§ D1205](../../../../DECISIONS.md), the decide-an ruling's Q1(b).
+ *
+ * With only the day's cap of six ({@link DAY_CALL_MAX}), a crowded morning or lunch could spend the
+ * cap and leave the evening silent: the swarm's engineering member measured 16 + 18 + 8 calls over
+ * the three peaks of ten Midtown branches, with an evening call on six of them. Two a peak, with
+ * the driver question asked again after a handover, put a call in all three peaks on ten of ten.
+ * Read only on a whole day, where a candidate carries the peak it falls in; a slice's calls carry
+ * no peak and are held by the day's cap alone. Owner-reversible: it is this one constant.
+ */
+export const DAY_CALL_PER_PEAK = 2;
+
+/**
+ * **No question is raised again within ten simulated minutes of the last time it was raised** —
+ * [§ D1205](../../../../DECISIONS.md). Seat A's rule, and S2 measured half of a day's follow-on
+ * calls repeating the question just asked. A candidate whose placement question is held by this
+ * rule is asked the driver question instead, where that one is not held too; a candidate where both
+ * are held costs no run and is not counted as asked. The same length as {@link DAY_CALL_WINDOW_S}
+ * and a different rule: that one is what a call's answers are counted over. Owner-reversible.
+ */
+export const DAY_CALL_REPEAT_S = 600;
+
+/**
  * **How many candidates a day may ask before it stops** — each asked candidate costs two runs, or
  * four where the driver question is asked too, and a refused one is runs nobody sees. Twice the
  * cap, so a day that refuses one candidate for each it raises can still reach the cap.
@@ -237,8 +262,8 @@ export type DayCallTriple<T> = Readonly<Partial<Record<DayCallAnswer, T>>>;
  * engineering member measured the question on, all conventional-panel profiles, and every contract
  * allows every dispatcher from the start. A tower's pair is the first two of these that differ from
  * the one driving when the day opens and that a handover can reach ({@link dayCallDriversOf}), so
- * it is fixed before the day starts and never chosen by which answer clears. Owner-reversible: it
- * is this list.
+ * it is fixed from who is driving and never chosen by which answer clears. Owner-reversible: it is
+ * this list.
  */
 export const DAY_CALL_DRIVER_OFFER: readonly string[] = Object.freeze(['collective', 'eta', 'fairness-first']);
 
@@ -246,7 +271,9 @@ export const DAY_CALL_DRIVER_OFFER: readonly string[] = Object.freeze(['collecti
  * **A tower's driver pair for one day** — the first two of {@link DAY_CALL_DRIVER_OFFER} that a
  * handover from `driving` reaches (`live/interventions.ts#switchRefusalOf` passes) and that would
  * change something (`#switchChangesNothing` refuses the rest), or `undefined` when fewer than two
- * do. Read once, when the day's session opens, from the dispatcher the day opened with.
+ * do. Read when the day's session opens, from the dispatcher the day opened with, and again after
+ * every handover, from the dispatcher it handed to ([§ D1205](../../../../DECISIONS.md)), so *keep*
+ * always names who is driving and the pair never offers the dispatcher already driving.
  */
 export function dayCallDriversOf(
   profiles: readonly DispatcherProfile[],
