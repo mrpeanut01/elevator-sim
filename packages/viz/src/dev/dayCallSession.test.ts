@@ -658,3 +658,272 @@ describe('wave AL: a pinned day asks after its call — § D1204', () => {
     expect(session.onStage()?.call.atS).toBe(PEAKS[0]![0]);
   });
 });
+
+/*
+ * Wave AL, lane AL-E, § D1218: a reload re-simulates the day's attempt from its log, and the
+ * session opens on that run from where the attempt's session stood. The resumed session must hold
+ * the calls already answered and raise the same next call the unbroken session raises, on the same
+ * run: a resume that re-asked from the day's start would put an answered call back in front of a
+ * player who has seen what followed it.
+ */
+describe('a resumed attempt’s calls — § D1218', () => {
+  it('reopens where the attempt stood: the answered calls kept, the next call the same', () => {
+    let log: RunInterventionConfig[] = [];
+    const facts = dayCallFactsOf(PRESS_DAY_RESOURCES, state)!;
+    const deps = (): Parameters<typeof openDayCallSession>[0] => ({
+      planWith: (extra) => planOf([...log, extra]),
+      simulate: (runs, done) => {
+        done(runs.map(run));
+      },
+      cancel: () => {},
+      changed: () => {},
+    });
+    const unbroken = openDayCallSession(deps(), { recording: built, bookedOut: facts.bookedOut, horizon: facts.horizon });
+    const first = unbroken.onStage();
+    expect(first?.raised).toBe(true);
+    unbroken.answer('spread-cars', (adoption) => {
+      log = [...log, adoption.entry];
+    });
+    const snapshot = JSON.parse(JSON.stringify(unbroken.snapshot())) as ReturnType<typeof unbroken.snapshot>;
+    expect(snapshot.records).toHaveLength(1);
+    expect(snapshot.searchFromS).toBeGreaterThan(first!.call.atS);
+    const next = unbroken.onStage();
+
+    /* The reload: the attempt's run re-simulated from its log, and a session opened on it from the snapshot. */
+    const resumedRun = run(planOf(log));
+    expect(resumedRun.legs.map(keyOf)).toEqual(unbroken.recording().legs.map(keyOf));
+    const resumed = openDayCallSession(deps(), {
+      recording: resumedRun,
+      bookedOut: facts.bookedOut,
+      horizon: facts.horizon,
+      resume: snapshot,
+    });
+    expect(resumed.records().map((record) => [record.atS, record.answer])).toEqual([[first!.call.atS, 'spread-cars']]);
+    expect(resumed.onStage()?.call.atS).toBe(next?.call.atS);
+    expect(resumed.onStage()?.raised).toBe(next?.raised);
+    /* Nothing before the snapshot's search point is asked again. */
+    expect(resumed.onStage()?.call.atS ?? Number.POSITIVE_INFINITY).toBeGreaterThanOrEqual(snapshot.searchFromS);
+  });
+});
+
+/*
+ * Wave AL's integration, over lanes AL-C and AL-E: § D1218's snapshot was written before § D1205
+ * gave the session a memory — two calls a peak, no question twice inside ten minutes, no driver
+ * question after *keep* in that peak, and the pair re-derived after a handover — and a resume that
+ * forgot any of it would raise a different call from the unbroken session. So the whole day is
+ * played once unbroken, and again from a snapshot taken after every answer (with the next card up,
+ * which the snapshot must leave out), each JSON round-tripped as the device stores it; the resumed
+ * tail must be the unbroken tail call for call, question for question, pair for pair and leg for leg.
+ */
+describe('a resumed session raises what an unbroken one would — § D1205 under § D1218', () => {
+  const profiles = (): readonly DispatcherProfile[] => PRESS_DAY_RESOURCES.dispatcherProfiles.profiles;
+  const byId = (id: string): DispatcherProfile => profiles().find((profile) => profile.id === id)!;
+
+  /** Park, and a handover to anybody but `collective`, empty the landings for ten minutes; spread changes nothing. */
+  function resumableOn(
+    day: VizRecording,
+    recording: VizRecording,
+    extra: Partial<Parameters<typeof openDayCallSession>[1]> = {},
+    parkCalms = true,
+    /* Where given, the runs land only when the test drains it, as the worker's do: a snapshot can fall while one is in flight. */
+    inFlight?: (() => void)[],
+  ) {
+    return openDayCallSession(
+      {
+        planWith: fakePlan,
+        simulate: (runs, done) => {
+          const land = (): void => done(
+            runs.map((ask) => {
+              const press = pressOf(ask);
+              const calms =
+                (parkCalms && press.change.kind === 'park-cars-lobby') ||
+                (press.change.kind === 'adopt-dispatcher' && press.change.profile.id !== 'collective');
+              return calms ? calmBetween(day, press.atS, press.atS + DAY_CALL_REPEAT_S) : day;
+            }),
+          );
+          if (inFlight === undefined) land();
+          else inFlight.push(land);
+        },
+        cancel: () => {},
+        changed: () => {},
+      },
+      {
+        recording,
+        bookedOut: [],
+        horizon: 'whole-day',
+        drivers: { profiles: profiles(), driving: byId('collective') },
+        ...extra,
+      },
+    );
+  }
+
+  /* Keep the placement; *keep who drives* on the first driver call, then hand the day to the pair's second. */
+  function answerFor(index: number, question: string | undefined): DayCallAnswer {
+    if (question !== 'driver') return index === 2 ? 'spread-cars' : 'leave';
+    return index === 1 ? 'leave' : 'driver-b';
+  }
+
+  interface Raised {
+    readonly atS: number;
+    readonly question: string | undefined;
+    readonly drivers: unknown;
+    readonly entry: RunInterventionConfig | undefined;
+    readonly legs: readonly string[];
+  }
+
+  /** Answer every call from `from` on, returning what was raised and what each answer left standing. */
+  function playOut(
+    session: ReturnType<typeof resumableOn>,
+    from: number,
+    answer: (index: number, question: string | undefined) => DayCallAnswer = answerFor,
+  ): Raised[] {
+    const raised: Raised[] = [];
+    for (let index = from, call = session.onStage(); call?.raised === true; index += 1, call = session.onStage()) {
+      let entry: RunInterventionConfig | undefined;
+      session.answer(answer(index, call.question), (adoption) => {
+        entry = adoption.entry;
+      });
+      raised.push({
+        atS: call.call.atS,
+        question: call.question,
+        drivers: call.question === 'driver' ? call.drivers : undefined,
+        entry,
+        legs: session.recording().legs.map(keyOf),
+      });
+    }
+    return raised;
+  }
+
+  function checkEveryResume(
+    calls: number,
+    open: (
+      resume?: ReturnType<ReturnType<typeof resumableOn>['snapshot']>,
+      recording?: VizRecording,
+    ) => ReturnType<typeof resumableOn>,
+    answer: (index: number, question: string | undefined) => DayCallAnswer = answerFor,
+  ) {
+    const unbroken = playOut(open(), 0, answer);
+    /* The day under test: every call it can raise, with a *keep* or a handover in it, across all three peaks. */
+    expect(unbroken.length).toBe(calls);
+    expect(new Set(unbroken.map((call) => peakIndexOf(call.atS)))).toEqual(new Set([0, 1, 2]));
+    for (let k = 0; k < unbroken.length; k += 1) {
+      const live = open();
+      playOut({ ...live, onStage: () => (live.records().length < k ? live.onStage() : undefined) }, 0, answer);
+      expect(live.records()).toHaveLength(k);
+      expect(live.onStage()?.raised, `a card is up at snapshot ${String(k)}`).toBe(true);
+      const stored = JSON.parse(JSON.stringify(live.snapshot())) as ReturnType<typeof live.snapshot>;
+      const resumed = open(stored, live.recording());
+      expect(resumed.records(), `the answered calls kept at snapshot ${String(k)}`).toEqual(live.records());
+      expect(playOut(resumed, k, answer), `the tail resumed after ${String(k)} answers`).toEqual(unbroken.slice(k));
+    }
+    return unbroken;
+  }
+
+  it('across a peak boundary, after *keep who drives*, and after a handover', () => {
+    const day = threePeakDay();
+    const unbroken = checkEveryResume(DAY_CALL_MAX, (resume, recording) => resumableOn(day, recording ?? day, { resume }));
+    /* The snapshot after the *keep* stands in a full peak with the driver question held; the next call is the next peak's. */
+    expect(unbroken[1]).toMatchObject({ question: 'driver', entry: undefined });
+    expect(peakIndexOf(unbroken[2]!.atS)).toBe(peakIndexOf(unbroken[1]!.atS) + 1);
+    /* After the handover the pair is re-derived, and a resumed session re-derives it the same way. */
+    const handed = unbroken.findIndex((call) => call.entry?.change.kind === 'adopt-dispatcher');
+    const after = unbroken.slice(handed + 1).find((call) => call.question === 'driver');
+    expect(after?.drivers).toMatchObject({ leave: byId('fairness-first').name });
+  });
+
+  it('on a pinned day, whose call the snapshot already carries', () => {
+    const day = threePeakDay();
+    const pinned: PressCall = { atS: 700, rule: 'first-minute-wait', carId: 'A', awayAtS: 650, backAtS: 900, act: undefined };
+    /* Five: the pinned call is one of its peak's two, and the cap of six counts the raised calls. */
+    const unbroken = checkEveryResume(DAY_CALL_MAX - 1, (resume, recording) =>
+      resumableOn(day, recording ?? day, resume === undefined ? { pinnedCall: pinned } : { resume }),
+    );
+    expect(unbroken[0]!.atS).toBeGreaterThanOrEqual(pinned.atS + DAY_CALL_SPACING_S);
+  });
+
+  it('where *keep who drives* is a peak’s first call, so only the kept peak holds the driver question', () => {
+    const day = threePeakDay();
+    /* Parking changes nothing here, so every call is who drives, and every answer keeps the driver. */
+    const unbroken = checkEveryResume(
+      3,
+      (resume, recording) => resumableOn(day, recording ?? day, { resume }, false),
+      () => 'leave',
+    );
+    expect(unbroken.map((call) => [peakIndexOf(call.atS), call.question])).toEqual([
+      [0, 'driver'],
+      [1, 'driver'],
+      [2, 'driver'],
+    ]);
+  });
+
+  it('while the next candidate’s runs are still in flight, inside the peak whose driver was kept', () => {
+    const day = threePeakDay();
+    const drain = (queue: (() => void)[]): void => {
+      while (queue.length > 0) queue.shift()!();
+    };
+    const open = (queue: (() => void)[], resume?: ReturnType<ReturnType<typeof resumableOn>['snapshot']>, recording?: VizRecording) =>
+      resumableOn(day, recording ?? day, { resume }, false, queue);
+    const keepAll = (session: ReturnType<typeof resumableOn>, queue: (() => void)[]): [number, string | undefined][] => {
+      const raised: [number, string | undefined][] = [];
+      for (;;) {
+        drain(queue);
+        const call = session.onStage();
+        if (call?.raised !== true) return raised;
+        raised.push([call.call.atS, call.question]);
+        session.answer('leave', () => {});
+      }
+    };
+    const unbrokenQueue: (() => void)[] = [];
+    const unbroken = keepAll(open(unbrokenQueue), unbrokenQueue);
+    expect(unbroken.length).toBeGreaterThan(1);
+    const queue: (() => void)[] = [];
+    const live = open(queue);
+    drain(queue);
+    const first = live.onStage();
+    expect(first?.question).toBe('driver');
+    live.answer('leave', () => {});
+    /* The snapshot falls here: the next candidate is in the kept peak, and its runs have not landed. */
+    const asking = live.onStage();
+    expect(asking?.raised).toBe(false);
+    expect(peakIndexOf(asking!.call.atS)).toBe(peakIndexOf(first!.call.atS));
+    const stored = JSON.parse(JSON.stringify(live.snapshot())) as ReturnType<typeof live.snapshot>;
+    expect(stored.keptInPeakS).toBe(PEAKS[peakIndexOf(first!.call.atS)]![0]);
+    const again: (() => void)[] = [];
+    const resumed = open(again, stored, live.recording());
+    expect([[first!.call.atS, first!.question], ...keepAll(resumed, again)]).toEqual(unbroken);
+    expect(resumed.quiet()).toEqual(keepAllQuiet());
+
+    function keepAllQuiet() {
+      const control: (() => void)[] = [];
+      const session = open(control);
+      keepAll(session, control);
+      return session.quiet();
+    }
+  });
+
+  it('the snapshot is needed — a resume that forgot § D1205’s memory, or counted the card up, raises a different call', () => {
+    const day = threePeakDay();
+    const live = resumableOn(day, day);
+    playOut({ ...live, onStage: () => (live.records().length < 1 ? live.onStage() : undefined) }, 0);
+    /* One placement call answered at 600; the card up is who drives, at 900, held from placement by ten minutes. */
+    const up = live.onStage();
+    expect([up?.call.atS, up?.question]).toEqual([900, 'driver']);
+    const snapshot = live.snapshot();
+    expect(snapshot).toMatchObject({ raisedInPeak: [600], lastRaisedAtS: { placement: 600, driver: null } });
+    const raisedFrom = (resume: typeof snapshot) => {
+      const call = resumableOn(day, live.recording(), { resume }).onStage();
+      return [call?.call.atS, call?.question];
+    };
+    expect(raisedFrom(snapshot)).toEqual([900, 'driver']);
+    /* Lane AL-E's snapshot as written: no memory, so placement is asked again five minutes after itself. */
+    expect(raisedFrom({ ...snapshot, raisedInPeak: [], lastRaisedAtS: { placement: null, driver: null } })).toEqual([
+      900,
+      'placement',
+    ]);
+    /* The card up counted in the snapshot: who drives is held by itself, and the call moves on. */
+    expect(raisedFrom({ ...snapshot, raisedInPeak: [600, 600], lastRaisedAtS: { placement: 600, driver: 900 } })).not.toEqual([
+      900,
+      'driver',
+    ]);
+  });
+});

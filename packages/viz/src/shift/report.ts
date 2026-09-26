@@ -488,7 +488,8 @@ export interface WeekDayReport extends DayReport, ShapedOnlyFields {
    * **The close did not close the day into the week**, so the week stands on this day and there is
    * nothing to advance from — wave AL, lane AL-A, the post-AK panel's seat D (H2), under
    * [§ D1141](../../../../DECISIONS.md). `true` only where the crowd made the run practice
-   * ({@link DayReportInput.practiceCrowd}): a retake's practice close follows a close that did bank,
+   * ({@link DayReportInput.practiceCrowd}) or an attempt at the day still stands
+   * ({@link DayReportInput.practiceAttempt}, [§ D1218](../../../../DECISIONS.md)): a retake's practice close follows a close that did bank,
    * so its week holds the day and tomorrow is a real next day. Both report surfaces read it through
    * `dev/reportPanel.ts#framingOf`'s `canAdvance`, which is what takes *Open the doors on Wednesday*
    * off a sheet whose own sentence says the week stays on this day. Absent otherwise.
@@ -527,6 +528,17 @@ export const PRACTICE_NOTE =
 export const PRACTICE_CROWD_NOTE =
   'Practice. This run met a crowd other than the day’s shared one, so it banks nothing: your week ' +
   'stays on this day, and the day still counts when you play it on the day’s own crowd.';
+
+/**
+ * **What a practice sheet says when an attempt at the day is still open** — wave AL, lane AL-E,
+ * [§ D1218](../../../../DECISIONS.md), `shift/attempt.ts`. The day's attempt began at *Start the
+ * day* and stands unclosed; this run is another run of the same day (the Engineer surface's own, or
+ * a run started while the attempt was parked), so the week keeps the day open for the attempt. No
+ * digit, for {@link PRACTICE_NOTE}'s reason.
+ */
+export const PRACTICE_ATTEMPT_NOTE =
+  'Practice. Your attempt at this day is still open, so this run banks nothing: your week stays on ' +
+  'this day, and it banks that attempt when you close it on the stage.';
 
 /**
  * One run, belonging to no week — the same figures, the same diagnosis, the same levers and the
@@ -771,6 +783,12 @@ export interface DayReportInput {
    * has not closed at all.
    */
   readonly practiceCrowd?: bigint | undefined;
+  /**
+   * **An attempt at the day stands and this run is not it** — [§ D1218](../../../../DECISIONS.md).
+   * Passed by `dev/main.ts#closeShift` beside {@link practice}; the sheet says
+   * {@link PRACTICE_ATTEMPT_NOTE}, and the day stays open as it does for {@link practiceCrowd}.
+   */
+  readonly practiceAttempt?: boolean | undefined;
   /**
    * The ordinary day's calls, in the order they were raised — [§ D1138](../../../../DECISIONS.md)
    * clause 3. One row each after § D1029's, from the three runs that admitted it
@@ -1251,7 +1269,12 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
 
   const nextIdx = (week.dayIdx + 1) % 7;
   const practice = input.practice === true;
-  const practiceNote = input.practiceCrowd === undefined ? PRACTICE_NOTE : PRACTICE_CROWD_NOTE;
+  const practiceNote =
+    input.practiceAttempt === true
+      ? PRACTICE_ATTEMPT_NOTE
+      : input.practiceCrowd === undefined
+        ? PRACTICE_NOTE
+        : PRACTICE_CROWD_NOTE;
   return {
     ...core,
     of: 'week-day',
@@ -1261,7 +1284,7 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
      */
     streakLine: practice ? practiceNote : streakLineFor(judgement.verdict, week.streak),
     ...(practice ? { practiceNote } : {}),
-    ...(practice && input.practiceCrowd !== undefined ? { dayStaysOpen: true } : {}),
+    ...(practice && (input.practiceCrowd !== undefined || input.practiceAttempt === true) ? { dayStaysOpen: true } : {}),
     ...weekMarksOf(week, practice),
     contractLine: contractLineFor(contract, week),
     cleared: week.cleared,

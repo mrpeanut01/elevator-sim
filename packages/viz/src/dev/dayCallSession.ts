@@ -83,6 +83,7 @@ import {
 } from '../shift/dayCalls.js';
 import { goalPlainNameOf, readGoals } from '../shift/goals.js';
 import { shiftObservationsOf } from '../shift/observations.js';
+import type { DayCallResume } from '../shift/attempt.js';
 import type { PressCall } from '../shift/pressCall.js';
 import type { Observations, RunHorizon, ShiftGoal } from '../shift/types.js';
 
@@ -137,6 +138,14 @@ export interface DayCallSessionOpening {
    * two. Absent on an ordinary day, which is searched from its start.
    */
   readonly pinnedCall?: PressCall | undefined;
+  /**
+   * **Where a resumed attempt's session stood** — wave AL, lane AL-E,
+   * [§ D1218](../../../../DECISIONS.md). A reload re-simulates the attempt from its log, which is the
+   * same run by determinism, and the session opens on it from {@link DayCallSession.snapshot}'s last
+   * reading: the calls already answered stay answered and their rows stay the report's, and asking
+   * goes on from the spacing after the last of them. Absent, the session opens at the day's start.
+   */
+  readonly resume?: DayCallResume | undefined;
 }
 
 /** A pressing answer's run, and the log entry it was made with. */
@@ -152,6 +161,11 @@ interface Pending {
   runs?: Partial<Record<DayCallAnswer, PressedRun>>;
   /** The call's record as its three runs counted it; the answer is written when one is given. */
   counted?: DayCallRecord;
+  /**
+   * When its question had last been raised before this call raised it, so a snapshot taken while
+   * the card is up can leave this call out of § D1205's memory: the resumed session raises it again.
+   */
+  lastRaisedBefore?: number | undefined;
 }
 
 /** What an answer hands the shell to adopt, or `undefined` for *leave them*. */
@@ -201,6 +215,16 @@ export interface DayCallSession {
   readonly quiet: () => DayCallsQuiet;
   /** Stop asking and drop whatever is in flight. */
   readonly close: () => void;
+  /**
+   * Where the session stands, as a plain value a resumed attempt reopens from — § D1218. It carries
+   * § D1205's memory (the peaks' counts, when each question was last raised, the peak *keep* held and
+   * who drives now), so the reopened session raises exactly what this one would. The call in hand,
+   * being asked or raised and waiting for an answer, is not in it anywhere: its instant is at or
+   * after {@link DayCallResume.searchFromS}, so the reopened session asks it again on the same run
+   * and counts it then (`dayCallSession.test.ts`, *a resumed session raises what an unbroken one
+   * would*).
+   */
+  readonly snapshot: () => DayCallResume;
 }
 
 /** A run folded over its own whole run, as `dev/main.ts#closeShift` folds the filed run. */
@@ -213,32 +237,45 @@ export function openDayCallSession(
   deps: DayCallSessionDeps,
   opening: DayCallSessionOpening,
 ): DayCallSession {
+  const resume = opening.resume;
   let standing = opening.recording;
   const pinned = opening.pinnedCall;
-  let searchFromS = pinned === undefined ? standing.startedAt : dayCallSearchFrom(pinned);
-  let asked = 0;
-  let done = false;
+  /*
+   * A resumed attempt's session opens where the snapshot stood (§ D1218), which already carries the
+   * pinned call's place in the ten-minute rule and its peak (§ D1204); a fresh one starts at the
+   * day's start, or {@link DAY_CALL_SPACING_S} after the pinned call.
+   */
+  let searchFromS =
+    resume?.searchFromS ?? (pinned === undefined ? standing.startedAt : dayCallSearchFrom(pinned));
+  let asked = resume?.asked ?? 0;
+  let done = resume?.done ?? false;
   /* § D1205: the peaks (by their start) each raised call fell in, and when each question was last raised. */
-  const raisedInPeak: number[] = [];
+  const raisedInPeak: number[] = [...(resume?.raisedInPeak ?? [])];
   const lastRaisedAtS: Partial<Record<DayCallQuestion, number>> = {};
   /* § D1205: the peak (by its start) in which *keep who drives* was answered, if any. */
-  let keptInPeakS: number | undefined;
-  if (pinned !== undefined) {
+  let keptInPeakS: number | undefined = resume?.keptInPeakS ?? undefined;
+  if (resume !== undefined) {
+    if (resume.lastRaisedAtS.placement !== null) lastRaisedAtS.placement = resume.lastRaisedAtS.placement;
+    if (resume.lastRaisedAtS.driver !== null) lastRaisedAtS.driver = resume.lastRaisedAtS.driver;
+  } else if (pinned !== undefined) {
     lastRaisedAtS.placement = pinned.atS;
     const peak = actsOf(standing.demandPhases).find((act) => act.startS <= pinned.atS && pinned.atS < act.endS);
     if (peak !== undefined) raisedInPeak.push(peak.startS);
   }
   /* § D1152's account of a quiet day: candidates turned down, and how asking ended. */
-  let refused = 0;
-  let ending: 'finished' | 'failed' | 'skipped' | 'lost' | undefined;
+  let refused = resume?.refused ?? 0;
+  let ending: 'finished' | 'failed' | 'skipped' | 'lost' | undefined = resume?.ending ?? undefined;
   /* § D1168: the instant and the goal that stopped the asking, when that is how it stopped. */
-  let lost: { readonly atS: number; readonly goal: string } | undefined;
+  let lost: { readonly atS: number; readonly goal: string } | undefined = resume?.lost ?? undefined;
   let pending: Pending | undefined;
-  const records: DayCallRecord[] = [];
+  const records: DayCallRecord[] = [...(resume?.records ?? [])];
   /* § D1167's pair and names, re-derived from the new driver after every handover (§ D1205). */
   let pair: readonly [DispatcherProfile, DispatcherProfile] | undefined;
   let driverNames: DayCallDriverNames | undefined;
+  /* Who drives now, for the snapshot: the pair is re-derived from this one on a resume (§ D1218). */
+  let drivingNow: DispatcherProfile | undefined;
   function driveBy(driving: DispatcherProfile | undefined): void {
+    drivingNow = driving;
     pair =
       driving === undefined || opening.drivers === undefined
         ? undefined
@@ -248,7 +285,11 @@ export function openDayCallSession(
         ? undefined
         : Object.freeze({ 'driver-a': pair[0].name, 'driver-b': pair[1].name, leave: driving.name });
   }
-  driveBy(opening.drivers?.driving);
+  /*
+   * A resume re-derives the pair from whoever drove when the snapshot was taken, which is the
+   * attempt's opening driver unless a handover moved it, and nobody where the question had stopped.
+   */
+  driveBy(resume === undefined ? opening.drivers?.driving : (resume.driving ?? undefined));
 
   /** Whether `question` was raised less than {@link DAY_CALL_REPEAT_S} before `atS`. */
   function heldByRepeat(question: DayCallQuestion, atS: number): boolean {
@@ -462,6 +503,7 @@ export function openDayCallSession(
   ): void {
     asking.raised = true;
     if (asking.call.act !== undefined) raisedInPeak.push(asking.call.act.startS);
+    asking.lastRaisedBefore = lastRaisedAtS[question];
     lastRaisedAtS[question] = asking.call.atS;
     asking.question = question;
     asking.counted = counted;
@@ -476,6 +518,36 @@ export function openDayCallSession(
   askNext();
 
   return {
+    snapshot: () => {
+      /*
+       * The call in hand — being asked, or raised and waiting for its answer — is left out, because
+       * the resumed session asks it again from {@link DayCallResume.searchFromS} on the same run and
+       * counts it then: its try, and, once raised, its place in its peak and in § D1205's
+       * ten-minute memory. Counted here as well, the resumed session would count it twice, find its
+       * own question held by itself, and raise a different call from an unbroken one.
+       */
+      const inHand = pending;
+      const peaks = [...raisedInPeak];
+      const last = { ...lastRaisedAtS };
+      if (inHand?.raised === true && inHand.question !== undefined) {
+        if (inHand.call.act !== undefined) peaks.pop();
+        if (inHand.lastRaisedBefore === undefined) delete last[inHand.question];
+        else last[inHand.question] = inHand.lastRaisedBefore;
+      }
+      return Object.freeze({
+        records: [...records],
+        searchFromS,
+        asked: inHand === undefined ? asked : asked - 1,
+        refused,
+        done,
+        ending: ending ?? null,
+        lost: lost ?? null,
+        raisedInPeak: peaks,
+        lastRaisedAtS: { placement: last.placement ?? null, driver: last.driver ?? null },
+        keptInPeakS: keptInPeakS ?? null,
+        driving: pair === undefined ? null : (drivingNow ?? null),
+      });
+    },
     recording: () => standing,
     onStage: () => {
       if (pending === undefined) return undefined;

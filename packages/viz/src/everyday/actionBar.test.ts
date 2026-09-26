@@ -117,6 +117,8 @@ const GUIDE_TABLE: readonly GuideRow[] = [
     back: { label: 'Front door', screen: 'door' },
     timeline: { flow: 'daily', step: 2 },
     primary: ['Start the day'],
+    /* § D1218: a day whose attempt stands is resumed from the brief — the guide's one, and one more. */
+    primaryShipsInstead: ['Start the day', 'Resume ⟨day⟩'],
     notes: ['Running the lifts: ⟨style⟩'],
     inverted: false,
   },
@@ -652,5 +654,16 @@ describe('§ 3.4 — leaving a mode has friction, and a watched run never warns'
 
   it('never warns a spectator — there is nothing of theirs to lose', () => {
     expect(confirmStripFor('watch')).toBeUndefined();
+  });
+
+  it('keeps a scored day’s attempt on the way out and says so, and nothing else changes — § D1218', () => {
+    const kept = confirmStripFor('daily', true);
+    expect(kept?.question).toBe('Leave the day for now?');
+    expect(kept?.consequence).toContain('Your attempt is kept where you left it');
+    expect(kept?.consequence).not.toMatch(/not be scored/u);
+    /* Without an attempt (a practice run, a retake), and on a campaign day, the strip is as it was. */
+    expect(confirmStripFor('daily', false)?.question).toBe('Leave the day unfinished?');
+    expect(confirmStripFor('campaign', true)?.question).toBe('Leave the day unfinished?');
+    expect(confirmStripFor('rush', true)?.question).toBe('Leave the rush?');
   });
 });

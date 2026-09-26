@@ -88,6 +88,7 @@ import {
 import { openingCareer } from '../campaign/career.js';
 import { CAREER_STORAGE_KEY, encodeCareer } from '../campaign/careerPersist.js';
 import { STAGE_DAY_OVER, STAGE_SPEEDS, stageBarModelOf } from './stageScreenModel.js';
+import { DAY_ATTEMPT_COPY } from '../shift/attempt.js';
 
 /** The run the address asks for, in simulated seconds. See the module docstring. */
 const RUN_S = 300;
@@ -534,7 +535,12 @@ describe.skipIf(!HAS_BROWSER)('a day left unfinished — GitHub issue #526 item 
     try {
       await enterEverydayStage(page);
       await page.locator('.everyday-bar-leave').click();
-      expect(await page.textContent('.everyday-bar-question')).toBe(LEAVE_UNFINISHED);
+      /*
+       * § D1218: the run landed, so the day's attempt stands and the strip keeps it rather than
+       * promising it will not be scored. What this case holds is unchanged: nothing is filed onto
+       * the week from the Engineer surface while it waits (`ATTEMPT_LEFT_CANNOT_BANK`).
+       */
+      expect(await page.textContent('.everyday-bar-question')).toBe(DAY_ATTEMPT_COPY.leaveQuestion);
       await page.locator('.everyday-bar-confirm-leave').click();
       await page.waitForSelector('.everyday-mode[data-screen]', { timeout: 15_000 });
       const scores = await scoresAfterEngineerClose(page);

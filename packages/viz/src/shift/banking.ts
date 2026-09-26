@@ -125,6 +125,17 @@ export const LEFT_UNFINISHED_CANNOT_BANK =
   'start a day, or press “Run this shift”, and that run files itself here';
 
 /**
+ * Why an attempt left for later is not filed from here — wave AL, lane AL-E,
+ * [§ D1218](../../../../DECISIONS.md). The Everyday leave strip now keeps a scored day's attempt
+ * (*the brief resumes it, and it is the one your week banks*), so the Engineer surface's `Ctrl`+`Enter`,
+ * its Day report tab and its export press would file a day the player was told was waiting for
+ * them. The attempt is filed once it is resumed on the stage and closed there.
+ */
+export const ATTEMPT_LEFT_CANNOT_BANK =
+  'this run is an attempt at a scored day that was left for later, so it is not filed from here — ' +
+  'resume it from the day’s brief and close it on the stage';
+
+/**
  * The refusal, or `null` when the run on screen **is** the run this shell simulated.
  *
  * ## Reference identity, and the finding that forced it

@@ -12,6 +12,7 @@ import { describe, expect, it } from 'vitest';
 import { closeDay, nextDay, openWeek, outcomeOf } from './week.js';
 import { goalsForDay, readGoals } from './goals.js';
 import { scheduledEventFor } from './calendar.js';
+import { practiceGroundOf } from './scoredCrowd.js';
 import { countedCleanOf, weekDealOf, weekHasClosed } from './weekStake.js';
 import {
   dealtCrowdOf,
@@ -165,5 +166,30 @@ describe('the record carries forward and buys nothing — § D1230', () => {
     expect(records.map((entry) => entry.contractId).sort()).toEqual(['c2', 'c3']);
     expect(weekRecordFor(records, 'c2').dateCrowd).toBe(DATE.toString());
     expect(weekRecordFor(records, 'c2').closed).toBe(1);
+  });
+});
+
+/*
+ * Wave AL's integration, over lanes AL-E and AL-F: § D1218 begins a day's attempt only where the day
+ * counts, and § D1229 deals every further day on a date a derived crowd, which the close treats as a
+ * shared one. `dev/main.ts#beginDayAttempt` and the close both read `practiceGroundOf` with the day's
+ * crowd from `dev/main.ts#dealtDaySeedNow` (this module's `dealtCrowdOf`); asked with the date's crowd
+ * instead, as the attempt rule was first written, a binged week's second day would begin no attempt
+ * while its close banked it.
+ */
+describe('the attempt rule and the dealt crowd agree on which crowd is the day’s — wave AL integration', () => {
+  it('a derived crowd begins an attempt exactly where its close banks it', () => {
+    const record = weekRecordFor([], 'c2');
+    let week = openWeek('c2');
+    expect(dealtCrowdOf(week, record, DATE)).toBe(DATE);
+    week = nextDay(fileOn(week, DATE));
+    const dealt = dealtCrowdOf(week, record, DATE);
+    expect(dealt).toBe(derivedCrowdOf(DATE, 2, 0));
+    /* The ground both readers ask: none, so the attempt begins and its close banks. */
+    expect(practiceGroundOf(week, dealt, dealt)).toBeUndefined();
+    /* The negative control: asked with the date's crowd, the same run reads as a link's crowd. */
+    expect(practiceGroundOf(week, dealt, DATE)).toBe('crowd');
+    /* And a close of another run while the attempt stands is practice on the attempt's ground. */
+    expect(practiceGroundOf(week, dealt, dealt, true)).toBe('attempt');
   });
 });

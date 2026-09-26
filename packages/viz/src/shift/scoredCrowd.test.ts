@@ -74,4 +74,24 @@ describe('a scored day belongs to its shared crowd — § D1141', () => {
     /* A link's crowd on a closed day is still the crowd's ground: the sheet names the crowd. */
     expect(practiceGroundOf(closedToday, 777n, DATE)).toBe('crowd');
   });
+
+  /*
+   * Wave AL, lane AL-E, § D1218: an attempt stands on today and the run being closed is not it. The
+   * close names the ground; the crowd and the retake still come first, because a run that is
+   * practice on either of those is practice whatever else stands.
+   */
+  it('names the attempt as the ground for another run of a day an attempt stands on — § D1218', () => {
+    const day = (n: number, seed: bigint): DayOutcome =>
+      outcomeOf({
+        day: n, dayIdx: n - 1, eventId: 'ordinary', readings: [], minutePct: 80, carried: 10, arrived: 10,
+        record: { seed: seed.toString() } as unknown as WatchRecord,
+        recordRefusal: null,
+      });
+    const underWay = { ...openWeek('c2'), day: 3, dayIdx: 2, history: [day(1, DATE), day(2, DATE)] };
+    expect(practiceGroundOf(underWay, DATE, DATE, true)).toBe('attempt');
+    expect(practiceGroundOf(underWay, DATE, DATE, false)).toBeUndefined();
+    expect(practiceGroundOf(underWay, 777n, DATE, true)).toBe('crowd');
+    const closedToday = { ...underWay, closedDay: 3, history: [...underWay.history, day(3, DATE)] };
+    expect(practiceGroundOf(closedToday, DATE, DATE, true)).toBe('retake');
+  });
 });

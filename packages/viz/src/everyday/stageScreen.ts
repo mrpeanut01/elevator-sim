@@ -146,6 +146,7 @@ import {
   stageEndDayOf,
   type StageCallOption,
 } from './stageCall.js';
+import { STAGE_CALL_ROWS_HEADING } from './stageCallRow.js';
 /* GitHub issue #340: the two beat-1 events. The recorder is a no-op until consent is granted. */
 import { everydayTelemetry } from './telemetryPort.js';
 import { telemetryRunPointerOf } from '../telemetry/schema.js';
@@ -1004,6 +1005,7 @@ function mountStage(
     const careerDay = context.ctx === 'campaign' ? host.campaignDay() : undefined;
     if (careerDay !== undefined) host.runCampaignDay(careerDay.tower.id);
     else if (context.ctx === 'rush') host.startRush();
+    else if (context.ctx === 'daily') host.playDay();
     else host.startRun();
     syncTransport();
   });
@@ -1459,6 +1461,54 @@ function mountStage(
   }
 
   /*
+   * **Each answered call's row, once its window can be observed** — wave AL, lane AL-E,
+   * [§ D1219](../../../../DECISIONS.md). Counts only, in the report row's own words, from the call
+   * plus 660 s; the words and the timing are `everyday/stageCallRow.ts`'s, and this decides only
+   * where they go. Hidden by its attribute alone, with the layout on an inner body, for
+   * `callBody`'s reason above.
+   */
+  const callRows = el(doc, 'section', 'everyday-stage-call-rows');
+  callRows.hidden = true;
+  callRows.setAttribute('aria-label', STAGE_CALL_ROWS_HEADING);
+  callRows.style.cssText = [
+    `border:1px solid ${C.rule}`,
+    `border-radius:${String(R.row)}px`,
+    `background:${C.card}`,
+    'padding:10px 14px',
+  ].join(';');
+  let callRowsKey = '';
+  /** Redraw the rows when the set due at the playhead changes, and at no other frame. */
+  function drawCallRows(recording: VizRecording, simTimeS: number): void {
+    const rows =
+      context.ctx === 'daily' && watchingNow() === undefined ? host.dayCallRowsAt(recording, simTimeS) : [];
+    const key = rows.map((row) => `${row.id}|${row.counts}|${row.note}`).join('\n');
+    if (key === callRowsKey) return;
+    callRowsKey = key;
+    callRows.replaceChildren();
+    callRows.hidden = rows.length === 0;
+    if (rows.length === 0) return;
+    const body = el(doc, 'div', 'everyday-stage-call-rows-body');
+    body.style.cssText = 'display:grid;gap:8px';
+    const heading = el(doc, 'div', 'everyday-stage-call-rows-heading', STAGE_CALL_ROWS_HEADING);
+    heading.style.cssText = `font-size:10.5px;letter-spacing:0.08em;color:${C.label}`;
+    body.append(heading);
+    for (const row of rows) {
+      const item = el(doc, 'div', 'everyday-stage-call-row');
+      item.dataset['row'] = row.id;
+      item.style.cssText = 'display:grid;gap:3px';
+      const title = el(doc, 'p', 'everyday-stage-call-row-heading', row.heading);
+      title.style.cssText = 'margin:0;font-size:13px;font-weight:600';
+      const counts = el(doc, 'p', 'everyday-stage-call-row-counts', row.counts);
+      counts.style.cssText = 'margin:0;font-size:13px;line-height:1.45';
+      const note = el(doc, 'p', 'everyday-stage-call-row-note', row.note);
+      note.style.cssText = `margin:0;font-size:12px;line-height:1.45;color:${C.inkSoft}`;
+      item.append(title, counts, note);
+      body.append(item);
+    }
+    callRows.append(body);
+  }
+
+  /*
    * **The call card sits under the header and above the goals** — the post-AI playability panel,
    * all four seats. It was appended after the building and its legend, which put it at y ≈ 1 060
    * on a 900 px viewport and y ≈ 1 320 on a 844 px phone while the only sign above the fold was the
@@ -1470,6 +1520,7 @@ function mountStage(
     title,
     header,
     callCard,
+    callRows,
     goals,
     watchBand,
     alarm,
@@ -1867,6 +1918,7 @@ function mountStage(
     waitingOnCall = false;
     if (standing.pinned) {
       callAnswered = true;
+      host.notePinnedCallDone();
       if (change !== undefined) {
         withRecomputeBeat(current, () => {
           host.intervene(call.atS, change);
@@ -2218,7 +2270,8 @@ function mountStage(
     if (resumeAtS === undefined) {
       stageCall =
         context.ctx === 'watch' || context.ctx === 'rush' ? undefined : host.pressCallOnStage(recording);
-      callAnswered = host.interventions().length > 0;
+      /* § D1218: a resumed attempt that answered its pinned call with *leave them* pressed nothing. */
+      callAnswered = host.interventions().length > 0 || host.pinnedCallDone(recording);
       skipping = false;
     } else if (host.interventions().length > 0) {
       callAnswered = true;
@@ -2256,7 +2309,19 @@ function mountStage(
      * paused mid-morning with no `Start` would be a stop nobody asked for.
      */
     const openAtS = resumeAtS === undefined ? host.openingAtS(recording) : undefined;
-    const startAtS = resumeAtS ?? openAtS;
+    /*
+     * **A resumed attempt opens where it had reached, paused** — wave AL, lane AL-E,
+     * [§ D1218](../../../../DECISIONS.md). A fresh mount over the day's attempt (the brief, the door,
+     * a menu or a reload between) used to open at the day's start with § 7.3's *Start* up, which let
+     * a day watched to its end be played again from its opening with every answer known. The
+     * attempt's furthest shown instant is the host's; `undefined` for any other run and for an
+     * attempt that never left its start, which opens as a fresh day does.
+     */
+    const resumedAtS =
+      resumeAtS === undefined && openAtS === undefined && context.ctx === 'daily'
+        ? host.attemptResumeAtS(recording)
+        : undefined;
+    const startAtS = resumeAtS ?? openAtS ?? resumedAtS;
     playback = new Playback(recording, systemClock(), {
       speed: stageSpeedAt(speedIndex).simPerRealS,
       ...(startAtS === undefined ? {} : { startAtS }),
@@ -2265,6 +2330,14 @@ function mountStage(
     if (openAtS !== undefined) {
       started = true;
       playback.play();
+    }
+    if (resumedAtS !== undefined) {
+      started = true;
+      /*
+       * An attempt left at its end is resumed at its end: playing, so the transport reads `ended`
+       * exactly as {@link skipToEnd} leaves it, and § 3.3's row offers the close rather than a skip.
+       */
+      if (resumedAtS >= recording.endedAt) playback.play();
     }
     raceKeyDrawn = '';
     raceView = undefined;
@@ -2627,9 +2700,13 @@ function mountStage(
     const recording = adopted;
     if (recording === undefined || playback === undefined) return;
     const simTimeS = playback.simTimeS;
+    /* § D1218 — how far the day's attempt has been shown, so leaving and coming back resumes here. */
+    if (context.ctx === 'daily') host.noteShown(recording, simTimeS);
     const observations: LiveObservations = observationsAt(recording, simTimeS);
     pace(simTimeS, observations.longestCurrentWaitS);
     drawCall(playback.simTimeS);
+    /* § D1219 — the rows due at the frame drawn. */
+    drawCallRows(recording, simTimeS);
     /*
      * Hoisted out of the canvas branch below for GitHub issue #258. It was computed only over a
      * laid-out canvas, which is correct for a picture and wrong for a sound: the cues are the
@@ -3407,6 +3484,8 @@ function mountStage(
   const pressTheDay = (): void => {
     const careerDay = context.ctx === 'campaign' ? host.campaignDay() : undefined;
     if (careerDay !== undefined) host.runCampaignDay(careerDay.tower.id);
+    /* § D1218: the daily day's own press resumes an attempt standing on it rather than rewinding it. */
+    else if (context.ctx === 'daily') host.playDay();
     else if (context.ctx !== 'campaign') host.startRun();
   };
   if (context.ctx !== 'watch' && context.ctx !== 'rush' && !host.runPending() && stageEntryStartsARun(host.runState())) pressTheDay();

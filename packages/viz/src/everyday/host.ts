@@ -177,6 +177,7 @@ import {
   type CampaignIncident,
 } from '../campaign/incidents.js';
 import { worksHeldCarRefsOf, worksHeldCarsOf } from '../campaign/works.js';
+import { stageCallRowsOf, type StageCallRowView } from './stageCallRow.js';
 import { everydayCareerStore, type CareerStore } from './careerStore.js';
 import { CAMPAIGN_DOCK_COPY, purseRefusalOf } from './campaignDock.js';
 import { CAREER_CONTRACT_ID, openCareer, REPLAY_CONTRACT_ID, switchWeek } from '../shift/week.js';
@@ -223,7 +224,7 @@ import { admittedPressDayIds, ladderTowersOf, pressDayFor } from '../shift/ladde
 import { crowdIsShared } from '../shift/scoredCrowd.js';
 import { callOpeningOf, watchedCallOpeningOf } from './callOpening.js';
 import type { PressCall } from '../shift/pressCall.js';
-import type { DayCallAnswer, DayCallOnStage } from '../shift/dayCalls.js';
+import type { DayCallAnswer, DayCallOnStage, DayCallRecord } from '../shift/dayCalls.js';
 import {
   runHorizonOf,
   scenarioHorizonFor,
@@ -233,15 +234,18 @@ import {
 } from '../shift/dayLength.js';
 import { goalsForDay, readGoals } from '../shift/goals.js';
 import { shiftObservationsOf } from '../shift/observations.js';
-import type { ShapedDayReport } from '../shift/report.js';
+import type { DayAttempt } from '../shift/attempt.js';
+import { clockOf, type ShapedDayReport } from '../shift/report.js';
 import type { TomorrowBriefing } from '../shift/tomorrow.js';
-import type {
-  DayOutcome,
-  GoalObservations,
-  GoalReading,
-  RunHorizon,
-  ScenarioContract,
-  WeekState,
+import {
+  DAY_START_S,
+  weekdayOf,
+  type DayOutcome,
+  type GoalObservations,
+  type GoalReading,
+  type RunHorizon,
+  type ScenarioContract,
+  type WeekState,
 } from '../shift/types.js';
 import { nextDay } from '../shift/week.js';
 import {
@@ -1537,6 +1541,44 @@ export interface EverydayHost {
   startRun(): void;
 
   /**
+   * **Today's day as the player asks for it** — the brief's *Start the day* and the stage's own
+   * entry press. Resumes the attempt standing on the week's day where there is one, and otherwise
+   * is {@link startRun} with the day's attempt begun on the run it presses — wave AL, lane AL-E,
+   * [§ D1218](../../../../DECISIONS.md), `shift/attempt.ts`.
+   */
+  playDay(): void;
+
+  /**
+   * The attempt standing on the week's day, for the brief's *Resume ⟨day⟩* and the leave strip —
+   * § D1218. `undefined` where none stands, which is every day before *Start the day* and every
+   * day after its close.
+   */
+  dayAttempt(): { readonly weekday: string } | undefined;
+
+  /**
+   * Where the stage opens `recording` when it is the standing attempt's run: the furthest instant
+   * the attempt had shown, or `undefined` for a run that is not the attempt's or never left its
+   * start — § D1218.
+   */
+  attemptResumeAtS(recording: VizRecording): number | undefined;
+
+  /** The stage has shown `recording` up to `atS` — § D1218, kept for a resume. */
+  noteShown(recording: VizRecording, atS: number): void;
+
+  /** Whether the attempt on `recording` has answered or skipped its pinned call — § D1218. */
+  pinnedCallDone(recording: VizRecording): boolean;
+
+  /** The stage answered the pinned call on the attempt standing — § D1218. */
+  notePinnedCallDone(): void;
+
+  /**
+   * Each answered call's row due on `recording` at `atS` — wave AL, lane AL-E,
+   * [§ D1219](../../../../DECISIONS.md), `everyday/stageCallRow.ts`: counts only, from the call plus
+   * 660 s, and never the day's verdict. Empty on any run the day's call session does not stand on.
+   */
+  dayCallRowsAt(recording: VizRecording, atS: number): readonly StageCallRowView[];
+
+  /**
    * File the day on the stage — § 3.3's *Close the day* (*stops the clock and writes the
    * report*). All of `closeShift`'s gates hold: a run nobody started, somebody else's run, and an
    * already-filed day all file nothing.
@@ -2124,6 +2166,34 @@ export interface EverydayHostBindings {
   dayStartS(): number | undefined;
   /** The latching run press — `MountContext.runShift`. */
   startRun(): void;
+  /**
+   * § D1218 — `dev/main.ts#beginDayAttempt`: the latching press, with the day's attempt begun on
+   * the run it lands where the day counts. **Optional** on {@link cancelRun}'s ground: a binding
+   * literal that keeps no attempt answers {@link startRun} for it.
+   */
+  beginDayAttempt?(): void;
+  /**
+   * § D1218 — `dev/main.ts#resumeDayAttempt`: the standing attempt back on the stage, re-simulated
+   * over `dayShape` where it is not already there. `false` when nothing was resumed.
+   */
+  resumeDayAttempt?(dayShape: Partial<ViewerState>): boolean;
+  /** § D1218 — the attempt standing on the week's day, or `undefined`. */
+  dayAttempt?(): DayAttempt | undefined;
+  /** § D1218 — where the stage opens the attempt's run, or `undefined`. */
+  attemptResumeAtS?(recording: VizRecording): number | undefined;
+  /** § D1218 — the stage's reach on the attempt's run. */
+  noteAttemptShown?(recording: VizRecording, atS: number): void;
+  /** § D1218 — whether the attempt on `recording` is past its pinned call. */
+  pinnedCallDone?(recording: VizRecording): boolean;
+  /** § D1218 — the pinned call was answered on the attempt standing. */
+  notePinnedCallDone?(): void;
+  /** § D1219 — the ordinary calls recorded on `recording`, while the session stands on it. */
+  dayCallRecordsOn?(recording: VizRecording): readonly DayCallRecord[];
+  /**
+   * § D1218 — § 3.4's *Leave it* on a day with an attempt standing: the attempt is kept for the
+   * brief to resume and no other surface files it meanwhile. `false` where none stands.
+   */
+  leaveDayAttempt?(): boolean;
   /**
    * Stop the run in flight, if there is one — `dev/main.ts`'s shift runner's `cancel`, which drops the
    * result unread. {@link EverydayHost.leaveRush} and {@link EverydayHost.leaveReplay} call it before
@@ -3183,6 +3253,95 @@ export function createEverydayHost(
     return checked.run;
   };
 
+  /**
+   * The Scenario press's set-up, shared by {@link EverydayHost.startRun} and
+   * {@link EverydayHost.playDay}: the day's shape, and the kit, event and log a fresh run starts
+   * without. `press` is what runs it (`b.startRun`, or `b.beginDayAttempt` for § D1218's attempt).
+   */
+  function pressTodaysRun(press: () => void): void {
+    /* A new ask is not a retake of a call until `takeCallAgain` says it is — § D1140. */
+    retakeOfCall = false;
+    /* § 6's day runs on § 6's record — GitHub issue #594, {@link careerHold}. */
+    releaseCareer();
+    /*
+     * The day is set up on the press rather than on a mount — § AB, and {@link dayPatchFor} for
+     * why the Everyday product's own press is the right owner. On the press, because it is the
+     * one moment a player has asked for *today* rather than for a screen, and because a mount
+     * that patched state would repaint every other surface reading it.
+     *
+     * Before `startRun`, and the order is load-bearing: `dev/main.ts#runShift` reads the state
+     * synchronously to build the config, so a patch landing after the press would run yesterday's
+     * length under today's caption.
+     *
+     * **Nothing at all** for a crowd with no authored day, rather than an empty patch: `applyPatch`
+     * is `MountContext.update`, which re-renders, and a press that repainted every surface to
+     * write no field would be doing work a player could see for a change nobody made.
+     */
+    /*
+     * The day's own shape — the whole authored day, a contract's slice on the shared day, or a
+     * replay's record left standing ({@link dayPatchFor}, § D1095).
+     */
+    /*
+     * **The day's dealt crowd first** — lane AL-F, [§ D1229](../../../../DECISIONS.md). A reload
+     * or a tower chosen elsewhere can leave the date's crowd standing on a day this device has
+     * already filed it on this tower; the press deals the day its own. Before the shape, which
+     * reads the crowd (§ D1095). {@link EverydayHost.playDay}'s resume deals nothing: an attempt
+     * carries the crowd it began on (§ D1218).
+     */
+    const dealt = dealPatchFor(b, b.state());
+    if (dealt.seed !== undefined) b.applyPatch(dealt);
+    const dayShape = dayPatchFor(b);
+    /*
+     * **And the kit comes off with the latch** — GitHub issue #181.
+     *
+     * `campaignFitOut` is a fact about *one tower's* day, so a § 6 day that inherited it would run
+     * the week's building with another contract's shafts and doors on it while the rail described
+     * the shipped tower. That is the same stale-latch failure the line below is about, one field
+     * over, and it is worse: the latch decides what a day is *filed* against and this decides what
+     * the day *is*.
+     *
+     * Spread in rather than patched separately, and only when there is something to clear, on the
+     * comment above's own ground — a press that repainted every surface to write no field would be
+     * doing work a player could see for a change nobody made.
+     */
+    const kitToClear = b.state().campaignFitOut === undefined ? {} : { campaignFitOut: undefined };
+    // And the campaign's event, on the same ground one field over — § D507.
+    const eventToClear = b.state().campaignEventId === undefined ? {} : { campaignEventId: undefined };
+    /*
+     * **And the presses — a day's run starts with none** — [§ D1002](../../../../DECISIONS.md).
+     *
+     * Every caller of this press is starting a run rather than growing one: the brief's *Start
+     * the day*, the designer's and the tuner's *Run a day in it*, the workshop's run, the stage's
+     * entry press and its retry. A press made on the stage is not one of them — it appends through
+     * `b.intervene`, which re-simulates on `dev/main.ts#interveneAt` and never comes here. So the
+     * log that stands at this line belongs to a run this press is replacing, and a run that
+     * inherited it is the defect the post-AH panel measured: a park pressed on Garden Apartments
+     * at 08:30 replayed in Crown Hotel's untouched day and credited to the player on its sheet;
+     * five presses from five earlier attempts applied under a stage that showed one; and
+     * Midtown's pinned day graded *Shift cleared, 424 s* on a spread nobody pressed, where
+     * § D974 says that day as built misses at 690 s. A second attempt at a day is the
+     * with-and-without experiment § D931's pair exists for, and it is only an experiment if it
+     * starts clean on the same seed.
+     *
+     * Spread in only when there is a log to clear, on the comments above's ground.
+     */
+    const logToClear = b.state().interventions.length === 0 ? {} : { interventions: [] };
+    const patch = {
+      ...dayShape,
+      ...kitToClear,
+      ...eventToClear,
+      ...logToClear,
+    };
+    if (Object.keys(patch).length > 0) b.applyPatch(patch);
+    // § 6's day is not a campaign day — see {@link campaignDayTowerId} for what a stale latch
+    // here would file, and against which building.
+    campaignDayTowerId = undefined;
+    campaignDayIncident = undefined;
+    // A run pressed inside a replay is the replay's to stop on the way out — {@link replaySession}.
+    if (replaySession !== undefined) replaySession = { ...replaySession, pressed: true };
+    press();
+  }
+
   const everydayHost: EverydayHost = {
     week: () => b.state().week,
     parkedWeeks: () => b.state().parkedWeeks,
@@ -3368,86 +3527,56 @@ export function createEverydayHost(
       b.state().recording === undefined ||
       runIdentityIssues(b.state(), b.resources, 'ranked').length === 0,
     startRun: () => {
-      /* A new ask is not a retake of a call until `takeCallAgain` says it is — § D1140. */
-      retakeOfCall = false;
-      /* § 6's day runs on § 6's record — GitHub issue #594, {@link careerHold}. */
-      releaseCareer();
-      /*
-       * The day is set up on the press rather than on a mount — § AB, and {@link dayPatchFor} for
-       * why the Everyday product's own press is the right owner. On the press, because it is the
-       * one moment a player has asked for *today* rather than for a screen, and because a mount
-       * that patched state would repaint every other surface reading it.
-       *
-       * Before `startRun`, and the order is load-bearing: `dev/main.ts#runShift` reads the state
-       * synchronously to build the config, so a patch landing after the press would run yesterday's
-       * length under today's caption.
-       *
-       * **Nothing at all** for a crowd with no authored day, rather than an empty patch: `applyPatch`
-       * is `MountContext.update`, which re-renders, and a press that repainted every surface to
-       * write no field would be doing work a player could see for a change nobody made.
-       */
-      /*
-       * The day's own shape — the whole authored day, a contract's slice on the shared day, or a
-       * replay's record left standing ({@link dayPatchFor}, § D1095).
-       */
-      /*
-       * **The day's dealt crowd first** — lane AL-F, [§ D1229](../../../../DECISIONS.md). A reload
-       * or a tower chosen elsewhere can leave the date's crowd standing on a day this device has
-       * already filed it on this tower; the press deals the day its own. Before the shape, which
-       * reads the crowd (§ D1095).
-       */
-      const dealt = dealPatchFor(b, b.state());
-      if (dealt.seed !== undefined) b.applyPatch(dealt);
-      const dayShape = dayPatchFor(b);
-      /*
-       * **And the kit comes off with the latch** — GitHub issue #181.
-       *
-       * `campaignFitOut` is a fact about *one tower's* day, so a § 6 day that inherited it would run
-       * the week's building with another contract's shafts and doors on it while the rail described
-       * the shipped tower. That is the same stale-latch failure the line below is about, one field
-       * over, and it is worse: the latch decides what a day is *filed* against and this decides what
-       * the day *is*.
-       *
-       * Spread in rather than patched separately, and only when there is something to clear, on the
-       * comment above's own ground — a press that repainted every surface to write no field would be
-       * doing work a player could see for a change nobody made.
-       */
-      const kitToClear = b.state().campaignFitOut === undefined ? {} : { campaignFitOut: undefined };
-      // And the campaign's event, on the same ground one field over — § D507.
-      const eventToClear = b.state().campaignEventId === undefined ? {} : { campaignEventId: undefined };
-      /*
-       * **And the presses — a day's run starts with none** — [§ D1002](../../../../DECISIONS.md).
-       *
-       * Every caller of this press is starting a run rather than growing one: the brief's *Start
-       * the day*, the designer's and the tuner's *Run a day in it*, the workshop's run, the stage's
-       * entry press and its retry. A press made on the stage is not one of them — it appends through
-       * `b.intervene`, which re-simulates on `dev/main.ts#interveneAt` and never comes here. So the
-       * log that stands at this line belongs to a run this press is replacing, and a run that
-       * inherited it is the defect the post-AH panel measured: a park pressed on Garden Apartments
-       * at 08:30 replayed in Crown Hotel's untouched day and credited to the player on its sheet;
-       * five presses from five earlier attempts applied under a stage that showed one; and
-       * Midtown's pinned day graded *Shift cleared, 424 s* on a spread nobody pressed, where
-       * § D974 says that day as built misses at 690 s. A second attempt at a day is the
-       * with-and-without experiment § D931's pair exists for, and it is only an experiment if it
-       * starts clean on the same seed.
-       *
-       * Spread in only when there is a log to clear, on the comments above's ground.
-       */
-      const logToClear = b.state().interventions.length === 0 ? {} : { interventions: [] };
-      const patch = {
-        ...dayShape,
-        ...kitToClear,
-        ...eventToClear,
-        ...logToClear,
-      };
-      if (Object.keys(patch).length > 0) b.applyPatch(patch);
-      // § 6's day is not a campaign day — see {@link campaignDayTowerId} for what a stale latch
-      // here would file, and against which building.
-      campaignDayTowerId = undefined;
-      campaignDayIncident = undefined;
-      // A run pressed inside a replay is the replay's to stop on the way out — {@link replaySession}.
-      if (replaySession !== undefined) replaySession = { ...replaySession, pressed: true };
-      b.startRun();
+      pressTodaysRun(() => {
+        b.startRun();
+      });
+    },
+    /*
+     * **Today's day, as § 6.2's *Start the day* and the stage's own entry press ask for it** — wave
+     * AL, lane AL-E, [§ D1218](../../../../DECISIONS.md). Where an attempt stands on the week's day
+     * it is resumed rather than rewound: the brief's primary reads *Resume ⟨day⟩*, and the run on
+     * the stage is the attempt's, re-simulated from its own crowd, driver and presses only when it
+     * is not already there. Otherwise this is {@link EverydayHost.startRun} with the attempt begun
+     * on the run it presses, where the day counts.
+     */
+    playDay: () => {
+      if (b.dayAttempt?.() !== undefined) {
+        retakeOfCall = false;
+        releaseCareer();
+        campaignDayTowerId = undefined;
+        campaignDayIncident = undefined;
+        const kitToClear = b.state().campaignFitOut === undefined ? {} : { campaignFitOut: undefined };
+        const eventToClear = b.state().campaignEventId === undefined ? {} : { campaignEventId: undefined };
+        if (b.resumeDayAttempt?.({ ...dayPatchFor(b), ...kitToClear, ...eventToClear }) === true) return;
+      }
+      pressTodaysRun(() => {
+        if (b.beginDayAttempt === undefined) b.startRun();
+        else b.beginDayAttempt();
+      });
+    },
+    dayAttempt: () => {
+      const attempt = b.dayAttempt?.();
+      return attempt === undefined ? undefined : { weekday: weekdayOf(attempt.dayIdx) };
+    },
+    attemptResumeAtS: (recording) => b.attemptResumeAtS?.(recording),
+    noteShown: (recording, atS) => {
+      b.noteAttemptShown?.(recording, atS);
+    },
+    pinnedCallDone: (recording) => b.pinnedCallDone?.(recording) === true,
+    notePinnedCallDone: () => {
+      b.notePinnedCallDone?.();
+    },
+    dayCallRowsAt: (recording, atS) => {
+      const records = b.dayCallRecordsOn?.(recording) ?? [];
+      if (records.length === 0) return [];
+      const dayStartS = b.dayStartS() ?? DAY_START_S;
+      return stageCallRowsOf({
+        records,
+        playheadS: atS,
+        endedAt: recording.endedAt,
+        log: b.state().interventions,
+        clockOf: (simTimeS) => clockOf(simTimeS, dayStartS),
+      });
     },
     /**
      * § 6.4's *Close the day*, and — in a campaign run — § 6.4 **step 4** with it.
@@ -4485,7 +4614,14 @@ export function createEverydayHost(
        * **And the run that stands goes unfiled** — a cancel alone was measured on the shipped bundle and
        * kept the promise in neither state: left in flight, the run behind the cancelled one filed at
        * 100 %; left after landing, the landed run did. `autoFile.browser.test.ts` holds both.
+       *
+       * **Except the attempt at a scored day, which is kept** — wave AL, lane AL-E,
+       * [§ D1218](../../../../DECISIONS.md). The strip says so on a day with an attempt standing
+       * (`actionBar.ts#confirmStripFor`), the brief resumes it, and until then no other surface
+       * files it (`dev/main.ts#leaveDayAttempt`). A run in flight on it is the attempt's own record
+       * growing, so it is let land rather than cancelled.
        */
+      if (b.leaveDayAttempt?.() === true) return;
       b.abandonDay?.();
     },
     playThisCrowd: (run) => {

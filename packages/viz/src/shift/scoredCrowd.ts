@@ -81,16 +81,23 @@ export function crowdMakesPractice(
  * that banks. The close (`dev/main.ts#closeShift`) and the brief (`everyday/today.ts`) both read
  * this one function, so the sentence before the press and the sheet after it cannot disagree about
  * whether the day counts.
+ *
+ * `'attempt'` is wave AL's third ground, [§ D1218](../../../../DECISIONS.md): an attempt at today
+ * stands (`shift/attempt.ts`) and the run being closed is not it, so the week keeps the day open for
+ * that attempt. Only the close can know it, because only the close holds both runs, so the caller
+ * says it with `otherThanTheAttempt` and the brief, which offers *Resume* instead, never passes it.
  */
-export type PracticeGround = 'crowd' | 'retake';
+export type PracticeGround = 'crowd' | 'retake' | 'attempt';
 
 export function practiceGroundOf(
   week: Pick<WeekState, 'contractId' | 'history' | 'closedDay' | 'day'>,
   seed: bigint,
   daySeed: bigint | undefined,
+  otherThanTheAttempt = false,
 ): PracticeGround | undefined {
   if (crowdMakesPractice(week, seed, daySeed)) return 'crowd';
   if (week.closedDay === week.day) return 'retake';
+  if (otherThanTheAttempt) return 'attempt';
   return undefined;
 }
 
@@ -104,4 +111,7 @@ export const PRACTICE_DAY_SENTENCES: Readonly<Record<PracticeGround, string>> = 
     'This run does not count toward the week: it meets a crowd other than the day’s shared one, ' +
     'so the day stays open for that crowd.',
   retake: 'This run does not count toward the week: your week keeps your first attempt at this day.',
+  attempt:
+    'This run does not count toward the week: your attempt at this day is still open, and it is the ' +
+    'one your week banks.',
 });

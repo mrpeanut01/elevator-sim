@@ -750,6 +750,15 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'The attempts slot — wave AL, lane AL-E, § D1218. `ATTEMPT_KEY` is a storage key, ' +
+        '`loadAttempts` returns the attempts it could read and drops the rest in silence, and ' +
+        '`saveAttempts` returns whether the store took the write. None of them returns a sentence, ' +
+        'and what a player reads about an attempt is `shift/attempt.ts#DAY_ATTEMPT_COPY`, which the ' +
+        '`EVERYDAY_MENU` adapter seeds by name.',
+      ids: ['persist/attempt.ts#ATTEMPT_KEY', 'persist/attempt.ts#loadAttempts', 'persist/attempt.ts#saveAttempts'],
+    },
+    {
+      reason:
         'The Everyday shell\'s boot seam: two CSS selectors and the functions that press what they ' +
         'find. No player reads any of it. The two `ENGINEER_*` selectors are ' +
         '`document.querySelector` arguments — derived only because the two-adjacent-words scanner ' +

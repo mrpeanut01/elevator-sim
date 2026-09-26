@@ -663,7 +663,6 @@ export function dayCallRowOf(
   clockOf: (simTimeS: SimTime) => string,
 ): ReportDiagnosis {
   const at = clockOf(record.atS);
-  const to = clockOf(record.windowEndS);
   const question = record.question ?? 'placement';
   const names = record.drivers;
   const answers = dayCallAnswersOf(question);
@@ -680,7 +679,6 @@ export function dayCallRowOf(
       ? 'The stage called the day, and you left the cars as they were'
       : `The stage called the day, and you ${stampVerbOf({ kind: record.answer } as Parameters<typeof stampVerbOf>[0])}`;
   })();
-  const counts = answers.map((answer) => `${String(record.counts[answer] ?? 0)} with ${wordsOf(answer)}`);
   const grades = new Map<string, DayCallAnswer[]>();
   for (const answer of answers) {
     const observations = record.observations[answer];
@@ -700,10 +698,29 @@ export function dayCallRowOf(
     what,
     why:
       'On this crowd the day was run three ways from the call, with every press before it kept and ' +
-      `nothing pressed after it. Riders who arrived from ${at} to ${to} and waited a minute or more: ` +
-      `${listOf(counts)}.${verdict} ${DAY_CALL_ROW_NOTE}`,
+      `nothing pressed after it. ${dayCallCountsLineOf(record, clockOf)}${verdict} ${DAY_CALL_ROW_NOTE}`,
     tone: 'plain',
   };
+}
+
+/**
+ * **A call's three counts, in the row's own words** — the one sentence the report's row
+ * ({@link dayCallRowOf}) and the stage's mid-day row (`everyday/stageCallRow.ts`, wave AL, lane
+ * AL-E, [§ D1219](../../../../DECISIONS.md)) both print, so the two cannot count or order the
+ * answers differently. The window and the counts only: no verdict, which is the close's.
+ */
+export function dayCallCountsLineOf(record: DayCallRecord, clockOf: (simTimeS: SimTime) => string): string {
+  const question = record.question ?? 'placement';
+  const names = record.drivers;
+  const wordsOf = (answer: DayCallAnswer): string =>
+    question === 'driver' && names !== undefined ? driverWordsOf(answer, names) : answerWordsOf(answer);
+  const counts = dayCallAnswersOf(question).map(
+    (answer) => `${String(record.counts[answer] ?? 0)} with ${wordsOf(answer)}`,
+  );
+  return (
+    `Riders who arrived from ${clockOf(record.atS)} to ${clockOf(record.windowEndS)} and waited a minute ` +
+    `or more: ${listOf(counts)}.`
+  );
 }
 
 /**

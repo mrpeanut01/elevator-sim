@@ -45955,6 +45955,10 @@ unspent, and whether each is free or a hole is the integrator's call at close ([
 
 > **Status 2026-09-26: OWNER-REVERSIBLE CLAUSE REVERSED by [§ D1204](#d1204)** (an agent ruling). A pinned press day opens its ordinary calls after its § D1029 call is answered, searched from five minutes after it; and every call's card gains a line saying who is standing ([§ D1206](#d1206)). See [`docs/39`](docs/39-decisions-in-force.md).
 
+---
+
+> **Status 2026-09-26: AMENDED by [§ D1218](#d1218) and [§ D1219](#d1219)** (agent rulings). Clause 4's attempt now starts at *Start the day* and leaving resumes it, so the first started attempt is the one that banks; clause 3's rows also print on the stage once each call's window can be observed, counts only and never the verdict. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-09-25 by agent sessions under delegated authority**, not by the product owner: the
 > post-AI decision swarm (the player, honesty and engineering lenses, whose records are the
 > integrator's scratch notes *decide-ak S1* to *S3* with their raw data, and are not in this
@@ -47657,8 +47661,6 @@ longest wait `overlayAt(...).longestCurrentWaitS`; the same line off a run that 
 call; every figure in it one of the frame's counts; five arms against the ban lists and a forward-word
 list. Red before: all four cases failed on `c2ca845`, which has no such line.
 
----
-
 ## D1212 — between a scored whole day's peaks, the quiet is skipped
 
 > **Taken 2026-09-26 by an agent session under delegated authority** (swarm DN, ruling § Q1 (c),
@@ -47751,7 +47753,116 @@ quotes in place of 51. The row's long end, 1 h 49, is a reference tower's measur
 stays an upper bound: re-measuring six reference towers at fifty seeds is hours of machine time and
 was not taken.
 
----
+## D1218 — one attempt per scored day: it starts at *Start the day*, leaving resumes it, and it is the only run of that day the week banks
+
+**Status (wave AL integration):** the resumed session's snapshot carries § D1205's per-peak counts, the 600 s repeat memory, the *keep* switch-off and the driver the pair is re-derived from, and leaves out the call in hand, so a resumed attempt raises exactly the calls an unbroken one would (`dev/dayCallSession.test.ts`, *a resumed session raises what an unbroken one would*). The attempt and the close read one dealt crowd (`dev/main.ts#dealtDaySeedNow`), so § D1229's derived crowds and this rule agree.
+
+> **Taken 2026-09-26 by agent sessions under delegated authority** (the decide-an swarm, ruling § Q2
+> clause 1, three of three; built by wave AL lane AL-E), not by the product owner, and to be read as
+> an agent ruling. **Amends [§ D1138](#d1138) clause 4**, whose rule stands and whose trigger moves
+> from the first close to the first start. Owner-reversible clauses: that the attempt starts at
+> *Start the day* rather than at the first press on the stage; that leaving keeps the attempt rather
+> than filing it at once (the engineering lens's *every exit files it*); and that the brief holds the
+> driver while an attempt stands.
+
+**Why an entry.** [§ D405](#d405)'s first two grounds. It moves a recorded ruling (§ D1138 clause 4)
+and it binds `dev/main.ts#closeShift`, `dev/dayCallSession.ts`, `everyday/host.ts`,
+`everyday/briefScreen.ts`, `everyday/briefView.ts`, `everyday/stageScreen.ts`,
+`everyday/actionBar.ts`, `everyday/shell.ts`, `shift/scoredCrowd.ts`, `shift/report.ts` and
+`shift/banking.ts`, and it adds a slot to this device's storage (`persist/attempt.ts`).
+
+**What was wrong.** The post-AK panel's seat D (H6), on a scored week day: *Nearest car*, *Start the
+day*, *Skip to the end*, and not closed; *‹ Brief*, another driver, *Start the day* again, the calls
+answered from what the first run showed, *Close the day*; the report read *Tuesday is banked*.
+§ D1138 clause 4 banked the first **closed** attempt, and nothing recorded that a day had been
+started, so an unclosed day could be watched to its end and taken again with the answer known. Two
+more roads led to the same place: a reload, and § 3.4's *Leave it*, which promised *today's run will
+not be scored* and left the day open for a fresh start. The ruling's own condition for § D1219 was
+that this close first: on a day that can be rewound, a mid-day row is a key for the second try.
+
+**The ruling.**
+
+1. **The attempt starts at *Start the day*** (`EverydayHost.playDay`, which the brief's primary and
+   the stage's own entry press call), on a scored week day that counts: a day the week has not
+   closed, on its shared crowd, on a week on a scenario. A retake of a closed day and a link's crowd
+   on a week under way begin none, and stay § D1138's and § D1141's practice exactly as before.
+2. **Leaving keeps it, and returning resumes it rather than rewinding it.** An attempt is the
+   question that produced its run (`shift/attempt.ts#DayAttempt`): the week's day, the crowd, the
+   driver, the press log, the furthest instant the stage has shown, the pinned call's state and the
+   ordinary calls' session. The brief's primary reads *Resume ⟨day⟩* and its driver cards and picker
+   are held, since the attempt keeps the driver it began with and a handover is the stage's. The
+   stage opens the attempt's run at the furthest instant it had shown, paused, or at its end where
+   it had been run out. In the page the run is still there and nothing is simulated; after a reload,
+   or once another run replaced it, it is re-simulated from its own crowd, driver and log, which is
+   the same run by determinism, and its calls reopen from where the session stood
+   (`DayCallSession.snapshot`, `DayCallSessionOpening.resume`). The attempt is kept on this device
+   under `elevator-sim.day-attempts`, one per scenario, written at each press and answer and as the
+   stage moves on, and on `pagehide`.
+3. **§ 3.4's strip keeps it and says so.** On a daily stage with an attempt standing the strip asks
+   *Leave the day for now?* and says *Your attempt is kept where you left it. The brief resumes it,
+   and it is the one your week banks.* Until it is resumed no other surface files it
+   (`shift/banking.ts#ATTEMPT_LEFT_CANNOT_BANK`); every other day-shaped leave keeps the strip it had.
+4. **It is the only run of that day the week banks.** A close of any other run of the day while the
+   attempt stands (the Engineer surface's own run, a run pressed while the attempt was parked) is
+   practice on a third ground, `practiceGroundOf`'s `'attempt'`: the week stays on the day and the
+   sheet says *Practice. Your attempt at this day is still open* (`shift/report.ts#PRACTICE_ATTEMPT_NOTE`).
+   The attempt's own close, by *Close the day*, *End the day* or the day's end, files it and clears it.
+5. **How this reads "every exit files it".** No exit discards an attempt: whichever way the player
+   leaves, the attempt stands until it is closed, and the day the week banks is that attempt's. The
+   engineering lens's stricter reading, that every exit files the day as it stands at once, is the
+   owner-reversible alternative, and the stored attempt is what it would file.
+
+**What holds it.** `everyday/oneAttempt.browser.test.ts` walks seat D's path on the built bundle,
+with and without a reload between: red on `c2ca845` in both cases (*expected 'Start the day' to match
+/^Resume /*), green after, and it asserts the week's stored day carries the first attempt's driver.
+`shift/attempt.test.ts` (the attempt stands until its day closes, its reach never moves back, where a
+resume opens), `persist/attempt.test.ts` (round trip with non-finite folds, a damaged slot dropped
+rather than repaired, a throwing store), `shift/scoredCrowd.test.ts` (the third ground and its
+order), `dev/dayCallSession.test.ts` (a session reopened on the re-simulated run keeps the answered
+call and raises the same next call on the same legs), `everyday/actionBar.test.ts` (the strip and the
+brief's second variant).
+
+**What it does not reach.** The Engineer surface opens no attempt of its own, so its own run of the
+week's day, watched and left unclosed, still leaves the Everyday *Start the day* free; a close from
+there while an Everyday attempt stands is practice. A resumed attempt after a reload carries no
+§ D931 counterfactual row, because the run the last press replaced is not re-simulated. Presses
+from the Engineer transport are not held to the attempt's reach.
+
+## D1219 — each call's row on the stage once its window can be observed: counts only, never the day's verdict
+
+> **Taken 2026-09-26 by agent sessions under delegated authority** (the decide-an swarm, ruling § Q1
+> clause (d), three of three; built by wave AL lane AL-E), not by the product owner, and to be read
+> as an agent ruling. **Amends [§ D1138](#d1138) clause 3** from *nothing about the other answers
+> until the day closes* to *nothing before the call's window can be observed, and no verdict before
+> the close*. Ships only with [§ D1218](#d1218). Owner-reversible clauses: the timing, and showing
+> the other answers' counts mid-day at all.
+
+**Why an entry.** It moves a recorded ruling and binds `everyday/stageScreen.ts`,
+`everyday/host.ts`, `dev/main.ts`, `shift/dayCalls.ts` and the honesty register.
+
+**The ruling.**
+
+1. **When.** A call's row counts riders who arrived in `[call, call + 600 s)` and waited a minute or
+   more; the last of them is known a minute after the window closes. So the stage prints the row
+   from `windowEndS + DAY_CALL_LONG_WAIT_S` (the call plus 660 s), or from the run's end where the
+   window ran into it, and never before (`everyday/stageCallRow.ts#stageCallRowDueAtS`).
+2. **What.** The call's clock and the three counts in the report row's own sentence
+   (`shift/dayCalls.ts#dayCallCountsLineOf`, which the report row now also prints), with *On this
+   crowd, with every press before the call kept and nothing pressed after it. Whether the day cleared
+   is on the report when the day closes.* A later press inside the window is named as not in the
+   counts. **Never the day's verdict** under any answer, which is whole-day and stays with the close.
+3. **Only answered or skipped calls, and only on the day's own run.** The rows are the session's
+   records while it stands on the run the stage is drawing.
+
+**What holds it.** `everyday/stageCallRow.test.ts` (absent at 659 s, present at 660 s, the report
+row's counts word for word, no verdict word, the later-press clause), the declared pair
+`day-call-stage-row` in `honesty/agreement.ts` (the stage row's three counts against the runs' legs
+counted by `day-call-row`'s independent expression), the `EVERYDAY_STAGE` adapter seeding the rows on
+every case's own legs with the counts' playhead at their due instant, and
+`everyday/midDayCallRow.browser.test.ts` on the built bundle: no row while a later card inside the
+window is up, then the first call's row with the day still running at a clock at least eleven
+minutes past the call's. That journey was watched red with the stage's row drawing removed (it timed
+out waiting for the row) and green with it.
 
 ## D1226 — the week's target is marked on the day it is met, and *banked* is said only of a day that banked
 

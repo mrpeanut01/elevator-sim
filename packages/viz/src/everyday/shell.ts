@@ -1422,7 +1422,8 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
       go('board');
       return;
     }
-    const strip = confirmStripFor(state.ctx);
+    /* § D1218 — a daily stage with an attempt standing keeps it on the way out, and says so. */
+    const strip = confirmStripFor(state.ctx, state.ctx === 'daily' && dataHost?.dayAttempt() !== undefined);
     if (state.screen === 'stage' && runOpen && strip !== undefined) {
       drawConfirm(strip.question, strip.consequence, strip.leaveLabel, strip.stayLabel);
       return;

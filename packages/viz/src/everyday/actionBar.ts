@@ -33,6 +33,7 @@
  * the guide.
  */
 
+import { DAY_ATTEMPT_COPY, RESUME_PRIMARY_CELL } from '../shift/attempt.js';
 import type {
   EverydayModePick,
   EverydayScreen,
@@ -380,7 +381,12 @@ export const ACTION_BAR_ROWS: readonly ActionBarRow[] = Object.freeze([
     leave: leave(LEAVE_TOWER),
     back: { label: 'Front door', screen: 'door' },
     timeline: { flow: 'daily', step: 2 },
-    primary: primary(['Start the day']),
+    /*
+     * The second variant is this build's, not the guide's — wave AL, lane AL-E,
+     * [§ D1218](../../../../DECISIONS.md): a day whose attempt stands is resumed from here, never
+     * started again, and `briefView.ts#briefBarModel` fills the weekday in.
+     */
+    primary: primary(['Start the day', RESUME_PRIMARY_CELL]),
     note: 'Running the lifts: ⟨style⟩',
     inverted: false,
   }),
@@ -663,7 +669,7 @@ export function actionBarFor(state: EverydayState): ActionBarModel {
  * the day not yet closed — everywhere else the bar's left button leaves immediately, because *"a
  * report is already after the fact; warning about it would be theatre."*
  */
-export function confirmStripFor(ctx: RunContext): ConfirmStrip | undefined {
+export function confirmStripFor(ctx: RunContext, attemptStanding = false): ConfirmStrip | undefined {
   if (ctx === 'watch') return undefined;
   if (ctx === 'replay') {
     return {
@@ -677,6 +683,21 @@ export function confirmStripFor(ctx: RunContext): ConfirmStrip | undefined {
     return {
       question: 'Leave the rush?',
       consequence: 'The climb is not saved, and a stopped rush has no wave to post.',
+      leaveLabel: 'Leave it',
+      stayLabel: 'Stay',
+    };
+  }
+  /*
+   * **A scored day's attempt is kept, not thrown away** — wave AL, lane AL-E,
+   * [§ D1218](../../../../DECISIONS.md). `attemptStanding` is the host's `dayAttempt()` on a daily
+   * stage; the brief resumes the attempt and the week banks it, so *will not be scored* would be
+   * false of it. Every other day-shaped leave (a practice run, a retake, a campaign day) keeps the
+   * strip it had.
+   */
+  if (ctx === 'daily' && attemptStanding) {
+    return {
+      question: DAY_ATTEMPT_COPY.leaveQuestion,
+      consequence: DAY_ATTEMPT_COPY.leaveConsequence,
       leaveLabel: 'Leave it',
       stayLabel: 'Stay',
     };

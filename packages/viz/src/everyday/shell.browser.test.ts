@@ -43,6 +43,7 @@ import {
   returnToEverydayMode,
 } from '../dev/browserTier.test-helper.js';
 import { railFooter } from './rail.js';
+import { DAY_ATTEMPT_COPY } from '../shift/attempt.js';
 
 let server: ViteDevServer;
 let browser: Browser;
@@ -596,10 +597,9 @@ describe.skipIf(!HAS_BROWSER)("Today's tower is playable through the new shell",
         consequence: document.querySelector('.everyday-bar-consequence')?.textContent ?? '',
         stillOnStage: document.querySelector('.everyday-stage-canvas') !== null,
       }));
-      expect(strip.question).toBe('Leave the day unfinished?');
-      expect(strip.consequence).toBe(
-        "Today's run will not be scored, and the board keeps whatever you posted before.",
-      );
+      /* § D1218: the day's attempt stands, so the strip keeps it and says so. */
+      expect(strip.question).toBe(DAY_ATTEMPT_COPY.leaveQuestion);
+      expect(strip.consequence).toBe(DAY_ATTEMPT_COPY.leaveConsequence);
       expect(strip.stillOnStage).toBe(true);
 
       // Stay: the strip goes down, the bar comes back, and the stage is exactly as it was.
@@ -845,7 +845,7 @@ describe.skipIf(!HAS_BROWSER)('switching between the two worlds — GAMEPLAY § 
        * surviving the trip. Answered with *Stay*, so nothing is left half-asked.
        */
       await page.locator('.everyday-rail-menu').click();
-      expect(await page.textContent('.everyday-bar-question')).toBe('Leave the day unfinished?');
+      expect(await page.textContent('.everyday-bar-question')).toBe(DAY_ATTEMPT_COPY.leaveQuestion);
       await page.locator('.everyday-bar-confirm-stay').click();
       expect(await page.textContent('.everyday-bar-primary')).toBe('Close the day');
     } finally {

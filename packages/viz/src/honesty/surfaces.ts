@@ -261,6 +261,8 @@ import {
   stageSkipOf,
 } from '../everyday/stagePace.js';
 import { STAGE_CALL_COPY, stageCallCardOf, stageCallPresentOf, stageEndDayOf } from '../everyday/stageCall.js';
+import { stageCallRowDueAtS, stageCallRowsOf, STAGE_CALL_ROWS_HEADING } from '../everyday/stageCallRow.js';
+import { DAY_ATTEMPT_COPY, resumeLabelOf } from '../shift/attempt.js';
 import type { PressCall } from '../shift/pressCall.js';
 import { PRESS_CALL_AGAIN, pressCallRowOf } from '../shift/callRow.js';
 import {
@@ -288,7 +290,7 @@ import { rushTutorialWorkedAnswerOf } from '../everyday/rushScreenModel.js';
 import { WORKED_ANSWER_COPY, type WorkedAnswerFacts, type WorkedAnswerView } from '../everyday/workedAnswer.js';
 import { WEEK_START_NEXT_LABEL, weekScreenViewOf } from '../everyday/weekView.js';
 import { percentileLine, WORLD_FIGURES_ABSENT, WORLD_FIGURES_LABEL, WORLD_FIGURES_REASON } from '../everyday/world.js';
-import type { GoalObservations } from '../shift/types.js';
+import { weekdayOf, type GoalObservations } from '../shift/types.js';
 import { buildingView, contractView, towersView } from '../everyday/campaignModel.js';
 import {
   applyCampaignAction,
@@ -654,6 +656,7 @@ import { CONTRACTS, contractById, contractForBuilding, nextContract, statLineOf 
 import {
   bankingRefusalFor,
   LEFT_UNFINISHED_CANNOT_BANK,
+  ATTEMPT_LEFT_CANNOT_BANK,
   LOADED_RUN_CANNOT_BANK,
   UNCHOSEN_RUN_CANNOT_BANK,
 } from '../shift/banking.js';
@@ -683,6 +686,7 @@ import {
   dayReportOf,
   NOT_RECORDED,
   PRACTICE_CROWD_NOTE,
+  PRACTICE_ATTEMPT_NOTE,
   type DayReportInput,
   type ShapedDayReport,
   type ShiftPlan,
@@ -2220,6 +2224,8 @@ const REPLAY: SurfaceAdapter = {
     'shift/banking.ts#LOADED_RUN_CANNOT_BANK',
     'shift/banking.ts#UNCHOSEN_RUN_CANNOT_BANK',
     'shift/banking.ts#LEFT_UNFINISHED_CANNOT_BANK',
+    /* § D1218 — an attempt left for later, which no other surface files meanwhile. */
+    'shift/banking.ts#ATTEMPT_LEFT_CANNOT_BANK',
   ],
   render(context) {
     const verdict = verifyReplay(context.recording, context.recording);
@@ -2258,6 +2264,13 @@ const REPLAY: SurfaceAdapter = {
       {
         field: 'leftUnfinishedCannotBank',
         text: LEFT_UNFINISHED_CANNOT_BANK,
+        role: 'reason',
+        provenance: 'authored',
+      },
+      /* The fourth — § D1218's attempt left for later — on the same pairing for the same reason. */
+      {
+        field: 'attemptLeftCannotBank',
+        text: ATTEMPT_LEFT_CANNOT_BANK,
         role: 'reason',
         provenance: 'authored',
       },
@@ -3752,6 +3765,14 @@ const SHIFT_REPORT: SurfaceAdapter = {
      * corpus closes no day on a crowd its week did not begin on.
      */
     'shift/report.ts#PRACTICE_CROWD_NOTE',
+    /*
+     * Wave AL, lane AL-E, § D1218: the practice note when an attempt at the day still stands, by name
+     * beside `PRACTICE_CROWD_NOTE` for its reason — the corpus closes no second run of a started day.
+     * And the counts sentence the call row now shares with the stage's mid-day row (§ D1219), reached
+     * through `dayCallRowOf` on the same sheet.
+     */
+    'shift/report.ts#PRACTICE_ATTEMPT_NOTE',
+    'shift/dayCalls.ts#dayCallCountsLineOf',
     'shift/goals.ts#GOAL_PLAIN_NAMES',
     'shift/goals.ts#goalPlainNameOf',
     /*
@@ -4054,6 +4075,8 @@ const SHIFT_REPORT: SurfaceAdapter = {
       }
       /* § D1141's practice-by-crowd note, by name — see the `covers` entry above. */
       seeds.push({ field: `${at}.practiceCrowdNote`, text: PRACTICE_CROWD_NOTE, role: 'prose' });
+      /* § D1218's practice-while-an-attempt-stands note, by name — see the `covers` entry above. */
+      seeds.push({ field: `${at}.practiceAttemptNote`, text: PRACTICE_ATTEMPT_NOTE, role: 'prose' });
       /* Wave AL: the title line after a handover, on the run's own clock. */
       seeds.push({
         field: `${at}.driversLine(handover)`,
@@ -9588,6 +9611,8 @@ const EVERYDAY_MENU: SurfaceAdapter = {
     'everyday/actionBar.ts#ACTION_BAR_ROWS',
     'everyday/actionBar.ts#actionBarFor',
     'everyday/actionBar.ts#confirmStripFor',
+    /* § D1218 — the brief's resume and held driver, and the strip over a day whose attempt stands. */
+    'shift/attempt.ts#DAY_ATTEMPT_COPY',
     'everyday/actionBar.ts#TIMELINE_STEPS',
     /*
      * § 3.3's `stage · watching` note, which both `watch` rows carry — GitHub issue #182,
@@ -9864,6 +9889,18 @@ const EVERYDAY_MENU: SurfaceAdapter = {
       });
       seeds.push({ field: `bar.confirm.${ctx}.leave`, text: strip.leaveLabel, role: 'label' });
       seeds.push({ field: `bar.confirm.${ctx}.stay`, text: strip.stayLabel, role: 'label' });
+    }
+    /* § D1218 — the daily strip over a scored day whose attempt stands, which keeps it. */
+    {
+      const kept = confirmStripFor('daily', true);
+      if (kept !== undefined) {
+        seeds.push({ field: 'bar.confirm.daily.attempt.question', text: kept.question, role: 'prose' });
+        seeds.push({ field: 'bar.confirm.daily.attempt.consequence', text: kept.consequence, role: 'prose' });
+      }
+      /* The brief's words while an attempt stands: the held driver, the bar's note and its resume. */
+      seeds.push({ field: 'bar.brief.attempt.driverHeld', text: DAY_ATTEMPT_COPY.driverHeld, role: 'prose' });
+      seeds.push({ field: 'bar.brief.attempt.resumeNote', text: DAY_ATTEMPT_COPY.resumeNote, role: 'prose' });
+      seeds.push({ field: 'bar.brief.attempt.resume', text: resumeLabelOf(weekdayOf(0)), role: 'label' });
     }
 
     /*
@@ -11879,6 +11916,14 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
     'everyday/stageCall.ts#stageCallCardOf',
     'everyday/stageCall.ts#STAGE_CALL_COPY',
     /*
+     * Wave AL, lane AL-E, § D1219: each answered call's row on the stage once its window can be
+     * observed. Seeded below over a call on this case's own run at a playhead the call plus 660 s
+     * on, with a later press inside the window so the note's second clause is swept too.
+     */
+    'everyday/stageCallRow.ts#stageCallRowsOf',
+    'everyday/stageCallRow.ts#STAGE_CALL_ROWS_HEADING',
+    'everyday/stageCallRow.ts#STAGE_CALL_ROW_NOTE',
+    /*
      * § D1168's *End the day*: seeded below on readings where the queue goal reads missed, at the
      * playhead it would be drawn at, and never where the day can still clear.
      */
@@ -12373,6 +12418,37 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
         }
       }
       seeds.push({ field: 'stage.call.held', text: STAGE_CALL_COPY.held, role: 'label' });
+      /* § D1219 — the stage's mid-day call row, on this case's own legs; see the `covers` entry. */
+      {
+        const callAtS = recording.startedAt + 60;
+        const windowEndS = Math.min(callAtS + 600, recording.endedAt);
+        const legs = recording.legs;
+        const record = dayCallRecordOf({
+          atS: callAtS,
+          windowEndS,
+          answer: 'spread-cars',
+          legs: { 'park-cars-lobby': legs, 'spread-cars': legs, leave: legs },
+          observations: {},
+        });
+        const rows = stageCallRowsOf({
+          records: [record],
+          playheadS: recording.endedAt,
+          endedAt: recording.endedAt,
+          log: [{ atS: callAtS + 120, change: { kind: 'park-cars-lobby' } }],
+          clockOf: (simTimeS) => clockOf(simTimeS, DAY_START_S),
+        });
+        seeds.push({ field: 'stage.callRows.heading', text: STAGE_CALL_ROWS_HEADING, role: 'label' });
+        for (const row of rows) {
+          seeds.push({ field: `stage.callRows(${row.id}).heading`, text: row.heading, role: 'label' });
+          seeds.push({
+            field: `stage.callRows(${row.id}).counts`,
+            text: row.counts,
+            role: 'observation',
+            playhead: atPlayhead(recording, stageCallRowDueAtS(record, recording.endedAt)),
+          });
+          seeds.push({ field: `stage.callRows(${row.id}).note`, text: row.note, role: 'prose' });
+        }
+      }
       /* Wave AL, lane AL-A: the close's question while a call is up, its consequence and its two buttons. */
       seeds.push({ field: 'stage.call.closeAsk', text: STAGE_CALL_COPY.closeAsk, role: 'prose' });
       seeds.push({ field: 'stage.call.closeConsequence', text: STAGE_CALL_COPY.closeConsequence, role: 'prose' });
