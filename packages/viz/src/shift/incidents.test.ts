@@ -200,8 +200,13 @@ describe('the incident reaches the simulation', () => {
     const state = moveInDay();
     const derate = eventFor(state.week.day, state.week.dayIdx).effect.derate;
     expect(derate, 'the drawn move-in carries no derate').not.toBeNull();
-    const opensAt = (derate?.fromFraction ?? 0) * 1800;
-    const closesAt = (derate?.toFraction ?? 0) * 1800;
+    /*
+     * Whole seconds, as `incidents.ts#serviceEventsFor` rounds them: the window's fractions stopped
+     * being exact in binary when § D1180 moved the move-in to 0.55–0.8, and 0.55 × 1800 is
+     * 990.0000000000001 while the event stands at 990.
+     */
+    const opensAt = Math.round((derate?.fromFraction ?? 0) * 1800);
+    const closesAt = Math.round((derate?.toFraction ?? 0) * 1800);
 
     const out = events.find((event) => event.mode === 'out-of-service');
     const back = events.find((event) => event.mode === 'in-service');
