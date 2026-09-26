@@ -19,7 +19,7 @@ import type { WatchRecord } from '../watch/types.js';
 import { closeDay, HISTORY_DAYS, openWeek, outcomeOf } from '../shift/week.js';
 
 import { GLOSSARY_TERMS } from '../mode/glossary.js';
-import { DAY_OFFSET_MIN, doorScreenViewOf, DOOR_STEPS, RUN_TODAY_AGAIN_NOTE, sameForEveryoneLine } from './doorView.js';
+import { DAY_OFFSET_MIN, doorScreenViewOf, DOOR_STEPS, RUN_TODAY_AGAIN_NOTE, sameForEveryoneLine, todayIsBanked } from './doorView.js';
 import { PRESS_DAY_CHOICE_COPY } from './towerChoice.js';
 import { EM_DASH } from './figures.js';
 import type { TodayRecord } from './today.js';
@@ -207,7 +207,7 @@ describe('the § 3.3 primary, and the replay a past day earns — § D517', () =
      * The post-AH panel's *no route to tomorrow from the front door*: a closed Monday left from its
      * report came back here as *Set up today* over a disabled `›`, and the press re-ran Monday.
      */
-    const view = viewAt(0, true);
+    const view = viewAt(0, true, weekWith(5, [closedDay(1), closedDay(2), closedDay(3), closedDay(4), closedDay(5)]));
     expect(view.primary.inert).toBe(false);
     expect(view.primary.goes).toBe('tomorrow');
     // Day 5 of this fixture is a Friday, so the doors open on Saturday.
@@ -217,6 +217,21 @@ describe('the § 3.3 primary, and the replay a past day earns — § D517', () =
     expect(view.primary.again?.label).toBe('Run today again');
     expect(view.primary.again?.note).toMatch(/another attempt/iu);
     expect(view.primary.again?.note).toMatch(/no presses carried over/);
+  });
+
+  it('does not call today closed because a run on another week was filed this sitting — § D1142', () => {
+    /*
+     * The post-AJ panel's seat A, D2: St Jude's Monday closed, the week moved to Midtown Office, and
+     * a fresh Monday read *"Today is closed and banked … Open the doors on Tuesday"* while its own
+     * chip said *today · not closed yet*. The filed run was St Jude's; this week holds no day.
+     */
+    const fresh = { ...openWeek('c2'), day: 1, dayIdx: 0 };
+    const view = viewAt(0, true, fresh);
+    expect(view.chips.at(-1)?.note).toBe('today · not closed yet');
+    expect(view.primary.label).toBe('Set up today');
+    expect(view.primary.goes).toBe('today');
+    expect(view.primary.note).not.toMatch(/closed and banked/u);
+    expect(todayIsBanked({ week: fresh })).toBe(false);
   });
 
   it('says which attempt the week keeps, and it is the one closeDay keeps (§ D1098, § D1138)', () => {
@@ -230,7 +245,7 @@ describe('the § 3.3 primary, and the replay a past day earns — § D517', () =
     const week = closeDay(closeDay(weekWith(5, []), first), second);
     expect(week.history.at(-1)?.minutePct, 'closeDay kept the first attempt, so the note must say so').toBe(36);
 
-    const note = viewAt(0, true).primary.again?.note ?? '';
+    const note = viewAt(0, true, week).primary.again?.note ?? '';
     expect(note).toBe(RUN_TODAY_AGAIN_NOTE);
     expect(note).not.toMatch(/better one/u);
     expect(note).not.toMatch(/close last/u);

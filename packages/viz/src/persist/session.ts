@@ -539,9 +539,12 @@ function readEnvelope(store: SessionStore): EnvelopeRead {
   return {
     ok: true,
     version,
-    session: withRecordRefusals(
-      withDayRecords(
-        withParkedWeeks(withWindowStart(record['session'], version), version),
+    session: withRecordRungs(
+      withRecordRefusals(
+        withDayRecords(
+          withParkedWeeks(withWindowStart(record['session'], version), version),
+          version,
+        ),
         version,
       ),
       version,
@@ -682,6 +685,50 @@ function withHistoryRefusals(week: unknown): unknown {
       // completes a shape-1 record into a shape-2 one, and a future shape needs its own pass and
       // its own evidence rather than this one silently claiming whatever the constant says today.
       return { ...withReason, record: { ...stored, ruleRows: [], version: 2 } };
+    }),
+  };
+}
+
+/**
+ * A version 1–9 `session`, its stored records given the one key version 10 added — wave AK,
+ * [§ D1139](../../../../DECISIONS.md), and `watch/types.ts`'s version-3 paragraph.
+ *
+ * `WatchRecord.rungContractId: null`, and the record's own `version` moved to 3. **Unlike the
+ * `ruleRows` completion above, the absence does not determine this value**, and the docstring says
+ * so rather than borrowing that argument: which rung a day ran on followed the week and the mode it
+ * was played in, and a shape-2 record stored neither. `null` is instead the reading the build that
+ * wrote the record re-asked it with, so it changes no row's verdict. A shape-2 day that reproduced
+ * before still reproduces; one that did not (a Scenario day on a rung) is refused by the watch gate
+ * exactly as it was, with the same sentence, because the gate re-simulates and compares before a
+ * row may be watched. The alternative, refusing the envelope, would take every stored week away
+ * for a field only the watch picker reads.
+ *
+ * Runs after {@link withRecordRefusals}, which has already moved any shape-1 record to shape 2.
+ * The `3` is a literal for that pass's stated reason.
+ */
+function withRecordRungs(session: unknown, version: number): unknown {
+  if (version >= 10) return session;
+  if (!isPlainRecord(session)) return session;
+  const parked = session['parkedWeeks'];
+  return {
+    ...session,
+    week: withHistoryRungs(session['week']),
+    ...(Array.isArray(parked) ? { parkedWeeks: parked.map(withHistoryRungs) } : {}),
+  };
+}
+
+/** One week's history, its records given version 10's key. */
+function withHistoryRungs(week: unknown): unknown {
+  if (!isPlainRecord(week)) return week;
+  const history = week['history'];
+  if (!Array.isArray(history)) return week;
+  return {
+    ...week,
+    history: history.map((outcome) => {
+      if (!isPlainRecord(outcome)) return outcome;
+      const stored = outcome['record'];
+      if (!isPlainRecord(stored) || 'rungContractId' in stored) return outcome;
+      return { ...outcome, record: { ...stored, rungContractId: null, version: 3 } };
     }),
   };
 }

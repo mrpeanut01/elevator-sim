@@ -1999,11 +1999,25 @@ function mountStage(
      */
     audioCrossover = undefined;
     audioBefore = undefined;
+    /*
+     * **A replay of a called day opens just before the call, playing** — wave AK,
+     * [§ D1140](../../../../DECISIONS.md), `everyday/callOpening.ts`. Asked on a fresh adoption only:
+     * a re-simulation resumes where the stage stopped, and an ordinary day's host answers
+     * `undefined`, so it opens at its start with § 7.3's `Start` up as before. Started and playing
+     * rather than paused, because the opening overlay describes the start of the day, and a stage
+     * paused mid-morning with no `Start` would be a stop nobody asked for.
+     */
+    const openAtS = resumeAtS === undefined ? host.openingAtS(recording) : undefined;
+    const startAtS = resumeAtS ?? openAtS;
     playback = new Playback(recording, systemClock(), {
       speed: stageSpeedAt(speedIndex).simPerRealS,
-      ...(resumeAtS === undefined ? {} : { startAtS: resumeAtS }),
+      ...(startAtS === undefined ? {} : { startAtS }),
     });
     if (wasPlaying) playback.play();
+    if (openAtS !== undefined) {
+      started = true;
+      playback.play();
+    }
     raceKeyDrawn = '';
     raceView = undefined;
     syncTransport();

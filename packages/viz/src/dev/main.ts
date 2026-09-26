@@ -226,6 +226,7 @@ import { coachWeekLines, weekKeptLine } from '../shift/weekLabel.js';
 import { weekdayOf, type DayOutcome, type WeekState } from '../shift/types.js';
 import { dailySeedAt } from '../shift/dailySeed.js';
 import { deviceNowMs } from '../shift/deviceDate.js';
+import { crowdMakesPractice } from '../shift/scoredCrowd.js';
 import { firstDayDealOf, isDealtPinnedDay } from '../shift/firstSession.js';
 
 import { savedProfilesOf } from '../batch/library.js';
@@ -296,6 +297,7 @@ import {
   shiftSubmittedSelection,
   runSubmissionOf,
   closedWeekOf,
+  advancesTheWeek,
   specsWithSaved,
   buildingNameOf,
   disclosureOf,
@@ -863,6 +865,13 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * § D311 is what happens when two of them share a flag.
    */
   let runCause: 'player' | 'intervention' = 'player';
+  /**
+   * **The date's crowd at the moment the run was asked for** — wave AK, [§ D1141](../../../../DECISIONS.md).
+   * Latched by {@link runShift} on a player's ask and read by {@link closeShift}, so a day pressed
+   * before UTC midnight and closed after it is judged against the date it was pressed on. Held for
+   * the session only: it is a fact about one run, and nothing stores it.
+   */
+  let runDaySeed: bigint = dailySeedAt(deviceNowMs());
   /**
    * The run **this shell simulated**, as opposed to the run on screen — GitHub issue #136.
    *
@@ -4789,9 +4798,10 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * so `false` would hand the stage a different replay than the gate compared, and this gate's
      * whole job is deciding whether a record reproduces.
      */
-    simulateRecord: (config, done, failed) => {
+    simulateRecord: (config, done, failed, outOfServiceCarIds) => {
       everydayWatchRunner.start({
-        runs: [{ config, outOfServiceCarIds: [], recordDecisions: true }],
+        /* The record's held cars beside the config — `watch/library.ts#WatchGate`, § D1139. */
+        runs: [{ config, outOfServiceCarIds, recordDecisions: true }],
         onDone: ([recording]) => {
           if (recording !== undefined) done(recording);
         },
@@ -6097,6 +6107,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
     // runner supersedes in-flight asks, and the latest ask is the one whose recording files. See
     // {@link runCause}; `'player'` is the default because every press but one means *a new ask*.
     runCause = cause;
+    if (cause === 'player') runDaySeed = dailySeedAt(deviceNowMs());
     /*
      * A fresh ask is a fresh attempt, and an attempt's calls are its own — § D1138. An intervention
      * is the same attempt's record growing, so its session stands and is told about the new run.
@@ -6802,20 +6813,33 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * counting an attempt; {@link runCause} is where the intent was latched and `closeDay`'s
      * docstring is where the one thing it gates is argued.
      */
-    const week = closedWeekOf(state, outcome, runCause === 'intervention');
+    /*
+     * **A run on a crowd that is not the day's shared one is practice** — wave AK,
+     * [§ D1141](../../../../DECISIONS.md), `shift/scoredCrowd.ts`. A link's `?seed=` may begin a
+     * week and may not enter one: on a week already under way on another crowd, the day is not
+     * closed into the week, so it banks nothing, moves no streak and stays open for its shared
+     * crowd. Only where the mode owns a week, and only on a week on a scenario; the date is the one
+     * latched at the press.
+     */
+    const crowdPractice =
+      advancesTheWeek(state.playMode) && crowdMakesPractice(state.week, state.seed, runDaySeed);
+    const week = crowdPractice ? state.week : closedWeekOf(state, outcome, runCause === 'intervention');
     /*
      * **A close of a day that had already closed is practice** — [§ D1138](../../../../DECISIONS.md)
      * clause 4, read off the week before the close, which is the one question `closeDay` keys it on.
      * Only where the mode owns a week: a Free Play sheet banks nothing on any close and says so in
      * its own words.
      */
-    const practice = week !== state.week && state.week.closedDay === state.week.day;
+    const practice =
+      crowdPractice || (week !== state.week && state.week.closedDay === state.week.day);
     filedReportInput = {
       recording,
       observations,
       goals,
       week,
       practice,
+      /* Which ground made it practice, so the sheet says the true one — § D1141. */
+      ...(crowdPractice ? { practiceCrowd: state.seed } : {}),
       /*
        * § D1138 clause 3 — the ordinary day's calls, from the session that raised them over the run
        * being filed. Nothing is printed about any call before this line runs.

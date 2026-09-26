@@ -24,6 +24,7 @@ import { describe, expect, it } from 'vitest';
 
 import { applyCampaignAction, openingCareer } from '../campaign/career.js';
 import { plainLeversOf } from '../mode/plainLevers.js';
+import { closeDay, openWeek, outcomeOf, switchWeek } from '../shift/week.js';
 import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
 import {
   TUTORIAL_ABSENCES,
@@ -34,6 +35,7 @@ import {
   TUTORIAL_STEPS,
   tutorialClockOf,
   tutorialCollapseViewOf,
+  filedDaysOf,
   tutorialIsDue,
   tutorialPaceOf,
   tutorialWalkthroughViewOf,
@@ -94,6 +96,29 @@ describe('the gate is derived state, and § D476 says which kind', () => {
     );
     expect(careerDaysOf(afterOneDay)).toBe(1);
     expect(tutorialIsDue({ ...NOTHING_YET, careerDays: careerDaysOf(afterOneDay) })).toBe(false);
+  });
+
+  it('counts a day filed in a week the player has since moved away from — § D1143', () => {
+    /*
+     * The post-AJ panel's seat A, D3: St Jude's Monday closed, the week moved to Midtown Office, and
+     * a reload put a returning player on the landing page and into the walkthrough, because the gate
+     * read the standing week alone and moving the week had parked the one that held the day.
+     */
+    const stJude = closeDay({ ...openWeek('c8'), day: 1, dayIdx: 0 }, outcomeOf({
+      day: 1, dayIdx: 0, eventId: 'ordinary', readings: [], minutePct: 81, carried: 300, arrived: 306,
+      record: null, recordRefusal: 'a test day carries no record',
+    }));
+    const moved = switchWeek(stJude, [], 'c2', 'restart');
+    expect(moved.week.history).toHaveLength(0);
+    /* The old reading, which is the defect: nothing filed. */
+    expect(tutorialIsDue({ ...NOTHING_YET, filedDays: moved.week.history.length })).toBe(true);
+    expect(filedDaysOf([moved.week, ...moved.parked])).toBe(1);
+    expect(tutorialIsDue({ ...NOTHING_YET, filedDays: filedDaysOf([moved.week, ...moved.parked]) })).toBe(false);
+    /* And both gate sites ask it of every week, not of the standing one. */
+    for (const source of [SHELL_SOURCE, read('packages/viz/src/everyday/landingScreen.ts')]) {
+      expect(source).toMatch(/filedDays: filedDaysOf\(\[[^\]]*\.week\(\), \.\.\.[^\]]*\.parkedWeeks\(\)\]\)/u);
+      expect(source).not.toMatch(/filedDays: [^,]*\.week\(\)\.history\.length/u);
+    }
   });
 
   it('reads no flag — the interface it is given has no boolean to hide one in', () => {
@@ -199,8 +224,9 @@ describe('§ D476’s condition as § D993 amends it — leaving files nothing, 
     const offer = /function offerTutorial\(host: EverydayHost\): void \{([\s\S]*?)\n  \}/u
       .exec(SHELL_SOURCE)?.[1];
     expect(offer, 'offerTutorial() moved or was renamed').toBeTypeOf('string');
-    // Derived, on every load, from the three records the player fills by playing.
-    expect(offer ?? '').toContain('host.week().history.length');
+    // Derived, on every load, from the records the player fills by playing — every week's days
+    // since § D1143, not the standing week's alone.
+    expect(offer ?? '').toContain('filedDaysOf([host.week(), ...host.parkedWeeks()])');
     expect(offer ?? '').toContain('profileStore.progress()');
     // GitHub issue #600, § D1077: the career's own day counter, which it persists for itself.
     expect(offer ?? '').toContain('host.campaign().today');

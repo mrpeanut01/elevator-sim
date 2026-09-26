@@ -1095,7 +1095,9 @@ describe('a payload this build cannot read is refused, with the reason', () => {
     for (const day of result.snapshot.week.history) {
       expect(day.recordRefusal, 'a build that kept no reason must not acquire one').toBeNull();
       expect(day.record?.ruleRows, 'shape 1 refused every rules run, so the list is []').toEqual([]);
-      expect(day.record?.version, 'the completed record is a shape-2 record and must say so').toBe(2);
+      // Shape 2 by version 7's completion, then shape 3 by version 10's (§ D1139).
+      expect(day.record?.version, 'the completed record is a current-shape record and must say so').toBe(3);
+      expect(day.record?.rungContractId, 'the reading the writing build re-asked it with').toBeNull();
     }
   });
 

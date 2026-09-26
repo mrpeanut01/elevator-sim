@@ -45,9 +45,9 @@ export function checkedRunForTest(
   run: WatchableRun,
   resources: BrowserResources,
   base: ViewerState,
-  simulate: (config: SimulationConfig) => VizRecording,
+  simulate: (config: SimulationConfig, outOfServiceCarIds: readonly string[]) => VizRecording,
 ): CheckedRun {
   const gate = watchGateBefore(run, resources, base);
   if (gate.kind === 'settled') return gate.checked;
-  return watchGateAfter(run, simulate(gate.config));
+  return watchGateAfter(run, simulate(gate.config, gate.outOfServiceCarIds));
 }

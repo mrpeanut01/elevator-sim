@@ -97,6 +97,10 @@ export const SESSION_KEY = 'elevator-sim.session';
  * | 4 | `session` gains `parkedWeeks` — the weeks the player is not currently playing (issue #107). |
  * | 5 | No new key: three **value** domains widen inside the week's readings (the worst-wait goal). |
  * | 6 | `DayOutcome` gains `record` — the run a filed day was, so it can be watched (slice 8). |
+ * | 7 | `DayOutcome.recordRefusal`, and the record's `ruleRows` (shape 2) — `docs/20` defect 1. |
+ * | 8 | No new key: the energy bar widens two value domains in the readings. |
+ * | 9 | No new key: `DayOutcome.eventId` becomes a drawn wrinkle id. |
+ * | 10 | The stored record's `rungContractId` (shape 3) — wave AK, § D1139. |
  *
  * **A newer payload is still refused**, because this build cannot know what a field it has never
  * seen means — and silently dropping it would hand back a *partially* applied week, which is the
@@ -286,8 +290,26 @@ export const SESSION_KEY = 'elevator-sim.session';
  * library was data, and every one of those seven is still a template in `data/wrinkles.json` — so an
  * old day resolves through `shift/events.ts#eventById` exactly as a new one does, and no stand-in is
  * supplied for anything.
+ *
+ * ## Version 10 adds a key inside the stored record, and its absence does **not** determine it
+ *
+ * Wave AK, [§ D1139](../../../../DECISIONS.md). `WatchRecord` gains `rungContractId` and moves to
+ * shape 3, because a banked Scenario day ran on its contract's rung and a record with no rung
+ * re-asked the tower as authored: every such day failed its own replay. The two questions:
+ *
+ * - **Does the absence determine the value?** No, and this is the first bump where the answer is
+ *   no and the older direction is still read. It is read because the one reader of the value is
+ *   the watch gate, which re-simulates the record and compares the figures it was filed with before
+ *   a row may be watched: `session.ts#withRecordRungs` writes `null`, the reading the build that
+ *   wrote the record re-asked it with, so no row's verdict moves and nothing is watched on a guess.
+ *   The rule above, *refuse when the absence does not determine the value*, is kept for every
+ *   field a run or a score reads; it yields here only because a wrong completion can do nothing
+ *   but draw the refusal the row already carried.
+ * - **Can an older build read what this one writes?** No: a version-9 reader meets
+ *   `rungContractId` inside a record and refuses the envelope as *damaged*. Refusing it as *newer*
+ *   is true — § D408, its sixth application.
  */
-export const SESSION_SCHEMA_VERSION = 9;
+export const SESSION_SCHEMA_VERSION = 10;
 
 /**
  * Every envelope shape this build can read, newest last.
@@ -298,7 +320,7 @@ export const SESSION_SCHEMA_VERSION = 9;
  * since the last deploy.
  */
 export const SESSION_SCHEMA_VERSIONS_READ: readonly number[] = Object.freeze([
-  1, 2, 3, 4, 5, 6, 7, 8, 9,
+  1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
 ]);
 
 /* -------------------------------------------------------------------------- *

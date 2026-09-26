@@ -60,6 +60,7 @@ const observationsOfRun = (recording: Parameters<typeof observationsAt>[0]) =>
   shiftObservationsOf(observationsAt(recording, recording.endedAt));
 import {
   NOT_RECORDED,
+  PRACTICE_CROWD_NOTE,
   PRACTICE_NOTE,
   WITHHELD,
   averageWaitFigure,
@@ -2233,5 +2234,14 @@ describe('the ordinary day’s calls and a practice close — § D1138', () => {
     const banked = weekDay(sheet({ week: { ...WEEK, attempt: 1, closedDay: 4 } }));
     expect(banked.practiceNote).toBeUndefined();
     expect(banked.streakLine).not.toBe(PRACTICE_NOTE);
+  });
+
+  it('says a run on a crowd other than the day’s shared one is practice for that reason — § D1141', () => {
+    /* The week has not closed the day at all, so *your week keeps your first attempt* would be false. */
+    const byCrowd = weekDay(sheet({ practice: true, practiceCrowd: 777n, week: { ...WEEK, attempt: 1, closedDay: null } }));
+    expect(byCrowd.practiceNote).toBe(PRACTICE_CROWD_NOTE);
+    expect(byCrowd.streakLine).toBe(PRACTICE_CROWD_NOTE);
+    expect(byCrowd.practiceNote).not.toMatch(/first attempt/u);
+    expect(byCrowd.practiceNote).not.toMatch(/\d/u);
   });
 });

@@ -31,7 +31,8 @@ import { carsToDerate } from '../shift/incidents.js';
 import { goalsForDay, readGoals } from '../shift/goals.js';
 import type { GoalReading, WeekState } from '../shift/types.js';
 import { admittedPressDayIds, ladderRowFor, ladderTowerConfig, rungFor } from '../shift/ladder.js';
-import { openWeek } from '../shift/week.js';
+import { openWeek, outcomeOf } from '../shift/week.js';
+import type { WatchRecord } from '../watch/types.js';
 import { dc10Of, wayThroughSentenceOf, WEEK_WAY, weekWayRowFor } from '../shift/weekWay.js';
 
 import { bookedOutCarsOf, carAbsencesOf } from '../shift/bookedOut.js';
@@ -510,7 +511,7 @@ describe('the rest of the record', () => {
      * be § D729's defect surviving inside its own repair — so the claim is conditional, and the
      * refusing arm is a fact the player wants rather than a hedge: nothing is comparing this run.
      */
-    const own = todayOf({
+    const ownInput: Parameters<typeof todayOf>[0] = {
       week: weekOn(2, 1),
       calendar: NO_CALENDAR,
       building: midtown,
@@ -528,9 +529,29 @@ describe('the rest of the record', () => {
       daySeed: 20_260_925n,
       firstSession: false,
       units: 'metric',
-    });
+    };
+    const own = todayOf(ownInput);
     expect(own.seedLine).toBe('tower midtown-office · crowd 424242 · a crowd of this run’s own, not the day’s');
     expect(own.seedLine).not.toContain('everyone');
+    /*
+     * § D1141: on a week already under way on another crowd, the line says before the press that the
+     * week keeps none of this run. A week with nothing banked is begun by it, and says nothing more.
+     */
+    const underWay = todayOf({
+      ...ownInput,
+      week: {
+        ...weekOn(2, 1),
+        history: [
+          outcomeOf({
+            day: 1, dayIdx: 0, eventId: 'ordinary', readings: [], minutePct: 80, carried: 10, arrived: 10,
+            record: { seed: '20260924' } as unknown as WatchRecord, recordRefusal: null,
+          }),
+        ],
+      },
+    });
+    expect(underWay.seedLine).toBe(
+      'tower midtown-office · crowd 424242 · a crowd of this run’s own, not the day’s, so this run is practice and banks nothing into your week',
+    );
     expect(own.crowdIsToday).toBe(false);
     expect(recordFor(midtown, 2, 1).crowdIsToday).toBe(true);
   });

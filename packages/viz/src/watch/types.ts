@@ -63,6 +63,7 @@ import type { RuleRow } from '../authoring/ruleSpec.js';
  * |---|---|
  * | 1 | The first shape: seed, the six selection axes, the week's day pair, the held cars, the log. |
  * | 2 | …and the Everyday rules the run's dispatcher was driven by. |
+ * | 3 | …and the scenario rung that handed the run its tower, or `null` for the tower as authored. |
  *
  * ## Version 2, and why it is a bump rather than an optional key
  *
@@ -79,8 +80,27 @@ import type { RuleRow } from '../authoring/ruleSpec.js';
  * something nobody wrote down — it is the only value such a record could have described.
  * `persist/session.ts` performs that completion on read, which is why the constant here can stay a
  * single number and `recordUnreadableReason` can stay a plain `!==`.
+ *
+ * ## Version 3, and why the rung is the record's to hold
+ *
+ * Wave AK, [§ D1139](../../../../DECISIONS.md). A Scenario day runs the tower its contract hands
+ * over: the rung's occupancy, its bank choices, its growth slope and the cars it books out
+ * (`dev/state.ts#shiftRunConfigOf`, step 2b-i). Which rung that was is a fact about the run that
+ * nothing else in the record determines: it follows the week the day was played in *and* the mode
+ * that played it, and neither is part of the question. Re-asked without it, the watch gate ran the
+ * tower as authored, and the post-AJ panel's seat A met a Monday filed at 2 539 people that
+ * replayed at 7 197 — every banked Scenario day was refused. So the record carries
+ * {@link WatchRecord.rungContractId}.
+ *
+ * A version-2 record is read as a version-3 one with `rungContractId: null`, and that is stated for
+ * what it is rather than dressed as the version-1 completion above: `null` is not determined by the
+ * absence. It is the reading **the build that wrote the record re-asked it with**, so a version-2
+ * row that reproduced before still reproduces, and one that did not (a Scenario day on a rung) is
+ * refused by the gate exactly as it was, with the same sentence. The gate, not the completion, is
+ * what decides whether a row may be watched, so nothing is ever watched on the strength of a guess.
+ * `persist/session.ts#withRecordRungs` performs it.
  */
-export const WATCH_RECORD_VERSION = 2;
+export const WATCH_RECORD_VERSION = 3;
 
 /**
  * A run, as the question that produced it — contract § 1.4's `{ seed, config, interventions[] }`,
@@ -171,6 +191,17 @@ export interface WatchRecord {
    * naming a building `data/buildings/` has stopped shipping.
    */
   readonly ruleRows: readonly RuleRow[];
+  /**
+   * **The contract whose rung handed this run its tower**, or `null` for the tower as authored —
+   * shape 3, wave AK, [§ D1139](../../../../DECISIONS.md).
+   *
+   * Written by `watch/record.ts#watchRecordOf` from `dev/state.ts#runRungContractIdOf`, the one
+   * reading `shiftRunConfigOf` builds the run from, and read back by `stateFromWatchRecord`, which
+   * stands the re-asked run on that rung. An id rather than the rung's figures, on
+   * {@link WatchRecord}'s own rule: the id re-resolves against `data/contract-ladder.json` as this
+   * build ships it, and the reproduction gate catches a rung that has moved since.
+   */
+  readonly rungContractId: string | null;
 }
 
 /* -------------------------------------------------------------------------- *

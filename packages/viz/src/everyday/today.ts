@@ -42,6 +42,7 @@
  * own words that whether the crowd is comfortable is the day's to show. GitHub issue #208.
  */
 
+import { crowdMakesPractice } from '../shift/scoredCrowd.js';
 import type { ResolvedBuilding } from '@elevator-sim/core/browser';
 
 import { bookedOutCarsOf, carAbsencesOf, wrinkleNameOf, wrinkleNoteOf } from '../shift/bookedOut.js';
@@ -818,7 +819,16 @@ function seedLineOf(input: TodayInput, crowdIsPinned: boolean): string {
    * tower's pinned first day meets this crowd, which is the one it was measured on.
    */
   if (crowdIsPinned) return `${crowd} · the pinned crowd this day was measured on, not the day’s`;
-  return `${crowd} · a crowd of this run’s own, not the day’s`;
+  /*
+   * **And on a scenario's week, what that costs** — wave AK, [§ D1141](../../../../DECISIONS.md).
+   * A run on a crowd other than the day's shared one, on a week already under way on another crowd,
+   * is practice and the week does not move (`shift/scoredCrowd.ts`), so the line says so before the
+   * press rather than the sheet after it.
+   */
+  const own = `${crowd} · a crowd of this run’s own, not the day’s`;
+  return crowdMakesPractice(input.week, input.seed, input.daySeed)
+    ? `${own}, so this run is practice and banks nothing into your week`
+    : own;
 }
 
 /**

@@ -24,7 +24,7 @@ import { buildingNameOf } from '../dev/state.js';
 import { checkedRunForTest } from './gate.test-helper.js';
 import { FIXTURE_MARKER, ReferenceRunsError, parseReferenceRuns } from './reference.js';
 import { postedResultOf } from './reproduce.js';
-import { watchRunConfigOf } from './record.js';
+import { watchRunPlanOf } from './record.js';
 
 const RAW = JSON.parse(
   readFileSync(fileURLToPath(new URL('../../../../data/reference-runs.json', import.meta.url)), 'utf8'),
@@ -65,7 +65,7 @@ describe('the shipped reference runs', () => {
       const record = run.record;
       expect(record).not.toBeNull();
       if (record === null) return;
-      const { recording } = recordRun(watchRunConfigOf(baseState(), RESOURCES, record));
+      const { recording } = recordRun(watchRunPlanOf(baseState(), RESOURCES, record).config);
       expect(postedResultOf(recording)).toEqual(run.posted);
     }, 120_000);
 
@@ -96,7 +96,7 @@ describe('the shipped reference runs', () => {
       const record = run.record;
       expect(record).not.toBeNull();
       if (record === null) return;
-      const config = watchRunConfigOf(baseState(), RESOURCES, record);
+      const config = watchRunPlanOf(baseState(), RESOURCES, record).config;
       const direct = recordRun(config).recording;
       const cloned = recordRun(structuredClone(config)).recording;
       const legs = (recording: typeof direct): string =>

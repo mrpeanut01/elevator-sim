@@ -219,6 +219,8 @@ import {
 import type { CalendarPeriod } from '../shift/calendar.js';
 import { contractById, statLineOf } from '../shift/contracts.js';
 import { admittedPressDayIds, ladderTowersOf, pressDayFor } from '../shift/ladder.js';
+import { crowdIsShared } from '../shift/scoredCrowd.js';
+import { callOpeningOf, watchedCallOpeningOf } from './callOpening.js';
 import type { PressCall } from '../shift/pressCall.js';
 import type { DayCallAnswer, DayCallOnStage } from '../shift/dayCalls.js';
 import {
@@ -832,6 +834,13 @@ export interface EverydayHost {
 
   /** The whole week — day, streak, history (each entry a {@link DayOutcome}), banked progress. */
   week(): WeekState;
+
+  /**
+   * **The weeks the player has stepped away from** — `ViewerState.parkedWeeks`, read fresh. Wave AK,
+   * [§ D1143](../../../../DECISIONS.md): the first-visit gate counts the days they hold, because
+   * moving the week parks the week that holds the player's first day.
+   */
+  parkedWeeks(): readonly WeekState[];
 
   /** The contract the week is on, or `undefined` on a sandbox/free-play week. */
   contract(): ScenarioContract | undefined;
@@ -1938,6 +1947,16 @@ export interface EverydayHost {
    */
   takeCallAgain(): string | undefined;
   /**
+   * **Where a fresh stage opens `recording`**, in simulated seconds, or `undefined` for the day's
+   * start — wave AK, [§ D1140](../../../../DECISIONS.md), `everyday/callOpening.ts`.
+   *
+   * Just before the call on the two runs that exist to replay one: a watched filed day, and the
+   * attempt {@link takeCallAgain} started. `undefined` on every other run, so an ordinary day still
+   * opens at its start. The stage asks it once per fresh adoption and never on a re-simulation, which
+   * resumes where it stopped.
+   */
+  openingAtS(recording: VizRecording): number | undefined;
+  /**
    * **The ordinary day's next call on `recording`**, or `undefined` — [§ D1138](../../../../DECISIONS.md).
    *
    * Where the next call is and whether it has been raised; never what its answers did, which the
@@ -2106,6 +2125,12 @@ export interface EverydayHostBindings {
     config: SimulationConfig,
     done: (recording: VizRecording) => void,
     failed: (message: string) => void,
+    /**
+     * The cars the record held out of service, handed to `recordRun` beside the config — wave AK,
+     * [§ D1139](../../../../DECISIONS.md), `watch/library.ts#WatchGate`. Last so a test binding that
+     * reads only the config and the callback stays drivable.
+     */
+    outOfServiceCarIds: readonly string[],
   ): void;
   /** Enter the spectator state — `dev/main.ts#enterWatch`, unchanged and not re-implemented here. */
   enterWatch(run: WatchableRun, view: WatchingView, recording: VizRecording): void;
@@ -2377,9 +2402,8 @@ function dayPatchFor(b: EverydayHostBindings, state: ViewerState = b.state()): P
 function contractSliceFor(b: EverydayHostBindings, state: ViewerState): Partial<ViewerState> {
   const contract = contractById(state.week.contractId);
   if (contract === undefined) return {};
-  const pinned = pressDayFor(contract.id)?.seedText === state.seed.toString();
-  const dated = b.daySeed !== undefined && b.daySeed() === state.seed;
-  if (!pinned && !dated) return {};
+  /* The shared day's one predicate — `shift/scoredCrowd.ts`, which the close reads too (§ D1141). */
+  if (!crowdIsShared(contract.id, state.seed, b.daySeed?.())) return {};
   const shiftLengthS = shiftLengthForContract(contract.id);
   return {
     ...(state.shiftLengthS === shiftLengthS ? {} : { shiftLengthS }),
@@ -2581,6 +2605,12 @@ export function createEverydayHost(
    * in flight the replay's to cancel on the way out (GitHub issue #526 item 4).
    */
   let replaySession: { readonly day: number; readonly before: ReplayBefore; readonly pressed: boolean } | undefined;
+  /**
+   * **The run standing is a retake of the call** — § D1140. Set by `takeCallAgain` after its press
+   * and cleared by every other `startRun`, so {@link EverydayHost.openingAtS} opens the retake at the
+   * call and every other day at its start. A fact about this sitting's run; nothing stores it.
+   */
+  let retakeOfCall = false;
   let rushSession:
     | {
         readonly before: RushBefore;
@@ -2997,6 +3027,7 @@ export function createEverydayHost(
 
   const everydayHost: EverydayHost = {
     week: () => b.state().week,
+    parkedWeeks: () => b.state().parkedWeeks,
     contract: () => contractById(b.state().week.contractId),
     calendarPeriod: () => b.state().calendar,
     goalsAt,
@@ -3176,6 +3207,8 @@ export function createEverydayHost(
       b.state().recording === undefined ||
       runIdentityIssues(b.state(), b.resources, 'ranked').length === 0,
     startRun: () => {
+      /* A new ask is not a retake of a call until `takeCallAgain` says it is — § D1140. */
+      retakeOfCall = false;
       /* § 6's day runs on § 6's record — GitHub issue #594, {@link careerHold}. */
       releaseCareer();
       /*
@@ -3878,6 +3911,7 @@ export function createEverydayHost(
             },
           });
         },
+        gate.outOfServiceCarIds,
       );
     },
     watching: () => b.watching(),
@@ -4173,7 +4207,23 @@ export function createEverydayHost(
         editingDispatcherId: next.editingDispatcherId,
       });
       everydayHost.startRun();
+      /* After the press, which clears it: this run is the retake, and it opens at the call (§ D1140). */
+      retakeOfCall = true;
       return undefined;
+    },
+    openingAtS: (recording) => {
+      /*
+       * A watched filed day opens at its first call, read off its own record — `callOpening.ts`.
+       * The recording is the watched one whenever a watch session stands (`dev/main.ts#enterWatch`
+       * puts it on the state), and the record is the question that produced it.
+       */
+      const watched = b.watching();
+      if (watched !== undefined) {
+        const record = watched.run.record;
+        return record === null ? undefined : watchedCallOpeningOf(b.resources, b.state(), record, recording);
+      }
+      if (!retakeOfCall) return undefined;
+      return callOpeningOf(b.resources, b.state(), recording);
     },
     chooseTower: (contractId) => {
       const contract = contractById(contractId);

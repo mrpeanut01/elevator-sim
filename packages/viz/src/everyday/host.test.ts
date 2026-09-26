@@ -57,9 +57,9 @@ import type { GoalReading } from '../shift/types.js';
 import type { ShapedDayReport } from '../shift/report.js';
 /* GitHub issue #245 — the predicate the façade carries the answer of, asked directly. */
 import { runIdentityIssues } from '../scope/runIdentity.js';
-import { watchRunConfigOf } from '../watch/record.js';
+import { watchRunPlanOf } from '../watch/record.js';
 import { postedResultOf } from '../watch/reproduce.js';
-import type { PostedResult, WatchableRun, WatchRecord } from '../watch/types.js';
+import { WATCH_RECORD_VERSION, type PostedResult, type WatchableRun, type WatchRecord } from '../watch/types.js';
 import { watchingViewOf, type WatchingView } from '../watch/view.js';
 
 import {
@@ -1533,10 +1533,10 @@ describe('filing the campaign day — issue #223', () => {
  * tests its own mock.
  */
 describe('§ 14.1 — the spectator entry', () => {
-  /** A record of the state the harness stands on, so `watchRunConfigOf` re-asks the same question. */
+  /** A record of the state the harness stands on, so `watchRunPlanOf` re-asks the same question. */
   function recordOf(state: ViewerState): WatchRecord {
     return {
-      version: 2,
+      version: WATCH_RECORD_VERSION,
       seed: String(state.seed),
       buildingId: state.buildingId,
       dispatcherId: state.dispatcherId,
@@ -1550,6 +1550,7 @@ describe('§ 14.1 — the spectator entry', () => {
       outOfServiceCarIds: [],
       interventions: [],
       ruleRows: [],
+      rungContractId: null,
     };
   }
 
@@ -1596,7 +1597,7 @@ describe('§ 14.1 — the spectator entry', () => {
     const h = harnessOf(base());
     h.state = { ...h.state, shiftLengthS: 600, windowStartS: null };
     const record = recordOf(h.state);
-    const recording = recordRun(watchRunConfigOf(h.state, resources, record)).recording;
+    const recording = recordRun(watchRunPlanOf(h.state, resources, record).config).recording;
     h.simulate = () => recording;
     const host = createEverydayHost(h.bindings);
 
@@ -1616,7 +1617,7 @@ describe('§ 14.1 — the spectator entry', () => {
     const h = harnessOf(base());
     h.state = { ...h.state, shiftLengthS: 600, windowStartS: null };
     const record = recordOf(h.state);
-    const recording = recordRun(watchRunConfigOf(h.state, resources, record)).recording;
+    const recording = recordRun(watchRunPlanOf(h.state, resources, record).config).recording;
     h.simulate = () => recording;
     const host = createEverydayHost(h.bindings);
 

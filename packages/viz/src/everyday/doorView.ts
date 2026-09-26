@@ -388,10 +388,8 @@ function primaryOf(input: DoorScreenInput, chips: readonly DoorDayChip[]): DoorP
      * week already says today is closed — its history carries the day, which is what the chip
      * reads — so the door says it too, and the press is the report's *Open the doors on …*.
      *
-     * Read off the history as well as `dayClosed`, because the two answer different questions:
-     * `dayClosed` is *the run on the stage was filed this sitting*, and a reload, or a second
-     * attempt pressed from the brief, leaves the day banked with no filed run standing. Either
-     * one is a closed today.
+     * Read off the week's history alone — wave AK, [§ D1142](../../../../DECISIONS.md). See
+     * {@link todayIsBanked} for why `dayClosed` no longer decides it.
      */
     if (todayIsBanked(input)) {
       const tomorrow = weekdayOf((input.week.dayIdx + 1) % 7);
@@ -453,12 +451,21 @@ function primaryOf(input: DoorScreenInput, chips: readonly DoorDayChip[]): DoorP
 }
 
 /**
- * Whether today is closed — its outcome is in the week's history, or the run on the stage was filed
- * this sitting. `everyday/weekView.ts` reads the same pair, so *Your week* and this door cannot
- * disagree about the one day both draw ([§ D1004](../../../../DECISIONS.md)).
+ * Whether today is closed — its outcome is in the standing week's history. `everyday/weekView.ts`
+ * reads the same question, so *Your week* and this door cannot disagree about the one day both draw
+ * ([§ D1004](../../../../DECISIONS.md)).
+ *
+ * **The week alone, and no longer `dayClosed` beside it** — wave AK, [§ D1142](../../../../DECISIONS.md),
+ * the post-AJ panel's seat A, D2. `dayClosed` is *the run on the stage was filed this sitting*, and
+ * that run need not belong to this week: seat A closed St Jude's Monday, moved the week to Midtown
+ * Office, and read *"Today is closed and banked … Open the doors on Tuesday"* over a Monday the
+ * strip beside it called *not closed yet*. A run on a crowd the week does not keep (§ D1141) is
+ * filed and never closed into the week either. Every close that does bank writes the day into the
+ * history, so the history is the whole answer; § D1004's other direction (a reload, or a second
+ * attempt pressed from the brief, leaves the day banked with no filed run standing) is unchanged.
  */
-export function todayIsBanked(input: Pick<DoorScreenInput, 'week' | 'dayClosed'>): boolean {
-  return input.dayClosed || input.week.history.some((entry) => entry.day === input.week.day);
+export function todayIsBanked(input: Pick<DoorScreenInput, 'week'>): boolean {
+  return input.week.history.some((entry) => entry.day === input.week.day);
 }
 
 /** § 6.1, resolved. Total: every arm answers something a player can read. */

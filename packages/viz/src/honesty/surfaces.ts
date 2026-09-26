@@ -652,6 +652,7 @@ import {
   clockRange,
   dayReportOf,
   NOT_RECORDED,
+  PRACTICE_CROWD_NOTE,
   type DayReportInput,
   type ShapedDayReport,
   type ShiftPlan,
@@ -3630,6 +3631,12 @@ const SHIFT_REPORT: SurfaceAdapter = {
     'shift/dayCalls.ts#DAY_CALL_ROW_NOTE',
     'shift/dayCalls.ts#DAY_CALL_LEAVE_LABEL',
     'shift/report.ts#PRACTICE_NOTE',
+    /*
+     * Wave AK, § D1141: the practice sheet's note when the crowd made it practice — a link's crowd
+     * on a week under way. Seeded by name once per case beside `PRACTICE_NOTE`'s sheet, because the
+     * corpus closes no day on a crowd its week did not begin on.
+     */
+    'shift/report.ts#PRACTICE_CROWD_NOTE',
     'shift/goals.ts#GOAL_PLAIN_NAMES',
     'shift/goals.ts#goalPlainNameOf',
     /*
@@ -3890,6 +3897,8 @@ const SHIFT_REPORT: SurfaceAdapter = {
       if (entry.retried.practiceNote !== undefined) {
         seeds.push({ field: `${at}.retried.practiceNote`, text: entry.retried.practiceNote, role: 'prose' });
       }
+      /* § D1141's practice-by-crowd note, by name — see the `covers` entry above. */
+      seeds.push({ field: `${at}.practiceCrowdNote`, text: PRACTICE_CROWD_NOTE, role: 'prose' });
       for (const [index, line] of entry.retried.metaLines.entries()) {
         if (sharedMeta.has(line)) continue;
         seeds.push({ field: `${at}.retried.metaLines[${String(index)}]`, text: line, role: 'label' });
@@ -8941,6 +8950,7 @@ const WATCH: SurfaceAdapter = {
         outOfServiceCarIds: [],
         interventions: [],
         ruleRows: [],
+        rungContractId: null,
       },
       browserResourcesOf(context),
     );

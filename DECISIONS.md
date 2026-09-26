@@ -31839,6 +31839,8 @@ measurement rather than by preference, and it may turn out to be small.
 
 ## D476 — a first-run cover conditioned on derived state is not the override non-goal 10 forbids
 
+> **Status 2026-09-26: WHAT THE GATE READS AMENDED by [§ D1143](#d1143)** (an agent ruling). Days filed are counted in every week the device holds, the parked ones included. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Status 2026-09-24: CONDITION AMENDED by [§ D993](#d993)** — the ruling stands; the cheapest form (the skip files a day) is withdrawn. The condition holds within a session; across a reload it is replaced by: the first-visit cover always carries a live route to the mode picker.
 
 **Date: 2026-09-05 · Owner: delegated to the integrator by the product owner, *"use your best
@@ -43142,6 +43144,8 @@ The sheet still reads `state.interventions` at close, as `dev/main.ts#closeShift
 
 ## D1004 — a closed today opens tomorrow from the front door, and a day in the week's history reads as closed everywhere
 
+> **Status 2026-09-26: AMENDED by [§ D1142](#d1142)** (an agent ruling). Today reads as closed when the standing week's history holds it, and a run filed this sitting no longer closes it on its own. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Status 2026-09-25: COPY AMENDED by [§ D1098](#d1098)** (an agent ruling). *Run today again* says the week keeps the attempt closed last, which is what `closeDay` does, instead of *the better one*. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Status 2026-09-25: AMENDED by [§ D1138](#d1138)** (an agent ruling). *Run today again* is practice: the first closed attempt at a day banks, and the retry replays the day without replacing it.
@@ -43633,6 +43637,8 @@ integrator registers them in `documentation.test.ts#KNOWN_DECISION_HOLES`.
 
 ## D1029 — the press becomes a call: the stage stops once at an instant it can name, a pin is admitted only over a window from it, and the day runs under its standing order until the call is answered
 
+> **Status 2026-09-26: CLAUSE 7 AMENDED by [§ D1140](#d1140)** (an agent ruling). *Take this call again* opens half a minute before the call, playing, rather than at the start of the day. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Status 2026-09-25: AMENDED by [§ D1107](#d1107).** The card names every booked-out car away at the call, and the called day is named for the call. See [`docs/39`](docs/39-decisions-in-force.md).
 
 ---
@@ -43945,6 +43951,8 @@ day showed. Whether that is the suggestion clause 4 forbids is the owner's readi
 does not take it.
 
 ## D1047 — a newcomer's first scored day is a pinned press day, drawn off the date from the legible towers § D1029 admits, and nothing is stored
+
+> **Status 2026-09-26: NARROWED by [§ D1141](#d1141)** (an agent ruling). A `?seed=` still deals a newcomer's crowd and may begin a week; it may not enter a week under way, where its run is practice. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Status 2026-09-25: AMENDED by [§ D1096](#d1096)** (an agent ruling). An address that only restates the date, its crowd or the tower its draw deals, deals the pinned day as a bare one does; a `?seed=` other than the date's still wins. See [`docs/39`](docs/39-decisions-in-force.md).
 
@@ -44648,6 +44656,8 @@ leave the interfloor denominators alone.
 
 ## D1077 — a player whose only play is the career is not a first arrival
 
+> **Status 2026-09-26: AMENDED by [§ D1143](#d1143)** (an agent ruling). The gate's day count reads every week the device holds, beside this entry's career count. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-09-25 by an agent session under delegated authority** (wave AJ, lane AJ-D), not by
 > the product owner. **Amends what [§ D476](#d476)'s gate reads**, as [§ D993](#d993) left it; nothing
 > in either is rewritten.
@@ -45154,6 +45164,8 @@ running `20260925`: no call, and a 304 s worst wait against the banked day's 181
 week's contract, and a replay week has none. That is recorded as open rather than fixed here.
 
 ## D1095 — the shared day's slice is its contract's length, and the address sizes only a crowd it chose
+
+> **Status 2026-09-26: CLAUSE 2 NARROWED by [§ D1141](#d1141)** (an agent ruling). A crowd the address chose still runs its own length, and on a week already under way on another crowd the run is practice and banks nothing. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Taken 2026-09-25 by an agent session under delegated authority** (wave AJ lane AJ-G), not by
 > the product owner, and to be read as an agent ruling. The owner may reverse clause 2, the reading
@@ -46079,3 +46091,144 @@ ordinary calls on a pinned press day; practice retakes, whose reversal would bri
 
 No bar, goal, rate, occupancy or booked-out car. `data/` is unchanged. The career, the rush, a
 watched run and a replay raise no ordinary call, and the Engineer surface is unchanged.
+
+## D1139 — a filed day's record names the rung it ran on, and the watch gate simulates the cars it held
+
+> **Taken 2026-09-26 by an agent session under delegated authority** (wave AK lane AK-A), not by
+> the product owner, and to be read as an agent ruling. The owner may reverse clause 3, the reading
+> of a stored shape-2 record as one with no rung, and the cost of reversing it is stated there.
+
+**Why an entry.** [§ D405](#d405)'s first two grounds: it moves `WatchRecord` to shape 3 and the
+session envelope to version 10, which binds `watch/`, `persist/`, `dev/state.ts`, `dev/main.ts`,
+`dev/watchPanel.ts` and `everyday/host.ts`, and it is the first bump to answer [§ D408](#d408)'s
+first question *no* while still reading the older envelope, for the reason clause 3 gives.
+
+**What was wrong.** The post-AJ panel's seats A and D pressed *Watch it* on every Scenario day they
+banked and were refused on every one: *"this record no longer reproduces the result it was filed
+with"*. Seat A's Monday was filed at 2 539 people and replayed at 7 197; Wednesday at 2 882 and
+9 628. A Scenario day runs the tower its contract hands over (`shiftRunConfigOf` step 2b-i: the
+rung's occupancy, its bank choices, its growth slope and the cars it books out), and the record
+named no rung, so the gate re-asked the tower as authored. Separately, both watch gates handed the
+simulator the config alone, so a car the player held out of service was back in service on the
+replay.
+
+**The ruling.**
+
+1. `WatchRecord` carries `rungContractId`, the contract whose rung the run stood on or `null`,
+   written from `dev/state.ts#runRungContractIdOf`, the reading `shiftRunConfigOf` builds the tower
+   from. `stateFromWatchRecord` re-asks a record with a rung on a fresh week of that contract, so
+   the rung reaches the run; a record with none still runs as Free Play. A rung this build does not
+   ship for the record's building is an unreadable record, on the ids' footing.
+2. The gate's simulate step carries the held cars beside the config (`watch/record.ts#watchRunPlanOf`,
+   `watch/library.ts#WatchGate`), and both runners pass them to `recordRun`. `watchRunConfigOf`,
+   which returned the config alone, is deleted.
+3. A stored shape-2 record is read as shape 3 with `rungContractId: null`. That value is not
+   determined by the absence, and it is taken anyway because it is the reading the build that wrote
+   the record re-asked it with: a shape-2 row that reproduced still does, and a Scenario day that
+   did not is refused by the gate as before. Refusing the envelope instead would take every stored
+   week away for a field only the watch picker reads. Reversing this clause means that refusal.
+
+`watch/filedDay.test.ts` files a whole Midtown Wednesday on its contract with a press and a held
+car and requires the gate's replay to match it leg for leg; it was red before at *2 882 and 9 628*.
+`everyday/oneRecord.browser.test.ts` watches a banked day on the shipped bundle and was red before.
+
+**What it does not do.** The reference runs and posted board runs carry `null`, which is what they
+ran. A career day's record is still refused for the reasons `watchRecordIssues` already gives.
+
+## D1140 — a replay of a called day opens just before the call
+
+> **Taken 2026-09-26 by an agent session under delegated authority** (wave AK lane AK-A), not by
+> the product owner, and to be read as an agent ruling. The owner may reverse the lead of thirty
+> simulated seconds (`everyday/callOpening.ts#CALL_LEAD_S`) and the reading of *the call* on a day
+> with more than one.
+
+**Why an entry.** [§ D405](#d405)'s second ground: it amends [§ D1029](#d1029) clause 7, whose
+*Take this call again* re-opens the day from its start, and it rules on what *the call* is on a day
+[§ D1138](#d1138) lets raise three.
+
+**What was wrong.** Seat A's best moment was the report saying their answer cleared the day where
+the other two would have missed, and both ways back to it began at the start of the day: *Take this
+call again* re-opened St Jude's day at 08:30 for a call at 08:40, and *Watch it* would have opened a
+ten-hour day at 08:00.
+
+**The ruling.** The two runs that exist to replay a call, the attempt *Take this call again* starts
+and a watched filed day, open thirty simulated seconds before the call, playing. *The call* is the
+first one, read off what the day kept: a pinned day's call where the run is that day as measured
+(`dev/state.ts#pressDayCallOf`, found whether the player pressed at it or not), else the first press
+on record, since an ordinary call stamps its press at the call second, else the day's start. A call
+answered *leave them* presses nothing and is not in the record, and the ordinary calls themselves
+are not stored, because re-raising them needs the look-ahead runs `shift/dayCalls.ts` admits a call
+with. Every other run opens at its start as before, and a re-simulation resumes where it stopped.
+
+`everyday/callOpening.test.ts` holds the three rules; `everyday/pressCall.browser.test.ts`'s retake
+now opens within two minutes of the call and was red before at *08:30 against 08:40*.
+
+**What it does not do.** A replay from the week strip (§ D517) still opens at its start, and still
+raises no call, which [§ D1094](#d1094) records as open.
+
+## D1141 — a link's crowd may begin a week and may not enter one
+
+> **Taken 2026-09-26 by an agent session under delegated authority** (wave AK lane AK-A), not by
+> the product owner, and to be read as an agent ruling. The owner may reverse the clause that lets a
+> link's crowd begin a week, which is what keeps [§ D1047](#d1047)'s newcomer on a shared link and
+> the browser tier's `?seed=424242` weeks banking.
+
+**Why an entry.** [§ D405](#d405)'s first two grounds: it binds `dev/main.ts#closeShift`,
+`everyday/today.ts`, `shift/report.ts` and `everyday/host.ts`, and it narrows [§ D1095](#d1095)
+clause 2 and [§ D1047](#d1047)'s *a `?seed=` in the address wins* where a week is already under way.
+
+**What was wrong.** Seat D had Monday and Tuesday banked on the date's crowd, opened
+`?building=midtown-office&seed=777&duration=3600`, played the Wednesday it opened on and read
+*"Wednesday is banked. Thursday opens."* over a sixty-minute day on crowd 777, where the shared
+Wednesday was thirty minutes. Seat A's Thursday brief re-seeded itself from a `seed=` link.
+
+**The ruling.** A day of a week on a scenario banks on its shared crowd (the date's, or the
+scenario's pin), or on the crowd the week's first banked day ran on, read off that day's record. A
+run on any other crowd is practice: it runs and is reported, the day is not closed into the week,
+no streak moves, and the day stays open. A week that has banked nothing takes the link's crowd,
+because there is no week yet to reshape, and a first day filed without a record leaves only the
+shared crowd safe to bank. The brief's seed line says so before the press (*so this run is practice
+and banks nothing into your week*) and the sheet after it (`shift/report.ts#PRACTICE_CROWD_NOTE`).
+The date is the one latched at the press, so a day pressed before UTC midnight and closed after it
+is judged against the date it was pressed on. Nothing is stored: `shift/scoredCrowd.ts` derives it
+from the week and the two seeds, and the Scenario press's length keeps [§ D1095](#d1095)'s pair.
+
+`shift/scoredCrowd.test.ts` holds both reported paths and the week a link begins;
+`everyday/oneRecord.browser.test.ts` banks a day, opens `?seed=777&duration=300` on the same device
+and requires the practice line, the practice sheet and an unmoved week, and was red before.
+
+## D1142 — today is closed when the week holds it, and only then
+
+> **Taken 2026-09-26 by an agent session under delegated authority** (wave AK lane AK-A), not by
+> the product owner, and to be read as an agent ruling.
+
+**Why an entry.** [§ D405](#d405)'s second ground: it amends [§ D1004](#d1004), whose door reads
+*today is closed* off the week's history **or** `dayClosed`, the run filed this sitting.
+
+**What was wrong.** Seat A closed St Jude's Monday, moved the week to Midtown Office and read
+*"Today is closed and banked. This opens Tuesday's day"* with *Open the doors on Tuesday* over a
+Monday the strip beside it called *not closed yet*. The run filed this sitting was St Jude's; the
+standing week held no day.
+
+**The ruling.** `everyday/doorView.ts#todayIsBanked` reads the standing week's history alone, and
+*Your week* reads the same function. Every close that banks writes the day into the history, so
+the history is the whole answer; [§ D1004](#d1004)'s other direction, a closed day with no filed
+run standing after a reload, is unchanged. `dayClosed` still decides what is about the sitting:
+whether a card can open a sheet. `everyday/doorView.test.ts` and the browser case were red before.
+
+## D1143 — the first-visit gate counts the days in every week the device holds
+
+> **Taken 2026-09-26 by an agent session under delegated authority** (wave AK lane AK-A), not by
+> the product owner, and to be read as an agent ruling.
+
+**Why an entry.** [§ D405](#d405)'s second ground: it amends what [§ D476](#d476)'s gate reads, as
+[§ D993](#d993) and [§ D1077](#d1077) left it.
+
+**What was wrong.** Moving the week parks the week that holds the player's days. The gate read
+`host.week().history.length`, the standing week's alone, so seat A reloaded after moving to Midtown
+Office, met the landing page, and *Start playing* opened the walkthrough again.
+
+**The ruling.** The gate's `filedDays` is `everyday/tutorialModel.ts#filedDaysOf` over the standing
+week and every parked one, which `persist/session.ts` already restores; `EverydayHost.parkedWeeks`
+reads them. Nothing new is stored (GAMEPLAY § 3.5). `everyday/tutorialModel.test.ts` and the browser
+reload case were red before. D1144 to D1147 are unspent.

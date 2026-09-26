@@ -200,6 +200,11 @@ export function postedRunOf(entry: PostedRow, place: number, resources: BrowserR
       then: row.then,
       ...(row.thenValue === undefined ? {} : { thenValue: row.thenValue }),
     })) as readonly RuleRow[],
+    /*
+     * A board run is ranked as the server ran it: the building as authored, on no scenario's rung —
+     * shape 3, § D1139. `null` is what the server's own replay re-asks, so it is the value.
+     */
+    rungContractId: null,
   };
   return {
     id: `posted-${entry.id}`,

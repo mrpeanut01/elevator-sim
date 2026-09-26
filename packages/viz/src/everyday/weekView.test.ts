@@ -129,8 +129,11 @@ describe('§ 16 rule 1 — today is withheld until *Close the day* has been pres
   it('says nothing to place until the day is closed, and then says why it still cannot place you', () => {
     const week = weekWith(3, [dayOf(1, MET)]);
     expect(viewOf(week, false).percentile.line).toMatch(/not closed/);
-    // Closed, and still withheld — but for the *other* reason, which is the world's.
-    expect(viewOf(week, true).percentile.line).toMatch(/no verified distribution/);
+    // Closed, and still withheld — but for the *other* reason, which is the world's. Closed means
+    // the week holds today (§ D1142): a run filed this sitting that the week did not keep is not.
+    const closed = weekWith(3, [dayOf(1, MET), dayOf(3, MET)]);
+    expect(viewOf(closed, true).percentile.line).toMatch(/no verified distribution/);
+    expect(viewOf(week, true).percentile.line).toMatch(/not closed/);
   });
 });
 
@@ -142,7 +145,8 @@ describe('the two absences are drawn in two places, and stay apart', () => {
 
   it('moves the percentile line when the day closes, because that one is about your run', () => {
     const week = weekWith(3, [dayOf(1, MET)]);
-    expect(viewOf(week, true).percentile.line).not.toBe(viewOf(week, false).percentile.line);
+    const closed = weekWith(3, [dayOf(1, MET), dayOf(3, MET)]);
+    expect(viewOf(closed, true).percentile.line).not.toBe(viewOf(week, false).percentile.line);
   });
 
   it('never renders a zero anywhere in the world band', () => {

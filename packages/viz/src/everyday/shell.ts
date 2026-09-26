@@ -68,7 +68,7 @@ import type { EverydayHost, EverydayHostSlot } from './host.js';
 import { EVERYDAY_MODES, isPlayable } from './modes.js';
 import { everydayAccount, onEverydayAccount } from './accountPort.js';
 import { everydayProfileStore } from './profileStore.js';
-import { tutorialIsDue } from './tutorialModel.js';
+import { filedDaysOf, tutorialIsDue } from './tutorialModel.js';
 import {
   RAIL_DRAWER_COPY,
   railFooter,
@@ -2895,7 +2895,8 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     if (state.screen !== EVERYDAY_ROOT) return;
     const progress = profileStore.progress();
     const due = tutorialIsDue({
-      filedDays: host.week().history.length,
+      /* Every week this device holds, not only the standing one — § D1143. */
+      filedDays: filedDaysOf([host.week(), ...host.parkedWeeks()]),
       solvedCases: progress.solvedCaseIds.length,
       ratings: progress.ratings.length,
       careerDays: host.campaign().today - 1,

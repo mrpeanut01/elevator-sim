@@ -266,12 +266,45 @@ describe.skipIf(!HAS_BROWSER)('the stage calls a pinned day — § D1029', () =>
       expect(report).toContain('The stage called the day');
       expect(report).toContain('On this crowd');
 
-      /* ---- Take this call again: the same day, from an empty record ---- */
+      /*
+       * ---- Take this call again: the same day, from an empty record, opened at the call ----
+       *
+       * Wave AK, § D1140, the post-AJ panel's seat A: the retake used to re-open the day at its
+       * start, paused, for a call ten simulated minutes in. It now opens half a minute before the
+       * call, playing, at the stage's default speed; so the card is up within seconds, where from
+       * the start at that speed it would take minutes, and the stop is the same instant as before.
+       */
       await page.locator('.everyday-report-call-again-press').click();
-      await waitForToday(page);
+      await page.waitForFunction(
+        () =>
+          (document.querySelector<HTMLCanvasElement>('.everyday-stage-canvas')?.width ?? 0) > 0 &&
+          /^\d{2}:\d{2}$/u.test(document.querySelector('.everyday-stage-clock')?.textContent ?? ''),
+        undefined,
+        { timeout: 120_000 },
+      );
+      const minutesOf = (clock: string): number => {
+        const [h, m] = clock.split(':').map(Number);
+        return (h ?? 0) * 60 + (m ?? 0);
+      };
+      const callClock = clockAtCall.split(' | ')[0] ?? '';
+      const opened = await textOf(page, '.everyday-stage-clock');
+      expect(
+        minutesOf(callClock) - minutesOf(opened),
+        `the retake opened at ${opened}, not just before the call at ${callClock}`,
+      ).toBeLessThanOrEqual(2);
       const again = await parkingHeld(page);
       expect(again.held, 'the second attempt started with the first one’s answer standing').toBe(true);
       expect(await textOf(page, '.everyday-stage-stamp'), 'a press is stamped on a fresh attempt').toBe('');
+      await page.waitForSelector('.everyday-stage-call:not([hidden])', { timeout: 60_000 });
+      /*
+       * The clock only, and to the minute: the canvas's sentence also names the speed, and the first
+       * attempt stopped at 600×, where one frame can carry the playhead past the call second's minute.
+       */
+      const retakeStop = await textOf(page, '.everyday-stage-clock');
+      expect(
+        Math.abs(minutesOf(retakeStop) - minutesOf(callClock)),
+        `the retake stopped at ${retakeStop}, not at the call at ${callClock}`,
+      ).toBeLessThanOrEqual(1);
       await page.locator('.everyday-stage-skip').click();
       await page.waitForFunction(
         () => (document.querySelector('.everyday-bar-primary')?.textContent ?? '').includes('Close the day'),

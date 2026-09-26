@@ -482,6 +482,16 @@ export const PRACTICE_NOTE =
   'the clean days and the day’s record stand as that attempt left them.';
 
 /**
+ * **What a practice sheet says when its crowd made it practice** — wave AK,
+ * [§ D1141](../../../../DECISIONS.md), `shift/scoredCrowd.ts`. A run on a crowd other than the
+ * day's shared one (a link's `?seed=`) is not closed into the week. No digit, for
+ * {@link PRACTICE_NOTE}'s reason; the seed line above it already names the crowd.
+ */
+export const PRACTICE_CROWD_NOTE =
+  'Practice. This run met a crowd other than the day’s shared one, so it banks nothing: your week ' +
+  'stays on this day, and the day still counts when you play it on the day’s own crowd.';
+
+/**
  * One run, belonging to no week — the same figures, the same diagnosis, the same levers and the
  * same small print, with the week's five statements **absent** and two single-run ones in their
  * place. See the module docstring.
@@ -715,6 +725,14 @@ export interface DayReportInput {
    * `undefined` is `false`, the first close.
    */
   readonly practice?: boolean | undefined;
+  /**
+   * **The crowd that made this close practice**, when it was the crowd rather than a retake — wave
+   * AK, [§ D1141](../../../../DECISIONS.md). Passed by `dev/main.ts#closeShift` beside
+   * {@link practice}; the sheet then says {@link PRACTICE_CROWD_NOTE} instead of
+   * {@link PRACTICE_NOTE}, because *your week keeps your first attempt* is false of a day the week
+   * has not closed at all.
+   */
+  readonly practiceCrowd?: bigint | undefined;
   /**
    * The ordinary day's calls, in the order they were raised — [§ D1138](../../../../DECISIONS.md)
    * clause 3. One row each after § D1029's, from the three runs that admitted it
@@ -1156,6 +1174,7 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
 
   const nextIdx = (week.dayIdx + 1) % 7;
   const practice = input.practice === true;
+  const practiceNote = input.practiceCrowd === undefined ? PRACTICE_NOTE : PRACTICE_CROWD_NOTE;
   return {
     ...core,
     of: 'week-day',
@@ -1163,8 +1182,8 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
      * § D1138 clause 4: a practice close moved no streak, so the streak sentence for this verdict
      * would describe a change that did not happen. The practice sentence stands in its place.
      */
-    streakLine: practice ? PRACTICE_NOTE : streakLineFor(judgement.verdict, week.streak),
-    ...(practice ? { practiceNote: PRACTICE_NOTE } : {}),
+    streakLine: practice ? practiceNote : streakLineFor(judgement.verdict, week.streak),
+    ...(practice ? { practiceNote } : {}),
     contractLine: contractLineFor(contract, week),
     cleared: week.cleared,
     forecast: forecastFor(

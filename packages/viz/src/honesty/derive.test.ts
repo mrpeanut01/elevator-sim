@@ -1126,7 +1126,7 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'watch/record.ts#WATCH_RECORD_CARRIES',
         'watch/record.ts#watchRecordIssues',
         'watch/record.ts#watchRecordOf',
-        'watch/record.ts#watchRunConfigOf',
+        'watch/record.ts#watchRunPlanOf',
         'watch/reference.ts#FIXTURE_MARKER',
         'watch/reference.ts#parseReferenceRuns',
         'watch/reproduce.ts#reproductionDrift',
@@ -1881,9 +1881,11 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'refusals that `dev/data.ts` folds into `BrowserResources.warnings` and `shift/weekWay.test.ts` ' +
         'turns into a failing test, and no screen renders one. `dev/state.ts#weekGrowthPerDayOf` ' +
         'returns a number, and is derived only because `runRungOf` names the `shift-week` play mode ' +
-        'id, which is a switch value rather than a sentence. What a player reads from the census is ' +
-        '`wayThroughSentenceOf`, seeded by name in `honesty/surfaces.ts`.',
-      ids: ['shift/weekWay.ts#weekWayIssues', 'dev/state.ts#weekGrowthPerDayOf'],
+        'id, which is a switch value rather than a sentence. `dev/state.ts#runRungContractIdOf` ' +
+        '(wave AK, § D1139) returns a contract id for a run record through the same `runRungOf`, on ' +
+        'the same ground. What a player reads from the census is `wayThroughSentenceOf`, seeded by ' +
+        'name in `honesty/surfaces.ts`.',
+      ids: ['shift/weekWay.ts#weekWayIssues', 'dev/state.ts#weekGrowthPerDayOf', 'dev/state.ts#runRungContractIdOf'],
     },
     {
       reason:

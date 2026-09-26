@@ -433,6 +433,20 @@ const STEP_DOWN: Readonly<Record<number, StepDown>> = Object.freeze({
       return envelope;
     },
   },
+  10: {
+    // Wave AK, § D1139: the stored record names the rung its run stood on, and moved to shape 3.
+    removes: 'WatchRecord.rungContractId',
+    undo: (envelope) => {
+      for (const day of everyDay(envelope)) {
+        const stored = day['record'];
+        if (isRecord(stored)) {
+          delete stored['rungContractId'];
+          stored['version'] = 2;
+        }
+      }
+      return envelope;
+    },
+  },
 });
 
 /**
@@ -534,7 +548,19 @@ describe('the session slot — every version this build has ever written', () =>
           expect(day.recordRefusal, 'those builds kept no reason, so none may be invented').toBeNull();
           if (day.record !== null) {
             expect(day.record.ruleRows, 'shape 1 refused every rules run, so the list is []').toEqual([]);
-            expect(day.record.version, 'the completed record is a shape-2 record').toBe(2);
+            // Shape 2 by that pass, then shape 3 by version 10's below.
+            expect(day.record.version, 'the completed record is a current-shape record').toBe(3);
+          }
+        }
+      }
+      if (version < 10) {
+        for (const day of days) {
+          if (day.record !== null) {
+            expect(
+              day.record.rungContractId,
+              'the reading the writing build re-asked it with; the watch gate decides the rest',
+            ).toBeNull();
+            expect(day.record.version, 'the completed record is a shape-3 record').toBe(3);
           }
         }
       }

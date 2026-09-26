@@ -56,7 +56,7 @@ import { Playback } from '../playback/playback.js';
 import { drawCutaway, sizeCanvas } from './cutaway.js';
 import { landingViewOf, type LandingMotionState, type LandingView } from './landingView.js';
 import { everydayProfileStore } from './profileStore.js';
-import { tutorialIsDue } from './tutorialModel.js';
+import { filedDaysOf, tutorialIsDue } from './tutorialModel.js';
 import type { EverydayScreenModule } from './screens.js';
 import { el } from './screenDom.js';
 import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.js';
@@ -335,7 +335,8 @@ function motionBlock(
 function firstSessionFor(context: EverydayScreenShellContext): boolean {
   const progress = everydayProfileStore().progress();
   return tutorialIsDue({
-    filedDays: context.host.week().history.length,
+    /* Every week this device holds, not only the standing one — § D1143. */
+    filedDays: filedDaysOf([context.host.week(), ...context.host.parkedWeeks()]),
     solvedCases: progress.solvedCaseIds.length,
     ratings: progress.ratings.length,
     careerDays: context.host.campaign().today - 1,

@@ -2021,6 +2021,20 @@ function runRungOf(state: ViewerState, buildingId: string): ReturnType<typeof ru
 }
 
 /**
+ * **The contract whose rung the state's run stands on**, or `null` for the tower as authored — wave
+ * AK, [§ D1139](../../../../DECISIONS.md).
+ *
+ * The id {@link shiftRunConfigOf} builds the run's tower from, read the same way, so the run record
+ * `watch/record.ts#watchRecordOf` files names the rung the day actually ran on. The watch gate re-asks
+ * a filed day from that record, and without the id it re-asked the tower as authored: every banked
+ * Scenario day failed its own replay.
+ */
+export function runRungContractIdOf(resources: BrowserResources, state: ViewerState): string | null {
+  const authored = buildingConfigOf(resources, state.savedBuildings, state.buildingId);
+  return runRungOf(state, authored?.id ?? state.buildingId)?.contractId ?? null;
+}
+
+/**
  * **The slope the state's building grows at between days** — [§ D1066](../../../../DECISIONS.md).
  *
  * The run grows its fabric by it (`grownBuilding` in {@link shiftRunConfigOf}), and the report's
@@ -2101,11 +2115,13 @@ export function shiftRunConfigOf(
    * **A rung applies to a week's day and to nothing else.** `playMode` is the field that says which
    * game this state belongs to (`scope/types.ts#PLAY_MODES`), and it exists precisely because
    * `freePlay !== undefined` was *"the shape of fact that stops being true the day somebody adds a
-   * second writer"*. Free Play, Endless and a watched replay all run **the building as authored**:
-   * `watch/record.ts#stateFromWatchRecord` sets `playMode: 'free-play'`, and a filed record names a
-   * building, a dispatcher and a seed but no scenario, so a rung reaching it would replay somebody's
-   * posted run against a tower they never ran. Measured rather than reasoned about — the two shipped
-   * reference runs stopped reproducing the figures they were filed with.
+   * second writer"*. Free Play and Endless run **the building as authored**. A watched replay runs
+   * the rung its record names and no other: `watch/record.ts#stateFromWatchRecord` stands the
+   * re-asked run on `WatchRecord.rungContractId` when the day ran on one (wave AK, § D1139) and sets
+   * `playMode: 'free-play'` when it did not, so a rung reaching a record that never ran on one would
+   * replay somebody's posted run against a tower they never ran. Measured rather than reasoned
+   * about, in both directions — the two shipped reference runs stopped reproducing the figures they
+   * were filed with, and every banked Scenario day did.
    *
    * The **building** check inside {@link rungFor} is the second half, and it was found the same way:
    * a `ViewerState` carries `buildingId` and `week.contractId` independently and they routinely
