@@ -82,15 +82,31 @@ export const ELIGIBLE_FIRST_CONTRACT_IDS: readonly string[] = Object.freeze(
  *
  * {@link ELIGIBLE_FIRST_CONTRACT_IDS} (§ D512's legibility) intersected with
  * `shift/ladder.ts#admittedPressDayIds` (§ D1029's admission criterion), in contract order. Both
- * halves are derived from data, so this is never typed: a pin that stops being admitted, or a tower
- * that stops being legible, leaves the set on the same commit, and the draw with it.
+ * halves are derived from data: a pin that stops being admitted, or a tower that stops being
+ * legible, leaves the set on the same commit, and the draw with it. Since § D1260 the set is also
+ * held inside {@link NEWCOMER_WEEK_TOWER_IDS}, the one typed half, which only narrows it.
  *
  * **Guarded non-empty with no fallback.** An empty set makes {@link firstSessionContractFor} throw
  * rather than quietly drawing from the legible set, and `firstSession.test.ts` fails first.
  */
+/**
+ * **The towers a newcomer's first week may be dealt on, and it is chosen rather than derived** —
+ * lane AM-E, [§ D1260](../../../../DECISIONS.md), amending § D1178's *the draw widens with it*.
+ *
+ * § D1178 let every tower the week census admits join the first-day draw on the commit its rows
+ * land. Swarm DO's ruling § 3 admits more towers' weeks in order to **offer** them at a held week's
+ * close (`shift/nextTower.ts`), and ruled that a newcomer still starts on Midtown Office: a second
+ * admitted tower is the next step after a held week, never the first. So this list stays one
+ * member, typed, and the three derived halves still apply to it: if Midtown's pin stopped being
+ * admitted, or its week stopped being admitted, the set would empty and the draw would throw with
+ * no fallback. **Owner-reversible**: widening this list restores § D1178's widening.
+ */
+export const NEWCOMER_WEEK_TOWER_IDS: readonly string[] = Object.freeze(['c2']);
+
 export const FIRST_DAY_CONTRACT_IDS: readonly string[] = Object.freeze(
   ELIGIBLE_FIRST_CONTRACT_IDS.filter(
-    (id) => admittedPressDayIds().includes(id) && weekAdmitsANewcomer(id),
+    (id) =>
+      NEWCOMER_WEEK_TOWER_IDS.includes(id) && admittedPressDayIds().includes(id) && weekAdmitsANewcomer(id),
   ),
 );
 
@@ -99,10 +115,10 @@ export const FIRST_DAY_CONTRACT_IDS: readonly string[] = Object.freeze(
  * ruled 3–0 that a newcomer's first *week* is dealt on a tower the week census (`docs/33` DC-10)
  * admits, because St Jude's, which the draw dealt on 2026-09-26, had never been censused and
  * measured one contested day of five once it was (S2's W3). `shift/weekStake.ts#weekAdmitsANewcomer`
- * reads it off the census: day 1 counts toward the week, and the week has room for one miss. On the
- * shipped census that leaves Midtown Office alone, so every date deals it; a tower joins on the
- * commit its census row admits it, and the draw widens with it. Still guarded non-empty with no
- * fallback.
+ * reads it off the census: day 1 counts toward the week, and the week has room for one miss. The
+ * draw no longer widens with the census ([§ D1260](../../../../DECISIONS.md)): a tower admitted
+ * after Midtown Office is offered at a held week's close, and a newcomer is dealt Midtown alone.
+ * Still guarded non-empty with no fallback.
  */
 
 /**

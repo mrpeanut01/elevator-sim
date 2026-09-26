@@ -186,8 +186,20 @@ describe.skipIf(!HAS_BROWSER)('GitHub issue #593 — a Scenario week plays from 
           await page.locator('.everyday-report-tomorrow').click();
           await page.waitForSelector('.everyday-week-sheet', { timeout: 15_000 });
           expect((await page.locator('.everyday-week-sheet-row').count())).toBe(7);
-          expect(await textOf(page, '.everyday-bar-primary')).toContain('Start next week');
-          await page.locator('.everyday-bar-primary').click();
+          /*
+           * A held week's sheet offers the next tower as its primary and keeps *Start next week
+           * here* in the sheet (lane AM-E, § D1259); a week that was not held keeps *Start next
+           * week*. The untouched standing order rarely holds Midtown's week, so both arms are read
+           * off the page rather than assumed, and the press taken is the one that stays.
+           */
+          if ((await page.locator('.everyday-week-sheet-onward').count()) > 0) {
+            expect(await textOf(page, '.everyday-bar-primary')).toMatch(/Play .+’s week/u);
+            expect(await textOf(page, '.everyday-week-sheet-stay')).toBe('Start next week here');
+            await page.locator('.everyday-week-sheet-stay').click();
+          } else {
+            expect(await textOf(page, '.everyday-bar-primary')).toContain('Start next week');
+            await page.locator('.everyday-bar-primary').click();
+          }
           await page.waitForSelector('.everyday-brief', { timeout: 15_000 });
         }
       } finally {

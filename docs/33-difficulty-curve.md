@@ -1549,6 +1549,24 @@ queue bar is `goalsForDay`'s):
 | Harbour Point | 3 (Wed) | none | 0.11 | `predictive-balanced` + spread at 0.2 | 1/8 | 1/20 | 0.001 | 20/20 | 29 / 28 | 19 | fails (c) queue out of reach, (a) no way through |
 | Harbour Point | 4 (Thu) | none | 0.11 | `fairness-first` | 0/8 | 0/20 | 0.000 | 20/20 | 53 / 26 | 17 | fails (c) queue out of reach, (a) no way through |
 | Harbour Point | 5 (Fri) | none | 0.11 | `predictive-balanced` + park at 0.43 | 0/8 | 0/20 | 0.000 | 20/20 | 113 / 24 | 13 | fails (c) queue out of reach, (a) no way through |
+| Chancery House | 1 (Mon) | none | 0 | `predictive-balanced` + park at 0.43 | 8/8 | 16/20 | 0.563 | 8/20 | 14 / 32 | 4 | **admitted** |
+| Chancery House | 2 (Tue) | none | 0 | `predictive-balanced` + park at 0.43 | 7/8 | 14/20 | 0.457 | 9/20 | 14 / 30 | 6 | **admitted** |
+| Chancery House | 2 (Tue) | move-in:past-halfway | 0 | `predictive-balanced` + park at 0.43 | 7/8 | 14/20 | 0.457 | 9/20 | 14 / 30 | 6 | **admitted** |
+| Chancery House | 3 (Wed) | none | 0 | `predictive-balanced` + park at 0.43 | 7/8 | 13/20 | 0.408 | 10/20 | 14 / 28 | 7 | **admitted** |
+| Chancery House | 3 (Wed) | fire-drill:full | 0 | `fairness-first` + spread at 0.2 | 7/8 | 17/20 | 0.621 | 12/20 | 15 / 28 | 3 | **admitted** |
+| Chancery House | 4 (Thu) | none | 0 | `predictive-balanced` | 7/8 | 11/20 | 0.315 | 11/20 | 14 / 26 | 9 | fails (a) no way through |
+| Chancery House | 4 (Thu) | conference:full-floor | 0 | `fairness-first` + park at 0.2 | 6/8 | 16/20 | 0.563 | 10/20 | 16 / 26 | 4 | **admitted** |
+| Chancery House | 5 (Fri) | none | 0 | `predictive-balanced` | 6/8 | 8/20 | 0.191 | 11/20 | 14 / 24 | 12 | fails (a) no way through |
+| Chancery House | 5 (Fri) | shaft-out:before-halfway | 0 | `predictive-balanced` | 6/8 | 8/20 | 0.191 | 11/20 | 14 / 24 | 12 | fails (a) no way through |
+| Ashgate | 1 (Mon) | none | 0 | `predictive-balanced` + spread at 0.2 | 8/8 | 17/20 | 0.621 | 12/20 | 15 / 32 | 3 | **admitted** |
+| Ashgate | 2 (Tue) | none | 0 | `predictive-balanced` + spread at 0.2 | 8/8 | 16/20 | 0.563 | 12/20 | 15 / 30 | 4 | **admitted** |
+| Ashgate | 2 (Tue) | move-in:past-halfway | 0 | `predictive-balanced` + spread at 0.2 | 8/8 | 16/20 | 0.563 | 12/20 | 15 / 30 | 4 | **admitted** |
+| Ashgate | 3 (Wed) | none | 0 | `fairness-first` | 8/8 | 14/20 | 0.457 | 14/20 | 15 / 28 | 6 | **admitted** |
+| Ashgate | 3 (Wed) | fire-drill:full | 0 | `fairness-first` + park at 0.2 | 7/8 | 12/20 | 0.361 | 14/20 | 16 / 28 | 8 | **admitted** |
+| Ashgate | 4 (Thu) | none | 0 | `predictive-balanced` + spread at 0.2 | 7/8 | 13/20 | 0.408 | 15/20 | 15 / 26 | 7 | **admitted** |
+| Ashgate | 4 (Thu) | conference:full-floor | 0 | `fairness-first` + spread at 0.43 | 6/8 | 9/20 | 0.231 | 14/20 | 18 / 26 | 11 | fails (a) no way through |
+| Ashgate | 5 (Fri) | none | 0 | `predictive-balanced` + spread at 0.2 | 6/8 | 10/20 | 0.272 | 17/20 | 15 / 24 | 10 | fails (a) no way through |
+| Ashgate | 5 (Fri) | shaft-out:before-halfway | 0 | `auction-multi-round` + spread at 0.2 | 6/8 | 5/20 | 0.087 | 17/20 | 15 / 24 | 15 | fails (a) no way through |
 
 - **Midtown Office's week is winnable and asks something.** At slope 0.02 ([§ D1066](../DECISIONS.md))
   all five unwrinkled weekdays are admitted, against 0 clears on days 3 to 5 at 0.11 in the swarm's
@@ -1575,6 +1593,21 @@ queue bar is `goalsForDay`'s):
   queue gate, day 4 among them as the queue-bar swarm's player member predicted (lowest peak over
   every screened play 53 against a bar of 26). Measured at the default slope and not tuned, on the
   ruling's own condition: a slope that cannot make a tower pass is not tuned toward one.
+- **Chancery House and Ashgate are measured at growth 0, and their Fridays are walls**
+  ([§ D1258](../DECISIONS.md), wave AM, lane AM-E). Swarm DO's screen passed both at slope 0 on
+  day 5's tuning crowds (6 of 8 each, against 3 and 2 of 8 at Midtown's 0.02), so the slope moved to
+  the bound's floor and the census above was taken there, weekdays plain and as dealt, 3 600 runs.
+  The held-out half refused day 5 on both towers: 8 and 5 of 20 as dealt, with the shaft out, and 8
+  and 10 of 20 plain. As
+  dealt, Chancery House counts Monday to Thursday and Ashgate Monday to Wednesday, Ashgate's
+  Thursday conference failing (a) at 9 of 20 where its plain Thursday passes at 13. Chancery House's
+  conference Thursday clears 16 of 20 where its plain Thursday clears 11; no mechanism is offered.
+  Both weeks meet [§ D1178](../DECISIONS.md)'s admission, and both targets can be met before
+  Thursday (three of four on Wednesday, two of three on Tuesday), which is the week
+  [§ D1180](../DECISIONS.md) refused for the first tower. So neither is dealt to a newcomer nor
+  offered after a held week ([§ D1259](../DECISIONS.md), [§ D1260](../DECISIONS.md)); the rows
+  still set each week's target and each day's sentence on the brief. As at Midtown, the move-in
+  Tuesday reproduces the plain Tuesday mark for mark on both towers.
 - The other whole-day towers are named in the file's `unmeasured` block with the reason for each.
 
 ### 4.4 Day one, which is what #208 is governed by

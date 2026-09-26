@@ -52,7 +52,7 @@ import {
   type WeekDeal,
 } from './weekStake.js';
 import { dc10Of, WEEK_WAY, type WeekWay } from './weekWay.js';
-import { isFirstDayOnALegibleTower } from './firstSession.js';
+import { FIRST_DAY_CONTRACT_IDS, isFirstDayOnALegibleTower } from './firstSession.js';
 import { filedDaysOf, tutorialIsDue } from '../everyday/tutorialModel.js';
 import { scheduledEventFor } from './calendar.js';
 import type { DayOutcome, GoalReading, WeekState } from './types.js';
@@ -304,8 +304,15 @@ describe('the target is derived — § D1176 clause 2', () => {
      * every counted day before it clean. Swarm DM's ruling (b): a target met by Wednesday is the
      * post-AJ panel's seat A complaint, so no tower § D1178 admits may allow it.
      */
-    const admitted = CONTRACTS.filter((contract) => weekAdmitsANewcomer(contract.id));
+    /*
+     * The towers a newcomer is dealt are the first-day set, which § D1260 holds to Midtown while
+     * § D1178's rule admits more weeks: Chancery House's and Ashgate's (§ D1258) can be met on
+     * Wednesday and Tuesday, so they are neither dealt to a newcomer nor offered at a held week's
+     * close (`shift/nextTower.ts`).
+     */
+    const admitted = CONTRACTS.filter((contract) => FIRST_DAY_CONTRACT_IDS.includes(contract.id));
     expect(admitted.map((contract) => contract.id)).toContain('c2');
+    expect(admitted.every((contract) => weekAdmitsANewcomer(contract.id))).toBe(true);
     for (const contract of admitted) {
       const deal = weekDealOf(contract.id);
       const counted = deal?.days.filter((day) => day.counts) ?? [];

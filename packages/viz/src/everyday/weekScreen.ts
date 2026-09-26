@@ -50,6 +50,7 @@ import type { ActionBarModel } from './actionBar.js';
 import { actionBarFor } from './actionBar.js';
 import { WEEK_START_NEXT_LABEL, weekScreenViewOf, type WeekDayCard, type WeekScreenView } from './weekView.js';
 import { weekHasClosed } from '../shift/weekStake.js';
+import type { NextTowerOffer } from '../shift/nextTower.js';
 import type { EverydayScreenModule } from './screens.js';
 import {
   BODY,
@@ -100,6 +101,13 @@ let todayIsClosed = false;
  */
 let weekSheetStands = false;
 
+/**
+ * The held week's onward tower, while its sheet stands — `shift/nextTower.ts`, lane AM-E
+ * ([§ D1259](../../../../DECISIONS.md)). Module state for {@link weekSheetStands}'s reason: the
+ * bar's primary is the next tower's press rather than *Start next week* while it holds.
+ */
+let onwardTower: NextTowerOffer | undefined;
+
 /** A card's ink, by verdict. § 19's moss for cleared, alarm for missed, faint for unjudged. */
 function inkFor(card: WeekDayCard): string {
   if (card.verdict === 'cleared') return C.moss;
@@ -145,7 +153,7 @@ function mountWeek(
     const dayClosed = data.runState().dayClosed;
     todayIsClosed = dayClosed;
     weekSheetStands = weekHasClosed(data.week());
-    return weekScreenViewOf({
+    const view = weekScreenViewOf({
       week: data.week(),
       towerToday: data.resolvedBuilding()?.name ?? data.selection().buildingId,
       nameOf: (buildingId) => data.buildingById(buildingId)?.name,
@@ -156,6 +164,8 @@ function mountWeek(
       /* The tower's record of closed weeks — § D1230. */
       record: data.weekRecord(),
     });
+    onwardTower = weekSheetStands ? view.onward : undefined;
+    return view;
   }
 
   /**
@@ -174,6 +184,17 @@ function mountWeek(
    */
   function playWeekendDay(): void {
     context.host.openTomorrow();
+    context.go('brief');
+  }
+
+  /**
+   * *Play Chancery House’s week* — a held week's onward press, lane AM-E
+   * ([§ D1259](../../../../DECISIONS.md)). The front door's own tower press, `chooseTower`, so the
+   * tower is reached by the one path every tower is reached by; the week left behind is parked with
+   * its sheet, as the front door parks it. The brief is where a day is set up, as for the next week.
+   */
+  function takeOnwardTower(offer: NextTowerOffer): void {
+    context.host.chooseTower(offer.contractId);
     context.go('brief');
   }
 
@@ -253,6 +274,31 @@ function mountWeek(
         why.style.cssText = `${QUIET};max-width:60ch`;
         row.append(press, why);
         sheet.body.append(row);
+      }
+      /*
+       * A held week's next tower, and the press that stays — lane AM-E, § D1259. The onward press
+       * is the bar's primary; this block names it and carries the other way on, so neither is a
+       * hidden choice.
+       */
+      if (view.onward !== undefined) {
+        const onward = el(doc, 'p', 'everyday-week-sheet-onward', view.onward.line);
+        onward.style.cssText = `${BODY};margin:0;max-width:74ch`;
+        const stay = el(doc, 'button', 'everyday-week-sheet-stay', view.onward.stayLabel);
+        stay.type = 'button';
+        stay.style.cssText = [
+          'justify-self:start',
+          'cursor:pointer',
+          `border:1px solid ${C.ruleLight}`,
+          'background:transparent',
+          `border-radius:${String(R.row)}px`,
+          'padding:7px 13px',
+          `color:${C.ink}`,
+          'font-size:13px',
+        ].join(';');
+        stay.addEventListener('click', () => {
+          startNextWeek();
+        });
+        sheet.body.append(onward, stay);
       }
       if (view.record !== undefined) {
         const record = el(doc, 'p', 'everyday-week-record', view.record);
@@ -533,7 +579,9 @@ function mountWeek(
      */
     primary: () => {
       if (weekHasClosed(context.host.week())) {
-        startNextWeek();
+        const offer = onwardTower;
+        if (offer !== undefined) takeOnwardTower(offer);
+        else startNextWeek();
         return;
       }
       context.go('door');
@@ -551,7 +599,9 @@ function mountWeek(
  */
 function weekBar(state: EverydayState): ActionBarModel {
   const base = actionBarFor(state);
-  if (weekSheetStands) return { ...base, primary: { ...base.primary, label: WEEK_START_NEXT_LABEL } };
+  if (weekSheetStands) {
+    return { ...base, primary: { ...base.primary, label: onwardTower?.label ?? WEEK_START_NEXT_LABEL } };
+  }
   const label = base.primary.variants[todayIsClosed ? 1 : 0] ?? base.primary.label;
   return { ...base, primary: { ...base.primary, label } };
 }

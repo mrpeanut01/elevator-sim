@@ -422,17 +422,351 @@
       "queueOnlyMisses": 13,
       "lowestPeakQueue": 113,
       "screenRuns": 130
-    }
-  ],
-  "unmeasured": [
+    },
     {
       "contractId": "c6",
-      "reason": "Chancery House: not measured at this lane's budget (a tower's five weekdays are about two and a half hours of whole days on this container, contended). The week swarm found its day 4 infeasible on the queue goal under all 65 configurations on one crowd (lowest peak queue 73 against a bar of 26); measure it at the next census."
+      "day": 1,
+      "eventId": "ordinary",
+      "growthPerDay": 0,
+      "breather": false,
+      "chosen": {
+        "dispatcherId": "predictive-balanced",
+        "press": "park-cars-lobby",
+        "atFraction": 0.43
+      },
+      "tuningClears": 8,
+      "tuningN": 8,
+      "chosenVerdicts": "CmCCCCmCCCCCmCmCCCCC",
+      "standingVerdicts": "mmCCCCmCCmCmmmmCCCCC",
+      "queueOnlyMisses": 4,
+      "lowestPeakQueue": 14,
+      "screenRuns": 130
+    },
+    {
+      "contractId": "c6",
+      "day": 2,
+      "eventId": "ordinary",
+      "growthPerDay": 0,
+      "breather": false,
+      "chosen": {
+        "dispatcherId": "predictive-balanced",
+        "press": "park-cars-lobby",
+        "atFraction": 0.43
+      },
+      "tuningClears": 7,
+      "tuningN": 8,
+      "chosenVerdicts": "CmCCCmmCCCCCmCmCCCmC",
+      "standingVerdicts": "mmCCCCmCCmCmmmmmCCCC",
+      "queueOnlyMisses": 6,
+      "lowestPeakQueue": 14,
+      "screenRuns": 130
+    },
+    {
+      "contractId": "c6",
+      "day": 2,
+      "eventId": "move-in:past-halfway",
+      "growthPerDay": 0,
+      "breather": false,
+      "chosen": {
+        "dispatcherId": "predictive-balanced",
+        "press": "park-cars-lobby",
+        "atFraction": 0.43
+      },
+      "tuningClears": 7,
+      "tuningN": 8,
+      "chosenVerdicts": "CmCCCmmCCCCCmCmCCCmC",
+      "standingVerdicts": "mmCCCCmCCmCmmmmmCCCC",
+      "queueOnlyMisses": 6,
+      "lowestPeakQueue": 14,
+      "screenRuns": 130
+    },
+    {
+      "contractId": "c6",
+      "day": 3,
+      "eventId": "ordinary",
+      "growthPerDay": 0,
+      "breather": false,
+      "chosen": {
+        "dispatcherId": "predictive-balanced",
+        "press": "park-cars-lobby",
+        "atFraction": 0.43
+      },
+      "tuningClears": 7,
+      "tuningN": 8,
+      "chosenVerdicts": "CmCCCmmCCCCCmmmCCCmC",
+      "standingVerdicts": "mmCCCCmCCmCmmmmmCCmC",
+      "queueOnlyMisses": 7,
+      "lowestPeakQueue": 14,
+      "screenRuns": 130
+    },
+    {
+      "contractId": "c6",
+      "day": 3,
+      "eventId": "fire-drill:full",
+      "growthPerDay": 0,
+      "breather": false,
+      "chosen": {
+        "dispatcherId": "fairness-first",
+        "press": "spread-cars",
+        "atFraction": 0.2
+      },
+      "tuningClears": 7,
+      "tuningN": 8,
+      "chosenVerdicts": "CmCCCCCCCCCCCmmCCCCC",
+      "standingVerdicts": "CmmmmCmCCCmmmmmmCCmC",
+      "queueOnlyMisses": 3,
+      "lowestPeakQueue": 15,
+      "screenRuns": 130
+    },
+    {
+      "contractId": "c6",
+      "day": 4,
+      "eventId": "ordinary",
+      "growthPerDay": 0,
+      "breather": false,
+      "chosen": {
+        "dispatcherId": "predictive-balanced",
+        "press": "",
+        "atFraction": 0
+      },
+      "tuningClears": 7,
+      "tuningN": 8,
+      "chosenVerdicts": "CmCmmmmCCCCCmmmCCCmC",
+      "standingVerdicts": "mmCmCCmCCmCmmmmmCCmC",
+      "queueOnlyMisses": 9,
+      "lowestPeakQueue": 14,
+      "screenRuns": 130
+    },
+    {
+      "contractId": "c6",
+      "day": 4,
+      "eventId": "conference:full-floor",
+      "growthPerDay": 0,
+      "breather": false,
+      "chosen": {
+        "dispatcherId": "fairness-first",
+        "press": "park-cars-lobby",
+        "atFraction": 0.2
+      },
+      "tuningClears": 6,
+      "tuningN": 8,
+      "chosenVerdicts": "CmCCCCCCCCmCCmCCCCmC",
+      "standingVerdicts": "mmCCCCmCmmmmCCmmCCmC",
+      "queueOnlyMisses": 4,
+      "lowestPeakQueue": 16,
+      "screenRuns": 130
+    },
+    {
+      "contractId": "c6",
+      "day": 5,
+      "eventId": "ordinary",
+      "growthPerDay": 0,
+      "breather": false,
+      "chosen": {
+        "dispatcherId": "predictive-balanced",
+        "press": "",
+        "atFraction": 0
+      },
+      "tuningClears": 6,
+      "tuningN": 8,
+      "chosenVerdicts": "CmCmmmmCCCCmmmmmCCmm",
+      "standingVerdicts": "mmCmCCmCCmCmmmmmCCmC",
+      "queueOnlyMisses": 12,
+      "lowestPeakQueue": 14,
+      "screenRuns": 130
+    },
+    {
+      "contractId": "c6",
+      "day": 5,
+      "eventId": "shaft-out:before-halfway",
+      "growthPerDay": 0,
+      "breather": false,
+      "chosen": {
+        "dispatcherId": "predictive-balanced",
+        "press": "",
+        "atFraction": 0
+      },
+      "tuningClears": 6,
+      "tuningN": 8,
+      "chosenVerdicts": "CmCmmmmCCCCmmmmmCCmm",
+      "standingVerdicts": "mmCmCCmCCmCmmmmmCCmC",
+      "queueOnlyMisses": 12,
+      "lowestPeakQueue": 14,
+      "screenRuns": 130
     },
     {
       "contractId": "c10",
-      "reason": "Ashgate: not measured at this lane's budget; the week swarm measured days 3 to 5 at 0 clears over 6 dispatchers and 2 crowds as built. Owed to the next census."
+      "day": 1,
+      "eventId": "ordinary",
+      "growthPerDay": 0,
+      "breather": false,
+      "chosen": {
+        "dispatcherId": "predictive-balanced",
+        "press": "spread-cars",
+        "atFraction": 0.2
+      },
+      "tuningClears": 8,
+      "tuningN": 8,
+      "chosenVerdicts": "CCCCCCCCCCmCCmCmCCCC",
+      "standingVerdicts": "mmCCmmCmCCmCmmCmmmCm",
+      "queueOnlyMisses": 3,
+      "lowestPeakQueue": 15,
+      "screenRuns": 130
     },
+    {
+      "contractId": "c10",
+      "day": 2,
+      "eventId": "ordinary",
+      "growthPerDay": 0,
+      "breather": false,
+      "chosen": {
+        "dispatcherId": "predictive-balanced",
+        "press": "spread-cars",
+        "atFraction": 0.2
+      },
+      "tuningClears": 8,
+      "tuningN": 8,
+      "chosenVerdicts": "CCCCCCCCCCmCmmCmCCCC",
+      "standingVerdicts": "mmCCmmCmCCmCmmCmmmCm",
+      "queueOnlyMisses": 4,
+      "lowestPeakQueue": 15,
+      "screenRuns": 130
+    },
+    {
+      "contractId": "c10",
+      "day": 2,
+      "eventId": "move-in:past-halfway",
+      "growthPerDay": 0,
+      "breather": false,
+      "chosen": {
+        "dispatcherId": "predictive-balanced",
+        "press": "spread-cars",
+        "atFraction": 0.2
+      },
+      "tuningClears": 8,
+      "tuningN": 8,
+      "chosenVerdicts": "CCCCCCCCCCmCmmCmCCCC",
+      "standingVerdicts": "mmCCmmCmCCmCmmCmmmCm",
+      "queueOnlyMisses": 4,
+      "lowestPeakQueue": 15,
+      "screenRuns": 130
+    },
+    {
+      "contractId": "c10",
+      "day": 3,
+      "eventId": "ordinary",
+      "growthPerDay": 0,
+      "breather": false,
+      "chosen": {
+        "dispatcherId": "fairness-first",
+        "press": "",
+        "atFraction": 0
+      },
+      "tuningClears": 8,
+      "tuningN": 8,
+      "chosenVerdicts": "CCCCCmCCCCmCmmCmCCmC",
+      "standingVerdicts": "mmCCmmCmCCmmmmCmmmmm",
+      "queueOnlyMisses": 6,
+      "lowestPeakQueue": 15,
+      "screenRuns": 130
+    },
+    {
+      "contractId": "c10",
+      "day": 3,
+      "eventId": "fire-drill:full",
+      "growthPerDay": 0,
+      "breather": false,
+      "chosen": {
+        "dispatcherId": "fairness-first",
+        "press": "park-cars-lobby",
+        "atFraction": 0.2
+      },
+      "tuningClears": 7,
+      "tuningN": 8,
+      "chosenVerdicts": "CmCCCCCCmCCCmmmmCmmC",
+      "standingVerdicts": "CmmmCCCCmmmCmmmmmmmm",
+      "queueOnlyMisses": 8,
+      "lowestPeakQueue": 16,
+      "screenRuns": 130
+    },
+    {
+      "contractId": "c10",
+      "day": 4,
+      "eventId": "ordinary",
+      "growthPerDay": 0,
+      "breather": false,
+      "chosen": {
+        "dispatcherId": "predictive-balanced",
+        "press": "spread-cars",
+        "atFraction": 0.2
+      },
+      "tuningClears": 7,
+      "tuningN": 8,
+      "chosenVerdicts": "CCCmCCCCmCmCmmCmCCmC",
+      "standingVerdicts": "mmCmmmCmCCmmmmCmmmmm",
+      "queueOnlyMisses": 7,
+      "lowestPeakQueue": 15,
+      "screenRuns": 130
+    },
+    {
+      "contractId": "c10",
+      "day": 4,
+      "eventId": "conference:full-floor",
+      "growthPerDay": 0,
+      "breather": false,
+      "chosen": {
+        "dispatcherId": "fairness-first",
+        "press": "spread-cars",
+        "atFraction": 0.43
+      },
+      "tuningClears": 6,
+      "tuningN": 8,
+      "chosenVerdicts": "CmCCmmmCmmmCmmmmCCCC",
+      "standingVerdicts": "mmmmCmmCmmmCmmCmmCmC",
+      "queueOnlyMisses": 11,
+      "lowestPeakQueue": 18,
+      "screenRuns": 130
+    },
+    {
+      "contractId": "c10",
+      "day": 5,
+      "eventId": "ordinary",
+      "growthPerDay": 0,
+      "breather": false,
+      "chosen": {
+        "dispatcherId": "predictive-balanced",
+        "press": "spread-cars",
+        "atFraction": 0.2
+      },
+      "tuningClears": 6,
+      "tuningN": 8,
+      "chosenVerdicts": "CmCmCmCCmmmCmmCmCCmC",
+      "standingVerdicts": "mmCmmmCmCmmmmmmmmmmm",
+      "queueOnlyMisses": 10,
+      "lowestPeakQueue": 15,
+      "screenRuns": 130
+    },
+    {
+      "contractId": "c10",
+      "day": 5,
+      "eventId": "shaft-out:before-halfway",
+      "growthPerDay": 0,
+      "breather": false,
+      "chosen": {
+        "dispatcherId": "auction-multi-round",
+        "press": "spread-cars",
+        "atFraction": 0.2
+      },
+      "tuningClears": 6,
+      "tuningN": 8,
+      "chosenVerdicts": "CmCmmmCmmmmCmmCmmmmm",
+      "standingVerdicts": "mmCmmmCmCmmmmmmmmmmm",
+      "queueOnlyMisses": 15,
+      "lowestPeakQueue": 15,
+      "screenRuns": 130
+    }
+  ],
+  "unmeasured": [
     {
       "contractId": "c4",
       "reason": "Mixed-Use High-Rise: not measured at this lane's budget, and its day 1 already misses under every shipped dispatcher once the energy bar is graded (docs/33 F7, #234), which no growth slope can move. Owed after #234."

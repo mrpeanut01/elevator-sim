@@ -201,6 +201,7 @@ import {
   NO_CALL_RAISED_LINE,
   type DayCloseView,
 } from '../shift/dayClose.js';
+import { NEXT_TOWER_STAY_LABEL, nextTowerOfferOf } from '../shift/nextTower.js';
 // GitHub issue #221's post block — the decision, seeded in all seven states by the report adapter.
 import { postRunViewOf } from '../everyday/postRun.js';
 import { CHIMES_PANEL_COPY } from '../everyday/chimesPanel.js';
@@ -14192,12 +14193,17 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     'shift/weekRecord.ts#weekRecordLineOf',
     'everyday/continueWeek.ts#continueWeekEntryOf',
     'everyday/continueWeek.ts#CONTINUE_WEEK_TITLE',
+    /* Lane AM-E (§ D1259): a held week's next tower, seeded in `seedWeekStake` for the same reason. */
+    'shift/nextTower.ts#nextTowerOfferOf',
+    'shift/nextTower.ts#NEXT_TOWER_STAY_LABEL',
   ],
   render(context) {
     const seeds: TextSeed[] = [];
     const bundle = shiftBundleOf(context);
     seeds.push({ field: 'today.driverHeld', text: PRESS_DAY_DRIVER_HELD, role: 'prose' });
-    seedWeekStake(seeds, bundle.observations);
+    seedWeekStake(seeds, bundle.observations, (buildingId) =>
+      context.buildings.find((building) => building.id === buildingId)?.name,
+    );
     seedDayClose(seeds, context, bundle);
     seeds.push({ field: 'brief.wayThrough.heading', text: BRIEF_WAY_THROUGH_HEADING, role: 'label' });
     for (const row of WEEK_WAY.rows) {
@@ -17026,7 +17032,11 @@ export { batchReport, evidenceFrom };
  * case's own readings, so the sheet's figures are the case's rather than a fixture's, under the
  * house's three states.
  */
-function seedWeekStake(seeds: TextSeed[], observations: Observations): void {
+function seedWeekStake(
+  seeds: TextSeed[],
+  observations: Observations,
+  nameOf: (buildingId: string) => string | undefined,
+): void {
   seeds.push({ field: 'brief.week.heading', text: BRIEF_WEEK_HEADING, role: 'label' });
   seeds.push({ field: 'week.stake.short', text: WEEK_WITHOUT_COUNTED_DAYS_SHORT, role: 'reason' });
   seeds.push({ field: 'week.day.unmeasured', text: DAY_UNMEASURED_SENTENCE, role: 'reason' });
@@ -17143,6 +17153,20 @@ function seedWeekStake(seeds: TextSeed[], observations: Observations): void {
   seeds.push({ field: 'week.sheetStep.label', text: WEEK_SHEET_STEP.label, role: 'label' });
   seeds.push({ field: 'week.sheetStep.note', text: WEEK_SHEET_STEP.note, role: 'prose' });
   seeds.push({ field: 'week.startNext', text: WEEK_START_NEXT_LABEL, role: 'label' });
+  /*
+   * Lane AM-E (§ D1259): a held week's sheet offers the next tower the census admits. Drawn only at
+   * a held week's close, which no corpus case's one day reaches, so it is seeded here for every
+   * census tower whose week has a target, held at exactly that target.
+   */
+  for (const contract of CONTRACTS) {
+    const deal = weekDealOf(contract.id);
+    if (deal === undefined || deal.target === 0) continue;
+    const offer = nextTowerOfferOf(contract.id, { yours: deal.target, target: deal.target }, nameOf);
+    if (offer === undefined) continue;
+    seeds.push({ field: `week.onward.${contract.id}.label`, text: offer.label, role: 'label' });
+    seeds.push({ field: `week.onward.${contract.id}.line`, text: offer.line, role: 'observation' });
+  }
+  seeds.push({ field: 'week.onward.stay', text: NEXT_TOWER_STAY_LABEL, role: 'label' });
   for (const [arm, record] of [
     ['one', { contractId: 'c2', closed: 1, met: 0, best: 3 }],
     ['several', { contractId: 'c2', closed: 3, met: 2, best: 5 }],

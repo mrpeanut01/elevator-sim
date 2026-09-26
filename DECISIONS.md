@@ -46853,6 +46853,8 @@ roll), `everyday/weekView.test.ts` (the sheet reaches the week screen with the s
 
 ## D1178 — a newcomer's first week is on a tower whose week the census admits
 
+> **Status 2026-09-26: AMENDED by [§ D1260](#d1260)** (an agent ruling). The set no longer widens with the census: it is also held to Midtown Office, and a tower admitted later is reached by [§ D1259](#d1259)'s offer, when its week meets that entry's rules. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-09-26 by agent sessions under delegated authority** (wave AK, lane AK-E, on swarm
 > DL's Q2 ruling, 3-0 on clause 4), not by the product owner. Owner-reversible clause: the
 > admission rule, day 1 counts and the week has room for one miss.
@@ -47907,6 +47909,8 @@ imported functions or asserted words that did not exist.
 
 ## D1227 — the week closes onto its sheet, and each day's house run starts as that day closes
 
+> **Status 2026-09-26: EXTENDED by [§ D1259](#d1259)** (an agent ruling). On a held week the sheet's primary is the next tower whose week the census admits and that cannot be won before Thursday, with *Start next week here* as the second press; on the shipped census only Midtown Office is offered, from the towers below and above it. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-09-26 by agent sessions under delegated authority** (wave AL, lane AL-F, on swarm DN's
 > Q2 ruling, item 3, three of three), not by the product owner. It amends [§ D1177](#d1177)'s
 > *asked lazily, the first time a screen reads the sheet*. **Owner-reversible**: the report's one
@@ -48492,3 +48496,116 @@ filed reads as this day still open. The Engineer rail's own goal ticks mid-day a
 **What holds it.** `shift/callRow.test.ts` (a later press keeps the row, the counts' framing, both
 through § D982's ban lists) and `everyday/stageRecord.browser.test.ts` on the built bundle, whose
 soft assertions named all eight defects red on `0911d63` and none after.
+
+---
+
+## D1258 — Chancery House and Ashgate grow at 0, and the week census measures both weeks: Monday to Thursday and Monday to Wednesday count, and both Fridays are walls
+
+> **Taken 2026-09-26 by agent sessions under delegated authority** (wave AM, lane AM-E, on swarm
+> DO's ruling § 3, three of three), not by the product owner. **Owner-reversible**: slope 0 on both
+> rungs. The marks are measurements and are not reversible by ruling; the remedy for a moved mark
+> is a census re-run.
+
+**Why an entry.** It moves two rungs' growth in `data/contract-ladder.json` ([§ D1066](#d1066)),
+adds eighteen rows to `data/week-way.json` ([§ D1067](#d1067)), and so changes what the week
+stake, the brief and the tower picker say about two towers (§ D1176, § D1179).
+
+**The slope.** Swarm DO's S3 screened day 5 on DC-10's tuning half: at Midtown's 0.02 Chancery
+House (`c6`) cleared 3 of 8 and Ashgate (`c10`) 2 of 8; at 0 both cleared 6 of 8, § D1066's pass
+mark. Both rungs now declare `growthPerDay: 0`, the floor of `GROWTH_PER_DAY_BOUNDS`, so no gentler
+slope was open. Their weeks do not grow; a day differs from Monday by its bars and its wrinkle.
+
+**The census.** DC-10's full protocol at slope 0, by the documented command
+(`WEEK_WAY_SWEEP=1 WEEK_WAY_CONTRACTS=<id> WEEK_WAY_DAYS=1,2,3,4,5`, then
+`WEEK_WAY_EVENTS=scheduled WEEK_WAY_DAYS=2,3,4,5`, one worker), eighteen cells of 200 runs, 3 600
+runs and 9 972 cell-seconds on a shared container at load 5 to 82. The rows are copied from the
+sweep's output line for line; `docs/33` DC-10's table carries every one. As dealt:
+
+| tower | Mon | Tue (move-in) | Wed (fire drill) | Thu (conference) | Fri (shaft out) | counted | target | met at the earliest |
+|---|---|---|---|---|---|---|---|---|
+| Chancery House | 16/20 | 14/20 | 17/20 | 16/20 | **8/20** | 4 | 3 | Wednesday |
+| Ashgate | 17/20 | 16/20 | 12/20 | **9/20** | **5/20** | 3 | 2 | Tuesday |
+
+Each figure is the held-out clears of the configuration chosen on tuning crowds; bold fails DC-10's
+(a). Every admitted day's standing order misses at least 8 of 20, and no day fails the queue gate.
+Plain, Chancery House's Thursday also fails (11 of 20) and Ashgate's passes (13 of 20); both
+Fridays fail plain (8 and 10). The move-in Tuesday reproduces the plain Tuesday mark for mark on
+both towers, as at Midtown (§ D1180 clause 4). **No mechanism is offered** for Chancery House's
+conference Thursday clearing more crowds than its plain one.
+
+**What it moves.** Both towers leave the census's `unmeasured` block. Their weeks now carry a
+derived target (§ D1176) in place of `needClean`, and each refused day draws its measured sentence
+on the brief. Both weeks meet § D1178's admission (day 1 counts, the target is below the counted
+days), and both targets can be met before Thursday, so § D1259 offers neither and § D1260 deals
+neither to a newcomer.
+
+**Tests.** `shift/weekWay.test.ts` (well formed and current against the ladder, every weekday of a
+measured tower present), `shift/weekWay.test.ts#a re-derived slope reaches the run` (day 5's
+population on both rungs is day 1's, and not the default's), and `shift/nextTower.test.ts`, which
+pins the counted days, targets and earliest days above. `shift/weekWay.verify.test.ts` re-runs every
+row weekly.
+
+## D1259 — a held week's close offers the next tower whose week meets every rule the first tower's does, and locks nothing
+
+> **Taken 2026-09-26 by agent sessions under delegated authority** (wave AM, lane AM-E, on swarm
+> DO's ruling § 3, three of three), not by the product owner. **Owner-reversible**: the offer
+> itself; that it is the sheet's primary rather than a second button; the ladder order with its
+> wrap; *held* meaning the week's target was met; and, deciding today's outcome, carrying
+> [§ D1180](#d1180)'s Thursday check to the offered tower.
+
+**Why an entry.** It changes the one button on the week's sheet ([§ D1227](#d1227)) and reads two
+week rulings ([§ D1178](#d1178), § D1180) for a purpose they were not written for.
+
+**The ruling.** A week is *held* when its sheet's target was met. At that close only, the sheet
+names the next tower, in `CONTRACTS` order (DC-6's ladder) after the tower just held, wrapping to
+the lowest rung, never the tower itself, whose week (1) § D1178 admits
+(`shift/weekStake.ts#weekAdmitsANewcomer`: day 1 counts and the week has room for one miss) and
+(2) cannot be won before Thursday, § D1180's check on the first tower. Its press, *Play Ashgate's
+week* for instance, is the bar's primary and runs the front door's own `chooseTower`, so the week
+left behind is parked with its sheet exactly as the picker parks it; *Start next week here* stays in
+the sheet as the second press. The sentence names the next tower's counted days and target and says
+the tower just held stays open from *This week's tower*. A week that was not held keeps *Start next
+week* and offers nothing. Nothing is locked or unlocked by any of it, and no string it draws
+contains *lock*.
+
+**What is offered today: Midtown Office, from below it.** § D1258's census admits Chancery House's
+and Ashgate's weeks by rule (1) and both fail rule (2), their targets met at the earliest on
+Wednesday and Tuesday. Rule (2) is carried because a week won by Wednesday is the complaint § D1180
+was taken to remove, and a tower offered as the next step should be no thinner a week than the
+first. So Midtown is the one tower whose week meets both: a held week on Chancery House, Harbour
+Point or Ashgate offers Midtown, and a held Midtown week offers nothing and keeps *Start next week*.
+Without rule (2) a held Midtown week would offer Ashgate. A further tower is offered on the commit a
+census row admits a week that meets both rules; no tower is named in code.
+
+**Tests.** `shift/nextTower.test.ts` over built censuses (the order and its wrap, a refused and an
+unmeasured tower skipped, the Thursday rule, no offer on a week not held or with no target, no
+*lock* in any drawn string) and over the shipped one (neither tower offered, and why, and Midtown offered from Chancery House, Harbour Point and Ashgate);
+`everyday/weekView.test.ts` (a held Chancery House week offers Midtown as the primary, a held
+Midtown week and a missed one keep *Start next week*); `everyday/weekSurvives.browser.test.ts` reads whichever arm the sheet draws. The honesty
+corpus seeds the label and the sentence per census tower that has an onward tower, and the second
+press's label.
+
+**Not established.** No browser case presses the onward button: the browser tier has no fixture for
+a held week, and the one tower offered today is offered from towers a browser case does not hold a
+week on.
+
+## D1260 — a newcomer's first week stays on Midtown Office while the census admits more weeks
+
+> **Taken 2026-09-26 by agent sessions under delegated authority** (wave AM, lane AM-E, on the lane
+> brief's clause 3 and swarm DO's ruling § 3), not by the product owner. **Owner-reversible**: the
+> one-member list; widening it restores § D1178's widening.
+
+**Why an entry.** It amends [§ D1178](#d1178)'s *a tower joins the set on the commit its census row
+admits it*, which § D1258's rows would otherwise have carried out for two towers.
+
+**The ruling.** `shift/firstSession.ts#FIRST_DAY_CONTRACT_IDS` is also held inside
+`NEWCOMER_WEEK_TOWER_IDS`, which names Midtown Office alone. It is typed, and its docstring says so;
+the three derived halves still filter it, so a Midtown pin or week that stopped being admitted would
+empty the set and the draw would throw with no fallback. § D1180's derived check, *the target
+cannot be met before Thursday on any tower a newcomer is dealt*, now iterates that set rather than
+every tower § D1178 admits, which is what its text named.
+
+**Tests.** `shift/firstSession.test.ts#a newcomer still starts on Midtown Office`: four hundred dates
+draw Midtown while § D1178 admits two more towers. Red before, with § D1258's rows and without the
+list: the set read `c2, c6, c10`. `shift/weekStake.test.ts`'s Thursday check reads the first-day
+set.

@@ -36,6 +36,7 @@
  * its `cleared | missed | ungraded` from exactly this pair. Two readers, one rule.
  */
 
+import { nextTowerOfferOf, type NextTowerOffer } from '../shift/nextTower.js';
 import { wasGraded } from '../shift/week.js';
 import {
   DAY_UNMEASURED_SENTENCE,
@@ -171,8 +172,16 @@ export interface WeekScreenView {
    */
   readonly record: string | undefined;
   /**
-   * The screen's one button while the week's sheet stands — {@link WEEK_START_NEXT_LABEL} — and
-   * `undefined` otherwise, when the button is the week row's own (§ 3.3).
+   * **The next tower, on a held week's sheet** — `shift/nextTower.ts#nextTowerOfferOf`, lane AM-E
+   * ([§ D1259](../../../../DECISIONS.md)) — or `undefined` where the week was not held or no tower
+   * after this one has a week the census admits. Where it stands it is the sheet's next step: its
+   * label is {@link primary}, and the next week on this tower is the sheet's second press.
+   */
+  readonly onward: NextTowerOffer | undefined;
+  /**
+   * The screen's one button while the week's sheet stands — the onward tower's label where a held
+   * week offers one, {@link WEEK_START_NEXT_LABEL} otherwise — and `undefined` when no sheet
+   * stands, when the button is the week row's own (§ 3.3).
    */
   readonly primary: string | undefined;
 }
@@ -425,6 +434,7 @@ export function weekScreenViewOf(input: WeekScreenInput): WeekScreenView {
   /* Today closed, by the week or by the sitting — `doorView.ts#todayIsBanked`, so the door agrees. */
   const todayClosed = todayIsBanked(input);
   const sheet = weekSheetOf(input.week, input.house ?? (() => undefined));
+  const onward = nextTowerOfferOf(input.week.contractId, sheet, input.nameOf);
   return {
     eyebrow: 'ELEVATOR SIM · EVERYDAY MODE',
     title: 'Your week',
@@ -456,7 +466,8 @@ export function weekScreenViewOf(input: WeekScreenInput): WeekScreenView {
     notCounted: notCountedOf(input.week, cards),
     sheet,
     record: input.record === undefined ? undefined : weekRecordLineOf(input.record),
-    primary: sheet === undefined ? undefined : WEEK_START_NEXT_LABEL,
+    onward,
+    primary: sheet === undefined ? undefined : (onward?.label ?? WEEK_START_NEXT_LABEL),
   };
 }
 
