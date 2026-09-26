@@ -42,9 +42,14 @@ afterAll(async () => {
   await site?.close();
 });
 
+/*
+ * Seed 424243 rather than 424242: § D1180 moved the Tuesday move-in out of the lunch peak, and on the
+ * old seed day 2 then scored exactly as day 1 did, which left #522's non-vacuity check (day 2's run
+ * must not score as day 1's) unable to tell the two runs apart. This seed keeps them apart.
+ */
 async function coldLoad(): Promise<Page> {
   const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
-  await page.goto(`${origin}?building=garden-apartments&seed=424242`, { waitUntil: 'load' });
+  await page.goto(`${origin}?building=garden-apartments&seed=424243`, { waitUntil: 'load' });
   await page.waitForFunction(
     () => document.querySelector<HTMLElement>('.menu-overlay')?.hidden === true,
     undefined,
