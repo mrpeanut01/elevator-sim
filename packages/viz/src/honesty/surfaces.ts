@@ -2986,7 +2986,16 @@ const CAMPAIGN: SurfaceAdapter = {
         field: `briefing.goals[${String(index)}]`,
         text: goal,
         role: 'goal',
-        goal: { rateShown: /\b\d+\s*(?:of|\/)\s*\d+\b/.test(goal), seeds: stage.replications },
+        /*
+         * `briefing.goals` is `stage.goals` mapped in order (`campaign/brief.ts`), so the index names
+         * the kind. The stage page names a goal in its own words (§ D1159), which carry neither the
+         * id nor `GOAL_NAMES`' name, so R12's exemption has to be told the kind.
+         */
+        goal: {
+          kind: stage.goals[index]?.kind,
+          rateShown: /\b\d+\s*(?:of|\/)\s*\d+\b/.test(goal),
+          seeds: stage.replications,
+        },
       });
     }
     for (const dimension of briefing.editable) {
