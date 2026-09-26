@@ -2214,12 +2214,13 @@ type DecisionReservation = {
  * them (§ D430), and the charter row moves to **D1139**.
  */
 /*
- * **Wave AK closed its reservation in its own merge commit.** It held D1139-D1190 (three blocks of
- * nine for the defect lanes, then an extension for the lanes swarms DL and DM made necessary) and
- * spent twenty-eight headings. The unspent numbers below D1185 are holes in `KNOWN_DECISION_HOLES`;
- * D1186-D1190 are free rather than holed (§ D430).
+ * **Wave AL is OPEN and reserves D1186-D1240**, blocks of nine for the lanes the post-AK panel's
+ * findings made necessary (medians P1 6, P2 6, P3 6, P4 5, honesty 7.5 from three of four seats;
+ * termination **no**). Committed on `al-base` before any lane worktree exists, and closed in the
+ * wave's own merge commit. Wave AK held D1139-D1190 and left D1186-D1190 free rather than holed
+ * (§ D430), so this block opens over them.
  */
-const OPEN_RESERVATION = null as DecisionReservation | null;
+const OPEN_RESERVATION = { wave: 'AL', from: 1186, to: 1240 } as DecisionReservation | null;
 /*
  * **Wave AC's reservation, D619-D620, is closed.** It opened on the pair wave AB left free.
  * GitHub issue #437 stage 2 wrote D619 first, on a lane that started from the same pre-#422 base as
