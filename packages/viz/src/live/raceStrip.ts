@@ -198,6 +198,14 @@ export const RACE_NOT_RUN = 'no rival run yet — the next Run this shift races 
 export const RACE_WATCHING =
   'no rival while this is somebody else’s day — a spectator who commissioned a second run would be playing, not watching';
 
+/**
+ * {@link RACE_WATCHING} on a replay of the player's **own** filed day — wave AL, lane AL-A,
+ * [§ D1186](../../../../DECISIONS.md). *Somebody else's day* was false of the player's own record.
+ * The rule it states is unchanged: a replay is the record as it was filed and runs no second day.
+ */
+export const RACE_WATCHING_OWN =
+  'no rival on a replay of your own filed day — the record is replayed as it was closed, and a replay runs no second day';
+
 /* -------------------------------------------------------------------------- *
  * The samples
  * -------------------------------------------------------------------------- */
@@ -416,6 +424,11 @@ export interface RaceRival {
    * reproduce exactly the defect that put this field here.
    */
   readonly watching: boolean;
+  /**
+   * Whether the watched run is the player's own filed day — `watch/view.ts#WatchOwner`, wave AL.
+   * Read only while {@link watching}; it picks {@link RACE_WATCHING_OWN} over {@link RACE_WATCHING}.
+   */
+  readonly watchingOwn?: boolean | undefined;
 }
 
 /** The three cells a shell writes that are not a polyline. */
@@ -473,7 +486,9 @@ export function raceSlotsOf(
   rival: RaceRival,
   yours: VizRecording | undefined,
 ): RaceSlots {
-  if (rival.watching) return { verdict: '', note: RACE_WATCHING, rivalName: '' };
+  if (rival.watching) {
+    return { verdict: '', note: rival.watchingOwn === true ? RACE_WATCHING_OWN : RACE_WATCHING, rivalName: '' };
+  }
   const drawn = view.ghost !== undefined;
   const pickNote = GHOST_OPTIONS.find((option) => option.id === rival.pick)?.note ?? '';
   const verdict =

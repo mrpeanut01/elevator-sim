@@ -377,6 +377,80 @@ export function stampVerbOf(change: InterventionChange): string {
 }
 
 /**
+ * **Who drove which stretch of the day** — wave AL, lane AL-A, the post-AK panel's seats B and C.
+ *
+ * A handover (`adopt-dispatcher`, or a stored weights-only `switch-dispatcher`) is an entry on the
+ * run's intervention log; the recording's `dispatcherProfileId` keeps naming the dispatcher the
+ * day was **configured** with. So the stage header kept reading *DRIVING Minimum estimated wait*
+ * until 18:00 after the player handed the day to *Fairness first* at 08:48, and the report's title
+ * named the configured dispatcher above its own log line reading *08:48 · switched to Fairness
+ * first*. Every surface that names the driver reads this list instead: the stage and the Engineer
+ * canvas at the playhead ({@link driverNameAt}), and the report over the whole day
+ * ({@link driversLineOf}).
+ *
+ * The first stretch starts with the day (`fromS` `undefined`) under `startName`, the configured
+ * dispatcher's display name. A handover that names the dispatcher already driving opens no
+ * stretch, because nothing changed hands. Entries are read in time order, and two at one instant
+ * resolve the way {@link interventionStampOf} resolves them: the later entry wins.
+ */
+export interface DriverStretch {
+  /** The simulated second this driver took over, or `undefined` for the one the day began with. */
+  readonly fromS: number | undefined;
+  readonly name: string;
+}
+
+export function driverStretchesOf(
+  interventions: readonly RunInterventionConfig[],
+  startName: string,
+): readonly DriverStretch[] {
+  const stretches: DriverStretch[] = [{ fromS: undefined, name: startName }];
+  const inTime = interventions
+    .map((entry, index) => ({ entry, index }))
+    .sort((a, b) => a.entry.atS - b.entry.atS || a.index - b.index);
+  for (const { entry } of inTime) {
+    const change = entry.change;
+    if (change.kind !== 'adopt-dispatcher' && change.kind !== 'switch-dispatcher') continue;
+    const name = change.profile.name;
+    const last = stretches[stretches.length - 1];
+    if (last !== undefined && last.name === name) continue;
+    if (last !== undefined && last.fromS === entry.atS) {
+      stretches[stretches.length - 1] = { fromS: entry.atS, name };
+      continue;
+    }
+    stretches.push({ fromS: entry.atS, name });
+  }
+  return stretches;
+}
+
+/** The dispatcher driving at `simTimeS` — the stage header's `DRIVING` cell. */
+export function driverNameAt(
+  interventions: readonly RunInterventionConfig[],
+  simTimeS: number,
+  startName: string,
+): string {
+  let name = startName;
+  for (const stretch of driverStretchesOf(interventions, startName)) {
+    if (stretch.fromS === undefined || stretch.fromS <= simTimeS) name = stretch.name;
+  }
+  return name;
+}
+
+/**
+ * Who drove the whole day, in one line — `Conventional collective`, or `Conventional collective,
+ * then Fairness first from 08:48`. The report's title line reads it, so the sheet names who drove
+ * when rather than only who the day was configured with.
+ */
+export function driversLineOf(
+  interventions: readonly RunInterventionConfig[],
+  startName: string,
+  dayStartS?: number | undefined,
+): string {
+  return driverStretchesOf(interventions, startName)
+    .map((stretch) => (stretch.fromS === undefined ? stretch.name : `then ${stretch.name} from ${clockAt(stretch.fromS, dayStartS)}`))
+    .join(', ');
+}
+
+/**
  * The most recent intervention **as of the playhead**, stamped — `09:14 · parked the cars in the
  * lobby` — or `''` when none has taken effect yet.
  *

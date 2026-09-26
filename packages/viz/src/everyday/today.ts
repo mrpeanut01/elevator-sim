@@ -42,7 +42,7 @@
  * own words that whether the crowd is comfortable is the day's to show. GitHub issue #208.
  */
 
-import { crowdMakesPractice } from '../shift/scoredCrowd.js';
+import { PRACTICE_DAY_SENTENCES, practiceGroundOf, type PracticeGround } from '../shift/scoredCrowd.js';
 import type { ResolvedBuilding } from '@elevator-sim/core/browser';
 
 import { bookedOutCarsOf, carAbsencesOf, wrinkleNameOf, wrinkleNoteOf } from '../shift/bookedOut.js';
@@ -818,7 +818,7 @@ function ledeOf(
  * **Neither arm names the tower as shared**, and that is [§ D730](../../../../DECISIONS.md)
  * rather than an omission. The tower is the one this player’s week was opened on.
  */
-function seedLineOf(input: TodayInput, crowdIsPinned: boolean): string {
+function seedLineOf(input: TodayInput, crowdIsPinned: boolean, practice: PracticeGround | undefined): string {
   const crowd = `tower ${input.buildingId} · crowd ${input.seed.toString()}`;
   if (input.crowdIsToday) return `${crowd} · today’s date, so everyone playing today meets this crowd`;
   /*
@@ -835,7 +835,7 @@ function seedLineOf(input: TodayInput, crowdIsPinned: boolean): string {
    * press rather than the sheet after it.
    */
   const own = `${crowd} · a crowd of this run’s own, not the day’s`;
-  return crowdMakesPractice(input.week, input.seed, input.daySeed)
+  return practice === 'crowd'
     ? `${own}, so this run is practice and banks nothing into your week`
     : own;
 }
@@ -854,6 +854,8 @@ function dayLengthOf(input: TodayInput, event: ShiftEvent): string | undefined {
 export function todayOf(input: TodayInput): TodayRecord {
   const { week, building } = input;
   const weekday = weekdayOf(week.dayIdx);
+  /* Whether this run banks, decided once and read by both lines that say so — the seed line and the week block. */
+  const practice = practiceGroundOf(week, input.seed, input.daySeed);
   /*
    * The event as the run will have it — § D1040. Its note is the wrinkle's own on every day but one
    * whose template keeps its own mix, where the wrinkle's mix is withheld by `core` and the note says
@@ -921,7 +923,7 @@ export function todayOf(input: TodayInput): TodayRecord {
     facts: factsOf(building, out, input.units),
     load: loadOf(building, out),
     asks: input.goals.map((reading) => reading.goal.label),
-    seedLine: seedLineOf(input, crowdIsPinned),
+    seedLine: seedLineOf(input, crowdIsPinned, practice),
     crowdIsToday: input.crowdIsToday,
     crowdIsPinned,
     /*
@@ -944,13 +946,26 @@ export function todayOf(input: TodayInput): TodayRecord {
       hasCalendar: input.calendar !== null,
       horizon: input.horizon,
     }),
-    weekStake: weekStakeOf(week, event.id),
+    weekStake: weekStakeOf(week, event.id, practice),
   };
 }
 
-/** {@link TodayRecord.weekStake} — § D1176, read off the census through `shift/weekStake.ts`. */
-function weekStakeOf(week: WeekState, eventId: string): TodayRecord['weekStake'] {
+/**
+ * {@link TodayRecord.weekStake} — § D1176, read off the census through `shift/weekStake.ts`.
+ *
+ * **A run that banks nothing says so here too** — wave AL, lane AL-A, the post-AK panel's seat D
+ * (H3). The census sentence describes the day as dealt; on a practice run it stood under the seed
+ * line's *banks nothing* and said *This day counts toward the week.* The day sentence is
+ * `shift/scoredCrowd.ts#PRACTICE_DAY_SENTENCES` for the ground {@link todayOf} decided once, which
+ * is the ground the close reads.
+ */
+function weekStakeOf(
+  week: WeekState,
+  eventId: string,
+  practice: PracticeGround | undefined,
+): TodayRecord['weekStake'] {
   const line = weekStakeLineOf(week);
   if (line === undefined) return undefined;
-  return { line, day: dayStakeSentenceOf(week.contractId, week.day, eventId) };
+  const dealt = dayStakeSentenceOf(week.contractId, week.day, eventId);
+  return { line, day: practice === undefined || dealt === undefined ? dealt : PRACTICE_DAY_SENTENCES[practice] };
 }

@@ -69,3 +69,39 @@ export function crowdMakesPractice(
   if (first === undefined) return false;
   return first.record?.seed !== seed.toString();
 }
+
+/**
+ * **Why a run would bank nothing, decided once** — wave AL, lane AL-A, the post-AK panel's seat D
+ * (H3). The brief printed *so this run is practice and banks nothing into your week* on its seed
+ * line and *This day counts toward the week.* two blocks below it, because the second sentence was
+ * the census's account of the day as dealt and never asked whether this run could bank it.
+ *
+ * `'crowd'` is {@link crowdMakesPractice}. `'retake'` is [§ D1138](../../../../DECISIONS.md) clause
+ * 4: the week has already closed today, so a later close of it is practice. `undefined` is a run
+ * that banks. The close (`dev/main.ts#closeShift`) and the brief (`everyday/today.ts`) both read
+ * this one function, so the sentence before the press and the sheet after it cannot disagree about
+ * whether the day counts.
+ */
+export type PracticeGround = 'crowd' | 'retake';
+
+export function practiceGroundOf(
+  week: Pick<WeekState, 'contractId' | 'history' | 'closedDay' | 'day'>,
+  seed: bigint,
+  daySeed: bigint | undefined,
+): PracticeGround | undefined {
+  if (crowdMakesPractice(week, seed, daySeed)) return 'crowd';
+  if (week.closedDay === week.day) return 'retake';
+  return undefined;
+}
+
+/**
+ * What the brief's week block says about a run that banks nothing, in place of the census's
+ * *This day counts toward the week.* No digit and no advice; each names the ground the close will
+ * print on its sheet (`shift/report.ts#PRACTICE_CROWD_NOTE` and `#PRACTICE_NOTE`).
+ */
+export const PRACTICE_DAY_SENTENCES: Readonly<Record<PracticeGround, string>> = Object.freeze({
+  crowd:
+    'This run does not count toward the week: it meets a crowd other than the day’s shared one, ' +
+    'so the day stays open for that crowd.',
+  retake: 'This run does not count toward the week: your week keeps your first attempt at this day.',
+});

@@ -25,6 +25,7 @@ import {
   RACE_PENDING,
   RACE_SAMPLE_INTERVAL_S,
   RACE_WATCHING,
+  RACE_WATCHING_OWN,
   SAME_CROWD_NOTE,
   SAME_RUN_NOTE,
   raceLaneOf,
@@ -161,6 +162,18 @@ describe('raceSlotsOf — the honesty order, once, for both shells', () => {
    * Everyday stage writes the record's eyebrow into it — and a slot function that guessed which
    * would be answering a question only the shell can.
    */
+  /* Wave AL, lane AL-A, § D1186: *somebody else's day* was false of the player's own replay. */
+  it('says the owner’s note on a replay of the player’s own filed day', () => {
+    const view = raceStripViewOf({ recording: recordingOf(), ghost: undefined, simTimeS: 480 });
+    const own = raceSlotsOf(view, { ...noRival, pending: false, watching: true, watchingOwn: true }, recordingOf());
+    expect(own.note).toBe(RACE_WATCHING_OWN);
+    expect(own.note).not.toMatch(/somebody else/u);
+    expect(own.verdict).toBe('');
+    /* Read only while watching: the player's own live day is not a replay. */
+    const live = raceSlotsOf(view, { ...noRival, pending: false, watching: false, watchingOwn: true }, recordingOf());
+    expect(live.note).not.toBe(RACE_WATCHING_OWN);
+  });
+
   it('lets a watched run outrank every state, including a refusal, and says why in the note', () => {
     const view = raceStripViewOf({ recording: recordingOf(), ghost: undefined, simTimeS: 480 });
     const slots = raceSlotsOf(

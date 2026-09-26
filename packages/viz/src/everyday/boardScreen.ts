@@ -78,9 +78,9 @@ import { everydayProgressWith } from './profile.js';
 import { everydayProfileStore } from './profileStore.js';
 import { SHARE_COPY, shareArtefactOf, shareFactsOf } from './shareResult.js';
 import { WATCH_CHECKING_LABEL, WATCH_IT_LABEL } from './watchStage.js';
-import type { EverydayScreenHandle, EverydayScreenModule } from './screens.js';
+import type { EverydayScreenModule } from './screens.js';
 import { pressWatchRow } from './watchPress.js';
-import type { EverydayScreenShellContext } from './shell.js';
+import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.js';
 import {
   EVERYDAY_COLORS as C,
   EVERYDAY_GAPS as G,
@@ -362,7 +362,7 @@ const NOTE = `font-size:13px;line-height:1.55;color:${C.warmGrey};margin:${Strin
  */
 const SHARE_NO_RUN_ID = 'everyday-share-no-run';
 
-function mount(host: HTMLElement, context: EverydayScreenShellContext): EverydayScreenHandle {
+function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedEverydayScreen {
   const doc = host.ownerDocument;
   // Before the first draw reads RATINGS — a restored ladder must be there on the first paint.
   ensureRestored();
@@ -1234,6 +1234,15 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): Everyday
       disposed = true;
       running?.cancel();
       running = undefined;
+    },
+    /**
+     * § 3.3's `week · board` primary — *Play today's tower* / *Replay today's tower* — and the front
+     * door is where both lead, exactly as `weekScreen.ts` answers the same row. This handle was
+     * missing, so the shell drew a filled, enabled primary with no listener: the post-AK panel's
+     * seat B (D4) pressed it and nothing happened. `dayControls.browser.test.ts` holds the press.
+     */
+    primary: () => {
+      context.go('door');
     },
     /**
      * **Read the host again on the way back from the Engineer surface** — GitHub issue #535,

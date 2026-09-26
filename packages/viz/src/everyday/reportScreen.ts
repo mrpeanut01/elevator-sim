@@ -1127,8 +1127,29 @@ function mountReportScreen(
     return cell;
   }
 
+  /**
+   * **Focus lands on the sheet when it has nowhere else to be** — wave AL, lane AL-A, the post-AK
+   * panel's seat B (D8). *Close the day* is the bar's primary, the shell redraws the bar on the way
+   * here, and the pressed button goes with it; so a keyboard player's focus fell to the page body
+   * and the next Tab started from the top of the document. Only a lost focus is moved: a press that
+   * left focus somewhere on the page keeps it there, which is `docs/36` `AX-12`'s *never because
+   * of the render loop*.
+   */
+  function keepFocus(): void {
+    const active = doc.activeElement;
+    if (active !== null && active !== doc.body) return;
+    const heading = root.querySelector<HTMLElement>('h1');
+    if (heading === null) return;
+    heading.tabIndex = -1;
+    heading.focus({ preventScroll: true });
+  }
+
   render();
-  const stopListening = context.host.subscribe(render);
+  keepFocus();
+  const stopListening = context.host.subscribe(() => {
+    render();
+    keepFocus();
+  });
   /*
    * The account, heard on its own channel — `everyday/accountPort.ts`. The host's `onChange` is
    * drained by `renderAll()` and no account path calls it, so signing in on the settings screen and

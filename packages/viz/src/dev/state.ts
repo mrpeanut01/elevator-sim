@@ -1899,6 +1899,38 @@ export interface PlannedDay {
 }
 
 /**
+ * **Where a config's clock starts**, seconds since midnight, or `undefined` when its template
+ * declares no hour or `core` refuses to plan it — the value the finished run carries as
+ * `SimulationResult.trace.startOfDayS`. `core`'s own `planDemand` over the config: a document
+ * resolve and a plan, never a simulation.
+ *
+ * Split out of {@link plannedDayOf} for the replay (wave AL, lane AL-A): `dev/main.ts#enterWatch`
+ * set the watched run's hour to `undefined`, so its clock fell back to 06:00 and a replay of a
+ * day that began at 08:00 read 08:40 for a 10:40 press (the post-AK panel's seats B and D).
+ * `watch/record.ts#watchRunPlanOf` reads this over the config the gate simulates, so the hour is
+ * the watched run's own rather than the spectator's selection.
+ */
+export function startOfDayOfConfig(config: SimulationConfig): number | undefined {
+  const demand = config.demand ?? {};
+  try {
+    return planDemand({
+      building: config.building,
+      profiles: config.trafficProfiles,
+      ...(config.demandTemplate === undefined ? {} : { template: config.demandTemplate }),
+      ...(config.durationS === undefined ? {} : { templateOverrides: { durationS: config.durationS } }),
+      ...(config.windowStartS === undefined ? {} : { windowStartS: config.windowStartS }),
+      ...(config.windowEndS === undefined ? {} : { windowEndS: config.windowEndS }),
+      ...(demand.arrivalRatePctPop5min === undefined
+        ? {}
+        : { arrivalRatePctPop5min: demand.arrivalRatePctPop5min }),
+      ...(demand.directionalSplit === undefined ? {} : { directionalSplit: demand.directionalSplit }),
+    }).template.startOfDayS;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * **The building and the clock of the run `state` would produce** — [§ D1039](../../../../DECISIONS.md).
  *
  * The brief prints the times a car is booked out, and they have to be the times the stage and the
@@ -1923,27 +1955,9 @@ export function plannedDayOf(resources: BrowserResources, state: ViewerState): P
   }
   const plan = shiftRunConfigOf(resources, state);
   const { config } = plan;
-  const demand = config.demand ?? {};
-  let startOfDayS: number | undefined;
-  try {
-    startOfDayS = planDemand({
-      building: config.building,
-      profiles: config.trafficProfiles,
-      ...(config.demandTemplate === undefined ? {} : { template: config.demandTemplate }),
-      ...(config.durationS === undefined ? {} : { templateOverrides: { durationS: config.durationS } }),
-      ...(config.windowStartS === undefined ? {} : { windowStartS: config.windowStartS }),
-      ...(config.windowEndS === undefined ? {} : { windowEndS: config.windowEndS }),
-      ...(demand.arrivalRatePctPop5min === undefined
-        ? {}
-        : { arrivalRatePctPop5min: demand.arrivalRatePctPop5min }),
-      ...(demand.directionalSplit === undefined ? {} : { directionalSplit: demand.directionalSplit }),
-    }).template.startOfDayS;
-  } catch {
-    startOfDayS = undefined;
-  }
   return {
     building: plan.building,
-    startOfDayS,
+    startOfDayS: startOfDayOfConfig(config),
     dayCars: plan.dayCars,
     wholeDayRun: plan.wholeDayRun,
     templateVariesMix:

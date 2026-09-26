@@ -112,7 +112,7 @@ import type { RunInterventionConfig, SimTime } from '@elevator-sim/core/browser'
 
 import type { VizRecording, VizSummary } from '../contract/types.js';
 import { fallbackLineOf, readbackOf, type RuleRow } from '../authoring/ruleSpec.js';
-import { interventionLogOf } from '../live/interventions.js';
+import { driversLineOf, driverStretchesOf, interventionLogOf } from '../live/interventions.js';
 
 import { afterPressBeatOf, type PairVerdicts } from './afterPress.js';
 import { pressCallRowOf, type PressCallRowInput } from './callRow.js';
@@ -477,6 +477,16 @@ export interface WeekDayReport extends DayReport, ShapedOnlyFields {
    * absent on the close that banked. The report screens draw it under the verdict.
    */
   readonly practiceNote?: string | undefined;
+  /**
+   * **The close did not close the day into the week**, so the week stands on this day and there is
+   * nothing to advance from — wave AL, lane AL-A, the post-AK panel's seat D (H2), under
+   * [§ D1141](../../../../DECISIONS.md). `true` only where the crowd made the run practice
+   * ({@link DayReportInput.practiceCrowd}): a retake's practice close follows a close that did bank,
+   * so its week holds the day and tomorrow is a real next day. Both report surfaces read it through
+   * `dev/reportPanel.ts#framingOf`'s `canAdvance`, which is what takes *Open the doors on Wednesday*
+   * off a sheet whose own sentence says the week stays on this day. Absent otherwise.
+   */
+  readonly dayStaysOpen?: boolean | undefined;
 }
 
 /**
@@ -831,7 +841,12 @@ function attemptLine(subject: ReportSubject, attempt: number, practice = false):
 function metaLinesFor(input: DayReportInput, dispatcherName: string, dayStartS: SimTime): readonly string[] {
   const { recording, subject, week } = input;
   return [
-    `${recording.buildingName} · ${dispatcherName}`,
+    /*
+     * Who drove, and from when — wave AL, lane AL-A, the post-AK panel's seats B and C. This read
+     * the configured dispatcher alone, so a day handed to *Fairness first* at 08:48 was titled
+     * *MIDTOWN OFFICE · MINIMUM ESTIMATED WAIT* above its own log line saying so.
+     */
+    `${recording.buildingName} · ${driversLineOf(input.interventions ?? [], dispatcherName, dayStartS)}`,
     `seed ${recording.seed} · ${clockRange(recording.startedAt, recording.endedAt, dayStartS)} · one replication`,
     ...(subject.kind === 'single-run' ? selectionLines(subject.selection) : []),
     ...bookedLine(
@@ -1178,7 +1193,18 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
         : undefined,
     ),
     levers: leversFor(recording, observations, summary, readings),
-    smallPrint: smallPrintFor(dispatcherName, summary, dayStartS),
+    /*
+     * Every dispatcher that drove a stretch of the day, because the sentence is about what one day
+     * cannot say of each of them — wave AL, lane AL-A. Naming only the configured one after a
+     * handover said something about a dispatcher that had stopped driving at 08:48.
+     */
+    smallPrint: smallPrintFor(
+      [...new Set(driverStretchesOf(input.interventions ?? [], dispatcherName).map((stretch) => stretch.name))].join(
+        ' or ',
+      ),
+      summary,
+      dayStartS,
+    ),
   };
 
   if (subject.kind === 'single-run') {
@@ -1215,6 +1241,7 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
      */
     streakLine: practice ? practiceNote : streakLineFor(judgement.verdict, week.streak),
     ...(practice ? { practiceNote } : {}),
+    ...(practice && input.practiceCrowd !== undefined ? { dayStaysOpen: true } : {}),
     contractLine: contractLineFor(contract, week),
     cleared: week.cleared,
     forecast: forecastFor(

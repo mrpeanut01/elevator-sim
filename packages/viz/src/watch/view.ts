@@ -72,6 +72,26 @@ export const POSTED_RUN_LINE = "a run posted to today's board · verified by the
 /** The mean a board row could not vouch for — the row withheld it, and so does this header. */
 export const CLAIM_WITHHELD = 'withheld';
 
+/**
+ * **Whose record this is** — wave AL, lane AL-A, the post-AK panel's seat B (D5) and seat D (H11),
+ * [§ D1186](../../../../DECISIONS.md). A day filed on this device is the player's own, and its
+ * replay read *THEIR DISPATCHER*, *Their record, replayed* and *no rival while this is somebody
+ * else's day*. § 14.1's no-first-person rule is about a run that belongs to somebody else, so it
+ * binds `'other'` and a filed day speaks to its owner.
+ */
+export type WatchOwner = 'player' | 'other';
+
+/** Whose record a row is: a day this device filed is the player's; a reference or a posted run is not. */
+export function watchOwnerOf(run: Pick<WatchableRun, 'source'>): WatchOwner {
+  return run.source === 'filed-day' ? 'player' : 'other';
+}
+
+/** The identity cell over the dispatcher name, by owner. */
+export const WATCH_DISPATCHER_EYEBROWS: Readonly<Record<WatchOwner, string>> = Object.freeze({
+  player: 'YOUR DISPATCHER',
+  other: 'THEIR DISPATCHER',
+});
+
 /** The action that puts the shell back exactly as it was. § 14.1's `⤺ Stop watching`. */
 export const STOP_WATCHING_LABEL = '⤺ Stop watching';
 
@@ -118,6 +138,8 @@ export interface WatchingView {
    * the thing being said.
    */
   readonly headerTone: 'ink';
+  /** Whose record this is — {@link watchOwnerOf}. Decides the pronoun on every owner-worded cell. */
+  readonly owner: WatchOwner;
   /** The disc's letter — the label's first character, upper-cased. */
   readonly initial: string;
   /** Whose day this is, in the words the row carried. */
@@ -154,11 +176,13 @@ export function watchingViewOf(
   dispatcherName: string,
 ): WatchingView {
   const name = run.label;
+  const owner = watchOwnerOf(run);
   return {
     headerTone: 'ink',
+    owner,
     initial: (name.trim()[0] ?? '·').toUpperCase(),
     name,
-    dispatcherEyebrow: 'THEIR DISPATCHER',
+    dispatcherEyebrow: WATCH_DISPATCHER_EYEBROWS[owner],
     dispatcherName,
     sourceLine:
       run.source === 'reference' ? REFERENCE_RUN_LINE : run.source === 'posted-run' ? POSTED_RUN_LINE : FILED_DAY_LINE,

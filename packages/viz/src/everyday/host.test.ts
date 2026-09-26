@@ -627,6 +627,18 @@ describe('the run actions', () => {
     expect(h.patches[0]?.week?.day).toBe(banked.day + 1);
   });
 
+  it('openTomorrow refuses from a sheet whose crowd kept the day open — § D1141, the post-AK panel’s seat D (H2)', () => {
+    const practice = { ...A_REPORT, of: 'week-day', dayStaysOpen: true } as unknown as ShapedDayReport;
+    const h = harnessOf({ ...base(), recording: A_RECORDING, report: practice });
+    createEverydayHost(h.bindings).openTomorrow();
+    expect(h.calls).toEqual([]);
+    /* The same sheet from a retake, whose day the week already holds, still advances. */
+    const retake = { ...A_REPORT, of: 'week-day' } as unknown as ShapedDayReport;
+    const again = harnessOf({ ...base(), recording: A_RECORDING, report: retake });
+    createEverydayHost(again.bindings).openTomorrow();
+    expect(again.calls).toEqual(['applyPatch', 'openRunTab', 'startRun']);
+  });
+
   it('openTomorrow refuses while no closed day’s sheet is standing', () => {
     const h = harnessOf(base());
     createEverydayHost(h.bindings).openTomorrow();

@@ -234,6 +234,16 @@ export const GUIDE_WATCHING_NOTE =
 export const WATCHING_NOTE =
   'Their record, replayed. Nothing here is scored, and the day on this device is untouched.';
 
+/**
+ * {@link WATCHING_NOTE} for a replay of the player's **own** filed day — wave AL, lane AL-A,
+ * [§ D1186](../../../../DECISIONS.md). The guide's cell is first-person and § 14.1 forbids that on
+ * somebody else's run; on the player's own record *their* was the false word. The three claims are
+ * kept: it is the player's record, replayed, and nothing here is scored; the week is untouched for
+ * {@link WATCHING_NOTE}'s reason. Drawn by `everyday/watchStage.ts#watchStageBarOf`.
+ */
+export const WATCHING_NOTE_OWN =
+  'Your own record, replayed. Nothing here is scored, and your week is untouched.';
+
 const row = (r: Omit<ActionBarRow, 'guide'> & { readonly guide?: boolean }): ActionBarRow => ({
   guide: true,
   ...r,

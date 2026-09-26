@@ -216,6 +216,7 @@ import {
   type PlainLeverId,
   type PlainLeverView,
 } from '../mode/plainLevers.js';
+import type { BookedOutCar } from '../shift/bookedOut.js';
 import type { CalendarPeriod } from '../shift/calendar.js';
 import { contractById, statLineOf } from '../shift/contracts.js';
 import { admittedPressDayIds, ladderTowersOf, pressDayFor } from '../shift/ladder.js';
@@ -781,6 +782,13 @@ export interface EverydayGhostRace {
 export interface EverydayWatchSession {
   readonly run: WatchableRun;
   readonly view: WatchingView;
+  /**
+   * The watched run's own cars out of service, from the run the gate simulated — wave AL, lane
+   * AL-A. The stage's car-out pill was switched off while watching, so a replay showed a car
+   * standing idle with nothing saying it was booked out. Optional so a shell that watches nothing
+   * with cars out need not write it; absent reads as none.
+   */
+  readonly bookedOut?: readonly BookedOutCar[] | undefined;
 }
 
 /**
@@ -3436,7 +3444,16 @@ export function createEverydayHost(
        * week already holds is a day there is something to advance from, whichever screen asks.
        */
       const todayBanked = state.week.history.some((entry) => entry.day === state.week.day);
-      if (state.report === undefined && !todayBanked) return;
+      /*
+       * **A sheet that closed nothing is not a sheet to advance from** — wave AL, lane AL-A, under
+       * [§ D1141](../../../../DECISIONS.md). A run on a link's crowd is practice and leaves the week
+       * on its day (`shift/report.ts#dayStaysOpen`); its sheet stood here all the same, so this
+       * press moved the week past a counted day the sheet itself said stays open (the post-AK
+       * panel's seat D, H2). The report no longer offers the button; this is the API refusing it.
+       */
+      const sheetClosedToday =
+        state.report !== undefined && !(state.report.of === 'week-day' && state.report.dayStaysOpen === true);
+      if (!sheetClosedToday && !todayBanked) return;
       // Tomorrow is a day of the same kind today was — the whole-day patch rides in the same merge
       // rather than in a second one, so no render sees a week advanced onto a horizon it is not
       // running yet.

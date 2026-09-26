@@ -29173,6 +29173,8 @@ over a catalogue edit would lose a player's afternoon to a data change they did 
 
 ## D435 — where § 3.3 and § 14.1 disagree on one screen, the defect condition wins
 
+> **Status 2026-09-26: NARROWED by [§ D1186](#d1186)** (an agent ruling). The rule binds a run that is somebody else's; a replay of a day this device filed speaks to its owner. See [`docs/39`](docs/39-decisions-in-force.md).
+
 **Date: 2026-09-01 · Owner: wave J lane C · GitHub issue #182 · Deviates from
 `GAMEPLAY_AND_NAVIGATION.md` § 3.3, line 188.**
 
@@ -42628,6 +42630,8 @@ A **single-run** sheet prints no verdict on the paired row. Its banner is `read,
 
 ## D983 — a missed day's report opens on the goal it missed, and a car the tower books out is named on the brief, the header and the stage
 
+> **Status 2026-09-26: AMENDED by [§ D1190](#d1190)** (an agent ruling). The stage's car-out pill is drawn on a replay too, from the watched run's own cars out, never the spectator's. See [`docs/39`](docs/39-decisions-in-force.md).
+
 **Date: 2026-09-24 · Owner: LANE-AH-C (wave AH) · GitHub issue [#596](https://github.com/mrpeanut01/elevator-sim/issues/596) items 2–4 · Rules on `packages/viz/src/shift/report.ts`, the new `shift/bookedOut.ts`, `shift/goals.ts`, `everyday/today.ts`, `everyday/briefView.ts`, `everyday/stageScreenModel.ts`, `everyday/stageScreen.ts`, `dev/main.ts`, `dev/reportPanel.ts`, `dev/leftRail.ts` and `honesty/surfaces.ts`. Cites [§ D871](#d871), [§ D227](#d227), [§ D256](#d256), [§ D343](#d343), [§ D405](#d405).**
 
 **Why an entry.** It binds a dozen modules in four directories and moves a spelling two of them agreed on (`was`), so it reaches past any one module (§ D405).
@@ -47209,3 +47213,128 @@ narrows [§ D1154](#d1154)'s `goalLabel` in the one caller that is not a player'
 
 **Tests.** `everyday/stagePlay.test.ts` (both marks on a per-run goal, *met* on the interval goal)
 and `campaign/campaign.test.ts` (the error's id and name).
+
+## D1186 — a replay of the player's own filed day speaks to its owner
+
+> **Taken 2026-09-26 by an agent session under delegated authority** (wave AL, lane AL-A), not by
+> the product owner, and to be read as an agent ruling. **Owner-reversible**: the reading of
+> `GAMEPLAY_AND_NAVIGATION.md` § 14.1's *no first-person copy anywhere in the mode* as a rule about
+> somebody else's run, which is what lets a filed day's replay say *your*.
+
+**Why an entry.** [§ D405](#d405)'s second ground: it narrows [§ D435](#d435), which applied
+§ 14.1's rule to every watched run, and it binds `watch/view.ts`, `everyday/actionBar.ts`,
+`everyday/watchStage.ts`, `live/raceStrip.ts`, `everyday/stageScreen.ts` and `dev/main.ts`.
+
+**What was wrong.** The post-AK panel's seat B (D5) and seat D (H11) watched their own Monday from
+*Your week* and read *THEIR DISPATCHER*, *Their record, replayed* and *no rival while this is
+somebody else's day*. A day filed on this device is the player's own. § D435 kept the pronoun off a
+watched run because § 14.1 calls `you` on somebody else's run a defect; on the player's own record
+the third person was the false word.
+
+**The ruling.** Whose record a row is follows its source (`watch/view.ts#watchOwnerOf`): a day this
+device filed is the player's, and a reference or posted run is somebody else's. On somebody else's
+run every rule § D435 applied stands unchanged, and `watch/view.test.ts` still greps it for the
+first person. On the player's own, the identity cell reads *YOUR DISPATCHER*, the bar's note reads
+*Your own record, replayed. Nothing here is scored, and your week is untouched.*
+(`actionBar.ts#WATCHING_NOTE_OWN`), and the race strip's note reads
+`live/raceStrip.ts#RACE_WATCHING_OWN`; none of them calls the day somebody else's. Nothing else about
+watching moves: the replay is still not closable, scorable or postable.
+
+## D1187 — a run that banks nothing says so once, and a sheet that closed nothing offers no next day
+
+> **Taken 2026-09-26 by an agent session under delegated authority** (wave AL, lane AL-A), not by
+> the product owner, and to be read as an agent ruling. No owner-reversible clause: it carries
+> [§ D1141](#d1141) and [§ D1138](#d1138) clause 4 to two surfaces they left behind.
+
+**Why an entry.** [§ D405](#d405)'s first ground: it binds `dev/main.ts#closeShift`,
+`everyday/today.ts`, `everyday/host.ts#openTomorrow`, `shift/report.ts` and `dev/reportPanel.ts`,
+and it extends § D1141.
+
+**What was wrong.** Seat D (H2) played a practice day on a link's crowd mid-week and read, under
+*your week stays on this day*, a button *Open the doors on Thursday*; pressed, it opened Thursday
+and left the counted Wednesday unplayed behind it. Seat D (H3) read a practice brief whose seed line
+said *banks nothing into your week* and whose week block said *This day counts toward the week.*
+
+**The ruling.**
+
+1. Why a run would bank nothing is decided once, by `shift/scoredCrowd.ts#practiceGroundOf`: `'crowd'`
+   is § D1141's link's crowd on a week under way, `'retake'` is § D1138 clause 4's later close of a
+   closed day. The close and the brief both read it. On a practice run the brief's week block says
+   `PRACTICE_DAY_SENTENCES[ground]` in place of the census's day sentence.
+2. A close on a link's crowd closes nothing into the week, so its sheet carries
+   `WeekDayReport.dayStaysOpen` and both report surfaces offer no button into the next day
+   (`reportPanel.ts#framingOf`'s `canAdvance`). `EverydayHost.openTomorrow` refuses to advance from
+   such a sheet while the week does not hold the day. A retake's sheet still advances: its week
+   already holds the day.
+
+## D1188 — every surface names who is driving at the playhead, and the report names who drove when
+
+> **Taken 2026-09-26 by an agent session under delegated authority** (wave AL, lane AL-A), not by
+> the product owner, and to be read as an agent ruling. No owner-reversible clause: it is a
+> correction.
+
+**Why an entry.** [§ D405](#d405)'s first ground: one reading of the run's log
+(`live/interventions.ts#driverStretchesOf`) now binds the Everyday stage, the Engineer canvas and
+the Day report.
+
+**What was wrong.** Seats B and C handed a day over (*Switch to Fairness first* at 08:48, and a rush
+handover to *Nearest car*) and read *DRIVING Minimum estimated wait* until 18:00, and a report
+titled *MIDTOWN OFFICE · MINIMUM ESTIMATED WAIT* that said it *cannot tell you that minimum
+estimated wait is better*, over its own log line *08:48 · switched to Fairness first*. The
+recording's `dispatcherProfileId` is the dispatcher the day was configured with, and a handover is
+an entry on the intervention log; every surface read the first and none read the second.
+
+**The ruling.** A handover (`adopt-dispatcher`, or a stored `switch-dispatcher`) opens a stretch
+under the dispatcher it names; a handover to the dispatcher already driving opens none. The stage
+header, the rush header and the Engineer canvas name the driver at the playhead (`driverNameAt`);
+the report's title line names every stretch with its clock (*Minimum estimated wait, then Fairness
+first from 08:48*, `driversLineOf`), and its small print names every dispatcher that drove.
+A replay names its driver at the playhead from the watched record's own log.
+
+## D1189 — *Close the day* asks once while a call is up, and the report takes focus after a close
+
+> **Taken 2026-09-26 by an agent session under delegated authority** (wave AL, lane AL-A), not by
+> the product owner, and to be read as an agent ruling. **Owner-reversible**: that the question is
+> asked at all, and its words (`everyday/stageCall.ts#STAGE_CALL_COPY.closeAsk` and the three keys
+> after it).
+
+**Why an entry.** [§ D405](#d405)'s first ground: it changes what § 3.3's *Close the day* primary
+does on the stage, which `everyday/actionBar.ts` authors and `everyday/shell.ts` draws, and it moves
+focus on `everyday/reportScreen.ts`.
+
+**What was wrong.** Seat B (D1) stopped at the pinned Monday's 10:40 call on a phone and tapped the
+large orange *Close the day*: the scored day was filed on the spot, unanswered, as missed, with no
+question asked. Closing by keyboard (D8) left focus on the page body.
+
+**The ruling.** While the call card is up, the first press of *Close the day* files nothing: it puts
+a question under the card's answers (*Close the day without answering this call?* and what that
+does) with *Close the day as it stands* and *Back to the call*, and focus moves to the first. That
+button, or a second press of the primary, files the day as it stands. With no card up nothing is
+asked. After a close the report screen moves focus to its heading when focus has nowhere else to
+be, and never otherwise.
+
+## D1190 — a replay runs on the watched day's own clock and names its own cars out
+
+> **Taken 2026-09-26 by an agent session under delegated authority** (wave AL, lane AL-A), not by
+> the product owner, and to be read as an agent ruling. No owner-reversible clause: it is a
+> correction.
+
+**Why an entry.** [§ D405](#d405)'s second ground: it amends [§ D983](#d983)'s *the player's own
+building, and only on the player's own run* for the stage's car-out pill, and it binds
+`dev/main.ts#enterWatch`, `watch/record.ts#watchRunPlanOf`, `dev/state.ts` and
+`everyday/stageScreen.ts`.
+
+**What was wrong.** Seats B and D watched a closed whole day from *Your week*. The header read
+**08:40** for a 10:40 press and *STEADY from 09:45* where live read *11:45*; the press stamp read
+*08:40 · spread the cars across the tower*. `enterWatch` set the watched run's start of day to
+`undefined` on the ground that the runner produces it, so the clock fell back to 06:00 on a day that
+began at 08:00. And the pill naming car D as booked out from 10:30 to 13:00 and out now was switched off while
+watching, so car D stood idle at floor 20 with nothing saying why.
+
+**The ruling.** The watched run's start of day is `core`'s own plan over the config the gate
+simulates (`dev/state.ts#startOfDayOfConfig`, the value the trace reports, which `plannedDayOf` now
+reads too), and its cars out are `carAbsencesOf` over the building that config resolved. Both ride
+on `WatchRunPlan`, so the hour and the cars are the watched run's, never the spectator's selection.
+The pill is drawn on a replay from those cars. `watch/filedDay.test.ts` holds both equal to the live
+day's on Midtown's week, and `everyday/dayControls.browser.test.ts` replays a banked day on the built
+bundle and was red before (06:10 against 08:40).

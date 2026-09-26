@@ -148,6 +148,7 @@ import { WAIT_BANDS, waitBandsAt } from '../live/bands.js';
 import { observationsAt } from '../live/observations.js';
 import type { WaitBandDefinition, WaitBands } from '../live/types.js';
 import {
+  driverNameAt,
   interventionStampOf,
   PARK_CARS_LOBBY_LABEL,
   SPREAD_CARS_LABEL,
@@ -212,7 +213,7 @@ import { contractById, statLineOf } from '../shift/contracts.js';
 import { bankingRefusalFor, UNCHOSEN_RUN_CANNOT_BANK } from '../shift/banking.js';
 import { shiftObservationsOf } from '../shift/observations.js';
 import { pressCounterfactualOf } from '../shift/counterfactual.js';
-import { carAbsencesOf } from '../shift/bookedOut.js';
+import { carAbsencesOf, type BookedOutCar } from '../shift/bookedOut.js';
 import { readGoals } from '../shift/goals.js';
 import {
   clockOf,
@@ -234,7 +235,7 @@ import { coachWeekLines, weekKeptLine } from '../shift/weekLabel.js';
 import { weekdayOf, type DayOutcome, type WeekState } from '../shift/types.js';
 import { dailySeedAt } from '../shift/dailySeed.js';
 import { deviceNowMs } from '../shift/deviceDate.js';
-import { crowdMakesPractice } from '../shift/scoredCrowd.js';
+import { practiceGroundOf } from '../shift/scoredCrowd.js';
 import { firstDayDealOf, isDealtPinnedDay } from '../shift/firstSession.js';
 
 import { savedProfilesOf } from '../batch/library.js';
@@ -3615,7 +3616,13 @@ function boot(ui: Elements, resources: BrowserResources): void {
 
   /** The run being watched and what to put back, or `undefined` when nobody is being watched. */
   let watching:
-    | { readonly run: WatchableRun; readonly view: WatchingView; readonly before: WatchedBefore }
+    | {
+        readonly run: WatchableRun;
+        readonly view: WatchingView;
+        readonly before: WatchedBefore;
+        /** The watched run's own cars out — `watch/record.ts#WatchRunPlan.bookedOut`. */
+        readonly bookedOut: readonly BookedOutCar[];
+      }
     | undefined;
 
   /**
@@ -4973,7 +4980,9 @@ function boot(ui: Elements, resources: BrowserResources): void {
       playThisCrowd(run);
     },
     watching: () =>
-      watching === undefined ? undefined : { run: watching.run, view: watching.view },
+      watching === undefined
+        ? undefined
+        : { run: watching.run, view: watching.view, bookedOut: watching.bookedOut },
     onChange: (listener) => {
       everydayHostListeners.push(listener);
       return () => {
@@ -5392,6 +5401,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
         recording: ghost,
         refusal: ghostRefusal,
         pending: ghostInFlight,
+        watchingOwn: watching?.view.owner === 'player',
         /*
          * § 14.1, and this is the cell the sweep actually caught. The picker above is hidden while
          * watching, so the forbidden word was never the option list here — it was the **note**,
@@ -6461,9 +6471,17 @@ function boot(ui: Elements, resources: BrowserResources): void {
    */
   function enterWatch(run: WatchableRun, view: WatchingView, recording: VizRecording): void {
     if (watching !== undefined) return;
+    /*
+     * The watched run's own hour and cars out, from the record the gate simulated — wave AL, lane
+     * AL-A. Read before `state` is replaced, because `watchRunPlanOf` takes the player's state as the
+     * shape it rebuilds the record's run from (as `watchGateBefore` did a moment ago). A row with no
+     * record was never simulated and cannot reach here; the guard keeps the arm total.
+     */
+    const watchedPlan = run.record === null ? undefined : watchRunPlanOf(state, resources, run.record);
     watching = {
       run,
       view,
+      bookedOut: watchedPlan?.bookedOut ?? [],
       before: {
         state,
         ghostRecording,
@@ -6501,12 +6519,15 @@ function boot(ui: Elements, resources: BrowserResources): void {
     unpressedRecording = undefined;
     lastRaceKey = '';
     /*
-     * The watched run's own start-of-day hour is not known here — the record carries the
-     * configuration, and `runStartOfDayS` is produced by the runner. `undefined` is the honest
-     * answer and is what the header already draws for a template that declares no hour: an
-     * omission means *this has no hour*, never *midnight*.
+     * **The watched run's own start-of-day hour** — wave AL, lane AL-A, the post-AK panel's seats B
+     * and D. This read `undefined` on the ground that the hour is produced by the runner and the
+     * record carries only the configuration; the clock then fell back to a flat 06:00, and a replay
+     * of a whole day that began at 08:00 read 08:40 for a 10:40 press. The configuration is enough:
+     * `dev/state.ts#startOfDayOfConfig` is `core`'s own plan over it, the value the trace reports,
+     * and `watch/filedDay.test.ts` holds it equal to the hour the filed run's brief read. `undefined`
+     * still means what it meant, for a template that declares no hour.
      */
-    runStartOfDayS = undefined;
+    runStartOfDayS = watchedPlan?.startOfDayS;
     /*
      * Through `watch/session.ts` rather than spelled out here — § 14.1's *"`dayClosed` is
      * untouched, and so is your own day's state"* is a checkable claim, and a claim living in a
@@ -6979,17 +7000,22 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * crowd. Only where the mode owns a week, and only on a week on a scenario; the date is the one
      * latched at the press.
      */
-    const crowdPractice =
-      advancesTheWeek(state.playMode) && crowdMakesPractice(state.week, state.seed, runDaySeed);
-    const week = crowdPractice ? state.week : closedWeekOf(state, outcome, runCause === 'intervention');
     /*
      * **A close of a day that had already closed is practice** — [§ D1138](../../../../DECISIONS.md)
      * clause 4, read off the week before the close, which is the one question `closeDay` keys it on.
      * Only where the mode owns a week: a Free Play sheet banks nothing on any close and says so in
      * its own words.
+     *
+     * Both grounds are `shift/scoredCrowd.ts#practiceGroundOf`'s, the function the brief's seed line
+     * and week block read before the press (wave AL, lane AL-A), so the brief cannot say *counts*
+     * over a run this close files as practice.
      */
-    const practice =
-      crowdPractice || (week !== state.week && state.week.closedDay === state.week.day);
+    const practiceGround = advancesTheWeek(state.playMode)
+      ? practiceGroundOf(state.week, state.seed, runDaySeed)
+      : undefined;
+    const crowdPractice = practiceGround === 'crowd';
+    const week = crowdPractice ? state.week : closedWeekOf(state, outcome, runCause === 'intervention');
+    const practice = practiceGround !== undefined;
     filedReportInput = {
       recording,
       observations,
@@ -7223,11 +7249,20 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * Read from `state.savedDispatchers` at call time rather than captured, because the reader can
    * save a profile — and rename one — while a recording is on screen.
    */
-  function dispatcherNameOf(recording: VizRecording): string {
+  /**
+   * The dispatcher driving `recording` at `simTimeS` — the configured one until a handover on the
+   * run's own log, then whoever it was handed to (wave AL, lane AL-A; the post-AK panel's seats B
+   * and C found the Everyday header naming the configured dispatcher all day after a handover, and
+   * this canvas said the same). The log is the watched record's while watching and the player's
+   * own otherwise; `live/interventions.ts#driverNameAt` is the one reading of it.
+   */
+  function dispatcherNameOf(recording: VizRecording, simTimeS: number): string {
     const found = allDispatchers(resources, state.savedDispatchers).find(
       (profile) => profile.id === recording.dispatcherProfileId,
     );
-    return found?.name ?? recording.dispatcherProfileId;
+    const configured = found?.name ?? recording.dispatcherProfileId;
+    const log = watching !== undefined ? (watching.run.record?.interventions ?? []) : state.interventions;
+    return driverNameAt(log, simTimeS, configured);
   }
 
   function drawStage(): void {
@@ -7304,7 +7339,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
       theme: stageTheme,
       recording,
       frame,
-      dispatcherName: dispatcherNameOf(recording),
+      dispatcherName: dispatcherNameOf(recording, frame.simTimeS),
       layout,
       selection: selectionFor(assignments),
       unservedFloorIds: unservedFloorsOf(recording),
@@ -7338,7 +7373,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
     }
     canvas.setAttribute(
       'aria-label',
-      describeFrame({ recording, frame, dispatcherName: dispatcherNameOf(recording) }),
+      describeFrame({ recording, frame, dispatcherName: dispatcherNameOf(recording, frame.simTimeS) }),
     );
   }
 
@@ -7397,12 +7432,13 @@ function boot(ui: Elements, resources: BrowserResources): void {
   function announce(): void {
     const recording = state.recording;
     if (recording === undefined || playback === undefined) return;
+    const frame = playback.frame();
     setText(
       ui.stage.description,
       describeFrame({
         recording,
-        frame: playback.frame(),
-        dispatcherName: dispatcherNameOf(recording),
+        frame,
+        dispatcherName: dispatcherNameOf(recording, frame.simTimeS),
       }),
     );
   }

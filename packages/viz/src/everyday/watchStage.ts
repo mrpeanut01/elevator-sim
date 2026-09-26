@@ -40,9 +40,10 @@
  */
 
 import type { ActionBarModel } from './actionBar.js';
-import { actionBarFor } from './actionBar.js';
+import { actionBarFor, WATCHING_NOTE_OWN } from './actionBar.js';
 import type { EverydayState } from './types.js';
 import type { WatchRecord } from '../watch/types.js';
+import type { WatchOwner } from '../watch/view.js';
 
 /* -------------------------------------------------------------------------- *
  * The picker — § 14.1's rows, on the one screen this build can put them
@@ -168,6 +169,12 @@ export interface WatchStageBarInput {
   readonly hasReplay: boolean;
   /** {@link playThisCrowdRefusalFor}'s answer for the row being watched. */
   readonly playRefusal: string | undefined;
+  /**
+   * Whose record is on the stage — `watch/view.ts#WatchOwner`, wave AL. `'player'` swaps the row's
+   * note for `actionBar.ts#WATCHING_NOTE_OWN`. Optional, and absent reads as somebody else's, which
+   * is the note the row has always carried.
+   */
+  readonly owner?: WatchOwner | undefined;
 }
 
 /** What the primary says instead of acting while the replay has not arrived. */
@@ -207,7 +214,8 @@ export function watchStageBarOf(
   state: EverydayState,
   input: WatchStageBarInput,
 ): ActionBarModel {
-  const base = actionBarFor(state);
+  const row = actionBarFor(state);
+  const base = input.owner === 'player' ? { ...row, note: WATCHING_NOTE_OWN } : row;
   const refusal = !input.hasReplay ? REPLAY_NOT_ON_STAGE : input.playRefusal;
   if (refusal === undefined) return base;
   return { ...base, primary: { ...base.primary, inert: refusal }, note: refusal };

@@ -1450,7 +1450,12 @@ function framingOf(report: ShapedDayReport): FramingView {
     forecast: report.forecast,
     taught: report.taught,
     nextDayLabel: `Open the doors on ${report.nextDayName}`,
-    canAdvance: true,
+    /*
+     * A close on a link's crowd closed nothing into the week (§ D1141), so tomorrow is not the next
+     * day of anything: the button that advanced from it skipped a counted day under a sentence
+     * saying the week stays put (the post-AK panel's seat D, H2). `shift/report.ts#dayStaysOpen`.
+     */
+    canAdvance: report.dayStaysOpen !== true,
   };
 }
 

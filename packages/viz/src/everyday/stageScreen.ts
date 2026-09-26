@@ -165,8 +165,8 @@ import {
   watchStageBarOf,
   SPECTATOR_MAKES_NO_CHANGES,
 } from './watchStage.js';
-import type { WatchingView } from '../watch/view.js';
-import { interventionLogOf } from '../live/interventions.js';
+import type { WatchingView, WatchOwner } from '../watch/view.js';
+import { driverNameAt, interventionLogOf } from '../live/interventions.js';
 import { campaignDockViewOf, type CampaignDockView } from './campaignDock.js';
 
 /* -------------------------------------------------------------------------- *
@@ -216,7 +216,7 @@ let alarmDrawn = false;
  * the four above, and cleared when the watch ends: a stale refusal is worse than none
  * (§ D227), and this one would sit on a *player's own* day claiming it belonged to somebody else.
  */
-const watchFacts: { hasReplay: boolean; playRefusal: string | undefined } = {
+const watchFacts: { hasReplay: boolean; playRefusal: string | undefined; owner?: WatchOwner | undefined } = {
   hasReplay: false,
   playRefusal: undefined,
 };
@@ -551,6 +551,8 @@ function mountStage(
   ].join(';');
   /* Read once per recording, not per frame — `resolvedBuilding()` resolves the whole run config. */
   let bookedFor: VizRecording | undefined;
+  /* Whether {@link bookedCars} was read for a watched run — the spectator state can arrive a frame after its recording. */
+  let bookedWatching = false;
   let bookedCars: readonly BookedOutCar[] = [];
 
   const driving = el(doc, 'span', 'everyday-stage-driving');
@@ -1360,7 +1362,42 @@ function mountStage(
    */
   const callBody = el(doc, 'div', 'everyday-stage-call-body');
   callBody.style.cssText = 'display:grid;gap:7px';
-  callCard.append(callBody);
+  /*
+   * **The close asks once while a call is up** — wave AL, lane AL-A, the post-AK panel's seat B
+   * (D1). § 3.3's *Close the day* filed the day as it stood, unanswered, on the first press; on a
+   * phone it is the largest button on the screen. The ask sits inside the card, under its answers,
+   * so the question and the choice it would skip are read together. Hidden by its attribute alone
+   * (its layout is on an inner row), for `callBody`'s reason above. Words: `STAGE_CALL_COPY`.
+   */
+  const closeAsk = el(doc, 'div', 'everyday-stage-call-confirm');
+  closeAsk.hidden = true;
+  closeAsk.setAttribute('role', 'group');
+  closeAsk.setAttribute('aria-label', STAGE_CALL_COPY.closeAsk);
+  const closeAskInner = el(doc, 'div');
+  closeAskInner.style.cssText = `display:grid;gap:7px;margin-top:10px;padding-top:10px;border-top:1px solid ${C.rule}`;
+  const closeAskQuestion = el(doc, 'p', 'everyday-stage-call-confirm-question', STAGE_CALL_COPY.closeAsk);
+  closeAskQuestion.style.cssText = 'margin:0;font-size:13.5px;font-weight:600';
+  const closeAskConsequence = el(doc, 'p', undefined, STAGE_CALL_COPY.closeConsequence);
+  closeAskConsequence.style.cssText = `margin:0;font-size:13px;line-height:1.45;color:${C.inkSoft}`;
+  const closeAskRow = el(doc, 'div');
+  closeAskRow.style.cssText = `display:flex;flex-wrap:wrap;gap:${String(GAP.row)}px`;
+  const closeAskFile = el(doc, 'button', 'everyday-stage-call-confirm-file', STAGE_CALL_COPY.closeFile);
+  closeAskFile.type = 'button';
+  closeAskFile.style.cssText = ARM_BUTTON_CSS;
+  const closeAskBack = el(doc, 'button', 'everyday-stage-call-confirm-back', STAGE_CALL_COPY.closeBack);
+  closeAskBack.type = 'button';
+  closeAskBack.style.cssText = ARM_BUTTON_CSS;
+  closeAskFile.addEventListener('click', () => {
+    fileDay();
+  });
+  closeAskBack.addEventListener('click', () => {
+    closeAsk.hidden = true;
+    callCard.focus({ preventScroll: true });
+  });
+  closeAskRow.append(closeAskFile, closeAskBack);
+  closeAskInner.append(closeAskQuestion, closeAskConsequence, closeAskRow);
+  closeAsk.append(closeAskInner);
+  callCard.append(callBody, closeAsk);
   let callCardKey = '';
   /**
    * Show or hide the card — and, **on the frame it appears and on no other**, bring it into the
@@ -1382,6 +1419,8 @@ function mountStage(
     const leaving = !shown && !callCard.hidden;
     const hadFocus = leaving && callCard.contains(doc.activeElement);
     callCard.hidden = !shown;
+    /* The close's question belongs to the call it would skip, and goes with it. */
+    if (!shown) closeAsk.hidden = true;
     if (appearing) {
       callCard.scrollIntoView({ block: 'nearest', inline: 'nearest' });
       callCard.focus({ preventScroll: true });
@@ -2175,6 +2214,8 @@ function mountStage(
      */
     const session = context.ctx === 'watch' ? host.watching() : undefined;
     watchFacts.hasReplay = session !== undefined && adopted !== undefined;
+    /* Whose record it is, so the row's note speaks to its owner — § D1186. */
+    watchFacts.owner = session?.view.owner;
     watchFacts.playRefusal =
       session === undefined
         ? undefined
@@ -2494,7 +2535,20 @@ function mountStage(
     const labelOf = (id: string): string =>
       recording.floors.find((floor) => floor.id === id)?.label ?? id;
 
-    const driverName = host.dispatcherById(recording.dispatcherProfileId)?.name ?? recording.dispatcherProfileId;
+    /*
+     * **Who is driving at this playhead**, not who the day was configured with — wave AL, lane AL-A,
+     * the post-AK panel's seats B and C. After a handover the header kept naming the configured
+     * dispatcher until the end of the day (daily and rush alike), beside a log saying the day had
+     * been handed over. `live/interventions.ts#driverNameAt` reads the run's own log: the player's
+     * on their own day, and the watched record's on a replay ([§ D1188](../../../../DECISIONS.md)).
+     */
+    const configuredName =
+      host.dispatcherById(recording.dispatcherProfileId)?.name ?? recording.dispatcherProfileId;
+    const driverName = driverNameAt(
+      watchingNow() === undefined ? host.interventions() : (host.watching()?.run.record?.interventions ?? []),
+      simTimeS,
+      configuredName,
+    );
     announce(recording, frame, driverName);
     /*
      * § 9.2, GitHub issue #220: in the `rush` context the clock is held time and the pill is the
@@ -2534,19 +2588,37 @@ function mountStage(
      * § D983. The player's own building, and only on the player's own run: a watched record is
      * somebody else's day in somebody else's tower, and a rush books nothing.
      */
-    if (recording !== bookedFor) {
+    /*
+     * **A watched run names its own cars out** — wave AL, lane AL-A, the post-AK panel's seat D (H1).
+     * The pill was switched off while watching, on the ground that a watched record is somebody
+     * else's tower; so a replay of the player's own day showed car D standing idle at floor 20 with
+     * nothing saying it was booked out. The watched run's cars come from the run the gate simulated
+     * (`watch/record.ts#WatchRunPlan.bookedOut`), never from the spectator's selection, and its hour
+     * is the watched run's too (`host.dayStartS()` reads it while watching).
+     */
+    if (recording !== bookedFor || (watching !== undefined) !== bookedWatching) {
       bookedFor = recording;
+      bookedWatching = watching !== undefined;
       const building = host.resolvedBuilding();
       /* § D1149: every window, a car out from the first instant included — the pill and the call card both read this. */
-      bookedCars = building?.id === recording.buildingId ? carAbsencesOf(building) : [];
+      bookedCars =
+        watching !== undefined
+          ? (host.watching()?.bookedOut ?? [])
+          : building?.id === recording.buildingId
+            ? carAbsencesOf(building)
+            : [];
     }
     const booked =
-      watching === undefined && context.ctx !== 'rush'
+      context.ctx !== 'rush'
         ? stageBookedOutOf({ bookedOut: bookedCars, simTimeS, dayStartS: host.dayStartS() })
         : [];
     bookedPill.textContent = booked.join('   ');
     bookedPill.style.display = booked.length === 0 ? 'none' : '';
-    drivingName.textContent = watching?.dispatcherName ?? head.driverName;
+    /* A watched record's handovers are on its own log, so a replay names its driver at the playhead too (§ D1188). */
+    drivingName.textContent =
+      watching === undefined
+        ? head.driverName
+        : driverNameAt(host.watching()?.run.record?.interventions ?? [], simTimeS, watching.dispatcherName);
     drawFigures(head.figures);
     drawGoals(recording, simTimeS, watching);
     drawEndDay(recording, simTimeS, watching);
@@ -2854,7 +2926,15 @@ function mountStage(
    * File the day and open what the filing lands on — the tail of the stage's primary, shared with
    * *End the day* so the two cannot file differently.
    */
+  /** Put the close's question up under the call, and focus its first button — see the primary. */
+  function askBeforeClosing(): void {
+    closeAsk.hidden = false;
+    closeAsk.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    closeAskFile.focus({ preventScroll: true });
+  }
+
   function fileDay(): void {
+    closeAsk.hidden = true;
     playback?.pause();
     host.closeDay();
     syncTransport();
@@ -3105,6 +3185,7 @@ function mountStage(
           refusal: race.refusal,
           pending: race.pending,
           watching,
+          watchingOwn: watchingNow()?.owner === 'player',
         },
         recording,
       );
@@ -3258,6 +3339,7 @@ function mountStage(
        */
       watchFacts.hasReplay = false;
       watchFacts.playRefusal = undefined;
+      watchFacts.owner = undefined;
     },
     /**
      * § 3.3's primary on the stage: *Close the day* — *stops the clock and writes the report*.
@@ -3297,6 +3379,16 @@ function mountStage(
         playback?.pause();
         host.endRush(playback?.simTimeS ?? adopted?.startedAt ?? 0);
         context.go('report');
+        return;
+      }
+      /*
+       * **A call is up: ask once before filing** — wave AL, lane AL-A, the post-AK panel's seat B
+       * (D1). The first press puts {@link closeAsk}'s question under the card's answers and moves
+       * focus to its first button; a second press of this primary, or that button, files. Nothing is
+       * asked with no card up, because then there is no answer to skip.
+       */
+      if (!callCard.hidden && closeAsk.hidden) {
+        askBeforeClosing();
         return;
       }
       fileDay();

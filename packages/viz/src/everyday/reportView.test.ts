@@ -295,6 +295,20 @@ describe('what this screen adds on top of the sheet', () => {
   });
 
   /*
+   * Wave AL, lane AL-A, the post-AK panel's seat D (H2), under § D1141. A run on a link's crowd is
+   * practice and closes nothing into the week, and its sheet still offered *Open the doors on
+   * Thursday*: pressed, it skipped the counted Wednesday the sentence above it said stays open.
+   */
+  it('offers no button into tomorrow on a sheet whose crowd kept the day open, and keeps it on a retake’s', () => {
+    const open = viewOf({ report: sheetOf({ practiceNote: 'Practice.', dayStaysOpen: true }) });
+    expect(open.tomorrow).toBeUndefined();
+    expect(open.sheet.framing.kind === 'week-day' && open.sheet.framing.canAdvance).toBe(false);
+    /* A retake's practice close follows a close that banked, so its week has a real next day. */
+    const retake = viewOf({ report: sheetOf({ practiceNote: 'Practice.' }) });
+    expect(retake.tomorrow?.label).toBe('Open the doors on Wednesday');
+  });
+
+  /*
    * GitHub issue #577. The unit half of the fix — `campaignJourney.browser.test.ts` holds the half
    * that matters, because the defect was a composition of three correct modules and only the crumbs
    * after the press can show it. What is worth pinning here is that the **daily arm is reached by

@@ -73,6 +73,16 @@ export const STAGE_CALL_COPY = Object.freeze({
    * the same words whether the answers will turn out to matter or not.
    */
   waiting: 'stopped while the day is run ahead from here',
+  /*
+   * Wave AL, lane AL-A, the post-AK panel's seat B (D1): *Close the day* pressed with the card up
+   * filed the scored day on the spot, unanswered, with nothing asked (on a phone it is the big
+   * button). The close now asks once, in these words, and a second press or the first button files.
+   */
+  closeAsk: 'Close the day without answering this call?',
+  closeConsequence:
+    'The rest of the day plays out with nothing answered, and the report is written from that.',
+  closeFile: 'Close the day as it stands',
+  closeBack: 'Back to the call',
 });
 
 /**

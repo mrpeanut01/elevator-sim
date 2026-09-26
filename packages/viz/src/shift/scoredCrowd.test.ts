@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { pressDayFor } from './ladder.js';
-import { crowdIsShared, crowdMakesPractice } from './scoredCrowd.js';
+import { crowdIsShared, crowdMakesPractice, practiceGroundOf } from './scoredCrowd.js';
 import { openWeek, outcomeOf, REPLAY_CONTRACT_ID, RUSH_CONTRACT_ID } from './week.js';
 import type { DayOutcome } from './types.js';
 import type { WatchRecord } from '../watch/types.js';
@@ -52,5 +52,26 @@ describe('a scored day belongs to its shared crowd — § D1141', () => {
     for (const sentinel of [REPLAY_CONTRACT_ID, RUSH_CONTRACT_ID]) {
       expect(crowdMakesPractice({ ...underWay, contractId: sentinel }, 777n, DATE)).toBe(false);
     }
+  });
+
+  /*
+   * Wave AL, lane AL-A, the post-AK panel's seat D (H3): the brief said *banks nothing* on its seed
+   * line and *This day counts toward the week.* in its week block. One function now names why a run
+   * banks nothing, and the close and the brief both read it.
+   */
+  it('names one ground for a run that banks nothing, crowd first, and none for a run that banks', () => {
+    const day = (n: number, seed: bigint): DayOutcome =>
+      outcomeOf({
+        day: n, dayIdx: n - 1, eventId: 'ordinary', readings: [], minutePct: 80, carried: 10, arrived: 10,
+        record: { seed: seed.toString() } as unknown as WatchRecord,
+        recordRefusal: null,
+      });
+    const underWay = { ...openWeek('c2'), day: 3, dayIdx: 2, history: [day(1, DATE), day(2, DATE)] };
+    expect(practiceGroundOf(underWay, DATE, DATE)).toBeUndefined();
+    expect(practiceGroundOf(underWay, 777n, DATE)).toBe('crowd');
+    const closedToday = { ...underWay, closedDay: 3, history: [...underWay.history, day(3, DATE)] };
+    expect(practiceGroundOf(closedToday, DATE, DATE)).toBe('retake');
+    /* A link's crowd on a closed day is still the crowd's ground: the sheet names the crowd. */
+    expect(practiceGroundOf(closedToday, 777n, DATE)).toBe('crowd');
   });
 });

@@ -1182,6 +1182,44 @@ describe('the rest of the sheet', () => {
     expect(sheet(undefined)).toEqual(sheet([]));
   });
 
+  it('names who drove when on the title line, and every driver in the small print — wave AL', () => {
+    /*
+     * The post-AK panel's seats B and C: after *Switch to Fairness first* at 08:48 the report was
+     * titled *MIDTOWN OFFICE · MINIMUM ESTIMATED WAIT* and said it *cannot tell you that minimum
+     * estimated wait is better*, over its own log line *08:48 · switched to Fairness first*.
+     */
+    const fair = { id: 'fairness-first', name: 'Fairness first', weights: { waitTime: 1 } };
+    const shaped = dayReportOf({
+      recording: clean,
+      observations: observationsOfRun(clean),
+      goals: goalsForDay(4),
+      week: openWeek('c2'),
+      contract: contractById('c2'),
+      event: SHIFT_EVENTS.ordinary,
+      plan: PLAN,
+      calendar: null,
+      subject: { kind: 'week-day' },
+      dispatcherName: 'Minimum estimated wait',
+      interventions: [{ atS: 2 * 3600 + 48 * 60, change: { kind: 'adopt-dispatcher', profile: fair } }],
+    });
+    expect(shaped.metaLines[0]).toBe(`${clean.buildingName} · Minimum estimated wait, then Fairness first from 08:48`);
+    expect(shaped.smallPrint).toContain('cannot tell you that minimum estimated wait or fairness first is better');
+    /* An untouched day keeps its one name. */
+    const untouched = dayReportOf({
+      recording: clean,
+      observations: observationsOfRun(clean),
+      goals: goalsForDay(4),
+      week: openWeek('c2'),
+      contract: contractById('c2'),
+      event: SHIFT_EVENTS.ordinary,
+      plan: PLAN,
+      calendar: null,
+      subject: { kind: 'week-day' },
+      dispatcherName: 'Minimum estimated wait',
+    });
+    expect(untouched.metaLines[0]).toBe(`${clean.buildingName} · Minimum estimated wait`);
+  });
+
   it('names the rules the run was driven by, in the editor’s own readback — docs/20 defect 2', () => {
     /*
      * The audit's finding: a rule governed the run, the stage header named it live for forty

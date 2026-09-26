@@ -62,7 +62,7 @@ import { batchReport, populationLineOf, type BatchReport } from '../batch/report
 import { SuiteError, suiteCellViewOf, suitePlanOf, suiteSummaryOf } from '../batch/suite.js';
 import { BATCH_METRIC_CLASS, BATCH_METRIC_PRESENTATION, BATCH_METRICS, type BatchResult, type BatchWorkerMessage } from '../batch/types.js';
 import { briefingFor } from '../campaign/brief.js';
-import { ACTION_BAR_ROWS, actionBarFor, confirmStripFor, TIMELINE_STEPS } from '../everyday/actionBar.js';
+import { ACTION_BAR_ROWS, actionBarFor, confirmStripFor, TIMELINE_STEPS, WATCHING_NOTE_OWN } from '../everyday/actionBar.js';
 import {
   everydayWatchingCopyOf,
   everydayWatchingStrings,
@@ -434,6 +434,7 @@ import { WAIT_BANDS, moodAt, waitBandsAt } from '../live/bands.js';
 import { decisionRowsAt } from '../live/decisions.js';
 import { honestyAt } from '../live/honesty.js';
 import {
+  driversLineOf,
   interventionLogOf,
   interventionStampOf,
   PARK_CARS_LOBBY_LABEL,
@@ -450,6 +451,7 @@ import {
   RACE_NOT_RUN,
   RACE_PENDING,
   RACE_WATCHING,
+  RACE_WATCHING_OWN,
   raceSlotsOf,
   raceStripViewOf,
   raceVerdictSlotAt,
@@ -758,6 +760,7 @@ import {
   type HouseReading,
   type WeekDeal,
 } from '../shift/weekStake.js';
+import { PRACTICE_DAY_SENTENCES } from '../shift/scoredCrowd.js';
 import { WATCH_RECORD_VERSION, type WatchRecord } from '../watch/types.js';
 
 import type { WaitBandBasis } from '../live/types.js';
@@ -3671,6 +3674,14 @@ const SHIFT_REPORT: SurfaceAdapter = {
      */
     'live/interventions.ts#interventionLogOf',
     /*
+     * Wave AL, lane AL-A: who drove when. `dayReportOf`'s title line reads `driversLineOf` on every
+     * sheet this bundle drives, and a handover arm is seeded by name below, because no corpus day
+     * hands its dispatcher over. `driverNameAt` is the stage header's reading of the same stretches.
+     */
+    'live/interventions.ts#driverStretchesOf',
+    'live/interventions.ts#driversLineOf',
+    'live/interventions.ts#driverNameAt',
+    /*
      * The beat under that log — GitHub issue #581, `shift/afterPress.ts`. Claimed here on
      * `gaveUpBesideOf`'s footing rather than as a way of being counted covered: the row is a
      * `ReportDiagnosis` like the two above it, the `report.diagnosis` loop below seeds its `when`,
@@ -4031,6 +4042,15 @@ const SHIFT_REPORT: SurfaceAdapter = {
       }
       /* § D1141's practice-by-crowd note, by name — see the `covers` entry above. */
       seeds.push({ field: `${at}.practiceCrowdNote`, text: PRACTICE_CROWD_NOTE, role: 'prose' });
+      /* Wave AL: the title line after a handover, on the run's own clock. */
+      seeds.push({
+        field: `${at}.driversLine(handover)`,
+        text: driversLineOf(
+          [{ atS: 3 * 3600, change: { kind: 'adopt-dispatcher', profile: { id: 'handed', name: 'Fairness first', weights: {} } } }],
+          entry.retried.metaLines[0]?.split(' · ').slice(1).join(' · ') ?? '',
+        ),
+        role: 'label',
+      });
       for (const [index, line] of entry.retried.metaLines.entries()) {
         if (sharedMeta.has(line)) continue;
         seeds.push({ field: `${at}.retried.metaLines[${String(index)}]`, text: line, role: 'label' });
@@ -8731,6 +8751,7 @@ const RACE_STRIP: SurfaceAdapter = {
     'live/raceStrip.ts#RACE_PENDING',
     'live/raceStrip.ts#RACE_NOT_RUN',
     'live/raceStrip.ts#RACE_WATCHING',
+    'live/raceStrip.ts#RACE_WATCHING_OWN',
     'live/raceStrip.ts#raceVerdictOf',
     'live/raceStrip.ts#raceStripViewOf',
     'live/raceStrip.ts#raceSlotsOf',
@@ -8749,6 +8770,7 @@ const RACE_STRIP: SurfaceAdapter = {
     seeds.push({ field: 'race.pending', text: RACE_PENDING, role: 'prose' });
     seeds.push({ field: 'race.notRun', text: RACE_NOT_RUN, role: 'prose' });
     seeds.push({ field: 'race.watching', text: RACE_WATCHING, role: 'reason' });
+    seeds.push({ field: 'race.watching.own', text: RACE_WATCHING_OWN, role: 'reason' });
 
     for (const at of sampleTimes(recording)) {
       const stamp = at.toFixed(0);
@@ -8974,6 +8996,9 @@ const WATCH: SurfaceAdapter = {
   id: 'watch/view.ts#watchingViewOf',
   covers: [
     'watch/view.ts#watchingViewOf',
+    /* § D1186: the owner decides the identity cell, and both arms are rendered below (a filed day and a reference row). */
+    'watch/view.ts#watchOwnerOf',
+    'watch/view.ts#WATCH_DISPATCHER_EYEBROWS',
     'watch/view.ts#postedFiguresOf',
     'watch/view.ts#REPLAY_PILL_VERB',
     'watch/view.ts#REFERENCE_RUN_LINE',
@@ -9511,6 +9536,8 @@ const EVERYDAY_MENU: SurfaceAdapter = {
      * guide's own sentence, kept so the deviation can be read against it, and it is never drawn.
      */
     'everyday/actionBar.ts#WATCHING_NOTE',
+    /* § D1186: the row's note on a replay of the player's own day, seeded by name below. */
+    'everyday/actionBar.ts#WATCHING_NOTE_OWN',
     /*
      * **`screens.ts#UNBUILT_REASONS` and `#unbuiltReasonFor` left this list on the merge that
      * registered the last three screens, and they left because they stopped being text producers.**
@@ -9733,6 +9760,7 @@ const EVERYDAY_MENU: SurfaceAdapter = {
      * guide's own state-dependent placeholders, swept as authored so a drift in the convention is
      * visible here too.
      */
+    seeds.push({ field: 'bar.watching.own.note', text: WATCHING_NOTE_OWN, role: 'prose' });
     for (const row of ACTION_BAR_ROWS) {
       const key = row.ctx === undefined ? `bar.${row.screen}` : `bar.${row.screen}.${row.ctx}`;
       seeds.push({ field: `${key}.leave`, text: row.leave.label, role: 'label' });
@@ -12269,6 +12297,11 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
         }
       }
       seeds.push({ field: 'stage.call.held', text: STAGE_CALL_COPY.held, role: 'label' });
+      /* Wave AL, lane AL-A: the close's question while a call is up, its consequence and its two buttons. */
+      seeds.push({ field: 'stage.call.closeAsk', text: STAGE_CALL_COPY.closeAsk, role: 'prose' });
+      seeds.push({ field: 'stage.call.closeConsequence', text: STAGE_CALL_COPY.closeConsequence, role: 'prose' });
+      seeds.push({ field: 'stage.call.closeFile', text: STAGE_CALL_COPY.closeFile, role: 'label' });
+      seeds.push({ field: 'stage.call.closeBack', text: STAGE_CALL_COPY.closeBack, role: 'label' });
       /*
        * § D1138's pace note while the stage waits at an ordinary candidate whose runs have not
        * landed. An ordinary call's card draws only facts the two cards above already seed (the
@@ -13840,6 +13873,12 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     'shift/weekStake.ts#dayStakeSentenceOf',
     'shift/weekStake.ts#DAY_COUNTS_SENTENCE',
     'shift/weekStake.ts#DAY_UNMEASURED_SENTENCE',
+    /*
+     * Wave AL, lane AL-A: the week block's sentence on a run that banks nothing, in place of the
+     * census's day sentence. Seeded by name beside the day sentences below, on both grounds, because
+     * no corpus case's brief is a practice run.
+     */
+    'shift/scoredCrowd.ts#PRACTICE_DAY_SENTENCES',
     'shift/weekStake.ts#WEEK_WITHOUT_COUNTED_DAYS_SHORT',
     /*
      * A week that counts no day holds its scenario — § D1179. The reason and the hub's line are
@@ -16596,6 +16635,9 @@ function seedWeekStake(seeds: TextSeed[], observations: Observations): void {
   seeds.push({ field: 'brief.week.heading', text: BRIEF_WEEK_HEADING, role: 'label' });
   seeds.push({ field: 'week.stake.short', text: WEEK_WITHOUT_COUNTED_DAYS_SHORT, role: 'reason' });
   seeds.push({ field: 'week.day.unmeasured', text: DAY_UNMEASURED_SENTENCE, role: 'reason' });
+  for (const [ground, sentence] of Object.entries(PRACTICE_DAY_SENTENCES)) {
+    seeds.push({ field: `week.day.practice.${ground}`, text: sentence, role: 'reason' });
+  }
   seeds.push({ field: 'week.closed', text: WEEK_CLOSED_LINE, role: 'prose' });
   for (const contract of CONTRACTS) {
     const deal = weekDealOf(contract.id);
