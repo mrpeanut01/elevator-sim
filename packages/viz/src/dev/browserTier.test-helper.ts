@@ -912,7 +912,7 @@ export const BUILT_ARTIFACT_CLAIMS: readonly string[] = Object.freeze([
  * to publish itself on a global."* Reaching a module the dev server already exposes is cheaper than
  * that, and it is honest about what it costs, which is this list.
  *
- * So the limitation is **stated rather than implied**: these four files assert nothing from
+ * So the limitation is **stated rather than implied**: these files assert nothing from
  * {@link BUILT_ARTIFACT_CLAIMS}, and if one of them ever needs to, the fix is to move that case into
  * a file that drives {@link startShippedSite} — not to relax this.
  *
@@ -925,4 +925,5 @@ export const DEV_SERVER_FILES: readonly string[] = Object.freeze([
   'everyday/reportScreen.browser.test.ts',
   'everyday/shell.browser.test.ts',
   'everyday/stageScreen.browser.test.ts',
+  'dev/loopRefile.browser.test.ts',
 ]);
