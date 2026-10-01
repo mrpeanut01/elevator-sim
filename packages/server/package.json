@@ -26,13 +26,13 @@
   },
   "dependencies": {
     "@azure/communication-email": "^1.1.0",
-    "@azure/identity": "^4.13.1",
+    "@azure/identity": "^4.13.3",
     "@elevator-sim/core": "*",
     "@elevator-sim/experiments": "*",
-    "pg": "^8.22.0"
+    "pg": "^8.23.0"
   },
   "devDependencies": {
-    "@electric-sql/pglite": "^0.5.4",
-    "@types/pg": "^8.20.4"
+    "@electric-sql/pglite": "^0.5.8",
+    "@types/pg": "^8.23.1"
   }
 }
