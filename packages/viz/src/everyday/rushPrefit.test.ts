@@ -28,9 +28,13 @@ import {
   RUSH_PREFIT_KIT,
   loadConfig,
   parseBuilding,
-  prefittedRushBuilding,
-  prefittedRushProfile,
   resolveBuilding,
+  rushFitOf,
+  rushRebuiltBuilding,
+  zonedProfileOf,
+  type BuildingConfig,
+  type DispatcherProfile,
+  type ElevatorSpecs,
   type LoadedConfig,
 } from '@elevator-sim/core';
 
@@ -42,6 +46,16 @@ import { priceOf } from '../pricing/parse.js';
 import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
 
 import { RUSH_PREFIT_LEVELS } from '@elevator-sim/core';
+
+/*
+ * `core`'s side of the kit, through the general appliers the server uses. Wave AN deleted
+ * `rushPrefit.ts`'s own two wrappers once § D1295 left them no caller outside the tests; these keep
+ * the tests' names for the same two edits.
+ */
+const prefittedRushBuilding = (base: BuildingConfig, specs: ElevatorSpecs): BuildingConfig =>
+  rushRebuiltBuilding(base, rushFitOf(RUSH_PREFIT_LEVELS), specs);
+const prefittedRushProfile = (profile: DispatcherProfile): DispatcherProfile =>
+  RUSH_PREFIT_KIT.zonesTheTower ? zonedProfileOf(profile) : profile;
 
 import { RUSH_SEED, rushFitOutOf } from './rush.js';
 

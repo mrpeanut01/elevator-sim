@@ -16,11 +16,10 @@ import { describe, expect, it } from 'vitest';
 
 import { loadConfig } from './loader.js';
 import { changeCovering, parsePriceSchedule } from './priceSchedule.js';
-import { RUSH_PREFIT_KIT, prefittedRushProfile } from './rushPrefit.js';
+import { RUSH_PREFIT_KIT, RUSH_PREFIT_LEVELS } from './rushPrefit.js';
 import {
   RUSH_AS_SHIPPED,
   RUSH_NO_LEVELS,
-  RUSH_PREFIT_LEVELS,
   RUSH_REBUILD_CATEGORY_IDS,
   RUSH_REBUILD_OFF_MENU,
   RUSH_REBUILD_TIERS,
@@ -30,6 +29,7 @@ import {
   rushRebuildUnits,
   rushRebuiltBuilding,
   rushRebuiltProfile,
+  zonedProfileOf,
 } from './rushRebuild.js';
 
 const DATA = fileURLToPath(new URL('../../../../data/', import.meta.url));
@@ -130,11 +130,11 @@ describe('the appliers', () => {
     expect(rushRebuiltProfile(profile, RUSH_AS_SHIPPED, (entry) => entry)).toBe(profile);
   });
 
-  it('give the pre-fit’s profile exactly what the kit’s own applier gives it', async () => {
+  it('give the pre-fit’s profile exactly the zoning the kit declares, and nothing else', async () => {
     const config = await loadConfig(DATA);
     for (const profile of config.dispatcherProfiles.profiles) {
       expect(rushRebuiltProfile(profile, rushFitOf(RUSH_PREFIT_LEVELS), (entry) => entry), profile.id).toEqual(
-        prefittedRushProfile(profile),
+        RUSH_PREFIT_KIT.zonesTheTower ? zonedProfileOf(profile) : profile,
       );
     }
   });

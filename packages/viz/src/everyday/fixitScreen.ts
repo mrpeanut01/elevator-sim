@@ -76,10 +76,11 @@
  * - **Who-drives: a car's duty.** `core` carries the concept — `CarConfig.duty`, a rider's duty and
  *   the `dutyMismatch` term (GitHub issue #481, § D549) — and the fixit engine has no seam for it:
  *   no field of `FixitPatch` writes a duty, so nothing on this screen draws one.
- *   The term's weight dial is withheld because it moves no leg on any case: no case's building
- *   declares a duty on any car (`fixit/families.ts#INERT_DIALS`), and no shipped profile weights the
- *   term either (GitHub issue #561, which names the pair as the work). Whether a duty control on its
- *   own would move a leg has not been measured. A car *out of service* is not a duty: the rezone
+ *   The term's weight dial is drawn: since § D1290, St Jude's car E declares a bed duty, so the
+ *   dial, once a player weights it, moves legs there; `fixit/families.ts#INERT_DIALS` is empty
+ *   (`authoring/stJudeDuty.test.ts`). No shipped profile weights the term yet, which is the owner's
+ *   call under § D1290. Whether a duty control of the car itself would move a leg has not been
+ *   measured. A car *out of service* is not a duty: the rezone
  *   family takes a car out (`fixit/types.ts#OUT_OF_SERVICE`) and puts one back, and that is drawn.
  *
  * **Shafts are drawn nowhere, and the reason is the price rather than a missing seam.** A new shaft

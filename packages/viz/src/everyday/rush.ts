@@ -119,8 +119,8 @@ export const RUSH_SEED = BigInt(RUSH_STREAM.seed);
  * § D640 — and left when the general rebuild arrived (§ D1295): a pre-fit is three levels of the same
  * fold now, so {@link rushFitOutOf} at `core`'s `RUSH_PREFIT_LEVELS` is that fit-out, and a constant
  * beside it would have been a second answer with no caller. `everyday/rushPrefit.test.ts` still asserts
- * the kit's three effects and its byte agreement with `core`'s `prefittedRushBuilding` on every shipped
- * tower, through {@link rushFitOutOf}.
+ * the kit's three effects and its byte agreement with `core`'s `rushRebuiltBuilding` at the kit's levels
+ * on every shipped tower, through {@link rushFitOutOf}.
  */
 
 /**

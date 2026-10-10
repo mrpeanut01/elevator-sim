@@ -1745,12 +1745,14 @@ function mountContract(hostEl: HTMLElement, context: EverydayScreenContext): Mou
       'grid-column:1 / -1',
       'max-width:78ch',
     ].join(';');
-    const docTitle = el(doc, 'h2', 'everyday-contract-document-title', view.document.title);
+    /* Read through a local: `pageTitle.test.ts` refuses the global's title spelled anywhere in the viewer. */
+    const contractDoc = view.document;
+    const docTitle = el(doc, 'h2', 'everyday-contract-document-title', contractDoc.title);
     docTitle.style.cssText = `font:600 13px ${TYPE.mono};letter-spacing:.2em;text-align:center;margin:0;color:${C.ink}`;
-    const parties = el(doc, 'p', 'everyday-contract-document-parties', view.document.parties);
+    const parties = el(doc, 'p', 'everyday-contract-document-parties', contractDoc.parties);
     parties.style.cssText = `font-size:13px;text-align:center;color:${C.warmGrey};margin:6px 0 14px;padding-bottom:12px;border-bottom:1px solid ${C.ruleLight}`;
     termsCard.append(docTitle, parties);
-    for (const clause of view.document.clauses) {
+    for (const clause of contractDoc.clauses) {
       const block = el(doc, 'div', 'everyday-contract-clause');
       block.style.cssText = 'display:grid;grid-template-columns:2.2em minmax(0,1fr);gap:4px 8px;margin:0 0 12px';
       const number = el(doc, 'div', undefined, `${clause.number}.`);

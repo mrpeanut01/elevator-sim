@@ -135,13 +135,12 @@ export {
 } from './rushPurse.js';
 export type { RushPurseRound, RushPurseSchema, RushPurseTable } from './rushPurse.js';
 
-/** The one fixed rush pre-fit kit and its two appliers — GitHub issue #372, § D640. */
+/** The one fixed rush pre-fit kit and its levels on the rebuild menu — GitHub issue #372, § D640. */
 export {
   RUSH_PREFIT_KIT,
+  RUSH_PREFIT_LEVELS,
   RUSH_PREFIT_SINK_ID,
   claimsRushPrefit,
-  prefittedRushBuilding,
-  prefittedRushProfile,
   violationsInRushPrefit,
 } from './rushPrefit.js';
 export type { RushPrefitClaim, RushPrefitKit, RushPrefitRung } from './rushPrefit.js';
@@ -151,7 +150,6 @@ export {
   MIN_DOOR_S,
   RUSH_AS_SHIPPED,
   RUSH_NO_LEVELS,
-  RUSH_PREFIT_LEVELS,
   RUSH_REBUILD_CATEGORY_IDS,
   RUSH_REBUILD_OFF_MENU,
   RUSH_REBUILD_TIERS,

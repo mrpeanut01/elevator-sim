@@ -56,17 +56,21 @@
  *
  * Between them the three effects are two per-car field edits and one dispatch lever, and **not one
  * of them needs the commissioning machinery** `packages/viz/src/commissioning/` owns: no
- * `extraShafts`, no `machineClassId`, no floor populations. So {@link prefittedRushBuilding} is a
- * plain edit to a `BuildingConfig` and {@link prefittedRushProfile} is three fields on a
- * `DispatcherProfile`. Both are now `rushRebuild.ts`'s general appliers at this kit's levels, which
- * is the same edit by construction rather than by agreement.
+ * `extraShafts`, no `machineClassId`, no floor populations. So the kit is a plain edit to a
+ * `BuildingConfig` and three fields on a `DispatcherProfile`, and both are `rushRebuild.ts`'s general
+ * appliers (`rushRebuiltBuilding`, `rushRebuiltProfile`) at {@link RUSH_PREFIT_LEVELS}, which is the
+ * same edit by construction rather than by agreement. The kit's own two wrappers were deleted in
+ * wave AN once [§ D1295](../../../../DECISIONS.md) moved the server onto those appliers and they
+ * kept no caller outside their tests.
  *
  * ## The two ends, and how they are held to one answer
  *
  * - **`packages/viz`** keeps its own generic applier: the prefit reaches a rush as the
  *   `CampaignFitOut` `everyday/rush.ts#rushFitOutOf` builds from {@link RUSH_PREFIT_LEVELS}, folded
  *   by `campaign/fitOut.ts` like any other kit, because a fit-out is what this is.
- * - **`packages/server`** has no `SHOP` and no fold, and calls the two functions below directly.
+ * - **`packages/server`** has no `SHOP`: it folds {@link RUSH_PREFIT_LEVELS} with `rushFitOf` and
+ *   applies `rushRebuiltBuilding` and `rushRebuiltProfile`, the appliers a rebuild between rounds
+ *   uses.
  *
  * Two paths, one set of values, and the agreement is **pinned by runs rather than by this
  * paragraph**: `packages/server/src/leaderboard/rushHoldAgreement.json` carries `prefit` cells that
@@ -81,15 +85,14 @@
  * A mid-round *switch dispatcher* press carries no kit, in either half. `viz` writes the zoning
  * lever into the **driving** profile only (`dev/state.ts#drivingProfileOf`) and the stage's switch
  * target is a shipped profile as shipped (`dev/main.ts`'s `plainBaselineOf`), so the server applies
- * {@link prefittedRushProfile} to a round's base profile and to no switch target. That is parity
+ * the zoning lever (`rushRebuild.ts#zonedProfileOf`) to a round's base profile and to no switch target. That is parity
  * with what a player's own run does, which is the only thing a replay may be: whether a bought
  * zoning *should* survive a switch is a product question and is not answered here.
  */
 
-import type { BuildingConfig, DispatcherProfile, ElevatorSpecs } from './types.js';
 import type { ChimeLedgerTable } from './chimeLedger.js';
 import { chimeSinkById } from './chimeLedger.js';
-import { RUSH_PREFIT_LEVELS, rushFitOf, rushRebuiltBuilding, zonedProfileOf } from './rushRebuild.js';
+import { rushRebuildTierOf, type RushFitLevels } from './rushRebuild.js';
 
 /* -------------------------------------------------------------------------- *
  * The kit
@@ -154,6 +157,27 @@ export const RUSH_PREFIT_KIT: RushPrefitKit = Object.freeze({
   ]),
   totalUnits: 15,
 });
+
+/**
+ * **The kit as levels** — Doors 1, Control 1, Tenants 1 (§ D640) — read off {@link RUSH_PREFIT_KIT}'s
+ * rungs through the rebuild menu, so which tiers the pre-fit is has one statement rather than two.
+ * Both ends fold it with `rushRebuild.ts#rushFitOf` and apply it like any rebuild
+ * ([§ D1295](../../../../DECISIONS.md)): the server in `leaderboard/rushSitting.ts`, the viewer in
+ * `everyday/rush.ts`. A rung the menu has no tier for throws as the module loads, because a kit the
+ * menu cannot build is the hole § D606 named. `rushPrefit.test.ts` holds the kit's three named effects
+ * equal to this fold.
+ */
+export const RUSH_PREFIT_LEVELS: RushFitLevels = Object.freeze(
+  Object.fromEntries(
+    RUSH_PREFIT_KIT.rungs.map((rung) => {
+      const tier = rushRebuildTierOf(rung.priceId);
+      if (tier === undefined) {
+        throw new Error(`rush-prefit's rung "${rung.priceId}" is no tier on the rebuild menu, so no fold can build it.`);
+      }
+      return [tier.categoryId, tier.level];
+    }),
+  ) as RushFitLevels,
+);
 
 /* -------------------------------------------------------------------------- *
  * The claim
@@ -223,39 +247,3 @@ export function violationsInRushPrefit(ledger: ChimeLedgerTable): readonly strin
  * from this module so nothing that imported them from here moved.
  */
 export { MIN_DOOR_S, doorCycleWithSaving } from './rushRebuild.js';
-
-/**
- * The building with {@link RUSH_PREFIT_KIT}'s two per-car edits on it — a real edit to a real
- * `BuildingConfig`, to be put back through the caller's own `parseBuilding`/`resolveBuilding`.
- *
- * **Now the general rebuild's applier at the kit's levels** — `rushRebuild.ts#rushRebuiltBuilding`
- * over {@link RUSH_PREFIT_LEVELS} — rather than an applier of its own. It wrote the same two fields
- * the same way, so the move changed no byte of a fitted tower: `rushHoldAgreement.json`'s two `prefit`
- * cells replay at the figures they were pinned at before it.
- *
- * What it does, unchanged: each field is resolved from the specs **before** it is moved, because a car
- * that declares none is not a car with none; **a ceiling over an unknown value is not a ceiling**, so a
- * building whose type the transfer table has no row for keeps every car's transfer time; and the
- * ceiling is a `Math.min`, so a lobby already at or below 1.2 s is left alone — `midtown-office` is
- * that building, and a cell where this half of the kit is inert is a measured fact.
- */
-export function prefittedRushBuilding(base: BuildingConfig, specs: ElevatorSpecs): BuildingConfig {
-  return rushRebuiltBuilding(base, rushFitOf(RUSH_PREFIT_LEVELS), specs);
-}
-
-/* -------------------------------------------------------------------------- *
- * The dispatcher
- * -------------------------------------------------------------------------- */
-
-/**
- * The driving profile with *the group is worked as zones* on it — `control` L1, at `core`'s level.
- *
- * Now `rushRebuild.ts#zonedProfileOf`, which holds the three fields and why each is
- * `authoring/dispatcherSpec.ts#profileFromSpec`'s own choice; this keeps the kit's name for it.
- * Nothing else on the profile is touched: the weights, the selection and the rules are the player's
- * and this is hardware in the building.
- */
-export function prefittedRushProfile(profile: DispatcherProfile): DispatcherProfile {
-  if (!RUSH_PREFIT_KIT.zonesTheTower) return profile;
-  return zonedProfileOf(profile);
-}

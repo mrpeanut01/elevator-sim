@@ -17,7 +17,7 @@
  * a level and the numbers it fits ({@link RUSH_REBUILD_TIERS}). No name, no sentence, no price in
  * units (the price is the schedule's, read through `priceSchedule.ts`), and no string a player meets.
  * `rushPrefit.ts`'s fixed kit was the first instance of this shape and is now one point of it: three
- * levels, {@link RUSH_PREFIT_LEVELS}, folded and applied by the same functions as any rebuild.
+ * levels, `rushPrefit.ts#RUSH_PREFIT_LEVELS`, folded and applied by the same functions as any rebuild.
  *
  * ## The menu, and the two categories that are not on it
  *
@@ -223,13 +223,6 @@ export type RushFitLevels = Readonly<Partial<Record<RushRebuildCategoryId, numbe
 
 /** Nothing fitted. */
 export const RUSH_NO_LEVELS: RushFitLevels = Object.freeze({});
-
-/**
- * **`rush-prefit`'s kit as levels** — Doors 1, Control 1, Tenants 1 (§ D640). `rushPrefit.ts` keeps
- * the kit's three effects as named numbers because the viewer builds its own fit-out from them;
- * `rushPrefit.test.ts` holds those numbers equal to this fold.
- */
-export const RUSH_PREFIT_LEVELS: RushFitLevels = Object.freeze({ doors: 1, control: 1, tenants: 1 });
 
 /**
  * The record a set of levels folds to — one tier per category, absolute at its level, in the menu's
@@ -540,8 +533,8 @@ const DEFAULT_SPLIT_THRESHOLD_PASSENGERS = 10;
  * - `idle.parkingStrategy: 'zone-center'` — what zoning means to the idle stage, and it **overrides**
  *   whatever the profile parks on, because `parkingFor` puts express above the profile's own.
  *
- * Nothing else on the profile is touched. This was `rushPrefit.ts#prefittedRushProfile`'s body, which
- * now calls the general applier below.
+ * Nothing else on the profile is touched. This was the body of `rushPrefit.ts`'s `prefittedRushProfile`,
+ * a wrapper wave AN deleted once it had no caller outside its tests.
  */
 export function zonedProfileOf(profile: DispatcherProfile): DispatcherProfile {
   return {

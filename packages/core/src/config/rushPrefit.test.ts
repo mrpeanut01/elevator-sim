@@ -23,14 +23,24 @@ import { loadConfig } from './loader.js';
 import {
   MIN_DOOR_S,
   RUSH_PREFIT_KIT,
+  RUSH_PREFIT_LEVELS,
   RUSH_PREFIT_SINK_ID,
   claimsRushPrefit,
   doorCycleWithSaving,
-  prefittedRushBuilding,
-  prefittedRushProfile,
   violationsInRushPrefit,
 } from './rushPrefit.js';
+import { rushFitOf, rushRebuiltBuilding, zonedProfileOf } from './rushRebuild.js';
 import type { BuildingConfig, DispatcherProfile, ElevatorSpecs } from './types.js';
+
+/*
+ * The kit at its levels, through the general appliers both shipped paths use. Wave AN deleted
+ * `rushPrefit.ts`'s own two wrappers once § D1295 left them no caller outside the tests; these keep
+ * the tests' names for the same two edits.
+ */
+const prefittedRushBuilding = (base: BuildingConfig, specs: ElevatorSpecs): BuildingConfig =>
+  rushRebuiltBuilding(base, rushFitOf(RUSH_PREFIT_LEVELS), specs);
+const prefittedRushProfile = (profile: DispatcherProfile): DispatcherProfile =>
+  RUSH_PREFIT_KIT.zonesTheTower ? zonedProfileOf(profile) : profile;
 
 const DATA = fileURLToPath(new URL('../../../../data/', import.meta.url));
 const RAW_LEDGER = JSON.parse(readFileSync(`${DATA}chime-ledger.json`, 'utf8')) as {

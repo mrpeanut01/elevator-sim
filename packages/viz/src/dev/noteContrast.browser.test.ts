@@ -112,8 +112,13 @@ const AA_BODY = 4.5;
  * that commitment (L-7's failure direction is silence), so this pin is a fact about a page whose
  * scope table declares it — which every shipped tree does, and the two lines above say why a pin
  * rather than a floor. Measured on this branch; the integrated figure is the integration lane's.
+ *
+ * **Twenty-three since wave AN's lane AN-6** ([§ D1323](../../../../DECISIONS.md)): the right rail
+ * draws a hidden `.rail-prose rail-attempt-note` beside each of its three scope notes, shown in that
+ * note's place while a scored attempt stands. The unit tier's mount count moved from nine to twelve in
+ * the lane; this one was found by the integrated head's browser run.
  */
-const NOTES_ON_THE_PAGE = 20;
+const NOTES_ON_THE_PAGE = 23;
 
 /** One paragraph as the browser resolved it. */
 interface Measured {

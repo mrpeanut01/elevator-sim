@@ -382,9 +382,11 @@ describe('issue #91 — the beat is built where the day closes, and nowhere else
       'tomorrowFactsOf is called more than once — a second call is either a second answer to ' +
         'what tomorrow holds, or a document resolve on the render path',
     ).toBe(1);
-    // And it is inside `briefingFor`, which `closeShift` is the only caller of.
-    const body = await bodyOf('briefingFor');
+    // And it is inside `closeShift`, the day-closing path: wave AN's lane AN-7 moved it out of
+    // `briefingFor` so the sheet's percentages and the close's tomorrow card read the same facts.
+    const body = await bodyOf('closeShift');
     expect(body).toContain('tomorrowFactsOf(resources,');
+    expect(await bodyOf('briefingFor')).not.toContain('tomorrowFactsOf(');
   });
 
   it('carries the sheet’s own verdict rather than re-deriving one', async () => {

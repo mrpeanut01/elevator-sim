@@ -240,16 +240,14 @@ export {
   violationsInRushPurse,
   // The one fixed rush pre-fit kit — GitHub issue #372; `config/rushPrefit.ts`, § D640.
   RUSH_PREFIT_KIT,
+  RUSH_PREFIT_LEVELS,
   RUSH_PREFIT_SINK_ID,
   claimsRushPrefit,
-  prefittedRushBuilding,
-  prefittedRushProfile,
   violationsInRushPrefit,
   // The rush rebuild between rounds — GitHub issue #372; `config/rushRebuild.ts`, § D1295.
   MIN_DOOR_S,
   RUSH_AS_SHIPPED,
   RUSH_NO_LEVELS,
-  RUSH_PREFIT_LEVELS,
   RUSH_REBUILD_CATEGORY_IDS,
   RUSH_REBUILD_OFF_MENU,
   RUSH_REBUILD_TIERS,
