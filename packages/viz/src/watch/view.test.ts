@@ -18,6 +18,9 @@
 
 import { describe, expect, it } from 'vitest';
 
+import type { BuildingConfig, DispatcherProfile } from '@elevator-sim/core/browser';
+
+import { DEFAULT_PATTERN } from '../authoring/patternSpec.js';
 import { RESOURCES, baseState } from '../scope/probes.test-helper.js';
 import { runIdentityIssues } from '../scope/runIdentity.js';
 import type { ViewerState } from '../dev/state.js';
@@ -50,6 +53,18 @@ import {
 
 const POSTED: PostedResult = { arrived: 300, carried: 290, minutePct: 82, worstWaitS: 94 };
 
+/** A shipped building and profile to save under an id the data does not carry. */
+function shippedBuilding(): BuildingConfig {
+  const config = RESOURCES.entries[0]?.config;
+  if (config === undefined) throw new Error('the shipped data loaded no building');
+  return config;
+}
+function shippedProfile(): DispatcherProfile {
+  const profile = RESOURCES.dispatcherProfiles.profiles[0];
+  if (profile === undefined) throw new Error('the shipped data loaded no dispatcher');
+  return profile;
+}
+
 /**
  * States that between them fire every arm of `runIdentityIssues` a filed day can carry.
  *
@@ -58,9 +73,29 @@ const POSTED: PostedResult = { arrived: 300, carried: 290, minutePct: 82, worstW
  * only arrangement that survives somebody else maintaining the copy.
  */
 const SCOPE_STATES: readonly ViewerState[] = [
+  /*
+   * The three value refusals, each in both of its arms since GitHub issue #591: an id saved nowhere,
+   * and the same id saved on this device, which is the only state that says *saved on this device
+   * alone*. Both reach the picker, so both are swept.
+   */
   { ...baseState(), buildingId: 'nobody-ships-this' },
   { ...baseState(), dispatcherId: 'nobody-ships-this' },
   { ...baseState(), pattern: 'nobody-ships-this' },
+  {
+    ...baseState(),
+    buildingId: 'nobody-ships-this',
+    savedBuildings: [{ id: 'nobody-ships-this', config: { ...shippedBuilding(), id: 'nobody-ships-this' } }],
+  },
+  {
+    ...baseState(),
+    dispatcherId: 'nobody-ships-this',
+    savedDispatchers: [{ id: 'nobody-ships-this', profile: { ...shippedProfile(), id: 'nobody-ships-this' } }],
+  },
+  {
+    ...baseState(),
+    pattern: 'nobody-ships-this',
+    savedPatterns: [{ id: 'nobody-ships-this', spec: DEFAULT_PATTERN }],
+  },
   { ...baseState(), patience: { distribution: 'exponential', meanS: 120 } },
   { ...baseState(), levers: { ...baseState().levers, parking: !baseState().levers.parking } },
   { ...baseState(), savedClasses: [{ id: 'mine' }] as never },
@@ -202,6 +237,7 @@ describe('the watching view', () => {
     // necessary — a green run over a corpus that happened to miss them would be green about nothing.
     expect(messages.length).toBeGreaterThan(3);
     expect(messages.filter((message) => message.includes('saved on this device alone'))).toHaveLength(3);
+    expect(messages.filter((message) => message.includes('not saved on this device either'))).toHaveLength(3);
     for (const message of messages) {
       expect(
         firstPersonWordsIn(refusalForDay(message)),

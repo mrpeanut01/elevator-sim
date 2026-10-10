@@ -18,6 +18,8 @@ import {
 } from '../menu/account.js';
 
 import { SOUND_ROW_COPY } from './audio.js';
+import { POST_RUN_COPY } from './postRun.js';
+import { RUSH_POST_COPY } from './rushPost.js';
 import { AVATAR_SWATCHES } from './profile.js';
 import { railFooter } from './rail.js';
 import {
@@ -321,6 +323,18 @@ describe('This device — statements of fact, and the register of refusals besid
     ]) {
       expect(entries.some((entry) => entry.startsWith(label)), label).toBe(true);
     }
+    /*
+     * **The posting row says what ships** — GitHub issue #219's settings criterion. It read
+     * *"nothing in this build posts a run yet"* after the report screen's *Post this run* and the
+     * rush sheet's *Post this sitting* were both built, which is § D227's more dangerous polarity: a
+     * sentence telling a player a thing cannot be done beside a button that does it. What is still
+     * true is narrower, and it names the two presses by the labels they carry, read from their own
+     * copy so a renamed button fails here rather than on a player's screen.
+     */
+    const posting = entries.find((entry) => entry.startsWith('Post runs to the board')) ?? '';
+    expect(posting).not.toMatch(/nothing in this build posts/u);
+    expect(posting).toContain(POST_RUN_COPY.button);
+    expect(posting).toContain(RUSH_POST_COPY.button);
     /*
      * **`Units` is asserted gone, in the same direction and for the same reason** — GitHub issue
      * #170, [§ D448](../../../../DECISIONS.md). Its consumer is built and the row is drawn, so a

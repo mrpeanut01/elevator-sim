@@ -1379,6 +1379,16 @@ export function recordLine(tower: CampaignTower): string {
  * -------------------------------------------------------------------------- */
 
 export const CONTRACT_COPY = Object.freeze({
+  /*
+   * **Why the sheet will not run a day while the tower's renewal stands** — GitHub issue #582 item
+   * 3, [§ D1274](../../../../DECISIONS.md). The desk refuses to open a day over a standing need, and
+   * the sheet's *Lock it in and run day N* ran the same day past it: measured on the built bundle with
+   * a career seeded on day 19, the press landed on the stage with the dock reading *day 19 of 20*
+   * while the desk still asked for an answer. `campaignScreens.ts#contractBar` puts this on the press
+   * as its refusal, and it names where the answer is given.
+   */
+  renewalFirst:
+    'the contract is up for renewal, and no day runs here until it is answered on the building’s desk',
   lede:
     'One building for twenty days. You are paid for each day you clear, more as the month goes on, and ' +
     'you spend it on the tower itself. A perfect month buys about a third of the shop, so the month is ' +

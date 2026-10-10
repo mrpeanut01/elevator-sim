@@ -262,8 +262,18 @@ const ABSENCE_TRIAGE: readonly TriagedAbsence[] = Object.freeze([
    * figures as that generator's first input. Inventing a new number would split one thing across
    * two queues, which is the rush row's own reasoning below.
    */
-  { register: 'EVERYDAY_SHELL_ABSENCES', fragment: 'your week’s after that', issue: 159 },
-  { register: 'STAGE_ABSENCES', fragment: 'no works to buy while the day plays', issue: 367 },
+  /*
+   * **Both rows re-pointed by wave AN's triage, because both owners had closed with the absence still
+   * standing** (#159 on 2026-09-09, #367 on 2026-09-10). Checked against the code on the commit that
+   * moved them: no tower is drawn for a returning player after the first day and nothing names
+   * today's draw (`everyday/towerChoice.ts` lists every tower and names none as the day's), and no
+   * caller passes `stageScreenModel.ts#StageInterventionInput.works`, so the stage still has no rung
+   * to spend against. The owners now are the open issues that build each: **#248**, whose rotation
+   * across the shipped buildings is what would draw a tower a day, and **#553**, the play-time
+   * tracker for the rung in force that #367's survivor table did not include.
+   */
+  { register: 'EVERYDAY_SHELL_ABSENCES', fragment: 'your week’s after that', issue: 248 },
+  { register: 'STAGE_ABSENCES', fragment: 'no works to buy while the day plays', issue: 553 },
   /*
    * **The rush's register is not empty any more, and the entry that refilled it came in with the
    * feature that half-closed its issue.** GitHub issue #372 asked for a per-wave purse, recorded
@@ -318,7 +328,14 @@ const ABSENCE_TRIAGE: readonly TriagedAbsence[] = Object.freeze([
    * (GitHub issues #171 and #169 item 1, § D507), and this test's own rule is what took it out: an
    * entry deleted while the map still names it fails here.
    */
-  { register: 'CAMPAIGN_ABSENCES', fragment: 'nothing files on', issue: 223 },
+  /*
+   * **Re-pointed by wave AN's triage: #223 closed on 2026-09-01 with the day filing on *Close the
+   * day*, and the sentence that stayed is about the other half.** `everyday/host.ts#closeDay` is the
+   * one writer of a career day, and it runs on the player's press, so *"nothing files one
+   * automatically"* is still true. The open issue that asks for days that run and file by themselves
+   * is **#536** (*"they automatically run while on this screen"*), so it owns the row.
+   */
+  { register: 'CAMPAIGN_ABSENCES', fragment: 'nothing files on', issue: 536 },
   /*
    * **A row that arrived with a fix rather than with a gap**, which this table has now recorded
    * three times and is the direction § D370's queue reading is weakest about. GitHub issue **#563**
@@ -331,7 +348,15 @@ const ABSENCE_TRIAGE: readonly TriagedAbsence[] = Object.freeze([
    * #375's own docstring argues about. Inventing a second issue would split one thing across two
    * queues, which is the rush row's reasoning above.
    */
-  { register: 'CAMPAIGN_ABSENCES', fragment: 'The month is remembered and the mornings are not', issue: 375 },
+  /*
+   * **Re-pointed by wave AN's triage: #375 closed on 2026-09-07 and the field it would carry was
+   * never added.** `campaign/careerPersist.ts` still restores the month and not the session's seed
+   * base, so the sentence stands. No open issue builds that field, so the row goes to **#219**, whose
+   * first criterion (*no shipped player surface carries a refusal caused by an unbuilt feature*)
+   * cannot close while it stands; a dedicated issue would be the better owner, and filing one is the
+   * integrator's.
+   */
+  { register: 'CAMPAIGN_ABSENCES', fragment: 'The month is remembered and the mornings are not', issue: 219 },
 
   /* Settings. Two of the six are #229's remainder after its premise was refuted (§ D368). */
   /*
@@ -352,7 +377,15 @@ const ABSENCE_TRIAGE: readonly TriagedAbsence[] = Object.freeze([
    * `Sound`, was never this row's: it is #258's above, and the two were separated by § D344's
    * ruling and § D447's correction rather than by this deletion.
    */
-  { register: 'SETTINGS_ABSENCES', fragment: 'Post runs to the board', issue: 161 },
+  /*
+   * **Re-pointed by wave AN's triage, with its entry rewritten on the same commit.** #161 closed on
+   * 2026-09-04, and the entry's *"nothing in this build posts a run yet"* went false when #221 and
+   * #372 built the two posting presses. What is still absent is the switch, and it is absent because
+   * nothing posts without a press for it to turn off. Whether the row is built (posting that happens
+   * on its own, with this switch to stop it) or removed from the design is **#219**'s third criterion
+   * in its own words: *every settings row either does something or is removed*.
+   */
+  { register: 'SETTINGS_ABSENCES', fragment: 'Post runs to the board', issue: 219 },
   /*
    * The tutorial — § D529, which built the two screens and deliberately did **not** settle which
    * building the first session uses: *"What this does not decide. Which building the tutorial
@@ -360,7 +393,14 @@ const ABSENCE_TRIAGE: readonly TriagedAbsence[] = Object.freeze([
    * `tutorialModel.ts`; the row is here because an argued choice is still an open question until
    * the issue that owns it closes.
    */
-  { register: 'TUTORIAL_ABSENCES', fragment: 'Which building the first session should use', issue: 270 },
+  /*
+   * **Re-pointed by wave AN's triage: #270 closed on 2026-09-10 as record-only, and the question did
+   * not go with it.** Its closing note sends each route elsewhere, and the tutorial's building is in
+   * none of them: § D372's authored, failable building is unbuilt and the tutorial still teaches
+   * `three-cars-one-cars-work` on Garden Apartments (`tutorialModel.ts#TUTORIAL_CASE_ID`). No open
+   * issue owns it, so the row goes to **#219**'s first criterion until one is filed.
+   */
+  { register: 'TUTORIAL_ABSENCES', fragment: 'Which building the first session should use', issue: 219 },
   /*
    * **`docs/36` `AX-1` on the first session's canvas** — GitHub issue **#239**, the accessibility
    * sweep that owns every clause `docs/36` records as failing. The entry arrived on the commit that
@@ -373,7 +413,13 @@ const ABSENCE_TRIAGE: readonly TriagedAbsence[] = Object.freeze([
    * truth about what is on the canvas is the name, which is #239's and shared with the fix-it
    * screen.
    */
-  { register: 'TUTORIAL_ABSENCES', fragment: 'no name a screen reader can read', issue: 239 },
+  /*
+   * **Re-pointed by wave AN's triage: #239 closed on 2026-09-09 and the canvases are still unnamed.**
+   * `everyday/caseStage.ts` sets no accessible name on either canvas it creates, so `docs/36`
+   * `AX-1`'s Everyday half is still failing here. No open accessibility issue exists, so the row goes
+   * to **#219**'s first criterion until one is filed.
+   */
+  { register: 'TUTORIAL_ABSENCES', fragment: 'no name a screen reader can read', issue: 219 },
   /*
    * **`Sign out` left this table on the commit that built the control** — GitHub issue #332,
    * [§ D489](../../../../DECISIONS.md). Its entry refused a button on the grounds that *nothing on
@@ -381,9 +427,10 @@ const ABSENCE_TRIAGE: readonly TriagedAbsence[] = Object.freeze([
    * its presses, so both the entry and this row go together. It is `Units`' case exactly (§ D448),
    * and the assertion below is the one that makes the pairing checkable rather than remembered.
    *
-   * **`Post runs to the board` above deliberately did not go with it.** It refuses a *switch* over
-   * a capability that still does not exist; sign-in does not make it false, posting does, and
-   * § D460 corrected that confusion once already.
+   * **`Post runs to the board` above deliberately did not go with it.** It refused a *switch* over
+   * a capability that did not exist then; sign-in did not make it false, posting did, and § D460
+   * corrected that confusion once already. Posting has since landed (#221, #372), and wave AN
+   * reworded that entry to the switch alone rather than deleting it.
    */
 ]);
 

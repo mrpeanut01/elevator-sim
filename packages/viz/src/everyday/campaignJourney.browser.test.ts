@@ -53,6 +53,9 @@ import {
   type ShippedSite,
 } from '../dev/browserTier.test-helper.js';
 import { DIFFICULTIES, rateOnDay } from '../campaign/economy.js';
+import { openingCareer } from '../campaign/career.js';
+import { CAREER_STORAGE_KEY, encodeCareer } from '../campaign/careerPersist.js';
+import { CONTRACT_COPY } from './campaignModel.js';
 
 let site: ShippedSite;
 let browser: Browser;
@@ -75,6 +78,39 @@ afterAll(async () => {
 /** A cold load, settled — the Engineer menu dismissed, so `dev/main.ts`'s boot has published a host. */
 async function coldLoad(): Promise<Page> {
   const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
+  await page.goto(`${origin}?building=garden-apartments&seed=424242`, { waitUntil: 'load' });
+  await page.waitForFunction(
+    () => document.querySelector<HTMLElement>('.menu-overlay')?.hidden === true,
+    undefined,
+    { timeout: 30_000 },
+  );
+  return page;
+}
+
+/**
+ * A cold load whose device already carries a career on contract day `day` — the career a returning
+ * player brings back, written through the codec the store itself decodes (`autoFile.browser.test.ts`
+ * seeds one the same way). Eighteen played days would cost this file the better part of an hour;
+ * the record is what the presses read, so the record is what is seeded.
+ */
+async function coldLoadOnContractDay(day: number): Promise<Page> {
+  const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
+  const opening = openingCareer('collective');
+  const stored = encodeCareer({
+    ...opening,
+    today: day,
+    towers: opening.towers.map((tower) => ({ ...tower, day })),
+  });
+  await page.addInitScript(
+    ({ key, value }) => {
+      try {
+        window.localStorage.setItem(key, value);
+      } catch {
+        /* No storage, no career: the case then fails on the day it reads rather than passing on nothing. */
+      }
+    },
+    { key: CAREER_STORAGE_KEY, value: stored },
+  );
   await page.goto(`${origin}?building=garden-apartments&seed=424242`, { waitUntil: 'load' });
   await page.waitForFunction(
     () => document.querySelector<HTMLElement>('.menu-overlay')?.hidden === true,
@@ -394,6 +430,52 @@ describe.skipIf(!HAS_BROWSER)('a campaign day, filed — issue #223', () => {
     /* And the day counter moved, which is the progression the press promised. */
     await page.waitForSelector('.everyday-stage-dock', { timeout: 60_000 });
     expect(await page.textContent('.everyday-stage-dock-day')).toBe('day 2 of 20');
+
+    await page.close();
+  }, 300_000);
+
+  /**
+   * **No press runs a contract day past its renewal** — GitHub issue #582 item 3, § D1274.
+   *
+   * The desk refuses to open day 19 until the renewal is answered, and two other doors ran it
+   * anyway. Measured on this bundle before the fix, with a career seeded on day 18: day 18's sheet
+   * offered *Open the doors on day 19 at Garden Apartments*, and the press landed on the stage with
+   * the dock reading *day 19 of 20*; and on day 19 the contract sheet's *Lock it in and run day 19*
+   * did the same while the desk said *needs a decision*. So both are driven here, by the presses a
+   * player has, and the second half is the polarity that says the sheet is not simply dead: its
+   * refusal names the reason and where the answer is given.
+   */
+  it('sends day 18’s sheet to the renewal, and runs no day past it from the sheet or the contract — #582', async () => {
+    const page = await coldLoadOnContractDay(18);
+    await enterCampaign(page);
+    const building = (await page.textContent('.everyday-towers-name')) ?? '';
+    expect(building.length).toBeGreaterThan(0);
+    await openDesk(page);
+    await openContract(page);
+    /* Day 18 still runs: the renewal stands from day 19, so this press is the control arm. */
+    expect(await page.textContent('.everyday-bar-primary')).toBe('Lock it in and run day 18');
+    await runAndCloseTheDay(page);
+
+    /* The sheet of the day before says the renewal has come, on the button the player presses. */
+    const onward = page.locator('.everyday-report-tomorrow');
+    expect(await onward.textContent()).toBe(`Answer the renewal at ${building}`);
+    expect(await page.textContent('.everyday-report')).toContain('The contract is up for renewal');
+    await onward.click();
+    await page.waitForSelector('.everyday-building', { timeout: 30_000 });
+    expect(await page.locator('.everyday-stage-canvas').count()).toBe(0);
+    expect(await page.textContent('.everyday-building')).toContain('The managing agent has offered a renewal');
+    expect((await monthFigures(page)).day).toBe(19);
+
+    /* And the contract sheet's own press refuses, with the reason on the bar, rather than running day 19. */
+    await openContract(page);
+    const primary = page.locator('.everyday-bar-primary');
+    expect(await primary.textContent()).toBe('Lock it in and run day 19');
+    expect(await primary.isDisabled()).toBe(true);
+    expect(await page.textContent('.everyday-bar-note')).toBe(CONTRACT_COPY.renewalFirst);
+    await page.click('.everyday-bar-back');
+    await page.waitForSelector('.everyday-towers', { timeout: 30_000 });
+    await openDesk(page);
+    expect((await monthFigures(page)).day).toBe(19);
 
     await page.close();
   }, 300_000);

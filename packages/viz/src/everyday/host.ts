@@ -4694,9 +4694,20 @@ export function createEverydayHost(
  * The sentence the shell draws when a registered screen is entered before `dev/main.ts` has
  * published the host — a state only reachable in the first instants of a cold load, and drawn
  * rather than blanked because a blank region is a control that silently did nothing.
+ *
+ * **In the player's words since GitHub issue #572, [§ D1273](../../../../DECISIONS.md).** It read
+ * *"the simulation host has not finished booting — this screen draws the moment it does"*, which
+ * was true and was the machine's vocabulary on the first screen a stranger meets (the front door
+ * draws it too, § D844). One state keeps one sentence, so this constant changed and both of the
+ * shell's waiting screens still read it; `host.test.ts` holds both halves.
+ *
+ * **Both clauses stay true on a load that fails**, which is the case `docs/27` D5 records: the
+ * game really has not finished loading, and the second clause is conditional on that rather than
+ * a forecast of it. What the sentence cannot do is say the load failed, because nothing tells the
+ * shell so; that is D5's remaining half and it is not this constant's to close.
  */
 export const HOST_PENDING_REASON =
-  'the simulation host has not finished booting — this screen draws the moment it does';
+  'The game has not finished loading. This screen fills in the moment it has.';
 
 /**
  * Where the host is handed across — `dev/main.ts` publishes, `everyday/boot.ts` passes the slot

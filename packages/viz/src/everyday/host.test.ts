@@ -8,7 +8,7 @@
  * § 3.4's confirm strip.
  */
 
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import {
@@ -69,6 +69,7 @@ import { watchingViewOf, type WatchingView } from '../watch/view.js';
 import {
   createEverydayHost,
   dailyBoardOf,
+  HOST_PENDING_REASON,
   challengeTodayOf,
   CHALLENGE_BOARD_METRIC,
   POST_RUN_NO_SERVER,
@@ -2946,5 +2947,53 @@ describe('one attempt per scored day — § D1218', () => {
     standing = false;
     host.leaveDayUnfinished();
     expect(h.calls).toEqual(['leaveDayAttempt', 'leaveDayAttempt', 'abandonDay']);
+  });
+});
+
+/*
+ * **The waiting sentence is in the player's words, and it is the only one** — GitHub issue #572,
+ * [§ D1273](../../../../DECISIONS.md).
+ *
+ * It read *"the simulation host has not finished booting — this screen draws the moment it does"*:
+ * true, and the machine's vocabulary on the first screen a stranger meets. One state has one
+ * sentence, so the fix is the constant and both of the shell's waiting screens read it; a second,
+ * friendlier copy beside the old one would be two answers to one question.
+ */
+describe('the sentence a screen shows while the game loads', () => {
+  it('names no machinery, and promises nothing it cannot keep', () => {
+    for (const word of ['host', 'boot', 'simulation', 'draw']) {
+      expect(HOST_PENDING_REASON.toLowerCase(), word).not.toContain(word);
+    }
+    // Conditional on the load, never a forecast of it: on a load that fails the screen never fills,
+    // and a sentence saying it soon will would be false there (docs/27 D5).
+    expect(HOST_PENDING_REASON).not.toMatch(/\b(soon|shortly|in a moment|any second)\b/u);
+  });
+
+  it('is the one sentence both of the shell\u2019s waiting screens draw, and no copy of the old one survives', () => {
+    const src = new URL('./', import.meta.url);
+    const shell = readFileSync(fileURLToPath(new URL('shell.ts', src)), 'utf8');
+    // The front door's waiting state and a registered screen's: both draw the constant itself.
+    expect(shell.match(/el\(doc, 'p', undefined, HOST_PENDING_REASON\)/gu)?.length).toBe(2);
+    // And nothing else in the shipped tree authors the old words as a string a player could read.
+    const root = fileURLToPath(new URL('../', import.meta.url));
+    const offenders: string[] = [];
+    const walk = (dir: string): void => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const path = `${dir}/${entry.name}`;
+        if (entry.isDirectory()) walk(path);
+        else if (path.endsWith('.ts') && !path.endsWith('.test.ts') && !path.includes('.test-helper.')) {
+          // Comments quote the old words as history (this constant's own docstring does), so they
+          // are stripped first: what is looked for is a string the build could put on a screen.
+          const text = readFileSync(path, 'utf8')
+            .replace(/\/\*[\s\S]*?\*\//gu, '')
+            .replace(/^\s*\/\/.*$/gmu, '');
+          if (/['"`][^'"`\n]*(finished booting|simulation host)[^'"`\n]*['"`]/u.test(text)) {
+            offenders.push(path.slice(root.length));
+          }
+        }
+      }
+    };
+    walk(root.replace(/\/$/u, ''));
+    expect(offenders).toEqual([]);
   });
 });

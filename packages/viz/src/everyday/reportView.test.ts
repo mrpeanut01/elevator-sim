@@ -327,7 +327,7 @@ describe('what this screen adds on top of the sheet', () => {
     // A career sheet keeps its own onward step whatever the week standing behind it says.
     const career = viewOf({
       report: sheetOf({ weekClosed: true }),
-      career: { buildingName: 'Garden Apartments', day: 4, canRunAnother: true },
+      career: { buildingName: 'Garden Apartments', day: 4, canRunAnother: true, renewalDue: false },
     });
     expect(career.tomorrow?.goes).toBe('career-day');
   });
@@ -378,7 +378,7 @@ describe('what this screen adds on top of the sheet', () => {
     // No week handed in (every caller but the daily report), a career sheet, or a practice close: no lead.
     expect(viewOf({ report }).close).toBeUndefined();
     expect(
-      viewOf({ report, week, career: { buildingName: 'Garden Apartments', day: 4, canRunAnother: true } }).close,
+      viewOf({ report, week, career: { buildingName: 'Garden Apartments', day: 4, canRunAnother: true, renewalDue: false } }).close,
     ).toBeUndefined();
     expect(viewOf({ report: sheetOf({ onward, practiceNote: 'Practice.' }), week }).close).toBeUndefined();
   });
@@ -390,7 +390,7 @@ describe('what this screen adds on top of the sheet', () => {
    * every caller that does not say otherwise**, which is what keeps the honesty corpus, the replay
    * and the daily loop on the label they have always had.
    */
-  const CAREER = Object.freeze({ buildingName: 'Garden Apartments', day: 4, canRunAnother: true });
+  const CAREER = Object.freeze({ buildingName: 'Garden Apartments', day: 4, canRunAnother: true, renewalDue: false });
 
   it('opens the career’s own next day from a career sheet, naming the day and the building — #577', () => {
     const view = viewOf({ career: CAREER });
@@ -406,8 +406,34 @@ describe('what this screen adds on top of the sheet', () => {
   it('offers no button once the contract has filed its last day — #577', () => {
     // `campaign/career.ts#fileDay` refuses a twenty-first day, so a button promising one would be a
     // control that cannot do what it says. An absent control is the honest state; the bar's own
-    // `Back to ⟨building⟩` carries the player to the desk that has the renewal.
+    // `Back to ⟨building⟩` carries the player to the desk that has the renewal. Since § D1274 a
+    // standing renewal takes this sheet to the desk first (the case below), so this arm is the
+    // refusal for a month run out with no renewal standing, which the record cannot produce today.
     expect(viewOf({ career: { ...CAREER, canRunAnother: false } }).tomorrow).toBeUndefined();
+  });
+
+  /*
+   * GitHub issue #582 item 3, [§ D1274](../../../../DECISIONS.md). Day 18's sheet offered *Open the
+   * doors on day 19* and the press ran day 19, while the building's desk refuses to run that day
+   * until the renewal is answered: measured on the built bundle with a career seeded on day 18, the
+   * press landed on the stage with the dock reading *day 19 of 20* and no answer given. So where the
+   * renewal stands the onward step is the renewal, and it says so before the press.
+   */
+  it('sends the career to the renewal, not past it, when the next day is the renewal’s — #582', () => {
+    const due = viewOf({ career: { ...CAREER, day: 19, renewalDue: true } }).tomorrow;
+    expect(due?.goes).toBe('career-desk');
+    expect(due?.label).toBe('Answer the renewal at Garden Apartments');
+    expect(due?.label).not.toContain('Open the doors');
+    // The line that says it is coming, on the sheet of the day before it.
+    expect(due?.note).toContain('up for renewal');
+    expect(due?.note).toContain('You stay in the career');
+    // And a month already run out still shows the renewal rather than no button: the desk is where
+    // the next press goes either way.
+    expect(viewOf({ career: { ...CAREER, day: 21, canRunAnother: false, renewalDue: true } }).tomorrow?.goes).toBe(
+      'career-desk',
+    );
+    // The other polarity: a day with no renewal standing still opens the next day.
+    expect(viewOf({ career: { ...CAREER, day: 18 } }).tomorrow?.goes).toBe('career-day');
   });
 
   it('leaves every non-career caller on the daily arm — #577’s other polarity', () => {

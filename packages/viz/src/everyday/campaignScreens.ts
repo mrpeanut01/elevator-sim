@@ -32,6 +32,7 @@ import { actionBarFor, type ActionBarModel } from './actionBar.js';
 import type { EverydayHost } from './host.js';
 import {
   buildingView,
+  CONTRACT_COPY,
   contractView,
   towersView,
   type BuildingFacts,
@@ -52,7 +53,7 @@ import {
   EVERYDAY_TYPE as TYPE,
 } from './tokens.js';
 import type { EverydayState } from './types.js';
-import { openTowerOf, type BuildId, type CampaignTower } from '../campaign/career.js';
+import { needOf, openTowerOf, type BuildId, type CampaignTower } from '../campaign/career.js';
 import { parseBuilding, resolveBuilding } from '@elevator-sim/core/browser';
 import { worksHeldCarRefsOf } from '../campaign/works.js';
 import { drawElevation } from './elevation.js';
@@ -1511,6 +1512,12 @@ function mountContract(hostEl: HTMLElement, context: EverydayScreenContext): Mou
     primary: () => {
       const tower = openTowerOf(host.campaign());
       if (tower === undefined) return;
+      /*
+       * Guarded as well as inert, on `postRun.ts`'s ground (a keyboard route into a handler): a
+       * standing renewal is the desk's to answer, and this press used to run the day past it —
+       * § D1274, and `campaignModel.ts#CONTRACT_COPY.renewalFirst` for the sentence.
+       */
+      if (needOf(tower)?.kind === 'renewal') return;
       host.runCampaignDay(tower.id);
       context.go('stage');
     },
@@ -1544,6 +1551,18 @@ function contractBar(state: EverydayState): ActionBarModel {
       ...base,
       primary: { ...base.primary, label: restartLabel ?? base.primary.label },
       note: overNote ?? 'this month is over — the difficulty you pick sets the month',
+    };
+  }
+  /* § D1274: the renewal is the desk's, so this sheet runs no day over it and says why on the press. */
+  if (needOf(tower)?.kind === 'renewal') {
+    return {
+      ...base,
+      primary: {
+        ...base.primary,
+        label: (lockLabel ?? '').replace('⟨N⟩', String(tower.day)),
+        inert: CONTRACT_COPY.renewalFirst,
+      },
+      note: CONTRACT_COPY.renewalFirst,
     };
   }
   return {

@@ -41357,6 +41357,8 @@ said to be unmeasured, and [§ D256](DECISIONS.md)'s refusal.
 
 ## D844 — the front door is not offered before the shell can answer who is arriving, and the landing page's run does not rebuild the page it lands on
 
+> **Status 2026-10-10: AMENDED by [§ D1273](#d1273)** (an agent ruling). The waiting front door stands; the sentence it reuses now reads *The game has not finished loading. This screen fills in the moment it has.* See [`docs/39`](docs/39-decisions-in-force.md).
+
 **Date: 2026-09-22 · Owner: LANE-AE-FIX (wave AE integration) · Rules on:** nothing recorded is
 reversed. It moves what [§ D335](DECISIONS.md)'s front door paints in its first quarter second, it
 withdraws a mechanism `dev/browserTier.test-helper.ts` stated as fact, and it moves the figure
@@ -41530,6 +41532,8 @@ The rest of the sweep, for the same reason — reported either way, because a nu
 ---
 
 ## D899 — a career day's onward press advances the career, rather than saying that it leaves it
+
+> **Status 2026-10-10: AMENDED by [§ D1274](#d1274)** (an agent ruling). While the tower's renewal stands, the onward step is *Answer the renewal at ⟨building⟩* and goes to the desk, a month run out included, and the contract sheet's run press refuses over the renewal too. See [`docs/39`](docs/39-decisions-in-force.md).
 
 **Date: 2026-09-22 · Owner: LANE-AF-C (wave AF) · GitHub issue [#577](https://github.com/mrpeanut01/elevator-sim/issues/577) · Settles a [§ D227](#d227) reading the issue deliberately left open · Rules on: `packages/viz/src/everyday/reportView.ts`, `packages/viz/src/everyday/reportScreen.ts`, `packages/viz/src/everyday/campaignJourney.browser.test.ts`.**
 
@@ -49097,3 +49101,83 @@ over a real pinned line and requires each to be the one new report. Red on the b
 **Not established.** No workflow uses a local action (`./path`) or a `docker://` image today; either
 would fail this rule and would need a clause of its own. The rule does not require the version
 comment, which is what Dependabot reads to propose an update.
+
+---
+
+## D1273 — the shell's loading sentence is in the player's words, and it is still one sentence for one state
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (wave AN, lane AN-2, on the lane
+> brief's item 2 and the triage's proposed ruling for GitHub issue #572: *one sentence for one
+> state, changed everywhere*), not by the product owner. **Owner-reversible**: the words.
+
+**Why an entry.** It answers the question [§ D844](#d844) named and left open (it reused the
+sentence rather than invent one), it changes words `docs/27` quotes in F0 and D5, and the constant
+is read by two of the shell's screens and the honesty corpus.
+
+**The ruling.**
+
+1. One state keeps one sentence. `everyday/host.ts#HOST_PENDING_REASON` changes, and both of the
+   shell's waiting screens (the front door's, § D844, and a registered screen's) still draw the
+   constant itself. No friendlier second copy is written beside it.
+2. It read *the simulation host has not finished booting*, then *this screen draws the moment it
+   does*. It now reads *The game has not finished loading. This screen fills in the moment it has.*
+3. The handoff was read first. `docs/design/` rules that an unavailable state is labelled and is
+   never a spinner (`ENGINE_CONTRACT.md` near lines 707 and 747, `GAMEPLAY_AND_NAVIGATION.md` near
+   line 1441) and says nothing about the words, so this is a judgement and not a citation.
+4. Both clauses are true while the host is on its way and also on a load that fails, which is the
+   state `docs/27` D5 records: the game has not finished loading, and the second clause is a
+   condition rather than a forecast. What no sentence here can do is say the load failed, because
+   nothing tells the shell so. D5's remainder (the failure is unsaid and unrecoverable) stays open,
+   and `docs/27` says so in both rows.
+
+**Not done.** The window was not re-measured; § D844's 190 ms to 430 ms on the built bundle is
+still the last figure.
+
+**Tests.** `everyday/host.test.ts`, *the sentence a screen shows while the game loads*: it names no
+machinery and forecasts nothing, and both waiting screens draw the constant while no string in the
+shipped tree carries the old words. Both cases were red before the change and green after.
+
+## D1274 — no press runs a contract day past its renewal: the day-18 sheet goes to the desk and the contract sheet refuses
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (wave AN, lane AN-2, on the lane
+> brief's item 5 for GitHub issue #582 item 3, after the defect was confirmed by a run), not by the
+> product owner. **Owner-reversible**: clauses 1 to 3. **Not put to a swarm**: the lane had no way
+> to spawn one, and the reading not chosen is set out below so the integrator can.
+
+**Why an entry.** It amends [§ D899](#d899)'s career onward arm and its one refusal, and it binds
+three modules none of which owns the others: `everyday/reportView.ts` with `reportScreen.ts`,
+`everyday/campaignScreens.ts`, and `everyday/campaignModel.ts`'s contract copy.
+
+**What was measured.** On the built bundle, with a career seeded on contract day 18 through the
+store's own codec: day 18's sheet offered *Open the doors on day 19 at Garden Apartments*, and the
+press landed on the stage with the dock reading *day 19 of 20*. With the career on day 19 the desk
+read *needs a decision* and *answer by day 20*, its primary read *Choose an option first*, and the
+contract sheet's *Lock it in and run day 19* ran the day anyway, dock *day 19 of 20*. So two doors
+ran past a renewal the third refuses to run over.
+
+**The ruling.**
+
+1. The desk's gate is the rule at every door: while `campaign/career.ts#needOf` answers a renewal,
+   no press runs a contract day.
+2. The career sheet's onward step becomes *Answer the renewal at ⟨building⟩*. It goes to the
+   building's desk and runs nothing, and its note (*The contract is up for renewal, and no day runs
+   here until it is answered.*) is the line #582 asked for on the sheet of the day before. It takes
+   precedence over § D899's refusal, so a month that has run out still offers the desk.
+3. The contract sheet's primary is inert while the renewal stands, with
+   `CONTRACT_COPY.renewalFirst` as its reason on the bar, and its handler is guarded as well.
+4. Only the renewal arm is gated at the two new doors. A service window is `needOf`'s other arm,
+   and `career.ts#answerNeed` returns the record unchanged for *Leave it to maintenance*, so a desk
+   asked about one would go on asking; that reading is from the code and is not measured.
+
+**The reading not chosen.** The shipped copy carries evidence that the renewal is a deadline rather
+than a gate: the desk's own `due` cell reads *answer by day 20*, § 3.3's note for the desk row reads
+*you can answer while the day plays*, and § 8.11 says *deadlines are days, not seconds*. Under that
+reading days 19 and 20 are playable before the answer, the desk's refusal is the deviation, and
+`answerNeed` resetting the month to day 1 would forfeit them. This entry follows the lane brief and
+the desk as shipped, which the issue's assessor called correct. Reversing it removes the two new
+gates and lets the desk open a day over a standing renewal.
+
+**Tests.** `everyday/reportView.test.ts`, *sends the career to the renewal, not past it*: red before
+(the step went to `career-day`), green after. `everyday/campaignJourney.browser.test.ts`, *sends day
+18's sheet to the renewal, and runs no day past it from the sheet or the contract*: red before on the
+onward label, green after, with day 18 still running as the control arm.

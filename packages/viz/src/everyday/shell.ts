@@ -2721,8 +2721,9 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
        * `data/`, so the three mode tiles were drawn from no host at all. Driven at 1280 × 800: the
        * region and the tiles paint at **t ≈ 190 ms** and the host publishes at **t ≈ 430 ms**, and
        * a *Scenario* press inside that window opens a screen reading
-       * {@link HOST_PENDING_REASON} — *the simulation host has not finished booting* — because
-       * {@link drawHostPending} below is what a registered screen gets with no host. So for a
+       * {@link HOST_PENDING_REASON} (then *the simulation host has not finished booting*, in player
+       * words since § D1273), because {@link drawHostPending} below is what a registered screen
+       * gets with no host. So for a
        * quarter of a second the front door offered three controls that could not act and said
        * nothing about it, which is § D227's first direction on the first screen anybody sees.
        *
@@ -2736,8 +2737,8 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
        *
        * `docs/31` § 3 defines interactive as a control *with its handler bound*, and
        * `dev/recordTti.ts`'s header already names presence and an enabled state as the two things
-       * that cannot prove it. A tile that opens *the simulation host has not finished booting* was
-       * never interactive; it only looked it. What this changes is which of those two the number
+       * that cannot prove it. A tile that opens the shell's waiting sentence was never
+       * interactive; it only looked it. What this changes is which of those two the number
        * measures — `builtBundle.browser.test.ts`'s `charter S9` B1 waits for the offer to be left
        * before it reads the tile either way.
        *

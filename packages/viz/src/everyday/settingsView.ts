@@ -582,7 +582,21 @@ export const SETTINGS_ABSENCES: readonly string[] = Object.freeze([
    * (`buildNotes.test.ts#ABSENCE_TRIAGE`, § D370), which is what that table's second assertion is
    * for.
    */
-  'Post runs to the board — nothing in this build posts a run yet, so there is no path for a switch to turn off',
+  /*
+   * **Reworded on the evidence of what ships** — GitHub issue #219's settings criterion, the
+   * triage of wave AN. It read *"nothing in this build posts a run yet, so there is no path for a
+   * switch to turn off"*, and the first half went false when GitHub issue #221 built the report
+   * screen's *Post this run* (`everyday/postRun.ts`, reaching `menu/client.ts#submit` through
+   * `dev/main.ts#postCurrentRun`) and #372 built the rush sheet's *Post this sitting*
+   * (`everyday/rushPost.ts`, through `client.postRushSitting`). A refusal that says a thing cannot
+   * be done beside a button that does it is § D227's more dangerous polarity.
+   *
+   * The second half is still true and is now the whole reason: those two presses and the Engineer
+   * menu's own *Post this run* are the only callers of either client method, so no run posts unless
+   * a player presses, and a switch to stop runs posting would have nothing to stop. The labels are
+   * the buttons' own, and `settingsView.test.ts` reads them from their copy.
+   */
+  'Post runs to the board — a run goes to a board only when you press Post this run, or Post this sitting after a rush, so nothing posts on its own for a switch to turn off',
   /*
    * **`Sign out` was the fourth entry and it is deleted, not reworded** — GitHub issue #332,
    * [§ D489](../../../../DECISIONS.md).
@@ -596,9 +610,10 @@ export const SETTINGS_ABSENCES: readonly string[] = Object.freeze([
    * (`buildNotes.test.ts#ABSENCE_TRIAGE`) goes on the same commit, which is what that table's
    * second assertion is for.
    *
-   * **The `Post runs to the board` row above deliberately does not move with it.** It refuses a
-   * *switch* over a capability that still does not exist, sign-in does not make it false, and
-   * § D460 corrected that exact confusion once already. Posting is GitHub issue #221's.
+   * **The `Post runs to the board` row above deliberately does not move with it.** It refused a
+   * *switch* over a capability that did not exist then, sign-in did not make it false, and § D460
+   * corrected that exact confusion once already. Posting was GitHub issue #221's, and it has
+   * landed; the row above now says what is left of it.
    */
   /*
    * **`Clear saved progress` was the sixth entry and it is deleted, not reworded** — GitHub issue

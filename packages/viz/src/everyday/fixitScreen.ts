@@ -30,50 +30,65 @@
  * inside the Everyday shell and the handoff is canonical for what that screen looks like. Each
  * reads its own product's tokens; neither hardcodes a palette of its own.
  *
- * ## The § 10.3 subset drawn, and why it is still a subset — narrowed by GitHub issue #422
+ * ## The § 10.3 editor drawn, and the two pieces still undrawn — GitHub issue #422
  *
  * § 10.1 item 6 asks for the full building editor — elevation grid, zones, shafts, parking,
- * who-drives. **Zones and parking are drawn**, because the engine prices them:
- * `FixitState.zoneOverlapFloors` writes `building.banks[]` at the schedule's `rezone-bank`, and
- * `FixitState.parkingStrategy` writes `dispatcher.idle.parkingStrategy` at `idle-parking`. Both are
- * proved on the legs in `fixit/cases.test.ts` — every rung of the stepper and every strategy the
- * select offers — which is the only thing that makes drawing them different from miming them.
+ * who-drives. **The seams for zones, service ranges, parking and elevation have landed in the fixit
+ * engine, and each one is drawn**, because a control that writes no field of the state it claims to
+ * edit is this repository's signature defect (§ D219 — *move the control and require the run to
+ * change*), and each of these writes one:
  *
- * **A third is drawn now too, narrower than what it closes is named after.** `FixitState.topFloorRaiseM`
- * raises the building's topmost floor and writes `building.floors[]` at the schedule's new
- * `raise-a-floor` (`fixit/types.ts#BuildingPatch.floors`, GitHub issue #422) — the field `FixitPatch`
- * had none of before, so a repair or the editor can now move a floor at all. It is **not** § 10.1
- * item 6's elevation grid — a per-shaft, per-floor-band click-to-set control — which stays exactly
- * as refused as it was; see the next bullet. What is drawn is the one floor move that can never
- * break `heightM`'s strict-increasing-with-`index` rule, whatever else the building holds:
- * `fixit/run.ts#topFloorRaiseCeilingOf` reports `0` and the row is not drawn where the topmost floor
- * is served by no bank or is one half of a double-deck pair, exactly the shape of refusal zoning's
- * ceiling already uses.
+ * - **Zones.** `FixitState.zoneOverlapFloors` writes `building.banks[]` at the schedule's
+ *   `rezone-bank`.
+ * - **Parking.** `FixitState.parkingStrategy` writes `dispatcher.idle.parkingStrategy` at
+ *   `idle-parking`, drawn at the head of the families card beside the floor it summons (§ D1020).
+ * - **Elevation, narrowed to the topmost floor.** `FixitState.topFloorRaiseM` writes
+ *   `building.floors[]` at `raise-a-floor` (`fixit/types.ts#BuildingPatch.floors`): the one floor
+ *   move that can never break `heightM`'s strict-increasing-with-`index` rule, whatever else the
+ *   building holds. `fixit/run.ts#topFloorRaiseCeilingOf` reports `0` and the row is not drawn where
+ *   the topmost floor is served by no bank or is one half of a double-deck pair.
+ * - **[§ D1000](../../../../DECISIONS.md)'s five families**, drawn by `everyday/fixitFamilies.ts`:
+ *   the dials of `idle-parking`, `dispatch-rules` and `dwell-policy`; the door hold for every car or
+ *   one car (`door-dwell`); and the rezone family (`rezone-bank`) — which bank a car runs in,
+ *   including a bank of its own (`fixit/types.ts#KEYED_BANK`) or none, which floors a bank serves, and
+ *   whether a bank's cars weigh against their plate. [§ D1001](../../../../DECISIONS.md)'s tenancy
+ *   row sits beside them.
  *
- * **What is still refused, and why each one is refused for its own reason.** A control that writes
- * no field of the state it claims to edit is this repository's signature defect (§ D219 — *move the
- * control and require the run to change*), and these three would each be one:
+ * `fixit/cases.test.ts` and `fixit/families.test.ts` prove every one on the legs, which is the only
+ * thing that makes drawing them different from miming them.
  *
- * - **The elevation grid.** One row per floor band, one column per shaft, click any cell to change
- *   what it does there (§ 10.3's own words) — a stopping-pattern control distinct from the one metre
- *   this build now moves. No field of `FixitPatch` expresses *which shaft stops at which band*:
- *   `BuildingPatch` carries populations, banks (a whole zone boundary, not one cell), cars, bank
- *   equipment, added cars and now one floor's elevation, and nothing that names a cell of that grid.
- *   A grid drawn over that would edit a document the run never reads.
- * - **Shafts.** A new shaft is `building.addCars[]` and *is* priced (`new-car`, 34 u) — but it is
- *   already sold as each case's fourth repair, at a price no shipped budget can take. A second
- *   control for the same purchase would be one act at two places, which is what #366 abolished.
- * - **Who-drives — per-shaft duty, the goods car and the bed car.** `core` carries the concept now
- *   — `CarConfig.duty`, a rider's duty and the `dutyMismatch` term (GitHub issue #481, § D549) —
- *   but nothing on this screen writes a duty, so the refusal stands as a refusal of the *control*,
- *   the one step of `data/buildings/README.md` § *Duty* not yet built. `CarConfig.mode` is still not
- *   the same concept, and `everyday/designerModel.ts` names the same absence from the other side,
- *   so it is one control two screens want rather than a gap in this one.
+ * **Which shaft stops at which floor is one of those, and that is the narrowing.** This section
+ * used to say *"no field of `FixitPatch` expresses which shaft stops at which band"*, and § D1000
+ * made that false: `FixitState.carBanks` and `FixitState.bankFloors` express exactly that. A car
+ * keyed to a bank of its own stops at that bank's floors, each floor toggled on or off, priced once
+ * at `rezone-bank`; `families.test.ts` drives a keyed car and a dropped floor and requires the legs
+ * to move. One limit is the rezone family's own and is stated where it is drawn: a double-deck
+ * bank's floors are its pairs, and the floor chips do not redraw them (`fixit/families.ts#RezoneBank`).
  *
- *   **This row used to end *"the one out of service"*, and that was over-scoped.** A car out of
- *   service is `CarConfig.mode: 'out-of-service'` — authorable today, and a `ServiceEventConfig`
- *   can put it back mid-run. Claiming it here made the refusal wider than the gap, which is § D227
- *   pointed the other way: a refusal may not claim more is missing than is.
+ * **What is still undrawn, each for its own reason.** A refusal may not claim more is missing than
+ * is (§ D227 pointed the other way), so these two are the whole of it:
+ *
+ * - **The grid, as a drawing.** § 10.3's elevation editor — one row per floor band, one column per
+ *   shaft, click a cell to change what it does there — is a presentation of the stop pattern the
+ *   rezone family already writes, and the selects and floor chips are drawn where it would be. When
+ *   the grid is drawn it has to write `carBanks` and `bankFloors` rather than a field of its own;
+ *   a second control for the same purchase is one act at two places, which #366 abolished.
+ * - **Who-drives: a car's duty.** `core` carries the concept — `CarConfig.duty`, a rider's duty and
+ *   the `dutyMismatch` term (GitHub issue #481, § D549) — and the fixit engine has no seam for it:
+ *   no field of `FixitPatch` writes a duty, so nothing on this screen draws one.
+ *   The term's weight dial is withheld because it moves no leg on any case: no case's building
+ *   declares a duty on any car (`fixit/families.ts#INERT_DIALS`), and no shipped profile weights the
+ *   term either (GitHub issue #561, which names the pair as the work). Whether a duty control on its
+ *   own would move a leg has not been measured. A car *out of service* is not a duty: the rezone
+ *   family takes a car out (`fixit/types.ts#OUT_OF_SERVICE`) and puts one back, and that is drawn.
+ *
+ * **Shafts are drawn nowhere, and the reason is the price rather than a missing seam.** A new shaft
+ * is `building.addCars[]` at the schedule's `new-car` (34 u before its building's area band). No
+ * shipped case can buy one even with its bought rung: § 10.2's budgets run 10 to 16 u and
+ * `data/fixit-cases.json`'s one rung, `a-wider-order`, adds 6, so a row offering a shaft would be
+ * refused on all eighteen. This paragraph used to say the shaft was *"already sold as each case's
+ * fourth repair"*; the repairs stay in `data/fixit-cases.json` as witnesses, and nothing has drawn
+ * them since § D1020 retired the menu.
  *
  * **And zoning and elevation are each drawn only where they can bind, on two different splits.**
  * Eight of the eighteen shipped cases run a single-bank building, where every floor a bank could

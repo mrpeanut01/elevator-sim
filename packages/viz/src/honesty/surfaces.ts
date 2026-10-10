@@ -302,7 +302,7 @@ import { WORKED_ANSWER_COPY, type WorkedAnswerFacts, type WorkedAnswerView } fro
 import { WEEK_START_NEXT_LABEL, weekScreenViewOf } from '../everyday/weekView.js';
 import { percentileLine, WORLD_FIGURES_ABSENT, WORLD_FIGURES_LABEL, WORLD_FIGURES_REASON } from '../everyday/world.js';
 import { weekdayOf, type GoalObservations } from '../shift/types.js';
-import { buildingView, contractView, towersView } from '../everyday/campaignModel.js';
+import { buildingView, CONTRACT_COPY, contractView, towersView } from '../everyday/campaignModel.js';
 import {
   applyCampaignAction,
   CAMPAIGN_ABSENCES,
@@ -7532,11 +7532,22 @@ const REPORT_CARD: SurfaceAdapter = {
           ok: false,
           /*
            * Ids `data/` does **not** ship, deliberately: a value taken from the loaded configuration
-           * would be reproducible by construction and the refusal arm would render nothing. These
-           * are the two *"saved on this device alone"* refusals a reader is most likely to meet.
+           * would be reproducible by construction and the refusal arm would render nothing.
+           *
+           * **One of each of the two sentences a value refusal can say** since GitHub issue #591: the
+           * building is one this device saved, so it reads *saved on this device alone*, and the
+           * dispatcher is saved nowhere, so it reads *not saved on this device either*. The same two
+           * reasons as before, so the card's seed count does not move; only which words it sweeps.
            */
           reasons: runIdentityIssues(
-            { ...initialState(resources, 1n), buildingId: 'my-tower', dispatcherId: 'my-dispatcher' },
+            {
+              ...initialState(resources, 1n),
+              buildingId: 'my-tower',
+              dispatcherId: 'my-dispatcher',
+              savedBuildings: resources.entries
+                .slice(0, 1)
+                .map((entry) => ({ id: 'my-tower', config: { ...entry.config, id: 'my-tower' } })),
+            },
             resources,
             'ranked',
           ).map((issue) => issue.message),
@@ -11527,6 +11538,12 @@ const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
         seeds.push({ field: `${label}.contract.shaft.body2`, text: sheet.shaft.body2, role: 'prose' });
       }
     }
+    /*
+     * The sheet's refusal while a renewal stands — GitHub issue #582 item 3, § D1274. Drawn by
+     * `campaignScreens.ts#contractBar` on the press, a DOM half no adapter reaches, so the sentence
+     * is seeded here from the copy it is read from.
+     */
+    seeds.push({ field: 'contract.renewalFirst', text: CONTRACT_COPY.renewalFirst, role: 'reason' });
 
     return singleRun(this.id, seeds);
   },
@@ -15007,6 +15024,34 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
         seedDayCloseView(seeds, `${at}.report.close.${label}`, view.close);
         seeds.push({ field: `${at}.report.close.${label}.week`, text: view.secondary.week, role: 'label' });
         seeds.push({ field: `${at}.report.close.${label}.menu`, text: view.secondary.menu, role: 'label' });
+      }
+    }
+
+    /*
+     * **A career sheet's onward step, both of its arms** — GitHub issue #582 item 3, § D1274. No
+     * input above passes a career, so the career arm of `everydayReportViewOf` was swept by nothing:
+     * neither *Open the doors on day N at ⟨building⟩* nor the renewal step that now stands in for it
+     * on the sheet before the renewal. One filed sheet, once per case rather than per day, because
+     * the words depend on the career and not on the day's figures.
+     */
+    const careerSheet = bundle.days[0]?.report;
+    /* The building's display name, as `careerOnwardOf` reads it, never its id. */
+    const careerBuilding = context.buildings.find((building) => building.id === context.case.buildingId)?.name;
+    if (careerSheet !== undefined && careerBuilding !== undefined) {
+      for (const [label, renewalDue] of [
+        ['next-day', false],
+        ['renewal', true],
+      ] as const) {
+        const view = everydayReportViewOf({
+          report: careerSheet,
+          previous: undefined,
+          overnight: undefined,
+          newerRunOnStage: false,
+          career: { buildingName: careerBuilding, day: 19, canRunAnother: true, renewalDue },
+        });
+        if (view.tomorrow === undefined) continue;
+        seeds.push({ field: `career.report.${label}.tomorrow.label`, text: view.tomorrow.label, role: 'label' });
+        seeds.push({ field: `career.report.${label}.tomorrow.note`, text: view.tomorrow.note, role: 'prose' });
       }
     }
 

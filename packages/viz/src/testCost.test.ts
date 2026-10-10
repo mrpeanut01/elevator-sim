@@ -496,8 +496,16 @@ const ABOVE_CEILING: ReadonlyMap<string, { readonly count: number; readonly tota
      * the gate to open. Its own waits are a 120 000 ms boot, a 60 000 ms filing and three shorter
      * polls, so it cannot sit under this project's 120 000 ms ceiling. Nothing existing was raised:
      * 26 760 000 + 300 000 = **27 060 000**.
+     *
+     * **99 → 100, and the one is named** — wave AN lane AN-2's case in
+     * `everyday/campaignJourney.browser.test.ts` at 300 000 ms (GitHub issue #582 item 3, § D1274):
+     * it seeds a career on contract day 18, runs and closes that day on the shipped bundle, presses
+     * the sheet's onward step to the desk and reads the contract sheet's refusal. It runs and closes
+     * a whole contract day, which is the work its seven siblings in that file are annotated at
+     * 300 000 ms for, and it failed on the bundle built before the fix. Nothing existing was raised:
+     * 27 060 000 + 300 000 = **27 360 000**.
      */
-    ['viz-browser', { count: 99, totalMs: 27_060_000 }],
+    ['viz-browser', { count: 100, totalMs: 27_360_000 }],
   ]);
 
 /**

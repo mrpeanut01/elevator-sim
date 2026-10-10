@@ -69,9 +69,10 @@ import { CHIME_PRICES } from './chimesPanel.js';
  * `noteReady`/`noteSolved` are its `fixFootNote` pair; the menu's cells — its eyebrow, its hint and
  * its two row-state words — retired with the menu ([§ D1020](../../../../DECISIONS.md)); `asBuiltEyebrow` is § 10.1 item 2's own name for the card, uppercased to the
  * eyebrow register, because the prototype's heading for that region names its elevation editor —
- * the per-shaft, per-floor-band click-to-set grid § 10.1 item 6 asks for, which this build still
- * deliberately does not draw (see `fixitScreen.ts`). What *is* drawn now is narrower: one control
- * that raises the building's topmost floor, issue #422.
+ * the per-shaft, per-floor-band click-to-set grid § 10.1 item 6 asks for, which this build does not
+ * draw as a grid (see `fixitScreen.ts`). The stop pattern that grid would edit is written by the
+ * rezone family's selects and floor chips (§ D1000), and the one floor move drawn is the topmost
+ * floor's raise, issue #422.
  */
 export const FIXIT_SCREEN_COPY = Object.freeze({
   railHeading: 'BUILDINGS THAT NEED HELP',

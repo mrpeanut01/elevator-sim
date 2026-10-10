@@ -81,7 +81,7 @@ import {
   type HonestyPart,
 } from './reportView.js';
 import { DAY_CLOSE_HEADING, type DayCloseView } from '../shift/dayClose.js';
-import { openTowerOf } from '../campaign/career.js';
+import { needOf, openTowerOf } from '../campaign/career.js';
 /* GitHub issue #577: `fileDay`'s twenty-day month, read rather than restated. */
 import { CONTRACT_DAYS } from '../campaign/economy.js';
 import { everydayAccount, onEverydayAccount } from './accountPort.js';
@@ -255,6 +255,15 @@ function mountReportScreen(
        * is filed. Past that the next press is § 8.9's renewal, which lives on the desk.
        */
       canRunAnother: tower.day <= CONTRACT_DAYS,
+      /*
+       * The desk's own gate, read the way the desk reads it — GitHub issue #582 item 3, § D1274.
+       * `campaignScreens.ts#mountBuilding` will not run a day while `needOf` stands, and only the
+       * renewal arm is taken here. A service window is the other arm, and `career.ts#answerNeed`
+       * returns the record unchanged for its *Leave it to maintenance*, so a desk asked about one
+       * would go on asking (read from the code, not measured); routing this press there would not
+       * be a way forward.
+       */
+      renewalDue: needOf(tower)?.kind === 'renewal',
     };
   }
 
@@ -966,6 +975,11 @@ function mountReportScreen(
       if (tower === undefined) return;
       context.host.runCampaignDay(tower.id);
       context.go('stage');
+      return;
+    }
+    /* The renewal is the desk's to answer, and nothing is run on the way — § D1274. */
+    if (step.goes === 'career-desk') {
+      context.go('building');
       return;
     }
     context.host.openTomorrow();

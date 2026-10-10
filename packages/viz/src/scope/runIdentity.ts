@@ -60,6 +60,11 @@
  * this device** is the fact the refusal turns on (only this browser has the artefact), where
  * *yours* was a claim about ownership that the leaderboard's own copy never needed either.
  *
+ * **And it is said only where it is that fact** (GitHub issue #591). An id the shipped data does
+ * not carry can be saved nowhere at all, and then each refusal says *"is not saved on this device
+ * either"* instead; see the value questions in {@link runIdentityIssues}. Neither sentence uses
+ * the first person, so the watch picker's rule holds for both (`watch/view.test.ts` sweeps both).
+ *
  * ## The unstated premise that sentence had, and the two questions it conflated — issue #129
  *
  * *"Everything outside `between-games`"* assumed that **`between-games` state is expressible in the
@@ -910,20 +915,33 @@ export function runIdentityIssues(
 
   /*
    * The value questions. `between-games` and still unreproducible: these three fields are legal to
-   * move in every mode and name something only this browser has.
+   * move in every mode and name something the shipped data does not.
+   *
+   * **Two sentences each, chosen by where the id actually lives** — GitHub issue #591. Each said
+   * *"is saved on this device alone"* for every id the build does not ship, and an id reaches here
+   * saved nowhere as well: a session stored before a release renamed a profile, or a deep link. The
+   * refusal is right in both cases (§ D948 keeps `profileById`'s fallback honest by it, because a
+   * posted run must not name a dispatcher that did not drive it); only the stated reason was false
+   * in the second. So the device sentence is said when the matching `saved*` list holds the id, and
+   * otherwise the sentence says both halves of what is true: the shipped data does not carry it and
+   * this device has not saved it. `runIdentity.test.ts` pins both arms for all three fields.
    */
   if (!resources.entries.some((entry) => entry.config.id === state.buildingId)) {
     issues.push({
       key: 'viewer.buildingId',
       scope: 'between-games',
-      message: `the building “${state.buildingId}” is saved on this device alone and data/buildings/ does not ship it`,
+      message: state.savedBuildings.some((entry) => entry.id === state.buildingId)
+        ? `the building “${state.buildingId}” is saved on this device alone and data/buildings/ does not ship it`
+        : `the building “${state.buildingId}” is not in data/buildings/ and is not saved on this device either`,
     });
   }
   if (!resources.dispatcherProfiles.profiles.some((profile) => profile.id === state.dispatcherId)) {
     issues.push({
       key: 'viewer.dispatcherId',
       scope: 'between-games',
-      message: `the dispatcher “${state.dispatcherId}” is saved on this device alone and data/dispatcher-profiles.json does not ship it`,
+      message: state.savedDispatchers.some((entry) => entry.id === state.dispatcherId)
+        ? `the dispatcher “${state.dispatcherId}” is saved on this device alone and data/dispatcher-profiles.json does not ship it`
+        : `the dispatcher “${state.dispatcherId}” is not in data/dispatcher-profiles.json and is not saved on this device either`,
     });
   }
   if (
@@ -933,7 +951,9 @@ export function runIdentityIssues(
     issues.push({
       key: 'viewer.pattern',
       scope: 'between-games',
-      message: `the arrival pattern “${state.pattern}” is saved on this device alone and no selection names a saved pattern`,
+      message: state.savedPatterns.some((entry) => entry.id === state.pattern)
+        ? `the arrival pattern “${state.pattern}” is saved on this device alone and no selection names a saved pattern`
+        : `the arrival pattern “${state.pattern}” is not in data/traffic-profiles.json and is not saved on this device either`,
     });
   }
 
