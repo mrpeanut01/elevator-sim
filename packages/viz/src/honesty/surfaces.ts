@@ -676,7 +676,11 @@ import {
   bankingRefusalFor,
   LEFT_UNFINISHED_CANNOT_BANK,
   ATTEMPT_CLOSES_ON_ITS_STAGE,
+  ATTEMPT_DAY_SHOWN_TO_ITS_REACH,
+  ATTEMPT_ENGINEER_WATCHES_ONLY,
   ATTEMPT_LEFT_CANNOT_BANK,
+  ATTEMPT_NOT_SAVED,
+  ATTEMPT_RAIL_NOTE,
   ATTEMPT_SHOWN_TO_ITS_REACH,
   LOADED_RUN_CANNOT_BANK,
   UNCHOSEN_RUN_CANNOT_BANK,
@@ -2253,6 +2257,11 @@ const REPLAY: SurfaceAdapter = {
     /* Wave AM, lane AM-B, § D1239 — a scored attempt is played and closed on its own stage. */
     'shift/banking.ts#ATTEMPT_CLOSES_ON_ITS_STAGE',
     'shift/banking.ts#ATTEMPT_SHOWN_TO_ITS_REACH',
+    /* Wave AN, lane AN-6, § D1323 — while a scored attempt stands, the Engineer surface only watches. */
+    'shift/banking.ts#ATTEMPT_DAY_SHOWN_TO_ITS_REACH',
+    'shift/banking.ts#ATTEMPT_ENGINEER_WATCHES_ONLY',
+    'shift/banking.ts#ATTEMPT_RAIL_NOTE',
+    'shift/banking.ts#ATTEMPT_NOT_SAVED',
   ],
   render(context) {
     const verdict = verifyReplay(context.recording, context.recording);
@@ -2311,6 +2320,31 @@ const REPLAY: SurfaceAdapter = {
       {
         field: 'attemptShownToItsReach',
         text: ATTEMPT_SHOWN_TO_ITS_REACH,
+        role: 'reason',
+        provenance: 'authored',
+      },
+      /* § D1323: the hold over the page's own run of the attempt's day, the watch-only refusal, its rail note and the save's. */
+      {
+        field: 'attemptDayShownToItsReach',
+        text: ATTEMPT_DAY_SHOWN_TO_ITS_REACH,
+        role: 'reason',
+        provenance: 'authored',
+      },
+      {
+        field: 'attemptEngineerWatchesOnly',
+        text: ATTEMPT_ENGINEER_WATCHES_ONLY,
+        role: 'reason',
+        provenance: 'authored',
+      },
+      {
+        field: 'attemptRailNote',
+        text: ATTEMPT_RAIL_NOTE,
+        role: 'reason',
+        provenance: 'authored',
+      },
+      {
+        field: 'attemptNotSaved',
+        text: ATTEMPT_NOT_SAVED,
         role: 'reason',
         provenance: 'authored',
       },
@@ -12856,6 +12890,10 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
       seeds.push({ field: 'stage.call.closeConsequence', text: STAGE_CALL_COPY.closeConsequence, role: 'prose' });
       seeds.push({ field: 'stage.call.closeFile', text: STAGE_CALL_COPY.closeFile, role: 'label' });
       seeds.push({ field: 'stage.call.closeBack', text: STAGE_CALL_COPY.closeBack, role: 'label' });
+      /* Wave AN, lane AN-6, § D1324: the skip's question at a due call; its *Back to the call* is the close's. */
+      seeds.push({ field: 'stage.call.skipAsk', text: STAGE_CALL_COPY.skipAsk, role: 'prose' });
+      seeds.push({ field: 'stage.call.skipConsequence', text: STAGE_CALL_COPY.skipConsequence, role: 'prose' });
+      seeds.push({ field: 'stage.call.skipGo', text: STAGE_CALL_COPY.skipGo, role: 'label' });
       /*
        * § D1138's pace note while the stage waits at an ordinary candidate whose runs have not
        * landed. An ordinary call's card draws only facts the two cards above already seed (the

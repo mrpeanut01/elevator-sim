@@ -106,7 +106,7 @@ async function skipIfAnythingIsLeft(page: Page): Promise<void> {
   /*
    * Read and pressed in one page turn, so the day cannot end between the two — and pressed until the
    * day has run out: since § D1204 the pinned day asks on after its call, so a skip may stop at a
-   * later card, and the next press with that card up skips it (recorded as skipped, pressing nothing).
+   * later card, and the next presses with that card up ask (§ D1324) and then skip it (recorded as skipped, pressing nothing).
    */
   await page.waitForFunction(
     () => {
@@ -321,9 +321,13 @@ describe.skipIf(!HAS_BROWSER)('the stage calls a pinned day — § D1029', () =>
        * *nothing was pressed*. The retake now opens just before the call (§ D1140), so the card is
        * already up when the player reaches for the skip, with the day not over; the skip is the
        * player's answer, and the report says the call was skipped.
+       *
+       * **Since § D1324 (wave AN, lane AN-6) the first press asks**, as *Close the day* does with a
+       * card up, and the question's own *Skip to the end* is that answer.
        */
       expect(await page.locator('.everyday-stage-skip').isDisabled(), 'the day ran out past its call').toBe(false);
       await page.locator('.everyday-stage-skip').click();
+      await page.locator('.everyday-stage-skip-confirm-go').click();
       await page.waitForFunction(
         () => document.querySelector<HTMLButtonElement>('.everyday-stage-skip')?.disabled === true,
         undefined,

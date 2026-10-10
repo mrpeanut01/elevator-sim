@@ -212,7 +212,10 @@ import { demandFromSpec, specFromTrafficProfile } from '../authoring/patternSpec
 import { contractById, statLineOf } from '../shift/contracts.js';
 import {
   ATTEMPT_CLOSES_ON_ITS_STAGE,
+  ATTEMPT_DAY_SHOWN_TO_ITS_REACH,
+  ATTEMPT_ENGINEER_WATCHES_ONLY,
   ATTEMPT_LEFT_CANNOT_BANK,
+  ATTEMPT_NOT_SAVED,
   ATTEMPT_SHOWN_TO_ITS_REACH,
   bankingRefusalFor,
   UNCHOSEN_RUN_CANNOT_BANK,
@@ -310,6 +313,7 @@ import {
 } from './parameterForm.js';
 import { mountReport, runProgressOf } from './reportPanel.js';
 import { mountRightRail } from './rightRail.js';
+import { watchOnlyContext, watchOnlyRefusal } from './engineerWindow.js';
 import { mountScenarios } from './scenariosPanel.js';
 import { mountTrafficEditor } from './trafficEditor.js';
 import { playbackRateFor, shouldAutoplayWith } from './motion.js';
@@ -1846,6 +1850,40 @@ function boot(ui: Elements, resources: BrowserResources): void {
   function standingAttempt(): DayAttempt | undefined {
     const attempt = dayAttempts.get(state.week.contractId);
     return attemptStandsOn(attempt, state.week) ? attempt : undefined;
+  }
+
+  /**
+   * **The Engineer surface only watches while a scored attempt stands on `over`'s week** — wave AN,
+   * lane AN-6, [§ D1323](../../../../DECISIONS.md), `dev/engineerWindow.ts`. The sentence the status
+   * line gives when a write is refused, or `undefined` where the week is free. Asked of a state rather
+   * than of {@link state}, so a write can be asked about the week it would put on screen as well.
+   */
+  function engineerWatchOnlySentence(over: ViewerState): string | undefined {
+    if (!advancesTheWeek(over.playMode)) return undefined;
+    return attemptStandsOn(dayAttempts.get(over.week.contractId), over.week) ? ATTEMPT_ENGINEER_WATCHES_ONLY : undefined;
+  }
+
+  /** Whether {@link engineerRefuses} is redrawing the page, so a refusal inside that redraw does not redraw again. */
+  let engineerRefusing = false;
+  /**
+   * § D1323: refuse an Engineer write (or, with no patch, an ask for a run) that would make or change
+   * a run while a scored attempt stands, and say why on the status line. `true` when it refused.
+   * Redrawn on a refusal, so a select or a field the player moved goes back to what is running.
+   */
+  function engineerRefuses(patch?: Partial<ViewerState>): boolean {
+    const sentence = watchOnlyRefusal(state, patch, engineerWatchOnlySentence);
+    if (sentence === undefined) return false;
+    /* Never re-entered: a panel that wrote from its own render would otherwise redraw itself forever. */
+    if (!engineerRefusing) {
+      engineerRefusing = true;
+      try {
+        renderAll();
+      } finally {
+        engineerRefusing = false;
+      }
+    }
+    setText(ui.transport.status, sentence);
+    return true;
   }
 
   /** Whether the run on the stage is the standing attempt's own. */
@@ -4688,17 +4726,26 @@ function boot(ui: Elements, resources: BrowserResources): void {
     },
   };
 
+  /**
+   * **The Engineer panels' context: the same one, with its two writes gated** — wave AN, lane AN-6,
+   * [§ D1323](../../../../DECISIONS.md), `dev/engineerWindow.ts`. While a scored attempt stands, a
+   * panel's write that would make or change a run, and its ask for a run, are refused with
+   * `ATTEMPT_ENGINEER_WATCHES_ONLY`. The Everyday host keeps {@link context} itself: the attempt's
+   * own presses, answers and resume are made there, and none of them comes through a panel.
+   */
+  const engineerContext = watchOnlyContext(context, engineerRefuses);
+
   /* ---------------------------------------------------------------------- *
    * Panels
    * ---------------------------------------------------------------------- */
   const leftRail = mountLeftRail(
     { mood: ui.mood, shift: ui.shift, honesty: ui.honesty, decisionLog: ui.decisionLog },
-    context,
+    engineerContext,
   );
-  const rightRail = mountRightRail(ui.rail, context);
-  const reportPanel = mountReport(ui.report, context);
-  const scenariosPanel = mountScenarios(ui.scenarioList, context);
-  const dispatcherEditor = mountDispatcherEditor(ui.dispatcherEditor, context);
+  const rightRail = mountRightRail(ui.rail, engineerContext);
+  const reportPanel = mountReport(ui.report, engineerContext);
+  const scenariosPanel = mountScenarios(ui.scenarioList, engineerContext);
+  const dispatcherEditor = mountDispatcherEditor(ui.dispatcherEditor, engineerContext);
   /*
    * The weight-set selector, mounted beneath the dispatcher's own controls — `docs/17` § 5 clause 6.
    *
@@ -4707,17 +4754,17 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * to the player it was built for. It follows `dispatcherEditor` in every respect, including that
    * an edit takes effect on the next Run rather than re-running under the reader.
    */
-  const selectorEditor = mountSelectorEditor(ui.selectorEditor, context);
+  const selectorEditor = mountSelectorEditor(ui.selectorEditor, engineerContext);
   /*
    * The Everyday rules editor, beneath the selector — GAMEPLAY §11.5. The same footing as the
    * selector in every respect: applied over whoever is driving, next-run rather than mid-run,
    * and when rules are written they take the run (`rulesOverrideNoteOf` on the selector panel is
    * the other half of that sentence).
    */
-  const ruleEditor = mountRuleEditor(ui.ruleEditor, context);
-  const trafficEditor = mountTrafficEditor(ui.trafficEditor, context);
-  const machinesEditor = mountMachinesEditor(ui.machinesEditor, context);
-  const buildingEditor = mountBuildingEditor(ui.buildingEditor, context);
+  const ruleEditor = mountRuleEditor(ui.ruleEditor, engineerContext);
+  const trafficEditor = mountTrafficEditor(ui.trafficEditor, engineerContext);
+  const machinesEditor = mountMachinesEditor(ui.machinesEditor, engineerContext);
+  const buildingEditor = mountBuildingEditor(ui.buildingEditor, engineerContext);
   const statePanels: readonly Panel[] = [
     rightRail,
     reportPanel,
@@ -4796,16 +4843,16 @@ function boot(ui: Elements, resources: BrowserResources): void {
        */
       switch (sourceName) {
         case 'PATIENCE_PARAMETERS':
-          context.update({ patience: patienceFromCandidate(candidate) });
+          engineerContext.update({ patience: patienceFromCandidate(candidate) });
           return;
         case 'TRAFFIC_PARAMETERS':
-          context.update({ paramDemand: demandFromCandidate(candidate) });
+          engineerContext.update({ paramDemand: demandFromCandidate(candidate) });
           return;
         case 'CROWDING_PARAMETERS':
-          context.update({ lobbyCrowding: crowdingFromCandidate(candidate) });
+          engineerContext.update({ lobbyCrowding: crowdingFromCandidate(candidate) });
           return;
         case 'SIM_PARAMETERS':
-          context.update({ runnerTunables: runnerTunablesFromCandidate(candidate) });
+          engineerContext.update({ runnerTunables: runnerTunablesFromCandidate(candidate) });
           return;
         default:
           return;
@@ -5566,6 +5613,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
        */
       watching: isWatching(),
       unfiledSheet: unfiledSheetFacts(recording, simTimeS),
+      /* § D1323: the rail draws the rule above its cards while it holds. */
+      engineerWatchesOnly: engineerWatchOnlySentence(state) !== undefined,
     };
   }
 
@@ -6082,12 +6131,22 @@ function boot(ui: Elements, resources: BrowserResources): void {
   function holdAtTheAttemptsReach(): void {
     if (playback === undefined) return;
     const attempt = advancesTheWeek(state.playMode) ? standingAttempt() : undefined;
-    const held = attempt !== undefined && playback.recording === attemptRecording;
+    const own = attempt !== undefined && playback.recording === attemptRecording;
+    /*
+     * **And any other run of the attempt's day this shell made** — wave AN, lane AN-6,
+     * [§ D1323](../../../../DECISIONS.md). After a reload the attempt's run is not in memory until
+     * it is resumed, and the run on this surface is the page's own run of the week's day: the
+     * attempt's crowd with none of its presses, so watched to its end it is the unanswered branch of
+     * the attempt's open call. While an attempt stands nothing here can make another run (§ D1323's
+     * gate), so a simulated run on screen is one of these two.
+     */
+    const ofItsDay = attempt !== undefined && !own && playback.recording === simulatedRecording;
+    const held = own || ofItsDay;
     const reach = held ? Math.max(attempt.shownToS, playback.recording.startedAt) : null;
     if (playback.reach !== reach) playback.setReach(reach);
     if (!held || heldRunId === playback.recording.runId + String(playback.recording.startedAt)) return;
     heldRunId = playback.recording.runId + String(playback.recording.startedAt);
-    setText(ui.transport.status, ATTEMPT_SHOWN_TO_ITS_REACH);
+    setText(ui.transport.status, own ? ATTEMPT_SHOWN_TO_ITS_REACH : ATTEMPT_DAY_SHOWN_TO_ITS_REACH);
   }
 
   /**
@@ -6603,7 +6662,10 @@ function boot(ui: Elements, resources: BrowserResources): void {
        * is every building change made while a player is still choosing one.
        */
       const leaving = state.week;
-      state = withBuilding(state, resources, ui.coach.building.value);
+      const moved = withBuilding(state, resources, ui.coach.building.value);
+      /* § D1323: while a scored attempt stands, the select moves no week; the redraw puts it back. */
+      if (engineerRefuses(moved)) return;
+      state = moved;
       renderAll();
       runShift();
       /*
@@ -6615,6 +6677,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
       if (weekNotice !== undefined) drawCoach(viewAt());
     });
     ui.coach.pattern.addEventListener('change', () => {
+      if (engineerRefuses({ pattern: ui.coach.pattern.value })) return;
       context.update({ pattern: ui.coach.pattern.value });
       runShift();
     });
@@ -6624,6 +6687,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
       // the menu, and both go through the one parser.
       const part = partById(coachParts(), ui.coach.shiftLength.value);
       if (part === undefined) return;
+      if (engineerRefuses({ shiftLengthS: part.durationS, windowStartS: part.windowStartS })) return;
       context.update({ shiftLengthS: part.durationS, windowStartS: part.windowStartS });
       runShift();
     });
@@ -7193,6 +7257,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
       ...state.savedBuildings.filter((entry) => entry.id !== id),
       { id, config },
     ];
+    /* § D1323: the JSON editor's own write, gated as the panels' are. */
+    if (engineerRefuses({ savedBuildings: saved, buildingId: id })) return;
     state = { ...state, savedBuildings: saved, buildingId: id, tab: 'run' };
     /*
      * The one library write that does **not** go through `context.update`, so it says so itself.
@@ -8022,7 +8088,10 @@ function boot(ui: Elements, resources: BrowserResources): void {
       const held = new Set(state.outOfServiceCarIds);
       if (held.has(hit.carId)) held.delete(hit.carId);
       else held.add(hit.carId);
-      state = { ...state, outOfServiceCarIds: [...held].sort((a, b) => a.localeCompare(b)) };
+      const outOfServiceCarIds = [...held].sort((a, b) => a.localeCompare(b));
+      /* § D1323: a car taken out here would be a run of the attempt's day the stage never asked for. */
+      if (engineerRefuses({ outOfServiceCarIds })) return;
+      state = { ...state, outOfServiceCarIds };
       runShift();
     });
     ui.stage.canvas.addEventListener('mousemove', (event) => {
@@ -8109,6 +8178,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
         shiftRunner.cancel();
         return;
       }
+      /* § D1323: while a scored attempt stands, this surface makes no run of the day. */
+      if (engineerRefuses()) return;
       // The other {@link playerStartedARun} site — the control the empty sheet's copy names, and
       // the audit's own repro (`docs/19` defect 1): reload → Resume → this button → a full day →
       // the day must file. On the start arm only: cancelling is not asking for a day to count,
@@ -8141,6 +8212,11 @@ function boot(ui: Elements, resources: BrowserResources): void {
         return;
       }
       const seed = entry.kind === 'draw' ? randomSeed() : entry.seed;
+      /* § D1323: the field goes back to the seed still running, as a refused entry's does above. */
+      if (engineerRefuses({ seed })) {
+        ui.transport.seed.value = state.seed.toString();
+        return;
+      }
       // A blank draws one **and shows it** — a blank field over a drawn seed is the same
       // field-does-not-show-the-run hazard as the refusal above, one keystroke earlier.
       ui.transport.seed.value = seed.toString();
@@ -8465,6 +8541,17 @@ function boot(ui: Elements, resources: BrowserResources): void {
     const recording = state.recording;
     if (recording === undefined) return;
     /*
+     * **Not while a scored attempt stands** — wave AN, lane AN-6, [§ D1323](../../../../DECISIONS.md),
+     * the post-AM panel's seat D (D1). A run this shell simulated, with an attempt standing on the
+     * week, is the attempt's own run or the page's run of the same day, and either is the whole day:
+     * saved at a held call it carried the unanswered branch to its end. Refused in words rather than
+     * cut at the stage's reach, because a recording cut short is not one Load can read back.
+     */
+    if (recording === simulatedRecording && engineerWatchOnlySentence(state) !== undefined) {
+      setText(ui.transport.status, ATTEMPT_NOT_SAVED);
+      return;
+    }
+    /*
      * TP-10 (§ D198): this wrote `{recording, frames}` — a wrapper readRecordingDocument refuses
      * by its first check — so Load could not read Save's own file. The document is now written by
      * the reader's own module, and it is the recording itself; the frames re-derive from it.
@@ -8483,6 +8570,11 @@ function boot(ui: Elements, resources: BrowserResources): void {
       if (!loaded.ok) {
         setText(ui.transport.error, loaded.failure.message);
         ui.transport.error.focus();
+        return;
+      }
+      /* § D1323: a file put on screen would take the attempt's run off the stage behind the cover. */
+      if (engineerRefuses({ recording: loaded.recording })) {
+        ui.transport.loadRecording.value = '';
         return;
       }
       // The beat goes with the sheet: a recording read off disk is not a day of anybody's week,

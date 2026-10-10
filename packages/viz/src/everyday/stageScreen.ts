@@ -1472,7 +1472,42 @@ function mountStage(
   closeAskRow.append(closeAskFile, closeAskBack);
   closeAskInner.append(closeAskQuestion, closeAskConsequence, closeAskRow);
   closeAsk.append(closeAskInner);
-  callCard.append(callBody, closeAsk);
+  /*
+   * **And so does the skip** — wave AN, lane AN-6, [§ D1324](../../../../DECISIONS.md), the post-AM
+   * panel's seat D (D4). § D1151 made a press of *Skip to the end* with the card up the player's
+   * answer, so one press ran a scored day out past a call that was due, where *Close the day* asks.
+   * The same question, on the same footing as the close's: under the card's answers, focus on *Back
+   * to the call*, and a second press of the skip, or *Skip to the end* here, skips as before.
+   */
+  const skipAsk = el(doc, 'div', 'everyday-stage-skip-confirm');
+  skipAsk.hidden = true;
+  skipAsk.setAttribute('role', 'group');
+  skipAsk.setAttribute('aria-label', STAGE_CALL_COPY.skipAsk);
+  const skipAskInner = el(doc, 'div');
+  skipAskInner.style.cssText = closeAskInner.style.cssText;
+  const skipAskQuestion = el(doc, 'p', 'everyday-stage-skip-confirm-question', STAGE_CALL_COPY.skipAsk);
+  skipAskQuestion.style.cssText = closeAskQuestion.style.cssText;
+  const skipAskConsequence = el(doc, 'p', undefined, STAGE_CALL_COPY.skipConsequence);
+  skipAskConsequence.style.cssText = closeAskConsequence.style.cssText;
+  const skipAskRow = el(doc, 'div');
+  skipAskRow.style.cssText = closeAskRow.style.cssText;
+  const skipAskGo = el(doc, 'button', 'everyday-stage-skip-confirm-go', STAGE_CALL_COPY.skipGo);
+  skipAskGo.type = 'button';
+  skipAskGo.style.cssText = ARM_BUTTON_CSS;
+  const skipAskBack = el(doc, 'button', 'everyday-stage-skip-confirm-back', STAGE_CALL_COPY.closeBack);
+  skipAskBack.type = 'button';
+  skipAskBack.style.cssText = ARM_BUTTON_CSS;
+  skipAskGo.addEventListener('click', () => {
+    skipToEnd(true);
+  });
+  skipAskBack.addEventListener('click', () => {
+    skipAsk.hidden = true;
+    callCard.focus({ preventScroll: true });
+  });
+  skipAskRow.append(skipAskGo, skipAskBack);
+  skipAskInner.append(skipAskQuestion, skipAskConsequence, skipAskRow);
+  skipAsk.append(skipAskInner);
+  callCard.append(callBody, closeAsk, skipAsk);
   let callCardKey = '';
   /**
    * Show or hide the card — and, **on the frame it appears and on no other**, bring it into the
@@ -1494,8 +1529,11 @@ function mountStage(
     const leaving = !shown && !callCard.hidden;
     const hadFocus = leaving && callCard.contains(doc.activeElement);
     callCard.hidden = !shown;
-    /* The close's question belongs to the call it would skip, and goes with it. */
-    if (!shown) closeAsk.hidden = true;
+    /* The close's question belongs to the call it would skip, and goes with it; so does the skip's. */
+    if (!shown) {
+      closeAsk.hidden = true;
+      skipAsk.hidden = true;
+    }
     if (appearing) {
       callCard.scrollIntoView({ block: 'nearest', inline: 'nearest' });
       callCard.focus({ preventScroll: true });
@@ -1852,7 +1890,7 @@ function mountStage(
    * watched at `1×`, at `600×` and a day skipped are the same day — the same legs, the same
    * report. `stageSkip.test.ts` asserts that rather than leaving it to this paragraph.
    */
-  function skipToEnd(): void {
+  function skipToEnd(confirmed = false): void {
     if (playback === undefined) return;
     /*
      * **And the day has been started** — GitHub issue #565's third defect, § D947.
@@ -1899,6 +1937,18 @@ function mountStage(
         syncTransport();
         requestFrame();
       }
+      return;
+    }
+    /*
+     * **A call that is due asks first** — wave AN, lane AN-6, [§ D1324](../../../../DECISIONS.md).
+     * Reaching here with a call standing means it is raised and its second has come: its card is up,
+     * or is drawn on the next frame. The first press puts {@link skipAsk}'s question under its
+     * answers; a second press, with the question up, or the question's own *Skip to the end*, is the
+     * answer § D1151 made it.
+     */
+    if (standing !== undefined && !confirmed && skipAsk.hidden) {
+      skipping = false;
+      askBeforeSkipping(playback.simTimeS);
       return;
     }
     skipping = false;
@@ -3240,13 +3290,31 @@ function mountStage(
    * focus, so closing takes a deliberate second choice.
    */
   function askBeforeClosing(): void {
+    skipAsk.hidden = true;
     closeAsk.hidden = false;
     closeAsk.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     closeAskBack.focus({ preventScroll: true });
   }
 
+  /**
+   * Put the skip's question up under the call, and focus *Back to the call* — {@link askBeforeClosing}'s
+   * twin, § D1324. The card is drawn first where the frame has not drawn it yet, so the question is
+   * never asked inside a card nobody can see; the transport stops at the call as the pace stops it.
+   */
+  function askBeforeSkipping(simTimeS: number): void {
+    playback?.pause();
+    if (callCard.hidden) drawCall(simTimeS);
+    closeAsk.hidden = true;
+    skipAsk.hidden = false;
+    skipAsk.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    skipAskBack.focus({ preventScroll: true });
+    syncTransport();
+    requestFrame();
+  }
+
   function fileDay(): void {
     closeAsk.hidden = true;
+    skipAsk.hidden = true;
     playback?.pause();
     host.closeDay();
     syncTransport();

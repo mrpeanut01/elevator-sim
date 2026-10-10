@@ -108,6 +108,7 @@ import type { ViewMode } from '../mode/types.js';
 import { meansAreSuppressed } from '../frame/overlay.js';
 import { commitmentOf } from '../scope/commitment.js';
 import type { SurfaceKey } from '../scope/types.js';
+import { ATTEMPT_RAIL_NOTE } from '../shift/banking.js';
 import { statLineOf } from '../shift/contracts.js';
 
 import type { BrowserResources } from './data.js';
@@ -1772,12 +1773,25 @@ export function mountRightRail(ui: RightRailElements, context: MountContext): Pa
    * deliberate — an absent sentence is not a false one — and `scopeNotes.test.ts` drives this mount
    * and reads the note back out, which is what stops the absence becoming permanent.
    */
+  /*
+   * **And while a scored attempt stands, the rule that replaces it** — wave AN, lane AN-6,
+   * [§ D1323](../../../../DECISIONS.md). The shell refuses every card here while an attempt stands
+   * on the week on screen (`dev/engineerWindow.ts`), so *nothing on this panel is locked* would be
+   * false for exactly as long as that holds. Each live list carries both notes and shows one,
+   * switched by {@link ViewAt.engineerWatchesOnly} on every render; drawn where the card is, which is
+   * where a player decides to press one.
+   */
+  const scopeNotes: HTMLElement[] = [];
+  const watchNotes: HTMLElement[] = [];
   const scopeNote = (list: HTMLElement, key: SurfaceKey): void => {
     if (commitmentOf(key, 'runs-the-shift') !== 're-runs-now') return;
-    list.parentElement?.insertBefore(
-      el(doc, 'p', { className: 'rail-prose', text: PICKS_RE_RUN }),
-      list,
-    );
+    const scope = el(doc, 'p', { className: 'rail-prose', text: PICKS_RE_RUN });
+    const watch = el(doc, 'p', { className: 'rail-prose rail-attempt-note', text: ATTEMPT_RAIL_NOTE });
+    watch.hidden = true;
+    list.parentElement?.insertBefore(scope, list);
+    list.parentElement?.insertBefore(watch, list);
+    scopeNotes.push(scope);
+    watchNotes.push(watch);
   };
   scopeNote(ui.dispatcherList, 'viewer.dispatcherId');
   scopeNote(ui.trafficList, 'viewer.pattern');
@@ -1796,6 +1810,19 @@ export function mountRightRail(ui: RightRailElements, context: MountContext): Pa
     render(view: ViewAt): void {
       latest = view;
       const { resources, state, recording, building } = view;
+      const watchOnly = view.engineerWatchesOnly === true;
+      for (const note of scopeNotes) note.hidden = watchOnly;
+      for (const note of watchNotes) note.hidden = !watchOnly;
+      /*
+       * **The state a card writes from is the latest one drawn, never the one this list was built
+       * under** — wave AN, lane AN-6, [§ D1323](../../../../DECISIONS.md), the post-AM panel's seat D
+       * (D3). Each list is rebuilt only when its signature moves, so a card's closure kept the state of
+       * whichever render last rebuilt it: for the building list, the last time the building changed,
+       * which after a reload is the page's first render. `withBuilding` over that state parked a copy
+       * of the week from then, so picking the tower back up reopened days already filed, and they
+       * banked and paid again. `withDispatcher` handed the whole stale state back the same way.
+       */
+      const current = (): ViewerState => latest?.state ?? state;
 
       /* ---- Dispatcher ---- */
       const profiles = allDispatchers(resources, state.savedDispatchers);
@@ -1834,7 +1861,7 @@ export function mountRightRail(ui: RightRailElements, context: MountContext): Pa
                  * `replace` would be the one thing that seam's docstring forbids a panel — writing a
                  * state directly rather than asking for a change.
                  */
-                context.update(withDispatcher(state, resources, entry.id));
+                context.update(withDispatcher(current(), resources, entry.id));
                 context.runShift();
               },
             });
@@ -1900,7 +1927,7 @@ export function mountRightRail(ui: RightRailElements, context: MountContext): Pa
                  * the building that is no longer running. `dev/main.ts`'s coach select has always
                  * called this function; this card is the other writer and did not.
                  */
-                context.update(withBuilding(state, resources, id));
+                context.update(withBuilding(current(), resources, id));
                 context.runShift();
               },
             });

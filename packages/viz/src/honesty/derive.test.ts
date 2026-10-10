@@ -43,6 +43,19 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
   Object.freeze([
     {
       reason:
+        'The Engineer surface’s watch-only gate — wave AN, lane AN-6, § D1323. `VIEWER_KEY_ROLES` ' +
+        'sorts every `ViewerState` key into `remakes-the-day` or `view`, two keys the gate compares ' +
+        'and no surface draws; `patchRemakesTheDay` answers a boolean and `watchOnlyRefusal` returns ' +
+        'whatever sentence its caller hands it, which is `shift/banking.ts#ATTEMPT_ENGINEER_WATCHES_ONLY`, ' +
+        'driven by `record/document.ts#verifyReplay`’s adapter by name.',
+      ids: [
+        'dev/engineerWindow.ts#VIEWER_KEY_ROLES',
+        'dev/engineerWindow.ts#patchRemakesTheDay',
+        'dev/engineerWindow.ts#watchOnlyRefusal',
+      ],
+    },
+    {
+      reason:
         'The stage press — wave AJ lane AJ-K, § D1129. `campaign/stagePress.ts#pressStage` is the one ' +
         'admission check followed by the shipped sequence, and it is derived only through ' +
         '`admitStageMove`, whose prose it returns inside `StagePress.admission` untouched. Every ' +

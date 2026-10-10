@@ -156,7 +156,7 @@ describe.skipIf(!HAS_BROWSER)('a stopped frame carries one standing count — wa
       );
       /*
        * Skipped until the day runs out: since § D1204 the pinned day asks on after its call, and a
-       * skip with a later card up skips that call, pressing nothing, so the press row stays this one.
+       * skip with a later card up asks (§ D1324) and the next press skips that call, pressing nothing, so the press row stays this one.
        */
       await page.waitForFunction(
         () => {

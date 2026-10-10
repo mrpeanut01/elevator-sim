@@ -153,7 +153,7 @@ async function recomputed(page: Page): Promise<void> {
 async function skipIfAnythingIsLeft(page: Page): Promise<void> {
   /*
    * Pressed until the day has run out: since § D1204 the pinned day asks on after its call, so a
-   * skip may stop at a later card, and the next press with that card up skips it (recorded as
+   * skip may stop at a later card, and the next presses with that card up ask (§ D1324) and then skip it (recorded as
    * skipped, pressing nothing).
    */
   await page.waitForFunction(

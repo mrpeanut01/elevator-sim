@@ -46368,6 +46368,8 @@ turns out to matter or not, which is what clause 2 protects.
 
 ## D1151 — *Skip to the end* stops at a call that has not been answered, and a skip at a call is recorded as one
 
+> **Status 2026-10-10: AMENDED by [§ D1324](#d1324)** (an agent ruling). A skip that reaches a call that is raised and due asks once under the card, focus on *Back to the call*; a second press, or the question's own *Skip to the end*, is the answer this entry made it. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-09-26 by agent sessions under delegated authority** (wave AK, lane AK-B), not by the
 > product owner. Owner-reversible clause: whether a second press with the card up skips only that
 > call or, as ruled, the rest of the day's calls too.
@@ -47790,6 +47792,8 @@ was not taken.
 
 ## D1218 — one attempt per scored day: it starts at *Start the day*, leaving resumes it, and it is the only run of that day the week banks
 
+> **Status 2026-10-10: AMENDED by [§ D1323](#d1323)** (an agent ruling). While an attempt stands the Engineer surface makes, changes and saves no run of the day, and holds any run of the day it made at the attempt's reach. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Status 2026-09-26: AMENDED by [§ D1239](#d1239)** (an agent ruling). The Engineer transport is held at the attempt's reach, the attempt is filed only by its own stage's close, an Engineer close banks nothing into any week while an attempt stands, and a close reads the week this device has stored. See [`docs/39`](docs/39-decisions-in-force.md).
 
 **Status (wave AL integration):** the resumed session's snapshot carries § D1205's per-peak counts, the 600 s repeat memory, the *keep* switch-off and the driver the pair is re-derived from, and leaves out the call in hand, so a resumed attempt raises exactly the calls an unbroken one would (`dev/dayCallSession.test.ts`, *a resumed session raises what an unbroken one would*). The attempt and the close read one dealt crowd (`dev/main.ts#dealtDaySeedNow`), so § D1229's derived crowds and this rule agree.
@@ -48306,6 +48310,8 @@ measurement of how much the lighter file changes a lane's cost, which is unmeasu
 
 ## D1239 — the one attempt is final: the Engineer surface shows it only to its reach and never files it, and a close reads the week this device has stored
 
+> **Status 2026-10-10: AMENDED by [§ D1323](#d1323)** (an agent ruling). The hold covers any run of the attempt's day the shell made; while an attempt stands on the week on screen, or on the week a write would put there, the Engineer surface's cards, runs, selects, seed, load and save refuse; the rail's cards write from the latest state. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-09-26 by agent sessions under delegated authority** (wave AM, lane AM-B, on the
 > post-AL panel's seat D, defects D1 to D3), not by the product owner, and to be read as an agent
 > ruling; [§ D626](#d626) is the cautionary case. **Amends [§ D1218](#d1218)**, whose clause 4 kept
@@ -48362,6 +48368,8 @@ close.
 filed reads as this day still open. The Engineer rail's own goal ticks mid-day are unchanged.
 
 ## D1240 — the stage's record of a scored day: the pinned call's row, a skip that stops at each call's clock, current status lines, a practice line, and a close question that focuses the safe answer
+
+> **Status 2026-10-10: EXTENDED by [§ D1324](#d1324)** (an agent ruling). A skip that reaches a call already due asks once before it answers it. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Taken 2026-09-26 by agent sessions under delegated authority** (wave AM, lane AM-B, on the
 > post-AL panel's seats B and D), not by the product owner, and to be read as an agent ruling.
@@ -49424,3 +49432,117 @@ sentence is false from this entry and is corrected with lane AP-1's census-touch
 this lane may not touch the file. Whether a shop shaft should go in one bank the player picks rather
 than in every bank. The shaft card's second sentence (*"They will out-perform the shaft this
 month"*), which no run measured and this lane left as it was.
+
+---
+
+## D1323 — while a scored attempt stands, the Engineer surface only watches: it makes, changes and saves no run of the day, and its cards write from the latest state
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (wave AN, lane AN-6, on the
+> post-AM panel's seat D, defects D1 to D3), not by the product owner, and to be read as an agent
+> ruling; [§ D626](#d626) is the cautionary case. **Amends [§ D1239](#d1239)**, whose clause 1 held
+> only the attempt's own run at its reach and whose clause 3 let a building card mid-attempt run
+> another tower's day as practice, and **[§ D1218](#d1218)**'s *What it does not reach*, which left
+> the Engineer surface free to run the week's day while an attempt stood. Owner-reversible clauses:
+> refusing every run-making control rather than dealing an Engineer run another crowd (clause 1);
+> refusing *Save recording* rather than cutting the file at the stage's reach (clause 3); and holding
+> the page's own run of the day at the attempt's reach (clause 4). **Not put to a swarm**: the lane
+> had no way to spawn one; the readings not chosen are set out below so the integrator can.
+
+**Why an entry.** [§ D405](#d405)'s first two grounds. It moves two recorded rulings and binds
+`dev/main.ts`, `dev/rightRail.ts`, `dev/mountTypes.ts`, `dev/engineerWindow.ts`,
+`shift/banking.ts`, `honesty/surfaces.ts` and three browser journeys other lanes wrote
+(`everyday/attemptIsFinal`, `everyday/autoFile`).
+
+**What was wrong.** Seat D found three ways round the one attempt from the Engineer surface. **D2**:
+at a held call, a dispatcher card re-ran the day on the attempt's own crowd; the Everyday stage
+adopted it as practice and stopped at the identical call, so each answer could be rehearsed to the
+day's end in about a minute and then given for score after *Resume*. *Run this shift* made the same
+practice. **D3**: a building card mid-attempt moved the week to Chancery House under a stage still
+drawing the Midtown run, which then could not close (*the day has not started yet*), and picking
+Midtown back up reopened days already filed, which banked and paid again (9 to 12 chimes, and "2
+weeks closed" for one week). The second half was not the attempt at all: each rail list is rebuilt
+only when its signature moves, so a card's closure held the state of the last rebuild (after a
+reload, the page's first render), and `withBuilding` over it parked a copy of the week from then.
+**D1**: *Save recording* at a held call downloaded the whole unanswered day. And after a reload the
+Engineer surface stands on the page's own run of the week's day, the attempt's crowd with none of its
+presses, which scrubbed to its end. All five reproduced on the base bundle by
+`everyday/watchOnly.browser.test.ts`, red in every case.
+
+**The ruling.**
+
+1. **While an attempt stands on the week on screen, or on the week a write would put on screen, the
+   Engineer surface makes and changes no run.** Every Engineer panel is mounted through
+   `dev/engineerWindow.ts#watchOnlyContext`, which refuses a write under any key that reaches a run
+   (`VIEWER_KEY_ROLES`, typed over every key of `ViewerState`) and every ask for a run; the shell's
+   own controls (*Run this shift*, the three coach selects, the seed, the car badges, the JSON
+   editor's save and *Load recording*) ask the same question first. A refusal says
+   `shift/banking.ts#ATTEMPT_ENGINEER_WATCHES_ONLY` on the status line, and the rail draws
+   `ATTEMPT_RAIL_NOTE` above its three lists in place of *Nothing on this panel is locked*, which
+   would be false while the rule holds. Writes of the view (a tab, a segment, an editor's working
+   copy of a building, a pattern or a machine) go through. The Everyday host keeps the ungated
+   context: the attempt's own presses, answers and resume are made there.
+2. **The rail's cards write from the latest state drawn**, never the one their list was built under,
+   so a building or dispatcher card can no longer park or restore an older copy of a week.
+3. ***Save recording* refuses** while an attempt stands and the run on screen is one this shell
+   simulated, with `ATTEMPT_NOT_SAVED`.
+4. **The Engineer transport holds any run of the attempt's day this shell made at the attempt's
+   reach**, not only the attempt's own, and says so once with `ATTEMPT_DAY_SHOWN_TO_ITS_REACH`.
+
+**How this reads § D1239's promise.** Its claim 1b, *a building change mid-attempt closes as
+practice*, is kept by not letting the change happen while the attempt is the week on screen: the
+attempt stays open and the stage stays closable, and no exit discards it ([§ D1218](#d1218) clause
+5). A tower left by the door or the leave strip parks the attempt as before, and an Engineer close of
+another tower's day while it stands parked is still § D1239 clause 3's practice
+(`attemptIsFinal.browser.test.ts`'s second case, which now reaches the other tower by the door).
+
+**The readings not chosen.** Dealing every Engineer run of the day a crowd other than the attempt's
+would keep the Engineer usable mid-attempt and would honour the brief's literal rule (*a practice
+must not replay that attempt's crowd up to its open call*), but a different crowd on the same tower,
+wrinkle and growth still rehearses the call's timing, and seat D asked for a window. Cutting a saved
+recording at the stage's reach would keep the export, but a recording cut short is not one
+`record/document.ts#readRecordingDocument` reads back.
+
+**What holds it.** `dev/engineerWindow.test.ts` (every state key sorted; a view write and a
+write of the state as it stands pass; the view keys measured not to reach the run config, with a
+dispatcher change as the control; the refusal over the week now and the week a write would put on
+screen; the gated context) and `everyday/watchOnly.browser.test.ts` on the built bundle, five
+cases, red on the base in all five and green after. `everyday/autoFile.browser.test.ts`'s three
+Engineer controls pressed *Run this shift* while the stage's attempt stood, which this entry forbids:
+the first now asserts the refusal and files the day by its own stage, and the other two press from
+the landing page, where none stands, and read the week this device stored.
+
+**What it does not reach.** The Engineer surface's own run of the week's day **before** *Start the
+day* is still free, so the day can be watched there before its attempt begins; § D1218 named this
+and it is unchanged. The Engineer menu's mode doors (Free play, a scenario card from its own menu)
+are not gated. Seat D's "no card after a resume" (D4b) was not reproduced on Crown Hotel's slice;
+§ D1324 covers the press either way.
+
+## D1324 — a skip asks once at a call that is due, as the close does
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (wave AN, lane AN-6, on the
+> post-AM panel's seat D, D4), not by the product owner, and to be read as an agent ruling.
+> **Amends [§ D1151](#d1151)**'s *pressed again with the card up, it is the player's answer* and
+> extends [§ D1240](#d1240) clause 2. Owner-reversible clauses: asking rather than refusing the skip
+> outright at a due call, and the question's words. **Not put to a swarm**, for § D1323's reason.
+
+**Why an entry.** It amends a recorded ruling and binds `everyday/stageScreen.ts`,
+`everyday/stageCall.ts`, `honesty/surfaces.ts` and two browser journeys other lanes wrote.
+
+**What was wrong.** With a call's card up, one press of *Skip to the end* answered it as skipped and
+ran the scored day to its end, where *Close the day* in the same state asks first. After a reload at a
+call and *Resume*, the same press ran the day out with the call recorded as skipped. Reproduced on the
+base bundle by `everyday/skipAsks.browser.test.ts`, red in both cases (*expected '09:00' to be
+'08:39'*).
+
+**The ruling.** A skip that reaches a call which is raised and due puts
+`STAGE_CALL_COPY.skipAsk` (*Skip to the end without answering this call?*) under the card's answers,
+draws the card first where the frame has not, stops the transport, and moves focus to *Back to the
+call*. A second press of the skip, or the question's own *Skip to the end*, is § D1151's answer as
+before: the call is recorded as skipped, no more calls are asked, and the day runs out with nothing
+more pressed. The close's question and the skip's are never up together.
+
+**What holds it.** `everyday/skipAsks.browser.test.ts` on the built bundle: the card up, and the
+reload with *Resume*, red before and green after. `everyday/pressCall.browser.test.ts`'s retake
+answers its card through the question's button; `stageRecord.browser.test.ts`'s budget of presses
+doubles, since each call now takes two. The loops elsewhere that press until the day runs out need no
+change: the first press asks and the next answers.

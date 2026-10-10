@@ -135,7 +135,7 @@ async function watchTheDayOutUnclosed(page: Page): Promise<string> {
     undefined,
     { timeout: 240_000 },
   );
-  /* § D1151: a skip stops at each call; each press with a card up answers it, until nothing is left. */
+  /* § D1151: a skip stops at each call; with a card up a press asks (§ D1324) and the next answers it. */
   await page.waitForFunction(
     () => {
       const skip = document.querySelector<HTMLButtonElement>('.everyday-stage-skip');

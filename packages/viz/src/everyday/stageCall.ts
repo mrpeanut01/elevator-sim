@@ -97,6 +97,17 @@ export const STAGE_CALL_COPY = Object.freeze({
     'The rest of the day plays out with nothing answered, and the report is written from that.',
   closeFile: 'Close the day as it stands',
   closeBack: 'Back to the call',
+  /*
+   * Wave AN, lane AN-6, [§ D1324](../../../../DECISIONS.md), the post-AM panel's seat D (D4): *Skip
+   * to the end* pressed with the card up answered the call as skipped and ran the day out on the
+   * first press, where *Close the day* asks. The skip now asks once, in these words; a second press
+   * of it, or the first button, skips.
+   */
+  skipAsk: 'Skip to the end without answering this call?',
+  skipConsequence:
+    'The call is recorded as skipped, no more calls are asked, and the rest of the day plays out with ' +
+    'nothing more pressed.',
+  skipGo: 'Skip to the end',
 });
 
 /**
