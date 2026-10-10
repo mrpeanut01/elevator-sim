@@ -386,6 +386,77 @@ describe('what this screen adds on top of the sheet', () => {
   });
 
   /*
+   * Wave AN, lane DQ-3, § D1351: the close says what decided a day no call decided from the shell's
+   * driver run, which reaches the view as `driver` beside `house`. Without it the run is still being
+   * run, and the line says so rather than guessing.
+   */
+  it('reads the shell’s driver run into the close’s call line — § D1351', () => {
+    const MET = {
+      arrived: 400,
+      carryPct: 100,
+      minutePct: 100,
+      peakQueue: 0,
+      abandoned: 0,
+      abandonedCarried: 0,
+      horizonS: 900,
+      worstWaitS: 40,
+      worstWaitIsCensored: false,
+      workPerServedLegKJ: 41.2,
+    };
+    const week = closeDay(
+      openWeek('c2'),
+      outcomeOf({
+        day: 1,
+        dayIdx: 0,
+        eventId: 'ordinary',
+        arrived: 400,
+        carried: 400,
+        minutePct: 100,
+        readings: readGoals(goalsForDay(1), MET),
+        record: {
+          version: 3,
+          seed: '1',
+          buildingId: 'midtown-office',
+          dispatcherId: 'fairness-first',
+          pattern: 'building',
+          demandTemplateId: null,
+          arrivalRatePctPop5min: null,
+          shiftLengthS: 36_000,
+          windowStartS: null,
+          day: 1,
+          dayIdx: 0,
+          outOfServiceCarIds: [],
+          interventions: [{ atS: 2_400, change: { kind: 'park-cars-lobby' } }],
+          ruleRows: [],
+          rungContractId: null,
+        },
+        recordRefusal: null,
+      }),
+    );
+    const onward = {
+      day: 2,
+      dayIdx: 1,
+      weekday: 'Tuesday',
+      eventId: 'move-in:past-halfway',
+      name: 'Move-in day',
+      note: 'A tenant is hauling boxes up.',
+      demand: '+2.0% more tenants than today',
+      newWeek: false,
+      week: 1,
+    };
+    const raised = 'No call decided today: the stage raised none.';
+    const report = sheetOf({ onward, decidingCall: raised, callDecided: false });
+    expect(viewOf({ report, week, house: () => 'cleared', driver: () => 'missed' }).close?.call).toBe(
+      `${raised} Your driver did: on this crowd, the same day with the tower’s standing order picked in place of ` +
+        'yours and every press kept read Shift missed.',
+    );
+    expect(viewOf({ report, week, house: () => 'cleared' }).close?.call).toBe(
+      `${raised} What decided it is still being run: the same day with the tower’s standing order picked in place ` +
+        'of yours and every press kept.',
+    );
+  });
+
+  /*
    * GitHub issue #577. The unit half of the fix — `campaignJourney.browser.test.ts` holds the half
    * that matters, because the defect was a composition of three correct modules and only the crumbs
    * after the press can show it. What is worth pinning here is that the **daily arm is reached by

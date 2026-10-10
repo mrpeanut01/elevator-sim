@@ -24,6 +24,8 @@ import {
   DAY_COUNTS_SENTENCE,
   daysWerePlayedOn,
   dayCountsToward,
+  driverRunNeedOf,
+  driverRunRecordOf,
   houseNeedOf,
   houseReadingOfDay,
   houseRecordOf,
@@ -432,6 +434,39 @@ describe('the house — § D1177', () => {
       played.day,
       played.dayIdx,
     ]);
+  });
+});
+
+/**
+ * Wave AN, lane DQ-3, § D1351: the run the close reads to say what decided a day no call decided.
+ * It differs from the day in the driver alone, so it is one more run only where the driver is not
+ * the house's and something was pressed; otherwise it is the day itself or the house's own run.
+ */
+describe('the driver run — § D1351', () => {
+  const press = [{ atS: 60, change: { kind: 'spread-cars' } }] as never;
+
+  it('is one more run only for another driver with presses, and is the day or the house otherwise', () => {
+    expect(driverRunNeedOf({ record: null })).toBe('unrecorded');
+    expect(driverRunNeedOf({ record: record(1) })).toBe('own');
+    expect(driverRunNeedOf({ record: record(1, { interventions: press }) })).toBe('same');
+    expect(driverRunNeedOf({ record: record(1, { outOfServiceCarIds: ['A1'] }) })).toBe('same');
+    expect(driverRunNeedOf({ record: record(1, { dispatcherId: 'eta' }) })).toBe('house');
+    /* Rules written on the driver are the driver's: the house's driver with rules is another driver. */
+    expect(driverRunNeedOf({ record: record(1, { ruleRows: [{}] as never }) })).toBe('house');
+    expect(driverRunNeedOf({ record: record(1, { dispatcherId: 'eta', interventions: press }) })).toBe('run');
+    expect(driverRunNeedOf({ record: record(1, { ruleRows: [{}] as never, outOfServiceCarIds: ['A1'] }) })).toBe('run');
+    /* `'own'` exactly where the house reads the day itself. */
+    for (const played of [record(1), record(1, { dispatcherId: 'eta' }), record(1, { interventions: press })]) {
+      expect(driverRunNeedOf({ record: played }) === 'own').toBe(houseNeedOf({ record: played }) === 'own');
+    }
+  });
+
+  it('runs the day’s own crowd with the standing order picked in place of its driver, every press and held car kept', () => {
+    const played = record(3, { dispatcherId: 'eta', ruleRows: [{}] as never, interventions: press, outOfServiceCarIds: ['A1'] });
+    expect(driverRunRecordOf(played)).toEqual({ ...played, dispatcherId: houseStandingOrder(), ruleRows: [] });
+    /* With nothing pressed it is the house's own record. */
+    const untouched = record(3, { dispatcherId: 'eta' });
+    expect(driverRunRecordOf(untouched)).toEqual(houseRecordOf(untouched));
   });
 });
 

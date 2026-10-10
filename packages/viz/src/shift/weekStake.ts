@@ -609,6 +609,59 @@ function isHouseRecord(record: WatchRecord, census: WeekWay): boolean {
   );
 }
 
+/* -------------------------------------------------------------------------- *
+ * The driver run — wave AN, lane DQ-3, swarm DQ's Q2 rule 3, § D1351
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **How a closed day's driver run is had**: the same day with only its driver swapped for the
+ * house's, every press kept. The close reads it, beside the house, to say what decided a day no call
+ * decided (`shift/dayClose.ts#dayDeciderOf`).
+ *
+ * *The driver* is who drove from the start: the dispatcher picked before the day and the rules
+ * written on it. *The presses* are everything else the player did to the day: the log of mid-run
+ * presses, a who-drives answer among them, and any car held out. So the house differs from the day
+ * in both, and the driver run differs from the day in the driver alone.
+ */
+export type DriverRunNeed =
+  /** The day kept no record of its crowd, so nothing can be run on it. */
+  | 'unrecorded'
+  /** The day ran the standing order untouched: it is its own house, and there is nothing to swap. */
+  | 'own'
+  /** The house's driver drove the day, with presses: the driver run would be the day itself. */
+  | 'same'
+  /** Another driver, nothing pressed: the driver run is the house's own run ({@link houseNeedOf}'s `'run'`). */
+  | 'house'
+  /** Another driver, with presses: one more run of the day's crowd. */
+  | 'run';
+
+function drivenByTheHouse(record: WatchRecord, census: WeekWay): boolean {
+  return record.dispatcherId === houseStandingOrder(census) && record.ruleRows.length === 0;
+}
+
+function pressedNothing(record: WatchRecord): boolean {
+  return record.interventions.length === 0 && record.outOfServiceCarIds.length === 0;
+}
+
+/** {@link DriverRunNeed} for a closed day. `'own'` exactly where {@link houseNeedOf} answers `'own'`. */
+export function driverRunNeedOf(outcome: Pick<DayOutcome, 'record'>, census: WeekWay = WEEK_WAY): DriverRunNeed {
+  const record = outcome.record;
+  if (record === null) return 'unrecorded';
+  const house = drivenByTheHouse(record, census);
+  const nothing = pressedNothing(record);
+  if (house) return nothing ? 'own' : 'same';
+  return nothing ? 'house' : 'run';
+}
+
+/**
+ * The record the driver run runs: the day's own crowd, building, day, window, presses and held cars,
+ * with the standing order picked in place of the day's driver and no rules written on it. Common
+ * random numbers by construction, as {@link houseRecordOf}'s are: the seed is the day's.
+ */
+export function driverRunRecordOf(record: WatchRecord, census: WeekWay = WEEK_WAY): WatchRecord {
+  return { ...record, dispatcherId: houseStandingOrder(census), ruleRows: [] };
+}
+
 /**
  * The record the house runs: the day's own crowd, building, day and window, under the standing
  * order with nothing pressed. Common random numbers by construction — the seed is the day's.

@@ -204,10 +204,14 @@ import { FIGURE_NOTE_HANDLE, everydayReportViewOf, REPORT_SECONDARY, WEEK_SHEET_
 import {
   DAY_CLOSE_HEADING,
   DAY_CLOSE_WEEKEND_LINE,
+  closeCallLineOf,
   dayCloseOf,
+  dayDeciderLineOf,
+  dayDeciderOf,
   NO_CALL_DECIDED_LINE,
   NO_CALL_RAISED_LINE,
   type DayCloseView,
+  type DayDecider,
 } from '../shift/dayClose.js';
 import { NEXT_TOWER_STAY_LABEL, nextTowerOfferOf } from '../shift/nextTower.js';
 // GitHub issue #221's post block — the decision, seeded in all seven states by the report adapter.
@@ -14695,11 +14699,19 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
      * in `seedDayClose`, because the lead's census lines speak only on a census tower.
      */
     'shift/dayClose.ts#dayCloseOf',
-    'shift/dayClose.ts#decidingCallLineOf',
     'shift/dayClose.ts#DAY_CLOSE_HEADING',
     'shift/dayClose.ts#DAY_CLOSE_WEEKEND_LINE',
     'shift/dayClose.ts#NO_CALL_DECIDED_LINE',
     'shift/dayClose.ts#NO_CALL_RAISED_LINE',
+    /*
+     * Wave AN, lane DQ-3 (§ D1351): what decided a day no call decided, from the driver run and the
+     * house. Driven through the closes `seedDayClose` files, and every arm of the decision seeded
+     * there by name, because the corpus's one day reaches only the arms its own record takes.
+     */
+    'shift/dayClose.ts#decidingCallOf',
+    'shift/dayClose.ts#dayDeciderOf',
+    'shift/dayClose.ts#dayDeciderLineOf',
+    'shift/dayClose.ts#closeCallLineOf',
     /*
      * Wave AN, lane AN-7: tomorrow's cars with their clock, and the week's number on the close, the
      * brief, the door, Your week and the menu's tile. Seeded in `seedDayClose` over Midtown's weeks 1
@@ -18021,10 +18033,80 @@ function seedDayClose(seeds: TextSeed[], context: HonestyContext, bundle: ShiftB
   ] as const) {
     seeds.push({ field: `week.close.noCall.${label}`, text: line, role: 'reason' });
   }
+  seedDayDecider(seeds, observations);
   seeds.push({ field: 'week.close.weekend', text: DAY_CLOSE_WEEKEND_LINE, role: 'prose' });
   seeds.push({ field: 'week.close.weekendNote', text: WEEKEND_NOTE, role: 'prose' });
   seeds.push({ field: 'week.close.secondary.week', text: REPORT_SECONDARY.week, role: 'label' });
   seeds.push({ field: 'week.close.secondary.menu', text: REPORT_SECONDARY.menu, role: 'label' });
+}
+
+/**
+ * **What decided a day no call decided** — wave AN, lane DQ-3 (§ D1351). The closes
+ * {@link seedDayClose} files reach the arms their records take: Monday ran the standing order
+ * untouched, and the other days another driver with nothing pressed, so the driver run is the house
+ * and only the driver, nothing and still-being-run arms speak there. Every arm is seeded here by
+ * name, and the close's whole line is read over Midtown's Monday played under another driver with
+ * one press, once for each pair of readings the driver run and the house can answer.
+ */
+function seedDayDecider(seeds: TextSeed[], observations: Observations): void {
+  const arms: readonly (readonly [string, DayDecider])[] = (['cleared', 'missed'] as const).flatMap((reads) => {
+    const other = reads === 'cleared' ? 'missed' : 'cleared';
+    return [
+      [`driver.pressed.${reads}`, { kind: 'driver', pressed: true, reads }],
+      [`driver.alone.${reads}`, { kind: 'driver', pressed: false, reads }],
+      [`presses.swapped.${reads}`, { kind: 'presses', houseDrove: false, kept: reads, alone: other }],
+      [`presses.houseDrove.${reads}`, { kind: 'presses', houseDrove: true, kept: reads, alone: other }],
+      [`nothing.both.${reads}`, { kind: 'nothing', pressed: true, houseDrove: false, reads }],
+      [`nothing.alone.${reads}`, { kind: 'nothing', pressed: false, houseDrove: false, reads }],
+      [`pending.house.${reads}`, { kind: 'pending', waiting: 'house', known: reads }],
+      [`unrun.house.${reads}`, { kind: 'unrun', run: 'house', known: reads }],
+    ] as const;
+  });
+  for (const [arm, decider] of [
+    ...arms,
+    ['pending.driverRun', { kind: 'pending', waiting: 'driver-run' }],
+    ['pending.house', { kind: 'pending', waiting: 'house' }],
+    ['unrun.driverRun', { kind: 'unrun', run: 'driver-run' }],
+    ['unrun.house', { kind: 'unrun', run: 'house' }],
+  ] as const) {
+    const line = dayDeciderLineOf(decider);
+    if (line === undefined) continue;
+    const role = decider.kind === 'pending' || decider.kind === 'unrun' ? 'reason' : 'observation';
+    seeds.push({ field: `week.close.decided.${arm}`, text: line, role });
+  }
+  /* The close's whole line over a pressed Monday under another driver, through the one decision. */
+  const monday = closeDay(
+    openWeek('c2'),
+    outcomeOf({
+      record: { ...weekStakeRecord(1, 'another-driver'), interventions: [{ atS: 2_400, change: { kind: 'park-cars-lobby' } }] },
+      recordRefusal: null,
+      day: 1,
+      dayIdx: 0,
+      eventId: scheduledEventFor(null, 1, 0, 'whole-day').id,
+      arrived: observations.arrived,
+      carried: observations.carried,
+      minutePct: observations.minutePct,
+      readings: readGoals(goalsForDay(1, 'whole-day'), observations),
+    }),
+  );
+  for (const [label, decidingCall] of [
+    ['decided', NO_CALL_DECIDED_LINE],
+    ['raised', NO_CALL_RAISED_LINE],
+  ] as const) {
+    for (const house of ['cleared', 'missed', undefined] as const) {
+      for (const driver of ['cleared', 'missed', undefined] as const) {
+        const input = { week: monday, report: { decidingCall, callDecided: false }, houseOf: () => house, driverOf: () => driver };
+        const line = closeCallLineOf(input);
+        if (line === undefined) continue;
+        const kind = dayDeciderOf(input).kind;
+        seeds.push({
+          field: `week.close.decidedLine.${label}.${house ?? 'pending'}.${driver ?? 'pending'}`,
+          text: line,
+          role: kind === 'pending' || kind === 'unrun' || kind === 'unsaid' ? 'reason' : 'observation',
+        });
+      }
+    }
+  }
 }
 
 /** A run record for a day of Midtown's week in {@link seedWeekStake}: the dispatcher is all that varies. */

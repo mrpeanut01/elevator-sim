@@ -48490,6 +48490,8 @@ states, nothing where the census does not speak), `honesty/agreement.test.ts`.
 
 ## D1248 — the close names the call that decided the day, or says plainly that none did
 
+> **Status 2026-10-10: AMENDED by [§ D1351](#d1351)** (an agent ruling). Where no call decided a counted day, the close goes on to say what did, your driver, your presses or nothing, from the driver run and the house. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-09-26 by agent sessions under delegated authority** (wave AM, lane AM-C, swarm DO's
 > § 1 ruling item 2), not by the product owner. **Owner-reversible**: naming the latest deciding
 > call rather than all of them.
@@ -50159,3 +50161,95 @@ building declares a duty, inert at both ends of its range elsewhere, binding on 
 and `core`'s `traffic/dutyIdentity.test.ts` (St Jude's trace is the undeclared trace plus a duty
 column; its legs are the undeclared legs until the term is weighted). Red before on the base building
 file: 5 of 20 viz cases and 3 of the core cases.
+
+---
+
+## D1351 — the close says what decided a day no call decided, from one more run: your driver, your presses, or nothing
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (swarm DQ, Q2 rule 3, three of
+> three, reconciled by wave AN's integrator; the mechanism is lane DQ-3's), not by the product owner.
+> A later reader weighing this against a product-owner ruling should treat it as an agent ruling and
+> say so. **Amends [§ D1248](#d1248)**, whose close said only *No call decided today* where calls
+> were raised and none flipped, and **adds a second run at the close beside [§ D1227](#d1227)'s
+> house**. **Owner-reversible**: the extra run at the close; reading the presses off the house rather
+> than off the player's own driver left alone (S1's arm, below); and adding nothing on a day that
+> does not count.
+
+**Why an entry.** [§ D405](#d405)'s first two grounds: it moves § D1248's ruling and binds
+`shift/dayClose.ts`, `shift/report.ts`, `shift/weekStake.ts`, `dev/main.ts`, `everyday/host.ts`, the
+Everyday report and the honesty corpus's close adapter.
+
+**What was wrong.** On 11 of the post-AM panel's seat A's 12 days the close read *No call decided
+today* and never said what did, while the house missed 12 of 12 of those days and Fairness first,
+picked on the brief, cleared 8 of 8. Seat B: the close *never credits the driver choice, which is
+what actually beat the house*. Swarm DQ measured the same on a correctly built bundle: on week 1 with
+nothing pressed the house cleared 13 of 50 day-crowds (S3) and 15 of 60 (S2), and Fairness first 44
+of 50 and 52 of 60.
+
+**The ruling.**
+
+1. **The driver run** is the day's own record with the tower's standing order picked in place of its
+   driver and no rules written on it, every press and held car kept
+   (`shift/weekStake.ts#driverRunRecordOf`). It is made only where it is not already in hand
+   (`driverRunNeedOf`): on a day the standing order drove it is the day itself, and on a day with
+   nothing pressed it is the house's own run. So it is one more simulation only on a counted day
+   driven by another dispatcher with presses, at most one a close. It runs off the thread that
+   paints on a runner of its own (`dev/main.ts#weekDriverRunReadingOf`), is started at the close
+   through the same decision the close reads, and is graded against the goals the day was graded
+   against, as the house is.
+2. **The decision is one function**, `shift/dayClose.ts#dayDeciderOf`, read where no call decided
+   the day (`WeekDayReport.callDecided`, which `report.ts` files beside its sentence from
+   `decidingCallOf`), on a counted day of a week the census speaks for. The close's call line is the
+   report's sentence followed by `dayDeciderLineOf` over it:
+   - **your driver**, where the driver run reads the other verdict: *Your driver did: on this crowd,
+     the same day with the tower's standing order picked in place of yours and every press kept read
+     Shift missed.*
+   - **your presses**, where the driver run reads the day's verdict and the house the other: *Your
+     driver did not: … read Shift cleared too. Your presses did, together: left alone, the tower's
+     standing order read Shift missed.*
+   - **nothing**, where both read the day's verdict: *Nothing you chose decided it either: on this
+     crowd, the tower's standing order read Shift cleared too, both with every press kept and left
+     alone.*
+   - while a run it needs has not answered, *What decided it is still being run: …* or *… waits on
+     the house, which is still being run*; where one could not be made, *What decided it is not
+     said: …*. Nothing is guessed meanwhile.
+3. **It adds nothing to § D1248's sentence** where a call decided the day, where the day does not
+   count (the house is not run on it, and the close says so), where the census does not speak for
+   the tower, where the day kept no record, where the day ran the standing order untouched (there is
+   nothing to swap, and the house line already says the day is the house's), and where a run read
+   no grade.
+4. **No forecast and no ranking.** Each arm states the runs it read on this crowd and never that a
+   driver or a press does better anywhere else. *Decided* is § D1248's word.
+
+**The split, and the dissent.** Three of three ruled that the close says what decided the day from
+one more run. S2 and S3 ran the standing order with every press kept; S1 ran the brief's driver with
+nothing pressed, which reads the presses off the player's own driver left alone. The reconciliation
+took S2 and S3's run, under which the driver arm is a single swap. What that costs, stated: the
+presses arm is read under the standing order, so on a crowd where the presses lift the standing
+order and the player's driver alone would also have cleared, the close credits the presses; the
+sentence names that condition (*left alone, the tower's standing order*). S3's *missed on the worst
+wait* is not drawn: the line states verdicts in the call line's words.
+
+**Measured on the shipped bundle.** `everyday/dayDecider.browser.test.ts`: Midtown Office's Monday
+closed as it stands, then Tuesday under Fairness first with one parking press. The close read *What
+decided it is still being run* and then, from the worker, *Your driver did not … read Shift cleared
+too. Your presses did, together: left alone, the tower's standing order read Shift missed.* One crowd:
+a fact about two runs, and no finding about drivers. On S3's week 1 a player who picks Fairness first
+and presses nothing reads *Your driver did* on at least 31 of the 50 day-crowds (Fairness first
+clears 44, the house 13), a floor from the two marginals.
+
+**Tests.** `shift/dayClose.test.ts` (*what decided today when no call did*, eleven cases: each arm,
+both waiting states, both unrun states, every ground for adding nothing, one decision for the close
+and the shell), `shift/weekStake.test.ts` (*the driver run*, two cases), `shift/report.test.ts` (the
+sheet files `callDecided`), `everyday/reportView.test.ts` (the view reads the shell's driver run)
+and `watch/driverRun.test.ts`, which holds the run to the legs on a whole Midtown day: it is the day
+the player would have had with the standing order picked (leg for leg), swapping the driver moves
+the legs, and the press is kept; a swap that keeps the driver and one that drops the presses each
+turn it red. Fifteen of the sixteen are red on the base sources and all are green after; the
+sixteenth, *adds nothing where the census does not speak*, is a guard that holds on both. The
+browser case above was red on the base sources (the bare *No call decided today*).
+
+**Not established.** The lane brief asked that *the close and the report read this one decision*.
+Here the report's sheet files the call half (`callDecided`) and the close reads it with the two runs
+through `dayDeciderOf`; no other surface states what decided the day, so no second reader was built.
+Whether the brief meant a report row as well is the integrator's to say.

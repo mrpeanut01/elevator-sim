@@ -337,6 +337,12 @@ export interface EverydayReportInput {
   readonly week?: WeekState | undefined;
   /** The shell's house runs per counted day — `EverydayHost.weekHouse`. Read only with {@link week}. */
   readonly house?: ((day: number) => HouseReading | undefined) | undefined;
+  /**
+   * The shell's driver run per counted day — `EverydayHost.weekDriverRun`, read only with
+   * {@link week}, and only where the close's call line needs it (`shift/dayClose.ts#dayDeciderOf`,
+   * wave AN, lane DQ-3, [§ D1351](../../../../DECISIONS.md)).
+   */
+  readonly driver?: ((day: number) => HouseReading | undefined) | undefined;
 }
 
 /** What a career sheet's onward step is drawn from — {@link EverydayReportInput.career}. */
@@ -748,6 +754,7 @@ export function everydayReportViewOf(input: EverydayReportInput): EverydayReport
             week: input.week,
             report: input.report,
             houseOf: input.house ?? (() => undefined),
+            driverOf: input.driver,
             population: input.overnight?.population,
             onward: input.overnight?.onward,
           }),

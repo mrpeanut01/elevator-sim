@@ -768,7 +768,7 @@ export function dayCallRowOf(
 /**
  * **An answer as a call's row names it** — the placement answer's own button words, or, on a driver
  * call, who drove from the call under it. Exported for the close's *call that decided it*
- * (`shift/dayClose.ts#decidingCallLineOf`, wave AM, lane AM-C), so that sentence and the row name
+ * (`shift/dayClose.ts#decidingCallOf`, wave AM, lane AM-C), so that sentence and the row name
  * an answer the same way.
  */
 export function dayCallAnswerWordsOf(record: DayCallRecord, answer: DayCallAnswer): string {

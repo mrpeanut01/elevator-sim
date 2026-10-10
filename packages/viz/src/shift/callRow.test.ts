@@ -14,7 +14,10 @@ import { SPREAD_CARS_LABEL } from '../live/interventions.js';
 
 import { clockOf } from './report.js';
 import { PRESS_CALL_AGAIN, PRESS_CALL_LATER_NOTE, PRESS_CALL_ROW_ID, pressCallDecidingOf, pressCallRowOf } from './callRow.js';
-import { decidingCallLineOf, NO_CALL_DECIDED_LINE } from './dayClose.js';
+import { decidingCallOf, NO_CALL_DECIDED_LINE, type DecidingCallInput } from './dayClose.js';
+
+/** The close's call sentence alone, `decidingCallOf`'s line. */
+const decidingCallLineOf = (input: DecidingCallInput): string | undefined => decidingCallOf(input)?.line;
 import type { ContractPressDay } from './ladder.js';
 import type { PressCall } from './pressCall.js';
 

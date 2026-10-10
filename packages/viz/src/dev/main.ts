@@ -233,6 +233,7 @@ import { shiftObservationsOf } from '../shift/observations.js';
 import { pressCounterfactualOf } from '../shift/counterfactual.js';
 import { carAbsencesOf, type BookedOutCar } from '../shift/bookedOut.js';
 import { readGoals } from '../shift/goals.js';
+import { dayDeciderOf } from '../shift/dayClose.js';
 import {
   clockOf,
   clockRange,
@@ -243,6 +244,8 @@ import {
 import { HISTORY_DAYS, MODE_WEEK_CONTRACT_IDS, outcomeOf, switchWeek, wasGraded } from '../shift/week.js';
 import {
   dayCountsToward,
+  driverRunNeedOf,
+  driverRunRecordOf,
   houseNeedOf,
   houseRecordOf,
   weekDealOf,
@@ -1757,18 +1760,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
         recordings.forEach((recording, index) => {
           const need = needs[index];
           if (need === undefined) return;
-          const graded = readGoals(
-            need.entry.readings.map((reading) => reading.goal),
-            shiftObservationsOf(observationsAt(recording, recording.endedAt)),
-          );
-          houseReadings.set(
-            need.key,
-            !wasGraded(graded)
-              ? 'ungraded'
-              : graded.every((reading) => reading.state === 'met')
-                ? 'cleared'
-                : 'missed',
-          );
+          houseReadings.set(need.key, dayRunReadingOf(need.entry, recording));
         });
         renderAll();
       },
@@ -1779,6 +1771,77 @@ function boot(ui: Elements, resources: BrowserResources): void {
         renderAll();
       },
     });
+  }
+
+  /**
+   * A run of a closed day's crowd, graded against the goals **the day was graded against**, read off
+   * the day's own readings — the house's grading, and the driver run's, so the two runs and the day
+   * answer one question.
+   */
+  function dayRunReadingOf(entry: DayOutcome, recording: VizRecording): HouseReading {
+    const graded = readGoals(
+      entry.readings.map((reading) => reading.goal),
+      shiftObservationsOf(observationsAt(recording, recording.endedAt)),
+    );
+    if (!wasGraded(graded)) return 'ungraded';
+    return graded.every((reading) => reading.state === 'met') ? 'cleared' : 'missed';
+  }
+
+  /**
+   * **The driver run** — wave AN, lane DQ-3, swarm DQ's Q2 rule 3, [§ D1351](../../../../DECISIONS.md).
+   * Its own runner, for {@link houseRunner}'s reason: it must not supersede the house, a shift or a
+   * call, nor be superseded by them.
+   *
+   * The same day's crowd with the tower's standing order picked in place of its driver and every
+   * press kept (`shift/weekStake.ts#driverRunRecordOf`), graded as the house is. The close reads it
+   * beside the house to say what decided a day no call decided (`shift/dayClose.ts#dayDeciderOf`),
+   * and it is one more run only on a counted day whose driver is not the house's and which has
+   * presses: with nothing pressed it is the house's own run, and with the house driving it is the
+   * day itself (`driverRunNeedOf`). So it costs at most one simulation a close, started at the close
+   * ({@link closeShift}) through the same decision the close's line reads, and asked again where the
+   * close reads it and nobody has. A reading is kept per run asked: the day's crowd and its whole
+   * swapped record, so a re-filed day with one more press is a different run.
+   */
+  const driverRunner = createOffThreadRunner({ spawn: spawnRunWorker });
+  const driverReadings = new Map<string, HouseReading>();
+  /** The key of the driver run in flight — so a render asking again does not restart it. */
+  let driverAsked: string | undefined;
+
+  /** The driver run's reading on a closed day of the live week, asking for it where nobody has. */
+  function weekDriverRunReadingOf(day: number): HouseReading | undefined {
+    const week = state.week;
+    if (weekDealOf(week) === undefined) return undefined;
+    const entry = week.history.find((candidate) => candidate.day === day);
+    const record = entry?.record ?? null;
+    if (entry === undefined || record === null) return undefined;
+    if (!dayCountsToward(week, entry) || driverRunNeedOf(entry) !== 'run') return undefined;
+    const swapped = driverRunRecordOf(record);
+    const key = `${week.contractId}|${entry.eventId}|${JSON.stringify(swapped)}`;
+    const known = driverReadings.get(key);
+    if (known !== undefined) return known;
+    /* A record this build cannot replay is no record of the crowd for the driver run either. */
+    if (recordUnreadableReason(record, resources) !== null) {
+      driverReadings.set(key, 'unrecorded');
+      return 'unrecorded';
+    }
+    if (driverAsked === key) return undefined;
+    driverAsked = key;
+    const plan = watchRunPlanOf(state, resources, swapped);
+    driverRunner.start({
+      runs: [{ config: plan.config, outOfServiceCarIds: plan.outOfServiceCarIds, recordDecisions: false }],
+      onDone: ([recording]) => {
+        if (driverAsked === key) driverAsked = undefined;
+        driverReadings.set(key, recording === undefined ? 'unrecorded' : dayRunReadingOf(entry, recording));
+        renderAll();
+      },
+      /* A run that threw: the close says the run could not be made, and claims nothing. */
+      onFailed: () => {
+        if (driverAsked === key) driverAsked = undefined;
+        if (!driverReadings.has(key)) driverReadings.set(key, 'unrecorded');
+        renderAll();
+      },
+    });
+    return undefined;
   }
   let dayCallSession: DayCallSession | undefined;
   /**
@@ -5067,6 +5130,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
     driverStore: sessionStore,
     /* § D1177 — the house on a closed week's counted days, run off this thread when first read. */
     weekHouse: weekHouseReadingOf,
+    /* § D1351 — the driver run on a counted day, run off this thread when the close first needs it. */
+    weekDriverRun: weekDriverRunReadingOf,
     /*
      * **The crowd a first session's pinned day replaced** — [§ D1047](../../../../DECISIONS.md).
      *
@@ -7911,6 +7976,14 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * tab now keeps is the one another tab stored, so the save below does not write over its close.
      */
     if (filedElsewhere !== undefined) state = { ...state, week: filedElsewhere.week, parkedWeeks: filedElsewhere.parked };
+    /*
+     * § D1351: what decided a day no call decided is read off one more run, started here as the
+     * house's is (§ D1227), through the close's own decision, so it is asked exactly where the close's
+     * line will need it and on no other close.
+     */
+    if (!practice && report.of === 'week-day') {
+      dayDeciderOf({ week: state.week, report, houseOf: weekHouseReadingOf, driverOf: weekDriverRunReadingOf });
+    }
     /*
      * **The sheet opens itself only over a reader who is not doing something else** — § D233,
      * issue #67.

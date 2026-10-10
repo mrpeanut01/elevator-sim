@@ -232,7 +232,12 @@ function mountReportScreen(
        * week's close, and a watched run is somebody else's.
        */
       ...(context.ctx === 'daily'
-        ? { week: data.week(), house: (day: number) => data.weekHouse(day) }
+        ? {
+            week: data.week(),
+            house: (day: number) => data.weekHouse(day),
+            /* Wave AN, lane DQ-3 (§ D1351): what decided a day no call decided, from the shell's driver run. */
+            driver: (day: number) => data.weekDriverRun(day),
+          }
         : {}),
     });
   }

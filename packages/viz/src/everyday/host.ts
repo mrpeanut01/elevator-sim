@@ -1011,6 +1011,16 @@ export interface EverydayHost {
   weekHouse(day: number): HouseReading | undefined;
 
   /**
+   * **The driver run on a counted day of the live week** — the same day with the tower's standing
+   * order picked in place of its driver and every press kept (`shift/weekStake.ts#driverRunRecordOf`),
+   * wave AN, lane DQ-3, [§ D1351](../../../../DECISIONS.md). `undefined` until the shell's run
+   * answers, and for every day that does not need one (`shift/weekStake.ts#driverRunNeedOf`). Asking
+   * starts the run, off the thread that paints, so only the close's call line asks, and only where
+   * no call decided the day (`shift/dayClose.ts#dayDeciderOf`).
+   */
+  weekDriverRun(day: number): HouseReading | undefined;
+
+  /**
    * **The live week's tower's record of closed weeks** — `shift/weekRecord.ts`, lane AL-F
    * ([§ D1230](../../../../DECISIONS.md)). A record with nothing closed where none is kept.
    */
@@ -2250,6 +2260,12 @@ export interface EverydayHostBindings {
    * which the week sheet reads as *still being run*.
    */
   readonly weekHouse?: ((day: number) => HouseReading | undefined) | undefined;
+  /**
+   * The driver run on a counted day of the live week — `dev/main.ts`'s, [§ D1351](../../../../DECISIONS.md).
+   * Optional on {@link weekHouse}'s ground: a shell that omits it answers nothing, which the close
+   * reads as *still being run*.
+   */
+  readonly weekDriverRun?: ((day: number) => HouseReading | undefined) | undefined;
   /**
    * **Each tower's record of closed weeks**, read and written — `shift/weekRecord.ts`, lane AL-F
    * ([§ D1229](../../../../DECISIONS.md), [§ D1230](../../../../DECISIONS.md)). `dev/main.ts` keeps
@@ -3609,6 +3625,7 @@ export function createEverydayHost(
     lastReport: () => b.state().report,
     lastOutcome: () => b.state().week.history.at(-1),
     weekHouse: (day) => b.weekHouse?.(day),
+    weekDriverRun: (day) => b.weekDriverRun?.(day),
     weekRecord: () => weekRecordFor(b.weekRecords?.read() ?? [], b.state().week.contractId),
     dayCrowd: () => dealtCrowdFor(b, b.state().week),
     selection: () => {

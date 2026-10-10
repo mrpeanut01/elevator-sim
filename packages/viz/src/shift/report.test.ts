@@ -80,7 +80,7 @@ import {
 import { reportWindowNameOf } from './reportWindow.js';
 import { closeDay, nextDay, openEndless, openWeek, outcomeOf } from './week.js';
 import { WEEK_CLOSED_LINE, weekDealOf } from './weekStake.js';
-import { dayCloseOf } from './dayClose.js';
+import { dayCloseOf, NO_CALL_RAISED_LINE } from './dayClose.js';
 import {
   DAY_START_S,
   WAKE_UP_ARRIVALS,
@@ -1526,6 +1526,18 @@ describe('the rest of the sheet', () => {
     expect(monday.onward?.demand).toBe('+3.2% more tenants than today');
     /* Without the measurement the slope's ratio stands, as before. */
     expect(midtownWeekReport(1, 5).report.onward?.demand).toMatch(/^A new week: the tower as handed, \d+\.\d% fewer tenants than today$/u);
+  });
+
+  /*
+   * **The sheet files whether a call decided the day beside its sentence** — wave AN, lane DQ-3,
+   * § D1351. The close reads the flag to say what decided a day no call decided, so the sheet's
+   * sentence and the close's decision are one; a sheet that filed only the sentence left the close to
+   * match its words.
+   */
+  it('files whether a call decided the day beside the sentence that says so — § D1351', () => {
+    const { report } = midtownWeekReport(1, 1);
+    expect(report.decidingCall).toBe(NO_CALL_RAISED_LINE);
+    expect(report.callDecided).toBe(false);
   });
 
   it('promises no unlock of what is already open — § D1250', () => {

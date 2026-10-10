@@ -135,7 +135,7 @@ import { gaveUpBesideOf, goalPlainNameOf, horizonLabelOf, readGoals, wasDisplayO
 import { growthFactor } from './growth.js';
 import { CONTRACT_LADDER } from './ladder.js';
 import { ENDLESS_CONTRACT_ID, nextDay, pathNextOf, wasGraded } from './week.js';
-import { decidingCallLineOf, type DecidingPinnedCall } from './dayClose.js';
+import { decidingCallOf, type DecidingPinnedCall } from './dayClose.js';
 import {
   WEEK_CLOSED_LINE,
   weekDealOf,
@@ -519,10 +519,17 @@ export interface WeekDayReport extends DayReport, ShapedOnlyFields {
   readonly onward?: ReportOnward | undefined;
   /**
    * **The call that decided today**, or the plain sentence that none did —
-   * `shift/dayClose.ts#decidingCallLineOf` over this sheet's own call runs, graded by this sheet's
+   * `shift/dayClose.ts#decidingCallOf` over this sheet's own call runs, graded by this sheet's
    * grader ([§ D1248](../../../../DECISIONS.md)). Absent on a day nobody graded.
    */
   readonly decidingCall?: string | undefined;
+  /**
+   * **Whether a call decided today** — `true` where {@link decidingCall} names one, `false` where it
+   * says none did, absent on a day nobody graded. The close reads it to say what decided a day no
+   * call decided (`shift/dayClose.ts#dayDeciderOf`, wave AN, lane DQ-3,
+   * [§ D1351](../../../../DECISIONS.md)), so the sheet's sentence and the close's decision are one.
+   */
+  readonly callDecided?: boolean | undefined;
 }
 
 /** The next day on the main path, as {@link WeekDayReport.onward} carries it. */
@@ -1380,7 +1387,7 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
     pathNext,
     input.populations === undefined ? undefined : { today: input.populations.today, tomorrow: input.populations.onward },
   );
-  const decidingCall = decidingCallLineOf({
+  const deciding = decidingCallOf({
     verdict: judgement.verdict,
     records: input.dayCalls ?? [],
     pinned: decidingPinnedOf(input),
@@ -1440,12 +1447,12 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
       newWeek: pathNext.day <= week.day,
       week: pathNext.week,
     },
-    ...(decidingCall === undefined ? {} : { decidingCall }),
+    ...(deciding === undefined ? {} : { decidingCall: deciding.line, callDecided: deciding.decided }),
   };
 }
 
 /**
- * The pinned press day's call in the terms {@link decidingCallLineOf} reads, or `undefined` where
+ * The pinned press day's call in the terms {@link decidingCallOf} reads, or `undefined` where
  * the call row would not print — `callRow.ts#pressCallDecidingOf`, which reads the answer at the
  * call through the row's own reader, so the close and the row name one answer to one call.
  */

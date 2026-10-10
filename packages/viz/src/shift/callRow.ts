@@ -134,7 +134,7 @@ export interface PressCallAnswer {
 
 /**
  * **What was answered at the pinned call, read once** — the row below and the close's deciding
- * sentence (`shift/dayClose.ts#decidingCallLineOf`, through `report.ts`) both read this, so the two
+ * sentence (`shift/dayClose.ts#decidingCallOf`, through `report.ts`) both read this, so the two
  * cannot name different answers to one call (wave AN, lane AN-7, the post-AM panel's seat B).
  *
  * Only what stands at or before the call second is the answer: a later call's press is not it.
@@ -164,7 +164,7 @@ export function pressCallAnswerOf(
 
 /**
  * **The pinned call in the terms the close's deciding sentence reads** — `report.ts` hands this to
- * `dayClose.ts#decidingCallLineOf`. `undefined` exactly where {@link pressCallRowOf} draws no row,
+ * `dayClose.ts#decidingCallOf`. `undefined` exactly where {@link pressCallRowOf} draws no row,
  * because both read {@link pressCallAnswerOf}.
  */
 export function pressCallDecidingOf(input: PressCallRowInput): DecidingPinnedCall | undefined {
