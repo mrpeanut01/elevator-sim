@@ -211,18 +211,24 @@ function button(
  */
 export function campaignInputOf(host: EverydayHost): CampaignInput {
   const buildings = new Map<string, BuildingFacts>();
+  const career = host.campaign();
   for (const id of host.buildingIds()) {
     const config = host.buildingById(id);
     if (config === undefined) continue;
+    /*
+     * § D1377: a building the career holds is described on the day its tower stands at, grown and
+     * fitted as the day's run builds it; any other building as its contract hands it over.
+     */
+    const held = career.towers.find((tower) => tower.buildingId === id);
     buildings.set(id, {
       name: config.name,
-      spec: host.buildingSpecLine(id),
+      spec: (held === undefined ? undefined : host.careerTowerSpecLine?.(held.id)) ?? host.buildingSpecLine(id),
       startTimeFloors: host.buildingStartTimeFloors(id),
       shafts: host.buildingShafts(id),
+      shape: host.buildingShape?.(id),
     });
   }
   const run = host.runState();
-  const career = host.campaign();
   /*
    * **Only a career day's run is graded here** — GitHub issue #594. The desk folded whatever
    * recording stood on the host, so a rush the player had just left read *1 of 4 holding* on a

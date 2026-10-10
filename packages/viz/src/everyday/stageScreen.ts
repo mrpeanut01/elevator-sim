@@ -82,6 +82,7 @@ import type { LiveObservations } from '../live/types.js';
 import type { GoalState } from '../shift/types.js';
 import { actionBarFor, type ActionBarModel } from './actionBar.js';
 import { RUSH_NOT_LANDED, rushStageHeaderOf } from './rush.js';
+import { RUSH_STREAM } from './rushScreenModel.js';
 import type { EverydayHost } from './host.js';
 import { SCREEN_NAMES, type EverydayScreenModule } from './screens.js';
 import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.js';
@@ -105,6 +106,8 @@ import {
   type StageCameraId,
   stageCameraWindowOf,
   type StageFigure,
+  type StageFigureTone,
+  stageFigureToneOf,
   stageFloorJumpOptionsOf,
   stageFilingLandsOn,
   stageGeometryOf,
@@ -278,6 +281,14 @@ const EYEBROW = `font:500 9.5px ${TYPE.mono};letter-spacing:.14em;color:${C.labe
  * KB-15 — *no colour-only signal* — is kept by the row rather than by this table: `GOAL_GLYPHS`'
  * `✓ × ·` sits at the head of every line and the value or the em dash sits at its end.
  */
+/** § D1381: a header figure's ink by its tone — the handoff's live accent, then the palette's verdicts. */
+const FIGURE_INK: Readonly<Record<StageFigureTone, string>> = Object.freeze({
+  live: C.terracotta,
+  met: C.moss,
+  missed: C.alarm,
+  still: C.ink,
+});
+
 const GOAL_INK: Readonly<Record<GoalState, string>> = Object.freeze({
   met: C.moss,
   missed: C.alarm,
@@ -1996,7 +2007,13 @@ function mountStage(
    * from the frame it describes.
    */
   function announce(recording: VizRecording, frame: Frame, dispatcherName: string): void {
-    const sentence = describeFrame({ recording, frame, dispatcherName });
+    /* § D1383: a rush's text quotes the climb its page states, not the drain the recording runs on into. */
+    const sentence = describeFrame({
+      recording,
+      frame,
+      dispatcherName,
+      ...(context.ctx === 'rush' ? { horizonS: RUSH_STREAM.lengthS } : {}),
+    });
     canvas.setAttribute('aria-label', sentence);
     if (pendingSay !== undefined) {
       view?.clearTimeout(pendingSay);
@@ -2824,15 +2841,19 @@ function mountStage(
       }
     }
     /*
-     * Wave AO, lane AO-4, the post-AN panel's seat B (lost moment 6): stopped at a call whose runs are
-     * still being made, the button says the stage is working and is not offered as *Play*.
+     * The transport's button, one rule over two lanes (joined at integration): stopped at a call whose
+     * runs are still being made it says the stage is working and is not offered as *Play* (lane AO-4,
+     * the post-AN panel's seat B, lost moment 6); once the day has run out it is inert with the reason
+     * on its face, as the skip beside it is (§ D1381, lane AO-3).
      */
     const waitingNow = waitingAtCall();
-    const control = stagePlayControlOf({ playing, hasRun: playback !== undefined, waitingOnCall: waitingNow });
-    playButton.textContent = control.label;
-    playButton.disabled = control.disabled;
+    const play = stagePlayControlOf({ playing, hasRun: playback !== undefined, waitingOnCall: waitingNow, dayEnded: ended });
+    playButton.textContent = play.label;
+    playButton.disabled = play.inert;
     /* A held button says why to a reader on it, in the line a sighted player reads beside it. */
-    playButton.title = waitingNow ? STAGE_CALL_COPY.waiting : '';
+    playButton.title = waitingNow ? STAGE_CALL_COPY.waiting : (play.note ?? '');
+    playButton.style.opacity = play.inert && playback !== undefined ? '0.55' : '';
+    playButton.style.cursor = play.inert ? 'default' : 'pointer';
     /*
      * § 2.3's skip control, resolved from the same fact the bar reads — GitHub issue #369. Inert
      * once there is nothing left to skip, with the reason on the button's own `title` rather than
@@ -3222,7 +3243,13 @@ function mountStage(
     if (practiceLine.textContent !== (practice ?? '')) practiceLine.textContent = practice ?? '';
     const practiceDisplay = practice === undefined ? 'none' : '';
     if (practiceLine.style.display !== practiceDisplay) practiceLine.style.display = practiceDisplay;
-    drawFigures(head.figures);
+    /* § D1381: the strip's own judgement, at the strip's own instant — a rush and a watched run grade nothing. */
+    const figureJudged = simTimeS >= recording.endedAt;
+    const figureReadings = context.ctx === 'rush' || watching !== undefined ? [] : host.goalsAt(simTimeS);
+    drawFigures(
+      head.figures,
+      head.figures.map((figure) => stageFigureToneOf(figure, figureReadings, figureJudged)),
+    );
     drawGoals(recording, simTimeS, watching);
     drawEndDay(recording, simTimeS, watching);
     /* A rush asks nothing of the day: § 9.2 has no brief and no goals to grade. */
@@ -3706,15 +3733,21 @@ function mountStage(
     }
   }
 
-  function drawFigures(list: readonly StageFigure[]): void {
+  function drawFigures(list: readonly StageFigure[], tones: readonly StageFigureTone[] = []): void {
     figures.replaceChildren();
-    for (const figure of list) {
+    for (const [index, figure] of list.entries()) {
       const box = el(doc, 'div', 'everyday-stage-figure');
       box.style.cssText = 'display:flex;flex-direction:column;gap:1px';
       const label = el(doc, 'span', undefined, figure.label);
       label.style.cssText = EYEBROW;
       const value = el(doc, 'span', 'everyday-stage-figure-value', figure.value);
-      value.style.cssText = `font:500 16px ${TYPE.mono};color:${figure.refusal === undefined ? C.terracotta : C.faint}`;
+      /*
+       * § D1381: the live accent while the day runs, the goal row's own verdict once it has run out,
+       * so a passing reading at 18:00 is not drawn in the red family beside a met goal.
+       */
+      const tone = tones[index] ?? (figure.refusal === undefined ? 'live' : 'still');
+      value.dataset['tone'] = tone;
+      value.style.cssText = `font:500 16px ${TYPE.mono};color:${figure.refusal !== undefined ? C.faint : FIGURE_INK[tone]}`;
       box.append(label, value);
       /*
        * R13: a ratio carries the count it was taken over, in its own box. A count is its own `n`

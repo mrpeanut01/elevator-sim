@@ -397,7 +397,47 @@ export interface StageFigure {
   readonly value: string;
   readonly count?: string | undefined;
   readonly refusal?: string | undefined;
+  /**
+   * The goal this figure is the reading of, where one grades it — so once the day has run out the
+   * figure is drawn in its goal's verdict rather than in the live accent ({@link stageFigureToneOf},
+   * [§ D1381](../../../../DECISIONS.md)). Absent on a figure no goal grades.
+   */
+  readonly reads?: ShiftGoal['reads'] | undefined;
 }
+
+/**
+ * **How a header figure is drawn** — [§ D1381](../../../../DECISIONS.md), the post-AN panel's seat B
+ * (defect 6). Every figure was drawn in terracotta, the handoff's *live figures* accent, at every
+ * playhead, so at 18:00 *93 %* against a 61 % bar and *220 s* against 460 s were drawn in the red
+ * family beside goal rows reading met.
+ *
+ * - `live`: the day is still running. The handoff's accent, and no verdict: a reading at the clock.
+ * - `met` / `missed`: the day has run out and the goal this figure reads is judged; the goal row's
+ *   own verdict, in the palette's *cleared* and *missed* colours.
+ * - `still`: the day has run out and no goal grades this figure, or it carries a refusal.
+ */
+export type StageFigureTone = 'live' | 'met' | 'missed' | 'still';
+
+/**
+ * The tone of one header figure — the goal strip's verdict for the goal it reads, once the strip is
+ * judged ({@link stageGoalsOf}'s own `judged`: the playhead at the run's end), and the live accent
+ * before. Pure, so the mount and the corpus read one answer.
+ */
+export function stageFigureToneOf(
+  figure: StageFigure,
+  readings: readonly GoalReading[],
+  judged: boolean,
+): StageFigureTone {
+  if (figure.refusal !== undefined) return 'still';
+  if (!judged) return 'live';
+  const reading = figure.reads === undefined ? undefined : readings.find((entry) => entry.goal.reads === figure.reads);
+  if (reading?.state === 'met') return 'met';
+  if (reading?.state === 'missed') return 'missed';
+  return 'still';
+}
+
+/** Why ▶ Play is inert once the day has run out (§ D1381). Describes, as {@link STAGE_DAY_OVER} does. */
+export const STAGE_PLAY_DONE_REASON = 'the day has already run out, so there is nothing left to play';
 
 /** § 7.1's header row, resolved at one playhead. */
 export interface StageHeaderView {
@@ -785,6 +825,7 @@ function awayInsideOf(o: LiveObservations): StageFigure {
     label,
     value: `${String(Math.round(o.servedUnderThresholdPct))}%`,
     count: `of ${String(o.servedCount)} away`,
+    reads: 'minutePct',
   };
 }
 
@@ -810,6 +851,7 @@ function longestSoFarOf(o: LiveObservations): StageFigure {
   return {
     label: 'longest so far',
     value: o.worstWaitIsCensored ? `${seconds} and counting` : seconds,
+    reads: 'worstWaitS',
   };
 }
 
@@ -2882,16 +2924,28 @@ export const STAGE_PLAY_CONTROL = Object.freeze({
   waiting: 'Running the day ahead…',
 });
 
-/** The transport button's words and whether it can be pressed. */
+/**
+ * The transport button's words, whether it can be pressed, and why not. One rule over two lanes'
+ * findings, joined at integration: with no run, or once the day has run out, it is inert with the
+ * reason on its face ([§ D1381](../../../../DECISIONS.md), lane AO-3: at 18:00 it stood live beside
+ * *the stage will not move again on its own*, and a press did nothing); stopped at a call whose runs
+ * have not landed, it says the stage is working and cannot be pressed (lane AO-4, § D1385).
+ * `disabled` and `inert` are the same fact under the two names the lanes' callers read.
+ */
 export function stagePlayControlOf(input: {
   readonly playing: boolean;
   readonly hasRun: boolean;
   /** The stage is stopped at a call whose runs have not landed. */
-  readonly waitingOnCall: boolean;
-}): { readonly label: string; readonly disabled: boolean } {
-  if (input.playing) return { label: STAGE_PLAY_CONTROL.pause, disabled: false };
-  if (input.hasRun && input.waitingOnCall) return { label: STAGE_PLAY_CONTROL.waiting, disabled: true };
-  return { label: STAGE_PLAY_CONTROL.play, disabled: !input.hasRun };
+  readonly waitingOnCall?: boolean;
+  /** The day has run out on the stage. */
+  readonly dayEnded?: boolean;
+}): { readonly label: string; readonly disabled: boolean; readonly inert: boolean; readonly note: string | undefined } {
+  const held = (label: string, note: string | undefined) => ({ label, disabled: true, inert: true, note });
+  if (!input.hasRun) return held(STAGE_PLAY_CONTROL.play, STAGE_SKIP_COPY.pendingReason);
+  if (input.dayEnded === true) return held(STAGE_PLAY_CONTROL.play, STAGE_PLAY_DONE_REASON);
+  if (input.playing) return { label: STAGE_PLAY_CONTROL.pause, disabled: false, inert: false, note: undefined };
+  if (input.waitingOnCall === true) return held(STAGE_PLAY_CONTROL.waiting, undefined);
+  return { label: STAGE_PLAY_CONTROL.play, disabled: false, inert: false, note: undefined };
 }
 
 /**

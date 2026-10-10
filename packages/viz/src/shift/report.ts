@@ -711,6 +711,13 @@ export interface DayReportInput {
   readonly plan: ShiftPlan;
   /** The dispatcher's display name. Defaults to the recording's profile id. */
   readonly dispatcherName?: string | undefined;
+  /**
+   * The weights the day's own driver started with — the configured profile's, before any handover in
+   * {@link interventions}. Read by the *Weight fairness up* card, which may not recommend a weight the
+   * day already carried ([§ D1378](../../../../DECISIONS.md)). Absent reads the configured driver as
+   * weighting nothing, which is every sheet built before it existed.
+   */
+  readonly startingWeights?: Readonly<Record<string, number>> | undefined;
   /** The simulated second the shift clock calls 06:00. See {@link DAY_START_S}. */
   readonly dayStartS?: SimTime | undefined;
   /**
@@ -1015,7 +1022,7 @@ function metaLinesFor(input: DayReportInput, dispatcherName: string, dayStartS: 
      * *MIDTOWN OFFICE · MINIMUM ESTIMATED WAIT* above its own log line saying so.
      */
     `${recording.buildingName} · ${driversLineOf(input.interventions ?? [], dispatcherName, dayStartS)}`,
-    `seed ${recording.seed} · ${clockRange(recording.startedAt, recording.endedAt, dayStartS)} · one replication`,
+    `seed ${recording.seed} · ${runStretchOf(recording, dayStartS)} · one replication`,
     ...(subject.kind === 'single-run' ? selectionLines(subject.selection) : []),
     ...bookedLine(
       eventAsRun(input.event, input.templateVariesMix === true, input.wholeDayRun === true),
@@ -1362,7 +1369,13 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
           }
         : undefined,
     ),
-    levers: leversFor(recording, observations, summary, readings),
+    levers: leversFor(
+      recording,
+      observations,
+      summary,
+      readings,
+      fairnessDriversOf(input.interventions ?? [], dispatcherName, input.startingWeights, dayStartS),
+    ),
     /*
      * Every dispatcher that drove a stretch of the day, because the sentence is about what one day
      * cannot say of each of them — wave AL, lane AL-A. Naming only the configured one after a
@@ -2976,8 +2989,18 @@ function leversFor(
   observations: Observations,
   summary: VizSummary,
   readings: readonly GoalReading[],
+  /* § D1378: who drove the day with fairness weighted, from when — {@link fairnessDriversOf}. */
+  fairnessDrivers: readonly string[] = [],
 ): readonly ReportLever[] {
-  const pointers = leverPointersFor(recording, observations, summary, readings);
+  const pointers = new Map(leverPointersFor(recording, observations, summary, readings));
+  /*
+   * **Advice may not recommend what the day already did** — [§ D1378](../../../../DECISIONS.md), the
+   * post-AN panel's seat B (defect 8). The card read *Today points here … Weight fairness up* on a
+   * day driven with Fairness first from 12:20. Where a driver of the day weighted fairness, the card
+   * is not pointed at, and it says who did, so it reads as what the day was rather than as advice.
+   */
+  const alreadyWeighted = fairnessDrivers.length > 0;
+  if (alreadyWeighted) pointers.delete('weight-fairness');
   const available = LEVERS.filter(
     (lever) =>
       !(lever.id === 'ask-destination' && recording.passengerModel === 'destination-dispatch'),
@@ -2986,11 +3009,42 @@ function leversFor(
   const pointed = available.filter((lever) => pointers.has(lever.id));
   const rest = available.filter((lever) => !pointers.has(lever.id));
   return [...pointed, ...rest].map((lever) => {
+    if (lever.id === 'weight-fairness' && alreadyWeighted) {
+      return { ...lever, body: `Today already weighted it: ${listOf(fairnessDrivers)}. ${lever.body}` };
+    }
     const because = pointers.get(lever.id);
     return because === undefined
       ? lever
       : { ...lever, body: `Today points here: ${because}. ${lever.body}` };
   });
+}
+
+/**
+ * **Who drove the day with fairness weighted**, in the drivers line's own words — `Fairness first
+ * from 12:20`, or a name alone for the driver that started the day. [§ D1378](../../../../DECISIONS.md).
+ *
+ * Fairness is the `starvation` weight, the term the workshop lever this card opens moves
+ * (`mode/plainLevers.ts`). A stretch counts where its profile weights that term above zero: the
+ * starting driver by {@link DayReportInput.startingWeights}, every handover by the profile the
+ * intervention carries whole. A weight is read, never a profile id (CLAUDE.md invariant 7).
+ */
+export function fairnessDriversOf(
+  interventions: readonly RunInterventionConfig[],
+  startName: string,
+  startingWeights: Readonly<Record<string, number>> | undefined,
+  dayStartS: SimTime,
+): readonly string[] {
+  const weightsByName = new Map<string, Readonly<Record<string, number>>>();
+  if (startingWeights !== undefined) weightsByName.set(startName, startingWeights);
+  for (const entry of interventions) {
+    const change = entry.change;
+    if (change.kind === 'switch-dispatcher' || change.kind === 'adopt-dispatcher') {
+      weightsByName.set(change.profile.name, change.profile.weights as Readonly<Record<string, number>>);
+    }
+  }
+  return driverStretchesOf(interventions, startName)
+    .filter((stretch) => (weightsByName.get(stretch.name)?.['starvation'] ?? 0) > 0)
+    .map((stretch) => (stretch.fromS === undefined ? stretch.name : `${stretch.name} from ${clockOf(stretch.fromS, dayStartS)}`));
 }
 
 /**
@@ -3459,6 +3513,29 @@ export function clockOf(simTimeS: SimTime, dayStartS: SimTime = DAY_START_S): st
 }
 
 /** `06:00–06:30`. An en dash, matching the design's own ranges. */
+/**
+ * **The stretch a run covered, as the day's clock reads it** — [§ D1383](../../../../DECISIONS.md),
+ * the post-AN panel's seat B (defect 10). The seed line read *08:00–18:01* over a day whose arrivals
+ * ran 08:00–18:00: `endedAt` is the arrivals' end or the last rider's, whichever is later
+ * (`ShiftPlan`'s own docstring), so the minute past 18:00 was the run carrying riders already in the
+ * building. The arrivals' stretch is quoted, from the run's own schedule (`demandPhases`), and the
+ * minutes the run went on past it are said as what they were. A run with no schedule on it (a
+ * recording from before version 7) quotes its whole span, as before.
+ */
+export function runStretchOf(
+  recording: Pick<VizRecording, 'startedAt' | 'endedAt' | 'demandPhases'>,
+  dayStartS: SimTime = DAY_START_S,
+): string {
+  const arrivalsEndS = recording.demandPhases.at(-1)?.endS;
+  if (arrivalsEndS === undefined || arrivalsEndS <= recording.startedAt || clockOf(recording.endedAt, dayStartS) === clockOf(arrivalsEndS, dayStartS)) {
+    return clockRange(recording.startedAt, recording.endedAt, dayStartS);
+  }
+  return (
+    `${clockRange(recording.startedAt, arrivalsEndS, dayStartS)}, run on to ` +
+    `${clockOf(recording.endedAt, dayStartS)} for the riders still travelling`
+  );
+}
+
 export function clockRange(startS: SimTime, endS: SimTime, dayStartS: SimTime = DAY_START_S): string {
   return `${clockOf(startS, dayStartS)}–${clockOf(endS, dayStartS)}`;
 }

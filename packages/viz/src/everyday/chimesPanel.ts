@@ -278,10 +278,24 @@ export interface ChimesPanelView {
  * the shape `BOARD_SCREEN_COPY` and `CAMPAIGN_DOCK_COPY` already have — and so that a reader
  * looking for the words a player meets finds them in one place.
  */
+/**
+ * **What pays chimes, and what does not** — [§ D1382](../../../../DECISIONS.md), the post-AN panel's
+ * seat D (D9). Settings and the Career read *Chimes are what finishing something pays you*, while a
+ * cleared Saturday and every practice run paid nothing. The rule is the one `everyday/host.ts` banks
+ * by and `everyday/deviceChimes.ts` pays by: a scenario or a stage pays its first clear (§ D533), a
+ * counted day that clears pays, whether a week's or a contract's (§ D1231), and a rush pays only the
+ * waves past your best; practice, a day that does not count and a missed day bank no turn at all.
+ * One sentence, read by both surfaces, so the two cannot state two rules.
+ */
+export const CHIMES_EARN_RULE =
+  'Chimes are paid for finishing something that counts: a scenario or a stage the first time it ' +
+  'clears, a counted day that clears, in a week or on a contract, and rush waves past your best. ' +
+  'Practice, a day that does not count and a missed day pay nothing.';
+
 export const CHIMES_PANEL_COPY = Object.freeze({
   heading: 'CHIMES',
   lede:
-    'Chimes are what finishing something pays you. Nothing about them changes while you are away ' +
+    `${CHIMES_EARN_RULE} Nothing about them changes while you are away ` +
     '— none of this refills, runs out, or asks you to come back on a particular day, and there is ' +
     'nothing here to buy with money.',
   spendHeading: 'WHAT THEY BUY',

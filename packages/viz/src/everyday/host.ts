@@ -166,8 +166,10 @@ import {
   CAREER_PURSE_TOP_UP_SINK_ID,
   DIFFICULTIES,
   contractIsLost,
+  careerDayIdxOf,
   purseOf,
   shopTierAt,
+  type ShopTowerShape,
   type TowerShafts,
 } from '../campaign/economy.js';
 import { fitOutOf, startTimeFloorIdsOf } from '../campaign/fitOut.js';
@@ -1195,6 +1197,25 @@ export interface EverydayHost {
    * per shaft from it, and {@link campaignAct} hands the reducer the same answer.
    */
   buildingShafts(id: string): TowerShafts | undefined;
+
+  /**
+   * **The tower a building's contract hands over, as the shop's words need it** — floors, cars per
+   * bank and top speed, read off the same `shift/ladder.ts#ladderTowersOf` tower
+   * {@link buildingSpecLine} describes, or `undefined` for a building this build cannot resolve.
+   * [§ D1377](../../../../DECISIONS.md): three shop tiers were worded for the design file's tower.
+   * Optional so a fake host that knows no building reads every tier's shipped words.
+   */
+  buildingShape?(id: string): ShopTowerShape | undefined;
+
+  /**
+   * **A career tower's stat line on the day it stands at** — `shift/contracts.ts#statLineOf` over the
+   * building `dev/state.ts#shiftRunConfigOf` resolves for that tower's next day: the contract's
+   * tower, the kit fitted by then, grown to the day. [§ D1377](../../../../DECISIONS.md): the desk and
+   * the renewal kept *120 people* after the tenants had grown to 385 (the post-AN panel's seat C, D5).
+   * `undefined` for a tower the career does not hold or a building that will not resolve. Optional
+   * so a fake host falls back to {@link buildingSpecLine}.
+   */
+  careerTowerSpecLine?(towerId: string): string | undefined;
 
   /**
    * The career GAMEPLAY § 8's three campaign screens read — the whole record, as plain data.
@@ -3029,6 +3050,15 @@ export function createEverydayHost(
    */
   let chimeTally: EverydayChimeTally | undefined;
   /**
+   * **The run the last turn was banked on** — [§ D1382](../../../../DECISIONS.md), the post-AN panel's
+   * seat D (D9). The rail's *cleared day filed · 3 chimes* stood on the next day's stage and on a
+   * practice stage, about a day those stages were not. The acknowledgement is of a turn just
+   * finished, so it is drawn while the run it finished is the one standing, through the report, the
+   * door and the brief after it, and withdrawn once another run is put on the stage. The recording
+   * is compared by identity: every fresh ask writes a new one, and nothing else replaces it.
+   */
+  let chimeTallyOn: { readonly recording: VizRecording | undefined } | undefined;
+  /**
    * What the account owns, as the ledger last answered — the claim {@link bankTurn} and
    * {@link spendChime} keep current so a purchase reaches the next sitting without a reload.
    *
@@ -3047,6 +3077,8 @@ export function createEverydayHost(
    * failed would be a worse trade than a chime nobody banked.
    */
   const bankTurn = (turn: ChimeTurn): void => {
+    /* § D1382: the run this turn finished, taken on the close rather than when the ledger answers. */
+    chimeTallyOn = { recording: b.state().recording };
     const bank = b.bankCompletion;
     if (bank === undefined) {
       chimeTally = { turn: turn.completion, answer: { kind: 'no-server' } };
@@ -3858,6 +3890,40 @@ export function createEverydayHost(
     },
     buildingStartTimeFloors: (id) => startTimeFloorsOf(id),
     buildingShafts: (id) => towerShaftsOf(id),
+    buildingShape: (id) => {
+      /* The same tower `buildingSpecLine` draws and `towerShaftsOf` prices (§ D1377). */
+      const resolved = ladderTowersOf(b.resources).find((building) => building.id === id);
+      if (resolved === undefined) return undefined;
+      const speeds = resolved.banks.flatMap((bank) => bank.cars.map((car) => car.ratedSpeedMps));
+      return {
+        floors: resolved.floors.length,
+        bankCars: new Map(resolved.banks.map((bank) => [bank.id, bank.cars.length])),
+        topSpeedMps: speeds.length === 0 ? 0 : Math.max(...speeds),
+      };
+    },
+    careerTowerSpecLine: (towerId) => {
+      const tower = towerById(career, towerId);
+      if (tower === undefined) return undefined;
+      /*
+       * `runCampaignDay`'s fabric fields — the building, the day it is grown to and the kit fitted
+       * by then — over the standing state, and nothing that moves the crowd: the seed, the event and
+       * the held cars change who rides, never the floors, the cars or the tenants this line counts.
+       */
+      const careerWeek = careerWeeks.get(tower.id) ?? openCareer();
+      try {
+        const resolved = resolvedBuildingOf(b.resources, {
+          ...b.state(),
+          buildingId: tower.buildingId,
+          week: { ...careerWeek, day: tower.day, dayIdx: careerDayIdxOf(tower.day) },
+          campaignFitOut: fitOutOf(tower),
+          shiftLengthS: shiftLengthForContract(tower.id),
+          windowStartS: null,
+        });
+        return resolved === undefined ? undefined : statLineOf(resolved);
+      } catch {
+        return undefined;
+      }
+    },
     campaign: () => career,
     priceSchedule: () => bindings.resources.priceSchedule,
     careerNotice: () => careerLoadNotice,
@@ -4435,7 +4501,8 @@ export function createEverydayHost(
           ...careerWeek,
           completed: parking.week.completed,
           day: tower.day,
-          dayIdx: (tower.day - 1) % 7,
+          /* § D1377: a contract is twenty working days, so a career day is never named Saturday or Sunday. */
+          dayIdx: careerDayIdxOf(tower.day),
         },
         /*
          * **And the car today's works hold** — GitHub issue #353, `docs/32` GD11's first half,
@@ -4540,7 +4607,7 @@ export function createEverydayHost(
         interventions: [],
         buildingId: tower.buildingId,
         seed: careerDaySeedFor(base, tower.id, tower.day),
-        week: { ...careerWeek, day: tower.day, dayIdx: (tower.day - 1) % 7 },
+        week: { ...careerWeek, day: tower.day, dayIdx: careerDayIdxOf(tower.day) },
         outOfServiceCarIds: worksHeldCarsOf(tower, towerBuilding),
         campaignFitOut: fitOutOf(tower),
         shiftLengthS: shiftLengthForContract(tower.id),
@@ -4958,7 +5025,9 @@ export function createEverydayHost(
     bankScenarioClear: (scenarioId) => {
       bankTurn({ completion: 'scenario-cleared', scenarioId });
     },
-    chimeTally: () => chimeTally,
+    /* § D1382: the acknowledgement stands while the run it was banked on does, and no longer. */
+    chimeTally: () =>
+      chimeTallyOn !== undefined && chimeTallyOn.recording !== b.state().recording ? undefined : chimeTally,
     rushStartsFitted: () => rushClaims().some((claim) => claim.sinkId === RUSH_PREFIT_SINK_ID),
     rushRebuild: () => rushRebuildInput(),
     pickRushRebuild: (priceId) => {

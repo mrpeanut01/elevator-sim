@@ -470,6 +470,14 @@ describe('screen two points where the letter’s waits are — post-AH panel B.m
     const words = ['one', 'two', 'three', 'four', 'five', 'six'];
     expect(TUTORIAL_COPY.collapseLede).toContain(`the top ${String(words[scope.length - 1])} floors`);
     expect(TUTORIAL_COPY.collapseLede).not.toMatch(/\b(?:fourth|fifth|sixth) floor\b/u);
+    /*
+     * § D1383, the post-AN panel's seat B (lost moment 1): screen one's figure notes named *the
+     * floors the letter is about* before any letter was on the screen. They name the same stretch.
+     */
+    for (const [kind, note] of Object.entries(TUTORIAL_FIGURE_NOTES)) {
+      expect(note, kind).not.toMatch(/\bletter\b/u);
+      expect(note, kind).toContain(`the top ${String(words[scope.length - 1])} floors`);
+    }
   });
 });
 

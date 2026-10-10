@@ -32,6 +32,7 @@ import { CONTRACTS } from '../shift/contracts.js';
 import { wholeDayFor, wholeDayRun } from '../shift/dayLength.js';
 
 import { EVERYDAY_MODES } from './modes.js';
+import { PINNED_DAY_LENGTHS, pinnedDayLengthLineOf, pinnedDayMinutesOf } from './firstDayLength.js';
 import { scenarioHubViewOf } from './scenarioModel.js';
 import {
   SITTING_SHAPES,
@@ -185,8 +186,32 @@ describe('every advertised length is the day the tile actually opens', () => {
     const low = SITTING_SPANS.contractDay.lowSimS;
     expect(SITTING_SPANS.contractDay.scoredShortEnd).toBe(true);
     expect(watchedRealS(SITTING_SPANS.contractDay, low, RUNG.simPerRealS)).toBe(low / BETWEEN_PEAKS_SIM_PER_REAL_S);
-    expect(SITTING_SHAPES.contractDay).toMatch(new RegExp(`^${String(Math.ceil(low / BETWEEN_PEAKS_SIM_PER_REAL_S / 60))} min-`, 'u'));
     expect(SITTING_SHAPES.contractDay).toContain('at most on the game’s own towers');
+  });
+
+  /*
+   * [§ D1383](../../../../DECISIONS.md), the post-AN panel's seat B (lost moment 2): the menu and the
+   * hub read *1 min-1 h 49 a day at 4×*, the union's two far ends, beside a brief saying *about 12
+   * min*. Both now lead with the brief's own measurement, the pinned whole days' watching, and the
+   * hub keeps the far end as what it is: a reference tower's.
+   */
+  it('quotes the brief’s measured day on the menu and the hub, from the brief’s own rows', () => {
+    const minutes = PINNED_DAY_LENGTHS.map((row) => pinnedDayMinutesOf(row));
+    const figure = `about ${String(Math.min(...minutes))}-${String(Math.max(...minutes))} min a day at ${RUNG.label}`;
+    expect(SITTING_SHAPES.scenarioMode.startsWith(figure)).toBe(true);
+    expect(SITTING_SHAPES.contractDay.startsWith(figure)).toBe(true);
+    /* Every brief's sentence quotes a minute inside the span the menu states. */
+    for (const row of PINNED_DAY_LENGTHS) {
+      expect(pinnedDayLengthLineOf(row.contractId), row.contractId).toContain(`about ${String(pinnedDayMinutesOf(row))} min of watching`);
+    }
+    /* The union's floor no longer leads either string. */
+    const low = SITTING_SPANS.contractDay.lowSimS;
+    const floor = `${String(Math.ceil(low / BETWEEN_PEAKS_SIM_PER_REAL_S / 60))} min-`;
+    expect(SITTING_SHAPES.scenarioMode.startsWith(floor)).toBe(false);
+    expect(SITTING_SHAPES.contractDay.startsWith(floor)).toBe(false);
+    const top = Math.ceil(pacedDayRealS(WHOLE_DAY_LONGEST, RUNG.simPerRealS) / 60);
+    expect(SITTING_SHAPES.contractDay).toMatch(new RegExp(`up to ${String(Math.floor(top / 60))} h \\d\\d on a reference tower`, 'u'));
+    expect(SITTING_SHAPES.scenarioMode).toContain(sittingLengthPhrase(SITTING_SPANS.fixCase, 'a case'));
   });
 
   /*

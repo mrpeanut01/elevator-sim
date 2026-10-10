@@ -123,6 +123,45 @@ import { STAGE_SPEEDS } from './stageScreenModel.js';
 export const BETWEEN_PEAKS_SIM_PER_REAL_S = 30;
 
 /**
+ * A whole authored day as the stage plays it — [§ D991](../../../../DECISIONS.md).
+ *
+ * `slowS` is the simulated seconds the stage plays at the **watching** rung: every act, plus every
+ * stretch between peaks with somebody on a landing past a minute. The rest of `recordedS` is crossed
+ * at the between-peaks rung. `recordedS` is the recording's own length, which a whole day overruns
+ * by the minutes its last riders take to drain; `periodS` is the authored day the span's end names.
+ */
+export interface PacedDay {
+  readonly periodS: number;
+  readonly recordedS: number;
+  readonly slowS: number;
+  /**
+   * **Simulated seconds the stage skips and never draws** — [§ D1212](../../../../DECISIONS.md), the
+   * quiet between a scored whole day's peaks, measured by `stagePace.test-helper.ts#scoredDayPlayOf` at the
+   * opening rung. Absent on a day measured before the skip, which is then an upper bound.
+   */
+  readonly skippedS?: number | undefined;
+}
+
+/**
+ * **Real seconds of watching for a whole day under § D991's pacing** — the slow part at the
+ * watching rung, the rest at the between-peaks rung or the watching rung, whichever is faster.
+ *
+ * Exact for the day it is handed, and derivable from the rung — rule 1 — because a day's slow part
+ * is a property of its recording, not of the speed it is played at: the stage holds the watching
+ * rung while somebody has waited past a minute **whatever** that rung is.
+ *
+ * Since [§ D1212](../../../../DECISIONS.md) a day may carry {@link PacedDay.skippedS}, the quiet
+ * between peaks the stage seeks over, which costs no real time. Its beats are in the fast part. It
+ * was measured at the opening rung, where every figure here is quoted; at a rung above the fast one
+ * the beat covers more of the day and this is short by at most two real seconds a skip.
+ */
+export function pacedDayRealS(day: PacedDay, watchingSimPerRealS: number): number {
+  const between = Math.max(watchingSimPerRealS, BETWEEN_PEAKS_SIM_PER_REAL_S);
+  return day.slowS / watchingSimPerRealS + (day.recordedS - day.slowS - (day.skippedS ?? 0)) / between;
+}
+
+
+/**
  * **The wait that holds the stage at the player's rung between peaks** — the third band's floor.
  *
  * `WAIT_BANDS`' *checking watch*, 60 s, read rather than restated: it is the band § D512's

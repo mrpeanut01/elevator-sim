@@ -492,12 +492,19 @@ export function tutorialClockOf(input: {
  * own sentence here, keyed by kind so a new kind fails to type rather than inheriting a neighbour's.
  * None carries a digit: the figure is the card's value, read off the run.
  */
+/*
+ * **Named by the floors, not by a letter the player has not met** — [§ D1383](../../../../DECISIONS.md),
+ * the post-AN panel's seat B (lost moment 1). These read *the floors the letter is about* on screen
+ * one, and the letter is screen two's. They name the stretch the case measures, *the top three
+ * floors*, which is the stretch screen two's lede names too; `tutorialModel.test.ts` derives it from
+ * the case and the building and holds both sentences to it.
+ */
 export const TUTORIAL_FIGURE_NOTES: Readonly<Record<FigureSpec['kind'], string>> = Object.freeze({
-  complaint: 'The thing the letter is about, counted over this morning.',
-  'scope-long-waits': 'Journeys starting on the floors the letter is about that waited over a minute for a car.',
-  'scope-mean-wait': 'The wait for a car on the floors the letter is about, taken over the journeys that boarded.',
-  'scope-worst-wait': 'The longest anybody on the floors the letter is about waited for a car.',
-  'rest-away-pct': 'Every other journey in the building, for comparison with the floors the letter is about.',
+  complaint: 'What the resident keeps running into, counted over this morning on the top three floors.',
+  'scope-long-waits': 'Journeys starting on the top three floors that waited over a minute for a car.',
+  'scope-mean-wait': 'The wait for a car on the top three floors, taken over the journeys that boarded.',
+  'scope-worst-wait': 'The longest anybody on the top three floors waited for a car.',
+  'rest-away-pct': 'Every other journey in the building, for comparison with the top three floors.',
 });
 
 /**

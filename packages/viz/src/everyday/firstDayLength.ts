@@ -25,7 +25,7 @@
  * disagrees, and asserts that the table's contracts **are** the whole-day members of the admitted
  * set, so a re-pin or a new pin cannot leave a stale row or a missing one.
  *
- * The **minutes** are composed from those seconds through `sittingShape.ts#pacedDayRealS` at the
+ * The **minutes** are composed from those seconds through `stagePace.ts#pacedDayRealS` at the
  * stage's opening rung — § D753 rule 1, the rung read rather than transcribed — so a move of either
  * rung moves this sentence on the same commit.
  *
@@ -54,7 +54,7 @@
  *   have contradicted (§ D227).
  */
 
-import { pacedDayRealS } from './sittingShape.js';
+import { pacedDayRealS } from './stagePace.js';
 import { DEFAULT_STAGE_SPEED_INDEX, stageSpeedAt } from './stageScreenModel.js';
 
 /** One admitted whole-day pin, as the stage would play it. Seconds are simulated. */
@@ -161,7 +161,7 @@ export function pinnedDayLengthLineOf(contractId: string): string | undefined {
   const row = PINNED_DAY_LENGTHS.find((entry) => entry.contractId === contractId);
   if (row === undefined) return undefined;
   const rung = stageSpeedAt(DEFAULT_STAGE_SPEED_INDEX);
-  const dayMin = Math.round(pacedDayRealS({ periodS: row.middle.recordedS, ...row.middle }, rung.simPerRealS) / 60);
+  const dayMin = pinnedDayMinutesOf(row);
   const toCallMin = Math.round(
     pacedDayRealS(
       { periodS: row.callAtS, recordedS: row.callAtS, slowS: row.toCallSlowS, skippedS: row.toCallSkippedS },
@@ -174,4 +174,22 @@ export function pinnedDayLengthLineOf(contractId: string): string | undefined {
     `landing has waited a minute the stage skips ahead. ` +
     (row.asksOn ? `The stage stops first ${call}, and may stop again later in the day.` : `The stage stops once ${call}.`)
   );
+}
+
+/** A pinned whole day's watching, in whole minutes at the opening rung — the brief's *about N min*. */
+export function pinnedDayMinutesOf(row: PinnedDayLength): number {
+  const rung = stageSpeedAt(DEFAULT_STAGE_SPEED_INDEX);
+  return Math.round(pacedDayRealS({ periodS: row.middle.recordedS, ...row.middle }, rung.simPerRealS) / 60);
+}
+
+/**
+ * **The shortest and the longest of the briefs' measured days**, in whole minutes at the opening
+ * rung — [§ D1383](../../../../DECISIONS.md), the post-AN panel's seat B (lost moment 2). The menu and
+ * the hub read *1 min-1 h 49 a day at 4×*, a span from a floor no day reaches to a reference tower
+ * nobody opens on, while the brief said *about 12 min*. They now quote the brief's own measurement,
+ * over every pinned whole day the first session can deal.
+ */
+export function pinnedDayMinutesSpan(): { readonly low: number; readonly high: number } {
+  const minutes = PINNED_DAY_LENGTHS.map(pinnedDayMinutesOf);
+  return { low: Math.min(...minutes), high: Math.max(...minutes) };
 }

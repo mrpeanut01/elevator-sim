@@ -54,7 +54,9 @@ import { resolveEditedProfile, type EditedVector } from '../controls/editedProfi
 import { glossaryFor, type GlossaryTerm } from '../mode/glossary.js';
 import type { PriceSchedule } from '../pricing/types.js';
 import { admitPurchase, rungsOf, type PurchaseAdmission } from '../scenario/budget.js';
+import { scenarioLadderOf, type ScenarioLadderRung } from '../scenario/ladder.js';
 import type { PublishedScenario } from '../scenario/published.js';
+import type { PublishedSurvivors } from '../scenario/survivors.js';
 
 import { movedDimensions, type MovedDimension } from './dimensions.js';
 import { runStageToVerdict, type StageBatchRunner, type StageSequenceOutcome } from './stageSequence.js';
@@ -376,6 +378,28 @@ export function routeUnitsOf(stages: readonly CampaignStage[], resources: StageR
     if (answer === undefined || typeof answer === 'string' || !answer.admitted) return undefined;
     return answer.units;
   };
+}
+
+/**
+ * **The path as every surface reads it** — the hub's rows and each stage page's par and hold,
+ * [§ D1376](../../../../DECISIONS.md).
+ *
+ * `scenario/ladder.ts#scenarioLadderOf` with both of the one check's answers: {@link routeRefusalsOf}
+ * for the hold and {@link routeUnitsOf} for the par. The stage page asked the ladder with the first
+ * and not the second, so every stage read *no par* on its own verdict beside a hub row that priced
+ * one (the post-AN panel's seats C and D). One composition, so the two cannot be asked differently.
+ */
+export function stagePathOf(
+  stages: readonly CampaignStage[],
+  survivors: PublishedSurvivors,
+  resources: StageRouteResources,
+): readonly ScenarioLadderRung[] {
+  return scenarioLadderOf({
+    stages,
+    survivors,
+    refusalOf: routeRefusalsOf(stages, resources),
+    unitsOf: routeUnitsOf(stages, resources),
+  });
 }
 
 /**

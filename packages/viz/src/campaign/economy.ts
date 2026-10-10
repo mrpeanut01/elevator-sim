@@ -121,12 +121,29 @@ export const DIFFICULTIES: Readonly<Record<DifficultyId, Difficulty>> = Object.f
     rates: Object.freeze([2, 2, 3, 3]) as unknown as readonly [number, number, number, number],
     miss: 0,
     tests: Object.freeze({ away: 88, worstS: 120, queue: 12, trips: 430 }),
-    note: 'No missed days, and the whole month pays 53 units. It has been cleared — with staggered start times bought on day one and never a wasted trip after.',
+    /*
+     * It read *the whole month pays 53 units*, and 53 is § 8.1's on-hand total: the month pays 50 and
+     * opens with 3 (§ D1377). `economy.test.ts` derives both from this row.
+     */
+    note: 'No missed days, and a perfect month leaves 53 units on hand, the 3 it opens with among them. It has been cleared — with staggered start times bought on day one and never a wasted trip after.',
   }),
 });
 
 /** A contract is twenty working days — § 8.7, and the bound in every booking rule. */
 export const CONTRACT_DAYS = 20;
+
+/** The working days in a contract week — § 8.1's *"rates step every five days"*. */
+export const CONTRACT_WEEK_DAYS = 5;
+
+/**
+ * **The weekday a career day falls on**, as an index into `shift/types.ts#WEEKDAYS` — Monday to
+ * Friday and round again, [§ D1377](../../../../DECISIONS.md). It was `(day − 1) % 7`, so days 6, 7,
+ * 13, 14 and 20 of *twenty working days* were filed as Saturday and Sunday (the post-AN panel's seat
+ * C, D5). It names the day and moves no run: a career day's event is the campaign's own.
+ */
+export function careerDayIdxOf(day: number): number {
+  return (Math.max(1, Math.floor(day)) - 1) % CONTRACT_WEEK_DAYS;
+}
 
 /**
  * The rate in force on a 0-based day index — § 8.1's *"rates step every five days"*.
@@ -148,7 +165,17 @@ export function rateOnDay(difficulty: Difficulty, dayIdx: number): number {
  * mistyped rate fails a test rather than moving the contract screen's lede by a unit.
  */
 export function perfectMonthUnits(difficulty: Difficulty): number {
-  return difficulty.purse + difficulty.rates.reduce((total, rate) => total + rate * 5, 0);
+  return difficulty.purse + perfectMonthPayUnits(difficulty);
+}
+
+/**
+ * **What a perfect month pays**: the four weekly rates over five cleared days each, and nothing the
+ * month opened with — standard `90`. [§ D1377](../../../../DECISIONS.md): the contract sheet said *A
+ * perfect month pays 98 units* beside rates that sum to 90 (the post-AN panel's seat D, D6), because
+ * {@link perfectMonthUnits} is § 8.1's on-hand total and includes the purse.
+ */
+export function perfectMonthPayUnits(difficulty: Difficulty): number {
+  return difficulty.rates.reduce((total, rate) => total + rate * CONTRACT_WEEK_DAYS, 0);
 }
 
 /* -------------------------------------------------------------------------- *
@@ -677,6 +704,118 @@ export function shopTierPrice(
     0,
   );
   return { units, nights: priced.nights, shafts: added.length };
+}
+
+/* -------------------------------------------------------------------------- *
+ * § 8.2 — a tier's name and effect, worded for the tower it is sold on
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **The tower a shop row describes**, as the tiers whose words depend on it need it —
+ * [§ D1377](../../../../DECISIONS.md). Read off the tower the contract hands over, before any shop
+ * shaft: `everyday/host.ts#buildingShape`, from `shift/ladder.ts#ladderTowersOf`, the derivation
+ * `campaign/shaftPlan.ts#careerTowerShaftsOf` prices the shafts on.
+ */
+export interface ShopTowerShape {
+  readonly floors: number;
+  /** Cars in each bank, by bank id. */
+  readonly bankCars: ReadonlyMap<string, number>;
+  /** The fastest rated speed on the tower, m/s. */
+  readonly topSpeedMps: number;
+}
+
+/** What a tier is called and what it does, on one tower. */
+export interface ShopTierFace {
+  readonly name: string;
+  readonly effect: string;
+}
+
+/** What {@link shopTierFaceOf} reads about the tower, every field optional for a desk that knows none. */
+export interface ShopTierTower {
+  readonly shape?: ShopTowerShape | undefined;
+  readonly shafts?: TowerShafts | undefined;
+  readonly startTimeFloors?: number | undefined;
+}
+
+const ORDINAL_WORDS: readonly string[] = Object.freeze([
+  'zeroth', 'first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth', 'ninth', 'tenth',
+  'eleventh', 'twelfth',
+]);
+const COUNT_WORDS: readonly string[] = Object.freeze([
+  'no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve',
+]);
+const countWord = (count: number): string => COUNT_WORDS[count] ?? String(count);
+const capitalised = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1);
+
+/** `0.63`, `4` — at most two decimals, trailing zeros trimmed, as `shift/contracts.ts#statLineOf` writes a speed. */
+function speedWord(mps: number): string {
+  return String(Math.round(mps * 100) / 100);
+}
+
+/**
+ * **A tier's name and effect on the tower it is sold on** — [§ D1377](../../../../DECISIONS.md), the
+ * post-AN panel's seats C (D5) and D (D6).
+ *
+ * Three tiers carried the design file's own building in their words, and every contract tower read
+ * them: *A fourth car* and *The tower stops being one car short* on a two-car building, *Modest on
+ * fourteen floors* on six, and *Negotiated with four tenants* beside the shop's own *nobody here
+ * keeps a start time to stagger*. Each is now worded from the tower:
+ *
+ * - a **shaft tier** is named for the car it adds where the shop sinks its shafts in one bank (*A
+ *   third car* on two), and as more cars in each bank where it sinks them in several, and its effect
+ *   is the count before and after;
+ * - the **machines** tiers' effect is the speed now and after, on the tower's floors, and claims no
+ *   gain the run has not measured;
+ * - **staggered start times** counts the floors that keep a start time, or says nobody here does.
+ *
+ * With no tower known (a fixture, a cold desk) every tier reads its shipped words, as the shop
+ * prices a row alone. Every other tier reads its shipped words always.
+ */
+export function shopTierFaceOf(tier: ShopTier, tower: ShopTierTower = {}): ShopTierFace {
+  const extra = tier.fits.extraShafts;
+  const shape = tower.shape;
+  if (extra !== undefined && shape !== undefined) {
+    const first = shopTierAt('shafts', 1);
+    const added = first === undefined ? [] : (shaftsAddedBy(first, tower.shafts) ?? []);
+    const banks = [...new Set(added.map((shaft) => shaft.bankId))];
+    const [only] = banks;
+    const before = only === undefined ? undefined : shape.bankCars.get(only);
+    if (banks.length === 1 && before !== undefined) {
+      const after = before + extra;
+      return {
+        name: `A ${ORDINAL_WORDS[after] ?? `${String(after)}th`} car`,
+        effect: `${capitalised(countWord(before))} ${before === 1 ? 'car becomes' : 'cars become'} ${countWord(after)}.`,
+      };
+    }
+    const more = extra === 1 ? 'one more car' : `${countWord(extra)} more cars`;
+    return banks.length === 0
+      ? { name: capitalised(more), effect: `${capitalised(more)} in a bank the shop can sink a shaft in.` }
+      : {
+          name: `${capitalised(more)} in each bank`,
+          effect: `Each of the ${countWord(banks.length)} banks the shop can sink a shaft in gets ${more}.`,
+        };
+  }
+  const speed = tier.fits.ratedSpeedMps;
+  if (speed !== undefined && shape !== undefined) {
+    return {
+      name: tier.name,
+      effect: `Every car rebuilt to ${speedWord(speed)} m/s, from ${speedWord(shape.topSpeedMps)} m/s now, on a tower of ${countWord(shape.floors)} floors.`,
+    };
+  }
+  const keep = tier.fits.arrivalRateFactor;
+  if (keep !== undefined && tower.startTimeFloors !== undefined) {
+    const floors = tower.startTimeFloors;
+    const cut = 1 - keep;
+    const share = Math.abs(cut - 1 / 3) < 1e-9 ? 'a third' : `${String(Math.round(cut * 100))} %`;
+    return {
+      name: tier.name,
+      effect:
+        floors === 0
+          ? 'Agreed with the tenants who keep a start time, and nobody on this tower keeps one.'
+          : `Agreed with the tenants on the ${countWord(floors)} ${floors === 1 ? 'floor' : 'floors'} that keep a start time: ${share} fewer journeys from ${floors === 1 ? 'it' : 'them'} in the day.`,
+    };
+  }
+  return { name: tier.name, effect: tier.effect };
 }
 
 /** The category for an id, or `undefined`. */

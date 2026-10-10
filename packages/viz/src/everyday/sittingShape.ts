@@ -94,7 +94,15 @@ import { DEFAULT_SHIFT_LENGTH_S } from '../dev/state.js';
 import { CONTRACTS } from '../shift/contracts.js';
 
 import { DEFAULT_STAGE_SPEED_INDEX, STAGE_SPEEDS, stageSpeedAt } from './stageScreenModel.js';
-import { BETWEEN_PEAKS_SIM_PER_REAL_S } from './stagePace.js';
+import { BETWEEN_PEAKS_SIM_PER_REAL_S, pacedDayRealS, type PacedDay } from './stagePace.js';
+import { pinnedDayMinutesSpan } from './firstDayLength.js';
+
+/*
+ * `PacedDay` and `pacedDayRealS` moved to `stagePace.ts` beside the rung they read (§ D1383), so that
+ * this module can quote `firstDayLength.ts`'s measured day without an import cycle; re-exported here
+ * for every caller that reads them from this module.
+ */
+export { pacedDayRealS, type PacedDay };
 
 /**
  * A sitting's watching, in simulated seconds, with the file that says so.
@@ -125,44 +133,6 @@ export interface SittingSpan {
    * the floor: the whole span crossed at the fast rung. The short end is quoted as that floor.
    */
   readonly scoredShortEnd?: boolean | undefined;
-}
-
-/**
- * A whole authored day as the stage plays it — [§ D991](../../../../DECISIONS.md).
- *
- * `slowS` is the simulated seconds the stage plays at the **watching** rung: every act, plus every
- * stretch between peaks with somebody on a landing past a minute. The rest of `recordedS` is crossed
- * at the between-peaks rung. `recordedS` is the recording's own length, which a whole day overruns
- * by the minutes its last riders take to drain; `periodS` is the authored day the span's end names.
- */
-export interface PacedDay {
-  readonly periodS: number;
-  readonly recordedS: number;
-  readonly slowS: number;
-  /**
-   * **Simulated seconds the stage skips and never draws** — [§ D1212](../../../../DECISIONS.md), the
-   * quiet between a scored whole day's peaks, measured by `stagePace.test-helper.ts#scoredDayPlayOf` at the
-   * opening rung. Absent on a day measured before the skip, which is then an upper bound.
-   */
-  readonly skippedS?: number | undefined;
-}
-
-/**
- * **Real seconds of watching for a whole day under § D991's pacing** — the slow part at the
- * watching rung, the rest at the between-peaks rung or the watching rung, whichever is faster.
- *
- * Exact for the day it is handed, and derivable from the rung — rule 1 — because a day's slow part
- * is a property of its recording, not of the speed it is played at: the stage holds the watching
- * rung while somebody has waited past a minute **whatever** that rung is.
- *
- * Since [§ D1212](../../../../DECISIONS.md) a day may carry {@link PacedDay.skippedS}, the quiet
- * between peaks the stage seeks over, which costs no real time. Its beats are in the fast part. It
- * was measured at the opening rung, where every figure here is quoted; at a rung above the fast one
- * the beat covers more of the day and this is short by at most two real seconds a skip.
- */
-export function pacedDayRealS(day: PacedDay, watchingSimPerRealS: number): number {
-  const between = Math.max(watchingSimPerRealS, BETWEEN_PEAKS_SIM_PER_REAL_S);
-  return day.slowS / watchingSimPerRealS + (day.recordedS - day.slowS - (day.skippedS ?? 0)) / between;
 }
 
 /**
@@ -472,6 +442,26 @@ export function sittingLengthPhrase(span: SittingSpan, noun = ''): string {
 const SCENARIO_HUB_SPAN: SittingSpan = unionOf(SITTING_SPANS.contractDay, SITTING_SPANS.fixCase);
 
 /**
+ * **A day as the brief measures it** — *about 7-12 min a day at 4×* — [§ D1383](../../../../DECISIONS.md),
+ * the post-AN panel's seat B (lost moment 2). The menu and the hub quoted {@link SCENARIO_HUB_SPAN}'s
+ * ends, *1 min-1 h 49*: a floor no day reaches and a reference tower nobody opens on, beside a brief
+ * saying *about 12 min of watching at 4×*. This is the brief's own measurement
+ * (`firstDayLength.ts#pinnedDayMinutesSpan`, re-run by `firstDayLength.test.ts` on every suite run),
+ * the shortest and the longest of the pinned whole days a first week can open on. *About*, because
+ * the brief's figure is the middle of three runs a call can leave.
+ */
+function typicalDayPhrase(): string {
+  const { low, high } = pinnedDayMinutesSpan();
+  const figure = low === high ? `about ${String(low)} min` : `about ${String(low)}-${String(high)} min`;
+  return `${figure} a day at ${openingRung().label} on the towers a first week can open on`;
+}
+
+/** {@link SCENARIO_HUB_SPAN}'s long end, a reference tower's measured day, in the hub's own words. */
+function longestDayWord(): string {
+  return sittingWord(sittingMinutes(pacedDayRealS(WHOLE_DAY_LONGEST, openingRung().simPerRealS), 1));
+}
+
+/**
  * The five session-shape strings, composed once.
  *
  * Each is *length · what the length is of · the promise the retired string already carried*. Every
@@ -497,7 +487,8 @@ export const SITTING_SHAPES = Object.freeze({
    * *retry as often as you like* stood here, beside a week whose scored day is one attempt (§ D1218)
    * and whose later runs are practice (§ D1138 clause 4) — swarm DO's S2, sentence 3, § D1250.
    */
-  scenarioMode: `${sittingLengthPhrase(SCENARIO_HUB_SPAN)}, skippable · one scored attempt a day, and replays as practice`,
+  /* § D1383: the brief's measured day and the fix case's span, never the union's two far ends. */
+  scenarioMode: `${typicalDayPhrase()}, ${sittingLengthPhrase(SITTING_SPANS.fixCase, 'a case')}, skippable · one scored attempt a day, and replays as practice`,
   /** The Career tile. The lose condition is the handoff's and is kept word for word. */
   careerMode: `${sittingLengthPhrase(SITTING_SPANS.careerDay, 'a building-day')} · three lost contracts ends the career`,
   /**
@@ -516,7 +507,11 @@ export const SITTING_SHAPES = Object.freeze({
    * one of the game's own towers read a figure more than twice what they will watch: the second
    * clause is {@link WHOLE_DAY_LONGEST_GAME_TOWER}, measured on the same sweep.
    */
-  contractDay: `${sittingLengthPhrase(SITTING_SPANS.contractDay, 'a day')}, and ${betweenRungLabel()} wherever nobody on a landing has waited a minute, the quiet between peaks skipped; ${String(Math.ceil(pacedDayRealS(WHOLE_DAY_LONGEST_GAME_TOWER, openingRung().simPerRealS) / 60))} min at most on the game’s own towers — the long end is a reference tower’s · no losing — a day is a score, not a pass`,
+  /*
+   * § D1383: led by the brief's measured day; the game towers' longest and the reference tower's
+   * follow it, so the far end is still said and no longer stands as the figure.
+   */
+  contractDay: `${typicalDayPhrase()}, and ${betweenRungLabel()} wherever nobody on a landing has waited a minute, the quiet between peaks skipped; ${String(Math.ceil(pacedDayRealS(WHOLE_DAY_LONGEST_GAME_TOWER, openingRung().simPerRealS) / 60))} min at most on the game’s own towers, and up to ${longestDayWord()} on a reference tower · no losing — a day is a score, not a pass`,
   /** The hub's *Fix a building* row. */
   fixCase: `${sittingLengthPhrase(SITTING_SPANS.fixCase, 'a case')}, skippable · retry as often as you like`,
 });

@@ -33,7 +33,9 @@
  * `data/` document and rules on how a measured zero is presented.
  */
 
-import { scenarioLadderOf, type LadderStage, type ScenarioLadderRung } from '../scenario/ladder.js';
+import { stagePathOf, type StageRouteResources } from '../campaign/stagePress.js';
+import type { CampaignStage } from '../campaign/types.js';
+import type { ScenarioLadderRung } from '../scenario/ladder.js';
 import type { PublishedSurvivors } from '../scenario/survivors.js';
 
 let provided: readonly ScenarioLadderRung[] | undefined;
@@ -72,11 +74,13 @@ export function onScenarioLadderProvided(listener: () => void): () => void {
  * statement, which is also what keeps this seam mergeable when two lanes are in that file.
  */
 export function provideScenarioLadderFrom(
-  stages: readonly LadderStage[],
+  stages: readonly CampaignStage[],
   survivors: PublishedSurvivors,
-  refusalOf?: (stageId: string, routeName: string) => string | undefined,
-  /* § D1234: what each named way through costs, so a cleared row can carry its par mark. */
-  unitsOf?: (stageId: string, routeName: string) => number | undefined,
+  /*
+   * § D1129 clause 3's hold and § D1234's par, both asked through `campaign/stagePress.ts#stagePathOf`,
+   * the one composition the stage page asks too (§ D1376).
+   */
+  resources: StageRouteResources,
 ): void {
-  provideScenarioLadder(scenarioLadderOf({ stages, survivors, refusalOf, unitsOf }));
+  provideScenarioLadder(stagePathOf(stages, survivors, resources));
 }

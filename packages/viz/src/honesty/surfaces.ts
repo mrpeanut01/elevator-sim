@@ -362,6 +362,7 @@ import {
   STAGE_PLAY_COPY,
   stageFactsOf,
   stagePlayViewOf,
+  stagePracticeLineOf,
   verdictFactsOf,
   type StagePlayChoice,
   type StagePlayPhase,
@@ -689,6 +690,7 @@ import {
   type ReportDeltaView,
 } from '../dev/reportPanel.js';
 import {
+  buildingCardOf,
   buildingPlateOf,
   dispatcherBlurbOf,
   dispatcherCardOf,
@@ -3341,6 +3343,11 @@ interface ShiftDay {
    */
   readonly swapped: WeekDayReport;
   /**
+   * The same day started on a driver that weights fairness — [§ D1378](../../../../DECISIONS.md). Its
+   * *Weight fairness up* card says the day already weighted it rather than pointing at it.
+   */
+  readonly fairnessWeighted: WeekDayReport;
+  /**
    * The same day run over a **different stretch** — issue #126's first new refusal axis.
    *
    * Same recording and same day: the *only* thing that differs is `ShiftPlan.shiftLengthS`, which is
@@ -3697,6 +3704,12 @@ function shiftBundleOf(context: HonestyContext): ShiftBundle {
       subject: { kind: 'week-day' },
       plan: shiftPlan,
     }) as WeekDayReport;
+    const fairnessWeighted = dayReportOf({
+      ...common,
+      subject: { kind: 'week-day' },
+      plan: shiftPlan,
+      startingWeights: { waitTime: 0.5, starvation: 0.5 },
+    }) as WeekDayReport;
     const shorterShift = dayReportOf({
       ...common,
       subject: { kind: 'week-day' },
@@ -3767,6 +3780,7 @@ function shiftBundleOf(context: HonestyContext): ShiftBundle {
       singleRunReport,
       retried,
       swapped,
+      fairnessWeighted,
       shorterShift,
       otherPattern,
       otherEquipment,
@@ -3847,6 +3861,10 @@ const SHIFT_REPORT: SurfaceAdapter = {
     'shift/goals.ts#horizonLabelOf',
     'shift/report.ts#averageWaitFigure',
     'shift/report.ts#clockRange',
+    /* § D1383: the seed line's arrivals stretch, on every sheet's meta line. */
+    'shift/report.ts#runStretchOf',
+    /* § D1378: who drove with fairness weighted, on the fairness-weighted sheet seeded below. */
+    'shift/report.ts#fairnessDriversOf',
     'shift/report.ts#NOT_RECORDED',
     /*
      * The filed sheet's intervention log — `docs/19` defect 10. Authored in `live/` beside the
@@ -4349,6 +4367,11 @@ const SHIFT_REPORT: SurfaceAdapter = {
       for (const lever of report.levers) {
         seeds.push({ field: `${at}.levers(${lever.id}).title`, text: lever.title, role: 'label' });
         seeds.push({ field: `${at}.levers(${lever.id}).body`, text: lever.body, role: 'prose' });
+      }
+      /* § D1378: the fairness card on a day a fairness-weighted driver started. */
+      const weighted = entry.fairnessWeighted.levers.find((lever) => lever.id === 'weight-fairness');
+      if (weighted !== undefined) {
+        seeds.push({ field: `${at}.fairnessWeighted.levers(weight-fairness).body`, text: weighted.body, role: 'prose' });
       }
       seeds.push({ field: `${at}.forecast.name`, text: report.forecast.name, role: 'label' });
       seeds.push({ field: `${at}.forecast.note`, text: report.forecast.note, role: 'prose' });
@@ -5857,10 +5880,23 @@ const RIGHT_RAIL: SurfaceAdapter = {
     'dev/rightRail.ts#nameplateOf',
     'dev/rightRail.ts#machineWarningOf',
     'dev/rightRail.ts#patternOptionsOf',
+    /* § D1382: each Building card, worded as the building a press of it runs, seeded below. */
+    'dev/rightRail.ts#buildingCardOf',
   ],
   render(context) {
     const seeds: TextSeed[] = [];
     const specs = context.elevatorSpecs as ElevatorSpecs;
+
+    /* § D1382 — the Building list's cards, every building the case carries, on a day-1 state. */
+    {
+      const resources = browserResourcesOf(context);
+      const state = initialState(resources, 1n);
+      for (const building of context.buildings) {
+        const card = buildingCardOf(resources, state, building.id);
+        seeds.push({ field: `buildingCardOf(${building.id}).label`, text: card.label, role: 'label' });
+        seeds.push({ field: `buildingCardOf(${building.id}).sub`, text: card.sub, role: 'observation' });
+      }
+    }
 
     /*
      * R2 — the dispatcher list, every shipped profile, **both registers** (GitHub issue #100).
@@ -10936,6 +10972,8 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
      */
     'everyday/chimesPanel.ts#chimesPanelViewOf',
     'everyday/chimesPanel.ts#CHIMES_PANEL_COPY',
+    /* § D1382: the one rule Settings and the Career both state; seeded inside the lede above. */
+    'everyday/chimesPanel.ts#CHIMES_EARN_RULE',
     /*
      * **`CHIME_PRICES` was claimed here and the claim is deleted** — GitHub issue #579,
      * [§ D911](../../../../DECISIONS.md), and it is worth four lines because the reason is a
@@ -11401,6 +11439,14 @@ const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
     'everyday/campaignModel.ts#SHOP_NO_SHAFT',
     'everyday/campaignModel.ts#SHOP_NO_SHAFT_COST',
     'everyday/campaignModel.ts#shaftDecisionOf',
+    /*
+     * § D1377: a tier worded for the tower it is sold on, a perfect month's pay and what it leaves on
+     * hand, and the renewal's comparison. Seeded through the contract sheets and the desks below, each
+     * fixture carrying the tower's shape, and the shop rows' names and effects seeded by name.
+     */
+    'campaign/economy.ts#shopTierFaceOf',
+    'everyday/campaignModel.ts#perfectMonthLineOf',
+    'everyday/campaignModel.ts#renewalRateHeadOf',
     'everyday/campaignModel.ts#CALENDAR_LEGEND',
     'everyday/campaignModel.ts#MONTH_LEGEND',
     /* Reached through the three views above: every figure they print is one of these. */
@@ -11472,6 +11518,7 @@ const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
           spec: '7 floors · 2 cars · 0.63 m/s · 240 people',
           startTimeFloors: 0,
           shafts: oneBank(0),
+          shape: { floors: 7, bankCars: new Map([['main', 2]]), topSpeedMps: 0.63 },
         },
       ],
       [
@@ -11481,6 +11528,7 @@ const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
           spec: '20 floors · 6 cars · 5 m/s · 612 people',
           startTimeFloors: 18,
           shafts: oneBank(1),
+          shape: { floors: 20, bankCars: new Map([['main', 6]]), topSpeedMps: 5 },
         },
       ],
     ]);
@@ -11867,6 +11915,7 @@ const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
             ['new-car', [{ bankId: 'low', band: 1 }, { bankId: 'high', band: 1 }]],
             ['fifth-car', [{ bankId: 'low', band: 1 }, { bankId: 'high', band: 1 }]],
           ]),
+          shape: { floors: 30, bankCars: new Map([['low', 3], ['high', 3]]), topSpeedMps: 3.5 },
         },
       ],
       [
@@ -11880,6 +11929,7 @@ const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
             ['new-car', []],
             ['fifth-car', []],
           ]),
+          shape: { floors: 12, bankCars: new Map([['main', 4]]), topSpeedMps: 2.5 },
         },
       ],
     ];
@@ -11903,6 +11953,9 @@ const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
       seeds.push({ field: `${label}.contract.purse.total`, text: sheet.purse.totalNote, role: 'prose' });
       for (const row of sheet.shop.categories.find((category) => category.id === 'shafts')?.rows ?? []) {
         const tier = `${label}.contract.shop.shafts.${row.levelLabel}`;
+        /* § D1377: the tier's name and effect on this tower — one bank, several, or none sold. */
+        seeds.push({ field: `${tier}.name`, text: row.name, role: 'label' });
+        seeds.push({ field: `${tier}.effect`, text: row.effect, role: 'prose' });
         seeds.push({ field: `${tier}.cost`, text: row.cost, role: 'observation' });
         seeds.push({ field: `${tier}.state`, text: row.state, role: row.pressable ? 'observation' : 'reason' });
       }
@@ -12598,6 +12651,9 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
      */
     'everyday/stageScreenModel.ts#stageSkipViewOf',
     'everyday/stageScreenModel.ts#STAGE_SKIP_COPY',
+    /* § D1381: ▶ Play beside it, resolved the same way, and its reason once the day has run out. */
+    'everyday/stageScreenModel.ts#stagePlayControlOf',
+    'everyday/stageScreenModel.ts#STAGE_PLAY_DONE_REASON',
     'everyday/stageScreenModel.ts#STAGE_NO_PHASE',
     'everyday/stageScreenModel.ts#STAGE_RECOMPUTING',
     /*
@@ -12846,6 +12902,10 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
       ['pending', { dayEnded: false, hasRun: false }],
     ];
     for (const [arm, state] of skipStates) {
+      /* § D1381: the header's ▶ Play over the same three states. */
+      const play = stagePlayControlOf({ ...state, playing: false });
+      seeds.push({ field: `stage.play.${arm}.label`, text: play.label, role: 'label' });
+      if (play.note !== undefined) seeds.push({ field: `stage.play.${arm}.note`, text: play.note, role: 'reason' });
       const skip = stageSkipViewOf(state);
       seeds.push({ field: `stage.skip.${arm}.label`, text: skip.label, role: 'label' });
       /*
@@ -14891,6 +14951,11 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
      * reaches this screen through that function and never through this one.
      */
     'campaign/stagePress.ts#routeUnitsOf',
+    /*
+     * § D1376: the composition of the two above that `honesty/run.ts` now seeds the path through,
+     * the same one the hub and the stage page read; its only sentence is theirs.
+     */
+    'campaign/stagePress.ts#stagePathOf',
     'everyday/weekView.ts#weekScreenViewOf',
     'everyday/reportView.ts#everydayReportViewOf',
     /* GitHub issue #211: the handle on a folded card note, seeded once — the note itself is the producer's whole string. */
@@ -17480,6 +17545,8 @@ const EVERYDAY_STAGE_PLAY: SurfaceAdapter = {
     'everyday/stagePlay.ts#stagePlayViewOf',
     'everyday/stagePlay.ts#STAGE_PLAY_COPY',
     'everyday/stagePlay.ts#stageFactsOf',
+    /* § D1376: a cleared stage's practice line in each par arm, seeded by name below. */
+    'everyday/stagePlay.ts#stagePracticeLineOf',
   ],
   render(this: SurfaceAdapter, context) {
     const seeds: TextSeed[] = [];
@@ -17579,6 +17646,10 @@ const EVERYDAY_STAGE_PLAY: SurfaceAdapter = {
     }
     /* § D1358: the bar's note on a stage this device has cleared. */
     seeds.push({ field: 'stagePlay.bar.practice', text: STAGE_PLAY_COPY.notePractice, role: 'prose' });
+    /* § D1376: the practice line's three par arms — priced, free and unpriced. */
+    for (const [arm, par] of [['priced', 4], ['free', 0], ['unpriced', undefined]] as const) {
+      seeds.push({ field: `stagePlay.practice.${arm}`, text: stagePracticeLineOf(par), role: 'prose' });
+    }
     /* `verdictFactsOf` is the screen's only way to a verdict; touched so its claim is checked by compile. */
     void verdictFactsOf;
     void STAGE_PLAY_COPY.loading;

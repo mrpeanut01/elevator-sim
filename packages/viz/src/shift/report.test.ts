@@ -67,6 +67,7 @@ import {
   WITHHELD,
   averageWaitFigure,
   clockOf,
+  runStretchOf,
   dayReportOf,
   leadingWith,
   meanIsPublishable,
@@ -774,6 +775,51 @@ describe('WORST WAIT states its censoring', () => {
   });
 
   /*
+   * [§ D1378](../../../../DECISIONS.md), the post-AN panel's seat B (defect 8): *Weight fairness up*
+   * was pointed at on a day driven with Fairness first from 12:20. A day whose drivers weighted
+   * fairness is not pointed at; the card says who did, read off the weights the day carried.
+   */
+  it('never points at weighting fairness on a day a driver already weighted it, and says who did', () => {
+    const shape = { ...observationsOfRun(clean), worstWaitS: 181, worstWaitIsCensored: false, minutePct: 100 };
+    const fairness = { ...config.dispatcherProfilesById.get('collective')!, id: 'fairness-first', name: 'Fairness first', weights: { waitTime: 0.5, starvation: 0.5 } };
+    const handedOver = dayReportOf({
+      recording: clean,
+      observations: shape,
+      goals: goalsForDay(4),
+      week: openWeek('c2'),
+      contract: contractById('c2'),
+      event: SHIFT_EVENTS.ordinary,
+      plan: PLAN,
+      calendar: null,
+      subject: { kind: 'week-day' },
+      dispatcherName: 'Conventional collective',
+      startingWeights: { waitTime: 1 },
+      interventions: [{ atS: 4 * 3600 + 20 * 60, change: { kind: 'switch-dispatcher', profile: fairness } }],
+    });
+    const card = handedOver.levers.find((lever) => lever.id === 'weight-fairness');
+    expect(card?.body).not.toContain('Today points here');
+    expect(card?.body).toMatch(/^Today already weighted it: Fairness first from \d\d:\d\d\. /u);
+    /* The same day with no fairness weighted is pointed at, so the withholding is the weights' doing. */
+    const plain = reportWith(shape);
+    expect(plain.levers.find((lever) => lever.id === 'weight-fairness')?.body).toContain('Today points here');
+    /* A day that started on a fairness-weighted driver says so by name, with no clock. */
+    const started = dayReportOf({
+      recording: clean,
+      observations: shape,
+      goals: goalsForDay(4),
+      week: openWeek('c2'),
+      contract: contractById('c2'),
+      event: SHIFT_EVENTS.ordinary,
+      plan: PLAN,
+      calendar: null,
+      subject: { kind: 'week-day' },
+      dispatcherName: 'Fairness first',
+      startingWeights: fairness.weights,
+    });
+    expect(started.levers.find((lever) => lever.id === 'weight-fairness')?.body).toMatch(/^Today already weighted it: Fairness first\. /u);
+  });
+
+  /*
    * § D1152, the post-AJ panel's seat B (U1): a day that raised no call said nothing about it.
    * The row is drawn from the session's account and only when no call row is.
    */
@@ -1146,6 +1192,25 @@ describe('the rest of the sheet', () => {
     // Not the handoff's fixed 06:00–22:00 ruler. § 4.1.
     expect(report.metaLines[1]).toContain(clockOf(clean.endedAt));
     expect(report.metaLines[1]).not.toContain('22:00');
+  });
+
+  /*
+   * [§ D1383](../../../../DECISIONS.md), the post-AN panel's seat B (defect 10): the seed line read
+   * *08:00–18:01* over a day whose arrivals ran 08:00–18:00. The arrivals' stretch is quoted from the
+   * run's own schedule, and the minutes past it are said as the run carrying riders still travelling.
+   */
+  it('quotes the arrivals’ stretch and says what the minutes past it were', () => {
+    const lastPhase = clean.demandPhases.at(-1);
+    expect(lastPhase).toBeDefined();
+    const arrivalsEnd = lastPhase!.endS;
+    const overrun = { ...clean, endedAt: arrivalsEnd + 75 };
+    expect(runStretchOf(overrun)).toBe(
+      `${clockOf(clean.startedAt)}–${clockOf(arrivalsEnd)}, run on to ${clockOf(arrivalsEnd + 75)} for the riders still travelling`,
+    );
+    /* A run that stopped inside the arrivals' last minute reads its span, as before. */
+    expect(runStretchOf({ ...clean, endedAt: arrivalsEnd })).toBe(`${clockOf(clean.startedAt)}–${clockOf(arrivalsEnd)}`);
+    /* A recording with no schedule on it quotes its whole span. */
+    expect(runStretchOf({ ...overrun, demandPhases: [] })).toBe(`${clockOf(clean.startedAt)}–${clockOf(arrivalsEnd + 75)}`);
   });
 
   it('names what was booked against today, and does not confuse it with tomorrow', () => {

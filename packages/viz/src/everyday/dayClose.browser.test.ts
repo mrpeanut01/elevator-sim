@@ -97,6 +97,90 @@ async function firstScreen(page: Page): Promise<{ readonly card: number; readonl
   });
 }
 
+/** The stage holds today's run, paused at its start and closable. */
+async function waitForClosable(page: Page): Promise<void> {
+  await page.waitForFunction(
+    () => {
+      const primary = document.querySelector('.everyday-bar-primary')?.textContent ?? '';
+      const start = document.querySelector<HTMLElement>('.everyday-stage-start');
+      return primary.includes('Close the day') && start?.style.display === '';
+    },
+    undefined,
+    { timeout: 240_000 },
+  );
+}
+
+/** The tally's text, whitespace folded. */
+async function tallyOf(page: Page): Promise<string> {
+  return ((await page.textContent('.everyday-report-close-tally')) ?? '').replace(/\s+/gu, ' ').trim();
+}
+
+/*
+ * [§ D1380](../../../../DECISIONS.md), the post-AN panel's seats B (defect 5) and D (D8). After a
+ * reload the close read *The house is still being run on all 2 of them* about a Monday an earlier
+ * close had settled, and caught up seconds later: a tally going backwards. Monday is driven by a
+ * driver other than the standing order, so its house is a run rather than the day itself; the
+ * verdict is settled before the reload, and Tuesday's first close must read Monday as answered.
+ */
+describe.skipIf(!HAS_BROWSER)('the house tally never goes backwards across a reload — § D1380', () => {
+  it('reads Monday’s settled house on Tuesday’s first close after a reload', async () => {
+    const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
+    try {
+      await page.goto(`${origin}?building=midtown-office&seed=424243`, { waitUntil: 'load' });
+      await page.waitForFunction(
+        () => document.querySelector<HTMLElement>('.menu-overlay')?.hidden === true,
+        undefined,
+        { timeout: 30_000 },
+      );
+      await leaveTutorialIfOffered(page);
+      if ((await page.locator('.everyday-consent-no').count()) > 0) await page.locator('.everyday-consent-no').click();
+      await openEverydayDoor(page);
+      await page.locator('.everyday-bar-primary').click();
+      await page.waitForSelector('.everyday-brief', { timeout: 15_000 });
+      /* A driver that is not the tower's standing order, so the house is a run of its own. */
+      const standing = await page.$eval('.everyday-brief-picker', (select) => (select as HTMLSelectElement).value);
+      const other = await page.$eval(
+        '.everyday-brief-picker',
+        (select, current) =>
+          [...(select as HTMLSelectElement).options].find((option) => !option.disabled && option.value !== current)?.value ?? '',
+        standing,
+      );
+      expect(other).not.toBe('');
+      await page.selectOption('.everyday-brief-picker', other);
+      await page.locator('.everyday-bar-primary').click();
+      await waitForClosable(page);
+      await page.locator('.everyday-bar-primary').click();
+      await page.waitForSelector('.everyday-report-close', { timeout: 60_000 });
+      /* Monday's house settles on this sitting. */
+      await page.waitForFunction(
+        () => /^This week so far: you \d, the house \d/u.test(
+          (document.querySelector('.everyday-report-close-tally')?.textContent ?? '').replace(/\s+/gu, ' ').trim(),
+        ),
+        undefined,
+        { timeout: 180_000 },
+      );
+
+      /* A reload keeps no sitting's copy; the continue tile brings the week back. */
+      await page.reload({ waitUntil: 'load' });
+      await page.waitForSelector('.everyday-continue-week', { timeout: 60_000 });
+      await page.locator('.everyday-continue-week').click();
+      await page.waitForSelector('.everyday-door', { timeout: 15_000 });
+      await page.locator('.everyday-bar-primary').click();
+      await page.waitForSelector('.everyday-brief', { timeout: 15_000 });
+      await page.locator('.everyday-bar-primary').click();
+      await waitForClosable(page);
+      await page.locator('.everyday-bar-primary').click();
+      await page.waitForSelector('.everyday-report-close-tally', { timeout: 60_000 });
+      const first = await tallyOf(page);
+      /* Red before: *The house is still being run on all 2 of them.* */
+      expect(first, 'the tally lost a house verdict an earlier close settled').not.toContain('all 2 of them');
+      expect(first).toMatch(/The house: \d clean over the 1 it has answered|the house \d, clean over the same 2 counted days/u);
+    } finally {
+      await page.close();
+    }
+  });
+});
+
 describe.skipIf(!HAS_BROWSER)('the close points at tomorrow — swarm DO § 1', () => {
   it('leads with the house and tomorrow, on the first screen at 1440 × 900 and at 390 × 844', async () => {
     const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });

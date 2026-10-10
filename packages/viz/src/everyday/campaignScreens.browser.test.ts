@@ -217,8 +217,15 @@ describe.skipIf(!HAS_BROWSER)('the Everyday campaign screens', () => {
     const page = await coldLoad();
     await openContract(page);
 
-    // The fourth car is 34 units against a standard month's opening 8.
+    // The first shaft tier is 34 units against a standard month's opening 8.
     const shaft = page.locator('.everyday-contract-category-shafts .everyday-contract-tier').first();
+    /*
+     * § D1377, the post-AN panel's seats C (D5) and D (D6): on Garden Apartments, two cars in one
+     * bank, the tier is the car it adds. Red before: *A fourth car*, *The tower stops being one car short*.
+     */
+    expect(await shaft.textContent()).toContain('A third car');
+    expect(await shaft.textContent()).toContain('Two cars become three.');
+    expect(await shaft.textContent()).not.toContain('fourth');
     expect(await shaft.isDisabled()).toBe(true);
     expect(await shaft.textContent()).toContain('need ');
     expect(await shaft.textContent()).toContain(' more');

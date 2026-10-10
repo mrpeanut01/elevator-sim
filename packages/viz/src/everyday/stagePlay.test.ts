@@ -24,7 +24,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { restrictedFloorIds } from '../access/zoning.js';
 import { parseCampaign, type CampaignContext } from '../campaign/parse.js';
 import { batchRequestForStage, demonstrationConfigFor } from '../campaign/stageRun.js';
-import { admitStageMove, routeRefusalsOf, routeUnitsOf, stageUnitsAt } from '../campaign/stagePress.js';
+import { admitStageMove, routeRefusalsOf, routeUnitsOf, stagePathOf, stageUnitsAt } from '../campaign/stagePress.js';
 import type { CampaignStage } from '../campaign/types.js';
 import { DATA_DIR, requireBuilding } from '../fixtures.test-helper.js';
 import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
@@ -32,7 +32,7 @@ import { recordRun } from '../record/recordRun.js';
 import type { PublishedGoalRates } from '../scenario/published.js';
 import type { PublishedSurvivors } from '../scenario/survivors.js';
 import { PAR_MARK_COPY } from '../scenario/par.js';
-import { SCENARIO_COPY, stageParNoteOf } from './scenarioModel.js';
+import { SCENARIO_COPY, scenarioHubViewOf, stageParNoteOf } from './scenarioModel.js';
 import {
   STAGE_PLAY_COPY,
   stageFactsOf,
@@ -40,6 +40,7 @@ import {
   stageMoveOf,
   stagePageMovesOf,
   stagePlayViewOf,
+  stagePracticeLineOf,
   verdictFactsOf,
   type StagePlayChoice,
   type StagePlayVerdictFacts,
@@ -278,13 +279,71 @@ describe('a clear pays once, flat, and unlocks nothing — § D1129 clause 4', (
       stagePlayViewOf({ ...factsOf(stage, choice), parUnits: 4 }, { kind: 'judged', verdict: verdict(false, undefined), stale: false })
         .verdict?.par,
     ).toBeUndefined();
-    /* The practice line, on a stage this device holds the clear of and on no other. */
-    expect(stagePlayViewOf({ ...factsOf(stage, choice), clearedBefore: true }, { kind: 'idle' }).practice).toBe(
-      STAGE_PLAY_COPY.practice,
-    );
+    /*
+     * The practice line, on a stage this device holds the clear of and on no other — and since
+     * § D1376 its par clause is the stage's own: a priced par promises the mark at its price, and a
+     * free par or none says the row's reason rather than promising a mark there is not.
+     */
+    const practiceAt = (parUnits: number | undefined): string | undefined =>
+      stagePlayViewOf({ ...factsOf(stage, choice), parUnits, clearedBefore: true }, { kind: 'idle' }).practice;
+    expect(practiceAt(4)).toBe(`${STAGE_PLAY_COPY.practice} A clear at or under par, 4 units, earns the mark.`);
+    expect(practiceAt(0)).toBe(`${STAGE_PLAY_COPY.practice} ${SCENARIO_COPY.parFree}`);
+    expect(practiceAt(undefined)).toBe(`${STAGE_PLAY_COPY.practice} ${SCENARIO_COPY.parNone}`);
+    for (const par of [0, undefined]) expect(practiceAt(par)).not.toMatch(/earns the mark/u);
+    expect(practiceAt(4)).toBe(stagePracticeLineOf(4));
     expect(stagePlayViewOf(factsOf(stage, choice), { kind: 'idle' }).practice).toBeUndefined();
     /* And `verdictFactsOf` carries what the pressed settings cost. */
     expect(verdictFactsOf({ headline: '', goals: [], holdout: undefined, metOnTuningSeeds: true, cleared: true } as never, 'again', 3).spentUnits).toBe(3);
+  });
+});
+
+/*
+ * [§ D1376](../../../../DECISIONS.md), the post-AN panel's seats C (D1) and D (D5). The stage page asked
+ * the ladder for the hold and not the par, so every clear read *This stage has no par: no way through
+ * … could be priced* beside a hub row reading *At par* or *Par is free here*. Both now read the path
+ * through `campaign/stagePress.ts#stagePathOf`, and this holds the page's sentence to the row's on
+ * every shipped stage, at a clear priced at the par.
+ */
+describe('the stage page and its hub row say one par — § D1376', () => {
+  it('draws the same par sentence on a clear as the row does, on every shipped stage', () => {
+    const resources = {
+      space,
+      schedule: shippedPriceSchedule(),
+      profiles: config.dispatcherProfiles.profiles,
+      buildings: [...config.buildingsById.keys()].map((id) => requireBuilding(config, id)),
+      elevatorSpecs: config.elevatorSpecs,
+      moveNamed: (name: string) => namedStageMoveOf(name, config.dispatcherProfiles.profiles, space),
+    };
+    const path = stagePathOf(stages, survivors, resources);
+    expect(path.length).toBeGreaterThan(0);
+    /* The par is priced on the path: some stage carries a priced par and some a free one (§ D1358's table). */
+    expect(path.some((rung) => rung.parUnits !== undefined && rung.parUnits > 0)).toBe(true);
+    expect(path.some((rung) => rung.parUnits === 0)).toBe(true);
+    for (const rung of path) {
+      if (rung.offer !== 'offered') continue;
+      const stage = stages.find((entry) => entry.id === rung.id);
+      if (stage === undefined) throw new Error(rung.id);
+      const spent = rung.parUnits ?? 0;
+      const page = stagePlayViewOf(
+        { ...factsOf(stage, { profileId: stage.dispatcher.startingProfileId, parking: null }), parUnits: rung.parUnits },
+        {
+          kind: 'judged',
+          verdict: {
+            headline: 'judge headline',
+            goals: [],
+            holdoutSentence: 'held on the held-back crowds',
+            metOnTuningSeeds: true,
+            cleared: true,
+            paid: 'again',
+            spentUnits: spent,
+          },
+          stale: false,
+        },
+      ).verdict?.par;
+      const row = scenarioHubViewOf([rung], new Set([rung.id]), () => spent).path?.rows[0];
+      expect(page, rung.id).toBe(row?.parMark ?? row?.parNote);
+      if (rung.parUnits !== undefined) expect(page, rung.id).not.toBe(SCENARIO_COPY.parNone);
+    }
   });
 });
 

@@ -43,6 +43,18 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
   Object.freeze([
     {
       reason:
+        'The settled-verdict store — wave AO, lane AO-3, § D1380. `dev/settledReadings.ts` keeps the ' +
+        'house’s and the driver run’s verdicts across a reload under a storage key; `SETTLED_READINGS_KEY` ' +
+        'is that key, and `keepSettled` and `settledReadingOf` read and write verdicts (`cleared`, ' +
+        '`missed`, `ungraded`), words the close draws through `shift/dayClose.ts`, never these.',
+      ids: [
+        'dev/settledReadings.ts#SETTLED_READINGS_KEY',
+        'dev/settledReadings.ts#keepSettled',
+        'dev/settledReadings.ts#settledReadingOf',
+      ],
+    },
+    {
+      reason:
         'The Engineer surface’s watch-only gate — wave AN, lane AN-6, § D1323. `VIEWER_KEY_ROLES` ' +
         'sorts every `ViewerState` key into `remakes-the-day` or `view`, two keys the gate compares ' +
         'and no surface draws; `patchRemakesTheDay` answers a boolean and `watchOnlyRefusal` returns ' +

@@ -29,7 +29,9 @@ import {
   campaignTestRows,
   careerStageLabel,
   contractView,
+  perfectMonthLineOf,
   recordLine,
+  renewalRateHeadOf,
   testsHeldLine,
   towersView,
   units,
@@ -45,10 +47,14 @@ import {
 import {
   CONTRACT_DAYS,
   DIFFICULTIES,
+  DIFFICULTY_IDS,
+  careerDayIdxOf,
+  carriedIn,
   clearedDays,
   purseOf,
   type Difficulty,
 } from '../campaign/economy.js';
+import { WEEKDAYS } from '../shift/types.js';
 import { CONTRACTS } from '../shift/contracts.js';
 import type { DayOutcome, GoalObservations } from '../shift/types.js';
 import { outcomeOf } from '../shift/week.js';
@@ -582,6 +588,44 @@ describe('the four daily tests (§ 7, § 8.6)', () => {
   });
 });
 
+/*
+ * [§ D1377](../../../../DECISIONS.md), the post-AN panel's seats C (D5) and D (D6): figures on the
+ * Career's sheets derived from the contract rather than written once for a design file's tower.
+ */
+describe('the Career sheets say what the contract and the tower are — § D1377', () => {
+  it('says what a perfect month pays and what it leaves on hand, for every difficulty, from its own rates', () => {
+    for (const id of DIFFICULTY_IDS) {
+      const difficulty = DIFFICULTIES[id];
+      const paid = difficulty.rates.reduce((sum, rate) => sum + rate * 5, 0);
+      const line = perfectMonthLineOf(difficulty, difficulty.purse, 100);
+      expect(line, id).toContain(`pays ${String(paid)} units`);
+      expect(line, id).toContain(`with the ${String(difficulty.purse)} carried in, that is ${String(difficulty.purse + paid)} on hand`);
+      for (const rate of difficulty.rates) expect(line, id).toContain(String(rate));
+    }
+    /* The impossible tier's own note no longer calls the on-hand total a month's pay. */
+    expect(DIFFICULTIES.impossible.note).not.toMatch(/month pays 53/u);
+  });
+
+  it('says a renewal rate rose only where it rose', () => {
+    expect(renewalRateHeadOf(4, 3)).toBe('a day, up from 3 — their offer, not yours to set');
+    expect(renewalRateHeadOf(3, 3)).toBe('a day, the same as this month — their offer, not yours to set');
+    expect(renewalRateHeadOf(2, 3)).toBe('a day, down from 3 — their offer, not yours to set');
+  });
+
+  it('names twenty career days Monday to Friday, never Saturday or Sunday', () => {
+    const names = Array.from({ length: CONTRACT_DAYS }, (_, index) => WEEKDAYS[careerDayIdxOf(index + 1)]);
+    expect(names.slice(0, 7)).toEqual(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Monday', 'Tuesday']);
+    expect(names).not.toContain('Saturday');
+    expect(names).not.toContain('Sunday');
+  });
+
+  it('carries the purse a month opens with into its line, not a constant', () => {
+    const tower = { ...openingCareer('eta').towers[0]!, months: 2 };
+    const view = contractView(inputOf({ ...openingCareer('eta'), towers: [tower] }))!;
+    expect(view.purse.totalNote).toContain(`with the ${String(carriedIn(tower))} carried in`);
+  });
+});
+
 describe('the contract sheet (§ 8.3, § 8.4)', () => {
   const openMonth = (patch: Partial<CampaignTower> = {}): CampaignCareer => {
     const base = openingCareer('eta');
@@ -590,8 +634,18 @@ describe('the contract sheet (§ 8.3, § 8.4)', () => {
 
   it('quotes the month against the shop, and both figures are the tables’ own', () => {
     const view = contractView(inputOf(openMonth()))!;
-    expect(view.purse.totalNote).toContain('A perfect month pays 98 units');
+    /*
+     * § D1377, the post-AN panel's seat D (D6): it read *A perfect month pays 98 units* beside four
+     * rates that sum to 90. What it pays and what it leaves on hand are now both said, from the rates
+     * the sheet prints and the purse's own carry.
+     */
+    expect(view.purse.totalNote).toContain(
+      'A perfect month pays 90 units, 3, 4, 5 and 6 a cleared day across its four weeks; with the 8 carried in, that is 98 on hand.',
+    );
     expect(view.purse.totalNote).toContain('worth 324');
+    const weekRates = view.purse.weeks.map((week) => Number.parseInt(week.value, 10));
+    const paid = weekRates.reduce((sum, rate) => sum + rate * 5, 0);
+    expect(view.purse.totalNote).toContain(`pays ${String(paid)} units`);
     /*
      * Read *"about a third of the shop"* until § D1312 made the shop's worth the tower's own; the
      * fraction was true of four contracts in sixteen. `campaign/shaftPlan.test.ts` holds the new

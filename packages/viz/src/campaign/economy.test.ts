@@ -53,6 +53,7 @@ import {
   nextSlot,
   oddsAfterWorksPct,
   offerFeeOf,
+  perfectMonthPayUnits,
   perfectMonthUnits,
   grantedUnits,
   purseOf,
@@ -127,10 +128,16 @@ describe('the figures § 8 publishes, derived from the tables that produce them'
     expect(share).toBeLessThan(0.36);
   });
 
-  it('pays 53 units over an impossible month, which is that tier’s own note', () => {
-    // The note reads "the whole month pays 53 units": 3 + (2 + 2 + 3 + 3) × 5.
+  /*
+   * § D1377: the note read *the whole month pays 53 units*, and 53 is the on-hand total — 3 opened
+   * with and 50 paid. It now says the total is what is left on hand, the purse among it.
+   */
+  it('leaves 53 units on hand after a perfect impossible month, 50 of them paid, which is that tier’s own note', () => {
     expect(perfectMonthUnits(DIFFICULTIES.impossible)).toBe(53);
-    expect(DIFFICULTIES.impossible.note).toContain('53 units');
+    expect(perfectMonthPayUnits(DIFFICULTIES.impossible)).toBe((2 + 2 + 3 + 3) * 5);
+    expect(DIFFICULTIES.impossible.note).toContain(`${String(perfectMonthUnits(DIFFICULTIES.impossible))} units on hand`);
+    expect(DIFFICULTIES.impossible.note).toContain(`the ${String(DIFFICULTIES.impossible.purse)} it opens with`);
+    expect(perfectMonthPayUnits(DIFFICULTIES.standard)).toBe(90);
   });
 });
 

@@ -158,6 +158,9 @@ const DOORS: Readonly<Record<keyof EverydayHost, Door>> = Object.freeze({
   /* Lane AO-4's two reads, joined at integration: the attempt's left-at clock and the day before's driver. */
   dayAttemptLeftAt: 'reads',
   previousDayDriver: 'reads',
+  /* Lane AO-3's two reads, joined at integration: the tower's shape and the career's tower line. */
+  buildingShape: 'reads',
+  careerTowerSpecLine: 'reads',
   runSandbox: 'held',
   /* Puts the parked week back; it runs nothing and writes only the sandbox day's own week away. */
   leaveSandbox: 'elsewhere',

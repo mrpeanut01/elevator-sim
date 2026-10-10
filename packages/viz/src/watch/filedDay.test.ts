@@ -24,7 +24,7 @@ import { RESOURCES, baseState } from '../scope/probes.test-helper.js';
 import { wholeDayFor, wholeDayRun } from '../shift/dayLength.js';
 import { readGoals } from '../shift/goals.js';
 import { shiftObservationsOf } from '../shift/observations.js';
-import { closeDay, openWeek, outcomeOf } from '../shift/week.js';
+import { closeDay, openReplay, openWeek, outcomeOf } from '../shift/week.js';
 
 import { checkedRunForTest } from './gate.test-helper.js';
 import { filedDayRuns, watchGateBefore } from './library.js';
@@ -122,5 +122,24 @@ describe('a replay reads its own day’s clock and cars out — wave AL', () => 
       if (liveBooked.length > 0) checkedADayWithACarOut = true;
     }
     expect(checkedADayWithACarOut, 'no Midtown day of the five books a car out, so the pill half checked nothing').toBe(true);
+  });
+});
+
+/*
+ * [§ D1382](../../../../DECISIONS.md), the post-AN panel's seat D (D9): *Your week* listed *Monday · day
+ * 1* twice under *Runs that can be watched*, both rows replaying one record. A replay week stands on
+ * a copy of the replayed week's earlier days (`shift/week.ts#openReplay`), and the picker read both.
+ */
+describe('a filed day is listed once, however many weeks carry it', () => {
+  it('lists the week a replay copies and not the replay’s copy, live or parked', () => {
+    const monday = { ...openWeek('c2'), day: 3, dayIdx: 2, history: [1, 2].map((day) => ({ day, dayIdx: day - 1, weekday: day === 1 ? 'Monday' : 'Tuesday', eventId: 'ordinary', arrived: 10, carried: 10, minutePct: 90, readings: [], allMet: true, record: null, recordRefusal: null })) } as unknown as Parameters<typeof filedDayRuns>[0][number];
+    const replay = openReplay(2, 1, monday.history);
+    expect(replay.history.length).toBeGreaterThan(0);
+    const name = (id: string): string => id;
+    const rows = (weeks: Parameters<typeof filedDayRuns>[0]) => filedDayRuns(weeks, name).map((row) => row.label);
+    const live = rows([monday]);
+    expect(rows([replay, monday]), 'a standing replay lists its copy beside the week').toEqual(live);
+    expect(rows([monday, replay]), 'a parked replay lists its copy beside the week').toEqual(live);
+    expect(new Set(live).size).toBe(live.length);
   });
 });

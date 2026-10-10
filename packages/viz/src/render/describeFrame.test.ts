@@ -19,7 +19,7 @@ import {
 import type { VizRecording } from '../contract/types.js';
 import { frameAt } from '../frame/frameAt.js';
 import { overlayAt, queueAt } from '../frame/overlay.js';
-import { playheadHasReachedEnd, undeliveredAt } from './canvas.js';
+import { formatClock, playheadHasReachedEnd, undeliveredAt } from './canvas.js';
 import { describeQueue } from './riderQueue.js';
 import { buildingMood, moodObservationsOf } from './mood.js';
 import { recordRun } from '../record/recordRun.js';
@@ -83,6 +83,16 @@ describe.each(BUILDING_IDS)('%s — the frame description', (buildingId) => {
     );
   }, 300_000);
 });
+
+/**
+ * The timed-out run, recorded once and shared by the cases that read it — each used to record its
+ * own, and the run is the costliest in this file (lane AO-3 added a third reader, § D1383).
+ */
+let timedOut: VizRecording | undefined;
+function timedOutRun(): VizRecording {
+  timedOut ??= recordRun(timedOutConfig(config)).recording;
+  return timedOut;
+}
 
 describe('the description carries the two facts a picture must not hide', () => {
   it('reports a suppressed mean as not reported, never as a number', () => {
@@ -166,7 +176,7 @@ describe('the description carries the two facts a picture must not hide', () => 
      * now completes at 100 % delivery, so the undelivered count this test prints has to come from
      * demand instead — 80 % of population per five minutes, which the drain tail cannot clear.
      */
-    const { recording } = recordRun(timedOutConfig(config));
+    const recording = timedOutRun();
     expect(recording.status).not.toBe('completed');
     expect(recording.summary.undelivered).toBeGreaterThan(0);
     const text = describeFrame({ recording, frame: frameAt(recording, recording.endedAt) });
@@ -184,7 +194,7 @@ describe('the description carries the two facts a picture must not hide', () => 
    * third assertion below red: the whole-run figure comes back at a mid-run playhead.
    */
   it('does not announce the run’s ending at a playhead short of it', () => {
-    const { recording } = recordRun(timedOutConfig(config));
+    const recording = timedOutRun();
     const t = recording.endedAt * 0.5;
     const frame = frameAt(recording, t);
     const text = describeFrame({ recording, frame });
@@ -199,6 +209,29 @@ describe('the description carries the two facts a picture must not hide', () => 
     // The status word itself is never withheld — § D294 on this same header. RV-16's lead survives.
     expect(text).toContain(`Run status ${recording.status}`);
   }, 300_000);
+
+  /*
+   * [§ D1383](../../../../DECISIONS.md), the post-AN panel's seat D (D9): at 0:00 the rush stage's text
+   * read *Run status timed-out … of 2:29:54* about a climb its page says runs 90 minutes. A caller
+   * that states a shorter length is quoted that length, and the run's status, which is about the
+   * drain past it, is said only once the playhead stands past it. No horizon, no change (§ D294).
+   */
+  it('quotes the length the screen states, and says the run’s status only past it', () => {
+    const recording = timedOutRun();
+    expect(recording.status).not.toBe('completed');
+    const span = recording.endedAt - recording.startedAt;
+    const horizonS = Math.floor(span / 2);
+    const start = describeFrame({ recording, frame: frameAt(recording, recording.startedAt), horizonS });
+    expect(start).toContain(`of ${formatClock(recording.startedAt + horizonS)}.`);
+    expect(start).not.toContain(`of ${formatClock(recording.endedAt)}.`);
+    expect(start).not.toContain('Run status');
+    const past = describeFrame({ recording, frame: frameAt(recording, recording.startedAt + horizonS + 1), horizonS });
+    expect(past).toContain(`Run status ${recording.status}`);
+    /* A horizon the recording does not overrun changes nothing. */
+    expect(describeFrame({ recording, frame: frameAt(recording, recording.startedAt), horizonS: span + 60 })).toBe(
+      describeFrame({ recording, frame: frameAt(recording, recording.startedAt) }),
+    );
+  });
 
   it('says OVERLOADED for a car over the alarm, and not for one merely full', () => {
     const { recording } = recordRun(breadthConfig(config, 'garden-apartments'));

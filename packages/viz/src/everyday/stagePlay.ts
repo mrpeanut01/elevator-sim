@@ -59,7 +59,7 @@ import type { PriceSchedule } from '../pricing/types.js';
 import { isPerReplicationGoal } from '../scenario/goals.js';
 import { statLineOf } from '../shift/contracts.js';
 import { fixitParkingRow, type FixitParkingRow } from './fixitScreenModel.js';
-import { stageParLineOf } from './scenarioModel.js';
+import { stageParLineOf, stageParNoteOf } from './scenarioModel.js';
 
 /** The dimension the parking select writes. The fix-it editor's own control, one id. */
 const PARKING_DIMENSION = 'idle.parkingStrategy';
@@ -145,8 +145,12 @@ export const STAGE_PLAY_COPY = Object.freeze({
    * A stage this device has cleared, opened again — [§ D1358](../../../../DECISIONS.md). The run is
    * the same judge on the same crowds, and only the pay differs: a stage pays once.
    */
-  practice:
-    'Cleared on this device. Running it again is practice: it pays nothing new, and a clear at or under par earns the mark.',
+  /*
+   * It read *… and a clear at or under par earns the mark* on every cleared stage, stage 1's free par
+   * among them, beside a verdict saying no clear is marked there (the post-AN panel's seat D, D5). The
+   * par clause is now {@link stagePracticeLineOf}'s, from the stage's own par (§ D1376).
+   */
+  practice: 'Cleared on this device. Running it again is practice: it pays nothing new.',
   notePractice: 'Practice: the same judge on the same crowds, and a stage pays once.',
   clearedHead: 'Cleared.',
   metNotHeldHead: 'Every goal met on the stage’s own crowds, and not on the ones held back.',
@@ -548,6 +552,21 @@ function verdictViewOf(facts: StagePlayFacts, verdict: StagePlayVerdictFacts, st
   };
 }
 
+/**
+ * **A cleared stage's practice line, with its par said once and truly** — [§ D1376](../../../../DECISIONS.md).
+ *
+ * A priced par names the mark and its price; a free par and a stage with no priced par say the
+ * hub row's own reason ({@link stageParNoteOf} with nothing spent), so the line before the press, the
+ * verdict after it and the row on the path give one reason for one stage.
+ */
+export function stagePracticeLineOf(parUnits: number | undefined): string {
+  const par =
+    parUnits !== undefined && parUnits > 0
+      ? `A clear at or under par, ${String(parUnits)} ${parUnits === 1 ? 'unit' : 'units'}, earns the mark.`
+      : (stageParNoteOf(parUnits, undefined) ?? '');
+  return `${STAGE_PLAY_COPY.practice} ${par}`.trim();
+}
+
 /** The screen, computed. */
 export function stagePlayViewOf(facts: StagePlayFacts, phase: StagePlayPhase): StagePlayView {
   return {
@@ -571,7 +590,7 @@ export function stagePlayViewOf(facts: StagePlayFacts, phase: StagePlayPhase): S
       `A run is ${String(facts.replications)} runs of ${minutesOf(facts.durationS)} of building time on this ` +
       `stage’s own crowds, your settings and the building’s on the same passengers. If every goal is met, ` +
       `${String(facts.replications)} more follow on crowds you could not have tuned against, and those decide the clear.`,
-    practice: facts.clearedBefore === true ? STAGE_PLAY_COPY.practice : undefined,
+    practice: facts.clearedBefore === true ? stagePracticeLineOf(facts.parUnits) : undefined,
     status: statusOf(phase),
     verdict: phase.kind === 'judged' ? verdictViewOf(facts, phase.verdict, phase.stale) : undefined,
     labLink: STAGE_PLAY_COPY.labLink,

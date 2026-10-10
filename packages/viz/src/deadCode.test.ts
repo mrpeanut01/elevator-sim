@@ -265,6 +265,14 @@ const PUBLIC_API_ONLY: Readonly<Record<string, string>> = Object.freeze({
     '§ 17’s content gate for one day; its consumer is gate.test.ts, which drives both doors',
   'honesty/runHonestyCampaign':
     'the honesty harness’s driver; its consumer is the suite § D163 clause 2 was accepted on',
+  /*
+   * -- § 8.1's published `perfectMonth` total, the purse plus four weekly rates over five days:
+   * ENGINE_CONTRACT publishes 98 for standard and economy.test.ts pins the sum against it, and
+   * shaftPlan.test.ts holds the contract lede's *a perfect month buys only part of the shop*
+   * against it on every tower. The sheet itself now quotes what a month pays and what it leaves on
+   * hand from the purse's own carry (§ D1377), so the guards are the consumer.
+   */
+  'campaign/perfectMonthUnits': 'the contract’s published on-hand total, for the guards that hold its arithmetic and the lede',
   'honesty/formatHonestyStats': 'formats the campaign tier summary for the suite that drives it',
   'honesty/formatFailure': 'formats a violation for the suite that reports it',
   /*

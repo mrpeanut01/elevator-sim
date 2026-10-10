@@ -84,6 +84,9 @@ import {
   stageGoalsOf,
   STAGE_GOALS_COPY,
   type StageGoalsView,
+  stageFigureToneOf,
+  stagePlayControlOf,
+  STAGE_PLAY_DONE_REASON,
 } from './stageScreenModel.js';
 import { restBarWidthPx } from '../render/carRest.js';
 /* Pillar 3's strip is read against the rail's own fold and the shift's own goals — issue #277. */
@@ -1834,6 +1837,54 @@ describe('the § 7 goal strip', () => {
     ).toEqual(rail.map((row) => [row.glyph, row.value, row.was, row.barPct, row.beside]));
   });
 
+  /*
+   * [§ D1381](../../../../DECISIONS.md), the post-AN panel's seat B (defect 6): at 18:00 the header
+   * drew 93 % against a 61 % bar and 220 s against 460 s in the red family beside met goal rows.
+   * Once the strip is judged, a header figure takes its own goal's verdict; before, the live accent.
+   */
+  it('draws a header figure in its goal’s verdict once the day has run out, and in the live accent before', () => {
+    const recording = spreadRun({ every: 8, waitS: 30 });
+    const atEnd = shiftObservationsOf(observationsAt(recording, recording.endedAt));
+    const readings = readGoals(goalsForDay(DAY), atEnd);
+    const head = stageHeaderOf({
+      simTimeS: recording.endedAt,
+      recording,
+      observations: observationsAt(recording, recording.endedAt),
+      driverName: 'the plain baseline',
+    });
+    const strip = stripAt(recording, recording.endedAt);
+    let compared = 0;
+    for (const figure of head.figures) {
+      const tone = stageFigureToneOf(figure, readings, strip.judged);
+      const goal = readings.find((reading) => reading.goal.reads === figure.reads);
+      if (figure.reads === undefined || goal === undefined) {
+        expect(tone, figure.label).toBe('still');
+        continue;
+      }
+      compared += 1;
+      expect(tone, figure.label).toBe(goal.state === 'met' ? 'met' : goal.state === 'missed' ? 'missed' : 'still');
+      /* Mid-day the same figure is a reading at the clock, never a verdict. */
+      expect(stageFigureToneOf(figure, readings, false), figure.label).toBe('live');
+    }
+    expect(compared, 'no header figure reads a goal; the tone has nothing to follow').toBe(2);
+    /* A met reading is drawn in the palette's cleared colour, never the live accent. */
+    const met = stageFigureToneOf(
+      { label: 'away inside a minute', value: '93%', reads: 'minutePct' },
+      readings.map((reading) => (reading.goal.reads === 'minutePct' ? { ...reading, state: 'met' as const } : reading)),
+      true,
+    );
+    expect(met).toBe('met');
+  });
+
+  it('draws ▶ Play inert once the day has run out, with the reason on it', () => {
+    expect(stagePlayControlOf({ hasRun: true, playing: false, dayEnded: false })).toEqual({ label: '▶ Play', disabled: false, inert: false, note: undefined });
+    expect(stagePlayControlOf({ hasRun: true, playing: true, dayEnded: false }).label).toBe('⏸ Pause');
+    const ended = stagePlayControlOf({ hasRun: true, playing: false, dayEnded: true });
+    expect(ended.inert).toBe(true);
+    expect(ended.note).toBe(STAGE_PLAY_DONE_REASON);
+    expect(stagePlayControlOf({ hasRun: false, playing: false, dayEnded: false }).inert).toBe(true);
+  });
+
   /**
    * **The energy bar refuses for the whole day, and it refuses in the product rather than here.**
    *
@@ -1869,7 +1920,6 @@ import {
   stageCameraWindowOf,
   stageFloorJumpOptionsOf,
   stageLitSpeedOf,
-  stagePlayControlOf,
   wholeTowerIsLegible,
 } from './stageScreenModel.js';
 
@@ -2247,10 +2297,14 @@ describe('the stage’s own state — wave AO, lane AO-4', () => {
     expect(stagePlayControlOf({ playing: false, hasRun: true, waitingOnCall: true })).toEqual({
       label: STAGE_PLAY_CONTROL.waiting,
       disabled: true,
+      inert: true,
+      note: undefined,
     });
     expect(stagePlayControlOf({ playing: false, hasRun: true, waitingOnCall: false })).toEqual({
       label: STAGE_PLAY_CONTROL.play,
       disabled: false,
+      inert: false,
+      note: undefined,
     });
     expect(stagePlayControlOf({ playing: true, hasRun: true, waitingOnCall: false }).label).toBe(STAGE_PLAY_CONTROL.pause);
     expect(stagePlayControlOf({ playing: false, hasRun: false, waitingOnCall: false }).disabled).toBe(true);

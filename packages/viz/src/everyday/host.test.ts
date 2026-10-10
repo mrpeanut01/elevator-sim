@@ -2537,6 +2537,29 @@ describe('what the host banks — GitHub issue #499, first time only', () => {
     expect(h.banked).toEqual([]);
   });
 
+  /*
+   * [§ D1382](../../../../DECISIONS.md), the post-AN panel's seat D (D9): *cleared day filed · 3 chimes*
+   * stood on the next day's stage and on a practice stage. The acknowledgement stands while the run
+   * it was banked on does — the report, the door, the brief — and is withdrawn once another run is
+   * put on the stage.
+   */
+  it('withdraws the banked line once another run stands on the stage', async () => {
+    const h = harnessOf({ ...base(), recording: A_RECORDING });
+    const host = createEverydayHost(h.bindings);
+    host.bankScenarioClear('sleeping-sky-lobby');
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(host.chimeTally()?.turn).toBe('scenario-cleared');
+    /* The same run still standing, as on the report and the door after a close. */
+    h.state = { ...h.state };
+    expect(host.chimeTally()?.turn).toBe('scenario-cleared');
+    /* A fresh ask clears the run, and the next one lands: neither is the run the turn finished. */
+    h.state = { ...h.state, recording: undefined };
+    expect(host.chimeTally()).toBeUndefined();
+    h.state = { ...h.state, recording: { ...A_RECORDING } };
+    expect(host.chimeTally()).toBeUndefined();
+  });
+
 });
 
 describe('the replay — GitHub issue #177 item 1, § D517', () => {

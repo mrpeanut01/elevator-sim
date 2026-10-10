@@ -51477,3 +51477,234 @@ on a practice close, a career sheet, a close with no week, or a pinned day.
 
 **Not established.** No browser case presses it: the browser tier's slice day (Crown Hotel) is
 decided by no call under any first answer, measured on this tree.
+
+## D1376 — the stage page and the hub row read one path, so a clear and its row give one par, and a cleared stage's practice line promises only the par it has
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (wave AO, lane AO-3), not by the
+> product owner: a correction the integrator's brief asked for from the post-AN panel's seats C (D1)
+> and D (D5). **Owner-reversible**: the words of the practice line's three arms.
+
+**Why an entry.** [§ D405](#d405)'s first and second grounds. It binds `campaign/stagePress.ts`,
+`everyday/scenarioLadderPort.ts`, `dev/main.ts` and `everyday/stagePlayScreen.ts`, and it amends
+[§ D1358](#d1358) clause 5, whose practice line promised a mark on every cleared stage.
+
+**What was wrong.** Stage 1's clear read *This stage has no par: no way through the census found on
+its page could be priced*, while the hub row for the same stage read *Par is free here*; stages 2, 3,
+5, 7, 8 and 9 read *no par* on their clears beside rows reading *At par* or *Par is 6 units*. The
+stage page asked `scenario/ladder.ts#scenarioLadderOf` for the hold (`routeRefusalsOf`) and not for
+the price (`routeUnitsOf`), so every stage page read its par as unpriced. The practice line, *a clear
+at or under par earns the mark*, stood on stage 1 too, where the par is free and nothing is marked.
+
+**The ruling.**
+
+1. **One composition.** `campaign/stagePress.ts#stagePathOf` asks the ladder with both of the one
+   check's answers, and the hub (through `scenarioLadderPort.ts#provideScenarioLadderFrom`) and the
+   stage page both read it. Neither may ask the ladder by hand.
+2. **The practice line says the stage's own par** (`everyday/stagePlay.ts#stagePracticeLineOf`): a
+   priced par names the mark and its price; a free par and a stage with no priced par say the hub
+   row's reason, with nothing spent. Amends [§ D1358](#d1358) clause 5's words, and nothing else.
+
+**Tests**, red before and green after: `everyday/stagePlay.test.ts`'s *the stage page and its hub row
+say one par* (every shipped offered stage, the page's verdict line against the row's at a clear priced
+at the par) and its practice arms; on the built bundle `everyday/stageClearPays.browser.test.ts` now
+asserts that stage 1's clear and its hub row read the same sentence and that the practice line is the
+free par's (red before: the clear read the *no par* sentence).
+
+## D1377 — the Career's sheets are worded from the tower and the contract: a shaft tier is named for the car it adds, a perfect month says what it pays, a renewal says *up* only of a rise, a career day is a weekday, and the desk counts today's tenants
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (wave AO, lane AO-3), not by the
+> product owner: corrections the integrator's brief asked for from the post-AN panel's seats C (D5)
+> and D (D6). **Owner-reversible**: every arm's words, and naming a single-bank shaft tier by its
+> ordinal rather than as *one more car*.
+
+**Why an entry.** [§ D405](#d405)'s first ground. It binds `campaign/economy.ts`,
+`everyday/campaignModel.ts`, `everyday/campaignScreens.ts` and `everyday/host.ts`, and it replaces
+design-handoff prose on three shop tiers (`docs/design/`'s tower, which the handoff wins on looks and
+the simulator wins on what a sentence means).
+
+**What was wrong**, on Garden Apartments, six floors and two cars: *A fourth car is 34 units* and *The
+tower stops being one car short*; *4.0 m/s: Modest on fourteen floors*; *Staggered start times:
+Negotiated with four tenants* beside the shop's own *nobody here keeps a start time to stagger*; *A
+perfect month pays 98 units* beside rates that sum to 90 (98 is § 8.1's on-hand total, the 8 a month
+opens with included); the desk and the renewal headers at *120 people* after the tenants grew past
+380; career days named Saturday and Sunday inside *twenty working days*; and a renewal reading *3 u a
+day, up from 3*.
+
+**The ruling.**
+
+1. **A tier is worded for the tower it is sold on** (`economy.ts#shopTierFaceOf`, from the contract's
+   tower as handed, `host.ts#buildingShape`). A shaft tier sinking its shafts in one bank of *n* cars
+   is named for car *n*+1 (or *n*+2) and its effect is the count before and after; in several banks it
+   is *one more car in each bank*. The machines tiers say the speed now and after on the tower's
+   floors and claim no gain. Staggered start times counts the floors that keep a start time, or says
+   nobody here does. With no tower known, the shipped words stand.
+2. **A perfect month says what it pays and what it leaves on hand** (`campaignModel.ts#perfectMonthLineOf`,
+   `economy.ts#perfectMonthPayUnits`), from the difficulty's rates and the purse's carry. The
+   impossible tier's note says 53 is on hand, the 3 it opens with among it.
+3. **A renewal says *up* only of a rise** (`campaignModel.ts#renewalRateHeadOf`): *the same as this
+   month* and *down from N* otherwise.
+4. **A career day is a weekday** (`economy.ts#careerDayIdxOf`, Monday to Friday and round). It moves no
+   run: a career day's event is the campaign's own and Everyday ships no calendar.
+5. **The desk describes a held tower on the day its next run builds** (`host.ts#careerTowerSpecLine`),
+   through `dev/state.ts#resolvedBuildingOf` on `runCampaignDay`'s fabric fields: the contract's tower,
+   the kit fitted by then, grown to the day.
+
+**Tests**, red before and green after: `campaign/shaftPlan.test.ts`'s three new cases (every contract
+tower's shaft tier names, Garden's *A third car*, the machines and start-time words, and the desk's
+line against the building `runCampaignDay` resolves), `campaign/economy.test.ts`'s impossible-month
+case and `everyday/campaignModel.test.ts`'s *Career sheets say what the contract and the tower are*.
+Red before for the desk line: with `campaignInputOf` reading the rung's spec, day 12 read the same
+589 people as day 1.
+
+**Not established.** The car-size tiers' *The morning shortens by a fifth* and the 5 m/s tier's
+*people load without hesitating* are still the handoff's claims, unmeasured, and were not reported.
+
+## D1378 — the report never advises a weight the day already carried: *Weight fairness up* is not pointed at on a day a driver weighted fairness, and says who did
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (wave AO, lane AO-3), not by the
+> product owner: a correction the integrator's brief asked for from the post-AN panel's seat B
+> (defect 8). **Owner-reversible**: keeping the card with the sentence rather than dropping it.
+
+**Why an entry.** [§ D405](#d405)'s first ground: it binds `shift/report.ts` and `dev/main.ts`, and it
+extends `report.ts#leversFor`'s rule that *a lever you have already pulled is not a lever you have*.
+
+**What was wrong.** The report read *Today points here … Weight fairness up* on a day driven with
+Fairness first from 12:20.
+
+**The ruling.** Fairness is the `starvation` weight, the term the workshop lever the card opens moves.
+Where any stretch of the day was driven by a profile weighting it above zero (the starting driver's
+weights, now on `DayReportInput.startingWeights`, and every handover's profile carried whole), the
+card is not pointed at and reads *Today already weighted it: ⟨drivers, from when⟩.* before its
+glossary sentence (`report.ts#fairnessDriversOf`). A weight is read, never a profile id.
+
+**Tests**, red before and green after: `shift/report.test.ts`'s *never points at weighting fairness on
+a day a driver already weighted it* (a handover to a fairness-weighted profile, the same day without
+it, and a day started on one).
+
+## D1379 — a close that names the call that decided the day names the earlier calls that could have too
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (wave AO, lane AO-3), not by the
+> product owner: a correction from the post-AN panel's seat B (defect 7). **Owner-reversible**: the
+> words.
+
+**Why an entry.** The sentence is the close's, read by `everyday/reportView.ts` and the corpus, and
+it changes the deciding call's choice where a pinned call fell between two rows.
+
+**The ruling.** *1 earlier call today could have turned it too* never said which; it now reads *The
+call at 10:40 could have turned it too.* (or *The calls at 08:42 and 10:40 …*), each by its row's
+clock. The calls are ordered by their instant before the latest is taken as deciding, so a pinned
+call between two rows no longer stands as the latest.
+
+**Tests**, red before and green after: `shift/dayClose.test.ts`'s *names the latest when several
+did* and *names every earlier call … the pinned one among them*.
+
+## D1380 — a settled house verdict is kept across a reload, so the close's tally never goes backwards
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (wave AO, lane AO-3), not by the
+> product owner: a correction the integrator's brief asked for from the post-AN panel's seats B
+> (defect 5) and D (D8). **Owner-reversible**: browser storage as the place, and the bound.
+
+**Why an entry.** [§ D405](#d405)'s first and second grounds: it adds `dev/settledReadings.ts`, binds
+`dev/main.ts`'s house and driver runs, and amends [§ D1227](#d1227)'s *a reading the sheet asks for and
+nobody asked yet (after a reload, which keeps nothing) is asked then*.
+
+**What was wrong.** After a reload the close read *The house is still being run on all 3 of them*
+about days earlier closes had settled, and caught up seconds later.
+
+**The ruling.** A verdict a run returned (*cleared*, *missed* or *ungraded*) is kept in browser
+storage under the run's own key, the house's (tower, day, wrinkle, seed) and the driver run's
+(the swapped record), bounded to the newest 512. `askWeekHouse` and `weekDriverRunReadingOf` read it
+before they ask a run. *Unrecorded* (a run that threw or a record this build cannot read) is never
+kept. A verdict is a pure function of the day's record, so the cache is safe to lose: lost, the run
+is asked as before.
+
+**Tests**, red before and green after: `dev/settledReadings.test.ts` (kept across a fresh sitting,
+the two runs apart, no failure kept, the bound, no storage), and on the built bundle
+`everyday/dayClose.browser.test.ts`'s *the house tally never goes backwards across a reload*.
+
+## D1381 — once the day has run out, a header figure is drawn in its goal's verdict, and ▶ Play is inert with its reason
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (wave AO, lane AO-3), not by the
+> product owner: a correction from the post-AN panel's seat B (defect 6). **Owner-reversible**: the
+> palette mapping.
+
+**Why an entry.** It departs from the handoff's *terracotta: live figures* once the figures stop being
+live, which is a disagreement about what a colour means rather than how the screen looks.
+
+**The ruling.** While the day runs a header figure keeps the live accent. Once the strip is judged
+(`stageGoalsOf`'s own `judged`), a figure that reads a goal takes its row's verdict, moss for met and
+alarm for missed, and a figure no goal grades is drawn in ink (`stageScreenModel.ts#stageFigureToneOf`).
+▶ Play at the day's end did nothing (a playing transport at its end is `ended`); it is inert, with
+*the day has already run out, so there is nothing left to play* on its face
+(`stageScreenModel.ts#stagePlayControlOf`), as the skip beside it already was.
+
+**Tests**, red before and green after: `everyday/stageScreenModel.test.ts`'s two new cases.
+
+## D1382 — four stale lines from D9: the banked line stands only while its run does, *Your week* lists a replayed day once, an Engineer Building card describes the building its press runs, and the chimes sentence says what pays nothing
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (wave AO, lane AO-3), not by the
+> product owner: corrections the integrator's brief asked for from the post-AN panel's seat D (D9).
+> **Owner-reversible**: the chimes sentence's words.
+
+**Why an entry.** It binds `everyday/host.ts`, `watch/library.ts`, `dev/rightRail.ts`,
+`everyday/chimesPanel.ts` and `everyday/campaignModel.ts`, four modules for four lines.
+
+**The ruling.**
+
+1. **The banked line** (*cleared day filed · 3 chimes*) is drawn while the run the turn finished is the
+   run on the stage, through the report, the door and the brief after it, and withdrawn once another
+   run stands there (`host.ts#chimeTally`, by recording identity). It stood on the next day's stage
+   and on a practice stage.
+2. **A replay week is not listed beside the week it copies** (`watch/library.ts#filedDayRuns`):
+   `shift/week.ts#openReplay` stands a replay on a copy of the earlier days, so *Monday · day 1* was
+   listed twice, both rows replaying one record.
+3. **An Engineer Building card describes the building a press of it runs** (`rightRail.ts#buildingCardOf`,
+   `state.ts#resolvedBuildingOf` over `withBuilding`), so Midtown reads the 589 people its week plays
+   rather than the file's 1,710.
+4. **One chimes sentence** (`chimesPanel.ts#CHIMES_EARN_RULE`), on Settings and on the Career: a
+   scenario or a stage pays its first clear, a counted day that clears pays, a rush pays only waves
+   past the best, and practice, a day that does not count and a missed day pay nothing. It read
+   *Chimes are what finishing something pays you* while a cleared Saturday and every practice paid 0.
+
+**Tests**, red before and green after: `everyday/host.test.ts`'s *withdraws the banked line once
+another run stands on the stage*, `watch/filedDay.test.ts`'s *lists the week a replay copies*,
+`dev/rightRail.test.ts`'s *a Building card describes the building its press runs* and
+`everyday/careerFrontPage.test.ts`'s chimes case. The rule's behaviour is held by `host.test.ts`'s
+existing *pays nothing for a clean day that does not count* and practice cases.
+
+## D1383 — lines read before or beside a run say the length and the place the screen does: the brief's measured day on the menu and the hub, the seed line's arrivals, the tutorial's floors, and the rush's text alternative
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (wave AO, lane AO-3), not by the
+> product owner: corrections the integrator's brief asked for from the post-AN panel's seats B (defect
+> 10, lost moments 1 and 2) and D (D9). **Owner-reversible**: every line's words.
+
+**Why an entry.** [§ D405](#d405)'s first and second grounds: it re-derives
+`SITTING_SHAPES.scenarioMode` and `.contractDay` (corrected by [§ D1169](#d1169) and [§ D1212](#d1212)),
+moves `pacedDayRealS` into `everyday/stagePace.ts`, adds a caller option to
+`render/describeFrame.ts`, and changes `docs/12`'s quotation.
+
+**The ruling.**
+
+1. **The menu and the hub lead with the brief's measured day**: *about 7-12 min a day at 4× on the
+   towers a first week can open on* (`firstDayLength.ts#pinnedDayMinutesSpan`, the pinned whole days'
+   middles, re-run by `firstDayLength.test.ts`). They read *1 min-1 h 49*, a floor no day reaches and a
+   reference tower nobody opens on, beside a brief saying *about 12 min*. The hub keeps the game
+   towers' longest and the reference tower's, said as what they are. `pacedDayRealS` moved to
+   `stagePace.ts` so `sittingShape.ts` reads `firstDayLength.ts` without an import cycle, and is
+   re-exported where it was.
+2. **The seed line quotes the arrivals** (`report.ts#runStretchOf`): *08:00 to 18:00, run on to 18:01
+   for the riders still travelling*, from the run's own schedule, where it quoted the whole span as one
+   range ending 18:01.
+3. **Tutorial screen one names the floors** (*the top three floors*), where its notes read *the floors
+   the letter is about* a screen before any letter.
+4. **A rush's text alternative quotes the climb** (`describeFrame.ts`'s `horizonS`): *of 1:30:00*, and
+   the run's status only past it, where at 0:00 it read *Run status timed-out … of 2:29:54*. With no
+   horizon nothing changes, so [§ D294](#d294)'s Engineer reading stands.
+
+**Tests**, red before and green after: `everyday/sittingShape.test.ts`'s *quotes the brief's measured
+day* (and its `docs/12` site), `shift/report.test.ts`'s *quotes the arrivals' stretch*,
+`everyday/tutorialModel.test.ts`'s stretch case and `render/describeFrame.test.ts`'s *quotes the
+length the screen states*.
+
+**Not established.** *About 7-12* is measured on the pinned first-day towers only; a later week on a
+reference tower can run longer, which the hub says and the menu tile does not.

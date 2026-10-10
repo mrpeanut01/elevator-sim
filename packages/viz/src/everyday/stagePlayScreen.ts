@@ -37,11 +37,10 @@ import type { DispatcherProfile } from '@elevator-sim/core/browser';
 
 import { loadBrowserResources, loadCampaign, type BrowserResources, type LoadedCampaign } from '../dev/data.js';
 import type { BatchRequest, BatchResult, BatchWorkerMessage, BatchWorkerRequest } from '../batch/types.js';
-import { pressStage, routeRefusalsOf, stageUnitsAt, type StageAdmissionContext } from '../campaign/stagePress.js';
+import { pressStage, stagePathOf, stageUnitsAt, type StageAdmissionContext } from '../campaign/stagePress.js';
 import type { StageSeedSet } from '../campaign/stageRun.js';
 import type { CampaignStage } from '../campaign/types.js';
 import type { EditorParkingStrategy } from '../fixit/types.js';
-import { scenarioLadderOf } from '../scenario/ladder.js';
 import { actionBarFor, type ActionBarModel } from './actionBar.js';
 import { everydayDeviceChimeStore } from './chimeStore.js';
 import { CHIME_AWARDS } from './deviceChimes.js';
@@ -189,12 +188,12 @@ function stageContextOf(data: Loaded, stageId: string):
     /* § D1183: a way through the census found on this page is published under the page's own name. */
     moveNamed: (name: string) => namedStageMoveOf(name, profiles, data.campaign.space),
   };
-  /* The hub's own derivation, so this page holds a stage exactly when the hub's row does. */
-  const rung = scenarioLadderOf({
-    stages,
-    survivors: data.campaign.survivors,
-    refusalOf: routeRefusalsOf(stages, route),
-  }).find((entry) => entry.id === stage.id);
+  /*
+   * The hub's own derivation, so this page holds a stage exactly when the hub's row does, and prices
+   * its par with the same figure: it asked the ladder for the hold and not the par, so every clear
+   * here read *no par* beside a hub row that priced one (§ D1376).
+   */
+  const rung = stagePathOf(stages, data.campaign.survivors, route).find((entry) => entry.id === stage.id);
   return {
     stage,
     position: position + 1,

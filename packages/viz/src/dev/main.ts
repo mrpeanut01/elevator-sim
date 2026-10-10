@@ -66,9 +66,9 @@ import { POST_RUN_COPY } from '../everyday/postRun.js';
 import { forgetDriver, rememberedDriverOf } from '../everyday/driverMemory.js';
 import { reportSignInLink } from '../everyday/signInLink.js';
 import { provideScenarioLadderFrom } from '../everyday/scenarioLadderPort.js';
+import { keepSettled, settledReadingOf } from './settledReadings.js';
 import { namedStageMoveOf } from '../everyday/stagePlay.js';
 import { provideScenarioOpen } from '../everyday/scenarioOpenPort.js';
-import { routeRefusalsOf, routeUnitsOf } from '../campaign/stagePress.js';
 import { everydaySwap, onEverydaySwapProvided } from '../everyday/swap.js';
 import {
   ENGINEER_RETURN_LABEL,
@@ -1744,6 +1744,15 @@ function boot(ui: Elements, resources: BrowserResources): void {
       if (record === null || !dayCountsToward(week, entry) || houseNeedOf(entry) !== 'run') return [];
       const key = houseKeyOf(week.contractId, entry);
       if (houseReadings.has(key)) return [];
+      /*
+       * A verdict an earlier close settled, kept across a reload — § D1380. Read from where it was
+       * kept rather than asked again, so the tally never reads it as still being run.
+       */
+      const kept = settledReadingOf('house', key);
+      if (kept !== undefined) {
+        houseReadings.set(key, kept);
+        return [];
+      }
       /* A record this build cannot replay is no record of the crowd for the house either. */
       if (recordUnreadableReason(record, resources) !== null) {
         houseReadings.set(key, 'unrecorded');
@@ -1767,7 +1776,9 @@ function boot(ui: Elements, resources: BrowserResources): void {
         recordings.forEach((recording, index) => {
           const need = needs[index];
           if (need === undefined) return;
-          houseReadings.set(need.key, dayRunReadingOf(need.entry, recording));
+          const reading = dayRunReadingOf(need.entry, recording);
+          houseReadings.set(need.key, reading);
+          keepSettled('house', need.key, reading);
         });
         renderAll();
       },
@@ -1826,6 +1837,12 @@ function boot(ui: Elements, resources: BrowserResources): void {
     const key = `${week.contractId}|${entry.eventId}|${JSON.stringify(swapped)}`;
     const known = driverReadings.get(key);
     if (known !== undefined) return known;
+    /* § D1380: a driver run an earlier close settled, kept across a reload. */
+    const kept = settledReadingOf('driver', key);
+    if (kept !== undefined) {
+      driverReadings.set(key, kept);
+      return kept;
+    }
     /* A record this build cannot replay is no record of the crowd for the driver run either. */
     if (recordUnreadableReason(record, resources) !== null) {
       driverReadings.set(key, 'unrecorded');
@@ -1838,7 +1855,9 @@ function boot(ui: Elements, resources: BrowserResources): void {
       runs: [{ config: plan.config, outOfServiceCarIds: plan.outOfServiceCarIds, recordDecisions: false }],
       onDone: ([recording]) => {
         if (driverAsked === key) driverAsked = undefined;
-        driverReadings.set(key, recording === undefined ? 'unrecorded' : dayRunReadingOf(entry, recording));
+        const reading = recording === undefined ? 'unrecorded' : dayRunReadingOf(entry, recording);
+        driverReadings.set(key, reading);
+        keepSettled('driver', key, reading);
         renderAll();
       },
       /* A run that threw: the close says the run could not be made, and claims nothing. */
@@ -5239,10 +5258,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
         /* § D1183: the stage page's own choices are published under its own names. */
         moveNamed: (name: string) => namedStageMoveOf(name, resources.dispatcherProfiles.profiles, loaded.space),
       };
-      const refusals = routeRefusalsOf(loaded.campaign.stages, routeResources);
-      /* § D1234: the same check read for its price, so a cleared stage's row can carry its par mark. */
-      const units = routeUnitsOf(loaded.campaign.stages, routeResources);
-      provideScenarioLadderFrom(loaded.campaign.stages, loaded.survivors, refusals, units);
+      /* § D1234: the same check read for its price, so a cleared stage's row can carry its par mark (§ D1376). */
+      provideScenarioLadderFrom(loaded.campaign.stages, loaded.survivors, routeResources);
     })
     .catch((error: unknown) => {
       setText(ui.campaign.error, error instanceof Error ? error.message : String(error));
@@ -8238,6 +8255,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
           ? undefined
           : { today: building.totalPopulation, tomorrow: facts.population, onward: facts.onward.population },
       dispatcherName: profileById(resources, state.savedDispatchers, state.dispatcherId).name,
+      /* § D1378: the weights the day started with, so the report never advises a weight it carried. */
+      startingWeights: profileById(resources, state.savedDispatchers, state.dispatcherId).weights,
       /*
        * The run's own hour, not a flat 06:00 — issue #83. `DAY_START_S` survives as the fallback for
        * a template that declares none (`constant-iso`) and for a recording restored from a file.
