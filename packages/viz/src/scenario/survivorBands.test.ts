@@ -36,6 +36,8 @@ import { readFile } from 'node:fs/promises';
 
 import { beforeAll, describe, expect, it } from 'vitest';
 
+import type { PublishedGoalRates, PublishedScenario } from './published.js';
+import { SCENARIO_GOALS_PATH } from './regenerate.test-helper.js';
 import { SCENARIO_SURVIVORS_PATH } from './regenerateSurvivors.test-helper.js';
 import {
   CAMPAIGN_PATH,
@@ -89,6 +91,11 @@ import type { PublishedSurvivorScenario, PublishedSurvivors } from './survivors.
  * ceiling) and stage 8 reads 6 of 39 (0.15 against 0.10). The re-authoring was done against the
  * stand-alone criterion rather than against the band, so neither row leaves this register.
  *
+ * **Stage 9 moved inside on 2026-10-10** ([§ D1288](../../../../DECISIONS.md)): at 3.5 %pop/5 min no
+ * crowd is refused its mean and it reads 3 of 63 at the base rung (0.05 against a 0.10 ceiling), all
+ * three from the dropdown, so it leaves this register and enters `DROPDOWN_CLEARS` on the same
+ * commit. Stage 10 stays below over suppressed runs, with its cause measured (§ D1289).
+ *
  * The owner approved the band as drafted on 2026-09-10, so every entry is a scenario outside an
  * approved band. If the band moves, this register moves with it on the same commit, and that is the
  * band moving rather than a scenario.
@@ -98,7 +105,6 @@ const OUTSIDE_THEIR_BAND: Readonly<Record<string, OutsideVerdict>> = Object.free
   'stage-4-two-banks': 'below',
   'stage-7-prove-it': 'above',
   'stage-8-the-headline-address': 'above',
-  'stage-9-both-ways-at-once': 'below-over-suppressed-runs',
   'stage-10-the-bed-and-the-visitor': 'below-over-suppressed-runs',
 });
 
@@ -608,5 +614,124 @@ describe('the band’s schema refuses what the ruling forbids', () => {
       bandAt(document, 0)['minSurvivors'] = 0;
     });
     expect(issues.some((line) => line.includes('unrecognised key'))).toBe(true);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * #558's trap: a goal a stage declares must stay a variable batch goal
+ * -------------------------------------------------------------------------- */
+
+/** A stage's declared goals, as `data/campaign.json` writes them. */
+interface DeclaredStage {
+  readonly id: string;
+  readonly goals: readonly { readonly kind: string }[];
+}
+
+/**
+ * **Every goal a stage declares is a batch goal in the published table, and variable on both seed
+ * sets where it has a per-run rate** — GitHub issue #558's trap, carried into #234 by the decision
+ * swarm's ruling (wave AN, lane AP-1).
+ *
+ * The trap, as #558 recorded it: moving stage 2's demand to 1.5 %pop/5 min took `long-waits-under`
+ * to constant-pass on the baseline, so the regenerated table moved it out of the stage's `goals`
+ * while `data/campaign.json` still declared it. `judgeStage` then returns `met: null` on every
+ * configuration, and the stage cannot be cleared by anything, with no red anywhere. `campaign/parse.ts`
+ * refuses the opposite direction (a live goal left undeclared); this is the direction it does not.
+ *
+ * Every stage rather than only a moved one, because which stage a rebalance moves is the thing a
+ * register cannot know in advance. `beat-the-baseline` compares two arms and has no per-run rate, so
+ * for it only the bucket is checked.
+ */
+function declaredGoalIssues(
+  stages: readonly DeclaredStage[],
+  published: PublishedGoalRates,
+): readonly string[] {
+  const issues: string[] = [];
+  for (const stage of stages) {
+    const row: PublishedScenario | undefined = published.scenarios.find(
+      (scenario) => scenario.id === stage.id,
+    );
+    if (row === undefined) {
+      issues.push(`${stage.id}: data/scenario-goals.json publishes no row for this stage`);
+      continue;
+    }
+    for (const { kind } of stage.goals) {
+      const record = row.goals.find((goal) => goal.kind === kind);
+      if (record === undefined) {
+        issues.push(
+          `${stage.id} declares ${kind}, and the published table does not ship it as a goal there, ` +
+            'so judgeStage reads met: null on every configuration and the stage cannot be cleared',
+        );
+        continue;
+      }
+      for (const [half, rate] of [['tuning', record.tuning], ['holdout', record.holdout]] as const) {
+        if (rate !== null && rate.rateClass !== 'variable') {
+          issues.push(
+            `${stage.id} declares ${kind}, which is ${rate.rateClass} on the ${half} seeds under its ` +
+              'baseline, so no configuration can be told apart on it',
+          );
+        }
+      }
+    }
+  }
+  return issues;
+}
+
+describe('every goal a stage declares stays a variable batch goal on its baseline — #558’s trap', () => {
+  let stages: readonly DeclaredStage[];
+  let published: PublishedGoalRates;
+  beforeAll(async () => {
+    const campaign = JSON.parse(await readFile(CAMPAIGN_PATH, 'utf8')) as {
+      readonly stages: readonly DeclaredStage[];
+    };
+    stages = campaign.stages;
+    published = JSON.parse(await readFile(SCENARIO_GOALS_PATH, 'utf8')) as PublishedGoalRates;
+  });
+
+  it('holds on every shipped stage', () => {
+    /* Non-vacuity: some stage declares a goal with a per-run rate for the variable check to read. */
+    expect(
+      stages.some((stage) =>
+        stage.goals.some((goal) =>
+          published.scenarios
+            .find((scenario) => scenario.id === stage.id)
+            ?.goals.some((record) => record.kind === goal.kind && record.tuning !== null),
+        ),
+      ),
+    ).toBe(true);
+    expect(declaredGoalIssues(stages, published)).toEqual([]);
+  });
+
+  it('is red on a declared goal the table moved out of the goals, and on one gone constant', () => {
+    const rowOf = (table: PublishedGoalRates, id: string) => table.scenarios.find((scenario) => scenario.id === id);
+    const ratedKind = (entry: DeclaredStage): string | undefined =>
+      entry.goals.find((goal) =>
+        rowOf(published, entry.id)?.goals.some((record) => record.kind === goal.kind && record.tuning !== null),
+      )?.kind;
+    const stage = stages.find((entry) => ratedKind(entry) !== undefined)!;
+    const kind = ratedKind(stage)!;
+    const clone = (): Writable<PublishedGoalRates> =>
+      JSON.parse(JSON.stringify(published)) as Writable<PublishedGoalRates>;
+
+    /* The trap itself: the regenerated table moves the goal into the configuration facts. */
+    const moved = clone();
+    const row = moved.scenarios.find((scenario) => scenario.id === stage.id)!;
+    const record = row.goals.find((goal) => goal.kind === kind)!;
+    row.goals = row.goals.filter((goal) => goal.kind !== kind);
+    row.configurationFacts.push(record);
+    expect(declaredGoalIssues([stage], moved as PublishedGoalRates).join('\n')).toContain('cannot be cleared');
+
+    /* The same goal still in the bucket, gone constant on one seed set. */
+    const constant = clone();
+    const rate = constant.scenarios
+      .find((scenario) => scenario.id === stage.id)!
+      .goals.find((goal) => goal.kind === kind)!.holdout!;
+    rate.rateClass = 'constant-pass';
+    expect(declaredGoalIssues([stage], constant as PublishedGoalRates).join('\n')).toContain('constant-pass on the holdout');
+
+    /* A declared kind the table never measured on the stage. */
+    expect(
+      declaredGoalIssues([{ id: stage.id, goals: [{ kind: 'no-such-goal' }] }], published).join('\n'),
+    ).toContain('no-such-goal');
   });
 });

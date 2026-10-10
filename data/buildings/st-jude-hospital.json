@@ -149,11 +149,13 @@
           "doorType": "sideOpening"
         },
         {
+          "$comment": "DUTY: AN AGENT'S PROPOSAL, drafted for the product owner to accept, tighten or reject under the 2026-09-08 standing ruling on governed data/ values (GitHub issue #561, DECISIONS.md section D1290). Car E is declared a bed lift; car D, the other bed car, is left undeclared, because the decision swarm ruled one car and the issue measured one. NOT CITED: no source assigns a duty to a car in this building, which is invented content. What it does: riders draw a duty against data/traffic-profiles.json duty.shares, and the dutyMismatch term prices a rider in a car whose duty is not theirs. No shipped dispatcher profile weights that term, so under every shipped profile the legs are identical to the building without this field; it moves a run only when a player's own dispatcher gives the term a weight. DECISIONS.md section D549 clause 7's approved 0.35 weight on capacity-aware is NOT applied here: the swarm ruled that a shipped weight waits for a paired-t interval, and applying it is one data row, the owner's to call.",
           "id": "E",
           "spec": "geared-traction",
           "ratedSpeedMps": 1.75,
           "ratedLoadLb": 4000,
-          "doorType": "sideOpening"
+          "doorType": "sideOpening",
+          "duty": "bed"
         }
       ]
     }
@@ -205,7 +207,7 @@
     }
   ],
   "notes": [
-    "One bank, five unlike cars. The two bed cars are the right car for a trolley and the wrong one for a visitor, and nothing in the config says so -- the dispatcher has only their speed, their capacity and their transfer time to go on. Whether it learns to leave them alone for ordinary hall calls is a measurable property, and no other shipped building can ask it.",
+    "One bank, five unlike cars. The two bed cars are the right car for a trolley and the wrong one for a visitor. Car E declares it: duty bed, drafted for the owner's approval (GitHub issue #561, DECISIONS.md section D1290). Car D declares nothing. No shipped dispatcher profile weights the duty term, so every shipped dispatcher still goes on the two cars' speed and capacity alone, and the declaration changes a run only for a player who weights the term on their own copy. Whether a dispatcher learns to leave them alone for ordinary hall calls is a measurable property, and no other shipped building can ask it.",
     "Population 986 with only 70 of it below ground and NONE at the entrance. Unlike every office here, the entrance floor holds nobody: A&E arrivals are incoming traffic, not a resident population.",
     "The clinical access zone covers theatres and critical care, and diagnostics covers the lower ground. Visitors hold neither credential, so a visitor calling from G can be carried to a ward and cannot be carried to a theatre -- access zoning does the work service zoning does elsewhere.",
     "Floor-to-floor is 4.0 m throughout, deeper than an office, because hospital floors carry services and must clear a bed being wheeled under them.",

@@ -122,6 +122,46 @@ export const SURVIVOR_REGENERATE_COMMAND =
   'ELEVATOR_SIM_SURVIVORS=deep ELEVATOR_SIM_REGENERATE_SURVIVORS=1 ' +
   'npx vitest run --project viz src/scenario/survivorSweep.test.ts';
 
+/**
+ * The variable that narrows a sweep to named stages, so iterating on one stage's demand or fabric
+ * costs that stage's sweep rather than the whole table's — GitHub issue #234's ladder lane.
+ */
+export const SURVIVOR_STAGE_FILTER_VARIABLE = 'ELEVATOR_SIM_SURVIVOR_STAGES';
+
+/**
+ * The stages a filtered sweep measures, read from {@link SURVIVOR_STAGE_FILTER_VARIABLE}'s value:
+ * comma-separated stage ids or ladder positions (`9`, `stage-10-the-bed-and-the-visitor`), or
+ * `undefined` when the variable is unset or blank, which is the whole table.
+ *
+ * **A name the campaign does not ship is refused** rather than dropped. A filter of two stages with
+ * one mistyped would otherwise measure one, pass on it, and read as the two having reproduced.
+ *
+ * **A filtered sweep compares and never writes.** The table's provenance is one run over every
+ * stage, with one tree and one input hash, so splicing a partial run into it would pin some rows to
+ * a run that did not produce them. `survivorSweep.test.ts` refuses the combination.
+ */
+export function survivorStageFilterOf(
+  raw: string | undefined,
+  shippedIds: readonly string[],
+): ReadonlySet<string> | undefined {
+  if (raw === undefined || raw.trim() === '') return undefined;
+  const ids: string[] = [];
+  const unknown: string[] = [];
+  for (const token of raw.split(',').map((entry) => entry.trim()).filter((entry) => entry !== '')) {
+    const position = /^\d+$/u.test(token) ? Number(token) : undefined;
+    const id = position === undefined ? token : shippedIds[position - 1];
+    if (id === undefined || !shippedIds.includes(id)) unknown.push(token);
+    else ids.push(id);
+  }
+  if (unknown.length > 0) {
+    throw new Error(
+      `${SURVIVOR_STAGE_FILTER_VARIABLE} names ${unknown.join(', ')}, which is not a shipped stage ` +
+        `id or ladder position (1 to ${String(shippedIds.length)})`,
+    );
+  }
+  return new Set(ids);
+}
+
 /** Everything the sweep needs, loaded from the real `data/` rather than from a fixture. */
 export interface SurvivorFixture {
   readonly campaign: Campaign;
@@ -161,7 +201,11 @@ export async function loadSurvivorFixture(): Promise<SurvivorFixture> {
  * prints nothing for half an hour is one a reader assumes has hung.
  */
 export async function measurePublishedSurvivors(
-  options: { readonly onScenario?: ((line: string) => void) | undefined } = {},
+  options: {
+    readonly onScenario?: ((line: string) => void) | undefined;
+    /** {@link survivorStageFilterOf}'s set: measure only these stages. Unset measures every one. */
+    readonly only?: ReadonlySet<string> | undefined;
+  } = {},
 ): Promise<PublishedSurvivors> {
   /* Hashed before anything is measured, so the hash is of the inputs the run started from. */
   const inputs = await censusInputHashOf(DATA_DIR);
@@ -172,8 +216,10 @@ export async function measurePublishedSurvivors(
   const firstHour = firstHourScenarioIds(campaign.stages);
 
   const scenarios: PublishedSurvivorScenario[] = [];
-  const scenarioBuildings: ReturnType<typeof requireBuilding>[] = [];
+  /* Every stage's building, filtered or not, because the scope sentence below is about the campaign. */
+  const scenarioBuildings = campaign.stages.map((stage) => requireBuilding(config, stage.building));
   for (const [index, stage] of campaign.stages.entries()) {
+    if (options.only !== undefined && !options.only.has(stage.id)) continue;
     const row = published.scenarios.find((entry) => entry.id === stage.id);
     if (row === undefined) throw new Error(`no published goal row for ${stage.id}`);
     const baseline = config.dispatcherProfilesById.get(stage.dispatcher.startingProfileId);
@@ -186,7 +232,6 @@ export async function measurePublishedSurvivors(
       trafficProfiles: config.trafficProfiles,
       elevatorSpecs: config.elevatorSpecs,
     };
-    scenarioBuildings.push(resources.building);
     const started = Date.now();
     const tallies = await measureScenarioSurvivors({
       stage,
@@ -241,9 +286,11 @@ export async function measurePublishedSurvivors(
   /*
    * A priced dimension no scenario's own building gives anything to act on is priced and still
    * varied by no configuration: `sampleReachableConfigurations` skips it before its value is drawn
-   * (§ D549). `weights.dutyMismatch` is that dimension on every shipped scenario, so the scope names
-   * it rather than counting it among the varied. The words below are the duty weight's own, so any
-   * other dimension in that position is refused here until somebody writes the sentence it needs.
+   * (§ D549). `weights.dutyMismatch` was that dimension on every shipped scenario until stage 10's
+   * building declared a duty (§ D1290); it is varied there and nowhere else, and the scope says which
+   * stages rather than counting it as varied everywhere. The words below are the duty weight's own,
+   * so any other dimension in that position is refused here until somebody writes the sentence it
+   * needs.
    */
   const liveOnSomeScenario = new Set(
     scenarioBuildings.flatMap((building) => dimensionIdsLiveOn(space.ids, building)),
@@ -256,9 +303,18 @@ export async function measurePublishedSurvivors(
     throw new Error(`the scope has no words for a priced dimension no scenario draws: ${unworded.join(', ')}`);
   }
   const dutyWeightChange = reachable.find((change) => change.dimensionIds.includes('weights.dutyMismatch'));
+  const dutyVariedOn = campaign.stages
+    .filter((_stage, index) =>
+      dimensionIdsLiveOn(space.ids, scenarioBuildings[index]).includes('weights.dutyMismatch'),
+    )
+    .map((stage) => stage.id);
   const varied =
     pricedNotVaried.length === 0
-      ? `are priced and therefore varied,`
+      ? dutyVariedOn.length === campaign.stages.length
+        ? `are priced and therefore varied,`
+        : `are priced and therefore varied — weights.dutyMismatch only on ${dutyVariedOn.join(', ')}, ` +
+          `whose building declares a duty, because a dial its building gives nothing to act on is not ` +
+          `drawn (DECISIONS.md § D549, § D1290) —`
       : `are priced, of which ${String(priced - pricedNotVaried.length)} are varied — ` +
         `weights.dutyMismatch is declared and priced by ${dutyWeightChange?.changeId ?? 'no change'}, ` +
         `which covers dispatcher.weights, and is not varied on a building that declares no duty, ` +

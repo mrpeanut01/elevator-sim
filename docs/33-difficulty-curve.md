@@ -1263,6 +1263,59 @@ exceeding it. So stage 3's C2 quarter is closed to demand and open only to fabri
 `data/reference-runs.json` pins figure-for-figure and `watch/reference.test.ts` re-simulates; that is
 a wave's blast radius rather than a lane's, and it is named here rather than attempted.
 
+### 3.3g Stages 9 and 10: each zero was a rider turned away at a landing, and demand mends one of the two
+
+GitHub issue **#234**, wave AN lane AP-1 ([§ D1288](../DECISIONS.md), [§ D1289](../DECISIONS.md)).
+Both stages read zero ways through at every rung with every examined configuration suppressed. The
+decision swarm's engineering member found the shape: one tuning crowd of fifty refused its mean for
+every arm, which under common random numbers suppresses every estimate row. This section names who
+the unserved riders are, measured 2026-10-10 on the lane's base, `5c5efaf`.
+
+**Instrument.** The shipped batch path (`campaign/stageRun.ts#batchRequestForStage`,
+`batch/runBatch.ts#armConfigOf`, `record/recordRun.ts`) under `collective`, both seed sets, fifty
+crowds each. For every rider who arrived in the reporting window and never boarded: the leg record's
+own outcome (`refusedAt`, `abandonedAt`, `strandedAt`, or still waiting), the rider's credential, and
+the access zone of the floor they were going to.
+
+**Result 1: every one of them was turned away at the landing.** On stage 10 at its shipped
+2 %pop/5 min there were 9 such riders on the tuning seeds and 11 on the holdout, and none was
+waiting, abandoned or stranded at the horizon; no car refused any call structurally. Each carried no
+credential, started on a ward or on Outpatients, and was going to theatres, critical care or
+imaging: the credential gap (`data/traffic-profiles.json` `credentialGap`, § D265) doing what it was
+built to do. All five cars serve every floor, none may legally carry these riders, and core's own
+warning says no dispatcher setting reaches them. The censoring ground counts them as never served
+(§ D266 puts them in `unservedCount`), and in a window of 8 to 25 arrivals one refusal is 4 to 12.5 %,
+above the 5 % ground, so 6 tuning and 7 holdout crowds are refused their mean. Stage 9's one censored
+crowd is the same event on `crown-hotel`: a rider from floor 23 with no credential, going to the
+back-of-house floor, 1 of 17 window arrivals.
+
+**Result 2: demand thickens the window, and only stage 9's gets thick enough.** Refusals scale with
+arrivals, so the expected refused share does not move with demand; its spread does. Stage 9 at
+3.5 % still has one refusal on each seed set, in windows of 26 and 32 arrivals, and no crowd on
+either set is refused. Stage 10 does not get there inside its building's declared range: at 5, 6 and
+8 % it keeps 2 to 5 refused crowds a seed set (3 of 39, 3 of 52, 4 of 64 arrivals at the worst), and
+at 8 % queue growth suppresses crowds as well. With the member's runs from 1.0 to 4.0 %, no demand
+from 1 to 8 % clears it.
+
+**What stage 9 reads at 3.5 %.** The re-measured goal row makes `deliver-everyone` a batch goal at
+49/50 on both sets, so the stage declares it, and `answer-the-demand` reads 38/50 and 39/50. The
+survivor census reads 3 of 63 at every rung, all three from the dropdown: `auction`,
+`auction-multi-round` and `destination-panel`, each meeting every goal on both seed sets. None of the
+stage page's 39 choices and none of the 12 drawn dials gets through. That is inside position 9's band,
+and it is a named breach of § D528 clause 2 in `DROPDOWN_CLEARS`, owner-reversible.
+
+**Why stage 10's fabric is left as it is.** The ruling allowed a fabric change chosen from this
+classification. The refusals come from St Jude's access zoning meeting the credential gap, and
+removing them means re-drawing who may reach theatres, critical care and imaging, or zoning the
+wards and Outpatients so their occupants carry a clinical badge. Either leaves the hospital's zones
+refusing nobody, which is § D265's defect shape (configuration nothing can act on), and either moves
+every St Jude pin outside the campaign for a cause the stage did not author. So stage 10 stays on
+`UNWINNABLE_AS_MEASURED` with its cause recorded. The question it leaves is whether the censoring
+ground should count a rider the building refused at the landing as a censored wait. § D265's third
+bound chose the gap's share so that it would not do this at the shipped demands; stage 10 runs at a
+quarter of the hospital profile's typical demand, where it does. That is a ruling on core's validity
+rules, outside this lane.
+
 ---
 
 ## 4. The week — Today's tower and the daily loop

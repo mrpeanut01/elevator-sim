@@ -10,7 +10,7 @@
  * makes the two runs below identical, which is the failure this file exists to see.
  *
  * `predictive-balanced` is the base, with the weight authored onto it: no shipped profile carries
- * one while no shipped building declares a duty (§ D549, clause 7). It authors no
+ * one (§ D549 clause 7, and since St Jude declared a duty, § D1290's ruling). It authors no
  * `dispatch.callType`, so it runs at `up-down-buttons` — the disclosure the call makes is the
  * landing's own duty control, not a destination panel.
  */

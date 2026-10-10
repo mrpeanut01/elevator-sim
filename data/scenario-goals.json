@@ -1184,7 +1184,7 @@
       "buildingId": "crown-hotel",
       "dispatcherProfileId": "collective",
       "durationS": 900,
-      "arrivalRatePctPop5min": 2.5,
+      "arrivalRatePctPop5min": 3.5,
       "tuningSeeds": {
         "name": "tuning-20260730",
         "seed": "20260730",
@@ -1197,25 +1197,46 @@
       },
       "goals": [
         {
-          "kind": "answer-the-demand",
+          "kind": "deliver-everyone",
           "threshold": null,
           "disposition": "batch",
           "tuning": {
             "n": 50,
-            "passes": 40,
-            "fails": 10,
+            "passes": 49,
+            "fails": 1,
             "unmeasured": 0,
             "rateClass": "variable"
           },
           "holdout": {
             "n": 50,
-            "passes": 42,
-            "fails": 8,
+            "passes": 49,
+            "fails": 1,
             "unmeasured": 0,
             "rateClass": "variable"
           },
           "holdoutAgrees": true,
-          "reason": "kept up with arrivals: a batch goal, judged over the scenario's replications — 40 of 50 on the tuning seeds and 42 of 50 on the holdout seeds."
+          "reason": "everyone delivered: a batch goal, judged over the scenario's replications — 49 of 50 on the tuning seeds and 49 of 50 on the holdout seeds."
+        },
+        {
+          "kind": "answer-the-demand",
+          "threshold": null,
+          "disposition": "batch",
+          "tuning": {
+            "n": 50,
+            "passes": 38,
+            "fails": 12,
+            "unmeasured": 0,
+            "rateClass": "variable"
+          },
+          "holdout": {
+            "n": 50,
+            "passes": 39,
+            "fails": 11,
+            "unmeasured": 0,
+            "rateClass": "variable"
+          },
+          "holdoutAgrees": true,
+          "reason": "kept up with arrivals: a batch goal, judged over the scenario's replications — 38 of 50 on the tuning seeds and 39 of 50 on the holdout seeds."
         },
         {
           "kind": "beat-the-baseline",
@@ -1269,34 +1290,11 @@
           },
           "holdoutAgrees": true,
           "reason": "nobody past the give-up line: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
-        }
-      ],
-      "withheld": [
-        {
-          "kind": "deliver-everyone",
-          "threshold": null,
-          "disposition": "not-shippable",
-          "tuning": {
-            "n": 50,
-            "passes": 47,
-            "fails": 3,
-            "unmeasured": 0,
-            "rateClass": "variable"
-          },
-          "holdout": {
-            "n": 50,
-            "passes": 50,
-            "fails": 0,
-            "unmeasured": 0,
-            "rateClass": "constant-pass"
-          },
-          "holdoutAgrees": false,
-          "reason": "everyone delivered: withheld. It passed 47 of 50 on the tuning seeds and 50 of 50 on the holdout seeds, which are two different kinds of answer (variable against constant-pass). A classification that does not survive a disjoint seed set is not one to ship a level on."
         },
         {
           "kind": "long-waits-under",
           "threshold": 10,
-          "disposition": "not-shippable",
+          "disposition": "configuration-fact",
           "tuning": {
             "n": 50,
             "passes": 50,
@@ -1306,14 +1304,16 @@
           },
           "holdout": {
             "n": 50,
-            "passes": 49,
-            "fails": 1,
+            "passes": 50,
+            "fails": 0,
             "unmeasured": 0,
-            "rateClass": "variable"
+            "rateClass": "constant-pass"
           },
-          "holdoutAgrees": false,
-          "reason": "long waits kept under 10 %: withheld. It passed 50 of 50 on the tuning seeds and 49 of 50 on the holdout seeds, which are two different kinds of answer (constant-pass against variable). A classification that does not survive a disjoint seed set is not one to ship a level on."
-        },
+          "holdoutAgrees": true,
+          "reason": "long waits kept under 10 %: a fact about this configuration, not a goal — 50 of 50 on the tuning seeds and 50 of 50 on the holdout seeds. It goes in the briefing, where it is true and interesting, rather than on the scoreboard, where it would be a win or a loss the player never earned."
+        }
+      ],
+      "withheld": [
         {
           "kind": "everyone-can-get-there",
           "threshold": null,

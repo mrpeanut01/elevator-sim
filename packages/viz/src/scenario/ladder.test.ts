@@ -307,7 +307,7 @@ describe('a stage’s par is the cheapest named way through the check prices —
 });
 
 describe('the stage page is counted, and a held stage says which half stopped it — § D1183', () => {
-  it('offers the four stages the page reaches and holds the three it does not, on the shipped table', () => {
+  it('offers the four stages the page reaches and stage 9 by the dropdown, and holds the two left, on the shipped table', () => {
     /*
      * The swarm's Q3 ruling as a reading of the regenerated table: S3 pressed the page's own choices
      * and found holdout-confirmed ways through stages 2, 6, 7 and 8, which the dial sample had
@@ -319,17 +319,24 @@ describe('the stage page is counted, and a held stage says which half stopped it
       const base = survivors.scenarios.find((row) => row.id === id)?.steps.find((step) => step.stepId === null);
       expect(base?.page.survivors, `${id}: its way through is on the page`).toBeGreaterThan(0);
     }
-    for (const id of ['stage-4-two-banks', 'stage-9-both-ways-at-once', 'stage-10-the-bed-and-the-visitor']) {
+    for (const id of ['stage-4-two-banks', 'stage-10-the-bed-and-the-visitor']) {
       expect(offer.get(id), id).toBe('held');
     }
+    /*
+     * § D1288: stage 9 at 3.5 %pop/5 min is offered, and its ways through are dropdown picks rather
+     * than page choices, which is the named breach `difficultyCurve.test.ts#DROPDOWN_CLEARS` holds.
+     */
+    expect(offer.get('stage-9-both-ways-at-once')).toBe('offered');
+    const nine = survivors.scenarios
+      .find((row) => row.id === 'stage-9-both-ways-at-once')
+      ?.steps.find((step) => step.stepId === null);
+    expect(nine?.dropdown.survivors, 'stage 9: its way through is in the dropdown').toBeGreaterThan(0);
   });
 
-  it('holds stage 4 on the held-back crowds and stages 9 and 10 on their own, in words, from the counts', () => {
+  it('holds stage 4 on the held-back crowds and stage 10 on its own, in words, from the counts', () => {
     const reason = new Map(ladder().map((rung) => [rung.id, rung.heldReason ?? '']));
     expect(reason.get('stage-4-two-banks')).toMatch(/^Held back: \d+ of the \d+ ways tried at this budget met every goal on the stage’s own crowds, and none of them met every goal again on the crowds held back\./u);
-    for (const id of ['stage-9-both-ways-at-once', 'stage-10-the-bed-and-the-visitor']) {
-      expect(reason.get(id), id).toMatch(/^Held back: None of the \d+ ways tried at this budget met every goal even on the stage’s own crowds\./u);
-    }
+    expect(reason.get('stage-10-the-bed-and-the-visitor')).toMatch(/^Held back: None of the \d+ ways tried at this budget met every goal even on the stage’s own crowds\./u);
   });
 
   it('reads the reason off metOnTuning, in both arms, on a synthetic table', () => {

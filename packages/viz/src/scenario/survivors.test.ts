@@ -138,14 +138,17 @@ const UNWINNABLE_AS_MEASURED: Readonly<Record<string, string>> = Object.freeze({
     '0 of 62 at the base rung and 0 of 63 at both bought ones. Sixteen configurations at the base ' +
     'rung meet every goal on the stage’s own crowds and none on the crowds held back; 17 or 18 a ' +
     'rung suppressed.',
-  'stage-9-both-ways-at-once':
-    '0 of 63 at every rung, with **every** examined configuration suppressed — 63 of 63 three ' +
-    'times over — and none meets every goal even on the stage’s own crowds. Read the count beside ' +
-    'that: on this scenario no configuration produced a quotable mean, so a zero here says less ' +
-    'about the ways through than the other two do.',
+  /*
+   * § D1288: stage 9 left on the commit that regenerated the table at its new demand, 3.5 %pop/5 min,
+   * where it reads 3 of 63 at every rung. Its zero had been one tuning crowd refused its mean for
+   * every arm, by one rider turned away at a landing for want of a credential.
+   */
   'stage-10-the-bed-and-the-visitor':
     '0 of 63 at every rung, every examined configuration suppressed and none meeting every goal ' +
-    'even on the stage’s own crowds — the same shape as stage 9 and the same caveat.',
+    'even on the stage’s own crowds, so a zero here says less about the ways through than stage ' +
+    '4’s does. The cause is measured (§ D1289): every rider left unserved in a window is one the ' +
+    'building turned away at the landing for want of a credential, and one in a window of 8 to 25 ' +
+    'arrivals trips the 5 % censoring ground for every arm alike.',
 });
 
 /**

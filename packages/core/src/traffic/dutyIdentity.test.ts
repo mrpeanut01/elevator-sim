@@ -26,7 +26,7 @@ import {
   type ResolvedBuilding,
 } from '../config/types.js';
 import { StreamSet } from '../random/index.js';
-import { withDuty } from '../sim/duty.test-helper.js';
+import { withDuty, withoutDuty as undeclaredFormOf } from '../sim/duty.test-helper.js';
 import { runSimulation } from '../sim/simulation.js';
 
 import { generateTrace } from './generator.js';
@@ -56,13 +56,23 @@ const SHIPPED = [
   'willis-class-reference',
 ] as const;
 
+/**
+ * The shipped cars that declare a duty, as `${bankId}-${carId}`: St Jude's car E, a bed lift drafted
+ * for the owner's approval (GitHub issue #561, `DECISIONS.md` § D1290). Every other building
+ * declares none, and is the population the byte-identity cases below run over.
+ */
+const DECLARED: Readonly<Record<string, Readonly<Record<string, Duty>>>> = Object.freeze({
+  'st-jude-hospital': { 'main-E': 'bed' },
+});
+const UNDECLARED = SHIPPED.filter((id) => DECLARED[id] === undefined);
+
 const NOBODY: DutyShares = { goods: 0, bed: 0, service: 0 };
 const EVERYBODY: DutyShares = { goods: 0.4, bed: 0.3, service: 0.3 };
 
 /**
  * The generalist every search-space probe starts from. The duty weight is authored onto it here,
- * because no shipped profile carries one while no shipped building declares a duty — the guard
- * below is that rule, and § D549 is why.
+ * because no shipped profile carries one: the guard below held that while no shipped building
+ * declared a duty (§ D549), and § D1290's ruling holds it since St Jude's car E declares one.
  */
 const BASE_PROFILE_ID = 'predictive-balanced';
 
@@ -98,12 +108,14 @@ const dutyColumn = (trace: PassengerTrace): readonly (Duty | undefined)[] =>
   trace.passengers.map((passenger) => passenger.duty);
 
 describe('a building that declares no duty is byte-identical', () => {
-  it('names the fourteen buildings from disk, and none of them declares a duty', () => {
+  it('names every building from disk, and only St Jude’s car E declares a duty — § D1290', () => {
     expect([...config.buildingsById.keys()].sort()).toEqual([...SHIPPED]);
     for (const id of SHIPPED) {
+      const declared: Record<string, Duty> = {};
       for (const bank of buildingOf(id).banks) {
-        for (const car of bank.cars) expect('duty' in car, `${id} ${bank.id}-${car.id}`).toBe(false);
+        for (const car of bank.cars) if (car.duty !== undefined) declared[`${bank.id}-${car.id}`] = car.duty;
       }
+      expect(declared, id).toEqual(DECLARED[id] ?? {});
     }
   });
 
@@ -112,6 +124,9 @@ describe('a building that declares no duty is byte-identical', () => {
     // shipped configuration is dropped rather than shipped, and the Engineer rail describes a profile
     // by the terms it weights. So a shipped weight lands with the first shipped building that
     // declares a duty, or with the control that lets a player declare one — § D549, clause 7.
+    // St Jude declares one since § D1290, so this guard is satisfied and no longer holds a weight
+    // out: what keeps the approved 0.35 off capacity-aware is that ruling (a shipped weight waits for
+    // a paired-t interval), and applying it is one row of data/dispatcher-profiles.json.
     const declares = SHIPPED.some((id) =>
       buildingOf(id).banks.some((bank) => bank.cars.some((car) => car.duty !== undefined)),
     );
@@ -121,7 +136,7 @@ describe('a building that declares no duty is byte-identical', () => {
     expect(declares || weighting.length === 0, `weighted by ${weighting.join(', ')}`).toBe(true);
   });
 
-  it.each(SHIPPED)('%s draws the same trace, byte for byte, at any duty share', (id) => {
+  it.each(UNDECLARED)('%s draws the same trace, byte for byte, at any duty share', (id) => {
     const building = buildingOf(id);
     const shipped = JSON.stringify(traceOf(building, undefined));
     expect(shipped.includes('"duty"')).toBe(false);
@@ -129,7 +144,7 @@ describe('a building that declares no duty is byte-identical', () => {
     expect(JSON.stringify(traceOf(building, EVERYBODY))).toBe(shipped);
   });
 
-  it.each(SHIPPED)(
+  it.each(UNDECLARED)(
     '%s runs the same legs, byte for byte, whether or not the profile weights duty',
     (id) => {
       const building = buildingOf(id);
@@ -177,6 +192,48 @@ describe('a building that declares no duty is byte-identical', () => {
      */
     900_000,
   );
+});
+
+describe('the shipped building that declares a duty runs its undeclared legs until a profile weights the term — § D1290', () => {
+  /*
+   * GitHub issue #561. St Jude's car E is a bed lift. Declaring it adds a duty column to the trace and
+   * to every leg record, and moves nothing else under a profile that does not weight `dutyMismatch`,
+   * which is every shipped profile; a weight on the term then moves the legs. Both halves on the
+   * shipped document, against the same building with the declaration stripped, which is what it was
+   * before this commit.
+   */
+  const stJude = (): ResolvedBuilding => buildingOf('st-jude-hospital');
+
+  it('draws the undeclared trace plus a duty column, byte for byte', () => {
+    const declared = traceOf(stJude(), undefined);
+    expect(declared.passengers.some((passenger) => passenger.duty === 'bed')).toBe(true);
+    expect(withoutDuty(declared)).toBe(JSON.stringify(traceOf(undeclaredFormOf(stJude()), undefined)));
+  });
+
+  it('runs the undeclared legs under an unweighted profile, and other legs once the term is weighted', () => {
+    const unweighted = config.dispatcherProfilesById.get('collective');
+    if (unweighted === undefined) throw new Error('no profile "collective"');
+    const weighted = { ...unweighted, weights: { ...unweighted.weights, dutyMismatch: 0.5 } };
+    const legsOf = (building: ResolvedBuilding, profile: typeof unweighted): string => {
+      const result = runSimulation({
+        building,
+        dispatcherProfile: profile,
+        trafficProfiles: config.trafficProfiles,
+        elevatorSpecs: config.elevatorSpecs,
+        seed: Number(SEED),
+        durationS: 1800,
+        onTimeout: 'report',
+      });
+      return JSON.stringify(
+        result.record.passengers.map((leg) => [leg.passengerId, leg.carId ?? null, leg.boardedAt ?? null, leg.alightedAt ?? null]),
+      );
+    };
+    const before = legsOf(undeclaredFormOf(stJude()), unweighted);
+    expect(JSON.parse(before).length, 'the run carried people').toBeGreaterThan(10);
+    expect(legsOf(stJude(), unweighted), 'the declaration alone').toBe(before);
+    expect(legsOf(undeclaredFormOf(stJude()), weighted), 'the weight alone, with nothing to price').toBe(before);
+    expect(legsOf(stJude(), weighted), 'the declaration and the weight together').not.toBe(before);
+  });
 });
 
 describe('a building that declares a duty draws it without moving any other draw', () => {
@@ -251,8 +308,9 @@ describe('the shares are a proposal the owner approved, and the record says both
      * The product owner approved the three shares and the drafted 0.35 weight as drafted on
      * 2026-09-11. The approval is recorded where the figures live and does not replace their
      * provenance: they are still an agent's proposal, not a citation and not a measurement. It does
-     * not apply the weight either — the shipped-weight case above still holds it out of every
-     * shipped profile while no shipped building declares a duty.
+     * not apply the weight either. The shipped-weight case above held it out of every shipped
+     * profile while no shipped building declared a duty; since St Jude declares one (§ D1290) that
+     * ruling, not the guard, keeps it out.
      */
     const file = JSON.parse(readFileSync(join(DATA_DIR, 'traffic-profiles.json'), 'utf8')) as {
       readonly duty: { readonly shares: Readonly<Record<string, number>>; readonly $comment: string };

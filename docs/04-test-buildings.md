@@ -222,9 +222,11 @@ so it ships with its own `hospital` traffic profile and is meant to be run again
 empties into.
 
 Three firsts. The bank holds **two bed cars** at 4,000 lb and 1.75 m/s beside three public cars at
-3,500 lb and 2.5 m/s, so a dispatcher has only speed, capacity and transfer time to tell them apart
+3,500 lb and 2.5 m/s, and every shipped dispatcher tells them apart by speed and capacity alone
 — whether it learns to leave them alone for an ordinary hall call is measurable, and no other
-building can ask it. It is the **first shipped building to declare a `stairs` transport mode**, so
+building can ask it. Car E also declares a bed duty, drafted for the owner's approval (GitHub issue
+#561, [`DECISIONS.md`](../DECISIONS.md) § D1290); no shipped profile weights the duty term, so the
+declaration moves a run only when a player's own dispatcher weights it. It is the **first shipped building to declare a `stairs` transport mode**, so
 the asymmetric-propensity model of [`docs/14` § 3.3](14-building-behaviour-contract.md) finally has
 a caller in `data/` rather than only in a test fixture. And the entrance is **not** the only crowd
 source: Outpatients on floor 1 holds 180 people, so a clinic ending sends a burst *downward from an

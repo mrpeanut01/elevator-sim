@@ -162,7 +162,7 @@ function familyRoutesFor(entry: FixitCase, asBuilt: SimulationConfig, resources:
   routes.push({ label: 'doors:4/2', state: { ...empty, doorDwell: { [EVERY_CAR]: { hallCallS: 4, carCallS: 2 } } } });
   const standing = standingDialValuesOf(asBuilt.dispatcherProfile);
   const live = liveDialIdsOf(asBuilt.dispatcherProfile, {});
-  for (const group of dialGroupsOf(schedule)) {
+  for (const group of dialGroupsOf(schedule, asBuilt.building)) {
     for (const parameter of group.parameters) {
       if (parameter.type !== 'categorical' && parameter.type !== 'boolean') continue;
       if (!live.has(parameter.id)) continue;

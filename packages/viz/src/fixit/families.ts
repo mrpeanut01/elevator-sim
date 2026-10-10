@@ -62,6 +62,7 @@ import {
   type SearchSpace,
 } from '@elevator-sim/experiments/browser';
 
+import { dimensionIdsLiveOn, type DutyDeclarations } from '../authoring/dispatcherSpec.js';
 import { controlsFor } from '../controls/controls.js';
 import { admitEditedVector, valuesFromProfile } from '../controls/editedProfile.js';
 import type { PriceSchedule } from '../pricing/types.js';
@@ -89,12 +90,15 @@ const OWN_CONTROL = 'idle.parkingStrategy';
  * rather than by reading them, and held **both ways** by `families.test.ts`: every entry here must
  * still leave all eighteen cases' legs untouched at both ends of its range, so the day a fix case
  * is set in a building where it binds, the register entry fails and has to go.
+ *
+ * **Empty since `st-jude-hospital` declared car E a bed lift** (GitHub issue #561, § D1290). Its one
+ * entry was `weights.dutyMismatch`, inert on every case because no fix case's building declared a
+ * duty. Two of St Jude's three cases keep that declaration, so the weight binds there and the entry
+ * went on the commit that made it false. Where the duty dial is drawn is now decided by the
+ * building, through {@link dialGroupsOf}'s `building` argument, not by this register. It is kept,
+ * empty, for the next dimension a run of every dial finds inert on every case.
  */
-export const INERT_DIALS: Readonly<Record<string, string>> = Object.freeze({
-  'weights.dutyMismatch':
-    'the term prices a rider riding a car of the wrong duty, and no building a fix case is set in ' +
-    'declares a duty on any car, so the term is zero on every call whatever it is weighted.',
-});
+export const INERT_DIALS: Readonly<Record<string, string>> = Object.freeze({});
 
 /** The dimension whose options are this building's floors rather than its declared range. */
 export const PARKING_FLOOR_DIMENSION = 'idle.parkingFloorIndex';
@@ -118,17 +122,28 @@ export interface DialGroup {
 }
 
 /**
- * The dials the editor offers, grouped by the schedule row that prices them. **Derived**, see the
- * module docstring; a row the schedule does not carry contributes nothing rather than throwing,
- * because an absent row is a price list that sells nothing there.
+ * The dials the editor offers on `building`, grouped by the schedule row that prices them.
+ * **Derived**, see the module docstring; a row the schedule does not carry contributes nothing
+ * rather than throwing, because an absent row is a price list that sells nothing there.
+ *
+ * **The building is required**, for `authoring/dispatcherSpec.ts#inertTerms`' reason: a weight no
+ * car of the building gives anything to act on is not drawn there (§ D549), and an optional
+ * building is a refusal some caller will not pass. Callers pass the building the next run is built
+ * from. `weights.dutyMismatch` is the dimension this decides today: drawn on the St Jude cases
+ * whose building keeps car E's bed duty, and on no other (GitHub issue #561, § D1290).
  */
-export function dialGroupsOf(schedule: PriceSchedule, space: SearchSpace = fixitDialSpace()): readonly DialGroup[] {
+export function dialGroupsOf(
+  schedule: PriceSchedule,
+  building: DutyDeclarations,
+  space: SearchSpace = fixitDialSpace(),
+): readonly DialGroup[] {
+  const live = new Set(dimensionIdsLiveOn(space.ids, building));
   const groups: DialGroup[] = [];
   for (const changeId of DIAL_CHANGE_IDS) {
     const change = schedule.changes.find((candidate) => candidate.id === changeId);
     if (change === undefined) continue;
     const parameters = dimensionsCoveredBy(space, change)
-      .filter((id) => id !== OWN_CONTROL && INERT_DIALS[id] === undefined)
+      .filter((id) => id !== OWN_CONTROL && INERT_DIALS[id] === undefined && live.has(id))
       .map((id) => space.byId.get(id))
       .filter((parameter): parameter is SearchParameter => parameter !== undefined);
     if (parameters.length > 0) groups.push({ changeId, name: change.name, parameters });

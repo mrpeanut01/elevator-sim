@@ -441,12 +441,23 @@ const DC2B_SHORT: ReadonlySet<string> = new Set<string>([]);
  * is the stage's own lesson (*a gain living only in these passenger traces has somewhere to fail*)
  * arriving from the dropdown, and it is a DC-2 breach at position seven all the same, recorded rather
  * than rebalanced.
+ *
+ * **Stage 9 entered on 2026-10-10 as a named breach, owner-reversible** ([§ D1288](../../../../DECISIONS.md),
+ * decision swarm DP's ruling on #558 option (ii)). At its old 2.5 %pop/5 min one tuning crowd was
+ * refused its mean for every arm, so nothing could meet a bar and the stage was unjudgeable. At
+ * 3.5 % no crowd is refused, and `auction`, `auction-multi-round` and `destination-panel` meet every
+ * goal on the tuning seeds and again on the holdout, read through `playToVerdict` over all twelve
+ * admitted profiles, which is this file's deep tier's own press; the regenerated survivor table counts
+ * the same three as its only ways through. Stage 9 is position nine, which § D528 clause 2 reaches,
+ * and the swarm ruled that a stage that can be won beats one that cannot be judged. Reverting the
+ * demand removes the row with the breach.
  */
 const DROPDOWN_CLEARS: Readonly<Record<string, readonly string[]>> = Object.freeze({
   'stage-1-first-call': ['zoned-uppeak'],
   'stage-3-overwhelmed': ['fairness-first'],
   'stage-5-credentials': ['auction', 'capacity-aware', 'energy-aware', 'eta', 'fairness-first', 'predictive-balanced'],
   'stage-7-prove-it': ['auction-multi-round', 'collective-enroute', 'predictive-balanced'],
+  'stage-9-both-ways-at-once': ['auction', 'auction-multi-round', 'destination-panel'],
 });
 
 /**

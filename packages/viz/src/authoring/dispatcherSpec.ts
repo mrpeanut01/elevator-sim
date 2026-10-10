@@ -436,6 +436,12 @@ interface InertTerm {
  *
  * A standing id that names no building (`undefined`) declares nothing: no run can be built on it, so
  * no run carries a duty either.
+ *
+ * **One shipped building declares a duty since § D1290**: `st-jude-hospital`'s car E is a bed lift
+ * (GitHub issue #561). The predicate did not change, and that is the point of asking it of the
+ * building: the refusal stopped speaking on St Jude, in its fix-it cases, Free Play, the workshop and
+ * stage 10, on the commit that declared the duty, and it still speaks on every building that declares
+ * none. No shipped profile weights the term, so the dial is live there only on a player's own copy.
  */
 function termsInertOnBuilding(building: DutyDeclarations | undefined): readonly InertTerm[] {
   if (building !== undefined && buildingDeclaresDuty(building)) return [];

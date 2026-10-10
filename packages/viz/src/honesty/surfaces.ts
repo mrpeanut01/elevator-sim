@@ -4783,8 +4783,9 @@ const AUTHORING: SurfaceAdapter = {
         },
       },
       /*
-       * § D549's vector: a weighted `dutyMismatch` on the case's own building, which declares no duty
-       * — no shipped building does — so the refusal the editor and the workshop draw is swept.
+       * § D549's vector: a weighted `dutyMismatch` on the case's own building, so the refusal the
+       * editor and the workshop draw is swept wherever the building declares no duty — every shipped
+       * building but St Jude, whose car E declares a bed duty since § D1290 and earns no refusal.
        */
       {
         label: 'inert-dutymismatch',
@@ -8823,7 +8824,7 @@ const FIXIT: SurfaceAdapter = {
       };
       const standing = new Map(context.space.parameters.map((parameter) => [parameter.id, parameter.default]));
       for (const affordable of [true, false]) {
-        const groups: DialGroupInput[] = dialGroupsOf(schedule, context.space).map((group) => ({
+        const groups: DialGroupInput[] = dialGroupsOf(schedule, context.building, context.space).map((group) => ({
           row: rowOf(group.changeId, affordable),
           dials: group.parameters.map((parameter) => {
             const words = playerWordsOfDimension(parameter.id);

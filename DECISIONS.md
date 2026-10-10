@@ -35338,6 +35338,8 @@ reservation was open, and the numbers below D537 are not written on this lane's 
 
 ## D549 — Duty is a closed vocabulary declared per car; a journey draws one on its own stream, and dispatch prices a mismatch through one weighted term
 
+> **Status 2026-10-10: AMENDED by [§ D1290](#d1290).** St Jude's car E declares a bed duty, drafted for approval, and clause 7's approved 0.35 weight stays unapplied by that ruling rather than by the shipped-weight guard. See [`docs/39`](docs/39-decisions-in-force.md).
+
 **Date: 2026-09-11 · GitHub issue #481 · Builds the project owner's ruling of 2026-09-10, given on the issue: *"Duty binds dispatch through a cost term. A mismatch between a rider's duty and a car's costs a weighted penalty declared in data, so a profile can express anything from a preference to near-exclusive use. The vocabulary is a closed list, declared per car."***
 
 **Why an entry.** It reaches past every module it touches — a field on `CarConfig`, a required block in `data/traffic-profiles.json`, a named stream, a field on the trace, the passenger, the leg record, the dispatch call and the cost request, and a cost term, across `config/`, `random/`, `traffic/`, `model/`, `metrics/`, `sim/`, `dispatch/` and two data files — and it closes the three questions `data/buildings/README.md` § *Duty* left for an entry ([§ D404](#d404), [§ D405](#d405)).
@@ -50028,3 +50030,132 @@ cells, each paired with its twin and required to differ, played by both halves (
 the host's own rebuild); `core/config/rushRebuild.test.ts`, `rushPurse.test.ts`'s spend describe and
 `priceSchedule.test.ts`; and the viewer's `rushRebuild.test.ts`, `host.test.ts`'s rebuild case and the
 copy registers' pins.
+
+---
+
+## D1288 — stage 9 runs at 3.5 %pop/5 min: its one censored crowd was a rider refused at a landing, and at that demand it clears from the dropdown as a named breach
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (decision swarm DP's reconciled
+> ruling § 2, lane AP-1, wave AN; GitHub issues #234 and #558, option (ii)), not by the product
+> owner. **Owner-reversible**: stage 9's `arrivalRatePctPop5min` back to 2.5 in `data/campaign.json`
+> and `scenario/candidates.ts` (one value the loader holds equal in both), then one regeneration of
+> the goal table and the survivor census; the dropdown breach leaves with it. The swarm's owner
+> question 4 (*may stage 9 clear from the dropdown, registered as a named breach?*) has the studio
+> default *yes*.
+
+**Why an entry.** It moves a survivor-census input and a stage's declared goals, and it registers a
+§ D528 clause 2 breach, which reaches `campaign/difficultyCurve.test.ts`, `docs/10` § M30 and
+`docs/33` § 3.3g.
+
+**The measurement** (`docs/33` § 3.3g has it in full). At 2.5 % one tuning crowd of fifty was refused
+its mean for every arm: 1 of 17 window arrivals never served, and that rider was turned away at the
+landing for want of a credential (no badge, floor 23 to the back-of-house floor), which the censoring
+ground counts as never served. Under common random numbers that one crowd suppressed every
+configuration's estimate rows, so the census read 0 of 63, 63 suppressed, at every rung. Lowering
+demand keeps a crowd refused (S3: 2.0 and 1.5). At 3.5 % the same kind of refusal falls inside
+windows of 26 and 32 arrivals and no crowd on either seed set is refused.
+
+**What moved.**
+
+- `data/scenario-goals.json`, stage 9's row only; every other row reproduced. `deliver-everyone` is
+  a batch goal at 49/50 on both sets (it was withheld, 47/50 against 50/50), `answer-the-demand`
+  reads 38/50 and 39/50 (40 and 42), and `long-waits-under` is a constant at 50/50 on both. The
+  stage declares `deliver-everyone`, because `campaign/parse.ts` refuses a live goal left out.
+  `docs/10` § M30's row, totals (23 / 36 / 1) and footnote are reprinted from the table.
+- `data/scenario-survivors.json`: stage 9 reads **3 of 63 at every rung**, all three from the
+  dropdown, `auction`, `auction-multi-round` and `destination-panel`; none of the 39 page choices
+  and none of the 12 drawn dials. The same three are what the DC-2 reading finds meeting every goal
+  on the tuning seeds through `playToVerdict`, and all three hold on the holdout.
+- Registers, on the regeneration's commit: stage 9 leaves `survivors.test.ts#UNWINNABLE_AS_MEASURED`
+  and `survivorBands.test.ts#OUTSIDE_THEIR_BAND` (3 of 63 is inside position 9's band, ceiling 0.10)
+  and enters `difficultyCurve.test.ts#DROPDOWN_CLEARS` with the three, none refused on the holdout.
+  `ladder.test.ts` reads stage 9 offered.
+
+**The guard #558 asked for.** `survivorBands.test.ts`: every goal a stage declares is a batch goal in
+the published table and variable on both seed sets under its baseline. It is red on the trap #558
+recorded (a declared goal the regeneration moved into the configuration facts, so `judgeStage` reads
+`met: null` everywhere) and on a declared goal gone constant.
+
+**Dissent and what was not taken.** S2 would have rebalanced stages 3, 7 and 8 first, for dominance,
+and S1 would have opened stage 4; two of three took 9 and 10. Option (i), declaring stage 9 a
+diagnosis, was refused because the copy would be false on both halves. A demand that lifts the
+censoring and also keeps the stage off the dropdown was not searched: the one rate measured to lift
+it admits the three profiles above, and finding one that does both is a following lane's.
+
+## D1289 — stage 10's zero is the credential gap counted as censoring; its fabric is left as it is and the cause is recorded
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (decision swarm DP's reconciled
+> ruling § 2, lane AP-1, wave AN; GitHub issue #234), not by the product owner. **Owner-reversible**:
+> nothing is changed, so nothing needs undoing; the question this leaves open is put below.
+
+**Why an entry.** The ruling scheduled a fabric change to stage 10 *chosen after the investigation*.
+This entry records the investigation and refuses the change, which moves something already recorded
+(the swarm's plan, posted on #234).
+
+**The measurement** (`docs/33` § 3.3g). For every rider who arrived in stage 10's reporting window
+and never boarded, under `collective`, fifty crowds a seed set at the shipped 2 %pop/5 min: 9 on the
+tuning seeds and 11 on the holdout, **every one of them refused at the landing for want of a
+credential**, none waiting, abandoned or stranded at the horizon, and no call structurally refused
+by any car. Each started on a ward or on Outpatients with no badge and was going to theatres,
+critical care or imaging. All five cars serve every floor and none may legally carry them. Because
+§ D266 counts a refused leg in `WaitStatistics.unservedCount`, the censoring ground reads one refusal
+in a window of 8 to 25 arrivals as 4 to 12.5 % unserved, and 6 tuning and 7 holdout crowds are refused
+their mean. Demand does not mend it: refusals scale with arrivals, and at 5, 6 and 8 % (inside the
+hospital profile's declared range) 2 to 5 crowds a set stay refused, with queue growth joining at 8.
+
+**The ruling.** No fabric change. Removing the refusals means re-drawing who may reach the clinical
+and diagnostics floors, or zoning the wards and Outpatients so their occupants carry a clinical
+badge, and either leaves St Jude's zones refusing nobody: § D265's defect shape, and a move of every
+St Jude pin outside the campaign for a cause stage 10 did not author. Stage 10 stays on
+`UNWINNABLE_AS_MEASURED` with the cause in its row, and no diagnosis is declared.
+
+**The question it leaves.** Whether the censoring ground should count a rider the building refused at
+the landing as a censored wait. Its stated reason (*the legs that boarded are the riders who waited
+least*) does not describe a rider who never waited, and § D265's third bound chose the gap's share so
+that it would not trip the ground at the shipped demands. Stage 10 runs at a quarter of the hospital
+profile's typical demand, where it does. Changing `awtIsValid` is a ruling on core's statistical
+rules, for a swarm and outside this lane.
+
+## D1290 — St Jude's car E declares a bed duty, drafted for approval, and no shipped profile weights the term
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (decision swarm DP's reconciled
+> ruling, unanimous on the content and two of three to build now; lane AP-1, wave AN; GitHub issue
+> #561), not by the product owner. **Owner-reversible**, each as one data row: removing
+> `"duty": "bed"` from car E in `data/buildings/st-jude-hospital.json`, and applying § D549's approved
+> `capacity-aware` 0.35 in `data/dispatcher-profiles.json`, which this entry leaves the owner to call.
+
+**Why an entry.** It amends § D549 clause 7's trigger, it is governed data, and it moves pins in
+`core` (`traffic/dutyIdentity.test.ts`), the fix-it editor (`fixit/families.ts#INERT_DIALS`) and the
+fix-it census (`data/fixit-as-built-mornings.json`'s input digests).
+
+**The ruling.** Car E, one of St Jude's two geared side-opening cars, declares `bed`, with a
+`$comment` marking it an agent's proposal. Car D stays undeclared, because the swarm ruled one car
+and the issue measured one. No shipped profile weights `dutyMismatch`, so the dropdown stays at
+thirteen and no figure pinned for a named dispatcher moves. The issue's AC1 is narrowed to *a
+player's working copy weights it*; a shipped weight waits for a paired-t interval at 50 to 200
+replications. That clause disagrees with § D549 clause 7's plan, which tied the owner-approved weight
+to the first declaring building; the later ruling stands until the owner says otherwise.
+
+**The measurement, on the legs** (St Jude, its authored demand, 1 800 s, five seeds, car E as `bed`).
+The declaration alone leaves every leg identical under all thirteen shipped profiles on five of five
+seeds, and `collective`'s recording is byte-identical. A weight of 0.5 alone, on the building without
+the declaration, moves nothing. Both together move 202 to 243 of 220 to 271 legs a seed, and car E
+carries fewer riders on every seed (40 to 33, 50 to 41, 39 to 31, 42 to 37, 39 to 37). The mean wait
+moved both ways across the seeds (26.9 to 24.6 s, 12.0 to 16.5, 20.8 to 28.6, 27.3 to 28.2, 18.9 to
+21.1), so no claim is made about better or worse.
+
+**What a player gets.** `authoring/dispatcherSpec.ts`'s refusal is unchanged as a predicate and stops
+speaking on St Jude: the duty dial is live in Free Play, the workshop and the Engineer editor there,
+and drawn in the two St Jude fix-it cases whose as-built building keeps car E
+(`deliveries-on-the-passenger-group`, `every-letter-says-nine`; `bed-cars-locked-out` re-authors the
+banks and declares nothing). The fix-it editor's dial groups are per building
+(`fixit/families.ts#dialGroupsOf` takes the building), and `INERT_DIALS` is empty. Stage 10's census
+draws the weight on its dials. Stage 10's brief no longer says the dispatcher tells the bed cars apart
+by transfer time, which the model does not give them.
+
+**Tests.** `authoring/stJudeDuty.test.ts` (the refusal by building, the declaration-only identity, the
+weighted legs, five seeds), `fixit/families.test.ts` (the duty dial drawn exactly where a case's
+building declares a duty, inert at both ends of its range elsewhere, binding on the St Jude cases),
+and `core`'s `traffic/dutyIdentity.test.ts` (St Jude's trace is the undeclared trace plus a duty
+column; its legs are the undeclared legs until the term is weighted). Red before on the base building
+file: 5 of 20 viz cases and 3 of the core cases.

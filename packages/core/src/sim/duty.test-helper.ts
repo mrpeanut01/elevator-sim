@@ -1,10 +1,11 @@
 /**
  * A shipped building with duty declared on named cars — GitHub issue #481, `DECISIONS.md` § D549.
  *
- * **No shipped building declares a duty, and that is deliberate rather than an omission.** A
- * declaration moves that building's runs, `data/` is draft-and-approve, and the control that lets a
- * player declare one is step 4 of `data/buildings/README.md` § *Duty*. So every test that needs a
- * building that declares one derives it here from a real building rather than authoring a new one.
+ * **One shipped building declares a duty**: `st-jude-hospital`'s car E is a bed lift, drafted for
+ * the owner's approval (GitHub issue #561, `DECISIONS.md` § D1290). A declaration is governed data
+ * and the control that lets a player declare one is still unbuilt (`data/buildings/README.md`
+ * § *Duty*), so a test that needs a duty anywhere else derives it here from a real building rather
+ * than authoring a new one, and {@link withoutDuty} gives back the undeclared form of one that does.
  *
  * Cars are named the way a run's legs name them — `${bankId}-${carId}`, which is what
  * `Simulation` gives a `Car` and `PassengerRecord.carId` carries — so a test can price a leg against
@@ -32,5 +33,18 @@ export function withDuty(
       `${building.id} has no car ${[...unclaimed].join(', ')}; name a car as <bankId>-<carId>.`,
     );
   }
+  return { ...building, banks };
+}
+
+/** The same building with every car's duty removed: the form it had before any car declared one. */
+export function withoutDuty(building: ResolvedBuilding): ResolvedBuilding {
+  const banks = building.banks.map((bank) => ({
+    ...bank,
+    cars: bank.cars.map((car) => {
+      if (car.duty === undefined) return car;
+      const { duty: _declared, ...rest } = car;
+      return rest;
+    }),
+  }));
   return { ...building, banks };
 }

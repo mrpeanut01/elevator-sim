@@ -325,13 +325,11 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          * dimension id whose options are floors, the rezone target id for a car taken out, and the
          * two functions returning `covers` paths. Dotted config paths and engine ids, on
          * `editorPathsOf`'s ground above — a path is not a sentence, and § 16 rule 11 is why every
-         * one of them is mapped to a phrase before it is drawn. `INERT_DIALS`' reasons are this
-         * module's record of why a dial is not drawn, read by `families.test.ts` and by nobody on a
-         * screen.
+         * one of them is mapped to a phrase before it is drawn. (`INERT_DIALS` left this list when
+         * § D1290 emptied it: an empty record produces no string, so it is no longer a producer.)
          */
         'fixit/families.ts#DIAL_CHANGE_IDS',
         'fixit/families.ts#PARKING_FLOOR_DIMENSION',
-        'fixit/families.ts#INERT_DIALS',
         'fixit/families.ts#doorDwellPathsOf',
         'fixit/families.ts#rezonePathsOf',
         'fixit/types.ts#OUT_OF_SERVICE',

@@ -400,8 +400,9 @@ export function timedOutConfig(
 /**
  * A building with its first car declared a goods car — GitHub issue #481, `DECISIONS.md` § D549.
  *
- * No shipped building declares a duty, and that is deliberate, so every viz test that needs one
- * derives it from a real building here rather than authoring a document — `core`'s
+ * One shipped building declares a duty, `st-jude-hospital`'s car E (GitHub issue #561, § D1290), and
+ * a test that needs a duty somewhere else, or a goods car rather than a bed car, still derives it
+ * from a real building here rather than authoring a document — `core`'s
  * `sim/duty.test-helper.ts#withDuty` makes the same move on its side of the package boundary.
  * Structural rather than bound to one shape: the Engineer editor reads the authored document, the
  * workshop and the scenario sweep read the resolved one, and the rule under test reads both.
