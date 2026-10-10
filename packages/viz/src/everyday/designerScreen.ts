@@ -85,8 +85,10 @@ import {
   withShaftStep,
   DESIGNER_COPY as COPY,
 } from './designerModel.js';
+import { actionBarFor, type ActionBarModel } from './actionBar.js';
 import { everydayProfileStore } from './profileStore.js';
 import type { EverydayScreenModule } from './screens.js';
+import type { EverydayState } from './types.js';
 import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.js';
 import {
   EVERYDAY_COLORS as C,
@@ -127,8 +129,15 @@ function cardStyle(): string {
   return `border:1px solid ${C.rule};border-radius:${String(R.card)}px;background:${C.card};padding:15px 17px;min-width:0`;
 }
 
+/**
+ * The mounted screen's host, for {@link designerBar}'s § D1360 question. Module-level because the
+ * shell asks `bar()` with a state and no handle, `fixitScreen.ts`'s seam; cleared on unmount.
+ */
+let designerHost: EverydayScreenShellContext['host'] | undefined;
+
 function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedEverydayScreen {
   const doc = host.ownerDocument;
+  designerHost = context.host;
   const specs = context.host.elevatorSpecs();
   const classes = designerClasses(specs);
 
@@ -1020,6 +1029,9 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
   host.append(root);
 
   return {
+    unmount: () => {
+      designerHost = undefined;
+    },
     /* § 3.3's primary — *Run a day in it*: apply, run, and hand off to the stage. */
     primary: () => {
       if (applyAndReport() === undefined) {
@@ -1034,12 +1046,22 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
 }
 
 /**
- * The registry row. § 3.3's designer row is static — `⌂ Modes`, no back, no timeline, primary
- * *Run a day in it*, note *Nothing here is scored. It is a drawing board.* — so there is no `bar()`
- * refinement: `actionBar.ts` already resolves the row whole, and a refinement that re-stated the
- * note would be the same sentence in two places.
+ * The § 3.3 row, refined in one state only — wave AO, lane AO-1, [§ D1360](../../../../DECISIONS.md).
+ * The row is static (`⌂ Modes`, no back, no timeline, primary *Run a day in it*, note *Nothing here
+ * is scored. It is a drawing board.*), and it is resolved whole by `actionBar.ts` except while a
+ * scored attempt stands on the week on screen: *Run a day in it* would move that week onto a drawn
+ * tower and run it, so the primary is inert with the host's sentence, which the shell draws in
+ * place of the note. *Save as a new building* refuses with the same words, quoted under the plate.
  */
+function designerBar(state: EverydayState): ActionBarModel {
+  const base = actionBarFor(state);
+  const held = designerHost?.attemptHold();
+  return held === undefined ? base : { ...base, primary: { ...base.primary, inert: held } };
+}
+
+/** The registry row — GAMEPLAY § 13's screen. */
 export const DESIGNER_SCREEN: EverydayScreenModule = {
   key: 'designer',
   mount,
+  bar: designerBar,
 };

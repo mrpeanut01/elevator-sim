@@ -120,6 +120,101 @@ export interface DayAttempt {
    * attempt whose pinned call has not been answered, or whose runs have not landed.
    */
   readonly pinnedCall?: DayCallRecord | undefined;
+  /**
+   * **The tab holding this attempt** — wave AO, lane AO-1, [§ D1361](../../../../DECISIONS.md).
+   * A tab's name for itself, drawn once per page load and never stored anywhere else
+   * (`dev/main.ts#attemptTab`). `null` once the tab that held it let it go (it closed, reloaded or
+   * navigated away), and absent on an attempt stored before wave AO; both read as
+   * {@link attemptHoldOf}'s `'free'`.
+   */
+  readonly holder?: string | null | undefined;
+}
+
+/* -------------------------------------------------------------------------- *
+ * One tab at a time — wave AO, lane AO-1, [§ D1361](../../../../DECISIONS.md)
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **Who holds the attempt, as one tab sees it.** The post-AN panel's seat D (D2): tab B resumed the
+ * scored attempt, played it to 18:00 without closing, read every goal, and tab A then banked with
+ * the answers B had shown; B's progress also overwrote the saved attempt. So the saved attempt
+ * belongs to one tab at a time:
+ *
+ * - `'here'`: this tab holds it, and only this tab advances it, writes it and files it;
+ * - `'free'`: nobody does (the tab that held it let it go), and the next tab to resume it holds it;
+ * - `'elsewhere'`: another tab does. This tab shows the day no further than it already had, takes
+ *   no press on it and closes nothing, and offers to continue it here: a takeover the player presses
+ *   on purpose, which resumes from the attempt as last written and never from further on.
+ *
+ * There is no expiry. A tab that is closed, reloaded or sent elsewhere lets go on `pagehide`, so a
+ * new tab or the reloaded one resumes with no question; a tab that died without letting go is
+ * taken over by that same pressed takeover, which is the one case a lease clock would have decided
+ * on the player's behalf.
+ */
+export type AttemptHold = 'here' | 'free' | 'elsewhere';
+
+/** {@link AttemptHold} for `tab`. */
+export function attemptHoldOf(attempt: Pick<DayAttempt, 'holder'>, tab: string): AttemptHold {
+  if (attempt.holder === undefined || attempt.holder === null) return 'free';
+  return attempt.holder === tab ? 'here' : 'elsewhere';
+}
+
+/**
+ * One tab's write to the attempt slot (`persist/attempt.ts`):
+ *
+ * - `'write'`: the attempt begun, or this tab's own change to it (a press, an answer, the reach);
+ * - `'clear'`: its day was filed;
+ * - `'claim'`: a resume, which holds the stored attempt here. `takeOver` is the player's pressed
+ *   takeover, the only thing that may claim an attempt another tab holds;
+ * - `'release'`: this tab is going (`pagehide`), so what it holds is let go.
+ */
+export type AttemptWrite =
+  | { readonly kind: 'write'; readonly attempt: DayAttempt }
+  | { readonly kind: 'clear' }
+  | { readonly kind: 'claim'; readonly takeOver: boolean }
+  | { readonly kind: 'release' };
+
+/**
+ * **The slot after `tab`'s write on `contractId`, or `undefined` where the write is refused.** The
+ * whole rule is here so `persist/attempt.ts` and `dev/main.ts` cannot disagree about it:
+ *
+ * - a `'write'` or a `'clear'` is refused while another tab holds the stored attempt, so a tab that
+ *   lost it can neither advance it nor wipe it, and learns so from the refusal;
+ * - a `'claim'` is refused where nothing is stored, and where another tab holds it unless the
+ *   player pressed the takeover;
+ * - a `'release'` lets go only of what this tab holds, and is never refused.
+ *
+ * Every other contract's entry is kept as stored: a tab writes one attempt, never the map it
+ * remembers, because the map it remembers may be older than another tab's write.
+ */
+export function attemptSlotAfter(
+  stored: ReadonlyMap<string, DayAttempt>,
+  contractId: string,
+  write: AttemptWrite,
+  tab: string,
+): ReadonlyMap<string, DayAttempt> | undefined {
+  const standing = stored.get(contractId);
+  const hold = standing === undefined ? undefined : attemptHoldOf(standing, tab);
+  const next = new Map(stored);
+  switch (write.kind) {
+    case 'write':
+      if (hold === 'elsewhere') return undefined;
+      next.set(contractId, { ...write.attempt, holder: tab });
+      return next;
+    case 'clear':
+      if (hold === 'elsewhere') return undefined;
+      next.delete(contractId);
+      return next;
+    case 'claim':
+      if (standing === undefined) return undefined;
+      if (hold === 'elsewhere' && !write.takeOver) return undefined;
+      next.set(contractId, { ...standing, holder: tab });
+      return next;
+    case 'release':
+      if (standing === undefined || hold !== 'here') return stored;
+      next.set(contractId, { ...standing, holder: null });
+      return next;
+  }
 }
 
 /**
@@ -211,6 +306,18 @@ export function resumeLabelOf(weekday: string): string {
 export const RESUME_PRIMARY_CELL = 'Resume ⟨day⟩';
 
 /**
+ * The takeover's label, on the brief and on the stage, while another tab holds the attempt —
+ * [§ D1361](../../../../DECISIONS.md). The press is the player's confirmation, and its note
+ * ({@link DAY_ATTEMPT_COPY}`.elsewhereNote`) says what it does before it is pressed.
+ */
+export function continueHereLabelOf(weekday: string): string {
+  return `Continue ${weekday} here`;
+}
+
+/** {@link continueHereLabelOf}'s cell as the action-bar table writes it. */
+export const CONTINUE_HERE_CELL = 'Continue ⟨day⟩ here';
+
+/**
  * The brief's words while an attempt stands. No figure: what the attempt did so far is on the
  * stage, and a count here would be a second reading of it.
  */
@@ -225,4 +332,27 @@ export const DAY_ATTEMPT_COPY = Object.freeze({
   leaveQuestion: 'Leave the day for now?',
   leaveConsequence:
     'Your attempt is kept where you left it. The brief resumes it, and it is the one your week banks.',
+  /**
+   * The bar's note beside {@link continueHereLabelOf}, on the brief and on the stage, while another
+   * tab holds the attempt — § D1361. What the press does, said before it is pressed.
+   */
+  elsewhereNote:
+    'Your attempt at this day is open in another tab. Continue it here and that tab stops where it ' +
+    'is; it is still the one your week banks.',
+  /**
+   * The stage's line while another tab holds the attempt — § D1361. This tab's playhead is held
+   * where it stood and its presses and close do nothing, so the line says so, and where a takeover
+   * picks up: the attempt as last saved, which is never further on than the other tab had shown.
+   */
+  elsewhereStage:
+    'This day is open in another tab, so this tab shows it no further and takes no press. Continue ' +
+    'it here to play on from where it was last saved.',
+  /**
+   * The stage's line over the run this tab was playing when another tab took the attempt over, once
+   * nobody holds the attempt any more (that tab let it go) — § D1361. The run here lacks whatever the
+   * other tab pressed, so it is shown no further; *Resume* plays on from the attempt as last saved.
+   */
+  staleStage:
+    'Your attempt at this day moved on in another tab, so this tab shows this run of it no further ' +
+    'and takes no press. Resume it to play on from where it was last saved.',
 });

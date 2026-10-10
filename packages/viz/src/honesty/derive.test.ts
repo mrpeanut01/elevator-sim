@@ -770,8 +770,14 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         '`loadAttempts` returns the attempts it could read and drops the rest in silence, and ' +
         '`saveAttempts` returns whether the store took the write. None of them returns a sentence, ' +
         'and what a player reads about an attempt is `shift/attempt.ts#DAY_ATTEMPT_COPY`, which the ' +
-        '`EVERYDAY_MENU` adapter seeds by name.',
-      ids: ['persist/attempt.ts#ATTEMPT_KEY', 'persist/attempt.ts#loadAttempts', 'persist/attempt.ts#saveAttempts'],
+        '`EVERYDAY_MENU` adapter seeds by name. `writeAttemptSlot` (wave AO, lane AO-1, § D1361) ' +
+        'returns whether one tab\'s write stood and the slot as read, with no sentence in either.',
+      ids: [
+        'persist/attempt.ts#ATTEMPT_KEY',
+        'persist/attempt.ts#loadAttempts',
+        'persist/attempt.ts#saveAttempts',
+        'persist/attempt.ts#writeAttemptSlot',
+      ],
     },
     {
       reason:

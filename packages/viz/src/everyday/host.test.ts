@@ -3025,13 +3025,86 @@ describe('one attempt per scored day — § D1218', () => {
       },
     };
     const host = createEverydayHost(bindings);
-    expect(host.dayAttempt()).toEqual({ weekday: 'Monday' });
+    expect(host.dayAttempt()).toEqual({ weekday: 'Monday', heldElsewhere: false });
     host.playDay();
     expect(h.calls).toEqual(['resumeDayAttempt']);
     expect(resumed).toHaveLength(1);
-    /* `startRun` itself is unchanged: the designer's and the tuner's runs still start a run. */
+    /*
+     * A shell that binds no `attemptHold` refuses nothing, so `startRun` still presses here. With the
+     * binding, the workshop's, the tuner's and the drawing board's runs refuse while an attempt
+     * stands — wave AO, § D1360, held door by door in `attemptDoors.test.ts`.
+     */
     host.startRun();
     expect(h.calls).toEqual(['resumeDayAttempt', 'startRun']);
+    const held = createEverydayHost({ ...bindings, attemptHold: () => 'held' });
+    expect(held.startRun()).toBe('held');
+    expect(h.calls).toEqual(['resumeDayAttempt', 'startRun']);
+  });
+
+  /*
+   * Wave AO, lane AO-1, § D1361 — the saved attempt belongs to one tab at a time. Where another tab
+   * holds it, *Start the day* and the stage's entry press start nothing; the pressed takeover resumes
+   * it here; and the stage is told to show the day no further.
+   */
+  it('starts nothing where another tab holds the attempt, and resumes it here only on the pressed takeover', () => {
+    const h = harnessOf(base());
+    const resumes: boolean[] = [];
+    let elsewhere = true;
+    const bindings: EverydayHostBindings = {
+      ...h.bindings,
+      beginDayAttempt: () => {
+        h.calls.push('beginDayAttempt');
+      },
+      dayAttempt: () => ATTEMPT,
+      attemptHeldElsewhere: () => elsewhere,
+      resumeDayAttempt: (_shape, takeOver) => {
+        h.calls.push('resumeDayAttempt');
+        resumes.push(takeOver === true);
+        if (takeOver === true) elsewhere = false;
+        return takeOver === true;
+      },
+    };
+    const host = createEverydayHost(bindings);
+    expect(host.dayAttempt()).toEqual({ weekday: 'Monday', heldElsewhere: true });
+    expect(host.stageHold(A_RECORDING)).toBe('elsewhere');
+    host.playDay();
+    expect(h.calls, 'the stage’s own entry press resumed or began the day').toEqual([]);
+    host.playDay({ takeOver: true });
+    expect(h.calls).toEqual(['resumeDayAttempt']);
+    expect(resumes).toEqual([true]);
+    expect(host.stageHold(A_RECORDING)).toBeUndefined();
+  });
+
+  it('begins nothing when a takeover loses to another tab, rather than starting the day afresh', () => {
+    const h = harnessOf(base());
+    const bindings: EverydayHostBindings = {
+      ...h.bindings,
+      beginDayAttempt: () => {
+        h.calls.push('beginDayAttempt');
+      },
+      dayAttempt: () => ATTEMPT,
+      attemptHeldElsewhere: () => true,
+      resumeDayAttempt: () => {
+        h.calls.push('resumeDayAttempt');
+        return false;
+      },
+    };
+    createEverydayHost(bindings).playDay({ takeOver: true });
+    expect(h.calls).toEqual(['resumeDayAttempt']);
+  });
+
+  it('holds the run this tab was playing when the attempt moved on in another tab, and no other', () => {
+    const h = harnessOf(base());
+    const stale = { runId: 'stale' } as unknown as VizRecording;
+    const host = createEverydayHost({
+      ...h.bindings,
+      dayAttempt: () => ATTEMPT,
+      attemptHeldElsewhere: () => false,
+      attemptRunStale: (recording) => recording === stale,
+    });
+    expect(host.stageHold(stale)).toBe('stale');
+    expect(host.stageHold(A_RECORDING)).toBeUndefined();
+    expect(createEverydayHost({ ...h.bindings, attemptRunStale: () => true }).stageHold(stale), 'no attempt stands').toBeUndefined();
   });
 
   it('starts afresh where the attempt could not be resumed exactly', () => {

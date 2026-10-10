@@ -860,6 +860,18 @@ function mountWorkshop(
     const lede = el(doc, 'p', undefined, COPY.lede);
     lede.style.cssText = `font-size:16px;line-height:1.55;color:${C.inkSoft};margin:12px 0 0;max-width:64ch;text-wrap:pretty`;
     column.append(eyebrow, title, lede);
+    /*
+     * **While a scored attempt stands, this screen only shows** — wave AO, lane AO-1,
+     * [§ D1360](../../../../DECISIONS.md). The press below would run the attempt's day and every
+     * control here writes the configuration it runs on, so each refuses with this sentence, and it
+     * is drawn here, above the controls, as well as in the bar beside the inert primary.
+     */
+    const held = api.attemptHold();
+    if (held !== undefined) {
+      const line = el(doc, 'p', 'everyday-workshop-held', held);
+      line.style.cssText = `${NOTE};margin:12px 0 0;max-width:64ch;color:${C.ink}`;
+      column.append(line);
+    }
     column.append(drawLevers());
     const optimising = section(doc, COPY.optimisingHeading);
     optimising.append(drawTerms(), drawMaths());
@@ -867,6 +879,18 @@ function mountWorkshop(
     column.append(drawBehaviour(), drawSwitching(), drawRules());
     root.append(column);
     sideBySide(root, { fixed: left, fluid: column, fixedPx: WORKSHOP_RAIL_PX, gapPx: GAP.wide });
+    /*
+     * § D1360: every control here writes the configuration the attempt runs on, and each write is
+     * refused while the attempt stands, so the controls are drawn disabled rather than moving under
+     * the pointer and springing back. The disclosures still open: reading the dispatcher is not a write.
+     */
+    if (held !== undefined) {
+      for (const control of root.querySelectorAll<HTMLInputElement | HTMLButtonElement | HTMLSelectElement | HTMLTextAreaElement>(
+        'input, button, select, textarea',
+      )) {
+        control.disabled = true;
+      }
+    }
     context.refreshBar();
   }
 
@@ -893,7 +917,11 @@ function mountWorkshop(
      * note and the legs agreeing.
      */
     primary: () => {
-      api.startRun();
+      /* § D1360: a refused press stays on this screen, whose bar already says why. */
+      if (api.startRun() !== undefined) {
+        context.refreshBar();
+        return;
+      }
       context.go('stage');
     },
   };
@@ -1044,6 +1072,9 @@ const SPLIT_NOTE = !workshopWriteReachesRun('viewer.dispatcherSpec')
  */
 function workshopBar(state: EverydayState): ActionBarModel {
   const base = actionBarFor(state);
+  /* § D1360: while a scored attempt stands, *Run a day with this* would run its day. Inert, with the reason. */
+  const held = mountedHost?.attemptHold();
+  if (held !== undefined) return { ...base, primary: { ...base.primary, inert: held } };
   const variants = base.noteVariants ?? [];
   const note = noteForReach(workshopReachOf(standingWrites()), variants) ?? base.note;
   return { ...base, ...(note === undefined ? {} : { note }) };

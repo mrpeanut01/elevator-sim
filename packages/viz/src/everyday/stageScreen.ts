@@ -126,6 +126,7 @@ import {
   type StageSwitchTarget,
 } from './stageScreenModel.js';
 import { everydayProfileStore } from './profileStore.js';
+import { DAY_ATTEMPT_COPY } from '../shift/attempt.js';
 import { carAbsencesOf, type BookedOutCar } from '../shift/bookedOut.js';
 /* GitHub issue #592, § D991 — the whole day's acts and the pace rule over them. */
 import { actsOf, type DayAct } from '../shift/dayLength.js';
@@ -199,7 +200,14 @@ import { campaignDockViewOf, type CampaignDockView } from './campaignDock.js';
  * `dayEnded` is a fact about the transport *this* screen owns, and `everyday/host.ts` deliberately
  * exposes none. {@link syncTransport} is its one writer, on the edge rather than on every frame.
  */
-const barFacts = { hasRun: false, dayClosed: false, recomputing: false, dayEnded: false };
+const barFacts: {
+  hasRun: boolean;
+  dayClosed: boolean;
+  recomputing: boolean;
+  dayEnded: boolean;
+  /** § D1361: why this tab may not play the stage's day, with the attempt's weekday. */
+  held: { readonly kind: 'elsewhere' | 'stale'; readonly weekday: string } | undefined;
+} = { hasRun: false, dayClosed: false, recomputing: false, dayEnded: false, held: undefined };
 
 /**
  * Whether this session has already seen visible trouble — GitHub issue #340, `docs/26` § 7.2 E3.
@@ -359,6 +367,13 @@ function mountStage(
 
   let alive = true;
   let playback: Playback | undefined;
+  /**
+   * **Where this stage is held while another tab holds the day's attempt** — wave AO, lane AO-1,
+   * [§ D1361](../../../../DECISIONS.md). The playhead where it stood when the hold began (or the
+   * run's start, for a run adopted under the hold), so this tab shows nothing it had not already
+   * shown; `undefined` while this tab may play the day. {@link holdForAnotherTab} keeps it.
+   */
+  let heldAtS: number | undefined;
   /** Display time of the last live-region write — see {@link STAGE_ANNOUNCE_MS}. */
   let lastAnnouncedMs = Number.NEGATIVE_INFINITY;
   /** A stopped frame's sentence, waiting for the rate limit to lift — see `announce`. */
@@ -1649,6 +1664,8 @@ function mountStage(
 
   function togglePlay(): void {
     if (playback === undefined) return;
+    /* § D1361: a day another tab holds is shown here no further. */
+    if (heldAtS !== undefined) return;
     if (playback.state === 'playing') {
       playback.pause();
       /* § D1212: a pause stops a skip that is coming; *Play* starts a fresh beat. */
@@ -1902,6 +1919,7 @@ function mountStage(
    */
   function skipToEnd(confirmed = false): void {
     if (playback === undefined) return;
+    if (heldAtS !== undefined) return;
     /*
      * **And the day has been started** — GitHub issue #565's third defect, § D947.
      *
@@ -2500,8 +2518,13 @@ function mountStage(
       speed: stageSpeedAt(speedIndex).simPerRealS,
       ...(startAtS === undefined ? {} : { startAtS }),
     });
-    if (wasPlaying) playback.play();
-    if (openAtS !== undefined) {
+    /* § D1361: a run adopted while another tab holds the day opens held at its start, and does not play. */
+    if (heldAtS !== undefined) {
+      heldAtS = recording.startedAt;
+      playback.setReach(heldAtS);
+    }
+    if (wasPlaying && heldAtS === undefined) playback.play();
+    if (openAtS !== undefined && heldAtS === undefined) {
       started = true;
       playback.play();
     }
@@ -2536,6 +2559,32 @@ function mountStage(
     return context.ctx === 'watch' ? host.watching()?.view : undefined;
   }
 
+  /**
+   * **A day whose attempt another tab holds is shown here no further** — wave AO, lane AO-1,
+   * [§ D1361](../../../../DECISIONS.md), the post-AN panel's seat D (D2). The saved attempt belongs
+   * to one tab at a time. While another tab holds it, this stage pauses where it stands and holds
+   * its playhead there (`Playback.setReach`), its transport and presses do nothing, and § 3.3's
+   * primary is the takeover. Let go the moment this tab holds the day again, which a takeover's
+   * re-simulated run replaces anyway. Only the daily flow carries a scored attempt.
+   */
+  function holdForAnotherTab(): void {
+    const attempt = context.ctx === 'daily' ? host.dayAttempt() : undefined;
+    const kind = attempt === undefined ? undefined : host.stageHold(adopted);
+    barFacts.held = attempt === undefined || kind === undefined ? undefined : { kind, weekday: attempt.weekday };
+    if (barFacts.held !== undefined) {
+      if (heldAtS === undefined) {
+        heldAtS = playback?.simTimeS ?? adopted?.startedAt ?? 0;
+        playback?.pause();
+        dropSkipBeat();
+      }
+      if (playback !== undefined && playback.reach !== heldAtS) playback.setReach(heldAtS);
+      return;
+    }
+    if (heldAtS === undefined) return;
+    heldAtS = undefined;
+    playback?.setReach(null);
+  }
+
   /** The host said something changed. Adopt a new recording; otherwise just redraw the facts. */
   function onHostChange(): void {
     if (!alive) return;
@@ -2551,6 +2600,7 @@ function mountStage(
       runFailed: host.runFailure?.() !== undefined,
     });
     if (mayAdopt && recording !== undefined) adopt(recording);
+    holdForAnotherTab();
     /*
      * § 3.3's row asks *this* stage what it has, and while the third clause of {@link stageMayAdopt}
      * is holding, what it has is nothing — GitHub issue #548. Unguarded, `runState().hasRun` is true
@@ -2685,6 +2735,18 @@ function mountStage(
      * press of *Try the day again* clears the host's failure as it starts the next run, so the
      * waiting line takes over on the same notification.
      */
+    /*
+     * § D1361: another tab holds this day's attempt. Above every other state, because the picture
+     * under it is held and none of the controls below act; the bar's primary is the takeover.
+     */
+    if (heldAtS !== undefined) {
+      failedRow.style.display = 'none';
+      statusText.textContent =
+        barFacts.held?.kind === 'stale' ? DAY_ATTEMPT_COPY.staleStage : DAY_ATTEMPT_COPY.elsewhereStage;
+      startButton.style.display = 'none';
+      status.style.display = 'flex';
+      return;
+    }
     const failed =
       context.ctx !== 'watch' &&
       host.runFailure?.() !== undefined &&
@@ -2831,6 +2893,10 @@ function mountStage(
     view: StageInterventionView,
     watching: WatchingView | undefined,
   ): string | undefined {
+    /* § D1361: every arm at once, while another tab holds this day's attempt. */
+    if (heldAtS !== undefined) {
+      return barFacts.held?.kind === 'stale' ? DAY_ATTEMPT_COPY.staleStage : DAY_ATTEMPT_COPY.elsewhereStage;
+    }
     return (watching === undefined ? undefined : SPECTATOR_MAKES_NO_CHANGES) ?? view.refusal;
   }
 
@@ -3762,6 +3828,16 @@ function mountStage(
      * docstring is the argument; what happens here is that it is asked.
      */
     primary: () => {
+      /*
+       * § D1361: while another tab holds this day's attempt, § 3.3's primary reads *Continue ⟨day⟩
+       * here* with the note that says what it does, so this press is the player's takeover. The run
+       * it lands is the attempt as last saved, re-simulated, and lets this stage's hold go.
+       */
+      if (barFacts.held !== undefined && context.ctx === 'daily') {
+        host.playDay({ takeOver: barFacts.held.kind === 'elsewhere' });
+        syncTransport();
+        return;
+      }
       /*
        * § 14.1's primary on a watched stage is a different press entirely — *"drops the spectator
        * state and opens the brief for the same day, which is the whole reason watching exists"* —

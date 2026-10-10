@@ -294,7 +294,7 @@ import {
   stageCallWrinkleQuietDueAtS,
   stageCallWrinkleQuietRowsOf,
 } from '../everyday/stageCallRow.js';
-import { DAY_ATTEMPT_COPY, resumeLabelOf } from '../shift/attempt.js';
+import { continueHereLabelOf, DAY_ATTEMPT_COPY, resumeLabelOf } from '../shift/attempt.js';
 import type { PressCall } from '../shift/pressCall.js';
 import { PRESS_CALL_AGAIN, pressCallRowOf } from '../shift/callRow.js';
 import {
@@ -704,7 +704,11 @@ import {
   ATTEMPT_CLOSES_ON_ITS_STAGE,
   ATTEMPT_DAY_SHOWN_TO_ITS_REACH,
   ATTEMPT_ENGINEER_WATCHES_ONLY,
+  ATTEMPT_HELD_IN_ANOTHER_TAB,
+  ATTEMPT_HOLDS_ITS_DAY,
   ATTEMPT_LEFT_CANNOT_BANK,
+  ATTEMPT_MOVED_ON_ELSEWHERE,
+  ATTEMPT_NOT_POSTED,
   ATTEMPT_NOT_SAVED,
   ATTEMPT_RAIL_NOTE,
   ATTEMPT_SHOWN_TO_ITS_REACH,
@@ -2289,6 +2293,14 @@ const REPLAY: SurfaceAdapter = {
     'shift/banking.ts#ATTEMPT_ENGINEER_WATCHES_ONLY',
     'shift/banking.ts#ATTEMPT_RAIL_NOTE',
     'shift/banking.ts#ATTEMPT_NOT_SAVED',
+    /*
+     * Wave AO, lane AO-1, § D1360 — the Everyday screens that would run a scored attempt's day only
+     * show, and a run of that day is not posted; § D1361 — one tab holds the attempt at a time.
+     */
+    'shift/banking.ts#ATTEMPT_HOLDS_ITS_DAY',
+    'shift/banking.ts#ATTEMPT_NOT_POSTED',
+    'shift/banking.ts#ATTEMPT_HELD_IN_ANOTHER_TAB',
+    'shift/banking.ts#ATTEMPT_MOVED_ON_ELSEWHERE',
   ],
   render(context) {
     const verdict = verifyReplay(context.recording, context.recording);
@@ -2372,6 +2384,32 @@ const REPLAY: SurfaceAdapter = {
       {
         field: 'attemptNotSaved',
         text: ATTEMPT_NOT_SAVED,
+        role: 'reason',
+        provenance: 'authored',
+      },
+      /* Wave AO, § D1360: the Everyday screens' hold over a scored attempt's day, and the post's refusal. */
+      {
+        field: 'attemptHoldsItsDay',
+        text: ATTEMPT_HOLDS_ITS_DAY,
+        role: 'reason',
+        provenance: 'authored',
+      },
+      {
+        field: 'attemptNotPosted',
+        text: ATTEMPT_NOT_POSTED,
+        role: 'reason',
+        provenance: 'authored',
+      },
+      /* Wave AO, § D1361: a day whose attempt another tab holds, and a run of it that moved on there. */
+      {
+        field: 'attemptHeldInAnotherTab',
+        text: ATTEMPT_HELD_IN_ANOTHER_TAB,
+        role: 'reason',
+        provenance: 'authored',
+      },
+      {
+        field: 'attemptMovedOnElsewhere',
+        text: ATTEMPT_MOVED_ON_ELSEWHERE,
         role: 'reason',
         provenance: 'authored',
       },
@@ -10279,6 +10317,11 @@ const EVERYDAY_MENU: SurfaceAdapter = {
       seeds.push({ field: 'bar.brief.attempt.driverHeld', text: DAY_ATTEMPT_COPY.driverHeld, role: 'prose' });
       seeds.push({ field: 'bar.brief.attempt.resumeNote', text: DAY_ATTEMPT_COPY.resumeNote, role: 'prose' });
       seeds.push({ field: 'bar.brief.attempt.resume', text: resumeLabelOf(weekdayOf(0)), role: 'label' });
+      /* Wave AO, § D1361: the takeover, its note, and the stage's two lines while this tab may not play the day. */
+      seeds.push({ field: 'bar.brief.attempt.continueHere', text: continueHereLabelOf(weekdayOf(0)), role: 'label' });
+      seeds.push({ field: 'bar.brief.attempt.elsewhereNote', text: DAY_ATTEMPT_COPY.elsewhereNote, role: 'prose' });
+      seeds.push({ field: 'stage.attempt.elsewhere', text: DAY_ATTEMPT_COPY.elsewhereStage, role: 'prose' });
+      seeds.push({ field: 'stage.attempt.stale', text: DAY_ATTEMPT_COPY.staleStage, role: 'prose' });
     }
 
     /*

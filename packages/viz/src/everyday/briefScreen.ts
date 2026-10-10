@@ -170,6 +170,7 @@ function mountBrief(
     // changed on this screen moves the bar's sentence with the card the reader pressed.
     briefDriver = today.driver;
     briefAttemptWeekday = context.host.dayAttempt()?.weekday;
+    briefAttemptElsewhere = context.host.dayAttempt()?.heldElsewhere === true;
     root.replaceChildren();
     const left = leftColumn(view);
     const right = rightColumn(view);
@@ -542,6 +543,7 @@ function mountBrief(
       alive = false;
       briefDriver = undefined;
       briefAttemptWeekday = undefined;
+      briefAttemptElsewhere = false;
       stopListening();
       view?.removeEventListener('resize', onResize);
     },
@@ -570,7 +572,12 @@ function mountBrief(
        * the press begins the day's one attempt, and where one already stands it resumes it, so this
        * screen can no longer rewind a day the stage has shown.
        */
-      context.host.playDay();
+      /*
+       * § D1361: where another tab holds the attempt the primary reads *Continue ⟨day⟩ here* with its
+       * note, so this press is the player's takeover; it is asked of the host as it stands now, so a
+       * label drawn before another tab moved never takes over by itself.
+       */
+      context.host.playDay({ takeOver: context.host.dayAttempt()?.heldElsewhere === true && briefAttemptElsewhere });
       context.go('stage');
     },
   };
@@ -607,9 +614,12 @@ let briefDriver: string | undefined;
 /** The weekday of the attempt standing on the day the last draw described — § D1218, {@link briefBar}. */
 let briefAttemptWeekday: string | undefined;
 
+/** Whether the last draw found that attempt held by another tab — § D1361, {@link briefBar}. */
+let briefAttemptElsewhere = false;
+
 /** § 3.3's brief row with this run's dispatcher named — see {@link briefBarModel} for the defect. */
 function briefBar(state: EverydayState): ActionBarModel {
-  return briefBarModel(actionBarFor(state), briefDriver, briefAttemptWeekday);
+  return briefBarModel(actionBarFor(state), briefDriver, briefAttemptWeekday, briefAttemptElsewhere);
 }
 
 export const BRIEF_SCREEN: EverydayScreenModule = {

@@ -47820,6 +47820,8 @@ was not taken.
 
 ## D1218 — one attempt per scored day: it starts at *Start the day*, leaving resumes it, and it is the only run of that day the week banks
 
+> **Status 2026-10-10: AMENDED by [§ D1360](#d1360) and [§ D1361](#d1361)** (agent rulings). The driver is held on every Everyday screen as well as the brief, and *Resume* resumes the attempt only in the tab that holds it or where none does. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Status 2026-10-10: AMENDED by [§ D1323](#d1323)** (an agent ruling). While an attempt stands the Engineer surface makes, changes and saves no run of the day, and holds any run of the day it made at the attempt's reach. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Status 2026-09-26: AMENDED by [§ D1239](#d1239)** (an agent ruling). The Engineer transport is held at the attempt's reach, the attempt is filed only by its own stage's close, an Engineer close banks nothing into any week while an attempt stands, and a close reads the week this device has stored. See [`docs/39`](docs/39-decisions-in-force.md).
@@ -48341,6 +48343,8 @@ it. Shown red on a 130-word row added to each document.
 measurement of how much the lighter file changes a lane's cost, which is unmeasured.
 
 ## D1239 — the one attempt is final: the Engineer surface shows it only to its reach and never files it, and a close reads the week this device has stored
+
+> **Status 2026-10-10: AMENDED by [§ D1361](#d1361)** (an agent ruling). The saved attempt belongs to one tab at a time: a tab that does not hold it shows the day no further, presses and files nothing of it, and takes it over only by a pressed *Continue ⟨day⟩ here*. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Status 2026-10-10: AMENDED by [§ D1323](#d1323)** (an agent ruling). The hold covers any run of the attempt's day the shell made; while an attempt stands on the week on screen, or on the week a write would put there, the Engineer surface's cards, runs, selects, seed, load and save refuse; the rail's cards write from the latest state. See [`docs/39`](docs/39-decisions-in-force.md).
 
@@ -49952,6 +49956,8 @@ site is opened again*: red on a bundle of the base tree (`collective`), green on
 
 ## D1323 — while a scored attempt stands, the Engineer surface only watches: it makes, changes and saves no run of the day, and its cards write from the latest state
 
+> **Status 2026-10-10: AMENDED by [§ D1360](#d1360)** (an agent ruling). The same hold covers the Everyday screens that would run the attempt's day or change how it runs (the workshop, the tuner, the drawing board, *Take this call again*, *Play this crowd*), the Engineer menu's calendar and *Post this run*, and `runShift` refuses any other ask for that day. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-10-10 by agent sessions under delegated authority** (wave AN, lane AN-6, on the
 > post-AM panel's seat D, defects D1 to D3), not by the product owner, and to be read as an agent
 > ruling; [§ D626](#d626) is the cautionary case. **Amends [§ D1239](#d1239)**, whose clause 1 held
@@ -50804,3 +50810,145 @@ else's, no purse key), `everyday/rushHouse.test.ts`'s two cases, `menu/client.te
 **Not established.** No browser case draws the row: the browser tier would need a server with a
 posted sitting. The row is pinned by its model, the route and the client, and
 `everyday/rush.browser.test.ts` still passes with the read in place (no server, so it says nothing).
+
+## D1360 — while a scored attempt stands, every Everyday screen that would run its day or change how it runs only shows, and the shell runs that day only as the attempt
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (wave AO, lane AO-1, on the
+> post-AN panel's seat D, defect D1), not by the product owner, and to be read as an agent ruling;
+> [§ D626](#d626) is the cautionary case. **Amends [§ D1323](#d1323)**, whose clause 1 held the
+> Engineer surface and whose *What it does not reach* left the Engineer menu's doors ungated, and
+> **[§ D1218](#d1218)** clause 2, whose held driver was held on the brief alone. Owner-reversible
+> clauses: refusing the workshop's, the tuner's and the drawing board's runs and edits rather than
+> dealing them a crowd other than the attempt's (clause 1); refusing *Post this run* rather than
+> posting a run cut at the stage's reach (clause 4); and holding *Play this crowd*, the Engineer
+> menu's calendar and a press day's pin over the attempt's week (clause 3). **Not put to a swarm**:
+> the lane had no way to spawn one, and § D1323 had already taken the reading this entry applies.
+
+**Why an entry.** [§ D405](#d405)'s first two grounds. It moves two recorded rulings and binds
+`everyday/host.ts`, `everyday/workshopScreen.ts`, `everyday/tunerScreen.ts`,
+`everyday/designerScreen.ts`, `dev/main.ts`, `shift/banking.ts`, `honesty/surfaces.ts` and
+`everyday/workshopTravel.test.ts`'s derivation of what Everyday writes.
+
+**What was wrong.** Seat D held week 3's Monday at its 08:39:19 call, opened Menu, *Dispatcher
+workshop*, a style card and *Run a day with this*: the stage opened on the same crowd labelled
+practice and stopped at the identical call, 10 standing, most at the lobby. Answered and skipped to
+18:00, every goal read in 82 s; then *‹ Brief*, *Resume Monday*, the rehearsed answers given, and
+the day banked. Reproduced on `b53ab48`: the practice label read § D1218's `'attempt'` sentence and
+the skip stopped at 08:39 on the identical card. The workshop's press is `EverydayHost.startRun`,
+whose set-up deals the day's crowd, so the tuner's *Run it and watch*, the drawing board's *Run a
+day in it*, *Take this call again* and the stage's press outside the daily flow were the same door.
+The workshop's style cards and levers also wrote the running configuration under the attempt, so a
+press on the stage afterwards re-simulated the attempt under a driver the brief says is held.
+
+**Does § D1323 decide it?** Yes. Its clause 1 chose refusing every run-making control over dealing
+an Engineer run another crowd, and its readings not chosen say why: another crowd on the same tower,
+wrinkle and growth still rehearses the call's timing. The Everyday screens ask the same question, so
+they take the same answer, and the brief's instruction to choose the refusal where nothing decided
+it was not needed.
+
+**The ruling.**
+
+1. **While an attempt stands on the week on screen, or on the week a write would put on screen, no
+   Everyday screen makes or changes a run of that day except the attempt's own controls.** The host
+   asks `attemptHold`, which `dev/main.ts` answers with § D1323's `watchOnlyRefusal` in the Everyday
+   words (`shift/banking.ts#ATTEMPT_HOLDS_ITS_DAY`), before `startRun`, `takeCallAgain`,
+   `playThisCrowd` and every editor write (`setWorkingSpec`, `setGroupLevers`, `setRuleRows`,
+   `setSelectorSpec`, `startFromDispatcher`, `setDispatcher`, `setPlainLever`, `setDoorDwell`,
+   `applyBuildingSpec`, `applyPatternSpec`), and refuses with that sentence, writing and running
+   nothing. The workshop, the tuner and the drawing board draw their primary inert with it, and the
+   workshop and the tuner also say it above their controls.
+2. **The shell's backstop.** `dev/main.ts#runShift` refuses a player's ask for a run of the week on
+   screen while an attempt stands on it, unless the ask is the attempt's own (begun or resumed) or
+   boot's, before anything is latched. A door the host has never heard of still cannot run the day.
+3. **Doors that wrote before they ran.** *Play this crowd* (a watched record's crowd set up on the
+   week on screen) and the Engineer menu's calendar period are asked before they write anything, and
+   a press day's pin is not written over a week an attempt stands on; the week still moves, as the
+   door's tower choice moves it.
+4. **A run of that day is not posted.** `postCurrentRun` refuses with `ATTEMPT_NOT_POSTED`: the
+   server replays a post whole and answers with the whole day's figures, which is § D1323 clause 3's
+   reason for refusing *Save recording*.
+
+**What holds it.** `everyday/attemptDoors.test.ts` sorts every member of `EverydayHost` in a table
+typed over the interface, so a member added later fails the compile until it is sorted; checks each
+sort against `host.ts`'s own member bodies (nothing that presses a run or writes the state is a
+read, and every held door asks first); drives every held door with an attempt standing (refused in
+words, nothing written or run) and with the week free (it writes or runs); and asserts the backstop
+sits ahead of `runShift`'s first latch. Against `b53ab48`'s host it is red in three of its five
+cases (*setWorkingSpec did not refuse*). `everyday/attemptHolder.browser.test.ts`'s first case walks
+seat D's route on the built bundle: red on `b53ab48` (*Run a day with this could still be pressed*),
+green after, with the attempt then resuming at the same call and banking.
+
+**What it does not reach.** A run another player posted on today's board for the same tower and
+crowd can still be watched, which is GD2's shared crowd rather than a run of the player's own; the
+ghost race runs a rival on the attempt's crowd and draws it only up to the stage's playhead. Neither
+takes a press. A resume whose record no longer matches the state still drops the attempt and starts
+afresh (§ D1218 clause 2); clause 1 removes the edits a player could make to cause that mid-attempt,
+and the drop itself is unchanged.
+
+## D1361 — the saved attempt belongs to one tab at a time: another tab shows it no further, a pressed takeover moves it, and a tab that goes lets it go
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (wave AO, lane AO-1, on the
+> post-AN panel's seat D, defect D2), not by the product owner, and to be read as an agent ruling.
+> **Amends [§ D1218](#d1218)** clause 2, whose brief resumed a standing attempt in any tab, and
+> **[§ D1239](#d1239)** clause 4, whose read of the stored week caught a second close but not a
+> second tab playing the attempt. Owner-reversible clauses: a takeover the player presses in the
+> other tab rather than a refusal outright (clause 3); no expiry, so a tab that died holding the
+> attempt is taken over by that press rather than released by a clock (clause 4); and the tab that
+> lost the attempt holding its run where it stood rather than leaving the stage (clause 5). **Not put
+> to a swarm**, as § D1360.
+
+**Why an entry.** [§ D405](#d405)'s first two grounds. It moves two recorded rulings and binds
+`shift/attempt.ts`, `persist/attempt.ts` (the slot gains a holder), `dev/main.ts`,
+`everyday/host.ts`, `everyday/briefView.ts`, `everyday/briefScreen.ts`, `everyday/stageScreen.ts`,
+`everyday/stageScreenModel.ts`, `everyday/actionBar.ts` and `everyday/attemptIsFinal.browser.test.ts`.
+
+**What was wrong.** Seat D held a day at a call in tab A, opened tab B, pressed *Continue your week*
+and *Resume*, played B to 18:00 without closing and read all five goals, then answered in A and
+banked. B's progress also overwrote the saved attempt, so a third tab resumed straight to 18:00 on
+B's branch. Reproduced on `b53ab48`: B's brief read *Resume Monday*, and B's skip moved the stored
+reach from 549 s to 1 800 s.
+
+**The ruling.**
+
+1. **One tab holds the saved attempt.** The slot (`elevator-sim.day-attempts`) carries the holding
+   tab's name, drawn once per page load and kept nowhere else. A tab holds the attempt by beginning
+   it or resuming it. Every write is read fresh and merged one contract at a time
+   (`persist/attempt.ts#writeAttemptSlot`), and a write or a clear over an attempt another tab holds
+   is refused (`shift/attempt.ts#attemptSlotAfter`), which is how a tab learns it has lost it. The
+   `storage` event tells every other tab at once.
+2. **A tab that does not hold it plays nothing of that day.** Its brief offers *Continue ⟨day⟩ here*
+   in place of *Resume*, with the note `DAY_ATTEMPT_COPY.elsewhereNote`. Its stage holds the playhead
+   where it stands (`Playback.setReach`), says `elsewhereStage`, and its § 3.3 primary is the same
+   takeover. `dev/main.ts` refuses its presses, answers, calls and close
+   (`ATTEMPT_HELD_IN_ANOTHER_TAB`), so only the holding tab's close files the day.
+3. **The takeover is pressed.** It claims the attempt as stored and re-simulates it from the slot:
+   every press the other tab wrote, opened at the reach that tab last saved, which is never further
+   on than it had shown. A takeover reveals nothing the holding tab had not seen.
+4. **A tab that goes lets go.** On `pagehide` (closed, reloaded or sent elsewhere) a tab releases
+   what it holds, so the reloaded page or the next tab resumes with no question. A tab that died
+   without a `pagehide` keeps its name on the slot, and the next tab's pressed takeover resumes it.
+   No clock decides it, and the device's clock is not read for it.
+5. **The tab that lost it shows its old run no further.** That run lacks the other tab's later
+   presses, so both transports hold it at this tab's own reach and nothing presses or files it
+   (`ATTEMPT_MOVED_ON_ELSEWHERE`, `DAY_ATTEMPT_COPY.staleStage`), until this tab resumes the attempt,
+   which re-simulates it from the slot, or the day is filed elsewhere, where § D1239 clause 4's
+   practice applies.
+
+**What holds it.** `shift/attempt.test.ts` (the holder read, write, clear, claim and release, and
+the merge) and `persist/attempt.test.ts` (holder validation, a refused write leaving the slot as
+stored, the merge, claim and release through a store); `everyday/host.test.ts` (nothing starts where
+another tab holds it, the takeover resumes, a lost takeover begins nothing, the stale hold);
+`everyday/briefView.test.ts` and `everyday/stageScreenModel.test.ts` (the labels and notes); and
+`everyday/attemptHolder.browser.test.ts`, two pages in one browser context. Its second case (a second
+tab neither resumes nor writes the attempt, and the first tab banks) and third (a takeover opens no
+further than the first tab's reach, the first tab's close is gone, its skip moves nothing and its
+press writes nothing, and only the second tab banks) are red on `b53ab48` and green after; its fourth
+(a tab closed without closing the day lets the next resume it with no takeover) passed before and
+after and guards clause 4. `attemptIsFinal.browser.test.ts`'s second-tab case now reaches the attempt
+by the takeover.
+
+**What it does not reach.** A page restored from the back-forward cache holds the attempt again on
+its next write if nobody holds it, and if another tab moved it on meanwhile, clause 5 holds the
+stale run. A begin reads the slot fresh first, so the later of two begins finds the earlier; two
+writes inside the same instant are not serialised by `localStorage`, and that race is not
+established.

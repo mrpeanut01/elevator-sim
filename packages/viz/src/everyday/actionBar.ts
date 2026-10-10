@@ -33,7 +33,7 @@
  * the guide.
  */
 
-import { DAY_ATTEMPT_COPY, RESUME_PRIMARY_CELL } from '../shift/attempt.js';
+import { CONTINUE_HERE_CELL, DAY_ATTEMPT_COPY, RESUME_PRIMARY_CELL } from '../shift/attempt.js';
 import type {
   EverydayModePick,
   EverydayScreen,
@@ -384,9 +384,10 @@ export const ACTION_BAR_ROWS: readonly ActionBarRow[] = Object.freeze([
     /*
      * The second variant is this build's, not the guide's — wave AL, lane AL-E,
      * [§ D1218](../../../../DECISIONS.md): a day whose attempt stands is resumed from here, never
-     * started again, and `briefView.ts#briefBarModel` fills the weekday in.
+     * started again, and `briefView.ts#briefBarModel` fills the weekday in. The third is wave AO's,
+     * [§ D1361](../../../../DECISIONS.md): an attempt another tab holds is taken over on purpose.
      */
-    primary: primary(['Start the day', RESUME_PRIMARY_CELL]),
+    primary: primary(['Start the day', RESUME_PRIMARY_CELL, CONTINUE_HERE_CELL]),
     note: 'Running the lifts: ⟨style⟩',
     inverted: false,
   }),
@@ -396,7 +397,13 @@ export const ACTION_BAR_ROWS: readonly ActionBarRow[] = Object.freeze([
     leave: leave(LEAVE_TOWER),
     back: { label: 'Brief', screen: 'brief' },
     timeline: { flow: 'daily', step: 3 },
-    primary: primary(['Close the day']),
+    /*
+     * The second and third variants are wave AO's, [§ D1361](../../../../DECISIONS.md): while
+     * another tab holds the day's attempt the stage offers the brief's takeover, and over the run
+     * this tab was playing before the attempt moved on there, the brief's resume
+     * (`stageScreenModel.ts#stageBarModelOf` fills the weekday in).
+     */
+    primary: primary(['Close the day', CONTINUE_HERE_CELL, RESUME_PRIMARY_CELL]),
     note: 'Stops the clock and writes the report.',
     inverted: false,
   }),

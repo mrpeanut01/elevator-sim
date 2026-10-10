@@ -1,14 +1,19 @@
 /**
- * `shift/attempt.ts` — one attempt per scored day, wave AL, lane AL-E, § D1218.
+ * `shift/attempt.ts` — one attempt per scored day, wave AL, lane AL-E, § D1218; and one tab holding
+ * it at a time, wave AO, lane AO-1, § D1361.
  */
 
 import { describe, expect, it } from 'vitest';
 
 import {
+  attemptHoldOf,
   attemptResumeAtS,
   attemptShownTo,
+  attemptSlotAfter,
   attemptStandingAmong,
   attemptStandsOn,
+  continueHereLabelOf,
+  CONTINUE_HERE_CELL,
   DAY_ATTEMPT_COPY,
   dayFiledElsewhere,
   resumeLabelOf,
@@ -141,5 +146,73 @@ describe('an attempt standing on any week — § D1239', () => {
     expect(attemptStandingAmong(attempts, [other])).toBeUndefined();
     expect(attemptStandingAmong(attempts, [closeDay(week, outcome(3))])).toBeUndefined();
     expect(attemptStandingAmong(new Map(), [week])).toBeUndefined();
+  });
+});
+
+/*
+ * Wave AO, lane AO-1, § D1361 — the post-AN panel's seat D (D2): tab B resumed the scored attempt,
+ * played it to 18:00 without closing, and tab A then banked with the answers B had shown; B's
+ * progress also overwrote the saved attempt. The saved attempt belongs to one tab at a time.
+ */
+describe('one tab holds the attempt at a time — § D1361', () => {
+  const slotOf = (attempt: DayAttempt): ReadonlyMap<string, DayAttempt> => new Map([[attempt.contractId, attempt]]);
+
+  it('reads an attempt with no holder, a released one and one stored before the rule as free', () => {
+    expect(attemptHoldOf(ATTEMPT, 'taba')).toBe('free');
+    expect(attemptHoldOf({ ...ATTEMPT, holder: null }, 'taba')).toBe('free');
+    expect(attemptHoldOf({ ...ATTEMPT, holder: 'taba' }, 'taba')).toBe('here');
+    expect(attemptHoldOf({ ...ATTEMPT, holder: 'taba' }, 'tabb')).toBe('elsewhere');
+  });
+
+  it('lets a tab write and clear only an attempt it holds or nobody holds, and holds what it writes', () => {
+    const free = slotOf(ATTEMPT);
+    expect(attemptSlotAfter(free, 'c2', { kind: 'write', attempt: { ...ATTEMPT, shownToS: 60 } }, 'tabb')?.get('c2')).toEqual({
+      ...ATTEMPT,
+      shownToS: 60,
+      holder: 'tabb',
+    });
+    const heldByA = slotOf({ ...ATTEMPT, holder: 'taba' });
+    /* B can neither advance A's attempt nor wipe it: the refusal is how B learns it does not hold it. */
+    expect(attemptSlotAfter(heldByA, 'c2', { kind: 'write', attempt: { ...ATTEMPT, shownToS: 1800 } }, 'tabb')).toBeUndefined();
+    expect(attemptSlotAfter(heldByA, 'c2', { kind: 'clear' }, 'tabb')).toBeUndefined();
+    expect(attemptSlotAfter(heldByA, 'c2', { kind: 'clear' }, 'taba')?.has('c2')).toBe(false);
+  });
+
+  it('claims another tab’s attempt only on the pressed takeover, and claims nothing that is not stored', () => {
+    const heldByA = slotOf({ ...ATTEMPT, holder: 'taba', shownToS: 549 });
+    expect(attemptSlotAfter(heldByA, 'c2', { kind: 'claim', takeOver: false }, 'tabb')).toBeUndefined();
+    const taken = attemptSlotAfter(heldByA, 'c2', { kind: 'claim', takeOver: true }, 'tabb')?.get('c2');
+    /* The takeover holds the attempt as stored: its presses and its reach, never anything further on. */
+    expect(taken).toEqual({ ...ATTEMPT, holder: 'tabb', shownToS: 549 });
+    expect(attemptSlotAfter(slotOf(ATTEMPT), 'c2', { kind: 'claim', takeOver: false }, 'tabb')?.get('c2')?.holder).toBe('tabb');
+    expect(attemptSlotAfter(new Map(), 'c2', { kind: 'claim', takeOver: true }, 'tabb')).toBeUndefined();
+  });
+
+  it('lets go only of what the tab holds, so a closed tab’s attempt resumes in the next with no question', () => {
+    const heldByA = slotOf({ ...ATTEMPT, holder: 'taba' });
+    const released = attemptSlotAfter(heldByA, 'c2', { kind: 'release' }, 'taba');
+    expect(released?.get('c2')?.holder).toBeNull();
+    expect(attemptHoldOf(released?.get('c2') ?? ATTEMPT, 'tabb')).toBe('free');
+    /* Another tab's release of A's attempt is no release at all, and is not refused either. */
+    expect(attemptSlotAfter(heldByA, 'c2', { kind: 'release' }, 'tabb')).toBe(heldByA);
+  });
+
+  it('writes one contract’s attempt and keeps every other entry as stored', () => {
+    const other: DayAttempt = { ...ATTEMPT, contractId: 'c7', holder: 'tabc' };
+    const stored = new Map<string, DayAttempt>([
+      ['c2', ATTEMPT],
+      ['c7', other],
+    ]);
+    const after = attemptSlotAfter(stored, 'c2', { kind: 'write', attempt: { ...ATTEMPT, shownToS: 120 } }, 'tabb');
+    expect(after?.get('c7')).toBe(other);
+  });
+
+  it('names the takeover by its weekday, and says what it does before it is pressed', () => {
+    expect(continueHereLabelOf('Monday')).toBe('Continue Monday here');
+    expect(CONTINUE_HERE_CELL.replace('⟨day⟩', 'Monday')).toBe(continueHereLabelOf('Monday'));
+    expect(DAY_ATTEMPT_COPY.elsewhereNote).toMatch(/another tab/u);
+    expect(DAY_ATTEMPT_COPY.elsewhereNote).toMatch(/stops where it is/u);
+    expect(DAY_ATTEMPT_COPY.elsewhereStage).toMatch(/no further/u);
+    expect(DAY_ATTEMPT_COPY.staleStage).toMatch(/no further/u);
   });
 });

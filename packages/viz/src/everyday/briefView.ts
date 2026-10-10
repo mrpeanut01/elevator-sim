@@ -46,7 +46,7 @@
  * gate), so this card prints `ShiftGoal.label` and never a value.
  */
 
-import { DAY_ATTEMPT_COPY, resumeLabelOf } from '../shift/attempt.js';
+import { continueHereLabelOf, DAY_ATTEMPT_COPY, resumeLabelOf } from '../shift/attempt.js';
 import { TODAY_ASKS_HEADING } from '../shift/goals.js';
 
 import type { GoalReading } from '../shift/types.js';
@@ -203,7 +203,21 @@ export function briefBarModel(
   base: ActionBarModel,
   driver: string | undefined,
   attemptWeekday?: string,
+  attemptHeldElsewhere = false,
 ): ActionBarModel {
+  /*
+   * **An attempt another tab holds is taken over on purpose, never resumed by default** — wave AO,
+   * lane AO-1, [§ D1361](../../../../DECISIONS.md). The table's third variant with the weekday
+   * filled in, and the note says what the press does before it is pressed: the other tab stops where
+   * it is. The press is the player's confirmation, so it is a label and a note rather than a dialog.
+   */
+  if (attemptWeekday !== undefined && attemptHeldElsewhere) {
+    return {
+      ...base,
+      primary: { ...base.primary, label: continueHereLabelOf(attemptWeekday) },
+      note: DAY_ATTEMPT_COPY.elsewhereNote,
+    };
+  }
   /*
    * **An attempt standing on the day is resumed, never started again** — [§ D1218](../../../../DECISIONS.md).
    * The primary is the table's second variant with the weekday filled in, and the note says what the

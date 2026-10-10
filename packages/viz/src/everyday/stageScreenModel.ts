@@ -116,6 +116,7 @@ import { sameLegs, type CrowdSource } from '../record/crowd.js';
  */
 import type { PriceSchedule } from '../pricing/types.js';
 import { goalRowsOf } from '../dev/leftRail.js';
+import { continueHereLabelOf, DAY_ATTEMPT_COPY, resumeLabelOf } from '../shift/attempt.js';
 import type { BookedOutCar } from '../shift/bookedOut.js';
 import { GOAL_GLYPHS, readGoals, TODAY_ASKS_DECIDES, TODAY_ASKS_HEADING } from '../shift/goals.js';
 import { shiftObservationsOf } from '../shift/observations.js';
@@ -1842,6 +1843,13 @@ export interface StageBarInput {
    * only thing that does, and it writes it through `everyday/stageScreen.ts`'s `barFacts`.
    */
   readonly dayEnded?: boolean | undefined;
+  /**
+   * Why this tab may not play the stage's day, with the attempt's weekday — wave AO, lane AO-1,
+   * [§ D1361](../../../../DECISIONS.md). `'elsewhere'`: another tab holds the attempt. `'stale'`:
+   * this run is the one this tab was playing before another tab took the attempt over, and the
+   * attempt has moved on since. Absent everywhere else, which is every stage before this wave.
+   */
+  readonly held?: { readonly kind: 'elsewhere' | 'stale'; readonly weekday: string } | undefined;
 }
 
 /**
@@ -2000,6 +2008,22 @@ export function stageBarModelOf(state: EverydayState, input: StageBarInput): Act
     table.back?.label.includes('⟨') === true
       ? { ...table, back: { ...table.back, label: input.buildingName ?? 'the building' } }
       : table;
+  /*
+   * **Another tab holds this day's attempt** — § D1361, above every other state, because none of
+   * them is this tab's to act on: the day is closed where it is held, so the primary is the takeover
+   * the brief offers, with the note that says what it does before it is pressed.
+   */
+  if (input.held !== undefined) {
+    const elsewhere = input.held.kind === 'elsewhere';
+    return {
+      ...base,
+      primary: {
+        ...base.primary,
+        label: elsewhere ? continueHereLabelOf(input.held.weekday) : resumeLabelOf(input.held.weekday),
+      },
+      note: elsewhere ? DAY_ATTEMPT_COPY.elsewhereNote : DAY_ATTEMPT_COPY.resumeNote,
+    };
+  }
   const refusal = !input.hasRun
     ? 'the day has not started yet — there is nothing to file'
     : input.recomputing

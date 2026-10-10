@@ -11,9 +11,11 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { BRIEF_WAY_THROUGH_HEADING, BRIEF_WEEK_HEADING, briefScreenViewOf, lockedForScore, raceAgainstCard, RECOMMENDED_CARDS,
+import { BRIEF_WAY_THROUGH_HEADING, BRIEF_WEEK_HEADING, briefBarModel, briefScreenViewOf, lockedForScore, raceAgainstCard, RECOMMENDED_CARDS,
   SANDBOX_DOOR_LABEL,
 } from './briefView.js';
+import { actionBarFor } from './actionBar.js';
+import { CONTINUE_HERE_CELL, DAY_ATTEMPT_COPY } from '../shift/attempt.js';
 import { GHOST_OPTIONS } from '../live/raceStrip.js';
 import { isScreenBuilt } from './screens.js';
 import { DAY_COUNTS_SENTENCE } from '../shift/weekStake.js';
@@ -310,5 +312,26 @@ describe('everything else on the card is the day record’s, unedited', () => {
     });
     expect(view.load).toBeUndefined();
     expect(view.outOfService).toBeUndefined();
+  });
+});
+
+/*
+ * Wave AO, lane AO-1, § D1361: the saved attempt belongs to one tab at a time. Where another tab
+ * holds it, the brief offers the takeover, named, with the note that says what it does before it is
+ * pressed; where this tab may resume it, the resume stands as § D1218 left it.
+ */
+describe('the brief’s primary over an attempt another tab holds — § D1361', () => {
+  const base = actionBarFor({ screen: 'brief', ctx: 'daily' });
+
+  it('offers the takeover by name, with its consequence beside it, and the resume otherwise', () => {
+    const elsewhere = briefBarModel(base, 'Steady hand', 'Monday', true);
+    expect(elsewhere.primary.label).toBe('Continue Monday here');
+    expect(elsewhere.primary.inert).toBeUndefined();
+    expect(elsewhere.note).toBe(DAY_ATTEMPT_COPY.elsewhereNote);
+    expect(base.primary.variants).toContain(CONTINUE_HERE_CELL);
+    const here = briefBarModel(base, 'Steady hand', 'Monday', false);
+    expect(here.primary.label).toBe('Resume Monday');
+    expect(here.note).toBe(DAY_ATTEMPT_COPY.resumeNote);
+    expect(briefBarModel(base, 'Steady hand').primary.label).toBe('Start the day');
   });
 });

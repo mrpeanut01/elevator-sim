@@ -76,9 +76,17 @@ function el<K extends keyof HTMLElementTagNameMap>(
  */
 let movedNow: readonly TuneKey[] = [];
 
+/**
+ * The mounted screen's host, for the `bar()` refinement's § D1360 question — module-level for
+ * {@link movedNow}'s reason, and cleared on unmount so a bar asked for with nothing mounted refuses
+ * nothing.
+ */
+let tunerHost: EverydayScreenShellContext['host'] | undefined;
+
 function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedEverydayScreen {
   const doc = host.ownerDocument;
   const dataHost = context.host;
+  tunerHost = dataHost;
   const specs = dataHost.elevatorSpecs();
   const classes = designerClasses(specs);
 
@@ -105,6 +113,17 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
   lede.style.cssText = `font-size:13px;color:${C.warmGrey};min-width:0;flex:1 1 340px`;
   header.append(title, lede);
   root.append(header);
+  /*
+   * **While a scored attempt stands, this screen runs nothing** — wave AO, lane AO-1,
+   * [§ D1360](../../../../DECISIONS.md). *Run it and watch* would run the attempt's day; the bar
+   * draws it inert with this sentence, and it is said here too, above the controls it covers.
+   */
+  const held = dataHost.attemptHold();
+  if (held !== undefined) {
+    const line = el(doc, 'p', 'everyday-tuner-held', held);
+    line.style.cssText = `font-size:13px;color:${C.ink};line-height:1.5;max-width:70ch;margin:0`;
+    root.append(line);
+  }
 
   /*
    * A standing building this build does not know leaves nothing to tune — four of the seven
@@ -367,6 +386,14 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
       node.append(head, body, effect);
       cards.append(node);
     }
+    /* § D1360: while a scored attempt stands this screen runs nothing, so nothing on it is drawn pressable. */
+    if (held !== undefined) {
+      for (const control of root.querySelectorAll<HTMLInputElement | HTMLButtonElement | HTMLSelectElement>(
+        'input, button, select',
+      )) {
+        control.disabled = true;
+      }
+    }
   }
 
   redraw();
@@ -388,6 +415,8 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
        * that moves the week onto the sandbox contract, and a pattern saved against a scored week
        * and then sandboxed would be a saved pattern whose name describes a run the week never had.
        */
+      /* § D1360: the bar is inert while an attempt stands; this is the press refusing as well. */
+      if (dataHost.attemptHold() !== undefined) return;
       const presses = tunePresses(standingBuilding, pattern, standing, tune);
       if (presses.building !== undefined) dataHost.applyBuildingSpec(presses.building);
       if (presses.pattern !== undefined) dataHost.applyPatternSpec(presses.pattern);
@@ -396,6 +425,7 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
     },
     unmount: () => {
       movedNow = [];
+      tunerHost = undefined;
     },
   };
 }
@@ -405,5 +435,10 @@ export const TUNER_SCREEN: EverydayScreenModule = {
   key: 'tuner',
   mount,
   /* Start from the table's own row and pick between its two note variants by index. */
-  bar: (state) => tunerBarModel(actionBarFor(state), movedNow),
+  bar: (state) => {
+    const model = tunerBarModel(actionBarFor(state), movedNow);
+    /* § D1360: while a scored attempt stands, *Run it and watch* would run its day. Inert, with the reason. */
+    const held = tunerHost?.attemptHold();
+    return held === undefined ? model : { ...model, primary: { ...model.primary, inert: held } };
+  },
 };

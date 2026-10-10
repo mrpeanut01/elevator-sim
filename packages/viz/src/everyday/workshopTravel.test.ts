@@ -423,19 +423,25 @@ const SOURCE_OF = (name: string): string =>
  */
 function patchBodies(source: string): readonly string[] {
   const bodies: string[] = [];
-  const opener = 'applyPatch({';
-  for (let at = source.indexOf(opener); at !== -1; at = source.indexOf(opener, at + 1)) {
-    let depth = 0;
-    let cursor = at + opener.length - 1;
-    for (; cursor < source.length; cursor += 1) {
-      const char = source[cursor];
-      if (char === '{') depth += 1;
-      else if (char === '}') {
-        depth -= 1;
-        if (depth === 0) break;
+  /*
+   * `editorWrite({` is the same patch since wave AO, [§ D1360](../../../../DECISIONS.md): the host's
+   * editor setters ask whether a scored attempt holds the day before they write, and then write
+   * exactly this object through `applyPatch`.
+   */
+  for (const opener of ['applyPatch({', 'editorWrite({']) {
+    for (let at = source.indexOf(opener); at !== -1; at = source.indexOf(opener, at + 1)) {
+      let depth = 0;
+      let cursor = at + opener.length - 1;
+      for (; cursor < source.length; cursor += 1) {
+        const char = source[cursor];
+        if (char === '{') depth += 1;
+        else if (char === '}') {
+          depth -= 1;
+          if (depth === 0) break;
+        }
       }
+      bodies.push(source.slice(at + opener.length, cursor));
     }
-    bodies.push(source.slice(at + opener.length, cursor));
   }
   return bodies;
 }

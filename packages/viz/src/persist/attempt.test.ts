@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { DayAttempt } from '../shift/attempt.js';
 
-import { ATTEMPT_KEY, loadAttempts, saveAttempts } from './attempt.js';
+import { ATTEMPT_KEY, loadAttempts, saveAttempts, writeAttemptSlot } from './attempt.js';
 import type { SessionStore } from './types.js';
 
 function memoryStore(): SessionStore & { readonly slots: Map<string, string> } {
@@ -135,5 +135,52 @@ describe('the attempts on this device — § D1218', () => {
     };
     expect(loadAttempts(throwing).size).toBe(0);
     expect(saveAttempts(throwing, new Map([['c7', ATTEMPT]]))).toBe(false);
+  });
+});
+
+/*
+ * Wave AO, lane AO-1, § D1361: one tab holds the saved attempt at a time. The slot is read at each
+ * write and merged, so a tab that remembers an older slot cannot put it back.
+ */
+describe('one tab’s write to the slot — § D1361', () => {
+  it('reads a holder back, reads an attempt stored before the rule, and drops a holder that is not a tab', () => {
+    const store = memoryStore();
+    saveAttempts(store, new Map([['c7', { ...ATTEMPT, holder: '0a1b2c3d4e5f6071' }]]));
+    expect(loadAttempts(store).get('c7')?.holder).toBe('0a1b2c3d4e5f6071');
+    saveAttempts(store, new Map([['c7', ATTEMPT]]));
+    expect(loadAttempts(store).get('c7')?.holder, 'an attempt stored before wave AO').toBeUndefined();
+    saveAttempts(store, new Map([['c7', { ...ATTEMPT, holder: 'Tab A' } as DayAttempt]]));
+    expect(loadAttempts(store).size).toBe(0);
+  });
+
+  it('refuses a second tab’s write over the first tab’s attempt, and leaves the slot as the first tab wrote it', () => {
+    const store = memoryStore();
+    expect(writeAttemptSlot(store, 'c7', { kind: 'write', attempt: ATTEMPT }, 'aaaa').ok).toBe(true);
+    const before = store.slots.get(ATTEMPT_KEY);
+    const second = writeAttemptSlot(store, 'c7', { kind: 'write', attempt: { ...ATTEMPT, shownToS: 36000 } }, 'bbbb');
+    expect(second.ok).toBe(false);
+    expect(second.slot.get('c7')?.shownToS, 'the refusal hands back the slot as stored').toBe(1800);
+    expect(store.slots.get(ATTEMPT_KEY)).toBe(before);
+  });
+
+  it('merges one contract’s write into the slot as stored, never the map a tab remembers', () => {
+    const store = memoryStore();
+    writeAttemptSlot(store, 'c7', { kind: 'write', attempt: ATTEMPT }, 'aaaa');
+    writeAttemptSlot(store, 'c2', { kind: 'write', attempt: { ...ATTEMPT, contractId: 'c2' } }, 'bbbb');
+    writeAttemptSlot(store, 'c7', { kind: 'write', attempt: { ...ATTEMPT, shownToS: 1900 } }, 'aaaa');
+    const slot = loadAttempts(store);
+    expect(slot.get('c2')?.holder).toBe('bbbb');
+    expect(slot.get('c7')?.shownToS).toBe(1900);
+  });
+
+  it('claims on the pressed takeover only, and lets go on release so the next tab claims with no takeover', () => {
+    const store = memoryStore();
+    writeAttemptSlot(store, 'c7', { kind: 'write', attempt: ATTEMPT }, 'aaaa');
+    expect(writeAttemptSlot(store, 'c7', { kind: 'claim', takeOver: false }, 'bbbb').ok).toBe(false);
+    expect(writeAttemptSlot(store, 'c7', { kind: 'claim', takeOver: true }, 'bbbb').ok).toBe(true);
+    expect(loadAttempts(store).get('c7')?.holder).toBe('bbbb');
+    writeAttemptSlot(store, 'c7', { kind: 'release' }, 'bbbb');
+    expect(loadAttempts(store).get('c7')?.holder).toBeNull();
+    expect(writeAttemptSlot(store, 'c7', { kind: 'claim', takeOver: false }, 'cccc').ok).toBe(true);
   });
 });

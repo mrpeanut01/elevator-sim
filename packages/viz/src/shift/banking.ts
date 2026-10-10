@@ -199,6 +199,50 @@ export const ATTEMPT_NOT_SAVED =
   'your attempt at a scored day is open in Everyday Mode, and a recording holds the whole day past ' +
   'where its stage has played, so nothing is saved until that day is closed on its stage';
 
+/**
+ * Why *Post this run* refuses while a scored attempt stands — § D1360, beside {@link ATTEMPT_NOT_SAVED}
+ * and for its reason: the server replays a posted run whole and answers with the whole day's
+ * figures, past where the attempt's stage has played.
+ */
+export const ATTEMPT_NOT_POSTED =
+  'Your attempt at a scored day is still open, and a posted run is replayed whole, past where its ' +
+  'stage has played, so nothing is posted until that day is closed on its stage.';
+
+/**
+ * **While a scored attempt stands, the Everyday screens that would run its day or change how it
+ * runs only show** — wave AO, lane AO-1, [§ D1360](../../../../DECISIONS.md), the post-AN panel's
+ * seat D (D1). At a held call, the Dispatcher workshop's *Run a day with this* opened the stage on
+ * the attempt's own crowd, labelled practice, and it stopped at the identical call, so every answer
+ * could be rehearsed to 18:00 and then given for score after *Resume*. § D1323 had closed the
+ * Engineer's dispatcher card for exactly this reason. So the workshop, the tuner, the drawing board,
+ * *Take this call again* and *Play this crowd* refuse in these words, drawn where their primary is,
+ * and a write they would make to the running configuration is refused with them.
+ */
+export const ATTEMPT_HOLDS_ITS_DAY =
+  'Your attempt at a scored day is still open. Until it is closed on its stage, nothing on this ' +
+  'screen runs that day or changes how it runs. Its brief resumes it.';
+
+/**
+ * Why a run of a scored day is not pressed, answered or closed in a tab that does not hold its
+ * attempt — wave AO, lane AO-1, [§ D1361](../../../../DECISIONS.md), the post-AN panel's seat D
+ * (D2). The saved attempt belongs to one tab at a time, and only the tab holding it advances it or
+ * files it. Said on the status line, where the Engineer surface's refusals are; the Everyday stage
+ * says it in `shift/attempt.ts#DAY_ATTEMPT_COPY.elsewhereStage`.
+ */
+export const ATTEMPT_HELD_IN_ANOTHER_TAB =
+  'your attempt at this scored day is open in another tab, so it is played and closed there, and ' +
+  'nothing here presses, answers or files it';
+
+/**
+ * The same refusal over the run this tab was playing when another tab took the attempt over, once
+ * that tab has let it go — § D1361. The run lacks the other tab's presses, so it is held where this
+ * tab had shown it and nothing presses or files it; resuming the attempt re-simulates it as saved.
+ */
+export const ATTEMPT_MOVED_ON_ELSEWHERE =
+  'your attempt at this scored day moved on in another tab after this run of it, so this run is ' +
+  'shown only as far as it was played here and nothing here presses or files it; resume the ' +
+  'attempt to play on';
+
 
 /**
  * The refusal, or `null` when the run on screen **is** the run this shell simulated.

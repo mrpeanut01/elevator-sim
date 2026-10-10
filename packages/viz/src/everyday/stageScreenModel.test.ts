@@ -40,6 +40,7 @@ import { syntheticFloor, syntheticShaft } from '../live/synthetic.test-helper.js
 import { ManualClock } from '../playback/clock.js';
 import { MAX_SPEED, MIN_SPEED } from '../playback/mapping.js';
 import { Playback } from '../playback/playback.js';
+import { DAY_ATTEMPT_COPY } from '../shift/attempt.js';
 import { actionBarFor } from './actionBar.js';
 import { EVERYDAY_COLORS } from './tokens.js';
 import { RUN_CONTEXTS } from './types.js';
@@ -987,6 +988,24 @@ describe('§ 3.3 — the stage row, refined', () => {
    * the transport, the second because `dayEnded` cannot be true without a run and a caller that
    * passed both anyway must not get a sentence about closing a day that does not exist.
    */
+  /*
+   * Wave AO, lane AO-1, § D1361: while another tab holds the day's attempt, the stage's primary is
+   * the takeover the brief offers, pressable, with the note that says what it does; over the run this
+   * tab was playing before the attempt moved on, it is the resume. Above every other state, because
+   * none of them is this tab's to act on.
+   */
+  it('offers the takeover while another tab holds the day, and the resume over a run that moved on', () => {
+    const flags = { hasRun: true, dayClosed: false, recomputing: false, dayEnded: true };
+    const elsewhere = stageBarModelOf(state, { ...flags, held: { kind: 'elsewhere', weekday: 'Monday' } });
+    expect(elsewhere.primary.label).toBe('Continue Monday here');
+    expect(elsewhere.primary.inert).toBeUndefined();
+    expect(elsewhere.note).toBe(DAY_ATTEMPT_COPY.elsewhereNote);
+    const stale = stageBarModelOf(state, { ...flags, held: { kind: 'stale', weekday: 'Monday' } });
+    expect(stale.primary.label).toBe('Resume Monday');
+    expect(stale.note).toBe(DAY_ATTEMPT_COPY.resumeNote);
+    expect(stageBarModelOf(state, flags).primary.label).toBe('Close the day');
+  });
+
   it('lets each refusal outrank it, so the row never points at an inert button', () => {
     for (const flags of [
       { hasRun: true, dayClosed: true, recomputing: false, dayEnded: true },

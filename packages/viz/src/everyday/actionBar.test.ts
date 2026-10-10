@@ -72,9 +72,10 @@ interface GuideRow {
   /**
    * What the build ships in place of {@link GuideRow.primary}, variant for variant.
    *
-   * Present on the `door` row and the `brief` row and nowhere else, each a variant appended after
-   * the guide's own: [§ D1004](../../../../DECISIONS.md)'s third door variant and § D1218's
-   * *Resume*. The `building` row carried one for GitHub issue #569 item 6 (*Open the day…* where the
+   * Present on the `door` row, the `brief` row and the daily `stage` row and nowhere else, each a
+   * variant appended after the guide's own: [§ D1004](../../../../DECISIONS.md)'s third door
+   * variant, § D1218's *Resume*, and [§ D1361](../../../../DECISIONS.md)'s takeover on the brief and
+   * the stage, with the resume over a stale run on the stage. The `building` row carried one for GitHub issue #569 item 6 (*Open the day…* where the
    * guide writes *Run the day…*) until [§ D1309](../../../../DECISIONS.md) took the collision off the
    * overlay instead, and it ships the guide's cell again (GitHub issue #573).
    */
@@ -118,8 +119,11 @@ const GUIDE_TABLE: readonly GuideRow[] = [
     back: { label: 'Front door', screen: 'door' },
     timeline: { flow: 'daily', step: 2 },
     primary: ['Start the day'],
-    /* § D1218: a day whose attempt stands is resumed from the brief — the guide's one, and one more. */
-    primaryShipsInstead: ['Start the day', 'Resume ⟨day⟩'],
+    /*
+     * § D1218: a day whose attempt stands is resumed from the brief; § D1361: one another tab holds
+     * is taken over from it — the guide's one, and two more.
+     */
+    primaryShipsInstead: ['Start the day', 'Resume ⟨day⟩', 'Continue ⟨day⟩ here'],
     notes: ['Running the lifts: ⟨style⟩'],
     inverted: false,
   },
@@ -130,6 +134,8 @@ const GUIDE_TABLE: readonly GuideRow[] = [
     back: { label: 'Brief', screen: 'brief' },
     timeline: { flow: 'daily', step: 3 },
     primary: ['Close the day'],
+    /* § D1361: the takeover and the resume over a day another tab holds — the guide's one, and two more. */
+    primaryShipsInstead: ['Close the day', 'Continue ⟨day⟩ here', 'Resume ⟨day⟩'],
     notes: ['Stops the clock and writes the report.'],
     inverted: false,
   },
