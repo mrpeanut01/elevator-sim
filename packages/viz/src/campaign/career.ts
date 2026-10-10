@@ -78,6 +78,8 @@ import {
   shopTierAt,
   startIsLegal,
   wearHeadOf,
+  shaftsAddedBy,
+  type TowerShafts,
 } from './economy.js';
 import { contractById } from '../shift/contracts.js';
 import { shopTierPrice } from './economy.js';
@@ -644,6 +646,14 @@ export function applyCampaignAction(
   action: CampaignAction,
   /* The price of anything bought here — `data/price-schedule.json`, GitHub issue #366. */
   schedule: PriceSchedule,
+  /**
+   * The shafts each shaft tier sinks on a building's career tower — `economy.ts#TowerShafts`,
+   * [§ D1312](../../../../DECISIONS.md). This record holds no building, so the host hands it the
+   * same resolver the desk's shop rows read (`campaign/shaftPlan.ts#careerTowerShaftsOf`), and a
+   * booking charges what the row showed. Omitted, or answering `undefined`, is a caller that knows
+   * no building: a shaft tier is then charged its schedule row alone, as before § D1312.
+   */
+  shaftsOf?: (buildingId: string) => TowerShafts | undefined,
 ): CampaignCareer {
   switch (action.kind) {
     case 'open-tower': {
@@ -679,9 +689,9 @@ export function applyCampaignAction(
         spends: [],
       }));
     case 'press-tier':
-      return pressTier(career, action.towerId, action.categoryId, action.level, schedule);
+      return pressTier(career, action.towerId, action.categoryId, action.level, schedule, shaftsOf);
     case 'pick-start':
-      return pickStart(career, action.startIdx, schedule);
+      return pickStart(career, action.startIdx, schedule, shaftsOf);
     case 'cancel-booking':
       return { ...career, pendingBooking: undefined };
     case 'answer-need':
@@ -814,13 +824,21 @@ function pressTier(
   categoryId: ShopCategoryId,
   level: number,
   schedule: PriceSchedule,
+  shaftsOf: ((buildingId: string) => TowerShafts | undefined) | undefined,
 ): CampaignCareer {
   const tower = towerById(career, towerId);
   const tier = shopTierAt(categoryId, level);
   if (tower === undefined || tier === undefined) return career;
   if (bookingFor(tower, categoryId, level) !== undefined) return career;
-  /* The price is the schedule's — issue #366. The booking records what was paid, as history. */
-  const { units, nights } = shopTierPrice(schedule, tier);
+  /*
+   * The price is the schedule's — issue #366 — charged per shaft at its bank's band on a shaft tier
+   * (§ D1312). A shaft tier that sinks no shaft on this tower is refused here as the shop refuses it,
+   * because per shaft it would book a free purchase that adds nothing.
+   */
+  const shafts = shaftsOf?.(tower.buildingId);
+  if (shaftsAddedBy(tier, shafts)?.length === 0) return career;
+  /* The booking records what was paid, as history. */
+  const { units, nights } = shopTierPrice(schedule, tier, shafts);
   if (purseOf(tower) < units) return career;
   if (nights === 0) {
     const booking: WorksBooking = {
@@ -846,13 +864,17 @@ function pickStart(
   career: CampaignCareer,
   startIdx: number,
   schedule: PriceSchedule,
+  shaftsOf: ((buildingId: string) => TowerShafts | undefined) | undefined,
 ): CampaignCareer {
   const pending = career.pendingBooking;
   if (pending === undefined) return career;
   const tower = towerById(career, pending.towerId);
   const tier = shopTierAt(pending.categoryId, pending.level);
   if (tower === undefined || tier === undefined) return { ...career, pendingBooking: undefined };
-  const { units, nights } = shopTierPrice(schedule, tier);
+  /* The same price {@link pressTier} checked, so the purse is charged what the row showed (§ D1312). */
+  const shafts = shaftsOf?.(tower.buildingId);
+  if (shaftsAddedBy(tier, shafts)?.length === 0) return { ...career, pendingBooking: undefined };
+  const { units, nights } = shopTierPrice(schedule, tier, shafts);
   if (!startIsLegal(tower, startIdx, nights)) return career;
   if (purseOf(tower) < units) return { ...career, pendingBooking: undefined };
   const booking: WorksBooking = {

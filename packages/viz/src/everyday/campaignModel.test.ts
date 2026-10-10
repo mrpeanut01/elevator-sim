@@ -438,7 +438,12 @@ describe('the contract sheet (§ 8.3, § 8.4)', () => {
     const view = contractView(inputOf(openMonth()))!;
     expect(view.purse.totalNote).toContain('A perfect month pays 98 units');
     expect(view.purse.totalNote).toContain('worth 324');
-    expect(view.lede).toContain('about a third of the shop');
+    /*
+     * Read *"about a third of the shop"* until § D1312 made the shop's worth the tower's own; the
+     * fraction was true of four contracts in sixteen. `campaign/shaftPlan.test.ts` holds the new
+     * sentence against every difficulty on every contract tower.
+     */
+    expect(view.lede).toContain('only part of the shop');
   });
 
   it('lays the month out as four weeks of five, with today marked NOW', () => {

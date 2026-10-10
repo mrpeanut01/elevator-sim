@@ -80,8 +80,11 @@ import {
   type DifficultyId,
   type ShopCategory,
   type ShopTier,
+  type ShopTierPrice,
   type ShopTierState,
+  type TowerShafts,
   atRiskTowers,
+  shaftsAddedBy,
   calendarColumns,
   calendarFrom,
   calendarRow,
@@ -104,6 +107,7 @@ import {
   rateOnDay,
   renewalOffer,
   serviceDaysLeft,
+  shopTierAt,
   shopTierState,
   shopTotalUnits,
   slotsOpen,
@@ -149,6 +153,14 @@ export interface BuildingFacts {
    * shipped path (`campaignScreens.ts#campaignInputOf`) always writes it.
    */
   readonly startTimeFloors?: number | undefined;
+  /**
+   * The shafts each shaft tier sinks on the tower the day runs, and the plan-area band of each —
+   * `campaign/shaftPlan.ts#careerTowerShaftsOf` (GitHub issue #429, § D1312). The shop prices a
+   * shaft tier per shaft from it and refuses one that sinks none. Optional for the same reason as
+   * {@link startTimeFloors}: a fixture that knows no building prices the row alone, and the shipped
+   * path (`campaignScreens.ts#campaignInputOf`) always writes it.
+   */
+  readonly shafts?: TowerShafts | undefined;
 }
 
 /** One dispatcher on offer, for the standing-order selects. */
@@ -1699,9 +1711,16 @@ export const CONTRACT_COPY = Object.freeze({
    */
   renewalFirst:
     'the contract is up for renewal, and no day runs here until it is answered on the building’s desk',
+  /*
+   * *"Only part of the shop"* read *"about a third of the shop"* until § D1312 priced a shaft per
+   * shaft at its bank's band, which made the shop's worth the tower's own. The fraction was then
+   * true of four contracts in sixteen; the purse's `totalNote` beside it prints the tower's two real
+   * figures, and `campaign/shaftPlan.test.ts` holds this sentence against every difficulty on every
+   * contract tower.
+   */
   lede:
     'One building for twenty days. You are paid for each day you clear, more as the month goes on, and ' +
-    'you spend it on the tower itself. A perfect month buys about a third of the shop, so the month is ' +
+    'you spend it on the tower itself. A perfect month buys only part of the shop, so the month is ' +
     'really a question about what this building will never get.',
   difficultyEyebrow: 'HOW HARD',
   difficultyFooter: 'Changing this starts a fresh month.',
@@ -1731,10 +1750,21 @@ export const CONTRACT_COPY = Object.freeze({
    * actually modelled is the one left standing — eight of the twenty days gone before the kit is
    * live, so buying late buys nothing.
    */
-  shaftBody:
-    'A fourth car is 34 units and eight nights. Buy it in week two and it is live with a fortnight ' +
-    'left to use it, which is what pays for the eight days it takes to go in. Buy it in week four ' +
-    'and you have paid for something you never get to use.',
+  /*
+   * **`shaftBody` is gone: the card's first sentence is {@link shaftDecisionOf}'s** — § D1312. It
+   * read *"A fourth car is 34 units and eight nights. Buy it in week two and it is live with a
+   * fortnight left to use it, which is what pays for the eight days it takes to go in. Buy it in
+   * week four and you have paid for something you never get to use."* Since a shaft is priced per
+   * shaft at its bank's band, the price was true of Garden Apartments alone (42 u at Midtown Office,
+   * 318 u for seven shafts on Willis, not sold where every bank mixes kinds of car). The timing was
+   * wrong on every tower: bought on day 6 an eight-night shaft is live on day 14 with seven days
+   * left, which is no fortnight, and in week four the shop refuses the booking (`past-contract`), so
+   * nobody can pay for it. The function says what `economy.ts#daysOfBenefit` says instead, and
+   * drops *"which is what pays for"*, a value no run measured.
+   */
+  /** The shaft card where the shop sells no shaft — {@link SHOP_NO_SHAFT}'s tower, § D1312. */
+  shaftNotSold: 'The shop sells no shaft here, because every bank mixes kinds of car.',
+  shaftNotSold2: 'The cars it was built with are the cars it keeps, so the month is spent on what they do.',
   shaftBody2:
     'The alternative is four cheap things that each shave a second. They will out-perform the shaft this ' +
     'month and leave the building exactly as short as it was.',
@@ -1985,17 +2015,14 @@ function shopTierRow(
   schedule: PriceSchedule,
   facts: BuildingFacts,
 ): ShopTierRowView {
-  const state = shopTierState(tower, category.id, tier, schedule, facts.startTimeFloors);
-  const priced = shopTierPrice(schedule, tier);
+  const state = shopTierState(tower, category.id, tier, schedule, facts.startTimeFloors, facts.shafts);
+  const priced = shopTierPrice(schedule, tier, facts.shafts);
   return {
     categoryId: category.id,
     level: tier.level,
     levelLabel: `L${String(tier.level)}`,
     name: tier.name,
-    cost:
-      priced.nights === 0
-        ? units(priced.units)
-        : `${units(priced.units)} · ${String(priced.nights)}n`,
+    cost: shopCostLine(priced),
     effect: tier.effect,
     state: shopStateLine(tower, tier, state, schedule),
     stateId: state.id,
@@ -2004,10 +2031,32 @@ function shopTierRow(
 }
 
 /**
+ * A row's cost: `9 u · 1n`, and on a shaft tier that sinks more than one shaft on this tower, how
+ * many the units pay for — `318 u · 8n · 7 shafts` (§ D1312). A shaft tier that sinks none reads
+ * {@link SHOP_NO_SHAFT_COST} rather than `0 u`, which would read as a free purchase.
+ */
+function shopCostLine(priced: ShopTierPrice): string {
+  if (priced.shafts === 0) return SHOP_NO_SHAFT_COST;
+  const money = priced.nights === 0 ? units(priced.units) : `${units(priced.units)} · ${String(priced.nights)}n`;
+  return priced.shafts === undefined || priced.shafts === 1 ? money : `${money} · ${String(priced.shafts)} shafts`;
+}
+
+/**
  * The line a staggered start drawn on a building with no start time reads — GitHub issue #603,
  * § D1078. Says what is true of the building and nothing about what would help instead.
  */
 export const SHOP_NO_START_TIME = 'nobody here keeps a start time to stagger';
+
+/**
+ * The state line of a shaft tier on a tower where no bank takes a shop shaft — § D1312. The shipped
+ * instances are the two mixed fleets, `crown-hotel/main` and `st-jude-hospital/main`, which
+ * `campaign/fitOut.ts#fittedBuilding` leaves as authored rather than rebuild every car to one
+ * machine; `shaftPlan.test.ts` holds that every tower drawing this line is one whose banks all mix.
+ */
+export const SHOP_NO_SHAFT = 'every bank here mixes kinds of car, so the shop adds no shaft';
+
+/** The cost cell beside {@link SHOP_NO_SHAFT}: nothing is sold, so no price is quoted. */
+export const SHOP_NO_SHAFT_COST = 'not sold here';
 
 /** § 8.2's *"every tier shows its own derived state"*, worded. */
 function shopStateLine(
@@ -2032,12 +2081,75 @@ function shopStateLine(
       return 'works run past the contract';
     case 'no-start-time':
       return SHOP_NO_START_TIME;
+    case 'no-shaft':
+      return SHOP_NO_SHAFT;
     case 'buyable': {
       if (nights === 0) return 'working tomorrow';
       const ready = dayIndexOf(tower) + nights;
       return `ready on day ${String(ready + 1)} · ${String(CONTRACT_DAYS - ready)} days of benefit`;
     }
   }
+}
+
+/** A count of days or nights as a word, for the shaft card; digits past the words listed. */
+const DAY_WORDS: readonly string[] = Object.freeze([
+  'no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten',
+  'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen',
+  'nineteen', 'twenty',
+]);
+
+function dayWord(count: number): string {
+  return DAY_WORDS[count] ?? String(count);
+}
+
+/**
+ * **The shaft card's two sentences, priced and timed on this tower** — § D1312.
+ *
+ * The price quotes the first shaft tier exactly as its shop row prices it
+ * (`campaign/economy.ts#shopTierPrice`, from the same {@link BuildingFacts.shafts}), so the card and
+ * the row cannot disagree: `A fourth car is 42 units and eight nights.` on a one-bank tower, the
+ * banks named where the tier sinks a shaft in each of several, and {@link CONTRACT_COPY}'s
+ * `shaftNotSold` pair where it sinks none. With no tower known it prices the row alone, as the shop
+ * does.
+ *
+ * The timing is § 8.2's arithmetic on the row's own nights: a booking from the first day of week two
+ * is live the day after its last night, with `economy.ts#daysOfBenefit` days left; and from the
+ * first day whose benefit is zero the shop refuses the booking as `past-contract`, because the kit
+ * would go live on a day the contract does not have.
+ */
+export function shaftDecisionOf(
+  schedule: PriceSchedule,
+  shafts: TowerShafts | undefined,
+): { readonly body: string; readonly body2: string } {
+  const tier = shopTierAt('shafts', 1);
+  if (tier === undefined) return { body: CONTRACT_COPY.shaftNotSold, body2: CONTRACT_COPY.shaftNotSold2 };
+  const priced = shopTierPrice(schedule, tier, shafts);
+  if (priced.shafts === 0) return { body: CONTRACT_COPY.shaftNotSold, body2: CONTRACT_COPY.shaftNotSold2 };
+  const nights = priced.nights;
+  const added = shaftsAddedBy(tier, shafts) ?? [];
+  const banks = new Set(added.map((shaft) => shaft.bankId)).size;
+  const count = priced.shafts ?? 1;
+  const what =
+    count === 1
+      ? `${tier.name} is`
+      : banks === count
+        ? `${tier.name} here is a new shaft in each of ${dayWord(count)} banks, for`
+        : `${tier.name} here is ${dayWord(count)} new shafts, for`;
+  /* Week two opens on the day after week one's last; the booking starts that day (0-based index). */
+  const weekTwo = WEEKDAY_HEADS.length;
+  const liveDay = weekTwo + nights + 1;
+  const left = CONTRACT_DAYS - (weekTwo + nights);
+  const refusedFrom = CONTRACT_DAYS - nights + 1;
+  const timing =
+    left > 0
+      ? `Bought on day ${String(weekTwo + 1)}, the first of week two, it is live on day ${String(liveDay)} ` +
+        `with ${dayWord(left)} ${left === 1 ? 'day' : 'days'} left to use it. From day ${String(refusedFrom)} ` +
+        'it would not be live before the contract ends, and the shop will not book it.'
+      : 'Bought in week two it would not be live before the contract ends, and the shop will not book it.';
+  return {
+    body: `${what} ${String(priced.units)} units and ${dayWord(nights)} nights. ${timing}`,
+    body2: CONTRACT_COPY.shaftBody2,
+  };
 }
 
 /** § 8.3's whole contract sheet. */
@@ -2194,7 +2306,7 @@ export function contractView(input: CampaignInput): ContractView | undefined {
         tower.bookings.length === 0
           ? 'Nothing booked yet, so this keeps climbing with every trip. Machine and door work is what moves this number.'
           : 'With the nights you have booked. Machines and doors both take load off the gear, which pushes the service window further out.',
-      totalNote: `A perfect month pays ${String(perfectMonthUnits(difficulty))} units. The shop below is worth ${String(shopTotalUnits(input.schedule))}. You are choosing what this building does not get.`,
+      totalNote: `A perfect month pays ${String(perfectMonthUnits(difficulty))} units. The shop below is worth ${String(shopTotalUnits(input.schedule, facts.shafts))}. You are choosing what this building does not get.`,
       carryNote: `This purse belongs to ${facts.name} alone and ${CONTRACT_COPY.purseCarryNote}`,
       kitNote: CONTRACT_COPY.purseKitNote,
     },
@@ -2251,10 +2363,6 @@ export function contractView(input: CampaignInput): ContractView | undefined {
       ],
     },
     document: contractDocumentOf(facts.name, difficulty),
-    shaft: {
-      heading: CONTRACT_COPY.shaftHeading,
-      body: CONTRACT_COPY.shaftBody,
-      body2: CONTRACT_COPY.shaftBody2,
-    },
+    shaft: { heading: CONTRACT_COPY.shaftHeading, ...shaftDecisionOf(input.schedule, facts.shafts) },
   };
 }

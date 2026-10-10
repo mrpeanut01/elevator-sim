@@ -167,8 +167,10 @@ import {
   contractIsLost,
   purseOf,
   shopTierAt,
+  type TowerShafts,
 } from '../campaign/economy.js';
 import { fitOutOf, startTimeFloorIdsOf } from '../campaign/fitOut.js';
+import { careerTowerShaftsOf } from '../campaign/shaftPlan.js';
 import {
   answerChangeOf,
   campaignEventFor,
@@ -1123,6 +1125,14 @@ export interface EverydayHost {
    * times where it is `0`, and {@link campaignAct} refuses the press on the same count.
    */
   buildingStartTimeFloors(id: string): number | undefined;
+
+  /**
+   * The shafts each Career shaft tier sinks on a building's career tower, with each one's plan-area
+   * band — `campaign/shaftPlan.ts#careerTowerShaftsOf`, or `undefined` for a building this build
+   * cannot resolve. GitHub issue #429, `DECISIONS.md` § D1312: the career shop prices a shaft tier
+   * per shaft from it, and {@link campaignAct} hands the reducer the same answer.
+   */
+  buildingShafts(id: string): TowerShafts | undefined;
 
   /**
    * The career GAMEPLAY § 8's three campaign screens read — the whole record, as plain data.
@@ -2762,6 +2772,15 @@ export function createEverydayHost(
     return startTimeFloorCounts.get(id);
   };
   /**
+   * A building's career shafts — GitHub issue #429, § D1312. Memoised per id for the reason
+   * {@link startTimeFloorsOf} is: the shop asks on every draw, and the reducer asks on every press.
+   */
+  const towerShafts = new Map<string, TowerShafts | undefined>();
+  const towerShaftsOf = (id: string): TowerShafts | undefined => {
+    if (!towerShafts.has(id)) towerShafts.set(id, careerTowerShaftsOf(b.resources, id));
+    return towerShafts.get(id);
+  };
+  /**
    * Assign and persist together. One writer, so a lane that adds a fourth mutation site cannot
    * forget the save — which is how a career that persists on two of three paths ships.
    */
@@ -3522,6 +3541,7 @@ export function createEverydayHost(
       return resolved === undefined ? undefined : statLineOf(resolved);
     },
     buildingStartTimeFloors: (id) => startTimeFloorsOf(id),
+    buildingShafts: (id) => towerShaftsOf(id),
     campaign: () => career,
     priceSchedule: () => bindings.resources.priceSchedule,
     careerNotice: () => careerLoadNotice,
@@ -3880,7 +3900,8 @@ export function createEverydayHost(
           return;
         }
       }
-      const next = applyCampaignAction(career, action, bindings.resources.priceSchedule);
+      /* The shafts the shop priced the row from, so the purse is charged what it showed (§ D1312). */
+      const next = applyCampaignAction(career, action, bindings.resources.priceSchedule, towerShaftsOf);
       /* A refused action moves nothing and notifies nobody: a redraw over an unchanged record
          would repaint a screen mid-interaction for no reason a player could see. */
       if (next === career) return;

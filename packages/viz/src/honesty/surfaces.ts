@@ -302,11 +302,12 @@ import { WORKED_ANSWER_COPY, type WorkedAnswerFacts, type WorkedAnswerView } fro
 import { WEEK_START_NEXT_LABEL, weekScreenViewOf } from '../everyday/weekView.js';
 import { percentileLine, WORLD_FIGURES_ABSENT, WORLD_FIGURES_LABEL, WORLD_FIGURES_REASON } from '../everyday/world.js';
 import { weekdayOf, type GoalObservations } from '../shift/types.js';
-import { buildingView, CONTRACT_COPY, contractView, towersView } from '../everyday/campaignModel.js';
+import { buildingView, CONTRACT_COPY, contractView, towersView, type BuildingFacts } from '../everyday/campaignModel.js';
 /* Wave AN lane AP-3's region — the Career's front page, § D1301. */
 import { TOWER_CARD_COPY, contractDocumentOf, type CampaignInput } from '../everyday/campaignModel.js';
 import { mootCountClause } from '../everyday/today.js';
 import { DIFFICULTIES, DIFFICULTY_IDS } from '../campaign/economy.js';
+import type { TowerShafts } from '../campaign/economy.js';
 import {
   applyCampaignAction,
   CAMPAIGN_ABSENCES,
@@ -11150,6 +11151,14 @@ const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
     'everyday/campaignModel.ts#BUILD_REFUSAL',
     /* § D1078's refused stagger, drawn on Garden Apartments' shop row, which keeps no start time. */
     'everyday/campaignModel.ts#SHOP_NO_START_TIME',
+    /*
+     * § D1312's shaft prices: the refusal and its cost cell, drawn where every bank mixes kinds of
+     * car, and the shaft card priced and timed on the open tower. Seeded by name below, on a
+     * one-bank tower, a two-bank tower and a mixed fleet.
+     */
+    'everyday/campaignModel.ts#SHOP_NO_SHAFT',
+    'everyday/campaignModel.ts#SHOP_NO_SHAFT_COST',
+    'everyday/campaignModel.ts#shaftDecisionOf',
     'everyday/campaignModel.ts#CALENDAR_LEGEND',
     'everyday/campaignModel.ts#MONTH_LEGEND',
     /* Reached through the three views above: every figure they print is one of these. */
@@ -11189,15 +11198,35 @@ const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
      * `startTimeFloors` is what `campaignScreens.ts#campaignInputOf` writes from the host (GitHub
      * issue #603, § D1078): a block of flats keeps no start time, so its shop draws staggered start
      * times refused, and Chancery House's eighteen populated office floors all keep one.
+     *
+     * `shafts` is what it writes from `campaign/shaftPlan.ts#careerTowerShaftsOf` (§ D1312), as the
+     * shipped tower gives it: one shaft a level in each building's one bank, band 0 at Garden
+     * Apartments (33 m²) and band 1 at Chancery House (152 m²), so the two shops quote different
+     * prices for the same tier.
      */
-    const buildings = new Map([
+    const oneBank = (band: number): TowerShafts =>
+      new Map([
+        ['new-car', [{ bankId: 'main', band }]],
+        ['fifth-car', [{ bankId: 'main', band }]],
+      ]);
+    const buildings = new Map<string, BuildingFacts>([
       [
         'garden-apartments',
-        { name: 'Garden Apartments', spec: '7 floors · 2 cars · 0.63 m/s · 240 people', startTimeFloors: 0 },
+        {
+          name: 'Garden Apartments',
+          spec: '7 floors · 2 cars · 0.63 m/s · 240 people',
+          startTimeFloors: 0,
+          shafts: oneBank(0),
+        },
       ],
       [
         'chancery-house',
-        { name: 'Chancery House', spec: '20 floors · 6 cars · 5 m/s · 612 people', startTimeFloors: 18 },
+        {
+          name: 'Chancery House',
+          spec: '20 floors · 6 cars · 5 m/s · 612 people',
+          startTimeFloors: 18,
+          shafts: oneBank(1),
+        },
       ],
     ]);
     const dispatchers = [
@@ -11548,6 +11577,69 @@ const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
      * is seeded here from the copy it is read from.
      */
     seeds.push({ field: 'contract.renewalFirst', text: CONTRACT_COPY.renewalFirst, role: 'reason' });
+
+    /*
+     * **The two shaft shops the four cases above cannot reach** — § D1312. Both cases' towers have
+     * one bank that takes a shaft, so the shaft tier's two other answers are drawn here on the
+     * contract sheet alone: a two-bank tower, where one tier sinks a shaft in each bank and the row
+     * says how many (Secure Tower's `low` and `high`, both band 1); and a tower whose one bank mixes
+     * kinds of car, where the shop sells no shaft and says why (Crown Hotel's `main`). Only what the
+     * shaft tiers change is seeded: the shaft rows, the shaft card and the shop's worth.
+     */
+    const shaftShops: readonly (readonly [string, string, string, BuildingFacts])[] = [
+      [
+        'two-banks',
+        'c3',
+        'secure-tower',
+        {
+          name: 'Secure Tower',
+          spec: undefined,
+          shafts: new Map([
+            ['new-car', [{ bankId: 'low', band: 1 }, { bankId: 'high', band: 1 }]],
+            ['fifth-car', [{ bankId: 'low', band: 1 }, { bankId: 'high', band: 1 }]],
+          ]),
+        },
+      ],
+      [
+        'mixed-fleet',
+        'c7',
+        'crown-hotel',
+        {
+          name: 'Crown Hotel',
+          spec: undefined,
+          shafts: new Map([
+            ['new-car', []],
+            ['fifth-car', []],
+          ]),
+        },
+      ],
+    ];
+    for (const [label, contractId, buildingId, facts] of shaftShops) {
+      const sheet = contractView({
+        career: {
+          ...first,
+          towers: [
+            { ...freshTower({ contractId, buildingId, dispatcherId: 'eta', rate: 5 }), carry: 120 },
+          ],
+          openTowerId: contractId,
+        },
+        schedule: shippedPriceSchedule(),
+        buildings: new Map([[buildingId, facts]]),
+        dispatchers,
+        observations: undefined,
+        observationsBasis: 'whole-run',
+        history: [],
+      });
+      if (sheet === undefined) continue;
+      seeds.push({ field: `${label}.contract.purse.total`, text: sheet.purse.totalNote, role: 'prose' });
+      for (const row of sheet.shop.categories.find((category) => category.id === 'shafts')?.rows ?? []) {
+        const tier = `${label}.contract.shop.shafts.${row.levelLabel}`;
+        seeds.push({ field: `${tier}.cost`, text: row.cost, role: 'observation' });
+        seeds.push({ field: `${tier}.state`, text: row.state, role: row.pressable ? 'observation' : 'reason' });
+      }
+      seeds.push({ field: `${label}.contract.shaft.body`, text: sheet.shaft.body, role: 'prose' });
+      seeds.push({ field: `${label}.contract.shaft.body2`, text: sheet.shaft.body2, role: 'prose' });
+    }
 
     return singleRun(this.id, seeds);
   },

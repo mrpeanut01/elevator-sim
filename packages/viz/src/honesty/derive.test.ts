@@ -1636,6 +1636,16 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'Which shaft tiers carry the plan-area surcharge — GitHub issue #429, § D1312. ' +
+        '`AREA_BANDED_SHAFT_PRICE_IDS` holds two `data/price-schedule.json` row ids, `new-car` and ' +
+        '`fifth-car`, and `shopTierPrice` reads it to return a number of units. Neither prints a ' +
+        'word: the row costs, the refusal and the shaft card a player reads are ' +
+        '`campaignModel.ts#shopTierRow`’s, `#SHOP_NO_SHAFT`’s and `#shaftDecisionOf`’s, which the ' +
+        'campaign adapter draws.',
+      ids: ['campaign/economy.ts#AREA_BANDED_SHAFT_PRICE_IDS', 'campaign/economy.ts#shopTierPrice'],
+    },
+    {
+      reason:
         'Assertions that two runs met the same crowd — GitHub issue #350 — and the three sites ' +
         'that make them. `crowdDifferencesOf` returns sentences naming the first legs that differ, ' +
         '`sameCrowd` is the predicate over it, `assertSameCrowd` throws with the pair’s own name in ' +

@@ -37222,6 +37222,8 @@ The editor control (`FixitState.topFloorRaiseM`) only ever raises the building's
 
 > **Status 2026-09-19: AMENDED by [§ D721](#d721)**, before sign-off. Every quantity in § 2 and § 3 reproduces on the tree at `393bda2`. Two claims do not: the gap table's **rank** column (the second- and third-widest gaps by ratio are 33.0 → 56.0 at 1.697× and 24.0 → 33.0 at 1.375×, both inside band 0, and the two named here are fourth and fifth), and **"the fourteen shipped buildings"**, which is seventeen. No price, boundary, band or population moves. This entry's text is left standing as the record it is. See [`docs/39`](docs/39-decisions-in-force.md).
 
+> **Status 2026-10-10: AMENDED by [§ D1312](#d1312)** (an agent ruling). § 8's boundary is closed: the Career shop prices a shaft tier once per shaft it sinks, each at this entry's fix-it price for its bank, and § 11's `fifth-car` question takes a studio default (banded). No band, boundary or price on the schedule moves. See [`docs/39`](docs/39-decisions-in-force.md).
+
 **Date: 2026-09-16 · GitHub issue [#429](https://github.com/mrpeanut01/elevator-sim/issues/429), stage 2 · Completes [§ D601](#d601), which built the area model and refused the price · Spends [§ D552](#d552)'s rate × quantity seam for the second time, after [§ D620](#d620) · Rules on: `data/price-schedule.json`, `data/campaign.json`, `data/engineering-briefs.json`, `packages/core/src/config/floorArea.ts`, `packages/viz/src/pricing/`, `packages/viz/src/fixit/parse.ts`.**
 
 **Why an entry.** Three of [§ D405](#d405)'s grounds. It adds authored figures to a governed `data/` file that need the product owner's approval and are drafted for it here. It **moves figures already recorded** — the budget ceiling in `data/campaign.json` (30 sites) and `data/engineering-briefs.json` (6), and the price of a new shaft in the shipped fix-it cases, none of which this lane's module owns. And it **settles a question § D601 deliberately left open**, which a docstring may not do on its own.
@@ -49351,3 +49353,74 @@ there.
 **Not established.** Persistence of filed recordings across a reload; a census on any tower but
 `c1`; the census line driven in the browser tier, where `campaignJourney.browser.test.ts` drives the
 intro and the cards and no case waits out the census's thirteen runs on the desk.
+
+---
+
+## D1312 — a Career shaft costs what a fix-it case charges for it, once for each shaft the tier sinks
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (swarm AP's reconciled ruling,
+> § 2's lane AP-5 *One price per act*, built at the integrator's direction although all three
+> members ruled #429's Career half build-later; built by wave AN lane AP-5), not by the product
+> owner. A later reader weighing this against a product-owner ruling should treat it as an agent
+> ruling and say so. **It approves nothing**: the four bands and the 8 u step stay the draft
+> [§ D631](#d631) put to the owner, and the Career reads whatever bands the schedule carries.
+> **Owner-reversible**: that `fifth-car` carries the surcharge (clause 2, one constant); that a shaft
+> tier is charged per shaft it sinks rather than sinking a shaft in every bank for one row
+> (clause 1); and the reworded sentences (clause 4).
+
+**Why an entry.** [§ D405](#d405)'s first and second grounds. It binds `everyday/host.ts` and
+`everyday/campaignScreens.ts`, which this lane does not own, and it moves recorded figures:
+§ D631 § 8's *what does NOT read it: the campaign shop* stops being true, the shop's 324 u becomes
+the figure for no building, and three player sentences change.
+
+**Measured first**, on `5c5efaf` through the loader. The 62 shipped banks fall 3, 44, 8 and 7
+across the four bands, so a fix-it case charges 34, 42, 50 or 58 u for one new shaft, and the Career
+shop charged 34 u on all 62: a different price on 59. Per contract tower,
+`campaign/fitOut.ts#fittedBuilding` adds one shaft a bank a level on every bank but the two mixed
+fleets (`crown-hotel/main`, `st-jude-hospital/main`), so one 34 u row sank between none and eight
+shafts: seven on Willis and Vertical City, eight on Empire State, and none on Crown Hotel or St
+Jude, which charged 34 u for nothing. On every bank of all sixteen contract towers the rung's tower
+takes the same band the shipped building gives a fix-it case.
+
+**1. Per shaft, at the fix-it price.** `campaign/economy.ts#shopTierPrice` charges a shaft tier (one
+whose `FitOutDelta.extraShafts` is set) once for each shaft in `campaign/shaftPlan.ts#towerShaftsOf`'s
+list, at its row plus the `shaft-area` row at that bank's band. The list is read off the cars the
+applier adds to the tower the career day runs, so the shafts charged are the shafts the run gets. The
+nights stay the row's however many shafts it sinks. With no tower known the row alone is charged.
+
+| tower | first shaft tier, before | after | shafts it sinks |
+|---|---|---|---|
+| Garden Apartments | 34 u | 34 u | 1 |
+| Midtown Office, Chancery House, Harbour Point | 34 u | 42 u | 1 |
+| Secure Tower | 34 u | 84 u | 2 |
+| Willis | 34 u | 318 u | 7 |
+| Empire State | 34 u | 352 u | 8 |
+| Crown Hotel, St Jude Hospital | 34 u | refused | 0 |
+
+**2. The fifth car carries the surcharge too.** Two of the swarm's three members banded it and one
+would have left it at its row; its shaft takes the same plan area as the one before it.
+`economy.ts#AREA_BANDED_SHAFT_PRICE_IDS` reverses it in one line.
+
+**3. A shaft tier that sinks no shaft is refused** (`no-shaft`), on [§ D1078](#d1078)'s footing:
+charged per shaft it would be a free purchase that moves no leg. The row reads *not sold here* and
+*every bank here mixes kinds of car, so the shop adds no shaft*, and the reducer refuses the press.
+
+**4. Sentences the tower's own shop made false.** The shop's worth now runs from 236 u (no shaft
+sold) to 1 100 u (Empire State), so *"A perfect month buys about a third of the shop"* was true of
+four contracts in sixteen. The contract lede now says *only part of the shop* and Standard's note
+*less than half the shop*, both held against every difficulty on every contract tower. The shaft
+card quoted *34 units and eight nights* everywhere and timed the purchase wrongly everywhere: bought
+on day 6 an eight-night shaft is live on day 14 with seven days left, no fortnight, and in week four
+the shop refuses the booking. `everyday/campaignModel.ts#shaftDecisionOf` prices it from the row and
+times it with the row's nights.
+
+**One reader.** The band is `pricing/parse.ts#shaftAreaBandOf` over `core`'s `shaftPlanAreaM2`, the
+pair `fixit/parse.ts#fixitContextOf` reads. `campaign/shaftPlan.test.ts` moves the band fixture and
+requires both modes to move together on every shipped bank.
+
+**Not decided here.** Whether the bands are right, which is the owner's (#429). The `shaft-area`
+row's note in `data/price-schedule.json` still says the campaign shop does not read it; that
+sentence is false from this entry and is corrected with lane AP-1's census-touching edit, because
+this lane may not touch the file. Whether a shop shaft should go in one bank the player picks rather
+than in every bank. The shaft card's second sentence (*"They will out-perform the shaft this
+month"*), which no run measured and this lane left as it was.

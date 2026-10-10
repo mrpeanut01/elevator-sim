@@ -212,6 +212,7 @@ export function campaignInputOf(host: EverydayHost): CampaignInput {
       name: config.name,
       spec: host.buildingSpecLine(id),
       startTimeFloors: host.buildingStartTimeFloors(id),
+      shafts: host.buildingShafts(id),
     });
   }
   const run = host.runState();
