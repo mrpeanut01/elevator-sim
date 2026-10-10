@@ -275,16 +275,13 @@ const ABSENCE_TRIAGE: readonly TriagedAbsence[] = Object.freeze([
   { register: 'EVERYDAY_SHELL_ABSENCES', fragment: 'your week’s after that', issue: 248 },
   { register: 'STAGE_ABSENCES', fragment: 'no works to buy while the day plays', issue: 553 },
   /*
-   * **The rush's register is not empty any more, and the entry that refilled it came in with the
-   * feature that half-closed its issue.** GitHub issue #372 asked for a per-wave purse, recorded
-   * interventions on the round and a postable result. The purse is derived and published, the
-   * interventions travel and the sitting posts; **nothing spends a purse**, because a between-round
-   * rebuild is the fit-out kit and `campaign/fitOut.ts` over `commissioning/` is code
-   * `packages/server` may not import ([§ D606](../../../../DECISIONS.md)). So the owner is #372
-   * itself rather than a new issue: the absence is that issue's own second criterion, still open on
-   * it, and inventing a second number would split one thing across two queues.
+   * **The rush's row left with its entry, on the commit that built what it was waiting for.** It
+   * owned `RUSH_ABSENCES`' *"The between-round purse"* for #372, whose second criterion was a rebuild
+   * between rounds that spends the purse. That is built ([§ D1295](../../../../DECISIONS.md)): the
+   * price reader moved into `core`, the server replays a rebuilt round, and the rush's result offers
+   * the rebuild. The entry is deleted from the register and this row with it, in the same edit, which
+   * is the direction the second assertion below exists for.
    */
-  { register: 'RUSH_ABSENCES', fragment: 'The between-round purse', issue: 372 },
   /*
    * **Two rows left together here, and that they were a pair is the whole reason to say so.**
    * `STAGE_ABSENCES`' *no rival lane* and `EVERYDAY_SHELL_ABSENCES`' *Racing a second dispatcher*

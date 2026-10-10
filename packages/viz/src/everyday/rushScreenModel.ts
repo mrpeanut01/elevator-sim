@@ -257,6 +257,27 @@ export const RUSH_FITTED_LINE =
   'This tower starts fitted — the doors, the control and the tenancies are already in. A fitted ' +
   'sitting is posted to its own board rather than ranked against towers as built.';
 
+/**
+ * **What the rebuild between rounds is, said before the first round** — GitHub issue #372,
+ * [§ D1295](../../../../DECISIONS.md). Drawn by `everyday/rushScreen.ts` in the driving block, under
+ * the fitted line when there is one.
+ *
+ * The rush's loop is *last longer, earn more, rebuild, last longer again*, and a player who met the
+ * rebuild only after a round would not know the round was paying for anything. So the setup screen
+ * says what a wave pays (the figure is `data/rush-purse.json`'s, passed in rather than written here),
+ * what it buys and that it stays; and, when the account owns a top-up, what the sitting opens with.
+ * It names the four categories the menu sells and no gain: what a tier does to a hold is not known
+ * before the round is played, which the menu itself says.
+ */
+export function rushRebuildLineOf(unitsPerWave: number, openingUnits: number): string {
+  const units = (value: number): string => `${String(value)} ${value === 1 ? 'unit' : 'units'}`;
+  const base =
+    `Each wave a round outlasts pays ${units(unitsPerWave)} into a purse, and between rounds you can ` +
+    'spend it rebuilding the tower: doors, control, car size and queue marshalling. What you buy stays ' +
+    'for the rest of the sitting.';
+  return openingUnits > 0 ? `${base} This sitting opens with ${units(openingUnits)} you bought with chimes.` : base;
+}
+
 export function rushHoldLineFigure(): string {
   return `${String(RUSH_HOLD_LINE.overS)} s × ${String(RUSH_HOLD_LINE.people)} people`;
 }
@@ -330,49 +351,24 @@ export function rushGeneratedRangeLine(): string {
 /**
  * The rush's register of absences, drawn by `buildNotes.ts` on the Settings screen's build notes.
  *
- * ## One entry back, and it is the half of GitHub issue #372 this build does not have
+ * ## Empty again, and the entry that left was the purse — GitHub issue #372, § D1295
  *
- * The sitting posts (`everyday/rushSitting.ts`), the server derives a purse for every round and
- * answers with it, and **nothing spends one**: a between-round rebuild is the fit-out kit, the code
- * that turns a kit into a building is `campaign/fitOut.ts` over `commissioning/`, and
- * `packages/server` may not import either ([§ D606](../../../../DECISIONS.md)). So a player reads
- * *outlasted 9 waves, which paid 18 into a purse of 18* and there is nowhere to take it, which is
- * the register's own case — an absence a player can meet, said where the build says what it does
- * not have. It leaves on the commit that makes it false, as every entry here has.
+ * The one entry here read *"The between-round purse — the server works out what each round earned and
+ * sends it back, and there is nothing to spend it on: rebuilding the tower between rounds is not built,
+ * so a purse is a record of how far you got rather than a budget."* It was exactly true while a
+ * between-round rebuild was the fit-out kit and `packages/server` could neither price nor build one
+ * ([§ D606](../../../../DECISIONS.md)). The price reader and the copy-free half of the shop moved into
+ * `core` ([§ D1295](../../../../DECISIONS.md)), the server replays a rebuilt round, and the rush's result
+ * now offers the rebuild (`everyday/rushRebuild.ts`), so the entry is **deleted on the commit that made
+ * it false**, § D227 in the direction it says binds hardest. `buildNotes.test.ts#ABSENCE_TRIAGE` loses
+ * its row on the same commit, and `everyday/chimesPanel.ts#SPEND_ABSENCES` its refusal of the purse
+ * top-up, which was the same absence said on the screen that lists the prices.
  *
- * **The two chime sinks have stopped being one absence, and this register now names only one.**
- * `data/chime-ledger.json` sells a wider purse and a fitted start;
- * [§ D672](../../../../DECISIONS.md) built the spend for the second and deliberately not for the
- * first, because a purse that buys nothing is a purchase that changes no run. So the pre-fit leaves
- * this list on the commit that made it sellable, and what stays is the purse alone — which is what
- * this register is for. `everyday/chimesPanel.ts#SPEND_ABSENCES` carries the purse's own refusal on
- * the screen that lists the prices, which is where a player meets it; a second wording here would
- * be the two-wordings defect, and the one a player is less likely to read.
+ * What a rush still does not sell between rounds is not an absence and is not listed here: Shafts and
+ * Machines, and the two tenant tiers that change who arrives, are refused **on the menu itself**, each
+ * with its reason, because that is where a player looking for one meets it.
  */
-export const RUSH_ABSENCES: readonly string[] = Object.freeze([
-  /*
-   * **This entry has now lost its second sentence twice, and the second loss is the instructive
-   * one** — GitHub issue #372, [§ D640](../../../../DECISIONS.md),
-   * [§ D672](../../../../DECISIONS.md).
-   *
-   * It read *"neither rush purchase can be bought yet"*, then — once the pre-fit reached the run —
-   * *"starting with the building fitted is a different case and is built … but neither can be
-   * bought yet"*. § D672 sells the pre-fit, so that clause is **deleted** rather than reworded a
-   * third time (§ D227): the pre-fit is not an absence, and an absence register carrying a note
-   * about a control that works is the more dangerous half of that rule.
-   *
-   * **A rewrite naming where it *is* bought was drafted and rejected by a guard**, which is worth
-   * recording because the guard was right. `refusalsAreCurrent.test.ts`' unkeyed-register clause
-   * refuses an entry that contains *not built* and the authored name of a registered screen — and
-   * *"rebuilding between rounds is not built … the tally in Settings sells it"* is exactly that
-   * shape, whatever the author meant. An entry a reader could parse as *Settings is not built* is
-   * an entry that will be read that way. The register says what is missing and nothing else; where
-   * the pre-fit is sold is `everyday/settingsView.ts`'s own screen to say.
-   */
-  'The between-round purse — the server works out what each round earned and sends it back, and ' +
-    'there is nothing to spend it on: rebuilding the tower between rounds is not built, so a purse ' +
-    'is a record of how far you got rather than a budget.',
-]);
+export const RUSH_ABSENCES: readonly string[] = Object.freeze([]);
 
 /* -------------------------------------------------------------------------- *
  * The bands — § 9.1, computed off the ramp

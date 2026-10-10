@@ -25,17 +25,20 @@
  */
 
 import {
+  RUSH_AS_SHIPPED,
   RUSH_STREAM,
   RUSH_TEMPLATE_ID,
   parseBuilding,
-  prefittedRushBuilding,
-  prefittedRushProfile,
   resolveBuilding,
   type RunInterventionConfig,
   runSimulation,
+  rushFitIsAsShipped,
+  rushRebuiltBuilding,
+  rushRebuiltProfile,
   rushTopRatePctPop5min,
   type RuleRowConfig,
   type RunSummary,
+  type RushFit,
   type SimulationConfig,
 } from '@elevator-sim/core';
 import { reportWindowForBuilding } from '@elevator-sim/experiments/browser';
@@ -62,18 +65,20 @@ export type RejectionCode =
   | 'awt-not-quotable'
   | 'simulation-failed'
   /**
-   * A sitting claims `rush-prefit` and this server cannot fit the building — GitHub issue #372,
-   * [§ D640](../../../../DECISIONS.md).
+   * A sitting's round is fitted — it claims `rush-prefit`, or it was rebuilt between rounds — and this
+   * server cannot fit the building. GitHub issue #372, [§ D640](../../../../DECISIONS.md), and
+   * [§ D1295](../../../../DECISIONS.md), which renamed it from `cannot-prefit` when a rebuild became the
+   * second way to reach it.
    *
    * One cause, and it is a configuration rather than a claim: {@link VerificationResources
-   * .elevatorSpecs} is optional, and the kit resolves each car's door timings and transfer time
-   * against that file before it moves them. **A refusal rather than an unfitted replay**, because
+   * .elevatorSpecs} is optional, and the fit resolves each car's door timings, dwell, load and transfer
+   * time against that file before it moves them. **A refusal rather than an unfitted replay**, because
    * the alternative is a round replayed on the tower as shipped and then compared against a held
    * time a fitted tower produced — which refuses an honest player as `held-does-not-reproduce` and
    * sends them looking at their own build. No shipped server reaches it: `bootstrap.ts` gives the
    * resources `loadConfig`'s own specs, and the optionality is for hand-built fixtures.
    */
-  | 'cannot-prefit';
+  | 'cannot-fit';
 
 export interface VerificationRejected {
   readonly ok: false;
@@ -152,16 +157,22 @@ export function configFor(
    *    one).
    *
    * **What stays refused, each on its own ground:** a bought change mid-run (`interventionWire.ts` —
-   * no submission carries the entitlement to it), an incident answer (§ D486, permanent), and a
-   * between-round rebuild, which no wire carries yet.
+   * no submission carries the entitlement to it) and an incident answer (§ D486, permanent).
+   *
+   * **A between-round rebuild was on that list and is not any more** — GitHub issue #372,
+   * [§ D1295](../../../../DECISIONS.md). A round carries the menu tiers bought before it as
+   * price-schedule row ids, the server prices them from its own copy of the schedule against the
+   * purse it derived from the rounds before, and {@link rushRoundConfigFor} replays the round on the
+   * tower fitted with everything the sitting has bought so far (`rushSitting.ts` says how).
    *
    * **A pre-fitted start was on that list and is not any more** — GitHub issue #372,
    * [§ D640](../../../../DECISIONS.md). It read *"a pre-fitted start (its fitted building is one this
    * server cannot build)"*, which was true of an arbitrary kit and had never been true of a fixed
    * one: `rush-prefit` is exactly one kit of three plain fields now, `core`'s `config/rushPrefit.ts`
    * builds it, and {@link rushRoundConfigFor} replays a sitting that claims it on the fitted tower.
-   * The general between-round rebuild — an arbitrary tier of an arbitrary category — is still
-   * refused and still for that sentence's reason (§ D606 § 2).
+   * The sentence that followed this one said the general rebuild was still refused for that reason;
+   * it travels now, as the paragraph above says, and Shafts and Machines are the part a server
+   * replay still cannot build (`core`'s `config/rushRebuild.ts#RUSH_REBUILD_OFF_MENU`).
    */
   if (run.demandTemplateId === RUSH_TEMPLATE_ID) return 'rush-posts-as-a-sitting';
   // Any other template that declares itself unselectable is one the board does not know, on #220's
@@ -174,15 +185,16 @@ export function configFor(
  * server's own `data/`, in the order the refusals have always come in, with the one question that
  * differs between them — *which templates this path admits* — asked by the caller.
  *
- * **`prefit` is the rush's alone** — GitHub issue #372, [§ D640](../../../../DECISIONS.md). A single
- * run carries no modifiers, so {@link configFor} passes `false` and this path is byte-identical to
- * what it was before that field existed.
+ * **`fit` is the rush's alone** — GitHub issue #372, [§ D640](../../../../DECISIONS.md) and
+ * [§ D1295](../../../../DECISIONS.md). A single run carries no modifiers and buys no rebuild, so
+ * {@link configFor} passes nothing, the default is `core`'s `RUSH_AS_SHIPPED`, and this path is
+ * byte-identical to what it was before the field existed.
  */
 function configOver(
   run: SubmittedRun,
   resources: VerificationResources,
   admits: (template: SimulationConfig['trafficProfiles']['demandTemplates'][number]) => boolean,
-  prefit = false,
+  fit: RushFit = RUSH_AS_SHIPPED,
 ): SimulationConfig | RejectionCode {
   const asShipped = resources.buildingsById.get(run.buildingId);
   if (asShipped === undefined) return 'unknown-building';
@@ -194,20 +206,21 @@ function configOver(
   if (template === undefined || !admits(template)) return 'unknown-template';
 
   /*
-   * **The kit, and it is a real edit put back through the loader** — `core`'s `config/rushPrefit.ts`.
+   * **The fit, and it is a real edit put back through the loader** — `core`'s `config/rushRebuild.ts`.
    *
-   * `prefittedRushBuilding` edits the **authored document** (`ResolvedBuilding.config`) and the
-   * result goes back through `parseBuilding`/`resolveBuilding`, which is how `packages/viz` applies
-   * a fit-out and is the only way the two can agree: a resolved building edited in place would skip
-   * every default, every cross-check and every derived figure the loader computes, and the viewer's
-   * half does not skip them. `rushHoldAgreement.json`'s `prefit` cells pin both paths to one held
-   * figure.
+   * `rushRebuiltBuilding` edits the **authored document** (`ResolvedBuilding.config`) and the result
+   * goes back through `parseBuilding`/`resolveBuilding`, which is how `packages/viz` applies a fit-out
+   * and is the only way the two can agree: a resolved building edited in place would skip every
+   * default, every cross-check and every derived figure the loader computes, and the viewer's half does
+   * not skip them. `rushHoldAgreement.json`'s `prefit` and `rebuild` cells pin both paths to one held
+   * figure. A round nothing fitted keeps the shipped `ResolvedBuilding` by identity, so a single run and
+   * an unfitted round are byte-identical to what they were before either field existed.
    */
   let building = asShipped;
-  if (prefit) {
+  if (!rushFitIsAsShipped(fit)) {
     const specs = resources.elevatorSpecs;
-    if (specs === undefined) return 'cannot-prefit';
-    building = resolveBuilding(parseBuilding(prefittedRushBuilding(asShipped.config, specs) as unknown), specs);
+    if (specs === undefined) return 'cannot-fit';
+    building = resolveBuilding(parseBuilding(rushRebuiltBuilding(asShipped.config, fit, specs) as unknown), specs);
   }
 
   /*
@@ -219,7 +232,7 @@ function configOver(
    * the ordering is a claim rather than an effect — which is exactly why it is written the same way
    * on both sides.
    */
-  const dispatcherProfile = profileWithRules(prefit ? prefittedRushProfile(shipped) : shipped, run.ruleRows ?? []);
+  const dispatcherProfile = rushRebuiltProfile(shipped, fit, (profile) => profileWithRules(profile, run.ruleRows ?? []));
   /*
    * And the log's handovers the same way — a switch to an id this server does not ship is refused
    * exactly as an unshipped base profile is. **A switch target carries no kit**, deliberately: the
@@ -341,20 +354,21 @@ const RUSH_POSTS_AS_A_SITTING =
  *
  * It admits **only** the rush template, which is the whole of the difference from {@link configFor}.
  *
- * **`prefit` is the one thing a sitting's modifiers change about a round** — GitHub issue #372,
- * [§ D640](../../../../DECISIONS.md). It comes from `core`'s `claimsRushPrefit` over the claims
- * `http/api.ts` has already checked against the account's spends, and it fits the tower and the
- * driving profile with the one kit `config/rushPrefit.ts` holds. The rate is **still derived from
- * the building as shipped**, deliberately: a rate is a fact about the crowd, the kit moves no floor's
- * population, and the viewer's press reads it off the unfitted tower for the same reason
- * (`everyday/rush.ts#rushBuildingOf`). The two `purse-units` top-ups reach nothing here, because a
- * purse is derived after the replay and spent by nothing (§ D606 § 2).
+ * **`fit` is everything the sitting has fitted by this round** — GitHub issue #372,
+ * [§ D640](../../../../DECISIONS.md), [§ D1295](../../../../DECISIONS.md): the pre-fit kit when the
+ * claims carry `rush-prefit`, and every tier bought between the rounds so far, folded by `core`'s
+ * `config/rushRebuild.ts#rushFitOf`. `rushSitting.ts#replayRushSitting` folds it; this only applies it,
+ * to the tower and to the round's base profile (never to a switch target, for the viewer's reason).
+ * The rate is **still derived from the building as shipped**, deliberately: a rate is a fact about the
+ * crowd, no menu tier moves a floor's population, and the viewer's press reads it off the unfitted
+ * tower for the same reason (`everyday/rush.ts#rushBuildingOf`). The `purse-units` top-ups reach a
+ * round only through what they let the sitting buy, which is the replay's to price.
  */
 export function rushRoundConfigFor(
   buildingId: string,
   round: Pick<SubmittedRun, 'dispatcherProfileId' | 'ruleRows' | 'interventions'>,
   resources: VerificationResources,
-  prefit = false,
+  fit: RushFit = RUSH_AS_SHIPPED,
 ): SimulationConfig | RejectionCode {
   const building = resources.buildingsById.get(buildingId);
   if (building === undefined) return 'unknown-building';
@@ -371,7 +385,7 @@ export function rushRoundConfigFor(
     ...(round.ruleRows === undefined ? {} : { ruleRows: round.ruleRows }),
     ...(round.interventions === undefined ? {} : { interventions: round.interventions }),
   };
-  return configOver(run, resources, (template) => template.id === RUSH_TEMPLATE_ID, prefit);
+  return configOver(run, resources, (template) => template.id === RUSH_TEMPLATE_ID, fit);
 }
 
 /**

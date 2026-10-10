@@ -109,14 +109,45 @@ describe('the purse across a sitting — paid on waves outlasted and on nothing 
   it('pays each round its waves outlasted times the authored figure, into a balance the next round opens with', () => {
     const rounds = rushPurseRounds(purse, 5, [4, 0, 11]);
     expect(rounds).toEqual([
-      { purseBeforeUnits: 5, paidUnits: 4 * perWave, purseAfterUnits: 5 + 4 * perWave },
-      { purseBeforeUnits: 5 + 4 * perWave, paidUnits: 0, purseAfterUnits: 5 + 4 * perWave },
-      { purseBeforeUnits: 5 + 4 * perWave, paidUnits: 11 * perWave, purseAfterUnits: 5 + 15 * perWave },
+      { purseBeforeUnits: 5, spentUnits: 0, paidUnits: 4 * perWave, purseAfterUnits: 5 + 4 * perWave },
+      { purseBeforeUnits: 5 + 4 * perWave, spentUnits: 0, paidUnits: 0, purseAfterUnits: 5 + 4 * perWave },
+      { purseBeforeUnits: 5 + 4 * perWave, spentUnits: 0, paidUnits: 11 * perWave, purseAfterUnits: 5 + 15 * perWave },
     ]);
   });
 
   it('refuses a wave count that is not a whole number of waves, rather than paying a fraction of one', () => {
     expect(() => rushPurseRounds(purse, 0, [2.5])).toThrow(RushPurseError);
     expect(() => rushPurseRounds(purse, 0, [-1])).toThrow(RushPurseError);
+  });
+});
+
+describe('the spend — GitHub issue #372’s second criterion, § D1295', () => {
+  const purse = parseRushPurse(RAW);
+  const perWave = purse.unitsPerWaveOutlasted;
+
+  it('takes a round’s rebuild from what it opened with, before its waves pay', () => {
+    // Round 1 pays 6 waves; round 2 opens on that, spends 9 before it plays, and is paid on 8.
+    const rounds = rushPurseRounds(purse, 0, [6, 8], [0, 9]);
+    expect(rounds).toEqual([
+      { purseBeforeUnits: 0, spentUnits: 0, paidUnits: 6 * perWave, purseAfterUnits: 6 * perWave },
+      { purseBeforeUnits: 6 * perWave, spentUnits: 9, paidUnits: 8 * perWave, purseAfterUnits: 6 * perWave - 9 + 8 * perWave },
+    ]);
+  });
+
+  it('gives exactly the figures it gave before the term existed when nothing is spent', () => {
+    expect(rushPurseRounds(purse, 15, [6, 8], [])).toEqual(rushPurseRounds(purse, 15, [6, 8], [0, 0]));
+  });
+
+  it('never runs a purse below zero: a rebuild the round could not afford throws, and one it could exactly does not', () => {
+    expect(() => rushPurseRounds(purse, 0, [6, 8], [0, 6 * perWave + 1])).toThrow(/spends .* from a purse of/u);
+    expect(rushPurseRounds(purse, 0, [6, 8], [0, 6 * perWave])[1]?.purseBeforeUnits).toBe(6 * perWave);
+    /* A wider opening purse is what lets the same rebuild through — the issue’s own control. */
+    expect(() => rushPurseRounds(purse, 15, [6, 8], [0, 6 * perWave + 1])).not.toThrow();
+  });
+
+  it('refuses a fractional or negative spend, and more rebuilds than rounds', () => {
+    expect(() => rushPurseRounds(purse, 10, [1], [2.5])).toThrow(RushPurseError);
+    expect(() => rushPurseRounds(purse, 10, [1], [-1])).toThrow(RushPurseError);
+    expect(() => rushPurseRounds(purse, 10, [1], [0, 0])).toThrow(/a rebuild belongs to the round it opens/u);
   });
 });

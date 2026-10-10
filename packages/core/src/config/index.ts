@@ -95,6 +95,36 @@ export {
   CHIME_SCHEMA_UNITS,
 } from './chimeLedger.js';
 
+/**
+ * `data/price-schedule.json`'s reader and its types — moved from `packages/viz/src/pricing/` in wave
+ * AN so the server can price a rush rebuild (GitHub issue #372, § D1295). The viewer re-exports both.
+ */
+export {
+  PriceScheduleError,
+  ceilingUnitsOf,
+  changeCovering,
+  parsePriceSchedule,
+  priceOf,
+  purchaseUnits,
+  shaftAreaBandOf,
+  smallestPurchaseUnitsOf,
+  steppedPurchaseUnits,
+  violationsInPriceSchedule,
+} from './priceSchedule.js';
+export type {
+  AreaBand,
+  FlatPricedChange,
+  PriceRate,
+  PriceSchedule,
+  PriceSchema,
+  PriceTier,
+  PricedChange,
+  PricedExtra,
+  QuantitySchema,
+  RatedPricedChange,
+  WithheldChange,
+} from './priceScheduleTypes.js';
+
 /** The rush purse — `data/rush-purse.json`'s reader and the balance across a sitting (GitHub issue #372). */
 export {
   RushPurseError,
@@ -107,16 +137,50 @@ export type { RushPurseRound, RushPurseSchema, RushPurseTable } from './rushPurs
 
 /** The one fixed rush pre-fit kit and its two appliers — GitHub issue #372, § D640. */
 export {
-  MIN_DOOR_S,
   RUSH_PREFIT_KIT,
   RUSH_PREFIT_SINK_ID,
   claimsRushPrefit,
-  doorCycleWithSaving,
   prefittedRushBuilding,
   prefittedRushProfile,
   violationsInRushPrefit,
 } from './rushPrefit.js';
 export type { RushPrefitClaim, RushPrefitKit, RushPrefitRung } from './rushPrefit.js';
+
+/** The rush rebuild between rounds: the menu, the fold and the appliers — GitHub issue #372, § D1295. */
+export {
+  MIN_DOOR_S,
+  RUSH_AS_SHIPPED,
+  RUSH_NO_LEVELS,
+  RUSH_PREFIT_LEVELS,
+  RUSH_REBUILD_CATEGORY_IDS,
+  RUSH_REBUILD_OFF_MENU,
+  RUSH_REBUILD_TIERS,
+  doorCycleWithSaving,
+  fitCarsOf,
+  fitProfileOf,
+  rushFitIsAsShipped,
+  rushFitOf,
+  rushLevelsAfter,
+  rushOffMenuTierOf,
+  rushRebuildTierOf,
+  rushRebuildUnits,
+  rushRebuiltBuilding,
+  rushRebuiltProfile,
+  rushTierChangesNothing,
+  zonedProfileOf,
+} from './rushRebuild.js';
+export type {
+  RushCarFit,
+  RushFit,
+  RushFitDelta,
+  RushFitLevels,
+  RushOffMenuReason,
+  RushOffMenuTier,
+  RushProfileFit,
+  RushRebuildCategoryId,
+  RushRebuildRefusal,
+  RushRebuildTier,
+} from './rushRebuild.js';
 export type {
   ChimeCompletion,
   ChimeCurrency,

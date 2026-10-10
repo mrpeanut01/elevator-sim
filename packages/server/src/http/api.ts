@@ -1421,8 +1421,9 @@ async function boardDistribution(deps: ApiDeps, request: ApiRequest): Promise<Ap
  * replays cost; then the ledger, so a top-up nobody paid for commands no replay either; then the
  * replay of every round (`leaderboard/rushSitting.ts#replayRushSitting`); then the board.
  *
- * What is stored is the server's: every round's held time, waves outlasted and purse from the replay,
- * beside the ids and the log that produced them. The held time the client claimed is compared and
+ * What is stored is the server's: every round's held time, waves outlasted and purse from the replay —
+ * what its rebuild spent among it (GitHub issue #372, § D1295) — beside the ids, the log and the
+ * rebuild that produced them. The held time the client claimed is compared and
  * discarded, as a single run's metrics are.
  */
 async function submitRushSitting(
@@ -1538,9 +1539,12 @@ async function replayAndPostRushSitting(
           dispatcherProfileId: round.dispatcherProfileId,
           ...(round.ruleRows === undefined ? {} : { ruleRows: round.ruleRows }),
           ...(round.interventions === undefined ? {} : { interventions: round.interventions }),
+          // What the round was rebuilt with — a cause, kept so the stored sitting replays (invariant 5).
+          ...(round.rebuild === undefined || round.rebuild.length === 0 ? {} : { rebuild: round.rebuild }),
           heldS: replayed.heldS,
           wavesOutlasted: replayed.wavesOutlasted,
           purseBeforeUnits: replayed.purseBeforeUnits,
+          spentUnits: replayed.spentUnits,
           paidUnits: replayed.paidUnits,
           purseAfterUnits: replayed.purseAfterUnits,
         };

@@ -35195,6 +35195,8 @@ reservation was open, and the numbers below D537 are not written on this lane's 
 
 ## D542 — A rush round is a sitting, posted whole: the server replays every round, derives every purse, and the refusal of `endless-rush` is lifted after its replay cost was measured
 
+> **Status 2026-10-10: AMENDED by [§ D1295](#d1295).** The other thing this entry records as unbuilt is built: a round carries the tiers bought before it, the server prices them and takes them from the purse it derived, and a purse is spent.
+
 > **Status 2026-09-15: one of the two things this entry records as unbuilt is built, by [§ D606](#d606).** *The viewer does not post a sitting* stopped being true on that commit — the rush's result screen keeps the round list and sends the sitting whole, and the honesty corpus moved with it. **The other is unchanged and is the open half of GitHub issue #372**: no between-round rebuild travels, so nothing spends a purse. § D606 names the boundary that blocks it and the three questions nobody has ruled on. This entry is left exactly as it was written.
 
 **Date: 2026-09-11 · Owner: product owner (the ruling, 2026-09-10, and the approval of the figures and readings under it as drafted, 2026-09-11); the lane that built GitHub issue #372 (the readings under it) · Rules on: [§ D515](#d515), [§ D525](#d525) clause 6, [§ D526](#d526) clauses 2 and 3, [§ D486](#d486), `packages/server/src/leaderboard/verify.ts`, `data/rush-purse.json`, [`docs/38`](docs/38-what-the-game-is.md) § 2.3, GitHub issue #372.**
@@ -36809,6 +36811,8 @@ Whether the four footprint figures are right — all four are chosen and all fou
 
 ## D606 — A rush sitting posts from the viewer, and the purse stays unspendable: the boundary that blocks it is named rather than moved, and the citation for it was the wrong way round
 
+> **Status 2026-10-10: AMENDED by [§ D1295](#d1295).** The boundary moved in § 2's first shape, for numbers only, and the general rebuild is built; the viewer now counts the purse it offers before a post with `core`'s own derivation, so *no purse is computed in `packages/viz`* no longer holds.
+
 > **Status 2026-09-16: AMENDED by [§ D640](#d640).** The boundary § 2 names is still not moved and the general between-round rebuild is still not built; the **three questions** § 2 named as unanswered are all answered — *fitted* is one fixed kit, a rush rebuild is instantaneous, and a tier does not require the tier below inside one sitting. See [`docs/39`](docs/39-decisions-in-force.md).
 
 **Date: 2026-09-15 · GitHub issue [#372](https://github.com/mrpeanut01/elevator-sim/issues/372) · Builds the client half of [§ D542](#d542) and [§ D543](#d543) · Corrects a citation carried in `data/rush-purse.json`.**
@@ -37354,6 +37358,8 @@ Whether **any** of the four prices or three boundaries is right — all seven ar
 ---
 
 ## D640 — `rush-prefit` is one fixed kit, authored at last: what *fitted* means, applied by `core` and claimable at both ends, with the general rebuild still refused
+
+> **Status 2026-10-10: AMENDED by [§ D1295](#d1295).** The general rebuild is no longer refused: it is built in this entry's shape, and the kit is three levels of its fold.
 
 **Date: 2026-09-16 · GitHub issue [#372](https://github.com/mrpeanut01/elevator-sim/issues/372) · Answers the third of the three questions [§ D606](#d606) § 2 named and declined · Rules on: [`data/chime-ledger.json`](data/chime-ledger.json)'s `rush-prefit` sink, `packages/core/src/config/rushPrefit.ts`, `packages/server/src/leaderboard/rushSitting.ts`, `packages/server/src/leaderboard/verify.ts`, `packages/viz/src/everyday/rush.ts`, `packages/viz/src/everyday/host.ts`, `packages/viz/src/campaign/fitOut.ts`, `packages/server/src/leaderboard/rushHoldAgreement.json`.**
 
@@ -38354,6 +38360,8 @@ purchase on the player's next clear, which is a defect an optional field makes u
 
 ## D672 — One sink is sold, and it is the only one that reaches a run; the other two are listed with their own refusals, and the scenario rung's refusal is **not** moved
 
+> **Status 2026-10-10: AMENDED by [§ D1295](#d1295).** The rush purse top-up is sold too, now that a rebuild between rounds spends the purse it widens; its refusal is deleted.
+
 **2026-09-19.** GitHub issue **#372**, `docs/38` § 2.1 and § 2.4, [§ D640](#d640), [§ D606](#d606)
 § 2, [§ D227](#d227), `docs/32` GD13, `docs/22` non-goal 5.
 
@@ -38898,6 +38906,8 @@ registers them in `documentation.test.ts#KNOWN_DECISION_HOLES`.
 ---
 
 ## D701 — § D606's three questions are closed by § D640, and the three sentences that still say otherwise are the stale-refusal class: what remains open in the rush package boundary is a fourth question nobody has asked
+
+> **Status 2026-10-10: the fourth question is ANSWERED by [§ D1295](#d1295)**, on swarm DP's default: a tier bought between rounds stays fitted for the rest of the sitting.
 
 **Date: 2026-09-19 · Owner: the studio war room's rulings lane · Closes `DECISIONS-OPEN.md` row OD-7 · Rules on: [`docs/38`](docs/38-what-the-game-is.md) § 2.3, [`docs/39`](docs/39-decisions-in-force.md) §§ 1 and 2, `packages/server/src/leaderboard/boardKey.ts`, [§ D606](#d606) § 2, [§ D640](#d640) § 4, GitHub issue [#372](https://github.com/mrpeanut01/elevator-sim/issues/372).**
 
@@ -49910,3 +49920,111 @@ slot and draws a line on the brief instead.
 total over a throwing store); `everyday/host.test.ts`, *keeps the brief's pick of driver*: red before
 (nothing kept), green after; `everyday/panelSeams.browser.test.ts`, *keeps the brief's driver when the
 site is opened again*: red on a bundle of the base tree (`collective`), green on this tree.
+
+---
+
+## D1295 — the rush rebuilds between rounds: the price reader and the copy-free shop move into core, a bought tier stays for the sitting, and both ends count one purse
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (wave AN, lane AP-2, building swarm
+> DP's reconciled ruling on GitHub issue #372, its lane AP-2 section), not by the product owner.
+> **Owner-reversible**: clauses 2, 3, 4, 5, 6 and 8, each as one constant, one data row or one
+> function. Clauses 1 to 3 are the swarm's ruling and its defaults on the owner's question 3 (two of
+> three members ruled build-now; S2 ruled build-later, after this wave's other lanes). Clauses 4 to 6
+> are this lane's readings, taken because the ruling's own tests or an existing decision forced them,
+> and **were not put to a swarm**: the lane had no way to spawn one, and each says what it reads.
+
+**Why an entry.** It moves the boundary [§ D606](#d606) named and declined to move, answers the fourth
+question [§ D701](#d701) left open, amends [§ D542](#d542)'s *no between-round rebuild travels*, § D606's
+*no purse is computed in `packages/viz`* and [§ D672](#d672)'s two refused purse rows, and it binds
+`core`, `packages/server` and `packages/viz`, none of which owns the others.
+
+**What was measured first.** `packages/viz/src/pricing/parse.ts` and `types.ts` imported nothing but
+each other (749 and 260 lines, S3's 1 009). After the move, the server half of
+`rushHoldAgreement.json` was regenerated through its own command and every one of the 24 existing cells
+came back at its pinned figure; only the three new cells were written. Shipped first rounds pay 12 to 50
+units (`data/rush-purse.json`'s note), against menu prices of 4, 9 and 16 (Doors), 6, 13 and 24
+(Control), 18 and 32 (Car size) and 5 (Tenants 1), so the smallest tower's first round can buy four of
+the nine tiers. And one probe through the server's own `rushRoundConfigFor`, `collective` on the rush's
+one seed, each tier alone on the tower as shipped:
+
+| tower (held as shipped) | Doors 1 | Doors 2 | Doors 3 | Control 1 | Control 2 | Control 3 | Car size 1 | Car size 2 | Tenants 1 |
+|---|---|---|---|---|---|---|---|---|---|
+| `midtown-office` (1 640 s) | 1 684 | 1 694 | 1 848 | 1 528 | 1 640 | 1 512 | 1 640, no leg moved | 1 696 | 1 640, no leg moved |
+| `garden-apartments` (1 178 s) | 1 078 | 1 142 | 1 242 | 1 178, no leg moved | 1 178, no leg moved | 950 | 1 348 | 1 502 | 1 142 |
+
+Car size 1 also moved no leg on `crown-hotel`, `secure-tower`, `chancery-house`, `st-jude-hospital` or
+`mixed-use-high-rise`; Car size 2 held 2 064, 2 848, 2 890 and 4 492 s on the four that moved and left
+St Jude's legs where they were. On `chancery-house` (2 820 s) Control 1, 2 and 3 held 2 852, 2 480 and
+2 646 s, and on `secure-tower` (2 842 s) 2 850, 2 880 and 2 388 s. So a tier can lengthen a hold on one
+tower and shorten it on the next, and on some towers it changes nothing. No mechanism is offered for
+any of it (§ D256).
+
+**The ruling.**
+
+1. **The boundary moves for numbers only.** § D606's first shape, restricted as § D640 restricted it:
+   `pricing/parse.ts` and `types.ts` move unchanged to `core/src/config/priceSchedule.ts` and
+   `priceScheduleTypes.ts`, and the viewer re-exports every name from the old path. The copy-free half
+   of the shop (each tier's price row id, category, level and `fits`) is transcribed into
+   `core/src/config/rushRebuild.ts`, and `everyday/rushRebuild.test.ts` pins it to `campaign/economy.ts#SHOP`
+   tier by tier. The per-car and dispatch appliers move from `campaign/fitOut.ts` into the same module
+   unchanged, so a career tower and a rush rebuild share one implementation. The shop's names, subtitles
+   and effect sentences stay in the viewer, which was § D606's whole reason.
+2. **The menu** is Doors 1 to 3, Control 1 to 3, Car size 1 and 2, and Tenants 1. **Shafts and Machines
+   are refused by name**, on the menu and by the server, because both need `commissioning/`, which the
+   server may not import (the swarm's default, *left off the rush menu at first*). One constant,
+   `RUSH_REBUILD_TIERS`.
+3. **A tier bought between rounds stays fitted for the rest of the sitting, and a new sitting starts as
+   built**: the swarm's default on § D701's fourth question. The fold is the campaign's (one tier per
+   category, absolute at its level), so Control 2 bought over Control 1 replaces zoning with a panel. A
+   rebuild stays instantaneous and is not tier-gated, the owner's two rulings of 2026-09-16 (§ D640).
+   One function, `rushFitOf`.
+4. **Tenants 2 and 3 are off the menu too**, which the ruling's *doors, control, tenants and car size*
+   did not say. Staggered starts keep two thirds of the start-time crowd and moving a tenant floor moves
+   people to other floors, so either changes who arrives; [§ D543](#d543) keys a rush board by building
+   because rows on one board must have met the identical crowd, and a rebuilt sitting ranks on the
+   standard board. Tenants 1 changes how fast people board and nobody's arrival, so it stays. One row
+   each in `RUSH_REBUILD_OFF_MENU`.
+5. **A purchase that would build the tower the sitting already has is refused, not charged**
+   (`rushTierChangesNothing`, structural, no simulation): the probe above found Car size 1 moving no leg
+   on six of seven towers and Tenants 1 none on Midtown. What it cannot see is a real edit the run is
+   not moved by (Control 1 and 2 on Garden), so those are sold, and the menu says that what a tier does
+   to the next hold is not known before the round is played.
+6. **The first round of a sitting carries no rebuild**, because the owner's ruling of 2026-09-10 makes a
+   sitting *consecutive runs from an as-shipped start*. A topped-up purse is spent from round 2 on.
+7. **One purse, counted on both ends.** `core`'s `rushPurseRounds` gains a spend term (taken from the
+   balance a round opened with, before its waves pay). The viewer counts the purse before a post with
+   that function over its own rounds, which **amends § D606's *no purse is computed in `packages/viz`***:
+   a purse a player spends between rounds has to be known before they post. Nothing it counts goes on
+   the wire. The server prices each rebuild from its own copy of the schedule, refuses an unaffordable
+   one by round (`rebuild-over-purse`) and a refused tier by name (`rebuild-refused`), and stores each
+   round's rebuild and spend for invariant 5. A board row still shows no purse (§ D543 clause 5).
+   `cannot-prefit` becomes `cannot-fit`, because a rebuild reaches it too.
+8. **The rush purse top-up is sold**, on § D672's terms: its refusal in `chimesPanel.ts#SPEND_ABSENCES`
+   is deleted and it is offered with what it does, and the host claims the steps the account owns,
+   capped at the sink's `maxSteps`.
+9. **Every sentence that said the rebuild was missing went on the same commit** (§ D227):
+   `rushScreenModel.ts#RUSH_ABSENCES`' one entry, `rushPost.ts#RUSH_POST_COPY.purseNote`, the top-up's
+   refusal, `data/rush-purse.json`'s *what is not built* sentence and
+   `buildNotes.test.ts#ABSENCE_TRIAGE`'s row, with the docstrings in `core`, the server and the viewer
+   that said the same.
+
+**What a player meets.** The rush's setup screen says what a wave pays, what it buys and that it stays,
+and what a sitting opens with when the account owns a top-up. After each round the result sheet draws
+the menu above the post block: the purse for the next round, every shop category in the shop's order,
+each tier with its price, what it fits in plain numbers and one press, and Shafts, Machines and the two
+tenant tiers with their reasons. *Run the rush again* fits what was picked. The round list names what
+each round was rebuilt with, and the server's answer names what each rebuild spent.
+
+**The reading not chosen.** Amending `docs/38` § 2.3 so the purse is a record and not a budget, and
+closing the issue's second criterion. No member chose it: the rebuild is in the mode's one-sentence
+pitch, and the swarm's own dissent (S2) was about when, not whether.
+
+**Tests.** Red before, green after, with the counts the lane's report carries:
+`server/leaderboard/rushSitting.test.ts`'s two *rebuild between rounds* describes (a rebuilt round plays
+different legs; it persists; the standard purse with no rebuild is the same run and figures; a rebuild
+above the derived purse is refused by name and goes through on a wider purse; Shafts and Machines are
+refused by name with the reason; an inert tier is refused); `rushHoldAgreement.json`'s three rebuilt
+cells, each paired with its twin and required to differ, played by both halves (the viewer's through
+the host's own rebuild); `core/config/rushRebuild.test.ts`, `rushPurse.test.ts`'s spend describe and
+`priceSchedule.test.ts`; and the viewer's `rushRebuild.test.ts`, `host.test.ts`'s rebuild case and the
+copy registers' pins.

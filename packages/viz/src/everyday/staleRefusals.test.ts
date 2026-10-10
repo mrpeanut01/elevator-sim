@@ -296,7 +296,12 @@ describe('a refusal that outlived the thing it refused — GitHub issue #423', (
      * one — which is the argument for asserting it here rather than writing it into a sentence, and
      * is exactly what this case was opened to say.
      */
-    expect(RUSH_ABSENCES.length).toBe(1);
+    /*
+     * And none again: GitHub issue #372's rebuild between rounds spends the purse (§ D1295), so the
+     * entry that said nothing did was deleted on that commit. Five values now — three, one, none, one,
+     * none.
+     */
+    expect(RUSH_ABSENCES.length).toBe(0);
     onlyInRetraction(
       sourceOf('./rushScreenModel.ts'),
       'three entries about the missing engine',

@@ -51,13 +51,17 @@
  */
 
 import {
-  RUSH_PREFIT_KIT,
+  RUSH_NO_LEVELS,
+  RUSH_PREFIT_LEVELS,
   RUSH_TEMPLATE_ID,
   claimsRushPrefit,
+  rushFitIsAsShipped,
+  rushFitOf,
   rushHoldAtLegs,
   rushTopArrivalsPerMinute,
   rushTopRatePctPop5min,
   type ResolvedBuilding,
+  type RushFitLevels,
   type RushPrefitClaim,
 } from '@elevator-sim/core/browser';
 
@@ -110,30 +114,38 @@ export { RUSH_TEMPLATE_ID, rushTopArrivalsPerMinute, rushTopRatePctPop5min };
 /** § 3.2's one seed, as the run carries it. */
 export const RUSH_SEED = BigInt(RUSH_STREAM.seed);
 
-/**
- * **`rush-prefit` as a kit this package can fold** — `data/chime-ledger.json`'s *Start with the
- * building fitted*, GitHub issue #372, [§ D640](../../../../DECISIONS.md).
- *
- * The three effects come from `@elevator-sim/core`'s {@link RUSH_PREFIT_KIT} rather than being
- * written again here, because `packages/server` has to fit the same building to replay a posted
- * sitting and may not import this package. What this constant adds is only the **shape**: a
- * `CampaignFitOut` is a total record, so the kit's three fields sit on `AS_BUILT`'s identity values
- * and every applier in `campaign/fitOut.ts` folds it exactly as it folds a campaign tower's
- * bookings — which is right, because a pre-fitted rush *is* a fitted building and a second applier
- * beside that one would be the answer that drifts.
- *
- * The two ends are held to one answer by runs rather than by this paragraph:
- * `everyday/rushPrefit.test.ts` asserts `fittedBuilding` with this kit agrees to the byte with
- * `core`'s `prefittedRushBuilding` on every shipped tower, and
- * `packages/server/src/leaderboard/rushHoldAgreement.json`'s `prefit` cells pin each half's whole
- * path to one held figure.
+/*
+ * **`RUSH_PREFIT_FIT_OUT` stood here** — the pre-fit kit as a `CampaignFitOut`, GitHub issue #372,
+ * § D640 — and left when the general rebuild arrived (§ D1295): a pre-fit is three levels of the same
+ * fold now, so {@link rushFitOutOf} at `core`'s `RUSH_PREFIT_LEVELS` is that fit-out, and a constant
+ * beside it would have been a second answer with no caller. `everyday/rushPrefit.test.ts` still asserts
+ * the kit's three effects and its byte agreement with `core`'s `prefittedRushBuilding` on every shipped
+ * tower, through {@link rushFitOutOf}.
  */
-export const RUSH_PREFIT_FIT_OUT: CampaignFitOut = Object.freeze({
-  ...AS_BUILT,
-  doorSecondsSaved: RUSH_PREFIT_KIT.doorSecondsSaved,
-  transferCeilingS: RUSH_PREFIT_KIT.transferCeilingS,
-  zonesTheTower: RUSH_PREFIT_KIT.zonesTheTower,
-});
+
+/**
+ * **What a sitting starts fitted with, as levels** — the pre-fit kit's when the claims carry one, and
+ * nothing otherwise. The levels every later rebuild between rounds is folded over (GitHub issue #372,
+ * [§ D1295](../../../../DECISIONS.md)); `EverydayHost.startRush` takes them at a sitting's first press.
+ *
+ * The one place in this package that asks `claimsRushPrefit`, which
+ * `pricing/spendWidensTheBudget.test.ts` holds: the claim is read where it is applied.
+ */
+export function rushStartLevelsOf(modifiers: readonly RushPrefitClaim[]): RushFitLevels {
+  return claimsRushPrefit(modifiers) ? RUSH_PREFIT_LEVELS : RUSH_NO_LEVELS;
+}
+
+/**
+ * **The fit-out a rush round runs with, from the levels its sitting has fitted** — `core`'s
+ * `config/rushRebuild.ts#rushFitOf`, put into the shape this package folds (`CampaignFitOut`, total, on
+ * {@link AS_BUILT}'s identity values) — or `undefined` when nothing is fitted, which is the value a
+ * rush's `campaignFitOut` otherwise runs at. At the pre-fit's levels it is the kit's three effects on
+ * {@link AS_BUILT}, and `rushRebuild.test.ts` holds that field for field.
+ */
+export function rushFitOutOf(levels: RushFitLevels): CampaignFitOut | undefined {
+  const fit = rushFitOf(levels);
+  return rushFitIsAsShipped(fit) ? undefined : Object.freeze({ ...AS_BUILT, ...fit });
+}
 
 /** What one `ViewerState` field is to a rush — see {@link RUSH_FIELD_ROLES}. */
 type RushFieldRole = 'building' | 'dispatcher' | 'rush' | 'fresh' | 'surface';
@@ -300,7 +312,7 @@ export type RushPatch = Pick<ViewerState, RushFieldWithRole<'rush'> | RushFieldW
  * `undefined` when no building is standing, `resolvedBuildingOf`'s own answer.
  */
 export function rushBuildingOf(resources: BrowserResources, state: ViewerState): ResolvedBuilding | undefined {
-  return resolvedBuildingOf(resources, { ...state, ...rushStandingOf(resources, state, null, []) });
+  return resolvedBuildingOf(resources, { ...state, ...rushStandingOf(resources, state, null, RUSH_NO_LEVELS) });
 }
 
 /**
@@ -312,25 +324,30 @@ export function rushBuildingOf(resources: BrowserResources, state: ViewerState):
  * and its one shipped caller passed the wrong one (see the note above the re-exports, and
  * {@link rushBuildingOf}). A caller cannot now choose whose people the stream is sized for.
  *
- * **`modifiers` is what the account bought for this sitting**, and today's one effect is
- * `rush-prefit` (GitHub issue #372, [§ D640](../../../../DECISIONS.md)): a claimed pre-fit writes
- * {@link RUSH_PREFIT_FIT_OUT} over the `campaignFitOut` a rush otherwise runs at a fresh session's
- * value, so the building the stream arrives at is the fitted one. Every other claim — the two
- * `purse-units` top-ups — changes nothing the viewer builds, because a purse is derived on the
- * server and spent by nothing (§ D606 § 2). **No surface fills this parameter yet**: nothing in this
- * build spends a chime, so `EverydayHost.startRush` passes what its binding supplies and that is the
- * empty list. The parameter exists because the sitting's wire already carries the field, and the day
- * a spend surface exists it passes its claims here rather than teaching this module a second way in.
+ * **`modifiers` is what the account bought for this sitting**, and the one claim it reads is
+ * `rush-prefit` (GitHub issue #372, [§ D640](../../../../DECISIONS.md)): a claimed pre-fit starts the
+ * levels at the kit's, so the building the stream arrives at is the fitted one. The purse top-up
+ * changes nothing this function builds, because it widens the purse a rebuild between rounds spends,
+ * and that rebuild arrives here as `levels`. `EverydayHost.startRush` passes the claims it derived
+ * from what the account owns (§ D672, § D1295). This paragraph said no surface filled the parameter
+ * and that a purse was spent by nothing; both are replaced on the commit that made them false.
+ *
+ * **`levels` is everything the sitting has fitted by this round** — GitHub issue #372,
+ * [§ D1295](../../../../DECISIONS.md): the start {@link rushStartLevelsOf} reads off the claims, and
+ * every tier bought between rounds since, which `EverydayHost` folds with `core`'s `rushLevelsAfter`.
+ * Left out, it is that start alone, which is what this function wrote before a rebuild existed; the
+ * paragraph above is about that default and is kept because the claims are still how a sitting starts.
  */
 export function rushPatchOf(
   resources: BrowserResources,
   state: ViewerState,
   modifiers: readonly RushPrefitClaim[] = [],
+  levels: RushFitLevels = rushStartLevelsOf(modifiers),
 ): RushPatch | undefined {
   const building = rushBuildingOf(resources, state);
   return building === undefined
     ? undefined
-    : rushStandingOf(resources, state, rushTopRatePctPop5min(building.totalPopulation), modifiers);
+    : rushStandingOf(resources, state, rushTopRatePctPop5min(building.totalPopulation), levels);
 }
 
 /**
@@ -342,10 +359,11 @@ function rushStandingOf(
   resources: BrowserResources,
   state: ViewerState,
   ratePctPop5min: number | null,
-  modifiers: readonly RushPrefitClaim[],
+  levels: RushFitLevels,
 ): RushPatch {
   const moved = switchWeek(state.week, state.parkedWeeks, RUSH_CONTRACT_ID, 'restart');
   const brought = profileById(resources, state.savedDispatchers, state.dispatcherId);
+  const fitted = rushFitOutOf(levels);
   return {
     /*
      * Every `fresh` field at a fresh session's value, read off the session a player opens rather than
@@ -381,14 +399,15 @@ function rushStandingOf(
      */
     editingDispatcherId: brought.id,
     /*
-     * And except the kit, when the sitting says the building started fitted. `campaignFitOut` is a
-     * `fresh` field, so a rush otherwise runs the tower as shipped and a campaign day's bookings
-     * never ride in (§ D548 clause 5); `rush-prefit` is the one thing allowed to write it, and it
-     * writes the same three effects `packages/server` fits the replay with. See
-     * {@link RUSH_PREFIT_FIT_OUT}. `leaveRush` puts the player's own kit back as it does every
-     * other fresh field, because {@link RushBefore} took it before this was written.
+     * And except the kit, when the sitting is fitted. `campaignFitOut` is a `fresh` field, so a rush
+     * otherwise runs the tower as shipped and a campaign day's bookings never ride in (§ D548 clause
+     * 5); what is allowed to write it is the sitting's own fit — the pre-fit kit it started with and
+     * every tier bought between its rounds since (GitHub issue #372, § D1295) — and it writes the same
+     * effects `packages/server` fits the replay with. See {@link rushFitOutOf}. `leaveRush` puts the
+     * player's own kit back as it does every other fresh field, because {@link RushBefore} took it
+     * before this was written.
      */
-    ...(claimsRushPrefit(modifiers) ? { campaignFitOut: RUSH_PREFIT_FIT_OUT } : {}),
+    ...(fitted === undefined ? {} : { campaignFitOut: fitted }),
     playMode: 'endless',
     week: moved.week.contractId === RUSH_CONTRACT_ID ? moved.week : openRush(),
     parkedWeeks: moved.parked,

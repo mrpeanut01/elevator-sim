@@ -118,7 +118,7 @@ import type {
  * **sink**, not a source: § D526 clause 5 forbids this package naming where a chime came from, and
  * `boundaries.test.ts` asserts exactly that, in both directions.
  */
-import { RUSH_PREFIT_SINK_ID } from '@elevator-sim/core/browser';
+import { RUSH_PREFIT_SINK_ID, rushLevelsAfter, type RushFitLevels } from '@elevator-sim/core/browser';
 
 /*
  * Type-only, and it has to stay that way: `boundaries.test.ts` asserts that the value importers
@@ -282,7 +282,8 @@ import { watchingViewOf, type WatchingView } from '../watch/view.js';
 
 import type { DemandBand } from '../fixit/parse.js';
 import type { RushBest } from './rushScreenModel.js';
-import { heldClock, rushBeforeOf, rushBuildingOf, rushDisclosureOf, rushHoldAt, rushOutcomeOf, rushPatchOf, rushRestorePatchOf, rushTopRatePctPop5min, rushWavesOutlastedOf, type RushBefore } from './rush.js';
+import { heldClock, rushBeforeOf, rushBuildingOf, rushDisclosureOf, rushHoldAt, rushOutcomeOf, rushPatchOf, rushRestorePatchOf, rushStartLevelsOf, rushTopRatePctPop5min, rushWavesOutlastedOf, type RushBefore } from './rush.js';
+import { rushPurseBeforeNextOf, rushRebuildPressOf, rushTopUpClaimsOf, type RushRebuildInput } from './rushRebuild.js';
 import {
   rushRoundRecordOf,
   rushSittingOf,
@@ -656,6 +657,14 @@ export type EverydayRushPostOutcome =
  * It is `refused` rather than `no-server` because the fact is about the screen: answering with the
  * deployment's sentence would send a player looking for a server that is there.
  */
+/**
+ * Why a rebuild press outside a finished round is refused — the state a keyboard route can reach and a
+ * screen cannot draw, since the menu is only on a rush's result. GitHub issue #372, § D1295.
+ */
+export const RUSH_REBUILD_NOT_YET =
+  'There is nothing to rebuild with yet. A rebuild is bought between rounds, from what the rounds of ' +
+  'this sitting have earned, so play a round of the rush first.';
+
 export const RUSH_NOT_STANDING =
   'There is no rush sitting to post. Open Endless rush and play a round out — a sitting is every ' +
   'round you have played since the building was as shipped.';
@@ -845,6 +854,15 @@ export interface EverydayRushSession {
   /** Whether the rounds so far may be posted — `everyday/rushSitting.ts#rushSittingOf`'s answer. */
   readonly check: RushSittingCheck;
 }
+
+/**
+ * **The rebuild between rounds, as the result screen needs it** — GitHub issue #372, § D1295. What
+ * `everyday/rushRebuild.ts#rushRebuildViewOf` reads: the levels the sitting has fitted, what is picked
+ * for the next round, the purse that next round opens with, the schedule, the tower as shipped and the
+ * specs. `undefined` outside a rush and before its first round has finished, because a sitting's first
+ * round is the building as shipped and a rebuild is bought between rounds.
+ */
+export type EverydayRushRebuild = RushRebuildInput;
 
 /** § 6.1's replay in progress — which day of the parked week is being played again (GitHub issue #177 item 1). */
 export interface EverydayReplaySession {
@@ -2007,6 +2025,26 @@ export interface EverydayHost {
   /** § D478's line for a rush on the standing building, before one starts; `undefined` inside the band or with no building. */
   rushDisclosure(): string | undefined;
   /**
+   * The rebuild menu's input for the next round, or `undefined` outside a rush or before its first round
+   * has finished — GitHub issue #372, [§ D1295](../../../../DECISIONS.md). See {@link EverydayRushRebuild}.
+   * Its non-test caller is `everyday/reportScreen.ts#drawRushResult`.
+   */
+  rushRebuild(): EverydayRushRebuild | undefined;
+  /**
+   * Pick or put back one tier for the next round — `everyday/rushRebuild.ts#rushRebuildPressOf`'s rule:
+   * a picked tier comes back, a tier of a category already picked replaces it, and anything else is
+   * added if the menu would draw it buyable. Returns the row's own refusal, or `undefined` when the
+   * picks changed. Nothing is fitted until the next round is pressed, and nothing is charged anywhere:
+   * the purse is a count of what the rounds earned, and the server re-derives it from the sitting.
+   */
+  pickRushRebuild(priceId: string): string | undefined;
+  /**
+   * What the **next** sitting's purse opens with, in units — what the listed rush top-ups this account
+   * owns grant ([§ D1295](../../../../DECISIONS.md)). `0` before the ledger has been read and on the
+   * standard board. The setup screen draws it; the server derives the same figure from the claims.
+   */
+  rushOpeningPurse(): number;
+  /**
    * Bank a Scenario-mode clear the player has just made — GitHub issue **#499**. `scenarioId` is a
    * fix case's id today, and the server pays it once per account whatever this is asked.
    *
@@ -2039,10 +2077,10 @@ export interface EverydayHost {
    * read, which is the arm that claims least: a screen promising a fitted tower over an account
    * nobody has asked about would be a figure with no source, and the sitting would run as built.
    *
-   * **It says nothing about a purse**, and must not be widened to. Nothing spends one
-   * ([§ D606](../../../../DECISIONS.md) § 2), and nothing here says anything about whether a tier
-   * bought between rounds would persist into the next — that question is open and a screen
-   * implying an answer would be answering it.
+   * **It says nothing about a purse**: {@link rushOpeningPurse} does. This paragraph used to say
+   * nothing spends one and that whether a tier bought between rounds persists was open; a rebuild
+   * spends it now and a bought tier stays fitted for the rest of the sitting (GitHub issue #372,
+   * [§ D1295](../../../../DECISIONS.md)), so both clauses are replaced rather than left standing.
    */
   rushStartsFitted(): boolean;
 
@@ -3014,6 +3052,16 @@ export function createEverydayHost(
         /** The finished rounds — see {@link EverydayRushSession.rounds}. */
         readonly rounds: readonly RushRoundRecord[];
         /**
+         * What the sitting has fitted so far — the start the claims give it, and every tier bought
+         * between its rounds since, folded by `core`'s `rushLevelsAfter` (GitHub issue #372, § D1295).
+         * A tier bought between rounds stays fitted for the rest of the sitting.
+         */
+        readonly levels: RushFitLevels;
+        /** What is picked for the next round, in pick order — fitted, and spent, by the next press. */
+        readonly pending: readonly string[];
+        /** What was bought before the round now playing — written on its record when it settles. */
+        readonly roundRebuild: readonly string[];
+        /**
          * The second a round ended at, while the run that round's presses asked for had not landed
          * yet — or `undefined`. See {@link settleRushRound}.
          */
@@ -3031,16 +3079,16 @@ export function createEverydayHost(
    * What the next sitting may claim, from what the ledger says this account owns —
    * [§ D672](../../../../DECISIONS.md).
    *
-   * **One sink, and the omissions are the design.** `rush-prefit` is the only modifier in the
-   * shipped table that reaches a run: `everyday/rush.ts#rushPatchOf` fits the building for it,
-   * `packages/server`'s replay fits it with the same three effects, and
-   * `leaderboard/rushHoldAgreement.json`'s two `prefit` cells are each required to differ from the
-   * same cell as built — which is `CLAUDE.md`'s *move the control and require the run to change*
-   * discharged by a run rather than by an argument. The two `purse-units` top-ups reach nothing,
-   * because no between-round rebuild travels (§ D606 § 2), so claiming one would put a modifier on
-   * a board key that separated a player's runs and changed none of them.
+   * **Two sinks, and the omission is the design.** `rush-prefit` reaches a run directly:
+   * `everyday/rush.ts#rushPatchOf` fits the building for it, `packages/server`'s replay fits it with
+   * the same three effects, and `leaderboard/rushHoldAgreement.json`'s two `prefit` cells are each
+   * required to differ from the same cell as built. The rush purse top-up reaches one through what it
+   * pays for: a rebuild between rounds spends the purse, and the server's replay refuses a rebuild on
+   * the standard purse that it plays on a topped-up one (GitHub issue #372, § D1295). This paragraph
+   * said the top-ups reached nothing because no between-round rebuild travelled; it is replaced on the
+   * commit that built one. The career's top-up is a career tower's purse and is never a rush claim.
    *
-   * **One step, not what was bought.** The sink's `maxSteps` is 1 and its note says why — *a
+   * **One pre-fit step, not what was bought.** The sink's `maxSteps` is 1 and its note says why — *a
    * building is fitted or it is not* — so a second purchase would be unbacked at the claim
    * (`chimes/ledger.ts#unbackedModifiers` caps a claim at the sink's own cap) rather than worth
    * twice as much. An account that somehow owns two claims one.
@@ -3049,9 +3097,38 @@ export function createEverydayHost(
    * a guess is a claim the server would refuse the whole sitting for.
    */
   const rushClaims = (): readonly ClaimedRushModifier[] =>
-    (owned ?? []).some((entry) => entry.sinkId === RUSH_PREFIT_SINK_ID && entry.steps >= 1)
-      ? Object.freeze([{ sinkId: RUSH_PREFIT_SINK_ID, steps: 1 }])
-      : [];
+    Object.freeze([
+      ...((owned ?? []).some((entry) => entry.sinkId === RUSH_PREFIT_SINK_ID && entry.steps >= 1)
+        ? [{ sinkId: RUSH_PREFIT_SINK_ID, steps: 1 }]
+        : []),
+      /*
+       * **And the purse top-up, now that a purse is spent** — GitHub issue #372, § D1295. The top-up
+       * reaches a run through what it lets the sitting rebuild between rounds, which
+       * `rushHoldAgreement.json`'s rebuilt cells and the server's `rebuild-over-purse` case pin. Capped
+       * at the sink's own `maxSteps`, on the pre-fit's ground: a claim above it is unbacked at the
+       * server and would refuse the whole sitting.
+       */
+      ...rushTopUpClaimsOf(owned ?? []),
+    ]);
+
+  /** The rebuild input for the next round, or `undefined` before a round of this sitting has finished. */
+  const rushRebuildInput = (): EverydayRushRebuild | undefined => {
+    if (rushSession === undefined) return undefined;
+    settleRushRound();
+    if (rushSession.rounds.length === 0) return undefined;
+    return {
+      levels: rushSession.levels,
+      pending: rushSession.pending,
+      purseUnits: rushPurseBeforeNextOf({
+        rounds: rushSession.rounds,
+        modifiers: rushSession.modifiers,
+        schedule: b.resources.priceSchedule,
+      }),
+      schedule: b.resources.priceSchedule,
+      building: b.resources.buildings.find((building) => building.id === rushSession?.buildingId)?.config,
+      specs: b.resources.elevatorSpecs,
+    };
+  };
 
   /** The building's profile band, for § D478's line — `fixit/parse.ts#fixitContextOf`'s own lookup. */
   const bandOf = (building: ResolvedBuilding): DemandBand | undefined =>
@@ -3259,6 +3336,8 @@ export function createEverydayHost(
       resources: b.resources,
       recording,
       endedAtS: atS,
+      /* What was bought before this round, as the press that started it recorded — § D1295. */
+      rebuild: rushSession.roundRebuild,
       /*
        * The shelf the stage's own header reads — a saved dispatcher has a name too, and the round
        * list has to say what the player drove even when that round is the reason the sitting cannot
@@ -4504,6 +4583,9 @@ export function createEverydayHost(
           modifiers: b.rushModifiers?.() ?? rushClaims(),
           rounds: [],
           unsettledEndS: undefined,
+          levels: rushStartLevelsOf(b.rushModifiers?.() ?? rushClaims()),
+          pending: [],
+          roundRebuild: [],
         };
       } else {
         /*
@@ -4514,6 +4596,16 @@ export function createEverydayHost(
          * the next `endRush` is a new round's (see `endRush`'s first-end guard).
          */
         rushSession = { ...rushSession, hold: undefined, endedAtS: undefined, unsettledEndS: undefined };
+        /*
+         * **And what was picked between the rounds is fitted now** — GitHub issue #372, § D1295. It
+         * joins the sitting's levels for every later round, and it is recorded as this round's
+         * rebuild so the post carries it; a pick that no longer folds (a tier the levels already
+         * reached) is dropped rather than fitted, because the server would refuse the sitting for it.
+         */
+        const after = rushLevelsAfter(rushSession.levels, rushSession.pending);
+        rushSession = after.ok
+          ? { ...rushSession, levels: after.levels, roundRebuild: rushSession.pending, pending: [] }
+          : { ...rushSession, roundRebuild: [], pending: [] };
       }
       /*
        * **Every press writes the rush's standing, *Run the rush again* included** — GitHub issue #518.
@@ -4529,7 +4621,7 @@ export function createEverydayHost(
        * the same argument one line up: the set is the sitting's, read at the first press, so every
        * round of it starts from the same building whatever the account bought in between.
        */
-      const patch = rushPatchOf(b.resources, state, rushSession.modifiers);
+      const patch = rushPatchOf(b.resources, state, rushSession.modifiers, rushSession.levels);
       if (patch !== undefined) b.applyPatch(patch);
       b.startRun();
       notifyCampaign();
@@ -4553,9 +4645,8 @@ export function createEverydayHost(
          * Computed on the read rather than stored, on `drivingProfile`'s opposite ground: this is a
          * pure fold over a list that changes only when a round ends, and a stored copy would be a
          * second answer to *may this be posted* that a lane could forget to refresh. The modifiers
-         * are the sitting's own, read at its first press, and in this build they are always empty —
-         * `rushSitting.ts#rushSittingOf` says why the parameter exists and what a `rush-prefit`
-         * claim would now do (§ D640).
+         * are the sitting's own, read at its first press: the pre-fit and the purse top-up the
+         * account owns (§ D672, § D1295), which `rushSitting.ts#rushSittingOf` puts on the wire.
          */
         check: rushSittingOf({
           buildingId: rushSession.buildingId,
@@ -4610,7 +4701,23 @@ export function createEverydayHost(
       bankTurn({ completion: 'scenario-cleared', scenarioId });
     },
     chimeTally: () => chimeTally,
-    rushStartsFitted: () => rushClaims().length > 0,
+    rushStartsFitted: () => rushClaims().some((claim) => claim.sinkId === RUSH_PREFIT_SINK_ID),
+    rushRebuild: () => rushRebuildInput(),
+    pickRushRebuild: (priceId) => {
+      const input = rushRebuildInput();
+      if (input === undefined || rushSession === undefined) return RUSH_REBUILD_NOT_YET;
+      const press = rushRebuildPressOf(input, priceId);
+      if (!press.ok) return press.reason;
+      /*
+       * No notification, on the post block's ground one screen over: the menu is the one surface that
+       * reads the picks, and it repaints itself after the press so the button keeps the focus. A full
+       * redraw on every pick would move focus to the top of the sheet for a keyboard player.
+       */
+      rushSession = { ...rushSession, pending: press.pending };
+      return undefined;
+    },
+    rushOpeningPurse: () =>
+      rushPurseBeforeNextOf({ rounds: [], modifiers: rushClaims(), schedule: b.resources.priceSchedule }),
     /*
      * The spend verb — GitHub issue #372, § D672. `dailyBoard`'s split applied to a write that
      * answers: the host's part is that there is nowhere to spend on a build served with no API

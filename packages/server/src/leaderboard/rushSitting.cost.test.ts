@@ -31,7 +31,7 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { loadConfig, parseChimeLedger, parseRushPurse, runSimulation, rushHoldAtLegs } from '@elevator-sim/core';
+import { loadConfig, parseChimeLedger, parsePriceSchedule, parseRushPurse, runSimulation, rushHoldAtLegs } from '@elevator-sim/core';
 
 import { replayRushSitting, type SubmittedRushRound, type SubmittedRushSitting } from './rushSitting.js';
 import { rushRoundConfigFor, type VerificationResources } from './verify.js';
@@ -61,7 +61,8 @@ describe.skipIf(OUT === undefined)('the replay cost of a rush round, measured â€
     };
     const ledger = parseChimeLedger(JSON.parse(await readFile(join(DATA_DIR, 'chime-ledger.json'), 'utf8')) as unknown);
     const purse = parseRushPurse(JSON.parse(await readFile(join(DATA_DIR, 'rush-purse.json'), 'utf8')) as unknown);
-    const from = { resources, purse, ledger };
+    const schedule = parsePriceSchedule(JSON.parse(await readFile(join(DATA_DIR, 'price-schedule.json'), 'utf8')) as unknown);
+    const from = { resources, purse, ledger, schedule };
 
     /** The honest claim for one round, taken once and untimed, so the timed passes verify rather than refuse. */
     const roundOn = (buildingId: string): { round: SubmittedRushRound; passengers: number } => {

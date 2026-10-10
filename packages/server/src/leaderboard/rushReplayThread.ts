@@ -22,7 +22,7 @@ import { loadConfig } from '@elevator-sim/core';
 
 import { loadChimeLedger } from '../chimes/ledger.js';
 import type { RushReplayMessage, RushReplayRequest, RushReplayWorkerInit } from './rushReplayPool.js';
-import { loadRushPurse, replayRushSitting } from './rushSitting.js';
+import { loadRushPriceSchedule, loadRushPurse, replayRushSitting } from './rushSitting.js';
 
 const port = parentPort;
 if (port === null) {
@@ -37,6 +37,8 @@ try {
   const config = await loadConfig(init.dataDir);
   const ledger = await loadChimeLedger(init.dataDir);
   const purse = await loadRushPurse(init.dataDir, ledger);
+  // What prices a rebuild bought between rounds — GitHub issue #372, § D1295.
+  const schedule = await loadRushPriceSchedule(init.dataDir);
   const from = {
     resources: {
       buildingsById: config.buildingsById,
@@ -47,6 +49,7 @@ try {
     },
     purse,
     ledger,
+    schedule,
   };
   port.on('message', (request: RushReplayRequest) => {
     try {

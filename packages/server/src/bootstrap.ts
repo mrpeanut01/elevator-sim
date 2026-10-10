@@ -28,7 +28,7 @@ import { TRAFFIC_DEFAULTS, loadConfig, type LoadedConfig } from '@elevator-sim/c
 
 import { requireSecret } from './accounts/credentials.js';
 import { loadChimeLedger, loadChimeTurnBounds } from './chimes/ledger.js';
-import { loadRushPurse } from './leaderboard/rushSitting.js';
+import { loadRushPriceSchedule, loadRushPurse } from './leaderboard/rushSitting.js';
 import {
   CHALLENGE_ROTATION,
   challengeDefinitionIssues,
@@ -158,6 +158,13 @@ export async function bootstrap(options: BootstrapOptions): Promise<Server> {
    * purse will not load would refuse every sitting at the moment a player posted one.
    */
   const rushPurse = await loadRushPurse(options.dataDir, chimeLedger);
+  /*
+   * And the price schedule a rebuild between rounds is priced from — GitHub issue #372, § D1295. The
+   * replay threads load their own copy from the same directory; this read is the boot-time refusal, so
+   * a schedule that does not price the rush menu stops the server here rather than failing the first
+   * sitting that bought something. Nothing on this thread keeps it.
+   */
+  await loadRushPriceSchedule(options.dataDir);
   // Threads start on the first sitting that needs one, so a boot that throws below leaves none running.
   const rushReplays = createRushReplays({ dataDir: options.dataDir, limit: rushReplayLimit });
   const now = options.now ?? ((): number => Date.now());

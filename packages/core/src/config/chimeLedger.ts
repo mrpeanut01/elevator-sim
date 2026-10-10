@@ -9,7 +9,10 @@
  *
  * ## Why this lives in `core/config/` rather than beside a screen
  *
- * `data/price-schedule.json` is parsed in `packages/viz`, because only the viewer reads it. The
+ * `data/price-schedule.json` was parsed in `packages/viz` on exactly this ground, because only the
+ * viewer read it, and it moved here beside this module (`priceSchedule.ts`) in wave AN on the day a
+ * second reader arrived: the server pricing a rush rebuild (GitHub issue #372,
+ * [§ D1295](../../../../DECISIONS.md)). That is this paragraph's own rule applied to that file. The
  * chime ledger has **two** readers that must agree: the server, which holds the balance and is the
  * only thing allowed to decide what an entry is worth, and the viewer, which draws a sink's price.
  * (This sentence used to add *"and keeps a device-only ledger when there is no account"*, then had
@@ -790,7 +793,7 @@ export function chimeGiftSource(table: ChimeLedgerTable): ChimeSource | undefine
 }
 
 /** One sink by id, or `undefined` — the play surface asks this to draw a price. */
-export function chimeSinkById(table: ChimeLedgerTable, id: string): ChimeSink | undefined {
+export function chimeSinkById(table: Pick<ChimeLedgerTable, 'sinks'>, id: string): ChimeSink | undefined {
   return table.sinks.find((sink) => sink.id === id);
 }
 

@@ -142,10 +142,12 @@ describe('what the panel says about spending — § D227 and § D672, a reason p
      * `campaign/purseTopUpReachesTheRun.test.ts` is the run that earns the offer — a tower that
      * bought a top-up and one that did not, same seed, compared on the legs.
      *
-     * `rush-purse-top-up` is still refused, and for its **own** cause rather than a shared one: no
-     * between-round rebuild travels (§ D606 § 2), so a wider rush purse still buys nothing. Issue
-     * #557 refuses to have the two folded together, which is why the two tables below are keyed by
-     * sink id and never by modifier kind.
+     * `rush-purse-top-up` reaches one too, since GitHub issue #372's rebuild between rounds
+     * (§ D1295): a wider rush purse pays for a rebuild the standard one cannot, and
+     * `packages/server`'s `rushSitting.test.ts` replays exactly that, refused on the standard purse
+     * and played to a different hold on the topped-up one. Issue #557 refused to have the two purse
+     * rows folded together, which is why the two tables below are keyed by sink id and never by
+     * modifier kind, and each offered row still carries its own sentence.
      *
      * Asserted in **both** directions over the shipped table, so a sink that gained or lost an
      * entry fails here rather than on a player's screen.
@@ -157,10 +159,10 @@ describe('what the panel says about spending — § D227 and § D672, a reason p
      * in its plainest form — and reading the view is the better assertion anyway: what a player
      * can press is what `offer` says, and a second derivation could come to disagree with it.
      */
-    expect(view.rows.filter((row) => row.offer !== 'not-offered').map((row) => row.id)).toEqual([
-      CAREER_PURSE_TOP_UP_SINK_ID,
-      RUSH_PREFIT_SINK_ID,
-    ]);
+    expect(view.rows.filter((row) => row.offer !== 'not-offered').map((row) => row.id).sort()).toEqual(
+      [CAREER_PURSE_TOP_UP_SINK_ID, RUSH_PREFIT_SINK_ID, 'rush-purse-top-up'].sort(),
+    );
+    expect(SPEND_ABSENCES).toEqual({});
     for (const id of Object.keys(SPEND_ABSENCES)) {
       expect(CHIME_PRICES.sinks.map((sink) => sink.id), id).toContain(id);
     }
@@ -229,10 +231,17 @@ describe('what the panel says about spending — § D227 and § D672, a reason p
      */
     const view = offered();
     for (const row of view.rows) expect(row.note.length, row.id).toBeGreaterThan(0);
-    expect(view.rows.filter((row) => row.offer === 'buy').map((row) => row.id)).toEqual([
-      CAREER_PURSE_TOP_UP_SINK_ID,
-      RUSH_PREFIT_SINK_ID,
-    ]);
+    expect(view.rows.filter((row) => row.offer === 'buy').map((row) => row.id).sort()).toEqual(
+      [CAREER_PURSE_TOP_UP_SINK_ID, RUSH_PREFIT_SINK_ID, 'rush-purse-top-up'].sort(),
+    );
+  });
+
+  it('says what the rush top-up does before the press: units into every sitting’s opening purse, and its own board — § D1295', () => {
+    const row = offered().rows.find((entry) => entry.id === 'rush-purse-top-up');
+    const granted = CHIME_PRICES.sinks.find((sink) => sink.id === 'rush-purse-top-up')?.modifier.grantUnits ?? 0;
+    expect(row?.note).toBe(`${String(granted)} units ${CHIMES_PANEL_COPY.rushPurseOffer}`);
+    expect(row?.note).toContain('between rounds');
+    expect(row?.note).toContain('board');
   });
 
   it('says what a purchase does before the press, including where the run is posted', () => {

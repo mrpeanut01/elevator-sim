@@ -313,7 +313,15 @@ describe('§ D219 on the spend verb — one sink is sold, and the rest say why n
      * commit that gave it one. Asserted absent, so a reworded version of it cannot creep back.
      */
     expect(SPEND_ABSENCES['career-purse-top-up']).toBeUndefined();
-    expect(SPEND_ABSENCES['rush-purse-top-up']).toMatch(/between rounds/u);
+    /*
+     * **And the rush's went the same way** — GitHub issue #372, § D1295. It asserted the refusal said
+     * *between rounds*, because a wider rush purse bought nothing while no rebuild travelled. A rebuild
+     * between rounds spends it now, and `packages/server`'s `rushSitting.test.ts` replays the same
+     * rebuild refused on the standard purse and played on a topped-up one, so the row is offered and
+     * its refusal is asserted absent, on the career row's ground one line up.
+     */
+    expect(SPEND_ABSENCES['rush-purse-top-up']).toBeUndefined();
+    expect(rows.find((row) => row.id === 'rush-purse-top-up')?.offer).toBe('buy');
   });
 });
 

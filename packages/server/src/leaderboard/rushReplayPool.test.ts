@@ -15,7 +15,7 @@ import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { loadConfig, parseChimeLedger, parseRushPurse } from '@elevator-sim/core';
+import { loadConfig, parseChimeLedger, parsePriceSchedule, parseRushPurse } from '@elevator-sim/core';
 
 import { createRushReplays, type RushReplays } from './rushReplayPool.js';
 import { replayRushSitting, type SubmittedRushSitting } from './rushSitting.js';
@@ -47,6 +47,7 @@ describe('the rush replay pool — PR #513, finding 2', () => {
     const config = await loadConfig(DATA_DIR);
     const ledger = parseChimeLedger(JSON.parse(readFileSync(join(DATA_DIR, 'chime-ledger.json'), 'utf8')) as unknown);
     const purse = parseRushPurse(JSON.parse(readFileSync(join(DATA_DIR, 'rush-purse.json'), 'utf8')) as unknown);
+    const schedule = parsePriceSchedule(JSON.parse(readFileSync(join(DATA_DIR, 'price-schedule.json'), 'utf8')) as unknown);
     const from = {
       resources: {
         buildingsById: config.buildingsById,
@@ -57,6 +58,7 @@ describe('the rush replay pool — PR #513, finding 2', () => {
       },
       purse,
       ledger,
+      schedule,
     };
     for (const sitting of [gardenSitting(2), gardenSitting(1, (GARDEN_HELD_S ?? 0) + 2)]) {
       const lease = pool.tryAcquire();

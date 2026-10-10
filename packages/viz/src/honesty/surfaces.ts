@@ -164,7 +164,15 @@ import {
   rushHoldLineFigure,
   rushLeftBehindLine,
   rushOpeningLine,
+  rushRebuildLineOf,
 } from '../everyday/rushScreenModel.js';
+import {
+  RUSH_PURSE,
+  RUSH_REBUILD_COPY,
+  rushRebuildPressOf,
+  rushRebuildViewOf,
+  type RushRebuildInput,
+} from '../everyday/rushRebuild.js';
 import { RUSH_HOUSE_COPY, rushStandingsOf } from '../everyday/rushHouse.js';
 import {
   TUNER_COPY,
@@ -240,7 +248,7 @@ import { todayOf, type TodayRecord } from '../everyday/today.js';
 import { RUSH_NOT_LANDED, RUSH_RESULT_EMPTY_LEDE, rushDisclosureOf, rushOutcomeOf, rushResultViewOf, rushStageHeaderOf, type RushOutcome } from '../everyday/rush.js';
 import { rushPostViewOf } from '../everyday/rushPost.js';
 import { RUSH_SITTING_COPY, rushSittingOf, type RushRoundRecord } from '../everyday/rushSitting.js';
-import { CAREER_TOP_UP_NO_TOWER, RUSH_NOT_STANDING } from '../everyday/host.js';
+import { CAREER_TOP_UP_NO_TOWER, RUSH_NOT_STANDING, RUSH_REBUILD_NOT_YET } from '../everyday/host.js';
 import {
   ENGINEER_RETURN_LABEL,
   ENGINEER_RETURN_TITLE,
@@ -10281,6 +10289,12 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
      * from a fixture would reach it.
      */
     'everyday/rushScreenModel.ts#RUSH_FITTED_LINE',
+    /*
+     * What the rebuild between rounds is, said before the first round — GitHub issue #372, § D1295.
+     * Seeded in both arms below: the standard purse, and a sitting that opens with the top-up's
+     * three steps, because the second clause is drawn only when the account owns one.
+     */
+    'everyday/rushScreenModel.ts#rushRebuildLineOf',
     'everyday/designerModel.ts#DESIGNER_COPY',
     'everyday/designerModel.ts#designerFigures',
     'everyday/designerModel.ts#designerWarnings',
@@ -10362,6 +10376,9 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
      * `rush.driving` carries one line up.
      */
     seeds.push({ field: 'rush.fitted', text: RUSH_FITTED_LINE, role: 'prose' });
+    /* § D1295's setup line, on the standard purse and on one opened by the top-up's three steps. */
+    seeds.push({ field: 'rush.rebuildLine(standard)', text: rushRebuildLineOf(RUSH_PURSE.unitsPerWaveOutlasted, 0), role: 'prose' });
+    seeds.push({ field: 'rush.rebuildLine(topped)', text: rushRebuildLineOf(RUSH_PURSE.unitsPerWaveOutlasted, 15), role: 'prose' });
     seeds.push({
       field: 'rush.driving',
       text: rushDrivingLine('Collective control'),
@@ -11948,8 +11965,10 @@ function rushPostStates(rounds: readonly RushRoundRecord[]): readonly {
             heldS: round.holdS,
             wavesOutlasted: 4 + index,
             purseBeforeUnits: index * 8,
+            /* The second round's rebuild, at the menu's cheapest tier's price — § D1295. */
+            spentUnits: index === 1 ? 4 : 0,
             paidUnits: 8 + index * 2,
-            purseAfterUnits: index * 8 + 8 + index * 2,
+            purseAfterUnits: index * 8 - (index === 1 ? 4 : 0) + 8 + index * 2,
           })),
         },
       },
@@ -12109,6 +12128,12 @@ const EVERYDAY_RUSH: SurfaceAdapter = {
         holdS: broke.heldS,
         outcome: broke,
         unpostable: [],
+        /*
+         * **And it was rebuilt first** — GitHub issue #372, § D1295 — so the round list's *rebuilt
+         * first with* line and the posted arm's spend clause are both reached. The tier is the
+         * cheapest on the menu, which every shipped tower's first round can pay for.
+         */
+        rebuild: ['faster-doors'],
         startKey: 'corpus-sitting',
       },
     ];
@@ -12153,6 +12178,7 @@ const EVERYDAY_RUSH: SurfaceAdapter = {
           seeds.push({ field: `${at}.changesNote`, text: round.changesNote, role: 'prose' });
         }
         if (round.earned !== undefined) seeds.push({ field: `${at}.earned`, text: round.earned, role: 'observation' });
+        if (round.rebuilt !== undefined) seeds.push({ field: `${at}.rebuilt`, text: round.rebuilt, role: 'observation' });
         if (round.refusal !== undefined) seeds.push({ field: `${at}.refusal`, text: round.refusal, role: 'reason' });
       }
     }
@@ -12184,6 +12210,93 @@ const EVERYDAY_RUSH: SurfaceAdapter = {
       });
       const note = twinView.rounds[0]?.changesNote;
       if (note !== undefined) seeds.push({ field: 'rush.post(twin).round0.changesNote', text: note, role: 'prose' });
+    }
+    return singleRun(this.id, seeds);
+  },
+};
+
+/* -------------------------------------------------------------------------- *
+ * Wave AN lane AP-2: the rush rebuild between rounds — GitHub issue #372, § D1295
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **The rebuild menu on the rush's result**, driven on every case's own tower — GitHub issue #372,
+ * § D1295. Four states, chosen so every row state and every sentence is reached: a first round's
+ * purse with nothing bought; the same with a tier picked, so the *picked* row and the pending line
+ * are read; a pre-fitted sitting further on, so *fitted* rows are read; and an empty purse, so every
+ * buyable row is *short*. The *changes nothing* row is reached on the towers where `core`'s structural
+ * check finds one (Midtown Office's Car size 1 and Tenants 1, for two), which is why it is driven on
+ * the case's building rather than on a fixture.
+ */
+function rushRebuildStates(context: HonestyContext): readonly { readonly label: string; readonly input: RushRebuildInput }[] {
+  const base: RushRebuildInput = {
+    levels: {},
+    pending: [],
+    purseUnits: 12,
+    schedule: shippedPriceSchedule(),
+    building: context.building.config,
+    specs: context.elevatorSpecs,
+  };
+  return [
+    { label: 'firstRound', input: base },
+    { label: 'picked', input: { ...base, pending: ['faster-doors'] } },
+    { label: 'prefitted', input: { ...base, levels: { doors: 1, control: 1, tenants: 1 }, purseUnits: 40 } },
+    { label: 'empty', input: { ...base, purseUnits: 0 } },
+  ];
+}
+
+const EVERYDAY_RUSH_REBUILD: SurfaceAdapter = {
+  id: 'everyday/rushRebuild.ts#rushRebuildViewOf',
+  covers: [
+    'everyday/rushRebuild.ts#rushRebuildViewOf',
+    'everyday/rushRebuild.ts#RUSH_REBUILD_COPY',
+    /* What a tier fits, as one line: every row's `fits` below is its output. */
+    'everyday/rushRebuild.ts#rushFitsLineOf',
+    /* The press rule's refusal, which is a row's own note: driven below on a short row of the empty purse. */
+    'everyday/rushRebuild.ts#rushRebuildPressOf',
+    /* The host's refusal for a press before a round has finished: reachable by a keyboard route only. */
+    'everyday/host.ts#RUSH_REBUILD_NOT_YET',
+  ],
+  render(context) {
+    const seeds: TextSeed[] = [];
+    for (const state of rushRebuildStates(context)) {
+      const view = rushRebuildViewOf(state.input);
+      const tag = `rush.rebuild(${state.label})`;
+      seeds.push({ field: `${tag}.eyebrow`, text: view.eyebrow, role: 'label' });
+      seeds.push({ field: `${tag}.purse`, text: view.purseLine, role: 'observation' });
+      seeds.push({ field: `${tag}.purseNote`, text: view.purseNote, role: 'prose' });
+      seeds.push({ field: `${tag}.unmeasured`, text: view.unmeasured, role: 'prose' });
+      seeds.push({ field: `${tag}.pending`, text: view.pendingLine, role: 'prose' });
+      for (const category of view.categories) {
+        const at = `${tag}.${category.id}`;
+        seeds.push({ field: `${at}.name`, text: category.name, role: 'label' });
+        if (category.refusal !== undefined) seeds.push({ field: `${at}.refusal`, text: category.refusal, role: 'reason' });
+        for (const row of category.rows) {
+          const rowAt = `${at}.${row.priceId}`;
+          seeds.push({ field: `${rowAt}.name`, text: row.name, role: 'label' });
+          if (row.price !== '') seeds.push({ field: `${rowAt}.price`, text: row.price, role: 'label' });
+          if (row.fits !== '') seeds.push({ field: `${rowAt}.fits`, text: row.fits, role: 'prose' });
+          if (row.action !== undefined) seeds.push({ field: `${rowAt}.action`, text: row.action, role: 'label' });
+          if (row.note !== undefined) {
+            seeds.push({
+              field: `${rowAt}.note`,
+              text: row.note,
+              role: row.state === 'fitted' || row.state === 'picked' ? 'prose' : 'reason',
+            });
+          }
+        }
+      }
+    }
+    seeds.push({ field: 'rush.rebuild.notYet', text: RUSH_REBUILD_NOT_YET, role: 'reason' });
+    /* A press the empty purse cannot pay for, refused in the row's own words — `EverydayHost.pickRushRebuild`'s answer. */
+    const empty = rushRebuildStates(context).find((state) => state.label === 'empty');
+    if (empty !== undefined) {
+      const press = rushRebuildPressOf(empty.input, 'faster-doors');
+      if (!press.ok) seeds.push({ field: 'rush.rebuild.press(short)', text: press.reason, role: 'reason' });
+    }
+    /* Every authored sentence once more by key, so a template no state above reaches is still read. */
+    for (const [key, value] of Object.entries(RUSH_REBUILD_COPY)) {
+      if (typeof value === 'string') seeds.push({ field: `rush.rebuild.copy.${key}`, text: value, role: 'prose' });
     }
     return singleRun(this.id, seeds);
   },
@@ -16611,14 +16724,12 @@ const EVERYDAY_BUILD_NOTES: SurfaceAdapter = {
     'everyday/stageScreenModel.ts#STAGE_ABSENCES',
     /*
      * `everyday/rushScreenModel.ts#RUSH_ABSENCES` stood here until GitHub issue #418 emptied it — the
-     * standings entry left when the rows became the house's measured runs (§ D547) — and it is
-     * **back**, because GitHub issue #372 put a sentence in it: the between-round purse the server
-     * derives and nothing spends ([§ D606](../../../../DECISIONS.md)). `STAGE_ABSENCES`' case
-     * exactly, one register over — the register was drawn either way, as the section's `empty` line
-     * while it was empty and as a seeded entry now, so what moved is the coverage claim rather than
-     * the rendering.
+     * standings entry left when the rows became the house's measured runs (§ D547) — came back when
+     * GitHub issue #372 put the between-round purse in it, and **left again** when the same issue's
+     * rebuild between rounds made that sentence false (wave AN, [§ D1295](../../../../DECISIONS.md)).
+     * The register is drawn either way, as the section's `empty` line now, so what moved is the
+     * coverage claim and not the rendering; it goes back in with the register's next entry.
      */
-    'everyday/rushScreenModel.ts#RUSH_ABSENCES',
     /*
      * `everyday/designerModel.ts#DESIGNER_ABSENCES` stood here until GitHub issue #420 emptied it —
      * the machine-per-shaft pickers made its last row false, so the row and its triage entry went
@@ -17343,6 +17454,7 @@ export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   // rail-shaped fault onto this surface.
   EVERYDAY_STAGE,
   EVERYDAY_RUSH,
+  EVERYDAY_RUSH_REBUILD,
   // Appended last, per the fault-ordering rule stated at SHIFT_REPORT: § 12.2's withheld matrix
   // re-renders cells other adapters draw in their ordinary state, so placing it earlier would move
   // every week-shaped and menu-shaped fault onto this surface.

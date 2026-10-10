@@ -16,7 +16,8 @@
  *
  * **A building id, the rounds in order, and the modifiers the account bought.** A round is the
  * dispatcher the player drove it with, the rules they wrote, the intervention log they pressed —
- * `submission.ts`'s own vocabulary, bounded by the same gates — and the held time they saw.
+ * `submission.ts`'s own vocabulary, bounded by the same gates — what they rebuilt before it, as
+ * price-schedule row ids (GitHub issue #372, § D1295), and the held time they saw.
  *
  * **Nothing else, and {@link rushSittingIssues} refuses the rest by name.** The seed, the stream,
  * the ninety minutes and the rate are not on the wire, because the rush is one seed and one climb for
@@ -44,27 +45,35 @@
  * run stopped by hand, arriving from the replay's side — a replay has no hand stop, and a run that
  * held to its horizon did not break.
  *
- * ## What is not built, and where it would enter
+ * ## The rebuild between rounds, and what spends the purse — GitHub issue #372, [§ D1295](../../../../DECISIONS.md)
  *
- * **No between-round rebuild travels, so nothing spends a purse.** `docs/38` § 2.3 rebuilds the
- * building between rounds from the price schedule, with the fit-out kit the career reaches the run
- * through (§ D427). The code that turns *an arbitrary kit* into a building is
- * `packages/viz/src/campaign/fitOut.ts` over `packages/viz/src/commissioning/`, which this package
- * may not import, and no module in `core` or `experiments` applies a priced change's `covers` path to
- * a building. A rebuild on this wire would be a change the server could price and could not build —
- * the entitlement without the change, which is `core/src/sim/interventionWire.ts`'s refusal of the
- * two bought kinds turned around. So the purse is still derived and published and still buys nothing,
- * and a rebuild enters at {@link replayRushSitting}'s per-round configuration the day one of
- * § D606 § 2's three shapes is taken.
+ * `docs/38` § 2.3 rebuilds the building between rounds from the price schedule. **A round now
+ * carries what was bought before it**, as `rebuild`: price-schedule row ids for tiers on `core`'s rush
+ * menu (`config/rushRebuild.ts`, Doors, Control and Car size at every level and Tenants at the first).
+ * The server prices them from its own copy of the schedule (`core`'s `config/priceSchedule.ts`, moved
+ * out of the viewer for exactly this), takes them from the purse it derived from the rounds before,
+ * and replays the round on the tower fitted with everything the sitting has bought so far: **a tier
+ * bought between rounds stays fitted for the rest of the sitting** (the swarm's default on the
+ * question § D701 left open, owner-reversible in `rushFitOf`'s one fold), and a new sitting starts as
+ * built. The first round carries none, because a sitting is consecutive runs from an as-shipped start.
  *
- * **What does travel now is one fixed start** — GitHub issue #372,
+ * What made it buildable is the shape § D606 § 2 named first, taken **for numbers only**: the price
+ * reader and the copy-free half of the shop moved into `core`, and the shop's names and sentences did
+ * not. Shafts and Machines stay off the menu because they need `packages/viz/src/commissioning/`, and
+ * Tenants 2 and 3 because they change who arrives and a board ranks sittings that met one crowd;
+ * {@link rushSittingIssues} refuses each by name. Nothing about the purse is ever on the wire: the
+ * rebuild is a cause, its price is the server's, and an unaffordable one is refused by round number
+ * (`rebuild-over-purse`) after the rounds before it have replayed and paid.
+ *
+ * **What also travels is one fixed start** — GitHub issue #372,
  * [§ D640](../../../../DECISIONS.md). `data/chime-ledger.json`'s `rush-prefit` had been refused by
  * name here for as long as *fitted* meant nothing; it means one kit of three plain fields now —
  * Doors L1, Control L1 and Tenants L1, held by `core`'s `config/rushPrefit.ts` — and a sitting that
  * claims it is replayed on the fitted tower from its first round. That needed **none** of § D606's
  * three shapes and moved no boundary: the kit names no shaft and no machine class, so
  * `commissioning/` is not wanted, and it carries no name, subtitle or effect sentence, so no product
- * copy goes into `core`. The general rebuild is a different feature and is the one still blocked.
+ * copy goes into `core`. The general rebuild, which the section above describes, is now built in
+ * the same shape, and the kit is three levels of its fold (`config/rushRebuild.ts#RUSH_PREFIT_LEVELS`).
  *
  * ## What a round costs to replay, measured before the refusal was lifted
  *
@@ -151,20 +160,36 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import {
+  RUSH_NO_LEVELS,
+  RUSH_PREFIT_LEVELS,
   RUSH_PREFIT_SINK_ID,
+  RUSH_REBUILD_TIERS,
   claimsRushPrefit,
+  parsePriceSchedule,
   parseRushPurse,
   playerWaveAt,
+  priceOf,
+  rushFitOf,
   rushHoldAtLegs,
+  rushLevelsAfter,
   rushPurseOpeningUnits,
   rushPurseRounds,
+  rushRebuildTierOf,
+  rushRebuildUnits,
+  rushTierChangesNothing,
   rushWavesOutlasted,
   runSimulation,
   violationsInRushPrefit,
   violationsInRushPurse,
+  type BuildingConfig,
   type ChimeLedgerTable,
+  type ElevatorSpecs,
+  type PriceSchedule,
   type RuleRowConfig,
+  type RushFit,
+  type RushFitLevels,
   type RushPurseTable,
+  type RushRebuildRefusal,
   type SimulationConfig,
 } from '@elevator-sim/core';
 
@@ -201,6 +226,32 @@ export async function loadRushPurse(dataDir: string, ledger: ChimeLedgerTable): 
   return table;
 }
 
+/** What `data/` calls the price schedule. */
+const PRICE_SCHEDULE_FILE = 'price-schedule.json';
+
+/**
+ * Read `<dataDir>/price-schedule.json` and check that it prices every tier the rush menu sells —
+ * GitHub issue #372, [§ D1295](../../../../DECISIONS.md).
+ *
+ * **Throws**, on {@link loadRushPurse}'s ground: a replay that met a menu tier the schedule does not
+ * price would fail at the moment a player posted the sitting that bought it, and boot is where a
+ * missing row is a configuration mistake with an obvious fix. The schedule's own rules are
+ * `parsePriceSchedule`'s, which collects every violation before it refuses.
+ */
+export async function loadRushPriceSchedule(dataDir: string): Promise<PriceSchedule> {
+  const schedule = parsePriceSchedule(JSON.parse(await readFile(join(dataDir, PRICE_SCHEDULE_FILE), 'utf8')) as unknown);
+  const unpriced = RUSH_REBUILD_TIERS.filter((tier) => !schedule.changes.some((change) => change.id === tier.priceId));
+  if (unpriced.length > 0) {
+    throw new Error(
+      `price schedule: the rush menu sells ${unpriced.map((tier) => tier.priceId).join(', ')}, which ` +
+        `${PRICE_SCHEDULE_FILE} does not price, so a sitting that bought one could not be replayed.`,
+    );
+  }
+  /* Priced and also flat: `rushRebuildUnits` sums one purchase a tier, and a rated row has no flat price. */
+  for (const tier of RUSH_REBUILD_TIERS) priceOf(schedule, tier.priceId);
+  return schedule;
+}
+
 /* -------------------------------------------------------------------------- *
  * The wire
  * -------------------------------------------------------------------------- */
@@ -213,6 +264,13 @@ export interface SubmittedRushRound {
   readonly ruleRows?: readonly RuleRowConfig[] | undefined;
   /** The round's intervention log, in press order, on `submission.ts`'s allow-list. */
   readonly interventions?: readonly SubmittedIntervention[] | undefined;
+  /**
+   * What the player bought **before** this round, as `data/price-schedule.json` row ids of tiers on
+   * `core`'s rush menu — GitHub issue #372, [§ D1295](../../../../DECISIONS.md). Absent, or empty, on
+   * a round nothing was bought for, and always absent on the first. A cause and never an amount: the
+   * server prices each row itself and takes the sum from the purse it derived.
+   */
+  readonly rebuild?: readonly string[] | undefined;
   /**
    * How long the player saw the round hold, in simulated seconds from its start, or `null` when the
    * stage never reached the line. **A claim compared, never a figure stored** — `verify.ts`'s
@@ -271,7 +329,7 @@ export const MAX_RUSH_SITTING_BODY_BYTES = 1.5 * 1024 * 1024;
 /** The keys a sitting may carry. Every other key is refused, by name. */
 const SITTING_KEYS: readonly string[] = Object.freeze(['buildingId', 'rounds', 'modifiers']);
 /** The keys a round may carry. */
-const ROUND_KEYS: readonly string[] = Object.freeze(['dispatcherProfileId', 'ruleRows', 'interventions', 'claimedHeldS']);
+const ROUND_KEYS: readonly string[] = Object.freeze(['dispatcherProfileId', 'ruleRows', 'interventions', 'rebuild', 'claimedHeldS']);
 /**
  * The keys below a round, each refused by name when something else is sent — the strictness that gives
  * the gate a maximum ({@link MAX_RUSH_SITTING_BODY_BYTES}). `submission.ts`'s gates check what a row and
@@ -300,6 +358,8 @@ const NEVER_ON_THE_WIRE: Readonly<Record<string, string>> = Object.freeze({
   paidUnits: PURSE_REFUSAL,
   purseBeforeUnits: PURSE_REFUSAL,
   purseAfterUnits: PURSE_REFUSAL,
+  // What a rebuild cost is the server's to price, from its own schedule — GitHub issue #372, § D1295.
+  spentUnits: PURSE_REFUSAL,
   wavesOutlasted: PURSE_REFUSAL,
   budgetUnits: PURSE_REFUSAL,
   units: PURSE_REFUSAL,
@@ -355,6 +415,77 @@ function idIssue(value: unknown, where: string): string | undefined {
   return typeof value === 'string' && value.length > 0 && value.length <= 64
     ? undefined
     : `${where} must be a non-empty id under 64 characters`;
+}
+
+/**
+ * The sentence for one tier a rebuild cannot buy — `core`'s `rushLevelsAfter` decides, this words it.
+ *
+ * Each names the round and the row, because a client on another build that sent one has to be able
+ * to find it; the two off-menu reasons are told apart because they are different facts — one is what
+ * this server's replay cannot build, the other is what a board that ranks one crowd will not rank.
+ */
+function rebuildRefusalOf(refusal: RushRebuildRefusal, where: string): string {
+  switch (refusal.kind) {
+    case 'unknown':
+      return (
+        `${where} names "${refusal.priceId}", which is not a tier the rush rebuild sells ` +
+        `(${RUSH_REBUILD_TIERS.map((tier) => tier.priceId).join(', ')})`
+      );
+    case 'off-menu':
+      return refusal.tier.reason === 'commissioning'
+        ? `${where} names "${refusal.priceId}", ${refusal.tier.categoryId} level ${String(refusal.tier.level)}, which a ` +
+            'rush cannot rebuild: it needs the commissioning this server replays without, so it is left off the rush menu'
+        : `${where} names "${refusal.priceId}", ${refusal.tier.categoryId} level ${String(refusal.tier.level)}, which a ` +
+            'rush does not sell: it changes who arrives, and a rush board ranks sittings that met the same crowd';
+    case 'already-fitted':
+      return (
+        `${where} buys "${refusal.priceId}", and this sitting already has that category at level ` +
+        `${String(refusal.fittedLevel)}, so it would take units and change nothing`
+      );
+    case 'same-category-twice':
+      return `${where} buys two ${refusal.categoryId} tiers at once; only the higher would be fitted, so the other would be paid for nothing`;
+  }
+}
+
+/**
+ * Every way a sitting's rebuilds cannot be bought, before a simulation starts — GitHub issue #372,
+ * [§ D1295](../../../../DECISIONS.md).
+ *
+ * Walked in round order from the levels the sitting starts at — the pre-fit kit's when the modifiers
+ * claim one, nothing otherwise — because whether a tier changes anything depends on what the rounds
+ * before it bought. **Affordability is not asked here**: the purse a rebuild spends is paid by the
+ * rounds before it, and that is a replay's figure, so {@link replayRushSitting} refuses an
+ * unaffordable one after those rounds have played.
+ */
+function rebuildIssues(rounds: unknown, modifiers: unknown): readonly string[] {
+  if (!Array.isArray(rounds) || rounds.length > MAX_SITTING_ROUNDS) return [];
+  const claims = objectsIn(modifiers).map(([, claim]) => claim as { readonly sinkId: string; readonly steps: number });
+  let levels: RushFitLevels = claimsRushPrefit(claims) ? RUSH_PREFIT_LEVELS : RUSH_NO_LEVELS;
+  const issues: string[] = [];
+  for (const [index, round] of objectsIn(rounds)) {
+    const rebuild = round['rebuild'];
+    if (rebuild === undefined) continue;
+    const where = `rounds[${String(index)}].rebuild`;
+    if (!Array.isArray(rebuild) || rebuild.some((id) => idIssue(id, where) !== undefined)) {
+      issues.push(`${where} must be a list of price-schedule row ids, each a non-empty id under 64 characters`);
+      continue;
+    }
+    if (rebuild.length > RUSH_REBUILD_TIERS.length) {
+      issues.push(`${where} names ${String(rebuild.length)} tiers, and the rush menu has ${String(RUSH_REBUILD_TIERS.length)}`);
+      continue;
+    }
+    if (index === 0 && rebuild.length > 0) {
+      issues.push(`${where} buys something before the first round, and a sitting's first round is the building as shipped: a rebuild is bought between rounds`);
+      continue;
+    }
+    const after = rushLevelsAfter(levels, rebuild as readonly string[]);
+    if (!after.ok) {
+      issues.push(...after.refusals.map((refusal) => rebuildRefusalOf(refusal, where)));
+      continue;
+    }
+    levels = after.levels;
+  }
+  return issues;
 }
 
 /**
@@ -420,6 +551,7 @@ export function rushSittingIssues(body: unknown, purse: RushPurseTable): readonl
   }
 
   const modifiers = sitting['modifiers'];
+  issues.push(...rebuildIssues(rounds, modifiers));
   const shape = claimedModifierIssues(modifiers);
   issues.push(...shape);
   for (const [index, claim] of objectsIn(modifiers)) issues.push(...keyIssues(claim, MODIFIER_KEYS, `modifiers[${String(index)}]`));
@@ -443,7 +575,14 @@ export function rushSittingIssues(body: unknown, purse: RushPurseTable): readonl
  * -------------------------------------------------------------------------- */
 
 /** Why a sitting was refused, as something the caller can branch on. */
-export type RushSittingRejectionCode = RejectionCode | 'held-does-not-reproduce' | 'no-breaking-point';
+export type RushSittingRejectionCode =
+  | RejectionCode
+  | 'held-does-not-reproduce'
+  | 'no-breaking-point'
+  /** A round's rebuild is one the menu does not sell or that changes nothing — the gate's refusal, re-asked here. */
+  | 'rebuild-refused'
+  /** A round's rebuild costs more than the purse the rounds before it left — GitHub issue #372, § D1295. */
+  | 'rebuild-over-purse';
 
 /** One round as the server replayed it. Every figure here is the server's; none is the claim. */
 export interface ReplayedRushRound {
@@ -452,6 +591,8 @@ export interface ReplayedRushRound {
   /** The generated waves it outlasted — what its purse was paid on. */
   readonly wavesOutlasted: number;
   readonly purseBeforeUnits: number;
+  /** What its rebuild took before it played, priced by this server from its own schedule. `0` when none. */
+  readonly spentUnits: number;
   readonly paidUnits: number;
   readonly purseAfterUnits: number;
 }
@@ -481,6 +622,8 @@ export interface RushSittingResources {
   readonly resources: VerificationResources;
   readonly purse: RushPurseTable;
   readonly ledger: ChimeLedgerTable;
+  /** `data/price-schedule.json`, which prices a rebuild — {@link loadRushPriceSchedule}. */
+  readonly schedule: PriceSchedule;
 }
 
 function refused(
@@ -492,20 +635,40 @@ function refused(
   return { ok: false, code, detail, round, simulations };
 }
 
+/** The first tier of `bought` that would change nothing over the levels before it, or `undefined`. */
+function inertTierIn(
+  base: BuildingConfig,
+  before: RushFitLevels,
+  bought: readonly string[],
+  specs: ElevatorSpecs,
+): string | undefined {
+  let levels: RushFitLevels = before;
+  for (const priceId of bought) {
+    const tier = rushRebuildTierOf(priceId);
+    if (tier === undefined) return undefined;
+    if (rushTierChangesNothing(base, levels, tier, specs)) return priceId;
+    levels = { ...levels, [tier.categoryId]: tier.level };
+  }
+  return undefined;
+}
+
 /**
  * Replay a sitting and decide — the chain the owner's ruling names, in the order the refusals should
  * reach a player.
  *
  * 0. **Read the sitting's modifiers once**, before any round resolves. A pre-fit is a fact about the
- *    *sitting* — every round of it starts from the same building, which is what *consecutive runs
- *    from an as-shipped start* becomes once the start is bought — so it is read here rather than per
- *    round, and a round cannot be fitted while its neighbour is not.
- * 1. **Resolve every round before simulating any**, so an id this server does not ship is refused at
- *    no cost however far into the sitting it sits.
+ *    *sitting*, so it is read here rather than per round, and it is where the fold starts.
+ * 1. **Fold every round's fit and price every rebuild before simulating any** — GitHub issue #372,
+ *    [§ D1295](../../../../DECISIONS.md). A round runs on everything the sitting has fitted by then:
+ *    the kit, and every tier bought before it, which stays fitted for the rest of the sitting. A
+ *    rebuild the menu refuses is refused here at no cost, as is an id this server does not ship.
  * 2. **Simulate each round and compare its hold moment**, stopping at the first that does not
- *    reproduce: nothing after it can be verified, and simulating it would spend a replay on a refusal.
+ *    reproduce: nothing after it can be verified, and simulating it would spend a replay on a
+ *    refusal. **Before** a round simulates, its rebuild is checked against the purse the rounds
+ *    before it left, which is only known once they have replayed.
  * 3. **Require a breaking point on the last round**, which is what posts.
- * 4. **Derive every purse** from the waves each round outlasted, opening at the listed top-up.
+ * 4. **Derive every purse** from the waves each round outlasted and what each rebuild spent, opening
+ *    at the listed top-up — `core`'s `rushPurseRounds`, the one derivation the viewer also reads.
  *
  * `sitting` must already have passed {@link rushSittingIssues}, and its modifiers `http/api.ts`'s
  * ledger check. Nothing here reads a key the gate refuses, so a purse smuggled onto the object reaches
@@ -513,10 +676,49 @@ function refused(
  */
 export function replayRushSitting(sitting: SubmittedRushSitting, from: RushSittingResources): RushSittingVerification {
   /* Once, for the whole sitting — see the numbered list above, step 0. */
-  const prefit = claimsRushPrefit(sitting.modifiers);
+  let levels: RushFitLevels = claimsRushPrefit(sitting.modifiers) ? RUSH_PREFIT_LEVELS : RUSH_NO_LEVELS;
   const configs: SimulationConfig[] = [];
+  const spends: number[] = [];
+  const asShipped = from.resources.buildingsById.get(sitting.buildingId);
   for (const [index, round] of sitting.rounds.entries()) {
-    const config = rushRoundConfigFor(sitting.buildingId, round, from.resources, prefit);
+    const bought = round.rebuild ?? [];
+    if (bought.length > 0) {
+      const after = index === 0 ? undefined : rushLevelsAfter(levels, bought);
+      /*
+       * A tier that would build the tower and the profile this sitting already has is refused rather
+       * than charged — `core`'s `rushTierChangesNothing`, which the viewer's menu asks too. Asked tier
+       * by tier over the levels so far, so a rebuild's second tier is judged on what its first fitted.
+       */
+      const inert =
+        after?.ok === true && asShipped !== undefined && from.resources.elevatorSpecs !== undefined
+          ? inertTierIn(asShipped.config, levels, bought, from.resources.elevatorSpecs)
+          : undefined;
+      if (inert !== undefined) {
+        return refused(
+          'rebuild-refused',
+          `Round ${String(index + 1)} buys "${inert}", which would build the tower this sitting already has, so ` +
+            'it would take units and change nothing. Nothing was ranked.',
+          index + 1,
+          0,
+        );
+      }
+      if (after === undefined || !after.ok) {
+        return refused(
+          'rebuild-refused',
+          index === 0
+            ? 'Round 1 says something was bought before it, and a sitting starts from the building as shipped: ' +
+                'a rebuild is bought between rounds.'
+            : `Round ${String(index + 1)} buys something this server's rush menu does not sell, or something ` +
+                'the sitting already had, so it cannot be replayed as posted.',
+          index + 1,
+          0,
+        );
+      }
+      levels = after.levels;
+    }
+    const fit: RushFit = rushFitOf(levels);
+    spends.push(bought.length === 0 ? 0 : rushRebuildUnits(from.schedule, bought));
+    const config = rushRoundConfigFor(sitting.buildingId, round, from.resources, fit);
     if (typeof config === 'string') {
       return refused(
         config,
@@ -524,24 +726,43 @@ export function replayRushSitting(sitting: SubmittedRushSitting, from: RushSitti
           ? `This server does not ship a building "${sitting.buildingId}".`
           : config === 'unknown-dispatcher'
             ? `Round ${String(index + 1)} names a dispatcher this server does not ship.`
-            : config === 'cannot-prefit'
-              ? 'This sitting says it started with the building fitted, and this server cannot fit one: it ' +
-                'was given no elevator specification to resolve the kit against. Nothing was ranked, and ' +
-                'replaying the sitting on the building as shipped would compare it against a held time a ' +
-                'different building produced.'
+            : config === 'cannot-fit'
+              ? 'This sitting fits the building, by starting fitted or by rebuilding it between rounds, and this ' +
+                'server cannot fit one: it was given no elevator specification to resolve the fit against. ' +
+                'Nothing was ranked, and replaying the sitting on the building as shipped would compare it ' +
+                'against a held time a different building produced.'
               : 'This server does not ship the rush stream, so no sitting can be replayed on it.',
-        config === 'unknown-building' || config === 'cannot-prefit' ? undefined : index + 1,
+        config === 'unknown-building' ? undefined : index + 1,
         0,
       );
     }
     configs.push(config);
   }
 
+  const opening = rushPurseOpeningUnits(from.purse, from.ledger, sitting.modifiers ?? []);
   const held: (number | null)[] = [];
   const waves: number[] = [];
   let simulations = 0;
   for (const [index, config] of configs.entries()) {
     const round = index + 1;
+    /*
+     * The purse this round's rebuild spends from is what the rounds before it left, and that is only
+     * known now — so the check is here, before the round costs a simulation, rather than in the gate.
+     */
+    const spent = spends[index] ?? 0;
+    if (spent > 0) {
+      const before = rushPurseRounds(from.purse, opening, waves, spends.slice(0, waves.length)).at(-1)?.purseAfterUnits ?? opening;
+      if (spent > before) {
+        return refused(
+          'rebuild-over-purse',
+          `Round ${String(round)} was rebuilt for ${String(spent)} units, and on this server's replay the rounds ` +
+            `before it left a purse of ${String(before)}. Nothing was ranked. That happens when the client is on ` +
+            'a different build or the reference data has changed since the sitting was played.',
+          round,
+          simulations,
+        );
+      }
+    }
     let record;
     try {
       ({ record } = runSimulation(config));
@@ -583,7 +804,7 @@ export function replayRushSitting(sitting: SubmittedRushSitting, from: RushSitti
     );
   }
 
-  const purses = rushPurseRounds(from.purse, rushPurseOpeningUnits(from.purse, from.ledger, sitting.modifiers ?? []), waves);
+  const purses = rushPurseRounds(from.purse, opening, waves, spends);
   return {
     ok: true,
     rounds: Object.freeze(

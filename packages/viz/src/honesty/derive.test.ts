@@ -268,20 +268,12 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'change’s own `name`, which the FIXIT adapter drove through `standingExtrasFrom` and ' +
         '`repairRowOf` until the menu that drew them retired (§ D1020), and the schedule’s `note` fields, which are provenance for a reviewer and ' +
         'are drawn on no screen. `fixit/parse.ts`’s own exclusion three groups down is the same ' +
-        'argument for the same reason, and this is that file’s pricing half.',
+        'argument for the same reason, and this is that file’s pricing half. **The parser itself left ' +
+        'this list in wave AN** (GitHub issue #372, § D1295): `parsePriceSchedule`, `violationsIn`, ' +
+        '`priceOf`, `purchaseUnits` and `steppedPurchaseUnits` moved to `core`’s ' +
+        '`config/priceSchedule.ts`, where this derivation does not look, and `pricing/parse.ts` now ' +
+        're-exports them, so the five ids were ghosts and were deleted rather than kept.',
       ids: [
-        'pricing/parse.ts#parsePriceSchedule',
-        'pricing/parse.ts#violationsIn',
-        'pricing/parse.ts#priceOf',
-        'pricing/parse.ts#purchaseUnits',
-        /*
-         * GitHub issue #528, § D560. The same argument one function along: it returns a number, and
-         * its one literal is a refusal addressed to whoever asked a stepper for half a step or a
-         * negative one. What a player reads about a step is `fixitScreenModel.ts#fixitMachineryRows`’
-         * *"10 u per half a metre per second"*, which the FIXIT adapter drives and which this
-         * function does not write.
-         */
-        'pricing/parse.ts#steppedPurchaseUnits',
         'pricing/repairPrice.ts#pathsIn',
         'pricing/repairPrice.ts#changesBought',
         'pricing/repairPrice.ts#unpricedPathsIn',

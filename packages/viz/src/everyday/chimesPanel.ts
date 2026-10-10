@@ -47,7 +47,7 @@
  * is a ruling rather than a lane's choice. The panel now says there is no tally until you sign in,
  * which is true today and stops being drawn the moment a device ledger exists.
  *
- * ## Two of the three can be bought, and the third says why it cannot
+ * ## All three can be bought, and each row says what it does
  *
  * This panel shipped with a single sentence across the whole list —
  * *"None of these can be bought yet"* — which was true of the build and is not true of this one.
@@ -70,10 +70,15 @@
  * § D227 again, and `campaign/purseTopUpReachesTheRun.test.ts` is the run that earns the deletion:
  * a tower that bought a top-up and one that did not, same seed, compared on the legs.
  *
- * `rush-purse-top-up` is still **not** offered and still says why on its own line: no between-round
- * rebuild travels for the rush ([§ D606](../../../../DECISIONS.md) § 2). It is a **separate case
- * with a different cause**, which is why issue #557 refuses to have the two folded together and why
- * one sentence about *purses* would be a reader's summary rather than either file's fact.
+ * **`rush-purse-top-up` is offered now too, and its refusal went the same way** — GitHub issue #372,
+ * [§ D1295](../../../../DECISIONS.md). Its row read *"Not offered. The rush works out a purse for every
+ * round and there is still nothing to spend it on: rebuilding the tower between rounds is not built,
+ * so a wider purse would change no run."* A rebuild between rounds is built and spends the purse, so a
+ * wider one reaches a run through what it pays for, and the row is **deleted rather than reworded**.
+ * The run that earns the deletion is `packages/server`'s `rushSitting.test.ts`: the same rebuild of the
+ * same round is refused on the standard purse (`rebuild-over-purse`) and replayed on a topped-up one,
+ * to a different hold. It stayed a separate case from the career's top-up to the end, which is why
+ * issue #557 refused to have the two folded together, and each row still carries its own sentence.
  *
  * Selling a sink that reaches nothing would be a control that writes nothing, which `CLAUDE.md`'s
  * standing requirement names and `docs/22` non-goal 5 forbids in **both** polarities — so a price
@@ -180,17 +185,14 @@ export type ChimesHome =
  */
 export const SPEND_ABSENCES: Readonly<Record<string, string>> = Object.freeze({
   /*
-   * **`career-purse-top-up`'s entry is deleted, not reworded** — GitHub issue #557, § D227, and the
-   * module docstring carries the sentence it used to say so that a reader can see what stopped
-   * being true. `campaign/economy.ts#purseOf` now has a fourth term and
-   * `campaign/purseTopUpReachesTheRun.test.ts` runs the day twice to prove it reaches the legs.
-   *
-   * `rush-purse-top-up` stays, and staying is a decision rather than an oversight: issue #557 says
-   * in terms that it is a separate case with a different cause and must not be folded in.
+   * **Empty, and both purse rows left it the same way** — each deleted rather than reworded on the
+   * commit that made it false, and the module docstring carries what each used to say.
+   * `career-purse-top-up` went with GitHub issue #557 (§ D738), when `campaign/economy.ts#purseOf`
+   * gained a fourth term; `rush-purse-top-up` went with GitHub issue #372 (§ D1295), when a rebuild
+   * between rush rounds began to spend the purse it widens. The table stays, because a sink the next
+   * ledger adds that this build cannot sell needs somewhere to say so, and `chimesPanel.test.ts` checks
+   * the two tables in both directions whatever either holds.
    */
-  'rush-purse-top-up':
-    'Not offered. The rush works out a purse for every round and there is still nothing to spend it ' +
-    'on: rebuilding the tower between rounds is not built, so a wider purse would change no run.',
 });
 
 /**
@@ -319,6 +321,21 @@ export const CHIMES_PANEL_COPY = Object.freeze({
     'Bought, as many times as one contract may be topped up. The units are in the purse of the ' +
     'tower each was bought for, and they are spent on works like any other unit.',
   /**
+   * **What the rush top-up does, said before the press** — GitHub issue #372, § D1295. The figure is
+   * composed in front of it from the ledger's own `grantUnits`, as the career's is. Two clauses, each
+   * true of what the press does: the units open every sitting the account starts, because a bought
+   * modifier is the account's and the host claims it at each sitting's first press; and a sitting
+   * opened with them ranks only beside sittings with the same modifiers (§ D543).
+   */
+  rushPurseOffer:
+    'into the purse every rush sitting you start opens with, to spend on rebuilding the tower between ' +
+    'rounds. A sitting that opens with a wider purse is posted to its own board rather than ranked ' +
+    'against the standard purse.',
+  /** And what it did, which is the same thing in the past tense. */
+  rushPurseOwned:
+    'Bought, as many times as a rush purse may be topped up. Every rush sitting you start opens with ' +
+    'these units, and is posted to its own board.',
+  /**
    * No campaign desk is open, so a top-up would be charged and land nowhere.
    *
    * The one arm of this panel that is about the **state of play** rather than about the build, the
@@ -403,6 +420,11 @@ export const SPEND_OFFERS: Readonly<Record<string, ChimesSpendCopy>> = Object.fr
   'rush-prefit': Object.freeze({
     offer: CHIMES_PANEL_COPY.prefitOffer,
     owned: CHIMES_PANEL_COPY.prefitOwned,
+    needsOpenTower: false,
+  }),
+  'rush-purse-top-up': Object.freeze({
+    offer: CHIMES_PANEL_COPY.rushPurseOffer,
+    owned: CHIMES_PANEL_COPY.rushPurseOwned,
     needsOpenTower: false,
   }),
 });

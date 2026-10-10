@@ -25,6 +25,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
 
 import { RUSH_SEED, RUSH_TEMPLATE_ID, rushOutcomeOf, rushPatchOf } from './rush.js';
+import { rushPurseBeforeNextOf } from './rushRebuild.js';
 import { REPLAY_COPY } from './replay.js';
 import { CAREER_CONTRACT_ID, RUSH_CONTRACT_ID, REPLAY_CONTRACT_ID, openWeek } from '../shift/week.js';
 import { CONTRACTS } from '../shift/contracts.js';
@@ -75,6 +76,7 @@ import {
   CHALLENGE_BOARD_METRIC,
   POST_RUN_NO_SERVER,
   RUSH_NOT_STANDING,
+  RUSH_REBUILD_NOT_YET,
   EVERYDAY_HOST,
   type EverydayGhostRace,
   type EverydayHost,
@@ -2279,6 +2281,56 @@ describe('a rush sitting — GitHub issue #372', () => {
     const moved = host.rush()?.rounds[2];
     expect(moved?.startKey).toBeDefined();
     expect(moved?.startKey).not.toBe(untouched?.startKey);
+  });
+
+  it('rebuilds between rounds from what the rounds earned, keeps it fitted, and posts it on the round it opened — § D1295', () => {
+    /*
+     * GitHub issue #372's second criterion, through the host's own verbs. Nothing to rebuild with before
+     * a round has finished; after one, the menu's purse is what that round paid (`core`'s derivation
+     * over this device's round), a pick is fitted by *Run the rush again* and stays for every later
+     * round, the round it opened carries it on the wire, and leaving the rush starts the next sitting
+     * as built. The recording is the same stub each round, which is all the host's bookkeeping needs.
+     */
+    const h = harnessOf(base());
+    const host = createEverydayHost(h.bindings);
+    expect(host.rushRebuild()).toBeUndefined();
+    host.startRush();
+    expect(host.rushRebuild(), 'a sitting’s first round is the building as shipped').toBeUndefined();
+    expect(host.pickRushRebuild('faster-doors')).toBe(RUSH_REBUILD_NOT_YET);
+    h.state = { ...h.state, recording: rush };
+    host.endRush(host.rush()?.holdAtS ?? 0);
+
+    const menu = host.rushRebuild();
+    const holdS = host.rush()?.rounds[0]?.holdS ?? null;
+    expect(menu?.purseUnits).toBe(rushPurseBeforeNextOf({ rounds: [{ holdS }], modifiers: [], schedule: resources.priceSchedule }));
+    expect(menu?.purseUnits, 'the first round paid nothing in, so this case tests nothing').toBeGreaterThan(0);
+    expect(host.pickRushRebuild('faster-doors')).toBeUndefined();
+    expect(host.rushRebuild()?.pending).toEqual(['faster-doors']);
+    /* Nothing is fitted until the next round is pressed. The harness records patches rather than applying them. */
+    const fitOfLastPress = (): ViewerState['campaignFitOut'] => h.patches.at(-1)?.campaignFitOut;
+    expect(fitOfLastPress()).toBeUndefined();
+
+    host.startRush();
+    expect(fitOfLastPress()?.doorSecondsSaved, 'the pick did not reach the next round’s building').toBe(1);
+    expect(host.rushRebuild()?.pending).toEqual([]);
+    h.state = { ...h.state, recording: rush };
+    host.endRush(host.rush()?.holdAtS ?? 0);
+    const rounds = host.rush()?.rounds ?? [];
+    expect(rounds.map((round) => round.rebuild)).toEqual([undefined, ['faster-doors']]);
+    const check = host.rush()?.check;
+    if (check?.ok !== true) throw new Error('the sitting should be postable');
+    expect(check.body.rounds[1]?.rebuild).toEqual(['faster-doors']);
+    expect(Object.hasOwn(check.body.rounds[0] ?? {}, 'rebuild'), 'a round nothing was bought for carries no key').toBe(false);
+    /* The tier is fitted, so the menu says so rather than selling it twice. */
+    expect(host.rushRebuild()?.levels).toEqual({ doors: 1 });
+
+    /* Round 3 buys nothing and still plays the rebuilt tower: a tier bought between rounds persists. */
+    host.startRush();
+    expect(fitOfLastPress()?.doorSecondsSaved).toBe(1);
+    /* And the next sitting starts from the building as shipped. */
+    host.leaveRush();
+    host.startRush();
+    expect(fitOfLastPress()).toBeUndefined();
   });
 
   it('ends the sitting when the rush is left, because a sitting is runs from an as-shipped start', () => {

@@ -87,6 +87,7 @@ import { CONTRACT_DAYS } from '../campaign/economy.js';
 import { everydayAccount, onEverydayAccount } from './accountPort.js';
 import { postRunViewOf } from './postRun.js';
 import { RUSH_POST_COPY, rushPostViewOf } from './rushPost.js';
+import { rushRebuildViewOf } from './rushRebuild.js';
 import type { EverydayPostOutcome, EverydayRushPostOutcome } from './host.js';
 import { actionBarFor, type ActionBarModel } from './actionBar.js';
 import type { EverydayScreenModule } from './screens.js';
@@ -200,6 +201,12 @@ function mountReportScreen(
     | undefined;
   let rushPosting = false;
   let rushPostBlock: HTMLElement | undefined;
+  /**
+   * The rebuild menu on the page, and the tier whose button keeps the focus across a repaint — GitHub
+   * issue #372, § D1295. Cleared with the post block on every render, for that block's reason.
+   */
+  let rushRebuildBlock: HTMLElement | undefined;
+  let rushRebuildFocus: string | undefined;
 
   const root = el(doc, 'div', 'everyday-report');
   root.style.cssText = 'max-width:900px';
@@ -288,6 +295,7 @@ function mountReportScreen(
      * cleared here to avoid.
      */
     rushPostBlock = undefined;
+    rushRebuildBlock = undefined;
     /* § 9.3: the rush's result is its own screen and never falls through to the day's sheet. */
     if (context.ctx === 'rush') {
       root.replaceChildren();
@@ -379,8 +387,122 @@ function mountReportScreen(
      * day report's own arrangement: the result is what the run was, and the sitting is what a
      * player may do about it.
      */
+    /*
+     * **The rebuild between rounds first** — GitHub issue #372, § D1295. Between the round that just
+     * ended and the post, because it is what the player does next if they play on: what they pick is
+     * fitted by *Run the rush again*. Drawn only once a round has finished, which is the host's answer.
+     */
+    const rebuild = drawRushRebuildBlock();
+    if (rebuild !== undefined) {
+      rushRebuildBlock = rebuild;
+      root.append(rebuild);
+    }
     rushPostBlock = drawRushPostBlock();
     root.append(rushPostBlock);
+  }
+
+  /**
+   * The rebuild menu — `everyday/rushRebuild.ts#rushRebuildViewOf`, drawn and not decided here. **This
+   * is `EverydayHost.pickRushRebuild`'s and `EverydayHost.rushRebuild`'s non-test caller.** A press
+   * repaints this block alone and puts the focus back on the button pressed, which is why the host does
+   * not notify for a pick. `undefined` before a round of the sitting has finished.
+   */
+  function drawRushRebuildBlock(): HTMLElement | undefined {
+    const input = context.host.rushRebuild();
+    if (input === undefined) return undefined;
+    const view = rushRebuildViewOf(input);
+    const block = el(doc, 'section', 'everyday-rush-rebuild');
+    block.style.cssText = `${WELL};margin-top:20px;padding:16px 18px;border-radius:${String(R.card)}px`;
+    const eyebrow = el(doc, 'p', 'everyday-rush-rebuild-eyebrow', view.eyebrow);
+    eyebrow.style.cssText = `${EYEBROW};margin:0`;
+    const purse = el(doc, 'p', 'everyday-rush-rebuild-purse', view.purseLine);
+    purse.style.cssText = `font:700 20px ${TYPE.heading};margin:10px 0 0`;
+    const purseNote = el(doc, 'p', 'everyday-rush-rebuild-purse-note', view.purseNote);
+    purseNote.style.cssText = `${QUIET};margin:6px 0 0;max-width:74ch`;
+    const unmeasured = el(doc, 'p', 'everyday-rush-rebuild-unmeasured', view.unmeasured);
+    unmeasured.style.cssText = `${QUIET};margin:6px 0 0;max-width:74ch`;
+    block.append(eyebrow, purse, purseNote, unmeasured);
+    for (const category of view.categories) {
+      const heading = el(doc, 'h3', 'everyday-rush-rebuild-category', category.name);
+      heading.style.cssText = `${EYEBROW};margin:16px 0 0`;
+      block.append(heading);
+      if (category.refusal !== undefined) {
+        const refusal = el(doc, 'p', 'everyday-rush-rebuild-refusal', category.refusal);
+        refusal.style.cssText = `${QUIET};margin:6px 0 0;max-width:74ch`;
+        block.append(refusal);
+        continue;
+      }
+      const list = el(doc, 'ul', 'everyday-rush-rebuild-tiers');
+      list.style.cssText = 'margin:6px 0 0;padding:0;list-style:none';
+      for (const row of category.rows) {
+        const item = el(doc, 'li', 'everyday-rush-rebuild-tier');
+        item.dataset['state'] = row.state;
+        item.style.cssText = `${BODY};margin:6px 0;display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline`;
+        const name = el(doc, 'span', 'everyday-rush-rebuild-tier-name', row.name);
+        name.style.cssText = 'font-weight:600';
+        item.append(name);
+        if (row.price !== '') item.append(el(doc, 'span', 'everyday-rush-rebuild-tier-price', row.price));
+        if (row.fits !== '') {
+          const fits = el(doc, 'span', 'everyday-rush-rebuild-tier-fits', row.fits);
+          fits.style.cssText = `${QUIET};flex-basis:100%`;
+          item.append(fits);
+        }
+        if (row.action !== undefined) {
+          const button = el(doc, 'button', 'everyday-rush-rebuild-press', row.action);
+          button.type = 'button';
+          button.dataset['priceId'] = row.priceId;
+          button.setAttribute('aria-pressed', row.state === 'picked' ? 'true' : 'false');
+          button.style.cssText = [
+            'cursor:pointer',
+            `border:1px solid ${C.ink}`,
+            `border-radius:${String(R.pill)}px`,
+            `background:${row.state === 'picked' ? C.sun : 'transparent'}`,
+            `color:${C.ink}`,
+            'padding:5px 12px',
+            'font-size:13px',
+            'font-weight:600',
+          ].join(';');
+          button.addEventListener('click', () => {
+            if (!row.pressable) return;
+            rushRebuildFocus = row.priceId;
+            context.host.pickRushRebuild(row.priceId);
+            repaintRushRebuildBlock();
+          });
+          item.append(button);
+        }
+        if (row.note !== undefined) {
+          const note = el(doc, 'span', 'everyday-rush-rebuild-tier-note', row.note);
+          note.style.cssText = `${QUIET};flex-basis:100%`;
+          item.append(note);
+        }
+        list.append(item);
+      }
+      block.append(list);
+    }
+    const pending = el(doc, 'p', 'everyday-rush-rebuild-pending', view.pendingLine);
+    pending.setAttribute('aria-live', 'polite');
+    pending.style.cssText = `${BODY};margin:14px 0 0;max-width:74ch`;
+    block.append(pending);
+    return block;
+  }
+
+  /** Repaint the rebuild menu alone — a press's redraw. A no-op on every screen that has not drawn one. */
+  function repaintRushRebuildBlock(): void {
+    if (!alive || rushRebuildBlock === undefined) return;
+    const next = drawRushRebuildBlock();
+    if (next === undefined) return;
+    rushRebuildBlock.replaceWith(next);
+    rushRebuildBlock = next;
+    /*
+     * The focus back on the tier just pressed, once the block is in the document: a picked tier's row
+     * now offers *Put it back* under the same id, so a keyboard player stays where they were.
+     */
+    const id = rushRebuildFocus;
+    rushRebuildFocus = undefined;
+    if (id === undefined) return;
+    for (const button of next.querySelectorAll<HTMLButtonElement>('button.everyday-rush-rebuild-press')) {
+      if (button.dataset['priceId'] === id) button.focus();
+    }
   }
 
   /**
@@ -433,6 +555,8 @@ function mountReportScreen(
        * and a violation could not say which of them was the one at fault.
        */
       item.append(label, el(doc, 'span', 'everyday-rush-post-round-driver', ` · ${round.driver}`));
+      // What it was rebuilt with first — GitHub issue #372, § D1295 — before how far it got.
+      if (round.rebuilt !== undefined) item.append(el(doc, 'span', 'everyday-rush-post-round-rebuilt', ` · ${round.rebuilt}`));
       item.append(el(doc, 'span', 'everyday-rush-post-round-held', ` · ${round.held}`));
       item.append(el(doc, 'span', 'everyday-rush-post-round-presses', ` · ${round.presses}`));
       if (round.earned !== undefined) {

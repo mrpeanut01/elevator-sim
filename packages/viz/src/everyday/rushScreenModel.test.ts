@@ -217,14 +217,15 @@ describe('what the screen refuses, and where the refusal sits', () => {
      * named them left on that commit. #418 measured the standings (§ D547), and the last entry left
      * on that one. An empty register is a state that keeps being checked, so the case stays.
      *
-     * **It stopped being empty on GitHub issue #372's commit, and the length is checked rather than
-     * the emptiness**, which is the same case one step along: the entry that refilled it is the
-     * between-round purse, whose units nothing spends (§ D606). What the four `not.toMatch` clauses
-     * still hold is that no entry has *re-acquired* one of the four claims that were deleted — a
-     * register can go back to naming something built only by somebody writing it there, and this
-     * case is what that would fail.
+     * **It stopped being empty on GitHub issue #372's commit, and is empty again on the commit that
+     * built what that entry named** — the between-round purse, which a rebuild between rounds spends
+     * now (§ D1295). The length is still checked rather than described, because this register has
+     * been three, one, none, one and none, and what the four `not.toMatch` clauses hold is that no
+     * entry has *re-acquired* one of the claims that were deleted. A fifth is added below: the purse
+     * entry's own words, so a register that names the rebuild as missing again fails here.
      */
-    expect(RUSH_ABSENCES).toHaveLength(1);
+    expect(RUSH_ABSENCES).toHaveLength(0);
+    for (const absence of RUSH_ABSENCES) expect(absence).not.toMatch(/between-round purse|rebuilding the tower between rounds/);
     for (const absence of RUSH_ABSENCES) {
       expect(absence).not.toMatch(/climbing stream|stage of its own|result screen|standings/);
     }

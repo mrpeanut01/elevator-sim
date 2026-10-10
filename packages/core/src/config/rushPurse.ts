@@ -28,16 +28,24 @@
  * drafted as a proposal, and the product owner approved it as drafted on 2026-09-11 (§ D542).
  * Changing it is this one function.
  *
- * ## What is not built
+ * ## What spends it — GitHub issue #372's second criterion, [§ D1295](../../../../DECISIONS.md)
  *
- * **Nothing spends a purse.** A between-round rebuild is the fit-out kit (§ D427), and the code that
- * turns a kit into a building is `packages/viz/src/campaign/fitOut.ts` over
- * `packages/viz/src/commissioning/`, which the server may not import. So `purseAfterUnits` is always
- * `purseBeforeUnits + paidUnits`: the arithmetic has no spend term because no spend travels, and a
- * spend term nothing could fill would be a dead seam with a column of zeroes in it.
+ * **A rebuild between rounds.** A round may open by buying tiers off the rush menu
+ * (`rushRebuild.ts`), priced from `data/price-schedule.json`; what they cost is that round's
+ * `spentUnits`, taken from the balance it opened with **before** it plays, and what its waves pay
+ * lands at its end. So `purseAfterUnits` is `purseBeforeUnits − spentUnits + paidUnits`, and a round
+ * may never spend more than it opened with — {@link rushPurseRounds} throws rather than run a purse
+ * below zero, because a caller that reached it with an unaffordable rebuild has skipped the refusal
+ * the player is owed (`packages/server`'s replay refuses such a sitting by name before it gets here).
+ *
+ * **The spend is a price and not a measurement**, which keeps the rule above whole: it is the sum
+ * of schedule rows for tiers the player chose, a cause the sitting carries, and nothing the run
+ * produced reaches it. The paragraph this replaces said the arithmetic had no spend term because no
+ * spend travelled, and that *a spend term nothing could fill would be a dead seam*; the server and
+ * the viewer both fill it now, so the term arrived with its first caller rather than ahead of one.
  *
  * Recorded under [§ D405](../../../../DECISIONS.md) where it binds only this module; the sitting it
- * serves is [§ D542](../../../../DECISIONS.md).
+ * serves is [§ D542](../../../../DECISIONS.md), and the rebuild that spends it is § D1295.
  */
 
 import { chimeGrantUnits, chimeSinkById, type ChimeLedgerTable } from './chimeLedger.js';
@@ -74,9 +82,14 @@ export interface RushPurseTable {
   readonly topUpSinkIds: readonly string[];
 }
 
-/** One round's purse: what it opened with, what its waves paid, and what the next round opens with. */
+/**
+ * One round's purse: what it opened with, what its rebuild spent before it played, what its waves
+ * paid, and what the next round opens with.
+ */
 export interface RushPurseRound {
   readonly purseBeforeUnits: number;
+  /** Units the round's rebuild took before it played. `0` on a round nothing was bought for. */
+  readonly spentUnits: number;
   readonly paidUnits: number;
   readonly purseAfterUnits: number;
 }
@@ -195,10 +208,14 @@ export function violationsInRushPurse(table: RushPurseTable, ledger: ChimeLedger
  * The claims arrive **already checked against the account's spends** (`packages/server`'s
  * `chimes/ledger.ts#unbackedModifiers`); this only sums them. A sink that is not one of this purse's
  * top-ups contributes nothing whatever it grants elsewhere, and a standard sitting opens at zero.
+ *
+ * **It reads the ledger's sinks and nothing else**, so the viewer, which binds only the spend half
+ * (`ChimeSpendTable`, sources projected away), can ask it the same question the server does about
+ * the purse a player is about to spend between rounds — one derivation and two callers, § D1295.
  */
 export function rushPurseOpeningUnits(
   table: RushPurseTable,
-  ledger: ChimeLedgerTable,
+  ledger: Pick<ChimeLedgerTable, 'sinks'>,
   claimed: readonly { readonly sinkId: string; readonly steps: number }[],
 ): number {
   let units = 0;
@@ -211,18 +228,27 @@ export function rushPurseOpeningUnits(
 }
 
 /**
- * Each round's purse across a sitting, from the purse it opened at and each round's waves outlasted.
+ * Each round's purse across a sitting, from the purse it opened at, each round's waves outlasted and
+ * what each round's rebuild spent before it played.
  *
  * Whole counts in, and nothing else: see the module docstring for why that signature is the guarantee
- * that no measurement moves a purse, and for the balance reading and the absent spend term.
+ * that no measurement moves a purse, for the balance reading, and for the spend term. `spentUnits` is
+ * read by position and a round with no entry spent nothing, so a caller with no rebuild to report
+ * passes none and gets exactly the figures this function gave before the term existed.
  */
 export function rushPurseRounds(
   table: RushPurseTable,
   openingUnits: number,
   wavesOutlasted: readonly number[],
+  spentUnits: readonly number[] = [],
 ): readonly RushPurseRound[] {
   if (!Number.isInteger(openingUnits) || openingUnits < 0) {
     throw new RushPurseError(`a purse opens at a whole number of units, and was asked to open at ${String(openingUnits)}.`);
+  }
+  if (spentUnits.length > wavesOutlasted.length) {
+    throw new RushPurseError(
+      `${String(spentUnits.length)} rebuilds were reported for ${String(wavesOutlasted.length)} rounds; a rebuild belongs to the round it opens.`,
+    );
   }
   const rounds: RushPurseRound[] = [];
   let balance = openingUnits;
@@ -230,9 +256,20 @@ export function rushPurseRounds(
     if (!Number.isInteger(waves) || waves < 0) {
       throw new RushPurseError(`round ${String(index + 1)} outlasted ${String(waves)} waves, which is not a whole number of waves.`);
     }
+    const spent = spentUnits[index] ?? 0;
+    if (!Number.isInteger(spent) || spent < 0) {
+      throw new RushPurseError(`round ${String(index + 1)} spent ${String(spent)} units, which is not a whole number of units.`);
+    }
+    if (spent > balance) {
+      throw new RushPurseError(
+        `round ${String(index + 1)} spends ${String(spent)} units from a purse of ${String(balance)}; an unaffordable ` +
+          'rebuild is refused before the purse is derived, never run below zero.',
+      );
+    }
     const paidUnits = waves * table.unitsPerWaveOutlasted;
-    rounds.push(Object.freeze({ purseBeforeUnits: balance, paidUnits, purseAfterUnits: balance + paidUnits }));
-    balance += paidUnits;
+    const purseAfterUnits = balance - spent + paidUnits;
+    rounds.push(Object.freeze({ purseBeforeUnits: balance, spentUnits: spent, paidUnits, purseAfterUnits }));
+    balance = purseAfterUnits;
   }
   return Object.freeze(rounds);
 }

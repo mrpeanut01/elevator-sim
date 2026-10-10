@@ -48,11 +48,13 @@ import {
   rushHoldLineFigure,
   rushLeftBehindLine,
   rushOpeningLine,
+  rushRebuildLineOf,
   rushTutorialWorkedAnswerOf,
   RUSH_FITTED_LINE,
   RUSH_SCREEN_COPY as COPY,
 } from './rushScreenModel.js';
 import { rushStandingsOf } from './rushHouse.js';
+import { RUSH_PURSE } from './rushRebuild.js';
 import { mountWorkedAnswer } from './tutorialScreens.js';
 import {
   EVERYDAY_COLORS as C,
@@ -293,6 +295,19 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
     fitted.style.cssText = `font-size:12px;line-height:1.5;color:${C.label};margin:12px 0 0`;
     drivingBlock.append(fitted);
   }
+  /*
+   * The rebuild between rounds, said before the first round — GitHub issue #372, § D1295. Always
+   * drawn, because every sitting earns a purse; the opening figure is the host's, from what the
+   * account owns, and the per-wave figure is `data/rush-purse.json`'s.
+   */
+  const rebuildLine = el(
+    doc,
+    'p',
+    'everyday-rush-rebuild-line',
+    rushRebuildLineOf(RUSH_PURSE.unitsPerWaveOutlasted, context.host.rushOpeningPurse()),
+  );
+  rebuildLine.style.cssText = `font-size:12px;line-height:1.5;color:${C.label};margin:12px 0 0`;
+  drivingBlock.append(rebuildLine);
   /* § D478: a stream this far outside the building's band says so before it starts. */
   const disclosureLine = context.host.rushDisclosure();
   if (disclosureLine !== undefined) {

@@ -41,7 +41,16 @@ import { DATA_DIR } from '../fixtures.test-helper.js';
 import { priceOf } from '../pricing/parse.js';
 import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
 
-import { RUSH_PREFIT_FIT_OUT, RUSH_SEED } from './rush.js';
+import { RUSH_PREFIT_LEVELS } from '@elevator-sim/core';
+
+import { RUSH_SEED, rushFitOutOf } from './rush.js';
+
+/** The pre-fit kit as this package folds it — `rush.ts#rushFitOutOf` at `core`'s levels (§ D1295). */
+const RUSH_PREFIT_FIT_OUT = ((): NonNullable<ReturnType<typeof rushFitOutOf>> => {
+  const fit = rushFitOutOf(RUSH_PREFIT_LEVELS);
+  if (fit === undefined) throw new Error('the pre-fit folds to nothing');
+  return fit;
+})();
 
 let config: LoadedConfig;
 let resources: BrowserResources;

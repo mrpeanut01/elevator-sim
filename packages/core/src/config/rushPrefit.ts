@@ -25,8 +25,10 @@
  * Nothing of that shape is here. {@link RUSH_PREFIT_KIT} carries **three numbers and no words** — no
  * name, no subtitle, no effect sentence, no tier, no price in units, no ladder and no second kit —
  * so no string in this file can reach a player and the honesty corpus has nothing here to sweep.
- * The general between-round rebuild — buying an arbitrary tier of an arbitrary category mid-sitting
- * — still needs one of § D606's three shapes and **is not built**; see that entry, and § 4 below.
+ * **The general between-round rebuild is built now, in this shape** (`rushRebuild.ts`, GitHub issue
+ * #372, [§ D1295](../../../../DECISIONS.md)): the copy-free half of the shop moved, tier by tier, and
+ * this kit became three of its levels. This sentence said the rebuild *"still needs one of § D606's
+ * three shapes and is not built"*, and it is replaced rather than left standing on § D227's ground.
  *
  * ## The kit, and why these three tiers
  *
@@ -54,15 +56,15 @@
  *
  * Between them the three effects are two per-car field edits and one dispatch lever, and **not one
  * of them needs the commissioning machinery** `packages/viz/src/commissioning/` owns: no
- * `extraShafts`, no `machineClassId`, no rated load, no floor populations. So
- * {@link prefittedRushBuilding} is a plain edit to a `BuildingConfig` and
- * {@link prefittedRushProfile} is three fields on a `DispatcherProfile`, and the boundary § D606
- * declined to move is not moved by either.
+ * `extraShafts`, no `machineClassId`, no floor populations. So {@link prefittedRushBuilding} is a
+ * plain edit to a `BuildingConfig` and {@link prefittedRushProfile} is three fields on a
+ * `DispatcherProfile`. Both are now `rushRebuild.ts`'s general appliers at this kit's levels, which
+ * is the same edit by construction rather than by agreement.
  *
  * ## The two ends, and how they are held to one answer
  *
  * - **`packages/viz`** keeps its own generic applier: the prefit reaches a rush as the
- *   `CampaignFitOut` `everyday/rush.ts#RUSH_PREFIT_FIT_OUT` builds **from this constant**, folded
+ *   `CampaignFitOut` `everyday/rush.ts#rushFitOutOf` builds from {@link RUSH_PREFIT_LEVELS}, folded
  *   by `campaign/fitOut.ts` like any other kit, because a fit-out is what this is.
  * - **`packages/server`** has no `SHOP` and no fold, and calls the two functions below directly.
  *
@@ -71,8 +73,8 @@
  * each half plays through its own path and pins to one held figure, and
  * `packages/viz/src/everyday/rushPrefit.test.ts` asserts the two building appliers agree to the
  * byte on every shipped tower. {@link doorCycleWithSaving} and {@link MIN_DOOR_S} moved here from
- * `campaign/fitOut.ts` when the second caller appeared, so the one piece of arithmetic in the kit
- * has one implementation rather than two that agree today.
+ * `campaign/fitOut.ts` when the second caller appeared, and on to `rushRebuild.ts` with the general
+ * appliers, so the one piece of arithmetic in the kit has one implementation rather than two.
  *
  * ## What a prefitted round does **not** get
  *
@@ -87,6 +89,7 @@
 import type { BuildingConfig, DispatcherProfile, ElevatorSpecs } from './types.js';
 import type { ChimeLedgerTable } from './chimeLedger.js';
 import { chimeSinkById } from './chimeLedger.js';
+import { RUSH_PREFIT_LEVELS, rushFitOf, rushRebuiltBuilding, zonedProfileOf } from './rushRebuild.js';
 
 /* -------------------------------------------------------------------------- *
  * The kit
@@ -108,10 +111,12 @@ export interface RushPrefitRung {
   /**
    * That row's `priceUnits` **as measured on the commit that authored this kit** (2026-09-16).
    *
-   * A dated transcription rather than a live read: `core` does not parse the price schedule
-   * (`chimeLedger.ts` says the only parser is in `packages/viz`), and a figure copied out of a file
-   * is a figure that goes stale. `packages/viz/src/everyday/rushPrefit.test.ts` re-derives the sum
-   * from the shipped schedule and goes red if a row moves, which is what keeps this honest.
+   * A dated transcription rather than a live read. When it was written `core` parsed no price
+   * schedule; it does now (`priceSchedule.ts`, moved from the viewer in wave AN, § D1295), but this
+   * module still holds no schedule, because the kit's price is the sink's chimes and these units are
+   * only the arithmetic that set them. A figure copied out of a file is a figure that goes stale, so
+   * `packages/viz/src/everyday/rushPrefit.test.ts` re-derives the sum from the shipped schedule and
+   * goes red if a row moves, which is what keeps this honest.
    */
   readonly priceUnits: number;
 }
@@ -212,129 +217,45 @@ export function violationsInRushPrefit(ledger: ChimeLedgerTable): readonly strin
  * The building
  * -------------------------------------------------------------------------- */
 
-/** The floor a door cycle's two halves stop at, in seconds. Authored — see {@link doorCycleWithSaving}. */
-export const MIN_DOOR_S = 0.8;
-
-/**
- * A door cycle with `savedS` taken out of it — **close first, then open**.
- *
- * The order is the shop's door ladder read in reverse: L3 is *doors start opening as the car lands*,
- * which is the open half, and it is the tier that asks for more seconds than the close half can
- * give. Taking the close first therefore keeps L1 and L2 entirely inside the half a faster door
- * operator moves, and only the tier whose own sentence is about opening reaches the open figure.
- *
- * Both halves floor at {@link MIN_DOOR_S}, which is authored rather than cited: `data/` publishes no
- * minimum door time, the fastest shipped figure is `centerOpening`'s 1.8 s open, and a door given
- * zero seconds is not a fast door but an absent one.
- *
- * Each half is **clamped to the floor** rather than having a computed saving subtracted from it, so
- * a tier that asks for more than a door has lands on {@link MIN_DOOR_S} exactly rather than on
- * `0.7999999999999998`. A floor that is only approximately the floor is a floor a test cannot state.
- *
- * Lives here rather than in `packages/viz/src/campaign/fitOut.ts`, which is where it was written and
- * which now imports it: the rush's replay needs the same arithmetic on the other side of a package
- * boundary, and two implementations that agree today is the shape this repository has a rule about.
+/*
+ * {@link MIN_DOOR_S} and {@link doorCycleWithSaving} lived here and moved to `rushRebuild.ts` with the
+ * appliers that call them, when the general rebuild arrived (GitHub issue #372, § D1295). Re-exported
+ * from this module so nothing that imported them from here moved.
  */
-export function doorCycleWithSaving(
-  openS: number,
-  closeS: number,
-  savedS: number,
-): { readonly openS: number; readonly closeS: number } {
-  const nextClose = Math.max(MIN_DOOR_S, closeS - savedS);
-  const takenFromClose = closeS - nextClose;
-  const nextOpen = Math.max(MIN_DOOR_S, openS - (savedS - takenFromClose));
-  return { openS: nextOpen, closeS: nextClose };
-}
+export { MIN_DOOR_S, doorCycleWithSaving } from './rushRebuild.js';
 
 /**
  * The building with {@link RUSH_PREFIT_KIT}'s two per-car edits on it — a real edit to a real
  * `BuildingConfig`, to be put back through the caller's own `parseBuilding`/`resolveBuilding`.
  *
- * Each field is resolved from the specs **before** it is moved, because a car that declares none is
- * not a car with none: `doorOpenS` defaults to its `doorType`'s figure and `passengerTransferS` to
- * the building type's row, so subtracting from an absent field would write the saving as the whole
- * value. `resolveCar` is where those defaults live and this reads the same rows it does.
+ * **Now the general rebuild's applier at the kit's levels** — `rushRebuild.ts#rushRebuiltBuilding`
+ * over {@link RUSH_PREFIT_LEVELS} — rather than an applier of its own. It wrote the same two fields
+ * the same way, so the move changed no byte of a fitted tower: `rushHoldAgreement.json`'s two `prefit`
+ * cells replay at the figures they were pinned at before it.
  *
- * **A ceiling over an unknown value is not a ceiling**: a building whose type the transfer table has
- * no row for keeps every car's transfer time, which is `resolveCar`'s own answer rather than the
- * office figure invented in its place. And the ceiling is a `Math.min`, so a lobby already at or
- * below 1.2 s is left alone — `midtown-office` is that building, and a cell where this half of the
- * kit is inert is a measured fact rather than a surprise.
- *
- * Returns a fresh document always, because the kit always names the door fields; there is no
- * identity branch to preserve, unlike `campaign/fitOut.ts`'s fold over a kit that may be empty.
+ * What it does, unchanged: each field is resolved from the specs **before** it is moved, because a car
+ * that declares none is not a car with none; **a ceiling over an unknown value is not a ceiling**, so a
+ * building whose type the transfer table has no row for keeps every car's transfer time; and the
+ * ceiling is a `Math.min`, so a lobby already at or below 1.2 s is left alone — `midtown-office` is
+ * that building, and a cell where this half of the kit is inert is a measured fact.
  */
 export function prefittedRushBuilding(base: BuildingConfig, specs: ElevatorSpecs): BuildingConfig {
-  const transferDefault = transferDefaultOf(base, specs);
-  return {
-    ...base,
-    banks: base.banks.map((bank) => ({
-      ...bank,
-      cars: bank.cars.map((car) => {
-        const doorType = car.doorType ?? 'centerOpening';
-        const timing = specs.doors[doorType];
-        const openS = car.doorOpenS ?? timing?.openS ?? 0;
-        const closeS = car.doorCloseS ?? timing?.closeS ?? 0;
-        const cycle = doorCycleWithSaving(openS, closeS, RUSH_PREFIT_KIT.doorSecondsSaved);
-        const transfer = car.passengerTransferS ?? transferDefault;
-        return {
-          ...car,
-          doorOpenS: cycle.openS,
-          doorCloseS: cycle.closeS,
-          ...(transfer === undefined
-            ? {}
-            : { passengerTransferS: Math.min(transfer, RUSH_PREFIT_KIT.transferCeilingS) }),
-        };
-      }),
-    })),
-  };
-}
-
-/** The per-passenger transfer time a car with none of its own would resolve to, or `undefined`. */
-function transferDefaultOf(config: BuildingConfig, specs: ElevatorSpecs): number | undefined {
-  const value: unknown = specs.timing.passengerTransferS[config.type];
-  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+  return rushRebuiltBuilding(base, rushFitOf(RUSH_PREFIT_LEVELS), specs);
 }
 
 /* -------------------------------------------------------------------------- *
  * The dispatcher
  * -------------------------------------------------------------------------- */
 
-/** The split threshold a zoned group uses when the profile names none — `dispatcherSpec.ts`'s figure. */
-const DEFAULT_SPLIT_THRESHOLD_PASSENGERS = 10;
-
 /**
  * The driving profile with *the group is worked as zones* on it — `control` L1, at `core`'s level.
  *
- * `packages/viz` expresses this tier as the **`express` group lever** and lets
- * `authoring/dispatcherSpec.ts#profileFromSpec` decide what that lever means, which is right there:
- * that module owns the lever and a second expression of it beside it would be the answer that
- * drifts. The server has no levers and no `dispatcherSpec` — it resolves a shipped profile by id —
- * so what it needs is that lever's *conclusion*, which is these three fields and is written here
- * once for both ends to be pinned against.
- *
- * Each one is `profileFromSpec`'s own choice, transcribed rather than reinvented:
- *
- * - `dispatch.assignmentMode: 'split-demand'` — give each car a slice.
- * - `dispatch.splitThresholdPassengers` — **the profile's own if it declares one**, and
- *   {@link DEFAULT_SPLIT_THRESHOLD_PASSENGERS} otherwise, which is the `??` that module writes.
- * - `idle.parkingStrategy: 'zone-center'` — what zoning means to the idle stage, and it **overrides**
- *   whatever the profile parks on, because `parkingFor` puts express above the profile's own.
- *
+ * Now `rushRebuild.ts#zonedProfileOf`, which holds the three fields and why each is
+ * `authoring/dispatcherSpec.ts#profileFromSpec`'s own choice; this keeps the kit's name for it.
  * Nothing else on the profile is touched: the weights, the selection and the rules are the player's
- * and this is hardware in the building. A kit that could move a weight would be a purchase
- * overruling the standing order about who drives.
+ * and this is hardware in the building.
  */
 export function prefittedRushProfile(profile: DispatcherProfile): DispatcherProfile {
   if (!RUSH_PREFIT_KIT.zonesTheTower) return profile;
-  return {
-    ...profile,
-    dispatch: {
-      ...(profile.dispatch ?? {}),
-      assignmentMode: 'split-demand',
-      splitThresholdPassengers:
-        profile.dispatch?.splitThresholdPassengers ?? DEFAULT_SPLIT_THRESHOLD_PASSENGERS,
-    },
-    idle: { ...(profile.idle ?? {}), parkingStrategy: 'zone-center' },
-  };
+  return zonedProfileOf(profile);
 }

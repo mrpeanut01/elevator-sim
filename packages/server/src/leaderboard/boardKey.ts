@@ -91,9 +91,11 @@
  * omission.** `SubmittedRun` is what `verify.ts` re-simulates, and neither `purse-units` nor `prefit`
  * has a field on it. So a modified single run replays to the same figures a standard one would and is
  * separated **on the board** rather than in the simulation. **GitHub issue #372 gave a purse a replay
- * to reach and not a run**: a posted rush sitting's `rush-purse-top-up` opens the purse
- * `leaderboard/rushSitting.ts` derives, and the sitting's rows and board key carry the set — but no
- * between-round rebuild travels yet, so nothing spends that purse and the legs are unchanged by it.
+ * to reach**: a posted rush sitting's `rush-purse-top-up` opens the purse
+ * `leaderboard/rushSitting.ts` derives, and the sitting's rows and board key carry the set. **And a run
+ * since § D1295**: a rebuild between rounds spends that purse, so a wider one pays for tiers the
+ * standard one cannot, and the rounds it rebuilt replay to different legs. This sentence said no
+ * rebuild travelled and the legs were unchanged by a top-up; it is replaced on the commit that built one.
  *
  * **The sentence that stood here about the pre-fit was false and is deleted** — it read
  * *"`rush-prefit` is refused on a sitting, because its fitted building is one this server cannot

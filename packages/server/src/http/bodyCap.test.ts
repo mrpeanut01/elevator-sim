@@ -25,7 +25,7 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { RULE_ACTION_WORDS, RULE_CONDITION_WORDS, parseRushPurse } from '@elevator-sim/core';
+import { RULE_ACTION_WORDS, RULE_CONDITION_WORDS, RUSH_REBUILD_CATEGORY_IDS, RUSH_REBUILD_TIERS, parseRushPurse } from '@elevator-sim/core';
 
 import * as sitting from '../leaderboard/rushSitting.js';
 import type { Api } from './api.js';
@@ -74,6 +74,13 @@ interface Bounds {
   readonly idLength: number;
 }
 
+/** One tier of each rush menu category at its top level — the most a rebuild may buy at once. */
+const LARGEST_REBUILD: readonly string[] = RUSH_REBUILD_CATEGORY_IDS.map((categoryId) => {
+  const top = RUSH_REBUILD_TIERS.filter((tier) => tier.categoryId === categoryId).sort((a, b) => b.level - a.level)[0];
+  if (top === undefined) throw new Error(`the rush menu sells no ${categoryId} tier`);
+  return top.priceId;
+});
+
 const MAX: Bounds = Object.freeze({ rounds: 12, rows: 16, interventions: 64, switchRows: 16, modifiers: 16, idLength: 64 });
 
 function sittingOf(bounds: Bounds): Record<string, unknown> {
@@ -90,7 +97,12 @@ function sittingOf(bounds: Bounds): Record<string, unknown> {
   };
   return {
     buildingId: id,
-    rounds: Array.from({ length: bounds.rounds }, () => round),
+    /*
+     * The second round carries the largest rebuild the gate admits — one tier of each menu category, at
+     * its top level (GitHub issue #372, § D1295). A later round could only add tiers above those, and
+     * there are none, so no legal sitting carries more rebuild bytes than this one.
+     */
+    rounds: Array.from({ length: bounds.rounds }, (_, index) => (index === 1 ? { ...round, rebuild: LARGEST_REBUILD } : round)),
     modifiers: Array.from({ length: bounds.modifiers }, () => ({ sinkId: SINK, steps: NUMBER })),
   };
 }

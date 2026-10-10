@@ -162,9 +162,16 @@ export interface RushEntryRound {
   readonly dispatcherProfileId: string;
   readonly ruleRows?: readonly unknown[] | undefined;
   readonly interventions?: readonly unknown[] | undefined;
+  /**
+   * The tiers bought before the round, as price-schedule row ids — GitHub issue #372, § D1295. Absent
+   * on a round nothing was bought for, which is every round stored before the rebuild existed.
+   */
+  readonly rebuild?: readonly string[] | undefined;
   readonly heldS: number | null;
   readonly wavesOutlasted: number;
   readonly purseBeforeUnits: number;
+  /** What the round's rebuild took, from the replay. Absent on a round stored before the spend term existed. */
+  readonly spentUnits?: number | undefined;
   readonly paidUnits: number;
   readonly purseAfterUnits: number;
 }

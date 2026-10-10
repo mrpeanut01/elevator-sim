@@ -281,19 +281,28 @@ measured before `leaderboard/verify.ts`'s refusal of `endless-rush` was lifted �
 round — and a sitting lands on a board keyed by the tower, the day and the modifier set
 ([§ D543](../DECISIONS.md)). **The viewer posts one now** ([§ D606](../DECISIONS.md)): the rush's
 result screen keeps the round list, names what drove each round and how far it got, and sends the
-sitting whole — and the purse figures a player reads are the server's reply to their own post and
-are computed nowhere in `packages/viz`. **One half is still not built**: no between-round rebuild
-travels, so the purse is derived and nothing spends it. That is a package boundary and a ruling
-rather than a missing feature — § D606 names the three shapes the boundary could move in, and **the
-three questions it recorded as unanswered are answered** ([§ D640](../DECISIONS.md), 2026-09-16):
-*fitted* is one fixed kit, Doors L1 + Control L1 + Tenants L1 at fifteen units against the sink's
-fifteen chimes; a rush rebuild is **instantaneous**, with no clock and no nights inside a sitting;
-and a tier **does not** require the tier below it inside the same sitting, both of the last two ruled
-by the product owner. **The two rush chime sinks are no longer one gap**: a wider purse still buys
-nothing, because nothing spends a purse, while **starting fitted reaches the run** — pinned at
-`garden-apartments`/`collective`, 1 178 s as built against 1 214 s pre-fitted — and waits only on a
-screen that spends a chime. `everyday/rushScreenModel.ts#RUSH_ABSENCES` says the same thing on the
-build's own face ([§ D701](../DECISIONS.md)).
+sitting whole. The purse figures its post block draws are the server's reply to the player's own
+post; the purse the rebuild menu offers before a post is counted on the device with `core`'s own
+derivation, and the server derives it again from its replay ([§ D1295](../DECISIONS.md), which
+amends § D606's *computed nowhere in `packages/viz`*). **The rebuild between rounds is built**
+(§ D1295, wave AN): the price reader and the copy-free half of the shop moved into `core`, which is
+the first of the three shapes § D606 named, taken for numbers only. A round after the first carries
+the tiers bought before it; the server prices them from its own schedule against the purse the
+rounds before left, refuses one that purse cannot pay for, and replays the round on the rebuilt
+tower; and a tier bought between rounds stays fitted for the rest of the sitting, which is swarm DP's
+default on the question § D701 left open. The menu is Doors, Control and Car size at every level and
+Tenants at the first. Shafts and Machines are refused by name because they need the viewer's
+commissioning code, and Tenants 2 and 3 because they change who arrives, while a board ranks sittings
+that met one crowd. The three questions § D606 recorded were answered by
+[§ D640](../DECISIONS.md) on 2026-09-16: *fitted* is one fixed kit, Doors L1 + Control L1 + Tenants
+L1, now three levels of the same fold; a rush rebuild is **instantaneous**, with no clock and no
+nights inside a sitting; and a tier **does not** require the tier below it inside the same sitting,
+both of the last two ruled by the product owner. **Both rush chime sinks reach a run now**: starting
+fitted, pinned at `garden-apartments`/`collective`, 1 178 s as built against 1 214 s pre-fitted; and
+a wider purse, through the rebuild it pays for, pinned by the server's replay refusing a Car size 2
+rebuild on Midtown Office's standard purse and playing it on a topped-up one. What a tier does to the
+next hold is not known before the round is played, and the menu says so: measured under `collective`
+on the rush's one seed, Doors 1 held Midtown Office longer and Garden Apartments shorter.
 
 **A run carries its modifiers onto the board.** The standard board is the standard purse and the
 building as shipped, the same for everyone; a run with a bought purse or a pre-fitted building ranks
@@ -339,7 +348,9 @@ no server** — GitHub issue #579: a scenario's budget rung, priced by the scena
 `data/fixit-cases.json`, bought from a device tally on the fix-a-building screen, with
 `packages/viz/src/fixit/budgetRungReachesTheRun.test.ts` as the legs comparison behind it. The ten
 campaign stages still sell no rung, because they are played on the Engineer surface, which has no
-budget control — `packages/viz/src/scenario/ladder.ts` says so on its own rows.* That is GD13 clause 1's one permission, a
+budget control — `packages/viz/src/scenario/ladder.ts` says so on its own rows.
+[§ D1295](../DECISIONS.md) sells the fourth against an account, the rush purse top-up, on the commit
+whose rebuild between rounds made the purse it widens something a run spends.* That is GD13 clause 1's one permission, a
 limit on a configuration. Everything else in GD13 holds and is restated here so nobody reads the
 currency as relaxing it: chimes never open a mode, a screen, a building, a dispatcher, a case or a
 figure (GD9); they never buy a verdict, a retry the mode declares free, or relief on a measurement,
