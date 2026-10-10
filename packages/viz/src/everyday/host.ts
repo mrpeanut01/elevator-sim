@@ -179,7 +179,12 @@ import {
   type CampaignIncident,
 } from '../campaign/incidents.js';
 import { worksHeldCarRefsOf, worksHeldCarsOf } from '../campaign/works.js';
-import { stageCallRowsOf, type StageCallRowView } from './stageCallRow.js';
+import {
+  stageCallFailedRowsOf,
+  stageCallRowsOf,
+  stageCallWrinkleQuietRowsOf,
+  type StageCallRowView,
+} from './stageCallRow.js';
 import { everydayCareerStore, type CareerStore } from './careerStore.js';
 import { CAMPAIGN_DOCK_COPY, purseRefusalOf } from './campaignDock.js';
 import { CAREER_CONTRACT_ID, openCareer, REPLAY_CONTRACT_ID, switchWeek } from '../shift/week.js';
@@ -228,7 +233,13 @@ import { admittedPressDayIds, ladderTowersOf, pressDayFor } from '../shift/ladde
 import { crowdIsShared, PRACTICE_DAY_SENTENCES, type PracticeGround } from '../shift/scoredCrowd.js';
 import { callOpeningOf, watchedCallOpeningOf } from './callOpening.js';
 import type { PressCall } from '../shift/pressCall.js';
-import type { DayCallAnswer, DayCallOnStage, DayCallRecord } from '../shift/dayCalls.js';
+import type {
+  DayCallAnswer,
+  DayCallFailure,
+  DayCallOnStage,
+  DayCallRecord,
+  DayCallWrinkleQuiet,
+} from '../shift/dayCalls.js';
 import {
   runHorizonOf,
   scenarioHorizonFor,
@@ -1661,6 +1672,9 @@ export interface EverydayHost {
    * Each answered call's row due on `recording` at `atS` — wave AL, lane AL-E,
    * [§ D1219](../../../../DECISIONS.md), `everyday/stageCallRow.ts`: counts only, from the call plus
    * 660 s, and never the day's verdict. Empty on any run the day's call session does not stand on.
+   * Since [§ D1335](../../../../DECISIONS.md) also each moment whose question a run that could not
+   * be made cost, from the instant the playhead reaches it; since [§ D1336](../../../../DECISIONS.md)
+   * the day's wrinkle where it raised no call, after its window.
    */
   dayCallRowsAt(recording: VizRecording, atS: number): readonly StageCallRowView[];
 
@@ -2322,6 +2336,16 @@ export interface EverydayHostBindings {
   notePinnedCallDone?(): void;
   /** § D1219 — the ordinary calls recorded on `recording`, while the session stands on it. */
   dayCallRecordsOn?(recording: VizRecording): readonly DayCallRecord[];
+  /**
+   * § D1335 — the moments on `recording` whose question a run that could not be made cost, while the
+   * session stands on it. Absent, the stage says nothing of them.
+   */
+  dayCallFailuresOn?(recording: VizRecording): readonly DayCallFailure[];
+  /**
+   * § D1336 — the day's wrinkle where it raised no call on `recording`, once nothing more in it can
+   * be asked, while the session stands on it. Absent, the stage says nothing of it.
+   */
+  dayCallWrinkleQuietOn?(recording: VizRecording): DayCallWrinkleQuiet | undefined;
   /**
    * § D1218 — § 3.4's *Leave it* on a day with an attempt standing: the attempt is kept for the
    * brief to resume and no other surface files it meanwhile. `false` where none stands.
@@ -3857,15 +3881,24 @@ export function createEverydayHost(
     },
     dayCallRowsAt: (recording, atS) => {
       const records = b.dayCallRecordsOn?.(recording) ?? [];
-      if (records.length === 0) return [];
+      const failures = b.dayCallFailuresOn?.(recording) ?? [];
+      const wrinkleQuiet = b.dayCallWrinkleQuietOn?.(recording);
+      if (records.length === 0 && failures.length === 0 && wrinkleQuiet === undefined) return [];
       const dayStartS = b.dayStartS() ?? DAY_START_S;
-      return stageCallRowsOf({
-        records,
-        playheadS: atS,
-        endedAt: recording.endedAt,
-        log: b.state().interventions,
-        clockOf: (simTimeS) => clockOf(simTimeS, dayStartS),
-      });
+      const clock = (simTimeS: number): string => clockOf(simTimeS, dayStartS);
+      return [
+        ...stageCallRowsOf({
+          records,
+          playheadS: atS,
+          endedAt: recording.endedAt,
+          log: b.state().interventions,
+          clockOf: clock,
+        }),
+        /* § D1335: a moment a run could not be made for, from the instant the playhead reaches it. */
+        ...stageCallFailedRowsOf({ failures, playheadS: atS, clockOf: clock }),
+        /* § D1336: a wrinkle that raised no call, once its window and its last counted moment are past. */
+        ...stageCallWrinkleQuietRowsOf({ quiet: wrinkleQuiet, playheadS: atS, endedAt: recording.endedAt, clockOf: clock }),
+      ];
     },
     /**
      * § 6.4's *Close the day*, and — in a campaign run — § 6.4 **step 4** with it.

@@ -115,8 +115,13 @@ import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
 
+import { INTERVENTION_KINDS, type InterventionChange, type RunInterventionConfig } from '@elevator-sim/core/browser';
 import { chromium, type Browser, type Page } from 'playwright-core';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
+
+import { shiftRunConfigOf } from '../dev/state.js';
+import { contractDayState } from '../shift/contractDay.test-helper.js';
+import { PRESS_DAY_RESOURCES } from '../shift/pressDay.test-helper.js';
 
 import {
   BUILT_ARTIFACT_CLAIMS,
@@ -343,6 +348,122 @@ describe.skipIf(!HAS_BROWSER)('the built bundle, not the dev server (issue #281)
         'and NOT in the bundle — it is reachable only through `publicDir`, which is a dev-server ' +
         'facility — so this is a `vite dev` server wearing this tier\'s name. GitHub issue #281.',
     ).not.toContain('application/json');
+  });
+
+  /**
+   * **The served run worker completes a run of every intervention kind `core` declares** — wave AN,
+   * lane DQ-1, the built-bundle half of [§ D1317](../../../../DECISIONS.md) (swarm DQ's ruling Q1
+   * item 1).
+   *
+   * § D1317 makes the viewer bundle `core` from source, and `dev/viteResolvesSource.test.ts` holds the
+   * resolution. What neither can see is the artifact: the post-AM panel's `shiftWorker` chunk carried
+   * six kinds, refused every `adopt-dispatcher` run with *"which this build does not declare"*, and
+   * every who-drives call, rush handover and mid-day handover failed with it. So this case asks the
+   * worker the page itself would spawn, from the served bundle, for one run of each kind, built as
+   * the shell builds a run (`dev/state.ts#shiftRunConfigOf`, a Crown Hotel slice) with one entry on
+   * its log, and requires every reply to be `done`.
+   *
+   * The kinds are read from `core`'s own `INTERVENTION_KINDS`, and the changes below are keyed by
+   * kind, so a kind added tomorrow fails here until it has a run. The undeclared kind at the end is
+   * the case's control: the same worker must refuse it in the stale bundle's own words, or a green
+   * run would say nothing about a refusal this case could not see.
+   */
+  it('serves a run worker that completes a run of every intervention kind core declares', async () => {
+    const profiles = PRESS_DAY_RESOURCES.dispatcherProfiles.profiles;
+    const profile = (id: string) => {
+      const found = profiles.find((entry) => entry.id === id);
+      if (found === undefined) throw new Error(`no shipped profile ${id}`);
+      return found;
+    };
+    const CHANGES: Record<(typeof INTERVENTION_KINDS)[number], InterventionChange> = {
+      'park-cars-lobby': { kind: 'park-cars-lobby' },
+      'switch-dispatcher': { kind: 'switch-dispatcher', profile: profile('eta') },
+      'answer-incident': { kind: 'answer-incident', option: 'Send the engineer', serviceEvents: [] },
+      'spread-cars': { kind: 'spread-cars' },
+      'equipment-change': { kind: 'equipment-change', changeId: 'larger-cars', name: 'Larger cars', serviceEvents: [] },
+      'building-change': { kind: 'building-change', changeId: 'rezone-bank', name: 'Rezone a bank', serviceEvents: [] },
+      'adopt-dispatcher': { kind: 'adopt-dispatcher', profile: profile('fairness-first') },
+    };
+    expect(Object.keys(CHANGES).sort(), 'a kind core declares has no run here').toEqual([...INTERVENTION_KINDS].sort());
+
+    const state = contractDayState('c7', { seed: 20_260_824n });
+    const plan = shiftRunConfigOf(PRESS_DAY_RESOURCES, state);
+    /* Ten simulated minutes in: every kind's entry is stamped there, after the run has begun. */
+    const entryAt = (change: InterventionChange): RunInterventionConfig => ({ atS: 600, change });
+    const asks = [
+      ...INTERVENTION_KINDS.map((kind) => ({ kind: kind as string, interventions: [entryAt(CHANGES[kind])] })),
+      /* The control: a kind no build declares, which a worker must refuse rather than ignore. */
+      { kind: 'undeclared', interventions: [entryAt({ kind: 'not-a-kind' } as unknown as InterventionChange)] },
+    ].map((ask) => ({
+      kind: ask.kind,
+      /*
+       * The config carries the building's `ReadonlyMap`s, which structured clone carries and the
+       * page's argument channel does not, so it crosses as JSON with Maps, Sets and non-finite
+       * numbers tagged, and is revived in the page before it is posted.
+       */
+      text: JSON.stringify(
+        { kind: 'run', config: { ...plan.config, interventions: ask.interventions }, outOfServiceCarIds: plan.outOfServiceCarIds, recordDecisions: false },
+        (_key, value: unknown) => {
+          if (value instanceof Map) return { __map: [...value.entries()] };
+          if (value instanceof Set) return { __set: [...value] };
+          if (typeof value === 'bigint') return { __bigint: value.toString() };
+          if (typeof value === 'number' && !Number.isFinite(value)) return { __number: String(value) };
+          return value;
+        },
+      ),
+    }));
+
+    /* The worker the page spawns, as the built page names it: one hashed `shiftWorker` asset. */
+    const workers = readdirSync(join(DIST_WEB, 'assets')).filter((name) => /^shiftWorker-[\w-]+\.js$/u.test(name));
+    expect(workers, 'the bundle should carry exactly one run worker').toHaveLength(1);
+    const workerPath = `/assets/${workers[0]!}`;
+    const served = await fetch(`${site.origin}${workerPath}`);
+    expect(served.headers.get('content-type') ?? '').toMatch(/javascript/u);
+
+    const page = await openPage(browser, { viewport: SHORTEST_SUPPORTED });
+    await page.goto(site.origin, { waitUntil: 'load' });
+    const replies = await page.evaluate(
+      async ({ path, runs }) => {
+        const revive = (_key: string, value: unknown): unknown => {
+          if (value !== null && typeof value === 'object') {
+            const tagged = value as Record<string, unknown>;
+            if (Array.isArray(tagged['__map'])) return new Map(tagged['__map'] as [unknown, unknown][]);
+            if (Array.isArray(tagged['__set'])) return new Set(tagged['__set'] as unknown[]);
+            if (typeof tagged['__bigint'] === 'string') return BigInt(tagged['__bigint']);
+            if (typeof tagged['__number'] === 'string') return Number(tagged['__number']);
+          }
+          return value;
+        };
+        const out: { kind: string; reply: string; message: string; legs: number }[] = [];
+        for (const run of runs) {
+          const worker = new Worker(path, { type: 'module' });
+          const reply = await new Promise<{ reply: string; message: string; legs: number }>((resolve) => {
+            worker.addEventListener('message', (event: MessageEvent) => {
+              const data = event.data as { kind: string; message?: string; recording?: { legs: unknown[] } };
+              resolve({ reply: data.kind, message: data.message ?? '', legs: data.recording?.legs.length ?? 0 });
+            });
+            worker.addEventListener('error', (event) => resolve({ reply: 'error', message: event.message, legs: 0 }));
+            worker.postMessage(JSON.parse(run.text, revive));
+          });
+          worker.terminate();
+          out.push({ kind: run.kind, ...reply });
+        }
+        return out;
+      },
+      { path: workerPath, runs: asks },
+    );
+    await page.close();
+
+    const declared = replies.filter((entry) => entry.kind !== 'undeclared');
+    expect(
+      declared.filter((entry) => entry.reply !== 'done').map((entry) => `${entry.kind}: ${entry.reply} ${entry.message}`),
+      'the served worker refused or failed these kinds. A worker built from a core older than the ' +
+        'tree refuses a kind it does not declare, which is the post-AM panel’s bundle exactly (§ D1317).',
+    ).toEqual([]);
+    for (const entry of declared) expect(entry.legs, `${entry.kind} came back with no legs`).toBeGreaterThan(0);
+    const [control] = replies.filter((entry) => entry.kind === 'undeclared');
+    expect(control?.reply).toBe('failed');
+    expect(control?.message).toContain('which this build does not declare');
   });
 
   it('keeps the incoming screen at the top when a tile is tapped from a scrolled menu', async () => {

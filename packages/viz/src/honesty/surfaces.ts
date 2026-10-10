@@ -284,14 +284,23 @@ import {
   stageSkipOf,
 } from '../everyday/stagePace.js';
 import { STAGE_CALL_COPY, stageCallCardOf, stageCallPresentOf, stageEndDayOf } from '../everyday/stageCall.js';
-import { stageCallRowDueAtS, stageCallRowsOf, STAGE_CALL_ROWS_HEADING } from '../everyday/stageCallRow.js';
+import {
+  stageCallFailedRowsOf,
+  stageCallRowDueAtS,
+  stageCallRowsOf,
+  STAGE_CALL_ROWS_HEADING,
+  stageCallWrinkleQuietDueAtS,
+  stageCallWrinkleQuietRowsOf,
+} from '../everyday/stageCallRow.js';
 import { DAY_ATTEMPT_COPY, resumeLabelOf } from '../shift/attempt.js';
 import type { PressCall } from '../shift/pressCall.js';
 import { PRESS_CALL_AGAIN, pressCallRowOf } from '../shift/callRow.js';
 import {
   dayCallCountsLineOf,
+  dayCallFailedRowOf,
   dayCallRecordOf,
   dayCallsQuietSentenceOf,
+  dayCallWrinkleQuietRowOf,
   dayCallWindowEndOf,
   type DayCallDriverNames,
   type DayCallsQuiet,
@@ -3848,6 +3857,19 @@ const SHIFT_REPORT: SurfaceAdapter = {
     'shift/dayCalls.ts#dayEndedEarlyRowOf',
     /* § D1152's quiet day, seeded on its seven arms below. */
     'shift/dayCalls.ts#dayCallsQuietSentenceOf',
+    /*
+     * Wave AN, lane DQ-1, § D1335: the row a day carries where a run the stage needed could not be
+     * made, whatever else it raised, and the sentence it shares with the stage's row. Seeded below
+     * beside the quiet arms, on one moment and on three.
+     */
+    'shift/dayCalls.ts#dayCallFailedRowOf',
+    'shift/dayCalls.ts#dayCallFailedSentenceOf',
+    /*
+     * § D1336: the past-tense row for a wrinkle the stage ran its answers in and raised no call,
+     * and its sentence. Seeded below on one turned-down moment and on two, over this case's legs.
+     */
+    'shift/dayCalls.ts#dayCallWrinkleQuietRowOf',
+    'shift/dayCalls.ts#dayCallWrinkleQuietSentenceOf',
     'shift/report.ts#PRACTICE_NOTE',
     /*
      * Wave AK, § D1141: the practice sheet's note when the crowd made it practice — a link's crowd
@@ -4006,6 +4028,8 @@ const SHIFT_REPORT: SurfaceAdapter = {
         ['refused-once', { kind: 'asked', refused: 1, ending: 'finished' }],
         ['no-moment', { kind: 'asked', refused: 0, ending: 'finished' }],
         ['failed', { kind: 'asked', refused: 1, ending: 'failed' }],
+        /* § D1335: every moment it tried lost its question to a run, and the day went on asking. */
+        ['failed-moments', { kind: 'asked', refused: 0, failed: 2, ending: 'finished' }],
         ['skipped', { kind: 'asked', refused: 0, ending: 'skipped' }],
         ['asking', { kind: 'asked', refused: 1, ending: 'asking' }],
         ['not-offered', { kind: 'not-offered' }],
@@ -4027,6 +4051,42 @@ const SHIFT_REPORT: SurfaceAdapter = {
           text: dayCallsQuietSentenceOf(account, (simTimeS) => clockOf(simTimeS, DAY_START_S)),
           role: 'prose',
         });
+      }
+      /* § D1335's row, on one failed moment and on three, at instants of this case's own run. */
+      const span = recording.endedAt - recording.startedAt;
+      const moments = [0.25, 0.5, 0.75].map((share) => recording.startedAt + span * share);
+      for (const [arm, failures] of [
+        ['one', moments.slice(0, 1)],
+        ['three', moments],
+      ] as const) {
+        const row = dayCallFailedRowOf(
+          failures.map((atS) => ({ atS, question: 'driver' as const })),
+          (simTimeS) => clockOf(simTimeS, DAY_START_S),
+        );
+        if (row === undefined) continue;
+        seeds.push({ field: `dayCallsFailed(${arm}).when`, text: row.when, role: 'label' });
+        seeds.push({ field: `dayCallsFailed(${arm}).what`, text: row.what, role: 'label' });
+        seeds.push({ field: `dayCallsFailed(${arm}).why`, text: row.why, role: 'prose' });
+      }
+      /* § D1336's wrinkle row, on one turned-down moment and on two, counted from this case's legs. */
+      const wrinkle = { startS: moments[0]!, endS: moments[2]!, name: 'A late finish' };
+      const turnedDown = moments.slice(0, 2).map((atS) =>
+        dayCallRecordOf({
+          atS,
+          windowEndS: dayCallWindowEndOf(atS, recording.endedAt),
+          answer: 'leave',
+          legs: { 'park-cars-lobby': recording.legs, 'spread-cars': recording.legs, leave: recording.legs },
+          observations: {},
+        }),
+      );
+      for (const [arm, refused] of [
+        ['one', turnedDown.slice(0, 1)],
+        ['two', turnedDown],
+      ] as const) {
+        const row = dayCallWrinkleQuietRowOf({ wrinkle, refused }, (simTimeS) => clockOf(simTimeS, DAY_START_S));
+        seeds.push({ field: `dayCallWrinkleQuiet(${arm}).when`, text: row.when, role: 'label' });
+        seeds.push({ field: `dayCallWrinkleQuiet(${arm}).what`, text: row.what, role: 'label' });
+        seeds.push({ field: `dayCallWrinkleQuiet(${arm}).why`, text: row.why, role: 'observation' });
       }
     }
 
@@ -12493,6 +12553,15 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
     'everyday/stageCallRow.ts#STAGE_CALL_ROWS_HEADING',
     'everyday/stageCallRow.ts#STAGE_CALL_ROW_NOTE',
     /*
+     * Wave AN, lane DQ-1, § D1335: a moment whose question a run that could not be made cost, on the
+     * stage from the instant the playhead reaches it. Seeded below at two instants of this case's run.
+     */
+    'everyday/stageCallRow.ts#stageCallFailedRowsOf',
+    'everyday/stageCallRow.ts#STAGE_CALL_FAILED_NOTE',
+    /* § D1336: a wrinkle that raised no call, after its window. Seeded below on this run's own legs. */
+    'everyday/stageCallRow.ts#stageCallWrinkleQuietRowsOf',
+    'everyday/stageCallRow.ts#STAGE_CALL_WRINKLE_NOTE',
+    /*
      * § D1168's *End the day*: seeded below on readings where the queue goal reads missed, at the
      * playhead it would be drawn at, and never where the day can still clear.
      */
@@ -13090,6 +13159,40 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
             text: row.counts,
             role: 'observation',
             playhead: atPlayhead(recording, stageCallRowDueAtS(record, recording.endedAt)),
+          });
+          seeds.push({ field: `stage.callRows(${row.id}).note`, text: row.note, role: 'prose' });
+        }
+        /* § D1335 — the failed moment's row, at two instants of this run, each drawn once it is reached. */
+        const failures = [
+          { atS: callAtS, question: 'driver' as const },
+          { atS: Math.min(callAtS + 300, recording.endedAt), question: 'placement' as const },
+        ];
+        for (const row of stageCallFailedRowsOf({
+          failures,
+          playheadS: recording.endedAt,
+          clockOf: (simTimeS) => clockOf(simTimeS, DAY_START_S),
+        })) {
+          seeds.push({ field: `stage.callRows(${row.id}).heading`, text: row.heading, role: 'label' });
+          seeds.push({ field: `stage.callRows(${row.id}).counts`, text: row.counts, role: 'prose' });
+          seeds.push({ field: `stage.callRows(${row.id}).note`, text: row.note, role: 'prose' });
+        }
+        /* § D1336 — a wrinkle that raised no call, its one turned-down moment the record above. */
+        const quiet = {
+          wrinkle: { startS: callAtS, endS: Math.min(callAtS + 900, recording.endedAt), name: 'A late finish' },
+          refused: [record],
+        };
+        for (const row of stageCallWrinkleQuietRowsOf({
+          quiet,
+          playheadS: recording.endedAt,
+          endedAt: recording.endedAt,
+          clockOf: (simTimeS) => clockOf(simTimeS, DAY_START_S),
+        })) {
+          seeds.push({ field: `stage.callRows(${row.id}).heading`, text: row.heading, role: 'label' });
+          seeds.push({
+            field: `stage.callRows(${row.id}).counts`,
+            text: row.counts,
+            role: 'observation',
+            playhead: atPlayhead(recording, stageCallWrinkleQuietDueAtS(quiet, recording.endedAt)),
           });
           seeds.push({ field: `stage.callRows(${row.id}).note`, text: row.note, role: 'prose' });
         }

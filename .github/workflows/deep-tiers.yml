@@ -358,6 +358,7 @@ on:
           - fixit-as-built-mornings
           - fixit-route-census
           - week-census
+          - call-cadence
           - honesty-deep
           - corpus-figures
           - benchmark
@@ -818,6 +819,34 @@ jobs:
           WEEK_WAY_VERIFY: '1'
         run: npx vitest run --passWithNoTests=false --project viz --testTimeout=10800000 src/shift/weekWay.verify.test.ts
 
+  # ---------------------------------------------------------------------------
+  # The careful day's call cadence — DECISIONS.md § D1338, with the who-drives trap check that gates
+  # § D1337. Midtown's week 1 on the first four census crowds, played through the shipped call
+  # session under the careful policy, held to floors written before the run: a median of four calls
+  # a day, no weekday without one, an evening call on three of each week's five, and no who-drives
+  # answer lowest on under a tenth or over three fifths of the rows. The post-AM panel's cadence was
+  # a stale bundle's (§ D1317); this is what keeps the correct build's figures from slipping unseen.
+  #
+  # A gate of its own (`CALL_CADENCE_SWEEP`), on this file's argument for one job per tier. About
+  # 70 s a day on the lane's contended container, twenty days; the minutes below are a ceiling.
+  # ---------------------------------------------------------------------------
+  call-cadence:
+    name: calls — the careful day's cadence floors
+    if: github.event_name == 'schedule' || inputs.tiers == 'all' || inputs.tiers == 'call-cadence'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '26'
+          cache: npm
+      - run: npm ci
+      - name: Play the census crowds' careful week and hold it to the floors
+        env:
+          CALL_CADENCE_SWEEP: '1'
+        run: npx vitest run --passWithNoTests=false --project viz --testTimeout=5400000 src/everyday/callCadence.sweep.test.ts
+
   honesty-deep:
     name: honesty — the deep corpus
     # `schedule` named explicitly rather than leaned on `inputs` being empty: the `inputs`
@@ -1178,6 +1207,7 @@ jobs:
       - fixit-as-built-mornings
       - fixit-route-census
       - week-census
+      - call-cadence
       - corpus-figures
       - benchmark-selection-sweep
       - benchmark-saturation-census
@@ -1240,6 +1270,7 @@ jobs:
       - fixit-as-built-mornings
       - fixit-route-census
       - week-census
+      - call-cadence
       - corpus-figures
       - benchmark-selection-sweep
       - benchmark-saturation-census

@@ -91,7 +91,7 @@ import {
   type WeekState,
 } from './types.js';
 import { readGoals } from './goals.js';
-import { DAY_CALL_ROW_NOTE, type DayCallRecord } from './dayCalls.js';
+import { DAY_CALL_FAILED_ROW_ID, DAY_CALL_ROW_NOTE, DAY_CALL_WRINKLE_QUIET_ROW_ID, type DayCallRecord } from './dayCalls.js';
 
 /**
  * The week-day sheet, narrowed — and the narrowing is an assertion, not a cast.
@@ -2464,6 +2464,37 @@ describe('the ordinary day’s calls and a practice close — § D1138', () => {
     expect(first?.why).toMatch(/The day read Shift (cleared|missed) with park the cars in the lobby and leave them and Shift (cleared|missed) with spread the cars across the tower\./u);
     expect(second?.why).not.toContain('The day read');
     expect(second?.why.endsWith(DAY_CALL_ROW_NOTE)).toBe(true);
+  });
+
+  it('says where a run the stage needed could not be made, on a day that raised calls too — § D1335', () => {
+    const failedAtS = clean.startedAt + 300;
+    const report = sheet({
+      dayCalls: [call(clean.startedAt + 60, 'spread-cars', failing())],
+      dayCallsQuiet: { kind: 'asked', refused: 0, failed: 1, ending: 'finished' },
+      dayCallFailures: [{ atS: failedAtS, question: 'driver' }],
+    });
+    /* Red before § D1335: a day with a call printed nothing about the fault. */
+    const row = report.diagnosis.find((entry) => entry.id === DAY_CALL_FAILED_ROW_ID);
+    expect(row?.when).toMatch(/^\d\d:\d\d$/u);
+    expect(row?.why).toContain(`At ${String(row?.when)} the stage tried to run the day ahead`);
+    expect(row?.why).toContain('That is a fault in the game');
+    /* The call row still prints, and § D1152's no-call row does not, because the day had a call. */
+    expect(report.diagnosis.some((entry) => entry.id === 'day-call-1')).toBe(true);
+    expect(report.diagnosis.some((entry) => entry.id === 'day-calls-none')).toBe(false);
+    /* Nothing failed, no row. */
+    expect(sheet({ dayCalls: [], dayCallFailures: [] }).diagnosis.some((entry) => entry.id === DAY_CALL_FAILED_ROW_ID)).toBe(false);
+  });
+
+  it('says a wrinkle the stage asked in raised no call, from the runs already made — § D1336', () => {
+    const refused = { ...call(clean.startedAt + 120, 'leave', passing()), observations: {} };
+    const wrinkle = { startS: clean.startedAt + 120, endS: clean.startedAt + 900, name: 'Caterers in early' };
+    const report = sheet({ dayCalls: [], dayCallWrinkleQuiet: { wrinkle, refused: [refused] } });
+    /* Red before § D1336: a refused candidate never reached the report. */
+    const row = report.diagnosis.find((entry) => entry.id === DAY_CALL_WRINKLE_QUIET_ROW_ID);
+    expect(row?.what).toBe('Caterers in early raised no call');
+    expect(row?.why).toMatch(/^Caterers in early began at \d\d:\d\d, and the stage raised no call in it\./u);
+    expect(row?.why).toContain('4 with park the cars in the lobby, 9 with spread the cars across the tower and 6 with leave them');
+    expect(sheet({ dayCalls: [] }).diagnosis.some((entry) => entry.id === DAY_CALL_WRINKLE_QUIET_ROW_ID)).toBe(false);
   });
 
   it('prints no call row on a single run, which grades nothing', () => {

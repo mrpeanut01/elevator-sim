@@ -615,6 +615,19 @@ const TIERS: Readonly<Record<string, Tier>> = Object.freeze({
       'reads. It is re-run by hand when the call rule, a building, a demand template or a goal bar moves',
     scheduled: false,
   },
+  'packages/viz/src/everyday/callCadence.sweep.test.ts': {
+    gates: ['CALL_CADENCE_SWEEP'],
+    reason:
+      'Wave AN lane DQ-1, § D1338 and § D1337 — Midtown’s week 1 on the first four census crowds, ' +
+      'played by the sitting bot’s careful policy through the shipped call session, held to floors ' +
+      'written before the run: a median of four calls a day, no weekday without one, an evening call ' +
+      'on three of each week’s five, and no who-drives answer lowest on under a tenth or over three ' +
+      'fifths of the rows; the longest silence published. Scheduled, unlike the sitting bot beside ' +
+      'it, because it is a check rather than a compute job: the post-AM panel’s cadence was a stale ' +
+      'bundle’s, and a floor nothing runs is #163 again. callCadence.test.ts holds the arithmetic on ' +
+      'every run. About 70 s a day on a contended four-core container, twenty days',
+    scheduled: true,
+  },
   'packages/viz/src/everyday/sittingBot.sweep.test.ts': {
     gates: ['SITTING_BOT_SWEEP'],
     reason:

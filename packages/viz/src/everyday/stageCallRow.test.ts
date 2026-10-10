@@ -5,11 +5,25 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { DAY_CALL_LONG_WAIT_S, dayCallRowOf, type DayCallRecord } from '../shift/dayCalls.js';
+import {
+  DAY_CALL_LONG_WAIT_S,
+  dayCallFailedRowOf,
+  dayCallRowOf,
+  dayCallWrinkleQuietRowOf,
+  type DayCallRecord,
+} from '../shift/dayCalls.js';
 import { clockOf } from '../shift/report.js';
 import type { Observations } from '../shift/types.js';
 
-import { stageCallRowDueAtS, stageCallRowsOf, STAGE_CALL_ROW_NOTE } from './stageCallRow.js';
+import {
+  STAGE_CALL_FAILED_NOTE,
+  stageCallFailedRowsOf,
+  stageCallRowDueAtS,
+  stageCallRowsOf,
+  STAGE_CALL_ROW_NOTE,
+  stageCallWrinkleQuietDueAtS,
+  stageCallWrinkleQuietRowsOf,
+} from './stageCallRow.js';
 
 const unread = {} as Observations;
 
@@ -61,5 +75,59 @@ describe('a call’s row on the stage — § D1219', () => {
     /* The call's own press, at the call second, is the answer the counts are about. */
     expect(rowsAt(9000, [{ atS: 7200, change: { kind: 'park-cars-lobby' } }])[0]?.note).toBe(STAGE_CALL_ROW_NOTE);
     expect(rowsAt(9000, [{ atS: 7800, change: { kind: 'park-cars-lobby' } }])[0]?.note).toBe(STAGE_CALL_ROW_NOTE);
+  });
+});
+
+describe('a moment a run could not be made for, on the stage — § D1335', () => {
+  const failures = [
+    { atS: 7200, question: 'driver' as const },
+    { atS: 9000, question: 'placement' as const },
+  ];
+  const failedAt = (playheadS: number) => stageCallFailedRowsOf({ failures, playheadS, clockOf: clock });
+
+  it('is said from the instant the playhead reaches it, and not a second before', () => {
+    expect(failedAt(7199)).toEqual([]);
+    expect(failedAt(7200).map((row) => row.heading)).toEqual([`No call at ${clock(7200)}`]);
+    expect(failedAt(9000)).toHaveLength(2);
+  });
+
+  it('says the fault in the report row’s own words, with no figure', () => {
+    const [row] = failedAt(7200);
+    const report = dayCallFailedRowOf(failures.slice(0, 1), clock);
+    expect(report?.why).toBe(row?.counts);
+    expect(row?.note).toBe(STAGE_CALL_FAILED_NOTE);
+    for (const text of [row?.heading, row?.counts, row?.note]) {
+      expect(text?.replace(/\d\d:\d\d/gu, '')).not.toMatch(/\d/u);
+    }
+  });
+});
+
+describe('a wrinkle that raised no call, on the stage — § D1336', () => {
+  const quiet = {
+    wrinkle: { startS: 7000, endS: 7500, name: 'A late finish' },
+    refused: [{ ...RECORD, observations: {} }],
+  };
+  const wrinkleRowsAt = (playheadS: number, endedAt = 36_000) =>
+    stageCallWrinkleQuietRowsOf({ quiet, playheadS, endedAt, clockOf: clock });
+
+  it('is said after its window and after its last counted moment can be observed, and not before', () => {
+    /* The record's window ends at 7 800 s, so its last rider is known at 7 860 s, after the wrinkle's 7 500 s. */
+    expect(stageCallWrinkleQuietDueAtS(quiet, 36_000)).toBe(RECORD.windowEndS + DAY_CALL_LONG_WAIT_S);
+    expect(wrinkleRowsAt(RECORD.windowEndS + DAY_CALL_LONG_WAIT_S - 1)).toEqual([]);
+    expect(wrinkleRowsAt(RECORD.windowEndS + DAY_CALL_LONG_WAIT_S)).toHaveLength(1);
+    /* A longer wrinkle waits for its own end. */
+    const long = { ...quiet, wrinkle: { ...quiet.wrinkle, endS: 9000 } };
+    expect(stageCallWrinkleQuietDueAtS(long, 36_000)).toBe(9000);
+    /* And a run that ends first says it at its end. */
+    expect(stageCallWrinkleQuietDueAtS(long, 8500)).toBe(8500);
+    expect(stageCallWrinkleQuietRowsOf({ quiet: undefined, playheadS: 36_000, endedAt: 36_000, clockOf: clock })).toEqual([]);
+  });
+
+  it('prints the report row’s sentence word for word, in the past tense, and never a verdict', () => {
+    const [row] = wrinkleRowsAt(36_000);
+    expect(row?.counts).toBe(dayCallWrinkleQuietRowOf(quiet, clock).why);
+    expect(row?.heading).toBe('A late finish raised no call');
+    expect(row?.counts).toMatch(/^A late finish began at \d\d:\d\d, and the stage raised no call in it\. It ran the day ahead/u);
+    expect(row?.counts).not.toMatch(/Shift (cleared|missed)|\bwill\b|\bbetter\b|\bworse\b/u);
   });
 });

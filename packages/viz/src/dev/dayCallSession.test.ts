@@ -31,12 +31,14 @@ import {
   DAY_CALL_SPACING_S,
   dayCallAdmits,
   dayCallDriversOf,
+  dayCallRowOf,
   longWaitRidersIn,
   type DayCallAnswer,
   type DayCallWrinkle,
 } from '../shift/dayCalls.js';
-import { goalsForDay } from '../shift/goals.js';
+import { goalsForDay, readGoals } from '../shift/goals.js';
 import type { PressCall } from '../shift/pressCall.js';
+import type { Observations, ShiftGoal } from '../shift/types.js';
 import { PRESS_DAY_RESOURCES } from '../shift/pressDay.test-helper.js';
 
 import { openDayCallSession } from './dayCallSession.js';
@@ -174,13 +176,15 @@ describe('an ordinary day’s calls on a real crowd', () => {
     expect(session.quiet()).toEqual({ kind: 'asked', refused: asks, ending: 'finished' });
   });
 
-  it('says it is still asking while a candidate’s runs are in flight, and failed when one could not be made — § D1152', () => {
+  it('says it is still asking while a candidate’s runs are in flight — § D1152 — and a run that could not be made costs that moment alone — § D1335', () => {
     const facts = dayCallFactsOf(PRESS_DAY_RESOURCES, state)!;
     let fail: ((message: string) => void) | undefined;
+    let asks = 0;
     const session = openDayCallSession(
       {
         planWith: (extra) => planOf([extra]),
         simulate: (_runs, _done, failed) => {
+          asks += 1;
           fail = failed;
         },
         cancel: () => {},
@@ -189,8 +193,16 @@ describe('an ordinary day’s calls on a real crowd', () => {
       { recording: built, bookedOut: facts.bookedOut, horizon: facts.horizon },
     );
     expect(session.quiet()).toEqual({ kind: 'asked', refused: 0, ending: 'asking' });
+    const first = session.onStage()!.call.atS;
     fail?.('worker gone');
-    expect(session.quiet()).toEqual({ kind: 'asked', refused: 0, ending: 'failed' });
+    expect(session.failures()).toEqual([{ atS: first, question: 'placement' }]);
+    /* Red before § D1335: the session ended `failed` here and asked no second moment. */
+    expect(asks).toBe(2);
+    expect(session.onStage()?.call.atS ?? -1).toBeGreaterThanOrEqual(first + DAY_CALL_SPACING_S);
+    /* Not refused: its answers were never compared, so § D1152's refusal sentence must not count it. */
+    expect(session.quiet()).toEqual({ kind: 'asked', refused: 0, failed: 1, ending: 'asking' });
+    /* And a resumed attempt still says where. */
+    expect(JSON.parse(JSON.stringify(session.snapshot())).failures).toEqual([{ atS: first, question: 'placement' }]);
   });
 
   it('records a skip with the card up as skipped, and asks nothing after it', () => {
@@ -527,6 +539,84 @@ function placementSessionOn(day: VizRecording, pinnedCall?: PressCall, wrinkle?:
   );
 }
 
+describe('a refused run costs one question, never the rest of the day — § D1335', () => {
+  const profiles = (): readonly DispatcherProfile[] => PRESS_DAY_RESOURCES.dispatcherProfiles.profiles;
+  const byId = (id: string): DispatcherProfile => profiles().find((profile) => profile.id === id)!;
+  /** The post-AM panel's worker: every handover run refused, every parking run made. */
+  const DOES_NOT_DECLARE =
+    'interventions[0] carries change kind "adopt-dispatcher", which this build does not declare';
+
+  /** Parking empties the landings from the second peak on and changes nothing before it. */
+  function staleWorkerSession(day: VizRecording) {
+    return openDayCallSession(
+      {
+        planWith: fakePlan,
+        simulate: (runs, done, failed) => {
+          if (runs.some((ask) => pressOf(ask).change.kind === 'adopt-dispatcher')) {
+            failed(DOES_NOT_DECLARE);
+            return;
+          }
+          done(
+            runs.map((ask) => {
+              const press = pressOf(ask);
+              return press.change.kind === 'park-cars-lobby' && press.atS >= PEAKS[1]![0] ? calmAfter(day, press.atS) : day;
+            }),
+          );
+        },
+        cancel: () => {},
+        changed: () => {},
+      },
+      {
+        recording: day,
+        bookedOut: [],
+        horizon: 'whole-day',
+        drivers: { profiles: profiles(), driving: byId('collective') },
+      },
+    );
+  }
+
+  it('goes on asking after a handover run is refused, and raises the placement calls after it', () => {
+    const session = staleWorkerSession(threePeakDay());
+    const raised: { atS: number; question: string | undefined }[] = [];
+    for (let call = session.onStage(); call?.raised === true; call = session.onStage()) {
+      raised.push({ atS: call.call.atS, question: call.question });
+      session.answer('leave', () => {});
+    }
+    /* Red before § D1335: the day ended at the first refusal, so nothing after it was ever raised. */
+    expect(raised.length).toBeGreaterThan(0);
+    expect(raised.every((call) => call.question === 'placement')).toBe(true);
+    expect(raised.some((call) => peakIndexOf(call.atS) === 2), 'the evening is still asked').toBe(true);
+    const failures = session.failures();
+    expect(failures.length, 'the first peak’s who-drives runs were refused').toBeGreaterThan(0);
+    expect(failures.every((failure) => failure.question === 'driver')).toBe(true);
+    expect(failures[0]!.atS).toBe(PEAKS[0]![0]);
+    expect(session.quiet()).toEqual({ kind: 'asked', refused: 0, failed: failures.length, ending: 'finished' });
+  });
+
+  it('asks every moment of the day the same way with a worker that refuses nothing — the negative control', () => {
+    const day = threePeakDay();
+    const session = openDayCallSession(
+      {
+        planWith: fakePlan,
+        simulate: (runs, done) => {
+          done(
+            runs.map((ask) => {
+              const press = pressOf(ask);
+              return press.change.kind === 'park-cars-lobby' && press.atS >= PEAKS[1]![0] ? calmAfter(day, press.atS) : day;
+            }),
+          );
+        },
+        cancel: () => {},
+        changed: () => {},
+      },
+      { recording: day, bookedOut: [], horizon: 'whole-day', drivers: { profiles: profiles(), driving: byId('collective') } },
+    );
+    while (session.onStage()?.raised === true) session.answer('leave', () => {});
+    expect(session.failures()).toEqual([]);
+    expect(session.quiet()).not.toHaveProperty('failed');
+  });
+});
+
 describe('wave AM: the day’s wrinkle asks once, outside the day’s cap — § D1265', () => {
   /* Between the first two peaks, where no peak rule reaches. */
   const wrinkle: DayCallWrinkle = { startS: 2000, endS: 2800, name: 'Move-in day' };
@@ -582,6 +672,128 @@ describe('wave AM: the day’s wrinkle asks once, outside the day’s cap — §
     );
     while (resumed.onStage()?.raised === true) resumed.answer('leave', () => {});
     expect(resumed.records().map((record) => record.atS)).toEqual(unbroken.records().map((record) => record.atS));
+  });
+});
+
+/*
+ * Wave AN, lane DQ-1, § D1336: a wrinkle asks who drives at its start, even inside a peak, and a
+ * second admission ground holds there only: the three runs' day verdicts differ. The day below has a
+ * late finish inside its third peak; handing the day to Fairness first leaves one rider, who arrives
+ * after the call's ten minutes, waiting 400 s, so that run misses a 300 s worst-wait bar the others
+ * clear while every ten-minute count stays the same.
+ */
+describe('a wrinkle asks who drives at its start, admitted where the day’s verdict differs — § D1336', () => {
+  const profiles = (): readonly DispatcherProfile[] => PRESS_DAY_RESOURCES.dispatcherProfiles.profiles;
+  const byId = (id: string): DispatcherProfile => profiles().find((profile) => profile.id === id)!;
+  const lateFinish: DayCallWrinkle = { startS: 5460, endS: 6000, name: 'A late finish' };
+  const worstWaitOnly = (): readonly ShiftGoal[] =>
+    goalsForDay(1)
+      .filter((goal) => goal.id === 'worst-wait')
+      .map((goal) => ({ ...goal, bar: 300 }));
+
+  /** The day with the rider arriving at 6 500 s waiting 400 s: after the call's window, inside the day. */
+  function lateWait(day: VizRecording): VizRecording {
+    return {
+      ...day,
+      legs: day.legs.map((leg) => (leg.arrivedAt === 6500 ? { ...leg, boardedAt: 6900, alightedAt: 6930 } : leg)),
+    } as VizRecording;
+  }
+
+  function lateFinishSession(goals: readonly ShiftGoal[] | undefined, asked: string[] = [], inFlight?: (() => void)[], split = true) {
+    const day = threePeakDay();
+    return openDayCallSession(
+      {
+        planWith: fakePlan,
+        simulate: (runs, done) => {
+          asked.push(`${String(pressOf(runs[0]).atS)}:${runs.map((ask) => pressOf(ask).change.kind).join('+')}`);
+          const land = (): void =>
+            done(
+              runs.map((ask) => {
+                const press = pressOf(ask);
+                return split && press.change.kind === 'adopt-dispatcher' && press.change.profile.id === 'fairness-first'
+                  ? lateWait(day)
+                  : day;
+              }),
+            );
+          if (inFlight === undefined) land();
+          else inFlight.push(land);
+        },
+        cancel: () => {},
+        changed: () => {},
+      },
+      {
+        recording: day,
+        bookedOut: [],
+        horizon: 'whole-day',
+        goals,
+        drivers: { profiles: profiles(), driving: byId('collective') },
+        wrinkle: lateFinish,
+      },
+    );
+  }
+
+  it('raises who drives at the start of a wrinkle inside a peak, on the verdict alone, and nowhere else', () => {
+    const asked: string[] = [];
+    const session = lateFinishSession(worstWaitOnly(), asked);
+    const raised: { atS: number; question: string | undefined; wrinkle: string | undefined }[] = [];
+    for (let call = session.onStage(); call?.raised === true; call = session.onStage()) {
+      raised.push({ atS: call.call.atS, question: call.question, wrinkle: call.call.wrinkle?.name });
+      session.answer('leave', () => {});
+    }
+    /* Red before § D1336: the late finish was no stretch and the counts never differ, so nothing was raised. */
+    expect(raised).toEqual([{ atS: lateFinish.startS, question: 'driver', wrinkle: 'A late finish' }]);
+    /* Who drives was asked first there, and the placement runs were never needed. */
+    expect(asked.filter((entry) => entry.startsWith(`${String(lateFinish.startS)}:`))).toEqual([
+      `${String(lateFinish.startS)}:adopt-dispatcher+adopt-dispatcher`,
+    ]);
+    const [record] = session.records();
+    expect(record?.wrinkle).toBe(true);
+    expect(dayCallAdmits(record!.counts), 'the counts alone would not raise it').toBe(false);
+    /* The report row prints the split this call was raised on, graded as the sheet grades. */
+    const grade = (observations: Observations): string =>
+      readGoals(worstWaitOnly(), observations).every((reading) => reading.state === 'met') ? 'Shift cleared' : 'Shift missed';
+    expect(dayCallRowOf(record!, 1, grade, String).why).toContain('The day read');
+  });
+
+  it('raises nothing on the verdict elsewhere, and nothing at the start without the day’s goals — the negative controls', () => {
+    /* Every peak's candidate had the same split runs and was turned down: the ground is the start's alone. */
+    const asked: string[] = [];
+    const session = lateFinishSession(worstWaitOnly(), asked);
+    expect(asked.some((entry) => !entry.startsWith(`${String(lateFinish.startS)}:`) && entry.includes('adopt-dispatcher'))).toBe(true);
+    expect(session.records().every((record) => record.atS === lateFinish.startS)).toBe(true);
+    /* No goals, no verdict: the start is asked and turned down on its counts. */
+    const ungraded = lateFinishSession(undefined);
+    expect(ungraded.onStage()).toBeUndefined();
+    expect(ungraded.records()).toEqual([]);
+  });
+
+  it('counts the start’s call against neither the peak’s two nor the day’s six', () => {
+    const session = lateFinishSession(worstWaitOnly());
+    while (session.onStage()?.raised === true) session.answer('leave', () => {});
+    const snapshot = session.snapshot();
+    expect(snapshot.raisedInWrinkle).toBe(1);
+    expect(snapshot.raisedInPeak).toEqual([]);
+  });
+
+  it('says once, after its window, that a wrinkle which raised nothing was asked and did not stop', () => {
+    const queue: (() => void)[] = [];
+    const session = lateFinishSession(worstWaitOnly(), [], queue, false);
+    /* Before the start's runs land, nothing: the wrinkle could still raise its call. */
+    while (queue.length > 0 && (session.onStage()?.call.atS ?? Infinity) <= lateFinish.startS) {
+      expect(session.wrinkleQuiet()).toBeUndefined();
+      queue.shift()!();
+    }
+    while (queue.length > 0) queue.shift()!();
+    expect(session.records()).toEqual([]);
+    const quiet = session.wrinkleQuiet();
+    expect(quiet?.wrinkle).toEqual(lateFinish);
+    expect(quiet?.refused.map((record) => [record.atS, record.question])).toEqual([[lateFinish.startS, 'driver']]);
+    /* Its counts are the runs already made, and it carries nothing graded. */
+    expect(quiet?.refused[0]?.observations).toEqual({});
+    /* A wrinkle that raised its call says nothing of the kind. */
+    const raisedIt = lateFinishSession(worstWaitOnly());
+    while (raisedIt.onStage()?.raised === true) raisedIt.answer('leave', () => {});
+    expect(raisedIt.wrinkleQuiet()).toBeUndefined();
   });
 });
 
@@ -660,15 +872,16 @@ describe('wave AL: calls across the whole day — § D1205', () => {
   });
 
   it('asks who drives again after a handover, with the pair re-derived from the new driver', () => {
-    const session = driverSession(threePeakDay(), ['eta', 'fairness-first']);
+    const session = driverSession(threePeakDay(), ['predictive-balanced', 'fairness-first']);
     const first = session.onStage();
+    /* § D1337: a player on the house is offered two contenders. */
     expect(first?.drivers).toEqual({
-      'driver-a': byId('eta').name,
-      'driver-b': byId('fairness-first').name,
+      'driver-a': byId('fairness-first').name,
+      'driver-b': byId('predictive-balanced').name,
       leave: byId('collective').name,
     });
     const handedTo: RunInterventionConfig[] = [];
-    session.answer('driver-b', (adoption) => {
+    session.answer('driver-a', (adoption) => {
       handedTo.push(adoption.entry);
     });
     expect(handedTo).toEqual([
@@ -678,10 +891,13 @@ describe('wave AL: calls across the whole day — § D1205', () => {
     expect(second?.raised).toBe(true);
     expect(second?.question).toBe('driver');
     expect(second!.call.atS - first!.call.atS).toBeGreaterThanOrEqual(DAY_CALL_REPEAT_S);
-    /* The pair never offers the dispatcher driving, and *keep* names it. */
+    /*
+     * The pair never offers the dispatcher driving, and *keep* names it. Since § D1337 it never
+     * offers the house either: § D1167's list put Conventional collective first here.
+     */
     expect(second?.drivers).toEqual({
-      'driver-a': byId('collective').name,
-      'driver-b': byId('eta').name,
+      'driver-a': byId('predictive-balanced').name,
+      'driver-b': byId('energy-aware').name,
       leave: byId('fairness-first').name,
     });
     /* And the second call's record carries the names it was asked with. */
@@ -691,7 +907,7 @@ describe('wave AL: calls across the whole day — § D1205', () => {
 
   it('re-derives the pair after the player’s own handover where the shell names the driver, and stops where it cannot', () => {
     const day = threePeakDay();
-    const named = driverSession(day, ['collective', 'eta']);
+    const named = driverSession(day, ['predictive-balanced', 'energy-aware']);
     named.grew({ ...day } as VizRecording, 100, true, byId('fairness-first'));
     const call = named.onStage();
     expect(call?.question).toBe('driver');
@@ -888,7 +1104,8 @@ describe('a resumed session raises what an unbroken one would — § D1205 under
     /* After the handover the pair is re-derived, and a resumed session re-derives it the same way. */
     const handed = unbroken.findIndex((call) => call.entry?.change.kind === 'adopt-dispatcher');
     const after = unbroken.slice(handed + 1).find((call) => call.question === 'driver');
-    expect(after?.drivers).toMatchObject({ leave: byId('fairness-first').name });
+    /* The pair's second for a player on the house, since § D1337. */
+    expect(after?.drivers).toMatchObject({ leave: byId('predictive-balanced').name });
   });
 
   it('on a pinned day, whose call the snapshot already carries', () => {

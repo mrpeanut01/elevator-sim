@@ -256,16 +256,38 @@ export type DayCallTriple<T> = Readonly<Partial<Record<DayCallAnswer, T>>>;
 
 /**
  * **The dispatchers the driver question may offer, in the order the pair is taken** —
- * [§ D1167](../../../../DECISIONS.md), the decide-al ruling's *a fixed pair per tower*.
+ * [§ D1167](../../../../DECISIONS.md), the decide-al ruling's *a fixed pair per tower*, with the
+ * house taken out by wave AN, lane DQ-1, [§ D1337](../../../../DECISIONS.md).
  *
- * Conventional collective, Minimum estimated wait and Fairness first: the three the swarm's
- * engineering member measured the question on, all conventional-panel profiles, and every contract
- * allows every dispatcher from the start. A tower's pair is the first two of these that differ from
- * the one driving when the day opens and that a handover can reach ({@link dayCallDriversOf}), so
- * it is fixed from who is driving and never chosen by which answer clears. Owner-reversible: it is
- * this list.
+ * § D1167's list was Conventional collective, Minimum estimated wait and Fairness first. Swarm DQ
+ * found what that did to a player on a good driver: the pair was the house and Minimum estimated
+ * wait, the house's ten-minute count was lowest on 3 of 69 such rows, and 27 of the 32 rows that
+ * split the day read *the house loses*, so the question taught *never hand it back* by Tuesday and
+ * stopped being a choice. So the house (`shift/weekStake.ts#houseStandingOrder`, Conventional
+ * collective) is on this list no more, and **a switch target is always a contender**: the
+ * conventional-panel drivers the week census and swarm DQ's player member found clearing nearly every
+ * Midtown day left alone. A player on the house still meets it, as *keep*.
+ *
+ * **Minimum estimated wait is last, and that is measured.** With it second, a player on Fairness
+ * first was offered it beside Predictive balanced, and on the careful policy's first census crowd
+ * its ten-minute count was lowest on 12 of the 18 who-drives rows (66.7 %): a formula, because the
+ * ten-minute count is what that driver chases. With Energy aware in its place, over the first four
+ * census crowds' week 1, the 68 rows were lowest under Predictive balanced on 22.1 %, Energy aware
+ * on 36.8 % and *keep* on 55.9 % (ties counted for each). The auction is not here because a
+ * handover cannot reach it from a central driver (`live/interventions.ts#switchRefusalOf`).
+ *
+ * A tower's pair is the first two of these that differ from the one driving and that a handover can
+ * reach ({@link dayCallDriversOf}), so it is fixed from who is driving and never chosen by which
+ * answer clears. Gated by `everyday/callCadence.sweep.test.ts`: on the careful policy's census week,
+ * no answer has the lowest count on under a tenth or over three fifths of the driver rows.
+ * Owner-reversible: it is this list.
  */
-export const DAY_CALL_DRIVER_OFFER: readonly string[] = Object.freeze(['collective', 'eta', 'fairness-first']);
+export const DAY_CALL_DRIVER_OFFER: readonly string[] = Object.freeze([
+  'fairness-first',
+  'predictive-balanced',
+  'energy-aware',
+  'eta',
+]);
 
 /**
  * **A tower's driver pair for one day** — the first two of {@link DAY_CALL_DRIVER_OFFER} that a
@@ -364,9 +386,37 @@ export function dayCallWrinkleWindowOf(
   return acts.some((act) => act.startS < wrinkle.endS && wrinkle.startS < act.endS) ? undefined : wrinkle;
 }
 
+/**
+ * **A wrinkle that overlaps a peak, as the one candidate at its start** — wave AN, lane DQ-1,
+ * [§ D1336](../../../../DECISIONS.md), which replaces [§ D1265](../../../../DECISIONS.md) clause 2
+ * (*a wrinkle overlapping a peak is not a second stretch*) for the start alone.
+ *
+ * Swarm DQ's engineering member ran every answer at 19 wrinkle starts over Midtown's two weeks: a
+ * handover split the day's verdict at 13 of them, the fire drill and the late finish among them,
+ * and those two overlap a peak, so § D1265 never asked at their start. Such a wrinkle still adds no
+ * stretch to search (its peak is searched as a peak); it adds the one instant it begins. `undefined`
+ * where the wrinkle has no window, or lies clear of every peak, which {@link dayCallWrinkleWindowOf}
+ * searches whole.
+ */
+export function dayCallWrinkleStartOf(
+  wrinkle: DayCallWrinkle | undefined,
+  acts: readonly DayAct[],
+): DayCallWrinkle | undefined {
+  if (wrinkle === undefined || !(wrinkle.endS > wrinkle.startS)) return undefined;
+  return dayCallWrinkleWindowOf(wrinkle, acts) === undefined ? wrinkle : undefined;
+}
+
 /** Whether `call` was drawn inside the day's wrinkle rather than a peak. */
 export function dayCallIsWrinkle(call: Pick<PressCall, 'wrinkle'>): boolean {
   return call.wrinkle !== undefined;
+}
+
+/**
+ * Whether `call` is the instant the day's wrinkle begins — the one candidate where § D1336's second
+ * admission ground applies (`dev/dayCallSession.ts`). A wrinkle's first-minute wait is not one.
+ */
+export function dayCallIsWrinkleStart(call: Pick<PressCall, 'wrinkle' | 'rule'>): boolean {
+  return call.wrinkle !== undefined && call.rule === 'wrinkle-start';
 }
 
 /** Everything a candidate is derived from. Plain data from the run's own record. */
@@ -412,9 +462,13 @@ function carAwayAt(bookedOut: readonly BookedOutCar[], atS: SimTime): BookedOutC
  * - **A whole day**: the first peak that ends after `fromS`. Inside it, rule 1 from
  *   `max(fromS, peak start)`; failing that, the peak's start, when that is not already past. A peak
  *   with neither yields to the next. **The day's wrinkle is searched as one more stretch** where it
- *   lies clear of every peak ([§ D1265](../../../../DECISIONS.md)): rule 1 inside it, and failing
- *   that its start (`wrinkle-start`), in time order with the peaks. Its calls carry the wrinkle as
- *   their `act`, so the session holds them to {@link DAY_CALL_PER_WRINKLE}.
+ *   lies clear of every peak ([§ D1265](../../../../DECISIONS.md)), in time order with the peaks.
+ *   Since [§ D1336](../../../../DECISIONS.md) **its start comes first** (`wrinkle-start`), and rule 1
+ *   inside it is the fallback once the start is past; and **a wrinkle that overlaps a peak adds its
+ *   start**, and only its start ({@link dayCallWrinkleStartOf}). Its calls carry the wrinkle as their
+ *   `act` and their `wrinkle`, so the session holds them to {@link DAY_CALL_PER_WRINKLE}. Where two
+ *   stretches offer a candidate the earlier wins, and the wrinkle's start is asked in place of any
+ *   candidate less than {@link DAY_CALL_SPACING_S} before it, so the spacing never passes it.
  * - **A slice**: rule 1 from `fromS`, and only while at least {@link DAY_CALL_SPACING_S} of the run
  *   is left to answer into. No rule 2: a slice's one act is the whole run, and its start is the
  *   stage opening, which is not a moment to call.
@@ -440,23 +494,48 @@ export function nextDayCallOf(input: DayCallInput, fromS: SimTime): PressCall | 
     });
   };
   if (input.horizon === 'whole-day') {
-    const wrinkle = dayCallWrinkleWindowOf(input.wrinkle, input.acts);
-    const stretches: { readonly act: DayAct; readonly wrinkle: DayCallWrinkle | undefined }[] = [
-      ...input.acts.map((act) => ({ act, wrinkle: undefined })),
-      ...(wrinkle === undefined ? [] : [{ act: { startS: wrinkle.startS, endS: wrinkle.endS }, wrinkle }]),
-    ].sort((a, b) => a.act.startS - b.act.startS);
-    for (const { act, wrinkle: within } of stretches) {
+    /*
+     * § D1336: the instant the day's wrinkle begins, whether its window is a stretch of its own or
+     * overlaps a peak, while it is not yet past.
+     */
+    const clear = dayCallWrinkleWindowOf(input.wrinkle, input.acts);
+    const begins = clear ?? dayCallWrinkleStartOf(input.wrinkle, input.acts);
+    const start =
+      begins !== undefined && begins.startS >= fromS && begins.startS < Math.min(begins.endS, lastS)
+        ? callAt(begins.startS, 'wrinkle-start', { startS: begins.startS, endS: begins.endS }, begins)
+        : undefined;
+    let best: PressCall | undefined;
+    const consider = (candidate: PressCall): void => {
+      if (best === undefined || candidate.atS < best.atS) best = candidate;
+    };
+    /* § D1265's stretch clear of every peak: rule 1 inside it, once its start is past. */
+    if (clear !== undefined && start === undefined && clear.endS > fromS) {
+      const from = Math.max(fromS, clear.startS);
+      const until = Math.min(clear.endS, lastS);
+      const waited = from < until ? firstMinuteWaitIn(input.legs, from, until) : undefined;
+      if (waited !== undefined) consider(callAt(waited, 'first-minute-wait', { startS: clear.startS, endS: clear.endS }, clear));
+    }
+    for (const act of input.acts) {
       if (act.endS <= fromS) continue;
+      /* A peak that starts after the best candidate so far cannot beat it. */
+      if (best !== undefined && Math.max(fromS, act.startS) >= best.atS) continue;
       const from = Math.max(fromS, act.startS);
       const until = Math.min(act.endS, lastS);
       if (!(from < until)) continue;
       const waited = firstMinuteWaitIn(input.legs, from, until);
-      if (waited !== undefined) return callAt(waited, 'first-minute-wait', act, within);
-      if (act.startS >= fromS && act.startS < until) {
-        return callAt(act.startS, within === undefined ? 'act-start' : 'wrinkle-start', act, within);
-      }
+      if (waited !== undefined) consider(callAt(waited, 'first-minute-wait', act));
+      else if (act.startS >= fromS && act.startS < until) consider(callAt(act.startS, 'act-start', act));
     }
-    return undefined;
+    /*
+     * The wrinkle's start is never spaced out of the day. Where another candidate falls less than
+     * {@link DAY_CALL_SPACING_S} before it, the start is asked in that candidate's place, so the
+     * spacing still holds between any two candidates and a peak's moment a minute before the drill
+     * (Midtown's fire drill and evacuation are acts that open a minute before their wrinkle) cannot
+     * push the drill's own start past the search.
+     */
+    const other = best as PressCall | undefined;
+    if (start !== undefined && (other === undefined || start.atS < other.atS + DAY_CALL_SPACING_S)) return start;
+    return other;
   }
   const from = Math.max(fromS, input.startedAt);
   if (!(from < lastS)) return undefined;
@@ -551,6 +630,68 @@ export interface DayCallRecord {
   readonly answer: DayCallAnswer | 'skipped';
   readonly counts: DayCallTriple<number>;
   readonly observations: DayCallTriple<Observations>;
+  /**
+   * **The call was the day's wrinkle's own** — [§ D1265](../../../../DECISIONS.md)'s one call, not
+   * counted against the day's six. Written since [§ D1336](../../../../DECISIONS.md), whose start
+   * call can fall inside a peak, so the wrinkle's call can no longer be told from a peak's by its
+   * instant alone. Absent on a peak's call, and on a record written before it.
+   */
+  readonly wrinkle?: true | undefined;
+}
+
+/**
+ * **A wrinkle the stage ran its answers in and raised no call** — wave AN, lane DQ-1,
+ * [§ D1336](../../../../DECISIONS.md), swarm DQ's honesty member's line: a wrinkle that raised nothing
+ * says so once, in the past tense, after its window. `refused` are the candidates asked inside it, in
+ * order, each counted from the runs already made (its first question's three runs; `observations`
+ * left empty, because the line prints counts and nothing graded). This amends § D1138 clause 3's
+ * *refused calls never reach the report*, for a wrinkle's candidates only.
+ */
+export interface DayCallWrinkleQuiet {
+  readonly wrinkle: DayCallWrinkle;
+  readonly refused: readonly DayCallRecord[];
+}
+
+/** The report's row id for a wrinkle that raised no call. */
+export const DAY_CALL_WRINKLE_QUIET_ROW_ID = 'day-call-wrinkle-quiet';
+
+/**
+ * **The past-tense line for a wrinkle that raised no call** — the one sentence the stage's row and the
+ * report's row both print ([§ D1336](../../../../DECISIONS.md)). What the stage did and the first
+ * moment's counts in the call row's own words ({@link dayCallCountsLineOf}); no verdict, which the
+ * stage may not print before the close, and no *because*, since a start's call is admitted on the
+ * day's verdict too. The session hands it at least one refused moment; with none it says only the
+ * first sentence.
+ */
+export function dayCallWrinkleQuietSentenceOf(
+  quiet: DayCallWrinkleQuiet,
+  clockOf: (simTimeS: SimTime) => string,
+): string {
+  const [first, ...rest] = quiet.refused;
+  const opening = `${quiet.wrinkle.name} began at ${clockOf(quiet.wrinkle.startS)}, and the stage raised no call in it.`;
+  if (first === undefined) return opening;
+  const more =
+    rest.length === 0
+      ? ''
+      : ` It ran the day ahead from ${listOf(rest.map((record) => clockOf(record.atS)))} too, and did not stop there either.`;
+  return (
+    `${opening} It ran the day ahead under each answer it could offer from ${clockOf(first.atS)}, and did not ` +
+    `stop. ${dayCallCountsLineOf(first, clockOf)}${more}`
+  );
+}
+
+/** The report's row for a wrinkle that raised no call — {@link dayCallWrinkleQuietSentenceOf}. */
+export function dayCallWrinkleQuietRowOf(
+  quiet: DayCallWrinkleQuiet,
+  clockOf: (simTimeS: SimTime) => string,
+): ReportDiagnosis {
+  return {
+    id: DAY_CALL_WRINKLE_QUIET_ROW_ID,
+    when: `${clockOf(quiet.wrinkle.startS)}–${clockOf(quiet.wrinkle.endS)}`,
+    what: `${quiet.wrinkle.name} raised no call`,
+    why: dayCallWrinkleQuietSentenceOf(quiet, clockOf),
+    tone: 'plain',
+  };
 }
 
 /**
@@ -645,16 +786,86 @@ export type DayCallsQuiet =
   | {
       readonly kind: 'asked';
       readonly refused: number;
+      /**
+       * How many candidate moments lost their question because a run they needed could not be made
+       * ([§ D1335](../../../../DECISIONS.md)). Absent where none did. Such a moment is not in
+       * `refused`, because its answers were never compared.
+       */
+      readonly failed?: number | undefined;
+      /**
+       * `failed` is kept for a session snapshot written before § D1335, when a refused run ended
+       * the day's asking. A session opened since never ends that way: it loses that one question
+       * and asks the next.
+       */
       readonly ending: 'finished' | 'failed' | 'skipped' | 'asking';
     }
   | {
       readonly kind: 'asked';
       readonly refused: number;
+      readonly failed?: number | undefined;
       readonly ending: 'lost';
       readonly lostAtS: SimTime;
       /** `shift/goals.ts#goalPlainNameOf` of the goal that read missed. */
       readonly lostGoal: string;
     };
+
+/**
+ * **A candidate whose question was lost because a run could not be made** — wave AN, lane DQ-1,
+ * [§ D1335](../../../../DECISIONS.md), swarm DQ's ruling Q1 item 2.
+ *
+ * The post-AM panel played a bundle whose worker refused every handover run, and the session ended
+ * the whole day's asking at the first refusal, so a day kept only the calls raised before its first
+ * who-drives candidate and nothing said so after the first card. Since § D1335 a run that cannot be
+ * made costs the one candidate it was made for: that moment asks nothing, the session goes on to
+ * the next, and the stage and the report each say where it happened, on every day it happens.
+ * `question` is the question whose runs were refused.
+ */
+export interface DayCallFailure {
+  readonly atS: SimTime;
+  readonly question: DayCallQuestion;
+}
+
+/** The report's row id for a day on which a run the stage needed could not be made. */
+export const DAY_CALL_FAILED_ROW_ID = 'day-calls-failed';
+
+/**
+ * **What a lost question was, in words** — the one sentence the report's row and the stage's row
+ * both print ([§ D1335](../../../../DECISIONS.md)), so the two cannot describe the fault
+ * differently. Past tense, of instants the run has reached, and no figure: nothing was compared.
+ */
+export function dayCallFailedSentenceOf(clocks: readonly string[]): string {
+  return (
+    `At ${listOf(clocks)} the stage tried to run the day ahead under the answers it would offer, and a run ` +
+    'it needed could not be made, so it asked nothing there and went on to the next moment. That is a ' +
+    'fault in the game, not something about this crowd or what you pressed.'
+  );
+}
+
+/**
+ * **The report's row for a day that lost a question to a run that could not be made** —
+ * [§ D1335](../../../../DECISIONS.md). Drawn whatever else the day raised, which is the half the
+ * post-AM panel's sheet lacked: § D1152's sentence spoke only on a day with no call at all.
+ * `undefined` where nothing failed.
+ */
+export function dayCallFailedRowOf(
+  failures: readonly DayCallFailure[],
+  clockOf: (simTimeS: SimTime) => string,
+): ReportDiagnosis | undefined {
+  const instants = [...new Set(failures.map((failure) => failure.atS))].sort((a, b) => a - b);
+  const [first] = instants;
+  if (first === undefined) return undefined;
+  const clocks = instants.map(clockOf);
+  return {
+    id: DAY_CALL_FAILED_ROW_ID,
+    when: clockOf(first),
+    what:
+      instants.length === 1
+        ? `The stage could not ask at ${clockOf(first)}`
+        : `The stage could not ask at ${String(instants.length)} moments`,
+    why: dayCallFailedSentenceOf(clocks),
+    tone: 'plain',
+  };
+}
 
 /**
  * **The one sentence a day with no call gets at its close** — § D1152. Only what the session saw:
@@ -685,6 +896,10 @@ export function dayCallsQuietSentenceOf(
       );
     case 'finished':
       break;
+  }
+  if (quiet.refused === 0 && (quiet.failed ?? 0) > 0) {
+    /* § D1335: every moment it tried lost its question to a run, so it compared no answers at all. */
+    return `${head} At every moment it tried, a run it needed in order to ask could not be made.`;
   }
   if (quiet.refused === 0) {
     return `${head} It found no moment to ask on this run: nobody on a landing had waited a minute with time left in the day to answer.`;

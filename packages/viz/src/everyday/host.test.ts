@@ -3118,3 +3118,47 @@ describe('the sentence a screen shows while the game loads', () => {
     expect(offenders).toEqual([]);
   });
 });
+
+/*
+ * Wave AN, lane DQ-1: the stage's call rows are assembled here from what the shell's session holds,
+ * and two of them are new. A moment a run could not be made for (§ D1335) is said from the instant the
+ * playhead reaches it, whatever else the day raised; a wrinkle that raised no call (§ D1336) is said
+ * after its window. Neither is said before, and neither is said where the shell reports nothing.
+ */
+describe('the stage’s call rows: a lost moment and a quiet wrinkle — § D1335, § D1336', () => {
+  const recording = { endedAt: 36_000 } as unknown as VizRecording;
+  const quiet = {
+    wrinkle: { startS: 7000, endS: 9000, name: 'A late finish' },
+    refused: [
+      {
+        atS: 7000,
+        windowEndS: 7600,
+        answer: 'leave' as const,
+        counts: { 'park-cars-lobby': 2, 'spread-cars': 2, leave: 3 },
+        observations: {},
+      },
+    ],
+  };
+  function hostWith(over: Partial<EverydayHostBindings>) {
+    const h = harnessOf(base());
+    return createEverydayHost({ ...h.bindings, ...over });
+  }
+
+  it('says a lost moment from its instant and a quiet wrinkle after its window, and nothing earlier', () => {
+    const host = hostWith({
+      dayCallFailuresOn: () => [{ atS: 5000, question: 'driver' }],
+      dayCallWrinkleQuietOn: () => quiet,
+    });
+    expect(host.dayCallRowsAt(recording, 4999)).toEqual([]);
+    expect(host.dayCallRowsAt(recording, 5000).map((row) => row.id)).toEqual(['stage-call-failed-1']);
+    expect(host.dayCallRowsAt(recording, 8999).map((row) => row.id)).toEqual(['stage-call-failed-1']);
+    expect(host.dayCallRowsAt(recording, 9000).map((row) => row.id)).toEqual([
+      'stage-call-failed-1',
+      'stage-call-wrinkle-quiet',
+    ]);
+  });
+
+  it('says nothing of either where the shell reports neither — the control', () => {
+    expect(hostWith({}).dayCallRowsAt(recording, 36_000)).toEqual([]);
+  });
+});

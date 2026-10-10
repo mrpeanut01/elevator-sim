@@ -46002,6 +46002,8 @@ unspent, and whether each is free or a hole is the integrator's call at close ([
 
 ## D1138 — the call is the core loop of every scored day: up to three calls, admitted by what their answers do to the next ten minutes, rows only at the close, and the first closed attempt banks
 
+> **Status 2026-10-10: AMENDED by [§ D1336](#d1336)** (an agent ruling). At a wrinkle's start alone, a call is also admitted where its three runs' day verdicts differ, and a wrinkle's turned-down moments reach the sheet and the stage in one past-tense line. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Status 2026-09-26: OWNER-REVERSIBLE CLAUSE REVERSED by [§ D1204](#d1204)** (an agent ruling). A pinned press day opens its ordinary calls after its § D1029 call is answered, searched from five minutes after it; and every call's card gains a line saying who is standing ([§ D1206](#d1206)). See [`docs/39`](docs/39-decisions-in-force.md).
 
 ---
@@ -46419,6 +46421,8 @@ the transport's speed are unchanged.
 
 ## D1152 — a day that raised no call says so at its close, in one sentence true of the run
 
+> **Status 2026-10-10: AMENDED by [§ D1335](#d1335)** (an agent ruling). A run the stage could not make costs that one candidate rather than the day's asking, and the sheet and the stage say where on every day it happens, whatever else the day raised. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-09-26 by agent sessions under delegated authority** (wave AK, lane AK-B), not by the
 > product owner. Owner-reversible clause: whether the row is drawn at all.
 
@@ -46692,6 +46696,8 @@ minutes. The lookahead costs a median 20.7 s of CPU a whole day on a worker (at 
 a slice, against § D1138's 11.4 s.
 
 ## D1167 — where the parking answers are alike, the stage asks who drives
+
+> **Status 2026-10-10: AMENDED by [§ D1337](#d1337)** (an agent ruling). Clause 2's owner-reversible list no longer holds the house: the pair is taken from Fairness first, Predictive balanced, Energy aware and Minimum estimated wait, so a switch target is always a contender, gated by a measured trap check. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Status 2026-09-26: CLAUSE 5 LIFTED by [§ D1205](#d1205)** (an agent ruling). After a handover the pair is re-derived from the dispatcher now driving and the driver question may be asked again; after *keep* it is not asked again in that peak. See [`docs/39`](docs/39-decisions-in-force.md).
 
@@ -48890,6 +48896,8 @@ crowds (the sitting bot, [§ D1267](#d1267), carries two more); any tower but Mi
 
 ## D1265 — the day's wrinkle is a stretch the stage may call in: one call, admitted by § D1138's rule, outside the day's six
 
+> **Status 2026-10-10: AMENDED by [§ D1336](#d1336)** (an agent ruling). Clause 2 is replaced for a wrinkle's start alone: every windowed wrinkle is asked at its start, inside a peak too, who drives first, admitted by § D1138's counts or where the three runs' day verdicts differ; a wrinkle that raised nothing says so after its window. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-09-26 by agent sessions under delegated authority** (swarm DO, ruling § 4's *where the
 > engine supports it, a wrinkle's own question, admitted by § D1138's rule; the wrinkle must not pass
 > inside a skip with no call*, reconciled by wave AM's integrator; the mechanism is lane AM-F's), not
@@ -50433,3 +50441,226 @@ else's, no purse key), `everyday/rushHouse.test.ts`'s two cases, `menu/client.te
 **Not established.** No browser case draws the row: the browser tier would need a server with a
 posted sitting. The row is pinned by its model, the route and the client, and
 `everyday/rush.browser.test.ts` still passes with the read in place (no server, so it says nothing).
+
+---
+
+## D1335 — a run the stage could not make costs that one question, the stage and the sheet say so on every day it happens, and the served worker runs every intervention kind
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (swarm DQ, ruling Q1 items 1 and
+> 2, three of three, reconciled by wave AN's integrator; built by lane DQ-1), not by the product
+> owner. A later reader weighing this against a product-owner ruling should treat it as an agent
+> ruling and say so. **Amends [§ D1152](#d1152)** (the fault was spoken only on a day with no call)
+> **and the session's own rule that a failed run ends the day's asking** (`dev/dayCallSession.ts`,
+> under [§ D1138](#d1138) clause 1). **Extends [§ D1317](#d1317)** with the built-bundle half.
+> **Owner-reversible**: clause 1's *one question, not the day*.
+
+**Why an entry.** It moves a recorded ruling's row on the Day report, adds a row to the stage, and
+binds `dev/dayCallSession.ts`, `shift/dayCalls.ts`, `shift/report.ts`, `shift/attempt.ts`,
+`persist/attempt.ts`, `everyday/stageCallRow.ts`, `everyday/host.ts`, `dev/main.ts`, the honesty
+corpus and the browser tier's `everyday/builtBundle.browser.test.ts`.
+
+**What was measured.** All three members of swarm DQ found the post-AM panel's call drought in its
+bundle: built with `vite build` alone against a `packages/core/dist` from 2026-09-19, its worker
+refused every `adopt-dispatcher` run with *"which this build does not declare"*, and the session's
+failure arm then ended the day's asking. On the pinned Monday played *park* and *keep*, the panel's
+bundle asked at 10:40 and 12:20 and nothing after; a bundle built after `tsc -b` asked at 10:40,
+12:20, 12:25, 17:20 and 17:25 (S2, S3). § D1152's sentence speaks only on a day with no call, so every
+day that raised one call and then died said nothing on the stage or the sheet.
+
+**The ruling.**
+
+1. **A run that cannot be made, or cannot be planned, costs the candidate it was made for and
+   nothing else.** That moment asks nothing; it is kept in the session's failures and not counted as
+   refused, because its answers were never compared; the session goes on from the spacing after it,
+   as after a refusal. Its try was spent when it was asked, so a day whose runs all fail still stops
+   at the day's tries. A session snapshot keeps the failures, so a resumed attempt still says where.
+2. **The stage says so from the instant the playhead reaches each such moment**, never before (the
+   session runs ahead, and an early row would say where somebody is about to have waited a minute):
+   a row *No call at hh:mm* in the calls section, with the report row's sentence and the rule that
+   the fault costs that moment only. No figure.
+3. **The sheet says so whatever else the day raised**: one row, *The stage could not ask at hh:mm*
+   (or at *n* moments), naming every such clock and that it is a fault in the game, not something
+   about the crowd or the presses. § D1152's no-call sentence gains one arm: where every moment it
+   tried was lost this way, it says that rather than that it found no moment.
+4. **The served worker runs every intervention kind `core` declares.** The browser tier asks the
+   bundle's one `shiftWorker` asset, as the page would spawn it, for one run of each kind in
+   `INTERVENTION_KINDS`, built as the shell builds a run, and requires every reply to be `done`; an
+   undeclared kind must come back refused in the stale bundle's words, so the case can see the
+   failure it guards. A kind added to `core` fails the case until it has a run there.
+
+**Tests.** `dev/dayCallSession.test.ts`: a failed run on a real Crown Hotel slice costs that moment
+and the next is asked (red before: the session ended `failed` with one ask); with every handover run
+refused, the day still raises its placement calls, the evening's among them (red before: nothing
+raised after the first refusal); a worker that refuses nothing records no failure (the control).
+`shift/report.test.ts`: a day with a call and a failure carries the row (red before: no row).
+`everyday/stageCallRow.test.ts`: the stage row is due at its instant and not a second before, in the
+report row's words, with no figure. `everyday/builtBundle.browser.test.ts`: every kind `done`, the
+undeclared kind refused; driven red once by pointing the bundle's `core` alias at the main checkout's
+`packages/core/dist` of 2026-09-19, where the worker refused `adopt-dispatcher` in the panel's own
+words, then put back. `everyday/host.test.ts`: the stage's rows from the shell's failures, from the
+instant and not before.
+
+## D1336 — a wrinkle asks who drives at its start, inside a peak too, admitted where the day's verdict differs, and a wrinkle that raised nothing says so after its window
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (swarm DQ, ruling Q1 item 4: the
+> start call and its ground are the engineering member's, measured, with the player member agreeing
+> on the question; the past-tense line is the honesty member's; reconciled by wave AN's integrator;
+> built by lane DQ-1), not by the product owner. A later reader weighing this against a
+> product-owner ruling should treat it as an agent ruling and say so. **Replaces
+> [§ D1265](#d1265) clause 2 for a wrinkle's start alone, amends [§ D1138](#d1138)'s admission at a
+> wrinkle's start alone, and amends § D1138 clause 3's *refused calls never reach the report* for a
+> wrinkle's candidates alone.** No bar is tightened and none is loosened elsewhere: the threshold,
+> the ten-minute window, the minute, six a day, two a peak, ten minutes between repeats and one a
+> wrinkle all stand. **Owner-reversible**: the verdict ground, the start inside a peak, and the line.
+
+**Why an entry.** It amends two recorded rulings and binds `shift/dayCalls.ts`,
+`dev/dayCallSession.ts`, `shift/attempt.ts`, `persist/attempt.ts`, `shift/report.ts`,
+`everyday/stageCallRow.ts`, `everyday/host.ts`, `dev/main.ts` and the honesty corpus.
+
+**What was measured.** Swarm DQ's engineering member played the careful brief to 19 wrinkle starts
+over Midtown's two weeks on census crowds 0 to 2 and ran every answer from each start. No placement
+answer split the day at any of the 19. A handover split it at 13. § D1138's counts admitted a question
+at 6 (fire drill 3, shaft 1, evacuation 1, late finish 1); at 8 more the day hung on who drives while
+the ten-minute counts did not move (the conference on 3 of 3, goods inward 2, caterers 1, auditors 1,
+shaft 1). The fire drill, the evacuation and the late finish overlap a peak, so § D1265 never asked at
+their start; and on Midtown the drill's and the evacuation's acts open a minute before the wrinkle,
+so the peak's moment there would have spaced the start out of the search.
+
+**The ruling.**
+
+1. **Every windowed wrinkle is a candidate at its start** (`wrinkle-start`), clear of the peaks or
+   not. A wrinkle overlapping a peak adds that instant only; its peak is searched as a peak. A clear
+   wrinkle asks its start before any minute-long wait inside it, which is the fallback once the
+   start is past. **The start is never spaced out**: where another candidate falls less than the
+   five-minute spacing before it, the start is asked in that one's place, so the spacing still holds
+   between any two candidates.
+2. **At a wrinkle's start the driver question is asked first**, and the placement question from the
+   same instant only where who drives cannot be asked or is turned down. Everywhere else the order
+   stays § D1167's.
+3. **One admission ground is added, at a wrinkle's start only: the three runs' day verdicts
+   differ.** Each run is graded with the day's goals over its whole run by the report's own
+   partition (ungraded, cleared, missed), so a call raised on this ground is one whose report row
+   prints the split. It reads whether the three differ, never which is ahead. It costs no run: the
+   three runs are the ones the counts are read from.
+4. **The start's call is the wrinkle's one call**, counted against neither its peak's two nor the
+   day's six; the record says so itself (`DayCallRecord.wrinkle`), because inside a peak its instant
+   cannot. A snapshot written before this keeps its clear wrinkle's call where it was and is read
+   from there.
+5. **A wrinkle that raised no call, where the stage ran its answers in it, says so once, in the past
+   tense, after its window**: on the stage once the window and its last turned-down moment's ten
+   minutes and a minute can be observed, and on the sheet. The sentence names when the wrinkle began,
+   that the stage ran the day ahead under each answer it could offer and did not stop, and the first
+   moment's counts in the call row's own words. No verdict and no *because* on either surface.
+
+**Refused.** The player member's handover plus handback for the wrinkle's length (two runs where one
+ground does the work), and a question of the wrinkle's own (§ D1265 refused the movers' car on its
+measurement).
+
+**Tests.** `shift/dayCalls.test.ts`: an overlapping wrinkle's start is a candidate and nothing else of
+its own is (red before: the search went to the next peak); a clear wrinkle's start comes before a
+wait inside it (red before: the wait at 6 060 s came first); a peak's moment a minute before the
+drill gives way to the drill's start. `dev/dayCallSession.test.ts`: a late finish inside the evening
+peak raises who drives at its start on the verdict alone, asked before placement, and its row prints
+the split (red before: nothing raised); the verdict raises nothing at any other candidate, and
+nothing at the start without the day's goals (controls); the call counts against neither cap; a
+wrinkle that raised nothing yields its line only once its candidates are over. `shift/report.test.ts`
+and `everyday/stageCallRow.test.ts`: the line on both surfaces, due after the window and never
+before, in one sentence.
+
+## D1337 — the who-drives card never offers the house as a switch target, and no answer on it is a trap or a formula
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (swarm DQ, ruling Q1 item 5: the
+> player member's, with the engineering member measuring the same fact; reconciled by wave AN's
+> integrator; built and measured by lane DQ-1), not by the product owner. A later reader weighing
+> this against a product-owner ruling should treat it as an agent ruling and say so. **Amends
+> [§ D1167](#d1167) clause 2's owner-reversible list.** **Owner-reversible**: the list, and the
+> trap check's tenth and three fifths.
+
+**Why an entry.** It replaces a recorded ruling's list, changes the card every player on a contender
+meets, and binds `shift/dayCalls.ts#DAY_CALL_DRIVER_OFFER`, its tests, and the nightly
+`call-cadence` tier that gates it.
+
+**What was measured.** With § D1167's list (Conventional collective, Minimum estimated wait, Fairness
+first), a player on Fairness first is offered the house and Minimum estimated wait. Swarm DQ's player
+member found the house lowest on the ten-minute row on 3 of 69 such rows, and 27 of the 32 rows that
+split the day read *the house loses; Minimum estimated wait and keep both clear*. This lane's sweep
+reproduced it on the first census crowd's week 1 under the careful policy: of 20 who-drives rows the
+house was lowest on 5.0 % (a trap) and Minimum estimated wait on 70.0 % (a formula, since the
+ten-minute count is what that driver chases). A first list without the house that kept Minimum
+estimated wait second still offered it to a Fairness first player, and it was lowest on 12 of 18
+rows (66.7 %).
+
+**The ruling.**
+
+1. **A switch target is always a contender, never the house.** The pair is the first two of Fairness
+   first, Predictive balanced, Energy aware and Minimum estimated wait that differ from who drives
+   and that a handover can reach. A player on the house meets the house as *keep* and is offered
+   Fairness first and Predictive balanced; a player on Fairness first, Predictive balanced and Energy
+   aware. The auction is not listed because a handover cannot reach it from a central driver.
+2. **Gated by a measured trap check**: on the careful policy's census week, no who-drives answer has
+   the lowest ten-minute count on under a tenth or over three fifths of the rows, ties counted for
+   each. Over the first four census crowds' week 1 (68 rows) Predictive balanced was lowest on 22.1 %,
+   Energy aware on 36.8 % and *keep* on 55.9 %. The check runs nightly beside § D1338's floors; a miss is
+   a finding for a ruling.
+3. It reads which answer is lowest only to say how often each is. Nothing the product shows reads it,
+   and the card stays identical whether a call turns the day or not (§ D1138 clause 2).
+
+**What it costs the wrinkle's start.** Swarm DQ's measurement of § D1336's verdict ground (8 more
+calls at 19 starts, the conference on 3 of 3) was taken with the house among the handovers, and the
+house was a losing answer at 12 of its 13 splits. With the house off the card, those splits are not
+offered: on the twenty careful days above, the wrinkle starts raised 5 calls (the fire drill 4 of 4,
+the shaft 1 of 4), one of them on the verdict alone, and the move-in and the conference raised none
+and said so after their window. That is the honest consequence of both rulings together, and it is
+recorded rather than tuned away.
+
+**Tests.** `shift/dayCalls.test.ts`: the list, and that no shipped profile is ever offered the house
+or itself (red before: a Fairness first player was offered the house and Minimum estimated wait).
+`dev/dayCallSession.test.ts`: the pair re-derived after a handover offers two contenders.
+`everyday/callCadence.test.ts`: the trap check refuses the house at 3 of 69 and a formula at seven in
+ten. `everyday/callCadence.sweep.test.ts`, gated and scheduled: the check on the census week.
+
+## D1338 — the careful day's cadence on a correct build is a set of floors, held nightly
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (swarm DQ, ruling Q1 item 3: the
+> honesty and engineering members, with the player member agreeing that § D1138 stays; reconciled by
+> wave AN's integrator; built and measured by lane DQ-1), not by the product owner. A later reader
+> weighing this against a product-owner ruling should treat it as an agent ruling and say so.
+> **Loosens no cadence rule and tightens none**: § D1138's search and admission, § D1166's six,
+> § D1205's two a peak and ten minutes, and § D1265's wrinkle stretch stand. **Owner-reversible**:
+> the floors' values.
+
+**Why an entry.** It adds a scheduled tier to `.github/workflows/deep-tiers.yml` and
+`deepTiers.test.ts`, and fixes figures other lanes and the next panel will be judged against.
+
+**What was measured.** The post-AM panel's 0.07 decisions a real minute, its P1 and its *0 of 11
+wrinkles* measured a stale bundle (§ D1317, § D1335), so no cadence rule moves on them. Swarm DQ
+measured the careful policy on a correct build at 4.42 to 4.8 calls a day, and S3 found searching the
+gaps between peaks lost calls (4.8 to 4.6 a day, the worst gap 4.7 to 5.8 minutes), so that search is
+refused. On this tree, with § D1335, § D1336 and § D1337 in, `everyday/callCadence.sweep.test.ts` played
+Midtown's week 1 on the first four census crowds under the careful policy (Fairness first, keep,
+park), twenty days through the shipped session:
+
+| figure | value |
+|---|---|
+| calls a day | median 5, mean 4.80, from 3 to 6 |
+| weekdays with no call | 0 of 20 |
+| weekdays with an evening call | 5 of 5 on each of the four crowds |
+| calls a real minute at the default rung | median 0.68 |
+| a day's real length | median 6.5 minutes |
+| the longest silence between two decisions | median 3.4, longest 5.6 real minutes |
+| of which somebody had waited a minute | median 3.1, longest 5.3 real minutes |
+| days cleared | 20 of 20 |
+
+The fourth crowd was finished in a second run after the first was stopped by its time limit; its
+first four days reproduced the first run's rows exactly.
+
+**The ruling.** These floors are written into `everyday/callCadence.test-helper.ts#cadenceMissesOf`
+and held by the sweep, scheduled nightly as the `call-cadence` job: a median of at least four calls
+a day; no weekday without a call; an evening call on at least three of each crowd's five weekdays.
+The longest silence is published and has no floor. The same run holds § D1337's trap check. A miss is
+a finding for a ruling, never a reason to change the instrument or a floor. `everyday/callCadence.test.ts`
+holds the arithmetic on every run, including that the panel's seat A week (7 calls in 10 weekdays, 3
+silent, no evening) misses all three floors.
+
+**The day still clears.** All twenty careful days cleared. That is the driver lock-in swarm DQ ruled on
+under Q2, which lane DQ-2 carries; nothing here moves it.

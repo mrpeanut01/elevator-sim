@@ -118,11 +118,15 @@ import { afterPressBeatOf, type PairVerdicts } from './afterPress.js';
 import { pressCallDecidingOf, pressCallRowOf, type PressCallRowInput } from './callRow.js';
 import {
   dayCallCountsLineOf,
+  dayCallFailedRowOf,
   dayCallRowOf,
   dayCallsQuietSentenceOf,
+  dayCallWrinkleQuietRowOf,
   dayEndedEarlyRowOf,
+  type DayCallFailure,
   type DayCallRecord,
   type DayCallsQuiet,
+  type DayCallWrinkleQuiet,
 } from './dayCalls.js';
 import { wrinkleNameOf, wrinkleNoteOf, type BookedOutCar } from './bookedOut.js';
 import type { PressCounterfactual } from './counterfactual.js';
@@ -888,6 +892,19 @@ export interface DayReportInput {
    */
   readonly dayCallsQuiet?: DayCallsQuiet | undefined;
   /**
+   * The moments whose question a run that could not be made cost — wave AN, lane DQ-1,
+   * [§ D1335](../../../../DECISIONS.md). One row says where, **whatever else the day raised**: until
+   * § D1335 the fault was spoken only through {@link dayCallsQuiet} on a day with no call at all.
+   * `undefined` and empty draw nothing.
+   */
+  readonly dayCallFailures?: readonly DayCallFailure[] | undefined;
+  /**
+   * The day's wrinkle where the stage ran its answers in it and raised no call — wave AN, lane DQ-1,
+   * [§ D1336](../../../../DECISIONS.md). One past-tense row, from the runs already made; `undefined`
+   * draws nothing.
+   */
+  readonly dayCallWrinkleQuiet?: DayCallWrinkleQuiet | undefined;
+  /**
    * Where the player pressed *End the day* — [§ D1168](../../../../DECISIONS.md), offered only once a
    * goal whose miss is final read missed on the stage. The day is filed on the run already recorded,
    * so every figure is the whole day's; the sheet carries one row saying when the watching stopped.
@@ -1318,6 +1335,8 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
         ? {
             records: input.dayCalls ?? [],
             quiet: input.dayCallsQuiet,
+            failures: input.dayCallFailures ?? [],
+            wrinkleQuiet: input.dayCallWrinkleQuiet,
             endedEarlyAtS: input.dayEndedEarlyAtS,
             gradeOf: (callObservations) =>
               VERDICT_VOICE[verdictOf(readGoals(input.goals, callObservations))].line,
@@ -2455,6 +2474,8 @@ function diagnosisFor(
   dayCalls?: {
     readonly records: readonly DayCallRecord[];
     readonly quiet?: DayCallsQuiet | undefined;
+    readonly failures?: readonly DayCallFailure[] | undefined;
+    readonly wrinkleQuiet?: DayCallWrinkleQuiet | undefined;
     readonly endedEarlyAtS?: SimTime | undefined;
     readonly gradeOf: (observations: Observations) => string;
   },
@@ -2616,6 +2637,16 @@ function diagnosisFor(
           tone: 'plain',
         }
       : undefined;
+  /* § D1335: a question lost to a run that could not be made is said on every day it happens. */
+  const failedRow =
+    dayCalls?.failures === undefined
+      ? undefined
+      : dayCallFailedRowOf(dayCalls.failures, (simTimeS) => clockOf(simTimeS, dayStartS));
+  /* § D1336: a wrinkle the stage ran its answers in and raised no call, in the past tense. */
+  const wrinkleRow =
+    dayCalls?.wrinkleQuiet === undefined
+      ? undefined
+      : dayCallWrinkleQuietRowOf(dayCalls.wrinkleQuiet, (simTimeS) => clockOf(simTimeS, dayStartS));
   /* § D1168: a day the player ended early says when, and that the figures are the whole day's. */
   const endedRow =
     dayCalls?.endedEarlyAtS === undefined
@@ -2626,7 +2657,9 @@ function diagnosisFor(
     ...(afterPress === undefined ? [] : [afterPress]),
     ...(callRow === undefined ? [] : [callRow]),
     ...callRows,
+    ...(wrinkleRow === undefined ? [] : [wrinkleRow]),
     ...(quietRow === undefined ? [] : [quietRow]),
+    ...(failedRow === undefined ? [] : [failedRow]),
     ...(endedRow === undefined ? [] : [endedRow]),
   ];
 }

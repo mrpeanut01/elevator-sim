@@ -5523,6 +5523,16 @@ function boot(ui: Elements, resources: BrowserResources): void {
         dayCallSession !== undefined && dayCallSession.recording() === recording ? dayCallSession.records() : [];
       return pinned === undefined ? ordinary : [pinned, ...ordinary];
     },
+    dayCallFailuresOn: (recording) => {
+      if (recording !== state.recording) return [];
+      return dayCallSession !== undefined && dayCallSession.recording() === recording ? dayCallSession.failures() : [];
+    },
+    dayCallWrinkleQuietOn: (recording) => {
+      if (recording !== state.recording) return undefined;
+      return dayCallSession !== undefined && dayCallSession.recording() === recording
+        ? dayCallSession.wrinkleQuiet()
+        : undefined;
+    },
     leaveDayAttempt: () => {
       if (standingAttempt() === undefined) return false;
       attemptLeft = true;
@@ -7815,6 +7825,10 @@ function boot(ui: Elements, resources: BrowserResources): void {
       dayCalls: dayCallSession?.records() ?? [],
       /* § D1152 — the one sentence a day with no call gets at its close. */
       dayCallsQuiet: dayCallsQuietForReport(),
+      /* § D1335 — the moments a run that could not be made cost their question, on any day. */
+      dayCallFailures: dayCallSession?.failures() ?? [],
+      /* § D1336 — the day's wrinkle where it raised no call, in the past tense. */
+      dayCallWrinkleQuiet: dayCallSession?.wrinkleQuiet(),
       /* § D1168 — where *End the day* was pressed, for the row that says so. */
       ...(dayEndedEarlyAtS === undefined ? {} : { dayEndedEarlyAtS }),
       // The scenario this shift belongs to, not `undefined`. Passing nothing made the sheet say

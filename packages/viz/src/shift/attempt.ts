@@ -37,7 +37,7 @@ import type { DispatcherProfile, RunInterventionConfig } from '@elevator-sim/cor
 
 import type { WatchRecord } from '../watch/types.js';
 
-import type { DayCallRecord } from './dayCalls.js';
+import type { DayCallFailure, DayCallRecord } from './dayCalls.js';
 import type { WeekState } from './types.js';
 
 /**
@@ -72,6 +72,20 @@ export interface DayCallResume {
    * day has no pair or the question has stopped after a handover that named nobody.
    */
   readonly driving: DispatcherProfile | null;
+  /**
+   * The candidates whose question was lost to a run that could not be made, wave AN lane DQ-1,
+   * [§ D1335](../../../../DECISIONS.md), so a resumed day still says where. Absent on a snapshot
+   * written before it, which is read as none.
+   */
+  readonly failures?: readonly DayCallFailure[] | undefined;
+  /**
+   * § D1336: the day's wrinkle's raised calls, counted apart from the peaks' because a wrinkle's start
+   * can fall inside one. Absent on a snapshot written before it, whose clear wrinkle's call sits in
+   * {@link raisedInPeak} under the wrinkle's start and is read from there.
+   */
+  readonly raisedInWrinkle?: number | undefined;
+  /** § D1336: the wrinkle's turned-down candidates, counted, for its past-tense line. */
+  readonly wrinkleRefused?: readonly DayCallRecord[] | undefined;
 }
 
 /** The attempt standing on one scored week day. */
