@@ -489,8 +489,15 @@ const ABOVE_CEILING: ReadonlyMap<string, { readonly count: number; readonly tota
      * day's crowd is the date's, so where the first quiet stretch falls is the run's, and the case
      * waits for it rather than for a clock. Nothing existing was raised:
      * 25 860 000 + 900 000 = **26 760 000**.
+     *
+     * **98 → 99, and the one is named** — GitHub PR #614's case in `dev/loopRefile.browser.test.ts`
+     * at 300 000 ms (regression cover for #215): it files a day on the dev server, presses the loop
+     * chip and requires the day-filing gate to stay shut, then starts a genuine re-run and requires
+     * the gate to open. Its own waits are a 120 000 ms boot, a 60 000 ms filing and three shorter
+     * polls, so it cannot sit under this project's 120 000 ms ceiling. Nothing existing was raised:
+     * 26 760 000 + 300 000 = **27 060 000**.
      */
-    ['viz-browser', { count: 98, totalMs: 26_760_000 }],
+    ['viz-browser', { count: 99, totalMs: 27_060_000 }],
   ]);
 
 /**
