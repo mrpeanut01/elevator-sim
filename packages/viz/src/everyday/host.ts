@@ -213,6 +213,7 @@ import {
   type ViewerState,
 } from '../dev/state.js';
 import { observationsAt } from '../live/observations.js';
+import type { SessionStore } from '../persist/types.js';
 import type { GhostPick } from '../live/raceStrip.js';
 import {
   applyPlainLever,
@@ -291,6 +292,7 @@ import {
   type RushSittingBody,
   type RushSittingCheck,
 } from './rushSitting.js';
+import { rememberDriver } from './driverMemory.js';
 import { REPLAY_COPY, replayBeforeOf, replayPatchOf, replayRestorePatchOf, replayableDay, type ReplayBefore } from './replay.js';
 
 import { campaignDayVerdict, campaignTestRows, type FiledDayRecord } from './campaignModel.js';
@@ -1706,8 +1708,12 @@ export interface EverydayHost {
    *
    * An id no profile carries writes nothing: `withDispatcher` leaves the spec alone, so the run is
    * built from a dispatcher that exists rather than from a name that does not.
+   *
+   * `keep: 'week'` is the brief's pick, which is kept across a reload
+   * ([§ D1318](../../../../DECISIONS.md), `everyday/driverMemory.ts`). Every other caller — the
+   * rush's setup screen is the one today — passes nothing and keeps nothing.
    */
-  setDispatcher(dispatcherId: string): void;
+  setDispatcher(dispatcherId: string, keep?: 'week'): void;
 
   /**
    * Write one plain lever — `mode/plainLevers.ts`'s seam, the identical route the Engineer
@@ -2486,6 +2492,12 @@ export interface EverydayHostBindings {
   raceAgainst(pick: GhostPick): void;
   /** Register a listener on `renderAll`'s notification list. Returns the unsubscribe. */
   onChange(listener: () => void): () => void;
+  /**
+   * Where the week's chosen driver is kept across a reload — `everyday/driverMemory.ts`,
+   * [§ D1318](../../../../DECISIONS.md). `dev/main.ts` passes its session store, and reads the
+   * slot back at boot. Optional because every test host but the one about this keeps nothing.
+   */
+  readonly driverStore?: SessionStore | undefined;
 }
 
 /**
@@ -3324,6 +3336,23 @@ export function createEverydayHost(
        * this press moved the building past without applying. [§ D1002](../../../../DECISIONS.md).
        */
       interventions: [],
+      /*
+       * **And so is the run, and the sheet that describes it** — the post-AM panel's seat C D4,
+       * wave AN, lane AN-5, recorded here under [§ D405](../../../../DECISIONS.md). The press moved
+       * `buildingId` and left the last tower's recording and report standing, so the Engineer
+       * surface drew the new tower's name (read from `buildingId`) over the old tower's run (read
+       * from the recording): *"Midtown Office · 22 floors · 5 cars · 610 people"*, which is
+       * Ashgate's, with Ashgate's log under it and a Day report reading *"06:40 of a shift that runs
+       * to 16:00"*. Cleared here exactly as *Take the next assignment* clears them
+       * (`dev/reportPanel.ts`) and `openTomorrowPatch` does, so until the new tower's day is set up
+       * there is no run, and every surface says so. The day being left is not lost by this: a filed
+       * day is in the week it was filed to, and an open attempt is stored and resumes from its own
+       * record (`shift/attempt.ts`).
+       */
+      recording: undefined,
+      report: undefined,
+      tomorrow: undefined,
+      withheld: [],
     });
   };
 
@@ -3855,7 +3884,7 @@ export function createEverydayHost(
       if (!weekHasClosed(b.state().week)) return;
       advanceDay(true);
     },
-    setDispatcher: (dispatcherId) => {
+    setDispatcher: (dispatcherId, keep) => {
       const state = b.state();
       const next = withDispatcher(state, b.resources, dispatcherId);
       /*
@@ -3868,6 +3897,18 @@ export function createEverydayHost(
         dispatcherSpec: next.dispatcherSpec,
         editingDispatcherId: next.editingDispatcherId,
       });
+      /*
+       * **And kept, when it is the week's own pick** — [§ D1318](../../../../DECISIONS.md), the
+       * post-AM panel's seat A: the brief's, said by `keep`. A rush's driver, a replay's and a career day's are their mode's,
+       * and the week they stand over is put back without them, so none of the three is kept: a
+       * reload must not hand the week a driver another mode chose. An id nothing offers is not
+       * kept either, for `withDispatcher`'s own reason.
+       */
+      const offered = allDispatchers(b.resources, state.savedDispatchers).some((profile) => profile.id === dispatcherId);
+      const ownMode = rushSession === undefined && replaySession === undefined && careerHold === undefined;
+      if (keep === 'week' && offered && ownMode) {
+        rememberDriver(b.driverStore, next.dispatcherId);
+      }
     },
     setPlainLever: (id, value) => {
       const state = b.state();

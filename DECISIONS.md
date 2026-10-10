@@ -1024,6 +1024,8 @@ THROW packages/core/dist/index.js
 
 ## D31 — `core` restructures into a browser barrel and a Node entry, routed by an export condition
 
+> **Status 2026-10-10: AMENDED by [§ D1317](#d1317)** (an agent ruling). The browser barrel and the export condition stand for every consumer of the package; the viewer's own bundle resolves both workspace packages to their source barrels through `vite.config.ts`. See [`docs/39`](docs/39-decisions-in-force.md).
+
 The brief offered two shapes: add an `@elevator-sim/core/config` subpath beside the existing
 default barrel, or move `loadConfig` off the default barrel. **Neither in its pure form was
 available**, and the reason is worth recording because it drove the answer.
@@ -49821,3 +49823,90 @@ Apartments at 900 s, `collective` to `eta` changes nobody's trip.
 at the day's end and not before; the Midtown day-7 handover draws neither line, and on that pair the
 carry goal alone withholds it while the energy goal alone agrees; the Garden Apartments handover to
 `eta` draws § D1278's line, and a later press withdraws it.
+
+---
+
+## D1317 — the viewer's bundle is built from the workspace's source, never from a `dist/` on disk
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (wave AN, lane AN-5, on the lane
+> brief's items 1 and 2 and the coordinator's item 5, after each defect was traced to its bundle),
+> not by the product owner. **Owner-reversible**: clause 1. **Not put to a swarm**: it decides how
+> the artifact is built and nothing a player chooses; the lane had no way to spawn one.
+
+**Why an entry.** It amends [§ D31](#d31), whose argument for the `browser` export condition was
+*"no aliasing, no stub, no bundler-specific configuration"*, and it changes what
+`.github/workflows/deploy-viz.yml`, the container and the browser tier's global setup bundle.
+
+**What was measured.** The post-AM panel played a bundle built at 05:00 from wave AM's viewer source
+beside a `packages/core/dist` last compiled on 2026-09-19. Vite resolved `@elevator-sim/core` through
+the `browser` condition to that `dist/browser.js`. The served `shiftWorker` chunk carries no
+`crowdThinning`, and its source map's `core/dist/sim/interventionWire.js` and `types.js` carry no
+`adopt-dispatcher`. Three defects followed, none of them in the code under review:
+
+- every tenancy repair on a fix-it case faulted with *"the repair moved nobody"* (seat C, D1);
+- every rush handover failed to recompute (seat C, D2), and *End the day* after a mid-day handover
+  threw `reading 'carried'` from `interventionKindRefusal`, reached by
+  `scope/runIdentity.ts#runIdentityIssues` (seat A, defect 1);
+- the filed record of that day dropped the handover, because the failed run never landed.
+
+Driven by the lane's own scripts on two bundles of the same viewer source: on the panel's bundle the
+tenancy press faulted and the rush handover failed within a second; on a bundle built after `tsc -b`
+the tenancy press landed *Better, and the complaint still stands* (30 → 8 waits) and the handover
+recomputed and played on, with no page error on either.
+
+**The ruling.**
+
+1. `packages/viz/vite.config.ts` resolves `@elevator-sim/core`, `@elevator-sim/core/browser`,
+   `@elevator-sim/experiments` and `@elevator-sim/experiments/browser` to their packages'
+   `src/browser.ts`, exactly as `vitest.config.ts` already resolves them for the tests. A build of a
+   tree is a build of that tree, whatever `dist/` holds and wherever `node_modules` points.
+2. § D31's barrel and export condition stand for every other consumer of the packages; only the
+   viewer's bundle stops reading `dist/`. The deploy and the container still run `tsc -b`, now as the
+   workspace's type check rather than as a precondition of the bundle.
+
+**Tests.** `dev/viteResolvesSource.test.ts` resolves every workspace specifier the viewer imports,
+and the plain forms from inside `experiments`' barrel, through `vite.config.ts` with Vite's own
+resolver: red before (*"@elevator-sim/core/browser resolved to packages/core/dist/browser.js"*),
+green after. `fixit/everyLeverRuns.test.ts` presses the six tenancy positions as the press site does;
+with `crowdThinning` withheld from the config, which is what the stale `core` did, it fails on the
+panel's own sentence.
+
+## D1318 — the brief's driver for the week comes back when the site is opened again
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (wave AN, lane AN-5, on the
+> coordinator's item 6 from the post-AM panel's seat A, defect 3), not by the product owner.
+> **Owner-reversible**: clauses 1 to 3. **Not put to a swarm**: the lane had no way to spawn one, and
+> the reading not chosen is set out below so the integrator can.
+
+**Why an entry.** It moves a row of `persist/persist.test.ts`'s ledger (`viewer.dispatcherId`, not
+persisted, *"part of the live run rather than the saved game"*), and it binds `dev/main.ts`'s boot,
+`everyday/host.ts#setDispatcher` and the brief's two pick controls.
+
+**What was measured.** On a bundle of the base tree, a fresh device on Crown Hotel picked *Fairness
+first* on the brief, played and closed the day, and opened the site again at its own address: the
+brief's picker read `collective` and its note *Running the lifts: Conventional collective*, with
+nothing said. A reload of the same address kept the pick, because the address carries
+`?dispatcher=` while it follows the run (`dev/main.ts#deepLinkSearchOf`); the bare address carries
+nothing.
+
+**The ruling.**
+
+1. The brief's pick (`setDispatcher(id, 'week')`) is kept under its own key, `elevator-sim.driver`,
+   beside `elevator-sim.viewMode` and `elevator-sim.revealedTabs` and for their reason rather than
+   inside the session envelope: an id this build no longer offers costs the pick, never the week.
+2. Only the brief's pick is kept, and only while no rush, replay or career day stands. A rush's
+   driver, a stage handover and a pinned day's house order are not, so what comes back is the
+   driver the player chose for their week.
+3. At boot, after the week and the library are restored, a kept id that the build or the restored
+   library still offers is put back through `dev/state.ts#withDispatcher`, unless the address names
+   a dispatcher, which is a link and wins. *Clear saved progress* forgets it.
+
+**The reading not chosen.** The coordinator allowed either restoring the driver or saying plainly
+that it was reset. Saying so needs the same kept id to know what was lost, and then asks the player
+to make the pick again; restoring it is the smaller change for the player. Reversing this keeps the
+slot and draws a line on the brief instead.
+
+**Tests.** `everyday/driverMemory.test.ts` (the slot: kept, refused when no longer offered, forgotten,
+total over a throwing store); `everyday/host.test.ts`, *keeps the brief's pick of driver*: red before
+(nothing kept), green after; `everyday/panelSeams.browser.test.ts`, *keeps the brief's driver when the
+site is opened again*: red on a bundle of the base tree (`collective`), green on this tree.

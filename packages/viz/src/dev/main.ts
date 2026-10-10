@@ -63,6 +63,7 @@ import { publishEverydayAccount } from '../everyday/accountPort.js';
 import { everydayDeviceChimeStore } from '../everyday/chimeStore.js';
 // The success sentence both shells say after a 201 — see `submitScore`.
 import { POST_RUN_COPY } from '../everyday/postRun.js';
+import { forgetDriver, rememberedDriverOf } from '../everyday/driverMemory.js';
 import { reportSignInLink } from '../everyday/signInLink.js';
 import { provideScenarioLadderFrom } from '../everyday/scenarioLadderPort.js';
 import { namedStageMoveOf } from '../everyday/stagePlay.js';
@@ -2601,6 +2602,17 @@ function boot(ui: Elements, resources: BrowserResources): void {
       const dealt = dealtCrowdOf(state.week, weekRecordFor(records, state.week.contractId), dateSeed);
       if (dealt !== state.seed) state = { ...state, seed: dealt };
     }
+    /*
+     * **And the week's driver comes back with the week** — [§ D1318](../../../../DECISIONS.md), the
+     * post-AM panel's seat A. The brief's pick is kept under its own key
+     * (`everyday/driverMemory.ts`), and an id this build and the restored library no longer offer
+     * comes back as nothing, which is the house, as before. After the library, so a player's own
+     * saved dispatcher is offered when it is asked about; and never over an address that names a
+     * dispatcher, which `applyDeepLink` has already applied and which is a link, honoured.
+     */
+    const linked = new URLSearchParams(window.location.search).has('dispatcher');
+    const driver = linked ? undefined : rememberedDriverOf(sessionStore, allDispatchers(resources, state.savedDispatchers));
+    if (driver !== undefined) state = withDispatcher(state, resources, driver);
   }
 
   /**
@@ -3539,6 +3551,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
       /* § D1218 — an attempt is part of what the player asked to forget. */
       dayAttempts = new Map();
       saveAttempts(sessionStore, dayAttempts);
+      /* § D1318 — and the week's kept driver, which is part of the same week. */
+      forgetDriver(sessionStore);
       return clearSession(sessionStore);
     },
     reloadPage: () => {
@@ -5049,6 +5063,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
    */
   const everydayHostBindings: EverydayHostBindings = {
     resources,
+    /* § D1318 — the week's chosen driver, kept across a reload; read back in the restore above. */
+    driverStore: sessionStore,
     /* § D1177 — the house on a closed week's counted days, run off this thread when first read. */
     weekHouse: weekHouseReadingOf,
     /*

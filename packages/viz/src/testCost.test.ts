@@ -353,7 +353,16 @@ const ABOVE_CEILING: ReadonlyMap<string, { readonly count: number; readonly tota
      * this lane's regeneration against 389 s quiet. 244 500 000 + 3 600 000 = **248 100 000**.
      * Nothing existing was raised.
      */
-    ['viz', { count: 117, totalMs: 248_100_000 }],
+    /*
+     * **117 → 118 and 248 100 000 → 249 900 000, one case** — wave AN lane AN-5's
+     * `fixit/everyLeverRuns.test.ts`, the nightly half: every one-control route through every offered
+     * fix case pressed as the press site presses it, about six hundred runs. Gated on the route
+     * census's own `ELEVATOR_SIM_FIXIT_ROUTES` and registered in `deepTiers.test.ts`, so the default
+     * suite pays only its always-on half, the six tenancy positions at 3.7 s. Measured 672 s in one
+     * vitest process at load 16 to 20; **1 800 000 ms** is about 2.7× that.
+     * 248 100 000 + 1 800 000 = **249 900 000**. Nothing existing was raised.
+     */
+    ['viz', { count: 118, totalMs: 249_900_000 }],
     /*
      * **67 → 70, and the three are named** — GitHub issue #240's
      * `everyday/smallScreen.browser.test.ts`. Five of that file's eight annotations sit **at** this

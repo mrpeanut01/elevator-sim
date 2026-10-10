@@ -166,10 +166,9 @@ jobs:
 
       - run: npm ci
 
-      # `tsc -b` first, and not as a formality: `@elevator-sim/core`'s exports map resolves the
-      # browser condition to `./dist/browser.js`, so Vite has nothing to bundle until the workspace
-      # has been compiled. Skipping this fails at resolution with a message about a missing file
-      # rather than about a missing build.
+      # `tsc -b` first, as the type check of the workspace. Since DECISIONS.md § D1317 the bundle no
+      # longer needs it: `vite.config.ts#WORKSPACE_SOURCE` bundles `core` and `experiments` from
+      # their source, so a build is a build of this checkout whatever `dist/` holds.
       - name: Compile the workspace
         run: npm run build
 

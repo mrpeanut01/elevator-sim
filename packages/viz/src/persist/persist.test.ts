@@ -414,7 +414,7 @@ const NOT_PERSISTED: Readonly<Record<string, string>> = Object.freeze({
   'viewer.buildingId':
     'derivable rather than stored: the restored week names a contract and a contract names its building, so persisting both is how two sources of truth come to disagree about which building a sheet is headed with',
   'viewer.dispatcherId':
-    'part of the live run rather than the saved game; menu.freePlay carries the dispatcher a selection means, and enterFreePlay is the one function allowed to turn one into a running state',
+    'part of the live run rather than the saved game; menu.freePlay carries the dispatcher a selection means, and enterFreePlay is the one function allowed to turn one into a running state. The brief’s pick of driver for the week is kept beside the envelope rather than in it, under its own key elevator-sim.driver (everyday/driverMemory.ts, § D1318), for revealedTabs’ reason: an id this build no longer offers must cost the player the pick and never the week',
   'viewer.pattern':
     'same: a saved pattern is this browser’s alone (runIdentity.ts refuses a run carrying one), so restoring it would restore an unreproducible run',
   'viewer.shiftLengthS': 'the live run’s length; menu.freePlay.durationS is the persisted selection',

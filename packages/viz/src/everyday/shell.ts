@@ -1369,7 +1369,7 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
      * a screen that reads the Scenario record, so the record comes back first. The host's release
      * is idempotent, so a row pressed with no career day standing costs nothing.
      */
-    if (state.ctx === 'campaign' && !CAREER_FLOW_SCREENS.includes(screen)) dataHost?.leaveCareer?.();
+    if (state.ctx === 'campaign' && !CAREER_FLOW_SCREENS.includes(screen)) leaveCareerFlow();
     /*
      * **The address names the run on screen, or nothing** — wave AJ, § D1097. A fix-it case plays a
      * building and a crowd of its own, and the bar went on reading the daily's
@@ -1477,6 +1477,24 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
   function leaveRush(): void {
     state = { ...state, ctx: 'daily' };
     dataHost?.leaveRush();
+  }
+
+  /**
+   * Leave the career's own screens: the context back to the daily loop, and the host gives the
+   * Scenario record back (GitHub issue #594, § D964) — the same two halves {@link leaveRush} and
+   * {@link leaveReplay} keep.
+   *
+   * **The context half was missing, and it was the post-AM panel's seat C D3** (wave AN, lane AN-5,
+   * recorded here under [§ D405](../../../../DECISIONS.md)). {@link go} released the career day
+   * when a rail row left § 8's five screens, and `ctx` stayed `campaign`. So a player who closed a
+   * career day, pressed *Your week* and played today's tower from there met a Scenario day in the
+   * career's chrome — the CAREER rail, *⤺ Leave the career*, the career's breadcrumb — and its close
+   * was the career's report, whose primary sent them to *day 3 at Garden Apartments*. The day banked
+   * to the Scenario week all the same; only the shell still thought it was in the career.
+   */
+  function leaveCareerFlow(): void {
+    state = { ...state, ctx: 'daily' };
+    dataHost?.leaveCareer?.();
   }
 
   /** § 6.1's replay, the shell's half — the context; `EverydayHost.startReplay` owns the week. GitHub issue #177 item 1. */

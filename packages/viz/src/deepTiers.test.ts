@@ -248,6 +248,16 @@ const TIERS: Readonly<Record<string, Tier>> = Object.freeze({
       'matches the par against fixit/par.ts#FIXIT_PAR',
     scheduled: true,
   },
+  'packages/viz/src/fixit/everyLeverRuns.test.ts': {
+    gates: ['ELEVATOR_SIM_FIXIT_ROUTES'],
+    reason:
+      'wave AN, lane AN-5: every one-control route through every offered fix case pressed as the ' +
+      'press site presses it, crowd check with the plan included, and required to run and to say so ' +
+      'where it moved nobody. Rides the route census\u2019s gate and job, whose routes it shares. The ' +
+      'always-on half presses the six tenancy positions. Measured 2026-10-10 on the shared four-core ' +
+      'container at load 16 to 20: 672 s',
+    scheduled: true,
+  },
   'packages/experiments/src/fuzz/deep.test.ts': {
     gates: ['ELEVATOR_SIM_FUZZ'],
     reason:

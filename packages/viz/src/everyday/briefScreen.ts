@@ -431,7 +431,7 @@ function mountBrief(
       if (view.drivers.held !== undefined) card.setAttribute('aria-describedby', 'everyday-brief-driver-held');
       card.addEventListener('click', () => {
         if (view.drivers.held !== undefined) return;
-        context.host.setDispatcher(option.id);
+        context.host.setDispatcher(option.id, 'week');
       });
       cards.append(card);
     }
@@ -464,7 +464,7 @@ function mountBrief(
     select.disabled = view.drivers.held !== undefined;
     select.addEventListener('change', () => {
       if (view.drivers.held !== undefined) return;
-      context.host.setDispatcher(select.value);
+      context.host.setDispatcher(select.value, 'week');
     });
     const count = el(doc, 'span', 'everyday-brief-count', view.drivers.count);
     count.style.cssText = MONO(11, C.label);

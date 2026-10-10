@@ -785,6 +785,19 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'The kept driver\'s slot — wave AN, lane AN-5, § D1318. `DRIVER_KEY` is a storage key, ' +
+        '`rememberDriver` and `forgetDriver` return nothing, and `rememberedDriverOf` returns a ' +
+        'dispatcher id or `undefined`. None of them returns a sentence; what a player reads about the ' +
+        'driver is the brief\'s own note, which names the profile the id resolves to.',
+      ids: [
+        'everyday/driverMemory.ts#DRIVER_KEY',
+        'everyday/driverMemory.ts#forgetDriver',
+        'everyday/driverMemory.ts#rememberDriver',
+        'everyday/driverMemory.ts#rememberedDriverOf',
+      ],
+    },
+    {
+      reason:
         'The Everyday shell\'s boot seam: two CSS selectors and the functions that press what they ' +
         'find. No player reads any of it. The two `ENGINEER_*` selectors are ' +
         '`document.querySelector` arguments — derived only because the two-adjacent-words scanner ' +

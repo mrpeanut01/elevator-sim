@@ -58,6 +58,7 @@ import { scheduledEventFor } from '../shift/calendar.js';
 import { derivedCrowdOf, type WeekRecord } from '../shift/weekRecord.js';
 import type { GoalReading } from '../shift/types.js';
 import type { DayAttempt } from '../shift/attempt.js';
+import { DRIVER_KEY } from './driverMemory.js';
 import type { ShapedDayReport } from '../shift/report.js';
 /* GitHub issue #245 — the predicate the façade carries the answer of, asked directly. */
 import { runIdentityIssues } from '../scope/runIdentity.js';
@@ -592,6 +593,59 @@ describe('the run actions', () => {
     const moved = h.patches.find((patch) => patch.week !== undefined);
     expect(moved?.buildingId).toBe(other.buildingId);
     expect(moved?.interventions).toEqual([]);
+  });
+
+  it('chooseTower takes the last tower’s run and sheet with the week it moves — the post-AM panel’s seat C D4', () => {
+    /*
+     * Red before: the move patched `buildingId` and left `recording` and `report` standing, so the
+     * Engineer surface drew the new tower's name over the old tower's run (Ashgate's 22 floors,
+     * 5 cars and 610 people under *Midtown Office*). The keys are asserted present, because a
+     * patch that omits a key leaves the field as it was, which is the defect.
+     */
+    const ranElsewhere: ViewerState = {
+      ...base(),
+      recording: A_RECORDING,
+      report: { of: 'single-run' } as unknown as ViewerState['report'],
+    };
+    const other = CONTRACTS.find((contract) => contract.id !== ranElsewhere.week.contractId);
+    if (other === undefined) throw new Error('the shipped contracts hold more than one tower');
+    const h = harnessOf(ranElsewhere, { dayClosed: true });
+    createEverydayHost(h.bindings).chooseTower(other.id);
+    const moved = h.patches.find((patch) => patch.week !== undefined);
+    expect(moved?.buildingId).toBe(other.buildingId);
+    for (const key of ['recording', 'report', 'tomorrow'] as const) {
+      expect(moved !== undefined && key in moved, `the move left ${key} standing`).toBe(true);
+      expect(moved?.[key]).toBeUndefined();
+    }
+    expect(moved?.withheld).toEqual([]);
+  });
+
+  it('keeps the brief’s pick of driver across a reload, and nobody else’s — § D1318, the post-AM panel’s seat A', () => {
+    /*
+     * Red before: nothing was kept, so the boot put the house back on the week's next day and the
+     * brief said nothing about it. What is held here is the host's half — the brief's press writes
+     * the slot, the rush's setup press and an id nothing offers do not; `driverMemory.test.ts`
+     * holds the read, and `dev/main.ts`'s restore is driven on the shipped bundle.
+     */
+    const slot = new Map<string, string>();
+    const store = {
+      read: (key: string) => slot.get(key) ?? null,
+      write: (key: string, value: string) => {
+        slot.set(key, value);
+      },
+      remove: (key: string) => {
+        slot.delete(key);
+      },
+    };
+    const h = harnessOf(base());
+    const host = createEverydayHost({ ...h.bindings, driverStore: store });
+    host.setDispatcher('nearest-car');
+    expect(slot.get(DRIVER_KEY), 'a pick that is not the brief’s was kept').toBeUndefined();
+    host.setDispatcher('no-such-dispatcher', 'week');
+    expect(slot.get(DRIVER_KEY), 'an id nothing offers was kept').toBeUndefined();
+    host.setDispatcher('fairness-first', 'week');
+    expect(slot.get(DRIVER_KEY)).toBe('fairness-first');
+    expect(h.patches.at(-1)?.dispatcherId).toBe('fairness-first');
   });
 
   it('chooseTower after a boot that dealt a pinned first day puts the day’s crowd back — § D1047', () => {
