@@ -16,7 +16,7 @@
  * device's slot.
  *
  * Gate: without `ELEVATOR_SIM_CHROMIUM` every case here skips and the file reports a pass, which is
- * why the tier is run with it set and the case count is what is read. Port 5934.
+ * why the tier is run with it set and the case count is what is read. Port 5933 (5934 at the lane; moved at integration, where lane AO-4 holds 5934).
  */
 
 import { chromium, type Browser } from 'playwright-core';
@@ -39,7 +39,7 @@ let origin: string;
 
 beforeAll(async () => {
   if (!HAS_BROWSER) return;
-  site = await startShippedSite({ preview: { port: 5934, strictPort: false } });
+  site = await startShippedSite({ preview: { port: 5933, strictPort: false } });
   origin = site.origin;
   browser = await chromium.launch({ executablePath: CHROMIUM });
 });
