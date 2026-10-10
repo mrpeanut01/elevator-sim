@@ -87,7 +87,9 @@
  * outside a test.
  */
 
-import { existsSync } from 'node:fs';
+import { existsSync, globSync, statSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /* ========================================================================== *
@@ -123,22 +125,164 @@ export const CHROMIUM_ENV = 'ELEVATOR_SIM_CHROMIUM';
 const PROVISIONED_FALLBACK =
   '/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell';
 
+/**
+ * Where Playwright keeps browsers on this platform — the roots discovery searches, in order.
+ *
+ * `PLAYWRIGHT_BROWSERS_PATH` first because it is Playwright's own override and the mechanism the
+ * provisioned image used; `'0'` is excluded because that value means *beside the package* rather
+ * than *at this path*. Then the platform default, which is the documented location
+ * `playwright-core` itself installs into. Then `/opt/pw-browsers`, unconditionally on anything
+ * POSIX, so the image {@link PROVISIONED_FALLBACK} came from resolves by the mechanism rather than
+ * by the literal.
+ *
+ * **No revision appears anywhere in this list, and none may.** `playwright-core` is `^1.62.1` and
+ * `chromium.executablePath()` on this host names revision **1234**, which is not installed; the
+ * newest build that *is* installed is **1228**, and it drove all 27 files without incident. A
+ * resolution that trusted the wanted revision would skip exactly as hard as the literal did, one
+ * `npm update` later. `browserTier.test.ts` asserts this list against the root `playwright-core`
+ * would itself use, so a Playwright that moves its cache is a red run rather than a silent skip.
+ */
+export const BROWSER_ROOTS: readonly string[] = browserRoots();
+
+function browserRoots(): readonly string[] {
+  const roots: string[] = [];
+  const named = process.env['PLAYWRIGHT_BROWSERS_PATH'];
+  if (named !== undefined && named !== '' && named !== '0') roots.push(named);
+  const home = homedir();
+  if (process.platform === 'darwin') {
+    roots.push(join(home, 'Library', 'Caches', 'ms-playwright'));
+  } else if (process.platform === 'win32') {
+    const local = process.env['LOCALAPPDATA'] ?? join(home, 'AppData', 'Local');
+    roots.push(join(local, 'ms-playwright'));
+  } else {
+    roots.push(join(home, '.cache', 'ms-playwright'));
+  }
+  if (process.platform !== 'win32') roots.push('/opt/pw-browsers');
+  return [...new Set(roots)];
+}
+
+/**
+ * The executable layouts Playwright has shipped, per platform, **most preferred first**.
+ *
+ * Two axes, and the order between them is a decision rather than a formatting choice.
+ *
+ * *Kind before revision.* `chrome-headless-shell` outranks a full *Google Chrome for Testing*
+ * whatever their revisions, because the tier launches with `chromium.launch({ executablePath })`
+ * and no `headless` argument — headless is the default — and because this tier holds a **pixel
+ * oracle** (`noteContrast.browser.test.ts`, whose own docstring records that it was calibrated
+ * against `chrome-headless-shell-mac-arm64`). Two kinds of binary that rasterise slightly
+ * differently would make that oracle depend on which build a machine happened to download.
+ *
+ * *Revision descending within a kind*, so a machine with five builds picks one build and picks the
+ * same one twice. Both older layouts (`chrome-linux/headless_shell`, `chrome-mac/headless_shell`)
+ * and current ones are listed: this host carries revision 1181 in the old shape and 1208–1228 in
+ * the new, and a pattern set that saw only one of them would be the literal again with a wildcard
+ * in it.
+ */
+const EXECUTABLES: Readonly<Record<string, readonly string[]>> = {
+  darwin: [
+    'chromium_headless_shell-*/chrome-headless-shell-mac-*/chrome-headless-shell',
+    'chromium_headless_shell-*/chrome-mac*/headless_shell',
+    'chromium-*/chrome-mac-*/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing',
+    'chromium-*/chrome-mac*/Chromium.app/Contents/MacOS/Chromium',
+  ],
+  linux: [
+    'chromium_headless_shell-*/chrome-headless-shell-linux*/chrome-headless-shell',
+    'chromium_headless_shell-*/chrome-linux*/headless_shell',
+    'chromium-*/chrome-linux*/chrome',
+  ],
+  win32: [
+    'chromium_headless_shell-*/chrome-headless-shell-win*/chrome-headless-shell.exe',
+    'chromium_headless_shell-*/chrome-win*/headless_shell.exe',
+    'chromium-*/chrome-win*/chrome.exe',
+  ],
+};
+
+/** The revision in `…/chromium_headless_shell-1228/…`, or `-1` if the segment does not carry one. */
+const REVISION = /-(\d+)[\\/]/u;
+
+function isFile(path: string): boolean {
+  try {
+    return statSync(path).isFile();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Every Chromium this machine has, best first — and *best* is total, not a preference.
+ *
+ * Sorted by pattern rank, then revision descending, then path ascending, so the answer is a
+ * function of the filesystem and nothing else. Two runs on one machine agree; two machines with the
+ * same cache agree. Exported because `browserTier.test.ts` re-derives the list to assert that
+ * property rather than trusting this docstring for it, and because the whole list — not only the
+ * winner — is what makes a skip attributable.
+ *
+ * `roots` is a parameter with a default rather than a closed-over constant so the guard can point it
+ * at an empty directory and prove the no-browser path still skips instead of throwing.
+ */
+export function discoverChromium(roots: readonly string[] = BROWSER_ROOTS): readonly string[] {
+  const patterns = EXECUTABLES[process.platform] ?? [];
+  const found: { path: string; rank: number; revision: number }[] = [];
+  for (const root of roots) {
+    for (const [rank, pattern] of patterns.entries()) {
+      for (const match of globSync([pattern], { cwd: root })) {
+        const path = join(root, match);
+        if (!isFile(path)) continue;
+        const revision = REVISION.exec(match.replace(/\\/gu, '/'));
+        found.push({ path, rank, revision: revision === null ? -1 : Number(revision[1]) });
+      }
+    }
+  }
+  found.sort(
+    (a, b) => a.rank - b.rank || b.revision - a.revision || (a.path < b.path ? -1 : a.path > b.path ? 1 : 0),
+  );
+  return found.map((entry) => entry.path);
+}
+
+/** The override, normalised: an empty string is not a path and must not beat discovery. */
+const OVERRIDE =
+  process.env[CHROMIUM_ENV] === undefined || process.env[CHROMIUM_ENV] === ''
+    ? undefined
+    : process.env[CHROMIUM_ENV];
+
+/**
+ * What discovery found — empty when {@link CHROMIUM_ENV} is set, because an explicit override is
+ * explicit and there is nothing for the tier to choose between.
+ */
+export const DISCOVERED: readonly string[] = OVERRIDE === undefined ? discoverChromium() : [];
+
 /** The executable the tier will launch. */
-export const CHROMIUM = process.env[CHROMIUM_ENV] ?? PROVISIONED_FALLBACK;
+export const CHROMIUM = OVERRIDE ?? DISCOVERED[0] ?? PROVISIONED_FALLBACK;
 
 /** Whether this machine has one. Every suite in the tier hangs off this. */
 export const HAS_BROWSER = existsSync(CHROMIUM);
 
 /**
- * What a reader is told when it does not.
+ * *How* the tier arrived at {@link CHROMIUM} — the half of the skip that used to be missing.
  *
- * One sentence, and it names the path it looked at rather than only the variable — the two failures
- * *unset* and *set to something that has been deleted* look identical without it, and the second one
- * is what a stale shell revision produces.
+ * The old reason named a path and nothing else, so *unset*, *set to something deleted* and *nothing
+ * installed anywhere* rendered as one sentence about one path. They are three different things to
+ * do next, and a reader who cannot tell them apart does the fourth thing: assumes the tier ran.
+ */
+export const CHROMIUM_SOURCE: string =
+  OVERRIDE !== undefined
+    ? `named by ${CHROMIUM_ENV}`
+    : DISCOVERED.length > 0
+      ? `discovered under ${BROWSER_ROOTS.join(', ')}; ${String(DISCOVERED.length)} candidate(s), newest headless build first`
+      : `the provisioned fallback — ${CHROMIUM_ENV} is unset and nothing matched under ${BROWSER_ROOTS.join(', ')}`;
+
+/**
+ * What a reader is told when there is no browser.
+ *
+ * One sentence, and it names the path it looked at *and how it got there* rather than only the
+ * variable. It also names the install command, because the honest next step on a machine with no
+ * Playwright is to install one — not to hunt for a path to export.
  */
 export const SKIP_REASON =
-  `[viz-browser] skipped: no Chromium at ${CHROMIUM}. ` +
-  `Set ${CHROMIUM_ENV} to run the browser tier (DECISIONS.md § D220, GitHub issue #142).`;
+  `[viz-browser] skipped: no Chromium at ${CHROMIUM} (${CHROMIUM_SOURCE}). ` +
+  `Run \`npx playwright-core install chromium\`, or set ${CHROMIUM_ENV} to an executable, to run ` +
+  `the browser tier (DECISIONS.md § D220, GitHub issue #142).`;
 
 /* ========================================================================== *
  * The artifact — which build, GitHub issue #281
