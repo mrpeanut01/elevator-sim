@@ -14,18 +14,22 @@
  * ## The rule
  *
  * A rung may author **week orders** (`data/contract-ladder.json`, `weekOrders`): five drawn ids,
- * Monday to Friday. Week 1 is always the draw it always was. Week `n` is dealt entry
- * `(n − 1) mod k` of the list *week 1's draw, then every authored order the census admits, in file
- * order*, so the orders cycle and a tower with none admitted deals week 1's draw every week, as
- * before. The weekend is not authored and keeps week 1's draw.
+ * Monday to Friday. Week 1 is always the draw it always was. From week 2 the weeks are dealt the
+ * authored orders the census admits, in file order, and round them again after the last
+ * ({@link weekOrderIndexOf}); a tower with none admitted deals week 1's draw every week, as before.
+ * The weekend is not authored and keeps week 1's draw. *(Under § D1252 the cycle wrapped back to
+ * week 1's draw; wave AN's lane DQ-2 stopped that, § D1343, because week 1 is a week one dropdown
+ * holds.)*
  *
- * **An order is dealt only once the census admits it** ({@link weekOrderAdmissionOf}): every one of
- * its five days has a current row in `data/week-way.json` under exactly the wrinkle it names (the
- * same day of the week, so the tower at that day's growth), and `docs/33` DC-10 admits each row: a
- * way through on held-out crowds, the standing order missing often enough, the queue gate met. So
- * an order is admitted by measurements taken by the command `shift/weekWay.sweep.test.ts`
- * documents, never by a flag, and an order the census refuses stays authored with its refusal
- * readable here and is not dealt.
+ * **An order is dealt only once the census admits it** ({@link weekOrderAdmissionOf}), on two
+ * grounds. Every one of its five days has a current row in `data/week-way.json` under exactly the
+ * wrinkle it names (the same day of the week, so the tower at that day's growth), and `docs/33`
+ * DC-10 admits each row: a way through on held-out crowds, the standing order missing often enough,
+ * the queue gate met. And **the one-profile screen admits the week** (`weekDominance.ts`, `docs/33`
+ * DC-11, [§ D1343](../../../../DECISIONS.md)): no single shipped profile, left alone with nothing
+ * pressed, holds its target on more than half of those crowds. So an order is admitted by
+ * measurements taken by the command `shift/weekWay.sweep.test.ts` documents, never by a flag, and an
+ * order either refuses stays authored with its refusal readable here and is not dealt.
  *
  * Whether a dealt day then **counts** toward the week is `weekStake.ts`'s rule, unchanged: the
  * census row for the day as dealt decides it, and the target is derived from the counted days of
@@ -34,8 +38,9 @@
  * ## The rotation this keeps, and the half it does not
  *
  * `GAMEPLAY_AND_NAVIGATION.md` § 17 asks for no template twice in fourteen days. Within a week the
- * orders repeat no template, and {@link weekOrderIssues} refuses two neighbouring weeks in the cycle
- * (week 1's draw included, and the wrap from the last order back to week 1) that share a template,
+ * orders repeat no template, and {@link weekOrderIssues} refuses two neighbouring weeks as dealt
+ * (week 1's draw and the first order, each order and the next, the last order and the first) that
+ * share a template,
  * so no template repeats inside seven days of itself across a roll. **Two weeks apart is not
  * kept**: with week 1's five templates and eleven usable others (`contractors` cannot be cleared on
  * Midtown's census and `flu-day` asks no decision), a cycle of four weeks cannot keep fourteen days
@@ -49,6 +54,7 @@ import type { WrinkleLibrary } from '../wrinkles/types.js';
 
 import { CONTRACT_LADDER, type ContractLadder, type ContractWeekOrder } from './ladder.js';
 import type { WeekState } from './types.js';
+import { WEEK_DOMINANCE, weekDominanceOf, type WeekDominance, type WeekDominanceReading } from './weekDominance.js';
 import { dc10Of, WEEK_WAY, weekWayRowFor, type WeekWay, type WeekWayRow } from './weekWay.js';
 
 /** How many days an order authors: Monday to Friday, day 1 to day 5. */
@@ -76,7 +82,13 @@ export interface WeekOrderDay {
 export interface WeekOrderAdmission {
   readonly order: ContractWeekOrder;
   readonly days: readonly WeekOrderDay[];
-  /** Every day admitted. */
+  /**
+   * **The one-profile screen's reading** — `weekDominance.ts`, wave AN lane DQ-2,
+   * [§ D1343](../../../../DECISIONS.md): whether some shipped profile, left alone, holds the week on
+   * more than the owner-reversible share of the census crowds.
+   */
+  readonly dominance: WeekDominanceReading;
+  /** Every day admitted, and the one-profile screen admits the week. */
   readonly admitted: boolean;
 }
 
@@ -90,6 +102,7 @@ export function weekOrderAdmissionOf(
   contractId: string,
   order: ContractWeekOrder,
   census: WeekWay = WEEK_WAY,
+  dominance: WeekDominance = WEEK_DOMINANCE,
 ): WeekOrderAdmission {
   const days = Array.from({ length: WEEK_ORDER_DAYS }, (_, index): WeekOrderDay => {
     const day = index + 1;
@@ -101,7 +114,8 @@ export function weekOrderAdmissionOf(
     return { day, eventId, row, reason };
   });
   const whole = order.days.length === WEEK_ORDER_DAYS && days.every((day) => day.reason === 'admitted');
-  return { order, days: Object.freeze(days), admitted: whole };
+  const screen = weekDominanceOf(contractId, order, census, dominance);
+  return { order, days: Object.freeze(days), dominance: screen, admitted: whole && screen.verdict === 'admitted' };
 }
 
 const DEALT = new WeakMap<WeekWay, Map<string, readonly (ContractWeekOrder | undefined)[]>>();
@@ -114,8 +128,9 @@ export function dealtWeekOrdersOf(
   contractId: string,
   census: WeekWay = WEEK_WAY,
   ladder: ContractLadder = CONTRACT_LADDER,
+  dominance: WeekDominance = WEEK_DOMINANCE,
 ): readonly (ContractWeekOrder | undefined)[] {
-  const shipped = ladder === CONTRACT_LADDER;
+  const shipped = ladder === CONTRACT_LADDER && dominance === WEEK_DOMINANCE;
   let cache = shipped ? DEALT.get(census) : undefined;
   const cached = cache?.get(contractId);
   if (cached !== undefined) return cached;
@@ -123,7 +138,7 @@ export function dealtWeekOrdersOf(
   const admitted = (rung?.weekOrders ?? []).filter(
     (order) =>
       order.days.every((id) => wrinkleOfDrawnId(WRINKLE_LIBRARY, id) !== undefined) &&
-      weekOrderAdmissionOf(contractId, order, census).admitted,
+      weekOrderAdmissionOf(contractId, order, census, dominance).admitted,
   );
   const dealt = Object.freeze([undefined, ...admitted]);
   if (shipped) {
@@ -136,11 +151,21 @@ export function dealtWeekOrdersOf(
   return dealt;
 }
 
-/** Which entry of {@link dealtWeekOrdersOf} week `key.week` is dealt: `0` is week 1's draw. */
+/**
+ * Which entry of {@link dealtWeekOrdersOf} week `key.week` is dealt: `0` is week 1's draw.
+ *
+ * **From week 2 the weeks cycle through the admitted orders only** — wave AN, lane DQ-2,
+ * [§ D1343](../../../../DECISIONS.md). Under § D1252 the cycle wrapped back to week 1's draw, so
+ * the week after the last admitted order was week 1 again; the one-profile rule says no week after
+ * the first is dealt unless the screen admits it, and week 1's draw is the newcomer's week, which
+ * the screen does not admit (one dropdown holds it). Week 1 itself is always the draw, and a tower
+ * with no admitted order still deals the draw every week.
+ */
 export function weekOrderIndexOf(key: WeekOrderKey, census: WeekWay = WEEK_WAY): number {
   const count = dealtWeekOrdersOf(key.contractId, census).length;
   const week = Math.max(1, Math.trunc(key.week));
-  return (week - 1) % count;
+  if (week === 1 || count <= 1) return 0;
+  return 1 + ((week - 2) % (count - 1));
 }
 
 /** The authored order a week is dealt, or `undefined` where it is dealt week 1's draw. */
@@ -186,6 +211,7 @@ export function weekOrderIssues(
   ladder: ContractLadder = CONTRACT_LADDER,
   census: WeekWay = WEEK_WAY,
   library: WrinkleLibrary = WRINKLE_LIBRARY,
+  dominance: WeekDominance = WEEK_DOMINANCE,
 ): readonly string[] {
   const issues: string[] = [];
   const weekday = new Set(poolFor(library, 'weekday', census.protocol.horizon).map((template) => template.id));
@@ -212,14 +238,29 @@ export function weekOrderIssues(
         templates.push(drawn.templateId);
       }
     }
-    const cycle = dealtWeekOrdersOf(rung.contractId, census, ladder);
+    const cycle = dealtWeekOrdersOf(rung.contractId, census, ladder, dominance);
     if (cycle.length < 2) continue;
     const templatesOf = (order: ContractWeekOrder | undefined): readonly string[] =>
       order === undefined
         ? drawnTemplatesOfWeekOne(library, census.protocol.horizon)
         : order.days.map((id) => wrinkleOfDrawnId(library, id)?.templateId ?? id);
+    /*
+     * The weeks as dealt: week 1's draw, then each admitted order, then round the admitted orders
+     * again ({@link weekOrderIndexOf}): so the neighbours are week 1 and the first order, each order
+     * and the next, and the last order and the first.
+     *
+     * **One admitted order repeats, and that is not refused here** — wave AN, lane DQ-2
+     * ([§ D1343](../../../../DECISIONS.md)), owner-reversible. A tower with none admitted deals week
+     * 1's draw every week, and the check above has never refused that (`cycle.length < 2`); a tower
+     * with one deals it every week from week 2, the same repetition one week later, and the sheet
+     * says *the same wrinkles as this week* rather than promising new ones. Refusing it would leave
+     * the tower dealing week 1's draw instead, which repeats just as often and is a week one
+     * dropdown holds.
+     */
     for (const [index, order] of cycle.entries()) {
-      const next = cycle[(index + 1) % cycle.length];
+      const wraps = index + 1 >= cycle.length;
+      if (wraps && cycle.length === 2) continue;
+      const next = cycle[wraps ? 1 : index + 1];
       const shared = templatesOf(order).filter((id) => templatesOf(next).includes(id));
       if (shared.length > 0) {
         issues.push(

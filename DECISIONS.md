@@ -50664,3 +50664,171 @@ silent, no evening) misses all three floors.
 
 **The day still clears.** All twenty careful days cleared. That is the driver lock-in swarm DQ ruled on
 under Q2, which lane DQ-2 carries; nothing here moves it.
+
+---
+
+## D1343 — DC-11: from week 2 a week order is dealt only where no single shipped profile, left alone, holds its target on more than half of the census crowds
+
+> **Taken 2026-10-10 by agent sessions under delegated authority**, carrying out swarm DQ's Q2
+> rule 2 as wave AN's lane DQ-2, not by the product owner. The ruling is the swarm's; the shape
+> below is the lane's. It reads [§ D528](#d528) clause 2's *no single shipped dispatcher profile may
+> meet every bar on its own* as a per-week rule, which the owner may reverse. **Owner-reversible**:
+> the threshold of half (S1 and S2 said half, S3 a third; the ruling took half); week 1's
+> exemption; reading *holds* as the week sheet's own target; the weeks after the first going
+> round the admitted orders rather than back to week 1's draw; and a sole admitted order
+> repeating.
+
+**Why an entry.** [§ D405](#d405)'s first and second grounds: it binds a new data file
+(`data/week-dominance.json`), adds a condition to [§ D1252](#d1252)'s admission, which
+`shift/weekOrders.ts` alone does not own the reasoning for, and amends § D1252 clause 2's cycle.
+
+**What was wrong.** Swarm DQ measured Midtown Office's week with each shipped driver left alone and
+found the brief's picker deciding it: the house cleared 13 of 50 day-crowds and held no week, while
+Fairness first cleared 44, Predictive balanced 48 and the auction 41 (S3; S2's 60 day-crowds read
+15, 52, 55 and 49). The authored later weeks were easier still. A second week a dropdown holds
+teaches nothing the first did not.
+
+**The rule (`docs/33` DC-11).** From week 2, an authored week order is dealt only if no single
+shipped profile, with nothing pressed, holds that week's target on more than
+`oneProfileHoldsAtMost` (0.5) of DC-10's held-out crowds. *Holds* is read as the sheet reads a
+player's week: the order's counted days (DC-10's rows as dealt), the target derived from them, and
+on each crowd the profile clears at least the target of those days. Week 1 is the newcomer's week,
+not an authored order, and stays as it is. No bar and no target moves; the rule chooses which
+measured weeks are dealt, as § D1252's admission already did.
+
+1. **Data.** `data/week-dominance.json` carries one row per authored order: per profile, five
+   verdict strings over the held-out crowds. Holds are derived, never stored
+   (`shift/weekDominance.ts#weekDominanceOf`). One profile over the line refuses an order on a row
+   naming only some profiles; admission needs every profile the protocol names, and the protocol's
+   list must be `data/dispatcher-profiles.json`'s, so a new shipped profile turns the always-on
+   test red until the screen is re-run.
+2. **One rule for which days count.** `DayStakeReason` and its reading moved from
+   `shift/weekStake.ts` into `shift/weekWay.ts#dayStakeReasonOf`, so the week deal and the screen
+   count the same days.
+3. **The instrument.** `WEEK_WAY_STAGE=profiles` on the DC-10 census command runs every profile,
+   nothing pressed, once on every held-out crowd of each named cell. The standing order's strings
+   it writes are DC-10's own `standingVerdicts` for the same days, and `weekDominanceIssues` holds
+   the two to the crowd.
+4. **The cycle (amends § D1252 clause 2).** Week 1 is the draw; week `n ≥ 2` is dealt the admitted
+   orders in file order and round them again, never week 1's draw, which one dropdown holds. A
+   tower with no admitted order deals the draw every week, as before. The neighbour rule follows:
+   week 1 and the first order, each order and the next, the last order and the first. **A sole
+   admitted order repeats from week 2**, and the neighbour rule does not refuse that, as it never
+   refused week 1's draw repeating where nothing is admitted; refusing it would deal the draw
+   instead, which repeats as often and is a week one dropdown holds. This narrows § D1252
+   clause 5's rotation for that one case, owner-reversible, and the sheet says *the same wrinkles
+   as this week* there.
+
+**What it refuses.** Removing the brief's picker (the ruling's rule 1, under [§ D525](#d525) and
+[§ D528](#d528)); moving a bar, the week's target or the growth slope to make an order pass.
+
+**Tests.** `shift/weekDominance.test.ts` (the arithmetic, both sides of the line, the threshold
+moved and the verdict following it, an order DC-10 admits day by day and the screen refuses is not
+dealt, and one crowd of one shipped row re-run); `shift/weekOrders.test.ts` (the cycle and the
+shipped orders' verdicts).
+
+## D1344 — a held week deals the next week; a week not held deals itself again, with the next one press away; and the next week is called harder only where the house's census fell
+
+> **Taken 2026-10-10 by agent sessions under delegated authority**, carrying out swarm DQ's Q3
+> primary as wave AN's lane DQ-2, not by the product owner. The ruling decided what a held week
+> deals and that nothing is locked; it was silent on a missed week, and clause 2 below is the
+> lane's reading. **Owner-reversible**: clause 2 (S1's *a loss costs the run, not the progress*,
+> under which a missed week deals the next week too, is the dissent, and reversing it is one line
+> in `shift/week.ts#rollWeek`); the measure of *harder* and its 95 % paired interval; and the
+> sheet's and the door's wording.
+
+**Why an entry.** [§ D405](#d405)'s first and second grounds: it amends [§ D1177](#d1177)'s roll
+and [§ D1252](#d1252) clause 1 (*the roll adds one*), and binds the week's sheet, the door, the
+continue tile and the host's *Start next week*, none of which `shift/nextWeek.ts` owns.
+
+**What was wrong.** The post-AM panel held Midtown's week and found nothing on the other side: no
+tower above Midtown passes [§ D1259](#d1259)'s rules, so the onward offer was empty, and *Start
+next week* dealt the next order whether the week was held or missed.
+
+**The ruling.**
+
+1. **A held week deals the next week** on the same tower: the next order DC-10 and DC-11 admit
+   ([§ D1343](#d1343)). Held is the sheet's reading, the target met.
+2. **A week not held deals its own order again** as the sheet's primary, *Play week 2 again*, on
+   crowds this device has not filed, and keeps its number, which is now which week of the tower's
+   orders this is. *Go on to week 3* sits in the sheet beside it and deals the next week whatever
+   the week did, because nothing is locked (`docs/38` § 1).
+3. **Harder only where the house's census fell.** DC-10 already ran the house on every weekday of
+   every dealt week over the same twenty held-out crowds. For each crowd the lane counts the
+   weekdays the house cleared in each week, and the next week is called harder exactly when the
+   paired-t interval on the per-crowd difference lies wholly below zero. The sentence states the
+   counts, and on the shipped census it reads *Week 2 is harder than week 1 by the house's measure:
+   left alone on the same 20 crowds, the house cleared 12 of week 2's 100 weekdays, against 21 of
+   week 1's* (per-crowd difference −0.45, 95 % interval [−0.865, −0.035]). Nothing is ever called
+   easier. Twenty crowds is DC-10's held-out budget and below `CLAUDE.md`'s 50 to 200; the sentence
+   claims a count over named crowds and an interval that excludes zero, and ranks no dispatcher.
+4. **Where it is said.** The week's sheet under its rows (`everyday-week-sheet-next`, with
+   `everyday-week-sheet-go-on` on a week not held), and the door's foot for the week under way
+   (`everyday-door-week-harder`). The sheet's roll line drops *Start next week opens …*, which
+   named a press a week not held does not draw. *Continue your week* offers a week dealt again
+   from its first morning, as [§ D1330](#d1330) offers a later week.
+
+**Tests.** `shift/nextWeek.test.ts` (the roll's three arms, the sheet's two, the comparison on both
+sides of zero and the door's line), `everyday/weekView.test.ts`, `everyday/doorView.test.ts`,
+`everyday/continueWeek.test.ts`, and `everyday/weekSurvives.browser.test.ts`, which presses *Go on
+to week 2* on the shipped page and reads week 2 on the brief.
+
+## D1345 — the census of Midtown's later weeks under DC-11: § D1254's three dealt orders refused and kept, one order authored and admitted, and no second order the wrinkle library can build
+
+> **Taken 2026-10-10 by agent sessions under delegated authority**, as wave AN's lane DQ-2 under
+> [§ D1343](#d1343), not by the product owner. The measurements are the census's; which wrinkles
+> were tried, on which days, and which admitted order was authored are the lane's choices. A later
+> reader weighing this against a product-owner ruling should treat it as an agent ruling and say
+> so; [§ D626](#d626) is the cautionary case. **Owner-reversible**: the authored order and its
+> Monday; keeping the refused orders in the data; choosing, among four admitted Mondays, the one
+> whose week the house's census shows harder.
+
+**Why an entry.** [§ D405](#d405)'s second ground: it refuses [§ D1254](#d1254)'s three dealt
+orders, adds an order to `data/contract-ladder.json`, two rows to `data/week-way.json` and four rows
+to `data/week-dominance.json`.
+
+**How it was measured.** Every cell is one (day, wrinkle) of Midtown Office at the day's growth,
+on DC-10's twenty held-out crowds (2026-10-01 to 2026-10-20), by the command
+`weekWay.sweep.test.ts` documents: `WEEK_WAY_STAGE=profiles` for the screen, the default stage for
+DC-10 rows on new cells. To spend the compute where it decides something, the screen ran the four
+strongest profiles (Predictive balanced, Fairness first, the two auctions) on 49 cells first, and
+the other nine only on the order it then admits; a row naming four profiles can refuse an order and
+cannot admit one. 7 360 whole days in all, about four and a half hours of machine time on a shared
+container. Two cells measured twice reproduced every mark (80 of 80 on the screen, both DC-10 rows
+whole). The rows were copied by script, row for row.
+
+**What it found.**
+
+1. **§ D1254's three dealt orders are refused.** Every day of each is DC-10-admitted, all five
+   count, and the target is 4 of 5; Predictive balanced, left alone, holds `midtown-week-2` on 15
+   of 20 crowds, `midtown-week-3` on 16 and `midtown-week-4` on 17 (Fairness first 14, 13 and 14).
+   They stay authored, undealt, beside the two DC-10 refused.
+2. **Why they could not pass, measured.** The crowds, not the days, carry most of the difficulty:
+   the first nine held-out crowds are cleared on nearly every authored day by every strong
+   profile, so a profile holds those weeks there whatever the wrinkles. Only days that also beat
+   the strong profiles on easy crowds move it: `lift-service:early` (a car out from 08:00 to 12:00
+   beside the rung's car D), and Thursday or Friday's `open-day:busy`.
+3. **New cells under DC-10.** Admitted: `lift-service:early` on Tuesday (14 of 20) and Wednesday
+   (12), `open-day:busy` on Thursday and Friday (12 each, Predictive balanced with a spread at a
+   fifth of the day, where it alone clears 10). Refused: `all-hands` on Monday (7), `goods-inward`
+   on Friday (11), `caterers:before-the-rush` on Thursday and Friday (10 each). Beyond any
+   configuration screened (0 of 20 for all four strong profiles): `shaft-out:morning` on Tuesday,
+   `move-in:first-half` on Tuesday and `move-in:two-thirds` on Wednesday.
+4. **One order is admitted: `midtown-early-lift`**, Monday to Friday `shift-change:tight`,
+   `evacuation-drill:all-at-once`, `lift-service:early`, `goods-inward`, `open-day:busy`. It shares
+   no template with week 1. Every profile was measured; Predictive balanced holds it on 10 of 20
+   (exactly half, which DC-11 admits), Fairness first on 9, the sealed-bid auction on 8 and no
+   other profile on more than 7. Three other Mondays (the caterers, the auditors, the late finish)
+   were admitted on the same four days with the same strongest count; the shift change was taken
+   because only its week is harder than week 1 by [§ D1344](#d1344)'s paired measure.
+5. **No second order exists in the library at this budget.** Under the neighbour rule a second
+   order must share no template with the first, and no week without `lift-service:early` or the
+   open day passed the four-profile screen (the closest held 11 of 20). So Midtown deals week 1's
+   draw in week 1 and `midtown-early-lift` in every week after it ([§ D1343](#d1343)'s sole-order
+   clause). A second order needs a wrinkle the library does not have: a capacity cut on an early
+   weekday that a press can recover, other than the lift service.
+
+**Not done.** The nine weaker profiles were not run on the three refused orders, whose refusal
+the four strong ones already decide. The screen's rows have no weekly re-check of their own; the
+always-on test re-runs one crowd of one row, and the standing order's strings are held to DC-10's,
+which `weekWay.verify.test.ts` re-runs weekly.

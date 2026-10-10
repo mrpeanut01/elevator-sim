@@ -250,6 +250,49 @@ export function dc10Of(row: WeekWayRow, protocol: WeekWayProtocol): Dc10Reading 
 }
 
 /* -------------------------------------------------------------------------- *
+ * Whether a measured day counts toward its week
+ * -------------------------------------------------------------------------- */
+
+/**
+ * Why a day of a tower's week counts toward the week's target or does not — the rule
+ * `shift/weekStake.ts` states ([§ D1176](../../../../DECISIONS.md)), held here so that the week
+ * deal and the one-profile screen (`shift/weekDominance.ts`, wave AN lane DQ-2) read one rule
+ * rather than two copies of it.
+ */
+export type DayStakeReason =
+  /** Both halves hold: the day counts. */
+  | 'contested'
+  /** A way through, and the standing order left alone clears it too often: no play decides it. */
+  | 'untouched'
+  /** DC-10's first half fails: nothing measured clears it often enough. */
+  | 'no-way-through'
+  /** The queue gate fails: no measured play met the day's queue bar on any crowd. */
+  | 'queue'
+  /** The census measured the tower and not this day as it is dealt. */
+  | 'unmeasured';
+
+/**
+ * **Whether a day counts, from its census row as dealt** (`undefined` where none was measured):
+ * the queue gate, DC-10's way through, and the standing order missing on at least
+ * `protocol.standingMissAtLeast` of the held-out crowds, **with no breather exemption**, the one
+ * place this is stricter than admission (`weekStake.ts` gives the reason).
+ */
+export function dayStakeReasonOf(row: WeekWayRow | undefined, census: WeekWay = WEEK_WAY): DayStakeReason {
+  if (row === undefined) return 'unmeasured';
+  const reading = dc10Of(row, census.protocol);
+  if (!reading.queueFeasible) return 'queue';
+  if (!reading.wayThrough) return 'no-way-through';
+  const n = row.standingVerdicts.length;
+  const missesEnough = n > 0 && reading.standingMisses / n >= census.protocol.standingMissAtLeast;
+  return missesEnough ? 'contested' : 'untouched';
+}
+
+/** A week's target for a count of counted days: minus one, at least one, and none for none. */
+export function weekTargetFor(counted: number): number {
+  return counted <= 0 ? 0 : Math.max(1, counted - 1);
+}
+
+/* -------------------------------------------------------------------------- *
  * Parsing and the shipped census
  * -------------------------------------------------------------------------- */
 

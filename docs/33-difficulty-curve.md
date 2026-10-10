@@ -1663,6 +1663,46 @@ queue bar is `goalsForDay`'s):
   Tuesday reproduces the plain Tuesday mark for mark on both towers.
 - The other whole-day towers are named in the file's `unmeasured` block with the reason for each.
 
+> **DC-11.** From a tower's second week, an authored week order is **dealt** only when no single
+> shipped dispatcher profile, left alone with nothing pressed, holds the week's target on more than
+> half of DC-10's held-out crowds. *Holds* is the week sheet's own reading: on a crowd, the profile
+> cleared at least the target of the order's counted days. Week 1 is the newcomer's week and is not
+> an authored order. The bars, the target and the growth slope never move to meet it.
+
+**Why it exists** ([§ D1343](../DECISIONS.md), swarm DQ's Q2 rule 2). DC-10 asks each day for a way
+through and a reason to decide, and a week of admitted days can still be a week one dropdown holds:
+swarm DQ measured Midtown's week 1 with every driver left alone, and the house cleared 13 of 50
+day-crowds and held no week while Fairness first cleared 44, Predictive balanced 48 and the auction
+41. DC-11 asks the week whether one dropdown is the way through. It reads [§ D528](../DECISIONS.md)
+clause 2's *no single shipped dispatcher profile may meet every bar on its own* per held week, and
+the half is the ruling's (S1 and S2 proposed half, S3 a third), owner-reversible.
+
+**The protocol** (`data/week-dominance.json`, read by `shift/weekDominance.ts`, run by
+`shift/weekWay.sweep.test.ts` with `WEEK_WAY_STAGE=profiles`): every shipped profile, nothing
+pressed, once on each of the twenty held-out crowds of each of the order's five weekdays, so 1 300
+whole days an order. A row may name only some profiles, which can refuse an order and cannot admit
+one; the standing order's marks are DC-10's own `standingVerdicts`, held to the crowd. The weeks
+after the first go round the admitted orders and never back to week 1's draw.
+
+**What the first screen found** ([§ D1345](../DECISIONS.md), wave AN, Midtown Office, every figure
+of 20 held-out crowds, target 4 of 5 counted days):
+
+| order | Monday to Friday | strongest profile left alone, crowds held | verdict |
+|---|---|---|---|
+| `midtown-week-2` | caterers, goods inward, evacuation, auditors, late finish | Predictive balanced 15 | refused |
+| `midtown-week-3` | shift change, open day, conference, fire drill, move-in | Predictive balanced 16 | refused |
+| `midtown-week-4` | auditors, evacuation, caterers, goods inward, late finish | Predictive balanced 17 | refused |
+| `midtown-early-lift` | shift change, evacuation, early lift service, goods inward, open day | Predictive balanced 10, Fairness first 9, no other above 8 | **admitted** |
+
+The three orders [§ D1254](../DECISIONS.md) dealt are refused: the first nine held-out crowds are
+cleared on nearly every authored day by every strong profile, so a profile holds those weeks there
+whatever the wrinkles. Only a day that beats the strong profiles on the easy crowds moves the
+count, and two did: `lift-service:early` (a car out until midday beside the rung's car D) and a late
+week `open-day:busy`, which Predictive balanced alone clears on 10 crowds and with a spread at a
+fifth of the day on 12. No second order passes under the neighbour rule, because every passing week
+needs one of those two wrinkles; so `midtown-early-lift` is dealt in every week from the second, and
+a second order waits on a wrinkle the library does not have.
+
 ### 4.4 Day one, which is what #208 is governed by
 
 #208 asks that *"a new player sees a building visibly failing within 90 seconds of first load"*, and

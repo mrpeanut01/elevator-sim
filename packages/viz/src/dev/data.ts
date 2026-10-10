@@ -32,6 +32,7 @@ import { restrictedFloorIds } from '../access/zoning.js';
 import { mixedFleetBanks } from '../commissioning/choices.js';
 import { scenarioHorizonFor } from '../shift/dayLength.js';
 import { weekOrderIssues } from '../shift/weekOrders.js';
+import { WEEK_DOMINANCE, weekDominanceIssues } from '../shift/weekDominance.js';
 import { WEEK_WAY, weekWayIssues } from '../shift/weekWay.js';
 import { CONTRACT_LADDER, contractLadderIssues } from '../shift/ladder.js';
 import { parseEngineeringBriefs, type EngineeringBriefs } from '../briefs/parse.js';
@@ -274,6 +275,16 @@ export async function loadBrowserResources(): Promise<BrowserResources> {
     ...weekWayIssues(WEEK_WAY).map((issue) => `week-way.json: ${issue}`),
     /* The authored week orders — lane AM-D, § D1252. `shift/weekOrders.test.ts` is where one is a failing test. */
     ...weekOrderIssues().map((issue) => `contract-ladder.json: ${issue}`),
+    /*
+     * The one-profile screen against the orders and profiles it was measured on — wave AN, lane
+     * DQ-2, § D1343. A shipped profile the screen has not met leaves every order unadmitted, and
+     * this says why; `shift/weekDominance.test.ts` is where it is a failing test.
+     */
+    ...weekDominanceIssues(
+      WEEK_DOMINANCE,
+      (contractId) => CONTRACT_LADDER.rows.find((row) => row.contractId === contractId)?.weekOrders,
+      dispatchers.profiles.map((profile) => profile.id),
+    ).map((issue) => `week-dominance.json: ${issue}`),
   ];
 
   return {

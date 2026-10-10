@@ -1087,6 +1087,44 @@
       "queueOnlyMisses": 15,
       "lowestPeakQueue": 15,
       "screenRuns": 130
+    },
+    {
+      "contractId": "c2",
+      "day": 3,
+      "eventId": "lift-service:early",
+      "growthPerDay": 0.02,
+      "breather": false,
+      "chosen": {
+        "dispatcherId": "fairness-first",
+        "press": "park-cars-lobby",
+        "atFraction": 0.2
+      },
+      "tuningClears": 5,
+      "tuningN": 8,
+      "chosenVerdicts": "CCCCCCCCmmmCmmCmmCmC",
+      "standingVerdicts": "mmCmmmmmmmmCmmmmmmmC",
+      "queueOnlyMisses": 5,
+      "lowestPeakQueue": 18,
+      "screenRuns": 130
+    },
+    {
+      "contractId": "c2",
+      "day": 5,
+      "eventId": "open-day:busy",
+      "growthPerDay": 0.02,
+      "breather": false,
+      "chosen": {
+        "dispatcherId": "predictive-balanced",
+        "press": "spread-cars",
+        "atFraction": 0.2
+      },
+      "tuningClears": 6,
+      "tuningN": 8,
+      "chosenVerdicts": "CCCCmCCCmCmmmmCCCmCm",
+      "standingVerdicts": "mmmmmmmmmmmmmmmmmmmm",
+      "queueOnlyMisses": 3,
+      "lowestPeakQueue": 13,
+      "screenRuns": 130
     }
   ],
   "unmeasured": [

@@ -40,7 +40,7 @@
 import type { WatchRecord } from '../watch/types.js';
 
 import { CONTRACTS, contractById, FIRST_CONTRACT_ID, nextContract } from './contracts.js';
-import { dayCountsToward, weekHasClosed, weekNeedOf, weekRollsOver } from './weekStake.js';
+import { dayCountsToward, weekHasClosed, weekNeedOf, weekRollsOver, weekTargetMetDayOf } from './weekStake.js';
 import {
   weekdayOf,
   type ClearedAward,
@@ -638,15 +638,23 @@ export function pathNextOf(week: WeekState): WeekState {
  * stands from the last counted weekday and the weekend is played only by choice). What the player
  * has is kept: every scenario cleared, the streak and the best day.
  */
-export function rollWeek(week: WeekState): WeekState {
+export function rollWeek(week: WeekState, onward = false): WeekState {
   return {
     ...openWeek(week.contractId),
     /*
      * The next week is the next one, and it is dealt its own wrinkle order — wave AM, lane AM-D,
      * [§ D1252](../../../../DECISIONS.md). The roll used to reopen week 1, so week 2 re-dealt
      * week 1's five wrinkles to the day (swarm DO's S3).
+     *
+     * **A held week deals the next week; a week that was not held deals itself again** — wave AN,
+     * lane DQ-2, swarm DQ's Q3 primary ([§ D1344](../../../../DECISIONS.md)). Held is the sheet's
+     * own reading, the target met (`weekStake.ts#weekTargetMetDayOf`). A week that was not held is
+     * dealt its own order again, on crowds this device has not filed (`weekRecord.ts#dealtCrowdOf`
+     * counts the closed week), and `onward` is the sheet's second press, which goes on to the next
+     * week whatever the week did: nothing is locked. The week number is which week of the tower's
+     * orders this is, so a week dealt again keeps its number.
      */
-    week: week.week + 1,
+    week: onward || weekTargetMetDayOf(week) !== undefined ? week.week + 1 : week.week,
     completed: week.completed,
     streak: week.streak,
     bestMinutePct: week.bestMinutePct,

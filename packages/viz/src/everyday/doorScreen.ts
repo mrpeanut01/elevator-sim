@@ -295,6 +295,12 @@ function mountDoor(
       held.style.cssText = `${BODY};margin:10px 0 0;max-width:70ch`;
       foot.append(held);
     }
+    /* This week, harder than the last where the house's census fell — wave AN, lane DQ-2, § D1344. */
+    if (view.weekHarder !== undefined) {
+      const harder = el(document_, 'p', 'everyday-door-week-harder', view.weekHarder);
+      harder.style.cssText = `${BODY};margin:10px 0 0;max-width:70ch`;
+      foot.append(harder);
+    }
     column.append(foot);
     return column;
   }

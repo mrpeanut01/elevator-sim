@@ -51,6 +51,7 @@ import { actionBarFor } from './actionBar.js';
 import { WEEK_START_NEXT_LABEL, weekScreenViewOf, type WeekDayCard, type WeekScreenView } from './weekView.js';
 import { weekHasClosed } from '../shift/weekStake.js';
 import type { NextTowerOffer } from '../shift/nextTower.js';
+import type { NextWeekView } from '../shift/nextWeek.js';
 import type { EverydayScreenModule } from './screens.js';
 import {
   BODY,
@@ -107,6 +108,13 @@ let weekSheetStands = false;
  * bar's primary is the next tower's press rather than *Start next week* while it holds.
  */
 let onwardTower: NextTowerOffer | undefined;
+
+/**
+ * What the sheet deals next, while it stands — `shift/nextWeek.ts`, wave AN, lane DQ-2
+ * ([§ D1344](../../../../DECISIONS.md)). Module state for {@link onwardTower}'s reason: the bar's
+ * primary reads *Play week 2 again* rather than *Start next week* over a week that was not held.
+ */
+let nextWeek: NextWeekView | undefined;
 
 /** A card's ink, by verdict. § 19's moss for cleared, alarm for missed, faint for unjudged. */
 function inkFor(card: WeekDayCard): string {
@@ -165,6 +173,7 @@ function mountWeek(
       record: data.weekRecord(),
     });
     onwardTower = weekSheetStands ? view.onward : undefined;
+    nextWeek = weekSheetStands ? view.next : undefined;
     return view;
   }
 
@@ -175,6 +184,16 @@ function mountWeek(
    */
   function startNextWeek(): void {
     context.host.openNextWeek();
+    context.go('brief');
+  }
+
+  /**
+   * *Go on to week 3* — the second press on a week that was not held, wave AN, lane DQ-2
+   * ([§ D1344](../../../../DECISIONS.md)): the next week whatever this one did, because nothing is
+   * locked. The same roll as {@link startNextWeek}, told to go on.
+   */
+  function goOnToNextWeek(): void {
+    context.host.openNextWeek(true);
     context.go('brief');
   }
 
@@ -299,6 +318,32 @@ function mountWeek(
           startNextWeek();
         });
         sheet.body.append(onward, stay);
+      }
+      /*
+       * What the sheet deals next — wave AN, lane DQ-2, § D1344: the next week on a held week, this
+       * week again on one that was not, with the press that goes on anyway beside it.
+       */
+      if (view.next !== undefined) {
+        const next = el(doc, 'p', 'everyday-week-sheet-next', view.next.line);
+        next.style.cssText = `${BODY};margin:0;max-width:74ch`;
+        sheet.body.append(next);
+        const onwardWeek = view.next.onward;
+        if (onwardWeek !== undefined) {
+          const goOn = el(doc, 'button', 'everyday-week-sheet-go-on', onwardWeek.label);
+          goOn.type = 'button';
+          goOn.style.cssText = [
+            'justify-self:start',
+            'cursor:pointer',
+            `border:1px solid ${C.ruleLight}`,
+            'background:transparent',
+            `border-radius:${String(R.row)}px`,
+            'padding:7px 13px',
+            `color:${C.ink}`,
+            'font-size:13px',
+          ].join(';');
+          goOn.addEventListener('click', goOnToNextWeek);
+          sheet.body.append(goOn);
+        }
       }
       if (view.record !== undefined) {
         const record = el(doc, 'p', 'everyday-week-record', view.record);
@@ -612,7 +657,10 @@ function mountWeek(
 function weekBar(state: EverydayState): ActionBarModel {
   const base = actionBarFor(state);
   if (weekSheetStands) {
-    return { ...base, primary: { ...base.primary, label: onwardTower?.label ?? WEEK_START_NEXT_LABEL } };
+    return {
+      ...base,
+      primary: { ...base.primary, label: onwardTower?.label ?? nextWeek?.label ?? WEEK_START_NEXT_LABEL },
+    };
   }
   const label = base.primary.variants[todayIsClosed ? 1 : 0] ?? base.primary.label;
   return { ...base, primary: { ...base.primary, label } };

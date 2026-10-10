@@ -11,6 +11,7 @@
  */
 
 import { nextAdmittedTowerAfter, nextTowerOfferOf } from '../shift/nextTower.js';
+import { NEXT_WEEK_LABEL } from '../shift/nextWeek.js';
 import { describe, expect, it } from 'vitest';
 
 import { goalsForDay, readGoals } from '../shift/goals.js';
@@ -387,7 +388,14 @@ describe('the week’s stake on the strip, and its sheet at the close — § D11
     });
     expect(missed.sheet?.targetLine).toBe('Target 4: not met.');
     expect(missed.onward).toBeUndefined();
-    expect(missed.primary).toBe(WEEK_START_NEXT_LABEL);
+    /*
+     * Wave AN, lane DQ-2 (§ D1344): a week that was not held plays itself again as the primary, and
+     * the next week is the second press beside it, because nothing is locked.
+     */
+    expect(missed.primary).toBe('Play week 1 again');
+    expect(missed.next?.onward?.label).toBe('Go on to week 2');
+    /* The held week's label is the one the sheet always had, spelled once in each layer. */
+    expect(NEXT_WEEK_LABEL).toBe(WEEK_START_NEXT_LABEL);
     const held = weekScreenViewOf({
       week: midtown(7, [1, 2, 3, 4, 5, 6, 7].map((day) => midtownDay(day, day === 5 ? MISSED : MET, 'collective'))),
       towerToday: 'Midtown Office',
@@ -397,6 +405,8 @@ describe('the week’s stake on the strip, and its sheet at the close — § D11
     });
     expect(held.sheet?.targetLine).toBe('Target 4: met.');
     const next = nextAdmittedTowerAfter('c2');
+    expect(held.next?.held).toBe(true);
+    expect(held.next?.onward).toBeUndefined();
     if (next === undefined) {
       expect(held.onward).toBeUndefined();
       expect(held.primary).toBe(WEEK_START_NEXT_LABEL);

@@ -42,6 +42,10 @@
         {
           "id": "midtown-week-4",
           "days": ["audit-day", "evacuation-drill:all-at-once", "caterers:before-the-rush", "goods-inward", "late-finish"]
+        },
+        {
+          "id": "midtown-early-lift",
+          "days": ["shift-change:tight", "evacuation-drill:all-at-once", "lift-service:early", "goods-inward", "open-day:busy"]
         }
       ],
       "demand": {},

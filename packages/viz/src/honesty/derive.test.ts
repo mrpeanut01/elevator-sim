@@ -1966,8 +1966,27 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
-        'The week stake’s plumbing — wave AK, § D1176 to § D1178. `WEEK_LENGTH` is a number, derived ' +
-        'only because the region after it declares `DayStakeReason`’s switch values. `weekDealOf`, ' +
+        'The day-counting rule and the one-profile screen, plumbing only — wave AN, lane DQ-2, § D1343. ' +
+        '`DayStakeReason` and `dayStakeReasonOf` moved from `shift/weekStake.ts` into `shift/weekWay.ts` ' +
+        'so the week deal and the screen read one rule: `dayStakeReasonOf` returns one of its switch ' +
+        'values, and `dc10Of` is derived only because the region after it now declares them (as ' +
+        '`weekStake.ts#WEEK_LENGTH` was before the move). What a player reads of a day is ' +
+        '`weekStake.ts#dayStakeSentenceOf`, which the week adapter seeds for every census tower. ' +
+        '`shift/weekDominance.ts#weekDominanceIssues` is `weekWayIssues`’ twin for ' +
+        '`data/week-dominance.json`, content-author refusals that `weekDominance.test.ts` turns into a ' +
+        'failing test and no screen renders. `weekDominanceOf` returns a reading, and its one clause, ' +
+        'why an order is unmeasured, is read by `weekOrders.ts#weekOrderAdmissionOf`’s callers in tests ' +
+        'and by no screen: a refused or unmeasured order is simply not dealt.',
+      ids: [
+        'shift/weekWay.ts#dc10Of',
+        'shift/weekWay.ts#dayStakeReasonOf',
+        'shift/weekDominance.ts#weekDominanceIssues',
+        'shift/weekDominance.ts#weekDominanceOf',
+      ],
+    },
+    {
+      reason:
+        'The week stake’s plumbing — wave AK, § D1176 to § D1178. `weekDealOf`, ' +
         '`dayCountsToward`, `countedCleanOf`, `weekNeedOf`, `weekHasClosed`, `weekRollsOver` and ' +
         '`weekAdmitsANewcomer` return a deal, counts or booleans: a dealt day carries a sentence, and ' +
         'what a player reads of it is `dayStakeSentenceOf`, which the week adapter seeds for every ' +
@@ -1975,7 +1994,6 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'reads from the module is seeded by name in `honesty/surfaces.ts#seedWeekStake`. ' +
         '`weekClosedByThisClose` (wave AM, § D1246) is a boolean for the tower’s record of weeks.',
       ids: [
-        'shift/weekStake.ts#WEEK_LENGTH',
         'shift/weekStake.ts#weekClosedByThisClose',
         'shift/weekStake.ts#weekDealOf',
         'shift/weekStake.ts#dayCountsToward',

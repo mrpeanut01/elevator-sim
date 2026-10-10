@@ -1492,11 +1492,16 @@ describe('the rest of the sheet', () => {
    * week 1's (`scheduledEventFor` without the week, § D1252), so it never matched week 2's deal.
    */
   it('deals tomorrow’s wrinkle from tomorrow’s week, so the close says what the brief says — § D1252', () => {
+    /*
+     * The helper files Friday alone, so the week is not held, and since wave AN's lane DQ-2
+     * (§ D1344) a week not held is dealt its own order again: Friday's close names that week's
+     * Monday. `nextWeek.test.ts` holds the held arm.
+     */
     for (const [weekNo, day, nextWeek, nextDayNo] of [
       [2, 1, 2, 2],
       [2, 3, 2, 4],
-      [1, 5, 2, 1],
-      [2, 5, 3, 1],
+      [1, 5, 1, 1],
+      [2, 5, 2, 1],
     ] as const) {
       const { report, week } = midtownWeekReport(weekNo, day);
       const dealt = weekDealOf({ contractId: 'c2', week: nextWeek })?.days[nextDayNo - 1];

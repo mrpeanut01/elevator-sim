@@ -192,15 +192,30 @@ describe.skipIf(!HAS_BROWSER)('GitHub issue #593 — a Scenario week plays from 
            * week*. The untouched standing order rarely holds Midtown's week, so both arms are read
            * off the page rather than assumed, and the press taken is the one that stays.
            */
+          /*
+           * Wave AN, lane DQ-2 (§ D1344): a week that was not held plays itself again as the primary,
+           * *Play week 1 again*, and *Go on to week 2* sits in the sheet beside it, because nothing is
+           * locked. The press taken on that arm is the one that goes on, and the brief it opens is
+           * week 2's.
+           */
+          let wentOn = false;
+          const targetMet = !(await textOf(page, '.everyday-week-sheet-target')).includes('not met');
           if ((await page.locator('.everyday-week-sheet-onward').count()) > 0) {
             expect(await textOf(page, '.everyday-bar-primary')).toMatch(/Play .+’s week/u);
             expect(await textOf(page, '.everyday-week-sheet-stay')).toBe('Start next week here');
             await page.locator('.everyday-week-sheet-stay').click();
-          } else {
+          } else if (targetMet) {
             expect(await textOf(page, '.everyday-bar-primary')).toContain('Start next week');
+            expect(await page.locator('.everyday-week-sheet-go-on').count()).toBe(0);
             await page.locator('.everyday-bar-primary').click();
+          } else {
+            expect(await textOf(page, '.everyday-bar-primary')).toContain('Play week 1 again');
+            expect(await textOf(page, '.everyday-week-sheet-go-on')).toBe('Go on to week 2');
+            await page.locator('.everyday-week-sheet-go-on').click();
+            wentOn = true;
           }
           await page.waitForSelector('.everyday-brief', { timeout: 15_000 });
+          if (wentOn) expect(await textOf(page, '.everyday-brief-eyebrow')).toMatch(/^WEEK 2 · MONDAY/u);
         }
       } finally {
         await page.close();

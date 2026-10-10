@@ -17,6 +17,7 @@ import { goalsForDay, readGoals } from '../shift/goals.js';
 import type { DayOutcome, GoalObservations, WeekState } from '../shift/types.js';
 import type { WatchRecord } from '../watch/types.js';
 import type { WeekRecord } from '../shift/weekRecord.js';
+import { weekUnderWayHarderLineOf } from '../shift/nextWeek.js';
 import { closeDay, HISTORY_DAYS, openWeek, outcomeOf } from '../shift/week.js';
 
 import { GLOSSARY_TERMS } from '../mode/glossary.js';
@@ -470,5 +471,21 @@ describe('weeks held on this tower — lane AM-D, § D1253', () => {
     const line = at({ contractId: 'c2', closed: 3, met: 3, best: 5, held: 3 });
     expect(line).toMatch(/^Weeks held on this tower: 3 in a row/u);
     expect(line).toContain('It buys nothing, and no clock runs on it');
+  });
+});
+
+/*
+ * Wave AN, lane DQ-2 (§ D1344): the door calls the week under way harder than the one before it
+ * only where the house's census fell, in `shift/nextWeek.ts`'s one sentence, and never in week 1.
+ */
+describe('a later week, harder only where the house’s census fell — § D1344', () => {
+  it('draws the census sentence on the door exactly where it says harder, and nothing in week 1', () => {
+    for (const number of [1, 2, 3, 4]) {
+      const week: WeekState = { ...openWeek('c2'), week: number };
+      const view = doorScreenViewOf({ week, today: { ...TODAY, day: 1 }, dayOffset: 0, dayClosed: false, nameOf: NAME_OF });
+      expect(view.weekHarder, `week ${String(number)}`).toBe(weekUnderWayHarderLineOf(week));
+      if (number === 1) expect(view.weekHarder).toBeUndefined();
+      if (view.weekHarder !== undefined) expect(view.weekHarder).toMatch(/^Week \d is harder than week \d by the house’s measure: left alone/u);
+    }
   });
 });

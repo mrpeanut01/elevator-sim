@@ -41,6 +41,7 @@
 import { dayWordsFor } from '../mode/glossary.js';
 import { HISTORY_DAYS } from '../shift/week.js';
 import { dayVerdictOf } from '../shift/weekStake.js';
+import { weekUnderWayHarderLineOf } from '../shift/nextWeek.js';
 import { weeksHeldLineOf, type WeekRecord } from '../shift/weekRecord.js';
 import type { DayOutcome, WeekState } from '../shift/types.js';
 import { weekdayOf } from '../shift/types.js';
@@ -152,6 +153,12 @@ export interface DoorScreenView {
    * ([§ D1253](../../../../DECISIONS.md)) — or `undefined` before a week on it has closed.
    */
   readonly weeksHeld: string | undefined;
+  /**
+   * **This week, called harder than the last only where the house's census fell** — wave AN, lane
+   * DQ-2, `shift/nextWeek.ts#weekUnderWayHarderLineOf` ([§ D1344](../../../../DECISIONS.md)) — or
+   * `undefined` on week 1 and wherever it did not fall.
+   */
+  readonly weekHarder: string | undefined;
   readonly sameForEveryone: string;
   readonly primary: DoorPrimaryView;
 }
@@ -560,6 +567,7 @@ export function doorScreenViewOf(input: DoorScreenInput): DoorScreenView {
     seedLine: input.today.seedLine,
     firstSessionLine: input.today.firstSessionLine,
     weeksHeld: input.record === undefined ? undefined : weeksHeldLineOf(input.record),
+    weekHarder: weekUnderWayHarderLineOf(input.week),
     sameForEveryone,
     primary: primaryOf(clamped, chips),
   };

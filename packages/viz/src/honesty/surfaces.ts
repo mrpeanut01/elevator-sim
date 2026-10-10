@@ -215,6 +215,8 @@ import {
   type DayDecider,
 } from '../shift/dayClose.js';
 import { NEXT_TOWER_STAY_LABEL, nextTowerOfferOf } from '../shift/nextTower.js';
+import { NEXT_WEEK_LABEL, nextWeekOf, weekUnderWayHarderLineOf } from '../shift/nextWeek.js';
+import { dealtWeekOrdersOf } from '../shift/weekOrders.js';
 // GitHub issue #221's post block — the decision, seeded in all seven states by the report adapter.
 import { postRunViewOf } from '../everyday/postRun.js';
 import { CHIMES_PANEL_COPY } from '../everyday/chimesPanel.js';
@@ -14895,6 +14897,15 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     /* Lane AM-E (§ D1259): a held week's next tower, seeded in `seedWeekStake` for the same reason. */
     'shift/nextTower.ts#nextTowerOfferOf',
     'shift/nextTower.ts#NEXT_TOWER_STAY_LABEL',
+    /*
+     * Wave AN, lane DQ-2 (§ D1344): what a closed week's sheet deals next, held and not held, and
+     * the door's line calling a week harder where the house's census fell. Seeded in `seedNextWeek`
+     * over every week number Midtown deals, because no corpus case's one day closes a week.
+     */
+    'shift/nextWeek.ts#nextWeekOf',
+    'shift/nextWeek.ts#NEXT_WEEK_LABEL',
+    'shift/nextWeek.ts#weekHarderSentenceOf',
+    'shift/nextWeek.ts#weekUnderWayHarderLineOf',
   ],
   render(context) {
     const seeds: TextSeed[] = [];
@@ -18050,7 +18061,8 @@ function seedWeekStake(
   }
   seeds.push({ field: 'week.continue.title', text: CONTINUE_WEEK_TITLE, role: 'label' });
   /* Wave AN, lane AN-7: the next week, offered from its first morning with nothing filed and numbered. */
-  const freshWeek = continueWeekEntryOf(rollWeek(week), 'Midtown Office');
+  /* `onward`: the next week whatever the case's readings did, since a week not held is dealt itself again (§ D1344). */
+  const freshWeek = continueWeekEntryOf(rollWeek(week, true), 'Midtown Office');
   if (freshWeek !== undefined) seeds.push({ field: 'week.continue.freshWeek', text: freshWeek.line, role: 'observation' });
   seeds.push({ field: 'week.sheetStep.label', text: WEEK_SHEET_STEP.label, role: 'label' });
   seeds.push({ field: 'week.sheetStep.note', text: WEEK_SHEET_STEP.note, role: 'prose' });
@@ -18069,6 +18081,7 @@ function seedWeekStake(
     seeds.push({ field: `week.onward.${contract.id}.line`, text: offer.line, role: 'observation' });
   }
   seeds.push({ field: 'week.onward.stay', text: NEXT_TOWER_STAY_LABEL, role: 'label' });
+  seedNextWeek(seeds, observations);
   for (const [arm, record] of [
     ['one', { contractId: 'c2', closed: 1, met: 0, best: 3 }],
     ['several', { contractId: 'c2', closed: 3, met: 2, best: 5 }],
@@ -18081,6 +18094,46 @@ function seedWeekStake(
     ['running', { contractId: 'c2', closed: 3, met: 2, best: 5, held: 2 }],
   ] as const) {
     seeds.push({ field: `week.held.${arm}`, text: weeksHeldLineOf(record) ?? '', role: 'observation' });
+  }
+}
+
+/**
+ * **What a closed week deals next, and the door's harder line** — wave AN, lane DQ-2, § D1344.
+ * Midtown's week `n` closed held and not held, for every week number the tower deals before its
+ * orders repeat and one past it, on the case's own readings with the verdict forced each way (the
+ * sentences read held-ness and the week number, never a reading's figure).
+ */
+function seedNextWeek(seeds: TextSeed[], observations: Observations): void {
+  seeds.push({ field: 'week.next.label', text: NEXT_WEEK_LABEL, role: 'label' });
+  const weeks = dealtWeekOrdersOf('c2').length + 1;
+  for (let number = 1; number <= weeks; number += 1) {
+    for (const [arm, met] of [['held', true], ['notHeld', false]] as const) {
+      let week: WeekState = { ...openWeek('c2'), week: number };
+      for (let day = 1; day <= 5; day += 1) {
+        if (day > 1) week = nextDay(week);
+        const outcome = outcomeOf({
+          record: null,
+          recordRefusal: null,
+          day: week.day,
+          dayIdx: week.dayIdx,
+          eventId: scheduledEventFor(null, week.day, week.dayIdx, 'whole-day', week).id,
+          arrived: observations.arrived,
+          carried: observations.carried,
+          minutePct: observations.minutePct,
+          readings: readGoals(goalsForDay(day), observations),
+        });
+        /* Held: four of five clean, the target; not held: none clean. */
+        week = closeDay(week, { ...outcome, allMet: met && day < 5 });
+      }
+      const next = nextWeekOf(week);
+      if (next === undefined) continue;
+      const at = `week.next.week${String(number)}.${arm}`;
+      seeds.push({ field: `${at}.label`, text: next.label, role: 'label' });
+      seeds.push({ field: `${at}.line`, text: next.line, role: 'observation' });
+      if (next.onward !== undefined) seeds.push({ field: `${at}.onward`, text: next.onward.label, role: 'label' });
+    }
+    const harder = weekUnderWayHarderLineOf({ contractId: 'c2', week: number });
+    if (harder !== undefined) seeds.push({ field: `door.weekHarder.week${String(number)}`, text: harder, role: 'observation' });
   }
 }
 

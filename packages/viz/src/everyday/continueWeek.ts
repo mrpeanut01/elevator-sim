@@ -14,7 +14,7 @@
  */
 
 import { contractById } from '../shift/contracts.js';
-import { countedCleanOf, weekDealOf, weekHasClosed, weekOrdinalOf } from '../shift/weekStake.js';
+import { countedCleanOf, daysWerePlayedOn, weekDealOf, weekHasClosed, weekOrdinalOf } from '../shift/weekStake.js';
 import { weekdayOf, type WeekState } from '../shift/types.js';
 
 /** The entry, as words and a destination. */
@@ -41,7 +41,13 @@ export const CONTINUE_WEEK_TITLE = 'Continue your week';
  */
 export function continueWeekEntryOf(week: WeekState, towerName: string): ContinueWeekEntry | undefined {
   if (contractById(week.contractId) === undefined) return undefined;
-  if (week.history.length === 0 && week.week <= 1) return undefined;
+  /*
+   * **And a week dealt again is under way from its first morning too** — wave AN, lane DQ-2
+   * ([§ D1344](../../../../DECISIONS.md)): a week that was not held rolls to its own order again,
+   * keeping its number, so a week 1 played again has nothing filed and is still one the player chose
+   * to carry on. `daysWerePlayedOn` is the roll's own mark (the streak or the best day it keeps).
+   */
+  if (week.history.length === 0 && week.week <= 1 && !daysWerePlayedOn(week)) return undefined;
   /* `Midtown Office, week 2` where the week has a number (§ D1252), the tower alone where it does not. */
   const ordinal = weekOrdinalOf(week);
   const tower = ordinal === undefined ? towerName : `${towerName}, ${ordinal}`;

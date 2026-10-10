@@ -1,0 +1,253 @@
+{
+  "$comment": "THE ONE-PROFILE SCREEN, docs/33 DC-11 and DECISIONS.md § D1343 (wave AN lane DQ-2, swarm DQ's Q2 rule 2). From week 2 an authored week order (data/contract-ladder.json weekOrders) is dealt only if no single shipped dispatcher profile, left alone with nothing pressed, holds that week's target on more than oneProfileHoldsAtMost of the census crowds. One row per authored order the screen measured: for each profile, five verdict strings (Monday to Friday, the order's own days), one mark per DC-10 held-out crowd in date order, C cleared and m missed, where missed means any goalsForDay(day, 'whole-day') goal not met. Whether a profile holds the week on a crowd is NOT stored: shift/weekDominance.ts#weekDominanceOf derives it from the marks, the days of the order that count (DC-10's rows as dealt, weekWay.ts#dayStakeReasonOf) and the target derived from them, so no row can say admitted over marks that do not support it. A row may carry only some profiles: one profile over the line refuses the order, and admission needs every profile the protocol names. The standing order's strings are the census rows' own standingVerdicts for the same days, and weekDominanceIssues holds them to the crowd. PROVENANCE: every mark is a measurement, run by `WEEK_WAY_SWEEP=1 WEEK_WAY_STAGE=profiles WEEK_WAY_OUT=<file> WEEK_WAY_CONTRACTS=c2 WEEK_WAY_CELLS=<day>=<drawn id>;... [WEEK_WAY_PROFILES=<ids>] npx vitest run --project viz --maxWorkers=1 --testTimeout=36000000 packages/viz/src/shift/weekWay.sweep.test.ts` and copied row for row. oneProfileHoldsAtMost is CHOSEN, an agent's proposal for the owner to accept, tighten or reject: swarm DQ's S1 and S2 proposed half and S3 a third, and the reconciled ruling took half.",
+  "version": 1,
+  "protocol": {
+    "heldOutFrom": "2026-10-01",
+    "heldOutCount": 20,
+    "oneProfileHoldsAtMost": 0.5,
+    "profiles": [
+      "nearest-car",
+      "eta",
+      "collective",
+      "collective-enroute",
+      "energy-aware",
+      "fairness-first",
+      "capacity-aware",
+      "predictive-balanced",
+      "auction",
+      "auction-multi-round",
+      "zoned-uppeak",
+      "destination-eta",
+      "destination-panel"
+    ]
+  },
+  "rows": [
+    {
+      "contractId": "c2",
+      "orderId": "midtown-week-2",
+      "days": [
+        "caterers:before-the-rush",
+        "goods-inward",
+        "evacuation-drill:all-at-once",
+        "audit-day",
+        "late-finish"
+      ],
+      "verdicts": {
+        "fairness-first": [
+          "CCCCCmCCCCCCCCCCCCCC",
+          "CCCCCCCCCCmCCCCCCCCC",
+          "CCCCCCCCCCmCCmCCCCCC",
+          "CCCmCCCCCmmmCmmCCmCm",
+          "CCCCCCCmCmmmCmCmCmCm"
+        ],
+        "predictive-balanced": [
+          "CCCCCmCCCCCCCCCCCCCC",
+          "CCCCCCCCCCCCCCCCCmCC",
+          "CCCCCmCCCCCCCCCmCCCC",
+          "CCCmCCCCCmmCmmmCCmCC",
+          "CCCCCCCCCmCmmmCCCmCC"
+        ],
+        "auction": [
+          "CCCCCmCCCCCCmCCCCCCC",
+          "CCCCCmCCCCCCCmCCCmCC",
+          "CCCCCCCCCCCCmmCmCCCm",
+          "CmCmCCCCCmmCmmCCmCCm",
+          "CCCCCCCCmmmmmmCmCmmm"
+        ],
+        "auction-multi-round": [
+          "CCCCCmCCCCCCmCCCCCCC",
+          "CCCCCCCCCCCCmCCmCCCC",
+          "CCCCCCCCmCmCmmCmCCmm",
+          "CCCmCCCCCmmCmmmCCmmm",
+          "CCCCCCCmmmmmmmCmCmmm"
+        ]
+      }
+    },
+    {
+      "contractId": "c2",
+      "orderId": "midtown-week-3",
+      "days": [
+        "shift-change:tight",
+        "open-day:busy",
+        "conference:full-floor",
+        "fire-drill:full",
+        "move-in:past-halfway"
+      ],
+      "verdicts": {
+        "fairness-first": [
+          "CCCCCmCCCCCCCCCCCCCC",
+          "CmCCCmCCCCCCCCCCCCCC",
+          "CCCCCCCCCCCCmCCCCCCC",
+          "CCCCCCCmCCmmCmCCmmCm",
+          "CCCmCmCmCmmCmmmCCmmm"
+        ],
+        "predictive-balanced": [
+          "CCCCCCCCCCCCCCCCCCCC",
+          "CCCCCmCCCCCCmCmCCCCC",
+          "CCCCCCCCCCCCmCCCCCCC",
+          "CCCCCCmCmmmCmmCCmCCC",
+          "CCCCCCCCCmCmmmmmCCmC"
+        ],
+        "auction": [
+          "CCCCCCmCCCCCmCCCCCCC",
+          "CCmCmCCCCCCCmCCmCCCC",
+          "CmCCCCCCCCCCmCCCCCCC",
+          "CCCCCCmCmmmmmmCCmCmm",
+          "CCCCCCCmmmmmmmmmCmmm"
+        ],
+        "auction-multi-round": [
+          "CCCCCCCmCCCCCCCmCCCC",
+          "CCCCCmCCCCCCmCCCCCCC",
+          "CCCCCCCCCCCCmCmCCCCm",
+          "CCCCmCmmmmmCmmmmmmCC",
+          "CCCCCCmCmmmCmmCmmCmC"
+        ]
+      }
+    },
+    {
+      "contractId": "c2",
+      "orderId": "midtown-week-4",
+      "days": [
+        "audit-day",
+        "evacuation-drill:all-at-once",
+        "caterers:before-the-rush",
+        "goods-inward",
+        "late-finish"
+      ],
+      "verdicts": {
+        "fairness-first": [
+          "CCCCCmCCCCCCCCCCmCCC",
+          "CCCCCCCCCCmCCCCCCCCC",
+          "CCCCCmCCCCmCCCCCCCCC",
+          "CCmCCCmCCmCmmmmmCCCC",
+          "CCCCCCCmCmmmCmCmCmCm"
+        ],
+        "predictive-balanced": [
+          "CCCCCCCCCCCCCCCCCCCC",
+          "CCCCCmCCCCCCCCCCCCCC",
+          "CCCCCCCCmCCCCCCCCCCC",
+          "CCCCCCCCCmCCmmmmCCCm",
+          "CCCCCCCCCmCmmmCCCmCC"
+        ],
+        "auction": [
+          "CCCCCmCCCCCCmCCCCCCC",
+          "CCCCCCCCCCCCmCCmCCCm",
+          "CCCCCCCCCCmCmCCmmCCC",
+          "CCmCCCmCCmmmmmmmCCmm",
+          "CCCCCCCCmmmmmmCmCmmm"
+        ],
+        "auction-multi-round": [
+          "CCCCCmCCCCCCCCCmCCCC",
+          "CCCCCCCCmCmCmmCmCCCm",
+          "CmCCCCCCmCCCmmCmCmCC",
+          "CCmCmCCCCmmCmmmmCCmC",
+          "CCCCCCCmmmmmmmCmCmmm"
+        ]
+      }
+    },
+    {
+      "contractId": "c2",
+      "orderId": "midtown-early-lift",
+      "days": [
+        "shift-change:tight",
+        "evacuation-drill:all-at-once",
+        "lift-service:early",
+        "goods-inward",
+        "open-day:busy"
+      ],
+      "verdicts": {
+        "nearest-car": [
+          "mmmmmmmmmmmmmmmmmmmm",
+          "mmmmmmmmmmmmmmmmmmmm",
+          "mmmmmmmmmmmmmmmmmmmm",
+          "mmmmmmmmmmmmmmmmmmmm",
+          "mmmmmmmmmmmmmmmmmmmm"
+        ],
+        "eta": [
+          "CCCCCmmCmCCCmCCmCCCC",
+          "CCCCCCCCCCmCmmCmCCCC",
+          "CmmmmCmmmmmCmmmmCmmC",
+          "CCmCmmmmCmmmmmmmCCmm",
+          "CmmmmmmCmmmmmmCmmmmm"
+        ],
+        "collective": [
+          "CmmmmmmCmCmmmmmmCmmC",
+          "mCmmCCmmmmmmmmmmmmmm",
+          "mmCmmmmmmmmCmmmmmmmC",
+          "mCmmmmmmmmmmmmmmmmmm",
+          "mmmmmmmmmmmmmmmmmmmm"
+        ],
+        "collective-enroute": [
+          "CCCmCmmmmmCmmCCmmCmC",
+          "CCCmmmmCmmmmmmmmmmmm",
+          "mmmmCmmCmmmCmmmmmmmC",
+          "mCmmCCmmCmmmmmmmmCmm",
+          "CmmmmmmmmmmmmmmCmmmm"
+        ],
+        "energy-aware": [
+          "CCCCCmCCCCCCmCCCCCCm",
+          "CCCCCmmCCCmCmmCmCCCC",
+          "CmCmmmmCmmmCmmmmmmmC",
+          "CCmmmCmmmmmmmmmmCCmm",
+          "CCCmCmCmmmmmmmmCmmmm"
+        ],
+        "fairness-first": [
+          "CCCCCmCCCCCCCCCCCCCC",
+          "CCCCCCCCCCmCCCCCCCCC",
+          "CCCCCCCCmmmCmmCmmCmC",
+          "CCmCCCmCCmCmmmmmCCCC",
+          "CCCCmmmCmCCmmmmCmmCm"
+        ],
+        "capacity-aware": [
+          "CCCCCCCCmCCCmCCCCCCC",
+          "CCCCCmCCCCCCmCCmCCCm",
+          "CmCmCmmCmmmCmmmmmmmC",
+          "CCmCCCmCCmmmmmmmCCmC",
+          "CCmCmCCCmmCmmmmmCmmm"
+        ],
+        "predictive-balanced": [
+          "CCCCCCCCCCCCCCCCCCCC",
+          "CCCCCmCCCCCCCCCCCCCC",
+          "CCCmCCmCmmmCmmCmmmmC",
+          "CCCCCCCCCmCCmmmmCCCm",
+          "CCCCmmCCmCmmmmmCCmCm"
+        ],
+        "auction": [
+          "CCCCCCmCCCCCmCCCCCCC",
+          "CCCCCCCCCCCCmCCmCCCm",
+          "CmCmmmmmmmmCmmCmmmmC",
+          "CCmCCCmCCmmmmmmmCCmm",
+          "CCCCmCCCmmCCmmmCmCmm"
+        ],
+        "auction-multi-round": [
+          "CCCCCCCmCCCCCCCmCCCC",
+          "CCCCCCCCmCmCmmCmCCCm",
+          "CmCmmmmmmmmmmmmmmmmC",
+          "CCmCmCCCCmmCmmmmCCmC",
+          "CCCCmCCmmCCmmmCmCmmm"
+        ],
+        "zoned-uppeak": [
+          "CCmCCCmCCCCCCCCCCCCC",
+          "CCCmmCCmCCmCmmCmCCCC",
+          "CmCmmmmmmmmCmmCmmmmC",
+          "mCCmCmmmCmmmmmmmCCCm",
+          "CmmCmmCCmmmmmmmmmmmm"
+        ],
+        "destination-eta": [
+          "CCCCCmCCCmCCCCCmCCCC",
+          "CCCCCCCCmmmCmmCCCCCC",
+          "CmCmmmmCmmmCmmmmmmmC",
+          "mCmmCmmCCmmmmmmmCCmC",
+          "CCmCmmmCmmmmCmmmmmmm"
+        ],
+        "destination-panel": [
+          "CCCCCmCCCCCmCCmCCCCC",
+          "CCCCCCCCCCmCmCCmmCCm",
+          "mmmmmmmmmmmCmmmmmmmm",
+          "mCmmCmmmCmmmmmmmCmmm",
+          "Cmmmmmmmmmmmmmmmmmmm"
+        ]
+      }
+    }
+  ]
+}

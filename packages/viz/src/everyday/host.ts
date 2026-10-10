@@ -1707,8 +1707,13 @@ export interface EverydayHost {
    * the week stands on: since the weekend came off the main path, the sheet stands from the last
    * counted weekday, and Saturday and Sunday are played only through {@link openTomorrow}. A no-op
    * while the week has not closed (`shift/weekStake.ts#weekHasClosed`).
+   *
+   * **Which week it deals** — wave AN, lane DQ-2 ([§ D1344](../../../../DECISIONS.md)): the next
+   * week where this one was held, and this week's own order again where it was not. `onward` is the
+   * sheet's second press on a week that was not held, *Go on to week N*, which deals the next week
+   * whatever this one did, because nothing is locked (`shift/nextWeek.ts`).
    */
-  openNextWeek(): void;
+  openNextWeek(onward?: boolean): void;
 
   /**
    * § 7.6's intervention: append `change` to today's record at `atS` and re-simulate from t = 0.
@@ -2622,9 +2627,9 @@ const NO_RUN_OBSERVATIONS: GoalObservations = Object.freeze({
  * replay onto a different day. That press is pinned by `reportPanel.test.ts`'s exactly-once text
  * guards, which is why this is a sibling composition here rather than an import there.
  */
-function openTomorrowPatch(week: WeekState, roll = false): Partial<ViewerState> {
+function openTomorrowPatch(week: WeekState, roll = false, onward = false): Partial<ViewerState> {
   return {
-    week: roll ? rollWeek(week) : nextDay(week),
+    week: roll ? rollWeek(week, onward) : nextDay(week),
     recording: undefined,
     report: undefined,
     tomorrow: undefined,
@@ -3017,7 +3022,7 @@ export function createEverydayHost(
    * {@link EverydayHost.openNextWeek}, one composition so the two presses cannot deal a crowd or a
    * horizon differently ([§ D1246](../../../../DECISIONS.md)).
    */
-  const advanceDay = (roll: boolean): void => {
+  const advanceDay = (roll: boolean, onward = false): void => {
     releaseCareer();
     const state = b.state();
     /*
@@ -3047,7 +3052,7 @@ export function createEverydayHost(
     // empty, so clearing a field that is already clear costs no render that was not happening.
     /* The crowd first, so the shape is read against the crowd tomorrow meets — § D1095. */
     const restore = pressDaySeedRestore();
-    const tomorrow = openTomorrowPatch(state.week, roll);
+    const tomorrow = openTomorrowPatch(state.week, roll, onward);
     /*
      * **And tomorrow's crowd is dealt, never re-dealt** — lane AL-F, [§ D1229](../../../../DECISIONS.md).
      * A week played in one sitting met the date's crowd on every day of it and again on every day
@@ -4022,9 +4027,9 @@ export function createEverydayHost(
     openTomorrow: () => {
       advanceDay(false);
     },
-    openNextWeek: () => {
+    openNextWeek: (onward = false) => {
       if (!weekHasClosed(b.state().week)) return;
-      advanceDay(true);
+      advanceDay(true, onward);
     },
     setDispatcher: (dispatcherId, keep) => {
       const state = b.state();

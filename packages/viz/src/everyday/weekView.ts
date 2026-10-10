@@ -37,6 +37,7 @@
  */
 
 import { nextTowerOfferOf, type NextTowerOffer } from '../shift/nextTower.js';
+import { nextWeekOf, type NextWeekView } from '../shift/nextWeek.js';
 import { wasGraded } from '../shift/week.js';
 import {
   DAY_UNMEASURED_SENTENCE,
@@ -180,14 +181,22 @@ export interface WeekScreenView {
    */
   readonly onward: NextTowerOffer | undefined;
   /**
+   * **What the sheet deals next on this tower** — `shift/nextWeek.ts#nextWeekOf`, wave AN, lane DQ-2
+   * ([§ D1344](../../../../DECISIONS.md)): the next week on a held week, this week again on one
+   * that was not held with *Go on to week N* beside it, and *harder* only where the house's census
+   * fell. `undefined` while no sheet stands.
+   */
+  readonly next: NextWeekView | undefined;
+  /**
    * **Weeks held on this tower**, one line — `shift/weekRecord.ts#weeksHeldLineOf`, lane AM-D
    * ([§ D1253](../../../../DECISIONS.md)) — or `undefined` before a week on it has closed.
    */
   readonly held: string | undefined;
   /**
    * The screen's one button while the week's sheet stands — the onward tower's label where a held
-   * week offers one, {@link WEEK_START_NEXT_LABEL} otherwise — and `undefined` when no sheet
-   * stands, when the button is the week row's own (§ 3.3).
+   * week offers one, {@link next}'s label otherwise (*Start next week* on a held week, *Play week 2
+   * again* on one that was not) — and `undefined` when no sheet stands, when the button is the week
+   * row's own (§ 3.3).
    */
   readonly primary: string | undefined;
 }
@@ -446,6 +455,7 @@ export function weekScreenViewOf(input: WeekScreenInput): WeekScreenView {
   const todayClosed = todayIsBanked(input);
   const sheet = weekSheetOf(input.week, input.house ?? (() => undefined));
   const onward = nextTowerOfferOf(input.week.contractId, sheet, input.nameOf);
+  const next = sheet === undefined ? undefined : nextWeekOf(input.week);
   return {
     /* Wave AN, lane AN-7: the week's number, where one is true of it (`weekStake.ts#weekOrdinalOf`). */
     eyebrow: `ELEVATOR SIM · EVERYDAY MODE${weekEyebrowOf(input.week)}`,
@@ -479,8 +489,9 @@ export function weekScreenViewOf(input: WeekScreenInput): WeekScreenView {
     sheet,
     record: input.record === undefined ? undefined : weekRecordLineOf(input.record),
     onward,
+    next,
     held: input.record === undefined ? undefined : weeksHeldLineOf(input.record),
-    primary: sheet === undefined ? undefined : (onward?.label ?? WEEK_START_NEXT_LABEL),
+    primary: sheet === undefined ? undefined : (onward?.label ?? next?.label ?? WEEK_START_NEXT_LABEL),
   };
 }
 

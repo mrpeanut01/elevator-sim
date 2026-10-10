@@ -93,6 +93,17 @@ describe('continue your week — § D1228', () => {
     expect(continueWeekEntryOf(openWeek('c2'), 'Midtown Office')).toBeUndefined();
   });
 
+  /*
+   * Wave AN, lane DQ-2 (§ D1344): a week that was not held is dealt itself again and keeps its
+   * number, so a week 1 played again starts with nothing filed. It is still a week the player chose
+   * to carry on, and the tile offers it from its first morning, as a later week is.
+   */
+  it('offers a week dealt again after it was not held, from its first morning', () => {
+    const again = rollWeek(fileClean(openWeek('c2')));
+    expect([again.week, again.history.length]).toEqual([1, 0]);
+    expect(continueWeekEntryOf(again, 'Midtown Office')?.line).toMatch(/^Midtown Office, week 1, Monday · 0 of the /u);
+  });
+
   it('says no count where the census does not speak for the tower', () => {
     expect(continueWeekEntryOf(fileClean(openWeek('c1')), 'Garden Apartments')?.line).toBe(
       'Garden Apartments, Monday filed, Tuesday next',

@@ -297,8 +297,10 @@ export interface ContractLadderRow {
    *
    * Authored here and admitted elsewhere: `shift/weekOrders.ts` deals an order only once the week
    * census (`data/week-way.json`) holds a current row for every one of its days under exactly the
-   * wrinkle it names, and `docs/33` DC-10 admits each row. An order the census refuses stays in the
-   * data with its refusal readable and is not dealt.
+   * wrinkle it names, `docs/33` DC-10 admits each row, and DC-11's one-profile screen
+   * (`data/week-dominance.json`, wave AN lane DQ-2, [§ D1343](../../../../DECISIONS.md)) finds no
+   * shipped profile left alone holding the week on more than half its crowds. An order either
+   * refuses stays in the data with its refusal readable and is not dealt.
    */
   readonly weekOrders: readonly ContractWeekOrder[];
 }

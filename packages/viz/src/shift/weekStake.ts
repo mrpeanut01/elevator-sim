@@ -51,25 +51,24 @@
 
 import { scheduledEventFor } from './calendar.js';
 import { weekOrderIndexOf } from './weekOrders.js';
-import { dc10Of, WEEK_WAY, weekWayRowFor, type WeekWay, type WeekWayRow } from './weekWay.js';
+import {
+  dayStakeReasonOf,
+  dc10Of,
+  WEEK_WAY,
+  weekTargetFor,
+  weekWayRowFor,
+  type DayStakeReason,
+  type WeekWay,
+  type WeekWayRow,
+} from './weekWay.js';
 import { weekdayOf, type DayOutcome, type ScenarioContract, type WeekState } from './types.js';
 import type { WatchRecord } from '../watch/types.js';
 
 /** A week's days. The census measures days 1 to 7, and a week that the census speaks for ends on 7. */
 export const WEEK_LENGTH = 7;
 
-/** Why a dealt day counts or does not. */
-export type DayStakeReason =
-  /** Both halves hold: the day counts. */
-  | 'contested'
-  /** A way through, and the standing order left alone clears it too often: no play decides it. */
-  | 'untouched'
-  /** DC-10's first half fails: nothing measured clears it often enough. */
-  | 'no-way-through'
-  /** The queue gate fails: no measured play met the day's queue bar on any crowd. */
-  | 'queue'
-  /** The census measured the tower and not this day as it is dealt. */
-  | 'unmeasured';
+/** Why a dealt day counts or does not — `weekWay.ts#dayStakeReasonOf`'s, re-exported for the callers that read it here. */
+export type { DayStakeReason };
 
 /** One day of a tower's week, as dealt. */
 export interface DealtDay {
@@ -128,12 +127,6 @@ function sentenceFor(reason: DayStakeReason, row: WeekWayRow | undefined, census
   );
 }
 
-/** Whether a row's standing order misses often enough — DC-10's second half, with no breather exemption. */
-function standingMissesEnough(row: WeekWayRow, census: WeekWay): boolean {
-  const n = row.standingVerdicts.length;
-  if (n === 0) return false;
-  return dc10Of(row, census.protocol).standingMisses / n >= census.protocol.standingMissAtLeast;
-}
 
 /**
  * Which wrinkle a day of the week is dealt: the shipped draw, with no calendar over it, for the
@@ -173,14 +166,8 @@ function dealtDayOf(key: WeekKey, day: number, census: WeekWay, dealing: WeekDea
   const found = weekWayRowFor(contractId, day, eventId, horizon, census);
   /* The day as it is dealt: a row measured without today's wrinkle describes a different day. */
   const row = found?.eventId === eventId ? found : undefined;
-  let reason: DayStakeReason;
-  if (row === undefined) reason = 'unmeasured';
-  else {
-    const reading = dc10Of(row, census.protocol);
-    if (!reading.queueFeasible) reason = 'queue';
-    else if (!reading.wayThrough) reason = 'no-way-through';
-    else reason = standingMissesEnough(row, census) ? 'contested' : 'untouched';
-  }
+  /* The rule itself is `weekWay.ts#dayStakeReasonOf`'s, so the one-profile screen counts the same days. */
+  const reason = dayStakeReasonOf(row, census);
   return {
     day,
     dayIdx,
@@ -192,10 +179,8 @@ function dealtDayOf(key: WeekKey, day: number, census: WeekWay, dealing: WeekDea
   };
 }
 
-/** The target for a count of counted days: minus one, at least one, and none for none. */
-export function weekTargetFor(counted: number): number {
-  return counted <= 0 ? 0 : Math.max(1, counted - 1);
-}
+/** The target for a count of counted days — `weekWay.ts#weekTargetFor`, re-exported where its callers read it. */
+export { weekTargetFor };
 
 const DEALS = new WeakMap<WeekWay, Map<string, WeekDeal | undefined>>();
 
@@ -785,11 +770,16 @@ export const WEEK_CLOSED_LINE =
 /**
  * *Tomorrow opens a new week* stood here, and since [§ D1246](../../../../DECISIONS.md) the sheet
  * stands from the last day of the main path, when the day after it may be a weekend day the player
- * chooses to play. What opens the new week is the press, so the line names the press.
+ * chooses to play. What opens the new week is the press.
+ *
+ * *Start next week opens …* stood here until wave AN's lane DQ-2 ([§ D1344](../../../../DECISIONS.md)):
+ * a week that was not held is played again by *Play week 2 again*, so the press is named by the
+ * sheet's own next-week line (`shift/nextWeek.ts#nextWeekOf`) and this line says what is true of
+ * either press.
  */
 export const WEEK_SHEET_ROLL_LINE =
-  'Start next week opens a new week on this tower, counted from zero. Nothing is locked, and a ' +
-  'scenario you have cleared stays cleared.';
+  'A new week on this tower is counted from zero. Nothing is locked, and a scenario you have ' +
+  'cleared stays cleared.';
 
 /**
  * A closed day's verdict as the sheet's cells read it. Exported for the close's own house line
