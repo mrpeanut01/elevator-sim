@@ -2227,12 +2227,14 @@ type DecisionReservation = {
  * **D1268**.
  */
 /*
- * **Wave AN is OPEN and reserves D1268-D1340**: the issue backlog's small fixes first, then the lanes
+ * **Wave AN is OPEN and reserves D1268-D1400** (D1340 at first): the issue backlog's small fixes first, then the lanes
  * a swarm's rulings on the open issues and the post-AM panel make necessary. Committed on `an-base`
  * before any lane worktree exists, and closed in the wave's own merge commit. Wave AM left
  * D1268-D1270 free rather than holed (§ D430), so this block opens over them.
  */
-const OPEN_RESERVATION = { wave: 'AN', from: 1268, to: 1340 } as DecisionReservation | null;
+// Extended to D1400 on 2026-10-10, before any lane took a number above D1340: the post-AM panel's
+// defect lanes and the play swarm's lanes needed blocks of their own.
+const OPEN_RESERVATION = { wave: 'AN', from: 1268, to: 1400 } as DecisionReservation | null;
 /*
  * **Wave AC's reservation, D619-D620, is closed.** It opened on the pair wave AB left free.
  * GitHub issue #437 stage 2 wrote D619 first, on a lane that started from the same pre-#422 base as
