@@ -229,7 +229,8 @@ describe.skipIf(!HAS_BROWSER)('GitHub issue #594 — no mode but Scenario writes
        * day standing, and its press opens the front door on that week.
        */
       await page.waitForSelector('.everyday-continue-week', { timeout: 15_000 });
-      expect(await textOf(page, '.everyday-continue-week')).toContain('Midtown Office, Monday filed, Tuesday next');
+      /* With the week's number since wave AN, lane AN-7 (§ D1330). */
+      expect(await textOf(page, '.everyday-continue-week')).toContain('Midtown Office, week 1, Monday filed, Tuesday next');
       await page.locator('.everyday-continue-week').click();
       await page.waitForSelector('.everyday-door', { timeout: 15_000 });
       await toModes(page);

@@ -42,6 +42,7 @@ import {
   DAY_UNMEASURED_SENTENCE,
   dayCountsToward,
   weekDealOf,
+  weekOrdinalOf,
   weekSheetOf,
   weekStakeLineOf,
   type HouseReading,
@@ -51,7 +52,7 @@ import type { DayOutcome, WeekState } from '../shift/types.js';
 import { weekRecordLineOf, weeksHeldLineOf, type WeekRecord } from '../shift/weekRecord.js';
 import { weekdayOf } from '../shift/types.js';
 
-import { todayIsBanked, type WorldBandView } from './doorView.js';
+import { DAY_VERDICT_NOTE, todayIsBanked, type WorldBandView } from './doorView.js';
 import { EM_DASH, percentFigure } from './figures.js';
 import {
   percentileLine,
@@ -253,12 +254,11 @@ export function verdictOf(outcome: DayOutcome): WeekDayVerdict {
   return outcome.allMet ? 'cleared' : 'missed';
 }
 
-/** The note a card carries. One sentence fragment per state, and no state without one. */
-const VERDICT_NOTE: Readonly<Record<WeekDayVerdict, string>> = Object.freeze({
-  cleared: 'clean day',
-  missed: 'missed',
-  ungraded: 'too quiet to grade',
-});
+/**
+ * The note a card carries. One sentence fragment per state, and no state without one — the door's
+ * chip reads the same map (`doorView.ts#DAY_VERDICT_NOTE`, wave AN, lane AN-7).
+ */
+const VERDICT_NOTE: Readonly<Record<WeekDayVerdict, string>> = DAY_VERDICT_NOTE;
 
 /** `Monday` → `MON`. */
 function shortWeekday(dayIdx: number): string {
@@ -335,6 +335,12 @@ function cardsOf(input: WeekScreenInput): readonly WeekDayCard[] {
     });
   }
   return Object.freeze(cards);
+}
+
+/** ` · WEEK 2`, or nothing where no week number is true of the week. */
+function weekEyebrowOf(week: WeekState): string {
+  const ordinal = weekOrdinalOf(week);
+  return ordinal === undefined ? '' : ` · ${ordinal.toUpperCase()}`;
 }
 
 /** The tally, counted off the cards. See the module docstring on § 16 rule 5. */
@@ -441,7 +447,8 @@ export function weekScreenViewOf(input: WeekScreenInput): WeekScreenView {
   const sheet = weekSheetOf(input.week, input.house ?? (() => undefined));
   const onward = nextTowerOfferOf(input.week.contractId, sheet, input.nameOf);
   return {
-    eyebrow: 'ELEVATOR SIM · EVERYDAY MODE',
+    /* Wave AN, lane AN-7: the week's number, where one is true of it (`weekStake.ts#weekOrdinalOf`). */
+    eyebrow: `ELEVATOR SIM · EVERYDAY MODE${weekEyebrowOf(input.week)}`,
     title: 'Your week',
     streakLine: streakLineOf(input.week, tally.closed),
     cards,

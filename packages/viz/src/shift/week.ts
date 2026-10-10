@@ -40,7 +40,7 @@
 import type { WatchRecord } from '../watch/types.js';
 
 import { CONTRACTS, contractById, FIRST_CONTRACT_ID, nextContract } from './contracts.js';
-import { dayCountsToward, weekNeedOf, weekRollsOver } from './weekStake.js';
+import { dayCountsToward, weekHasClosed, weekNeedOf, weekRollsOver } from './weekStake.js';
 import {
   weekdayOf,
   type ClearedAward,
@@ -619,6 +619,16 @@ export function nextDay(week: WeekState): WeekState {
     closedDay: null,
     banked: null,
   };
+}
+
+/**
+ * **The next day on the week's main path** — [§ D1246](../../../../DECISIONS.md): a closed week's
+ * next day is the next week's first, and every other day's is {@link nextDay}'s. The close's
+ * tomorrow card (`shift/report.ts`) and the facts measured for it (`dev/state.ts#tomorrowFactsOf`)
+ * both ask this, so the card's wrinkle and the tenants and cars measured under it are one day's.
+ */
+export function pathNextOf(week: WeekState): WeekState {
+  return weekHasClosed(week) ? rollWeek(week) : nextDay(week);
 }
 
 /**

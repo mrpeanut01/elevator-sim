@@ -499,6 +499,7 @@ describe('the load reading', () => {
 describe('the rest of the record', () => {
   it('names the day and prints the seed line two players can compare', () => {
     const record = recordFor(midtown, 2, 1);
+    /* The fixture's week is Garden Apartments', which the census does not deal: no week number. */
     expect(record.dayLabel).toBe('TUESDAY · DAY 2');
     expect(record.weekday).toBe('Tuesday');
     expect(record.seedLine).toBe(
@@ -998,6 +999,11 @@ describe('a pinned first day says whose crowd it is, and how long it takes — �
     const sentence = midtownPinned({}).outOfService?.mootUnder ?? '';
     expect(sentence).toContain('Measured on this crowd');
     expect(sentence).not.toContain('today’s crowd');
+    /*
+     * Wave AN, lane AN-7, carried from the post-AL panel and found again by the post-AM panel's seat
+     * D: the count opened mid-sentence with a capital, *Measured on this crowd, Ten other …*.
+     */
+    expect(sentence).toMatch(/Measured on this crowd, [a-z]/u);
   });
 
   it('prints how long the whole day takes and when the call comes, derived — and only on the day as measured', () => {
@@ -1063,5 +1069,38 @@ describe('the week’s stake on the brief (§ D1176)', () => {
   it('draws nothing on a tower the census does not speak for', () => {
     const state = { week: openWeek('c1'), buildingId: 'garden-apartments', seed: 1n } as unknown as ViewerState;
     expect(todayOf(inputOf(state)).weekStake).toBeUndefined();
+  });
+});
+
+/*
+ * **The week's number reaches the brief and the door** — wave AN, lane AN-7, the post-AM panel's
+ * seats B and D: § D1252 deals each week of a census tower its own order, and no screen numbered
+ * the weeks, so week 2's Tuesday and week 1's read alike above different wrinkles.
+ */
+describe('the eyebrow numbers a census tower’s week', () => {
+  it('reads WEEK n on Midtown’s week, and nothing where the census does not deal the week', () => {
+    const on = (week: WeekState): string =>
+      todayOf({
+        week,
+        calendar: NO_CALENDAR,
+        building: midtown,
+        buildingId: midtown.id,
+        dispatcherName: 'Steady hand',
+        dispatcherNameOf: () => undefined,
+        goals: pendingGoals(week.day),
+        seed: 424_242n,
+        horizon: 'period',
+        dayStartS: undefined,
+        templateVariesMix: false,
+        wholeDayRun: false,
+        dayCars: undefined,
+        crowdIsToday: true,
+        daySeed: 20_260_925n,
+        firstSession: false,
+        units: 'metric',
+      }).dayLabel;
+    expect(on({ ...openWeek('c2'), week: 2, day: 2, dayIdx: 1 })).toBe('WEEK 2 · TUESDAY · DAY 2');
+    expect(on({ ...openWeek('c2'), day: 1, dayIdx: 0 })).toBe('WEEK 1 · MONDAY · DAY 1');
+    expect(on({ ...openWeek('c1'), day: 2, dayIdx: 1 })).toBe('TUESDAY · DAY 2');
   });
 });

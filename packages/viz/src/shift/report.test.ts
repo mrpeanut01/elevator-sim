@@ -79,7 +79,8 @@ import {
 } from './report.js';
 import { reportWindowNameOf } from './reportWindow.js';
 import { closeDay, nextDay, openEndless, openWeek, outcomeOf } from './week.js';
-import { WEEK_CLOSED_LINE } from './weekStake.js';
+import { WEEK_CLOSED_LINE, weekDealOf } from './weekStake.js';
+import { dayCloseOf } from './dayClose.js';
 import {
   DAY_START_S,
   WAKE_UP_ARRIVALS,
@@ -87,6 +88,7 @@ import {
   type DayReport,
   type Observations,
   type ShiftGoal,
+  type WeekState,
 } from './types.js';
 import { readGoals } from './goals.js';
 import { DAY_CALL_ROW_NOTE, type DayCallRecord } from './dayCalls.js';
@@ -191,6 +193,50 @@ function reportOf(
       subject: { kind: 'week-day' },
     }),
   );
+}
+
+/**
+ * Midtown Office's week `weekNo`, closed through `day` on the clean run, its wrinkle dealt as that
+ * week deals it (§ D1252), filed as a whole day — wave AN, lane AN-7's two cases below.
+ */
+function midtownWeekReport(
+  weekNo: number,
+  day: number,
+  populations?: DayReportInput['populations'],
+): { readonly report: WeekDayReport; readonly week: WeekState } {
+  const observations = observationsOfRun(clean);
+  const goals = goalsForDay(day);
+  const opened = { ...openWeek('c2'), week: weekNo, day, dayIdx: (day - 1) % 7 };
+  const week = closeDay(
+    opened,
+    outcomeOf({
+      record: null,
+      recordRefusal: null,
+      day,
+      dayIdx: opened.dayIdx,
+      eventId: scheduledEventFor(null, day, opened.dayIdx, 'whole-day', opened).id,
+      arrived: observations.arrived,
+      carried: observations.carried,
+      minutePct: observations.minutePct,
+      readings: readGoals(goals, observations),
+    }),
+  );
+  const report = weekDay(
+    dayReportOf({
+      recording: clean,
+      observations,
+      goals,
+      week,
+      contract: contractById('c2'),
+      event: SHIFT_EVENTS.ordinary,
+      plan: PLAN,
+      calendar: null,
+      subject: { kind: 'week-day' },
+      wholeDayRun: true,
+      ...(populations === undefined ? {} : { populations }),
+    }),
+  );
+  return { report, week };
 }
 
 function figure(
@@ -1439,6 +1485,49 @@ describe('the rest of the sheet', () => {
     expect(thursday.onward?.name).toBe(thursday.forecast.name);
   });
 
+  /*
+   * **Tomorrow is dealt from tomorrow's week** — wave AN, lane AN-7, the post-AM panel's seats B and
+   * D. Every week-2 close said tomorrow *does not count toward the week: it has not been measured as
+   * it is dealt*, and the next brief and the tally both counted it: the onward wrinkle was drawn as
+   * week 1's (`scheduledEventFor` without the week, § D1252), so it never matched week 2's deal.
+   */
+  it('deals tomorrow’s wrinkle from tomorrow’s week, so the close says what the brief says — § D1252', () => {
+    for (const [weekNo, day, nextWeek, nextDayNo] of [
+      [2, 1, 2, 2],
+      [2, 3, 2, 4],
+      [1, 5, 2, 1],
+      [2, 5, 3, 1],
+    ] as const) {
+      const { report, week } = midtownWeekReport(weekNo, day);
+      const dealt = weekDealOf({ contractId: 'c2', week: nextWeek })?.days[nextDayNo - 1];
+      const at = `week ${String(weekNo)} day ${String(day)}`;
+      expect(dealt, at).toBeDefined();
+      expect(report.onward?.eventId, at).toBe(dealt?.eventId);
+      expect(report.onward?.week, at).toBe(nextWeek);
+      const close = dayCloseOf({ week, report, houseOf: () => undefined });
+      expect(close?.tomorrow.counts, at).toBe(dealt?.sentence);
+    }
+  });
+
+  /*
+   * **The tenants line is the two buildings' counts, not a slope's ratio** — wave AN, lane AN-7, the
+   * post-AM panel's seat D (D7). Friday's close read *7.4 % fewer tenants* for 627 → 589 (6.1 %)
+   * and Saturday's *9.1 %* for 646 → 589 (8.8 %): `forecastFor` divided two growth factors, and
+   * growth rounds per floor. The counts are Midtown's measured buildings on the shipped chain
+   * (`dev/state.ts#tomorrowFactsOf`, pinned in `tomorrow.test.ts`).
+   */
+  it('states the forecast’s percentage from the measured tenants where the shell measured them', () => {
+    const friday = midtownWeekReport(1, 5, { today: 627, tomorrow: 646, onward: 589 }).report;
+    expect(friday.onward?.demand).toBe('A new week: the tower as handed, 6.1% fewer tenants than today');
+    expect(friday.forecast.demand).toBe('+3.0% more tenants than today');
+    const saturday = midtownWeekReport(1, 6, { today: 646, tomorrow: 665, onward: 589 }).report;
+    expect(saturday.onward?.demand).toBe('A new week: the tower as handed, 8.8% fewer tenants than today');
+    const monday = midtownWeekReport(1, 1, { today: 589, tomorrow: 608, onward: 608 }).report;
+    expect(monday.onward?.demand).toBe('+3.2% more tenants than today');
+    /* Without the measurement the slope's ratio stands, as before. */
+    expect(midtownWeekReport(1, 5).report.onward?.demand).toMatch(/^A new week: the tower as handed, \d+\.\d% fewer tenants than today$/u);
+  });
+
   it('promises no unlock of what is already open — § D1250', () => {
     for (const day of [1, 2, 3, 4]) {
       const taught = reportOf(clean, day).taught;
@@ -1839,6 +1928,19 @@ describe('the levers point at what this run showed — issue #55', () => {
     if (found === undefined) throw new Error(`no lever "${id}" on the sheet`);
     return found.body;
   }
+
+  /*
+   * **The fairness card promises no outcome** — wave AN, lane AN-7, on lane AN-3's measurement for
+   * GitHub issue #575: swept on the legs, the workshop's patience lever (the
+   * starvation weight this card's route opens) changes nobody's trip on some days under every
+   * shipped profile, so *Your worst wait falls* was a promise the run does not keep.
+   */
+  it('says what the fairness lever charges for, and that on some days it changes nobody’s trip', () => {
+    const body = leverBody(reportOf(clean), 'weight-fairness');
+    expect(body).not.toMatch(/worst wait falls|will fall|will drop|will cut/iu);
+    expect(body).toContain('aims at the worst wait rather than the average');
+    expect(body).toContain('On some days it changes nobody’s trip.');
+  });
 
   it('reorders and annotates on a day that was outrun, and leaves the glossary alone otherwise', () => {
     const outrun = reportOf(saturated);

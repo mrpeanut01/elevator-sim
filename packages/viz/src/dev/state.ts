@@ -146,9 +146,10 @@ import {
   closeDay,
   nextDay,
   openWeek,
+  pathNextOf,
   switchWeek,
 } from '../shift/week.js';
-import type { TomorrowBriefing } from '../shift/tomorrow.js';
+import type { OnwardFacts, TomorrowBriefing } from '../shift/tomorrow.js';
 import type { DayOutcome, RunHorizon, ShiftEvent, ShiftEventId, WeekState } from '../shift/types.js';
 import type { ShapedDayReport } from '../shift/report.js';
 import type { PlayMode } from '../scope/types.js';
@@ -2680,6 +2681,13 @@ export interface TomorrowFacts {
   readonly calendarLine: string;
   /** What tomorrow's configuration refuses, verbatim. */
   readonly withheld: readonly string[];
+  /**
+   * **The next day on the week's main path, measured the same way** — wave AN, lane AN-7. The
+   * close's tomorrow card names that day (`shift/week.ts#pathNextOf`, § D1246), which on the close
+   * that closed the week is the next week's Monday rather than the literal tomorrow above; on every
+   * other close the two are one day and one plan.
+   */
+  readonly onward: OnwardFacts;
 }
 
 /**
@@ -2710,8 +2718,10 @@ export interface TomorrowFacts {
  *
  * ## What it costs, and why that is affordable exactly here
  *
- * Two `parseBuilding`/`resolveBuilding` passes — no simulation, no RNG, no kernel. It is called
- * **once per closed day**, from `closeShift`, and never from a render: the shell redraws at 60 Hz
+ * Two `parseBuilding`/`resolveBuilding` passes — no simulation, no RNG, no kernel — and two more on
+ * the close that closes a week, whose next day on the main path is not the literal tomorrow
+ * ({@link TomorrowFacts.onward}). It is called **once per closed day**, from `closeShift`, and never
+ * from a render: the shell redraws at 60 Hz
  * during playback and a resolve on that path would be a per-frame document parse. That is the
  * reason {@link ViewerState.tomorrow} is a stored output rather than something the report panel
  * derives when it draws.
@@ -2727,12 +2737,42 @@ export function tomorrowFactsOf(
   resources: BrowserResources,
   state: ViewerState,
 ): TomorrowFacts {
-  const plan = shiftRunConfigOf(resources, { ...state, week: nextDay(state.week) });
+  const literal = nextDay(state.week);
+  const plan = shiftRunConfigOf(resources, { ...state, week: literal });
+  const path = pathNextOf(state.week);
+  const onward =
+    path.day === literal.day && path.week === literal.week
+      ? plan
+      : shiftRunConfigOf(resources, { ...state, week: path });
   return {
     population: plan.building.totalPopulation,
     calendarLine: plan.calendarLine,
     withheld: plan.withheld,
+    onward: {
+      population: onward.building.totalPopulation,
+      /*
+       * Every car that day's run takes out of passenger service: the tower's bookings and the day's
+       * own windows off its building's service events (`carAbsencesOf`, the brief's strip's reading),
+       * and a car the day holds for the whole run, which travels beside the building rather than on it.
+       */
+      cars: onwardCarsOf(onward),
+      startOfDayS: startOfDayOfConfig(onward.config),
+    },
   };
+}
+
+/**
+ * Every car a planned run takes out of passenger service — {@link TomorrowFacts.onward}'s cars: the
+ * spans on the run's own building (`shift/bookedOut.ts#carAbsencesOf`, the brief's strip's reading),
+ * and a car the day holds for the whole run, which travels beside the building rather than on it, as
+ * out from the start to the end. Ordered by car id.
+ */
+function onwardCarsOf(plan: ShiftRunConfig): readonly BookedOutCar[] {
+  const spans = carAbsencesOf(plan.building, [...plan.dayCars.holds, ...plan.dayCars.windows]);
+  const held = plan.dayCars.holds
+    .filter((carId) => !spans.some((car) => car.carId === carId))
+    .map((carId): BookedOutCar => ({ carId, awayAtS: 0, backAtS: null, ofTheDay: true }));
+  return [...spans, ...held].sort((a, b) => a.carId.localeCompare(b.carId));
 }
 
 /**

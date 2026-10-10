@@ -13,7 +13,8 @@ import { describe, expect, it } from 'vitest';
 import { SPREAD_CARS_LABEL } from '../live/interventions.js';
 
 import { clockOf } from './report.js';
-import { PRESS_CALL_AGAIN, PRESS_CALL_LATER_NOTE, PRESS_CALL_ROW_ID, pressCallRowOf } from './callRow.js';
+import { PRESS_CALL_AGAIN, PRESS_CALL_LATER_NOTE, PRESS_CALL_ROW_ID, pressCallDecidingOf, pressCallRowOf } from './callRow.js';
+import { decidingCallLineOf, NO_CALL_DECIDED_LINE } from './dayClose.js';
 import type { ContractPressDay } from './ladder.js';
 import type { PressCall } from './pressCall.js';
 
@@ -176,5 +177,63 @@ describe('the call row', () => {
 
   it('draws no census sentence where no other order clears the day', () => {
     expect(rowOf([], { ...PRESS, mootUnder: [] })?.why).not.toContain('With no press at all');
+  });
+});
+
+/*
+ * **The close and the row read one answer to the pinned call** — wave AN, lane AN-7, the post-AM
+ * panel's seat B (defect 1). Answered *leave them* at 10:40 and *spread* at a later call, the day
+ * missed; the row said spread at 10:40 read *Shift cleared* on this crowd, and the close said *No
+ * call decided today*, because it read the log's first press (the later call's) as the 10:40 answer.
+ */
+describe('the deciding sentence over a pinned call', () => {
+  const verdictOf = () => 'ungraded' as const;
+  const lineOf = (verdict: 'cleared' | 'missed' | 'ungraded'): string =>
+    verdict === 'cleared' ? 'Shift cleared' : verdict === 'missed' ? 'Shift missed' : 'Too quiet to grade';
+  const later = at(CALL.atS + 6000, 'spread-cars');
+
+  it('reads nothing pressed at the call where only a later call was pressed, as the row does', () => {
+    const input = { press: PRESS, call: CALL, interventions: later, nameOf: (id: string) => names[id] };
+    const row = pressCallRowOf(input, clock);
+    expect(row?.what).toBe('The stage called the day, and nothing was pressed at the call');
+    const pinned = pressCallDecidingOf(input);
+    expect(pinned?.answered).toBeUndefined();
+    const line = decidingCallLineOf({ verdict: 'missed', records: [], pinned, verdictOf, lineOf, clockOf: clock });
+    expect(line).not.toBe(NO_CALL_DECIDED_LINE);
+    expect(line).toContain('The call that decided today came at 10:40, where nothing was pressed');
+    expect(line).toContain('with spread the cars across the tower and nothing pressed after it read Shift cleared.');
+    /* The row's own sentence for the same press on the same crowd. */
+    expect(row?.why).toContain('with spread the cars across the tower the day read Shift cleared at every one');
+  });
+
+  it('reads the press at the call second as the answer, with later presses beside it', () => {
+    const input = {
+      press: PRESS,
+      call: CALL,
+      interventions: [...at(CALL.atS, 'park-cars-lobby'), ...later],
+      nameOf: (id: string) => names[id],
+    };
+    expect(pressCallDecidingOf(input)?.answered).toBe('park-cars-lobby');
+    expect(
+      decidingCallLineOf({ verdict: 'missed', records: [], pinned: pressCallDecidingOf(input), verdictOf, lineOf, clockOf: clock }),
+    ).toContain('where you chose park the cars in the lobby');
+  });
+
+  it('says the day was skipped past the call where it was, in the row’s terms', () => {
+    const input = { press: PRESS, call: CALL, interventions: [], nameOf: (id: string) => names[id], skipped: true };
+    expect(
+      decidingCallLineOf({ verdict: 'missed', records: [], pinned: pressCallDecidingOf(input), verdictOf, lineOf, clockOf: clock }),
+    ).toContain('where the day was skipped past the call');
+  });
+
+  it('draws no pinned reading where the row draws none', () => {
+    const twice = {
+      press: PRESS,
+      call: CALL,
+      interventions: [...at(CALL.atS - 60, 'park-cars-lobby'), ...at(CALL.atS, 'spread-cars')],
+      nameOf: (id: string) => names[id],
+    };
+    expect(pressCallRowOf(twice, clock)).toBeUndefined();
+    expect(pressCallDecidingOf(twice)).toBeUndefined();
   });
 });

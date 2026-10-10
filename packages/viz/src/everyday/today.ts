@@ -46,7 +46,7 @@ import { PRACTICE_DAY_SENTENCES, practiceGroundOf, type PracticeGround } from '.
 import { isDerivedCrowdOn } from '../shift/weekRecord.js';
 import type { ResolvedBuilding } from '@elevator-sim/core/browser';
 
-import { bookedOutCarsOf, carAbsencesOf, wrinkleNameOf, wrinkleNoteOf } from '../shift/bookedOut.js';
+import { absenceSpanPhraseOf, bookedOutCarsOf, carAbsencesOf, wrinkleNameOf, wrinkleNoteOf } from '../shift/bookedOut.js';
 import type { CalendarPeriod } from '../shift/calendar.js';
 import { scheduledEventFor } from '../shift/calendar.js';
 import { firstSessionLineFor } from '../shift/firstSession.js';
@@ -54,8 +54,8 @@ import { eventAsRun, eventCarChoice } from '../shift/events.js';
 import { carsToDerate } from '../shift/incidents.js';
 import { admittedPressDayIds, pressDayStanding } from '../shift/ladder.js';
 import { wayThroughSentenceOf } from '../shift/weekWay.js';
-import { dayStakeSentenceOf, weekStakeLineOf } from '../shift/weekStake.js';
-import { clockOf, clockRange } from '../shift/report.js';
+import { dayStakeSentenceOf, weekOrdinalOf, weekStakeLineOf } from '../shift/weekStake.js';
+import { clockOf } from '../shift/report.js';
 import type { GoalReading, RunHorizon, ShiftEvent, WeekState, Weekday } from '../shift/types.js';
 import { weekdayOf } from '../shift/types.js';
 
@@ -116,7 +116,7 @@ export interface TodayRecord {
   /** 1-based, `WeekState.day`. */
   readonly day: number;
   readonly weekday: Weekday;
-  /** `TUESDAY · DAY 2` — the eyebrow both screens carry. */
+  /** `WEEK 1 · TUESDAY · DAY 2` — the eyebrow both screens carry; no week where none is true of it. */
   readonly dayLabel: string;
   /** The building's own name, or its id when this build does not know the document. */
   readonly towerName: string;
@@ -479,19 +479,19 @@ function carsOutTodayOf(
   });
 }
 
+/** `WEEK 2 · `, or nothing where no week number is true of the week. */
+function ordinalEyebrowOf(week: WeekState): string {
+  const ordinal = weekOrdinalOf(week);
+  return ordinal === undefined ? '' : `${ordinal.toUpperCase()} · `;
+}
+
 /** `10:30–15:30`, `from the start of the day until 16:30`, `from 10:30 to the end of the day`, `all day`. */
 function spanPhrase(
   span: { readonly awayAtS: number; readonly backAtS: number | null },
   dayStartS: number,
 ): string {
-  if (span.awayAtS === 0) {
-    return span.backAtS === null
-      ? 'all day'
-      : `from the start of the day until ${clockOf(span.backAtS, dayStartS)}`;
-  }
-  return span.backAtS === null
-    ? `from ${clockOf(span.awayAtS, dayStartS)} to the end of the day`
-    : clockRange(span.awayAtS, span.backAtS, dayStartS);
+  /* One set of words for a span, shared with the close's tomorrow card (`bookedOut.ts`). */
+  return absenceSpanPhraseOf(span, (simTimeS) => clockOf(simTimeS, dayStartS));
 }
 
 /**
@@ -947,7 +947,8 @@ export function todayOf(input: TodayInput): TodayRecord {
   return {
     day: week.day,
     weekday,
-    dayLabel: `${weekday.toUpperCase()} · DAY ${String(week.day)}`,
+    /* Wave AN, lane AN-7: the week's number, where one is true of it (`weekStake.ts#weekOrdinalOf`). */
+    dayLabel: `${ordinalEyebrowOf(week)}${weekday.toUpperCase()} · DAY ${String(week.day)}`,
     towerName: building?.name ?? input.buildingId,
     lede: ledeOf(building, wrinkleName, wrinkleNote, out),
     wrinkle: event,

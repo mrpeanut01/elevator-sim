@@ -39,8 +39,12 @@
 
 import type { SimTime } from '@elevator-sim/core/browser';
 
+import { clockAt } from '../live/timeline.js';
+
+import { carsOutLineOf, wrinkleNoteOf } from './bookedOut.js';
 import { dayCallAnswerWordsOf, dayCallAnswersOf, type DayCallAnswer, type DayCallRecord } from './dayCalls.js';
 import type { WeekDayReport } from './report.js';
+import type { OnwardDay } from './tomorrow.js';
 import {
   countedCleanOf,
   dayCountsToward,
@@ -49,6 +53,7 @@ import {
   houseNeedOf,
   houseReadingOfDay,
   weekDealOf,
+  weekOrdinalOf,
   type HouseReading,
 } from './weekStake.js';
 import { clearsIn, WEEK_WAY, type WeekWay } from './weekWay.js';
@@ -72,6 +77,11 @@ export interface DecidingPinnedCall {
   readonly missedBy: string;
   /** What was pressed at the call: one of the two, or nothing. */
   readonly answered: string | undefined;
+  /**
+   * Whether the day was skipped past the call with its card up and nothing pressed (§ D1151), so
+   * the sentence says what the row says (`callRow.ts#PRESS_CALL_SKIPPED_WHAT`).
+   */
+  readonly skipped?: boolean | undefined;
 }
 
 export interface DecidingCallInput {
@@ -137,7 +147,12 @@ export function decidingCallLineOf(input: DecidingCallInput): string | undefined
     if (other.reads !== verdict) {
       decided.push({
         at,
-        chose: pinned.answered === undefined ? 'nothing was pressed' : `you chose ${pressWordsOf(pinned.answered)}`,
+        chose:
+          pinned.answered !== undefined
+            ? `you chose ${pressWordsOf(pinned.answered)}`
+            : pinned.skipped === true
+              ? 'the day was skipped past the call'
+              : 'nothing was pressed',
         others: [other.words],
         reads: other.reads,
       });
@@ -200,16 +215,29 @@ export interface DayCloseInput {
    * next day on the path; `undefined` draws the report's own tenants line instead.
    */
   readonly population?: { readonly today: number; readonly tomorrow: number } | undefined;
+  /**
+   * **The day the card names, measured on its own plan** — `shift/tomorrow.ts#TomorrowBriefing.onward`
+   * (wave AN, lane AN-7): its tenants beside today's, every car its run takes out of passenger
+   * service, and where its clock starts. Read before {@link population} wherever given, and on the
+   * close that closed the week, where `population` is the literal tomorrow and this is the next
+   * week's Monday.
+   */
+  readonly onward?: OnwardDay | undefined;
 }
 
 /** Tomorrow, whole — item 4. */
 export interface DayCloseTomorrow {
-  /** `TOMORROW · THURSDAY, DAY 4`, or the next week's Monday once the week has closed. */
+  /** `TOMORROW · WEEK 1 · THURSDAY, DAY 4`, or the next week's Monday once the week has closed. */
   readonly heading: string;
   /** `Conference: …` — the wrinkle by name, and its note, which carries its clock window where it has one. */
   readonly wrinkle: string;
   /** Who moves in, measured on the two buildings or read off the report's own tenants line. */
   readonly moveIns: string;
+  /**
+   * Every car the day's run takes out of passenger service, with its clock times, in one line
+   * (`bookedOut.ts#carsOutLineOf`); `undefined` where none is out or the day was not measured.
+   */
+  readonly cars: string | undefined;
   /** Whether it counts toward the week, the census's own sentence; `undefined` where the census does not speak. */
   readonly counts: string | undefined;
   /** The census's count for the standing order left alone on that day, over the crowds it measured. */
@@ -286,7 +314,21 @@ function houseLineOf(week: WeekState, houseOf: DayCloseInput['houseOf'], census:
   );
 }
 
-/** Item 1's tally, over the counted days closed so far. */
+/** `one of them`, `3 of them`, or `it` / `all 3 of them` where it is every one. */
+function ofThem(count: number, of: number): string {
+  if (count === of) return of === 1 ? 'it' : `all ${String(of)} of them`;
+  return count === 1 ? 'one of them' : `${String(count)} of them`;
+}
+
+/**
+ * Item 1's tally, over the counted days closed so far.
+ *
+ * **A count the house has not answered is not a zero** — wave AN, lane AN-7, the post-AM panel's
+ * seat B (defect 3). With the house still being run on every counted day (after a reload, which
+ * keeps no reading and asks again), this read *you 3, the house 0 … The house is still being run on
+ * 3 of them*: a figure for a count nobody had yet made. While any day is pending the house's count
+ * is stated over the days it has answered, and not at all where it has answered none.
+ */
 function tallyOf(week: WeekState, houseOf: DayCloseInput['houseOf'], census: WeekWay): string | undefined {
   const counted = week.history.filter((entry) => dayCountsToward(week, entry, census));
   if (counted.length === 0) return undefined;
@@ -295,13 +337,22 @@ function tallyOf(week: WeekState, houseOf: DayCloseInput['houseOf'], census: Wee
   const house = readings.filter((reading) => reading === 'cleared').length;
   const pending = readings.filter((reading) => reading === 'pending').length;
   const unrecorded = readings.filter((reading) => reading === 'unrecorded').length;
-  const tail =
-    (pending === 0 ? '' : ` The house is still being run on ${pending === 1 ? 'one of them' : `${String(pending)} of them`}.`) +
-    (unrecorded === 0 ? '' : ` It could not be run on ${unrecorded === 1 ? 'one of them' : `${String(unrecorded)} of them`}.`);
-  return (
-    `This week so far: you ${String(yours)}, the house ${String(house)}, clean over the same ` +
-    `${countedDays(counted.length)}.${tail}`
-  );
+  const unrun =
+    unrecorded === 0 ? '' : ` It could not be run on ${unrecorded === 1 ? 'one of them' : `${String(unrecorded)} of them`}.`;
+  if (pending === 0) {
+    return (
+      `This week so far: you ${String(yours)}, the house ${String(house)}, clean over the same ` +
+      `${countedDays(counted.length)}.${unrun}`
+    );
+  }
+  const answered = counted.length - pending - unrecorded;
+  const lead = `This week so far: you ${String(yours)} clean over ${countedDays(counted.length)}.`;
+  const houseClause =
+    answered === 0
+      ? ` The house is still being run on ${ofThem(pending, counted.length)}.`
+      : ` The house: ${String(house)} clean over the ${String(answered)} it has answered, and still being run on ` +
+        `${ofThem(pending, counted.length)}.`;
+  return `${lead}${houseClause}${unrun}`;
 }
 
 /** Item 3. */
@@ -336,23 +387,58 @@ function moveInsOf(population: { readonly today: number; readonly tomorrow: numb
   return `${people.toLocaleString('en-GB')} ${people === 1 ? 'person' : 'people'} ${delta > 0 ? 'move in' : 'move out'} overnight: ${counts}.`;
 }
 
+/**
+ * `A new week: the tower as handed, 627 → 589 tenants.` — the two measured counts, on the close
+ * whose next day opens a new week. A percentage stood here, and it was a slope's ratio rather than
+ * these counts' (the post-AM panel's seat D: *7.4 %* for 627 → 589, which is 6.1 %).
+ */
+function newWeekTenantsOf(population: { readonly today: number; readonly tomorrow: number }): string {
+  return (
+    `A new week: the tower as handed, ${population.today.toLocaleString('en-GB')} → ` +
+    `${population.tomorrow.toLocaleString('en-GB')} tenants.`
+  );
+}
+
 /** Item 4. */
 function tomorrowOf(input: DayCloseInput, census: WeekWay): DayCloseTomorrow {
   const { week, report } = input;
   const onward = report.onward;
-  const deal = weekDealOf(week, census);
+  /* Tomorrow's own week: on the close that closed the week, the next one's deal (§ D1252). */
+  const on = { contractId: week.contractId, week: onward?.week ?? week.week };
+  const deal = weekDealOf(on, census);
   const day = onward?.day ?? week.day + 1;
   const weekday = onward?.weekday ?? weekdayOf(week.dayIdx + 1);
   const newWeek = onward?.newWeek === true;
+  /* Wave AN, lane AN-7: the week's number where one is true of it (`weekStake.ts#weekOrdinalOf`). */
+  const ordinal = weekOrdinalOf({ ...on, day })?.toUpperCase();
   const heading = newWeek
-    ? `NEXT · ${weekday.toUpperCase()}, DAY ${String(day)} OF A NEW WEEK`
-    : `TOMORROW · ${weekday.toUpperCase()}, DAY ${String(day)}`;
-  const wrinkle = onward === undefined ? report.forecast.name : `${onward.name}: ${onward.note}`;
+    ? `NEXT · ${ordinal === undefined ? '' : `${ordinal} · `}${weekday.toUpperCase()}, DAY ${String(day)} OF A NEW WEEK`
+    : `TOMORROW · ${ordinal === undefined ? '' : `${ordinal} · `}${weekday.toUpperCase()}, DAY ${String(day)}`;
+  const measured = input.onward;
+  /*
+   * On an ordinary day the note is told the truth about the tower's bookings, as the brief's card
+   * tells it (`bookedOut.ts#wrinkleNoteOf`), because *Nothing booked* would sit over the car line.
+   * On every other day the note is about the wrinkle and stays true, and the car line names the
+   * booking, so the card does not say it twice on a phone's first screen.
+   */
+  const wrinkle =
+    onward === undefined
+      ? report.forecast.name
+      : `${onward.name}: ${
+          onward.eventId === 'ordinary'
+            ? wrinkleNoteOf({ id: onward.eventId, note: onward.note }, measured?.cars ?? [])
+            : onward.note
+        }`;
+  const tenants = measured?.population ?? (newWeek ? undefined : input.population);
   const moveIns =
-    !newWeek && input.population !== undefined
-      ? moveInsOf(input.population)
-      : `${onward?.demand ?? report.forecast.demand}.`;
-  const counts = onward === undefined ? undefined : dayStakeSentenceOf(week, day, onward.eventId, census);
+    tenants === undefined
+      ? `${onward?.demand ?? report.forecast.demand}.`
+      : newWeek
+        ? newWeekTenantsOf(tenants)
+        : moveInsOf(tenants);
+  const cars =
+    measured === undefined ? undefined : carsOutLineOf(measured.cars, (simTimeS) => clockAt(simTimeS, measured.startOfDayS));
+  const counts = onward === undefined ? undefined : dayStakeSentenceOf(on, day, onward.eventId, census);
   const dealt = deal?.days[day - 1];
   const row = onward !== undefined && dealt?.eventId === onward.eventId ? dealt.row : undefined;
   const censusLine =
@@ -370,6 +456,7 @@ function tomorrowOf(input: DayCloseInput, census: WeekWay): DayCloseTomorrow {
     heading,
     wrinkle,
     moveIns,
+    cars,
     counts,
     census: censusLine,
     weekend: newWeek && week.day < 7 ? DAY_CLOSE_WEEKEND_LINE : undefined,

@@ -1020,6 +1020,7 @@ function mountReportScreen(
     tomorrow.append(heading);
     for (const [cls, text] of [
       ['everyday-report-close-wrinkle', close.tomorrow.wrinkle],
+      ['everyday-report-close-cars', close.tomorrow.cars],
       ['everyday-report-close-movein', close.tomorrow.moveIns],
       ['everyday-report-close-counts', close.tomorrow.counts],
       ['everyday-report-close-census', close.tomorrow.census],

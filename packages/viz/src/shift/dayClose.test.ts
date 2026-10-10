@@ -111,6 +111,7 @@ function onwardAfter(week: WeekState, newWeek = false): ReportOnward {
     note: event.note,
     demand: newWeek ? 'A new week: the tower as handed, 8.0% fewer tenants than today' : '+2.0% more tenants than today',
     newWeek,
+    week: newWeek ? week.week + 1 : week.week,
   };
 }
 
@@ -130,9 +131,24 @@ describe('today against the house — § D1247', () => {
     expect(close?.house).toBe(
       'Today against the house: you cleared it; the tower’s standing order, left alone on the same crowd, is still being run.',
     );
-    expect(close?.tally).toBe(
-      'This week so far: you 1, the house 0, clean over the same 1 counted day. The house is still being run on one of them.',
+    expect(close?.tally).toBe('This week so far: you 1 clean over 1 counted day. The house is still being run on it.');
+  });
+
+  /*
+   * Wave AN, lane AN-7, the post-AM panel's seat B (defect 3): after a reload the house is asked
+   * again on every counted day, and the tally read *you 3, the house 0* beside *still being run on
+   * 3 of them*. A count nobody has made yet is not drawn as a zero.
+   */
+  it('draws no house figure for days the house has not answered', () => {
+    const week = weekThrough([true, true, true]);
+    const none = closeOf(week, () => undefined);
+    expect(none?.tally).toBe('This week so far: you 3 clean over 3 counted days. The house is still being run on all 3 of them.');
+    expect(none?.tally).not.toMatch(/the house \d/u);
+    const some = closeOf(week, (day) => (day === 1 ? 'missed' : day === 2 ? 'cleared' : undefined));
+    expect(some?.tally).toBe(
+      'This week so far: you 3 clean over 3 counted days. The house: 1 clean over the 2 it has answered, and still being run on one of them.',
     );
+    expect(closeOf(week, () => 'missed')?.tally).toBe('This week so far: you 3, the house 0, clean over the same 3 counted days.');
   });
 
   it('states the house’s answer once it has one, and tallies it', () => {
@@ -211,6 +227,7 @@ describe('the week’s arithmetic — § D1247', () => {
       undefined,
       undefined,
     ]);
+    /* No week number where none is true of the week: the census does not deal this tower's. */
     expect(close?.tomorrow.heading).toBe('TOMORROW · TUESDAY, DAY 2');
   });
 });
@@ -221,7 +238,7 @@ describe('tomorrow in full — § D1249', () => {
     const close = closeOf(week, () => 'missed', { population: { today: 589, tomorrow: 608 } });
     const tuesday = weekDealOf('c2')?.days[1];
     const onward = onwardAfter(week);
-    expect(close?.tomorrow.heading).toBe('TOMORROW · TUESDAY, DAY 2');
+    expect(close?.tomorrow.heading).toBe('TOMORROW · WEEK 1 · TUESDAY, DAY 2');
     expect(close?.tomorrow.wrinkle).toBe(`${onward.name}: ${onward.note}`);
     expect(close?.tomorrow.moveIns).toBe('19 people move in overnight: 589 → 608 tenants.');
     expect(close?.tomorrow.counts).toBe(DAY_COUNTS_SENTENCE);
@@ -235,9 +252,60 @@ describe('tomorrow in full — § D1249', () => {
 
   it('points at the next week’s Monday on Friday’s close, and says the weekend is off the path', () => {
     const close = closeOf(weekThrough([true, true, true, true, true]), () => 'missed');
-    expect(close?.tomorrow.heading).toBe('NEXT · MONDAY, DAY 1 OF A NEW WEEK');
+    expect(close?.tomorrow.heading).toBe('NEXT · WEEK 2 · MONDAY, DAY 1 OF A NEW WEEK');
     expect(close?.tomorrow.moveIns).toBe('A new week: the tower as handed, 8.0% fewer tenants than today.');
     expect(close?.tomorrow.weekend).toBe(DAY_CLOSE_WEEKEND_LINE);
+  });
+
+  /*
+   * Wave AN, lane AN-7, the post-AM panel's seat D (D5 and D7): tomorrow named its wrinkle and never
+   * car D's 10:30–13:00 booking, and on a new week printed a slope's percentage rather than the two
+   * buildings' counts. With the day measured, the card says every car out and the counts.
+   */
+  it('names every car the day takes out, with its clock, and the measured tenants', () => {
+    const week = weekThrough([true]);
+    const close = closeOf(week, () => 'missed', {
+      onward: {
+        population: { today: 589, tomorrow: 608 },
+        cars: [
+          { carId: 'C', awayAtS: 19_800, backAtS: 28_800, ofTheDay: true },
+          { carId: 'D', awayAtS: 9000, backAtS: 18_000, ofTheDay: false },
+        ],
+        startOfDayS: 8 * 3600,
+      },
+    });
+    const onward = onwardAfter(week);
+    /* The wrinkle's own note stays; the car line names the tower's booking once. */
+    expect(close?.tomorrow.wrinkle).toBe(`${onward.name}: ${onward.note}`);
+    expect(close?.tomorrow.cars).toBe(
+      'Out of passenger service: car C 13:30–16:00, taken by the day, and car D 10:30–13:00, booked by the tower.',
+    );
+    expect(close?.tomorrow.moveIns).toBe('19 people move in overnight: 589 → 608 tenants.');
+    /* Not measured, no car line: the card says nothing it was not handed. */
+    expect(closeOf(week, () => 'missed')?.tomorrow.cars).toBeUndefined();
+  });
+
+  it('says the tower books a car on an ordinary day, rather than *Nothing booked* over it', () => {
+    const week = weekThrough([true]);
+    const ordinary = { ...onwardAfter(week), eventId: 'ordinary', name: 'An ordinary day', note: 'Nothing booked. The building is the only thing in the way.' };
+    const close = dayCloseOf({
+      week,
+      report: sheet({ onward: ordinary }),
+      houseOf: () => 'missed',
+      onward: { population: { today: 589, tomorrow: 608 }, cars: [{ carId: 'D', awayAtS: 9000, backAtS: 18_000, ofTheDay: false }], startOfDayS: 8 * 3600 },
+    });
+    expect(close?.tomorrow.wrinkle).toBe(
+      'An ordinary day: Nothing on the calendar, but the tower books car D out of passenger service part-way through the day.',
+    );
+    expect(close?.tomorrow.cars).toBe('Out of passenger service: car D 10:30–13:00, booked by the tower.');
+  });
+
+  it('states a new week’s tenants as the two measured counts', () => {
+    const close = closeOf(weekThrough([true, true, true, true, true]), () => 'missed', {
+      onward: { population: { today: 627, tomorrow: 589 }, cars: [], startOfDayS: 8 * 3600 },
+    });
+    expect(close?.tomorrow.moveIns).toBe('A new week: the tower as handed, 627 → 589 tenants.');
+    expect(close?.tomorrow.cars).toBeUndefined();
   });
 
   it('forecasts nothing: no word of how the player’s day will go', () => {

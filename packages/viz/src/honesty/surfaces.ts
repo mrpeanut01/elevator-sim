@@ -685,7 +685,7 @@ import {
   LOADED_RUN_CANNOT_BANK,
   UNCHOSEN_RUN_CANNOT_BANK,
 } from '../shift/banking.js';
-import { wrinkleNameOf } from '../shift/bookedOut.js';
+import { wrinkleNameOf, type BookedOutCar } from '../shift/bookedOut.js';
 import { baseDemandOf, eventAsRun, SHIFT_EVENTS, shiftRunPatch } from '../shift/events.js';
 import { everyWrinkle } from '../wrinkles/draw.js';
 import { WRINKLE_LIBRARY } from '../wrinkles/library.js';
@@ -783,6 +783,7 @@ import {
   openEndless,
   openWeek,
   outcomeOf,
+  rollWeek,
 } from '../shift/week.js';
 import { coachWeekLines, weekKeptLine } from '../shift/weekLabel.js';
 import {
@@ -14403,6 +14404,8 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     'shift/firstSession.ts#FIRST_SESSION_LINE_PINNED_BY_NUMBER',
     'everyday/firstDayLength.ts#pinnedDayLengthLineOf',
     'everyday/doorView.ts#doorScreenViewOf',
+    /* Wave AN, lane AN-7: a closed day's chip says its verdict, in Your week's words — seeded through the chips. */
+    'everyday/doorView.ts#DAY_VERDICT_NOTE',
     /* *Run today again*'s note — wave AJ, § D1098. Drawn by `doorScreenViewOf` at a closed today,
        which the door renders below reach, and exported so its test can read it by name. */
     'everyday/doorView.ts#RUN_TODAY_AGAIN_NOTE',
@@ -14547,6 +14550,14 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     'shift/dayClose.ts#DAY_CLOSE_WEEKEND_LINE',
     'shift/dayClose.ts#NO_CALL_DECIDED_LINE',
     'shift/dayClose.ts#NO_CALL_RAISED_LINE',
+    /*
+     * Wave AN, lane AN-7: tomorrow's cars with their clock, and the week's number on the close, the
+     * brief, the door, Your week and the menu's tile. Seeded in `seedDayClose` over Midtown's weeks 1
+     * and 2, and through the continue tile in `seedWeekStake`.
+     */
+    'shift/bookedOut.ts#carsOutLineOf',
+    'shift/bookedOut.ts#absenceSpanPhraseOf',
+    'shift/weekStake.ts#weekOrdinalOf',
     'shift/dayCalls.ts#dayCallAnswerWordsOf',
     'everyday/reportView.ts#REPORT_SECONDARY',
     'shift/weekStake.ts#WEEKEND_NOTE',
@@ -17678,6 +17689,9 @@ function seedWeekStake(
     if (day < 7) week = nextDay(week);
   }
   seeds.push({ field: 'week.continue.title', text: CONTINUE_WEEK_TITLE, role: 'label' });
+  /* Wave AN, lane AN-7: the next week, offered from its first morning with nothing filed and numbered. */
+  const freshWeek = continueWeekEntryOf(rollWeek(week), 'Midtown Office');
+  if (freshWeek !== undefined) seeds.push({ field: 'week.continue.freshWeek', text: freshWeek.line, role: 'observation' });
   seeds.push({ field: 'week.sheetStep.label', text: WEEK_SHEET_STEP.label, role: 'label' });
   seeds.push({ field: 'week.sheetStep.note', text: WEEK_SHEET_STEP.note, role: 'prose' });
   seeds.push({ field: 'week.startNext', text: WEEK_START_NEXT_LABEL, role: 'label' });
@@ -17721,6 +17735,8 @@ function seedDayCloseView(seeds: TextSeed[], at: string, close: DayCloseView | u
   seeds.push({ field: `${at}.tomorrow.heading`, text: close.tomorrow.heading, role: 'label' });
   seeds.push({ field: `${at}.tomorrow.wrinkle`, text: close.tomorrow.wrinkle, role: 'prose' });
   seeds.push({ field: `${at}.tomorrow.moveIns`, text: close.tomorrow.moveIns, role: 'observation' });
+  /* Wave AN, lane AN-7: every car tomorrow's run takes out, with its clock. */
+  if (close.tomorrow.cars !== undefined) seeds.push({ field: `${at}.tomorrow.cars`, text: close.tomorrow.cars, role: 'observation' });
   if (close.tomorrow.counts !== undefined) seeds.push({ field: `${at}.tomorrow.counts`, text: close.tomorrow.counts, role: 'reason' });
   if (close.tomorrow.census !== undefined) seeds.push({ field: `${at}.tomorrow.census`, text: close.tomorrow.census, role: 'observation' });
   if (close.tomorrow.weekend !== undefined) seeds.push({ field: `${at}.tomorrow.weekend`, text: close.tomorrow.weekend, role: 'prose' });
@@ -17738,15 +17754,50 @@ function seedDayClose(seeds: TextSeed[], context: HonestyContext, bundle: ShiftB
   const { observations } = bundle;
   const missed: Observations = { ...observations, peakQueue: Number.MAX_SAFE_INTEGER };
   const standing = houseStandingOrder();
-  for (const [arm, missFirst] of [
-    ['asRead', 0],
-    ['lost', 2],
+  /*
+   * Wave AN, lane AN-7: the day each close's tomorrow card names, as `dev/state.ts#tomorrowFactsOf`
+   * measures Midtown's week on the shipped bundle — today's and the literal tomorrow's tenants, the
+   * next day on the main path's (the next week's Monday after Friday), and every car that day's run
+   * takes out. A fixture of those measurements, for the shape of the sentences they make, as the
+   * 589 → 608 pair below is; `shift/tomorrow.test.ts` pins the measurement itself.
+   */
+  const carD = { carId: 'D', awayAtS: 9000, backAtS: 18_000, ofTheDay: false };
+  const MIDTOWN_DAY_START_S = 8 * 3600;
+  interface MeasuredAfter {
+    readonly today: number;
+    readonly tomorrow: number;
+    readonly onward: number;
+    readonly cars: readonly BookedOutCar[];
+  }
+  const measuredAfter: Readonly<Record<number, MeasuredAfter>> = {
+    1: {
+      today: 589,
+      tomorrow: 608,
+      onward: 608,
+      cars: [{ carId: 'C', awayAtS: 19_800, backAtS: 28_800, ofTheDay: true }, carD],
+    },
+    2: { today: 608, tomorrow: 608, onward: 608, cars: [carD] },
+    3: { today: 608, tomorrow: 627, onward: 627, cars: [carD] },
+    4: {
+      today: 627,
+      tomorrow: 627,
+      onward: 627,
+      cars: [{ carId: 'C', awayAtS: 3600, backAtS: 14_400, ofTheDay: true }, carD],
+    },
+    5: { today: 627, tomorrow: 646, onward: 589, cars: [carD] },
+  };
+  for (const [arm, missFirst, weekNo] of [
+    ['asRead', 0, 1],
+    ['lost', 2, 1],
+    /* Wave AN, lane AN-7: week 2 deals its own order (§ D1252), and its closes said tomorrow did not count. */
+    ['week2', 0, 2],
   ] as const) {
-    let week = openWeek('c2');
+    let week: WeekState = { ...openWeek('c2'), week: weekNo };
     for (let day = 1; day <= 5; day += 1) {
       if (day > 1) week = nextDay(week);
       const dayIdx = day - 1;
-      const event = scheduledEventFor(null, day, dayIdx, 'whole-day');
+      const event = scheduledEventFor(null, day, dayIdx, 'whole-day', week);
+      const measured = measuredAfter[day];
       const goals = goalsForDay(day, 'whole-day');
       const read = day <= missFirst ? missed : observations;
       week = closeDay(
@@ -17776,6 +17827,9 @@ function seedDayClose(seeds: TextSeed[], context: HonestyContext, bundle: ShiftB
         dispatcherName: bundle.dispatcherName,
         dayStartS: DAY_START_S,
         wholeDayRun: true,
+        ...(measured === undefined
+          ? {}
+          : { populations: { today: measured.today, tomorrow: measured.tomorrow, onward: measured.onward } }),
       });
       if (report.of !== 'week-day') continue;
       for (const [house, houseOf] of [
@@ -17787,7 +17841,22 @@ function seedDayClose(seeds: TextSeed[], context: HonestyContext, bundle: ShiftB
          * buildings on the shipped bundle (589 → 608); the corpus resolves no second building here,
          * and the sentence's shape, not its count, is what this seeds.
          */
-        const close = dayCloseOf({ week, report, houseOf, population: { today: 589, tomorrow: 608 } });
+        const close = dayCloseOf({
+          week,
+          report,
+          houseOf,
+          population: { today: 589, tomorrow: 608 },
+          ...(measured === undefined
+            ? {}
+            : {
+                onward: {
+                  population: { today: measured.today, tomorrow: measured.onward },
+                  cars: measured.cars,
+                  /* Midtown's authored day opens at 08:00, so car D reads 10:30 to 13:00 as the brief shows it. */
+                  startOfDayS: MIDTOWN_DAY_START_S,
+                },
+              }),
+        });
         seedDayCloseView(seeds, `week.close.${arm}.day${String(day)}.${house}`, close);
       }
     }

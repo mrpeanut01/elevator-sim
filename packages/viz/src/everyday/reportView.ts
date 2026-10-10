@@ -749,6 +749,7 @@ export function everydayReportViewOf(input: EverydayReportInput): EverydayReport
             report: input.report,
             houseOf: input.house ?? (() => undefined),
             population: input.overnight?.population,
+            onward: input.overnight?.onward,
           }),
     secondary: REPORT_SECONDARY,
   };

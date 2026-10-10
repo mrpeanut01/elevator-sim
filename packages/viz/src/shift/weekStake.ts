@@ -505,6 +505,22 @@ export function weekPathEndOf(deal: WeekDeal): number {
 }
 
 /**
+ * **Which week of the tower this is, in words** — `week 2` — or `undefined` where no week number
+ * is true of it: the census does not deal the tower's week (its days run on and never roll, § D1177),
+ * or the week stands past its seventh day (a week saved by an older build). Wave AN, lane AN-7: the
+ * post-AM panel's seats B and D found no week number on the brief, the door, Your week, the menu's
+ * tile or the close, although § D1252 deals each week its own order and the brief two weeks apart
+ * named different wrinkles for the same weekday. Lower case; a caller drawing an eyebrow upper-cases it.
+ */
+export function weekOrdinalOf(
+  week: Pick<WeekState, 'contractId' | 'week' | 'day'>,
+  census: WeekWay = WEEK_WAY,
+): string | undefined {
+  if (weekDealOf(week, census) === undefined || week.day > WEEK_LENGTH) return undefined;
+  return `week ${String(week.week)}`;
+}
+
+/**
  * Whether the week has closed: the census speaks for its tower, the last day of its main path
  * ({@link weekPathEndOf}) has been filed, and the day the week stands on is filed. The sheet is
  * drawn from here until the week rolls, and again after each weekend day the player chooses to

@@ -360,6 +360,7 @@ import {
   withDispatcher,
   type PatternSelection,
   type ShiftRunConfig,
+  type TomorrowFacts,
   type ViewerState,
 } from './state.js';
 import { ghostPlanOf, plainBaselineOf } from './ghostRun.js';
@@ -7477,8 +7478,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
     week: WeekState,
     closed: DayOutcome,
     verdict: ShapedDayReport['verdict'],
+    facts: TomorrowFacts,
   ): TomorrowBriefing {
-    const facts = tomorrowFactsOf(resources, { ...state, week });
     return tomorrowBriefingOf({
       closed,
       week,
@@ -7488,6 +7489,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
       populationTomorrow: facts.population,
       calendarLineTomorrow: facts.calendarLine,
       withheldTomorrow: facts.withheld,
+      onward: facts.onward,
     });
   }
 
@@ -7684,6 +7686,13 @@ function boot(ui: Elements, resources: BrowserResources): void {
     const practice = practiceGround !== undefined || elsewherePractice;
     /* The house on this day's crowd starts as the day closes, so the week's sheet is ready — § D1227. */
     if (!practice) askWeekHouse(week);
+    /*
+     * Tomorrow and the next day on the main path, measured once per close — wave AN, lane AN-7. Read
+     * here, before the sheet, so its percentages and the close's tomorrow card are the two plans'
+     * counts and cars rather than a slope's ratio (`report.ts#DayReportInput.populations`). Only
+     * where a day closed into the week, which is where the beat measured tomorrow before.
+     */
+    const facts = week === state.week ? undefined : tomorrowFactsOf(resources, { ...state, week });
     filedReportInput = {
       recording,
       observations,
@@ -7766,6 +7775,10 @@ function boot(ui: Elements, resources: BrowserResources): void {
        * run tomorrow will be grown by — § D1066. From `state` for `calendar`'s reason directly above.
        */
       growthPerDay: weekGrowthPerDayOf(resources, state),
+      populations:
+        building === undefined || facts === undefined
+          ? undefined
+          : { today: building.totalPopulation, tomorrow: facts.population, onward: facts.onward.population },
       dispatcherName: profileById(resources, state.savedDispatchers, state.dispatcherId).name,
       /*
        * The run's own hour, not a flat 06:00 — issue #83. `DAY_START_S` survives as the fallback for
@@ -7863,7 +7876,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
      *    for why that is affordable exactly on this path and nowhere near a render.
      */
     const closedDay = week === state.week ? null : (week.history.at(-1) ?? null);
-    const tomorrow = closedDay === null ? undefined : briefingFor(week, closedDay, report.verdict);
+    const tomorrow =
+      closedDay === null || facts === undefined ? undefined : briefingFor(week, closedDay, report.verdict, facts);
     /*
      * The tab is **not** forced here. `closeShift` is reached two ways — the playhead reaching the
      * end, and the reader opening the sheet — and the second one has already set the tab. Setting

@@ -35,6 +35,7 @@ import type { RunInterventionConfig, SimTime } from '@elevator-sim/core/browser'
 
 import { PARK_CARS_LOBBY_LABEL, SPREAD_CARS_LABEL, stampVerbOf } from '../live/interventions.js';
 
+import type { DecidingPinnedCall } from './dayClose.js';
 import type { ContractPressDay } from './ladder.js';
 import type { PressCall } from './pressCall.js';
 import type { ReportDiagnosis } from './types.js';
@@ -123,6 +124,61 @@ function listOf(parts: readonly string[]): string {
   return `${parts.slice(0, -1).join(', ')} and ${String(parts[parts.length - 1])}`;
 }
 
+/** What the log says was answered at a pinned day's call — {@link pressCallAnswerOf}. */
+export interface PressCallAnswer {
+  /** The press at the call second, or `undefined` where nothing was pressed at the call. */
+  readonly answer: RunInterventionConfig | undefined;
+  /** Whether the log holds presses after the call second (later calls' answers, § D1204). */
+  readonly pressedLater: boolean;
+}
+
+/**
+ * **What was answered at the pinned call, read once** — the row below and the close's deciding
+ * sentence (`shift/dayClose.ts#decidingCallLineOf`, through `report.ts`) both read this, so the two
+ * cannot name different answers to one call (wave AN, lane AN-7, the post-AM panel's seat B).
+ *
+ * Only what stands at or before the call second is the answer: a later call's press is not it.
+ * The close read the log's first entry whatever its second, so a day answered *leave them* at 10:40
+ * and *spread* at 12:20 was read as *spread at 10:40*, and the close printed *No call decided
+ * today* over the row saying spread at 10:40 read *Shift cleared* on this crowd.
+ *
+ * `undefined` when the log is not the day as measured — two presses at or before the call, a press
+ * at another second, or a press that is neither of the pin's two — or when the pin is refused or
+ * carries no measured call.
+ */
+export function pressCallAnswerOf(
+  press: ContractPressDay,
+  call: PressCall,
+  log: readonly RunInterventionConfig[],
+): PressCallAnswer | undefined {
+  if (press.call === undefined || press.refused !== undefined) return undefined;
+  const interventions = log.filter((entry) => entry.atS <= call.atS);
+  if (interventions.length > 1) return undefined;
+  const answer = interventions[0];
+  if (answer !== undefined) {
+    if (answer.atS !== call.atS) return undefined;
+    if (answer.change.kind !== press.clearedBy && answer.change.kind !== press.missedBy) return undefined;
+  }
+  return { answer, pressedLater: interventions.length < log.length };
+}
+
+/**
+ * **The pinned call in the terms the close's deciding sentence reads** — `report.ts` hands this to
+ * `dayClose.ts#decidingCallLineOf`. `undefined` exactly where {@link pressCallRowOf} draws no row,
+ * because both read {@link pressCallAnswerOf}.
+ */
+export function pressCallDecidingOf(input: PressCallRowInput): DecidingPinnedCall | undefined {
+  const read = pressCallAnswerOf(input.press, input.call, input.interventions);
+  if (read === undefined) return undefined;
+  return {
+    atS: input.call.atS,
+    clearedBy: input.press.clearedBy,
+    missedBy: input.press.missedBy,
+    answered: read.answer?.change.kind,
+    skipped: read.answer === undefined && input.skipped === true,
+  };
+}
+
 /**
  * The row, or `undefined` when the log is not the day as measured — two presses, a press at another
  * second, or a press that is neither of the pin's two. `shift/ladder.ts#pressDayMeasuredAs` refuses
@@ -135,15 +191,9 @@ export function pressCallRowOf(
 ): ReportDiagnosis | undefined {
   const { press, call } = input;
   const measured = press.call;
-  if (measured === undefined || press.refused !== undefined) return undefined;
-  const interventions = input.interventions.filter((entry) => entry.atS <= call.atS);
-  const pressedLater = interventions.length < input.interventions.length;
-  if (interventions.length > 1) return undefined;
-  const answer = interventions[0];
-  if (answer !== undefined) {
-    if (answer.atS !== call.atS) return undefined;
-    if (answer.change.kind !== press.clearedBy && answer.change.kind !== press.missedBy) return undefined;
-  }
+  const read = pressCallAnswerOf(press, call, input.interventions);
+  if (measured === undefined || read === undefined) return undefined;
+  const { answer, pressedLater } = read;
 
   const at = clockOf(call.atS);
   const to = clockOf(call.atS + measured.windowS);

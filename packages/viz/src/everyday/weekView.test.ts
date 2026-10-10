@@ -431,3 +431,17 @@ describe('the week’s stake on the strip, and its sheet at the close — § D11
     );
   });
 });
+
+/*
+ * **Your week numbers the week** — wave AN, lane AN-7, the post-AM panel's seats B and D: in week 2
+ * no screen said which week it was. The eyebrow carries § D1252's ordinal where one is true of the
+ * week, and nothing where the census does not deal the tower's week.
+ */
+describe('the week’s number on Your week', () => {
+  it('reads WEEK n on a census tower’s week, and no number elsewhere', () => {
+    expect(viewOf({ ...openWeek('c2'), week: 2, day: 1, dayIdx: 0 }, false).eyebrow).toBe(
+      'ELEVATOR SIM · EVERYDAY MODE · WEEK 2',
+    );
+    expect(viewOf(weekWith(3, []), false).eyebrow).toBe('ELEVATOR SIM · EVERYDAY MODE');
+  });
+});

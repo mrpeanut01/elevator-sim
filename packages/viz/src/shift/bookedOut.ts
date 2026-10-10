@@ -128,6 +128,50 @@ export function carsPhraseOf(cars: readonly BookedOutCar[]): string {
 }
 
 /**
+ * `10:30–13:00`, `from the start of the day until 16:30`, `from 10:30 to the end of the day`,
+ * `all day` — a car's span in the brief's strip's words (`everyday/today.ts#outOfServiceOf`), over
+ * the run's own clock.
+ */
+export function absenceSpanPhraseOf(
+  span: Pick<BookedOutCar, 'awayAtS' | 'backAtS'>,
+  clock: (simTimeS: number) => string,
+): string {
+  if (span.awayAtS === 0) {
+    return span.backAtS === null ? 'all day' : `from the start of the day until ${clock(span.backAtS)}`;
+  }
+  return span.backAtS === null
+    ? `from ${clock(span.awayAtS)} to the end of the day`
+    : `${clock(span.awayAtS)}–${clock(span.backAtS)}`;
+}
+
+/**
+ * **One line for every car a day's run takes out of passenger service**, with the clock — what the
+ * close's tomorrow card says about the next day's cars (wave AN, lane AN-7). The post-AM panel's
+ * seat D: every Midtown close named tomorrow's wrinkle and never car D's booking from 10:30 to 13:00,
+ * which the next brief showed on four days of the week, and on Thursday the card read *the morning,
+ * lunch and the evening are the tower's own* over a car booked out across lunch.
+ *
+ * *Out of passenger service: car C 13:30–16:00, taken by the day, and car D 10:30–13:00, booked by
+ * the tower.* One sentence rather than the brief's one per car, because the card must stay on a
+ * phone's first screen (§ D1249); the spans are the brief's strip's own words
+ * ({@link absenceSpanPhraseOf}). A car the day's wrinkle takes is *taken by the day*; every other car
+ * is the tower's booking. No advice, and nothing about what the absence does to the day.
+ * `undefined` when no car is out.
+ */
+export function carsOutLineOf(
+  cars: readonly BookedOutCar[],
+  clock: (simTimeS: number) => string,
+): string | undefined {
+  const parts = cars.map(
+    (car) =>
+      `car ${car.carId} ${absenceSpanPhraseOf(car, clock)}, ${car.ofTheDay === true ? 'taken by the day' : 'booked by the tower'}`,
+  );
+  if (parts.length === 0) return undefined;
+  const list = parts.length === 1 ? (parts[0] ?? '') : `${parts.slice(0, -1).join(', ')}, and ${String(parts.at(-1))}`;
+  return `Out of passenger service: ${list}.`;
+}
+
+/**
  * **The day's wrinkle note, told the truth about the tower's own bookings** — the one sentence the
  * brief's wrinkle card and the report's header line both print.
  *
@@ -147,7 +191,7 @@ export function carsPhraseOf(cars: readonly BookedOutCar[]): string {
  * Tuesday it said *the tower also books car D* about the move-in's own car, and on any tower a
  * wrinkle whose window starts after the first instant was read back as *the tower's* booking.
  */
-export function wrinkleNoteOf(event: ShiftEvent, bookedOut: readonly BookedOutCar[]): string {
+export function wrinkleNoteOf(event: Pick<ShiftEvent, 'id' | 'note'>, bookedOut: readonly BookedOutCar[]): string {
   /*
    * `awayAtS > 0` as well since § D1149: the report's header is handed {@link carAbsencesOf} now,
    * and this sentence says *part-way through the day*, which a car out from the first instant is not.

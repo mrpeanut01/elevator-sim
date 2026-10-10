@@ -117,7 +117,42 @@ describe('§ 16 rule 1 — an unfinished day shows the em dash', () => {
     const week = weekWith(5, [closedDay(1), closedDay(2), closedDay(3), closedDay(4), closedDay(5)]);
     const today = viewAt(0, true, week).chips.at(-1);
     expect(today?.score).toBe('84%');
-    expect(today?.note).toBe('today');
+    /* The fixture's readings leave a goal pending, so the day is too quiet to grade — Your week's words. */
+    expect(today?.note).toBe('today · too quiet to grade');
+  });
+});
+
+/*
+ * **A closed day says how it went** — wave AN, lane AN-7, carried from the post-AL panel and found
+ * again by the post-AM panel's seat D: a missed Monday read *90 % · played* on the door while Your
+ * week read *missed*. The chip carries the day's verdict in the week card's own words.
+ */
+describe('a closed day’s chip says its verdict, as Your week does', () => {
+  function graded(day: number, observations: GoalObservations): DayOutcome {
+    return outcomeOf({
+      day,
+      dayIdx: (day - 1) % 7,
+      eventId: 'ordinary',
+      arrived: observations.arrived,
+      carried: observations.arrived,
+      minutePct: 90,
+      readings: readGoals(goalsForDay(day), { ...observations, workPerServedLegKJ: 40 } as GoalObservations),
+      record: recordOn('chancery-house'),
+      recordRefusal: null,
+    });
+  }
+  const MISSED: GoalObservations = { ...MET, peakQueue: 999, worstWaitS: 990 };
+
+  it('reads *missed* beside a high score on a missed day, and *clean day* on a clean one', () => {
+    const week = weekWith(3, [graded(1, MISSED), graded(2, MET)]);
+    const chips = viewAt(0, false, week).chips;
+    const byDay = new Map(chips.map((chip) => [chip.day, chip]));
+    expect(byDay.get(1)?.score).toBe('90%');
+    expect(byDay.get(1)?.note).toBe('missed');
+    expect(byDay.get(2)?.note).toBe('clean day');
+    for (const chip of chips) expect(chip.note, String(chip.day)).not.toBe('played');
+    /* The selected chip keeps its verdict and says it is the one showing. */
+    expect(viewAt(-2, false, week).chips.find((chip) => chip.day === 1)?.note).toBe('missed · showing');
   });
 });
 

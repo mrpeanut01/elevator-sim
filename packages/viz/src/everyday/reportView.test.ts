@@ -367,10 +367,12 @@ describe('what this screen adds on top of the sheet', () => {
       note: 'A tenant is hauling boxes up.',
       demand: '+2.0% more tenants than today',
       newWeek: false,
+      week: 1,
     };
     const report = sheetOf({ onward, decidingCall: 'No call decided today: the stage raised none.' });
     const view = viewOf({ report, week, house: () => 'missed' });
-    expect(view.close?.tomorrow.heading).toBe('TOMORROW · TUESDAY, DAY 2');
+    /* The week's number since wave AN, lane AN-7 (§ D1252's ordinal, on the screen). */
+    expect(view.close?.tomorrow.heading).toBe('TOMORROW · WEEK 1 · TUESDAY, DAY 2');
     expect(view.close?.tomorrow.wrinkle).toBe('Move-in day: A tenant is hauling boxes up.');
     expect(view.close?.call).toBe('No call decided today: the stage raised none.');
     expect(view.close?.arithmetic).toBeDefined();

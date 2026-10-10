@@ -44378,6 +44378,8 @@ is a data edit to its window, level or note, and the caption test and the census
 
 ## D1066 — the week's growth is data, per tower, re-derived by a census, and no bar moves
 
+> **Status 2026-10-10: AMENDED by [§ D1329](#d1329)** (an agent ruling). Where the shell measured today's building and tomorrow's, the forecast's percentage is the ratio of their counts and the slope is only the fallback, because growth rounds per floor. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-09-25 by agent sessions under delegated authority**, not by the product owner: the
 > week decision swarm's three members (the player, honesty and engineering lenses, whose records are
 > the integrator's scratch notes `week-S1` to `-S3` and are not in this repository), reconciled by
@@ -47976,6 +47978,8 @@ step on a closing sheet, a career sheet unchanged).
 
 ## D1228 — the mode picker offers *Continue your week* while a week is under way
 
+> **Status 2026-10-10: AMENDED by [§ D1330](#d1330)** (an agent ruling). A week past the first is offered from its first morning with nothing filed, and the entry names the week's number where one is true of it. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-09-26 by agent sessions under delegated authority** (wave AL, lane AL-F, on swarm DN's
 > Q2 ruling, item 4, three of three), not by the product owner. **Owner-reversible**: the entry, its
 > place above the tiles, and its words.
@@ -48489,6 +48493,8 @@ never that the other answer is better.
 **Tests.** `shift/dayClose.test.ts`.
 
 ## D1249 — the close says tomorrow in full, and its press into tomorrow is the report's primary
+
+> **Status 2026-10-10: AMENDED by [§ D1329](#d1329)** (an agent ruling). The card is measured on the day it names: its wrinkle and whether it counts come from that day's own week, it names every car the day's run takes out with its clock, and a new week's tenants are the two measured counts. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Taken 2026-09-26 by agent sessions under delegated authority** (wave AM, lane AM-C, swarm DO's
 > § 1 ruling items 4 and 5), not by the product owner. It amends the guide's § 3.3 report row
@@ -49546,3 +49552,99 @@ reload with *Resume*, red before and green after. `everyday/pressCall.browser.te
 answers its card through the question's button; `stageRecord.browser.test.ts`'s budget of presses
 doubles, since each call now takes two. The loops elsewhere that press until the day runs out need no
 change: the first press asks and the next answers.
+
+---
+
+## D1329 — the close's tomorrow is measured on the day it names: its week, its tenants and every car out
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (wave AN, lane AN-7, on the lane
+> brief's items 2, 4 and 5, from the post-AM panel's seats B and D), not by the product owner. It
+> amends [§ D1066](#d1066)'s forecast percentage and extends [§ D1249](#d1249)'s card.
+> **Owner-reversible**: clause 3's car line, and clause 4's counts in place of a percentage on the
+> close. **Not put to a swarm**: each clause corrects a sentence measured false of the run, and the
+> lane had no way to spawn one.
+
+**Why an entry.** [§ D405](#d405)'s first two grounds: it binds `shift/report.ts`, `shift/dayClose.ts`,
+`shift/tomorrow.ts`, `dev/state.ts`, `dev/main.ts` and the Everyday report screen, none of which owns
+the others, and it moves what § D1066 and § D1249 recorded.
+
+**What was wrong, each measured on the shipped bundle.**
+
+- Every week-2 close said tomorrow *does not count toward the week: it has not been measured as it
+  is dealt*, and the next brief and the next close's tally both counted it. `report.ts` drew the
+  onward wrinkle with no week, so it was week 1's draw, and § D1252 deals week 2 its own order:
+  week 2's Tuesday is dealt *goods inward* and the card's wrinkle id read *move-in*.
+- No close named car D's booking from 10:30 to 13:00, which Midtown's tower schedule takes on every
+  day of its week and the next brief showed. On Thursday the card read *the morning, lunch and the evening are
+  the tower's own* over a car booked out across lunch.
+- On a new week the card printed a slope's ratio: *7.4 % fewer tenants* for 627 to 589 (6.1 %), and
+  *9.1 %* for 646 to 589 (8.8 %). Growth rounds per floor, so the ratio of two growth factors is not
+  the ratio of two buildings; the Engineer sheet's forecast card printed the same ratio on every day.
+
+**The ruling.**
+
+1. The next day on the main path is one function, `shift/week.ts#pathNextOf`, and the card and the
+   facts measured for it both ask it.
+2. The onward wrinkle is dealt from that day's own week, `WeekDayReport.onward.week` carries the
+   week, and whether it counts and the census line are read off that week's deal.
+3. `dev/state.ts#tomorrowFactsOf` also plans that day (one more plan, with no simulation, on the
+   close that closes the week, and none on any other) and hands the close its tenants, every car
+   its run takes out of passenger service with the run's spans, and where its clock starts. The
+   card prints them in one line, *Out of passenger service: car C 13:30–16:00, taken by the day,
+   and car D 10:30–13:00, booked by the tower.* (`shift/bookedOut.ts#carsOutLineOf`, whose span
+   words the brief's strip now shares). One line rather than the brief's sentence per car, because
+   § D1249 holds the card on a phone's first screen and the brief's two sentences pushed it 46 px
+   below the bar at 390 × 844. On an ordinary day the wrinkle line is told the truth about the
+   tower's bookings by `wrinkleNoteOf`, as the brief's card is, so *Nothing booked* never sits over
+   a booked car; on every other day the note stays as it is and the car line names the booking.
+4. Where the shell measured the two buildings, the forecast's percentage is their counts' ratio
+   (`DayReportInput.populations`) and the slope is only the fallback; the close states a new week's
+   tenants as the two counts, *A new week: the tower as handed, 627 → 589 tenants.*
+
+**Not established.** The wrinkle notes in `data/wrinkles.json` still say *the tower's own*; with
+the booking named after them the pair is true, and the notes were not rewritten.
+
+**Tests.** `shift/report.test.ts` (*deals tomorrow's wrinkle from tomorrow's week*, *states the
+forecast's percentage from the measured tenants*), `shift/tomorrow.test.ts` (*the next day on the main
+path, measured*: car D at the run's span and the next week's Monday measured on Friday's and
+Saturday's closes) and `shift/dayClose.test.ts` (three cases: the car line, the ordinary day, the
+new week's counts). All seven were red on the base sources and are green after.
+`everyday/dayClose.browser.test.ts` reads the car line and the measured tenants off the shipped page
+on Monday's close, and holds the card on the first screen at both viewports.
+
+## D1330 — a later week is continued from its first morning, and its number is on the screen
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (wave AN, lane AN-7, on the lane
+> brief's item 6, carried from the post-AL panel and found again by the post-AM panel's seats B and
+> D), not by the product owner. It amends [§ D1228](#d1228) and reads [§ D1252](#d1252)'s ordinal.
+> **Owner-reversible**: drawing the number in week 1, the places it is drawn, and offering the tile
+> on a later week with nothing filed.
+
+**Why an entry.** It moves § D1228's rule (*drawn exactly while a Scenario week has a day filed*)
+and binds five screens' words: the brief and the door, Your week, the menu's tile and the close.
+
+**What was wrong.** *Start next week* empties the week's history (§ D1177's roll), so after it a
+reload showed only the mode tiles until a day of the new week was filed. And no screen said which
+week it was, although week 2 deals its own wrinkles under the same weekday names.
+
+**The ruling.**
+
+1. *Continue your week* is drawn for a week past the first from its first morning, with nothing
+   filed. A first week with nothing filed is still Scenario's to open.
+2. `shift/weekStake.ts#weekOrdinalOf` answers *week n* where the census deals the tower's week and the
+   week stands on its seven days, and nothing elsewhere: a tower whose days never roll has no true
+   week number. The brief's and the door's eyebrow read *WEEK 2 · TUESDAY · DAY 2*, Your week's
+   eyebrow ends *· WEEK 2*, the tile reads *Midtown Office, week 2, Monday*, and the close's
+   tomorrow heading reads *TOMORROW · WEEK 2 · TUESDAY, DAY 2* or *NEXT · WEEK 3 · MONDAY, DAY 1 OF
+   A NEW WEEK*.
+
+**Not decided: the streak and the weekend.** Seat D read *4 days running · best 100 %* as counting a
+Saturday that does not count. [§ D1176](#d1176) clause 2 rules that the streak is about every day
+played, and [§ D1246](#d1246) later took the weekend off the main path. Whether a day off the path
+moves the streak and the best day is a question about what the game rewards, so it is left for a
+swarm, and nothing here changes it.
+
+**Tests.** `everyday/continueWeek.test.ts` (*offers a later week from its first morning, numbered*),
+`everyday/today.test.ts` (*the eyebrow numbers a census tower's week*), `everyday/weekView.test.ts`
+(*the week's number on Your week*) and `shift/dayClose.test.ts` (the headings). Each was red on the
+base sources and is green after.
