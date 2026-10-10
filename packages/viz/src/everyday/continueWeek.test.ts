@@ -46,6 +46,22 @@ describe('continue your week — § D1228', () => {
     expect(continueWeekEntryOf(fileClean(openWeek('sandbox')), 'My tower')).toBeUndefined();
   });
 
+  it('offers a first week whose first day is begun, and says the day is under way — § D1369', () => {
+    /*
+     * The post-AN panel's seat D (D4): the pinned Monday started and the page reloaded, and the
+     * picker drew no entry because nothing had been filed. Red before `dayBegun`: `undefined`.
+     */
+    const entry = continueWeekEntryOf(openWeek('c2'), 'Midtown Office', true);
+    expect(entry?.goes).toBe('door');
+    expect(entry?.line).toMatch(/^Midtown Office, week 1, Monday under way/u);
+    /* Nothing begun on a week on no scenario is still nothing to continue. */
+    expect(continueWeekEntryOf(openWeek('sandbox'), 'My tower', true)).toBeUndefined();
+    /* And a filed day reads as filed, whatever stands on the next one. */
+    expect(continueWeekEntryOf(fileClean(openWeek('c2')), 'Midtown Office', true)?.line).toMatch(
+      /Monday filed, Tuesday next/u,
+    );
+  });
+
   it('names the tower, the day standing and the count toward the target, and opens the door', () => {
     const tuesdayFiled = fileClean(nextDay(fileClean(openWeek('c2'))));
     expect(continueWeekEntryOf(tuesdayFiled, 'Midtown Office')).toEqual({

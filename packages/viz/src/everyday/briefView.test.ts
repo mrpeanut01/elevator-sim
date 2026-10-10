@@ -13,11 +13,13 @@ import { describe, expect, it } from 'vitest';
 
 import { BRIEF_WAY_THROUGH_HEADING, BRIEF_WEEK_HEADING, briefBarModel, briefScreenViewOf, lockedForScore, raceAgainstCard, RECOMMENDED_CARDS,
   SANDBOX_DOOR_LABEL,
+  TUNE_OFFER_EVERYTHING,
 } from './briefView.js';
 import { actionBarFor } from './actionBar.js';
 import { CONTINUE_HERE_CELL, DAY_ATTEMPT_COPY } from '../shift/attempt.js';
 import { GHOST_OPTIONS } from '../live/raceStrip.js';
 import { isScreenBuilt } from './screens.js';
+import { tuneControlsOffered } from './tunerModel.js';
 import { DAY_COUNTS_SENTENCE } from '../shift/weekStake.js';
 import type { TodayRecord } from './today.js';
 
@@ -213,6 +215,33 @@ describe('the two cards this build states rather than draws as a live control', 
     expect(card.door).toEqual({ label: SANDBOX_DOOR_LABEL, screen: 'tuner' });
     expect(card.why).toContain('sandbox day');
     expect(card.why).not.toMatch(/not built/);
+  });
+
+  it('names what its button opens, from the tuner’s own list, and none of it as the dispatcher — § D1368', () => {
+    /*
+     * The post-AN panel's seat D (D7): the caveat read *"Everything you can change from here changes
+     * the dispatcher, and nothing else"* above a button that opens floors, shafts, speed, capacity,
+     * door dwell, arrival rate and lobby share. Red before: that sentence.
+     */
+    const card = lockedForScore(true);
+    expect(card.caveat).toBe(
+      'What it opens: the tower (floors above the lobby, shafts), the machines (rated speed, capacity, ' +
+        'door dwell) and the crowd (how busy, arriving at the lobby).',
+    );
+    expect(card.caveat).not.toMatch(/dispatcher/u);
+    for (const { controls } of tuneControlsOffered(TUNE_OFFER_EVERYTHING)) {
+      for (const label of controls) expect(card.caveat).toContain(label.toLowerCase());
+    }
+    /* On a day that keeps its own mix the tuner draws no lobby share, and the brief names none. */
+    const mixDay = briefScreenViewOf({
+      today: TODAY,
+      dispatchers: DISPATCHERS,
+      savedIds: [],
+      selectedId: 'collective',
+      tunerOffer: { mixIsTheDays: true, machineSteps: true },
+    });
+    expect(mixDay.locked.caveat).toMatch(/the crowd \(how busy\)\.$/u);
+    expect(mixDay.locked.caveat).not.toMatch(/arriving at the lobby/u);
   });
 
   it('names a state rather than a destination on the door — GitHub issue #225, § D496', () => {

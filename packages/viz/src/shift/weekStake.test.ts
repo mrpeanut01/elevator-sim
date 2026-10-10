@@ -567,7 +567,7 @@ describe('the week sheet — § D1177', () => {
     expect(isFirstDayOnALegibleTower(rolled)).toBe(false);
     expect(isFirstDayOnALegibleTower(openWeek('c2'))).toBe(true);
     expect(filedDaysOf([rolled])).toBe(1);
-    expect(tutorialIsDue({ filedDays: filedDaysOf([rolled]), solvedCases: 0, ratings: 0, careerDays: 0 })).toBe(false);
+    expect(tutorialIsDue({ filedDays: filedDaysOf([rolled]), solvedCases: 0, ratings: 0, careerDays: 0, daysBegun: 0 })).toBe(false);
   });
 });
 

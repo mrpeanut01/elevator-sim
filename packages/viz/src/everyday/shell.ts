@@ -1364,6 +1364,14 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     if (state.ctx === 'rush' && screen !== 'stage' && screen !== 'report') leaveRush();
     if (state.ctx === 'replay' && screen !== 'brief' && screen !== 'stage' && screen !== 'report') leaveReplay();
     /*
+     * **A sandbox day ends when its stage and its report do** — wave AO, lane AO-2,
+     * [§ D1368](../../../../DECISIONS.md). The host parked the week behind it (`everyday/sandbox.ts`);
+     * any other screen reads the week, so the week comes back first, exactly as it was. That includes
+     * *Tune the tower* itself, so a second sandbox is opened over the week rather than over the last
+     * sandbox. A no-op with none standing, whatever the context.
+     */
+    if (screen !== 'stage' && screen !== 'report') dataHost?.leaveSandbox();
+    /*
      * **A career day's state goes when the career's screens do** — GitHub issue #594, § D964. The
      * host parked the Scenario record behind the career day; any screen outside § 8's own five is
      * a screen that reads the Scenario record, so the record comes back first. The host's release
@@ -2571,7 +2579,8 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     const week = dataHost.week();
     const buildingId = contractById(week.contractId)?.buildingId;
     const towerName = buildingId === undefined ? '' : (dataHost.buildingById(buildingId)?.name ?? buildingId);
-    const entry = continueWeekEntryOf(week, towerName);
+    /* § D1369: a week whose first day is begun is under way, and the tile is how the reload finds it. */
+    const entry = continueWeekEntryOf(week, towerName, dataHost.dayAttempt() !== undefined);
     if (entry === undefined) return undefined;
     const tile = el(doc, 'button', 'everyday-continue-week');
     tile.type = 'button';
@@ -2964,6 +2973,8 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
       solvedCases: progress.solvedCaseIds.length,
       ratings: progress.ratings.length,
       careerDays: host.campaign().today - 1,
+      /* A day begun is a player met — § D1369: the attempt the reload kept is not a first arrival. */
+      daysBegun: host.dayAttempt() === undefined ? 0 : 1,
     });
     if (due) go('landing');
   }

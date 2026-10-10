@@ -54,6 +54,7 @@ import type { GoalReading } from '../shift/types.js';
 import type { ActionBarModel } from './actionBar.js';
 import type { EverydayHost } from './host.js';
 import { isScreenBuilt, unbuiltReasonFor } from './screens.js';
+import { tuneControlsOffered, type TuneOffer } from './tunerModel.js';
 import type { TodayRecord } from './today.js';
 import type { EverydayScreen } from './types.js';
 
@@ -267,7 +268,18 @@ export interface BriefScreenInput {
    * with and a handover is the stage's to make.
    */
   readonly attemptWeekday?: string | undefined;
+  /**
+   * What *Tune the tower* draws on this day, which the *Locked for score* caveat names — wave AO,
+   * lane AO-2 ([§ D1368](../../../../DECISIONS.md)). Absent is {@link TUNE_OFFER_EVERYTHING}.
+   */
+  readonly tunerOffer?: TuneOffer | undefined;
 }
+
+/**
+ * Every control the tuner can draw: a day that keeps no mix of its own, on a machine class this build
+ * knows. {@link lockedForScore}'s default, for a caller with no day to ask; the brief passes the day's.
+ */
+export const TUNE_OFFER_EVERYTHING: TuneOffer = Object.freeze({ mixIsTheDays: false, machineSteps: true });
 
 /** How many style cards § 6.2 puts above the dropdown. */
 export const RECOMMENDED_CARDS = 3;
@@ -373,7 +385,10 @@ export function raceAgainstCard(): BriefRefusalCard {
  */
 export const SANDBOX_DOOR_LABEL = 'Change it anyway — the day stops counting';
 
-export function lockedForScore(crowdIsToday: boolean): BriefRefusalCard {
+export function lockedForScore(
+  crowdIsToday: boolean,
+  offer: TuneOffer = TUNE_OFFER_EVERYTHING,
+): BriefRefusalCard {
   const built = isScreenBuilt('tuner');
   return {
     heading: 'LOCKED FOR SCORE',
@@ -420,9 +435,25 @@ export function lockedForScore(crowdIsToday: boolean): BriefRefusalCard {
       ? 'Change anything you like: the day still runs with what you changed, it just stops ' +
         'counting on today’s board — a sandbox day, not a scored one.'
       : `Change it here: ${unbuiltReasonFor('tuner')}.`,
-    caveat: 'Everything you can change from here changes the dispatcher, and nothing else.',
+    /*
+     * **What the door opens, named from the screen's own control list** — wave AO, lane AO-2,
+     * [§ D1368](../../../../DECISIONS.md), the post-AN panel's seat D (D7). This read *"Everything
+     * you can change from here changes the dispatcher, and nothing else"*, directly above a button
+     * that opens floors, shafts, speed, capacity, door dwell, arrival rate and lobby share, none of
+     * which is the dispatcher. `tunerModel.ts#tuneControlsOffered` is the tuner's own list for the
+     * day, so a control the screen adds or stops offering moves this line on the same commit.
+     */
+    caveat: built ? `What it opens: ${tunerControlsLine(offer)}.` : '',
     door: built ? { label: SANDBOX_DOOR_LABEL, screen: 'tuner' } : undefined,
   };
+}
+
+/** `the tower (floors above the lobby, shafts), the machines (…) and the crowd (…)`. */
+function tunerControlsLine(offer: TuneOffer): string {
+  const cards = tuneControlsOffered(offer).map(
+    (entry) => `${entry.card.toLowerCase()} (${entry.controls.map((label) => label.toLowerCase()).join(', ')})`,
+  );
+  return cards.length <= 1 ? (cards[0] ?? '') : `${cards.slice(0, -1).join(', ')} and ${String(cards.at(-1))}`;
 }
 
 /** § 6.2, resolved. */
@@ -491,7 +522,7 @@ export function briefScreenViewOf(input: BriefScreenInput): BriefScreenView {
       held: input.attemptWeekday === undefined ? today.driverHeld : DAY_ATTEMPT_COPY.driverHeld,
     },
     ghost: raceAgainstCard(),
-    locked: lockedForScore(today.crowdIsToday),
+    locked: lockedForScore(today.crowdIsToday, input.tunerOffer),
     barNote: `${BRIEF_NOTE_LEAD}${today.driver}`,
   };
 }

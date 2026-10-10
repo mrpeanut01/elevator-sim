@@ -85,9 +85,10 @@
  *   {@link EverydayHost.playThisCrowd}, and every one of them arrived **with** its consumer — § 14's
  *   *Your week* picker and § 7's stage — which is the rule these absences exist to keep;
  * - **no saved-pattern or saved-building *shelf* to browse** — and the narrowing is the point.
- *   {@link EverydayHost.applyBuildingSpec} and {@link EverydayHost.applyPatternSpec} both *write* to
- *   those shelves and hand back the id they took, because § 13's designer and § 3.3's tuner press
- *   them. What no listed screen reads is the **list**, so no method answers one. The bullet used to
+ *   {@link EverydayHost.applyBuildingSpec} *writes* to the building shelf and hands back the id it
+ *   took, because § 13's designer presses it, and {@link EverydayHost.runSandbox} saves § 3.3's
+ *   tuner's changed tower and pattern to both shelves ([§ D1368](../../../../DECISIONS.md)). What
+ *   no listed screen reads is the **list**, so no method answers one. The bullet used to
  *   say the shelves were untouched, and a stated absence that has stopped being true is § D227's
  *   defect with its polarity reversed.
  *
@@ -197,7 +198,6 @@ import {
 import type { VizRecording } from '../contract/types.js';
 import { savedBuildingFrom, stateRunningSaved } from '../dev/buildingEditor.js';
 import type { BrowserResources } from '../dev/data.js';
-import { nextSavedId } from '../dev/dispatcherEditor.js';
 import {
   allBuildingIds,
   allDispatchers,
@@ -206,6 +206,7 @@ import {
   pressDayCallOf,
   plannedDayOf,
   resolvedBuildingOf,
+  runRungContractIdOf,
   runSubmissionOf,
   shiftDemandTemplateId,
   shiftLengthForContract,
@@ -229,7 +230,7 @@ import {
 import type { BookedOutCar } from '../shift/bookedOut.js';
 import type { CalendarPeriod } from '../shift/calendar.js';
 import { contractById, statLineOf } from '../shift/contracts.js';
-import { admittedPressDayIds, ladderTowersOf, pressDayFor } from '../shift/ladder.js';
+import { admittedPressDayIds, ladderTowerConfig, ladderTowersOf, pressDayFor, rungFor } from '../shift/ladder.js';
 import { crowdIsShared, PRACTICE_DAY_SENTENCES, type PracticeGround } from '../shift/scoredCrowd.js';
 import { callOpeningOf, watchedCallOpeningOf } from './callOpening.js';
 import type { PressCall } from '../shift/pressCall.js';
@@ -307,6 +308,13 @@ import {
 } from './rushSitting.js';
 import { rememberDriver } from './driverMemory.js';
 import { REPLAY_COPY, replayBeforeOf, replayPatchOf, replayRestorePatchOf, replayableDay, type ReplayBefore } from './replay.js';
+import {
+  sandboxBeforeOf,
+  sandboxPatchOf,
+  sandboxRestorePatchOf,
+  type SandboxBefore,
+  type SandboxPresses,
+} from './sandbox.js';
 
 import { campaignDayVerdict, campaignTestRows, type FiledDayRecord } from './campaignModel.js';
 
@@ -892,6 +900,16 @@ export interface CampaignDayFacts {
   readonly answered: boolean;
 }
 
+/** What *Tune the tower* opens on — {@link EverydayHost.sandboxStanding}, [§ D1368](../../../../DECISIONS.md). */
+export interface SandboxStanding {
+  /** The tower its contract's rung hands over, as the authoring model's spec. */
+  readonly building: BuildingSpec;
+  /** The pattern behind the selection, carrying the rate the day runs at. */
+  readonly pattern: PatternSpec;
+  /** The levers' door dwell, or `undefined` for *the dispatcher's own*. */
+  readonly dwell: DwellChoice | undefined;
+}
+
 export interface EverydayHost {
   /* ---------------------------------------------------------------- reads */
 
@@ -1246,21 +1264,20 @@ export interface EverydayHost {
   buildingSpec(): BuildingSpec | undefined;
 
   /**
-   * The demand the next run is under, as the pattern editor's spec.
+   * **What *Tune the tower* opens on: the day as it will run** — wave AO, lane AO-2,
+   * [§ D1368](../../../../DECISIONS.md), the post-AN panel's seat D (D3). `undefined` when the
+   * standing id names no building this build knows, on {@link buildingById}'s rule.
    *
-   * Read through the **selection**, never through the editor's working copy: `state.patternSpec` is
-   * what the Engineer traffic panel has under its sliders and reaches no run until it is saved, so
-   * a screen that read it would draw numbers the simulation is not using. What this answers is the
-   * spec behind `state.pattern` — the saved pattern it names, the shipped profile it names, or the
-   * building's own profile when the selection is `'building'`.
+   * It replaced three reads (the building as authored, the pattern behind the selection, and the
+   * levers' dwell), and the first two were not the day: the authored Midtown is let in full where
+   * its contract hands it over at about a third (`occupancy: 0.34`), which is how a tuned copy came
+   * to read *People 1,900* on the brief, and a rung that declares a rate runs at that rate while the
+   * profile's `typical` said another. So the tower is the one its contract's rung hands
+   * over (`shift/ladder.ts#ladderTowerConfig`, the scenario card's own derivation) and the pattern
+   * carries the rate the day runs at. Whether the day keeps its own mix is {@link dayAhead}'s
+   * `templateVariesMix`, which the tuner and the brief both read.
    */
-  patternSpec(): PatternSpec;
-
-  /**
-   * The door-dwell chip the group levers hold, or `undefined` for *the dispatcher's own* —
-   * `GroupLevers.dwell`'s fourth state, which is not a fourth chip and must not be defaulted.
-   */
-  doorDwell(): DwellChoice | undefined;
+  sandboxStanding(): SandboxStanding | undefined;
 
   /**
    * The four plain levers over the current working spec and group levers —
@@ -1908,24 +1925,27 @@ export interface EverydayHost {
   applyBuildingSpec(spec: BuildingSpec): string;
 
   /**
-   * Save a demand pattern and point the next run at it, answering the id it took.
+   * **Run a sandbox day: the day with what moved, over the week and never on it** — wave AO, lane
+   * AO-2, [§ D1368](../../../../DECISIONS.md), `everyday/sandbox.ts`. *Tune the tower*'s primary,
+   * whenever any of its seven moved.
    *
-   * `savedPatterns` **and** `pattern`, in one patch, for `dev/trafficEditor.ts`'s stated reason:
-   * *"a pattern the run cannot be pointed at is the dead seam this repository keeps finding"*.
-   * `patternSpec` is written alongside so the Engineer traffic panel opens on what is running
-   * rather than on whatever it was last left at. Throws {@link attemptHold}'s sentence while a
-   * scored attempt stands on the week on screen, as {@link applyBuildingSpec} does — § D1360.
+   * Keeps every field a press writes, stands the run on a copy of the week's day with the week
+   * parked behind it, writes what moved, and presses the run as {@link startRun} does. The day's
+   * own crowd and shape are read first, while the week still stands on its contract. One session at
+   * a time: a press while one stands puts it back first, so a sandbox day is always the week's day
+   * plus this press and never the last sandbox's. Throws {@link attemptHold}'s sentence and writes
+   * nothing while a scored attempt stands on the week on screen, because a sandbox day plays that
+   * day's crowd (§ D1360, joined at integration).
    */
-  applyPatternSpec(spec: PatternSpec): string;
+  runSandbox(presses: SandboxPresses): void;
 
   /**
-   * Write the door-dwell chip — `GroupLevers.dwell`, the seam that reaches the run as every car's
-   * `dwellCarCallS`/`dwellHallCallS` through `shiftRunConfigOf`'s `withDoorTiming`.
-   *
-   * `undefined` restores *the dispatcher's own*, which is a real fourth value rather than a
-   * missing one: writing a chip nobody pressed silently replaces an authored `dwellPolicy`.
+   * Put the week back — every field {@link runSandbox} kept, exactly — and refuse the sandbox's run
+   * on the week it leaves: a run still generating is cancelled, and one that landed and was not
+   * closed is marked left (`abandonDay`), so neither can be filed as the week's day. A no-op with no
+   * sandbox standing. `everyday/shell.ts#go` calls it on every screen but the stage and the report.
    */
-  setDoorDwell(choice: DwellChoice | undefined): string | undefined;
+  leaveSandbox(): void;
 
   /* ------------------------------------------------- § 14.1, the spectator */
 
@@ -3139,6 +3159,37 @@ export function createEverydayHost(
    */
   let replaySession: { readonly day: number; readonly before: ReplayBefore; readonly pressed: boolean } | undefined;
   /**
+   * The sandbox day standing — [§ D1368](../../../../DECISIONS.md), `everyday/sandbox.ts`. Opened by
+   * {@link EverydayHost.runSandbox}, which always presses a run, and ended by {@link leaveSandbox}.
+   * Host-scoped and never stored: a reload has no sandbox, and the save never wrote one.
+   */
+  let sandboxSession:
+    | {
+        readonly before: SandboxBefore;
+        /** The recording that stood when the sandbox pressed — see {@link leaveSandbox}. */
+        readonly recording: VizRecording | undefined;
+      }
+    | undefined;
+  /**
+   * Put the week back and refuse the sandbox's run on it — {@link EverydayHost.leaveSandbox}.
+   *
+   * The recording standing tells which: the one standing before the sandbox pressed means its run
+   * is still generating (or failed), so it is cancelled before it can land on the week put back, as
+   * `leaveReplay` cancels; a different one is the sandbox's own, and unless it was closed (filed into
+   * the sandbox day's week, which goes) it is marked left, so `closeShift` and the posting gate refuse
+   * it on the week (`shift/banking.ts`'s third ground) and the stage re-entered presses a fresh run.
+   */
+  const leaveSandbox = (): void => {
+    if (sandboxSession === undefined) return;
+    const { before, recording } = sandboxSession;
+    sandboxSession = undefined;
+    const standing = b.state().recording;
+    if (standing !== undefined && standing !== recording && !b.dayClosed()) b.abandonDay?.();
+    else b.cancelRun?.();
+    b.applyPatch(sandboxRestorePatchOf(before));
+    notifyCampaign();
+  };
+  /**
    * **The run standing is a retake of the call** — § D1140. Set by `takeCallAgain` after its press
    * and cleared by every other `startRun`, so {@link EverydayHost.openingAtS} opens the retake at the
    * call and every other day at its start. A fact about this sitting's run; nothing stores it.
@@ -3825,17 +3876,31 @@ export function createEverydayHost(
       const config = buildingConfigOf(b.resources, state.savedBuildings, state.buildingId);
       return config === undefined ? undefined : specFromBuilding(config, state.buildingId);
     },
-    patternSpec: () => {
+    sandboxStanding: () => {
       const state = b.state();
-      if (state.pattern !== 'building') {
-        const saved = state.savedPatterns.find((entry) => entry.id === state.pattern);
-        if (saved !== undefined) return saved.spec;
-        return specFromTrafficProfile(b.resources.trafficProfiles, state.pattern);
-      }
       const config = buildingConfigOf(b.resources, state.savedBuildings, state.buildingId);
-      return specFromTrafficProfile(b.resources.trafficProfiles, config?.trafficProfile);
+      if (config === undefined) return undefined;
+      const rungId = runRungContractIdOf(b.resources, state);
+      const handed =
+        rungId === null
+          ? config
+          : ladderTowerConfig(config, rungId, specsWithSaved(b.resources, state.savedClasses));
+      const selected =
+        state.pattern === 'building'
+          ? undefined
+          : (state.savedPatterns.find((entry) => entry.id === state.pattern)?.spec ??
+            specFromTrafficProfile(b.resources.trafficProfiles, state.pattern));
+      /* The rung's declared rate, where the selection leaves the rate to it — `shiftRunConfigOf`'s `rungRate`. */
+      const rungRate = rungId === null ? undefined : rungFor(rungId, config.id)?.arrivalRatePctPop5min;
+      const own = specFromTrafficProfile(b.resources.trafficProfiles, config.trafficProfile);
+      const pattern =
+        selected ?? (rungRate === undefined ? own : { ...own, ratePctPop5min: rungRate });
+      return {
+        building: specFromBuilding(handed, state.buildingId),
+        pattern,
+        dwell: state.levers.dwell,
+      };
     },
-    doorDwell: () => b.state().levers.dwell,
     plainLevers: () => {
       const state = b.state();
       return plainLeversOf(state.dispatcherSpec, state.levers);
@@ -4545,29 +4610,30 @@ export function createEverydayHost(
       b.applyPatch({ ...next });
       return saved.id;
     },
-    applyPatternSpec: (spec) => {
-      const state = b.state();
-      const id = nextSavedId('pat', [
-        ...state.savedPatterns.map((entry) => entry.id),
-        ...b.resources.trafficProfiles.profiles.map((profile) => profile.id),
-      ]);
-      const named: PatternSpec = {
-        ...spec,
-        name: spec.name.trim() === '' ? 'My pattern' : spec.name.trim(),
-      };
-      const patch: Partial<ViewerState> = {
-        savedPatterns: [...state.savedPatterns, { id, spec: named }],
-        pattern: id,
-        patternSpec: named,
-      };
-      /* § D1360, as {@link EverydayHost.applyBuildingSpec}. */
-      const held = attemptHoldOver(patch);
+    runSandbox: (presses) => {
+      /* § D1360: a sandbox day plays the attempt's crowd, so it is refused while an attempt stands. */
+      const held = attemptHoldOver();
       if (held !== undefined) throw new Error(held);
-      b.applyPatch(patch);
-      return id;
+      /* The career's record back first, so what is kept is the Scenario week (`pressTodaysRun`'s own first step). */
+      releaseCareer();
+      leaveSandbox();
+      /*
+       * The day's crowd and shape **while the week still stands on its contract**: on the sandbox
+       * day's week `dealPatchFor` and `contractSliceFor` answer nothing, so a slice-day tower would
+       * otherwise run whatever length stood rather than its day's.
+       */
+      const before = sandboxBeforeOf(b.state());
+      const dealt = dealPatchFor(b, b.state());
+      const shape = dayPatchFor(b, { ...b.state(), ...dealt });
+      sandboxSession = { before, recording: b.state().recording };
+      b.applyPatch({ ...dealt, ...shape, ...sandboxPatchOf({ ...b.state(), ...dealt, ...shape }, b.resources, presses) });
+      notifyCampaign();
+      pressTodaysRun(() => {
+        b.startRun();
+      });
     },
-    setDoorDwell: (choice) => {
-      return editorWrite({ levers: { ...b.state().levers, dwell: choice } });
+    leaveSandbox: () => {
+      leaveSandbox();
     },
     /* ----------------------------------------------- § 14.1, the spectator */
     dailyBoard: async () => {

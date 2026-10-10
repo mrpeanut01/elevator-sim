@@ -37,6 +37,7 @@
 import { contractById } from './contracts.js';
 import { pressDayFor } from './ladder.js';
 import type { WeekState } from './types.js';
+import { SANDBOX_DAY_CONTRACT_ID } from './week.js';
 
 /**
  * Whether `seed` is the shared crowd of a day on `contractId`: the contract's pin, or `daySeed`, the
@@ -86,8 +87,14 @@ export function crowdMakesPractice(
  * stands (`shift/attempt.ts`) and the run being closed is not it, so the week keeps the day open for
  * that attempt. Only the close can know it, because only the close holds both runs, so the caller
  * says it with `otherThanTheAttempt` and the brief, which offers *Resume* instead, never passes it.
+ *
+ * `'sandbox'` is wave AO's fourth, [§ D1368](../../../../DECISIONS.md): the run stands on a sandbox
+ * day's week (`shift/week.ts#SANDBOX_DAY_CONTRACT_ID`), which *Tune the tower* parks over the week,
+ * so its close banks nothing, leaves the week on its day and offers no tomorrow, and the stage
+ * carries the same sentence while it plays. It is asked first because it is a fact about the week
+ * the run stands on, whichever crowd it met.
  */
-export type PracticeGround = 'crowd' | 'retake' | 'attempt';
+export type PracticeGround = 'sandbox' | 'crowd' | 'retake' | 'attempt';
 
 export function practiceGroundOf(
   week: Pick<WeekState, 'contractId' | 'history' | 'closedDay' | 'day'>,
@@ -95,6 +102,7 @@ export function practiceGroundOf(
   daySeed: bigint | undefined,
   otherThanTheAttempt = false,
 ): PracticeGround | undefined {
+  if (week.contractId === SANDBOX_DAY_CONTRACT_ID) return 'sandbox';
   if (crowdMakesPractice(week, seed, daySeed)) return 'crowd';
   if (week.closedDay === week.day) return 'retake';
   if (otherThanTheAttempt) return 'attempt';
@@ -107,6 +115,9 @@ export function practiceGroundOf(
  * print on its sheet (`shift/report.ts#PRACTICE_CROWD_NOTE` and `#PRACTICE_NOTE`).
  */
 export const PRACTICE_DAY_SENTENCES: Readonly<Record<PracticeGround, string>> = Object.freeze({
+  sandbox:
+    'This run does not count toward the week: it is a sandbox day with the changes you made, and ' +
+    'your week is where you left it.',
   crowd:
     'This run does not count toward the week: it meets a crowd other than the day’s shared one, ' +
     'so the day stays open for that crowd.',

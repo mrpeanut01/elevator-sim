@@ -31853,6 +31853,8 @@ measurement rather than by preference, and it may turn out to be small.
 
 ## D476 — a first-run cover conditioned on derived state is not the override non-goal 10 forbids
 
+> **Status 2026-10-10: WHAT THE GATE READS AMENDED by [§ D1369](#d1369)** (an agent ruling). A day begun, an attempt standing on the week's day, closes the gate as a day filed does. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Status 2026-09-26: WHAT THE GATE READS AMENDED by [§ D1143](#d1143)** (an agent ruling). Days filed are counted in every week the device holds, the parked ones included. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Status 2026-09-24: CONDITION AMENDED by [§ D993](#d993)** — the ruling stands; the cheapest form (the skip files a day) is withdrawn. The condition holds within a session; across a reload it is replaced by: the first-visit cover always carries a live route to the mode picker.
@@ -42526,6 +42528,8 @@ From fresh storage the route was worse: the stage's entry rule found the boot ru
 
 ## D965 — a mode's own week is never written to the saved session, and one found there is taken off
 
+> **Status 2026-10-10: AMENDED by [§ D1368](#d1368)** (an agent ruling). The list of mode weeks gains a fourth, the sandbox day *Tune the tower* parks over the week, so the save never writes it. See [`docs/39`](docs/39-decisions-in-force.md).
+
 **Date: 2026-09-24 · Owner: wave AH lane A · GitHub issue [#594](https://github.com/mrpeanut01/elevator-sim/issues/594) · Rules on: [§ D231](#d231)'s *a mode that does not own a week does not write one*, and `persist/validate.ts`'s closed set of ids a week may name.**
 
 **Why an entry.** [§ D405](#d405)'s first and second grounds: it binds `persist/validate.ts`, `dev/state.ts#weeksForSession` and `dev/main.ts`'s restore, and it widens a set `validate.ts` documents as deliberately closed.
@@ -48006,6 +48010,8 @@ step on a closing sheet, a career sheet unchanged).
 
 ## D1228 — the mode picker offers *Continue your week* while a week is under way
 
+> **Status 2026-10-10: AMENDED by [§ D1369](#d1369)** (an agent ruling). A first week is offered once its first day is begun, with the attempt standing and nothing filed, and the entry says the day is under way. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Status 2026-10-10: AMENDED by [§ D1330](#d1330)** (an agent ruling). A week past the first is offered from its first morning with nothing filed, and the entry names the week's number where one is true of it. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Taken 2026-09-26 by agent sessions under delegated authority** (wave AL, lane AL-F, on swarm DN's
@@ -50952,3 +50958,122 @@ its next write if nobody holds it, and if another tab moved it on meanwhile, cla
 stale run. A begin reads the slot fresh first, so the later of two begins finds the earlier; two
 writes inside the same instant are not serialised by `localStorage`, and that race is not
 established.
+
+## D1368 — a sandbox day runs the day with the player's changes, over the week and never on it
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (wave AO, lane AO-2, on the wave
+> brief's item for the post-AN panel's seat D, D3 and D7), not by the product owner, and to be read as
+> an agent ruling. **Amends [§ D965](#d965)**, whose list of mode weeks gains a fourth. Owner-reversible
+> clauses: that the sandbox ends when the player leaves its stage and its report (rather than at the
+> next scored press); that a changed tower is copied from the tower as its contract hands it over,
+> keeping the day's population and not the contract's bookings; that *Arriving at the lobby* is not
+> offered on a day that keeps its own mix (rather than offered with a sentence that it does nothing);
+> and the words of the stage sentence, the sheet's note and the brief's caveat.
+
+**Why an entry.** [§ D405](#d405)'s first two grounds. It amends § D965's closed list of the weeks a
+mode stands on, adds a practice ground beside [§ D1141](#d1141)'s and [§ D1218](#d1218)'s, and binds
+`shift/week.ts`, `shift/scoredCrowd.ts`, `shift/report.ts`, `dev/state.ts#shiftRunConfigOf`,
+`dev/main.ts#closeShift`, `authoring/patternSpec.ts` and the honesty register as well as the Everyday
+host, shell, tuner and brief.
+
+**What was wrong.** Seat D, on a scored day's brief: the *Locked for score* card's sandbox door, any
+change in *Tune the tower* (*How busy* 12 to 11.5, or door dwell *patient*), *Run it and watch*, and
+the stage said *"Today's day could not be simulated"*, on *Try the day again* too, and after setting the
+change back. The brief then read *Midtown Office, People 1,900, tower bld-1*, and after a reload the
+week's day sat on Garden Apartments. Three causes, each reproduced on a bundle built from `b53ab48`:
+
+1. **No change could run.** The tuner saved a pattern on every press, and a pattern writes its
+   template's peak hold and off-peak level (and a split on a one-direction order). On a building with
+   an authored day the run uses the day's record, which authors its phases and varies its mix, and
+   `core` refuses all of those against it: the worker's refusal was *templateOverrides (peakWindowS,
+   baselineFraction) cannot be applied to demand template "office-day"*. Every saved pattern on every
+   whole authored day failed the same way.
+2. **The week was the sandbox's.** The press went through `applyBuildingSpec` and `withBuilding`,
+   which stood the player's own week on `SANDBOX_CONTRACT_ID` and the building on a copy (`bld-1`).
+   The save wrote that pair the moment the week moved; a sandbox week names no tower, so the restore
+   answered with the state's default building, Garden Apartments. The copy also lost the contract's
+   rung, which is where *People 1,900* came from (Midtown is handed over at a third of its authored
+   population) and where car D's booking went.
+3. **Door dwell was written on the press of its chip**, into the levers the scored day runs under,
+   before any run; leaving the tuner kept it. And an untouched tuner pressed `startRun`, which begins
+   no attempt, so the day could be watched to its end from the tuner and begun afresh from the brief.
+
+**The ruling.**
+
+1. **A sandbox day stands on a week of its own** (`shift/week.ts#SANDBOX_DAY_CONTRACT_ID`), a copy of
+   the week's day (the day, the weekday, the history, the growth) with the week itself parked
+   (`openSandboxDay`). It is one of `MODE_WEEK_CONTRACT_IDS`, so the save takes it off the pair and
+   writes the week, and a reload taken on the sandbox stage opens on the week.
+2. **Leaving puts the week back.** `everyday/sandbox.ts` keeps every field a press writes (the week,
+   the parked weeks, the building id, the commissioning, the pattern, the levers, the crowd, the day's
+   shape and the sheet) and the host puts them back exactly when the player goes anywhere but the
+   stage and the report (`everyday/shell.ts#go`), *Tune the tower* included, so a second sandbox is
+   opened over the week. A run still generating is cancelled; one that landed unclosed is marked left,
+   so it cannot be filed as the week's day.
+3. **Only what moved is pressed.** The tower is copied only when one of its four controls moved, the
+   pattern only when one of the crowd's two did, and the dwell is held with the others until the run.
+   A tower left alone keeps its id, and `shift/ladder.ts#rungFor` hands a week on no contract that
+   tower's rung, so the sandbox meets the population and the booked car the day has. The tuner opens
+   on the day as it runs (`EverydayHost.sandboxStanding`: the tower its rung hands over, and the rate
+   the day runs at). With nothing moved, the tuner's primary is the brief's own `playDay`.
+4. **A saved pattern takes only what the run's template can take**
+   (`authoring/patternSpec.ts#demandTheTemplateTakes`, read in `shiftRunConfigOf`): on a template that
+   authors its phases the pattern's peak hold, off-peak level and mix swing are left out, and on one
+   that keeps its own mix its split is, with a withheld sentence naming them. Nothing a template can
+   take is touched, so no run that simulated before changes. On a day that keeps its own mix the tuner
+   does not offer *Arriving at the lobby*, and says why where the row would be.
+5. **It closes as practice.** `practiceGroundOf` answers `'sandbox'` first on a sandbox day's week, so
+   the stage carries *This run does not count toward the week: it is a sandbox day with the changes you
+   made, and your week is where you left it*, and the close leaves the week on its day, offers no next
+   day and says `shift/report.ts#PRACTICE_SANDBOX_NOTE`. The scoreboard guard in `closeDay` names both
+   sandbox ids.
+6. **The brief's *Locked for score* caveat names what its button opens**, from the tuner's own list
+   for the day (`tunerModel.ts#tuneControlsOffered`, the rows and labels the screen draws), in place of
+   *"Everything you can change from here changes the dispatcher, and nothing else"* (seat D, D7).
+
+[§ D496](#d496)'s ruling stands: a sandbox is a week on no assignment, arrived at and never chosen.
+What moves is which week it is.
+
+**Tests**, red on `b53ab48` and green after. `everyday/sandbox.test.ts` (9): a saved pattern on
+Midtown's whole day through `recordRun` (red with `core`'s refusal), each offered control moving the
+legs, the save writing the week, the restore putting back every kept field, the rung kept while the
+tower is unmoved, and the close moving no scoreboard. `everyday/sandboxDay.browser.test.ts` (2, red with
+*"Today's day could not be simulated"* on the stage): one value changed, run, played, *‹ Brief*, a
+reload, the brief reading as before each time and the stored week on Midtown's Monday; and the sandbox
+day closed, its sheet saying it banked nothing with no next day. `everyday/briefView.test.ts` (the
+caveat, red with the old sentence) and `everyday/tunerModel.test.ts` (the presses and the offer).
+
+**What it does not reach.** A changed tower runs without the contract's own bookings, since a rung
+belongs to the tower it names. The sandbox plays the day's crowd with the change and raises no call; it
+is offered while an attempt stands, as before, and whether it should be is the rehearsal question seat
+D's D1 and D2 put, which this lane does not rule on.
+
+## D1369 — a first day begun brings *Continue your week*, and keeps the first-visit page away
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (wave AO, lane AO-2, on the wave
+> brief's item for the post-AN panel's seat D, D4), not by the product owner, and to be read as an
+> agent ruling. **Amends [§ D1228](#d1228)**, whose entry was drawn only once a day was filed, and
+> what [§ D476](#d476)'s gate reads, as [§ D1143](#d1143) left it. Owner-reversible clauses: the
+> words *Monday under way*, and that the entry still opens the front door.
+
+**Why an entry.** [§ D405](#d405)'s second ground: it amends two recorded rulings.
+
+**What was wrong.** A fresh player started the pinned Monday, played to its call and reloaded. The
+page opened on the landing page, *Start playing* opened the tutorial, and the picker had no *Continue
+your week*; the way back was Scenario, *Play today's scenario*, *Set up today* and *Resume Monday*.
+Both reads asked what had been filed, and an attempt files nothing until it closes.
+
+**The ruling.** A day begun is an attempt standing on the week's day (`host.dayAttempt()`, § D1218).
+`everyday/tutorialModel.ts#tutorialIsDue` reads it as a fifth count, `daysBegun`, at both gate sites, so
+a player with a day begun is not a first arrival; and `everyday/continueWeek.ts#continueWeekEntryOf`
+offers a first week whose first day is begun, reading *Midtown Office, week 1, Monday under way*.
+Nothing new is stored: the attempt has its own slot (`persist/attempt.ts`), which the brief resumes
+from.
+
+**Tests**, red on `b53ab48` and green after: `everyday/tutorialModel.test.ts`,
+`everyday/continueWeek.test.ts`, and `everyday/dayOneReload.browser.test.ts` (red: the landing page came
+up after the reload), whose second case keeps a genuine first arrival on the landing page.
+
+**Not established.** A reload across UTC midnight with the first day begun and nothing else stored
+deals the first visit again for the new date, which may be another tower, and then neither read finds
+the attempt.

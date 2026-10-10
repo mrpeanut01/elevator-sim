@@ -8074,13 +8074,15 @@ function boot(ui: Elements, resources: BrowserResources): void {
       ? practiceGroundOf(state.week, state.seed, runDaySeed, attemptStanding !== undefined && !isTheAttempt)
       : undefined;
     const crowdPractice = practiceGround === 'crowd';
+    /* § D1368: a sandbox day's week is parked practice; its close moves nothing and offers no tomorrow. */
+    const sandboxPractice = practiceGround === 'sandbox';
     /* § D1218: a run that is not the standing attempt leaves the week on its day, as a link's crowd does. */
     const attemptPractice = practiceGround === 'attempt';
     /* § D1239: another tab filed the day, or an attempt stands while the Engineer surface closes. */
     const otherTabPractice = filedElsewhere !== undefined;
     const elsewherePractice = otherTabPractice || (engineerPractice && practiceGround === undefined);
     const week =
-      crowdPractice || attemptPractice || elsewherePractice
+      crowdPractice || attemptPractice || elsewherePractice || sandboxPractice
         ? state.week
         : closedWeekOf(state, outcome, runCause === 'intervention');
     const practice = practiceGround !== undefined || elsewherePractice;
@@ -8102,6 +8104,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
       /* Which ground made it practice, so the sheet says the true one — § D1141. */
       ...(crowdPractice ? { practiceCrowd: state.seed } : {}),
       ...(attemptPractice ? { practiceAttempt: true } : {}),
+      ...(sandboxPractice ? { practiceSandbox: true } : {}),
       ...(otherTabPractice ? { practiceOtherTab: true } : elsewherePractice ? { practiceEngineer: true } : {}),
       /*
        * § D1138 clause 3 — the ordinary day's calls, from the session that raised them over the run

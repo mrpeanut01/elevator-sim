@@ -25,6 +25,7 @@ import {
   HISTORY_DAYS,
   PARKED_WEEKS_MAX,
   SANDBOX_CONTRACT_ID,
+  SANDBOX_DAY_CONTRACT_ID,
   WEEK_CONTRACT_SENTINELS,
   closeDay,
   nextDay,
@@ -727,12 +728,14 @@ describe('a sandbox day leaves the scoreboard where it found it — GitHub issue
    */
   const relabelled = (contractId: string): WeekState => withContract(scored(), contractId);
 
-  it('raises the best on every week except the sandbox', () => {
+  it('raises the best on every week except the two sandboxes', () => {
     for (const [name, id] of Object.entries(WEEK_CONTRACT_SENTINELS)) {
       const week = relabelled(id);
       expect(week.bestMinutePct, name).toBe(74);
       const after = closeDay(week, day(week, 'met', 97));
-      expect(after.bestMinutePct, name).toBe(id === SANDBOX_CONTRACT_ID ? 74 : 97);
+      /* The sandbox day's week (wave AO, § D1368) is the same promise from *Tune the tower*. */
+      const sandbox = id === SANDBOX_CONTRACT_ID || id === SANDBOX_DAY_CONTRACT_ID;
+      expect(after.bestMinutePct, name).toBe(sandbox ? 74 : 97);
     }
     // The scored arm, so *does not move* is read beside a *does*: the guard is the sentinel, not
     // the arithmetic having quietly stopped working.

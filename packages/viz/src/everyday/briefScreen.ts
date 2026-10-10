@@ -50,6 +50,7 @@ import {
 } from './screenDom.js';
 import { everydayProfileStore } from './profileStore.js';
 import { drawElevation } from './elevation.js';
+import { classOfSpec, designerClasses } from './designerModel.js';
 import { isFirstDayOnALegibleTower } from '../shift/firstSession.js';
 import { dailySeedAt, isDailySeed } from '../shift/dailySeed.js';
 import { deviceNowMs } from '../shift/deviceDate.js';
@@ -159,6 +160,17 @@ function mountBrief(
         selectedId: selection.dispatcherId,
         /* § D1218 — an attempt standing on this day holds the driver it began with. */
         attemptWeekday: context.host.dayAttempt()?.weekday,
+        /*
+         * What the tuner behind *Locked for score* draws on this day — § D1368. The same two facts
+         * `tunerScreen.ts` reads when it mounts: the planned day's mix and the standing tower's class.
+         */
+        tunerOffer: {
+          mixIsTheDays: dayAhead.templateVariesMix,
+          machineSteps: (() => {
+            const standing = data.sandboxStanding()?.building;
+            return standing !== undefined && classOfSpec(designerClasses(data.elevatorSpecs()), standing) !== undefined;
+          })(),
+        },
       }),
     };
   }

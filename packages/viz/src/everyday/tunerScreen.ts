@@ -11,17 +11,19 @@
  * So this module registers a screen and adds no rail row; the two doors into it (*Take it to the
  * sandbox* on the brief, the report's third lever) arrive with those screens.
  *
- * ## The primary is one apply of everything, then the run
+ * ## The primary is one sandbox day of everything that moved, then the stage
  *
- * Four of the seven live on the building and two on the demand, so *Run it and watch* writes both
- * documents and then runs: `applyBuildingSpec` (which stands the week on the sandbox contract) and
- * `applyPatternSpec` (which saves the pattern **and points the selection at it**, because a pattern
- * the run cannot be pointed at is the dead seam this repository keeps finding). Door dwell is the
- * seventh and is written as it is pressed, because `GroupLevers` is state the Engineer surface also
- * shows and a deferred write there would leave two panels disagreeing.
+ * Four of the seven live on the building, two on the demand and one on the levers, and *Run it and
+ * watch* hands whichever moved to the host's `runSandbox` in one press (`tunerModel.ts#tunePresses`),
+ * which runs them as a sandbox day over the week and puts the week back when the player leaves
+ * (`everyday/sandbox.ts`, [§ D1368](../../../../DECISIONS.md)). Door dwell used to be written as it
+ * was pressed, so that the Engineer surface's lever panel would agree with the chip; that wrote it
+ * into the scored day's levers before any run, and the post-AN panel's seat D found the day running
+ * on it. It is held with the other six now, and the Engineer panel shows the lever the day has.
  */
 
 import type { BuildingSpec } from '../authoring/buildingSpec.js';
+import { DEFAULT_PATTERN } from '../authoring/patternSpec.js';
 import { actionBarFor } from './actionBar.js';
 import { everydayProfileStore } from './profileStore.js';
 import type { EverydayScreenModule } from './screens.js';
@@ -45,12 +47,14 @@ import {
   tuneSpeedReadout,
   tuneStateFrom,
   tunerBarModel,
+  tuneRowsOffered,
   TUNE_CARDS,
   TUNER_COPY as COPY,
   type TuneKey,
   type TuneState,
 } from './tunerModel.js';
 import { speedValueFigure, type EverydayUnits } from './units.js';
+import { sandboxMoves } from './sandbox.js';
 
 const EYEBROW = `font:500 10.5px ${TYPE.mono};letter-spacing:.14em;color:${C.label};text-transform:uppercase`;
 
@@ -90,8 +94,16 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
   const specs = dataHost.elevatorSpecs();
   const classes = designerClasses(specs);
 
-  const building = dataHost.buildingSpec();
-  const pattern = dataHost.patternSpec();
+  /*
+   * **What the day runs, as the day hands it over** — wave AO, [§ D1368](../../../../DECISIONS.md).
+   * This read the building as authored and the pattern's profile `typical`, so on Midtown it opened
+   * on the tower let in full where the day is let at about a third, and on a rung that declares a
+   * rate it opened on a rate the day does not run. `sandboxStanding` is the tower after its
+   * contract's rung, the rate the day runs at and the levers' door dwell; whether the day keeps its
+   * own mix is the planned day's, read below.
+   */
+  const standingDay = dataHost.sandboxStanding();
+  const building = standingDay?.building;
 
   /**
    * How this screen's machine specifications read — § 15.1's `Units` row, GitHub issue #170.
@@ -141,7 +153,10 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
   /* Bound after the guard, so every closure below reads a spec rather than a maybe-spec. */
   const standingBuilding: BuildingSpec = building;
 
-  const standing: TuneState = tuneStateFrom(standingBuilding, pattern, dataHost.doorDwell());
+  const pattern = standingDay?.pattern ?? DEFAULT_PATTERN;
+  /* Whether the day keeps its own mix — the planned day's answer, which the brief's caveat reads too. */
+  const mixIsTheDays = dataHost.dayAhead().templateVariesMix;
+  const standing: TuneState = tuneStateFrom(standingBuilding, pattern, standingDay?.dwell);
   let tune: TuneState = standing;
   movedNow = [];
 
@@ -277,10 +292,10 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
       button.append(label, seconds);
       button.addEventListener('click', () => {
         /*
-         * Written through immediately — see the module docstring. `set` then re-reads nothing: the
-         * lever is the host's, and the screen's own copy moves with it so the chip lights.
+         * **Held until the run, like the other six** — wave AO, [§ D1368](../../../../DECISIONS.md).
+         * This wrote the lever on the press of the chip, so the scored day itself ran on the chosen
+         * dwell from then on, run or no run, and leaving the tuner kept it.
          */
-        dataHost.setDoorDwell(chip.choice);
         set({ dwell: chip.choice });
       });
       chips.append(button);
@@ -310,8 +325,8 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
      * A design whose class does not carry the set speed or load is snapped back onto the ladder
      * **before** the chips are drawn, not after — a card drawn from one value and lit from another
      * is a control whose selected state is a lie. Only ever downward, `snapToStep`'s own rule, and
-     * it is here because `applyBuildingSpec` would otherwise hand `parseBuilding` a car outside its
-     * band.
+     * it is here because the sandbox's copy of the tower would otherwise hand `parseBuilding` a car
+     * outside its band.
      *
      * **This used to say it was only reachable through a class change, and that was false.** The
      * ladder is the *catalogue* filtered to the class, and two shipped buildings are specified off
@@ -343,7 +358,12 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
       head.append(name, sub);
       const body = el(doc, 'div');
       body.style.cssText = 'padding:14px 16px;display:grid;gap:14px';
-      for (const row of card.rows) drawSliderRow(body, row);
+      for (const row of tuneRowsOffered(card, { mixIsTheDays })) drawSliderRow(body, row);
+      if (card.rows.length !== tuneRowsOffered(card, { mixIsTheDays }).length) {
+        const kept = el(doc, 'p', 'everyday-tuner-days-own', COPY.lobbyShareIsTheDays);
+        kept.style.cssText = `font-size:12.5px;color:${C.warmGrey};line-height:1.45;margin:0`;
+        body.append(kept);
+      }
       if (card.dwellChips) {
         if (machineClass !== undefined) {
           drawStepRow(
@@ -410,17 +430,20 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
        * building under a fresh id, and `shift/reportWindow.ts` — which is keyed on the id —
        * stopped recognising Garden Apartments and handed the sheet back the five-minute band it
        * was moved off for `docs/20` defect 5.
-       *
-       * The building still goes first when there is one, because `applyBuildingSpec` is the press
-       * that moves the week onto the sandbox contract, and a pattern saved against a scored week
-       * and then sandboxed would be a saved pattern whose name describes a run the week never had.
        */
       /* § D1360: the bar is inert while an attempt stands; this is the press refusing as well. */
       if (dataHost.attemptHold() !== undefined) return;
       const presses = tunePresses(standingBuilding, pattern, standing, tune);
-      if (presses.building !== undefined) dataHost.applyBuildingSpec(presses.building);
-      if (presses.pattern !== undefined) dataHost.applyPatternSpec(presses.pattern);
-      dataHost.startRun();
+      /*
+       * **And the run is a sandbox day's whenever anything moved** — wave AO,
+       * [§ D1368](../../../../DECISIONS.md). `runSandbox` parks the week behind a copy of its day and
+       * puts it back when the player leaves the stage and the report, so nothing the sandbox does
+       * reaches the week, in the page or on disk. With nothing moved the press is the brief's own
+       * (`playDay`): an untouched tuner runs the day, and `startRun` here began no attempt, so the day
+       * could be watched to its end from this screen and then begun again from the brief (§ D1218).
+       */
+      if (sandboxMoves(presses)) dataHost.runSandbox(presses);
+      else dataHost.playDay();
       context.go('stage');
     },
     unmount: () => {

@@ -596,6 +596,8 @@ import {
 } from '../authoring/machineSpec.js';
 import {
   DEFAULT_PATTERN,
+  demandFromSpec,
+  demandTheTemplateTakes,
   PATTERN_ROWS,
   patternSummary,
   PEAK_ORDERS,
@@ -744,6 +746,7 @@ import {
   PRACTICE_ATTEMPT_NOTE,
   PRACTICE_ENGINEER_NOTE,
   PRACTICE_OTHER_TAB_NOTE,
+  PRACTICE_SANDBOX_NOTE,
   type DayReportInput,
   type ShapedDayReport,
   type ShiftPlan,
@@ -3931,6 +3934,8 @@ const SHIFT_REPORT: SurfaceAdapter = {
      */
     'shift/report.ts#PRACTICE_ENGINEER_NOTE',
     'shift/report.ts#PRACTICE_OTHER_TAB_NOTE',
+    /* Wave AO, lane AO-2, § D1368: a sandbox day's sheet, by name for the same reason. */
+    'shift/report.ts#PRACTICE_SANDBOX_NOTE',
     'shift/callRow.ts#PRESS_CALL_LATER_NOTE',
     'shift/dayCalls.ts#dayCallCountsLineOf',
     'shift/goals.ts#GOAL_PLAIN_NAMES',
@@ -4303,6 +4308,8 @@ const SHIFT_REPORT: SurfaceAdapter = {
       /* § D1239's two practice notes, by name — see the `covers` entries above. */
       seeds.push({ field: `${at}.practiceEngineerNote`, text: PRACTICE_ENGINEER_NOTE, role: 'prose' });
       seeds.push({ field: `${at}.practiceOtherTabNote`, text: PRACTICE_OTHER_TAB_NOTE, role: 'prose' });
+      /* § D1368's sandbox day sheet, by name — see the `covers` entry above. */
+      seeds.push({ field: `${at}.practiceSandboxNote`, text: PRACTICE_SANDBOX_NOTE, role: 'prose' });
       /* Wave AL: the title line after a handover, on the run's own clock. */
       seeds.push({
         field: `${at}.driversLine(handover)`,
@@ -4712,6 +4719,8 @@ const AUTHORING: SurfaceAdapter = {
     'authoring/patternSpec.ts#rowsFor',
     'authoring/patternSpec.ts#DEFAULT_PATTERN',
     'authoring/patternSpec.ts#specFromTrafficProfile',
+    /* Wave AO, lane AO-2, § D1368: what a saved pattern's run says it left out on an authored day. */
+    'authoring/patternSpec.ts#demandTheTemplateTakes',
   ],
   render(context) {
     const seeds: TextSeed[] = [];
@@ -4865,6 +4874,19 @@ const AUTHORING: SurfaceAdapter = {
       role: 'observation',
     });
     seeds.push({ field: 'DEFAULT_PATTERN.name', text: DEFAULT_PATTERN.name, role: 'label' });
+    /*
+     * § D1368: the withheld sentence a saved pattern's run carries on a day that authors its hours
+     * and keeps its own mix, for each order (the two-way order writes a mix swing and no split).
+     */
+    for (const order of PEAK_ORDERS) {
+      const taken = demandTheTemplateTakes(demandFromSpec({ ...DEFAULT_PATTERN, order }).demand, {
+        authorsItsPhases: true,
+        variesMix: true,
+      });
+      if (taken.withheld !== undefined) {
+        seeds.push({ field: `demandTheTemplateTakes(${order})`, text: taken.withheld, role: 'reason' });
+      }
+    }
 
     /* ---- M8, the dispatcher ---- */
     for (const [choice, hint] of Object.entries(DWELL_HINTS)) {
@@ -14775,6 +14797,8 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     'everyday/briefView.ts#BRIEF_NOTE_LEAD',
     'everyday/briefView.ts#raceAgainstCard',
     'everyday/briefView.ts#lockedForScore',
+    /* § D1368: the controls the locked card's caveat names, seeded through each case's brief card. */
+    'everyday/tunerModel.ts#tuneControlsOffered',
     /* GitHub issue #225's door into the sandbox, drawn on the brief once the tuner is built. */
     'everyday/briefView.ts#SANDBOX_DOOR_LABEL',
     /* GitHub issue #364: § D525's Scenario hub — the words the first tile opens on. */
@@ -18107,6 +18131,9 @@ function seedWeekStake(
   /* `onward`: the next week whatever the case's readings did, since a week not held is dealt itself again (§ D1344). */
   const freshWeek = continueWeekEntryOf(rollWeek(week, true), 'Midtown Office');
   if (freshWeek !== undefined) seeds.push({ field: 'week.continue.freshWeek', text: freshWeek.line, role: 'observation' });
+  /* Wave AO, lane AO-2, § D1369: a first week whose first day is begun, offered before anything is filed. */
+  const begun = continueWeekEntryOf(openWeek('c2'), 'Midtown Office', true);
+  if (begun !== undefined) seeds.push({ field: 'week.continue.dayBegun', text: begun.line, role: 'observation' });
   seeds.push({ field: 'week.sheetStep.label', text: WEEK_SHEET_STEP.label, role: 'label' });
   seeds.push({ field: 'week.sheetStep.note', text: WEEK_SHEET_STEP.note, role: 'prose' });
   seeds.push({ field: 'week.startNext', text: WEEK_START_NEXT_LABEL, role: 'label' });

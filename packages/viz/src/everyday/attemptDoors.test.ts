@@ -98,8 +98,6 @@ const DOORS: Readonly<Record<keyof EverydayHost, Door>> = Object.freeze({
   editedDispatcher: 'reads',
   elevatorSpecs: 'reads',
   buildingSpec: 'reads',
-  patternSpec: 'reads',
-  doorDwell: 'reads',
   plainLevers: 'reads',
   dispatcherProfilesFile: 'reads',
   workingSpec: 'reads',
@@ -155,8 +153,11 @@ const DOORS: Readonly<Record<keyof EverydayHost, Door>> = Object.freeze({
   campaignDay: 'reads',
   answerIncident: 'elsewhere',
   applyBuildingSpec: 'held',
-  applyPatternSpec: 'held',
-  setDoorDwell: 'held',
+  /* § D1368's sandbox day plays the day's crowd, so it is held while an attempt stands (joined at integration). */
+  sandboxStanding: 'reads',
+  runSandbox: 'held',
+  /* Puts the parked week back; it runs nothing and writes only the sandbox day's own week away. */
+  leaveSandbox: 'elsewhere',
   watchableRuns: 'reads',
   dailyBoard: 'reads',
   chimeBalance: 'reads',
@@ -316,8 +317,7 @@ const HELD_PRESSES: Readonly<Record<string, (host: EverydayHost) => unknown>> = 
     if (spec === undefined) throw new Error('the standing building has no spec');
     return host.applyBuildingSpec(spec);
   },
-  applyPatternSpec: (host) => host.applyPatternSpec(host.patternSpec()),
-  setDoorDwell: (host) => host.setDoorDwell('patient'),
+  runSandbox: (host) => host.runSandbox({ building: undefined, pattern: undefined, dwell: { choice: 'patient' } }),
   takeCallAgain: (host) => host.takeCallAgain(),
   playThisCrowd: (host) =>
     host.playThisCrowd({ id: 'doors', record: watchRecordOf({ ...BASE, seed: BASE.seed + 1n }, RESOURCES) } as unknown as WatchableRun),

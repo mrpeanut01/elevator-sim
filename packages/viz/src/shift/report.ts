@@ -608,6 +608,17 @@ export const PRACTICE_OTHER_TAB_NOTE =
   'so this run banks nothing.';
 
 /**
+ * **What a sandbox day's sheet says** — wave AO, lane AO-2, [§ D1368](../../../../DECISIONS.md). The
+ * post-AN panel's seat D could not reach one (no change simulated); once a change could, the close
+ * read *Monday — day 1, Shift missed* over *Open the doors on Tuesday* and *Today stays in your week
+ * exactly as it is*, which said the sandbox had filed the day. No digit, for {@link PRACTICE_NOTE}'s
+ * reason.
+ */
+export const PRACTICE_SANDBOX_NOTE =
+  'A sandbox day. It ran with the changes you made, so it banks nothing: your week is still on this ' +
+  'day, exactly as you left it.';
+
+/**
  * One run, belonging to no week — the same figures, the same diagnosis, the same levers and the
  * same small print, with the week's five statements **absent** and two single-run ones in their
  * place. See the module docstring.
@@ -877,6 +888,13 @@ export interface DayReportInput {
    * the other tab wrote, which has already been moved on or can be from the door.
    */
   readonly practiceOtherTab?: boolean | undefined;
+  /**
+   * **A sandbox day's close** — wave AO, lane AO-2, [§ D1368](../../../../DECISIONS.md),
+   * `shift/scoredCrowd.ts#practiceGroundOf`'s `'sandbox'`. The sheet says
+   * {@link PRACTICE_SANDBOX_NOTE} and offers no next day: the week the sandbox stood over is still on
+   * this day, and it is put back the moment the player leaves the report.
+   */
+  readonly practiceSandbox?: boolean | undefined;
   /**
    * The ordinary day's calls, in the order they were raised — [§ D1138](../../../../DECISIONS.md)
    * clause 3. One row each after § D1029's, from the three runs that admitted it
@@ -1415,15 +1433,17 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
     clockOf: (simTimeS) => clockOf(simTimeS, dayStartS),
   });
   const practiceNote =
-    input.practiceOtherTab === true
-      ? PRACTICE_OTHER_TAB_NOTE
-      : input.practiceEngineer === true
-        ? PRACTICE_ENGINEER_NOTE
-        : input.practiceAttempt === true
-          ? PRACTICE_ATTEMPT_NOTE
-          : input.practiceCrowd === undefined
-            ? PRACTICE_NOTE
-            : PRACTICE_CROWD_NOTE;
+    input.practiceSandbox === true
+      ? PRACTICE_SANDBOX_NOTE
+      : input.practiceOtherTab === true
+        ? PRACTICE_OTHER_TAB_NOTE
+        : input.practiceEngineer === true
+          ? PRACTICE_ENGINEER_NOTE
+          : input.practiceAttempt === true
+            ? PRACTICE_ATTEMPT_NOTE
+            : input.practiceCrowd === undefined
+              ? PRACTICE_NOTE
+              : PRACTICE_CROWD_NOTE;
   return {
     ...core,
     of: 'week-day',
@@ -1438,7 +1458,8 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
     (input.practiceCrowd !== undefined ||
       input.practiceAttempt === true ||
       input.practiceEngineer === true ||
-      input.practiceOtherTab === true)
+      input.practiceOtherTab === true ||
+      input.practiceSandbox === true)
       ? { dayStaysOpen: true }
       : {}),
     ...weekMarksOf(week, practice),

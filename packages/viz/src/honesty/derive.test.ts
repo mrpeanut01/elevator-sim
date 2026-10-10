@@ -1140,6 +1140,17 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'shift/week.ts#PARKED_WEEKS_MAX',
         'shift/week.ts#switchWeek',
         'everyday/replay.ts#replayPatchOf',
+        /*
+         * Wave AO, lane AO-2, § D1368: the sandbox day's week. `SANDBOX_DAY_CONTRACT_ID` is the
+         * string `sandbox-day`, derived for `FREE_PLAY_CONTRACT_ID`'s reason (the hyphen), and the
+         * list of mode weeks and the function that opens one inherit it; neither authors a sentence.
+         * What a player reads about a week carrying it is `coachWeekLines`' sandbox branch, driven
+         * through `WEEK_CONTRACT_SENTINELS`, and on the stage and the sheet the sandbox practice
+         * sentences, driven through `PRACTICE_DAY_SENTENCES` and `PRACTICE_SANDBOX_NOTE`.
+         */
+        'shift/week.ts#SANDBOX_DAY_CONTRACT_ID',
+        'shift/week.ts#MODE_WEEK_CONTRACT_IDS',
+        'shift/week.ts#openSandboxDay',
       ],
     },
     {

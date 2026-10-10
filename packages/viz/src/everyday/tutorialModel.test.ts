@@ -52,7 +52,7 @@ const SHELL_SOURCE = read('packages/viz/src/everyday/shell.ts');
 const PROFILE_SOURCE = read('packages/viz/src/everyday/profile.ts');
 
 /** A player who has produced nothing. The one state § D476's condition is about. */
-const NOTHING_YET: TutorialProgress = { filedDays: 0, solvedCases: 0, ratings: 0, careerDays: 0 };
+const NOTHING_YET: TutorialProgress = { filedDays: 0, solvedCases: 0, ratings: 0, careerDays: 0, daysBegun: 0 };
 
 describe('the gate is derived state, and § D476 says which kind', () => {
   it('is due for a player who has produced nothing, and for nobody else', () => {
@@ -62,16 +62,19 @@ describe('the gate is derived state, and § D476 says which kind', () => {
      * one of them moving closes the gate. Written as a sweep rather than four cases so a fifth
      * count added to `TutorialProgress` without a clause here fails to compile rather than passing
      * silently. The fourth, `careerDays`, is GitHub issue #600's (§ D1077): a player whose only
-     * play is the career is not a first arrival.
+     * play is the career is not a first arrival. The fifth, `daysBegun`, is § D1369's: a player with
+     * a day begun is not either.
      */
     for (const filedDays of [0, 1]) {
       for (const solvedCases of [0, 1]) {
         for (const ratings of [0, 1]) {
           for (const careerDays of [0, 1]) {
-            const progress: TutorialProgress = { filedDays, solvedCases, ratings, careerDays };
-            expect(tutorialIsDue(progress), JSON.stringify(progress)).toBe(
-              filedDays === 0 && solvedCases === 0 && ratings === 0 && careerDays === 0,
-            );
+            for (const daysBegun of [0, 1]) {
+              const progress: TutorialProgress = { filedDays, solvedCases, ratings, careerDays, daysBegun };
+              expect(tutorialIsDue(progress), JSON.stringify(progress)).toBe(
+                filedDays === 0 && solvedCases === 0 && ratings === 0 && careerDays === 0 && daysBegun === 0,
+              );
+            }
           }
         }
       }
@@ -96,6 +99,19 @@ describe('the gate is derived state, and § D476 says which kind', () => {
     );
     expect(careerDaysOf(afterOneDay)).toBe(1);
     expect(tutorialIsDue({ ...NOTHING_YET, careerDays: careerDaysOf(afterOneDay) })).toBe(false);
+  });
+
+  it('does not take a player with a day begun for a first arrival — § D1369', () => {
+    /*
+     * The post-AN panel's seat D (D4): a fresh player started the pinned Monday, reloaded before
+     * closing it, and met the landing page and the walkthrough over a day they could resume, because
+     * the gate read only what had been filed. Red before the fifth count: this arm was `true`.
+     */
+    expect(tutorialIsDue({ ...NOTHING_YET, daysBegun: 1 })).toBe(false);
+    /* And both gate sites read it from the attempt standing on the week, the one the brief resumes. */
+    for (const source of [SHELL_SOURCE, read('packages/viz/src/everyday/landingScreen.ts')]) {
+      expect(source).toMatch(/daysBegun: [^,]*\.dayAttempt\(\) === undefined \? 0 : 1/u);
+    }
   });
 
   it('counts a day filed in a week the player has since moved away from — § D1143', () => {
@@ -137,8 +153,9 @@ describe('the gate is derived state, and § D476 says which kind', () => {
       'string',
     );
     expect(/\bboolean\b/u.test(block ?? ''), block ?? '').toBe(false);
-    // And the four fields are counts, which is what makes them re-derivable on every load.
-    expect((block ?? '').match(/:\s*number;/gu) ?? []).toHaveLength(4);
+    // And the five fields are counts, which is what makes them re-derivable on every load. The
+    // fifth, `daysBegun`, is § D1369's, read off the attempt slot the brief resumes from.
+    expect((block ?? '').match(/:\s*number;/gu) ?? []).toHaveLength(5);
   });
 
   it('touches no storage of its own — nothing in the tutorial writes a key', () => {
@@ -181,8 +198,10 @@ describe('§ D476’s condition as § D993 amends it — leaving files nothing, 
       for (const solvedCases of [0, 1]) {
         for (const ratings of [0, 1]) {
           for (const careerDays of [0, 1]) {
-            const progress = { filedDays, solvedCases, ratings, careerDays };
-            if (tutorialIsDue(progress)) due.push(progress);
+            for (const daysBegun of [0, 1]) {
+              const progress = { filedDays, solvedCases, ratings, careerDays, daysBegun };
+              if (tutorialIsDue(progress)) due.push(progress);
+            }
           }
         }
       }
@@ -246,7 +265,7 @@ describe('§ D476’s condition as § D993 amends it — leaving files nothing, 
 
   /*
    * § D993's forward rule, at the two types a flag would arrive in. `TutorialProgress` is exactly the
-   * four counts, and `EverydayProgress` — the profile's persisted progress — is exactly its two
+   * five counts (the fifth, § D1369's, is the attempt standing, stored for the brief and not for this), and `EverydayProgress` — the profile's persisted progress — is exactly its two
    * lists, so a *tutorials watched* count cannot be added to either without this going red.
    */
   it('stores nothing whose only reader is the gate: the two progress types keep exactly their fields', () => {
@@ -256,6 +275,8 @@ describe('§ D476’s condition as § D993 amends it — leaving files nothing, 
       'solvedCases',
       'ratings',
       'careerDays',
+      /* § D1369: the day begun, read off `persist/attempt.ts`'s slot, which the brief resumes from. */
+      'daysBegun',
     ]);
     const profile = /export interface EverydayProgress \{([\s\S]*?)\n\}/u.exec(PROFILE_SOURCE)?.[1] ?? '';
     expect([...profile.matchAll(/readonly (\w+):/gu)].map((match) => match[1])).toEqual([

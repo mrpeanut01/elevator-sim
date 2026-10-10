@@ -45,10 +45,14 @@
  *
  * ## A sandbox run is never posted, and the screen says so
  *
- * It is not a claim this module makes about itself: `tunerScreen.ts`'s primary routes every building
- * change through the host's `applyBuildingSpec`, which selects the drawn tower through
- * `withBuilding` and puts the week on `shift/week.ts#SANDBOX_CONTRACT_ID`. That is the mechanism,
- * and {@link tuneSandboxStrip}'s sentence beside it is a description of it.
+ * It is not a claim this module makes about itself: `tunerScreen.ts`'s primary hands every change
+ * to the host's `runSandbox`, which stands the run on a copy of the day on
+ * `shift/week.ts#SANDBOX_DAY_CONTRACT_ID` with the week parked behind it, and puts the week back when
+ * the player leaves (`everyday/sandbox.ts`, [§ D1368](../../../../DECISIONS.md)). That is the
+ * mechanism, and {@link tuneSandboxStrip}'s sentence beside it is a description of it. It used to be
+ * `applyBuildingSpec` and `withBuilding`, which stood the **player's** week on
+ * `SANDBOX_CONTRACT_ID`; the save then wrote the sandbox over the week, which is the post-AN panel's
+ * seat D (D3).
  *
  * **And the converse now holds too, which it did not until GitHub issue #289.** The press was
  * unconditional, so *entering the sandbox and changing nothing* was also a sandbox run — the screen
@@ -73,6 +77,7 @@ import {
 import type { MachineClass } from '../authoring/machineSpec.js';
 import type { PatternSpec } from '../authoring/patternSpec.js';
 import type { ActionBarModel } from './actionBar.js';
+import type { SandboxPresses } from './sandbox.js';
 import { loadStepsFor, speedStepsFor, stepAtOrBelow } from './designerModel.js';
 import { speedFigure, type EverydayUnits } from './units.js';
 
@@ -152,52 +157,32 @@ export function movedKeys(from: TuneState, to: TuneState): readonly TuneKey[] {
 }
 
 /**
- * What *Run it and watch* writes before it runs — GitHub issue **#289**.
+ * What *Run it and watch* hands the sandbox — GitHub issue **#289**, and since wave AO
+ * ([§ D1368](../../../../DECISIONS.md)) each part only where its own controls moved.
  *
- * ## The defect: entering the sandbox and changing nothing re-measured the building
+ * ## The defect #289 closed: entering the sandbox and changing nothing re-measured the building
  *
  * The primary pressed `applyBuildingSpec(buildingWithTune(standing, tune))` **unconditionally**, on
  * every press, whether or not a control had been touched. `applyBuildingSpec` allocates a *fresh
- * id* and selects the result through `withBuilding`, so an untouched press turned
- * `garden-apartments` into `bld-1` — a document byte-identical to the one it was copied from,
- * wearing a name the matrix has never measured.
+ * id*, so an untouched press turned `garden-apartments` into `bld-1` — a document byte-identical to
+ * the one it was copied from, wearing a name the matrix has never measured, and
+ * `shift/reportWindow.ts#shiftReportWindowFor`, which is keyed on that name, handed the sheet back
+ * the five-minute band `docs/20` defect 5 moved Garden Apartments off. So with nothing moved,
+ * nothing is pressed, and the tuner's primary runs the day exactly as the brief's primary does.
  *
- * `shift/reportWindow.ts#shiftReportWindowFor` is keyed on that name. Garden Apartments is the one
- * shipped building whose every matrix cell declares `full-run`, and the reason is measured rather
- * than stylistic: at its rates the peak five minutes holds **0 to 25** arrivals of a day averaging
- * 38.6, so the narrow band is empty on 14 seeds in 500 and the sheet then withholds *both* headline
- * figures under *"the reporting window held no arrivals"*. Copied to `bld-1` the rule returns
- * `undefined` — *leave the template's band alone* — and `docs/20` defect 5 came back on the one
- * screen that had never been on `reportWindow.ts`'s list of callers. Measured: the same day, run
- * from the tuner, reported `peak-5min` where the scored route reported `full-run`.
+ * ## Why the parts are now separate, which #289 argued against
  *
- * ## Why the guard is *anything moved* rather than *the building moved*
- *
- * The narrower guard is the tempting one and it is wrong. Standing the week on
- * `shift/week.ts#SANDBOX_CONTRACT_ID` is something only `applyBuildingSpec` does — it is
- * `withBuilding`'s doing, and there is no other door to it. So a press that skipped the building
- * because only *How busy* had moved would run a **re-timed crowd against a scored assignment**:
- * {@link tuneSandboxStrip} would say *Sandbox — nothing counts* while `closeDay` banked the day
- * against Scenario 1. That is the forgery `dev/buildingEditor.ts#stateRunningSaved` exists to
- * prevent, arriving from the opposite direction, and it would have been a *new* defect shipped to
- * close this one.
- *
- * So one predicate decides everything: {@link movedKeys}. It already drives the strip, the stamp
- * and § 3.3's two-state note, and now it drives the presses too — which is what makes the screen and
- * the state agree **by construction** rather than by two authors remembering the same rule.
- *
- * ## Both documents or neither, and an untouched tuner runs the standing day
- *
- * {@link tunerBarModel}'s docstring already stated this as the contract — *"an untouched tuner runs
- * the standing day, which is what Scored day — three things are fixed means"* — and the code
- * contradicted it. It does not any more: with nothing moved, nothing is written, the run is the one
- * the daily loop would have made, and the id `shiftReportWindowFor` is asked about is the authored
- * one.
- *
- * A **genuinely tuned** building keeps the old behaviour exactly, including the fall-through to the
- * template's band, and that is correct rather than tolerated: a drawn tower has no matrix cell, and
- * inventing a window for a building nobody censused is what `reportWindow.ts`'s last paragraph
- * refuses.
+ * #289 pressed **both documents or neither**, and the reason was the mechanism of the day:
+ * standing the week on `SANDBOX_CONTRACT_ID` was something only `applyBuildingSpec` did, so a press
+ * that skipped the building because only *How busy* had moved would have run a re-timed crowd
+ * against a scored assignment. That reason is gone. The sandbox day is the host's own session now
+ * (`everyday/sandbox.ts`): whatever moved, the run stands on a sandbox day's week and the scored
+ * week is parked, so nothing is ever banked against the assignment. And pressing the building when
+ * only the crowd moved is now a defect of its own, because a copied tower is a different id: it
+ * loses the contract's rung, so a player who moved *How busy* met a tower with a different population
+ * and no booked car. So the tower goes only when one of its four moved, the pattern only when one of
+ * the crowd's two moved, and the dwell chip only when it moved; {@link movedKeys} still decides all
+ * three, and it is the same predicate the strip, the stamp and § 3.3's note read.
  *
  * @param building what is standing, as {@link tuneStateFrom} read it
  * @param pattern the demand that is standing, likewise
@@ -210,18 +195,76 @@ export function tunePresses(
   standing: TuneState,
   tune: TuneState,
 ): TunePresses {
-  if (movedKeys(standing, tune).length === 0) return { building: undefined, pattern: undefined };
-  return { building: buildingWithTune(building, tune), pattern: patternWithTune(pattern, tune) };
+  const moved = new Set(movedKeys(standing, tune));
+  const towerMoved = BUILDING_KEYS.some((key) => moved.has(key));
+  const crowdMoved = CROWD_KEYS.some((key) => moved.has(key));
+  return {
+    building: towerMoved ? buildingWithTune(building, tune) : undefined,
+    pattern: crowdMoved ? patternWithTune(pattern, tune) : undefined,
+    dwell: moved.has('dwell') ? { choice: tune.dwell } : undefined,
+  };
+}
+
+/** The four of the seven that live on the building document. */
+const BUILDING_KEYS: readonly TuneKey[] = ['floors', 'cars', 'speed', 'cap'];
+/** The two that live on the demand pattern. */
+const CROWD_KEYS: readonly TuneKey[] = ['rate', 'lobbyShare'];
+
+/**
+ * The parts {@link tunePresses} hands the primary. `undefined` is *press nothing*, which is a
+ * different instruction from *press this unchanged copy* — the copy takes a new id, which is the
+ * whole of issue #289. It is `everyday/sandbox.ts#SandboxPresses`, which the host's `runSandbox`
+ * takes as it stands.
+ */
+export type TunePresses = SandboxPresses;
+
+/* -------------------------------------------------------------------------- *
+ * What the screen offers on the day it is opened over
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The two facts about the day that decide which controls the tuner draws — wave AO
+ * ([§ D1368](../../../../DECISIONS.md)).
+ */
+export interface TuneOffer {
+  /**
+   * Whether the day's template keeps its own directional mix (`PlannedDay.templateVariesMix`). On
+   * such a day `core` refuses a split beside the template, so *Arriving at the lobby* would write
+   * nothing the run reads: the row is not drawn, and {@link TUNER_COPY}'s `lobbyShareIsTheDays`
+   * says why in its place. Every whole authored day is one (`office-day` declares a mix in every
+   * phase), which is why the row was a dead control on most Scenario days once the run could run.
+   */
+  readonly mixIsTheDays: boolean;
+  /**
+   * Whether the standing tower's machine class is one this build knows, which is when the machine
+   * card draws its speed and capacity ladders (`tunerScreen.ts#redraw`).
+   */
+  readonly machineSteps: boolean;
+}
+
+/** The rows of `card` the day lets the tuner offer — {@link TuneOffer.mixIsTheDays}. */
+export function tuneRowsOffered(card: TuneCard, offer: Pick<TuneOffer, 'mixIsTheDays'>): readonly TuneRow[] {
+  return card.rows.filter((row) => !(row.key === 'lobbyShare' && offer.mixIsTheDays));
 }
 
 /**
- * The documents {@link tunePresses} hands the primary. `undefined` is *press nothing*, which is a
- * different instruction from *press this unchanged copy* — the copy takes a new id and a new
- * contract, which is the whole of issue #289.
+ * **Every control the tuner draws on this day, by card, in the screen's own words** — the list the
+ * brief's *Locked for score* caveat names (the post-AN panel's seat D, D7). Read from
+ * {@link TUNE_CARDS} and {@link TUNER_COPY} rather than restated, so the brief cannot name a control
+ * the screen does not draw, or miss one it adds.
  */
-export interface TunePresses {
-  readonly building: BuildingSpec | undefined;
-  readonly pattern: PatternSpec | undefined;
+export function tuneControlsOffered(
+  offer: TuneOffer,
+): readonly { readonly card: string; readonly controls: readonly string[] }[] {
+  return TUNE_CARDS.map((card) => ({
+    card: card.name,
+    controls: [
+      ...tuneRowsOffered(card, offer).map((row) => row.label),
+      ...(card.dwellChips
+        ? [...(offer.machineSteps ? [TUNER_COPY.speedLabel, TUNER_COPY.capLabel] : []), TUNER_COPY.dwellLabel]
+        : []),
+    ],
+  })).filter((entry) => entry.controls.length > 0);
 }
 
 /* -------------------------------------------------------------------------- *
@@ -489,9 +532,9 @@ export interface TuneSandboxStrip {
  * The strip, **derived from what has moved** rather than from a toggle.
  *
  * The prototype has an *Unlock everything* button and a `sandbox` flag, and this build has neither:
- * a run becomes a sandbox run by the fact of the tower being drawn rather than by a switch, because
- * `applyBuildingSpec` selects a saved building through `withBuilding`, which puts the week on the
- * sandbox contract. So the strip reports the state the seven controls have already produced, which
+ * a run becomes a sandbox run by the fact of a control having moved rather than by a switch, because
+ * the host's `runSandbox` is what the primary presses whenever one has, and it stands the run on a
+ * sandbox day (`everyday/sandbox.ts`). So the strip reports the state the seven controls have already produced, which
  * is a statement about the run rather than a promise about it — and a switch beside it would be a
  * second, disagreeing, source for the same fact.
  */
@@ -527,6 +570,14 @@ export const TUNER_COPY = Object.freeze({
   stepsHint: 'Rated speed and capacity are steps within the machine class, not free numbers.',
   writesEyebrow: 'WHAT IT WRITES',
   noBuilding: 'the standing building is one this build does not know, so there is nothing to tune',
+  /**
+   * In place of *Arriving at the lobby* on a day whose template keeps its own mix — {@link TuneOffer}.
+   * Wave AO, [§ D1368](../../../../DECISIONS.md): once the run could run, the row wrote a split `core`
+   * refuses beside such a template, so it would have been a control that changes nothing.
+   */
+  lobbyShareIsTheDays:
+    'Arriving at the lobby is not offered on this day: the day sets who arrives where, hour by hour, ' +
+    'so the share through the lobby stays the day’s own.',
 } as const);
 
 /**
