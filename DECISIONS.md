@@ -41464,6 +41464,8 @@ somebody else's box.
 
 ## D886 — the dispatcher working copy reaches the run, and § D386's disclosure is superseded by wiring
 
+> **Status 2026-10-10: the remaining half is measured by [§ D1279](#d1279)** — under `collective` the patience lever moves the legs on 47 of 60 cells swept and is quiet on 13, this entry's among them, so no refusal is drawn and `adviceFor` stops promising an outcome.
+
 **Date: 2026-09-22 · Owner: lane AF-B (wave AF) · GitHub issue [#575](https://github.com/mrpeanut01/elevator-sim/issues/575) · Supersedes [§ D386](#d386)'s *"stay latent"* clause and nothing else in it · Binds `packages/viz/src/dev/state.ts`, `packages/viz/src/scope/surface.ts`, `packages/viz/src/scope/runIdentity.ts`, `packages/viz/src/everyday/rush.ts` and `packages/viz/src/dev/dispatcherEditor.ts`, so it is an entry rather than a docstring.**
 
 **Decision.** `dev/state.ts#drivingProfileOf` composes the run's profile from `state.dispatcherSpec` — every weight the term library declares, the three behaviour flags and the family moves — over the base `dispatcherId` names, while `state.editingDispatcherId` names that base. `scope/surface.ts` declares `viewer.dispatcherSpec` a **`within-day` control** and `viewer.editingDispatcherId` a `within-day` control with it. Every sentence the product draws about either field is derived through `scope/commitment.ts#commitmentOf`, so all of them changed themselves.
@@ -42156,6 +42158,8 @@ the kind of change that should arrive with its own test.
 ---
 
 ## D949 — The stage's parking press is not told to say it does nothing, because the derivation that would have let it say so is false
+
+> **Status 2026-10-10: AMENDED by [§ D1278](#d1278)** — the *no note* clause only: after a parking press whose re-simulated day has every leg the same as the day before it, the pressed arm draws a line saying so. No refusal before the press is added, and the refutation below stands.
 
 **Date: 2026-09-22 · Owner: lane AG-C · Lane block: D946–D960 · Under: [§ D227](#d227), [§ D177](#d177), [§ D256](#d256) · Cited by: `packages/viz/src/everyday/stageHandover.test.ts`**
 
@@ -49181,3 +49185,109 @@ gates and lets the desk open a day over a standing renewal.
 (the step went to `career-day`), green after. `everyday/campaignJourney.browser.test.ts`, *sends day
 18's sheet to the renewal, and runs no day past it from the sheet or the contract*: red before on the
 onward label, green after, with day 18 still running as the control arm.
+
+---
+
+## D1278 — a parking press that changed nobody's trip says so on the stage, after the press, from the run it made
+
+> **Taken 2026-10-10 by an agent session under delegated authority** (wave AN, lane AN-3, GitHub
+> issue [#588](https://github.com/mrpeanut01/elevator-sim/issues/588)), carrying out the route
+> [§ D949](#d949) itself names. It is not the product owner's. **Owner-reversible**: the sentence's
+> wording; judging on the legs alone rather than on the cars as well; drawing nothing for a press
+> after the last rider got off; and leaving the handover arm and the Engineer surface's parking
+> buttons without the line.
+
+**Why an entry.** [§ D405](#d405)'s second ground: it moves a recorded decision. § D949 ruled that
+*"§ 7.6's two parking arms are left exactly as they are. No refusal and no note is added to them."*
+This adds a note, so § D949 carries a status line and `docs/39` a row.
+
+**The defect.** A playability assessor pressed *spread the cars* on a day `zoned-uppeak` drove,
+measured 0 of 355 legs changed, and read nothing ([§ D913](#d913)). § D949 ruled out a refusal before
+the press (derived from the driving profile, it was false on 2 of 36 cells) and a simulation before
+the press (a whole run per arm per frame), and named the honest move: a statement drawn after the
+press, about a run that has happened.
+
+**Decision.** When a parking press's re-simulated day lands, the stage compares it with the day it
+replaces, which it is still holding, on the legs (`record/crowd.ts#sameLegs`: each leg's passenger,
+boarding and alighting instants). Where every leg is the same and somebody's trip was still open at
+the press, the pressed arm draws, in a slot of its own under the strip: *"That press changed
+nobody's trip: every rider boarded and got off at the same moment as on the day without it."* It
+stays while that press is the latest on the log and the playhead is at or past it.
+
+1. **No mechanism is offered**, on [§ D256](#d256)'s rule; why a value-identical override moves some
+   runs is still unmeasured.
+2. **It claims only what is compared.** Nothing is said about the cars, because the comparison does
+   not read them. On the sweep below, every pair with identical legs also had identical summaries
+   (energy included) and identical progress series, and every pair whose legs moved differed in
+   both; that bounds the choice at those cells and licenses no wider sentence.
+3. **No pre-press refusal is drawn**, so § D949's refutation stands and nothing reads the driving
+   profile's parking strategy.
+4. **It costs no simulation.** The pair already exists, and it is judged once per press in
+   `everyday/stageScreen.ts#adopt`; the frame loop only reads the verdict.
+
+**How often the line is earned.** Swept at `baseState()`'s seed over two buildings × three shift
+lengths × three dispatchers × both arms, pressed at 28 % of the shift and compared on the legs:
+14 of 36 pressed pairs changed no leg, among them all six at `midtown-office` 900 s. In the
+browser, on the walk's `midtown-office` day under `zoned-uppeak` (seed 424242, whole day), *spread
+the cars* at the opening changed no leg and *park the cars in the lobby* straight after did.
+
+**Pinned by runs.** `everyday/stageHandover.test.ts`'s three § D949 cells now read the row the stage
+draws: the line on the inert office cell, none on the live residential cell or the live office cell
+under `collective`. `everyday/stageScreen.browser.test.ts` presses both arms on the page and reads
+the legs before the line. `everyday/stageScreenModel.test.ts` holds the edges: a moved leg, a late
+press, two empty days, a later press, a playhead before the stamp, and a handover verdict, which
+lands on no parking row.
+
+## D1279 — under `collective` the workshop's patience and room levers are live on most days and quiet on some, so no dispatcher note is drawn and the advice stops promising an outcome
+
+> **Taken 2026-10-10 by an agent session under delegated authority** (wave AN, lane AN-3, GitHub
+> issue [#575](https://github.com/mrpeanut01/elevator-sim/issues/575)'s remaining half). It is not
+> the product owner's. **Owner-reversible**: the two advice sentences' wording, and drawing no
+> per-dispatcher note.
+
+**Why an entry.** [§ D405](#d405)'s second ground: it settles the half [§ D886](#d886) filed as
+measured rather than fixed, and it moves that entry's reading of its own cells. § D886 found the
+*patience* lever (`weights.starvation`) quiet under `collective` at every cell it tried and left a
+refusal waiting on *"a run across the operating space"*.
+
+**The run.** The shipped path (`applyPlainLever` → `shiftRunConfigOf` → `recordRun`), compared on
+the legs, over ten buildings (`garden-apartments`, `midtown-office`, `crown-hotel`, `secure-tower`,
+`chancery-house`, `harbour-point`, `ashgate`, `st-jude-hospital`, `mixed-use-high-rise`,
+`vertical-city`) × shift lengths 900, 1 800 and 3 600 s × days 1 and 10, seed 20 260 804, each
+lever moved from the profile's own value to 100:
+
+| profile | patience at 100 moves the legs | room at 100 moves the legs | `diversionDetour` at 100 |
+|---|---|---|---|
+| `collective` | **47 of 60** | 55 of 60 | 0 of 60 |
+| `collective-enroute` | **50 of 60** | 56 of 60 | 46 of 60 |
+
+Under `collective` the patience lever is quiet on all six `garden-apartments` cells, on
+`midtown-office` at 900 s (both days) and at 1 800 s day 1, and on four others; it moves on every
+`crown-hotel`, `harbour-point`, `st-jude-hospital`, `mixed-use-high-rise` and `vertical-city` cell.
+§ D886's cell (`midtown-office`, 900 s, day 1) is one of the quiet ones. Every one of the other eleven shipped profiles leaves
+both levers quiet at `garden-apartments` 900 s day 1 and moves both at `midtown-office` 900 s day 1.
+
+**Decision.**
+
+1. **No per-dispatcher note is drawn.** The lever is not inert under either constraint-carrying
+   profile; it is operating-point dependent, the same finding [§ D949](#d949) made of the parking
+   press. A note keyed on the dispatcher would be false on most cells, which is
+   [§ D227](#d227)'s worse half.
+2. **`authoring/dispatcherSpec.ts#adviceFor` stops promising an outcome.** The starvation branch
+   read *"Your worst wait falls"*, false on every quiet cell above; it now says what the term
+   prices (a car pays for delaying a call that has already waited a long time, aimed at the worst
+   wait rather than the average) and that on some days it changes nobody's trip, which the sweep
+   measured under every shipped profile. The load branch's *"will be sent"* is now *"can be
+   sent"*. The closing sentence's *"Twelve terms"* is derived from `core`'s registry (fourteen).
+3. **No mechanism is offered** for why a cell is quiet ([§ D256](#d256)).
+
+**Pinned by runs.** `everyday/workshopTravel.test.ts` pins patience quiet on `midtown-office`'s
+900 s and moving over its 3 600 s under `collective`, room quiet on `garden-apartments`' 900 s and
+moving on `midtown-office`'s, and requires the advice drawn at those weights to promise no
+outcome.
+
+**Not established, and left.** `diversionDetour` is quiet on all 60 `collective` cells and live on
+46 of 60 under `collective-enroute`; `core`'s own docstring and `dispatch/terms/liveness.test.ts`
+put the term outside its `activeWhen` without `eligibility.enRouteDiversion`, so a refusal beside
+that slider is available on § D112's footing, and is not drawn here. The day report's *Weight
+fairness up* card (`shift/report.ts`) still says *"Your worst wait falls; your average may not"*.

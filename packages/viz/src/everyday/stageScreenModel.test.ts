@@ -66,6 +66,7 @@ import {
   STAGE_RUN_FAILED_COPY,
   stageNextStretchOf,
   stageOpeningLineOf,
+  stagePressChangedNobody,
   stageSpeedAt,
   STAGE_ABSENCES,
   STAGE_ALARM_STANDING,
@@ -73,6 +74,7 @@ import {
   STAGE_DAY_OVER,
   STAGE_INTERVENTIONS,
   STAGE_NO_PHASE,
+  STAGE_PRESS_CHANGED_NOBODY,
   STAGE_RECOMPUTING,
   STAGE_SPEEDS,
   STAGE_SWITCH_NO_CHANGE,
@@ -630,6 +632,79 @@ describe('§ 7.6 — the intervention control', () => {
     expect(handover?.note).toBe('A day handed to Lobby anchor cannot be posted.');
     expect(handover?.refusal).toBeUndefined();
     expect(armsFor({ target: OTHER, driving: PLAIN }).rows.at(-1)?.note).toBeUndefined();
+  });
+
+  /* ------------------------------------------------------------------ *
+   * The parking press's line after the fact — GitHub issue #588, § D1278
+   * ------------------------------------------------------------------ */
+
+  /**
+   * **The judgement and the gate, on hand-built days** — the run-backed cells are
+   * `stageHandover.test.ts`'s, where the sentence is pinned against real legs at three operating
+   * points. These are the edges a run would take a whole sweep to reach: a press after everyone has
+   * got off, a kind the parking row does not offer, a later press, and a playhead before the stamp.
+   */
+  describe('the parking press says when it changed nobody’s trip — #588', () => {
+    const SPREAD: RunInterventionConfig = { atS: 100, change: { kind: 'spread-cars' } };
+    const day = (...legs: readonly ReturnType<typeof servedLeg>[]): VizRecording => syntheticRecording({ legs });
+    const same = day(servedLeg('p1', 10, 20, 40), servedLeg('p2', 90, 120, 150));
+
+    it('says it when the legs are the same and somebody was still travelling at the press', () => {
+      expect(stagePressChangedNobody({ before: same, after: same, press: SPREAD })).toBe(true);
+    });
+
+    it('stays silent when one leg moved, by any amount', () => {
+      const moved = day(servedLeg('p1', 10, 20, 40), servedLeg('p2', 90, 121, 150));
+      expect(stagePressChangedNobody({ before: same, after: moved, press: SPREAD })).toBe(false);
+    });
+
+    it('stays silent when nobody was left to change — a press after the last rider got off', () => {
+      const done = day(servedLeg('p1', 10, 20, 40), servedLeg('p2', 50, 60, 80));
+      expect(stagePressChangedNobody({ before: done, after: done, press: SPREAD })).toBe(false);
+      /* And over two empty days, which `sameLegs` already refuses. */
+      expect(stagePressChangedNobody({ before: day(), after: day(), press: SPREAD })).toBe(false);
+    });
+
+    it('lands on the parking arms only — a handover has its own refusal before the press', () => {
+      const handover: RunInterventionConfig = { atS: 100, change: { kind: 'adopt-dispatcher', profile: OTHER } };
+      const rows = stageInterventionsOf({
+        interventions: [handover],
+        simTimeS: 100,
+        hasRun: true,
+        dayClosed: false,
+        recomputing: false,
+        switchTo: { target: OTHER, driving: () => PLAIN },
+        pressChangedNobody: handover,
+      }).rows;
+      expect(rows.some((row) => row.note === STAGE_PRESS_CHANGED_NOBODY)).toBe(false);
+    });
+
+    const noteAt = (interventions: readonly RunInterventionConfig[], simTimeS: number) =>
+      stageInterventionsOf({
+        interventions,
+        simTimeS,
+        hasRun: true,
+        dayClosed: false,
+        recomputing: false,
+        pressChangedNobody: SPREAD,
+      }).rows.map((row) => [row.change.kind, row.note] as const);
+
+    it('draws the line on the pressed arm only, while that press is the latest and the playhead is past it', () => {
+      expect(noteAt([SPREAD], 100)).toEqual([
+        ['park-cars-lobby', undefined],
+        ['spread-cars', STAGE_PRESS_CHANGED_NOBODY],
+      ]);
+      /* Before the stamp the stamp names nothing, so the line has nothing to be about. */
+      expect(noteAt([SPREAD], 99).every(([, note]) => note === undefined)).toBe(true);
+      /* A later press is a different question, with no answer yet. */
+      const later: RunInterventionConfig = { atS: 200, change: { kind: 'park-cars-lobby' } };
+      expect(noteAt([SPREAD, later], 300).every(([, note]) => note === undefined)).toBe(true);
+      /* And with no verdict handed in, the constant rows exactly. */
+      expect(
+        stageInterventionsOf({ interventions: [SPREAD], simTimeS: 300, hasRun: true, dayClosed: false, recomputing: false })
+          .rows,
+      ).toEqual(STAGE_INTERVENTIONS);
+    });
   });
 
   /* ------------------------------------------------------------------ *

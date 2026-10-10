@@ -12113,6 +12113,12 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
     'everyday/stageScreenModel.ts#STAGE_SWITCH_PICKER_LABEL',
     'everyday/stageScreenModel.ts#STAGE_SWITCH_PICKER_NOTE',
     /*
+     * GitHub issue #588, § D1278: the parking row's line after a press that changed nobody's trip.
+     * Seeded below through `stageInterventionsOf` with a verdict handed in, which is the one arm that
+     * draws it.
+     */
+    'everyday/stageScreenModel.ts#STAGE_PRESS_CHANGED_NOBODY',
+    /*
      * GitHub issue #338: the sentence a handover row carries when its target cannot travel to a
      * board, drawn before the press. Rendered below on a hand-tuned target, which is the one
      * arm that produces it.
@@ -12488,6 +12494,31 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
             role: 'reason',
           });
         }
+      }
+    }
+    /*
+     * **The parking row's line after the fact** — GitHub issue #588, [§ D1278](../../../../DECISIONS.md).
+     * Drawn only once the stage has measured a press as changing nobody's trip, so it is reached by
+     * handing the model that verdict over a log whose latest entry is the press. `observation`,
+     * because it is a fact about a run that has happened; it orders nothing and estimates nothing.
+     */
+    {
+      const press: RunInterventionConfig = { atS: recording.startedAt, change: { kind: 'spread-cars' } };
+      const after = stageInterventionsOf({
+        interventions: [press],
+        simTimeS: recording.startedAt,
+        hasRun: true,
+        dayClosed: false,
+        recomputing: false,
+        pressChangedNobody: press,
+      });
+      for (const arm of after.rows) {
+        if (arm.note === undefined) continue;
+        seeds.push({
+          field: `stage.intervene(unchanged).${arm.change.kind}.note`,
+          text: arm.note,
+          role: 'observation',
+        });
       }
     }
     seeds.push({

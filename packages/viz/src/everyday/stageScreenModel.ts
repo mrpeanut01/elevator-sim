@@ -105,6 +105,7 @@ import {
 } from '../live/interventions.js';
 import { clockAt, phaseAt, timelineOf } from '../live/timeline.js';
 import type { LiveObservations, WaitBandId } from '../live/types.js';
+import { sameLegs, type CrowdSource } from '../record/crowd.js';
 /*
  * The rail's goal fold, imported rather than reimplemented — [§ D371](../../../../DECISIONS.md)'s
  * *"never a second implementation"*. `goalRowsOf` is one of the pure functions `dev/leftRail.ts`
@@ -1134,6 +1135,10 @@ export interface StageInterventionRow {
    * disabling nothing — GitHub issue #338, § D486's fourth criterion: a handover that cannot be
    * posted says so while the day is still being played, not at the moment they try to post. A
    * refusal stops a press; a note lets it through with its consequence stated.
+   *
+   * **A parking arm's note is the one drawn after a press rather than before it** — GitHub issue
+   * #588, [§ D1278](../../../../DECISIONS.md): {@link STAGE_PRESS_CHANGED_NOBODY}, a measured fact
+   * about the press the stamp names. It disables nothing either.
    */
   readonly note?: string | undefined;
 }
@@ -1167,6 +1172,67 @@ export const STAGE_INTERVENTIONS: readonly StageInterventionRow[] = Object.freez
     explains: PARKING_ARM_EXPLAINS,
   }),
 ]);
+
+/**
+ * **What the parking row says after a press that changed nobody's trip** — GitHub issue **#588**,
+ * [§ D1278](../../../../DECISIONS.md).
+ *
+ * A playability assessor pressed *spread the cars* on a day `zoned-uppeak` was driving, measured
+ * 0 of 355 legs changed, and read nothing on the screen: § D227's first polarity, a control that
+ * did nothing and did not say so. Two cheaper answers are ruled out by measurement, and both are
+ * recorded so nobody builds them a third time. A refusal **before** the press, derived from the
+ * driving profile's parking strategy, was false on 2 of 36 cells ([§ D949](../../../../DECISIONS.md),
+ * [§ D913](../../../../DECISIONS.md)); and simulating both arms before the press would cost a
+ * whole run per arm per frame.
+ *
+ * This sentence is the third answer, which § D949 names: a statement made **after** the press,
+ * about a run that has happened. The press already re-simulates the day, and the stage is holding
+ * the day it replaces, so the two are the with-and-without pair on the same seed at no extra cost.
+ * {@link stagePressChangedNobody} decides it on the legs, and the words claim exactly what that
+ * reads (who boarded and got off, and when) and nothing about why. No mechanism is offered,
+ * because none is measured ([§ D256](../../../../DECISIONS.md)); and nothing about the cars, because
+ * the comparison does not read them.
+ *
+ * It is one day on one seed, and it says so: *on the day without it* names the one counterfactual
+ * the stage holds. It is an identity on that pair rather than an estimate, so R2's replication rule
+ * has nothing to order.
+ */
+export const STAGE_PRESS_CHANGED_NOBODY =
+  'That press changed nobody’s trip: every rider boarded and got off at the same moment as on the day without it.';
+
+/**
+ * **Whether a parking press changed nobody's trip**, compared on the legs — GitHub issue #588,
+ * [§ D1278](../../../../DECISIONS.md).
+ *
+ * `before` is the day the stage was playing when the press landed, and `after` is the same day
+ * re-simulated with the press appended; `everyday/stageScreen.ts#adopt` holds both for one
+ * instant and asks this once, never per frame.
+ *
+ * **The comparison is `record/crowd.ts#sameLegs`, over the whole day**, which is the comparison
+ * from the press onward plus the prefix. The prefix is identical by construction (§ 1.4, and
+ * `stageHandover.test.ts` pins it on the shipped path), so reading it costs nothing and can only
+ * withhold the line. `sameLegs` is `false` for two empty days.
+ *
+ * **And somebody's trip has to have been open at the press**, or the sentence is true of a day in
+ * which nothing was left to change. A press stamped after the last rider got off changes nobody's
+ * trip vacuously; that is `stageHandover.test.ts`'s `LATE_IS_INERT` state, and saying so would be a
+ * check satisfied by nothing having happened, which `record/crowd.ts`'s own contract refuses.
+ *
+ * **Which arm the sentence lands on is not decided here.** This answers for any press; the row
+ * builder draws {@link STAGE_PRESS_CHANGED_NOBODY} only on the parking arm whose kind the press
+ * carries, so a handover judged here reaches no row (it has a refusal of its own before the press)
+ * and the dock's answer is never handed in.
+ */
+export function stagePressChangedNobody(input: {
+  readonly before: CrowdSource;
+  readonly after: CrowdSource;
+  readonly press: RunInterventionConfig;
+}): boolean {
+  const openAtPress = input.after.legs.some(
+    (leg) => leg.alightedAt === undefined || leg.alightedAt >= input.press.atS,
+  );
+  return openAtPress && sameLegs(input.before, input.after);
+}
 
 /**
  * The handover arm's title — the park arm's own sentence, with what a switch does to the player's
@@ -1280,6 +1346,17 @@ export interface StageInterventionInput {
    * that supplying it is the whole of what the screen has to do when the rung arrives.
    */
   readonly works?: StageWorksInput | undefined;
+  /**
+   * The parking press the caller **measured** as changing nobody's trip, or `undefined` — GitHub
+   * issue #588, [§ D1278](../../../../DECISIONS.md). Decided by {@link stagePressChangedNobody} once,
+   * when the re-simulated day landed, and handed in here on every frame after.
+   *
+   * Drawn as the pressed row's {@link StageInterventionRow.note} only while it is still the
+   * **latest** entry in {@link interventions} and the playhead is at or past it: a later press is a
+   * different question with no answer yet, and a playhead before the press is a stamp that does not
+   * name it.
+   */
+  readonly pressChangedNobody?: RunInterventionConfig | undefined;
 }
 
 /** One mid-run purchase a screen is offering — the priced change, and what it would do. */
@@ -1371,7 +1448,8 @@ export function stageInterventionsOf(input: StageInterventionInput): StageInterv
 function rowsOf(input: StageInterventionInput): readonly StageInterventionRow[] {
   const { switchTo } = input;
   const works = worksRowsOf(input);
-  if (switchTo === undefined) return Object.freeze([...STAGE_INTERVENTIONS, ...works]);
+  const parking = parkingRowsOf(input);
+  if (switchTo === undefined) return Object.freeze([...parking, ...works]);
   /*
    * The target's own refusal first — [§ D1048](../../../../DECISIONS.md): a handover that cannot
    * carry the landing panels or the bidding is refused on that ground whatever else is true of it,
@@ -1397,7 +1475,7 @@ function rowsOf(input: StageInterventionInput): readonly StageInterventionRow[] 
     switchTo.unpostable,
   ].filter((note): note is string => note !== undefined);
   return Object.freeze([
-    ...STAGE_INTERVENTIONS,
+    ...parking,
     Object.freeze({
       /*
        * `adopt-dispatcher` since [§ D1048](../../../../DECISIONS.md): the label says *Switch to X*,
@@ -1412,6 +1490,31 @@ function rowsOf(input: StageInterventionInput): readonly StageInterventionRow[] 
     }),
     ...works,
   ]);
+}
+
+/**
+ * The two parking arms, with {@link STAGE_PRESS_CHANGED_NOBODY} on the one that was pressed when
+ * the caller measured that press as changing nobody's trip — GitHub issue #588,
+ * [§ D1278](../../../../DECISIONS.md). The constant rows otherwise, unchanged.
+ *
+ * The note disables nothing: the press was a real control that happened to change no leg on this
+ * day, and pressing the other arm, or this one again later, is a different question.
+ */
+function parkingRowsOf(input: StageInterventionInput): readonly StageInterventionRow[] {
+  const press = input.pressChangedNobody;
+  const latest = input.interventions[input.interventions.length - 1];
+  const standing =
+    press !== undefined &&
+    latest !== undefined &&
+    latest.atS === press.atS &&
+    latest.change.kind === press.change.kind &&
+    input.simTimeS >= press.atS;
+  if (!standing) return STAGE_INTERVENTIONS;
+  return STAGE_INTERVENTIONS.map((row) =>
+    row.change.kind === press.change.kind
+      ? Object.freeze({ ...row, note: STAGE_PRESS_CHANGED_NOBODY })
+      : row,
+  );
 }
 
 /**

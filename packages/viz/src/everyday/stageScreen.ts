@@ -57,7 +57,7 @@
  * *Run this shift* performs, so the day it produces may file.
  */
 
-import type { DispatcherProfile, InterventionChange } from '@elevator-sim/core/browser';
+import type { DispatcherProfile, InterventionChange, RunInterventionConfig } from '@elevator-sim/core/browser';
 
 import { drawCutaway, sizeCanvas } from './cutaway.js';
 import { Playback } from '../playback/playback.js';
@@ -116,6 +116,7 @@ import {
   stageLegend,
   stageMayAdopt,
   stageOpeningLineOf,
+  stagePressChangedNobody,
   stageShowsOpening,
   stageSkipViewOf,
   stageSpeedAt,
@@ -473,6 +474,21 @@ function mountStage(
    * only signal the façade offers and the correct one — § 1.4's re-simulation keeps the `runId`.
    */
   let recomputingOver: VizRecording | undefined;
+  /**
+   * **The parking press whose re-simulation is in flight, and the verdict on the last one that
+   * landed** — GitHub issue #588, [§ D1278](../../../../DECISIONS.md).
+   *
+   * {@link intervene} writes `pendingPress` beside {@link recomputingOver}, so when {@link adopt}
+   * takes the re-simulated day it holds the day before the press, the day after it, and the press:
+   * the with-and-without pair on one seed, compared once on the legs by
+   * `stageScreenModel.ts#stagePressChangedNobody`. `pressChangedNobody` is that press when the
+   * answer was *nobody's trip changed*, and `undefined` otherwise; every adoption rewrites it, so a
+   * new day or a later answer never inherits an old verdict.
+   */
+  let pendingPress: RunInterventionConfig | undefined;
+  let pressChangedNobody: RunInterventionConfig | undefined;
+  /** What the parking note last said, so a frame that changes nothing writes nothing. */
+  let parkingNoteSaid = '';
   /** What § 14.1's band was last drawn for — see {@link drawWatching}. `''` while it is down. */
   let watchKey = '';
   /**
@@ -1205,6 +1221,16 @@ function mountStage(
   /* The handover arm's note — drawn, not a title, because a reason a player cannot see is not one. */
   const interventionNote = el(doc, 'span', 'everyday-stage-intervene-note');
   interventionNote.style.cssText = `font-size:11.5px;color:${C.warmGrey};flex-basis:100%`;
+  /*
+   * **The parking arms' note** — GitHub issue #588, [§ D1278](../../../../DECISIONS.md). A slot of its
+   * own, because `interventionNote` above is the handover row's and its one writer is
+   * {@link applySwitchRow}; a parking note written into it would be overwritten on the next frame.
+   * § D949's second ruled-out route was exactly this missing element: a note on a parking row was a
+   * string no surface rendered. Drawn text rather than a `title`, for the reason the handover note
+   * gives one line up.
+   */
+  const parkingNote = el(doc, 'span', 'everyday-stage-park-note');
+  parkingNote.style.cssText = `font-size:11.5px;color:${C.warmGrey};flex-basis:100%`;
   interventions.append(
     ...interventionButtons,
     switchPicker,
@@ -1213,6 +1239,7 @@ function mountStage(
     interventionStamp,
     interventionRefusal,
     interventionNote,
+    parkingNote,
   );
 
   /* --- § 7.4's strip. SVG rather than a second canvas: `raceLaneOf` computes polyline
@@ -2082,6 +2109,8 @@ function mountStage(
      * taking it. A change stamped at the Engineer transport's position would be filed at an instant
      * nobody was looking at.
      */
+    /* § D1278: the press, held until its day lands, so `adopt` can say whether it changed anybody's trip. */
+    pendingPress = { atS, change };
     withRecomputeBeat(current, () => {
       host.intervene(atS, change);
     });
@@ -2305,6 +2334,20 @@ function mountStage(
   function adopt(recording: VizRecording): void {
     const resumeAtS = recomputingOver !== undefined ? playback?.simTimeS : undefined;
     const wasPlaying = recomputingOver !== undefined && playback?.state === 'playing';
+    /*
+     * § D1278 — GitHub issue #588. The day before the press and the day after it are both in hand
+     * on this line and on no other, so the parking press is judged here, once: on the legs, by the
+     * model. Any other adoption (a new day, a call's answer, the dock's) leaves no press pending
+     * and so clears the verdict rather than carrying it onto a day it was not about.
+     */
+    const press = pendingPress;
+    pendingPress = undefined;
+    pressChangedNobody =
+      press !== undefined &&
+      recomputingOver !== undefined &&
+      stagePressChangedNobody({ before: recomputingOver, after: recording, press })
+        ? press
+        : undefined;
     adopted = recording;
     recomputingOver = undefined;
     barFacts.recomputing = false;
@@ -2676,8 +2719,25 @@ function mountStage(
       dayClosed: barFacts.dayClosed,
       recomputing: recomputingOver !== undefined,
       ...(target === undefined ? {} : { switchTo: target }),
+      ...(pressChangedNobody === undefined ? {} : { pressChangedNobody }),
     });
     applySwitchRow(view, sharedRefusalOf(view, watchingNow()) ?? callHeld());
+    applyParkingRows(view);
+  }
+
+  /**
+   * The parking arms' note, from the rows the model built — GitHub issue #588,
+   * [§ D1278](../../../../DECISIONS.md). One writer, called wherever the handover row is applied,
+   * and written only when its sentence changes (`AX-3`'s rule, which the stamp beside it keeps).
+   */
+  function applyParkingRows(view: StageInterventionView): void {
+    const said =
+      view.rows.find(
+        (row) => row.note !== undefined && STAGE_INTERVENTIONS.some((arm) => arm.change.kind === row.change.kind),
+      )?.note ?? '';
+    if (said === parkingNoteSaid) return;
+    parkingNote.textContent = said;
+    parkingNoteSaid = said;
   }
 
   /**
@@ -3037,6 +3097,7 @@ function mountStage(
       dayClosed: barFacts.dayClosed,
       recomputing: recomputingOver !== undefined,
       ...(target === undefined ? {} : { switchTo: target }),
+      ...(pressChangedNobody === undefined ? {} : { pressChangedNobody }),
     });
     /* Written only when the stamp changes — {@link stampSaid}, `AX-3`. */
     if (intervention.stamp !== stampSaid) {
@@ -3068,6 +3129,7 @@ function mountStage(
      * a filed day cannot be handed to anybody either.
      */
     applySwitchRow(intervention, refusal);
+    applyParkingRows(intervention);
 
     drawRace(recording, simTimeS);
     syncDock();

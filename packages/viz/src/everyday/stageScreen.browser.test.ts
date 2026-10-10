@@ -61,6 +61,7 @@ import { ACTION_BAR_ROWS } from './actionBar.js';
 import {
   DEFAULT_STAGE_SPEED_INDEX,
   STAGE_DAY_OVER,
+  STAGE_PRESS_CHANGED_NOBODY,
   STAGE_SKIP_COPY,
   STAGE_SPEEDS,
   stageSpeedAt,
@@ -875,6 +876,74 @@ describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
     /* *A re-simulation is not a reset* — the clock continues from the playhead. */
     expect(await page.textContent('.everyday-stage-clock')).not.toBe(opened);
     expect(await page.textContent('.everyday-stage-clock')).toBe(before);
+    await page.close();
+  });
+
+  /**
+   * **A parking press that changed nobody's trip says so, and one that changed somebody's does not** —
+   * GitHub issue **#588**, [§ D1278](../../../../DECISIONS.md).
+   *
+   * `stageHandover.test.ts` pins the sentence against the legs in node, at three operating points.
+   * What needs a document is the half no node case can vouch for: that the stage holds the day
+   * before the press when the re-simulated day lands, judges the pair, and draws the line in an
+   * element a player can read, which § D949 found missing (*"a note on a parking row is a string no
+   * surface renders"*).
+   *
+   * **The cell is measured, not assumed.** On this walk's `midtown-office` day under `zoned-uppeak`
+   * (seed 424242, the whole working day, contract `c2`), *spread the cars* pressed at the opening
+   * reproduces the legs byte for byte, and *park the cars in the lobby* pressed straight after it
+   * moves them. Both halves are asserted on the legs before the sentence is read, so the case cannot
+   * pass on a line that appears whatever the run did, and cannot pass on a line that never appears.
+   */
+  it('says after a parking press that it changed nobody’s trip, and only when it did not', async () => {
+    const page = await coldLoad('midtown-office', 'zoned-uppeak');
+    await enterEverydayStage(page);
+    const PARK_NOTE = '.everyday-stage-park-note';
+    /*
+     * **Press, then wait for the re-simulated day itself rather than for the log.** The host appends
+     * the press to its log at once and publishes the new recording when the worker returns, so a
+     * fingerprint read on `presses` alone reads the *old* legs beside the new count, and an inert
+     * press would pass on a day that was never re-simulated. The recording object is marked before
+     * the press and must be replaced, and the arm must be pressable again (the beat is down, so the
+     * stage has adopted and drawn the new day) before anything is read.
+     */
+    const pressAndLand = async (kind: string): Promise<RunFingerprint | null> => {
+      const arm = `.everyday-stage-intervene[data-intervention-kind="${kind}"]`;
+      await page.evaluate(
+        '(() => { window.__parkCaseBefore = window.__everydayHost.current().recording(); return true; })()',
+      );
+      await page.click(arm);
+      await page.waitForFunction(
+        (selector) =>
+          document.querySelector<HTMLButtonElement>(selector)?.disabled === false &&
+          (window as unknown as { __everydayHost: { current(): { recording(): unknown } }; __parkCaseBefore: unknown })
+            .__everydayHost.current()
+            .recording() !==
+            (window as unknown as { __parkCaseBefore: unknown }).__parkCaseBefore,
+        arm,
+        { timeout: 120_000 },
+      );
+      return runFingerprint(page);
+    };
+
+    const opened = await runFingerprint(page);
+    expect(opened?.presses).toBe(0);
+    /* Nothing pressed, nothing said. */
+    expect(await page.textContent(PARK_NOTE)).toBe('');
+
+    /* The inert press: the day comes back the same, on the legs, and the row says so. */
+    const spread = await pressAndLand('spread-cars');
+    expect(spread?.presses).toBe(1);
+    expect(spread?.hash).toBe(opened?.hash);
+    expect(await page.textContent('.everyday-stage-stamp')).toContain('spread the cars');
+    expect(await page.textContent(PARK_NOTE)).toBe(STAGE_PRESS_CHANGED_NOBODY);
+
+    /* The live press straight after it: the legs move, and the line goes rather than lingering. */
+    const parked = await pressAndLand('park-cars-lobby');
+    expect(parked?.presses).toBe(2);
+    expect(parked?.hash).not.toBe(spread?.hash);
+    expect(await page.textContent('.everyday-stage-stamp')).toContain('parked the cars');
+    expect(await page.textContent(PARK_NOTE)).toBe('');
     await page.close();
   });
 

@@ -40,6 +40,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import {
+  adviceFor,
   DEFAULT_LEVERS,
   specFromProfile,
   type DispatcherSpec,
@@ -256,6 +257,12 @@ describe('every plain lever’s scope declaration agrees with the legs it produc
    * mechanism in place of a measured one (§ D256), and a stale refusal aimed at a live control is
    * the half § D227 rates worse. So this is a pinned measurement at one cell and nothing more; what
    * would license the sentence is a run that shows the term inert across the operating space.
+   *
+   * **That run has been made, and it refutes the sentence** — [§ D1279](../../../../DECISIONS.md).
+   * Swept across ten buildings, three shift lengths and two days, the same lever under `collective`
+   * moves the legs on 47 of 60 cells (the office tower over a whole hour among them, below) and is
+   * quiet on 13. So the constraint makes the lever quiet *here*, which this case still pins, and does
+   * not make it inert: a per-dispatcher refusal would be false on most cells.
    */
   it('names why patience is quiet here, by isolating the one field that makes it so', () => {
     const base = workshopState();
@@ -596,5 +603,61 @@ describe('the ownership map this file reads off applyPlainLever', () => {
         dispatcherSpec: { ...base.dispatcherSpec, weights: { ...base.dispatcherSpec.weights, starvation: 7 } },
       }),
     ).toThrow(/wrote both/u);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * 5 — #575's remaining half: the levers under collective, and the advice beside them
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **The patience lever under `collective` is quiet at one operating point and live at another, and
+ * the advice drawn about it may promise neither** — GitHub issue #575, [§ D1279](../../../../DECISIONS.md).
+ *
+ * § D886 left this half open: under `collective` the *patience* lever was quiet at every cell
+ * tried, `authoring/dispatcherSpec.ts#adviceFor` still said *"Your worst wait falls"* at that weight,
+ * and a per-dispatcher refusal waited on a run across the operating space. The run was made (ten
+ * buildings, three shift lengths, two days, both constraint-carrying profiles) and it says the lever
+ * is **operating-point dependent**: quiet on the office tower's fifteen minutes and live over its
+ * whole hour, under the same dispatcher. So no refusal is drawn, and the advice is corrected to say
+ * what the term prices rather than what the run will do.
+ *
+ * Each case pins the sentence against the legs on the same states, which is this file's founding
+ * rule: neither half is asserted alone.
+ */
+describe('the levers under collective, against the advice drawn beside them — #575', () => {
+  const quiet = (): ViewerState => stateUnder('collective');
+  const hour = (): ViewerState => ({ ...stateUnder('collective'), shiftLengthS: 3600 });
+
+  it('patience changes no leg on the office tower’s fifteen minutes and moves them over its whole hour', () => {
+    expect(legsOf(withLever(quiet(), 'patience', 100))).toBe(legsOf(quiet()));
+    expect(legsOf(withLever(hour(), 'patience', 100))).not.toBe(legsOf(hour()));
+  });
+
+  /*
+   * The assessor's own setting: both weight-backed levers at 100, which is what reaches the
+   * starvation branch of the advice (the load branch outranks it while *room* is low). At this cell
+   * the patience lever alone changed nobody's trip, so a sentence promising that the worst wait
+   * falls is false here, and so is any sentence promising what the run will do.
+   */
+  it('so the starvation advice promises no outcome, at the cell where the lever changed nothing', () => {
+    const both = withLever(withLever(quiet(), 'patience', 100), 'room', 100);
+    const advice = adviceFor(both.dispatcherSpec);
+    expect(advice).toMatch(/^Starvation/u);
+    expect(advice).not.toMatch(/\bfalls?\b|\bwill\b/u);
+  });
+
+  /*
+   * The second lever #575 names, given the same treatment. *Room* moves the legs on the office tower
+   * and is quiet on the residential block's short day under the same dispatcher, so the advice drawn
+   * while it is low may say what can happen and not what will.
+   */
+  it('room is quiet on the residential block’s short day, and the load advice says can rather than will', () => {
+    const small: ViewerState = { ...stateUnder('collective'), buildingId: 'garden-apartments' };
+    expect(legsOf(withLever(small, 'room', 100))).toBe(legsOf(small));
+    expect(legsOf(withLever(quiet(), 'room', 100))).not.toBe(legsOf(quiet()));
+    const advice = adviceFor(small.dispatcherSpec);
+    expect(advice).toMatch(/^With load and crowding ignored/u);
+    expect(advice).not.toMatch(/\bwill\b/u);
   });
 });
