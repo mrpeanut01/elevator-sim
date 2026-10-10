@@ -282,6 +282,7 @@ import { watchingViewOf, type WatchingView } from '../watch/view.js';
 
 import type { DemandBand } from '../fixit/parse.js';
 import type { RushBest } from './rushScreenModel.js';
+import type { RushPostedStandings } from './rushHouse.js';
 import { heldClock, rushBeforeOf, rushBuildingOf, rushDisclosureOf, rushHoldAt, rushOutcomeOf, rushPatchOf, rushRestorePatchOf, rushStartLevelsOf, rushTopRatePctPop5min, rushWavesOutlastedOf, type RushBefore } from './rush.js';
 import { rushPurseBeforeNextOf, rushRebuildPressOf, rushTopUpClaimsOf, type RushRebuildInput } from './rushRebuild.js';
 import {
@@ -1926,6 +1927,12 @@ export interface EverydayHost {
    * deployment for the screen.
    */
   postRushSitting(): Promise<EverydayRushPostOutcome>;
+  /**
+   * The player's own best posted sitting on each of `buildingId`'s rush boards today, for the setup
+   * screen to draw among the house's rows — [§ D1359](../../../../DECISIONS.md). `silent` on a build
+   * with no server. Its non-test caller is `everyday/rushScreen.ts`.
+   */
+  rushPosted(buildingId: string): Promise<RushPostedStandings>;
 
   /**
    * Today's challenge and its board — GitHub issue #221's third criterion, *reachable without
@@ -2499,6 +2506,12 @@ export interface EverydayHostBindings {
    * the three things `boundaries.test.ts` will not let a screen or this file hold.
    */
   readonly postRushSitting?: ((body: RushSittingBody) => Promise<EverydayRushPostOutcome>) | undefined;
+  /**
+   * The signed-in player's own best posted sitting on each of a tower's rush boards today —
+   * [§ D1359](../../../../DECISIONS.md), `GET /api/rush-best`. Absent with no API origin, on
+   * {@link postRushSitting}'s rule; `dev/main.ts` holds the client and the token.
+   */
+  readonly readRushPosted?: ((buildingId: string) => Promise<RushPostedStandings>) | undefined;
   /**
    * What the account has bought and claims for the next rush sitting — GitHub issue #372,
    * [§ D640](../../../../DECISIONS.md). Read **once**, at the sitting's first press.
@@ -4468,6 +4481,11 @@ export function createEverydayHost(
       // answered with one of four would undo that at the last step (`postCurrentRun`'s own join).
       if (!check.ok) return { kind: 'refused', detail: check.reasons.join(' ') };
       return post(check.body);
+    },
+    /* § D1359: the player's own posted rows, read-only, and nothing to ask with no server. */
+    rushPosted: async (buildingId) => {
+      const read = b.readRushPosted;
+      return read === undefined ? { kind: 'silent' } : read(buildingId);
     },
     /* Read-only, and the same split. See {@link EverydayHost.challengeToday}. */
     challengeToday: async () => {

@@ -457,47 +457,77 @@ describe.skipIf(!HAS_BROWSER)('a campaign day, filed — issue #223', () => {
   }, 300_000);
 
   /**
-   * **No press runs a contract day past its renewal** — GitHub issue #582 item 3, § D1274.
+   * **The renewal falls due when day 20 closes, and days 19 and 20 play** — swarm DQ's Q4 ruling,
+   * § D1357, amending § D1274 clauses 1 to 3 (GitHub issue #582 item 3 is where the gate began).
    *
-   * The desk refuses to open day 19 until the renewal is answered, and two other doors ran it
-   * anyway. Measured on this bundle before the fix, with a career seeded on day 18: day 18's sheet
-   * offered *Open the doors on day 19 at Garden Apartments*, and the press landed on the stage with
-   * the dock reading *day 19 of 20*; and on day 19 the contract sheet's *Lock it in and run day 19*
-   * did the same while the desk said *needs a decision*. So both are driven here, by the presses a
-   * player has, and the second half is the polarity that says the sheet is not simply dead: its
-   * refusal names the reason and where the answer is given.
+   * Under § D1274 the renewal stood from day 19 and every door refused a contract day over it, so day
+   * 18's sheet sent the career to the desk and days 19 and 20 never ran, while the copy said *day 19
+   * of 20*. Red before on this bundle: day 18's sheet offered *Answer the renewal at …* rather than
+   * day 19. So the whole end of a month is driven here by the presses a player has: day 18's sheet
+   * opens day 19 and names the date, day 19's opens day 20, day 20's goes to the desk, the desk asks
+   * with its true date and no *while the day plays*, the contract sheet refuses the next month's day
+   * 1 with its reason, and an answer starts the month (the control: the same press then runs).
    */
-  it('sends day 18’s sheet to the renewal, and runs no day past it from the sheet or the contract — #582', async () => {
+  it('plays days 19 and 20, then holds the next month’s day 1 for the renewal — § D1357', async () => {
     const page = await coldLoadOnContractDay(18);
     await enterCampaign(page);
     const building = (await page.textContent('.everyday-towers-name')) ?? '';
     expect(building.length).toBeGreaterThan(0);
     await openDesk(page);
     await openContract(page);
-    /* Day 18 still runs: the renewal stands from day 19, so this press is the control arm. */
     expect(await page.textContent('.everyday-bar-primary')).toBe('Lock it in and run day 18');
     await runAndCloseTheDay(page);
 
-    /* The sheet of the day before says the renewal has come, on the button the player presses. */
+    /* Day 18's sheet opens day 19, and says when the renewal falls due. */
     const onward = page.locator('.everyday-report-tomorrow');
+    for (const [day, left] of [[19, '2 working days'], [20, '1 working day']] as const) {
+      expect(await onward.textContent()).toBe(`Open the doors on day ${String(day)} at ${building}`);
+      expect(await page.textContent('.everyday-report')).toContain(
+        `A renewal falls due when day 20 closes, in ${left}.`,
+      );
+      await onward.click();
+      await page.waitForSelector('.everyday-stage-canvas', { timeout: 60_000 });
+      expect(await page.textContent('.everyday-stage-dock-day')).toBe(`day ${String(day)} of 20`);
+      await closeTheDayOnStage(page);
+    }
+
+    /* Day 20's sheet goes to the desk, and runs nothing on the way. */
     expect(await onward.textContent()).toBe(`Answer the renewal at ${building}`);
-    expect(await page.textContent('.everyday-report')).toContain('The contract is up for renewal');
+    expect(await page.textContent('.everyday-report')).toContain('Day 20 has closed and the contract is up for renewal');
     await onward.click();
     await page.waitForSelector('.everyday-building', { timeout: 30_000 });
     expect(await page.locator('.everyday-stage-canvas').count()).toBe(0);
     expect(await page.textContent('.everyday-building')).toContain('The managing agent has offered a renewal');
-    expect((await monthFigures(page)).day).toBe(19);
+    expect(await page.textContent('.everyday-building-due')).toBe('answer before the next month’s day 1 runs');
+    expect((await monthFigures(page)).day).toBe(20);
+    expect(await page.textContent('.everyday-bar-primary')).toBe('Choose an option first');
+    const deskNote = (await page.textContent('.everyday-bar-note')) ?? '';
+    expect(deskNote).not.toContain('while the day plays');
+    expect(deskNote).not.toContain('⟨');
 
-    /* And the contract sheet's own press refuses, with the reason on the bar, rather than running day 19. */
+    /* The contract sheet refuses the next month's first day, with the reason on the bar. */
     await openContract(page);
     const primary = page.locator('.everyday-bar-primary');
-    expect(await primary.textContent()).toBe('Lock it in and run day 19');
+    expect(await primary.textContent()).toBe('Lock it in and run day 1');
     expect(await primary.isDisabled()).toBe(true);
     expect(await page.textContent('.everyday-bar-note')).toBe(CONTRACT_COPY.renewalFirst);
     await page.click('.everyday-bar-back');
     await page.waitForSelector('.everyday-towers', { timeout: 30_000 });
     await openDesk(page);
-    expect((await monthFigures(page)).day).toBe(19);
+
+    /* The control: an answer starts the month, and the same sheet's press is live again. */
+    await page.locator('.everyday-building-option', { hasText: 'Sign the renewal at their rate' }).click();
+    expect(await page.textContent('.everyday-bar-primary')).toBe('Send your answer');
+    await page.click('.everyday-bar-primary');
+    await page.waitForFunction(
+      () => !(document.querySelector('.everyday-building')?.textContent ?? '').includes('offered a renewal'),
+      undefined,
+      { timeout: 30_000 },
+    );
+    expect((await monthFigures(page)).day).toBe(1);
+    await openContract(page);
+    expect(await primary.textContent()).toBe('Lock it in and run day 1');
+    expect(await primary.isDisabled()).toBe(false);
 
     await page.close();
   }, 300_000);

@@ -1410,7 +1410,7 @@ function buildingBar(state: EverydayState): ActionBarModel {
   if (view === undefined) {
     return { ...base, primary: { ...base.primary, inert: NO_TOWER }, note: NO_TOWER };
   }
-  const [effectNote, travelNote] = base.noteVariants ?? [];
+  const [, travelNote] = base.noteVariants ?? [];
   if (view.need !== undefined) {
     const picked = view.options?.rows.find((row) => row.id === pickedOption);
     return {
@@ -1420,7 +1420,14 @@ function buildingBar(state: EverydayState): ActionBarModel {
         label: (picked === undefined ? chooseLabel : sendLabel) ?? base.primary.label,
         ...(picked === undefined ? { inert: NO_ANSWER_PICKED } : {}),
       },
-      note: picked?.effect ?? effectNote ?? travelNote,
+      /*
+       * The picked option's effect, or the press's own reason while nothing is picked —
+       * [§ D1357](../../../../DECISIONS.md). This fell back to the § 3.3 cell itself,
+       * `⟨the picked option's effect⟩`, which is a placeholder and is never drawn, and the cell after
+       * it (*you can answer while the day plays*) is not true of a desk whose press runs no day until
+       * it is answered. The renewal reached this arm on every month's end once days 19 and 20 played.
+       */
+      note: picked?.effect ?? NO_ANSWER_PICKED,
     };
   }
   return {
@@ -1842,13 +1849,17 @@ function contractBar(state: EverydayState): ActionBarModel {
       note: overNote ?? 'this month is over — the difficulty you pick sets the month',
     };
   }
-  /* § D1274: the renewal is the desk's, so this sheet runs no day over it and says why on the press. */
+  /*
+   * § D1274: the renewal is the desk's, so this sheet runs no day over it and says why on the press.
+   * Since § D1357 it stands once day 20 has closed, so the day the press would run is the next
+   * month's first, and the label names that day rather than a twenty-first.
+   */
   if (needOf(tower)?.kind === 'renewal') {
     return {
       ...base,
       primary: {
         ...base.primary,
-        label: (lockLabel ?? '').replace('⟨N⟩', String(tower.day)),
+        label: (lockLabel ?? '').replace('⟨N⟩', '1'),
         inert: CONTRACT_COPY.renewalFirst,
       },
       note: CONTRACT_COPY.renewalFirst,

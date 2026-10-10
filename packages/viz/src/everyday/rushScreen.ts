@@ -53,7 +53,7 @@ import {
   RUSH_FITTED_LINE,
   RUSH_SCREEN_COPY as COPY,
 } from './rushScreenModel.js';
-import { rushStandingsOf } from './rushHouse.js';
+import { rushStandingsOf, type RushPostedStandings, type RushYoursRowView } from './rushHouse.js';
 import { RUSH_PURSE } from './rushRebuild.js';
 import { mountWorkedAnswer } from './tutorialScreens.js';
 import {
@@ -206,6 +206,16 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
   const standingsBody = el(doc, 'div');
   bestsBlock.append(standingsBody);
   ink.append(bestsBlock);
+  /*
+   * **The player's own best posted sitting, among the house's rows** — swarm DQ's Q3 supporting
+   * payoff, [§ D1359](../../../../DECISIONS.md). Asked of the server once per mount, for the building
+   * standing at the mount, and drawn by {@link syncDriver} when it answers; until then, and on a build
+   * with no server, nothing is said. `alive` is the mount's own, so an answer landing after the
+   * player has left draws nothing.
+   */
+  let posted: RushPostedStandings = { kind: 'silent' };
+  let alive = true;
+  const askedFor = context.host.selection().buildingId;
 
   const drivingBlock = el(doc, 'div');
   drivingBlock.style.cssText = `margin-top:auto;border-top:1px solid ${INK_RULE};padding-top:18px`;
@@ -350,6 +360,7 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
       (id) => context.host.dispatcherById(id)?.name,
       undefined,
       selection.dispatcherId,
+      selection.buildingId === askedFor ? posted : { kind: 'silent' },
     );
     standingsBody.replaceChildren();
     if (standings.kind === 'withheld') {
@@ -362,7 +373,11 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
     houseNote.style.cssText = `font-size:11.5px;line-height:1.5;color:${C.label};margin:0 0 11px;text-wrap:pretty`;
     const bestsList = el(doc, 'div', 'everyday-rush-bests');
     bestsList.style.cssText = 'display:grid;gap:5px';
-    for (const standing of standings.rows) {
+    const yoursBefore = (index: number): void => {
+      for (const yours of standings.yours.filter((row) => row.before === index)) bestsList.append(yoursRow(yours));
+    };
+    for (const [index, standing] of standings.rows.entries()) {
+      yoursBefore(index);
       const row = el(doc, 'div', 'everyday-rush-best');
       row.style.cssText = `display:flex;align-items:baseline;gap:10px;padding:6px 11px;border-radius:${String(R.row)}px;background:${standing.heldThrough ? '#2A2620' : RAIL_SURFACE.card}`;
       const left = el(doc, 'span');
@@ -387,7 +402,37 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
       row.append(left, right);
       bestsList.append(row);
     }
+    yoursBefore(standings.rows.length);
     standingsBody.append(houseNote, bestsList);
+    if (standings.yoursLine !== undefined) {
+      const line = el(doc, 'p', 'everyday-rush-yours-note', standings.yoursLine);
+      line.style.cssText = `font-size:11.5px;line-height:1.5;color:${C.label};margin:11px 0 0;text-wrap:pretty`;
+      standingsBody.append(line);
+    }
+  }
+
+  /** One of the player's own rows, in the house rows' columns, tagged in words rather than colour alone. */
+  function yoursRow(yours: RushYoursRowView): HTMLElement {
+    const row = el(doc, 'div', 'everyday-rush-best everyday-rush-best-yours');
+    row.style.cssText = `display:flex;align-items:baseline;gap:10px;padding:6px 11px;border-radius:${String(R.row)}px;background:${RAIL_SURFACE.card};border:1px solid ${C.sun}`;
+    const left = el(doc, 'span');
+    left.style.cssText = 'min-width:0;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap';
+    const name = el(doc, 'span', undefined, yours.name);
+    name.style.cssText = 'font-size:12.5px;font-weight:600;min-width:0';
+    const tag = el(doc, 'span', 'everyday-rush-best-yours-tag', yours.tag);
+    tag.style.cssText = `flex:none;font:600 9.5px ${TYPE.mono};letter-spacing:.12em;text-transform:uppercase;color:${C.sun};border:1px solid ${C.sun};border-radius:${String(R.row)}px;padding:0 5px`;
+    const detail = el(doc, 'span', 'everyday-rush-best-yours-detail', yours.detail);
+    detail.style.cssText = `font-size:11px;color:${C.label};min-width:0`;
+    left.append(name, tag, detail);
+    const right = el(doc, 'span');
+    right.style.cssText = 'margin-left:auto;text-align:right;flex:none';
+    const wave = el(doc, 'span', undefined, yours.wave);
+    wave.style.cssText = `display:block;font:500 12.5px ${TYPE.mono};color:${C.sun}`;
+    const held = el(doc, 'span', undefined, yours.held);
+    held.style.cssText = `display:block;font:500 11px ${TYPE.mono};color:${C.label};margin-top:1px`;
+    right.append(wave, held);
+    row.append(left, right);
+    return row;
   }
 
   pickSelect.addEventListener('change', () => {
@@ -395,6 +440,18 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
     syncDriver();
   });
   syncDriver();
+  void context.host.rushPosted(askedFor).then(
+    (answer) => {
+      if (!alive) return;
+      posted = answer;
+      syncDriver();
+    },
+    () => {
+      if (!alive) return;
+      posted = { kind: 'unreachable' };
+      syncDriver();
+    },
+  );
 
   root.append(paper, ink);
   host.append(root);
@@ -415,6 +472,9 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
   mountWorkedAnswer(root, rushTutorialWorkedAnswerOf);
 
   return {
+    unmount: () => {
+      alive = false;
+    },
     /*
      * § 9.1's *Start the rush* — GitHub issue #220. The run first, the context second, the brief's
      * own order: a stage entered before a run was asked for would be a stage with nothing to play.

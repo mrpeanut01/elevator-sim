@@ -433,9 +433,15 @@ function renewalNeed(tower: CampaignTower): TowerNeed {
   return {
     kind: 'renewal',
     title: 'The managing agent has offered a renewal',
-    due: `answer by day ${String(CONTRACT_DAYS)}`,
+    /*
+     * The true date — [§ D1357](../../../../DECISIONS.md). This read *answer by day 20* while the
+     * renewal stood from day 19 and no door would run day 19 or day 20 over it, so the date it named
+     * was one the player could never reach. The renewal now falls due when day 20 closes, and what
+     * waits on the answer is the next month's first day, so that is the date the cell names.
+     */
+    due: RENEWAL_DUE_CELL,
     brief:
-      'The contract ends this week. Their rate is set by what this building costs to run and by the record you have on it — you can sign it, push it, take the machines apart while you are at it, or hand the building back and free the slot.',
+      `Day ${String(CONTRACT_DAYS)} has closed, so this contract has run its ${String(CONTRACT_DAYS)} days, and the next month’s first day does not run until you answer. Their rate is set by what this building costs to run and by the record you have on it — you can sign it, push it, take the machines apart while you are at it, or hand the building back and free the slot.`,
     options: [
       {
         id: 'sign',
@@ -520,14 +526,74 @@ function serviceNeed(): TowerNeed {
 }
 
 /**
+ * The desk's `due` cell over a standing renewal — [§ D1357](../../../../DECISIONS.md). Exported so
+ * the screens that name the same date read one sentence.
+ */
+export const RENEWAL_DUE_CELL = 'answer before the next month’s day 1 runs';
+
+/** How far ahead the quiet desk says when the renewal falls due — the five days it always said. */
+export const RENEWAL_AHEAD_ON_DESK_DAYS = 5;
+
+/**
+ * How far ahead the day report says it: the sheets of day 18 and day 19, which is how far ahead swarm
+ * DQ's Q4 ruling asked the sheet to name it ([§ D1357](../../../../DECISIONS.md)).
+ */
+export const RENEWAL_AHEAD_ON_SHEET_DAYS = 2;
+
+/**
+ * Whether the renewal stands: **once day 20 has closed**, which is `tower.day` past
+ * `CONTRACT_DAYS` — [§ D1357](../../../../DECISIONS.md), amending [§ D1274](../../../../DECISIONS.md).
+ *
+ * It stood from day 19 (*§ 8.9's day ≥ 19*), and § D1274 then made every door refuse a contract day
+ * while it stood. Together those meant days 19 and 20 never ran, while the dock read *day 19 of 20*
+ * and *sign* promised *another twenty days* (swarm DQ's S2, read from the code). So the last two
+ * days play, the renewal falls due when the last of them closes, and the next month's first day is
+ * what waits on the answer: {@link fileDay} already refuses a twenty-first day, and
+ * {@link answerNeed} is what starts the next month.
+ *
+ * The one place the rule is written. The desk, the report sheet's onward step, the contract sheet's
+ * refusal and the tower row all ask this, through {@link needOf} or directly, and none re-derives it
+ * from `day`.
+ */
+export function renewalIsDue(tower: Pick<CampaignTower, 'day'>): boolean {
+  return tower.day > CONTRACT_DAYS;
+}
+
+/**
+ * Working days still to run before the renewal falls due — `2` on day 19, `1` on day 20 and `0` once
+ * day 20 has closed. [§ D1357](../../../../DECISIONS.md); the count {@link nextLineOf} and the
+ * report sheet's note print.
+ */
+export function workingDaysBeforeRenewal(tower: Pick<CampaignTower, 'day'>): number {
+  return Math.max(0, CONTRACT_DAYS + 1 - tower.day);
+}
+
+/**
+ * The renewal still ahead of a running contract, as one sentence — *A renewal falls due when day 20
+ * closes, in 2 working days.* — or `undefined` once it has fallen due or while it is more than
+ * `withinDays` working days off. The quiet desk's next line carries it from five working days out
+ * ({@link RENEWAL_AHEAD_ON_DESK_DAYS}), and the day report's onward step from two
+ * ({@link RENEWAL_AHEAD_ON_SHEET_DAYS}, the sheets of days 18 and 19), so both say the same date in
+ * the same words ([§ D1357](../../../../DECISIONS.md)).
+ */
+export function renewalAheadSentenceOf(
+  tower: Pick<CampaignTower, 'day'>,
+  withinDays: number = Number.POSITIVE_INFINITY,
+): string | undefined {
+  const left = workingDaysBeforeRenewal(tower);
+  if (left === 0 || left > withinDays) return undefined;
+  return `A renewal falls due when day ${String(CONTRACT_DAYS)} closes, in ${String(left)} working ${left === 1 ? 'day' : 'days'}.`;
+}
+
+/**
  * What this building wants from you today, or `undefined` for § 8.11's silent one.
  *
- * Derived from the record, never drawn: a renewal is due once the contract is inside its last two
- * days (§ 8.9's *day ≥ 19*), and a service window once § 8.3's head says so. See the module
- * docstring for the two kinds this build cannot produce.
+ * Derived from the record, never drawn: a renewal once day 20 has closed ({@link renewalIsDue}), and
+ * a service window once § 8.3's head says so. See the module docstring for the two kinds this build
+ * cannot produce.
  */
 export function needOf(tower: CampaignTower): TowerNeed | undefined {
-  if (tower.day >= 19) return renewalNeed(tower);
+  if (renewalIsDue(tower)) return renewalNeed(tower);
   if (wearHeadOf(tower) === 'due') return serviceNeed();
   return undefined;
 }
@@ -540,10 +606,8 @@ export function needOf(tower: CampaignTower): TowerNeed | undefined {
  * either the window its trips are heading for or the renewal its days are.
  */
 export function nextLineOf(tower: CampaignTower): string {
-  const daysToRenewal = 19 - tower.day;
-  if (daysToRenewal <= 5) {
-    return `Nothing booked. A renewal falls due in ${String(daysToRenewal)} working days.`;
-  }
+  const ahead = renewalAheadSentenceOf(tower, RENEWAL_AHEAD_ON_DESK_DAYS);
+  if (ahead !== undefined) return `Nothing booked. ${ahead}`;
   if (wearHeadOf(tower) === 'wearing') {
     return 'Nothing booked. The machines are wearing in, and the window is not due yet.';
   }

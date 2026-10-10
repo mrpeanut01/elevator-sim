@@ -165,6 +165,7 @@ import {
   rushLeftBehindLine,
   rushOpeningLine,
   rushRebuildLineOf,
+  playerWaveAt,
 } from '../everyday/rushScreenModel.js';
 import {
   RUSH_PURSE,
@@ -173,7 +174,7 @@ import {
   rushRebuildViewOf,
   type RushRebuildInput,
 } from '../everyday/rushRebuild.js';
-import { RUSH_HOUSE_COPY, rushStandingsOf } from '../everyday/rushHouse.js';
+import { RUSH_HOUSE_COPY, RUSH_HOUSE_TABLE, rushStandingsOf } from '../everyday/rushHouse.js';
 import {
   TUNER_COPY,
   TUNE_CARDS,
@@ -318,13 +319,15 @@ import { buildingView, CONTRACT_COPY, contractView, towersView, type BuildingFac
 /* Wave AN lane AP-3's region — the Career's front page, § D1301. */
 import { TOWER_CARD_COPY, contractDocumentOf, type CampaignInput } from '../everyday/campaignModel.js';
 import { mootCountClause } from '../everyday/today.js';
-import { DIFFICULTIES, DIFFICULTY_IDS } from '../campaign/economy.js';
+import { CONTRACT_DAYS, DIFFICULTIES, DIFFICULTY_IDS } from '../campaign/economy.js';
 import type { TowerShafts } from '../campaign/economy.js';
 import {
   applyCampaignAction,
   CAMPAIGN_ABSENCES,
   freshTower,
   openingCareer,
+  RENEWAL_AHEAD_ON_SHEET_DAYS,
+  renewalAheadSentenceOf,
   type CampaignCareer,
   type CampaignTower,
 } from '../campaign/career.js';
@@ -8270,6 +8273,16 @@ const FIXIT: SurfaceAdapter = {
       seeds.push({ field: 'rail.par.kept', text: fixitParTagOf(parCase, parRow.units ?? 0) ?? '', role: 'label' });
       seeds.push({ field: 'rail.par.unrecorded', text: fixitParTagOf(parCase, undefined) ?? '', role: 'label' });
     }
+    /* § D1358: a free par says it is free, on the card and on the row, and a dearer fix reads the comparison. */
+    const freePar = Object.entries(FIXIT_PAR).find(([, row]) => row.units === 0);
+    if (freePar !== undefined) {
+      const [freeCase] = freePar;
+      seeds.push({ field: 'outcome.par.free', text: fixitParLineOf(freeCase, 0) ?? '', role: 'prose', provenance: 'authored' });
+      seeds.push({ field: 'outcome.par.free.dearer', text: fixitParLineOf(freeCase, 2) ?? '', role: 'prose', provenance: 'authored' });
+      seeds.push({ field: 'rail.par.free', text: fixitParTagOf(freeCase, 0) ?? '', role: 'label' });
+    }
+    /* § D1358: under a settled fixed card, how to run it again as practice. */
+    seeds.push({ field: 'practice.settled', text: FIXIT_SCREEN_COPY.practiceSettled, role: 'prose', provenance: 'authored' });
     /* § D1234: the mark's own words, by key, so the under-par tag is swept as well as the at-par one. */
     for (const [key, text] of Object.entries(PAR_MARK_COPY)) {
       seeds.push({ field: `par.mark.${key}`, text, role: 'label' });
@@ -8659,6 +8672,8 @@ const FIXIT: SurfaceAdapter = {
       /* § D1120: a check running on an order since edited gives the press back, and says what it stops. */
       ['supersedes', { ready: true, running: false, ran: true, solved: false, supersedes: true }],
       ['solved', { ready: true, running: false, ran: true, solved: true }],
+      /* § D1358: a fixed case whose order on screen has no fixed verdict of its own: practice. */
+      ['practice', { ready: true, running: false, ran: false, solved: false, fixed: true }],
     ] as const) {
       const row = fixitBarModel(barBase, view);
       seeds.push({ field: `bar.${where}.primary`, text: row.primary.label, role: 'label', provenance: 'authored' });
@@ -10462,6 +10477,35 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
       } else {
         seeds.push({ field: 'rush.house.refusal', text: standings.refusal, role: 'reason' });
       }
+      /*
+       * § D1359: the player's own best posted sitting among the house's rows, on a sitting placed at
+       * the first house row's hold, and every line that says why no row is theirs.
+       */
+      const firstBroke = RUSH_HOUSE_TABLE.runs.find(
+        (run) => run.buildingId === context.building.id && run.brokeAtS !== null,
+      )?.brokeAtS;
+      if (firstBroke !== undefined && firstBroke !== null) {
+        const withYours = rushStandingsOf(context.building.id, nameOf, undefined, undefined, {
+          kind: 'rows',
+          date: '2026-10-10',
+          sittings: [{ heldS: firstBroke, furthestWave: playerWaveAt(firstBroke), roundCount: 2, modifiers: [] }],
+        });
+        if (withYours.kind === 'rows') {
+          for (const yours of withYours.yours) {
+            seeds.push({ field: 'rush.yours.name', text: yours.name, role: 'label' });
+            seeds.push({ field: 'rush.yours.tag', text: yours.tag, role: 'label' });
+            seeds.push({ field: 'rush.yours.detail', text: yours.detail, role: 'label' });
+            seeds.push({ field: 'rush.yours.wave', text: yours.wave, role: 'observation' });
+            seeds.push({ field: 'rush.yours.held', text: yours.held, role: 'observation' });
+          }
+          if (withYours.yoursLine !== undefined) {
+            seeds.push({ field: 'rush.yours.note', text: withYours.yoursLine, role: 'prose' });
+          }
+        }
+      }
+      seeds.push({ field: 'rush.yours.none', text: RUSH_HOUSE_COPY.yoursNone, role: 'reason' });
+      seeds.push({ field: 'rush.yours.signedOut', text: RUSH_HOUSE_COPY.yoursSignedOut, role: 'reason' });
+      seeds.push({ field: 'rush.yours.unreachable', text: RUSH_HOUSE_COPY.yoursUnreachable, role: 'reason' });
       /* Both refusals on every case — a drawn building, and a table from a different climb. */
       seeds.push({ field: 'rush.house.withheld.unrun', text: RUSH_HOUSE_COPY.unrun, role: 'reason' });
       seeds.push({ field: 'rush.house.withheld.stale', text: RUSH_HOUSE_COPY.stale, role: 'reason' });
@@ -11242,6 +11286,13 @@ const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
     /* The record and its decisions — every option the desk offers is authored here. */
     'campaign/career.ts#needOf',
     'campaign/career.ts#nextLineOf',
+    /*
+     * § D1357: the renewal's true date — the desk's due cell, and the sentence the quiet desk and the
+     * day report's onward step share. Seeded through the month-end and last-days desks above and the
+     * career sheet's renewal-ahead arm.
+     */
+    'campaign/career.ts#RENEWAL_DUE_CELL',
+    'campaign/career.ts#renewalAheadSentenceOf',
     'campaign/career.ts#BUILD_LABELS',
     'campaign/career.ts#openingCareer',
     'campaign/career.ts#freshTower',
@@ -11294,7 +11345,8 @@ const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
     const first = openingCareer('eta');
     const worn: CampaignTower = {
       ...freshTower({ contractId: 'c6', buildingId: 'chancery-house', dispatcherId: 'mine', rate: 4 }),
-      day: 19,
+      /* Day 20 has closed, so the renewal stands on this desk (§ D1357; it stood from day 19 before). */
+      day: 21,
       missed: 1,
       months: 2,
       trips: 41_000,
@@ -11369,6 +11421,8 @@ const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
       WaitBandBasis,
     ])[] = [
       ['first-day', first, undefined, 'whole-run'],
+      /* § D1357: days 19 and 20 play, and the quiet desk says when the renewal falls due. */
+      ['last-days', { ...first, today: 19, towers: [{ ...first.towers[0]!, day: 19 }] }, undefined, 'whole-run'],
       ['second-month', { ...second, openTowerId: 'c6' }, observations, 'whole-run'],
       ['booked', booked, observations, 'now'],
       ['picking-a-night', pending, undefined, 'whole-run'],
@@ -14578,6 +14632,12 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     /* GitHub issue #364: § D525's Scenario hub — the words the first tile opens on. */
     'everyday/scenarioModel.ts#scenarioHubViewOf',
     'everyday/scenarioModel.ts#SCENARIO_COPY',
+    /*
+     * § D1358: why a cleared row earns no mark, seeded arm by arm on the first rung; the stage page
+     * words its verdict's par with the same two functions, and its adapter seeds those arms too.
+     */
+    'everyday/scenarioModel.ts#stageParNoteOf',
+    'everyday/scenarioModel.ts#stageParLineOf',
     'everyday/scenarioModel.ts#SCENARIO_ABSENCES',
     /*
      * The hub's two session shapes — GitHub issue #559, [§ D753](../../../../DECISIONS.md). They
@@ -15144,6 +15204,22 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
            * § D1234: the par mark, at and under par, on the first stage whose par is priced. A free
            * par is never marked, so a path with none priced seeds nothing here.
            */
+          /* § D1358: every arm a cleared row draws where it earns no mark, on the first rung, priced as asked. */
+          const noteRung = context.scenarioPath[0];
+          if (noteRung !== undefined) {
+            for (const [arm, parUnits, spent] of [
+              ['free', 0, 0],
+              ['free-dearer', 0, 2],
+              ['none', undefined, 2],
+              ['over', 4, 6],
+              ['unkept', 4, undefined],
+            ] as const) {
+              const row = scenarioHubViewOf([{ ...noteRung, parUnits }], new Set([noteRung.id]), () => spent).path?.rows[0];
+              if (row?.parNote !== undefined) {
+                seeds.push({ field: `${arm}.scenario.path.parNote`, text: row.parNote, role: 'prose' });
+              }
+            }
+          }
           const pricedRung = context.scenarioPath.find((rung) => rung.parUnits !== undefined && rung.parUnits > 0);
           if (pricedRung?.parUnits !== undefined) {
             const par = pricedRung.parUnits;
@@ -15376,16 +15452,24 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     /* The building's display name, as `careerOnwardOf` reads it, never its id. */
     const careerBuilding = context.buildings.find((building) => building.id === context.case.buildingId)?.name;
     if (careerSheet !== undefined && careerBuilding !== undefined) {
-      for (const [label, renewalDue] of [
-        ['next-day', false],
-        ['renewal', true],
+      for (const [label, day, renewalDue] of [
+        ['next-day', 12, false],
+        /* § D1357: day 18's sheet opens day 19 and says when the renewal falls due. */
+        ['renewal-ahead', 19, false],
+        ['renewal', CONTRACT_DAYS + 1, true],
       ] as const) {
         const view = everydayReportViewOf({
           report: careerSheet,
           previous: undefined,
           overnight: undefined,
           newerRunOnStage: false,
-          career: { buildingName: careerBuilding, day: 19, canRunAnother: true, renewalDue },
+          career: {
+            buildingName: careerBuilding,
+            day,
+            canRunAnother: day <= CONTRACT_DAYS,
+            renewalDue,
+            renewalAhead: renewalAheadSentenceOf({ day }, RENEWAL_AHEAD_ON_SHEET_DAYS),
+          },
         });
         if (view.tomorrow === undefined) continue;
         seeds.push({ field: `career.report.${label}.tomorrow.label`, text: view.tomorrow.label, role: 'label' });
@@ -17128,7 +17212,9 @@ const EVERYDAY_STAGE_PLAY: SurfaceAdapter = {
       building,
       elevatorSpecs: context.elevatorSpecs,
     };
-    const factsFor = (choice: StagePlayChoice, held?: string) =>
+    /* § D1358: the stage's own par off the hub's path, and whether this device holds its clear. */
+    const parUnits = context.scenarioPath.find((rung) => rung.id === stage.id)?.parUnits;
+    const factsFor = (choice: StagePlayChoice, held?: string, clearedBefore = false) =>
       stageFactsOf({
         stage,
         position: stages.indexOf(stage) + 1,
@@ -17140,6 +17226,8 @@ const EVERYDAY_STAGE_PLAY: SurfaceAdapter = {
         held,
         award: CHIME_AWARDS.awards['scenario-cleared'] ?? 0,
         choice,
+        parUnits,
+        clearedBefore,
       });
     const standing: StagePlayChoice = { profileId: baseline.id, parking: null };
     const overBudget = factsFor(standing).profiles.find((profile) => !profile.admitted);
@@ -17147,7 +17235,8 @@ const EVERYDAY_STAGE_PLAY: SurfaceAdapter = {
       cleared: boolean,
       metOnTuningSeeds: boolean,
       paid: 'first' | 'again' | undefined,
-    ): StagePlayVerdictFacts => ({ headline: '', goals: [], holdoutSentence: null, metOnTuningSeeds, cleared, paid });
+      spentUnits?: number,
+    ): StagePlayVerdictFacts => ({ headline: '', goals: [], holdoutSentence: null, metOnTuningSeeds, cleared, paid, spentUnits });
     const states: readonly (readonly [string, StagePlayChoice, StagePlayPhase, string | undefined])[] = [
       ['standing', standing, { kind: 'idle' }, undefined],
       ['parked', { profileId: baseline.id, parking: 'zone-center' }, { kind: 'idle' }, undefined],
@@ -17158,13 +17247,16 @@ const EVERYDAY_STAGE_PLAY: SurfaceAdapter = {
       ['running-holdout', standing, { kind: 'running', seedSet: 'holdout', completed: 50, total: 100 }, undefined],
       ['cleared-first', standing, { kind: 'judged', verdict: verdict(true, true, 'first'), stale: false }, undefined],
       ['cleared-again', standing, { kind: 'judged', verdict: verdict(true, true, 'again'), stale: false }, undefined],
+      /* § D1358: a clear's par arms — at the par, above it, and with no cost kept. */
+      ['cleared-at-par', standing, { kind: 'judged', verdict: verdict(true, true, 'again', parUnits ?? 0), stale: false }, undefined],
+      ['cleared-over-par', standing, { kind: 'judged', verdict: verdict(true, true, 'again', (parUnits ?? 0) + 2), stale: false }, undefined],
       ['met-not-held', standing, { kind: 'judged', verdict: verdict(false, true, undefined), stale: false }, undefined],
       ['missed-stale', standing, { kind: 'judged', verdict: verdict(false, false, undefined), stale: true }, undefined],
       ['failed', standing, { kind: 'failed' }, undefined],
       ['held', standing, { kind: 'idle' }, `${SCENARIO_LADDER_COPY.heldLead} ${SCENARIO_LADDER_COPY.heldBody}`],
     ];
     for (const [state, choice, phase, held] of states) {
-      const view = stagePlayViewOf(factsFor(choice, held), phase);
+      const view = stagePlayViewOf(factsFor(choice, held, state.startsWith('cleared-')), phase);
       const at = `stagePlay.${state}`;
       seeds.push({ field: `${at}.eyebrow`, text: view.eyebrow, role: 'label' });
       seeds.push({ field: `${at}.title`, text: view.title, role: 'prose' });
@@ -17186,6 +17278,7 @@ const EVERYDAY_STAGE_PLAY: SurfaceAdapter = {
         seeds.push({ field: `${at}.parking.${option.value ?? 'standing'}`, text: option.label, role: 'label' });
       }
       seeds.push({ field: `${at}.runNote`, text: view.runNote, role: 'prose' });
+      if (view.practice !== undefined) seeds.push({ field: `${at}.practice`, text: view.practice, role: 'prose' });
       if (view.status !== undefined) seeds.push({ field: `${at}.status`, text: view.status, role: 'prose' });
       if (view.verdict !== undefined) {
         seeds.push({ field: `${at}.verdict.head`, text: view.verdict.head, role: 'prose' });
@@ -17193,12 +17286,15 @@ const EVERYDAY_STAGE_PLAY: SurfaceAdapter = {
           seeds.push({ field: `${at}.verdict.holdout`, text: view.verdict.holdout, role: 'reason' });
         }
         if (view.verdict.pay !== undefined) seeds.push({ field: `${at}.verdict.pay`, text: view.verdict.pay, role: 'prose' });
+        if (view.verdict.par !== undefined) seeds.push({ field: `${at}.verdict.par`, text: view.verdict.par, role: 'prose' });
         if (view.verdict.unlock !== undefined) seeds.push({ field: `${at}.verdict.unlock`, text: view.verdict.unlock, role: 'prose' });
         if (view.verdict.stale !== undefined) seeds.push({ field: `${at}.verdict.stale`, text: view.verdict.stale, role: 'reason' });
       }
       seeds.push({ field: `${at}.lab`, text: view.labLink, role: 'label' });
       seeds.push({ field: `${at}.labNote`, text: view.labNote, role: 'prose' });
     }
+    /* § D1358: the bar's note on a stage this device has cleared. */
+    seeds.push({ field: 'stagePlay.bar.practice', text: STAGE_PLAY_COPY.notePractice, role: 'prose' });
     /* `verdictFactsOf` is the screen's only way to a verdict; touched so its claim is checked by compile. */
     void verdictFactsOf;
     void STAGE_PLAY_COPY.loading;

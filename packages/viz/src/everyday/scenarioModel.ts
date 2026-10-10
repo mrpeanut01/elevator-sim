@@ -110,6 +110,14 @@ export interface ScenarioPathRow {
    * It pays nothing, and it is never drawn on a free par, which every clear that buys nothing meets.
    */
   readonly parMark: string | undefined;
+  /**
+   * **Why a cleared row carries no mark** — [§ D1358](../../../../DECISIONS.md). Present exactly when
+   * the row is cleared and {@link parMark} is not: the par is free, the stage has no priced par, the
+   * clear cost more than the par, or its cost was not kept. The post-AM panel's seat C cleared stages
+   * 1, 6 and 8 and read nothing where stages 2, 3, 5 and 7 drew a mark (D6), so the row says which
+   * of the four it is.
+   */
+  readonly parNote: string | undefined;
 }
 
 /** The ordered path, drawn over the entries, or its absence. */
@@ -159,6 +167,14 @@ export const SCENARIO_COPY = Object.freeze({
   /** § D1234: what a par mark on a stage row is measured against, and that it pays nothing. */
   parBasis: 'the cheapest way through the census found on this stage’s page',
   parPays: 'Matching it or beating it pays nothing extra.',
+  /* § D1358: the arms a cleared row draws where it earns no mark. */
+  parFree:
+    'Par is free here: the cheapest way through the census found on this stage’s page costs nothing, so no clear is marked against it.',
+  parNone:
+    'This stage has no par: no way through the census found on its page could be priced, so no clear is marked against one.',
+  parUnkept: 'What your clear cost was not kept on this device, so it is not compared.',
+  /* § D1358: a cleared stage can be run again as practice. */
+  parPractice: 'Run it again as practice to chase it: a clear pays once, and a practice run can only move your mark up.',
 });
 
 function unitsText(units: number): string {
@@ -177,6 +193,33 @@ function parMarkLineOf(parUnits: number | undefined, spentUnits: number | undefi
       ? `Your clear cost ${unitsText(spentUnits)}, the same as ${SCENARIO_COPY.parBasis}.`
       : `Your clear cost ${unitsText(spentUnits)}, less than the ${unitsText(parUnits)} of ${SCENARIO_COPY.parBasis}.`;
   return `${PAR_MARK_COPY[mark]} ${comparison} ${SCENARIO_COPY.parPays}`;
+}
+
+/**
+ * **What a cleared stage draws about its par where it earns no mark** — [§ D1358](../../../../DECISIONS.md),
+ * or `undefined` where {@link parMarkLineOf} speaks. The four arms, in the order they are decided:
+ * no priced par, a free par, a cost that was not kept, and a clear above a priced par. Exported so
+ * the stage page words its verdict's par the same way the hub row does.
+ */
+export function stageParNoteOf(parUnits: number | undefined, spentUnits: number | undefined): string | undefined {
+  if (parMarkLineOf(parUnits, spentUnits) !== undefined) return undefined;
+  if (parUnits === undefined) return SCENARIO_COPY.parNone;
+  if (parUnits === 0) {
+    return spentUnits === undefined || spentUnits === 0
+      ? SCENARIO_COPY.parFree
+      : `${SCENARIO_COPY.parFree} Your clear cost ${unitsText(spentUnits)}.`;
+  }
+  const par = `Par is ${unitsText(parUnits)}, ${SCENARIO_COPY.parBasis}.`;
+  if (spentUnits === undefined) return `${par} ${SCENARIO_COPY.parUnkept}`;
+  return `${par} Your clear cost ${unitsText(spentUnits)}. ${SCENARIO_COPY.parPractice}`;
+}
+
+/**
+ * A cleared stage's par, whichever arm it is: the mark at or under a priced par, or
+ * {@link stageParNoteOf}'s reason otherwise. One of the two is always drawn on a clear (§ D1358).
+ */
+export function stageParLineOf(parUnits: number | undefined, spentUnits: number | undefined): string {
+  return parMarkLineOf(parUnits, spentUnits) ?? stageParNoteOf(parUnits, spentUnits) ?? SCENARIO_COPY.parNone;
 }
 
 /**
@@ -315,6 +358,7 @@ function pathRowOf(
     refusal: playable ? undefined : rung.heldReason,
     cleared: cleared ? SCENARIO_COPY.cleared : undefined,
     parMark: cleared ? parMarkLineOf(rung.parUnits, spentOf(rung.id)) : undefined,
+    parNote: cleared ? stageParNoteOf(rung.parUnits, spentOf(rung.id)) : undefined,
   });
 }
 

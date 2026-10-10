@@ -31,6 +31,8 @@ import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
 import { recordRun } from '../record/recordRun.js';
 import type { PublishedGoalRates } from '../scenario/published.js';
 import type { PublishedSurvivors } from '../scenario/survivors.js';
+import { PAR_MARK_COPY } from '../scenario/par.js';
+import { SCENARIO_COPY, stageParNoteOf } from './scenarioModel.js';
 import {
   STAGE_PLAY_COPY,
   stageFactsOf,
@@ -248,6 +250,41 @@ describe('a clear pays once, flat, and unlocks nothing — § D1129 clause 4', (
     /* The judge's own sentences pass through untouched. */
     expect(first?.headline).toBe('judge headline');
     expect(first?.goals[0]?.sentence).toBe('judge sentence');
+  });
+
+  /*
+   * [§ D1358](../../../../DECISIONS.md): a cleared stage can be run again as practice, and its clear
+   * says the par it meets or why it earns no mark, in the hub row's own words. Red before: the page
+   * drew no par at all and nothing said a run of a cleared stage was practice.
+   */
+  it('says the par a clear meets, or why it earns none, and that a cleared stage’s run is practice', () => {
+    const stage = stageAt(0);
+    const choice = { profileId: 'zoned-uppeak', parking: null } as const;
+    const cleared = (spent: number | undefined): StagePlayVerdictFacts => ({ ...verdict(true, 'again'), spentUnits: spent });
+    const parAt = (parUnits: number | undefined, spent: number | undefined): string | undefined =>
+      stagePlayViewOf(
+        { ...factsOf(stage, choice), parUnits },
+        { kind: 'judged', verdict: cleared(spent), stale: false },
+      ).verdict?.par;
+    expect(parAt(4, 4)?.startsWith(PAR_MARK_COPY.at)).toBe(true);
+    expect(parAt(4, 2)?.startsWith(PAR_MARK_COPY.under)).toBe(true);
+    expect(parAt(4, 6)).toBe(stageParNoteOf(4, 6));
+    expect(parAt(4, 6)).toContain('Your clear cost 6 units');
+    expect(parAt(0, 0)).toBe(SCENARIO_COPY.parFree);
+    expect(parAt(0, 2)).toContain('Your clear cost 2 units');
+    expect(parAt(undefined, 2)).toBe(SCENARIO_COPY.parNone);
+    /* No par line on a run that did not clear. */
+    expect(
+      stagePlayViewOf({ ...factsOf(stage, choice), parUnits: 4 }, { kind: 'judged', verdict: verdict(false, undefined), stale: false })
+        .verdict?.par,
+    ).toBeUndefined();
+    /* The practice line, on a stage this device holds the clear of and on no other. */
+    expect(stagePlayViewOf({ ...factsOf(stage, choice), clearedBefore: true }, { kind: 'idle' }).practice).toBe(
+      STAGE_PLAY_COPY.practice,
+    );
+    expect(stagePlayViewOf(factsOf(stage, choice), { kind: 'idle' }).practice).toBeUndefined();
+    /* And `verdictFactsOf` carries what the pressed settings cost. */
+    expect(verdictFactsOf({ headline: '', goals: [], holdout: undefined, metOnTuningSeeds: true, cleared: true } as never, 'again', 3).spentUnits).toBe(3);
   });
 });
 

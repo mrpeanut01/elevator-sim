@@ -368,6 +368,12 @@ export interface EverydayReportCareer {
    * second copy of the rule that decides where a button goes.
    */
   readonly renewalDue: boolean;
+  /**
+   * The renewal still ahead, as `campaign/career.ts#renewalAheadSentenceOf` words it, on the sheets of
+   * the contract's last running days — [§ D1357](../../../../DECISIONS.md). `undefined` on every other
+   * sheet. Passed in for {@link renewalDue}'s reason: the date is `campaign/`'s rule.
+   */
+  readonly renewalAhead?: string | undefined;
 }
 
 /**
@@ -644,12 +650,17 @@ function onwardStepOf(
      * because a month that has run out still has its renewal standing, and the desk is where that
      * is answered.
      */
+    /*
+     * Since [§ D1357](../../../../DECISIONS.md) the renewal stands once day 20 has closed, so this arm
+     * is day 20's sheet (and any later one), and the note names the day that waits on the answer.
+     */
     if (career.renewalDue) {
       return {
         label: `Answer the renewal at ${career.buildingName}`,
         note:
-          'The contract is up for renewal, and no day runs here until it is answered. This opens ' +
-          'the building’s desk, where the offer is. You stay in the career.',
+          'Day 20 has closed and the contract is up for renewal. The next month’s first day does not ' +
+          'run until it is answered. This opens the building’s desk, where the offer is. You stay in ' +
+          'the career.',
         goes: 'career-desk',
       };
     }
@@ -661,7 +672,14 @@ function onwardStepOf(
        * reading is a sheet about one tower.
        */
       label: `Open the doors on day ${String(career.day)} at ${career.buildingName}`,
-      note: 'Runs the next day of this contract. You stay in the career.',
+      /*
+       * Days 19 and 20 play, and the sheets of day 18 and day 19 say when the renewal falls due: the
+       * line #582 asked for on the sheet before it, on its true date (§ D1357).
+       */
+      note:
+        career.renewalAhead === undefined
+          ? 'Runs the next day of this contract. You stay in the career.'
+          : `Runs the next day of this contract. ${career.renewalAhead} You stay in the career.`,
       goes: 'career-day',
     };
   }

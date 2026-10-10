@@ -201,6 +201,29 @@ describe('the § 3.3 refinement', () => {
     expect(COPY.noteReady).not.toMatch(/crowd/);
   });
 
+  /*
+   * [§ D1358](../../../../DECISIONS.md): a fixed case whose order on screen has no fixed verdict of its
+   * own (a reload, an edit, a run that did not fix it) offers the press as practice. Red before: the
+   * model had no such state, and the screen read such a case as solved, so its bar said `Next
+   * building` and nothing could run it again (the post-AM panel's seat C, D7).
+   */
+  it('offers a fixed case’s run as practice, and keeps the settled case’s own cells', () => {
+    const [ready, ran, solved] = FIXIT_BAR.primary.variants;
+    const practice = fixitBarModel(FIXIT_BAR, view({ fixed: true }));
+    expect(practice.primary.label).toBe(ran);
+    expect(practice.primary.inert).toBeUndefined();
+    expect(practice.note).toBe(COPY.notePractice);
+    expect(practice.inverted).toBe(false);
+    expect(COPY.notePractice).toContain('pays nothing new');
+    expect(COPY.practiceSettled).toContain('Run it again comes back');
+    /* A settled case is still `Next building`, and a case never fixed is still `Run the day`. */
+    expect(fixitBarModel(FIXIT_BAR, view({ fixed: true, solved: true })).primary.label).toBe(solved);
+    expect(fixitBarModel(FIXIT_BAR, view({ fixed: false })).primary.label).toBe(ready);
+    expect(fixitBarModel(FIXIT_BAR, view({ fixed: false })).note).toBe(COPY.noteReady);
+    /* A check stopped by an edit says that first, whatever the case's badge. */
+    expect(fixitBarModel(FIXIT_BAR, view({ fixed: true, supersedes: true })).note).toBe(COPY.noteSupersedes);
+  });
+
   it('applies the § 3.3 solved inversion the row ships uninverted, with the row’s own way out', () => {
     const solved = fixitBarModel(FIXIT_BAR, view({ solved: true }));
     expect(solved.inverted).toBe(true);

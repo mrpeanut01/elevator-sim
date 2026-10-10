@@ -178,6 +178,20 @@ export const FIXIT_SCREEN_COPY = Object.freeze({
     'Runs the letter’s morning again with everything you have changed, and scores the whole building.',
   noteSolved: 'This one is settled. There are more buildings than you have afternoons.',
   /*
+   * **A fixed case run again is practice** — [§ D1358](../../../../DECISIONS.md), swarm DQ's Q3
+   * supporting payoff. The bar's note while the order on screen has no fixed verdict of its own:
+   * after a reload (a restored case carries none), after an edit, and after a run that did not fix.
+   */
+  notePractice:
+    'Practice: the case stays fixed whatever this run says, and it pays nothing new. A fix at or under par earns the mark.',
+  /*
+   * Under the settled card, where the bar's primary is `Next building`: how to run it again. The
+   * post-AM panel's seat C read *"A fixed case has no Run button"* (D7), because the press comes back
+   * only once the order moves and nothing said so.
+   */
+  practiceSettled:
+    'You can run a fixed case again as practice: change anything above and Run it again comes back. It pays nothing new, the case stays fixed whatever the run says, and a fix at or under par earns the mark.',
+  /*
    * **A verdict that no longer describes the order on screen** — [§ D1011](../../../../DECISIONS.md),
    * assessor C's D6. Drawn over the outcome card the moment the order moves away from the one the
    * verdict was measured on, and the Run press comes back beside it. The verdict is kept rather than
@@ -469,6 +483,12 @@ export interface FixitBarView {
   /** The open case's three rows have held (§ 10.4's `Next building`, and the inversion). */
   readonly solved: boolean;
   /**
+   * The open case is fixed, in this sitting or an earlier one, so a run of it is practice —
+   * [§ D1358](../../../../DECISIONS.md). Meaningful only while {@link solved} is false. Optional so a
+   * caller that predates it reads as a case never fixed.
+   */
+  readonly fixed?: boolean;
+  /**
    * The letter's morning cleared and the other forty-nine are running — [§ D1020](../../../../DECISIONS.md).
    * Only meaningful while {@link running}; optional so a caller that predates the judge reads as
    * not checking.
@@ -519,14 +539,21 @@ export function fixitBarModel(base: ActionBarModel, view: FixitBarView): ActionB
       inverted: true,
     };
   }
+  /* § D1358: a fixed case's run is practice, so the press reads `Run it again` and the note says so. */
+  const practice = view.fixed === true;
   return {
     ...base,
     primary: {
       ...base.primary,
-      label: (view.ran ? ranLabel : readyLabel) ?? base.primary.label,
+      label: (view.ran || practice ? ranLabel : readyLabel) ?? base.primary.label,
       ...(view.ready ? {} : { inert: FIXIT_SCREEN_COPY.loading }),
     },
-    note: view.supersedes === true ? FIXIT_SCREEN_COPY.noteSupersedes : FIXIT_SCREEN_COPY.noteReady,
+    note:
+      view.supersedes === true
+        ? FIXIT_SCREEN_COPY.noteSupersedes
+        : practice
+          ? FIXIT_SCREEN_COPY.notePractice
+          : FIXIT_SCREEN_COPY.noteReady,
   };
 }
 

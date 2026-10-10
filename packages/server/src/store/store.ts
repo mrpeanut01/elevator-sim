@@ -1062,6 +1062,29 @@ export class Store {
     return Object.freeze(result.rows.map((row) => rushEntryOf(row)));
   }
 
+  /**
+   * **One player's best sitting on each of a tower's rush boards for one day** — the standard board
+   * `dayBoardKey` names, and every modifier set's board that extends it with `/<set>`
+   * ([§ D1359](../../../../DECISIONS.md)). Longest held first, with {@link rushBoard}'s tie rule (the
+   * earlier post wins), so each row is exactly the row that board ranks for this player.
+   *
+   * The key is matched whole or with its `/` suffix, never with `LIKE`: a building id may hold `_`,
+   * which `LIKE` reads as a wildcard. The building is matched too, which the key already implies and
+   * which keeps the query on the column a reader would expect.
+   */
+  async rushBestsOf(userId: string, buildingId: string, dayBoardKey: string): Promise<readonly RushEntryRow[]> {
+    const result = await this.#sql.query(
+      'SELECT * FROM (' +
+        'SELECT DISTINCT ON (r.board_key) r.*, u.display_name AS display_name ' +
+        'FROM rush_entries r JOIN users u ON u.id = r.user_id ' +
+        'WHERE r.user_id = $1 AND r.building_id = $2 AND (r.board_key = $3 OR starts_with(r.board_key, $4)) ' +
+        'ORDER BY r.board_key, r.held_s DESC, r.submitted_at_ms ASC' +
+        ') best ORDER BY best.held_s DESC, best.submitted_at_ms ASC',
+      [userId, buildingId, dayBoardKey, `${dayBoardKey}/`],
+    );
+    return Object.freeze(result.rows.map((row) => rushEntryOf(row)));
+  }
+
   /** Every contributing player's best held time on one rush board, with its entry — the ladder's observations. */
   async rushHeldObservations(
     boardKey: string,

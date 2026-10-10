@@ -5220,6 +5220,30 @@ function boot(ui: Elements, resources: BrowserResources): void {
             return result.ok ? { kind: 'posted', rounds: result.value.rounds } : { kind: 'failed', detail: result.detail };
           },
     /*
+     * The player's own posted rows for the rush setup screen — § D1359. `accountState` is read at call
+     * time, on `chimeBalance`'s rule below; no token is *signed out* rather than a request that would
+     * come back 401, and a failed read is said as one rather than as no rows.
+     */
+    readRushPosted:
+      client === undefined
+        ? undefined
+        : async (buildingId) => {
+            const token = accountState.token;
+            if (token === undefined) return { kind: 'signed-out' };
+            const answer = await client.rushBest(token, buildingId);
+            if (!answer.ok) return { kind: 'unreachable' };
+            return {
+              kind: 'rows',
+              date: answer.value.date,
+              sittings: answer.value.entries.map((row) => ({
+                heldS: row.heldS,
+                furthestWave: row.furthestWave,
+                roundCount: row.roundCount,
+                modifiers: row.modifiers ?? [],
+              })),
+            };
+          },
+    /*
      * The chime ledger's one read — GitHub issue #368, § D526 clause 5.
      *
      * `accountState` is read **at call time** rather than captured, on this literal's own rule: a

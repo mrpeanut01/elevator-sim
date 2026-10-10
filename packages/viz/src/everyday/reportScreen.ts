@@ -81,7 +81,7 @@ import {
   type HonestyPart,
 } from './reportView.js';
 import { DAY_CLOSE_HEADING, type DayCloseView } from '../shift/dayClose.js';
-import { needOf, openTowerOf } from '../campaign/career.js';
+import { RENEWAL_AHEAD_ON_SHEET_DAYS, needOf, openTowerOf, renewalAheadSentenceOf } from '../campaign/career.js';
 /* GitHub issue #577: `fileDay`'s twenty-day month, read rather than restated. */
 import { CONTRACT_DAYS } from '../campaign/economy.js';
 import { everydayAccount, onEverydayAccount } from './accountPort.js';
@@ -276,6 +276,11 @@ function mountReportScreen(
        * be a way forward.
        */
       renewalDue: needOf(tower)?.kind === 'renewal',
+      /*
+       * The renewal still ahead, on the sheets of day 18 and day 19 — [§ D1357](../../../../DECISIONS.md).
+       * How far ahead is `career.ts`'s, as is the sentence.
+       */
+      renewalAhead: renewalAheadSentenceOf(tower, RENEWAL_AHEAD_ON_SHEET_DAYS),
     };
   }
 

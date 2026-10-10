@@ -90,7 +90,8 @@ function twoTowers(): CampaignCareer {
       dispatcherId: 'collective',
       rate: 4,
     }),
-    day: 19,
+    // Day 20 has closed, so the renewal stands (§ D1357).
+    day: 21,
     missed: 1,
     months: 2,
     trips: 41_000,
@@ -137,8 +138,9 @@ describe('the triage screen (§ 8.1)', () => {
     expect(dueService?.value).toBe(`1 of 2`);
     // The record line is the economy's `cleared`, so `4 of 1` is not expressible.
     const chancery = view.rows.find((row) => row.name === 'Chancery House');
-    expect(chancery?.record).toBe('17 cleared · 1 missed');
-    expect(chancery?.day).toBe('day 19');
+    expect(chancery?.record).toBe('19 cleared · 1 missed');
+    // Day 20 has closed, and the row names that rather than a twenty-first day (§ D1357).
+    expect(chancery?.day).toBe('day 20 closed');
   });
 
   it('names the fee and refuses the complexity nothing published, rather than defaulting it', () => {
@@ -166,7 +168,7 @@ describe('the triage screen (§ 8.1)', () => {
     expect(view.rows[0]?.status).toBe('Nothing — it is running itself');
     expect(view.rows[0]?.cta).toBe('Look in');
     expect(view.rows[0]?.needsDecision).toBe(false);
-    // Day 19 is a renewal, so the row's button says the word the destination contains (§ 16 rule 4).
+    // Day 20 has closed, so it is a renewal and the button says the word the destination contains (§ 16 rule 4).
     expect(view.rows[1]?.cta).toBe('Renew');
     expect(view.rows[1]?.needsDecision).toBe(true);
   });
@@ -264,11 +266,11 @@ describe('the building desk (§ 8.2)', () => {
     const career = applyCampaignAction(twoTowers(), { kind: 'open-tower', towerId: 'c6' }, shippedPriceSchedule());
     const view = buildingView(inputOf(career))!;
     expect(view.need?.allowance).toBe('1 of 3 missed days used · standard');
-    // 17 of 18 cleared is 94%, which § 8.9 moves by +1: 4 u a day becomes 5.
+    // 19 of 20 cleared is 95%, which § 8.9 moves by +1: 4 u a day becomes 5.
     expect(view.need?.offer?.rate).toBe('5 u');
-    expect(view.need?.offer?.why).toContain('94% of days cleared · complexity 2 of 5');
+    expect(view.need?.offer?.why).toContain('95% of days cleared · complexity 2 of 5');
     expect(view.need?.offer?.why).toContain('moves the rate by +1');
-    expect(recordLine(career.towers[1]!)).toBe('94% of days cleared · complexity 2 of 5');
+    expect(recordLine(career.towers[1]!)).toBe('95% of days cleared · complexity 2 of 5');
   });
 
   it('dims an option the purse cannot reach and says what it is short by (§ 16 rule 6)', () => {
@@ -328,6 +330,55 @@ describe('the building desk (§ 8.2)', () => {
     const closed: CampaignCareer = { ...openingCareer('eta'), openTowerId: undefined };
     expect(buildingView(inputOf(closed))).toBeUndefined();
     expect(contractView(inputOf(closed))).toBeUndefined();
+  });
+});
+
+/**
+ * **The month's end names no twenty-first day** — [§ D1357](../../../../DECISIONS.md). Once day 20 is
+ * filed `tower.day` is 21 and stays there while the renewal stands, which is now every month's end
+ * rather than a state only a door past the gate could reach. Red before: the desk's month card read
+ * *day 21*, the contract sheet *day 21 of twenty* and *SPEND BEFORE DAY 21 RUNS*, and the due cell
+ * *answer by day 20*.
+ */
+describe('the month’s end, once day 20 has closed (§ D1357)', () => {
+  const ended = (): CampaignCareer => {
+    const base = openingCareer('eta');
+    return { ...base, today: CONTRACT_DAYS + 1, towers: [{ ...base.towers[0]!, day: CONTRACT_DAYS + 1 }] };
+  };
+
+  it('draws the renewal on the desk with its true date, and the month card names day 20 closed', () => {
+    const view = buildingView(inputOf(ended()))!;
+    expect(view.need?.title).toBe('The managing agent has offered a renewal');
+    expect(view.need?.due).toBe('answer before the next month’s day 1 runs');
+    expect(view.month.day).toBe('day 20 closed');
+    expect(view.tests.eyebrow).toBe('WHAT THE CONTRACT ASKS ON THE NEXT MONTH’S DAY 1');
+    // No week-four rate is quoted for a cleared day the month no longer has.
+    expect(view.options?.purse).toMatch(/ on hand · this month has paid all it will$/u);
+    const row = towersView(inputOf(ended())).rows[0]!;
+    expect(row.day).toBe('day 20 closed');
+    expect(row.statusSub).toBe('answer before the next month’s day 1 runs');
+    expect(row.cta).toBe('Renew');
+  });
+
+  it('keeps the desk quiet on days 19 and 20, with the date the renewal falls due', () => {
+    const base = openingCareer('eta');
+    for (const [day, left] of [[19, '2 working days'], [CONTRACT_DAYS, '1 working day']] as const) {
+      const view = buildingView(inputOf({ ...base, towers: [{ ...base.towers[0]!, day }] }))!;
+      expect(view.need).toBeUndefined();
+      expect(view.quiet?.next).toBe(`Nothing booked. A renewal falls due when day 20 closes, in ${left}.`);
+      expect(view.month.day).toBe(`day ${String(day)}`);
+    }
+  });
+
+  it('names no twenty-first day on the contract sheet', () => {
+    const view = contractView(inputOf(ended()))!;
+    expect(view.meta).toContain('all twenty days run');
+    expect(view.month.note).toContain('all 20 days run · the renewal is on the building’s desk');
+    expect(view.purse.note).toContain('this month has paid all it will');
+    expect(view.shop.eyebrow).toBe('SPEND BEFORE THE NEXT MONTH’S DAY 1 RUNS');
+    const all = JSON.stringify(view);
+    expect(all).not.toMatch(/day 21|DAY 21|21 of/u);
+    expect(CONTRACT_COPY.renewalFirst).toContain('day 20 has closed');
   });
 });
 
@@ -550,7 +601,12 @@ describe('the contract sheet (§ 8.3, § 8.4)', () => {
 
 describe('one record, three screens (§ 16 rule 14)', () => {
   it('has all three agree about the day, the record and the purse', () => {
-    const career = applyCampaignAction(twoTowers(), { kind: 'open-tower', towerId: 'c6' }, shippedPriceSchedule());
+    // A running day, so all three name it (`twoTowers` is past day 20, where the § D1357 case speaks).
+    const running: CampaignCareer = {
+      ...twoTowers(),
+      towers: twoTowers().towers.map((tower) => (tower.id === 'c6' ? { ...tower, day: 19 } : tower)),
+    };
+    const career = applyCampaignAction(running, { kind: 'open-tower', towerId: 'c6' }, shippedPriceSchedule());
     const input = inputOf(career);
     const towers = towersView(input);
     const desk = buildingView(input)!;

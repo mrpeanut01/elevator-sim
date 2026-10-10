@@ -35277,6 +35277,8 @@ reservation was open, and the numbers below D537 are not written on this lane's 
 
 ## D547 — The Endless rush standings are the house's measured runs: one pinned run per shipped dispatcher per shipped building on the rush's one seed, and the two handles are dropped
 
+> **Status 2026-10-10: EXTENDED by [§ D1359](#d1359)** (an agent ruling). The player's own best posted sitting on the tower's boards today is drawn among the house's rows, tagged *yours*, from the server, with a line saying what it is. The house's rows are unchanged. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Status 2026-09-11: AMENDED by [§ D548](#d548).** A rush's crowd is sized from the building it runs on, never the player's week, and the 26 house rows on Midtown Office and Chancery House are re-measured through the corrected path. See [`docs/39`](docs/39-decisions-in-force.md).
 
 **Date: 2026-09-11 · GitHub issue #418 · Implements the product owner's ruling of 2026-09-10, given on the issue · Amends [§ D376](#d376).**
@@ -48152,6 +48154,8 @@ cases against the retired lines, which is its own control arm.
 
 ## D1234 — a clear at or under its par carries a mark, on fix cases and on cleared stages, and a free par is never marked
 
+> **Status 2026-10-10: AMENDED by [§ D1358](#d1358)** (an agent ruling). A free par is still never marked, and is now said on the line and the row; a cleared stage says why it earns no mark; the device keeps the cheapest clear; a fixed case and a cleared stage run again as practice. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-09-26 by agent sessions under delegated authority**, not by the product owner: the
 > `decide-an` swarm's Q3 ruling item 3 (S1 and S3 proposed the mark, S2 set its limit), reconciled by
 > wave AL's integrator and built by lane AL-G. A later reader weighing this against a product-owner
@@ -49178,6 +49182,8 @@ machinery and forecasts nothing, and both waiting screens draw the constant whil
 shipped tree carries the old words. Both cases were red before the change and green after.
 
 ## D1274 — no press runs a contract day past its renewal: the day-18 sheet goes to the desk and the contract sheet refuses
+
+> **Status 2026-10-10: AMENDED by [§ D1357](#d1357)** (an agent ruling). Clauses 1 to 3 stand at the month's end: the renewal falls due when day 20 closes, days 19 and 20 play, and the next month's first day waits on the answer. Day 20's sheet goes to the desk, and the contract sheet refuses the next month's day 1. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Taken 2026-10-10 by agent sessions under delegated authority** (wave AN, lane AN-2, on the lane
 > brief's item 5 for GitHub issue #582 item 3, after the defect was confirmed by a run), not by the
@@ -50253,3 +50259,177 @@ browser case above was red on the base sources (the bare *No call decided today*
 Here the report's sheet files the call half (`callDecided`) and the close reads it with the two runs
 through `dayDeciderOf`; no other surface states what decided the day, so no second reader was built.
 Whether the brief meant a report row as well is the integrator's to say.
+
+---
+
+## D1357 — the career renewal falls due when day 20 closes: days 19 and 20 play, and the next month's first day waits on the answer
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (wave AN, lane DQ-4), not by the
+> product owner: swarm DQ's Q4 ruling, reconciled by the wave's integrator from three members (S1 the
+> player, S2 honesty, S3 engineering and measurement) and built by this lane. A later reader weighing
+> this against a product-owner ruling should treat it as an agent ruling and say so; [§ D626](#d626)
+> is the cautionary case. **Owner-reversible**: clauses 1 to 3 as one rule, *the renewal falls due
+> when day 20 closes* against § D1274's *from day 19*. Reversing it restores § D1274 as built, and
+> then the copy has to say that a contract runs eighteen days.
+
+**Why an entry.** [§ D405](#d405)'s first and second grounds. It amends [§ D1274](#d1274) clauses 1
+to 3 and § 8.9's *day ≥ 19* reading in `campaign/career.ts#needOf`, and it binds the desk, the day
+report's onward step, the contract sheet, the tower row and the contract document, which live in
+`campaign/`, `everyday/campaignModel.ts`, `campaignScreens.ts`, `reportView.ts` and `reportScreen.ts`.
+
+**What was wrong** (S2, read from the code, and confirmed by this lane's run). § D1274 made the
+desk's gate the rule at every door while `needOf` answered a renewal, and `needOf` answered one from
+day 19. So days 19 and 20 never ran, while the dock read *day 19 of 20*, the desk's due cell read
+*answer by day 20* (a date no door would run to), *sign* promised *another twenty days*, and the
+renewal arm's note said *you can answer while the day plays*.
+
+**The swarm.** S2 and S3 ruled a gate; S1 ruled a deadline with a stated default (unanswered at day
+20's close, signed at their rate). The integrator reconciled on S2's finding: the gate stays, at the
+month's end. S1's default signing is the reading not chosen, and S3's gate at day 19 with corrected
+words is the other.
+
+**The ruling.**
+
+1. **The renewal falls due when day 20 closes.** `career.ts#renewalIsDue` is `tower.day` past
+   `CONTRACT_DAYS`, and `needOf` asks it. It is the one place the rule is written.
+2. **Days 19 and 20 play.** No door refuses them: the desk is quiet on both (unless a service window
+   falls due), day 18's sheet opens day 19 and day 19's opens day 20.
+3. **The next month's first day does not run until the renewal is answered.** `fileDay` already
+   refuses a twenty-first day and `answerNeed` already starts the month at day 1, so § D1274's gate at
+   every door stands, now at the month's end: day 20's sheet offers *Answer the renewal at
+   ⟨building⟩* and runs nothing, and the contract sheet's press reads *Lock it in and run day 1*,
+   inert, with the reason on the bar.
+4. **Every line names the true date.** The due cell reads *answer before the next month's day 1
+   runs* (`RENEWAL_DUE_CELL`). The quiet desk says *A renewal falls due when day 20 closes, in N
+   working days* from five days out, and the sheets of day 18 and day 19 say the same sentence on
+   the step that opens the next day (`renewalAheadSentenceOf`, two days out). The renewal's brief, the
+   day-20 sheet's note, `CONTRACT_COPY.renewalFirst` and the contract document's clause 6 say that
+   day 20 has closed and the next month's first day waits.
+5. **"While the day plays" goes from the renewal.** The desk's bar fell back to the § 3.3 cell itself,
+   *⟨the picked option's effect⟩*, whenever a need stood and nothing was picked; it now carries the
+   press's own reason (*the options above are the answer …*), on both arms of `needOf`.
+6. **No twenty-first day is named anywhere.** `tower.day` sits at 21 while the renewal stands, which
+   is now every month's end, so the tower row and the desk's month card read *day 20 closed*, the
+   contract sheet *all twenty days run* and *all 20 days run · the renewal is on the building's
+   desk*, the purse note *this month has paid all it will*, and the two eyebrows name the next
+   month's day 1.
+
+**Tests**, red before and green after. `campaign/career.test.ts`'s *the renewal falls due when day 20
+closes* (three cases), `everyday/campaignModel.test.ts`'s *the month's end, once day 20 has closed*
+(three cases, one of them asserting no `day 21` anywhere on the contract sheet), and
+`everyday/reportView.test.ts`'s two career-step cases. **On the built bundle**,
+`everyday/campaignJourney.browser.test.ts`'s *plays days 19 and 20, then holds the next month's day 1
+for the renewal* replaces § D1274's case: seeded on day 18, it runs day 18, opens day 19 and day 20
+from the sheets (the dock reading *day 19 of 20* and *day 20 of 20*), meets the renewal on day 20's
+sheet, reads the due cell and a bar note with neither *while the day plays* nor a placeholder, finds
+the contract sheet's press inert on day 1, and, as its control, signs and finds the same press live.
+Red before on its first assertion: day 18's sheet offered *Answer the renewal at Garden Apartments*.
+The fixtures that stood a renewal on day 19 (§ 8.12's second month, `twoTowers`, the honesty
+corpus's second month) now stand it on day 21, and the corpus gains a desk on day 19.
+
+**Not established.** S2's service arm (*you can answer while the day plays* kept only where a test
+shows a service window's options reach the stage) is not built: no desk with a standing need draws
+that sentence any more, and the quiet desk still does. § D1274 clause 4 (a desk asked about a service
+window goes on asking after *Leave it to maintenance*) is unchanged and unmeasured.
+
+## D1358 — a par is said on every clear: a free par says it is free, a cleared stage says why it earns no mark, the cheapest clear is kept, and a fixed case or a cleared stage runs again as practice
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (wave AN, lane DQ-4), not by the
+> product owner: swarm DQ's Q3 ruling, its supporting payoffs (three of three on the shape), built
+> by this lane. **Owner-reversible**: the words of every arm; drawing the free par rather than nothing;
+> keeping the cheapest clear rather than the latest; and offering a restored fixed case's run as
+> practice rather than `Next building`.
+
+**Why an entry.** [§ D405](#d405)'s first and second grounds. It amends [§ D1234](#d1234) clause 2
+(*on a free par the line and the row's par are not drawn*) and clause 4 (*keeps what a clearing press
+cost*), and it binds `fixit/par.ts`, `everyday/fixitScreen.ts` and `fixitScreenModel.ts`,
+`everyday/scenarioModel.ts` and `scenarioScreen.ts`, `everyday/stagePlay.ts` and
+`stagePlayScreen.ts`, and `everyday/profile.ts`.
+
+**What was wrong**, as the post-AM panel's seat C met it. Par was missing on stages 1, 6 and 8 and on
+the free fix case *Three cars, one car's work* (D6), and *a fixed case has no Run button, so its par
+cannot be chased* (D7). **Why par was missing**, found rather than derived: those are exactly the
+stages whose par is free on the table § D1234 priced (stages 2, 3, 5 and 7 priced at 2, 4, 9 and 2;
+1, 6 and 8 free; 4, 9 and 10 with no way through and held), and § D1234 clause 2 drew nothing on a
+free par. Seat C's stage 8 clear cost 2 units against a free par, which § D1234 also left silent.
+The pars were not re-priced on this tree.
+
+**The ruling.**
+
+1. **A free par is said, and still never marked.** A fix case where a free fix meets a free par reads
+   *Par is free on this case: … cost nothing, so no fix is marked against it*, and its row *par free ·
+   not marked*. A dearer fix reads *cost nothing. Yours cost N units.*
+2. **A cleared stage always says its par.** Beside § D1234's mark, a cleared hub row carries
+   `parNote` on every other arm: a free par (with the clear's cost where it spent any), no priced par,
+   a clear above the par (both prices, and that a practice run can chase it), and a cost not kept.
+   Exactly one of the mark and the note is drawn on a cleared row, and neither before a clear. The
+   stage page's verdict draws the same sentence for the clear it has just judged, priced at what the
+   pressed settings cost.
+3. **The cheapest clear is kept.** `profile.ts#progressWithFixSpent` keeps the cheaper of the held and
+   the new cost, so a practice run at a dearer order takes no mark away, on [§ D1157](#d1157)'s
+   footing for the badge itself.
+4. **A fixed case runs again as practice.** `fixitScreen.ts#settledNow` requires the latest run's own
+   verdict to be *fixed* on the order on screen. A restored case (whose order on screen is the
+   building as it stands, read as settled until now) and a fixed case whose latest run did not fix it
+   offer `Run it again`, with the note *Practice: the case stays fixed whatever this run says, and it
+   pays nothing new …*. Under a settled card, where the bar keeps § 3.3's `Next building`, a line says
+   how to run it again.
+5. **A cleared stage runs again as practice.** The page already reopened a cleared stage with its
+   press live; it now says so before the press, and its bar reads `Run it again` with a practice note.
+6. **It pays nothing new.** The server's first-time-only rule ([§ D533](#d533)) is unchanged, and
+   nothing here unlocks anything.
+
+S2's *a case with no pinned par shows no par slot* is the reading not chosen for the free par: the
+lane brief asked for the absence to be derived or said, and a blank is what seat C read as missing.
+
+**Tests**, red before and green after: `fixit/par.test.ts`'s free-par case, `everyday/profile.test.ts`'s
+cheapest-kept case, `everyday/scenarioModel.test.ts`'s *says why a cleared stage earns no mark*,
+`everyday/stagePlay.test.ts`'s par and practice case, and `everyday/fixitScreenModel.test.ts`'s practice
+bar. On the built bundle, `everyday/fixitVerdict.browser.test.ts`'s reload case now asserts that the
+restored case reads `Run it again`, live, with the practice note (red before: `Next building`), and
+`everyday/stageClearPays.browser.test.ts` asserts that stage 1's clear draws its par line, that its
+hub row draws exactly one of the mark and the note, and that the reopened stage says it is practice
+on the page and on the bar (red before: no par line, a 30 s timeout).
+
+**Not established.** No browser case fixes a free-par fix case to read its line on the bundle; it is
+pinned by its model. Whether practice changes how often a player re-runs a case is unmeasured.
+
+## D1359 — the player's best posted rush sitting is drawn among the house's rows, from the server, and says what it is
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (wave AN, lane DQ-4), not by the
+> product owner: swarm DQ's Q3 ruling, its second supporting payoff (S1, S2 and S3), built by this
+> lane. **Owner-reversible**: drawing the row at all, its words, one row per board, and reading it
+> from the server rather than from what this page posted.
+
+**Why an entry.** [§ D405](#d405)'s first ground. It adds a route to `packages/server`
+(`GET /api/rush-best`), a store read, a client method, a host binding in `dev/main.ts` and a row on
+the rush setup screen, and it extends [§ D547](#d547) clause 3, whose standings were the house's runs
+alone.
+
+**The ruling.**
+
+1. **Which row.** The signed-in player's best posted sitting on each of the standing tower's rush
+   boards for today, which is the row each board ranks for them (`Store.rushBestsOf`, on
+   `rushBoard`'s best-sitting and tie rules). The day is the server's (`boardKey.ts#rushDayBoardOf`,
+   the derivation a post lands by), and the client names a building, never a board key.
+2. **Where.** Among the house's rows, furthest first, the house's row first on a tie, in the same
+   columns: a wave and how long its last round held, both the server's replay. Its tag is *yours*,
+   in words as well as colour, and its detail names the rounds and any modifiers.
+3. **What it says it is**, under the rows: *Rows marked yours are your best sitting on each of this
+   tower's boards for ⟨date⟩ (the server's day), as the server replayed it. A sitting ranks on how
+   long its last round held, and that round may have been rebuilt between rounds or handed over while
+   it played, so it was not run the way the house's rows were.* With no row, one sentence says why
+   (none posted today, signed out, or the read failed); a build with no server says nothing.
+4. **No purse and no ranking.** The route's row is `publicRushEntry`'s board-row shape, with no purse
+   and no price ([§ D543](#d543) clause 5). The house note's *the order does not rank the
+   dispatchers* stands, and the player's row ranks no dispatcher either.
+
+**Tests**, red before and green after: `server/store/store.test.ts`'s per-board best (ties, other
+players, other days, and a building id `LIKE` would have matched through `_`),
+`server/http/api.test.ts`'s route case (401 signed out, the player's own row after a post, nobody
+else's, no purse key), `everyday/rushHouse.test.ts`'s two cases, `menu/client.test.ts`'s read and
+`everyday/host.test.ts`'s binding.
+
+**Not established.** No browser case draws the row: the browser tier would need a server with a
+posted sitting. The row is pinned by its model, the route and the client, and
+`everyday/rush.browser.test.ts` still passes with the read in place (no server, so it says nothing).

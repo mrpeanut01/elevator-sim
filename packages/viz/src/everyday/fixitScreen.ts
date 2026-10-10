@@ -381,9 +381,21 @@ interface CaseSession {
  * screen is still the one that run measured. The § 3.3 bar's `Next building` and the primary's
  * advance both read this rather than `fixed` alone, which is what gives a fixed case its Run press
  * back after an edit (§ D1011).
+ *
+ * **The latest run's own verdict, since [§ D1358](../../../../DECISIONS.md).** This read `fixed`
+ * alone beside an order that had not moved, and two sessions met that with no fixed verdict on the
+ * order on screen: a restored case, whose order is the building as it stands and whose verdict
+ * state is the same empty order, and a fixed case whose latest run did not fix it (§ D1157 keeps the
+ * badge). Both read `Next building` with no way to run the order again, which the post-AM panel's
+ * seat C met as *"A fixed case has no Run button, so its par cannot be chased"*. They now offer the
+ * press, as practice ({@link fixitBar}'s `fixed`).
  */
 function settledNow(session: CaseSession): boolean {
-  return session.fixed && !verdictIsStale(session.verdictState ?? emptyFixitState(), session.state);
+  return (
+    session.fixed &&
+    session.outcome?.kind === 'fixed' &&
+    !verdictIsStale(session.verdictState ?? emptyFixitState(), session.state)
+  );
 }
 
 interface LoadedFixit {
@@ -555,8 +567,10 @@ let restored = false;
  * would stay badged FIXED beside an outcome card saying it is not — `docs/20` defect 16, rebuilt.
  *
  * The restored session carries **no outcome and no cached run**: `outcome: undefined` is true — this
- * sitting has not run this case — and it is what makes the § 3.3 primary read `Run the day` rather
- * than `Run it again` on a case whose verdict this tab has never seen.
+ * sitting has not run this case. Since [§ D1358](../../../../DECISIONS.md) that is also what keeps a
+ * restored case from reading settled: no verdict this sitting measured the order on screen, which is
+ * the building as it stands rather than the order that fixed it, so the § 3.3 primary offers the
+ * run as practice (`Run it again`, the case having been run before) rather than `Next building`.
  */
 function ensureRestored(): void {
   if (restored) return;
@@ -1334,6 +1348,15 @@ function mountFixit(
       /* § D1120 clause 4: the live count and the marks, under the checking card and nowhere else. */
       if (session.outcome.kind === 'checking' && checking && checkingCaseId === entry.id) card.append(progressBlock());
       main.append(card);
+    }
+    /*
+     * § D1358: under a settled fixed card the bar's primary is `Next building`, so the way to run the
+     * case again as practice is said here, where the par it would chase is drawn.
+     */
+    if (settledNow(session)) {
+      const practice = el(doc, 'p', 'everyday-fixit-practice', COPY.practiceSettled);
+      practice.style.cssText = `font-size:12.5px;line-height:1.5;color:${C.inkSoft};margin:10px 0 0;max-width:80ch`;
+      main.append(practice);
     }
     /*
      * The bar reads {@link settledNow}, and an edit only redraws the screen — so a redraw that moved
@@ -2210,6 +2233,8 @@ function fixitBar(state: EverydayState): ActionBarModel {
     ran: session?.outcome !== undefined || session?.stoppedLine !== undefined,
     /* Settled for the order on screen, not merely FIXED once — § D1011. */
     solved: session !== undefined && settledNow(session),
+    /* FIXED in this sitting or an earlier one: a run of it is practice — § D1358. */
+    fixed: session?.fixed === true,
   });
 }
 

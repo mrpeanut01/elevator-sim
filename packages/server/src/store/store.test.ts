@@ -405,6 +405,62 @@ function challengeScore(awtS: number) {
   return challengeScoreOf(perSeed);
 }
 
+/**
+ * **One player's best sitting on a tower's boards for one day** — [§ D1359](../../../../DECISIONS.md).
+ * The row the rush setup screen draws among the house's, read the way `rushBoard` ranks: the longest
+ * held per board, the earlier post on a tie. Red before: the store had no such read.
+ */
+describe('a player’s own best rush sitting, per board, for one day (§ D1359)', () => {
+  const DAY = 'rush:garden_apartments:2026-09-01';
+  const round = (heldS: number) => [
+    { dispatcherProfileId: 'collective', heldS, wavesOutlasted: 6, purseBeforeUnits: 0, paidUnits: 12, purseAfterUnits: 12 },
+  ];
+  async function post(
+    store: Store,
+    userId: string,
+    boardKey: string,
+    heldS: number,
+    buildingId = 'garden_apartments',
+    modifiers: readonly { readonly sinkId: string; readonly steps: number }[] = [],
+  ): Promise<string> {
+    const row = await store.recordRushEntry({
+      boardKey,
+      userId,
+      buildingId,
+      seed: '90210',
+      heldS,
+      furthestWave: 7,
+      rounds: round(heldS),
+      modifiers,
+    });
+    return row.id;
+  }
+
+  it('answers the longest held on each of the day’s boards, the earlier on a tie, and nobody else’s', async () => {
+    const { store, tick, ada, bo } = await fixture();
+    await post(store, ada, DAY, 1_100);
+    tick(1_000);
+    const best = await post(store, ada, DAY, 1_178);
+    tick(1_000);
+    await post(store, ada, DAY, 1_178);
+    const topped = await post(store, ada, `${DAY}/rush-purse-top-up=1`, 1_300, 'garden_apartments', [
+      { sinkId: 'rush-purse-top-up', steps: 1 },
+    ]);
+    // Another player, another day, and a building whose id `LIKE` would have matched through `_`.
+    await post(store, bo, DAY, 1_500);
+    await post(store, ada, 'rush:garden_apartments:2026-09-02', 1_600);
+    await post(store, ada, 'rush:gardenXapartments:2026-09-01', 1_700, 'gardenXapartments');
+    const rows = await store.rushBestsOf(ada, 'garden_apartments', DAY);
+    expect(rows.map((row) => [row.boardKey, row.heldS, row.id])).toEqual([
+      [`${DAY}/rush-purse-top-up=1`, 1_300, topped],
+      [DAY, 1_178, best],
+    ]);
+    expect(rows[0]?.modifiers).toEqual([{ sinkId: 'rush-purse-top-up', steps: 1 }]);
+    expect(rows.every((row) => row.userId === ada)).toBe(true);
+    expect(await store.rushBestsOf(bo, 'garden_apartments', 'rush:garden_apartments:2026-09-02')).toEqual([]);
+  });
+});
+
 describe('a challenge board', () => {
   const CHALLENGE = issuedChallengeFor(0);
 

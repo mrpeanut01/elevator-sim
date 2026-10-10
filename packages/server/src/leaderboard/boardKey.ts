@@ -469,10 +469,21 @@ export function rushPlacementOf(
   claimedModifiers: ModifierSet | undefined,
 ): RushPlacement {
   const modifiers = canonicalModifierSet(claimedModifiers);
-  const date = dailyDateOf(nowMs);
+  const { key: board, date } = rushDayBoardOf(buildingId, nowMs);
   const setKey = modifierSetKeyOf(modifiers);
-  const board = `rush:${buildingId}:${date}`;
   return Object.freeze({ kind: 'rush', key: setKey === '' ? board : `${board}/${setKey}`, date, buildingId, modifiers });
+}
+
+/**
+ * **Today's rush board for a tower on the standard set**, against this server's clock: the key
+ * {@link rushPlacementOf} gives a sitting with no modifiers, and the stem every modifier set's board
+ * for the same tower and day extends with `/<set>`. One derivation, so the route that answers a
+ * player's own best ({@link rushPlacementOf}'s reader, `http/api.ts#rushBestOf`) cannot come to
+ * name a different day from the one a post lands on ([§ D1359](../../../../DECISIONS.md)).
+ */
+export function rushDayBoardOf(buildingId: string, nowMs: number): { readonly key: string; readonly date: string } {
+  const date = dailyDateOf(nowMs);
+  return Object.freeze({ key: `rush:${buildingId}:${date}`, date });
 }
 
 /* -------------------------------------------------------------------------- *

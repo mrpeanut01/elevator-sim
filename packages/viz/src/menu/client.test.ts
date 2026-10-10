@@ -1219,4 +1219,19 @@ describe('a rush sitting posts whole — GitHub issue #372, § D542', () => {
     expect(result.code).toBe('held-does-not-reproduce');
     expect((result.body as { round: number }).round).toBe(2);
   });
+
+  /* § D1359: the player's own best on a tower's boards today — a building out, the server's rows back. */
+  it('reads the player’s own best sittings by building, never by a board key it built', async () => {
+    const rows = [{ boardKey: 'rush:midtown-office:2026-09-15', heldS: 1640, furthestWave: 10, roundCount: 2 }];
+    const { transport, seen } = scripted({ status: 200, body: { buildingId: 'midtown office', date: '2026-09-15', entries: rows } });
+    const result = await createClient('https://x', transport).rushBest('t', 'midtown office');
+    expect(seen.map((request) => [request.method, request.url, request.token])).toEqual([
+      ['GET', 'https://x/api/rush-best?building=midtown%20office', 't'],
+    ]);
+    expect(result.ok && result.value.entries).toEqual(rows);
+    expect(result.ok && result.value.date).toBe('2026-09-15');
+    const { transport: odd } = scripted({ status: 200, body: { entries: rows } });
+    const unreadable = await createClient('https://x', odd).rushBest('t', 'midtown-office');
+    expect(!unreadable.ok && unreadable.code).toBe('unexpected-response');
+  });
 });

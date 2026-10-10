@@ -931,7 +931,7 @@ describe('what the order that fixed a case cost is kept — lane AL-B, seat C D5
    * because the fixing order's cost lived in the session. Red before the fix: the progress had no
    * field for it, so there was nothing for a reload to read.
    */
-  it('round-trips a fix cost, keeps it through a rating and a new solved set, and replaces it on a new fix', () => {
+  it('round-trips a fix cost, keeps it through a rating and a new solved set, and keeps the cheapest fix', () => {
     const backing = memoryBacking();
     const fixed = progressWithFixSpent(progressWithSolvedCases(EMPTY_EVERYDAY_PROGRESS, ['let-faster']), 'let-faster', 2);
     expect(fixSpentUnitsOf(fixed, 'let-faster')).toBe(2);
@@ -943,11 +943,18 @@ describe('what the order that fixed a case cost is kept — lane AL-B, seat C D5
     const back = loadProgress(backing);
     expect(back.notice).toBeNull();
     expect(fixSpentUnitsOf(back.progress, 'let-faster')).toBe(2);
-    /* A later fixed verdict at another price is the one the card last showed. */
-    const again = progressWithFixSpent(back.progress, 'let-faster', 6);
-    expect(fixSpentUnitsOf(again, 'let-faster')).toBe(6);
-    expect(again.fixSpent).toHaveLength(1);
-    expect(progressWithFixSpent(again, 'let-faster', 6)).toBe(again);
+    /*
+     * § D1358: a later fix at a dearer price is a practice run, and it takes nothing away, so the
+     * cheaper kept figure stands (red before: it replaced it with 6, and an at-par mark vanished);
+     * a cheaper later fix moves the kept figure down.
+     */
+    const dearer = progressWithFixSpent(back.progress, 'let-faster', 6);
+    expect(dearer).toBe(back.progress);
+    expect(fixSpentUnitsOf(dearer, 'let-faster')).toBe(2);
+    const cheaper = progressWithFixSpent(back.progress, 'let-faster', 1);
+    expect(fixSpentUnitsOf(cheaper, 'let-faster')).toBe(1);
+    expect(cheaper.fixSpent).toHaveLength(1);
+    expect(progressWithFixSpent(cheaper, 'let-faster', 1)).toBe(cheaper);
   });
 
   it('reads progress kept before the field as no cost recorded, and refuses a malformed one', () => {

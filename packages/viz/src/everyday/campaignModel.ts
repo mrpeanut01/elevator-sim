@@ -134,6 +134,7 @@ import {
   openTowerOf,
   offerRefusalOf,
   quirkOf,
+  renewalIsDue,
 } from '../campaign/career.js';
 import { worksTodayOf } from '../campaign/works.js';
 
@@ -381,9 +382,25 @@ export function units(value: number): string {
  */
 export const CONTRACT_ASKS_HEADING = 'WHAT THE CONTRACT ASKS';
 
-/** `WHAT THE CONTRACT ASKS ON DAY 6` — {@link CONTRACT_ASKS_HEADING} with the tower's own day. */
+/**
+ * `WHAT THE CONTRACT ASKS ON DAY 6` — {@link CONTRACT_ASKS_HEADING} with the tower's own day.
+ *
+ * Once day 20 has closed the tower's `day` is 21, which is no day of anything, and the next day these
+ * bars are asked on is a renewed month's first ([§ D1357](../../../../DECISIONS.md)): a renewal keeps
+ * the difficulty, so the four are the same.
+ */
 export function contractAsksEyebrow(day: number): string {
+  if (renewalIsDue({ day })) return `${CONTRACT_ASKS_HEADING} ON THE NEXT MONTH’S DAY 1`;
   return `${CONTRACT_ASKS_HEADING} ON DAY ${String(day)}`;
+}
+
+/**
+ * The contract day a short label names — `day 7`, or `day 20 closed` once the month has run out
+ * ([§ D1357](../../../../DECISIONS.md)). `tower.day` reaches 21 when day 20 is filed and stays there
+ * while the renewal stands, and a label reading *day 21* would name a day no contract has.
+ */
+function contractDayLabelOf(tower: CampaignTower): string {
+  return renewalIsDue(tower) ? `day ${String(CONTRACT_DAYS)} closed` : `day ${String(tower.day)}`;
 }
 
 /**
@@ -1069,7 +1086,7 @@ function standingNote(standing: number, open: number, atRisk: number): string {
 /** The status of a quiet tower's contract — § 8.1's `statusSub`, derived from the allowance. */
 function contractStatusLine(tower: CampaignTower): string {
   const allowance = DIFFICULTIES[tower.difficultyId].miss;
-  if (tower.day >= 19) return 'renewal offered';
+  if (renewalIsDue(tower)) return 'renewal offered';
   const left = allowance - tower.missed;
   if (left < 0) return `contract ended — ${String(tower.missed)} missed`;
   if (left === 0) return 'one more miss ends it';
@@ -1120,7 +1137,7 @@ function towerRowView(input: CampaignInput, tower: CampaignTower): TowerRowView 
     spec: facts.spec ?? UNFINISHED,
     quirk: tower.quirk === '' ? UNFINISHED : tower.quirk,
     terms: termsLine(tower),
-    day: `day ${String(tower.day)}`,
+    day: contractDayLabelOf(tower),
     record: `${String(clearedDays(tower))} cleared · ${String(tower.missed)} missed`,
     wear: `${months} · ${String(wearPct)}% to service`,
     wearIsDue: wearHeadOf(tower) === 'due',
@@ -1596,7 +1613,14 @@ export function buildingView(input: CampaignInput): BuildingView | undefined {
               need.kind === 'renewal'
                 ? BUILDING_COPY.optionsNoteRenewal
                 : BUILDING_COPY.optionsNote,
-            purse: `${units(purseOf(tower))} on hand · ${String(rateOnDay(difficulty, dayIndexOf(tower)))} a cleared day`,
+            /*
+             * § D1357: once day 20 has closed there is no cleared day left in this month to quote,
+             * and the next one is a new month's at its own week-one rate, so the line says the month
+             * has paid rather than printing week four's figure.
+             */
+            purse: renewalIsDue(tower)
+              ? `${units(purseOf(tower))} on hand · this month has paid all it will`
+              : `${units(purseOf(tower))} on hand · ${String(rateOnDay(difficulty, dayIndexOf(tower)))} a cleared day`,
             rows: needOptionViews(tower, need),
           },
     quiet:
@@ -1673,7 +1697,7 @@ export function buildingView(input: CampaignInput): BuildingView | undefined {
     temporary: { heading: BUILDING_COPY.temporaryHeading, body: BUILDING_COPY.temporaryEmpty },
     month: {
       heading: BUILDING_COPY.monthHeading,
-      day: `day ${String(tower.day)}`,
+      day: contractDayLabelOf(tower),
       cleared: String(clearedDays(tower)),
       missed: String(tower.missed),
     },
@@ -1708,9 +1732,12 @@ export const CONTRACT_COPY = Object.freeze({
    * a career seeded on day 19, the press landed on the stage with the dock reading *day 19 of 20*
    * while the desk still asked for an answer. `campaignScreens.ts#contractBar` puts this on the press
    * as its refusal, and it names where the answer is given.
+   *
+   * **It names the true day since [§ D1357](../../../../DECISIONS.md)**: the renewal stands once day
+   * 20 has closed, so the day it holds back is the next month's first and the sentence says so.
    */
   renewalFirst:
-    'the contract is up for renewal, and no day runs here until it is answered on the building’s desk',
+    'day 20 has closed and the contract is up for renewal, so the next month’s day 1 runs only once it is answered on the building’s desk',
   /*
    * *"Only part of the shop"* read *"about a third of the shop"* until § D1312 priced a shaft per
    * shaft at its bank's band, which made the shop's worth the tower's own. The fraction was then
@@ -1936,7 +1963,8 @@ export interface ContractDocumentView {
  *    (`career.ts#careerIsOver`). **No debit of units already earned** — that would be a second sink
  *    (§ D716 § 4, § D717), and it is the owner's question rather than this clause's;
  * 5. a day the run could not read is not filed — `campaignDayVerdict`'s `ungraded`;
- * 6. renewal is `career.ts#needOf` from day 19, with `renewalNeed`'s four answers.
+ * 6. renewal is `career.ts#needOf` once day 20 has closed (`renewalIsDue`, § D1357), with
+ *    `renewalNeed`'s four answers, and the next month's first day waits on it.
  *
  * There is no energy level, no grade, no letter and no score: the contract asks four pass-or-fail
  * questions and the document asks the same four.
@@ -2000,7 +2028,7 @@ export function contractDocumentOf(
       {
         number: '6',
         heading: 'Renewal',
-        body: 'In the last two days the agent offers a renewal, priced from the building and your record on it. You may sign it, ask for more, renew with a refurbishment, or hand the building back.',
+        body: 'When day 20 closes the agent offers a renewal, priced from the building and your record on it. You may sign it, ask for more, renew with a refurbishment, or hand the building back. All twenty days are played first, and the next month’s first day does not run until you answer.',
         levels: undefined,
         basisNote: undefined,
       },
@@ -2255,7 +2283,7 @@ export function contractView(input: CampaignInput): ContractView | undefined {
 
   return {
     title: `${facts.name}, this month`,
-    meta: `${facts.spec ?? UNFINISHED} · day ${String(tower.day)} of twenty · ${units(tower.rate)} a day`,
+    meta: `${facts.spec ?? UNFINISHED} · ${renewalIsDue(tower) ? 'all twenty days run' : `day ${String(tower.day)} of twenty`} · ${units(tower.rate)} a day`,
     lede: CONTRACT_COPY.lede,
     difficulty: {
       eyebrow: CONTRACT_COPY.difficultyEyebrow,
@@ -2266,7 +2294,10 @@ export function contractView(input: CampaignInput): ContractView | undefined {
     },
     month: {
       heading: CONTRACT_COPY.monthHeading,
-      note: `day ${String(tower.day)} of ${String(CONTRACT_DAYS)} · ${String(rateOnDay(difficulty, dayIdx))} units a cleared day this week · ${difficulty.name.toLowerCase()}`,
+      /* § D1357: past day 20 there is no week to quote a rate for, and the renewal is what stands. */
+      note: renewalIsDue(tower)
+        ? `all ${String(CONTRACT_DAYS)} days run · the renewal is on the building’s desk · ${difficulty.name.toLowerCase()}`
+        : `day ${String(tower.day)} of ${String(CONTRACT_DAYS)} · ${String(rateOnDay(difficulty, dayIdx))} units a cleared day this week · ${difficulty.name.toLowerCase()}`,
       heads: WEEKDAY_HEADS,
       weeks,
       prompt:
@@ -2292,7 +2323,7 @@ export function contractView(input: CampaignInput): ContractView | undefined {
     purse: {
       heading: CONTRACT_COPY.purseHeading,
       onHand: units(purse),
-      note: `on hand · ${String(carriedIn(tower))} carried in from earlier months, ${String(earnedSoFar(tower))} earned this one, ${String(committedUnits(tower))} committed${worksDays.length === 0 ? '' : ` · ${String(worksDays.length)} nights of works running`} · ${String(rateOnDay(difficulty, dayIdx))} more tomorrow if today clears`,
+      note: `on hand · ${String(carriedIn(tower))} carried in from earlier months, ${String(earnedSoFar(tower))} earned this one, ${String(committedUnits(tower))} committed${worksDays.length === 0 ? '' : ` · ${String(worksDays.length)} nights of works running`} · ${renewalIsDue(tower) ? 'this month has paid all it will' : `${String(rateOnDay(difficulty, dayIdx))} more tomorrow if today clears`}`,
       weeks: difficulty.rates.map((rate, week) => ({
         label: `WEEK ${String(week + 1)}`,
         value: units(rate),
@@ -2319,7 +2350,7 @@ export function contractView(input: CampaignInput): ContractView | undefined {
       conflict: CONTRACT_COPY.testsConflict,
     },
     shop: {
-      eyebrow: `SPEND BEFORE DAY ${String(tower.day)} RUNS`,
+      eyebrow: renewalIsDue(tower) ? 'SPEND BEFORE THE NEXT MONTH’S DAY 1 RUNS' : `SPEND BEFORE DAY ${String(tower.day)} RUNS`,
       sub: CONTRACT_COPY.shopSub,
       categories: SHOP.map((category): ShopCategoryView => {
         const live = fittedLevel(tower, category.id);

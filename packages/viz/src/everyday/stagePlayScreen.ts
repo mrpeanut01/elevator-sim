@@ -169,6 +169,7 @@ function stageContextOf(data: Loaded, stageId: string):
       readonly total: number;
       readonly context: StageAdmissionContext;
       readonly held: string | undefined;
+      readonly parUnits: number | undefined;
     }
   | undefined {
   const stages = data.campaign.campaign.stages;
@@ -206,7 +207,16 @@ function stageContextOf(data: Loaded, stageId: string):
       elevatorSpecs: data.resources.elevatorSpecs,
     },
     held: rung === undefined ? COPY.notFound : rung.offer === 'held' ? rung.heldReason : undefined,
+    /* The hub row's own par, so the page and the row compare a clear with one figure (§ D1358). */
+    parUnits: rung?.parUnits,
   };
+}
+
+/** Whether this device holds the stage's clear — the ledger the pay line reads (§ D1129, § D1358). */
+function clearedOnDevice(stageId: string): boolean {
+  return everydayDeviceChimeStore()
+    .record()
+    .turns.some((turn) => turn.completion === 'scenario-cleared' && turn.key === stageId);
 }
 
 function viewOf(data: Loaded, stageId: string): { readonly view: StagePlayView; readonly admitted: boolean; readonly held: boolean } | undefined {
@@ -226,6 +236,8 @@ function viewOf(data: Loaded, stageId: string): { readonly view: StagePlayView; 
     held: found.held,
     award: CHIME_AWARDS.awards['scenario-cleared'] ?? 0,
     choice: session.choice,
+    parUnits: found.parUnits,
+    clearedBefore: clearedOnDevice(found.stage.id),
   });
   const phase: StagePlayPhase =
     session.phase.kind === 'judged'
@@ -309,20 +321,23 @@ function press(data: Loaded, stageId: string, context: EverydayScreenShellContex
         const report = result.outcome.verdict;
         let paid: 'first' | 'again' | undefined;
         if (report.cleared) {
-          const before = everydayDeviceChimeStore()
-            .record()
-            .turns.some((turn) => turn.completion === 'scenario-cleared' && turn.key === found.stage.id);
+          const before = clearedOnDevice(found.stage.id);
           host.bankScenarioClear(found.stage.id);
           paid = before ? 'again' : 'first';
           /*
            * § D1234: keep what this clear's order cost, under the stage's id, so the hub row can
            * compare it with the stage's par after a reload. The fix-it list's record, one list for
-           * every scenario a clear is filed under.
+           * every scenario a clear is filed under, and since § D1358 it keeps the cheapest clear, so
+           * a practice run at a dearer order takes no mark away.
            */
           const store = everydayProfileStore();
           store.setProgress(progressWithFixSpent(store.progress(), found.stage.id, result.admission.units));
         }
-        session.phase = { kind: 'judged', verdict: verdictFactsOf(report, paid), stale: false };
+        session.phase = {
+          kind: 'judged',
+          verdict: verdictFactsOf(report, paid, result.admission.units),
+          stale: false,
+        };
       }
       live?.redraw();
       live?.refreshBar();
@@ -461,6 +476,10 @@ export function mountStagePlay(host: HTMLElement, context: EverydayScreenShellCo
         controls.append(para(doc, 'everyday-stage-play-refusal', view.refusal, `font-size:13.5px;line-height:1.5;color:${C.alarm}`));
       }
       controls.append(para(doc, 'everyday-stage-play-run-note', view.runNote, `font-size:13px;line-height:1.5;color:${C.warmGrey}`));
+      /* § D1358: a stage this device has cleared says a run here is practice, before the press. */
+      if (view.practice !== undefined) {
+        controls.append(para(doc, 'everyday-stage-play-practice', view.practice, `font-size:13px;line-height:1.5;color:${C.inkSoft}`));
+      }
       if (view.status !== undefined) {
         const status = para(doc, 'everyday-stage-play-status', view.status, `font:500 12.5px ${TYPE.mono};color:${C.inkSoft}`);
         status.setAttribute('role', 'status');
@@ -491,6 +510,9 @@ export function mountStagePlay(host: HTMLElement, context: EverydayScreenShellCo
       verdict.append(para(doc, 'everyday-stage-play-holdout', view.verdict.holdout, `font-size:13px;line-height:1.5;color:${C.inkSoft}`));
       if (view.verdict.pay !== undefined) {
         verdict.append(para(doc, 'everyday-stage-play-pay', view.verdict.pay, `font-size:14px;font-weight:600;color:${C.ink}`));
+      }
+      if (view.verdict.par !== undefined) {
+        verdict.append(para(doc, 'everyday-stage-play-par', view.verdict.par, `font-size:13px;line-height:1.5;color:${C.inkSoft}`));
       }
       if (view.verdict.unlock !== undefined) {
         verdict.append(para(doc, 'everyday-stage-play-unlock', view.verdict.unlock, `font-size:13px;color:${C.inkSoft}`));
@@ -591,5 +613,11 @@ export function stagePlayBar(state: EverydayState): ActionBarModel {
     return { ...base, primary: primaryWith(COPY.runLabel, COPY.refusedWhy), note: COPY.noteReady };
   }
   const ran = session.phase.kind === 'judged';
-  return { ...base, primary: primaryWith(ran ? COPY.runAgainLabel : COPY.runLabel), note: COPY.noteReady };
+  /* § D1358: a stage this device has cleared is run again as practice, and the bar says so. */
+  const practice = clearedOnDevice(found.stage.id);
+  return {
+    ...base,
+    primary: primaryWith(ran || practice ? COPY.runAgainLabel : COPY.runLabel),
+    note: practice ? COPY.notePractice : COPY.noteReady,
+  };
 }

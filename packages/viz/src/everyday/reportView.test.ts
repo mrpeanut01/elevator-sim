@@ -29,6 +29,7 @@
 import { loadConfig, type LoadedConfig, type SimulationConfig } from '@elevator-sim/core';
 import { beforeAll, describe, expect, it } from 'vitest';
 
+import { RENEWAL_AHEAD_ON_SHEET_DAYS, renewalAheadSentenceOf } from '../campaign/career.js';
 import type { VizRecording } from '../contract/types.js';
 import type { TabName } from '../dev/elementMap.js';
 import { DATA_DIR, fixtureConfig } from '../fixtures.test-helper.js';
@@ -492,21 +493,40 @@ describe('what this screen adds on top of the sheet', () => {
    * press landed on the stage with the dock reading *day 19 of 20* and no answer given. So where the
    * renewal stands the onward step is the renewal, and it says so before the press.
    */
-  it('sends the career to the renewal, not past it, when the next day is the renewal’s — #582', () => {
-    const due = viewOf({ career: { ...CAREER, day: 19, renewalDue: true } }).tomorrow;
+  it('sends the career to the renewal, not past it, once day 20 has closed — #582, § D1357', () => {
+    // Since § D1357 the renewal stands once day 20 is filed, so this is day 20's sheet.
+    const due = viewOf({ career: { ...CAREER, day: 21, canRunAnother: false, renewalDue: true } }).tomorrow;
     expect(due?.goes).toBe('career-desk');
     expect(due?.label).toBe('Answer the renewal at Garden Apartments');
     expect(due?.label).not.toContain('Open the doors');
-    // The line that says it is coming, on the sheet of the day before it.
-    expect(due?.note).toContain('up for renewal');
+    // It names the day that waits on the answer.
+    expect(due?.note).toContain('Day 20 has closed and the contract is up for renewal');
+    expect(due?.note).toContain('The next month’s first day does not run until it is answered');
     expect(due?.note).toContain('You stay in the career');
-    // And a month already run out still shows the renewal rather than no button: the desk is where
-    // the next press goes either way.
-    expect(viewOf({ career: { ...CAREER, day: 21, canRunAnother: false, renewalDue: true } }).tomorrow?.goes).toBe(
-      'career-desk',
-    );
     // The other polarity: a day with no renewal standing still opens the next day.
     expect(viewOf({ career: { ...CAREER, day: 18 } }).tomorrow?.goes).toBe('career-day');
+  });
+
+  /*
+   * [§ D1357](../../../../DECISIONS.md): days 19 and 20 play, and the sheets of day 18 and day 19 say
+   * when the renewal falls due, on the step that opens the next day. Red before: day 18's sheet went
+   * to the desk, and no sheet named the date.
+   */
+  it('opens days 19 and 20 from the sheets before them, saying when the renewal falls due — § D1357', () => {
+    for (const [day, left] of [[19, '2 working days'], [20, '1 working day']] as const) {
+      const tower = { day };
+      const step = viewOf({
+        career: { ...CAREER, day, renewalAhead: renewalAheadSentenceOf(tower, RENEWAL_AHEAD_ON_SHEET_DAYS) },
+      }).tomorrow;
+      expect(step?.goes).toBe('career-day');
+      expect(step?.label).toBe(`Open the doors on day ${String(day)} at Garden Apartments`);
+      expect(step?.note).toBe(
+        `Runs the next day of this contract. A renewal falls due when day 20 closes, in ${left}. You stay in the career.`,
+      );
+    }
+    // Earlier sheets carry the step's own note and nothing about the renewal.
+    expect(renewalAheadSentenceOf({ day: 18 }, RENEWAL_AHEAD_ON_SHEET_DAYS)).toBeUndefined();
+    expect(viewOf({ career: CAREER }).tomorrow?.note).toBe('Runs the next day of this contract. You stay in the career.');
   });
 
   it('leaves every non-career caller on the daily arm — #577’s other polarity', () => {

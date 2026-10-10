@@ -2413,6 +2413,21 @@ describe('a rush sitting — GitHub issue #372', () => {
     expect(outcome.kind).toBe('refused');
     expect(outcome.kind === 'refused' && outcome.detail).toBe(RUSH_NOT_STANDING);
   });
+
+  /* § D1359: the player's own posted rows — silent with no server, and the binding's answer otherwise. */
+  it('reads the player’s own posted rows through the binding, and says nothing with no server', async () => {
+    expect(await createEverydayHost(harnessOf(base()).bindings).rushPosted('garden-apartments')).toEqual({ kind: 'silent' });
+    const asked: string[] = [];
+    const host = createEverydayHost({
+      ...harnessOf(base()).bindings,
+      readRushPosted: async (buildingId) => {
+        asked.push(buildingId);
+        return { kind: 'rows', date: '2026-10-10', sittings: [] };
+      },
+    });
+    expect(await host.rushPosted('garden-apartments')).toEqual({ kind: 'rows', date: '2026-10-10', sittings: [] });
+    expect(asked).toEqual(['garden-apartments']);
+  });
 });
 
 describe('what the host banks — GitHub issue #499, first time only', () => {
