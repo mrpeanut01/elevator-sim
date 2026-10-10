@@ -138,10 +138,11 @@ describe.skipIf(!HAS_BROWSER)('the replay — GitHub issue #177 item 1', () => {
         stepper: document.querySelector('.everyday-door-stepper')?.textContent ?? '',
         scores: [...document.querySelectorAll('.everyday-door-chip-score')].map((node) => node.textContent ?? ''),
       }));
-      expect(before.scores[5]).not.toBe('—');
+      /* Yesterday's chip is the one before today's — lane AO-4: the strip starts on day 1, with no blanks. */
+      expect(before.scores.at(-2)).not.toBe('—');
 
       /* Yesterday's chip, and the primary it earns. */
-      await page.locator('.everyday-door-chip').nth(5).click();
+      await page.locator('.everyday-door-chip[data-offset="-1"]').click();
       const primary = page.locator('.everyday-bar-primary');
       expect(await primary.textContent()).toBe('Set up the replay');
       expect(await primary.isDisabled()).toBe(false);
@@ -203,9 +204,9 @@ describe.skipIf(!HAS_BROWSER)('the replay — GitHub issue #177 item 1', () => {
        * the two equal the door could not tell which run had been filed.
        */
       expect(expected).not.toEqual(before);
-      expect(expected.scores[6]).not.toBe(before.scores[5]);
+      expect(expected.scores.at(-1)).not.toBe(before.scores.at(-2));
 
-      await page.locator('.everyday-door-chip').nth(5).click();
+      await page.locator('.everyday-door-chip[data-offset="-1"]').click();
       await page.locator('.everyday-bar-primary').click(); // Set up the replay
       await page.waitForSelector('.everyday-brief', { timeout: 15_000 });
       /*
@@ -282,7 +283,7 @@ describe.skipIf(!HAS_BROWSER)('the replay — GitHub issue #177 item 1', () => {
     const page = await coldLoad();
     try {
       await toTomorrowsDoor(page);
-      await page.locator('.everyday-door-chip').nth(5).click();
+      await page.locator('.everyday-door-chip[data-offset="-1"]').click();
       await page.locator('.everyday-bar-primary').click(); // Set up the replay
       await page.waitForSelector('.everyday-brief', { timeout: 15_000 });
 

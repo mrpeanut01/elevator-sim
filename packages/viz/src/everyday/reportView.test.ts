@@ -55,9 +55,11 @@ import {
   type EverydayReportView,
   type HonestyPart,
   FIGURE_NOTE_HANDLE,
+  REPORT_PRACTICE_AGAIN,
   WEEK_SHEET_STEP,
   figureNotePartsOf,
 } from './reportView.js';
+import { PRESS_CALL_ROW_ID } from '../shift/callRow.js';
 
 const BASIS: ReportBasis = Object.freeze({
   buildingId: 'chancery-house',
@@ -926,5 +928,59 @@ describe('a figure card’s note leads with its first sentence and folds the res
     /* Non-vacuity: at least one card on a real sheet is over the budget, or the fold is decoration. */
     expect(shaped.figures.some((cell) => figureNotePartsOf(cell.note).rest !== undefined)).toBe(true);
     expect(FIGURE_NOTE_HANDLE.length).toBeGreaterThan(3);
+  });
+});
+
+/*
+ * Wave AO, lane AO-4, § D1388, the post-AN panel's seat D: *Take this call again* is drawn only on the
+ * pinned Monday, so practising a day an ordinary call decided was three screens deep. The close
+ * offers today again as practice wherever it names the call that decided the day, and nowhere else.
+ */
+describe('today again, as practice, beside the call that decided it — wave AO, lane AO-4', () => {
+  const week = closeDay(
+    openWeek('c2'),
+    outcomeOf({
+      day: 1,
+      dayIdx: 0,
+      eventId: 'ordinary',
+      arrived: 400,
+      carried: 380,
+      minutePct: 90,
+      readings: [],
+      record: null,
+      recordRefusal: null,
+    }),
+  );
+  const decided = 'The 10:40 call decided today: you chose leave them, and park them would have cleared it.';
+
+  it('is offered on the close of a counted day an ordinary call decided', () => {
+    const view = viewOf({ report: sheetOf({ decidingCall: decided, callDecided: true }), week });
+    expect(view.close?.call).toBe(decided);
+    expect(view.practiceAgain).toEqual(REPORT_PRACTICE_AGAIN);
+    /* It says it is the whole day and that it banks nothing, and never that it is the call alone. */
+    expect(REPORT_PRACTICE_AGAIN.label).not.toMatch(/call/iu);
+    expect(REPORT_PRACTICE_AGAIN.note).toMatch(/banks nothing/u);
+  });
+
+  it('is not offered where no call decided the day, on a practice close, a career sheet or with no week', () => {
+    expect(viewOf({ report: sheetOf({ decidingCall: 'No call decided today.', callDecided: false }), week }).practiceAgain).toBeUndefined();
+    expect(viewOf({ report: sheetOf({ decidingCall: decided, callDecided: true, practiceNote: 'Practice.' }), week }).practiceAgain).toBeUndefined();
+    expect(
+      viewOf({
+        report: sheetOf({ decidingCall: decided, callDecided: true }),
+        week,
+        career: { buildingName: 'Garden Apartments', day: 4, canRunAnother: true, renewalDue: false },
+      }).practiceAgain,
+    ).toBeUndefined();
+    expect(viewOf({ report: sheetOf({ decidingCall: decided, callDecided: true }) }).practiceAgain).toBeUndefined();
+  });
+
+  it('leaves a pinned day to its own *Take this call again*', () => {
+    const pinned = sheetOf({ decidingCall: decided, callDecided: true });
+    const withRow = {
+      ...pinned,
+      diagnosis: [...pinned.diagnosis, { id: PRESS_CALL_ROW_ID, when: '10:40', what: 'The stage called the day', why: 'At 10:40.', tone: 'plain' as const }],
+    };
+    expect(viewOf({ report: withRow, week }).practiceAgain).toBeUndefined();
   });
 });

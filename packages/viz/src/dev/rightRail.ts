@@ -1783,6 +1783,21 @@ export function mountRightRail(ui: RightRailElements, context: MountContext): Pa
    */
   const scopeNotes: HTMLElement[] = [];
   const watchNotes: HTMLElement[] = [];
+  const watchNoteOf = new Map<HTMLElement, HTMLElement>();
+  /** Lane AO-4: the cards of a list drawn unavailable while the attempt rule holds, described by its note. */
+  const markWatchOnlyCards = (list: HTMLElement, watchOnly: boolean, note: HTMLElement | undefined, index: number): void => {
+    if (note !== undefined && note.id === '') note.id = `rail-attempt-note-${String(index)}`;
+    for (const card of list.querySelectorAll<HTMLElement>('button')) {
+      card.classList.toggle('watch-only', watchOnly);
+      if (watchOnly) {
+        card.setAttribute('aria-disabled', 'true');
+        if (note !== undefined) card.setAttribute('aria-describedby', note.id);
+      } else if (card.getAttribute('aria-disabled') === 'true') {
+        card.removeAttribute('aria-disabled');
+        if (note !== undefined && card.getAttribute('aria-describedby') === note.id) card.removeAttribute('aria-describedby');
+      }
+    }
+  };
   const scopeNote = (list: HTMLElement, key: SurfaceKey): void => {
     if (commitmentOf(key, 'runs-the-shift') !== 're-runs-now') return;
     const scope = el(doc, 'p', { className: 'rail-prose', text: PICKS_RE_RUN });
@@ -1792,6 +1807,7 @@ export function mountRightRail(ui: RightRailElements, context: MountContext): Pa
     list.parentElement?.insertBefore(watch, list);
     scopeNotes.push(scope);
     watchNotes.push(watch);
+    watchNoteOf.set(list, watch);
   };
   scopeNote(ui.dispatcherList, 'viewer.dispatcherId');
   scopeNote(ui.trafficList, 'viewer.pattern');
@@ -1955,6 +1971,16 @@ export function mountRightRail(ui: RightRailElements, context: MountContext): Pa
        * what is drawn now is what the building is built to. Nothing in this block can change a
        * run, which is why it is the only one of the four that never calls `runShift`.
        */
+      /*
+       * **And the cards that run nothing say so before they are pressed** — wave AO, lane AO-4, the
+       * post-AN panel's seat B, [§ D1387](../../../../DECISIONS.md) extending § D1323. While a scored attempt stands
+       * the three lists' cards refuse when picked; they looked live until then. Each is drawn
+       * unavailable (`aria-disabled`, dimmed by `index.html`'s `.watch-only`) and described by the
+       * rule drawn above it, and a press still says the rule on the status line.
+       */
+      for (const [index, list] of [ui.dispatcherList, ui.trafficList, ui.buildingList].entries()) {
+        markWatchOnlyCards(list, watchOnly, watchNoteOf.get(list), index);
+      }
       const running = runningClassesOf(building, allClasses(resources, state.savedClasses));
       const shownClass = running[0]?.machineClass;
       setText(ui.machinesNote, machinesNoteOf(building));

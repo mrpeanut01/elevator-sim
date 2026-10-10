@@ -46,32 +46,59 @@ describe('continue your week — § D1228', () => {
     expect(continueWeekEntryOf(fileClean(openWeek('sandbox')), 'My tower')).toBeUndefined();
   });
 
-  it('offers a first week whose first day is begun, and says the day is under way — § D1369', () => {
+  it('offers a first week whose first day is begun, at the instant it was left — § D1369, § D1384', () => {
     /*
      * The post-AN panel's seat D (D4): the pinned Monday started and the page reloaded, and the
-     * picker drew no entry because nothing had been filed. Red before `dayBegun`: `undefined`.
+     * picker drew no entry because nothing had been filed. Lane AO-2's `dayBegun` flag and lane AO-4's
+     * attempt clock met at integration; the attempt is the one reading, checked before the nothing-filed rule.
      */
-    const entry = continueWeekEntryOf(openWeek('c2'), 'Midtown Office', true);
-    expect(entry?.goes).toBe('door');
-    expect(entry?.line).toMatch(/^Midtown Office, week 1, Monday under way/u);
+    const entry = continueWeekEntryOf(openWeek('c2'), 'Midtown Office', { clock: '08:39' });
+    expect(entry?.goes).toBe('stage');
+    expect(entry?.line).toMatch(/^Midtown Office, week 1, Monday, left at 08:39/u);
     /* Nothing begun on a week on no scenario is still nothing to continue. */
-    expect(continueWeekEntryOf(openWeek('sandbox'), 'My tower', true)).toBeUndefined();
-    /* And a filed day reads as filed, whatever stands on the next one. */
-    expect(continueWeekEntryOf(fileClean(openWeek('c2')), 'Midtown Office', true)?.line).toMatch(
-      /Monday filed, Tuesday next/u,
-    );
+    expect(continueWeekEntryOf(openWeek('sandbox'), 'My tower', { clock: '08:39' })).toBeUndefined();
   });
 
-  it('names the tower, the day standing and the count toward the target, and opens the door', () => {
+  /*
+   * Wave AO, lane AO-4, § D1384, the post-AN panel's seat B (lost moments 7 and 8): the entry opened
+   * the front door in every state, so a closed day opened on yesterday's door and a day not started
+   * was two presses from its brief. Red before: `goes` was `'door'` in both.
+   */
+  it('names the tower, the day standing and the count toward the target, and goes on to the next brief', () => {
     const tuesdayFiled = fileClean(nextDay(fileClean(openWeek('c2'))));
     expect(continueWeekEntryOf(tuesdayFiled, 'Midtown Office')).toEqual({
       title: CONTINUE_WEEK_TITLE,
       line: 'Midtown Office, week 1, Tuesday filed, Wednesday next · 2 of the 4 clean counted days the target asks for, so far',
-      goes: 'door',
+      goes: 'tomorrow',
     });
-    expect(continueWeekEntryOf(nextDay(tuesdayFiled), 'Midtown Office')?.line).toBe(
-      'Midtown Office, week 1, Wednesday · 2 of the 4 clean counted days the target asks for, so far',
-    );
+    expect(continueWeekEntryOf(nextDay(tuesdayFiled), 'Midtown Office')).toEqual({
+      title: CONTINUE_WEEK_TITLE,
+      line: 'Midtown Office, week 1, Wednesday · 2 of the 4 clean counted days the target asks for, so far',
+      goes: 'brief',
+    });
+  });
+
+  /*
+   * § D1384: a day left part-way goes straight back to its stage, at the instant it was left — on a
+   * first day with nothing filed too (the post-AN panel's seat D, D4, found no entry there at all).
+   */
+  it('goes to the stage where an attempt stands on the day, naming where it was left', () => {
+    const wednesday = nextDay(fileClean(nextDay(fileClean(openWeek('c2')))));
+    expect(continueWeekEntryOf(wednesday, 'Midtown Office', { clock: '10:00' })).toEqual({
+      title: CONTINUE_WEEK_TITLE,
+      line: 'Midtown Office, week 1, Wednesday, left at 10:00 · 2 of the 4 clean counted days the target asks for, so far',
+      goes: 'stage',
+    });
+    expect(continueWeekEntryOf(openWeek('c2'), 'Midtown Office', { clock: '08:43' })).toEqual({
+      title: CONTINUE_WEEK_TITLE,
+      line: 'Midtown Office, week 1, Monday, left at 08:43 · 0 of the 4 clean counted days the target asks for, so far',
+      goes: 'stage',
+    });
+    /* The control: the same weeks with no attempt standing go on to a brief, or draw no entry. */
+    expect(continueWeekEntryOf(wednesday, 'Midtown Office')?.goes).toBe('brief');
+    expect(continueWeekEntryOf(openWeek('c2'), 'Midtown Office')).toBeUndefined();
+    /* A week on no scenario has no entry, attempt or not. */
+    expect(continueWeekEntryOf(openWeek('sandbox'), 'My tower', { clock: '08:43' })).toBeUndefined();
   });
 
   it('opens the week’s sheet once the week has closed', () => {
@@ -85,6 +112,8 @@ describe('continue your week — § D1228', () => {
       line: 'Midtown Office, week 1: the week has closed, and its sheet beside the house is standing',
       goes: 'week',
     });
+    /* A closed week's sheet outranks an attempt, which cannot stand on a filed day anyway. */
+    expect(continueWeekEntryOf(week, 'Midtown Office', { clock: '17:00' })?.goes).toBe('week');
   });
 
   /*
@@ -103,7 +132,7 @@ describe('continue your week — § D1228', () => {
     expect(continueWeekEntryOf(second, 'Midtown Office')).toEqual({
       title: CONTINUE_WEEK_TITLE,
       line: 'Midtown Office, week 2, Monday · 0 of the 4 clean counted days the target asks for, so far',
-      goes: 'door',
+      goes: 'brief',
     });
     /* A first week with nothing filed is still Scenario's to open. */
     expect(continueWeekEntryOf(openWeek('c2'), 'Midtown Office')).toBeUndefined();

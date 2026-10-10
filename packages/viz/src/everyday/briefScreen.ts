@@ -171,6 +171,8 @@ function mountBrief(
             return standing !== undefined && classOfSpec(designerClasses(data.elevatorSpecs()), standing) !== undefined;
           })(),
         },
+        /* Lane AO-4 — the day before, so the brief says which driver this one opens on and why. */
+        yesterday: context.host.previousDayDriver(),
       }),
     };
   }
@@ -483,6 +485,15 @@ function mountBrief(
     count.style.cssText = MONO(11, C.label);
     pickerRow.append(pickerLabel, select, count);
     drivers.append(pickerRow);
+    /*
+     * Lane AO-4, the post-AN panel's seat B (lost moment 10): where the day before ended on another
+     * driver, which driver this day opens on and why, beside the control that changes it.
+     */
+    if (view.drivers.carried !== undefined) {
+      const carried = el(doc, 'p', 'everyday-brief-driver-carried', view.drivers.carried);
+      carried.style.cssText = `margin:9px 0 0;font-size:12px;line-height:1.45;color:${C.inkSoft}`;
+      drivers.append(carried);
+    }
     if (view.drivers.held !== undefined) {
       const held = el(doc, 'p', 'everyday-brief-driver-held', view.drivers.held);
       held.style.cssText = `margin:9px 0 0;font-size:12px;line-height:1.45;color:${C.warmGrey}`;

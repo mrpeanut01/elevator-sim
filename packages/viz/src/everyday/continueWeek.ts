@@ -9,13 +9,27 @@
  * screen: the page still opens on the picker, and the entry is one press on it.
  *
  * It says what it knows and nothing it does not: the tower, the day the week stands on, and the
- * clean counted days so far against the target where the week census speaks. A week whose last
- * day is closed and not yet rolled opens its sheet, which is where that week is standing.
+ * clean counted days so far against the target where the week census speaks.
+ *
+ * **One press to the moment the player left** — wave AO, lane AO-4, the post-AN panel's seat B
+ * (lost moments 7 and 8, defect 1), [§ D1384](../../../../DECISIONS.md). The entry used to open the
+ * front door whatever the week was doing, so a day left at a call was three presses away (the door,
+ * *Set up today*, *Resume*), and a day already closed opened on yesterday's door with *Open the doors
+ * on Tuesday* as its primary. It now goes where the door's own primary would have taken the player:
+ *
+ * - **an attempt standing on the day** → the stage, resumed as the brief's *Resume ⟨day⟩* resumes it;
+ * - **today closed and banked** → tomorrow's brief, by the door's own *Open the doors on ⟨day⟩* press;
+ * - **a day not yet started** → today's brief, which is where *Set up today* goes;
+ * - **a week whose last day is closed and not yet rolled** → its sheet, where that week is standing.
+ *
+ * The front door stays one rail press away from all four.
  */
 
 import { contractById } from '../shift/contracts.js';
 import { countedCleanOf, daysWerePlayedOn, weekDealOf, weekHasClosed, weekOrdinalOf } from '../shift/weekStake.js';
 import { weekdayOf, type WeekState } from '../shift/types.js';
+
+import { todayIsBanked } from './doorView.js';
 
 /** The entry, as words and a destination. */
 export interface ContinueWeekEntry {
@@ -23,8 +37,24 @@ export interface ContinueWeekEntry {
   readonly title: string;
   /** `Midtown Office, Wednesday · 2 of the 4 clean counted days the target asks for, so far`. */
   readonly line: string;
-  /** The front door for a day to play; the week's sheet for a week that has closed. */
-  readonly goes: 'door' | 'week';
+  /**
+   * Where the press goes — [§ D1384](../../../../DECISIONS.md): the stage for a day left part-way,
+   * tomorrow's brief for a day closed and banked, today's brief for a day not yet started, and the
+   * week's sheet for a week that has closed.
+   */
+  readonly goes: ContinueWeekGoes;
+}
+
+/** {@link ContinueWeekEntry.goes}. */
+export type ContinueWeekGoes = 'stage' | 'tomorrow' | 'brief' | 'week';
+
+/**
+ * The attempt standing on the week's day, as the entry needs it — `everyday/host.ts#dayAttempt`.
+ * `clock` is the furthest instant the stage had shown of it, on the run's own clock, which is where
+ * the stage reopens (`shift/attempt.ts#attemptResumeAtS`).
+ */
+export interface ContinueWeekAttempt {
+  readonly clock: string;
 }
 
 export const CONTINUE_WEEK_TITLE = 'Continue your week';
@@ -50,19 +80,37 @@ export const CONTINUE_WEEK_TITLE = 'Continue your week';
 export function continueWeekEntryOf(
   week: WeekState,
   towerName: string,
-  dayBegun = false,
+  attempt?: ContinueWeekAttempt,
 ): ContinueWeekEntry | undefined {
   if (contractById(week.contractId) === undefined) return undefined;
+  const deal = weekDealOf(week);
+  const tally =
+    deal === undefined || deal.target === 0
+      ? ''
+      : ` · ${String(countedCleanOf(week))} of the ${String(deal.target)} clean counted days the target asks for, so far`;
+  /* `Midtown Office, week 2` where the week has a number (§ D1252), the tower alone where it does not. */
+  const ordinal = weekOrdinalOf(week);
+  const tower = ordinal === undefined ? towerName : `${towerName}, ${ordinal}`;
+  /*
+   * **An attempt standing on the day is under way, whatever the history holds** — § D1384. It is the
+   * one run of that day the week can bank (§ D1218), so a player who left it, on the first day of a
+   * week as on any other, is offered it back at the instant they left. Checked before the
+   * nothing-filed rule below, which would otherwise hide a first day left part-way.
+   */
+  if (attempt !== undefined && !weekHasClosed(week)) {
+    return {
+      title: CONTINUE_WEEK_TITLE,
+      line: `${tower}, ${weekdayOf(week.dayIdx)}, left at ${attempt.clock}${tally}`,
+      goes: 'stage',
+    };
+  }
   /*
    * **And a week dealt again is under way from its first morning too** — wave AN, lane DQ-2
    * ([§ D1344](../../../../DECISIONS.md)): a week that was not held rolls to its own order again,
    * keeping its number, so a week 1 played again has nothing filed and is still one the player chose
    * to carry on. `daysWerePlayedOn` is the roll's own mark (the streak or the best day it keeps).
    */
-  if (!dayBegun && week.history.length === 0 && week.week <= 1 && !daysWerePlayedOn(week)) return undefined;
-  /* `Midtown Office, week 2` where the week has a number (§ D1252), the tower alone where it does not. */
-  const ordinal = weekOrdinalOf(week);
-  const tower = ordinal === undefined ? towerName : `${towerName}, ${ordinal}`;
+  if (week.history.length === 0 && week.week <= 1 && !daysWerePlayedOn(week)) return undefined;
   if (weekHasClosed(week)) {
     return {
       title: CONTINUE_WEEK_TITLE,
@@ -74,21 +122,16 @@ export function continueWeekEntryOf(
       goes: 'week',
     };
   }
-  const deal = weekDealOf(week);
-  const tally =
-    deal === undefined || deal.target === 0
-      ? ''
-      : ` · ${String(countedCleanOf(week))} of the ${String(deal.target)} clean counted days the target asks for, so far`;
-  /* A day closed and not yet advanced from: the week stands on it, and the next is what waits. */
-  const standing =
-    week.closedDay === week.day
-      ? `${weekdayOf(week.dayIdx)} filed, ${weekdayOf(week.dayIdx + 1)} next`
-      : dayBegun
-        ? `${weekdayOf(week.dayIdx)} under way`
-        : weekdayOf(week.dayIdx);
+  /*
+   * A day closed and not yet advanced from: the week stands on it, and the next is what waits. Read
+   * off the history, as the door's *Open the doors on ⟨day⟩* reads it (`doorView.ts#todayIsBanked`,
+   * § D1142), so the entry goes on to tomorrow exactly where the door would.
+   */
+  const banked = todayIsBanked({ week });
+  const standing = banked ? `${weekdayOf(week.dayIdx)} filed, ${weekdayOf(week.dayIdx + 1)} next` : weekdayOf(week.dayIdx);
   return {
     title: CONTINUE_WEEK_TITLE,
     line: `${tower}, ${standing}${tally}`,
-    goes: 'door',
+    goes: banked ? 'tomorrow' : 'brief',
   };
 }

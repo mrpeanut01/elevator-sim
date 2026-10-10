@@ -89,6 +89,7 @@ import { reportViewOf } from '../dev/reportPanel.js';
 import type { TabName } from '../dev/elementMap.js';
 import type { ShapedDayReport } from '../shift/report.js';
 import type { TomorrowBriefing } from '../shift/tomorrow.js';
+import { PRESS_CALL_ROW_ID } from '../shift/callRow.js';
 import { dayCloseOf, type DayCloseView } from '../shift/dayClose.js';
 import type { WeekState } from '../shift/types.js';
 import { weekDealOf, type HouseReading } from '../shift/weekStake.js';
@@ -291,11 +292,34 @@ export interface EverydayReportView {
    */
   readonly close: DayCloseView | undefined;
   /**
+   * **Today again, as practice, beside the call that decided it** — wave AO, lane AO-4,
+   * [§ D1388](../../../../DECISIONS.md), {@link REPORT_PRACTICE_AGAIN}. `undefined` except on the close of
+   * a counted day an ordinary call decided; a pinned day's call keeps its own *Take this call again*.
+   */
+  readonly practiceAgain: { readonly label: string; readonly note: string } | undefined;
+  /**
    * The two secondary presses beside the onward one on the close: *Your week* and the menu. Words
    * only; `reportScreen.ts` owns where each goes.
    */
   readonly secondary: { readonly week: string; readonly menu: string };
 }
+
+/**
+ * **Today again, as practice** — wave AO, lane AO-4, [§ D1388](../../../../DECISIONS.md), the post-AN
+ * panel's seat D: *Take this call again* is drawn only on the pinned Monday, so practising a day an
+ * ordinary call decided was three screens deep (*Your week*, *Replay today's tower*, *Run today
+ * again*). The close now offers it where it names the call. It is the whole day from its start: an
+ * ordinary call is asked by the day's own calls from no presses (`dev/state.ts#dayCallsOpenOn`), so a
+ * run opened at that call with the earlier answers carried would ask nothing, and the label says
+ * *today*, never *this call*. A close of it is practice (§ D1138 clause 4), and its stage says so.
+ */
+export const REPORT_PRACTICE_AGAIN = Object.freeze({
+  label: 'Play today again, as practice',
+  note:
+    'The same crowd from the start, under the driver the day began with and with nothing pressed, ' +
+    'and the day asks its calls again as it reaches them. It banks nothing: your week keeps the day ' +
+    'as you closed it.',
+});
 
 /** The close's two secondary presses — {@link EverydayReportView.secondary}. */
 export const REPORT_SECONDARY = Object.freeze({ week: 'Your week', menu: 'Main menu' });
@@ -792,6 +816,15 @@ export function everydayReportViewOf(input: EverydayReportInput): EverydayReport
       : undefined,
     practiceNote: framing.kind === 'week-day' ? framing.practiceNote : undefined,
     weekMark: framing.kind === 'week-day' ? framing.weekMark : undefined,
+    practiceAgain:
+      input.week !== undefined &&
+      input.career === undefined &&
+      input.report?.of === 'week-day' &&
+      input.report.callDecided === true &&
+      input.report.practiceNote === undefined &&
+      !input.report.diagnosis.some((entry) => entry.id === PRESS_CALL_ROW_ID)
+        ? REPORT_PRACTICE_AGAIN
+        : undefined,
     close:
       input.week === undefined || input.report?.of !== 'week-day' || input.career !== undefined
         ? undefined

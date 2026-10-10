@@ -487,3 +487,58 @@ export const STAGE_SKIP_BEAT_NOTE =
 export function stageSkipLineOf(skip: StageSkip, dayStartS?: number | undefined): string {
   return `skipped ${clockAt(skip.fromS, dayStartS)}–${clockAt(skip.toS, dayStartS)}: nobody on a landing waited a minute`;
 }
+
+/*
+ * ---- Wave AO, lane AO-4: one message for one state ----
+ */
+
+/**
+ * **What the transport's line says: one message for one state** — wave AO, lane AO-4, the post-AN
+ * panel's seat B (lost moment 5, defect 3). The pace note and the skip's line were two spans side by
+ * side, each written by its own rule, so a skip that landed on a call read *stopped for the day's call
+ * skipped 09:46–10:40: nobody on a landing waited a minute*, and on a phone a skip's range stood
+ * beside every later note until the next skip replaced it (*skipped 08:31–08:41* still up at the
+ * 12:20 stop).
+ *
+ * Both spans stay, so a reader can tell the two kinds of line apart, but at most one of them has
+ * words at any instant, and this decides which:
+ *
+ * 1. **A stop speaks alone.** The stage stopped for a call, or is waiting at one while its runs are
+ *    made: that is the one thing the player has to act on.
+ * 2. **Otherwise a skip speaks while it stands**: the beat while one is coming, and the line one
+ *    left while {@link stageSkipLineStands} holds.
+ * 3. **Otherwise the pace note.**
+ *
+ * [§ D1385](../../../../DECISIONS.md) clause 2: it changes which of two lines § D1169 and § D1212
+ * already wrote is drawn, and the words of neither.
+ */
+export function stageStatusOf(input: {
+  /** The pace rule's note for the present frame, or the call's while the stage stops for one. */
+  readonly pace: string;
+  /** The stage is stopped for a call, or waiting at one. */
+  readonly stopped: boolean;
+  /** The beat's note while a skip is coming, else the line the last skip left, else `''`. */
+  readonly skip: string;
+}): { readonly pace: string; readonly skip: string } {
+  if (input.stopped) return { pace: input.pace, skip: '' };
+  if (input.skip !== '') return { pace: '', skip: input.skip };
+  return { pace: input.pace, skip: '' };
+}
+
+/**
+ * **Whether the line a skip left still describes the stage** — {@link stageStatusOf}'s *cleared when
+ * the state ends*. A skip lands somewhere the pace rule has a reason for (somebody has waited a
+ * minute, a peak has begun, a call is due); the line stands while the stage stays in that state and
+ * goes the first frame it leaves it, or the moment a call stops the transport.
+ *
+ * @param input.landedReason the pace reason on the first frame after the skip landed, or `undefined`
+ *   before that frame has been asked.
+ * @param input.reason the pace reason now.
+ */
+export function stageSkipLineStands(input: {
+  readonly landedReason: StagePaceReason | undefined;
+  readonly reason: StagePaceReason;
+}): boolean {
+  if (input.reason === 'call') return false;
+  return input.landedReason === undefined || input.landedReason === input.reason;
+}

@@ -34061,6 +34061,8 @@ four screens. `scope/commitment.ts`'s docstring stops describing the model as un
 
 > **Status 2026-09-25: AMENDED by [§ D1094](#d1094)** (an agent ruling). A replay meets the crowd and the stretch of the day its own record holds rather than the seed and length standing now, and a day filed without a record says so on the door. See [`docs/39`](docs/39-decisions-in-force.md).
 
+> **Status 2026-10-10: AMENDED by [§ D1386](#d1386)** (an agent ruling). The week strip starts on the week's first day, so no chip from before the week is drawn and the stepper stops at day 1, saying why. See [`docs/39`](docs/39-decisions-in-force.md).
+
 **Date:** 2026-09-06. **Status:** Accepted. **GitHub issue #177 item 1**, GAMEPLAY § 6.1.
 
 **Context.** § 6.1 says *every past day stays playable* and *never silently rescore history*. The
@@ -48020,6 +48022,8 @@ step on a closing sheet, a career sheet unchanged).
 
 > **Status 2026-10-10: AMENDED by [§ D1330](#d1330)** (an agent ruling). A week past the first is offered from its first morning with nothing filed, and the entry names the week's number where one is true of it. See [`docs/39`](docs/39-decisions-in-force.md).
 
+> **Status 2026-10-10: AMENDED by [§ D1384](#d1384)** (an agent ruling). The entry opens the stage for a day left part-way, tomorrow's brief after a close and today's brief for a day not started, never the front door, and a day left part-way is offered on its first day too. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-09-26 by agent sessions under delegated authority** (wave AL, lane AL-F, on swarm DN's
 > Q2 ruling, item 4, three of three), not by the product owner. **Owner-reversible**: the entry, its
 > place above the tiles, and its words.
@@ -49970,6 +49974,8 @@ site is opened again*: red on a bundle of the base tree (`collective`), green on
 
 > **Status 2026-10-10: AMENDED by [§ D1360](#d1360)** (an agent ruling). The same hold covers the Everyday screens that would run the attempt's day or change how it runs (the workshop, the tuner, the drawing board, *Take this call again*, *Play this crowd*), the Engineer menu's calendar and *Post this run*, and `runShift` refuses any other ask for that day. See [`docs/39`](docs/39-decisions-in-force.md).
 
+> **Status 2026-10-10: EXTENDED by [§ D1387](#d1387)** (an agent ruling). The controls clause 1 refuses are drawn unavailable, with the reason, before they are pressed, and a press still refuses in these words. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-10-10 by agent sessions under delegated authority** (wave AN, lane AN-6, on the
 > post-AM panel's seat D, defects D1 to D3), not by the product owner, and to be read as an agent
 > ruling; [§ D626](#d626) is the cautionary case. **Amends [§ D1239](#d1239)**, whose clause 1 held
@@ -51297,3 +51303,177 @@ at every call that reads the state's own day* (red before on `dev/main.ts`), and
 
 **Not established.** Whether a career day's sheet says anything about the next career day's wrinkle,
 and from which source, was not checked: the next day's event is chosen when its run is pressed.
+
+## D1384 — *Continue your week* opens where the player left: the stage at a held call, tomorrow's brief after a close
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (wave AO, lane AO-4, on the
+> post-AN panel's seat B, lost moments 7 and 8 and defect 1), not by the product owner, and to be read
+> as an agent ruling. **Amends [§ D1228](#d1228)**, whose entry opened the front door for a day to
+> play. **Owner-reversible**: each of the four destinations, and naming the clock the day was left at.
+> **Not put to a swarm**: the lane had no way to spawn one; the reading not chosen is set out below so
+> the integrator can.
+
+**Why an entry.** [§ D405](#d405)'s first two grounds. It moves a recorded ruling and binds
+`everyday/shell.ts`, `everyday/continueWeek.ts`, `everyday/host.ts` (a new `dayAttemptLeftAt`) and
+`everyday/weekSurvives.browser.test.ts`, which another lane wrote.
+
+**What was measured.** On a bundle of the base tree (`b53ab48`), Crown Hotel on 2026-10-03: a day
+left at its 08:39 call came back as the front door, then *Set up today*, then *Resume Tuesday*, and
+the stage stood paused at 08:39 with no card for about six seconds and *▶ Play* offered; a closed
+Monday came back as Monday's door with *Open the doors on Tuesday* as its primary; and a first day
+left part-way drew no entry at all.
+
+**The ruling.**
+
+1. **The entry goes where the screen it skips would have sent the player**, by that screen's own
+   calls. An attempt standing on the day opens the stage (`host.playDay`, the brief's *Resume*). A day
+   closed and banked opens tomorrow's brief (`host.openTomorrow`, the door's *Open the doors on
+   ⟨day⟩*). A day not yet started opens today's brief (the door's *Set up today*). A week whose last
+   day is closed opens its sheet, as before. The front door stays one rail press away.
+2. **An attempt standing on the day is under way whatever the history holds**, so a first day left
+   part-way draws the entry too. Its line names the instant it was left, on the hour the day is
+   planned at: *Midtown Office, week 1, Wednesday, left at 10:00 · 2 of the 4 clean counted days the
+   target asks for, so far*.
+3. **The stage it opens shows the held call without a press.** A resumed attempt reopens paused at
+   the instant it was left (§ D1218); while the call's runs are made the transport's button reads
+   *Running the day ahead…* and cannot be pressed, and the card comes up when they land (§ D1385).
+
+**The reading not chosen.** Opening the brief with *Resume* as its primary would keep one screen
+between the menu and the stage and keep the brief's held driver in view. Seat B's ranked change was
+*one step from Continue to the moment you left*, and the brief's only press there is *Resume*, so it
+was taken out.
+
+**Tests**, red before and green after. `everyday/continueWeek.test.ts`: the destinations, the
+first-day attempt and its control (red before: three cases, `goes` was `'door'`).
+`everyday/host.test.ts`, *says where the standing attempt was left*. `everyday/continueWhereLeft.browser.test.ts`
+cases 1 and 2 on the built bundle: the stage with the card up and Play never offered while the call
+is worked out, and Tuesday's brief after a close.
+
+**What it does not reach.** Seat D's D4 (a reload with the first day open lands on the landing page,
+which offers the tutorial) is lane AO-2's; this entry only makes the menu's entry exist there.
+
+## D1385 — the stage tells the truth about its own state: the chip the player chose, one line at a time, no Play while a call is worked out, and the building in view
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (wave AO, lane AO-4, on the
+> post-AN panel's seat B, lost moments 4, 5, 6 and 9 and defects 2, 3 and 9), not by the product
+> owner. It reads [§ D991](#d991) clause 2 (*every change shows on the lit chip*) for the state that
+> clause did not name, a stopped transport, and moves no clause. **Owner-reversible**: lighting the
+> player's chip while stopped, which of the two lines speaks, the waiting button's words, and the
+> half-in-view line for bringing the building back. **Not put to a swarm**: the lane had no way to
+> spawn one.
+
+**Why an entry.** It binds `everyday/stageScreen.ts`, `everyday/stageScreenModel.ts`,
+`everyday/stagePace.ts` and `everyday/stagePace.browser.test.ts`, which another lane wrote, and it
+reads a recorded ruling.
+
+**What was wrong**, each reproduced on a bundle of the base tree. At every call stop and at 18:00
+the lit chip read `30×` for a player who never left `4×`: the transport had stopped, and the chip
+named the rung it stopped from. The pace note and a skip's line were two spans side by side, so a
+skip that landed on a call read *stopped for the day's call skipped 09:46 to 10:40: …*, and a skip's
+line stood beside every later note until the next skip. While the stage waited at a call whose runs
+were being made it offered *▶ Play*, which played one frame and stopped again. At 390×844 the
+header's *▶ Play* left the canvas at y 756 to 1262 under a bar from y 725.
+
+**The ruling.**
+
+1. **A stopped transport lights the chip the player chose** (`stageScreenModel.ts#stageLitSpeedOf`);
+   a moving one lights the rung it moves at, as § D991 has it.
+2. **One message for one state** (`stagePace.ts#stageStatusOf`). A stop speaks alone; otherwise a
+   skip speaks, its beat while one is coming and its line while the stage stays in the state it
+   landed in; otherwise the pace note. A skip's line goes the frame the stage leaves that state, at a
+   call, and at a chip press. The words of § D1169 and § D1212 are unchanged.
+3. **While the stage waits at a call it says so** (`stageScreenModel.ts#STAGE_PLAY_CONTROL`): the
+   button reads *Running the day ahead…* and cannot be pressed, from the stop until the card is
+   drawn, on a resumed attempt as well as in play, where a resumed attempt used to sit silent with
+   no card until Play was pressed.
+4. **A press that sets the day playing brings the building into view** where less than half of it
+   can be seen (`stageScreenModel.ts#stageBuildingWantsBringing`), on the next frame, so the shell's
+   scroll keeper does not undo it. A desktop stage, which shows four fifths of its canvas, is not
+   moved.
+
+**Tests.** `everyday/stageScreenModel.test.ts` and `everyday/stagePace.test.ts` (the four rules,
+with their controls); `everyday/continueWhereLeft.browser.test.ts` cases 1 to 3 (the chip at a call
+stop and at the day's end, one line at the stop, no Play offered while the call is worked out, the
+canvas in view on a phone); `everyday/stagePace.browser.test.ts`, whose skip-line reads now hold the
+one-line rule.
+
+**Not established.** On a phone the building in view puts the header, and its *Pause*, above the
+fold; the panel has not played that layout.
+
+## D1386 — the front door's week strip starts on the week's first day, and its definitions sit behind one disclosure
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (wave AO, lane AO-4, on the
+> post-AN panel's seat B, lost moment 3), not by the product owner. **Amends [§ D517](#d517)** clause
+> 3's last sentence (*a chip from before the week began stays inert with the reason*): no such chip
+> is drawn. **Owner-reversible**: dropping the slots before day 1, stopping the stepper there, and the
+> disclosure. **Not put to a swarm**: the lane had no way to spawn one.
+
+**Why an entry.** It moves a recorded ruling, departs from the design handoff's seven-chip strip
+where the handoff draws nothing (its prototype shows a week of days played and no blank tile), and
+binds `everyday/dailyLoop.browser.test.ts`, `everyday/replay.browser.test.ts` and
+`honesty/surfaces.ts`.
+
+**The ruling.**
+
+1. **The strip draws the week's days so far**, from day 1 to today, up to seven
+   (`everyday/doorView.ts#earliestOffsetOf`). A first visit draws today alone.
+2. **The stepper stops at day 1**, and its dimmed arrow says why, true of the day it is dimmed on:
+   *This is the week's first day, so there is no day before it.*, or the seven-day reach as before.
+3. **The day's words sit behind one disclosure**, closed on arrival, whose line names exactly the
+   words inside (*What press, standing order and pinned crowd mean*). The definitions are
+   `mode/glossary.ts`'s, unchanged.
+
+**Tests.** `everyday/doorView.test.ts` (red before: seven chips, offsets −6 to 0, on a Friday);
+`everyday/dailyLoop.browser.test.ts` and `everyday/replay.browser.test.ts`, which named chips by
+position and now name them by their day.
+
+## D1387 — while a scored attempt stands, the Engineer surface draws the controls that run nothing as unavailable, with the reason, before they are pressed
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (wave AO, lane AO-4, on the
+> post-AN panel's seat B), not by the product owner. **Extends [§ D1323](#d1323)** clause 1, which
+> refuses those controls in words when pressed. **Owner-reversible**: `aria-disabled` rather than
+> `disabled`, and the dimming. **Not put to a swarm**: the lane had no way to spawn one.
+
+**Why an entry.** It binds `dev/main.ts`, `dev/rightRail.ts`, `index.html` and two browser journeys
+other lanes wrote (`everyday/autoFile.browser.test.ts`, `everyday/watchOnly.browser.test.ts`).
+
+**The ruling.** While an attempt stands on the week on screen, the building, pattern and part-of-day
+selects, *Run this shift* (not *Cancel this run*), *Save recording* (where its press refuses) and the
+rail's dispatcher, traffic and building cards carry `aria-disabled` and the `watch-only` class, which
+dims them. The selects and buttons carry the sentence their press gives as their `title`, and each
+card is described by the rule drawn above its list. A press still refuses in § D1323's words on the
+status line, so no clause of § D1323 moves. `aria-disabled` keeps them focusable and pressable, which
+is what lets the press keep saying why.
+
+**Tests.** `everyday/continueWhereLeft.browser.test.ts` case 4 (red before: none of the controls
+carried `aria-disabled` or a reason). The two journeys that press *Run this shift* and *Save
+recording* during an attempt now press past the drawn state (`force`), and still read the refusal.
+
+## D1388 — the close offers today again, as practice, beside the call that decided it
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (wave AO, lane AO-4, on the
+> post-AN panel's seat D, whose note was that *Take this call again* exists only on the pinned
+> Monday and practice on any other day is three screens deep), not by the product owner.
+> **Owner-reversible**: drawing the press at all, and its words. **Not put to a swarm**: the lane had
+> no way to spawn one.
+
+**Why an entry.** It adds a press to the close [§ D1247](#d1247) to [§ D1249](#d1249) laid out, and
+it is a practice under [§ D1218](#d1218)'s rule.
+
+**The ruling.** On the close of a counted day an ordinary call decided (the close's call line names
+it, `WeekDayReport.callDecided`), the press *Play today again, as practice* sits under that line. It
+is the brief's own press, `host.playDay`, which on a day already filed runs it again as practice from
+its start, under the driver it began with and with nothing pressed; the stage carries the practice
+line and a close of it banks nothing. A pinned day keeps its own *Take this call again*.
+
+**The reading not chosen.** A practice that opens at the deciding call with the earlier answers
+carried, as the pinned day's does. An ordinary day's calls open only on a log no press reached
+(`dev/state.ts#dayCallsOpenOn`), so that run would ask nothing; opening it would need the call
+session reopened mid-day on a practice run, which is not built. So the label says *today*, never
+*this call*.
+
+**Tests.** `everyday/reportView.test.ts`: drawn on a decided ordinary day, not where no call decided,
+on a practice close, a career sheet, a close with no week, or a pinned day.
+
+**Not established.** No browser case presses it: the browser tier's slice day (Crown Hotel) is
+decided by no call under any first answer, measured on this tree.

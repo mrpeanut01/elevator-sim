@@ -3086,6 +3086,24 @@ describe('one attempt per scored day — § D1218', () => {
     expect(createEverydayHost({ ...h.bindings, attemptRunStale: () => true }).stageHold(stale), 'no attempt stands').toBeUndefined();
   });
 
+  /*
+   * Wave AO, lane AO-4, § D1384: *Continue your week* names the instant the attempt was left, on the
+   * hour the day is planned at (the hour its resumed stage prints), and nothing where none stands.
+   */
+  it('says where the standing attempt was left, on the hour the day is planned at', () => {
+    const h = harnessOf(base());
+    const none = createEverydayHost({ ...h.bindings, dayAttempt: () => undefined });
+    expect(none.dayAttemptLeftAt()).toBeUndefined();
+    const host = createEverydayHost({ ...h.bindings, dayAttempt: () => ATTEMPT });
+    const hour = host.dayAhead().startOfDayS ?? 6 * 3600;
+    const total = hour + ATTEMPT.shownToS;
+    const expected = `${String(Math.floor(total / 3600) % 24).padStart(2, '0')}:${String(Math.floor((total % 3600) / 60)).padStart(2, '0')}`;
+    expect(host.dayAttemptLeftAt()).toBe(expected);
+    /* The control: moved on by ten minutes, the clock moves by ten minutes. */
+    const later = createEverydayHost({ ...h.bindings, dayAttempt: () => ({ ...ATTEMPT, shownToS: ATTEMPT.shownToS + 600 }) });
+    expect(later.dayAttemptLeftAt()).not.toBe(expected);
+  });
+
   it('starts afresh where the attempt could not be resumed exactly', () => {
     const h = harnessOf(base());
     const bindings: EverydayHostBindings = {

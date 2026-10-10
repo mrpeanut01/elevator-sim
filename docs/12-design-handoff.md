@@ -1086,6 +1086,19 @@ is held from the table: no stage-reaching primary shares a verb with the overlay
 (`everyday/actionBar.test.ts`, `everyday/firstTwoMinutes.browser.test.ts`). **Owner-reversible**:
 the owner's question 17 offers this reading, and reversing it is the one constant.
 
+### 4.21 The front door's week strip starts on the week's first day, and its definitions sit behind one disclosure
+
+**The deviation.** The prototype's door strip is seven days played, so it draws no tile for a day
+that does not exist; this build drew one for every slot before day 1, an em dash for a tower and a
+score with *before this week* under it, six of them on a first visit. The post-AN panel's newcomer
+seat named them and the three definition paragraphs under the rule as clutter before the day
+(lost moment 3). [§ D1386](../DECISIONS.md) draws the week's days so far, up to seven, stops the
+stepper at day 1 with a sentence saying why, and puts the day's definitions behind one disclosure
+whose line names the words inside.
+
+**What it does not change.** A day that exists is drawn exactly as § 6.1 has it, and a week on its
+seventh day draws the full seven. The definitions are `mode/glossary.ts`'s, unchanged.
+
 The refactor is done when all of the following are true, and not before.
 
 1. **Layout fidelity** — the three regions, their widths, their order and their internal card

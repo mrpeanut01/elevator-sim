@@ -289,6 +289,8 @@ import {
   type CheckedRun,
 } from '../watch/library.js';
 import { postedRunOf } from '../watch/posted.js';
+import { watchRunPlanOf } from '../watch/record.js';
+import type { BriefYesterday } from './briefView.js';
 import type { WatchableRun } from '../watch/types.js';
 import { watchingViewOf, type WatchingView } from '../watch/view.js';
 
@@ -1698,6 +1700,26 @@ export interface EverydayHost {
    * where this tab may play it.
    */
   stageHold(recording: VizRecording | undefined): 'elsewhere' | 'stale' | undefined;
+
+  /**
+   * **Where the standing attempt was left, on the day's own clock** — wave AO, lane AO-4,
+   * [§ D1384](../../../../DECISIONS.md), for the mode picker's *Continue your week*. The furthest
+   * instant the stage had shown of it (`shift/attempt.ts#DayAttempt.shownToS`, where the stage
+   * reopens), on the hour {@link dayAhead} plans for the day, which is the hour the resumed run's
+   * stage prints: a page opened on the menu has no run of the day yet whose hour could be read.
+   * `undefined` where no attempt stands. Its own method so `dayAttempt`, asked on every bar, plans
+   * nothing.
+   */
+  dayAttemptLeftAt(): string | undefined;
+
+  /**
+   * **The day before this one, as the brief says what it carries** — wave AO, lane AO-4, the post-AN
+   * panel's seat B (lost moment 10), `briefView.ts#briefCarriedDriverLineOf`. The week's filed day
+   * before the one it stands on: its weekday, the dispatcher it started with, and the last handover
+   * made on its stage with that handover's clock, on the day's own hour. `undefined` on a first day
+   * and where that day was filed without a record of its run.
+   */
+  previousDayDriver(): BriefYesterday | undefined;
 
   /**
    * Where the stage opens `recording` when it is the standing attempt's run: the furthest instant
@@ -4033,6 +4055,38 @@ export function createEverydayHost(
       if (b.dayAttempt?.() === undefined) return undefined;
       if (b.attemptHeldElsewhere?.() === true) return 'elsewhere';
       return recording !== undefined && b.attemptRunStale?.(recording) === true ? 'stale' : undefined;
+    },
+    previousDayDriver: () => {
+      const state = b.state();
+      const entry = state.week.history.find((outcome) => outcome.day === state.week.day - 1);
+      const record = entry?.record;
+      if (entry === undefined || record === null || record === undefined) return undefined;
+      const weekday = weekdayOf(entry.dayIdx);
+      let last: { readonly atS: number; readonly toId: string; readonly toName: string } | undefined;
+      for (const press of record.interventions) {
+        if (press.change.kind === 'adopt-dispatcher' || press.change.kind === 'switch-dispatcher') {
+          last = { atS: press.atS, toId: press.change.profile.id, toName: press.change.profile.name };
+        }
+      }
+      if (last === undefined) return { weekday, startedWithId: record.dispatcherId };
+      let dayStartS: number | undefined;
+      try {
+        dayStartS = watchRunPlanOf(state, b.resources, record).startOfDayS;
+      } catch {
+        /* A record this build cannot plan keeps the clock's fallback hour rather than losing the line. */
+        dayStartS = undefined;
+      }
+      return {
+        weekday,
+        startedWithId: record.dispatcherId,
+        handover: { toId: last.toId, toName: last.toName, clock: clockOf(last.atS, dayStartS ?? DAY_START_S) },
+      };
+    },
+    dayAttemptLeftAt: () => {
+      const attempt = b.dayAttempt?.();
+      if (attempt === undefined) return undefined;
+      const dayStartS = plannedDayOf(b.resources, { ...b.state(), ...dayPatchFor(b) }).startOfDayS;
+      return clockOf(attempt.shownToS, dayStartS ?? DAY_START_S);
     },
     attemptResumeAtS: (recording) => b.attemptResumeAtS?.(recording),
     practiceOnStage: () => {

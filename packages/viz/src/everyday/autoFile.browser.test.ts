@@ -420,7 +420,8 @@ describe.skipIf(!HAS_BROWSER)('the day nobody closed', () => {
         ATTEMPT_SHOWN_TO_ITS_REACH,
         { timeout: 10_000 },
       );
-      await page.click('#run');
+      /* Forced: since wave AO, lane AO-4 the button is drawn unavailable (`aria-disabled`) while the attempt stands, and a press still refuses in words. */
+      await page.click('#run', { force: true });
       expect(await page.textContent('#status')).toBe(ATTEMPT_ENGINEER_WATCHES_ONLY);
       await waitPastTheCoveredEnd(page, 1, LONG_RUN_S);
       await returnToEverydayMode(page);

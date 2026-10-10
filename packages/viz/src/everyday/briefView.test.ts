@@ -11,9 +11,10 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { BRIEF_WAY_THROUGH_HEADING, BRIEF_WEEK_HEADING, briefBarModel, briefScreenViewOf, lockedForScore, raceAgainstCard, RECOMMENDED_CARDS,
+import { BRIEF_WAY_THROUGH_HEADING, BRIEF_WEEK_HEADING, briefBarModel, briefCarriedDriverLineOf, briefScreenViewOf, lockedForScore, raceAgainstCard, RECOMMENDED_CARDS,
   SANDBOX_DOOR_LABEL,
   TUNE_OFFER_EVERYTHING,
+  type BriefYesterday,
 } from './briefView.js';
 import { actionBarFor } from './actionBar.js';
 import { CONTINUE_HERE_CELL, DAY_ATTEMPT_COPY } from '../shift/attempt.js';
@@ -362,5 +363,53 @@ describe('the brief’s primary over an attempt another tab holds — § D1361',
     expect(here.primary.label).toBe('Resume Monday');
     expect(here.note).toBe(DAY_ATTEMPT_COPY.resumeNote);
     expect(briefBarModel(base, 'Steady hand').primary.label).toBe('Start the day');
+  });
+});
+
+/**
+ * Wave AO, lane AO-4, the post-AN panel's seat B (lost moment 10): a newcomer handed Monday to
+ * another driver on the stage, and Tuesday's brief opened on the house with nothing said. § D1318's
+ * rule is unchanged (the brief's pick carries, a stage handover does not); the brief now says it.
+ */
+describe('which driver the day opens on, and why — wave AO, lane AO-4', () => {
+  const HANDED: BriefYesterday = {
+    weekday: 'Tuesday',
+    startedWithId: 'collective',
+    handover: { toId: 'eta', toName: 'Estimated time', clock: '12:20' },
+  };
+  const brief = (input: { selectedId?: string; yesterday?: BriefYesterday; attemptWeekday?: string; today?: TodayRecord }) =>
+    briefScreenViewOf({
+      today: input.today ?? TODAY,
+      dispatchers: DISPATCHERS,
+      savedIds: [],
+      selectedId: input.selectedId ?? 'collective',
+      ...(input.yesterday === undefined ? {} : { yesterday: input.yesterday }),
+      ...(input.attemptWeekday === undefined ? {} : { attemptWeekday: input.attemptWeekday }),
+    });
+
+  it('names the driver the day opens on, the handover the day before made, and how to drive with it today', () => {
+    expect(brief({ yesterday: HANDED }).drivers.carried).toBe(
+      'Wednesday opens on Steady hand, the driver Tuesday started with. Tuesday’s handover to Estimated time ' +
+        'at 12:20 kept to Tuesday: a handover on the stage lasts the rest of its own day, and only the driver ' +
+        'picked on this brief carries over. To drive with Estimated time today, pick it here.',
+    );
+    /* Picked something else since: the line names the driver and claims no history for it. */
+    expect(brief({ selectedId: 'nearest-car', yesterday: HANDED }).drivers.carried).toMatch(/^Wednesday opens on Steady hand\. /u);
+  });
+
+  it('says nothing where nothing was handed back', () => {
+    /* No day before, no handover on it, or the day opens on the driver the handover named. */
+    expect(brief({}).drivers.carried).toBeUndefined();
+    expect(brief({ yesterday: { weekday: 'Tuesday', startedWithId: 'collective' } }).drivers.carried).toBeUndefined();
+    expect(brief({ selectedId: 'eta', yesterday: HANDED }).drivers.carried).toBeUndefined();
+    /* A held driver has its own sentence on this line: an attempt under way, a pinned day's order. */
+    expect(brief({ yesterday: HANDED, attemptWeekday: 'Wednesday' }).drivers.carried).toBeUndefined();
+    expect(brief({ yesterday: HANDED, today: { ...TODAY, driverHeld: 'held' } }).drivers.carried).toBeUndefined();
+  });
+
+  it('is the pure function the view draws', () => {
+    expect(
+      briefCarriedDriverLineOf({ weekday: 'Wednesday', driverId: 'collective', driverName: 'Collective', yesterday: HANDED }),
+    ).toContain('Wednesday opens on Collective, the driver Tuesday started with.');
   });
 });

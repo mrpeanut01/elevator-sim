@@ -328,7 +328,8 @@ describe.skipIf(!HAS_BROWSER)('the Engineer surface only watches a scored attemp
       page.on('download', (download) => {
         downloads.push(download.suggestedFilename());
       });
-      await page.locator('#save-recording').click();
+      /* Forced: since wave AO, lane AO-4 the button is drawn unavailable (`aria-disabled`) while the attempt stands, and a press still refuses in words. */
+      await page.locator('#save-recording').click({ force: true });
       await page.waitForTimeout(2_000);
       expect(downloads, 'the whole day was handed over').toEqual([]);
       expect(await textOf(page, '#status')).toBe(ATTEMPT_NOT_SAVED);

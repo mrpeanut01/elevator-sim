@@ -117,6 +117,9 @@ import {
   stageMayAdopt,
   stageOpeningLineOf,
   STAGE_OVERLAY_PLAY,
+  stageBuildingWantsBringing,
+  stageLitSpeedOf,
+  stagePlayControlOf,
   stageHandoverVerdictOf,
   type StageHandoverVerdict,
   stagePressChangedNobody,
@@ -135,6 +138,8 @@ import {
   STAGE_SKIP_BEAT_NOTE,
   stagePaceNoteOf,
   stagePaceOf,
+  stageSkipLineStands,
+  stageStatusOf,
   stageSkipApplies,
   stageSkipLineOf,
   stageSkipOf,
@@ -434,6 +439,19 @@ function mountStage(
   let skipArmedAtS: number | undefined;
   let skipLandedAtS: number | undefined;
   let skipLine = '';
+  /*
+   * ---- Wave AO, lane AO-4: one message for one state (`stagePace.ts#stageStatusOf`). ----
+   *
+   * `paceText` is what the pace rule (or a call's stop) says now and `paceStopped` whether that is a
+   * stop; `skipLineReason` is the pace reason on the first frame after the last skip landed, so the
+   * line goes the frame the stage leaves that state (`stageSkipLineStands`). {@link showStatus} is
+   * the one writer of both spans.
+   */
+  let paceText = '';
+  let paceStopped = false;
+  let skipLineReason: StagePaceReason | undefined;
+  /** A press set the day playing, and the next frame brings the building into view — {@link bringBuildingIntoView}. */
+  let bringBuildingPending = false;
   /*
    * ---- § D1029's call — wave AI. Two cells, both set in `adopt`. ----
    *
@@ -1657,6 +1675,10 @@ function mountStage(
   function tick(): void {
     pendingFrame = undefined;
     if (!alive) return;
+    if (bringBuildingPending) {
+      bringBuildingPending = false;
+      bringBuildingIntoView();
+    }
     draw();
     if (playback?.state === 'playing') requestFrame();
     else syncTransport();
@@ -1671,6 +1693,8 @@ function mountStage(
       /* § D1212: a pause stops a skip that is coming; *Play* starts a fresh beat. */
       dropSkipBeat();
     } else {
+      /* Lane AO-4: the button is held while the stage works out a call; a key press is held with it. */
+      if (waitingAtCall()) return;
       started = true;
       /*
        * The one place a player gesture reaches the sound — GitHub issue #258. A browser suspends
@@ -1679,9 +1703,30 @@ function mountStage(
        */
       audioSink?.wake();
       playback.play();
+      bringBuildingPending = true;
     }
     syncTransport();
     requestFrame();
+  }
+
+  /**
+   * **Keep the building in view while the day plays** — wave AO, lane AO-4, the post-AN panel's seat
+   * B (lost moment 9, defect 9), [§ D1385](../../../../DECISIONS.md) clause 4. Asked when a press sets the day playing: on a phone the header's
+   * *▶ Play* sits above the goals, and the canvas under them was below the fixed bar for the whole of
+   * the day it started. `stageScreenModel.ts#stageBuildingWantsBringing` decides, so a desktop stage
+   * that already shows most of its building is not scrolled under the reader.
+   *
+   * **On the next frame, never inside the press** ({@link bringBuildingPending}): the shell keeps the
+   * region's offset across the first re-render after a player's press (`shell.ts#keepScrollAcrossRerender`),
+   * so a scroll made in the press is put back by the press's own button-text change. The call
+   * card's scroll is made from a frame for the same reason.
+   */
+  function bringBuildingIntoView(): void {
+    const box = canvas.getBoundingClientRect();
+    const shown = region.getBoundingClientRect();
+    const viewportBottom = view?.innerHeight ?? doc.documentElement.clientHeight;
+    const seen = { top: Math.max(0, shown.top), bottom: Math.min(viewportBottom, shown.bottom) };
+    if (stageBuildingWantsBringing(box, seen)) canvas.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   }
 
   function setSpeed(index: number): void {
@@ -1696,6 +1741,12 @@ function mountStage(
      * somebody next waits a minute.
      */
     playerChoseSpeedAtS = paceScored && lastPaceReason === 'watching' ? undefined : (playback?.simTimeS ?? 0);
+    /* Lane AO-4: a chip press is a state of the player's making, so a skip's line from before it is over. */
+    if (skipLine !== '') {
+      skipLine = '';
+      skipLineReason = undefined;
+      showStatus();
+    }
     playback?.setSpeed(stageSpeedAt(index).simPerRealS);
     syncTransport();
     requestFrame();
@@ -1729,7 +1780,14 @@ function mountStage(
        * *stopped for the day's call* and *fast-forwarding at 30×* stood under an 18:00 clock after a
        * skip had run the day out. The bar says the day has run out; the note says nothing more.
        */
-      if (playback.simTimeS >= playback.recording.endedAt && paceNote.textContent !== '') paceNote.textContent = '';
+      if (playback.simTimeS >= playback.recording.endedAt && (paceText !== '' || skipLine !== '')) {
+        /* Wave AO, lane AO-4: and nor does a skip's line — the day's end is one state, said by the bar. */
+        skipLine = '';
+        skipLineReason = undefined;
+        setPace('', false);
+      }
+      /* A stop the stage is waiting at says so, on a resumed attempt too (lane AO-4). */
+      syncWaitingNote();
       return;
     }
     const answer = stagePaceOf({
@@ -1753,7 +1811,20 @@ function mountStage(
     const note = waiting
       ? STAGE_CALL_COPY.waiting
       : (stagePaceNoteOf(answer, { acts: paceActs, simTimeS, dayStartS: host.dayStartS() }) ?? '');
-    if (paceNote.textContent !== note) paceNote.textContent = note;
+    /*
+     * Wave AO, lane AO-4 — one message for one state (`stagePace.ts#stageStatusOf`): the line a skip
+     * left stands while the stage stays where it landed, and goes the frame it leaves (or a call
+     * stops it); the pace note is drawn only where neither a stop nor a skip is speaking.
+     */
+    if (skipLine !== '') {
+      if (!stageSkipLineStands({ landedReason: skipLineReason, reason: answer.reason })) {
+        skipLine = '';
+        skipLineReason = undefined;
+      } else if (skipLineReason === undefined) {
+        skipLineReason = answer.reason;
+      }
+    }
+    setPace(note, answer.reason === 'call');
     if (answer.reason === 'call') waitingOnCall = waiting;
     /*
      * **The call stops the transport** — § D1029. At any rung, and after a chip press, because the
@@ -1817,7 +1888,7 @@ function mountStage(
     }
     if (skipArmedAtS === undefined || simTimeS < skipArmedAtS) {
       skipArmedAtS = simTimeS;
-      if (skipNote.textContent !== STAGE_SKIP_BEAT_NOTE) skipNote.textContent = STAGE_SKIP_BEAT_NOTE;
+      showStatus();
       return;
     }
     const skip = stageSkipOf({
@@ -1834,7 +1905,8 @@ function mountStage(
     skipArmedAtS = undefined;
     skipLandedAtS = skip.toS;
     skipLine = stageSkipLineOf(skip, host.dayStartS());
-    skipNote.textContent = skipLine;
+    skipLineReason = undefined;
+    showStatus();
     playback.seekTo(skip.toS);
     syncTransport();
     requestFrame();
@@ -1844,7 +1916,64 @@ function mountStage(
   function dropSkipBeat(): void {
     if (skipArmedAtS === undefined) return;
     skipArmedAtS = undefined;
-    if (skipNote.textContent !== skipLine) skipNote.textContent = skipLine;
+    showStatus();
+  }
+
+  /**
+   * **The one writer of the transport's two lines** — wave AO, lane AO-4, the post-AN panel's seat B
+   * (lost moment 5): `stagePace.ts#stageStatusOf` decides which of them speaks, so the two can never
+   * run together.
+   */
+  function showStatus(): void {
+    const lines = stageStatusOf({
+      pace: paceText,
+      stopped: paceStopped,
+      skip: skipArmedAtS !== undefined ? STAGE_SKIP_BEAT_NOTE : skipLine,
+    });
+    if (paceNote.textContent !== lines.pace) paceNote.textContent = lines.pace;
+    if (skipNote.textContent !== lines.skip) skipNote.textContent = lines.skip;
+  }
+
+  /** What the pace rule, or a call's stop, says now. */
+  function setPace(text: string, stopped: boolean): void {
+    paceText = text;
+    paceStopped = stopped;
+    showStatus();
+  }
+
+  /**
+   * **Whether the stage is stopped at a call whose runs have not landed** — wave AO, lane AO-4, the
+   * post-AN panel's seat B (lost moments 6 and 7). True while the transport is paused, short of the
+   * day's end, with an ordinary candidate standing at or before the playhead and not yet raised:
+   * the pace stopped there (§ D1138), or a resumed attempt reopened there (§ D1218). The transport's
+   * button says so and cannot be pressed ({@link syncTransport}), and the note says what the stage
+   * is doing ({@link syncWaitingNote}).
+   */
+  function waitingAtCall(): boolean {
+    if (playback === undefined || playback.state === 'playing') return false;
+    if (playback.simTimeS >= playback.recording.endedAt) return false;
+    const standing = activeCall();
+    if (standing === undefined || standing.call.atS > playback.simTimeS) return false;
+    /*
+     * Raised but not yet drawn is still waiting: the host's notification reaches the transport a
+     * frame before the card is drawn, and *Play* offered in that frame would be the same false offer.
+     */
+    return !standing.raised || callCard.hidden !== false;
+  }
+
+  /**
+   * The paused stage's note while it waits at a call, and back to nothing once it no longer does —
+   * a resumed attempt reopens paused at the instant it was left, where the pace (which is asked only
+   * while playing) would say nothing at all. A stop the pace made itself is left to the pace.
+   */
+  function syncWaitingNote(): void {
+    if (playback === undefined || playback.state === 'playing') return;
+    const waiting = waitingAtCall();
+    if (waiting && paceText !== STAGE_CALL_COPY.waiting && callCard.hidden) {
+      setPace(STAGE_CALL_COPY.waiting, true);
+    } else if (!waiting && !waitingOnCall && paceText === STAGE_CALL_COPY.waiting) {
+      setPace('', false);
+    }
   }
 
   /**
@@ -2086,6 +2215,8 @@ function mountStage(
       }
     }
     playback.play();
+    /* Lane AO-4: the card has gone and the day plays on, so the building comes back into view. */
+    bringBuildingPending = true;
     syncTransport();
     requestFrame();
   }
@@ -2132,14 +2263,22 @@ function mountStage(
       playback.seekTo(call.atS);
       const stopNote =
         stagePaceNoteOf({ simPerRealS: stageSpeedAt(speedIndex).simPerRealS, reason: 'call' }, { acts: paceActs, simTimeS: call.atS }) ?? '';
-      if (paceNote.textContent !== stopNote) paceNote.textContent = stopNote;
+      /* Lane AO-4: a stop speaks alone, and the skip that ran past it is over. */
+      skipLine = '';
+      skipLineReason = undefined;
+      setPace(stopNote, true);
       syncTransport();
       requestFrame();
     }
     /* The wait is over and the call is raised: the note says what the stop now is. */
-    if (paceNote.textContent === STAGE_CALL_COPY.waiting) {
-      paceNote.textContent =
-        stagePaceNoteOf({ simPerRealS: stageSpeedAt(speedIndex).simPerRealS, reason: 'call' }, { acts: paceActs, simTimeS }) ?? '';
+    if (paceText === STAGE_CALL_COPY.waiting || paceText === '') {
+      /* Lane AO-4: and on a resumed attempt, whose paused stage the pace never wrote, it says so too. */
+      skipLine = '';
+      skipLineReason = undefined;
+      setPace(
+        stagePaceNoteOf({ simPerRealS: stageSpeedAt(speedIndex).simPerRealS, reason: 'call' }, { acts: paceActs, simTimeS }) ?? '',
+        true,
+      );
     }
     waitingOnCall = false;
     /* § D1151: the skip has arrived at a call; the next press of it is the player's answer. */
@@ -2483,7 +2622,8 @@ function mountStage(
     if (resumeAtS === undefined) {
       skipLandedAtS = undefined;
       skipLine = '';
-      skipNote.textContent = '';
+      skipLineReason = undefined;
+      showStatus();
     }
     /*
      * A new recording is a new building — GitHub issue #258. The crossover is the old tower's
@@ -2683,8 +2823,16 @@ function mountStage(
         });
       }
     }
-    playButton.textContent = playing ? '⏸ Pause' : '▶ Play';
-    playButton.disabled = playback === undefined;
+    /*
+     * Wave AO, lane AO-4, the post-AN panel's seat B (lost moment 6): stopped at a call whose runs are
+     * still being made, the button says the stage is working and is not offered as *Play*.
+     */
+    const waitingNow = waitingAtCall();
+    const control = stagePlayControlOf({ playing, hasRun: playback !== undefined, waitingOnCall: waitingNow });
+    playButton.textContent = control.label;
+    playButton.disabled = control.disabled;
+    /* A held button says why to a reader on it, in the line a sighted player reads beside it. */
+    playButton.title = waitingNow ? STAGE_CALL_COPY.waiting : '';
     /*
      * § 2.3's skip control, resolved from the same fact the bar reads — GitHub issue #369. Inert
      * once there is nothing left to skip, with the reason on the button's own `title` rather than
@@ -2705,11 +2853,18 @@ function mountStage(
       `cursor:${skipButton.disabled ? 'default' : 'pointer'}`,
     ].join(';');
     /*
-     * The chip that is lit is the rung the transport is **at**, which between a whole day's peaks
-     * may be faster than the player's own (§ D991: *every change shows on the chip*). The label is
+     * The chip that is lit is the rung the transport is **at** while it moves, which on a scored day
+     * may be faster than the player's own (§ D991: *every change shows on the chip*), and the
+     * player's own rung while it is stopped — wave AO, lane AO-4, `stageScreenModel.ts#stageLitSpeedOf`:
+     * a call stop and the day's end lit `30×` for a player who had never left `4×`. The label is
      * always the multiplier, so the lit chip is never a claim the transport contradicts.
      */
-    const runningAt = playback?.speed ?? stageSpeedAt(speedIndex).simPerRealS;
+    const chosenAt = stageSpeedAt(speedIndex).simPerRealS;
+    const runningAt = stageLitSpeedOf({
+      moving: playing,
+      runningSimPerRealS: playback?.speed ?? chosenAt,
+      chosenSimPerRealS: chosenAt,
+    });
     for (const [index, button] of speedButtons.entries()) {
       const on = stageSpeedAt(index).simPerRealS === runningAt;
       button.disabled = playback === undefined;

@@ -155,6 +155,9 @@ const DOORS: Readonly<Record<keyof EverydayHost, Door>> = Object.freeze({
   applyBuildingSpec: 'held',
   /* § D1368's sandbox day plays the day's crowd, so it is held while an attempt stands (joined at integration). */
   sandboxStanding: 'reads',
+  /* Lane AO-4's two reads, joined at integration: the attempt's left-at clock and the day before's driver. */
+  dayAttemptLeftAt: 'reads',
+  previousDayDriver: 'reads',
   runSandbox: 'held',
   /* Puts the parked week back; it runs nothing and writes only the sandbox day's own week away. */
   leaveSandbox: 'elsewhere',

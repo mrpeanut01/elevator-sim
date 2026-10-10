@@ -21,7 +21,16 @@ import { weekUnderWayHarderLineOf } from '../shift/nextWeek.js';
 import { closeDay, HISTORY_DAYS, openWeek, outcomeOf } from '../shift/week.js';
 
 import { GLOSSARY_TERMS } from '../mode/glossary.js';
-import { DAY_OFFSET_MIN, doorScreenViewOf, DOOR_STEPS, RUN_TODAY_AGAIN_NOTE, sameForEveryoneLine, todayIsBanked } from './doorView.js';
+import {
+  DAY_OFFSET_MIN,
+  DOOR_BACK_REFUSAL,
+  doorScreenViewOf,
+  doorWordsHeadingOf,
+  DOOR_STEPS,
+  RUN_TODAY_AGAIN_NOTE,
+  sameForEveryoneLine,
+  todayIsBanked,
+} from './doorView.js';
 import { PRESS_DAY_CHOICE_COPY } from './towerChoice.js';
 import { EM_DASH } from './figures.js';
 import type { TodayRecord } from './today.js';
@@ -157,12 +166,23 @@ describe('a closed day’s chip says its verdict, as Your week does', () => {
   });
 });
 
-describe('the seven chips are matched to the week by day number', () => {
-  it('draws seven, oldest first, ending on today', () => {
+describe('the chips are matched to the week by day number', () => {
+  /*
+   * Wave AO, lane AO-4, the post-AN panel's seat B (lost moment 3): the strip drew seven slots on
+   * every day, so a Friday drew two blank *before this week* tiles and a first visit six. It starts
+   * on day 1 now. Red before: seven chips, offsets −6 to 0.
+   */
+  it('draws the week’s days so far, oldest first, ending on today, and no slot before day 1', () => {
     const chips = viewAt(0, false).chips;
-    expect(chips).toHaveLength(HISTORY_DAYS);
-    expect(chips.map((chip) => chip.offset)).toEqual([-6, -5, -4, -3, -2, -1, 0]);
-    expect(chips.at(-1)?.day).toBe(5);
+    expect(chips).toHaveLength(5);
+    expect(chips.map((chip) => chip.offset)).toEqual([-4, -3, -2, -1, 0]);
+    expect(chips.map((chip) => chip.day)).toEqual([1, 2, 3, 4, 5]);
+    expect(chips.map((chip) => chip.note)).not.toContain('before this week');
+    /* A first visit draws today alone; a Sunday draws the whole seven, as far back as the strip goes. */
+    expect(viewAt(0, false, weekWith(1, [])).chips.map((chip) => chip.day)).toEqual([1]);
+    const sunday = viewAt(0, false, weekWith(7, [closedDay(1), closedDay(2)])).chips;
+    expect(sunday).toHaveLength(HISTORY_DAYS);
+    expect(sunday[0]?.offset).toBe(DAY_OFFSET_MIN);
   });
 
   it('leaves a gap where a day was never closed, rather than sliding the later ones into it', () => {
@@ -174,11 +194,10 @@ describe('the seven chips are matched to the week by day number', () => {
     expect(byDay.get(4)?.score).toBe('84%');
   });
 
-  it('says *before this week* for a slot earlier than day 1, rather than inventing a day', () => {
+  it('draws no slot earlier than day 1, rather than inventing a day or a blank', () => {
     const early = viewAt(0, false, weekWith(2, [closedDay(1)]));
-    expect(early.chips[0]?.day).toBeUndefined();
-    expect(early.chips[0]?.note).toBe('before this week');
-    expect(early.chips[0]?.score).toBe(EM_DASH);
+    expect(early.chips.map((chip) => chip.day)).toEqual([1, 2]);
+    expect(early.chips[0]?.score).not.toBe(EM_DASH);
   });
 
   it('names the tower each day was **played on**, from that day’s own record', () => {
@@ -210,11 +229,20 @@ describe('the seven chips are matched to the week by day number', () => {
 });
 
 describe('the stepper', () => {
-  it('dims the forward arrow at 0 and the back arrow at the far end — § 6.1', () => {
+  it('dims the forward arrow at 0 and the back arrow at the week’s first day — § 6.1, lane AO-4', () => {
     expect(viewAt(0, false).stepper.forwardEnabled).toBe(false);
     expect(viewAt(0, false).stepper.backEnabled).toBe(true);
-    expect(viewAt(DAY_OFFSET_MIN, false).stepper.backEnabled).toBe(false);
-    expect(viewAt(DAY_OFFSET_MIN, false).stepper.forwardEnabled).toBe(true);
+    /* Friday: day 1 is four back, and the arrow stops there rather than at six. */
+    expect(viewAt(-4, false).stepper.backEnabled).toBe(false);
+    expect(viewAt(-4, false).stepper.forwardEnabled).toBe(true);
+    expect(viewAt(-4, false).stepper.label).toBe('Monday · day 1');
+    /* And the dimmed arrow says why, true of the day it is dimmed on. */
+    expect(viewAt(-4, false).stepper.backRefusal).toBe(DOOR_BACK_REFUSAL.firstDay);
+    /* A Sunday's strip goes back the whole seven. */
+    const sunday = weekWith(7, []);
+    expect(viewAt(DAY_OFFSET_MIN, false, sunday).stepper.backEnabled).toBe(false);
+    expect(viewAt(DAY_OFFSET_MIN, false, sunday).stepper.backRefusal).toBe(DOOR_BACK_REFUSAL.reach);
+    expect(viewAt(DAY_OFFSET_MIN + 1, false, sunday).stepper.backEnabled).toBe(true);
   });
 
   it('clamps an offset off the strip rather than selecting a chip that is not drawn', () => {
@@ -315,12 +343,12 @@ describe('the § 3.3 primary, and the replay a past day earns — § D517', () =
     expect(view.primary.note).toMatch(/never counts/);
   });
 
-  it('is inert on a chip from before this week began, and says so', () => {
+  it('clamps an offset before the week began to its first day, which is a day it can hand back', () => {
     const view = viewAt(-6, false);
-    expect(view.chips.find((chip) => chip.selected)?.day).toBeUndefined();
+    expect(view.chips.find((chip) => chip.selected)?.day).toBe(1);
     expect(view.primary.label).toBe('Set up the replay');
-    expect(view.primary.inert).toBe(true);
-    expect(view.primary.note).toMatch(/before this week/);
+    expect(view.primary.inert).toBe(false);
+    expect(view.primary.note).not.toMatch(/before this week/);
   });
 });
 
@@ -456,6 +484,25 @@ describe('the rest of § 6.1', () => {
     expect(pinned[0]).toMatch(/^A press is/u);
     expect(pinned[1]).toMatch(/^A standing order is/u);
     expect(pinned[2]).toMatch(/^A pinned crowd is/u);
+  });
+
+  /*
+   * Wave AO, lane AO-4, the post-AN panel's seat B (lost moment 3): the three definitions stood open
+   * on every visit. They sit behind one disclosure now, whose line names exactly the words inside.
+   */
+  it('names the words its disclosure defines, in one line, and none it does not', () => {
+    expect(viewAt(0, false).wordsHeading).toBe('What press means');
+    const pinned = doorScreenViewOf({
+      week: weekWith(1, []),
+      today: { ...TODAY, day: 1, crowdIsToday: false, crowdIsPinned: true },
+      dayOffset: 0,
+      dayClosed: false,
+      nameOf: NAME_OF,
+      alsoOnScreen: [PRESS_DAY_CHOICE_COPY.heading, PRESS_DAY_CHOICE_COPY.ledeBefore],
+    });
+    expect(pinned.wordsHeading).toBe('What press, standing order and pinned crowd mean');
+    expect(doorWordsHeadingOf([])).toBe('');
+    expect(doorWordsHeadingOf(['press', 'standing order'])).toBe('What press and standing order mean');
   });
 });
 

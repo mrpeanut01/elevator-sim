@@ -157,7 +157,7 @@ function mountDoor(
         '‹',
         'everyday-door-back',
         'The day before this one',
-        'The week only goes back seven days.',
+        view.stepper.backRefusal,
         view.stepper.backEnabled,
         () => {
           dayOffset -= 1;
@@ -202,15 +202,24 @@ function mountDoor(
     const rule = el(document_, 'p', 'everyday-door-rule', view.rule);
     rule.style.cssText = `${QUIET};margin:12px 0 0;max-width:70ch`;
     column.append(rule);
-    /* The day's own words, defined under the rule that first prints one — `doorView.ts#words`. */
+    /*
+     * The day's own words, defined under the rule that first prints one — `doorView.ts#words`. Behind
+     * one disclosure since wave AO, lane AO-4 (§ D1386, the post-AN panel's seat B, lost moment 3): closed on
+     * arrival, its summary naming every word inside, so the door reads as a day first.
+     */
     if (view.words.length > 0) {
-      const words = el(document_, 'div', 'everyday-door-words');
-      words.style.cssText = `margin:8px 0 0;max-width:70ch;padding-left:10px;border-left:2px solid ${C.ruleLight};display:grid;gap:4px`;
+      const words = el(document_, 'details', 'everyday-door-words');
+      words.style.cssText = `margin:8px 0 0;max-width:70ch;padding-left:10px;border-left:2px solid ${C.ruleLight}`;
+      const summary = el(document_, 'summary', 'everyday-door-words-summary', view.wordsHeading);
+      summary.style.cssText = `${QUIET};cursor:pointer`;
+      const body = el(document_, 'div');
+      body.style.cssText = 'display:grid;gap:4px;margin-top:4px';
       for (const word of view.words) {
         const line = el(document_, 'p', 'everyday-door-word', word);
         line.style.cssText = `${QUIET};margin:0`;
-        words.append(line);
+        body.append(line);
       }
+      words.append(summary, body);
       column.append(words);
     }
 
@@ -230,6 +239,8 @@ function mountDoor(
     for (const chip of view.chips) {
       const button = el(document_, 'button', 'everyday-door-chip');
       button.type = 'button';
+      /* Which day back it is, so a reader (and the browser tier) can name a chip by its day, not its place. */
+      button.dataset['offset'] = String(chip.offset);
       button.style.cssText = [
         'text-align:left',
         'cursor:pointer',

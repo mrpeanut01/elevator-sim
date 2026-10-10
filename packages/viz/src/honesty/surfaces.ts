@@ -204,6 +204,7 @@ import {
 import {
   FIGURE_NOTE_HANDLE,
   everydayReportViewOf,
+  REPORT_PRACTICE_AGAIN,
   REPORT_SECONDARY,
   UNMEASURED_WEEK_SHEET_STEP,
   WEEK_SHEET_STEP,
@@ -254,6 +255,7 @@ import {
   stageInterventionsOf,
   stageLegend,
   stageOpeningLineOf,
+  stagePlayControlOf,
   stageSkipViewOf,
   type StageSwitchTarget,
 } from '../everyday/stageScreenModel.js';
@@ -12641,6 +12643,12 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
     'everyday/stageCall.ts#STAGE_CALL_COPY',
     'everyday/stageCall.ts#stageCallWrinkleLineOf',
     /*
+     * Wave AO, lane AO-4: the transport's button in its three states — playing, paused, and stopped
+     * while a call's runs are made — seeded below beside the wait's own note.
+     */
+    'everyday/stageScreenModel.ts#STAGE_PLAY_CONTROL',
+    'everyday/stageScreenModel.ts#stagePlayControlOf',
+    /*
      * Wave AL, lane AL-E, § D1219: each answered call's row on the stage once its window can be
      * observed. Seeded below over a call on this case's own run at a playhead the call plus 660 s
      * on, with a later press inside the window so the note's second clause is swept too.
@@ -13313,6 +13321,14 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
         role: 'label',
         playhead: atPlayhead(recording, recording.startedAt + span * 0.3),
       });
+      /* Wave AO, lane AO-4: the transport's button, through its own function, in each of its states. */
+      for (const [state, input] of [
+        ['playing', { playing: true, hasRun: true, waitingOnCall: false }],
+        ['paused', { playing: false, hasRun: true, waitingOnCall: false }],
+        ['waiting', { playing: false, hasRun: true, waitingOnCall: true }],
+      ] as const) {
+        seeds.push({ field: `stage.play(${state})`, text: stagePlayControlOf(input).label, role: 'label' });
+      }
       /*
        * And the pace note's two arms the sampled loop below never reaches: `call`, drawn while the
        * card is up, and `chosen`, since § D1029 bounded to the next act boundary.
@@ -14821,7 +14837,12 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     'everyday/replay.ts#REPLAY_COPY',
     'everyday/doorView.ts#DOOR_STEPS',
     'everyday/doorView.ts#sameForEveryoneLine',
+    /* Wave AO, lane AO-4: the back arrow's refusal and the line the day's words sit behind, through the view. */
+    'everyday/doorView.ts#DOOR_BACK_REFUSAL',
+    'everyday/doorView.ts#doorWordsHeadingOf',
     'everyday/briefView.ts#briefScreenViewOf',
+    /* Wave AO, lane AO-4: which driver the day opens on, seeded through the view over a handed-over day. */
+    'everyday/briefView.ts#briefCarriedDriverLineOf',
     'everyday/briefView.ts#briefBarModel',
     'everyday/briefView.ts#BRIEF_NOTE_LEAD',
     'everyday/briefView.ts#raceAgainstCard',
@@ -14991,6 +15012,8 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     'shift/weekStake.ts#weekOrdinalOf',
     'shift/dayCalls.ts#dayCallAnswerWordsOf',
     'everyday/reportView.ts#REPORT_SECONDARY',
+    /* Wave AO, lane AO-4 (§ D1388): today again as practice, under the call that decided it. */
+    'everyday/reportView.ts#REPORT_PRACTICE_AGAIN',
     'shift/weekStake.ts#WEEKEND_NOTE',
     'everyday/weekView.ts#WEEK_START_NEXT_LABEL',
     'shift/weekRecord.ts#weekRecordLineOf',
@@ -15327,7 +15350,11 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
           const where = `${arm}.door${String(offset)}`;
           seeds.push({ field: `${where}.kind`, text: door.kindPill, role: 'label' });
           seeds.push({ field: `${where}.stepper`, text: door.stepper.label, role: 'label' });
+          /* Lane AO-4: the back arrow's refusal, drawn where the arrow is dimmed. */
+          if (!door.stepper.backEnabled) seeds.push({ field: `${where}.stepper.back`, text: door.stepper.backRefusal, role: 'reason' });
           seeds.push({ field: `${where}.rule`, text: door.rule, role: 'prose' });
+          /* Wave AO, lane AO-4: the one line the day's words now sit behind. */
+          if (door.wordsHeading !== '') seeds.push({ field: `${where}.words.heading`, text: door.wordsHeading, role: 'label' });
           for (const chip of door.chips) {
             /* The tower a chip names — GitHub issue #599: an id on a closed chip, a name on today's. */
             seeds.push({ field: `${where}.chip.tower`, text: chip.tower, role: 'label' });
@@ -15541,6 +15568,26 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
       seeds.push({ field: `${at}.brief.asks.note`, text: brief.asks.note, role: 'prose' });
       seeds.push({ field: `${at}.brief.count`, text: brief.drivers.count, role: 'observation' });
       seeds.push({ field: `${at}.brief.bar`, text: brief.barNote, role: 'label' });
+      /*
+       * Wave AO, lane AO-4: the line that says which driver the day opens on, over a day before that
+       * started on the first profile and was handed to the second on its stage.
+       */
+      const first = options[0];
+      const second = options[1];
+      if (first !== undefined && second !== undefined) {
+        const carried = briefScreenViewOf({
+          today,
+          dispatchers: options,
+          savedIds: [],
+          selectedId: first.id,
+          yesterday: {
+            weekday: 'Monday',
+            startedWithId: first.id,
+            handover: { toId: second.id, toName: second.name, clock: '12:20' },
+          },
+        }).drivers.carried;
+        if (carried !== undefined) seeds.push({ field: `${at}.brief.carried`, text: carried, role: 'prose' });
+      }
       for (const [name, card] of [
         ['ghost', brief.ghost],
         ['locked', brief.locked],
@@ -18230,7 +18277,7 @@ function seedWeekStake(
   const freshWeek = continueWeekEntryOf(rollWeek(week, true), 'Midtown Office');
   if (freshWeek !== undefined) seeds.push({ field: 'week.continue.freshWeek', text: freshWeek.line, role: 'observation' });
   /* Wave AO, lane AO-2, § D1369: a first week whose first day is begun, offered before anything is filed. */
-  const begun = continueWeekEntryOf(openWeek('c2'), 'Midtown Office', true);
+  const begun = continueWeekEntryOf(openWeek('c2'), 'Midtown Office', { clock: '08:39' });
   if (begun !== undefined) seeds.push({ field: 'week.continue.dayBegun', text: begun.line, role: 'observation' });
   seeds.push({ field: 'week.sheetStep.label', text: WEEK_SHEET_STEP.label, role: 'label' });
   seeds.push({ field: 'week.sheetStep.note', text: WEEK_SHEET_STEP.note, role: 'prose' });
@@ -18458,6 +18505,8 @@ function seedDayClose(seeds: TextSeed[], context: HonestyContext, bundle: ShiftB
   seeds.push({ field: 'week.close.weekendNote', text: WEEKEND_NOTE, role: 'prose' });
   seeds.push({ field: 'week.close.secondary.week', text: REPORT_SECONDARY.week, role: 'label' });
   seeds.push({ field: 'week.close.secondary.menu', text: REPORT_SECONDARY.menu, role: 'label' });
+  seeds.push({ field: 'week.close.practiceAgain.label', text: REPORT_PRACTICE_AGAIN.label, role: 'label' });
+  seeds.push({ field: 'week.close.practiceAgain.note', text: REPORT_PRACTICE_AGAIN.note, role: 'prose' });
 }
 
 /**

@@ -88,13 +88,12 @@ describe.skipIf(!HAS_BROWSER)('a reload with the first day begun — § D1369', 
       ).toBe(0);
       const tile = page.locator('.everyday-continue-week');
       expect(await tile.count(), 'the picker drew no Continue your week over a begun day').toBe(1);
-      expect((await page.textContent('.everyday-continue-week-line')) ?? '').toMatch(/Monday under way/u);
+      /* Lane AO-4's § D1384 met this lane's § D1369 at integration: the tile opens the stage where the day was left. */
+      expect((await page.textContent('.everyday-continue-week-line')) ?? '').toMatch(/Monday, left at \d\d:\d\d/u);
+      expect(await page.getAttribute('.everyday-continue-week', 'data-goes')).toBe('stage');
 
       await tile.click();
-      await page.waitForSelector('.everyday-door', { timeout: 15_000 });
-      await page.locator('.everyday-bar-primary').click();
-      await page.waitForSelector('.everyday-brief', { timeout: 15_000 });
-      expect((await page.textContent('.everyday-bar-primary'))?.trim()).toBe('Resume Monday');
+      await page.waitForSelector('.everyday-stage-canvas', { timeout: 15_000 });
     } finally {
       await page.close();
     }

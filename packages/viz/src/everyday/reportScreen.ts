@@ -1157,6 +1157,35 @@ function mountReportScreen(
       const line = el(doc, 'p', cls, text);
       line.style.cssText = `${BODY};margin:0;max-width:78ch${strong ? `;color:${C.ink};font-weight:600` : ''}`;
       block.append(line);
+      /*
+       * **Today again, as practice, under the call that decided it** — wave AO, lane AO-4,
+       * [§ D1388](../../../../DECISIONS.md). The brief's own press (`host.playDay`), which on a day
+       * already filed runs it again as practice, and then the stage, where the practice line says so.
+       */
+      if (cls === 'everyday-report-close-call' && view.practiceAgain !== undefined) {
+        const again = el(doc, 'div', 'everyday-report-practice-again');
+        again.style.cssText = 'display:flex;align-items:center;gap:11px;flex-wrap:wrap';
+        const button = el(doc, 'button', 'everyday-report-practice-again-press', view.practiceAgain.label);
+        button.type = 'button';
+        button.style.cssText = [
+          'cursor:pointer',
+          'background:transparent',
+          `border:1px solid ${C.rule}`,
+          `border-radius:${String(R.control)}px`,
+          'padding:6px 12px',
+          `color:${C.ink}`,
+          'font-size:12.5px',
+          'font-weight:600',
+        ].join(';');
+        button.addEventListener('click', () => {
+          context.host.playDay();
+          context.go('stage');
+        });
+        const note = el(doc, 'span', 'everyday-report-practice-again-note', view.practiceAgain.note);
+        note.style.cssText = QUIET;
+        again.append(button, note);
+        block.append(again);
+      }
     }
     const tomorrow = el(doc, 'div', 'everyday-report-close-tomorrow');
     tomorrow.style.cssText = `${WELL};padding:8px 11px;display:grid;gap:3px;margin-top:2px`;

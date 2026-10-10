@@ -173,6 +173,11 @@ export interface BriefScreenView {
      * `driverHeld`, § D1029. Drawn beside the control rather than as a tooltip, § 7.6's fourth rule.
      */
     readonly held: string | undefined;
+    /**
+     * Which driver the day opens on and why, where the day before ended on another — wave AO, lane
+     * AO-4, {@link briefCarriedDriverLineOf}. `undefined` where nothing was handed back.
+     */
+    readonly carried: string | undefined;
   };
   readonly ghost: BriefRefusalCard;
   readonly locked: BriefRefusalCard;
@@ -273,6 +278,53 @@ export interface BriefScreenInput {
    * lane AO-2 ([§ D1368](../../../../DECISIONS.md)). Absent is {@link TUNE_OFFER_EVERYTHING}.
    */
   readonly tunerOffer?: TuneOffer | undefined;
+  /**
+   * The day before this one in the week, as {@link briefCarriedDriverLineOf} reads it —
+   * `everyday/host.ts#previousDayDriver`. Absent on a first day, and on a day before which nothing
+   * was filed.
+   */
+  readonly yesterday?: BriefYesterday | undefined;
+}
+
+/** The day before, for {@link briefCarriedDriverLineOf}. */
+export interface BriefYesterday {
+  readonly weekday: string;
+  /** The dispatcher the day was started with — its record's `dispatcherId`. */
+  readonly startedWithId: string;
+  /** The last handover made on its stage, or `undefined` where none was. */
+  readonly handover?: { readonly toId: string; readonly toName: string; readonly clock: string } | undefined;
+}
+
+/**
+ * **Say which driver the day opens on, and why** — wave AO, lane AO-4, the post-AN panel's seat B
+ * (lost moment 10). A newcomer handed Monday to *Fairness first* on the stage at 12:20, and Tuesday's
+ * brief opened on *Conventional collective* with nothing saying it had changed back. It had, by
+ * [§ D1318](../../../../DECISIONS.md)'s rule, which this line states and does not move: the brief's
+ * pick is kept from day to day, and a handover on the stage is not.
+ *
+ * Drawn only where the day before ended under a driver other than the one this day opens on, which
+ * is the one case where the brief would otherwise hand the day back silently. It names the driver,
+ * says it is the one the day before started with where it is, names the handover and its clock, and
+ * says how to drive with that dispatcher today: a statement of the control, not advice about which
+ * dispatcher is better.
+ */
+export function briefCarriedDriverLineOf(input: {
+  /** This day's weekday. */
+  readonly weekday: string;
+  /** Who drives as the brief opens, by id and by name. */
+  readonly driverId: string;
+  readonly driverName: string;
+  readonly yesterday?: BriefYesterday | undefined;
+}): string | undefined {
+  const before = input.yesterday;
+  const handover = before?.handover;
+  if (before === undefined || handover === undefined || handover.toId === input.driverId) return undefined;
+  const why = input.driverId === before.startedWithId ? `, the driver ${before.weekday} started with` : '';
+  return (
+    `${input.weekday} opens on ${input.driverName}${why}. ${before.weekday}’s handover to ${handover.toName} ` +
+    `at ${handover.clock} kept to ${before.weekday}: a handover on the stage lasts the rest of its own day, ` +
+    `and only the driver picked on this brief carries over. To drive with ${handover.toName} today, pick it here.`
+  );
 }
 
 /**
@@ -520,6 +572,19 @@ export function briefScreenViewOf(input: BriefScreenInput): BriefScreenView {
        */
       count: `${String(options.length)} to choose from · ${String(mine)} of yours`,
       held: input.attemptWeekday === undefined ? today.driverHeld : DAY_ATTEMPT_COPY.driverHeld,
+      /*
+       * Lane AO-4: only on a day whose driver can still be picked here — a held driver (an attempt
+       * under way, a pinned day's standing order) has its own sentence on this line.
+       */
+      carried:
+        input.attemptWeekday === undefined && today.driverHeld === undefined
+          ? briefCarriedDriverLineOf({
+              weekday: today.weekday,
+              driverId: input.selectedId,
+              driverName: today.driver,
+              yesterday: input.yesterday,
+            })
+          : undefined,
     },
     ghost: raceAgainstCard(),
     locked: lockedForScore(today.crowdIsToday, input.tunerOffer),

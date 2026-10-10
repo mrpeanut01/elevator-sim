@@ -2836,3 +2836,83 @@ export function stageCarRestBarOf(input: StageCarRestBarInput): StageCarRect {
     height: REST_BAR_THICKNESS_PX,
   };
 }
+
+/*
+ * ---- Wave AO, lane AO-4: the stage tells the truth about its own state, § D1385 ----
+ */
+
+/**
+ * **Which speed chip is lit** — wave AO, lane AO-4, the post-AN panel's seat B (lost moment 4,
+ * defect 2). § D991 clause 2 lights *the rung the transport is at*, so a scored day's pace, which
+ * crosses quiet stretches at `30×` on its own (§ D1169), left `30×` lit at every call stop and at
+ * 18:00 for a player who had never left `4×`: the transport had stopped, and the chip still named
+ * the rung it stopped from.
+ *
+ * A stopped transport is at no rung, so the lit chip is then the one the player chose, which is the
+ * rung a fresh day opens on (§ 4.6) and the one the pace measures every later stretch from. While
+ * the transport moves the lit chip is still the rung it moves at, so § D991's *every change shows on
+ * the lit chip* holds wherever there is a change to show, and the note beside the chips says why.
+ * [§ D1385](../../../../DECISIONS.md) clause 1: it reads § D991 clause 2 for a state the clause did
+ * not name, and moves nothing it did.
+ *
+ * @returns the multiplier, in simulated seconds per real second, whose chip is lit.
+ */
+export function stageLitSpeedOf(input: {
+  /** The transport is playing (not paused, and not stopped at a call or at the day's end). */
+  readonly moving: boolean;
+  /** The rung the transport would run at — `Playback.speed`. */
+  readonly runningSimPerRealS: number;
+  /** The rung the player chose — the chip they last pressed, or the default. */
+  readonly chosenSimPerRealS: number;
+}): number {
+  return input.moving ? input.runningSimPerRealS : input.chosenSimPerRealS;
+}
+
+/**
+ * **The transport's button while the stage is working out a call** — wave AO, lane AO-4, the
+ * post-AN panel's seat B (lost moment 6). The stage stops at an ordinary call's instant while the
+ * call's runs are made (§ D1138), which took 5 to 10 s on a whole day, with *▶ Play* offered beside
+ * *stopped while the day is run ahead from here*. Pressed, it played one frame and stopped again. So
+ * while the stage waits there the button says what the stage is doing and cannot be pressed; it
+ * names no call, because the call may not be raised (`stageCall.ts#STAGE_CALL_COPY.waiting`'s rule).
+ */
+export const STAGE_PLAY_CONTROL = Object.freeze({
+  play: '▶ Play',
+  pause: '⏸ Pause',
+  waiting: 'Running the day ahead…',
+});
+
+/** The transport button's words and whether it can be pressed. */
+export function stagePlayControlOf(input: {
+  readonly playing: boolean;
+  readonly hasRun: boolean;
+  /** The stage is stopped at a call whose runs have not landed. */
+  readonly waitingOnCall: boolean;
+}): { readonly label: string; readonly disabled: boolean } {
+  if (input.playing) return { label: STAGE_PLAY_CONTROL.pause, disabled: false };
+  if (input.hasRun && input.waitingOnCall) return { label: STAGE_PLAY_CONTROL.waiting, disabled: true };
+  return { label: STAGE_PLAY_CONTROL.play, disabled: !input.hasRun };
+}
+
+/**
+ * **Whether the building has to be brought into view when the day starts playing** — wave AO, lane
+ * AO-4, the post-AN panel's seat B (lost moment 9, defect 9). At 390×844 the header and the goals
+ * are taller than the screen region above the fixed bar, so after the header's *▶ Play* the canvas
+ * sat at y 756–1262 under a bar from y 725, and the day played with nobody able to see it. A desktop
+ * stage shows four fifths of the canvas from the same press and is left where it is.
+ *
+ * Half is the line: a canvas at least half in view is being watched, and moving it would scroll the
+ * page under a reader for nothing; one less than half in view is not.
+ *
+ * @param canvas the canvas's laid-out top and bottom, in viewport pixels.
+ * @param view the top and bottom of what the player can see of the screen region, in viewport pixels.
+ */
+export function stageBuildingWantsBringing(
+  canvas: { readonly top: number; readonly bottom: number },
+  view: { readonly top: number; readonly bottom: number },
+): boolean {
+  const height = canvas.bottom - canvas.top;
+  if (!(height > 0) || !(view.bottom > view.top)) return false;
+  const shown = Math.max(0, Math.min(canvas.bottom, view.bottom) - Math.max(canvas.top, view.top));
+  return shown / height < 0.5;
+}

@@ -38,6 +38,7 @@ import {
   openEverydayDoor,
   openPage,
 } from '../dev/browserTier.test-helper.js';
+import { DOOR_BACK_REFUSAL } from './doorView.js';
 
 let server: ViteDevServer;
 let browser: Browser;
@@ -203,8 +204,9 @@ describe.skipIf(!HAS_BROWSER)('the daily loop is walkable end to end', () => {
       await openEverydayDoor(page);
 
       /*
-       * § 16 rule 1, at the front door: today's chip is the last of the seven, and it reads the em
-       * dash rather than a `0%` for as long as the day is unfinished.
+       * § 16 rule 1, at the front door: today's chip is the last of the strip, and it reads the em
+       * dash rather than a `0%` for as long as the day is unfinished. A fresh week stands on day 1,
+       * so the strip is today's chip alone (wave AO, lane AO-4: no blank tile before the week).
        */
       const beforeDoor = await page.evaluate(() => {
         const chips = [...document.querySelectorAll('.everyday-door-chip')];
@@ -215,7 +217,7 @@ describe.skipIf(!HAS_BROWSER)('the daily loop is walkable end to end', () => {
           note: today?.querySelector('.everyday-door-chip-note')?.textContent ?? '',
         };
       });
-      expect(beforeDoor.chips).toBe(7);
+      expect(beforeDoor.chips).toBe(1);
       expect(beforeDoor.score).toBe('—');
       expect(beforeDoor.note).toBe('today · not closed yet');
 
@@ -403,42 +405,20 @@ describe.skipIf(!HAS_BROWSER)('the daily loop is walkable end to end', () => {
 
   /*
    * Since § D517 a past day inside the week is handed back as a replay (`replay.browser.test.ts`
-   * drives that route). On a fresh session the week stands on day 1, so the chip behind it is from
-   * before the week began, and that is the one arm of the primary that is still a refusal.
+   * drives that route). On a fresh session the week stands on day 1, and since wave AO, lane AO-4
+   * the strip starts there: there is no chip from before the week to step to, so the back arrow is
+   * dimmed and says why, and the primary is today's.
    */
-  it('refuses a chip from before the week in the § 3.3 primary, rather than pretending to open it', async () => {
+  it('stops the stepper at the week’s first day, saying why, rather than stepping to a day that is not there', async () => {
     const page = await coldLoad();
     try {
       await openEverydayDoor(page);
       expect(await page.textContent('.everyday-door-kind')).toBe('TODAY’S TOWER');
-
-      await page.locator('.everyday-door-back').click();
-      await page.waitForFunction(
-        () => document.querySelector('.everyday-door-kind')?.textContent?.includes('REPLAY') === true,
-        undefined,
-        { timeout: 15_000 },
-      );
-
-      const replay = await page.evaluate(() => {
-        const primary = document.querySelector<HTMLButtonElement>('.everyday-bar-primary');
-        return {
-          label: primary?.textContent ?? '',
-          disabled: primary?.disabled,
-          note: document.querySelector('.everyday-door-primary-note')?.textContent ?? '',
-        };
+      const back = await page.evaluate(() => {
+        const arrow = document.querySelector<HTMLButtonElement>('.everyday-door-back');
+        return { disabled: arrow?.disabled, title: arrow?.title ?? '', chips: document.querySelectorAll('.everyday-door-chip').length };
       });
-      // § 16 rule 6: visible, dimmed, inert — and it says what it is short by.
-      expect(replay.label).toBe('Set up the replay');
-      expect(replay.disabled).toBe(true);
-      expect(replay.note).toMatch(/before this week/);
-
-      // And forward again: today is pressable, so the refusal is about the day and not the screen.
-      await page.locator('.everyday-door-forward').click();
-      await page.waitForFunction(
-        () => document.querySelector<HTMLButtonElement>('.everyday-bar-primary')?.disabled === false,
-        undefined,
-        { timeout: 15_000 },
-      );
+      expect(back).toEqual({ disabled: true, title: DOOR_BACK_REFUSAL.firstDay, chips: 1 });
       expect(await page.textContent('.everyday-bar-primary')).toBe('Set up today');
     } finally {
       await page.close();

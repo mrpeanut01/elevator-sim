@@ -1862,10 +1862,14 @@ import { DATA_DIR } from '../fixtures.test-helper.js';
 import { RESOURCES } from '../scope/probes.test-helper.js';
 import {
   STAGE_CAMERAS,
+  STAGE_PLAY_CONTROL,
   legibleFloorCount,
+  stageBuildingWantsBringing,
   stageCameraChipsOf,
   stageCameraWindowOf,
   stageFloorJumpOptionsOf,
+  stageLitSpeedOf,
+  stagePlayControlOf,
   wholeTowerIsLegible,
 } from './stageScreenModel.js';
 
@@ -2221,5 +2225,52 @@ describe('the booked-out car’s pill — GitHub issue #596 item 3, § D983', ()
 
   it('draws nothing on a tower that books nothing', () => {
     expect(stageBookedOutOf({ bookedOut: [], simTimeS: 700 })).toEqual([]);
+  });
+});
+
+/*
+ * ---- Wave AO, lane AO-4: the stage tells the truth about its own state ----
+ */
+describe('the stage’s own state — wave AO, lane AO-4', () => {
+  /*
+   * The post-AN panel's seat B (defect 2): `30×` lit at every call stop and at 18:00 for a player who
+   * never left `4×`. Red before: the lit chip was `Playback.speed` whatever the transport was doing.
+   */
+  it('lights the player’s chip while the transport is stopped, and the rung it runs at while it moves', () => {
+    expect(stageLitSpeedOf({ moving: false, runningSimPerRealS: 30, chosenSimPerRealS: 4 })).toBe(4);
+    expect(stageLitSpeedOf({ moving: true, runningSimPerRealS: 30, chosenSimPerRealS: 4 })).toBe(30);
+    expect(stageLitSpeedOf({ moving: true, runningSimPerRealS: 4, chosenSimPerRealS: 4 })).toBe(4);
+  });
+
+  /* Seat B (lost moment 6): *▶ Play* offered for 5 to 10 s while the stage worked out a call. */
+  it('does not offer Play while the stage is stopped working out a call, and says what it is doing', () => {
+    expect(stagePlayControlOf({ playing: false, hasRun: true, waitingOnCall: true })).toEqual({
+      label: STAGE_PLAY_CONTROL.waiting,
+      disabled: true,
+    });
+    expect(stagePlayControlOf({ playing: false, hasRun: true, waitingOnCall: false })).toEqual({
+      label: STAGE_PLAY_CONTROL.play,
+      disabled: false,
+    });
+    expect(stagePlayControlOf({ playing: true, hasRun: true, waitingOnCall: false }).label).toBe(STAGE_PLAY_CONTROL.pause);
+    expect(stagePlayControlOf({ playing: false, hasRun: false, waitingOnCall: false }).disabled).toBe(true);
+    /* It names no call, because the call may not be raised. */
+    expect(STAGE_PLAY_CONTROL.waiting).not.toMatch(/call/iu);
+  });
+
+  /*
+   * Seat B (defect 9), measured on the bundle at 390×844: the canvas at y 756–1262 under a bar from
+   * y 725 after the header's Play. A desktop stage showing four fifths of it is left alone.
+   */
+  it('brings the building into view only when less than half of it can be seen', () => {
+    const phoneRegion = { top: 50, bottom: 725 };
+    expect(stageBuildingWantsBringing({ top: 756, bottom: 1262 }, phoneRegion)).toBe(true);
+    expect(stageBuildingWantsBringing({ top: 219, bottom: 725 }, phoneRegion)).toBe(false);
+    expect(stageBuildingWantsBringing({ top: 411, bottom: 951 }, { top: 0, bottom: 844 })).toBe(false);
+    /* Exactly half is being watched. */
+    expect(stageBuildingWantsBringing({ top: 0, bottom: 200 }, { top: 100, bottom: 900 })).toBe(false);
+    /* A box with no height, or a region with none, asks for nothing. */
+    expect(stageBuildingWantsBringing({ top: 10, bottom: 10 }, phoneRegion)).toBe(false);
+    expect(stageBuildingWantsBringing({ top: 756, bottom: 1262 }, { top: 0, bottom: 0 })).toBe(false);
   });
 });

@@ -5998,6 +5998,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
     drawCoach(view);
     drawFooter(view);
     drawTransportChrome(view);
+    drawWatchOnlyControls();
     drawParity();
     drawLegend(view);
     drawRaceStrip(view);
@@ -7112,6 +7113,42 @@ function boot(ui: Elements, resources: BrowserResources): void {
     setText(ui.coach.title, buildingNameOf(resources, state.savedBuildings, state.buildingId));
     setText(ui.coach.progress, coach.progress);
     setText(ui.coach.hint, coachHint(view));
+  }
+
+  /**
+   * **The controls that run nothing while an attempt stands, drawn so before they are pressed** —
+   * wave AO, lane AO-4, the post-AN panel's seat B, [§ D1387](../../../../DECISIONS.md) extending
+   * [§ D1323](../../../../DECISIONS.md). The
+   * building, pattern and part-of-day selects, *Run this shift* and *Save recording* refuse while a
+   * scored attempt stands on the week on screen, and looked live until they were pressed. Each is
+   * drawn unavailable (`aria-disabled`, dimmed by `index.html`'s `.watch-only`) with the sentence its
+   * press gives as its `title`; a press still refuses in those words on the status line, so nothing
+   * about the rule moves. *Save recording* is marked only where its press refuses: a run this shell
+   * simulated.
+   */
+  function drawWatchOnlyControls(): void {
+    const sentence = engineerWatchOnlySentence(state);
+    const mark = (control: HTMLElement, reason: string | undefined): void => {
+      control.classList.toggle('watch-only', reason !== undefined);
+      if (reason !== undefined) {
+        control.setAttribute('aria-disabled', 'true');
+        control.title = reason;
+        control.dataset['watchOnly'] = 'true';
+      } else if (control.dataset['watchOnly'] === 'true') {
+        control.removeAttribute('aria-disabled');
+        control.removeAttribute('title');
+        delete control.dataset['watchOnly'];
+      }
+    };
+    for (const control of [ui.coach.building, ui.coach.pattern, ui.coach.shiftLength]) mark(control, sentence);
+    /* *Cancel this run* is never held: it stops a run, it makes none. */
+    mark(ui.coach.run, shiftRunner.isRunning() ? undefined : sentence);
+    mark(
+      ui.transport.saveRecording,
+      sentence !== undefined && state.recording !== undefined && state.recording === simulatedRecording
+        ? ATTEMPT_NOT_SAVED
+        : undefined,
+    );
   }
 
   function coachHint(view: ViewAt): string {
