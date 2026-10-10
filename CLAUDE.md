@@ -56,14 +56,15 @@ verdict:
   to be corrected ([§ D186](DECISIONS.md)); and mode parity is **derived from the code**, proved
   against a fail state the product deliberately does not ship.
 
-  **The honesty corpus: the always-on row is wave AM's, measured 2026-09-26 on the integrated tree;
-  the deep row is still wave AL's (`eff454b`) until the first nightly run after wave AM merges.**
+  **The honesty corpus: the always-on row is wave AN's, measured 2026-10-10 on the integrated tree;
+  the deep row is still wave AL's (`eff454b`), because the nightly job's figures could not be read
+  from an agent session until wave AN made it emit them as annotations.**
   Every earlier wave's move, its decomposition and what it taught are in
   [`docs/44`](docs/44-honesty-corpus-log.md), newest first:
 
   | tier | cases | strings | simulations | surfaces | failing cases | verdict |
   |---|---|---|---|---|---|---|
-  | always-on | 49 | **941 293** | **606** | **77** | **0** | **green**, and the register is empty |
+  | always-on | 49 | **1 002 246** | **606** | **79** | **0** | **green**, and the register is empty |
   | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **1 157 486** | **4 710** | **76** | **0** | **green**, and the register is empty |
 
   **How this row is kept.** Each rule below was learned the hard way at least once, and the log says
