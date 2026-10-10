@@ -183,7 +183,19 @@ export class Playback {
     return this.#rawSimTime() >= this.recording.endedAt ? 'ended' : 'playing';
   }
 
-  /** Simulated seconds, clamped into the recording. */
+  /**
+   * Simulated seconds, clamped into the recording and held at the reach.
+   *
+   * **Reading this never wraps a loop.** The wrap is applied by {@link frame} and nowhere else, so
+   * on a looping transport this reads on past the window's `toS`, as far as the run's end, until
+   * the next `frame()` brings the playhead back. A painter that read only this would play into the
+   * tail and then hold the last frame for good, which is the trap `everyday/towerLoop.ts` and
+   * `everyday/landingScreen.ts#landingLoopOf` both fell into. Draw a looping transport from
+   * `frame()` and take `frame.simTimeS` for whatever is drawn beside the cars.
+   *
+   * It stays a plain read rather than learning to wrap because a getter that re-anchored the
+   * transport would move the playhead for every caller that only asked where it was.
+   */
   get simTimeS(): SimTime {
     if (!this.#playing) return this.#pausedAtS;
     return Math.min(this.#clampSim(this.#rawSimTime()), this.#limit());
@@ -202,6 +214,10 @@ export class Playback {
    * Reads the clock exactly once, so every number in the returned frame describes the same
    * instant. A caller that read `simTimeS` and then called `frameAt` itself could straddle a
    * clock tick and draw a car at one instant and its doors at another.
+   *
+   * It is also the only call that applies the loop window (see {@link simTimeS}): crossing `toS`
+   * re-anchors the playhead at `fromS` here, so a looping transport loops only for a caller that
+   * draws from this.
    */
   frame(): Frame {
     return frameAt(this.recording, this.#advance());

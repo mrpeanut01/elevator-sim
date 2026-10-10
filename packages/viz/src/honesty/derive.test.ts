@@ -2536,6 +2536,22 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'sentence and `dayCensusLineOf`’s line, which the Career front-page adapter drives.',
       ids: ['everyday/campaignModel.ts#filedDayBandOf', 'everyday/campaignModel.ts#censusVerdictOf'],
     },
+    {
+      reason:
+        'The landing block’s run and the transport it plays on, not prose — GitHub issue #244. ' +
+        '`LANDING_RUN` is a building id, a dispatcher id, a seed and four numbers, and ' +
+        '`midtown-office` is the id that reads as two hyphenated words. `landingConfigOf` turns it ' +
+        'into a `SimulationConfig` and `landingLoopOf` into a `Playback` looping over the recording; ' +
+        'neither returns a string, and the one sentence between them is a thrown error about missing ' +
+        'reference data that no screen shows. They are exported so `landingScreen.test.ts` can drive ' +
+        'the loop with a `ManualClock`. Every word the page draws is `everyday/landingView.ts`’s, ' +
+        'which the `EVERYDAY_LANDING` adapter drives.',
+      ids: [
+        'everyday/landingScreen.ts#LANDING_RUN',
+        'everyday/landingScreen.ts#landingConfigOf',
+        'everyday/landingScreen.ts#landingLoopOf',
+      ],
+    },
   ]);
 
 const excludedIds = new Set(NOT_PLAYER_FACING.flatMap((group) => group.ids));
