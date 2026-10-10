@@ -17164,11 +17164,11 @@ const EVERYDAY_CAREER_FRONT: SurfaceAdapter = {
 
     /* The contract document, on every difficulty. */
     for (const id of DIFFICULTY_IDS) {
-      const document = contractDocumentOf(context.buildingName, DIFFICULTIES[id]);
+      const contractDoc = contractDocumentOf(context.buildingName, DIFFICULTIES[id]);
       const at = `careerFront.contract.${id}`;
-      seeds.push({ field: `${at}.title`, text: document.title, role: 'label' });
-      seeds.push({ field: `${at}.parties`, text: document.parties, role: 'prose' });
-      for (const clause of document.clauses) {
+      seeds.push({ field: `${at}.title`, text: contractDoc.title, role: 'label' });
+      seeds.push({ field: `${at}.parties`, text: contractDoc.parties, role: 'prose' });
+      for (const clause of contractDoc.clauses) {
         const where = `${at}.clause.${clause.number}`;
         seeds.push({ field: `${where}.heading`, text: clause.heading, role: 'label' });
         seeds.push({ field: `${where}.body`, text: clause.body, role: 'prose' });
