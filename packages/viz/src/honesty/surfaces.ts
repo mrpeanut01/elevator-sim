@@ -252,6 +252,7 @@ import { scenarioHubViewOf } from '../everyday/scenarioModel.js';
 import { SCENARIO_LADDER_COPY, type ScenarioLadderRung } from '../scenario/ladder.js';
 import {
   TUTORIAL_ABSENCES,
+  TUTORIAL_CASE_ID,
   TUTORIAL_COPY,
   TUTORIAL_FIGURE_NOTES,
   TUTORIAL_STEPS,
@@ -383,9 +384,11 @@ import {
   judgeReplication,
   markTitleOf,
   progressLineOf,
+  replicationRowOf,
   type MorningMark,
 } from '../fixit/judge.js';
-import { HELD_FIX_CASES, heldReasonOf } from '../fixit/held.js';
+import { HELD_FIX_CASES, heldReasonOf, isOffered } from '../fixit/held.js';
+import { routeCensusOf } from '../fixit/routeCensus.js';
 import { demandDisclosureOf } from '../fixit/parse.js';
 import { switchUnpostableReasonOf } from '../scope/switchWire.js';
 import {
@@ -7620,6 +7623,11 @@ const REPORT_CARD: SurfaceAdapter = {
  * the escalator fixtures above: the shipped `data/fixit-cases.json` copy is validated at load time
  * by `fixit/parse.ts` (R10 and § 16 rule 11), which is the campaign precedent — `data/` documents
  * are refused at the door, and what the search drives is the machinery that wraps them.
+ *
+ * **The shipped copy is swept as well, beside this case** (GitHub issue #570): `shippedFixitSeedsOf`
+ * words every shipped case's verdict (§ D1011) and, on every offered case, the page around it (lane
+ * AN-4). The synthetic case stays for the arms no shipped case reaches and for the figures, which it
+ * measures on the corpus's own runs.
  */
 /** The declarations the FIXIT adapter drives. A list, so `derive.test.ts` can hold it both ways. */
 const FIXIT_COVERS: readonly string[] = [
@@ -7837,6 +7845,11 @@ const shippedFixitSeeds = new WeakMap<ShippedFixit, readonly TextSeed[]>();
  * decision itself — that the pressed answer is the witness's run and the reproduced routes are not —
  * is held on real runs in `fixit/families.test.ts` and `fixit/verdictNamesTheOrder.test.ts`.
  *
+ * **And everything the case's page draws around the verdict**, since lane AN-4 took the rest of
+ * #570: every case's name, and on every case the list offers, the letter, the building as it stands,
+ * the figures' captions, the measure's row labels, the diagnosis card's case words and the tenancy
+ * cohorts. {@link shippedCaseBriefSeedsOf} says which fields and why only those.
+ *
  * The same strings on every honesty case, so they are built once per loaded file and reused.
  */
 function shippedFixitSeedsOf(shipped: ShippedFixit): readonly TextSeed[] {
@@ -7845,6 +7858,9 @@ function shippedFixitSeedsOf(shipped: ShippedFixit): readonly TextSeed[] {
   const schedule = shipped.cases.schedule;
   const seeds: TextSeed[] = [];
   for (const entry of shipped.cases.cases) {
+    /* The rail draws every case's name, a held case's beside its reason (§ D1020), so all eighteen. */
+    seeds.push({ field: `shipped(${entry.id}).name`, text: entry.name, role: 'label', provenance: 'authored' });
+    let witnessOutcome: FixitOutcome | undefined;
     const witness = witnessStateOf(entry);
     /* The select withholds the strategy the case already runs, so the order never presses it. */
     const standing = standingParkingOf(fixitRunPlanOf(entry, emptyFixitState(), shipped.resources).asBuilt);
@@ -7864,6 +7880,7 @@ function shippedFixitSeedsOf(shipped: ShippedFixit): readonly TextSeed[] {
         witnessRun,
       });
       const outcome = classifyOutcome(entry, FIXED_PAIR, spendOf(entry, state, schedule), verdict);
+      if (witnessRun) witnessOutcome = outcome;
       const attribution = fixitOutcomeAttribution(outcome, verdict);
       const at = `shipped(${entry.id}).${arm}`;
       seeds.push({ field: `${at}.head`, text: outcome.head, role: 'label', provenance: 'authored', attribution });
@@ -7893,9 +7910,155 @@ function shippedFixitSeedsOf(shipped: ShippedFixit): readonly TextSeed[] {
         });
       }
     }
+    if (isOffered(entry.id) && witnessOutcome !== undefined) {
+      seeds.push(...shippedCaseBriefSeedsOf(entry, witnessOutcome, shipped));
+    }
   }
   shippedFixitSeeds.set(shipped, seeds);
   return seeds;
+}
+
+/**
+ * **What a player reads of one shipped case around its verdict.** The rest of GitHub issue #570,
+ * taken by lane AN-4; this docstring is the record § D405 asks for, since nothing here reaches past
+ * this module.
+ *
+ * § D1011 swept each case's verdict, and the page above it stayed unswept. This is that page, field
+ * by field, in the order `everyday/fixitScreen.ts` draws it (`dev/fixitPanel.ts` draws the letter,
+ * the building, the captions, the row labels and the diagnosis card from the same fields):
+ *
+ * - **the letter**: the complaint, and who signed it;
+ * - **the building as it stands**: the as-built note, the symptom printed on the failing band, and
+ *   § D478's demand disclosure on a case whose rate falls outside its building's band;
+ * - **the four figures' captions**. The value under each is a measurement of the case's own as-built
+ *   run, which would cost two simulations a case, so the captions are swept here and the values are
+ *   swept on the synthetic case's four, over the corpus's own runs;
+ * - **the measure's two row labels** on the verdict card, the letter's morning and the forty-nine
+ *   more, through `classifyOutcome` and `replicationRowOf`, which is where `measure.label` reaches
+ *   a player;
+ * - **the diagnosis card's case words**, through `fixitDiagnosisView` on the case's own row of
+ *   `fixit/routeCensus.ts`: the measured hint a press shows (the schedule rows the diagnosed repair
+ *   buys), the census sentence where the census opens the card, and the authored diagnosis and
+ *   reasoning the explained card prints. The explained arm is seeded only where the witness's verdict
+ *   is fixed and credits the diagnosis, which is the condition both surfaces explain under;
+ * - **the tenancy cohorts** on the cases that author one: each cohort's name, its reason and its
+ *   positions, through `fixitTenancyView` over the case's own editor inputs.
+ *
+ * **Only the words that vary by case.** The card's eyebrow and press, the hint's note, the withheld
+ * sentences and the tenancy row's own heading are copy-table constants, identical on every case, and
+ * the synthetic arms in `FIXIT` already seed each one. Seeding them once per case would add renderings
+ * and sweep no new word.
+ *
+ * **Offered cases only, by the product's own predicate.** A held case (`fixit/held.ts`) is drawn in
+ * the rail as its name and its reason and opens on neither surface, so its letter, figures and
+ * diagnosis are strings nothing draws; the caller seeds its name and stops. The question is asked of
+ * `isOffered`, so a case the register releases enters the sweep on the same commit.
+ *
+ * Roles follow the tutorial adapter's seeding of the same three fields (`collapse.*`): the letter is
+ * prose, its signature a label and the symptom an observation. Every string is `authored`, being text
+ * a person wrote into `data/` or that the parser composed from it; the census sentence keeps the
+ * synthetic arm's classification, an observation that declares the routes it counts.
+ */
+function shippedCaseBriefSeedsOf(entry: FixitCase, witnessOutcome: FixitOutcome, shipped: ShippedFixit): readonly TextSeed[] {
+  const schedule = shipped.cases.schedule;
+  const at = `shipped(${entry.id})`;
+  const seeds: TextSeed[] = [
+    { field: `${at}.brief.complaint`, text: entry.complaint.text, role: 'prose', provenance: 'authored' },
+    { field: `${at}.brief.complainer`, text: entry.complaint.complainer, role: 'label', provenance: 'authored' },
+    { field: `${at}.brief.asBuilt`, text: entry.asBuilt.note, role: 'prose', provenance: 'authored' },
+    { field: `${at}.brief.symptom`, text: entry.symptom, role: 'observation', provenance: 'authored' },
+  ];
+  if (entry.demandDisclosure !== undefined) {
+    seeds.push({ field: `${at}.brief.demand`, text: entry.demandDisclosure, role: 'prose', provenance: 'authored' });
+  }
+  for (const [index, figure] of entry.figures.entries()) {
+    seeds.push({ field: `${at}.figure[${String(index)}].label`, text: figure.label, role: 'label', provenance: 'authored' });
+  }
+  seeds.push({ field: `${at}.row.complaint.label`, text: witnessOutcome.rows[0].label, role: 'label', provenance: 'authored' });
+  /* The fourth row's label reads only the measure; the mornings are fabricated, this adapter's habit. */
+  const replication = judgeReplication(
+    Array.from({ length: DERIVED_MORNINGS }, () => ({ complaint: 6, restAwayPct: 90, restBoarded: 120 })),
+    Array.from({ length: DERIVED_MORNINGS }, (_, i) => ({ complaint: i % 2, restAwayPct: 90, restBoarded: 120 })),
+  );
+  seeds.push({
+    field: `${at}.row.replication.label`,
+    text: replicationRowOf(entry, replication).label,
+    role: 'label',
+    provenance: 'authored',
+  });
+
+  const census = routeCensusOf(entry.id);
+  const shown = fixitDiagnosisView({ entry, schedule, asked: true, census, explained: false });
+  if (shown.text !== undefined) {
+    seeds.push({ field: `${at}.diagnosis.shown.text`, text: shown.text, role: 'prose', provenance: 'authored' });
+  }
+  if (shown.because !== undefined) {
+    seeds.push({
+      field: `${at}.diagnosis.shown.because`,
+      text: shown.because,
+      role: 'observation',
+      declaredCount: census?.routes ?? 0,
+      countShown: true,
+    });
+  }
+  if (witnessOutcome.kind === 'fixed' && witnessOutcome.attribution === 'diagnosis') {
+    const explained = fixitDiagnosisView({ entry, schedule, asked: true, census, explained: true });
+    if (explained.text !== undefined) {
+      seeds.push({ field: `${at}.diagnosis.explained.text`, text: explained.text, role: 'prose', provenance: 'authored' });
+    }
+    seeds.push({ field: `${at}.diagnosis.explained.note`, text: explained.note, role: 'prose', provenance: 'authored' });
+  }
+
+  const tenancy = fixitTenancyView(editorInputsOf(entry, emptyFixitState(), shipped.resources, schedule).tenancy);
+  for (const cohort of tenancy.cohorts) {
+    const where = `${at}.tenancy.${cohort.key}`;
+    seeds.push({ field: `${where}.name`, text: cohort.name, role: 'label', provenance: 'authored' });
+    seeds.push({ field: `${where}.reason`, text: cohort.reason, role: 'prose', provenance: 'authored' });
+    for (const option of cohort.options) {
+      /* The empty value is the copy table's *as it stands*, seeded by the synthetic arms. */
+      if (option.value === '') continue;
+      seeds.push({ field: `${where}.option(${option.value})`, text: option.label, role: 'label', provenance: 'authored' });
+    }
+  }
+  return seeds;
+}
+
+/**
+ * **The tutorial's case, in the shipped words the tutorial draws.** The tutorial adapter
+ * (`EVERYDAY_TUTORIAL`) drives the synthetic case for its runs, and the tutorial screens draw
+ * `everyday/tutorialModel.ts#TUTORIAL_CASE_ID` out of `data/fixit-cases.json`. Its letter, signature,
+ * symptom, diagnosis and reasoning are the same strings {@link shippedCaseBriefSeedsOf} seeds for that
+ * case under `FIXIT`; what only the tutorial draws is the diagnosed repair's name and effect, which
+ * the worked answer prints as the change that answered the letter. Since § D1020 retired the repair
+ * menu, that is the one repair blurb in the file a player still reads (GitHub issue #570, lane AN-4),
+ * so those two are seeded here and the five shared strings are not seeded twice.
+ *
+ * Seeded through `tutorialWorkedAnswerOf`, the function screen two calls, so each string is the one
+ * drawn rather than the field it came from. The worked answer's two counted lines are left to the
+ * synthetic arms: they are measurements of the case's own pair of runs, and the counts handed in here
+ * are placeholders nothing below reads. Empty where the file ships no such case, which
+ * `tutorialScreens.ts` refuses to open on.
+ */
+function shippedTutorialSeedsOf(shipped: ShippedFixit): readonly TextSeed[] {
+  const entry = shipped.cases.cases.find((candidate) => candidate.id === TUTORIAL_CASE_ID);
+  const diagnosed = entry?.repairs.find((repair) => repair.role === 'diagnosed');
+  if (entry === undefined || diagnosed === undefined) return [];
+  const at = `shipped(${entry.id})`;
+  const worked = tutorialWorkedAnswerOf({
+    diagnosis: entry.diagnosis.text,
+    reasoning: entry.diagnosis.reasoning,
+    change: diagnosed.name,
+    effect: diagnosed.effect,
+    measure: entry.complaint.measure.label,
+    before: 1,
+    after: 0,
+    sameCrowd: true,
+  });
+  /* Roles as the tutorial adapter seeds the same two fields of its synthetic answer (`worked.*`). */
+  return [
+    { field: `${at}.worked.change`, text: worked.change, role: 'label', provenance: 'authored' },
+    { field: `${at}.worked.effect`, text: worked.effect, role: 'prose', provenance: 'authored' },
+  ];
 }
 
 const FIXIT: SurfaceAdapter = {
@@ -15800,6 +15963,8 @@ const EVERYDAY_TUTORIAL: SurfaceAdapter = {
       seeds.push({ field: `worked.${arm}.basis`, text: view.basis, role: 'reason' });
       seeds.push({ field: `worked.${arm}.boundary`, text: view.boundary, role: 'reason' });
     }
+    /* The shipped tutorial case's change and effect, which only this screen draws (GitHub issue #570). */
+    seeds.push(...shippedTutorialSeedsOf(context.shippedFixit));
 
     /*
      * ---- screen two's own words, loaded and not-yet-loaded ----

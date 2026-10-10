@@ -39,6 +39,15 @@
  * test that only checked equality could pass while watching nothing. The last clause requires the
  * omission to still be **detectable**: on `garden-apartments`, whose only bank has two cars, the
  * event-bearing and event-less derivations must disagree, in the caption and in the refusal.
+ *
+ * ## A second subject on the same context: the shipped fix-it cases (GitHub issue #570)
+ *
+ * The same layer one adapter over. The FIXIT adapter drove its own synthetic case, and after
+ * § D1011 it drove the shipped cases' verdicts and nothing above them, so every letter, as-built
+ * note and diagnosis a player opens was rendered by nothing the search reads. The cases below read
+ * the registered adapters back out of `SURFACE_ADAPTERS`, take each expectation from the shipped
+ * file or from the screen model's own function, and hold the held cases the other way: a case the
+ * list will not open contributes its name and nothing else.
  */
 
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -55,6 +64,12 @@ import {
   scheduledEventFor,
   type CalendarPeriodId,
 } from '../shift/calendar.js';
+
+import { fixitDiagnosisView } from '../everyday/fixitScreenModel.js';
+import { TUTORIAL_CASE_ID } from '../everyday/tutorialModel.js';
+import { isOffered } from '../fixit/held.js';
+import { opensWithDiagnosis, routeCensusOf } from '../fixit/routeCensus.js';
+import type { FixitCase } from '../fixit/types.js';
 
 import { caseFromSeed, contextFor, type HonestySpace } from './index.js';
 import { loadHonestyResources } from './resources.test-helper.js';
@@ -173,5 +188,108 @@ describe('the corpus’s calendar caption is the one the product would publish �
     expect(withEvent.get('period.moving-week.day1.withheld[0]')).toContain('could reserve 0');
     expect(without.get('period.moving-week.day6.withheld[0]')).toContain('could reserve 1');
     expect(withEvent.get('period.moving-week.day6.withheld[0]')).toContain('could reserve 0');
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * GitHub issue #570 — the shipped fix-it cases, as a player opens them
+ * -------------------------------------------------------------------------- */
+
+const FIXIT_ADAPTER_ID = 'fixit/engine.ts#classifyOutcome';
+const TUTORIAL_ADAPTER_ID = 'everyday/tutorialModel.ts#tutorialWalkthroughViewOf';
+
+/** One adapter's output, `field → text`, read off the registered adapter rather than re-derived. */
+function fieldsOf(adapterId: string): ReadonlyMap<string, string> {
+  const adapter = SURFACE_ADAPTERS.find((candidate) => candidate.id === adapterId);
+  if (adapter === undefined) throw new Error(`no surface adapter is registered as ${adapterId}`);
+  return new Map(adapter.render(context).map((text) => [text.field, text.text]));
+}
+
+describe('the corpus reads every shipped fix-it case a player opens — issue #570', () => {
+  let fixit: ReadonlyMap<string, string>;
+  let cases: readonly FixitCase[];
+  let offered: readonly FixitCase[];
+
+  beforeAll(() => {
+    fixit = fieldsOf(FIXIT_ADAPTER_ID);
+    cases = context.shippedFixit.cases.cases;
+    offered = cases.filter((entry) => isOffered(entry.id));
+  });
+
+  it('seeds every case’s name, a held case’s included, because the rail draws all of them', () => {
+    expect(cases.length).toBeGreaterThan(offered.length);
+    for (const entry of cases) {
+      expect(fixit.get(`shipped(${entry.id}).name`), entry.id).toBe(entry.name);
+    }
+  });
+
+  it('seeds every offered case’s letter, the building as it stands and the figures’ captions', () => {
+    for (const entry of offered) {
+      const at = `shipped(${entry.id})`;
+      expect(fixit.get(`${at}.brief.complaint`), entry.id).toBe(entry.complaint.text);
+      expect(fixit.get(`${at}.brief.complainer`), entry.id).toBe(entry.complaint.complainer);
+      expect(fixit.get(`${at}.brief.asBuilt`), entry.id).toBe(entry.asBuilt.note);
+      expect(fixit.get(`${at}.brief.symptom`), entry.id).toBe(entry.symptom);
+      /* Present exactly where the parser derived a disclosure, absent where it derived none. */
+      expect(fixit.get(`${at}.brief.demand`), entry.id).toBe(entry.demandDisclosure);
+      entry.figures.forEach((figure, index) => {
+        expect(fixit.get(`${at}.figure[${String(index)}].label`), entry.id).toBe(figure.label);
+      });
+      expect(fixit.get(`${at}.row.complaint.label`), entry.id).toContain(entry.complaint.measure.label);
+      expect(fixit.get(`${at}.row.replication.label`), entry.id).toContain(entry.complaint.measure.label);
+    }
+  });
+
+  it('seeds every offered case’s diagnosis card in the words both surfaces print', () => {
+    const schedule = context.shippedFixit.cases.schedule;
+    let opened = 0;
+    for (const entry of offered) {
+      const at = `shipped(${entry.id})`;
+      const census = routeCensusOf(entry.id);
+      const shown = fixitDiagnosisView({ entry, schedule, asked: true, census, explained: false });
+      expect(fixit.get(`${at}.diagnosis.shown.text`), entry.id).toBe(shown.text);
+      expect(fixit.get(`${at}.diagnosis.explained.text`), entry.id).toBe(entry.diagnosis.text);
+      expect(fixit.get(`${at}.diagnosis.explained.note`), entry.id).toBe(entry.diagnosis.reasoning);
+      /* The census sentence exactly where the census opens the card, and nowhere else. */
+      expect(fixit.has(`${at}.diagnosis.shown.because`), entry.id).toBe(opensWithDiagnosis(entry.id));
+      if (opensWithDiagnosis(entry.id)) opened += 1;
+    }
+    /* Or the clause above only ever watched the absent side. */
+    expect(opened).toBeGreaterThan(0);
+  });
+
+  it('seeds the tenancy cohorts, their reasons and their positions on the cases that author one', () => {
+    const authoring = offered.filter((entry) => (entry.asBuilt.tenancy?.cohorts.length ?? 0) > 0);
+    expect(authoring.length).toBeGreaterThan(0);
+    for (const entry of authoring) {
+      for (const cohort of entry.asBuilt.tenancy?.cohorts ?? []) {
+        const where = `shipped(${entry.id}).tenancy.${cohort.id}`;
+        expect(fixit.get(`${where}.name`), entry.id).toBe(cohort.name);
+        expect(fixit.get(`${where}.reason`), entry.id).toBe(cohort.reason);
+        for (const position of cohort.positions) {
+          expect(fixit.get(`${where}.option(${position.id})`), entry.id).toBe(position.name);
+        }
+      }
+    }
+  });
+
+  it('and seeds nothing of a held case beyond its name, since neither surface opens one', () => {
+    const held = cases.filter((entry) => !isOffered(entry.id));
+    expect(held.length).toBeGreaterThan(0);
+    for (const entry of held) {
+      const page = [...fixit.keys()].filter(
+        (field) => field.startsWith(`shipped(${entry.id}).`) && /\.(brief|figure\[|row|diagnosis|tenancy)/u.test(field),
+      );
+      expect(page, entry.id).toEqual([]);
+    }
+  });
+
+  it('seeds the tutorial case’s change and effect under the tutorial’s own surface', () => {
+    const entry = cases.find((candidate) => candidate.id === TUTORIAL_CASE_ID);
+    const diagnosed = entry?.repairs.find((repair) => repair.role === 'diagnosed');
+    expect(diagnosed).toBeDefined();
+    const tutorial = fieldsOf(TUTORIAL_ADAPTER_ID);
+    expect(tutorial.get(`shipped(${TUTORIAL_CASE_ID}).worked.change`)).toBe(diagnosed?.name);
+    expect(tutorial.get(`shipped(${TUTORIAL_CASE_ID}).worked.effect`)).toBe(diagnosed?.effect);
   });
 });
