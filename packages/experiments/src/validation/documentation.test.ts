@@ -3083,7 +3083,7 @@ const KNOWN_DECISION_HOLES: ReadonlyMap<number, string> = new Map([
   [910, "wave AF's career lane's block; unspent for § 901's reason."],
   /*
    * **D912, D913 and D914 were registered here and are headings now, and the contradiction is
-   * recorded rather than silently repaired** — build lane AG-A, wave AG, GitHub issues #587 and
+   * recorded rather than silently repaired** — build lane AG-A, wave AG, PR #587 and GitHub issue
    * #588.
    *
    * The entry that stood here said wave AF's chimes lane held D911–D925, spent only § D911, and

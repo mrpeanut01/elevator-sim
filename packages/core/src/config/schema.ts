@@ -154,7 +154,7 @@ export const ISSUE_CODES = {
   coreExceedsFloorPlate: 'core-exceeds-floor-plate',
   /**
    * **A bank's `shafts` block does not partition its cars** — `docs/11` § 1.2, GitHub issue
-   * #412, `DECISIONS.md` § D620.
+   * #412, `DECISIONS.md` § D621.
    *
    * A car named by no shaft, a car named by two, or a shaft naming a car the bank does not
    * declare. All three refuse rather than warn, because each produces a runtime that cannot be
@@ -169,7 +169,7 @@ export const ISSUE_CODES = {
   shaftLayoutNotAPartition: 'shaft-layout-not-a-partition',
   /**
    * **A two-car shaft states no clearance, or states a safety brake weaker than its own service
-   * brake** — `docs/11` § 2.1 and § 2.2, `DECISIONS.md` § D620.
+   * brake** — `docs/11` § 2.1 and § 2.2, `DECISIONS.md` § D621.
    *
    * Two refusals under one code because both are the same failure: a TWIN shaft whose separation
    * arithmetic cannot be evaluated. `standingClearanceM` and `emergencyDecelerationMps2` have no
@@ -1574,7 +1574,7 @@ export const BANK_ROPE_TUNABLES = Object.freeze({
 });
 
 /**
- * **The TWIN shaft's declared hardware** — `docs/11` § 2.2, GitHub issue #412, § D620.
+ * **The TWIN shaft's declared hardware** — `docs/11` § 2.2, GitHub issue #412, § D621.
  *
  * Three figures, and all three are a property of a *hoistway* rather than of a dispatcher: a
  * clearance, a padding on a braking distance, and a brake. None of them is a weight vector and

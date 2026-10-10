@@ -493,7 +493,7 @@ occupants is not a quantity the Barney/CIBSE expression has.
 taking a car away or adding one would delete or dissolve the thing the scenario is about. Measured
 day-1 miss rate **0.52 of 50 seeds**, inside `docs/33` DC-4's band.
 
-> **Both figures moved on 2026-09-22** ([§ D914](../DECISIONS.md), GitHub issue #587, `docs/33`
+> **Both figures moved on 2026-09-22** ([§ D914](../DECISIONS.md), PR #587, `docs/33`
 > § 4.7n). The rung now books **car `D` of the shops-and-offices bank** out of passenger service
 > between a quarter and a half of the way through the shift — never the car park lift, which is the
 > only car in its own bank — so the fabric is no longer untouched, and the crowd comes back to

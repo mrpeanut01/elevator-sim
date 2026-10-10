@@ -30877,6 +30877,10 @@ first line of its own output. That line is why this row is not wrong.
 
 ## D462 — the CI matrix is one leg, on the product owner's call
 
+> **Corrected 2026-10-10 ([§ D1268](#d1268)).** The date line below cites #334 as an issue. It is
+> [PR #334](https://github.com/mrpeanut01/elevator-sim/pull/334), wave O's pull request, and the
+> macOS red was on its checks (`ISSUE_WORKER_LEDGER.md` § O.5). The line is left as written.
+
 **Date: 2026-09-02 · Owner: the product owner, directly · GitHub issue #334's macOS red is the
 occasion, not the reason.**
 
@@ -41688,6 +41692,10 @@ So the **longest gap between moments that decide the day is 112.5 s** — the di
 
 ## D912 — the week's tower is a control, so the day whose verdict turns on a press is reachable on purpose
 
+> **Corrected 2026-10-10 ([§ D1268](#d1268)).** The date line below cites #587 as an issue. It is
+> [PR #587](https://github.com/mrpeanut01/elevator-sim/pull/587), the pull request that shipped
+> wave AG, and no issue was filed for this entry's work. The line is left as written.
+
 **Date: 2026-09-22 · Owner: build lane AG-A (wave AG) · GitHub issue [#587](https://github.com/mrpeanut01/elevator-sim/issues/587) · Binds `packages/viz/src/everyday/towerChoice.ts`, `packages/viz/src/everyday/host.ts` and `packages/viz/src/everyday/doorScreen.ts`, so it is an entry rather than a docstring ([§ D405](#d405)).**
 
 **Decision.** `everyday/towerChoice.ts` composes the picker; `EverydayHost.chooseTower` moves the
@@ -41792,6 +41800,10 @@ another sentence* — applied to the lane that wrote the sentence.
 ## D914 — seven contracts carry a day whose verdict turns on a press, and the day says which standing orders make it moot
 
 > **Status 2026-09-25: AMENDED by [§ D1029](#d1029)** — the pin's typed instant is replaced by a derived call and a window of at least 120 simulated seconds from it; the moot census moves from the brief to the report.
+
+> **Corrected 2026-10-10 ([§ D1268](#d1268)).** The date line below cites #587 as an issue. It is
+> [PR #587](https://github.com/mrpeanut01/elevator-sim/pull/587), the pull request that shipped
+> wave AG, and no issue was filed for this entry's work. The line is left as written.
 
 **Date: 2026-09-22 · Owner: build lane AG-A (wave AG) · GitHub issue [#587](https://github.com/mrpeanut01/elevator-sim/issues/587) · Binds `data/contract-ladder.json`, `packages/viz/src/shift/ladder.ts`, `packages/viz/src/dev/data.ts`, `packages/viz/src/everyday/today.ts`, `packages/viz/src/everyday/briefView.ts` and `packages/viz/src/everyday/briefScreen.ts`, so it is an entry rather than a docstring ([§ D405](#d405)).**
 
@@ -42366,6 +42378,11 @@ On the same two cells at **80 kJ**, clean days summed over all thirteen arms are
 ---
 
 ## D963 — the legibility sweep is re-measured over the rungs that moved under it, and the first-session set grows from eleven towers to fourteen
+
+> **Corrected 2026-10-10 ([§ D1268](#d1268)).** The date line below cites #587 as an issue beside
+> #584, which is one. #587 is [PR #587](https://github.com/mrpeanut01/elevator-sim/pull/587), the
+> pull request that shipped wave AG, so the body's *Lane AG-A closed #587* means that lane's work
+> shipped in it. The line and the body are left as written.
 
 **Date: 2026-09-22 · Owner: wave AG fix lane 2 · GitHub issues [#584](https://github.com/mrpeanut01/elevator-sim/issues/584) and [#587](https://github.com/mrpeanut01/elevator-sim/issues/587) · Rules on: [§ D961](#d961)'s table, [§ D512](#d512)'s threshold, [§ D514](#d514)'s line, [§ D729](#d729)'s rotation figures.**
 
@@ -49010,3 +49027,73 @@ policy and 213 to 224 under the house.
 rule; any tower but Midtown; more than three sittings (the sweep's default of eight was not run);
 which answer a flipping call's other runs favoured, which the bot records only as a flip and the
 census ([§ D1264](#d1264)) records in full.
+
+## D1268 — a number cited as a GitHub issue is an issue: pull requests are cited as pull requests, four entries are corrected under their headings, and a registry holds it
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (wave AN, lane AN-1, on GitHub
+> issue #589 and the lane brief), not by the product owner. **It moves no bar, no rule and no
+> player surface.** **Owner-reversible**: the correction form (a dated blockquote under a heading
+> rather than an edit to the line) and the registry's scope.
+
+**Why an entry.** [§ D405](#d405)'s first ground. The guard binds every authored text file in the
+tree, and the corrections sit in four decision entries this lane did not write.
+
+**The finding.** GitHub numbers issues and pull requests from one sequence, so a link that calls a
+pull request an issue still resolves and lands on a relevant page. Wave AG cited
+[PR #587](https://github.com/mrpeanut01/elevator-sim/pull/587), the pull request that shipped it,
+as an issue: in three decision entries' date lines, seven `data/contract-ladder.json` notes, two
+documents and nineteen docstrings. Its lanes had been briefed from an assessor's findings, and wrote
+down a number nobody had filed. Reading every pull request number rather than the few #589 named
+found two older instances: § D462's date line cites wave O's PR #334 as an issue, and a
+`fixitScreen.ts` docstring cites PR #556.
+
+**The ruling.**
+
+1. A pull request is cited as one: `PR #N`, or a link to `pull/N`. Thirty sites in nineteen files
+   are rewritten so: the seven data notes, `docs/04` and `docs/33` (two), and the docstrings in
+   `everyday/`, `shift/`, `honesty/surfaces.ts` and `validation/documentation.test.ts`.
+2. A decision entry is not rewritten. [§ D462](#d462), [§ D912](#d912), [§ D914](#d914) and
+   [§ D963](#d963) keep their date lines, and each gains a blockquote under its heading,
+   `Corrected 2026-10-10`, that names the pull request by its `pull/N` link.
+3. `packages/experiments/src/validation/citations.test.ts` holds it. A registry lists all **180**
+   pull request numbers through #616, read from `GET /repos/mrpeanut01/elevator-sim/pulls?state=all`
+   on 2026-10-10. The case reads every `.md`, `.ts`, `.mts`, `.mjs`, `.json`, `.yml`, `.yaml`, `.sh`
+   and `.bicep` file, takes each number in a *GitHub issue* or *GitHub issues* list and each
+   `issues/N` link, and fails on any registered number. In `DECISIONS.md` a hit is accepted only
+   inside an entry named in `CORRECTED_UNDER_THE_HEADING` that carries its correction, and that map
+   is held both ways. Red on the base: thirty sites outside `DECISIONS.md`, and the four entries
+   without their corrections. Green after.
+
+**Not established.** The registry is complete through #616 and a floor above it: a pull request
+opened later is caught only once someone adds its number. A bare `#N` with no *issue* beside it is
+not read, so § D963's *closed #587* is left to its correction. #589's process question (whether the
+integrator files an issue before dispatch and puts its number in the brief) is the integrator's to
+adopt and is not taken here.
+
+## D1269 — every action a workflow uses is pinned to a 40-character commit SHA
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (wave AN, lane AN-1, on the lane
+> brief, which replaces Dependabot's closed PRs #615 and #616), not by the product owner. **It moves
+> no bar, no rule and no player surface.** **Owner-reversible**: the rule itself. A later wave may
+> admit a tag pin by deleting the case, which puts that decision on the diff.
+
+**Why an entry.** [§ D405](#d405)'s first ground. It binds every file in `.github/workflows/`, which
+several lanes and Dependabot edit.
+
+**The finding.** Sixty of the sixty-two `uses:` lines across the seven workflows named a full commit
+SHA with the version as a trailing comment. The week census job ([§ D1067](#d1067)'s census, in
+`deep-tiers.yml`) named `actions/checkout@v4` and `actions/setup-node@v4`, and Dependabot's two pull
+requests proposed moving those tags to `v7` rather than pinning them.
+
+**The ruling.** Both lines name the SHAs every other workflow uses for the same actions,
+`actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1` and
+`actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0`.
+`packages/experiments/src/validation/ciWorkflowMatrix.test.ts` holds the rule for every workflow
+file: each step's `uses:` key, read at the start of a line so a comment cannot count, must be
+`owner/repo[/path]@` and forty hex digits. A mutation case writes a tag, a branch and a short SHA
+over a real pinned line and requires each to be the one new report. Red on the base: two lines,
+`deep-tiers.yml:806` and `:807`. Green after: 28 cases.
+
+**Not established.** No workflow uses a local action (`./path`) or a `docker://` image today; either
+would fail this rule and would need a clause of its own. The rule does not require the version
+comment, which is what Dependabot reads to propose an update.

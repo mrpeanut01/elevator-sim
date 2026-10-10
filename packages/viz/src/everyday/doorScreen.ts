@@ -400,7 +400,7 @@ function mountDoor(
   }
 
   /**
-   * **This week's tower, as a control** — GitHub issue #587, § D912, `everyday/towerChoice.ts`.
+   * **This week's tower, as a control** — PR #587, § D912, `everyday/towerChoice.ts`.
    *
    * On the front door rather than on the week screen or behind the campaign, because this is the
    * screen that says *today's tower* and the assessor's finding was that the tower could not be

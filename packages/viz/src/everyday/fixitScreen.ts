@@ -263,7 +263,7 @@ const PROTO = Object.freeze({
 } as const);
 
 /**
- * The two stage blocks' DOM classes, one constant each — GitHub issue #556, § D644.
+ * The two stage blocks' DOM classes, one constant each — PR #556, § D644.
  *
  * Named rather than inlined at the two mount sites because the browser tier addresses both blocks by
  * these strings and asserts one is **absent** where the other may be present: the as-built block is

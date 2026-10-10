@@ -874,7 +874,7 @@ export interface EverydayHost {
   contract(): ScenarioContract | undefined;
 
   /**
-   * **The towers a player can move this week to** — GitHub issue #587,
+   * **The towers a player can move this week to** — PR #587,
    * [§ D912](../../../../DECISIONS.md), `everyday/towerChoice.ts`.
    *
    * Derived per call from the live week and the parked ones, so a screen that holds the view across
@@ -2013,7 +2013,7 @@ export interface EverydayHost {
   startReplay(day: number): string | undefined;
 
   /**
-   * **Move the week to another contract** — GitHub issue #587, § D912.
+   * **Move the week to another contract** — PR #587, § D912.
    *
    * `shift/week.ts#switchWeek` with the `resume` arrival, which is the whole of the decision and is
    * argued in `everyday/towerChoice.ts`: the player is picking a week up, not taking an assignment,

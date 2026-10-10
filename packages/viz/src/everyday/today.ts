@@ -74,7 +74,7 @@ export interface OutOfServiceStrip {
   /** One sentence per cause, joined. See {@link outOfServiceOf} for why they are not merged. */
   readonly sentence: string;
   /**
-   * **Which standing orders make today's question go away** — GitHub issue #587,
+   * **Which standing orders make today's question go away** — PR #587,
    * [§ D914](../../../../DECISIONS.md). `undefined` on every day that is not a pinned one.
    *
    * A playability assessor swept § D871's day across all thirteen shipped dispatchers and found

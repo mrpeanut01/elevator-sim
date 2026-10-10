@@ -102,7 +102,7 @@ import { ModelError } from '../types.js';
  * guide rails with one safety-gear design, and a per-car value lets the two cars of one shaft
  * disagree about the arithmetic that keeps them apart. A shaft whose two halves compute
  * different clearances is a shaft with no separation contract. Recorded in `DECISIONS.md`
- * § D620 rather than left as a silent divergence from a locked document.
+ * § D621 rather than left as a silent divergence from a locked document.
  *
  * It is hardware and not strategy, so it is **not** a dispatcher weight (CLAUDE.md invariant
  * 7 puts strategy in `data/dispatcher-profiles.json`; this is a brake). Its type, range and
@@ -361,7 +361,7 @@ export interface ShaftSpanM {
  *
  * Under docs/11 OQ-2's two readings of the deadlock zone this is the **conservative** one: it
  * is bounded by where the mate is committed to be, not by which of the mate's scheduled stops
- * lie in the way. § D620 records the choice and the reason — the tight reading is only safe
+ * lie in the way. § D621 records the choice and the reason — the tight reading is only safe
  * while the mate's route cannot change, and a re-assigning dispatcher makes that false.
  */
 export function reachableHeightRangeM(

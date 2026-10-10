@@ -1249,7 +1249,7 @@ export interface StageActivity {
    * Not a park and not priced like one: a clearing move does not pass through
    * `idle.repositionThresholdS`, because a tuning deadband that can veto a move the constraint
    * requires is a deadlock produced by a tuning value (§ 5.2's Q-PP, answered *no* in
-   * `DECISIONS.md` § D620). It is empty-car driving and it reaches the energy proxy through
+   * `DECISIONS.md` § D621). It is empty-car driving and it reaches the energy proxy through
    * `#depart` like every other move, which is the obligation § 5.2's *if no* branch names.
    */
   readonly clearingMoves?: number | undefined;

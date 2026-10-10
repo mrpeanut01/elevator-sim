@@ -970,6 +970,21 @@ handoff's single-cutaway assumption does not survive this building, and that the
 starting point rather than the answer — three fixed positions is a zoning mechanism with no way to
 aim it.
 
+**Status 2026-10-10: the floor-number jump SHIPPED**, in
+[PR #551](https://github.com/mrpeanut01/elevator-sim/pull/551) (`f71f3d3`) on
+[§ D625](../DECISIONS.md)'s ruling, and GitHub issue #549 is closed by it.
+`packages/viz/src/everyday/stageScreen.ts` draws a floor select
+beside the three band chips, and `packages/viz/src/everyday/stageScreenModel.ts` adds a fourth
+camera, `floor`: `stageFloorJumpOptionsOf` offers every floor and `stageCameraWindowOf` centres the
+band on the chosen one. `packages/viz/src/everyday/stage165Floors.browser.test.ts` measures it on
+the reference tower: all 165 floors are offered, a floor the three fixed positions cannot reach is
+reached through the jump, and on the built page choosing a floor moves the control and un-presses
+the three chips. So *cannot be looked at legibly at all* and the reachable band of **40 of 165**
+above describe the three fixed positions alone, and *Neither candidate is built by this ruling* was
+true of the ruling; all three are left as written. The deviation stands, because the stage still
+draws 35 to 40 floors legibly at a time, and the zone picker keyed to the tower's sky lobbies is
+still the unbuilt v2.
+
 **Why this row is not simply "make the canvas taller".** `60vh` is § 4's own deviation `RX-03`, and
 at 165 floors a legible pitch needs about **2 160 px** of canvas — nearly three times a 900 px
 viewport. There is no viewport this fits in, so the fix cannot be geometry.

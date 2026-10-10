@@ -1,5 +1,5 @@
 /**
- * **Which tower your week runs on, as a control** — GitHub issue **#587**,
+ * **Which tower your week runs on, as a control** — PR **#587**,
  * [§ D912](../../../../DECISIONS.md).
  *
  * ## The defect this answers, in the assessor's own measurement

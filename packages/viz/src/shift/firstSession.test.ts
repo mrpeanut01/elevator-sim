@@ -93,7 +93,7 @@ describe('the eligible set — § D512’s table read by arithmetic', () => {
      */
     /*
      * **The set gains three members on the integrated tree, and its published count moves for the
-     * first time since it was derived** — [§ D963](../../../../DECISIONS.md). GitHub issue #587's
+     * first time since it was derived** — [§ D963](../../../../DECISIONS.md). PR #587's
      * lane booked a car out of seven contracts' day 1 and rebalanced six of their rungs
      * ([§ D914](../../../../DECISIONS.md)); the sweep above was pinned before that landed. Measured
      * on the merged tree at the same 800-day budget, `c6` goes 14 of 50 → **25**, `c8` **3 → 43**

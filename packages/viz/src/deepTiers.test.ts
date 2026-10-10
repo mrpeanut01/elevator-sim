@@ -1021,4 +1021,64 @@ describe('§ 3 — the workflow keeps the shape that made this safe', () => {
     ).toMatch(/if: always\(\)\n\s+run: \|\n\s+\{\n\s+echo "## Corpus figures"/u);
     expect(job).toMatch(/if: always\(\)\n\s+with:\n\s+name: corpus-figures/u);
   });
+
+  it('puts each tier on a check-run annotation as well, the one place a session can read it', () => {
+    /*
+     * The case above makes the figures readable by a person. The deep row is carried by agent
+     * sessions, and a session reads neither: the REST API serves no job summary, and the session's
+     * GitHub client refuses the artifact download host. A check run's annotations are served
+     * (`repos/{owner}/{repo}/check-runs/{id}/annotations`), so the job emits one `::notice` per tier
+     * under one title, with the figures and the commit, and runs it under `always()` for the same
+     * reason the summary does.
+     *
+     * Each figure is cut from its line by the label the measurement writes, so the labels are read
+     * off the two writers rather than trusted: a relabelled line would otherwise leave a notice
+     * that names every figure and fills none.
+     */
+    const lines = workflow().split('\n');
+    const start = lines.findIndex((line) => /^\s{2}corpus-figures:\s*$/u.test(line));
+    const end = lines.findIndex((line, at) => at > start && /^\s{2}[a-z][a-z0-9-]*:\s*$/u.test(line));
+    const job = lines.slice(start, end === -1 ? undefined : end);
+    const from = job.findIndex((line) => /^\s+- name: Annotate the run with each tier's figures$/u.test(line));
+    expect(from, 'the corpus-figures job has no annotation step').toBeGreaterThan(0);
+    const until = job.findIndex((line, at) => at > from && /^\s{6}- /u.test(line));
+    const step = job.slice(from, until === -1 ? undefined : until).join('\n');
+
+    expect(step).toMatch(/\n\s+if: always\(\)\n\s+run: \|\n\s+for tier in always-on deep; do\n/u);
+    expect(step).toMatch(/file="\$\{\{ runner\.temp \}\}\/corpus-\$tier\.txt"/u);
+    const notice = /echo "::notice title=corpus figures::([^"\n]*)"/u.exec(step)?.[1];
+    expect(notice, 'no notice line titled "corpus figures"').toBeDefined();
+    for (const field of [
+      '$tier',
+      'cases $cases',
+      'strings $strings',
+      'surfaces $surfaces',
+      'failing cases $failing',
+      'commit ${{ github.sha }}',
+    ]) {
+      expect(notice, `the notice does not carry ${field}`).toContain(field);
+    }
+    expect(step, 'a tier that wrote nothing must still say so under the same title').toMatch(
+      /echo "::warning title=corpus figures::\$tier · no figures were written/u,
+    );
+
+    const writers =
+      readFileSync(join(ROOT, 'packages', 'viz', 'src', 'honesty', 'campaign.ts'), 'utf8') +
+      readFileSync(join(ROOT, 'packages', 'viz', 'src', 'honesty', 'measure.corpus.test.ts'), 'utf8');
+    for (const [variable, label] of [
+      ['cases', 'cases'],
+      ['strings', 'strings checked'],
+      ['simulations', 'simulations'],
+      ['surfaces', 'surface count'],
+      ['failing', 'failing cases'],
+    ] as const) {
+      expect(step, `$${variable} is not cut from the "${label}" line`).toContain(
+        `${variable}=$(sed -n 's/^${label}  *//p' "$file")`,
+      );
+      expect(
+        writers,
+        `no writer emits a "${label}" line any more, so $${variable} would be empty`,
+      ).toMatch(new RegExp(`\`${label} +\\$\\{`, 'u'));
+    }
+  });
 });

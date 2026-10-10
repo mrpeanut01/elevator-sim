@@ -803,8 +803,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 240
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '26'
           cache: npm
@@ -855,6 +855,9 @@ jobs:
   # nightly run of this job after the wave merges. So the headline of both tiers is written to the
   # run's summary page as well as to the artifact, with the commit it is true of, which makes it
   # readable without a download. Carried by a person, as before: nothing here edits the tree.
+  #
+  # **And as one check-run annotation per tier**, because an agent session can read neither the
+  # summary page nor the artifact, and the deep row is carried by agent sessions. The step says how.
   # ---------------------------------------------------------------------------
   corpus-figures:
     name: corpus figures — § D343, both tiers, one sitting
@@ -971,6 +974,31 @@ jobs:
               echo '```'
             done
           } >> "$GITHUB_STEP_SUMMARY"
+
+      # The same headline once more, as one check-run annotation per tier, because neither the
+      # summary nor the artifact can be read from an agent session: the REST API serves no job
+      # summary, and a session's GitHub client refuses the artifact download host. Annotations are
+      # served, at `repos/{owner}/{repo}/check-runs/{job id}/annotations`, so the integrator can
+      # carry the deep row without a browser. Every tier's line has the title `corpus figures` and
+      # names the commit. A tier that wrote nothing gets a warning under that title instead, and the
+      # `cases` field keeps the file's own `(n evaluated, n skipped)`, which is what tells a complete
+      # tier from a truncated one.
+      - name: Annotate the run with each tier's figures
+        if: always()
+        run: |
+          for tier in always-on deep; do
+            file="${{ runner.temp }}/corpus-$tier.txt"
+            if [ -f "$file" ]; then
+              cases=$(sed -n 's/^cases  *//p' "$file")
+              strings=$(sed -n 's/^strings checked  *//p' "$file")
+              simulations=$(sed -n 's/^simulations  *//p' "$file")
+              surfaces=$(sed -n 's/^surface count  *//p' "$file")
+              failing=$(sed -n 's/^failing cases  *//p' "$file")
+              echo "::notice title=corpus figures::$tier · cases $cases · strings $strings · simulations $simulations · surfaces $surfaces · failing cases $failing · commit ${{ github.sha }}"
+            else
+              echo "::warning title=corpus figures::$tier · no figures were written · commit ${{ github.sha }}"
+            fi
+          done
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()

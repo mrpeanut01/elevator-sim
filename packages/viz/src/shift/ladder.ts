@@ -274,7 +274,7 @@ export interface ContractLadderRow {
   /**
    * The pinned day whose verdict turns on a press, or `undefined` for a rung that has none.
    *
-   * GitHub issue **#587**, [§ D914](../../../../DECISIONS.md). See {@link ContractPressDay}.
+   * PR **#587**, [§ D914](../../../../DECISIONS.md). See {@link ContractPressDay}.
    */
   readonly pressDay: ContractPressDay | undefined;
   /**
@@ -521,7 +521,7 @@ function contractIncidentOf(value: unknown): ContractIncident {
  * something else.
  */
 /**
- * The contract's pinned press day, or `undefined` — GitHub issue #587, § D914.
+ * The contract's pinned press day, or `undefined` — PR #587, § D914.
  *
  * Keyed on the contract alone rather than on `(contractId, buildingId)` like {@link rungFor},
  * because a press day is a fact about **the day this contract hands you** rather than about a run:

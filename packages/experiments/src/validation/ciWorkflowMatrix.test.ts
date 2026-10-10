@@ -62,7 +62,8 @@
  * deleted guard never actually asserted, since the `uname -m` step has always lived in `ci.yml` and
  * nothing has ever checked that it is still there.
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -369,5 +370,92 @@ describe('node infra/checks/workflowMatrix.mjs', () => {
 
   it('renders each violation on its own line', () => {
     expect(summaryOf(['first', 'second'])).toBe('ci.yml: 2 violation(s).\n  - first\n  - second');
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * Every action a workflow uses is pinned to a commit: § D1269
+ * -------------------------------------------------------------------------- */
+
+const WORKFLOW_DIR = fileURLToPath(new URL('../../../../.github/workflows/', import.meta.url));
+
+/**
+ * A step's `uses:` key, read off the start of the line after an optional list dash.
+ *
+ * Anchored that way because prose says the word too: `deploy-viz.yml`'s header has a comment line
+ * that ends a clause in *uses:*, and a scan for the substring would read it as an action.
+ */
+const USES_LINE = /^\s*(?:-\s+)?uses:\s*['"]?([^\s'"#]+)/u;
+
+/**
+ * `owner/repo[/path]@` and forty hex digits. A tag or a branch is a pointer its owner can move after
+ * this repository last read it; a commit SHA is the only reference that names the code that runs.
+ */
+const PINNED_TO_A_COMMIT = /^[\w.-]+\/[\w./-]+@[0-9a-f]{40}$/u;
+
+interface ActionUse {
+  readonly file: string;
+  readonly line: number;
+  readonly ref: string;
+}
+
+const actionUsesIn = (file: string, source: string): readonly ActionUse[] =>
+  source.split('\n').flatMap((text, at) => {
+    const ref = USES_LINE.exec(text)?.[1];
+    return ref === undefined ? [] : [{ file, line: at + 1, ref }];
+  });
+
+const unpinned = (uses: readonly ActionUse[]): readonly string[] =>
+  uses
+    .filter((use) => !PINNED_TO_A_COMMIT.test(use.ref))
+    .map((use) => `${use.file}:${String(use.line)} uses ${use.ref}`);
+
+const WORKFLOW_SOURCES: readonly (readonly [string, string])[] = readdirSync(WORKFLOW_DIR)
+  .filter((file) => file.endsWith('.yml') || file.endsWith('.yaml'))
+  .sort()
+  .map((file) => [file, readFileSync(join(WORKFLOW_DIR, file), 'utf8')] as const);
+
+const ALL_USES: readonly ActionUse[] = WORKFLOW_SOURCES.flatMap(([file, source]) =>
+  actionUsesIn(file, source),
+);
+
+describe('every action a workflow uses is pinned to a 40-character commit SHA', () => {
+  it('reads every workflow file, and finds the actions they use', () => {
+    // The guard on the guard: a directory read that found nothing, or a pattern that stopped
+    // matching, would pass the case below by checking no line at all.
+    const files = WORKFLOW_SOURCES.map(([file]) => file);
+    expect(files).toContain('ci.yml');
+    expect(files).toContain('deep-tiers.yml');
+    expect(ALL_USES.length, 'almost no `uses:` lines were read').toBeGreaterThan(20);
+    expect(new Set(ALL_USES.map((use) => use.file)).size).toBeGreaterThanOrEqual(5);
+  });
+
+  it('pins every one, in every workflow file', () => {
+    expect(
+      unpinned(ALL_USES),
+      'an action referenced by a tag, a branch or a short SHA. Pin it to the full commit SHA the ' +
+        "other workflows use for the same action, with the version as a trailing comment, so the " +
+        'code that runs is the code that was read. The week census ran on two tag pins until ' +
+        'Dependabot proposed moving them (closed PRs #615 and #616).',
+    ).toEqual([]);
+  });
+
+  it('catches a tag, a branch and a short SHA written over a real pinned line', () => {
+    const source = WORKFLOW_SOURCES.find(([file]) => file === 'deep-tiers.yml')?.[1] ?? '';
+    const pinned = actionUsesIn('deep-tiers.yml', source).find((use) =>
+      use.ref.startsWith('actions/checkout@'),
+    );
+    expect(pinned, 'deep-tiers.yml checks out nothing, so there is no line to mutate').toBeDefined();
+    const sha = pinned?.ref.split('@')[1] ?? '';
+    // Compared against the file as it stands, so this case reports its own mutation and not
+    // whatever the case above already reports.
+    const before = new Set(unpinned(actionUsesIn('deep-tiers.yml', source)));
+    for (const moved of ['v7', 'main', sha.slice(0, 7)]) {
+      const mutated = source.replace(`actions/checkout@${sha}`, `actions/checkout@${moved}`);
+      expect(mutated, 'the mutation did not land').not.toBe(source);
+      expect(
+        unpinned(actionUsesIn('deep-tiers.yml', mutated)).filter((found) => !before.has(found)),
+      ).toEqual([`deep-tiers.yml:${String(pinned?.line)} uses actions/checkout@${moved}`]);
+    }
   });
 });

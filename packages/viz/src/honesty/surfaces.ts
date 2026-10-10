@@ -180,7 +180,7 @@ import {
 } from '../everyday/tunerModel.js';
 import { SCREEN_NAMES, UNBUILT_REASONS } from '../everyday/screens.js';
 import { SIGN_IN_LINK_STAGES, signInNoticeViewOf } from '../everyday/signInLink.js';
-/* GitHub issue #587's week-tower picker — driven by `EVERYDAY_TOWER_CHOICE` at the end of this file. */
+/* PR #587's week-tower picker — driven by `EVERYDAY_TOWER_CHOICE` at the end of this file. */
 import { towerChoiceViewOf } from '../everyday/towerChoice.js';
 /* GitHub issue #242's fault ceiling — the report line's *at least* arm is drawn at it. */
 import { MAX_FAULTS_COUNTED } from '../everyday/faults.js';
@@ -15212,7 +15212,7 @@ const EVERYDAY_SIGN_IN_LINK: SurfaceAdapter = {
 };
 
 /**
- * **The week's tower picker** — GitHub issue **#587**, [§ D912](../../../../DECISIONS.md).
+ * **The week's tower picker** — PR **#587**, [§ D912](../../../../DECISIONS.md).
  *
  * ## Why it is swept, and what it is most likely to get wrong
  *
@@ -17102,7 +17102,7 @@ export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
    */
   EVERYDAY_LANDING,
   /*
-   * And the week's tower picker — GitHub issue #587, § D912. Appended last in turn, and the
+   * And the week's tower picker — PR #587, § D912. Appended last in turn, and the
    * fault-ordering rule is free here for the landing page's reason rather than the tutorial's: the
    * surface publishes no figure at all (`towerChoice.test.ts` fails on a digit outside the
    * contract's own `Scenario n` label), so there is no rate-shaped wording whose fault it could

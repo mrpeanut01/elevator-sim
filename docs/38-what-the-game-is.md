@@ -447,10 +447,21 @@ Named so the next lane does not discover it. None of it is built by this page.
   fallback that says so, and the server checking a posted modified run against a real spend.
   **Partly built**: the ledger, the balance read, the earn, the spend route and the posted-run check
   ship, and the balance is read by Settings and paid by a filed contract day, a fix case's first
-  clear and a rush's waves beyond the account's best (#499); a campaign stage or brief will pay its
+  clear and a rush's waves beyond the account's best (#499); ~~a campaign stage or brief will pay its
   first clear once it is playable in Everyday. The **device-only
   fallback** does not — see § 2.4 for the ruling it is waiting on — and **no screen spends a chime
-  yet**, which the panel that lists the prices says on its own face (#371, #372).
+  yet**, which the panel that lists the prices says on its own face (#371, #372).~~ *Corrected
+  2026-10-10, and struck rather than deleted so the record stands.* A campaign stage's first clear
+  from the Scenario hub pays ([§ D1129](../DECISIONS.md)), and the E1 to E6 briefs pay once they
+  are playable in Everyday. The **device-only fallback ships**: the device
+  ledger records turns and derives its balance ([§ D711](../DECISIONS.md)), built in
+  `everyday/deviceChimes.ts` and `everyday/chimeStore.ts` ([§ D911](../DECISIONS.md)). **Three
+  spends ship**: `rush-prefit` against an account ([§ D672](../DECISIONS.md)),
+  `career-purse-top-up` through the career shop, also against an account
+  ([§ D738](../DECISIONS.md)), and a fix case's budget rung, priced by the scenario and bought from
+  the device tally with no account ([§ D911](../DECISIONS.md)). `rush-purse-top-up` is still
+  refused, on its own row in the panel, because no between-round rebuild exists to spend it on
+  ([§ D606](../DECISIONS.md) § 2).
 - The stage's opening speed moves to a watching rung, reopening [§ D354](../DECISIONS.md)'s
   default, and a *skip to the end* control is added.
 - ~~Two new intervention kinds, equipment and building changes, on the run record.~~ **Built**
@@ -465,7 +476,11 @@ Named so the next lane does not discover it. None of it is built by this page.
   interventions on its round, and a postable result. **Built on the server** ([§ D542](../DECISIONS.md),
   [§ D543](../DECISIONS.md)): the purse in `data/rush-purse.json`, a sitting replayed round by round,
   every purse derived, and a board. **Not built:** a between-round rebuild the server can price and
-  apply, and the viewer posting a sitting (GitHub issue #372).
+  apply~~, and the viewer posting a sitting~~ (GitHub issue #372). *The struck clause is corrected
+  2026-10-10:* the viewer posts a sitting ([§ D606](../DECISIONS.md)) wherever the page has a
+  server and the player is signed in: a rush session keeps its rounds, `everyday/rushSitting.ts`
+  builds the body, and `menu/client.ts#postRushSitting` sends it to the route
+  [§ D542](../DECISIONS.md) opened. The purse a player reads is the server's reply to that post.
 - The design handoff's § 5 session-shapes table names four modes and § 10 authors repair lists, and
   [`CLAUDE.md`](../CLAUDE.md) makes the handoff canonical for the interface. Both are deviations,
   recorded in [`12-design-handoff.md`](12-design-handoff.md) § 4 like every other one, with this

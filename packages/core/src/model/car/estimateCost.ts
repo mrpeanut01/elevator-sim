@@ -184,7 +184,7 @@ export function infeasibilityOf(
 
   /*
    * 3'. **TWIN: the other car in this hoistway** — `docs/11` § 4.3, GitHub issue #412,
-   *     `DECISIONS.md` § D620. Gate 1 of § 2.3: a *feasibility filter*, not the authority.
+   *     `DECISIONS.md` § D621. Gate 1 of § 2.3: a *feasibility filter*, not the authority.
    *     Gate 2 lives in `sim/simulation.ts#depart` and is the one that may not be wrong; if this
    *     one is wrong the run is merely inefficient.
    *

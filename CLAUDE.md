@@ -77,8 +77,11 @@ verdict:
   - **The always-on row is measured on the integrated head each wave; the deep row is read from the
     nightly job.** The `corpus-figures` job in `.github/workflows/deep-tiers.yml` measures both tiers
     on `main` in one sitting and writes them, with the commit they are true of, to its job summary
-    and its `corpus-figures` artifact. The deep row is republished from the first nightly run after
-    the wave merges, and until then it names the commit it describes.
+    and its `corpus-figures` artifact, and emits one `::notice title=corpus figures::` annotation per
+    tier, which is the copy an agent session can read (`gh api
+    repos/mrpeanut01/elevator-sim/check-runs/<job id>/annotations`; the summary and the artifact are
+    not served to it). The deep row is republished from the first nightly run after the wave
+    merges, and until then it names the commit it describes.
   - **Re-measure the base first.** Only a base measurement tells a correction from a move; waves Y,
     Z and AC-2 each found the published row had drifted under waves that never re-measured it.
   - **Diff the surface sets, never only the counts.** A count cannot say whether a move is a new

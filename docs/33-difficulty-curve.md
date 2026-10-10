@@ -2370,7 +2370,7 @@ would turn § 4.7d's table into an answer to P1 as well as to DC-4, and it does 
 
 #### 4.7n Seven days that turn on a press, and the five rungs that had to be rebalanced to keep them
 
-**Landed 2026-09-22, GitHub issue [#587](https://github.com/mrpeanut01/elevator-sim/issues/587),
+**Landed 2026-09-22, PR [#587](https://github.com/mrpeanut01/elevator-sim/pull/587),
 [§ D914](../DECISIONS.md).** § 4.7m's closing paragraph asked for exactly one thing — *a
 press-sensitivity column beside the miss rate* — and said the instrument did not exist. It does now:
 `packages/viz/src/shift/pressLadder.sweep.test.ts`, gated on `PRESS_LADDER_SWEEP=1`, runs each
@@ -3012,8 +3012,8 @@ established is that both moves are a rung reaching a run it never used to reach.
 
 #### 6.4d The rungs moved under the sweep in the same wave, and the eligible set grew by three
 
-**Re-measured 2026-09-22, on the integrated tree** — [§ D963](../DECISIONS.md), GitHub issue
-[#587](https://github.com/mrpeanut01/elevator-sim/issues/587). § 6.4c's table was taken on a branch.
+**Re-measured 2026-09-22, on the integrated tree** — [§ D963](../DECISIONS.md), PR
+[#587](https://github.com/mrpeanut01/elevator-sim/pull/587). § 6.4c's table was taken on a branch.
 A sibling lane in the same wave **booked a car out of passenger service on seven contracts' day 1**
 and rebalanced **six of the seven rungs** to keep DC-4 ([§ D914](../DECISIONS.md)): `c2` let
 0.395 → 0.34, `c3` crowd 12 → 11, `c6` 16 → 15, `c8` 8.5 → **10.5** with **two** cars out, `c10`

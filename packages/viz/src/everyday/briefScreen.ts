@@ -220,7 +220,7 @@ function mountBrief(
       strip.append(badge, sentence);
       column.append(strip);
       /*
-       * **Which standing orders make today's question go away** — GitHub issue #587, § D914.
+       * **Which standing orders make today's question go away** — PR #587, § D914.
        *
        * Under the strip rather than inside it, and drawn only on a pinned day: the strip says a
        * lift is going and this says what the day is asking, which are two facts with two causes.

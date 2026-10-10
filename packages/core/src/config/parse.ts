@@ -640,7 +640,7 @@ export function resolveBuilding(
     }
 
     /*
-     * **The hoistway layout** — `docs/11` § 1.2, GitHub issue #412, `DECISIONS.md` § D620.
+     * **The hoistway layout** — `docs/11` § 1.2, GitHub issue #412, `DECISIONS.md` § D621.
      *
      * Resolved here rather than at run time for the reason every cross-reference in this
      * function is resolved here: a shaft naming a car that does not exist must be a located
@@ -945,7 +945,7 @@ export function crossCheckDispatcherProfiles(
 
 /**
  * **A bank's hoistways, resolved and always populated** — `docs/11` § 1.2, GitHub issue #412,
- * `DECISIONS.md` § D620.
+ * `DECISIONS.md` § D621.
  *
  * Three jobs, and the third is the one that matters:
  *

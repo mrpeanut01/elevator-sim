@@ -233,7 +233,7 @@ describe('Scenario 6 day 1 — the event the day asks to be answered', () => {
      * Both directions. A field every row used would make the identity below untestable, and a field
      * no row used would make this whole file a description of nothing.
      *
-     * **This case read `toEqual([CONTRACT_ID])` until GitHub issue #587**, which is a statement
+     * **This case read `toEqual([CONTRACT_ID])` until PR #587**, which is a statement
      * about wave AF rather than about the field: § D871 authored the first absence and § D914
      * authored six more, so `c7` is no longer the only rung and asserting that it is would have
      * turned a piece of content into a schema rule. What has to hold for the rest of this file to

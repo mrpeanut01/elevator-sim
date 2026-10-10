@@ -1621,7 +1621,7 @@ export interface BankConfig extends Commented {
    */
   readonly ropeClass?: string | undefined;
   /**
-   * **Which cars share a hoistway** — `docs/11` § 1.2, GitHub issue #412, `DECISIONS.md` § D620.
+   * **Which cars share a hoistway** — `docs/11` § 1.2, GitHub issue #412, `DECISIONS.md` § D621.
    *
    * **Absent means today's meaning exactly: one shaft per car, no separation**, which is every
    * shipped building and every run this project has ever measured. Declaring the block is how a
