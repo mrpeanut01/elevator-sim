@@ -1023,6 +1023,18 @@ carries.
 refusal outcome) remain outside `VizRecording` entirely, per #544's own findings, and neither is
 touched here. This row closes only the bank-kind half of that issue.
 
+### 4.18 The Career's triage screen carries tower cards, an intro and a contract document the handoff does not draw
+
+**The deviation.** The handoff's `isTowers` block is a table of text rows, and its `isContract` block
+lists terms as label and value pairs. GitHub issue #536, the owner's own, asks for buildings drawn
+with status colours that run on the screen, an intro to the career and to chimes, and a contract
+that reads like one. [§ D1301](../DECISIONS.md) adds all three and keeps every handoff element.
+
+**What it does not change.** A card's colour is the worst wait band of the tower's last filed day,
+in the band palette § 1.2 already sets (`var(--band-0…3)`), with the band said in words beside it, so
+no colour is the only signal (KB-15). The card plays that day with the stage's own painter and files
+nothing ([§ D716](../DECISIONS.md) § 3). The intro is drawn on a fresh career only.
+
 The refactor is done when all of the following are true, and not before.
 
 1. **Layout fidelity** — the three regions, their widths, their order and their internal card

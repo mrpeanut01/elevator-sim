@@ -303,6 +303,10 @@ import { WEEK_START_NEXT_LABEL, weekScreenViewOf } from '../everyday/weekView.js
 import { percentileLine, WORLD_FIGURES_ABSENT, WORLD_FIGURES_LABEL, WORLD_FIGURES_REASON } from '../everyday/world.js';
 import { weekdayOf, type GoalObservations } from '../shift/types.js';
 import { buildingView, CONTRACT_COPY, contractView, towersView } from '../everyday/campaignModel.js';
+/* Wave AN lane AP-3's region — the Career's front page, § D1301. */
+import { TOWER_CARD_COPY, contractDocumentOf, type CampaignInput } from '../everyday/campaignModel.js';
+import { mootCountClause } from '../everyday/today.js';
+import { DIFFICULTIES, DIFFICULTY_IDS } from '../campaign/economy.js';
 import {
   applyCampaignAction,
   CAMPAIGN_ABSENCES,
@@ -16968,6 +16972,138 @@ const TELEMETRY_CONSENT: SurfaceAdapter = {
   },
 };
 
+/* -------------------------------------------------------------------------- *
+ * Wave AN lane AP-3's region — the Career's front page, § D1301
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **The Career's front page** — GitHub issue #536's permitted half and #571's Career line, wave AN
+ * lane AP-3, [§ D1301](../../../../DECISIONS.md).
+ *
+ * Four things, each driven through the function the screen calls:
+ *
+ * - the fresh career's intro, `campaignModel.ts#careerIntroOf`;
+ * - the tower cards, `towersView`'s `cards`, with **this case's own recording** filed as the tower's
+ *   last day, so the band sentence a card draws is swept against every recording the corpus runs
+ *   rather than against a band this adapter chose; plus the no-filed-day and nobody-came arms;
+ * - the contract document, `contractDocumentOf`, on all four difficulties, since its payment,
+ *   allowance and worst-wait clauses each carry the difficulty's own figures;
+ * - the desk's census line, `dayCensusLineOf`, on a census where every driver clears, and the moot
+ *   count clause `today.ts#mootCountClause` on its three shapes (none, one, many).
+ *
+ * The census here is a fixture and says so in its field name: the sweep asks whether the sentence is
+ * licensed by what it claims, and the claim is about thirteen runs the desk takes live
+ * (`careerCensus.test.ts` takes them for real). No simulation is added by this adapter.
+ */
+const EVERYDAY_CAREER_FRONT: SurfaceAdapter = {
+  id: 'everyday/campaignModel.ts#careerIntroOf',
+  covers: [
+    'everyday/campaignModel.ts#careerIntroOf',
+    'everyday/campaignModel.ts#CAREER_INTRO_COPY',
+    'everyday/campaignModel.ts#towerCardView',
+    'everyday/campaignModel.ts#TOWER_CARD_COPY',
+    'everyday/campaignModel.ts#contractDocumentOf',
+    'everyday/campaignModel.ts#dayCensusLineOf',
+    'everyday/campaignModel.ts#DAY_CENSUS_COPY',
+    'everyday/today.ts#mootCountClause',
+  ],
+  render(context) {
+    const seeds: TextSeed[] = [];
+    const buildings = new Map([['garden-apartments', { name: 'Garden Apartments', spec: undefined }]]);
+    const dispatchers = [
+      { id: 'collective', name: 'Collective control', note: undefined, saved: false },
+      { id: 'eta', name: 'Minimum estimated wait', note: undefined, saved: false },
+    ];
+    const fresh = openingCareer('collective');
+    const filed = applyCampaignAction(
+      fresh,
+      { kind: 'file-day', towerId: 'c1', verdict: 'cleared', trips: 300 },
+      shippedPriceSchedule(),
+    );
+    const inputOf = (career: CampaignCareer, patch: Partial<CampaignInput> = {}): CampaignInput => ({
+      career,
+      schedule: shippedPriceSchedule(),
+      buildings,
+      dispatchers,
+      observations: undefined,
+      observationsBasis: 'whole-run',
+      history: [],
+      ...patch,
+    });
+
+    /* The intro, on the fresh career it is drawn on. */
+    const intro = towersView(inputOf(fresh)).intro;
+    if (intro !== undefined) {
+      seeds.push({ field: 'careerFront.intro.heading', text: intro.heading, role: 'label' });
+      intro.paragraphs.forEach((text, index) => {
+        seeds.push({ field: `careerFront.intro.${String(index)}`, text, role: 'prose' });
+      });
+      seeds.push({ field: 'careerFront.intro.chimesHeading', text: intro.chimesHeading, role: 'label' });
+      intro.chimes.forEach((text, index) => {
+        seeds.push({ field: `careerFront.intro.chimes.${String(index)}`, text, role: 'prose' });
+      });
+    }
+
+    /* The cards: this case's own run filed as the tower's day, then no day filed, then an empty run. */
+    for (const [arm, recording] of [
+      ['case', context.recording],
+      ['comparison', context.comparisonRecording],
+    ] as const) {
+      const view = towersView(
+        inputOf(filed, {
+          filedDays: new Map([['c1', { towerId: 'c1', day: 1, verdict: 'cleared' as const, recording }]]),
+        }),
+      );
+      seeds.push({ field: `careerFront.cards.${arm}.heading`, text: view.cards.heading, role: 'label' });
+      seeds.push({ field: `careerFront.cards.${arm}.sub`, text: view.cards.sub, role: 'prose' });
+      for (const card of view.cards.rows) {
+        const at = `careerFront.cards.${arm}.${card.towerId}`;
+        seeds.push({ field: `${at}.name`, text: card.name, role: 'label' });
+        seeds.push({ field: `${at}.day`, text: card.day, role: 'observation' });
+        if (card.filed !== undefined) seeds.push({ field: `${at}.filed`, text: card.filed, role: 'observation' });
+        seeds.push({ field: `${at}.status`, text: card.status, role: 'observation' });
+        seeds.push({ field: `${at}.cta`, text: card.cta, role: 'label' });
+      }
+    }
+    for (const card of towersView(inputOf(filed)).cards.rows) {
+      seeds.push({ field: `careerFront.cards.unfiled.${card.towerId}.status`, text: card.status, role: 'reason' });
+    }
+    seeds.push({ field: 'careerFront.cards.nobodyCame', text: TOWER_CARD_COPY.nobodyCame, role: 'reason' });
+
+    /* The contract document, on every difficulty. */
+    for (const id of DIFFICULTY_IDS) {
+      const document = contractDocumentOf(context.buildingName, DIFFICULTIES[id]);
+      const at = `careerFront.contract.${id}`;
+      seeds.push({ field: `${at}.title`, text: document.title, role: 'label' });
+      seeds.push({ field: `${at}.parties`, text: document.parties, role: 'prose' });
+      for (const clause of document.clauses) {
+        const where = `${at}.clause.${clause.number}`;
+        seeds.push({ field: `${where}.heading`, text: clause.heading, role: 'label' });
+        seeds.push({ field: `${where}.body`, text: clause.body, role: 'prose' });
+        for (const level of clause.levels ?? []) {
+          seeds.push({ field: `${where}.level.${level.id}`, text: level.text, role: 'label' });
+        }
+        if (clause.basisNote !== undefined) seeds.push({ field: `${where}.basis`, text: clause.basisNote, role: 'prose' });
+      }
+    }
+
+    /* The desk's census line, on a fixture census where both listed drivers clear. */
+    const census = {
+      towerId: 'c1',
+      towerDay: fresh.towers[0]?.day ?? 1,
+      verdicts: new Map(dispatchers.map((entry) => [entry.id, 'cleared' as const])),
+    };
+    const line = buildingView(inputOf(fresh, { dayCensus: census }))?.order.census;
+    if (line !== undefined) seeds.push({ field: 'careerFront.desk.census.fixture', text: line, role: 'observation' });
+
+    /* The brief's moot count, in each of its three shapes. */
+    for (const others of [0, 1, 10]) {
+      seeds.push({ field: `careerFront.moot.${String(others)}`, text: mootCountClause(others), role: 'observation' });
+    }
+    return singleRun(this.id, seeds);
+  },
+};
+
 export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   RUN_SUMMARY,
   DESCRIBE_FRAME,
@@ -17188,6 +17324,9 @@ export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   // Appended last, per the fault-ordering rule stated at SHIFT_REPORT: § D1129's stage page. Its
   // budget and pay lines are its own words, and nothing here re-seeds another surface's.
   EVERYDAY_STAGE_PLAY,
+  // Appended last in turn — wave AN lane AP-3, § D1301: the Career's front page. Its band sentences
+  // carry wait figures, so it sits after every surface whose wait-shaped faults it could take.
+  EVERYDAY_CAREER_FRONT,
 ]);
 
 /* -------------------------------------------------------------------------- *

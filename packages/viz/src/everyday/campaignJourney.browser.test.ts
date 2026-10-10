@@ -200,6 +200,14 @@ describe.skipIf(!HAS_BROWSER)('a campaign day, filed — issue #223', () => {
     const page = await coldLoad();
     await enterCampaign(page);
     const building = await page.textContent('.everyday-towers-name');
+    /*
+     * The career's front page before anything is filed — GitHub issue #536, § D1301: the fresh
+     * career's intro with its chimes half, and one card with no day to play and so no colour.
+     */
+    expect(await page.textContent('.everyday-towers-intro')).toContain('CHIMES');
+    expect(await page.locator('.everyday-towers-card').count()).toBe(1);
+    expect(await page.getAttribute('.everyday-towers-card', 'data-band')).toBe('none');
+    expect(await page.locator('.everyday-towers-card-canvas').count()).toBe(0);
     await openDesk(page);
 
     const before = await monthFigures(page);
@@ -232,6 +240,20 @@ describe.skipIf(!HAS_BROWSER)('a campaign day, filed — issue #223', () => {
     const purseAfter = await purseOnHand(page);
     const firstWeekRate = rateOnDay(DIFFICULTIES.standard, 0);
     expect(purseAfter).toBe(after.cleared === 1 ? purseBefore + firstWeekRate : purseBefore);
+
+    /*
+     * And the front page after it — § D1301. The intro is gone with the fresh career, and the card
+     * now plays the day just filed, coloured by one of the four wait bands and naming the verdict
+     * the month card counted. Which band is the run's business, as which mark is.
+     */
+    await page.locator('.everyday-bar-timeline').getByText('All buildings').first().click();
+    await page.waitForSelector('.everyday-towers', { timeout: 30_000 });
+    expect(await page.locator('.everyday-towers-intro').count()).toBe(0);
+    expect(await page.getAttribute('.everyday-towers-card', 'data-band')).toMatch(/^[0-3]$/u);
+    expect(await page.locator('.everyday-towers-card-canvas').count()).toBe(1);
+    expect(await page.textContent('.everyday-towers-card-filed')).toBe(
+      `Day 1 · ${after.cleared === 1 ? 'cleared' : 'missed'}`,
+    );
 
     await page.close();
   }, 300_000);

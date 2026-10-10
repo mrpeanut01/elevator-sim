@@ -59,8 +59,12 @@
 import { gaveUpBesideOf, readGoal, wasDisplayOf, PENDING_DISPLAY } from '../shift/goals.js';
 import type { PriceSchedule } from '../pricing/types.js';
 import type { WaitBandBasis } from '../live/types.js';
+import { WAIT_BANDS, waitBandsAt } from '../live/bands.js';
+import { observationsAt } from '../live/observations.js';
+import { shiftObservationsOf } from '../shift/observations.js';
+import type { VizRecording } from '../contract/types.js';
 import { shopTierPrice } from '../campaign/economy.js';
-import type { DayOutcome, GoalObservations, GoalReading, ShiftGoal } from '../shift/types.js';
+import type { DayOutcome, GoalObservationId, GoalObservations, GoalReading, ShiftGoal } from '../shift/types.js';
 import { wasGraded } from '../shift/week.js';
 import {
   CALENDAR_SPAN,
@@ -117,6 +121,7 @@ import {
   careerIsOver,
   type BuildId,
   type CampaignCareer,
+  type CampaignDayVerdict,
   type CampaignTower,
   type NeedOption,
   type TowerNeed,
@@ -196,6 +201,118 @@ export interface CampaignInput {
    * persistence closes, and a sentence somewhere else is a disclosure that becomes nobody's.
    */
   readonly careerNotice?: string | undefined;
+  /**
+   * **The last day each tower filed this sitting, with the recording it was filed from** — GitHub
+   * issue #536's permitted half, [§ D1301](../../../../DECISIONS.md).
+   *
+   * Keyed by tower id. The tower cards take their colour from it and play it, so a card's colour is
+   * a thing that happened in a day the player filed rather than what the desk wants
+   * ({@link needOf}). Page-lifetime, on {@link EverydayHost.campaignHistory}'s ground: the career
+   * persists and the mornings do not (`campaign/career.ts#CAMPAIGN_ABSENCES`), so after a reload a
+   * card has no filed day to show and says so. Optional because a fixture that files nothing has
+   * nothing to show; the shipped path (`campaignScreens.ts#campaignInputOf`) always writes it.
+   */
+  readonly filedDays?: ReadonlyMap<string, FiledDayRecord> | undefined;
+  /**
+   * **Every driver on the list, run on the open tower's next day before it is played** — GitHub
+   * issue #571's Career half, [§ D1301](../../../../DECISIONS.md). See {@link CareerDayCensus}.
+   * `undefined` until the census has landed for the day the desk is on, and on every tower outside
+   * {@link DAY_CENSUS_CONTRACT_IDS}.
+   */
+  readonly dayCensus?: CareerDayCensus | undefined;
+}
+
+/**
+ * The contracts whose desk takes a census of the day's own crowd before the day is run — GitHub
+ * issue #571, [§ D1301](../../../../DECISIONS.md).
+ *
+ * **`c1` alone, and owner-reversible as one constant.** The issue is about the opening contract,
+ * Garden Apartments, where the choice moves who rides which car and, on most days, not the verdict:
+ * measured by wave AN lane AP-3 over twenty career crowds of each of its twenty days at Standard,
+ * all thirteen shipped profiles cleared 361 of 400 crowds, all missed 12, and the verdict depended
+ * on the profile on 27. A census is thirteen runs of the day; on Garden Apartments that is under a
+ * second off the main thread, and on the towers where dispatch decides most days it would be many
+ * runs of a large building for a line that would almost never be drawn.
+ */
+export const DAY_CENSUS_CONTRACT_IDS: readonly string[] = Object.freeze(['c1']);
+
+/**
+ * What one driver's untouched run of a career day files — `'ungraded'` included, because a day the
+ * run could not read is not a day a driver cleared.
+ */
+export type CensusVerdict = 'cleared' | 'missed' | 'ungraded';
+
+/**
+ * **A census of one career day's own crowd** — every driver on the select, each run on exactly the
+ * day the tower's *Run day* press would start, with no press at all.
+ *
+ * Taken on that crowd and on nothing else, which is § D914's rule: a census describes only the runs
+ * it was taken on. A career day's crowd is derived from a base the session captures
+ * (`everyday/host.ts#careerSeedBase`), so a figure pinned for *day 6 of c1* would describe a crowd
+ * the next session never meets. The census is therefore taken where the day is about to be played,
+ * and `towerDay` ties it to that day.
+ */
+export interface CareerDayCensus {
+  readonly towerId: string;
+  /** The contract day the census ran — the tower's `day` when it was taken. */
+  readonly towerDay: number;
+  /** Driver id → what that driver's untouched run of the day files. */
+  readonly verdicts: ReadonlyMap<string, CensusVerdict>;
+}
+
+/**
+ * What a driver's run of a career day would file — the same fold `everyday/host.ts#closeDay` files
+ * by: the four tests at the tower's difficulty, over the whole run, through
+ * {@link campaignDayVerdict}. Non-test caller: `campaignScreens.ts`, on each census run as it lands.
+ */
+export function censusVerdictOf(tower: CampaignTower, recording: VizRecording): CensusVerdict {
+  const observations = shiftObservationsOf(observationsAt(recording, recording.endedAt));
+  return campaignDayVerdict(
+    campaignTestRows(DIFFICULTIES[tower.difficultyId], tower, observations, [], 'whole-run'),
+  );
+}
+
+/**
+ * The desk's census sentence — GitHub issue #571's *"say so"*, measured per day.
+ *
+ * It names no mechanism (§ D256): it says what thirteen runs did, not why. It says *with no press
+ * at all* because that is the run each driver was given, which is the press-day sentence's own
+ * qualifier (`everyday/today.ts#mootSentenceOf`).
+ */
+export const DAY_CENSUS_COPY = Object.freeze({
+  allClear:
+    'Measured on this day’s crowd before you run it: every driver on the list clears it with no ' +
+    'press at all.',
+} as const);
+
+/**
+ * {@link DAY_CENSUS_COPY.allClear} when a census of **this** tower's **this** day covers every
+ * driver the select offers and every one of them clears; otherwise `undefined`, which is also the
+ * answer on a day where the drivers' verdicts differ — that is the day the choice decides, and the
+ * desk says nothing that would suggest otherwise.
+ */
+export function dayCensusLineOf(input: CampaignInput, tower: CampaignTower): string | undefined {
+  const census = input.dayCensus;
+  if (census === undefined || census.towerId !== tower.id || census.towerDay !== tower.day) return undefined;
+  if (input.dispatchers.length === 0) return undefined;
+  for (const choice of input.dispatchers) {
+    if (census.verdicts.get(choice.id) !== 'cleared') return undefined;
+  }
+  return DAY_CENSUS_COPY.allClear;
+}
+
+/**
+ * One filed career day, as the tower card needs it — {@link CampaignInput.filedDays}.
+ *
+ * `day` is the contract day that was filed (the tower's day **before** `file-day` moved it on), and
+ * `verdict` is the one `file-day` carried, so the card and the month grid cannot disagree about
+ * how the day went. `recording` is the run the verdict was graded from, unaltered.
+ */
+export interface FiledDayRecord {
+  readonly towerId: string;
+  readonly day: number;
+  readonly verdict: CampaignDayVerdict;
+  readonly recording: VizRecording;
 }
 
 /** § 16 rule 1's mark for anything unfinished. Shared, so the three screens use one character. */
@@ -545,6 +662,183 @@ export const TOWERS_COPY = Object.freeze({
    */
 } as const);
 
+/**
+ * **The career's opening page** — GitHub issue #536's first ask, *"an easy to read, easy to
+ * understand description of what the campaign is"*, and its chimes ask, *"from the start, the idea
+ * of Chimes needs to be explained"*. Wave AN lane AP-3, [§ D1301](../../../../DECISIONS.md).
+ *
+ * Drawn on the triage screen while the career is fresh (career day 1, nothing filed), which is the
+ * screen a new career opens on (`everyday/modes.ts`). Every clause is a rule this build enforces,
+ * and each one names where: twenty days is `economy.ts#CONTRACT_DAYS`; *nothing files a day without
+ * you* is `career.ts#CAMPAIGN_ABSENCES`' first entry and § D716's ruling on the tower cards below;
+ * the four tests and the unread day are {@link BUILDING_COPY.testsNote}; two for a cleared day and
+ * three off for a miss is `economy.ts#standingOf`; the missed-day allowance is
+ * `economy.ts#contractIsLost`; three lost is `career.ts#LOST_CONTRACTS_MAX`. The second slot's
+ * standing is read from `economy.ts#SLOTS` in {@link careerIntroOf}, never typed here.
+ *
+ * The chimes half says what `data/chime-ledger.json` carries and nothing more: `earn-career-day`
+ * pays a day the contract paid for, `career-purse-top-up` is the one career sink, and it is bought
+ * against an account (`everyday/chimesPanel.ts#CHIMES_PANEL_COPY.rowSignedOut`). The two refusals
+ * are `docs/32` GD14 and GD13 clause 5, as `docs/38` § 2.2 states them. Its first sentence is the
+ * Settings panel's own lede, so the two places a player meets chimes open the same way.
+ */
+export const CAREER_INTRO_COPY = Object.freeze({
+  heading: 'HOW A CAREER WORKS',
+  contracts:
+    'You run buildings on contracts. A contract is one building for twenty working days, and each ' +
+    'day is one you run, watch and close yourself. Nothing files a day without you.',
+  clearing:
+    'A day clears when the building meets the contract’s four tests, and a day the run could not ' +
+    'read is not filed at all. A cleared day pays the contract’s fee into that building’s own ' +
+    'purse, and the purse buys that building its kit, fitted on nights you book.',
+  missing:
+    'A missed day pays nothing and costs three standing. Miss more days than the contract allows ' +
+    'and the contract is lost; lose three contracts and the career ends.',
+  /** `{n}` is `SLOTS[1].standing`, substituted by {@link careerIntroOf}. */
+  standing:
+    'Standing is two for every cleared day, less three for every missed one. It opens slots, which ' +
+    'is how you come to hold more than one building: the second opens at {n}.',
+  chimesHeading: 'CHIMES',
+  chimesEarn:
+    'Chimes are what finishing something pays you, in every mode. Here, each day the contract pays ' +
+    'for earns some, and a missed day earns none.',
+  chimesSpend:
+    'Signed in, you can spend them from Settings to top up the purse of the building your desk is ' +
+    'open on. They never open a slot and never buy back a missed day: standing opens slots, and a ' +
+    'missed day stays missed.',
+} as const);
+
+export interface CareerIntroView {
+  readonly heading: string;
+  readonly paragraphs: readonly string[];
+  readonly chimesHeading: string;
+  readonly chimes: readonly string[];
+}
+
+/** The intro, or `undefined` once the career has filed a day — see {@link CAREER_INTRO_COPY}. */
+export function careerIntroOf(career: CampaignCareer): CareerIntroView | undefined {
+  if (career.today !== 1) return undefined;
+  const second = SLOTS[1]?.standing;
+  return {
+    heading: CAREER_INTRO_COPY.heading,
+    paragraphs: [
+      CAREER_INTRO_COPY.contracts,
+      CAREER_INTRO_COPY.clearing,
+      CAREER_INTRO_COPY.missing,
+      ...(second === undefined ? [] : [CAREER_INTRO_COPY.standing.replace('{n}', String(second))]),
+    ],
+    chimesHeading: CAREER_INTRO_COPY.chimesHeading,
+    chimes: [CAREER_INTRO_COPY.chimesEarn, CAREER_INTRO_COPY.chimesSpend],
+  };
+}
+
+/**
+ * **The tower cards' chrome** — GitHub issue #536's *"graphics to depict buildings under contract
+ * with status colors. They automatically run while on this screen"*, in the one form
+ * [§ D716](../../../../DECISIONS.md) permits: a presentation control over a recording the day
+ * already produced. It plays, loops and colours. It never files and never grades
+ * ([§ D1301](../../../../DECISIONS.md)).
+ */
+export const TOWER_CARD_COPY = Object.freeze({
+  heading: 'YOUR BUILDINGS',
+  sub:
+    'Each card plays the last day its building filed, over and over, coloured by the longest wait ' +
+    'anybody stood that day. Watching a card files nothing and changes nothing; only closing a day ' +
+    'does that.',
+  /** No filed day this sitting. The career persists and its mornings do not. */
+  nothingFiled:
+    'No day filed here since this page opened, so there is nothing to play yet. Close a day and it ' +
+    'plays here.',
+  nobodyCame: 'Nobody arrived that day, so it has no colour.',
+  open: 'Open',
+} as const);
+
+/**
+ * The worst wait band anybody reached on a filed day, or `undefined` when nobody arrived.
+ *
+ * `live/bands.ts#waitBandsAt` on the **whole-run** basis at the recording's end — every rider who
+ * called, by the worst wait each realised — so a card cannot read calm off an empty final frame,
+ * which is the inversion § D239 measured. `censored` is that banding's own flag: the longest wait
+ * belongs to somebody still standing when the day ended, so its band is a floor.
+ *
+ * **Read from the recording and from nothing else.** The desk's {@link needOf} is not an argument,
+ * so a card's colour cannot be the desk's opinion of the building (§ D716 § 3).
+ */
+export function filedDayBandOf(recording: VizRecording): {
+  readonly index: number | undefined;
+  readonly censored: boolean;
+} {
+  const bands = waitBandsAt(recording, recording.endedAt, 'whole-run');
+  if (bands.total === 0) return { index: undefined, censored: false };
+  return { index: bands.worstIndex, censored: bands.longestWaitIsCensored };
+}
+
+/** What the card's colour says, in words, from the band's own boundaries in {@link WAIT_BANDS}. */
+function bandSentenceOf(index: number, censored: boolean): string {
+  const band = WAIT_BANDS[index];
+  if (band === undefined) return TOWER_CARD_COPY.nobodyCame;
+  if (censored) {
+    return `The longest wait reached ${String(band.fromS)} s, and that rider was still waiting when the day ended.`;
+  }
+  if (band.toS === undefined) return `Somebody waited more than ${String(band.fromS)} s.`;
+  if (index === 0) return `Nobody waited ${String(band.toS)} s or more.`;
+  return `The longest wait was between ${String(band.fromS)} and ${String(band.toS)} s.`;
+}
+
+export interface TowerCardView {
+  readonly towerId: string;
+  readonly name: string;
+  /** `day 4 of 20` — the tower's own contract day. */
+  readonly day: string;
+  /** Index into {@link WAIT_BANDS}, or `undefined` with no filed day or nobody in it. */
+  readonly bandIndex: number | undefined;
+  /** `WAIT_BANDS[bandIndex].color` — a CSS token, never handed to a canvas. */
+  readonly color: string | undefined;
+  /** `Day 3 · cleared` — the filed day and the verdict `file-day` carried — or `undefined`. */
+  readonly filed: string | undefined;
+  /** What the colour says, so colour is never the only signal. */
+  readonly status: string;
+  /** Whether the card has a recording to play. */
+  readonly playable: boolean;
+  readonly cta: string;
+}
+
+/**
+ * One tower card, from the tower and **its last filed day**, never from the desk.
+ *
+ * Non-test caller: {@link towersView}, drawn by `campaignScreens.ts#mountTowers`.
+ */
+export function towerCardView(input: CampaignInput, tower: CampaignTower): TowerCardView {
+  const facts = factsFor(input, tower);
+  const filed = input.filedDays?.get(tower.id);
+  const day = `day ${String(Math.min(tower.day, CONTRACT_DAYS))} of ${String(CONTRACT_DAYS)}`;
+  if (filed === undefined) {
+    return {
+      towerId: tower.id,
+      name: facts.name,
+      day,
+      bandIndex: undefined,
+      color: undefined,
+      filed: undefined,
+      status: TOWER_CARD_COPY.nothingFiled,
+      playable: false,
+      cta: TOWER_CARD_COPY.open,
+    };
+  }
+  const band = filedDayBandOf(filed.recording);
+  return {
+    towerId: tower.id,
+    name: facts.name,
+    day,
+    bandIndex: band.index,
+    color: band.index === undefined ? undefined : WAIT_BANDS[band.index]?.color,
+    filed: `Day ${String(filed.day)} · ${filed.verdict}`,
+    status: band.index === undefined ? TOWER_CARD_COPY.nobodyCame : bandSentenceOf(band.index, band.censored),
+    playable: true,
+    cta: TOWER_CARD_COPY.open,
+  };
+}
+
 /** § 8.6's legend, one entry per mark the grid can draw. */
 export const CALENDAR_LEGEND: readonly { readonly glyph: string; readonly label: string }[] =
   Object.freeze([
@@ -656,6 +950,10 @@ export interface TowersView {
   readonly rows: readonly TowerRowView[];
   readonly footer: string;
   readonly offers: OffersView;
+  /** {@link careerIntroOf} — present on a fresh career only. */
+  readonly intro: CareerIntroView | undefined;
+  /** One {@link TowerCardView} per tower held, in the table's order. */
+  readonly cards: { readonly heading: string; readonly sub: string; readonly rows: readonly TowerCardView[] };
   readonly lately: { readonly heading: string; readonly sub: string; readonly refusal: string };
   readonly oddsFootnote: string;
   /** The career-load refusal, if the last load refused. Never a bare blank. */
@@ -1009,6 +1307,12 @@ export function towersView(input: CampaignInput): TowersView {
     rows: career.towers.map((tower) => towerRowView(input, tower)),
     footer: `${String(wanting)} of ${String(held)} buildings want a decision · the rest need nothing from you today`,
     offers: offersView(career, (id) => input.buildings.get(id)?.name),
+    intro: careerIntroOf(career),
+    cards: {
+      heading: TOWER_CARD_COPY.heading,
+      sub: TOWER_CARD_COPY.sub,
+      rows: career.towers.map((tower) => towerCardView(input, tower)),
+    },
     lately: {
       heading: TOWERS_COPY.incidentsHeading,
       sub: TOWERS_COPY.incidentsSub,
@@ -1137,6 +1441,11 @@ export interface BuildingView {
     readonly sub: string;
     readonly drives: string;
     readonly view: StandingOrderView;
+    /**
+     * {@link dayCensusLineOf} — that every driver on the list clears this day on this crowd, or
+     * `undefined` wherever that was not measured or is not true. GitHub issue #571, § D1301.
+     */
+    readonly census: string | undefined;
   };
   readonly fitted: { readonly heading: string; readonly rows: readonly FittedRowView[] };
   readonly purse: {
@@ -1294,6 +1603,7 @@ export function buildingView(input: CampaignInput): BuildingView | undefined {
       sub: BUILDING_COPY.orderSub,
       drives: BUILDING_COPY.orderDrives,
       view: standingOrderView(input, tower),
+      census: dayCensusLineOf(input, tower),
     },
     fitted: {
       heading: BUILDING_COPY.fittedHeading,
@@ -1531,7 +1841,141 @@ export interface ContractView {
     readonly heading: string;
     readonly rows: readonly { readonly label: string; readonly got: string }[];
   };
+  /** The contract set out as a document — {@link contractDocumentOf}, § D1301. */
+  readonly document: ContractDocumentView;
   readonly shaft: { readonly heading: string; readonly body: string; readonly body2: string };
+}
+
+/**
+ * Where a service level's bar comes from — and the only two answers it may give.
+ *
+ * GitHub issue #536 asks for goals *"based on research on human interaction with elevators"*. A
+ * threshold called research-based has to cite the research, so the type has no third arm: a level
+ * either names its source or says it is the game's own choice. Every shipped level is the latter —
+ * `campaign/economy.ts#DIFFICULTIES` transcribes `ENGINE_CONTRACT.md` § 8.6's table, which is a
+ * design table, and nothing in this tree measures how long a person will stand at a landing.
+ */
+export type ServiceLevelBasis =
+  | { readonly kind: 'assumed' }
+  | { readonly kind: 'cited'; readonly source: string };
+
+/** One service level — one of the contract's four tests, as a clause. */
+export interface ServiceLevelView {
+  readonly id: string;
+  readonly text: string;
+  /**
+   * The one observation the level is graded from. **Typed as `GoalObservationId`**, so a level over
+   * a quantity `awtIsValid` could suppress (an average wait above all) is not expressible: § D716
+   * § 4's bound, held by the compiler as well as by `careerFrontPage.test.ts`.
+   */
+  readonly reads: GoalObservationId;
+  readonly basis: ServiceLevelBasis;
+}
+
+export interface ContractClauseView {
+  readonly number: string;
+  readonly heading: string;
+  readonly body: string;
+  /** Clause 2 only: the levels themselves. */
+  readonly levels: readonly ServiceLevelView[] | undefined;
+  /** Clause 2 only: where the levels come from, said once beneath them. */
+  readonly basisNote: string | undefined;
+}
+
+export interface ContractDocumentView {
+  readonly title: string;
+  readonly parties: string;
+  readonly clauses: readonly ContractClauseView[];
+}
+
+/**
+ * **The contract, as a contract** — GitHub issue #536's *"a simple concise, but look like a contract
+ * describing AQLs, monetary incentives, monetary penalties"*, wave AN lane AP-3,
+ * [§ D1301](../../../../DECISIONS.md), inside [§ D716](../../../../DECISIONS.md) § 4's bound.
+ *
+ * Every clause re-states a rule the career already enforces, and says where:
+ *
+ * 1. the term is `economy.ts#CONTRACT_DAYS`, and *a day counts only when you close it* is
+ *    `career.ts#CAMPAIGN_ABSENCES`' first entry;
+ * 2. the service levels are {@link campaignTestGoals} for the tower's difficulty, the four
+ *    `campaignDayVerdict` files a day by, each over one `GOAL_OBSERVATION_IDS` field, so the worst
+ *    wait is a level and an average wait cannot be one;
+ * 3. the payment is the difficulty's four weekly rates, `economy.ts#rateOnDay`;
+ * 4. the penalty is the one that exists: a missed day pays nothing and costs three standing, past
+ *    the allowance the contract is lost (`economy.ts#contractIsLost`), and three lost ends the career
+ *    (`career.ts#careerIsOver`). **No debit of units already earned** — that would be a second sink
+ *    (§ D716 § 4, § D717), and it is the owner's question rather than this clause's;
+ * 5. a day the run could not read is not filed — `campaignDayVerdict`'s `ungraded`;
+ * 6. renewal is `career.ts#needOf` from day 19, with `renewalNeed`'s four answers.
+ *
+ * There is no energy level, no grade, no letter and no score: the contract asks four pass-or-fail
+ * questions and the document asks the same four.
+ */
+export function contractDocumentOf(
+  buildingName: string,
+  difficulty: Difficulty,
+): ContractDocumentView {
+  const levels = campaignTestGoals(difficulty).map(
+    (goal): ServiceLevelView => ({
+      id: goal.id,
+      text: goal.label,
+      reads: goal.reads,
+      basis: { kind: 'assumed' },
+    }),
+  );
+  const [w1, w2, w3, w4] = difficulty.rates;
+  const allowance =
+    difficulty.miss === 0
+      ? 'A single missed day loses the contract.'
+      : `More than ${String(difficulty.miss)} missed ${difficulty.miss === 1 ? 'day' : 'days'} and the contract is lost.`;
+  return {
+    title: 'SERVICE CONTRACT',
+    parties: `Between the managing agent of ${buildingName} and you, on ${difficulty.name} terms.`,
+    clauses: [
+      {
+        number: '1',
+        heading: 'Term',
+        body: `${buildingName}, for ${String(CONTRACT_DAYS)} working days. You run each day yourself, and a day counts only when you close it.`,
+        levels: undefined,
+        basisNote: undefined,
+      },
+      {
+        number: '2',
+        heading: 'Service levels',
+        body: 'On every day of the term the building is to meet all four, over the whole day:',
+        levels,
+        basisNote: `These levels are the game’s own for ${difficulty.name}, and harder settings ask more. None is taken from a study of how long people will wait for a lift.`,
+      },
+      {
+        number: '3',
+        heading: 'Payment',
+        body: `Each cleared day pays ${String(w1)}, ${String(w2)}, ${String(w3)} or ${String(w4)} units into this building’s purse, in weeks one to four. The purse is this building’s alone and buys its kit.`,
+        levels: undefined,
+        basisNote: undefined,
+      },
+      {
+        number: '4',
+        heading: 'Missed days',
+        body: `A missed day pays nothing and costs three standing. ${allowance} Three contracts lost and the career ends.`,
+        levels: undefined,
+        basisNote: undefined,
+      },
+      {
+        number: '5',
+        heading: 'Days that cannot be read',
+        body: 'A day the run could not read, because too few people came or the longest wait belongs to somebody still waiting, is not filed. It pays nothing and costs nothing.',
+        levels: undefined,
+        basisNote: undefined,
+      },
+      {
+        number: '6',
+        heading: 'Renewal',
+        body: 'In the last two days the agent offers a renewal, priced from the building and your record on it. You may sign it, ask for more, renew with a refurbishment, or hand the building back.',
+        levels: undefined,
+        basisNote: undefined,
+      },
+    ],
+  };
 }
 
 function shopTierRow(
@@ -1795,11 +2239,18 @@ export function contractView(input: CampaignInput): ContractView | undefined {
               : `${String(tower.missed)} of ${String(difficulty.miss)} used`,
         },
         {
-          label: 'Nobody over three minutes, any day',
+          /*
+           * Read off the difficulty rather than typed — wave AN lane AP-3. It read *"Nobody over
+           * three minutes, any day"* on every difficulty, which is Standard's 180 s; Easy asks 240,
+           * Hard 150 and Impossible 120, so on three of four settings the row named a bar the
+           * contract does not set.
+           */
+          label: `Nobody over ${String(difficulty.tests.worstS)} s, any day`,
           got: rows.find((row) => row.id === 'worst')?.reading?.display ?? UNFINISHED,
         },
       ],
     },
+    document: contractDocumentOf(facts.name, difficulty),
     shaft: {
       heading: CONTRACT_COPY.shaftHeading,
       body: CONTRACT_COPY.shaftBody,

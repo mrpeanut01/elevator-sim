@@ -2477,6 +2477,15 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'dev/ttiHistory.ts#ttiRecordSchema',
       ],
     },
+    {
+      reason:
+        'Two readings that return a band index and a verdict, not prose — wave AN lane AP-3, ' +
+        '§ D1301. `filedDayBandOf` answers `{ index, censored }` off a recording, and ' +
+        '`censusVerdictOf` answers `cleared` / `missed` / `ungraded`, the same vocabulary ' +
+        '`campaignDayVerdict` files by. What a player reads of either is `towerCardView`’s status ' +
+        'sentence and `dayCensusLineOf`’s line, which the Career front-page adapter drives.',
+      ids: ['everyday/campaignModel.ts#filedDayBandOf', 'everyday/campaignModel.ts#censusVerdictOf'],
+    },
   ]);
 
 const excludedIds = new Set(NOT_PLAYER_FACING.flatMap((group) => group.ids));

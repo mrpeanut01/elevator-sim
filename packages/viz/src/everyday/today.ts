@@ -620,25 +620,36 @@ function mootSentenceOf(
    */
   const standing = nameOf(press.standingOrder) ?? press.standingOrder;
   const others = press.mootUnder.length;
-  const count =
-    others === 0
-      ? 'No other standing order clears it'
-      : `${countWord(others, true)} other standing ${others === 1 ? 'order clears' : 'orders clear'} it`;
   return (
     `This day runs under the tower’s standing order, ${standing}. Measured on this crowd, ` +
-    `${count} with no press at all; the day’s report names ${others === 1 ? 'it' : 'them'}.`
+    `${mootCountClause(others)} with no press at all; the day’s report names ${others === 1 ? 'it' : 'them'}.`
   );
 }
 
+/**
+ * The count half of the moot sentence, in words, **lowercase because it follows a comma** — wave
+ * AN lane AP-3, the decision swarm's side finding on GitHub issue #571.
+ *
+ * It read a capitalised count word and a capitalised `No other …`, so the brief printed
+ * *"Measured on this crowd, Ten other standing orders clear it"*: a capital in the middle of a
+ * sentence, on both branches. The clause is mid-sentence on every path into it, so it is never
+ * capitalised. Exported so `today.test.ts` can reach the zero branch, which no shipped pin draws
+ * (every pinned day's census names at least two others).
+ */
+export function mootCountClause(others: number): string {
+  return others === 0
+    ? 'no other standing order clears it'
+    : `${countWord(others)} other standing ${others === 1 ? 'order clears' : 'orders clear'} it`;
+}
+
 /** A small count in words, for a strip that may carry no digit. Past twenty it is the digits' job. */
-function countWord(count: number, capital: boolean): string {
+function countWord(count: number): string {
   const words = [
     'no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten',
     'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen',
     'nineteen', 'twenty',
   ];
-  const word = words[count] ?? 'many';
-  return capital ? word.charAt(0).toUpperCase() + word.slice(1) : word;
+  return words[count] ?? 'many';
 }
 
 /**

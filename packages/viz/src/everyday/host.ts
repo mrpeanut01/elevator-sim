@@ -202,6 +202,7 @@ import {
   runSubmissionOf,
   shiftDemandTemplateId,
   shiftLengthForContract,
+  shiftRunConfigOf,
   specsWithSaved,
   withDispatcher,
   type PatternSelection,
@@ -290,7 +291,7 @@ import {
 } from './rushSitting.js';
 import { REPLAY_COPY, replayBeforeOf, replayPatchOf, replayRestorePatchOf, replayableDay, type ReplayBefore } from './replay.js';
 
-import { campaignDayVerdict, campaignTestRows } from './campaignModel.js';
+import { campaignDayVerdict, campaignTestRows, type FiledDayRecord } from './campaignModel.js';
 
 /**
  * What a read of today's board came back with — four states, because a screen that collapses them
@@ -1444,6 +1445,40 @@ export interface EverydayHost {
    * **Optional** on {@link runFailure}'s ground.
    */
   campaignHistory?(towerId: string): readonly DayOutcome[];
+
+  /**
+   * **The last day each career tower filed, with the recording it was graded from** — GitHub issue
+   * #536's permitted half, [§ D1301](../../../../DECISIONS.md).
+   *
+   * Written by {@link closeDay} on the press that files the day and by nothing else, so a card can
+   * only ever show a day the player filed. Read by the Career screen's tower cards, which colour
+   * from it and play it as a picture: a presentation control that never files and never grades
+   * ([§ D716](../../../../DECISIONS.md)). Page-lifetime on {@link campaignHistory}'s ground.
+   * **Optional** on {@link runFailure}'s ground.
+   */
+  campaignFiledDays?(): ReadonlyMap<string, FiledDayRecord>;
+
+  /**
+   * **The runs a census of a tower's next career day takes** — GitHub issue #571's Career half,
+   * [§ D1301](../../../../DECISIONS.md). One run per driver the select offers ({@link dispatchers}),
+   * each the day {@link runCampaignDay} would start for that tower with that driver standing and no
+   * press: the same derived seed, growth day, held cars, fitted kit, length and drawn event. `key`
+   * names that day, so a census landed for another day, another kit, another difficulty or another
+   * crowd is never read as this one's; it is cheap, and `runs()` builds the configurations only when
+   * asked. Nothing here simulates; the Career desk runs them off the main thread. `undefined` for a
+   * tower this career does not hold. **Optional** on {@link runFailure}'s ground.
+   */
+  careerDayCensusRuns?(towerId: string):
+    | {
+        readonly key: string;
+        readonly towerDay: number;
+        runs(): readonly {
+          readonly dispatcherId: string;
+          readonly config: SimulationConfig;
+          readonly outOfServiceCarIds: readonly string[];
+        }[];
+      }
+    | undefined;
 
   /**
    * The run on the stage as a **pointer** — GitHub issue #340, `docs/26` § 2.1.
@@ -3088,6 +3123,11 @@ export function createEverydayHost(
    * {@link EverydayHost.campaignHistory} for why, and what that costs after a reload.
    */
   const careerWeeks = new Map<string, WeekState>();
+  /**
+   * Each career tower's last filed day and the recording it was graded from —
+   * {@link EverydayHost.campaignFiledDays}. Page-lifetime, on {@link careerWeeks}' ground.
+   */
+  const careerFiled = new Map<string, FiledDayRecord>();
   /** {@link EverydayHost.leaveCareer}, as a local so every Scenario press can call it first. */
   const releaseCareer = (): void => {
     const hold = careerHold;
@@ -3739,6 +3779,13 @@ export function createEverydayHost(
         trips: observations.loadedDepartures,
       }, bindings.resources.priceSchedule);
       if (next === career) return;
+      /*
+       * **The day as filed, for the tower card** — GitHub issue #536, [§ D1301](../../../../DECISIONS.md).
+       * Written here, after the reducer accepted the day and before anything is told, so a card can
+       * only hold a day that was really filed: `tower.day` is the day `file-day` just closed, the
+       * verdict is the one it carried, and the recording is the one the verdict was graded from.
+       */
+      careerFiled.set(towerId, { towerId, day: tower.day, verdict, recording });
       setCareer(next);
       notifyCampaign();
       /*
@@ -4082,6 +4129,68 @@ export function createEverydayHost(
       b.holdAddress?.(!describes);
     },
     campaignHistory: (towerId) => careerWeeks.get(towerId)?.history ?? [],
+    campaignFiledDays: () => careerFiled,
+    careerDayCensusRuns: (towerId) => {
+      const tower = towerById(career, towerId);
+      if (tower === undefined) return undefined;
+      const towerBuilding = b.resources.buildings.find((building) => building.id === tower.buildingId);
+      if (towerBuilding === undefined) return undefined;
+      /*
+       * The base `runCampaignDay` derives from, captured on the same rule: once, on the first career
+       * use of the sitting. Captured here when the desk asks before any day is run, so the census
+       * and the press that follows it meet the same crowd.
+       */
+      careerSeedBase ??= b.state().seed;
+      const base = careerSeedBase;
+      const event = campaignEventFor({ tower, seed: base });
+      const careerWeek = careerWeeks.get(tower.id) ?? openCareer();
+      /*
+       * **`runCampaignDay`'s run-relevant fields, one by one** — the press writes these and the
+       * shift runner simulates the state they make. `careerCensus.test.ts` holds the two together
+       * on the legs: the census arm for the tower's own standing order has to reproduce the day the
+       * press runs, so a field added to one and not the other turns it red.
+       */
+      const day: Partial<ViewerState> = {
+        interventions: [],
+        buildingId: tower.buildingId,
+        seed: careerDaySeedFor(base, tower.id, tower.day),
+        week: { ...careerWeek, day: tower.day, dayIdx: (tower.day - 1) % 7 },
+        outOfServiceCarIds: worksHeldCarsOf(tower, towerBuilding),
+        campaignFitOut: fitOutOf(tower),
+        shiftLengthS: shiftLengthForContract(tower.id),
+        windowStartS: null,
+        campaignEventId: event.id,
+      };
+      const state = { ...b.state(), ...day };
+      const drivers = allDispatchers(b.resources, state.savedDispatchers);
+      const key = JSON.stringify([
+        tower.id,
+        tower.day,
+        tower.difficultyId,
+        String(day.seed),
+        event.id,
+        day.outOfServiceCarIds,
+        day.campaignFitOut,
+        drivers.map((profile) => profile.id),
+        /* What the player can author that a run reads, so a workshop edit retires the census too. */
+        state.savedDispatchers,
+        state.levers,
+        state.ruleRows,
+        state.patience,
+        state.commissioning,
+        state.savedBuildings,
+        state.savedClasses,
+      ]);
+      return {
+        key,
+        towerDay: tower.day,
+        runs: () =>
+          drivers.map((profile) => {
+            const plan = shiftRunConfigOf(b.resources, { ...state, dispatcherId: profile.id });
+            return { dispatcherId: profile.id, config: plan.config, outOfServiceCarIds: plan.outOfServiceCarIds };
+          }),
+      };
+    },
     answerIncident: (atS, optionId) => {
       const facts = campaignDayFacts();
       if (facts === undefined || facts.incident === undefined) return CAMPAIGN_DOCK_COPY.refusedNoIncident;

@@ -45,7 +45,7 @@ import { recordRun } from '../record/recordRun.js';
 import { plannedDayOf } from '../dev/state.js';
 
 import { EM_DASH, groupThousands } from './figures.js';
-import { PRESS_DAY_DRIVER_HELD, TODAY_CHOICE_LINE, todayOf } from './today.js';
+import { PRESS_DAY_DRIVER_HELD, TODAY_CHOICE_LINE, mootCountClause, todayOf } from './today.js';
 import { pinnedDayLengthLineOf } from './firstDayLength.js';
 import { dailySeedFor } from '../shift/dailySeed.js';
 import { FIRST_SESSION_LINE_PINNED, firstSessionContractFor } from '../shift/firstSession.js';
@@ -853,6 +853,21 @@ describe('the moot sentence is drawn only over the run it was measured on — is
     for (const id of press?.mootUnder ?? []) expect(sentence).not.toContain(`name of ${id}`);
     /* No digit, the strip's own rule. */
     expect(/\d/u.test(sentence), sentence).toBe(false);
+  });
+
+  it('lowercases the count after the comma, on both branches — wave AN lane AP-3 (#571’s side finding)', () => {
+    /*
+     * The brief printed *"Measured on this crowd, Ten other standing orders clear it"*. The count
+     * follows a comma on every path, so neither branch may open with a capital: the counted one
+     * (*ten*) is drawn on the shipped pin, and the zero one (*no*) is reached through the clause,
+     * because no shipped pin's census is empty.
+     */
+    const sentence = crownOn({}).outOfService?.mootUnder ?? '';
+    expect(sentence).toMatch(/Measured on this crowd, [a-z]/u);
+    expect(sentence).toContain(`Measured on this crowd, ${mootCountClause(ladderRowFor('c7')?.pressDay?.mootUnder.length ?? -1)}`);
+    expect(mootCountClause(10)).toBe('ten other standing orders clear it');
+    expect(mootCountClause(1)).toBe('one other standing order clears it');
+    expect(mootCountClause(0)).toBe('no other standing order clears it');
   });
 
   it('is silent when the press would run the other horizon — the gate #595 added', () => {

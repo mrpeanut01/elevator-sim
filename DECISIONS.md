@@ -49291,3 +49291,63 @@ outcome.
 put the term outside its `activeWhen` without `eligibility.enRouteDiversion`, so a refusal beside
 that slider is available on § D112's footing, and is not drawn here. The day report's *Weight
 fairness up* card (`shift/report.ts`) still says *"Your worst wait falls; your average may not"*.
+
+---
+
+## D1301 — the Career's front page: tower cards coloured and played from the filed day's recording, an intro to the career and to chimes, the contract as a document, and a census of the day's own crowd on the opening desk
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (decision swarm DP's ruling § 2,
+> lane AP-3, three lenses reconciled by wave AN's integrator; built and measured by wave AN lane
+> AP-3), not by the product owner. A later reader weighing this against a product-owner ruling
+> should treat it as an agent ruling and say so. It reads GitHub issue #536, the owner's own, and
+> **five clauses are owner-reversible**: (1) towers *play* and never *progress*, so the card loop
+> files nothing (swarm DP's owner question 1); (2) a career ends at three lost contracts,
+> `career.ts#LOST_CONTRACTS_MAX` (question 5); (3) a miss debits no units already earned
+> (question 6); (4) the census is taken on `c1` alone, `campaignModel.ts#DAY_CENSUS_CONTRACT_IDS`;
+> (5) the Career keeps one opener, Garden Apartments (question 7).
+
+**Why an entry.** [§ D405](#d405)'s first and third grounds: it edits `data/contract-ladder.json`'s
+`c1` note, which this module does not own; it builds the permitted half of [§ D716](#d716) and
+settles a split on how a card is coloured; and it refuses one of the ruling's two census forms.
+
+**What is built.**
+
+1. **Tower cards on the triage screen**, one per tower held. A card's colour is the worst wait band
+   any rider reached over the tower's last filed day (`live/bands.ts#waitBandsAt`, whole-run basis
+   at the recording's end), with the band said in words beside it. It is never read from the desk's
+   `needOf`. S3 would have coloured from `need` as well; two to one, on § D716 § 3's own wording.
+2. **A loop on each card** that replays that recording with the stage's painter. `towerLoop.ts`
+   is handed a source that can only read filed days, so a card cannot file, grade or move
+   `tower.day`. The recording is the one `host.ts#closeDay` graded, kept for the page's lifetime on
+   `campaignHistory`'s ground; after a reload a card says it has nothing to play.
+3. **An intro on a fresh career**, explaining contracts, clearing, missing, standing and chimes, every
+   clause a rule the build enforces.
+4. **The contract as a document**: numbered clauses for term, service levels, payment, missed days,
+   unread days and renewal. A level is typed `GoalObservationId`, so the worst wait is a level and an
+   average wait cannot be one. Each level's basis is *assumed* or *cited*; every shipped level is
+   assumed and the sheet says none is taken from a study. There is no energy level and no grade.
+5. **A census on the `c1` desk**: every driver on the select, run on the day *Run day* would start,
+   off the main thread. Where every one clears, the desk says so; elsewhere it says nothing.
+
+**The census is derived, not pinned, and the ruling's other form is refused.** A career day's crowd is
+derived from a base each sitting captures (`host.ts#careerSeedBase`), so a figure pinned for *`c1`
+day 6* would describe a crowd the next sitting never meets ([§ D914](#d914)).
+
+**Measured** (all thirteen shipped profiles, Standard's four tests, `careerDaySeedFor` at bases
+20260824 + 7919n for n 0 to 19, each day's own drawn event, a fresh tower; 5 200 runs):
+
+| `c1` career crowds, 20 days × 20 bases | crowds |
+|---|---|
+| all 13 clear | **361** |
+| all 13 miss | 12 |
+| the verdict depends on the profile | **27** (10 on day 17's booked move-in) |
+| day 1, all 13 clear | 20 of 20 |
+| distinct leg sets per crowd | 5 to 13 of 13 |
+
+So swarm DP's premise, that the choice *has never moved the verdict on a crowd measured*, holds on
+day 1 and not over the month: on 27 of 400 crowds the driver decides the day, and the desk is silent
+there.
+
+**Not established.** Persistence of filed recordings across a reload; a census on any tower but
+`c1`; the census line driven in the browser tier, where `campaignJourney.browser.test.ts` drives the
+intro and the cards and no case waits out the census's thirteen runs on the desk.
