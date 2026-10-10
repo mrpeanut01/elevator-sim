@@ -120,9 +120,10 @@ describe('continue your week — § D1228', () => {
     expect(continueWeekEntryOf(again, 'Midtown Office')?.line).toMatch(/^Midtown Office, week 1, Monday · 0 of the /u);
   });
 
-  it('says no count where the census does not speak for the tower', () => {
+  it('says no count where the census does not speak for the tower, and the week’s number — § D1394', () => {
+    /* Since § D1394 (wave AO lane AO-5) every Scenario week ends and rolls, so each carries its number. */
     expect(continueWeekEntryOf(fileClean(openWeek('c1')), 'Garden Apartments')?.line).toBe(
-      'Garden Apartments, Monday filed, Tuesday next',
+      'Garden Apartments, week 1, Monday filed, Tuesday next',
     );
   });
 });

@@ -33788,6 +33788,8 @@ different decision from a reset, and this entry takes neither side of it.
 
 ## D510 — § 8.8's offers are priced by a fee table beside the complexity table, gated by the economy's own arithmetic, and a take parks the week being left
 
+> **Status 2026-10-10: AMENDED by [§ D1393](#d1393)** (an agent ruling, owner-reversible). Clause 3's week switch is withdrawn: a take writes the career record alone and moves no Scenario week. See [`docs/39`](docs/39-decisions-in-force.md).
+
 **Date: 2026-09-06 · Owner: the integrator, wave V · Rules on: GitHub issue #169 item 3,
 `campaign/economy.ts#OFFER_FEES`, `campaign/career.ts#offerRefusalOf` and the `take-offer` action,
 `everyday/campaignModel.ts#offersView`, `everyday/host.ts#campaignAct`.**
@@ -42495,6 +42497,8 @@ So § D961 pinned a sweep **over rungs that § D914 then moved**. Neither lane w
 
 ## D964 — a career day stands on a week of its own, and the Scenario record is parked behind it
 
+> **Status 2026-10-10: AMENDED by [§ D1393](#d1393)** (an agent ruling, owner-reversible). *What this deliberately does not move* no longer holds: § D510's take-offer moves no Scenario week either. See [`docs/39`](docs/39-decisions-in-force.md).
+
 **Date: 2026-09-24 · Owner: wave AH lane A · GitHub issue [#594](https://github.com/mrpeanut01/elevator-sim/issues/594) · Rules on: `docs/38` § 2.2 (*the week and the career are separate records*), [§ D510](#d510)'s take-offer, and the career's run pipeline as [§ D507](#d507) and GitHub issue #563 left it.**
 
 **Why an entry.** [§ D405](#d405)'s first ground: the decision is taken in `everyday/host.ts` and binds `shift/week.ts` (a new sentinel), `everyday/shell.ts` (the release on the way out), `everyday/stageScreen.ts` (the entry press), `everyday/campaignScreens.ts` (what the desk grades) and, through `shift/ladder.ts#rungFor`, which rung a career run is handed.
@@ -46870,6 +46874,8 @@ fifty-four).
 
 ## D1177 — a census week closes on a sheet beside the house, on the same crowds, and rolls into a new week on the same tower
 
+> **Status 2026-10-10: AMENDED by [§ D1394](#d1394)** (an agent ruling). *Every other week runs on as before* is withdrawn: a week the census does not deal closes on Sunday, numbered, on a sheet with no house. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-09-26 by agent sessions under delegated authority** (wave AK, lane AK-E, on swarm
 > DL's Q2 ruling, 3-0 on clause 3), not by the product owner. Owner-reversible clauses: the house
 > as the census's standing order untouched; that the closed week's days leave the history on the
@@ -50133,6 +50139,8 @@ on Monday's close, and holds the card on the first screen at both viewports.
 
 ## D1330 — a later week is continued from its first morning, and its number is on the screen
 
+> **Status 2026-10-10: AMENDED by [§ D1394](#d1394)** (an agent ruling). Every Scenario week carries its number, the ones the census does not deal included. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-10-10 by agent sessions under delegated authority** (wave AN, lane AN-7, on the lane
 > brief's item 6, carried from the post-AL panel and found again by the post-AM panel's seats B and
 > D), not by the product owner. It amends [§ D1228](#d1228) and reads [§ D1252](#d1252)'s ordinal.
@@ -50647,6 +50655,8 @@ Whether the brief meant a report row as well is the integrator's to say.
 
 ## D1357 — the career renewal falls due when day 20 closes: days 19 and 20 play, and the next month's first day waits on the answer
 
+> **Status 2026-10-10: AMENDED by [§ D1392](#d1392)** (an agent ruling). A contract past its missed-day allowance is lost and is offered no renewal; its desk starts the month again as a lost contract. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-10-10 by agent sessions under delegated authority** (wave AN, lane DQ-4), not by the
 > product owner: swarm DQ's Q4 ruling, reconciled by the wave's integrator from three members (S1 the
 > player, S2 honesty, S3 engineering and measurement) and built by this lane. A later reader weighing
@@ -51077,3 +51087,213 @@ up after the reload), whose second case keeps a genuine first arrival on the lan
 **Not established.** A reload across UTC midnight with the first day begun and nothing else stored
 deals the first visit again for the new date, which may be another tower, and then neither read finds
 the attempt.
+
+## D1392 — a contract past its missed-day allowance is lost: no more of its days run, no renewal is offered, and the desk starts the month again as a lost contract
+
+> **Taken 2026-10-10 by an agent session under delegated authority** (wave AO, lane AO-5, on the lane
+> brief's item 1 for the post-AN panel's seat C, D2), not by the product owner. A later reader weighing
+> this against a product-owner ruling should treat it as an agent ruling and say so; [§ D626](#d626) is
+> the cautionary case. **Owner-reversible**: clause 1 (the contract document's wording is the reading
+> taken), clause 3 (one answer on the desk, with *hand it back* left off it), clause 4 (the month
+> restarts on the purse it opened with) and clause 5 (a new difficulty on a lost month counts the
+> loss). **Not put to a swarm**: the lane had no way to spawn one, and the readings not chosen are set
+> out below so the integrator can.
+
+**Why an entry.** [§ D405](#d405)'s first and second grounds. It amends [§ D1357](#d1357) clause 1 for
+a lost contract, gives `career.lost` its first writer, and binds `campaign/career.ts`,
+`everyday/campaignModel.ts`, `campaignScreens.ts`, `reportScreen.ts` and `reportView.ts`.
+
+**What was wrong** (seat C, reproduced from the record on this lane's tree). Garden Apartments on the
+standing order missed days 14, 17, 18 and 20. The desk read *4 of 3 missed days used* over *The managing
+agent has offered a renewal*, and signing it opened the second month, while clause 4 of the contract
+reads *More than 3 missed days and the contract is lost*. `economy.ts#contractIsLost` said so already,
+and nothing that runs a day asked it: `fileDay` filed days on a lost contract, `needOf` offered the
+renewal, and `career.lost` was written only by `openingCareer`. The contract sheet's red *Start the
+month again* (the guide's § 3.3 row) was drawn only on an impossible month, by reading the terms row's
+words, and its press ran the day whatever its label said.
+
+**The ruling.**
+
+1. **The contract document's reading.** A contract is lost when its missed days exceed the
+   difficulty's allowance (`contractIsLost`), on the close that files the miss past it, whichever day
+   of the month that is.
+2. **A lost contract runs no more of its days and is offered no renewal.** `fileDay` refuses a day on
+   it, and `needOf` asks the loss before the renewal, so a contract lost on day 20 meets the loss on its
+   desk and no offer.
+3. **The desk carries one answer, § 3.3's *Start the month again*.** The day's sheet goes to the desk
+   (*Open the desk at ⟨building⟩*, with `career.ts#contractLostSentenceOf`'s *4 days missed, and
+   standard allows 3, so this contract is lost.*), the contract sheet's primary is the red variant and
+   starts the month again without running a day, and the tower row reads *contract ended*.
+4. **Starting the month again counts the loss and restarts the month as it opened.** `career.lost`
+   grows by one; the day goes to 1; the misses and this month's bookings and answers go; the purse
+   returns to `carriedIn`, what the month opened with; the kit of earlier months, the top-ups, the rate
+   and the wear stay with the building.
+5. **A new difficulty pressed on a lost month counts the loss too**, so the difficulty buttons are no
+   free way to un-lose a contract. A running month's difficulty change is unchanged.
+
+**The readings not chosen.** (a) Reword clause 4 to match the renewal, so that no contract is ever
+lost: the brief named the contract's own reading. (b) The building is taken away, its standing banked
+and its slot freed: refused for now because banking a lost month can leave a career holding no building
+and no open slot (`slotsOpen` answers 0 below standing zero, and four misses from day 1 bank minus 12)
+with no offer it may take and the career not over, which is the dead end [§ D716](#d716) checked for
+and found unreachable only because no contract could be lost. (c) *Hand it back* beside *Start the
+month again* on the desk: the same dead end, by the player's press.
+
+**Tests**, red before and green after. `campaign/career.test.ts`'s *a contract past its missed-day
+allowance is lost* (five cases, four red before: the need was the renewal, a lost month filed day 5,
+`lost` stayed 0 on either restart); `everyday/campaignModel.test.ts`'s *a lost contract reads as lost
+on every screen that names it* (two cases); `everyday/reportView.test.ts`'s *sends a lost contract to
+the desk*. **On the built bundle**, `everyday/campaignJourney.browser.test.ts`'s *holds a lost contract
+as lost*, seeded on day 21 at 4 of 3: red before on *The contract is lost* (the desk read the renewal),
+green after, with the contract sheet's *Start the month again* starting the month at day 1 and running
+no day.
+
+**Not established.** What happens at the third loss beyond `careerIsOver` reading true is unchanged
+and unmeasured here: no screen was checked for what it does once the career is over.
+
+## D1393 — taking a career offer moves no week: the Scenario week stays on the tower the player put it on
+
+> **Taken 2026-10-10 by an agent session under delegated authority** (wave AO, lane AO-5, on the lane
+> brief's item 4 for the post-AN panel's seat C, D6), not by the product owner. [§ D964](#d964) said
+> that removing this write *is a ruling on § D510 that is the product owner's to make, not a lane's*;
+> this lane makes it on the integrator's brief under the owner's standing instructions for autonomous
+> work, and says so here so the owner can reverse it. **Owner-reversible**: the whole entry, which
+> restores [§ D510](#d510) clause 3's week switch when reversed. **Not put to a swarm**: the lane had
+> no way to spawn one.
+
+**Why an entry.** [§ D405](#d405)'s second ground: it amends § D510 clause 3 and § D964's *What this
+deliberately does not move*, and it changes `everyday/host.ts#campaignAct` and the offer card's note in
+`everyday/campaignModel.ts`.
+
+**What was wrong**, isolated from storage on the built bundle. A career seeded one slot up (standing
+14), Scenario's *Today's scenario* opened on Midtown Office, Career → *Take it* on St Jude Hospital,
+then back to Scenario: the door's selected tower read `c8`. The take parked the Scenario week and
+restarted it on the offered building with that building and length (`switchWeek(…, 'restart')`), as
+§ D510 clause 3 built it when a career day still ran on the Scenario week. Seat C met it as a St Jude
+week nobody chose, *moved here rather than drawn*, and a rush on St Jude, because the rush runs on the
+Scenario's standing building (`rush.ts#rushBuildingOf`).
+
+**The ruling.** A take writes the career record and nothing else. A career day has stood on a week of
+its own since § D964, so nothing of the Scenario's has to move: the Scenario week, its building, its
+crowd, its presses and any run in flight stay as they were, and the abandon or cancel the take used to
+press (GitHub issue #526 item 2, #531 item 4, [§ D565](#d565)) has no week to protect and is gone with
+it. The offer card's note reads *taking it adds the building to your career on a month of its own; your
+Scenario week stays where you left it*. Career and Rush now write no Scenario week: the career day
+parks and restores it (§ D964), and a rush parks and restores it ([§ D965](#d965)).
+
+**Tests**, red before and green after. `everyday/host.test.ts`'s *takes the offer into the career and
+leaves the Scenario week, its run and its day alone*, replacing the two cases that pinned the old
+write: red before with `abandonDay, applyPatch`. **On the built bundle**,
+`everyday/campaignJourney.browser.test.ts`'s *takes a career offer without moving the Scenario week*:
+red before on the door's tower (`c8` where `c2` was), green after.
+
+## D1394 — every Scenario week ends: a week the census does not deal closes on Sunday, numbered, on a sheet with no house, and a held one offers the next tower
+
+> **Taken 2026-10-10 by an agent session under delegated authority** (wave AO, lane AO-5, on the lane
+> brief's item 4, *a week on any tower, however it arrived there, carries its number, closes on the week
+> sheet and offers the next tower*), not by the product owner. **Owner-reversible**: clause 1 (the
+> close on day 7, read from § D1246's rule) and clause 3 (no house is run beside such a week). **Not put
+> to a swarm**: the lane had no way to spawn one, and the reading not chosen is set out below.
+
+**Why an entry.** [§ D405](#d405)'s second ground: it amends [§ D1177](#d1177)'s *every other week runs
+on as before*, [§ D1330](#d1330)'s *where the census deals the week*, and the scope of
+[§ D1259](#d1259)'s offer and [§ D1344](#d1344)'s roll, and it binds `shift/weekStake.ts`,
+`shift/nextWeek.ts`, `shift/report.ts`, `everyday/host.ts`, `continueWeek.ts` and `reportView.ts`.
+
+**What was wrong.** A week on a tower the week census does not deal (St Jude Hospital, Garden
+Apartments, Crown Hotel and the eight unmeasured towers) carried no number, never closed and ran on past
+day 7. Seat C's St Jude week met its target on Tuesday (*BANKED 2 of 2*) and after Sunday opened
+*MONDAY · DAY 8*, with no sheet, no *Go on* and no next tower. Every tower is pressable from Scenario's
+tower list, so a player reaches such a week by choosing it.
+
+**The ruling.**
+
+1. **Such a week ends on day 7.** Every clean day of it counts toward its `needClean` target
+   (§ D1176's rule for an unmeasured tower), so its last counted day is day 7, and § D1246's *the later
+   of Friday and the last counted day* closes it on Sunday (`weekStake.ts#weekPathEndFor`). A mode's or
+   the sandbox's week still has no ending.
+2. **It carries its number** on the brief, the door, Your week, the menu's continue entry and the
+   close's tomorrow heading, and **it rolls as a census week does**: held (target met) to the next week,
+   not held to itself again with *Go on to week N* beside it (§ D1344), dealing the same draw.
+3. **Its sheet has no house.** The house is the census's standing order run on each counted day's own
+   crowd, and no census row says what that order makes of this tower's days, so nothing is run beside
+   the week and the sheet says *Nothing was run beside you this week*. The close's lead stays without a
+   house tally on such a week, and the day's onward step reads *See the week's sheet*.
+4. **A held week offers the next tower** by § D1259's own rule (on the shipped census, Midtown Office),
+   and the tower's record of weeks counts it at its `needClean`.
+
+**The reading not chosen.** A census-measured target and house for these towers, run before they may
+close: honest, and a census of eleven towers this lane cannot run; the week would go on running past day
+7 until it lands.
+
+**Tests**, red before and green after. `shift/weekStake.test.ts`'s *closes a week the census does not
+speak for on day 7* (red before: not closed, no number, no sheet) with a sentinel control;
+`shift/week.test.ts`'s *ends every Scenario week on day 7*; `shift/nextWeek.test.ts`'s *deals next on a
+tower whose week the census does not deal*; `everyday/weekView.test.ts`'s *draws a closed St Jude week's
+sheet, without a house, and offers Midtown Office*. Six existing cases that pinned the old reading were
+moved to the new one: two day-boundary cases in `week.test.ts` now run on the sandbox's week, and the
+number on Garden Apartments' week is asserted in `today.test.ts`, `weekView.test.ts`,
+`continueWeek.test.ts` and `dayClose.test.ts`. On the built bundle, `everyday/weekSurvives.browser.test.ts`'s
+seven-day case on Garden Apartments now closes the week on Sunday's sheet.
+
+**Not established.** Whether a day of such a week is one a player decides is unmeasured, as it was;
+this entry gives the week an ending, and says nothing about the days in it.
+
+## D1395 — a filed career day keeps its own verdict: the month grid, the rolling calendar and the purse read which days were missed
+
+> **Taken 2026-10-10 by an agent session under delegated authority** (wave AO, lane AO-5, on the lane
+> brief's item 2 for the post-AN panel's seat C, D3), not by the product owner. **Owner-reversible**:
+> clause 3 (a filed day's verdict leads a booking's flag on the rolling calendar).
+
+**Why an entry.** [§ D405](#d405)'s first ground. It changes `campaign/economy.ts#earnedSoFar` and
+`calendarRow`, which carried the design's § 8.1 rule (*"the last `missed` days before today"*), adds a
+field the career's codec carries, and binds `everyday/campaignModel.ts`'s month grid.
+
+**What was wrong.** The record kept a count of missed days and no days, so the month grid, the rolling
+calendar and the purse all placed every miss at the tail of the past. A month missed on days 14, 17 and
+18 drew days 1 to 15 cleared and 16 to 18 missed on Contract & works, day 14 cleared and day 16 missed
+on the front page, and paid day 14 at week three's rate and day 16 nothing.
+
+**The ruling.**
+
+1. **`career.ts#fileDay` records which day it filed missed** (`TowerEconomy.missedDays`), and the two
+   presses that start a month empty it.
+2. **`economy.ts#missedDaysOf` is the one reading**, shared by the purse, the rolling calendar and the
+   month grid. It uses the list where it agrees with the count and the day, and falls back to the tail
+   rule for a month filed before the list existed (or carried through a build that did not append to
+   it), which is what such a month drew before. The envelope's version does not move, so no saved
+   career is set aside.
+3. **A filed day draws its verdict ahead of a booking's flag or a night of works** on the rolling
+   calendar, as the month grid already did, and its tip keeps the booking.
+
+**Tests**, red before and green after: `everyday/campaignModel.test.ts`'s *a filed day keeps its own
+verdict on the month and the rolling calendar* (three cases, all red before: day 14 drew cleared, day 4
+drew flagged, the purse read 68 where the days filed pay 69); `campaign/economy.test.ts`'s
+`missedDaysOf` case; `campaign/careerPersist.test.ts`'s round trip with and without the list.
+
+## D1396 — one source for the day's wrinkle: the run, the day's sheet, the rail and the identity line all read the wrinkle a mode handed the day
+
+> **Taken 2026-10-10 by an agent session under delegated authority** (wave AO, lane AO-5, on the lane
+> brief's item 3 for the post-AN panel's seat C, D4), not by the product owner. It carries out
+> [§ D507](#d507)'s *a campaign day's event is the campaign's* on the surfaces that describe the day.
+
+**Why an entry.** [§ D405](#d405)'s first ground: `shift/calendar.ts#scheduledEventFor` gains an
+argument, and `dev/main.ts`, `dev/state.ts`, `dev/leftRail.ts` and `scope/runIdentity.ts` pass it.
+
+**What was wrong.** Garden Apartments' day 20 ran *Two cars down*, the career's own event, which the
+stage card named; its sheet was headed *Something on upstairs*, the weekend wrinkle the week's schedule
+deals the career week's Saturday, over the run's own *car B out until 09:12*. The run was built from
+`ViewerState.campaignEventId` (`dev/state.ts`), and `dev/main.ts#closeShift` asked the schedule without
+it.
+
+**The ruling.** `scheduledEventFor` takes the wrinkle a mode assigned the day and answers it ahead of a
+booking and the draw, resolving a whole drawn id first and a template id after, and every caller that
+describes the stage's own day passes `state.campaignEventId`. `shift/eventSeam.test.ts` scans those four
+files and fails a call that does not.
+
+**Tests**, red before and green after: `shift/eventSeam.test.ts`'s *passes the state's campaignEventId
+at every call that reads the state's own day* (red before on `dev/main.ts`), and
+`shift/calendar.test.ts`'s *answers the assigned wrinkle where a mode handed one*.
+
+**Not established.** Whether a career day's sheet says anything about the next career day's wrinkle,
+and from which source, was not checked: the next day's event is chosen when its run is pressed.

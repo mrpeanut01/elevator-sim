@@ -53,7 +53,13 @@ import {
   EVERYDAY_TYPE as TYPE,
 } from './tokens.js';
 import type { EverydayState } from './types.js';
-import { needOf, openTowerOf, type BuildId, type CampaignTower } from '../campaign/career.js';
+import {
+  contractLostSentenceOf,
+  needOf,
+  openTowerOf,
+  type BuildId,
+  type CampaignTower,
+} from '../campaign/career.js';
 import { parseBuilding, resolveBuilding } from '@elevator-sim/core/browser';
 import { worksHeldCarRefsOf } from '../campaign/works.js';
 import { drawElevation } from './elevation.js';
@@ -1816,6 +1822,15 @@ function mountContract(hostEl: HTMLElement, context: EverydayScreenContext): Mou
        * § D1274, and `campaignModel.ts#CONTRACT_COPY.renewalFirst` for the sentence.
        */
       if (needOf(tower)?.kind === 'renewal') return;
+      /*
+       * **A lost contract's press starts the month again and runs nothing** — § 3.3's red
+       * *Start the month again*, wave AO lane AO-5, § D1392. It used to run the day whatever the
+       * label said, and on a standard month the label never changed at 4 of 3.
+       */
+      if (needOf(tower)?.kind === 'lost') {
+        host.campaignAct({ kind: 'answer-need', towerId: tower.id, optionId: 'start-again' });
+        return;
+      }
       host.runCampaignDay(tower.id);
       context.go('stage');
     },
@@ -1838,17 +1853,24 @@ function contractBar(state: EverydayState): ActionBarModel {
     return { ...withoutPlaceholders(base), note: NO_TOWER };
   }
   const [lockLabel, restartLabel] = base.primary.variants;
-  const [nightsNote, overNote] = base.noteVariants ?? [];
+  const [nightsNote] = base.noteVariants ?? [];
   const nights = view.month.booked.reduce(
     (total, entry) => total + (entry.when.includes('–') ? 2 : 1),
     0,
   );
-  const over = tower.missed > 0 && view.terms.rows[2]?.got.startsWith('none');
-  if (over === true) {
+  /*
+   * **The month is over exactly when the contract is lost** — `career.ts#contractLostSentenceOf`,
+   * which asks `economy.ts#contractIsLost`, wave AO lane AO-5, § D1392. This read the terms row's
+   * words (`startsWith('none')`), which only an impossible month prints, so a standard month at 4 of
+   * 3 offered *Lock it in and run day N* and ran it. The press starts the month again; the note says
+   * why, then what the press does.
+   */
+  const lostSentence = contractLostSentenceOf(tower);
+  if (lostSentence !== undefined) {
     return {
       ...base,
       primary: { ...base.primary, label: restartLabel ?? base.primary.label },
-      note: overNote ?? 'this month is over — the difficulty you pick sets the month',
+      note: `${lostSentence} This starts the month again from day 1 and counts the loss.`,
     };
   }
   /*

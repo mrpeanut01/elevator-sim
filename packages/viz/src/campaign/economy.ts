@@ -779,6 +779,23 @@ export interface TowerEconomy {
   /** 1-based, 1…{@link CONTRACT_DAYS}. */
   readonly day: number;
   readonly missed: number;
+  /**
+   * **Which contract days of this month were filed missed**, 1-based and ascending — the post-AN
+   * panel's seat C, D3, wave AO lane AO-5. `career.ts#fileDay` appends the day it files missed, and
+   * the two writers that start a month (`set-difficulty` and the renewal) empty it.
+   *
+   * The month grid, the rolling calendar and the purse read it through {@link missedDaysOf}. They
+   * used to place every miss at the tail of the past (§ 8.1's *"the last `missed` days before
+   * today"*, the design prototype's simplification for a record that kept only a count), so a month
+   * missed on days 14, 17, 18 and 20 drew day 14 cleared and day 19 missed, and paid week three's
+   * rate for day 14 and nothing for day 19.
+   *
+   * Optional, and that is the persistence rather than a shortcut: a month filed by a build that kept
+   * only the count has no list, and an older build reading a newer save carries the list without
+   * appending to it. {@link missedDaysOf} uses the list only where it agrees with `missed` and
+   * `day`, and falls back to the tail rule otherwise, which is exactly what those months drew before.
+   */
+  readonly missedDays?: readonly number[] | undefined;
   /** Whole months held. Feeds § 8.1's `carriedIn` when no explicit carry is set. */
   readonly months: number;
   /** An explicit purse carried in from an earlier month, or `undefined` for § 8.1's fallback. */
@@ -831,20 +848,49 @@ export function clearedDays(tower: TowerEconomy): number {
 }
 
 /**
+ * **The contract days of this month that were filed missed**, 1-based — the one reading of
+ * {@link TowerEconomy.missedDays} the purse, the rolling calendar and the month grid share (seat C's
+ * D3, wave AO lane AO-5).
+ *
+ * The recorded list where it is consistent with the count: as many entries as `missed`, each a
+ * distinct past day. Anything else is a month filed before the record kept its days, or carried
+ * through a build that did not append to it, and takes § 8.1's own rule, *"the last `missed` days
+ * before today"*, which is what every view drew before the list existed. A placement nobody recorded
+ * is not invented: the fallback is the rule the design states, said here as the fallback it is.
+ */
+export function missedDaysOf(tower: TowerEconomy): ReadonlySet<number> {
+  const past = tower.day - 1;
+  const recorded = tower.missedDays;
+  if (Array.isArray(recorded)) {
+    const days = new Set(recorded);
+    const consistent =
+      days.size === tower.missed &&
+      recorded.length === tower.missed &&
+      recorded.every((day) => Number.isInteger(day) && day >= 1 && day <= past);
+    if (consistent) return days;
+  }
+  const tail = new Set<number>();
+  for (let day = Math.max(1, past - tower.missed + 1); day <= past; day += 1) tail.add(day);
+  return tail;
+}
+
+/**
  * § 8.1's `earnedSoFar` — the sum over past, non-missed days of that day's rate.
  *
- * *"`missedDays` = the last `missed` days before today"*, so the missed days are the tail of the
- * past and the earned ones are the head. Written as a filter over the past rather than a
- * multiplication, because the rate steps every five days and a mean rate would be wrong in exactly
- * the months a player cares about.
+ * The missed days are {@link missedDaysOf}'s: the days actually filed missed, where the record kept
+ * them, so a cleared day pays the rate of the week it fell in and a missed day pays nothing whichever
+ * week it fell in (seat C's D3, wave AO). It read *"`missedDays` = the last `missed` days before
+ * today"* alone, the design's rule for a record that kept only a count, which is still the answer
+ * for such a month. Written as a filter over the past rather than a multiplication, because the rate
+ * steps every five days and a mean rate would be wrong in exactly the months a player cares about.
  */
 export function earnedSoFar(tower: TowerEconomy): number {
   const difficulty = DIFFICULTIES[tower.difficultyId];
   const past = dayIndexOf(tower);
-  const firstMissed = past - tower.missed;
+  const missed = missedDaysOf(tower);
   let earned = 0;
   for (let index = 0; index < past; index += 1) {
-    if (index >= firstMissed) continue;
+    if (missed.has(index + 1)) continue;
     earned += rateOnDay(difficulty, index);
   }
   return earned;
@@ -1494,10 +1540,11 @@ export interface CalendarMarks {
 /**
  * One row of § 8.6's grid.
  *
- * `missedHere` is the contract's own rule — *"`d > t.day − 1 − t.missed` among past days"* — which
- * places the missed days at the tail of the past, exactly as {@link earnedSoFar} does. The two
- * derivations agree because they are the same sentence read twice, and `economy.test.ts` holds
- * them to each other.
+ * A past day's mark is its own verdict, read through {@link missedDaysOf} exactly as
+ * {@link earnedSoFar} reads it, so the grid and the purse cannot disagree about which days paid.
+ * It was the prototype's *"`d > t.day − 1 − t.missed` among past days"*, which drew every miss at
+ * the tail of the past: a month missed on day 14 drew day 14 cleared and a later clear missed
+ * (seat C's D3, wave AO).
  */
 export function calendarRow(
   careerToday: number,
@@ -1507,26 +1554,33 @@ export function calendarRow(
   const start = contractStartDay(careerToday, tower);
   const end = contractEndDay(careerToday, tower);
   const occupied = occupiedDayIndices(tower);
-  const lastCleared = tower.day - 1 - tower.missed;
+  const missed = missedDaysOf(tower);
   return calendarColumns(careerToday).map((careerDay): CalendarCell => {
     if (careerDay < start || careerDay > end) {
       return { careerDay, towerDay: undefined, mark: 'blank' };
     }
     const towerDay = careerDay - start + 1;
     const past = towerDay < tower.day;
+    /*
+     * **A filed day shows its own verdict**, ahead of a booking or a night of works that fell on it
+     * (seat C's D3, wave AO): the flag and the hammer are for a day a player can still plan around,
+     * and on a day already filed they hid whether it cleared. Contract & works' month grid already
+     * put a past day's verdict first, so the two views now draw the same mark for the same day. The
+     * cell's tip still names what was booked (`everyday/campaignModel.ts#calendarView`).
+     */
     const mark: CalendarMarkId =
       careerDay === careerToday
         ? 'today'
-        : marks.dueDays.includes(towerDay)
-          ? 'due'
-          : occupied.has(towerDay - 1)
-            ? 'works'
-            : marks.flaggedDays.includes(towerDay)
-              ? 'flagged'
-              : past
-                ? towerDay > lastCleared
-                  ? 'missed'
-                  : 'cleared'
+        : past
+          ? missed.has(towerDay)
+            ? 'missed'
+            : 'cleared'
+          : marks.dueDays.includes(towerDay)
+            ? 'due'
+            : occupied.has(towerDay - 1)
+              ? 'works'
+              : marks.flaggedDays.includes(towerDay)
+                ? 'flagged'
                 : 'ahead';
     return { careerDay, towerDay, mark };
   });

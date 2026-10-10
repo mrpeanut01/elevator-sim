@@ -46,6 +46,7 @@ import {
   dayIndexOf,
   daysOfBenefit,
   earnedSoFar,
+  missedDaysOf,
   failureOddsPct,
   fittedLevel,
   legalStarts,
@@ -602,7 +603,7 @@ describe('§ 8.6’s rolling calendar', () => {
     expect(row.find((cell) => cell.careerDay === 18)?.mark).toBe('blank');
   });
 
-  it('places the missed days at the tail of the past, the same way the purse does', () => {
+  it('places the missed days at the tail of the past where the record kept only the count, the same way the purse does', () => {
     const today = 10;
     const entry = tower({ day: 6, missed: 2 });
     const row = calendarRow(today, entry);
@@ -612,6 +613,26 @@ describe('§ 8.6’s rolling calendar', () => {
     expect(past.map((cell) => cell.mark)).toEqual(['cleared', 'cleared', 'cleared', 'missed', 'missed']);
     // And the two derivations agree about how many days were cleared.
     expect(past.filter((cell) => cell.mark === 'cleared')).toHaveLength(clearedDays(entry));
+  });
+
+  /**
+   * **A recorded month draws each day's own verdict** — seat C's D3, wave AO lane AO-5. The list is
+   * read only where it agrees with the count and the day; a list an older build carried without
+   * appending to takes the tail rule, which is what that month drew before.
+   */
+  it('reads the recorded missed days where they agree with the count, and the tail where they do not', () => {
+    const today = 10;
+    const entry = tower({ day: 6, missed: 2, missedDays: [2, 4] });
+    expect([...missedDaysOf(entry)]).toEqual([2, 4]);
+    const past = calendarRow(today, entry).filter((cell) => cell.towerDay !== undefined && cell.towerDay < 6);
+    expect(past.map((cell) => cell.mark)).toEqual(['cleared', 'missed', 'cleared', 'missed', 'cleared']);
+    /* The purse pays the days that cleared: 1, 3 and 5 at week one's rate. */
+    expect(earnedSoFar(entry)).toBe(3 * 3);
+    /* Short, long, a duplicate, or a day not yet run: the tail, as before the list. */
+    for (const missedDays of [[2], [2, 4, 5], [4, 4], [2, 6]]) {
+      expect([...missedDaysOf(tower({ day: 6, missed: 2, missedDays }))], JSON.stringify(missedDays)).toEqual([4, 5]);
+    }
+    expect([...missedDaysOf(tower({ day: 6, missed: 2 }))]).toEqual([4, 5]);
   });
 
   it('marks works, a due decision and a flagged event over the days ahead', () => {

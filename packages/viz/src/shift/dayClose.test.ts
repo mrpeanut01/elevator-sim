@@ -234,8 +234,11 @@ describe('the week’s arithmetic — § D1247', () => {
       undefined,
       undefined,
     ]);
-    /* No week number where none is true of the week: the census does not deal this tower's. */
-    expect(close?.tomorrow.heading).toBe('TOMORROW · TUESDAY, DAY 2');
+    /*
+     * The week's number, which since § D1394 (wave AO lane AO-5) is true of every Scenario week:
+     * the census does not deal this tower's, and its week still ends on Sunday and rolls.
+     */
+    expect(close?.tomorrow.heading).toBe('TOMORROW · WEEK 1 · TUESDAY, DAY 2');
   });
 });
 

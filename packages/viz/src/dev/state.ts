@@ -93,12 +93,9 @@ import { contractById, contractForBuilding, CONTRACTS } from '../shift/contracts
 import { firstSessionContractFor, firstSessionDayFor } from '../shift/firstSession.js';
 import { actsOf, runHorizonOf, runsWholeDay, wholeDayFor } from '../shift/dayLength.js';
 import {
-  SHIFT_EVENTS,
   baseDemandOf,
   demandTemplateVariesMix,
   eventCarChoice,
-  eventById,
-  eventOfDrawnId,
   shiftRunPatch,
   wholeDayEpisodeOf,
 } from '../shift/events.js';
@@ -2306,24 +2303,21 @@ export function shiftRunConfigOf(
    * before. Read here, at the one seam the run is built from, so the caption and the run agree for
    * the reason `scheduledEventFor`'s comment above gives.
    */
-  const event =
-    state.campaignEventId === undefined
-      ? scheduledEventFor(
-          state.calendar,
-          state.week.day,
-          state.week.dayIdx,
-          wholeDayRun ? 'whole-day' : 'period',
-          state.week,
-        )
-      : /*
-         * A whole drawn id first, so a day handed one named wrinkle (`caterers:before-the-rush`)
-         * runs that wrinkle's axis values rather than its template's base: the week census hands a
-         * run an authored week order's day this way (lane AM-D, § D1252). A template id reads the
-         * same through either lookup, so a campaign day is unchanged.
-         */
-        (eventOfDrawnId(state.campaignEventId) ??
-        eventById(state.campaignEventId) ??
-        SHIFT_EVENTS.ordinary);
+  const event = scheduledEventFor(
+    state.calendar,
+    state.week.day,
+    state.week.dayIdx,
+    wholeDayRun ? 'whole-day' : 'period',
+    state.week,
+    /*
+     * The campaign's own wrinkle where it handed one — `scheduledEventFor`'s `assigned`, which
+     * resolves a whole drawn id first (`caterers:before-the-rush`, how the week census hands a run
+     * an authored order's day, lane AM-D, § D1252) and then a template id. It was a ternary here,
+     * and the day's sheet in `dev/main.ts#closeShift` asked the schedule without it (wave AO, seat
+     * C's D4), so the one function now answers for both.
+     */
+    state.campaignEventId,
+  );
   const spec = selectedPatternSpec(resources, state, authored);
   const pattern = spec === undefined ? { demandTemplate: 'rise-and-fall' as const, demand: {} } : demandFromSpec(spec);
   /*

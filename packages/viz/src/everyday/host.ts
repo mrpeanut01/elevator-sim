@@ -267,8 +267,8 @@ import { nextDay, rollWeek } from '../shift/week.js';
 import {
   countedCleanOf,
   dayCountsToward,
+  weekAsksOf,
   weekClosedByThisClose,
-  weekDealOf,
   weekHasClosed,
   type HouseReading,
 } from '../shift/weekStake.js';
@@ -3084,10 +3084,14 @@ export function createEverydayHost(
       if (date !== undefined && seedText === date.toString()) {
         records = recordsWithDateCrowd(records, week.contractId, seedText);
       }
-      const deal = weekDealOf(week);
-      /* Once per week: at the close of the path's last day, and not again on a weekend day after it — § D1246. */
-      if (deal !== undefined && weekClosedByThisClose(week)) {
-        records = recordsWithClosedWeek(records, week.contractId, countedCleanOf(week), deal.target);
+      /*
+       * Once per week: at the close of the path's last day, and not again on a weekend day after it —
+       * § D1246. Every Scenario week since § D1394 (wave AO lane AO-5), at the target it asks: the
+       * census's, or an unmeasured week's `needClean`.
+       */
+      const asks = weekAsksOf(week);
+      if (asks !== undefined && weekClosedByThisClose(week)) {
+        records = recordsWithClosedWeek(records, week.contractId, countedCleanOf(week), asks);
       }
       if (records !== before) port.write(records);
     }
@@ -4258,60 +4262,16 @@ export function createEverydayHost(
       if (next === career) return;
       setCareer(next);
       /*
-       * **§ 8.8: taking an offer moves a week between assignments** — GitHub issue #169 item 3,
-       * § D510. The record above is the campaign's; the week is `ViewerState`'s, and it moves the
-       * way `dev/scenariosPanel.ts`'s *take* moves it: the destination restarts (the card's own
-       * promise — a fresh week on this building) and the week being left is **parked**, not lost.
-       * The length is the contract's, for `runCampaignDay`'s reason.
+       * **Taking an offer moves no week** — the post-AN panel's seat C, D6, wave AO lane AO-5,
+       * [§ D1393](../../../../DECISIONS.md), amending [§ D510](../../../../DECISIONS.md) clause 3's
+       * week switch. A take used to park the Scenario week and restart it on the offered building
+       * (`switchWeek(…, contract.id, 'restart')`, with the building and the length), so a player who
+       * took St Jude in the career opened Scenario's *Today's scenario* on a St Jude week they never
+       * chose, numbered nowhere and closing on no sheet, and their rush ran on St Jude. A career
+       * day has stood on a week of its own since § D964, so the take has nothing of the Scenario's
+       * to move: the record above holds the new tower, and the Scenario week, its building, its
+       * crowd and its presses stay exactly where the player left them.
        */
-      if (action.kind === 'take-offer') {
-        const contract = contractById(action.contractId);
-        if (contract !== undefined) {
-          /*
-           * **The day being left goes with the week being parked** — GitHub issue #526 item 2. A run in
-           * flight here was asked for the old week and landed on the new one, where the Engineer surface's
-           * filing presses filed it; a landed, unclosed run was filed there the same way. So the run in
-           * flight is stopped and the run standing is refused, first — *unclosed* being the word the
-           * block below adds, because a day that has already filed is neither of those things.
-           * Starting the new contract's run
-           * instead would put a run nobody pressed on the new week, which those same presses would file.
-           */
-          /*
-           * **And a day already filed is stopped rather than refused** — GitHub issue #531 item 4,
-           * [§ D565](../../../../DECISIONS.md). `abandonDay` does two things: it cancels whatever is
-           * in flight, and it marks the recording that stands as one this shell may not file
-           * (`shift/banking.ts#LEFT_UNFINISHED_CANNOT_BANK`). The first is right whatever the day
-           * has done — a run in flight was asked for the week being parked. The second is a claim,
-           * and on a day that has already closed it is a **false** one: the posting gate asks
-           * `bankingRefusalFor` before it asks about identity, so a filed day posted after an offer
-           * was refused with *“belongs to a day that was left unfinished”* about a day that was
-           * finished and filed. It would have been refused anyway, on the selection the offer had
-           * just moved, and a true refusal for the wrong reason is still the product accusing a
-           * player of something they did not do — which is the one accusation `scope/runIdentity.ts`
-           * spends a docstring on not spending.
-           *
-           * So the mark is gated on {@link EverydayHostBindings.dayClosed} and the cancel is not.
-           * {@link EverydayHost.leaveDayUnfinished} needs no such gate and deliberately does not get
-           * one: § 3.4's strip is only drawn while `runState().open` is true, and that is false for
-           * a closed day, so the other caller cannot arrive here with one.
-           */
-          if (b.dayClosed()) b.cancelRun?.();
-          else b.abandonDay?.();
-          /* The offer's promise is about the Scenario week, so that is the week it moves (#594). */
-          releaseCareer();
-          const state = b.state();
-          const moved = switchWeek(state.week, state.parkedWeeks, contract.id, 'restart');
-          b.applyPatch({
-            week: moved.week,
-            parkedWeeks: moved.parked,
-            buildingId: contract.buildingId,
-            shiftLengthS: shiftLengthForContract(contract.id),
-            windowStartS: null,
-            /* A fresh week on another tower keeps no presses — `moveWeekTo`'s line, § D1002. */
-            interventions: [],
-          });
-        }
-      }
       notifyCampaign();
     },
     runCampaignDay: (towerId) => {

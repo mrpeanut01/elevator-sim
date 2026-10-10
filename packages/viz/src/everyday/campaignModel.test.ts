@@ -382,6 +382,109 @@ describe('the month’s end, once day 20 has closed (§ D1357)', () => {
   });
 });
 
+/**
+ * **Each filed day keeps its own verdict, on both calendars** — the post-AN panel's seat C, D3, wave
+ * AO lane AO-5. Garden Apartments filed through `file-day` with misses on days 14, 17 and 18, read
+ * before day 19 as the seat read it. Red before: Contract & works' month drew days 1 to 15 ✓ and 16
+ * to 18 ×, and the front page's rolling schedule drew day 14 ✓ and day 16 ×, because both placed the
+ * three misses at the tail of the past; and the purse paid week three's rate for day 14 and nothing
+ * for day 16.
+ */
+describe('a filed day keeps its own verdict on the month and the rolling calendar (seat C’s D3)', () => {
+  const MISSED = [14, 17, 18];
+  const filed = (): CampaignCareer => {
+    let career = openingCareer('eta');
+    const id = career.towers[0]!.id;
+    for (let day = 1; day <= 18; day += 1) {
+      career = applyCampaignAction(
+        career,
+        { kind: 'file-day', towerId: id, verdict: MISSED.includes(day) ? 'missed' : 'cleared', trips: 400 },
+        shippedPriceSchedule(),
+      );
+    }
+    return career;
+  };
+
+  it('draws every past day from its own filing on Contract & works', () => {
+    const career = filed();
+    expect(career.towers[0]?.day).toBe(19);
+    const month = contractView(inputOf(career))!.month;
+    const cells = month.weeks.flatMap((week) => week.cells);
+    for (const cell of cells.filter((entry) => entry.dayIdx < 18)) {
+      const day = cell.dayIdx + 1;
+      expect(cell.state, `day ${String(day)}`).toBe(MISSED.includes(day) ? 'missed' : 'cleared');
+      expect(cell.mark, `day ${String(day)}`).toBe(MISSED.includes(day) ? '×' : '✓');
+    }
+  });
+
+  it('draws the same verdicts on the front page’s rolling schedule, a booked day included', () => {
+    const career = filed();
+    const row = calendarView(inputOf(career)).rows[0]!;
+    const byDay = new Map<number, (typeof row.cells)[number]>();
+    for (const cell of row.cells) {
+      const day = /its day (\d+) of/u.exec(cell.tip)?.[1];
+      if (day !== undefined) byDay.set(Number(day), cell);
+    }
+    for (let day = 1; day <= 18; day += 1) {
+      const cell = byDay.get(day);
+      expect(cell, `day ${String(day)} is in the window`).toBeDefined();
+      expect(cell?.mark, `day ${String(day)}`).toBe(MISSED.includes(day) ? 'missed' : 'cleared');
+    }
+    /* Day 17 is a booked move-in: the verdict leads and the tip keeps the booking. */
+    expect(byDay.get(17)?.tip).toContain('missed · booked:');
+    expect(byDay.get(19)?.mark).toBe('today');
+  });
+
+  it('pays each cleared day the rate of the week it fell in, and nothing for a miss', () => {
+    const tower = filed().towers[0]!;
+    const [w1, w2, w3, w4] = DIFFICULTIES.standard.rates;
+    /* Days 1 to 5, 6 to 10, then 11, 12, 13, 15 of week three, then 16 of week four. */
+    const earned = 5 * w1! + 5 * w2! + 4 * w3! + 1 * w4!;
+    expect(purseOf(tower)).toBe(DIFFICULTIES.standard.purse + earned);
+  });
+});
+
+/**
+ * **A lost contract on the desk, the tower row and the contract** — the post-AN panel's seat C, D2,
+ * wave AO lane AO-5, § D1392. Red before: the desk read *4 of 3 missed days used* beside *The managing
+ * agent has offered a renewal*, the tower row read *renewal offered*, and clause 4 stated a loss
+ * nothing enforced.
+ */
+describe('a lost contract reads as lost on every screen that names it (§ D1392)', () => {
+  const lostAt20 = (): CampaignCareer => {
+    let career = openingCareer('eta');
+    const id = career.towers[0]!.id;
+    for (let day = 1; day <= CONTRACT_DAYS; day += 1) {
+      career = applyCampaignAction(
+        career,
+        { kind: 'file-day', towerId: id, verdict: [14, 17, 18, 20].includes(day) ? 'missed' : 'cleared', trips: 400 },
+        shippedPriceSchedule(),
+      );
+    }
+    return career;
+  };
+
+  it('puts the loss on the desk with one answer, and no renewal offer', () => {
+    const view = buildingView(inputOf(lostAt20()))!;
+    expect(view.need?.title).toBe('The contract is lost');
+    expect(view.need?.allowance).toBe('4 of 3 missed days used · standard');
+    expect(view.need?.offer).toBeUndefined();
+    expect(view.options?.rows.map((row) => row.label)).toEqual(['Start the month again']);
+    expect(view.options?.note).toBe(BUILDING_COPY.optionsNoteLost);
+    expect(JSON.stringify(view)).not.toContain('offered a renewal');
+    const row = towersView(inputOf(lostAt20())).rows[0]!;
+    expect(row.status).toBe('The contract is lost');
+    expect(row.cta).not.toBe('Renew');
+  });
+
+  it('says on the contract what a loss does', () => {
+    const clause = contractView(inputOf(lostAt20()))!;
+    const all = JSON.stringify(clause);
+    expect(all).toContain('More than 3 missed days and the contract is lost.');
+    expect(all).toContain('runs no more of its days and is offered no renewal');
+  });
+});
+
 describe('the four daily tests (§ 7, § 8.6)', () => {
   const tower = (): CampaignTower => openingCareer('eta').towers[0]!;
 

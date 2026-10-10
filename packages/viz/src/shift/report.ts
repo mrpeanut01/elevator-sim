@@ -141,6 +141,7 @@ import { CONTRACT_LADDER } from './ladder.js';
 import { ENDLESS_CONTRACT_ID, nextDay, pathNextOf, wasGraded } from './week.js';
 import { decidingCallOf, type DecidingPinnedCall } from './dayClose.js';
 import {
+  UNMEASURED_WEEK_CLOSED_LINE,
   WEEK_CLOSED_LINE,
   weekDealOf,
   weekHasClosed,
@@ -3281,8 +3282,12 @@ function forecastFor(
  */
 function taughtFor(contract: ScenarioContract | undefined, week: WeekState): string {
   if (week.cleared !== null) return `Cleared: ${week.cleared.reward}.`;
-  /* § D1177: the last dealt day of a census week closes the week, and its sheet is on Your week. */
-  if (weekHasClosed(week)) return WEEK_CLOSED_LINE;
+  /*
+   * § D1177: the last dealt day of a census week closes the week, and its sheet is on Your week.
+   * Since § D1394 (wave AO lane AO-5) a week the census does not deal closes too, on Sunday, and its
+   * sheet sets no house beside the player, so its line does not say it does.
+   */
+  if (weekHasClosed(week)) return weekDealOf(week) === undefined ? UNMEASURED_WEEK_CLOSED_LINE : WEEK_CLOSED_LINE;
   if (contract === undefined) {
     return 'A building you drew yourself. Nothing banks here — the sheet is the whole reward.';
   }

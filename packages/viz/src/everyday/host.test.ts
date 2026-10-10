@@ -32,7 +32,7 @@ import { CONTRACTS } from '../shift/contracts.js';
 import { pressDayFor } from '../shift/ladder.js';
 import type { CareerStore } from './careerStore.js';
 
-import { offerRefusalOf, openingCareer, towerById, type CampaignTower } from '../campaign/career.js';
+import { offerRefusalOf, openingCareer, towerById, type CampaignCareer, type CampaignTower } from '../campaign/career.js';
 import { clearedDays, purseOf, spentTodayUnits, type ShopCategoryId } from '../campaign/economy.js';
 import { TECHNICIAN_UNITS, campaignEventFor } from '../campaign/incidents.js';
 import { CAMPAIGN_DOCK_COPY } from './campaignDock.js';
@@ -2629,59 +2629,38 @@ describe('a run in flight when a day is left — GitHub issue #526', () => {
     expect(h.calls.slice(beforeLeaving)).toEqual(['abandonDay']);
   });
 
-  it('taking a campaign offer abandons the day before the week moves — item 2', () => {
-    /*
-     * A career one slot up, so the reducer takes the offer rather than refusing it: standing 14 opens
-     * the second slot. The day in flight was asked for the week being parked, so it goes first, and the
-     * week then moves exactly as it did.
-     */
-    const career = { ...openingCareer(base().dispatcherId), carry: 14 };
-    const store: CareerStore = {
-      load: () => ({ career, refusal: undefined, notice: undefined }),
-      save: () => {},
-      clear: () => {},
-    };
-    const offer = CONTRACTS.find((contract) => offerRefusalOf(career, contract.id) === undefined);
-    if (offer === undefined) throw new Error('no contract is takeable on a career one slot up — the fixture no longer opens one');
-    const h = harnessOf(base());
-    const host = createEverydayHost(h.bindings, store);
-    const beforeTaking = h.calls.length;
-    host.campaignAct({ kind: 'take-offer', contractId: offer.id });
-    expect(h.calls.slice(beforeTaking)).toEqual(['abandonDay', 'applyPatch']);
-    expect(h.patches.at(-1)?.buildingId).toBe(offer.buildingId);
-    expect(h.patches.at(-1)?.week?.contractId).toBe(offer.id);
-  });
-
   /**
-   * **A day already filed is stopped, not accused** — GitHub issue #531 item 4, § D565.
-   *
-   * `abandonDay` cancels *and* marks: `dev/main.ts` writes the standing recording into
-   * `abandonedRecording`, which `shift/banking.ts#bankingRefusalFor` then refuses with *“belongs to
-   * a day that was left unfinished”*. `dev/main.ts#postCurrentRun` asks that refusal **before** it
-   * asks whether the run reproduces from the selection, so after an offer a filed day was refused
-   * with a sentence that is false about it. The cancel is still right — a run in flight was asked
-   * for the week being parked — so the two halves are split by the fact that decides them, and the
-   * assertion is on which binding was called.
-   *
-   * The refusal itself is `shift/banking.test.ts`'s and is not restated here: what this file owns is
-   * which of `dev/main.ts`'s two presses this façade reaches, which is the whole of the fix.
+   * **Taking a campaign offer moves no week, so it has no day to stop** — the post-AN panel's seat C,
+   * D6, wave AO lane AO-5, § D1393. The take used to park the Scenario week and restart it on the
+   * offered building, abandoning the day in flight first (GitHub issue #526 item 2) or cancelling it
+   * where the day had filed (#531 item 4, § D565). Seat C took St Jude in the career and opened
+   * Scenario on a St Jude week nobody chose. Red before: the calls read `abandonDay, applyPatch` and
+   * `cancelRun, applyPatch`, and the patch named the offer's contract and building.
    */
-  it('stops the run but does not refuse a day that has already filed — item 4', () => {
+  it('takes the offer into the career and leaves the Scenario week, its run and its day alone — § D1393', () => {
     const career = { ...openingCareer(base().dispatcherId), carry: 14 };
-    const store: CareerStore = {
-      load: () => ({ career, refusal: undefined, notice: undefined }),
-      save: () => {},
-      clear: () => {},
-    };
     const offer = CONTRACTS.find((contract) => offerRefusalOf(career, contract.id) === undefined);
     if (offer === undefined) throw new Error('no contract is takeable on a career one slot up — the fixture no longer opens one');
-    const h = harnessOf(base(), { dayClosed: true });
-    const host = createEverydayHost(h.bindings, store);
-    const beforeTaking = h.calls.length;
-    host.campaignAct({ kind: 'take-offer', contractId: offer.id });
-    expect(h.calls.slice(beforeTaking)).toEqual(['cancelRun', 'applyPatch']);
-    /* And the week still moves, so this is the refusal being dropped rather than the arm being skipped. */
-    expect(h.patches.at(-1)?.week?.contractId).toBe(offer.id);
+    for (const dayClosed of [false, true]) {
+      let saved: CampaignCareer | undefined;
+      const store: CareerStore = {
+        load: () => ({ career, refusal: undefined, notice: undefined }),
+        save: (next) => {
+          saved = next;
+        },
+        clear: () => {},
+      };
+      const h = harnessOf(base(), { dayClosed });
+      const host = createEverydayHost(h.bindings, store);
+      const beforeTaking = h.calls.length;
+      const patchesBefore = h.patches.length;
+      host.campaignAct({ kind: 'take-offer', contractId: offer.id });
+      expect(h.calls.slice(beforeTaking), `dayClosed ${String(dayClosed)}`).toEqual([]);
+      expect(h.patches.length).toBe(patchesBefore);
+      /* The control: the career did take it. */
+      expect(saved?.towers.map((tower) => tower.id)).toContain(offer.id);
+      expect(host.campaign().towers.map((tower) => tower.id)).toContain(offer.id);
+    }
   });
 });
 

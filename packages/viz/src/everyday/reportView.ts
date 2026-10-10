@@ -91,7 +91,7 @@ import type { ShapedDayReport } from '../shift/report.js';
 import type { TomorrowBriefing } from '../shift/tomorrow.js';
 import { dayCloseOf, type DayCloseView } from '../shift/dayClose.js';
 import type { WeekState } from '../shift/types.js';
-import type { HouseReading } from '../shift/weekStake.js';
+import { weekDealOf, type HouseReading } from '../shift/weekStake.js';
 
 /**
  * Where a lever's press goes — GitHub issue #213, the owner's ruling on it, and GAMEPLAY § 6.5.
@@ -216,6 +216,16 @@ export interface EverydayOnwardStep {
 export const WEEK_SHEET_STEP: EverydayOnwardStep = Object.freeze({
   label: 'See the week against the house',
   note: 'Opens this week’s sheet: your counted days beside the tower’s standing order on the same crowds. The next week starts from there.',
+  goes: 'week-sheet',
+});
+
+/**
+ * {@link WEEK_SHEET_STEP} for a week the census does not deal, which closes on Sunday since § D1394
+ * (wave AO lane AO-5) and whose sheet sets no house beside the player.
+ */
+export const UNMEASURED_WEEK_SHEET_STEP: EverydayOnwardStep = Object.freeze({
+  label: 'See the week’s sheet',
+  note: 'Opens this week’s sheet: your seven days against its target. The next week starts from there.',
   goes: 'week-sheet',
 });
 
@@ -374,6 +384,13 @@ export interface EverydayReportCareer {
    * sheet. Passed in for {@link renewalDue}'s reason: the date is `campaign/`'s rule.
    */
   readonly renewalAhead?: string | undefined;
+  /**
+   * The contract is lost, in `campaign/career.ts#contractLostSentenceOf`'s words, or `undefined` —
+   * wave AO lane AO-5, [§ D1392](../../../../DECISIONS.md). Passed in for {@link renewalDue}'s
+   * reason: when a contract is lost is `campaign/`'s rule. The step goes to the desk, where the
+   * month is started again, and outranks a renewal, which a lost contract is not offered.
+   */
+  readonly contractLost?: string | undefined;
 }
 
 /**
@@ -630,6 +647,7 @@ function onwardStepOf(
   canAdvance: boolean,
   nextDayLabel: string,
   weekClosed = false,
+  weekStep: EverydayOnwardStep = WEEK_SHEET_STEP,
 ): EverydayOnwardStep | undefined {
   /*
    * An unfiled sheet advances from nothing, on either flow. The screen returns before this block
@@ -639,7 +657,7 @@ function onwardStepOf(
    * `canAdvance`, so it has to carry it here.
    */
   if (!filed) return undefined;
-  if (weekClosed && career === undefined) return WEEK_SHEET_STEP;
+  if (weekClosed && career === undefined) return weekStep;
   if (career !== undefined) {
     /*
      * **The renewal comes before the next day, and the step says so** — GitHub issue #582 item 3,
@@ -654,6 +672,13 @@ function onwardStepOf(
      * Since [§ D1357](../../../../DECISIONS.md) the renewal stands once day 20 has closed, so this arm
      * is day 20's sheet (and any later one), and the note names the day that waits on the answer.
      */
+    if (career.contractLost !== undefined) {
+      return {
+        label: `Open the desk at ${career.buildingName}`,
+        note: `${career.contractLost} No more of its days run. This opens the building’s desk, where the month can be started again. You stay in the career.`,
+        goes: 'career-desk',
+      };
+    }
     if (career.renewalDue) {
       return {
         label: `Answer the renewal at ${career.buildingName}`,
@@ -758,6 +783,8 @@ export function everydayReportViewOf(input: EverydayReportInput): EverydayReport
       canAdvance,
       framing.kind === 'week-day' ? framing.nextDayLabel : '',
       framing.kind === 'week-day' && framing.weekClosed === true,
+      /* No house beside a week the census does not deal (§ D1394), so its step does not name one. */
+      input.week !== undefined && weekDealOf(input.week) === undefined ? UNMEASURED_WEEK_SHEET_STEP : WEEK_SHEET_STEP,
     ),
     staleNote: input.newerRunOnStage
       ? 'A newer run is standing on the stage and has not been closed. This sheet is the last day ' +

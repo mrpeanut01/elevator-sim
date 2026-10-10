@@ -705,6 +705,8 @@ export function todaysShiftOf(resources: BrowserResources, state: ViewerState): 
       week.dayIdx,
       planned.wholeDayRun ? 'whole-day' : 'period',
       week,
+      /* A campaign day's wrinkle is the career's (seat C's D4, wave AO): the one the run is built from. */
+      state.campaignEventId,
     ),
     planned.templateVariesMix,
     planned.wholeDayRun,

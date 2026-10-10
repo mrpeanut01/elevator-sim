@@ -499,8 +499,11 @@ describe('the load reading', () => {
 describe('the rest of the record', () => {
   it('names the day and prints the seed line two players can compare', () => {
     const record = recordFor(midtown, 2, 1);
-    /* The fixture's week is Garden Apartments', which the census does not deal: no week number. */
-    expect(record.dayLabel).toBe('TUESDAY · DAY 2');
+    /*
+     * The fixture's week is Garden Apartments', which the census does not deal. It carries its
+     * number since § D1394 (wave AO lane AO-5): every Scenario week ends on day 7 and rolls.
+     */
+    expect(record.dayLabel).toBe('WEEK 1 · TUESDAY · DAY 2');
     expect(record.weekday).toBe('Tuesday');
     expect(record.seedLine).toBe(
       'tower midtown-office · crowd 424242 · today’s date, so everyone playing today meets this crowd',
@@ -1077,8 +1080,8 @@ describe('the week’s stake on the brief (§ D1176)', () => {
  * seats B and D: § D1252 deals each week of a census tower its own order, and no screen numbered
  * the weeks, so week 2's Tuesday and week 1's read alike above different wrinkles.
  */
-describe('the eyebrow numbers a census tower’s week', () => {
-  it('reads WEEK n on Midtown’s week, and nothing where the census does not deal the week', () => {
+describe('the eyebrow numbers every Scenario week', () => {
+  it('reads WEEK n on Midtown’s week and, since § D1394, on a week the census does not deal', () => {
     const on = (week: WeekState): string =>
       todayOf({
         week,
@@ -1101,6 +1104,9 @@ describe('the eyebrow numbers a census tower’s week', () => {
       }).dayLabel;
     expect(on({ ...openWeek('c2'), week: 2, day: 2, dayIdx: 1 })).toBe('WEEK 2 · TUESDAY · DAY 2');
     expect(on({ ...openWeek('c2'), day: 1, dayIdx: 0 })).toBe('WEEK 1 · MONDAY · DAY 1');
-    expect(on({ ...openWeek('c1'), day: 2, dayIdx: 1 })).toBe('TUESDAY · DAY 2');
+    /* Red before § D1394 (wave AO lane AO-5): Garden Apartments' week read no number. */
+    expect(on({ ...openWeek('c1'), day: 2, dayIdx: 1 })).toBe('WEEK 1 · TUESDAY · DAY 2');
+    /* The control: a sentinel week has no number. */
+    expect(on({ ...openWeek('sandbox'), day: 2, dayIdx: 1 })).toBe('TUESDAY · DAY 2');
   });
 });

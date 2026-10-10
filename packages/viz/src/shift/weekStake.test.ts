@@ -35,6 +35,7 @@ import {
   weekClosedByThisClose,
   weekHasClosed,
   weekNeedOf,
+  weekOrdinalOf,
   weekPathEndOf,
   weekRollsOver,
   weekSheetOf,
@@ -44,6 +45,7 @@ import {
   weekTargetFor,
   weekTargetMetDayOf,
   weekTargetMetLineOf,
+  UNMEASURED_WEEK_HOUSE_LINE,
   WEEK_HELD_NOTE,
   WEEK_LENGTH,
   WEEK_SHEET_NOTE,
@@ -390,10 +392,44 @@ describe('the week closes and rolls — § D1177', () => {
     }
   });
 
-  it('never closes a week the census does not speak for', () => {
-    const week = { ...openWeek('c1'), day: 7, dayIdx: 6, closedDay: 7 };
+  /**
+   * **A week the census does not speak for closes on Sunday, numbered, on its own sheet** — the
+   * post-AN panel's seat C, D6, wave AO lane AO-5, § D1394. St Jude Hospital's week met its target on
+   * Tuesday and ran on to *MONDAY · DAY 8* with no number, no sheet and no next tower. Red before:
+   * `weekHasClosed` and `weekRollsOver` read `false` on day 7, `weekOrdinalOf` read nothing and
+   * `weekSheetOf` drew no sheet.
+   */
+  it('closes a week the census does not speak for on day 7, with its number and a sheet — § D1394', () => {
+    expect(weekDealOf('c8')).toBeUndefined();
+    const saturday = { ...openWeek('c8'), day: 6, dayIdx: 5, closedDay: 6 };
+    expect(weekHasClosed(saturday)).toBe(false);
+    expect(weekOrdinalOf(saturday)).toBe('week 1');
+    const held = playWeek('c8', [1, 2]);
+    expect(held.closedDay).toBe(7);
+    expect(weekHasClosed(held)).toBe(true);
+    expect(weekClosedByThisClose(held)).toBe(true);
+    expect(weekRollsOver(held)).toBe(true);
+    expect(weekTargetMetDayOf(held)?.day).toBe(2);
+    const sheet = weekSheetOf(held, () => undefined);
+    expect(sheet?.rows).toHaveLength(WEEK_LENGTH);
+    expect(sheet?.rows.every((row) => row.counts && row.house === undefined)).toBe(true);
+    expect(sheet?.target).toBe(contractById('c8')?.needClean);
+    expect(sheet?.targetLine).toBe(`Target ${String(contractById('c8')?.needClean)}: met.`);
+    expect(sheet?.houseLine).toBe(UNMEASURED_WEEK_HOUSE_LINE);
+    expect(sheet?.houseLine).not.toContain('cleared');
+    expect(sheet?.weekend).toBeUndefined();
+    /* A held week moves on to week 2; a week not held deals itself again (§ D1344). */
+    expect(rollWeek(held).week).toBe(2);
+    const missed = playWeek('c8', [3]);
+    expect(weekSheetOf(missed, () => undefined)?.targetLine).toContain('not met');
+    expect(rollWeek(missed).week).toBe(1);
+  });
+
+  it('leaves a sentinel week without an ending — the control', () => {
+    const week = { ...openWeek('sandbox'), day: 7, dayIdx: 6, closedDay: 7 };
     expect(weekHasClosed(week)).toBe(false);
     expect(weekRollsOver(week)).toBe(false);
+    expect(weekOrdinalOf(week)).toBeUndefined();
   });
 });
 

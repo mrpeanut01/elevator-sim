@@ -98,6 +98,7 @@ import {
   fittedLevel,
   bookedLevel,
   legalStarts,
+  missedDaysOf,
   nextSlot,
   oddsAfterWorksPct,
   offerFeeOf,
@@ -651,7 +652,7 @@ export const TOWERS_COPY = Object.freeze({
    * here yet — a building is offered on a complexity and a fee, and taking one moves a week between
    * assignments; neither of those reaches this screen in this build"*) is deleted on the commit
    * that built both halves: `economy.ts#OFFER_FEES` prices the offer and `career.ts#offerRefusalOf`
-   * gates it, and `everyday/host.ts#campaignAct` moves the week on a take.
+   * gates it. Since § D1393 a take moves no week (`everyday/host.ts#campaignAct`).
    */
   offersTake: 'Take it',
   offersNotYet: 'Not yet',
@@ -660,7 +661,12 @@ export const TOWERS_COPY = Object.freeze({
   offersAtRisk: 'A tower is one miss from ending. Fix that before adding another.',
   /* `offersUnpriced` (*complexity unpublished — not offered until somebody measures one*) left on
      the commit that priced the last two buildings — GitHub issue #169 item 4, § D519, § D227. */
-  offersFreshWeek: 'taking it starts a fresh week on this building; the week you are on is parked, not lost',
+  /*
+   * What a take does to the rest of the game, which since § D1393 (wave AO lane AO-5) is nothing: it
+   * read *taking it starts a fresh week on this building; the week you are on is parked, not lost*,
+   * and the take moved the Scenario week to the offered building.
+   */
+  offersKeepsWeek: 'taking it adds the building to your career on a month of its own; your Scenario week stays where you left it',
   incidentsHeading: 'WHAT HAS HAPPENED LATELY',
   incidentsSub: 'none of it was your doing',
   incidentsRefusal:
@@ -1053,7 +1059,7 @@ export function offersView(career: CampaignCareer, buildingNameOf: (id: string) 
     caption: `${String(rows.length)} ${rows.length === 1 ? 'offer' : 'offers'}`,
     rows,
     empty: rows.length === 0 ? TOWERS_COPY.offersNone : undefined,
-    note: TOWERS_COPY.offersFreshWeek,
+    note: TOWERS_COPY.offersKeepsWeek,
   };
 }
 
@@ -1086,9 +1092,10 @@ function standingNote(standing: number, open: number, atRisk: number): string {
 /** The status of a quiet tower's contract — § 8.1's `statusSub`, derived from the allowance. */
 function contractStatusLine(tower: CampaignTower): string {
   const allowance = DIFFICULTIES[tower.difficultyId].miss;
-  if (renewalIsDue(tower)) return 'renewal offered';
   const left = allowance - tower.missed;
+  /* Lost before renewed: a contract lost on day 20 is offered no renewal (§ D1392, wave AO). */
   if (left < 0) return `contract ended — ${String(tower.missed)} missed`;
+  if (renewalIsDue(tower)) return 'renewal offered';
   if (left === 0) return 'one more miss ends it';
   if (left === 1) return 'one miss left';
   return `${String(left)} misses left`;
@@ -1245,10 +1252,11 @@ function tipSuffix(mark: CalendarCell['mark'], booked?: string): string {
        * that array is empty in this build, so the arm is there for the day it is not.
        */
       return booked === undefined ? ' · something is booked' : ` · booked: ${booked}`;
+    /* A filed day draws its verdict over a booking, so the tip keeps the booking (seat C's D3, wave AO). */
     case 'cleared':
-      return ' · cleared';
+      return booked === undefined ? ' · cleared' : ` · cleared · booked: ${booked}`;
     case 'missed':
-      return ' · missed';
+      return booked === undefined ? ' · missed' : ` · missed · booked: ${booked}`;
     default:
       return '';
   }
@@ -1360,6 +1368,8 @@ export const BUILDING_COPY = Object.freeze({
   optionsEyebrow: 'WHAT DO YOU WANT DONE',
   optionsNote: 'maintenance can handle any of it — they need you to choose',
   optionsNoteRenewal: 'a finished contract frees its slot — that is how you move up',
+  /* § D1392: the desk's note over a lost contract's one answer. */
+  optionsNoteLost: 'a lost contract counts toward the three that end the career',
   quietHeading: 'Running itself',
   quietBody:
     'Your standing order is holding and nothing is booked. Maintenance will carry on without you, and ' +
@@ -1612,7 +1622,9 @@ export function buildingView(input: CampaignInput): BuildingView | undefined {
             note:
               need.kind === 'renewal'
                 ? BUILDING_COPY.optionsNoteRenewal
-                : BUILDING_COPY.optionsNote,
+                : need.kind === 'lost'
+                  ? BUILDING_COPY.optionsNoteLost
+                  : BUILDING_COPY.optionsNote,
             /*
              * § D1357: once day 20 has closed there is no cleared day left in this month to quote,
              * and the next one is a new month's at its own week-one rate, so the line says the month
@@ -1986,6 +1998,12 @@ export function contractDocumentOf(
     difficulty.miss === 0
       ? 'A single missed day loses the contract.'
       : `More than ${String(difficulty.miss)} missed ${difficulty.miss === 1 ? 'day' : 'days'} and the contract is lost.`;
+  /*
+   * What *lost* does, said where the term is (§ D1392, wave AO lane AO-5): it was stated and not
+   * enforced, and a desk at 4 of 3 offered a renewal under this clause.
+   */
+  const lostMeans =
+    'A lost contract runs no more of its days and is offered no renewal; the month can be started again from day 1, which counts the loss.';
   return {
     title: 'SERVICE CONTRACT',
     parties: `Between the managing agent of ${buildingName} and you, on ${difficulty.name} terms.`,
@@ -2014,7 +2032,7 @@ export function contractDocumentOf(
       {
         number: '4',
         heading: 'Missed days',
-        body: `A missed day pays nothing and costs three standing. ${allowance} Three contracts lost and the career ends.`,
+        body: `A missed day pays nothing and costs three standing. ${allowance} ${lostMeans} Three contracts lost and the career ends.`,
         levels: undefined,
         basisNote: undefined,
       },
@@ -2200,7 +2218,8 @@ export function contractView(input: CampaignInput): ContractView | undefined {
     pendingTier === undefined ? 0 : shopTierPrice(input.schedule, pendingTier).nights;
   const starts = pendingTier === undefined ? [] : legalStarts(tower, pendingNights);
   const occupied = occupiedDayIndices(tower);
-  const lastCleared = tower.day - 1 - tower.missed;
+  /* Each past day's own verdict, as the purse and the rolling calendar read it (seat C's D3, wave AO). */
+  const missedDays = missedDaysOf(tower);
   const worksDays = [...occupied].filter((index) => index >= dayIdx);
   const rows = campaignTestRows(
     difficulty,
@@ -2225,7 +2244,7 @@ export function contractView(input: CampaignInput): ContractView | undefined {
         : index === dayIdx
         ? 'today'
         : index < dayIdx
-          ? index + 1 > lastCleared
+          ? missedDays.has(index + 1)
             ? 'missed'
             : 'cleared'
           : occupied.has(index)

@@ -81,7 +81,13 @@ import {
   type HonestyPart,
 } from './reportView.js';
 import { DAY_CLOSE_HEADING, type DayCloseView } from '../shift/dayClose.js';
-import { RENEWAL_AHEAD_ON_SHEET_DAYS, needOf, openTowerOf, renewalAheadSentenceOf } from '../campaign/career.js';
+import {
+  RENEWAL_AHEAD_ON_SHEET_DAYS,
+  contractLostSentenceOf,
+  needOf,
+  openTowerOf,
+  renewalAheadSentenceOf,
+} from '../campaign/career.js';
 /* GitHub issue #577: `fileDay`'s twenty-day month, read rather than restated. */
 import { CONTRACT_DAYS } from '../campaign/economy.js';
 import { everydayAccount, onEverydayAccount } from './accountPort.js';
@@ -266,7 +272,7 @@ function mountReportScreen(
        * `CONTRACT_DAYS` while the contract does and reaches `CONTRACT_DAYS + 1` when the last day
        * is filed. Past that the next press is § 8.9's renewal, which lives on the desk.
        */
-      canRunAnother: tower.day <= CONTRACT_DAYS,
+      canRunAnother: tower.day <= CONTRACT_DAYS && needOf(tower)?.kind !== 'lost',
       /*
        * The desk's own gate, read the way the desk reads it — GitHub issue #582 item 3, § D1274.
        * `campaignScreens.ts#mountBuilding` will not run a day while `needOf` stands, and only the
@@ -281,6 +287,11 @@ function mountReportScreen(
        * How far ahead is `career.ts`'s, as is the sentence.
        */
       renewalAhead: renewalAheadSentenceOf(tower, RENEWAL_AHEAD_ON_SHEET_DAYS),
+      /*
+       * A lost contract, in `career.ts`'s own sentence — wave AO lane AO-5, § D1392. The day that
+       * spent the allowance goes to the desk rather than to the next day, which no door runs.
+       */
+      contractLost: contractLostSentenceOf(tower),
     };
   }
 

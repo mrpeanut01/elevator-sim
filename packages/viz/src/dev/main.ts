@@ -7994,7 +7994,21 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * week-day arm, where a wrong id makes a calendar-overridden day pair with an ordinary one as
      * one question — the exact comparison § D311 built the basis to refuse.
      */
-    const event = scheduledEventFor(state.calendar, state.week.day, state.week.dayIdx, 'period', state.week);
+    /*
+     * **And the campaign's own wrinkle where it handed the day one** — the post-AN panel's seat C, D4
+     * (wave AO lane AO-5). This asked the week's schedule alone, while the run was built from
+     * `state.campaignEventId` (`dev/state.ts#shiftRunConfigOf`): Garden Apartments' day 20 ran *Two
+     * cars down*, as its stage card said, under a sheet headed *Something on upstairs*. One function
+     * answers both now.
+     */
+    const event = scheduledEventFor(
+      state.calendar,
+      state.week.day,
+      state.week.dayIdx,
+      'period',
+      state.week,
+      state.campaignEventId,
+    );
     /*
      * The run this sheet reports, read back the way the brief read it before the press — its
      * building's windows, the cars the day's event took and whether its template kept its mix

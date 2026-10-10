@@ -2009,8 +2009,13 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'what a player reads of it is `dayStakeSentenceOf`, which the week adapter seeds for every ' +
         'census tower. `houseRecordOf` returns a run record for the shell’s house run. What a player ' +
         'reads from the module is seeded by name in `honesty/surfaces.ts#seedWeekStake`. ' +
-        '`weekClosedByThisClose` (wave AM, § D1246) is a boolean for the tower’s record of weeks.',
+        '`weekClosedByThisClose` (wave AM, § D1246) is a boolean for the tower’s record of weeks. ' +
+        '`weekPathEndFor` and `weekAsksOf` (wave AO lane AO-5, § D1394) return a day number and a ' +
+        'target count, for any Scenario week, which the sheet and the close print through the ' +
+        'producers seeded above.',
       ids: [
+        'shift/weekStake.ts#weekPathEndFor',
+        'shift/weekStake.ts#weekAsksOf',
         'shift/weekStake.ts#weekClosedByThisClose',
         'shift/weekStake.ts#weekDealOf',
         'shift/weekStake.ts#dayCountsToward',

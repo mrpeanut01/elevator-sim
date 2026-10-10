@@ -48,6 +48,26 @@ describe('a career round-trips', () => {
   });
 });
 
+/**
+ * **Which days were missed survives a reload, and a save without it still reads** — seat C's D3,
+ * wave AO lane AO-5. The list rides the same envelope, so no version moves and no saved career is
+ * set aside; a tower written before it decodes as it was and draws the tail rule it always drew.
+ */
+describe('the missed days ride the envelope at the same version', () => {
+  it('round-trips the list, and reads a tower saved without one', () => {
+    const base = openingCareer('collective');
+    const tower: CampaignTower = { ...base.towers[0]!, day: 7, missed: 2, missedDays: [2, 5] };
+    const played: CampaignCareer = { ...base, today: 7, towers: [tower] };
+    expect(decodeCareer(encodeCareer(played)).career?.towers[0]?.missedDays).toEqual([2, 5]);
+    const { missedDays: _dropped, ...older } = tower;
+    void _dropped;
+    const back = decodeCareer(JSON.stringify({ version: CAREER_SCHEMA_VERSION, career: { ...played, towers: [older] } }));
+    expect(back.refusal).toBeUndefined();
+    expect(back.career?.towers[0]?.missedDays).toBeUndefined();
+    expect(back.career?.towers[0]?.missed).toBe(2);
+  });
+});
+
 describe('the envelope refuses in both directions', () => {
   it('refuses a version this build does not read, and says so', () => {
     const newer = JSON.stringify({

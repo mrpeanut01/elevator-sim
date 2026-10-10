@@ -359,29 +359,54 @@ function holdoutVerdictFor(
   }
 
   const goals = judgeGoalsOf(stage, published, batch.result, batch.report, 'holdout');
-  const met = goals.filter((goal) => goal.met === true).length;
-  const held = goals.length > 0 && met === goals.length;
-  const unjudged = goals.filter((goal) => goal.met === null).length;
-  const runs = `${String(batch.report.replications)} ${plural(batch.report.replications, 'run', 'runs')}`;
-  const tail =
-    unjudged === 0
-      ? ''
-      : ` ${String(unjudged)} of them could not be judged there, and an unjudged goal is not a passed one.`;
   return {
     seedSetName: seeds.name,
     seed: seeds.seed,
     goals,
-    held,
-    sentence: held
-      ? `The held-back crowds agree: all ${String(goals.length)} ` +
-        `${plural(goals.length, 'goal', 'goals')} reached over ${runs} this setting was not tuned ` +
-        'against.'
-      : `The held-back crowds do not agree: ${String(met)} of ` +
-        `${String(goals.length)} ${plural(goals.length, 'goal', 'goals')} reached over ${runs} ` +
-        'this setting was not tuned against.' +
-        `${tail} A gain that does not survive crowds it was not tuned against is a fit to fifty ` +
-        'crowds rather than a better way of running the building.',
+    held: goals.length > 0 && goals.every((goal) => goal.met === true),
+    sentence: holdoutSentenceOf(goals, batch.report.replications),
   };
+}
+
+/**
+ * **What the held-back crowds said, in one sentence** — the tally, and, where they refused, **which
+ * goals they refused** by their plain names (the post-AN panel's seat C, D7, wave AO lane AO-5).
+ * Stage 5 with Fairness first read *"The held-back crowds do not agree: 4 of 5 goals reached"* and
+ * named none, so the player could not tell which goal the crowds they never tuned against had
+ * turned down. A goal the batch could not judge is counted in its own clause rather than named as
+ * missed, because unjudged is neither passed nor failed. Exported so the sentence can be held on
+ * goal verdicts directly; {@link holdoutVerdictFor} is its one caller. The decision reaches no further
+ * than this module, so this docstring is its record ([§ D405](../../../../DECISIONS.md)).
+ */
+export function holdoutSentenceOf(goals: readonly StageGoalVerdict[], replications: number): string {
+  const met = goals.filter((goal) => goal.met === true).length;
+  const held = goals.length > 0 && met === goals.length;
+  const unjudged = goals.filter((goal) => goal.met === null).length;
+  const missed = goals.filter((goal) => goal.met === false).map((goal) => goal.label);
+  const runs = `${String(replications)} ${plural(replications, 'run', 'runs')}`;
+  if (held) {
+    return (
+      `The held-back crowds agree: all ${String(goals.length)} ` +
+      `${plural(goals.length, 'goal', 'goals')} reached over ${runs} this setting was not tuned ` +
+      'against.'
+    );
+  }
+  const named =
+    missed.length === 0
+      ? ''
+      : ` ${missed.length === 1 ? 'The one they did not reach' : 'The ones they did not reach'}: ` +
+        `${missed.join('; ')}.`;
+  const tail =
+    unjudged === 0
+      ? ''
+      : ` ${String(unjudged)} of them could not be judged there, and an unjudged goal is not a passed one.`;
+  return (
+    `The held-back crowds do not agree: ${String(met)} of ` +
+    `${String(goals.length)} ${plural(goals.length, 'goal', 'goals')} reached over ${runs} ` +
+    'this setting was not tuned against.' +
+    `${named}${tail} A gain that does not survive crowds it was not tuned against is a fit to fifty ` +
+    'crowds rather than a better way of running the building.'
+  );
 }
 
 /**

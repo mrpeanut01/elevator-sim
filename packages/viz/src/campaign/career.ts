@@ -58,6 +58,7 @@
 
 import {
   CONTRACT_DAYS,
+  DIFFICULTIES,
   REFURBISHMENT,
   type DifficultyId,
   type ShopCategoryId,
@@ -65,10 +66,12 @@ import {
   type WorksBooking,
   atRiskTowers,
   bookingFor,
+  carriedIn,
   clearedDays,
   complexityOf,
   contractIsLost,
   dayIndexOf,
+  missedDaysOf,
   nextSlot,
   offerFeeOf,
   purseOf,
@@ -334,6 +337,7 @@ export function freshTower(input: {
     quirk: quirkOf(input.buildingId) ?? '',
     day: 1,
     missed: 0,
+    missedDays: [],
     months: 0,
     carry: undefined,
     difficultyId: input.difficultyId ?? 'standard',
@@ -392,7 +396,11 @@ export function towerById(career: CampaignCareer, id: string): CampaignTower | u
  * § 8.2 / § 8.9 — what a building wants from you
  * -------------------------------------------------------------------------- */
 
-export type TowerNeedKind = 'renewal' | 'service';
+/**
+ * What a desk can be asked: a renewal, a service window, or **a contract that is lost** (wave AO lane
+ * AO-5, [§ D1392](../../../../DECISIONS.md)).
+ */
+export type TowerNeedKind = 'renewal' | 'service' | 'lost';
 
 /**
  * One option on the desk — § 8.2's *"three or four options, each with cost, when it takes effect,
@@ -474,6 +482,57 @@ function renewalNeed(tower: CampaignTower): TowerNeed {
         nights: 0,
         when: 'ends with this contract',
         effect: 'Frees the slot. The kit stays with the building, because it always belonged to it.',
+      },
+    ],
+  };
+}
+
+/**
+ * **The sentence that says a contract is lost, with its own numbers** — *4 days missed, and standard
+ * allows 3, so this contract is lost.* — or `undefined` while it is not. Wave AO lane AO-5,
+ * [§ D1392](../../../../DECISIONS.md): the desk's brief, the day report's onward step and the
+ * contract sheet's bar all say the same sentence, so it is written once.
+ */
+export function contractLostSentenceOf(tower: CampaignTower): string | undefined {
+  if (!contractIsLost(tower)) return undefined;
+  const difficulty = DIFFICULTIES[tower.difficultyId];
+  const allows =
+    difficulty.miss === 0
+      ? `${difficulty.name.toLowerCase()} allows none`
+      : `${difficulty.name.toLowerCase()} allows ${String(difficulty.miss)}`;
+  return `${String(tower.missed)} days missed, and ${allows}, so this contract is lost.`;
+}
+
+/**
+ * **A lost contract, on the desk** — the post-AN panel's seat C, D2, wave AO lane AO-5,
+ * [§ D1392](../../../../DECISIONS.md). Garden Apartments missed days 14, 17, 18 and 20 and the desk
+ * read *4 of 3 missed days used* over a renewal, while the contract's own clause 4 says *more than 3
+ * missed days and the contract is lost*. `economy.ts#contractIsLost` had said so all along and no
+ * path asked it, and `career.lost` had no writer. So a lost contract runs no more of its days
+ * ({@link fileDay} refuses one), is offered no renewal ({@link needOf} asks this first), and puts
+ * one answer on the desk: § 3.3's own *Start the month again*, which counts the loss.
+ *
+ * One option rather than the renewal's four, and the missing *hand it back* is a refusal with a
+ * reason: banking a lost month's standing can leave a career holding no building and no open slot
+ * (`slotsOpen` answers 0 below standing zero, and four misses from day 1 bank −12), with no offer
+ * it may take and three losses still to go. Starting the month again keeps the building, so the
+ * career always has a day it can run.
+ */
+function lostNeed(tower: CampaignTower): TowerNeed {
+  return {
+    kind: 'lost',
+    title: 'The contract is lost',
+    due: 'answer before another day runs here',
+    brief:
+      `${contractLostSentenceOf(tower) ?? ''} No more of its days run. Starting the month again keeps the building on the same terms, from day 1 with the purse the month opened with, and counts as a lost contract: three lost and the career ends.`,
+    options: [
+      {
+        id: 'start-again',
+        label: 'Start the month again',
+        units: 0,
+        nights: 0,
+        when: 'day 1, as soon as you send it',
+        effect: 'The month starts again on these terms. The kit fitted in earlier months stays, this month’s bookings go, and the loss is counted.',
       },
     ],
   };
@@ -593,6 +652,8 @@ export function renewalAheadSentenceOf(
  * cannot produce.
  */
 export function needOf(tower: CampaignTower): TowerNeed | undefined {
+  /* A lost contract first: it is offered no renewal, whichever day it was lost on (§ D1392). */
+  if (contractIsLost(tower)) return lostNeed(tower);
   if (renewalIsDue(tower)) return renewalNeed(tower);
   if (wearHeadOf(tower) === 'due') return serviceNeed();
   return undefined;
@@ -743,15 +804,25 @@ export function applyCampaignAction(
        * month keeps it. It cannot be farmed by repeating the press: a grant row is written once per
        * purchase and this action writes none.
        */
-      return mapTower(career, action.towerId, (tower) => ({
-        ...tower,
-        difficultyId: action.difficultyId,
-        day: 1,
-        missed: 0,
-        carry: undefined,
-        bookings: [],
-        spends: [],
-      }));
+      return {
+        ...mapTower(career, action.towerId, (tower) => ({
+          ...tower,
+          difficultyId: action.difficultyId,
+          day: 1,
+          missed: 0,
+          missedDays: [],
+          carry: undefined,
+          bookings: [],
+          spends: [],
+        })),
+        /*
+         * **A lost month started again by a new difficulty is still a lost contract** — wave AO lane
+         * AO-5, § D1392. Without this the difficulty buttons were a free way to un-lose one: the
+         * desk's *Start the month again* counts the loss, and the same fresh month by another press
+         * may not cost less.
+         */
+        lost: lostOn(career, action.towerId) ? career.lost + 1 : career.lost,
+      };
     case 'press-tier':
       return pressTier(career, action.towerId, action.categoryId, action.level, schedule, shaftsOf);
     case 'pick-start':
@@ -769,6 +840,12 @@ export function applyCampaignAction(
     case 'file-day':
       return fileDay(career, action.towerId, action.verdict, action.trips);
   }
+}
+
+/** Whether the career's tower `towerId` holds a lost contract — § D1392's `set-difficulty` count. */
+function lostOn(career: CampaignCareer, towerId: string): boolean {
+  const tower = towerById(career, towerId);
+  return tower !== undefined && contractIsLost(tower);
 }
 
 function mapTower(
@@ -864,6 +941,8 @@ function fileDay(
   const tower = towerById(career, towerId);
   if (tower === undefined) return career;
   if (tower.day > CONTRACT_DAYS) return career;
+  /* A lost contract runs no more of its days (§ D1392): its clause 4, read where a day is filed. */
+  if (contractIsLost(tower)) return career;
   const worn =
     trips === undefined || !Number.isFinite(trips) || trips < 0 ? 0 : Math.round(trips);
   return {
@@ -871,6 +950,15 @@ function fileDay(
       ...current,
       day: current.day + 1,
       missed: verdict === 'missed' ? current.missed + 1 : current.missed,
+      /*
+       * **And which day it was** — the post-AN panel's seat C, D3, wave AO lane AO-5. The grid, the
+       * rolling calendar and the purse read each past day's own verdict through
+       * `economy.ts#missedDaysOf`; with only the count they drew every miss at the tail of the past.
+       * Read through that function here too, so a month whose list an older build left short is
+       * extended from what the views already drew rather than from a list that disagrees with them.
+       */
+      missedDays:
+        verdict === 'missed' ? [...missedDaysOf(current), current.day] : [...missedDaysOf(current)],
       trips: current.trips + worn,
     })),
     today: career.today + 1,
@@ -974,6 +1062,35 @@ function answerNeed(career: CampaignCareer, towerId: string, optionId: string): 
   if (option === undefined) return career;
   if (option.units > purseOf(tower)) return career;
 
+  if (need.kind === 'lost') {
+    if (option.id !== 'start-again') return career;
+    /*
+     * **The month starts again as it opened, and the loss is counted** — § D1392. The day, the
+     * misses and this month's bookings and answers go; the purse returns to what the month opened
+     * with (`carriedIn`, so a renewed building keeps the purse it carried in, where `set-difficulty`
+     * falls back to the difficulty's opening figure); the kit of earlier months, the top-ups, the
+     * rate and the wear stay with the building.
+     */
+    return {
+      ...career,
+      lost: career.lost + 1,
+      pendingBooking: undefined,
+      towers: career.towers.map((entry) =>
+        entry.id !== towerId
+          ? entry
+          : {
+              ...entry,
+              day: 1,
+              missed: 0,
+              missedDays: [],
+              carry: carriedIn(entry),
+              bookings: [],
+              spends: [],
+            },
+      ),
+    };
+  }
+
   if (need.kind === 'service') {
     if (option.id === 'leave') return career;
     const starts = startIsLegal(tower, dayIndexOf(tower), option.nights)
@@ -1039,6 +1156,7 @@ function answerNeed(career: CampaignCareer, towerId: string, optionId: string): 
             ...entry,
             day: 1,
             missed: 0,
+            missedDays: [],
             months: entry.months + 1,
             carry: purseOf(entry) - option.units,
             rate,

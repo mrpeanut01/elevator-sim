@@ -201,7 +201,13 @@ import {
   type SupportInput,
   type SupportRun,
 } from '../everyday/support.js';
-import { FIGURE_NOTE_HANDLE, everydayReportViewOf, REPORT_SECONDARY, WEEK_SHEET_STEP } from '../everyday/reportView.js';
+import {
+  FIGURE_NOTE_HANDLE,
+  everydayReportViewOf,
+  REPORT_SECONDARY,
+  UNMEASURED_WEEK_SHEET_STEP,
+  WEEK_SHEET_STEP,
+} from '../everyday/reportView.js';
 import {
   DAY_CLOSE_HEADING,
   DAY_CLOSE_WEEKEND_LINE,
@@ -335,6 +341,7 @@ import type { TowerShafts } from '../campaign/economy.js';
 import {
   applyCampaignAction,
   CAMPAIGN_ABSENCES,
+  contractLostSentenceOf,
   freshTower,
   openingCareer,
   RENEWAL_AHEAD_ON_SHEET_DAYS,
@@ -822,6 +829,9 @@ import { coachWeekLines, weekKeptLine } from '../shift/weekLabel.js';
 import {
   DAY_UNMEASURED_SENTENCE,
   dayStakeSentenceOf,
+  UNMEASURED_WEEK_CLOSED_LINE,
+  UNMEASURED_WEEK_HOUSE_LINE,
+  UNMEASURED_WEEK_SHEET_NOTE,
   WEEK_CLOSED_LINE,
   houseStandingOrder,
   weekDealOf,
@@ -3110,6 +3120,8 @@ const CAMPAIGN: SurfaceAdapter = {
   covers: [
     'campaign/judge.ts#judgeStage',
     'campaign/judge.ts#stageGoalNameOf',
+    /* Wave AO lane AO-5: the held-back crowds' sentence, which `judgeStage` composes for its holdout. */
+    'campaign/judge.ts#holdoutSentenceOf',
     'campaign/brief.ts#briefingFor',
     'campaign/failStates.ts#failStateReports',
     'campaign/failStates.ts#failStateCounts',
@@ -11420,6 +11432,12 @@ const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
      */
     'campaign/career.ts#RENEWAL_DUE_CELL',
     'campaign/career.ts#renewalAheadSentenceOf',
+    /*
+     * § D1392 (wave AO lane AO-5): a lost contract's sentence, read by the desk's brief, the contract
+     * sheet's bar and the day sheet's onward step. Seeded through the `lost` desk below and the
+     * career sheet's lost arm.
+     */
+    'campaign/career.ts#contractLostSentenceOf',
     'campaign/career.ts#BUILD_LABELS',
     'campaign/career.ts#openingCareer',
     'campaign/career.ts#freshTower',
@@ -11551,6 +11569,17 @@ const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
       /* § D1357: days 19 and 20 play, and the quiet desk says when the renewal falls due. */
       ['last-days', { ...first, today: 19, towers: [{ ...first.towers[0]!, day: 19 }] }, undefined, 'whole-run'],
       ['second-month', { ...second, openTowerId: 'c6' }, observations, 'whole-run'],
+      /* § D1392: day 20 closed at 4 of 3 missed, so the desk holds the loss and no renewal. */
+      [
+        'lost',
+        {
+          ...first,
+          today: CONTRACT_DAYS + 1,
+          towers: [{ ...first.towers[0]!, day: CONTRACT_DAYS + 1, missed: 4, missedDays: [14, 17, 18, 20] }],
+        },
+        undefined,
+        'whole-run',
+      ],
       ['booked', booked, observations, 'now'],
       ['picking-a-night', pending, undefined, 'whole-run'],
     ];
@@ -14914,6 +14943,14 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     'shift/weekStake.ts#WEEK_SHEET_NOTE',
     'shift/weekStake.ts#WEEK_SHEET_ROLL_LINE',
     'shift/weekStake.ts#WEEK_CLOSED_LINE',
+    /*
+     * § D1394 (wave AO lane AO-5): a week the census does not deal closes on Sunday on a sheet with no
+     * house. Seeded in `seedWeekStake` over St Jude Hospital's week played on the case's own readings.
+     */
+    'shift/weekStake.ts#UNMEASURED_WEEK_HOUSE_LINE',
+    'shift/weekStake.ts#UNMEASURED_WEEK_SHEET_NOTE',
+    'shift/weekStake.ts#UNMEASURED_WEEK_CLOSED_LINE',
+    'everyday/reportView.ts#UNMEASURED_WEEK_SHEET_STEP',
     'everyday/briefView.ts#BRIEF_WEEK_HEADING',
     /*
      * Wave AL, lane AL-F (§ D1226 to § D1230): the target's mark on the close that met it, the
@@ -15655,6 +15692,25 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
         if (view.tomorrow === undefined) continue;
         seeds.push({ field: `career.report.${label}.tomorrow.label`, text: view.tomorrow.label, role: 'label' });
         seeds.push({ field: `career.report.${label}.tomorrow.note`, text: view.tomorrow.note, role: 'prose' });
+      }
+      /* § D1392 (wave AO lane AO-5): the sheet of the day that lost the contract goes to the desk. */
+      const lostTower = { ...openingCareer('eta').towers[0]!, day: CONTRACT_DAYS + 1, missed: 4 };
+      const lost = everydayReportViewOf({
+        report: careerSheet,
+        previous: undefined,
+        overnight: undefined,
+        newerRunOnStage: false,
+        career: {
+          buildingName: careerBuilding,
+          day: CONTRACT_DAYS + 1,
+          canRunAnother: false,
+          renewalDue: false,
+          contractLost: contractLostSentenceOf(lostTower),
+        },
+      });
+      if (lost.tomorrow !== undefined) {
+        seeds.push({ field: 'career.report.lost.tomorrow.label', text: lost.tomorrow.label, role: 'label' });
+        seeds.push({ field: 'career.report.lost.tomorrow.note', text: lost.tomorrow.note, role: 'reason' });
       }
     }
 
@@ -18097,6 +18153,48 @@ function seedWeekStake(
     for (const row of sheet.rows) seeds.push({ field: `${at}.row(${row.weekday})`, text: row.line, role: 'observation' });
     const entry = continueWeekEntryOf(week, 'Midtown Office');
     if (entry !== undefined) seeds.push({ field: `${at}.continue`, text: entry.line, role: 'observation' });
+  }
+  /*
+   * § D1394 (wave AO lane AO-5): St Jude Hospital's week, which the census does not deal, closed on
+   * Sunday on the case's own readings, so its sheet, its seven rows and the entry back into it are
+   * drawn as a player meets them, with the three lines that stand in for the house.
+   */
+  {
+    let week = openWeek('c8');
+    for (let day = 1; day <= 7; day += 1) {
+      const dayIdx = (day - 1) % 7;
+      week = closeDay(
+        week,
+        outcomeOf({
+          record: null,
+          recordRefusal: null,
+          day,
+          dayIdx,
+          eventId: scheduledEventFor(null, day, dayIdx).id,
+          arrived: observations.arrived,
+          carried: observations.carried,
+          minutePct: observations.minutePct,
+          readings: readGoals(goalsForDay(day), observations),
+        }),
+      );
+      if (day < 7) week = nextDay(week);
+    }
+    const sheet = weekSheetOf(week, () => undefined);
+    if (sheet !== undefined) {
+      const at = 'week.sheet.unmeasured';
+      seeds.push({ field: `${at}.yours`, text: sheet.yoursLine, role: 'observation' });
+      seeds.push({ field: `${at}.house`, text: sheet.houseLine, role: 'reason' });
+      seeds.push({ field: `${at}.target`, text: sheet.targetLine, role: 'observation' });
+      seeds.push({ field: `${at}.note`, text: sheet.note, role: 'prose' });
+      for (const row of sheet.rows) seeds.push({ field: `${at}.row(${row.weekday})`, text: row.line, role: 'observation' });
+      const entry = continueWeekEntryOf(week, 'St Jude Hospital');
+      if (entry !== undefined) seeds.push({ field: `${at}.continue`, text: entry.line, role: 'observation' });
+    }
+    seeds.push({ field: 'week.unmeasured.house', text: UNMEASURED_WEEK_HOUSE_LINE, role: 'reason' });
+    seeds.push({ field: 'week.unmeasured.note', text: UNMEASURED_WEEK_SHEET_NOTE, role: 'prose' });
+    seeds.push({ field: 'week.unmeasured.closed', text: UNMEASURED_WEEK_CLOSED_LINE, role: 'prose' });
+    seeds.push({ field: 'week.unmeasured.sheetStep.label', text: UNMEASURED_WEEK_SHEET_STEP.label, role: 'label' });
+    seeds.push({ field: 'week.unmeasured.sheetStep.note', text: UNMEASURED_WEEK_SHEET_STEP.note, role: 'prose' });
   }
   /*
    * Lane AL-F (§ D1226, § D1228): the week closed day by day on the case's own readings, so the

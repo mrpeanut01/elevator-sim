@@ -529,6 +529,26 @@ describe('what this screen adds on top of the sheet', () => {
     expect(viewOf({ career: CAREER }).tomorrow?.note).toBe('Runs the next day of this contract. You stay in the career.');
   });
 
+  /*
+   * The post-AN panel's seat C, D2, wave AO lane AO-5, § D1392: the sheet of the day that spends the
+   * allowance goes to the desk, where the month is started again, and never to a renewal a lost
+   * contract is not offered. The sentence is `campaign/career.ts#contractLostSentenceOf`'s.
+   */
+  it('sends a lost contract to the desk, ahead of a renewal and of the next day — § D1392', () => {
+    const lost = '4 days missed, and standard allows 3, so this contract is lost.';
+    for (const career of [
+      { ...CAREER, day: 21, canRunAnother: false, renewalDue: false, contractLost: lost },
+      { ...CAREER, day: 9, canRunAnother: false, renewalDue: false, contractLost: lost },
+    ]) {
+      const step = viewOf({ career }).tomorrow;
+      expect(step?.goes).toBe('career-desk');
+      expect(step?.label).toBe('Open the desk at Garden Apartments');
+      expect(step?.note).toContain(lost);
+      expect(step?.note).toContain('No more of its days run');
+      expect(step?.label).not.toContain('renewal');
+    }
+  });
+
   it('leaves every non-career caller on the daily arm — #577’s other polarity', () => {
     // Passing nothing is *this is not a career day*, which is what the corpus, the replay and the
     // daily loop all do. A repair that had made the career arm the default would fail here.
