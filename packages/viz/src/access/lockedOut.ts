@@ -60,10 +60,14 @@
  * `unservedFloorIds` is a fact about its geometry, and `dev/main.ts` already derives both for
  * `drawScene` rather than the renderer reaching for them. § 10.4 names
  * `VizLeg.credentialGroup` as *"the one genuine contract widening U8 needs"*, and one is what it
- * got. The consequence is stated rather than hidden: a recording **loaded from a file** for a
- * building this build does not ship carries no access zoning, so the caller passes an empty list
- * and this function claims nothing. Silence is the right answer there; an inference would not
- * be.
+ * got. The consequence was stated rather than hidden: a recording **loaded from a file** for a
+ * building this build does not ship carried no access zoning, so the caller passed an empty list
+ * and this function claimed nothing.
+ *
+ * **Since recording version 17 the recording carries the zones too** (`VizRecording.accessZones`,
+ * GitHub issue #544, `DECISIONS.md` § D1307), for the stage's standing `⚿` mark. The list stays an
+ * input here, so every caller's answer is what it was; a caller holding only a file can now pass
+ * the zones' `floorIds` rather than an empty list.
  *
  * ## Why the origin floor and not the credential alone
  *

@@ -54,6 +54,7 @@ import type {
   ServiceLevelVerdict,
   SimTime,
   SimulationStatus,
+  TransportModeKind,
 } from '@elevator-sim/core/browser';
 
 /**
@@ -83,6 +84,7 @@ import type {
  * | 14 | {@link VizRecording.bankEquipment} added — what each bank was fitted with when it is not the default, read off the resolved building the run was simulated on through `core`'s `energyConventionOf` (`DECISIONS.md` § D539, and GitHub PR #515's review finding L1). The Day report's before/after block reads it as `shift/report.ts#ReportBasis.equipment`, so the energy rows of two runs priced on different scales are refused rather than paired. Absent on every shipped building, so a shipped run's recording differs from version 13's in this number and nothing else. |
  * | 15 | {@link VizBankEquipment.ropeMassKg} added — the rope moving with each of a bank's cars, when the bank declares a rope class (`DECISIONS.md` § D583, GitHub issue #433). Optional, and absent on every shipped building, so a version-14 recording reads as a version-15 one with no rope modelled. The bump is because the equipment axis is a **pairing key**: without this field two runs of one building roped differently carry identical `bankEquipment` entries, and the Day report's before/after block would pair their energy rows although the two were priced on different scales — which is exactly the defect GitHub PR #515's review found and version 14 was added to close. |
  * | 16 | {@link VizLeg.journeyStartedAt}, {@link VizLeg.journeyOriginFloorId} and {@link VizLeg.journeyDestinationFloorId} added — the generator's own arrival, origin and destination on a first leg whose lift ride begins or ends away from them, because the route opened or closed with an escalator (GitHub issue #605, `DECISIONS.md` § D1075). **Its consumer lands in the same change**: `src/record/crowd.ts` keys the crowd on them, because a zoning edit on `vertical-city` moved riders' first lift legs from `2` to `G` and 21.2 s earlier without moving one of the 649 people the generator issued, and the same-crowd check the fix-it press runs refused the pair. Optional, and absent on every leg of every building that declares no transport mode, so a version-15 recording of such a building differs from a version-16 one in this number and nothing else. |
+ * | 17 | {@link VizRecording.accessZones} and {@link VizRecording.transportModes} added — the building's declared access zones and its escalators and stairs, so the stage can draw where a credential decides who rides and where the floors are joined by something other than a lift (GitHub issue #544, `DECISIONS.md` § D1307). **Its consumers land in the same change**: `src/render/buildingMarks.ts` turns both into the floor gutter's `⚿` and `⇅`/`⋰` marks, which `render/canvas.ts#drawFloors` and `everyday/cutaway.ts` draw, and `render/describeFrame.ts` says both in a sentence. Until this version the only access fact a recording carried was the per-leg outcome (`credentialGroup`, `refusedAt`), so a restricted floor nobody had yet called from showed nothing. Optional, and each is absent when the building declares none, so a version-16 recording of such a building differs from a version-17 one in this number and nothing else. |
  *
  * ## What version 4 fixed, measured rather than predicted
  *
@@ -115,7 +117,7 @@ import type {
  * a recording arrives from somewhere other than this build and the versions genuinely can
  * disagree (`UX.md` `PB-07`/`PB-15`).
  */
-export const VIZ_SCHEMA_VERSION = 16;
+export const VIZ_SCHEMA_VERSION = 17;
 
 /* -------------------------------------------------------------------------- *
  * Geometry
@@ -992,8 +994,73 @@ export interface VizRecording {
    * rows (GitHub PR #515's review finding L1). It moves no leg, and nothing that draws a leg reads it.
    */
   readonly bankEquipment?: readonly VizBankEquipment[] | undefined;
+  /**
+   * **The building's access zones, as declared** — version 17, GitHub issue #544, `DECISIONS.md`
+   * § D1307. One entry per zone, in the building's own zone order.
+   *
+   * The standing fact the stage had no way to draw. Before this field the only access facts a
+   * recording carried were outcomes on a leg (`VizLeg.credentialGroup`, `VizLeg.refusedAt`), so the
+   * stage could mark a landing whose call had already been refused (`▩`) and could not mark a
+   * restricted floor nobody had yet called from. `render/buildingMarks.ts` reads this for the gutter's
+   * `⚿` and `render/describeFrame.ts` for its sentence.
+   *
+   * **A field of the recording, never a flag on {@link VizFloor}.** Access zoning is a property of a
+   * credential against a floor, and `CLAUDE.md` forbids collapsing it into the floor's geometry
+   * (service zoning) or into a dispatcher's strategy (operational zoning). Carrying the zones whole,
+   * with the groups they admit, is what lets a reader say *who* may ride to a floor rather than only
+   * that somebody may not.
+   *
+   * **Absent when the building declares none**, which is most shipped buildings, and written as
+   * absent rather than `[]` or an explicit `undefined`, so such a building's recording is the
+   * version-16 recording with a different version number.
+   */
+  readonly accessZones?: readonly VizAccessZone[] | undefined;
+  /**
+   * **The building's escalators and stairs** — version 17, GitHub issue #544, `DECISIONS.md` § D1307.
+   * One entry per non-lift edge of the routing graph, in authored order.
+   *
+   * `core` routes riders over these (`traffic/route.ts`) and the stage drew nothing for them, so a
+   * player watching `vertical-city` saw riders appear at floor `2` with no lift having carried them
+   * there. `render/buildingMarks.ts` reads this for the gutter's `⇅` (escalator) and `⋰` (stairs),
+   * and `render/describeFrame.ts` for its sentence.
+   *
+   * **Absent when the building declares none**, written as absent for {@link accessZones}'s reason.
+   */
+  readonly transportModes?: readonly VizTransportMode[] | undefined;
   /** Non-fatal diagnostics from the run, for the viewer's warning strip. */
   readonly warnings: readonly string[];
+}
+
+/**
+ * One access zone on {@link VizRecording.accessZones} — `core`'s `AccessZone`, without its comment.
+ *
+ * Copied rather than referenced because a recording is serialisable and self-sufficient: a reader
+ * holding only the file can say which floors a credential decides, with no building document beside
+ * it.
+ */
+export interface VizAccessZone {
+  /** The zone's id, as the building declares it. */
+  readonly id: string;
+  /** The floors the zone covers, in the building's floor order. */
+  readonly floorIds: readonly string[];
+  /** The credential groups permitted to ride to those floors, in declared order. */
+  readonly credentialGroups: readonly string[];
+}
+
+/**
+ * One escalator or stair on {@link VizRecording.transportModes} — `core`'s `TransportModeConfig`,
+ * cut to what the stage draws.
+ *
+ * The traversal time and a stair's use propensity are deliberately not copied: nothing in this
+ * package reads them, and a field with no consumer is this repository's signature defect.
+ */
+export interface VizTransportMode {
+  /** The mode's id, as the building declares it. */
+  readonly id: string;
+  /** `escalator` or `stairs`, resolved: an authored mode with no `kind` is an escalator. */
+  readonly kind: TransportModeKind;
+  /** The two floors it joins, lower first by the building's floor order. */
+  readonly floorIds: readonly [string, string];
 }
 
 /**

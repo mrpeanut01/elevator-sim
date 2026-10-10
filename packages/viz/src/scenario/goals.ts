@@ -27,7 +27,7 @@
  * | `answer-the-demand` | per-replication | `personsPer5Min >= offeredPer5Min` — § 3.5's paired bar, both halves |
  * | `long-waits-under` | per-replication | `waiting.pctOverLongWait <= threshold` |
  * | `beat-the-baseline` | batch-only | a paired-t interval on a **difference between two arms**. There is no predicate over one replication to take a rate of; R2 already makes it a batch goal and no measurement here can change that |
- * | `everyone-can-get-there` | blocked | § 10.4: `VizLeg` carries no `credentialGroup`, so the recording cannot distinguish *"nobody came"* from *"nobody may come"*. § 5.2's table says it is checkable and § 10.4 says it is not; **§ 10.4 matches the code.** Blocked on W7 |
+ * | `everyone-can-get-there` | blocked | The recording **can** tell *"nobody came"* from *"nobody may come"*: `VizLeg.credentialGroup` landed at version 6, `VizLeg.refusedAt` with § D266, and the zones themselves at version 17. What is missing is one level up: {@link BatchReplication}, which every predicate here reads, carries no count of riders turned away for want of a credential, so there is nothing for a predicate to read. § 10.4's *"matches the code"* was true when written and stopped being true at version 6; `goalBlocker.test.ts` checks {@link GOAL_BLOCKER}'s sentence against an access-zoned day so it cannot go stale that way again (§ D1308) |
  *
  * ## Why the predicates read a {@link BatchReplication} and not a `RunSummary`
  *
@@ -68,9 +68,8 @@ export type GoalKind = (typeof GOAL_KINDS)[number];
  *
  * - `per-replication` — there is a predicate over one run, so there is a pass rate to measure.
  * - `batch-only` — the claim is about a *difference between arms*. No single run answers it.
- * - `blocked` — the recording does not carry the fact. Named, with its blocker, rather than
- *   quietly dropped: § 5.2's table and § 10.4 contradict each other and § 10.4 is the one that
- *   matches the code.
+ * - `blocked` — what a predicate reads does not carry the fact. Named, with its blocker, rather
+ *   than quietly dropped: see {@link GOAL_BLOCKER} for which fact, and where it stops.
  */
 export type GoalJudgement = 'per-replication' | 'batch-only' | 'blocked';
 
@@ -112,13 +111,18 @@ export const GOAL_BLOCKER: Readonly<Record<GoalKind, string | null>> = {
    * copy at the render site would have been the classic two-answers defect: the sweep would go on
    * checking a sentence nobody sees.
    *
-   * The claim itself is unchanged and is still the one that matches the code, which is the half
-   * that had to survive the rewrite: the recording carries no credential on a leg.
+   * **The claim is restated, because it had stopped being true** ([§ D1308](../../../../DECISIONS.md),
+   * the swarm's AP-4 ruling). It read *"A recording carries no credential on a leg"*, and a
+   * recording has carried one since version 6: on stage 5's building every leg of a day does, and
+   * the riders the building turned away carry `refusedAt` beside it. The goal is still not judged,
+   * for a narrower reason the sentence now states: the run totals a goal is judged on
+   * (`batch/types.ts#BatchReplication`) leave that count out. `goalBlocker.test.ts` runs an
+   * access-zoned day and checks both halves against it, so the next time the reason moves this
+   * sentence goes red rather than stale.
    */
   'everyone-can-get-there':
-    'Not judgeable from what a run records. A recording carries no credential on a leg, so it ' +
-    'cannot tell a call nobody answered from a call nobody was allowed to answer — and scoring ' +
-    'the second as though it were the first is exactly the wrong number this goal exists to catch.',
+    'Not scored. A run does record each rider the building turned away for want of a credential, ' +
+    'but the run totals a goal is judged on leave that count out, so this goal has nothing to read.',
   'beat-the-baseline': null,
 };
 

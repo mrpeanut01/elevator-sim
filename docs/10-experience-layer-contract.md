@@ -893,6 +893,14 @@ frequency, which § 3.4 says lay readers read well.
 > (§ 10)"; § 10.4 says the recording carries no `credentialGroup` on a `VizLeg` and so cannot
 > distinguish *"nobody came"* from *"nobody may come"*. § 10.4 matches the code. The goal is
 > **blocked on W7**, not available now.
+>
+> **Corrected 2026-10-10 ([§ D1308](../DECISIONS.md)): the recording half stopped being true at
+> version 6.** A leg carries its credential (`VizLeg.credentialGroup`), a rider the building turned
+> away carries `refusedAt` (§ D266), and since version 17 the recording carries the zones
+> themselves, so a recording can tell the two apart. The goal is still not scored, for a narrower
+> reason: the per-run figures every goal predicate reads (`batch/types.ts#BatchReplication`) carry
+> no count of riders turned away. `scenario/goalBlocker.test.ts` checks the player's sentence
+> against an access-zoned day.
 
 > **Measured on all seven stages 2026-07-29 — and the "Judged on" column is now wrong in one
 > direction on every row.** W9 landed R12's mechanism: `data/scenario-goals.json` carries every

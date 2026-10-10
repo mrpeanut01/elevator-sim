@@ -12250,6 +12250,11 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
      */
     'everyday/stageScreenModel.ts#STAGE_PRESS_CHANGED_NOBODY',
     /*
+     * GitHub issue #571, § D1310: the handover row's line when a handover moved riders and no goal's
+     * verdict. Seeded below through `stageInterventionsOf` with a judged handover handed in.
+     */
+    'everyday/stageScreenModel.ts#STAGE_HANDOVER_GOALS_AGREE',
+    /*
      * GitHub issue #338: the sentence a handover row carries when its target cannot travel to a
      * board, drawn before the press. Rendered below on a hand-tuned target, which is the one
      * arm that produces it.
@@ -12648,6 +12653,37 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
         seeds.push({
           field: `stage.intervene(unchanged).${arm.change.kind}.note`,
           text: arm.note,
+          role: 'observation',
+        });
+      }
+    }
+    /*
+     * **The handover row's line after the fact** — GitHub issue #571, [§ D1310](../../../../DECISIONS.md).
+     * Drawn only once the stage has judged a handover's pair: § D1278's sentence when nobody's trip
+     * moved, and the goals line, at the day's end, when trips moved and no goal's verdict did. Reached
+     * by handing the model each verdict over a log whose latest entry is the handover, at the
+     * recording's last instant so the second is drawn. `observation`, for § D1278's reason.
+     */
+    if (driving !== undefined && elsewhere !== undefined) {
+      const handover: RunInterventionConfig = {
+        atS: recording.startedAt,
+        change: { kind: 'adopt-dispatcher', profile: elsewhere },
+      };
+      for (const outcome of ['unchanged', 'agrees'] as const) {
+        const judged = stageInterventionsOf({
+          interventions: [handover],
+          simTimeS: recording.endedAt,
+          hasRun: true,
+          dayClosed: false,
+          recomputing: false,
+          switchTo: { target: elsewhere, driving: () => elsewhere },
+          handoverVerdict: { press: handover, outcome, dayEndS: recording.endedAt },
+        });
+        const row = judged.rows.find((arm) => arm.change.kind === 'adopt-dispatcher');
+        if (row?.note === undefined) continue;
+        seeds.push({
+          field: `stage.intervene(handover-${outcome}).adopt-dispatcher.note`,
+          text: row.note,
           role: 'observation',
         });
       }

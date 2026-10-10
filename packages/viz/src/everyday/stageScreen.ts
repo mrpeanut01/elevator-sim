@@ -116,6 +116,9 @@ import {
   stageLegend,
   stageMayAdopt,
   stageOpeningLineOf,
+  STAGE_OVERLAY_PLAY,
+  stageHandoverVerdictOf,
+  type StageHandoverVerdict,
   stagePressChangedNobody,
   stageShowsOpening,
   stageSkipViewOf,
@@ -487,6 +490,12 @@ function mountStage(
    */
   let pendingPress: RunInterventionConfig | undefined;
   let pressChangedNobody: RunInterventionConfig | undefined;
+  /**
+   * **The last handover, judged when its day landed** — GitHub issue #571,
+   * [§ D1310](../../../../DECISIONS.md). `stageScreenModel.ts#stageHandoverVerdictOf` reads the same
+   * pair {@link adopt} hands § D1278's comparator, and every adoption rewrites it for the same reason.
+   */
+  let handoverVerdict: StageHandoverVerdict | undefined;
   /** What the parking note last said, so a frame that changes nothing writes nothing. */
   let parkingNoteSaid = '';
   /** What § 14.1's band was last drawn for — see {@link drawWatching}. `''` while it is down. */
@@ -1004,7 +1013,8 @@ function mountStage(
   ].join(';');
   const statusText = el(doc, 'p', 'everyday-stage-status-text');
   statusText.style.cssText = `margin:0;color:${C.inkSoft};font-size:13px;max-width:44ch`;
-  const startButton = el(doc, 'button', 'everyday-stage-start', 'Start');
+  /* § D1309, GitHub issue #573: a playback verb, so the brief's `Start the day` is the one start. */
+  const startButton = el(doc, 'button', 'everyday-stage-start', STAGE_OVERLAY_PLAY);
   startButton.type = 'button';
   startButton.style.cssText = [
     `background:${C.sun}`,
@@ -2398,6 +2408,23 @@ function mountStage(
       stagePressChangedNobody({ before: recomputingOver, after: recording, press })
         ? press
         : undefined;
+    /*
+     * § D1310 — GitHub issue #571. A handover is judged on the same pair, and on the goals as well:
+     * the strip's own list, read at each day's end. Any other press or adoption clears it.
+     */
+    const handover =
+      press !== undefined && press.change.kind === 'adopt-dispatcher' && recomputingOver !== undefined
+        ? stageHandoverVerdictOf({
+            before: recomputingOver,
+            after: recording,
+            press,
+            goals: host.goalsAt(recording.endedAt).map((reading) => reading.goal),
+          })
+        : undefined;
+    handoverVerdict =
+      press !== undefined && handover !== undefined
+        ? { press, outcome: handover, dayEndS: recording.endedAt }
+        : undefined;
     adopted = recording;
     recomputingOver = undefined;
     barFacts.recomputing = false;
@@ -2770,6 +2797,7 @@ function mountStage(
       recomputing: recomputingOver !== undefined,
       ...(target === undefined ? {} : { switchTo: target }),
       ...(pressChangedNobody === undefined ? {} : { pressChangedNobody }),
+      ...(handoverVerdict === undefined ? {} : { handoverVerdict }),
     });
     applySwitchRow(view, sharedRefusalOf(view, watchingNow()) ?? callHeld());
     applyParkingRows(view);
@@ -3148,6 +3176,7 @@ function mountStage(
       recomputing: recomputingOver !== undefined,
       ...(target === undefined ? {} : { switchTo: target }),
       ...(pressChangedNobody === undefined ? {} : { pressChangedNobody }),
+      ...(handoverVerdict === undefined ? {} : { handoverVerdict }),
     });
     /* Written only when the stamp changes — {@link stampSaid}, `AX-3`. */
     if (intervention.stamp !== stampSaid) {

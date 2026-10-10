@@ -16259,6 +16259,10 @@ one was not.
 
 ## D234 — four things the product said about itself that were not true, and one it could not show
 
+> **Status 2026-10-10: AMENDED by [§ D1308](#d1308).** The claim the #25 rewrite kept, *a recording
+> carries no credential on a leg*, stopped being true at recording version 6; the sentence now names
+> the narrower gap. See [`docs/39`](docs/39-decisions-in-force.md).
+
 **Date: 2026-08-05 · Written after the code.** Play-test issues #27, #36, #37 and #69. They arrived
 as four unrelated reports and are one entry because the same rule settles all four: **a surface may
 not make a claim the run underneath it does not keep** — and the fourth adds a corollary the others
@@ -49206,6 +49210,10 @@ onward label, green after, with day 18 still running as the control arm.
 
 ## D1278 — a parking press that changed nobody's trip says so on the stage, after the press, from the run it made
 
+> **Status 2026-10-10: AMENDED by [§ D1310](#d1310).** The handover arm draws this sentence too when
+> a handover changed nobody's trip, and a second line when it changed trips and no goal's verdict.
+> See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-10-10 by an agent session under delegated authority** (wave AN, lane AN-3, GitHub
 > issue [#588](https://github.com/mrpeanut01/elevator-sim/issues/588)), carrying out the route
 > [§ D949](#d949) itself names. It is not the product owner's. **Owner-reversible**: the sentence's
@@ -49648,3 +49656,168 @@ swarm, and nothing here changes it.
 `everyday/today.test.ts` (*the eyebrow numbers a census tower's week*), `everyday/weekView.test.ts`
 (*the week's number on Your week*) and `shift/dayClose.test.ts` (the headings). Each was red on the
 base sources and is green after.
+
+---
+
+## D1307 — recording version 17 carries the building's access zones, escalators and stairs, and both stages mark them
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (wave AN, lane AP-4, GitHub
+> issue [#544](https://github.com/mrpeanut01/elevator-sim/issues/544)), building swarm DP's ruling,
+> which is not the product owner's. **Owner-reversible**: each glyph (`⚿`, `⇅`, `⋰`, one constant
+> each in `render/buildingMarks.ts`); drawing on the § 7 stage as well as the Engineer schematic;
+> and the access sentence naming floors rather than credential groups.
+
+**Why an entry.** [§ D405](#d405)'s first and second grounds: it widens the recording contract every
+renderer reads, and it adopts the handoff's `⚿` badge, which wave 10's stage lane refused
+(`WAVE10_PLAN.md` § 6) and later records cite as refused ([§ D181](#d181), `docs/10` W8, the
+editor's access block in `index.html`).
+
+**The swarm.** BUILD-NOW, two to one: S1 and S3 build it now; S2 would wait until Career cards make
+towers with escalators or access zones prominent. Settled by S3's count of the shipped buildings
+that carry the blocks, which reach players: access zones on `crown-hotel`, `mixed-use-high-rise`,
+`secure-tower`, `st-jude-hospital` and `vertical-city` (campaign stages 4, 5, 6, 9 and 10), escalators
+on `vertical-city` (stage 6), `one-wtc-class-reference` and `willis-class-reference` (contracts c14
+and c16), and a stair on `st-jude-hospital`.
+
+**Decision.**
+
+1. **Version 17 adds two optional fields** to `VizRecording`: `accessZones` (each zone's id, its
+   floors in the building's order, and the credential groups it admits) and `transportModes` (each
+   escalator or stair, its kind resolved, its two floors lower first). `record/recordRun.ts` reads
+   both off the resolved building the run was simulated on, and writes each as absent when the
+   building declares none, so a building with neither block records what version 16 recorded.
+2. **The gutter marks them, on both painters.** `⚿` on a floor inside any zone, `⇅` on a landing an
+   escalator serves (the casual handoff's own mark), `⋰` on a landing a stair serves. The ruling
+   named `render/canvas.ts#drawFloors`, which is the Engineer schematic; the stage a player plays
+   on is `everyday/cutaway.ts`, so it draws them too, from the same module.
+3. **`⚿` is fed by the zone list, never by a flag on the floor**, which is the ground wave 10
+   refused it on, kept. `⊘` (no shaft reaches the floor), `⚿` (a credential decides who may ride
+   to it) and `▩` (a call there went unserved because of a credential, in this run) stay three
+   marks for three facts.
+4. **The text alternative says both** (`render/describeFrame.ts`): which floors the zones cover,
+   with `core`'s own rule that access is asked of the floor a rider rides *to*, and which floors
+   each escalator or stair joins. It claims nothing about who used them.
+
+**Measured first.** On `secure-tower` (stage 5) at 600 s, every leg of three seeds carries a
+credential (173 of 173, 150 of 150, 205 of 205), and the legs turned away carry `refusedAt`, equal
+in number to `core`'s `conservation.accessRefused` (3, 4 and 3) and the same count under four
+dispatchers; a refused call can be told from an unanswered one in the recording, as
+`access/lockedOut.ts` already does.
+
+**Pinned by runs.** `render/buildingMarks.test.ts`: stage 5's recording carries its five zones and
+stage 6's its four escalators; each painter marks exactly the zoned or served labelled floors and
+no other; the same recording with its zones deleted draws no `⚿`; the stair draws `⋰` and not
+`⇅`; the § 7 stage roofs exactly the express banks' wells on stage 6's tower; the text alternative
+carries both sentences; and Garden Apartments and Midtown Office record neither key. Red before
+(11 of 18 cases), green after (18 of 18).
+
+5. **And the express mark reaches the § 7 stage.** [§ D624](#d624)'s roof mark was drawn on the
+   Engineer schematic only. `expressBankIdsOf` moves from `render/canvas.ts` to
+   `render/buildingMarks.ts`, and the cutaway draws the same triangle at the top of each express or
+   shuttle bank's well, so all three of #544's facts are on the stage a day is played on.
+
+## D1308 — the reason *everyone can reach their floor* is not scored is restated, because the one it gave stopped being true at recording version 6
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (wave AN, lane AP-4, swarm DP's
+> AP-4 ruling on the `everyone-can-get-there` blocker). It is not the product owner's.
+> **Owner-reversible**: the sentence's wording, and keeping the goal unscored rather than lifting
+> the blocker.
+
+**Why an entry.** [§ D405](#d405)'s second ground: it moves a claim [§ D234](#d234) kept on purpose
+(*"the claim was never the problem"*) and `docs/10` § 5.2 and § 10.4 repeat, and it changes a
+sentence the published goal table carries on every stage.
+
+**The defect.** `scenario/goals.ts#GOAL_BLOCKER['everyone-can-get-there']` told players *"A
+recording carries no credential on a leg, so it cannot tell a call nobody answered from a call
+nobody was allowed to answer"*. Version 6 added `VizLeg.credentialGroup` for exactly that
+distinction, § D266 added `refusedAt`, and on stage 5's building every leg of a day carries a
+credential. S3 flagged it as a possible stale refusal ([§ D227](#d227)).
+
+**Decision: the sentence states the real remaining gap, and the goal stays unscored.** It now reads
+*"Not scored. A run does record each rider the building turned away for want of a credential, but
+the run totals a goal is judged on leave that count out, so this goal has nothing to read."* Every
+goal predicate reads a `BatchReplication`, and it carries no refusal count. Lifting the blocker was
+the ruling's other branch and is not taken: it would need that field, a per-run predicate and a
+regeneration of the goal table, and on every zoned building measured the count is set by the
+building's zones and § D265's credential gap, the same under four dispatchers on every cell, so
+R12 would publish it as a fact about the configuration rather than as a goal.
+
+**The published table moves with it.** `data/scenario-goals.json` was regenerated rather than
+edited (`ELEVATOR_SIM_REGENERATE_GOAL_RATES=1`, 220 s): twelve string replacements and not one
+moved count. That file is an input to the survivor census's hash, so
+`scenario/survivorInputs.test.ts` is red until `data/scenario-survivors.json` is regenerated; the
+wave's survivor regeneration on the integrated head absorbs it, and the census reads no reason
+string, so only its stored input hash should move on this account.
+
+**Pinned by a run.** `scenario/goalBlocker.test.ts` runs stage 5's building and checks the sentence
+against it: it may not claim legs carry no credential while they do; the run's `refusedAt` legs
+equal `core`'s count and are more than none; and the shipped batch runner's replication for the
+same building has no field for that count. Red before (3 of 5), green after (5 of 5).
+
+## D1309 — the stage overlay's button says `Play`, and the building row returns to the guide's *Run the day*
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (wave AN, lane AP-4, swarm DP's
+> fold of GitHub issue [#573](https://github.com/mrpeanut01/elevator-sim/issues/573), option (a)).
+> It is not the product owner's. **Owner-reversible**, and it is the owner's question 17: the
+> overlay's word (`everyday/stageScreenModel.ts#STAGE_OVERLAY_PLAY`, one constant).
+
+**Why an entry.** [§ D405](#d405)'s first ground: it deviates from the handoff's `Start` on § 7.3
+and retires the building row's registered deviation, both read by documents this lane does not own.
+
+**The swarm.** Unanimous for option (a). S2: the transport already says `Play` and the overlay does
+the same thing, so one verb for one act; `Start the day` now truly starts the scored attempt
+([§ D1218](#d1218)) and keeps *start*. S3: the guide backticks both words, so the collision is the
+guide's; restore *Run the day* and derive item 6 from the rows.
+
+**Decision.** The overlay says `Play`. The building row's first two variants are the guide's
+*Run the day and decide as it goes* and *Run the day with that* again, retiring #569 item 6's *Open
+the day…*. `firstTwoMinutes.browser.test.ts` item 6 is raised to the issue's criterion, **no
+stage-reaching primary shares a verb with the overlay**, read off the drawn overlay and derived
+from `actionBar.ts`'s table (`everyday/overlayVerb.test-helper.ts`): every variant sharing the verb
+is a candidate, and only the six rows whose press lands short of the stage are written down, each
+with its handler; `actionBar.test.ts` asserts the same against the constant in both directions.
+`docs/12` § 4.20 registers it.
+
+**Pinned.** With the overlay at `Start` the derived check is red on `Start the day`, `Start the
+rush`, `Start the month again` and both `Start playing` rows; at `Play` it is green, and every
+register row still says `Play`.
+
+**Not established.** The six register rows are cited by handler; the browser case drives the
+building's press only, not each of the six.
+
+## D1310 — the handover row says when a handover changed nobody's trip, and when it changed trips and no goal
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (wave AN, lane AP-4, swarm DP's
+> fold of GitHub issue [#571](https://github.com/mrpeanut01/elevator-sim/issues/571) into AN-3's
+> later pass). It is not the product owner's. **Owner-reversible**: the goals line's wording;
+> drawing it only from the day's end; and withholding it when a reading was not graded.
+
+**Why an entry.** [§ D405](#d405)'s second ground: it moves [§ D1278](#d1278)'s owner-reversible
+clause *"leaving the handover arm … without the line"*.
+
+**The swarm.** Unanimous BUILD-NOW. The lines are S3's (the legs line, § D1278's comparator) and S2's
+(a goals line when the legs differ and every reading agrees); nothing is drawn when a reading
+changes. S1 would also offer two opening contracts; that is the owner's question 7, and its default
+stands (tell the player, keep one opener).
+
+**Decision.** When a handover's re-simulated day lands, `everyday/stageScreen.ts#adopt` judges the
+pair once with `stageScreenModel.ts#stageHandoverVerdictOf`. Identical legs (and somebody still
+travelling at the press) draw § D1278's own sentence on the handover row from the press on.
+Different legs with every goal on the strip landing on the same side of its bar on both days, read
+at each day's end through the strip's own fold, draw *"That handover changed who rode which car,
+and every goal on the strip came out as it did on the day without it."*, from the day's end on,
+because met-or-missed is a verdict and [§ D371](#d371) draws none before then. A goal that flips,
+or a reading not graded on either day, draws nothing. Either line stands while the handover is the
+latest press. No mechanism is offered ([§ D256](#d256)), and no dispatcher is ordered: one day on
+one seed.
+
+**Measured.** On `c1` day 1 (the career's crowd for that day, from three base seeds), `collective`
+handing to `nearest-car` or `eta` at 28 % of the shift moved the legs and agreed on every goal in 6
+of 6 pairs. On `midtown-office` 900 s with the press at 45 s, 24 of 27 pairs agreed; the three that
+did not are day 7's handovers to `nearest-car`, where *carry* goes from met to missed. On Garden
+Apartments at 900 s, `collective` to `eta` changes nobody's trip.
+
+**Pinned by runs.** `everyday/stageHandoverVerdict.test.ts`: the `c1` handover draws the goals line
+at the day's end and not before; the Midtown day-7 handover draws neither line, and on that pair the
+carry goal alone withholds it while the energy goal alone agrees; the Garden Apartments handover to
+`eta` draws § D1278's line, and a later press withdraws it.

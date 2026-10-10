@@ -13,6 +13,7 @@
 import type { Frame, VizRecording } from '../contract/types.js';
 import type { FloorQueue } from '../frame/overlay.js';
 import { WAIT_BANDS } from '../live/bands.js';
+import { expressBankIdsOf, floorMarksOf } from '../render/buildingMarks.js';
 import { carRestsAt } from '../render/carRest.js';
 import type { Canvas2DLike } from '../render/canvas.js';
 import {
@@ -118,6 +119,13 @@ export function drawCutaway(ctx: CanvasRenderingContext2D, input: CutawayInput):
   ctx.beginPath();
   ctx.rect(g.plot.x, g.plot.y, g.plot.width, g.plot.height);
   ctx.clip();
+  /*
+   * The building's own marks after the number — `⚿` where a credential decides who may ride, `⇅`/`⋰`
+   * where an escalator or a stair serves the landing. GitHub issue #544, § D1307: decided in
+   * `render/buildingMarks.ts`, which the Engineer schematic reads too, so the two pictures spell each
+   * fact once. Empty on a building that declares neither, so its gutter is what it was.
+   */
+  const marks = floorMarksOf(recording);
   for (const row of g.rows) {
     if (!row.visible) continue;
     ctx.fillStyle = row.isEntrance ? C.ruleMid : C.ruleLight;
@@ -127,10 +135,17 @@ export function drawCutaway(ctx: CanvasRenderingContext2D, input: CutawayInput):
     ctx.font = `600 ${String(Math.min(11, Math.max(8, g.rowPitch * 0.45)))}px ${TYPE.mono}`;
     ctx.textBaseline = 'bottom';
     ctx.textAlign = 'left';
-    ctx.fillText(input.floorLabelOf(row.floorId), g.plot.x + 4, row.y - 1, g.gutterWidth - 8);
+    ctx.fillText(
+      `${input.floorLabelOf(row.floorId)}${marks.get(row.floorId) ?? ''}`,
+      g.plot.x + 4,
+      row.y - 1,
+      g.gutterWidth - 8,
+    );
   }
 
   /* --- The wells. A void is lighter than the building around it, per § 7.2. --- */
+  const express = expressBankIdsOf(recording);
+  const bankOf = new Map(recording.shafts.map((shaft) => [shaft.carId, shaft.bankId] as const));
   for (const column of g.columns) {
     if (column.outOfService) {
       ctx.save();
@@ -152,6 +167,24 @@ export function drawCutaway(ctx: CanvasRenderingContext2D, input: CutawayInput):
     }
     ctx.fillStyle = C.paper;
     ctx.fillRect(column.x, g.plot.y + 6, column.width, g.plot.height - 12);
+    /*
+     * An express or shuttle bank's roof mark — GitHub issue #544, § D624's shape, drawn here since
+     * § D1307 so the stage a day is played on carries it as the Engineer schematic does. A shape at
+     * the top of the well rather than a colour: the bank's kind is `render/buildingMarks.ts`'
+     * derivation from the floors it skips, and the triangle is the one signal (KB-15).
+     */
+    if (express.has(bankOf.get(column.carId) ?? '')) {
+      const cx = column.centreX;
+      const size = Math.min(6, column.width / 3);
+      const top = g.plot.y + 6;
+      ctx.fillStyle = C.warmGrey;
+      ctx.beginPath();
+      ctx.moveTo(cx - size, top + size);
+      ctx.lineTo(cx, top);
+      ctx.lineTo(cx + size, top + size);
+      ctx.closePath();
+      ctx.fill();
+    }
   }
 
   /* --- The waiting crowd, at the landings. --- */

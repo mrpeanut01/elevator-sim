@@ -1023,6 +1023,11 @@ carries.
 refusal outcome) remain outside `VizRecording` entirely, per #544's own findings, and neither is
 touched here. This row closes only the bank-kind half of that issue.
 
+> **Status 2026-10-10: the other two halves are § 4.19's** ([§ D1307](../DECISIONS.md)). Recording
+> version 17 carries both, and both stages draw them. The roof mark above is drawn on the § 7 stage
+> too since the same change (`render/buildingMarks.ts#expressBankIdsOf`), so it is no longer the
+> Engineer schematic's alone.
+
 ### 4.18 The Career's triage screen carries tower cards, an intro and a contract document the handoff does not draw
 
 **The deviation.** The handoff's `isTowers` block is a table of text rows, and its `isContract` block
@@ -1034,6 +1039,52 @@ that reads like one. [§ D1301](../DECISIONS.md) adds all three and keeps every 
 in the band palette § 1.2 already sets (`var(--band-0…3)`), with the band said in words beside it, so
 no colour is the only signal (KB-15). The card plays that day with the stage's own painter and files
 nothing ([§ D716](../DECISIONS.md) § 3). The intro is drawn on a fresh career only.
+
+### 4.19 The stage marks where a credential decides and where an escalator or a stair joins two floors
+
+**The deviation, stated first.** The handoff draws `⚿` beside a secure floor in the stage's label
+gutter (`docs/design/elevator-sim-reimagined.dc.html:2042`), and wave 10 refused it
+(`WAVE10_PLAN.md` § 6) because the only way to feed it was a `secure` flag on the floor, which would
+collapse access zoning into the floor's geometry. The casual handoff marks a landing an escalator
+serves with `⇅` on the designer's elevation (`docs/design/elevator-sim-casual.dc.html:5897`) and has
+no stage row for it. Neither handoff draws a stair.
+
+**What the product does now** ([§ D1307](../DECISIONS.md), GitHub issue #544). Recording version 17
+carries the building's declared access zones (`VizRecording.accessZones`, each zone's floors and the
+credential groups it admits) and its escalators and stairs (`VizRecording.transportModes`), both
+absent on a building that declares none. `render/buildingMarks.ts` turns them into gutter marks
+after the floor's label: `⚿` on a floor inside any zone, `⇅` on a landing an escalator serves, and
+`⋰` on a landing a stair serves. Both painters draw them, the Engineer schematic
+(`render/canvas.ts#drawFloors`) and the § 7 stage a player plays on (`everyday/cutaway.ts`), and the
+canvas's text alternative says each in a sentence (`render/describeFrame.ts`): which floors the
+zones cover, and which floors each escalator or stair joins.
+
+**Why `⚿` now, with the refusal's ground kept.** The mark is fed by the zone list, never by a flag on
+the floor, so access zoning stays a fact about a credential against a floor. The three access marks
+stay three: `⊘` says no shaft reaches the floor, `⚿` says a credential decides who may ride to it,
+and `▩` on the landing row says a call there went unserved because of a credential in this run. The
+new marks keep the row's own colour, since each is a glyph and KB-15 asks for exactly that.
+
+**`⋰` is this project's, not the handoff's**, because a stair is not an escalator: it is chosen by
+the rider, costs more to climb than to descend, and `st-jude-hospital` declares one. Drawing it as
+`⇅` would say something false.
+
+### 4.20 The stage overlay's button says `Play`, and the building row says the guide's *Run the day*
+
+**The deviation, stated first.** § 7.3 backticks the centred control over the paused first frame as
+`Start`, and the brief's primary one screen earlier is the guide's `Start the day`. A player met two
+starts for one intention (GitHub issue #569 item 6, then #573). The prototype holds no such control,
+so the handoff's precedence rule is silent on its wording.
+
+**What the product does now** ([§ D1309](../DECISIONS.md)). The overlay says `Play`
+(`everyday/stageScreenModel.ts#STAGE_OVERLAY_PLAY`), the verb of the transport's own `▶ Play`, because
+what it does is play back a day already simulated. `Start the day` keeps *start*, and since
+[§ D1218](../DECISIONS.md) it is the press that starts the day's one scored attempt. The building
+row's first two variants return to the guide's verbatim *Run the day and decide as it goes* and *Run
+the day with that*, retiring #569's *Open the day…*, since the press does run the day. The criterion
+is held from the table: no stage-reaching primary shares a verb with the overlay
+(`everyday/actionBar.test.ts`, `everyday/firstTwoMinutes.browser.test.ts`). **Owner-reversible**:
+the owner's question 17 offers this reading, and reversing it is the one constant.
 
 The refactor is done when all of the following are true, and not before.
 

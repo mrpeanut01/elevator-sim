@@ -8,7 +8,7 @@
  *
  * | # | what was wrong | what is asked here |
  * |---|---|---|
- * | **6** | *Run the day and decide as it goes* landed on a **paused** clock — a button promising a start the press did not perform | the label says *Open*, and the `Start` it points at is on the screen |
+ * | **6** | *Run the day and decide as it goes* landed on a **paused** clock under a centred `Start`, one screen after the brief's `Start the day` — two starts for one intention | no stage-reaching primary shares a verb with the overlay the stage actually draws, derived from the table (GitHub issue #573, § D1309) |
  * | **5** | the tutorial's only control sat at y = 889.5 in a 900 px viewport, below an **inner** scroller `window` scrolling does not reach | the press is inside the viewport, and `elementFromPoint` at its centre returns it |
  * | **1** | the footer read *“…Nothing is shown until both land”* while both runs were on screen | once the comparison is settled, that sentence is not on the page |
  *
@@ -26,6 +26,8 @@
 import { chromium, type Browser, type Page } from 'playwright-core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { ACTION_BAR_ROWS } from './actionBar.js';
+import { NEVER_OPENS_THE_STAGE, primariesSharingVerb, verbOf } from './overlayVerb.test-helper.js';
 import {
   CHROMIUM,
   EVERYDAY_SCREEN_ROUTES,
@@ -64,23 +66,26 @@ async function laptop(): Promise<Page> {
 
 describe.skipIf(!HAS_BROWSER)('§ 569 — what a first-time player meets in their first two minutes', () => {
   /**
-   * **Item 6.** The button said *run*; what the press does is open the § 7 stage **paused**, with
-   * § 7.3's centred `Start` over the first frame.
+   * **Item 6, raised** — GitHub issue #573, [§ D1309](../../../../DECISIONS.md). The building's
+   * press opens the § 7 stage **paused** (§ 7.3), and the player met two starts for one intention:
+   * the brief's `Start the day`, then the overlay's `Start`.
    *
-   * **The verb moved and the behaviour did not**, and this case is written to hold both halves at
-   * once — it fails if the label goes back to promising a start, and it fails if the stage stops
-   * offering the `Start` the label now sends the player to. § 7.3 specifies the paused entry and
-   * `stageScreen.browser.test.ts` pins it; making the press play instead would have meant editing
-   * that case, which is the wrong end of the disagreement to change. Whether the stage *should*
-   * open playing is a design question for the owner, not a lane's to settle inside a label fix.
+   * The criterion is the issue's: **no stage-reaching primary shares a verb with the overlay**. The
+   * overlay's verb is read off the drawn page, not off a constant, and the primaries are derived from
+   * `actionBar.ts`'s own table (`overlayVerb.test-helper.ts`), so a tenth route that shares the verb
+   * fails here rather than escaping by not being listed. It was red while the overlay said `Start`,
+   * on `Start the day`, `Start the rush` and `Start the month again`.
+   *
+   * And the building row says the guide's *Run the day…* again, because the press does run the day.
    */
-  it('takes the player where its own label says, and the start it points at is on the screen', async () => {
+  it('lets no stage-reaching primary share a verb with the overlay the stage draws', async () => {
     const page = await laptop();
     try {
       await EVERYDAY_SCREEN_ROUTES.building(page);
       const label = (await page.textContent('.everyday-bar-primary')) ?? '';
-      expect(label).not.toMatch(/^Run the day/u);
-      expect(label).toMatch(/^Open the day/u);
+      const row = ACTION_BAR_ROWS.find((entry) => entry.screen === 'building');
+      expect(row?.primary.variants).toContain(label);
+      expect(label).toMatch(/^Run the day/u);
 
       await page.locator('.everyday-bar-primary').click();
       await page.waitForSelector('.everyday-stage', { timeout: 30_000 });
@@ -91,9 +96,14 @@ describe.skipIf(!HAS_BROWSER)('§ 569 — what a first-time player meets in thei
         undefined,
         { timeout: 180_000 },
       );
-      /* Paused, and the control the label sends the player to is the one that is offered. */
-      expect(await page.textContent('.everyday-stage-play')).toContain('Play');
-      expect(await page.textContent('.everyday-stage-start')).toBe('Start');
+      const overlay = verbOf((await page.textContent('.everyday-stage-start')) ?? '');
+      expect(overlay).not.toBe('');
+      const offending = primariesSharingVerb(overlay).filter(
+        (entry) => NEVER_OPENS_THE_STAGE[entry.key] === undefined,
+      );
+      expect(offending, `primaries that reach the stage and say ${overlay}`).toEqual([]);
+      /* One verb for one act: the overlay and the transport both play the day back. */
+      expect(verbOf((await page.textContent('.everyday-stage-play')) ?? '')).toBe(overlay);
     } finally {
       await page.close();
     }
