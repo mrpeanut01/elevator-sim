@@ -93,15 +93,20 @@
  * nothing.
  */
 
-import { globSync } from 'node:fs';
+import { existsSync, globSync, mkdtempSync, statSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
 import {
+  BROWSER_ROOTS,
   CHROMIUM,
   CHROMIUM_ENV,
+  CHROMIUM_SOURCE,
+  DISCOVERED,
+  discoverChromium,
   DEV_SERVER_FILES,
   HAS_BROWSER,
   SKIP_REASON,
@@ -351,6 +356,226 @@ describe('a registered vitest project that runs nowhere — GitHub issue #142', 
     );
     expect(SKIP_REASON).toContain(CHROMIUM_ENV);
     expect(SKIP_REASON).toContain(CHROMIUM);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The gate must resolve a browser the machine actually has
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **A gate whose only fallback is one machine's path is a gate that skips on every other machine.**
+ *
+ * The case above refuses a *CI* run in which the tier would skip, and it is the right rule for CI:
+ * `ci.yml` installs a Chromium and exports `ELEVATOR_SIM_CHROMIUM` on both legs, so a shut tier
+ * there is a broken workflow. It says nothing about a developer's machine, deliberately — § D220
+ * decided that `npm test` stays green without a browser, and that decision stands.
+ *
+ * What nobody had noticed is that *the local case is not one state, it is two*, and only one of them
+ * is the one § D220 blessed:
+ *
+ *   - **no Playwright installed at all** — the skip is correct, and the only thing owed is a reason a
+ *     reader can act on; and
+ *   - **Playwright installed, five Chromium builds in its cache, tier skips anyway** — which is not
+ *     "no browser". It is the gate failing to find one, and it is indistinguishable from the first
+ *     state in every summary line this suite prints.
+ *
+ * The second state was the actual condition of this repository on macOS. `browserTier.test-helper.ts`
+ * resolved `ELEVATOR_SIM_CHROMIUM` or a Linux literal from the container that first provisioned the
+ * tier, so `HAS_BROWSER` was false and **27 files / 156 cases reported `skipped`, exit code 0**,
+ * while `~/Library/Caches/ms-playwright/` held revisions 1181 through 1228. Three verification lanes
+ * found it independently in one day. Pointed at 1228 by hand, the same 27 files ran.
+ *
+ * So the rule this block adds is the narrowest one that separates those two states, and it is a
+ * *raise* on the existing gate rather than a relaxation of it: **a machine with a completed
+ * Playwright Chromium install may not run a gated tier that skips.** A machine without one still
+ * skips, exactly as before.
+ *
+ * The probe is deliberately **coarser than the resolution it checks**, or it would be a tautology.
+ * `discoverChromium` globs executables; this asks only whether a `chromium-<rev>` directory carrying
+ * Playwright's own `INSTALLATION_COMPLETE` marker exists. A Playwright that renames the binary or
+ * moves it one directory deeper — which is the shape that produced the literal's staleness, since
+ * the shell moved from `chrome-linux/headless_shell` to
+ * `chrome-headless-shell-linux64/chrome-headless-shell` between revisions — leaves the directory
+ * visible, discovery empty, and this case red.
+ *
+ * The residual hole is named rather than papered over: the probe shares {@link BROWSER_ROOTS} with
+ * the thing it checks, so a Playwright that moved its *cache root* would be invisible to both. That
+ * is what the `playwright-core` cross-check below is for.
+ */
+describe('the gate resolves a Chromium this machine has, or says why it did not', () => {
+  /** Playwright's own completion sentinel. A half-downloaded directory is not an install. */
+  const COMPLETE = 'INSTALLATION_COMPLETE';
+
+  /** `chromium-1228`, `chromium_headless_shell-1194` — a revision directory and not `ffmpeg-1011`. */
+  const REVISION_DIR = /^chromium(?:_headless_shell)?-(\d+)$/u;
+
+  /**
+   * Completed Chromium installs on this machine, by directory — the coarse probe.
+   *
+   * Independent of `discoverChromium` below the root level on purpose; see this block's docstring.
+   */
+  function installedChromium(): readonly string[] {
+    const found: string[] = [];
+    for (const root of BROWSER_ROOTS) {
+      for (const entry of globSync(['chromium-*', 'chromium_headless_shell-*'], { cwd: root })) {
+        if (!REVISION_DIR.test(entry)) continue;
+        const path = join(root, entry);
+        if (existsSync(join(path, COMPLETE))) found.push(path);
+      }
+    }
+    return found.sort();
+  }
+
+  /** `…/chromium_headless_shell-1228/…` → `{ headless: true, revision: 1228 }`. */
+  function kindOf(path: string): { readonly headless: boolean; readonly revision: number } {
+    const found = /[\\/]chromium(_headless_shell)?-(\d+)[\\/]/u.exec(path.replace(/\\/gu, '/'));
+    return {
+      headless: found?.[1] !== undefined,
+      revision: found === null ? -1 : Number(found[2]),
+    };
+  }
+
+  it('returns only real executable files, and launches the first of them', () => {
+    for (const path of DISCOVERED) {
+      expect(existsSync(path), `discoverChromium returned ${path}, which does not exist`).toBe(true);
+      expect(statSync(path).isFile(), `discoverChromium returned ${path}, which is not a file`).toBe(
+        true,
+      );
+    }
+    if (process.env[CHROMIUM_ENV] !== undefined && process.env[CHROMIUM_ENV] !== '') {
+      /*
+       * The override wins, and *wins* means discovery does not run at all rather than runs and is
+       * overruled — an explicit path that resolves and a discovered one that happens to match are
+       * two different claims, and CI makes the first.
+       */
+      expect(CHROMIUM, `${CHROMIUM_ENV} is set and did not win the resolution`).toBe(
+        process.env[CHROMIUM_ENV],
+      );
+      expect(DISCOVERED, 'discovery ran behind an explicit override').toEqual([]);
+      return;
+    }
+    if (DISCOVERED.length === 0) return;
+    expect(CHROMIUM, 'discovery found candidates and the tier launched none of them').toBe(
+      DISCOVERED[0],
+    );
+    expect(HAS_BROWSER, `${CHROMIUM} resolved and the tier is gated shut anyway`).toBe(true);
+  });
+
+  it('picks the same executable twice, and picks it by a rule and not by directory order', () => {
+    /*
+     * Determinism is the whole reason this is a sort and not a `find`. Five builds are installed on
+     * the machine this was written on; `globSync` does not promise an order, and a tier that drove
+     * 1208 on Tuesday and 1228 on Wednesday would make every pixel oracle in it a coin toss.
+     *
+     * Two claims. *Stable*: the same roots give the same list. *Ordered*: headless shells before
+     * full Chromiums, and revisions descending within each kind — recomputed from the paths here
+     * rather than trusted from the docstring, so a future sort that quietly loses a key fails.
+     */
+    const once = discoverChromium();
+    const twice = discoverChromium();
+    expect(twice, 'two calls disagreed about which browser this machine has').toEqual(once);
+
+    const keys = once.map(kindOf).map((kind) => [kind.headless ? 0 : 1, -kind.revision] as const);
+    for (const [at, key] of keys.entries()) {
+      if (at === 0) continue;
+      const before = keys[at - 1] as readonly [number, number];
+      const ordered = before[0] < key[0] || (before[0] === key[0] && before[1] <= key[1]);
+      expect(
+        ordered,
+        `${once[at - 1] as string} was returned before ${once[at] as string}, which breaks the ` +
+          'kind-then-revision order the tier picks by',
+      ).toBe(true);
+    }
+  });
+
+  it('searches the root playwright-core itself installs into', async () => {
+    /*
+     * The one thing the coarse probe cannot see: a Playwright that moves its cache directory. The
+     * authority for where that is is Playwright, so it is asked rather than guessed at.
+     *
+     * `chromium.executablePath()` names the build this `playwright-core` *wants*, which on the host
+     * this was written on is revision 1234 and is not installed — the path need not exist, and
+     * nothing here requires it to. Only the root above the revision directory is read, which is why
+     * this check is revision-agnostic in the same way the resolution is.
+     */
+    let expected: string;
+    try {
+      const { chromium } = await import('playwright-core');
+      expected = chromium.executablePath();
+    } catch (error) {
+      /*
+       * `playwright-core` is a devDependency and this project always runs, so a tree without it is a
+       * tree that cannot run the tier either. Warn rather than fail: this case exists to catch
+       * Playwright moving, not to become a second install check.
+       */
+      console.warn(`[viz-browser] could not ask playwright-core where it installs: ${String(error)}`);
+      return;
+    }
+    const at = expected.replace(/\\/gu, '/').search(/\/chromium(?:_headless_shell)?-\d+\//u);
+    if (at === -1) {
+      console.warn(
+        `[viz-browser] playwright-core reports ${expected}, which carries no chromium-<revision> ` +
+          'segment; the root cross-check has nothing to read and is skipping rather than guessing.',
+      );
+      return;
+    }
+    const root = expected.slice(0, at);
+    expect(
+      BROWSER_ROOTS.map((entry) => entry.replace(/\\/gu, '/')),
+      `playwright-core installs into ${root} and browserTier.test-helper.ts does not look there. ` +
+        'Every browser this machine downloads will land somewhere the tier cannot see, and the ' +
+        'tier will skip green. Add the root to BROWSER_ROOTS rather than exporting a path by hand.',
+    ).toContain(root);
+  });
+
+  it('finds nothing, and throws nothing, where there is no Playwright', () => {
+    /*
+     * The state § D220 protects, exercised rather than assumed. A developer with no Playwright must
+     * get a skip — not a crash, and not a red run — so the resolution is pointed at an empty
+     * directory and at one that does not exist, and required to come back empty both times.
+     */
+    const empty = mkdtempSync(join(tmpdir(), 'elevator-sim-no-browsers-'));
+    expect(discoverChromium([empty]), 'an empty browsers root produced a candidate').toEqual([]);
+    expect(
+      discoverChromium([join(empty, 'absent')]),
+      'a browsers root that does not exist produced a candidate',
+    ).toEqual([]);
+    expect(discoverChromium([]), 'no roots at all produced a candidate').toEqual([]);
+  });
+
+  it('refuses a run in which this machine has a Chromium and the tier skips anyway', () => {
+    if (HAS_BROWSER) {
+      expect(CHROMIUM_SOURCE, 'the tier resolved a browser and cannot say how').not.toBe('');
+      return;
+    }
+    if (process.env[CHROMIUM_ENV] !== undefined && process.env[CHROMIUM_ENV] !== '') {
+      /*
+       * An explicit override that does not exist. CI already fails on this, loudly, in the case
+       * above; off CI it is the operator's own path and the skip is fully attributable, so this is
+       * a warning rather than a failure. An explicit override is explicit in both directions.
+       */
+      console.warn(
+        `[viz-browser] ${CHROMIUM_ENV} names ${CHROMIUM}, which does not exist. The tier is ` +
+          'skipping because you told it to look there — unset the variable to let it find a ' +
+          'locally installed Chromium instead.',
+      );
+      return;
+    }
+    const installed = installedChromium();
+    if (installed.length === 0) return;
+    expect.fail(
+      `this machine has ${String(installed.length)} completed Playwright Chromium install(s) and ` +
+        `the browser tier is gated shut. The gate resolved ${CHROMIUM} (${CHROMIUM_SOURCE}).\n` +
+        `  installs: ${installed.join('\n            ')}\n` +
+        'Every case in the tier will report `skipped` with exit code 0, which is what a green run ' +
+        'looked like on macOS for as long as the gate carried one Linux path — 27 files and 156 ' +
+        'cases of nothing, three lanes reading it as coverage. The executable layout under those ' +
+        'directories is what browserTier.test-helper.ts globs for, so if Playwright has renamed or ' +
+        'moved the binary, add the new layout to EXECUTABLES. Do not silence this by exporting ' +
+        `${CHROMIUM_ENV}: that fixes your shell and leaves the next reader's run reporting absence ` +
+        'of failure.',
+    );
   });
 });
 
