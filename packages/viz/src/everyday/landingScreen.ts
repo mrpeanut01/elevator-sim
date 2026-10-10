@@ -46,12 +46,11 @@
 
 import type { ResolvedBuilding, SimulationConfig } from '@elevator-sim/core/browser';
 
-import type { VizRecording } from '../contract/types.js';
+import type { Frame, VizRecording } from '../contract/types.js';
 import { loadBrowserResources, type BrowserResources } from '../dev/data.js';
 import { createOffThreadRunner } from '../dev/offThreadRuns.js';
-import { frameAt } from '../frame/frameAt.js';
 import { queueAt } from '../frame/overlay.js';
-import { systemClock } from '../playback/clock.js';
+import { systemClock, type DisplayClock } from '../playback/clock.js';
 import { Playback } from '../playback/playback.js';
 import { drawCutaway, sizeCanvas } from './cutaway.js';
 import { landingViewOf, type LandingMotionState, type LandingView } from './landingView.js';
@@ -85,7 +84,7 @@ import { EVERYDAY_COLORS as C, EVERYDAY_RADII as R, EVERYDAY_TYPE as TYPE } from
  * the worker answers well inside a visit — the same tower's eight-seed challenge press measures in
  * the low hundreds of milliseconds, and this is one seed of a shorter day.
  */
-const LANDING_RUN = Object.freeze({
+export const LANDING_RUN = Object.freeze({
   buildingId: 'midtown-office',
   dispatcherId: 'collective',
   seed: 20_260_910n,
@@ -141,7 +140,7 @@ function resources(): Promise<BrowserResources | undefined> {
 }
 
 /** The morning, as a configuration. Every field of it comes from {@link LANDING_RUN}. */
-function configFor(loaded: BrowserResources, building: ResolvedBuilding): SimulationConfig {
+export function landingConfigOf(loaded: BrowserResources, building: ResolvedBuilding): SimulationConfig {
   const dispatcherProfile = loaded.dispatcherProfiles.profiles.find(
     (profile) => profile.id === LANDING_RUN.dispatcherId,
   );
@@ -192,7 +191,7 @@ function askForTheMorning(): void {
        * neither. A recorded decision trace is the largest thing a recording can carry, and a page
        * that asked for one it never opens would be paying the transport for it on every load.
        */
-      runs: [{ config: configFor(loaded, building), outOfServiceCarIds: [], recordDecisions: false }],
+      runs: [{ config: landingConfigOf(loaded, building), outOfServiceCarIds: [], recordDecisions: false }],
       onDone: ([landed]) => {
         if (landed === undefined) unavailable = true;
         else recording = landed;
@@ -215,9 +214,26 @@ function motionState(): LandingMotionState {
  * The canvas
  * -------------------------------------------------------------------------- */
 
-/** Paint the recording, looping, until the canvas leaves the page. Returns the way to stop. */
-function playInto(doc: Document, canvas: HTMLCanvasElement, played: VizRecording): () => void {
-  const playback = new Playback(played, systemClock(), {
+/** The landing block's transport, as the canvas reads it. Built by {@link landingLoopOf}. */
+export interface LandingLoop {
+  /**
+   * The picture now: the transport's frame, which reads the clock once and wraps to
+   * {@link LANDING_RUN}'s `loopFromS` when it crosses the window's end. Paint from this and take
+   * `frame.simTimeS` for anything else drawn beside it, so the cars and the queues are one instant.
+   */
+  frame(): Frame;
+  /** Stops the transport. */
+  stop(): void;
+}
+
+/**
+ * The transport the landing block paints from, over the morning {@link askForTheMorning} landed.
+ *
+ * Its non-test caller is {@link playInto}, which hands it `systemClock()`; `landingScreen.test.ts`
+ * hands it a `ManualClock` and drives it past the window.
+ */
+export function landingLoopOf(played: VizRecording, clock: DisplayClock): LandingLoop {
+  const playback = new Playback(played, clock, {
     speed: LANDING_RUN.speedSimPerRealS,
     autoplay: true,
     startAtS: LANDING_RUN.loopFromS,
@@ -239,6 +255,24 @@ function playInto(doc: Document, canvas: HTMLCanvasElement, played: VizRecording
     fromS: LANDING_RUN.loopFromS,
     toS: Math.min(LANDING_RUN.durationS, played.endedAt),
   });
+  return {
+    /*
+     * **`frame()`, never `simTimeS`.** The wrap lives in `Playback.frame`, and the `simTimeS`
+     * getter clamps at the recording's end without ever applying it. This block painted from the
+     * getter until wave AN lane AP-3 found the same trap in `towerLoop.ts`: at this seed it played
+     * from 30 s through the drain to the run's end at about 616 s and then held that last frame
+     * for good, the still picture the module header says this block exists to avoid.
+     */
+    frame: () => playback.frame(),
+    stop: () => {
+      playback.pause();
+    },
+  };
+}
+
+/** Paint the recording, looping, until the canvas leaves the page. Returns the way to stop. */
+function playInto(doc: Document, canvas: HTMLCanvasElement, played: VizRecording): () => void {
+  const loop = landingLoopOf(played, systemClock());
   const labelOf = (id: string): string =>
     played.floors.find((floor) => floor.id === id)?.label ?? id;
 
@@ -255,11 +289,11 @@ function playInto(doc: Document, canvas: HTMLCanvasElement, played: VizRecording
     const ctx = sizeCanvas(canvas);
     if (ctx !== undefined) {
       const rect = canvas.getBoundingClientRect();
-      const simTimeS = playback.simTimeS;
+      const frame = loop.frame();
       drawCutaway(ctx, {
         recording: played,
-        frame: frameAt(played, simTimeS),
-        queues: queueAt(played, simTimeS),
+        frame,
+        queues: queueAt(played, frame.simTimeS),
         geometry: stageGeometryOf({
           width: rect.width,
           height: rect.height,
@@ -276,7 +310,7 @@ function playInto(doc: Document, canvas: HTMLCanvasElement, played: VizRecording
 
   return () => {
     stopped = true;
-    playback.pause();
+    loop.stop();
     if (handle !== undefined) doc.defaultView?.cancelAnimationFrame(handle);
     handle = undefined;
   };
