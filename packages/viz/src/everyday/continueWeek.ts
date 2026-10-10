@@ -14,7 +14,7 @@
  */
 
 import { contractById } from '../shift/contracts.js';
-import { countedCleanOf, weekDealOf, weekHasClosed } from '../shift/weekStake.js';
+import { countedCleanOf, daysWerePlayedOn, weekDealOf, weekHasClosed, weekOrdinalOf } from '../shift/weekStake.js';
 import { weekdayOf, type WeekState } from '../shift/types.js';
 
 /** The entry, as words and a destination. */
@@ -30,16 +30,31 @@ export interface ContinueWeekEntry {
 export const CONTINUE_WEEK_TITLE = 'Continue your week';
 
 /**
- * The entry, or `undefined` where there is no week under way: a week on no scenario, or one with no
- * day filed yet (its first day is what *Scenario* already opens).
+ * The entry, or `undefined` where there is no week under way: a week on no scenario, or a first
+ * week with no day filed yet (its first day is what *Scenario* already opens).
+ *
+ * **A later week is under way from its first morning** — wave AN, lane AN-7, carried from the
+ * post-AL panel and found again by the post-AM panel's seats B and D. *Start next week* rolls the
+ * week (§ D1177's roll empties its history), so the week a returning player had just begun drew no
+ * entry until a day of it was filed, and the picker showed only the mode tiles. A week numbered past
+ * the first is one the player chose to carry on, so it is offered with nothing filed.
  */
 export function continueWeekEntryOf(week: WeekState, towerName: string): ContinueWeekEntry | undefined {
   if (contractById(week.contractId) === undefined) return undefined;
-  if (week.history.length === 0) return undefined;
+  /*
+   * **And a week dealt again is under way from its first morning too** — wave AN, lane DQ-2
+   * ([§ D1344](../../../../DECISIONS.md)): a week that was not held rolls to its own order again,
+   * keeping its number, so a week 1 played again has nothing filed and is still one the player chose
+   * to carry on. `daysWerePlayedOn` is the roll's own mark (the streak or the best day it keeps).
+   */
+  if (week.history.length === 0 && week.week <= 1 && !daysWerePlayedOn(week)) return undefined;
+  /* `Midtown Office, week 2` where the week has a number (§ D1252), the tower alone where it does not. */
+  const ordinal = weekOrdinalOf(week);
+  const tower = ordinal === undefined ? towerName : `${towerName}, ${ordinal}`;
   if (weekHasClosed(week)) {
     return {
       title: CONTINUE_WEEK_TITLE,
-      line: `${towerName}: the week has closed, and its sheet beside the house is standing`,
+      line: `${tower}: the week has closed, and its sheet beside the house is standing`,
       goes: 'week',
     };
   }
@@ -55,7 +70,7 @@ export function continueWeekEntryOf(week: WeekState, towerName: string): Continu
       : weekdayOf(week.dayIdx);
   return {
     title: CONTINUE_WEEK_TITLE,
-    line: `${towerName}, ${standing}${tally}`,
+    line: `${tower}, ${standing}${tally}`,
     goes: 'door',
   };
 }

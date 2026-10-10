@@ -851,8 +851,12 @@ describe('a week with a stake and an ending — § D1176, § D1177', () => {
     expect(rolled.completed).toEqual(['c1']);
     expect(rolled.streak).toBe(4);
     expect(rolled.bestMinutePct).toBe(90);
-    // § D1252: the roll is the next week of the tower, so it is dealt the next order.
-    expect([week.week, rolled.week]).toEqual([1, 2]);
+    /*
+     * § D1252 dealt the roll the next order whatever the week did; since wave AN's lane DQ-2
+     * (§ D1344) a week that was not held (one clean day, Sunday, of a 4-of-5 target) is dealt its
+     * own order again, and only a held week moves on (`nextWeek.test.ts` holds both arms).
+     */
+    expect([week.week, rolled.week]).toEqual([1, 1]);
   });
 
   it('leaves every week the census does not speak for rolling on past day 7, as before', () => {

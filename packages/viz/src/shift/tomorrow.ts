@@ -73,6 +73,7 @@
  * example of an in-scope Engineer change.
  */
 
+import type { BookedOutCar } from './bookedOut.js';
 import { dayCountsToward, weekNeedOf, WEEK_WITHOUT_COUNTED_DAYS_SHORT } from './weekStake.js';
 import {
   weekdayOf,
@@ -148,6 +149,31 @@ export interface TomorrowBriefing {
    * rather than a second derivation of them. `undefined` when no day has closed.
    */
   readonly population?: { readonly today: number; readonly tomorrow: number } | undefined;
+  /**
+   * **The next day on the week's main path**, measured on its own plan — what the close's tomorrow
+   * card states (wave AN, lane AN-7). On the close that closed the week it is the next week's
+   * Monday, where {@link population} is the literal tomorrow (Saturday). `undefined` when no day has
+   * closed or the caller measured none.
+   */
+  readonly onward?: OnwardDay | undefined;
+}
+
+/**
+ * The next day on the week's main path (`shift/week.ts#pathNextOf`), as `dev/state.ts#tomorrowFactsOf`
+ * measures it through `shiftRunConfigOf`: its building's population, every car its run takes out
+ * of passenger service with the run's own spans, and where its clock starts.
+ */
+export interface OnwardFacts {
+  readonly population: number;
+  readonly cars: readonly BookedOutCar[];
+  readonly startOfDayS: number | undefined;
+}
+
+/** {@link OnwardFacts} beside today's population — the pair the close's tenants line prints. */
+export interface OnwardDay {
+  readonly population: { readonly today: number; readonly tomorrow: number };
+  readonly cars: readonly BookedOutCar[];
+  readonly startOfDayS: number | undefined;
 }
 
 /** Everything the beat needs. Every field is measured by somebody else and copied here. */
@@ -190,6 +216,8 @@ export interface TomorrowInput {
   readonly calendarLineTomorrow: string;
   /** `shiftRunConfigOf`'s refusals for tomorrow. */
   readonly withheldTomorrow: readonly string[];
+  /** The next day on the main path, measured — {@link TomorrowBriefing.onward}. */
+  readonly onward?: OnwardFacts | undefined;
 }
 
 /**
@@ -213,6 +241,15 @@ export function tomorrowBriefingOf(input: TomorrowInput): TomorrowBriefing {
     groups: groups.filter((group) => group.rows.length > 0),
     withheld: input.withheldTomorrow,
     ...(closed === null ? {} : { population: { today: input.populationToday, tomorrow: input.populationTomorrow } }),
+    ...(closed === null || input.onward === undefined
+      ? {}
+      : {
+          onward: {
+            population: { today: input.populationToday, tomorrow: input.onward.population },
+            cars: input.onward.cars,
+            startOfDayS: input.onward.startOfDayS,
+          },
+        }),
   };
 }
 

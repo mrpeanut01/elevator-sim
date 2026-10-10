@@ -233,6 +233,77 @@ describe('the standings are the house’s runs on the standing building', () => 
   });
 });
 
+/**
+ * **The player's own best posted sitting, among the house's rows** — swarm DQ's Q3 supporting payoff,
+ * [§ D1359](../../../../DECISIONS.md). Red before: the standings took nothing of the player's, so no
+ * row was ever theirs and nothing said why.
+ */
+describe('the player’s own row among the house’s (§ D1359)', () => {
+  const house = (): readonly RushHouseRowView[] => rowsFor('garden-apartments');
+  const heldOf = (run: { readonly dispatcherId: string }): number => {
+    const row = RUSH_HOUSE_TABLE.runs.find((entry) => entry.buildingId === 'garden-apartments' && entry.dispatcherId === run.dispatcherId);
+    return row?.brokeAtS ?? Number.POSITIVE_INFINITY;
+  };
+  const view = (posted: Parameters<typeof rushStandingsOf>[4]) => {
+    const drawn = rushStandingsOf('garden-apartments', nameOf, RUSH_HOUSE_TABLE, undefined, posted);
+    if (drawn.kind !== 'rows') throw new Error(`drew ${drawn.kind}, not rows`);
+    return drawn;
+  };
+
+  it('places each posted sitting furthest first among the house rows, the house first on a tie', () => {
+    const rows = house();
+    const finite = rows.map(heldOf).filter((held) => Number.isFinite(held));
+    expect(finite.length).toBeGreaterThan(1);
+    const middle = finite[Math.floor(finite.length / 2)]!;
+    const drawn = view({
+      kind: 'rows',
+      date: '2026-10-10',
+      sittings: [
+        { heldS: middle, furthestWave: playerWaveAt(middle), roundCount: 2, modifiers: [] },
+        { heldS: 1, furthestWave: 1, roundCount: 1, modifiers: [{ sinkId: 'rush-purse-top-up', steps: 2, name: 'Start with a bigger purse' }] },
+      ],
+    });
+    /* The house rows are exactly what they were: the player's are placed among them, not mixed in. */
+    expect(drawn.rows).toEqual(rows);
+    const [tied, last] = drawn.yours;
+    expect(tied?.before).toBe(rows.findIndex((row) => heldOf(row) < middle));
+    expect(heldOf(rows[(tied?.before ?? 0) - 1]!)).toBe(middle);
+    expect(tied?.name).toBe(RUSH_HOUSE_COPY.yoursName);
+    expect(tied?.tag).toBe(RUSH_HOUSE_COPY.yoursTag);
+    expect(tied?.tag).not.toBe(RUSH_HOUSE_COPY.tag);
+    expect(tied?.wave).toBe(`wave ${String(playerWaveAt(middle))}`);
+    expect(tied?.held).toBe(heldClock(middle));
+    expect(tied?.detail).toBe('2 rounds');
+    expect(last?.before).toBe(rows.length);
+    expect(last?.detail).toBe('1 round · Start with a bigger purse ×2');
+    /* What the row is, plainly: whose, which board and day, whose figure, and why it is not a house run. */
+    expect(drawn.yoursLine).toBe(RUSH_HOUSE_COPY.yoursNote('2026-10-10'));
+    expect(drawn.yoursLine).toContain('your best sitting');
+    expect(drawn.yoursLine).toContain('2026-10-10');
+    expect(drawn.yoursLine).toContain('as the server replayed it');
+    expect(drawn.yoursLine).toContain('rebuilt between rounds or handed over');
+    expect([tied?.wave, tied?.held, drawn.yoursLine].join(' ')).not.toMatch(/average|mean|awt|rank the/iu);
+  });
+
+  it('says why no row is the player’s, and says nothing on a build with no server', () => {
+    expect(view({ kind: 'rows', date: '2026-10-10', sittings: [] }).yoursLine).toBe(RUSH_HOUSE_COPY.yoursNone);
+    expect(view({ kind: 'signed-out' }).yoursLine).toBe(RUSH_HOUSE_COPY.yoursSignedOut);
+    expect(view({ kind: 'unreachable' }).yoursLine).toBe(RUSH_HOUSE_COPY.yoursUnreachable);
+    for (const quiet of [view({ kind: 'silent' }), view(undefined)]) {
+      expect(quiet.yours).toEqual([]);
+      expect(quiet.yoursLine).toBeUndefined();
+    }
+    /* A withheld table draws its refusal and none of the player's rows either. */
+    expect(
+      rushStandingsOf('a-tower-drawn-in-the-designer', nameOf, RUSH_HOUSE_TABLE, undefined, {
+        kind: 'rows',
+        date: '2026-10-10',
+        sittings: [{ heldS: 600, furthestWave: 4, roundCount: 1, modifiers: [] }],
+      }).kind,
+    ).toBe('withheld');
+  });
+});
+
 describe('the schema refuses a table that does not say what it is', () => {
   const raw = (): Record<string, unknown> => JSON.parse(JSON.stringify(RUSH_HOUSE_TABLE)) as Record<string, unknown>;
   const firstRun = (doc: Record<string, unknown>): Record<string, unknown> =>

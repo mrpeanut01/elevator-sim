@@ -53,6 +53,9 @@ import {
   type ShippedSite,
 } from '../dev/browserTier.test-helper.js';
 import { DIFFICULTIES, rateOnDay } from '../campaign/economy.js';
+import { openingCareer } from '../campaign/career.js';
+import { CAREER_STORAGE_KEY, encodeCareer } from '../campaign/careerPersist.js';
+import { CONTRACT_COPY } from './campaignModel.js';
 
 let site: ShippedSite;
 let browser: Browser;
@@ -75,6 +78,39 @@ afterAll(async () => {
 /** A cold load, settled — the Engineer menu dismissed, so `dev/main.ts`'s boot has published a host. */
 async function coldLoad(): Promise<Page> {
   const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
+  await page.goto(`${origin}?building=garden-apartments&seed=424242`, { waitUntil: 'load' });
+  await page.waitForFunction(
+    () => document.querySelector<HTMLElement>('.menu-overlay')?.hidden === true,
+    undefined,
+    { timeout: 30_000 },
+  );
+  return page;
+}
+
+/**
+ * A cold load whose device already carries a career on contract day `day` — the career a returning
+ * player brings back, written through the codec the store itself decodes (`autoFile.browser.test.ts`
+ * seeds one the same way). Eighteen played days would cost this file the better part of an hour;
+ * the record is what the presses read, so the record is what is seeded.
+ */
+async function coldLoadOnContractDay(day: number): Promise<Page> {
+  const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
+  const opening = openingCareer('collective');
+  const stored = encodeCareer({
+    ...opening,
+    today: day,
+    towers: opening.towers.map((tower) => ({ ...tower, day })),
+  });
+  await page.addInitScript(
+    ({ key, value }) => {
+      try {
+        window.localStorage.setItem(key, value);
+      } catch {
+        /* No storage, no career: the case then fails on the day it reads rather than passing on nothing. */
+      }
+    },
+    { key: CAREER_STORAGE_KEY, value: stored },
+  );
   await page.goto(`${origin}?building=garden-apartments&seed=424242`, { waitUntil: 'load' });
   await page.waitForFunction(
     () => document.querySelector<HTMLElement>('.menu-overlay')?.hidden === true,
@@ -164,6 +200,14 @@ describe.skipIf(!HAS_BROWSER)('a campaign day, filed — issue #223', () => {
     const page = await coldLoad();
     await enterCampaign(page);
     const building = await page.textContent('.everyday-towers-name');
+    /*
+     * The career's front page before anything is filed — GitHub issue #536, § D1301: the fresh
+     * career's intro with its chimes half, and one card with no day to play and so no colour.
+     */
+    expect(await page.textContent('.everyday-towers-intro')).toContain('CHIMES');
+    expect(await page.locator('.everyday-towers-card').count()).toBe(1);
+    expect(await page.getAttribute('.everyday-towers-card', 'data-band')).toBe('none');
+    expect(await page.locator('.everyday-towers-card-canvas').count()).toBe(0);
     await openDesk(page);
 
     const before = await monthFigures(page);
@@ -196,6 +240,20 @@ describe.skipIf(!HAS_BROWSER)('a campaign day, filed — issue #223', () => {
     const purseAfter = await purseOnHand(page);
     const firstWeekRate = rateOnDay(DIFFICULTIES.standard, 0);
     expect(purseAfter).toBe(after.cleared === 1 ? purseBefore + firstWeekRate : purseBefore);
+
+    /*
+     * And the front page after it — § D1301. The intro is gone with the fresh career, and the card
+     * now plays the day just filed, coloured by one of the four wait bands and naming the verdict
+     * the month card counted. Which band is the run's business, as which mark is.
+     */
+    await page.locator('.everyday-bar-timeline').getByText('All buildings').first().click();
+    await page.waitForSelector('.everyday-towers', { timeout: 30_000 });
+    expect(await page.locator('.everyday-towers-intro').count()).toBe(0);
+    expect(await page.getAttribute('.everyday-towers-card', 'data-band')).toMatch(/^[0-3]$/u);
+    expect(await page.locator('.everyday-towers-card-canvas').count()).toBe(1);
+    expect(await page.textContent('.everyday-towers-card-filed')).toBe(
+      `Day 1 · ${after.cleared === 1 ? 'cleared' : 'missed'}`,
+    );
 
     await page.close();
   }, 300_000);
@@ -394,6 +452,82 @@ describe.skipIf(!HAS_BROWSER)('a campaign day, filed — issue #223', () => {
     /* And the day counter moved, which is the progression the press promised. */
     await page.waitForSelector('.everyday-stage-dock', { timeout: 60_000 });
     expect(await page.textContent('.everyday-stage-dock-day')).toBe('day 2 of 20');
+
+    await page.close();
+  }, 300_000);
+
+  /**
+   * **The renewal falls due when day 20 closes, and days 19 and 20 play** — swarm DQ's Q4 ruling,
+   * § D1357, amending § D1274 clauses 1 to 3 (GitHub issue #582 item 3 is where the gate began).
+   *
+   * Under § D1274 the renewal stood from day 19 and every door refused a contract day over it, so day
+   * 18's sheet sent the career to the desk and days 19 and 20 never ran, while the copy said *day 19
+   * of 20*. Red before on this bundle: day 18's sheet offered *Answer the renewal at …* rather than
+   * day 19. So the whole end of a month is driven here by the presses a player has: day 18's sheet
+   * opens day 19 and names the date, day 19's opens day 20, day 20's goes to the desk, the desk asks
+   * with its true date and no *while the day plays*, the contract sheet refuses the next month's day
+   * 1 with its reason, and an answer starts the month (the control: the same press then runs).
+   */
+  it('plays days 19 and 20, then holds the next month’s day 1 for the renewal — § D1357', async () => {
+    const page = await coldLoadOnContractDay(18);
+    await enterCampaign(page);
+    const building = (await page.textContent('.everyday-towers-name')) ?? '';
+    expect(building.length).toBeGreaterThan(0);
+    await openDesk(page);
+    await openContract(page);
+    expect(await page.textContent('.everyday-bar-primary')).toBe('Lock it in and run day 18');
+    await runAndCloseTheDay(page);
+
+    /* Day 18's sheet opens day 19, and says when the renewal falls due. */
+    const onward = page.locator('.everyday-report-tomorrow');
+    for (const [day, left] of [[19, '2 working days'], [20, '1 working day']] as const) {
+      expect(await onward.textContent()).toBe(`Open the doors on day ${String(day)} at ${building}`);
+      expect(await page.textContent('.everyday-report')).toContain(
+        `A renewal falls due when day 20 closes, in ${left}.`,
+      );
+      await onward.click();
+      await page.waitForSelector('.everyday-stage-canvas', { timeout: 60_000 });
+      expect(await page.textContent('.everyday-stage-dock-day')).toBe(`day ${String(day)} of 20`);
+      await closeTheDayOnStage(page);
+    }
+
+    /* Day 20's sheet goes to the desk, and runs nothing on the way. */
+    expect(await onward.textContent()).toBe(`Answer the renewal at ${building}`);
+    expect(await page.textContent('.everyday-report')).toContain('Day 20 has closed and the contract is up for renewal');
+    await onward.click();
+    await page.waitForSelector('.everyday-building', { timeout: 30_000 });
+    expect(await page.locator('.everyday-stage-canvas').count()).toBe(0);
+    expect(await page.textContent('.everyday-building')).toContain('The managing agent has offered a renewal');
+    expect(await page.textContent('.everyday-building-due')).toBe('answer before the next month’s day 1 runs');
+    expect((await monthFigures(page)).day).toBe(20);
+    expect(await page.textContent('.everyday-bar-primary')).toBe('Choose an option first');
+    const deskNote = (await page.textContent('.everyday-bar-note')) ?? '';
+    expect(deskNote).not.toContain('while the day plays');
+    expect(deskNote).not.toContain('⟨');
+
+    /* The contract sheet refuses the next month's first day, with the reason on the bar. */
+    await openContract(page);
+    const primary = page.locator('.everyday-bar-primary');
+    expect(await primary.textContent()).toBe('Lock it in and run day 1');
+    expect(await primary.isDisabled()).toBe(true);
+    expect(await page.textContent('.everyday-bar-note')).toBe(CONTRACT_COPY.renewalFirst);
+    await page.click('.everyday-bar-back');
+    await page.waitForSelector('.everyday-towers', { timeout: 30_000 });
+    await openDesk(page);
+
+    /* The control: an answer starts the month, and the same sheet's press is live again. */
+    await page.locator('.everyday-building-option', { hasText: 'Sign the renewal at their rate' }).click();
+    expect(await page.textContent('.everyday-bar-primary')).toBe('Send your answer');
+    await page.click('.everyday-bar-primary');
+    await page.waitForFunction(
+      () => !(document.querySelector('.everyday-building')?.textContent ?? '').includes('offered a renewal'),
+      undefined,
+      { timeout: 30_000 },
+    );
+    expect((await monthFigures(page)).day).toBe(1);
+    await openContract(page);
+    expect(await primary.textContent()).toBe('Lock it in and run day 1');
+    expect(await primary.isDisabled()).toBe(false);
 
     await page.close();
   }, 300_000);

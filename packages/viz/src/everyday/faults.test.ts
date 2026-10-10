@@ -14,8 +14,9 @@
  *
  * `docs/27-flow-maps.md` F0's *Unavailable* row and its D5: if the application's data does not load,
  * the Everyday shell has already covered the Engineer surface's own failure notice, the player sees
- * a working-looking main menu, and every tile leads to a screen saying the boot has not finished —
- * a sentence that is false in that state and never retracted. *Recovery: none inside the product.*
+ * a working-looking main menu, and every tile leads to a screen saying the game has not finished
+ * loading. Since § D1273 that sentence is true in that state too, and it still never says the load
+ * failed. *Recovery: none inside the product.*
  * So the two cases that matter here are the ones where a fault lands **before** the shell says it
  * mounted, and they are what makes a report from a dead page distinguishable from a report about a
  * lift going to the wrong floor.

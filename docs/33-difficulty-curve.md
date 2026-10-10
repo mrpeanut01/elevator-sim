@@ -1263,6 +1263,59 @@ exceeding it. So stage 3's C2 quarter is closed to demand and open only to fabri
 `data/reference-runs.json` pins figure-for-figure and `watch/reference.test.ts` re-simulates; that is
 a wave's blast radius rather than a lane's, and it is named here rather than attempted.
 
+### 3.3g Stages 9 and 10: each zero was a rider turned away at a landing, and demand mends one of the two
+
+GitHub issue **#234**, wave AN lane AP-1 ([§ D1288](../DECISIONS.md), [§ D1289](../DECISIONS.md)).
+Both stages read zero ways through at every rung with every examined configuration suppressed. The
+decision swarm's engineering member found the shape: one tuning crowd of fifty refused its mean for
+every arm, which under common random numbers suppresses every estimate row. This section names who
+the unserved riders are, measured 2026-10-10 on the lane's base, `5c5efaf`.
+
+**Instrument.** The shipped batch path (`campaign/stageRun.ts#batchRequestForStage`,
+`batch/runBatch.ts#armConfigOf`, `record/recordRun.ts`) under `collective`, both seed sets, fifty
+crowds each. For every rider who arrived in the reporting window and never boarded: the leg record's
+own outcome (`refusedAt`, `abandonedAt`, `strandedAt`, or still waiting), the rider's credential, and
+the access zone of the floor they were going to.
+
+**Result 1: every one of them was turned away at the landing.** On stage 10 at its shipped
+2 %pop/5 min there were 9 such riders on the tuning seeds and 11 on the holdout, and none was
+waiting, abandoned or stranded at the horizon; no car refused any call structurally. Each carried no
+credential, started on a ward or on Outpatients, and was going to theatres, critical care or
+imaging: the credential gap (`data/traffic-profiles.json` `credentialGap`, § D265) doing what it was
+built to do. All five cars serve every floor, none may legally carry these riders, and core's own
+warning says no dispatcher setting reaches them. The censoring ground counts them as never served
+(§ D266 puts them in `unservedCount`), and in a window of 8 to 25 arrivals one refusal is 4 to 12.5 %,
+above the 5 % ground, so 6 tuning and 7 holdout crowds are refused their mean. Stage 9's one censored
+crowd is the same event on `crown-hotel`: a rider from floor 23 with no credential, going to the
+back-of-house floor, 1 of 17 window arrivals.
+
+**Result 2: demand thickens the window, and only stage 9's gets thick enough.** Refusals scale with
+arrivals, so the expected refused share does not move with demand; its spread does. Stage 9 at
+3.5 % still has one refusal on each seed set, in windows of 26 and 32 arrivals, and no crowd on
+either set is refused. Stage 10 does not get there inside its building's declared range: at 5, 6 and
+8 % it keeps 2 to 5 refused crowds a seed set (3 of 39, 3 of 52, 4 of 64 arrivals at the worst), and
+at 8 % queue growth suppresses crowds as well. With the member's runs from 1.0 to 4.0 %, no demand
+from 1 to 8 % clears it.
+
+**What stage 9 reads at 3.5 %.** The re-measured goal row makes `deliver-everyone` a batch goal at
+49/50 on both sets, so the stage declares it, and `answer-the-demand` reads 38/50 and 39/50. The
+survivor census reads 3 of 63 at every rung, all three from the dropdown: `auction`,
+`auction-multi-round` and `destination-panel`, each meeting every goal on both seed sets. None of the
+stage page's 39 choices and none of the 12 drawn dials gets through. That is inside position 9's band,
+and it is a named breach of § D528 clause 2 in `DROPDOWN_CLEARS`, owner-reversible.
+
+**Why stage 10's fabric is left as it is.** The ruling allowed a fabric change chosen from this
+classification. The refusals come from St Jude's access zoning meeting the credential gap, and
+removing them means re-drawing who may reach theatres, critical care and imaging, or zoning the
+wards and Outpatients so their occupants carry a clinical badge. Either leaves the hospital's zones
+refusing nobody, which is § D265's defect shape (configuration nothing can act on), and either moves
+every St Jude pin outside the campaign for a cause the stage did not author. So stage 10 stays on
+`UNWINNABLE_AS_MEASURED` with its cause recorded. The question it leaves is whether the censoring
+ground should count a rider the building refused at the landing as a censored wait. § D265's third
+bound chose the gap's share so that it would not do this at the shipped demands; stage 10 runs at a
+quarter of the hospital profile's typical demand, where it does. That is a ruling on core's validity
+rules, outside this lane.
+
 ---
 
 ## 4. The week — Today's tower and the daily loop
@@ -1609,6 +1662,46 @@ queue bar is `goalsForDay`'s):
   still set each week's target and each day's sentence on the brief. As at Midtown, the move-in
   Tuesday reproduces the plain Tuesday mark for mark on both towers.
 - The other whole-day towers are named in the file's `unmeasured` block with the reason for each.
+
+> **DC-11.** From a tower's second week, an authored week order is **dealt** only when no single
+> shipped dispatcher profile, left alone with nothing pressed, holds the week's target on more than
+> half of DC-10's held-out crowds. *Holds* is the week sheet's own reading: on a crowd, the profile
+> cleared at least the target of the order's counted days. Week 1 is the newcomer's week and is not
+> an authored order. The bars, the target and the growth slope never move to meet it.
+
+**Why it exists** ([§ D1343](../DECISIONS.md), swarm DQ's Q2 rule 2). DC-10 asks each day for a way
+through and a reason to decide, and a week of admitted days can still be a week one dropdown holds:
+swarm DQ measured Midtown's week 1 with every driver left alone, and the house cleared 13 of 50
+day-crowds and held no week while Fairness first cleared 44, Predictive balanced 48 and the auction
+41. DC-11 asks the week whether one dropdown is the way through. It reads [§ D528](../DECISIONS.md)
+clause 2's *no single shipped dispatcher profile may meet every bar on its own* per held week, and
+the half is the ruling's (S1 and S2 proposed half, S3 a third), owner-reversible.
+
+**The protocol** (`data/week-dominance.json`, read by `shift/weekDominance.ts`, run by
+`shift/weekWay.sweep.test.ts` with `WEEK_WAY_STAGE=profiles`): every shipped profile, nothing
+pressed, once on each of the twenty held-out crowds of each of the order's five weekdays, so 1 300
+whole days an order. A row may name only some profiles, which can refuse an order and cannot admit
+one; the standing order's marks are DC-10's own `standingVerdicts`, held to the crowd. The weeks
+after the first go round the admitted orders and never back to week 1's draw.
+
+**What the first screen found** ([§ D1345](../DECISIONS.md), wave AN, Midtown Office, every figure
+of 20 held-out crowds, target 4 of 5 counted days):
+
+| order | Monday to Friday | strongest profile left alone, crowds held | verdict |
+|---|---|---|---|
+| `midtown-week-2` | caterers, goods inward, evacuation, auditors, late finish | Predictive balanced 15 | refused |
+| `midtown-week-3` | shift change, open day, conference, fire drill, move-in | Predictive balanced 16 | refused |
+| `midtown-week-4` | auditors, evacuation, caterers, goods inward, late finish | Predictive balanced 17 | refused |
+| `midtown-early-lift` | shift change, evacuation, early lift service, goods inward, open day | Predictive balanced 10, Fairness first 9, no other above 8 | **admitted** |
+
+The three orders [§ D1254](../DECISIONS.md) dealt are refused: the first nine held-out crowds are
+cleared on nearly every authored day by every strong profile, so a profile holds those weeks there
+whatever the wrinkles. Only a day that beats the strong profiles on the easy crowds moves the
+count, and two did: `lift-service:early` (a car out until midday beside the rung's car D) and a late
+week `open-day:busy`, which Predictive balanced alone clears on 10 crowds and with a spread at a
+fifth of the day on 12. No second order passes under the neighbour rule, because every passing week
+needs one of those two wrinkles; so `midtown-early-lift` is dealt in every week from the second, and
+a second order waits on a wrinkle the library does not have.
 
 ### 4.4 Day one, which is what #208 is governed by
 
@@ -2370,7 +2463,7 @@ would turn § 4.7d's table into an answer to P1 as well as to DC-4, and it does 
 
 #### 4.7n Seven days that turn on a press, and the five rungs that had to be rebalanced to keep them
 
-**Landed 2026-09-22, GitHub issue [#587](https://github.com/mrpeanut01/elevator-sim/issues/587),
+**Landed 2026-09-22, PR [#587](https://github.com/mrpeanut01/elevator-sim/pull/587),
 [§ D914](../DECISIONS.md).** § 4.7m's closing paragraph asked for exactly one thing — *a
 press-sensitivity column beside the miss rate* — and said the instrument did not exist. It does now:
 `packages/viz/src/shift/pressLadder.sweep.test.ts`, gated on `PRESS_LADDER_SWEEP=1`, runs each
@@ -3012,8 +3105,8 @@ established is that both moves are a rung reaching a run it never used to reach.
 
 #### 6.4d The rungs moved under the sweep in the same wave, and the eligible set grew by three
 
-**Re-measured 2026-09-22, on the integrated tree** — [§ D963](../DECISIONS.md), GitHub issue
-[#587](https://github.com/mrpeanut01/elevator-sim/issues/587). § 6.4c's table was taken on a branch.
+**Re-measured 2026-09-22, on the integrated tree** — [§ D963](../DECISIONS.md), PR
+[#587](https://github.com/mrpeanut01/elevator-sim/pull/587). § 6.4c's table was taken on a branch.
 A sibling lane in the same wave **booked a car out of passenger service on seven contracts' day 1**
 and rebalanced **six of the seven rungs** to keep DC-4 ([§ D914](../DECISIONS.md)): `c2` let
 0.395 → 0.34, `c3` crowd 12 → 11, `c6` 16 → 15, `c8` 8.5 → **10.5** with **two** cars out, `c10`

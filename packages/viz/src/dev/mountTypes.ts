@@ -80,6 +80,13 @@ export interface ViewAt {
    * `emptyReportView` holds the wording; this carries the facts — the split every panel keeps.
    */
   readonly unfiledSheet?: UnfiledSheetFacts | undefined;
+  /**
+   * Whether a scored attempt stands on the week on screen, so this surface only watches it — wave
+   * AN, lane AN-6, [§ D1323](../../../../DECISIONS.md), `dev/engineerWindow.ts`. On the view for
+   * {@link watching}'s reason: the attempts live in `boot()`'s closure, and the rail draws the rule
+   * above its cards while it holds. `undefined` is *nobody has said*, read as not holding.
+   */
+  readonly engineerWatchesOnly?: boolean | undefined;
 }
 
 /**

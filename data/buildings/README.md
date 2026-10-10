@@ -211,7 +211,9 @@ property of the shaft as built, and it does not change during a run.
 project owner's ruling of 2026-09-10. **Absent means a passenger car.** A building in which no car
 declares a duty runs exactly as it did before the field existed: its riders are drawn a duty and the
 draw is thrown away, so its traces and its legs are byte-identical (`traffic/dutyIdentity.test.ts`,
-all nine shipped buildings). **No shipped building declares one.**
+over every shipped building that declares none). **One shipped building declares one**: `st-jude-hospital`'s car E is a
+bed lift, an agent's proposal drafted for the owner's approval (GitHub issue #561,
+[§ D1290](../../DECISIONS.md)). Every other building declares none.
 
 ### What duty is not, and each of these already exists
 
@@ -255,7 +257,11 @@ is not for the trip, so a car whose duty differs is still sent when it is the on
    the shipped-weight guard until a shipped building declares a duty. This sentence read *proposals
    awaiting the owner's approval* until 2026-09-15 — a stale refusal of exactly the kind `CLAUDE.md`
    calls worse than a dead seam, since it tells a reader a decision is still open when it has been
-   taken, and nothing in the suite reads this file's prose to catch it.
+   taken, and nothing in the suite reads this file's prose to catch it. **St Jude declares a duty
+   since [§ D1290](../../DECISIONS.md), and the weight is still not applied**: the decision swarm
+   ruled that a shipped weight waits for a paired-t interval at 50 to 200 replications, so applying
+   the approved 0.35 is one row of `data/dispatcher-profiles.json` and the owner's to call. Until
+   then the term moves a run only on a player's own copy of a dispatcher.
 3. **The control.** Not built: the picker the two screens want, on § D219's test.
 
 **The precedent that set that order is `accessZones`, this defect with its polarity reversed**

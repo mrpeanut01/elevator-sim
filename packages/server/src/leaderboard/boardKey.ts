@@ -91,9 +91,11 @@
  * omission.** `SubmittedRun` is what `verify.ts` re-simulates, and neither `purse-units` nor `prefit`
  * has a field on it. So a modified single run replays to the same figures a standard one would and is
  * separated **on the board** rather than in the simulation. **GitHub issue #372 gave a purse a replay
- * to reach and not a run**: a posted rush sitting's `rush-purse-top-up` opens the purse
- * `leaderboard/rushSitting.ts` derives, and the sitting's rows and board key carry the set — but no
- * between-round rebuild travels yet, so nothing spends that purse and the legs are unchanged by it.
+ * to reach**: a posted rush sitting's `rush-purse-top-up` opens the purse
+ * `leaderboard/rushSitting.ts` derives, and the sitting's rows and board key carry the set. **And a run
+ * since § D1295**: a rebuild between rounds spends that purse, so a wider one pays for tiers the
+ * standard one cannot, and the rounds it rebuilt replay to different legs. This sentence said no
+ * rebuild travelled and the legs were unchanged by a top-up; it is replaced on the commit that built one.
  *
  * **The sentence that stood here about the pre-fit was false and is deleted** — it read
  * *"`rush-prefit` is refused on a sitting, because its fitted building is one this server cannot
@@ -467,10 +469,21 @@ export function rushPlacementOf(
   claimedModifiers: ModifierSet | undefined,
 ): RushPlacement {
   const modifiers = canonicalModifierSet(claimedModifiers);
-  const date = dailyDateOf(nowMs);
+  const { key: board, date } = rushDayBoardOf(buildingId, nowMs);
   const setKey = modifierSetKeyOf(modifiers);
-  const board = `rush:${buildingId}:${date}`;
   return Object.freeze({ kind: 'rush', key: setKey === '' ? board : `${board}/${setKey}`, date, buildingId, modifiers });
+}
+
+/**
+ * **Today's rush board for a tower on the standard set**, against this server's clock: the key
+ * {@link rushPlacementOf} gives a sitting with no modifiers, and the stem every modifier set's board
+ * for the same tower and day extends with `/<set>`. One derivation, so the route that answers a
+ * player's own best ({@link rushPlacementOf}'s reader, `http/api.ts#rushBestOf`) cannot come to
+ * name a different day from the one a post lands on ([§ D1359](../../../../DECISIONS.md)).
+ */
+export function rushDayBoardOf(buildingId: string, nowMs: number): { readonly key: string; readonly date: string } {
+  const date = dailyDateOf(nowMs);
+  return Object.freeze({ key: `rush:${buildingId}:${date}`, date });
 }
 
 /* -------------------------------------------------------------------------- *

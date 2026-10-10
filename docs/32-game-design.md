@@ -484,7 +484,10 @@ published totals make it checkable. A perfect Standard month pays **98 u**
 (`economy.ts#perfectMonthUnits`, summed from the rate table rather than written down) against a shop
 worth **324 u** (`economy.ts#shopTotalUnits`, summed from the shop). **You cannot buy the shop, and
 you cannot come close.** A perfect month buys about a third of it, and the difficulty tier's own
-note says so in the player's words.
+note says so in the player's words. *Amended by [§ D1312](../DECISIONS.md) on 2026-10-10:* 324 u is
+the shop priced for no building. A Career shaft is now priced per shaft at its bank's plan-area band,
+so the shop a contract sheet quotes runs from 236 u to 1 100 u by tower, a third is true of four
+contracts in sixteen, and the lede and Standard's note now say *only part* and *less than half*.
 
 Two consequences that are design decisions rather than observations:
 

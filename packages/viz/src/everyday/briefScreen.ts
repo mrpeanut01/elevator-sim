@@ -220,7 +220,7 @@ function mountBrief(
       strip.append(badge, sentence);
       column.append(strip);
       /*
-       * **Which standing orders make today's question go away** — GitHub issue #587, § D914.
+       * **Which standing orders make today's question go away** — PR #587, § D914.
        *
        * Under the strip rather than inside it, and drawn only on a pinned day: the strip says a
        * lift is going and this says what the day is asking, which are two facts with two causes.
@@ -431,7 +431,7 @@ function mountBrief(
       if (view.drivers.held !== undefined) card.setAttribute('aria-describedby', 'everyday-brief-driver-held');
       card.addEventListener('click', () => {
         if (view.drivers.held !== undefined) return;
-        context.host.setDispatcher(option.id);
+        context.host.setDispatcher(option.id, 'week');
       });
       cards.append(card);
     }
@@ -464,7 +464,7 @@ function mountBrief(
     select.disabled = view.drivers.held !== undefined;
     select.addEventListener('change', () => {
       if (view.drivers.held !== undefined) return;
-      context.host.setDispatcher(select.value);
+      context.host.setDispatcher(select.value, 'week');
     });
     const count = el(doc, 'span', 'everyday-brief-count', view.drivers.count);
     count.style.cssText = MONO(11, C.label);

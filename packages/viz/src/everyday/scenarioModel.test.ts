@@ -264,6 +264,38 @@ describe('the Scenario hub', () => {
     expect(markOf([{ ...rung, parUnits: undefined }], cleared, 0)).toBeUndefined();
   });
 
+  /**
+   * **Why a cleared row carries no mark** — [§ D1358](../../../../DECISIONS.md). The post-AM panel's
+   * seat C cleared stages 1, 6 and 8 and read nothing where 2, 3, 5 and 7 drew a mark (D6). Every
+   * cleared row now draws exactly one of the mark and the note, and an uncleared row neither. Red
+   * before: the row had no note at all.
+   */
+  it('says why a cleared stage earns no mark: free par, no par, a dearer clear, or a cost not kept', () => {
+    const rung = path[0];
+    if (rung === undefined) throw new Error('no path');
+    const cleared = new Set([rung.id]);
+    const rowOf = (parUnits: number | undefined, spent: number | undefined, ids: ReadonlySet<string> = cleared) =>
+      scenarioHubViewOf([{ ...rung, parUnits }], ids, () => spent).path?.rows[0];
+    expect(rowOf(0, 0)?.parNote).toBe(SCENARIO_COPY.parFree);
+    expect(rowOf(0, 2)?.parNote).toBe(`${SCENARIO_COPY.parFree} Your clear cost 2 units.`);
+    expect(rowOf(undefined, 2)?.parNote).toBe(SCENARIO_COPY.parNone);
+    expect(rowOf(4, 6)?.parNote).toBe(
+      `Par is 4 units, ${SCENARIO_COPY.parBasis}. Your clear cost 6 units. ${SCENARIO_COPY.parPractice}`,
+    );
+    expect(rowOf(4, undefined)?.parNote).toBe(`Par is 4 units, ${SCENARIO_COPY.parBasis}. ${SCENARIO_COPY.parUnkept}`);
+    /* Exactly one of the two on every cleared row, and neither before a clear. */
+    for (const [par, spent] of [[0, 0], [0, 2], [undefined, 1], [4, 4], [4, 2], [4, 6], [4, undefined]] as const) {
+      const row = rowOf(par, spent);
+      expect([row?.parMark, row?.parNote].filter((line) => line !== undefined), `${String(par)}/${String(spent)}`).toHaveLength(1);
+      const open = rowOf(par, spent, new Set());
+      expect(open?.parMark).toBeUndefined();
+      expect(open?.parNote).toBeUndefined();
+    }
+    /* The free par stays unmarked, which is § D1234's rule; only the silence is gone. */
+    expect(rowOf(0, 0)?.parMark).toBeUndefined();
+    expect(SCENARIO_COPY.parFree).toContain('no clear is marked');
+  });
+
   it('counts the held stages in the register rather than writing the number down', () => {
     /*
      * The count is a measurement of `data/scenario-survivors.json`, so it is derived on every read.

@@ -1,5 +1,5 @@
 /**
- * **The week's tower is a control** — GitHub issue **#587**, [§ D912](../../../../DECISIONS.md).
+ * **The week's tower is a control** — PR **#587**, [§ D912](../../../../DECISIONS.md).
  *
  * The pure half. What is asserted here is what the *words* promise; that pressing a row moves the
  * week is `everyday/host.ts`'s and is proved on the built bundle by

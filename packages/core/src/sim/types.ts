@@ -558,10 +558,12 @@ export function isInterventionKind(id: string): id is InterventionKind {
  * playhead like every other. Two kinds rather than one because the two are priced on **different
  * rungs of one ladder** (`data/price-schedule.json`'s `equipment` and `building` tiers), and the
  * record has to say which rung was paid on or the day's spend cannot be re-derived from it. The
- * tier is a *pricing* fact and deliberately not an engine one — `core` reads no price schedule and
- * must not learn to — so {@link InterventionChange.changeId} travels as an opaque id, exactly as
- * `answer-incident`'s `option` travels as opaque copy, and `packages/viz/src/pricing/` is the only
- * thing that resolves either to a number.
+ * tier is a *pricing* fact and deliberately not an engine one — the engine reads no price schedule
+ * and must not learn to — so {@link InterventionChange.changeId} travels as an opaque id, exactly as
+ * `answer-incident`'s `option` travels as opaque copy. What resolves it to a number is
+ * `config/priceSchedule.ts`, which moved into this package from `packages/viz/src/pricing/` in wave
+ * AN so the server could price a rush rebuild (GitHub issue #372, § D1295); nothing under `sim/`
+ * imports it, and `config/priceSchedule.test.ts` holds that.
  *
  * **The effect is `ResolvedServiceEvent`, and that is the whole design decision.** `charter`
  * non-goal 7 and `docs/38` § 4 forbid a second engine, and this engine already has exactly one
@@ -614,10 +616,10 @@ export type InterventionChange =
   | {
       readonly kind: 'equipment-change';
       /**
-       * The priced change's id in `data/price-schedule.json` — **opaque here**. `core` reads no
-       * price schedule and this field is never resolved to a number in this package; it is the key
-       * `packages/viz/src/pricing/parse.ts#priceOf` looks the price up under, carried on the record
-       * so a day's spend can be re-derived from the record alone.
+       * The priced change's id in `data/price-schedule.json` — **opaque here**. The engine reads no
+       * price schedule and never resolves this field to a number; it is the key
+       * `config/priceSchedule.ts#priceOf` looks the price up under (re-exported by the viewer's
+       * `pricing/parse.ts`), carried on the record so a day's spend can be re-derived from it alone.
        */
       readonly changeId: string;
       /** What the schedule calls it, in the player's own words. Never an engine identifier. */
@@ -1249,7 +1251,7 @@ export interface StageActivity {
    * Not a park and not priced like one: a clearing move does not pass through
    * `idle.repositionThresholdS`, because a tuning deadband that can veto a move the constraint
    * requires is a deadlock produced by a tuning value (§ 5.2's Q-PP, answered *no* in
-   * `DECISIONS.md` § D620). It is empty-car driving and it reaches the energy proxy through
+   * `DECISIONS.md` § D621). It is empty-car driving and it reaches the energy proxy through
    * `#depart` like every other move, which is the obligation § 5.2's *if no* branch names.
    */
   readonly clearingMoves?: number | undefined;

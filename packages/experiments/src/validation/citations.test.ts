@@ -341,3 +341,216 @@ describe('a cited repository path can be followed', () => {
     ).toEqual([]);
   });
 });
+
+/* -------------------------------------------------------------------------- *
+ * A number cited as an issue is an issue: GitHub issue #589, § D1268
+ * -------------------------------------------------------------------------- */
+
+/**
+ * Every pull request GitHub has numbered in this repository, read from
+ * `GET /repos/mrpeanut01/elevator-sim/pulls?state=all` on 2026-10-10: **180 of them, through #616**.
+ *
+ * GitHub numbers issues and pull requests from one sequence, so a number is one kind or the other
+ * for good, and a citation that calls a pull request an issue still resolves (GitHub redirects
+ * `issues/N` to `pull/N`), lands on a relevant page, and names the wrong kind of thing. Wave AG wrote
+ * that thirty-one times about the pull request that shipped it, #587: its lanes were briefed from an
+ * assessor's findings rather than from filed issues and wrote down a number nobody had filed. Reading
+ * the whole list rather than the handful the issue named found two older ones, #334 in § D462's date
+ * line and #556 in a `fixitScreen.ts` docstring.
+ *
+ * **Complete up to #616 and no further.** A pull request opened later is not here until someone adds
+ * it, so this catches every instance up to that number and is a floor above it. Written as ranges
+ * because the numbers are, and expanded once.
+ */
+const PULL_REQUEST_RANGES: readonly (number | readonly [number, number])[] = [
+  [1, 12], 89, 95, [120, 122], 128, [131, 133], [138, 139], 141, 148, [150, 155], [183, 185], 253,
+  271, 276, 280, [284, 285], 302, 304, [307, 308], 311, 314, 319, 322, 326, 330, 334, 339, 343, 345,
+  347, [357, 363], 378, [383, 399], [401, 403], [446, 455], [457, 466], [468, 474], [479, 480],
+  [482, 498], [502, 517], [519, 521], [524, 525], 527, [529, 530], 532, 538, [541, 542], [545, 547],
+  [550, 552], 556, 560, 574, 585, 587, 604, [606, 616],
+];
+
+const PULL_REQUESTS: ReadonlySet<number> = new Set(
+  PULL_REQUEST_RANGES.flatMap((entry) =>
+    typeof entry === 'number'
+      ? [entry]
+      : Array.from({ length: entry[1] - entry[0] + 1 }, (_unused, at) => entry[0] + at),
+  ),
+);
+
+/**
+ * Decision entries whose date line cites a pull request as an issue and keeps doing so, keyed by
+ * decision number, with the numbers each one miscites.
+ *
+ * A decision entry is not rewritten after the fact, so each of these carries a dated correction in a
+ * blockquote under its heading instead (`> **Corrected 2026-10-10 …**`, naming the `pull/N` link),
+ * and the case below requires that line rather than trusting this map. It is held in both
+ * directions: a row whose entry no longer miscites the number is stale and fails, and so does a row
+ * whose entry lost its correction.
+ */
+const CORRECTED_UNDER_THE_HEADING: ReadonlyMap<number, readonly number[]> = new Map([
+  [462, [334]],
+  [912, [587]],
+  [914, [587]],
+  [963, [587]],
+]);
+
+/** Every authored text file a citation can live in: prose, code, data notes, workflows and scripts. */
+const AUTHORED_TEXT: readonly string[] = Object.freeze(
+  ['.md', '.ts', '.mts', '.mjs', '.json', '.yml', '.yaml', '.sh', '.bicep']
+    .flatMap((suffix) => filesWithSuffix(suffix, ROOT))
+    // Generated, and carries no prose.
+    .filter((file) => !file.endsWith('package-lock.json'))
+    .sort(),
+);
+
+/**
+ * The words that call a number an issue. `issues?`, so a list (*issues #584 and #587*) is read
+ * whole, and the two words may be split by a wrapped line's gutter, a blockquote marker or bold.
+ */
+const ISSUE_WORDS = /GitHub[\s>*/]+issues?\b/giu;
+
+/**
+ * What may stand between those words and the numbers they cite, and between one number and the
+ * next: whitespace, a docstring gutter or a line comment, a blockquote marker, bold, a markdown
+ * link's brackets and target, and a list's comma or conjunction. Anything else ends the list, so
+ * *issue #334's* reads one number, and so does *issue #412, `DECISIONS.md` § D621*.
+ *
+ * Anchored and able to match nothing, so it never fails and never backtracks.
+ */
+const CITED_LIST = /^(?:\s|\*{1,2}|\/\/|>|\[|\]|\([^()\s]*\)|,|&|\band\b|\bor\b|#\d+)*/u;
+
+/** A link to an issue page, which is the form a citation keeps when the prose around it is reworded. */
+const ISSUE_URL = /github\.com\/mrpeanut01\/elevator-sim\/issues\/(\d+)/gu;
+
+interface IssueCitation {
+  readonly offset: number;
+  readonly number: number;
+}
+
+function issueCitationsIn(text: string): readonly IssueCitation[] {
+  const found: IssueCitation[] = [];
+  for (const words of text.matchAll(ISSUE_WORDS)) {
+    const from = (words.index ?? 0) + words[0].length;
+    const list = CITED_LIST.exec(text.slice(from, from + 600))?.[0] ?? '';
+    for (const cited of list.matchAll(/#(\d+)/gu)) {
+      found.push({ offset: from + (cited.index ?? 0), number: Number(cited[1]) });
+    }
+  }
+  for (const url of text.matchAll(ISSUE_URL)) {
+    found.push({ offset: url.index ?? 0, number: Number(url[1]) });
+  }
+  return found;
+}
+
+const lineAt = (text: string, offset: number): number => text.slice(0, offset).split('\n').length;
+
+/** The `## Dnnn` entry an offset in `DECISIONS.md` falls inside, with that entry's text. */
+function entryAt(
+  log: string,
+  offset: number,
+): { readonly id: number; readonly text: string } | undefined {
+  const headings = [...log.matchAll(/^##\s+D(\d+)\b/gmu)];
+  const at = headings.filter((heading) => (heading.index ?? 0) <= offset).length - 1;
+  if (at < 0) return undefined;
+  const start = headings[at]?.index ?? 0;
+  const end = headings[at + 1]?.index ?? log.length;
+  return { id: Number(headings[at]?.[1]), text: log.slice(start, end) };
+}
+
+/** The dated blockquote corrections an entry carries, each read whole across its wrapped lines. */
+const correctionsIn = (entry: string): readonly string[] =>
+  [...entry.matchAll(/^> \*\*Corrected \d{4}-\d{2}-\d{2}\b[^\n]*(?:\n>[^\n]*)*/gmu)].map(
+    (match) => match[0],
+  );
+
+describe('a number cited as a GitHub issue is an issue, not a pull request', () => {
+  it('reads every authored text file, and finds citations there to police', () => {
+    const names = AUTHORED_TEXT.map(relativeToRoot);
+    for (const expected of [
+      'DECISIONS.md',
+      'data/contract-ladder.json',
+      '.github/workflows/deep-tiers.yml',
+      'packages/experiments/src/validation/citations.test.ts',
+    ]) {
+      expect(names, `the walk missed ${expected}, so it is not reading the tree`).toContain(expected);
+    }
+    const cited = AUTHORED_TEXT.reduce(
+      (sum, file) => sum + issueCitationsIn(readFileSync(file, 'utf8')).length,
+      0,
+    );
+    expect(
+      cited,
+      'almost no issue citations were read, so the case below asserts nothing',
+    ).toBeGreaterThan(1000);
+    expect(PULL_REQUESTS.size, 'the registry expanded to the wrong size').toBe(180);
+    expect([587, 606, 616].every((number) => PULL_REQUESTS.has(number))).toBe(true);
+    expect(PULL_REQUESTS.has(589), '#589 is the issue that asked for this guard').toBe(false);
+  });
+
+  it('reads each form a citation takes in this tree, and stops where the list stops', () => {
+    // Built at run time, so this file's own text carries none of the forms it tests.
+    const words = ['GitHub', 'issue'].join(' ');
+    const url = ['https://github.com/mrpeanut01/elevator-sim', 'issues', '587'].join('/');
+    const numbersIn = (text: string): readonly number[] =>
+      issueCitationsIn(text).map((citation) => citation.number);
+    expect(numbersIn(`${words} #587, § D914.`)).toEqual([587]);
+    expect(numbersIn(`${words} **#587**, [§ D912](x).`)).toEqual([587]);
+    expect(numbersIn(`${words}\n * **#587**, [§ D914](x).`)).toEqual([587]);
+    expect(numbersIn(`GitHub\n> issue [#587](u), wrapped in a blockquote`)).toEqual([587]);
+    expect(numbersIn(`${words}s [#584](u) and [#587](u) · Rules on`)).toEqual([584, 587]);
+    expect(numbersIn(`(${url})`)).toEqual([587]);
+    expect(numbersIn(`${words} #334's macOS red, and #587 later`)).toEqual([334]);
+    expect(numbersIn(`${words} #412, \`DECISIONS.md\` #587`)).toEqual([412]);
+    expect(numbersIn('PR #587 and pull/587')).toEqual([]);
+  });
+
+  it('cites no pull request as an issue, outside the decision entries corrected under their headings', () => {
+    const miscited: string[] = [];
+    const corrected = new Map<number, Set<number>>();
+    for (const file of AUTHORED_TEXT) {
+      const raw = readFileSync(file, 'utf8');
+      const text = file.endsWith('.md') ? withoutFences(raw) : raw;
+      const name = relativeToRoot(file);
+      for (const citation of issueCitationsIn(text)) {
+        if (!PULL_REQUESTS.has(citation.number)) continue;
+        if (name === 'DECISIONS.md') {
+          const entry = entryAt(text, citation.offset);
+          const kept = entry === undefined ? undefined : CORRECTED_UNDER_THE_HEADING.get(entry.id);
+          if (entry !== undefined && kept?.includes(citation.number) === true) {
+            corrected.set(entry.id, (corrected.get(entry.id) ?? new Set()).add(citation.number));
+            continue;
+          }
+        }
+        miscited.push(`${name}:${String(lineAt(text, citation.offset))} → #${String(citation.number)}`);
+      }
+    }
+
+    expect(
+      [...new Set(miscited)],
+      'a pull request cited as a GitHub issue. Cite it as a pull request ("PR #N", or a pull/N ' +
+        'link), or cite the issue that asked for the work. A decision entry is not rewritten: give it ' +
+        'a dated correction under its heading and a row in CORRECTED_UNDER_THE_HEADING.',
+    ).toEqual([]);
+
+    const log = withoutFences(readFileSync(resolve(ROOT, 'DECISIONS.md'), 'utf8'));
+    for (const [id, numbers] of CORRECTED_UNDER_THE_HEADING) {
+      const heading = [...log.matchAll(/^##\s+D(\d+)\b/gmu)].find(
+        (match) => Number(match[1]) === id,
+      );
+      const entry = heading === undefined ? undefined : entryAt(log, heading.index ?? 0);
+      const lines = entry === undefined ? [] : correctionsIn(entry.text);
+      for (const number of numbers) {
+        expect(
+          corrected.get(id)?.has(number),
+          `§ D${String(id)} no longer cites #${String(number)} as an issue, so its row here is stale`,
+        ).toBe(true);
+        expect(
+          lines.some((line) => line.includes(`/pull/${String(number)})`)),
+          `§ D${String(id)} keeps its citation of #${String(number)} and carries no dated ` +
+            'correction naming the pull request, which is the condition of keeping it',
+        ).toBe(true);
+      }
+    }
+  });
+});

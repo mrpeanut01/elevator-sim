@@ -898,7 +898,7 @@
       ],
       "building": "crown-hotel",
       "traffic": {
-        "arrivalRatePctPop5min": 2.5
+        "arrivalRatePctPop5min": 3.5
       },
       "durationS": 900,
       "dispatcher": {
@@ -929,6 +929,10 @@
       },
       "replications": 50,
       "goals": [
+        {
+          "kind": "deliver-everyone",
+          "threshold": null
+        },
         {
           "kind": "answer-the-demand",
           "threshold": null
@@ -995,7 +999,7 @@
       "teaches": "that two cars in one bank can be the wrong car",
       "brief": [
         "A hospital never empties, and its busiest moments are shift changes rather than a morning arrival.",
-        "Two of the five cars are bed lifts: bigger, slower, and the wrong answer to an ordinary hall call. They are in the same bank as the other three and the dispatcher has only their speed, capacity and transfer time to tell them apart.",
+        "Two of the five cars are bed lifts: bigger, slower, and the wrong answer to an ordinary hall call. They are in the same bank as the other three, and the dispatcher you start with tells them apart only by their speed and capacity.",
         "Outpatients on floor 1 holds 180 people. When a clinic ends it empties downward \u2014 a crowd from the middle of the building rather than from the lobby, which is a shape no earlier stage produces."
       ],
       "building": "st-jude-hospital",

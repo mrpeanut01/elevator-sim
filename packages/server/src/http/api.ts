@@ -107,7 +107,14 @@ import {
 } from '../challenge/submission.js';
 import { verifyChallengeSubmission } from '../challenge/verify.js';
 import { signInMessage, type Mailer } from '../mail/mailer.js';
-import { BOARD_KEYS, dailyFixtureAt, placeSubmission, runDataHashOf, rushPlacementOf } from '../leaderboard/boardKey.js';
+import {
+  BOARD_KEYS,
+  dailyFixtureAt,
+  placeSubmission,
+  runDataHashOf,
+  rushDayBoardOf,
+  rushPlacementOf,
+} from '../leaderboard/boardKey.js';
 import { boardDistributionOf, heldLadderOf, type AxisObservation } from '../leaderboard/distribution.js';
 import { submissionIssues, type ResolvedDataFacts, type Submission } from '../leaderboard/submission.js';
 import { seedDailyBoard } from '../leaderboard/seed.js';
@@ -497,6 +504,9 @@ export function createApi(deps: ApiDeps): Api {
         return submitRushSitting(deps, request, nextSubmitMs);
       case 'GET /api/rush-board':
         return rushBoardOf(deps, request);
+      /* The signed-in player's own best sitting on a tower's boards today — § D1359. */
+      case 'GET /api/rush-best':
+        return rushBestOf(deps, request);
       case 'GET /api/challenges':
         return challenges(deps);
       case 'GET /api/challenge':
@@ -1421,8 +1431,9 @@ async function boardDistribution(deps: ApiDeps, request: ApiRequest): Promise<Ap
  * replays cost; then the ledger, so a top-up nobody paid for commands no replay either; then the
  * replay of every round (`leaderboard/rushSitting.ts#replayRushSitting`); then the board.
  *
- * What is stored is the server's: every round's held time, waves outlasted and purse from the replay,
- * beside the ids and the log that produced them. The held time the client claimed is compared and
+ * What is stored is the server's: every round's held time, waves outlasted and purse from the replay —
+ * what its rebuild spent among it (GitHub issue #372, § D1295) — beside the ids, the log and the
+ * rebuild that produced them. The held time the client claimed is compared and
  * discarded, as a single run's metrics are.
  */
 async function submitRushSitting(
@@ -1538,9 +1549,12 @@ async function replayAndPostRushSitting(
           dispatcherProfileId: round.dispatcherProfileId,
           ...(round.ruleRows === undefined ? {} : { ruleRows: round.ruleRows }),
           ...(round.interventions === undefined ? {} : { interventions: round.interventions }),
+          // What the round was rebuilt with — a cause, kept so the stored sitting replays (invariant 5).
+          ...(round.rebuild === undefined || round.rebuild.length === 0 ? {} : { rebuild: round.rebuild }),
           heldS: replayed.heldS,
           wavesOutlasted: replayed.wavesOutlasted,
           purseBeforeUnits: replayed.purseBeforeUnits,
+          spentUnits: replayed.spentUnits,
           paidUnits: replayed.paidUnits,
           purseAfterUnits: replayed.purseAfterUnits,
         };
@@ -1582,6 +1596,48 @@ async function rushBoardOf(deps: ApiDeps, request: ApiRequest): Promise<ApiRespo
       note: RUSH_BOARD_NOTE,
       entries: entries.map((entry) => publicRushEntry(deps, entry, 'row')),
       ladder,
+    },
+  };
+}
+
+/** What the player's own best says it is, on the wire — carried whole by the viewer's note. */
+const RUSH_BEST_NOTE =
+  'Your best sitting on each of this tower’s boards today, as the server replayed it: the row each board ' +
+  'ranks for you, by how long its last round held.';
+
+/**
+ * **The signed-in player's best posted sitting on a tower's rush boards for today** — swarm DQ's Q3
+ * supporting payoff, [§ D1359](../../../../DECISIONS.md).
+ *
+ * The rush setup screen draws the house's runs on the tower the player stands on, and this is what
+ * lets it draw the player's own row among them: one row per board the player posted to today, which
+ * is the row that board ranks for them (`Store.rushBestsOf`, on {@link rushBoardOf}'s best-sitting
+ * rule). The day is this server's ({@link rushDayBoardOf}, the derivation a post lands by), so a
+ * client never decides which day's board it is reading, and the key is answered rather than built
+ * by the client.
+ *
+ * Signed in only: it reads one account's rows by its session, and a player's row on a board is
+ * already public through {@link rushBoardOf}, so nothing here is more than that board would show.
+ * No purse and no price, for {@link publicRushEntry}'s `row` reason.
+ */
+async function rushBestOf(deps: ApiDeps, request: ApiRequest): Promise<ApiResponse> {
+  const user = await authenticate(deps, request);
+  if (user === undefined) {
+    return { status: 401, body: { error: 'not-signed-in', detail: 'Sign in to read your own rush rows.' } };
+  }
+  const buildingId = request.query.get('building') ?? '';
+  if (buildingId === '') {
+    return { status: 400, body: { error: 'no-building', detail: 'Name a tower with ?building=…' } };
+  }
+  const day = rushDayBoardOf(buildingId, deps.now());
+  const entries = await deps.store.rushBestsOf(user.id, buildingId, day.key);
+  return {
+    status: 200,
+    body: {
+      buildingId,
+      date: day.date,
+      note: RUSH_BEST_NOTE,
+      entries: entries.map((entry) => ({ ...publicRushEntry(deps, entry, 'row'), boardKey: entry.boardKey })),
     },
   };
 }

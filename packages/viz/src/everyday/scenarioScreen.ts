@@ -307,6 +307,12 @@ function pathBlock(
       mark.style.cssText = `font-size:12.5px;line-height:1.5;color:${C.inkSoft};margin:5px 0 0;max-width:58ch`;
       card.append(mark);
     }
+    /* § D1358: a cleared row with no mark says why, so no cleared stage reads as a par forgotten. */
+    if (row.parNote !== undefined) {
+      const note = el(doc, 'div', 'everyday-scenario-path-par-note', row.parNote);
+      note.style.cssText = `font-size:12.5px;line-height:1.5;color:${C.inkSoft};margin:5px 0 0;max-width:58ch`;
+      card.append(note);
+    }
 
     const tail = row.playable ? row.note : row.refusal;
     if (tail !== undefined) {

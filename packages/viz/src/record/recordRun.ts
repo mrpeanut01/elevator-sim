@@ -66,6 +66,7 @@ import { StepSeriesBuilder, constantSeries } from '../contract/series.js';
 import {
   VIZ_SCHEMA_VERSION,
   type StepSeries,
+  type VizAccessZone,
   type VizBankEquipment,
   type VizFloor,
   type VizLanding,
@@ -77,6 +78,7 @@ import {
   type VizRecording,
   type VizShaft,
   type VizSummary,
+  type VizTransportMode,
 } from '../contract/types.js';
 import { DecisionCollector, recordingPolicyFactory } from './decisionLog.js';
 import { instrumentCar, shortCarLabel, type CarTrack } from './instrument.js';
@@ -450,7 +452,51 @@ function describeRun(
     });
   }
   if (bankEquipment.length > 0) recording.bankEquipment = bankEquipment;
+  /*
+   * The building's access zones and its escalators and stairs — version 17, GitHub issue #544,
+   * `DECISIONS.md` § D1307. Read off the resolved building the run was simulated on, the same object
+   * `Simulation` consults, and absent when it declares none, so a building with neither block records
+   * what version 16 recorded.
+   */
+  const accessZones = describeAccessZones(building);
+  if (accessZones.length > 0) recording.accessZones = accessZones;
+  const transportModes = describeTransportModes(building);
+  if (transportModes.length > 0) recording.transportModes = transportModes;
   return recording;
+}
+
+/**
+ * The declared zones, each zone's floors put in the building's floor order — the order every other
+ * floor list in a recording is in, so a reader that runs them (`access/zoning.ts#floorRunsOf`) never
+ * reads `11, 12, 16, 2` off an authored list.
+ */
+function describeAccessZones(building: ResolvedBuilding): readonly VizAccessZone[] {
+  return building.accessZones.map((zone) => ({
+    id: zone.id,
+    floorIds: inFloorOrder(building, zone.floors),
+    credentialGroups: [...zone.credentialGroups],
+  }));
+}
+
+/**
+ * The non-lift edges, each with its kind resolved and its two floors lower first. `connects` carries
+ * no order (`core`'s own docstring: *"Order carries no meaning"*), so one is chosen here rather than
+ * by whoever reads it.
+ */
+function describeTransportModes(building: ResolvedBuilding): readonly VizTransportMode[] {
+  return building.transportModes.map((mode) => {
+    const [lower, upper] = inFloorOrder(building, mode.connects);
+    return {
+      id: mode.id,
+      kind: mode.kind ?? 'escalator',
+      floorIds: [lower ?? mode.connects[0], upper ?? mode.connects[1]],
+    };
+  });
+}
+
+function inFloorOrder(building: ResolvedBuilding, floorIds: readonly string[]): string[] {
+  const indexOf = (id: string): number => building.floorsById.get(id)?.index ?? Number.POSITIVE_INFINITY;
+  return [...floorIds].sort((a, b) => indexOf(a) - indexOf(b));
 }
 
 /* -------------------------------------------------------------------------- *

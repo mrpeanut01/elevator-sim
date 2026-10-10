@@ -37,11 +37,13 @@
  */
 
 import { nextTowerOfferOf, type NextTowerOffer } from '../shift/nextTower.js';
+import { nextWeekOf, type NextWeekView } from '../shift/nextWeek.js';
 import { wasGraded } from '../shift/week.js';
 import {
   DAY_UNMEASURED_SENTENCE,
   dayCountsToward,
   weekDealOf,
+  weekOrdinalOf,
   weekSheetOf,
   weekStakeLineOf,
   type HouseReading,
@@ -51,7 +53,7 @@ import type { DayOutcome, WeekState } from '../shift/types.js';
 import { weekRecordLineOf, weeksHeldLineOf, type WeekRecord } from '../shift/weekRecord.js';
 import { weekdayOf } from '../shift/types.js';
 
-import { todayIsBanked, type WorldBandView } from './doorView.js';
+import { DAY_VERDICT_NOTE, todayIsBanked, type WorldBandView } from './doorView.js';
 import { EM_DASH, percentFigure } from './figures.js';
 import {
   percentileLine,
@@ -179,14 +181,22 @@ export interface WeekScreenView {
    */
   readonly onward: NextTowerOffer | undefined;
   /**
+   * **What the sheet deals next on this tower** — `shift/nextWeek.ts#nextWeekOf`, wave AN, lane DQ-2
+   * ([§ D1344](../../../../DECISIONS.md)): the next week on a held week, this week again on one
+   * that was not held with *Go on to week N* beside it, and *harder* only where the house's census
+   * fell. `undefined` while no sheet stands.
+   */
+  readonly next: NextWeekView | undefined;
+  /**
    * **Weeks held on this tower**, one line — `shift/weekRecord.ts#weeksHeldLineOf`, lane AM-D
    * ([§ D1253](../../../../DECISIONS.md)) — or `undefined` before a week on it has closed.
    */
   readonly held: string | undefined;
   /**
    * The screen's one button while the week's sheet stands — the onward tower's label where a held
-   * week offers one, {@link WEEK_START_NEXT_LABEL} otherwise — and `undefined` when no sheet
-   * stands, when the button is the week row's own (§ 3.3).
+   * week offers one, {@link next}'s label otherwise (*Start next week* on a held week, *Play week 2
+   * again* on one that was not) — and `undefined` when no sheet stands, when the button is the week
+   * row's own (§ 3.3).
    */
   readonly primary: string | undefined;
 }
@@ -253,12 +263,11 @@ export function verdictOf(outcome: DayOutcome): WeekDayVerdict {
   return outcome.allMet ? 'cleared' : 'missed';
 }
 
-/** The note a card carries. One sentence fragment per state, and no state without one. */
-const VERDICT_NOTE: Readonly<Record<WeekDayVerdict, string>> = Object.freeze({
-  cleared: 'clean day',
-  missed: 'missed',
-  ungraded: 'too quiet to grade',
-});
+/**
+ * The note a card carries. One sentence fragment per state, and no state without one — the door's
+ * chip reads the same map (`doorView.ts#DAY_VERDICT_NOTE`, wave AN, lane AN-7).
+ */
+const VERDICT_NOTE: Readonly<Record<WeekDayVerdict, string>> = DAY_VERDICT_NOTE;
 
 /** `Monday` → `MON`. */
 function shortWeekday(dayIdx: number): string {
@@ -335,6 +344,12 @@ function cardsOf(input: WeekScreenInput): readonly WeekDayCard[] {
     });
   }
   return Object.freeze(cards);
+}
+
+/** ` · WEEK 2`, or nothing where no week number is true of the week. */
+function weekEyebrowOf(week: WeekState): string {
+  const ordinal = weekOrdinalOf(week);
+  return ordinal === undefined ? '' : ` · ${ordinal.toUpperCase()}`;
 }
 
 /** The tally, counted off the cards. See the module docstring on § 16 rule 5. */
@@ -440,8 +455,10 @@ export function weekScreenViewOf(input: WeekScreenInput): WeekScreenView {
   const todayClosed = todayIsBanked(input);
   const sheet = weekSheetOf(input.week, input.house ?? (() => undefined));
   const onward = nextTowerOfferOf(input.week.contractId, sheet, input.nameOf);
+  const next = sheet === undefined ? undefined : nextWeekOf(input.week);
   return {
-    eyebrow: 'ELEVATOR SIM · EVERYDAY MODE',
+    /* Wave AN, lane AN-7: the week's number, where one is true of it (`weekStake.ts#weekOrdinalOf`). */
+    eyebrow: `ELEVATOR SIM · EVERYDAY MODE${weekEyebrowOf(input.week)}`,
     title: 'Your week',
     streakLine: streakLineOf(input.week, tally.closed),
     cards,
@@ -472,8 +489,9 @@ export function weekScreenViewOf(input: WeekScreenInput): WeekScreenView {
     sheet,
     record: input.record === undefined ? undefined : weekRecordLineOf(input.record),
     onward,
+    next,
     held: input.record === undefined ? undefined : weeksHeldLineOf(input.record),
-    primary: sheet === undefined ? undefined : (onward?.label ?? WEEK_START_NEXT_LABEL),
+    primary: sheet === undefined ? undefined : (onward?.label ?? next?.label ?? WEEK_START_NEXT_LABEL),
   };
 }
 

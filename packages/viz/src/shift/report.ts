@@ -115,14 +115,18 @@ import { fallbackLineOf, readbackOf, type RuleRow } from '../authoring/ruleSpec.
 import { driversLineOf, driverStretchesOf, interventionLogOf } from '../live/interventions.js';
 
 import { afterPressBeatOf, type PairVerdicts } from './afterPress.js';
-import { pressCallRowOf, type PressCallRowInput } from './callRow.js';
+import { pressCallDecidingOf, pressCallRowOf, type PressCallRowInput } from './callRow.js';
 import {
   dayCallCountsLineOf,
+  dayCallFailedRowOf,
   dayCallRowOf,
   dayCallsQuietSentenceOf,
+  dayCallWrinkleQuietRowOf,
   dayEndedEarlyRowOf,
+  type DayCallFailure,
   type DayCallRecord,
   type DayCallsQuiet,
+  type DayCallWrinkleQuiet,
 } from './dayCalls.js';
 import { wrinkleNameOf, wrinkleNoteOf, type BookedOutCar } from './bookedOut.js';
 import type { PressCounterfactual } from './counterfactual.js';
@@ -134,8 +138,8 @@ import { contractStatus } from './contracts.js';
 import { gaveUpBesideOf, goalPlainNameOf, horizonLabelOf, readGoals, wasDisplayOf } from './goals.js';
 import { growthFactor } from './growth.js';
 import { CONTRACT_LADDER } from './ladder.js';
-import { ENDLESS_CONTRACT_ID, nextDay, rollWeek, wasGraded } from './week.js';
-import { decidingCallLineOf, type DecidingPinnedCall } from './dayClose.js';
+import { ENDLESS_CONTRACT_ID, nextDay, pathNextOf, wasGraded } from './week.js';
+import { decidingCallOf, type DecidingPinnedCall } from './dayClose.js';
 import {
   WEEK_CLOSED_LINE,
   weekDealOf,
@@ -519,10 +523,17 @@ export interface WeekDayReport extends DayReport, ShapedOnlyFields {
   readonly onward?: ReportOnward | undefined;
   /**
    * **The call that decided today**, or the plain sentence that none did —
-   * `shift/dayClose.ts#decidingCallLineOf` over this sheet's own call runs, graded by this sheet's
+   * `shift/dayClose.ts#decidingCallOf` over this sheet's own call runs, graded by this sheet's
    * grader ([§ D1248](../../../../DECISIONS.md)). Absent on a day nobody graded.
    */
   readonly decidingCall?: string | undefined;
+  /**
+   * **Whether a call decided today** — `true` where {@link decidingCall} names one, `false` where it
+   * says none did, absent on a day nobody graded. The close reads it to say what decided a day no
+   * call decided (`shift/dayClose.ts#dayDeciderOf`, wave AN, lane DQ-3,
+   * [§ D1351](../../../../DECISIONS.md)), so the sheet's sentence and the close's decision are one.
+   */
+  readonly callDecided?: boolean | undefined;
 }
 
 /** The next day on the main path, as {@link WeekDayReport.onward} carries it. */
@@ -537,6 +548,11 @@ export interface ReportOnward {
   readonly demand: string;
   /** Whether the next day on the path opens a new week. */
   readonly newWeek: boolean;
+  /**
+   * Which week of the tower the next day is in (`WeekState.week`, § D1252): this week's, or the next
+   * one's where {@link newWeek}. Whether it counts is read off that week's deal.
+   */
+  readonly week: number;
 }
 
 /**
@@ -876,6 +892,19 @@ export interface DayReportInput {
    */
   readonly dayCallsQuiet?: DayCallsQuiet | undefined;
   /**
+   * The moments whose question a run that could not be made cost — wave AN, lane DQ-1,
+   * [§ D1335](../../../../DECISIONS.md). One row says where, **whatever else the day raised**: until
+   * § D1335 the fault was spoken only through {@link dayCallsQuiet} on a day with no call at all.
+   * `undefined` and empty draw nothing.
+   */
+  readonly dayCallFailures?: readonly DayCallFailure[] | undefined;
+  /**
+   * The day's wrinkle where the stage ran its answers in it and raised no call — wave AN, lane DQ-1,
+   * [§ D1336](../../../../DECISIONS.md). One past-tense row, from the runs already made; `undefined`
+   * draws nothing.
+   */
+  readonly dayCallWrinkleQuiet?: DayCallWrinkleQuiet | undefined;
+  /**
    * Where the player pressed *End the day* — [§ D1168](../../../../DECISIONS.md), offered only once a
    * goal whose miss is final read missed on the stage. The day is filed on the run already recorded,
    * so every figure is the whole day's; the sheet carries one row saying when the watching stopped.
@@ -897,6 +926,16 @@ export interface DayReportInput {
    * declares one and the sentence is never left without a figure.
    */
   readonly growthPerDay?: number | undefined;
+  /**
+   * **The measured tenants behind the forecast's percentage** — wave AN, lane AN-7. Today's
+   * building, the literal tomorrow's and the next day on the main path's, each
+   * `ResolvedBuilding.totalPopulation` off the plan its run is built from
+   * (`dev/state.ts#tomorrowFactsOf`). Where given, the percentage is the ratio of these counts; where
+   * absent it falls back to {@link growthPerDay}'s slope. The slope's ratio is not the run's: growth
+   * rounds per floor (`shift/growth.ts`), so the post-AM panel's seat D read *7.4 % fewer tenants*
+   * for 627 → 589, which is 6.1 %, and *9.1 %* for 646 → 589, which is 8.8 %.
+   */
+  readonly populations?: { readonly today: number; readonly tomorrow: number; readonly onward: number } | undefined;
   /**
    * Whether this run is the building's whole authored day — `dev/state.ts#plannedDayOf`'s
    * `wholeDayRun`. On such a run a mix-setting wrinkle with a placement was spliced as an episode,
@@ -1296,6 +1335,8 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
         ? {
             records: input.dayCalls ?? [],
             quiet: input.dayCallsQuiet,
+            failures: input.dayCallFailures ?? [],
+            wrinkleQuiet: input.dayCallWrinkleQuiet,
             endedEarlyAtS: input.dayEndedEarlyAtS,
             gradeOf: (callObservations) =>
               VERDICT_VOICE[verdictOf(readGoals(input.goals, callObservations))].line,
@@ -1342,12 +1383,19 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
   const nextIdx = (week.dayIdx + 1) % 7;
   const practice = input.practice === true;
   /* The next day on the main path — § D1246: a closed week's next day is the next week's first. */
-  const pathNext = weekHasClosed(week) ? rollWeek(week) : nextDay(week);
+  const pathNext = pathNextOf(week);
+  /*
+   * Dealt from the next day's own week — wave AN, lane AN-7. This drew week 1's wrinkle whatever the
+   * week (§ D1252 deals each week its own order), so on every week-2 close the onward wrinkle
+   * matched nothing the census dealt and tomorrow read *does not count toward the week*, while its
+   * brief and the next close's tally both counted it (the post-AM panel's seats B and D).
+   */
   const onwardEvent = scheduledEventFor(
     input.calendar,
     pathNext.day,
     pathNext.dayIdx,
     input.wholeDayRun === true ? 'whole-day' : 'period',
+    pathNext,
   );
   const onwardForecast = forecastFor(
     input.calendar,
@@ -1356,8 +1404,9 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
     input.wholeDayRun === true,
     input.growthPerDay ?? CONTRACT_LADDER.defaultGrowthPerDay,
     pathNext,
+    input.populations === undefined ? undefined : { today: input.populations.today, tomorrow: input.populations.onward },
   );
-  const decidingCall = decidingCallLineOf({
+  const deciding = decidingCallOf({
     verdict: judgement.verdict,
     records: input.dayCalls ?? [],
     pinned: decidingPinnedOf(input),
@@ -1401,6 +1450,8 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
       input.templateVariesMix === true,
       input.wholeDayRun === true,
       input.growthPerDay ?? CONTRACT_LADDER.defaultGrowthPerDay,
+      nextDay(week),
+      input.populations === undefined ? undefined : { today: input.populations.today, tomorrow: input.populations.tomorrow },
     ),
     taught: taughtFor(contract, week),
     nextDayName: weekdayOf(nextIdx),
@@ -1413,27 +1464,21 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
       note: onwardForecast.note,
       demand: onwardForecast.demand,
       newWeek: pathNext.day <= week.day,
+      week: pathNext.week,
     },
-    ...(decidingCall === undefined ? {} : { decidingCall }),
+    ...(deciding === undefined ? {} : { decidingCall: deciding.line, callDecided: deciding.decided }),
   };
 }
 
 /**
- * The pinned press day's call in the terms {@link decidingCallLineOf} reads, or `undefined` where
- * the call row would not print — the same gate, asked of `callRow.ts#pressCallRowOf` itself, so the
- * close names a pinned call exactly where the sheet's row describes one.
+ * The pinned press day's call in the terms {@link decidingCallOf} reads, or `undefined` where
+ * the call row would not print — `callRow.ts#pressCallDecidingOf`, which reads the answer at the
+ * call through the row's own reader, so the close and the row name one answer to one call.
  */
 function decidingPinnedOf(input: DayReportInput): DecidingPinnedCall | undefined {
   const pressCall = input.pressCall;
   if (pressCall === undefined) return undefined;
-  const interventions = input.interventions ?? [];
-  if (pressCallRowOf({ ...pressCall, interventions }, (simTimeS) => String(simTimeS)) === undefined) return undefined;
-  return {
-    atS: pressCall.call.atS,
-    clearedBy: pressCall.press.clearedBy,
-    missedBy: pressCall.press.missedBy,
-    answered: interventions[0]?.change.kind,
-  };
+  return pressCallDecidingOf({ ...pressCall, interventions: input.interventions ?? [] });
 }
 
 /**
@@ -2429,6 +2474,8 @@ function diagnosisFor(
   dayCalls?: {
     readonly records: readonly DayCallRecord[];
     readonly quiet?: DayCallsQuiet | undefined;
+    readonly failures?: readonly DayCallFailure[] | undefined;
+    readonly wrinkleQuiet?: DayCallWrinkleQuiet | undefined;
     readonly endedEarlyAtS?: SimTime | undefined;
     readonly gradeOf: (observations: Observations) => string;
   },
@@ -2590,6 +2637,16 @@ function diagnosisFor(
           tone: 'plain',
         }
       : undefined;
+  /* § D1335: a question lost to a run that could not be made is said on every day it happens. */
+  const failedRow =
+    dayCalls?.failures === undefined
+      ? undefined
+      : dayCallFailedRowOf(dayCalls.failures, (simTimeS) => clockOf(simTimeS, dayStartS));
+  /* § D1336: a wrinkle the stage ran its answers in and raised no call, in the past tense. */
+  const wrinkleRow =
+    dayCalls?.wrinkleQuiet === undefined
+      ? undefined
+      : dayCallWrinkleQuietRowOf(dayCalls.wrinkleQuiet, (simTimeS) => clockOf(simTimeS, dayStartS));
   /* § D1168: a day the player ended early says when, and that the figures are the whole day's. */
   const endedRow =
     dayCalls?.endedEarlyAtS === undefined
@@ -2600,7 +2657,9 @@ function diagnosisFor(
     ...(afterPress === undefined ? [] : [afterPress]),
     ...(callRow === undefined ? [] : [callRow]),
     ...callRows,
+    ...(wrinkleRow === undefined ? [] : [wrinkleRow]),
     ...(quietRow === undefined ? [] : [quietRow]),
+    ...(failedRow === undefined ? [] : [failedRow]),
     ...(endedRow === undefined ? [] : [endedRow]),
   ];
 }
@@ -2828,10 +2887,22 @@ const LEVERS: readonly ReportLever[] = Object.freeze([
     title: 'Zone the tower',
     body: 'Split the floors between cars during the peak only. Superb while the peak holds, wasteful the moment it eases.',
   }),
+  /*
+   * **The outcome clause is struck** — wave AN, lane AN-7, on lane AN-3's measurement for GitHub
+   * issue #575. This read *"Your worst wait falls; your average may
+   * not"*: a promise of what the run will do. Swept on the legs through the shipped path, the
+   * workshop's patience lever (the starvation weight this card's route opens) changes nobody's trip
+   * on some days under every shipped profile, so the card says what the term charges for, in the
+   * workshop advice's own terms (`authoring/dispatcherSpec.ts#adviceFor`), and that it can change
+   * nothing. The design's words lose here because the simulator wins what a sentence about a run
+   * means (CLAUDE.md, the design handoff).
+   */
   Object.freeze({
     id: 'weight-fairness',
     title: 'Weight fairness up',
-    body: 'Rescue the forgotten floor rather than shaving seconds off the easy calls. Your worst wait falls; your average may not.',
+    body:
+      'Fairness makes a car pay for delaying a call that has already waited a long time, which aims at ' +
+      'the worst wait rather than the average. On some days it changes nobody’s trip.',
   }),
   /*
    * **The mechanism clause is struck** — first-day swarm S2 item 5, point 2. This read *"…pools
@@ -2996,9 +3067,10 @@ function leverPointersFor(
   /*
    * Weight fairness up — the forgotten-floor shape, and it is a shape rather than a level: most
    * riders away quickly *and* somebody left standing far longer than the rest. The card's own
-   * sentence is that trade in as many words (*your worst wait falls; your average may not*), so it
-   * is the card a day of that shape points at. A day where nobody was away quickly is an
-   * out-of-capacity day, and the first card above already has it.
+   * sentence names that aim (*the worst wait rather than the average*) and promises no outcome
+   * ([§ D1279](../../../../DECISIONS.md), GitHub issue #575), so it is the card a day of that shape
+   * points at. A day where nobody was away quickly is an out-of-capacity day, and the first card
+   * above already has it.
    */
   /*
    * **The sheet's one worst wait** — wave AK, [§ D1148](../../../../DECISIONS.md), the post-AJ
@@ -3142,19 +3214,31 @@ function forecastFor(
    * card passes the next day on the main path instead ([§ D1246](../../../../DECISIONS.md)).
    */
   tomorrow: WeekState = nextDay(week),
+  /*
+   * The two buildings' measured tenants, where the shell measured them — {@link DayReportInput.populations}.
+   * The percentage is their ratio; the slope's ratio is the fallback, and it is not the run's,
+   * because growth rounds per floor.
+   */
+  measured?: { readonly today: number; readonly tomorrow: number },
 ): ReportForecast {
   const event = eventAsRun(
     scheduledEventFor(calendar, tomorrow.day, tomorrow.dayIdx, wholeDayRun ? 'whole-day' : 'period', tomorrow),
     templateVariesMix,
     wholeDayRun,
   );
-  const change = (growthFactor(tomorrow.day, perDay) / growthFactor(week.day, perDay) - 1) * 100;
+  const change =
+    measured !== undefined && measured.today > 0
+      ? (measured.tomorrow / measured.today - 1) * 100
+      : (growthFactor(tomorrow.day, perDay) / growthFactor(week.day, perDay) - 1) * 100;
+  const newWeek = tomorrow.day <= week.day;
   return {
     name: event.name,
     note: event.note,
     demand:
       change < 0
-        ? `A new week: the tower as handed, ${(-change).toFixed(1)}% fewer tenants than today`
+        ? newWeek
+          ? `A new week: the tower as handed, ${(-change).toFixed(1)}% fewer tenants than today`
+          : `${(-change).toFixed(1)}% fewer tenants than today`
         : `+${change.toFixed(1)}% more tenants than today`,
   };
 }

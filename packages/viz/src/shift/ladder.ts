@@ -274,7 +274,7 @@ export interface ContractLadderRow {
   /**
    * The pinned day whose verdict turns on a press, or `undefined` for a rung that has none.
    *
-   * GitHub issue **#587**, [§ D914](../../../../DECISIONS.md). See {@link ContractPressDay}.
+   * PR **#587**, [§ D914](../../../../DECISIONS.md). See {@link ContractPressDay}.
    */
   readonly pressDay: ContractPressDay | undefined;
   /**
@@ -297,8 +297,10 @@ export interface ContractLadderRow {
    *
    * Authored here and admitted elsewhere: `shift/weekOrders.ts` deals an order only once the week
    * census (`data/week-way.json`) holds a current row for every one of its days under exactly the
-   * wrinkle it names, and `docs/33` DC-10 admits each row. An order the census refuses stays in the
-   * data with its refusal readable and is not dealt.
+   * wrinkle it names, `docs/33` DC-10 admits each row, and DC-11's one-profile screen
+   * (`data/week-dominance.json`, wave AN lane DQ-2, [§ D1343](../../../../DECISIONS.md)) finds no
+   * shipped profile left alone holding the week on more than half its crowds. An order either
+   * refuses stays in the data with its refusal readable and is not dealt.
    */
   readonly weekOrders: readonly ContractWeekOrder[];
 }
@@ -521,7 +523,7 @@ function contractIncidentOf(value: unknown): ContractIncident {
  * something else.
  */
 /**
- * The contract's pinned press day, or `undefined` — GitHub issue #587, § D914.
+ * The contract's pinned press day, or `undefined` — PR #587, § D914.
  *
  * Keyed on the contract alone rather than on `(contractId, buildingId)` like {@link rungFor},
  * because a press day is a fact about **the day this contract hands you** rather than about a run:

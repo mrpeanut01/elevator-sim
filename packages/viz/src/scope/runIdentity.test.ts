@@ -58,6 +58,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import { DEFAULT_LEVERS } from '../authoring/dispatcherSpec.js';
+import { DEFAULT_PATTERN } from '../authoring/patternSpec.js';
 import { asBuiltChoices, withBankChoice } from '../commissioning/choices.js';
 import { commissionableClasses } from '../commissioning/types.js';
 import {
@@ -243,6 +244,63 @@ describe('the predicate answers the question it claims to', () => {
     expect(issues.map((issue) => issue.key)).toContain('viewer.dispatcherId');
     // And the polarity that says the gate is not simply on: the shipped id passes.
     expect(runIdentityIssues(baseState(), RESOURCES)).toEqual([]);
+  });
+
+  /*
+   * **The reason is true of the id it names, in both of the cases that reach it** — GitHub issue
+   * #591. The three value refusals said *"is saved on this device alone"* for every id the build
+   * does not ship, and an id can reach them saved nowhere: a session stored before a release renamed
+   * a profile, or a deep link. Then the sentence told the reader the id lives on this device when it
+   * lives nowhere, which is § D227's stale reason inside a refusal that is itself correct.
+   *
+   * Asserted per field and in both directions: an id this device saved keeps the device sentence,
+   * and an id saved nowhere does not get it. The refusal still fires in both, keyed to its field,
+   * because § D948's pin above is about the refusal existing and this one is about its words.
+   */
+  it('says an unshipped id is saved on this device only when this device saved it', () => {
+    const base = baseState();
+    const shippedBuilding = RESOURCES.entries[0]?.config;
+    const shippedProfile = RESOURCES.dispatcherProfiles.profiles[0];
+    if (shippedBuilding === undefined || shippedProfile === undefined) {
+      throw new Error('the shipped data loaded no building or no dispatcher');
+    }
+    const cases: readonly {
+      readonly key: string;
+      readonly saved: ViewerState;
+      readonly nowhere: ViewerState;
+    }[] = [
+      {
+        key: 'viewer.buildingId',
+        saved: {
+          ...base,
+          buildingId: 'mine',
+          savedBuildings: [{ id: 'mine', config: { ...shippedBuilding, id: 'mine' } }],
+        },
+        nowhere: { ...base, buildingId: 'renamed-since' },
+      },
+      {
+        key: 'viewer.dispatcherId',
+        saved: {
+          ...base,
+          dispatcherId: 'mine',
+          savedDispatchers: [{ id: 'mine', profile: { ...shippedProfile, id: 'mine' } }],
+        },
+        nowhere: { ...base, dispatcherId: 'renamed-since' },
+      },
+      {
+        key: 'viewer.pattern',
+        saved: { ...base, pattern: 'mine', savedPatterns: [{ id: 'mine', spec: DEFAULT_PATTERN }] },
+        nowhere: { ...base, pattern: 'renamed-since' },
+      },
+    ];
+    for (const { key, saved, nowhere } of cases) {
+      const onDevice = runIdentityIssues(saved, RESOURCES).find((issue) => issue.key === key);
+      const savedNowhere = runIdentityIssues(nowhere, RESOURCES).find((issue) => issue.key === key);
+      expect(onDevice?.message, `${key}, saved on this device`).toContain('saved on this device alone');
+      expect(savedNowhere, `${key}, saved nowhere, is still refused`).toBeDefined();
+      expect(savedNowhere?.message, `${key}, saved nowhere`).not.toContain('saved on this device alone');
+      expect(savedNowhere?.message, `${key}, saved nowhere`).toContain('not saved on this device');
+    }
   });
 
   it('names the field each refusal is about', () => {

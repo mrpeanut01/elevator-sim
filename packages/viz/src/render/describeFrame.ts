@@ -21,6 +21,7 @@
 
 import type { LockedOutLanding } from '../access/lockedOut.js';
 import { describeLockedOut } from '../access/lockedOut.js';
+import { floorRunsOf } from '../access/zoning.js';
 import type { Frame, VizRecording } from '../contract/types.js';
 import type { FloorQueue, OverlayMetrics } from '../frame/overlay.js';
 import { LOAD_ALARM, LOAD_FULL } from './overlay.js';
@@ -109,6 +110,60 @@ export interface DescribeFrameInput {
    * `dayReportOf`'s reason — a caller with no name to give gets the string it had before.
    */
   readonly dispatcherName?: string | undefined;
+}
+
+/**
+ * The two standing facts the gutter marks `⚿` and `⇅`/`⋰` — GitHub issue #544, § D1307 — said in
+ * words, one sentence each, and nothing when the building declares neither.
+ *
+ * **The access sentence names floors and no credential groups.** A secure tower has five zones and a
+ * dozen groups between them, and `KB-13` asks for a description rather than a manifest; what a
+ * reader needs from the standing fact is *where a credential decides*, and the locked-out clause
+ * below names the credential when one actually went unread. The floors are runs in the building's
+ * order (`access/zoning.ts#floorRunsOf`), so twenty-nine restricted floors read `2–30`.
+ *
+ * **What the sentence claims is `core`'s rule, and only that.** Access is asked of the floor a rider
+ * is going **to** (`model/car/estimateCost.ts`: *"this is the only place access zoning is asked, and
+ * the pickup floor is deliberately not asked about"*), so the words are *ride to*. The transport
+ * sentence names what joins which floors and claims nothing about who uses it: a stair is chosen,
+ * and a run may have nobody on it.
+ *
+ * Private, beside {@link loadWords}, for the reason {@link restWords} gives: the adapter drives
+ * {@link describeFrame}, and this is how it speaks.
+ */
+function buildingFactSentences(recording: VizRecording): readonly string[] {
+  const sentences: string[] = [];
+  const zones = recording.accessZones ?? [];
+  if (zones.length > 0) {
+    const order = recording.floors.map((floor) => floor.id);
+    const inZone = new Set(zones.flatMap((zone) => zone.floorIds));
+    const zoned = order.filter((id) => inZone.has(id));
+    const runs = floorRunsOf(order, zoned);
+    const one = zoned.length === 1;
+    sentences.push(
+      `${zones.length === 1 ? 'One access zone covers' : `${String(zones.length)} access zones cover`} ` +
+        `${one ? 'floor' : 'floors'} ${runs}: only a rider whose credential the zone admits may ride to ` +
+        `${one ? 'it' : 'them'}.`,
+    );
+  }
+  const modes = recording.transportModes ?? [];
+  for (const kind of ['escalator', 'stairs'] as const) {
+    const joins = modes.filter((mode) => mode.kind === kind).map((mode) => mode.floorIds.join(' to '));
+    if (joins.length === 0) continue;
+    const noun = kind === 'escalator' ? 'escalator' : 'stair';
+    sentences.push(
+      joins.length === 1
+        ? `A${noun === 'escalator' ? 'n' : ''} ${noun} joins floors ${joins[0] ?? ''}.`
+        : `${String(joins.length)} ${noun}s join floors ${listWords(joins)}.`,
+    );
+  }
+  return sentences;
+}
+
+/** `G to 2, 26 to 27 and 51 to 52` — the transport sentence's list, so four escalators read as one sentence. */
+function listWords(items: readonly string[]): string {
+  if (items.length <= 1) return items.join('');
+  return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1] ?? ''}`;
 }
 
 /** Words for a load factor. The `!` glyph's spoken equivalent. */
@@ -294,6 +349,14 @@ export function describeFrame(input: DescribeFrameInput): string {
    */
   const lockedOut = describeLockedOut(input.lockedOutLandings ?? []);
   if (lockedOut !== '') parts.push(`${lockedOut}.`);
+
+  /*
+   * The building's standing facts — GitHub issue #544, § D1307. After the outcome above rather than
+   * before it: a refused call is news about this run, and where the zones and the escalators are is
+   * true of every run of the building. Before the per-floor clauses, so a reader hearing the floors
+   * one by one already knows which are restricted and which are joined without a lift.
+   */
+  parts.push(...buildingFactSentences(recording));
 
   /*
    * § 6.3 — the per-floor clause, which lands *with* the renderer rather than after it.

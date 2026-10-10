@@ -118,7 +118,7 @@ import type {
  * **sink**, not a source: § D526 clause 5 forbids this package naming where a chime came from, and
  * `boundaries.test.ts` asserts exactly that, in both directions.
  */
-import { RUSH_PREFIT_SINK_ID } from '@elevator-sim/core/browser';
+import { RUSH_PREFIT_SINK_ID, rushLevelsAfter, type RushFitLevels } from '@elevator-sim/core/browser';
 
 /*
  * Type-only, and it has to stay that way: `boundaries.test.ts` asserts that the value importers
@@ -167,8 +167,10 @@ import {
   contractIsLost,
   purseOf,
   shopTierAt,
+  type TowerShafts,
 } from '../campaign/economy.js';
 import { fitOutOf, startTimeFloorIdsOf } from '../campaign/fitOut.js';
+import { careerTowerShaftsOf } from '../campaign/shaftPlan.js';
 import {
   answerChangeOf,
   campaignEventFor,
@@ -177,7 +179,12 @@ import {
   type CampaignIncident,
 } from '../campaign/incidents.js';
 import { worksHeldCarRefsOf, worksHeldCarsOf } from '../campaign/works.js';
-import { stageCallRowsOf, type StageCallRowView } from './stageCallRow.js';
+import {
+  stageCallFailedRowsOf,
+  stageCallRowsOf,
+  stageCallWrinkleQuietRowsOf,
+  type StageCallRowView,
+} from './stageCallRow.js';
 import { everydayCareerStore, type CareerStore } from './careerStore.js';
 import { CAMPAIGN_DOCK_COPY, purseRefusalOf } from './campaignDock.js';
 import { CAREER_CONTRACT_ID, openCareer, REPLAY_CONTRACT_ID, switchWeek } from '../shift/week.js';
@@ -202,6 +209,7 @@ import {
   runSubmissionOf,
   shiftDemandTemplateId,
   shiftLengthForContract,
+  shiftRunConfigOf,
   specsWithSaved,
   withDispatcher,
   type PatternSelection,
@@ -210,6 +218,7 @@ import {
   type ViewerState,
 } from '../dev/state.js';
 import { observationsAt } from '../live/observations.js';
+import type { SessionStore } from '../persist/types.js';
 import type { GhostPick } from '../live/raceStrip.js';
 import {
   applyPlainLever,
@@ -224,7 +233,13 @@ import { admittedPressDayIds, ladderTowersOf, pressDayFor } from '../shift/ladde
 import { crowdIsShared, PRACTICE_DAY_SENTENCES, type PracticeGround } from '../shift/scoredCrowd.js';
 import { callOpeningOf, watchedCallOpeningOf } from './callOpening.js';
 import type { PressCall } from '../shift/pressCall.js';
-import type { DayCallAnswer, DayCallOnStage, DayCallRecord } from '../shift/dayCalls.js';
+import type {
+  DayCallAnswer,
+  DayCallFailure,
+  DayCallOnStage,
+  DayCallRecord,
+  DayCallWrinkleQuiet,
+} from '../shift/dayCalls.js';
 import {
   runHorizonOf,
   scenarioHorizonFor,
@@ -278,7 +293,9 @@ import { watchingViewOf, type WatchingView } from '../watch/view.js';
 
 import type { DemandBand } from '../fixit/parse.js';
 import type { RushBest } from './rushScreenModel.js';
-import { heldClock, rushBeforeOf, rushBuildingOf, rushDisclosureOf, rushHoldAt, rushOutcomeOf, rushPatchOf, rushRestorePatchOf, rushTopRatePctPop5min, rushWavesOutlastedOf, type RushBefore } from './rush.js';
+import type { RushPostedStandings } from './rushHouse.js';
+import { heldClock, rushBeforeOf, rushBuildingOf, rushDisclosureOf, rushHoldAt, rushOutcomeOf, rushPatchOf, rushRestorePatchOf, rushStartLevelsOf, rushTopRatePctPop5min, rushWavesOutlastedOf, type RushBefore } from './rush.js';
+import { rushPurseBeforeNextOf, rushRebuildPressOf, rushTopUpClaimsOf, type RushRebuildInput } from './rushRebuild.js';
 import {
   rushRoundRecordOf,
   rushSittingOf,
@@ -288,9 +305,10 @@ import {
   type RushSittingBody,
   type RushSittingCheck,
 } from './rushSitting.js';
+import { rememberDriver } from './driverMemory.js';
 import { REPLAY_COPY, replayBeforeOf, replayPatchOf, replayRestorePatchOf, replayableDay, type ReplayBefore } from './replay.js';
 
-import { campaignDayVerdict, campaignTestRows } from './campaignModel.js';
+import { campaignDayVerdict, campaignTestRows, type FiledDayRecord } from './campaignModel.js';
 
 /**
  * What a read of today's board came back with — four states, because a screen that collapses them
@@ -651,6 +669,14 @@ export type EverydayRushPostOutcome =
  * It is `refused` rather than `no-server` because the fact is about the screen: answering with the
  * deployment's sentence would send a player looking for a server that is there.
  */
+/**
+ * Why a rebuild press outside a finished round is refused — the state a keyboard route can reach and a
+ * screen cannot draw, since the menu is only on a rush's result. GitHub issue #372, § D1295.
+ */
+export const RUSH_REBUILD_NOT_YET =
+  'There is nothing to rebuild with yet. A rebuild is bought between rounds, from what the rounds of ' +
+  'this sitting have earned, so play a round of the rush first.';
+
 export const RUSH_NOT_STANDING =
   'There is no rush sitting to post. Open Endless rush and play a round out — a sitting is every ' +
   'round you have played since the building was as shipped.';
@@ -841,6 +867,15 @@ export interface EverydayRushSession {
   readonly check: RushSittingCheck;
 }
 
+/**
+ * **The rebuild between rounds, as the result screen needs it** — GitHub issue #372, § D1295. What
+ * `everyday/rushRebuild.ts#rushRebuildViewOf` reads: the levels the sitting has fitted, what is picked
+ * for the next round, the purse that next round opens with, the schedule, the tower as shipped and the
+ * specs. `undefined` outside a rush and before its first round has finished, because a sitting's first
+ * round is the building as shipped and a rebuild is bought between rounds.
+ */
+export type EverydayRushRebuild = RushRebuildInput;
+
 /** § 6.1's replay in progress — which day of the parked week is being played again (GitHub issue #177 item 1). */
 export interface EverydayReplaySession {
   readonly day: number;
@@ -874,7 +909,7 @@ export interface EverydayHost {
   contract(): ScenarioContract | undefined;
 
   /**
-   * **The towers a player can move this week to** — GitHub issue #587,
+   * **The towers a player can move this week to** — PR #587,
    * [§ D912](../../../../DECISIONS.md), `everyday/towerChoice.ts`.
    *
    * Derived per call from the live week and the parked ones, so a screen that holds the view across
@@ -986,6 +1021,16 @@ export interface EverydayHost {
    * close's *today against the house* ([§ D1247](../../../../DECISIONS.md)).
    */
   weekHouse(day: number): HouseReading | undefined;
+
+  /**
+   * **The driver run on a counted day of the live week** — the same day with the tower's standing
+   * order picked in place of its driver and every press kept (`shift/weekStake.ts#driverRunRecordOf`),
+   * wave AN, lane DQ-3, [§ D1351](../../../../DECISIONS.md). `undefined` until the shell's run
+   * answers, and for every day that does not need one (`shift/weekStake.ts#driverRunNeedOf`). Asking
+   * starts the run, off the thread that paints, so only the close's call line asks, and only where
+   * no call decided the day (`shift/dayClose.ts#dayDeciderOf`).
+   */
+  weekDriverRun(day: number): HouseReading | undefined;
 
   /**
    * **The live week's tower's record of closed weeks** — `shift/weekRecord.ts`, lane AL-F
@@ -1122,6 +1167,14 @@ export interface EverydayHost {
    * times where it is `0`, and {@link campaignAct} refuses the press on the same count.
    */
   buildingStartTimeFloors(id: string): number | undefined;
+
+  /**
+   * The shafts each Career shaft tier sinks on a building's career tower, with each one's plan-area
+   * band — `campaign/shaftPlan.ts#careerTowerShaftsOf`, or `undefined` for a building this build
+   * cannot resolve. GitHub issue #429, `DECISIONS.md` § D1312: the career shop prices a shaft tier
+   * per shaft from it, and {@link campaignAct} hands the reducer the same answer.
+   */
+  buildingShafts(id: string): TowerShafts | undefined;
 
   /**
    * The career GAMEPLAY § 8's three campaign screens read — the whole record, as plain data.
@@ -1446,6 +1499,40 @@ export interface EverydayHost {
   campaignHistory?(towerId: string): readonly DayOutcome[];
 
   /**
+   * **The last day each career tower filed, with the recording it was graded from** — GitHub issue
+   * #536's permitted half, [§ D1301](../../../../DECISIONS.md).
+   *
+   * Written by {@link closeDay} on the press that files the day and by nothing else, so a card can
+   * only ever show a day the player filed. Read by the Career screen's tower cards, which colour
+   * from it and play it as a picture: a presentation control that never files and never grades
+   * ([§ D716](../../../../DECISIONS.md)). Page-lifetime on {@link campaignHistory}'s ground.
+   * **Optional** on {@link runFailure}'s ground.
+   */
+  campaignFiledDays?(): ReadonlyMap<string, FiledDayRecord>;
+
+  /**
+   * **The runs a census of a tower's next career day takes** — GitHub issue #571's Career half,
+   * [§ D1301](../../../../DECISIONS.md). One run per driver the select offers ({@link dispatchers}),
+   * each the day {@link runCampaignDay} would start for that tower with that driver standing and no
+   * press: the same derived seed, growth day, held cars, fitted kit, length and drawn event. `key`
+   * names that day, so a census landed for another day, another kit, another difficulty or another
+   * crowd is never read as this one's; it is cheap, and `runs()` builds the configurations only when
+   * asked. Nothing here simulates; the Career desk runs them off the main thread. `undefined` for a
+   * tower this career does not hold. **Optional** on {@link runFailure}'s ground.
+   */
+  careerDayCensusRuns?(towerId: string):
+    | {
+        readonly key: string;
+        readonly towerDay: number;
+        runs(): readonly {
+          readonly dispatcherId: string;
+          readonly config: SimulationConfig;
+          readonly outOfServiceCarIds: readonly string[];
+        }[];
+      }
+    | undefined;
+
+  /**
    * The run on the stage as a **pointer** — GitHub issue #340, `docs/26` § 2.1.
    *
    * *"A run is fully reconstructible from a small tuple of ids, a rate, a duration, a window and a
@@ -1585,6 +1672,9 @@ export interface EverydayHost {
    * Each answered call's row due on `recording` at `atS` — wave AL, lane AL-E,
    * [§ D1219](../../../../DECISIONS.md), `everyday/stageCallRow.ts`: counts only, from the call plus
    * 660 s, and never the day's verdict. Empty on any run the day's call session does not stand on.
+   * Since [§ D1335](../../../../DECISIONS.md) also each moment whose question a run that could not
+   * be made cost, from the instant the playhead reaches it; since [§ D1336](../../../../DECISIONS.md)
+   * the day's wrinkle where it raised no call, after its window.
    */
   dayCallRowsAt(recording: VizRecording, atS: number): readonly StageCallRowView[];
 
@@ -1617,8 +1707,13 @@ export interface EverydayHost {
    * the week stands on: since the weekend came off the main path, the sheet stands from the last
    * counted weekday, and Saturday and Sunday are played only through {@link openTomorrow}. A no-op
    * while the week has not closed (`shift/weekStake.ts#weekHasClosed`).
+   *
+   * **Which week it deals** — wave AN, lane DQ-2 ([§ D1344](../../../../DECISIONS.md)): the next
+   * week where this one was held, and this week's own order again where it was not. `onward` is the
+   * sheet's second press on a week that was not held, *Go on to week N*, which deals the next week
+   * whatever this one did, because nothing is locked (`shift/nextWeek.ts`).
    */
-  openNextWeek(): void;
+  openNextWeek(onward?: boolean): void;
 
   /**
    * § 7.6's intervention: append `change` to today's record at `atS` and re-simulate from t = 0.
@@ -1661,8 +1756,12 @@ export interface EverydayHost {
    *
    * An id no profile carries writes nothing: `withDispatcher` leaves the spec alone, so the run is
    * built from a dispatcher that exists rather than from a name that does not.
+   *
+   * `keep: 'week'` is the brief's pick, which is kept across a reload
+   * ([§ D1318](../../../../DECISIONS.md), `everyday/driverMemory.ts`). Every other caller — the
+   * rush's setup screen is the one today — passes nothing and keeps nothing.
    */
-  setDispatcher(dispatcherId: string): void;
+  setDispatcher(dispatcherId: string, keep?: 'week'): void;
 
   /**
    * Write one plain lever — `mode/plainLevers.ts`'s seam, the identical route the Engineer
@@ -1847,6 +1946,12 @@ export interface EverydayHost {
    * deployment for the screen.
    */
   postRushSitting(): Promise<EverydayRushPostOutcome>;
+  /**
+   * The player's own best posted sitting on each of `buildingId`'s rush boards today, for the setup
+   * screen to draw among the house's rows — [§ D1359](../../../../DECISIONS.md). `silent` on a build
+   * with no server. Its non-test caller is `everyday/rushScreen.ts`.
+   */
+  rushPosted(buildingId: string): Promise<RushPostedStandings>;
 
   /**
    * Today's challenge and its board — GitHub issue #221's third criterion, *reachable without
@@ -1956,6 +2061,26 @@ export interface EverydayHost {
   /** § D478's line for a rush on the standing building, before one starts; `undefined` inside the band or with no building. */
   rushDisclosure(): string | undefined;
   /**
+   * The rebuild menu's input for the next round, or `undefined` outside a rush or before its first round
+   * has finished — GitHub issue #372, [§ D1295](../../../../DECISIONS.md). See {@link EverydayRushRebuild}.
+   * Its non-test caller is `everyday/reportScreen.ts#drawRushResult`.
+   */
+  rushRebuild(): EverydayRushRebuild | undefined;
+  /**
+   * Pick or put back one tier for the next round — `everyday/rushRebuild.ts#rushRebuildPressOf`'s rule:
+   * a picked tier comes back, a tier of a category already picked replaces it, and anything else is
+   * added if the menu would draw it buyable. Returns the row's own refusal, or `undefined` when the
+   * picks changed. Nothing is fitted until the next round is pressed, and nothing is charged anywhere:
+   * the purse is a count of what the rounds earned, and the server re-derives it from the sitting.
+   */
+  pickRushRebuild(priceId: string): string | undefined;
+  /**
+   * What the **next** sitting's purse opens with, in units — what the listed rush top-ups this account
+   * owns grant ([§ D1295](../../../../DECISIONS.md)). `0` before the ledger has been read and on the
+   * standard board. The setup screen draws it; the server derives the same figure from the claims.
+   */
+  rushOpeningPurse(): number;
+  /**
    * Bank a Scenario-mode clear the player has just made — GitHub issue **#499**. `scenarioId` is a
    * fix case's id today, and the server pays it once per account whatever this is asked.
    *
@@ -1988,10 +2113,10 @@ export interface EverydayHost {
    * read, which is the arm that claims least: a screen promising a fitted tower over an account
    * nobody has asked about would be a figure with no source, and the sitting would run as built.
    *
-   * **It says nothing about a purse**, and must not be widened to. Nothing spends one
-   * ([§ D606](../../../../DECISIONS.md) § 2), and nothing here says anything about whether a tier
-   * bought between rounds would persist into the next — that question is open and a screen
-   * implying an answer would be answering it.
+   * **It says nothing about a purse**: {@link rushOpeningPurse} does. This paragraph used to say
+   * nothing spends one and that whether a tier bought between rounds persists was open; a rebuild
+   * spends it now and a bought tier stays fitted for the rest of the sitting (GitHub issue #372,
+   * [§ D1295](../../../../DECISIONS.md)), so both clauses are replaced rather than left standing.
    */
   rushStartsFitted(): boolean;
 
@@ -2013,7 +2138,7 @@ export interface EverydayHost {
   startReplay(day: number): string | undefined;
 
   /**
-   * **Move the week to another contract** — GitHub issue #587, § D912.
+   * **Move the week to another contract** — PR #587, § D912.
    *
    * `shift/week.ts#switchWeek` with the `resume` arrival, which is the whole of the decision and is
    * argued in `everyday/towerChoice.ts`: the player is picking a week up, not taking an assignment,
@@ -2162,6 +2287,12 @@ export interface EverydayHostBindings {
    */
   readonly weekHouse?: ((day: number) => HouseReading | undefined) | undefined;
   /**
+   * The driver run on a counted day of the live week — `dev/main.ts`'s, [§ D1351](../../../../DECISIONS.md).
+   * Optional on {@link weekHouse}'s ground: a shell that omits it answers nothing, which the close
+   * reads as *still being run*.
+   */
+  readonly weekDriverRun?: ((day: number) => HouseReading | undefined) | undefined;
+  /**
    * **Each tower's record of closed weeks**, read and written — `shift/weekRecord.ts`, lane AL-F
    * ([§ D1229](../../../../DECISIONS.md), [§ D1230](../../../../DECISIONS.md)). `dev/main.ts` keeps
    * it in the Everyday profile store. Optional on {@link daySeed}'s ground: a test host with no
@@ -2210,6 +2341,16 @@ export interface EverydayHostBindings {
   notePinnedCallDone?(): void;
   /** § D1219 — the ordinary calls recorded on `recording`, while the session stands on it. */
   dayCallRecordsOn?(recording: VizRecording): readonly DayCallRecord[];
+  /**
+   * § D1335 — the moments on `recording` whose question a run that could not be made cost, while the
+   * session stands on it. Absent, the stage says nothing of them.
+   */
+  dayCallFailuresOn?(recording: VizRecording): readonly DayCallFailure[];
+  /**
+   * § D1336 — the day's wrinkle where it raised no call on `recording`, once nothing more in it can
+   * be asked, while the session stands on it. Absent, the stage says nothing of it.
+   */
+  dayCallWrinkleQuietOn?(recording: VizRecording): DayCallWrinkleQuiet | undefined;
   /**
    * § D1218 — § 3.4's *Leave it* on a day with an attempt standing: the attempt is kept for the
    * brief to resume and no other surface files it meanwhile. `false` where none stands.
@@ -2395,6 +2536,12 @@ export interface EverydayHostBindings {
    */
   readonly postRushSitting?: ((body: RushSittingBody) => Promise<EverydayRushPostOutcome>) | undefined;
   /**
+   * The signed-in player's own best posted sitting on each of a tower's rush boards today —
+   * [§ D1359](../../../../DECISIONS.md), `GET /api/rush-best`. Absent with no API origin, on
+   * {@link postRushSitting}'s rule; `dev/main.ts` holds the client and the token.
+   */
+  readonly readRushPosted?: ((buildingId: string) => Promise<RushPostedStandings>) | undefined;
+  /**
    * What the account has bought and claims for the next rush sitting — GitHub issue #372,
    * [§ D640](../../../../DECISIONS.md). Read **once**, at the sitting's first press.
    *
@@ -2441,6 +2588,12 @@ export interface EverydayHostBindings {
   raceAgainst(pick: GhostPick): void;
   /** Register a listener on `renderAll`'s notification list. Returns the unsubscribe. */
   onChange(listener: () => void): () => void;
+  /**
+   * Where the week's chosen driver is kept across a reload — `everyday/driverMemory.ts`,
+   * [§ D1318](../../../../DECISIONS.md). `dev/main.ts` passes its session store, and reads the
+   * slot back at boot. Optional because every test host but the one about this keeps nothing.
+   */
+  readonly driverStore?: SessionStore | undefined;
 }
 
 /**
@@ -2474,9 +2627,9 @@ const NO_RUN_OBSERVATIONS: GoalObservations = Object.freeze({
  * replay onto a different day. That press is pinned by `reportPanel.test.ts`'s exactly-once text
  * guards, which is why this is a sibling composition here rather than an import there.
  */
-function openTomorrowPatch(week: WeekState, roll = false): Partial<ViewerState> {
+function openTomorrowPatch(week: WeekState, roll = false, onward = false): Partial<ViewerState> {
   return {
-    week: roll ? rollWeek(week) : nextDay(week),
+    week: roll ? rollWeek(week, onward) : nextDay(week),
     recording: undefined,
     report: undefined,
     tomorrow: undefined,
@@ -2727,6 +2880,15 @@ export function createEverydayHost(
     return startTimeFloorCounts.get(id);
   };
   /**
+   * A building's career shafts — GitHub issue #429, § D1312. Memoised per id for the reason
+   * {@link startTimeFloorsOf} is: the shop asks on every draw, and the reducer asks on every press.
+   */
+  const towerShafts = new Map<string, TowerShafts | undefined>();
+  const towerShaftsOf = (id: string): TowerShafts | undefined => {
+    if (!towerShafts.has(id)) towerShafts.set(id, careerTowerShaftsOf(b.resources, id));
+    return towerShafts.get(id);
+  };
+  /**
    * Assign and persist together. One writer, so a lane that adds a fourth mutation site cannot
    * forget the save — which is how a career that persists on two of three paths ships.
    */
@@ -2860,7 +3022,7 @@ export function createEverydayHost(
    * {@link EverydayHost.openNextWeek}, one composition so the two presses cannot deal a crowd or a
    * horizon differently ([§ D1246](../../../../DECISIONS.md)).
    */
-  const advanceDay = (roll: boolean): void => {
+  const advanceDay = (roll: boolean, onward = false): void => {
     releaseCareer();
     const state = b.state();
     /*
@@ -2890,7 +3052,7 @@ export function createEverydayHost(
     // empty, so clearing a field that is already clear costs no render that was not happening.
     /* The crowd first, so the shape is read against the crowd tomorrow meets — § D1095. */
     const restore = pressDaySeedRestore();
-    const tomorrow = openTomorrowPatch(state.week, roll);
+    const tomorrow = openTomorrowPatch(state.week, roll, onward);
     /*
      * **And tomorrow's crowd is dealt, never re-dealt** — lane AL-F, [§ D1229](../../../../DECISIONS.md).
      * A week played in one sitting met the date's crowd on every day of it and again on every day
@@ -2948,6 +3110,16 @@ export function createEverydayHost(
         /** The finished rounds — see {@link EverydayRushSession.rounds}. */
         readonly rounds: readonly RushRoundRecord[];
         /**
+         * What the sitting has fitted so far — the start the claims give it, and every tier bought
+         * between its rounds since, folded by `core`'s `rushLevelsAfter` (GitHub issue #372, § D1295).
+         * A tier bought between rounds stays fitted for the rest of the sitting.
+         */
+        readonly levels: RushFitLevels;
+        /** What is picked for the next round, in pick order — fitted, and spent, by the next press. */
+        readonly pending: readonly string[];
+        /** What was bought before the round now playing — written on its record when it settles. */
+        readonly roundRebuild: readonly string[];
+        /**
          * The second a round ended at, while the run that round's presses asked for had not landed
          * yet — or `undefined`. See {@link settleRushRound}.
          */
@@ -2965,16 +3137,16 @@ export function createEverydayHost(
    * What the next sitting may claim, from what the ledger says this account owns —
    * [§ D672](../../../../DECISIONS.md).
    *
-   * **One sink, and the omissions are the design.** `rush-prefit` is the only modifier in the
-   * shipped table that reaches a run: `everyday/rush.ts#rushPatchOf` fits the building for it,
-   * `packages/server`'s replay fits it with the same three effects, and
-   * `leaderboard/rushHoldAgreement.json`'s two `prefit` cells are each required to differ from the
-   * same cell as built — which is `CLAUDE.md`'s *move the control and require the run to change*
-   * discharged by a run rather than by an argument. The two `purse-units` top-ups reach nothing,
-   * because no between-round rebuild travels (§ D606 § 2), so claiming one would put a modifier on
-   * a board key that separated a player's runs and changed none of them.
+   * **Two sinks, and the omission is the design.** `rush-prefit` reaches a run directly:
+   * `everyday/rush.ts#rushPatchOf` fits the building for it, `packages/server`'s replay fits it with
+   * the same three effects, and `leaderboard/rushHoldAgreement.json`'s two `prefit` cells are each
+   * required to differ from the same cell as built. The rush purse top-up reaches one through what it
+   * pays for: a rebuild between rounds spends the purse, and the server's replay refuses a rebuild on
+   * the standard purse that it plays on a topped-up one (GitHub issue #372, § D1295). This paragraph
+   * said the top-ups reached nothing because no between-round rebuild travelled; it is replaced on the
+   * commit that built one. The career's top-up is a career tower's purse and is never a rush claim.
    *
-   * **One step, not what was bought.** The sink's `maxSteps` is 1 and its note says why — *a
+   * **One pre-fit step, not what was bought.** The sink's `maxSteps` is 1 and its note says why — *a
    * building is fitted or it is not* — so a second purchase would be unbacked at the claim
    * (`chimes/ledger.ts#unbackedModifiers` caps a claim at the sink's own cap) rather than worth
    * twice as much. An account that somehow owns two claims one.
@@ -2983,9 +3155,38 @@ export function createEverydayHost(
    * a guess is a claim the server would refuse the whole sitting for.
    */
   const rushClaims = (): readonly ClaimedRushModifier[] =>
-    (owned ?? []).some((entry) => entry.sinkId === RUSH_PREFIT_SINK_ID && entry.steps >= 1)
-      ? Object.freeze([{ sinkId: RUSH_PREFIT_SINK_ID, steps: 1 }])
-      : [];
+    Object.freeze([
+      ...((owned ?? []).some((entry) => entry.sinkId === RUSH_PREFIT_SINK_ID && entry.steps >= 1)
+        ? [{ sinkId: RUSH_PREFIT_SINK_ID, steps: 1 }]
+        : []),
+      /*
+       * **And the purse top-up, now that a purse is spent** — GitHub issue #372, § D1295. The top-up
+       * reaches a run through what it lets the sitting rebuild between rounds, which
+       * `rushHoldAgreement.json`'s rebuilt cells and the server's `rebuild-over-purse` case pin. Capped
+       * at the sink's own `maxSteps`, on the pre-fit's ground: a claim above it is unbacked at the
+       * server and would refuse the whole sitting.
+       */
+      ...rushTopUpClaimsOf(owned ?? []),
+    ]);
+
+  /** The rebuild input for the next round, or `undefined` before a round of this sitting has finished. */
+  const rushRebuildInput = (): EverydayRushRebuild | undefined => {
+    if (rushSession === undefined) return undefined;
+    settleRushRound();
+    if (rushSession.rounds.length === 0) return undefined;
+    return {
+      levels: rushSession.levels,
+      pending: rushSession.pending,
+      purseUnits: rushPurseBeforeNextOf({
+        rounds: rushSession.rounds,
+        modifiers: rushSession.modifiers,
+        schedule: b.resources.priceSchedule,
+      }),
+      schedule: b.resources.priceSchedule,
+      building: b.resources.buildings.find((building) => building.id === rushSession?.buildingId)?.config,
+      specs: b.resources.elevatorSpecs,
+    };
+  };
 
   /** The building's profile band, for § D478's line — `fixit/parse.ts#fixitContextOf`'s own lookup. */
   const bandOf = (building: ResolvedBuilding): DemandBand | undefined =>
@@ -3088,6 +3289,11 @@ export function createEverydayHost(
    * {@link EverydayHost.campaignHistory} for why, and what that costs after a reload.
    */
   const careerWeeks = new Map<string, WeekState>();
+  /**
+   * Each career tower's last filed day and the recording it was graded from —
+   * {@link EverydayHost.campaignFiledDays}. Page-lifetime, on {@link careerWeeks}' ground.
+   */
+  const careerFiled = new Map<string, FiledDayRecord>();
   /** {@link EverydayHost.leaveCareer}, as a local so every Scenario press can call it first. */
   const releaseCareer = (): void => {
     const hold = careerHold;
@@ -3188,6 +3394,8 @@ export function createEverydayHost(
       resources: b.resources,
       recording,
       endedAtS: atS,
+      /* What was bought before this round, as the press that started it recorded — § D1295. */
+      rebuild: rushSession.roundRebuild,
       /*
        * The shelf the stage's own header reads — a saved dispatcher has a name too, and the round
        * list has to say what the player drove even when that round is the reason the sitting cannot
@@ -3265,6 +3473,23 @@ export function createEverydayHost(
        * this press moved the building past without applying. [§ D1002](../../../../DECISIONS.md).
        */
       interventions: [],
+      /*
+       * **And so is the run, and the sheet that describes it** — the post-AM panel's seat C D4,
+       * wave AN, lane AN-5, recorded here under [§ D405](../../../../DECISIONS.md). The press moved
+       * `buildingId` and left the last tower's recording and report standing, so the Engineer
+       * surface drew the new tower's name (read from `buildingId`) over the old tower's run (read
+       * from the recording): *"Midtown Office · 22 floors · 5 cars · 610 people"*, which is
+       * Ashgate's, with Ashgate's log under it and a Day report reading *"06:40 of a shift that runs
+       * to 16:00"*. Cleared here exactly as *Take the next assignment* clears them
+       * (`dev/reportPanel.ts`) and `openTomorrowPatch` does, so until the new tower's day is set up
+       * there is no run, and every surface says so. The day being left is not lost by this: a filed
+       * day is in the week it was filed to, and an open attempt is stored and resumes from its own
+       * record (`shift/attempt.ts`).
+       */
+      recording: undefined,
+      report: undefined,
+      tomorrow: undefined,
+      withheld: [],
     });
   };
 
@@ -3442,6 +3667,7 @@ export function createEverydayHost(
     lastReport: () => b.state().report,
     lastOutcome: () => b.state().week.history.at(-1),
     weekHouse: (day) => b.weekHouse?.(day),
+    weekDriverRun: (day) => b.weekDriverRun?.(day),
     weekRecord: () => weekRecordFor(b.weekRecords?.read() ?? [], b.state().week.contractId),
     dayCrowd: () => dealtCrowdFor(b, b.state().week),
     selection: () => {
@@ -3482,6 +3708,7 @@ export function createEverydayHost(
       return resolved === undefined ? undefined : statLineOf(resolved);
     },
     buildingStartTimeFloors: (id) => startTimeFloorsOf(id),
+    buildingShafts: (id) => towerShaftsOf(id),
     campaign: () => career,
     priceSchedule: () => bindings.resources.priceSchedule,
     careerNotice: () => careerLoadNotice,
@@ -3659,15 +3886,24 @@ export function createEverydayHost(
     },
     dayCallRowsAt: (recording, atS) => {
       const records = b.dayCallRecordsOn?.(recording) ?? [];
-      if (records.length === 0) return [];
+      const failures = b.dayCallFailuresOn?.(recording) ?? [];
+      const wrinkleQuiet = b.dayCallWrinkleQuietOn?.(recording);
+      if (records.length === 0 && failures.length === 0 && wrinkleQuiet === undefined) return [];
       const dayStartS = b.dayStartS() ?? DAY_START_S;
-      return stageCallRowsOf({
-        records,
-        playheadS: atS,
-        endedAt: recording.endedAt,
-        log: b.state().interventions,
-        clockOf: (simTimeS) => clockOf(simTimeS, dayStartS),
-      });
+      const clock = (simTimeS: number): string => clockOf(simTimeS, dayStartS);
+      return [
+        ...stageCallRowsOf({
+          records,
+          playheadS: atS,
+          endedAt: recording.endedAt,
+          log: b.state().interventions,
+          clockOf: clock,
+        }),
+        /* § D1335: a moment a run could not be made for, from the instant the playhead reaches it. */
+        ...stageCallFailedRowsOf({ failures, playheadS: atS, clockOf: clock }),
+        /* § D1336: a wrinkle that raised no call, once its window and its last counted moment are past. */
+        ...stageCallWrinkleQuietRowsOf({ quiet: wrinkleQuiet, playheadS: atS, endedAt: recording.endedAt, clockOf: clock }),
+      ];
     },
     /**
      * § 6.4's *Close the day*, and — in a campaign run — § 6.4 **step 4** with it.
@@ -3739,6 +3975,13 @@ export function createEverydayHost(
         trips: observations.loadedDepartures,
       }, bindings.resources.priceSchedule);
       if (next === career) return;
+      /*
+       * **The day as filed, for the tower card** — GitHub issue #536, [§ D1301](../../../../DECISIONS.md).
+       * Written here, after the reducer accepted the day and before anything is told, so a card can
+       * only hold a day that was really filed: `tower.day` is the day `file-day` just closed, the
+       * verdict is the one it carried, and the recording is the one the verdict was graded from.
+       */
+      careerFiled.set(towerId, { towerId, day: tower.day, verdict, recording });
       setCareer(next);
       notifyCampaign();
       /*
@@ -3784,11 +4027,11 @@ export function createEverydayHost(
     openTomorrow: () => {
       advanceDay(false);
     },
-    openNextWeek: () => {
+    openNextWeek: (onward = false) => {
       if (!weekHasClosed(b.state().week)) return;
-      advanceDay(true);
+      advanceDay(true, onward);
     },
-    setDispatcher: (dispatcherId) => {
+    setDispatcher: (dispatcherId, keep) => {
       const state = b.state();
       const next = withDispatcher(state, b.resources, dispatcherId);
       /*
@@ -3801,6 +4044,18 @@ export function createEverydayHost(
         dispatcherSpec: next.dispatcherSpec,
         editingDispatcherId: next.editingDispatcherId,
       });
+      /*
+       * **And kept, when it is the week's own pick** — [§ D1318](../../../../DECISIONS.md), the
+       * post-AM panel's seat A: the brief's, said by `keep`. A rush's driver, a replay's and a career day's are their mode's,
+       * and the week they stand over is put back without them, so none of the three is kept: a
+       * reload must not hand the week a driver another mode chose. An id nothing offers is not
+       * kept either, for `withDispatcher`'s own reason.
+       */
+      const offered = allDispatchers(b.resources, state.savedDispatchers).some((profile) => profile.id === dispatcherId);
+      const ownMode = rushSession === undefined && replaySession === undefined && careerHold === undefined;
+      if (keep === 'week' && offered && ownMode) {
+        rememberDriver(b.driverStore, next.dispatcherId);
+      }
     },
     setPlainLever: (id, value) => {
       const state = b.state();
@@ -3833,7 +4088,8 @@ export function createEverydayHost(
           return;
         }
       }
-      const next = applyCampaignAction(career, action, bindings.resources.priceSchedule);
+      /* The shafts the shop priced the row from, so the purse is charged what it showed (§ D1312). */
+      const next = applyCampaignAction(career, action, bindings.resources.priceSchedule, towerShaftsOf);
       /* A refused action moves nothing and notifies nobody: a redraw over an unchanged record
          would repaint a screen mid-interaction for no reason a player could see. */
       if (next === career) return;
@@ -4082,6 +4338,68 @@ export function createEverydayHost(
       b.holdAddress?.(!describes);
     },
     campaignHistory: (towerId) => careerWeeks.get(towerId)?.history ?? [],
+    campaignFiledDays: () => careerFiled,
+    careerDayCensusRuns: (towerId) => {
+      const tower = towerById(career, towerId);
+      if (tower === undefined) return undefined;
+      const towerBuilding = b.resources.buildings.find((building) => building.id === tower.buildingId);
+      if (towerBuilding === undefined) return undefined;
+      /*
+       * The base `runCampaignDay` derives from, captured on the same rule: once, on the first career
+       * use of the sitting. Captured here when the desk asks before any day is run, so the census
+       * and the press that follows it meet the same crowd.
+       */
+      careerSeedBase ??= b.state().seed;
+      const base = careerSeedBase;
+      const event = campaignEventFor({ tower, seed: base });
+      const careerWeek = careerWeeks.get(tower.id) ?? openCareer();
+      /*
+       * **`runCampaignDay`'s run-relevant fields, one by one** — the press writes these and the
+       * shift runner simulates the state they make. `careerCensus.test.ts` holds the two together
+       * on the legs: the census arm for the tower's own standing order has to reproduce the day the
+       * press runs, so a field added to one and not the other turns it red.
+       */
+      const day: Partial<ViewerState> = {
+        interventions: [],
+        buildingId: tower.buildingId,
+        seed: careerDaySeedFor(base, tower.id, tower.day),
+        week: { ...careerWeek, day: tower.day, dayIdx: (tower.day - 1) % 7 },
+        outOfServiceCarIds: worksHeldCarsOf(tower, towerBuilding),
+        campaignFitOut: fitOutOf(tower),
+        shiftLengthS: shiftLengthForContract(tower.id),
+        windowStartS: null,
+        campaignEventId: event.id,
+      };
+      const state = { ...b.state(), ...day };
+      const drivers = allDispatchers(b.resources, state.savedDispatchers);
+      const key = JSON.stringify([
+        tower.id,
+        tower.day,
+        tower.difficultyId,
+        String(day.seed),
+        event.id,
+        day.outOfServiceCarIds,
+        day.campaignFitOut,
+        drivers.map((profile) => profile.id),
+        /* What the player can author that a run reads, so a workshop edit retires the census too. */
+        state.savedDispatchers,
+        state.levers,
+        state.ruleRows,
+        state.patience,
+        state.commissioning,
+        state.savedBuildings,
+        state.savedClasses,
+      ]);
+      return {
+        key,
+        towerDay: tower.day,
+        runs: () =>
+          drivers.map((profile) => {
+            const plan = shiftRunConfigOf(b.resources, { ...state, dispatcherId: profile.id });
+            return { dispatcherId: profile.id, config: plan.config, outOfServiceCarIds: plan.outOfServiceCarIds };
+          }),
+      };
+    },
     answerIncident: (atS, optionId) => {
       const facts = campaignDayFacts();
       if (facts === undefined || facts.incident === undefined) return CAMPAIGN_DOCK_COPY.refusedNoIncident;
@@ -4201,6 +4519,11 @@ export function createEverydayHost(
       // answered with one of four would undo that at the last step (`postCurrentRun`'s own join).
       if (!check.ok) return { kind: 'refused', detail: check.reasons.join(' ') };
       return post(check.body);
+    },
+    /* § D1359: the player's own posted rows, read-only, and nothing to ask with no server. */
+    rushPosted: async (buildingId) => {
+      const read = b.readRushPosted;
+      return read === undefined ? { kind: 'silent' } : read(buildingId);
     },
     /* Read-only, and the same split. See {@link EverydayHost.challengeToday}. */
     challengeToday: async () => {
@@ -4333,6 +4656,9 @@ export function createEverydayHost(
           modifiers: b.rushModifiers?.() ?? rushClaims(),
           rounds: [],
           unsettledEndS: undefined,
+          levels: rushStartLevelsOf(b.rushModifiers?.() ?? rushClaims()),
+          pending: [],
+          roundRebuild: [],
         };
       } else {
         /*
@@ -4343,6 +4669,16 @@ export function createEverydayHost(
          * the next `endRush` is a new round's (see `endRush`'s first-end guard).
          */
         rushSession = { ...rushSession, hold: undefined, endedAtS: undefined, unsettledEndS: undefined };
+        /*
+         * **And what was picked between the rounds is fitted now** — GitHub issue #372, § D1295. It
+         * joins the sitting's levels for every later round, and it is recorded as this round's
+         * rebuild so the post carries it; a pick that no longer folds (a tier the levels already
+         * reached) is dropped rather than fitted, because the server would refuse the sitting for it.
+         */
+        const after = rushLevelsAfter(rushSession.levels, rushSession.pending);
+        rushSession = after.ok
+          ? { ...rushSession, levels: after.levels, roundRebuild: rushSession.pending, pending: [] }
+          : { ...rushSession, roundRebuild: [], pending: [] };
       }
       /*
        * **Every press writes the rush's standing, *Run the rush again* included** — GitHub issue #518.
@@ -4358,7 +4694,7 @@ export function createEverydayHost(
        * the same argument one line up: the set is the sitting's, read at the first press, so every
        * round of it starts from the same building whatever the account bought in between.
        */
-      const patch = rushPatchOf(b.resources, state, rushSession.modifiers);
+      const patch = rushPatchOf(b.resources, state, rushSession.modifiers, rushSession.levels);
       if (patch !== undefined) b.applyPatch(patch);
       b.startRun();
       notifyCampaign();
@@ -4382,9 +4718,8 @@ export function createEverydayHost(
          * Computed on the read rather than stored, on `drivingProfile`'s opposite ground: this is a
          * pure fold over a list that changes only when a round ends, and a stored copy would be a
          * second answer to *may this be posted* that a lane could forget to refresh. The modifiers
-         * are the sitting's own, read at its first press, and in this build they are always empty —
-         * `rushSitting.ts#rushSittingOf` says why the parameter exists and what a `rush-prefit`
-         * claim would now do (§ D640).
+         * are the sitting's own, read at its first press: the pre-fit and the purse top-up the
+         * account owns (§ D672, § D1295), which `rushSitting.ts#rushSittingOf` puts on the wire.
          */
         check: rushSittingOf({
           buildingId: rushSession.buildingId,
@@ -4439,7 +4774,23 @@ export function createEverydayHost(
       bankTurn({ completion: 'scenario-cleared', scenarioId });
     },
     chimeTally: () => chimeTally,
-    rushStartsFitted: () => rushClaims().length > 0,
+    rushStartsFitted: () => rushClaims().some((claim) => claim.sinkId === RUSH_PREFIT_SINK_ID),
+    rushRebuild: () => rushRebuildInput(),
+    pickRushRebuild: (priceId) => {
+      const input = rushRebuildInput();
+      if (input === undefined || rushSession === undefined) return RUSH_REBUILD_NOT_YET;
+      const press = rushRebuildPressOf(input, priceId);
+      if (!press.ok) return press.reason;
+      /*
+       * No notification, on the post block's ground one screen over: the menu is the one surface that
+       * reads the picks, and it repaints itself after the press so the button keeps the focus. A full
+       * redraw on every pick would move focus to the top of the sheet for a keyboard player.
+       */
+      rushSession = { ...rushSession, pending: press.pending };
+      return undefined;
+    },
+    rushOpeningPurse: () =>
+      rushPurseBeforeNextOf({ rounds: [], modifiers: rushClaims(), schedule: b.resources.priceSchedule }),
     /*
      * The spend verb — GitHub issue #372, § D672. `dailyBoard`'s split applied to a write that
      * answers: the host's part is that there is nowhere to spend on a build served with no API
@@ -4694,9 +5045,20 @@ export function createEverydayHost(
  * The sentence the shell draws when a registered screen is entered before `dev/main.ts` has
  * published the host — a state only reachable in the first instants of a cold load, and drawn
  * rather than blanked because a blank region is a control that silently did nothing.
+ *
+ * **In the player's words since GitHub issue #572, [§ D1273](../../../../DECISIONS.md).** It read
+ * *"the simulation host has not finished booting — this screen draws the moment it does"*, which
+ * was true and was the machine's vocabulary on the first screen a stranger meets (the front door
+ * draws it too, § D844). One state keeps one sentence, so this constant changed and both of the
+ * shell's waiting screens still read it; `host.test.ts` holds both halves.
+ *
+ * **Both clauses stay true on a load that fails**, which is the case `docs/27` D5 records: the
+ * game really has not finished loading, and the second clause is conditional on that rather than
+ * a forecast of it. What the sentence cannot do is say the load failed, because nothing tells the
+ * shell so; that is D5's remaining half and it is not this constant's to close.
  */
 export const HOST_PENDING_REASON =
-  'the simulation host has not finished booting — this screen draws the moment it does';
+  'The game has not finished loading. This screen fills in the moment it has.';
 
 /**
  * Where the host is handed across — `dev/main.ts` publishes, `everyday/boot.ts` passes the slot

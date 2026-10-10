@@ -150,7 +150,8 @@ describe.skipIf(!HAS_BROWSER)('the stage’s record of a scored day — § D1239
         document.querySelector<HTMLButtonElement>('.everyday-stage-skip')?.click();
       });
       const seen: string[] = [];
-      for (let presses = 0; presses < 12; presses += 1) {
+      /* Two presses a call since § D1324: the first asks, the second skips it. */
+      for (let presses = 0; presses < 24; presses += 1) {
         if (presses > 0) {
           const before = await stageNow(page);
           if (before.ended) break;

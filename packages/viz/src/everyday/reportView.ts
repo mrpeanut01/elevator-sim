@@ -202,7 +202,7 @@ export interface EverydayOnwardStep {
    * function down: the label is a *rendering* of this decision, and reading the destination back
    * out of a string makes where a button goes depend on how it is worded.
    */
-  readonly goes: 'daily-tomorrow' | 'career-day' | 'week-sheet';
+  readonly goes: 'daily-tomorrow' | 'career-day' | 'career-desk' | 'week-sheet';
 }
 
 /**
@@ -337,6 +337,12 @@ export interface EverydayReportInput {
   readonly week?: WeekState | undefined;
   /** The shell's house runs per counted day — `EverydayHost.weekHouse`. Read only with {@link week}. */
   readonly house?: ((day: number) => HouseReading | undefined) | undefined;
+  /**
+   * The shell's driver run per counted day — `EverydayHost.weekDriverRun`, read only with
+   * {@link week}, and only where the close's call line needs it (`shift/dayClose.ts#dayDeciderOf`,
+   * wave AN, lane DQ-3, [§ D1351](../../../../DECISIONS.md)).
+   */
+  readonly driver?: ((day: number) => HouseReading | undefined) | undefined;
 }
 
 /** What a career sheet's onward step is drawn from — {@link EverydayReportInput.career}. */
@@ -353,6 +359,21 @@ export interface EverydayReportCareer {
    * question that decides whether a button lies.
    */
   readonly canRunAnother: boolean;
+  /**
+   * Whether the tower's renewal stands, so the next press belongs to the desk rather than to a day —
+   * GitHub issue #582 item 3, [§ D1274](../../../../DECISIONS.md).
+   *
+   * `campaign/career.ts#needOf`'s own answer, passed in for {@link canRunAnother}'s reason: when a
+   * renewal falls due is `campaign/`'s rule, and a view that re-derived it from `day` would be a
+   * second copy of the rule that decides where a button goes.
+   */
+  readonly renewalDue: boolean;
+  /**
+   * The renewal still ahead, as `campaign/career.ts#renewalAheadSentenceOf` words it, on the sheets of
+   * the contract's last running days — [§ D1357](../../../../DECISIONS.md). `undefined` on every other
+   * sheet. Passed in for {@link renewalDue}'s reason: the date is `campaign/`'s rule.
+   */
+  readonly renewalAhead?: string | undefined;
 }
 
 /**
@@ -594,9 +615,10 @@ function leverButtonLabel(panel: string | undefined): string {
  *
  * The career arm wins where there is a career, and it does not consult `canAdvance`: that flag is
  * the **week's** — `WeekFramingView.canAdvance` is *is there a day after this one in the seven* —
- * and a contract's twenty days are not a week's seven. A career whose month is over draws nothing
- * here, which is {@link EverydayReportCareer.canRunAnother} and is a different refusal for a
- * different record.
+ * and a contract's twenty days are not a week's seven. A standing renewal sends the press to the
+ * desk instead of a day ({@link EverydayReportCareer.renewalDue}, § D1274), and a career whose month
+ * is over with no renewal standing draws nothing here, which is
+ * {@link EverydayReportCareer.canRunAnother} and is a different refusal for a different record.
  *
  * Both notes say what the press does **and** where it leaves you, because the whole of #577 is a
  * player who could not tell those two apart. The career note names the career; the daily note says
@@ -619,6 +641,29 @@ function onwardStepOf(
   if (!filed) return undefined;
   if (weekClosed && career === undefined) return WEEK_SHEET_STEP;
   if (career !== undefined) {
+    /*
+     * **The renewal comes before the next day, and the step says so** — GitHub issue #582 item 3,
+     * [§ D1274](../../../../DECISIONS.md). This arm used to offer *Open the doors on day 19* on day
+     * 18's sheet, and the press ran day 19 past a renewal the building's desk will not run a day
+     * over. It goes to the desk instead, and its note is the line that says the renewal has come,
+     * on the sheet of the day before it. Checked before {@link EverydayReportCareer.canRunAnother}
+     * because a month that has run out still has its renewal standing, and the desk is where that
+     * is answered.
+     */
+    /*
+     * Since [§ D1357](../../../../DECISIONS.md) the renewal stands once day 20 has closed, so this arm
+     * is day 20's sheet (and any later one), and the note names the day that waits on the answer.
+     */
+    if (career.renewalDue) {
+      return {
+        label: `Answer the renewal at ${career.buildingName}`,
+        note:
+          'Day 20 has closed and the contract is up for renewal. The next month’s first day does not ' +
+          'run until it is answered. This opens the building’s desk, where the offer is. You stay in ' +
+          'the career.',
+        goes: 'career-desk',
+      };
+    }
     if (!career.canRunAnother) return undefined;
     return {
       /*
@@ -627,7 +672,14 @@ function onwardStepOf(
        * reading is a sheet about one tower.
        */
       label: `Open the doors on day ${String(career.day)} at ${career.buildingName}`,
-      note: 'Runs the next day of this contract. You stay in the career.',
+      /*
+       * Days 19 and 20 play, and the sheets of day 18 and day 19 say when the renewal falls due: the
+       * line #582 asked for on the sheet before it, on its true date (§ D1357).
+       */
+      note:
+        career.renewalAhead === undefined
+          ? 'Runs the next day of this contract. You stay in the career.'
+          : `Runs the next day of this contract. ${career.renewalAhead} You stay in the career.`,
       goes: 'career-day',
     };
   }
@@ -720,7 +772,9 @@ export function everydayReportViewOf(input: EverydayReportInput): EverydayReport
             week: input.week,
             report: input.report,
             houseOf: input.house ?? (() => undefined),
+            driverOf: input.driver,
             population: input.overnight?.population,
+            onward: input.overnight?.onward,
           }),
     secondary: REPORT_SECONDARY,
   };

@@ -492,4 +492,74 @@ describe.skipIf(!HAS_BROWSER)('Endless rush — GitHub issue #220', () => {
       await page.close();
     }
   });
+
+  it('offers the rebuild between rounds, refuses Shafts and Machines by name, and fits a pick for the next round — GitHub issue #372, § D1295', async () => {
+    const page = await coldLoad();
+    try {
+      await leaveTutorialIfOffered(page);
+      await page.locator('.everyday-mode[data-screen="rush"]').click();
+      await page.waitForSelector('.everyday-rush-driving', { timeout: 15_000 });
+      /* The setup screen says what the purse is for before the first round. */
+      const setupLine = await page.locator('.everyday-rush-rebuild-line').textContent();
+      expect(setupLine).toContain('between rounds you can spend it rebuilding the tower');
+      /* No menu before a round has finished: a sitting's first round is the building as shipped. */
+      await page.locator('.everyday-bar-primary').click(); // Start the rush
+      await page.waitForFunction(
+        () => /^WAVE \d+$/u.test(document.querySelector('.everyday-stage-phase')?.textContent ?? ''),
+        undefined,
+        { timeout: 60_000 },
+      );
+      await page.locator('.everyday-bar-primary').click(); // End the rush
+      await page.waitForSelector('.everyday-rush-rebuild', { timeout: 15_000 });
+
+      const menu = await page.evaluate(() => {
+        const block = document.querySelector('.everyday-rush-rebuild');
+        const categories = [...(block?.querySelectorAll('.everyday-rush-rebuild-category') ?? [])].map((node) => node.textContent ?? '');
+        const refusals = [...(block?.querySelectorAll('.everyday-rush-rebuild-refusal') ?? [])].map((node) => node.textContent ?? '');
+        const press = block?.querySelector<HTMLButtonElement>('button.everyday-rush-rebuild-press[data-price-id="faster-doors"]');
+        return {
+          purse: block?.querySelector('.everyday-rush-rebuild-purse')?.textContent ?? '',
+          categories,
+          refusals,
+          doors: press?.textContent ?? null,
+          /* The post block is still below the menu: the menu is what the player does next if they play on. */
+          order: block !== null && block !== undefined && block.nextElementSibling?.classList.contains('everyday-rush-post') === true,
+        };
+      });
+      expect(menu.purse).toMatch(/^\d+ units? in the purse for the next round\.$/u);
+      expect(menu.categories).toEqual(['Doors', 'Control', 'Machines', 'Car size', 'Shafts', 'The tenants']);
+      expect(menu.refusals).toHaveLength(2);
+      for (const refusal of menu.refusals) expect(refusal).toContain('Not sold between rush rounds');
+      expect(menu.doors, 'Garden Apartments’ first round pays for Doors 1, so its press is drawn').toMatch(/^Buy for \d+ units?$/u);
+      expect(menu.order).toBe(true);
+
+      await page.locator('button.everyday-rush-rebuild-press[data-price-id="faster-doors"]').click();
+      const picked = await page.evaluate(() => ({
+        pressed: document.querySelector('button.everyday-rush-rebuild-press[data-price-id="faster-doors"]')?.getAttribute('aria-pressed') ?? null,
+        pending: document.querySelector('.everyday-rush-rebuild-pending')?.textContent ?? '',
+        focused: (document.activeElement as HTMLElement | null)?.dataset['priceId'] ?? null,
+      }));
+      expect(picked.pressed).toBe('true');
+      expect(picked.pending).toContain('Run the rush again to play the next round with it.');
+      expect(picked.focused, 'the press repaints the menu and keeps the focus on the tier pressed').toBe('faster-doors');
+
+      /* *Run the rush again* fits the pick; the round it opened says so on the round list. */
+      await page.locator('.everyday-bar-primary').click();
+      await page.waitForFunction(
+        () => /^WAVE \d+$/u.test(document.querySelector('.everyday-stage-phase')?.textContent ?? ''),
+        undefined,
+        { timeout: 60_000 },
+      );
+      await page.locator('.everyday-bar-primary').click();
+      await page.waitForSelector('.everyday-rush-post-round-rebuilt', { timeout: 15_000 });
+      const after = await page.evaluate(() => ({
+        rebuilt: [...document.querySelectorAll('.everyday-rush-post-round-rebuilt')].map((node) => node.textContent ?? ''),
+        fitted: document.querySelector('.everyday-rush-rebuild-tier[data-state="fitted"] .everyday-rush-rebuild-tier-name')?.textContent ?? null,
+      }));
+      expect(after.rebuilt).toEqual([' · rebuilt first with Faster doors']);
+      expect(after.fitted, 'a tier bought between rounds stays fitted for the rest of the sitting').toBe('Faster doors');
+    } finally {
+      await page.close();
+    }
+  });
 });

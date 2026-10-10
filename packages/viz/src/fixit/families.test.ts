@@ -9,8 +9,10 @@
  *    deduplicated the way #366 deduplicates a repair's patch.
  * 2. **Every dial the editor draws moves the legs** — each proved on a named case at a named value,
  *    and the set of proved dials is held against the set drawn, so a dimension added to one of the
- *    three rows fails here until somebody proves it. The one covered dimension that moves nothing
- *    anywhere is held in `families.ts#INERT_DIALS` **both ways**.
+ *    three rows fails here until somebody proves it. A covered dimension that moved nothing on any
+ *    case would be held in `families.ts#INERT_DIALS` **both ways**; it is empty since § D1290, and
+ *    the duty weight, drawn only where a case's building declares a duty, is held both ways by
+ *    building instead.
  * 3. **Every fabric control moves the legs** — door hold for every car and for one, a car moved,
  *    keyed, taken out and put back, a floor dropped from a bank, a bank re-plated.
  * 4. **The editor writes § D706's answers.** For fifteen of the eighteen cases a state built from
@@ -19,6 +21,8 @@
  *    what they are waiting on is named rather than approximated.
  */
 
+import { buildingDeclaresDuty } from '@elevator-sim/core/browser';
+import type { SearchParameter } from '@elevator-sim/experiments/browser';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { changesAtPaths, changesBought } from '../pricing/repairPrice.js';
@@ -104,6 +108,25 @@ function repairedLegs(entry: FixitCase, state: FixitState): string {
 
 const empty = (): FixitState => emptyFixitState();
 
+/** The building a case's next run is built from, before any edit: the one the editor draws dials for. */
+function asBuiltBuildingOf(entry: FixitCase) {
+  return fixitRunPlanOf(entry, empty(), resources).asBuilt.building;
+}
+
+/**
+ * Every dial the editor draws on at least one shipped case. `dialGroupsOf` is per building since
+ * § D1290, so the set held against {@link DIAL_PROOFS} is the union over the cases' own buildings.
+ */
+function dialsDrawnAnywhere(schedule = shippedPriceSchedule()): ReadonlyMap<string, SearchParameter> {
+  const drawn = new Map<string, SearchParameter>();
+  for (const entry of cases.cases) {
+    for (const group of dialGroupsOf(schedule, asBuiltBuildingOf(entry))) {
+      for (const parameter of group.parameters) drawn.set(parameter.id, parameter);
+    }
+  }
+  return drawn;
+}
+
 /* -------------------------------------------------------------------------- *
  * 1 — priced through the schedule
  * -------------------------------------------------------------------------- */
@@ -187,7 +210,7 @@ function gateOpenedFor(dimensionId: string, schedule = shippedPriceSchedule()): 
   if (parameter === undefined) return undefined;
   const condition = parameter.activeWhen as Readonly<Record<string, readonly unknown[]>> | undefined;
   if (condition === undefined) return empty();
-  const offered = new Map(dialGroupsOf(schedule).flatMap((group) => group.parameters.map((p) => [p.id, p] as const)));
+  const offered = dialsDrawnAnywhere(schedule);
   let state = empty();
   for (const [gate, values] of Object.entries(condition)) {
     if (!Array.isArray(values)) return undefined;
@@ -225,6 +248,8 @@ const DIAL_PROOFS: Readonly<Record<string, readonly [string, DialValue]>> = Obje
   'weights.zoneAffinity': ['sleeping-sky-lobby', 5],
   'weights.predictedDemand': ['sleeping-sky-lobby', 5],
   'weights.crowding': ['express-that-stops-everywhere', 5],
+  /* § D1290: drawn only where the case's building declares a duty, which is two St Jude cases. */
+  'weights.dutyMismatch': ['deliveries-on-the-passenger-group', 5],
   'constraints.noDirectionReversal': ['sleeping-sky-lobby', false],
   'dispatch.assignmentMode': ['controller-sends-every-car', 'single-car'],
   'dispatch.splitThresholdPassengers': ['sleeping-sky-lobby', 7],
@@ -244,7 +269,7 @@ const NEVER_DRAWN: readonly string[] = Object.freeze(['weights.rideTime']);
 describe('every dial the editor draws moves the legs', () => {
   it('proves each drawn dial on its pinned case and value', () => {
     const schedule = shippedPriceSchedule();
-    const drawn = dialGroupsOf(schedule).flatMap((group) => group.parameters.map((p) => p.id));
+    const drawn = [...dialsDrawnAnywhere(schedule).keys()];
     expect(
       [...drawn].sort(),
       'the set of dials drawn is the set proved, plus the ones no editor gate can open',
@@ -270,20 +295,47 @@ describe('every dial the editor draws moves the legs', () => {
     }
   }, SUITE_TIMEOUT);
 
-  it('keeps the one it never draws off the screen for a measured reason, and would notice it binding', () => {
-    expect(Object.keys(INERT_DIALS)).toEqual(['weights.dutyMismatch']);
+  it('draws the duty weight exactly where the case’s building declares a duty, and it binds only there — § D1290', () => {
+    /*
+     * GitHub issue #561. `INERT_DIALS` held `weights.dutyMismatch` while no fix case's building
+     * declared a duty; St Jude's car E declares a bed duty now, so the register is empty and the
+     * building decides. Held both ways on every case: where the building declares no duty the dial
+     * is not drawn and moving it at either end of its range moves no leg (the refusal is true);
+     * where it declares one the dial is drawn and moving it moves the legs.
+     */
+    expect(INERT_DIALS).toEqual({});
+    const schedule = shippedPriceSchedule();
     const parameter = fixitDialSpace().byId.get('weights.dutyMismatch')!;
     expect(parameter.type).toBe('continuous');
     if (parameter.type !== 'continuous') return;
-    const moved: string[] = [];
+    const declaring: string[] = [];
+    const movedWithoutDuty: string[] = [];
+    const stillWithDuty: string[] = [];
     for (const entry of cases.cases) {
+      const building = asBuiltBuildingOf(entry);
+      const declares = buildingDeclaresDuty(building);
+      const drawn = dialGroupsOf(schedule, building).some((group) =>
+        group.parameters.some((candidate) => candidate.id === parameter.id),
+      );
+      expect(drawn, `${entry.id}: the duty dial is drawn exactly where a car declares a duty`).toBe(declares);
       const base = repairedLegs(entry, empty());
+      if (declares) {
+        declaring.push(entry.id);
+        const after = repairedLegs(entry, { ...empty(), dispatcherDials: { [parameter.id]: parameter.max } });
+        if (after === base) stillWithDuty.push(entry.id);
+        continue;
+      }
       for (const value of [parameter.min, parameter.max]) {
-        const after = repairedLegs(entry, { ...empty(), dispatcherDials: { 'weights.dutyMismatch': value } });
-        if (after !== base) moved.push(`${entry.id}=${String(value)}`);
+        const after = repairedLegs(entry, { ...empty(), dispatcherDials: { [parameter.id]: value } });
+        if (after !== base) movedWithoutDuty.push(`${entry.id}=${String(value)}`);
       }
     }
-    expect(moved, 'weights.dutyMismatch now binds somewhere — take it out of INERT_DIALS and prove it').toEqual([]);
+    expect(declaring, 'the St Jude cases that keep car E as built').toEqual([
+      'deliveries-on-the-passenger-group',
+      'every-letter-says-nine',
+    ]);
+    expect(movedWithoutDuty, 'the weight moved a run on a building no car of which declares a duty').toEqual([]);
+    expect(stillWithDuty, 'the weight moved no leg on a building that declares a duty').toEqual([]);
   }, SUITE_TIMEOUT);
 
   it('offers the whole parking-floor select from floors the building serves, by their own names', () => {

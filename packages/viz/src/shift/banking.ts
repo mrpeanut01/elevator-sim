@@ -157,6 +157,48 @@ export const ATTEMPT_SHOWN_TO_ITS_REACH =
   'this run is your attempt at a scored day in Everyday Mode, so it is shown here only as far as ' +
   'its stage has played';
 
+/**
+ * The same hold over a run of the attempt's day that is not the attempt's own — wave AN, lane AN-6,
+ * [§ D1323](../../../../DECISIONS.md). After a reload the Engineer surface stands on the page's own
+ * run of the week's day, which carries the attempt's crowd and none of its presses: watched to its
+ * end it would be the unanswered branch of the attempt's open call.
+ */
+export const ATTEMPT_DAY_SHOWN_TO_ITS_REACH =
+  'this run is of the day your attempt in Everyday Mode is open on, so it is shown here only as far ' +
+  'as that attempt’s stage has played';
+
+/**
+ * **While a scored attempt stands, the Engineer surface only watches** — wave AN, lane AN-6,
+ * [§ D1323](../../../../DECISIONS.md), the post-AM panel's seat D (D2 and D3). A dispatcher card
+ * made a practice of the attempt's own crowd that stopped at the identical call, so every answer
+ * could be rehearsed and then given for score; a building card moved the week under the stage. So
+ * while an attempt stands on the week on screen, nothing on this surface makes or changes a run:
+ * the rail's cards, *Run this shift*, the selects, the seed, the car badges and the editors' runs
+ * all refuse, in these words, on the status line.
+ */
+export const ATTEMPT_ENGINEER_WATCHES_ONLY =
+  'your attempt at a scored day is open in Everyday Mode, so this surface only watches it and makes ' +
+  'or changes no run until that day is closed on its stage';
+
+/**
+ * The same rule, drawn above the rail's cards while it holds — "state it to the player where the card
+ * is". It replaces `rightRail.ts#PICKS_RE_RUN` for as long as it holds, because that sentence says
+ * nothing on the panel is locked.
+ */
+export const ATTEMPT_RAIL_NOTE =
+  'Your attempt at a scored day is open in Everyday Mode. Until it is closed on its stage, this ' +
+  'surface only watches it: a card picked here runs nothing.';
+
+/**
+ * Why *Save recording* refuses while a scored attempt stands — § D1323, seat D (D1). A recording
+ * is the whole day: saved at a held call, it carried the unanswered branch to 18:00, and loaded in
+ * any tab it showed what *leave them* would cost. Refused rather than cut at the stage's reach,
+ * because a recording cut short is not one `record/document.ts` can read back.
+ */
+export const ATTEMPT_NOT_SAVED =
+  'your attempt at a scored day is open in Everyday Mode, and a recording holds the whole day past ' +
+  'where its stage has played, so nothing is saved until that day is closed on its stage';
+
 
 /**
  * The refusal, or `null` when the run on screen **is** the run this shell simulated.

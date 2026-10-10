@@ -530,7 +530,7 @@ export const DEFAULT_ENERGY_CONVENTION: EnergyConvention = Object.freeze({
  */
 /**
  * **One completed car move, with enough of it to reconstruct where the car was at any instant**
- * — `docs/11` § 3.4(a) and § 8 row 9, GitHub issue #412, `DECISIONS.md` § D620.
+ * — `docs/11` § 3.4(a) and § 8 row 9, GitHub issue #412, `DECISIONS.md` § D621.
  *
  * ## The gap this closes, and the one it does not
  *

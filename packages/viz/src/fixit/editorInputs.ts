@@ -219,7 +219,7 @@ function computeEditorInputs(
   const target = { building: standing.building, elevatorSpecs: resources.elevatorSpecs };
 
   const dialGroups: DialGroupInput[] = [];
-  for (const group of dialGroupsOf(schedule)) {
+  for (const group of dialGroupsOf(schedule, standing.building)) {
     const dials: DialInput[] = [];
     for (const parameter of group.parameters) {
       if (!live.has(parameter.id)) continue;

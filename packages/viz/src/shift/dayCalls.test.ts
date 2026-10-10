@@ -22,6 +22,8 @@ import {
   DAY_CALL_MAX_TRIES,
   DAY_CALL_PER_WRINKLE,
   dayCallIsWrinkle,
+  dayCallIsWrinkleStart,
+  dayCallWrinkleStartOf,
   dayCallWrinkleWindowOf,
   DAY_ENDED_EARLY_ROW_ID,
   dayCallChangeOf,
@@ -46,6 +48,7 @@ import {
 } from './dayCalls.js';
 import { contractBuildings } from './contractDay.test-helper.js';
 import { goalsForDay } from './goals.js';
+import { houseStandingOrder } from './weekStake.js';
 import { clockOf } from './report.js';
 import type { Observations } from './types.js';
 
@@ -180,6 +183,57 @@ describe('the day’s wrinkle as a stretch of its own — § D1265', () => {
 
   it('holds one call, outside the day’s cap of six', () => {
     expect(DAY_CALL_PER_WRINKLE).toBe(1);
+  });
+});
+
+/**
+ * **A wrinkle asks at its start** — wave AN, lane DQ-1, [§ D1336](../../../../DECISIONS.md), which
+ * replaces § D1265 clause 2 for the start alone: a wrinkle overlapping a peak adds the instant it
+ * begins, a clear wrinkle asks its start before any minute-long wait inside it, and no candidate
+ * shortly before the start can space it out of the day.
+ */
+describe('the wrinkle’s start is a candidate, inside a peak too — § D1336', () => {
+  const acts = [
+    { startS: 1000, endS: 3000 },
+    { startS: 10_000, endS: 12_000 },
+  ];
+
+  it('asks at the start of a wrinkle that overlaps a peak, and only there', () => {
+    const overlapping = { startS: 2500, endS: 4000, name: 'A late finish' };
+    expect(dayCallWrinkleWindowOf(overlapping, acts)).toBeUndefined();
+    expect(dayCallWrinkleStartOf(overlapping, acts)).toEqual(overlapping);
+    const day = input([], { horizon: 'whole-day', acts, endedAt: 36_000, wrinkle: overlapping });
+    /* Red before § D1336: an overlapping wrinkle was no stretch, so the search went on to the next peak. */
+    const call = nextDayCallOf(day, 1001);
+    expect([call?.atS, call?.rule, call?.wrinkle?.name]).toEqual([2500, 'wrinkle-start', 'A late finish']);
+    expect(dayCallIsWrinkleStart(call!)).toBe(true);
+    /* Its start is all it adds: past it, the peaks are searched as peaks. */
+    const next = nextDayCallOf(day, dayCallSearchFrom(call!));
+    expect([next?.atS, next?.rule, next?.wrinkle]).toEqual([10_000, 'act-start', undefined]);
+  });
+
+  it('asks a clear wrinkle’s start before a minute-long wait inside it, and the wait after', () => {
+    const wrinkle = { startS: 5000, endS: 8000, name: 'Move-in day' };
+    const day = input([leg('a', 6000, 6200)], { horizon: 'whole-day', acts, endedAt: 36_000, wrinkle });
+    /* Red before § D1336: the wait at 6 060 s came first and the start was never asked. */
+    const call = nextDayCallOf(day, 3000);
+    expect([call?.atS, call?.rule]).toEqual([5000, 'wrinkle-start']);
+    const fallback = nextDayCallOf(day, dayCallSearchFrom(call!));
+    expect([fallback?.atS, fallback?.rule, fallback?.wrinkle?.name]).toEqual([6060, 'first-minute-wait', 'Move-in day']);
+    expect(dayCallIsWrinkleStart(fallback!)).toBe(false);
+  });
+
+  it('asks the start in place of a peak’s moment less than the spacing before it, as on the fire drill', () => {
+    /* Midtown's fire drill: its act opens at 09:59 and the drill at 10:00. */
+    const drillActs = [{ startS: 1000, endS: 3000 }, { startS: 5940, endS: 7260 }];
+    const drill = { startS: 6000, endS: 7200, name: 'Fire drill' };
+    const day = input([leg('a', 5880, 6100)], { horizon: 'whole-day', acts: drillActs, endedAt: 36_000, wrinkle: drill });
+    /* Without the wrinkle the act's moment is 5 940 s, and its spacing would pass the drill's start. */
+    expect(nextDayCallOf(input([leg('a', 5880, 6100)], { horizon: 'whole-day', acts: drillActs, endedAt: 36_000 }), 3001)?.atS).toBe(5940);
+    const call = nextDayCallOf(day, 3001);
+    expect([call?.atS, call?.rule]).toEqual([6000, 'wrinkle-start']);
+    /* The spacing holds from the start it asked. */
+    expect(nextDayCallOf(day, dayCallSearchFrom(call!))?.atS ?? Infinity).toBeGreaterThanOrEqual(6000 + DAY_CALL_SPACING_S);
   });
 });
 
@@ -373,11 +427,33 @@ describe('the driver question', () => {
     return profile;
   };
 
-  it('offers the first two of collective, Minimum estimated wait and Fairness first that are not driving', () => {
-    expect(DAY_CALL_DRIVER_OFFER).toEqual(['collective', 'eta', 'fairness-first']);
-    expect(dayCallDriversOf(profiles, byId('collective'))?.map((profile) => profile.id)).toEqual(['eta', 'fairness-first']);
-    expect(dayCallDriversOf(profiles, byId('eta'))?.map((profile) => profile.id)).toEqual(['collective', 'fairness-first']);
-    expect(dayCallDriversOf(profiles, byId('nearest-car'))?.map((profile) => profile.id)).toEqual(['collective', 'eta']);
+  it('offers the first two of Fairness first, Predictive balanced, Energy aware and Minimum estimated wait that are not driving — § D1337', () => {
+    expect(DAY_CALL_DRIVER_OFFER).toEqual(['fairness-first', 'predictive-balanced', 'energy-aware', 'eta']);
+    expect(dayCallDriversOf(profiles, byId('collective'))?.map((profile) => profile.id)).toEqual([
+      'fairness-first',
+      'predictive-balanced',
+    ]);
+    expect(dayCallDriversOf(profiles, byId('eta'))?.map((profile) => profile.id)).toEqual(['fairness-first', 'predictive-balanced']);
+    expect(dayCallDriversOf(profiles, byId('predictive-balanced'))?.map((profile) => profile.id)).toEqual([
+      'fairness-first',
+      'energy-aware',
+    ]);
+  });
+
+  it('never offers the house as a switch target, whoever drives — § D1337', () => {
+    const house = houseStandingOrder();
+    expect(DAY_CALL_DRIVER_OFFER).not.toContain(house);
+    /* Red before § D1337: a player on Fairness first was offered the house and Minimum estimated wait. */
+    expect(dayCallDriversOf(profiles, byId('fairness-first'))?.map((profile) => profile.id)).toEqual([
+      'predictive-balanced',
+      'energy-aware',
+    ]);
+    for (const driving of profiles) {
+      const pair = dayCallDriversOf(profiles, driving);
+      if (pair === undefined) continue;
+      expect(pair.map((profile) => profile.id), driving.id).not.toContain(house);
+      expect(pair.map((profile) => profile.id), driving.id).not.toContain(driving.id);
+    }
   });
 
   it('offers no pair where a handover cannot reach them — a day opened on a landing panel', () => {

@@ -150,6 +150,13 @@ export interface RushRoundRecord {
   /** The player's rules over it, in first-match order. */
   readonly ruleRows: readonly RuleRowConfig[];
   /**
+   * What was bought **before** this round, as `data/price-schedule.json` row ids of tiers on `core`'s
+   * rush menu, in the order they were picked — GitHub issue #372, [§ D1295](../../../../DECISIONS.md).
+   * Wire half: it travels as the round's `rebuild` and the server prices it from its own schedule.
+   * Absent or empty on a round nothing was bought for, which is always the first.
+   */
+  readonly rebuild?: readonly string[];
+  /**
    * The round's log as the wire carries it, or `undefined` when something on it cannot travel —
    * in which case {@link unpostable} says which press and why.
    */
@@ -230,6 +237,8 @@ export function rushRoundRecordOf(input: {
   readonly endedAtS: number;
   /** What the driving dispatcher is called — `EverydayHost.dispatcherById`'s answer, or the id. */
   readonly dispatcherName: string;
+  /** What was bought before this round — {@link RushRoundRecord.rebuild}. The host holds it from the press. */
+  readonly rebuild?: readonly string[];
 }): RushRoundRecord {
   const { state, resources, recording } = input;
   const shipped = resources.dispatcherProfiles.profiles;
@@ -265,6 +274,7 @@ export function rushRoundRecordOf(input: {
     drivers: Object.freeze(drivers),
     changes: Object.freeze(ordered.map((entry) => ({ atS: entry.atS, verb: stampVerbOf(entry.change) }))),
     ruleRows: Object.freeze([...state.ruleRows]),
+    ...(input.rebuild === undefined || input.rebuild.length === 0 ? {} : { rebuild: Object.freeze([...input.rebuild]) }),
     wireInterventions: wire.log,
     interventionCount: state.interventions.length,
     holdS: holdAtS === undefined ? null : holdAtS - recording.startedAt,
@@ -325,6 +335,8 @@ export interface RushSittingRoundBody {
   readonly dispatcherProfileId: string;
   readonly ruleRows?: readonly RuleRowConfig[] | undefined;
   readonly interventions?: readonly WireIntervention[] | undefined;
+  /** What was bought before the round — {@link RushRoundRecord.rebuild}. Absent when nothing was. */
+  readonly rebuild?: readonly string[] | undefined;
   readonly claimedHeldS: number | null;
 }
 
@@ -361,6 +373,12 @@ export interface RushPostedRound {
   readonly heldS: number | null;
   readonly wavesOutlasted: number;
   readonly purseBeforeUnits: number;
+  /**
+   * What the round's rebuild took before it played, priced by the server — GitHub issue #372, § D1295.
+   * Optional because a server on an older build answers without it, and a missing figure is drawn as
+   * nothing spent rather than invented.
+   */
+  readonly spentUnits?: number;
   readonly paidUnits: number;
   readonly purseAfterUnits: number;
 }
@@ -404,17 +422,13 @@ export const RUSH_SITTING_COPY = Object.freeze({
  * the reasons, never the first — `runIdentityIssues`' own rule, and for its reason: a reader told
  * about one and then about the next has been made to guess how many there are.
  *
- * **`modifiers` is a parameter and is still empty in every sitting this build produces**, and that
- * is the issue's third criterion rather than an oversight. Nothing here spends a chime
- * (`everyday/chimesPanel.ts` says so on its own face), so no account holds a rush modifier to
- * claim. **What changed on 2026-09-16 is what one of them would now do**
- * ([§ D640](../../../../DECISIONS.md)): a claimed `rush-prefit` reaches the run —
- * `everyday/host.ts#startRush` passes the sitting's claims to `everyday/rush.ts#rushPatchOf`, which
- * fits the building, and `packages/server`'s replay fits it with the same three effects — so the
- * sink is no longer a purchase that would change nothing. The two `purse-units` top-ups still are,
- * because nothing spends a purse (§ D606 § 2), and selling one now would be the defect
- * `CLAUDE.md`'s standing requirement names. The parameter is unmoved: the day a spend surface
- * exists it passes its claims here rather than teaching this module a second way in.
+ * **`modifiers` is what the account bought for this sitting**, as `everyday/host.ts` claims it at the
+ * sitting's first press: `rush-prefit` when the account owns it ([§ D672](../../../../DECISIONS.md)),
+ * and the rush purse top-up's steps since GitHub issue #372's rebuild between rounds made a wider
+ * purse something a run spends ([§ D1295](../../../../DECISIONS.md)). This paragraph said the list was
+ * empty in every sitting this build produced and that a top-up would change nothing; both stopped
+ * being true, the first with § D672 and the second with § D1295, and it is replaced rather than left
+ * standing. A round's own rebuild travels on the round (`RushRoundRecord.rebuild`), never here.
  */
 export function rushSittingOf(input: {
   readonly buildingId: string;
@@ -460,6 +474,8 @@ export function rushSittingOf(input: {
             ...(round.wireInterventions === undefined || round.wireInterventions.length === 0
               ? {}
               : { interventions: round.wireInterventions }),
+            /* And an empty rebuild the same way: a round nothing was bought for carries no key. */
+            ...(round.rebuild === undefined || round.rebuild.length === 0 ? {} : { rebuild: round.rebuild }),
             claimedHeldS: round.holdS,
           }),
         ),

@@ -67,6 +67,42 @@ import { apiOriginFrom, apiOriginPlugin, hostConfigWithApiOrigin } from './apiOr
 
 const DATA_DIR = fileURLToPath(new URL('../../data', import.meta.url));
 
+/**
+ * **The two workspace packages the viewer bundles, from their source** — wave AN, lane AN-5,
+ * [§ D1317](../../DECISIONS.md).
+ *
+ * `@elevator-sim/core` and `@elevator-sim/experiments` publish their `browser` condition as
+ * `./dist/browser.js`, which is `tsc -b`'s output, so without this table Vite bundled whatever
+ * `dist/` held on the machine that built. Nothing checked that `dist/` matched `src/`. The post-AM
+ * panel's build was made from wave AM's tree beside a `packages/core/dist` last compiled on
+ * 2026-09-19, and its bundle carried a `core` with no `crowdThinning` and no `adopt-dispatcher`:
+ * every tenancy repair on a fix-it case faulted (*the repair moved nobody*), every rush handover
+ * and every mid-day handover failed to recompute, and *End the day* after a handover threw
+ * `reading 'carried'` from `interventionKindRefusal`. Three defects across two panel seats, one stale
+ * directory, and none of them in the code under review.
+ *
+ * So the viewer is bundled from the packages' source, exactly as vitest runs it (`vitest.config.ts`
+ * aliases the same specifiers): a build from a tree is a build of that tree, whatever `dist/` holds
+ * and whichever checkout `node_modules` points at. The deploy and the container still run `tsc -b`
+ * first, which type-checks the workspace; they no longer have to for the bundle to be right.
+ *
+ * Exact matches (`^…$`), both forms of each specifier, and both to the **browser** barrel: the plain
+ * specifier already meant the browser barrel under the `browser` condition this replaces, and
+ * `src/index.ts` would put `node:` builtins back into the graph. `dev/viteResolvesSource.test.ts`
+ * resolves every specifier the viewer imports through this configuration and requires a `src/`
+ * file.
+ */
+const WORKSPACE_SOURCE = [
+  {
+    find: /^@elevator-sim\/core(?:\/browser)?$/u,
+    replacement: fileURLToPath(new URL('../core/src/browser.ts', import.meta.url)),
+  },
+  {
+    find: /^@elevator-sim\/experiments(?:\/browser)?$/u,
+    replacement: fileURLToPath(new URL('../experiments/src/browser.ts', import.meta.url)),
+  },
+];
+
 /** The hosting rules that travel with the artifact — see the header. */
 const HOST_CONFIG = fileURLToPath(new URL('./staticwebapp.config.json', import.meta.url));
 
@@ -180,15 +216,17 @@ export default defineConfig({
   define: {
     __BUILD_VERSION__: JSON.stringify(buildVersion()),
   },
-  // No `resolve.alias`. There used to be one: `@elevator-sim/core` published a single entry
-  // point that re-exported `loadConfig`, so importing the package pulled `node:fs/promises` and
+  // There used to be a different alias here: `@elevator-sim/core` published a single entry point
+  // that re-exported `loadConfig`, so importing the package pulled `node:fs/promises` and
   // `node:path` into the browser graph, and Vite's externalisation stub for a Node builtin throws
   // at module *evaluation* — the viewer died before running a line. The two builtins were aliased
-  // to a throwing shim in `dev-shims/`. Both are deleted: `core` now publishes a `browser` export
-  // condition that resolves the plain specifier to its fs-free barrel (`core/src/browser.ts`),
-  // which Vite selects on its own for a browser build. `core/src/browser.test.ts` walks that
-  // barrel's transitive import graph and fails if a `node:` import returns to it, so the shim
-  // cannot become necessary again without a red test first.
+  // to a throwing shim in `dev-shims/`. Both are deleted: `core` publishes a fs-free barrel
+  // (`core/src/browser.ts`), and `core/src/browser.test.ts` walks that barrel's transitive import
+  // graph and fails if a `node:` import returns to it, so the shim cannot become necessary again
+  // without a red test first.
+  //
+  // The alias that stands now is {@link WORKSPACE_SOURCE}'s, and its docstring carries why.
+  resolve: { alias: WORKSPACE_SOURCE },
   //
   // The reference data is the viewer's static content in dev. On build it is emitted file by file
   // instead — see the header and `copyPublicDir` below.

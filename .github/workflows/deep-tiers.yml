@@ -358,6 +358,7 @@ on:
           - fixit-as-built-mornings
           - fixit-route-census
           - week-census
+          - call-cadence
           - honesty-deep
           - corpus-figures
           - benchmark
@@ -768,12 +769,16 @@ jobs:
   #
   # A gate of its own (`ELEVATOR_SIM_FIXIT_ROUTES=deep`). Measured 2026-09-25 on a shared four-core
   # container: 15 cases in 190 s, the slowest 92.8 s. The minutes below are a ceiling.
+  #
+  # Since wave AN (lane AN-5) the same job presses every one-control route as the press site does,
+  # crowd check and all, and requires each to run (`fixit/everyLeverRuns.test.ts`): 672 s of one
+  # contended vitest process on the lane's container, so the ceiling rose to 75 minutes.
   # ---------------------------------------------------------------------------
   fixit-route-census:
     name: fix-it — the route census reproduces
     if: github.event_name == 'schedule' || inputs.tiers == 'all' || inputs.tiers == 'fixit-route-census'
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -784,7 +789,7 @@ jobs:
       - name: Press every route through the gate and match the census
         env:
           ELEVATOR_SIM_FIXIT_ROUTES: deep
-        run: npx vitest run --passWithNoTests=false --project viz src/fixit/routeCensus.sweep.test.ts
+        run: npx vitest run --passWithNoTests=false --project viz src/fixit/routeCensus.sweep.test.ts src/fixit/everyLeverRuns.test.ts
 
   # ---------------------------------------------------------------------------
   # The week census — docs/33 DC-10, DECISIONS.md § D1067. Every row of `data/week-way.json` re-run
@@ -803,8 +808,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 240
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '26'
           cache: npm
@@ -813,6 +818,34 @@ jobs:
         env:
           WEEK_WAY_VERIFY: '1'
         run: npx vitest run --passWithNoTests=false --project viz --testTimeout=10800000 src/shift/weekWay.verify.test.ts
+
+  # ---------------------------------------------------------------------------
+  # The careful day's call cadence — DECISIONS.md § D1338, with the who-drives trap check that gates
+  # § D1337. Midtown's week 1 on the first four census crowds, played through the shipped call
+  # session under the careful policy, held to floors written before the run: a median of four calls
+  # a day, no weekday without one, an evening call on three of each week's five, and no who-drives
+  # answer lowest on under a tenth or over three fifths of the rows. The post-AM panel's cadence was
+  # a stale bundle's (§ D1317); this is what keeps the correct build's figures from slipping unseen.
+  #
+  # A gate of its own (`CALL_CADENCE_SWEEP`), on this file's argument for one job per tier. About
+  # 70 s a day on the lane's contended container, twenty days; the minutes below are a ceiling.
+  # ---------------------------------------------------------------------------
+  call-cadence:
+    name: calls — the careful day's cadence floors
+    if: github.event_name == 'schedule' || inputs.tiers == 'all' || inputs.tiers == 'call-cadence'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '26'
+          cache: npm
+      - run: npm ci
+      - name: Play the census crowds' careful week and hold it to the floors
+        env:
+          CALL_CADENCE_SWEEP: '1'
+        run: npx vitest run --passWithNoTests=false --project viz --testTimeout=5400000 src/everyday/callCadence.sweep.test.ts
 
   honesty-deep:
     name: honesty — the deep corpus
@@ -855,6 +888,9 @@ jobs:
   # nightly run of this job after the wave merges. So the headline of both tiers is written to the
   # run's summary page as well as to the artifact, with the commit it is true of, which makes it
   # readable without a download. Carried by a person, as before: nothing here edits the tree.
+  #
+  # **And as one check-run annotation per tier**, because an agent session can read neither the
+  # summary page nor the artifact, and the deep row is carried by agent sessions. The step says how.
   # ---------------------------------------------------------------------------
   corpus-figures:
     name: corpus figures — § D343, both tiers, one sitting
@@ -971,6 +1007,31 @@ jobs:
               echo '```'
             done
           } >> "$GITHUB_STEP_SUMMARY"
+
+      # The same headline once more, as one check-run annotation per tier, because neither the
+      # summary nor the artifact can be read from an agent session: the REST API serves no job
+      # summary, and a session's GitHub client refuses the artifact download host. Annotations are
+      # served, at `repos/{owner}/{repo}/check-runs/{job id}/annotations`, so the integrator can
+      # carry the deep row without a browser. Every tier's line has the title `corpus figures` and
+      # names the commit. A tier that wrote nothing gets a warning under that title instead, and the
+      # `cases` field keeps the file's own `(n evaluated, n skipped)`, which is what tells a complete
+      # tier from a truncated one.
+      - name: Annotate the run with each tier's figures
+        if: always()
+        run: |
+          for tier in always-on deep; do
+            file="${{ runner.temp }}/corpus-$tier.txt"
+            if [ -f "$file" ]; then
+              cases=$(sed -n 's/^cases  *//p' "$file")
+              strings=$(sed -n 's/^strings checked  *//p' "$file")
+              simulations=$(sed -n 's/^simulations  *//p' "$file")
+              surfaces=$(sed -n 's/^surface count  *//p' "$file")
+              failing=$(sed -n 's/^failing cases  *//p' "$file")
+              echo "::notice title=corpus figures::$tier · cases $cases · strings $strings · simulations $simulations · surfaces $surfaces · failing cases $failing · commit ${{ github.sha }}"
+            else
+              echo "::warning title=corpus figures::$tier · no figures were written · commit ${{ github.sha }}"
+            fi
+          done
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
@@ -1146,6 +1207,7 @@ jobs:
       - fixit-as-built-mornings
       - fixit-route-census
       - week-census
+      - call-cadence
       - corpus-figures
       - benchmark-selection-sweep
       - benchmark-saturation-census
@@ -1208,6 +1270,7 @@ jobs:
       - fixit-as-built-mornings
       - fixit-route-census
       - week-census
+      - call-cadence
       - corpus-figures
       - benchmark-selection-sweep
       - benchmark-saturation-census

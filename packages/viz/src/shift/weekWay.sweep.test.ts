@@ -29,6 +29,11 @@
  *   the held-out half is run once, at the slope the search settled on.
  * - `WEEK_WAY_STAGE=full` (the default) runs both halves and writes one `data/week-way.json` row
  *   per (contract, day) as JSON lines, with the run count and seconds beside it.
+ * - `WEEK_WAY_STAGE=profiles` is **the one-profile screen** (`docs/33` DC-11, wave AN lane DQ-2,
+ *   § D1343): every shipped profile, nothing pressed, once on every held-out crowd of each named
+ *   cell, one JSON line per cell with a verdict string per profile. With `WEEK_WAY_CELLS` naming an
+ *   authored order's five days, its lines are that order's `data/week-dominance.json` row.
+ *   `WEEK_WAY_PROFILES` narrows the profiles for a screen by hand.
  * - `WEEK_WAY_EVENTS=scheduled` measures each day under the wrinkle the week draws for it
  *   (`shift/calendar.ts#scheduledEventFor`) instead of the ordinary day. **That is the re-run owed
  *   once wave AJ's wrinkle episodes land**: the shipped rows are the unwrinkled weekday.
@@ -96,7 +101,8 @@ describe.runIf(process.env['WEEK_WAY_SWEEP'] === '1')('the week census', () => {
   it('writes each (contract, day) cell of DC-10', () => {
     const out = process.env['WEEK_WAY_OUT'];
     expect(out, 'WEEK_WAY_OUT names the file the rows are appended to').toBeTypeOf('string');
-    const stage = process.env['WEEK_WAY_STAGE'] === 'screen' ? 'screen' : 'full';
+    const stageEnv = process.env['WEEK_WAY_STAGE'];
+    const stage = stageEnv === 'screen' ? 'screen' : stageEnv === 'profiles' ? 'profiles' : 'full';
     const scheduled = process.env['WEEK_WAY_EVENTS'] === 'scheduled';
     const contracts = (process.env['WEEK_WAY_CONTRACTS'] ?? 'c2').split(',');
     /* `[day, drawn id or undefined]`: a named wrinkle from `WEEK_WAY_CELLS`, or the day as dealt. */
@@ -124,6 +130,54 @@ describe.runIf(process.env['WEEK_WAY_SWEEP'] === '1')('the week census', () => {
     const heldOutSeeds = crowdSeeds(p.heldOutFrom, p.heldOutCount);
     const configs = configsOf();
     const standing: WeekWayConfig = { dispatcherId: p.standingOrder, press: '', atFraction: 0 };
+
+    if (stage === 'profiles') {
+      /*
+       * **The one-profile screen** — wave AN, lane DQ-2 (`shift/weekDominance.ts`): every shipped
+       * profile, nothing pressed, once on every held-out crowd of each named cell. No tuning half,
+       * because nothing is chosen: the rule reads every profile. `WEEK_WAY_PROFILES` narrows the
+       * profiles for a screen by hand, and a line taken that way cannot be shipped, because
+       * `weekDominanceIssues` requires every profile.
+       */
+      const only = process.env['WEEK_WAY_PROFILES']?.split(',');
+      const profiles = resources.dispatcherProfiles.profiles
+        .map((profile) => profile.id)
+        .filter((id) => only === undefined || only.includes(id));
+      for (const contractId of contracts) {
+        for (const [day, eventId] of cells) {
+          const started = performance.now();
+          const verdicts: Record<string, string> = {};
+          const failing: Record<string, string[]> = {};
+          for (const dispatcherId of profiles) {
+            let marks = '';
+            const reasons: string[] = [];
+            for (const seed of heldOutSeeds) {
+              const verdict = runDay(contractId, day, seed, { dispatcherId, press: '', atFraction: 0 }, scheduled, eventId);
+              marks += verdict.cleared ? 'C' : 'm';
+              reasons.push(verdict.failing.join('+'));
+            }
+            verdicts[dispatcherId] = marks;
+            failing[dispatcherId] = reasons;
+          }
+          appendFileSync(
+            String(out),
+            `${JSON.stringify({
+              stage,
+              contractId,
+              day,
+              eventId: eventId ?? 'ordinary',
+              heldOutFrom: p.heldOutFrom,
+              heldOutCount: p.heldOutCount,
+              verdicts,
+              failing,
+              runs: profiles.length * heldOutSeeds.length,
+              seconds: (performance.now() - started) / 1000,
+            })}\n`,
+          );
+        }
+      }
+      return;
+    }
 
     for (const contractId of contracts) {
       const slope = growthPerDayOf(ladderRowFor(contractId));

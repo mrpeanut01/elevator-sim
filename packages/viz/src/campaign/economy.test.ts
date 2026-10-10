@@ -8,10 +8,10 @@
  * against a worked case whose arithmetic is written out in the assertion rather than recomputed by
  * the code under test.
  *
- * The `98 ≈ a third of 324` relationship is checked too, because the contract screen's lede asserts
- * it in words (*"A perfect month buys about a third of the shop"*) and a lede that stopped being
- * true of the tables would be this repository's stale-sentence defect in the one place a player
- * reads a ratio.
+ * The `98 ≈ a third of 324` relationship is checked too. The contract screen's lede asserted it in
+ * words (*"A perfect month buys about a third of the shop"*) until § D1312 made the shop a contract
+ * sheet quotes the tower's own; the sentences a player reads now are held against every tower in
+ * `shaftPlan.test.ts`, and this file keeps the contract's figure for the shop priced for no building.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -114,7 +114,13 @@ describe('the figures § 8 publishes, derived from the tables that produce them'
     expect(subtotals.reduce((a, b) => a + b, 0)).toBe(shopTotalUnits(shippedPriceSchedule()));
   });
 
-  it('leaves the contract screen’s lede true — a perfect month is about a third of the shop', () => {
+  /*
+   * The contract's own ratio, for the shop priced for no building. This case was titled *"leaves the
+   * contract screen's lede true"* until § D1312 priced a shaft per shaft at its bank's band, which
+   * made the shop a contract sheet quotes the tower's own; the lede and the standard note stopped
+   * naming a third, and `shaftPlan.test.ts` holds both against every difficulty on every tower.
+   */
+  it('keeps the contract’s ratio — a perfect standard month is about a third of the shop priced for no building', () => {
     const share = perfectMonthUnits(DIFFICULTIES.standard) / shopTotalUnits(shippedPriceSchedule());
     expect(share).toBeGreaterThan(0.28);
     expect(share).toBeLessThan(0.36);

@@ -17,6 +17,7 @@ import { goalsForDay, readGoals } from '../shift/goals.js';
 import type { DayOutcome, GoalObservations, WeekState } from '../shift/types.js';
 import type { WatchRecord } from '../watch/types.js';
 import type { WeekRecord } from '../shift/weekRecord.js';
+import { weekUnderWayHarderLineOf } from '../shift/nextWeek.js';
 import { closeDay, HISTORY_DAYS, openWeek, outcomeOf } from '../shift/week.js';
 
 import { GLOSSARY_TERMS } from '../mode/glossary.js';
@@ -117,7 +118,42 @@ describe('§ 16 rule 1 — an unfinished day shows the em dash', () => {
     const week = weekWith(5, [closedDay(1), closedDay(2), closedDay(3), closedDay(4), closedDay(5)]);
     const today = viewAt(0, true, week).chips.at(-1);
     expect(today?.score).toBe('84%');
-    expect(today?.note).toBe('today');
+    /* The fixture's readings leave a goal pending, so the day is too quiet to grade — Your week's words. */
+    expect(today?.note).toBe('today · too quiet to grade');
+  });
+});
+
+/*
+ * **A closed day says how it went** — wave AN, lane AN-7, carried from the post-AL panel and found
+ * again by the post-AM panel's seat D: a missed Monday read *90 % · played* on the door while Your
+ * week read *missed*. The chip carries the day's verdict in the week card's own words.
+ */
+describe('a closed day’s chip says its verdict, as Your week does', () => {
+  function graded(day: number, observations: GoalObservations): DayOutcome {
+    return outcomeOf({
+      day,
+      dayIdx: (day - 1) % 7,
+      eventId: 'ordinary',
+      arrived: observations.arrived,
+      carried: observations.arrived,
+      minutePct: 90,
+      readings: readGoals(goalsForDay(day), { ...observations, workPerServedLegKJ: 40 } as GoalObservations),
+      record: recordOn('chancery-house'),
+      recordRefusal: null,
+    });
+  }
+  const MISSED: GoalObservations = { ...MET, peakQueue: 999, worstWaitS: 990 };
+
+  it('reads *missed* beside a high score on a missed day, and *clean day* on a clean one', () => {
+    const week = weekWith(3, [graded(1, MISSED), graded(2, MET)]);
+    const chips = viewAt(0, false, week).chips;
+    const byDay = new Map(chips.map((chip) => [chip.day, chip]));
+    expect(byDay.get(1)?.score).toBe('90%');
+    expect(byDay.get(1)?.note).toBe('missed');
+    expect(byDay.get(2)?.note).toBe('clean day');
+    for (const chip of chips) expect(chip.note, String(chip.day)).not.toBe('played');
+    /* The selected chip keeps its verdict and says it is the one showing. */
+    expect(viewAt(-2, false, week).chips.find((chip) => chip.day === 1)?.note).toBe('missed · showing');
   });
 });
 
@@ -435,5 +471,21 @@ describe('weeks held on this tower — lane AM-D, § D1253', () => {
     const line = at({ contractId: 'c2', closed: 3, met: 3, best: 5, held: 3 });
     expect(line).toMatch(/^Weeks held on this tower: 3 in a row/u);
     expect(line).toContain('It buys nothing, and no clock runs on it');
+  });
+});
+
+/*
+ * Wave AN, lane DQ-2 (§ D1344): the door calls the week under way harder than the one before it
+ * only where the house's census fell, in `shift/nextWeek.ts`'s one sentence, and never in week 1.
+ */
+describe('a later week, harder only where the house’s census fell — § D1344', () => {
+  it('draws the census sentence on the door exactly where it says harder, and nothing in week 1', () => {
+    for (const number of [1, 2, 3, 4]) {
+      const week: WeekState = { ...openWeek('c2'), week: number };
+      const view = doorScreenViewOf({ week, today: { ...TODAY, day: 1 }, dayOffset: 0, dayClosed: false, nameOf: NAME_OF });
+      expect(view.weekHarder, `week ${String(number)}`).toBe(weekUnderWayHarderLineOf(week));
+      if (number === 1) expect(view.weekHarder).toBeUndefined();
+      if (view.weekHarder !== undefined) expect(view.weekHarder).toMatch(/^Week \d is harder than week \d by the house’s measure: left alone/u);
+    }
   });
 });

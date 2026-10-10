@@ -40,6 +40,8 @@
 
 import { dayWordsFor } from '../mode/glossary.js';
 import { HISTORY_DAYS } from '../shift/week.js';
+import { dayVerdictOf } from '../shift/weekStake.js';
+import { weekUnderWayHarderLineOf } from '../shift/nextWeek.js';
 import { weeksHeldLineOf, type WeekRecord } from '../shift/weekRecord.js';
 import type { DayOutcome, WeekState } from '../shift/types.js';
 import { weekdayOf } from '../shift/types.js';
@@ -68,7 +70,7 @@ export interface DoorDayChip {
   readonly tower: string;
   /** Away inside a minute, that day. The em dash for a day that has not been played. */
   readonly score: string;
-  /** *today*, *today · not closed yet*, *played*, *showing*, *not played*. */
+  /** *today · clean day*, *today · not closed yet*, *missed*, *clean day · showing*, *not played*. */
   readonly note: string;
   readonly selected: boolean;
 }
@@ -151,6 +153,12 @@ export interface DoorScreenView {
    * ([§ D1253](../../../../DECISIONS.md)) — or `undefined` before a week on it has closed.
    */
   readonly weeksHeld: string | undefined;
+  /**
+   * **This week, called harder than the last only where the house's census fell** — wave AN, lane
+   * DQ-2, `shift/nextWeek.ts#weekUnderWayHarderLineOf` ([§ D1344](../../../../DECISIONS.md)) — or
+   * `undefined` on week 1 and wherever it did not fall.
+   */
+  readonly weekHarder: string | undefined;
   readonly sameForEveryone: string;
   readonly primary: DoorPrimaryView;
 }
@@ -361,24 +369,43 @@ function chipsOf(input: DoorScreenInput): readonly DoorDayChip[] {
             : EM_DASH
           : (input.nameOf(closed.record.buildingId) ?? closed.record.buildingId),
       score: closed === undefined ? EM_DASH : percentFigure(closed.minutePct),
-      note: noteFor({ isToday, selected, closed: closed !== undefined, exists: day >= 1 }),
+      note: noteFor({ isToday, selected, closed, exists: day >= 1 }),
       selected,
     });
   }
   return Object.freeze(chips);
 }
 
-/** A chip's one-word state. § 16 rule 1 owns the first arm: an unfinished day says so. */
+/**
+ * **A closed day's verdict, in Your week's card's words** — `clean day`, `missed`, `too quiet to
+ * grade`. One map for both screens (`weekView.ts` reads it), so the door's chip and the week's card
+ * cannot name one day two ways.
+ */
+export const DAY_VERDICT_NOTE: Readonly<Record<'cleared' | 'missed' | 'ungraded', string>> = Object.freeze({
+  cleared: 'clean day',
+  missed: 'missed',
+  ungraded: 'too quiet to grade',
+});
+
+/**
+ * A chip's state. § 16 rule 1 owns the first arm: an unfinished day says so.
+ *
+ * **A closed day says how it went** — wave AN, lane AN-7, carried from the post-AL panel and found
+ * again by the post-AM panel's seat D: a missed Monday read *90 % · played* here while Your week
+ * read *missed*. The figure is the share of riders away inside a minute, which a missed day can
+ * score high, so the word beside it is the day's verdict, as the week's card gives it.
+ */
 function noteFor(state: {
   readonly isToday: boolean;
   readonly selected: boolean;
-  readonly closed: boolean;
+  readonly closed: DayOutcome | undefined;
   readonly exists: boolean;
 }): string {
   if (!state.exists) return 'before this week';
-  if (state.isToday) return state.closed ? 'today' : 'today · not closed yet';
-  if (!state.closed) return 'not played';
-  return state.selected ? 'showing' : 'played';
+  const verdict = state.closed === undefined ? undefined : DAY_VERDICT_NOTE[dayVerdictOf(state.closed)];
+  if (state.isToday) return verdict === undefined ? 'today · not closed yet' : `today · ${verdict}`;
+  if (verdict === undefined) return 'not played';
+  return state.selected ? `${verdict} · showing` : verdict;
 }
 
 /**
@@ -540,6 +567,7 @@ export function doorScreenViewOf(input: DoorScreenInput): DoorScreenView {
     seedLine: input.today.seedLine,
     firstSessionLine: input.today.firstSessionLine,
     weeksHeld: input.record === undefined ? undefined : weeksHeldLineOf(input.record),
+    weekHarder: weekUnderWayHarderLineOf(input.week),
     sameForEveryone,
     primary: primaryOf(clamped, chips),
   };

@@ -45,7 +45,7 @@ import { recordRun } from '../record/recordRun.js';
 import { plannedDayOf } from '../dev/state.js';
 
 import { EM_DASH, groupThousands } from './figures.js';
-import { PRESS_DAY_DRIVER_HELD, TODAY_CHOICE_LINE, todayOf } from './today.js';
+import { PRESS_DAY_DRIVER_HELD, TODAY_CHOICE_LINE, mootCountClause, todayOf } from './today.js';
 import { pinnedDayLengthLineOf } from './firstDayLength.js';
 import { dailySeedFor } from '../shift/dailySeed.js';
 import { FIRST_SESSION_LINE_PINNED, firstSessionContractFor } from '../shift/firstSession.js';
@@ -499,6 +499,7 @@ describe('the load reading', () => {
 describe('the rest of the record', () => {
   it('names the day and prints the seed line two players can compare', () => {
     const record = recordFor(midtown, 2, 1);
+    /* The fixture's week is Garden Apartments', which the census does not deal: no week number. */
     expect(record.dayLabel).toBe('TUESDAY · DAY 2');
     expect(record.weekday).toBe('Tuesday');
     expect(record.seedLine).toBe(
@@ -855,6 +856,21 @@ describe('the moot sentence is drawn only over the run it was measured on — is
     expect(/\d/u.test(sentence), sentence).toBe(false);
   });
 
+  it('lowercases the count after the comma, on both branches — wave AN lane AP-3 (#571’s side finding)', () => {
+    /*
+     * The brief printed *"Measured on this crowd, Ten other standing orders clear it"*. The count
+     * follows a comma on every path, so neither branch may open with a capital: the counted one
+     * (*ten*) is drawn on the shipped pin, and the zero one (*no*) is reached through the clause,
+     * because no shipped pin's census is empty.
+     */
+    const sentence = crownOn({}).outOfService?.mootUnder ?? '';
+    expect(sentence).toMatch(/Measured on this crowd, [a-z]/u);
+    expect(sentence).toContain(`Measured on this crowd, ${mootCountClause(ladderRowFor('c7')?.pressDay?.mootUnder.length ?? -1)}`);
+    expect(mootCountClause(10)).toBe('ten other standing orders clear it');
+    expect(mootCountClause(1)).toBe('one other standing order clears it');
+    expect(mootCountClause(0)).toBe('no other standing order clears it');
+  });
+
   it('is silent when the press would run the other horizon — the gate #595 added', () => {
     const press = ladderRowFor('c7')?.pressDay;
     const other = press?.horizon === 'period' ? 'whole-day' : 'period';
@@ -983,6 +999,11 @@ describe('a pinned first day says whose crowd it is, and how long it takes — �
     const sentence = midtownPinned({}).outOfService?.mootUnder ?? '';
     expect(sentence).toContain('Measured on this crowd');
     expect(sentence).not.toContain('today’s crowd');
+    /*
+     * Wave AN, lane AN-7, carried from the post-AL panel and found again by the post-AM panel's seat
+     * D: the count opened mid-sentence with a capital, *Measured on this crowd, Ten other …*.
+     */
+    expect(sentence).toMatch(/Measured on this crowd, [a-z]/u);
   });
 
   it('prints how long the whole day takes and when the call comes, derived — and only on the day as measured', () => {
@@ -1048,5 +1069,38 @@ describe('the week’s stake on the brief (§ D1176)', () => {
   it('draws nothing on a tower the census does not speak for', () => {
     const state = { week: openWeek('c1'), buildingId: 'garden-apartments', seed: 1n } as unknown as ViewerState;
     expect(todayOf(inputOf(state)).weekStake).toBeUndefined();
+  });
+});
+
+/*
+ * **The week's number reaches the brief and the door** — wave AN, lane AN-7, the post-AM panel's
+ * seats B and D: § D1252 deals each week of a census tower its own order, and no screen numbered
+ * the weeks, so week 2's Tuesday and week 1's read alike above different wrinkles.
+ */
+describe('the eyebrow numbers a census tower’s week', () => {
+  it('reads WEEK n on Midtown’s week, and nothing where the census does not deal the week', () => {
+    const on = (week: WeekState): string =>
+      todayOf({
+        week,
+        calendar: NO_CALENDAR,
+        building: midtown,
+        buildingId: midtown.id,
+        dispatcherName: 'Steady hand',
+        dispatcherNameOf: () => undefined,
+        goals: pendingGoals(week.day),
+        seed: 424_242n,
+        horizon: 'period',
+        dayStartS: undefined,
+        templateVariesMix: false,
+        wholeDayRun: false,
+        dayCars: undefined,
+        crowdIsToday: true,
+        daySeed: 20_260_925n,
+        firstSession: false,
+        units: 'metric',
+      }).dayLabel;
+    expect(on({ ...openWeek('c2'), week: 2, day: 2, dayIdx: 1 })).toBe('WEEK 2 · TUESDAY · DAY 2');
+    expect(on({ ...openWeek('c2'), day: 1, dayIdx: 0 })).toBe('WEEK 1 · MONDAY · DAY 1');
+    expect(on({ ...openWeek('c1'), day: 2, dayIdx: 1 })).toBe('TUESDAY · DAY 2');
   });
 });

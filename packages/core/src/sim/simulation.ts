@@ -316,7 +316,7 @@ const STRUCTURAL_INELIGIBILITY: ReadonlySet<string> = new Set([
 
 /*
  * **`'shaftBlocked'` is deliberately absent from the set above, and that absence is
- * INV-TWIN-3** — `docs/11` § 3.1 and § 3.5, GitHub issue #412, `DECISIONS.md` § D620.
+ * INV-TWIN-3** — `docs/11` § 3.1 and § 3.5, GitHub issue #412, `DECISIONS.md` § D621.
  *
  * A passenger refused because a TWIN shaft's other car is in the way **is servable**: the
  * hardware reaches them, the credential permits them, and the block is the control system's own
@@ -801,7 +801,7 @@ export class Simulation {
   /** Runs cut short en route. Zero under every profile leaving `enRouteDiversion` off. */
   #diversions = 0;
 
-  /* ---- TWIN shafts (docs/11, GitHub issue #412, DECISIONS.md § D620) ---- */
+  /* ---- TWIN shafts (docs/11, GitHub issue #412, DECISIONS.md § D621) ---- */
 
   /**
    * The two-car hoistways of this building, by shaft id. **Empty on every shipped building**,
@@ -1093,7 +1093,7 @@ export class Simulation {
 
     /*
      * **The shafts of every bank, built once** — `docs/11` § 1.2 row "the car factory", GitHub
-     * issue #412, `DECISIONS.md` § D620.
+     * issue #412, `DECISIONS.md` § D621.
      *
      * The factory below used to call `shaftForBank(resolved, bankId)` **per car**, so four cars
      * in a bank got four structurally identical but distinct `CarShaft` values and nothing in
@@ -4797,7 +4797,7 @@ export class Simulation {
   }
 
   /* ---------------------------------------------------------------- *
-   * TWIN shafts — docs/11, GitHub issue #412, DECISIONS.md § D620
+   * TWIN shafts — docs/11, GitHub issue #412, DECISIONS.md § D621
    * ---------------------------------------------------------------- */
 
   /**
@@ -6997,7 +6997,7 @@ function terminalCarTimings(
  * shaft does not serve is a construction error rather than a tuning choice.
  */
 /**
- * **Where a TWIN shaft's two cars stand at t = 0** — GitHub issue #412, `DECISIONS.md` § D620.
+ * **Where a TWIN shaft's two cars stand at t = 0** — GitHub issue #412, `DECISIONS.md` § D621.
  *
  * `homeFloorIdFor` gives every car of a bank the *same* home, which is the entrance on every
  * shipped building. For two cars in one hoistway that is a starting state in which the separation

@@ -21,6 +21,7 @@ import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
 import {
   CAMPAIGN_ABSENCES,
   LOST_CONTRACTS_MAX,
+  RENEWAL_DUE_CELL,
   SERVICE_AT_TRIPS,
   type CampaignCareer,
   type CampaignTower,
@@ -32,7 +33,10 @@ import {
   openTowerOf,
   openingCareer,
   quirkOf,
+  renewalAheadSentenceOf,
+  renewalIsDue,
   towerById,
+  workingDaysBeforeRenewal,
 } from './career.js';
 import {
   CONTRACT_DAYS,
@@ -63,7 +67,8 @@ const SECOND_MONTH: CampaignCareer = Object.freeze({
   towers: Object.freeze([
     {
       ...freshTower({ contractId: 'c1', buildingId: 'garden-apartments', dispatcherId: 'eta', rate: 3 }),
-      day: 19,
+      // § 8.12's *a renewal due*: since § D1357 a renewal stands once day 20 has closed.
+      day: 21,
       missed: 0,
       months: 3,
       trips: 41_200,
@@ -214,7 +219,7 @@ describe('a building is a commitment, not a setting (§ 8.1)', () => {
     expect(opened.towers).toEqual(SECOND_MONTH.towers);
     const back = applyCampaignAction(opened, { kind: 'open-tower', towerId: 'c1' }, shippedPriceSchedule());
     expect(back.towers).toEqual(SECOND_MONTH.towers);
-    expect(openTowerOf(back)?.day).toBe(19);
+    expect(openTowerOf(back)?.day).toBe(CONTRACT_DAYS + 1);
   });
 
   it('refuses to open a building the career does not hold', () => {
@@ -252,7 +257,7 @@ describe('a building is a commitment, not a setting (§ 8.1)', () => {
     expect(tower.missed).toBe(0);
     expect(tower.bookings).toEqual([]);
     // And it is that tower's month, not the career's.
-    expect(towerById(next, 'c1')?.day).toBe(19);
+    expect(towerById(next, 'c1')?.day).toBe(CONTRACT_DAYS + 1);
   });
 });
 
@@ -335,9 +340,9 @@ describe('what a building wants from you (§ 8.9, § 8.3)', () => {
     expect(nextLineOf(career.towers[0]!)).toContain('Nothing booked');
   });
 
-  it('is a renewal in the contract’s last days', () => {
+  it('is a renewal once day 20 has closed', () => {
     const tower = towerById(SECOND_MONTH, 'c1')!;
-    expect(tower.day).toBe(19);
+    expect(tower.day).toBe(CONTRACT_DAYS + 1);
     const need = needOf(tower);
     expect(need?.kind).toBe('renewal');
     expect(need?.options.map((option) => option.id)).toEqual([
@@ -361,8 +366,64 @@ describe('what a building wants from you (§ 8.9, § 8.3)', () => {
 
   it('prices a renewal from the record, and § 8.9’s worked example holds on the snapshot', () => {
     const tower = towerById(SECOND_MONTH, 'c1')!;
-    // Eighteen of eighteen cleared: a clean month, +2, and 3 u a day becomes 5.
+    // Twenty of twenty cleared: a clean month, +2, and 3 u a day becomes 5.
     expect(renewalOffer(tower)).toMatchObject({ bonus: 2, offered: 5, wasRate: 3 });
+  });
+});
+
+/**
+ * **The renewal falls due when day 20 closes** — [§ D1357](../../../../DECISIONS.md), swarm DQ's Q4
+ * ruling, amending § D1274 clauses 1 to 3.
+ *
+ * It stood from day 19, and § D1274 made every door refuse a contract day while it stood, so days 19
+ * and 20 never ran while the dock said *day 19 of 20* and *sign* promised *another twenty days*.
+ * Red before: `needOf` answered a renewal on day 19 and day 20, and the due cell read *answer by
+ * day 20*, a date no door would run to.
+ */
+describe('the renewal falls due when day 20 closes (§ D1357)', () => {
+  const fresh = (day: number): CampaignTower => ({ ...openingCareer('eta').towers[0]!, day });
+
+  it('lets days 19 and 20 run, and stands only once day 20 has closed', () => {
+    for (const day of [18, 19, CONTRACT_DAYS]) {
+      expect(renewalIsDue(fresh(day))).toBe(false);
+      expect(needOf(fresh(day))).toBeUndefined();
+    }
+    expect(renewalIsDue(fresh(CONTRACT_DAYS + 1))).toBe(true);
+    expect(needOf(fresh(CONTRACT_DAYS + 1))?.kind).toBe('renewal');
+  });
+
+  it('files day 19 and day 20 through the reducer, and the renewal then waits on the answer', () => {
+    let career: CampaignCareer = { ...openingCareer('eta'), towers: [fresh(19)] };
+    for (const verdict of ['cleared', 'cleared'] as const) {
+      expect(needOf(career.towers[0]!)).toBeUndefined();
+      career = applyCampaignAction(career, { kind: 'file-day', towerId: 'c1', verdict, trips: 0 }, shippedPriceSchedule());
+    }
+    expect(career.towers[0]?.day).toBe(CONTRACT_DAYS + 1);
+    expect(needOf(career.towers[0]!)?.kind).toBe('renewal');
+    // No twenty-first day: the next month's first is what the answer starts.
+    expect(
+      applyCampaignAction(career, { kind: 'file-day', towerId: 'c1', verdict: 'cleared', trips: 0 }, shippedPriceSchedule()),
+    ).toBe(career);
+    const signed = applyCampaignAction(career, { kind: 'answer-need', towerId: 'c1', optionId: 'sign' }, shippedPriceSchedule());
+    expect(signed.towers[0]?.day).toBe(1);
+    expect(needOf(signed.towers[0]!)).toBeUndefined();
+  });
+
+  it('names the true date: when day 20 closes ahead of it, and the next month’s day 1 once it stands', () => {
+    expect(workingDaysBeforeRenewal(fresh(19))).toBe(2);
+    expect(workingDaysBeforeRenewal(fresh(CONTRACT_DAYS))).toBe(1);
+    expect(workingDaysBeforeRenewal(fresh(CONTRACT_DAYS + 1))).toBe(0);
+    expect(nextLineOf(fresh(19))).toBe('Nothing booked. A renewal falls due when day 20 closes, in 2 working days.');
+    expect(nextLineOf(fresh(CONTRACT_DAYS))).toBe('Nothing booked. A renewal falls due when day 20 closes, in 1 working day.');
+    expect(renewalAheadSentenceOf(fresh(CONTRACT_DAYS + 1))).toBeUndefined();
+    // Five working days out, as the quiet line always began; not six.
+    expect(nextLineOf(fresh(16))).toContain('in 5 working days');
+    expect(nextLineOf(fresh(15))).not.toContain('renewal');
+    const need = needOf(fresh(CONTRACT_DAYS + 1))!;
+    expect(need.due).toBe(RENEWAL_DUE_CELL);
+    expect(need.due).not.toContain('by day 20');
+    expect(need.brief).toContain('Day 20 has closed');
+    expect(need.brief).toContain('does not run until you answer');
   });
 });
 

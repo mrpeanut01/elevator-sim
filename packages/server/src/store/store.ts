@@ -162,9 +162,16 @@ export interface RushEntryRound {
   readonly dispatcherProfileId: string;
   readonly ruleRows?: readonly unknown[] | undefined;
   readonly interventions?: readonly unknown[] | undefined;
+  /**
+   * The tiers bought before the round, as price-schedule row ids — GitHub issue #372, § D1295. Absent
+   * on a round nothing was bought for, which is every round stored before the rebuild existed.
+   */
+  readonly rebuild?: readonly string[] | undefined;
   readonly heldS: number | null;
   readonly wavesOutlasted: number;
   readonly purseBeforeUnits: number;
+  /** What the round's rebuild took, from the replay. Absent on a round stored before the spend term existed. */
+  readonly spentUnits?: number | undefined;
   readonly paidUnits: number;
   readonly purseAfterUnits: number;
 }
@@ -1051,6 +1058,29 @@ export class Store {
         'ORDER BY r.user_id, r.held_s DESC, r.submitted_at_ms ASC' +
         ') best ORDER BY best.held_s DESC, best.submitted_at_ms ASC LIMIT $2',
       [boardKey, limit],
+    );
+    return Object.freeze(result.rows.map((row) => rushEntryOf(row)));
+  }
+
+  /**
+   * **One player's best sitting on each of a tower's rush boards for one day** — the standard board
+   * `dayBoardKey` names, and every modifier set's board that extends it with `/<set>`
+   * ([§ D1359](../../../../DECISIONS.md)). Longest held first, with {@link rushBoard}'s tie rule (the
+   * earlier post wins), so each row is exactly the row that board ranks for this player.
+   *
+   * The key is matched whole or with its `/` suffix, never with `LIKE`: a building id may hold `_`,
+   * which `LIKE` reads as a wildcard. The building is matched too, which the key already implies and
+   * which keeps the query on the column a reader would expect.
+   */
+  async rushBestsOf(userId: string, buildingId: string, dayBoardKey: string): Promise<readonly RushEntryRow[]> {
+    const result = await this.#sql.query(
+      'SELECT * FROM (' +
+        'SELECT DISTINCT ON (r.board_key) r.*, u.display_name AS display_name ' +
+        'FROM rush_entries r JOIN users u ON u.id = r.user_id ' +
+        'WHERE r.user_id = $1 AND r.building_id = $2 AND (r.board_key = $3 OR starts_with(r.board_key, $4)) ' +
+        'ORDER BY r.board_key, r.held_s DESC, r.submitted_at_ms ASC' +
+        ') best ORDER BY best.held_s DESC, best.submitted_at_ms ASC',
+      [userId, buildingId, dayBoardKey, `${dayBoardKey}/`],
     );
     return Object.freeze(result.rows.map((row) => rushEntryOf(row)));
   }

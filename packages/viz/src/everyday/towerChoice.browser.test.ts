@@ -1,5 +1,5 @@
 /**
- * **A player can choose which tower their week runs on** — GitHub issue **#587**,
+ * **A player can choose which tower their week runs on** — PR **#587**,
  * [§ D912](../../../../DECISIONS.md), on the shipped bundle.
  *
  * ## Why this case is the deliverable rather than `towerChoice.test.ts`

@@ -28,9 +28,13 @@ import {
   RUSH_PREFIT_KIT,
   loadConfig,
   parseBuilding,
-  prefittedRushBuilding,
-  prefittedRushProfile,
   resolveBuilding,
+  rushFitOf,
+  rushRebuiltBuilding,
+  zonedProfileOf,
+  type BuildingConfig,
+  type DispatcherProfile,
+  type ElevatorSpecs,
   type LoadedConfig,
 } from '@elevator-sim/core';
 
@@ -41,7 +45,26 @@ import { DATA_DIR } from '../fixtures.test-helper.js';
 import { priceOf } from '../pricing/parse.js';
 import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
 
-import { RUSH_PREFIT_FIT_OUT, RUSH_SEED } from './rush.js';
+import { RUSH_PREFIT_LEVELS } from '@elevator-sim/core';
+
+/*
+ * `core`'s side of the kit, through the general appliers the server uses. Wave AN deleted
+ * `rushPrefit.ts`'s own two wrappers once § D1295 left them no caller outside the tests; these keep
+ * the tests' names for the same two edits.
+ */
+const prefittedRushBuilding = (base: BuildingConfig, specs: ElevatorSpecs): BuildingConfig =>
+  rushRebuiltBuilding(base, rushFitOf(RUSH_PREFIT_LEVELS), specs);
+const prefittedRushProfile = (profile: DispatcherProfile): DispatcherProfile =>
+  RUSH_PREFIT_KIT.zonesTheTower ? zonedProfileOf(profile) : profile;
+
+import { RUSH_SEED, rushFitOutOf } from './rush.js';
+
+/** The pre-fit kit as this package folds it — `rush.ts#rushFitOutOf` at `core`'s levels (§ D1295). */
+const RUSH_PREFIT_FIT_OUT = ((): NonNullable<ReturnType<typeof rushFitOutOf>> => {
+  const fit = rushFitOutOf(RUSH_PREFIT_LEVELS);
+  if (fit === undefined) throw new Error('the pre-fit folds to nothing');
+  return fit;
+})();
 
 let config: LoadedConfig;
 let resources: BrowserResources;

@@ -74,7 +74,7 @@ const profile = (id: string): DispatcherProfile => {
 
 const specOf = (id: string): DispatcherSpec => specFromProfile(profile(id), profile(id).name);
 
-/** A shipped tower on which no car declares a duty — every shipped building, § D549 clause 6. */
+/** A shipped tower on which no car declares a duty — every shipped building but St Jude (§ D549 clause 6, § D1290). */
 const MIDTOWN = (() => {
   const found = RESOURCES.buildings.find((building) => building.id === 'midtown-office');
   if (found === undefined) throw new Error('no shipped midtown-office');

@@ -17,7 +17,9 @@
  * **98** units ({@link perfectMonthUnits}) and the shop is worth **324** ({@link shopTotalUnits}),
  * and both are *summed from the tables below* rather than written down — `economy.test.ts` pins the
  * sums against the contract's stated figures, which is what makes a mistyped tier cost fail a test
- * instead of quietly moving a lede.
+ * instead of quietly moving a lede. The 324 is the shop priced for no building; on a tower, a shaft
+ * is priced per shaft at its bank's plan-area band ([§ D1312](../../../../DECISIONS.md)), so the
+ * shop a contract sheet quotes is that tower's own.
  *
  * ## Day numbering, which the two source documents disagree about
  *
@@ -94,7 +96,14 @@ export const DIFFICULTIES: Readonly<Record<DifficultyId, Difficulty>> = Object.f
     rates: Object.freeze([3, 4, 5, 6]) as unknown as readonly [number, number, number, number],
     miss: 3,
     tests: Object.freeze({ away: 75, worstS: 180, queue: 25, trips: 520 }),
-    note: 'A perfect month buys about a third of the shop. Three missed days and the contract ends.',
+    /*
+     * Read *"A perfect month buys about a third of the shop."* until § D1312 priced a shaft per
+     * shaft at its bank's band: the shop's worth is now the tower's own, from 236 u where no bank
+     * takes a shaft to over 1 000 u on the eight-bank supertall, and a third was true of four of
+     * the sixteen contracts. Less than half is true of all sixteen, and `shaftPlan.test.ts` holds it
+     * against every contract tower.
+     */
+    note: 'A perfect month buys less than half the shop. Three missed days and the contract ends.',
   }),
   hard: Object.freeze({
     id: 'hard' as const,
@@ -536,28 +545,138 @@ export const SHOP: readonly ShopCategory[] = Object.freeze([
   }),
 ]);
 
+/* -------------------------------------------------------------------------- *
+ * § 8.2 — what a shaft costs on the tower it is sunk in
+ * -------------------------------------------------------------------------- */
+
 /**
- * § 8.1's `shopTotal` — **324**, summed from {@link SHOP} rather than stated.
+ * **One shaft a shop tier sinks, and the price band of the bank it joins** — GitHub issue #429's
+ * Career half, [§ D1312](../../../../DECISIONS.md).
  *
- * The contract publishes the figure and this function derives it; `economy.test.ts` compares the
- * two. That is the difference between a lede that quotes a number and a lede that quotes the shop.
+ * `band` is the `shaft-area` row's quantity for that bank: `pricing/parse.ts#shaftAreaBandOf` over
+ * `core`'s `config/floorArea.ts#shaftPlanAreaM2`, the two functions `fixit/parse.ts#fixitContextOf`
+ * reads for a fix-it case's new shaft. `undefined` is a bank whose plan area cannot be resolved; it
+ * is charged no surcharge and is never called band 0, which is `pricing/repairPrice.ts`'s own rule.
  */
-export function shopTotalUnits(schedule: PriceSchedule): number {
+export interface AddedShaft {
+  readonly bankId: string;
+  readonly band: number | undefined;
+}
+
+/**
+ * **Every shaft each shaft-sinking tier adds on one tower, over the tier below it**, keyed by the
+ * tier's `priceId` — [§ D1312](../../../../DECISIONS.md).
+ *
+ * Derived by `campaign/shaftPlan.ts#towerShaftsOf` from the cars `campaign/fitOut.ts#fittedBuilding`
+ * actually adds to the tower the career day runs, so the shafts a price is charged for are the
+ * shafts the run gets, one entry per shaft. A mixed-fleet bank, which that applier leaves as
+ * authored, has no entry and is charged nothing.
+ *
+ * Wherever it is taken, `undefined` is a caller that knows no building — `startTimeFloors`'
+ * convention one function down — and the tier is priced at its schedule row alone.
+ */
+export type TowerShafts = ReadonlyMap<string, readonly AddedShaft[]>;
+
+/**
+ * **The shaft tiers that carry the plan-area surcharge** — [§ D1312](../../../../DECISIONS.md)
+ * clause 2, and the one place to reverse it.
+ *
+ * `new-car` carries it because it is the same act a fix-it case prices, and `docs/38` § 2.2 holds
+ * the two modes to one price for it. `fifth-car` carries it on the swarm's two-to-one ruling (one
+ * member would have left it unbanded): its shaft takes the same plan area as the one before it.
+ * **Owner-reversible**: deleting `'fifth-car'` here leaves the second shaft at its own row, still
+ * charged once per shaft, and changes nothing else.
+ */
+export const AREA_BANDED_SHAFT_PRICE_IDS: ReadonlySet<string> = new Set(['new-car', 'fifth-car']);
+
+/**
+ * The shafts a tier sinks on this tower, or `undefined` for a tier that sinks none or a caller that
+ * knows no tower.
+ *
+ * Read off {@link FitOutDelta.extraShafts} rather than off the category's id, so a shaft tier added
+ * to {@link SHOP} is priced per shaft without a line changing here (CLAUDE.md invariant 7). A tower
+ * whose map has no entry for the tier reads as **no shafts**: refused, never charged the row alone.
+ */
+export function shaftsAddedBy(
+  tier: ShopTier,
+  shafts: TowerShafts | undefined,
+): readonly AddedShaft[] | undefined {
+  if (tier.fits.extraShafts === undefined || shafts === undefined) return undefined;
+  return shafts.get(tier.priceId) ?? [];
+}
+
+/** The `shaft-area` row bought at `band`: nothing for band 0 and nothing for an unresolved band. */
+function shaftAreaUnits(schedule: PriceSchedule, band: number | undefined): number {
+  if (band === undefined || band <= 0) return 0;
+  return purchaseUnits(priceOf(schedule, 'shaft-area'), band);
+}
+
+/** What a shop tier costs on one tower — {@link shopTierPrice}'s answer. */
+export interface ShopTierPrice {
+  readonly units: number;
+  readonly nights: number;
+  /**
+   * How many shafts {@link units} pays for, on a shaft tier priced for a known tower. `undefined`
+   * on every other tier, and on a shaft tier priced for no tower.
+   */
+  readonly shafts?: number | undefined;
+}
+
+/**
+ * § 8.1's `shopTotal`, summed from {@link SHOP} rather than stated.
+ *
+ * With no tower it is the contract's **324**, which `economy.test.ts` compares with
+ * `ENGINE_CONTRACT.md`'s figure. With a tower's {@link TowerShafts} it is what the shop sells on
+ * that building, priced as {@link shopTierPrice} prices each row: 340 u at Midtown Office, where a
+ * shaft takes band 1's plan area, and less than 324 where no bank takes a shaft at all. The contract
+ * sheet's *"the shop below is worth N"* is this figure for the open tower, so the sentence and the
+ * rows under it cannot disagree.
+ */
+export function shopTotalUnits(schedule: PriceSchedule, shafts?: TowerShafts): number {
   return SHOP.reduce(
     (total, category) =>
-      total +
-      category.tiers.reduce((sum, tier) => sum + purchaseUnits(priceOf(schedule, tier.priceId)), 0),
+      total + category.tiers.reduce((sum, tier) => sum + shopTierPrice(schedule, tier, shafts).units, 0),
     0,
   );
 }
 
-/** What a shop tier costs and how long its works take — one lookup, one place (issue #366). */
+/**
+ * What a shop tier costs and how long its works take — one lookup, one place (issue #366).
+ *
+ * ## A shaft tier is charged for each shaft it sinks, at the price a fix-it case charges for it
+ *
+ * GitHub issue #429's Career half, [§ D1312](../../../../DECISIONS.md). `docs/38` § 2.2: *"a fourth
+ * car costs the same units in both modes"*. A fix-it case prices one new shaft as `new-car` plus the
+ * `shaft-area` row at that bank's band, and this charges exactly that for **every** shaft in
+ * {@link shaftsAddedBy}, summed. Two defects close together:
+ *
+ * - **One act, two prices.** The shop quoted the unbanded 34 u where a fix-it case charged 42, 50
+ *   or 58 u for the same shaft in the same bank; 59 of the 62 shipped banks sit above band 0.
+ * - **Seven shafts for the price of one.** `extraShafts` adds a shaft to every bank the applier
+ *   grows, so on Willis the tier sank seven shafts for one 34 u row. It now charges 318 u for them.
+ *
+ * **The nights are the row's, however many shafts it sinks.** The works on separate hoistways are
+ * booked as one job of `nights` nights, as they always were; only the units change.
+ *
+ * With no tower known the tier is priced at its row alone, as it always was, and `shafts` is
+ * `undefined`. Every shipped caller passes one: `everyday/campaignModel.ts#shopTierRow` from the
+ * desk's building facts, and `campaign/career.ts`'s two booking steps from the host's resolver.
+ */
 export function shopTierPrice(
   schedule: PriceSchedule,
   tier: ShopTier,
-): { readonly units: number; readonly nights: number } {
+  shafts?: TowerShafts,
+): ShopTierPrice {
   const priced = priceOf(schedule, tier.priceId);
-  return { units: purchaseUnits(priced), nights: priced.nights };
+  const added = shaftsAddedBy(tier, shafts);
+  if (added === undefined) return { units: purchaseUnits(priced), nights: priced.nights };
+  const banded = AREA_BANDED_SHAFT_PRICE_IDS.has(tier.priceId);
+  const units = added.reduce(
+    (total, shaft) =>
+      total + purchaseUnits(priced) + (banded ? shaftAreaUnits(schedule, shaft.band) : 0),
+    0,
+  );
+  return { units, nights: priced.nights, shafts: added.length };
 }
 
 /** The category for an id, or `undefined`. */
@@ -801,7 +920,9 @@ export function purseOf(tower: TowerEconomy): number {
  *
  * Seven values, in the order the contract evaluates them: a tier already in the building, one whose
  * nights are booked, one the tier below blocks, one the purse blocks, one whose works would run
- * past the contract, and one that is simply buyable.
+ * past the contract, and one that is simply buyable. Two more are refusals the building makes
+ * rather than the contract: `no-start-time` (§ D1078) and `no-shaft` (§ D1312), each a tier that
+ * would move nobody on this tower.
  */
 export type ShopTierStateId =
   | 'fitted'
@@ -811,6 +932,7 @@ export type ShopTierStateId =
   | 'short'
   | 'past-contract'
   | 'no-start-time'
+  | 'no-shaft'
   | 'buyable';
 
 export interface ShopTierState {
@@ -923,6 +1045,11 @@ export function shopTierState(
    * no building, and refuses nothing on this ground.
    */
   startTimeFloors?: number,
+  /**
+   * The shafts each shaft tier sinks on the tower the day runs — {@link TowerShafts}, § D1312.
+   * `undefined` is a caller that knows no building, and prices and refuses nothing on this ground.
+   */
+  shafts?: TowerShafts,
 ): ShopTierState {
   const dayIdx = dayIndexOf(tower);
   const booking = bookingFor(tower, categoryId, tier.level);
@@ -944,6 +1071,12 @@ export function shopTierState(
   if (tier.fits.arrivalRateFactor !== undefined && startTimeFloors === 0) {
     return { id: 'no-start-time', pressable: false };
   }
+  /*
+   * § D1312: a shaft tier on a tower where the applier grows no bank. Priced per shaft, it would
+   * cost nothing and sink nothing, which is a press that moves no leg; refused on § D1078's footing,
+   * before the purse and the level below, because no money and no earlier tier changes it.
+   */
+  if (shaftsAddedBy(tier, shafts)?.length === 0) return { id: 'no-shaft', pressable: false };
   if (tier.level > 1) {
     const below = tier.level - 1;
     const owned = Math.max(fittedLevel(tower, categoryId), bookedLevel(tower, categoryId));
@@ -951,7 +1084,7 @@ export function shopTierState(
   }
   const purse = purseOf(tower);
   /* One lookup, and the schedule is the only place a price comes from — issue #366. */
-  const { units, nights } = shopTierPrice(schedule, tier);
+  const { units, nights } = shopTierPrice(schedule, tier, shafts);
   if (purse < units) {
     return { id: 'short', shortBy: units - purse, pressable: false };
   }

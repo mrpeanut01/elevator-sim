@@ -109,7 +109,16 @@ describe.skipIf(!HAS_BROWSER)('the close points at tomorrow — swarm DO § 1', 
       expect(await text('.everyday-report-close-tally')).toMatch(/^This week so far: you \d, the house \d/u);
       expect(await text('.everyday-report-close-call')).toMatch(/^(The call that decided today|No call decided today)/u);
       expect(await text('.everyday-report-close-arithmetic')).toMatch(/target/u);
-      expect(await text('.everyday-report-close-tomorrow-heading')).toBe('TOMORROW · TUESDAY, DAY 2');
+      /* Wave AN, lane AN-7 (§ D1330): the week's number on the heading. */
+      expect(await text('.everyday-report-close-tomorrow-heading')).toBe('TOMORROW · WEEK 1 · TUESDAY, DAY 2');
+      /*
+       * Wave AN, lane AN-7 (§ D1329), through the shipped path: the shell plans Tuesday at the close
+       * (`dev/state.ts#tomorrowFactsOf`), and the card names the tower's booking of car D with its
+       * clock, beside the move-in's own car, and the two buildings' measured tenants.
+       */
+      expect(await text('.everyday-report-close-cars')).toContain('car D 10:30–13:00, booked by the tower.');
+      expect(await text('.everyday-report-close-cars')).toMatch(/^Out of passenger service: car [A-Z] \d\d:\d\d–\d\d:\d\d, taken by the day, and /u);
+      expect(await text('.everyday-report-close-movein')).toMatch(/^\d+ people move in overnight: [\d,]+ → [\d,]+ tenants\.$/u);
       expect(await text('.everyday-report-close-counts')).toMatch(/counts? toward the week/u);
       expect(await text('.everyday-report-close-census')).toMatch(/^The census ran Tuesday on \d+ crowds: .* cleared it on \d+ of them\.$/u);
       /* The pinned bar's primary is the press into tomorrow, at full emphasis — not *Your week*. */

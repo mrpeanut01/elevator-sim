@@ -222,6 +222,24 @@ export interface RushSittingRoundAccepted {
   readonly purseAfterUnits: number;
 }
 
+/** One row of `GET /api/rush-best` — the board's own row for this player (§ D1359). */
+export interface RushBestRow {
+  readonly boardKey: string;
+  readonly heldS: number;
+  readonly furthestWave: number;
+  readonly roundCount: number;
+  /** Absent on the standard board, on the board row's own rule. */
+  readonly modifiers?: readonly { readonly sinkId: string; readonly steps: number; readonly name: string }[];
+}
+
+/** `GET /api/rush-best`'s answer, carried as the server sent it. */
+export interface RushBestAnswer {
+  readonly buildingId: string;
+  /** The server's day, `YYYY-MM-DD`. */
+  readonly date: string;
+  readonly entries: readonly RushBestRow[];
+}
+
 export interface ClaimedMetrics {
   readonly awtS: number;
   readonly wt95S: number;
@@ -685,6 +703,13 @@ export interface LeaderboardClient {
     token: string,
     sitting: RushSittingWire,
   ): Promise<Result<{ rounds: readonly RushSittingRoundAccepted[] }>>;
+  /**
+   * The signed-in player's own best posted sitting on each of a tower's rush boards today —
+   * `GET /api/rush-best`, [§ D1359](../../../../DECISIONS.md). The day is the server's; the client
+   * names a building and never a board key. Every figure is the server's replay, and no row carries a
+   * purse.
+   */
+  rushBest(token: string, buildingId: string): Promise<Result<RushBestAnswer>>;
   submitChallenge(token: string, submission: ChallengeSubmission): Promise<Result<ChallengeEntryAccepted>>;
   challengeBoard(challengeId: string, metric: string): Promise<Result<ChallengeBoardPage>>;
   /**
@@ -1066,6 +1091,17 @@ export function createClient(origin: string, transport: Transport): LeaderboardC
          */
         return Array.isArray(rounds) ? { rounds: rounds as readonly RushSittingRoundAccepted[] } : undefined;
       }),
+    rushBest: (token, buildingId) =>
+      call(
+        { method: 'GET', url: `${base}/api/rush-best?building=${encodeURIComponent(buildingId)}`, token, body: undefined },
+        (body) => {
+          const record = body as Record<string, unknown> | null;
+          // `entries` and the day decide whether the answer is readable; a row is carried as sent.
+          return Array.isArray(record?.['entries']) && typeof record['date'] === 'string'
+            ? (record as unknown as RushBestAnswer)
+            : undefined;
+        },
+      ),
     submitChallenge: (token, submission) =>
       call({ method: 'POST', url: `${base}/api/challenge-scores`, token, body: submission }, (body) => {
         const record = body as Record<string, unknown> | null;

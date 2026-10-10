@@ -4,11 +4,11 @@
   "provenance": {
     "kind": "measured",
     "command": "ELEVATOR_SIM_SURVIVORS=deep ELEVATOR_SIM_REGENERATE_SURVIVORS=1 npx vitest run --project viz src/scenario/survivorSweep.test.ts",
-    "tree": "2cb0ab0",
-    "measuredAt": "2026-09-26",
+    "tree": "f68e686",
+    "measuredAt": "2026-10-10",
     "masterSeed": 20260910,
     "sampleSize": 12,
-    "scope": "Every configuration is an edit of the scenario's own baseline dispatcher or a shipped profile picked in its place, alone or with idle cars parked where the stage page offers, priced by data/price-schedule.json. 10 of 37 priced changes can reach a scenario run at all — the rest price shafts, machines and fittings that campaign/stageRun.ts cannot apply — and 47 of 60 declared dimensions are priced, of which 46 are varied — weights.dutyMismatch is declared and priced by dispatch-rules, which covers dispatcher.weights, and is not varied on a building that declares no duty, which no scenario's building does, because a dial its building gives nothing to act on is not drawn (DECISIONS.md § D549) — and 13 are withheld from every scenario by data/price-schedule.json and varied by no configuration. A configuration differing only on an unpriced dimension is reachable at every rung, so counting it would make the budget inert.",
+    "scope": "Every configuration is an edit of the scenario's own baseline dispatcher or a shipped profile picked in its place, alone or with idle cars parked where the stage page offers, priced by data/price-schedule.json. 10 of 37 priced changes can reach a scenario run at all — the rest price shafts, machines and fittings that campaign/stageRun.ts cannot apply — and 47 of 60 declared dimensions are priced and therefore varied — weights.dutyMismatch only on stage-10-the-bed-and-the-visitor, whose building declares a duty, because a dial its building gives nothing to act on is not drawn (DECISIONS.md § D549, § D1290) — and 13 are withheld from every scenario by data/price-schedule.json and varied by no configuration. A configuration differing only on an unpriced dimension is reachable at every rung, so counting it would make the budget inert.",
     "reachableChangeIds": [
       "idle-parking",
       "dispatch-rules",
@@ -53,7 +53,7 @@
     "unpricedDimensionCount": 0,
     "withheldDimensionCount": 13,
     "declaredDimensionCount": 60,
-    "inputHash": "20c8fc6400d8950e6923ca3cf909cbc40b335db9b5793a009ed077c6409ce9b6"
+    "inputHash": "29a33c2b1d845c69939b6300973eaa6b26beca9f9fe9ee2b4173846659676787"
   },
   "scenarios": [
     {
@@ -1560,15 +1560,19 @@
           "units": 15,
           "chimesSpent": 0,
           "examined": 63,
-          "survivors": 0,
-          "survivorNames": [],
+          "survivors": 3,
+          "survivorNames": [
+            "auction",
+            "auction-multi-round",
+            "destination-panel"
+          ],
           "unjudged": 0,
-          "suppressed": 63,
+          "suppressed": 3,
           "unbuildable": 0,
-          "metOnTuning": 0,
+          "metOnTuning": 8,
           "dropdown": {
             "examined": 12,
-            "survivors": 0
+            "survivors": 3
           },
           "page": {
             "examined": 39,
@@ -1581,11 +1585,11 @@
           "perTier": {
             "dispatcher": {
               "examined": 52,
-              "survivors": 0
+              "survivors": 2
             },
             "equipment": {
               "examined": 11,
-              "survivors": 0
+              "survivors": 1
             }
           },
           "sampling": {
@@ -1606,15 +1610,19 @@
           "units": 24,
           "chimesSpent": 9,
           "examined": 63,
-          "survivors": 0,
-          "survivorNames": [],
+          "survivors": 3,
+          "survivorNames": [
+            "auction",
+            "auction-multi-round",
+            "destination-panel"
+          ],
           "unjudged": 0,
-          "suppressed": 63,
+          "suppressed": 5,
           "unbuildable": 0,
-          "metOnTuning": 0,
+          "metOnTuning": 8,
           "dropdown": {
             "examined": 12,
-            "survivors": 0
+            "survivors": 3
           },
           "page": {
             "examined": 39,
@@ -1627,11 +1635,11 @@
           "perTier": {
             "dispatcher": {
               "examined": 47,
-              "survivors": 0
+              "survivors": 2
             },
             "equipment": {
               "examined": 16,
-              "survivors": 0
+              "survivors": 1
             }
           },
           "sampling": {
@@ -1652,15 +1660,19 @@
           "units": 54,
           "chimesSpent": 39,
           "examined": 63,
-          "survivors": 0,
-          "survivorNames": [],
+          "survivors": 3,
+          "survivorNames": [
+            "auction",
+            "auction-multi-round",
+            "destination-panel"
+          ],
           "unjudged": 0,
-          "suppressed": 63,
+          "suppressed": 4,
           "unbuildable": 0,
-          "metOnTuning": 0,
+          "metOnTuning": 9,
           "dropdown": {
             "examined": 12,
-            "survivors": 0
+            "survivors": 3
           },
           "page": {
             "examined": 39,
@@ -1673,11 +1685,11 @@
           "perTier": {
             "dispatcher": {
               "examined": 48,
-              "survivors": 0
+              "survivors": 2
             },
             "equipment": {
               "examined": 15,
-              "survivors": 0
+              "survivors": 1
             }
           },
           "sampling": {
@@ -1720,12 +1732,12 @@
           "stepId": null,
           "units": 15,
           "chimesSpent": 0,
-          "examined": 63,
+          "examined": 62,
           "survivors": 0,
           "survivorNames": [],
           "unjudged": 0,
-          "suppressed": 63,
-          "unbuildable": 0,
+          "suppressed": 62,
+          "unbuildable": 1,
           "metOnTuning": 0,
           "dropdown": {
             "examined": 12,
@@ -1736,16 +1748,16 @@
             "survivors": 0
           },
           "dials": {
-            "examined": 12,
+            "examined": 11,
             "survivors": 0
           },
           "perTier": {
             "dispatcher": {
-              "examined": 51,
+              "examined": 47,
               "survivors": 0
             },
             "equipment": {
-              "examined": 12,
+              "examined": 15,
               "survivors": 0
             }
           },
@@ -1756,8 +1768,8 @@
             "seed": 58369091,
             "bundles": 511,
             "enumerable": false,
-            "draws": 12,
-            "refusedDraws": 0,
+            "draws": 13,
+            "refusedDraws": 1,
             "inertDraws": 0,
             "duplicateDraws": 0
           }
@@ -1787,11 +1799,11 @@
           },
           "perTier": {
             "dispatcher": {
-              "examined": 47,
+              "examined": 50,
               "survivors": 0
             },
             "equipment": {
-              "examined": 16,
+              "examined": 13,
               "survivors": 0
             }
           },
@@ -1802,8 +1814,8 @@
             "seed": 1343276222,
             "bundles": 909,
             "enumerable": false,
-            "draws": 14,
-            "refusedDraws": 2,
+            "draws": 12,
+            "refusedDraws": 0,
             "inertDraws": 0,
             "duplicateDraws": 0
           }
@@ -1833,11 +1845,11 @@
           },
           "perTier": {
             "dispatcher": {
-              "examined": 49,
+              "examined": 51,
               "survivors": 0
             },
             "equipment": {
-              "examined": 14,
+              "examined": 12,
               "survivors": 0
             }
           },

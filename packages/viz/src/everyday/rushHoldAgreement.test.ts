@@ -67,10 +67,17 @@ interface AgreementCell {
    * Whether the sitting claimed `data/chime-ledger.json`'s `rush-prefit` — GitHub issue #372,
    * § D640. This half fits the tower by letting the press do it: the claim goes to the host's
    * `rushModifiers` binding, `startRush` hands it to `everyday/rush.ts#rushPatchOf`, and the patch
-   * writes `RUSH_PREFIT_FIT_OUT` onto `campaignFitOut` — the player's own path, whole, which is the
+   * writes the kit's fit-out (`rushFitOutOf` at `core`'s `RUSH_PREFIT_LEVELS`) onto `campaignFitOut` — the player's own path, whole, which is the
    * only thing this half may test.
    */
   readonly prefit?: boolean;
+  /**
+   * The menu tiers the round was rebuilt with — GitHub issue #372, § D1295. This half buys them the
+   * way a player does: it plays the sitting's first round to its line through the host, picks each tier
+   * on the host's rebuild with the purse that round paid in, and presses *Run the rush again*, so the
+   * round this cell pins is the second one, on the tower the host fitted.
+   */
+  readonly rebuild?: readonly string[];
   readonly heldS: number | null;
 }
 
@@ -111,11 +118,16 @@ function resourcesFor(cell: AgreementCell): BrowserResources {
   };
 }
 
-/** *Start the rush*, pressed through `EverydayHost` exactly as `rushScreen.ts` presses it. */
+/**
+ * *Start the rush*, pressed through `EverydayHost` exactly as `rushScreen.ts` presses it — and, for a
+ * rebuilt cell, the first round played to its line, each tier picked on the host's rebuild exactly as
+ * `reportScreen.ts` picks it, and *Run the rush again* pressed (GitHub issue #372, § D1295).
+ */
 function pressedRush(
   standing: ViewerState,
   using: BrowserResources = resources,
   modifiers: readonly ClaimedRushModifier[] = [],
+  rebuild: readonly string[] = [],
 ): ViewerState {
   let state = standing;
   const bindings = {
@@ -151,11 +163,26 @@ function pressedRush(
     playThisCrowd: () => undefined,
     watching: () => undefined,
     dailyBoard: undefined,
-    bankCompletion: () => undefined,
+    // No ledger: a rebuilt cell plays a first round to its line, and the host banks that turn (`bankTurn`).
+    bankCompletion: undefined,
     onChange: () => () => undefined,
   } as unknown as EverydayHostBindings;
-  const refusal = createEverydayHost(bindings).startRush();
+  const host = createEverydayHost(bindings);
+  const refusal = host.startRush();
   if (refusal !== undefined) throw new Error(`the rush would not start: ${refusal}`);
+  if (rebuild.length === 0) return state;
+  /* The first round, played to its line on the tower as shipped: what pays the purse the rebuild spends. */
+  const first = shiftRunConfigOf(using, state);
+  state = { ...state, recording: recordRun(first.config, { recordDecisions: false, outOfServiceCarIds: first.outOfServiceCarIds }).recording };
+  const holdAtS = host.rush()?.holdAtS;
+  if (holdAtS === undefined) throw new Error('the first round never crossed its line, so it paid nothing to rebuild with');
+  host.endRush(holdAtS);
+  for (const priceId of rebuild) {
+    const picked = host.pickRushRebuild(priceId);
+    if (picked !== undefined) throw new Error(`the rebuild refused ${priceId}: ${picked}`);
+  }
+  const again = host.startRush();
+  if (again !== undefined) throw new Error(`the next round would not start: ${again}`);
   return state;
 }
 
@@ -188,7 +215,7 @@ describe('the rush hold agreement table — the viewer’s half (PR #513, findin
     table.cells.map(
       (cell) =>
         [
-          `${cell.buildingId} ${cell.dispatcherProfileId}${cell.prefit === true ? ' pre-fitted' : ''}${cell.declaredSelection === undefined ? '' : ` declaring ${JSON.stringify(cell.declaredSelection)}`}${cell.interventions === undefined ? '' : ' logged'}`,
+          `${cell.buildingId} ${cell.dispatcherProfileId}${cell.prefit === true ? ' pre-fitted' : ''}${(cell.rebuild ?? []).map((priceId) => ` rebuilt ${priceId}`).join('')}${cell.declaredSelection === undefined ? '' : ` declaring ${JSON.stringify(cell.declaredSelection)}`}${cell.interventions === undefined ? '' : ' logged'}`,
           cell,
         ] as const,
     ),
@@ -200,6 +227,7 @@ describe('the rush hold agreement table — the viewer’s half (PR #513, findin
         standingOn(cell.buildingId, cell.dispatcherProfileId, using),
         using,
         cell.prefit === true ? PREFIT_CLAIM : [],
+        cell.rebuild ?? [],
       );
       const log: RunInterventionConfig[] = (cell.interventions ?? []).map((entry) => {
         if (entry.change.kind !== 'switch-dispatcher') return { atS: entry.atS, change: { kind: entry.change.kind } } as RunInterventionConfig;

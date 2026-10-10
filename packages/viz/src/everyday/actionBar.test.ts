@@ -28,6 +28,8 @@ import {
   WATCHING_NOTE,
   type TimelineFlow,
 } from './actionBar.js';
+import { NEVER_OPENS_THE_STAGE, primariesSharingVerb, verbOf } from './overlayVerb.test-helper.js';
+import { STAGE_OVERLAY_PLAY } from './stageScreenModel.js';
 import { EVERYDAY_SCREENS, RUN_CONTEXTS, type EverydayScreen, type RunContext } from './types.js';
 import { firstPersonWordsIn } from '../watch/view.js';
 
@@ -70,12 +72,11 @@ interface GuideRow {
   /**
    * What the build ships in place of {@link GuideRow.primary}, variant for variant.
    *
-   * Present on the `building` row and the `door` row and nowhere else. On `door` it is
-   * [§ D1004](../../../../DECISIONS.md)'s third variant, appended after the guide's two. On
-   * `building` it is GitHub issue #569 item 6. § 3.3 writes
-   * *Run the day…*; the press opens the § 7 stage **paused**, which § 7.3 specifies and
-   * `stageScreen.browser.test.ts` pins, so the shipped verb is *Open*. The deviation case below
-   * the table loop asserts it in both directions.
+   * Present on the `door` row and the `brief` row and nowhere else, each a variant appended after
+   * the guide's own: [§ D1004](../../../../DECISIONS.md)'s third door variant and § D1218's
+   * *Resume*. The `building` row carried one for GitHub issue #569 item 6 (*Open the day…* where the
+   * guide writes *Run the day…*) until [§ D1309](../../../../DECISIONS.md) took the collision off the
+   * overlay instead, and it ships the guide's cell again (GitHub issue #573).
    */
   readonly primaryShipsInstead?: readonly string[];
   readonly inverted: boolean;
@@ -206,13 +207,6 @@ const GUIDE_TABLE: readonly GuideRow[] = [
     primary: [
       'Run the day and decide as it goes',
       'Run the day with that',
-      'Send your answer',
-      'Choose an option first',
-      'Watch a day here',
-    ],
-    primaryShipsInstead: [
-      'Open the day and decide as it goes',
-      'Open the day with that',
       'Send your answer',
       'Choose an option first',
       'Watch a day here',
@@ -390,44 +384,30 @@ describe('the table matches the guide, cell for cell', () => {
   }
 
   /**
-   * **The `building` primary's verb, asserted in both directions** — GitHub issue **#569** item 6.
+   * **No stage-reaching primary shares a verb with the overlay** — GitHub issue **#573**,
+   * [§ D1309](../../../../DECISIONS.md), the criterion #569 item 6 was raised to.
    *
-   * § 3.3 writes *Run the day and decide as it goes*. The press runs `host.runCampaignDay` and
-   * opens the § 7 stage **paused** — § 7.3's own specification, drawn with a centred `Start` and
-   * pinned by `stageScreen.browser.test.ts`. So the button promised a start the press did not
-   * perform, and the **verb** moved rather than the behaviour: changing the behaviour would mean
-   * editing the case that holds § 7.3, which is the wrong end of the disagreement to change.
+   * Item 6 found *two starts for one intention*: the brief's `Start the day`, then the stage's
+   * centred `Start` over a paused first frame. #569 moved the building row's verb to *Open*; this
+   * asks the question that settles it, over the whole shipped table rather than over the nine routes
+   * the issue counted. The candidates are derived (every variant whose verb is the overlay's) and
+   * only the rows known to land short of the stage are written down, with the handler that sends
+   * each elsewhere (`overlayVerb.test-helper.ts`). A tenth route that says *Play* is red here until
+   * somebody classifies it, and a register row that stops saying it is red as stale.
    *
-   * The guide's cell is still read off the vendored file, so a revision that adopts *Open* makes
-   * this red and the deviation is deleted rather than kept because nobody re-read it. And the
-   * three variants the deviation does **not** touch are asserted unchanged, so this can never
-   * quietly become a licence to reword the whole cell.
+   * The building row's cell is the guide's again — `Run the day…` — and the table loop above holds
+   * it, so a revision that moved it back to *Open* would red there.
    */
-  it('ships Open where § 3.3 says Run, on the two variants that reach the stage and no others', () => {
-    const row = GUIDE_TABLE.find((entry) => entry.screen === 'building');
-    expect(row?.primaryShipsInstead).toBeDefined();
-    const guideCell = row?.primary ?? [];
-    const shipped = row?.primaryShipsInstead ?? [];
-    expect(shipped).toHaveLength(guideCell.length);
-    /* Exactly two variants differ, and each differs only by its first word. */
-    const moved = guideCell.flatMap((text, index) => (shipped[index] === text ? [] : [index]));
-    expect(moved).toEqual([0, 1]);
-    for (const index of moved) {
-      expect(guideCell[index]?.startsWith('Run the day')).toBe(true);
-      expect(shipped[index]?.startsWith('Open the day')).toBe(true);
-      expect(shipped[index]?.slice('Open'.length)).toBe(guideCell[index]?.slice('Run'.length));
+  it('lets no stage-reaching primary share a verb with the overlay, derived from the table', () => {
+    const overlay = verbOf(STAGE_OVERLAY_PLAY);
+    const sharing = primariesSharingVerb(overlay);
+    expect(sharing.filter((entry) => NEVER_OPENS_THE_STAGE[entry.key] === undefined)).toEqual([]);
+    for (const key of Object.keys(NEVER_OPENS_THE_STAGE)) {
+      expect(sharing.some((entry) => entry.key === key), `${key} no longer says ${overlay}`).toBe(true);
     }
-
-    const guide = readFileSync(
-      fileURLToPath(
-        new URL('../../../../docs/design/design_handoff_casual_mode/GAMEPLAY_AND_NAVIGATION.md', import.meta.url),
-      ),
-      'utf8',
-    );
-    expect(
-      guide,
-      'the guide has adopted the verb — the deviation has outlived its reason and should be deleted',
-    ).toContain('Run the day and decide as it goes');
+    /* The one start stays where § D1218 anchored it, and it is the brief's. */
+    expect(primariesSharingVerb('start').map((entry) => entry.key)).toContain('brief');
+    expect(verbOf(STAGE_OVERLAY_PLAY)).not.toBe('start');
   });
 
   /**

@@ -59,6 +59,7 @@ import type { PriceSchedule } from '../pricing/types.js';
 import { isPerReplicationGoal } from '../scenario/goals.js';
 import { statLineOf } from '../shift/contracts.js';
 import { fixitParkingRow, type FixitParkingRow } from './fixitScreenModel.js';
+import { stageParLineOf } from './scenarioModel.js';
 
 /** The dimension the parking select writes. The fix-it editor's own control, one id. */
 const PARKING_DIMENSION = 'idle.parkingStrategy';
@@ -140,6 +141,13 @@ export const STAGE_PLAY_COPY = Object.freeze({
   refusedWhy: 'This setting is refused at this budget, so there is nothing to run until it fits.',
   noteReady: 'Judged on the stage’s own goals, then again on crowds you did not tune against.',
   noteSolved: 'Cleared. A stage pays once, and a clear unlocks nothing.',
+  /*
+   * A stage this device has cleared, opened again — [§ D1358](../../../../DECISIONS.md). The run is
+   * the same judge on the same crowds, and only the pay differs: a stage pays once.
+   */
+  practice:
+    'Cleared on this device. Running it again is practice: it pays nothing new, and a clear at or under par earns the mark.',
+  notePractice: 'Practice: the same judge on the same crowds, and a stage pays once.',
   clearedHead: 'Cleared.',
   metNotHeldHead: 'Every goal met on the stage’s own crowds, and not on the ones held back.',
   missedHead: 'Not cleared.',
@@ -218,6 +226,14 @@ export interface StagePlayFacts {
   /** `data/chime-ledger.json`'s `scenario-cleared` award. */
   readonly award: number;
   readonly choice: StagePlayChoice;
+  /**
+   * The stage's par, `scenario/ladder.ts`'s `parUnits` for its row: `undefined` where no named way
+   * through could be priced — [§ D1358](../../../../DECISIONS.md). Optional so a caller that predates
+   * it reads as a stage with no par.
+   */
+  readonly parUnits?: number | undefined;
+  /** This device holds the stage's clear, so a run here is practice (§ D1358). */
+  readonly clearedBefore?: boolean | undefined;
 }
 
 /** A verdict as the screen draws it. The sentences are the judge's own. */
@@ -235,6 +251,8 @@ export interface StagePlayVerdictFacts {
   readonly cleared: boolean;
   /** `first` when this clear banked the award, `again` when the stage had paid before. */
   readonly paid: 'first' | 'again' | undefined;
+  /** What the pressed settings cost, by the one check — the figure a par is compared with (§ D1358). */
+  readonly spentUnits?: number | undefined;
 }
 
 /** Where a press is. */
@@ -250,6 +268,8 @@ export interface StagePlayVerdictView {
   readonly goals: readonly { readonly label: string; readonly mark: string; readonly sentence: string }[];
   readonly holdout: string;
   readonly pay: string | undefined;
+  /** On a clear: the par mark, or why the clear earns none (§ D1358). */
+  readonly par: string | undefined;
   readonly unlock: string | undefined;
   readonly stale: string | undefined;
 }
@@ -267,6 +287,8 @@ export interface StagePlayView {
   readonly settingOptions: readonly StagePlayOption[];
   readonly parking: FixitParkingRow;
   readonly runNote: string;
+  /** On a stage this device has cleared: that a run here is practice (§ D1358). */
+  readonly practice: string | undefined;
   readonly status: string | undefined;
   readonly verdict: StagePlayVerdictView | undefined;
   readonly labLink: string;
@@ -364,6 +386,10 @@ export interface StageFactsInput {
   readonly held: string | undefined;
   readonly award: number;
   readonly choice: StagePlayChoice;
+  /** {@link StagePlayFacts.parUnits}, passed through. */
+  readonly parUnits?: number | undefined;
+  /** {@link StagePlayFacts.clearedBefore}, passed through. */
+  readonly clearedBefore?: boolean | undefined;
 }
 
 /**
@@ -409,12 +435,18 @@ export function stageFactsOf(input: StageFactsInput): StagePlayFacts {
     admission,
     held: input.held,
     award: input.award,
+    parUnits: input.parUnits,
+    clearedBefore: input.clearedBefore,
     choice,
   };
 }
 
 /** A judge's report, reduced to what this screen draws. The sentences are passed through unchanged. */
-export function verdictFactsOf(report: StageReport, paid: StagePlayVerdictFacts['paid']): StagePlayVerdictFacts {
+export function verdictFactsOf(
+  report: StageReport,
+  paid: StagePlayVerdictFacts['paid'],
+  spentUnits?: number,
+): StagePlayVerdictFacts {
   return {
     headline: report.headline,
     goals: report.goals.map((goal) => ({
@@ -427,6 +459,7 @@ export function verdictFactsOf(report: StageReport, paid: StagePlayVerdictFacts[
     metOnTuningSeeds: report.metOnTuningSeeds,
     cleared: report.cleared,
     paid,
+    spentUnits,
   };
 }
 
@@ -508,6 +541,8 @@ function verdictViewOf(facts: StagePlayFacts, verdict: StagePlayVerdictFacts, st
     })),
     holdout: verdict.holdoutSentence ?? STAGE_PLAY_COPY.holdoutNotRun,
     pay,
+    /* § D1358: the par this clear meets, or why it earns no mark, in the hub row's own words. */
+    par: verdict.cleared ? stageParLineOf(facts.parUnits, verdict.spentUnits) : undefined,
     unlock: verdict.cleared ? STAGE_PLAY_COPY.unlocksNothing : undefined,
     stale: stale ? STAGE_PLAY_COPY.stale : undefined,
   };
@@ -536,6 +571,7 @@ export function stagePlayViewOf(facts: StagePlayFacts, phase: StagePlayPhase): S
       `A run is ${String(facts.replications)} runs of ${minutesOf(facts.durationS)} of building time on this ` +
       `stage’s own crowds, your settings and the building’s on the same passengers. If every goal is met, ` +
       `${String(facts.replications)} more follow on crowds you could not have tuned against, and those decide the clear.`,
+    practice: facts.clearedBefore === true ? STAGE_PLAY_COPY.practice : undefined,
     status: statusOf(phase),
     verdict: phase.kind === 'judged' ? verdictViewOf(facts, phase.verdict, phase.stale) : undefined,
     labLink: STAGE_PLAY_COPY.labLink,

@@ -2654,6 +2654,39 @@ describe('a rush sitting, posted whole — GitHub issue #372', () => {
     expect(bodyOf(posted)['round']).toBe(1);
   }, 300_000);
 
+  /*
+   * [§ D1359](../../../../DECISIONS.md): the row the rush setup screen draws among the house's — the
+   * player's best posted sitting on each of the tower's boards today, by this server's day. Red
+   * before: no route answered it (404).
+   */
+  it('answers the signed-in player’s own best sitting on the tower’s boards today, and nobody else’s', async () => {
+    expect((await call('GET', '/api/rush-best', { query: { building: 'garden-apartments' } })).status).toBe(401);
+    const player = await signIn();
+    const other = await signIn();
+    const before = await call('GET', '/api/rush-best', { token: player.token, query: { building: 'garden-apartments' } });
+    expect(before.status, JSON.stringify(before.body)).toBe(200);
+    expect(bodyOf(before)['entries']).toEqual([]);
+    expect(bodyOf(before)['date']).toBe(dailyDateOf(clock));
+    const posted = await call('POST', '/api/rush-sittings', { token: player.token, body: sitting(2) });
+    expect(posted.status, JSON.stringify(posted.body)).toBe(201);
+    const mine = await call('GET', '/api/rush-best', { token: player.token, query: { building: 'garden-apartments' } });
+    const entries = bodyOf(mine)['entries'] as readonly Record<string, unknown>[];
+    expect(entries).toHaveLength(1);
+    expect(entries[0]?.['boardKey']).toBe(bodyOf(posted)['boardKey']);
+    expect(entries[0]?.['heldS']).toBe(gardenHeldS);
+    expect(entries[0]?.['furthestWave']).toBe((bodyOf(posted)['entry'] as Record<string, unknown>)['furthestWave']);
+    expect(entries[0]?.['roundCount']).toBe(2);
+    expect(String(bodyOf(mine)['note'])).toContain('as the server replayed it');
+    // A row, never a purse: the board's own shape.
+    expect(keysIn(bodyOf(mine)).filter((key) => /purse|chime|rounds$/iu.test(key))).toEqual([]);
+    // Another player, and another tower, see none of it.
+    const theirs = await call('GET', '/api/rush-best', { token: other.token, query: { building: 'garden-apartments' } });
+    expect(bodyOf(theirs)['entries']).toEqual([]);
+    const elsewhere = await call('GET', '/api/rush-best', { token: player.token, query: { building: 'midtown-office' } });
+    expect(bodyOf(elsewhere)['entries']).toEqual([]);
+    expect((await call('GET', '/api/rush-best', { token: player.token, query: {} })).status).toBe(400);
+  }, 300_000);
+
   it('withholds the ladder below twenty players, and publishes how many posted', async () => {
     const player = await signIn();
     const key = `rush:garden-apartments:${dailyDateOf(clock)}`;

@@ -281,19 +281,28 @@ measured before `leaderboard/verify.ts`'s refusal of `endless-rush` was lifted �
 round — and a sitting lands on a board keyed by the tower, the day and the modifier set
 ([§ D543](../DECISIONS.md)). **The viewer posts one now** ([§ D606](../DECISIONS.md)): the rush's
 result screen keeps the round list, names what drove each round and how far it got, and sends the
-sitting whole — and the purse figures a player reads are the server's reply to their own post and
-are computed nowhere in `packages/viz`. **One half is still not built**: no between-round rebuild
-travels, so the purse is derived and nothing spends it. That is a package boundary and a ruling
-rather than a missing feature — § D606 names the three shapes the boundary could move in, and **the
-three questions it recorded as unanswered are answered** ([§ D640](../DECISIONS.md), 2026-09-16):
-*fitted* is one fixed kit, Doors L1 + Control L1 + Tenants L1 at fifteen units against the sink's
-fifteen chimes; a rush rebuild is **instantaneous**, with no clock and no nights inside a sitting;
-and a tier **does not** require the tier below it inside the same sitting, both of the last two ruled
-by the product owner. **The two rush chime sinks are no longer one gap**: a wider purse still buys
-nothing, because nothing spends a purse, while **starting fitted reaches the run** — pinned at
-`garden-apartments`/`collective`, 1 178 s as built against 1 214 s pre-fitted — and waits only on a
-screen that spends a chime. `everyday/rushScreenModel.ts#RUSH_ABSENCES` says the same thing on the
-build's own face ([§ D701](../DECISIONS.md)).
+sitting whole. The purse figures its post block draws are the server's reply to the player's own
+post; the purse the rebuild menu offers before a post is counted on the device with `core`'s own
+derivation, and the server derives it again from its replay ([§ D1295](../DECISIONS.md), which
+amends § D606's *computed nowhere in `packages/viz`*). **The rebuild between rounds is built**
+(§ D1295, wave AN): the price reader and the copy-free half of the shop moved into `core`, which is
+the first of the three shapes § D606 named, taken for numbers only. A round after the first carries
+the tiers bought before it; the server prices them from its own schedule against the purse the
+rounds before left, refuses one that purse cannot pay for, and replays the round on the rebuilt
+tower; and a tier bought between rounds stays fitted for the rest of the sitting, which is swarm DP's
+default on the question § D701 left open. The menu is Doors, Control and Car size at every level and
+Tenants at the first. Shafts and Machines are refused by name because they need the viewer's
+commissioning code, and Tenants 2 and 3 because they change who arrives, while a board ranks sittings
+that met one crowd. The three questions § D606 recorded were answered by
+[§ D640](../DECISIONS.md) on 2026-09-16: *fitted* is one fixed kit, Doors L1 + Control L1 + Tenants
+L1, now three levels of the same fold; a rush rebuild is **instantaneous**, with no clock and no
+nights inside a sitting; and a tier **does not** require the tier below it inside the same sitting,
+both of the last two ruled by the product owner. **Both rush chime sinks reach a run now**: starting
+fitted, pinned at `garden-apartments`/`collective`, 1 178 s as built against 1 214 s pre-fitted; and
+a wider purse, through the rebuild it pays for, pinned by the server's replay refusing a Car size 2
+rebuild on Midtown Office's standard purse and playing it on a topped-up one. What a tier does to the
+next hold is not known before the round is played, and the menu says so: measured under `collective`
+on the rush's one seed, Doors 1 held Midtown Office longer and Garden Apartments shorter.
 
 **A run carries its modifiers onto the board.** The standard board is the standard purse and the
 building as shipped, the same for everyone; a run with a bought purse or a pre-fitted building ranks
@@ -339,7 +348,9 @@ no server** — GitHub issue #579: a scenario's budget rung, priced by the scena
 `data/fixit-cases.json`, bought from a device tally on the fix-a-building screen, with
 `packages/viz/src/fixit/budgetRungReachesTheRun.test.ts` as the legs comparison behind it. The ten
 campaign stages still sell no rung, because they are played on the Engineer surface, which has no
-budget control — `packages/viz/src/scenario/ladder.ts` says so on its own rows.* That is GD13 clause 1's one permission, a
+budget control — `packages/viz/src/scenario/ladder.ts` says so on its own rows.
+[§ D1295](../DECISIONS.md) sells the fourth against an account, the rush purse top-up, on the commit
+whose rebuild between rounds made the purse it widens something a run spends.* That is GD13 clause 1's one permission, a
 limit on a configuration. Everything else in GD13 holds and is restated here so nobody reads the
 currency as relaxing it: chimes never open a mode, a screen, a building, a dispatcher, a case or a
 figure (GD9); they never buy a verdict, a retry the mode declares free, or relief on a measurement,
@@ -447,10 +458,21 @@ Named so the next lane does not discover it. None of it is built by this page.
   fallback that says so, and the server checking a posted modified run against a real spend.
   **Partly built**: the ledger, the balance read, the earn, the spend route and the posted-run check
   ship, and the balance is read by Settings and paid by a filed contract day, a fix case's first
-  clear and a rush's waves beyond the account's best (#499); a campaign stage or brief will pay its
+  clear and a rush's waves beyond the account's best (#499); ~~a campaign stage or brief will pay its
   first clear once it is playable in Everyday. The **device-only
   fallback** does not — see § 2.4 for the ruling it is waiting on — and **no screen spends a chime
-  yet**, which the panel that lists the prices says on its own face (#371, #372).
+  yet**, which the panel that lists the prices says on its own face (#371, #372).~~ *Corrected
+  2026-10-10, and struck rather than deleted so the record stands.* A campaign stage's first clear
+  from the Scenario hub pays ([§ D1129](../DECISIONS.md)), and the E1 to E6 briefs pay once they
+  are playable in Everyday. The **device-only fallback ships**: the device
+  ledger records turns and derives its balance ([§ D711](../DECISIONS.md)), built in
+  `everyday/deviceChimes.ts` and `everyday/chimeStore.ts` ([§ D911](../DECISIONS.md)). **Three
+  spends ship**: `rush-prefit` against an account ([§ D672](../DECISIONS.md)),
+  `career-purse-top-up` through the career shop, also against an account
+  ([§ D738](../DECISIONS.md)), and a fix case's budget rung, priced by the scenario and bought from
+  the device tally with no account ([§ D911](../DECISIONS.md)). `rush-purse-top-up` is still
+  refused, on its own row in the panel, because no between-round rebuild exists to spend it on
+  ([§ D606](../DECISIONS.md) § 2).
 - The stage's opening speed moves to a watching rung, reopening [§ D354](../DECISIONS.md)'s
   default, and a *skip to the end* control is added.
 - ~~Two new intervention kinds, equipment and building changes, on the run record.~~ **Built**
@@ -465,7 +487,11 @@ Named so the next lane does not discover it. None of it is built by this page.
   interventions on its round, and a postable result. **Built on the server** ([§ D542](../DECISIONS.md),
   [§ D543](../DECISIONS.md)): the purse in `data/rush-purse.json`, a sitting replayed round by round,
   every purse derived, and a board. **Not built:** a between-round rebuild the server can price and
-  apply, and the viewer posting a sitting (GitHub issue #372).
+  apply~~, and the viewer posting a sitting~~ (GitHub issue #372). *The struck clause is corrected
+  2026-10-10:* the viewer posts a sitting ([§ D606](../DECISIONS.md)) wherever the page has a
+  server and the player is signed in: a rush session keeps its rounds, `everyday/rushSitting.ts`
+  builds the body, and `menu/client.ts#postRushSitting` sends it to the route
+  [§ D542](../DECISIONS.md) opened. The purse a player reads is the server's reply to that post.
 - The design handoff's § 5 session-shapes table names four modes and § 10 authors repair lists, and
   [`CLAUDE.md`](../CLAUDE.md) makes the handoff canonical for the interface. Both are deviations,
   recorded in [`12-design-handoff.md`](12-design-handoff.md) § 4 like every other one, with this

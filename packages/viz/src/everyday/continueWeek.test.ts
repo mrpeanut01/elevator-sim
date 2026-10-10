@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 
 import { goalsForDay, readGoals } from '../shift/goals.js';
 import { scheduledEventFor } from '../shift/calendar.js';
-import { closeDay, nextDay, openWeek, outcomeOf } from '../shift/week.js';
+import { closeDay, nextDay, openWeek, outcomeOf, rollWeek } from '../shift/week.js';
 import type { WeekState } from '../shift/types.js';
 
 import { CONTINUE_WEEK_TITLE, continueWeekEntryOf } from './continueWeek.js';
@@ -50,11 +50,11 @@ describe('continue your week — § D1228', () => {
     const tuesdayFiled = fileClean(nextDay(fileClean(openWeek('c2'))));
     expect(continueWeekEntryOf(tuesdayFiled, 'Midtown Office')).toEqual({
       title: CONTINUE_WEEK_TITLE,
-      line: 'Midtown Office, Tuesday filed, Wednesday next · 2 of the 4 clean counted days the target asks for, so far',
+      line: 'Midtown Office, week 1, Tuesday filed, Wednesday next · 2 of the 4 clean counted days the target asks for, so far',
       goes: 'door',
     });
     expect(continueWeekEntryOf(nextDay(tuesdayFiled), 'Midtown Office')?.line).toBe(
-      'Midtown Office, Wednesday · 2 of the 4 clean counted days the target asks for, so far',
+      'Midtown Office, week 1, Wednesday · 2 of the 4 clean counted days the target asks for, so far',
     );
   });
 
@@ -66,9 +66,42 @@ describe('continue your week — § D1228', () => {
     }
     expect(continueWeekEntryOf(week, 'Midtown Office')).toEqual({
       title: CONTINUE_WEEK_TITLE,
-      line: 'Midtown Office: the week has closed, and its sheet beside the house is standing',
+      line: 'Midtown Office, week 1: the week has closed, and its sheet beside the house is standing',
       goes: 'week',
     });
+  });
+
+  /*
+   * Wave AN, lane AN-7, carried from the post-AL panel and found again by the post-AM panel's seats
+   * B and D: after *Start next week* the picker showed no entry until a day of the new week was
+   * filed, because the roll empties the history. A later week is under way from its first morning.
+   */
+  it('offers a later week from its first morning, numbered, with nothing filed', () => {
+    let week = openWeek('c2');
+    for (let day = 1; day <= 5; day += 1) {
+      week = fileClean(week);
+      if (day < 5) week = nextDay(week);
+    }
+    const second = rollWeek(week);
+    expect(second.history).toHaveLength(0);
+    expect(continueWeekEntryOf(second, 'Midtown Office')).toEqual({
+      title: CONTINUE_WEEK_TITLE,
+      line: 'Midtown Office, week 2, Monday · 0 of the 4 clean counted days the target asks for, so far',
+      goes: 'door',
+    });
+    /* A first week with nothing filed is still Scenario's to open. */
+    expect(continueWeekEntryOf(openWeek('c2'), 'Midtown Office')).toBeUndefined();
+  });
+
+  /*
+   * Wave AN, lane DQ-2 (§ D1344): a week that was not held is dealt itself again and keeps its
+   * number, so a week 1 played again starts with nothing filed. It is still a week the player chose
+   * to carry on, and the tile offers it from its first morning, as a later week is.
+   */
+  it('offers a week dealt again after it was not held, from its first morning', () => {
+    const again = rollWeek(fileClean(openWeek('c2')));
+    expect([again.week, again.history.length]).toEqual([1, 0]);
+    expect(continueWeekEntryOf(again, 'Midtown Office')?.line).toMatch(/^Midtown Office, week 1, Monday · 0 of the /u);
   });
 
   it('says no count where the census does not speak for the tower', () => {

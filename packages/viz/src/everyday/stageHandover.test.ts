@@ -55,8 +55,11 @@ import { drivingProfileOf, profileById, shiftRunConfigOf, type ViewerState } fro
 import { recordRun } from '../record/recordRun.js';
 import { baseState, RESOURCES } from '../scope/probes.test-helper.js';
 import { SWITCH_NEEDS_BIDDING, SWITCH_NEEDS_OTHER_PANELS } from '../live/interventions.js';
+import type { VizRecording } from '../contract/types.js';
 import {
   stageInterventionsOf,
+  stagePressChangedNobody,
+  STAGE_PRESS_CHANGED_NOBODY,
   STAGE_SWITCH_NO_CHANGE,
   type StageInterventionRow,
 } from './stageScreenModel.js';
@@ -97,6 +100,15 @@ function legsOf(state: ViewerState): readonly LegKey[] {
     recordDecisions: false,
     outOfServiceCarIds: plan.outOfServiceCarIds,
   }).recording.legs.map((leg) => [leg.passengerId, leg.carId ?? '', leg.boardedAt ?? -1] as const);
+}
+
+/** The whole recording, for the cases that hand the model both days of a press — GitHub issue #588. */
+function recordingOf(state: ViewerState): VizRecording {
+  const plan = shiftRunConfigOf(RESOURCES, state);
+  return recordRun(plan.config, {
+    recordDecisions: false,
+    outOfServiceCarIds: plan.outOfServiceCarIds,
+  }).recording;
 }
 
 function endOfRun(state: ViewerState): number {
@@ -356,36 +368,75 @@ describe('the parking press is operating-point dependent, not dispatcher depende
   const PRESS_AT_S = Math.round(AT.shiftLengthS * 0.28);
   const SPREAD: RunInterventionConfig = { atS: PRESS_AT_S, change: { kind: 'spread-cars' } };
 
-  const spreadMoves = (buildingId: string, shiftLengthS: number, dispatcherId: string): boolean => {
+  /**
+   * One cell, pressed: whether the legs moved, and **what the parking row says after the press** —
+   * GitHub issue #588, [§ D1278](../../../../DECISIONS.md).
+   *
+   * The note is read the way `everyday/stageScreen.ts` reads it: the model judges the pair once
+   * (`stagePressChangedNobody`, handed the day before the press and the day after it), and the row
+   * the stage draws is asked of `stageInterventionsOf` with that verdict and the grown log. So each
+   * cell below pins the sentence against the legs on the same two runs, which is § D227 in both
+   * directions at once: the line is drawn where the press changed nobody's trip, and only there.
+   */
+  const pressed = (
+    buildingId: string,
+    shiftLengthS: number,
+    dispatcherId: string,
+  ): { readonly moves: boolean; readonly note: string | undefined } => {
     const at: ViewerState = { ...stageState(), buildingId, shiftLengthS, dispatcherId };
-    const baseline = legsOf(at);
-    expect(baseline.length, `${buildingId}/${dispatcherId} carried nobody`).toBeGreaterThan(0);
-    return JSON.stringify(legsOf({ ...at, interventions: [SPREAD] })) !== JSON.stringify(baseline);
+    const before = recordingOf(at);
+    expect(before.legs.length, `${buildingId}/${dispatcherId} carried nobody`).toBeGreaterThan(0);
+    const after = recordingOf({ ...at, interventions: [SPREAD] });
+    const key = (recording: VizRecording): string =>
+      JSON.stringify(
+        recording.legs.map((leg) => [leg.passengerId, leg.carId ?? '', leg.boardedAt ?? -1] as const),
+      );
+    const unchanged = stagePressChangedNobody({ before, after, press: SPREAD });
+    const view = stageInterventionsOf({
+      interventions: [SPREAD],
+      simTimeS: PRESS_AT_S,
+      hasRun: true,
+      dayClosed: false,
+      recomputing: false,
+      ...(unchanged ? { pressChangedNobody: SPREAD } : {}),
+    });
+    return {
+      moves: key(after) !== key(before),
+      note: view.rows.find((row) => row.change.kind === 'spread-cars')?.note,
+    };
   };
 
   /*
    * The assessor's own cell, reproduced: the press writes the strategy `zoned-uppeak` already
-   * declares and the legs do not move. This is the half that made the refusal look derivable.
+   * declares and the legs do not move. This is the half that made the refusal look derivable — and
+   * since § D1278 it is the half that gets the line, after the press, because a run said so.
    */
-  it('moves no leg under zoned-uppeak on the office tower', () => {
-    expect(spreadMoves('midtown-office', 1800, 'zoned-uppeak')).toBe(false);
+  it('moves no leg under zoned-uppeak on the office tower, and the row says so after the press', () => {
+    const cell = pressed('midtown-office', 1800, 'zoned-uppeak');
+    expect(cell.moves).toBe(false);
+    expect(cell.note).toBe(STAGE_PRESS_CHANGED_NOBODY);
   });
 
   /*
    * And the half that refutes it. Same dispatcher, same press, same 28 % stamp — a different
    * building, and the legs move. Whatever makes the press bite is not the profile's declared
-   * parking strategy, so no screen reading that profile can say in advance that the press is inert.
+   * parking strategy, so no screen reading that profile can say in advance that the press is inert,
+   * and the line drawn after it is absent here, where saying it would be false.
    */
-  it('and moves legs under the same dispatcher on the residential block', () => {
-    expect(spreadMoves('garden-apartments', 1800, 'zoned-uppeak')).toBe(true);
+  it('and moves legs under the same dispatcher on the residential block, where the row says nothing', () => {
+    const cell = pressed('garden-apartments', 1800, 'zoned-uppeak');
+    expect(cell.moves).toBe(true);
+    expect(cell.note).toBeUndefined();
   });
 
   /*
    * The control that keeps the pair from being a statement about `zoned-uppeak` at all: on the
    * office tower the press is live under `collective`, so the office cell above is not simply a
-   * building on which nothing ever repositions.
+   * building on which nothing ever repositions, and the line is not simply a building's.
    */
   it('and is live on that same office tower under a dispatcher that parks nowhere in particular', () => {
-    expect(spreadMoves('midtown-office', 1800, 'collective')).toBe(true);
+    const cell = pressed('midtown-office', 1800, 'collective');
+    expect(cell.moves).toBe(true);
+    expect(cell.note).toBeUndefined();
   });
 });

@@ -8,7 +8,7 @@
  * § 3.4's confirm strip.
  */
 
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import {
@@ -25,6 +25,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
 
 import { RUSH_SEED, RUSH_TEMPLATE_ID, rushOutcomeOf, rushPatchOf } from './rush.js';
+import { rushPurseBeforeNextOf } from './rushRebuild.js';
 import { REPLAY_COPY } from './replay.js';
 import { CAREER_CONTRACT_ID, RUSH_CONTRACT_ID, REPLAY_CONTRACT_ID, openWeek } from '../shift/week.js';
 import { CONTRACTS } from '../shift/contracts.js';
@@ -58,6 +59,7 @@ import { scheduledEventFor } from '../shift/calendar.js';
 import { derivedCrowdOf, type WeekRecord } from '../shift/weekRecord.js';
 import type { GoalReading } from '../shift/types.js';
 import type { DayAttempt } from '../shift/attempt.js';
+import { DRIVER_KEY } from './driverMemory.js';
 import type { ShapedDayReport } from '../shift/report.js';
 /* GitHub issue #245 — the predicate the façade carries the answer of, asked directly. */
 import { runIdentityIssues } from '../scope/runIdentity.js';
@@ -69,10 +71,12 @@ import { watchingViewOf, type WatchingView } from '../watch/view.js';
 import {
   createEverydayHost,
   dailyBoardOf,
+  HOST_PENDING_REASON,
   challengeTodayOf,
   CHALLENGE_BOARD_METRIC,
   POST_RUN_NO_SERVER,
   RUSH_NOT_STANDING,
+  RUSH_REBUILD_NOT_YET,
   EVERYDAY_HOST,
   type EverydayGhostRace,
   type EverydayHost,
@@ -591,6 +595,59 @@ describe('the run actions', () => {
     const moved = h.patches.find((patch) => patch.week !== undefined);
     expect(moved?.buildingId).toBe(other.buildingId);
     expect(moved?.interventions).toEqual([]);
+  });
+
+  it('chooseTower takes the last tower’s run and sheet with the week it moves — the post-AM panel’s seat C D4', () => {
+    /*
+     * Red before: the move patched `buildingId` and left `recording` and `report` standing, so the
+     * Engineer surface drew the new tower's name over the old tower's run (Ashgate's 22 floors,
+     * 5 cars and 610 people under *Midtown Office*). The keys are asserted present, because a
+     * patch that omits a key leaves the field as it was, which is the defect.
+     */
+    const ranElsewhere: ViewerState = {
+      ...base(),
+      recording: A_RECORDING,
+      report: { of: 'single-run' } as unknown as ViewerState['report'],
+    };
+    const other = CONTRACTS.find((contract) => contract.id !== ranElsewhere.week.contractId);
+    if (other === undefined) throw new Error('the shipped contracts hold more than one tower');
+    const h = harnessOf(ranElsewhere, { dayClosed: true });
+    createEverydayHost(h.bindings).chooseTower(other.id);
+    const moved = h.patches.find((patch) => patch.week !== undefined);
+    expect(moved?.buildingId).toBe(other.buildingId);
+    for (const key of ['recording', 'report', 'tomorrow'] as const) {
+      expect(moved !== undefined && key in moved, `the move left ${key} standing`).toBe(true);
+      expect(moved?.[key]).toBeUndefined();
+    }
+    expect(moved?.withheld).toEqual([]);
+  });
+
+  it('keeps the brief’s pick of driver across a reload, and nobody else’s — § D1318, the post-AM panel’s seat A', () => {
+    /*
+     * Red before: nothing was kept, so the boot put the house back on the week's next day and the
+     * brief said nothing about it. What is held here is the host's half — the brief's press writes
+     * the slot, the rush's setup press and an id nothing offers do not; `driverMemory.test.ts`
+     * holds the read, and `dev/main.ts`'s restore is driven on the shipped bundle.
+     */
+    const slot = new Map<string, string>();
+    const store = {
+      read: (key: string) => slot.get(key) ?? null,
+      write: (key: string, value: string) => {
+        slot.set(key, value);
+      },
+      remove: (key: string) => {
+        slot.delete(key);
+      },
+    };
+    const h = harnessOf(base());
+    const host = createEverydayHost({ ...h.bindings, driverStore: store });
+    host.setDispatcher('nearest-car');
+    expect(slot.get(DRIVER_KEY), 'a pick that is not the brief’s was kept').toBeUndefined();
+    host.setDispatcher('no-such-dispatcher', 'week');
+    expect(slot.get(DRIVER_KEY), 'an id nothing offers was kept').toBeUndefined();
+    host.setDispatcher('fairness-first', 'week');
+    expect(slot.get(DRIVER_KEY)).toBe('fairness-first');
+    expect(h.patches.at(-1)?.dispatcherId).toBe('fairness-first');
   });
 
   it('chooseTower after a boot that dealt a pinned first day puts the day’s crowd back — § D1047', () => {
@@ -2226,6 +2283,56 @@ describe('a rush sitting — GitHub issue #372', () => {
     expect(moved?.startKey).not.toBe(untouched?.startKey);
   });
 
+  it('rebuilds between rounds from what the rounds earned, keeps it fitted, and posts it on the round it opened — § D1295', () => {
+    /*
+     * GitHub issue #372's second criterion, through the host's own verbs. Nothing to rebuild with before
+     * a round has finished; after one, the menu's purse is what that round paid (`core`'s derivation
+     * over this device's round), a pick is fitted by *Run the rush again* and stays for every later
+     * round, the round it opened carries it on the wire, and leaving the rush starts the next sitting
+     * as built. The recording is the same stub each round, which is all the host's bookkeeping needs.
+     */
+    const h = harnessOf(base());
+    const host = createEverydayHost(h.bindings);
+    expect(host.rushRebuild()).toBeUndefined();
+    host.startRush();
+    expect(host.rushRebuild(), 'a sitting’s first round is the building as shipped').toBeUndefined();
+    expect(host.pickRushRebuild('faster-doors')).toBe(RUSH_REBUILD_NOT_YET);
+    h.state = { ...h.state, recording: rush };
+    host.endRush(host.rush()?.holdAtS ?? 0);
+
+    const menu = host.rushRebuild();
+    const holdS = host.rush()?.rounds[0]?.holdS ?? null;
+    expect(menu?.purseUnits).toBe(rushPurseBeforeNextOf({ rounds: [{ holdS }], modifiers: [], schedule: resources.priceSchedule }));
+    expect(menu?.purseUnits, 'the first round paid nothing in, so this case tests nothing').toBeGreaterThan(0);
+    expect(host.pickRushRebuild('faster-doors')).toBeUndefined();
+    expect(host.rushRebuild()?.pending).toEqual(['faster-doors']);
+    /* Nothing is fitted until the next round is pressed. The harness records patches rather than applying them. */
+    const fitOfLastPress = (): ViewerState['campaignFitOut'] => h.patches.at(-1)?.campaignFitOut;
+    expect(fitOfLastPress()).toBeUndefined();
+
+    host.startRush();
+    expect(fitOfLastPress()?.doorSecondsSaved, 'the pick did not reach the next round’s building').toBe(1);
+    expect(host.rushRebuild()?.pending).toEqual([]);
+    h.state = { ...h.state, recording: rush };
+    host.endRush(host.rush()?.holdAtS ?? 0);
+    const rounds = host.rush()?.rounds ?? [];
+    expect(rounds.map((round) => round.rebuild)).toEqual([undefined, ['faster-doors']]);
+    const check = host.rush()?.check;
+    if (check?.ok !== true) throw new Error('the sitting should be postable');
+    expect(check.body.rounds[1]?.rebuild).toEqual(['faster-doors']);
+    expect(Object.hasOwn(check.body.rounds[0] ?? {}, 'rebuild'), 'a round nothing was bought for carries no key').toBe(false);
+    /* The tier is fitted, so the menu says so rather than selling it twice. */
+    expect(host.rushRebuild()?.levels).toEqual({ doors: 1 });
+
+    /* Round 3 buys nothing and still plays the rebuilt tower: a tier bought between rounds persists. */
+    host.startRush();
+    expect(fitOfLastPress()?.doorSecondsSaved).toBe(1);
+    /* And the next sitting starts from the building as shipped. */
+    host.leaveRush();
+    host.startRush();
+    expect(fitOfLastPress()).toBeUndefined();
+  });
+
   it('ends the sitting when the rush is left, because a sitting is runs from an as-shipped start', () => {
     const h = harnessOf(base());
     const host = createEverydayHost(h.bindings);
@@ -2305,6 +2412,21 @@ describe('a rush sitting — GitHub issue #372', () => {
     const outcome = await other.postRushSitting();
     expect(outcome.kind).toBe('refused');
     expect(outcome.kind === 'refused' && outcome.detail).toBe(RUSH_NOT_STANDING);
+  });
+
+  /* § D1359: the player's own posted rows — silent with no server, and the binding's answer otherwise. */
+  it('reads the player’s own posted rows through the binding, and says nothing with no server', async () => {
+    expect(await createEverydayHost(harnessOf(base()).bindings).rushPosted('garden-apartments')).toEqual({ kind: 'silent' });
+    const asked: string[] = [];
+    const host = createEverydayHost({
+      ...harnessOf(base()).bindings,
+      readRushPosted: async (buildingId) => {
+        asked.push(buildingId);
+        return { kind: 'rows', date: '2026-10-10', sittings: [] };
+      },
+    });
+    expect(await host.rushPosted('garden-apartments')).toEqual({ kind: 'rows', date: '2026-10-10', sittings: [] });
+    expect(asked).toEqual(['garden-apartments']);
   });
 });
 
@@ -2946,5 +3068,97 @@ describe('one attempt per scored day — § D1218', () => {
     standing = false;
     host.leaveDayUnfinished();
     expect(h.calls).toEqual(['leaveDayAttempt', 'leaveDayAttempt', 'abandonDay']);
+  });
+});
+
+/*
+ * **The waiting sentence is in the player's words, and it is the only one** — GitHub issue #572,
+ * [§ D1273](../../../../DECISIONS.md).
+ *
+ * It read *"the simulation host has not finished booting — this screen draws the moment it does"*:
+ * true, and the machine's vocabulary on the first screen a stranger meets. One state has one
+ * sentence, so the fix is the constant and both of the shell's waiting screens read it; a second,
+ * friendlier copy beside the old one would be two answers to one question.
+ */
+describe('the sentence a screen shows while the game loads', () => {
+  it('names no machinery, and promises nothing it cannot keep', () => {
+    for (const word of ['host', 'boot', 'simulation', 'draw']) {
+      expect(HOST_PENDING_REASON.toLowerCase(), word).not.toContain(word);
+    }
+    // Conditional on the load, never a forecast of it: on a load that fails the screen never fills,
+    // and a sentence saying it soon will would be false there (docs/27 D5).
+    expect(HOST_PENDING_REASON).not.toMatch(/\b(soon|shortly|in a moment|any second)\b/u);
+  });
+
+  it('is the one sentence both of the shell\u2019s waiting screens draw, and no copy of the old one survives', () => {
+    const src = new URL('./', import.meta.url);
+    const shell = readFileSync(fileURLToPath(new URL('shell.ts', src)), 'utf8');
+    // The front door's waiting state and a registered screen's: both draw the constant itself.
+    expect(shell.match(/el\(doc, 'p', undefined, HOST_PENDING_REASON\)/gu)?.length).toBe(2);
+    // And nothing else in the shipped tree authors the old words as a string a player could read.
+    const root = fileURLToPath(new URL('../', import.meta.url));
+    const offenders: string[] = [];
+    const walk = (dir: string): void => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const path = `${dir}/${entry.name}`;
+        if (entry.isDirectory()) walk(path);
+        else if (path.endsWith('.ts') && !path.endsWith('.test.ts') && !path.includes('.test-helper.')) {
+          // Comments quote the old words as history (this constant's own docstring does), so they
+          // are stripped first: what is looked for is a string the build could put on a screen.
+          const text = readFileSync(path, 'utf8')
+            .replace(/\/\*[\s\S]*?\*\//gu, '')
+            .replace(/^\s*\/\/.*$/gmu, '');
+          if (/['"`][^'"`\n]*(finished booting|simulation host)[^'"`\n]*['"`]/u.test(text)) {
+            offenders.push(path.slice(root.length));
+          }
+        }
+      }
+    };
+    walk(root.replace(/\/$/u, ''));
+    expect(offenders).toEqual([]);
+  });
+});
+
+/*
+ * Wave AN, lane DQ-1: the stage's call rows are assembled here from what the shell's session holds,
+ * and two of them are new. A moment a run could not be made for (§ D1335) is said from the instant the
+ * playhead reaches it, whatever else the day raised; a wrinkle that raised no call (§ D1336) is said
+ * after its window. Neither is said before, and neither is said where the shell reports nothing.
+ */
+describe('the stage’s call rows: a lost moment and a quiet wrinkle — § D1335, § D1336', () => {
+  const recording = { endedAt: 36_000 } as unknown as VizRecording;
+  const quiet = {
+    wrinkle: { startS: 7000, endS: 9000, name: 'A late finish' },
+    refused: [
+      {
+        atS: 7000,
+        windowEndS: 7600,
+        answer: 'leave' as const,
+        counts: { 'park-cars-lobby': 2, 'spread-cars': 2, leave: 3 },
+        observations: {},
+      },
+    ],
+  };
+  function hostWith(over: Partial<EverydayHostBindings>) {
+    const h = harnessOf(base());
+    return createEverydayHost({ ...h.bindings, ...over });
+  }
+
+  it('says a lost moment from its instant and a quiet wrinkle after its window, and nothing earlier', () => {
+    const host = hostWith({
+      dayCallFailuresOn: () => [{ atS: 5000, question: 'driver' }],
+      dayCallWrinkleQuietOn: () => quiet,
+    });
+    expect(host.dayCallRowsAt(recording, 4999)).toEqual([]);
+    expect(host.dayCallRowsAt(recording, 5000).map((row) => row.id)).toEqual(['stage-call-failed-1']);
+    expect(host.dayCallRowsAt(recording, 8999).map((row) => row.id)).toEqual(['stage-call-failed-1']);
+    expect(host.dayCallRowsAt(recording, 9000).map((row) => row.id)).toEqual([
+      'stage-call-failed-1',
+      'stage-call-wrinkle-quiet',
+    ]);
+  });
+
+  it('says nothing of either where the shell reports neither — the control', () => {
+    expect(hostWith({}).dayCallRowsAt(recording, 36_000)).toEqual([]);
   });
 });

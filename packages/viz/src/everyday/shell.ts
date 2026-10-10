@@ -1369,7 +1369,7 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
      * a screen that reads the Scenario record, so the record comes back first. The host's release
      * is idempotent, so a row pressed with no career day standing costs nothing.
      */
-    if (state.ctx === 'campaign' && !CAREER_FLOW_SCREENS.includes(screen)) dataHost?.leaveCareer?.();
+    if (state.ctx === 'campaign' && !CAREER_FLOW_SCREENS.includes(screen)) leaveCareerFlow();
     /*
      * **The address names the run on screen, or nothing** — wave AJ, § D1097. A fix-it case plays a
      * building and a crowd of its own, and the bar went on reading the daily's
@@ -1477,6 +1477,24 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
   function leaveRush(): void {
     state = { ...state, ctx: 'daily' };
     dataHost?.leaveRush();
+  }
+
+  /**
+   * Leave the career's own screens: the context back to the daily loop, and the host gives the
+   * Scenario record back (GitHub issue #594, § D964) — the same two halves {@link leaveRush} and
+   * {@link leaveReplay} keep.
+   *
+   * **The context half was missing, and it was the post-AM panel's seat C D3** (wave AN, lane AN-5,
+   * recorded here under [§ D405](../../../../DECISIONS.md)). {@link go} released the career day
+   * when a rail row left § 8's five screens, and `ctx` stayed `campaign`. So a player who closed a
+   * career day, pressed *Your week* and played today's tower from there met a Scenario day in the
+   * career's chrome — the CAREER rail, *⤺ Leave the career*, the career's breadcrumb — and its close
+   * was the career's report, whose primary sent them to *day 3 at Garden Apartments*. The day banked
+   * to the Scenario week all the same; only the shell still thought it was in the career.
+   */
+  function leaveCareerFlow(): void {
+    state = { ...state, ctx: 'daily' };
+    dataHost?.leaveCareer?.();
   }
 
   /** § 6.1's replay, the shell's half — the context; `EverydayHost.startReplay` owns the week. GitHub issue #177 item 1. */
@@ -2721,8 +2739,9 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
        * `data/`, so the three mode tiles were drawn from no host at all. Driven at 1280 × 800: the
        * region and the tiles paint at **t ≈ 190 ms** and the host publishes at **t ≈ 430 ms**, and
        * a *Scenario* press inside that window opens a screen reading
-       * {@link HOST_PENDING_REASON} — *the simulation host has not finished booting* — because
-       * {@link drawHostPending} below is what a registered screen gets with no host. So for a
+       * {@link HOST_PENDING_REASON} (then *the simulation host has not finished booting*, in player
+       * words since § D1273), because {@link drawHostPending} below is what a registered screen
+       * gets with no host. So for a
        * quarter of a second the front door offered three controls that could not act and said
        * nothing about it, which is § D227's first direction on the first screen anybody sees.
        *
@@ -2736,8 +2755,8 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
        *
        * `docs/31` § 3 defines interactive as a control *with its handler bound*, and
        * `dev/recordTti.ts`'s header already names presence and an enabled state as the two things
-       * that cannot prove it. A tile that opens *the simulation host has not finished booting* was
-       * never interactive; it only looked it. What this changes is which of those two the number
+       * that cannot prove it. A tile that opens the shell's waiting sentence was never
+       * interactive; it only looked it. What this changes is which of those two the number
        * measures — `builtBundle.browser.test.ts`'s `charter S9` B1 waits for the offer to be left
        * before it reads the tile either way.
        *

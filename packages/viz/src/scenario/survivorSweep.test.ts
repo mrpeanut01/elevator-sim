@@ -51,6 +51,19 @@
  * regeneration cannot be mistaken for a passing guard. A re-run that disagrees with the file is a
  * question rather than an answer: something moved — a profile, a building, the price schedule, a
  * goal's published bar, or the judge — and the thing to do is find out which.
+ *
+ * ## One stage at a time
+ *
+ * ```
+ * ELEVATOR_SIM_SURVIVORS=deep ELEVATOR_SIM_SURVIVOR_STAGES=9,10 \
+ *   npx vitest run --project viz src/scenario/survivorSweep.test.ts
+ * ```
+ *
+ * GitHub issue #234's rebalance moves one stage's demand or fabric at a time, and a whole sweep
+ * per iteration would cost an hour and a half for one row. The variable takes stage ids or ladder
+ * positions; the sweep then measures only those stages and compares only their rows with the file.
+ * It **never writes** (`regenerateSurvivors.test-helper.ts#survivorStageFilterOf` says why), so the
+ * one regeneration a rebalance ends with is still the whole table.
  */
 
 import { readFile } from 'node:fs/promises';
@@ -59,18 +72,27 @@ import { describe, expect, it } from 'vitest';
 
 import {
   SCENARIO_SURVIVORS_PATH,
+  SURVIVOR_STAGE_FILTER_VARIABLE,
   measurePublishedSurvivors,
   regenerateScenarioSurvivors,
+  survivorStageFilterOf,
 } from './regenerateSurvivors.test-helper.js';
 import type { PublishedSurvivors, PublishedSurvivorStep } from './survivors.js';
 
 const OPEN = process.env['ELEVATOR_SIM_SURVIVORS'] === 'deep';
 const REGENERATE = process.env['ELEVATOR_SIM_REGENERATE_SURVIVORS'] === '1';
 
-/** The counts a re-run must reproduce, keyed the way the table is: `(scenarioId, stepId)`. */
-function countsOf(table: PublishedSurvivors): Readonly<Record<string, string>> {
+/**
+ * The counts a re-run must reproduce, keyed the way the table is: `(scenarioId, stepId)`, over the
+ * scenarios `only` names, or every scenario when it is unset.
+ */
+function countsOf(
+  table: PublishedSurvivors,
+  only?: ReadonlySet<string>,
+): Readonly<Record<string, string>> {
   const out: Record<string, string> = {};
   for (const scenario of table.scenarios) {
+    if (only !== undefined && !only.has(scenario.id)) continue;
     for (const step of scenario.steps) {
       out[`${scenario.id}#${step.stepId ?? ''}`] = summaryOf(step);
     }
@@ -113,13 +135,40 @@ const CASE_NAME = REGENERATE
   ? 'regenerates data/scenario-survivors.json'
   : 're-runs every scenario at every budget step and matches the file';
 
+describe('a sweep narrowed to named stages — GitHub issue #234', () => {
+  const shipped = ['stage-a', 'stage-b', 'stage-c'];
+
+  it('reads ids and ladder positions, and reads unset or blank as the whole table', () => {
+    expect(survivorStageFilterOf(undefined, shipped)).toBeUndefined();
+    expect(survivorStageFilterOf(' ', shipped)).toBeUndefined();
+    expect([...(survivorStageFilterOf('stage-c, 1', shipped) ?? [])]).toEqual(['stage-c', 'stage-a']);
+  });
+
+  it('refuses a name the campaign does not ship, rather than measuring fewer stages than asked', () => {
+    expect(() => survivorStageFilterOf('stage-a,stage-z', shipped)).toThrow(/stage-z/u);
+    expect(() => survivorStageFilterOf('4', shipped)).toThrow(/1 to 3/u);
+    expect(() => survivorStageFilterOf('0', shipped)).toThrow(SURVIVOR_STAGE_FILTER_VARIABLE);
+  });
+});
+
 describe.skipIf(!OPEN)('the published survivor counts reproduce — issue #367', () => {
   /* Hours, not minutes. The ceiling below is the tier's, and it is not an expectation. */
   it(CASE_NAME, async () => {
+    const onDisk = JSON.parse(await readFile(SCENARIO_SURVIVORS_PATH, 'utf8')) as PublishedSurvivors;
+    const only = survivorStageFilterOf(
+      process.env[SURVIVOR_STAGE_FILTER_VARIABLE],
+      onDisk.scenarios.map((scenario) => scenario.id),
+    );
+    if (REGENERATE && only !== undefined) {
+      throw new Error(
+        `${SURVIVOR_STAGE_FILTER_VARIABLE} narrows the sweep, and a narrowed sweep cannot regenerate ` +
+          'the table: its provenance is one run over every stage. Unset it to regenerate.',
+      );
+    }
     const lines: string[] = [];
     const measured = REGENERATE
       ? await regenerateScenarioSurvivors({ onScenario: (line) => lines.push(line) })
-      : await measurePublishedSurvivors({ onScenario: (line) => lines.push(line) });
+      : await measurePublishedSurvivors({ onScenario: (line) => lines.push(line), only });
     process.stderr.write(`survivor sweep\n${lines.join('\n')}\n`);
 
     /* Non-vacuity: the sweep found something to count. */
@@ -134,12 +183,11 @@ describe.skipIf(!OPEN)('the published survivor counts reproduce — issue #367',
 
     if (REGENERATE) return;
 
-    const onDisk = JSON.parse(await readFile(SCENARIO_SURVIVORS_PATH, 'utf8')) as PublishedSurvivors;
     expect(
       countsOf(measured),
       'a published survivor count no longer reproduces from the run that produced it. Something ' +
         'moved — a dispatcher profile, a building, data/price-schedule.json, a goal’s published ' +
         'bar, or the judge. That is a finding to report, not a number to edit.',
-    ).toEqual(countsOf(onDisk));
+    ).toEqual(countsOf(onDisk, only));
   }, 10_800_000);
 });

@@ -24,6 +24,7 @@ import {
   startShippedSite,
   type ShippedSite,
 } from '../dev/browserTier.test-helper.js';
+import { STAGE_PLAY_COPY } from './stagePlay.js';
 
 let site: ShippedSite;
 let browser: Browser;
@@ -124,15 +125,30 @@ describe.skipIf(!HAS_BROWSER)('a campaign stage is played from the hub, and a cl
       expect(first.unlock).toContain('unlocks nothing');
       expect(first.primary).toBe('Back to the path');
       expect(await deviceTurns(page)).toEqual([{ completion: 'scenario-cleared', key: STAGE }]);
+      /* § D1358: the clear says its par, the mark or why it earns none. Red before: no par line at all. */
+      const parLine = (await page.textContent('.everyday-stage-play-par')) ?? '';
+      expect(parLine).toMatch(/par/iu);
+      expect(parLine).not.toContain('⟨');
 
-      /* The way back marks the row. */
+      /* The way back marks the row, and the row says its par (§ D1358): exactly one of the mark and the note. */
       await page.locator('.everyday-bar-primary').click();
       await page.waitForSelector(`.everyday-scenario-path-card[data-stage="${STAGE}"][data-cleared="yes"]`, {
         timeout: 30_000,
       });
+      expect(
+        await page
+          .locator(`.everyday-scenario-path-card[data-stage="${STAGE}"] :is(.everyday-scenario-path-par, .everyday-scenario-path-par-note)`)
+          .count(),
+      ).toBe(1);
 
-      /* A second clear of the same stage pays nothing, and the ledger holds one turn for it. */
+      /*
+       * A second clear of the same stage pays nothing, and the ledger holds one turn for it. § D1358:
+       * the page says before the press that this run is practice, and the bar says so too.
+       */
       await openStageOne(page);
+      expect(await page.textContent('.everyday-stage-play-practice')).toBe(STAGE_PLAY_COPY.practice);
+      expect(await page.textContent('.everyday-bar-primary')).toBe('Run it again');
+      expect(await page.textContent('.everyday-bar-note')).toBe(STAGE_PLAY_COPY.notePractice);
       await runWithSetting(page, 'zoned-uppeak');
       const again = await page.evaluate(() => document.querySelector('.everyday-stage-play-pay')?.textContent ?? '');
       expect(again).toBe('A stage pays once, so this clear pays nothing.');

@@ -436,6 +436,12 @@ interface InertTerm {
  *
  * A standing id that names no building (`undefined`) declares nothing: no run can be built on it, so
  * no run carries a duty either.
+ *
+ * **One shipped building declares a duty since § D1290**: `st-jude-hospital`'s car E is a bed lift
+ * (GitHub issue #561). The predicate did not change, and that is the point of asking it of the
+ * building: the refusal stopped speaking on St Jude, in its fix-it cases, Free Play, the workshop and
+ * stage 10, on the commit that declared the duty, and it still speaks on every building that declares
+ * none. No shipped profile weights the term, so the dial is live there only on a player's own copy.
  */
 function termsInertOnBuilding(building: DutyDeclarations | undefined): readonly InertTerm[] {
   if (building !== undefined && buildingDeclaresDuty(building)) return [];
@@ -612,6 +618,24 @@ export function costFunctionLine(
  * Each branch is a claim about a trade the reader has made, and every one of them is a claim this
  * simulator can support from its own term table. None of them says a configuration is *better*,
  * because one run cannot say that (R2) and this text is drawn beside one run.
+ *
+ * ## The two lever branches say what the term charges, never what the run will do
+ *
+ * GitHub issue #575's remaining half, [§ D1279](../../../../DECISIONS.md). The starvation branch
+ * read *"Your worst wait falls"* and the load branch *"a nearly full car **will** be sent"*: both
+ * were promises of an outcome, and both were measured false on the legs. Swept through the shipped
+ * path over ten buildings, three shift lengths and two days, the *patience* lever
+ * (`weights.starvation`) under `collective` moves the legs on 47 of 60 cells and changes no leg on
+ * 13, and the *room* lever (`weights.loadFactor`) is quiet on the residential block's small days;
+ * `everyday/workshopTravel.test.ts` pins a quiet cell and a live cell. Whether either bites is a
+ * fact about the day, so no dispatcher-keyed condition could make the promise true, and no
+ * per-dispatcher note is drawn either (that would be a refusal aimed at a lever that is live on
+ * most cells, § D227's worse half). Each branch now states what the term prices, which is true by
+ * construction from `core`'s own definition, and the starvation branch says, from the same sweep,
+ * that some days it changes nobody's trip.
+ *
+ * **The closing count is derived**, because it was not: it read *"Twelve terms"* beside a library
+ * of fourteen.
  */
 export function adviceFor(spec: DispatcherSpec): string {
   const w = (term: string): number => spec.weights[term] ?? 0;
@@ -622,12 +646,12 @@ export function adviceFor(spec: DispatcherSpec): string {
     return 'Energy outranks people: cars will sit still and let calls age. A real thing to build, and a lesson when you watch it.';
   }
   if (w('loadFactor') + w('crowding') < 15) {
-    return 'With load and crowding ignored, a nearly full car will be sent to the busiest floor and drive straight past it.';
+    return 'With load and crowding ignored, a nearly full car can be sent to the busiest floor and drive straight past it.';
   }
   if (w('starvation') > 70) {
-    return 'Starvation this high chases the oldest call across the building. Your worst wait falls; the average may get worse.';
+    return 'Starvation this high makes a car pay for delaying a call that has already waited a long time, which aims at the worst wait rather than the average. On some days it changes nobody’s trip.';
   }
-  return 'Twelve terms, same as the shipped cost engine. Each is a trade, never a free win.';
+  return `${String(COST_TERMS_BY_ID.size)} terms, the same set the engine scores with. Each is a trade, never a free win.`;
 }
 
 /**

@@ -79,7 +79,8 @@ import {
 } from './report.js';
 import { reportWindowNameOf } from './reportWindow.js';
 import { closeDay, nextDay, openEndless, openWeek, outcomeOf } from './week.js';
-import { WEEK_CLOSED_LINE } from './weekStake.js';
+import { WEEK_CLOSED_LINE, weekDealOf } from './weekStake.js';
+import { dayCloseOf, NO_CALL_RAISED_LINE } from './dayClose.js';
 import {
   DAY_START_S,
   WAKE_UP_ARRIVALS,
@@ -87,9 +88,10 @@ import {
   type DayReport,
   type Observations,
   type ShiftGoal,
+  type WeekState,
 } from './types.js';
 import { readGoals } from './goals.js';
-import { DAY_CALL_ROW_NOTE, type DayCallRecord } from './dayCalls.js';
+import { DAY_CALL_FAILED_ROW_ID, DAY_CALL_ROW_NOTE, DAY_CALL_WRINKLE_QUIET_ROW_ID, type DayCallRecord } from './dayCalls.js';
 
 /**
  * The week-day sheet, narrowed — and the narrowing is an assertion, not a cast.
@@ -191,6 +193,50 @@ function reportOf(
       subject: { kind: 'week-day' },
     }),
   );
+}
+
+/**
+ * Midtown Office's week `weekNo`, closed through `day` on the clean run, its wrinkle dealt as that
+ * week deals it (§ D1252), filed as a whole day — wave AN, lane AN-7's two cases below.
+ */
+function midtownWeekReport(
+  weekNo: number,
+  day: number,
+  populations?: DayReportInput['populations'],
+): { readonly report: WeekDayReport; readonly week: WeekState } {
+  const observations = observationsOfRun(clean);
+  const goals = goalsForDay(day);
+  const opened = { ...openWeek('c2'), week: weekNo, day, dayIdx: (day - 1) % 7 };
+  const week = closeDay(
+    opened,
+    outcomeOf({
+      record: null,
+      recordRefusal: null,
+      day,
+      dayIdx: opened.dayIdx,
+      eventId: scheduledEventFor(null, day, opened.dayIdx, 'whole-day', opened).id,
+      arrived: observations.arrived,
+      carried: observations.carried,
+      minutePct: observations.minutePct,
+      readings: readGoals(goals, observations),
+    }),
+  );
+  const report = weekDay(
+    dayReportOf({
+      recording: clean,
+      observations,
+      goals,
+      week,
+      contract: contractById('c2'),
+      event: SHIFT_EVENTS.ordinary,
+      plan: PLAN,
+      calendar: null,
+      subject: { kind: 'week-day' },
+      wholeDayRun: true,
+      ...(populations === undefined ? {} : { populations }),
+    }),
+  );
+  return { report, week };
 }
 
 function figure(
@@ -1439,6 +1485,66 @@ describe('the rest of the sheet', () => {
     expect(thursday.onward?.name).toBe(thursday.forecast.name);
   });
 
+  /*
+   * **Tomorrow is dealt from tomorrow's week** — wave AN, lane AN-7, the post-AM panel's seats B and
+   * D. Every week-2 close said tomorrow *does not count toward the week: it has not been measured as
+   * it is dealt*, and the next brief and the tally both counted it: the onward wrinkle was drawn as
+   * week 1's (`scheduledEventFor` without the week, § D1252), so it never matched week 2's deal.
+   */
+  it('deals tomorrow’s wrinkle from tomorrow’s week, so the close says what the brief says — § D1252', () => {
+    /*
+     * The helper files Friday alone, so the week is not held, and since wave AN's lane DQ-2
+     * (§ D1344) a week not held is dealt its own order again: Friday's close names that week's
+     * Monday. `nextWeek.test.ts` holds the held arm.
+     */
+    for (const [weekNo, day, nextWeek, nextDayNo] of [
+      [2, 1, 2, 2],
+      [2, 3, 2, 4],
+      [1, 5, 1, 1],
+      [2, 5, 2, 1],
+    ] as const) {
+      const { report, week } = midtownWeekReport(weekNo, day);
+      const dealt = weekDealOf({ contractId: 'c2', week: nextWeek })?.days[nextDayNo - 1];
+      const at = `week ${String(weekNo)} day ${String(day)}`;
+      expect(dealt, at).toBeDefined();
+      expect(report.onward?.eventId, at).toBe(dealt?.eventId);
+      expect(report.onward?.week, at).toBe(nextWeek);
+      const close = dayCloseOf({ week, report, houseOf: () => undefined });
+      expect(close?.tomorrow.counts, at).toBe(dealt?.sentence);
+    }
+  });
+
+  /*
+   * **The tenants line is the two buildings' counts, not a slope's ratio** — wave AN, lane AN-7, the
+   * post-AM panel's seat D (D7). Friday's close read *7.4 % fewer tenants* for 627 → 589 (6.1 %)
+   * and Saturday's *9.1 %* for 646 → 589 (8.8 %): `forecastFor` divided two growth factors, and
+   * growth rounds per floor. The counts are Midtown's measured buildings on the shipped chain
+   * (`dev/state.ts#tomorrowFactsOf`, pinned in `tomorrow.test.ts`).
+   */
+  it('states the forecast’s percentage from the measured tenants where the shell measured them', () => {
+    const friday = midtownWeekReport(1, 5, { today: 627, tomorrow: 646, onward: 589 }).report;
+    expect(friday.onward?.demand).toBe('A new week: the tower as handed, 6.1% fewer tenants than today');
+    expect(friday.forecast.demand).toBe('+3.0% more tenants than today');
+    const saturday = midtownWeekReport(1, 6, { today: 646, tomorrow: 665, onward: 589 }).report;
+    expect(saturday.onward?.demand).toBe('A new week: the tower as handed, 8.8% fewer tenants than today');
+    const monday = midtownWeekReport(1, 1, { today: 589, tomorrow: 608, onward: 608 }).report;
+    expect(monday.onward?.demand).toBe('+3.2% more tenants than today');
+    /* Without the measurement the slope's ratio stands, as before. */
+    expect(midtownWeekReport(1, 5).report.onward?.demand).toMatch(/^A new week: the tower as handed, \d+\.\d% fewer tenants than today$/u);
+  });
+
+  /*
+   * **The sheet files whether a call decided the day beside its sentence** — wave AN, lane DQ-3,
+   * § D1351. The close reads the flag to say what decided a day no call decided, so the sheet's
+   * sentence and the close's decision are one; a sheet that filed only the sentence left the close to
+   * match its words.
+   */
+  it('files whether a call decided the day beside the sentence that says so — § D1351', () => {
+    const { report } = midtownWeekReport(1, 1);
+    expect(report.decidingCall).toBe(NO_CALL_RAISED_LINE);
+    expect(report.callDecided).toBe(false);
+  });
+
   it('promises no unlock of what is already open — § D1250', () => {
     for (const day of [1, 2, 3, 4]) {
       const taught = reportOf(clean, day).taught;
@@ -1839,6 +1945,19 @@ describe('the levers point at what this run showed — issue #55', () => {
     if (found === undefined) throw new Error(`no lever "${id}" on the sheet`);
     return found.body;
   }
+
+  /*
+   * **The fairness card promises no outcome** — wave AN, lane AN-7, on lane AN-3's measurement for
+   * GitHub issue #575: swept on the legs, the workshop's patience lever (the
+   * starvation weight this card's route opens) changes nobody's trip on some days under every
+   * shipped profile, so *Your worst wait falls* was a promise the run does not keep.
+   */
+  it('says what the fairness lever charges for, and that on some days it changes nobody’s trip', () => {
+    const body = leverBody(reportOf(clean), 'weight-fairness');
+    expect(body).not.toMatch(/worst wait falls|will fall|will drop|will cut/iu);
+    expect(body).toContain('aims at the worst wait rather than the average');
+    expect(body).toContain('On some days it changes nobody’s trip.');
+  });
 
   it('reorders and annotates on a day that was outrun, and leaves the glossary alone otherwise', () => {
     const outrun = reportOf(saturated);
@@ -2350,6 +2469,37 @@ describe('the ordinary day’s calls and a practice close — § D1138', () => {
     expect(first?.why).toMatch(/The day read Shift (cleared|missed) with park the cars in the lobby and leave them and Shift (cleared|missed) with spread the cars across the tower\./u);
     expect(second?.why).not.toContain('The day read');
     expect(second?.why.endsWith(DAY_CALL_ROW_NOTE)).toBe(true);
+  });
+
+  it('says where a run the stage needed could not be made, on a day that raised calls too — § D1335', () => {
+    const failedAtS = clean.startedAt + 300;
+    const report = sheet({
+      dayCalls: [call(clean.startedAt + 60, 'spread-cars', failing())],
+      dayCallsQuiet: { kind: 'asked', refused: 0, failed: 1, ending: 'finished' },
+      dayCallFailures: [{ atS: failedAtS, question: 'driver' }],
+    });
+    /* Red before § D1335: a day with a call printed nothing about the fault. */
+    const row = report.diagnosis.find((entry) => entry.id === DAY_CALL_FAILED_ROW_ID);
+    expect(row?.when).toMatch(/^\d\d:\d\d$/u);
+    expect(row?.why).toContain(`At ${String(row?.when)} the stage tried to run the day ahead`);
+    expect(row?.why).toContain('That is a fault in the game');
+    /* The call row still prints, and § D1152's no-call row does not, because the day had a call. */
+    expect(report.diagnosis.some((entry) => entry.id === 'day-call-1')).toBe(true);
+    expect(report.diagnosis.some((entry) => entry.id === 'day-calls-none')).toBe(false);
+    /* Nothing failed, no row. */
+    expect(sheet({ dayCalls: [], dayCallFailures: [] }).diagnosis.some((entry) => entry.id === DAY_CALL_FAILED_ROW_ID)).toBe(false);
+  });
+
+  it('says a wrinkle the stage asked in raised no call, from the runs already made — § D1336', () => {
+    const refused = { ...call(clean.startedAt + 120, 'leave', passing()), observations: {} };
+    const wrinkle = { startS: clean.startedAt + 120, endS: clean.startedAt + 900, name: 'Caterers in early' };
+    const report = sheet({ dayCalls: [], dayCallWrinkleQuiet: { wrinkle, refused: [refused] } });
+    /* Red before § D1336: a refused candidate never reached the report. */
+    const row = report.diagnosis.find((entry) => entry.id === DAY_CALL_WRINKLE_QUIET_ROW_ID);
+    expect(row?.what).toBe('Caterers in early raised no call');
+    expect(row?.why).toMatch(/^Caterers in early began at \d\d:\d\d, and the stage raised no call in it\./u);
+    expect(row?.why).toContain('4 with park the cars in the lobby, 9 with spread the cars across the tower and 6 with leave them');
+    expect(sheet({ dayCalls: [] }).diagnosis.some((entry) => entry.id === DAY_CALL_WRINKLE_QUIET_ROW_ID)).toBe(false);
   });
 
   it('prints no call row on a single run, which grades nothing', () => {

@@ -15,7 +15,9 @@
  *
  * 1. **Today against the house**, with the week's running tally beside it.
  * 2. **The call that decided it**, where one did, read from the call rows' own runs; where none
- *    did, a plain sentence saying so.
+ *    did, a plain sentence saying so, and on a counted day what did decide it: the driver, the
+ *    presses or nothing, read off the driver run and the house (wave AN, lane DQ-3,
+ *    [§ D1351](../../../../DECISIONS.md), {@link dayDeciderOf}).
  * 3. **The week's arithmetic**: what the target still needs of the counted days left, that it is
  *    met, or that it is out of reach while the tally against the house stays open.
  * 4. **Tomorrow in full**: its wrinkle and when, who moves in, whether it counts, and the census's
@@ -29,26 +31,37 @@
  *   with every earlier press kept and nothing pressed after (`dayCalls.ts#DayCallRecord`), graded by
  *   the report's own grader. The sentence names those conditions, because the filed day may carry
  *   later presses those runs do not.
+ * - What decided a day no call decided is read off two runs the shell made of the day's own crowd
+ *   (the standing order picked in place of the day's driver with every press kept, and the house),
+ *   graded against the day's own goals, and reads *still being run* until they answer.
  * - Tomorrow's wrinkle, its note and its tenants are read off tomorrow's own run config through the
  *   report (`report.ts#WeekDayReport.onward`, derived as the run is), and the census line is a count
  *   over the crowds the census measured, worded as that and never as how the player's day will go
  *   (swarm DN's Q1(d) refusal and S1's refusal, honoured).
  *
- * Pure: no clock, no RNG, no simulation. `everyday/reportView.ts` is its non-test caller.
+ * Pure: no clock, no RNG, no simulation. `everyday/reportView.ts` is its non-test caller, and
+ * `dev/main.ts#closeShift` calls {@link dayDeciderOf} at the close, so the shell starts the driver
+ * run through the decision that reads it; the one effect is the shell's, behind `driverOf`.
  */
 
 import type { SimTime } from '@elevator-sim/core/browser';
 
+import { clockAt } from '../live/timeline.js';
+
+import { carsOutLineOf, wrinkleNoteOf } from './bookedOut.js';
 import { dayCallAnswerWordsOf, dayCallAnswersOf, type DayCallAnswer, type DayCallRecord } from './dayCalls.js';
 import type { WeekDayReport } from './report.js';
+import type { OnwardDay } from './tomorrow.js';
 import {
   countedCleanOf,
   dayCountsToward,
   dayStakeSentenceOf,
   dayVerdictOf,
+  driverRunNeedOf,
   houseNeedOf,
   houseReadingOfDay,
   weekDealOf,
+  weekOrdinalOf,
   type HouseReading,
 } from './weekStake.js';
 import { clearsIn, WEEK_WAY, type WeekWay } from './weekWay.js';
@@ -72,6 +85,11 @@ export interface DecidingPinnedCall {
   readonly missedBy: string;
   /** What was pressed at the call: one of the two, or nothing. */
   readonly answered: string | undefined;
+  /**
+   * Whether the day was skipped past the call with its card up and nothing pressed (§ D1151), so
+   * the sentence says what the row says (`callRow.ts#PRESS_CALL_SKIPPED_WHAT`).
+   */
+  readonly skipped?: boolean | undefined;
 }
 
 export interface DecidingCallInput {
@@ -108,6 +126,16 @@ export const NO_CALL_DECIDED_LINE =
 /** The same, on a day the stage raised no call. */
 export const NO_CALL_RAISED_LINE = 'No call decided today: the stage raised none.';
 
+/** {@link decidingCallOf}'s answer: the sentence, and whether a call decided the day. */
+export interface DecidingCall {
+  readonly line: string;
+  /**
+   * `true` where a call's other answer read the other verdict; `false` where calls were raised and
+   * none did, or none was raised. The close reads `false` as *say what did* ({@link dayDeciderOf}).
+   */
+  readonly decided: boolean;
+}
+
 /**
  * **The call that decided today**, or the plain sentence that none did — swarm DO's § 1 ruling,
  * item 2, [§ D1248](../../../../DECISIONS.md). `undefined` on a day nobody graded, which has no
@@ -117,8 +145,13 @@ export const NO_CALL_RAISED_LINE = 'No call decided today: the stage raised none
  * every earlier press kept and nothing pressed after, reads a different verdict from the day that
  * was filed. Where several calls did, the latest is named, because the fewest later presses stand
  * between its runs and the filed day, and the count of the others is said beside it.
+ *
+ * Whether a call decided the day is answered beside the sentence — wave AN, lane DQ-3,
+ * [§ D1351](../../../../DECISIONS.md). `report.ts` files both (`WeekDayReport.decidingCall`,
+ * `WeekDayReport.callDecided`), and the close's one decision reads them; this was
+ * `decidingCallLineOf`, which answered the sentence alone and left the close to match its words.
  */
-export function decidingCallLineOf(input: DecidingCallInput): string | undefined {
+export function decidingCallOf(input: DecidingCallInput): DecidingCall | undefined {
   const { verdict } = input;
   if (verdict === 'ungraded') return undefined;
   const decided: { readonly at: string; readonly chose: string; readonly others: readonly string[]; readonly reads: CloseVerdict }[] = [];
@@ -137,7 +170,12 @@ export function decidingCallLineOf(input: DecidingCallInput): string | undefined
     if (other.reads !== verdict) {
       decided.push({
         at,
-        chose: pinned.answered === undefined ? 'nothing was pressed' : `you chose ${pressWordsOf(pinned.answered)}`,
+        chose:
+          pinned.answered !== undefined
+            ? `you chose ${pressWordsOf(pinned.answered)}`
+            : pinned.skipped === true
+              ? 'the day was skipped past the call'
+              : 'nothing was pressed',
         others: [other.words],
         reads: other.reads,
       });
@@ -170,16 +208,175 @@ export function decidingCallLineOf(input: DecidingCallInput): string | undefined
 
   const last = decided.at(-1);
   if (last === undefined) {
-    return input.records.length === 0 && pinned === undefined ? NO_CALL_RAISED_LINE : NO_CALL_DECIDED_LINE;
+    return {
+      line: input.records.length === 0 && pinned === undefined ? NO_CALL_RAISED_LINE : NO_CALL_DECIDED_LINE,
+      decided: false,
+    };
   }
   const more =
     decided.length === 1
       ? ''
       : ` ${String(decided.length - 1)} earlier ${decided.length === 2 ? 'call' : 'calls'} today could have turned it too.`;
-  return (
-    `The call that decided today came at ${last.at}, where ${last.chose}: on this crowd, the day run ` +
-    `from ${last.at} with ${orList(last.others)} and nothing pressed after it read ${input.lineOf(last.reads)}.${more}`
-  );
+  return {
+    line:
+      `The call that decided today came at ${last.at}, where ${last.chose}: on this crowd, the day run ` +
+      `from ${last.at} with ${orList(last.others)} and nothing pressed after it read ${input.lineOf(last.reads)}.${more}`,
+    decided: true,
+  };
+}
+
+/* -------------------------------------------------------------------------- *
+ * What decided it, when no call did — § D1351
+ * -------------------------------------------------------------------------- */
+
+/** A verdict the driver run or the house can read, graded. */
+type Graded = 'cleared' | 'missed';
+
+/**
+ * **What decided a day no call decided**, as one value — wave AN, lane DQ-3, swarm DQ's Q2 rule 3
+ * (three of three), [§ D1351](../../../../DECISIONS.md). {@link dayDeciderOf} is the one decision;
+ * the close's call line is {@link dayDeciderLineOf} over it, and the shell asks the driver run
+ * exactly when this asks for its reading.
+ *
+ * - `'call'`: a call decided it, and the report's sentence names it.
+ * - `'unsaid'`: no run here speaks, so the report's *No call decided today* stands alone: a day that
+ *   does not count (the house is not run on it), a tower the census does not speak for, a day that
+ *   kept no record, a day that ran the standing order untouched (there is nothing to swap) and a run
+ *   nobody could grade.
+ * - `'driver'`: the driver run, the same day with the standing order picked in place of the day's
+ *   driver and every press kept, reads the other verdict.
+ * - `'presses'`: the driver run reads the day's verdict, and the house, the standing order left
+ *   alone, reads the other one. So under the house's driver the presses turn it, and swapping the
+ *   driver alone does not.
+ * - `'nothing'`: the house reads the day's verdict, and so does the driver run.
+ * - `'pending'`: a run the answer needs is still being run. `known` is the driver run's verdict
+ *   where it has answered and the house has not.
+ * - `'unrun'`: a run the answer needs could not be run on this crowd.
+ */
+export type DayDecider =
+  | { readonly kind: 'call' }
+  | { readonly kind: 'unsaid' }
+  | { readonly kind: 'driver'; readonly pressed: boolean; readonly reads: Graded }
+  | { readonly kind: 'presses'; readonly houseDrove: boolean; readonly kept: Graded; readonly alone: Graded }
+  | { readonly kind: 'nothing'; readonly pressed: boolean; readonly houseDrove: boolean; readonly reads: Graded }
+  | { readonly kind: 'pending'; readonly waiting: 'driver-run' | 'house'; readonly known?: Graded | undefined }
+  | { readonly kind: 'unrun'; readonly run: 'driver-run' | 'house'; readonly known?: Graded | undefined };
+
+/** What {@link dayDeciderOf} reads. Every field is somebody else's measurement. */
+export interface DayDeciderInput {
+  /** The week the sheet stands on: after `closeDay`. */
+  readonly week: WeekState;
+  /** The filed sheet's call half — `report.ts` writes both from `decidingCallOf`. */
+  readonly report: Pick<WeekDayReport, 'decidingCall' | 'callDecided'>;
+  /** The shell's house runs, per counted day — `EverydayHost.weekHouse`. */
+  readonly houseOf: (day: number) => HouseReading | undefined;
+  /**
+   * The shell's driver run on a counted day — `EverydayHost.weekDriverRun`, `undefined` until it
+   * answers. **Asked only where the answer needs it**: on a counted day no call decided, whose driver
+   * is not the house's and which has presses, so the shell starts the run on this call and on no other.
+   */
+  readonly driverOf?: ((day: number) => HouseReading | undefined) | undefined;
+}
+
+/** Graded, or `undefined` for every reading that is not a verdict. */
+function gradedOf(reading: HouseReading | CloseVerdict): Graded | undefined {
+  return reading === 'cleared' || reading === 'missed' ? reading : undefined;
+}
+
+/** See {@link DayDecider}. Pure: the only effect is the shell's, behind {@link DayDeciderInput.driverOf}. */
+export function dayDeciderOf(input: DayDeciderInput, census: WeekWay = WEEK_WAY): DayDecider {
+  const { week, report } = input;
+  if (report.callDecided !== false) return report.callDecided === true ? { kind: 'call' } : { kind: 'unsaid' };
+  const today = week.history.find((entry) => entry.day === week.day);
+  if (today === undefined || weekDealOf(week, census) === undefined || !dayCountsToward(week, today, census)) {
+    return { kind: 'unsaid' };
+  }
+  const yours = gradedOf(dayVerdictOf(today));
+  const need = driverRunNeedOf(today, census);
+  if (yours === undefined || need === 'unrecorded' || need === 'own') return { kind: 'unsaid' };
+  const house = houseReadingOfDay(today, input.houseOf, census);
+
+  /* The driver run's reading: the day itself, the house's own run, or one more run. */
+  if (need !== 'same') {
+    const reading: HouseReading = need === 'house' ? house : (input.driverOf?.(today.day) ?? 'pending');
+    const run = need === 'house' ? 'house' : 'driver-run';
+    if (reading === 'pending') return { kind: 'pending', waiting: run };
+    if (reading === 'unrecorded') return { kind: 'unrun', run };
+    const swapped = gradedOf(reading);
+    if (swapped === undefined) return { kind: 'unsaid' };
+    if (swapped !== yours) return { kind: 'driver', pressed: need === 'run', reads: swapped };
+    if (need === 'house') return { kind: 'nothing', pressed: false, houseDrove: false, reads: yours };
+  }
+
+  /* The driver did not turn it (or drove as the house's): the house says whether the presses did. */
+  const known = need === 'run' ? yours : undefined;
+  if (house === 'pending') return { kind: 'pending', waiting: 'house', known };
+  if (house === 'unrecorded') return { kind: 'unrun', run: 'house', known };
+  const alone = gradedOf(house);
+  if (alone === undefined) return { kind: 'unsaid' };
+  return alone !== yours
+    ? { kind: 'presses', houseDrove: need === 'same', kept: yours, alone }
+    : { kind: 'nothing', pressed: true, houseDrove: need === 'same', reads: yours };
+}
+
+/** The close's words for a graded run — the call line's own *read Shift cleared* vocabulary. */
+const READ_WORDS: Readonly<Record<Graded, string>> = Object.freeze({
+  cleared: 'Shift cleared',
+  missed: 'Shift missed',
+});
+
+/** The driver run, as the close names it. */
+const SWAPPED = 'the same day with the tower’s standing order picked in place of yours';
+
+/** *Your driver did not* — said before the house's half wherever the driver run answered and the day had presses. */
+function driverDidNot(reads: Graded): string {
+  return `Your driver did not: on this crowd, ${SWAPPED} and every press kept read ${READ_WORDS[reads]} too.`;
+}
+
+/**
+ * **The sentence that says what decided a day no call decided**, or `undefined` where
+ * {@link dayDeciderOf} says nothing beyond the report's own line. Every arm states the runs it read
+ * and the crowd they ran on, and none says which driver or press is better anywhere else.
+ */
+export function dayDeciderLineOf(decider: DayDecider): string | undefined {
+  switch (decider.kind) {
+    case 'call':
+    case 'unsaid':
+      return undefined;
+    case 'driver':
+      return `Your driver did: on this crowd, ${SWAPPED}${decider.pressed ? ' and every press kept' : ''} read ${READ_WORDS[decider.reads]}.`;
+    case 'presses':
+      return decider.houseDrove
+        ? `Your presses did, together: on this crowd, the tower’s standing order left alone read ${READ_WORDS[decider.alone]}.`
+        : `${driverDidNot(decider.kept)} Your presses did, together: left alone, the tower’s standing order read ${READ_WORDS[decider.alone]}.`;
+    case 'nothing':
+      return decider.pressed && !decider.houseDrove
+        ? `Nothing you chose decided it either: on this crowd, the tower’s standing order read ${READ_WORDS[decider.reads]} too, both with every press kept and left alone.`
+        : `Nothing you chose decided it either: on this crowd, the tower’s standing order left alone read ${READ_WORDS[decider.reads]} too.`;
+    case 'pending':
+      if (decider.waiting === 'driver-run') return `What decided it is still being run: ${SWAPPED} and every press kept.`;
+      return decider.known === undefined
+        ? 'What decided it waits on the house, which is still being run.'
+        : `${driverDidNot(decider.known)} Whether your presses did waits on the house, which is still being run.`;
+    case 'unrun':
+      if (decider.run === 'driver-run') {
+        return `What decided it is not said: ${SWAPPED} could not be run on this crowd.`;
+      }
+      return decider.known === undefined
+        ? 'What decided it is not said: the house could not be run on this crowd.'
+        : `${driverDidNot(decider.known)} Whether your presses did is not said: the house could not be run on this crowd.`;
+  }
+}
+
+/**
+ * **The close's call line**: the report's sentence, and after it what decided the day where no call
+ * did — the one decision {@link dayDeciderOf} takes. `undefined` on a day nobody graded.
+ */
+export function closeCallLineOf(input: DayDeciderInput, census: WeekWay = WEEK_WAY): string | undefined {
+  const lead = input.report.decidingCall;
+  if (lead === undefined) return undefined;
+  const more = dayDeciderLineOf(dayDeciderOf(input, census));
+  return more === undefined ? lead : `${lead} ${more}`;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -200,16 +397,35 @@ export interface DayCloseInput {
    * next day on the path; `undefined` draws the report's own tenants line instead.
    */
   readonly population?: { readonly today: number; readonly tomorrow: number } | undefined;
+  /**
+   * **The day the card names, measured on its own plan** — `shift/tomorrow.ts#TomorrowBriefing.onward`
+   * (wave AN, lane AN-7): its tenants beside today's, every car its run takes out of passenger
+   * service, and where its clock starts. Read before {@link population} wherever given, and on the
+   * close that closed the week, where `population` is the literal tomorrow and this is the next
+   * week's Monday.
+   */
+  readonly onward?: OnwardDay | undefined;
+  /**
+   * **The shell's driver run per counted day** — `EverydayHost.weekDriverRun`, wave AN, lane DQ-3
+   * ([§ D1351](../../../../DECISIONS.md)). Read only through {@link dayDeciderOf}, which asks it
+   * only where the call line needs it. Absent, the run is *still being run*.
+   */
+  readonly driverOf?: ((day: number) => HouseReading | undefined) | undefined;
 }
 
 /** Tomorrow, whole — item 4. */
 export interface DayCloseTomorrow {
-  /** `TOMORROW · THURSDAY, DAY 4`, or the next week's Monday once the week has closed. */
+  /** `TOMORROW · WEEK 1 · THURSDAY, DAY 4`, or the next week's Monday once the week has closed. */
   readonly heading: string;
   /** `Conference: …` — the wrinkle by name, and its note, which carries its clock window where it has one. */
   readonly wrinkle: string;
   /** Who moves in, measured on the two buildings or read off the report's own tenants line. */
   readonly moveIns: string;
+  /**
+   * Every car the day's run takes out of passenger service, with its clock times, in one line
+   * (`bookedOut.ts#carsOutLineOf`); `undefined` where none is out or the day was not measured.
+   */
+  readonly cars: string | undefined;
   /** Whether it counts toward the week, the census's own sentence; `undefined` where the census does not speak. */
   readonly counts: string | undefined;
   /** The census's count for the standing order left alone on that day, over the crowds it measured. */
@@ -286,7 +502,21 @@ function houseLineOf(week: WeekState, houseOf: DayCloseInput['houseOf'], census:
   );
 }
 
-/** Item 1's tally, over the counted days closed so far. */
+/** `one of them`, `3 of them`, or `it` / `all 3 of them` where it is every one. */
+function ofThem(count: number, of: number): string {
+  if (count === of) return of === 1 ? 'it' : `all ${String(of)} of them`;
+  return count === 1 ? 'one of them' : `${String(count)} of them`;
+}
+
+/**
+ * Item 1's tally, over the counted days closed so far.
+ *
+ * **A count the house has not answered is not a zero** — wave AN, lane AN-7, the post-AM panel's
+ * seat B (defect 3). With the house still being run on every counted day (after a reload, which
+ * keeps no reading and asks again), this read *you 3, the house 0 … The house is still being run on
+ * 3 of them*: a figure for a count nobody had yet made. While any day is pending the house's count
+ * is stated over the days it has answered, and not at all where it has answered none.
+ */
 function tallyOf(week: WeekState, houseOf: DayCloseInput['houseOf'], census: WeekWay): string | undefined {
   const counted = week.history.filter((entry) => dayCountsToward(week, entry, census));
   if (counted.length === 0) return undefined;
@@ -295,13 +525,22 @@ function tallyOf(week: WeekState, houseOf: DayCloseInput['houseOf'], census: Wee
   const house = readings.filter((reading) => reading === 'cleared').length;
   const pending = readings.filter((reading) => reading === 'pending').length;
   const unrecorded = readings.filter((reading) => reading === 'unrecorded').length;
-  const tail =
-    (pending === 0 ? '' : ` The house is still being run on ${pending === 1 ? 'one of them' : `${String(pending)} of them`}.`) +
-    (unrecorded === 0 ? '' : ` It could not be run on ${unrecorded === 1 ? 'one of them' : `${String(unrecorded)} of them`}.`);
-  return (
-    `This week so far: you ${String(yours)}, the house ${String(house)}, clean over the same ` +
-    `${countedDays(counted.length)}.${tail}`
-  );
+  const unrun =
+    unrecorded === 0 ? '' : ` It could not be run on ${unrecorded === 1 ? 'one of them' : `${String(unrecorded)} of them`}.`;
+  if (pending === 0) {
+    return (
+      `This week so far: you ${String(yours)}, the house ${String(house)}, clean over the same ` +
+      `${countedDays(counted.length)}.${unrun}`
+    );
+  }
+  const answered = counted.length - pending - unrecorded;
+  const lead = `This week so far: you ${String(yours)} clean over ${countedDays(counted.length)}.`;
+  const houseClause =
+    answered === 0
+      ? ` The house is still being run on ${ofThem(pending, counted.length)}.`
+      : ` The house: ${String(house)} clean over the ${String(answered)} it has answered, and still being run on ` +
+        `${ofThem(pending, counted.length)}.`;
+  return `${lead}${houseClause}${unrun}`;
 }
 
 /** Item 3. */
@@ -336,23 +575,58 @@ function moveInsOf(population: { readonly today: number; readonly tomorrow: numb
   return `${people.toLocaleString('en-GB')} ${people === 1 ? 'person' : 'people'} ${delta > 0 ? 'move in' : 'move out'} overnight: ${counts}.`;
 }
 
+/**
+ * `A new week: the tower as handed, 627 → 589 tenants.` — the two measured counts, on the close
+ * whose next day opens a new week. A percentage stood here, and it was a slope's ratio rather than
+ * these counts' (the post-AM panel's seat D: *7.4 %* for 627 → 589, which is 6.1 %).
+ */
+function newWeekTenantsOf(population: { readonly today: number; readonly tomorrow: number }): string {
+  return (
+    `A new week: the tower as handed, ${population.today.toLocaleString('en-GB')} → ` +
+    `${population.tomorrow.toLocaleString('en-GB')} tenants.`
+  );
+}
+
 /** Item 4. */
 function tomorrowOf(input: DayCloseInput, census: WeekWay): DayCloseTomorrow {
   const { week, report } = input;
   const onward = report.onward;
-  const deal = weekDealOf(week, census);
+  /* Tomorrow's own week: on the close that closed the week, the next one's deal (§ D1252). */
+  const on = { contractId: week.contractId, week: onward?.week ?? week.week };
+  const deal = weekDealOf(on, census);
   const day = onward?.day ?? week.day + 1;
   const weekday = onward?.weekday ?? weekdayOf(week.dayIdx + 1);
   const newWeek = onward?.newWeek === true;
+  /* Wave AN, lane AN-7: the week's number where one is true of it (`weekStake.ts#weekOrdinalOf`). */
+  const ordinal = weekOrdinalOf({ ...on, day })?.toUpperCase();
   const heading = newWeek
-    ? `NEXT · ${weekday.toUpperCase()}, DAY ${String(day)} OF A NEW WEEK`
-    : `TOMORROW · ${weekday.toUpperCase()}, DAY ${String(day)}`;
-  const wrinkle = onward === undefined ? report.forecast.name : `${onward.name}: ${onward.note}`;
+    ? `NEXT · ${ordinal === undefined ? '' : `${ordinal} · `}${weekday.toUpperCase()}, DAY ${String(day)} OF A NEW WEEK`
+    : `TOMORROW · ${ordinal === undefined ? '' : `${ordinal} · `}${weekday.toUpperCase()}, DAY ${String(day)}`;
+  const measured = input.onward;
+  /*
+   * On an ordinary day the note is told the truth about the tower's bookings, as the brief's card
+   * tells it (`bookedOut.ts#wrinkleNoteOf`), because *Nothing booked* would sit over the car line.
+   * On every other day the note is about the wrinkle and stays true, and the car line names the
+   * booking, so the card does not say it twice on a phone's first screen.
+   */
+  const wrinkle =
+    onward === undefined
+      ? report.forecast.name
+      : `${onward.name}: ${
+          onward.eventId === 'ordinary'
+            ? wrinkleNoteOf({ id: onward.eventId, note: onward.note }, measured?.cars ?? [])
+            : onward.note
+        }`;
+  const tenants = measured?.population ?? (newWeek ? undefined : input.population);
   const moveIns =
-    !newWeek && input.population !== undefined
-      ? moveInsOf(input.population)
-      : `${onward?.demand ?? report.forecast.demand}.`;
-  const counts = onward === undefined ? undefined : dayStakeSentenceOf(week, day, onward.eventId, census);
+    tenants === undefined
+      ? `${onward?.demand ?? report.forecast.demand}.`
+      : newWeek
+        ? newWeekTenantsOf(tenants)
+        : moveInsOf(tenants);
+  const cars =
+    measured === undefined ? undefined : carsOutLineOf(measured.cars, (simTimeS) => clockAt(simTimeS, measured.startOfDayS));
+  const counts = onward === undefined ? undefined : dayStakeSentenceOf(on, day, onward.eventId, census);
   const dealt = deal?.days[day - 1];
   const row = onward !== undefined && dealt?.eventId === onward.eventId ? dealt.row : undefined;
   const censusLine =
@@ -370,6 +644,7 @@ function tomorrowOf(input: DayCloseInput, census: WeekWay): DayCloseTomorrow {
     heading,
     wrinkle,
     moveIns,
+    cars,
     counts,
     census: censusLine,
     weekend: newWeek && week.day < 7 ? DAY_CLOSE_WEEKEND_LINE : undefined,
@@ -389,7 +664,7 @@ export function dayCloseOf(input: DayCloseInput, census: WeekWay = WEEK_WAY): Da
   return {
     house: speaks ? houseLineOf(week, input.houseOf, census) : undefined,
     tally: speaks ? tallyOf(week, input.houseOf, census) : undefined,
-    call: report.decidingCall,
+    call: closeCallLineOf({ week, report, houseOf: input.houseOf, driverOf: input.driverOf }, census),
     arithmetic: speaks ? arithmeticOf(week, census) : undefined,
     tomorrow: tomorrowOf(input, census),
   };

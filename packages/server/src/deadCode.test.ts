@@ -124,6 +124,9 @@ const WIRING: readonly (readonly [string, string, 'import' | 'same file'])[] = O
   // placement and the ladder are the two rush routes'; a round's configuration and the two shared gates
   // are the replay's.
   ['loadRushPurse', 'server/src/bootstrap.ts', 'import'],
+  // GitHub issue #372, § D1295: the schedule a rebuild between rounds is priced from. Boot reads it to
+  // refuse a schedule that does not price the rush menu; the replay thread reads its own copy.
+  ['loadRushPriceSchedule', 'server/src/bootstrap.ts', 'import'],
   ['rushSittingIssues', 'server/src/http/api.ts', 'import'],
   // PR #513's review, finding 2: the replay moved off the request thread. `api.ts` leases a slot from
   // the pool `bootstrap.ts` builds; the pool starts `rushReplayWorker.ts` by URL — the one link no import

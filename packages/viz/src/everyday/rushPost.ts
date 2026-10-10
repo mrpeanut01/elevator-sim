@@ -17,20 +17,22 @@
  * that a round two rounds back is what is holding the post up, which is why a round's own refusal
  * is drawn on its own line rather than pooled into the reasons below.
  *
- * ## The purse is the server's answer and is drawn nowhere else
+ * ## The purse on this block is the server's answer
  *
- * `packages/server`'s `rushSitting.ts` refuses a client-named purse **by name**, and this module is
- * the other side of that rule: there is no arithmetic here, and the only state in which a purse
- * appears at all is {@link RushPostOutcomeView} `posted`, where the figures are the server's own
- * reply to this player's own post. [§ D543](../../../../DECISIONS.md) clause 5 permits exactly that
- * and no more — *a board row shows no purse, and only the poster's own answer carries one* — so
- * nothing here reaches a board row, and `everyday/boardScreen.ts` draws no purse.
+ * `packages/server`'s `rushSitting.ts` refuses a client-named purse **by name**, and this block is the
+ * other side of that rule: there is no purse arithmetic here, and the purse figures on the round list
+ * appear only in {@link RushPostOutcomeView} `posted`, as the server's own reply to this player's own
+ * post. [§ D543](../../../../DECISIONS.md) clause 5 permits exactly that and no more, so nothing here
+ * reaches a board row, and `everyday/boardScreen.ts` draws no purse.
  *
- * **And the purse buys nothing yet, which is said where the figure is.** A player who reads *purse
- * 18 units* and goes looking for the shop would be meeting the eleven-times defect
- * (`CLAUDE.md`'s standing requirement) from the other side: not a control that writes nothing, but
- * a figure that promises one. {@link RUSH_POST_COPY.purseNote} is that sentence, and
- * `rushScreenModel.ts#RUSH_ABSENCES` carries the same absence in the register's own shape.
+ * **The purse is spent now, and the sentence that said it was not is replaced on the commit that made
+ * it false** — GitHub issue #372, [§ D1295](../../../../DECISIONS.md), § D227. It read *"Nothing spends
+ * a purse in this build yet, so what a round earned is a record of how far it got and not a budget you
+ * can take into the next one"*. A rebuild between rounds spends it (`everyday/rushRebuild.ts`, which
+ * counts the purse it offers with `core`'s own derivation), so {@link RUSH_POST_COPY.purseNote} now says
+ * whose figures these are and that the server's agree with the menu's; and a round that was rebuilt
+ * says so on its own line ({@link RUSH_POST_COPY.rebuilt}), so the list does not read as one tower run
+ * several times.
  *
  * Recorded under [§ D405](../../../../DECISIONS.md) — it decides the wording of one block — beside
  * [§ D606](../../../../DECISIONS.md), which is what this lane decided about the half it did not
@@ -46,6 +48,7 @@ import { SIGNED_OUT, postingRefusal } from '../menu/account.js';
 
 import type { PostRunLine } from './postRun.js';
 import { heldClock, type RushOutcome } from './rush.js';
+import { rushTierNameOf } from './rushRebuild.js';
 import type { RushPostedRound, RushRoundRecord, RushSittingCheck } from './rushSitting.js';
 
 /**
@@ -89,9 +92,14 @@ export const RUSH_POST_COPY = Object.freeze({
     'screen and you can keep playing rounds into it.',
   /** Under the round list once a post has come back — see the module docstring. */
   purseNote:
-    'The purse figures are the server’s own, derived from its replay of each round rather than ' +
-    'counted here. Nothing spends a purse in this build yet, so what a round earned is a record ' +
-    'of how far it got and not a budget you can take into the next one.',
+    'The purse figures are the server’s own, from its replay of each round: what each round earned ' +
+    'and what each rebuild between rounds spent. The server replays a rebuilt round on the tower it ' +
+    'was rebuilt to.',
+  /**
+   * What a round was rebuilt with before it began — GitHub issue #372, § D1295. The names are the
+   * shop's, and the line is on every rebuilt round so a sitting's rounds do not read as one tower.
+   */
+  rebuilt: (names: readonly string[]): string => `rebuilt first with ${names.join(' and ')}`,
   /* The round list's own small words. Each is a label rather than a sentence. */
   roundLabel: (round: number): string => `Round ${String(round)}`,
   /**
@@ -185,6 +193,11 @@ export const RUSH_POST_COPY = Object.freeze({
   earned: (waves: number, paid: number, after: number): string =>
     `outlasted ${String(waves)} ${waves === 1 ? 'wave' : 'waves'}, which paid ${String(paid)} ` +
     `${paid === 1 ? 'unit' : 'units'} into a purse of ${String(after)}`,
+  /** {@link RUSH_POST_COPY.earned} for a round a rebuild spent from first — the server's figure, before the waves'. */
+  earnedAfterSpend: (spent: number, waves: number, paid: number, after: number): string =>
+    `spent ${String(spent)} ${spent === 1 ? 'unit' : 'units'} on its rebuild, then outlasted ${String(waves)} ` +
+    `${waves === 1 ? 'wave' : 'waves'}, which paid ${String(paid)} ${paid === 1 ? 'unit' : 'units'} into a ` +
+    `purse of ${String(after)}`,
   /** The list before a rush has been played at all. Never empty: a list with no words lies. */
   noRounds: 'No round of this sitting has finished yet.',
 } as const);
@@ -222,6 +235,8 @@ export interface RushRoundLineView {
   readonly changesNote: string | undefined;
   /** What the server said this round earned, once it has answered. `undefined` before a post. */
   readonly earned: string | undefined;
+  /** What the round was rebuilt with before it began, or `undefined` on a round nothing was bought for. */
+  readonly rebuilt: string | undefined;
   /** Why this round cannot travel, if it cannot — drawn on its own line. */
   readonly refusal: string | undefined;
 }
@@ -343,7 +358,18 @@ function roundLinesOf(
       earned:
         answered === undefined
           ? undefined
-          : RUSH_POST_COPY.earned(answered.wavesOutlasted, answered.paidUnits, answered.purseAfterUnits),
+          : (answered.spentUnits ?? 0) > 0
+            ? RUSH_POST_COPY.earnedAfterSpend(
+                answered.spentUnits ?? 0,
+                answered.wavesOutlasted,
+                answered.paidUnits,
+                answered.purseAfterUnits,
+              )
+            : RUSH_POST_COPY.earned(answered.wavesOutlasted, answered.paidUnits, answered.purseAfterUnits),
+      rebuilt:
+        round.rebuild === undefined || round.rebuild.length === 0
+          ? undefined
+          : RUSH_POST_COPY.rebuilt(round.rebuild.map(rushTierNameOf)),
       /*
        * The first of a round's refusals rather than all of them, and this is the one place in this
        * lane that shows one of a set. The whole set is below the button, in `check.reasons`, where

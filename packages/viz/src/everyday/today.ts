@@ -46,7 +46,7 @@ import { PRACTICE_DAY_SENTENCES, practiceGroundOf, type PracticeGround } from '.
 import { isDerivedCrowdOn } from '../shift/weekRecord.js';
 import type { ResolvedBuilding } from '@elevator-sim/core/browser';
 
-import { bookedOutCarsOf, carAbsencesOf, wrinkleNameOf, wrinkleNoteOf } from '../shift/bookedOut.js';
+import { absenceSpanPhraseOf, bookedOutCarsOf, carAbsencesOf, wrinkleNameOf, wrinkleNoteOf } from '../shift/bookedOut.js';
 import type { CalendarPeriod } from '../shift/calendar.js';
 import { scheduledEventFor } from '../shift/calendar.js';
 import { firstSessionLineFor } from '../shift/firstSession.js';
@@ -54,8 +54,8 @@ import { eventAsRun, eventCarChoice } from '../shift/events.js';
 import { carsToDerate } from '../shift/incidents.js';
 import { admittedPressDayIds, pressDayStanding } from '../shift/ladder.js';
 import { wayThroughSentenceOf } from '../shift/weekWay.js';
-import { dayStakeSentenceOf, weekStakeLineOf } from '../shift/weekStake.js';
-import { clockOf, clockRange } from '../shift/report.js';
+import { dayStakeSentenceOf, weekOrdinalOf, weekStakeLineOf } from '../shift/weekStake.js';
+import { clockOf } from '../shift/report.js';
 import type { GoalReading, RunHorizon, ShiftEvent, WeekState, Weekday } from '../shift/types.js';
 import { weekdayOf } from '../shift/types.js';
 
@@ -74,7 +74,7 @@ export interface OutOfServiceStrip {
   /** One sentence per cause, joined. See {@link outOfServiceOf} for why they are not merged. */
   readonly sentence: string;
   /**
-   * **Which standing orders make today's question go away** — GitHub issue #587,
+   * **Which standing orders make today's question go away** — PR #587,
    * [§ D914](../../../../DECISIONS.md). `undefined` on every day that is not a pinned one.
    *
    * A playability assessor swept § D871's day across all thirteen shipped dispatchers and found
@@ -116,7 +116,7 @@ export interface TodayRecord {
   /** 1-based, `WeekState.day`. */
   readonly day: number;
   readonly weekday: Weekday;
-  /** `TUESDAY · DAY 2` — the eyebrow both screens carry. */
+  /** `WEEK 1 · TUESDAY · DAY 2` — the eyebrow both screens carry; no week where none is true of it. */
   readonly dayLabel: string;
   /** The building's own name, or its id when this build does not know the document. */
   readonly towerName: string;
@@ -479,19 +479,19 @@ function carsOutTodayOf(
   });
 }
 
+/** `WEEK 2 · `, or nothing where no week number is true of the week. */
+function ordinalEyebrowOf(week: WeekState): string {
+  const ordinal = weekOrdinalOf(week);
+  return ordinal === undefined ? '' : `${ordinal.toUpperCase()} · `;
+}
+
 /** `10:30–15:30`, `from the start of the day until 16:30`, `from 10:30 to the end of the day`, `all day`. */
 function spanPhrase(
   span: { readonly awayAtS: number; readonly backAtS: number | null },
   dayStartS: number,
 ): string {
-  if (span.awayAtS === 0) {
-    return span.backAtS === null
-      ? 'all day'
-      : `from the start of the day until ${clockOf(span.backAtS, dayStartS)}`;
-  }
-  return span.backAtS === null
-    ? `from ${clockOf(span.awayAtS, dayStartS)} to the end of the day`
-    : clockRange(span.awayAtS, span.backAtS, dayStartS);
+  /* One set of words for a span, shared with the close's tomorrow card (`bookedOut.ts`). */
+  return absenceSpanPhraseOf(span, (simTimeS) => clockOf(simTimeS, dayStartS));
 }
 
 /**
@@ -620,25 +620,36 @@ function mootSentenceOf(
    */
   const standing = nameOf(press.standingOrder) ?? press.standingOrder;
   const others = press.mootUnder.length;
-  const count =
-    others === 0
-      ? 'No other standing order clears it'
-      : `${countWord(others, true)} other standing ${others === 1 ? 'order clears' : 'orders clear'} it`;
   return (
     `This day runs under the tower’s standing order, ${standing}. Measured on this crowd, ` +
-    `${count} with no press at all; the day’s report names ${others === 1 ? 'it' : 'them'}.`
+    `${mootCountClause(others)} with no press at all; the day’s report names ${others === 1 ? 'it' : 'them'}.`
   );
 }
 
+/**
+ * The count half of the moot sentence, in words, **lowercase because it follows a comma** — wave
+ * AN lane AP-3, the decision swarm's side finding on GitHub issue #571.
+ *
+ * It read a capitalised count word and a capitalised `No other …`, so the brief printed
+ * *"Measured on this crowd, Ten other standing orders clear it"*: a capital in the middle of a
+ * sentence, on both branches. The clause is mid-sentence on every path into it, so it is never
+ * capitalised. Exported so `today.test.ts` can reach the zero branch, which no shipped pin draws
+ * (every pinned day's census names at least two others).
+ */
+export function mootCountClause(others: number): string {
+  return others === 0
+    ? 'no other standing order clears it'
+    : `${countWord(others)} other standing ${others === 1 ? 'order clears' : 'orders clear'} it`;
+}
+
 /** A small count in words, for a strip that may carry no digit. Past twenty it is the digits' job. */
-function countWord(count: number, capital: boolean): string {
+function countWord(count: number): string {
   const words = [
     'no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten',
     'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen',
     'nineteen', 'twenty',
   ];
-  const word = words[count] ?? 'many';
-  return capital ? word.charAt(0).toUpperCase() + word.slice(1) : word;
+  return words[count] ?? 'many';
 }
 
 /**
@@ -936,7 +947,8 @@ export function todayOf(input: TodayInput): TodayRecord {
   return {
     day: week.day,
     weekday,
-    dayLabel: `${weekday.toUpperCase()} · DAY ${String(week.day)}`,
+    /* Wave AN, lane AN-7: the week's number, where one is true of it (`weekStake.ts#weekOrdinalOf`). */
+    dayLabel: `${ordinalEyebrowOf(week)}${weekday.toUpperCase()} · DAY ${String(week.day)}`,
     towerName: building?.name ?? input.buildingId,
     lede: ledeOf(building, wrinkleName, wrinkleNote, out),
     wrinkle: event,

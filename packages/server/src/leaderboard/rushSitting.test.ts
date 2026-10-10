@@ -17,23 +17,32 @@ import { join } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import {
+  RUSH_AS_SHIPPED,
+  RUSH_PREFIT_LEVELS,
   chimeGrantUnits,
   chimeSinkById,
   loadConfig,
   parseChimeLedger,
+  parsePriceSchedule,
   parseRushPurse,
+  rushFitOf,
   rushHoldAtLegs,
+  rushRebuildUnits,
   rushWavesOutlasted,
   runSimulation,
   type ChimeLedgerTable,
   type PassengerRecord,
+  type PriceSchedule,
+  type RushFit,
   type RushPurseTable,
 } from '@elevator-sim/core';
 
 import {
+  loadRushPriceSchedule,
   loadRushPurse,
   replayRushSitting,
   rushSittingIssues,
+  type RushSittingResources,
   type SubmittedRushRound,
   type SubmittedRushSitting,
 } from './rushSitting.js';
@@ -61,6 +70,9 @@ const BUILDING = 'midtown-office';
 let resources: VerificationResources;
 let ledger: ChimeLedgerTable;
 let purse: RushPurseTable;
+let schedule: PriceSchedule;
+/** Everything {@link replayRushSitting} reads, from the shipped `data/`; `over` swaps one part. */
+const from = (over: Partial<RushSittingResources> = {}): RushSittingResources => ({ resources, purse, ledger, schedule, ...over });
 
 interface Truth {
   readonly startedAt: number;
@@ -70,8 +82,8 @@ interface Truth {
 }
 
 /** One round, measured the way the server measures it — see the module docstring. */
-function truthOf(round: Omit<SubmittedRushRound, 'claimedHeldS'>, buildingId = BUILDING, prefit = false): Truth {
-  const config = rushRoundConfigFor(buildingId, round, resources, prefit);
+function truthOf(round: Omit<SubmittedRushRound, 'claimedHeldS'>, buildingId = BUILDING, fit: RushFit = RUSH_AS_SHIPPED): Truth {
+  const config = rushRoundConfigFor(buildingId, round, resources, fit);
   if (typeof config === 'string') throw new Error(`the fixture does not resolve: ${config}`);
   const { record } = runSimulation(config);
   const holdAtS = rushHoldAtLegs(record.passengers, record.startedAt, record.endedAt);
@@ -87,6 +99,8 @@ const PLAIN: Omit<SubmittedRushRound, 'claimedHeldS'> = Object.freeze({ dispatch
 let switched: Omit<SubmittedRushRound, 'claimedHeldS'>;
 let plain: Truth;
 let withSwitch: Truth;
+/** The same round on the tower with Doors 1 fitted — what a round after a 4-unit rebuild plays. */
+let doors: Truth;
 
 beforeAll(async () => {
   const config = await loadConfig(DATA_DIR);
@@ -99,7 +113,9 @@ beforeAll(async () => {
   };
   ledger = parseChimeLedger(JSON.parse(await readFile(join(DATA_DIR, 'chime-ledger.json'), 'utf8')) as unknown);
   purse = parseRushPurse(JSON.parse(await readFile(join(DATA_DIR, 'rush-purse.json'), 'utf8')) as unknown);
+  schedule = parsePriceSchedule(JSON.parse(await readFile(join(DATA_DIR, 'price-schedule.json'), 'utf8')) as unknown);
   plain = truthOf(PLAIN);
+  doors = truthOf(PLAIN, BUILDING, rushFitOf({ doors: 1 }));
   // A minute in, the day is handed to the weakest shipped dispatcher — a mid-run change on the log.
   switched = {
     dispatcherProfileId: 'collective',
@@ -128,7 +144,7 @@ describe('the cheap gate — everything refused before a simulation starts', () 
   });
 
   it('refuses a purse or an amount the client names, by name, on the sitting and on a round', () => {
-    for (const key of ['purse', 'purseUnits', 'paidUnits', 'purseBeforeUnits', 'purseAfterUnits', 'wavesOutlasted', 'budgetUnits', 'units']) {
+    for (const key of ['purse', 'purseUnits', 'paidUnits', 'purseBeforeUnits', 'purseAfterUnits', 'spentUnits', 'wavesOutlasted', 'budgetUnits', 'units']) {
       const onSitting = rushSittingIssues({ buildingId: BUILDING, rounds: [round], [key]: 999 }, purse);
       expect(onSitting.join(' '), key).toContain(`"${key}"`);
       expect(onSitting.join(' '), key).toMatch(/derives? .*purse|purse .*derived/u);
@@ -199,7 +215,7 @@ describe('the cheap gate — everything refused before a simulation starts', () 
 
 describe('the replay — every round re-simulated, every purse derived', () => {
   it('verifies an honest sitting, reading each round’s hold moment off its own replay', () => {
-    const verified = replayRushSitting(honestSitting(), { resources, purse, ledger });
+    const verified = replayRushSitting(honestSitting(), from());
     if (!verified.ok) throw new Error(`${verified.code}: ${verified.detail}`);
     expect(verified.simulations).toBe(2);
     expect(verified.rounds.map((entry) => entry.heldS)).toEqual([plain.heldS, withSwitch.heldS]);
@@ -208,7 +224,7 @@ describe('the replay — every round re-simulated, every purse derived', () => {
   }, 300_000);
 
   it('pays each round its waves outlasted, and opens the next round with the balance the last one left', () => {
-    const verified = replayRushSitting(honestSitting(), { resources, purse, ledger });
+    const verified = replayRushSitting(honestSitting(), from());
     if (!verified.ok) throw new Error(`${verified.code}: ${verified.detail}`);
     const [first, second] = verified.rounds;
     expect(first?.purseBeforeUnits).toBe(0);
@@ -223,16 +239,18 @@ describe('the replay — every round re-simulated, every purse derived', () => {
     if (sink === undefined) throw new Error('the shipped ledger sells no rush-purse-top-up');
     const topped = replayRushSitting(
       { buildingId: BUILDING, rounds: [claimed(PLAIN, plain)], modifiers: [{ sinkId: 'rush-purse-top-up', steps: 2 }] },
-      { resources, purse, ledger },
+      from(),
     );
     if (!topped.ok) throw new Error(`${topped.code}: ${topped.detail}`);
     expect(topped.rounds[0]?.purseBeforeUnits).toBe(chimeGrantUnits(sink, 2));
     expect(topped.rounds[0]?.paidUnits).toBe(plain.wavesOutlasted * purse.unitsPerWaveOutlasted);
     /*
-     * **And the purse it opens moves no run, pinned by a run rather than by a sentence** (§ D227). No
-     * between-round rebuild travels, so a bought top-up widens a purse nothing spends: the replay holds
-     * at the same moment it holds without one. The day a rebuild travels, this is the assertion that
-     * has to change with it — which is what makes the absence a stated refusal rather than a quiet one.
+     * **And the purse it opens moves no run by itself, pinned by a run rather than by a sentence**
+     * (§ D227). This read *"no between-round rebuild travels, so a bought top-up widens a purse nothing
+     * spends … the day a rebuild travels, this is the assertion that has to change with it"*. A rebuild
+     * travels now (GitHub issue #372, § D1295), and the assertion still holds for the reason it now
+     * states: the first round is the tower as shipped, so a wider purse reaches a run only through a
+     * rebuild it pays for between rounds, and `the rebuild between rounds` below is that run.
      */
     expect(topped.rounds[0]?.heldS).toBe(plain.heldS);
   }, 300_000);
@@ -248,12 +266,12 @@ describe('the replay — every round re-simulated, every purse derived', () => {
      * The claim is honest on both sides: the round claims the held time a *fitted* replay produces,
      * because that is what a player who bought the kit would have watched.
      */
-    const fitted = truthOf(PLAIN, BUILDING, true);
+    const fitted = truthOf(PLAIN, BUILDING, rushFitOf(RUSH_PREFIT_LEVELS));
     expect(fitted.heldS, 'the kit changed nothing the rush can see on this cell').not.toBe(plain.heldS);
 
     const verified = replayRushSitting(
       { buildingId: BUILDING, rounds: [claimed(PLAIN, fitted)], modifiers: [{ sinkId: 'rush-prefit', steps: 1 }] },
-      { resources, purse, ledger },
+      from(),
     );
     if (!verified.ok) throw new Error(`${verified.code}: ${verified.detail}`);
     expect(verified.heldS).toBe(fitted.heldS);
@@ -265,7 +283,7 @@ describe('the replay — every round re-simulated, every purse derived', () => {
      * than always on: the same round, claiming the same fitted figure, with no modifier on it is
      * refused because the server replays the tower as shipped and gets a different moment.
      */
-    const unclaimed = replayRushSitting({ buildingId: BUILDING, rounds: [claimed(PLAIN, fitted)] }, { resources, purse, ledger });
+    const unclaimed = replayRushSitting({ buildingId: BUILDING, rounds: [claimed(PLAIN, fitted)] }, from());
     expect(unclaimed.ok).toBe(false);
     if (!unclaimed.ok) expect(unclaimed.code).toBe('held-does-not-reproduce');
   }, 300_000);
@@ -280,23 +298,23 @@ describe('the replay — every round re-simulated, every purse derived', () => {
     const blind: VerificationResources = { ...resources, elevatorSpecs: undefined };
     const verified = replayRushSitting(
       { buildingId: BUILDING, rounds: [claimed(PLAIN, plain)], modifiers: [{ sinkId: 'rush-prefit', steps: 1 }] },
-      { resources: blind, purse, ledger },
+      from({ resources: blind }),
     );
     expect(verified.ok).toBe(false);
     if (!verified.ok) {
-      expect(verified.code).toBe('cannot-prefit');
+      expect(verified.code).toBe('cannot-fit');
       expect(verified.simulations, 'a refusal that cannot be built costs no simulation').toBe(0);
     }
   });
 
   it('ignores a purse the client smuggles past the gate — every purse is the replay’s, whatever the body says', () => {
-    const honest = replayRushSitting(honestSitting(), { resources, purse, ledger });
+    const honest = replayRushSitting(honestSitting(), from());
     const smuggled = {
       ...honestSitting(),
       purseUnits: 999,
       rounds: honestSitting().rounds.map((entry) => ({ ...entry, paidUnits: 999, purseAfterUnits: 999, wavesOutlasted: 30 })),
     } as unknown as SubmittedRushSitting;
-    const replayed = replayRushSitting(smuggled, { resources, purse, ledger });
+    const replayed = replayRushSitting(smuggled, from());
     if (!honest.ok || !replayed.ok) throw new Error('both sittings should verify');
     expect(replayed.rounds).toEqual(honest.rounds);
     expect(replayed.rounds.every((entry) => entry.paidUnits !== 999 && entry.purseAfterUnits !== 999)).toBe(true);
@@ -309,7 +327,7 @@ describe('the replay — every round re-simulated, every purse derived', () => {
     // The same round posted without its log claims a hold moment its own replay does not reach.
     const logDropped = replayRushSitting(
       { buildingId: BUILDING, rounds: [{ dispatcherProfileId: 'collective', claimedHeldS: withSwitch.heldS }] },
-      { resources, purse, ledger },
+      from(),
     );
     expect(logDropped.ok).toBe(false);
     if (!logDropped.ok) expect(logDropped.code).toBe('held-does-not-reproduce');
@@ -318,7 +336,7 @@ describe('the replay — every round re-simulated, every purse derived', () => {
   it('refuses a claim that does not reproduce, and names the round it came from', () => {
     const forged = honestSitting();
     const rounds = [forged.rounds[0], { ...forged.rounds[1], claimedHeldS: (withSwitch.heldS ?? 0) + 2 }] as SubmittedRushRound[];
-    const verified = replayRushSitting({ ...forged, rounds }, { resources, purse, ledger });
+    const verified = replayRushSitting({ ...forged, rounds }, from());
     expect(verified.ok).toBe(false);
     if (!verified.ok) {
       expect(verified.code).toBe('held-does-not-reproduce');
@@ -334,7 +352,7 @@ describe('the replay — every round re-simulated, every purse derived', () => {
     expect(held.wavesOutlasted).toBe(30);
     const verified = replayRushSitting(
       { buildingId: 'vertical-city', rounds: [{ ...PLAIN, claimedHeldS: null }] },
-      { resources, purse, ledger },
+      from(),
     );
     expect(verified.ok).toBe(false);
     if (!verified.ok) {
@@ -347,13 +365,193 @@ describe('the replay — every round re-simulated, every purse derived', () => {
   it('refuses a round under a dispatcher this server does not ship, before anything simulates', () => {
     const verified = replayRushSitting(
       { buildingId: BUILDING, rounds: [claimed(PLAIN, plain), { dispatcherProfileId: 'saved-on-a-device', claimedHeldS: 900 }] },
-      { resources, purse, ledger },
+      from(),
     );
     expect(verified.ok).toBe(false);
     if (!verified.ok) {
       expect(verified.code).toBe('unknown-dispatcher');
       expect(verified.round).toBe(2);
       expect(verified.simulations).toBe(0);
+    }
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The rebuild between rounds — GitHub issue #372's second criterion, § D1295
+ * -------------------------------------------------------------------------- */
+
+describe('the rebuild between rounds — the gate', () => {
+  const round = { dispatcherProfileId: 'collective', claimedHeldS: 900 };
+  const sittingWith = (rebuild: unknown, modifiers?: unknown): readonly string[] =>
+    rushSittingIssues(
+      { buildingId: BUILDING, rounds: [round, { ...round, rebuild }], ...(modifiers === undefined ? {} : { modifiers }) },
+      purse,
+    );
+
+  it('accepts a rebuild of menu tiers on a later round, and two categories at once', () => {
+    expect(sittingWith(['faster-doors'])).toEqual([]);
+    expect(sittingWith(['advance-opening', 'larger-cars-21'])).toEqual([]);
+    expect(sittingWith([])).toEqual([]);
+  });
+
+  it('refuses a rebuild before the first round, because a sitting starts from the building as shipped', () => {
+    const issues = rushSittingIssues({ buildingId: BUILDING, rounds: [{ ...round, rebuild: ['faster-doors'] }] }, purse);
+    expect(issues.join(' ')).toMatch(/rounds\[0\]\.rebuild .*first round is the building as shipped/u);
+  });
+
+  it('refuses Shafts and Machines by name, with the reason, and the two tenant tiers that change who arrives', () => {
+    for (const priceId of ['new-car', 'fifth-car', 'machines-4mps', 'machines-5mps', 'machines-gearless']) {
+      const issues = sittingWith([priceId]).join(' ');
+      expect(issues, priceId).toContain(`"${priceId}"`);
+      expect(issues, priceId).toMatch(/(shafts|machines) level \d, which a rush cannot rebuild: it needs the commissioning/u);
+    }
+    for (const priceId of ['staggered-starts', 'move-a-tenant']) {
+      expect(sittingWith([priceId]).join(' '), priceId).toMatch(/changes who arrives, and a rush board ranks sittings that met the same crowd/u);
+    }
+    expect(sittingWith(['no-such-row']).join(' ')).toContain('not a tier the rush rebuild sells');
+  });
+
+  it('refuses a tier the sitting already has, the pre-fit’s Doors 1 included, and two tiers of one category', () => {
+    expect(sittingWith(['faster-doors'], [{ sinkId: 'rush-prefit', steps: 1 }]).join(' ')).toMatch(/already has that category at level 1/u);
+    expect(sittingWith(['door-sensors'], [{ sinkId: 'rush-prefit', steps: 1 }])).toEqual([]);
+    expect(sittingWith(['faster-doors', 'door-sensors']).join(' ')).toMatch(/two doors tiers at once/u);
+    const twice = rushSittingIssues(
+      { buildingId: BUILDING, rounds: [round, { ...round, rebuild: ['faster-doors'] }, { ...round, rebuild: ['faster-doors'] }] },
+      purse,
+    );
+    expect(twice.join(' ')).toMatch(/rounds\[2\]\.rebuild buys "faster-doors", and this sitting already has/u);
+  });
+
+  it('refuses a rebuild that is not a list of ids', () => {
+    expect(sittingWith('faster-doors').join(' ')).toMatch(/must be a list of price-schedule row ids/u);
+    expect(sittingWith([7]).join(' ')).toMatch(/must be a list of price-schedule row ids/u);
+  });
+});
+
+describe('the rebuild between rounds — the replay', () => {
+  it('moves the control and requires the run to change: a rebuilt round plays different legs, compared on the legs', () => {
+    const boardings = (truth: Truth): readonly (number | undefined)[] => truth.passengers.map((leg) => leg.boardedAt);
+    expect(boardings(doors)).not.toEqual(boardings(plain));
+    expect(doors.heldS, 'Doors 1 changed nothing the rush can see on this cell').not.toBe(plain.heldS);
+  });
+
+  it('replays a rebuilt round on the rebuilt tower, keeps the tier for the rest of the sitting, and takes its price from the purse', () => {
+    const verified = replayRushSitting(
+      {
+        buildingId: BUILDING,
+        rounds: [claimed(PLAIN, plain), { ...claimed(PLAIN, doors), rebuild: ['faster-doors'] }, claimed(PLAIN, doors)],
+      },
+      from(),
+    );
+    if (!verified.ok) throw new Error(`${verified.code}: ${verified.detail}`);
+    /* Round 3 bought nothing and still plays the rebuilt tower: a tier bought between rounds persists. */
+    expect(verified.rounds.map((entry) => entry.heldS)).toEqual([plain.heldS, doors.heldS, doors.heldS]);
+    const price = rushRebuildUnits(schedule, ['faster-doors']);
+    const [first, second, third] = verified.rounds;
+    expect(first?.spentUnits).toBe(0);
+    expect(second?.purseBeforeUnits).toBe(first?.purseAfterUnits);
+    expect(second?.spentUnits).toBe(price);
+    expect(second?.purseAfterUnits).toBe((first?.purseAfterUnits ?? Number.NaN) - price + (second?.paidUnits ?? Number.NaN));
+    expect(third?.spentUnits).toBe(0);
+  }, 600_000);
+
+  it('gives the standard purse with no rebuild exactly the run and the figures it gave before', () => {
+    /*
+     * The negative control. A second round nothing was bought for is the first round again, and its
+     * purse adds what it earned and takes nothing: the figures this file pinned before the spend term
+     * existed, with a zero where the term now sits.
+     */
+    const verified = replayRushSitting({ buildingId: BUILDING, rounds: [claimed(PLAIN, plain), claimed(PLAIN, plain)] }, from());
+    if (!verified.ok) throw new Error(`${verified.code}: ${verified.detail}`);
+    expect(verified.rounds[1]?.heldS).toBe(plain.heldS);
+    expect(verified.rounds.map((entry) => entry.spentUnits)).toEqual([0, 0]);
+    expect(verified.rounds[1]?.purseAfterUnits).toBe(2 * plain.wavesOutlasted * purse.unitsPerWaveOutlasted);
+  }, 600_000);
+
+  it('refuses a rebuild above the derived purse by name, and the same rebuild goes through on a wider purse', () => {
+    /*
+     * Car size 2 is dearer than what Midtown Office's first round pays on the standard purse, and not
+     * dearer than that plus the top-up's three steps. So this is the issue's own control: a round
+     * rebuilt with a larger purse produces a different run from the same seed, and on the standard
+     * purse the rebuild is refused and the round cannot be played as posted.
+     */
+    const price = rushRebuildUnits(schedule, ['larger-cars-21']);
+    const earned = plain.wavesOutlasted * purse.unitsPerWaveOutlasted;
+    const sink = chimeSinkById(ledger, 'rush-purse-top-up');
+    if (sink === undefined) throw new Error('the shipped ledger sells no rush-purse-top-up');
+    const topUp = chimeGrantUnits(sink, sink.maxSteps);
+    expect(price, 'the fixture needs a tier the standard purse cannot reach').toBeGreaterThan(earned);
+    expect(price, 'and one the wider purse can').toBeLessThanOrEqual(earned + topUp);
+
+    const cars = truthOf(PLAIN, BUILDING, rushFitOf({ cars: 2 }));
+    expect(cars.heldS).not.toBe(plain.heldS);
+    const sitting = { buildingId: BUILDING, rounds: [claimed(PLAIN, plain), { ...claimed(PLAIN, cars), rebuild: ['larger-cars-21'] }] };
+
+    const standard = replayRushSitting(sitting, from());
+    expect(standard.ok).toBe(false);
+    if (!standard.ok) {
+      expect(standard.code).toBe('rebuild-over-purse');
+      expect(standard.round).toBe(2);
+      expect(standard.detail).toContain(`${String(price)} units`);
+      expect(standard.detail).toContain(`a purse of ${String(earned)}`);
+      expect(standard.simulations, 'refused before the round it would have paid for simulates').toBe(1);
+    }
+
+    const wider = replayRushSitting({ ...sitting, modifiers: [{ sinkId: 'rush-purse-top-up', steps: sink.maxSteps }] }, from());
+    if (!wider.ok) throw new Error(`${wider.code}: ${wider.detail}`);
+    expect(wider.rounds[1]?.heldS).toBe(cars.heldS);
+    expect(wider.rounds[1]?.spentUnits).toBe(price);
+  }, 600_000);
+
+  it('refuses a tier that would build the tower the sitting already has, before anything simulates', () => {
+    /* Measured: Midtown Office's cars are already rated for sixteen, so Car size 1 moves no leg there. */
+    const verified = replayRushSitting(
+      { buildingId: BUILDING, rounds: [claimed(PLAIN, plain), { ...claimed(PLAIN, plain), rebuild: ['larger-cars'] }] },
+      from(),
+    );
+    expect(verified.ok).toBe(false);
+    if (!verified.ok) {
+      expect(verified.code).toBe('rebuild-refused');
+      expect(verified.detail).toContain('would build the tower this sitting already has');
+      expect(verified.simulations).toBe(0);
+    }
+  });
+
+  it('refuses a rebuild it cannot build, rather than replaying the tower as shipped', () => {
+    const blind: VerificationResources = { ...resources, elevatorSpecs: undefined };
+    const verified = replayRushSitting(
+      { buildingId: BUILDING, rounds: [claimed(PLAIN, plain), { ...claimed(PLAIN, doors), rebuild: ['faster-doors'] }] },
+      from({ resources: blind }),
+    );
+    expect(verified.ok).toBe(false);
+    if (!verified.ok) {
+      expect(verified.code).toBe('cannot-fit');
+      expect(verified.round).toBe(2);
+      expect(verified.simulations).toBe(0);
+    }
+  });
+});
+
+describe('loadRushPriceSchedule — at boot', () => {
+  it('reads the shipped schedule, which prices every tier on the rush menu', async () => {
+    expect(await loadRushPriceSchedule(DATA_DIR)).toEqual(schedule);
+  });
+
+  it('refuses to start on a schedule that does not price a menu tier', async () => {
+    const scratch = await mkdtemp(join(tmpdir(), 'rush-schedule-'));
+    try {
+      const raw = JSON.parse(await readFile(join(DATA_DIR, 'price-schedule.json'), 'utf8')) as { readonly changes: readonly { readonly id: string }[] };
+      /* Renamed rather than removed, so the schedule's own rules (a tier's typical is its median) still pass. */
+      await writeFile(
+        join(scratch, 'price-schedule.json'),
+        JSON.stringify({
+          ...raw,
+          changes: raw.changes.map((change) => (change.id === 'faster-doors' ? { ...change, id: 'quicker-doors' } : change)),
+        }),
+      );
+      await expect(loadRushPriceSchedule(scratch)).rejects.toThrow(/faster-doors/u);
+    } finally {
+      await rm(scratch, { recursive: true, force: true });
     }
   });
 });

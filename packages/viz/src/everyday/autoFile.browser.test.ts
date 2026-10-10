@@ -45,6 +45,12 @@
  * files by itself*, which is the wrong fix that every absence case would have been equally happy
  * with.
  *
+ * **Since § D1323 (wave AN, lane AN-6) two of the three run on a page of their own.** While the
+ * stage's attempt stands the Engineer surface makes no run, so the Run button's and the keystroke's
+ * positive halves are pressed from the landing page, where none stands, and read the week this device
+ * has stored rather than the stage's row, which is not on the page there. The day that crosses into
+ * the Engineer world now files by its own stage's close, once the player is back on it.
+ *
  * **What was actually watched failing, and where** — stated case by case rather than as a blanket
  * claim, because *"they all fail on the parent commit"* is the kind of sentence that is written
  * once and is wrong by the next commit:
@@ -89,7 +95,12 @@ import { openingCareer } from '../campaign/career.js';
 import { CAREER_STORAGE_KEY, encodeCareer } from '../campaign/careerPersist.js';
 import { STAGE_DAY_OVER, STAGE_SPEEDS, stageBarModelOf } from './stageScreenModel.js';
 import { DAY_ATTEMPT_COPY } from '../shift/attempt.js';
-import { ATTEMPT_CLOSES_ON_ITS_STAGE, ATTEMPT_SHOWN_TO_ITS_REACH } from '../shift/banking.js';
+import { SESSION_KEY } from '../persist/types.js';
+import {
+  ATTEMPT_CLOSES_ON_ITS_STAGE,
+  ATTEMPT_ENGINEER_WATCHES_ONLY,
+  ATTEMPT_SHOWN_TO_ITS_REACH,
+} from '../shift/banking.js';
 
 /** The run the address asks for, in simulated seconds. See the module docstring. */
 const RUN_S = 300;
@@ -394,10 +405,11 @@ describe.skipIf(!HAS_BROWSER)('the day nobody closed', () => {
     /*
      * **Since § D1239 (wave AM, lane AM-B) the day started on the stage is a scored attempt, and the
      * Engineer transport is held at the stage's reach and files none of it** — the post-AL panel's
-     * seat D (D1). So the day that crosses into the Engineer world and runs out there is the
-     * Engineer's own run, pressed there, while the attempt stands; it closes on its transport
-     * reaching the end, as practice. The edge this case tells apart is unchanged: a rule reading
-     * *nothing files while an Everyday day stands* would leave it open, and this case goes red.
+     * seat D (D1). And **since § D1323 (wave AN, lane AN-6) the Engineer surface makes no run of the
+     * day while that attempt stands**: its Run refuses, in words (the post-AM panel's seat D, D2). So
+     * the day that crosses into the Engineer world is filed by the stage it belongs to, once the
+     * player is back on it, and by nothing over there. The edge this case tells apart is unchanged
+     * in kind: a build where nothing files at all leaves the day open, and this case goes red.
      */
     const page = await coldLoad(LONG_RUN_S);
     try {
@@ -409,11 +421,23 @@ describe.skipIf(!HAS_BROWSER)('the day nobody closed', () => {
         { timeout: 10_000 },
       );
       await page.click('#run');
+      expect(await page.textContent('#status')).toBe(ATTEMPT_ENGINEER_WATCHES_ONLY);
+      await waitPastTheCoveredEnd(page, 1, LONG_RUN_S);
+      await returnToEverydayMode(page);
+      expect((await barSays(page)).note, 'the Engineer surface filed the attempt').not.toBe(FILED_NOTE);
+      /* Skipped until the day runs out: a call on the way asks once, and the next press skips it (§ D1324). */
       await page.waitForFunction(
-        (note) => document.querySelector('.everyday-bar-note')?.textContent === note,
-        FILED_NOTE,
-        { timeout: 120_000 },
+        () => {
+          const skip = document.querySelector<HTMLButtonElement>('.everyday-stage-skip');
+          if (skip === null || skip.disabled) return true;
+          skip.click();
+          return false;
+        },
+        undefined,
+        { timeout: 120_000, polling: 500 },
       );
+      await page.click('.everyday-bar-primary');
+      await page.waitForSelector('.everyday-report', { timeout: 60_000 });
     } finally {
       await page.close();
     }
@@ -422,9 +446,10 @@ describe.skipIf(!HAS_BROWSER)('the day nobody closed', () => {
   /**
    * The third negative control: the shortcut is not broken, it is **scoped**.
    *
-   * `LONG_RUN_S` is what makes this an isolation rather than a coincidence. The covered transport
-   * cannot reach the end of a fifteen-minute day in under fifteen real seconds, so a day that is
-   * filed within five of them was filed by the keystroke and by nothing else.
+   * On the stage's own attempt the shortcut is refused and says why (§ D1239). Its positive half
+   * runs where no attempt stands, since § D1323 leaves the Engineer surface no run of its own while
+   * one does: a cold page, straight to the Engineer surface from the landing page, its own Run, then
+   * the keystroke, and the day files at once.
    */
   it('still closes the day from the keyboard on the surface the shortcut belongs to', async () => {
     const page = await coldLoad(LONG_RUN_S);
@@ -435,45 +460,73 @@ describe.skipIf(!HAS_BROWSER)('the day nobody closed', () => {
       await page.keyboard.press('Control+Enter');
       expect(await page.textContent('#status')).toBe(ATTEMPT_CLOSES_ON_ITS_STAGE);
       expect(await page.evaluate(() => document.querySelector('.everyday-bar-note')?.textContent ?? '')).not.toBe(FILED_NOTE);
-      /* On the Engineer's own run it files at once. */
-      await page.click('#run');
-      await page.waitForFunction((label) => document.getElementById('run')?.textContent === label, RUN_IDLE, {
-        timeout: 120_000,
-      });
-      await page.evaluate(() => {
-        (document.activeElement as HTMLElement | null)?.blur();
-      });
-      await page.keyboard.press('Control+Enter');
-      await page.waitForFunction(
-        (note) => document.querySelector('.everyday-bar-note')?.textContent === note,
-        FILED_NOTE,
-        { timeout: 5_000 },
-      );
     } finally {
       await page.close();
+    }
+    const own = await coldLoad(LONG_RUN_S);
+    try {
+      await enterEngineerStage(own);
+      await own.click('#run');
+      await own.waitForFunction((label) => document.getElementById('run')?.textContent === label, RUN_IDLE, {
+        timeout: 120_000,
+      });
+      await own.evaluate(() => {
+        (document.activeElement as HTMLElement | null)?.blur();
+      });
+      await own.keyboard.press('Control+Enter');
+      /* Five seconds: the covered transport cannot reach the end of a fifteen-minute day in that time. */
+      await own.waitForFunction((key) => {
+          const raw = window.localStorage.getItem(key);
+          if (raw === null) return false;
+          const session = (JSON.parse(raw) as { session?: { week?: { history?: unknown[] } } }).session;
+          return (session?.week?.history?.length ?? 0) > 0;
+        }, SESSION_KEY, {
+        timeout: 5_000,
+      }).catch(() => undefined);
+      expect(await filedDays(own), 'the shortcut filed nothing on the Engineer surface’s own run').toBeGreaterThan(0);
+    } finally {
+      await own.close();
     }
   }, 300_000);
 
   it('still closes the Engineer surface’s own day when its own transport ends', async () => {
+    /*
+     * The Engineer Run button — `wireTransport`'s, one of `playerStartedARun`'s two latch sites. It
+     * re-adopts, which clears `filedRunId`, so the day this files is the one started here. Pressed
+     * from the landing page, where no attempt stands: § D1323 refuses it while one does, which the
+     * first control above holds.
+     */
     const page = await coldLoad();
     try {
-      await enterEverydayStage(page);
       await enterEngineerStage(page);
-      /*
-       * The Engineer Run button — `wireTransport`'s, one of `playerStartedARun`'s two latch sites.
-       * It re-adopts, which clears `filedRunId`, so the day this files is the one started here.
-       */
       await page.click('#run');
-      await page.waitForFunction(
-        (note) => document.querySelector('.everyday-bar-note')?.textContent === note,
-        FILED_NOTE,
-        { timeout: 120_000 },
-      );
+      await page.waitForFunction((key) => {
+          const raw = window.localStorage.getItem(key);
+          if (raw === null) return false;
+          const session = (JSON.parse(raw) as { session?: { week?: { history?: unknown[] } } }).session;
+          return (session?.week?.history?.length ?? 0) > 0;
+        }, SESSION_KEY, {
+        timeout: 120_000,
+      }).catch(() => undefined);
+      expect(await filedDays(page), 'the Engineer surface’s own run did not file at its end').toBeGreaterThan(0);
     } finally {
       await page.close();
     }
   }, 300_000);
 });
+
+/**
+ * How many days the week this device has stored has filed — the instrument for the two controls
+ * that run where no Everyday stage stands, read in the page from the session slot.
+ */
+async function filedDays(page: Page): Promise<number> {
+  return page.evaluate((key) => {
+    const raw = window.localStorage.getItem(key);
+    if (raw === null) return 0;
+    const session = (JSON.parse(raw) as { session?: { week?: { history?: unknown[] } } }).session;
+    return session?.week?.history?.length ?? 0;
+  }, SESSION_KEY);
+}
 
 /* -------------------------------------------------------------------------- *
  * A day left unfinished — GitHub issue #526 item 1

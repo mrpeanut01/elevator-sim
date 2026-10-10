@@ -222,9 +222,11 @@ so it ships with its own `hospital` traffic profile and is meant to be run again
 empties into.
 
 Three firsts. The bank holds **two bed cars** at 4,000 lb and 1.75 m/s beside three public cars at
-3,500 lb and 2.5 m/s, so a dispatcher has only speed, capacity and transfer time to tell them apart
+3,500 lb and 2.5 m/s, and every shipped dispatcher tells them apart by speed and capacity alone
 — whether it learns to leave them alone for an ordinary hall call is measurable, and no other
-building can ask it. It is the **first shipped building to declare a `stairs` transport mode**, so
+building can ask it. Car E also declares a bed duty, drafted for the owner's approval (GitHub issue
+#561, [`DECISIONS.md`](../DECISIONS.md) § D1290); no shipped profile weights the duty term, so the
+declaration moves a run only when a player's own dispatcher weights it. It is the **first shipped building to declare a `stairs` transport mode**, so
 the asymmetric-propensity model of [`docs/14` § 3.3](14-building-behaviour-contract.md) finally has
 a caller in `data/` rather than only in a test fixture. And the entrance is **not** the only crowd
 source: Outpatients on floor 1 holds 180 people, so a clinic ending sends a burst *downward from an
@@ -493,7 +495,7 @@ occupants is not a quantity the Barney/CIBSE expression has.
 taking a car away or adding one would delete or dissolve the thing the scenario is about. Measured
 day-1 miss rate **0.52 of 50 seeds**, inside `docs/33` DC-4's band.
 
-> **Both figures moved on 2026-09-22** ([§ D914](../DECISIONS.md), GitHub issue #587, `docs/33`
+> **Both figures moved on 2026-09-22** ([§ D914](../DECISIONS.md), PR #587, `docs/33`
 > § 4.7n). The rung now books **car `D` of the shops-and-offices bank** out of passenger service
 > between a quarter and a half of the way through the shift — never the car park lift, which is the
 > only car in its own bank — so the fabric is no longer untouched, and the crowd comes back to

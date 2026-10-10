@@ -100,7 +100,7 @@ const read = (path: string): unknown =>
 const SPECS: ElevatorSpecs = parseElevatorSpecs(read('elevator-specs.json'));
 const TRAFFIC: TrafficProfiles = parseTrafficProfiles(read('traffic-profiles.json'));
 const PROFILES = parseDispatcherProfiles(read('dispatcher-profiles.json'));
-/** A shipped tower on which no car declares a duty — every shipped building, § D549 clause 6. */
+/** A shipped tower on which no car declares a duty — every shipped building but St Jude (§ D549 clause 6, § D1290). */
 const MIDTOWN = resolveBuilding(parseBuilding(read('buildings/midtown-office.json')), SPECS);
 /*
  * The project's own list, not a second copy of it — GitHub issue #108.

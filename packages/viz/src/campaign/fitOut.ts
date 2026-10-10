@@ -44,11 +44,10 @@
 
 import {
   MIN_DOOR_S,
-  doorCycleWithSaving,
-  parseLoadDivisor,
+  fitCarsOf,
+  fitProfileOf,
   type BuildingConfig,
   type CrowdThinning,
-  type DispatchStageConfig,
   type DispatcherProfile,
   type ElevatorSpecs,
   type FloorConfig,
@@ -269,134 +268,31 @@ function choicesFor(
 }
 
 /**
- * Every car with the kit's door timings, rated load and transfer time on it.
+ * Every car with the kit's door timings, hall dwell, rated load and transfer time on it.
  *
- * Each field is resolved from the specs file **before** it is moved, because a car that declares
- * none is not a car with none: `doorOpenS` defaults to its `doorType`'s figure and `dwellHallCallS`
- * to the shared typical, so subtracting from an absent field would write the saving as the whole
- * value. `resolveCar` is where those defaults live and this reads the same rows it does.
+ * **`@elevator-sim/core`'s `fitCarsOf`, called rather than kept here** — GitHub issue #372,
+ * [§ D1295](../../../../DECISIONS.md). This function's body moved to `core/config/rushRebuild.ts`
+ * unchanged when the rush rebuild made the server its second caller: a car size bought between rush
+ * rounds and the same car size bought on a career tower have to be one edit, and two copies that
+ * agree today is the shape this repository has a rule about. The argument for resolving each field
+ * from the specs before moving it, for *never smaller than the car already is* and for moving the
+ * per-deck rating with the whole-car one went with the code. A `CampaignFitOut` lends it the four
+ * per-car fields it reads, structurally.
  */
-function carsFitted(
-  config: BuildingConfig,
-  fit: CampaignFitOut,
-  specs: ElevatorSpecs,
-): BuildingConfig {
-  const touchesCars =
-    fit.doorSecondsSaved > 0 ||
-    fit.hallDwellSecondsSaved > 0 ||
-    fit.carPersons !== undefined ||
-    fit.transferCeilingS !== undefined;
-  if (!touchesCars) return config;
-
-  const divisor = parseLoadDivisor(specs.conventions.personsPerRatedLoadUS, true);
-  const transferDefault = transferDefaultOf(config, specs);
-
-  return {
-    ...config,
-    banks: config.banks.map((bank) => ({
-      ...bank,
-      cars: bank.cars.map((car) => {
-        const doorType = car.doorType ?? 'centerOpening';
-        const timing = specs.doors[doorType];
-        const openS = car.doorOpenS ?? timing?.openS ?? 0;
-        const closeS = car.doorCloseS ?? timing?.closeS ?? 0;
-        const cycle = doorCycleWithSaving(openS, closeS, fit.doorSecondsSaved);
-        const hallS = car.dwellHallCallS ?? specs.doors.dwellHallCallS.typical;
-        const wantedLb =
-          fit.carPersons === undefined || divisor === undefined
-            ? undefined
-            : fit.carPersons * divisor;
-        const spec = specs.classes.find((entry) => entry.id === car.spec);
-        const transfer = car.passengerTransferS ?? transferDefault;
-        return {
-          ...car,
-          ...(fit.doorSecondsSaved > 0 ? { doorOpenS: cycle.openS, doorCloseS: cycle.closeS } : {}),
-          ...(fit.hallDwellSecondsSaved > 0
-            ? {
-                dwellHallCallS: Math.max(
-                  specs.doors.dwellHallCallS.min,
-                  hallS - fit.hallDwellSecondsSaved,
-                ),
-              }
-            : {}),
-          /*
-           * **Never smaller than the car already is**, then clamped into the class's band.
-           *
-           * The `Math.max` is the ladder read honestly: *16-person cars* is a tier you buy, and a
-           * building whose cars are already 16-person has bought nothing — it has not bought
-           * 13-person ones. Without it the tier is a purchase that **shrinks** a car on any
-           * building above its rung, which is a control moving the run in the direction opposite to
-           * its own label. The clamp is second and is `commissionedBuilding`'s rule verbatim: a
-           * load outside the class's `capacityLbRange` is refused by `core` on a field the shop has
-           * no control for, so choosing a class is choosing the sizes that class is built in.
-           */
-          ...(wantedLb === undefined || spec === undefined
-            ? {}
-            : loadOf(
-                clamp(
-                  Math.max(wantedLb, car.ratedLoadLb ?? 0),
-                  spec.capacityLbRange[0],
-                  spec.capacityLbRange[1],
-                ),
-                car.ratedLoadLbPerDeck,
-              )),
-          ...(fit.transferCeilingS === undefined || transfer === undefined
-            ? {}
-            : { passengerTransferS: Math.min(transfer, fit.transferCeilingS) }),
-        };
-      }),
-    })),
-  };
-}
-
-/**
- * A car's new rating, **with the per-deck half moved with it** where the car declares one.
- *
- * `core` states the coupling as an invariant of the document — `parse.ts` warns
- * `deck-load-mismatch` when the whole-car rating is not twice the per-deck one, and
- * `model/car/car.ts` derives a deck's design load from the *ratio* rather than by halving — so a
- * bigger car whose per-deck figure stayed behind would be a building describing hardware that does
- * not exist, and would carry a warning nobody asked a question about.
- *
- * **No shipped building reaches this today** and it is still written: `vertical-city`'s shuttles are
- * the only double-deck cars in `data/buildings/`, they are rated 4 000 lb, and both `cars` tiers ask
- * for less than that, so the `Math.max` above leaves them alone. That is a fact about the shipped
- * set rather than about this function — a ninth building with a smaller double-deck car makes the
- * branch live, and a latent defect waiting on a data file is the shape this repository has a rule
- * about. `fitOut.test.ts` drives it directly for the same reason.
- */
-function loadOf(
-  ratedLoadLb: number,
-  perDeckLb: number | undefined,
-): { readonly ratedLoadLb: number; readonly ratedLoadLbPerDeck?: number } {
-  if (perDeckLb === undefined) return { ratedLoadLb };
-  return { ratedLoadLb, ratedLoadLbPerDeck: ratedLoadLb / 2 };
+function carsFitted(config: BuildingConfig, fit: CampaignFitOut, specs: ElevatorSpecs): BuildingConfig {
+  return fitCarsOf(config, fit, specs);
 }
 
 /**
  * The door cycle with `saved` seconds taken out of it, and the floor its two halves stop at.
  *
- * **Both moved to `@elevator-sim/core`'s `config/rushPrefit.ts` and are re-exported here**, which is
- * a change of address rather than of behaviour: GitHub issue #372's rush pre-fit needs the same
- * arithmetic in `packages/server`, which may not import this package, so the one piece of arithmetic
- * in a door tier now has one implementation instead of two that agree today. The argument for the
- * close-then-open order, for the floor and for clamping rather than subtracting is on
- * `doorCycleWithSaving` where the code is. `MIN_DOOR_S` keeps this name because `fitOut.test.ts` and
- * the designer copy already read it from here.
+ * **Both moved to `@elevator-sim/core`** — first to `config/rushPrefit.ts` for GitHub issue #372's
+ * rush pre-fit and then, with the general rebuild, to `config/rushRebuild.ts` — which is a change of
+ * address rather than of behaviour: the server needs the same arithmetic and may not import this
+ * package. `MIN_DOOR_S` keeps this name because `fitOut.test.ts` and the designer copy already read
+ * it from here.
  */
 export { MIN_DOOR_S };
-
-/**
- * The per-passenger transfer time a car with none of its own would resolve to.
- *
- * `undefined` for a building type the table has no row for, which is `resolveCar`'s own answer and
- * an error there rather than the office figure. A ceiling over an unknown value is not a ceiling, so
- * this tier leaves such a car alone instead of inventing the number the loader refuses to.
- */
-function transferDefaultOf(config: BuildingConfig, specs: ElevatorSpecs): number | undefined {
-  const value: unknown = specs.timing.passengerTransferS[config.type];
-  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
-}
 
 /**
  * The heaviest tenant floor's population moved to the lowest floors above the entrance.
@@ -529,59 +425,19 @@ export function leversWithKit(
  * The driving profile with the landing hardware on it — *how calls are gathered*, § 8.2's own
  * subtitle for the `control` category.
  *
- * ## Applied over whichever dispatcher is driving, never a fork of one
+ * **`@elevator-sim/core`'s `fitProfileOf`, re-exported under this name** — GitHub issue #372,
+ * [§ D1295](../../../../DECISIONS.md). The body moved to `core/config/rushRebuild.ts` unchanged when
+ * the rush rebuild made the server its second caller, with its argument: applied over whichever
+ * dispatcher is driving and never a fork of one, the ride-time weight a floor rather than an
+ * assignment (§ D112), and the input returned by identity when the kit names none of its fields.
  *
- * The same shape as `profileWithSelector` and `profileWithRules`, and for the same reason
- * `ViewerState.levers` sits outside `dispatcherSpec`: the panel in the lobby is a fact about the
- * **building**, and folding it into the dispatcher's working copy would mean that buying a panel
- * silently forked the profile named in the rail. § 8.5's standing order still chooses who drives.
- *
- * ## Written last, and that is a claim rather than a convenience
- *
- * `profileWithSelector` and `profileWithRules` write `selection`; this writes `dispatch`. The two
- * are disjoint, so the ordering cannot change a value — what it says is that a rule list is a
- * preference and a destination panel is hardware, and a preference may not un-install hardware.
- *
- * Returns its input **by object identity** when the kit names neither field.
+ * `dev/state.ts#drivingProfileOf` still writes it **last**, over the rules, and that ordering is a
+ * claim this module keeps making: a rule list is a preference and a destination panel is hardware,
+ * and a preference may not un-install hardware.
  */
 export function profileWithKit(
   profile: DispatcherProfile,
   fit: CampaignFitOut | undefined,
 ): DispatcherProfile {
-  if (fit === undefined) return profile;
-  if (
-    fit.callType === undefined &&
-    fit.passengerAssignment === undefined &&
-    fit.rideTimeWeightFloor === 0
-  ) {
-    return profile;
-  }
-  const dispatch: DispatchStageConfig = {
-    ...(profile.dispatch ?? {}),
-    ...(fit.callType === undefined ? {} : { callType: fit.callType as never }),
-    ...(fit.passengerAssignment === undefined
-      ? {}
-      : { passengerAssignment: fit.passengerAssignment as never }),
-  };
-  /*
-   * The **floor**, never an assignment — § D112's defect read forwards. A panel that discloses a
-   * destination the cost function does not price changes no decision (measured: bit-identical to
-   * `eta` at 8 of 8 matrix cells), so the kit both discloses and prices. A dispatcher already
-   * pricing ride time higher keeps its own number, which is what makes this a purchase raising a
-   * floor rather than a purchase overruling the § 8.5 standing order.
-   */
-  const rideTime = Math.max(profile.weights['rideTime'] ?? 0, fit.rideTimeWeightFloor);
-  const weights =
-    rideTime === (profile.weights['rideTime'] ?? 0)
-      ? profile.weights
-      : { ...profile.weights, rideTime };
-  return { ...profile, dispatch, weights };
-}
-
-/* -------------------------------------------------------------------------- *
- * Small shared arithmetic
- * -------------------------------------------------------------------------- */
-
-function clamp(value: number, low: number, high: number): number {
-  return Math.min(high, Math.max(low, value));
+  return fitProfileOf(profile, fit);
 }

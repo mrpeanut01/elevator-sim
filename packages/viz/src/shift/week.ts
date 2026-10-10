@@ -40,7 +40,7 @@
 import type { WatchRecord } from '../watch/types.js';
 
 import { CONTRACTS, contractById, FIRST_CONTRACT_ID, nextContract } from './contracts.js';
-import { dayCountsToward, weekNeedOf, weekRollsOver } from './weekStake.js';
+import { dayCountsToward, weekHasClosed, weekNeedOf, weekRollsOver, weekTargetMetDayOf } from './weekStake.js';
 import {
   weekdayOf,
   type ClearedAward,
@@ -622,21 +622,39 @@ export function nextDay(week: WeekState): WeekState {
 }
 
 /**
+ * **The next day on the week's main path** — [§ D1246](../../../../DECISIONS.md): a closed week's
+ * next day is the next week's first, and every other day's is {@link nextDay}'s. The close's
+ * tomorrow card (`shift/report.ts`) and the facts measured for it (`dev/state.ts#tomorrowFactsOf`)
+ * both ask this, so the card's wrinkle and the tenants and cars measured under it are one day's.
+ */
+export function pathNextOf(week: WeekState): WeekState {
+  return weekHasClosed(week) ? rollWeek(week) : nextDay(week);
+}
+
+/**
  * **Day 1 of a new week on the same tower** — § D1177's roll, which {@link nextDay} takes from the
  * week's last day, and which *Start next week* takes from the week's sheet as soon as the sheet
  * stands ([§ D1246](../../../../DECISIONS.md): the weekend comes off the main path, so the sheet
  * stands from the last counted weekday and the weekend is played only by choice). What the player
  * has is kept: every scenario cleared, the streak and the best day.
  */
-export function rollWeek(week: WeekState): WeekState {
+export function rollWeek(week: WeekState, onward = false): WeekState {
   return {
     ...openWeek(week.contractId),
     /*
      * The next week is the next one, and it is dealt its own wrinkle order — wave AM, lane AM-D,
      * [§ D1252](../../../../DECISIONS.md). The roll used to reopen week 1, so week 2 re-dealt
      * week 1's five wrinkles to the day (swarm DO's S3).
+     *
+     * **A held week deals the next week; a week that was not held deals itself again** — wave AN,
+     * lane DQ-2, swarm DQ's Q3 primary ([§ D1344](../../../../DECISIONS.md)). Held is the sheet's
+     * own reading, the target met (`weekStake.ts#weekTargetMetDayOf`). A week that was not held is
+     * dealt its own order again, on crowds this device has not filed (`weekRecord.ts#dealtCrowdOf`
+     * counts the closed week), and `onward` is the sheet's second press, which goes on to the next
+     * week whatever the week did: nothing is locked. The week number is which week of the tower's
+     * orders this is, so a week dealt again keeps its number.
      */
-    week: week.week + 1,
+    week: onward || weekTargetMetDayOf(week) !== undefined ? week.week + 1 : week.week,
     completed: week.completed,
     streak: week.streak,
     bestMinutePct: week.bestMinutePct,

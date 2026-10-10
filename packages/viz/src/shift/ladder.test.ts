@@ -224,7 +224,7 @@ describe('a rung’s booked absence reaches the run, and no other rung’s does 
   it('declares exactly one absence, and it is a window strictly inside the run', () => {
     const declaring = CONTRACT_LADDER.rows.filter((row) => row.fabric.incidents.length > 0);
     /*
-     * **Seven rungs now, not one** — GitHub issue #587, § D914. § D871 authored the first and this
+     * **Seven rungs now, not one** — PR #587, § D914. § D871 authored the first and this
      * case read `toBe(1)`, which was a statement about that wave rather than about the schema. The
      * bound that matters is that *some* rung declares one, or the loop below checks nothing; the
      * exact count is `pressLadder.test.ts`'s, where it is derived from the rows that carry a pinned

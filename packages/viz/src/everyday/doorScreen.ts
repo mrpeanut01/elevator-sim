@@ -295,6 +295,12 @@ function mountDoor(
       held.style.cssText = `${BODY};margin:10px 0 0;max-width:70ch`;
       foot.append(held);
     }
+    /* This week, harder than the last where the house's census fell — wave AN, lane DQ-2, § D1344. */
+    if (view.weekHarder !== undefined) {
+      const harder = el(document_, 'p', 'everyday-door-week-harder', view.weekHarder);
+      harder.style.cssText = `${BODY};margin:10px 0 0;max-width:70ch`;
+      foot.append(harder);
+    }
     column.append(foot);
     return column;
   }
@@ -400,7 +406,7 @@ function mountDoor(
   }
 
   /**
-   * **This week's tower, as a control** — GitHub issue #587, § D912, `everyday/towerChoice.ts`.
+   * **This week's tower, as a control** — PR #587, § D912, `everyday/towerChoice.ts`.
    *
    * On the front door rather than on the week screen or behind the campaign, because this is the
    * screen that says *today's tower* and the assessor's finding was that the tower could not be

@@ -18,6 +18,15 @@
  * note says and for the same reasons: nobody played these, they are one run per dispatcher, and
  * one crowd with one run each does not rank the dispatchers.
  *
+ * ## The player's own rows sit among them, and are never mistaken for one — [§ D1359](../../../../DECISIONS.md)
+ *
+ * The player's best posted sitting on each of the tower's boards today, read from the server
+ * (`EverydayHost.rushPosted`), is placed among the house rows furthest first and drawn in their
+ * columns, tagged {@link RUSH_HOUSE_COPY.yoursTag} rather than `house`, with a line under the rows
+ * saying whose it is, which board and day, that the figure is the server's replay, and why a sitting
+ * was not run the way a house row was. The house rows themselves are untouched: {@link rushStandingsOf}
+ * returns them exactly as before and places the player's beside them by index.
+ *
  * ## Keyed on the building, because the waves are only the same on the same tower
  *
  * `RUSH_STREAM.seed` is one seed for everybody, and `rushPatchOf` scales the rate to the population of
@@ -227,6 +236,27 @@ export const RUSH_HOUSE_COPY = Object.freeze({
     'they are withheld rather than drawn against the wrong waves.',
   /** The wave cell of a run whose line was never crossed. */
   neverBroke: 'never broke',
+  /*
+   * **The player's own row among the house's** — swarm DQ's Q3 supporting payoff,
+   * [§ D1359](../../../../DECISIONS.md). The tag is the daily board's own word for a player's row
+   * (`boardScreen.ts`'s `your run` button sits on the row the server says is yours); here it is a tag,
+   * because a rush row has no run to watch.
+   */
+  yoursTag: 'yours',
+  yoursName: 'Your best posted sitting',
+  /**
+   * What the row is, said plainly and drawn under the rows whenever one is drawn: whose, which board
+   * and day, whose figure, what a sitting is ranked on, and why it is not a run like the house's.
+   */
+  yoursNote: (date: string): string =>
+    `Rows marked yours are your best sitting on each of this tower’s boards for ${date} (the server’s ` +
+    'day), as the server replayed it. A sitting ranks on how long its last round held, and that round may ' +
+    'have been rebuilt between rounds or handed over while it played, so it was not run the way the ' +
+    'house’s rows were.',
+  /** Why no row is yours, by what the read answered. The build with no server says nothing. */
+  yoursNone: 'You have posted no sitting on this tower today, so no row here is yours.',
+  yoursSignedOut: 'Your best posted sitting on this tower is drawn among these rows once you are signed in and have posted one today.',
+  yoursUnreachable: 'Your posted sittings could not be read from the server just now, so no row here is yours.',
 });
 
 /** One house row, as `rushScreen.ts` draws it. There is no mean here, by construction. */
@@ -250,8 +280,60 @@ export interface RushHouseRowView {
   readonly standingTag: string | undefined;
 }
 
+/**
+ * **The player's best posted sitting on one of the tower's boards today**, as the server answered it
+ * (`GET /api/rush-best`, [§ D1359](../../../../DECISIONS.md)). Every figure is the server's replay.
+ */
+export interface RushPostedSitting {
+  /** How long the sitting's last round held, the figure its board ranks on. */
+  readonly heldS: number;
+  /** The wave that round's line was crossed in, the server's `playerWaveAt`. */
+  readonly furthestWave: number;
+  readonly roundCount: number;
+  /** The board's modifier set, by the names the server sent; empty on the standard board. */
+  readonly modifiers: readonly { readonly sinkId: string; readonly steps: number; readonly name: string }[];
+}
+
+/** What the read of the player's own sittings answered, as the standings take it (§ D1359). */
+export type RushPostedStandings =
+  | { readonly kind: 'rows'; readonly date: string; readonly sittings: readonly RushPostedSitting[] }
+  | { readonly kind: 'signed-out' }
+  | { readonly kind: 'unreachable' }
+  /** No server on this build, or the read has not answered yet: nothing is said. */
+  | { readonly kind: 'silent' };
+
+/** One row of the player's own, drawn among the house's rows. */
+export interface RushYoursRowView {
+  /** {@link RUSH_HOUSE_COPY.yoursName}. */
+  readonly name: string;
+  /** {@link RUSH_HOUSE_COPY.yoursTag}. */
+  readonly tag: string;
+  /** `2 rounds`, then the board's modifiers where it has any. */
+  readonly detail: string;
+  /** `wave 7`, the server's furthest wave. */
+  readonly wave: string;
+  /** How long its last round held, `rush.ts#heldClock`'s. */
+  readonly held: string;
+  /**
+   * The index in {@link RushStandingsView}'s `rows` this row is drawn before — `rows.length` for after
+   * the last. Furthest first, the eyebrow's order, with the house's row first on a tie.
+   */
+  readonly before: number;
+}
+
 export type RushStandingsView =
-  | { readonly kind: 'rows'; readonly note: string; readonly rows: readonly RushHouseRowView[] }
+  | {
+      readonly kind: 'rows';
+      readonly note: string;
+      readonly rows: readonly RushHouseRowView[];
+      /** The player's own rows, each placed among {@link rows} — § D1359. Empty when there are none. */
+      readonly yours: readonly RushYoursRowView[];
+      /**
+       * {@link RUSH_HOUSE_COPY.yoursNote} when a row is the player's, otherwise why none is, or
+       * `undefined` on a build with no server.
+       */
+      readonly yoursLine: string | undefined;
+    }
   | { readonly kind: 'withheld'; readonly reason: 'unrun' | 'stale'; readonly refusal: string };
 
 /** Whether the table was measured on the stream this build generates. */
@@ -287,6 +369,11 @@ export function rushStandingsOf(
   nameOf: (dispatcherId: string) => string | undefined,
   table: RushHouseTable = RUSH_HOUSE_TABLE,
   standingDispatcherId?: string | undefined,
+  /**
+   * The player's own best posted sittings on this tower today — [§ D1359](../../../../DECISIONS.md).
+   * Omitted is {@link RushPostedStandings} `silent`: every caller but the setup screen.
+   */
+  posted: RushPostedStandings = { kind: 'silent' },
 ): RushStandingsView {
   if (!measuredOnThisStream(table)) return { kind: 'withheld', reason: 'stale', refusal: RUSH_HOUSE_COPY.stale };
   const here = table.runs
@@ -313,5 +400,45 @@ export function rushStandingsOf(
         standingTag: run.dispatcherId === standingDispatcherId ? RUSH_HOUSE_COPY.standingTag : undefined,
       };
     });
-  return { kind: 'rows', note: RUSH_HOUSE_COPY.note, rows };
+  const houseHeld = [...here].sort((a, b) => heldFor(b.run) - heldFor(a.run) || a.index - b.index).map(({ run }) => heldFor(run));
+  const yours = posted.kind !== 'rows' ? [] : posted.sittings.map((sitting) => yoursRowOf(sitting, houseHeld));
+  return { kind: 'rows', note: RUSH_HOUSE_COPY.note, rows, yours, yoursLine: yoursLineOf(posted) };
+}
+
+/**
+ * One of the player's own rows, placed **furthest first** among the house's: before the first house
+ * row that held for less, so a tie draws the house first. A posted sitting always broke (the server
+ * refuses one that did not), so it never sits among the rows that held the whole climb.
+ */
+function yoursRowOf(sitting: RushPostedSitting, houseHeld: readonly number[]): RushYoursRowView {
+  const before = houseHeld.findIndex((held) => held < sitting.heldS);
+  const rounds = `${String(sitting.roundCount)} ${sitting.roundCount === 1 ? 'round' : 'rounds'}`;
+  const modifiers = sitting.modifiers
+    .map((modifier) => {
+      const name = modifier.name === '' ? modifier.sinkId : modifier.name;
+      return modifier.steps > 1 ? `${name} ×${String(modifier.steps)}` : name;
+    })
+    .join(' · ');
+  return {
+    name: RUSH_HOUSE_COPY.yoursName,
+    tag: RUSH_HOUSE_COPY.yoursTag,
+    detail: modifiers === '' ? rounds : `${rounds} · ${modifiers}`,
+    wave: `wave ${String(sitting.furthestWave)}`,
+    held: heldClock(sitting.heldS),
+    before: before === -1 ? houseHeld.length : before,
+  };
+}
+
+/** What the line under the rows says about the player's own: what a row is, or why none is. */
+function yoursLineOf(posted: RushPostedStandings): string | undefined {
+  switch (posted.kind) {
+    case 'rows':
+      return posted.sittings.length === 0 ? RUSH_HOUSE_COPY.yoursNone : RUSH_HOUSE_COPY.yoursNote(posted.date);
+    case 'signed-out':
+      return RUSH_HOUSE_COPY.yoursSignedOut;
+    case 'unreachable':
+      return RUSH_HOUSE_COPY.yoursUnreachable;
+    case 'silent':
+      return undefined;
+  }
 }

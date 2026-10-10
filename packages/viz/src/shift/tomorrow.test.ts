@@ -24,7 +24,9 @@ import { goalsForDay, readGoals } from './goals.js';
 import { growthFactor } from './growth.js';
 import { tomorrowBriefingOf, type TomorrowBriefing, type TomorrowInput } from './tomorrow.js';
 import type { GoalObservations, GoalReading, WeekState } from './types.js';
-import { closeDay, nextDay, openWeek, outcomeOf } from './week.js';
+import { closeDay, nextDay, openWeek, outcomeOf, rollWeek } from './week.js';
+import { contractBuildings, todaysScenarioDayState } from './contractDay.test-helper.js';
+import { scheduledEventFor } from './calendar.js';
 
 /* -------------------------------------------------------------------------- *
  * Fixtures
@@ -479,3 +481,61 @@ describe('the number on the beat is the number the next run has', () => {
     expect(tenants?.value).toContain(afterThePress.toLocaleString('en-GB'));
   });
 });
+
+/*
+ * **The close's tomorrow is measured on the day it names** — wave AN, lane AN-7, the post-AM
+ * panel's seat D (D5 and D7). Midtown's week as Today's scenario plays it, closed day by day: every
+ * close's next day carries car D's 10:30–13:00 booking, which no close named, and the close that
+ * closes the week names the next week's Monday, whose tenants are the tower as handed (589), not
+ * Saturday's.
+ */
+describe('the next day on the main path, measured', () => {
+  const resources = contractBuildings();
+  const { state } = todaysScenarioDayState(resources, 'c2', { seed: 20_261_010n, over: { campaignEventId: undefined } });
+
+  function closedThrough(lastDay: number): WeekState {
+    let week = state.week;
+    for (let day = 1; day <= lastDay; day += 1) {
+      if (day > 1) week = nextDay(week);
+      week = closeDay(
+        week,
+        outcomeOf({
+          day,
+          dayIdx: week.dayIdx,
+          eventId: scheduledEventFor(null, day, week.dayIdx, 'whole-day', week).id,
+          arrived: 10,
+          carried: 10,
+          minutePct: 100,
+          readings: readGoals(goalsForDay(day), CLEAN),
+          record: null,
+          recordRefusal: null,
+        }),
+      );
+    }
+    return week;
+  }
+
+  it('names every car the next day’s run takes out, the tower’s and the day’s, with the run’s spans', () => {
+    const monday = closedThrough(1);
+    const facts = tomorrowFactsOf(resources, { ...state, week: monday });
+    expect(facts.onward.population).toBe(facts.population);
+    const tuesday = shiftRunConfigOf(resources, { ...state, week: nextDay(monday) });
+    expect(facts.onward.population).toBe(tuesday.building.totalPopulation);
+    expect(facts.onward.startOfDayS).toBe(8 * 3600);
+    expect(facts.onward.cars.find((car) => car.carId === 'D')).toEqual({ carId: 'D', awayAtS: 9000, backAtS: 18_000, ofTheDay: false });
+    /* Tuesday's move-in takes a car of its own, and it is marked as the day's. */
+    expect(facts.onward.cars.some((car) => car.ofTheDay === true)).toBe(true);
+  });
+
+  it('measures the next week’s Monday on the close that closed the week, not the literal tomorrow', () => {
+    for (const lastDay of [5, 6]) {
+      const week = closedThrough(lastDay);
+      const facts = tomorrowFactsOf(resources, { ...state, week });
+      const monday = shiftRunConfigOf(resources, { ...state, week: rollWeek(week) }).building.totalPopulation;
+      expect(facts.onward.population, `day ${String(lastDay)}`).toBe(monday);
+      expect(facts.onward.population, `day ${String(lastDay)}`).not.toBe(facts.population);
+      expect(facts.onward.cars.map((car) => car.carId), `day ${String(lastDay)}`).toContain('D');
+    }
+  });
+});
+

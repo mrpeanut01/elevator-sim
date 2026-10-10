@@ -29,6 +29,7 @@
 import { loadConfig, type LoadedConfig, type SimulationConfig } from '@elevator-sim/core';
 import { beforeAll, describe, expect, it } from 'vitest';
 
+import { RENEWAL_AHEAD_ON_SHEET_DAYS, renewalAheadSentenceOf } from '../campaign/career.js';
 import type { VizRecording } from '../contract/types.js';
 import type { TabName } from '../dev/elementMap.js';
 import { DATA_DIR, fixtureConfig } from '../fixtures.test-helper.js';
@@ -327,7 +328,7 @@ describe('what this screen adds on top of the sheet', () => {
     // A career sheet keeps its own onward step whatever the week standing behind it says.
     const career = viewOf({
       report: sheetOf({ weekClosed: true }),
-      career: { buildingName: 'Garden Apartments', day: 4, canRunAnother: true },
+      career: { buildingName: 'Garden Apartments', day: 4, canRunAnother: true, renewalDue: false },
     });
     expect(career.tomorrow?.goes).toBe('career-day');
   });
@@ -367,10 +368,12 @@ describe('what this screen adds on top of the sheet', () => {
       note: 'A tenant is hauling boxes up.',
       demand: '+2.0% more tenants than today',
       newWeek: false,
+      week: 1,
     };
     const report = sheetOf({ onward, decidingCall: 'No call decided today: the stage raised none.' });
     const view = viewOf({ report, week, house: () => 'missed' });
-    expect(view.close?.tomorrow.heading).toBe('TOMORROW · TUESDAY, DAY 2');
+    /* The week's number since wave AN, lane AN-7 (§ D1252's ordinal, on the screen). */
+    expect(view.close?.tomorrow.heading).toBe('TOMORROW · WEEK 1 · TUESDAY, DAY 2');
     expect(view.close?.tomorrow.wrinkle).toBe('Move-in day: A tenant is hauling boxes up.');
     expect(view.close?.call).toBe('No call decided today: the stage raised none.');
     expect(view.close?.arithmetic).toBeDefined();
@@ -378,9 +381,80 @@ describe('what this screen adds on top of the sheet', () => {
     // No week handed in (every caller but the daily report), a career sheet, or a practice close: no lead.
     expect(viewOf({ report }).close).toBeUndefined();
     expect(
-      viewOf({ report, week, career: { buildingName: 'Garden Apartments', day: 4, canRunAnother: true } }).close,
+      viewOf({ report, week, career: { buildingName: 'Garden Apartments', day: 4, canRunAnother: true, renewalDue: false } }).close,
     ).toBeUndefined();
     expect(viewOf({ report: sheetOf({ onward, practiceNote: 'Practice.' }), week }).close).toBeUndefined();
+  });
+
+  /*
+   * Wave AN, lane DQ-3, § D1351: the close says what decided a day no call decided from the shell's
+   * driver run, which reaches the view as `driver` beside `house`. Without it the run is still being
+   * run, and the line says so rather than guessing.
+   */
+  it('reads the shell’s driver run into the close’s call line — § D1351', () => {
+    const MET = {
+      arrived: 400,
+      carryPct: 100,
+      minutePct: 100,
+      peakQueue: 0,
+      abandoned: 0,
+      abandonedCarried: 0,
+      horizonS: 900,
+      worstWaitS: 40,
+      worstWaitIsCensored: false,
+      workPerServedLegKJ: 41.2,
+    };
+    const week = closeDay(
+      openWeek('c2'),
+      outcomeOf({
+        day: 1,
+        dayIdx: 0,
+        eventId: 'ordinary',
+        arrived: 400,
+        carried: 400,
+        minutePct: 100,
+        readings: readGoals(goalsForDay(1), MET),
+        record: {
+          version: 3,
+          seed: '1',
+          buildingId: 'midtown-office',
+          dispatcherId: 'fairness-first',
+          pattern: 'building',
+          demandTemplateId: null,
+          arrivalRatePctPop5min: null,
+          shiftLengthS: 36_000,
+          windowStartS: null,
+          day: 1,
+          dayIdx: 0,
+          outOfServiceCarIds: [],
+          interventions: [{ atS: 2_400, change: { kind: 'park-cars-lobby' } }],
+          ruleRows: [],
+          rungContractId: null,
+        },
+        recordRefusal: null,
+      }),
+    );
+    const onward = {
+      day: 2,
+      dayIdx: 1,
+      weekday: 'Tuesday',
+      eventId: 'move-in:past-halfway',
+      name: 'Move-in day',
+      note: 'A tenant is hauling boxes up.',
+      demand: '+2.0% more tenants than today',
+      newWeek: false,
+      week: 1,
+    };
+    const raised = 'No call decided today: the stage raised none.';
+    const report = sheetOf({ onward, decidingCall: raised, callDecided: false });
+    expect(viewOf({ report, week, house: () => 'cleared', driver: () => 'missed' }).close?.call).toBe(
+      `${raised} Your driver did: on this crowd, the same day with the tower’s standing order picked in place of ` +
+        'yours and every press kept read Shift missed.',
+    );
+    expect(viewOf({ report, week, house: () => 'cleared' }).close?.call).toBe(
+      `${raised} What decided it is still being run: the same day with the tower’s standing order picked in place ` +
+        'of yours and every press kept.',
+    );
   });
 
   /*
@@ -390,7 +464,7 @@ describe('what this screen adds on top of the sheet', () => {
    * every caller that does not say otherwise**, which is what keeps the honesty corpus, the replay
    * and the daily loop on the label they have always had.
    */
-  const CAREER = Object.freeze({ buildingName: 'Garden Apartments', day: 4, canRunAnother: true });
+  const CAREER = Object.freeze({ buildingName: 'Garden Apartments', day: 4, canRunAnother: true, renewalDue: false });
 
   it('opens the career’s own next day from a career sheet, naming the day and the building — #577', () => {
     const view = viewOf({ career: CAREER });
@@ -406,8 +480,53 @@ describe('what this screen adds on top of the sheet', () => {
   it('offers no button once the contract has filed its last day — #577', () => {
     // `campaign/career.ts#fileDay` refuses a twenty-first day, so a button promising one would be a
     // control that cannot do what it says. An absent control is the honest state; the bar's own
-    // `Back to ⟨building⟩` carries the player to the desk that has the renewal.
+    // `Back to ⟨building⟩` carries the player to the desk that has the renewal. Since § D1274 a
+    // standing renewal takes this sheet to the desk first (the case below), so this arm is the
+    // refusal for a month run out with no renewal standing, which the record cannot produce today.
     expect(viewOf({ career: { ...CAREER, canRunAnother: false } }).tomorrow).toBeUndefined();
+  });
+
+  /*
+   * GitHub issue #582 item 3, [§ D1274](../../../../DECISIONS.md). Day 18's sheet offered *Open the
+   * doors on day 19* and the press ran day 19, while the building's desk refuses to run that day
+   * until the renewal is answered: measured on the built bundle with a career seeded on day 18, the
+   * press landed on the stage with the dock reading *day 19 of 20* and no answer given. So where the
+   * renewal stands the onward step is the renewal, and it says so before the press.
+   */
+  it('sends the career to the renewal, not past it, once day 20 has closed — #582, § D1357', () => {
+    // Since § D1357 the renewal stands once day 20 is filed, so this is day 20's sheet.
+    const due = viewOf({ career: { ...CAREER, day: 21, canRunAnother: false, renewalDue: true } }).tomorrow;
+    expect(due?.goes).toBe('career-desk');
+    expect(due?.label).toBe('Answer the renewal at Garden Apartments');
+    expect(due?.label).not.toContain('Open the doors');
+    // It names the day that waits on the answer.
+    expect(due?.note).toContain('Day 20 has closed and the contract is up for renewal');
+    expect(due?.note).toContain('The next month’s first day does not run until it is answered');
+    expect(due?.note).toContain('You stay in the career');
+    // The other polarity: a day with no renewal standing still opens the next day.
+    expect(viewOf({ career: { ...CAREER, day: 18 } }).tomorrow?.goes).toBe('career-day');
+  });
+
+  /*
+   * [§ D1357](../../../../DECISIONS.md): days 19 and 20 play, and the sheets of day 18 and day 19 say
+   * when the renewal falls due, on the step that opens the next day. Red before: day 18's sheet went
+   * to the desk, and no sheet named the date.
+   */
+  it('opens days 19 and 20 from the sheets before them, saying when the renewal falls due — § D1357', () => {
+    for (const [day, left] of [[19, '2 working days'], [20, '1 working day']] as const) {
+      const tower = { day };
+      const step = viewOf({
+        career: { ...CAREER, day, renewalAhead: renewalAheadSentenceOf(tower, RENEWAL_AHEAD_ON_SHEET_DAYS) },
+      }).tomorrow;
+      expect(step?.goes).toBe('career-day');
+      expect(step?.label).toBe(`Open the doors on day ${String(day)} at Garden Apartments`);
+      expect(step?.note).toBe(
+        `Runs the next day of this contract. A renewal falls due when day 20 closes, in ${left}. You stay in the career.`,
+      );
+    }
+    // Earlier sheets carry the step's own note and nothing about the renewal.
+    expect(renewalAheadSentenceOf({ day: 18 }, RENEWAL_AHEAD_ON_SHEET_DAYS)).toBeUndefined();
+    expect(viewOf({ career: CAREER }).tomorrow?.note).toBe('Runs the next day of this contract. You stay in the career.');
   });
 
   it('leaves every non-career caller on the daily arm — #577’s other polarity', () => {

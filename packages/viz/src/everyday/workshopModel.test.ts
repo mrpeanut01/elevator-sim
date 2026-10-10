@@ -73,7 +73,7 @@ const profileOf = (id: string): DispatcherProfile => {
 const COLLECTIVE = profileOf('collective');
 const SPEC: DispatcherSpec = specFromProfile(COLLECTIVE, COLLECTIVE.name);
 const LEVERS: GroupLevers = DEFAULT_LEVERS;
-/** A shipped tower, as authored — no car of it declares a duty, like every shipped building (§ D549). */
+/** A shipped tower, as authored — no car of it declares a duty, like every shipped building but St Jude (§ D549, § D1290). */
 const MIDTOWN = parseBuilding(
   JSON.parse(
     readFileSync(

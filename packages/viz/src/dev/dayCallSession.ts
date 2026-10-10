@@ -43,6 +43,13 @@
  *
  * - **No call before its runs are folded.** A candidate whose runs have not landed is
  *   `raised: false`, and the stage waits at its instant rather than guessing.
+ * - **No call from a run that could not be made, and no end to the day for it** — wave AN, lane
+ *   DQ-1, [§ D1335](../../../../DECISIONS.md). A candidate whose runs were refused, or could not be
+ *   planned, loses its question and nothing else: it is kept in {@link DayCallSession.failures}, it
+ *   is not counted as refused (its answers were never compared), and the next candidate is asked.
+ *   Until § D1335 it ended the day's asking, which is how one stale bundle's worker, refusing every
+ *   handover, left the post-AM panel's days with the placement calls before their first who-drives
+ *   candidate and no word on the stage or, after a call, on the sheet.
  * - **No call after *Skip to the end* with a card up.** That skip answers every call the day had left.
  * - **No row for a candidate that was refused.** Refused calls never reach the report.
  * - **No driver question with a pair chosen against somebody else.** After a handover by a call,
@@ -71,13 +78,17 @@ import {
   dayCallChangeOf,
   dayCallDriversOf,
   dayCallIsWrinkle,
+  dayCallIsWrinkleStart,
   dayCallLostGoalOf,
   dayCallRecordOf,
   dayCallSearchFrom,
   dayCallWindowEndOf,
+  dayCallWrinkleWindowOf,
   nextDayCallOf,
   type DayCallAnswer,
   type DayCallDriverNames,
+  type DayCallFailure,
+  type DayCallWrinkleQuiet,
   type DayCallOnStage,
   type DayCallQuestion,
   type DayCallRecord,
@@ -86,6 +97,7 @@ import {
 } from '../shift/dayCalls.js';
 import { goalPlainNameOf, readGoals } from '../shift/goals.js';
 import { shiftObservationsOf } from '../shift/observations.js';
+import { wasGraded } from '../shift/week.js';
 import type { DayCallResume } from '../shift/attempt.js';
 import type { PressCall } from '../shift/pressCall.js';
 import type { Observations, RunHorizon, ShiftGoal } from '../shift/types.js';
@@ -97,7 +109,7 @@ export interface DayCallSessionDeps {
   /**
    * The run the shell would make with `extra` appended to the log it holds now —
    * `dev/state.ts#shiftRunConfigOf` over the state with one more press. `undefined` when the state
-   * cannot be planned, which ends the session's asking.
+   * cannot be planned, which costs that candidate its question as a refused run does (§ D1335).
    */
   readonly planWith: (extra: RunInterventionConfig) => OffThreadRun | undefined;
   /** Make the runs, in order, off the painting thread. The latest ask supersedes. */
@@ -177,6 +189,8 @@ interface Pending {
    * the card is up can leave this call out of § D1205's memory: the resumed session raises it again.
    */
   lastRaisedBefore?: number | undefined;
+  /** The first question's record where it was turned down, for a wrinkle's line (§ D1336). */
+  refusedCounted?: DayCallRecord;
 }
 
 /** What an answer hands the shell to adopt, or `undefined` for *leave them*. */
@@ -218,6 +232,18 @@ export interface DayCallSession {
   ) => void;
   /** The raised and answered calls, in order — what the report reads at day close. */
   readonly records: () => readonly DayCallRecord[];
+  /**
+   * The candidates whose question was lost to a run that could not be made, in order — wave AN,
+   * lane DQ-1, [§ D1335](../../../../DECISIONS.md). What the stage and the report say on every day
+   * it happens, whatever else the day raised.
+   */
+  readonly failures: () => readonly DayCallFailure[];
+  /**
+   * The day's wrinkle where it raised no call and the stage ran its answers in it, once nothing
+   * more in it can be asked — [§ D1336](../../../../DECISIONS.md). `undefined` otherwise: a wrinkle
+   * that raised its call, one the session never asked in, or one still ahead.
+   */
+  readonly wrinkleQuiet: () => DayCallWrinkleQuiet | undefined;
   /**
    * What the session did on a day that raised nothing — [§ D1152](../../../../DECISIONS.md). How
    * many candidates it asked and turned down, and whether it finished asking, so the report can
@@ -280,6 +306,8 @@ export function openDayCallSession(
   let lost: { readonly atS: number; readonly goal: string } | undefined = resume?.lost ?? undefined;
   let pending: Pending | undefined;
   const records: DayCallRecord[] = [...(resume?.records ?? [])];
+  /* § D1335: the moments whose question a run that could not be made cost, kept for the stage and the sheet. */
+  const failures: DayCallFailure[] = [...(resume?.failures ?? [])];
   /* § D1167's pair and names, re-derived from the new driver after every handover (§ D1205). */
   let pair: readonly [DispatcherProfile, DispatcherProfile] | undefined;
   let driverNames: DayCallDriverNames | undefined;
@@ -329,11 +357,14 @@ export function openDayCallSession(
 
   /*
    * § D1265: a call raised inside the day's wrinkle is the wrinkle's own, so it is not counted
-   * against the day's cap of six. Read off the record's instant against the opening's window, which
-   * a resumed session is opened with too, so a resume counts exactly as an unbroken session does.
+   * against the day's cap of six. Since § D1336 the record says so itself (`DayCallRecord.wrinkle`),
+   * because a wrinkle's start call can fall inside a peak; a record written before that is read off
+   * its instant against the opening's window, as it was.
    */
   const wrinkleWindow = opening.wrinkle;
-  function inWrinkle(atS: number): boolean {
+  function inWrinkle(record: DayCallRecord): boolean {
+    if (record.wrinkle === true) return true;
+    const atS = record.atS;
     return (
       opening.horizon === 'whole-day' &&
       wrinkleWindow !== undefined &&
@@ -344,6 +375,24 @@ export function openDayCallSession(
   }
   /* Each asked candidate in the wrinkle may cost a try; its one call gets two more. */
   const maxTries = DAY_CALL_MAX_TRIES + (wrinkleWindow === undefined ? 0 : 2 * DAY_CALL_PER_WRINKLE);
+  /*
+   * § D1336: the wrinkle's raised calls, counted apart from the peaks', because a start call inside
+   * a peak shares that peak's start instant (the fire drill's episode is an act of its own). A
+   * snapshot written before it kept a clear wrinkle's call in `raisedInPeak` under the wrinkle's
+   * start, which no peak shares; that entry is moved here.
+   */
+  let raisedInWrinkle = resume?.raisedInWrinkle ?? 0;
+  if (resume !== undefined && resume.raisedInWrinkle === undefined && wrinkleWindow !== undefined) {
+    const legacy = raisedInPeak.filter((startS) => startS === wrinkleWindow.startS).length;
+    if (legacy > 0 && !actsOf(standing.demandPhases).some((act) => act.startS === wrinkleWindow.startS)) {
+      raisedInWrinkle = legacy;
+      for (let k = raisedInPeak.length - 1; k >= 0; k -= 1) {
+        if (raisedInPeak[k] === wrinkleWindow.startS) raisedInPeak.splice(k, 1);
+      }
+    }
+  }
+  /* § D1336: the wrinkle's candidates that were asked and turned down, for its past-tense line. */
+  const wrinkleRefused: DayCallRecord[] = [...(resume?.wrinkleRefused ?? [])];
 
   function stop(): void {
     done = true;
@@ -358,23 +407,62 @@ export function openDayCallSession(
     return reading === undefined ? undefined : goalPlainNameOf(reading.goal);
   }
 
-  function refuse(call: PressCall): void {
+  /**
+   * **The day's verdict under each of a candidate's three runs, where they differ** — the second
+   * admission ground, at a wrinkle's start only ([§ D1336](../../../../DECISIONS.md)). Each run is
+   * graded with the day's own goals over its whole run, by the report's own partition
+   * (`shift/report.ts#verdictOf`: ungraded where a goal is still pending, cleared where every goal is
+   * met, missed otherwise), so a call admitted here is one whose report row prints the split. It
+   * reads whether the three differ, never which is ahead: a card raised only where *keep* loses would
+   * teach *switch* by being raised (swarm DQ's honesty member).
+   */
+  function verdictsSplit(observations: DayCallRecord['observations']): boolean {
+    const goals = opening.goals;
+    if (goals === undefined) return false;
+    const verdicts = new Set<string>();
+    for (const folded of Object.values(observations)) {
+      if (folded === undefined) continue;
+      const readings = readGoals(goals, folded);
+      verdicts.add(
+        !wasGraded(readings) ? 'ungraded' : readings.every((reading) => reading.state === 'met') ? 'cleared' : 'missed',
+      );
+    }
+    return verdicts.size > 1;
+  }
+
+  /** § D1138's admission, and at a wrinkle's start § D1336's verdict ground beside it. */
+  function admits(counted: DayCallRecord, verdictGround: boolean): boolean {
+    return dayCallAdmits(counted.counts) || (verdictGround && verdictsSplit(counted.observations));
+  }
+
+  function refuse(asking: Pending): void {
     refused += 1;
-    searchFromS = dayCallSearchFrom(call);
+    /* § D1336: a wrinkle's turned-down moment, counted from the runs already made, for its line. */
+    if (dayCallIsWrinkle(asking.call) && asking.refusedCounted !== undefined) {
+      wrinkleRefused.push(Object.freeze({ ...asking.refusedCounted, observations: Object.freeze({}) }));
+    }
+    searchFromS = dayCallSearchFrom(asking.call);
     askNext();
     deps.changed();
   }
 
-  function fail(): void {
-    ending = 'failed';
-    stop();
+  /**
+   * § D1335: a run this candidate needed could not be made, or planned. The candidate loses its
+   * question and nothing else: it is not refused (nothing was compared), and the next is asked from
+   * the spacing after it, exactly as after a refusal. Its try was spent when it was asked, so a day
+   * whose runs all fail still stops at the day's tries.
+   */
+  function fail(asking: Pending, question: DayCallQuestion): void {
+    failures.push(Object.freeze({ atS: asking.call.atS, question }));
+    searchFromS = dayCallSearchFrom(asking.call);
+    askNext();
     deps.changed();
   }
 
   function askNext(): void {
     pending = undefined;
     if (done) return;
-    const peakCalls = records.filter((record) => !inWrinkle(record.atS)).length;
+    const peakCalls = records.filter((record) => !inWrinkle(record)).length;
     if (peakCalls >= DAY_CALL_MAX || asked >= maxTries) {
       ending ??= 'finished';
       stop();
@@ -383,13 +471,19 @@ export function openDayCallSession(
     let call = nextDayCallOf(inputOf(standing), searchFromS);
     /*
      * § D1205: a peak that has raised its two asks nothing more; the search moves to the next. The
-     * day's wrinkle is held to its one (§ D1265), the same way.
+     * day's wrinkle is held to its one (§ D1265), the same way: a stretch clear of the peaks is
+     * passed to its end, and a start inside a peak (§ D1336) by the spacing, so the peak goes on.
      */
     while (call?.act !== undefined) {
-      const peakS = call.act.startS;
-      const cap = dayCallIsWrinkle(call) ? DAY_CALL_PER_WRINKLE : DAY_CALL_PER_PEAK;
-      if (raisedInPeak.filter((startS) => startS === peakS).length < cap) break;
-      searchFromS = call.act.endS;
+      if (dayCallIsWrinkle(call)) {
+        if (raisedInWrinkle < DAY_CALL_PER_WRINKLE) break;
+        const clear = dayCallWrinkleWindowOf(wrinkleWindow, actsOf(standing.demandPhases)) !== undefined;
+        searchFromS = clear ? call.act.endS : dayCallSearchFrom(call);
+      } else {
+        const peakS = call.act.startS;
+        if (raisedInPeak.filter((startS) => startS === peakS).length < DAY_CALL_PER_PEAK) break;
+        searchFromS = call.act.endS;
+      }
       call = nextDayCallOf(inputOf(standing), searchFromS);
     }
     if (call === undefined) {
@@ -413,35 +507,65 @@ export function openDayCallSession(
       return;
     }
     asked += 1;
-    if (placementHeld) {
-      const asking: Pending = { call, raised: false };
-      pending = asking;
-      const leave = standing;
-      askDriver(asking, leave, dayCallWindowEndOf(call.atS, leave.endedAt), () => pending !== asking || standing !== leave);
-      return;
-    }
-    const park: RunInterventionConfig = { atS: call.atS, change: dayCallChangeOf('park-cars-lobby')! };
-    const spread: RunInterventionConfig = { atS: call.atS, change: dayCallChangeOf('spread-cars')! };
-    const parkRun = deps.planWith(park);
-    const spreadRun = deps.planWith(spread);
-    if (parkRun === undefined || spreadRun === undefined) {
-      ending = 'failed';
-      stop();
-      return;
-    }
     const asking: Pending = { call, raised: false };
     pending = asking;
     const leave = standing;
     const windowEndS = dayCallWindowEndOf(call.atS, leave.endedAt);
     /* A later ask, a press or a skip has replaced this one: its runs describe nothing now. */
     const stale = (): boolean => pending !== asking || standing !== leave;
+    const turnDown = (): void => refuse(asking);
+    /*
+     * § D1336: a wrinkle's start asks who drives first, since that is the question a handover can
+     * answer there, admitted by § D1138's counts or by the day's verdict differing; where it cannot
+     * be asked or is turned down, the placement question is asked from the same instant on the same
+     * two grounds. Everywhere else the order is § D1167's: placement, then who drives.
+     */
+    const atStart = dayCallIsWrinkleStart(call);
+    const verdictGround = atStart && opening.goals !== undefined;
+    if (atStart && driverAskable(call)) {
+      askDriver(asking, leave, windowEndS, stale, verdictGround, () => {
+        if (placementHeld) turnDown();
+        else askPlacement(asking, leave, windowEndS, stale, verdictGround, turnDown);
+      });
+      return;
+    }
+    if (placementHeld) {
+      askDriver(asking, leave, windowEndS, stale, verdictGround, turnDown);
+      return;
+    }
+    askPlacement(asking, leave, windowEndS, stale, verdictGround, () => {
+      askDriver(asking, leave, windowEndS, stale, verdictGround, turnDown);
+    });
+  }
+
+  /**
+   * § D1138's placement question: the day run twice more from the instant (*park*, *spread*), and
+   * raised where those two and the run standing are admitted ({@link admits}); `onRefused` where not.
+   */
+  function askPlacement(
+    asking: Pending,
+    leave: VizRecording,
+    windowEndS: number,
+    stale: () => boolean,
+    verdictGround: boolean,
+    onRefused: () => void,
+  ): void {
+    const call = asking.call;
+    const park: RunInterventionConfig = { atS: call.atS, change: dayCallChangeOf('park-cars-lobby')! };
+    const spread: RunInterventionConfig = { atS: call.atS, change: dayCallChangeOf('spread-cars')! };
+    const parkRun = deps.planWith(park);
+    const spreadRun = deps.planWith(spread);
+    if (parkRun === undefined || spreadRun === undefined) {
+      fail(asking, 'placement');
+      return;
+    }
     deps.simulate(
       [parkRun, spreadRun],
       (recordings) => {
         if (stale()) return;
         const [parked, spreadOut] = recordings;
         if (parked === undefined || spreadOut === undefined) {
-          fail();
+          fail(asking, 'placement');
           return;
         }
         const counted = dayCallRecordOf({
@@ -455,32 +579,41 @@ export function openDayCallSession(
             leave: wholeRunOf(leave),
           },
         });
-        if (dayCallAdmits(counted.counts)) {
+        if (admits(counted, verdictGround)) {
           raise(asking, 'placement', counted, {
             'park-cars-lobby': { recording: parked, entry: park },
             'spread-cars': { recording: spreadOut, entry: spread },
           });
           return;
         }
-        askDriver(asking, leave, windowEndS, stale);
+        asking.refusedCounted ??= counted;
+        onRefused();
       },
       () => {
-        /* A run that failed is a call nobody can stand behind, so the day asks no more. */
+        /* A run that failed is a call nobody can stand behind: this moment asks nothing (§ D1335). */
         if (pending !== asking) return;
-        fail();
+        fail(asking, 'placement');
       },
     );
   }
 
   /**
-   * § D1167 — the placement question was refused at this candidate, or held by § D1205's ten-minute
-   * rule; ask the driver question from the same instant, when the day has a pair and neither of
-   * § D1205's holds applies.
+   * § D1167 — the driver question: the day run twice more from the instant, each handing it to one
+   * of the pair, and raised where those two and the run standing are admitted ({@link admits}).
+   * `onRefused` where the day has no pair, one of § D1205's holds applies, or the runs are not
+   * admitted.
    */
-  function askDriver(asking: Pending, leave: VizRecording, windowEndS: number, stale: () => boolean): void {
+  function askDriver(
+    asking: Pending,
+    leave: VizRecording,
+    windowEndS: number,
+    stale: () => boolean,
+    verdictGround: boolean,
+    onRefused: () => void,
+  ): void {
     const call = asking.call;
     if (!driverAskable(call) || pair === undefined || driverNames === undefined) {
-      refuse(call);
+      onRefused();
       return;
     }
     const names = driverNames;
@@ -489,7 +622,7 @@ export function openDayCallSession(
     const runA = deps.planWith(toA);
     const runB = deps.planWith(toB);
     if (runA === undefined || runB === undefined) {
-      fail();
+      fail(asking, 'driver');
       return;
     }
     deps.simulate(
@@ -498,7 +631,7 @@ export function openDayCallSession(
         if (stale()) return;
         const [handedA, handedB] = recordings;
         if (handedA === undefined || handedB === undefined) {
-          fail();
+          fail(asking, 'driver');
           return;
         }
         const counted = dayCallRecordOf({
@@ -514,8 +647,9 @@ export function openDayCallSession(
             leave: wholeRunOf(leave),
           },
         });
-        if (!dayCallAdmits(counted.counts)) {
-          refuse(call);
+        if (!admits(counted, verdictGround)) {
+          asking.refusedCounted ??= counted;
+          onRefused();
           return;
         }
         raise(asking, 'driver', counted, {
@@ -525,7 +659,7 @@ export function openDayCallSession(
       },
       () => {
         if (pending !== asking) return;
-        fail();
+        fail(asking, 'driver');
       },
     );
   }
@@ -537,11 +671,14 @@ export function openDayCallSession(
     runs: Partial<Record<DayCallAnswer, PressedRun>>,
   ): void {
     asking.raised = true;
-    if (asking.call.act !== undefined) raisedInPeak.push(asking.call.act.startS);
+    /* § D1336: the wrinkle's call is counted apart from the peaks', and its record says whose it is. */
+    const ofWrinkle = dayCallIsWrinkle(asking.call);
+    if (ofWrinkle) raisedInWrinkle += 1;
+    else if (asking.call.act !== undefined) raisedInPeak.push(asking.call.act.startS);
     asking.lastRaisedBefore = lastRaisedAtS[question];
     lastRaisedAtS[question] = asking.call.atS;
     asking.question = question;
-    asking.counted = counted;
+    asking.counted = ofWrinkle ? Object.freeze({ ...counted, wrinkle: true as const }) : counted;
     asking.runs = runs;
     deps.changed();
   }
@@ -563,9 +700,11 @@ export function openDayCallSession(
        */
       const inHand = pending;
       const peaks = [...raisedInPeak];
+      let wrinkleCalls = raisedInWrinkle;
       const last = { ...lastRaisedAtS };
       if (inHand?.raised === true && inHand.question !== undefined) {
-        if (inHand.call.act !== undefined) peaks.pop();
+        if (dayCallIsWrinkle(inHand.call)) wrinkleCalls -= 1;
+        else if (inHand.call.act !== undefined) peaks.pop();
         if (inHand.lastRaisedBefore === undefined) delete last[inHand.question];
         else last[inHand.question] = inHand.lastRaisedBefore;
       }
@@ -581,6 +720,9 @@ export function openDayCallSession(
         lastRaisedAtS: { placement: last.placement ?? null, driver: last.driver ?? null },
         keptInPeakS: keptInPeakS ?? null,
         driving: pair === undefined ? null : (drivingNow ?? null),
+        failures: [...failures],
+        raisedInWrinkle: wrinkleCalls,
+        wrinkleRefused: [...wrinkleRefused],
       });
     },
     recording: () => standing,
@@ -640,12 +782,31 @@ export function openDayCallSession(
       askNext();
     },
     records: () => records,
+    failures: () => failures,
+    wrinkleQuiet: () => {
+      const wrinkle = wrinkleWindow;
+      if (wrinkle === undefined || opening.horizon !== 'whole-day') return undefined;
+      if (raisedInWrinkle > 0 || records.some((record) => record.wrinkle === true)) return undefined;
+      if (wrinkleRefused.length === 0) return undefined;
+      /*
+       * Only once nothing more in the wrinkle can be asked: past its end where it is a stretch of its
+       * own, past its start where it overlaps a peak (its start is all it adds), or asking is over.
+       */
+      const clear = dayCallWrinkleWindowOf(wrinkle, actsOf(standing.demandPhases)) !== undefined;
+      const over = clear
+        ? done || searchFromS >= wrinkle.endS || (pending !== undefined && pending.call.atS >= wrinkle.endS)
+        : done || searchFromS > wrinkle.startS;
+      return over ? Object.freeze({ wrinkle, refused: [...wrinkleRefused] }) : undefined;
+    },
     quiet: () => {
-      if (!done) return Object.freeze({ kind: 'asked' as const, refused, ending: 'asking' as const });
+      /* § D1335: present only where a moment lost its question, so a day without one reads as before. */
+      const failed = failures.length === 0 ? {} : { failed: failures.length };
+      if (!done) return Object.freeze({ kind: 'asked' as const, refused, ...failed, ending: 'asking' as const });
       if (ending === 'lost' && lost !== undefined) {
         return Object.freeze({
           kind: 'asked' as const,
           refused,
+          ...failed,
           ending: 'lost' as const,
           lostAtS: lost.atS,
           lostGoal: lost.goal,
@@ -654,6 +815,7 @@ export function openDayCallSession(
       return Object.freeze({
         kind: 'asked' as const,
         refused,
+        ...failed,
         ending: ending === 'lost' || ending === undefined ? ('finished' as const) : ending,
       });
     },

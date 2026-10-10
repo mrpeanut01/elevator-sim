@@ -30,6 +30,7 @@ import {
 } from '../dev/browserTier.test-helper.js';
 import { FIXIT_PAR, FIXIT_PAR_COPY } from '../fixit/par.js';
 import { PAR_MARK_COPY } from '../scenario/par.js';
+import { FIXIT_SCREEN_COPY } from './fixitScreenModel.js';
 
 let site: ShippedSite;
 let browser: Browser;
@@ -200,6 +201,14 @@ describe.skipIf(!HAS_BROWSER)('a fixed verdict on the shipped bundle — § D101
       expect(kept.row).toBe(`par ${String(par)} u · yours ${String(par)} u · at par`);
       expect(kept.par.startsWith(PAR_MARK_COPY.at)).toBe(true);
       expect(kept.withheld).not.toContain('marked as fixed with the diagnosis');
+      /*
+       * § D1358: the restored case can be run again, as practice. Red before: its order on screen (the
+       * building as it stands) was read as the order that fixed it, so the bar read `Next building`
+       * and nothing ran it (the post-AM panel's seat C, D7).
+       */
+      expect(await page.textContent('.everyday-bar-primary')).toBe('Run it again');
+      expect(await page.locator('.everyday-bar-primary').isDisabled()).toBe(false);
+      expect(await page.textContent('.everyday-bar-note')).toBe(FIXIT_SCREEN_COPY.notePractice);
     } finally {
       await page.close();
     }

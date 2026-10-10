@@ -1,6 +1,6 @@
 /**
  * **The TWIN shaft config seam** — `docs/11-twin-shaft-contract.md` § 1.2, GitHub issue #412,
- * `DECISIONS.md` § D620.
+ * `DECISIONS.md` § D621.
  *
  * `docs/11` § 0 fact 1 is the one this file exists to close: *"A shaft is not an object today. It
  * is a per-car value derived from the bank."* It is one now, and a building can say which of its

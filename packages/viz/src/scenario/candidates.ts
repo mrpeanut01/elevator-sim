@@ -260,7 +260,17 @@ export const CANDIDATE_SCENARIOS: readonly GoalScenario[] = [
    */
   stage('stage-7-prove-it', 'Tune it', 'midtown-office', 'zoned-uppeak', 1.25),
   stage('stage-8-the-headline-address', 'The headline address', 'chancery-house', 'zoned-uppeak', 3),
-  stage('stage-9-both-ways-at-once', 'Both ways at once', 'crown-hotel', 'collective', 2.5),
+  /*
+   * **3.5 rather than 2.5, and it is #234's rebalance by demand** (wave AN lane AP-1, § D1288). At
+   * 2.5 one tuning crowd of fifty was refused its mean for every arm: 1 of 17 window arrivals never
+   * served, and that one was a rider turned away at the landing for want of a credential (the
+   * credential gap, heading for the back-of-house floor), so the censoring ground suppressed every
+   * configuration under common random numbers and nothing could clear. Lowering demand thins the
+   * window and keeps one crowd refused at 2.0 and 1.5; at 3.5 the same refusals fall inside windows
+   * of 26 and 32 arrivals, under the 5 % ground, and no crowd on either seed set is refused. No bar
+   * moved: the goals are re-measured here at the new demand, which is DC-R1.
+   */
+  stage('stage-9-both-ways-at-once', 'Both ways at once', 'crown-hotel', 'collective', 3.5),
   stage('stage-10-the-bed-and-the-visitor', 'The bed and the visitor', 'st-jude-hospital', 'collective', 2),
   ...BRIEF_SCENARIOS,
 ];

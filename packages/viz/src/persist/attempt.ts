@@ -106,6 +106,28 @@ function attemptIssue(value: unknown): string | undefined {
     if (driving !== null && !(isObject(driving) && typeof driving['id'] === 'string' && typeof driving['name'] === 'string')) {
       return 'calls.driving is not a dispatcher';
     }
+    /* § D1335: optional, so an attempt stored before it still resumes, and read as no failure. */
+    const failures = calls['failures'];
+    if (
+      failures !== undefined &&
+      !(Array.isArray(failures) && (failures as unknown[]).every((entry) => isObject(entry) && isNumber(entry['atS'])))
+    ) {
+      return 'calls.failures is not a list of moments';
+    }
+    /* § D1336: optional for the same reason. */
+    if (calls['raisedInWrinkle'] !== undefined && !isNumber(calls['raisedInWrinkle'])) {
+      return 'calls.raisedInWrinkle is not a count';
+    }
+    const refusedInWrinkle = calls['wrinkleRefused'];
+    if (
+      refusedInWrinkle !== undefined &&
+      !(
+        Array.isArray(refusedInWrinkle) &&
+        (refusedInWrinkle as unknown[]).every((entry) => isObject(entry) && isNumber(entry['atS']) && isObject(entry['counts']))
+      )
+    ) {
+      return 'calls.wrinkleRefused is not a list of call records';
+    }
   }
   return undefined;
 }

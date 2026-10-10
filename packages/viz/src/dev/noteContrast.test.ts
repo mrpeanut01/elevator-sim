@@ -704,15 +704,16 @@ describe('the places these classes are drawn are derived, not listed', () => {
      * The positive control. Without it every assertion below could pass on an empty set — the
      * silent-instrument shape wave 12's rule 5 forbids, and the one this repository has been caught
      * by. The counts are the shipped page's: six static paragraphs (two `.advice`, four
-     * `.rail-prose`) and the nine notes § D309 added.
+     * `.rail-prose`), the nine notes § D309 added, and the three the rail draws above its lists while
+     * a scored attempt stands (wave AN, lane AN-6, § D1323), each in place of that list's scope note.
      */
     const markup = SITES.filter((site) => site.origin === 'markup');
     const notes = SITES.filter(
       (site) => site.origin === 'mount' && SUBJECT_CLASSES.some((n) => site.node.classes.includes(n)),
     );
     expect(markup.length, 'no static user of either class was found').toBe(6);
-    expect(notes, 'the mounts inserted a different number of notes than § D309 added').toHaveLength(
-      9,
+    expect(notes, 'the mounts inserted a different number of notes than § D309 and § D1323 added').toHaveLength(
+      12,
     );
     expect(MARKUP.length).toBeGreaterThan(500);
     expect(RULES.length).toBeGreaterThan(100);

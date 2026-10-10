@@ -120,7 +120,8 @@ describe.skipIf(!HAS_BROWSER)('the Scenario hub opens the stage that was pressed
       expect(offered.length).toBeGreaterThanOrEqual(2);
       /*
        * § D1183: the census counts the stage page's own choices, so the four stages it found ways
-       * through on are offered on the built bundle, beside the three that were already.
+       * through on are offered on the built bundle, beside the three that were already. § D1288
+       * added stage 9, once its demand moved to 3.5 and the census found ways through on it.
        */
       expect(offered.map((row) => row.id)).toEqual([
         'stage-1-first-call',
@@ -130,6 +131,7 @@ describe.skipIf(!HAS_BROWSER)('the Scenario hub opens the stage that was pressed
         'stage-6-the-tall-one',
         'stage-7-prove-it',
         'stage-8-the-headline-address',
+        'stage-9-both-ways-at-once',
       ]);
       expect(new Set(offered.map((row) => row.id)).size, 'the hub drew two rows for one stage').toBe(offered.length);
 

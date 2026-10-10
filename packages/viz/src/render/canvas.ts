@@ -25,6 +25,7 @@
 
 import type { LockedOutLanding } from '../access/lockedOut.js';
 import { describeLockedOut } from '../access/lockedOut.js';
+import { expressBankIdsOf, floorMarksOf } from './buildingMarks.js';
 import { describePinnedQueues, pinnedQueuesAt } from '../frame/pinnedQueue.js';
 import { STATE_GLYPHS } from '../access/zoning.js';
 import type { FloorQueue, LandingAssignment, WaitBand } from '../frame/overlay.js';
@@ -1138,24 +1139,29 @@ function meanClause(recording: VizRecording, frame: Frame, casual = false): stri
 /**
  * Slabs, lit windows and labels — design `:2023–2045`.
  *
- * ## The three floor badges, and the one that was not adopted
+ * ## The floor badges, and how the fourth was adopted without the flag it was refused over
  *
  * The artefact draws four states in the label gutter: `⌂` entrance, `⇄` transfer, `⚿` secure, and
- * plain. Three of those are taken; **`⚿` is not**, and refusing it is the point rather than an
- * omission.
+ * plain. Wave 10 refused `⚿` (`WAVE10_PLAN.md` § 6), and the ground was a sound one: a `VizFloor`
+ * has no *secure* flag, and giving it one would be the third kind of zoning collapsed into the
+ * first. `CLAUDE.md` forbids exactly that, because service zoning (no shaft reaches this floor),
+ * access zoning (no credential opens this call) and operational zoning (the dispatcher's own
+ * strategy) are different facts with different fixes. Access control in this simulator is a property
+ * of a **credential against a floor**: the same floor is open to one rider and shut to the next.
  *
- * A `VizFloor` has no *secure* flag, and giving it one would be the third kind of zoning
- * collapsed into the first — `CLAUDE.md` forbids exactly that, because service zoning (no shaft
- * reaches this floor), access zoning (no credential opens this call) and operational zoning (the
- * dispatcher's own strategy) are different facts with different fixes. Access control in this
- * simulator is a property of a **call's credential**, not of a storey: the same floor is open to
- * one rider and shut to the next. It already has a mark — `▩`, on the landing row, drawn by
- * `drawLandings` and named in the banner — and `access/zoning.ts`'s docstring is explicit that a
- * reader who learned `▩` must not have to learn a second spelling of it.
+ * **`⚿` is drawn since recording version 17, and the ground is kept rather than overruled**
+ * (GitHub issue #544, `DECISIONS.md` § D1307). The badge reads `VizRecording.accessZones`, the zones
+ * whole with the credential groups each admits, through `render/buildingMarks.ts#floorMarksOf`; no
+ * flag was added to a floor. It says what the zone list says, *a credential decides who may ride
+ * here*, and the sentence `describeFrame` carries names which credentials. The outcome keeps its own
+ * mark: `▩`, on the landing row, drawn by `drawLandings` and named in the banner, still means *a call
+ * here went unserved because of a credential, in this run*, and `access/zoning.ts`'s docstring is
+ * explicit that a reader who learned `▩` must not have to learn a second spelling of it. The same
+ * module's `⇅` and `⋰` mark a landing an escalator or a stair serves.
  *
- * So the gutter's third badge stays `⊘`, which is the fact the gutter actually knows: **no shaft
- * in this building reaches this floor**. It keeps the design's `#c9a56a`, because that is the
- * slot the artefact painted that colour.
+ * `⊘` is the fact the gutter knows on its own: **no shaft in this building reaches this floor**. It
+ * keeps the design's `#c9a56a`, because that is the slot the artefact painted that colour. The new
+ * marks keep the row's own colour: each is a glyph, and a glyph is the signal KB-15 asks for.
  *
  * ## The label stride is the layout's, not a second one
  *
@@ -1168,6 +1174,8 @@ function meanClause(recording: VizRecording, frame: Frame, casual = false): stri
 function drawFloors(ctx: Canvas2DLike, input: SceneInput, theme: Theme, hour: number): void {
   const { layout } = input;
   const unserved = new Set(input.unservedFloorIds ?? []);
+  /* `⚿`, `⇅` and `⋰` — the building's own facts, version 17 (GitHub issue #544, § D1307). */
+  const marks = floorMarksOf(input.recording);
   const populationById = new Map(
     input.recording.floors.map((floor) => [floor.id, floor.population]),
   );
@@ -1220,6 +1228,7 @@ function drawFloors(ctx: Canvas2DLike, input: SceneInput, theme: Theme, hour: nu
     // greyscale screenshot.
     const badge = row.isTransferFloor ? '⇄ ' : row.isEntrance ? '⌂ ' : '';
     const restricted = unserved.has(row.floorId) ? ' ⊘' : '';
+    const mark = marks.get(row.floorId) ?? '';
     ctx.fillStyle =
       restricted !== ''
         ? theme.restricted
@@ -1230,9 +1239,9 @@ function drawFloors(ctx: Canvas2DLike, input: SceneInput, theme: Theme, hour: nu
             : theme.floorLabel;
     // The gutter is everything left of the plot, less the 8 px the text is inset by. A label
     // longer than that is clipped here rather than drawn off the left edge of the canvas.
-    const budget = layout.plot.x - 8 - (badge.length + restricted.length) * 8;
+    const budget = layout.plot.x - 8 - (badge.length + mark.length + restricted.length) * 8;
     ctx.fillText(
-      `${badge}${fitLabel(row.label, budget)}${restricted}`,
+      `${badge}${fitLabel(row.label, budget)}${mark}${restricted}`,
       layout.plot.x - 8,
       row.y,
     );
@@ -1283,41 +1292,6 @@ interface ShaftGroupLabel {
   readonly widthPx: number;
   /** Whether this bank's own heading carries the express glyph — see {@link expressBankIdsOf}. */
   readonly isExpress: boolean;
-}
-
-/**
- * Which banks skip at least one floor between the lowest and highest they serve — an express or
- * shuttle bank's shape, read off the geometry a shaft already carries rather than from an authored
- * field. GitHub issue #544, [§ D624](../../../../DECISIONS.md): `docs/12` § 4.5 already establishes
- * that a bank's shuttle-vs-local role is *"derived from the bank structure rather than assigned"* —
- * there is no `kind` on `BankConfig` to read, and this is that derivation, reaching the render layer
- * rather than staying a fact only the config layer knows.
- *
- * A local bank's `servedFloorIds` are contiguous once mapped onto {@link VizFloor.index} — every
- * floor between the lowest it stops at and the highest is one it also stops at. A shuttle or express
- * bank skips floors on the way to a sky lobby or an observatory deck, so its served set has a gap.
- * One car with the gap is enough to mark the whole bank, matching how a bank is one unit everywhere
- * else this renderer treats it (RV-06's grouping, `#stageCameraWindowOf`'s bank filter).
- */
-function expressBankIdsOf(recording: VizRecording): ReadonlySet<string> {
-  const indexById = new Map(recording.floors.map((floor) => [floor.id, floor.index]));
-  const servedIndicesByBank = new Map<string, Set<number>>();
-  for (const shaft of recording.shafts) {
-    const indices = servedIndicesByBank.get(shaft.bankId) ?? new Set<number>();
-    for (const floorId of shaft.servedFloorIds) {
-      const index = indexById.get(floorId);
-      if (index !== undefined) indices.add(index);
-    }
-    servedIndicesByBank.set(shaft.bankId, indices);
-  }
-  const express = new Set<string>();
-  for (const [bankId, indices] of servedIndicesByBank) {
-    if (indices.size < 2) continue;
-    const min = Math.min(...indices);
-    const max = Math.max(...indices);
-    if (max - min + 1 > indices.size) express.add(bankId);
-  }
-  return express;
 }
 
 interface ShaftLabelPlan {

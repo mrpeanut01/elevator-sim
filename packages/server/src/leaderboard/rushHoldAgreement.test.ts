@@ -61,12 +61,32 @@
  *
  * ## One cell is a fixture, and it is the one no shipped cell could be — GitHub issue #523, item 2
  *
+ * ## The rebuilt cells, and what they are for — GitHub issue #372, § D1295
+ *
+ * A cell carrying `rebuild` is a round after a between-round rebuild: both halves play it on the tower
+ * with those menu tiers fitted, this one through `verify.ts#rushRoundConfigFor`'s `fit` (folded by
+ * `core`'s `config/rushRebuild.ts`), the viewer's through the host's own rebuild path, which writes the
+ * same levels onto the `campaignFitOut` its press builds. Three cells, one for each way a menu tier
+ * edits a run: Doors 1 on Midtown Office (a per-car door cycle), Car size 2 on Mixed-Use High-Rise (a
+ * rated load), and Control 3 on Chancery House (the landing panel and the ride-time floor, written on
+ * the driving profile). Each is paired with the same cell unrebuilt and must differ from it, on the
+ * pre-fit cells' ground below.
+ *
+ * **Each is a rebuild the tower's own first round can pay for on the standard purse**, because the
+ * viewer's half buys it through the host the way a player does, after a first round has paid in:
+ * Midtown's first round pays 18 units and Doors 1 costs 4, Mixed-Use's pays 50 and Car size 2 costs 32,
+ * Chancery's pays 30 and Control 3 costs 24. That is also why Car size is pinned at level 2 and not 1:
+ * Car size 1 moved no leg on Midtown, Crown Hotel, Secure Tower, Chancery House, St Jude or Mixed-Use
+ * (their cars are already rated for sixteen; wave AN lane AP-2's probe), so the menu refuses it there
+ * (`core`'s `rushTierChangesNothing`), and on Garden Apartments, where it does move the run, it costs
+ * more than that tower's first round pays.
+ *
  * ## The pre-fit cells, and what they are for — GitHub issue #372, § D640
  *
  * A cell carrying `prefit` is a sitting that claimed `data/chime-ledger.json`'s `rush-prefit`, and
  * both halves fit the tower before they play it: this one through
- * `verify.ts#rushRoundConfigFor`'s `prefit` argument, the viewer's through
- * `everyday/rush.ts#rushPatchOf`, which writes `RUSH_PREFIT_FIT_OUT` onto the state the press
+ * `verify.ts#rushRoundConfigFor`'s `fit` argument at the kit's levels, the viewer's through
+ * `everyday/rush.ts#rushPatchOf`, which writes `rushFitOutOf(RUSH_PREFIT_LEVELS)` onto the state the press
  * builds. Two different appliers over one set of values (`core`'s `config/rushPrefit.ts` holds them),
  * so these cells are what says the two agree on the **legs** rather than on the constants.
  *
@@ -90,7 +110,17 @@ import { readFileSync, writeFileSync } from 'node:fs';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { loadConfig, rushHoldAtLegs, runSimulation, type SimulationConfig } from '@elevator-sim/core';
+import {
+  RUSH_NO_LEVELS,
+  RUSH_PREFIT_LEVELS,
+  loadConfig,
+  rushFitOf,
+  rushHoldAtLegs,
+  rushLevelsAfter,
+  runSimulation,
+  type RushFit,
+  type SimulationConfig,
+} from '@elevator-sim/core';
 
 import type { SubmittedIntervention } from './submission.js';
 import { rushRoundConfigFor, type VerificationResources } from './verify.js';
@@ -110,6 +140,12 @@ interface AgreementCell {
    * § D640, and see the docstring's `## The pre-fit cells` section.
    */
   readonly prefit?: boolean;
+  /**
+   * The menu tiers the round was rebuilt with, as price-schedule row ids — GitHub issue #372, § D1295,
+   * and see the docstring's `## The rebuilt cells` section. A round after a rebuild, played on the
+   * tower with those tiers fitted over whatever the sitting started with.
+   */
+  readonly rebuild?: readonly string[];
   /** Seconds from the round's start to the line being crossed, or `null` when it never was. */
   readonly heldS: number | null;
 }
@@ -157,7 +193,16 @@ function labelOf(cell: AgreementCell): string {
   );
   const declared = cell.declaredSelection === undefined ? [] : [`declaring ${JSON.stringify(cell.declaredSelection)}`];
   const prefit = cell.prefit === true ? ['pre-fitted'] : [];
-  return [cell.buildingId, cell.dispatcherProfileId, ...prefit, ...declared, ...log].join(' ');
+  const rebuild = (cell.rebuild ?? []).map((priceId) => `rebuilt ${priceId}`);
+  return [cell.buildingId, cell.dispatcherProfileId, ...prefit, ...rebuild, ...declared, ...log].join(' ');
+}
+
+/** Everything a cell's round is fitted with: the kit when it claims one, and its rebuild over that. */
+function fitOf(cell: AgreementCell): RushFit {
+  const start = cell.prefit === true ? RUSH_PREFIT_LEVELS : RUSH_NO_LEVELS;
+  const after = rushLevelsAfter(start, cell.rebuild ?? []);
+  if (!after.ok) throw new Error(`${labelOf(cell)} is a rebuild the rush menu refuses: ${JSON.stringify(after.refusals)}`);
+  return rushFitOf(after.levels);
 }
 
 let resources: VerificationResources;
@@ -240,6 +285,7 @@ describe('the rush hold agreement table — the server’s replay half (PR #513,
           other.prefit !== true &&
           other.buildingId === cell.buildingId &&
           other.dispatcherProfileId === cell.dispatcherProfileId &&
+          JSON.stringify(other.rebuild ?? []) === JSON.stringify(cell.rebuild ?? []) &&
           JSON.stringify(other.interventions ?? []) === JSON.stringify(cell.interventions ?? []) &&
           JSON.stringify(other.declaredSelection ?? null) === JSON.stringify(cell.declaredSelection ?? null),
       );
@@ -252,12 +298,37 @@ describe('the rush hold agreement table — the server’s replay half (PR #513,
     }
   });
 
+  it('pairs every rebuilt cell with the same cell unrebuilt, and the two differ — GitHub issue #372, § D1295', () => {
+    const rebuilt = table.cells.filter((cell) => (cell.rebuild ?? []).length > 0);
+    expect(rebuilt.length, 'no rebuilt cell to pin, so this rule checks nothing').toBeGreaterThan(0);
+    /* Every category of the menu that edits the run differently is pinned once: the doors, the car and the panel. */
+    expect(new Set(rebuilt.flatMap((cell) => cell.rebuild ?? []))).toEqual(new Set(['faster-doors', 'larger-cars-21', 'full-destination']));
+    if (REGENERATE) return;
+    for (const cell of rebuilt) {
+      const unrebuilt = table.cells.find(
+        (other) =>
+          (other.rebuild ?? []).length === 0 &&
+          (other.prefit === true) === (cell.prefit === true) &&
+          other.buildingId === cell.buildingId &&
+          other.dispatcherProfileId === cell.dispatcherProfileId &&
+          JSON.stringify(other.interventions ?? []) === JSON.stringify(cell.interventions ?? []) &&
+          JSON.stringify(other.declaredSelection ?? null) === JSON.stringify(cell.declaredSelection ?? null),
+      );
+      expect(unrebuilt, `${labelOf(cell)} has no unrebuilt twin to be compared against`).toBeDefined();
+      expect(
+        cell.heldS,
+        `${labelOf(cell)} holds exactly as long as the same round unrebuilt, so the rebuild is a purchase ` +
+          'that changed no decision — CLAUDE.md’s standing requirement',
+      ).not.toBe(unrebuilt?.heldS);
+    }
+  });
+
   it.each(table.cells.map((cell) => [labelOf(cell), cell] as const))('%s', (label, cell) => {
     const config = rushRoundConfigFor(
       cell.buildingId,
       { dispatcherProfileId: cell.dispatcherProfileId, ...(cell.interventions === undefined ? {} : { interventions: cell.interventions }) },
       resourcesFor(cell),
-      cell.prefit === true,
+      fitOf(cell),
     );
     if (typeof config === 'string') throw new Error(`${label} does not resolve on this server: ${config}`);
     const { record } = runSimulation(config);

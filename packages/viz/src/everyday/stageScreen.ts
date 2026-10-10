@@ -57,7 +57,7 @@
  * *Run this shift* performs, so the day it produces may file.
  */
 
-import type { DispatcherProfile, InterventionChange } from '@elevator-sim/core/browser';
+import type { DispatcherProfile, InterventionChange, RunInterventionConfig } from '@elevator-sim/core/browser';
 
 import { drawCutaway, sizeCanvas } from './cutaway.js';
 import { Playback } from '../playback/playback.js';
@@ -116,6 +116,10 @@ import {
   stageLegend,
   stageMayAdopt,
   stageOpeningLineOf,
+  STAGE_OVERLAY_PLAY,
+  stageHandoverVerdictOf,
+  type StageHandoverVerdict,
+  stagePressChangedNobody,
   stageShowsOpening,
   stageSkipViewOf,
   stageSpeedAt,
@@ -473,6 +477,27 @@ function mountStage(
    * only signal the façade offers and the correct one — § 1.4's re-simulation keeps the `runId`.
    */
   let recomputingOver: VizRecording | undefined;
+  /**
+   * **The parking press whose re-simulation is in flight, and the verdict on the last one that
+   * landed** — GitHub issue #588, [§ D1278](../../../../DECISIONS.md).
+   *
+   * {@link intervene} writes `pendingPress` beside {@link recomputingOver}, so when {@link adopt}
+   * takes the re-simulated day it holds the day before the press, the day after it, and the press:
+   * the with-and-without pair on one seed, compared once on the legs by
+   * `stageScreenModel.ts#stagePressChangedNobody`. `pressChangedNobody` is that press when the
+   * answer was *nobody's trip changed*, and `undefined` otherwise; every adoption rewrites it, so a
+   * new day or a later answer never inherits an old verdict.
+   */
+  let pendingPress: RunInterventionConfig | undefined;
+  let pressChangedNobody: RunInterventionConfig | undefined;
+  /**
+   * **The last handover, judged when its day landed** — GitHub issue #571,
+   * [§ D1310](../../../../DECISIONS.md). `stageScreenModel.ts#stageHandoverVerdictOf` reads the same
+   * pair {@link adopt} hands § D1278's comparator, and every adoption rewrites it for the same reason.
+   */
+  let handoverVerdict: StageHandoverVerdict | undefined;
+  /** What the parking note last said, so a frame that changes nothing writes nothing. */
+  let parkingNoteSaid = '';
   /** What § 14.1's band was last drawn for — see {@link drawWatching}. `''` while it is down. */
   let watchKey = '';
   /**
@@ -988,7 +1013,8 @@ function mountStage(
   ].join(';');
   const statusText = el(doc, 'p', 'everyday-stage-status-text');
   statusText.style.cssText = `margin:0;color:${C.inkSoft};font-size:13px;max-width:44ch`;
-  const startButton = el(doc, 'button', 'everyday-stage-start', 'Start');
+  /* § D1309, GitHub issue #573: a playback verb, so the brief's `Start the day` is the one start. */
+  const startButton = el(doc, 'button', 'everyday-stage-start', STAGE_OVERLAY_PLAY);
   startButton.type = 'button';
   startButton.style.cssText = [
     `background:${C.sun}`,
@@ -1205,6 +1231,16 @@ function mountStage(
   /* The handover arm's note — drawn, not a title, because a reason a player cannot see is not one. */
   const interventionNote = el(doc, 'span', 'everyday-stage-intervene-note');
   interventionNote.style.cssText = `font-size:11.5px;color:${C.warmGrey};flex-basis:100%`;
+  /*
+   * **The parking arms' note** — GitHub issue #588, [§ D1278](../../../../DECISIONS.md). A slot of its
+   * own, because `interventionNote` above is the handover row's and its one writer is
+   * {@link applySwitchRow}; a parking note written into it would be overwritten on the next frame.
+   * § D949's second ruled-out route was exactly this missing element: a note on a parking row was a
+   * string no surface rendered. Drawn text rather than a `title`, for the reason the handover note
+   * gives one line up.
+   */
+  const parkingNote = el(doc, 'span', 'everyday-stage-park-note');
+  parkingNote.style.cssText = `font-size:11.5px;color:${C.warmGrey};flex-basis:100%`;
   interventions.append(
     ...interventionButtons,
     switchPicker,
@@ -1213,6 +1249,7 @@ function mountStage(
     interventionStamp,
     interventionRefusal,
     interventionNote,
+    parkingNote,
   );
 
   /* --- § 7.4's strip. SVG rather than a second canvas: `raceLaneOf` computes polyline
@@ -1445,7 +1482,42 @@ function mountStage(
   closeAskRow.append(closeAskFile, closeAskBack);
   closeAskInner.append(closeAskQuestion, closeAskConsequence, closeAskRow);
   closeAsk.append(closeAskInner);
-  callCard.append(callBody, closeAsk);
+  /*
+   * **And so does the skip** — wave AN, lane AN-6, [§ D1324](../../../../DECISIONS.md), the post-AM
+   * panel's seat D (D4). § D1151 made a press of *Skip to the end* with the card up the player's
+   * answer, so one press ran a scored day out past a call that was due, where *Close the day* asks.
+   * The same question, on the same footing as the close's: under the card's answers, focus on *Back
+   * to the call*, and a second press of the skip, or *Skip to the end* here, skips as before.
+   */
+  const skipAsk = el(doc, 'div', 'everyday-stage-skip-confirm');
+  skipAsk.hidden = true;
+  skipAsk.setAttribute('role', 'group');
+  skipAsk.setAttribute('aria-label', STAGE_CALL_COPY.skipAsk);
+  const skipAskInner = el(doc, 'div');
+  skipAskInner.style.cssText = closeAskInner.style.cssText;
+  const skipAskQuestion = el(doc, 'p', 'everyday-stage-skip-confirm-question', STAGE_CALL_COPY.skipAsk);
+  skipAskQuestion.style.cssText = closeAskQuestion.style.cssText;
+  const skipAskConsequence = el(doc, 'p', undefined, STAGE_CALL_COPY.skipConsequence);
+  skipAskConsequence.style.cssText = closeAskConsequence.style.cssText;
+  const skipAskRow = el(doc, 'div');
+  skipAskRow.style.cssText = closeAskRow.style.cssText;
+  const skipAskGo = el(doc, 'button', 'everyday-stage-skip-confirm-go', STAGE_CALL_COPY.skipGo);
+  skipAskGo.type = 'button';
+  skipAskGo.style.cssText = ARM_BUTTON_CSS;
+  const skipAskBack = el(doc, 'button', 'everyday-stage-skip-confirm-back', STAGE_CALL_COPY.closeBack);
+  skipAskBack.type = 'button';
+  skipAskBack.style.cssText = ARM_BUTTON_CSS;
+  skipAskGo.addEventListener('click', () => {
+    skipToEnd(true);
+  });
+  skipAskBack.addEventListener('click', () => {
+    skipAsk.hidden = true;
+    callCard.focus({ preventScroll: true });
+  });
+  skipAskRow.append(skipAskGo, skipAskBack);
+  skipAskInner.append(skipAskQuestion, skipAskConsequence, skipAskRow);
+  skipAsk.append(skipAskInner);
+  callCard.append(callBody, closeAsk, skipAsk);
   let callCardKey = '';
   /**
    * Show or hide the card — and, **on the frame it appears and on no other**, bring it into the
@@ -1467,8 +1539,11 @@ function mountStage(
     const leaving = !shown && !callCard.hidden;
     const hadFocus = leaving && callCard.contains(doc.activeElement);
     callCard.hidden = !shown;
-    /* The close's question belongs to the call it would skip, and goes with it. */
-    if (!shown) closeAsk.hidden = true;
+    /* The close's question belongs to the call it would skip, and goes with it; so does the skip's. */
+    if (!shown) {
+      closeAsk.hidden = true;
+      skipAsk.hidden = true;
+    }
     if (appearing) {
       callCard.scrollIntoView({ block: 'nearest', inline: 'nearest' });
       callCard.focus({ preventScroll: true });
@@ -1825,7 +1900,7 @@ function mountStage(
    * watched at `1×`, at `600×` and a day skipped are the same day — the same legs, the same
    * report. `stageSkip.test.ts` asserts that rather than leaving it to this paragraph.
    */
-  function skipToEnd(): void {
+  function skipToEnd(confirmed = false): void {
     if (playback === undefined) return;
     /*
      * **And the day has been started** — GitHub issue #565's third defect, § D947.
@@ -1872,6 +1947,18 @@ function mountStage(
         syncTransport();
         requestFrame();
       }
+      return;
+    }
+    /*
+     * **A call that is due asks first** — wave AN, lane AN-6, [§ D1324](../../../../DECISIONS.md).
+     * Reaching here with a call standing means it is raised and its second has come: its card is up,
+     * or is drawn on the next frame. The first press puts {@link skipAsk}'s question under its
+     * answers; a second press, with the question up, or the question's own *Skip to the end*, is the
+     * answer § D1151 made it.
+     */
+    if (standing !== undefined && !confirmed && skipAsk.hidden) {
+      skipping = false;
+      askBeforeSkipping(playback.simTimeS);
       return;
     }
     skipping = false;
@@ -2082,6 +2169,8 @@ function mountStage(
      * taking it. A change stamped at the Engineer transport's position would be filed at an instant
      * nobody was looking at.
      */
+    /* § D1278: the press, held until its day lands, so `adopt` can say whether it changed anybody's trip. */
+    pendingPress = { atS, change };
     withRecomputeBeat(current, () => {
       host.intervene(atS, change);
     });
@@ -2305,6 +2394,37 @@ function mountStage(
   function adopt(recording: VizRecording): void {
     const resumeAtS = recomputingOver !== undefined ? playback?.simTimeS : undefined;
     const wasPlaying = recomputingOver !== undefined && playback?.state === 'playing';
+    /*
+     * § D1278 — GitHub issue #588. The day before the press and the day after it are both in hand
+     * on this line and on no other, so the parking press is judged here, once: on the legs, by the
+     * model. Any other adoption (a new day, a call's answer, the dock's) leaves no press pending
+     * and so clears the verdict rather than carrying it onto a day it was not about.
+     */
+    const press = pendingPress;
+    pendingPress = undefined;
+    pressChangedNobody =
+      press !== undefined &&
+      recomputingOver !== undefined &&
+      stagePressChangedNobody({ before: recomputingOver, after: recording, press })
+        ? press
+        : undefined;
+    /*
+     * § D1310 — GitHub issue #571. A handover is judged on the same pair, and on the goals as well:
+     * the strip's own list, read at each day's end. Any other press or adoption clears it.
+     */
+    const handover =
+      press !== undefined && press.change.kind === 'adopt-dispatcher' && recomputingOver !== undefined
+        ? stageHandoverVerdictOf({
+            before: recomputingOver,
+            after: recording,
+            press,
+            goals: host.goalsAt(recording.endedAt).map((reading) => reading.goal),
+          })
+        : undefined;
+    handoverVerdict =
+      press !== undefined && handover !== undefined
+        ? { press, outcome: handover, dayEndS: recording.endedAt }
+        : undefined;
     adopted = recording;
     recomputingOver = undefined;
     barFacts.recomputing = false;
@@ -2676,8 +2796,26 @@ function mountStage(
       dayClosed: barFacts.dayClosed,
       recomputing: recomputingOver !== undefined,
       ...(target === undefined ? {} : { switchTo: target }),
+      ...(pressChangedNobody === undefined ? {} : { pressChangedNobody }),
+      ...(handoverVerdict === undefined ? {} : { handoverVerdict }),
     });
     applySwitchRow(view, sharedRefusalOf(view, watchingNow()) ?? callHeld());
+    applyParkingRows(view);
+  }
+
+  /**
+   * The parking arms' note, from the rows the model built — GitHub issue #588,
+   * [§ D1278](../../../../DECISIONS.md). One writer, called wherever the handover row is applied,
+   * and written only when its sentence changes (`AX-3`'s rule, which the stamp beside it keeps).
+   */
+  function applyParkingRows(view: StageInterventionView): void {
+    const said =
+      view.rows.find(
+        (row) => row.note !== undefined && STAGE_INTERVENTIONS.some((arm) => arm.change.kind === row.change.kind),
+      )?.note ?? '';
+    if (said === parkingNoteSaid) return;
+    parkingNote.textContent = said;
+    parkingNoteSaid = said;
   }
 
   /**
@@ -3037,6 +3175,8 @@ function mountStage(
       dayClosed: barFacts.dayClosed,
       recomputing: recomputingOver !== undefined,
       ...(target === undefined ? {} : { switchTo: target }),
+      ...(pressChangedNobody === undefined ? {} : { pressChangedNobody }),
+      ...(handoverVerdict === undefined ? {} : { handoverVerdict }),
     });
     /* Written only when the stamp changes — {@link stampSaid}, `AX-3`. */
     if (intervention.stamp !== stampSaid) {
@@ -3068,6 +3208,7 @@ function mountStage(
      * a filed day cannot be handed to anybody either.
      */
     applySwitchRow(intervention, refusal);
+    applyParkingRows(intervention);
 
     drawRace(recording, simTimeS);
     syncDock();
@@ -3178,13 +3319,31 @@ function mountStage(
    * focus, so closing takes a deliberate second choice.
    */
   function askBeforeClosing(): void {
+    skipAsk.hidden = true;
     closeAsk.hidden = false;
     closeAsk.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     closeAskBack.focus({ preventScroll: true });
   }
 
+  /**
+   * Put the skip's question up under the call, and focus *Back to the call* — {@link askBeforeClosing}'s
+   * twin, § D1324. The card is drawn first where the frame has not drawn it yet, so the question is
+   * never asked inside a card nobody can see; the transport stops at the call as the pace stops it.
+   */
+  function askBeforeSkipping(simTimeS: number): void {
+    playback?.pause();
+    if (callCard.hidden) drawCall(simTimeS);
+    closeAsk.hidden = true;
+    skipAsk.hidden = false;
+    skipAsk.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    skipAskBack.focus({ preventScroll: true });
+    syncTransport();
+    requestFrame();
+  }
+
   function fileDay(): void {
     closeAsk.hidden = true;
+    skipAsk.hidden = true;
     playback?.pause();
     host.closeDay();
     syncTransport();

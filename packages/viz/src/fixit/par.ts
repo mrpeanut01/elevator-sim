@@ -30,13 +30,16 @@
  * on, that every offered case has a row and that a row's par never sits where the census found no
  * clearing route.
  *
- * ## The mark, and where nothing is drawn — [§ D1234](../../../../DECISIONS.md)
+ * ## The mark, and the free par — [§ D1234](../../../../DECISIONS.md), [§ D1358](../../../../DECISIONS.md)
  *
  * A fixed case at or under its par carries `scenario/par.ts`'s mark, on the fixed card's line and on
- * the case list's row. **Where the par is free and the fix bought nothing, neither the line nor the
- * row's par is drawn**: a free par is matched by every fix that buys nothing, so the comparison
- * records nothing about this player's order. A fix that spent more than a free par still reads the
- * line, because that a free fix exists is news to that player.
+ * the case list's row. **A free par is never marked**: it is matched by every fix that buys nothing,
+ * so the comparison records nothing about this player's order. § D1234 drew nothing at all where a
+ * free fix met a free par, and the post-AM panel's seat C read the empty space as a missing par
+ * (*"FIXED · on your own with no par"*, D6). So the line and the row now say the par is free and that
+ * no fix is marked against it ({@link FIXIT_PAR_COPY.free}, {@link FIXIT_PAR_COPY.tagFree}), and a fix
+ * that spent more than a free par still reads the comparison, because a free fix is news to that
+ * player.
  *
  * Pure. No DOM, no data read.
  */
@@ -89,6 +92,15 @@ export const FIXIT_PAR_COPY = Object.freeze({
   same: 'Yours cost the same.',
   pays: 'Matching it or beating it pays nothing extra.',
   /*
+   * A free par met by a free fix — § D1358. Said rather than left blank, because a blank read as a
+   * par the game forgot (seat C D6).
+   */
+  free:
+    'Par is free on this case: the cheapest change we tried that fixes this letter, judged on the same ' +
+    'forty-nine mornings, cost nothing, so no fix is marked against it.',
+  /* The case list's short form of {@link free}. */
+  tagFree: 'par free · not marked',
+  /*
    * A case fixed before its cost was kept on this device (lane AL-B, seat C D5): the par is still
    * drawn, and the comparison is withheld rather than guessed.
    */
@@ -112,8 +124,11 @@ function unitsOf(units: number): string {
 export function fixitParLineOf(caseId: string, spentUnits: number | undefined): string | undefined {
   const row = fixitParOf(caseId);
   if (row === undefined || row.units === null) return undefined;
-  /* § D1234: a free fix beside a free par is not compared, since every free fix would match it. */
-  if (row.units === 0 && spentUnits === 0) return undefined;
+  /*
+   * § D1234: a free fix beside a free par is not compared, since every free fix would match it, and
+   * § D1358 says so rather than drawing nothing.
+   */
+  if (row.units === 0 && spentUnits === 0) return FIXIT_PAR_COPY.free;
   const mark = parMarkOf(row.units, spentUnits);
   const lead = mark === undefined ? '' : `${PAR_MARK_COPY[mark]} `;
   const comparison =
@@ -126,7 +141,7 @@ export function fixitParLineOf(caseId: string, spentUnits: number | undefined): 
         : `Yours cost ${unitsOf(spentUnits)}.`;
   return (
     `${lead}The cheapest change we tried that fixes this letter, judged on the same forty-nine mornings, ` +
-    `cost ${unitsOf(row.units)}. ${comparison} ${FIXIT_PAR_COPY.pays}`
+    `cost ${row.units === 0 ? 'nothing' : unitsOf(row.units)}. ${comparison} ${FIXIT_PAR_COPY.pays}`
   );
 }
 
@@ -139,8 +154,8 @@ export function fixitParLineOf(caseId: string, spentUnits: number | undefined): 
 export function fixitParTagOf(caseId: string, spentUnits: number | undefined): string | undefined {
   const row = fixitParOf(caseId);
   if (row === undefined || row.units === null) return undefined;
-  /* § D1234: nothing to compare where a free fix meets a free par. */
-  if (row.units === 0 && spentUnits === 0) return undefined;
+  /* § D1234: nothing to compare where a free fix meets a free par, and § D1358 says so on the row. */
+  if (row.units === 0 && spentUnits === 0) return FIXIT_PAR_COPY.tagFree;
   const par = `${FIXIT_PAR_COPY.tagPar} ${String(row.units)} u`;
   if (spentUnits === undefined) return par;
   const mark = parMarkOf(row.units, spentUnits);

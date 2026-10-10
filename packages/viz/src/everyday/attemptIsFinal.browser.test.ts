@@ -19,8 +19,11 @@
  * 1. At a held call the Engineer clock never passes the stage's, a scrub to the timeline's end stops
  *    at the stage's reach, nothing is filed, and back on the stage the call is still up with no
  *    filed-day line beside it; the stage's own close then banks the attempt.
- * 2. A building picked on the Engineer surface mid-attempt, run to its end, banks nothing into that
- *    tower's week, and its sheet says why.
+ * 2. Another tower's day run on the Engineer surface while the attempt stands parked, run to its end,
+ *    banks nothing into that tower's week, and its sheet says why. Since § D1323 (wave AN, lane AN-6)
+ *    the building card itself refuses while the attempt is the week on screen, so the other tower is
+ *    reached the way a player leaves a day: the leave strip, then the door (`watchOnly.browser.test.ts`
+ *    holds the card's refusal).
  * 3. A tab closing a day another tab has already closed files practice, says so, and leaves the
  *    stored week as the first close wrote it.
  *
@@ -149,7 +152,7 @@ async function skipToTheFirstCall(page: Page): Promise<string> {
   return textOf(page, '.everyday-stage-clock');
 }
 
-/** Pressed until the day has run out, each press with a card up answering it. */
+/** Pressed until the day has run out: with a card up the first press asks (§ D1324) and the next answers it. */
 async function skipAll(page: Page): Promise<void> {
   await page.waitForFunction(
     () => {
@@ -245,7 +248,7 @@ describe.skipIf(!HAS_BROWSER)('the one attempt is final — § D1239', () => {
     }
   });
 
-  it('another building picked on the Engineer surface mid-attempt banks nothing into its week', async () => {
+  it('another tower run on the Engineer surface while the attempt stands parked banks nothing into its week', async () => {
     const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
     try {
       await load(page);
@@ -253,20 +256,19 @@ describe.skipIf(!HAS_BROWSER)('the one attempt is final — § D1239', () => {
       await ontoTheStage(page);
       await skipToTheFirstCall(page);
 
+      /* Leave the day for now (the attempt is kept), and take Chancery House's door instead. */
+      await page.locator('.everyday-rail-menu').click();
+      await page.waitForSelector('.everyday-bar-confirm-leave', { timeout: 15_000 });
+      await page.locator('.everyday-bar-confirm-leave').click();
+      await page.waitForSelector('.everyday-mode[data-screen]', { timeout: 15_000 });
+      await openEverydayDoor(page);
+      /* Chancery House is Scenario `c6` (`shift/contracts.ts`). */
+      await page.click('.everyday-door-tower[data-contract="c6"]');
+      await page.waitForSelector('.everyday-door-tower[data-contract="c6"][data-selected="true"]', { timeout: 30_000 });
+
+      /* The Engineer surface's own run of Chancery House's day, scrubbed to its end until its sheet is filed. */
       await toEngineer(page);
-      await page.locator('#seg-building').click();
-      await page.waitForFunction(
-        () => [...document.querySelectorAll('#rail-building-list > *')].some((card) => /Chancery House/u.test(card.textContent ?? '')),
-        undefined,
-        { timeout: 15_000 },
-      );
-      await page.evaluate(() => {
-        const card = [...document.querySelectorAll<HTMLElement>('#rail-building-list > *')].find((entry) =>
-          /Chancery House/u.test(entry.textContent ?? ''),
-        );
-        (card?.querySelector<HTMLElement>('button') ?? card)?.click();
-      });
-      /* Scrubbed to its end until Chancery House's day has been filed on the Engineer sheet. */
+      await page.click('#run');
       await page.waitForFunction(
         () => {
           const sheet = document.querySelector('#panel-report')?.textContent ?? '';

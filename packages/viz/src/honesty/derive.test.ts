@@ -43,6 +43,19 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
   Object.freeze([
     {
       reason:
+        'The Engineer surface’s watch-only gate — wave AN, lane AN-6, § D1323. `VIEWER_KEY_ROLES` ' +
+        'sorts every `ViewerState` key into `remakes-the-day` or `view`, two keys the gate compares ' +
+        'and no surface draws; `patchRemakesTheDay` answers a boolean and `watchOnlyRefusal` returns ' +
+        'whatever sentence its caller hands it, which is `shift/banking.ts#ATTEMPT_ENGINEER_WATCHES_ONLY`, ' +
+        'driven by `record/document.ts#verifyReplay`’s adapter by name.',
+      ids: [
+        'dev/engineerWindow.ts#VIEWER_KEY_ROLES',
+        'dev/engineerWindow.ts#patchRemakesTheDay',
+        'dev/engineerWindow.ts#watchOnlyRefusal',
+      ],
+    },
+    {
+      reason:
         'The stage press — wave AJ lane AJ-K, § D1129. `campaign/stagePress.ts#pressStage` is the one ' +
         'admission check followed by the shipped sequence, and it is derived only through ' +
         '`admitStageMove`, whose prose it returns inside `StagePress.admission` untouched. Every ' +
@@ -255,20 +268,12 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'change’s own `name`, which the FIXIT adapter drove through `standingExtrasFrom` and ' +
         '`repairRowOf` until the menu that drew them retired (§ D1020), and the schedule’s `note` fields, which are provenance for a reviewer and ' +
         'are drawn on no screen. `fixit/parse.ts`’s own exclusion three groups down is the same ' +
-        'argument for the same reason, and this is that file’s pricing half.',
+        'argument for the same reason, and this is that file’s pricing half. **The parser itself left ' +
+        'this list in wave AN** (GitHub issue #372, § D1295): `parsePriceSchedule`, `violationsIn`, ' +
+        '`priceOf`, `purchaseUnits` and `steppedPurchaseUnits` moved to `core`’s ' +
+        '`config/priceSchedule.ts`, where this derivation does not look, and `pricing/parse.ts` now ' +
+        're-exports them, so the five ids were ghosts and were deleted rather than kept.',
       ids: [
-        'pricing/parse.ts#parsePriceSchedule',
-        'pricing/parse.ts#violationsIn',
-        'pricing/parse.ts#priceOf',
-        'pricing/parse.ts#purchaseUnits',
-        /*
-         * GitHub issue #528, § D560. The same argument one function along: it returns a number, and
-         * its one literal is a refusal addressed to whoever asked a stepper for half a step or a
-         * negative one. What a player reads about a step is `fixitScreenModel.ts#fixitMachineryRows`’
-         * *"10 u per half a metre per second"*, which the FIXIT adapter drives and which this
-         * function does not write.
-         */
-        'pricing/parse.ts#steppedPurchaseUnits',
         'pricing/repairPrice.ts#pathsIn',
         'pricing/repairPrice.ts#changesBought',
         'pricing/repairPrice.ts#unpricedPathsIn',
@@ -320,13 +325,11 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          * dimension id whose options are floors, the rezone target id for a car taken out, and the
          * two functions returning `covers` paths. Dotted config paths and engine ids, on
          * `editorPathsOf`'s ground above — a path is not a sentence, and § 16 rule 11 is why every
-         * one of them is mapped to a phrase before it is drawn. `INERT_DIALS`' reasons are this
-         * module's record of why a dial is not drawn, read by `families.test.ts` and by nobody on a
-         * screen.
+         * one of them is mapped to a phrase before it is drawn. (`INERT_DIALS` left this list when
+         * § D1290 emptied it: an empty record produces no string, so it is no longer a producer.)
          */
         'fixit/families.ts#DIAL_CHANGE_IDS',
         'fixit/families.ts#PARKING_FLOOR_DIMENSION',
-        'fixit/families.ts#INERT_DIALS',
         'fixit/families.ts#doorDwellPathsOf',
         'fixit/families.ts#rezonePathsOf',
         'fixit/types.ts#OUT_OF_SERVICE',
@@ -769,6 +772,19 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'and what a player reads about an attempt is `shift/attempt.ts#DAY_ATTEMPT_COPY`, which the ' +
         '`EVERYDAY_MENU` adapter seeds by name.',
       ids: ['persist/attempt.ts#ATTEMPT_KEY', 'persist/attempt.ts#loadAttempts', 'persist/attempt.ts#saveAttempts'],
+    },
+    {
+      reason:
+        'The kept driver\'s slot — wave AN, lane AN-5, § D1318. `DRIVER_KEY` is a storage key, ' +
+        '`rememberDriver` and `forgetDriver` return nothing, and `rememberedDriverOf` returns a ' +
+        'dispatcher id or `undefined`. None of them returns a sentence; what a player reads about the ' +
+        'driver is the brief\'s own note, which names the profile the id resolves to.',
+      ids: [
+        'everyday/driverMemory.ts#DRIVER_KEY',
+        'everyday/driverMemory.ts#forgetDriver',
+        'everyday/driverMemory.ts#rememberDriver',
+        'everyday/driverMemory.ts#rememberedDriverOf',
+      ],
     },
     {
       reason:
@@ -1636,6 +1652,16 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'Which shaft tiers carry the plan-area surcharge — GitHub issue #429, § D1312. ' +
+        '`AREA_BANDED_SHAFT_PRICE_IDS` holds two `data/price-schedule.json` row ids, `new-car` and ' +
+        '`fifth-car`, and `shopTierPrice` reads it to return a number of units. Neither prints a ' +
+        'word: the row costs, the refusal and the shaft card a player reads are ' +
+        '`campaignModel.ts#shopTierRow`’s, `#SHOP_NO_SHAFT`’s and `#shaftDecisionOf`’s, which the ' +
+        'campaign adapter draws.',
+      ids: ['campaign/economy.ts#AREA_BANDED_SHAFT_PRICE_IDS', 'campaign/economy.ts#shopTierPrice'],
+    },
+    {
+      reason:
         'Assertions that two runs met the same crowd — GitHub issue #350 — and the three sites ' +
         'that make them. `crowdDifferencesOf` returns sentences naming the first legs that differ, ' +
         '`sameCrowd` is the predicate over it, `assertSameCrowd` throws with the pair’s own name in ' +
@@ -1940,8 +1966,27 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
-        'The week stake’s plumbing — wave AK, § D1176 to § D1178. `WEEK_LENGTH` is a number, derived ' +
-        'only because the region after it declares `DayStakeReason`’s switch values. `weekDealOf`, ' +
+        'The day-counting rule and the one-profile screen, plumbing only — wave AN, lane DQ-2, § D1343. ' +
+        '`DayStakeReason` and `dayStakeReasonOf` moved from `shift/weekStake.ts` into `shift/weekWay.ts` ' +
+        'so the week deal and the screen read one rule: `dayStakeReasonOf` returns one of its switch ' +
+        'values, and `dc10Of` is derived only because the region after it now declares them (as ' +
+        '`weekStake.ts#WEEK_LENGTH` was before the move). What a player reads of a day is ' +
+        '`weekStake.ts#dayStakeSentenceOf`, which the week adapter seeds for every census tower. ' +
+        '`shift/weekDominance.ts#weekDominanceIssues` is `weekWayIssues`’ twin for ' +
+        '`data/week-dominance.json`, content-author refusals that `weekDominance.test.ts` turns into a ' +
+        'failing test and no screen renders. `weekDominanceOf` returns a reading, and its one clause, ' +
+        'why an order is unmeasured, is read by `weekOrders.ts#weekOrderAdmissionOf`’s callers in tests ' +
+        'and by no screen: a refused or unmeasured order is simply not dealt.',
+      ids: [
+        'shift/weekWay.ts#dc10Of',
+        'shift/weekWay.ts#dayStakeReasonOf',
+        'shift/weekDominance.ts#weekDominanceIssues',
+        'shift/weekDominance.ts#weekDominanceOf',
+      ],
+    },
+    {
+      reason:
+        'The week stake’s plumbing — wave AK, § D1176 to § D1178. `weekDealOf`, ' +
         '`dayCountsToward`, `countedCleanOf`, `weekNeedOf`, `weekHasClosed`, `weekRollsOver` and ' +
         '`weekAdmitsANewcomer` return a deal, counts or booleans: a dealt day carries a sentence, and ' +
         'what a player reads of it is `dayStakeSentenceOf`, which the week adapter seeds for every ' +
@@ -1949,7 +1994,6 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'reads from the module is seeded by name in `honesty/surfaces.ts#seedWeekStake`. ' +
         '`weekClosedByThisClose` (wave AM, § D1246) is a boolean for the tower’s record of weeks.',
       ids: [
-        'shift/weekStake.ts#WEEK_LENGTH',
         'shift/weekStake.ts#weekClosedByThisClose',
         'shift/weekStake.ts#weekDealOf',
         'shift/weekStake.ts#dayCountsToward',
@@ -2012,13 +2056,16 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         '(`everyday/stageCall.ts`, seeded by name) and the report row (`shift/dayCalls.ts#dayCallRowOf`, ' +
         'seeded by the report adapter). Wave AK (§ D1166 to § D1168) adds more of the same kind: ' +
         '`DAY_CALL_DRIVER_ANSWERS` and `dayCallAnswersOf` are answer ids, `DAY_CALL_DRIVER_OFFER` is ' +
-        'three profile ids and `dayCallDriversOf` returns profiles, whose names reach a player only ' +
+        'profile ids (four since § D1337) and `dayCallDriversOf` returns profiles, whose names reach a player only ' +
         'through the card and the row; `dayCallChangeOf` returns an intervention, ' +
         '`DAY_CALL_FINAL_GOAL_IDS` is two goal ids, `dayCallLostGoalOf` returns a reading, and ' +
         '`DAY_ENDED_EARLY_ROW_ID` is a row id. `dayCallAdmits` left this list when it stopped ' +
         'reading `DAY_CALL_ANSWERS`.' +
         ' Wave AL (§ D1204) adds `dev/state.ts#dayCallsOpenOn`, the gate `dev/main.ts#dayCallOnStage` ' +
-        'asks, which returns one of three gate ids (`open`, `not-offered`, `shut`) and no word a player reads.',
+        'asks, which returns one of three gate ids (`open`, `not-offered`, `shut`) and no word a player reads.' +
+        ' Wave AN lane DQ-1 (§ D1335) adds `DAY_CALL_FAILED_ROW_ID`, a row id on `DAY_ENDED_EARLY_ROW_ID`’s precedent,' +
+        ' and (§ D1336) `DAY_CALL_WRINKLE_QUIET_ROW_ID`, another, and `dayCallIsWrinkleStart`, a boolean whose' +
+        ' literal is the rule id `wrinkle-start`.',
       ids: [
         'shift/dayCalls.ts#nextDayCallOf',
         'shift/dayCalls.ts#dayCallsOffered',
@@ -2033,6 +2080,9 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'shift/dayCalls.ts#DAY_CALL_FINAL_GOAL_IDS',
         'shift/dayCalls.ts#dayCallLostGoalOf',
         'shift/dayCalls.ts#DAY_ENDED_EARLY_ROW_ID',
+        'shift/dayCalls.ts#DAY_CALL_FAILED_ROW_ID',
+        'shift/dayCalls.ts#DAY_CALL_WRINKLE_QUIET_ROW_ID',
+        'shift/dayCalls.ts#dayCallIsWrinkleStart',
         'dev/state.ts#dayCallFactsOf',
         'dev/state.ts#dayCallsOpenOn',
         'dev/dayCallSession.ts#openDayCallSession',
@@ -2476,6 +2526,15 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'dev/ttiHistory.ts#TtiHistoryParseError',
         'dev/ttiHistory.ts#ttiRecordSchema',
       ],
+    },
+    {
+      reason:
+        'Two readings that return a band index and a verdict, not prose — wave AN lane AP-3, ' +
+        '§ D1301. `filedDayBandOf` answers `{ index, censored }` off a recording, and ' +
+        '`censusVerdictOf` answers `cleared` / `missed` / `ungraded`, the same vocabulary ' +
+        '`campaignDayVerdict` files by. What a player reads of either is `towerCardView`’s status ' +
+        'sentence and `dayCensusLineOf`’s line, which the Career front-page adapter drives.',
+      ids: ['everyday/campaignModel.ts#filedDayBandOf', 'everyday/campaignModel.ts#censusVerdictOf'],
     },
   ]);
 

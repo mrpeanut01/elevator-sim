@@ -309,11 +309,18 @@ export function fixSpentUnitsOf(progress: EverydayProgress, caseId: string): num
 }
 
 /**
- * Progress with `caseId`'s fix cost set to `units`, replacing any it held — seat C D5. Returns the
- * same object when that is already the kept figure.
+ * Progress with `caseId`'s fix cost set to `units` **where that is cheaper than what it held** —
+ * seat C D5, and [§ D1358](../../../../DECISIONS.md). Returns the same object when the kept figure is
+ * already `units` or less.
+ *
+ * It replaced whatever it held, so a fixed case or a cleared stage re-run as practice at a dearer
+ * order lost the par mark its cheaper clear had earned. The mark is earned by a clear (§ D1234), and
+ * a later clear that cost more takes nothing away, on § D1157's footing for the FIXED badge itself:
+ * so the record keeps the cheapest clear, and a practice run can only move it down.
  */
 export function progressWithFixSpent(progress: EverydayProgress, caseId: string, units: number): EverydayProgress {
-  if (fixSpentUnitsOf(progress, caseId) === units) return progress;
+  const kept = fixSpentUnitsOf(progress, caseId);
+  if (kept !== undefined && kept <= units) return progress;
   return {
     ...progress,
     fixSpent: [...(progress.fixSpent ?? []).filter((entry) => entry.caseId !== caseId), { caseId, units }],

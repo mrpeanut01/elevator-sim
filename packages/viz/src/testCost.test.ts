@@ -353,7 +353,16 @@ const ABOVE_CEILING: ReadonlyMap<string, { readonly count: number; readonly tota
      * this lane's regeneration against 389 s quiet. 244 500 000 + 3 600 000 = **248 100 000**.
      * Nothing existing was raised.
      */
-    ['viz', { count: 117, totalMs: 248_100_000 }],
+    /*
+     * **117 → 118 and 248 100 000 → 249 900 000, one case** — wave AN lane AN-5's
+     * `fixit/everyLeverRuns.test.ts`, the nightly half: every one-control route through every offered
+     * fix case pressed as the press site presses it, about six hundred runs. Gated on the route
+     * census's own `ELEVATOR_SIM_FIXIT_ROUTES` and registered in `deepTiers.test.ts`, so the default
+     * suite pays only its always-on half, the six tenancy positions at 3.7 s. Measured 672 s in one
+     * vitest process at load 16 to 20; **1 800 000 ms** is about 2.7× that.
+     * 248 100 000 + 1 800 000 = **249 900 000**. Nothing existing was raised.
+     */
+    ['viz', { count: 118, totalMs: 249_900_000 }],
     /*
      * **67 → 70, and the three are named** — GitHub issue #240's
      * `everyday/smallScreen.browser.test.ts`. Five of that file's eight annotations sit **at** this
@@ -496,8 +505,16 @@ const ABOVE_CEILING: ReadonlyMap<string, { readonly count: number; readonly tota
      * the gate to open. Its own waits are a 120 000 ms boot, a 60 000 ms filing and three shorter
      * polls, so it cannot sit under this project's 120 000 ms ceiling. Nothing existing was raised:
      * 26 760 000 + 300 000 = **27 060 000**.
+     *
+     * **99 → 100, and the one is named** — wave AN lane AN-2's case in
+     * `everyday/campaignJourney.browser.test.ts` at 300 000 ms (GitHub issue #582 item 3, § D1274):
+     * it seeds a career on contract day 18, runs and closes that day on the shipped bundle, presses
+     * the sheet's onward step to the desk and reads the contract sheet's refusal. It runs and closes
+     * a whole contract day, which is the work its seven siblings in that file are annotated at
+     * 300 000 ms for, and it failed on the bundle built before the fix. Nothing existing was raised:
+     * 27 060 000 + 300 000 = **27 360 000**.
      */
-    ['viz-browser', { count: 99, totalMs: 27_060_000 }],
+    ['viz-browser', { count: 100, totalMs: 27_360_000 }],
   ]);
 
 /**

@@ -144,7 +144,7 @@ describe('the sweep, pinned on its first ten seeds per contract', () => {
      */
     /*
      * **Re-measured again the same day, on the integrated tree** —
-     * [§ D963](../../../../DECISIONS.md). GitHub issue #587's lane rebalanced six of the seven
+     * [§ D963](../../../../DECISIONS.md). PR #587's lane rebalanced six of the seven
      * rungs and booked a car out of passenger service on each of their days
      * ([§ D914](../../../../DECISIONS.md)), so the slice above was pinned over rungs that had moved
      * by the time the wave merged. Six keys move again, and they are exactly the six rungs that

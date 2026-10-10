@@ -1,5 +1,5 @@
 /**
- * **Every shipped day whose verdict turns on a press, proved by running it** — GitHub issue
+ * **Every shipped day whose verdict turns on a press, proved by running it** — PR
  * **#587**, [§ D914](../../../../DECISIONS.md).
  *
  * ## What this is, and why it is not `pressDecidesTheDay.test.ts` grown by six

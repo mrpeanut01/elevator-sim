@@ -495,9 +495,10 @@ interface InertReason {
   /** Run options that make the dimension live. */
   readonly liveWith?: RunOverrides | undefined;
   /**
-   * Set when the live condition is a building that declares a duty — GitHub issue #481. No shipped
-   * building does, so the probe derives one: Midtown Office with car A declared goods, under a demand
-   * that gives it goods trips to be right or wrong about.
+   * Set when the live condition is a building that declares a duty — GitHub issue #481. One shipped
+   * building does since § D1290 (St Jude's car E, a bed lift), and the probe still derives its own:
+   * Midtown Office with car A declared goods, under a demand that gives it goods trips to be right or
+   * wrong about, so the obligation does not rest on one hospital's bed traffic.
    */
   readonly liveOnDutyBuilding?: boolean | undefined;
 }
@@ -505,14 +506,15 @@ interface InertReason {
 const DECLARED_INERT: Readonly<Record<string, InertReason>> = Object.freeze({
   /*
    * GitHub issue #481. A duty is priced only on a call that carries one, and a call carries one only
-   * in a building where some car declares a duty — which no shipped building does, by design: the
-   * control that lets a player declare one is the next step of `data/buildings/README.md` § *Duty*.
+   * in a building where some car declares a duty — which one shipped building does, St Jude's car E
+   * (§ D1290); the control that lets a player declare one is the next step of
+   * `data/buildings/README.md` § *Duty*.
    * Not a gate `activeWhen` can express, because the condition is a building rather than any
    * dispatcher parameter; the proof obligation below derives that building and requires a run to move.
    */
   'weights.dutyMismatch': {
     reason:
-      'a mismatch can be priced only on a call that carries a duty, and only a building in which some car declares a duty generates one; no shipped building declares one',
+      'a mismatch can be priced only on a call that carries a duty, and only a building in which some car declares a duty generates one; of the shipped buildings only St Jude declares one, on car E',
     liveOnDutyBuilding: true,
   },
 

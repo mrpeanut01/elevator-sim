@@ -32,6 +32,7 @@ import { actionBarFor, type ActionBarModel } from './actionBar.js';
 import type { EverydayHost } from './host.js';
 import {
   buildingView,
+  CONTRACT_COPY,
   contractView,
   towersView,
   type BuildingFacts,
@@ -52,7 +53,7 @@ import {
   EVERYDAY_TYPE as TYPE,
 } from './tokens.js';
 import type { EverydayState } from './types.js';
-import { openTowerOf, type BuildId, type CampaignTower } from '../campaign/career.js';
+import { needOf, openTowerOf, type BuildId, type CampaignTower } from '../campaign/career.js';
 import { parseBuilding, resolveBuilding } from '@elevator-sim/core/browser';
 import { worksHeldCarRefsOf } from '../campaign/works.js';
 import { drawElevation } from './elevation.js';
@@ -61,6 +62,21 @@ import { observationsAt } from '../live/observations.js';
 import type { WaitBandBasis } from '../live/types.js';
 import { shiftIsOver } from '../dev/leftRail.js';
 import type { GoalObservations } from '../shift/types.js';
+import { queueAt } from '../frame/overlay.js';
+import { systemClock } from '../playback/clock.js';
+import { drawCutaway, sizeCanvas } from './cutaway.js';
+import { stageGeometryOf } from './stageScreenModel.js';
+import { towerLoopOf, type TowerLoop } from './towerLoop.js';
+import {
+  DAY_CENSUS_CONTRACT_IDS,
+  censusVerdictOf,
+  type CareerDayCensus,
+  type CareerIntroView,
+  type CensusVerdict,
+  type FiledDayRecord,
+  type TowerCardView,
+} from './campaignModel.js';
+import { createOffThreadRunner } from '../dev/offThreadRuns.js';
 
 /* -------------------------------------------------------------------------- *
  * Module store — the two facts a `bar()` needs and a mount cannot pass it
@@ -196,6 +212,7 @@ export function campaignInputOf(host: EverydayHost): CampaignInput {
       name: config.name,
       spec: host.buildingSpecLine(id),
       startTimeFloors: host.buildingStartTimeFloors(id),
+      shafts: host.buildingShafts(id),
     });
   }
   const run = host.runState();
@@ -250,7 +267,77 @@ export function campaignInputOf(host: EverydayHost): CampaignInput {
       career.openTowerId === undefined
         ? []
         : (host.campaignHistory?.(career.openTowerId) ?? host.week().history),
+    /* The tower cards' filed days — GitHub issue #536, § D1301. Read only; nothing here writes. */
+    filedDays: host.campaignFiledDays?.(),
+    /* The desk's census of the day's own crowd — GitHub issue #571, § D1301. */
+    dayCensus: dayCensusOf(host),
   };
+}
+
+/* -------------------------------------------------------------------------- *
+ * The desk's census of the day's own crowd — GitHub issue #571, § D1301
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The census runner — module scope so its worker stays warm across visits, and lazy so importing
+ * this module starts nothing. `everyday/landingScreen.ts`'s pattern: the shell hands a screen no
+ * worker, and thirteen runs of a day do not belong on the thread that paints.
+ */
+const censusRunner = createOffThreadRunner({
+  spawn: () => new Worker(new URL('../dev/shiftWorker.ts', import.meta.url), { type: 'module' }),
+});
+/** The last census that landed, under the key of the day it was taken on. */
+let censusLanded: { readonly key: string; readonly census: CareerDayCensus } | undefined;
+/** The key last asked for, so a redraw does not ask twice for the same day. */
+let censusAsked: string | undefined;
+
+/** The open tower, when its contract takes a census at all — {@link DAY_CENSUS_CONTRACT_IDS}. */
+function censusTowerOf(host: EverydayHost): CampaignTower | undefined {
+  const tower = openTowerOf(host.campaign());
+  if (tower === undefined || !DAY_CENSUS_CONTRACT_IDS.includes(tower.id)) return undefined;
+  return tower;
+}
+
+/** The landed census, only while it is still of the day the desk is on. */
+function dayCensusOf(host: EverydayHost): CareerDayCensus | undefined {
+  const tower = censusTowerOf(host);
+  if (tower === undefined || censusLanded === undefined) return undefined;
+  const plan = host.careerDayCensusRuns?.(tower.id);
+  return plan !== undefined && plan.key === censusLanded.key ? censusLanded.census : undefined;
+}
+
+/**
+ * Take the census of the open tower's next day, once per day it could be, off the main thread.
+ * A run that fails draws no line, which is the honest default: nothing measured, nothing said.
+ */
+function askForCensus(host: EverydayHost, redraw: () => void): void {
+  const tower = censusTowerOf(host);
+  if (tower === undefined) return;
+  const plan = host.careerDayCensusRuns?.(tower.id);
+  if (plan === undefined || plan.key === censusLanded?.key || plan.key === censusAsked) return;
+  censusAsked = plan.key;
+  const runs = plan.runs();
+  const [first, ...rest] = runs.map((run) => ({
+    config: run.config,
+    outOfServiceCarIds: run.outOfServiceCarIds,
+    recordDecisions: false,
+  }));
+  if (first === undefined) return;
+  censusRunner.start({
+    runs: [first, ...rest],
+    onDone: (recordings) => {
+      const verdicts = new Map<string, CensusVerdict>();
+      runs.forEach((run, index) => {
+        const recording = recordings[index];
+        if (recording !== undefined) verdicts.set(run.dispatcherId, censusVerdictOf(tower, recording));
+      });
+      censusLanded = { key: plan.key, census: { towerId: tower.id, towerDay: plan.towerDay, verdicts } };
+      redraw();
+    },
+    onFailed: () => {
+      /* Nothing measured, so nothing said; the next day asks again. */
+    },
+  });
 }
 
 /** {@link campaignInputOf}'s basis, through the rail's own `shiftIsOver` rather than a second `>=`. */
@@ -462,6 +549,104 @@ function testRows(doc: Document, rows: readonly CampaignTestRow[]): HTMLElement 
 }
 
 /* -------------------------------------------------------------------------- *
+ * The career's front page — GitHub issue #536's permitted half, § D1301
+ * -------------------------------------------------------------------------- */
+
+/** The fresh career's intro, every word `campaignModel.ts#CAREER_INTRO_COPY`'s. */
+function introBlock(doc: Document, intro: CareerIntroView): HTMLElement {
+  const block = el(doc, 'section', 'everyday-towers-intro');
+  block.style.cssText = `${CARD};padding:16px 18px;margin-top:18px;max-width:80ch;background:${C.cardSunk}`;
+  block.append(eyebrow(doc, intro.heading, '0 0 8px'));
+  for (const text of intro.paragraphs) {
+    const para = el(doc, 'p', 'everyday-towers-intro-para', text);
+    para.style.cssText = `font-size:14px;line-height:1.55;color:${C.inkSoft};margin:0 0 8px;text-wrap:pretty`;
+    block.append(para);
+  }
+  block.append(eyebrow(doc, intro.chimesHeading, '12px 0 8px'));
+  for (const text of intro.chimes) {
+    const para = el(doc, 'p', 'everyday-towers-intro-chimes', text);
+    para.style.cssText = `font-size:14px;line-height:1.55;color:${C.inkSoft};margin:0 0 8px;text-wrap:pretty`;
+    block.append(para);
+  }
+  return block;
+}
+
+/**
+ * One tower card. The colour is a `var(--band-N)` token from `live/bands.ts#WAIT_BANDS`, written
+ * into CSS only — `render/tokens.ts` is what a canvas reads — and the status sentence beside it says
+ * the same thing in words, so colour is never the only signal.
+ */
+function towerCard(
+  doc: Document,
+  card: TowerCardView,
+  onOpen: () => void,
+): { readonly node: HTMLElement; readonly canvas: HTMLCanvasElement | undefined } {
+  const node = el(doc, 'div', 'everyday-towers-card');
+  node.dataset['tower'] = card.towerId;
+  node.dataset['band'] = card.bandIndex === undefined ? 'none' : String(card.bandIndex);
+  node.style.cssText = [
+    `${CARD}`,
+    'padding:12px 14px',
+    'display:flex',
+    'flex-direction:column',
+    'gap:6px',
+    'min-width:0',
+    `border-left:6px solid ${card.color ?? C.rule}`,
+  ].join(';');
+  const head = el(doc, 'div');
+  head.style.cssText = 'display:flex;align-items:baseline;gap:8px;flex-wrap:wrap';
+  const name = el(doc, 'span', 'everyday-towers-card-name', card.name);
+  name.style.cssText = 'font-size:14.5px;font-weight:600;flex:1 1 auto';
+  const day = el(doc, 'span', 'everyday-towers-card-day', card.day);
+  day.style.cssText = `${MONO};color:${C.label}`;
+  head.append(name, day);
+  node.append(head);
+  if (card.filed !== undefined) {
+    const filed = el(doc, 'div', 'everyday-towers-card-filed', card.filed);
+    filed.style.cssText = `${MONO};color:${C.ink}`;
+    node.append(filed);
+  }
+  let canvas: HTMLCanvasElement | undefined;
+  if (card.playable) {
+    canvas = el(doc, 'canvas', 'everyday-towers-card-canvas');
+    canvas.setAttribute('role', 'img');
+    canvas.setAttribute('aria-label', `${card.name}, ${card.filed ?? ''}: ${card.status}`);
+    canvas.style.cssText = `display:block;width:100%;height:150px;border-radius:${String(R.tile)}px;background:${C.cardSunk}`;
+    node.append(canvas);
+  }
+  const status = el(doc, 'div', 'everyday-towers-card-status', card.status);
+  status.style.cssText = `font-size:12px;line-height:1.45;color:${C.warmGrey}`;
+  const open = button(doc, 'everyday-towers-card-open', card.cta, true, onOpen);
+  open.style.alignSelf = 'flex-start';
+  open.setAttribute('aria-label', `${card.cta} ${card.name}`);
+  node.append(status, open);
+  return { node, canvas };
+}
+
+/** Paint one loop's current frame onto its canvas with the stage's own painter. */
+function paintLoop(canvas: HTMLCanvasElement, loop: TowerLoop): void {
+  if (!canvas.isConnected) return;
+  const ctx = sizeCanvas(canvas);
+  if (ctx === undefined) return;
+  const rect = canvas.getBoundingClientRect();
+  const played = loop.recording;
+  const frame = loop.frame();
+  drawCutaway(ctx, {
+    recording: played,
+    frame,
+    queues: queueAt(played, frame.simTimeS),
+    geometry: stageGeometryOf({
+      width: rect.width,
+      height: rect.height,
+      floors: played.floors,
+      shafts: played.shafts,
+      outOfServiceCarIds: played.outOfServiceCarIds,
+    }),
+    floorLabelOf: (id) => played.floors.find((floor) => floor.id === id)?.label ?? id,
+  });
+}
+
+/* -------------------------------------------------------------------------- *
  * `towers` — All buildings (§ 8.1)
  * -------------------------------------------------------------------------- */
 
@@ -475,9 +660,36 @@ function mountTowers(hostEl: HTMLElement, context: EverydayScreenContext): Mount
   root.style.cssText = 'max-width:1180px';
   hostEl.append(root);
 
+  /*
+   * **The tower cards' loops** — GitHub issue #536, § D1301. One transport per card, kept across
+   * redraws while the filed day under it is the same record, so a redraw on any career write does
+   * not send every picture back to the start of its day. One frame callback paints all of them.
+   * Each loop is built from `host` through `towerLoop.ts#TowerLoopSource`, which can only read.
+   */
+  const loops = new Map<string, { readonly filed: FiledDayRecord; readonly loop: TowerLoop }>();
+  let painted: { readonly canvas: HTMLCanvasElement; readonly loop: TowerLoop }[] = [];
+  let paintHandle: number | undefined;
+  const paint = (): void => {
+    paintHandle = undefined;
+    for (const entry of painted) paintLoop(entry.canvas, entry.loop);
+    if (painted.length > 0) paintHandle = doc.defaultView?.requestAnimationFrame(paint);
+  };
+  const loopFor = (towerId: string): TowerLoop | undefined => {
+    const filed = host.campaignFiledDays?.().get(towerId);
+    if (filed === undefined) return undefined;
+    const kept = loops.get(towerId);
+    if (kept !== undefined && kept.filed === filed) return kept.loop;
+    kept?.loop.stop();
+    const loop = towerLoopOf(host, towerId, systemClock());
+    if (loop === undefined) return undefined;
+    loops.set(towerId, { filed, loop });
+    return loop;
+  };
+
   const draw = (): void => {
     const view: TowersView = towersView(campaignInputOf(host));
     root.replaceChildren();
+    painted = [];
 
     /* ---- header ---- */
     const header = el(doc, 'div');
@@ -502,6 +714,25 @@ function mountTowers(hostEl: HTMLElement, context: EverydayScreenContext): Mount
       const notice = el(doc, 'p', 'everyday-towers-career-notice', view.careerNotice);
       notice.style.cssText = `font-size:14px;line-height:1.55;color:${C.inkSoft};margin:14px 0 0;padding:12px 14px;border:1px solid ${C.amberEdge};background:${C.amberWash};border-radius:${String(R.card)}px;max-width:74ch;text-wrap:pretty`;
       root.append(notice);
+    }
+
+    /* ---- the fresh career's intro, then the tower cards — #536, § D1301 ---- */
+    if (view.intro !== undefined) root.append(introBlock(doc, view.intro));
+    root.append(eyebrow(doc, view.cards.heading), note(doc, view.cards.sub));
+    const cards = el(doc, 'div', 'everyday-towers-cards');
+    cards.style.cssText = `display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:${String(GAP.row)}px;margin-top:10px`;
+    for (const card of view.cards.rows) {
+      const drawn = towerCard(doc, card, () => {
+        host.campaignAct({ kind: 'open-tower', towerId: card.towerId });
+        context.go('building');
+      });
+      const loop = drawn.canvas === undefined ? undefined : loopFor(card.towerId);
+      if (drawn.canvas !== undefined && loop !== undefined) painted.push({ canvas: drawn.canvas, loop });
+      cards.append(drawn.node);
+    }
+    root.append(cards);
+    if (painted.length > 0 && paintHandle === undefined) {
+      paintHandle = doc.defaultView?.requestAnimationFrame(paint);
     }
 
     /* ---- standing and the slots ---- */
@@ -758,6 +989,11 @@ function mountTowers(hostEl: HTMLElement, context: EverydayScreenContext): Mount
     unmount: () => {
       stop();
       liveHost = undefined;
+      painted = [];
+      if (paintHandle !== undefined) doc.defaultView?.cancelAnimationFrame(paintHandle);
+      paintHandle = undefined;
+      for (const entry of loops.values()) entry.loop.stop();
+      loops.clear();
     },
     primary: () => {
       const tower = openTowerOf(host.campaign()) ?? host.campaign().towers[0];
@@ -1028,6 +1264,12 @@ function mountBuilding(hostEl: HTMLElement, context: EverydayScreenContext): Mou
     if (tower !== undefined) {
       orderCard.append(standingOrderControls(doc, host, tower.id, view.order.view, draw));
       orderCard.append(note(doc, view.order.view.note));
+      /* GitHub issue #571's Career brief line, § D1301 — drawn only where the census says it. */
+      if (view.order.census !== undefined) {
+        const census = note(doc, view.order.census, 'everyday-building-census');
+        census.style.cssText += `;color:${C.inkSoft};font-weight:600`;
+        orderCard.append(census);
+      }
     }
     right.append(orderCard);
 
@@ -1108,7 +1350,11 @@ function mountBuilding(hostEl: HTMLElement, context: EverydayScreenContext): Mou
   };
 
   draw();
-  const stop = host.subscribe(draw);
+  askForCensus(host, draw);
+  const stop = host.subscribe(() => {
+    draw();
+    askForCensus(host, draw);
+  });
 
   return {
     unmount: () => {
@@ -1164,7 +1410,7 @@ function buildingBar(state: EverydayState): ActionBarModel {
   if (view === undefined) {
     return { ...base, primary: { ...base.primary, inert: NO_TOWER }, note: NO_TOWER };
   }
-  const [effectNote, travelNote] = base.noteVariants ?? [];
+  const [, travelNote] = base.noteVariants ?? [];
   if (view.need !== undefined) {
     const picked = view.options?.rows.find((row) => row.id === pickedOption);
     return {
@@ -1174,7 +1420,14 @@ function buildingBar(state: EverydayState): ActionBarModel {
         label: (picked === undefined ? chooseLabel : sendLabel) ?? base.primary.label,
         ...(picked === undefined ? { inert: NO_ANSWER_PICKED } : {}),
       },
-      note: picked?.effect ?? effectNote ?? travelNote,
+      /*
+       * The picked option's effect, or the press's own reason while nothing is picked —
+       * [§ D1357](../../../../DECISIONS.md). This fell back to the § 3.3 cell itself,
+       * `⟨the picked option's effect⟩`, which is a placeholder and is never drawn, and the cell after
+       * it (*you can answer while the day plays*) is not true of a desk whose press runs no day until
+       * it is answered. The renewal reached this arm on every month's end once days 19 and 20 played.
+       */
+      note: picked?.effect ?? NO_ANSWER_PICKED,
     };
   }
   return {
@@ -1476,10 +1729,56 @@ function mountContract(hostEl: HTMLElement, context: EverydayScreenContext): Mou
     /* ---- terms and the shaft ---- */
     const bottom = el(doc, 'div');
     bottom.style.cssText = `display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:${String(GAP.block)}px;margin-top:${String(GAP.section)}px`;
-    const termsCard = el(doc, 'div', 'everyday-contract-terms');
-    termsCard.style.cssText = `${CARD};padding:14px 16px`;
-    const termsHeading = el(doc, 'h2', undefined, view.terms.heading);
-    termsHeading.style.cssText = `font-family:${TYPE.heading};font-size:16px;font-weight:600;margin:0 0 8px`;
+    /*
+     * **The contract, set out as a document** — GitHub issue #536, § D1301. Numbered clauses on a
+     * paper sheet, the service levels as a list with where their bars come from said beneath them,
+     * and the month's standing as the document's schedule. Every word is
+     * `campaignModel.ts#contractDocumentOf`'s; the class is kept so the journey test's read of the
+     * terms still finds them.
+     */
+    const termsCard = el(doc, 'div', 'everyday-contract-terms everyday-contract-document');
+    termsCard.style.cssText = [
+      `border:1px solid ${C.rule}`,
+      `border-radius:${String(R.card)}px`,
+      `background:${C.paper}`,
+      'padding:20px 22px',
+      'grid-column:1 / -1',
+      'max-width:78ch',
+    ].join(';');
+    /* Read through a local: `pageTitle.test.ts` refuses the global's title spelled anywhere in the viewer. */
+    const contractDoc = view.document;
+    const docTitle = el(doc, 'h2', 'everyday-contract-document-title', contractDoc.title);
+    docTitle.style.cssText = `font:600 13px ${TYPE.mono};letter-spacing:.2em;text-align:center;margin:0;color:${C.ink}`;
+    const parties = el(doc, 'p', 'everyday-contract-document-parties', contractDoc.parties);
+    parties.style.cssText = `font-size:13px;text-align:center;color:${C.warmGrey};margin:6px 0 14px;padding-bottom:12px;border-bottom:1px solid ${C.ruleLight}`;
+    termsCard.append(docTitle, parties);
+    for (const clause of contractDoc.clauses) {
+      const block = el(doc, 'div', 'everyday-contract-clause');
+      block.style.cssText = 'display:grid;grid-template-columns:2.2em minmax(0,1fr);gap:4px 8px;margin:0 0 12px';
+      const number = el(doc, 'div', undefined, `${clause.number}.`);
+      number.style.cssText = `${MONO};color:${C.label}`;
+      const body = el(doc, 'div');
+      const heading = el(doc, 'div', 'everyday-contract-clause-heading', clause.heading);
+      heading.style.cssText = 'font-size:13.5px;font-weight:600';
+      const text = el(doc, 'p', 'everyday-contract-clause-body', clause.body);
+      text.style.cssText = `font-size:13px;line-height:1.55;color:${C.inkSoft};margin:2px 0 0;text-wrap:pretty`;
+      body.append(heading, text);
+      if (clause.levels !== undefined) {
+        const list = el(doc, 'ol', 'everyday-contract-levels');
+        list.style.cssText = `margin:6px 0 0;padding-left:1.4em;font-size:13px;line-height:1.55;color:${C.ink}`;
+        for (const level of clause.levels) list.append(el(doc, 'li', 'everyday-contract-level', level.text));
+        body.append(list);
+      }
+      if (clause.basisNote !== undefined) {
+        const basis = el(doc, 'p', 'everyday-contract-basis', clause.basisNote);
+        basis.style.cssText = `font-size:12px;line-height:1.5;color:${C.warmGrey};margin:6px 0 0;font-style:italic`;
+        body.append(basis);
+      }
+      block.append(number, body);
+      termsCard.append(block);
+    }
+    const termsHeading = el(doc, 'h3', undefined, view.terms.heading);
+    termsHeading.style.cssText = `font-family:${TYPE.heading};font-size:14px;font-weight:600;margin:14px 0 6px;padding-top:12px;border-top:1px solid ${C.ruleLight}`;
     termsCard.append(termsHeading);
     for (const row of view.terms.rows) {
       const line = el(doc, 'div', 'everyday-contract-term');
@@ -1511,6 +1810,12 @@ function mountContract(hostEl: HTMLElement, context: EverydayScreenContext): Mou
     primary: () => {
       const tower = openTowerOf(host.campaign());
       if (tower === undefined) return;
+      /*
+       * Guarded as well as inert, on `postRun.ts`'s ground (a keyboard route into a handler): a
+       * standing renewal is the desk's to answer, and this press used to run the day past it —
+       * § D1274, and `campaignModel.ts#CONTRACT_COPY.renewalFirst` for the sentence.
+       */
+      if (needOf(tower)?.kind === 'renewal') return;
       host.runCampaignDay(tower.id);
       context.go('stage');
     },
@@ -1544,6 +1849,22 @@ function contractBar(state: EverydayState): ActionBarModel {
       ...base,
       primary: { ...base.primary, label: restartLabel ?? base.primary.label },
       note: overNote ?? 'this month is over — the difficulty you pick sets the month',
+    };
+  }
+  /*
+   * § D1274: the renewal is the desk's, so this sheet runs no day over it and says why on the press.
+   * Since § D1357 it stands once day 20 has closed, so the day the press would run is the next
+   * month's first, and the label names that day rather than a twenty-first.
+   */
+  if (needOf(tower)?.kind === 'renewal') {
+    return {
+      ...base,
+      primary: {
+        ...base.primary,
+        label: (lockLabel ?? '').replace('⟨N⟩', '1'),
+        inert: CONTRACT_COPY.renewalFirst,
+      },
+      note: CONTRACT_COPY.renewalFirst,
     };
   }
   return {

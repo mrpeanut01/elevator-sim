@@ -34,7 +34,15 @@
 
 import type { RunInterventionConfig } from '@elevator-sim/core/browser';
 
-import { DAY_CALL_LONG_WAIT_S, dayCallCountsLineOf, type DayCallRecord } from '../shift/dayCalls.js';
+import {
+  DAY_CALL_LONG_WAIT_S,
+  dayCallCountsLineOf,
+  dayCallFailedSentenceOf,
+  dayCallWrinkleQuietSentenceOf,
+  type DayCallFailure,
+  type DayCallRecord,
+  type DayCallWrinkleQuiet,
+} from '../shift/dayCalls.js';
 
 /** One row on the stage. */
 export interface StageCallRowView {
@@ -89,4 +97,72 @@ export function stageCallRowsOf(input: {
     });
   }
   return rows;
+}
+
+/**
+ * **A moment whose question a run could not be made for, on the stage** — wave AN, lane DQ-1,
+ * [§ D1335](../../../../DECISIONS.md). One row per such moment, from the instant the playhead
+ * reaches it and never before: the session runs ahead of the stage, and a row printed early would say
+ * where somebody is about to have waited a minute. Its words are the report row's sentence
+ * (`shift/dayCalls.ts#dayCallFailedSentenceOf`), so the two surfaces describe the fault alike, and it
+ * carries no figure because nothing was compared.
+ */
+export function stageCallFailedRowsOf(input: {
+  readonly failures: readonly DayCallFailure[];
+  readonly playheadS: number;
+  readonly clockOf: (simTimeS: number) => string;
+}): readonly StageCallRowView[] {
+  const instants = [...new Set(input.failures.map((failure) => failure.atS))].sort((a, b) => a - b);
+  return instants
+    .filter((atS) => input.playheadS >= atS)
+    .map((atS, index) => ({
+      id: `stage-call-failed-${String(index + 1)}`,
+      heading: `No call at ${input.clockOf(atS)}`,
+      counts: dayCallFailedSentenceOf([input.clockOf(atS)]),
+      note: STAGE_CALL_FAILED_NOTE,
+    }));
+}
+
+/** The failed row's clause: the rule, which costs one moment and not the day. No figure, no forecast. */
+export const STAGE_CALL_FAILED_NOTE =
+  'A run that cannot be made costs the stage that one moment, not the rest of the day’s calls.';
+
+/**
+ * **When a wrinkle that raised no call may say so** — wave AN, lane DQ-1,
+ * [§ D1336](../../../../DECISIONS.md): after its window, and after the last of its turned-down
+ * moments can be observed (that moment's ten minutes and the minute its last rider needs, as a call
+ * row waits), or at the run's end where either runs into it. Before then the line would say the
+ * wrinkle raised nothing while it could still raise something, or quote counts of riders still
+ * standing.
+ */
+export function stageCallWrinkleQuietDueAtS(quiet: DayCallWrinkleQuiet, endedAt: number): number {
+  const counted = quiet.refused.map((record) => record.windowEndS + DAY_CALL_LONG_WAIT_S);
+  return Math.min(Math.max(quiet.wrinkle.endS, ...counted), endedAt);
+}
+
+/** The wrinkle row's clause: whose runs the counts are, as the call row's note says it of a call. */
+export const STAGE_CALL_WRINKLE_NOTE =
+  'On this crowd, with every press before that moment kept and nothing pressed after it.';
+
+/**
+ * The wrinkle's past-tense row on the stage, once due ({@link stageCallWrinkleQuietDueAtS}): the
+ * report row's sentence, word for word (`shift/dayCalls.ts#dayCallWrinkleQuietSentenceOf`), so the
+ * two cannot differ, and {@link STAGE_CALL_WRINKLE_NOTE}, since its counts are runs of a call's kind.
+ */
+export function stageCallWrinkleQuietRowsOf(input: {
+  readonly quiet: DayCallWrinkleQuiet | undefined;
+  readonly playheadS: number;
+  readonly endedAt: number;
+  readonly clockOf: (simTimeS: number) => string;
+}): readonly StageCallRowView[] {
+  const quiet = input.quiet;
+  if (quiet === undefined || input.playheadS < stageCallWrinkleQuietDueAtS(quiet, input.endedAt)) return [];
+  return [
+    {
+      id: 'stage-call-wrinkle-quiet',
+      heading: `${quiet.wrinkle.name} raised no call`,
+      counts: dayCallWrinkleQuietSentenceOf(quiet, input.clockOf),
+      note: STAGE_CALL_WRINKLE_NOTE,
+    },
+  ];
 }

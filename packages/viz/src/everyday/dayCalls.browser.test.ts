@@ -91,7 +91,8 @@ async function waitForToday(page: Page): Promise<void> {
 /**
  * Close the day from wherever the stage is, skipping what is left, and wait for the report. Since
  * § D1151 a skip stops at each call it has not had an answer to, so it is pressed until the day
- * has run out — each press with a card up is that call's answer, recorded as skipped.
+ * has run out — with a card up the first press asks (§ D1324) and the next is that call's answer,
+ * recorded as skipped.
  */
 async function closeTheDay(page: Page): Promise<string> {
   await page.waitForFunction(
