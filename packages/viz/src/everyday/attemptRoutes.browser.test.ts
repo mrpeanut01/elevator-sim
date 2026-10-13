@@ -196,9 +196,14 @@ describe.skipIf(!HAS_BROWSER)('the attempt’s routes, before it begins and at i
        * is exactly the practice crowd the shell dealt (`shift/scoredCrowd.test.ts`); a sandbox day is a
        * mode week, so the address keeps the week's crowd and is not read here.
        */
-      expect(await textOf(page, '.everyday-stage-practice'), 'the run was not labelled a practice crowd').toBe(
-        PRACTICE_DAY_SENTENCES.practiceCrowd,
-      );
+      /*
+       * Polled rather than read once: the line is written by the stage's frame draw, which can land
+       * a frame after the run does, and a single read straight after {@link stageWithARun} raced it
+       * (red once in CI on PR #623, green locally three times of three).
+       */
+      await expect
+        .poll(() => textOf(page, '.everyday-stage-practice'), { message: 'the run was not labelled a practice crowd', timeout: 15_000 })
+        .toBe(PRACTICE_DAY_SENTENCES.practiceCrowd);
       expect(await storedAttempt(page), 'the workshop’s run began the day’s attempt').toBeUndefined();
 
       await page.locator('.everyday-bar-back').click();
