@@ -264,6 +264,7 @@ import { goalsForDay, readGoals } from '../shift/goals.js';
 import { shiftObservationsOf } from '../shift/observations.js';
 import type { DayAttempt } from '../shift/attempt.js';
 import { decidingCallOf } from '../shift/dayClose.js';
+import { DAY_NOT_BEGUN_HOLDS_ITS_CROWD } from '../shift/banking.js';
 import { clockOf, type ShapedDayReport } from '../shift/report.js';
 import type { TomorrowBriefing } from '../shift/tomorrow.js';
 import {
@@ -345,6 +346,9 @@ import {
   type CareerCloseInput,
   type CareerDayCalls,
 } from './careerCalls.js';
+
+/** A sandbox day that moves nothing: the day as it runs, on whatever crowd {@link runSandboxDay} deals. */
+const NO_SANDBOX_PRESSES: SandboxPresses = Object.freeze({ building: undefined, pattern: undefined, dwell: undefined });
 
 /**
  * What a read of today's board came back with — four states, because a screen that collapses them
@@ -2527,6 +2531,16 @@ export interface EverydayHostBindings {
    * would make. Absent, nothing is refused, which is every test host that keeps no attempt.
    */
   attemptHold?(patch?: Partial<ViewerState>): string | undefined;
+  /**
+   * **The practice crowd a run of the week's day on `seed` must meet instead**, or `undefined` —
+   * wave AO, lane AO-1b, [§ D1362](../../../../DECISIONS.md). A crowd answers where `seed` is the
+   * crowd the day counts on and the day has not begun: a scored week day the week has not closed,
+   * with no attempt standing, on which *Start the day* would begin one (§ D1218). `dev/main.ts`
+   * answers `shift/scoredCrowd.ts#practiceCrowdOf` there and keeps it, so the stage and the close
+   * name the run's ground. Absent, nothing is a rehearsal, which is every test host that keeps no
+   * attempt.
+   */
+  rehearsalCrowdFor?(seed: bigint): bigint | undefined;
   /** § D1218 — where the stage opens the attempt's run, or `undefined`. */
   attemptResumeAtS?(recording: VizRecording): number | undefined;
   /** § D1239 — the ground the run on the stage would close as practice on, or `undefined` where it banks. */
@@ -4085,6 +4099,51 @@ export function createEverydayHost(
   }
 
   /**
+   * **A sandbox day: the week's day with `presses`, over the week and never on it** — wave AO, lane
+   * AO-2, [§ D1368](../../../../DECISIONS.md), {@link EverydayHost.runSandbox}'s body, and since wave
+   * AO's lane AO-1b ([§ D1362](../../../../DECISIONS.md)) also the run {@link EverydayHost.startRun}
+   * makes of a day that has not begun. Where the crowd the day would run on is the one it counts on
+   * and its attempt has not begun, the run meets {@link EverydayHostBindings.rehearsalCrowdFor}'s
+   * practice crowd instead, so no surface but the brief's *Start the day* plays the scored crowd
+   * before the attempt does. The caller has already asked § D1360's question.
+   */
+  function runSandboxDay(presses: SandboxPresses): void {
+    /* The career's record back first, so what is kept is the Scenario week (`pressTodaysRun`'s own first step). */
+    releaseCareer();
+    leaveSandbox();
+    /*
+     * The day's crowd and shape **while the week still stands on its contract**: on the sandbox
+     * day's week `dealPatchFor` and `contractSliceFor` answer nothing, so a slice-day tower would
+     * otherwise run whatever length stood rather than its day's.
+     */
+    const before = sandboxBeforeOf(b.state());
+    const dealt = dealPatchFor(b, b.state());
+    const shape = dayPatchFor(b, { ...b.state(), ...dealt });
+    /*
+     * § D1362: the shape is the shared day's (a slice's length follows the shared crowd, § D1095),
+     * and only then is the crowd swapped for the practice one, which the restore takes back off.
+     */
+    const practice = b.rehearsalCrowdFor?.(dealt.seed ?? b.state().seed);
+    const crowd = practice === undefined ? dealt : { seed: practice };
+    sandboxSession = { before, recording: b.state().recording };
+    b.applyPatch({ ...crowd, ...shape, ...sandboxPatchOf({ ...b.state(), ...crowd, ...shape }, b.resources, presses) });
+    notifyCampaign();
+    pressTodaysRun(() => {
+      b.startRun();
+    });
+  }
+
+  /**
+   * Whether a run of the week's day pressed now would meet the crowd that day counts on before its
+   * attempt has begun — [§ D1362](../../../../DECISIONS.md). Asked over the crowd the press would
+   * deal, which is what {@link pressTodaysRun} runs.
+   */
+  function wouldRehearse(): boolean {
+    const dealt = dealPatchFor(b, b.state());
+    return b.rehearsalCrowdFor?.(dealt.seed ?? b.state().seed) !== undefined;
+  }
+
+  /**
    * **One question before any Everyday write or run that would reach a scored attempt's day** —
    * wave AO, lane AO-1, [§ D1360](../../../../DECISIONS.md). `dev/main.ts` answers it with § D1323's
    * `watchOnlyRefusal` in the Everyday words: with no patch it is an ask for a run of the day on
@@ -4340,6 +4399,15 @@ export function createEverydayHost(
       /* § D1360: before the press's own patch, so a refused press moves nothing on the attempt's week. */
       const held = attemptHoldOver();
       if (held !== undefined) return held;
+      /*
+       * § D1362: before *Start the day*, a run of the day from any other door (the workshop's, the
+       * stage's outside the daily flow) is a sandbox day on a practice crowd, so it neither rehearses
+       * the scored crowd nor stands on the week it would otherwise file into.
+       */
+      if (wouldRehearse()) {
+        runSandboxDay(NO_SANDBOX_PRESSES);
+        return undefined;
+      }
       pressTodaysRun(() => {
         b.startRun();
       });
@@ -4445,6 +4513,8 @@ export function createEverydayHost(
           endedAt: recording.endedAt,
           log: b.state().interventions,
           clockOf: clock,
+          /* § D1433: the rail's own goals, so each row's readings are graded as the rail grades. */
+          goals: goalsForDay(b.state().week.day, horizonOf(b)),
         }),
         /* § D1335: a moment a run could not be made for, from the instant the playhead reaches it. */
         ...stageCallFailedRowsOf({ failures, playheadS: atS, clockOf: clock }),
@@ -4977,23 +5047,7 @@ export function createEverydayHost(
       /* § D1360: a sandbox day plays the attempt's crowd, so it is refused while an attempt stands. */
       const held = attemptHoldOver();
       if (held !== undefined) throw new Error(held);
-      /* The career's record back first, so what is kept is the Scenario week (`pressTodaysRun`'s own first step). */
-      releaseCareer();
-      leaveSandbox();
-      /*
-       * The day's crowd and shape **while the week still stands on its contract**: on the sandbox
-       * day's week `dealPatchFor` and `contractSliceFor` answer nothing, so a slice-day tower would
-       * otherwise run whatever length stood rather than its day's.
-       */
-      const before = sandboxBeforeOf(b.state());
-      const dealt = dealPatchFor(b, b.state());
-      const shape = dayPatchFor(b, { ...b.state(), ...dealt });
-      sandboxSession = { before, recording: b.state().recording };
-      b.applyPatch({ ...dealt, ...shape, ...sandboxPatchOf({ ...b.state(), ...dealt, ...shape }, b.resources, presses) });
-      notifyCampaign();
-      pressTodaysRun(() => {
-        b.startRun();
-      });
+      runSandboxDay(presses);
     },
     leaveSandbox: () => {
       leaveSandbox();
@@ -5529,6 +5583,8 @@ export function createEverydayHost(
       /* § D1360: a retake of the call is a run of the day, so not while that day's attempt stands. */
       const held = attemptHoldOver();
       if (held !== undefined) return held;
+      /* § D1362: nor before it has begun, on the crowd it counts on; a practice crowd has no such call. */
+      if (wouldRehearse()) return DAY_NOT_BEGUN_HOLDS_ITS_CROWD;
       releaseCareer();
       const state = b.state();
       const contractId = state.week.contractId;
@@ -5661,6 +5717,11 @@ export function createEverydayHost(
           seed: BigInt(record.seed),
         });
         if (held !== undefined) return held;
+        /*
+         * § D1362: a watched crowd that is the one the week's unbegun day counts on would be that day
+         * played before its attempt, and the point of this press is that crowd, so it is refused.
+         */
+        if (b.rehearsalCrowdFor?.(BigInt(record.seed)) !== undefined) return DAY_NOT_BEGUN_HOLDS_ITS_CROWD;
       }
       b.playThisCrowd(run);
       return undefined;

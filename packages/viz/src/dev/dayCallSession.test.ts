@@ -20,6 +20,7 @@ import type { DispatcherProfile, RunInterventionConfig } from '@elevator-sim/cor
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import type { VizRecording } from '../contract/types.js';
+import { queueAt } from '../frame/overlay.js';
 import { recordRun } from '../record/recordRun.js';
 import { todaysScenarioDayState } from '../shift/contractDay.test-helper.js';
 import {
@@ -699,8 +700,14 @@ describe('a wrinkle asks who drives at its start, admitted where the day’s ver
     } as VizRecording;
   }
 
-  function lateFinishSession(goals: readonly ShiftGoal[] | undefined, asked: string[] = [], inFlight?: (() => void)[], split = true) {
-    const day = threePeakDay();
+  function lateFinishSession(
+    goals: readonly ShiftGoal[] | undefined,
+    asked: string[] = [],
+    inFlight?: (() => void)[],
+    split = true,
+    shape: (day: VizRecording) => VizRecording = (day) => day,
+  ) {
+    const day = shape(threePeakDay());
     return openDayCallSession(
       {
         planWith: fakePlan,
@@ -753,6 +760,35 @@ describe('a wrinkle asks who drives at its start, admitted where the day’s ver
     const grade = (observations: Observations): string =>
       readGoals(worstWaitOnly(), observations).every((reading) => reading.state === 'met') ? 'Shift cleared' : 'Shift missed';
     expect(dayCallRowOf(record!, 1, grade, String).why).toContain('The day read');
+  });
+
+  /*
+   * Wave AO, lane DR-1, § D1434: a call admitted on the verdict alone, with nobody standing at its
+   * second, put *Nobody is standing at the landings* over a row of zeros. It is turned down; the
+   * same start with somebody standing (the case above) is still raised.
+   */
+  it('turns down a start admitted on the verdict alone where nobody is standing at its second — § D1434', () => {
+    /* Everybody who arrived in the 100 s up to the start boards as they arrive, so nobody stands at 5 460 s. */
+    const empty = (day: VizRecording): VizRecording =>
+      ({
+        ...day,
+        legs: day.legs.map((leg) =>
+          leg.arrivedAt < lateFinish.startS - 100 || leg.arrivedAt > lateFinish.startS
+            ? leg
+            : { ...leg, boardedAt: leg.arrivedAt, alightedAt: leg.arrivedAt + 30 },
+        ),
+      }) as VizRecording;
+    expect(queueAt(empty(threePeakDay()), lateFinish.startS).every((queue) => queue.total === 0)).toBe(true);
+    expect(queueAt(threePeakDay(), lateFinish.startS).some((queue) => queue.total > 0)).toBe(true);
+    const session = lateFinishSession(worstWaitOnly(), [], undefined, true, empty);
+    const raised: number[] = [];
+    for (let call = session.onStage(); call?.raised === true; call = session.onStage()) {
+      raised.push(call.call.atS);
+      session.answer('leave', () => {});
+    }
+    /* Red before § D1434: the start was raised here, on the verdict, over nobody. */
+    expect(raised).toEqual([]);
+    expect(session.records()).toEqual([]);
   });
 
   it('raises nothing on the verdict elsewhere, and nothing at the start without the day’s goals — the negative controls', () => {

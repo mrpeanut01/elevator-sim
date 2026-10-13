@@ -46,6 +46,7 @@ import {
   nextDayCallOf,
   type DayCallInput,
   type DayCallRecord,
+  dayCallGapSentenceOf,
 } from './dayCalls.js';
 import { contractBuildings } from './contractDay.test-helper.js';
 import { goalsForDay } from './goals.js';
@@ -341,6 +342,38 @@ describe('the report’s row for a call', () => {
         '12 with park the cars in the lobby, 7 with spread the cars across the tower and 15 with leave them',
       );
       expect(row.why.endsWith(DAY_CALL_ROW_NOTE), arm).toBe(true);
+    }
+  });
+
+  /*
+   * Wave AO, lane DR-1, § D1433: the answer with the fewest one-minute waits is spread (7), and where
+   * the day split and spread missed, the row names the goal it missed with its figure.
+   */
+  it('says where the count’s favourite missed the day, with the goal and its figure, and not otherwise', () => {
+    const worst = goalsForDay(1).find((goal) => goal.id === 'worst-wait');
+    if (worst === undefined) throw new Error('the day has a worst-wait goal');
+    const goal = { ...worst, bar: 200 };
+    const judge = (observations: Observations) =>
+      observations.worstWaitS > 200
+        ? {
+            verdict: 'missed' as const,
+            readings: [{ goal, state: 'missed' as const, observed: observations.worstWaitS, display: '', progressPct: 100, glyph: '' }],
+          }
+        : { verdict: 'cleared' as const, readings: [] };
+    const missedByFavourite = dayCallRowOf(record('park-cars-lobby', [150, 250, 250]), 1, grade, clock, judge);
+    expect(missedByFavourite.why).toContain(
+      'The fewest riders waited a minute with spread the cars across the tower, and the day missed with it: the ' +
+        'worst-wait goal read 250 s against a bar of 200 s.',
+    );
+    expect(dayCallGapSentenceOf(record('park-cars-lobby', [150, 250, 250]), judge)).toBeDefined();
+    /* Controls: the favourite cleared; nobody cleared, so there is no split to set the count against. */
+    expect(dayCallGapSentenceOf(record('leave', [250, 150, 250]), judge)).toBeUndefined();
+    expect(dayCallGapSentenceOf(record('leave', [250, 250, 250]), judge)).toBeUndefined();
+    expect(dayCallRowOf(record('leave', [250, 150, 250]), 1, grade, clock, judge).why).not.toContain('The fewest riders');
+    /* And without the report's judgement the row says nothing of it, as before. */
+    expect(dayCallRowOf(record('park-cars-lobby', [150, 250, 250]), 1, grade, clock).why).not.toContain('The fewest riders');
+    for (const phrase of [...CAUSAL, ...ESTIMATE, ...MECHANISM, ...GENERAL]) {
+      expect(says(dayCallGapSentenceOf(record('park-cars-lobby', [150, 250, 250]), judge) ?? '', phrase), phrase).toBe(false);
     }
   });
 

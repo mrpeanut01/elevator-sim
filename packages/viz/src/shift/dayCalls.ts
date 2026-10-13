@@ -88,6 +88,8 @@ import { WAIT_BANDS } from '../live/bands.js';
 
 import type { BookedOutCar } from './bookedOut.js';
 import { CALL_BANDS, driverOfferOf } from './callBands.js';
+import type { DayCallMaxima } from './dayCallMaxima.js';
+import { goalPlainNameOf } from './goals.js';
 import { PRESS_CALL_SKIPPED_WHAT } from './callRow.js';
 import type { DayAct } from './dayLength.js';
 import { firstMinuteWaitIn, type PressCall, type PressCallRule } from './pressCall.js';
@@ -627,6 +629,13 @@ export interface DayCallRecord {
    * instant alone. Absent on a peak's call, and on a record written before it.
    */
   readonly wrinkle?: true | undefined;
+  /**
+   * **Each answer's two final goals, read through the day from the call** — wave AO, lane DR-1,
+   * [§ D1433](../../../../DECISIONS.md), `shift/dayCallMaxima.ts`. Taken at the raise from the three
+   * runs, so the stage's row reads them at its playhead on a resumed attempt as on an unbroken one.
+   * Absent on a record written before it, which keeps its counts-only row.
+   */
+  readonly maxima?: DayCallTriple<DayCallMaxima> | undefined;
 }
 
 /**
@@ -928,6 +937,12 @@ export function dayCallRowOf(
   index: number,
   gradeOf: (observations: Observations) => string,
   clockOf: (simTimeS: SimTime) => string,
+  /**
+   * The report's own judgement of one run — its verdict and its readings against the sheet's goals —
+   * for {@link dayCallGapSentenceOf} (wave AO, lane DR-1, [§ D1433](../../../../DECISIONS.md)).
+   * Absent, the row says nothing about the count's favourite.
+   */
+  judgeOf?: (observations: Observations) => DayCallRunJudgement,
 ): ReportDiagnosis {
   const at = clockOf(record.atS);
   const question = record.question ?? 'placement';
@@ -959,15 +974,68 @@ export function dayCallRowOf(
       : ` The day read ${listOf(
           [...grades.entries()].map(([line, answered]) => `${line} with ${listOf(answered.map(wordsOf))}`),
         )}.`;
+  const gap = judgeOf === undefined ? undefined : dayCallGapSentenceOf(record, judgeOf);
   return {
     id: dayCallRowIdOf(index),
     when: at,
     what,
     why:
       'On this crowd the day was run three ways from the call, with every press before it kept and ' +
-      `nothing pressed after it. ${dayCallCountsLineOf(record, clockOf)}${verdict} ${DAY_CALL_ROW_NOTE}`,
+      `nothing pressed after it. ${dayCallCountsLineOf(record, clockOf)}${verdict}${gap === undefined ? '' : ` ${gap}`} ` +
+      DAY_CALL_ROW_NOTE,
     tone: 'plain',
   };
+}
+
+/** One run as the report judges it: the day's verdict and its readings against the sheet's goals. */
+export interface DayCallRunJudgement {
+  readonly verdict: 'cleared' | 'missed' | 'ungraded';
+  readonly readings: readonly GoalReading[];
+}
+
+/**
+ * **Where the count's favourite missed the day** — wave AO, lane DR-1,
+ * [§ D1433](../../../../DECISIONS.md), swarm DR's ruling § Q1 item 3 (three of three).
+ *
+ * A call's row counts riders who waited a minute over ten minutes; the day is graded on its goals.
+ * The panel's members measured the answer with the fewest such riders missing the day on 10 of 21
+ * deciding rows (S2), 14 of 22 split rows (S3) and 20 of 55 (S1), and a player reading the row took
+ * the count for the verdict. So where the answers split the day, and every answer with the fewest
+ * one-minute waits missed it, the close says so and names the goal it missed with its figure:
+ * *The fewest riders waited a minute with Energy aware driving, and the day missed with it: the
+ * landing-queue goal read 31 against a bar of 24.* Each answer the count favoured gets its own
+ * clause. No *because*: why the count and the day disagree is unmeasured. `undefined` where the
+ * three agree on the day (no split to set the count against) or a fewest-count answer cleared.
+ */
+export function dayCallGapSentenceOf(
+  record: DayCallRecord,
+  judgeOf: (observations: Observations) => DayCallRunJudgement,
+): string | undefined {
+  const answers = dayCallAnswersOf(record.question ?? 'placement');
+  const judged = answers.flatMap((answer) => {
+    const observations = record.observations[answer];
+    return observations === undefined ? [] : [{ answer, count: record.counts[answer] ?? 0, judgement: judgeOf(observations) }];
+  });
+  if (!judged.some((entry) => entry.judgement.verdict === 'cleared')) return undefined;
+  const fewest = Math.min(...judged.map((entry) => entry.count));
+  const favoured = judged.filter((entry) => entry.count === fewest);
+  if (favoured.length === 0 || favoured.some((entry) => entry.judgement.verdict !== 'missed')) return undefined;
+  const clauses = favoured.map(({ answer, judgement }) => {
+    const missed = judgement.readings.find((reading) => reading.state === 'missed');
+    const figure =
+      missed === undefined || missed.observed === null
+        ? undefined
+        : `${goalPlainNameOf(missed.goal)} read ${String(missed.observed)}${missed.goal.unit} against a bar of ` +
+          `${String(missed.goal.bar)}${missed.goal.unit}`;
+    return { words: dayCallAnswerWordsOf(record, answer), figure };
+  });
+  const names = listOf(clauses.map((clause) => clause.words));
+  if (clauses.length === 1) {
+    const [only] = clauses;
+    return `The fewest riders waited a minute with ${names}, and the day missed with it${only?.figure === undefined ? '' : `: ${only.figure}`}.`;
+  }
+  const figures = clauses.filter((clause) => clause.figure !== undefined).map((clause) => `with ${clause.words} ${String(clause.figure)}`);
+  return `The fewest riders waited a minute with ${names}, and the day missed with each${figures.length === 0 ? '' : `: ${figures.join('; ')}`}.`;
 }
 
 /**

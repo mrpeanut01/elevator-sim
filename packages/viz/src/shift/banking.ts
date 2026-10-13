@@ -223,6 +223,17 @@ export const ATTEMPT_HOLDS_ITS_DAY =
   'screen runs that day or changes how it runs. Its brief resumes it.';
 
 /**
+ * **Before its attempt begins, a scored day's own crowd plays only from *Start the day*** — wave AO,
+ * lane AO-1b, [§ D1362](../../../../DECISIONS.md). The workshop, the tuner and the drawing board run
+ * the day on a practice crowd instead (`shift/scoredCrowd.ts#practiceCrowdOf`). *Take this call
+ * again* and *Play this crowd* exist for one crowd in particular, so where that crowd is the one the
+ * unbegun day counts on they refuse in these words.
+ */
+export const DAY_NOT_BEGUN_HOLDS_ITS_CROWD =
+  'This is the crowd your scored day counts on, and that day has not begun. It plays only from ' +
+  'Start the day on its brief, as your attempt.';
+
+/**
  * Why a run of a scored day is not pressed, answered or closed in a tab that does not hold its
  * attempt — wave AO, lane AO-1, [§ D1361](../../../../DECISIONS.md), the post-AN panel's seat D
  * (D2). The saved attempt belongs to one tab at a time, and only the tab holding it advances it or

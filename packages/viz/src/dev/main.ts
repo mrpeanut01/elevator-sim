@@ -229,7 +229,7 @@ import {
 import {
   attemptHoldOf,
   attemptResumeAtS,
-  attemptShownTo,
+  attemptShownToHeld,
   attemptSlotAfter,
   attemptStandingAmong,
   attemptStandsOn,
@@ -268,7 +268,7 @@ import { dealtCrowdOf, weekRecordFor } from '../shift/weekRecord.js';
 import { progressWithWeekRecords, weekRecordsOf } from '../everyday/profile.js';
 import { everydayProfileStore } from '../everyday/profileStore.js';
 import { deviceNowMs } from '../shift/deviceDate.js';
-import { practiceGroundOf } from '../shift/scoredCrowd.js';
+import { practiceCrowdOf, practiceGroundOf } from '../shift/scoredCrowd.js';
 import { firstDayDealOf, isDealtPinnedDay } from '../shift/firstSession.js';
 
 import { savedProfilesOf } from '../batch/library.js';
@@ -2231,18 +2231,48 @@ function boot(ui: Elements, resources: BrowserResources): void {
   function beginDayAttempt(): void {
     /* § D1361: an attempt another tab began on this day since this tab last looked stands here too. */
     refreshAttempts();
-    /*
-     * The day's crowd as the close will read it — {@link dealtDaySeedNow}, the value `runShift`
-     * latches into {@link runDaySeed} — so a day dealt a derived crowd (§ D1229) begins the attempt
-     * its close will bank, rather than being refused here as a crowd other than the date's.
-     */
-    const counts =
+    nextAttemptAsk = dayWouldBeginOn(state.seed) ? 'begin' : undefined;
+    context.runShift();
+  }
+
+  /**
+   * **Whether a run of the week's day on `seed` would begin its attempt** — § D1218 clause 1's
+   * condition, read by {@link beginDayAttempt} and by {@link rehearsalCrowdFor}, so *Start the day*
+   * and the practice crowd agree about which days have not begun. A scored week day that counts: a
+   * week on a scenario, the day not closed, `seed` the crowd it banks on, and no attempt standing.
+   *
+   * The day's crowd as the close will read it — {@link dealtDaySeedNow}, the value `runShift`
+   * latches into {@link runDaySeed} — so a day dealt a derived crowd (§ D1229) begins the attempt
+   * its close will bank, rather than being refused here as a crowd other than the date's.
+   */
+  function dayWouldBeginOn(seed: bigint): boolean {
+    return (
       advancesTheWeek(state.playMode) &&
       contractById(state.week.contractId) !== undefined &&
       standingAttempt() === undefined &&
-      practiceGroundOf(state.week, state.seed, dealtDaySeedNow()) === undefined;
-    nextAttemptAsk = counts ? 'begin' : undefined;
-    context.runShift();
+      practiceGroundOf(state.week, seed, dealtDaySeedNow()) === undefined
+    );
+  }
+
+  /**
+   * The practice crowd this shell last dealt a run of an unbegun day — wave AO, lane AO-1b,
+   * [§ D1362](../../../../DECISIONS.md). Kept so the stage's line and the close's sheet name the
+   * ground (`practiceGroundOf`'s `'practiceCrowd'`); a sandbox day never outlives the page (§ D1368
+   * clause 1), so memory is enough.
+   */
+  let rehearsalCrowd: bigint | undefined;
+
+  /**
+   * **The crowd a run of the week's unbegun day meets in place of `seed`** — § D1362. Where `seed`
+   * is the crowd the day would begin its attempt on ({@link dayWouldBeginOn}), every door but the
+   * brief's *Start the day* plays `practiceCrowdOf(seed)` instead; elsewhere `undefined`, and the
+   * door runs as it did (an attempt standing is § D1360's refusal, a closed day is § D1138's retake).
+   */
+  function rehearsalCrowdFor(seed: bigint): bigint | undefined {
+    refreshAttempts();
+    if (!dayWouldBeginOn(seed)) return undefined;
+    rehearsalCrowd = practiceCrowdOf(seed);
+    return rehearsalCrowd;
   }
 
   /**
@@ -2319,18 +2349,54 @@ function boot(ui: Elements, resources: BrowserResources): void {
     return true;
   }
 
-  /** The stage has shown `recording` to `atS`; kept, and written each {@link ATTEMPT_WRITE_EVERY_S}. */
+  /**
+   * The stage has shown `recording` to `atS`; kept, and written each {@link ATTEMPT_WRITE_EVERY_S}.
+   * Never past the call the attempt is held at ({@link heldCallAtS}, § D1364), and written at once
+   * where that puts back a reach the device already holds.
+   */
   function noteAttemptShown(recording: VizRecording, atS: number): void {
     if (recording !== state.recording || !attemptOnScreen()) return;
     const attempt = standingAttempt();
     if (attempt === undefined || attemptHoldOf(attempt, attemptTab) === 'elsewhere') return;
-    const moved = attemptShownTo(attempt, atS);
+    const moved = attemptShownToHeld(attempt, atS, heldCallAtS(recording));
     if (moved === attempt) return;
-    if (moved.shownToS - attemptSavedShownS >= ATTEMPT_WRITE_EVERY_S) {
+    if (moved.shownToS < attemptSavedShownS || moved.shownToS - attemptSavedShownS >= ATTEMPT_WRITE_EVERY_S) {
       writeAttempt({ shownToS: moved.shownToS });
       return;
     }
     dayAttempts = new Map(dayAttempts).set(attempt.contractId, moved);
+  }
+
+  /** {@link heldCallAtS}'s pinned call, measured once a run: `pressDayCallOf` plans the day and reads its legs. */
+  let pinnedCallAtOn: { readonly recording: VizRecording; readonly atS: number | undefined } | undefined;
+
+  /**
+   * **The second a call holds the attempt at** — wave AO, lane AO-1, [§ D1364](../../../../DECISIONS.md),
+   * handed over by lane AO-3. The call the stage stops at on the attempt's run, unanswered: the
+   * pinned day's § D1029 call until it is answered or skipped (the stage's own `callAnswered` rule),
+   * else the ordinary call § D1138's session is asking or has raised, which the stage waits at either
+   * way. `undefined` on any other run and where no call stands. The attempt's reach goes no further
+   * ({@link noteAttemptShown}), and neither does the Engineer transport ({@link holdAtTheAttemptsReach}).
+   */
+  function heldCallAtS(recording: VizRecording): number | undefined {
+    if (recording !== attemptRecording) return undefined;
+    const attempt = standingAttempt();
+    if (attempt === undefined) return undefined;
+    if (state.interventions.length === 0 && !attempt.pinnedCallDone && !pressCallSkipped) {
+      if (pinnedCallAtOn?.recording !== recording) {
+        let atS: number | undefined;
+        try {
+          atS = pressDayCallOf(resources, state, recording)?.call.atS;
+        } catch {
+          atS = undefined;
+        }
+        pinnedCallAtOn = { recording, atS };
+      }
+      if (pinnedCallAtOn.atS !== undefined) return pinnedCallAtOn.atS;
+    }
+    return dayCallSession !== undefined && dayCallSession.recording() === recording
+      ? dayCallSession.onStage()?.call.atS
+      : undefined;
   }
 
   /*
@@ -5759,6 +5825,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
     attemptRunStale: (recording) => attemptRunStale(recording),
     /* § D1360 — the Everyday screens' refusal over the day an attempt stands on, or over the write. */
     attemptHold: (patch) => watchOnlyRefusal(state, patch, everydayHoldSentence),
+    /* § D1362 — a run of the unbegun day from any door but *Start the day* meets a practice crowd. */
+    rehearsalCrowdFor: (seed) => rehearsalCrowdFor(seed),
     attemptResumeAtS: (recording) => {
       const attempt = standingAttempt();
       if (attempt === undefined || recording !== attemptRecording || recording !== state.recording) return undefined;
@@ -5773,6 +5841,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
         state.seed,
         runDaySeed,
         attempt !== undefined && state.recording !== attemptRecording,
+        rehearsalCrowd,
       );
     },
     noteAttemptShown: (recording, atS) => {
@@ -6536,11 +6605,13 @@ function boot(ui: Elements, resources: BrowserResources): void {
      */
     const lost = lostAttemptRun !== undefined && playback.recording === lostAttemptRun.recording ? lostAttemptRun : undefined;
     const held = own || ofItsDay;
+    /* § D1364: and never past the call the attempt's run is held at, whatever the reach says. */
+    const callAtS = own ? heldCallAtS(playback.recording) : undefined;
     const reach =
       lost !== undefined
         ? lost.atS
         : held
-          ? Math.max(attempt.shownToS, playback.recording.startedAt)
+          ? Math.max(Math.min(attempt.shownToS, callAtS ?? Number.POSITIVE_INFINITY), playback.recording.startedAt)
           : null;
     if (playback.reach !== reach) playback.setReach(reach);
     if (!held || heldRunId === playback.recording.runId + String(playback.recording.startedAt)) return;
@@ -8171,11 +8242,13 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * over a run this close files as practice.
      */
     const practiceGround = advancesTheWeek(state.playMode)
-      ? practiceGroundOf(state.week, state.seed, runDaySeed, attemptStanding !== undefined && !isTheAttempt)
+      ? practiceGroundOf(state.week, state.seed, runDaySeed, attemptStanding !== undefined && !isTheAttempt, rehearsalCrowd)
       : undefined;
     const crowdPractice = practiceGround === 'crowd';
+    /* § D1362: a sandbox day dealt a practice crowd is a sandbox day whose sheet says so. */
+    const rehearsalPractice = practiceGround === 'practiceCrowd';
     /* § D1368: a sandbox day's week is parked practice; its close moves nothing and offers no tomorrow. */
-    const sandboxPractice = practiceGround === 'sandbox';
+    const sandboxPractice = practiceGround === 'sandbox' || rehearsalPractice;
     /* § D1218: a run that is not the standing attempt leaves the week on its day, as a link's crowd does. */
     const attemptPractice = practiceGround === 'attempt';
     /* § D1239: another tab filed the day, or an attempt stands while the Engineer surface closes. */
@@ -8205,6 +8278,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
       ...(crowdPractice ? { practiceCrowd: state.seed } : {}),
       ...(attemptPractice ? { practiceAttempt: true } : {}),
       ...(sandboxPractice ? { practiceSandbox: true } : {}),
+      ...(rehearsalPractice ? { practiceRehearsal: true } : {}),
       ...(otherTabPractice ? { practiceOtherTab: true } : elsewherePractice ? { practiceEngineer: true } : {}),
       /*
        * § D1138 clause 3 — the ordinary day's calls, from the session that raised them over the run

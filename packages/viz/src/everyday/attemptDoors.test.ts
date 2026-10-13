@@ -25,6 +25,12 @@
  * 4. **The shell's backstop stands at the one place every run is made**: `dev/main.ts#runShift`
  *    asks `attemptRefusesTheRun` before it latches anything, so a door this table never heard of
  *    still cannot run the attempt's day.
+ * 5. **Before the attempt begins, too** — wave AO, lane AO-1b, [§ D1362](../../../../DECISIONS.md).
+ *    On a scored day that counts and has not begun, every `'held'` door is driven again: a door
+ *    that runs the day runs a sandbox day on the practice crowd (`practiceCrowdOf`), never on the
+ *    crowd the day counts on and never on the week, or refuses in words
+ *    (`DAY_NOT_BEGUN_HOLDS_ITS_CROWD`); an editor write still writes. Only *Start the day*
+ *    (`playDay`) runs the day's own crowd, and it begins the attempt.
  */
 
 import { readFileSync } from 'node:fs';
@@ -37,7 +43,9 @@ import type { BrowserResources } from '../dev/data.js';
 import { initialState, type ViewerState } from '../dev/state.js';
 import { contractBuildings } from '../shift/contractDay.test-helper.js';
 import type { DayAttempt } from '../shift/attempt.js';
-import { ATTEMPT_HOLDS_ITS_DAY } from '../shift/banking.js';
+import { ATTEMPT_HOLDS_ITS_DAY, DAY_NOT_BEGUN_HOLDS_ITS_CROWD } from '../shift/banking.js';
+import { practiceCrowdOf } from '../shift/scoredCrowd.js';
+import { SANDBOX_DAY_CONTRACT_ID } from '../shift/week.js';
 import { watchRecordOf } from '../watch/record.js';
 import type { WatchableRun } from '../watch/types.js';
 
@@ -238,15 +246,25 @@ interface Harness {
   readonly host: EverydayHost;
   /** Every press and write a binding received, in order. */
   readonly calls: string[];
+  /** The crowd and the week each run was pressed on, read off the state at the press. */
+  readonly runs: { readonly seed: bigint; readonly contractId: string; readonly by: string }[];
 }
 
 /**
  * `standing` puts an attempt on the week on screen, and binds `attemptHold` the way `dev/main.ts`
  * does: § D1323's `watchOnlyRefusal` over the state, with the sentence wherever an attempt stands.
+ *
+ * `unbegun` makes the week's day one that counts and has not begun (§ D1362): `rehearsalCrowdFor`
+ * answers the practice crowd for the day's own crowd, as `dev/main.ts#rehearsalCrowdFor` does, and
+ * the state takes the patches the host writes, so a run's crowd and week are the ones it ran on.
  */
-function harnessOf(standing: boolean): Harness {
+function harnessOf(standing: boolean, unbegun = false): Harness {
   const calls: string[] = [];
-  const state: ViewerState = { ...BASE, recording: { runId: 'doors' } as unknown as ViewerState['recording'] };
+  const runs: { seed: bigint; contractId: string; by: string }[] = [];
+  let state: ViewerState = { ...BASE, recording: { runId: 'doors' } as unknown as ViewerState['recording'] };
+  const ran = (by: string): void => {
+    runs.push({ seed: state.seed, contractId: state.week.contractId, by });
+  };
   const bindings: EverydayHostBindings = {
     resources: RESOURCES,
     state: () => state,
@@ -257,9 +275,11 @@ function harnessOf(standing: boolean): Harness {
     dayStartS: () => undefined,
     startRun: () => {
       calls.push('startRun');
+      ran('startRun');
     },
     beginDayAttempt: () => {
       calls.push('beginDayAttempt');
+      ran('beginDayAttempt');
     },
     intervene: (atS, change) => {
       calls.push(`intervene:${change.kind}`);
@@ -270,8 +290,9 @@ function harnessOf(standing: boolean): Harness {
     openRunTab: () => {
       calls.push('openRunTab');
     },
-    applyPatch: () => {
+    applyPatch: (patch) => {
       calls.push('applyPatch');
+      if (unbegun) state = { ...state, ...patch };
     },
     ghostRace: () => ({ pick: 'none', rival: undefined, refusal: undefined, pending: false }),
     raceAgainst: (pick) => {
@@ -287,8 +308,9 @@ function harnessOf(standing: boolean): Harness {
     stopWatching: () => {
       calls.push('stopWatching');
     },
-    playThisCrowd: () => {
+    playThisCrowd: (run) => {
       calls.push('playThisCrowd');
+      runs.push({ seed: BigInt(run.record?.seed ?? '0'), contractId: state.week.contractId, by: 'playThisCrowd' });
     },
     watching: () => undefined,
     dailyBoard: undefined,
@@ -296,8 +318,16 @@ function harnessOf(standing: boolean): Harness {
     dayAttempt: () => (standing ? ATTEMPT : undefined),
     attemptHold: (patch) =>
       watchOnlyRefusal(state, patch, () => (standing ? ATTEMPT_HOLDS_ITS_DAY : undefined)),
+    ...(unbegun
+      ? {
+          rehearsalCrowdFor: (seed: bigint) =>
+            !standing && state.week.contractId === BASE.week.contractId && seed === BASE.seed
+              ? practiceCrowdOf(seed)
+              : undefined,
+        }
+      : {}),
   };
-  return { host: createEverydayHost(bindings), calls };
+  return { host: createEverydayHost(bindings), calls, runs };
 }
 
 /** What a binding call counts as: a run, or a write of the state. */
@@ -330,6 +360,33 @@ const HELD_PRESSES: Readonly<Record<string, (host: EverydayHost) => unknown>> = 
   takeCallAgain: (host) => host.takeCallAgain(),
   playThisCrowd: (host) =>
     host.playThisCrowd({ id: 'doors', record: watchRecordOf({ ...BASE, seed: BASE.seed + 1n }, RESOURCES) } as unknown as WatchableRun),
+});
+
+/**
+ * How each `'held'` door answers before the day's attempt begins — § D1362. `'practice'`: it runs a
+ * sandbox day on the practice crowd. `'refused'`: it refuses in words. `'writes'`: an editor write,
+ * which runs nothing and so rehearses nothing; it writes as the brief's picker does.
+ */
+const BEFORE_THE_ATTEMPT: Readonly<Record<string, 'practice' | 'refused' | 'writes'>> = Object.freeze({
+  setWorkingSpec: 'writes',
+  setGroupLevers: 'writes',
+  setRuleRows: 'writes',
+  setSelectorSpec: 'writes',
+  startFromDispatcher: 'writes',
+  setDispatcher: 'writes',
+  setPlainLever: 'writes',
+  applyBuildingSpec: 'writes',
+  startRun: 'practice',
+  runSandbox: 'practice',
+  takeCallAgain: 'refused',
+  playThisCrowd: 'refused',
+});
+
+/** The `'held'` presses as they meet a day that has not begun: *Play this crowd* on the day's own crowd. */
+const PRESSES_BEFORE: Readonly<Record<string, (host: EverydayHost) => unknown>> = Object.freeze({
+  ...HELD_PRESSES,
+  playThisCrowd: (host: EverydayHost) =>
+    host.playThisCrowd({ id: 'doors', record: watchRecordOf(BASE, RESOURCES) } as unknown as WatchableRun),
 });
 
 /** A press's answer: its returned sentence, or the sentence it threw. */
@@ -416,6 +473,58 @@ describe('every door the Everyday host has onto a run is sorted — § D1360', (
       if (member === 'takeCallAgain') continue;
       expect(free.calls.some((call) => RUNS_OR_WRITES.has(call)), `${member} wrote and ran nothing`).toBe(true);
     }
+  });
+
+  it('drives every held door before the attempt begins: a practice crowd on a sandbox day, or refused in words — § D1362', () => {
+    const held = Object.entries(DOORS)
+      .filter(([, door]) => door === 'held')
+      .map(([member]) => member);
+    expect(held.filter((member) => BEFORE_THE_ATTEMPT[member] === undefined), 'a held door not sorted before the attempt').toEqual([]);
+    const practice = practiceCrowdOf(BASE.seed);
+    expect(practice).not.toBe(BASE.seed);
+    for (const member of held) {
+      const press = PRESSES_BEFORE[member];
+      if (press === undefined) continue;
+      const unbegun = harnessOf(false, true);
+      const answer = answerOf(() => press(unbegun.host));
+      const sort = BEFORE_THE_ATTEMPT[member];
+      if (sort === 'refused') {
+        expect(answer, `${member} did not refuse`).toBe(DAY_NOT_BEGUN_HOLDS_ITS_CROWD);
+        expect(unbegun.runs, `${member} ran`).toEqual([]);
+        continue;
+      }
+      expect(answer, `${member} refused before the attempt`).not.toBe(ATTEMPT_HOLDS_ITS_DAY);
+      expect(answer, `${member} refused before the attempt`).not.toBe(DAY_NOT_BEGUN_HOLDS_ITS_CROWD);
+      /* No door but Start the day ever runs the crowd the day counts on before its attempt. */
+      expect(unbegun.runs.filter((run) => run.seed === BASE.seed), `${member} ran the day’s own crowd`).toEqual([]);
+      if (sort === 'writes') {
+        expect(unbegun.runs, `${member} ran`).toEqual([]);
+        expect(unbegun.calls, `${member} wrote nothing`).toContain('applyPatch');
+        continue;
+      }
+      expect(unbegun.runs, `${member} ran nothing`).toEqual([
+        { seed: practice, contractId: SANDBOX_DAY_CONTRACT_ID, by: 'startRun' },
+      ]);
+    }
+  });
+
+  it('runs the day’s own crowd before the attempt only from Start the day, which begins the attempt', () => {
+    const unbegun = harnessOf(false, true);
+    unbegun.host.playDay();
+    expect(unbegun.runs).toEqual([{ seed: BASE.seed, contractId: BASE.week.contractId, by: 'beginDayAttempt' }]);
+  });
+
+  it('asks the rehearsal question in the body of every held door that runs', () => {
+    const bodies = hostMemberBodies();
+    const runsTheDay = /\bpressTodaysRun\(|\beverydayHost\.startRun\(|\bb\.playThisCrowd\(|\brunSandboxDay\(/u;
+    const asks = /\bwouldRehearse\(|\brehearsalCrowdFor\b|\brunSandboxDay\(/u;
+    const unasked = Object.entries(DOORS)
+      .filter(([member, door]) => door === 'held' && runsTheDay.test(bodies.get(member) ?? '') && !asks.test(bodies.get(member) ?? ''))
+      .map(([member]) => member);
+    expect(unasked, 'a held door that runs the day and never asks whether it has begun').toEqual([]);
+    /* And the one function they share asks it of the crowd it is about to deal. */
+    const shared = HOST_SOURCE.slice(HOST_SOURCE.indexOf('  function runSandboxDay('), HOST_SOURCE.indexOf('  function wouldRehearse('));
+    expect(shared).toMatch(/b\.rehearsalCrowdFor\?\.\(dealt\.seed \?\? b\.state\(\)\.seed\)/u);
   });
 
   it('keeps the shell’s backstop at the one place every run is made', () => {

@@ -303,7 +303,15 @@ import {
   stageSkipLineOf,
   stageSkipOf,
 } from '../everyday/stagePace.js';
-import { STAGE_CALL_COPY, stageCallCardOf, stageCallPresentOf, stageEndDayOf } from '../everyday/stageCall.js';
+import {
+  STAGE_CALL_COPY,
+  stageCallCardOf,
+  stageCallPresentOf,
+  stageEndDayOf,
+  stageLostCardOf,
+  STAGE_LOST_COPY,
+} from '../everyday/stageCall.js';
+import { dayCallMaximaOf } from '../shift/dayCallMaxima.js';
 import {
   stageCallFailedRowsOf,
   stageCallRowDueAtS,
@@ -318,6 +326,7 @@ import { PRESS_CALL_AGAIN, pressCallRowOf } from '../shift/callRow.js';
 import {
   dayCallCountsLineOf,
   dayCallFailedRowOf,
+  dayCallGapSentenceOf,
   dayCallRecordOf,
   dayCallsQuietSentenceOf,
   dayCallWrinkleQuietRowOf,
@@ -734,6 +743,7 @@ import {
   ATTEMPT_ENGINEER_WATCHES_ONLY,
   ATTEMPT_HELD_IN_ANOTHER_TAB,
   ATTEMPT_HOLDS_ITS_DAY,
+  DAY_NOT_BEGUN_HOLDS_ITS_CROWD,
   ATTEMPT_LEFT_CANNOT_BANK,
   ATTEMPT_MOVED_ON_ELSEWHERE,
   ATTEMPT_NOT_POSTED,
@@ -773,6 +783,7 @@ import {
   PRACTICE_ENGINEER_NOTE,
   PRACTICE_OTHER_TAB_NOTE,
   PRACTICE_SANDBOX_NOTE,
+  PRACTICE_REHEARSAL_NOTE,
   type DayReportInput,
   type ShapedDayReport,
   type ShiftPlan,
@@ -2330,6 +2341,8 @@ const REPLAY: SurfaceAdapter = {
      * show, and a run of that day is not posted; § D1361 — one tab holds the attempt at a time.
      */
     'shift/banking.ts#ATTEMPT_HOLDS_ITS_DAY',
+    /* Wave AO, lane AO-1b, § D1362 — before the attempt, the day's own crowd plays only from *Start the day*. */
+    'shift/banking.ts#DAY_NOT_BEGUN_HOLDS_ITS_CROWD',
     'shift/banking.ts#ATTEMPT_NOT_POSTED',
     'shift/banking.ts#ATTEMPT_HELD_IN_ANOTHER_TAB',
     'shift/banking.ts#ATTEMPT_MOVED_ON_ELSEWHERE',
@@ -2423,6 +2436,13 @@ const REPLAY: SurfaceAdapter = {
       {
         field: 'attemptHoldsItsDay',
         text: ATTEMPT_HOLDS_ITS_DAY,
+        role: 'reason',
+        provenance: 'authored',
+      },
+      /* Wave AO, lane AO-1b, § D1362: *Take this call again* and *Play this crowd* before the attempt. */
+      {
+        field: 'dayNotBegunHoldsItsCrowd',
+        text: DAY_NOT_BEGUN_HOLDS_ITS_CROWD,
         role: 'reason',
         provenance: 'authored',
       },
@@ -3937,6 +3957,8 @@ const SHIFT_REPORT: SurfaceAdapter = {
      * builder over this case's two runs, and on {@link ShiftDay.retried}, a practice close.
      */
     'shift/dayCalls.ts#dayCallRowOf',
+    /* Wave AO, lane DR-1, § D1433: the row's sentence where the count's favourite missed, seeded below. */
+    'shift/dayCalls.ts#dayCallGapSentenceOf',
     'shift/dayCalls.ts#DAY_CALL_ROW_NOTE',
     'shift/dayCalls.ts#DAY_CALL_LEAVE_LABEL',
     /*
@@ -3983,6 +4005,8 @@ const SHIFT_REPORT: SurfaceAdapter = {
     'shift/report.ts#PRACTICE_OTHER_TAB_NOTE',
     /* Wave AO, lane AO-2, § D1368: a sandbox day's sheet, by name for the same reason. */
     'shift/report.ts#PRACTICE_SANDBOX_NOTE',
+    /* Wave AO, lane AO-1b, § D1362: a sandbox day dealt a practice crowd, by name for the same reason. */
+    'shift/report.ts#PRACTICE_REHEARSAL_NOTE',
     'shift/callRow.ts#PRESS_CALL_LATER_NOTE',
     'shift/dayCalls.ts#dayCallCountsLineOf',
     'shift/goals.ts#GOAL_PLAIN_NAMES',
@@ -4344,6 +4368,33 @@ const SHIFT_REPORT: SurfaceAdapter = {
         seeds.push({ field: `${at}.dayCalls(${row.id}).when`, text: row.when, role: 'label' });
         seeds.push({ field: `${at}.dayCalls(${row.id}).what`, text: row.what, role: 'observation' });
       }
+      /*
+       * Wave AO, lane DR-1, § D1433: where the answer with the fewest one-minute waits missed the day
+       * while another cleared, the row names the goal it missed with its figure. Seeded on this case's
+       * whole-run readings with the landing goal read missed under the fewest-count answer only.
+       */
+      {
+        const whole = shiftObservationsOf(observationsAt(recording, recording.endedAt));
+        const favoured = { ...whole } as Observations;
+        const readings = readGoals(goalsForDay(1), whole);
+        const gap = dayCallGapSentenceOf(
+          {
+            atS: recording.startedAt,
+            windowEndS: dayCallWindowEndOf(recording.startedAt, recording.endedAt),
+            answer: 'leave',
+            counts: { 'park-cars-lobby': 3, 'spread-cars': 9, leave: 6 },
+            observations: { 'park-cars-lobby': favoured, 'spread-cars': whole, leave: whole },
+          },
+          (observations) =>
+            observations === favoured
+              ? {
+                  verdict: 'missed',
+                  readings: readings.map((reading) => (reading.goal.id === 'queue' ? { ...reading, state: 'missed' as const } : reading)),
+                }
+              : { verdict: 'cleared', readings },
+        );
+        if (gap !== undefined) seeds.push({ field: `${at}.dayCalls.gap`, text: gap, role: 'observation' });
+      }
       /* § D1138 clause 4's practice sheet: its note, and its streak line, which carries the same words. */
       if (entry.retried.practiceNote !== undefined) {
         seeds.push({ field: `${at}.retried.practiceNote`, text: entry.retried.practiceNote, role: 'prose' });
@@ -4357,6 +4408,8 @@ const SHIFT_REPORT: SurfaceAdapter = {
       seeds.push({ field: `${at}.practiceOtherTabNote`, text: PRACTICE_OTHER_TAB_NOTE, role: 'prose' });
       /* § D1368's sandbox day sheet, by name — see the `covers` entry above. */
       seeds.push({ field: `${at}.practiceSandboxNote`, text: PRACTICE_SANDBOX_NOTE, role: 'prose' });
+      /* § D1362's practice-crowd sheet, by name — see the `covers` entry above. */
+      seeds.push({ field: `${at}.practiceRehearsalNote`, text: PRACTICE_REHEARSAL_NOTE, role: 'prose' });
       /* Wave AL: the title line after a handover, on the run's own clock. */
       seeds.push({
         field: `${at}.driversLine(handover)`,
@@ -12816,6 +12869,19 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
      */
     'everyday/stageCall.ts#STAGE_END_DAY_COPY',
     'everyday/stageCall.ts#stageEndDayOf',
+    /*
+     * Wave AO, lane DR-1: the card's goal nearest its bar and each answer's line (§ D1432), seeded on
+     * this case's readings at a call second and the shipped profiles; each row's goals so far
+     * (§ D1433), off this case's run; and the lost day's card (§ D1435), where the queue goal reads
+     * missed at mid-run.
+     */
+    'everyday/stageCall.ts#STAGE_CALL_ANSWER_LINES',
+    'everyday/stageCall.ts#stageCallDriverLineOf',
+    'everyday/stageCall.ts#stageCallNearestBarLineOf',
+    'everyday/stageCall.ts#STAGE_LOST_COPY',
+    'everyday/stageCall.ts#stageLostCardOf',
+    'everyday/stageCallRow.ts#stageCallGoalsLineOf',
+    'shift/dayCallMaxima.ts#dayCallMaximaReadingsAt',
     /* Pillar 3's strip — GitHub issue #277, § D470. Driven at every sample time below. */
     'everyday/stageScreenModel.ts#stageGoalsOf',
     /*
@@ -13358,6 +13424,35 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
           seeds.push({ field: 'stage.endDay.label', text: end.label, role: 'label' });
           seeds.push({ field: 'stage.endDay.note', text: end.note, role: 'prose', playhead: atPlayhead(recording, at) });
         }
+        /* Wave AO, lane DR-1, § D1435: the lost day's card on the same readings, at the same playhead. */
+        const lost = stageLostCardOf(readings, clockOf(at, DAY_START_S));
+        if (lost !== undefined) {
+          seeds.push({ field: 'stage.lost.heading', text: lost.heading, role: 'label' });
+          seeds.push({ field: 'stage.lost.fact', text: lost.fact, role: 'observation', playhead: atPlayhead(recording, at) });
+          seeds.push({ field: 'stage.lost.choices', text: lost.choices, role: 'prose' });
+        }
+        seeds.push({ field: 'stage.lost.end', text: STAGE_LOST_COPY.end, role: 'label' });
+        seeds.push({ field: 'stage.lost.watch', text: STAGE_LOST_COPY.watch, role: 'label' });
+      }
+      /*
+       * Wave AO, lane DR-1, § D1432: the card's teaching, on both questions — the goal nearest its bar
+       * off this case's readings at the call second, and each answer's line, a driver's from the
+       * shipped profile it names.
+       */
+      for (const drivers of [undefined, DAY_CALL_FIXTURE_DRIVERS]) {
+        const call = calls[2]!;
+        const card = stageCallCardOf(call, undefined, [], drivers, undefined, {
+          readings: readGoals(goalsForDay(1), shiftObservationsOf(observationsAt(recording, call.atS))),
+          driverOf: (name) => context.dispatcherProfiles.profiles.find((profile) => profile.name === name),
+        });
+        const at = `stage.call(${drivers === undefined ? 'placement' : 'driver'},taught)`;
+        const plain = stageCallCardOf(call, undefined, [], drivers);
+        for (const fact of card.facts.slice(plain.facts.length)) {
+          seeds.push({ field: `${at}.nearestBar`, text: fact, role: 'observation', playhead: atPlayhead(recording, call.atS) });
+        }
+        for (const option of card.options) {
+          if (option.line !== undefined) seeds.push({ field: `${at}.line(${option.answer})`, text: option.line, role: 'prose' });
+        }
       }
       for (const call of calls) {
         /* § D1206: the present-tense line, read off this case's run at the call second. */
@@ -13390,19 +13485,23 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
         const callAtS = recording.startedAt + 60;
         const windowEndS = Math.min(callAtS + 600, recording.endedAt);
         const legs = recording.legs;
-        const record = dayCallRecordOf({
+        const counted = dayCallRecordOf({
           atS: callAtS,
           windowEndS,
           answer: 'spread-cars',
           legs: { 'park-cars-lobby': legs, 'spread-cars': legs, leave: legs },
           observations: {},
         });
+        /* § D1433: each answer's two final goals through the day, off this case's own run. */
+        const maxima = dayCallMaximaOf(recording, callAtS);
+        const record = { ...counted, maxima: { 'park-cars-lobby': maxima, 'spread-cars': maxima, leave: maxima } };
         const rows = stageCallRowsOf({
           records: [record],
           playheadS: recording.endedAt,
           endedAt: recording.endedAt,
           log: [{ atS: callAtS + 120, change: { kind: 'park-cars-lobby' } }],
           clockOf: (simTimeS) => clockOf(simTimeS, DAY_START_S),
+          goals: goalsForDay(1),
         });
         seeds.push({ field: 'stage.callRows.heading', text: STAGE_CALL_ROWS_HEADING, role: 'label' });
         for (const row of rows) {
@@ -13414,6 +13513,14 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
             playhead: atPlayhead(recording, stageCallRowDueAtS(record, recording.endedAt)),
           });
           seeds.push({ field: `stage.callRows(${row.id}).note`, text: row.note, role: 'prose' });
+          if (row.goals !== undefined) {
+            seeds.push({
+              field: `stage.callRows(${row.id}).goals`,
+              text: row.goals,
+              role: 'observation',
+              playhead: atPlayhead(recording, recording.endedAt),
+            });
+          }
         }
         /* § D1335 — the failed moment's row, at two instants of this run, each drawn once it is reached. */
         const failures = [

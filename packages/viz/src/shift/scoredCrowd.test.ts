@@ -5,8 +5,9 @@
 import { describe, expect, it } from 'vitest';
 
 import { pressDayFor } from './ladder.js';
-import { crowdIsShared, crowdMakesPractice, practiceGroundOf } from './scoredCrowd.js';
-import { openWeek, outcomeOf, REPLAY_CONTRACT_ID, RUSH_CONTRACT_ID } from './week.js';
+import { crowdIsShared, crowdMakesPractice, PRACTICE_DAY_SENTENCES, practiceCrowdOf, practiceGroundOf } from './scoredCrowd.js';
+import { openSandboxDay, openWeek, outcomeOf, REPLAY_CONTRACT_ID, RUSH_CONTRACT_ID } from './week.js';
+import { derivedCrowdOf } from './weekRecord.js';
 import type { DayOutcome } from './types.js';
 import type { WatchRecord } from '../watch/types.js';
 import { CONTRACTS } from './contracts.js';
@@ -93,5 +94,40 @@ describe('a scored day belongs to its shared crowd — § D1141', () => {
     expect(practiceGroundOf(underWay, 777n, DATE, true)).toBe('crowd');
     const closedToday = { ...underWay, closedDay: 3, history: [...underWay.history, day(3, DATE)] };
     expect(practiceGroundOf(closedToday, DATE, DATE, true)).toBe('retake');
+  });
+});
+
+/*
+ * Wave AO, lane AO-1b, § D1362: before *Start the day* begins a day's attempt, a run of it from any
+ * other door meets the practice crowd on a sandbox day, and the stage and the sheet say which.
+ */
+describe('a day that has not begun is practised on a practice crowd — § D1362', () => {
+  it('deals a crowd that is never the day’s, never a derived crowd of any date and never a pin', () => {
+    const pins = CONTRACTS.flatMap((contract) => {
+      const text = pressDayFor(contract.id)?.seedText;
+      return text === undefined ? [] : [BigInt(text)];
+    });
+    const shared = [DATE, derivedCrowdOf(DATE, 3, 0), derivedCrowdOf(DATE, 5, 12), ...pins, 424_242n];
+    for (const crowd of shared) {
+      const practice = practiceCrowdOf(crowd);
+      expect(practice, crowd.toString()).not.toBe(crowd);
+      expect(practiceCrowdOf(crowd), 'the practice crowd moved between two asks').toBe(practice);
+      /* Never a crowd a scenario shares: no date, no crowd derived from a date, no pin. */
+      for (const contract of CONTRACTS) expect(crowdIsShared(contract.id, practice, DATE)).toBe(false);
+      expect(practice.toString().startsWith(DATE.toString())).toBe(false);
+      expect(pins).not.toContain(practice);
+    }
+  });
+
+  it('names the practice crowd on a sandbox day dealt it, and the sandbox on any other crowd', () => {
+    const week = openWeek('c2');
+    const sandbox = openSandboxDay(week, []).week;
+    const practice = practiceCrowdOf(DATE);
+    expect(practiceGroundOf(sandbox, practice, DATE, false, practice)).toBe('practiceCrowd');
+    expect(practiceGroundOf(sandbox, DATE, DATE, false, practice)).toBe('sandbox');
+    expect(practiceGroundOf(sandbox, practice, DATE)).toBe('sandbox');
+    /* On the week itself the practice crowd is never asked about: the sandbox is what deals it. */
+    expect(practiceGroundOf(week, DATE, DATE, false, practice)).toBeUndefined();
+    expect(PRACTICE_DAY_SENTENCES.practiceCrowd).toMatch(/practice crowd, not the day’s shared one/u);
   });
 });

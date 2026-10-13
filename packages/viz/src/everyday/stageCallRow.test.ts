@@ -12,12 +12,15 @@ import {
   dayCallWrinkleQuietRowOf,
   type DayCallRecord,
 } from '../shift/dayCalls.js';
+import type { DayCallMaxima } from '../shift/dayCallMaxima.js';
+import { goalsForDay } from '../shift/goals.js';
 import { clockOf } from '../shift/report.js';
-import type { Observations } from '../shift/types.js';
+import type { Observations, ShiftGoal } from '../shift/types.js';
 
 import {
   STAGE_CALL_FAILED_NOTE,
   stageCallFailedRowsOf,
+  stageCallGoalsLineOf,
   stageCallRowDueAtS,
   stageCallRowsOf,
   STAGE_CALL_ROW_NOTE,
@@ -129,5 +132,59 @@ describe('a wrinkle that raised no call, on the stage — § D1336', () => {
     expect(row?.heading).toBe('A late finish raised no call');
     expect(row?.counts).toMatch(/^A late finish began at \d\d:\d\d, and the stage raised no call in it\. It ran the day ahead/u);
     expect(row?.counts).not.toMatch(/Shift (cleared|missed)|\bwill\b|\bbetter\b|\bworse\b/u);
+  });
+});
+
+/*
+ * Wave AO, lane DR-1, § D1433: once due, the row reads each answer's deepest landing and longest
+ * wait so far at the last whole minute the stage has reached, says *past its bar* only where the
+ * reading is past it, and that a run could no longer clear only from the minute it first read so.
+ */
+describe('a call’s row reads the day’s two final goals at the playhead — § D1433', () => {
+  const series = (samples: DayCallMaxima['samples']): DayCallMaxima => ({ fromS: 7200, endedAt: 36_000, samples });
+  /* Park's landing passes 24 at 7 800 s; spread's wait passes 380 s at 8 400 s; leave's longest wait is a rider still standing. */
+  const READ: DayCallRecord = {
+    ...RECORD,
+    maxima: {
+      'park-cars-lobby': series([[7200, 20, 10, 100], [7800, 20, 25, 100]]),
+      'spread-cars': series([[7200, 20, 10, 100], [8400, 20, 12, 400]]),
+      leave: series([[7200, 20, 10, null]]),
+    },
+  };
+  const GOALS: readonly ShiftGoal[] = goalsForDay(1).map((goal) =>
+    goal.id === 'queue' ? { ...goal, bar: 24 } : goal.id === 'worst-wait' ? { ...goal, bar: 380 } : goal,
+  );
+
+  it('reads each answer at the last whole minute reached, in the counts sentence’s order and naming', () => {
+    expect(stageCallGoalsLineOf(READ, GOALS, 7890, clock)).toBe(
+      `By ${clock(7860)}, the deepest landing and the longest wait so far: 25 (past its bar of 24) and 100 s with ` +
+        'park the cars in the lobby; 10 and 100 s with spread the cars across the tower; 10 and a wait still ' +
+        'under way with leave them. A landing’s deepest stack and the longest wait cannot come back under a bar ' +
+        `once past it: the day could no longer clear with park the cars in the lobby from ${clock(7800)}.`,
+    );
+  });
+
+  it('says past its bar only where the reading is past it — the honesty pair', () => {
+    /* Before park's landing passed 24, nothing is past and no run is said to be lost. */
+    const before = stageCallGoalsLineOf(READ, GOALS, 7799, clock) ?? '';
+    expect(before).not.toMatch(/past its bar|could no longer clear/u);
+    /* Spread's wait passes its bar at 8 400 s: not said a minute earlier, said from then. */
+    expect(stageCallGoalsLineOf(READ, GOALS, 8399, clock)).not.toMatch(/400 s|with spread the cars across the tower from/u);
+    const after = stageCallGoalsLineOf(READ, GOALS, 8400, clock) ?? '';
+    expect(after).toContain('12 and 400 s (past its bar of 380 s) with spread the cars across the tower');
+    expect(after).toContain(`with park the cars in the lobby from ${clock(7800)} and with spread the cars across the tower from ${clock(8400)}`);
+    /* A wait still under way is pending on the rail, never past its bar, however long it has run. */
+    expect(after).toContain('a wait still under way with leave them');
+    expect(after).not.toMatch(/with leave them from/u);
+  });
+
+  it('prints the readings on a due row, labels the count as no goal, and prints counts only on a record without readings', () => {
+    const [row] = stageCallRowsOf({ records: [READ], playheadS: 7860, endedAt: 36_000, log: [], clockOf: clock, goals: GOALS });
+    expect(row?.goals).toBe(stageCallGoalsLineOf(READ, GOALS, 7860, clock));
+    expect(row?.note).toContain('The count of riders who waited a minute is not one of the day’s goals.');
+    expect(stageCallRowsOf({ records: [READ], playheadS: 7859, endedAt: 36_000, log: [], clockOf: clock, goals: GOALS })).toEqual([]);
+    const [old] = stageCallRowsOf({ records: [RECORD], playheadS: 7860, endedAt: 36_000, log: [], clockOf: clock, goals: GOALS });
+    expect(old?.goals).toBeUndefined();
+    expect(stageCallGoalsLineOf(RECORD, GOALS, 7860, clock)).toBeUndefined();
   });
 });

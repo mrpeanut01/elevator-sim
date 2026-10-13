@@ -2080,6 +2080,14 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'A practice crowd, plumbing only — wave AO, lane AO-1b, § D1362. `practiceCrowdOf` returns a ' +
+        'seed built from the shared one’s digits; what a player reads about it is the stage line ' +
+        '`PRACTICE_DAY_SENTENCES.practiceCrowd` and the sheet’s `PRACTICE_REHEARSAL_NOTE`, both seeded ' +
+        'by their adapters.',
+      ids: ['shift/scoredCrowd.ts#practiceCrowdOf'],
+    },
+    {
+      reason:
         'The press-moment ruling’s plumbing — wave AI, § D1029. `admittedPressDayIds` and ' +
         '`pressDayMeasuredAs` return ids and a pin, and are derived only because they reach ' +
         '`contractLadderIssues`’ own call-block check, whose content-author strings the entry above ' +

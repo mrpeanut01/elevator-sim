@@ -125,6 +125,7 @@ import {
   dayEndedEarlyRowOf,
   type DayCallFailure,
   type DayCallRecord,
+  type DayCallRunJudgement,
   type DayCallsQuiet,
   type DayCallWrinkleQuiet,
 } from './dayCalls.js';
@@ -620,6 +621,16 @@ export const PRACTICE_SANDBOX_NOTE =
   'day, exactly as you left it.';
 
 /**
+ * **What a sandbox day's sheet says when it was dealt a practice crowd** — wave AO, lane AO-1b,
+ * [§ D1362](../../../../DECISIONS.md), `shift/scoredCrowd.ts#practiceCrowdOf`. The day it stood over
+ * had not begun, so the run met a practice crowd rather than the day's shared one. No digit, for
+ * {@link PRACTICE_NOTE}'s reason.
+ */
+export const PRACTICE_REHEARSAL_NOTE =
+  'A sandbox day on a practice crowd. It met a crowd other than the day’s shared one, so it banks ' +
+  'nothing: your week is still on this day, exactly as you left it, and the day has not begun.';
+
+/**
  * One run, belonging to no week — the same figures, the same diagnosis, the same levers and the
  * same small print, with the week's five statements **absent** and two single-run ones in their
  * place. See the module docstring.
@@ -903,6 +914,13 @@ export interface DayReportInput {
    * this day, and it is put back the moment the player leaves the report.
    */
   readonly practiceSandbox?: boolean | undefined;
+  /**
+   * **That sandbox day was dealt a practice crowd** — wave AO, lane AO-1b,
+   * [§ D1362](../../../../DECISIONS.md), `practiceGroundOf`'s `'practiceCrowd'`. Read only beside
+   * {@link practiceSandbox}: the sheet says {@link PRACTICE_REHEARSAL_NOTE} in place of
+   * {@link PRACTICE_SANDBOX_NOTE}, because the run met a crowd other than the day's.
+   */
+  readonly practiceRehearsal?: boolean | undefined;
   /**
    * The ordinary day's calls, in the order they were raised — [§ D1138](../../../../DECISIONS.md)
    * clause 3. One row each after § D1029's, from the three runs that admitted it
@@ -1366,6 +1384,11 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
             endedEarlyAtS: input.dayEndedEarlyAtS,
             gradeOf: (callObservations) =>
               VERDICT_VOICE[verdictOf(readGoals(input.goals, callObservations))].line,
+            /* § D1433: the same grader, kept whole, for the row's sentence about the count's favourite. */
+            judgeOf: (callObservations) => {
+              const callReadings = readGoals(input.goals, callObservations);
+              return { verdict: verdictOf(callReadings), readings: callReadings };
+            },
           }
         : undefined,
     ),
@@ -1448,7 +1471,9 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
   });
   const practiceNote =
     input.practiceSandbox === true
-      ? PRACTICE_SANDBOX_NOTE
+      ? input.practiceRehearsal === true
+        ? PRACTICE_REHEARSAL_NOTE
+        : PRACTICE_SANDBOX_NOTE
       : input.practiceOtherTab === true
         ? PRACTICE_OTHER_TAB_NOTE
         : input.practiceEngineer === true
@@ -2513,6 +2538,7 @@ function diagnosisFor(
     readonly wrinkleQuiet?: DayCallWrinkleQuiet | undefined;
     readonly endedEarlyAtS?: SimTime | undefined;
     readonly gradeOf: (observations: Observations) => string;
+    readonly judgeOf?: ((observations: Observations) => DayCallRunJudgement) | undefined;
   },
 ): readonly ReportDiagnosis[] {
   const at = observations.peakQueueAtS;
@@ -2656,7 +2682,7 @@ function diagnosisFor(
     dayCalls === undefined
       ? []
       : dayCalls.records.map((record, index) =>
-          dayCallRowOf(record, index + 1, dayCalls.gradeOf, (simTimeS) => clockOf(simTimeS, dayStartS)),
+          dayCallRowOf(record, index + 1, dayCalls.gradeOf, (simTimeS) => clockOf(simTimeS, dayStartS), dayCalls.judgeOf),
         );
   /*
    * § D1152: a day that raised no call says so at its close, in one sentence true of the run — the

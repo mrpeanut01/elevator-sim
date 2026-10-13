@@ -94,19 +94,49 @@ export function crowdMakesPractice(
  * carries the same sentence while it plays. It is asked first because it is a fact about the week
  * the run stands on, whichever crowd it met.
  */
-export type PracticeGround = 'sandbox' | 'crowd' | 'retake' | 'attempt';
+export type PracticeGround = 'practiceCrowd' | 'sandbox' | 'crowd' | 'retake' | 'attempt';
 
+/*
+ * `'practiceCrowd'` is wave AO's fifth, [§ D1362](../../../../DECISIONS.md): a sandbox day dealt
+ * {@link practiceCrowdOf} because the day it stands over counts and has not begun, so a run of it
+ * from anywhere but the brief's *Start the day* would have rehearsed the crowd the day is scored on.
+ * `practiceCrowd` is the crowd the shell dealt it (`dev/main.ts` keeps it), and a sandbox day on any
+ * other crowd stays `'sandbox'`. Asked before `'sandbox'`, because it is the same week with one more
+ * fact about its crowd.
+ */
 export function practiceGroundOf(
   week: Pick<WeekState, 'contractId' | 'history' | 'closedDay' | 'day'>,
   seed: bigint,
   daySeed: bigint | undefined,
   otherThanTheAttempt = false,
+  practiceCrowd?: bigint,
 ): PracticeGround | undefined {
-  if (week.contractId === SANDBOX_DAY_CONTRACT_ID) return 'sandbox';
+  if (week.contractId === SANDBOX_DAY_CONTRACT_ID) {
+    return practiceCrowd !== undefined && seed === practiceCrowd ? 'practiceCrowd' : 'sandbox';
+  }
   if (crowdMakesPractice(week, seed, daySeed)) return 'crowd';
   if (week.closedDay === week.day) return 'retake';
   if (otherThanTheAttempt) return 'attempt';
   return undefined;
+}
+
+/**
+ * **The practice crowd of a day whose shared crowd is `shared`** — wave AO, lane AO-1b,
+ * [§ D1362](../../../../DECISIONS.md).
+ *
+ * Before *Start the day* begins a scored day's attempt (§ D1218), the workshop's *Run a day with
+ * this*, *Tune the tower*'s sandbox and the drawing board's *Run a day in it* used to play the day's
+ * shared crowd, so each driver could be run on the very crowd the day is scored on and *Start the
+ * day* pressed with the answer known. They now play this crowd instead.
+ *
+ * The shared crowd's digits behind a leading 9. It is never `shared` (it is one digit longer), and
+ * never any day's shared crowd: those are a date (§ D1047), a crowd derived from one by appending
+ * digits (`shift/weekRecord.ts#derivedCrowdOf`) or a pinned day's seed, all of which begin with the
+ * year, and a link's crowd that begins a week is the week's own and is never what this is dealt
+ * over it. Fixed for the day, so a practice run is repeatable, and pure: no draw and no clock.
+ */
+export function practiceCrowdOf(shared: bigint): bigint {
+  return BigInt(`9${shared.toString()}`);
 }
 
 /**
@@ -115,6 +145,9 @@ export function practiceGroundOf(
  * print on its sheet (`shift/report.ts#PRACTICE_CROWD_NOTE` and `#PRACTICE_NOTE`).
  */
 export const PRACTICE_DAY_SENTENCES: Readonly<Record<PracticeGround, string>> = Object.freeze({
+  practiceCrowd:
+    'This run does not count toward the week: it is a sandbox day on a practice crowd, not the ' +
+    'day’s shared one, and your week is where you left it.',
   sandbox:
     'This run does not count toward the week: it is a sandbox day with the changes you made, and ' +
     'your week is where you left it.',

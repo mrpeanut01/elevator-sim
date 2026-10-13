@@ -19,16 +19,21 @@ import { WAIT_BANDS } from '../live/bands.js';
 import { PARK_CARS_LOBBY_LABEL, SPREAD_CARS_LABEL } from '../live/interventions.js';
 import type { PressCall } from '../shift/pressCall.js';
 
-import { goalsForDay } from '../shift/goals.js';
-import type { GoalReading } from '../shift/types.js';
+import { goalsForDay, readGoals } from '../shift/goals.js';
+import type { GoalObservations, GoalReading } from '../shift/types.js';
 
 import {
+  STAGE_CALL_ANSWER_LINES,
   STAGE_CALL_COPY,
   STAGE_END_DAY_COPY,
   stageCallCardOf,
+  stageCallDriverLineOf,
+  stageCallNearestBarLineOf,
   stageCallPhaseOf,
   stageCallPresentOf,
   stageEndDayOf,
+  stageLostCardOf,
+  STAGE_LOST_COPY,
   type StageCallPresent,
 } from './stageCall.js';
 import { PACE_HOLD_WAIT_S } from './stagePace.js';
@@ -369,5 +374,128 @@ describe('the present-tense line — § D1206', () => {
       /* No forward figure: nothing about what follows, what an answer does, or a count ahead. */
       expect(text).not.toMatch(/\b(will|would|next|ahead|expect\w*|forecast|if you|after)\b/iu);
     }
+  });
+});
+
+/*
+ * Wave AO, lane DR-1, § D1432: before the answer the card states present facts only: the goal
+ * graded on a maximum nearest its bar, with its reading and bar, and one line per answer saying what
+ * that answer is. No cleared or missed, no effect, no cause, nothing about what follows.
+ */
+describe('the card teaches what it may before the answer — § D1432', () => {
+  const GOALS = goalsForDay(1).map((goal) =>
+    goal.id === 'queue' ? { ...goal, bar: 24 } : goal.id === 'worst-wait' ? { ...goal, bar: 380 } : goal,
+  );
+  const readingsOf = (peakQueue: number, worstWaitS: number, censored = false): readonly GoalReading[] => {
+    const observations: GoalObservations = {
+      arrived: 400, carryPct: 100, minutePct: 100, peakQueue, abandoned: 0, abandonedCarried: 0,
+      horizonS: 900, worstWaitS, worstWaitIsCensored: censored,
+    };
+    return readGoals(GOALS, observations);
+  };
+  const FORWARD = /\b(will|would|next|ahead|expect\w*|forecast|if you|after|cleared?|miss(ed|es)?|better|worse|because|faster|slower|helps?)\b/iu;
+
+  it('names the goal nearest its bar, with its reading and bar, and neither a share goal nor a pending one', () => {
+    expect(stageCallNearestBarLineOf(readingsOf(13, 252))).toBe(
+      'Nearest its bar: the longest wait so far is 252 s, against a bar of 380 s.',
+    );
+    expect(stageCallNearestBarLineOf(readingsOf(22, 252))).toBe(
+      'Nearest its bar: the deepest landing so far is 22, against a bar of 24.',
+    );
+    /* A wait still under way reads pending on the rail, so the landing is named whatever its share. */
+    expect(stageCallNearestBarLineOf(readingsOf(5, 370, true))).toBe(
+      'Nearest its bar: the deepest landing so far is 5, against a bar of 24.',
+    );
+    expect(stageCallNearestBarLineOf(readGoals(GOALS, { ...({} as GoalObservations), arrived: 3 }))).toBeUndefined();
+    const card = stageCallCardOf(CALLS[0]!, DAY_START_S, [], undefined, undefined, { readings: readingsOf(13, 252) });
+    expect(card.facts.at(-1)).toBe('Nearest its bar: the longest wait so far is 252 s, against a bar of 380 s.');
+  });
+
+  it('writes each driver’s line from its own weights, heaviest first, so a moved weight moves it', async () => {
+    const config = await loadConfig(DATA_DIR);
+    const profiles = config.dispatcherProfiles.profiles;
+    expect(profiles.length).toBeGreaterThan(5);
+    for (const profile of profiles) {
+      const line = stageCallDriverLineOf(profile);
+      expect(line.startsWith(`${profile.name} weighs `), line).toBe(true);
+      /* Player names only: no engine id survives into the line. */
+      expect(line, line).not.toMatch(/[a-z][A-Z]/u);
+      for (const [what, pattern] of BANNED) expect(pattern.test(line), `${what}: ${line}`).toBe(false);
+      expect(line).not.toMatch(FORWARD);
+    }
+    const fairness = profiles.find((profile) => profile.id === 'fairness-first');
+    if (fairness === undefined) throw new Error('the library carries Fairness first');
+    expect(stageCallDriverLineOf(fairness)).toBe('Fairness first weighs wait time and starvation.');
+    /* Move a weight and the line moves with it: the data is the source. */
+    expect(stageCallDriverLineOf({ name: fairness.name, weights: { waitTime: 0.2, starvation: 0.8 } })).toBe(
+      'Fairness first weighs starvation and wait time.',
+    );
+    const predictive = profiles.find((profile) => profile.id === 'predictive-balanced');
+    expect(stageCallDriverLineOf(predictive!)).toBe(
+      'Predictive balanced weighs 10 things, most of all wait time, direction reversal and starvation.',
+    );
+  });
+
+  it('puts one line under each answer, a car order’s in its own words, and nothing about the crowd', () => {
+    const placement = stageCallCardOf(CALLS[0]!, DAY_START_S, [], undefined, undefined, { readings: readingsOf(13, 252) });
+    expect(placement.options.map((option) => option.line)).toEqual([
+      STAGE_CALL_ANSWER_LINES['park-cars-lobby'],
+      STAGE_CALL_ANSWER_LINES['spread-cars'],
+      STAGE_CALL_ANSWER_LINES.leave,
+    ]);
+    const profiles = new Map([
+      ['Energy aware', { name: 'Energy aware', weights: { waitTime: 0.6, stopCount: 0.3, distanceTravelled: 0.1 } }],
+      ['Fairness first', { name: 'Fairness first', weights: { waitTime: 0.5, starvation: 0.5 } }],
+      ['Predictive balanced', { name: 'Predictive balanced', weights: { waitTime: 1 } }],
+    ]);
+    const driver = stageCallCardOf(
+      CALLS[0]!,
+      DAY_START_S,
+      [],
+      { 'driver-a': 'Energy aware', 'driver-b': 'Predictive balanced', leave: 'Fairness first' },
+      undefined,
+      { readings: readingsOf(13, 252), driverOf: (name) => profiles.get(name) },
+    );
+    expect(driver.options.map((option) => option.line)).toEqual([
+      'Energy aware weighs wait time, stop count and distance travelled.',
+      'Predictive balanced weighs only wait time.',
+      'Fairness first weighs wait time and starvation.',
+    ]);
+    for (const card of [placement, driver]) {
+      for (const text of [...card.facts, ...card.options.map((option) => option.line ?? '')]) {
+        for (const [what, pattern] of BANNED) expect(pattern.test(text), `${what}: ${text}`).toBe(false);
+        expect(text, text).not.toMatch(FORWARD);
+      }
+    }
+    /* Without the teaching the card is drawn as it was: no line, no bar. */
+    expect(stageCallCardOf(CALLS[0]!, DAY_START_S, []).options.every((option) => option.line === undefined)).toBe(true);
+  });
+});
+
+/* Wave AO, lane DR-1, § D1435: the lost day's card, only once a maximum reads past its bar. */
+describe('the lost day’s card — § D1435', () => {
+  const GOALS = goalsForDay(1).map((goal) =>
+    goal.id === 'queue' ? { ...goal, bar: 28 } : goal.id === 'worst-wait' ? { ...goal, bar: 380 } : goal,
+  );
+  const at = (peakQueue: number, worstWaitS: number): readonly GoalReading[] =>
+    readGoals(GOALS, {
+      arrived: 400, carryPct: 100, minutePct: 100, peakQueue, abandoned: 0, abandonedCarried: 0,
+      horizonS: 900, worstWaitS, worstWaitIsCensored: false,
+    });
+
+  it('names the goal past its bar with its figure and clock, and is absent while the day can still clear', () => {
+    expect(stageLostCardOf(at(28, 380), '08:49')).toBeUndefined();
+    const card = stageLostCardOf(at(29, 200), '08:49');
+    expect(card?.heading).toBe(STAGE_LOST_COPY.heading);
+    expect(card?.fact).toBe(
+      'The deepest landing reached 29 by 08:49, past its bar of 28. A maximum past its bar stays past it, and the ' +
+        'stage asks nothing more today.',
+    );
+    expect(stageLostCardOf(at(10, 412), '12:37')?.fact).toMatch(/^The longest wait reached 412 s by 12:37, past its bar of 380 s\./u);
+    /* It offers ending and watching and promises nothing about the rest of the day. */
+    for (const text of [card?.fact ?? '', STAGE_LOST_COPY.choices]) {
+      expect(text).not.toMatch(/\b(would|could have|if you|better|worse|because|should)\b/iu);
+    }
+    expect([STAGE_LOST_COPY.end, STAGE_LOST_COPY.watch]).toEqual(['End the day', 'Watch the rest']);
   });
 });

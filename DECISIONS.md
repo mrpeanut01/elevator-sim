@@ -43708,6 +43708,8 @@ integrator registers them in `documentation.test.ts#KNOWN_DECISION_HOLES`.
 
 ## D1029 — the press becomes a call: the stage stops once at an instant it can name, a pin is admitted only over a window from it, and the day runs under its standing order until the call is answered
 
+> **Status 2026-10-13: AMENDED by [§ D1432](#d1432)** (an agent ruling). Before the answer the card states the goal nearest its bar and one line per answer saying what it is; nothing about an answer's effect on this crowd. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Status 2026-09-26: CARD EXTENDED by [§ D1206](#d1206), AND NO LONGER THE DAY'S ONLY STOP by [§ D1204](#d1204)** (agent rulings). The card also says who is standing at the call second; after the call is answered the day's ordinary calls open. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Status 2026-09-26: CLAUSE 7 AMENDED by [§ D1140](#d1140)** (an agent ruling). *Take this call again* opens half a minute before the call, playing, rather than at the start of the day. See [`docs/39`](docs/39-decisions-in-force.md).
@@ -46757,6 +46759,8 @@ run differs after it.
 
 ## D1168 — no call once the day is lost, and *End the day*
 
+> **Status 2026-10-13: AMENDED by [§ D1435](#d1435)** (an agent ruling). The stage stops once on a card whose focused primary is *End the day*, and *Watch the rest* plays on at 30×. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-09-26 by agent sessions under delegated authority** (the decide-al swarm, ruling § Q1
 > clause 4, two of three; the player lens would raise the call and say so; built by wave AK lane
 > AK-D), not by the product owner. **Narrows [§ D371](#d371)** for one case, and amends
@@ -46791,6 +46795,8 @@ every call left, offers *End the day* (by 960 s on the run as built, measured in
 after it, and files a report that says when.
 
 ## D1169 — a scored day is paced by the tutorial's hold rule
+
+> **Status 2026-10-13: NARROWED by [§ D1435](#d1435)** (an agent ruling). A lost day plays the rest at the fast rung whoever waits, unless a chip is pressed after the loss. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Taken 2026-09-26 by agent sessions under delegated authority** (the decide-al swarm, ruling § Q1
 > clause 1, three of three; built by wave AK lane AK-D), not by the product owner. **Amends
@@ -47921,6 +47927,8 @@ from the Engineer transport are not held to the attempt's reach.
 
 ## D1219 — each call's row on the stage once its window can be observed: counts only, never the day's verdict
 
+> **Status 2026-10-13: AMENDED by [§ D1433](#d1433)** (an agent ruling). From its due instant the row reads each answer's two final goals at the playhead and says a run could no longer clear once one reads past its bar. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-09-26 by agent sessions under delegated authority** (the decide-an swarm, ruling § Q1
 > clause (d), three of three; built by wave AL lane AL-E), not by the product owner, and to be read
 > as an agent ruling. **Amends [§ D1138](#d1138) clause 3** from *nothing about the other answers
@@ -48375,6 +48383,8 @@ it. Shown red on a 130-word row added to each document.
 measurement of how much the lighter file changes a lane's cost, which is unmeasured.
 
 ## D1239 — the one attempt is final: the Engineer surface shows it only to its reach and never files it, and a close reads the week this device has stored
+
+> **Status 2026-10-13: NARROWED by [§ D1364](#d1364)** (an agent ruling). The attempt's reach never passes a call it is held at. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Status 2026-10-10: AMENDED by [§ D1361](#d1361)** (an agent ruling). The saved attempt belongs to one tab at a time: a tab that does not hold it shows the day no further, presses and files nothing of it, and takes it over only by a pressed *Continue ⟨day⟩ here*. See [`docs/39`](docs/39-decisions-in-force.md).
 
@@ -50256,6 +50266,8 @@ instant and not before.
 
 ## D1336 — a wrinkle asks who drives at its start, inside a peak too, admitted where the day's verdict differs, and a wrinkle that raised nothing says so after its window
 
+> **Status 2026-10-13: AMENDED by [§ D1434](#d1434)** (an agent ruling). A start admitted on the verdict alone with nobody standing at its second is not asked. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-10-10 by agent sessions under delegated authority** (swarm DQ, ruling Q1 item 4: the
 > start call and its ground are the engineering member's, measured, with the player member agreeing
 > on the question; the past-tense line is the honesty member's; reconciled by wave AN's integrator;
@@ -50863,6 +50875,8 @@ posted sitting. The row is pinned by its model, the route and the client, and
 
 ## D1360 — while a scored attempt stands, every Everyday screen that would run its day or change how it runs only shows, and the shell runs that day only as the attempt
 
+> **Status 2026-10-13: AMENDED by [§ D1362](#d1362)** (an agent ruling). Before a scored day's attempt begins, the workshop's, the tuner's and the drawing board's runs are sandbox days on a practice crowd, and *Take this call again* and *Play this crowd* refuse on the day's own crowd. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-10-10 by agent sessions under delegated authority** (wave AO, lane AO-1, on the
 > post-AN panel's seat D, defect D1), not by the product owner, and to be read as an agent ruling;
 > [§ D626](#d626) is the cautionary case. **Amends [§ D1323](#d1323)**, whose clause 1 held the
@@ -51003,7 +51017,133 @@ stale run. A begin reads the slot fresh first, so the later of two begins finds 
 writes inside the same instant are not serialised by `localStorage`, and that race is not
 established.
 
+## D1362 — before a scored day's attempt begins, a run of its crowd from any door but *Start the day* meets a practice crowd, or is refused in words
+
+> **Taken 2026-10-13 by agent sessions under delegated authority** (wave AO, lane AO-1b, the
+> integration follow-up to lane AO-1, on the post-AN panel's seat D, D1 and D2), not by the product
+> owner, and to be read as an agent ruling; [§ D626](#d626) is the cautionary case. **Amends
+> [§ D1360](#d1360)**, whose hold bound only while an attempt stood, and **[§ D1368](#d1368)**'s
+> *What it does not reach*, which left the sandbox day free to play the day's crowd before the
+> attempt. Owner-reversible clauses: a practice crowd for the workshop, the tuner and the drawing
+> board rather than a refusal (clause 2); a fixed practice crowd per day rather than one drawn afresh
+> (clause 3); refusing *Take this call again* and *Play this crowd* rather than dealing them a
+> practice crowd (clause 4); and the words of the stage line, the sheet's note and the refusal.
+> **Not put to a swarm**: the lane had no way to spawn one, and the brief named the two readings.
+
+**Why an entry.** [§ D405](#d405)'s first two grounds. It moves two recorded rulings, adds a fifth
+practice ground beside [§ D1141](#d1141)'s, [§ D1218](#d1218)'s and § D1368's, and binds
+`shift/scoredCrowd.ts`, `shift/banking.ts`, `shift/report.ts`, `everyday/host.ts`, `dev/main.ts`,
+`everyday/designerScreen.ts` and the honesty register.
+
+**What was wrong.** § D1218 begins the attempt at *Start the day*, and § D1360 holds every other
+door only while an attempt stands. Before it begins, the workshop's *Run a day with this* and a
+sandbox day from *Change it anyway* still played the scored day's shared crowd, so a player could
+run each driver on it, read which cleared, and then press *Start the day* with the answer known.
+The workshop's run stood on the week itself, so its close would also have banked the day.
+
+**What the three rulings imply.** § D1218 makes the attempt the only run of the day the week banks
+and starts it at *Start the day*; § D1360 and [§ D1323](#d1323) refused every other run of the day
+while it stands, because a different crowd still rehearses the call's timing at a held call. Before
+the attempt nothing is held: the call has not been met, the brief already states the day's wrinkle
+and its hour, and the answer key is the shared crowd under each driver. So the crowd is what must not
+be rehearsed, and a practice crowd keeps the workshop and the sandbox usable, which the brief asked
+for where the rulings allowed it.
+
+**The ruling.**
+
+1. **A day that has not begun** is a scored week day on which *Start the day* would begin an
+   attempt: a week on a scenario, the day not closed, no attempt standing, and the crowd the one it
+   banks on (`dev/main.ts#dayWouldBeginOn`, the condition `beginDayAttempt` now reads too).
+2. **On such a day the workshop's run, the tuner's sandbox and the drawing board's run are a sandbox
+   day on a practice crowd** (`everyday/host.ts#runSandboxDay`): the week is parked and put back on
+   leaving, exactly as § D1368 does, and the crowd is swapped after the day's shape is read, so the
+   practice day is the shared day's length. The stage says *This run does not count toward the week:
+   it is a sandbox day on a practice crowd, not the day's shared one, and your week is where you left
+   it* (`PRACTICE_DAY_SENTENCES.practiceCrowd`), and the close says `PRACTICE_REHEARSAL_NOTE`.
+3. **The practice crowd is the shared crowd's digits behind a 9**
+   (`shift/scoredCrowd.ts#practiceCrowdOf`): one digit longer than the shared crowd, so never it, and
+   never a date, a crowd derived from a date or a pinned day, all of which begin with the year. It is
+   fixed for the day and drawn from no random source.
+4. ***Take this call again* and *Play this crowd*** exist for one crowd in particular, so on the
+   crowd an unbegun day counts on they refuse with `shift/banking.ts#DAY_NOT_BEGUN_HOLDS_ITS_CROWD`.
+5. **Only *Start the day* plays the day's own crowd before the attempt**, and it begins the attempt.
+
+**What holds it.** `everyday/attemptDoors.test.ts` drives every held door before the attempt as well
+as during it: a door that runs runs a sandbox day on the practice crowd and never the day's, a refusal
+is in words, an editor write still writes, and only `playDay` runs the shared crowd; and every held
+door that runs asks the question in its own body. Against `c5f57a9`'s host two of its eight cases
+fail (*startRun ran the day's own crowd*). `shift/scoredCrowd.test.ts` (the practice crowd is never a
+shared one; the ground), `shift/report.test.ts` (the note), `everyday/sandbox.test.ts` (the ground on
+a sandbox day, legs differing from the shared crowd's), and `everyday/attemptRoutes.browser.test.ts`'s
+first case on the built bundle: the workshop's run before *Start the day* carries the practice line,
+begins no attempt, *‹ Brief* finds the brief unchanged, and *Start the day* then begins the attempt on
+the day's own crowd.
+
+**What it does not reach.** The Engineer surface's own run of the week's day before *Start the day*
+is still free, as § D1323 and § D1218 named: its close banks the day when no attempt stands, so it is
+an Engineer road to the week rather than a rehearsal door, and refusing it would take Engineer play
+of the week away; it is listed for the owner. A posted run of today's crowd on the board can still be
+watched (§ D1360's *What it does not reach*). A practice crowd still rehearses the day's wrinkle and
+growth on another crowd, which the brief already states.
+
+## D1363 — the drawing board's *Run a day in it* is a sandbox day
+
+> **Taken 2026-10-13 by agent sessions under delegated authority** (wave AO, lane AO-1b, on lane
+> AO-2's finding), not by the product owner, and to be read as an agent ruling. **Extends
+> [§ D1368](#d1368)** clause 1 from the tuner to the drawing board. Owner-reversible clause: that the
+> drawn tower runs the week's day (its crowd, its length, its wrinkle) rather than a free day on no
+> scenario. **Not put to a swarm**, as § D1362.
+
+**Why an entry.** It extends a recorded ruling to a screen that ruling did not reach, and binds
+`everyday/designerScreen.ts` and `everyday/host.ts`.
+
+**What was wrong.** *Run a day in it* applied the drawn tower through `applyBuildingSpec`, whose
+`withBuilding` stood the player's own week on `SANDBOX_CONTRACT_ID`; the save wrote that week, and a
+reload opened the week on Garden Apartments, the fault § D1368 fixed for the tuner.
+
+**The ruling.** The press hands the drawn tower to `EverydayHost.runSandbox` (`everyday/sandbox.ts`),
+which saves it to the shelf, runs the week's day in it over the week, and puts the week back when the
+player leaves the stage and the report. Before the day's attempt it meets the practice crowd
+(§ D1362), and while an attempt stands it refuses in § D1360's words, quoted under the plate.
+
+**What holds it.** `everyday/sandbox.test.ts` (a drawn tower, the standing one widened and the blank
+board, simulates on Midtown's whole day and the save writes the week) and
+`everyday/attemptRoutes.browser.test.ts`'s second case: a designed day runs, the page reloads, and the
+stored week is on Crown Hotel's first day with nothing filed and no sandbox week stored.
+
+**What it does not reach.** *Save as a new building* still applies through `applyBuildingSpec`, so a
+reload after a save with no run still opens on the sandbox contract's week; that press is the
+designer's own statement that *the next run stands on it*, and it is listed rather than changed here.
+
+## D1364 — the attempt's reach never passes a call it is held at
+
+> **Taken 2026-10-13 by agent sessions under delegated authority** (wave AO, lane AO-1b, on lane
+> AO-3's trace), not by the product owner, and to be read as an agent ruling. **Narrows
+> [§ D1239](#d1239)** clause 1's reach and [§ D1218](#d1218) clause 2's *furthest instant the stage
+> has shown*. Owner-reversible clause: putting a stored reach back on the call when the call is found
+> after the frame that passed it, rather than leaving it where the frame had drawn.
+
+**Why an entry.** It narrows two recorded rulings and binds `shift/attempt.ts` and `dev/main.ts`.
+
+**What was wrong.** The Engineer surface showed about three seconds of a held call's unanswered
+branch (2:40:16 against a call at 2:40:13): the stage noted its reach from the frame it drew, which at
+a fast chip is past the call before the stop puts the playhead back on the call second, and the
+Engineer transport is held at that reach.
+
+**The ruling.** While a call stands unanswered on the attempt's run (the pinned call until answered or
+skipped, else the ordinary call the session is asking or has raised, which the stage waits at either
+way), the reach goes no further than its second, and a reach already past it is put back on it
+(`shift/attempt.ts#attemptShownToHeld`, `dev/main.ts#heldCallAtS`). The Engineer transport is held at
+the lesser of the reach and the call. Once the call is answered the reach moves on as before.
+
+**What holds it.** `shift/attempt.test.ts` (never past a held call, put back where it was, unchanged
+with none held) and `everyday/attemptRoutes.browser.test.ts`'s third case at the fastest chip but one:
+stopped at the call, the stored reach is within a second at or before the call, and the Engineer
+playhead scrubbed to its end is at or before it.
+
 ## D1368 — a sandbox day runs the day with the player's changes, over the week and never on it
+
+> **Status 2026-10-13: AMENDED by [§ D1362](#d1362) and EXTENDED by [§ D1363](#d1363)** (agent rulings). Before the day's attempt begins a sandbox day meets a practice crowd, and the drawing board's *Run a day in it* is a sandbox day too. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Taken 2026-10-10 by agent sessions under delegated authority** (wave AO, lane AO-2, on the wave
 > brief's item for the post-AN panel's seat D, D3 and D7), not by the product owner, and to be read as
@@ -52397,3 +52537,147 @@ and `scenario/survivorBands.test.ts` with stage 7's rows moved, against the rege
 
 **Not established.** Whether a carried answer is always this close to clearing on Midtown's up-peak;
 twelve demands is a screen, and nothing here measures the distance.
+
+
+## D1432 — before the answer the call card states the goal nearest its bar and what each answer is, and nothing ahead
+
+> **Taken 2026-10-13 by agent sessions under delegated authority** (swarm DR, ruling § Q1 item 1,
+> three of three on the shape: S1 the player lens, S2 honesty, S3 engineering and measurement;
+> reconciled by wave AO's integrator; built by lane DR-1), not by the product owner, and to be read as
+> an agent ruling. **Amends [§ D1029](#d1029)**'s fourth refusal, *nothing on the card describes either
+> one's effect*, to *nothing on the card describes an answer's effect on this crowd*, and **extends
+> [§ D1206](#d1206)** by one fact. Owner-reversible clauses: the nearest-bar line and which goals it
+> may name; that a driver's line is generated from its weights rather than authored (S1's `cardLine`
+> was the alternative); the three car orders' lines.
+
+**Why an entry.** [§ D405](#d405)'s first two grounds: it moves a recorded ruling about what the card
+may say, and binds `everyday/stageCall.ts`, `everyday/stageScreen.ts` and the honesty register.
+
+**What was wrong.** The post-AN panel (seats A and B) met cards that stated the present and offered
+three buttons with nothing to reason from: who the drivers were, what an order sets, or which of the
+day's goals stood near its bar. Swarm DR measured that the card's own row then taught the wrong
+lesson (§ D1433).
+
+**The ruling.**
+
+1. **The goal graded on a maximum that stands nearest its bar**, the deepest landing or the longest
+   wait, whichever reading is the larger share of its bar, with the reading and the bar:
+   *Nearest its bar: the longest wait so far is 252 s, against a bar of 380 s*
+   (`stageCallNearestBarLineOf`, the rail's own readings at the call second, identical off all three
+   runs). A goal the rail reads as pending is not named; the share goals are not named.
+2. **One line per answer saying what it is.** A driver's is what its profile weighs, heaviest first,
+   by `core`'s player names, three named and the rest counted (`stageCallDriverLineOf`), from the
+   vector the handover hands the day to, so it cannot drift; the keep answer carries the line of the
+   driver driving. A profile's authored blurb is not used, because several state effects. A car
+   order's line says what it sets (`STAGE_CALL_ANSWER_LINES`).
+3. **Refused, as by all three members:** cleared or missed under each answer, an effect, a cause, or
+   what a driver would do now. S3 measured that the nearest-bar reading did not predict the right
+   answer on its 18 split rows, so the next panel says whether these lines help.
+
+**What holds it.** `everyday/stageCall.test.ts`: landing 13 of 24 and wait 252 of 380 s name the wait,
+22 of 24 names the landing, a pending wait is never named; every shipped profile's line is derived
+from its weights, carries no engine id and moves when a fixture weight moves; the card's ban lists and
+a forward-word list hold on every new line. Red before: the functions did not exist.
+
+## D1433 — after the answer each call's row reads the day's two final goals at the playhead, and the close names where the count's favourite missed
+
+> **Taken 2026-10-13 by agent sessions under delegated authority** (swarm DR, ruling § Q1 items 2
+> and 3, three of three; built by lane DR-1), not by the product owner, and to be read as an agent
+> ruling. **Amends [§ D1219](#d1219) clause 2** (*never the day's verdict*) for one fact: a run whose
+> maximum reads past its bar could no longer clear, said only once it reads so. **Extends
+> [§ D1138](#d1138) clause 3's** report row by one sentence. Owner-reversible clauses: the readings
+> line and its minute grid; *could no longer clear*; the count's label; the close's sentence and the
+> reading that it is said only where the three answers split the day.
+
+**Why an entry.** It amends two recorded rulings and binds `shift/dayCalls.ts` (the record gains
+`maxima`), `shift/dayCallMaxima.ts`, `dev/dayCallSession.ts`, `everyday/stageCallRow.ts`,
+`everyday/host.ts`, `everyday/stageScreen.ts`, `shift/report.ts` and the honesty register.
+
+**What was measured.** The answer with the fewest one-minute waits missed the day on 10 of 21
+deciding rows (S2), 14 of 22 split rows (S3) and on 20 of 55 split rows every lowest-count answer
+missed (S1). On 8 of 22 split rows the readings at the window's end were identical under all three
+answers (S1, S3), so a row frozen at the call plus 660 s misses most of what it could teach.
+
+**The ruling.**
+
+1. **From its due instant, each call's row reads each answer's deepest landing and longest wait so
+   far**, at the last whole minute the stage has reached, in the counts sentence's order: *By 10:41,
+   the deepest landing and the longest wait so far: 22 and 340 s with Energy aware driving; …*. A
+   reading past its bar says *past its bar of N*, and a run with one past its bar *could no longer
+   clear* from the first minute it read so: § D1168's one verdict, applied to the call's runs. A wait
+   still under way is pending on the rail and is said so. The readings are kept on the record when
+   the call is raised (`shift/dayCallMaxima.ts`: the rail's fold at each whole minute from the call,
+   kept where it moves), so a resumed attempt reads them as an unbroken one does; a record written
+   before this keeps its counts-only row, and the attempt slot's version does not move.
+2. **The row's note says the count is not one of the day's goals.**
+3. **The close names the gap.** Where the three answers split the day and every answer with the
+   fewest one-minute waits missed it, the report row says so and names the goal it missed with its
+   figure (`dayCallGapSentenceOf`). The ruling's text says *where the answer with the fewest waits
+   missed the day*; all three members measured and worded it on split rows, so this lane reads it
+   there, and the owner may widen it to every row where the favourite missed.
+
+**What holds it.** `shift/dayCallMaxima.test.ts`: at every whole minute from a call to the end of two
+shipped runs the readings equal `readGoal` over `observationsAt` (state and figure), and the honesty
+pair: *past its bar* and the lost instant are said exactly where the rail reads the goal missed and
+never a minute before, a censored wait reads pending. `everyday/stageCallRow.test.ts`: the line at the
+minute reached, the pair on a synthetic record (not before 7 800 s, from it; spread's crossing not at
+8 399 s, from 8 400 s), the count's label, counts only on an old record. `shift/dayCalls.test.ts`: the
+sentence with the goal and figure where the favourite missed, none where it cleared or nobody cleared,
+and the row's ban lists. Red before: the functions did not exist.
+
+**Not established.** A stage row on the built bundle with readings past a bar was not walked in a
+browser; the readings are unit-held against the rail's fold.
+
+## D1434 — a call admitted only on the verdict ground with nobody standing is not asked
+
+> **Taken 2026-10-13 by agent sessions under delegated authority** (swarm DR, ruling § Q1 item 4,
+> two of three: S1 and S2 for the drop, S3 against; built by lane DR-1), not by the product owner, and
+> to be read as an agent ruling. **Amends [§ D1336](#d1336) clause 3.** Owner-reversible in full; S3's
+> one save is the recorded cost.
+
+**Why an entry.** It amends a recorded admission rule and binds `dev/dayCallSession.ts`.
+
+**The ruling.** A candidate the counts do not admit, admitted on § D1336's verdict ground alone, is
+turned down where nobody stands at a landing at its second on the run standing (the card's own fold,
+`frame/overlay.ts#queueAt`). A call the counts admit is asked whoever stands; nothing else moves.
+
+**The dissent.** S3 kept such calls: on crowd 15's Thursday a call whose counts read 0, 0 and 0 at the
+09:30 goods-inward start was its sample's only save of a day no profile clears alone. S1 measured the
+drop at 5 of 130 calls, each a card saying nobody was standing over a row of zeros.
+
+**What holds it.** `dev/dayCallSession.test.ts`: the late finish's start with the landings emptied
+for the hundred seconds before it raises nothing (red without the drop: raised at 5 460 s), and the
+same start with riders standing is raised (the existing case).
+
+## D1435 — a lost day stops once on *End the day*, and *Watch the rest* plays on at 30×
+
+> **Taken 2026-10-13 by agent sessions under delegated authority** (swarm DR, ruling § Q4, three of
+> three; built by lane DR-1), not by the product owner, and to be read as an agent ruling. **Amends
+> [§ D1168](#d1168) clause 2** (the chip becomes a card whose primary takes focus) and **narrows
+> [§ D1169](#d1169) clause 1** for a lost day alone. Owner-reversible clauses: the stop, the fast rung
+> after the loss, and that a chip pressed after the loss is the player's rung to the end. Reversing
+> them restores § D1168's chip and § D1169's hold.
+
+**Why an entry.** It moves two recorded rulings and binds `everyday/stagePace.ts`,
+`everyday/stageCall.ts`, `everyday/stageScreen.ts` and the honesty register.
+
+**What was measured.** 110 of 332 real minutes were played after the day was already lost (S1); a
+day lost by 08:49 played on for 9.3 to 13.3 real minutes (S3); *End the day* was an 11 px chip with
+its reason in a tooltip.
+
+**The ruling.** On the first frame of the player's own scored day at which a goal graded on a maximum
+reads past its bar, the stage pauses once and puts a card in the call card's place
+(`stageLostCardOf`): which goal, its figure, the clock and the bar, and that a maximum past its bar
+stays past it. *End the day* is its primary and takes focus; *Watch the rest* plays on under the pace
+note *the day can no longer clear: playing the rest at 30×, and no call is asked* (`stagePace.ts`'s
+`lost`), whoever is waiting. A chip pressed after the loss is the player's rung. A pinned call still
+standing is answered first. The stage never ends the day itself. § D1266's skip is not extended to the
+lost stretch (S1 asked for it; the ruling did not), so a day lost early still plays its afternoon at
+30×.
+
+**What holds it.** `everyday/stagePace.test.ts`: lost with somebody waiting paces `lost` at 30× (red
+before: `watching`), a chip after the loss stands, one before it does not, a call still stops first.
+`everyday/stageCall.test.ts`: the card names the goal and figure and is absent while the day can clear.
+`everyday/lostDay.browser.test.ts` on the built bundle, Crown Hotel on 2026-10-05: the stage stops on
+the card with *End the day* focused and the clock still; *Watch the rest* plays on under the `lost`
+line, raises no call, never stops on the card again, and reaches the day's end with no report filed.
