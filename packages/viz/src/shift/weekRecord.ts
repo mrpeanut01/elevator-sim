@@ -52,6 +52,8 @@ import chimeLedgerDocument from '../../../../data/chime-ledger.json' with { type
 
 import { contractById } from './contracts.js';
 import type { WeekState } from './types.js';
+import { dealtWeekOf } from './weekLevels.js';
+import { poolDealOf } from './weekPool.js';
 
 /** One tower's record of closed weeks — see the module docstring. */
 export interface WeekRecord {
@@ -156,7 +158,7 @@ export function isDerivedCrowdOn(seed: bigint, dateSeed: bigint): boolean {
  * derived crowd after.
  */
 export function dealtCrowdOf(
-  week: Pick<WeekState, 'contractId' | 'day' | 'closedDay' | 'history'>,
+  week: Pick<WeekState, 'contractId' | 'week' | 'day' | 'closedDay' | 'history'>,
   record: WeekRecord,
   dateSeed: bigint,
 ): bigint {
@@ -165,6 +167,15 @@ export function dealtCrowdOf(
     const filedOn = week.history.find((entry) => entry.day === week.day)?.record?.seed;
     if (filedOn !== undefined && /^\d+$/u.test(filedOn)) return BigInt(filedOn);
   }
+  /*
+   * **From week 2 a counted day is dealt from the pool** — wave AP, lane DT-1,
+   * [§ D1459](../../../../DECISIONS.md) and [§ D1460](../../../../DECISIONS.md): a measured crowd,
+   * never a dead one, by the date, the day and the weeks closed (`weekPool.ts#poolDealOf`). This
+   * replaces the derivation below for those days, the date's own crowd included; week 1, a day that
+   * does not count and a tower the pool does not cover keep it.
+   */
+  const pooled = poolDealOf(week.contractId, dealtWeekOf(week), week.day, record.closed, dateSeed);
+  if (pooled !== undefined) return pooled.seed;
   const date = dateSeed.toString();
   const filed = record.dateCrowd === date || week.history.some((entry) => entry.record?.seed === date);
   return filed ? derivedCrowdOf(dateSeed, week.day, record.closed) : dateSeed;

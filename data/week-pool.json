@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "protocol": {
+    "contractId": "c2",
+    "crowdsFrom": "2026-07-01",
+    "crowdCount": 40,
+    "throughWeek": 4,
+    "placement": "leave",
+    "profiles": ["nearest-car", "eta", "collective", "collective-enroute", "energy-aware", "fairness-first", "capacity-aware", "predictive-balanced", "auction", "auction-multi-round", "zoned-uppeak", "destination-eta", "destination-panel"]
+  },
+  "cells": []
+}
