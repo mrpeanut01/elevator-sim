@@ -164,8 +164,7 @@ describe.skipIf(!HAS_BROWSER)('the house tally never goes backwards across a rel
       await page.reload({ waitUntil: 'load' });
       await page.waitForSelector('.everyday-continue-week', { timeout: 60_000 });
       await page.locator('.everyday-continue-week').click();
-      await page.waitForSelector('.everyday-door', { timeout: 15_000 });
-      await page.locator('.everyday-bar-primary').click();
+      /* § D1384 (lane AO-4, joined at integration): a filed Monday's tile opens Tuesday's brief directly. */
       await page.waitForSelector('.everyday-brief', { timeout: 15_000 });
       await page.locator('.everyday-bar-primary').click();
       await waitForClosable(page);

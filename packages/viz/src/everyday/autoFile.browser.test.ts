@@ -744,7 +744,7 @@ describe.skipIf(!HAS_BROWSER)('a day left unfinished — GitHub issue #526 item 
     }
   });
 
-  it('taking a campaign offer while the day’s run is still generating files nothing onto the new week — item 2', async () => {
+  it('taking a campaign offer while the day’s run is still generating files nothing, and moves no week (§ D1393) — item 2', async () => {
     const page = await openPage(browser, { viewport: { ...VIEWPORTS[0] } });
     try {
       /*
@@ -808,8 +808,11 @@ describe.skipIf(!HAS_BROWSER)('a day left unfinished — GitHub issue #526 item 
       await page.locator('.everyday-rail-menu').click();
       await page.waitForSelector('.everyday-mode[data-screen]', { timeout: 15_000 });
       const scores = await scoresAfterEngineerClose(page);
-      /* The door is reading the week the offer switched to — otherwise this would measure the parked one. */
-      expect(await page.textContent('.everyday-door-seed'), `the runner read "${seen.left}" as the offer was taken`).not.toBe(
+      /*
+       * Since § D1393 (wave AO, lane AO-5) taking a career offer moves no week, so the door still reads the
+       * Scenario week the run was generating for; what this item guards is that nothing was filed onto it.
+       */
+      expect(await page.textContent('.everyday-door-seed'), `the runner read "${seen.left}" as the offer was taken`).toBe(
         towerBefore,
       );
       expect(figuresIn(scores)).toEqual([]);
