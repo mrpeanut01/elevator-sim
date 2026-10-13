@@ -62,6 +62,7 @@ import {
   leaveTutorialIfOffered,
   openEverydayDoor,
   openPage,
+  leaveLobbyIfShown,
   startShippedSite,
   type ShippedSite,
 } from '../dev/browserTier.test-helper.js';
@@ -113,6 +114,8 @@ async function coldLoad(
     undefined,
     { timeout: 30_000 },
   );
+  /* § D1445: a cold launch opens the lobby; its *Main menu* is the player's way to the front door. */
+  await leaveLobbyIfShown(page);
   await page.waitForSelector('.everyday-bar-primary');
   /* One frame for the mount's first draw, the same settle the gate beside this file takes. */
   await page.waitForTimeout(600);

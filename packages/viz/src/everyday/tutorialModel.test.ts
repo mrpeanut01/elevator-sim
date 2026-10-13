@@ -240,9 +240,19 @@ describe('§ D476’s condition as § D993 amends it — leaving files nothing, 
   });
 
   it('is offered from the shell against the week and the profile, once per load', () => {
-    const offer = /function offerTutorial\(host: EverydayHost\): void \{([\s\S]*?)\n  \}/u
+    const offerOnly = /function offerTutorial\(host: EverydayHost\): void \{([\s\S]*?)\n  \}/u
       .exec(SHELL_SOURCE)?.[1];
-    expect(offer, 'offerTutorial() moved or was renamed').toBeTypeOf('string');
+    expect(offerOnly, 'offerTutorial() moved or was renamed').toBeTypeOf('string');
+    /*
+     * § D1445: the derivation moved one function down, into `firstVisitOf`, so the lobby's welcome
+     * line asks the same question from the same counts. The offer still calls it, and the two
+     * bodies together are what this case reads.
+     */
+    expect(offerOnly ?? '').toContain('firstVisitOf(host)');
+    const gate = /function firstVisitOf\(host: EverydayHost\): boolean \{([\s\S]*?)\n  \}/u
+      .exec(SHELL_SOURCE)?.[1];
+    expect(gate, 'firstVisitOf() moved or was renamed').toBeTypeOf('string');
+    const offer = `${offerOnly ?? ''}\n${gate ?? ''}`;
     // Derived, on every load, from the records the player fills by playing — every week's days
     // since § D1143, not the standing week's alone.
     expect(offer ?? '').toContain('filedDaysOf([host.week(), ...host.parkedWeeks()])');

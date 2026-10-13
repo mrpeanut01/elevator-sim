@@ -354,6 +354,8 @@ describe('the table matches the guide, cell for cell', () => {
       /* GitHub issue #244's landing page — § 3.3's table begins at the menu and has no row for a
          screen that comes before it. */
       'landing',
+      /* § D1445's lobby — no § 3.3 row, and the shell steps the bar aside while it shows. */
+      'lobby',
       'report·replay',
       'report·watch',
       'scenario',

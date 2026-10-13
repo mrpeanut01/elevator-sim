@@ -245,7 +245,7 @@ async function coldLoad(): Promise<Page> {
    * a chance to be wrong as well — so widening only the leave helper swapped one timeout for the
    * same one, which is how a wait that is too narrow hides the next wait that is too narrow.
    */
-  await page.waitForSelector('.everyday-landing, .everyday-tutorial, .everyday-mode[data-screen]', {
+  await page.waitForSelector('.everyday-lobby, .everyday-landing, .everyday-tutorial, .everyday-mode[data-screen]', {
     timeout: 30_000,
   });
   return page;
@@ -269,6 +269,12 @@ async function coldLoad(): Promise<Page> {
  * timeout for a different timeout.
  */
 async function leaveTutorial(page: Page): Promise<void> {
+  /* § D1445: every cold launch opens the lobby, left by its own *Main menu*, by keyboard. */
+  if ((await page.locator('.everyday-lobby').count()) > 0) {
+    await pressFocused(page, '.everyday-lobby-menu');
+    await page.waitForSelector('.everyday-mode[data-screen]', { timeout: 30_000 });
+    return;
+  }
   const OFFERED = '.everyday-landing, .everyday-tutorial';
   for (let pass = 0; pass < 2; pass += 1) {
     if ((await page.locator(OFFERED).count()) === 0) return;

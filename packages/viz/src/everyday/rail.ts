@@ -351,6 +351,9 @@ export function sublineFor(state: EverydayState): string {
   switch (state.screen) {
     case 'menu':
       return 'YOU ARE HERE';
+    /* § D1445's lobby. The rail is stepped aside while it shows, so this is the word it would say. */
+    case 'lobby':
+      return 'IN THE LOBBY';
     /*
      * GitHub issue #244's landing page. Bare words for the same reason the two arms below carry
      * them: the run this page plays is its own block's, not the shell's transport, so there is no
@@ -462,6 +465,11 @@ export function railGroups(
        * first visit and Scenario afterwards, and the second of those is only ever drawn for
        * somebody who came back here on purpose.
        */
+      /*
+       * § D1445's lobby, so the elevator a cold launch opens on can be ridden again. *Main menu*
+       * still goes to the menu: the handoff says the lobby is not replayed on every return.
+       */
+      item('lobby', 'The lobby'),
       item('landing', 'What this is'),
       item('week', 'Your week'),
       /*

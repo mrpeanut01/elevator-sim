@@ -276,6 +276,20 @@ export const ACTION_BAR_ROWS: readonly ActionBarRow[] = Object.freeze([
     inverted: false,
   }),
   /*
+   * § D1445's lobby, `guide: false` — no § 3.3 row exists for it, and the shell steps the bar aside
+   * while the lobby has the viewport (`shell.ts#applyChrome`), so this row is never drawn. It is here
+   * because every screen answers this table, and it says what is true if it ever were drawn: the
+   * modes list is the way past the ride, and the lobby's own panel is its primary.
+   */
+  row({
+    screen: 'lobby',
+    guide: false,
+    leave: leave(MODES),
+    primary: primary(['Call the car']),
+    note: 'Press CALL, choose a floor on the panel, then close the doors.',
+    inverted: false,
+  }),
+  /*
    * GitHub issue #244's landing page, `guide: false` — § 3.3's table predates it and contains no
    * landing row, so this sits beside the tutorial's pair and the Scenario hub's rather than being
    * compared against a transcription of the handoff.

@@ -99,8 +99,8 @@ verdict:
   **The named gaps travel with the verdict.** Clause 4, *every unit names its non-test caller*, is
   mechanised for reachability and not for the naming: every `packages/viz/src` directory is in
   `deadCode.test.ts`'s `AUDITED_MODULES`, asserted against disk in both directions, and no test
-  checks that a unit *names* its caller in prose. **42 statically swept DOM entry points** are not
-  driven *(**21** mounts and **21** screen-registry rows, derived by
+  checks that a unit *names* its caller in prose. **43 statically swept DOM entry points** are not
+  driven *(**22** mounts and **21** screen-registry rows, derived by
   `packages/viz/src/honesty/derive.test.ts`; the screen rows' pure halves **are** driven, so what
   goes unswept is only what an entry point authors inline)*. And **U6**, **U7's rider models** and
   **Basic's curated three-dimension subset** are unbuilt. The long form, with the temporal axis's

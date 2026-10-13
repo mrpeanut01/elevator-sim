@@ -339,6 +339,13 @@ const EVERYDAY_SHELL_FILES = new Set([
    */
   'everyday/rushDeviceStore.ts',
   /*
+   * § D1445's lobby: the mount owns its door timers, its fit observer and its two synthesised
+   * sounds, and the store owns the one `localStorage` key that says whether to skip it. Every word
+   * and every door decision stays pure in `lobbyModel.ts`.
+   */
+  'everyday/lobbyScreen.ts',
+  'everyday/lobbyStore.ts',
+  /*
    * § 6's daily loop — four DOM halves and the vocabulary they share. Each one's words and
    * decisions stay pure in its `*View.ts` sibling (`doorView`, `briefView`, `reportView`,
    * `weekView`) plus `today.ts`, `figures.ts` and `world.ts`, none of which are exempt and all of

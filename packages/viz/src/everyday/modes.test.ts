@@ -441,7 +441,8 @@ describe('the Scenario row describes § D525’s hub, not § D335’s four-tile 
      * is the shape this suite's own § M30-style notes keep warning about.
      */
     expect(EVERYDAY_SCREENS.length).toBeGreaterThan(1);
-    expect([...new Set(EVERYDAY_SCREENS.map(routeFor))].sort()).toEqual(['menu', 'screen']);
+    /* § D1445 added the lobby, which the shell draws itself as it does the menu; still no hand-off. */
+    expect([...new Set(EVERYDAY_SCREENS.map(routeFor))].sort()).toEqual(['lobby', 'menu', 'screen']);
   });
 
   it('puts the door on § 3.2’s footer row, which is neither the tile nor the stage', () => {

@@ -39,6 +39,7 @@ import {
   openPage,
   startShippedSite,
   type ShippedSite,
+  leaveLobbyIfShown,
 } from '../dev/browserTier.test-helper.js';
 import { SESSION_KEY } from '../persist/types.js';
 
@@ -370,6 +371,8 @@ describe.skipIf(!HAS_BROWSER)('GitHub issue #594 — no mode but Scenario writes
         undefined,
         { timeout: 30_000 },
       );
+      /* § D1445: the reload opens the lobby; its *Main menu* is the way back to the tiles. */
+      await leaveLobbyIfShown(page);
       await page.waitForSelector('.everyday-mode[data-screen]', { timeout: 30_000 });
       expect(await weekAtTheDoor(page), 'after a reload').toEqual(before);
     } finally {
@@ -408,6 +411,8 @@ describe.skipIf(!HAS_BROWSER)('GitHub issue #594 — no mode but Scenario writes
         undefined,
         { timeout: 30_000 },
       );
+      /* § D1445: the reload opens the lobby; its *Main menu* is the way back to the tiles. */
+      await leaveLobbyIfShown(page);
       await page.waitForSelector('.everyday-mode[data-screen]', { timeout: 30_000 });
       expect(await weekAtTheDoor(page)).toEqual(before);
     } finally {

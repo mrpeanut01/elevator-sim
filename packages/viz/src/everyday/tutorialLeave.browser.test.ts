@@ -24,6 +24,7 @@ import {
   HAS_BROWSER,
   openEverydayDoor,
   openPage,
+  skipTheLobby,
   startShippedSite,
   type ShippedSite,
 } from '../dev/browserTier.test-helper.js';
@@ -48,6 +49,7 @@ afterAll(async () => {
 /** A first visit, into the walkthrough by the landing page's own call to action. */
 async function intoWalkthrough(): Promise<Page> {
   const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
+  await skipTheLobby(page);
   await page.goto(origin, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('.everyday-landing-cta', { timeout: 30_000 });
   await page.locator('.everyday-landing-cta').click();
