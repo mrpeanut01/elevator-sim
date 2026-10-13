@@ -2234,13 +2234,14 @@ type DecisionReservation = {
  * is registered in `KNOWN_DECISION_HOLES`; **D1360-D1400 are free rather than holed**, since nothing
  * is written above them (§ D430), and the charter row moves to **D1360**.
  */
+const OPEN_RESERVATION = null as DecisionReservation | null;
 /*
- * **Wave AO is OPEN and reserves D1360-D1460**: the defects the post-AN re-panel found first, then the
- * lanes a swarm's rulings on that panel make necessary. Committed on `ao-int` before any lane worktree
- * exists, and closed in the wave's own merge commit. Wave AN left D1360-D1400 free rather than holed
- * (§ D430), so this block opens over them.
+ * **Wave AO's reservation, D1360-D1460, is closed** in the wave's own merge commit. Nine lanes in two
+ * parts (the post-AN re-panel's five defect lanes, then four built on swarms DR and DS) spent
+ * forty-seven headings. **Every number below the highest heading, D1444, that no lane spent comes back
+ * as a hole** and is registered in `KNOWN_DECISION_HOLES`; **D1445-D1460 are free rather than holed**,
+ * since nothing is written above them (§ D430), and the charter row moves to **D1445**.
  */
-const OPEN_RESERVATION = { wave: 'AO', from: 1360, to: 1460 } as DecisionReservation | null;
 /*
  * **Wave AC's reservation, D619-D620, is closed.** It opened on the pair wave AB left free.
  * GitHub issue #437 stage 2 wrote D619 first, on a lane that started from the same pre-#422 base as
@@ -3545,6 +3546,71 @@ const KNOWN_DECISION_HOLES: ReadonlyMap<number, string> = new Map([
   [1354, "wave AN's lane DQ-3's block; unspent for § 1352's reason."],
   [1355, "wave AN's lane DQ-3's block; unspent for § 1352's reason."],
   [1356, "wave AN's lane DQ-3's block; unspent for § 1352's reason."],
+  [
+    1365,
+    "wave AO's lane P2-1 (AO-1b) held D1362-D1367 and spent D1362-D1364. Registered under D404 and D430.",
+  ],
+  [1366, "wave AO's lane P2-1 (AO-1b)'s block; unspent for § 1365's reason."],
+  [1367, "wave AO's lane P2-1 (AO-1b)'s block; unspent for § 1365's reason."],
+  [
+    1370,
+    "wave AO's lane AO-2 held D1368-D1375 and spent D1368-D1369. Registered under D404 and D430.",
+  ],
+  [1371, "wave AO's lane AO-2's block; unspent for § 1370's reason."],
+  [1372, "wave AO's lane AO-2's block; unspent for § 1370's reason."],
+  [1373, "wave AO's lane AO-2's block; unspent for § 1370's reason."],
+  [1374, "wave AO's lane AO-2's block; unspent for § 1370's reason."],
+  [1375, "wave AO's lane AO-2's block; unspent for § 1370's reason."],
+  [
+    1389,
+    "wave AO's lane AO-4 held D1384-D1391 and spent D1384-D1388. Registered under D404 and D430.",
+  ],
+  [1390, "wave AO's lane AO-4's block; unspent for § 1389's reason."],
+  [1391, "wave AO's lane AO-4's block; unspent for § 1389's reason."],
+  [
+    1397,
+    "wave AO's lane AO-5 held D1392-D1399 and spent D1392-D1396. Registered under D404 and D430.",
+  ],
+  [1398, "wave AO's lane AO-5's block; unspent for § 1397's reason."],
+  [1399, "wave AO's lane AO-5's block; unspent for § 1397's reason."],
+  [
+    1403,
+    "wave AO's lane P2-3 held D1400-D1407 and spent D1400-D1402. Registered under D404 and D430.",
+  ],
+  [1404, "wave AO's lane P2-3's block; unspent for § 1403's reason."],
+  [1405, "wave AO's lane P2-3's block; unspent for § 1403's reason."],
+  [1406, "wave AO's lane P2-3's block; unspent for § 1403's reason."],
+  [1407, "wave AO's lane P2-3's block; unspent for § 1403's reason."],
+  [
+    1410,
+    "wave AO's lane P2-2 (DS-2) held D1408-D1415 and spent D1408-D1409. Registered under D404 and D430.",
+  ],
+  [1411, "wave AO's lane P2-2 (DS-2)'s block; unspent for § 1410's reason."],
+  [1412, "wave AO's lane P2-2 (DS-2)'s block; unspent for § 1410's reason."],
+  [1413, "wave AO's lane P2-2 (DS-2)'s block; unspent for § 1410's reason."],
+  [1414, "wave AO's lane P2-2 (DS-2)'s block; unspent for § 1410's reason."],
+  [1415, "wave AO's lane P2-2 (DS-2)'s block; unspent for § 1410's reason."],
+  [
+    1421,
+    "wave AO's lane P2-4 (DS-3) held D1416-D1423 and spent D1416-D1420. Registered under D404 and D430.",
+  ],
+  [1422, "wave AO's lane P2-4 (DS-3)'s block; unspent for § 1421's reason."],
+  [1423, "wave AO's lane P2-4 (DS-3)'s block; unspent for § 1421's reason."],
+  [
+    1427,
+    "wave AO's lane P2-4 (DS-4) held D1424-D1431 and spent D1424-D1426. Registered under D404 and D430.",
+  ],
+  [1428, "wave AO's lane P2-4 (DS-4)'s block; unspent for § 1427's reason."],
+  [1429, "wave AO's lane P2-4 (DS-4)'s block; unspent for § 1427's reason."],
+  [1430, "wave AO's lane P2-4 (DS-4)'s block; unspent for § 1427's reason."],
+  [1431, "wave AO's lane P2-4 (DS-4)'s block; unspent for § 1427's reason."],
+  [
+    1436,
+    "wave AO's lane P2-1 (DR-1) held D1432-D1439 and spent D1432-D1435. Registered under D404 and D430.",
+  ],
+  [1437, "wave AO's lane P2-1 (DR-1)'s block; unspent for § 1436's reason."],
+  [1438, "wave AO's lane P2-1 (DR-1)'s block; unspent for § 1436's reason."],
+  [1439, "wave AO's lane P2-1 (DR-1)'s block; unspent for § 1436's reason."],
   [
     1030,
     "wave AI's lane AI-D held D1029-D1037 and spent D1029. Registered under D404 and D430.",

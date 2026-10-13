@@ -19,6 +19,22 @@ after this split; the entries below are older than the cap and are registered th
 The always-on row is measured on the integrated head; the deep row is read from the nightly
 `corpus-figures` job in [`.github/workflows/deep-tiers.yml`](../.github/workflows/deep-tiers.yml).
 
+## Wave AO
+
+**Wave AO's move is 538.37 strings a case always-on, with no new surface.** The base, `main` at
+`c218034`, reproduced wave AN's always-on row to the string. Measured on the integrated head after
+both parts; the deep tier is left to the nightly job's annotations.
+
+| | base `c218034` | wave AO | move | per case |
+|---|---|---|---|---|
+| always-on strings | 1 002 246 | **1 028 626** | **+26 380** | **538.37** |
+| always-on surfaces | 79 | **79** | **0** | none |
+| cases · simulations · failing cases | 49 · 606 · 0 | **unmoved** | **0** | none |
+
+**The surface sets were diffed and are identical**: every new producer was seeded inside an existing
+adapter. Nine lanes published floors summing to roughly the measured move; it is not split between
+them by quotient (§ D256).
+
 ## Wave AN
 
 **Wave AN's move is 1 243.94 strings a case always-on, with two surfaces.** The base, `main` at
