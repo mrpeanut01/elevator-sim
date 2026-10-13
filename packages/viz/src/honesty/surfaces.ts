@@ -222,7 +222,8 @@ import {
   type DayDecider,
 } from '../shift/dayClose.js';
 import { NEXT_TOWER_STAY_LABEL, nextTowerOfferOf } from '../shift/nextTower.js';
-import { NEXT_WEEK_LABEL, nextWeekOf, weekUnderWayHarderLineOf } from '../shift/nextWeek.js';
+import { NEXT_WEEK_LABEL, nextWeekOf, weekBookingsLineOf, weekUnderWayHarderLineOf, type BookingClock } from '../shift/nextWeek.js';
+import { weekTopOf } from '../shift/weekLevels.js';
 import { dealtWeekOrdersOf } from '../shift/weekOrders.js';
 // GitHub issue #221's post block — the decision, seeded in all seven states by the report adapter.
 import { postRunViewOf } from '../everyday/postRun.js';
@@ -328,7 +329,7 @@ const DAY_CALL_FIXTURE_DRIVERS: DayCallDriverNames = Object.freeze({
 import { wayThroughSentenceOf, WEEK_WAY } from '../shift/weekWay.js';
 import { admittedPressDayIds, pressDayFor } from '../shift/ladder.js';
 import { PRESS_DAY_DRIVER_HELD } from '../everyday/today.js';
-import { actsOf } from '../shift/dayLength.js';
+import { actsOf, wholeDayFor } from '../shift/dayLength.js';
 import { rushTutorialWorkedAnswerOf } from '../everyday/rushScreenModel.js';
 import { WORKED_ANSWER_COPY, type WorkedAnswerFacts, type WorkedAnswerView } from '../everyday/workedAnswer.js';
 import { WEEK_START_NEXT_LABEL, weekScreenViewOf } from '../everyday/weekView.js';
@@ -10302,7 +10303,7 @@ const EVERYDAY_MENU: SurfaceAdapter = {
      * string for the search to read — and `rail.test.ts` asserts that absence, which is what keeps
      * GD13 clause 2 mechanical rather than remembered.
      */
-    for (const turn of ['scenario-cleared', 'career-day-paid', 'rush-wave-survived'] as const) {
+    for (const turn of ['scenario-cleared', 'career-day-paid', 'rush-wave-survived', 'week-held'] as const) {
       for (const [arm, answer] of [
         ['one', { kind: 'balance', chimes: 1 }],
         ['many', { kind: 'balance', chimes: 40 }],
@@ -15098,13 +15099,27 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     'shift/nextWeek.ts#NEXT_WEEK_LABEL',
     'shift/nextWeek.ts#weekHarderSentenceOf',
     'shift/nextWeek.ts#weekUnderWayHarderLineOf',
+    /*
+     * Wave AO, lane DS-1 (§ D1400): the booking a level adds, on the sheet's next-week line and the
+     * door's own line, seeded in `seedNextWeek` over every level Midtown deals and one past its top,
+     * on Midtown's own run clock as the screens hand it.
+     */
+    'shift/nextWeek.ts#weekBookingsLineOf',
+    'shift/weekLevels.ts#bookingPhraseOf',
   ],
   render(context) {
     const seeds: TextSeed[] = [];
     const bundle = shiftBundleOf(context);
     seeds.push({ field: 'today.driverHeld', text: PRESS_DAY_DRIVER_HELD, role: 'prose' });
-    seedWeekStake(seeds, bundle.observations, (buildingId) =>
-      context.buildings.find((building) => building.id === buildingId)?.name,
+    /* Midtown's run clock, from its whole authored day: a booking's window is a fraction of that run. */
+    const midtownDay = wholeDayFor(context.trafficProfiles, context.buildings.find((building) => building.id === 'midtown-office'));
+    const clock: BookingClock | undefined =
+      midtownDay === undefined ? undefined : (fraction) => clockOf(fraction * midtownDay.periodS, midtownDay.startOfDayS);
+    seedWeekStake(
+      seeds,
+      bundle.observations,
+      (buildingId) => context.buildings.find((building) => building.id === buildingId)?.name,
+      clock,
     );
     seedDayClose(seeds, context, bundle);
     seeds.push({ field: 'brief.wayThrough.heading', text: BRIEF_WAY_THROUGH_HEADING, role: 'label' });
@@ -18187,6 +18202,7 @@ function seedWeekStake(
   seeds: TextSeed[],
   observations: Observations,
   nameOf: (buildingId: string) => string | undefined,
+  clock?: BookingClock,
 ): void {
   seeds.push({ field: 'brief.week.heading', text: BRIEF_WEEK_HEADING, role: 'label' });
   seeds.push({ field: 'week.stake.short', text: WEEK_WITHOUT_COUNTED_DAYS_SHORT, role: 'reason' });
@@ -18367,7 +18383,7 @@ function seedWeekStake(
     seeds.push({ field: `week.onward.${contract.id}.line`, text: offer.line, role: 'observation' });
   }
   seeds.push({ field: 'week.onward.stay', text: NEXT_TOWER_STAY_LABEL, role: 'label' });
-  seedNextWeek(seeds, observations);
+  seedNextWeek(seeds, observations, clock);
   for (const [arm, record] of [
     ['one', { contractId: 'c2', closed: 1, met: 0, best: 3 }],
     ['several', { contractId: 'c2', closed: 3, met: 2, best: 5 }],
@@ -18389,9 +18405,13 @@ function seedWeekStake(
  * orders repeat and one past it, on the case's own readings with the verdict forced each way (the
  * sentences read held-ness and the week number, never a reading's figure).
  */
-function seedNextWeek(seeds: TextSeed[], observations: Observations): void {
+function seedNextWeek(seeds: TextSeed[], observations: Observations, clock?: BookingClock): void {
   seeds.push({ field: 'week.next.label', text: NEXT_WEEK_LABEL, role: 'label' });
-  const weeks = dealtWeekOrdersOf('c2').length + 1;
+  /*
+   * Every week up to one past the top (wave AO lane DS-1, § D1400): the orders before they repeat,
+   * then each level the census deals, then the week the sheet says no further week of.
+   */
+  const weeks = Math.max(dealtWeekOrdersOf('c2').length, weekTopOf('c2')) + 1;
   for (let number = 1; number <= weeks; number += 1) {
     for (const [arm, met] of [['held', true], ['notHeld', false]] as const) {
       let week: WeekState = { ...openWeek('c2'), week: number };
@@ -18411,7 +18431,7 @@ function seedNextWeek(seeds: TextSeed[], observations: Observations): void {
         /* Held: four of five clean, the target; not held: none clean. */
         week = closeDay(week, { ...outcome, allMet: met && day < 5 });
       }
-      const next = nextWeekOf(week);
+      const next = nextWeekOf(week, undefined, clock);
       if (next === undefined) continue;
       const at = `week.next.week${String(number)}.${arm}`;
       seeds.push({ field: `${at}.label`, text: next.label, role: 'label' });
@@ -18420,6 +18440,8 @@ function seedNextWeek(seeds: TextSeed[], observations: Observations): void {
     }
     const harder = weekUnderWayHarderLineOf({ contractId: 'c2', week: number });
     if (harder !== undefined) seeds.push({ field: `door.weekHarder.week${String(number)}`, text: harder, role: 'observation' });
+    const booked = weekBookingsLineOf({ contractId: 'c2', week: number }, undefined, clock);
+    if (booked !== undefined) seeds.push({ field: `door.weekBookings.week${String(number)}`, text: booked, role: 'observation' });
   }
 }
 

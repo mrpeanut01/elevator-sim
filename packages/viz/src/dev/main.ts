@@ -260,6 +260,7 @@ import {
 } from '../shift/weekStake.js';
 import { tomorrowBriefingOf, type TomorrowBriefing } from '../shift/tomorrow.js';
 import { coachWeekLines, weekKeptLine } from '../shift/weekLabel.js';
+import { weekLevelKeyOf } from '../shift/weekLevels.js';
 import { weekdayOf, type DayOutcome, type WeekState } from '../shift/types.js';
 import { dailySeedAt } from '../shift/dailySeed.js';
 import { dealtCrowdOf, weekRecordFor } from '../shift/weekRecord.js';
@@ -1717,8 +1718,13 @@ function boot(ui: Elements, resources: BrowserResources): void {
 
   /** One counted day's crowd: its tower, its day and its seed. */
   function houseKeyOf(contractId: string, entry: DayOutcome): string {
-    /* The wrinkle is in the key: since § D1252 two weeks can deal one day on one crowd under two wrinkles. */
-    return `${contractId}|${String(entry.day)}|${entry.eventId}|${entry.record?.seed ?? '-'}`;
+    /*
+     * The wrinkle is in the key: since § D1252 two weeks can deal one day on one crowd under two
+     * wrinkles. And the week as dealt is (wave AO lane DS-1, § D1400): two weeks can deal one day
+     * under one wrinkle with a car booked out on one and not the other, which is two runs.
+     */
+    const dealt = weekLevelKeyOf({ contractId, week: entry.record?.week ?? 1 });
+    return `${contractId}|${String(entry.day)}|${entry.eventId}|${dealt}|${entry.record?.seed ?? '-'}`;
   }
 
   /**

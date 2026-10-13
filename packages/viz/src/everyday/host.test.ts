@@ -2916,12 +2916,39 @@ describe('a Scenario week’s days pay once, are recorded, and are dealt new cro
       s.host.closeDay();
       s.tomorrow();
     }
-    expect(s.h.banked).toHaveLength(5);
+    /* Friday closes the held week, which pays `week-held` besides (§ D1402); no day after it pays. */
+    const days = (): number => s.h.banked.filter((turn) => turn.completion === 'career-day-paid').length;
+    expect(days()).toBe(5);
     s.host.closeDay(); // Saturday: clean, and it does not count on Midtown's week.
-    expect(s.h.banked).toHaveLength(5);
+    expect(days()).toBe(5);
     const sandbox = scenario('sandbox');
     sandbox.host.closeDay();
     expect(sandbox.h.banked).toEqual([]);
+  });
+
+  /*
+   * Wave AO, lane DS-1, § D1402: a held week pays `week-held` once, on the close that closes it,
+   * keyed by the level it was dealt, so the device's tally and the server's turn key pay a level
+   * once however often it is held. Red before: nothing beyond the five days was posted.
+   */
+  it('pays a held week once, on its closing day, keyed by its level; and nothing for a week not held — § D1402', () => {
+    const s = scenario();
+    for (let day = 1; day <= 5; day += 1) {
+      s.host.closeDay();
+      if (day < 5) s.tomorrow();
+    }
+    expect(s.h.banked.at(-1)).toEqual({ completion: 'week-held', levelKey: 'c2/1' });
+    expect(s.h.banked.filter((turn) => turn.completion === 'week-held')).toHaveLength(1);
+    s.tomorrow();
+    s.host.closeDay(); // Saturday, after the close: nothing more for the week.
+    expect(s.h.banked.filter((turn) => turn.completion === 'week-held')).toHaveLength(1);
+    const missed = scenario();
+    for (let day = 1; day <= 5; day += 1) {
+      missed.next.clean = day === 1;
+      missed.host.closeDay();
+      if (day < 5) missed.tomorrow();
+    }
+    expect(missed.h.banked.filter((turn) => turn.completion === 'week-held'), 'a week not held paid').toEqual([]);
   });
 
   it('pays nothing for a close filed as practice on the attempt’s ground, which leaves the week on its day — § D1218 with § D1231', () => {

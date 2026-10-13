@@ -2015,6 +2015,31 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'The week levels’ plumbing — wave AO, lane DS-1, § D1400. `weekLevelAdmissionOf` returns a ' +
+        'reading whose one clause, why a level is not dealt, is read by `weekLevels.test.ts` and by no ' +
+        'screen: a refused or unmeasured level is simply not dealt, and the sheet says the tower has no ' +
+        'further week in `nextWeek.ts#nextWeekOf`’s words, which the shift adapter seeds. ' +
+        '`weekLevelIssues` is `weekOrderIssues`’ twin for the bookings, a content-author refusal ' +
+        '`dev/data.ts` lists as a load warning. The rest return a week number, a level, a list of ' +
+        'bookings, a drawn id, a boolean or a key (`weekLevelKeyOf` for the house’s cache, ' +
+        '`weekLevelAwardKeyOf` for the ledger’s turn key), none of them words; they are derived only ' +
+        'because they sit after the admission’s clause in the file.',
+      ids: [
+        'shift/weekLevels.ts#weekLevelAdmissionOf',
+        'shift/weekLevels.ts#weekLevelIssues',
+        'shift/weekLevels.ts#weekLevelKeyOf',
+        'shift/weekLevels.ts#weekLevelAwardKeyOf',
+        'shift/weekLevels.ts#weekTopOf',
+        'shift/weekLevels.ts#dealtWeekOf',
+        'shift/weekLevels.ts#dealtLevelOf',
+        'shift/weekLevels.ts#hasFurtherWeek',
+        'shift/weekLevels.ts#levelWrinkleIdFor',
+        'shift/weekLevels.ts#weekBookingsOn',
+        'shift/weekLevels.ts#bookingsAddedBetween',
+      ],
+    },
+    {
+      reason:
         'The week stake’s plumbing — wave AK, § D1176 to § D1178. `weekDealOf`, ' +
         '`dayCountsToward`, `countedCleanOf`, `weekNeedOf`, `weekHasClosed`, `weekRollsOver` and ' +
         '`weekAdmitsANewcomer` return a deal, counts or booleans: a dealt day carries a sentence, and ' +

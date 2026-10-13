@@ -30,7 +30,7 @@ describe.runIf(process.env['WEEK_WAY_VERIFY'] === '1')('every census row, re-run
     (row) => only === undefined || only.includes(`${row.contractId}/${String(row.day)}`),
   );
   for (const row of rows) {
-    it(`${row.contractId} day ${String(row.day)} (${row.eventId}) reproduces both verdict strings`, () => {
+    it(`${row.contractId} day ${String(row.day)} (${row.eventId}${row.bookings.length === 0 ? '' : ', booked'}) reproduces both verdict strings`, () => {
       const scheduled = row.eventId !== 'ordinary';
       /*
        * A row measured under a wrinkle week 1 does not draw on that day is an authored week order's
@@ -39,11 +39,12 @@ describe.runIf(process.env['WEEK_WAY_VERIFY'] === '1')('every census row, re-run
       const drawn = scheduledEventFor(null, row.day, (row.day - 1) % 7, WEEK_WAY.protocol.horizon).id;
       const eventId = scheduled && row.eventId !== drawn ? row.eventId : undefined;
       const mark = (cleared: boolean): string => (cleared ? 'C' : 'm');
+      /* A week level's booked day (wave AO lane DS-1, § D1400) is re-run with its cars out, as measured. */
       const chosen = seeds
-        .map((seed) => mark(weekWayCell(row.contractId, row.day, seed, row.chosen, scheduled, eventId).cleared))
+        .map((seed) => mark(weekWayCell(row.contractId, row.day, seed, row.chosen, scheduled, eventId, row.bookings).cleared))
         .join('');
       const standing = seeds
-        .map((seed) => mark(weekWayCell(row.contractId, row.day, seed, standingConfig(), scheduled, eventId).cleared))
+        .map((seed) => mark(weekWayCell(row.contractId, row.day, seed, standingConfig(), scheduled, eventId, row.bookings).cleared))
         .join('');
       expect(chosen).toBe(row.chosenVerdicts);
       expect(standing).toBe(row.standingVerdicts);

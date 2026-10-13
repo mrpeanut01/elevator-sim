@@ -46824,6 +46824,8 @@ it the longest again was not taken in wave AK.
 
 ## D1176 — only contested days count toward a census week, and its target is derived: counted days dealt, minus one
 
+> **Status 2026-10-13: EXTENDED by [§ D1400](#d1400)** (an agent ruling). Clause 1's *as it is dealt* includes the week level's bookings: a booked day counts by the census row measured with its car out. The target rule is unchanged. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Status 2026-09-26: AMENDED by [§ D1179](#d1179) and [§ D1180](#d1180)** (agent rulings). A week that counts no day holds its scenario's clear with a reason that tells a refused day from an unmeasured one, replacing this entry's *cannot clear its scenario* line; and Midtown's week reads 4 of 5 as dealt since Tuesday's and Friday's wrinkles moved off the lunch peak. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Taken 2026-09-26 by agent sessions under delegated authority** (wave AK, lane AK-E, on swarm
@@ -48096,6 +48098,8 @@ counted days in one closed week, written by the Everyday close of a week's last 
 malformed refused), `everyday/weekView.test.ts` and `everyday/host.test.ts` (a closed week counted).
 
 ## D1231 — a Scenario week's counted day that clears pays `career-day-paid`, once
+
+> **Status 2026-10-13: AMENDED by [§ D1402](#d1402)** (an agent ruling, owner-reversible). *There is no award for a week* no longer holds for a held week: it pays `week-held`, 10 chimes, once per level of the tower's week. The days pay as here. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Taken 2026-09-26 by agent sessions under delegated authority** (wave AL, lane AL-F, on swarm DN's
 > Q2 ruling, item 7, three of three; no separate week award, two of three). It makes true the premise
@@ -50405,6 +50409,8 @@ under Q2, which lane DQ-2 carries; nothing here moves it.
 
 ## D1343 — DC-11: from week 2 a week order is dealt only where no single shipped profile, left alone, holds its target on more than half of the census crowds
 
+> **Status 2026-10-13: AMENDED by [§ D1400](#d1400)** (an agent ruling, owner-reversible). Clause 4's sole order repeats from week 3 with one more booking a level, and stops at the tower's top; a level is admitted by a `data/week-dominance.json` row for the order with its bookings, and by the monotone clause. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-10-10 by agent sessions under delegated authority**, carrying out swarm DQ's Q2
 > rule 2 as wave AN's lane DQ-2, not by the product owner. The ruling is the swarm's; the shape
 > below is the lane's. It reads [§ D528](#d528) clause 2's *no single shipped dispatcher profile may
@@ -50464,6 +50470,8 @@ dealt, and one crowd of one shipped row re-run); `shift/weekOrders.test.ts` (the
 shipped orders' verdicts).
 
 ## D1344 — a held week deals the next week; a week not held deals itself again, with the next one press away; and the next week is called harder only where the house's census fell
+
+> **Status 2026-10-13: AMENDED by [§ D1400](#d1400)** (an agent ruling, owner-reversible). Clause 1 from week 3: a held week deals the next level, the same order with one more car booked out, only where the census admits it; where no level is left the sheet says the tower deals no further week, and clause 2's *Go on to week N* is not offered there. Clause 3 is read off the booked rows. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Taken 2026-10-10 by agent sessions under delegated authority**, carrying out swarm DQ's Q3
 > primary as wave AN's lane DQ-2, not by the product owner. The ruling decided what a held week
@@ -51708,3 +51716,187 @@ length the screen states*.
 
 **Not established.** *About 7-12* is measured on the pinned first-day towers only; a later week on a
 reference tower can run longer, which the hub says and the menu tile does not.
+
+## D1400 — from week 3 a held week deals the next level: the same order with one more car booked out of passenger service on a named morning, dealt only where the census admits it, and a tower with no level left says so
+
+> **Taken 2026-10-13 by agent sessions under delegated authority** (wave AO, lane DS-1, carrying out
+> swarm DS's reconciled Q1 ruling), not by the product owner. The ruling is the swarm's; the shapes
+> below that it did not fix are the lane's. A later reader weighing this against a product-owner
+> ruling should treat it as an agent ruling and say so; [§ D626](#d626) is the cautionary case.
+> **Owner-reversible**: the booking vocabulary (a whole car, out from the start of the day to 0.4
+> of the run); the monotone clause, and reading it per profile; *no further week*, and withdrawing
+> *Go on* at the top; and counting the week number on past the top.
+
+**Why an entry.** [§ D405](#d405)'s first and second grounds. It amends [§ D1344](#d1344) clauses 1
+and 2 and [§ D1343](#d1343) clause 4 (what a held week deals after week 2, and the sole order's
+repeat), extends [§ D1176](#d1176) clause 1's *as it is dealt* to the week's bookings, adds a field
+to `data/contract-ladder.json`, `data/week-way.json` and `data/week-dominance.json`, and binds
+`dev/state.ts#shiftRunConfigOf`, `shift/calendar.ts`, `shift/week.ts`, `shift/weekStake.ts`,
+`shift/nextWeek.ts`, the week's sheet and the door, none of which `shift/weekLevels.ts` owns.
+
+**What was wrong.** Midtown dealt week 1's draw and then `midtown-early-lift` every week after it
+([§ D1345](#d1345)), and the sheet of every held week from the second said *the same wrinkles as
+this week*. Swarm DS found, three of three, that no new week 3 can be built from the wrinkle
+library: S3 measured that every buildable order DC-11 admits deals `lift-service:early` on
+Wednesday, and S2 that of 324 weeks from the measured cells 16 pass DC-11, all on the line, none
+harder than week 2. A held week bought nothing a player could see.
+
+**The members, and how they split.** S1 (player) ruled for a week booking stacked through the
+rung's `incidents`, measured on `midtown-week-2`: car C out from 08:00 to 12:00 on Monday and
+Tuesday cut the strongest single profiles from 15, 14 and 12 holds to 9, 11 and 7, both booked days
+still at DC-10's line. S2 (honesty) ruled for a ladder of levels, each stacking one measured load on
+the counted day with the most headroom, never measurably easier. S3 (engineering) ruled for
+raising the week's target to every counted day from week 3. The ruling took S1's and S2's
+mechanism and refused S3's target as `docs/38` § 4's *difficulty setting that moves a bar*; it also
+refused tenant ramps (S1 measured 10 % more tenants breaking Friday at 4 and 1 clears) and more than
+one new booking per level.
+
+**The rule** (`shift/weekLevels.ts`).
+
+1. **A level.** Week `n ≥ 3` is the order the cycle deals that week with the rung's first `n − 2`
+   week bookings (`ContractLadderRow.weekBookings`). A booking is one car out of passenger service
+   on one weekday, written in the rung's own incident vocabulary (kind, bank, car, the fractions of
+   the run it leaves and returns) plus `day`, 1 to 5, declared with its bounds
+   (`WEEK_BOOKING_DAY_BOUNDS`, invariant 8) and checked by `contractLadderIssues` with every rule a
+   rung's absence meets, and one more: the bank keeps a car on that day once the rung's own absences
+   and every booking on the day are counted. Level `n` carries the first `n − 2`, so bookings
+   accumulate and never shrink by construction.
+2. **Where a booking goes.** On the day with the most room: among the weekdays with no booking yet,
+   the one whose census row (with the bookings it inherits) has the most held-out clears for the
+   chosen play, the earlier on a tie. `weekLevelIssues` refuses a ladder that authors one anywhere
+   else, and `dev/data.ts` lists it as a load warning beside the orders'.
+3. **When a level is dealt.** Only where all three hold: DC-10 admits every day as the level deals
+   it, each booked day read off a `data/week-way.json` row measured with exactly that day's
+   bookings (`weekWayRowFor` matches on them, the ordinary fallback included); DC-11 admits the
+   week, read off a `data/week-dominance.json` row for the order with those bookings; and **the
+   monotone clause**: no shipped profile, left alone, holds it on more crowds than it held the week
+   before. The ruling's sentence allows *no single profile* to be read of the strongest only or of
+   each; the lane reads it of each, the stricter, owner-reversible. The first level refused or
+   unmeasured ends the ladder, so a level above it is never dealt.
+4. **The top, and the number.** The highest week dealt is the tower's top (`weekTopOf`): week 1 on a
+   tower with no admitted order, week 2 on one with an order and no admitted level. A tower that
+   cycles admitted orders and authors no booking keeps [§ D1343](#d1343)'s cycle and has no top; no
+   shipped tower is that tower today, and the arm is there so the rule cannot stop the next one's
+   orders. A week numbered
+   above the top is dealt the top (`dealtWeekOf`), on every reader at once: the run's bookings
+   (`weekBookingsOn`), the day's wrinkle (`calendar.ts#scheduledEventFor` through
+   `levelWrinkleIdFor`), the week's deal and its cache, and the house's census. The number itself
+   still counts on with each held week, as [§ D1394](#d1394) counts it on a week the census does
+   not deal; the lane's first draft capped it at the top and § D1394's own test refused that.
+5. **The run reads it.** `dev/state.ts#shiftRunConfigOf` takes the day's bookings from the week by
+   default and adds them to the rung's own absences, so the run, the brief's strip, the tomorrow
+   card, the calls and the house's run read one composition; a run on no rung (Free Play, Endless, a
+   career day on its own week) never meets one.
+6. **The words.** The held week's sheet names the booking the next level adds, *with the same
+   wrinkles as this week and one more car out of passenger service: car C on Monday from 08:00
+   until 12:00*, on the run's clock the screen hands it (`dev/state.ts#PlannedDay.lengthS` and
+   `startOfDayS`), and the door names the week's bookings with the new one marked
+   (`everyday-door-week-booked`). *Harder* is said only by [§ D1344](#d1344) clause 3's paired
+   house measure, now read off the booked rows; on the shipped census it falls by one crowd's
+   Monday from week 2 to week 3 and one crowd's Tuesday from week 3 to week 4, an interval holding
+   zero, so neither sheet says harder, and nothing says easier.
+7. **No further week.** Where the census deals the tower's week and no level is left above it, the
+   held week's sheet says *This tower deals no further week: Start next week deals week 5 as this
+   week was dealt, the same wrinkles and the same cars out, on new crowds*, and a week not held
+   there offers no *Go on to week N*: the next number would deal this week again, and a press that
+   promises the next week would promise one that does not exist. The onward tower (`nextTower.ts`,
+   [§ D1259](#d1259)) is offered beside a held week as before; on the shipped census no tower above
+   Midtown passes it, so Midtown's top offers none, as S1 recorded. Other towers enter at their own
+   week 1 and are never called harder than Midtown (S3 measured them easier by the house, 50 and 31
+   of 100). A week the census does not deal keeps [§ D1394](#d1394)'s words.
+
+**What it refuses.** A tighter target or bar by week (`docs/38` § 4); tenants rising by week; two
+new bookings in one level; and a level dealt on argument where the census has no row.
+
+**Tests**, red before and green after. `shift/weekLevels.test.ts` (twelve cases: the shipped levels
+and the top; the monotone clause, DC-11 and an unmeasured screen each moved and the verdict
+following; a booking placed off the day with the most room refused). `shift/weekBookingReachesTheRun.test.ts`
+(the control and the run: week 3's Monday stands car C down from 0 to 0.4 of the run and moves the
+legs, its Tuesday is week 2's run leg for leg, week 5 deals week 4, Free Play books nothing; red
+before, no booking reached the run). `shift/nextWeek.test.ts` (the sheet's level, Tuesday's
+booking and the door, and no further week; red before on *with the same wrinkles as this week.*).
+`shift/ladder.test.ts` (the booking schema's refusals), `everyday/doorView.test.ts`,
+`everyday/weekView.test.ts`, and `shift/weekStake.test.ts`'s § D1394 case, which refused the capped
+number.
+
+## D1401 — the census of Midtown's first levels: car C booked out on Monday morning, then Tuesday, both dealt; Thursday refused, so Midtown tops out at week 4
+
+> **Taken 2026-10-13 by agent sessions under delegated authority** (wave AO, lane DS-1, under
+> [§ D1400](#d1400)), not by the product owner. The measurements are the census's; which car,
+> which window, and the one extra window tried on Thursday are the lane's choices.
+> **Owner-reversible**: the booking (car C, from the start of the day to 0.4 of the run, 08:00 to
+> 12:00 on Midtown's office day) and keeping the refused Thursday booking authored.
+
+**Why an entry.** [§ D405](#d405)'s second ground: it authors three week bookings in
+`data/contract-ladder.json`, three booked rows in `data/week-way.json` and two level rows in
+`data/week-dominance.json`.
+
+**How it was measured.** Every cell is one weekday of `midtown-early-lift` on Midtown Office at its
+growth, with car C booked out from 0 to 0.4 of the run beside the rung's car D, on DC-10's protocol
+(`WEEK_WAY_BOOKINGS` on the census command, the default stage for the DC-10 row and
+`WEEK_WAY_STAGE=profiles` for the thirteen-profile screen on the twenty held-out crowds). The
+census ran on a frozen copy of the tree, one vitest process and one worker at a time, detached.
+1 732 whole days in all: 660 on 2026-10-10 (Monday's DC-10 row and screen, Tuesday's DC-10 row), and
+1 072 on 2026-10-13, 12 of them a smoke. The smoke re-ran six crowds of Monday's screen on the
+integrated base for two profiles and reproduced all twelve marks, and Tuesday's screen, taken on the
+base, reproduced the standing order's string its 2026-10-10 DC-10 row carries, mark for mark. The
+rows were copied by script, row for row.
+
+**What it found.**
+
+1. **Placement.** Week 2 as dealt clears Monday on 20 of 20 crowds under its chosen play, Tuesday
+   19, Thursday 15, Wednesday and Friday 12 each, so the bookings fall Monday, Tuesday, Thursday.
+2. **Week 3 (Monday booked) is dealt.** DC-10: 15 of 20 under the chosen play (Fairness first, a
+   spread at a fifth of the day), the standing order missing 16. DC-11: Predictive balanced holds
+   it on 10 of 20, exactly half, Fairness first on 9, no other profile above 7. Monotone: no profile
+   rose (Predictive balanced 10 against 10, Fairness first 9 against 9, five fell).
+3. **Week 4 (Tuesday booked too) is dealt.** DC-10: Tuesday 12 of 20, on the line. DC-11:
+   Predictive balanced 8, Fairness first 6. Monotone: no profile held it more often than week 3, and
+   seven held it less often.
+4. **Week 5 (Thursday booked too) is refused.** DC-10: Thursday 7 of 20. A shorter morning, car C
+   from 08:00 to 10:00, read 5 of 20, and Wednesday and Friday with the 08:00 to 12:00 booking read 0
+   and 2: no weekday has room left. Week 4 is Midtown's top. The Thursday booking stays authored,
+   refusal readable, as [§ D1345](#d1345) keeps refused orders; the two other days and the shorter
+   window are recorded here only.
+5. **Harder.** The house, left alone, cleared 12 of week 2's 100 weekdays, 11 of week 3's and 10 of
+   week 4's; each step is one crowd, and the paired interval holds zero, so neither level is called
+   harder.
+
+**Not done.** No second car, no other window on Monday or Tuesday, and no level on another tower:
+no other tower deals an order, so none has a week 2 to build on.
+
+## D1402 — a held week pays 10 chimes, once per level of a tower's week, through the ledger with the level as its turn key
+
+> **Taken 2026-10-13 by agent sessions under delegated authority** (wave AO, lane DS-1, carrying out
+> swarm DS's Q1 award: S1 and S3 for 10 chimes, S2 for one flat award), not by the product owner.
+> It amends [§ D1231](#d1231)'s *there is no award for a week*, which carried swarm DN's two of
+> three. **Owner-reversible**: the figure, and paying a tower's week 1 and week 2 as levels too.
+> **Owner-reserved under [§ D533](#d533)**: whether a Scenario turn pays at all.
+
+**Why an entry.** [§ D405](#d405)'s first and second grounds: it adds a completion to `core`'s
+closed vocabulary and a source to `data/chime-ledger.json`, and binds the server's earn route and
+bounds, the device's tally and the host's close.
+
+**The rule.** The close that closes a Scenario week, where its target was met, posts `week-held`
+with a `levelKey`: the tower and the week as dealt, `c2/3` (`weekLevels.ts#weekLevelAwardKeyOf`),
+never past the levels the rung authors, so a tower whose weeks cycle orders with no booking pays its
+week 2 once.
+The ledger pays it `earn-week-held`, 10 chimes, flat. The level is the turn key: on the device
+`deviceChimes.ts#turnKeyOf` keys it and `withTurn` records it once, and on the server
+`chimes/ledger.ts#earnCompletion` writes it with that key, so the store refuses a second entry in
+the statement that writes it, the mechanism a scenario clear already uses. A level held again, or a
+week numbered past the top that is dealt the top again, pays nothing more, so a run of held weeks
+buys nothing by its length ([§ D1253](#d1253) stays a record). The server bounds the key by the
+authored ladder (`weekLevelKeysOf`): week 1 on every rung, week 2 where a rung authors an order,
+and one week per authored booking, so a hand-built request can claim at most the levels a ladder
+authors, each once. Each counted day that cleared still pays `career-day-paid` as before.
+
+**Lane DS-3's turn keys.** DS-3 adds a turn key to every award, `career-day-paid` included. This
+award is written as a keyed ledger entry on the mechanism that exists on this lane's base, so DS-3's
+general mechanism can key it without a change of shape.
+
+**Tests**, red before and green after: `everyday/host.test.ts` (a held week posts `week-held` keyed
+`c2/1` once, on its closing day; a week not held posts none; red before, nothing beyond the days);
+`everyday/deviceChimes.test.ts` (a level held twice records once, another level pays again);
+`packages/server/src/chimes/ledger.test.ts` (once per account per level, a key the ladder does not
+author refused, and the bounds read off the shipped ladder).

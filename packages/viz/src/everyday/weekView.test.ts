@@ -14,6 +14,8 @@ import { nextAdmittedTowerAfter, nextTowerOfferOf } from '../shift/nextTower.js'
 import { NEXT_WEEK_LABEL } from '../shift/nextWeek.js';
 import { describe, expect, it } from 'vitest';
 
+import { clockOf } from '../shift/report.js';
+
 import { goalsForDay, readGoals } from '../shift/goals.js';
 import type { DayOutcome, GoalObservations, WeekState } from '../shift/types.js';
 import type { WatchRecord } from '../watch/types.js';
@@ -295,6 +297,30 @@ describe('the week’s stake on the strip, and its sheet at the close — § D11
     ...weekWith(day, history),
     contractId: 'c2',
     closedDay: history.some((entry) => entry.day === day) ? day : null,
+  });
+
+  /*
+   * Wave AO, lane DS-1 (§ D1400): a held week 2's sheet names the booking week 3 adds, on the run's
+   * clock the screen hands it. Red before: *with the same wrinkles as this week.*
+   */
+  it('names the booking the next level adds, with the clock the screen hands it — § D1400', () => {
+    const dealtDay = (day: number, observed: GoalObservations): DayOutcome => ({
+      ...midtownDay(day, observed),
+      eventId: scheduledEventFor(null, day, (day - 1) % 7, 'whole-day', { contractId: 'c2', week: 2 }).id,
+    });
+    const view = weekScreenViewOf({
+      week: { ...midtown(7, [1, 2, 3, 4, 5, 6, 7].map((day) => dealtDay(day, day === 5 ? MISSED : MET))), week: 2 },
+      towerToday: 'Midtown Office',
+      nameOf: NAME_OF,
+      dayClosed: true,
+      sheetStanding: true,
+      bookingClock: (fraction) => clockOf(fraction * 10 * 3600, 8 * 3600),
+    });
+    expect(view.next?.held).toBe(true);
+    expect(view.next?.line).toBe(
+      'You held week 2, so Start next week deals week 3, with the same wrinkles as this week and one more ' +
+        'car out of passenger service: car C on Monday from 08:00 until 12:00.',
+    );
   });
 
   it('marks the days that do not count on their cards, and says why under the strip in the brief’s sentence', () => {

@@ -37,7 +37,7 @@
  */
 
 import { nextTowerOfferOf, type NextTowerOffer } from '../shift/nextTower.js';
-import { nextWeekOf, type NextWeekView } from '../shift/nextWeek.js';
+import { nextWeekOf, type BookingClock, type NextWeekView } from '../shift/nextWeek.js';
 import { wasGraded } from '../shift/week.js';
 import {
   DAY_UNMEASURED_SENTENCE,
@@ -252,6 +252,13 @@ export interface WeekScreenInput {
    * screen says nothing about a record, which is what a tower with none gets anyway.
    */
   readonly record?: WeekRecord | undefined;
+  /**
+   * A fraction of the run as the day's clock reads it — `shift/nextWeek.ts#BookingClock`, built by
+   * `weekScreen.ts` from the run's own start and length. Wave AO, lane DS-1
+   * ([§ D1400](../../../../DECISIONS.md)): the sheet names the booking the next level adds with its
+   * times. Optional: absent, the booking is named by its car and its day alone.
+   */
+  readonly bookingClock?: BookingClock | undefined;
 }
 
 /** How many cards § 14 draws. Seven, and `HISTORY_DAYS` is the same seven one layer down. */
@@ -455,7 +462,7 @@ export function weekScreenViewOf(input: WeekScreenInput): WeekScreenView {
   const todayClosed = todayIsBanked(input);
   const sheet = weekSheetOf(input.week, input.house ?? (() => undefined));
   const onward = nextTowerOfferOf(input.week.contractId, sheet, input.nameOf);
-  const next = sheet === undefined ? undefined : nextWeekOf(input.week);
+  const next = sheet === undefined ? undefined : nextWeekOf(input.week, undefined, input.bookingClock);
   return {
     /* Wave AN, lane AN-7: the week's number, where one is true of it (`weekStake.ts#weekOrdinalOf`). */
     eyebrow: `ELEVATOR SIM · EVERYDAY MODE${weekEyebrowOf(input.week)}`,

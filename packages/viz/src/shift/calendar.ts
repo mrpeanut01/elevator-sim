@@ -109,7 +109,8 @@ import {
 import { scaledBuilding } from './growth.js';
 import { carsToDerate, type CarRef, type Incident } from './incidents.js';
 import { weekdayOf, type RunHorizon, type ShiftEvent, type ShiftEventId, type Weekday } from './types.js';
-import { orderedWrinkleIdFor, type WeekOrderKey } from './weekOrders.js';
+import { levelWrinkleIdFor } from './weekLevels.js';
+import type { WeekOrderKey } from './weekOrders.js';
 
 /* -------------------------------------------------------------------------- *
  * A bias on the directional mix
@@ -624,7 +625,9 @@ export function scheduledEventFor(
    * order's wrinkle (`weekOrders.ts#orderedWrinkleIdFor`) instead of the draw; week 1, the weekend
    * and every tower with no admitted order keep the draw. Omitted, the day is dealt as week 1's,
    * which is what a caller with no week (a Free Play run, the census's own week-1 cells) means. A
-   * calendar booking still wins, as it wins over the draw.
+   * calendar booking still wins, as it wins over the draw. A week numbered above the tower's top is
+   * dealt the top's wrinkles (`weekLevels.ts#levelWrinkleIdFor`, wave AO lane DS-1, § D1400), so a
+   * run is never built from a week the census does not deal.
    */
   week?: WeekOrderKey,
   /*
@@ -647,7 +650,7 @@ export function scheduledEventFor(
   const today = calendarDayFor(period, day, dayIdx);
   const booked = today?.shift.eventId;
   if (booked != null) return SHIFT_EVENTS[booked];
-  const ordered = week === undefined ? undefined : orderedWrinkleIdFor(week, day, dayIdx);
+  const ordered = week === undefined ? undefined : levelWrinkleIdFor(week, day, dayIdx);
   const dealt = ordered === undefined ? undefined : eventOfDrawnId(ordered);
   return dealt ?? eventFor(day, dayIdx, horizon);
 }

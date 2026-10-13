@@ -23,6 +23,7 @@ import { contractBuildings, contractDayState } from './contractDay.test-helper.j
 import { contractById } from './contracts.js';
 import { runHorizonOf, wholeDayFor, wholeDayRun } from './dayLength.js';
 import { goalsForDay, readGoals } from './goals.js';
+import type { ContractIncident } from './ladder.js';
 import { shiftObservationsOf } from './observations.js';
 import { openWeek } from './week.js';
 import { dailySeedFor } from './dailySeed.js';
@@ -59,6 +60,13 @@ export function weekWayCell(
   config: WeekWayConfig,
   scheduled = false,
   eventId?: string,
+  /*
+   * A week level's bookings on this day (wave AO lane DS-1, § D1400): cars the level takes out of
+   * passenger service beside the rung's own, handed to `shiftRunConfigOf` exactly as the week deals
+   * them, so a candidate level's day is measured before the level is dealt. Empty is the day with
+   * no week booking, which is every row measured before levels existed.
+   */
+  bookings: readonly ContractIncident[] = [],
 ): WeekWayVerdict {
   const resources = WEEK_WAY_RESOURCES;
   const contract = contractById(contractId);
@@ -80,7 +88,7 @@ export function weekWayCell(
           : {}),
     },
   });
-  const plan = shiftRunConfigOf(resources, state);
+  const plan = shiftRunConfigOf(resources, state, bookings);
   const interventions: RunInterventionConfig[] =
     config.press === ''
       ? []

@@ -272,8 +272,10 @@ import {
   weekAsksOf,
   weekClosedByThisClose,
   weekHasClosed,
+  weekTargetMetDayOf,
   type HouseReading,
 } from '../shift/weekStake.js';
+import { weekLevelAwardKeyOf } from '../shift/weekLevels.js';
 import {
   dealtCrowdOf,
   isDerivedCrowdOn,
@@ -3150,6 +3152,17 @@ export function createEverydayHost(
       if (records !== before) port.write(records);
     }
     if (filed.allMet && dayCountsToward(week, filed)) bankTurn({ completion: 'career-day-paid' });
+    /*
+     * 4. **A held week pays `week-held`, once per level** — wave AO, lane DS-1, swarm DS's Q1 award
+     *    ([§ D1402](../../../../DECISIONS.md)). On the close that closes the week, when its target
+     *    was met, keyed by the level the week was dealt (`weekLevels.ts#weekLevelAwardKeyOf`), so a
+     *    level held again, or a week past the top dealt the top again, pays nothing more on the
+     *    device (`deviceChimes.ts#withTurn`) or on the server (`chimes/ledger.ts#earnCompletion`).
+     *    After the day's own award, so the rail's tally names the week.
+     */
+    if (weekClosedByThisClose(week) && weekTargetMetDayOf(week) !== undefined) {
+      bankTurn({ completion: 'week-held', levelKey: weekLevelAwardKeyOf(week) });
+    }
   };
   /**
    * Tomorrow, or with `roll` day 1 of the next week — {@link EverydayHost.openTomorrow} and

@@ -32,6 +32,7 @@ import { restrictedFloorIds } from '../access/zoning.js';
 import { mixedFleetBanks } from '../commissioning/choices.js';
 import { scenarioHorizonFor } from '../shift/dayLength.js';
 import { weekOrderIssues } from '../shift/weekOrders.js';
+import { weekLevelIssues } from '../shift/weekLevels.js';
 import { WEEK_DOMINANCE, weekDominanceIssues } from '../shift/weekDominance.js';
 import { WEEK_WAY, weekWayIssues } from '../shift/weekWay.js';
 import { CONTRACT_LADDER, contractLadderIssues } from '../shift/ladder.js';
@@ -285,6 +286,12 @@ export async function loadBrowserResources(): Promise<BrowserResources> {
       (contractId) => CONTRACT_LADDER.rows.find((row) => row.contractId === contractId)?.weekOrders,
       dispatchers.profiles.map((profile) => profile.id),
     ).map((issue) => `week-dominance.json: ${issue}`),
+    /*
+     * The week levels' bookings against the census they are placed by — wave AO, lane DS-1,
+     * § D1400: each on the day with the most room. `shift/weekLevels.test.ts` is where a misplaced
+     * booking is a failing test.
+     */
+    ...weekLevelIssues().map((issue) => `contract-ladder.json: ${issue}`),
   ];
 
   return {

@@ -95,6 +95,30 @@ describe('the shipped census', () => {
     );
     expect(verdictOf(WEEK_WAY.protocol.standingOrder, '', 0)).toBe(row.standingVerdicts[0]);
   });
+
+  it('re-runs the crowd where week 3’s booked Monday parts from week 2’s, and reproduces both marks — § D1401', () => {
+    /*
+     * Wave AO, lane DS-1. The booked row is a claim about the product's chain with car C out, so one
+     * crowd of it is re-run here as the first row is above; the crowd is the one where the standing
+     * order's mark moves with the booking, so the same run without the booking reproduces the
+     * unbooked row's mark and the pair is the control moved and the run changed.
+     */
+    const booked = WEEK_WAY.rows.find((row) => row.contractId === 'c2' && row.day === 1 && row.bookings.length === 1);
+    const plain = WEEK_WAY.rows.find(
+      (row) => row.contractId === 'c2' && row.day === 1 && row.eventId === booked?.eventId && row.bookings.length === 0,
+    );
+    expect(booked, 'the census carries week 3’s booked Monday').toBeDefined();
+    expect(plain, 'the census carries week 2’s Monday').toBeDefined();
+    if (booked === undefined || plain === undefined) return;
+    const crowd = [...booked.standingVerdicts].findIndex((mark, index) => mark !== plain.standingVerdicts[index]);
+    expect(crowd, 'the booking moved no standing mark').toBeGreaterThanOrEqual(0);
+    const seed = crowdSeeds(WEEK_WAY.protocol.heldOutFrom, crowd + 1)[crowd] ?? 0n;
+    const standing = { dispatcherId: WEEK_WAY.protocol.standingOrder, press: '', atFraction: 0 };
+    const mark = (bookings: typeof booked.bookings): string =>
+      weekWayCell('c2', 1, seed, standing, true, booked.eventId, bookings).cleared ? 'C' : 'm';
+    expect(mark(booked.bookings)).toBe(booked.standingVerdicts[crowd]);
+    expect(mark([])).toBe(plain.standingVerdicts[crowd]);
+  });
 });
 
 describe('a re-derived slope reaches the run (§ D1066)', () => {
@@ -143,6 +167,7 @@ describe('the interval and the rule', () => {
       contractId: 'c2',
       day: 3,
       eventId: 'ordinary',
+      bookings: [],
       growthPerDay: 0,
       breather: false,
       chosen: { dispatcherId: 'eta', press: '', atFraction: 0 },

@@ -1703,6 +1703,20 @@ fifth of the day on 12. No second order passes under the neighbour rule, because
 needs one of those two wrinkles; so `midtown-early-lift` is dealt in every week from the second, and
 a second order waits on a wrinkle the library does not have.
 
+**The levels after week 2** ([§ D1400](../DECISIONS.md), [§ D1401](../DECISIONS.md), wave AO, swarm
+DS's Q1 ruling). From week 3 a held week deals the next level: the order the cycle deals with one
+more car booked out of passenger service on a named morning (`data/contract-ladder.json`'s
+`weekBookings`), placed on the weekday with the most room. A level is dealt only where DC-10 admits
+each booked day off a row measured with exactly that day's bookings, DC-11 admits the week off a row
+for the order with them, and no profile left alone holds it on more crowds than it held the week
+before. Nothing here moves a bar or a target. On Midtown, car C out from 08:00 to 12:00 on Monday
+(15 of 20 under the chosen play; Predictive balanced holds the week on 10) and then on Tuesday too
+(12 of 20; Predictive balanced 8) are dealt as weeks 3 and 4. Thursday, the day with the most room
+left, reads 7 of 20 with the booking and 5 with a shorter one, and Wednesday and Friday 0 and 2, so
+week 4 is Midtown's top and its sheet says the tower deals no further week. The house cleared 12,
+11 and 10 of weeks 2, 3 and 4's 100 weekdays, a step of one crowd each, so no level is called
+harder.
+
 ### 4.4 Day one, which is what #208 is governed by
 
 #208 asks that *"a new player sees a building visibly failing within 90 seconds of first load"*, and

@@ -106,6 +106,19 @@ describe('the device ledger records turns and derives a balance — § D711 clau
     expect(turnKeyOf({ completion: 'career-day-paid' })).toBe('');
   });
 
+  it('pays a held level once, keyed by the level, and another level again — § D1402', () => {
+    const levelAward = CHIME_AWARDS.awards['week-held'] ?? 0;
+    expect(levelAward, 'the shipped table pays a held week nothing').toBe(10);
+    let record = emptyDeviceChimes();
+    record = withTurn(record, { completion: 'week-held', levelKey: 'c2/3' });
+    const once = record;
+    record = withTurn(record, { completion: 'week-held', levelKey: 'c2/3' });
+    expect(record, 'a level held again was recorded again').toBe(once);
+    record = withTurn(record, { completion: 'week-held', levelKey: 'c2/4' });
+    expect(deviceBalanceOf(record)).toBe(levelAward * 2);
+    expect(turnKeyOf({ completion: 'week-held', levelKey: 'c2/4' })).toBe('c2/4');
+  });
+
   it('never reads below zero, whatever a hand-edited record holds', () => {
     const tampered = { version: 1, turns: [], spends: [{ scenarioId: 'a', stepId: 'b', chimes: 99 }] };
     expect(deviceBalanceOf(tampered)).toBe(0);

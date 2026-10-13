@@ -34,6 +34,7 @@ import { isFirstDayOnALegibleTower } from '../shift/firstSession.js';
 import { dailySeedAt, isDailySeed } from '../shift/dailySeed.js';
 import { deviceNowMs } from '../shift/deviceDate.js';
 import { todayOf } from './today.js';
+import { clockOf } from '../shift/report.js';
 import {
   EVERYDAY_COLORS as C,
   EVERYDAY_GAPS as GAP,
@@ -66,6 +67,8 @@ function viewOf(context: EverydayScreenShellContext): DoorScreenView {
   const dayAhead = host.dayAhead();
   return doorScreenViewOf({
     week: host.week(),
+    /* The run's own clock for a booking's window — wave AO, lane DS-1, § D1400. */
+    bookingClock: (fraction) => clockOf(fraction * dayAhead.lengthS, dayAhead.startOfDayS),
     today: todayOf({
       week: host.week(),
       calendar: host.calendarPeriod(),
@@ -311,6 +314,12 @@ function mountDoor(
       const harder = el(document_, 'p', 'everyday-door-week-harder', view.weekHarder);
       harder.style.cssText = `${BODY};margin:10px 0 0;max-width:70ch`;
       foot.append(harder);
+    }
+    /* The cars this week's level books out — wave AO, lane DS-1, § D1400. */
+    if (view.weekBookings !== undefined) {
+      const booked = el(document_, 'p', 'everyday-door-week-booked', view.weekBookings);
+      booked.style.cssText = `${BODY};margin:10px 0 0;max-width:70ch`;
+      foot.append(booked);
     }
     column.append(foot);
     return column;

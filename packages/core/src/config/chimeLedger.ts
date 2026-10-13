@@ -86,7 +86,7 @@
  * turn, never by a run's figures* — every member here is a turn that either happened or did not,
  * and none of them is a quantity a run can suppress.
  */
-export const CHIME_COMPLETIONS = ['scenario-cleared', 'career-day-paid', 'rush-wave-survived'] as const;
+export const CHIME_COMPLETIONS = ['scenario-cleared', 'career-day-paid', 'rush-wave-survived', 'week-held'] as const;
 
 /** One member of {@link CHIME_COMPLETIONS}. */
 export type ChimeCompletion = (typeof CHIME_COMPLETIONS)[number];
@@ -110,6 +110,11 @@ export type ChimeCompletion = (typeof CHIME_COMPLETIONS)[number];
  *   line was crossed in was reached and not survived. The server refuses a count above the waves the
  *   stream generates.
  * - A contract day carries nothing. The ruling does not reach it, and each posted day still pays.
+ * - `levelKey` names the level of a tower's week that was held: `c2/3` is Midtown Office's week 3
+ *   as dealt (wave AO, lane DS-1, [§ D1402](../../../../DECISIONS.md)). It is the turn key, so a
+ *   level pays once per account however often it is held; a held week dealt the top again names the
+ *   top's level and pays nothing more. The server refuses a key outside the levels
+ *   `data/contract-ladder.json` authors.
  *
  * **What the server cannot check, stated rather than hidden:** that the clear happened, or that the
  * run reached the waves it claims. Nothing replays a scenario clear or a rush result before paying
@@ -119,7 +124,8 @@ export type ChimeCompletion = (typeof CHIME_COMPLETIONS)[number];
 export type ChimeTurn =
   | { readonly completion: 'scenario-cleared'; readonly scenarioId: string }
   | { readonly completion: 'career-day-paid' }
-  | { readonly completion: 'rush-wave-survived'; readonly waves: number };
+  | { readonly completion: 'rush-wave-survived'; readonly waves: number }
+  | { readonly completion: 'week-held'; readonly levelKey: string };
 
 /**
  * How a source came to exist. **Two values, and there is no third.**

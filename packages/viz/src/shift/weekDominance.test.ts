@@ -57,7 +57,7 @@ function screenWith(
     if (drop.includes(id)) continue;
     verdicts[id] = over[id] ?? (id === WEEK_WAY.protocol.standingOrder ? houseOf(MIDTOWN_ORDER) : marks(3));
   }
-  const row: WeekDominanceRow = { contractId: 'c2', orderId: MIDTOWN_ORDER.id, days: MIDTOWN_ORDER.days, verdicts };
+  const row: WeekDominanceRow = { contractId: 'c2', orderId: MIDTOWN_ORDER.id, days: MIDTOWN_ORDER.days, bookings: [], verdicts };
   return {
     version: 1,
     protocol: { ...WEEK_DOMINANCE.protocol, oneProfileHoldsAtMost: share },

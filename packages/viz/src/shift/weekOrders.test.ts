@@ -62,6 +62,7 @@ function screenAdmitting(order: ContractWeekOrder, base: WeekDominance = WEEK_DO
         contractId: 'c2',
         orderId: order.id,
         days: order.days,
+        bookings: [],
         verdicts: Object.fromEntries(WEEK_DOMINANCE.protocol.profiles.map((id) => [id, none])),
       },
     ],

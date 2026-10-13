@@ -52,6 +52,7 @@ import { WEEK_START_NEXT_LABEL, weekScreenViewOf, type WeekDayCard, type WeekScr
 import { weekHasClosed } from '../shift/weekStake.js';
 import type { NextTowerOffer } from '../shift/nextTower.js';
 import type { NextWeekView } from '../shift/nextWeek.js';
+import { clockOf } from '../shift/report.js';
 import type { EverydayScreenModule } from './screens.js';
 import {
   BODY,
@@ -171,6 +172,14 @@ function mountWeek(
       house: (day) => data.weekHouse(day),
       /* The tower's record of closed weeks — § D1230. */
       record: data.weekRecord(),
+      /*
+       * The run's own clock for a booking's window — wave AO, lane DS-1, § D1400. Planned only when
+       * a booking is named, since the plan builds the run's tower.
+       */
+      bookingClock: (fraction) => {
+        const ahead = data.dayAhead();
+        return clockOf(fraction * ahead.lengthS, ahead.startOfDayS);
+      },
     });
     onwardTower = weekSheetStands ? view.onward : undefined;
     nextWeek = weekSheetStands ? view.next : undefined;

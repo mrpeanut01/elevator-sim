@@ -57,6 +57,7 @@ function scenario(index: number): string {
 const BOUNDS: ChimeTurnBounds = Object.freeze({
   scenarioIds: new Set(Array.from({ length: 40 }, (_, index) => scenario(index))),
   rushWaves: 30,
+  weekLevels: new Set(['c2/1', 'c2/2', 'c2/3']),
 });
 
 function earn(store: Store, userId: string, turn: ChimeTurn): ReturnType<typeof earnCompletion> {
@@ -439,6 +440,20 @@ describe('earnCompletion pays a scenario once and a rush its new best — issue 
     expect(await store.chimeBalance(userId)).toBe(0);
   });
 
+  it('pays a held level once per account, another level again, and refuses a level the ladder does not author — § D1402', async () => {
+    const { store, userId } = await fixture();
+    const levelAward = sourceFor('week-held').awardChimes;
+    const held = (levelKey: string): ReturnType<typeof earn> => earn(store, userId, { completion: 'week-held', levelKey });
+    expect(await held('c2/3')).toEqual({ ok: true, balanceChimes: levelAward });
+    expect(await held('c2/3'), 'a second hold of one level paid').toEqual({ ok: true, balanceChimes: levelAward });
+    expect(await held('c2/2')).toEqual({ ok: true, balanceChimes: 2 * levelAward });
+    for (const levelKey of ['', 'c2/4', 'c9/1', 'c2/3 ']) {
+      expect(await held(levelKey), JSON.stringify(levelKey)).toEqual({ ok: false, reason: 'unknown-level' });
+    }
+    expect(await store.chimeBalance(userId)).toBe(2 * levelAward);
+    expect([...(await store.chimeTurnKeys(userId, sourceFor('week-held').id))].sort()).toEqual(['c2/2', 'c2/3']);
+  });
+
   it('still pays a contract day every time it is posted, which the ruling does not reach', async () => {
     const { store, userId } = await fixture();
     await earn(store, userId, { completion: 'career-day-paid' });
@@ -500,6 +515,20 @@ describe('the turns a shipped build will pay for — loadChimeTurnBounds, issue 
      */
     expect(bounds.rushWaves).toBe(30);
     expect(rushWaveCountOf(profiles)).toBe(bounds.rushWaves);
+    /*
+     * § D1402: a held week pays once per level, and the levels are the authored ladder's — week 1 on
+     * every rung, week 2 where a rung authors an order, and one week per authored booking above it.
+     */
+    const ladder = JSON.parse(readFileSync(join(DATA_DIR, 'contract-ladder.json'), 'utf8')) as {
+      readonly contracts: readonly { readonly contractId: string; readonly weekOrders?: readonly unknown[]; readonly weekBookings?: readonly unknown[] }[];
+    };
+    const expected = ladder.contracts.flatMap((row) => {
+      const top = (row.weekOrders ?? []).length === 0 ? 1 : 2 + (row.weekBookings ?? []).length;
+      return Array.from({ length: top }, (_, index) => `${row.contractId}/${String(index + 1)}`);
+    });
+    expect([...bounds.weekLevels].sort()).toEqual(expected.sort());
+    expect(bounds.weekLevels.has('c2/3'), 'Midtown Office authors no level above week 2').toBe(true);
+    expect(bounds.weekLevels.has('c1/2'), 'a rung with no order pays a week 2').toBe(false);
   });
 
   it('refuses to start when the rush cannot be read or the case file names one id twice', async () => {

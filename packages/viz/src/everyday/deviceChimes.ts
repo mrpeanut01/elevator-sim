@@ -168,6 +168,9 @@ export function turnKeyOf(turn: ChimeTurn): string {
       return turn.scenarioId;
     case 'rush-wave-survived':
       return String(turn.waves);
+    case 'week-held':
+      /* The level held — wave AO lane DS-1, § D1402: once per level, as a scenario is once per id. */
+      return turn.levelKey;
     default:
       return '';
   }

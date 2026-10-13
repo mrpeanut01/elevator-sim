@@ -1,5 +1,5 @@
 {
-  "$comment": "THE ONE-PROFILE SCREEN, docs/33 DC-11 and DECISIONS.md § D1343 (wave AN lane DQ-2, swarm DQ's Q2 rule 2). From week 2 an authored week order (data/contract-ladder.json weekOrders) is dealt only if no single shipped dispatcher profile, left alone with nothing pressed, holds that week's target on more than oneProfileHoldsAtMost of the census crowds. One row per authored order the screen measured: for each profile, five verdict strings (Monday to Friday, the order's own days), one mark per DC-10 held-out crowd in date order, C cleared and m missed, where missed means any goalsForDay(day, 'whole-day') goal not met. Whether a profile holds the week on a crowd is NOT stored: shift/weekDominance.ts#weekDominanceOf derives it from the marks, the days of the order that count (DC-10's rows as dealt, weekWay.ts#dayStakeReasonOf) and the target derived from them, so no row can say admitted over marks that do not support it. A row may carry only some profiles: one profile over the line refuses the order, and admission needs every profile the protocol names. The standing order's strings are the census rows' own standingVerdicts for the same days, and weekDominanceIssues holds them to the crowd. PROVENANCE: every mark is a measurement, run by `WEEK_WAY_SWEEP=1 WEEK_WAY_STAGE=profiles WEEK_WAY_OUT=<file> WEEK_WAY_CONTRACTS=c2 WEEK_WAY_CELLS=<day>=<drawn id>;... [WEEK_WAY_PROFILES=<ids>] npx vitest run --project viz --maxWorkers=1 --testTimeout=36000000 packages/viz/src/shift/weekWay.sweep.test.ts` and copied row for row. oneProfileHoldsAtMost is CHOSEN, an agent's proposal for the owner to accept, tighten or reject: swarm DQ's S1 and S2 proposed half and S3 a third, and the reconciled ruling took half.",
+  "$comment": "THE ONE-PROFILE SCREEN, docs/33 DC-11 and DECISIONS.md § D1343 (wave AN lane DQ-2, swarm DQ's Q2 rule 2). From week 2 an authored week order (data/contract-ladder.json weekOrders) is dealt only if no single shipped dispatcher profile, left alone with nothing pressed, holds that week's target on more than oneProfileHoldsAtMost of the census crowds. One row per authored order the screen measured: for each profile, five verdict strings (Monday to Friday, the order's own days), one mark per DC-10 held-out crowd in date order, C cleared and m missed, where missed means any goalsForDay(day, 'whole-day') goal not met. Whether a profile holds the week on a crowd is NOT stored: shift/weekDominance.ts#weekDominanceOf derives it from the marks, the days of the order that count (DC-10's rows as dealt, weekWay.ts#dayStakeReasonOf) and the target derived from them, so no row can say admitted over marks that do not support it. A row may carry only some profiles: one profile over the line refuses the order, and admission needs every profile the protocol names. The standing order's strings are the census rows' own standingVerdicts for the same days, and weekDominanceIssues holds them to the crowd. PROVENANCE: every mark is a measurement, run by `WEEK_WAY_SWEEP=1 WEEK_WAY_STAGE=profiles WEEK_WAY_OUT=<file> WEEK_WAY_CONTRACTS=c2 WEEK_WAY_CELLS=<day>=<drawn id>;... [WEEK_WAY_PROFILES=<ids>] npx vitest run --project viz --maxWorkers=1 --testTimeout=36000000 packages/viz/src/shift/weekWay.sweep.test.ts` and copied row for row. oneProfileHoldsAtMost is CHOSEN, an agent's proposal for the owner to accept, tighten or reject: swarm DQ's S1 and S2 proposed half and S3 a third, and the reconciled ruling took half. A row carrying `bookings` is a week level's (wave AO lane DS-1, DECISIONS.md § D1400 and § D1401): the order with the rung's first k weekBookings, each with its day; its booked days' strings are the screen run with WEEK_WAY_BOOKINGS on that day's cell, and its other days' strings are the order's own row, unchanged, since those days are the same runs.",
   "version": 1,
   "protocol": {
     "heldOutFrom": "2026-10-01",
@@ -243,6 +243,242 @@
         "destination-panel": [
           "CCCCCmCCCCCmCCmCCCCC",
           "CCCCCCCCCCmCmCCmmCCm",
+          "mmmmmmmmmmmCmmmmmmmm",
+          "mCmmCmmmCmmmmmmmCmmm",
+          "Cmmmmmmmmmmmmmmmmmmm"
+        ]
+      }
+    },
+    {
+      "contractId": "c2",
+      "orderId": "midtown-early-lift",
+      "days": [
+        "shift-change:tight",
+        "evacuation-drill:all-at-once",
+        "lift-service:early",
+        "goods-inward",
+        "open-day:busy"
+      ],
+      "bookings": [
+        {
+          "kind": "maintenance",
+          "bankId": "main",
+          "carId": "C",
+          "fromFraction": 0,
+          "toFraction": 0.4,
+          "day": 1
+        }
+      ],
+      "verdicts": {
+        "nearest-car": [
+          "mmmmmmmmmmmmmmmmmmmm",
+          "mmmmmmmmmmmmmmmmmmmm",
+          "mmmmmmmmmmmmmmmmmmmm",
+          "mmmmmmmmmmmmmmmmmmmm",
+          "mmmmmmmmmmmmmmmmmmmm"
+        ],
+        "eta": [
+          "CmCCmmmmmCmCmmCmCCmC",
+          "CCCCCCCCCCmCmmCmCCCC",
+          "CmmmmCmmmmmCmmmmCmmC",
+          "CCmCmmmmCmmmmmmmCCmm",
+          "CmmmmmmCmmmmmmCmmmmm"
+        ],
+        "collective": [
+          "CmmmmmmmmCmmmmmmCmmC",
+          "mCmmCCmmmmmmmmmmmmmm",
+          "mmCmmmmmmmmCmmmmmmmC",
+          "mCmmmmmmmmmmmmmmmmmm",
+          "mmmmmmmmmmmmmmmmmmmm"
+        ],
+        "collective-enroute": [
+          "CCCmCmmmmmmmmmCmmCmC",
+          "CCCmmmmCmmmmmmmmmmmm",
+          "mmmmCmmCmmmCmmmmmmmC",
+          "mCmmCCmmCmmmmmmmmCmm",
+          "CmmmmmmmmmmmmmmCmmmm"
+        ],
+        "energy-aware": [
+          "CmCCCmmmmmmmmmmmCCmm",
+          "CCCCCmmCCCmCmmCmCCCC",
+          "CmCmmmmCmmmCmmmmmmmC",
+          "CCmmmCmmmmmmmmmmCCmm",
+          "CCCmCmCmmmmmmmmCmmmm"
+        ],
+        "fairness-first": [
+          "CCCCCmCmCCmCmmCmCCCC",
+          "CCCCCCCCCCmCCCCCCCCC",
+          "CCCCCCCCmmmCmmCmmCmC",
+          "CCmCCCmCCmCmmmmmCCCC",
+          "CCCCmmmCmCCmmmmCmmCm"
+        ],
+        "capacity-aware": [
+          "CCCCmCCmmCmCmmCmCmmC",
+          "CCCCCmCCCCCCmCCmCCCm",
+          "CmCmCmmCmmmCmmmmmmmC",
+          "CCmCCCmCCmmmmmmmCCmC",
+          "CCmCmCCCmmCmmmmmCmmm"
+        ],
+        "predictive-balanced": [
+          "CCCCCCCCCCCCmmCmCCCC",
+          "CCCCCmCCCCCCCCCCCCCC",
+          "CCCmCCmCmmmCmmCmmmmC",
+          "CCCCCCCCCmCCmmmmCCCm",
+          "CCCCmmCCmCmmmmmCCmCm"
+        ],
+        "auction": [
+          "CCCCmCmmmCmCmmCmCCmC",
+          "CCCCCCCCCCCCmCCmCCCm",
+          "CmCmmmmmmmmCmmCmmmmC",
+          "CCmCCCmCCmmmmmmmCCmm",
+          "CCCCmCCCmmCCmmmCmCmm"
+        ],
+        "auction-multi-round": [
+          "mmmCCCCmmmmCmmCmCmmC",
+          "CCCCCCCCmCmCmmCmCCCm",
+          "CmCmmmmmmmmmmmmmmmmC",
+          "CCmCmCCCCmmCmmmmCCmC",
+          "CCCCmCCmmCCmmmCmCmmm"
+        ],
+        "zoned-uppeak": [
+          "CCmCmCmmmCmCmmCmCCCC",
+          "CCCmmCCmCCmCmmCmCCCC",
+          "CmCmmmmmmmmCmmCmmmmC",
+          "mCCmCmmmCmmmmmmmCCCm",
+          "CmmCmmCCmmmmmmmmmmmm"
+        ],
+        "destination-eta": [
+          "CCCCCmmmmmmCmmCmCCmm",
+          "CCCCCCCCmmmCmmCCCCCC",
+          "CmCmmmmCmmmCmmmmmmmC",
+          "mCmmCmmCCmmmmmmmCCmC",
+          "CCmCmmmCmmmmCmmmmmmm"
+        ],
+        "destination-panel": [
+          "CCCCCmCmmCCmmmmmCCmC",
+          "CCCCCCCCCCmCmCCmmCCm",
+          "mmmmmmmmmmmCmmmmmmmm",
+          "mCmmCmmmCmmmmmmmCmmm",
+          "Cmmmmmmmmmmmmmmmmmmm"
+        ]
+      }
+    },
+    {
+      "contractId": "c2",
+      "orderId": "midtown-early-lift",
+      "days": [
+        "shift-change:tight",
+        "evacuation-drill:all-at-once",
+        "lift-service:early",
+        "goods-inward",
+        "open-day:busy"
+      ],
+      "bookings": [
+        {
+          "kind": "maintenance",
+          "bankId": "main",
+          "carId": "C",
+          "fromFraction": 0,
+          "toFraction": 0.4,
+          "day": 1
+        },
+        {
+          "kind": "maintenance",
+          "bankId": "main",
+          "carId": "C",
+          "fromFraction": 0,
+          "toFraction": 0.4,
+          "day": 2
+        }
+      ],
+      "verdicts": {
+        "nearest-car": [
+          "mmmmmmmmmmmmmmmmmmmm",
+          "mmmmmmmmmmmmmmmmmmmm",
+          "mmmmmmmmmmmmmmmmmmmm",
+          "mmmmmmmmmmmmmmmmmmmm",
+          "mmmmmmmmmmmmmmmmmmmm"
+        ],
+        "eta": [
+          "CmCCmmmmmCmCmmCmCCmC",
+          "CCCmCmmmmmmCmmmmmmmC",
+          "CmmmmCmmmmmCmmmmCmmC",
+          "CCmCmmmmCmmmmmmmCCmm",
+          "CmmmmmmCmmmmmmCmmmmm"
+        ],
+        "collective": [
+          "CmmmmmmmmCmmmmmmCmmC",
+          "mCmmmCmmmmmmmmmmmmmm",
+          "mmCmmmmmmmmCmmmmmmmC",
+          "mCmmmmmmmmmmmmmmmmmm",
+          "mmmmmmmmmmmmmmmmmmmm"
+        ],
+        "collective-enroute": [
+          "CCCmCmmmmmmmmmCmmCmC",
+          "CCCmmmmmmmmmmmmmmmmm",
+          "mmmmCmmCmmmCmmmmmmmC",
+          "mCmmCCmmCmmmmmmmmCmm",
+          "CmmmmmmmmmmmmmmCmmmm"
+        ],
+        "energy-aware": [
+          "CmCCCmmmmmmmmmmmCCmm",
+          "CmCmCmmmmmmCmmmmmmmm",
+          "CmCmmmmCmmmCmmmmmmmC",
+          "CCmmmCmmmmmmmmmmCCmm",
+          "CCCmCmCmmmmmmmmCmmmm"
+        ],
+        "fairness-first": [
+          "CCCCCmCmCCmCmmCmCCCC",
+          "CCCCCCCmmCmCmmCmCmmC",
+          "CCCCCCCCmmmCmmCmmCmC",
+          "CCmCCCmCCmCmmmmmCCCC",
+          "CCCCmmmCmCCmmmmCmmCm"
+        ],
+        "capacity-aware": [
+          "CCCCmCCmmCmCmmCmCmmC",
+          "CCCCmmmmmmmCmmCmCmmm",
+          "CmCmCmmCmmmCmmmmmmmC",
+          "CCmCCCmCCmmmmmmmCCmC",
+          "CCmCmCCCmmCmmmmmCmmm"
+        ],
+        "predictive-balanced": [
+          "CCCCCCCCCCCCmmCmCCCC",
+          "CCCCCmmmmmmCmmCmCCmC",
+          "CCCmCCmCmmmCmmCmmmmC",
+          "CCCCCCCCCmCCmmmmCCCm",
+          "CCCCmmCCmCmmmmmCCmCm"
+        ],
+        "auction": [
+          "CCCCmCmmmCmCmmCmCCmC",
+          "CmCCCCmmmmmCmmmmmmmm",
+          "CmCmmmmmmmmCmmCmmmmC",
+          "CCmCCCmCCmmmmmmmCCmm",
+          "CCCCmCCCmmCCmmmCmCmm"
+        ],
+        "auction-multi-round": [
+          "mmmCCCCmmmmCmmCmCmmC",
+          "CmCmCCmmmmmCmmmmCmmm",
+          "CmCmmmmmmmmmmmmmmmmC",
+          "CCmCmCCCCmmCmmmmCCmC",
+          "CCCCmCCmmCCmmmCmCmmm"
+        ],
+        "zoned-uppeak": [
+          "CCmCmCmmmCmCmmCmCCCC",
+          "CCCmmCmmmmmCmmmmCmmC",
+          "CmCmmmmmmmmCmmCmmmmC",
+          "mCCmCmmmCmmmmmmmCCCm",
+          "CmmCmmCCmmmmmmmmmmmm"
+        ],
+        "destination-eta": [
+          "CCCCCmmmmmmCmmCmCCmm",
+          "CmCmCmCmmmmCmmmmmmmm",
+          "CmCmmmmCmmmCmmmmmmmC",
+          "mCmmCmmCCmmmmmmmCCmC",
+          "CCmCmmmCmmmmCmmmmmmm"
+        ],
+        "destination-panel": [
+          "CCCCCmCmmCCmmmmmCCmC",
+          "CmmmCmmmmmmCmmmmmCmm",
           "mmmmmmmmmmmCmmmmmmmm",
           "mCmmCmmmCmmmmmmmCmmm",
           "Cmmmmmmmmmmmmmmmmmmm"

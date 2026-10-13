@@ -98,6 +98,7 @@ export type ChimeRefusal =
   | 'unknown-completion'
   | 'unknown-scenario'
   | 'unknown-wave'
+  | 'unknown-level'
   | 'unknown-modifier'
   | 'not-enough-chimes';
 
@@ -125,6 +126,39 @@ export interface ChimeTurnBounds {
   readonly scenarioIds: ReadonlySet<string>;
   /** How many waves the rush's stream generates — the most a run can outlast before it breaks. */
   readonly rushWaves: number;
+  /**
+   * **Every level of a tower's week a held week can pay for**, by key (`c2/3`) — wave AO, lane DS-1,
+   * [§ D1402](../../../../DECISIONS.md). Read off `data/contract-ladder.json` by {@link weekLevelKeysIn}:
+   * week 1 of every rung, week 2 where the rung authors an order, and one week per authored week
+   * booking above it. Which of them the census admits is the viewer's reading, and this package may
+   * not import it; the bound is the authored ladder, so an unadmitted level is the most a hand-built
+   * request can claim beyond what a player can hold, and each pays once.
+   */
+  readonly weekLevels: ReadonlySet<string>;
+}
+
+/**
+ * **The level keys {@link ChimeTurnBounds.weekLevels} holds**, from the ladder document's rows — see
+ * that field. Throws on a document with no rows, on {@link loadChimeTurnBounds}' ground.
+ */
+export function weekLevelKeysOf(ladder: unknown): ReadonlySet<string> {
+  const rows: unknown = (ladder as Record<string, unknown> | null)?.['contracts'];
+  if (!Array.isArray(rows) || rows.length === 0) {
+    throw new Error('chime turns: the contract ladder has no "contracts" list, so no held week could be paid.');
+  }
+  const keys = new Set<string>();
+  for (const raw of rows) {
+    const row = raw as Record<string, unknown> | null;
+    const contractId = row?.['contractId'];
+    if (typeof contractId !== 'string' || contractId === '') {
+      throw new Error('chime turns: a contract ladder row has no contractId.');
+    }
+    const orders = Array.isArray(row?.['weekOrders']) ? (row['weekOrders'] as unknown[]).length : 0;
+    const bookings = Array.isArray(row?.['weekBookings']) ? (row['weekBookings'] as unknown[]).length : 0;
+    const top = orders === 0 ? 1 : 2 + bookings;
+    for (let week = 1; week <= top; week += 1) keys.add(`${contractId}/${String(week)}`);
+  }
+  return keys;
 }
 
 /**
@@ -182,7 +216,8 @@ export async function loadChimeTurnBounds(dataDir: string, profiles: TrafficProf
       `chime turns: the traffic profiles carry no "${RUSH_TEMPLATE_ID}" template with waves in it, so no rush result can be bounded.`,
     );
   }
-  return Object.freeze({ scenarioIds: new Set([...cases, ...stages]), rushWaves });
+  const weekLevels = weekLevelKeysOf(JSON.parse(await readFile(join(dataDir, 'contract-ladder.json'), 'utf8')));
+  return Object.freeze({ scenarioIds: new Set([...cases, ...stages]), rushWaves, weekLevels });
 }
 
 /**
@@ -334,6 +369,15 @@ export async function earnCompletion(input: {
         if (!paid.has(String(wave))) await store.recordChimeEntry({ ...entry, turnKey: String(wave) });
       }
       return { ok: true, balanceChimes: await store.chimeBalance(userId) };
+    }
+    case 'week-held': {
+      /*
+       * Wave AO lane DS-1, § D1402: once per level per account, on the scenario's own mechanism — the
+       * level is the turn, and the store refuses a second entry for it in the statement that writes.
+       */
+      if (!bounds.weekLevels.has(turn.levelKey)) return { ok: false, reason: 'unknown-level' };
+      const written = await store.recordChimeEntry({ ...entry, turnKey: turn.levelKey });
+      return { ok: true, balanceChimes: written?.balanceAfter ?? (await store.chimeBalance(userId)) };
     }
   }
 }

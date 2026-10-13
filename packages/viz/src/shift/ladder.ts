@@ -303,7 +303,43 @@ export interface ContractLadderRow {
    * refuses stays in the data with its refusal readable and is not dealt.
    */
   readonly weekOrders: readonly ContractWeekOrder[];
+  /**
+   * **The bookings this tower's week levels add, in the order they are added** — wave AO, lane DS-1,
+   * swarm DS's Q1 ruling ([§ D1400](../../../../DECISIONS.md)). Empty for a rung that authors none,
+   * whose ladder of weeks ends at its last admitted order.
+   *
+   * Week 3 is the next order with the first booking, week 4 the next order with the first two, and
+   * so on: level `n` carries the first `n − 2` entries, so **bookings accumulate and never shrink**
+   * by construction rather than by a check. Each is one car out of passenger service on one named
+   * weekday, in {@link ContractIncident}'s own vocabulary plus the day. Authored here and admitted
+   * elsewhere: `shift/weekLevels.ts` deals a level only where DC-10 admits each booked day, DC-11
+   * admits the week, and no profile holds it more often than it held the week before.
+   */
+  readonly weekBookings: readonly ContractWeekBooking[];
 }
+
+/**
+ * **One week booking: a car out of passenger service on a named weekday** — [§ D1400](../../../../DECISIONS.md).
+ *
+ * The rung's own {@link ContractIncident} (which car, which bank, which part of the run, what kind
+ * of absence) with the one field the rung's incidents do not need: the weekday, `1` (Monday) to `5`
+ * (Friday), because a rung's incidents happen every day and a booking happens on one. Declared with
+ * its schema in {@link WEEK_BOOKING_DAY_BOUNDS} (invariant 8) and checked by
+ * {@link contractLadderIssues} with every rule a rung incident meets, plus one: the bank keeps a car
+ * on that day once the rung's own absences and every booking on that day are counted.
+ */
+export interface ContractWeekBooking extends ContractIncident {
+  /** `WeekState.day` of the weekday it falls on: `1` to `5`. */
+  readonly day: number;
+}
+
+/**
+ * What a booking's day may be: a weekday, Monday to Friday. The weekend counts toward no target
+ * ([§ D1176](../../../../DECISIONS.md)) and the census measures weekdays only, so a booking there
+ * would change a day nothing reads. Integer only; there is no default, because a booking with no day
+ * is not a booking.
+ */
+export const WEEK_BOOKING_DAY_BOUNDS = Object.freeze({ min: 1, max: 5 });
 
 /**
  * **One authored week's wrinkles, Monday to Friday** — [§ D1252](../../../../DECISIONS.md).
@@ -629,7 +665,17 @@ export function pressDayMeasuredAs(
 
 export function rungIncidents(rung: ContractLadderRow | undefined): readonly Incident[] {
   if (rung === undefined) return [];
-  return rung.fabric.incidents.map((entry) => ({
+  return incidentsOfBookings(rung.fabric.incidents);
+}
+
+/**
+ * Named absences as the shape the run's own seam takes: the rung's own ({@link rungIncidents}) and
+ * a week level's bookings (`shift/weekLevels.ts`, wave AO lane DS-1, [§ D1400](../../../../DECISIONS.md))
+ * go through this one mapping, so a booking the census measured and a booking the week deals reach
+ * `withIncidents` as the same entries.
+ */
+export function incidentsOfBookings(entries: readonly ContractIncident[]): readonly Incident[] {
+  return entries.map((entry) => ({
     kind: entry.kind,
     car: { bankId: entry.bankId, carId: entry.carId },
     fromFraction: entry.fromFraction,
@@ -774,6 +820,17 @@ function weekOrdersOf(value: unknown): readonly ContractWeekOrder[] {
   );
 }
 
+/** Structure only; {@link contractLadderIssues} names what is wrong with a booking. A missing day is `NaN`. */
+function weekBookingsOf(value: unknown): readonly ContractWeekBooking[] {
+  if (!Array.isArray(value)) return Object.freeze([]);
+  return Object.freeze(
+    value.map((raw) => {
+      const record = asRecord(raw);
+      return Object.freeze({ ...contractIncidentOf(raw), day: asNumber(record['day']) ?? Number.NaN });
+    }),
+  );
+}
+
 export function parseContractLadder(input: unknown): ContractLadder {
   const record = asRecord(input);
   const rows = Array.isArray(record['contracts']) ? (record['contracts'] as unknown[]) : [];
@@ -800,6 +857,7 @@ export function parseContractLadder(input: unknown): ContractLadder {
           growthPerDay:
             entry['growthPerDay'] === undefined ? undefined : (asNumber(entry['growthPerDay']) ?? Number.NaN),
           weekOrders: weekOrdersOf(entry['weekOrders']),
+          weekBookings: weekBookingsOf(entry['weekBookings']),
         });
       }),
     ),
@@ -1087,6 +1145,56 @@ export function contractLadderIssues(
             `${String(incident.toFraction)}, at or before it leaves at ` +
             `${String(incident.fromFraction)}; that is an absence that never happened`,
         );
+      }
+    }
+
+    /*
+     * A week booking (wave AO lane DS-1, § D1400) meets every rule a rung incident meets, names a
+     * weekday, and never empties its bank **on its day**: the rung's own absences happen every day,
+     * so they are counted with every booking on the same weekday. A booking is cumulative across the
+     * levels (level `n` carries the first `n − 2`), so the last level is the one that could empty a
+     * bank, and counting every booking on the day is counting the last level.
+     */
+    for (const booking of row.weekBookings) {
+      const at = `ladder row ${row.contractId} books car ${booking.carId} out on day ${String(booking.day)}`;
+      if (!(INCIDENT_KINDS as readonly string[]).includes(booking.kind)) {
+        issues.push(`${at} as ${JSON.stringify(booking.kind)}, which is none of ${INCIDENT_KINDS.join(', ')}`);
+      }
+      if (
+        !Number.isInteger(booking.day) ||
+        booking.day < WEEK_BOOKING_DAY_BOUNDS.min ||
+        booking.day > WEEK_BOOKING_DAY_BOUNDS.max
+      ) {
+        issues.push(`${at}, and a booking falls on a weekday, ${String(WEEK_BOOKING_DAY_BOUNDS.min)} to ${String(WEEK_BOOKING_DAY_BOUNDS.max)}`);
+      }
+      const carIds = input.carIdsFor(row.buildingId, booking.bankId);
+      if (carIds === undefined) {
+        issues.push(`${at} of bank ${booking.bankId}, which ${row.buildingId} does not have`);
+      } else if (!carIds.includes(booking.carId)) {
+        issues.push(`${at}, and ${row.buildingId}'s ${booking.bankId} has ${carIds.join(', ')}`);
+      } else {
+        const away = new Set([
+          ...row.fabric.incidents.filter((other) => other.bankId === booking.bankId).map((other) => other.carId),
+          ...row.weekBookings
+            .filter((other) => other.bankId === booking.bankId && other.day === booking.day)
+            .map((other) => other.carId),
+        ]);
+        if (carIds.length <= away.size) {
+          issues.push(`${at}, and with the rung's own absences that takes every car in ${booking.bankId} that day`);
+        }
+      }
+      if (booking.fromFraction < 0 || booking.fromFraction >= 1) {
+        issues.push(`${at} at ${String(booking.fromFraction)} of the run, outside [0, 1)`);
+      }
+      if (booking.toFraction <= booking.fromFraction) {
+        issues.push(`${at} and returns it at ${String(booking.toFraction)}, at or before it leaves`);
+      }
+      const twice = row.weekBookings.filter(
+        (other) => other.day === booking.day && other.bankId === booking.bankId && other.carId === booking.carId,
+      ).length;
+      if (twice > 1) issues.push(`${at} twice; one car is booked once on a day`);
+      if (row.fabric.incidents.some((other) => other.bankId === booking.bankId && other.carId === booking.carId)) {
+        issues.push(`${at}, a car the rung already takes out every day`);
       }
     }
 

@@ -57,8 +57,9 @@ import weekDominanceDocument from '../../../../data/week-dominance.json' with { 
 import { drawWrinkle } from '../wrinkles/draw.js';
 import { WRINKLE_LIBRARY } from '../wrinkles/library.js';
 
-import type { ContractWeekOrder } from './ladder.js';
+import { ladderRowFor, type ContractIncident, type ContractWeekBooking, type ContractWeekOrder } from './ladder.js';
 import {
+  bookingsKeyOf,
   crowdDates,
   dayStakeReasonOf,
   WEEK_WAY,
@@ -87,6 +88,12 @@ export interface WeekDominanceRow {
   readonly orderId: string;
   /** The five drawn ids the row was measured under, Monday to Friday. */
   readonly days: readonly string[];
+  /**
+   * **The week level's bookings the row was measured with**, each on its weekday — wave AO, lane
+   * DS-1, [§ D1400](../../../../DECISIONS.md). Empty for an order measured as an order, which is
+   * every row before levels. A row is a level's only when the order and the bookings both match.
+   */
+  readonly bookings: readonly ContractWeekBooking[];
   readonly verdicts: Readonly<Record<string, readonly string[]>>;
 }
 
@@ -134,6 +141,19 @@ export function parseWeekDominance(input: unknown): WeekDominance {
           contractId: asString(row['contractId']),
           orderId: asString(row['orderId']),
           days: asStrings(row['days']),
+          bookings: Object.freeze(
+            (Array.isArray(row['bookings']) ? (row['bookings'] as unknown[]) : []).map((raw) => {
+              const entry = asRecord(raw);
+              return Object.freeze({
+                kind: asString(entry['kind']) as ContractWeekBooking['kind'],
+                bankId: asString(entry['bankId']),
+                carId: asString(entry['carId']),
+                fromFraction: asNumber(entry['fromFraction']),
+                toFraction: asNumber(entry['toFraction']),
+                day: asNumber(entry['day']),
+              });
+            }),
+          ),
           verdicts: Object.freeze(
             Object.fromEntries(Object.entries(verdicts).map(([id, strings]) => [id, asStrings(strings)])),
           ),
@@ -184,6 +204,24 @@ export interface WeekDominanceReading {
   readonly unmeasuredBecause: string | undefined;
 }
 
+/** The bookings of a level that fall on `day`, without the day: what that day's census row was measured with. */
+export function bookingsOnDay(bookings: readonly ContractWeekBooking[], day: number): readonly ContractIncident[] {
+  return bookings
+    .filter((booking) => booking.day === day)
+    .map(({ kind, bankId, carId, fromFraction, toFraction }) => ({ kind, bankId, carId, fromFraction, toFraction }));
+}
+
+/** One spelling of a level's bookings, each with its day, so a row and a level match on what was booked. */
+export function levelBookingsKeyOf(bookings: readonly ContractWeekBooking[]): string {
+  return [1, 2, 3, 4, 5, 6, 7]
+    .map((day) => {
+      const key = bookingsKeyOf(bookingsOnDay(bookings, day));
+      return key === '' ? '' : `${String(day)}:${key}`;
+    })
+    .filter((key) => key !== '')
+    .join(';');
+}
+
 /** The weekend day ids week 1 draws, which an authored order does not move. */
 function weekendIdsOf(census: WeekWay): readonly string[] {
   return [6, 7].map((day) => drawWrinkle(WRINKLE_LIBRARY, day, day - 1, census.protocol.horizon).id);
@@ -209,13 +247,19 @@ export function weekDominanceOf(
   order: ContractWeekOrder,
   census: WeekWay = WEEK_WAY,
   dominance: WeekDominance = WEEK_DOMINANCE,
+  /*
+   * A week level's bookings (wave AO lane DS-1, § D1400; `shift/weekLevels.ts`): each booked day is
+   * read off its census row measured with that day's bookings, and the row read is the level's, the
+   * order and the bookings both matching. Empty for an order read as an order.
+   */
+  bookings: readonly ContractWeekBooking[] = [],
 ): WeekDominanceReading {
   const p = dominance.protocol;
   const n = p.heldOutCount;
   const atMost = Math.floor(p.oneProfileHoldsAtMost * n + 1e-9);
   const horizon = census.protocol.horizon;
   const countedOf = (day: number, eventId: string): boolean => {
-    const found = weekWayRowFor(contractId, day, eventId, horizon, census);
+    const found = weekWayRowFor(contractId, day, eventId, horizon, census, bookingsOnDay(bookings, day));
     return dayStakeReasonOf(found?.eventId === eventId ? found : undefined, census) === 'contested';
   };
   const weekdays = order.days.map((eventId, index) => (countedOf(index + 1, eventId) ? index + 1 : 0)).filter((day) => day > 0);
@@ -229,7 +273,8 @@ export function weekDominanceOf(
       entry.contractId === contractId &&
       entry.orderId === order.id &&
       entry.days.length === order.days.length &&
-      entry.days.every((id, index) => id === order.days[index]),
+      entry.days.every((id, index) => id === order.days[index]) &&
+      levelBookingsKeyOf(entry.bookings) === levelBookingsKeyOf(bookings),
   );
   const empty = (because: string): WeekDominanceReading => ({
     verdict: 'unmeasured',
@@ -297,6 +342,8 @@ export function weekDominanceIssues(
   orders: (contractId: string) => readonly ContractWeekOrder[] | undefined,
   shippedProfiles: readonly string[],
   census: WeekWay = WEEK_WAY,
+  /* The rung's authored week bookings (§ D1400): a row's bookings must be a level's, the first k of them. */
+  weekBookings: (contractId: string) => readonly ContractWeekBooking[] = (contractId) => ladderRowFor(contractId)?.weekBookings ?? [],
 ): readonly string[] {
   const issues: string[] = [];
   const p = dominance.protocol;
@@ -312,8 +359,16 @@ export function weekDominanceIssues(
   if (crowdDates(p.heldOutFrom, p.heldOutCount).length !== p.heldOutCount) issues.push('protocol crowds do not resolve');
   const seen = new Set<string>();
   for (const row of dominance.rows) {
-    const key = `${row.contractId}/${row.orderId}`;
+    const levelKey = levelBookingsKeyOf(row.bookings);
+    const key = `${row.contractId}/${row.orderId}${levelKey === '' ? '' : `+${levelKey}`}`;
     if (seen.has(key)) issues.push(`row ${key} is measured twice`);
+    if (row.bookings.length > 0) {
+      const authored = weekBookings(row.contractId);
+      const prefix = authored.slice(0, row.bookings.length);
+      if (prefix.length !== row.bookings.length || levelBookingsKeyOf(prefix) !== levelBookingsKeyOf(row.bookings)) {
+        issues.push(`row ${key} carries bookings that are not the first ${String(row.bookings.length)} the rung authors`);
+      }
+    }
     seen.add(key);
     const order = orders(row.contractId)?.find((entry) => entry.id === row.orderId);
     if (order === undefined) {
@@ -331,7 +386,14 @@ export function weekDominanceIssues(
     }
     const house = row.verdicts[census.protocol.standingOrder];
     row.days.forEach((eventId, index) => {
-      const found = weekWayRowFor(row.contractId, index + 1, eventId, census.protocol.horizon, census);
+      const found = weekWayRowFor(
+        row.contractId,
+        index + 1,
+        eventId,
+        census.protocol.horizon,
+        census,
+        bookingsOnDay(row.bookings, index + 1),
+      );
       if (house === undefined || found?.eventId !== eventId) return;
       if (house[index] !== found.standingVerdicts) {
         issues.push(`row ${key} day ${String(index + 1)}: the standing order's marks differ from the census row's`);
