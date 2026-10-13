@@ -182,7 +182,7 @@ import {
   EVERYDAY_RADII as R,
   EVERYDAY_TYPE as TYPE,
 } from './tokens.js';
-import type { EverydayState } from './types.js';
+import type { EverydayState, RunContext } from './types.js';
 import {
   playThisCrowdRefusalFor,
   watchStageBarOf,
@@ -1616,7 +1616,7 @@ function mountStage(
   /** Redraw the rows when the set due at the playhead changes, and at no other frame. */
   function drawCallRows(recording: VizRecording, simTimeS: number): void {
     const rows =
-      context.ctx === 'daily' && watchingNow() === undefined ? host.dayCallRowsAt(recording, simTimeS) : [];
+      dayCallsAskedIn(context.ctx) && watchingNow() === undefined ? host.dayCallRowsAt(recording, simTimeS) : [];
     const key = rows.map((row) => `${row.id}|${row.counts}|${row.note}`).join('\n');
     if (key === callRowsKey) return;
     callRowsKey = key;
@@ -2161,7 +2161,11 @@ function mountStage(
     | undefined {
     if (watchingNow() !== undefined) return undefined;
     if (stageCall !== undefined && !callAnswered) return { call: stageCall, raised: true, pinned: true };
-    if (context.ctx !== 'daily' || adopted === undefined || recomputingOver !== undefined) return undefined;
+    /*
+     * § D1408: a career day asks too, where its event makes it a day that asks; the host decides
+     * which career days those are (`everyday/careerCalls.ts`) and answers `undefined` for the rest.
+     */
+    if (!dayCallsAskedIn(context.ctx) || adopted === undefined || recomputingOver !== undefined) return undefined;
     /*
      * § D1204: once the pinned call is answered, the day asks on. The host opens the ordinary
      * session after it, searched from five minutes past it, and refuses it where the call was
@@ -4124,6 +4128,17 @@ export function stageEntryStartsARun(run: {
   readonly dayClosed: boolean;
 }): boolean {
   return !run.open && !run.dayClosed;
+}
+
+/**
+ * **The stage contexts that ask the day's calls** — the daily stage since § D1138, and a career day
+ * since wave AO, lane DS-2 ([§ D1408](../../../../DECISIONS.md)). Which career days ask is the host's
+ * (`everyday/careerCalls.ts#careerDayCallsOf`: a day with an event), so an ordinary career day still
+ * meets no card; a watch, a rush and a fix case never ask. Pure and exported for
+ * `stageScreen.test.ts`; its non-test callers are {@link mountStage}'s `activeCall` and its call rows.
+ */
+export function dayCallsAskedIn(ctx: RunContext): boolean {
+  return ctx === 'daily' || ctx === 'campaign';
 }
 
 /** One lane of § 7.4's strip: a caption, a dashed marker and your line. */

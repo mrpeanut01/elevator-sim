@@ -332,7 +332,10 @@ import { PRESS_DAY_DRIVER_HELD } from '../everyday/today.js';
 import { actsOf, wholeDayFor } from '../shift/dayLength.js';
 import { rushTutorialWorkedAnswerOf } from '../everyday/rushScreenModel.js';
 import { WORKED_ANSWER_COPY, type WorkedAnswerFacts, type WorkedAnswerView } from '../everyday/workedAnswer.js';
-import { WEEK_START_NEXT_LABEL, weekScreenViewOf } from '../everyday/weekView.js';
+import { WEEK_START_NEXT_LABEL, driverRecordLinesOf, weekScreenViewOf } from '../everyday/weekView.js';
+import { CAREER_MARK_WORDS, careerCloseLineOf, type CareerCloseInput } from '../everyday/careerCalls.js';
+import { CALL_BANDS, weekBandsLinesOf, type CallBandsCall } from '../shift/callBands.js';
+import { weekOrderFor } from '../shift/weekOrders.js';
 import { percentileLine, WORLD_FIGURES_ABSENT, WORLD_FIGURES_LABEL, WORLD_FIGURES_REASON } from '../everyday/world.js';
 import { weekdayOf, type GoalObservations } from '../shift/types.js';
 import { buildingView, CONTRACT_COPY, contractView, towersView, type BuildingFacts } from '../everyday/campaignModel.js';
@@ -15085,6 +15088,20 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     'shift/weekRecord.ts#weekRecordLineOf',
     /* Weeks held on this tower — lane AM-D, § D1253: the run's two arms, drawn on the sheet and the door. */
     'shift/weekRecord.ts#weeksHeldLineOf',
+    /*
+     * Wave AO, lane DR-2 (§ D1443): DC-13 on a week dealt from week 2, and this week's record with
+     * each driver, on Your week. Seeded in `seedWeekStake`: Midtown's week 2 from the shipped census,
+     * the passing arm over a synthetic row, and the record over the week played on the case's readings.
+     */
+    'shift/callBands.ts#weekBandsLinesOf',
+    'shift/callBands.ts#shareWordsOf',
+    'everyday/weekView.ts#driverRecordLinesOf',
+    /*
+     * Wave AO, lane DS-2 (§ D1409): the career report's account of the day, graded on the contract's
+     * tests. A career day is no corpus case's, so every arm is seeded by name in `seedCareerClose`.
+     */
+    'everyday/careerCalls.ts#careerCloseLineOf',
+    'everyday/careerCalls.ts#CAREER_MARK_WORDS',
     'everyday/continueWeek.ts#continueWeekEntryOf',
     'everyday/continueWeek.ts#CONTINUE_WEEK_TITLE',
     /* Lane AM-E (§ D1259): a held week's next tower, seeded in `seedWeekStake` for the same reason. */
@@ -15120,8 +15137,10 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
       bundle.observations,
       (buildingId) => context.buildings.find((building) => building.id === buildingId)?.name,
       clock,
+      (profileId) => context.dispatcherProfiles.profiles.find((profile) => profile.id === profileId)?.name,
     );
     seedDayClose(seeds, context, bundle);
+    seedCareerClose(seeds);
     seeds.push({ field: 'brief.wayThrough.heading', text: BRIEF_WAY_THROUGH_HEADING, role: 'label' });
     for (const row of WEEK_WAY.rows) {
       for (const eventId of [row.eventId, 'another-wrinkle']) {
@@ -18203,7 +18222,9 @@ function seedWeekStake(
   observations: Observations,
   nameOf: (buildingId: string) => string | undefined,
   clock?: BookingClock,
+  profileNameOf: (profileId: string) => string | undefined = () => undefined,
 ): void {
+  seedWeekBands(seeds, profileNameOf);
   seeds.push({ field: 'brief.week.heading', text: BRIEF_WEEK_HEADING, role: 'label' });
   seeds.push({ field: 'week.stake.short', text: WEEK_WITHOUT_COUNTED_DAYS_SHORT, role: 'reason' });
   seeds.push({ field: 'week.day.unmeasured', text: DAY_UNMEASURED_SENTENCE, role: 'reason' });
@@ -18396,6 +18417,107 @@ function seedWeekStake(
     ['running', { contractId: 'c2', closed: 3, met: 2, best: 5, held: 2 }],
   ] as const) {
     seeds.push({ field: `week.held.${arm}`, text: weeksHeldLineOf(record) ?? '', role: 'observation' });
+  }
+  /*
+   * § D1443: this week's record with each driver, over Midtown's weekdays closed on the case's own
+   * readings with a record each, Monday to Wednesday picked Fairness first and Thursday and Friday
+   * Predictive balanced (the week above keeps no record, so it would draw nothing).
+   */
+  let driven = openWeek('c2');
+  for (let day = 1; day <= 5; day += 1) {
+    const dayIdx = (day - 1) % 7;
+    driven = closeDay(
+      driven,
+      outcomeOf({
+        record: weekStakeRecord(day, day <= 3 ? 'fairness-first' : 'predictive-balanced'),
+        recordRefusal: null,
+        day,
+        dayIdx,
+        eventId: scheduledEventFor(null, day, dayIdx, 'whole-day').id,
+        arrived: observations.arrived,
+        carried: observations.carried,
+        minutePct: observations.minutePct,
+        readings: readGoals(goalsForDay(day), observations),
+      }),
+    );
+    if (day < 5) driven = nextDay(driven);
+  }
+  for (const [index, line] of driverRecordLinesOf(driven, profileNameOf).entries()) {
+    seeds.push({ field: `week.drivers.${String(index)}`, text: line, role: 'observation' });
+  }
+}
+
+/**
+ * **DC-13 on Your week** — wave AO, lane DR-2, § D1443. Midtown's week 2 from the shipped census, in
+ * whichever arm the pinned rows take, and the passing arm over a synthetic row (keep lost 4 of 9
+ * split calls, each switch on the card cleared 5 and 4), because the shipped week misses.
+ */
+function seedWeekBands(seeds: TextSeed[], profileNameOf: (profileId: string) => string | undefined): void {
+  const order = weekOrderFor({ contractId: 'c2', week: 2 });
+  for (const [index, line] of weekBandsLinesOf('c2', order, profileNameOf).entries()) {
+    seeds.push({ field: `week.bands.shipped.${String(index)}`, text: line, role: index === 0 ? 'prose' : 'observation' });
+  }
+  if (order === undefined) return;
+  const calls: CallBandsCall[] = Array.from({ length: 10 }, (_, k) => ({
+    crowd: 0,
+    day: 1,
+    atS: 0,
+    offered: ['predictive-balanced', 'capacity-aware'],
+    marks: {
+      keep: k < 4 ? 'm' : 'C',
+      'predictive-balanced': k < 6 ? 'C' : 'm',
+      'capacity-aware': k >= 5 ? 'C' : 'm',
+    },
+  }));
+  const passing = {
+    ...CALL_BANDS,
+    rows: [{ orderId: order.id, week: 2, briefDriver: 'fairness-first', days: order.days, dayMarks: [], calls }],
+  };
+  for (const [index, line] of weekBandsLinesOf('c2', order, profileNameOf, passing).entries()) {
+    seeds.push({ field: `week.bands.passing.${String(index)}`, text: line, role: 'observation' });
+  }
+}
+
+/**
+ * **The career report's account, every arm** — wave AO, lane DS-2, § D1409. The call line no call
+ * decided, then each of § D1351's arms on a career day as `everyday/careerCalls.ts#careerCloseLineOf`
+ * words them, from the runs each needs, for a day marked cleared and one marked missed.
+ */
+function seedCareerClose(seeds: TextSeed[]): void {
+  for (const [reads, words] of Object.entries(CAREER_MARK_WORDS)) {
+    seeds.push({ field: `career.close.mark.${reads}`, text: words, role: 'prose' });
+  }
+  for (const verdict of ['cleared', 'missed'] as const) {
+    const other = verdict === 'cleared' ? 'missed' : 'cleared';
+    const base: CareerCloseInput = {
+      verdict,
+      lead: { line: NO_CALL_DECIDED_LINE, decided: false },
+      need: 'run',
+      driverRun: undefined,
+      house: undefined,
+      houseName: 'Conventional collective',
+    };
+    const arms: readonly (readonly [string, Partial<CareerCloseInput>])[] = [
+      ['driver.pressed', { need: 'run', driverRun: other }],
+      ['driver.alone', { need: 'house', house: other }],
+      ['presses.swapped', { need: 'run', driverRun: verdict, house: other }],
+      ['presses.houseDrove', { need: 'same', house: other }],
+      ['nothing.both', { need: 'run', driverRun: verdict, house: verdict }],
+      ['nothing.alone', { need: 'house', house: verdict }],
+      ['pending.driverRun', { need: 'run' }],
+      ['pending.house.known', { need: 'run', driverRun: verdict }],
+      ['pending.house', { need: 'same' }],
+      ['unrun.driverRun', { need: 'run', driverRun: 'unrecorded' }],
+      ['unrun.house.known', { need: 'run', driverRun: verdict, house: 'unrecorded' }],
+      ['unrun.house', { need: 'same', house: 'unrecorded' }],
+      ['own', { need: 'own' }],
+    ];
+    for (const [arm, over] of arms) {
+      const line = careerCloseLineOf({ ...base, ...over });
+      if (line === undefined) continue;
+      const role = arm.startsWith('pending') || arm.startsWith('unrun') ? 'reason' : 'observation';
+      seeds.push({ field: `career.close.${verdict}.${arm}`, text: line, role });
+    }
   }
 }
 

@@ -1717,6 +1717,28 @@ week 4 is Midtown's top and its sheet says the tower deals no further week. The 
 11 and 10 of weeks 2, 3 and 4's 100 weekdays, a step of one crowd each, so no level is called
 harder.
 
+> **DC-13.** A week dealt from week 2 states on Your week whether it passes the call bands in play:
+> on census crowds 0, 5, 10 and 15, under each of the two profiles DC-11 shows holding the week on the
+> most crowds, with every who-drives call answered *keep* and every placement call *park*, among the
+> raised who-drives calls whose three runs split the day, *keep* is the losing answer on at least a
+> fifth and at most three fifths, every switch target on the card clears at least one in five, and no
+> answer on the card clears more than two thirds. A week that misses stays dealt and its sheet states
+> the miss with the census's counts. The bars, the target and the slope never move to meet it.
+
+**Why it exists** ([§ D1443](../DECISIONS.md), swarm DR's Q3, named DC-13 because swarm DS took
+DC-12). DC-11 asks whether one dropdown, left alone, holds a week. It cannot see the day with the
+calls in it: swarm DR's player member found that on `midtown-early-lift` a player on Predictive
+balanced who kept the driver lost only 3 of 18 split who-drives rows, so *keep* was nearly always
+safe, while switching to Predictive balanced cleared nearly every split row for a player on Fairness
+first. DC-13 measures the week where the player is. The bands and the offer list derived from the
+same rows are [§ D1441](../DECISIONS.md) and [§ D1442](../DECISIONS.md).
+
+**The protocol** (`data/call-bands.json`, read by `shift/callBands.ts`, run by
+`everyday/callBands.sweep.test.ts` and nightly as the `call-bands` job): every raised who-drives call
+with its pair and each answer's day verdict, and each offer candidate the card does not offer run from
+the same instant beside it. The nightly job requires the rows to be exactly the pinned ones, so a band
+that starts or stops holding arrives as a row that moved.
+
 ### 4.4 Day one, which is what #208 is governed by
 
 #208 asks that *"a new player sees a building visibly failing within 90 seconds of first load"*, and

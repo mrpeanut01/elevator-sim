@@ -323,6 +323,29 @@ export function weekDominanceOf(
   };
 }
 
+/**
+ * **The two profiles the screen shows holding an order's week on the most crowds**, in that order,
+ * the first in the protocol's profile order on a tie — wave AO, lane DR-2,
+ * [§ D1441](../../../../DECISIONS.md), swarm DR's S1: the drivers a player who read the census would
+ * pick, so the call bands (`callBands.ts`) are measured under them. Empty where the screen has not
+ * measured the order; no name is written anywhere.
+ */
+export function bandedProfilesOf(
+  contractId: string,
+  order: ContractWeekOrder,
+  census: WeekWay = WEEK_WAY,
+  dominance: WeekDominance = WEEK_DOMINANCE,
+): readonly string[] {
+  const holds = weekDominanceOf(contractId, order, census, dominance).holds;
+  return Object.freeze(
+    holds
+      .map((hold, index) => ({ hold, index }))
+      .sort((a, b) => b.hold.held - a.hold.held || a.index - b.index)
+      .slice(0, 2)
+      .map(({ hold }) => hold.profileId),
+  );
+}
+
 /* -------------------------------------------------------------------------- *
  * The shipped screen, checked
  * -------------------------------------------------------------------------- */

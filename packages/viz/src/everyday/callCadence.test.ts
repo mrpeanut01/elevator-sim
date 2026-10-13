@@ -17,7 +17,9 @@ import {
   CADENCE_TRAP_SHARE,
   cadenceMissesOf,
   cadenceOf,
+  countTrapNotesOf,
   lowestSharesOf,
+  verdictReadingOf,
   type CadenceCall,
   type CadenceDay,
 } from './callCadence.test-helper.js';
@@ -89,14 +91,14 @@ describe('the cadence floors — § D1338', () => {
   });
 });
 
-describe('the who-drives trap check — § D1337', () => {
+describe('the who-drives count check, published beside the floors since § D1440 — § D1337', () => {
   it('counts each answer lowest on a row, ties for every answer tied', () => {
     const { rows, shares } = lowestSharesOf([driverRow(1, 1, 5), driverRow(5, 1, 5), placementRow()], 'driver');
     expect(rows).toBe(2);
     expect(shares).toEqual({ 'driver-a': 0.5, 'driver-b': 1, leave: 0 });
   });
 
-  it('refuses an answer lowest on under a tenth of the rows, as the house was, and one lowest on over three fifths', () => {
+  it('names an answer lowest on under a tenth of the rows, as the house was, and one lowest on over three fifths, without gating on it', () => {
     /* The house as the switch target: swarm DQ found it lowest on 3 of 69 rows. */
     const houseTrap = [
       ...Array.from({ length: 3 }, () => driverRow(1, 5, 5)),
@@ -105,7 +107,9 @@ describe('the who-drives trap check — § D1337', () => {
     ];
     const trap = cadenceOf([{ ...week(0, [4], 1)[0]!, calls: houseTrap }]);
     expect(trap.driver.shares['driver-a']).toBeLessThan(CADENCE_TRAP_SHARE);
-    expect(cadenceMissesOf(trap).some((miss) => miss.startsWith('who drives: driver-a was lowest on 4.3 %'))).toBe(true);
+    expect(countTrapNotesOf(trap).some((note) => note.startsWith('who drives: driver-a was lowest on 4.3 %'))).toBe(true);
+    /* § D1440: the gate is the day's verdict now (`shift/callBands.ts`), so the count misses no floor. */
+    expect(cadenceMissesOf(trap).some((miss) => miss.startsWith('who drives'))).toBe(false);
     const formula = [
       ...Array.from({ length: 7 }, () => driverRow(1, 5, 5)),
       ...Array.from({ length: 2 }, () => driverRow(5, 1, 5)),
@@ -113,6 +117,19 @@ describe('the who-drives trap check — § D1337', () => {
     ];
     const summary = cadenceOf([{ ...week(0, [4], 1)[0]!, calls: formula }]);
     expect(summary.driver.shares['driver-a']).toBeGreaterThan(CADENCE_FORMULA_SHARE);
-    expect(cadenceMissesOf(summary).some((miss) => miss.startsWith('who drives: driver-a was lowest on 70.0 %'))).toBe(true);
+    expect(countTrapNotesOf(summary).some((note) => note.startsWith('who drives: driver-a was lowest on 70.0 %'))).toBe(true);
+    expect(cadenceMissesOf(summary).some((miss) => miss.startsWith('who drives'))).toBe(false);
+  });
+
+  it('reads who-drives rows on the day’s verdict: rows, the rows that split, and the splits keep lost', () => {
+    const graded = (keep: boolean, a: boolean, b: boolean): CadenceCall => ({
+      ...driverRow(1, 2, 3),
+      clears: { leave: keep, 'driver-a': a, 'driver-b': b },
+    });
+    expect(verdictReadingOf([graded(true, true, true), graded(false, true, true), graded(true, false, true), placementRow()])).toEqual({
+      rows: 3,
+      split: 2,
+      keepLoses: 1,
+    });
   });
 });

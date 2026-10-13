@@ -87,6 +87,7 @@ import {
 import { WAIT_BANDS } from '../live/bands.js';
 
 import type { BookedOutCar } from './bookedOut.js';
+import { CALL_BANDS, driverOfferOf } from './callBands.js';
 import { PRESS_CALL_SKIPPED_WHAT } from './callRow.js';
 import type { DayAct } from './dayLength.js';
 import { firstMinuteWaitIn, type PressCall, type PressCallRule } from './pressCall.js';
@@ -257,37 +258,26 @@ export type DayCallTriple<T> = Readonly<Partial<Record<DayCallAnswer, T>>>;
 /**
  * **The dispatchers the driver question may offer, in the order the pair is taken** —
  * [§ D1167](../../../../DECISIONS.md), the decide-al ruling's *a fixed pair per tower*, with the
- * house taken out by wave AN, lane DQ-1, [§ D1337](../../../../DECISIONS.md).
+ * house taken out by wave AN, lane DQ-1, [§ D1337](../../../../DECISIONS.md), and **derived from the
+ * census since wave AO, lane DR-2**, [§ D1442](../../../../DECISIONS.md).
  *
- * § D1167's list was Conventional collective, Minimum estimated wait and Fairness first. Swarm DQ
- * found what that did to a player on a good driver: the pair was the house and Minimum estimated
- * wait, the house's ten-minute count was lowest on 3 of 69 such rows, and 27 of the 32 rows that
- * split the day read *the house loses*, so the question taught *never hand it back* by Tuesday and
- * stopped being a choice. So the house (`shift/weekStake.ts#houseStandingOrder`, Conventional
- * collective) is on this list no more, and **a switch target is always a contender**: the
- * conventional-panel drivers the week census and swarm DQ's player member found clearing nearly every
- * Midtown day left alone. A player on the house still meets it, as *keep*.
- *
- * **Minimum estimated wait is last, and that is measured.** With it second, a player on Fairness
- * first was offered it beside Predictive balanced, and on the careful policy's first census crowd
- * its ten-minute count was lowest on 12 of the 18 who-drives rows (66.7 %): a formula, because the
- * ten-minute count is what that driver chases. With Energy aware in its place, over the first four
- * census crowds' week 1, the 68 rows were lowest under Predictive balanced on 22.1 %, Energy aware
- * on 36.8 % and *keep* on 55.9 % (ties counted for each). The auction is not here because a
- * handover cannot reach it from a central driver (`live/interventions.ts#switchRefusalOf`).
+ * § D1337 wrote the list here: Fairness first, Predictive balanced, Energy aware and Minimum
+ * estimated wait, gated by a check on the row's ten-minute counts. Swarm DR measured what that list
+ * did on the day's verdict: offered to a player on Predictive balanced, Energy aware cleared 2 of the
+ * 18 who-drives rows whose answers split the day (S1), and it was the day-safe side on 1 of 21
+ * danger instants (S2), so the card offered a trap. So the list is no longer written in code: it is
+ * `callBands.ts#driverOfferOf` over `data/call-bands.json`, the candidates in the census's order
+ * less every one that clears the day on under one split row in five where it was measured. A
+ * candidate the census has not placed keeps its place. The house is not a candidate, so a switch
+ * target is still always a contender, and a player on the house still meets it as *keep*.
  *
  * A tower's pair is the first two of these that differ from the one driving and that a handover can
  * reach ({@link dayCallDriversOf}), so it is fixed from who is driving and never chosen by which
- * answer clears. Gated by `everyday/callCadence.sweep.test.ts`: on the careful policy's census week,
- * no answer has the lowest count on under a tenth or over three fifths of the driver rows.
- * Owner-reversible: it is this list.
+ * answer clears on the day being played. `everyday/callBands.sweep.test.ts` re-measures the census
+ * nightly and requires the rows this is derived from. Owner-reversible: the census's candidates and
+ * their order, and the floor.
  */
-export const DAY_CALL_DRIVER_OFFER: readonly string[] = Object.freeze([
-  'fairness-first',
-  'predictive-balanced',
-  'energy-aware',
-  'eta',
-]);
+export const DAY_CALL_DRIVER_OFFER: readonly string[] = driverOfferOf(CALL_BANDS);
 
 /**
  * **A tower's driver pair for one day** — the first two of {@link DAY_CALL_DRIVER_OFFER} that a

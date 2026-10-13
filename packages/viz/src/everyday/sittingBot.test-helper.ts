@@ -38,7 +38,7 @@
  * A test helper rather than a production module: nothing the player runs needs it.
  */
 
-import type { RunInterventionConfig } from '@elevator-sim/core/browser';
+import type { DispatcherProfile, RunInterventionConfig } from '@elevator-sim/core/browser';
 
 import type { VizRecording } from '../contract/types.js';
 import type { BrowserResources } from '../dev/data.js';
@@ -51,6 +51,7 @@ import {
   shiftRunConfigOf,
   type ViewerState,
 } from '../dev/state.js';
+import { switchRefusalOf } from '../live/interventions.js';
 import { observationsAt } from '../live/observations.js';
 import { recordRun } from '../record/recordRun.js';
 import { scheduledEventFor } from '../shift/calendar.js';
@@ -110,6 +111,20 @@ export interface PlayedCall {
   readonly counts: Readonly<Partial<Record<DayCallAnswer, number>>>;
   /** Each answer's run, graded with the day's goals: `true` cleared. Empty on a pinned call. */
   readonly clears: Readonly<Partial<Record<DayCallAnswer, boolean>>>;
+  /**
+   * **A who-drives call's pair, by profile id** — `driver-a` then `driver-b`, as
+   * `shift/dayCalls.ts#dayCallDriversOf` took it from whoever drove at the call. Absent on a
+   * placement or pinned call.
+   */
+  readonly pair?: readonly [string, string] | undefined;
+  /**
+   * **Every shadow driver's run from the call, graded** — wave AO, lane DR-2,
+   * [§ D1441](../../../../DECISIONS.md): for each id in {@link ScoredDayInput.shadowDrivers} that a
+   * handover from whoever drove can reach, the day handed to it at the call second, with every press
+   * before the call and nothing after, `true` cleared. A pair member reads its own run. Absent unless
+   * the caller asked for shadows; a who-drives call only.
+   */
+  readonly shadow?: Readonly<Record<string, boolean>> | undefined;
 }
 
 /** Whether a call's three runs split the day's verdict. */
@@ -174,6 +189,13 @@ export interface ScoredDayInput {
   readonly policy: SittingPolicy;
   /** Fields written over the day after the week, for an instrument's variant. */
   readonly over?: Partial<ViewerState>;
+  /**
+   * **Profiles to run as switch targets at every raised who-drives call**, beside the pair the card
+   * offers — the call bands' census ([§ D1441](../../../../DECISIONS.md)) measures each offer
+   * candidate on the rows a player actually meets, whether or not today's list offers it. Costs one
+   * whole-day run per candidate per such call, a pair member none.
+   */
+  readonly shadowDrivers?: readonly string[];
 }
 
 function run(plan: ReturnType<typeof shiftRunConfigOf>): VizRecording {
@@ -200,7 +222,15 @@ export function playScoredDay(input: ScoredDayInput): PlayedDay {
     opened = openWith(pinnedOrder);
   }
   const state: ViewerState = opened.state;
-  const wrinkle = scheduledEventFor(state.calendar, state.week.day, state.week.dayIdx, opened.horizon).id;
+  /* The week and a mode's own event, as the run is built from them: week 2 deals its order (§ D1252). */
+  const wrinkle = scheduledEventFor(
+    state.calendar,
+    state.week.day,
+    state.week.dayIdx,
+    opened.horizon,
+    state.week,
+    state.campaignEventId,
+  ).id;
   const goals = shiftGoalsOf(state, resources);
   const gradeClears = (observations: Observations | undefined): boolean | undefined =>
     observations === undefined ? undefined : failingGoalsOf(goals, observations).length === 0;
@@ -224,6 +254,28 @@ export function playScoredDay(input: ScoredDayInput): PlayedDay {
   const driverAnswer = (): DayCallAnswer =>
     policy.driver === 'rotate' ? DRIVER_ROTATION[drivers++ % DRIVER_ROTATION.length]! : policy.driver;
 
+  /* § D1441: who drives as the calls are answered, and each who-drives call's pair and shadows. */
+  const profiles = resources.dispatcherProfiles.profiles;
+  let drivingNow = drivingProfileOf(resources, state);
+  const pairs = new Map<number, readonly [string, string]>();
+  const shadows = new Map<number, Readonly<Record<string, boolean>>>();
+  const shadowOf = (atS: number, pair: readonly [DispatcherProfile, DispatcherProfile]): Readonly<Record<string, boolean>> => {
+    const marks: Record<string, boolean> = {};
+    for (const id of input.shadowDrivers ?? []) {
+      const target = profiles.find((profile) => profile.id === id);
+      if (target === undefined || target.id === drivingNow.id || pair.some((member) => member.id === id)) continue;
+      if (switchRefusalOf(target, drivingNow) !== undefined) continue;
+      const handed = run(
+        shiftRunConfigOf(resources, {
+          ...state,
+          interventions: [...log, { atS, change: { kind: 'adopt-dispatcher', profile: target } }],
+        }),
+      );
+      marks[id] = gradeClears(wholeRunOf(handed)) === true;
+    }
+    return Object.freeze(marks);
+  };
+
   let pinnedCall: ReturnType<typeof pressDayCallOf> = undefined;
   if (status === 'pinned') {
     pinnedCall = pressDayCallOf(resources, state, built);
@@ -238,8 +290,8 @@ export function playScoredDay(input: ScoredDayInput): PlayedDay {
     }
   }
   if ((status === 'called' || (status === 'pinned' && pinnedCall !== undefined)) && facts !== undefined) {
-    const driving = drivingProfileOf(resources, state);
-    const pair = dayCallDriversOf(resources.dispatcherProfiles.profiles, driving);
+    const driving = drivingNow;
+    const pair = dayCallDriversOf(profiles, driving);
     const session = openDayCallSession(
       {
         planWith: (extra) => {
@@ -266,9 +318,17 @@ export function playScoredDay(input: ScoredDayInput): PlayedDay {
     for (let raised = session.onStage(); raised?.raised === true; raised = session.onStage()) {
       const question = raised.question ?? 'placement';
       const answer = question === 'driver' ? driverAnswer() : placementAnswer();
+      if (question === 'driver') {
+        const nowPair = dayCallDriversOf(profiles, drivingNow);
+        if (nowPair !== undefined) {
+          pairs.set(raised.call.atS, Object.freeze([nowPair[0].id, nowPair[1].id] as const));
+          if (input.shadowDrivers !== undefined) shadows.set(raised.call.atS, shadowOf(raised.call.atS, nowPair));
+        }
+      }
       session.answer(answer, (adoption) => {
         log = [...log, adoption.entry];
         ended = adoption.recording;
+        if (adoption.entry.change.kind === 'adopt-dispatcher') drivingNow = adoption.entry.change.profile;
       });
     }
     const records = session.records();
@@ -279,12 +339,16 @@ export function playScoredDay(input: ScoredDayInput): PlayedDay {
         const cleared = gradeClears(record.observations[answer]);
         if (cleared !== undefined) clears[answer] = cleared;
       }
+      const pairIds = question === 'driver' ? pairs.get(record.atS) : undefined;
+      const shadow = question === 'driver' ? shadows.get(record.atS) : undefined;
       calls.push({
         atS: record.atS,
         question,
         answer: record.answer === 'skipped' ? 'leave' : record.answer,
         counts: record.counts,
         clears,
+        ...(pairIds === undefined ? {} : { pair: pairIds }),
+        ...(shadow === undefined ? {} : { shadow }),
       });
     }
     session.close();

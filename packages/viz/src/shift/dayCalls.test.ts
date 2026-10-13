@@ -12,6 +12,7 @@ import { describe, expect, it } from 'vitest';
 import type { VizLeg } from '../contract/types.js';
 
 import type { BookedOutCar } from './bookedOut.js';
+import { CALL_BANDS, driverOfferOf } from './callBands.js';
 import {
   DAY_CALL_ANSWERS,
   DAY_CALL_DRIVER_ANSWERS,
@@ -427,16 +428,19 @@ describe('the driver question', () => {
     return profile;
   };
 
-  it('offers the first two of Fairness first, Predictive balanced, Energy aware and Minimum estimated wait that are not driving — § D1337', () => {
-    expect(DAY_CALL_DRIVER_OFFER).toEqual(['fairness-first', 'predictive-balanced', 'energy-aware', 'eta']);
-    expect(dayCallDriversOf(profiles, byId('collective'))?.map((profile) => profile.id)).toEqual([
-      'fairness-first',
-      'predictive-balanced',
-    ]);
-    expect(dayCallDriversOf(profiles, byId('eta'))?.map((profile) => profile.id)).toEqual(['fairness-first', 'predictive-balanced']);
+  it('offers the first two of the census’s offer list that are not driving — § D1337, derived since § D1442', () => {
+    /* The list is the census's (`data/call-bands.json`), never names written in code. */
+    expect(DAY_CALL_DRIVER_OFFER).toEqual(driverOfferOf(CALL_BANDS));
+    const firstTwo = (driving: string): readonly string[] =>
+      DAY_CALL_DRIVER_OFFER.filter((id) => id !== driving).slice(0, 2);
+    for (const driving of ['collective', 'eta', 'fairness-first', 'predictive-balanced']) {
+      expect(dayCallDriversOf(profiles, byId(driving))?.map((profile) => profile.id), driving).toEqual(firstTwo(driving));
+    }
+    /* Today's census: Energy aware is under the floor and Capacity aware takes its place (§ D1442). */
+    expect(DAY_CALL_DRIVER_OFFER.slice(0, 3)).toEqual(['fairness-first', 'predictive-balanced', 'capacity-aware']);
     expect(dayCallDriversOf(profiles, byId('predictive-balanced'))?.map((profile) => profile.id)).toEqual([
       'fairness-first',
-      'energy-aware',
+      'capacity-aware',
     ]);
   });
 
@@ -446,7 +450,7 @@ describe('the driver question', () => {
     /* Red before § D1337: a player on Fairness first was offered the house and Minimum estimated wait. */
     expect(dayCallDriversOf(profiles, byId('fairness-first'))?.map((profile) => profile.id)).toEqual([
       'predictive-balanced',
-      'energy-aware',
+      'capacity-aware',
     ]);
     for (const driving of profiles) {
       const pair = dayCallDriversOf(profiles, driving);

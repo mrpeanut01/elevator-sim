@@ -253,6 +253,7 @@ import {
 import { goalsForDay, readGoals } from '../shift/goals.js';
 import { shiftObservationsOf } from '../shift/observations.js';
 import type { DayAttempt } from '../shift/attempt.js';
+import { decidingCallOf } from '../shift/dayClose.js';
 import { clockOf, type ShapedDayReport } from '../shift/report.js';
 import type { TomorrowBriefing } from '../shift/tomorrow.js';
 import {
@@ -261,14 +262,16 @@ import {
   type DayOutcome,
   type GoalObservations,
   type GoalReading,
+  type Observations,
   type RunHorizon,
   type ScenarioContract,
   type WeekState,
 } from '../shift/types.js';
-import { nextDay, rollWeek } from '../shift/week.js';
+import { nextDay, rollWeek, wasGraded } from '../shift/week.js';
 import {
   countedCleanOf,
   dayCountsToward,
+  houseStandingOrder,
   weekAsksOf,
   weekClosedByThisClose,
   weekHasClosed,
@@ -322,7 +325,16 @@ import {
   type SandboxPresses,
 } from './sandbox.js';
 
-import { campaignDayVerdict, campaignTestRows, type FiledDayRecord } from './campaignModel.js';
+import { campaignDayVerdict, campaignTestGoals, campaignTestRows, type FiledDayRecord } from './campaignModel.js';
+import {
+  CAREER_MARK_WORDS,
+  careerCloseLineOf,
+  careerCloseRunStatesOf,
+  careerDayCallsOf,
+  careerRunNeedOf,
+  type CareerCloseInput,
+  type CareerDayCalls,
+} from './careerCalls.js';
 
 /**
  * What a read of today's board came back with — four states, because a screen that collapses them
@@ -1567,6 +1579,14 @@ export interface EverydayHost {
    * **Optional** on {@link runFailure}'s ground.
    */
   campaignFiledDays?(): ReadonlyMap<string, FiledDayRecord>;
+  /**
+   * **The career report's account of the day just filed** — wave AO, lane DS-2,
+   * [§ D1409](../../../../DECISIONS.md): the call line graded on the contract's tests, and after it
+   * what decided the day where no call did ([§ D1351](../../../../DECISIONS.md)'s arms, from one or
+   * two more runs at the close). `undefined` on every run that is not the career day this host
+   * filed last, and on a day nothing graded.
+   */
+  careerCloseLine?(): string | undefined;
 
   /**
    * **The runs a census of a tower's next career day takes** — GitHub issue #571's Career half,
@@ -2520,9 +2540,12 @@ export interface EverydayHostBindings {
   abandonDay?(): void;
   /**
    * § D1138 — `dev/main.ts#dayCallOnStage`. Optional: a host with no calls answers `undefined`.
-   * `pinnedCall` is a pinned day's answered call, after which that day asks on (§ D1204).
+   * `pinnedCall` is a pinned day's answered call, after which that day asks on (§ D1204). `career`
+   * is a career day's calls, where its event makes it a day that asks
+   * (`everyday/careerCalls.ts#careerDayCallsOf`, [§ D1408](../../../../DECISIONS.md)); without it a
+   * career day asks nothing.
    */
-  dayCallOnStage?(recording: VizRecording, pinnedCall?: PressCall): DayCallOnStage | undefined;
+  dayCallOnStage?(recording: VizRecording, pinnedCall?: PressCall, career?: CareerDayCalls): DayCallOnStage | undefined;
   /** § D1138 — `dev/main.ts#answerDayCall`. */
   answerDayCall?(answer: DayCallAnswer): void;
   /** § D1138 — the session's skip, then a re-render. */
@@ -3671,6 +3694,86 @@ export function createEverydayHost(
     });
   };
 
+  /**
+   * § D1409: the account of the career day filed last, keyed by its run, and the runs it waits on.
+   * Host-scoped like the career: it is a fact about a filed day, not about the run standing.
+   */
+  let careerClose: (CareerCloseInput & { readonly runId: string }) | undefined;
+
+  /**
+   * **Start the career report's account of a day just filed** — § D1409. The call line is
+   * `shift/dayClose.ts#decidingCallOf` over the day's calls, graded on the contract's tests; where
+   * no call decided the day, the house (the house's driver, nothing pressed) and, where the player's
+   * own standing order drove with presses, the driver run are made from the day's own state and
+   * graded the same way. The runs go one after the other through the shell's off-thread runner, and
+   * the line says *still being run* until they answer.
+   */
+  function startCareerClose(tower: CampaignTower, recording: VizRecording, verdict: 'cleared' | 'missed'): void {
+    const state = b.state();
+    const difficulty = DIFFICULTIES[tower.difficultyId];
+    const goals = campaignTestGoals(difficulty);
+    const grade = (observations: Observations): 'cleared' | 'missed' | 'ungraded' => {
+      const readings = readGoals(goals, observations);
+      return !wasGraded(readings) ? 'ungraded' : readings.every((reading) => reading.state === 'met') ? 'cleared' : 'missed';
+    };
+    const lead = decidingCallOf({
+      verdict,
+      records: b.dayCallRecordsOn?.(recording) ?? [],
+      verdictOf: grade,
+      lineOf: (reads) => (reads === 'ungraded' ? 'a day too quiet to grade' : CAREER_MARK_WORDS[reads]),
+      clockOf: (simTimeS) => clockOf(simTimeS, b.dayStartS() ?? undefined),
+    });
+    const house = houseStandingOrder();
+    const need = careerRunNeedOf({
+      dispatcherId: state.dispatcherId,
+      ruleRows: state.ruleRows.length,
+      presses: state.interventions.length,
+      house,
+    });
+    const houseName =
+      allDispatchers(b.resources, state.savedDispatchers).find((profile) => profile.id === house)?.name ?? house;
+    const runId = recording.runId;
+    careerClose = { runId, verdict, lead, need, driverRun: undefined, house: undefined, houseName };
+    if (lead === undefined || lead.decided || need === 'own') return;
+    const runs = careerCloseRunStatesOf(state, house);
+    const land = (which: 'driverRun' | 'house', reading: HouseReading): void => {
+      if (careerClose?.runId !== runId) return;
+      careerClose = { ...careerClose, [which]: reading };
+      notifyCampaign();
+    };
+    const ask = (which: 'driverRun' | 'house', day: ViewerState, then?: () => void): void => {
+      let plan: ReturnType<typeof shiftRunConfigOf>;
+      try {
+        plan = shiftRunConfigOf(b.resources, day);
+      } catch {
+        land(which, 'unrecorded');
+        then?.();
+        return;
+      }
+      /* The account never stands in the close's way: a runner that throws is a run that could not be made. */
+      try {
+        b.simulateRecord(
+          plan.config,
+          (ran) => {
+            land(which, grade(shiftObservationsOf(observationsAt(ran, ran.endedAt))));
+            then?.();
+          },
+          () => {
+            land(which, 'unrecorded');
+            then?.();
+          },
+          plan.outOfServiceCarIds,
+        );
+      } catch {
+        land(which, 'unrecorded');
+        then?.();
+      }
+    };
+    /* One after the other: the shell's runner answers its latest ask, so two at once would lose one. */
+    if (need === 'run') ask('driverRun', runs.driverRun, () => ask('house', runs.house));
+    else ask('house', runs.house);
+  }
+
   /** {@link EverydayHost.campaignDay}, as a local so `answerIncident` reads the same fold. */
   const campaignDayFacts = (): CampaignDayFacts | undefined => {
     const towerId = campaignDayTowerId;
@@ -4278,6 +4381,8 @@ export function createEverydayHost(
        */
       careerFiled.set(towerId, { towerId, day: tower.day, verdict, recording });
       setCareer(next);
+      /* § D1409: the report's account of the day, from the day's calls and one or two more runs. */
+      startCareerClose(tower, recording, verdict);
       notifyCampaign();
       /*
        * **And the ledger hears about it** — GitHub issue #368. `data/chime-ledger.json`'s
@@ -4596,6 +4701,11 @@ export function createEverydayHost(
     },
     campaignHistory: (towerId) => careerWeeks.get(towerId)?.history ?? [],
     campaignFiledDays: () => careerFiled,
+    careerCloseLine: () => {
+      const close = careerClose;
+      if (close === undefined || b.state().recording?.runId !== close.runId) return undefined;
+      return careerCloseLineOf(close);
+    },
     careerDayCensusRuns: (towerId) => {
       const tower = towerById(career, towerId);
       if (tower === undefined) return undefined;
@@ -5169,7 +5279,17 @@ export function createEverydayHost(
       return undefined;
     },
     pressCallOnStage: (recording) => pressDayCallOf(b.resources, b.state(), recording)?.call,
-    dayCallOnStage: (recording, pinnedCall) => b.dayCallOnStage?.(recording, pinnedCall),
+    /*
+     * § D1408: a career day with an event asks the Scenario day's calls, graded on the contract's
+     * tests; an ordinary career day, and every day this host did not start for a tower, hands in
+     * nothing, so `dev/main.ts` asks nothing of it.
+     */
+    dayCallOnStage: (recording, pinnedCall) => {
+      const towerId = campaignDayTowerId;
+      const asks =
+        towerId === undefined ? undefined : careerDayCallsOf(towerById(career, towerId), b.state().campaignEventId);
+      return b.dayCallOnStage?.(recording, pinnedCall, asks);
+    },
     answerDayCall: (answer) => {
       b.answerDayCall?.(answer);
     },

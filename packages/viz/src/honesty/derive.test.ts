@@ -2114,9 +2114,9 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'function’s adapters sweep. What a player reads about an ordinary call is the stage card ' +
         '(`everyday/stageCall.ts`, seeded by name) and the report row (`shift/dayCalls.ts#dayCallRowOf`, ' +
         'seeded by the report adapter). Wave AK (§ D1166 to § D1168) adds more of the same kind: ' +
-        '`DAY_CALL_DRIVER_ANSWERS` and `dayCallAnswersOf` are answer ids, `DAY_CALL_DRIVER_OFFER` is ' +
-        'profile ids (four since § D1337) and `dayCallDriversOf` returns profiles, whose names reach a player only ' +
-        'through the card and the row; `dayCallChangeOf` returns an intervention, ' +
+        '`DAY_CALL_DRIVER_ANSWERS` and `dayCallAnswersOf` are answer ids (`DAY_CALL_DRIVER_OFFER` and ' +
+        '`dayCallDriversOf` left this list in wave AO, lane DR-2, § D1442, when the offer came to be derived ' +
+        'from `data/call-bands.json` and no literal stayed in either); `dayCallChangeOf` returns an intervention, ' +
         '`DAY_CALL_FINAL_GOAL_IDS` is two goal ids, `dayCallLostGoalOf` returns a reading, and ' +
         '`DAY_ENDED_EARLY_ROW_ID` is a row id. `dayCallAdmits` left this list when it stopped ' +
         'reading `DAY_CALL_ANSWERS`.' +
@@ -2133,8 +2133,6 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'shift/dayCalls.ts#DAY_CALL_ANSWERS',
         'shift/dayCalls.ts#DAY_CALL_DRIVER_ANSWERS',
         'shift/dayCalls.ts#dayCallAnswersOf',
-        'shift/dayCalls.ts#DAY_CALL_DRIVER_OFFER',
-        'shift/dayCalls.ts#dayCallDriversOf',
         'shift/dayCalls.ts#dayCallChangeOf',
         'shift/dayCalls.ts#DAY_CALL_FINAL_GOAL_IDS',
         'shift/dayCalls.ts#dayCallLostGoalOf',
@@ -2145,6 +2143,29 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'dev/state.ts#dayCallFactsOf',
         'dev/state.ts#dayCallsOpenOn',
         'dev/dayCallSession.ts#openDayCallSession',
+      ],
+    },
+    {
+      reason:
+        'The call bands’ census and the career’s close, plumbing only — wave AO, lanes DR-2 and DS-2, ' +
+        '§ D1441 to § D1443 and § D1409. `shift/callBands.ts#CALL_BANDS` and `parseCallBands` are ' +
+        '`data/call-bands.json` parsed, derived only because a placement id is a literal; ' +
+        '`callBandsIssues` is `weekDominanceIssues`’ twin, content-author refusals that `dev/data.ts` ' +
+        'folds into warnings and `callBands.test.ts` turns into a failing test; `callBandsReadingOf` ' +
+        'returns counts and the sweep’s own summary lines, which the nightly job writes to a file and ' +
+        'no screen draws; `driverOfferOf` returns profile ids. `shift/weekDominance.ts#bandedProfilesOf` ' +
+        'returns two profile ids, derived only through `weekDominanceOf`’s unmeasured clause. ' +
+        '`everyday/careerCalls.ts#careerDeciderOf` returns one of § D1351’s arms as data, whose words ' +
+        'are `careerCloseLineOf`’s, seeded arm by arm. What a player reads of the census is ' +
+        '`weekBandsLinesOf`, seeded in `seedWeekBands`.',
+      ids: [
+        'shift/callBands.ts#CALL_BANDS',
+        'shift/callBands.ts#parseCallBands',
+        'shift/callBands.ts#callBandsIssues',
+        'shift/callBands.ts#callBandsReadingOf',
+        'shift/callBands.ts#driverOfferOf',
+        'shift/weekDominance.ts#bandedProfilesOf',
+        'everyday/careerCalls.ts#careerDeciderOf',
       ],
     },
     {

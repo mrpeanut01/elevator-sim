@@ -359,6 +359,7 @@ on:
           - fixit-route-census
           - week-census
           - call-cadence
+          - call-bands
           - honesty-deep
           - corpus-figures
           - benchmark
@@ -820,12 +821,13 @@ jobs:
         run: npx vitest run --passWithNoTests=false --project viz --testTimeout=10800000 src/shift/weekWay.verify.test.ts
 
   # ---------------------------------------------------------------------------
-  # The careful day's call cadence — DECISIONS.md § D1338, with the who-drives trap check that gates
-  # § D1337. Midtown's week 1 on the first four census crowds, played through the shipped call
-  # session under the careful policy, held to floors written before the run: a median of four calls
-  # a day, no weekday without one, an evening call on three of each week's five, and no who-drives
-  # answer lowest on under a tenth or over three fifths of the rows. The post-AM panel's cadence was
-  # a stale bundle's (§ D1317); this is what keeps the correct build's figures from slipping unseen.
+  # The careful day's call cadence — DECISIONS.md § D1338. Midtown's week 1 on census crowds 0, 5,
+  # 10 and 15 since § D1440 (the first four were the census's easy end), played through the shipped
+  # call session under the careful policy, held to floors written before the run: a median of four
+  # calls a day, no weekday without one, an evening call on three of each week's five. § D1337's
+  # count check on the who-drives answers is published beside them and no longer gates; the gate on
+  # who drives is the day's verdict, in `call-bands` below. The post-AM panel's cadence was a stale
+  # bundle's (§ D1317); this is what keeps the correct build's figures from slipping unseen.
   #
   # A gate of its own (`CALL_CADENCE_SWEEP`), on this file's argument for one job per tier. About
   # 70 s a day on the lane's contended container, twenty days; the minutes below are a ceiling.
@@ -846,6 +848,36 @@ jobs:
         env:
           CALL_CADENCE_SWEEP: '1'
         run: npx vitest run --passWithNoTests=false --project viz --testTimeout=5400000 src/everyday/callCadence.sweep.test.ts
+
+  # ---------------------------------------------------------------------------
+  # Keep can be wrong, on the day's verdict — DECISIONS.md § D1441 to § D1443 (swarm DR's Q2). Every
+  # week order Midtown deals from week 2, on census crowds 0, 5, 10 and 15, under each of the two
+  # profiles DC-11 shows holding that week most, played through the shipped call session with the
+  # careful answers, and every offer candidate run beside the card at each who-drives call. The rows
+  # must be exactly `data/call-bands.json`'s: the keep band, the switch floor, the answer ceiling,
+  # the offer list and the week sheet's DC-13 line are all arithmetic over them
+  # (`shift/callBands.ts`, held on every run by `callBands.test.ts`), so a band that starts or stops
+  # holding arrives here as a row that moved. A miss is a finding for a ruling, never a moved band.
+  #
+  # A gate of its own (`CALL_BANDS_SWEEP`). Measured at 20 to 27 minutes a profile on the lane's
+  # contended four-core container; the minutes below are a ceiling.
+  # ---------------------------------------------------------------------------
+  call-bands:
+    name: calls — keep, the switch targets and the offer list on the day's verdict
+    if: github.event_name == 'schedule' || inputs.tiers == 'all' || inputs.tiers == 'call-bands'
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '26'
+          cache: npm
+      - run: npm ci
+      - name: Play every dealt week's careful line under its two strongest profiles and match the pinned rows
+        env:
+          CALL_BANDS_SWEEP: '1'
+        run: npx vitest run --passWithNoTests=false --project viz --testTimeout=9000000 src/everyday/callBands.sweep.test.ts
 
   honesty-deep:
     name: honesty — the deep corpus
@@ -1208,6 +1240,7 @@ jobs:
       - fixit-route-census
       - week-census
       - call-cadence
+      - call-bands
       - corpus-figures
       - benchmark-selection-sweep
       - benchmark-saturation-census
@@ -1271,6 +1304,7 @@ jobs:
       - fixit-route-census
       - week-census
       - call-cadence
+      - call-bands
       - corpus-figures
       - benchmark-selection-sweep
       - benchmark-saturation-census

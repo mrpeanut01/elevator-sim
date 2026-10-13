@@ -248,7 +248,7 @@ import {
   type DayReportInput,
   type ShapedDayReport,
 } from '../shift/report.js';
-import { HISTORY_DAYS, MODE_WEEK_CONTRACT_IDS, outcomeOf, switchWeek, wasGraded } from '../shift/week.js';
+import { CAREER_CONTRACT_ID, HISTORY_DAYS, MODE_WEEK_CONTRACT_IDS, outcomeOf, switchWeek, wasGraded } from '../shift/week.js';
 import {
   dayCountsToward,
   driverRunNeedOf,
@@ -261,7 +261,7 @@ import {
 import { tomorrowBriefingOf, type TomorrowBriefing } from '../shift/tomorrow.js';
 import { coachWeekLines, weekKeptLine } from '../shift/weekLabel.js';
 import { weekLevelKeyOf } from '../shift/weekLevels.js';
-import { weekdayOf, type DayOutcome, type WeekState } from '../shift/types.js';
+import { weekdayOf, type DayOutcome, type ShiftGoal, type WeekState } from '../shift/types.js';
 import { dailySeedAt } from '../shift/dailySeed.js';
 import { dealtCrowdOf, weekRecordFor } from '../shift/weekRecord.js';
 import { progressWithWeekRecords, weekRecordsOf } from '../everyday/profile.js';
@@ -2367,13 +2367,25 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * the stage hands in the pinned call its player answered (`pinnedCall`), and from then on the
    * day's ordinary calls, searched from five minutes after it ([§ D1204](../../../../DECISIONS.md)).
    * The gate is `dev/state.ts#dayCallsOpenOn`.
+   *
+   * **And a career day with an event** — wave AO, lane DS-2, [§ D1408](../../../../DECISIONS.md).
+   * The career's week names no Scenario contract, so this refused every career day. Now a career
+   * day asks where the Everyday host hands in `career` (`everyday/careerCalls.ts#careerDayCallsOf`:
+   * a day whose event changes something, graded on the contract's own tests), and an ordinary
+   * career day, which the host hands nothing, still asks nothing.
    */
-  function dayCallOnStage(recording: VizRecording, pinnedCall?: PressCall): DayCallOnStage | undefined {
+  function dayCallOnStage(
+    recording: VizRecording,
+    pinnedCall?: PressCall,
+    career?: { readonly goals: readonly ShiftGoal[] },
+  ): DayCallOnStage | undefined {
     if (recording !== state.recording || recording !== simulatedRecording) return undefined;
     /* A re-simulation in flight is about to replace this run, so nothing is called on it. */
     if (shiftInFlight) return undefined;
     if (state.playMode !== 'shift-week' || watching !== undefined) return undefined;
-    if (contractById(state.week.contractId) === undefined) return undefined;
+    /* § D1408: a career day asks only where the host says its event makes it a day that asks. */
+    const careerDay = state.week.contractId === CAREER_CONTRACT_ID;
+    if (careerDay ? career === undefined : contractById(state.week.contractId) === undefined) return undefined;
     /* § D1361: nothing is asked of a day whose attempt another tab holds; that tab asks it. */
     if (attemptNotPlayableHere() !== undefined) return undefined;
     if (dayCallSession === undefined) {
@@ -2443,7 +2455,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
           recording,
           bookedOut: facts.bookedOut,
           horizon: facts.horizon,
-          goals: shiftGoalsOf(state, resources),
+          /* § D1408: a career day's runs are graded on the contract's tests, the mark the career files. */
+          goals: careerDay && career !== undefined ? career.goals : shiftGoalsOf(state, resources),
           drivers: pair === undefined ? undefined : { profiles: resources.dispatcherProfiles.profiles, driving },
           /* § D1204: on a pinned day, the call its player answered — the search starts after it. */
           pinnedCall: facts.pinned ? pinnedCall : undefined,
@@ -5791,7 +5804,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
       interveneAt(atS, change);
     },
     /* § D1138 — the ordinary day's calls; the three functions carry the argument. */
-    dayCallOnStage: (recording, pinnedCall) => dayCallOnStage(recording, pinnedCall),
+    dayCallOnStage: (recording, pinnedCall, career) => dayCallOnStage(recording, pinnedCall, career),
     answerDayCall: (answer) => {
       answerDayCall(answer);
     },

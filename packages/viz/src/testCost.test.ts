@@ -513,8 +513,15 @@ const ABOVE_CEILING: ReadonlyMap<string, { readonly count: number; readonly tota
      * a whole contract day, which is the work its seven siblings in that file are annotated at
      * 300 000 ms for, and it failed on the bundle built before the fix. Nothing existing was raised:
      * 27 060 000 + 300 000 = **27 360 000**.
+     *
+     * **100 → 101, and the one is named** — wave AO lane DS-2's case in
+     * `everyday/careerCalls.browser.test.ts` at 300 000 ms (§ D1408): it seeds a career on contract
+     * day 16, runs and closes that day, then runs day 17, answers its call, closes it and waits for
+     * the report's account, whose house run lands off the thread. Two whole contract days, the work
+     * `campaignJourney.browser.test.ts`'s cases are annotated at 300 000 ms for; it measured 34 s on
+     * the lane's contended container. Nothing existing was raised: 27 360 000 + 300 000 = **27 660 000**.
      */
-    ['viz-browser', { count: 100, totalMs: 27_360_000 }],
+    ['viz-browser', { count: 101, totalMs: 27_660_000 }],
   ]);
 
 /**

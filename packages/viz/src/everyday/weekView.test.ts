@@ -23,8 +23,11 @@ import { scheduledEventFor } from '../shift/calendar.js';
 import { openWeek, outcomeOf, wasGraded } from '../shift/week.js';
 import { weekDealOf } from '../shift/weekStake.js';
 
+import { CALL_BANDS, callBandsReadingOf } from '../shift/callBands.js';
+import { weekOrderFor } from '../shift/weekOrders.js';
+
 import { EM_DASH } from './figures.js';
-import { verdictOf, WEEK_CARDS, WEEK_START_NEXT_LABEL, weekScreenViewOf } from './weekView.js';
+import { driverRecordLinesOf, verdictOf, WEEK_CARDS, WEEK_START_NEXT_LABEL, weekScreenViewOf } from './weekView.js';
 
 const MET: GoalObservations = {
   arrived: 400,
@@ -504,5 +507,55 @@ describe('the week’s number on Your week', () => {
     const notHeld = viewOf({ ...week, history: days.map((day) => (day.day <= 2 ? dayOf(day.day, MISSED) : day)), cleanRun: 0 }, true);
     expect(notHeld.onward).toBeUndefined();
     expect(notHeld.primary).toBe('Play week 1 again');
+  });
+});
+
+/*
+ * Wave AO, lane DR-2, § D1443 (swarm DR's Q3): a week dealt from week 2 says on Your week whether
+ * it passes the call bands in play, and the screen keeps the player's own record with each driver.
+ */
+describe('DC-13 and your record with each driver — § D1443', () => {
+  const NAMES_OF: Readonly<Record<string, string>> = {
+    'fairness-first': 'Fairness first',
+    'predictive-balanced': 'Predictive balanced',
+    'capacity-aware': 'Capacity aware',
+  };
+  const profileNameOf = (id: string): string | undefined => NAMES_OF[id];
+  const viewWithNames = (week: WeekState) =>
+    weekScreenViewOf({ week, towerToday: 'Midtown Office', nameOf: NAME_OF, dayClosed: false, sheetStanding: false, profileNameOf });
+
+  it('states the census’s check on Midtown’s week 2, a miss with its counts, and nothing on week 1', () => {
+    const week1: WeekState = { ...openWeek('c2'), day: 1, dayIdx: 0 };
+    const week2: WeekState = { ...week1, week: 2 };
+    const order = weekOrderFor(week2);
+    expect(order?.id).toBe('midtown-early-lift');
+    expect(viewWithNames(week1).bands).toEqual([]);
+    const lines = viewWithNames(week2).bands;
+    expect(lines.length).toBeGreaterThan(0);
+    /* What it says follows the pinned rows: a miss names the driver it was measured under and its counts. */
+    const rows = CALL_BANDS.rows.filter((row) => row.orderId === order?.id);
+    const missing = rows.filter((row) => !callBandsReadingOf(row, CALL_BANDS.protocol).passes);
+    if (missing.length === 0) {
+      expect(lines).toHaveLength(1);
+    } else {
+      expect(lines[0]).toBe('This week misses the census’s check on its who-drives calls, and is dealt with the miss stated.');
+      for (const row of missing) expect(lines.join(' ')).toContain(`With ${String(profileNameOf(row.briefDriver))} picked`);
+    }
+    /* No advice: what the census found, never what to press. */
+    expect(lines.join(' ')).not.toMatch(/\b(should|try|better|best|worse|switch to)\b/iu);
+  });
+
+  it('counts this week’s days by the driver picked at the brief, and nothing before a day closes', () => {
+    const day = (n: number, observed: GoalObservations, dispatcherId: string): DayOutcome => ({
+      ...dayOf(n, observed),
+      record: { buildingId: 'chancery-house', dispatcherId, interventions: [], ruleRows: [], outOfServiceCarIds: [] } as unknown as WatchRecord,
+    });
+    expect(driverRecordLinesOf(weekWith(1, []), profileNameOf)).toEqual([]);
+    const week = weekWith(4, [day(1, MET, 'fairness-first'), day(2, MISSED, 'fairness-first'), day(3, MET, 'predictive-balanced'), day(4, TOO_QUIET, 'capacity-aware')]);
+    expect(driverRecordLinesOf(week, profileNameOf)).toEqual([
+      'You started 2 days this week with Fairness first: 1 cleared, 1 missed.',
+      'You started 1 day this week with Predictive balanced: 1 cleared, 0 missed.',
+    ]);
+    expect(viewWithNames(week).drivers).toEqual(driverRecordLinesOf(week, profileNameOf));
   });
 });

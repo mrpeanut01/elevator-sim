@@ -47617,6 +47617,8 @@ a second card before the report.
 
 ## D1205 — calls across the whole day: two a peak, no question twice in ten minutes, and who drives asked again after a handover
 
+> **Status 2026-10-13: AMENDED by [§ D1444](#d1444)** (an agent ruling). Clause 3: after *keep who drives*, a later candidate in that peak asks who drives again and raises it only where its three runs' day verdicts differ. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Status 2026-09-26: EXTENDED by [§ D1265](#d1265)** (an agent ruling). The day's wrinkle, where it has a window clear of every peak, is searched like a peak and holds one call, which is not counted against the day's six. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Taken 2026-09-26 by agent sessions under delegated authority** (swarm DN, ruling § Q1(b): the
@@ -50311,6 +50313,8 @@ before, in one sentence.
 
 ## D1337 — the who-drives card never offers the house as a switch target, and no answer on it is a trap or a formula
 
+> **Status 2026-10-13: AMENDED by [§ D1440](#d1440) and [§ D1442](#d1442)** (agent rulings). The trap check is judged on the day's verdict on census crowds 0, 5, 10 and 15, the count check published beside it; the list is derived from `data/call-bands.json`. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-10-10 by agent sessions under delegated authority** (swarm DQ, ruling Q1 item 5: the
 > player member's, with the engineering member measuring the same fact; reconciled by wave AN's
 > integrator; built and measured by lane DQ-1), not by the product owner. A later reader weighing
@@ -50362,6 +50366,8 @@ or itself (red before: a Fairness first player was offered the house and Minimum
 ten. `everyday/callCadence.sweep.test.ts`, gated and scheduled: the check on the census week.
 
 ## D1338 — the careful day's cadence on a correct build is a set of floors, held nightly
+
+> **Status 2026-10-13: AMENDED by [§ D1440](#d1440)** (an agent ruling). The floors are held on census crowds 0, 5, 10 and 15; their values stand. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Taken 2026-10-10 by agent sessions under delegated authority** (swarm DQ, ruling Q1 item 3: the
 > honesty and engineering members, with the player member agreeing that § D1138 stays; reconciled by
@@ -50578,6 +50584,8 @@ always-on test re-runs one crowd of one row, and the standing order's strings ar
 which `weekWay.verify.test.ts` re-runs weekly.
 
 ## D1351 — the close says what decided a day no call decided, from one more run: your driver, your presses, or nothing
+
+> **Status 2026-10-13: EXTENDED by [§ D1409](#d1409)** (an agent ruling). The career report says what decided a career day, graded on the contract's tests. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Taken 2026-10-10 by agent sessions under delegated authority** (swarm DQ, Q2 rule 3, three of
 > three, reconciled by wave AN's integrator; the mechanism is lane DQ-3's), not by the product owner.
@@ -51900,3 +51908,228 @@ general mechanism can key it without a change of shape.
 `everyday/deviceChimes.test.ts` (a level held twice records once, another level pays again);
 `packages/server/src/chimes/ledger.test.ts` (once per account per level, a key the ladder does not
 author refused, and the bounds read off the shipped ladder).
+
+## D1408 — a career day with an event raises the Scenario day's own calls, graded on the contract's tests; an ordinary career day raises none, and a call pays nothing
+
+> **Taken 2026-10-13 by agent sessions under delegated authority** (swarm DS, ruling Q2: opening the
+> path three of three, the event-day scope S1's and S2's against S3's every day; built by wave AO lane
+> DS-2), not by the product owner. A later reader weighing this against a product-owner ruling should
+> treat it as an agent ruling and say so. **Extends [§ D1138](#d1138)** and its amendments
+> ([§ D1166](#d1166), [§ D1205](#d1205), [§ D1265](#d1265), [§ D1336](#d1336)) from the Scenario's
+> scored days to a career day with an event. **Owner-reversible**: the event-day scope, a breakdown
+> counting as an event, and grading on the contract's tests.
+
+**Why an entry.** [§ D405](#d405)'s first ground: it binds `dev/main.ts#dayCallOnStage`,
+`everyday/host.ts`, `everyday/stageScreen.ts` and the new `everyday/careerCalls.ts`, and moves where
+§ D1138's calls are asked.
+
+**What was wrong.** The post-AN re-panel's seat C played 22 career days and every one offered a single
+press, the dock's *Let the day run as it is*. Two gates kept the Scenario's calls off every career day:
+`dev/main.ts#dayCallOnStage` refused any week whose contract the Scenario does not know (the career's
+week names none), and the stage asked for a call on the daily context alone. Swarm DS's S3 named the
+first; the second was found building it.
+
+**The ruling.**
+
+1. **A career day with an event asks.** An event is `campaign/incidents.ts#campaignEventFor`'s answer
+   where it changes something about the day: a calendar booking, a breakdown, or the building's own
+   drawn wrinkle. The host hands the shell that day's calls (`careerCalls.ts#careerDayCallsOf`), and
+   the shell opens the same session (`dev/dayCallSession.ts`) with the same admission, caps, spacing
+   and cards as a Scenario day.
+2. **An ordinary career day asks nothing.** § D1301 measured 361 of Garden Apartments' 400 crowd-days
+   cleared under every one of the thirteen drivers, so an ordinary day's call would move ten minutes
+   and never the day (S1, S2). S3's every-day scope is refused for that reason, as the ruling records.
+3. **Graded on the contract's tests.** The session reads its runs' verdicts against
+   `campaignModel.ts#campaignTestGoals` at the tower's difficulty, the four tests the career files the
+   day on, so the verdict ground, the day-lost stop and the close speak about the career's mark.
+4. **A call costs nothing and pays nothing.** An answer adopts a run the session already made; no
+   unit leaves the purse, and the day's mark pays as it did.
+
+**Measured** (Garden Apartments, base `424242`, the opening career on Conventional collective, every
+call answered *leave*, one base and one driver, so counts and no rate): 9 of the contract's 20 days
+carry an event; 3 of those raise a call (day 7's caterers one, day 17's booked move-in one, day 20's
+all-hands three); days 16 and 19 are ordinary and the same session, if asked, would raise one call
+each, so on those days the gate is what keeps the stage quiet.
+
+**Tests.** `everyday/careerCalls.test.ts` (red with the host's hand-in removed: day 17's call was never
+raised): the rule; through the host on real runs, day 16 hands nothing and a session on it would still
+raise a call, day 17 hands the contract's tests and its who-drives call is raised, the answer moves no
+unit, and the purse after the close is the reducer's for that mark. `everyday/careerCalls.browser.test.ts`
+on the shipped bundle: day 16's skip runs to the end with no card, day 17's stops at the move-in's
+card, which is answered, and the report carries the account (§ D1409).
+
+**A seam left standing, said.** The career's report sheet grades its own verdict line and its call
+rows on the Scenario day's goals, as it did before this entry (§ D1395 moved the month grid, the
+calendar and the purse to the career's mark, not the sheet). The account § D1409 adds says which tests
+it reads, so the two cannot be mistaken for one figure; moving the sheet's own verdict is another
+lane's.
+
+## D1409 — the career report says what decided the day, from the day's calls and one or two more runs, graded on the contract's tests
+
+> **Taken 2026-10-13 by agent sessions under delegated authority** (swarm DS, ruling Q2's *the career
+> report adds § D1351's what decided the day*, three of three; built by wave AO lane DS-2), not by the
+> product owner. A later reader weighing this against a product-owner ruling should treat it as an
+> agent ruling and say so. **Extends [§ D1351](#d1351)** to a career day, where clause 3's *adds
+> nothing where the census does not speak for the tower* had kept it silent. **Owner-reversible**: the
+> runs at a career close, the house's driver as the one swapped in, and the words.
+
+**Why an entry.** It extends a recorded ruling to another mode and binds `everyday/careerCalls.ts`,
+`everyday/host.ts#closeDay`, `reportView.ts`, `reportScreen.ts` and the honesty corpus.
+
+**The ruling.**
+
+1. **The call line** is `shift/dayClose.ts#decidingCallOf` over the day's calls, graded on the
+   contract's tests and worded *a cleared day on the contract's tests* or *a missed day on the
+   contract's tests*.
+2. **Where no call decided the day**, § D1351's arms in its order (`careerCalls.ts#careerDeciderOf`):
+   the driver run (the day run by the house's driver, Conventional collective, in place of the player's
+   standing order, every press kept) and the house (that driver with nothing pressed), each made from
+   the day's own state at the close (its seed, event, kit and the works' held cars, none of which a
+   Scenario record carries) and graded on the contract's tests. *Your standing order did*, *your
+   presses did*, *nothing you chose decided it either*, *still being run* and *not said* are the arms.
+3. **No ranking and no forecast.** Each arm states the runs it read on this crowd.
+
+**Tests.** `everyday/careerCalls.test.ts`: every arm, the need read off the day, both runs planned from
+the day, and through the host the line on day 17's sheet withdrawn once another run stands; the
+browser case reads it on the shipped bundle once the house's run lands. Every arm is seeded in the
+honesty corpus (`honesty/surfaces.ts#seedCareerClose`).
+
+## D1440 — the gates on who drives move onto census crowds 0, 5, 10 and 15, and are judged on the day's verdict rather than the row's count
+
+> **Taken 2026-10-13 by agent sessions under delegated authority** (swarm DR, ruling Q2 item 1: the
+> crowds S3's, the verdict three of three; built by wave AO lane DR-2), not by the product owner. A
+> later reader weighing this against a product-owner ruling should treat it as an agent ruling and
+> say so. **Amends [§ D1337](#d1337) clause 2 and [§ D1338](#d1338)'s gate.** No floor's value moves.
+> **Owner-reversible**: the crowds, and the count check published rather than gating.
+
+**Why an entry.** It moves two recorded rulings' gate and binds `everyday/callCadence.*`,
+`.github/workflows/deep-tiers.yml` and `deepTiers.test.ts`.
+
+**What was wrong.** § D1337's trap check and § D1338's floors read census crowds 0 to 3, the census's
+easy end: the careful line cleared 20 of 20 days there against 82 of 100 over all twenty (swarm DR's
+S3), and the check read the row's ten-minute count, whose favourite lost the day on 20 of 55 split
+rows (S1).
+
+**The ruling.** The cadence floors (a median of four calls a day, no silent weekday, an evening call
+on three of five) are held nightly on week 1 at crowds 0, 5, 10 and 15. § D1337's count check is
+published beside them and gates nothing, with each who-drives row's verdict split published too. The
+gate on who drives is the day's verdict, on the weeks dealt from week 2, which is [§ D1441](#d1441).
+
+**Measured** on this lane's tree, with § D1442's offer and § D1444's amendment in
+(`everyday/callCadence.sweep.test.ts`, crowds 0, 5, 10 and 15, twenty days): the median day raised 4 calls (from 1 to 7), no weekday raised none, and crowds 0, 5, 10 and 15 had an evening call on 5, 3, 3 and 4 of their five weekdays, so every floor holds, crowds 5 and 10 on it. The careful line cleared 16 of the 20 days, where it cleared 20 of 20 on crowds 0 to 3 (§ D1338). The longest silence was 3.9 real minutes at the median and 9.6 at the longest. Published and not gated: of 67 who-drives rows the count was lowest under the pair's first on 14.9 %, under its second (Capacity aware for a Fairness first player since § D1442) on 59.7 % and under *keep* on 38.8 %, so no answer stands outside a tenth to three fifths; on the day's verdict 16 of the 67 rows split the day and *keep* lost 7.
+
+## D1441 — keep can be wrong, checked nightly on the day's verdict: the call bands on every week dealt from week 2
+
+> **Taken 2026-10-13 by agent sessions under delegated authority** (swarm DR, ruling Q2 item 2: the
+> two profiles S1's, the keep band where S1's and S2's overlap, the floor S1's, the ceiling S3's;
+> built by wave AO lane DR-2), not by the product owner. A later reader weighing this against a
+> product-owner ruling should treat it as an agent ruling and say so. **Owner-reversible**: the band of
+> a fifth to three fifths, the floor of one in five, the ceiling of two thirds, which two profiles they
+> are read under, and the crowds.
+
+**Why an entry.** [§ D405](#d405)'s first ground: it adds `data/call-bands.json`, a scheduled tier
+(`call-bands`) and a load-time warning in `dev/data.ts`, and its rows decide the offer list
+(§ D1442) and a line on Your week (§ D1443).
+
+**The ruling.** For every week order a tower deals from week 2, under each of the two profiles DC-11
+shows holding that week on the most crowds (`weekDominance.ts#bandedProfilesOf`: Predictive balanced
+with 10 holds, Fairness first with 9, on `midtown-early-lift`), the careful line (that profile at the
+brief, *keep* who drives, *park* the cars) is played through the shipped session on census crowds 0, 5,
+10 and 15, and every offer candidate the card does not offer is run beside each raised who-drives call.
+Among who-drives calls whose card answers split the day:
+
+1. *keep* is the losing answer on at least a fifth and at most three fifths;
+2. every switch target on the card clears on at least one in five;
+3. no answer on the card clears on more than two thirds.
+
+The rows are pinned in `data/call-bands.json` and the nightly job requires them exactly; the bands are
+arithmetic over them (`shift/callBands.ts`), held on every run by `shift/callBands.test.ts` on a fixture
+built from S1's figures (13 of 25 in, 3 of 18 out; 5 of 25 in, 2 of 18 out). A miss is a finding for a
+ruling, never a moved band.
+
+**Measured** (`midtown-early-lift`, crowds 0, 5, 10 and 15, this lane's tree, § D1442's offer and
+§ D1444 in): under Predictive balanced, 63 who-drives calls, 14 of them splitting the day: *keep* lost 7 and cleared 7, Fairness first cleared 6 and Capacity aware 7, so every band holds. Under Fairness first, 62 calls, 20 splitting the day: *keep* lost 13, over three fifths, Predictive balanced cleared 16, over two thirds, and Capacity aware 5, on the floor. Beside the card, Energy aware would have cleared 2 of the 14 and 5 of the 20, and Minimum estimated wait 2 and 6. The careful line cleared 13 of 20 days under Predictive balanced and 12 of 20 under Fairness first. So the ruling's *today* moved with § D1442 and § D1444: the week now misses under Fairness first and passes under Predictive balanced, where the ruling, measured with Energy aware offered, read the reverse for the keep band.
+
+**What the base list measured, for the record** (the same census with § D1337's list, Energy aware
+offered, before § D1442 and § D1444): under Fairness first, 59 who-drives calls, 21 split, *keep*
+lost 9, Predictive balanced cleared 20 and Energy aware 2 on the card, Capacity aware would have
+cleared 10 and Minimum estimated wait 8; under Predictive balanced, 68 calls, 21 split, *keep* lost 2
+and cleared 19, Fairness first cleared 16 and Energy aware 1 on the card, Capacity aware would have
+cleared 15 and Minimum estimated wait 4.
+
+## D1442 — the who-drives offer is derived from the census: a candidate under the floor is not offered
+
+> **Taken 2026-10-13 by agent sessions under delegated authority** (swarm DR, ruling Q2 item 3: S1 and
+> S2, Capacity aware first for Energy aware's place S1's; built by wave AO lane DR-2), not by the product
+> owner. A later reader weighing this against a product-owner ruling should treat it as an agent ruling
+> and say so. **Amends [§ D1337](#d1337) clause 1's owner-reversible list.** **Owner-reversible**: the
+> candidates and their order, and the floor.
+
+**Why an entry.** It replaces a recorded ruling's list and changes the card a player on a contender
+meets.
+
+**The ruling.** `shift/dayCalls.ts#DAY_CALL_DRIVER_OFFER` is `shift/callBands.ts#driverOfferOf` over
+the shipped census: the protocol's candidates in order (Fairness first, Predictive balanced, Capacity
+aware, Energy aware, Minimum estimated wait) less every candidate that clears the day on under one
+split who-drives row in five on a row where it was measured, offered or run beside the card. A
+candidate the census has not placed keeps its place. The house is not a candidate.
+
+**Today**: the census leaves Fairness first, Predictive balanced and Capacity aware. Energy aware is under the floor under Predictive balanced (2 of 14 split rows) and so is Minimum estimated wait (2 of 14), so a player on the house is offered Fairness first and Predictive balanced, a player on Fairness first Predictive balanced and Capacity aware, and a player on Predictive balanced Fairness first and Capacity aware. The derivation is a fixed point: the census taken with § D1337's list dropped the same two (Energy aware 1 of 21 and Minimum estimated wait 4 of 21 under Predictive balanced), and the census taken with the derived list drops them again, so the pinned rows are the rows the shipped list makes.
+
+**Tests.** `shift/callBands.test.ts` (the derivation on the fixture, and the shipped list equal to it,
+no house); `dev/dayCallSession.test.ts`'s re-derived pair reads the list rather than naming it.
+
+## D1443 — DC-13: a week dealt from week 2 says on Your week whether it passes the call bands in play, and the player's record with each driver is shown
+
+> **Taken 2026-10-13 by agent sessions under delegated authority** (swarm DR, ruling Q3: DC-13 S1's
+> check, named here because swarm DS took DC-12; the record S2's; built by wave AO lane DR-2), not by
+> the product owner. A later reader weighing this against a product-owner ruling should treat it as an
+> agent ruling and say so. **Adds DC-13 to `docs/33`**, beside DC-11. **Owner-reversible**: stating
+> the miss on Your week, the incumbent kept dealt, and the record's wording.
+
+**Why an entry.** It adds a criterion to `docs/33` and binds `everyday/weekView.ts`, `weekScreen.ts`
+and the honesty corpus.
+
+**The ruling.** Your week draws, on a week dealt from week 2, `callBands.ts#weekBandsLinesOf` over the
+week's order: one line saying the week misses the check and is dealt with the miss stated, and one per
+banded profile that misses, naming each bound it missed with the census's own counts; or one line that
+it passes. Week 1's draw and an unmeasured order draw nothing. `midtown-early-lift` misses today and
+stays dealt, because refusing it would deal week 1's draw again ([§ D1343](#d1343)). Your week also
+draws the player's record with each driver this week (`weekView.ts#driverRecordLinesOf`): for each
+driver picked at a brief, the counted days it started and how they came out, from this device's filed
+days and never from a census. *Started*, because a call or a press may hand a day on.
+
+**Today, on Midtown's week 2**: *This week misses the census’s check on its who-drives calls, and is dealt with the miss stated.* and *With Fairness first picked and every who-drives call kept, over 4 census crowds, 20 of 62 who-drives calls split the day: keeping the driver lost 13 of them, over the three fifths the check allows; Predictive balanced cleared 16 of them, over the two thirds the check allows any one answer.*
+
+**Tests.** `shift/callBands.test.ts` (the miss line word for word on a fixture, the passing line, and
+nothing for week 1 or an unmeasured order); `everyday/weekView.test.ts` (Midtown's week 2 from the
+shipped census, nothing on week 1; the record over a week of three drivers, an ungraded day left out).
+
+## D1444 — after *keep who drives*, a peak asks who drives again where the day hangs on it: § D1205 clause 3 amended
+
+> **Taken 2026-10-13 by agent sessions under delegated authority** (swarm DR, ruling Q2 item 4: S2's
+> diagnosis, S3's adoption of the verdict ground; built by wave AO lane DR-2), not by the product
+> owner. A later reader weighing this against a product-owner ruling should treat it as an agent ruling
+> and say so. **Amends [§ D1205](#d1205) clause 3.** Two a peak, ten minutes between repeats, six a day
+> and § D1138's admission elsewhere all stand. **Owner-reversible**: the amendment.
+
+**Why an entry.** It amends a recorded ruling in writing and binds `dev/dayCallSession.ts`.
+
+**What was wrong.** § D1205 clause 3 closed the driver question for the rest of a peak once *keep* was
+answered, and swarm DR's honesty member found the census's lost days inside those very peaks (crowd
+14's Thursday: *keep* at 12:33 with the worst wait at 267 of 400 s, the day lost at 12:37, nothing more
+asked).
+
+**The ruling.** After *keep* in a peak, a later candidate in that peak may ask who drives again, and
+raises it only where its three runs' day verdicts differ ([§ D1336](#d1336)'s ground, read the same
+way: whether they differ, never which is ahead); the ten-minute counts alone raise nothing there.
+Without the day's goals no verdict can raise it, so no run is made. Elsewhere admission is as before:
+the verdict ground stays a wrinkle start's alone outside a kept peak. S3 measured extending it to every
+who-drives candidate; the ruling's item names clause 3, so this entry takes that clause and no more.
+
+**Measured** (on `midtown-early-lift`, crowds 0, 5, 10 and 15, the careful line under both banded profiles, 40 days, with § D1442's offer in both runs, `c5f57a9`'s session against this one: who-drives calls raised went from 58 to 62 under Fairness first and from 60 to 63 under Predictive balanced. Eight calls were added, each splitting the day, as the ground requires, and *keep* was the losing answer on 4 of them; one who-drives call later in a Predictive balanced day was no longer raised, a consequence of the added one that this lane did not trace. No day's verdict moved under the careful line, which keeps at every call. S3 measured 3 added over 17 days with *keep* losing 2, with the ground extended to every who-drives candidate. Placement calls are not in the census rows, so a placement call an added one displaced is not counted here).
+
+**Tests.** `dev/dayCallSession.test.ts`, three cases on a synthetic three-peak day with the day's
+goals: a second who-drives call in the kept peak, ten minutes on, where the pair's first misses the day
+and *keep* clears it (red on `c5f57a9`: one call in that peak); none where the verdicts agree though the
+counts differ (the control); none, and no run, without the day's goals.

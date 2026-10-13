@@ -31,9 +31,10 @@ import { collectSearchSpace, type SearchSpace } from '@elevator-sim/experiments/
 import { restrictedFloorIds } from '../access/zoning.js';
 import { mixedFleetBanks } from '../commissioning/choices.js';
 import { scenarioHorizonFor } from '../shift/dayLength.js';
-import { weekOrderIssues } from '../shift/weekOrders.js';
+import { dealtWeekOrdersOf, weekOrderIssues } from '../shift/weekOrders.js';
 import { weekLevelIssues } from '../shift/weekLevels.js';
-import { WEEK_DOMINANCE, weekDominanceIssues } from '../shift/weekDominance.js';
+import { CALL_BANDS, callBandsIssues } from '../shift/callBands.js';
+import { WEEK_DOMINANCE, bandedProfilesOf, weekDominanceIssues } from '../shift/weekDominance.js';
 import { WEEK_WAY, weekWayIssues } from '../shift/weekWay.js';
 import { CONTRACT_LADDER, contractLadderIssues } from '../shift/ladder.js';
 import { parseEngineeringBriefs, type EngineeringBriefs } from '../briefs/parse.js';
@@ -292,6 +293,19 @@ export async function loadBrowserResources(): Promise<BrowserResources> {
      * booking is a failing test.
      */
     ...weekLevelIssues().map((issue) => `contract-ladder.json: ${issue}`),
+    /*
+     * The call bands' census against the weeks it was measured on — wave AO, lane DR-2, § D1441. A
+     * week dealt from week 2 with no row under one of its two strongest profiles is a week the
+     * offer list and its sheet's DC-13 line know nothing of; `shift/callBands.test.ts` is where it is
+     * a failing test, and the nightly `call-bands` job re-measures the rows.
+     */
+    ...callBandsIssues(
+      CALL_BANDS,
+      dealtWeekOrdersOf(CALL_BANDS.protocol.contractId),
+      dispatchers.profiles.map((profile) => profile.id),
+      (order) => bandedProfilesOf(CALL_BANDS.protocol.contractId, order),
+      WEEK_WAY.protocol.heldOutCount,
+    ).map((issue) => `call-bands.json: ${issue}`),
   ];
 
   return {

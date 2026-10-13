@@ -123,6 +123,7 @@ const DOORS: Readonly<Record<keyof EverydayHost, Door>> = Object.freeze({
   addressDescribesRun: 'reads',
   campaignHistory: 'reads',
   campaignFiledDays: 'reads',
+  careerCloseLine: 'reads',
   /* The career tower's day under every driver, handed to the desk to run: the career's crowd, never the week's. */
   careerDayCensusRuns: 'elsewhere',
   runPointer: 'reads',

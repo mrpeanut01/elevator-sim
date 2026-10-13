@@ -7,7 +7,9 @@
  * [§ D1204](../../../../DECISIONS.md) (a pinned day's session opens after its pinned call) and
  * [§ D1205](../../../../DECISIONS.md) (two calls a peak, no question repeated within ten minutes, no
  * driver question after *keep* in that peak, and the driver question asked again after a handover
- * with the pair re-derived from whoever now drives).
+ * with the pair re-derived from whoever now drives). Wave AO's lane DR-2 amended the third
+ * ([§ D1444](../../../../DECISIONS.md)): after *keep*, who drives is raised again in that peak where
+ * its three runs' day verdicts differ, and on nothing else.
  *
  * ## What it holds, and for how long
  *
@@ -57,8 +59,9 @@
  *   dispatcher now driving ([§ D1205](../../../../DECISIONS.md)); after a handover the shell cannot
  *   name, the driver question stops for the day, because *keep who drives* would name nobody.
  * - **No third call in a peak, no question twice inside {@link DAY_CALL_REPEAT_S}, and no driver
- *   question after *keep* in the same peak** ([§ D1205](../../../../DECISIONS.md)). A candidate where
- *   both questions are held costs no run and is not counted as asked.
+ *   question after *keep* in the same peak** ([§ D1205](../../../../DECISIONS.md)) **unless its runs
+ *   split the day's verdict** ([§ D1444](../../../../DECISIONS.md)). A candidate where both questions
+ *   are held costs no run and is not counted as asked.
  */
 
 import type { DispatcherProfile, RunInterventionConfig } from '@elevator-sim/core/browser';
@@ -336,11 +339,20 @@ export function openDayCallSession(
     return last !== undefined && atS - last < DAY_CALL_REPEAT_S;
   }
 
-  /** Whether the driver question may be asked of `call` — a pair, and neither § D1205 hold. */
+  /** Whether *keep who drives* was answered earlier in `call`'s peak (§ D1205 clause 3). */
+  function keptHere(call: PressCall): boolean {
+    return call.act !== undefined && keptInPeakS === call.act.startS;
+  }
+
+  /**
+   * Whether the driver question may be asked of `call` — a pair, and § D1205's ten minutes. After
+   * *keep* in the same peak it is asked only where the day's goals can grade its runs, because there
+   * the day's verdict differing is its only ground (§ D1444, below).
+   */
   function driverAskable(call: PressCall): boolean {
     if (pair === undefined || driverNames === undefined) return false;
     if (heldByRepeat('driver', call.atS)) return false;
-    return call.act === undefined || keptInPeakS !== call.act.startS;
+    return !keptHere(call) || opening.goals !== undefined;
   }
 
   function inputOf(recording: VizRecording) {
@@ -647,7 +659,13 @@ export function openDayCallSession(
             leave: wholeRunOf(leave),
           },
         });
-        if (!admits(counted, verdictGround)) {
+        /*
+         * § D1444, amending § D1205 clause 3: after *keep* in this peak, who drives is raised again
+         * only where its three runs' day verdicts differ (§ D1336's ground), never on the counts
+         * alone, so a peak that kept its driver is asked again where the day hangs on it.
+         */
+        const admitted = keptHere(call) ? verdictsSplit(counted.observations) : admits(counted, verdictGround);
+        if (!admitted) {
           asking.refusedCounted ??= counted;
           onRefused();
           return;
@@ -743,7 +761,7 @@ export function openDayCallSession(
       if (record !== undefined) records.push(record);
       searchFromS = dayCallSearchFrom(raised.call);
       const pressed = answer === 'leave' ? undefined : raised.runs?.[answer];
-      /* § D1205: *keep who drives* holds the driver question for the rest of that peak. */
+      /* § D1205, as § D1444 amends it: after *keep who drives*, that peak asks it again only on a split verdict. */
       if (raised.question === 'driver' && answer === 'leave' && raised.call.act !== undefined) {
         keptInPeakS = raised.call.act.startS;
       }
