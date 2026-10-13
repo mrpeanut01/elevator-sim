@@ -58,6 +58,7 @@ import { everydayProfileStore } from './profileStore.js';
 import { el } from './screenDom.js';
 import {
   EVERYDAY_COLORS as C,
+  EVERYDAY_RAIL_DRAWER_MAX_PX,
   EVERYDAY_RAIL_SURFACES as RAIL,
   EVERYDAY_TYPE as TYPE,
 } from './tokens.js';
@@ -244,7 +245,13 @@ export function mountLobby(region: HTMLElement, ports: LobbyPorts): MountedLobby
   root.setAttribute('role', 'region');
   root.setAttribute('aria-label', LOBBY_COPY.regionLabel);
   root.style.cssText = [
-    'min-height:100%',
+    /*
+     * The region's height rather than the viewport's: the handoff sizes the frame from `100vh`, and
+     * on this page the consent ask can stand above the region, which pushed the doors below the fold.
+     * The frame takes what the column leaves instead, and the panel's fit-to-height does the rest.
+     */
+    'height:100%',
+    'min-height:520px',
     'box-sizing:border-box',
     'display:flex',
     'flex-direction:column',
@@ -293,15 +300,18 @@ export function mountLobby(region: HTMLElement, ports: LobbyPorts): MountedLobby
 
   /* 3. The door row: the frame and the hall call plate. */
   const doorRow = el(doc, 'div');
-  doorRow.style.cssText = 'display:flex;align-items:center;gap:22px;max-width:100%';
+  doorRow.style.cssText =
+    'display:flex;align-items:center;gap:22px;max-width:100%;flex:1 1 auto;min-height:0;max-height:730px';
 
   const frameColumn = el(doc, 'div');
-  frameColumn.style.cssText = 'display:flex;flex-direction:column;align-items:center;min-width:0';
+  frameColumn.style.cssText =
+    'display:flex;flex-direction:column;align-items:center;min-width:0;height:100%;min-height:0';
   const frame = el(doc, 'div');
   frame.style.cssText = [
     'width:min(76vw,820px)',
-    'height:min(calc(100vh - 170px),720px)',
+    'flex:1 1 auto',
     'min-height:320px',
+    'max-height:720px',
     'box-sizing:border-box',
     'padding:16px 16px 0',
     'border-radius:6px 6px 0 0',
@@ -671,6 +681,39 @@ export function mountLobby(region: HTMLElement, ports: LobbyPorts): MountedLobby
   region.replaceChildren(root);
 
   /* ---------------------------------------------------------------- *
+   * Narrow screens — the shell's own drawer breakpoint
+   * ---------------------------------------------------------------- */
+
+  /*
+   * The handoff draws one geometry, for a desktop. At phone width the call plate beside the doors
+   * took a quarter of the width and the fit scaled the panel below legibility, so under the shell's
+   * drawer breakpoint the plate becomes a slim row under the sill, the frame takes the full width,
+   * and the display drops its minimum height. Nothing about the machine or the words changes.
+   */
+  const narrowQuery = win?.matchMedia(`(max-width: ${String(EVERYDAY_RAIL_DRAWER_MAX_PX)}px)`);
+  const applyNarrow = (narrow: boolean): void => {
+    doorRow.style.flexDirection = narrow ? 'column' : 'row';
+    doorRow.style.gap = narrow ? '10px' : '22px';
+    doorRow.style.width = narrow ? '100%' : '';
+    frameColumn.style.width = narrow ? '100%' : '';
+    frame.style.width = narrow ? '100%' : 'min(76vw,820px)';
+    sill.style.width = narrow ? 'calc(100% + 12px)' : 'calc(min(76vw,820px) + 24px)';
+    plate.style.flexDirection = narrow ? 'row' : 'column';
+    plate.style.width = narrow ? 'auto' : '86px';
+    plate.style.padding = narrow ? '8px 16px' : '16px 0 14px';
+    plate.style.gap = narrow ? '14px' : '10px';
+    display.style.minHeight = narrow ? '0' : '300px';
+    root.style.padding = narrow ? '14px 12px 18px' : '22px 18px 26px';
+    root.style.gap = narrow ? '10px' : '14px';
+  };
+  applyNarrow(narrowQuery?.matches === true);
+  const onNarrow = (event: MediaQueryListEvent): void => {
+    applyNarrow(event.matches);
+    refit();
+  };
+  narrowQuery?.addEventListener('change', onNarrow);
+
+  /* ---------------------------------------------------------------- *
    * Fit the panel to the opening's height — the handoff's § 2
    * ---------------------------------------------------------------- */
 
@@ -866,6 +909,7 @@ export function mountLobby(region: HTMLElement, ports: LobbyPorts): MountedLobby
       timers.clear();
       if (tick !== undefined) win?.clearInterval(tick);
       observer?.disconnect();
+      narrowQuery?.removeEventListener('change', onNarrow);
       sound.close();
     },
     reread: () => {

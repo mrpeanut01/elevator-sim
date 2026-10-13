@@ -22,6 +22,7 @@ import { chromium, type Browser, type Page, type ViewportSize } from 'playwright
 import {
   leaveTutorialIfOffered,
   openScenarioEntry,
+  leaveLobbyIfShown,
 } from '../dev/browserTier.test-helper.js';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -64,6 +65,8 @@ async function coldLoad(viewport: ViewportSize = DESKTOP): Promise<Page> {
     undefined,
     { timeout: 30_000 },
   );
+  /* § D1445: a cold launch opens the lobby, which steps the rail aside; *Main menu* brings it back. */
+  await leaveLobbyIfShown(page);
   return page;
 }
 
