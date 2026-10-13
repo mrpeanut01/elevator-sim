@@ -224,6 +224,23 @@ describe('Playback — the loop window (PB-09)', () => {
     expect(playback.frame().simTimeS).toBe(90); // and never below 80 again
   });
 
+  it('wraps only in `frame()`: reading `simTimeS` alone runs past the window to the end and stays', () => {
+    /*
+     * The getter's docstring says so, and this is the run that holds it to that sentence.
+     * `everyday/towerLoop.ts` and `everyday/landingScreen.ts` both painted a looping transport from
+     * `simTimeS` at first, and both showed the tail of the run and then its last frame for ever.
+     */
+    const [playback, clock] = make({ speed: 10, autoplay: true });
+    playback.setLoop({ fromS: 20, toS: 40 });
+    playback.seekTo(20);
+    clock.advance(3000);
+    expect(playback.simTimeS).toBe(50); // past `toS`, and nothing has wrapped it
+    clock.advance(10_000);
+    expect(playback.simTimeS).toBe(100); // held at the run's end, however long it is read
+    expect(playback.frame().simTimeS).toBe(20); // the first frame brings it back to the window
+    expect(playback.simTimeS).toBe(20); // and the getter reads the re-anchored playhead from then on
+  });
+
   it('never reads `ended` while a sub-window is looping, so no day is filed off it', () => {
     const [playback, clock] = make({ speed: 10, autoplay: true });
     playback.setLoop({ fromS: 10, toS: 30 });
