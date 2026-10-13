@@ -24,7 +24,7 @@
  * which is the temporal-dead-zone class of defect the guide's § 18 notes killed the prototype
  * with, twice.
  *
- * ## What "built" means, and the one screen the shell owns
+ * ## What "built" means, and the screens the shell owns
  *
  * `menu` appears in no table row and is built anyway: it is the shell's own front door (§ 3.5).
  * {@link EVERYDAY_SCREENS_BUILT} is therefore *shell-owned ∪ registered*, derived from this file
@@ -39,7 +39,9 @@
  * saying so. That was honest and it was not § 7 — the register said as much in its own first line.
  *
  * `everyday/stageScreen.ts` is now § 7's stage, so `stage` is an ordinary registered screen and
- * `SHELL_OWNED` is down to the menu alone. The consequence worth stating is that
+ * `SHELL_OWNED` was down to the menu alone. § D1445 added the lobby back to it, on a different
+ * ground from the stage's: the lobby is a screen of the shell's own that draws before the host
+ * publishes, not a hand-off, so it routes as `'lobby'` beside `'menu'`. The consequence worth stating is that
  * {@link EverydayRoute} lost its `'handoff'` arm **entirely**: it had exactly one producer, this
  * file, and a route value nothing can return is the dead seam this repository keeps a count of. The
  * Engineer surface is unchanged and still boots and runs behind the shell.
@@ -182,7 +184,7 @@ const SCREEN_MODULES: Readonly<Partial<Record<EverydayScreen, EverydayScreenModu
     settings: SETTINGS_SCREEN,
   });
 
-/** The one screen the shell itself provides — see the module docstring. */
+/** The screens the shell itself provides — the menu, and § D1445's lobby. See the module docstring. */
 const SHELL_OWNED: readonly EverydayScreen[] = Object.freeze(['menu', 'lobby']);
 
 /**

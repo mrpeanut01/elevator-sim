@@ -24,7 +24,7 @@ import { actionBarFor } from './actionBar.js';
 import { EVERYDAY_SCREENS, RUN_CONTEXTS } from './types.js';
 
 describe('what this build has actually built', () => {
-  it('is § 4’s whole inventory plus § D529’s tutorial — the shell’s own menu and nineteen registered modules', () => {
+  it('is § 4’s whole inventory plus § D529’s tutorial — the shell’s own menu and lobby, and nineteen registered modules', () => {
     /*
      * Stated as a fact about this tree rather than a design intent, exactly as `modes.test.ts`
      * does for the tiles: the day a screen lane lands, this case fails and is updated in the same
@@ -68,6 +68,8 @@ describe('what this build has actually built', () => {
      */
     expect(EVERYDAY_SCREENS_BUILT).toEqual([
       'menu',
+      /* § D1445's lobby — shell-owned like the menu, because it draws before the host publishes. */
+      'lobby',
       /*
        * GitHub issue #244's landing page — the third key past § 4's seventeen, on the same ground
        * as the two below it and one screen earlier: the handoff's inventory begins at the menu, so
@@ -106,18 +108,22 @@ describe('what this build has actually built', () => {
   it('derives BUILT from the registry, in both directions', () => {
     for (const screen of EVERYDAY_SCREENS) {
       const registered = screenModuleFor(screen) !== undefined;
-      const shellOwned = screen === 'menu';
+      /* § D1445 made the lobby the shell's second own screen. */
+      const shellOwned = screen === 'menu' || screen === 'lobby';
       expect(isScreenBuilt(screen), screen).toBe(registered || shellOwned);
     }
   });
 
-  it('owns exactly one screen in the shell — the menu, and no longer the stage', () => {
+  it('owns two screens in the shell — the menu and the lobby, and no longer the stage', () => {
     /*
      * The hand-off's epitaph. `stage` carries a module now, so it must route like every other
      * registered key; a `stage` that were still shell-owned *and* registered would be built twice
      * and refused by neither half of the reasons check.
      */
     expect(screenModuleFor('menu')).toBeUndefined();
+    /* § D1445: the lobby is the shell's too, and routes its own way rather than as a module. */
+    expect(screenModuleFor('lobby')).toBeUndefined();
+    expect(routeFor('lobby')).toBe('lobby');
     expect(screenModuleFor('stage')).toBeDefined();
     expect(routeFor('stage')).toBe('screen');
   });
@@ -167,17 +173,18 @@ describe('the refusal sentences and the registry move together', () => {
 });
 
 describe('the router', () => {
-  it('sends the one shell-owned key its own way and splits the rest by registration', () => {
+  it('sends the two shell-owned keys their own ways and splits the rest by registration', () => {
     expect(routeFor('menu')).toBe('menu');
+    expect(routeFor('lobby')).toBe('lobby');
     for (const screen of EVERYDAY_SCREENS) {
-      if (screen === 'menu') continue;
+      if (screen === 'menu' || screen === 'lobby') continue;
       expect(routeFor(screen), screen).toBe(
         screenModuleFor(screen) === undefined ? 'refusal' : 'screen',
       );
     }
   });
 
-  it('produces two of its three arms, and `refusal` is empty of keys rather than of producers', () => {
+  it('produces three of its four arms, and `refusal` is empty of keys rather than of producers', () => {
     /*
      * `'handoff'` was the fourth value and it had exactly one producer. It went with the route
      * rather than being left in the union: a route a reader can switch on and nothing can return
@@ -195,7 +202,7 @@ describe('the router', () => {
      * that would fail if a screen were unregistered without its sentence coming back.
      */
     const produced = new Set(EVERYDAY_SCREENS.map((screen) => routeFor(screen)));
-    expect([...produced].sort()).toEqual(['menu', 'screen']);
+    expect([...produced].sort()).toEqual(['lobby', 'menu', 'screen']);
     expect(EVERYDAY_SCREENS.filter((screen) => routeFor(screen) === 'refusal')).toEqual([]);
     expect(EVERYDAY_SCREENS.filter((screen) => routeFor(screen) === 'refusal')).toEqual(
       EVERYDAY_SCREENS.filter((screen) => UNBUILT_REASONS[screen] !== undefined),
