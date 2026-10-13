@@ -315,6 +315,7 @@ import { dayCallMaximaOf } from '../shift/dayCallMaxima.js';
 import {
   stageCallFailedRowsOf,
   stageCallRowDueAtS,
+  stageCallRowsCaveatOf,
   stageCallRowsOf,
   STAGE_CALL_ROWS_HEADING,
   stageCallWrinkleQuietDueAtS,
@@ -332,6 +333,7 @@ import {
   dayCallWrinkleQuietRowOf,
   dayCallWindowEndOf,
   type DayCallDriverNames,
+  type DayCallRecord,
   type DayCallsQuiet,
 } from '../shift/dayCalls.js';
 
@@ -12855,6 +12857,20 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
     'everyday/stageCallRow.ts#STAGE_CALL_ROWS_HEADING',
     'everyday/stageCallRow.ts#STAGE_CALL_ROW_NOTE',
     /*
+     * Wave AP, lane DT-2, swarm DT's Q3: the row's lead (the first crossing, or none yet), its
+     * readings with the answer taken first, and the caveat said once above the rows, labelling a
+     * counts-only row's count where one is drawn. Seeded below at the row's due instant and the run's
+     * end, and on a record written before the readings.
+     */
+    'everyday/stageCallRow.ts#stageCallLeadOf',
+    'everyday/stageCallRow.ts#STAGE_CALL_NO_CROSSING',
+    'everyday/stageCallRow.ts#stageCallReadingsLineOf',
+    'everyday/stageCallRow.ts#STAGE_CALL_TAKEN',
+    'everyday/stageCallRow.ts#stageCallRowsCaveatOf',
+    'everyday/stageCallRow.ts#STAGE_CALL_ROWS_CAVEAT',
+    'everyday/stageCallRow.ts#STAGE_CALL_COUNT_LABEL',
+    'shift/dayCallMaxima.ts#dayCallCrossingPhraseOf',
+    /*
      * Wave AN, lane DQ-1, § D1335: a moment whose question a run that could not be made cost, on the
      * stage from the instant the playhead reaches it. Seeded below at two instants of this case's run.
      */
@@ -12880,7 +12896,6 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
     'everyday/stageCall.ts#stageCallNearestBarLineOf',
     'everyday/stageCall.ts#STAGE_LOST_COPY',
     'everyday/stageCall.ts#stageLostCardOf',
-    'everyday/stageCallRow.ts#stageCallGoalsLineOf',
     'shift/dayCallMaxima.ts#dayCallMaximaReadingsAt',
     /* Pillar 3's strip — GitHub issue #277, § D470. Driven at every sample time below. */
     'everyday/stageScreenModel.ts#stageGoalsOf',
@@ -13495,31 +13510,44 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
         /* § D1433: each answer's two final goals through the day, off this case's own run. */
         const maxima = dayCallMaximaOf(recording, callAtS);
         const record = { ...counted, maxima: { 'park-cars-lobby': maxima, 'spread-cars': maxima, leave: maxima } };
-        const rows = stageCallRowsOf({
-          records: [record],
-          playheadS: recording.endedAt,
-          endedAt: recording.endedAt,
-          log: [{ atS: callAtS + 120, change: { kind: 'park-cars-lobby' } }],
-          clockOf: (simTimeS) => clockOf(simTimeS, DAY_START_S),
-          goals: goalsForDay(1),
-        });
-        seeds.push({ field: 'stage.callRows.heading', text: STAGE_CALL_ROWS_HEADING, role: 'label' });
-        for (const row of rows) {
-          seeds.push({ field: `stage.callRows(${row.id}).heading`, text: row.heading, role: 'label' });
-          seeds.push({
-            field: `stage.callRows(${row.id}).counts`,
-            text: row.counts,
-            role: 'observation',
-            playhead: atPlayhead(recording, stageCallRowDueAtS(record, recording.endedAt)),
+        /*
+         * Wave AP, lane DT-2 (swarm DT's Q3): a row that reads goals leads with its first crossing, or
+         * says none has happened, and prints no count. Seeded at the row's due instant and at the run's
+         * end, each at its own playhead, with a later press so the note's clause is swept; and a record
+         * written before the readings, whose counts-only row the caveat labels.
+         */
+        const dueS = stageCallRowDueAtS(record, recording.endedAt);
+        const rowsAt = (playheadS: number, records: readonly DayCallRecord[]) =>
+          stageCallRowsOf({
+            records,
+            playheadS,
+            endedAt: recording.endedAt,
+            log: [{ atS: Math.min(callAtS + 120, playheadS), change: { kind: 'park-cars-lobby' } }],
+            clockOf: (simTimeS) => clockOf(simTimeS, DAY_START_S),
+            goals: goalsForDay(1),
           });
-          seeds.push({ field: `stage.callRows(${row.id}).note`, text: row.note, role: 'prose' });
-          if (row.goals !== undefined) {
-            seeds.push({
-              field: `stage.callRows(${row.id}).goals`,
-              text: row.goals,
-              role: 'observation',
-              playhead: atPlayhead(recording, recording.endedAt),
-            });
+        seeds.push({ field: 'stage.callRows.heading', text: STAGE_CALL_ROWS_HEADING, role: 'label' });
+        for (const [at, records] of [
+          ['due', [record]],
+          ['end', [record]],
+          ['counts-only', [counted]],
+        ] as const) {
+          const playheadS = at === 'end' ? recording.endedAt : dueS;
+          const rows = rowsAt(playheadS, records);
+          const playhead = atPlayhead(recording, playheadS);
+          const caveat = stageCallRowsCaveatOf(rows);
+          if (caveat !== undefined) seeds.push({ field: `stage.callRows(${at}).caveat`, text: caveat, role: 'prose' });
+          for (const row of rows) {
+            const field = `stage.callRows(${row.id},${at})`;
+            seeds.push({ field: `${field}.heading`, text: row.heading, role: 'label' });
+            for (const [part, text] of [
+              ['lead', row.lead],
+              ['goals', row.goals],
+              ['counts', row.counts],
+            ] as const) {
+              if (text !== undefined) seeds.push({ field: `${field}.${part}`, text, role: 'observation', playhead });
+            }
+            if (row.note !== undefined) seeds.push({ field: `${field}.note`, text: row.note, role: 'prose' });
           }
         }
         /* § D1335 — the failed moment's row, at two instants of this run, each drawn once it is reached. */
@@ -13533,8 +13561,8 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
           clockOf: (simTimeS) => clockOf(simTimeS, DAY_START_S),
         })) {
           seeds.push({ field: `stage.callRows(${row.id}).heading`, text: row.heading, role: 'label' });
-          seeds.push({ field: `stage.callRows(${row.id}).counts`, text: row.counts, role: 'prose' });
-          seeds.push({ field: `stage.callRows(${row.id}).note`, text: row.note, role: 'prose' });
+          if (row.counts !== undefined) seeds.push({ field: `stage.callRows(${row.id}).counts`, text: row.counts, role: 'prose' });
+          if (row.note !== undefined) seeds.push({ field: `stage.callRows(${row.id}).note`, text: row.note, role: 'prose' });
         }
         /* § D1336 — a wrinkle that raised no call, its one turned-down moment the record above. */
         const quiet = {
@@ -13548,13 +13576,15 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
           clockOf: (simTimeS) => clockOf(simTimeS, DAY_START_S),
         })) {
           seeds.push({ field: `stage.callRows(${row.id}).heading`, text: row.heading, role: 'label' });
-          seeds.push({
-            field: `stage.callRows(${row.id}).counts`,
-            text: row.counts,
-            role: 'observation',
-            playhead: atPlayhead(recording, stageCallWrinkleQuietDueAtS(quiet, recording.endedAt)),
-          });
-          seeds.push({ field: `stage.callRows(${row.id}).note`, text: row.note, role: 'prose' });
+          if (row.counts !== undefined) {
+            seeds.push({
+              field: `stage.callRows(${row.id}).counts`,
+              text: row.counts,
+              role: 'observation',
+              playhead: atPlayhead(recording, stageCallWrinkleQuietDueAtS(quiet, recording.endedAt)),
+            });
+          }
+          if (row.note !== undefined) seeds.push({ field: `stage.callRows(${row.id}).note`, text: row.note, role: 'prose' });
         }
       }
       /* Wave AL, lane AL-A: the close's question while a call is up, its consequence and its two buttons. */

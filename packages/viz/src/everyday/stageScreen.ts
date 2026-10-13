@@ -164,7 +164,7 @@ import {
   STAGE_LOST_COPY,
   type StageCallOption,
 } from './stageCall.js';
-import { STAGE_CALL_ROWS_HEADING } from './stageCallRow.js';
+import { STAGE_CALL_ROWS_HEADING, stageCallRowsCaveatOf } from './stageCallRow.js';
 /* GitHub issue #340: the two beat-1 events. The recorder is a no-op until consent is granted. */
 import { everydayTelemetry } from './telemetryPort.js';
 import { telemetryRunPointerOf } from '../telemetry/schema.js';
@@ -1762,8 +1762,9 @@ function mountStage(
 
   /*
    * **Each answered call's row, once its window can be observed** — wave AL, lane AL-E,
-   * [§ D1219](../../../../DECISIONS.md). Counts only, in the report row's own words, from the call
-   * plus 660 s; the words and the timing are `everyday/stageCallRow.ts`'s, and this decides only
+   * [§ D1219](../../../../DECISIONS.md), from the call plus 660 s; since wave AP's lane DT-2 a row
+   * that reads goals leads with its first crossing and prints no count, and the caveat is said once
+   * above the rows. The words and the timing are `everyday/stageCallRow.ts`'s, and this decides only
    * where they go. Hidden by its attribute alone, with the layout on an inner body, for
    * `callBody`'s reason above.
    */
@@ -1781,7 +1782,8 @@ function mountStage(
   function drawCallRows(recording: VizRecording, simTimeS: number): void {
     const rows =
       dayCallsAskedIn(context.ctx) && watchingNow() === undefined ? host.dayCallRowsAt(recording, simTimeS) : [];
-    const key = rows.map((row) => `${row.id}|${row.counts}|${row.goals ?? ''}|${row.note}`).join('\n');
+    const caveat = stageCallRowsCaveatOf(rows);
+    const key = [caveat ?? '', ...rows.map((row) => `${row.id}|${row.lead ?? ''}|${row.goals ?? ''}|${row.counts ?? ''}|${row.note ?? ''}`)].join('\n');
     if (key === callRowsKey) return;
     callRowsKey = key;
     callRows.replaceChildren();
@@ -1792,22 +1794,40 @@ function mountStage(
     const heading = el(doc, 'div', 'everyday-stage-call-rows-heading', STAGE_CALL_ROWS_HEADING);
     heading.style.cssText = `font-size:10.5px;letter-spacing:0.08em;color:${C.label}`;
     body.append(heading);
+    /* Wave AP, lane DT-2: the caveat once, under the heading, rather than under every row. */
+    if (caveat !== undefined) {
+      const said = el(doc, 'p', 'everyday-stage-call-rows-caveat', caveat);
+      said.style.cssText = `margin:0;font-size:12px;line-height:1.45;color:${C.inkSoft}`;
+      body.append(said);
+    }
     for (const row of rows) {
       const item = el(doc, 'div', 'everyday-stage-call-row');
       item.dataset['row'] = row.id;
       item.style.cssText = 'display:grid;gap:3px';
       const title = el(doc, 'p', 'everyday-stage-call-row-heading', row.heading);
       title.style.cssText = 'margin:0;font-size:13px;font-weight:600';
-      const counts = el(doc, 'p', 'everyday-stage-call-row-counts', row.counts);
-      counts.style.cssText = 'margin:0;font-size:13px;line-height:1.45';
-      const note = el(doc, 'p', 'everyday-stage-call-row-note', row.note);
-      note.style.cssText = `margin:0;font-size:12px;line-height:1.45;color:${C.inkSoft}`;
-      /* § D1433: each answer's two final goals so far, under the counts they are set against. */
-      if (row.goals === undefined) item.append(title, counts, note);
-      else {
+      item.append(title);
+      /* DT-2: the first crossing leads, then each answer's goals so far, the answer taken first. */
+      if (row.lead !== undefined) {
+        const lead = el(doc, 'p', 'everyday-stage-call-row-lead', row.lead);
+        lead.style.cssText = 'margin:0;font-size:13px;line-height:1.45;font-weight:600';
+        item.append(lead);
+      }
+      if (row.goals !== undefined) {
         const goalsLine = el(doc, 'p', 'everyday-stage-call-row-goals', row.goals);
         goalsLine.style.cssText = 'margin:0;font-size:13px;line-height:1.45';
-        item.append(title, counts, goalsLine, note);
+        item.append(goalsLine);
+      }
+      /* A counts-only row (a record written before the readings), and a failed or quiet row's sentence. */
+      if (row.counts !== undefined) {
+        const counts = el(doc, 'p', 'everyday-stage-call-row-counts', row.counts);
+        counts.style.cssText = 'margin:0;font-size:13px;line-height:1.45';
+        item.append(counts);
+      }
+      if (row.note !== undefined) {
+        const note = el(doc, 'p', 'everyday-stage-call-row-note', row.note);
+        note.style.cssText = `margin:0;font-size:12px;line-height:1.45;color:${C.inkSoft}`;
+        item.append(note);
       }
       body.append(item);
     }

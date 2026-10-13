@@ -234,28 +234,61 @@ export function stageCallDriverLineOf(profile: Pick<DispatcherProfile, 'name' | 
  * and the longest wait, the one whose reading is the larger share of its bar, with the reading and
  * the bar: *Nearest its bar: the longest wait so far is 252 s, against a bar of 380 s.* `readings`
  * are the rail's at the call second (`host.goalsAt`), identical off all three runs, and a maximum so
- * far is a floor under the day's figure, so the line is true of the instant and claims nothing
- * after it. A goal the rail reads as pending (a wait still under way, or too few arrivals) is not
- * named; with neither readable, nothing is said. The share goals move both ways and are not named.
+ * far is a floor under the day's figure, so the line is true of the instant and claims nothing after
+ * it. The share goals move both ways and are not named.
+ *
+ * **A goal already past its bar ranks first** — wave AP, lane DT-2, swarm DT's Q3 item 7, seat A's
+ * W1 Thursday at 12:36: the card said *the longest of them has waited 473 s* and named the landing,
+ * at 19 of 26, as nearest its bar against a worst-wait bar of 400 s. The pick read only goals the
+ * rail reads met, so it skipped both a reading the rail reads past its bar and a longest wait the
+ * rail reads as pending because it is a rider still standing. Both are now named first, as *Past its
+ * bar*: a reading past it in its own words, and a standing rider (`longestStandingS`, the card's own
+ * present-tense fold) whose wait so far already exceeds the bar as *a rider still standing at 473 s*.
+ * That is the present: the rider has waited that long. It says nothing about when the rider boards,
+ * or whether the day can still clear, which is the lost card's to say from the rail's own reading
+ * (§ D1435). A pending wait under its bar, or one pending because too few have arrived, is still not
+ * named; with nothing readable, nothing is said.
  */
-export function stageCallNearestBarLineOf(readings: readonly GoalReading[]): string | undefined {
-  const readable = readings.filter(
-    (reading) =>
-      DAY_CALL_FINAL_GOAL_IDS.includes(reading.goal.id) &&
-      reading.state === 'met' &&
-      reading.observed !== null &&
-      reading.goal.bar > 0,
-  );
-  let nearest: GoalReading | undefined;
-  for (const reading of readable) {
-    if (nearest === undefined || (reading.observed ?? 0) / reading.goal.bar > (nearest.observed ?? 0) / nearest.goal.bar) {
-      nearest = reading;
+export function stageCallNearestBarLineOf(
+  readings: readonly GoalReading[],
+  longestStandingS?: number,
+): string | undefined {
+  const awake = readings.some((reading) => DAY_CALL_FINAL_GOAL_IDS.includes(reading.goal.id) && reading.state !== 'pending');
+  const candidates = readings.flatMap((reading) => {
+    if (!DAY_CALL_FINAL_GOAL_IDS.includes(reading.goal.id) || reading.goal.bar <= 0) return [];
+    const unit = reading.goal.unit;
+    const bar = `against a bar of ${String(reading.goal.bar)}${unit}`;
+    const what = reading.goal.id === 'queue' ? 'the deepest landing so far is' : 'the longest wait so far is';
+    if ((reading.state === 'met' || reading.state === 'missed') && reading.observed !== null) {
+      const past = reading.state === 'missed';
+      return [{
+        past,
+        share: reading.observed / reading.goal.bar,
+        line: `${past ? 'Past' : 'Nearest'} its bar: ${what} ${String(reading.observed)}${unit}, ${bar}.`,
+      }];
+    }
+    /* A longest wait the rail reads as pending because a rider still standing holds it. */
+    const standing = longestStandingS === undefined ? undefined : Math.round(longestStandingS);
+    if (reading.goal.id === 'worst-wait' && reading.state === 'pending' && awake && standing !== undefined && standing > reading.goal.bar) {
+      return [{
+        past: true,
+        share: standing / reading.goal.bar,
+        line: `Past its bar: ${what} a rider still standing at ${String(standing)}${unit}, ${bar}.`,
+      }];
+    }
+    return [];
+  });
+  let nearest: (typeof candidates)[number] | undefined;
+  for (const candidate of candidates) {
+    if (
+      nearest === undefined ||
+      (candidate.past && !nearest.past) ||
+      (candidate.past === nearest.past && candidate.share > nearest.share)
+    ) {
+      nearest = candidate;
     }
   }
-  if (nearest === undefined || nearest.observed === null) return undefined;
-  const unit = nearest.goal.unit;
-  const what = nearest.goal.id === 'queue' ? 'the deepest landing so far is' : 'the longest wait so far is';
-  return `Nearest its bar: ${what} ${String(nearest.observed)}${unit}, against a bar of ${String(nearest.goal.bar)}${unit}.`;
+  return nearest?.line;
 }
 
 /**
@@ -339,8 +372,9 @@ export function stageCallCardOf(
    */
   if (call.wrinkle !== undefined) facts.push(stageCallWrinkleLineOf(call.wrinkle, dayStartS));
   if (present !== undefined) facts.push(presentLineOf(present));
-  /* § D1432: the goal nearest its bar, read at the call second, last. */
-  const nearest = teaching?.readings === undefined ? undefined : stageCallNearestBarLineOf(teaching.readings);
+  /* § D1432: the goal nearest its bar, read at the call second, last; one already past it first (DT-2). */
+  const nearest =
+    teaching?.readings === undefined ? undefined : stageCallNearestBarLineOf(teaching.readings, present?.longestS);
   if (nearest !== undefined) facts.push(nearest);
   const teach = teaching !== undefined;
   if (drivers !== undefined) {

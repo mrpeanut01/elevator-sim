@@ -737,7 +737,9 @@ export const AGREED_FIGURES: readonly AgreedFigure[] = Object.freeze<AgreedFigur
       '`everyday/stageCallRow.ts#stageCallRowsOf` draws it at the call plus 660 s from a record the ' +
       'shipped `dayCallRecordOf` counted, over `day-call-row`’s edge-case legs; the right side counts ' +
       'the same legs by the expression written there. A stage row that counted anything else, or drew ' +
-      'before the window’s last rider had settled, would publish a count its runs do not hold.',
+      'before the window’s last rider had settled, would publish a count its runs do not hold. Since wave ' +
+      'AP’s lane DT-2 a row that reads goals prints no count; a record written before the readings, as ' +
+      'this fixture is, keeps its counts-only row, and that row is what this pair holds.',
     left: {
       surfaceId: 'everyday/stageCallRow.ts#stageCallRowsOf',
       read: () => {
@@ -757,7 +759,7 @@ export const AGREED_FIGURES: readonly AgreedFigure[] = Object.freeze<AgreedFigur
           clockOf: (simTimeS) => clockOf(simTimeS, DAY_START_S),
         });
         if (row === undefined) return undefined;
-        const counts = /: (\d+) with park[^,]*, (\d+) with spread[^.]* and (\d+) with leave/u.exec(row.counts);
+        const counts = /: (\d+) with park[^,]*, (\d+) with spread[^.]* and (\d+) with leave/u.exec(row.counts ?? '');
         return counts === null ? undefined : `${String(counts[1])}/${String(counts[2])}/${String(counts[3])}`;
       },
     },
