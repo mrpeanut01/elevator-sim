@@ -1,0 +1,24 @@
+## Common rules for every wave AP lane
+
+You are one lane of an autonomous game studio making elevator-sim a very playable, very successful game. The owner's standing instructions are in `CHARTER_PROGRAMME.md` under "The owner's standing instructions for autonomous work"; read them. Read `CLAUDE.md` (the invariants, statistical discipline and "move the control and require the run to change, compared on the legs" bind you), then `docs/38-what-the-game-is.md` and `docs/39-decisions-in-force.md`.
+
+**Base.** Your worktree starts on an older commit. First thing: `git reset --hard ed379f9` (wave AO whole, PR #620's head 14e18c9, plus wave AP's reservation D1445-D1540). Confirm `git log --oneline -1` shows `ed379f9`. If the reset is refused, use `git checkout --detach ed379f9` then `git switch -c` a branch of your own.
+
+**node_modules.** Your worktree's symlinked `node_modules` resolves `@elevator-sim/*` to the main checkout, which gives false `tsc` and test results. Build a real one: `mkdir node_modules.real && for e in /home/user/elevator-sim/node_modules/* /home/user/elevator-sim/node_modules/.bin; do n=$(basename $e); [ "$n" = "@elevator-sim" ] || ln -s "$e" node_modules.real/$n; done; mkdir node_modules.real/@elevator-sim; for p in cli core experiments server viz; do ln -s ../../packages/$p node_modules.real/@elevator-sim/$p; done`, then replace `node_modules` with it (`rm node_modules` only if it is a symlink; use literal paths or `${VAR:?}` in any `rm`), and symlink `packages/{core,experiments,viz}/node_modules` to the main checkout's equivalents if they exist. Check `readlink -f node_modules/@elevator-sim/core` points inside your worktree.
+
+**Tests.** Six vitest projects: viz, viz-browser, core, experiments, cli, server. The browser tier needs `ELEVATOR_SIM_CHROMIUM=/opt/pw-browsers/chromium-1194/chrome-linux/chrome` or every case skips silently; always read file and case counts, never the word "passed". The machine has 4 cores shared with other lanes: use `--maxWorkers=2` or less, run browser files one at a time, and do not run the whole viz project (the integrator does). Run the test files you touch, their neighbours, `testCost.test.ts`, `deadCode.test.ts`, `boundaries.test.ts`, `honesty/derive.test.ts`, and `packages/experiments/src/validation/documentation.test.ts` + `citations.test.ts`, plus `npx tsc -b packages/viz` (and core if touched).
+
+**Decisions.** Your decision numbers are in your brief below; allocate sequentially from the bottom of your block and report the highest used. Never take numbers outside it. An entry in `DECISIONS.md` is owed only when a decision reaches past your module (§ D405); use the § D729 agent-ruling form ("Taken by agent sessions under delegated authority…", naming owner-reversible clauses). Add a `docs/39` row for any entry that moves or amends a ruling in force.
+
+**Honesty corpus.** Do not publish corpus figures (§ D343: measured once, after integration). Do publish a forecast: per-case strings and surfaces you expect your change to add, with its decomposition, or a floor if you cannot derive it.
+
+**Writing.** Player-facing copy: plain, true of the run, no advice the measurement does not license. Documents: no em or en dashes inside paragraph bodies, no "not X, it's Y" constructions.
+
+**Git.** Commit on your worktree branch with trailers:
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_015na6GKYZnv9hW3Chy6ALuR
+Do not push. Commit at least every hour (the container can be reclaimed; WIP commits are fine and will be squashed).
+
+**Report** (your final message, about 400 words at most, sent once and never resent): head commit, decision numbers used and unspent, each change with its test (red before, green after, with counts), the corpus forecast, browser files run, and anything not established. Be concrete; the integrator merges from your report.
+
+**Read your source first.** The post-AO panel's reports are `/tmp/claude-0/-home-user-elevator-sim/96ab6e1a-00db-5ceb-940f-5b1532967d30/scratchpad/rescore-ap/A.md`, `B.md` and `D.md`; a design lane also builds swarm DT's reconciled ruling (`.../scratchpad/decide-dt/ruling.md`). Read the parts your brief names; where your brief and the ruling differ, the ruling wins and you say so. **Browsers:** start your own on a port nobody else uses (your brief names one), never reuse another agent's driver scripts, and build your own bundle with `npx tsc -b packages/viz && (cd packages/viz && npx vite build)` if you need one. The machine is heavily loaded (several lanes and a swarm), so run **one vitest process at a time with `--maxWorkers=1`**, browser files one at a time, and any census detached with `setsid nohup` and a log, so a tool timeout cannot kill it. **Verification is lighter:** guards, touched files and their neighbours locally; CI runs the full suite. Keep to your files where you can and name any shared file you had to touch.

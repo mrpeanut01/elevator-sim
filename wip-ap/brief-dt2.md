@@ -1,0 +1,13 @@
+## Lane DT-2: rows that teach, and the top
+
+Decision block **D1471–D1480**. Browser port: **6014**. Your ruling is `.../scratchpad/decide-dt/ruling.md`, "Q3" items 1 to 7 and "Q4" items 2 to 4; read it, then S3.md's Q3 (the crossing timings) and S2.md's Q3 (what may be shown when).
+
+**Build:**
+1. **The row leads with the first crossing** once the playhead has reached it, in the ruling's wording; until then *No answer has crossed a bar yet*, then each answer's deepest landing and longest wait at the playhead, the answer taken first. Nothing is read past the playhead, and *cleared* only at the close. Test at the crossing minute and one minute before (`everyday/stageCallRow.test.ts`).
+2. **The count leaves the stage row**; on the report row it comes last, labelled as not one of the day's goals. The caveat is said once, above the rows.
+3. **The pinned call reads goals**: `dev/main.ts#measurePinnedCall` passes each of its three runs through `dayCallMaximaOf` into `dayCallRecordOf`; a record written before keeps its counts-only row. Red before: the pinned 10:40 row shows counts only.
+4. **The close names every answer's verdict on a split row**, with the goal each missing answer crossed, its figure and its clock (widens § D1433 clause 3; write the amendment). Lane DT-1 adds a separate past-tense line naming the drivers that cleared a pooled crowd; keep your close change to the split rows.
+5. **The card's two faults**: the nearest-bar pick must rank a goal already past its bar first (seat A: W1 Thursday 12:36, landing named while the wait read 473 s against 400 s), and the card and the row must read one source at one instant (seat D's D5, W1 Thursday 08:48: card 27 against 26, row 26). Root-cause the second; do not paper over it.
+6. **The held top's sheet**: *Start next week here* stays the primary press; the tower's Rush is offered beside it with this device's best (§ D1420) and the line that chimes buy its pre-fit and purse there (§ D1418). The onward tower is offered only where a census admits a harder ladder (§ D1259); say what the next level adds where one exists, *harder* only on § D1344's measure. Test in `shift/nextWeek.test.ts` or wherever the sheet is composed, and a browser case if the press is new.
+
+**Files you own:** `everyday/stageCallRow.ts`, the call card and rows in `everyday/stageScreen.ts`, `dev/main.ts#measurePinnedCall`, the close's split-row lines, and the week sheet's top section. Lane DT-1 owns the pool, the dealer, the gates, *Your week*'s band sentence, the brief's ways line and the close's driver names; lane AP-D1 owns the lost-day stop and the skip; lane AP-D2 owns the week sheet's award line. Keep any diff in their files small and name it.
