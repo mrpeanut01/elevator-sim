@@ -24,8 +24,13 @@
  * turns and derives the balance, `everyday/chimeStore.ts` keeps them, and the `signed-out` arm and
  * its sentence are **deleted rather than reworded** ([§ D227](../../../../DECISIONS.md)) in favour
  * of `device`. What the device tally buys is a scenario's own budget rung, which the scenario
- * prices — **not** one of the three sinks below, which are the account ledger's and stay refused
- * off an account, each with its own reason on its own row.
+ * prices. ~~**not** one of the three sinks below, which are the account ledger's and stay refused
+ * off an account, each with its own reason on its own row.~~ *Replaced in writing by
+ * [§ D1418](../../../../DECISIONS.md), swarm DS's Q3 ruling (three of three): off an account the
+ * three sinks are bought from the device tally too, for play on this device, and each row says that
+ * what it buys stays here.* The row's refusal (`rowSignedOut`, *"These are bought against your
+ * account, so signing in is what makes this one spendable"*) is deleted rather than reworded on the
+ * commit that made it false, § D227.
  *
  * The rest of this section is left standing as the dated record it is, because the defect it
  * describes is the one a reader most needs to have met before touching this file.
@@ -203,13 +208,16 @@ export const SPEND_ABSENCES: Readonly<Record<string, string>> = Object.freeze({
  * something false. Every arm but `buy` carries a {@link ChimesSpendRowView.note}.
  */
 export type ChimesSpendOffer =
-  /** Offered, affordable, and there is an account and a route to spend through. */
+  /**
+   * Offered and affordable: an account and a route to spend through, or, off an account, this
+   * device's tally for play on this device ([§ D1418](../../../../DECISIONS.md)).
+   */
   | 'buy'
   /** Offered and the balance does not cover it. The note carries the shortfall. */
   | 'short'
   /** Bought already, up to what one run may claim. A second purchase would buy nothing. */
   | 'owned'
-  /** Nothing is wrong with the sink; something is missing here and now — no account, or no server. */
+  /** Nothing is wrong with the sink; something is missing here and now — no read yet, or no ledger. */
   | 'unavailable'
   /** This build does not sell it, and {@link SPEND_ABSENCES} says why. */
   | 'not-offered';
@@ -302,7 +310,7 @@ export const CHIMES_PANEL_COPY = Object.freeze({
   spendNote:
     'A wider budget for a scenario is the fourth thing chimes are for, and it is not on this list ' +
     'because each scenario sets its own price for it rather than this table \u2014 so nothing here ' +
-    'charges one. The fix-a-building screen does, on the case in front of you.',
+    'charges one. The fix-a-building screen and a stage\u2019s own page do, on the one in front of you.',
   /** What the one offered row does, said before the press rather than after it. */
   prefitOffer:
     'Your next rush starts with the doors, the control and the tenancies already fitted, and it is ' +
@@ -360,16 +368,39 @@ export const CHIMES_PANEL_COPY = Object.freeze({
     'Open a building on the Career screen first — this tops up that tower\u2019s purse, so there ' +
     'has to be one.',
   /**
-   * These three are the **ledger's** sinks and the ledger is on the account — GitHub issue #579.
+   * **What each row does when this device's tally pays** — [§ D1418](../../../../DECISIONS.md),
+   * swarm DS's Q3 ruling, which replaced § D911 clause 6 in writing. The account sentences above say
+   * a fitted or widened sitting is posted to its own board, and that is false of a device purchase:
+   * a sitting started with one is never offered for posting (`rushSitting.ts#RUSH_SITTING_COPY.boughtOnDevice`).
+   * So each device row says plainly that what it buys stays on this device, which is the ruling's
+   * own requirement of this panel.
    *
-   * It read *"Sign in and there is a tally to spend this from"*, which told a player off an account
-   * that there was no tally at all. There is one now and it buys something else, so the row says
-   * which: § D227 in the direction that matters here, where the stale half of a refusal is the half
-   * a player would have acted on.
+   * It replaced `rowSignedOut` (*"These are bought against your account, so signing in is what makes
+   * this one spendable"*), deleted rather than reworded on the commit that made it false (§ D227).
    */
-  rowSignedOut:
-    'These are bought against your account, so signing in is what makes this one spendable. What ' +
-    'this device has banked is spent on a wider budget instead, on the case in front of you.',
+  prefitDeviceOffer:
+    'Your next rush on this device starts with the doors, the control and the tenancies already ' +
+    'fitted, bought once from this device\u2019s chimes. It stays on this device: a sitting started ' +
+    'fitted is kept here and never posted.',
+  prefitDeviceOwned:
+    'Bought on this device. Your next rush here starts fitted, and a sitting started fitted is kept ' +
+    'on this device and never posted.',
+  purseDeviceOffer:
+    'into the purse of the tower your Career desk is open on, from this device\u2019s chimes, to spend ' +
+    'on works there like any other unit. It stays with this device\u2019s career. Works still take the ' +
+    'nights they take, and nothing here buys back a missed day.',
+  purseDeviceOwned:
+    'Bought on this device, as many times as one contract may be topped up. The units are in the ' +
+    'purse of the tower each was bought for, in this device\u2019s career.',
+  rushPurseDeviceOffer:
+    'into the purse every rush sitting you start on this device opens with, from this device\u2019s ' +
+    'chimes, to spend on rebuilding the tower between rounds. A sitting that opens with it is kept ' +
+    'on this device and never posted.',
+  rushPurseDeviceOwned:
+    'Bought on this device, as many times as a rush purse may be topped up. Every rush sitting you ' +
+    'start here opens with these units, and is kept on this device rather than posted.',
+  /** A device row whose tally the caller did not read, so nothing is offered from it. */
+  rowNoDeviceRead: 'This device\u2019s tally has not been read on this screen, so nothing is offered from it.',
   /** The account bridge has not answered, so whether this can be pressed is not yet known. */
   rowBooting: 'Still finding out whether you are signed in, so this is not offered for a moment.',
   /** Served with no API origin: there is no ledger on this build to spend out of. */
@@ -383,14 +414,15 @@ export const CHIMES_PANEL_COPY = Object.freeze({
    * this device"*, and its second half stopped being true on the commit that built
    * `everyday/deviceChimes.ts`.
    *
-   * What it says now is bounded by what is built, and the bound is the second clause: this tally
-   * pays for a scenario's own budget, which the scenario prices and which needs no route, and it
-   * does not pay for the three rows below, which are the account ledger's.
+   * Reworded again by [§ D1418](../../../../DECISIONS.md): it ended *"the three below are bought
+   * against an account, so signing in is what opens those"*, and off an account they are bought from
+   * this tally now. What it says is bounded by what is built: what this tally buys, and that what it
+   * buys stays on this device, because a device purchase is never posted.
    */
   deviceHome:
     'You are not signed in, so this tally is kept on this device. It pays for a wider budget on a ' +
-    'scenario you are playing; the three below are bought against an account, so signing in is ' +
-    'what opens those.',
+    'scenario or a stage you are playing and for the three below, and whatever it buys stays on this ' +
+    'device: a run that uses it is kept here and never posted.',
   /** And where the browser will not keep it — `settingsView.ts#saveNotice`'s shape, one block down. */
   deviceNotDurable:
     'This device is not keeping storage, so anything finished here is counted until this tab ' +
@@ -421,6 +453,10 @@ export interface ChimesSpendCopy {
   readonly offer: string;
   /** What it did, once it is bought to its cap — the same sentence in the past tense. */
   readonly owned: string;
+  /** {@link offer} when this device's tally pays, saying what it buys stays here (§ D1418). */
+  readonly deviceOffer: string;
+  /** {@link owned} when this device bought it (§ D1418). */
+  readonly deviceOwned: string;
   /** Whether it needs a career desk open to land in. */
   readonly needsOpenTower: boolean;
 }
@@ -429,16 +465,22 @@ export const SPEND_OFFERS: Readonly<Record<string, ChimesSpendCopy>> = Object.fr
   [CAREER_PURSE_TOP_UP_SINK_ID]: Object.freeze({
     offer: CHIMES_PANEL_COPY.purseOffer,
     owned: CHIMES_PANEL_COPY.purseOwned,
+    deviceOffer: CHIMES_PANEL_COPY.purseDeviceOffer,
+    deviceOwned: CHIMES_PANEL_COPY.purseDeviceOwned,
     needsOpenTower: true,
   }),
   'rush-prefit': Object.freeze({
     offer: CHIMES_PANEL_COPY.prefitOffer,
     owned: CHIMES_PANEL_COPY.prefitOwned,
+    deviceOffer: CHIMES_PANEL_COPY.prefitDeviceOffer,
+    deviceOwned: CHIMES_PANEL_COPY.prefitDeviceOwned,
     needsOpenTower: false,
   }),
   'rush-purse-top-up': Object.freeze({
     offer: CHIMES_PANEL_COPY.rushPurseOffer,
     owned: CHIMES_PANEL_COPY.rushPurseOwned,
+    deviceOffer: CHIMES_PANEL_COPY.rushPurseDeviceOffer,
+    deviceOwned: CHIMES_PANEL_COPY.rushPurseDeviceOwned,
     needsOpenTower: false,
   }),
 });
@@ -512,6 +554,14 @@ export interface ChimesPanelInput {
   /** The server's own sentence about the last press, carried unrewritten. */
   readonly notice?: string | undefined;
   /**
+   * **What this device has bought of each sink** — `deviceChimes.ts#deviceOwnedOf`,
+   * [§ D1418](../../../../DECISIONS.md). Read on the `device` home only, where it stands where
+   * {@link owns} stands for an account: the cap a row is drawn *bought* at counts this device's
+   * purchases. Absent draws every device row `unavailable`, the arm that promises least, because a
+   * row drawn buyable over steps this device already holds would take its chimes for nothing.
+   */
+  readonly deviceOwns?: readonly { readonly sinkId: string; readonly steps: number }[] | undefined;
+  /**
    * Whether this device will keep the tally past the tab — `chimeStore.ts#DeviceChimeStore.durable`.
    *
    * Drawn only on the `device` home, and **never claimed**: absent or `true` says nothing extra,
@@ -547,23 +597,27 @@ function offerOf(
    */
   const copy = SPEND_OFFERS[sink.id];
   if (copy === undefined) return { offer: 'not-offered', note: UNDESCRIBED_SINK };
-  if (input.spendable !== true) {
+  if (input.home === 'booting') return { offer: 'unavailable', note: CHIMES_PANEL_COPY.rowBooting };
+  /*
+   * **Off an account, this device's tally pays** — [§ D1418](../../../../DECISIONS.md), replacing
+   * § D911 clause 6 in writing. The same cap, desk and shortfall rules as an account's row, read
+   * over what this device bought, and the sentence says that what it buys stays on this device.
+   */
+  const onDevice = input.home === 'device';
+  if (!onDevice && input.spendable !== true) {
     return { offer: 'unavailable', note: CHIMES_PANEL_COPY.rowNoLedger };
   }
-  if (input.home === 'booting') return { offer: 'unavailable', note: CHIMES_PANEL_COPY.rowBooting };
-  if (input.home !== 'account') {
-    return { offer: 'unavailable', note: CHIMES_PANEL_COPY.rowSignedOut };
+  const owns = onDevice ? input.deviceOwns : input.owns;
+  if (owns === undefined) {
+    return { offer: 'unavailable', note: onDevice ? CHIMES_PANEL_COPY.rowNoDeviceRead : CHIMES_PANEL_COPY.rowBooting };
   }
-  if (input.owns === undefined) {
-    return { offer: 'unavailable', note: CHIMES_PANEL_COPY.rowBooting };
-  }
-  const held = input.owns.find((entry) => entry.sinkId === sink.id)?.steps ?? 0;
+  const held = owns.find((entry) => entry.sinkId === sink.id)?.steps ?? 0;
   /*
    * At the cap this run may claim, a second purchase buys nothing — `chimeSpendPrice` would take
    * the chimes and `unbackedModifiers` would still cap the claim at `maxSteps`. So the row says
    * *bought* rather than offering a step the ledger will not honour.
    */
-  if (held >= sink.maxSteps) return { offer: 'owned', note: copy.owned };
+  if (held >= sink.maxSteps) return { offer: 'owned', note: onDevice ? copy.deviceOwned : copy.owned };
   /*
    * **After *bought* and before *short*, and the order is the decision.** A row already bought to
    * its cap says so whatever desk is open — that sentence is true of the account and does not
@@ -583,7 +637,7 @@ function offerOf(
     const unit = short === 1 ? CHIME_PRICES.currency.one : CHIME_PRICES.currency.many;
     return { offer: 'short', note: `Short by ${String(short)} ${unit}.` };
   }
-  return { offer: 'buy', note: offerNoteOf(sink, copy) };
+  return { offer: 'buy', note: offerNoteOf(sink, onDevice ? copy.deviceOffer : copy.offer) };
 }
 
 /**
@@ -602,10 +656,10 @@ function offerOf(
  * widened a landed boundary to make a sentence convenient, and the row offers exactly one step, so
  * the helper's whole contribution over the authored field would have been multiplying by 1.
  */
-function offerNoteOf(sink: ChimeSink, copy: ChimesSpendCopy): string {
+function offerNoteOf(sink: ChimeSink, offer: string): string {
   const granted = sink.modifier.grantUnits;
-  if (granted <= 0) return copy.offer;
-  return `${String(granted)} ${granted === 1 ? 'unit' : 'units'} ${copy.offer}`;
+  if (granted <= 0) return offer;
+  return `${String(granted)} ${granted === 1 ? 'unit' : 'units'} ${offer}`;
 }
 
 /**

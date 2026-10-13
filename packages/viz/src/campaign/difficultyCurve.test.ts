@@ -442,6 +442,12 @@ const DC2B_SHORT: ReadonlySet<string> = new Set<string>([]);
  * arriving from the dropdown, and it is a DC-2 breach at position seven all the same, recorded rather
  * than rebalanced.
  *
+ * **Stage 7's row went from three names to one on 2026-10-13** ([§ D1426](../../../../DECISIONS.md)):
+ * at 2.25 %pop/5 min, DC-12's rebalance, the lane's census of the stage (the same press and judge,
+ * not this file's deep tier, which was not re-run) reads only `predictive-balanced` meeting every
+ * bar on the tuning seeds, and the holdout refuses it. `auction-multi-round` and `collective-enroute`
+ * no longer meet on the tuning seeds, so they leave.
+ *
  * **Stage 9 entered on 2026-10-10 as a named breach, owner-reversible** ([§ D1288](../../../../DECISIONS.md),
  * decision swarm DP's ruling on #558 option (ii)). At its old 2.5 %pop/5 min one tuning crowd was
  * refused its mean for every arm, so nothing could meet a bar and the stage was unjudgeable. At
@@ -456,7 +462,7 @@ const DROPDOWN_CLEARS: Readonly<Record<string, readonly string[]>> = Object.free
   'stage-1-first-call': ['zoned-uppeak'],
   'stage-3-overwhelmed': ['fairness-first'],
   'stage-5-credentials': ['auction', 'capacity-aware', 'energy-aware', 'eta', 'fairness-first', 'predictive-balanced'],
-  'stage-7-prove-it': ['auction-multi-round', 'collective-enroute', 'predictive-balanced'],
+  'stage-7-prove-it': ['predictive-balanced'],
   'stage-9-both-ways-at-once': ['auction', 'auction-multi-round', 'destination-panel'],
 });
 
@@ -483,8 +489,8 @@ const DROPDOWN_CLEARS: Readonly<Record<string, readonly string[]>> = Object.free
  */
 const DROPDOWN_CLEARS_REFUSED_ON_HOLDOUT: Readonly<Record<string, readonly string[]>> = Object.freeze({
   'stage-5-credentials': ['auction', 'capacity-aware', 'energy-aware', 'eta', 'fairness-first'],
-  /* § D1235: under `zoned-uppeak` all three meet on the tuning seeds and none holds on the holdout. */
-  'stage-7-prove-it': ['auction-multi-round', 'collective-enroute', 'predictive-balanced'],
+  /* § D1426: at 2.25 %pop/5 min it meets on the tuning seeds and does not hold on the holdout. */
+  'stage-7-prove-it': ['predictive-balanced'],
 });
 
 /**

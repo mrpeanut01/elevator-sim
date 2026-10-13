@@ -20,12 +20,14 @@ import {
   CHIME_AWARDS,
   DEVICE_CHIMES_KEY,
   DEVICE_CHIMES_QUARANTINE_KEY,
+  DEVICE_SINK_PRICES,
   boughtStepIdOf,
   decodeDeviceChimes,
   deviceBalanceOf,
+  deviceOwnedOf,
   emptyDeviceChimes,
   encodeDeviceChimes,
-  turnKeyOf,
+  withSinkSpend,
   withSpend,
   withTurn,
 } from './deviceChimes.js';
@@ -34,6 +36,10 @@ import type { SessionStore } from '../persist/types.js';
 const SCENARIO_AWARD = CHIME_AWARDS.awards['scenario-cleared'] ?? 0;
 const RUSH_AWARD = CHIME_AWARDS.awards['rush-wave-survived'] ?? 0;
 const DAY_AWARD = CHIME_AWARDS.awards['career-day-paid'] ?? 0;
+const PAR_AWARD = CHIME_AWARDS.awards['scenario-at-par'] ?? 0;
+/** A sink's price, read off the shipped table rather than written down. */
+const priceOf = (sinkId: string): number => DEVICE_SINK_PRICES.sinks.find((sink) => sink.id === sinkId)?.priceChimes ?? Number.NaN;
+const capOf = (sinkId: string): number => DEVICE_SINK_PRICES.sinks.find((sink) => sink.id === sinkId)?.maxSteps ?? Number.NaN;
 
 function fakeBacking(): { store: SessionStore; slots: Map<string, string> } {
   const slots = new Map<string, string>();
@@ -93,34 +99,65 @@ describe('the device ledger records turns and derives a balance — § D711 clau
     expect(withTurn(empty, { completion: 'rush-wave-survived', waves: 1.5 })).toBe(empty);
   });
 
-  it('counts a contract day every time, because nothing can tell a second day from a re-post', () => {
+  it('pays a contract day once per day it names, and every day it names — § D1416', () => {
     /*
-     * § D533 clause 4, named rather than smoothed — the module docstring calls this the clause to
-     * distrust first, and the test says which behaviour that clause produces rather than leaving a
-     * reader to infer it.
+     * The inverse of the case that stood here, and the inversion is the record: it read *"counts a
+     * contract day every time, because nothing can tell a second day from a re-post"*. The day names
+     * itself now, so the same day filed twice pays once and two days pay twice.
      */
     let record = emptyDeviceChimes();
-    record = withTurn(record, { completion: 'career-day-paid' });
-    record = withTurn(record, { completion: 'career-day-paid' });
+    record = withTurn(record, { completion: 'career-day-paid', key: 'career:c1:m0:d1:t1' });
+    const once = record;
+    record = withTurn(record, { completion: 'career-day-paid', key: 'career:c1:m0:d1:t1' });
+    expect(record, 'the same day filed twice paid twice').toBe(once);
+    record = withTurn(record, { completion: 'career-day-paid', key: 'career:c1:m0:d2:t2' });
     expect(deviceBalanceOf(record)).toBe(DAY_AWARD * 2);
-    expect(turnKeyOf({ completion: 'career-day-paid' })).toBe('');
+  });
+
+  it('reads a version-1 record’s counted days and pays them again under no composed day — § D1416', () => {
+    /* Version 1 keyed a day by a count; no composed key is a bare number, so the two never collide. */
+    const v1 = JSON.stringify({
+      version: 1,
+      turns: [
+        { completion: 'career-day-paid', key: '1' },
+        { completion: 'career-day-paid', key: '2' },
+      ],
+      spends: [],
+    });
+    const loaded = decodeDeviceChimes(v1);
+    expect(loaded.refusal).toBeUndefined();
+    expect(deviceBalanceOf(loaded.record)).toBe(DAY_AWARD * 2);
+    expect(loaded.record.sinks).toEqual([]);
+    const next = withTurn(loaded.record, { completion: 'career-day-paid', key: 'week:c1:s20260901' });
+    expect(deviceBalanceOf(next)).toBe(DAY_AWARD * 3);
+  });
+
+  it('pays a par once per scenario, apart from the scenario’s clear — § D1417', () => {
+    expect(PAR_AWARD, 'the shipped table pays nothing for a par').toBeGreaterThan(0);
+    let record = withTurn(emptyDeviceChimes(), { completion: 'scenario-cleared', scenarioId: 'stage-2' });
+    record = withTurn(record, { completion: 'scenario-at-par', scenarioId: 'stage-2' });
+    const once = record;
+    record = withTurn(record, { completion: 'scenario-at-par', scenarioId: 'stage-2' });
+    expect(record).toBe(once);
+    expect(deviceBalanceOf(record)).toBe(SCENARIO_AWARD + PAR_AWARD);
   });
 
   it('pays a held level once, keyed by the level, and another level again — § D1402', () => {
+    /* A keyed completion since a held level joined § D1416's table: `{ completion, key }`. */
     const levelAward = CHIME_AWARDS.awards['week-held'] ?? 0;
-    expect(levelAward, 'the shipped table pays a held week nothing').toBe(10);
+    expect(levelAward, 'the shipped table pays a held week nothing').toBeGreaterThan(0);
     let record = emptyDeviceChimes();
-    record = withTurn(record, { completion: 'week-held', levelKey: 'c2/3' });
+    record = withTurn(record, { completion: 'week-held', key: 'c2/3' });
     const once = record;
-    record = withTurn(record, { completion: 'week-held', levelKey: 'c2/3' });
+    record = withTurn(record, { completion: 'week-held', key: 'c2/3' });
     expect(record, 'a level held again was recorded again').toBe(once);
-    record = withTurn(record, { completion: 'week-held', levelKey: 'c2/4' });
+    record = withTurn(record, { completion: 'week-held', key: 'c2/4' });
     expect(deviceBalanceOf(record)).toBe(levelAward * 2);
-    expect(turnKeyOf({ completion: 'week-held', levelKey: 'c2/4' })).toBe('c2/4');
+    expect(record.turns.map((turn) => turn.key)).toEqual(['c2/3', 'c2/4']);
   });
 
   it('never reads below zero, whatever a hand-edited record holds', () => {
-    const tampered = { version: 1, turns: [], spends: [{ scenarioId: 'a', stepId: 'b', chimes: 99 }] };
+    const tampered = { version: 2, turns: [], spends: [{ scenarioId: 'a', stepId: 'b', chimes: 99 }], sinks: [] };
     expect(deviceBalanceOf(tampered)).toBe(0);
   });
 });
@@ -167,6 +204,61 @@ describe('the one thing it spends on is a scenario’s own rung — § D911', ()
 
   it('knows nothing about a scenario nobody bought a rung on', () => {
     expect(boughtStepIdOf(emptyDeviceChimes(), 'x')).toBeUndefined();
+  });
+});
+
+describe('the three ledger sinks are spent from this tally for play on this device — § D1418', () => {
+  const banked = (count: number) =>
+    Array.from({ length: count }, (_, index) => `case-${String(index)}`).reduce(
+      (record, id) => withTurn(record, { completion: 'scenario-cleared', scenarioId: id }),
+      emptyDeviceChimes(),
+    );
+
+  it('sells every sink the shipped table sells, at the ledger’s own price', () => {
+    for (const sink of DEVICE_SINK_PRICES.sinks) {
+      const record = banked(Math.ceil(sink.priceChimes / SCENARIO_AWARD));
+      const outcome = withSinkSpend(record, sink.id, 1);
+      expect(outcome.kind, sink.id).toBe('bought');
+      if (outcome.kind !== 'bought') continue;
+      expect(deviceBalanceOf(record) - deviceBalanceOf(outcome.record), sink.id).toBe(sink.priceChimes);
+      expect(outcome.grantUnits, sink.id).toBe(sink.modifier.grantUnits);
+      expect(deviceOwnedOf(outcome.record), sink.id).toEqual([{ sinkId: sink.id, steps: 1 }]);
+    }
+  });
+
+  it('refuses a shortfall and says by how much', () => {
+    const price = priceOf('career-purse-top-up');
+    expect(withSinkSpend(emptyDeviceChimes(), 'career-purse-top-up', 1)).toEqual({
+      kind: 'refused',
+      refusal: { kind: 'short', shortBy: price },
+    });
+  });
+
+  it('stops at the sink’s own cap, which is the most a run may claim', () => {
+    let record = banked(20);
+    const cap = capOf('rush-purse-top-up');
+    for (let step = 0; step < cap; step += 1) {
+      const outcome = withSinkSpend(record, 'rush-purse-top-up', 1);
+      expect(outcome.kind).toBe('bought');
+      if (outcome.kind === 'bought') record = outcome.record;
+    }
+    expect(withSinkSpend(record, 'rush-purse-top-up', 1)).toEqual({ kind: 'refused', refusal: { kind: 'owned' } });
+    expect(deviceOwnedOf(record)).toEqual([{ sinkId: 'rush-purse-top-up', steps: cap }]);
+    expect(withSinkSpend(banked(20), 'rush-prefit', 1).kind).toBe('bought');
+  });
+
+  it('refuses a sink the table does not sell, naming no price', () => {
+    expect(withSinkSpend(banked(5), 'a-sink-nobody-sells', 1)).toEqual({ kind: 'refused', refusal: { kind: 'unknown' } });
+  });
+
+  it('keeps what it bought across a reload, and a version-1 record reads as having bought none', () => {
+    const backing = fakeBacking();
+    const first = createDeviceChimeStore(backing.store);
+    for (let i = 0; i < 3; i += 1) first.bank({ completion: 'scenario-cleared', scenarioId: `c${String(i)}` });
+    expect(first.spendSink('rush-prefit', 1).kind).toBe('bought');
+    const second = createDeviceChimeStore(backing.store);
+    expect(deviceOwnedOf(second.record())).toEqual([{ sinkId: 'rush-prefit', steps: 1 }]);
+    expect(second.balance()).toBe(SCENARIO_AWARD * 3 - priceOf('rush-prefit'));
   });
 });
 

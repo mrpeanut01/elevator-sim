@@ -735,7 +735,8 @@ export const TOWERS_COPY = Object.freeze({
  *
  * The chimes half says what `data/chime-ledger.json` carries and nothing more: `earn-career-day`
  * pays a day the contract paid for, `career-purse-top-up` is the one career sink, and it is bought
- * against an account (`everyday/chimesPanel.ts#CHIMES_PANEL_COPY.rowSignedOut`). The two refusals
+ * against an account or, signed out, from this device's tally for this device's career
+ * ([§ D1418](../../../../DECISIONS.md), `everyday/chimesPanel.ts#CHIMES_PANEL_COPY.purseDeviceOffer`). The two refusals
  * are `docs/32` GD14 and GD13 clause 5, as `docs/38` § 2.2 states them. Its first sentence is the
  * Settings panel's own lede, so the two places a player meets chimes open the same way.
  */
@@ -759,9 +760,10 @@ export const CAREER_INTRO_COPY = Object.freeze({
   /* § D1382: the one rule Settings states too, then what it means on a contract. */
   chimesEarn: `${CHIMES_EARN_RULE} Here, each day the contract pays for earns some.`,
   chimesSpend:
-    'Signed in, you can spend them from Settings to top up the purse of the building your desk is ' +
-    'open on. They never open a slot and never buy back a missed day: standing opens slots, and a ' +
-    'missed day stays missed.',
+    'You can spend them from Settings to top up the purse of the building your desk is open on. ' +
+    'Signed out, that comes from the chimes on this device and stays with this device\u2019s career. ' +
+    'They never open a slot and never buy back a missed day: standing opens slots, and a missed day ' +
+    'stays missed.',
 } as const);
 
 export interface CareerIntroView {

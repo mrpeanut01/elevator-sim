@@ -172,6 +172,8 @@ const DOORS: Readonly<Record<keyof EverydayHost, Door>> = Object.freeze({
   postRun: 'reads',
   postRushSitting: 'reads',
   rushPosted: 'reads',
+  /* § D1420: replays this device's kept rush sitting off-thread; nothing is pressed, written or filed. */
+  rushDeviceBest: 'watch',
   challengeToday: 'reads',
   accountActions: 'reads',
   watchRun: 'watch',

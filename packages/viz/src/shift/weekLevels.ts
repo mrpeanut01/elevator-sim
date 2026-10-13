@@ -56,6 +56,8 @@
  * strip, the tomorrow card, the stage's calls and the house's run all read one composition.
  */
 
+import { weekLevelTurnKeyOf } from '@elevator-sim/core/browser';
+
 import { dayKindOf } from '../wrinkles/draw.js';
 
 import { CONTRACT_LADDER, type ContractIncident, type ContractLadder, type ContractWeekBooking, type ContractWeekOrder } from './ladder.js';
@@ -336,6 +338,8 @@ export function weekLevelKeyOf(key: WeekLevelKey, census: WeekWay = WEEK_WAY): s
  * the top's level and a run of held weeks there pays once; a tower with no level dealt names week 1,
  * or week 2 where an order is dealt. The server bounds the key by the authored ladder
  * (`packages/server/src/chimes/ledger.ts#weekLevelKeysOf`), which is a superset of what is dealt.
+ * The spelling is `core`'s `weekLevelTurnKeyOf`, the composer the server enumerates with, since a
+ * held level joined [§ D1416](../../../../DECISIONS.md)'s keyed completions.
  */
 export function weekLevelAwardKeyOf(key: WeekLevelKey, census: WeekWay = WEEK_WAY): string {
   /*
@@ -344,7 +348,7 @@ export function weekLevelAwardKeyOf(key: WeekLevelKey, census: WeekWay = WEEK_WA
    */
   const orders = dealtWeekOrdersOf(key.contractId, census).length;
   const authored = 2 + (CONTRACT_LADDER.rows.find((row) => row.contractId === key.contractId)?.weekBookings.length ?? 0);
-  return `${key.contractId}/${String(Math.min(dealtWeekOf(key, census), orders > 1 ? authored : 1))}`;
+  return weekLevelTurnKeyOf({ contractId: key.contractId, week: Math.min(dealtWeekOf(key, census), orders > 1 ? authored : 1) });
 }
 
 /**

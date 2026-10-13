@@ -30,8 +30,11 @@
  * - **A `symptom` names a sight, not a figure** (GitHub issue #351, `docs/35` PM-FB2). The
  *   symptom is printed on the failing band of the schematic so the problem arrives as something
  *   the player can *see* on the stage rather than a statistic they are asked to take on trust.
- *   A symptom carrying a numeral, or a statistic's name, is a figure — see
- *   {@link symptomFigureIn} for the exact rule and the two shipped cases that failed it.
+ *   A symptom carrying a numeral, a number in words before a unit, or a statistic's name, is a
+ *   figure — see {@link symptomFigureIn} for the exact rule and the two shipped cases that failed it.
+ * - **A `symptom` names the trouble, never the lever** ([§ D1425](../../../../DECISIONS.md)): no
+ *   machinery and no word for the setting the case's own as-built patch writes, so the line never
+ *   says where to look. {@link symptomLeverIn} derives the words from the patch.
  * - **A case that runs outside its profile's declared arrival-rate band declares it on its own
  *   face** — [§ D478](../../../../DECISIONS.md)'s obligation, and the declaration is **derived
  *   here rather than authored in the file**. See {@link demandDisclosureOf} for why: the brief
@@ -277,16 +280,19 @@ function shaftBankIdOf(repair: FixitRepair): string {
 }
 
 /**
- * What makes a `symptom` a **figure** rather than a **sight** — GitHub issue #351, PM-FB2.
+ * What makes a `symptom` a **figure** rather than a **sight** — GitHub issue #351, PM-FB2, and
+ * [§ D1425](../../../../DECISIONS.md) for the second clause.
  *
- * Two clauses, and both are deliberately blunt:
+ * Three clauses, and all three are deliberately blunt:
  *
  * - **a numeral.** `a 341 s mean wait to board` and `a 322 s worst wait beside an empty
  *   hoistway` — the two shipped symptoms this rule was written against — are both caught here,
- *   and so is any future `12 %` or `95th`. A number written in words (*doors held eleven seconds
- *   at every stop*) passes, because it reads as a description of what the doors did rather than
- *   as a reading off a dial, and because the shipped case that says it is a sight: a player can
- *   watch the doors stand open.
+ *   and so is any future `12 %` or `95th`.
+ * - **a number in words before a unit.** *Doors held eleven seconds at every stop* and *nine dense
+ *   floors* are readings off a dial, spelled out. Until § D1425 they passed: this clause used to
+ *   say a number in words reads as a description of what the doors did. Decision swarm DS ruled the
+ *   other way (Q4): the figure has its own grid, and a symptom that spells one out is quoting it. A
+ *   spelled count with no unit after it (*a crowd of hundreds*) is not a reading and still passes.
  * - **a statistic's name.** `mean`, `average`, `median`, `percentile` — a symptom naming one of
  *   these is quoting the figure grid below it, whatever number it carries.
  *
@@ -296,8 +302,128 @@ function shaftBankIdOf(repair: FixitRepair): string {
 export function symptomFigureIn(symptom: string): string | null {
   const numeral = /\d+(?:[.,]\d+)?\s*(?:s|%|min)?\b/u.exec(symptom);
   if (numeral !== null) return numeral[0].trim();
+  const spelled = SPELLED_FIGURE.exec(symptom);
+  if (spelled !== null) return spelled[0];
   const statistic = /\b(mean|average|median|percentile)\b/iu.exec(symptom);
   return statistic === null ? null : statistic[0];
+}
+
+/** A cardinal written in words. Compounds (*twenty-five*, *seven hundred*) are runs of these. */
+const SPELLED_NUMBER =
+  '(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|' +
+  'sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|' +
+  'hundred|thousand|dozen)';
+
+/**
+ * A spelled cardinal, then at most one word, then a unit a figure is read in: time, length, floors,
+ * a share, a mass, or a head count. *Nine dense floors* is caught through its one adjective.
+ */
+const SPELLED_FIGURE = new RegExp(
+  String.raw`\b${SPELLED_NUMBER}(?:(?:-|\s+(?:and\s+)?)${SPELLED_NUMBER})*\b\s+(?:[a-z]+\s+)?` +
+    String.raw`(?:seconds?|minutes?|hours?|metres?|meters?|floors?|storeys?|stories|per\s?cent|percent|` +
+    String.raw`kilograms?|kilos?|people|persons|passengers|riders)\b`,
+  'iu',
+);
+
+/**
+ * **What an as-built setting writes, as families of words a symptom may not use** —
+ * [§ D1425](../../../../DECISIONS.md), decision swarm DS's Q4 ruling.
+ *
+ * The symptom is printed in terracotta on the as-built card, under the note that says what the
+ * building is, and the tutorial prints it under *What you are looking at*. It names the tenant's
+ * trouble: who waits, and where. A symptom that names the machinery or the setting the case's
+ * as-built patch writes has told the player where to look, which is the fix proposed with the price
+ * taken off (`docs/38` § 2.1: no fixes are proposed).
+ *
+ * The families are read off the case's own **as-built patch**, never listed per case, so a case
+ * whose trouble is the crowd may say *a crowd* and a case whose trouble is the parking may not say
+ * *the cars*:
+ *
+ * | family | written by | words it refuses, beside the machinery |
+ * |---|---|---|
+ * | `parking` | `dispatcher.idle` | park, parked, parking |
+ * | `assignment` | any other dispatcher section | answer, send, sent, assign, dispatch |
+ * | `doors` | a car's dwell | dwell, held, hold, open, close |
+ * | `machines` | a car's speed or cabin, `bankEquipment` | speed, pressure, machine, motor, drive, rope, counterweight |
+ * | `fleet` | `banks`, `addCars`, `floors`, any other building section | zone, zoning, in service, out of service, serve, stop |
+ * | `weighing` | a bank with a per-deck rated load | plated, load, full, weigh, capacity |
+ * | `tenancy` | `floorPopulations`, or a tenancy block | letter, printed, start time, o'clock, *at* a spelled hour, lease, let, desk, appointment |
+ *
+ * **The machinery**, refused by every family but `tenancy`: car, lift, elevator, shuttle, cabin,
+ * cab, deck, door, bank, hoistway, shaft, controller, express. A case whose as-built patch writes
+ * only the crowd may name a car; none of the shipped three does.
+ */
+export type SymptomLeverFamily =
+  | 'parking'
+  | 'assignment'
+  | 'doors'
+  | 'machines'
+  | 'fleet'
+  | 'weighing'
+  | 'tenancy';
+
+const MACHINERY_WORDS =
+  'cars?|lifts?|elevators?|shuttles?|cabins?|cabs?|decks?|doors?|banks?|hoistways?|shafts?|controllers?|express';
+
+/** One family's words, the machinery first unless the family is the crowd's. */
+function leverWords(own: string, withMachinery = true): RegExp {
+  return new RegExp(String.raw`\b(?:${withMachinery ? `${MACHINERY_WORDS}|` : ''}${own})\b`, 'iu');
+}
+
+const LEVER_WORDS: Readonly<Record<SymptomLeverFamily, RegExp>> = {
+  parking: leverWords('park(?:s|ed|ing)?'),
+  assignment: leverWords(String.raw`answer(?:s|ed|ing)?|send(?:s|ing)?|sent|assign\w*|dispatch\w*`),
+  doors: leverWords(String.raw`dwell\w*|held|hold(?:s|ing)?|open(?:s|ed)?|clos(?:e|es|ed|ing)`),
+  machines: leverWords(String.raw`speeds?|pressur\w*|machines?|motors?|drives?|ropes?|counterweights?`),
+  fleet: leverWords('zones?|zoned|zoning|in service|out of service|serv(?:e|es|ed|ing)|stop(?:s|ped|ping)?'),
+  weighing: leverWords(String.raw`plated|loads?|loaded|full|weigh\w*|capacity`),
+  tenancy: leverWords(
+    String.raw`letters?|printed|start(?:s|ing)?\s+times?|o'clock|at\s+${SPELLED_NUMBER}|at\s+noon|leases?|let|desks?|appointments?`,
+    false,
+  ),
+};
+
+/** The families a case's as-built patch writes, read off the patch's own sections. */
+export function asBuiltLeverFamiliesOf(asBuilt: FixitCase['asBuilt']): readonly SymptomLeverFamily[] {
+  const families = new Set<SymptomLeverFamily>();
+  const { dispatcher, building } = asBuilt.patch;
+  for (const [section, value] of Object.entries(dispatcher ?? {})) {
+    if (value === undefined) continue;
+    families.add(section === 'idle' ? 'parking' : 'assignment');
+  }
+  for (const [section, value] of Object.entries(building ?? {})) {
+    if (value === undefined) continue;
+    if (section === 'floorPopulations') {
+      if ((value as readonly unknown[]).length > 0) families.add('tenancy');
+    } else if (section === 'cars') {
+      for (const car of value as readonly CarPatch[]) {
+        for (const key of Object.keys(car.set)) families.add(/^dwell/u.test(key) ? 'doors' : 'machines');
+      }
+    } else if (section === 'bankEquipment') {
+      families.add('machines');
+    } else {
+      families.add('fleet');
+      if (section === 'banks' && /PerDeck/u.test(JSON.stringify(value))) families.add('weighing');
+    }
+  }
+  if (asBuilt.tenancy !== undefined) families.add('tenancy');
+  return [...families];
+}
+
+/**
+ * **The word in a symptom that names what its own as-built setting writes**, with its family, or
+ * `null` — [§ D1425](../../../../DECISIONS.md). {@link SymptomLeverFamily} has the table. Exported so
+ * the test that holds the shipped lines can drive the rule in both directions.
+ */
+export function symptomLeverIn(
+  symptom: string,
+  asBuilt: FixitCase['asBuilt'],
+): { readonly family: SymptomLeverFamily; readonly word: string } | null {
+  for (const family of asBuiltLeverFamiliesOf(asBuilt)) {
+    const found = LEVER_WORDS[family].exec(symptom);
+    if (found !== null) return { family, word: found[0] };
+  }
+  return null;
 }
 
 /**
@@ -497,14 +623,23 @@ function checkCase(where: string, entry: FixitCase, context: FixitContext): read
 
   violations.push(...checkTenancy(where, entry, context));
 
-  // The symptom is a sight, not a figure (PM-FB2).
+  // The symptom is a sight, not a figure (PM-FB2), and names the trouble, not the lever (§ D1425).
   const figure = symptomFigureIn(entry.symptom);
   if (figure !== null) {
     violations.push(
       `${where}: the symptom "${entry.symptom}" states a figure ("${figure}"). A symptom names ` +
-        'something the player can see on the stage — cars standing together, doors held, a crowd ' +
-        'on a landing — so the problem arrives as a sight rather than as a statistic they are ' +
-        'asked to take on trust. The figures have their own grid (PM-FB2).',
+        'who waits and where — a crowd on a landing, a queue at the street — so the problem arrives ' +
+        'as a sight rather than as a statistic they are asked to take on trust. The figures have ' +
+        'their own grid (PM-FB2, § D1425).',
+    );
+  }
+  const lever = symptomLeverIn(entry.symptom, entry.asBuilt);
+  if (lever !== null) {
+    violations.push(
+      `${where}: the symptom "${entry.symptom}" says "${lever.word}", which names the ${lever.family} ` +
+        "this case's as-built setting writes. A symptom has people, or a place where people stand, " +
+        'as its subject and names no machinery and no setting, so it never says where to look ' +
+        '(§ D1425).',
     );
   }
 

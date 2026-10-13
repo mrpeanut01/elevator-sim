@@ -1316,6 +1316,55 @@ bound chose the gap's share so that it would not do this at the shipped demands;
 quarter of the hospital profile's typical demand, where it does. That is a ruling on core's validity
 rules, outside this lane.
 
+### 3.3h DC-12: a carried answer does not clear
+
+GitHub issue **#234**, decision swarm DS's Q4 ruling, wave AO lane P2-4 ([§ D1424](../DECISIONS.md),
+[§ D1426](../DECISIONS.md)). The post-AN panel's seat C cleared stage 2 with `eta-parked-lobby` and
+then cleared stages 7 and 8 with it on the first attempt. Five configurations were each a way through
+three of stages 1 to 8. A late stage that an early answer clears asks the player nothing new.
+
+> **DC-12.** From path position 3, a stage's survivors at its base rung, as the pinned survivor census
+> names them, number at least one, share no configuration name with any earlier stage's base-rung
+> survivors, and include no shipped profile picked by name alone. Positions 1 and 2 are exempt. A drawn
+> dial (`edit-<n>`) is never carried, and a stage with no survivor is held under DC-3.
+
+**What it reads, and what it does not.** The census's named configurations at the base rung, the rung
+the stages are played at. A carried answer outside what the census examined is not checked, and the
+rule says so rather than implying it was. The ruling's own text asks for *at least one survivor that
+clears no earlier stage*; its register is derived only by the stronger reading above, which every
+member wrote, so § D1424 takes that reading. Whether DC-12 should read only each earlier stage's par
+configuration is owner-reversible.
+
+**The register**, `scenario/carriedAnswers.test.ts#CARRIED_ANSWERS`, checked in both directions against
+the census with no simulation, and allowed only to shrink:
+
+| stage | breaks DC-12 by | |
+|---|---|---|
+| 3 | carrying three of stages 1 and 2's answers, and the dropdown's `fairness-first` | next wave |
+| 4 | having no way through (held) | next wave |
+| 5 | the dropdown's `predictive-balanced` | a named breach |
+| 6 | carrying stage 1's mid-zone parking twice | next wave |
+| 8 | carrying stage 2's three lobby answers | measured, not rebalanced |
+| 9 | three dropdown picks | a named breach (§ D1288) |
+| 10 | having no way through (held, § D1289) | |
+
+**Stage 7 passes at 2.25 %pop/5 min** (§ D1426). Its base-rung ways through are
+`destination-eta-parked-lobby` and `predictive-balanced-parked-zone-center`, 2 of 63, inside its band.
+At 1.25 four of its eleven were earlier stages'. It passes as a point: screens at 2.1, 2.2, 2.3 and
+2.4, and at every demand from 0.75 to 2.0, each found a carried answer clearing on the stage's seeds.
+
+**Stage 8 stays on the register.** Forty-one demands were measured (§ D1426 lists them). By rate alone
+stage 2's `eta-parked-lobby` clears from 1.5 to 7 %pop/5 min and nothing clears below. With the trips
+split two ways, a lobby answer clears when 68 % or more arrive and stage 1's zone-centre answer when
+55 % or fewer do. The two cells between that pass DC-12 do so only because the holdout crowds refuse
+about twenty configurations that meet every bar on the tuning crowds, five of them bare picks, so
+they would trade a DC-12 breach for a DC-2 one, and their neighbours a step away fail.
+
+**What this says about the rule.** On Midtown's and Chancery House's up-peaks a carried answer was
+never far from clearing: every passing point found has a failing neighbour within 0.05 %pop/5 min or
+two points of split. DC-12 is met on the census and its seeds, which is how every DC rule here is met,
+and nothing above measures how far a carried answer sits from the bar.
+
 ---
 
 ## 4. The week — Today's tower and the daily loop

@@ -2900,7 +2900,8 @@ describe('a Scenario week’s days pay once, are recorded, and are dealt new cro
   it('pays a counted day that cleared, once, and nothing for its practice close or a missed day', () => {
     const s = scenario();
     s.host.closeDay();
-    expect(s.h.banked).toEqual([{ completion: 'career-day-paid' }]);
+    /* § D1416: the day names itself, its contract and the crowd it was dealt, so it pays once. */
+    expect(s.h.banked).toEqual([{ completion: 'career-day-paid', key: 'week:c2:s20260926' }]);
     s.reopen();
     s.host.closeDay();
     expect(s.h.banked, 'a practice close paid').toHaveLength(1);
@@ -2937,7 +2938,7 @@ describe('a Scenario week’s days pay once, are recorded, and are dealt new cro
       s.host.closeDay();
       if (day < 5) s.tomorrow();
     }
-    expect(s.h.banked.at(-1)).toEqual({ completion: 'week-held', levelKey: 'c2/1' });
+    expect(s.h.banked.at(-1)).toEqual({ completion: 'week-held', key: 'c2/1' });
     expect(s.h.banked.filter((turn) => turn.completion === 'week-held')).toHaveLength(1);
     s.tomorrow();
     s.host.closeDay(); // Saturday, after the close: nothing more for the week.

@@ -890,7 +890,7 @@
       "buildingId": "midtown-office",
       "dispatcherProfileId": "zoned-uppeak",
       "durationS": 900,
-      "arrivalRatePctPop5min": 1.25,
+      "arrivalRatePctPop5min": 2.25,
       "tuningSeeds": {
         "name": "tuning-20260730",
         "seed": "20260730",
@@ -908,20 +908,20 @@
           "disposition": "batch",
           "tuning": {
             "n": 50,
-            "passes": 33,
-            "fails": 17,
+            "passes": 29,
+            "fails": 21,
             "unmeasured": 0,
             "rateClass": "variable"
           },
           "holdout": {
             "n": 50,
-            "passes": 33,
-            "fails": 17,
+            "passes": 22,
+            "fails": 28,
             "unmeasured": 0,
             "rateClass": "variable"
           },
           "holdoutAgrees": true,
-          "reason": "kept up with arrivals: a batch goal, judged over the scenario's replications — 33 of 50 on the tuning seeds and 33 of 50 on the holdout seeds."
+          "reason": "kept up with arrivals: a batch goal, judged over the scenario's replications — 29 of 50 on the tuning seeds and 22 of 50 on the holdout seeds."
         },
         {
           "kind": "long-waits-under",
@@ -929,20 +929,20 @@
           "disposition": "batch",
           "tuning": {
             "n": 50,
-            "passes": 43,
-            "fails": 7,
+            "passes": 36,
+            "fails": 14,
             "unmeasured": 0,
             "rateClass": "variable"
           },
           "holdout": {
             "n": 50,
-            "passes": 49,
-            "fails": 1,
+            "passes": 32,
+            "fails": 18,
             "unmeasured": 0,
             "rateClass": "variable"
           },
           "holdoutAgrees": true,
-          "reason": "long waits kept under 10 %: a batch goal, judged over the scenario's replications — 43 of 50 on the tuning seeds and 49 of 50 on the holdout seeds."
+          "reason": "long waits kept under 10 %: a batch goal, judged over the scenario's replications — 36 of 50 on the tuning seeds and 32 of 50 on the holdout seeds."
         },
         {
           "kind": "beat-the-baseline",

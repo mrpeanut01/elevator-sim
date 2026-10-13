@@ -36881,6 +36881,8 @@ Building that spend now would ship **a purchase that changes no run**: a wider p
 
 ## D611 — Stage 7 stops clearing from the dropdown, by moving its demand down; the bar follows the demand rather than being moved
 
+> **Status 2026-10-13: AMENDED by [§ D1426](#d1426).** Stage 7 runs at 2.25 %pop/5 min, where DC-12 holds on the census. See [`docs/39`](docs/39-decisions-in-force.md).
+
 **Date: 2026-09-15 · GitHub issue [#234](https://github.com/mrpeanut01/elevator-sim/issues/234) · Rules on: [`data/campaign.json`](data/campaign.json), `packages/viz/src/scenario/candidates.ts`, [`data/scenario-goals.json`](data/scenario-goals.json), `campaign/difficultyCurve.test.ts#DROPDOWN_CLEARS`, [`docs/33`](docs/33-difficulty-curve.md) § 3.3f and § 6 C2, [`docs/10`](docs/10-experience-layer-contract.md) M30.**
 
 **Why an entry.** [§ D405](#d405)'s second and third grounds: it moves something already recorded — [§ D520](#d520)'s pinned three-row register and `docs/10` M30's published cell — and it binds a `data/` file, a `.ts` constant and two documents that no one module owns.
@@ -41609,6 +41611,8 @@ The rest of the sweep, for the same reason — reported either way, because a nu
 ---
 
 ## D911 — the chimes loop closes for one sink in one mode with no account and no server: a device ledger that spends, and a scenario budget rung priced by the scenario
+
+> **Status 2026-10-13: AMENDED by [§ D1418](#d1418) and [§ D1419](#d1419).** Clause 6 is replaced: off an account the three ledger sinks are bought from the device tally for play on that device; and a stage sells a wider budget where the census says it adds a way through. See [`docs/39`](docs/39-decisions-in-force.md).
 
 **Date: 2026-09-22 · GitHub issue [#579](https://github.com/mrpeanut01/elevator-sim/issues/579) · Rules on: [`docs/38`](docs/38-what-the-game-is.md) §§ 2.1 and 2.4, [§ D711](#d711) clause 7 and its § 5, [§ D227](#d227), `packages/viz/src/everyday/deviceChimes.ts`, `packages/viz/src/everyday/chimeStore.ts`, `packages/viz/src/fixit/budgetRungs.ts`, `packages/viz/src/everyday/chimesPanel.ts`, `packages/viz/src/everyday/rail.ts`, `packages/core/src/config/chimeLedger.ts`, `data/fixit-cases.json`. Cites [§ D526](#d526), [§ D530](#d530), [§ D533](#d533), [§ D490](#d490), [§ D672](#d672), [§ D738](#d738), [§ D606](#d606), [§ D256](#d256), [§ D343](#d343), [§ D405](#d405).**
 
@@ -48103,6 +48107,8 @@ malformed refused), `everyday/weekView.test.ts` and `everyday/host.test.ts` (a c
 
 > **Status 2026-10-13: AMENDED by [§ D1402](#d1402)** (an agent ruling, owner-reversible). *There is no award for a week* no longer holds for a held week: it pays `week-held`, 10 chimes, once per level of the tower's week. The days pay as here. See [`docs/39`](docs/39-decisions-in-force.md).
 
+> **Status 2026-10-13: AMENDED by [§ D1416](#d1416).** The day still pays once, and the turn now names it, so the same day posted again pays nothing at the server too. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-09-26 by agent sessions under delegated authority** (wave AL, lane AL-F, on swarm DN's
 > Q2 ruling, item 7, three of three; no separate week award, two of three). It makes true the premise
 > of [§ D533](#d533)'s second ruling, which is the product owner's, and changes neither ruling.
@@ -48184,6 +48190,8 @@ cases against the retired lines, which is its own control arm.
 
 ## D1234 — a clear at or under its par carries a mark, on fix cases and on cleared stages, and a free par is never marked
 
+> **Status 2026-10-13: AMENDED by [§ D1417](#d1417).** A clear that earns the mark pays 3 chimes once per stage or case; a free par still earns no mark and pays nothing. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Status 2026-10-10: AMENDED by [§ D1358](#d1358)** (an agent ruling). A free par is still never marked, and is now said on the line and the row; a cleared stage says why it earns no mark; the device keeps the cheapest clear; a fixed case and a cleared stage run again as practice. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Taken 2026-09-26 by agent sessions under delegated authority**, not by the product owner: the
@@ -48229,6 +48237,8 @@ par is the minimum over priced names, and absent without pricing), `everyday/sce
 reload, on the built bundle).
 
 ## D1235 — no earlier stage's whole set of ways through may clear a later stage, and stages 7 and 8 start on `zoned-uppeak` to meet it
+
+> **Status 2026-10-13: AMENDED by [§ D1426](#d1426).** Stage 7 keeps `zoned-uppeak` and moves to 2.25 %pop/5 min. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Taken 2026-09-26 by agent sessions under delegated authority**, not by the product owner: the
 > `decide-an` swarm's Q3 ruling item 2 (S1 and S2 on the criterion, S3's census as the
@@ -50749,6 +50759,8 @@ window goes on asking after *Leave it to maintenance*) is unchanged and unmeasur
 
 ## D1358 — a par is said on every clear: a free par says it is free, a cleared stage says why it earns no mark, the cheapest clear is kept, and a fixed case or a cleared stage runs again as practice
 
+> **Status 2026-10-13: AMENDED by [§ D1417](#d1417).** Clause 6 is narrowed: a practice run that first meets a priced par pays the par award, once. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-10-10 by agent sessions under delegated authority** (wave AN, lane DQ-4), not by the
 > product owner: swarm DQ's Q3 ruling, its supporting payoffs (three of three on the shape), built
 > by this lane. **Owner-reversible**: the words of every arm; drawing the free par rather than nothing;
@@ -51886,11 +51898,11 @@ closed vocabulary and a source to `data/chime-ledger.json`, and binds the server
 bounds, the device's tally and the host's close.
 
 **The rule.** The close that closes a Scenario week, where its target was met, posts `week-held`
-with a `levelKey`: the tower and the week as dealt, `c2/3` (`weekLevels.ts#weekLevelAwardKeyOf`),
+with a `key`: the tower and the week as dealt, `c2/3` (`weekLevels.ts#weekLevelAwardKeyOf`),
 never past the levels the rung authors, so a tower whose weeks cycle orders with no booking pays its
 week 2 once.
 The ledger pays it `earn-week-held`, 10 chimes, flat. The level is the turn key: on the device
-`deviceChimes.ts#turnKeyOf` keys it and `withTurn` records it once, and on the server
+`core`'s `chimeTurnKeysOf` keys it and `withTurn` records it once, and on the server
 `chimes/ledger.ts#earnCompletion` writes it with that key, so the store refuses a second entry in
 the statement that writes it, the mechanism a scenario clear already uses. A level held again, or a
 week numbered past the top that is dealt the top again, pays nothing more, so a run of held weeks
@@ -51901,7 +51913,10 @@ authors, each once. Each counted day that cleared still pays `career-day-paid` a
 
 **Lane DS-3's turn keys.** DS-3 adds a turn key to every award, `career-day-paid` included. This
 award is written as a keyed ledger entry on the mechanism that exists on this lane's base, so DS-3's
-general mechanism can key it without a change of shape.
+general mechanism can key it without a change of shape. At integration it joined
+[§ D1416](#d1416)'s `CHIME_KEYED_COMPLETIONS`: its composer is `core`'s `weekLevelTurnKeyOf`, its
+shape is in `KEYED_TURN_SHAPES`, and a key outside `weekLevelKeysOf`'s set is refused as
+`unknown-key`.
 
 **Tests**, red before and green after: `everyday/host.test.ts` (a held week posts `week-held` keyed
 `c2/1` once, on its closing day; a week not held posts none; red before, nothing beyond the days);
@@ -52133,3 +52148,252 @@ who-drives candidate; the ruling's item names clause 3, so this entry takes that
 goals: a second who-drives call in the kept peak, ten minutes on, where the pair's first misses the day
 and *keep* clears it (red on `c5f57a9`: one call in that peak); none where the verdicts agree though the
 counts differ (the control); none, and no run, without the day's goals.
+
+## D1416 — every award pays once under a turn key, and a contract day is keyed by the day it names
+
+> **Taken 2026-10-13 by agent sessions under delegated authority** (wave AO part 2, lane P2-4), not by
+> the product owner: swarm DS's Q3 ruling on S2's integrity finding (M7), built by this lane.
+> **Owner-reversible**: the shape of the two day keys.
+
+**Why an entry.** [§ D405](#d405)'s first and second grounds. It binds `core`'s
+`config/chimeLedger.ts`, the server's `chimes/ledger.ts` and `http/api.ts`, and the viewer's
+`everyday/deviceChimes.ts` and `everyday/host.ts`, and it amends [§ D1231](#d1231), whose pay it keys.
+
+**What was wrong.** The server paid `career-day-paid` on every post, because the turn carried nothing
+that could tell a second day from one day posted twice.
+
+**The ruling.**
+
+1. **One rule for every award**: a ledger writes an entry for each key a turn names that it has not
+   yet paid under the same completion (`chimeTurnKeysOf`). A scenario's key is its id, a rush's are
+   the waves it outlasted, a par's is its scenario, and a contract day's is the day it names.
+2. **A contract day names itself**: a Career day as tower, month, contract day and career day
+   (`careerDayTurnKeyOf`), and a Scenario week's counted day as its contract and the crowd it was
+   dealt (`weekDayTurnKeyOf`). Every day still pays; the same day posted again pays nothing.
+3. **Keyed completions are general.** `CHIME_KEYED_COMPLETIONS` lists the completions paid under a
+   composed key. Each carries `{ completion, key }` on the wire, the route reads `key` for every
+   member, and the ledger refuses a key whose shape no composer writes (`KEYED_TURN_SHAPES`) or whose
+   contract `data/contract-ladder.json` does not hold (`unknown-key`). A held level (swarm DS's Q1)
+   joins by adding its id, a composer, a shape and a ledger source, with no route or store change.
+4. A device record of version 1 keeps its day rows under their old count keys, which no composed key
+   equals, so they are read and never paid again.
+
+**Tests**, red before and green after: `server/chimes/ledger.test.ts`'s *pays a contract day once
+however often the same day is posted* and its refusal case, `server/http/api.test.ts`'s *pays a
+contract day once when the same day is posted twice* (red: two posts paid twice),
+`core/config/chimeLedger.test.ts`'s four turn-key cases, `everyday/deviceChimes.test.ts`'s day cases,
+`everyday/host.test.ts`'s keyed week day and `everyday/chimeTurns.browser.test.ts`'s Career day key.
+
+## D1417 — a clear at or under a priced par pays 3 chimes, once per stage or case
+
+> **Taken 2026-10-13 by agent sessions under delegated authority** (wave AO part 2, lane P2-4), not by
+> the product owner: swarm DS's Q3 ruling (S3's figure; S1 proposed 4 and S2 a flat award once).
+> **Owner-reversible**: the figure, 3.
+
+**Why an entry.** It amends [§ D1234](#d1234) (*the mark pays nothing*) and [§ D1358](#d1358)
+clause 6 (*it pays nothing new*), and binds `data/chime-ledger.json`, the server's ledger and the
+stage and fix-it screens.
+
+**The ruling.**
+
+1. A new completion, `scenario-at-par`, pays `earn-scenario-par`, 3 chimes, flat, keyed by the
+   scenario. It is filed where `scenario/par.ts#parMarkOf` draws a mark, so a free par, no par and a
+   clear above the par pay nothing. A practice run that first meets the par pays it then, once.
+2. The server pays a par only to an account its scenario's clear has been paid to (`not-cleared`),
+   and the host files the par after the clear's own answer, so two posts in flight cannot arrive in
+   the wrong order. Whether the clear was at par is believed within that bound, as a clear is.
+3. Every par line ends with one sentence, `scenario/par.ts#PAR_PAYS_LINE`: *Matching it or beating
+   it pays 3 chimes, once.* The stage page's pay line says the par award on the clear that banked it.
+
+A par is the price of a configuration and never a figure a run measured, so [§ D526](#d526) clause 2
+holds.
+
+**Tests**: `everyday/stagePlay.test.ts`'s *a clear at or under a priced par pays once* (three cases),
+`server/chimes/ledger.test.ts`'s par cases (paid once, only after the clear),
+`everyday/deviceChimes.test.ts`'s par case and `menu/client.test.ts`'s wire case.
+
+## D1418 — with no server or no sign-in, the three ledger sinks are spent from the device tally, for play on that device
+
+> **Taken 2026-10-13 by agent sessions under delegated authority** (wave AO part 2, lane P2-4), not by
+> the product owner: swarm DS's Q3 ruling, three of three. **Owner-reversible**: the device spends.
+
+**Why an entry.** It replaces [§ D911](#d911) clause 6 (*the three ledger sinks are untouched and stay
+refused off an account*) in writing, amends `docs/38` § 2.4's *still need an account*, and binds
+`everyday/deviceChimes.ts`, `chimeStore.ts`, `host.ts`, `chimesPanel.ts`, `settingsView.ts`,
+`settingsScreen.ts`, `campaignModel.ts`, `rushSitting.ts` and `dev/main.ts`.
+
+**The ruling.**
+
+1. With no server, or with one and nobody signed in, `career-purse-top-up`, `rush-prefit` and
+   `rush-purse-top-up` are bought from this device's tally (`deviceChimes.ts#withSinkSpend`) at the
+   ledger's own price and step cap. The device record goes to version 2, which reads version 1.
+2. A career top-up lands in this device's career through the reducer an account's lands through; a
+   rush modifier starts this device's sittings.
+3. **Integrity stays at the post.** A sitting started with a device purchase is never offered for
+   posting (`RUSH_SITTING_COPY.boughtOnDevice`), and the server's post route refuses any modifier the
+   account did not buy ([§ D671](#d671)), which `server/http/api.test.ts` now proves for a sitting
+   claiming both rush sinks.
+4. **Settings and the chimes panel say it plainly**: off an account each row is buyable from this
+   device and says that what it buys stays on this device, and the panel's home line says a run using
+   it is kept here and never posted. The row that read *bought against your account, so signing in is
+   what makes this one spendable* is deleted rather than reworded ([§ D227](#d227)). The Career's
+   opening page says the same of the top-up.
+
+**Tests**: `everyday/chimesPanel.test.ts`'s *off an account, sells all three from this device* (red
+on the base: three `unavailable` rows) and its cap, desk and shortfall case;
+`campaign/purseTopUpReachesTheRun.test.ts`'s device arm (the grant lands and the legs are the account
+arm's, red on the base: `no-server`); `everyday/rushDeviceBest.test.ts`'s device pre-fit (the tower is
+fitted, the legs move, and the post is refused with its reason); `everyday/deviceChimes.test.ts`'s sink
+cases; `server/http/api.test.ts`'s device-bought sitting.
+
+## D1419 — a stage sells a wider budget from the device tally only where the survivor census says it adds a way through
+
+> **Taken 2026-10-13 by agent sessions under delegated authority** (wave AO part 2, lane P2-4), not by
+> the product owner: swarm DS's Q3 ruling (S2 and S3; S1's *every authored rung* refused).
+> **Owner-reversible**: selling only rungs that add survivors.
+
+**Why an entry.** It amends [§ D911](#d911)'s *it is still exactly true of these ten stages* (no
+screen sells a stage a wider budget), and binds `everyday/stagePlay.ts` and `stagePlayScreen.ts`.
+
+**The ruling.** `stagePlay.ts#stageRungsOf` sells a rung where the pinned survivor count at it exceeds
+the count at the rung below, read off `data/scenario-survivors.json` on every draw and never written
+down. On the census this tree pins that is the equipment rung on stages 1, 2 and 8. Every other rung
+is drawn with its measured reason (*the census found N ways through at it, the same as at M units, so
+it would buy no new way through*). A sold rung is bought from this device's tally on the record a fix
+case's rung uses, and the stage is then pressed at that budget. A clear at a bought rung pays exactly
+what a clear at the base pays, once, and the verdict says the budget it was run at. A rung bought and
+later unsold by a regenerated census is still stood on. The Scenario hub's row says the same: it prices
+the rungs the page sells and gives the census's reason on a row that sells none
+(`scenario/ladder.ts#budgetLineOf`), and *"Nothing sells a wider budget for these ten"* is deleted
+rather than reworded ([§ D227](#d227)). The row's open note says a stage opens at a rung this device
+bought and that the first clear at par pays more.
+
+**Tests**: `scenario/ladder.test.ts`'s *prices on the budget line exactly the rungs the stage page
+sells*, and `everyday/stagePlay.test.ts`'s three § D1419 cases: the sold set equals the census's
+answer in both directions, a raised count in a copy of the census sells a rung, and on a found stage a
+page choice the base refuses runs at the bought rung, moves the legs, and leaves the run plan carrying
+no budget. Red on the base: `stageRungsOf` did not exist and every press used the base rung.
+
+## D1420 — on a build with no rush board, the device keeps its best sitting per tower and draws its replayed last round among the house's rows
+
+> **Taken 2026-10-13 by agent sessions under delegated authority** (wave AO part 2, lane P2-4), not by
+> the product owner: swarm DS's Q3 ruling (S3's form). **Owner-reversible**: the device row.
+
+**Why an entry.** It extends [§ D1359](#d1359) to a build with no server, and binds
+`everyday/rushDeviceBest.ts`, `rushDeviceStore.ts`, `rushHouse.ts`, `rushScreen.ts`, `host.ts` and
+`dev/main.ts`.
+
+**The ruling.**
+
+1. At each round's settle, on a build with no rush board, the host keeps the sitting's causes (the
+   body a server would replay) as the tower's best on this device when its last round held longer
+   than the kept one's. Only a sitting whose rounds could all travel, and whose last round crossed
+   the line, is kept.
+2. **No stored figure is drawn.** The setup screen asks `EverydayHost.rushDeviceBest`, which replays
+   the kept sitting's last round off this thread (its dispatcher, rules and log, at the fit its claims
+   and rebuilds fold to, on the rush's one seed) and reads the hold line off that recording. Only the
+   last round is replayed, because a sitting ranks on it and its tower needs no earlier simulation.
+3. The row is tagged *yours, on this device* and placed among the house's rows by § D1359's rule,
+   under a line saying it was posted nowhere, no server checked it, and it is ranked against nobody.
+   A served build draws § D1359's row and never this one.
+
+**Tests**: `everyday/rushDeviceBest.test.ts`, ten cases on the row: the replay of a sitting built from the
+house's own garden cell holds exactly where the house table says, a hand-edited figure moves nothing
+drawn, a rebuild before the last round reaches its replay, the host keeps a played sitting only with
+no board, and the row and its lines. Red on the base: none of it existed.
+
+**Not established.** The replay runs once per visit to the setup screen; its cost on the largest
+tower in a browser was not measured.
+
+## D1424 — DC-12, a carried answer does not clear: from path position 3 a stage's base-rung ways through share no name with an earlier stage's and include no bare dropdown pick
+
+> **Taken 2026-10-13 by agent sessions under delegated authority** (wave AO part 2, lane P2-4), not by
+> the product owner: swarm DS's Q4 ruling, three of three on a census criterion. **Owner-reversible**:
+> whether DC-12 reads any earlier survivor or only each earlier stage's par configuration, and the
+> exemption of positions 1 and 2.
+
+**Why an entry.** It adds a criterion to `docs/33` (§ 3.3h) beside DC-10 and DC-11 and a register,
+`scenario/carriedAnswers.test.ts#CARRIED_ANSWERS`, that later rebalances must empty.
+
+**The ruling.** From path position 3, a stage's base-rung survivors on the pinned census must number
+at least one, share no configuration name with an earlier stage's base-rung survivors, and include no
+shipped profile picked by name alone. A drawn dial (`edit-<n>`) is never carried, since the name is a
+position in one cell's draw. The census's named configurations only, at the base rung only.
+
+**The reading taken, and why.** The ruling's text says *at least one survivor that clears no earlier
+stage and is not a bare dropdown pick*, and its register (stages 3, 6, 7 and 8 failing, 5 and 9 as
+dropdown breaches) is derived only by the stronger reading: stages 6, 7 and 8 each held one fresh
+survivor beside their carried ones, and stage 5's second survivor is not a bare pick. Every swarm
+member wrote the rule as *shares no configuration name*. So the test reads it that way, and says so.
+
+**The register**, checked in both directions with no simulation: stages 3, 6, 7 and 8 carried; 5 and
+9 named dropdown breaches ([§ D1288](#d1288) for 9); 4 and 10 held for no way through. Stage 7 leaves
+it with § D1426.
+
+**Tests**: `scenario/carriedAnswers.test.ts`, seven cases, among them red on a new carried answer
+and red on a registered stage that stops breaking.
+
+## D1425 — fix-it as-built lines name the tenant's symptom, held by a word test derived from each case's patch
+
+> **Taken 2026-10-13 by agent sessions under delegated authority** (wave AO part 2, lane P2-4), not by
+> the product owner: swarm DS's Q4 ruling. **Owner-reversible**: the symptom word families and every
+> new line's words.
+
+**Why an entry.** It replaces PM-FB2's examples (*cars standing together, doors held*) in writing,
+and binds `data/fixit-cases.json` and `fixit/parse.ts`, which now refuses a line at load time.
+
+**The ruling.** A case's `symptom` has people, or a place where people stand, as its subject, and
+names no machinery, no setting its as-built patch writes and no figure. `fixit/parse.ts#symptomLeverIn`
+derives the word families from the patch (dwell, parking, banks and car counts, tenancy, weighing,
+assignment) and `symptomFigureIn` reads figures in words as well as numerals (*eleven seconds*).
+Sixteen lines are new: the union of the members' lists (S1 fifteen, S2 sixteen, S3 fourteen) and the
+test's own fifteen. Two stand.
+
+**Each new line was checked against the as-built morning it describes.** Fifteen of them end on a
+contrast (*while the lower floors get away*), and on each case's own as-built morning the journeys
+outside the complaint's scope boarded under its threshold for 92.7 % to 100 % of boarders
+(`fixit/run.ts#morningReadingOf`'s `restAwayPct`, run 2026-10-13). On `let-faster-than-the-lifts`
+it was 75 % of 12, so that line drops its contrast and reads *a crowd waiting in the lobby*.
+
+**Tests**: `fixit/symptomNamesNoLever.test.ts` (red on the sixteen old lines, with *doors held* kept
+red on a dwell case) and `fixit/parse.test.ts`'s refusal cases.
+
+## D1426 — stage 7 moves to 2.25 %pop/5 min and meets DC-12; stage 8 was measured at forty-one demands and stays registered
+
+> **Taken 2026-10-13 by agent sessions under delegated authority** (wave AO part 2, lane P2-4), not by
+> the product owner: swarm DS's Q4 rebalance of stages 7 and 8, by demand and never by a goal (DC-R1).
+> **Owner-reversible**: stage 7's demand.
+
+**Why an entry.** It amends [§ D611](#d611)'s and [§ D1235](#d1235)'s stage 7 demand of 1.25 %pop/5
+min, and binds `data/campaign.json`, `scenario/candidates.ts`, `data/scenario-goals.json`, the
+survivor census and four registers.
+
+**Stage 7.** At 2.25 the census names two base-rung ways through, `destination-eta-parked-lobby` and
+`predictive-balanced-parked-zone-center`, neither an earlier stage's nor a bare pick, so DC-12 holds.
+Of the dropdown only `predictive-balanced` meets every bar on the tuning crowds, and the holdout
+refuses it (DC-2's register goes from three names to one). Two of 63 is inside the 5 to 7 band
+(0 to 0.15), where 11 of 63 was above it. The goals are re-measured, not moved: `answer-the-demand`
+29/50, 22/50 and `long-waits-under` 36/50, 32/50, both still batch goals. 17 of 63 configurations
+now refuse a mean somewhere, and the brief's first line says some settings refuse to stand behind
+their numbers.
+
+**Measured as a point and said so.** Screens at 1.1, 1.15, 1.2, 1.3, 1.65, 1.7, 1.8, 1.9, 2.1, 2.2,
+2.3 and 2.4 each found a carried answer clearing on these seeds (with the earlier lane's 0.75 to 1.6,
+2.0 and 4.0), so DC-12 holds at 2.25 on the pinned seeds rather than over a range of demand.
+
+**Stage 8 is not rebalanced.** Rate alone, eleven demands from 0.75 to 7: `eta-parked-lobby` (stage
+2's) clears from 1.5 to 7, and nothing at all clears at 0.75 or 1. A directional split, thirty cells
+at rates 2 to 6: with 68 % or more of trips arriving a lobby answer clears, with 55 % or fewer stage
+1's `eta-parked-zone-center` does, and between them the answer changes from cell to cell, three cells
+clearing nothing. Two cells pass DC-12 (3 at 0.65/0.20/0.15, base survivor `edit-7`; 2 at 0.62/0.18/0.20, `edit-7` and
+`edit-11`). Both pass only because the holdout refuses about twenty configurations that meet every bar
+on the tuning crowds, five of them bare picks, which would enter stage 8 into DC-2's register; their
+neighbours a step away fail. So stage 8 stays registered, the split field built to carry a stage's
+demand shape was withdrawn because no shipped stage would call it, and the cells are in this lane's
+report for the next wave.
+
+**Tests**: `scenario/carriedAnswers.test.ts` with stage 7's row deleted, `campaign/difficultyCurve.test.ts`
+and `scenario/survivorBands.test.ts` with stage 7's rows moved, against the regenerated census.
+
+**Not established.** Whether a carried answer is always this close to clearing on Midtown's up-peak;
+twelve demands is a screen, and nothing here measures the distance.

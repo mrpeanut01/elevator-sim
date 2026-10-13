@@ -84,12 +84,14 @@ const BANKED_TURN: Readonly<Record<BankedTurn, string>> = Object.freeze({
    */
   'career-day-paid': 'cleared day filed',
   'rush-wave-survived': 'rush waves banked',
+  /* § D1417: a clear at or under a priced par, filed once per scenario. No figure, as above. */
+  'scenario-at-par': 'par met',
   /* A held week, paid once per level — wave AO, lane DS-1, [§ D1402](../../../../DECISIONS.md). */
   'week-held': 'week held',
 });
 
 /** One member of `core`'s `CHIME_COMPLETIONS`, spelled here so this module imports no ledger type. */
-export type BankedTurn = 'scenario-cleared' | 'career-day-paid' | 'rush-wave-survived' | 'week-held';
+export type BankedTurn = 'scenario-cleared' | 'scenario-at-par' | 'career-day-paid' | 'rush-wave-survived' | 'week-held';
 
 /**
  * What the ledger said when it was told — {@link RailOptions.banked}.

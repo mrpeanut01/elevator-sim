@@ -83,7 +83,14 @@ export {
   CHIME_MODIFIER_KINDS,
   ChimeLedgerError,
   chimeAwardFor,
+  chimeTurnKeyOwnerOf,
+  CHIME_KEYED_COMPLETIONS,
+  isChimeKeyedCompletion,
   chimeEarnTableOf,
+  chimeTurnKeysOf,
+  careerDayTurnKeyOf,
+  weekDayTurnKeyOf,
+  weekLevelTurnKeyOf,
   chimeGiftSource,
   chimeGrantUnits,
   chimeSinkById,
@@ -193,6 +200,7 @@ export type {
   ChimeSpendTable,
   ChimeSource,
   ChimeTurn,
+  ChimeKeyedCompletion,
 } from './chimeLedger.js';
 
 export {

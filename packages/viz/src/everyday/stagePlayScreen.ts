@@ -31,19 +31,25 @@
  * `data/chime-ledger.json`'s `scenario-cleared` award once per account per scenario. Whether this
  * clear was the first is read off the device record **before** banking, so the page's pay line says
  * which of the two happened. Nothing is unlocked, because nothing on the path is locked.
+ *
+ * A clear at or under a priced par also files the par award ([§ D1417](../../../../DECISIONS.md)),
+ * after the clear's own answer, and a rung the census says adds a way through is bought here from
+ * this device's tally and pressed at ([§ D1419](../../../../DECISIONS.md)); `stagePlay.ts` decides
+ * both, and this forwards the presses.
  */
 
 import type { DispatcherProfile } from '@elevator-sim/core/browser';
 
 import { loadBrowserResources, loadCampaign, type BrowserResources, type LoadedCampaign } from '../dev/data.js';
 import type { BatchRequest, BatchResult, BatchWorkerMessage, BatchWorkerRequest } from '../batch/types.js';
-import { pressStage, stagePathOf, stageUnitsAt, type StageAdmissionContext } from '../campaign/stagePress.js';
+import { pressStage, stagePathOf, type StageAdmissionContext } from '../campaign/stagePress.js';
 import type { StageSeedSet } from '../campaign/stageRun.js';
 import type { CampaignStage } from '../campaign/types.js';
+import type { PublishedSurvivorScenario } from '../scenario/survivors.js';
 import type { EditorParkingStrategy } from '../fixit/types.js';
 import { actionBarFor, type ActionBarModel } from './actionBar.js';
 import { everydayDeviceChimeStore } from './chimeStore.js';
-import { CHIME_AWARDS } from './deviceChimes.js';
+import { CHIME_AWARDS, deviceHoldsTurn } from './deviceChimes.js';
 import { progressWithFixSpent } from './profile.js';
 import { everydayProfileStore } from './profileStore.js';
 import { scenarioOpen } from './scenarioOpenPort.js';
@@ -51,12 +57,14 @@ import { el } from './screenDom.js';
 import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.js';
 import {
   STAGE_PLAY_COPY as COPY,
+  clearEarnsParOf,
   namedStageMoveOf,
   stageFactsOf,
   stageMoveOf,
   stagePlayViewOf,
   verdictFactsOf,
   type StagePlayChoice,
+  type StagePlayFacts,
   type StagePlayPhase,
   type StagePlayView,
 } from './stagePlay.js';
@@ -169,6 +177,7 @@ function stageContextOf(data: Loaded, stageId: string):
       readonly context: StageAdmissionContext;
       readonly held: string | undefined;
       readonly parUnits: number | undefined;
+      readonly census: PublishedSurvivorScenario | undefined;
     }
   | undefined {
   const stages = data.campaign.campaign.stages;
@@ -208,6 +217,8 @@ function stageContextOf(data: Loaded, stageId: string):
     held: rung === undefined ? COPY.notFound : rung.offer === 'held' ? rung.heldReason : undefined,
     /* The hub row's own par, so the page and the row compare a clear with one figure (§ D1358). */
     parUnits: rung?.parUnits,
+    /* § D1419: the stage's census row, which decides which of its rungs are sold. */
+    census: data.campaign.survivors.scenarios.find((entry) => entry.id === stage.id),
   };
 }
 
@@ -218,13 +229,25 @@ function clearedOnDevice(stageId: string): boolean {
     .turns.some((turn) => turn.completion === 'scenario-cleared' && turn.key === stageId);
 }
 
-function viewOf(data: Loaded, stageId: string): { readonly view: StagePlayView; readonly admitted: boolean; readonly held: boolean } | undefined {
+/** The rungs this device bought for a stage (§ D1419), off the same record its spend writes. */
+function ownedStepIdsOf(stageId: string): ReadonlySet<string> {
+  return new Set(
+    everydayDeviceChimeStore()
+      .record()
+      .spends.filter((spend) => spend.scenarioId === stageId)
+      .map((spend) => spend.stepId),
+  );
+}
+
+/** One stage's facts for the choice on screen, or `undefined` while it cannot be read. */
+function factsOf(data: Loaded, stageId: string): StagePlayFacts | undefined {
   const found = stageContextOf(data, stageId);
   if (found === undefined) return undefined;
   const session = sessionOf(found.stage);
   const building = found.context.building;
   if (building === undefined) return undefined;
-  const facts = stageFactsOf({
+  const store = everydayDeviceChimeStore();
+  return stageFactsOf({
     stage: found.stage,
     position: found.position,
     total: found.total,
@@ -237,7 +260,18 @@ function viewOf(data: Loaded, stageId: string): { readonly view: StagePlayView; 
     choice: session.choice,
     parUnits: found.parUnits,
     clearedBefore: clearedOnDevice(found.stage.id),
+    census: found.census,
+    ownedStepIds: ownedStepIdsOf(found.stage.id),
+    balanceChimes: store.balance(),
+    parAward: CHIME_AWARDS.awards['scenario-at-par'] ?? 0,
   });
+}
+
+function viewOf(data: Loaded, stageId: string): { readonly view: StagePlayView; readonly admitted: boolean; readonly held: boolean } | undefined {
+  const found = stageContextOf(data, stageId);
+  const facts = factsOf(data, stageId);
+  if (found === undefined || facts === undefined) return undefined;
+  const session = sessionOf(found.stage);
   const phase: StagePlayPhase =
     session.phase.kind === 'judged'
       ? { ...session.phase, stale: !sameChoice(session.pressed, session.choice) }
@@ -289,7 +323,11 @@ function press(data: Loaded, stageId: string, context: EverydayScreenShellContex
   const published = data.campaign.published.scenarios.find((entry) => entry.id === found.stage.id);
   const profiles: readonly DispatcherProfile[] = data.resources.dispatcherProfiles.profiles;
   const move = stageMoveOf(session.choice, profiles, found.context);
-  if (published === undefined || move === undefined) return;
+  const facts = factsOf(data, stageId);
+  if (published === undefined || move === undefined || facts === undefined) return;
+  /* § D1419: the base, or the rung this device bought; the facts and the press read one figure. */
+  const budgetUnits = facts.budgetUnits;
+  const boughtUnits = facts.boughtStepId === undefined ? undefined : budgetUnits;
   const pressedChoice = session.choice;
   const token = ++runToken;
   const host = context.host;
@@ -303,8 +341,11 @@ function press(data: Loaded, stageId: string, context: EverydayScreenShellContex
     published,
     context: found.context,
     move,
-    /* The base rung: nothing on this screen sells a wider one, and the census counts it first. */
-    budgetUnits: stageUnitsAt(found.stage, null),
+    /*
+     * The base rung, or the rung this device bought where one is sold (§ D1419). It read *"nothing on
+     * this screen sells a wider one"*, which stopped being true on this commit.
+     */
+    budgetUnits,
     run: (request: BatchRequest, seedSet: StageSeedSet) =>
       runOneBatch(request, (completed, total) => {
         if (token !== runToken) return;
@@ -319,10 +360,18 @@ function press(data: Loaded, stageId: string, context: EverydayScreenShellContex
       } else {
         const report = result.outcome.verdict;
         let paid: 'first' | 'again' | undefined;
+        let parPaid: 'first' | 'again' | undefined;
         if (report.cleared) {
           const before = clearedOnDevice(found.stage.id);
-          host.bankScenarioClear(found.stage.id);
+          /*
+           * § D1417: a clear at or under a priced par files the par award too, by the mark's own rule,
+           * so a clear that earns no mark earns no par award. Read off the device before banking.
+           */
+          const atPar = clearEarnsParOf(found.parUnits, result.admission.units);
+          const parBefore = deviceHoldsTurn(everydayDeviceChimeStore().record(), 'scenario-at-par', found.stage.id);
+          host.bankScenarioClear(found.stage.id, atPar);
           paid = before ? 'again' : 'first';
+          parPaid = atPar ? (parBefore ? 'again' : 'first') : undefined;
           /*
            * § D1234: keep what this clear's order cost, under the stage's id, so the hub row can
            * compare it with the stage's par after a reload. The fix-it list's record, one list for
@@ -334,7 +383,7 @@ function press(data: Loaded, stageId: string, context: EverydayScreenShellContex
         }
         session.phase = {
           kind: 'judged',
-          verdict: verdictFactsOf(report, paid, result.admission.units),
+          verdict: verdictFactsOf(report, paid, result.admission.units, parPaid, boughtUnits),
           stale: false,
         };
       }
@@ -474,6 +523,39 @@ export function mountStagePlay(host: HTMLElement, context: EverydayScreenShellCo
       if (view.refusal !== undefined) {
         controls.append(para(doc, 'everyday-stage-play-refusal', view.refusal, `font-size:13.5px;line-height:1.5;color:${C.alarm}`));
       }
+      /*
+       * § D1419: the wider budgets. A sold rung is bought from this device's tally on the record a fix
+       * case's rung is (`deviceChimes.ts#withSpend`), and the page redraws at the budget it bought.
+       */
+      if (view.rungs.length > 0) {
+        const rungs = el(doc, 'section', 'everyday-stage-play-rungs');
+        rungs.style.cssText = 'display:grid;gap:6px;min-width:0';
+        const rungHead = el(doc, 'div', 'everyday-stage-play-rungs-head', COPY.rungHeading);
+        rungHead.style.cssText = EYEBROW;
+        rungs.append(rungHead);
+        for (const row of view.rungs) {
+          const line = el(doc, 'div', 'everyday-stage-play-rung');
+          line.dataset.offer = row.offer;
+          line.style.cssText = 'display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap;min-width:0';
+          line.append(para(doc, 'everyday-stage-play-rung-text', row.text, `font-size:13px;line-height:1.5;color:${C.inkSoft};flex:1 1 30ch`));
+          if (row.buyLabel !== undefined) {
+            const buy = el(doc, 'button', 'everyday-stage-play-rung-buy', row.buyLabel);
+            buy.type = 'button';
+            buy.style.cssText = `font:600 12.5px ${TYPE.body};padding:6px 10px;border:1px solid ${C.rule};border-radius:${R.card};background:${C.card};color:${C.ink};cursor:pointer`;
+            buy.disabled = session.phase.kind === 'running';
+            buy.addEventListener('click', () => {
+              const rung = stageFactsRungOf(data, stage.id, row.stepId);
+              if (rung === undefined || !rung.next || session.phase.kind === 'running') return;
+              everydayDeviceChimeStore().spend({ scenarioId: stage.id, stepId: rung.stepId, chimes: rung.chimes });
+              render();
+              context.refreshBar();
+            });
+            line.append(buy);
+          }
+          rungs.append(line);
+        }
+        controls.append(rungs);
+      }
       controls.append(para(doc, 'everyday-stage-play-run-note', view.runNote, `font-size:13px;line-height:1.5;color:${C.warmGrey}`));
       /* § D1358: a stage this device has cleared says a run here is practice, before the press. */
       if (view.practice !== undefined) {
@@ -512,6 +594,9 @@ export function mountStagePlay(host: HTMLElement, context: EverydayScreenShellCo
       }
       if (view.verdict.par !== undefined) {
         verdict.append(para(doc, 'everyday-stage-play-par', view.verdict.par, `font-size:13px;line-height:1.5;color:${C.inkSoft}`));
+      }
+      if (view.verdict.rung !== undefined) {
+        verdict.append(para(doc, 'everyday-stage-play-rung-run', view.verdict.rung, `font-size:13px;line-height:1.5;color:${C.inkSoft}`));
       }
       if (view.verdict.unlock !== undefined) {
         verdict.append(para(doc, 'everyday-stage-play-unlock', view.verdict.unlock, `font-size:13px;color:${C.inkSoft}`));
@@ -565,6 +650,11 @@ export function mountStagePlay(host: HTMLElement, context: EverydayScreenShellCo
       press(loaded, stageId, context);
     },
   };
+}
+
+/** A stage's rung as the facts have it now, so a press buys what the census sells at that moment. */
+function stageFactsRungOf(data: Loaded, stageId: string, stepId: string): NonNullable<StagePlayFacts['rungs']>[number] | undefined {
+  return factsOf(data, stageId)?.rungs?.find((rung) => rung.stepId === stepId);
 }
 
 /** Cleared, and the settings on screen are the ones the clear was measured on. */

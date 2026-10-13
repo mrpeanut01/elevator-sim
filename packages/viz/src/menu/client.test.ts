@@ -1123,8 +1123,10 @@ describe('the earn verb carries the turn it finished, and never an amount — is
     const client = createClient('https://x', transport);
     await client.bankCompletion('t', { completion: 'scenario-cleared', scenarioId: 'three-cars-one-cars-work' });
     await client.bankCompletion('t', { completion: 'rush-wave-survived', waves: 4 });
-    await client.bankCompletion('t', { completion: 'career-day-paid' });
+    await client.bankCompletion('t', { completion: 'career-day-paid', key: 'career:c1:m0:d3:t3' });
+    await client.bankCompletion('t', { completion: 'scenario-at-par', scenarioId: 'three-cars-one-cars-work' });
     expect(seen.map((request) => [request.method, request.url, request.token])).toEqual([
+      ['POST', 'https://x/api/chimes/earn', 't'],
       ['POST', 'https://x/api/chimes/earn', 't'],
       ['POST', 'https://x/api/chimes/earn', 't'],
       ['POST', 'https://x/api/chimes/earn', 't'],
@@ -1137,7 +1139,9 @@ describe('the earn verb carries the turn it finished, and never an amount — is
     expect(seen.map((request) => request.body)).toEqual([
       { completion: 'scenario-cleared', scenarioId: 'three-cars-one-cars-work' },
       { completion: 'rush-wave-survived', waves: 4 },
-      { completion: 'career-day-paid' },
+      /* § D1416: a contract day names its day, and § D1417's par names its scenario. */
+      { completion: 'career-day-paid', key: 'career:c1:m0:d3:t3' },
+      { completion: 'scenario-at-par', scenarioId: 'three-cars-one-cars-work' },
     ]);
   });
 });

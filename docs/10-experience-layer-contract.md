@@ -2158,7 +2158,7 @@ this paragraph named only the empty route for as long as the totals above it wer
 | **4 two banks** | `mixed-use-high-rise`, 1.5 % | **36/50, 34/50** | 50/50, 50/50 | 50/50, 50/50 | **19/50, 20/50** | 50/50, 50/50 |
 | **5 credentials** | `secure-tower`, shipped | **5/50, 11/50** | **45/50, 46/50** | 50/50, 50/50 | **5/50, 9/50** | **14/50, 12/50** |
 | **6 the tall one** | `vertical-city`, 0.5 % | **40/50, 46/50** | 50/50, 50/50 | 50/50, 50/50 | **31/50, 25/50** | 50/50, 50/50 |
-| **7 prove it** | `midtown-office`, 1.25 % ¶, `zoned-uppeak` | 50/50, 50/50 | 50/50, 50/50 | 50/50, 50/50 | **33/50, 33/50** | **43/50, 49/50** |
+| **7 prove it** | `midtown-office`, 2.25 % ¶, `zoned-uppeak` | 50/50, 50/50 | 50/50, 50/50 | 50/50, 50/50 | **29/50, 22/50** | **36/50, 32/50** |
 | **8 the headline address** | `chancery-house`, 3 %, `zoned-uppeak` | 50/50, 50/50 | 50/50, 50/50 | 50/50, 50/50 | **38/50, 40/50** | 50/50, 50/50 |
 | **9 both ways at once** | `crown-hotel`, 3.5 % ¶ | **49/50, 49/50** | 50/50, 50/50 | 50/50, 50/50 | **38/50, 39/50** | 50/50, 50/50 |
 | **10 the bed and the visitor** | `st-jude-hospital`, 2 % | **41/50, 41/50** | 50/50, 50/50 | 50/50, 50/50 | **32/50, 30/50** | 50/50, 50/50 |
@@ -2190,6 +2190,8 @@ reads **38/50, 39/50** (it read **40/50, 42/50**), `deliver-everyone` is a batch
 49/50**, so the stage now declares it, and `long-waits-under` is a constant at 50/50 on both sets.
 
 **Rows 7 and 8 start on `zoned-uppeak` since wave AL, and it is a re-authoring rather than a drift** ([`DECISIONS.md`](../DECISIONS.md) § D1235). Under `collective` every one of stage 2's five ways through cleared both stages, so neither asked for anything stage 2 had not already answered. The starting setting is the only field authored differently, and stage 7's third goal follows from it; demand, horizon and seeds are as they were, and each cell is the new setting's own count, re-measured rather than authored. Stage 7's `answer-the-demand` cell read **31/50, 26/50** under `collective` and reads **33/50, 33/50**; its `long-waits-under` cell was a constant under `collective` and is a batch goal under `zoned-uppeak` at **43/50, 49/50**, so the stage now declares it: `campaign/parse.ts` refuses a stage that leaves out a goal the table measures as live there. Stage 8's `answer-the-demand` cell read **32/50, 30/50** and reads **38/50, 40/50**.
+
+**Row 7's demand moved again in wave AO, from 1.25 % to 2.25 %, and it is DC-12's rebalance** ([`DECISIONS.md`](../DECISIONS.md) § D1426, `docs/33` § 3.3h). At 1.25 % four of the stage's eleven ways through were earlier stages' answers; at 2.25 % the survivor census names two, neither an earlier stage's nor a bare pick. No bar moved: each cell is re-measured at the new demand, `answer-the-demand` at **29/50, 22/50** and `long-waits-under` at **36/50, 32/50**, both still batch goals.
 
 **§ is stage 1's whole row, and it is a correction rather than a measurement that drifted** — GitHub
 issue **#255**. Three of its five cells read `49/50, 48/50 †` and `**38/50, 48/50**` until the

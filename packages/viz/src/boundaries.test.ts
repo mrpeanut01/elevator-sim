@@ -333,6 +333,12 @@ const EVERYDAY_SHELL_FILES = new Set([
    */
   'everyday/chimeStore.ts',
   /*
+   * This device's best rush sitting per tower — [§ D1420](../../../DECISIONS.md), on `chimeStore.ts`'
+   * split: `everyday/rushDeviceBest.ts` is the record and the replay, storage-agnostic and driven in
+   * this node tier; this file is the `window.localStorage` it is kept in, and nothing else.
+   */
+  'everyday/rushDeviceStore.ts',
+  /*
    * § 6's daily loop — four DOM halves and the vocabulary they share. Each one's words and
    * decisions stay pure in its `*View.ts` sibling (`doorView`, `briefView`, `reportView`,
    * `weekView`) plus `today.ts`, `figures.ts` and `world.ts`, none of which are exempt and all of

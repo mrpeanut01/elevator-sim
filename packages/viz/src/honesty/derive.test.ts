@@ -2420,11 +2420,33 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
       ids: [
         'everyday/deviceChimes.ts#DEVICE_CHIMES_KEY',
         'everyday/deviceChimes.ts#DEVICE_CHIMES_QUARANTINE_KEY',
-        'everyday/deviceChimes.ts#withTurn',
-        'everyday/deviceChimes.ts#turnKeyOf',
-        'everyday/deviceChimes.ts#boughtStepIdOf',
         'everyday/deviceChimes.ts#decodeDeviceChimes',
+        /* § D1418: the sink spend's arithmetic; its refusals are worded by `host.ts#DEVICE_SPEND_COPY`. */
+        'everyday/deviceChimes.ts#withSinkSpend',
       ],
+    },
+    {
+      reason:
+        'This device’s best rush sitting, kept and replayed \u2014 DECISIONS.md § D1420. The two keys ' +
+        'are its `localStorage` slots, on `DEVICE_CHIMES_KEY`’s ground one entry up, and ' +
+        '`rushDeviceReplayOf` builds a simulation configuration whose only sentences are ' +
+        '`RUSH_DEVICE_REPLAY_REFUSAL`’s, which the rush adapter drives through the line the standings ' +
+        'draw. The deriver collected all three for their comments.',
+      ids: [
+        'everyday/rushDeviceBest.ts#RUSH_DEVICE_BEST_KEY',
+        'everyday/rushDeviceBest.ts#RUSH_DEVICE_BEST_QUARANTINE_KEY',
+        'everyday/rushDeviceBest.ts#rushDeviceReplayOf',
+      ],
+    },
+    {
+      reason:
+        'Load-time checks and a figure, not sentences a player meets \u2014 DECISIONS.md § D1425 and ' +
+        '§ D1417. `fixit/parse.ts#symptomLeverIn` answers the word and the family a line breaks, for ' +
+        'the author-facing refusal `parseFixitCases` prints when `data/fixit-cases.json` fails, and a ' +
+        'file that fails does not ship. `scenario/par.ts#PAR_AWARD_CHIMES` is a number read off the ' +
+        'ledger; the sentence it reaches a player in is `PAR_PAYS_LINE`, which the stage and fix-it ' +
+        'adapters drive inside every par line.',
+      ids: ['fixit/parse.ts#symptomLeverIn', 'scenario/par.ts#PAR_AWARD_CHIMES'],
     },
     {
       reason:

@@ -202,21 +202,26 @@ describe.skipIf(!HAS_BROWSER)('the Scenario hub opens the stage that was pressed
         ),
       );
       expect(budgets.length).toBeGreaterThanOrEqual(2);
+      /*
+       * **Since § D1419 the stage page sells a rung the census says adds a way through**, so a row
+       * may name a price exactly where its page sells one, and every other row gives the census's
+       * reason. `scenario/ladder.test.ts` derives the sold set from the census; this holds the built
+       * bundle to the same two shapes: no row promises with *can be bought*, a row that names chimes
+       * says its page sells from this device's chimes, and at least one row gives the reason.
+       */
+      let refusing = 0;
       for (const line of budgets) {
-        expect(line).not.toMatch(/\bcan be bought\b|\bchimes?\b/iu);
-        /*
-         * **The literal narrowed in wave AF and the claim did not weaken** — GitHub issue #579,
-         * § D911. It read *No screen in this build sells a wider budget*, which stopped being true
-         * when the fix cases got a rung: a cleared case now earns, and the earning buys a wider
-         * budget there. It is still exactly true of **these ten**: they were played on the Engineer
-         * surface, and since § D1129 on the fix-it editor's stage page, which presses at the base
-         * rung and draws no budget control, so the sentence narrowed rather than went.
-         *
-         * The line above is the half that matters and is unchanged: these rows may not promise a
-         * purchase, in `can be bought` or `chimes`, that the Scenario hub cannot deliver.
-         */
-        expect(line).toContain('Nothing sells a wider budget for these ten');
+        expect(line).not.toMatch(/\bcan be bought\b/iu);
+        if (/\bchimes?\b/u.test(line)) {
+          expect(line).toContain("Its page sells");
+          expect(line).toContain("from this device's chimes");
+        } else {
+          expect(line).toContain('the census finds no further way through');
+          refusing += 1;
+        }
+        expect(line).not.toContain('Nothing sells a wider budget for these ten');
       }
+      expect(refusing).toBeGreaterThan(0);
     } finally {
       await page.close();
     }

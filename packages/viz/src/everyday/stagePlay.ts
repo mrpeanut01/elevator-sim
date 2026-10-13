@@ -38,6 +38,22 @@
  * or held for the reason its row states. Two of three swarm members wanted a clear to unlock the
  * next stage; § D1129 records their dissent and the owner-reversible clause.
  *
+ * ## A wider budget is sold only where the census says it adds a way through
+ *
+ * [§ D1419](../../../../DECISIONS.md), swarm DS's Q3 ruling (S2 and S3; S1's *every authored rung* is
+ * refused). A stage's ladder is authored in `data/campaign.json` and its survivor count is pinned per
+ * rung in `data/scenario-survivors.json`. {@link stageRungsOf} sells a rung, from this device's
+ * tally, only where the pinned count at it exceeds the count at the rung below, and every other rung
+ * is drawn with that measured reason. The rule is read off the census on every draw and never written
+ * down, so a regenerated census moves what is sold on the same commit. When this was written it sold
+ * the equipment rung on stages 1, 2 and 8 and nothing else. A clear at a bought rung pays exactly
+ * what a clear at the base pays, once, and the verdict says which budget it was run at.
+ *
+ * ## A clear at or under a priced par pays once
+ *
+ * [§ D1417](../../../../DECISIONS.md): `data/chime-ledger.json`'s `scenario-at-par`, once per stage,
+ * where `scenario/par.ts#parMarkOf` draws a mark. A free par draws none and pays nothing.
+ *
  * Pure. No DOM, no worker, no fetch: `stagePlayScreen.ts` mounts what this returns, and the honesty
  * sweep drives {@link stagePlayViewOf} without a document.
  */
@@ -57,6 +73,8 @@ import { emptyFixitState, parkingPriceUnits } from '../fixit/engine.js';
 import type { EditorParkingStrategy } from '../fixit/types.js';
 import type { PriceSchedule } from '../pricing/types.js';
 import { isPerReplicationGoal } from '../scenario/goals.js';
+import { parMarkOf } from '../scenario/par.js';
+import type { PublishedSurvivorScenario } from '../scenario/survivors.js';
 import { statLineOf } from '../shift/contracts.js';
 import { fixitParkingRow, type FixitParkingRow } from './fixitScreenModel.js';
 import { stageParLineOf, stageParNoteOf } from './scenarioModel.js';
@@ -172,6 +190,15 @@ export const STAGE_PLAY_COPY = Object.freeze({
   unlocksNothing: 'It unlocks nothing: every stage on the path is open, or held for the reason written on it.',
   stale: 'The settings on screen are not the ones this verdict was measured on. Run it again to judge them.',
   failed: 'The run stopped before it finished, so there is no verdict.',
+  /*
+   * § D1419: the budget rungs. Each sold row says what it buys on the census and that a device
+   * purchase is for this stage on this device; each unsold row says its measured reason.
+   */
+  rungHeading: 'A WIDER BUDGET',
+  rungDevice: 'Bought from this device\u2019s chimes, for this stage on this device.',
+  rungBuy: 'Buy it',
+  rungUnmeasured: 'The census has no count at this rung, so whether it adds a way through is not known.',
+  rungAboveUnbought: 'Sold once the rung below it is bought.',
   labLink: 'Open this stage on the Engineer surface',
   labNote: 'The Engineer surface draws every dial the stage’s budget reaches and the full report. A clear there pays nothing.',
 });
@@ -208,6 +235,71 @@ export interface StagePlayAdmissionFacts {
   readonly refusal: 'over-budget' | 'withheld' | 'cannot-run' | undefined;
 }
 
+/**
+ * **One rung above a stage's base, as this page sells it or says why not** — [§ D1419](../../../../DECISIONS.md).
+ *
+ * `sold` is the census's answer and nothing else: the pinned survivor count at this rung exceeds the
+ * count at the rung below. Both counts are carried so the row can say so on its own face.
+ */
+export interface StageRungFacts {
+  readonly stepId: string;
+  readonly name: string;
+  /** The budget a player standing on this rung holds — `campaign/stagePress.ts#stageUnitsAt`. */
+  readonly units: number;
+  /** The budget of the rung below, which the counts are compared at. */
+  readonly unitsBelow: number;
+  /** What this step costs, in chimes, from the stage's own ladder. */
+  readonly chimes: number;
+  /** The pinned count at this rung, or `undefined` where the census carries none. */
+  readonly survivors: number | undefined;
+  /** The pinned count at the rung below. */
+  readonly survivorsBelow: number | undefined;
+  /** The census says this rung adds a way through, so it is sold. */
+  readonly sold: boolean;
+  /** This device bought it. */
+  readonly owned: boolean;
+  /** Sold, not owned, and every rung below it is the base or owned: the one a press would buy. */
+  readonly next: boolean;
+}
+
+/**
+ * **Which rungs a stage sells, read off the pinned census** — [§ D1419](../../../../DECISIONS.md).
+ *
+ * A rung is sold where its pinned survivor count exceeds the count at the rung below it, and on no
+ * other ground. Where the census carries no row for the stage, or no count at a rung, nothing is
+ * sold, because an unmeasured rung is not one this page can say adds a way through. Owned is this
+ * device's record (`deviceChimes.ts#withSpend`), and a rung is bought only above the base or an owned
+ * rung, so a purchase never skips a step it did not pay for.
+ */
+export function stageRungsOf(
+  stage: CampaignStage,
+  census: PublishedSurvivorScenario | undefined,
+  ownedStepIds: ReadonlySet<string>,
+): readonly StageRungFacts[] {
+  const countAt = (stepId: string | null): number | undefined =>
+    census?.steps.find((step) => step.stepId === stepId)?.survivors;
+  return stage.budget.steps.map((step, index) => {
+    const below = index === 0 ? null : (stage.budget.steps[index - 1]?.id ?? null);
+    const survivors = countAt(step.id);
+    const survivorsBelow = countAt(below);
+    const sold = survivors !== undefined && survivorsBelow !== undefined && survivors > survivorsBelow;
+    const owned = ownedStepIds.has(step.id);
+    const belowHeld = below === null || ownedStepIds.has(below);
+    return {
+      stepId: step.id,
+      name: step.name,
+      units: stageUnitsAt(stage, step.id),
+      unitsBelow: stageUnitsAt(stage, below),
+      chimes: step.chimes,
+      survivors,
+      survivorsBelow,
+      sold,
+      owned,
+      next: sold && !owned && belowHeld,
+    };
+  });
+}
+
 /** Everything the view needs about a stage and the player's choice on it — plain data. */
 export interface StagePlayFacts {
   readonly stageId: string;
@@ -238,6 +330,14 @@ export interface StagePlayFacts {
   readonly parUnits?: number | undefined;
   /** This device holds the stage's clear, so a run here is practice (§ D1358). */
   readonly clearedBefore?: boolean | undefined;
+  /** Every rung above the base, sold or with its reason (§ D1419). Empty where none is authored. */
+  readonly rungs?: readonly StageRungFacts[] | undefined;
+  /** The rung this device bought for this stage, or `undefined` on the base (§ D1419). */
+  readonly boughtStepId?: string | undefined;
+  /** This device's balance, for a rung's shortfall (§ D1419). */
+  readonly balanceChimes?: number | undefined;
+  /** `data/chime-ledger.json`'s `scenario-at-par` award (§ D1417). */
+  readonly parAward?: number | undefined;
 }
 
 /** A verdict as the screen draws it. The sentences are the judge's own. */
@@ -257,6 +357,10 @@ export interface StagePlayVerdictFacts {
   readonly paid: 'first' | 'again' | undefined;
   /** What the pressed settings cost, by the one check — the figure a par is compared with (§ D1358). */
   readonly spentUnits?: number | undefined;
+  /** `first` when this clear banked the par award, `again` when it had paid before (§ D1417). */
+  readonly parPaid?: 'first' | 'again' | undefined;
+  /** The budget the press was made at, where this device bought a rung for it (§ D1419). */
+  readonly boughtUnits?: number | undefined;
 }
 
 /** Where a press is. */
@@ -274,6 +378,8 @@ export interface StagePlayVerdictView {
   readonly pay: string | undefined;
   /** On a clear: the par mark, or why the clear earns none (§ D1358). */
   readonly par: string | undefined;
+  /** The budget the run was made at, where this device bought a rung for this stage (§ D1419). */
+  readonly rung: string | undefined;
   readonly unlock: string | undefined;
   readonly stale: string | undefined;
 }
@@ -295,8 +401,19 @@ export interface StagePlayView {
   readonly practice: string | undefined;
   readonly status: string | undefined;
   readonly verdict: StagePlayVerdictView | undefined;
+  /** The wider budgets, each sold from this device or with its measured reason (§ D1419). */
+  readonly rungs: readonly StageRungRowView[];
   readonly labLink: string;
   readonly labNote: string;
+}
+
+/** One rung as a row: a sentence, and a press where it can be bought now (§ D1419). */
+export interface StageRungRowView {
+  readonly stepId: string;
+  readonly text: string;
+  /** `buy` exactly when a press would buy it; the label is drawn on the button. */
+  readonly offer: 'buy' | 'short' | 'owned' | 'not-sold' | 'later';
+  readonly buyLabel: string | undefined;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -394,6 +511,28 @@ export interface StageFactsInput {
   readonly parUnits?: number | undefined;
   /** {@link StagePlayFacts.clearedBefore}, passed through. */
   readonly clearedBefore?: boolean | undefined;
+  /** The stage's row of the pinned survivor census, which decides what is sold (§ D1419). */
+  readonly census?: PublishedSurvivorScenario | undefined;
+  /** The rungs this device bought for this stage (§ D1419). */
+  readonly ownedStepIds?: ReadonlySet<string> | undefined;
+  /** {@link StagePlayFacts.balanceChimes}, passed through. */
+  readonly balanceChimes?: number | undefined;
+  /** {@link StagePlayFacts.parAward}, passed through. */
+  readonly parAward?: number | undefined;
+}
+
+/**
+ * The rung a device stands on: the highest rung it owns with every rung below it owned too
+ * ([§ D1419](../../../../DECISIONS.md)). A rung bought and later unsold by a regenerated census is
+ * still stood on, because what a player paid for is kept, as a fix case's bought rung is.
+ */
+function standingStepOf(rungs: readonly StageRungFacts[]): string | undefined {
+  let standing: string | undefined;
+  for (const rung of rungs) {
+    if (!rung.owned) break;
+    standing = rung.stepId;
+  }
+  return standing;
 }
 
 /**
@@ -402,7 +541,9 @@ export interface StageFactsInput {
  */
 export function stageFactsOf(input: StageFactsInput): StagePlayFacts {
   const { stage, context, choice } = input;
-  const budgetUnits = stageUnitsAt(stage, null);
+  const rungs = stageRungsOf(stage, input.census, input.ownedStepIds ?? new Set());
+  const boughtStepId = standingStepOf(rungs);
+  const budgetUnits = stageUnitsAt(stage, boughtStepId ?? null);
   const profiles = input.profiles.map((profile) => {
     const admission = admitStageMove(context, { profile }, budgetUnits);
     return {
@@ -441,8 +582,17 @@ export function stageFactsOf(input: StageFactsInput): StagePlayFacts {
     award: input.award,
     parUnits: input.parUnits,
     clearedBefore: input.clearedBefore,
+    rungs,
+    boughtStepId,
+    balanceChimes: input.balanceChimes,
+    parAward: input.parAward,
     choice,
   };
+}
+
+/** Whether a clear at `spentUnits` earns the par award on a par of `parUnits` (§ D1417): the mark's own rule. */
+export function clearEarnsParOf(parUnits: number | undefined, spentUnits: number | undefined): boolean {
+  return parMarkOf(parUnits, spentUnits) !== undefined;
 }
 
 /** A judge's report, reduced to what this screen draws. The sentences are passed through unchanged. */
@@ -450,6 +600,8 @@ export function verdictFactsOf(
   report: StageReport,
   paid: StagePlayVerdictFacts['paid'],
   spentUnits?: number,
+  parPaid?: StagePlayVerdictFacts['parPaid'],
+  boughtUnits?: number,
 ): StagePlayVerdictFacts {
   return {
     headline: report.headline,
@@ -464,6 +616,8 @@ export function verdictFactsOf(
     cleared: report.cleared,
     paid,
     spentUnits,
+    parPaid,
+    boughtUnits,
   };
 }
 
@@ -520,12 +674,19 @@ function verdictViewOf(facts: StagePlayFacts, verdict: StagePlayVerdictFacts, st
     : verdict.metOnTuningSeeds
       ? STAGE_PLAY_COPY.metNotHeldHead
       : STAGE_PLAY_COPY.missedHead;
-  const pay =
+  const clearPay =
     !verdict.cleared || verdict.paid === undefined
       ? undefined
       : verdict.paid === 'first'
         ? `This clear pays ${String(facts.award)} chimes, the first time only.`
         : STAGE_PLAY_COPY.paysOnce;
+  /* § D1417: the par award, said once, on the clear that banked it. */
+  const parAward = facts.parAward ?? 0;
+  const parPay =
+    verdict.cleared && verdict.parPaid === 'first' && parAward > 0
+      ? `Meeting par pays ${String(parAward)} ${parAward === 1 ? 'chime' : 'chimes'} more, once, and this clear is that once.`
+      : undefined;
+  const pay = clearPay === undefined ? parPay : parPay === undefined ? clearPay : `${clearPay} ${parPay}`;
   return {
     head,
     headline: verdict.headline,
@@ -547,6 +708,10 @@ function verdictViewOf(facts: StagePlayFacts, verdict: StagePlayVerdictFacts, st
     pay,
     /* § D1358: the par this clear meets, or why it earns no mark, in the hub row's own words. */
     par: verdict.cleared ? stageParLineOf(facts.parUnits, verdict.spentUnits) : undefined,
+    rung:
+      verdict.boughtUnits === undefined
+        ? undefined
+        : `Run at the ${String(verdict.boughtUnits)}-unit budget this device bought for this stage. A clear pays the same at any budget.`,
     unlock: verdict.cleared ? STAGE_PLAY_COPY.unlocksNothing : undefined,
     stale: stale ? STAGE_PLAY_COPY.stale : undefined,
   };
@@ -565,6 +730,60 @@ export function stagePracticeLineOf(parUnits: number | undefined): string {
       ? `A clear at or under par, ${String(parUnits)} ${parUnits === 1 ? 'unit' : 'units'}, earns the mark.`
       : (stageParNoteOf(parUnits, undefined) ?? '');
   return `${STAGE_PLAY_COPY.practice} ${par}`.trim();
+}
+
+function waysText(count: number): string {
+  return `${String(count)} ${count === 1 ? 'way' : 'ways'} through`;
+}
+
+/**
+ * **A rung's row** — [§ D1419](../../../../DECISIONS.md). Sold rows say what the census found at the
+ * rung against the rung below and that a device purchase is for this stage on this device; unsold
+ * rows say the measured reason. The shortfall is a subtraction of two counts of finished turns.
+ */
+export function stageRungRowOf(rung: StageRungFacts, balanceChimes: number): StageRungRowView {
+  const unit = rung.chimes === 1 ? 'chime' : 'chimes';
+  const head = `${rung.name}: ${String(rung.units)} units for ${String(rung.chimes)} ${unit}.`;
+  if (rung.survivors === undefined || rung.survivorsBelow === undefined) {
+    return { stepId: rung.stepId, text: `${head} Not sold. ${STAGE_PLAY_COPY.rungUnmeasured}`, offer: 'not-sold', buyLabel: undefined };
+  }
+  const found =
+    `The census found ${waysText(rung.survivors)} at ${String(rung.units)} units, against ` +
+    `${String(rung.survivorsBelow)} at ${String(rung.unitsBelow)}.`;
+  if (!rung.sold) {
+    return {
+      stepId: rung.stepId,
+      text: `${head} Not sold. The census found ${waysText(rung.survivors)} at it, the same as at ${String(rung.unitsBelow)} units, so it would buy no new way through.`,
+      offer: 'not-sold',
+      buyLabel: undefined,
+    };
+  }
+  if (rung.owned) {
+    return {
+      stepId: rung.stepId,
+      text: `${rung.name}: bought on this device, so this stage runs at ${String(rung.units)} units here. ${found}`,
+      offer: 'owned',
+      buyLabel: undefined,
+    };
+  }
+  if (!rung.next) {
+    return { stepId: rung.stepId, text: `${head} ${found} ${STAGE_PLAY_COPY.rungAboveUnbought}`, offer: 'later', buyLabel: undefined };
+  }
+  const short = rung.chimes - Math.max(0, Math.trunc(balanceChimes));
+  if (short > 0) {
+    return {
+      stepId: rung.stepId,
+      text: `${head} ${found} ${STAGE_PLAY_COPY.rungDevice} Short by ${String(short)} ${short === 1 ? 'chime' : 'chimes'}.`,
+      offer: 'short',
+      buyLabel: undefined,
+    };
+  }
+  return {
+    stepId: rung.stepId,
+    text: `${head} ${found} ${STAGE_PLAY_COPY.rungDevice}`,
+    offer: 'buy',
+    buyLabel: `${STAGE_PLAY_COPY.rungBuy} · ${String(rung.chimes)} ${unit}`,
+  };
 }
 
 /** The screen, computed. */
@@ -593,6 +812,7 @@ export function stagePlayViewOf(facts: StagePlayFacts, phase: StagePlayPhase): S
     practice: facts.clearedBefore === true ? stagePracticeLineOf(facts.parUnits) : undefined,
     status: statusOf(phase),
     verdict: phase.kind === 'judged' ? verdictViewOf(facts, phase.verdict, phase.stale) : undefined,
+    rungs: (facts.rungs ?? []).map((rung) => stageRungRowOf(rung, facts.balanceChimes ?? 0)),
     labLink: STAGE_PLAY_COPY.labLink,
     labNote: STAGE_PLAY_COPY.labNote,
   };

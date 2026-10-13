@@ -69,6 +69,7 @@ import {
   type ChimeTurn,
   type RushPurseTable,
   chimeSinkById,
+  isChimeKeyedCompletion,
 } from '@elevator-sim/core';
 
 import {
@@ -1219,28 +1220,36 @@ async function chimeBalance(deps: ApiDeps, request: ApiRequest): Promise<ApiResp
 const EARN_REFUSAL_DETAIL: Readonly<Partial<Record<string, string>>> = Object.freeze({
   'unknown-scenario': 'This build has no scenario by that name to pay for.',
   'unknown-wave': 'A rush pays whole waves outlasted, from one up to the waves its stream generates.',
-  'unknown-level': 'This build authors no level of a tower’s week by that key.',
+  'unknown-key':
+    'This award pays once under the turn it names, and this build has no contract day or level of a tower’s week by that name.',
+  'not-cleared': 'A par pays on a scenario this account has already been paid a clear for.',
 });
 
 /**
  * The turn a request names, or `undefined` for a completion this build does not know.
  *
- * A missing or mistyped `scenarioId` or `levelKey` becomes `''` and a missing or mistyped `waves` becomes `NaN`, so
+ * A missing or mistyped `scenarioId` or `key` becomes `''` and a missing or mistyped `waves` becomes `NaN`, so
  * the refusal is the ledger's and is made in one place, rather than by a second shape check here that
  * could come to disagree with it. Every other key on the body is ignored, which is what keeps an
  * amount — or any figure a run measured — from having anywhere to arrive.
  */
-function turnOf(completion: string, body: Partial<Record<'scenarioId' | 'waves' | 'levelKey', unknown>> | null | undefined): ChimeTurn | undefined {
+function turnOf(
+  completion: string,
+  body: Partial<Record<'scenarioId' | 'waves' | 'key', unknown>> | null | undefined,
+): ChimeTurn | undefined {
+  /*
+   * § D1416: every keyed completion (`core`'s `CHIME_KEYED_COMPLETIONS`, a contract day and, since
+   * § D1402 joined the table, a held level) is read the same way, so one added later needs no arm
+   * here. The key it names, `''` when missing, so the ledger refuses it in one place.
+   */
+  if (isChimeKeyedCompletion(completion)) return { completion, key: typeof body?.key === 'string' ? body.key : '' };
   switch (completion) {
     case 'scenario-cleared':
       return { completion: 'scenario-cleared', scenarioId: typeof body?.scenarioId === 'string' ? body.scenarioId : '' };
-    case 'career-day-paid':
-      return { completion: 'career-day-paid' };
+    case 'scenario-at-par':
+      return { completion: 'scenario-at-par', scenarioId: typeof body?.scenarioId === 'string' ? body.scenarioId : '' };
     case 'rush-wave-survived':
       return { completion: 'rush-wave-survived', waves: typeof body?.waves === 'number' ? body.waves : Number.NaN };
-    case 'week-held':
-      /* Wave AO lane DS-1, § D1402: the level is the turn key, and `''` is refused by the ledger. */
-      return { completion: 'week-held', levelKey: typeof body?.levelKey === 'string' ? body.levelKey : '' };
     default:
       return undefined;
   }
@@ -1257,7 +1266,7 @@ async function chimeEarn(
   }
   const limited = chargeChimeWrite(deps, user.id, perAccount);
   if (limited !== undefined) return limited;
-  const body = request.body as Partial<Record<'completion' | 'scenarioId' | 'waves' | 'levelKey', unknown>> | null | undefined;
+  const body = request.body as Partial<Record<'completion' | 'scenarioId' | 'waves' | 'key', unknown>> | null | undefined;
   const completion = typeof body?.completion === 'string' ? body.completion : '';
   const turn = turnOf(completion, body);
   if (turn === undefined) {

@@ -227,7 +227,8 @@ import { weekTopOf } from '../shift/weekLevels.js';
 import { dealtWeekOrdersOf } from '../shift/weekOrders.js';
 // GitHub issue #221's post block — the decision, seeded in all seven states by the report adapter.
 import { postRunViewOf } from '../everyday/postRun.js';
-import { CHIMES_PANEL_COPY } from '../everyday/chimesPanel.js';
+import {
+  CHIME_PRICES, CHIMES_PANEL_COPY } from '../everyday/chimesPanel.js';
 import { SETTINGS_ABSENCES, SIGN_IN_COPY, settingsScreenViewOf } from '../everyday/settingsView.js';
 import { EVERYDAY_UNITS, lengthFigure, speedRangeFigure } from '../everyday/units.js';
 import {
@@ -264,7 +265,15 @@ import { todayOf, type TodayRecord } from '../everyday/today.js';
 import { RUSH_NOT_LANDED, RUSH_RESULT_EMPTY_LEDE, rushDisclosureOf, rushOutcomeOf, rushResultViewOf, rushStageHeaderOf, type RushOutcome } from '../everyday/rush.js';
 import { rushPostViewOf } from '../everyday/rushPost.js';
 import { RUSH_SITTING_COPY, rushSittingOf, type RushRoundRecord } from '../everyday/rushSitting.js';
-import { CAREER_TOP_UP_NO_TOWER, RUSH_NOT_STANDING, RUSH_REBUILD_NOT_YET } from '../everyday/host.js';
+import {
+  CAREER_TOP_UP_NO_TOWER,
+  CHIME_HOME_BOOTING,
+  DEVICE_SPEND_COPY,
+  RUSH_DEVICE_HELD_THROUGH,
+  RUSH_NOT_STANDING,
+  RUSH_REBUILD_NOT_YET,
+} from '../everyday/host.js';
+import { RUSH_DEVICE_COPY, RUSH_DEVICE_REPLAY_REFUSAL } from '../everyday/rushDeviceBest.js';
 import {
   ENGINEER_RETURN_LABEL,
   ENGINEER_RETURN_TITLE,
@@ -363,6 +372,8 @@ import { admitStageMove, stageUnitsAt } from '../campaign/stagePress.js';
 import { playerSafeDescription } from '../campaign/words.js';
 import type { CampaignStage } from '../campaign/types.js';
 import {
+  stageRungsOf,
+  stageRungRowOf,
   STAGE_PLAY_COPY,
   stageFactsOf,
   stagePlayViewOf,
@@ -10476,6 +10487,13 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
      */
     'everyday/rushHouse.ts#RUSH_HOUSE_COPY',
     'everyday/rushHouse.ts#rushStandingsOf',
+    /*
+     * § D1420: this device's best sitting on a build with no board, its row and every line the
+     * standings say about it (replayed, nothing kept, or kept and not replayable here), seeded below.
+     */
+    'everyday/rushDeviceBest.ts#RUSH_DEVICE_COPY',
+    'everyday/rushDeviceBest.ts#RUSH_DEVICE_REPLAY_REFUSAL',
+    'everyday/host.ts#RUSH_DEVICE_HELD_THROUGH',
     'everyday/rushScreenModel.ts#rushBandViews',
     'everyday/rushScreenModel.ts#rushFactViews',
     'everyday/rushScreenModel.ts#rushDrivingLine',
@@ -10683,6 +10701,29 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
             seeds.push({ field: 'rush.yours.note', text: withYours.yoursLine, role: 'prose' });
           }
         }
+      }
+      /* § D1420: the device's own row, and the line in each of its three states. */
+      if (firstBroke !== undefined && firstBroke !== null) {
+        const onDevice = rushStandingsOf(context.building.id, nameOf, undefined, undefined, { kind: 'silent' }, {
+          kind: 'row',
+          heldS: firstBroke,
+          roundCount: 3,
+          modifiers: [{ sinkId: 'rush-prefit', steps: 1 }],
+        });
+        if (onDevice.kind === 'rows') {
+          for (const row of onDevice.yours) {
+            seeds.push({ field: 'rush.device.name', text: row.name, role: 'label' });
+            seeds.push({ field: 'rush.device.tag', text: row.tag, role: 'label' });
+            seeds.push({ field: 'rush.device.detail', text: row.detail, role: 'label' });
+            seeds.push({ field: 'rush.device.wave', text: row.wave, role: 'observation' });
+            seeds.push({ field: 'rush.device.held', text: row.held, role: 'observation' });
+          }
+          if (onDevice.yoursLine !== undefined) seeds.push({ field: 'rush.device.note', text: onDevice.yoursLine, role: 'prose' });
+        }
+      }
+      seeds.push({ field: 'rush.device.none', text: RUSH_DEVICE_COPY.none, role: 'reason' });
+      for (const [key, reason] of [...Object.entries(RUSH_DEVICE_REPLAY_REFUSAL), ['heldThrough', RUSH_DEVICE_HELD_THROUGH] as const]) {
+        seeds.push({ field: `rush.device.unreplayable.${key}`, text: RUSH_DEVICE_COPY.unreplayable(reason), role: 'reason' });
       }
       seeds.push({ field: 'rush.yours.none', text: RUSH_HOUSE_COPY.yoursNone, role: 'reason' });
       seeds.push({ field: 'rush.yours.signedOut', text: RUSH_HOUSE_COPY.yoursSignedOut, role: 'reason' });
@@ -11032,6 +11073,13 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
      */
     'everyday/host.ts#CAREER_TOP_UP_NO_TOWER',
     /*
+     * § D1418: what a spend from this device's tally says when it is refused, and the moment the
+     * account bridge has not answered. The host decides those arms, so it holds the words; each is
+     * seeded below as the notice a press on the device home carries.
+     */
+    'everyday/host.ts#DEVICE_SPEND_COPY',
+    'everyday/host.ts#CHIME_HOME_BOOTING',
+    /*
      * The DISPLAY NAME field's note, which is **two** sentences because it is about two different
      * names — § D490. Both arms are reached below: all but one of the cases draw the device one, and
      * `not-durable` is signed in and named and draws the account one. A pair of sentences with one
@@ -11172,11 +11220,48 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
        * `account: undefined` is what makes the home `device` rather than `booting`: the bridge has
        * answered and there is nobody signed in.
        */
-      ['device-tally', { profile: stored, reduceMotion: false, account: SIGNED_OUT, deviceChimes: 6 }],
+      /*
+       * § D1418: the device home sells the three sinks. `device-tally` holds enough for every row and
+       * a desk open, so each row's device offer is swept; `device-not-durable` holds every sink at its
+       * cap, so each device *bought* line is; `device-short` holds too little, with the host's own
+       * refusal as its notice.
+       */
+      [
+        'device-tally',
+        {
+          profile: stored,
+          reduceMotion: false,
+          account: SIGNED_OUT,
+          deviceChimes: 999,
+          deviceOwns: [],
+          careerTowerOpen: true,
+          chimeNotice: DEVICE_SPEND_COPY.owned,
+        },
+      ],
       [
         'device-not-durable',
-        { profile: stored, reduceMotion: false, account: SIGNED_OUT, deviceChimes: 1, deviceDurable: false },
+        {
+          profile: stored,
+          reduceMotion: false,
+          account: SIGNED_OUT,
+          deviceChimes: 1,
+          deviceDurable: false,
+          deviceOwns: CHIME_PRICES.sinks.map((sink) => ({ sinkId: sink.id, steps: sink.maxSteps })),
+          chimeNotice: DEVICE_SPEND_COPY.unknown,
+        },
       ],
+      [
+        'device-short',
+        {
+          profile: stored,
+          reduceMotion: false,
+          account: SIGNED_OUT,
+          deviceChimes: 2,
+          deviceOwns: [],
+          chimeNotice: DEVICE_SPEND_COPY.short(4),
+        },
+      ],
+      ['device-booting-notice', { profile: stored, reduceMotion: false, account: SIGNED_OUT, deviceChimes: 3, chimeNotice: CHIME_HOME_BOOTING }],
       /*
        * § D672's spend, in the arms a balance and an account alone cannot reach. Every case above
        * leaves `chimeSpendable` unset, so every row draws its *there is no ledger on this build*
@@ -17581,6 +17666,15 @@ const EVERYDAY_STAGE_PLAY: SurfaceAdapter = {
     'everyday/stagePlay.ts#stageFactsOf',
     /* § D1376: a cleared stage's practice line in each par arm, seeded by name below. */
     'everyday/stagePlay.ts#stagePracticeLineOf',
+    /*
+     * § D1419: the wider budgets, sold from the device tally where the census adds a way through and
+     * drawn with the measured reason elsewhere. Seeded over every shipped stage's ladder below, in the
+     * buy, short and bought arms, so the sold and the unsold sentences are both read.
+     */
+    'everyday/stagePlay.ts#stageRungRowOf',
+    'everyday/stagePlay.ts#stageRungsOf',
+    /* § D1417: the sentence every par line ends with, read inside each verdict's par line. */
+    'scenario/par.ts#PAR_PAYS_LINE',
   ],
   render(this: SurfaceAdapter, context) {
     const seeds: TextSeed[] = [];
@@ -17678,6 +17772,30 @@ const EVERYDAY_STAGE_PLAY: SurfaceAdapter = {
       seeds.push({ field: `${at}.lab`, text: view.labLink, role: 'label' });
       seeds.push({ field: `${at}.labNote`, text: view.labNote, role: 'prose' });
     }
+    /* § D1417: the pay line on a clear that also met the par, first time and again. */
+    for (const [state, paid] of [['first', 'first'], ['again', 'again']] as const) {
+      const view = stagePlayViewOf(
+        { ...factsFor(standing, undefined, paid === 'again'), parAward: CHIME_AWARDS.awards['scenario-at-par'] ?? 0 },
+        { kind: 'judged', verdict: { ...verdict(true, true, paid, parUnits ?? 0), parPaid: 'first', boughtUnits: 24 }, stale: false },
+      );
+      if (view.verdict?.pay !== undefined) seeds.push({ field: `stagePlay.parPaid.${state}.pay`, text: view.verdict.pay, role: 'prose' });
+      if (view.verdict?.rung !== undefined) seeds.push({ field: `stagePlay.parPaid.${state}.rung`, text: view.verdict.rung, role: 'prose' });
+    }
+    /* § D1419: every shipped stage's ladder, in the arms a device can stand in. */
+    for (const each of stages) {
+      const census = context.survivors.scenarios.find((row) => row.id === each.id);
+      for (const [arm, owned, balance] of [['buy', false, 999], ['short', false, 0], ['owned', true, 0]] as const) {
+        const rungs = stageRungsOf(each, census, owned ? new Set(each.budget.steps.map((step) => step.id)) : new Set());
+        for (const rung of rungs) {
+          const row = stageRungRowOf(rung, balance);
+          seeds.push({ field: `stagePlay.rung.${each.id}.${rung.stepId}.${arm}`, text: row.text, role: 'reason' });
+          if (row.buyLabel !== undefined) {
+            seeds.push({ field: `stagePlay.rung.${each.id}.${rung.stepId}.${arm}.buy`, text: row.buyLabel, role: 'label' });
+          }
+        }
+      }
+    }
+    seeds.push({ field: 'stagePlay.rung.heading', text: STAGE_PLAY_COPY.rungHeading, role: 'label' });
     /* § D1358: the bar's note on a stage this device has cleared. */
     seeds.push({ field: 'stagePlay.bar.practice', text: STAGE_PLAY_COPY.notePractice, role: 'prose' });
     /* § D1376: the practice line's three par arms — priced, free and unpriced. */

@@ -161,8 +161,13 @@ describe('the row’s face matches what the press does', () => {
      * these ten, whose stage page (§ D1129) presses at the base rung and has no budget control, so the
      * row says *these ten*. The old wording is asserted **absent** so it cannot creep back.
      */
-    expect(SCENARIO_LADDER_COPY.baseRungNote).not.toMatch(/\bbought\b|\bchimes?\b|\bcan be bought\b/iu);
-    expect(SCENARIO_LADDER_COPY.baseRungNote).not.toContain('No screen in this build sells');
-    expect(SCENARIO_LADDER_COPY.baseRungNote).toContain('for these ten');
+    /*
+     * § D1419: the stage page sells the rungs the census says add a way through, so the blanket
+     * refusal is gone and a row that sells nothing says the census's reason instead.
+     */
+    expect(SCENARIO_LADDER_COPY.rungsNotSold).not.toMatch(/\bbought\b|\bchimes?\b|\bcan be bought\b/iu);
+    expect(SCENARIO_LADDER_COPY.rungsNotSold).not.toContain('No screen in this build sells');
+    expect(SCENARIO_LADDER_COPY.rungsNotSold).toContain('the census finds no further way through');
+    expect(Object.hasOwn(SCENARIO_LADDER_COPY, 'baseRungNote'), 'the deleted refusal came back').toBe(false);
   });
 });

@@ -117,53 +117,56 @@ describe('the ordered path', () => {
     }
   });
 
-  it('offers no purchase on the budget line while no screen sells one — § D786', () => {
+  it('prices on the budget line exactly the rungs the stage page sells, and says why it sells no other — § D786, § D1419', () => {
     /*
-     * **The worst thing on the Scenario hub, asserted in both directions.**
+     * **The worst thing on the Scenario hub, asserted in both directions, and moved by the commit
+     * that built the sink.** The line read *"2 wider budgets can be bought … (20 chimes) … (30
+     * chimes)"* on every row while nothing could charge either price (§ D786), and then *"Nothing
+     * sells a wider budget for these ten"* (§ D911). Since § D1419 the stage page sells, from the
+     * device tally, a rung whose pinned count exceeds the rung below's. So:
      *
-     * The line read *"2 wider budgets **can be bought**, in order: Widen to the equipment tier
-     * (20 chimes), Widen to the building tier (30 chimes)"* on every row, and shipped in
-     * `dist-web`. `data/chime-ledger.json` has no scenario-budget sink and by its own ruling may
-     * never have one — it refuses `scenario-budget-step` by name and
-     * `core/config/chimeLedger.ts#REFUSED_MODIFIER_KINDS` refuses the modifier kind — so nothing in
-     * the product could charge that price. § D227 in both polarities at once, on the first screen
-     * of the mode `docs/38` § 2.1 rules first.
+     * 1. **A sold rung is named with its price**, and a rung the page does not sell carries no price.
+     * 2. **A row whose page sells nothing says why, in the census's words**, and names nobody who
+     *    has not bought.
      *
-     * Two halves, because either alone would pass on a line that is wrong:
-     *
-     * 1. **No purchase verb and no chime figure.** A price is the only part of that sentence a
-     *    player could have acted on, and there is no act.
-     * 2. **The refusal is there, and it names who cannot sell rather than who has not bought.**
-     *    The deleted mitigation — *"Nothing here has bought a wider budget"* — reads to a first
-     *    arrival as *you have not saved up yet*, which is why deleting the promise alone would not
-     *    have been enough.
-     *
-     * It goes red the moment somebody re-adds a price, **and it goes red the moment somebody builds
-     * the sink and forgets this line**: clause 2 requires the refusal on every row that has a rung,
-     * so a spend surface that ships has to come back here.
+     * The sold set is derived here from the census, as `everyday/stagePlay.ts#stageRungsOf` derives it,
+     * so a regenerated census moves both on one commit.
      */
-    const purchase = /\bcan be bought\b|\bbuy\b|\bbought\b|\bchimes?\b|\bprices?\b|\bcosts?\b/iu;
+    const purchaseWord = /\bcan be bought\b|\bbuy\b|\bbought\b|\bprices?\b|\bcosts?\b/iu;
     let withRungs = 0;
+    let rowsSelling = 0;
     for (const rung of ladder()) {
       const stage = campaign.stages.find((row) => row.id === rung.id);
       if (stage === undefined) throw new Error(`no stage for ${rung.id}`);
-      expect(rung.budgetLine, rung.id).not.toMatch(purchase);
-      /*
-       * **Every figure on the line, enumerated** — rather than *this price is absent*, which a
-       * price that happens to equal the opening units could pass by coincidence. The line draws the
-       * units it opens on, and the number of rungs above it when there is more than one; a third
-       * figure of any kind is a regression whether or not it is one of today's prices.
-       */
+      expect(rung.budgetLine, rung.id).not.toMatch(purchaseWord);
+      const census = survivors.scenarios.find((row) => row.id === stage.id);
+      const countAt = (stepId: string | null) => census?.steps.find((step) => step.stepId === stepId)?.survivors;
+      const sold = stage.budget.steps.filter((step, index) => {
+        const at = countAt(step.id);
+        const below = countAt(index === 0 ? null : (stage.budget.steps[index - 1]?.id ?? null));
+        return at !== undefined && below !== undefined && at > below;
+      });
+      /* Every figure on the line, enumerated: the opening units, the count of rungs, and each sold price. */
       const figures = new Set([...rung.budgetLine.matchAll(/\d+/gu)].map((match) => match[0]));
       const allowed = new Set([String(rungsOf(stage.budget)[0]?.units)]);
       if (stage.budget.steps.length > 1) allowed.add(String(stage.budget.steps.length));
+      for (const step of sold) allowed.add(String(step.chimes));
       expect([...figures].sort(), rung.id).toEqual([...allowed].sort());
       if (stage.budget.steps.length === 0) continue;
       withRungs += 1;
-      expect(rung.budgetLine, rung.id).toContain(SCENARIO_LADDER_COPY.baseRungNote);
+      if (sold.length === 0) {
+        expect(rung.budgetLine, rung.id).toContain(SCENARIO_LADDER_COPY.rungsNotSold);
+        expect(rung.budgetLine, rung.id).not.toMatch(/\bchimes?\b/u);
+      } else {
+        rowsSelling += 1;
+        for (const step of sold) expect(rung.budgetLine, `${rung.id}/${step.id}`).toContain(`${step.name} for ${String(step.chimes)} chimes`);
+        expect(rung.budgetLine, rung.id).toContain(SCENARIO_LADDER_COPY.countAtBase);
+      }
     }
-    // The clause above is vacuous if no shipped stage authors a rung; it does, and this says so.
+    // Both arms are drawn on the shipped census, so neither clause is vacuous.
     expect(withRungs).toBeGreaterThan(0);
+    expect(rowsSelling, 'no row sells a rung on the shipped census').toBeGreaterThan(0);
+    expect(rowsSelling, 'every row sells a rung, so the refusal is never drawn').toBeLessThan(withRungs);
   });
 
   it('never calls a held scenario unwinnable, because the dial half is a sample', () => {

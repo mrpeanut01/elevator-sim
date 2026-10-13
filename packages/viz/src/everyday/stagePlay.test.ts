@@ -35,7 +35,9 @@ import { PAR_MARK_COPY } from '../scenario/par.js';
 import { SCENARIO_COPY, scenarioHubViewOf, stageParNoteOf } from './scenarioModel.js';
 import {
   STAGE_PLAY_COPY,
+  clearEarnsParOf,
   stageFactsOf,
+  stageRungsOf,
   namedStageMoveOf,
   stageMoveOf,
   stagePageMovesOf,
@@ -92,6 +94,21 @@ function admissionContextOf(stage: CampaignStage) {
   };
 }
 
+function factsInputOf(stage: CampaignStage, choice: StagePlayChoice, held?: string) {
+  return {
+    stage,
+    position: stages.indexOf(stage) + 1,
+    total: stages.length,
+    building: requireBuilding(config, stage.building),
+    context: admissionContextOf(stage),
+    profiles: config.dispatcherProfiles.profiles,
+    schedule: shippedPriceSchedule(),
+    held,
+    award: 6,
+    choice,
+  };
+}
+
 function factsOf(stage: CampaignStage, choice: StagePlayChoice, held?: string) {
   return stageFactsOf({
     stage,
@@ -108,10 +125,10 @@ function factsOf(stage: CampaignStage, choice: StagePlayChoice, held?: string) {
 }
 
 /** The stage's own demonstration replication, folded to the legs `docs/12` § 5 clause 9 compares. */
-function legsOf(stage: CampaignStage, choice: StagePlayChoice): string {
+function legsOf(stage: CampaignStage, choice: StagePlayChoice, budgetUnits = stageUnitsAt(stage, null)): string {
   const move = stageMoveOf(choice, config.dispatcherProfiles.profiles, { space });
   if (move === undefined) throw new Error('no move');
-  const admission = admitStageMove(admissionContextOf(stage), move, stageUnitsAt(stage, null));
+  const admission = admitStageMove(admissionContextOf(stage), move, budgetUnits);
   if (admission.candidate === undefined) throw new Error(admission.sentence);
   const simulation = demonstrationConfigFor({
     stage,
@@ -454,5 +471,156 @@ describe('a per-run goal’s mark names its bar — § D1185', () => {
     }
     const interval = stagePlayViewOf(facts, { kind: 'judged', verdict: verdictFactsOf(report('beat-the-baseline', true), undefined), stale: false });
     expect(interval.verdict?.goals[0]?.mark).toBe(STAGE_PLAY_COPY.goalMet);
+  });
+});
+
+/*
+ * **A wider budget is sold only where the census says it adds a way through** — [§ D1419](../../../../DECISIONS.md),
+ * swarm DS's Q3 ruling. Red on the base: the page sold no rung at all (`stageUnitsAt(stage, null)` on
+ * every press), while the census pinned a count per rung and the equipment rung raised it on three
+ * stages. The rule is read off the census, so these cases hold it in both directions over whatever
+ * census is pinned rather than naming the stages it sells today.
+ */
+describe('a stage sells a rung only where the census adds a way through — § D1419', () => {
+  const censusOf = (stage: CampaignStage) => survivors.scenarios.find((entry) => entry.id === stage.id);
+
+  it('sells exactly the rungs whose pinned count exceeds the rung below, and draws every other with its reason', () => {
+    let sold = 0;
+    let unsold = 0;
+    for (const stage of stages) {
+      const census = censusOf(stage);
+      for (const [index, rung] of stageRungsOf(stage, census, new Set()).entries()) {
+        const below = index === 0 ? null : (stage.budget.steps[index - 1]?.id ?? null);
+        const at = census?.steps.find((step) => step.stepId === rung.stepId)?.survivors;
+        const under = census?.steps.find((step) => step.stepId === below)?.survivors;
+        expect(rung.sold, `${stage.id} ${rung.stepId}`).toBe(at !== undefined && under !== undefined && at > under);
+        const row = stagePlayViewOf(
+          { ...factsOf(stage, { profileId: stage.dispatcher.startingProfileId, parking: null }), rungs: [rung], balanceChimes: 999 },
+          { kind: 'idle' },
+        ).rungs[0];
+        if (rung.sold) {
+          sold += 1;
+          expect(row?.offer, `${stage.id} ${rung.stepId}`).toBe(rung.next ? 'buy' : 'later');
+          expect(row?.text).toContain(`The census found ${String(at)} ways through at ${String(rung.units)} units`);
+          expect(row?.text).toContain('this device');
+        } else {
+          unsold += 1;
+          expect(row?.offer).toBe('not-sold');
+          expect(row?.text).toMatch(/Not sold\./u);
+          expect(row?.buyLabel).toBeUndefined();
+        }
+      }
+    }
+    /* Non-vacuous on the shipped census: something is sold and something is refused. */
+    expect(sold, 'no rung on the shipped census adds a way through').toBeGreaterThan(0);
+    expect(unsold, 'every rung is sold, so the refusal arm is never drawn').toBeGreaterThan(0);
+  });
+
+  it('positive control: a count raised in a copy of the census sells that rung, and lowering it again unsells it', () => {
+    const stage = stages.find((entry) => stageRungsOf(entry, censusOf(entry), new Set()).some((rung) => !rung.sold && rung.survivors !== undefined));
+    if (stage === undefined) throw new Error('no unsold measured rung to move');
+    const census = censusOf(stage)!;
+    const rung = stageRungsOf(stage, census, new Set()).find((entry) => !entry.sold && entry.survivors !== undefined)!;
+    const raised = {
+      ...census,
+      steps: census.steps.map((step) => (step.stepId === rung.stepId ? { ...step, survivors: (rung.survivorsBelow ?? 0) + 1 } : step)),
+    };
+    expect(stageRungsOf(stage, raised, new Set()).find((entry) => entry.stepId === rung.stepId)?.sold).toBe(true);
+    expect(stageRungsOf(stage, census, new Set()).find((entry) => entry.stepId === rung.stepId)?.sold).toBe(false);
+    /* And no census row at all sells nothing. */
+    expect(stageRungsOf(stage, undefined, new Set()).some((entry) => entry.sold)).toBe(false);
+  });
+
+  it('a bought rung widens the budget the page admits at: a move the base refuses runs there and moves the legs, and the run plan carries no budget', () => {
+    /*
+     * Found rather than named, on two properties: a stage with a sold rung and a page choice its base
+     * refuses and that rung admits, **and** whose run differs from the building as it stands. The
+     * second is what makes the case about the budget: a move inert on its building (a destination
+     * order on one shaft) would leave the refusal arm saying nothing about money.
+     */
+    let found: { stage: CampaignStage; stepId: string; choice: StagePlayChoice } | undefined;
+    const tried: string[] = [];
+    for (const stage of stages) {
+      const rung = stageRungsOf(stage, censusOf(stage), new Set()).find((entry) => entry.next);
+      if (rung === undefined) continue;
+      const standingLegs = legsOf(stage, { profileId: stage.dispatcher.startingProfileId, parking: null });
+      for (const profile of config.dispatcherProfiles.profiles) {
+        for (const parking of [null, 'lobby', 'zone-center'] as const) {
+          const choice = { profileId: profile.id, parking };
+          const base = stageFactsOf({ ...factsInputOf(stage, choice), census: censusOf(stage), ownedStepIds: new Set() });
+          const bought = stageFactsOf({ ...factsInputOf(stage, choice), census: censusOf(stage), ownedStepIds: new Set([rung.stepId]) });
+          if (base.admission.refusal !== 'over-budget' || !bought.admission.admitted || bought.admission.control) continue;
+          tried.push(`${stage.id}:${profile.id}:${String(parking)}`);
+          if (legsOf(stage, choice, bought.budgetUnits) === standingLegs) continue;
+          found = { stage, stepId: rung.stepId, choice };
+          break;
+        }
+        if (found !== undefined) break;
+      }
+      if (found !== undefined) break;
+    }
+    if (found === undefined) throw new Error(`no sold rung admits a move its base refuses that moves the legs (tried ${tried.join(', ')})`);
+    const { stage, stepId, choice } = found;
+    const base = stageFactsOf({ ...factsInputOf(stage, choice), census: censusOf(stage), ownedStepIds: new Set() });
+    const bought = stageFactsOf({ ...factsInputOf(stage, choice), census: censusOf(stage), ownedStepIds: new Set([stepId]) });
+    /* Arm one: the base refuses it, with the price, and nothing runs. */
+    expect(base.budgetUnits).toBe(stageUnitsAt(stage, null));
+    expect(stagePlayViewOf(base, { kind: 'idle' }).refusal).toMatch(/^Over budget/u);
+    /* Arm two: the bought rung admits it, and the run it makes differs from the building as it stands, on the legs. */
+    expect(bought.budgetUnits).toBe(stageUnitsAt(stage, stepId));
+    expect(bought.boughtStepId).toBe(stepId);
+    const standing = { profileId: stage.dispatcher.startingProfileId, parking: null } as const;
+    expect(legsOf(stage, choice, bought.budgetUnits)).not.toEqual(legsOf(stage, standing));
+    /* Arm three: what is simulated is a function of the stage and the move, never of the budget. */
+    const move = stageMoveOf(choice, config.dispatcherProfiles.profiles, { space });
+    expect(batchRequestForStage(stage, move?.profile.id ?? '', move?.edit)).toEqual(
+      batchRequestForStage(stage, move?.profile.id ?? '', move?.edit),
+    );
+    expect(Object.keys(batchRequestForStage(stage, move?.profile.id ?? '', move?.edit))).not.toContain('budgetUnits');
+  }, 300_000);
+});
+
+describe('a clear at or under a priced par pays once — § D1417', () => {
+  const cleared = (parPaid: 'first' | 'again' | undefined, paid: 'first' | 'again'): StagePlayVerdictFacts => ({
+    headline: 'h',
+    goals: [],
+    holdoutSentence: 'held',
+    metOnTuningSeeds: true,
+    cleared: true,
+    paid,
+    spentUnits: 4,
+    parPaid,
+  });
+
+  it('earns the award by the mark’s own rule: at or under a priced par, never on a free par or none', () => {
+    expect(clearEarnsParOf(4, 4)).toBe(true);
+    expect(clearEarnsParOf(4, 2)).toBe(true);
+    expect(clearEarnsParOf(4, 5)).toBe(false);
+    expect(clearEarnsParOf(0, 0)).toBe(false);
+    expect(clearEarnsParOf(undefined, 2)).toBe(false);
+    expect(clearEarnsParOf(4, undefined)).toBe(false);
+  });
+
+  it('says the par award once, on the clear that banked it, beside the clear’s own pay', () => {
+    const facts = { ...factsOf(stageAt(1), { profileId: 'collective', parking: null }), parUnits: 4, parAward: 3 };
+    const view = (verdict: StagePlayVerdictFacts) => stagePlayViewOf(facts, { kind: 'judged', verdict, stale: false }).verdict;
+    expect(view(cleared('first', 'first'))?.pay).toBe(
+      'This clear pays 6 chimes, the first time only. Meeting par pays 3 chimes more, once, and this clear is that once.',
+    );
+    expect(view(cleared('first', 'again'))?.pay).toBe(
+      `${STAGE_PLAY_COPY.paysOnce} Meeting par pays 3 chimes more, once, and this clear is that once.`,
+    );
+    expect(view(cleared('again', 'again'))?.pay).toBe(STAGE_PLAY_COPY.paysOnce);
+    expect(view(cleared(undefined, 'first'))?.pay).toBe('This clear pays 6 chimes, the first time only.');
+    /* The par line itself now says what a par pays, in the one sentence every par line ends with. */
+    expect(view(cleared('first', 'first'))?.par).toContain('pays 3 chimes, once.');
+  });
+
+  it('says the budget a clear was run at where this device bought one, and nothing on the base', () => {
+    const facts = factsOf(stageAt(1), { profileId: 'collective', parking: null });
+    const at = (boughtUnits: number | undefined) =>
+      stagePlayViewOf(facts, { kind: 'judged', verdict: { ...cleared(undefined, 'first'), boughtUnits }, stale: false }).verdict?.rung;
+    expect(at(24)).toBe('Run at the 24-unit budget this device bought for this stage. A clear pays the same at any budget.');
+    expect(at(undefined)).toBeUndefined();
   });
 });

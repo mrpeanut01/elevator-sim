@@ -90,6 +90,8 @@ import type { PublishedSurvivorScenario, PublishedSurvivors } from './survivors.
  * `zoned-uppeak` ([§ D1235](../../../../DECISIONS.md)): stage 7 reads 11 of 63 (0.17 against a 0.15
  * ceiling) and stage 8 reads 6 of 39 (0.15 against 0.10). The re-authoring was done against the
  * stand-alone criterion rather than against the band, so neither row leaves this register.
+ * **Stage 7 left it on 2026-10-13** ([§ D1426](../../../../DECISIONS.md)): at 2.25 %pop/5 min it
+ * reads 2 of 63 (0.03), inside its 0 to 0.15 band.
  *
  * **Stage 9 moved inside on 2026-10-10** ([§ D1288](../../../../DECISIONS.md)): at 3.5 %pop/5 min no
  * crowd is refused its mean and it reads 3 of 63 at the base rung (0.05 against a 0.10 ceiling), all
@@ -103,7 +105,6 @@ import type { PublishedSurvivorScenario, PublishedSurvivors } from './survivors.
 const OUTSIDE_THEIR_BAND: Readonly<Record<string, OutsideVerdict>> = Object.freeze({
   'stage-2-morning-rush': 'below',
   'stage-4-two-banks': 'below',
-  'stage-7-prove-it': 'above',
   'stage-8-the-headline-address': 'above',
   'stage-10-the-bed-and-the-visitor': 'below-over-suppressed-runs',
 });

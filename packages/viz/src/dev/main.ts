@@ -61,6 +61,7 @@ import {
 } from '../everyday/host.js';
 import { publishEverydayAccount } from '../everyday/accountPort.js';
 import { everydayDeviceChimeStore } from '../everyday/chimeStore.js';
+import { everydayRushDeviceStore } from '../everyday/rushDeviceStore.js';
 // The success sentence both shells say after a 201 — see `submitScore`.
 import { POST_RUN_COPY } from '../everyday/postRun.js';
 import { forgetDriver, rememberedDriverOf } from '../everyday/driverMemory.js';
@@ -5614,6 +5615,18 @@ function boot(ui: Elements, resources: BrowserResources): void {
               ? { kind: 'short', detail: answer.detail }
               : { kind: 'unreachable', detail: answer.detail };
           },
+    /*
+     * **The device's tally, and whose tally pays** — [§ D1418](../../../../DECISIONS.md), swarm DS's
+     * Q3 ruling. With no API origin, or with one and nobody signed in, the device holds the tally
+     * (§ D711 clause 5's chooser, which `everyday/settingsView.ts` makes for the panel), so a spend
+     * comes out of this store and what it buys is for play on this device. `accountState` is read at
+     * call time, on `chimeBalance`'s rule: the host is built after boot, and a sign-in later moves
+     * the answer without rebuilding anything.
+     */
+    deviceChimes: everydayDeviceChimeStore(),
+    /* § D1420: this device's best rush sitting per tower, kept and drawn only on a build with no board. */
+    rushDeviceBest: everydayRushDeviceStore(),
+    chimeHome: () => (client === undefined || accountState.token === undefined ? 'device' : 'account'),
     /*
      * **This binding and `accountActions` below are absent together, and a screen reads that.**
      * `everyday/reportScreen.ts` decides whether to draw a live *Post this run* from

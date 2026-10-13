@@ -119,7 +119,13 @@ import type {
  * **sink**, not a source: § D526 clause 5 forbids this package naming where a chime came from, and
  * `boundaries.test.ts` asserts exactly that, in both directions.
  */
-import { RUSH_PREFIT_SINK_ID, rushLevelsAfter, type RushFitLevels } from '@elevator-sim/core/browser';
+import {
+  RUSH_PREFIT_SINK_ID,
+  careerDayTurnKeyOf,
+  rushLevelsAfter,
+  weekDayTurnKeyOf,
+  type RushFitLevels,
+} from '@elevator-sim/core/browser';
 
 /*
  * Type-only, and it has to stay that way: `boundaries.test.ts` asserts that the value importers
@@ -189,6 +195,10 @@ import {
   type StageCallRowView,
 } from './stageCallRow.js';
 import { everydayCareerStore, type CareerStore } from './careerStore.js';
+import type { DeviceChimeStore } from './chimeStore.js';
+import { rushDeviceReplayOf, rushDeviceSittingOf, type RushDeviceStanding } from './rushDeviceBest.js';
+import type { RushDeviceStore } from './rushDeviceStore.js';
+import { deviceOwnedOf } from './deviceChimes.js';
 import { CAMPAIGN_DOCK_COPY, purseRefusalOf } from './campaignDock.js';
 import { CAREER_CONTRACT_ID, openCareer, REPLAY_CONTRACT_ID, switchWeek } from '../shift/week.js';
 import {
@@ -464,7 +474,13 @@ export type EverydayChimeSpend =
    */
   | { readonly kind: 'refused'; readonly detail: string }
   /** Bought. The balance after, and the units the step granted — `0` for a kit. */
-  | { readonly kind: 'bought'; readonly chimes: number; readonly grantUnits: number };
+  | { readonly kind: 'bought'; readonly chimes: number; readonly grantUnits: number }
+  /**
+   * **Bought from this device's tally, for play on this device** — [§ D1418](../../../../DECISIONS.md).
+   * The answer with no server or no sign-in: the balance after is this device's, and what it bought
+   * starts this device's sittings or lands in this device's career, and is never posted.
+   */
+  | { readonly kind: 'bought-on-device'; readonly chimes: number; readonly grantUnits: number };
 
 /**
  * **The acknowledgement a finished turn gets, and the only place a chime may be drawn beside
@@ -654,6 +670,33 @@ export const CAREER_TOP_UP_NO_TOWER =
   'This tops up a tower\u2019s purse, and you have no building on the Career screen with a month ' +
   'still running \u2014 so there is nowhere for the units to go. Nothing was spent; open one and ' +
   'press it again.';
+
+/**
+ * **What a spend from this device's tally says when it is refused** — [§ D1418](../../../../DECISIONS.md).
+ *
+ * The device ledger did this arithmetic (`deviceChimes.ts#withSinkSpend`), so these are this side's
+ * sentences rather than the server's, and each says that nothing was spent.
+ */
+export const DEVICE_SPEND_COPY = Object.freeze({
+  short: (shortBy: number): string =>
+    `There are not enough chimes on this device for that yet: it is short by ${String(shortBy)} ` +
+    `${shortBy === 1 ? 'chime' : 'chimes'}. Nothing was spent.`,
+  owned: 'This device has already bought as much of that as one run can use. Nothing was spent.',
+  unknown: 'This build does not sell that from this device. Nothing was spent.',
+});
+
+/**
+ * Why a kept sitting is not drawn when its replayed last round never crossed the line — § D1420. A
+ * kept sitting crossed it when it was played, so this is a build whose rush differs from the one it
+ * was played on.
+ */
+export const RUSH_DEVICE_HELD_THROUGH =
+  'its last round, replayed on this build, held to the end of the waves, so this build’s rush is not the one it was played on';
+
+/** The account bridge has not answered, so whose tally would pay is not yet known. Nothing is sent. */
+export const CHIME_HOME_BOOTING =
+  'Still finding out whether you are signed in, so it is not yet known whose tally this would come ' +
+  'out of. Nothing was spent.';
 
 /**
  * **What posting a rush sitting came back with** — GitHub issue #372's fourth criterion, in
@@ -2080,6 +2123,14 @@ export interface EverydayHost {
    * with no server. Its non-test caller is `everyday/rushScreen.ts`.
    */
   rushPosted(buildingId: string): Promise<RushPostedStandings>;
+  /**
+   * **This device's best sitting on `buildingId`, replayed** — [§ D1420](../../../../DECISIONS.md).
+   * On a build with no rush board, the sitting `everyday/rushDeviceStore.ts` keeps for the tower, its
+   * last round replayed off this thread through {@link EverydayHostBindings.simulateRecord} and read
+   * at the hold line, so the row draws the replay's hold and never a stored one. `silent` on a build
+   * with a board, where § D1359's row is drawn instead. Its non-test caller is `everyday/rushScreen.ts`.
+   */
+  rushDeviceBest(buildingId: string): Promise<RushDeviceStanding>;
 
   /**
    * Today's challenge and its board — GitHub issue #221's third criterion, *reachable without
@@ -2218,8 +2269,14 @@ export interface EverydayHost {
    * `everyday/chimeTurns.browser.test.ts` drives that press on the shipped bundle. Campaign stages
    * and the E1–E6 briefs call it once they are playable in Everyday. A daily-loop week contract never
    * does: its clear is not Scenario content and pays no scenario award (§ D533's second ruling).
+   *
+   * **`atPar` files the par award too** — [§ D1417](../../../../DECISIONS.md). The caller passes it
+   * where the clear meets or beats a priced par by `scenario/par.ts#parMarkOf`, the rule the mark is
+   * drawn by, so a clear that earns no mark earns no par award. The par turn is filed **after** the
+   * clear's own answer has come back, because the server pays a par only on an account the clear has
+   * been paid to, and two posts in flight at once could arrive in either order.
    */
-  bankScenarioClear(scenarioId: string): void;
+  bankScenarioClear(scenarioId: string, atPar?: boolean): void;
 
   /**
    * The last finished turn and what the ledger said about it, or `undefined` before one —
@@ -2653,6 +2710,28 @@ export interface EverydayHostBindings {
    */
   readonly spendChime?: ((sinkId: string, steps: number) => Promise<EverydayChimeSpend>) | undefined;
   /**
+   * **This device's own chime tally** — `everyday/chimeStore.ts`, [§ D1418](../../../../DECISIONS.md).
+   *
+   * What a spend comes out of, and what a rush sitting claims from, whenever {@link chimeHome} says
+   * the device holds the tally. Absent, no spend is made on the device and a press with no server
+   * answers `no-server` as it did before § D1418.
+   */
+  readonly deviceChimes?: DeviceChimeStore | undefined;
+  /**
+   * **Where this device keeps its best rush sitting per tower** — `everyday/rushDeviceStore.ts`,
+   * [§ D1420](../../../../DECISIONS.md). Read and written only on a build with no rush board. Absent,
+   * nothing is kept and {@link EverydayHost.rushDeviceBest} answers `silent`.
+   */
+  readonly rushDeviceBest?: RushDeviceStore | undefined;
+  /**
+   * **Whose tally a spend comes out of right now** — `account` signed in on a build with a server,
+   * `device` with no server or no sign-in, and `booting` while the account bridge has not answered
+   * ([§ D1418](../../../../DECISIONS.md), § D711 clause 5's one chooser, which
+   * `settingsView.ts#settingsScreenViewOf` makes for the panel). Absent, a build with no spend route
+   * is `device` and one with a route is `account`, which is what every binding before § D1418 meant.
+   */
+  readonly chimeHome?: (() => 'account' | 'device' | 'booting') | undefined;
+  /**
    * Post the run on screen — GitHub issue #221's write half. `undefined` when there is no API
    * origin, on {@link dailyBoard}'s rule: the absence is a property of the page, decided once at
    * boot, and a binding that exists and always refuses is the shape this repository keeps paying
@@ -3059,6 +3138,24 @@ export function createEverydayHost(
     if (open === undefined || contractIsLost(open)) return undefined;
     return open.id;
   };
+  /**
+   * **A bought top-up's units, landed in the open tower's purse** — the one write both tallies'
+   * purchases go through (GitHub issue #557, [§ D738](../../../../DECISIONS.md); a device's since
+   * [§ D1418](../../../../DECISIONS.md)). `grantUnits` is the ledger's figure as the charging side
+   * answered it, the server's for an account and `deviceChimes.ts#withSinkSpend`'s for this device,
+   * and what it does is `campaign/career.ts#grantUnits`' decision, written through
+   * `applyCampaignAction` and {@link setCareer} like every other career write.
+   */
+  const landTopUp = (sinkId: string, grantUnits: number): void => {
+    const target = careerGrantTarget();
+    if (sinkId !== CAREER_PURSE_TOP_UP_SINK_ID || target === undefined || grantUnits <= 0) return;
+    const next = applyCampaignAction(
+      career,
+      { kind: 'grant-units', towerId: target, units: grantUnits, sinkId },
+      bindings.resources.priceSchedule,
+    );
+    if (next !== career) setCareer(next);
+  };
   /** {@link EverydayHost.drivingProfile}'s memo — see the binding for why it is keyed on identity. */
   let drivingCache: { readonly forState: ViewerState; readonly profile: DispatcherProfile } | undefined;
   const campaignListeners = new Set<() => void>();
@@ -3101,16 +3198,20 @@ export function createEverydayHost(
    * is a synchronous path that files something, and a filing that failed because a network call
    * failed would be a worse trade than a chime nobody banked.
    */
-  const bankTurn = (turn: ChimeTurn): void => {
+  const bankTurn = (turn: ChimeTurn): Promise<void> => {
     /* § D1382: the run this turn finished, taken on the close rather than when the ledger answers. */
     chimeTallyOn = { recording: b.state().recording };
     const bank = b.bankCompletion;
     if (bank === undefined) {
       chimeTally = { turn: turn.completion, answer: { kind: 'no-server' } };
       notifyCampaign();
-      return;
+      return Promise.resolve();
     }
-    void bank(turn).then(
+    /*
+     * Answered as a promise that never rejects, so a caller may sequence a second turn after this
+     * one (the par after its clear, § D1417) and every other caller may drop it, as they did.
+     */
+    return bank(turn).then(
       (answer) => {
         chimeTally = { turn: turn.completion, answer };
         if (answer.kind === 'balance' && answer.owns !== undefined) owned = answer.owns;
@@ -3174,17 +3275,27 @@ export function createEverydayHost(
       }
       if (records !== before) port.write(records);
     }
-    if (filed.allMet && dayCountsToward(week, filed)) bankTurn({ completion: 'career-day-paid' });
+    /*
+     * § D1416: the day names itself — its contract and the crowd it was dealt — so the server pays
+     * it once however often the close is posted.
+     */
+    if (filed.allMet && dayCountsToward(week, filed)) {
+      void bankTurn({
+        completion: 'career-day-paid',
+        key: weekDayTurnKeyOf({ contractId: week.contractId, week: week.week, day: week.day, seed: filed.record?.seed }),
+      });
+    }
     /*
      * 4. **A held week pays `week-held`, once per level** — wave AO, lane DS-1, swarm DS's Q1 award
      *    ([§ D1402](../../../../DECISIONS.md)). On the close that closes the week, when its target
-     *    was met, keyed by the level the week was dealt (`weekLevels.ts#weekLevelAwardKeyOf`), so a
-     *    level held again, or a week past the top dealt the top again, pays nothing more on the
-     *    device (`deviceChimes.ts#withTurn`) or on the server (`chimes/ledger.ts#earnCompletion`).
-     *    After the day's own award, so the rail's tally names the week.
+     *    was met, keyed by the level the week was dealt (`weekLevels.ts#weekLevelAwardKeyOf`), a
+     *    keyed completion on § D1416's one rule, so a level held again, or a week past the top dealt
+     *    the top again, pays nothing more on the device (`deviceChimes.ts#withTurn`) or on the
+     *    server (`chimes/ledger.ts#earnCompletion`). After the day's own award, so the rail's tally
+     *    names the week.
      */
     if (weekClosedByThisClose(week) && weekTargetMetDayOf(week) !== undefined) {
-      bankTurn({ completion: 'week-held', levelKey: weekLevelAwardKeyOf(week) });
+      void bankTurn({ completion: 'week-held', key: weekLevelAwardKeyOf(week) });
     }
   };
   /**
@@ -3308,6 +3419,8 @@ export function createEverydayHost(
          * sitting would then claim a set no round but the last one met.
          */
         readonly modifiers: readonly ClaimedRushModifier[];
+        /** Whether {@link modifiers} are this device's purchases, so the sitting is never posted (§ D1418). */
+        readonly boughtOnDevice: boolean;
         /** The finished rounds — see {@link EverydayRushSession.rounds}. */
         readonly rounds: readonly RushRoundRecord[];
         /**
@@ -3355,9 +3468,23 @@ export function createEverydayHost(
    * `undefined` {@link owned} claims nothing: nobody has asked the ledger yet, and a claim made on
    * a guess is a claim the server would refuse the whole sitting for.
    */
-  const rushClaims = (): readonly ClaimedRushModifier[] =>
+  const rushClaims = (): readonly ClaimedRushModifier[] => claimsFrom(claimedOwned());
+  /**
+   * **Whose purchases a sitting claims** — the account's where the account holds the tally, and this
+   * device's where the device does ([§ D1418](../../../../DECISIONS.md)). `booting` claims nothing,
+   * on {@link owned}'s ground: a claim made on a guess is one the server would refuse the whole
+   * sitting for, and one made from the wrong tally would start a signed-in player's sitting on a
+   * purchase it could never post.
+   */
+  const claimedOwned = (): readonly EverydayOwnedModifier[] => {
+    const home = chimeHomeNow();
+    if (home === 'device') return b.deviceChimes === undefined ? [] : deviceOwnedOf(b.deviceChimes.record());
+    if (home === 'booting') return [];
+    return owned ?? [];
+  };
+  const claimsFrom = (from: readonly EverydayOwnedModifier[]): readonly ClaimedRushModifier[] =>
     Object.freeze([
-      ...((owned ?? []).some((entry) => entry.sinkId === RUSH_PREFIT_SINK_ID && entry.steps >= 1)
+      ...(from.some((entry) => entry.sinkId === RUSH_PREFIT_SINK_ID && entry.steps >= 1)
         ? [{ sinkId: RUSH_PREFIT_SINK_ID, steps: 1 }]
         : []),
       /*
@@ -3367,8 +3494,11 @@ export function createEverydayHost(
        * at the sink's own `maxSteps`, on the pre-fit's ground: a claim above it is unbacked at the
        * server and would refuse the whole sitting.
        */
-      ...rushTopUpClaimsOf(owned ?? []),
+      ...rushTopUpClaimsOf(from),
     ]);
+  /** {@link EverydayHostBindings.chimeHome}, with its default — see there. */
+  const chimeHomeNow = (): 'account' | 'device' | 'booting' =>
+    b.chimeHome?.() ?? (b.spendChime === undefined ? 'device' : 'account');
 
   /** The rebuild input for the next round, or `undefined` before a round of this sitting has finished. */
   const rushRebuildInput = (): EverydayRushRebuild | undefined => {
@@ -3626,7 +3756,26 @@ export function createEverydayHost(
       };
     }
     const waves = rushWavesOutlastedOf(outcome);
-    if (waves !== undefined) bankTurn({ completion: 'rush-wave-survived', waves });
+    if (waves !== undefined) void bankTurn({ completion: 'rush-wave-survived', waves });
+    keepRushOnDevice();
+  };
+
+  /**
+   * **This device keeps its best sitting where there is no rush board** — [§ D1420](../../../../DECISIONS.md).
+   * Asked at every round's settle, on a build with no rush board (no `readRushPosted`, which is the
+   * build with no server), of the sitting's causes as a server would read them: the sitting is kept
+   * when every round could travel and its last round crossed the line, whatever the device bought,
+   * because a device purchase stays on this device and so does this row. The figure handed over
+   * decides only whether it beats the one kept; the drawn figure is a replay
+   * ({@link EverydayHost.rushDeviceBest}).
+   */
+  const keepRushOnDevice = (): void => {
+    const store = b.rushDeviceBest;
+    if (store === undefined || b.readRushPosted !== undefined || rushSession === undefined) return;
+    const check = rushSittingOf({ buildingId: rushSession.buildingId, rounds: rushSession.rounds, modifiers: rushSession.modifiers });
+    const held = rushSession.rounds[rushSession.rounds.length - 1]?.holdS;
+    if (!check.ok || held === null || held === undefined) return;
+    store.offer(rushSession.buildingId, check.body, held);
   };
 
   /** The horizon the Scenario press runs `buildingId` on — `dayLength.ts#scenarioHorizonFor`. */
@@ -4380,6 +4529,16 @@ export function createEverydayHost(
        * verdict is the one it carried, and the recording is the one the verdict was graded from.
        */
       careerFiled.set(towerId, { towerId, day: tower.day, verdict, recording });
+      /*
+       * § D1416: the day this file closed, named before the career moves on — the tower, the month of
+       * its contract, the contract day and the career day — so the same day pays once.
+       */
+      const dayKey = careerDayTurnKeyOf({
+        towerId,
+        month: tower.months,
+        day: tower.day,
+        careerDay: career.today,
+      });
       setCareer(next);
       /* § D1409: the report's account of the day, from the day's calls and one or two more runs. */
       startCareerClose(tower, recording, verdict);
@@ -4414,7 +4573,7 @@ export function createEverydayHost(
        * a worse trade than a chime nobody banked. The balance is read again next time Settings is
        * opened, and the ledger is append-only, so nothing is lost that was not already spent.
        */
-      if (verdict === 'cleared') bankTurn({ completion: 'career-day-paid' });
+      if (verdict === 'cleared') void bankTurn({ completion: 'career-day-paid', key: dayKey });
     },
     intervene: (atS, change) => {
       // Gated here as well as on the control, because the record cannot grow before it exists and
@@ -4889,6 +5048,7 @@ export function createEverydayHost(
         buildingId: rushSession.buildingId,
         rounds: rushSession.rounds,
         modifiers: rushSession.modifiers,
+        boughtOnDevice: rushSession.boughtOnDevice,
       });
       // All of them, joined: `rushSittingOf` reports every reason on purpose, and a press that
       // answered with one of four would undo that at the last step (`postCurrentRun`'s own join).
@@ -4899,6 +5059,37 @@ export function createEverydayHost(
     rushPosted: async (buildingId) => {
       const read = b.readRushPosted;
       return read === undefined ? { kind: 'silent' } : read(buildingId);
+    },
+    /* § D1420: this device's kept sitting, replayed off this thread; a build with a board says nothing. */
+    rushDeviceBest: (buildingId) => {
+      const store = b.rushDeviceBest;
+      if (store === undefined || b.readRushPosted !== undefined) return Promise.resolve({ kind: 'silent' });
+      const kept = rushDeviceSittingOf(store.record(), buildingId);
+      if (kept === undefined) return Promise.resolve({ kind: 'none' });
+      const replay = rushDeviceReplayOf(b.resources, kept.body);
+      if (typeof replay === 'string') return Promise.resolve({ kind: 'unreplayable', reason: replay });
+      return new Promise<RushDeviceStanding>((resolve) => {
+        b.simulateRecord(
+          replay.config,
+          (recording) => {
+            const holdAtS = rushHoldAt(recording);
+            resolve(
+              holdAtS === undefined
+                ? { kind: 'unreplayable', reason: RUSH_DEVICE_HELD_THROUGH }
+                : {
+                    kind: 'row',
+                    heldS: holdAtS - recording.startedAt,
+                    roundCount: kept.body.rounds.length,
+                    modifiers: kept.body.modifiers ?? [],
+                  },
+            );
+          },
+          (message) => {
+            resolve({ kind: 'unreplayable', reason: `its replay did not complete here (${message})` });
+          },
+          replay.outOfServiceCarIds,
+        );
+      });
     },
     /* Read-only, and the same split. See {@link EverydayHost.challengeToday}. */
     challengeToday: async () => {
@@ -5029,6 +5220,11 @@ export function createEverydayHost(
            * § D490 exists to refuse one field over.
            */
           modifiers: b.rushModifiers?.() ?? rushClaims(),
+          /*
+           * § D1418: a sitting that claims what this device bought stays on this device. Read with
+           * the claims, once, because a sitting is one modifier set.
+           */
+          boughtOnDevice: b.rushModifiers === undefined && chimeHomeNow() === 'device' && rushClaims().length > 0,
           rounds: [],
           unsettledEndS: undefined,
           levels: rushStartLevelsOf(b.rushModifiers?.() ?? rushClaims()),
@@ -5100,6 +5296,7 @@ export function createEverydayHost(
           buildingId: rushSession.buildingId,
           rounds: rushSession.rounds,
           modifiers: rushSession.modifiers,
+          boughtOnDevice: rushSession.boughtOnDevice,
         }),
       };
     },
@@ -5145,8 +5342,10 @@ export function createEverydayHost(
       const building = rushBuildingOf(b.resources, b.state());
       return building === undefined ? undefined : rushDisclosureOf(building, bandOf(building));
     },
-    bankScenarioClear: (scenarioId) => {
-      bankTurn({ completion: 'scenario-cleared', scenarioId });
+    bankScenarioClear: (scenarioId, atPar = false) => {
+      const cleared = bankTurn({ completion: 'scenario-cleared', scenarioId });
+      /* § D1417: the par after the clear's answer, so a server that pays a par only on a paid clear has it. */
+      if (atPar) void cleared.then(() => bankTurn({ completion: 'scenario-at-par', scenarioId }));
     },
     /* § D1382: the acknowledgement stands while the run it was banked on does, and no longer. */
     chimeTally: () =>
@@ -5180,7 +5379,10 @@ export function createEverydayHost(
      */
     spendChime: async (sinkId, steps) => {
       const spend = b.spendChime;
-      if (spend === undefined) return { kind: 'no-server' };
+      const home = chimeHomeNow();
+      /* The device's tally holds nothing to spend on a build that keeps no device store. */
+      if (home === 'device' && b.deviceChimes === undefined) return { kind: spend === undefined ? 'no-server' : 'signed-out' };
+      if (home !== 'device' && spend === undefined) return { kind: 'no-server' };
       /*
        * **The one gate that has to come before the charge** — GitHub issue #557,
        * [§ D738](../../../../DECISIONS.md). A career top-up grants units into *this tower's* purse,
@@ -5192,6 +5394,35 @@ export function createEverydayHost(
        */
       if (sinkId === CAREER_PURSE_TOP_UP_SINK_ID && careerGrantTarget() === undefined) {
         return { kind: 'refused', detail: CAREER_TOP_UP_NO_TOWER };
+      }
+      /*
+       * **With no server or no sign-in, the device's tally pays** — [§ D1418](../../../../DECISIONS.md),
+       * replacing § D911 clause 6 in writing. The device ledger charges the ledger's own price and
+       * holds the sink's own cap (`deviceChimes.ts#withSinkSpend`); what it bought starts this
+       * device's next sitting through {@link rushClaims}, or lands in this device's career below, on
+       * the same reducer an account's top-up lands through. A sitting started with it is never
+       * offered for posting (`rushSitting.ts#RUSH_SITTING_COPY.boughtOnDevice`).
+       */
+      if (home === 'booting') return { kind: 'refused', detail: CHIME_HOME_BOOTING };
+      if (home === 'device' || spend === undefined) {
+        const store = b.deviceChimes;
+        if (store === undefined) return { kind: 'no-server' };
+        const bought = store.spendSink(sinkId, steps);
+        if (bought.kind === 'refused') {
+          const refusal = bought.refusal;
+          return {
+            kind: 'refused',
+            detail:
+              refusal.kind === 'short'
+                ? DEVICE_SPEND_COPY.short(refusal.shortBy)
+                : refusal.kind === 'owned'
+                  ? DEVICE_SPEND_COPY.owned
+                  : DEVICE_SPEND_COPY.unknown,
+          };
+        }
+        landTopUp(sinkId, bought.grantUnits);
+        notifyCampaign();
+        return { kind: 'bought-on-device', chimes: store.balance(), grantUnits: bought.grantUnits };
       }
       const outcome = await spend(sinkId, steps);
       if (outcome.kind === 'bought') {
@@ -5218,15 +5449,7 @@ export function createEverydayHost(
          * career write goes through, so the grant is persisted by the one writer rather than by a
          * fourth mutation site.
          */
-        const target = careerGrantTarget();
-        if (sinkId === CAREER_PURSE_TOP_UP_SINK_ID && target !== undefined && outcome.grantUnits > 0) {
-          const next = applyCampaignAction(
-            career,
-            { kind: 'grant-units', towerId: target, units: outcome.grantUnits, sinkId },
-            bindings.resources.priceSchedule,
-          );
-          if (next !== career) setCareer(next);
-        }
+        landTopUp(sinkId, outcome.grantUnits);
         notifyCampaign();
       }
       return outcome;

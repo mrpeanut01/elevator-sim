@@ -17,8 +17,15 @@ import { describe, expect, it } from 'vitest';
 import {
   CHIME_COMPLETIONS,
   CHIME_EARNED_BY,
+  CHIME_KEYED_COMPLETIONS,
   ChimeLedgerError,
+  careerDayTurnKeyOf,
   chimeAwardFor,
+  chimeTurnKeyOwnerOf,
+  chimeTurnKeysOf,
+  isChimeKeyedCompletion,
+  weekDayTurnKeyOf,
+  weekLevelTurnKeyOf,
   chimeGiftSource,
   chimeGrantUnits,
   chimeSinkById,
@@ -390,5 +397,67 @@ describe('every tunable declares its schema — invariant 8', () => {
         }),
       ),
     ).toThrow(/outside its own declared range/u);
+  });
+});
+
+/**
+ * **Every award pays once under a key, and a keyed completion needs no new route** —
+ * [§ D1416](../../../../DECISIONS.md), swarm DS's Q3 ruling on S2's finding that the server paid one
+ * contract day on every post. The ledgers' behaviour is `server/chimes/ledger.test.ts`'s and
+ * `viz/everyday/deviceChimes.test.ts`'s; this is the vocabulary they share.
+ */
+describe('turn keys — § D1416', () => {
+  it('keys every completion, so a turn the table pays always names what it finished', () => {
+    expect(chimeTurnKeysOf({ completion: 'scenario-cleared', scenarioId: 'stage-2-morning-rush' })).toEqual([
+      'stage-2-morning-rush',
+    ]);
+    expect(chimeTurnKeysOf({ completion: 'scenario-at-par', scenarioId: 'stage-2-morning-rush' })).toEqual([
+      'stage-2-morning-rush',
+    ]);
+    expect(chimeTurnKeysOf({ completion: 'rush-wave-survived', waves: 3 })).toEqual(['1', '2', '3']);
+    const day = careerDayTurnKeyOf({ towerId: 'c1', month: 0, day: 4, careerDay: 4 });
+    expect(chimeTurnKeysOf({ completion: 'career-day-paid', key: day })).toEqual([day]);
+    /* Empty names nothing payable, on every arm. */
+    expect(chimeTurnKeysOf({ completion: 'career-day-paid', key: '' })).toEqual([]);
+    expect(chimeTurnKeysOf({ completion: 'scenario-cleared', scenarioId: '' })).toEqual([]);
+    expect(chimeTurnKeysOf({ completion: 'rush-wave-survived', waves: 0 })).toEqual([]);
+  });
+
+  it('names a contract day by the contract that owns it, from either composer, and nothing else', () => {
+    expect(chimeTurnKeyOwnerOf('career-day-paid', careerDayTurnKeyOf({ towerId: 'c3', month: 2, day: 9, careerDay: 41 }))).toBe('c3');
+    expect(chimeTurnKeyOwnerOf('career-day-paid', weekDayTurnKeyOf({ contractId: 'c2', week: 1, day: 3, seed: '20260926' }))).toBe('c2');
+    expect(chimeTurnKeyOwnerOf('career-day-paid', weekDayTurnKeyOf({ contractId: 'c2', week: 2, day: 3, seed: undefined }))).toBe('c2');
+    for (const invented of ['', 'monday', 'career:c1', 'week:c1:s1; drop table', 'career:C1:m0:d1:t1', 'level:c1:l3']) {
+      expect(chimeTurnKeyOwnerOf('career-day-paid', invented), invented).toBeUndefined();
+    }
+  });
+
+  it('names a held level by its contract, and keeps a level and a day apart — § D1402 on § D1416', () => {
+    const level = weekLevelTurnKeyOf({ contractId: 'c2', week: 3 });
+    expect(level).toBe('c2/3');
+    expect(chimeTurnKeysOf({ completion: 'week-held', key: level })).toEqual([level]);
+    expect(chimeTurnKeyOwnerOf('week-held', level)).toBe('c2');
+    expect(chimeTurnKeyOwnerOf('career-day-paid', level), 'a level key paid as a day').toBeUndefined();
+    const day = careerDayTurnKeyOf({ towerId: 'c2', month: 0, day: 3, careerDay: 3 });
+    for (const invented of ['', day, 'c2/0', 'c2/3 ', 'C2/3', 'c2/three']) {
+      expect(chimeTurnKeyOwnerOf('week-held', invented), invented).toBeUndefined();
+    }
+  });
+
+  it('a keyed completion is a member of the closed vocabulary, and the wire can ask which ones are keyed', () => {
+    for (const completion of CHIME_KEYED_COMPLETIONS) {
+      expect(CHIME_COMPLETIONS as readonly string[]).toContain(completion);
+      expect(isChimeKeyedCompletion(completion)).toBe(true);
+    }
+    expect(isChimeKeyedCompletion('scenario-cleared')).toBe(false);
+    expect(isChimeKeyedCompletion('rush-wave-survived')).toBe(false);
+    expect(isChimeKeyedCompletion('gift-card')).toBe(false);
+  });
+
+  it('every completion the table names is paid by a source the shipped table carries', () => {
+    const table = shipped();
+    for (const completion of CHIME_COMPLETIONS) {
+      expect(chimeAwardFor(table, completion), completion).toBeGreaterThan(0);
+    }
   });
 });

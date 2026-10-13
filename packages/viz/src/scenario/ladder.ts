@@ -94,11 +94,19 @@
  * rather than *no screen in this build* — because the blanket half of that sentence stopped being
  * true.
  *
+ * **And then a stage's page began selling one** — [§ D1419](../../../../DECISIONS.md), swarm DS's
+ * Q3 ruling. The stage page sells, from the device tally, a rung whose pinned survivor count exceeds
+ * the count at the rung below, so {@link budgetLineOf} takes the price back for exactly those rungs, as
+ * this docstring said it would on that commit, and says of the rest that the census finds no further
+ * way through at them. `baseRungNote` (*"Nothing sells a wider budget for these ten"*) is deleted
+ * rather than reworded, § D227: it stopped being true of stages 1, 2 and 8.
+ *
  * Pure. No DOM, no host, no `data/` read — the caller supplies both documents, exactly as
  * `scenario/survivors.ts#validatePublishedSurvivors` takes its context rather than fetching one.
  */
 
 import { rungsOf, type ScenarioBudget } from './budget.js';
+import { PAR_AWARD_CHIMES } from './par.js';
 import {
   survivorSentenceFor,
   type PublishedSurvivorScenario,
@@ -196,8 +204,15 @@ export const SCENARIO_LADDER_COPY = Object.freeze({
    * `everyday/scenarioScreen.test.ts` pressing three different rows and requiring three different
    * ids to arrive.
    */
+  /*
+   * § D1419 and § D1417: a stage opens at a wider budget this device bought for it, and the first
+   * clear at or under a priced par pays the par award. It read *"at the budget it opens on. The first
+   * clear of it pays chimes and a second pays nothing"*.
+   */
   openNote:
-    'Opens this stage in the fix-it editor, on its own building and at the budget it opens on. The first clear of it pays chimes and a second pays nothing. A clear unlocks nothing, because nothing on this path is locked: each stage is open, or held for the reason written on it.',
+    'Opens this stage in the fix-it editor, on its own building, at the budget it opens on or a wider one this device bought for it. ' +
+    `The first clear of it pays chimes, the first clear at or under a priced par pays ${String(PAR_AWARD_CHIMES)} more, and a clear after those pays nothing. ` +
+    'A clear unlocks nothing, because nothing on this path is locked: each stage is open, or held for the reason written on it.',
   /** A stage held back. Never the word unwinnable — see the module docstring. */
   heldLead: 'Held back:',
   /*
@@ -229,17 +244,15 @@ export const SCENARIO_LADDER_COPY = Object.freeze({
    * docstring for what that commit has to contain.
    */
   /*
-   * **Narrowed on the commit that made the blanket claim false** — GitHub issue #579, § D911,
-   * § D227. It read *"No screen in this build sells a wider budget"*, exactly true until the
-   * fix-a-building screen began selling one out of the device tally. It is **still true of these
-   * ten stages**: § D1129 moved them from the Engineer surface into the fix-it editor, and the
-   * stage page there plays every press at the base rung and draws no budget control, so there is
-   * still nowhere for a bought rung to be spent.
-   * Saying *these ten* rather than *no screen* is the difference between a refusal a reader can
-   * check and one that has quietly stopped being true somewhere else.
+   * **What a row says of rungs its page does not sell** — [§ D1419](../../../../DECISIONS.md). It
+   * replaced `baseRungNote` (*"Nothing sells a wider budget for these ten"*), which § D911 narrowed
+   * once and which stopped being true when the stage page began selling the rungs the census says
+   * add a way through. The reason is the census's, and it is the one the stage page draws per rung.
    */
-  baseRungNote:
-    'Nothing sells a wider budget for these ten, so the count below is the count at the budget it opens on.',
+  rungsNotSold:
+    'Its page sells none of them: the census finds no further way through at a wider budget, so the count below is the count at the budget it opens on.',
+  /** The count's basis on a row whose page does sell a rung — the same clause, said once. */
+  countAtBase: 'The count below is the count at the budget it opens on.',
 });
 
 /* -------------------------------------------------------------------------- *
@@ -323,7 +336,7 @@ function shapeOf(stage: LadderStage): string {
  * rung *widens* stays, because that is a fact about the stage. `ladder.test.ts` asserts both
  * halves, in both directions.
  */
-function budgetLineOf(budget: ScenarioBudget): string {
+function budgetLineOf(budget: ScenarioBudget, scenario: PublishedSurvivorScenario): string {
   const rungs = rungsOf(budget);
   const base = rungs[0]?.units ?? budget.startingUnits;
   const opens = `Opens on ${String(base)} units of change.`;
@@ -335,7 +348,23 @@ function budgetLineOf(budget: ScenarioBudget): string {
     budget.steps.length === 1
       ? `One wider budget sits above it: ${named}.`
       : `${String(budget.steps.length)} wider budgets sit above it, in order: ${named}.`;
-  return `${opens} ${ladder} ${SCENARIO_LADDER_COPY.baseRungNote}`;
+  /*
+   * § D1419: the rungs the stage page sells, by the census's own rule (`everyday/stagePlay.ts#stageRungsOf`
+   * reads the same two counts): a rung whose pinned count exceeds the rung below's.
+   */
+  const countAt = (stepId: string | null): number | undefined =>
+    scenario.steps.find((step) => step.stepId === stepId)?.survivors;
+  const sold = budget.steps.filter((step, index) => {
+    const at = countAt(step.id);
+    const below = countAt(index === 0 ? null : (budget.steps[index - 1]?.id ?? null));
+    return at !== undefined && below !== undefined && at > below;
+  });
+  if (sold.length === 0) return `${opens} ${ladder} ${SCENARIO_LADDER_COPY.rungsNotSold}`;
+  const offers = sold.map((step) => `${step.name} for ${String(step.chimes)} ${step.chimes === 1 ? 'chime' : 'chimes'}`).join(' and ');
+  return (
+    `${opens} ${ladder} Its page sells ${offers} from this device's chimes, because the census finds more ` +
+    `ways through there. ${SCENARIO_LADDER_COPY.countAtBase}`
+  );
 }
 
 /**
@@ -386,7 +415,7 @@ export function scenarioLadderOf(input: ScenarioLadderInput): readonly ScenarioL
         openingLine: stage.brief[0] ?? '',
         buildingId: stage.building,
         shape: shapeOf(stage),
-        budgetLine: budgetLineOf(stage.budget),
+        budgetLine: budgetLineOf(stage.budget, scenario),
         waysThrough: survivorSentenceFor(scenario, base, 'total'),
         waysThroughCleared: survivorSentenceFor(scenario, base, 'split'),
         parUnits,

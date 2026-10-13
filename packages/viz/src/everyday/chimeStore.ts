@@ -23,10 +23,12 @@ import {
   deviceBalanceOf,
   emptyDeviceChimes,
   encodeDeviceChimes,
+  withSinkSpend,
   withSpend,
   withTurn,
   type DeviceChimeRecord,
   type DeviceChimeRefusal,
+  type DeviceSinkOutcome,
   type DeviceSpend,
   type DeviceSpendOutcome,
 } from './deviceChimes.js';
@@ -46,6 +48,12 @@ export interface DeviceChimeStore {
   bank(turn: ChimeTurn): number;
   /** Buy a scenario's budget rung out of this tally, or say why not. */
   spend(spend: DeviceSpend): DeviceSpendOutcome;
+  /**
+   * Buy `steps` of a ledger sink out of this tally, for play on this device, or say why not —
+   * [§ D1418](../../../../DECISIONS.md). The price and the cap are the ledger's; see
+   * `deviceChimes.ts#withSinkSpend`.
+   */
+  spendSink(sinkId: string, steps: number): DeviceSinkOutcome;
   /**
    * Forget everything and **seal the store**, so nothing this session goes on to do writes it back.
    *
@@ -142,6 +150,11 @@ export function createDeviceChimeStore(backing: SessionStore | undefined): Devic
     },
     spend: (spend) => {
       const outcome = withSpend(load(), spend);
+      if (outcome.kind === 'bought') save(outcome.record);
+      return outcome;
+    },
+    spendSink: (sinkId, steps) => {
+      const outcome = withSinkSpend(load(), sinkId, steps);
       if (outcome.kind === 'bought') save(outcome.record);
       return outcome;
     },

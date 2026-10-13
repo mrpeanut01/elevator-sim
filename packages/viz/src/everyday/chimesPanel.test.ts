@@ -88,10 +88,17 @@ describe('what the panel says off an account — the review of PR #485, and now 
     expect(Object.hasOwn(CHIMES_PANEL_COPY, 'signedOutHome')).toBe(false);
   });
 
-  it('says what that tally does and does not buy, so neither half is guessed at', () => {
+  it('says what that tally buys and where what it buys goes, so neither half is guessed at', () => {
     const note = chimesPanelViewOf({ balanceChimes: 6, home: 'device' }).homeNote;
     expect(note, 'the device tally buys a scenario budget').toMatch(/wider budget/u);
-    expect(note, 'and the three sinks below need an account').toMatch(/signing in/u);
+    /*
+     * § D1418: the second half read *"the three below are bought against an account, so signing in
+     * is what opens those"* until the device tally paid for them; now it says what the ruling asks
+     * this panel to say, that a device spend stays on this device.
+     */
+    expect(note, 'and the three below, which stay on this device').toMatch(/the three below/u);
+    expect(note).toMatch(/stays on this device/u);
+    expect(note, 'the replaced half came back').not.toMatch(/signing in/u);
   });
 
   it('adds the durability caveat only where the browser will not keep it', () => {
@@ -295,14 +302,18 @@ describe('what the panel says about spending — § D227 and § D672, a reason p
   it('refuses the press for a reason that is about the moment rather than the sink', () => {
     /*
      * Four states that are not *this build does not sell it*: no ledger on the page, an account
-     * bridge still answering, nobody signed in, and a ledger nobody has read yet. Each has its own
-     * sentence, because collapsing them would tell at least one player something false — which is
-     * the mistake the review of PR #485 found on this very panel.
+     * bridge still answering, a device tally nobody read on this screen, and a ledger nobody has
+     * read yet. Each has its own sentence, because collapsing them would tell at least one player
+     * something false — which is the mistake the review of PR #485 found on this very panel.
+     *
+     * The third read *"bought against your account, so signing in is what makes this one
+     * spendable"* until § D1418 made the device tally pay for these rows; it is deleted rather than
+     * reworded (§ D227), and the device rows' own cases are below.
      */
     const cases = [
       [{ balanceChimes: 40, home: 'account' as const }, CHIMES_PANEL_COPY.rowNoLedger],
       [{ balanceChimes: 0, home: 'booting' as const, spendable: true }, CHIMES_PANEL_COPY.rowBooting],
-      [{ balanceChimes: 40, home: 'device' as const, spendable: true }, CHIMES_PANEL_COPY.rowSignedOut],
+      [{ balanceChimes: 40, home: 'device' as const }, CHIMES_PANEL_COPY.rowNoDeviceRead],
       [{ balanceChimes: 40, home: 'account' as const, spendable: true }, CHIMES_PANEL_COPY.rowBooting],
     ] as const;
     const notes = new Set<string>();
@@ -313,6 +324,55 @@ describe('what the panel says about spending — § D227 and § D672, a reason p
       notes.add(note);
     }
     expect(notes.size).toBe(3);
+  });
+
+  it('off an account, sells all three from this device and says on every row that it stays here — § D1418', () => {
+    /*
+     * Red on the base: the three rows were `unavailable` off an account, each reading *"bought
+     * against your account"*, and seat C on the post-AN panel held 158 chimes that bought nothing.
+     * No server and no sign-in is the `device` home, whether or not this build has a spend route.
+     */
+    for (const spendable of [false, true]) {
+      const view = chimesPanelViewOf({
+        balanceChimes: 999,
+        home: 'device',
+        spendable,
+        deviceOwns: [],
+        careerTowerOpen: true,
+      });
+      for (const row of view.rows) {
+        expect(row.offer, `${row.id} (route ${String(spendable)})`).toBe('buy');
+        expect(row.note, row.id).toMatch(/this device/u);
+        expect(row.note, row.id).not.toMatch(/posted to its own board/u);
+      }
+    }
+    expect(chimesPanelViewOf({ balanceChimes: 0, home: 'device', deviceOwns: [] }).homeNote).toMatch(
+      /stays on this device/u,
+    );
+  });
+
+  it('a device row is capped by what this device bought, needs a desk for the purse, and is short by the subtraction', () => {
+    const prefit = CHIME_PRICES.sinks.find((entry) => entry.id === RUSH_PREFIT_SINK_ID);
+    const owned = chimesPanelViewOf({
+      balanceChimes: 999,
+      home: 'device',
+      deviceOwns: [{ sinkId: RUSH_PREFIT_SINK_ID, steps: prefit?.maxSteps ?? 1 }],
+      /* An account's purchase is not this device's: it does not cap a device row. */
+      owns: [],
+    }).rows.find((entry) => entry.id === RUSH_PREFIT_SINK_ID);
+    expect(owned?.offer).toBe('owned');
+    expect(owned?.note).toBe(CHIMES_PANEL_COPY.prefitDeviceOwned);
+    const purse = chimesPanelViewOf({ balanceChimes: 999, home: 'device', deviceOwns: [] }).rows.find(
+      (entry) => entry.id === 'career-purse-top-up',
+    );
+    expect(purse?.offer).toBe('unavailable');
+    expect(purse?.note).toBe(CHIMES_PANEL_COPY.purseNoTower);
+    const price = prefit?.priceChimes ?? 0;
+    const short = chimesPanelViewOf({ balanceChimes: price - 2, home: 'device', deviceOwns: [] }).rows.find(
+      (entry) => entry.id === RUSH_PREFIT_SINK_ID,
+    );
+    expect(short?.offer).toBe('short');
+    expect(short?.note).toBe(`Short by 2 ${CHIME_PRICES.currency.many}.`);
   });
 
   it('says the fourth thing chimes buy is priced elsewhere, and never lists it as a row', () => {

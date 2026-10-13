@@ -27,6 +27,12 @@
  * was not run the way a house row was. The house rows themselves are untouched: {@link rushStandingsOf}
  * returns them exactly as before and places the player's beside them by index.
  *
+ * **On a build with no server, the device's own best sitting is drawn the same way** —
+ * [§ D1420](../../../../DECISIONS.md). There is no board to read, so the row is the sitting
+ * `everyday/rushDeviceStore.ts` kept for the tower, its last round replayed on this device
+ * (`EverydayHost.rushDeviceBest`), tagged `rushDeviceBest.ts#RUSH_DEVICE_COPY.tag` and placed by the
+ * same rule, with a line saying it was posted nowhere and is ranked against nobody.
+ *
  * ## Keyed on the building, because the waves are only the same on the same tower
  *
  * `RUSH_STREAM.seed` is one seed for everybody, and `rushPatchOf` scales the rate to the population of
@@ -60,6 +66,7 @@
 import houseDocument from '../../../../data/rush-house-runs.json' with { type: 'json' };
 
 import { heldClock } from './rush.js';
+import { RUSH_DEVICE_COPY, type RushDeviceStanding } from './rushDeviceBest.js';
 import { LAST_GENERATED_WAVE, RUSH_HOLD_LINE, RUSH_STREAM, playerWaveAt } from './rushScreenModel.js';
 
 /** One house run: a shipped dispatcher, a shipped building, the rush's seed, read at the hold line. */
@@ -374,6 +381,11 @@ export function rushStandingsOf(
    * Omitted is {@link RushPostedStandings} `silent`: every caller but the setup screen.
    */
   posted: RushPostedStandings = { kind: 'silent' },
+  /**
+   * This device's best sitting on this tower, replayed — [§ D1420](../../../../DECISIONS.md). Drawn
+   * only while {@link posted} is `silent`, which is a build with no server; omitted is `silent`.
+   */
+  device: RushDeviceStanding = { kind: 'silent' },
 ): RushStandingsView {
   if (!measuredOnThisStream(table)) return { kind: 'withheld', reason: 'stale', refusal: RUSH_HOUSE_COPY.stale };
   const here = table.runs
@@ -402,7 +414,45 @@ export function rushStandingsOf(
     });
   const houseHeld = [...here].sort((a, b) => heldFor(b.run) - heldFor(a.run) || a.index - b.index).map(({ run }) => heldFor(run));
   const yours = posted.kind !== 'rows' ? [] : posted.sittings.map((sitting) => yoursRowOf(sitting, houseHeld));
+  /* § D1420: with no board to read, this device's replayed sitting stands where a posted row would. */
+  if (posted.kind === 'silent') {
+    return {
+      kind: 'rows',
+      note: RUSH_HOUSE_COPY.note,
+      rows,
+      yours: device.kind === 'row' ? [deviceRowOf(device, houseHeld)] : [],
+      yoursLine: deviceLineOf(device),
+    };
+  }
   return { kind: 'rows', note: RUSH_HOUSE_COPY.note, rows, yours, yoursLine: yoursLineOf(posted) };
+}
+
+/** This device's row, placed among the house's by {@link yoursRowOf}'s rule, its figure the replay's. */
+function deviceRowOf(device: Extract<RushDeviceStanding, { kind: 'row' }>, houseHeld: readonly number[]): RushYoursRowView {
+  const row = yoursRowOf(
+    {
+      heldS: device.heldS,
+      furthestWave: playerWaveAt(device.heldS),
+      roundCount: device.roundCount,
+      modifiers: device.modifiers.map((modifier) => ({ ...modifier, name: '' })),
+    },
+    houseHeld,
+  );
+  return { ...row, name: RUSH_DEVICE_COPY.name, tag: RUSH_DEVICE_COPY.tag };
+}
+
+/** What the line under the rows says about this device's row, or nothing on a build with a board. */
+function deviceLineOf(device: RushDeviceStanding): string | undefined {
+  switch (device.kind) {
+    case 'row':
+      return RUSH_DEVICE_COPY.note;
+    case 'none':
+      return RUSH_DEVICE_COPY.none;
+    case 'unreplayable':
+      return RUSH_DEVICE_COPY.unreplayable(device.reason);
+    case 'silent':
+      return undefined;
+  }
 }
 
 /**

@@ -9,8 +9,10 @@
  * cases clear at more than one price and seven of fifteen have a free clearing route, so there is
  * something left to find after a clear. The par is that, stated on the fixed card and nowhere else:
  * *the cheapest change we tried that fixes this letter, judged on the same forty-nine mornings*, and
- * what the player's own order cost beside it. **It pays nothing and moves no verdict**: a fixed case
- * is fixed at any price inside its budget, and the chime award is the same either way.
+ * what the player's own order cost beside it. ~~**It pays nothing and moves no verdict**~~ *It moves no
+ * verdict, and since [§ D1417](../../../../DECISIONS.md) a fix at or under a priced par pays the par
+ * award once*: a fixed case is fixed at any price inside its budget, and the clear's award is the
+ * same either way.
  *
  * ## What the figure is, and is not
  *
@@ -44,7 +46,7 @@
  * Pure. No DOM, no data read.
  */
 
-import { PAR_MARK_COPY, parMarkOf } from '../scenario/par.js';
+import { PAR_MARK_COPY, PAR_PAYS_LINE, parMarkOf } from '../scenario/par.js';
 
 /** One case's par. `units` is `null` where no clearing route the sample tried held on the mornings. */
 export interface FixitParRow {
@@ -90,7 +92,8 @@ export function fixitParOf(caseId: string): FixitParRow | undefined {
 export const FIXIT_PAR_COPY = Object.freeze({
   under: 'Yours cost less than any fix we tried.',
   same: 'Yours cost the same.',
-  pays: 'Matching it or beating it pays nothing extra.',
+  /* § D1417: `scenario/par.ts`'s one sentence. It read *"Matching it or beating it pays nothing extra"*. */
+  pays: PAR_PAYS_LINE,
   /*
    * A free par met by a free fix — § D1358. Said rather than left blank, because a blank read as a
    * par the game forgot (seat C D6).

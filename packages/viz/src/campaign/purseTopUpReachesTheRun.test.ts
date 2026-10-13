@@ -69,6 +69,8 @@ import { shiftLengthForContract, type ViewerState } from '../dev/state.js';
 import { applyCampaignAction, openingCareer, towerById, type CampaignCareer } from './career.js';
 import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
 import type { CareerStore } from '../everyday/careerStore.js';
+import { createDeviceChimeStore, type DeviceChimeStore } from '../everyday/chimeStore.js';
+import { deviceOwnedOf } from '../everyday/deviceChimes.js';
 import {
   CAREER_PURSE_TOP_UP_SINK_ID,
   carriedIn,
@@ -101,7 +103,7 @@ const GRANT_UNITS = SINK === undefined ? 0 : chimeGrantUnits(SINK, 1);
  * recorded — a player charged for a grant that landed nowhere is issue #557's own defect with their
  * chimes attached to it.
  */
-function harness(saved?: CampaignCareer): {
+function harness(saved?: CampaignCareer, device?: DeviceChimeStore): {
   readonly host: EverydayHost;
   state: () => ViewerState;
   readonly ledgerCalls: () => number;
@@ -163,14 +165,22 @@ function harness(saved?: CampaignCareer): {
       throw new Error('this fixture does not drive watching');
     },
     watching: () => undefined,
-    spendChime: (_sinkId, steps) => {
-      calls += 1;
-      return Promise.resolve<EverydayChimeSpend>({
-        kind: 'bought',
-        chimes: 30,
-        grantUnits: SINK === undefined ? 0 : chimeGrantUnits(SINK, steps),
-      });
-    },
+    /*
+     * § D1418: a device with no server holds the tally itself, so there is no route to count; an
+     * account's arm answers through the route as before.
+     */
+    ...(device === undefined
+      ? {
+          spendChime: (_sinkId: string, steps: number) => {
+            calls += 1;
+            return Promise.resolve<EverydayChimeSpend>({
+              kind: 'bought',
+              chimes: 30,
+              grantUnits: SINK === undefined ? 0 : chimeGrantUnits(SINK, steps),
+            });
+          },
+        }
+      : { deviceChimes: device, chimeHome: () => 'device' as const }),
     dailyBoard: undefined,
     onChange: () => () => {},
   };
@@ -454,5 +464,58 @@ describe('a top-up with nowhere to land is refused before the chimes are taken',
     expect(h.ledgerCalls()).toBe(1);
     /* And a sink that grants no units writes no grant row, whatever the server answers. */
     expect(towerById(h.host.campaign(), 'c1')?.grants).toEqual([]);
+  });
+});
+
+/*
+ * **The same top-up bought from this device's tally reaches the run the same way** — [§ D1418](../../../../DECISIONS.md),
+ * swarm DS's Q3 ruling. With no server and no sign-in the host charges the device's own ledger at the
+ * ledger's price and lands the grant through the reducer an account's lands through, so the legs are
+ * the account arm's to the boarding. Red on the base: the press answered `no-server` and nothing landed.
+ */
+describe('a top-up bought from the device tally reaches the run — § D1418', () => {
+  /** A device that cleared five scenarios and has thirty chimes to spend. */
+  function funded(): DeviceChimeStore {
+    const store = createDeviceChimeStore(undefined);
+    for (const id of ['a', 'b', 'c', 'd', 'e']) store.bank({ completion: 'scenario-cleared', scenarioId: `case-${id}` });
+    return store;
+  }
+
+  it('lands the grant in the open tower’s purse, takes the ledger’s price, and moves the legs as the account’s does', async () => {
+    const store = funded();
+    const before = store.balance();
+    const h = harness(undefined, store);
+    buyDoors(h);
+    const purseBefore = purse(h);
+    const outcome = await h.host.spendChime(CAREER_PURSE_TOP_UP_SINK_ID, 1);
+    expect(outcome).toEqual({ kind: 'bought-on-device', chimes: before - (SINK?.priceChimes ?? 0), grantUnits: GRANT_UNITS });
+    expect(purse(h)).toBe(purseBefore + GRANT_UNITS);
+    expect(deviceOwnedOf(store.record())).toEqual([{ sinkId: CAREER_PURSE_TOP_UP_SINK_ID, steps: 1 }]);
+    pressMarshal(h);
+    h.host.runCampaignDay('c1');
+    const onDevice = legsOf(h.state());
+
+    const account = harness();
+    buyDoors(account);
+    await account.host.spendChime(CAREER_PURSE_TOP_UP_SINK_ID, 1);
+    pressMarshal(account);
+    account.host.runCampaignDay('c1');
+    expect(onDevice).toBe(legsOf(account.state()));
+
+    const none = harness();
+    buyDoors(none);
+    pressMarshal(none);
+    none.host.runCampaignDay('c1');
+    expect(onDevice).not.toBe(legsOf(none.state()));
+  });
+
+  it('refuses a device that cannot cover it, saying by how much, and spends nothing', async () => {
+    const store = createDeviceChimeStore(undefined);
+    store.bank({ completion: 'scenario-cleared', scenarioId: 'case-a' });
+    const h = harness(undefined, store);
+    const outcome = await h.host.spendChime(CAREER_PURSE_TOP_UP_SINK_ID, 1);
+    expect(outcome.kind).toBe('refused');
+    expect(outcome.kind === 'refused' ? outcome.detail : '').toMatch(/short by \d+ chimes?\. Nothing was spent\./u);
+    expect(store.record().sinks).toEqual([]);
   });
 });

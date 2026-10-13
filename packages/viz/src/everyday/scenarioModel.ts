@@ -47,7 +47,7 @@
  * the path off `scenarioLadderPort.ts`, and the honesty corpus sweeps it without a document.
  */
 import { ladderOfferCounts, SCENARIO_LADDER_COPY, type ScenarioLadderRung } from '../scenario/ladder.js';
-import { PAR_MARK_COPY, parMarkOf } from '../scenario/par.js';
+import { PAR_MARK_COPY, PAR_PAYS_LINE, parMarkOf } from '../scenario/par.js';
 import { SITTING_SHAPES } from './sittingShape.js';
 import type { EverydayScreen } from './types.js';
 
@@ -164,9 +164,10 @@ export const SCENARIO_COPY = Object.freeze({
     'The ten stages on the path are read from the campaign’s own file, and this page has not been handed it. Reload if it does not appear.',
   /** § D1129 clause 4: a cleared stage's row. It pays once and unlocks nothing, and says both. */
   cleared: 'Cleared on this device. Its chimes are paid, and clearing it again pays nothing.',
-  /** § D1234: what a par mark on a stage row is measured against, and that it pays nothing. */
+  /** § D1234: what a par mark on a stage row is measured against. */
   parBasis: 'the cheapest way through the census found on this stage’s page',
-  parPays: 'Matching it or beating it pays nothing extra.',
+  /* § D1417: what meeting it pays, said in `scenario/par.ts`'s one sentence. It read *"pays nothing extra"*. */
+  parPays: PAR_PAYS_LINE,
   /* § D1358: the arms a cleared row draws where it earns no mark. */
   parFree:
     'Par is free here: the cheapest way through the census found on this stage’s page costs nothing, so no clear is marked against it.',
