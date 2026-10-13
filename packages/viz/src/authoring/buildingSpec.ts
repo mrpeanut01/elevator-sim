@@ -2894,6 +2894,22 @@ function declaredFloorsOf(config: BuildingConfig): readonly FloorConfig[] {
 }
 
 /**
+ * **How many floors stand above the lobby and below it** — the count *Tune the tower*'s *Floors above
+ * the lobby* row edits ({@link BuildingSpec.floors}) and the length of {@link BuildingSpec.belowLobby},
+ * from {@link lobbyIndexOf}'s lobby, so a surface that states a building's floors can state the one
+ * count the sandbox does. Wave AP lane AP-D2, the post-AO panel's seat D (D9): the brief read *21
+ * above ground* (every declared floor, lobby and car park included) where the sandbox read *19 above
+ * the lobby*.
+ */
+export function floorsAroundLobbyOf(declared: readonly FloorConfig[]): { readonly above: number; readonly below: number } {
+  const lobby = lobbyIndexOf(declared);
+  return {
+    above: declared.filter((floor) => floor.index > lobby).length,
+    below: declared.filter((floor) => floor.index < lobby).length,
+  };
+}
+
+/**
  * Which declared floor the spec calls floor `0`.
  *
  * The lowest entrance **at or above datum**, because that is the one a reader means by *the lobby*:

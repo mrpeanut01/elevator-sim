@@ -36,9 +36,11 @@ import {
 
 import {
   sandboxBeforeOf,
+  sandboxCarriedLineOf,
   sandboxMoves,
   sandboxPatchOf,
   sandboxRestorePatchOf,
+  sandboxWeekLineOf,
   type SandboxPresses,
 } from './sandbox.js';
 import { tunePresses, tuneStateFrom, type TuneState } from './tunerModel.js';
@@ -252,5 +254,65 @@ describe('a drawn tower runs as a sandbox day over the week — § D1363', () =>
     /* The practice crowd is a different day: the legs differ from the shared crowd's in the same tower. */
     const shared = { ...during, seed: MIDTOWN.seed };
     expect(legsOf(during)).not.toBe(legsOf(shared));
+  });
+});
+
+/*
+ * Wave AP lane AP-D2, [§ D1451](../../../../DECISIONS.md), the post-AO panel's seat B (D1): week 2's
+ * Monday on Midtown Office (Shift change, car D booked out 10:30–13:00), *Open the sandbox*, 3000 lb,
+ * *Run it and watch*, and the run had no car D out and an ordinary day, so its clear read as *bigger
+ * cars fixed it*. Week 3's Monday is that day with the level's car C booked out too. Red before: the
+ * changed tower's run was an ordinary day with no booking at all.
+ */
+describe('a sandbox day runs the day it copies, its wrinkle and its bookings — § D1451', () => {
+  /* The week deals the day's wrinkle: the helper pins `campaignEventId: 'ordinary'`, which no Scenario day carries. */
+  const WEEK3: ViewerState = { ...MIDTOWN, campaignEventId: undefined, week: { ...MIDTOWN.week, week: 3, day: 1, dayIdx: 0 } };
+  const cars = (state: ViewerState): readonly string[] =>
+    [...new Set((shiftRunConfigOf(RESOURCES, state).bookings ?? []).map((incident) => incident.car.carId))].sort();
+  const bigger = pressesFor(WEEK3, { cap: standingOf(WEEK3).building.ratedLoadLb + 500 });
+
+  it('keeps the day’s wrinkle and every booking on a changed tower, and the legs show it', () => {
+    const day = shiftRunConfigOf(RESOURCES, WEEK3);
+    expect(day.event.id).toBe('shift-change:tight');
+    expect(cars(WEEK3)).toEqual(['C', 'D']);
+    const during = sandboxed(WEEK3, bigger);
+    expect(during.buildingId).not.toBe(WEEK3.buildingId);
+    expect(shiftRunConfigOf(RESOURCES, during).event.id).toBe(day.event.id);
+    expect(cars(during)).toEqual(['C', 'D']);
+    /* Leaving the day out is the player's to do, and it reaches the run: compared on the legs. */
+    const plain = sandboxed(WEEK3, { ...bigger, plainDay: true });
+    expect(shiftRunConfigOf(RESOURCES, plain).event.effect.changesNothing).toBe(true);
+    expect(cars(plain)).toEqual([]);
+    expect(legsOf(plain)).not.toBe(legsOf(during));
+    expect(sandboxCarriedLineOf(day, shiftRunConfigOf(RESOURCES, during), false)).toBe(
+      'This sandbox day keeps the day’s wrinkle (Shift change) and cars C and D booked out of passenger service as the day had.',
+    );
+    expect(sandboxCarriedLineOf(day, shiftRunConfigOf(RESOURCES, plain), true)).toBe(
+      'This sandbox day leaves out the day’s wrinkle (Shift change) and the booking of cars C and D, because you left the day’s wrinkle and bookings out.',
+    );
+  });
+
+  it('runs the untouched day as the day, on the legs, and counts it for nothing', () => {
+    const untouched = sandboxed(WEEK3, pressesFor(WEEK3, {}));
+    expect(untouched.week.contractId).toBe(SANDBOX_DAY_CONTRACT_ID);
+    expect(legsOf(untouched)).toBe(legsOf(WEEK3));
+  });
+
+  it('leaves out a booking on a car the changed tower lost, runs, and says why', () => {
+    const fewer = sandboxed(WEEK3, pressesFor(WEEK3, { cars: 3 }));
+    expect(cars(fewer)).toEqual(['C']);
+    const plan = shiftRunConfigOf(RESOURCES, fewer);
+    expect(() => recordRun(plan.config, { recordDecisions: false, outOfServiceCarIds: plan.outOfServiceCarIds })).not.toThrow();
+    expect(sandboxCarriedLineOf(shiftRunConfigOf(RESOURCES, WEEK3), plan, false)).toBe(
+      'This sandbox day keeps the day’s wrinkle (Shift change) and car C booked out of passenger service as the day had. ' +
+        'It leaves out the booking of car D, because the tower you changed has no car D.',
+    );
+  });
+
+  it('says where the week it stood over is, closed day or not', () => {
+    expect(sandboxWeekLineOf(WEEK3.week)).toBe('Your week is where you left it, on Monday, which you have not closed.');
+    expect(sandboxWeekLineOf({ ...WEEK3.week, closedDay: 1 })).toBe(
+      'Your week is where you left it: Monday is closed as you closed it, and Tuesday is next.',
+    );
   });
 });

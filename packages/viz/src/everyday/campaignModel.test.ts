@@ -28,6 +28,7 @@ import {
   campaignTestGoals,
   campaignTestRows,
   careerStageLabel,
+  contractDocumentOf,
   contractView,
   perfectMonthLineOf,
   recordLine,
@@ -51,6 +52,7 @@ import {
   careerDayIdxOf,
   carriedIn,
   clearedDays,
+  missAllowanceSentenceOf,
   purseOf,
   type Difficulty,
 } from '../campaign/economy.js';
@@ -486,8 +488,25 @@ describe('a lost contract reads as lost on every screen that names it (§ D1392)
   it('says on the contract what a loss does', () => {
     const clause = contractView(inputOf(lostAt20()))!;
     const all = JSON.stringify(clause);
-    expect(all).toContain('More than 3 missed days and the contract is lost.');
+    expect(all).toContain('Three missed days are allowed: a fourth loses the contract.');
     expect(all).toContain('runs no more of its days and is offered no renewal');
+  });
+
+  /*
+   * Wave AP lane AP-D2, the post-AO panel's seat D (D4): the Standard contract said *"Three missed
+   * days and the contract ends"* in its tier note beside *"More than 3 missed days and the contract
+   * is lost"* in clause 4. Red before: the note's false form was on the sheet.
+   */
+  it('states the allowance in one form on the whole contract sheet, the one contractIsLost enforces', () => {
+    const view = contractView(inputOf(lostAt20()))!;
+    const all = JSON.stringify(view);
+    expect(all).not.toMatch(/missed days and the contract ends|More than \d+ missed/u);
+    for (const difficulty of Object.values(DIFFICULTIES)) {
+      const sentence = missAllowanceSentenceOf(difficulty);
+      if (difficulty.id !== 'easy') expect(difficulty.note).toContain(sentence);
+      expect(JSON.stringify(contractDocumentOf('Garden Apartments', difficulty))).toContain(sentence);
+    }
+    expect(all).toContain(missAllowanceSentenceOf(DIFFICULTIES.standard));
   });
 });
 

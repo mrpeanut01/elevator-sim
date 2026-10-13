@@ -50,7 +50,7 @@ import {
   rushOpeningLine,
   rushRebuildLineOf,
   rushTutorialWorkedAnswerOf,
-  RUSH_FITTED_LINE,
+  rushFittedLineOf,
   RUSH_SCREEN_COPY as COPY,
 } from './rushScreenModel.js';
 import { rushStandingsOf, type RushPostedStandings, type RushYoursRowView } from './rushHouse.js';
@@ -306,8 +306,10 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
    * where it will be posted. Absent otherwise — there is no control here and no price, because the
    * tally in Settings is what sells it and a pitch on a mode's own screen would be a store.
    */
-  if (context.host.rushStartsFitted()) {
-    const fitted = el(doc, 'p', 'everyday-rush-fitted', RUSH_FITTED_LINE);
+  /* Wave AP lane AP-D2: a device purchase is never posted, so its line says so (§ D1418). */
+  const fittedLine = rushFittedLineOf(context.host);
+  if (fittedLine !== undefined) {
+    const fitted = el(doc, 'p', 'everyday-rush-fitted', fittedLine);
     fitted.style.cssText = `font-size:12px;line-height:1.5;color:${C.label};margin:12px 0 0`;
     drivingBlock.append(fitted);
   }

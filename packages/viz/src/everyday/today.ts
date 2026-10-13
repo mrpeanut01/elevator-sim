@@ -45,6 +45,7 @@
 import { PRACTICE_DAY_SENTENCES, practiceGroundOf, type PracticeGround } from '../shift/scoredCrowd.js';
 import { isDerivedCrowdOn } from '../shift/weekRecord.js';
 import type { ResolvedBuilding } from '@elevator-sim/core/browser';
+import { floorsAroundLobbyOf } from '../authoring/buildingSpec.js';
 
 import { absenceSpanPhraseOf, bookedOutCarsOf, carAbsencesOf, wrinkleNameOf, wrinkleNoteOf } from '../shift/bookedOut.js';
 import type { CalendarPeriod } from '../shift/calendar.js';
@@ -673,6 +674,12 @@ function driverHeldOf(input: TodayInput, event: ShiftEvent): string | undefined 
   return PRESS_DAY_DRIVER_HELD;
 }
 
+/** `19 above the lobby, 1 below it` — `authoring/buildingSpec.ts#floorsAroundLobbyOf`, the sandbox's count. */
+export function floorsLineOf(building: Pick<ResolvedBuilding, 'floors'>): string {
+  const { above, below } = floorsAroundLobbyOf(building.floors);
+  return below === 0 ? `${String(above)} above the lobby` : `${String(above)} above the lobby, ${String(below)} below it`;
+}
+
 /** § 6.2's five rows, from the resolved building. Empty when there is no document to read. */
 function factsOf(
   building: ResolvedBuilding | undefined,
@@ -689,7 +696,12 @@ function factsOf(
   );
   const smallest = capacities.length === 0 ? undefined : Math.min(...capacities);
   return [
-    { label: 'Floors', value: `${String(building.floors.length)} above ground` },
+    /*
+     * The sandbox's count, from the same lobby (wave AP lane AP-D2, the post-AO panel's seat D, D9):
+     * this read `floors.length` *above ground*, which counts the lobby and any car park, so Midtown
+     * Office's brief said 21 where *Tune the tower* said 19 above the lobby.
+     */
+    { label: 'Floors', value: floorsLineOf(building) },
     { label: 'People', value: groupThousands(building.totalPopulation) },
     {
       label: 'Lifts',

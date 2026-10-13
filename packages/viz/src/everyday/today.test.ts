@@ -20,6 +20,7 @@ import {
 } from '@elevator-sim/core/browser';
 import { describe, expect, it } from 'vitest';
 
+import { specFromBuilding } from '../authoring/buildingSpec.js';
 import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
 
 import type { BrowserResources } from '../dev/data.js';
@@ -417,7 +418,15 @@ describe('the facts come from the resolved building', () => {
   it('counts floors, people and cars as `resolveBuilding` counted them', () => {
     const record = recordFor(garden, 2, 1);
     const byLabel = new Map(record.facts.map((fact) => [fact.label, fact.value]));
-    expect(byLabel.get('Floors')).toBe(`${String(garden.floors.length)} above ground`);
+    /*
+     * Wave AP lane AP-D2, the post-AO panel's seat D (D9): the sandbox's count, from its own spec —
+     * the brief read every declared floor *above ground*, 21 on Midtown where the sandbox read 19.
+     */
+    expect(byLabel.get('Floors')).toBe(`${String(specFromBuilding(garden.config, garden.id).floors)} above the lobby`);
+    const tall = new Map(recordFor(midtown, 2, 1).facts.map((fact) => [fact.label, fact.value]));
+    const spec = specFromBuilding(midtown.config, midtown.id);
+    expect(tall.get('Floors')).toBe(`${String(spec.floors)} above the lobby, ${String(spec.belowLobby.length)} below it`);
+    expect(tall.get('Floors')).toBe('19 above the lobby, 1 below it');
     // The floor sum, which is what the kernel counts arrivals against.
     expect(byLabel.get('People')?.replace(/,/g, '')).toBe(String(garden.totalPopulation));
   });

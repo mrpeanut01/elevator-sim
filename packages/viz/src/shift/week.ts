@@ -334,12 +334,26 @@ export function openReplay(day: number, dayIdx: number, history: readonly DayOut
  * pair) writes the week and never the copy. Any sandbox day already parked goes, because there is
  * one sandbox day at a time and it is always a fresh copy of the week it stands over.
  */
-export function openSandboxDay(week: WeekState, parked: readonly WeekState[]): WeekSwitch {
+export function openSandboxDay(
+  week: WeekState,
+  parked: readonly WeekState[],
+  /**
+   * The tower the day stood on and whether the player left its wrinkle and bookings out — wave AP
+   * lane AP-D2, [§ D1451](../../../../DECISIONS.md): the copy remembers what it was dealt as
+   * ({@link WeekState.sandboxOf}). Omitted, the copy keeps nothing of the day's dealing, which is
+   * what a caller with no tower means.
+   */
+  source?: { readonly buildingId: string; readonly plain: boolean },
+): WeekSwitch {
   const kept = parked.filter(
     (entry) => entry.contractId !== SANDBOX_DAY_CONTRACT_ID && entry.contractId !== week.contractId,
   );
+  const copy = withContract(week, SANDBOX_DAY_CONTRACT_ID);
   return {
-    week: withContract(week, SANDBOX_DAY_CONTRACT_ID),
+    week:
+      source === undefined
+        ? copy
+        : { ...copy, sandboxOf: { contractId: week.contractId, buildingId: source.buildingId, plain: source.plain } },
     parked: Object.freeze([...kept, week].slice(-PARKED_WEEKS_MAX)),
   };
 }

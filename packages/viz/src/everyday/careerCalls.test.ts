@@ -23,14 +23,20 @@ import { observationsAt } from '../live/observations.js';
 import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
 import { recordRun } from '../record/recordRun.js';
 import { RESOURCES, baseState } from '../scope/probes.test-helper.js';
-import { dayCallDriversOf } from '../shift/dayCalls.js';
+import { shiftGoalsOf } from '../dev/leftRail.js';
+import { dayCallDriversOf, dayCallsQuietSentenceOf } from '../shift/dayCalls.js';
 import { NO_CALL_DECIDED_LINE } from '../shift/dayClose.js';
+import { SHIFT_EVENTS } from '../shift/events.js';
+import { TODAY_ASKS_DECIDES } from '../shift/goals.js';
 import { shiftObservationsOf } from '../shift/observations.js';
+import { dayReportOf, type ShapedDayReport } from '../shift/report.js';
 import type { ShiftGoal } from '../shift/types.js';
 
-import { campaignDayVerdict, campaignTestGoals, campaignTestRows } from './campaignModel.js';
+import { CONTRACT_ASKS_DECIDES, campaignDayVerdict, campaignTestGoals, campaignTestRows } from './campaignModel.js';
 import {
+  CAREER_GOALS_HEADING,
   CAREER_MARK_WORDS,
+  CAREER_VERDICT_LINES,
   careerCloseLineOf,
   careerCloseRunStatesOf,
   careerDayAsks,
@@ -41,6 +47,7 @@ import {
   type CareerDayCalls,
 } from './careerCalls.js';
 import { createEverydayHost, type EverydayHostBindings } from './host.js';
+import { everydayReportViewOf } from './reportView.js';
 
 /** The base the browser tier's cold load captures (`?seed=424242`). */
 const BASE = 424_242n;
@@ -70,6 +77,8 @@ function careerHarness() {
   let filed: string | undefined;
   let session: DayCallSession | undefined;
   const handed: (CareerDayCalls | undefined)[] = [];
+  /* What each close handed the shell to grade the sheet on (§ D1452): `undefined` is the day's own five. */
+  const graded: ({ readonly goals: readonly ShiftGoal[] } | undefined)[] = [];
   const run = (day: ViewerState): VizRecording => {
     const plan = shiftRunConfigOf(RESOURCES, day);
     return recordRun(plan.config, { recordDecisions: false, outOfServiceCarIds: plan.outOfServiceCarIds }).recording;
@@ -87,7 +96,8 @@ function careerHarness() {
       state = { ...state, recording: run(state) };
     },
     intervene: () => {},
-    closeDay: () => {
+    closeDay: (grading) => {
+      graded.push(grading);
       if (state.recording !== undefined) filed = state.recording.runId;
     },
     openRunTab: () => {},
@@ -121,7 +131,7 @@ function careerHarness() {
     },
     dayCallRecordsOn: () => session?.records() ?? [],
   };
-  return { bindings, handed, state: () => state };
+  return { bindings, handed, graded, state: () => state };
 }
 
 /** The shipped session on a day, every run made synchronously by the shipped `recordRun`. */
@@ -289,5 +299,107 @@ describe('what decided a career day — § D1409', () => {
     expect(careerDeciderOf({ ...base, driverRun: 'unrecorded' })).toEqual({ kind: 'unrun', run: 'driver-run' });
     expect(careerCloseLineOf(base)).toContain('What decided it is still being run');
     expect(careerCloseLineOf({ ...base, driverRun: 'unrecorded' })).toContain('could not be run on this crowd');
+  });
+});
+
+/*
+ * Wave AP lane AP-D2, [§ D1452](../../../../DECISIONS.md), the post-AO panel's seat D (D10): Garden
+ * Apartments on Impossible, day 3, headed *Shift cleared · No call decided today* on the week's five
+ * goals while the contract's four tests filed the day missed and the desk said the contract was lost.
+ * At this base the calendar's day-4 move-in is such a day: the week's five clear it and the
+ * contract's four miss it.
+ */
+describe('one verdict for a career day — § D1452', () => {
+  /** The sheet `dev/main.ts#closeShift` files from these goals, through the shipped report. */
+  function sheetOn(state: ViewerState, goals: readonly ShiftGoal[]): ShapedDayReport {
+    const recording = state.recording!;
+    return dayReportOf({
+      recording,
+      observations: shiftObservationsOf(observationsAt(recording, recording.endedAt)),
+      goals,
+      week: state.week,
+      contract: undefined,
+      event: SHIFT_EVENTS['move-in'],
+      calendar: null,
+      subject: { kind: 'week-day' },
+      plan: { shiftLengthS: state.shiftLengthS, windowStartS: state.windowStartS, patternId: 'building' },
+    });
+  }
+
+  it('grades the sheet on the contract’s four tests, so its headline is the mark the career files', () => {
+    const h = careerHarness();
+    const host = createEverydayHost(h.bindings);
+    for (let day = 1; day < 4; day += 1) host.campaignAct({ kind: 'file-day', towerId: 'c1', verdict: 'cleared', trips: 0 });
+    const before = towerById(host.campaign(), 'c1')!;
+    expect(before.day).toBe(4);
+    host.runCampaignDay('c1');
+    const day = h.state();
+    expect(day.campaignEventId).toBe('move-in');
+    /* The control: the week's five clear this run, so a sheet graded on them heads it cleared. */
+    expect(sheetOn(day, shiftGoalsOf(day, RESOURCES)).verdict).toBe('cleared');
+
+    host.closeDay();
+    /* Red before: the career's close handed the shell nothing, so the sheet was graded on the five. */
+    const grading = h.graded.at(-1);
+    expect(grading?.goals).toEqual(campaignTestGoals(DIFFICULTIES[before.difficultyId]));
+    /* The career filed the day missed on the same four. */
+    expect(towerById(host.campaign(), 'c1')!.missed).toBe(before.missed + 1);
+    const sheet = sheetOn(day, grading?.goals ?? []);
+    expect(sheet.verdict).toBe('missed');
+    const view = everydayReportViewOf({
+      report: sheet,
+      previous: undefined,
+      overnight: undefined,
+      newerRunOnStage: false,
+      career: { buildingName: 'Garden Apartments', day: 5, canRunAnother: true, renewalDue: false },
+    });
+    expect(view.sheet.verdictLine).toBe(CAREER_VERDICT_LINES.missed);
+    expect(view.sheet.verdictLine).not.toMatch(/Shift cleared/u);
+    expect(view.sheet.goalsHeading).toBe(CAREER_GOALS_HEADING);
+    /* Every row the sheet grades is one of the contract's four, and none is the week's. */
+    expect(sheet.goals.map((line) => line.reading.goal.id)).toEqual(['away', 'worst', 'queue', 'trips']);
+  });
+
+  it('leaves a close with no career day graded on the day’s own five — the negative control', () => {
+    const h = careerHarness();
+    const host = createEverydayHost(h.bindings);
+    host.closeDay();
+    expect(h.graded).toEqual([undefined]);
+  });
+
+  it('labels the week’s five, where the career stage shows them, as goals the contract does not count', () => {
+    expect(TODAY_ASKS_DECIDES).toContain('the contract counts none of them');
+    expect(CONTRACT_ASKS_DECIDES).toContain('the day’s report is graded on them');
+    expect(`${TODAY_ASKS_DECIDES} ${CONTRACT_ASKS_DECIDES}`).not.toMatch(/decide the report and your streak|those decide your streak/u);
+  });
+});
+
+/*
+ * Wave AP lane AP-D2, the post-AO panel's seat B (claim 7): day 9's drawn move-in asked a call and
+ * day 4's calendared one did not. At seat D's base (§ D729's date seed for 2026-10-13) day 4 is the
+ * calendared move-in and asked nothing either, and this is why: the move-in's car is out from the
+ * career day's first instant, a career day is a slice whose opening is not a moment to call
+ * (`shift/dayCalls.ts#nextDayCallOf`; § D1336's start candidate is a whole day's), and the one moment
+ * the stage reached was turned down on § D1138's counts. No admissible call, and the sheet says so.
+ */
+describe('a career move-in that asks nothing had nothing admissible to ask — § D1336, § D1408', () => {
+  it('turns down the one moment it reaches, and the sheet’s quiet line says what it ran', () => {
+    const h = careerHarness();
+    h.bindings.applyPatch({ seed: 20_261_013n });
+    const host = createEverydayHost(h.bindings);
+    for (let day = 1; day < 4; day += 1) host.campaignAct({ kind: 'file-day', towerId: 'c1', verdict: 'cleared', trips: 0 });
+    host.runCampaignDay('c1');
+    const day = h.state();
+    expect(day.campaignEventId).toBe('move-in');
+    const recording = day.recording!;
+    const facts = dayCallFactsOf(RESOURCES, day)!;
+    /* The move-in's window opens with the day, and a slice reads no wrinkle start. */
+    expect(facts.horizon).not.toBe('whole-day');
+    expect(facts.wrinkle?.startS).toBe(0);
+    const session = sessionOn(day, recording, campaignTestGoals(DIFFICULTIES[towerById(host.campaign(), 'c1')!.difficultyId]));
+    expect(session.onStage()?.raised ?? false).toBe(false);
+    const quiet = session.quiet();
+    expect(quiet).toEqual({ kind: 'asked', refused: 1, ending: 'finished' });
+    expect(dayCallsQuietSentenceOf(quiet!)).toContain('from one moment, and each time the answers left close to the same number');
   });
 });

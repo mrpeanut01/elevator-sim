@@ -330,6 +330,12 @@ export interface StagePlayFacts {
   readonly parUnits?: number | undefined;
   /** This device holds the stage's clear, so a run here is practice (§ D1358). */
   readonly clearedBefore?: boolean | undefined;
+  /**
+   * What the clear this device keeps for the stage cost, in units (`everyday/profile.ts#fixSpentUnitsOf`,
+   * the cheapest since § D1358), or `undefined` where none is kept. Wave AP lane AP-D2: the practice
+   * line said *earns the mark* after the mark was earned (the post-AO panel's seat D, D9).
+   */
+  readonly keptSpentUnits?: number | undefined;
   /** Every rung above the base, sold or with its reason (§ D1419). Empty where none is authored. */
   readonly rungs?: readonly StageRungFacts[] | undefined;
   /** The rung this device bought for this stage, or `undefined` on the base (§ D1419). */
@@ -511,6 +517,8 @@ export interface StageFactsInput {
   readonly parUnits?: number | undefined;
   /** {@link StagePlayFacts.clearedBefore}, passed through. */
   readonly clearedBefore?: boolean | undefined;
+  /** {@link StagePlayFacts.keptSpentUnits}, passed through. */
+  readonly keptSpentUnits?: number | undefined;
   /** The stage's row of the pinned survivor census, which decides what is sold (§ D1419). */
   readonly census?: PublishedSurvivorScenario | undefined;
   /** The rungs this device bought for this stage (§ D1419). */
@@ -582,6 +590,7 @@ export function stageFactsOf(input: StageFactsInput): StagePlayFacts {
     award: input.award,
     parUnits: input.parUnits,
     clearedBefore: input.clearedBefore,
+    keptSpentUnits: input.keptSpentUnits,
     rungs,
     boughtStepId,
     balanceChimes: input.balanceChimes,
@@ -724,10 +733,18 @@ function verdictViewOf(facts: StagePlayFacts, verdict: StagePlayVerdictFacts, st
  * hub row's own reason ({@link stageParNoteOf} with nothing spent), so the line before the press, the
  * verdict after it and the row on the path give one reason for one stage.
  */
-export function stagePracticeLineOf(parUnits: number | undefined): string {
-  const par =
-    parUnits !== undefined && parUnits > 0
-      ? `A clear at or under par, ${String(parUnits)} ${parUnits === 1 ? 'unit' : 'units'}, earns the mark.`
+export function stagePracticeLineOf(parUnits: number | undefined, keptSpentUnits?: number): string {
+  const priced = parUnits !== undefined && parUnits > 0;
+  const unitsOf = (units: number): string => `${String(units)} ${units === 1 ? 'unit' : 'units'}`;
+  /*
+   * Wave AP lane AP-D2, the post-AO panel's seat D (D9): once the clear this device keeps met the par,
+   * the line still promised *earns the mark*. It says the mark is held, from the kept clear's own cost.
+   */
+  const marked = priced && keptSpentUnits !== undefined && parMarkOf(parUnits, keptSpentUnits) !== undefined;
+  const par = marked
+    ? `This stage has its mark: your clear cost ${unitsOf(keptSpentUnits)}, against a par of ${unitsOf(parUnits)}.`
+    : priced
+      ? `A clear at or under par, ${unitsOf(parUnits)}, earns the mark.`
       : (stageParNoteOf(parUnits, undefined) ?? '');
   return `${STAGE_PLAY_COPY.practice} ${par}`.trim();
 }
@@ -809,7 +826,7 @@ export function stagePlayViewOf(facts: StagePlayFacts, phase: StagePlayPhase): S
       `A run is ${String(facts.replications)} runs of ${minutesOf(facts.durationS)} of building time on this ` +
       `stage’s own crowds, your settings and the building’s on the same passengers. If every goal is met, ` +
       `${String(facts.replications)} more follow on crowds you could not have tuned against, and those decide the clear.`,
-    practice: facts.clearedBefore === true ? stagePracticeLineOf(facts.parUnits) : undefined,
+    practice: facts.clearedBefore === true ? stagePracticeLineOf(facts.parUnits, facts.keptSpentUnits) : undefined,
     status: statusOf(phase),
     verdict: phase.kind === 'judged' ? verdictViewOf(facts, phase.verdict, phase.stale) : undefined,
     rungs: (facts.rungs ?? []).map((rung) => stageRungRowOf(rung, facts.balanceChimes ?? 0)),

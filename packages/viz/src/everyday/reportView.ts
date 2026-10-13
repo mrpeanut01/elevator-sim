@@ -91,6 +91,7 @@ import type { ShapedDayReport } from '../shift/report.js';
 import type { TomorrowBriefing } from '../shift/tomorrow.js';
 import { PRESS_CALL_ROW_ID } from '../shift/callRow.js';
 import { dayCloseOf, type DayCloseView } from '../shift/dayClose.js';
+import { CAREER_GOALS_HEADING, CAREER_VERDICT_LINES } from './careerCalls.js';
 import type { WeekState } from '../shift/types.js';
 import { weekDealOf, type HouseReading } from '../shift/weekStake.js';
 
@@ -278,6 +279,12 @@ export interface EverydayReportView {
    */
   readonly practiceNote: string | undefined;
   /**
+   * **A sandbox day's close: what it kept of the day, what it left out, and where the week is** —
+   * wave AP lane AP-D2, [§ D1451](../../../../DECISIONS.md), the host's `sandboxDayLines`, drawn under
+   * {@link practiceNote}. Empty on every sheet but a sandbox day's practice close.
+   */
+  readonly sandboxLines: readonly string[];
+  /**
    * `shift/report.ts`'s target-met line on the close whose day met the week's target, drawn under
    * the verdict — swarm DN's Q2.2, [§ D1226](../../../../DECISIONS.md). `undefined` on every other
    * close.
@@ -376,6 +383,11 @@ export interface EverydayReportInput {
    * lead, so every existing caller is unchanged.
    */
   readonly week?: WeekState | undefined;
+  /**
+   * `EverydayHost.sandboxDayLines` — wave AP lane AP-D2, § D1451. Read only on a practice close, so a
+   * stale session can put nothing on a counted day's sheet.
+   */
+  readonly sandbox?: readonly string[] | undefined;
   /** The shell's house runs per counted day — `EverydayHost.weekHouse`. Read only with {@link week}. */
   readonly house?: ((day: number) => HouseReading | undefined) | undefined;
   /**
@@ -771,10 +783,25 @@ export function everydayReportViewOf(input: EverydayReportInput): EverydayReport
   );
   const framing = sheet.framing;
   const canAdvance = framing.kind === 'week-day' && framing.canAdvance && sheet.filed;
+  /*
+   * **A career day's headline is the contract's mark** — wave AP lane AP-D2, § D1452. The sheet a
+   * career close files is graded on the contract's four tests (`host.ts#closeDay`), so its verdict is
+   * the mark the career files; the headline says whose tests it is, and the goal rows are headed as
+   * the contract's.
+   */
+  const verdict = input.report?.verdict;
+  const careerSheet =
+    input.career === undefined || !sheet.filed
+      ? sheet
+      : {
+          ...sheet,
+          verdictLine: verdict === 'cleared' || verdict === 'missed' ? CAREER_VERDICT_LINES[verdict] : sheet.verdictLine,
+          goalsHeading: CAREER_GOALS_HEADING,
+        };
   return {
     filed: sheet.filed,
     emptyLede: sheet.filed ? undefined : EMPTY_LEDE,
-    sheet,
+    sheet: careerSheet,
     headings: {
       figures: 'HOW THE DAY CAME OUT',
       beats: sheet.diagnosisHeading,
@@ -828,6 +855,7 @@ export function everydayReportViewOf(input: EverydayReportInput): EverydayReport
         'you closed, not that run — close the day to replace it.'
       : undefined,
     practiceNote: framing.kind === 'week-day' ? framing.practiceNote : undefined,
+    sandboxLines: framing.kind === 'week-day' && framing.practiceNote !== undefined ? (input.sandbox ?? []) : [],
     weekMark: framing.kind === 'week-day' ? framing.weekMark : undefined,
     practiceAgain:
       input.week !== undefined &&

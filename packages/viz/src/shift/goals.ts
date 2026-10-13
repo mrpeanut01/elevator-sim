@@ -489,7 +489,11 @@ export const GOAL_BARS = Object.freeze({
 export const TODAY_ASKS_HEADING = 'WHAT TODAY ASKS';
 
 /**
- * What {@link TODAY_ASKS_HEADING}'s bars decide, in the player's words.
+ * What {@link TODAY_ASKS_HEADING}'s bars decide, in the player's words. On a career day, nothing the
+ * career files: since wave AP lane AP-D2 ([§ D1452](../../../../DECISIONS.md)) the day's report is
+ * graded on the contract's four too, so this sentence labels the five as not what the contract counts
+ * (it said *they decide the report and your streak* while the report headed a day the contract missed
+ * *Shift cleared*).
  *
  * Drawn where a player is reading these five with the contract's four one click away — today that
  * is the § 7 stage inside a career run (`everyday/stageScreenModel.ts`). It names the other set
@@ -498,8 +502,8 @@ export const TODAY_ASKS_HEADING = 'WHAT TODAY ASKS';
  * mirror and the pair is asserted against the two goal sets in `everyday/goalSets.test.ts`.
  */
 export const TODAY_ASKS_DECIDES =
-  'These five are the week’s, and they decide the report and your streak. What files this day for ' +
-  'the contract is the four on the building desk, under WHAT THE CONTRACT ASKS.';
+  'These five are the week’s, and the contract counts none of them. What files this day, and what ' +
+  'its report is graded on, is the four on the building desk, under WHAT THE CONTRACT ASKS.';
 
 /**
  * Today's goals: the handoff's four tests every day, in tension (§ 8.6), plus the energy bar.

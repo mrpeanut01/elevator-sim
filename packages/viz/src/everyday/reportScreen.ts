@@ -232,6 +232,8 @@ function mountReportScreen(
       newerRunOnStage: report !== undefined && run.hasRun && !run.dayClosed,
       panelNames: panelNamesOf(doc),
       career: careerOnwardOf(),
+      /* Wave AP lane AP-D2 (§ D1451): a sandbox day's close says what it kept and where the week is. */
+      sandbox: data.sandboxDayLines(),
       /*
        * The close's lead reads the live week and the house's runs — wave AM, lane AM-C,
        * § D1246 to § D1249. The daily flow only: a replay's sheet and a career day's are not a
@@ -782,6 +784,12 @@ function mountReportScreen(
       const practice = el(doc, 'p', 'everyday-report-practice', view.practiceNote);
       practice.style.cssText = `${QUIET};margin:10px 0 0;max-width:74ch`;
       head.append(practice);
+    }
+    /* § D1451: a sandbox day's close names what it kept of the day, what it left out, and where the week is. */
+    for (const line of view.sandboxLines) {
+      const node = el(doc, 'p', 'everyday-report-sandbox', line);
+      node.style.cssText = `${QUIET};margin:6px 0 0;max-width:74ch`;
+      head.append(node);
     }
     /*
      * The week's target, marked on the close that met it — swarm DN's Q2.2, § D1226. Where the

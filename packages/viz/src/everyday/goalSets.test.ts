@@ -18,8 +18,8 @@
  * | | `campaignModel.ts#campaignTestGoals` | `shift/goals.ts#goalsForDay` |
  * |---|---|---|
  * | bars | `economy.ts#DIFFICULTIES[tier].tests`, fixed for the tier | `GOAL_BARS`, a ladder that hardens with the week's day |
- * | decides | `campaignDayVerdict` → `career.ts#fileDay`: the day is filed **cleared** or **missed** against the contract | `week.ts#outcomeOf`: the report's verdict, the streak, the banked clean day |
- * | drawn on | the building desk and the contract sheet | the brief, the § 7 stage strip, the report |
+ * | decides | `campaignDayVerdict` → `career.ts#fileDay`: the day is filed **cleared** or **missed** against the contract, and since [§ D1452](../../../../DECISIONS.md) the career day's report is graded on these | `week.ts#outcomeOf`: the career week's own record, which the contract counts nothing of |
+ * | drawn on | the building desk, the contract sheet and the career day's report | the brief and the § 7 stage strip |
  *
  * Neither can be deleted without losing a grading rule, so § 567's second acceptance arm is the one
  * taken: **two sets, visibly distinct in what they are, each saying which it is.** No bar moved in

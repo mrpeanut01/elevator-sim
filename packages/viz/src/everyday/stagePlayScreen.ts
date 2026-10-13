@@ -50,7 +50,7 @@ import type { EditorParkingStrategy } from '../fixit/types.js';
 import { actionBarFor, type ActionBarModel } from './actionBar.js';
 import { everydayDeviceChimeStore } from './chimeStore.js';
 import { CHIME_AWARDS, deviceHoldsTurn } from './deviceChimes.js';
-import { progressWithFixSpent } from './profile.js';
+import { fixSpentUnitsOf, progressWithFixSpent } from './profile.js';
 import { everydayProfileStore } from './profileStore.js';
 import { scenarioOpen } from './scenarioOpenPort.js';
 import { el } from './screenDom.js';
@@ -260,6 +260,8 @@ function factsOf(data: Loaded, stageId: string): StagePlayFacts | undefined {
     choice: session.choice,
     parUnits: found.parUnits,
     clearedBefore: clearedOnDevice(found.stage.id),
+    /* Wave AP lane AP-D2: the kept clear's cost, so a met par is said as met rather than promised. */
+    keptSpentUnits: fixSpentUnitsOf(everydayProfileStore().progress(), found.stage.id),
     census: found.census,
     ownedStepIds: ownedStepIdsOf(found.stage.id),
     balanceChimes: store.balance(),

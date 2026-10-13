@@ -610,15 +610,18 @@ export const PRACTICE_OTHER_TAB_NOTE =
   'so this run banks nothing.';
 
 /**
- * **What a sandbox day's sheet says** — wave AO, lane AO-2, [§ D1368](../../../../DECISIONS.md). The
+ * **What a sandbox day's sheet says** — wave AO, lane AO-2, [§ D1368](../../../../DECISIONS.md). It
+ * ended *your week is still on this day, exactly as you left it* until wave AP lane AP-D2 (§ D1451):
+ * the post-AO panel's seat B closed Monday, opened the sandbox from its sheet and read that while its
+ * week's next day was Tuesday. Where the week is is now the Everyday close's own line
+ * (`everyday/sandbox.ts#sandboxWeekLineOf`), read off the week the sandbox parked. The
  * post-AN panel's seat D could not reach one (no change simulated); once a change could, the close
  * read *Monday — day 1, Shift missed* over *Open the doors on Tuesday* and *Today stays in your week
  * exactly as it is*, which said the sandbox had filed the day. No digit, for {@link PRACTICE_NOTE}'s
  * reason.
  */
 export const PRACTICE_SANDBOX_NOTE =
-  'A sandbox day. It ran with the changes you made, so it banks nothing: your week is still on this ' +
-  'day, exactly as you left it.';
+  'A sandbox day. It ran with the changes you made, so it banks nothing, and your week is not moved by it.';
 
 /**
  * **What a sandbox day's sheet says when it was dealt a practice crowd** — wave AO, lane AO-1b,
@@ -628,7 +631,7 @@ export const PRACTICE_SANDBOX_NOTE =
  */
 export const PRACTICE_REHEARSAL_NOTE =
   'A sandbox day on a practice crowd. It met a crowd other than the day’s shared one, so it banks ' +
-  'nothing: your week is still on this day, exactly as you left it, and the day has not begun.';
+  'nothing, and your week is not moved by it.';
 
 /**
  * One run, belonging to no week — the same figures, the same diagnosis, the same levers and the

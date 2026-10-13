@@ -462,6 +462,14 @@ function longestDayWord(): string {
 }
 
 /**
+ * **What a Scenario day and week can lose, said where the hub says how long one takes** — wave AP,
+ * lane AP-D2, the post-AO panel's seats A and B. The row read *no losing — a day is a score, not a
+ * pass* beside a day the report files missed and a week whose sheet says it missed its target and
+ * ends the run of weeks held (`shift/weekRecord.ts`), so the clause was false of the mode it heads.
+ */
+export const SCENARIO_LOSS_CLAUSE = 'a day can be missed, and a week can miss its target';
+
+/**
  * The five session-shape strings, composed once.
  *
  * Each is *length · what the length is of · the promise the retired string already carried*. Every
@@ -509,9 +517,10 @@ export const SITTING_SHAPES = Object.freeze({
    */
   /*
    * § D1383: led by the brief's measured day; the game towers' longest and the reference tower's
-   * follow it, so the far end is still said and no longer stands as the figure.
+   * follow it, so the far end is still said and no longer stands as the figure. Its last clause read
+   * *no losing — a day is a score, not a pass* until wave AP lane AP-D2 ({@link SCENARIO_LOSS_CLAUSE}).
    */
-  contractDay: `${typicalDayPhrase()}, and ${betweenRungLabel()} wherever nobody on a landing has waited a minute, the quiet between peaks skipped; ${String(Math.ceil(pacedDayRealS(WHOLE_DAY_LONGEST_GAME_TOWER, openingRung().simPerRealS) / 60))} min at most on the game’s own towers, and up to ${longestDayWord()} on a reference tower · no losing — a day is a score, not a pass`,
+  contractDay: `${typicalDayPhrase()}, and ${betweenRungLabel()} wherever nobody on a landing has waited a minute, the quiet between peaks skipped; ${String(Math.ceil(pacedDayRealS(WHOLE_DAY_LONGEST_GAME_TOWER, openingRung().simPerRealS) / 60))} min at most on the game’s own towers, and up to ${longestDayWord()} on a reference tower · ${SCENARIO_LOSS_CLAUSE}`,
   /** The hub's *Fix a building* row. */
   fixCase: `${sittingLengthPhrase(SITTING_SPANS.fixCase, 'a case')}, skippable · retry as often as you like`,
 });

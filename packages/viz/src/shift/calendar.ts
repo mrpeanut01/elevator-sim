@@ -108,7 +108,7 @@ import {
 } from './events.js';
 import { scaledBuilding } from './growth.js';
 import { carsToDerate, type CarRef, type Incident } from './incidents.js';
-import { weekdayOf, type RunHorizon, type ShiftEvent, type ShiftEventId, type Weekday } from './types.js';
+import { dealtKeyOf, weekdayOf, type RunHorizon, type ShiftEvent, type ShiftEventId, type WeekState, type Weekday } from './types.js';
 import { levelWrinkleIdFor } from './weekLevels.js';
 import type { WeekOrderKey } from './weekOrders.js';
 
@@ -629,7 +629,7 @@ export function scheduledEventFor(
    * dealt the top's wrinkles (`weekLevels.ts#levelWrinkleIdFor`, wave AO lane DS-1, § D1400), so a
    * run is never built from a week the census does not deal.
    */
-  week?: WeekOrderKey,
+  week?: WeekOrderKey & Partial<Pick<WeekState, 'sandboxOf'>>,
   /*
    * **The wrinkle a mode already handed this day, which outranks everything above** — wave AO lane
    * AO-5, the post-AN panel's seat C, D4. A career day's event is the career's own
@@ -650,7 +650,11 @@ export function scheduledEventFor(
   const today = calendarDayFor(period, day, dayIdx);
   const booked = today?.shift.eventId;
   if (booked != null) return SHIFT_EVENTS[booked];
-  const ordered = week === undefined ? undefined : levelWrinkleIdFor(week, day, dayIdx);
+  /*
+   * A sandbox day's copy is dealt as the week it copied (wave AP lane AP-D2, § D1451): the post-AO
+   * panel's seat B ran week 2's Shift change Monday in the sandbox and met an ordinary day.
+   */
+  const ordered = week === undefined ? undefined : levelWrinkleIdFor(dealtKeyOf(week), day, dayIdx);
   const dealt = ordered === undefined ? undefined : eventOfDrawnId(ordered);
   return dealt ?? eventFor(day, dayIdx, horizon);
 }

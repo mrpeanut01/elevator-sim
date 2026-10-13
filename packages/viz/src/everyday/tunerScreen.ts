@@ -54,7 +54,6 @@ import {
   type TuneState,
 } from './tunerModel.js';
 import { speedValueFigure, type EverydayUnits } from './units.js';
-import { sandboxMoves } from './sandbox.js';
 
 const EYEBROW = `font:500 10.5px ${TYPE.mono};letter-spacing:.14em;color:${C.label};text-transform:uppercase`;
 
@@ -169,6 +168,27 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
   stripNote.style.cssText = `font-size:13px;color:${C.inkSoft};min-width:0;flex:1 1 320px;line-height:1.5`;
   strip.append(stripState, stripNote);
   root.append(strip);
+
+  /*
+   * ---- the day it copies: kept unless the player leaves it out ---- wave AP lane AP-D2,
+   * [§ D1451](../../../../DECISIONS.md), the post-AO panel's seat B (D1). A sandbox day runs the day
+   * it copies, its wrinkle and its booked cars, so a bigger car is judged against the morning that
+   * was played; this box is the one way to run it plain, and the stage and the close then say what
+   * was left out.
+   */
+  let keepDay = true;
+  const keep = el(doc, 'label', 'everyday-tuner-keep-day');
+  keep.style.cssText = `display:flex;align-items:center;gap:8px;font-size:13px;color:${C.ink};line-height:1.45`;
+  const keepBox = el(doc, 'input', 'everyday-tuner-keep-day-box');
+  keepBox.type = 'checkbox';
+  keepBox.checked = true;
+  keepBox.addEventListener('change', () => {
+    keepDay = keepBox.checked;
+    redraw();
+    context.refreshBar();
+  });
+  keep.append(keepBox, doc.createTextNode(COPY.keepDay));
+  root.append(keep);
 
   /* ---- the cards ---- */
   const cards = el(doc, 'div');
@@ -433,7 +453,7 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
        */
       /* § D1360: the bar is inert while an attempt stands; this is the press refusing as well. */
       if (dataHost.attemptHold() !== undefined) return;
-      const presses = tunePresses(standingBuilding, pattern, standing, tune);
+      const presses = { ...tunePresses(standingBuilding, pattern, standing, tune), plainDay: !keepDay };
       /*
        * **And the run is a sandbox day's whenever anything moved** — wave AO,
        * [§ D1368](../../../../DECISIONS.md). `runSandbox` parks the week behind a copy of its day and
@@ -442,8 +462,14 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
        * (`playDay`): an untouched tuner runs the day, and `startRun` here began no attempt, so the day
        * could be watched to its end from this screen and then begun again from the brief (§ D1218).
        */
-      if (sandboxMoves(presses)) dataHost.runSandbox(presses);
-      else dataHost.playDay();
+      /*
+       * **And an untouched tuner runs a sandbox day as well** — wave AP lane AP-D2,
+       * [§ D1451](../../../../DECISIONS.md), the post-AO panel's seat D (D8). The press used to be the
+       * brief's own `playDay` when nothing moved, which began the day's counted attempt with the house
+       * driving and nothing on this screen saying so. The counted day starts from its brief, where its
+       * driver is picked; a run from here never counts.
+       */
+      dataHost.runSandbox(presses);
       context.go('stage');
     },
     unmount: () => {

@@ -22,6 +22,7 @@ import {
   recordsWithDateCrowd,
   weekRecordFor,
   weekRecordLineOf,
+  WEEK_HELD_AWARD_CHIMES,
   weeksHeldLineOf,
   weeksHeldOf,
   type WeekRecord,
@@ -173,15 +174,25 @@ describe('the record carries forward and buys nothing — § D1230', () => {
     expect(weeksHeldOf(run([[4, 4], [2, 4], [4, 4]]))).toBe(1);
     /* A week with no target is never held, so it ends a run as a missed week does. */
     expect(weeksHeldOf(run([[4, 4], [0, 0]]))).toBe(0);
+    /*
+     * Wave AP lane AP-D2, the post-AO panel's seats A and D: the line said *It buys nothing* beside a
+     * held level that paid 10 chimes (§ D1402). Red before: the held arm named no award.
+     */
+    expect(WEEK_HELD_AWARD_CHIMES).toBe(10);
     expect(weeksHeldLineOf(run([[4, 4], [5, 4]]))).toBe(
-      'Weeks held on this tower: 2 in a row, each with its target met. A missed week ends the run. ' +
-        'It buys nothing, and no clock runs on it: a week counts when you close it, however long that takes.',
+      'Weeks held on this tower: 2 in a row, each with its target met. A held week pays 10 chimes the ' +
+        'first time its level of this tower’s week is held; holding that level again, or a longer run, ' +
+        'pays nothing more. A missed week ends the run, and no clock runs on it: a week counts when you ' +
+        'close it, however long that takes.',
     );
     expect(weeksHeldLineOf(run([[4, 4], [3, 4]]))).toBe(
       'Weeks held on this tower: none in a row, because the last week closed here missed its target. ' +
-        'A missed week ends the run. It buys nothing, and no clock runs on it: a week counts when you ' +
-        'close it, however long that takes.',
+        'A missed week ends the run, and no clock runs on it: a week counts when you close it, however ' +
+        'long that takes.',
     );
+    for (const line of [weeksHeldLineOf(run([[4, 4], [5, 4]])), weeksHeldLineOf(run([[4, 4], [3, 4]]))]) {
+      expect(line).not.toContain('buys nothing');
+    }
   });
 
   it('reads an older record’s run only where its counts settle it, and never overstates one', () => {

@@ -191,4 +191,61 @@ describe.skipIf(!HAS_BROWSER)('a sandbox day runs and cannot touch the week — 
       await page.close();
     }
   });
+
+  /*
+   * Wave AP lane AP-D2, [§ D1451](../../../../DECISIONS.md). The post-AO panel's seat D (D8): an
+   * untouched tuner's *Run it and watch* began the day's counted attempt with the house driving, under
+   * *the day still matches everyone else's*. Seat B (D1): a bigger car ran with no car D out and
+   * closed under *An ordinary day — nothing booked*, so its clear read as *bigger cars fixed it*.
+   * Red before: the untouched press's stage carried no sandbox sentence, and the changed tower's stage
+   * had no car D booked.
+   */
+  it('runs an untouched tuner as a sandbox day, and a bigger car on the day it copies, car D booked as the day had it', async () => {
+    const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
+    try {
+      await page.clock.setFixedTime(new Date(`${DATE}T12:00:00Z`));
+      await page.goto(origin, { waitUntil: 'load' });
+      await toMidtownsBrief(page);
+
+      /* Untouched: a sandbox day all the same, and the day that counts is not begun. */
+      await page.click('.everyday-brief-locked-go');
+      await page.waitForSelector('.everyday-tuner', { timeout: 15_000 });
+      expect(await textOf(page, '.everyday-tuner-state')).toMatch(/^Nothing changed yet — a sandbox day/u);
+      await page.locator('.everyday-bar-primary').click();
+      await page.waitForSelector('.everyday-stage-canvas', { timeout: 15_000 });
+      await page.waitForFunction(() => document.querySelector<HTMLElement>('.everyday-stage-start')?.style.display === '', undefined, {
+        timeout: 90_000,
+      });
+      expect(await textOf(page, '.everyday-screen')).toContain(PRACTICE_DAY_SENTENCES.practiceCrowd);
+      await page.locator('.everyday-bar-back').click();
+      await page.waitForSelector('.everyday-brief', { timeout: 15_000 });
+
+      /* A bigger car: the day's booking rides along, and the stage and the close say so. */
+      await page.click('.everyday-brief-locked-go');
+      await page.waitForSelector('.everyday-tuner', { timeout: 15_000 });
+      await page.locator('.everyday-tuner button:has-text("3000 lb")').first().click();
+      expect(await textOf(page, '.everyday-tuner-state')).toMatch(/^Sandbox/u);
+      await page.locator('.everyday-bar-primary').click();
+      await page.waitForSelector('.everyday-stage-canvas', { timeout: 15_000 });
+      await page.waitForFunction(() => document.querySelector<HTMLElement>('.everyday-stage-start')?.style.display === '', undefined, {
+        timeout: 90_000,
+      });
+      const stage = await textOf(page, '.everyday-screen');
+      expect(stage).toContain('Car D booked out 10:30–13:00');
+      expect(stage).toContain('This sandbox day keeps car D booked out of passenger service as the day had.');
+
+      await page.locator('.everyday-bar-primary').click();
+      const asStands = page.getByText('Close the day as it stands');
+      if (await asStands.isVisible().catch(() => false)) await asStands.click();
+      await page.waitForSelector('.everyday-report', { timeout: 90_000 });
+      expect(await textOf(page, '.everyday-report')).toContain('car D · out of passenger service 10:30–13:00');
+      expect(await page.locator('.everyday-report-sandbox').allTextContents()).toEqual([
+        'This sandbox day keeps car D booked out of passenger service as the day had.',
+        'Your week is where you left it, on Monday, which you have not closed.',
+      ]);
+      expect((await storedWeeks(page)).week?.history ?? []).toEqual([]);
+    } finally {
+      await page.close();
+    }
+  });
 });

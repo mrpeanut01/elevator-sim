@@ -500,7 +500,7 @@ export function contractLostSentenceOf(tower: CampaignTower): string | undefined
     difficulty.miss === 0
       ? `${difficulty.name.toLowerCase()} allows none`
       : `${difficulty.name.toLowerCase()} allows ${String(difficulty.miss)}`;
-  return `${String(tower.missed)} days missed, and ${allows}, so this contract is lost.`;
+  return `${String(tower.missed)} ${tower.missed === 1 ? 'day' : 'days'} missed, and ${allows}, so this contract is lost.`;
 }
 
 /**

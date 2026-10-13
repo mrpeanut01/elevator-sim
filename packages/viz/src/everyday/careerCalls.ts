@@ -165,6 +165,23 @@ export function careerDeciderOf(input: CareerCloseInput): DayDecider {
     : { kind: 'nothing', pressed: true, houseDrove: need === 'same', reads: yours };
 }
 
+/**
+ * **A career day's headline: the contract's mark, said as the contract's** — wave AP lane AP-D2,
+ * [§ D1452](../../../../DECISIONS.md), the post-AO panel's seat D (D10). The sheet headed *Shift
+ * cleared*, graded on the week's five goals, over a day the contract's four tests filed missed and a
+ * desk saying the contract was lost. The sheet is graded on the contract's tests now
+ * (`host.ts#closeDay` hands them to `dev/main.ts#closeShift`), and its headline names them, so the
+ * one verdict a player reads is the one the career files. A day too quiet to grade keeps the sheet's
+ * own words: the career files nothing for it.
+ */
+export const CAREER_VERDICT_LINES: Readonly<Record<'cleared' | 'missed', string>> = Object.freeze({
+  cleared: 'Cleared on the contract’s four tests',
+  missed: 'Missed on the contract’s four tests',
+});
+
+/** The goals heading over a career day's sheet: the contract's four, as the desk heads them. */
+export const CAREER_GOALS_HEADING = 'WHAT THE CONTRACT ASKED';
+
 /** A career run's mark in the account's words. */
 export const CAREER_MARK_WORDS: Readonly<Record<'cleared' | 'missed', string>> = Object.freeze({
   cleared: 'a cleared day on the contract’s tests',

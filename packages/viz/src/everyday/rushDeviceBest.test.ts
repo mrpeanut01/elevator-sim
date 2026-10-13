@@ -36,6 +36,7 @@ import {
 import { createRushDeviceStore } from './rushDeviceStore.js';
 import { createDeviceChimeStore } from './chimeStore.js';
 import { RUSH_SITTING_COPY } from './rushSitting.js';
+import { RUSH_FITTED_DEVICE_LINE, rushFittedLineOf } from './rushScreenModel.js';
 import { RUSH_HOUSE_TABLE, rushStandingsOf } from './rushHouse.js';
 import { browserResourcesFrom } from './rushHouse.test-helper.js';
 import type { RushSittingBody } from './rushSitting.js';
@@ -278,6 +279,7 @@ describe('a rush pre-fit bought on the device reaches the run and is never poste
     const host = createEverydayHost(bindings);
     /* The device charge runs before the press's first await, so the purchase is held on return. */
     if (buy) void host.spendChime('rush-prefit', 1);
+    fittedLine = rushFittedLineOf(host);
     const refusal = host.startRush();
     if (refusal !== undefined) throw new Error(refusal);
     const config = shiftRunConfigOf(resources, state);
@@ -292,9 +294,18 @@ describe('a rush pre-fit bought on the device reaches the run and is never poste
     };
   }
 
+  let fittedLine: string | undefined;
+
   it('fits the tower, moves the legs, and refuses the post with its reason', () => {
     const asBuilt = started(false);
+    expect(fittedLine).toBeUndefined();
     const fitted = started(true);
+    /*
+     * Wave AP lane AP-D2, the post-AO panel's seat D (D9): the setup screen's line said *posted to its
+     * own board* over this sitting, whose post is refused. Red before: it drew RUSH_FITTED_LINE.
+     */
+    expect(fittedLine).toBe(RUSH_FITTED_DEVICE_LINE);
+    expect(fittedLine).toContain('never posted');
     expect(asBuilt.fitted).toBe(false);
     expect(fitted.fitted).toBe(true);
     expect(fitted.legs).not.toBe(asBuilt.legs);

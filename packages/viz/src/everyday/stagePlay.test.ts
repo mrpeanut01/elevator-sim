@@ -308,6 +308,15 @@ describe('a clear pays once, flat, and unlocks nothing — § D1129 clause 4', (
     expect(practiceAt(undefined)).toBe(`${STAGE_PLAY_COPY.practice} ${SCENARIO_COPY.parNone}`);
     for (const par of [0, undefined]) expect(practiceAt(par)).not.toMatch(/earns the mark/u);
     expect(practiceAt(4)).toBe(stagePracticeLineOf(4));
+    /*
+     * Wave AP lane AP-D2, the post-AO panel's seat D (D9): once the kept clear met the par, the line
+     * still promised *earns the mark*. Red before: the kept cost was not read and the promise stood.
+     */
+    const practiceKept = (keptSpentUnits: number): string | undefined =>
+      stagePlayViewOf({ ...factsOf(stage, choice), parUnits: 4, clearedBefore: true, keptSpentUnits }, { kind: 'idle' }).practice;
+    expect(practiceKept(4)).toBe(`${STAGE_PLAY_COPY.practice} This stage has its mark: your clear cost 4 units, against a par of 4 units.`);
+    expect(practiceKept(3)).not.toMatch(/earns the mark/u);
+    expect(practiceKept(6)).toBe(`${STAGE_PLAY_COPY.practice} A clear at or under par, 4 units, earns the mark.`);
     expect(stagePlayViewOf(factsOf(stage, choice), { kind: 'idle' }).practice).toBeUndefined();
     /* And `verdictFactsOf` carries what the pressed settings cost. */
     expect(verdictFactsOf({ headline: '', goals: [], holdout: undefined, metOnTuningSeeds: true, cleared: true } as never, 'again', 3).spentUnits).toBe(3);

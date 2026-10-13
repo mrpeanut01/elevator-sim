@@ -1130,7 +1130,7 @@ const HOW_TO_PLAY: MenuGuide = Object.freeze({
           'does depend on is how much of the day you run — 80 kJ per ride delivered over a part of ' +
           'a day, and 350 kJ per ride delivered over a whole authored one, because a ' +
           'whole day includes the quiet hours where the same travel carries far fewer people. ' +
-          'There is no losing here. There is a line you are trying to bend upward.',
+          'A day that misses any one of the five is a missed day, and a week that clears too few of its days misses its target.',
         'Nothing is graded before the building wakes up: under 20 arrivals every goal reads a ' +
           'dash instead of a verdict, because a carried share over three riders is arithmetic ' +
           'rather than competence. The energy goal reads a dash until the day is over, because ' +

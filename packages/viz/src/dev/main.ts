@@ -5907,9 +5907,9 @@ function boot(ui: Elements, resources: BrowserResources): void {
       /* § D1239 — a skip at the call is an answer too, and its row counts all three. */
       measurePinnedCall();
     },
-    closeDay: () => {
+    closeDay: (grading) => {
       /* § D1239 — the Everyday stage's own close, the only one that files a scored attempt. */
-      closeShift('stage');
+      closeShift('stage', grading);
     },
     openRunTab: () => {
       context.openTab('run');
@@ -8047,8 +8047,17 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * tab and its export press. Wave AM, lane AM-B, [§ D1239](../../../../DECISIONS.md): a scored
    * attempt closes only by its own stage, and while one stands on this device an Engineer close banks
    * nothing into any week.
+   *
+   * `grading` is the goals the **sheet** is graded on where they are not the day's own five — wave
+   * AP lane AP-D2, [§ D1452](../../../../DECISIONS.md): a career day's report is graded on the
+   * contract's four tests (`everyday/host.ts#closeDay` hands them in), so its headline is the mark
+   * the career files. The week's outcome is still read against the five, so nothing the week keeps
+   * moves; only the sheet's verdict, rows and account follow the contract.
    */
-  function closeShift(via: 'stage' | 'engineer' = 'engineer'): void {
+  function closeShift(
+    via: 'stage' | 'engineer' = 'engineer',
+    grading?: { readonly goals: readonly ShiftGoal[] },
+  ): void {
     const recording = state.recording;
     if (recording === undefined || filedRunId === recording.runId) return;
     /*
@@ -8283,7 +8292,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
     filedReportInput = {
       recording,
       observations,
-      goals,
+      /* § D1452: a career day's sheet is graded on the contract's tests; every other sheet on the day's own. */
+      goals: grading?.goals ?? goals,
       week,
       practice,
       /* Which ground made it practice, so the sheet says the true one — § D1141. */

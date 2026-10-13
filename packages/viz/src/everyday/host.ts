@@ -276,6 +276,7 @@ import {
   type Observations,
   type RunHorizon,
   type ScenarioContract,
+  type ShiftGoal,
   type WeekState,
 } from '../shift/types.js';
 import { nextDay, rollWeek, wasGraded } from '../shift/week.js';
@@ -330,7 +331,9 @@ import { rememberDriver } from './driverMemory.js';
 import { REPLAY_COPY, replayBeforeOf, replayPatchOf, replayRestorePatchOf, replayableDay, type ReplayBefore } from './replay.js';
 import {
   sandboxBeforeOf,
+  sandboxCarriedLineOf,
   sandboxPatchOf,
+  sandboxWeekLineOf,
   sandboxRestorePatchOf,
   type SandboxBefore,
   type SandboxPresses,
@@ -1836,6 +1839,13 @@ export interface EverydayHost {
    */
   practiceOnStage?(): string | undefined;
 
+  /**
+   * **What a sandbox day kept of the day it copied, and where the week it stood over is** — wave AP
+   * lane AP-D2, [§ D1451](../../../../DECISIONS.md), drawn on the sandbox day's close beside its
+   * practice note. Empty while no sandbox day stands.
+   */
+  sandboxDayLines(): readonly string[];
+
   /** The stage has shown `recording` up to `atS` — § D1218, kept for a resume. */
   noteShown(recording: VizRecording, atS: number): void;
 
@@ -2320,6 +2330,14 @@ export interface EverydayHost {
   rushStartsFitted(): boolean;
 
   /**
+   * Whether the claims {@link rushStartsFitted} reads are this device's purchases, so a sitting that
+   * starts on them is never posted — [§ D1418](../../../../DECISIONS.md). The same expression the
+   * sitting's own `boughtOnDevice` is taken from at its first press, so the setup screen's line and
+   * the post's refusal cannot disagree (wave AP lane AP-D2).
+   */
+  rushBoughtOnDevice(): boolean;
+
+  /**
    * Buy one step of a modifier — GitHub issue **#372**, [§ D672](../../../../DECISIONS.md).
    *
    * The play surface's second verb. A sink id and a step count go out; a balance and a grant come
@@ -2646,8 +2664,11 @@ export interface EverydayHostBindings {
    * with the Engineer stage's own button — two would be two different runs from one press.
    */
   intervene(atS: number, change: RunInterventionConfig['change']): void;
-  /** `closeShift`, with all its gates. */
-  closeDay(): void;
+  /**
+   * `closeShift`, with all its gates. `grading` is the goals the sheet is graded on where they are not
+   * the day's own five: a career day's, the contract's four tests (wave AP lane AP-D2, § D1452).
+   */
+  closeDay(grading?: { readonly goals: readonly ShiftGoal[] }): void;
   /** Put the Engineer surface on its run tab — `MountContext.openTab('run')`. */
   openRunTab(): void;
   /** Merge a patch into the state and re-render — `MountContext.update`. */
@@ -3263,7 +3284,7 @@ export function createEverydayHost(
    * 1. **The date's crowd, noted on the tower's record**, when the day was filed on it, so no later
    *    day on this device is dealt it again (`shift/weekRecord.ts#dealtCrowdOf`).
    * 2. **The week, counted on the record**, when this close closed it: weeks closed, weeks met, and
-   *    the best week. It buys nothing.
+   *    the best week. The record buys nothing; a held week's award is item 4's.
    * 3. **A counted day that cleared pays `career-day-paid`, once.** `docs/38` § 1: *everything you
    *    finish earns chimes, in every mode*, and `data/chime-ledger.json`'s own note said a week
    *    contract's days *"already pay earn-career-day"*. They did not: this close returned before
@@ -3402,6 +3423,13 @@ export function createEverydayHost(
         readonly before: SandboxBefore;
         /** The recording that stood when the sandbox pressed — see {@link leaveSandbox}. */
         readonly recording: VizRecording | undefined;
+        /**
+         * What the sandbox day kept of the day and what it left out (`sandbox.ts#sandboxCarriedLineOf`),
+         * and where the week it stood over is (`#sandboxWeekLineOf`) — wave AP lane AP-D2, § D1451,
+         * said on its stage and its close.
+         */
+        readonly carried: string | undefined;
+        readonly weekLine: string;
       }
     | undefined;
   /**
@@ -3525,6 +3553,9 @@ export function createEverydayHost(
        */
       ...rushTopUpClaimsOf(from),
     ]);
+  /** {@link EverydayHost.rushBoughtOnDevice}: the sitting's `boughtOnDevice`, one expression for both readers. */
+  const rushBoughtOnDevice = (): boolean =>
+    b.rushModifiers === undefined && chimeHomeNow() === 'device' && rushClaims().length > 0;
   /** {@link EverydayHostBindings.chimeHome}, with its default — see there. */
   const chimeHomeNow = (): 'account' | 'device' | 'booting' =>
     b.chimeHome?.() ?? (b.spendChime === undefined ? 'device' : 'account');
@@ -4140,8 +4171,25 @@ export function createEverydayHost(
      */
     const practice = b.rehearsalCrowdFor?.(dealt.seed ?? b.state().seed);
     const crowd = practice === undefined ? dealt : { seed: practice };
-    sandboxSession = { before, recording: b.state().recording };
-    b.applyPatch({ ...crowd, ...shape, ...sandboxPatchOf({ ...b.state(), ...crowd, ...shape }, b.resources, presses) });
+    const standingDay: ViewerState = { ...b.state(), ...crowd, ...shape };
+    const patch = sandboxPatchOf(standingDay, b.resources, presses);
+    /*
+     * § D1451: what the sandbox day kept of the day and what it left out, off the two runs' own plans
+     * (a resolve each and no simulation), and where the week it stands over is. A plan that cannot
+     * be made says nothing rather than standing in the way of the run, which reports its own refusal.
+     */
+    let carried: string | undefined;
+    try {
+      carried = sandboxCarriedLineOf(
+        shiftRunConfigOf(b.resources, standingDay),
+        shiftRunConfigOf(b.resources, { ...standingDay, ...patch }),
+        presses.plainDay === true,
+      );
+    } catch {
+      carried = undefined;
+    }
+    sandboxSession = { before, recording: b.state().recording, carried, weekLine: sandboxWeekLineOf(before.week) };
+    b.applyPatch({ ...crowd, ...shape, ...patch });
     notifyCampaign();
     pressTodaysRun(() => {
       b.startRun();
@@ -4510,8 +4558,16 @@ export function createEverydayHost(
     attemptResumeAtS: (recording) => b.attemptResumeAtS?.(recording),
     practiceOnStage: () => {
       const ground = b.practiceOnStage?.();
-      return ground === undefined ? undefined : PRACTICE_DAY_SENTENCES[ground];
+      if (ground === undefined) return undefined;
+      /* § D1451: a sandbox day's stage also says what it kept of the day and what it left out. */
+      const carried = ground === 'sandbox' || ground === 'practiceCrowd' ? sandboxSession?.carried : undefined;
+      const sentence = PRACTICE_DAY_SENTENCES[ground];
+      return carried === undefined ? sentence : `${sentence} ${carried}`;
     },
+    sandboxDayLines: () =>
+      sandboxSession === undefined
+        ? []
+        : [...(sandboxSession.carried === undefined ? [] : [sandboxSession.carried]), sandboxSession.weekLine],
     noteShown: (recording, atS) => {
       b.noteAttemptShown?.(recording, atS);
     },
@@ -4573,7 +4629,15 @@ export function createEverydayHost(
       const towerId = campaignDayTowerId;
       const closedBefore = b.dayClosed();
       const historyBefore = b.state().week.history;
-      b.closeDay();
+      /*
+       * **One verdict for a career day** — wave AP lane AP-D2, [§ D1452](../../../../DECISIONS.md), the
+       * post-AO panel's seat D (D10). The sheet was graded on the week's five goals, so Garden
+       * Apartments' day 3 on Impossible headed *Shift cleared* while the contract's four tests filed
+       * it missed and the desk said the contract was lost. The sheet is graded on the contract's tests
+       * now, the same four `campaignDayVerdict` files the day by below, so its headline is that mark.
+       */
+      const careerTower = towerId === undefined ? undefined : towerById(career, towerId);
+      b.closeDay(careerTower === undefined ? undefined : { goals: campaignTestGoals(DIFFICULTIES[careerTower.difficultyId]) });
       if (!closedBefore && b.dayClosed()) fileScenarioDay(historyBefore);
       if (towerId === undefined || closedBefore || !b.dayClosed()) return;
       campaignDayTowerId = undefined;
@@ -5298,7 +5362,7 @@ export function createEverydayHost(
            * § D1418: a sitting that claims what this device bought stays on this device. Read with
            * the claims, once, because a sitting is one modifier set.
            */
-          boughtOnDevice: b.rushModifiers === undefined && chimeHomeNow() === 'device' && rushClaims().length > 0,
+          boughtOnDevice: rushBoughtOnDevice(),
           rounds: [],
           unsettledEndS: undefined,
           levels: rushStartLevelsOf(b.rushModifiers?.() ?? rushClaims()),
@@ -5425,6 +5489,7 @@ export function createEverydayHost(
     chimeTally: () =>
       chimeTallyOn !== undefined && chimeTallyOn.recording !== b.state().recording ? undefined : chimeTally,
     rushStartsFitted: () => rushClaims().some((claim) => claim.sinkId === RUSH_PREFIT_SINK_ID),
+    rushBoughtOnDevice,
     rushRebuild: () => rushRebuildInput(),
     pickRushRebuild: (priceId) => {
       const input = rushRebuildInput();

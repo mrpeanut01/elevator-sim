@@ -42,6 +42,14 @@
  * are played, and the gap is stated rather than guessed at.
  */
 
+import { chimeEarnTableOf, parseChimeLedger } from '@elevator-sim/core/browser';
+
+/*
+ * Named `chimeLedgerDocument` rather than `document`, for `boundaries.test.ts`' bare-global rule, as
+ * `scenario/par.ts` names it.
+ */
+import chimeLedgerDocument from '../../../../data/chime-ledger.json' with { type: 'json' };
+
 import { contractById } from './contracts.js';
 import type { WeekState } from './types.js';
 
@@ -177,11 +185,29 @@ export function weekRecordLineOf(record: WeekRecord): string | undefined {
 
 /**
  * What the run of weeks held is and is not, said beside it wherever it is drawn —
- * [§ D1253](../../../../DECISIONS.md): it buys nothing, and no clock runs on it.
+ * [§ D1253](../../../../DECISIONS.md): no clock runs on it. It also said *It buys nothing* until wave
+ * AP lane AP-D2 (the post-AO panel's seats A and D): since [§ D1402](../../../../DECISIONS.md) a held
+ * week pays {@link WEEK_HELD_AWARD_CHIMES} once per level, so the sentence sat beside a level that
+ * had just paid. The run's length still buys nothing more, which {@link WEEK_HELD_PAYS} says.
  */
 const WEEKS_HELD_NOTE =
-  'A missed week ends the run. It buys nothing, and no clock runs on it: a week counts when you ' +
-  'close it, however long that takes.';
+  'A missed week ends the run, and no clock runs on it: a week counts when you close it, however ' +
+  'long that takes.';
+
+/** `data/chime-ledger.json`'s `week-held` award (§ D1402), read once from the earn projection as `scenario/par.ts` reads its own. */
+export const WEEK_HELD_AWARD_CHIMES: number =
+  chimeEarnTableOf(parseChimeLedger(chimeLedgerDocument)).awards['week-held'] ?? 0;
+
+/**
+ * **What a held week paid, said once, where the run of weeks held is drawn** — wave AP lane AP-D2,
+ * [§ D1402](../../../../DECISIONS.md)'s award in the ledger's words: once per level of the tower's
+ * week, keyed by the level, so holding a level again or a longer run pays nothing more.
+ */
+export const WEEK_HELD_PAYS: string =
+  WEEK_HELD_AWARD_CHIMES > 0
+    ? `A held week pays ${String(WEEK_HELD_AWARD_CHIMES)} ${WEEK_HELD_AWARD_CHIMES === 1 ? 'chime' : 'chimes'} the first ` +
+      'time its level of this tower’s week is held; holding that level again, or a longer run, pays nothing more.'
+    : 'A held week pays nothing in chimes.';
 
 /**
  * **Weeks held on this tower, as one line**, or `undefined` before a week on it has closed or
@@ -191,9 +217,8 @@ const WEEKS_HELD_NOTE =
 export function weeksHeldLineOf(record: WeekRecord): string | undefined {
   const held = weeksHeldOf(record);
   if (record.closed === 0 || held === undefined) return undefined;
-  const run =
-    held === 0
-      ? 'Weeks held on this tower: none in a row, because the last week closed here missed its target.'
-      : `Weeks held on this tower: ${String(held)} in a row, each with its target met.`;
-  return `${run} ${WEEKS_HELD_NOTE}`;
+  if (held === 0) {
+    return `Weeks held on this tower: none in a row, because the last week closed here missed its target. ${WEEKS_HELD_NOTE}`;
+  }
+  return `Weeks held on this tower: ${String(held)} in a row, each with its target met. ${WEEK_HELD_PAYS} ${WEEKS_HELD_NOTE}`;
 }

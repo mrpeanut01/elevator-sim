@@ -46,6 +46,7 @@ import { probabilityWordIn } from '../campaign/words.js';
 import { DATA_DIR } from '../fixtures.test-helper.js';
 import { GOAL_BARS, goalsForDay } from '../shift/goals.js';
 import { WAKE_UP_ARRIVALS } from '../shift/types.js';
+import { RAIL_NOTE_PLAYER } from '../watch/shell.js';
 
 import { catalogueOf, type CatalogueSource } from './catalogue.js';
 import { canStart, initialMenuState, navigate, partsFor } from './menu.js';
@@ -170,6 +171,20 @@ describe('the menu offers a how-to-play entry', () => {
 /* -------------------------------------------------------------------------- *
  * It describes the product that exists — every list derived, never written down
  * -------------------------------------------------------------------------- */
+
+/*
+ * Wave AP lane AP-D2, the post-AO panel's seats A and B: *What a shift is* said *There is no losing
+ * here* and the rail's note under the week's bars said *No losing*, beside a day the sheet files
+ * missed and a week that can miss its target. Red before: both carried the phrase.
+ */
+describe('the Engineer surface says a day can be lost', () => {
+  it('claims no losing nowhere in the guide or under the rail’s bars', async () => {
+    const prose = proseOf(await guide());
+    expect(prose).not.toMatch(/no losing/iu);
+    expect(prose).toContain('is a missed day');
+    expect(RAIL_NOTE_PLAYER).not.toMatch(/no losing/iu);
+  });
+});
 
 describe('the guide describes the shipped product, in both directions', () => {
   it('introduces every destination the root menu offers', async () => {
