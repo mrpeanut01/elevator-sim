@@ -550,6 +550,10 @@ const FOLDS_WITHOUT_DRAWING: Readonly<Record<string, string>> = Object.freeze({
   'dev/main.ts':
     'files the readings into `outcomeOf` on close. It draws no row; `dev/leftRail.ts` and ' +
     '`dev/reportPanel.ts` are where this shell puts a goal on screen.',
+  'shift/dayCallMaxima.ts':
+    'records each answer\'s queue and worst-wait readings for the call row (§ D1433, wave AO). It ' +
+    'draws nothing itself. The row that draws them does not yet put the riders who gave up beside ' +
+    'them; that is recorded as wave AO\'s follow-up rather than claimed here.',
   'everyday/host.ts':
     'the one fold behind `goalsAt`/`goalsToday`. It hands readings — and, since #456, the fold ' +
     'they were graded against — to the screens; it draws nothing itself.',

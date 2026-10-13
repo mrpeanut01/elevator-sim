@@ -219,7 +219,12 @@ describe('§ D219 on the spend verb — one sink is sold, and the rest say why n
      *   `core`'s `chimeGrantUnits` precisely so that the charging side's arithmetic stays where the
      *   case above keeps it.
      *
-     * A sixth arrival has to come here and say which of those it is.
+     * - `everyday/deviceChimes.ts` — wave AO, [§ D1418](../../../../DECISIONS.md): with no server or
+     *   no sign-in, the ledger's sinks are bought from the device tally at the ledger's own price
+     *   (`chimeSpendPrice`) and grant the sink's authored units. It is the device's half of the
+     *   server's spend route, and a sitting it fits is never posted.
+     *
+     * A seventh arrival has to come here and say which of those it is.
      */
     const applying = /grantUnits|chimeSpendPrice|chimeGrantUnits|chimes\/spend/u;
     const reaching = (await vizSourceFiles())
@@ -229,12 +234,13 @@ describe('§ D219 on the spend verb — one sink is sold, and the rest say why n
       .sort((a, b) => a.localeCompare(b));
     expect(
       reaching,
-      'a module touches a granted unit and is not one of the five this seam runs through. Either ' +
+      'a module touches a granted unit and is not one of the six this seam runs through. Either ' +
         'it is a second spend surface, or this list is stale — say which.',
     ).toEqual([
       'campaign/career.ts',
       'dev/main.ts',
       'everyday/chimesPanel.ts',
+      'everyday/deviceChimes.ts',
       'everyday/host.ts',
       'menu/client.ts',
     ]);
@@ -341,8 +347,15 @@ describe('the device tally spends on one thing, through one module — issue #57
       .filter((file) => file.id !== 'everyday/chimeStore.ts')
       .filter((file) => charging.test(file.code))
       .map((file) => file.id);
-    expect(reaching, 'a second module can take a chime off this device').toEqual([
+    /*
+     * Two since wave AO's [§ D1419](../../../../DECISIONS.md): the stage page sells a rung from the
+     * device tally where the census count rises, at the price schedule's own row for that rung, as the
+     * fix-it case does for its own. Two pages, one store and one schedule, so still one answer to what a
+     * rung costs.
+     */
+    expect(reaching.sort(), 'a third module can take a chime off this device').toEqual([
       'everyday/fixitScreen.ts',
+      'everyday/stagePlayScreen.ts',
     ]);
   });
 

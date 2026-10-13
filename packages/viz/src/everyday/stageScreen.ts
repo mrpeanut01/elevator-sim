@@ -1655,6 +1655,24 @@ function mountStage(
    * After an answer the card leaves the document flow, and focus would fall to the body; it goes to
    * the transport instead, which is what the answer set moving.
    */
+  /**
+   * **A card taller than the screen region scrolls inside itself** — wave AO, joined at integration.
+   * Lane P2-1's answer lines (§ D1432) made the card about 450 px tall, and at 390×844 the screen
+   * region shows about 336, so `nearest` could bring only its foot into view and the question sat
+   * above the region. The card keeps its height where it fits; where it does not, it is capped at the
+   * region's own height and scrolls, so the question, the focus and every answer stay in the region.
+   */
+  function fitCallCardToRegion(): void {
+    callCard.style.maxHeight = '';
+    callCard.style.overflowY = '';
+    const region = callCard.closest<HTMLElement>('.everyday-screen');
+    if (region === null) return;
+    const room = region.clientHeight - 16;
+    if (room > 0 && callCard.offsetHeight > room) {
+      callCard.style.maxHeight = `${String(room)}px`;
+      callCard.style.overflowY = 'auto';
+    }
+  }
   function showCallCard(shown: boolean): void {
     const appearing = shown && callCard.hidden;
     const leaving = !shown && !callCard.hidden;
@@ -1666,6 +1684,7 @@ function mountStage(
       skipAsk.hidden = true;
     }
     if (appearing) {
+      fitCallCardToRegion();
       callCard.scrollIntoView({ block: 'nearest', inline: 'nearest' });
       callCard.focus({ preventScroll: true });
     } else if (hadFocus) {

@@ -129,6 +129,10 @@ const ID_MOVERS: Readonly<Record<string, string>> = Object.freeze({
     '`<select>` — all three move to a building the player named, never to a copy of one.',
   'dev/rightRail.ts': 'the rail’s building picker: the same named-selection case.',
   'menu/enterFreePlay.ts': 'free play’s own selection — again a building the player named.',
+  'everyday/rushDeviceBest.ts':
+    'replays the sitting this device kept (§ D1420, wave AO) on a state it builds itself, ' +
+    '`withBuilding` over a fresh `initialState`, and never on the player\'s own state, so no window ' +
+    'the player reads moves.',
   'everyday/host.ts':
     'declares and implements `applyBuildingSpec`, the Everyday port onto `stateRunningSaved`, and ' +
     '`runSandbox`, which presses `everyday/sandbox.ts#sandboxPatchOf` (wave AO, § D1368).',
