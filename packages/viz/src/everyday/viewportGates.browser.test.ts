@@ -176,6 +176,7 @@ import {
   HAS_BROWSER,
   enterEverydayStage,
   openPage,
+  leaveLobbyIfShown,
   startShippedSite,
   type ShippedSite,
 } from '../dev/browserTier.test-helper.js';
@@ -461,6 +462,8 @@ async function coldLoad(width: number, height: number): Promise<Page> {
     undefined,
     { timeout: 30_000 },
   );
+  /* § D1445: a cold launch opens the lobby; its *Main menu* is the player's way to the front door. */
+  await leaveLobbyIfShown(page);
   await page.waitForSelector('.everyday-bar-primary');
   /* One frame for the mount's first draw, the same settle `deadControls.browser.test.ts` takes. */
   await page.waitForTimeout(600);

@@ -183,7 +183,7 @@ const SCREEN_MODULES: Readonly<Partial<Record<EverydayScreen, EverydayScreenModu
   });
 
 /** The one screen the shell itself provides — see the module docstring. */
-const SHELL_OWNED: readonly EverydayScreen[] = Object.freeze(['menu']);
+const SHELL_OWNED: readonly EverydayScreen[] = Object.freeze(['menu', 'lobby']);
 
 /**
  * The honest subset of {@link EVERYDAY_SCREENS}: the keys a player can actually enter.
@@ -207,7 +207,7 @@ export function screenModuleFor(screen: EverydayScreen): EverydayScreenModule | 
 }
 
 /** How the shell routes a key. One decision, taken here so it can be tested without a document. */
-export type EverydayRoute = 'menu' | 'screen' | 'refusal';
+export type EverydayRoute = 'menu' | 'lobby' | 'screen' | 'refusal';
 
 /**
  * `menu` draws the shell's own front door; a registered key mounts its module; everything else
@@ -227,6 +227,8 @@ export type EverydayRoute = 'menu' | 'screen' | 'refusal';
  */
 export function routeFor(screen: EverydayScreen): EverydayRoute {
   if (screen === 'menu') return 'menu';
+  /* § D1445: the lobby draws before the host publishes, so the shell routes it as it does the menu. */
+  if (screen === 'lobby') return 'lobby';
   return SCREEN_MODULES[screen] !== undefined ? 'screen' : 'refusal';
 }
 
@@ -320,6 +322,7 @@ export function unbuiltReasonFor(screen: EverydayScreen): string {
  */
 export const SCREEN_NAMES: Readonly<Record<EverydayScreen, string>> = Object.freeze({
   menu: 'Main menu',
+  lobby: 'The lobby',
   landing: 'What this is',
   tutorial: 'How this works',
   collapse: 'Watch it come apart',

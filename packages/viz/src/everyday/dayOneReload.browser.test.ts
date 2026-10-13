@@ -28,6 +28,7 @@ import {
   leaveTutorialIfOffered,
   openEverydayBrief,
   openPage,
+  skipTheLobby,
   startShippedSite,
   type ShippedSite,
 } from '../dev/browserTier.test-helper.js';
@@ -54,6 +55,7 @@ const DATE = '2026-10-10';
 describe.skipIf(!HAS_BROWSER)('a reload with the first day begun — § D1369', () => {
   it('opens on the picker with Continue your week, and the tile leads back to Resume', async () => {
     const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
+    await skipTheLobby(page);
     try {
       await page.clock.setFixedTime(new Date(`${DATE}T12:00:00Z`));
       await page.goto(origin, { waitUntil: 'load' });
@@ -101,6 +103,7 @@ describe.skipIf(!HAS_BROWSER)('a reload with the first day begun — § D1369', 
 
   it('still offers a genuine first arrival the landing page — the gate moved only for a begun day', async () => {
     const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
+    await skipTheLobby(page);
     try {
       await page.clock.setFixedTime(new Date(`${DATE}T12:00:00Z`));
       await page.goto(origin, { waitUntil: 'load' });

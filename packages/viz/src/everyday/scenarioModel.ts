@@ -231,8 +231,11 @@ export function stageParLineOf(parUnits: number | undefined, spentUnits: number 
  * The ten campaign stages are **not** here, and the split is the one the shapes above argue for:
  * these two are a press and nothing else, and a stage may be a press or a refusal depending on a
  * measurement. See {@link ScenarioPathRow}.
+ *
+ * Exported because the lobby's floor 5 is the today row (`lobbyModel.ts`), and a second copy of its
+ * words would be a second answer to what today's scenario is.
  */
-const ENTRIES: readonly ScenarioEntry[] = Object.freeze([
+export const SCENARIO_ENTRIES: readonly ScenarioEntry[] = Object.freeze([
   Object.freeze({
     id: 'today',
     title: "Today's scenario",
@@ -410,7 +413,7 @@ export function scenarioHubViewOf(
     eyebrow: SCENARIO_COPY.eyebrow,
     title: SCENARIO_COPY.title,
     lede: SCENARIO_COPY.lede,
-    entries: ENTRIES,
+    entries: SCENARIO_ENTRIES,
     path: view,
     absences: Object.freeze([
       ...SCENARIO_ABSENCES,

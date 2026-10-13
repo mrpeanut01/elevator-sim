@@ -22,6 +22,7 @@ import {
   HAS_BROWSER,
   leaveTutorialIfOffered,
   openPage,
+  leaveLobbyIfShown,
   startShippedSite,
   type ShippedSite,
 } from '../dev/browserTier.test-helper.js';
@@ -60,11 +61,15 @@ async function coldLoad(): Promise<Page> {
     undefined,
     { timeout: 30_000 },
   );
+  /* § D1445: a cold launch opens the lobby, which steps the rail aside; *Main menu* brings it back. */
+  await leaveLobbyIfShown(page);
   return page;
 }
 
 /** The rail's bordered gear row — § 3.2's one Settings destination. */
 async function openSettings(page: Page): Promise<void> {
+  /* A reload opens the lobby again (§ D1445), so the rail is reached through its *Main menu*. */
+  await leaveLobbyIfShown(page);
   await page.click('.everyday-rail-settings');
   await page.waitForSelector('.everyday-settings');
 }

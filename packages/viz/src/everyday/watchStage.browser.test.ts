@@ -47,6 +47,7 @@ import {
   openPage,
   startShippedSite,
   type ShippedSite,
+  leaveLobbyIfShown,
 } from '../dev/browserTier.test-helper.js';
 
 let site: ShippedSite;
@@ -102,6 +103,8 @@ async function openEveryday(): Promise<Page> {
     undefined,
     { timeout: 30_000 },
   );
+  /* § D1445: a cold launch opens the lobby, which steps the rail aside; *Main menu* brings it back. */
+  await leaveLobbyIfShown(page);
   return page;
 }
 

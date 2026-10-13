@@ -40,6 +40,7 @@ import {
   leaveTutorialIfOffered,
   openEverydayDoor,
   openPage,
+  skipTheLobby,
   startShippedSite,
   type ShippedSite,
 } from '../dev/browserTier.test-helper.js';
@@ -103,6 +104,7 @@ async function backToTheDoor(page: Page): Promise<void> {
 describe.skipIf(!HAS_BROWSER)('one record of the day', () => {
   it('keeps a link’s crowd out of a week under way — § D1141', async () => {
     const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
+    await skipTheLobby(page);
     try {
       /* ---- a fresh device closes its first day ---- */
       await load(page, '');
@@ -147,6 +149,7 @@ describe.skipIf(!HAS_BROWSER)('one record of the day', () => {
 
   it('lets a moved week open on its own Monday — § D1142', async () => {
     const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
+    await skipTheLobby(page);
     try {
       await load(page, '');
       await leaveTutorialIfOffered(page);
@@ -176,6 +179,7 @@ describe.skipIf(!HAS_BROWSER)('one record of the day', () => {
 
   it('watches a banked day from *Your week*, opened at its call — § D1139, § D1140', async () => {
     const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
+    await skipTheLobby(page);
     try {
       await load(page, '');
       await leaveTutorialIfOffered(page);
@@ -208,6 +212,7 @@ describe.skipIf(!HAS_BROWSER)('one record of the day', () => {
 
   it('keeps a returning player off the landing page after the week moved and the page reloaded — § D1143', async () => {
     const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
+    await skipTheLobby(page);
     try {
       await load(page, '');
       await leaveTutorialIfOffered(page);

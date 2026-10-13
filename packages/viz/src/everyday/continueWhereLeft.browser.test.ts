@@ -36,6 +36,7 @@ import {
   openPage,
   startShippedSite,
   type ShippedSite,
+  leaveLobbyIfShown,
 } from '../dev/browserTier.test-helper.js';
 import { ATTEMPT_ENGINEER_WATCHES_ONLY } from '../shift/banking.js';
 import { STAGE_CALL_COPY } from './stageCall.js';
@@ -159,6 +160,14 @@ describe.skipIf(!HAS_BROWSER)('Continue lands where you left — wave AO, lane A
       expect(focused, 'focus left the strip for the covered page').toContain('everyday-bar-confirm-stay');
       await page.reload({ waitUntil: 'load' });
       await settle(page);
+
+      /*
+       * § D1445: the reload opens the lobby, which offers the same *Continue* the menu's tile does,
+       * in the same words. Checked here, then left by *Main menu* for the tile this case is about.
+       */
+      await page.waitForSelector('.everyday-lobby-continue', { state: 'visible', timeout: 30_000 });
+      expect(await textOf(page, '.everyday-lobby-continue')).toContain(`left at ${atCall.clock}`);
+      await leaveLobbyIfShown(page);
 
       /* Red before: no entry at all on a first day, and on a later day the entry opened the door. */
       await page.waitForSelector('.everyday-continue-week', { timeout: 15_000 });

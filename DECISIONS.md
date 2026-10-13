@@ -34411,6 +34411,8 @@ unmoved. The range event has no equivalent writer yet; § D523 says whose questi
 > **Status 2026-09-10: AMENDED by [§ D535](#d535).** Clause 2's whole editor is every declared dial less the weight-set selector and the arrival predictor, which no scenario sells at any price; per-scenario scarcity is still a price, never a removed control. See [`docs/39`](docs/39-decisions-in-force.md).
 >
 > **Status 2026-09-19: NARROWED by [§ D706](#d706)** *(agent session, delegated authority — not the product owner)*. Clause 2's retirement stands and is a retirement from the screen rather than from the file: the diagnosed repair stays in `data/` as the scenario's pinned witness, the five decoys survive as prices in the one schedule, the diagnosis is not retired, and all three retirements wait for the editor that can write the answers — measured, 1 of 18 today. See [`docs/39`](docs/39-decisions-in-force.md).
+>
+> **Status 2026-10-13: AMENDED by [§ D1445](#d1445).** A cold launch opens the lobby before the menu, unless Settings says to skip it; its car panel lists Scenario, Career and Rush first, in the menu's own words. See [`docs/39`](docs/39-decisions-in-force.md).
 
 **Date: 2026-09-06 · Owner: product owner · Rules on: [`docs/38`](docs/38-what-the-game-is.md), [§ D373](#d373), [§ D477](#d477), [§ D354](#d354), [§ D497](#d497), [§ D514](#d514), [§ D515](#d515), `docs/32` § 1.2 and GD4, `docs/23` § 4, `docs/16` S5's `ranked` row, the design handoff §§ 5 and 10, GitHub issues #217 and #220.**
 
@@ -34712,6 +34714,8 @@ The tutorial [§ D529](#d529) builds is **outside this curve** and is asserted t
 ---
 
 ## D529 — The first session is a two-screen tutorial, and a worked answer is permitted there and nowhere else
+
+> **Status 2026-10-13: AMENDED by [§ D1445](#d1445).** A first visit meets the lobby rather than the landing page, and the walkthrough is floor B on its panel; the landing page and its call to action are one press away and unchanged. See [`docs/39`](docs/39-decisions-in-force.md).
 
 **Date: 2026-09-06 · Owner: product owner · Rules on: [`docs/38`](docs/38-what-the-game-is.md) § 2.1, [§ D525](#d525) clauses 2 and 4, [§ D476](#d476), [§ D372](#d372), [§ D515](#d515), `docs/35` § 8.1's `PM-DOOR`, GitHub issues #210, #270, #380.**
 
@@ -52681,3 +52685,36 @@ before: `watching`), a chip after the loss stands, one before it does not, a cal
 `everyday/lostDay.browser.test.ts` on the built bundle, Crown Hotel on 2026-10-05: the stage stops on
 the card with *End the day* focused and the clock still; *Watch the rest* plays on under the `lost`
 line, raises no call, never stops on the card again, and reaches the day's end with no report filed.
+
+## D1445 — the lobby opens every cold launch, its panel follows § D525, and the tutorial is the basement
+
+> **Taken 2026-10-13 by the product owner**, answering two questions put to them while the lobby
+> handoff (`docs/design/design_handoff_lobby_intro/`) was being built. **Amends
+> [§ D525](#d525)'s front door** (a screen now comes before the menu on every visit) and **moves
+> [§ D529](#d529) clause 1's sequence**: a first visitor meets the lobby rather than the landing page,
+> and the walkthrough is a floor on its panel rather than the landing page's call to action. Reversing
+> it is Settings → *Skip the lobby*, which restores the old front door exactly.
+
+**Why an entry.** It moves two recorded rulings, binds `everyday/shell.ts`, `everyday/rail.ts`,
+`everyday/settingsView.ts` and the browser tier's shared route to the menu, and refuses part of a
+handoff the repository vendors.
+
+**The ruling.** A cold launch opens `lobby`, the shell's own route beside the menu, unless
+`lobbyStore.ts` says to skip it. *Main menu* in game still goes to the menu and never replays the
+lobby. The panel keeps the handoff's look, timings, sounds and door behaviour, and re-reads its floor
+map under § D525: 8 Scenario, 7 Career, 6 Rush, 5 today's scenario, each in the words the menu tile or
+the Scenario hub already uses, then the handoff's 4 to L, and **B, *How this works***, the tutorial.
+The handoff's four retired tile names are not drawn. The lobby spends the first-arrival offer, so a
+first visitor is told on the in-car display where B is and is never bounced to the landing page; the
+landing page stays one press away on the lobby and on the rail. A returning player mid-week is
+offered the menu's own *Continue your week* on the lobby, in its words and through the same press, so
+the lobby never costs a quick resume. The Engineer key steps out onto the
+floor's screen and then crosses to the Engineer surface at its own menu, because that surface has no
+per-floor screens; the arrival note says so. Auto-close is the handoff's 6 s with no setting yet, and
+auto-handoff is off.
+
+**What holds it.** `everyday/lobbyModel.test.ts`: every floor opens a registered screen, the play
+floors read `modes.ts` and `scenarioModel.ts` word for word, no retired name is drawn, B is the
+tutorial below L, and the door machine's CALL, pick, CLOSE, OPEN, HOLD, countdown, ride and ride-back
+behave as the handoff's table says. The browser tier reaches the menu through the lobby's own *Main
+menu* (`leaveTutorialIfOffered`) and the landing page through its *What this is*.

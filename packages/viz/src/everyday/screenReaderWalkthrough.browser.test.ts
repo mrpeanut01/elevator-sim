@@ -547,7 +547,7 @@ async function coldLoad(): Promise<Page> {
     undefined,
     { timeout: 30_000 },
   );
-  await page.waitForSelector('.everyday-landing, .everyday-tutorial, .everyday-mode[data-screen]', {
+  await page.waitForSelector('.everyday-lobby, .everyday-landing, .everyday-tutorial, .everyday-mode[data-screen]', {
     timeout: 30_000,
   });
   return page;

@@ -62,6 +62,17 @@
 export const EVERYDAY_SCREENS = [
   'menu',
   /*
+   * **The lobby** — the elevator cold-open, [§ D1445](../../../../DECISIONS.md). Every cold launch
+   * opens on it unless Settings says to skip it, and its car operating panel is a mode picker whose
+   * floors are screens below. Like `menu` it is the shell's own route rather than a registered
+   * module, because it draws before the host has published and has nothing to wait for.
+   *
+   * **Four keys past § 4's seventeen**, on the argument the landing page's entry makes: the handoff
+   * this screen comes from (`docs/design/design_handoff_lobby_intro/`) specifies a screen that
+   * comes before the front door, and there is no surface for it to be a state of.
+   */
+  'lobby',
+  /*
    * The landing page (GitHub issue #244), listed straight after the root because it sits **before**
    * it: a visitor arriving from a link meets this and then the menu, where a returning player meets
    * the menu directly.
@@ -198,7 +209,12 @@ export interface EverydayState {
   readonly modePick?: EverydayModePick | undefined;
 }
 
-/** The root, named rather than assumed — GAMEPLAY § 3.5. */
+/**
+ * The root, named rather than assumed — GAMEPLAY § 3.5.
+ *
+ * Still the menu after § D1445: the lobby is where a cold launch *starts*, and the root is where
+ * *Main menu* goes back to. The handoff says the lobby is not replayed on every return.
+ */
 export const EVERYDAY_ROOT: EverydayScreen = 'menu';
 
 /* -------------------------------------------------------------------------- *

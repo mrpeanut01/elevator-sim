@@ -42,6 +42,7 @@ import {
   leaveTutorialIfOffered,
   openEverydayDoor,
   openPage,
+  skipTheLobby,
   returnToEverydayMode,
   startShippedSite,
   type ShippedSite,
@@ -77,6 +78,7 @@ const RUN_IDLE = 'Run this shift';
  */
 async function coldLoad(): Promise<Page> {
   const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
+  await skipTheLobby(page);
   await page.goto(`${origin}?building=garden-apartments&seed=424242&duration=300`, {
     waitUntil: 'load',
   });
