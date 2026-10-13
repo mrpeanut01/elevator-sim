@@ -55,9 +55,11 @@ import {
   type EverydayReportView,
   type HonestyPart,
   FIGURE_NOTE_HANDLE,
+  REPORT_PRACTICE_AGAIN,
   WEEK_SHEET_STEP,
   figureNotePartsOf,
 } from './reportView.js';
+import { PRESS_CALL_ROW_ID } from '../shift/callRow.js';
 
 const BASIS: ReportBasis = Object.freeze({
   buildingId: 'chancery-house',
@@ -529,6 +531,26 @@ describe('what this screen adds on top of the sheet', () => {
     expect(viewOf({ career: CAREER }).tomorrow?.note).toBe('Runs the next day of this contract. You stay in the career.');
   });
 
+  /*
+   * The post-AN panel's seat C, D2, wave AO lane AO-5, § D1392: the sheet of the day that spends the
+   * allowance goes to the desk, where the month is started again, and never to a renewal a lost
+   * contract is not offered. The sentence is `campaign/career.ts#contractLostSentenceOf`'s.
+   */
+  it('sends a lost contract to the desk, ahead of a renewal and of the next day — § D1392', () => {
+    const lost = '4 days missed, and standard allows 3, so this contract is lost.';
+    for (const career of [
+      { ...CAREER, day: 21, canRunAnother: false, renewalDue: false, contractLost: lost },
+      { ...CAREER, day: 9, canRunAnother: false, renewalDue: false, contractLost: lost },
+    ]) {
+      const step = viewOf({ career }).tomorrow;
+      expect(step?.goes).toBe('career-desk');
+      expect(step?.label).toBe('Open the desk at Garden Apartments');
+      expect(step?.note).toContain(lost);
+      expect(step?.note).toContain('No more of its days run');
+      expect(step?.label).not.toContain('renewal');
+    }
+  });
+
   it('leaves every non-career caller on the daily arm — #577’s other polarity', () => {
     // Passing nothing is *this is not a career day*, which is what the corpus, the replay and the
     // daily loop all do. A repair that had made the career arm the default would fail here.
@@ -906,5 +928,59 @@ describe('a figure card’s note leads with its first sentence and folds the res
     /* Non-vacuity: at least one card on a real sheet is over the budget, or the fold is decoration. */
     expect(shaped.figures.some((cell) => figureNotePartsOf(cell.note).rest !== undefined)).toBe(true);
     expect(FIGURE_NOTE_HANDLE.length).toBeGreaterThan(3);
+  });
+});
+
+/*
+ * Wave AO, lane AO-4, § D1388, the post-AN panel's seat D: *Take this call again* is drawn only on the
+ * pinned Monday, so practising a day an ordinary call decided was three screens deep. The close
+ * offers today again as practice wherever it names the call that decided the day, and nowhere else.
+ */
+describe('today again, as practice, beside the call that decided it — wave AO, lane AO-4', () => {
+  const week = closeDay(
+    openWeek('c2'),
+    outcomeOf({
+      day: 1,
+      dayIdx: 0,
+      eventId: 'ordinary',
+      arrived: 400,
+      carried: 380,
+      minutePct: 90,
+      readings: [],
+      record: null,
+      recordRefusal: null,
+    }),
+  );
+  const decided = 'The 10:40 call decided today: you chose leave them, and park them would have cleared it.';
+
+  it('is offered on the close of a counted day an ordinary call decided', () => {
+    const view = viewOf({ report: sheetOf({ decidingCall: decided, callDecided: true }), week });
+    expect(view.close?.call).toBe(decided);
+    expect(view.practiceAgain).toEqual(REPORT_PRACTICE_AGAIN);
+    /* It says it is the whole day and that it banks nothing, and never that it is the call alone. */
+    expect(REPORT_PRACTICE_AGAIN.label).not.toMatch(/call/iu);
+    expect(REPORT_PRACTICE_AGAIN.note).toMatch(/banks nothing/u);
+  });
+
+  it('is not offered where no call decided the day, on a practice close, a career sheet or with no week', () => {
+    expect(viewOf({ report: sheetOf({ decidingCall: 'No call decided today.', callDecided: false }), week }).practiceAgain).toBeUndefined();
+    expect(viewOf({ report: sheetOf({ decidingCall: decided, callDecided: true, practiceNote: 'Practice.' }), week }).practiceAgain).toBeUndefined();
+    expect(
+      viewOf({
+        report: sheetOf({ decidingCall: decided, callDecided: true }),
+        week,
+        career: { buildingName: 'Garden Apartments', day: 4, canRunAnother: true, renewalDue: false },
+      }).practiceAgain,
+    ).toBeUndefined();
+    expect(viewOf({ report: sheetOf({ decidingCall: decided, callDecided: true }) }).practiceAgain).toBeUndefined();
+  });
+
+  it('leaves a pinned day to its own *Take this call again*', () => {
+    const pinned = sheetOf({ decidingCall: decided, callDecided: true });
+    const withRow = {
+      ...pinned,
+      diagnosis: [...pinned.diagnosis, { id: PRESS_CALL_ROW_ID, when: '10:40', what: 'The stage called the day', why: 'At 10:40.', tone: 'plain' as const }],
+    };
+    expect(viewOf({ report: withRow, week }).practiceAgain).toBeUndefined();
   });
 });

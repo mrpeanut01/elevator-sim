@@ -31853,6 +31853,8 @@ measurement rather than by preference, and it may turn out to be small.
 
 ## D476 — a first-run cover conditioned on derived state is not the override non-goal 10 forbids
 
+> **Status 2026-10-10: WHAT THE GATE READS AMENDED by [§ D1369](#d1369)** (an agent ruling). A day begun, an attempt standing on the week's day, closes the gate as a day filed does. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Status 2026-09-26: WHAT THE GATE READS AMENDED by [§ D1143](#d1143)** (an agent ruling). Days filed are counted in every week the device holds, the parked ones included. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Status 2026-09-24: CONDITION AMENDED by [§ D993](#d993)** — the ruling stands; the cheapest form (the skip files a day) is withdrawn. The condition holds within a session; across a reload it is replaced by: the first-visit cover always carries a live route to the mode picker.
@@ -33786,6 +33788,8 @@ different decision from a reset, and this entry takes neither side of it.
 
 ## D510 — § 8.8's offers are priced by a fee table beside the complexity table, gated by the economy's own arithmetic, and a take parks the week being left
 
+> **Status 2026-10-10: AMENDED by [§ D1393](#d1393)** (an agent ruling, owner-reversible). Clause 3's week switch is withdrawn: a take writes the career record alone and moves no Scenario week. See [`docs/39`](docs/39-decisions-in-force.md).
+
 **Date: 2026-09-06 · Owner: the integrator, wave V · Rules on: GitHub issue #169 item 3,
 `campaign/economy.ts#OFFER_FEES`, `campaign/career.ts#offerRefusalOf` and the `take-offer` action,
 `everyday/campaignModel.ts#offersView`, `everyday/host.ts#campaignAct`.**
@@ -34056,6 +34060,8 @@ four screens. `scope/commitment.ts`'s docstring stops describing the model as un
 ## D517 — A past day is handed back over a replay week: the same day, closed as any day is, counting for nothing
 
 > **Status 2026-09-25: AMENDED by [§ D1094](#d1094)** (an agent ruling). A replay meets the crowd and the stretch of the day its own record holds rather than the seed and length standing now, and a day filed without a record says so on the door. See [`docs/39`](docs/39-decisions-in-force.md).
+
+> **Status 2026-10-10: AMENDED by [§ D1386](#d1386)** (an agent ruling). The week strip starts on the week's first day, so no chip from before the week is drawn and the stepper stops at day 1, saying why. See [`docs/39`](docs/39-decisions-in-force.md).
 
 **Date:** 2026-09-06. **Status:** Accepted. **GitHub issue #177 item 1**, GAMEPLAY § 6.1.
 
@@ -42493,6 +42499,8 @@ So § D961 pinned a sweep **over rungs that § D914 then moved**. Neither lane w
 
 ## D964 — a career day stands on a week of its own, and the Scenario record is parked behind it
 
+> **Status 2026-10-10: AMENDED by [§ D1393](#d1393)** (an agent ruling, owner-reversible). *What this deliberately does not move* no longer holds: § D510's take-offer moves no Scenario week either. See [`docs/39`](docs/39-decisions-in-force.md).
+
 **Date: 2026-09-24 · Owner: wave AH lane A · GitHub issue [#594](https://github.com/mrpeanut01/elevator-sim/issues/594) · Rules on: `docs/38` § 2.2 (*the week and the career are separate records*), [§ D510](#d510)'s take-offer, and the career's run pipeline as [§ D507](#d507) and GitHub issue #563 left it.**
 
 **Why an entry.** [§ D405](#d405)'s first ground: the decision is taken in `everyday/host.ts` and binds `shift/week.ts` (a new sentinel), `everyday/shell.ts` (the release on the way out), `everyday/stageScreen.ts` (the entry press), `everyday/campaignScreens.ts` (what the desk grades) and, through `shift/ladder.ts#rungFor`, which rung a career run is handed.
@@ -42525,6 +42533,8 @@ From fresh storage the route was worse: the stage's entry rule found the boot ru
 ---
 
 ## D965 — a mode's own week is never written to the saved session, and one found there is taken off
+
+> **Status 2026-10-10: AMENDED by [§ D1368](#d1368)** (an agent ruling). The list of mode weeks gains a fourth, the sandbox day *Tune the tower* parks over the week, so the save never writes it. See [`docs/39`](docs/39-decisions-in-force.md).
 
 **Date: 2026-09-24 · Owner: wave AH lane A · GitHub issue [#594](https://github.com/mrpeanut01/elevator-sim/issues/594) · Rules on: [§ D231](#d231)'s *a mode that does not own a week does not write one*, and `persist/validate.ts`'s closed set of ids a week may name.**
 
@@ -46866,6 +46876,8 @@ fifty-four).
 
 ## D1177 — a census week closes on a sheet beside the house, on the same crowds, and rolls into a new week on the same tower
 
+> **Status 2026-10-10: AMENDED by [§ D1394](#d1394)** (an agent ruling). *Every other week runs on as before* is withdrawn: a week the census does not deal closes on Sunday, numbered, on a sheet with no house. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-09-26 by agent sessions under delegated authority** (wave AK, lane AK-E, on swarm
 > DL's Q2 ruling, 3-0 on clause 3), not by the product owner. Owner-reversible clauses: the house
 > as the census's standing order untouched; that the closed week's days leave the history on the
@@ -47820,6 +47832,8 @@ was not taken.
 
 ## D1218 — one attempt per scored day: it starts at *Start the day*, leaving resumes it, and it is the only run of that day the week banks
 
+> **Status 2026-10-10: AMENDED by [§ D1360](#d1360) and [§ D1361](#d1361)** (agent rulings). The driver is held on every Everyday screen as well as the brief, and *Resume* resumes the attempt only in the tab that holds it or where none does. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Status 2026-10-10: AMENDED by [§ D1323](#d1323)** (an agent ruling). While an attempt stands the Engineer surface makes, changes and saves no run of the day, and holds any run of the day it made at the attempt's reach. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Status 2026-09-26: AMENDED by [§ D1239](#d1239)** (an agent ruling). The Engineer transport is held at the attempt's reach, the attempt is filed only by its own stage's close, an Engineer close banks nothing into any week while an attempt stands, and a close reads the week this device has stored. See [`docs/39`](docs/39-decisions-in-force.md).
@@ -48004,7 +48018,11 @@ step on a closing sheet, a career sheet unchanged).
 
 ## D1228 — the mode picker offers *Continue your week* while a week is under way
 
+> **Status 2026-10-10: AMENDED by [§ D1369](#d1369)** (an agent ruling). A first week is offered once its first day is begun, with the attempt standing and nothing filed, and the entry says the day is under way. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Status 2026-10-10: AMENDED by [§ D1330](#d1330)** (an agent ruling). A week past the first is offered from its first morning with nothing filed, and the entry names the week's number where one is true of it. See [`docs/39`](docs/39-decisions-in-force.md).
+
+> **Status 2026-10-10: AMENDED by [§ D1384](#d1384)** (an agent ruling). The entry opens the stage for a day left part-way, tomorrow's brief after a close and today's brief for a day not started, never the front door, and a day left part-way is offered on its first day too. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Taken 2026-09-26 by agent sessions under delegated authority** (wave AL, lane AL-F, on swarm DN's
 > Q2 ruling, item 4, three of three), not by the product owner. **Owner-reversible**: the entry, its
@@ -48341,6 +48359,8 @@ it. Shown red on a 130-word row added to each document.
 measurement of how much the lighter file changes a lane's cost, which is unmeasured.
 
 ## D1239 — the one attempt is final: the Engineer surface shows it only to its reach and never files it, and a close reads the week this device has stored
+
+> **Status 2026-10-10: AMENDED by [§ D1361](#d1361)** (an agent ruling). The saved attempt belongs to one tab at a time: a tab that does not hold it shows the day no further, presses and files nothing of it, and takes it over only by a pressed *Continue ⟨day⟩ here*. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Status 2026-10-10: AMENDED by [§ D1323](#d1323)** (an agent ruling). The hold covers any run of the attempt's day the shell made; while an attempt stands on the week on screen, or on the week a write would put there, the Engineer surface's cards, runs, selects, seed, load and save refuse; the rail's cards write from the latest state. See [`docs/39`](docs/39-decisions-in-force.md).
 
@@ -49952,6 +49972,10 @@ site is opened again*: red on a bundle of the base tree (`collective`), green on
 
 ## D1323 — while a scored attempt stands, the Engineer surface only watches: it makes, changes and saves no run of the day, and its cards write from the latest state
 
+> **Status 2026-10-10: AMENDED by [§ D1360](#d1360)** (an agent ruling). The same hold covers the Everyday screens that would run the attempt's day or change how it runs (the workshop, the tuner, the drawing board, *Take this call again*, *Play this crowd*), the Engineer menu's calendar and *Post this run*, and `runShift` refuses any other ask for that day. See [`docs/39`](docs/39-decisions-in-force.md).
+
+> **Status 2026-10-10: EXTENDED by [§ D1387](#d1387)** (an agent ruling). The controls clause 1 refuses are drawn unavailable, with the reason, before they are pressed, and a press still refuses in these words. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-10-10 by agent sessions under delegated authority** (wave AN, lane AN-6, on the
 > post-AM panel's seat D, defects D1 to D3), not by the product owner, and to be read as an agent
 > ruling; [§ D626](#d626) is the cautionary case. **Amends [§ D1239](#d1239)**, whose clause 1 held
@@ -50120,6 +50144,8 @@ new week's counts). All seven were red on the base sources and are green after.
 on Monday's close, and holds the card on the first screen at both viewports.
 
 ## D1330 — a later week is continued from its first morning, and its number is on the screen
+
+> **Status 2026-10-10: AMENDED by [§ D1394](#d1394)** (an agent ruling). Every Scenario week carries its number, the ones the census does not deal included. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Taken 2026-10-10 by agent sessions under delegated authority** (wave AN, lane AN-7, on the lane
 > brief's item 6, carried from the post-AL panel and found again by the post-AM panel's seats B and
@@ -50635,6 +50661,8 @@ Whether the brief meant a report row as well is the integrator's to say.
 
 ## D1357 — the career renewal falls due when day 20 closes: days 19 and 20 play, and the next month's first day waits on the answer
 
+> **Status 2026-10-10: AMENDED by [§ D1392](#d1392)** (an agent ruling). A contract past its missed-day allowance is lost and is offered no renewal; its desk starts the month again as a lost contract. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-10-10 by agent sessions under delegated authority** (wave AN, lane DQ-4), not by the
 > product owner: swarm DQ's Q4 ruling, reconciled by the wave's integrator from three members (S1 the
 > player, S2 honesty, S3 engineering and measurement) and built by this lane. A later reader weighing
@@ -50804,3 +50832,879 @@ else's, no purse key), `everyday/rushHouse.test.ts`'s two cases, `menu/client.te
 **Not established.** No browser case draws the row: the browser tier would need a server with a
 posted sitting. The row is pinned by its model, the route and the client, and
 `everyday/rush.browser.test.ts` still passes with the read in place (no server, so it says nothing).
+
+## D1360 — while a scored attempt stands, every Everyday screen that would run its day or change how it runs only shows, and the shell runs that day only as the attempt
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (wave AO, lane AO-1, on the
+> post-AN panel's seat D, defect D1), not by the product owner, and to be read as an agent ruling;
+> [§ D626](#d626) is the cautionary case. **Amends [§ D1323](#d1323)**, whose clause 1 held the
+> Engineer surface and whose *What it does not reach* left the Engineer menu's doors ungated, and
+> **[§ D1218](#d1218)** clause 2, whose held driver was held on the brief alone. Owner-reversible
+> clauses: refusing the workshop's, the tuner's and the drawing board's runs and edits rather than
+> dealing them a crowd other than the attempt's (clause 1); refusing *Post this run* rather than
+> posting a run cut at the stage's reach (clause 4); and holding *Play this crowd*, the Engineer
+> menu's calendar and a press day's pin over the attempt's week (clause 3). **Not put to a swarm**:
+> the lane had no way to spawn one, and § D1323 had already taken the reading this entry applies.
+
+**Why an entry.** [§ D405](#d405)'s first two grounds. It moves two recorded rulings and binds
+`everyday/host.ts`, `everyday/workshopScreen.ts`, `everyday/tunerScreen.ts`,
+`everyday/designerScreen.ts`, `dev/main.ts`, `shift/banking.ts`, `honesty/surfaces.ts` and
+`everyday/workshopTravel.test.ts`'s derivation of what Everyday writes.
+
+**What was wrong.** Seat D held week 3's Monday at its 08:39:19 call, opened Menu, *Dispatcher
+workshop*, a style card and *Run a day with this*: the stage opened on the same crowd labelled
+practice and stopped at the identical call, 10 standing, most at the lobby. Answered and skipped to
+18:00, every goal read in 82 s; then *‹ Brief*, *Resume Monday*, the rehearsed answers given, and
+the day banked. Reproduced on `b53ab48`: the practice label read § D1218's `'attempt'` sentence and
+the skip stopped at 08:39 on the identical card. The workshop's press is `EverydayHost.startRun`,
+whose set-up deals the day's crowd, so the tuner's *Run it and watch*, the drawing board's *Run a
+day in it*, *Take this call again* and the stage's press outside the daily flow were the same door.
+The workshop's style cards and levers also wrote the running configuration under the attempt, so a
+press on the stage afterwards re-simulated the attempt under a driver the brief says is held.
+
+**Does § D1323 decide it?** Yes. Its clause 1 chose refusing every run-making control over dealing
+an Engineer run another crowd, and its readings not chosen say why: another crowd on the same tower,
+wrinkle and growth still rehearses the call's timing. The Everyday screens ask the same question, so
+they take the same answer, and the brief's instruction to choose the refusal where nothing decided
+it was not needed.
+
+**The ruling.**
+
+1. **While an attempt stands on the week on screen, or on the week a write would put on screen, no
+   Everyday screen makes or changes a run of that day except the attempt's own controls.** The host
+   asks `attemptHold`, which `dev/main.ts` answers with § D1323's `watchOnlyRefusal` in the Everyday
+   words (`shift/banking.ts#ATTEMPT_HOLDS_ITS_DAY`), before `startRun`, `takeCallAgain`,
+   `playThisCrowd` and every editor write (`setWorkingSpec`, `setGroupLevers`, `setRuleRows`,
+   `setSelectorSpec`, `startFromDispatcher`, `setDispatcher`, `setPlainLever`, `setDoorDwell`,
+   `applyBuildingSpec`, `applyPatternSpec`), and refuses with that sentence, writing and running
+   nothing. The workshop, the tuner and the drawing board draw their primary inert with it, and the
+   workshop and the tuner also say it above their controls.
+2. **The shell's backstop.** `dev/main.ts#runShift` refuses a player's ask for a run of the week on
+   screen while an attempt stands on it, unless the ask is the attempt's own (begun or resumed) or
+   boot's, before anything is latched. A door the host has never heard of still cannot run the day.
+3. **Doors that wrote before they ran.** *Play this crowd* (a watched record's crowd set up on the
+   week on screen) and the Engineer menu's calendar period are asked before they write anything, and
+   a press day's pin is not written over a week an attempt stands on; the week still moves, as the
+   door's tower choice moves it.
+4. **A run of that day is not posted.** `postCurrentRun` refuses with `ATTEMPT_NOT_POSTED`: the
+   server replays a post whole and answers with the whole day's figures, which is § D1323 clause 3's
+   reason for refusing *Save recording*.
+
+**What holds it.** `everyday/attemptDoors.test.ts` sorts every member of `EverydayHost` in a table
+typed over the interface, so a member added later fails the compile until it is sorted; checks each
+sort against `host.ts`'s own member bodies (nothing that presses a run or writes the state is a
+read, and every held door asks first); drives every held door with an attempt standing (refused in
+words, nothing written or run) and with the week free (it writes or runs); and asserts the backstop
+sits ahead of `runShift`'s first latch. Against `b53ab48`'s host it is red in three of its five
+cases (*setWorkingSpec did not refuse*). `everyday/attemptHolder.browser.test.ts`'s first case walks
+seat D's route on the built bundle: red on `b53ab48` (*Run a day with this could still be pressed*),
+green after, with the attempt then resuming at the same call and banking.
+
+**What it does not reach.** A run another player posted on today's board for the same tower and
+crowd can still be watched, which is GD2's shared crowd rather than a run of the player's own; the
+ghost race runs a rival on the attempt's crowd and draws it only up to the stage's playhead. Neither
+takes a press. A resume whose record no longer matches the state still drops the attempt and starts
+afresh (§ D1218 clause 2); clause 1 removes the edits a player could make to cause that mid-attempt,
+and the drop itself is unchanged.
+
+## D1361 — the saved attempt belongs to one tab at a time: another tab shows it no further, a pressed takeover moves it, and a tab that goes lets it go
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (wave AO, lane AO-1, on the
+> post-AN panel's seat D, defect D2), not by the product owner, and to be read as an agent ruling.
+> **Amends [§ D1218](#d1218)** clause 2, whose brief resumed a standing attempt in any tab, and
+> **[§ D1239](#d1239)** clause 4, whose read of the stored week caught a second close but not a
+> second tab playing the attempt. Owner-reversible clauses: a takeover the player presses in the
+> other tab rather than a refusal outright (clause 3); no expiry, so a tab that died holding the
+> attempt is taken over by that press rather than released by a clock (clause 4); and the tab that
+> lost the attempt holding its run where it stood rather than leaving the stage (clause 5). **Not put
+> to a swarm**, as § D1360.
+
+**Why an entry.** [§ D405](#d405)'s first two grounds. It moves two recorded rulings and binds
+`shift/attempt.ts`, `persist/attempt.ts` (the slot gains a holder), `dev/main.ts`,
+`everyday/host.ts`, `everyday/briefView.ts`, `everyday/briefScreen.ts`, `everyday/stageScreen.ts`,
+`everyday/stageScreenModel.ts`, `everyday/actionBar.ts` and `everyday/attemptIsFinal.browser.test.ts`.
+
+**What was wrong.** Seat D held a day at a call in tab A, opened tab B, pressed *Continue your week*
+and *Resume*, played B to 18:00 without closing and read all five goals, then answered in A and
+banked. B's progress also overwrote the saved attempt, so a third tab resumed straight to 18:00 on
+B's branch. Reproduced on `b53ab48`: B's brief read *Resume Monday*, and B's skip moved the stored
+reach from 549 s to 1 800 s.
+
+**The ruling.**
+
+1. **One tab holds the saved attempt.** The slot (`elevator-sim.day-attempts`) carries the holding
+   tab's name, drawn once per page load and kept nowhere else. A tab holds the attempt by beginning
+   it or resuming it. Every write is read fresh and merged one contract at a time
+   (`persist/attempt.ts#writeAttemptSlot`), and a write or a clear over an attempt another tab holds
+   is refused (`shift/attempt.ts#attemptSlotAfter`), which is how a tab learns it has lost it. The
+   `storage` event tells every other tab at once.
+2. **A tab that does not hold it plays nothing of that day.** Its brief offers *Continue ⟨day⟩ here*
+   in place of *Resume*, with the note `DAY_ATTEMPT_COPY.elsewhereNote`. Its stage holds the playhead
+   where it stands (`Playback.setReach`), says `elsewhereStage`, and its § 3.3 primary is the same
+   takeover. `dev/main.ts` refuses its presses, answers, calls and close
+   (`ATTEMPT_HELD_IN_ANOTHER_TAB`), so only the holding tab's close files the day.
+3. **The takeover is pressed.** It claims the attempt as stored and re-simulates it from the slot:
+   every press the other tab wrote, opened at the reach that tab last saved, which is never further
+   on than it had shown. A takeover reveals nothing the holding tab had not seen.
+4. **A tab that goes lets go.** On `pagehide` (closed, reloaded or sent elsewhere) a tab releases
+   what it holds, so the reloaded page or the next tab resumes with no question. A tab that died
+   without a `pagehide` keeps its name on the slot, and the next tab's pressed takeover resumes it.
+   No clock decides it, and the device's clock is not read for it.
+5. **The tab that lost it shows its old run no further.** That run lacks the other tab's later
+   presses, so both transports hold it at this tab's own reach and nothing presses or files it
+   (`ATTEMPT_MOVED_ON_ELSEWHERE`, `DAY_ATTEMPT_COPY.staleStage`), until this tab resumes the attempt,
+   which re-simulates it from the slot, or the day is filed elsewhere, where § D1239 clause 4's
+   practice applies.
+
+**What holds it.** `shift/attempt.test.ts` (the holder read, write, clear, claim and release, and
+the merge) and `persist/attempt.test.ts` (holder validation, a refused write leaving the slot as
+stored, the merge, claim and release through a store); `everyday/host.test.ts` (nothing starts where
+another tab holds it, the takeover resumes, a lost takeover begins nothing, the stale hold);
+`everyday/briefView.test.ts` and `everyday/stageScreenModel.test.ts` (the labels and notes); and
+`everyday/attemptHolder.browser.test.ts`, two pages in one browser context. Its second case (a second
+tab neither resumes nor writes the attempt, and the first tab banks) and third (a takeover opens no
+further than the first tab's reach, the first tab's close is gone, its skip moves nothing and its
+press writes nothing, and only the second tab banks) are red on `b53ab48` and green after; its fourth
+(a tab closed without closing the day lets the next resume it with no takeover) passed before and
+after and guards clause 4. `attemptIsFinal.browser.test.ts`'s second-tab case now reaches the attempt
+by the takeover.
+
+**What it does not reach.** A page restored from the back-forward cache holds the attempt again on
+its next write if nobody holds it, and if another tab moved it on meanwhile, clause 5 holds the
+stale run. A begin reads the slot fresh first, so the later of two begins finds the earlier; two
+writes inside the same instant are not serialised by `localStorage`, and that race is not
+established.
+
+## D1368 — a sandbox day runs the day with the player's changes, over the week and never on it
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (wave AO, lane AO-2, on the wave
+> brief's item for the post-AN panel's seat D, D3 and D7), not by the product owner, and to be read as
+> an agent ruling. **Amends [§ D965](#d965)**, whose list of mode weeks gains a fourth. Owner-reversible
+> clauses: that the sandbox ends when the player leaves its stage and its report (rather than at the
+> next scored press); that a changed tower is copied from the tower as its contract hands it over,
+> keeping the day's population and not the contract's bookings; that *Arriving at the lobby* is not
+> offered on a day that keeps its own mix (rather than offered with a sentence that it does nothing);
+> and the words of the stage sentence, the sheet's note and the brief's caveat.
+
+**Why an entry.** [§ D405](#d405)'s first two grounds. It amends § D965's closed list of the weeks a
+mode stands on, adds a practice ground beside [§ D1141](#d1141)'s and [§ D1218](#d1218)'s, and binds
+`shift/week.ts`, `shift/scoredCrowd.ts`, `shift/report.ts`, `dev/state.ts#shiftRunConfigOf`,
+`dev/main.ts#closeShift`, `authoring/patternSpec.ts` and the honesty register as well as the Everyday
+host, shell, tuner and brief.
+
+**What was wrong.** Seat D, on a scored day's brief: the *Locked for score* card's sandbox door, any
+change in *Tune the tower* (*How busy* 12 to 11.5, or door dwell *patient*), *Run it and watch*, and
+the stage said *"Today's day could not be simulated"*, on *Try the day again* too, and after setting the
+change back. The brief then read *Midtown Office, People 1,900, tower bld-1*, and after a reload the
+week's day sat on Garden Apartments. Three causes, each reproduced on a bundle built from `b53ab48`:
+
+1. **No change could run.** The tuner saved a pattern on every press, and a pattern writes its
+   template's peak hold and off-peak level (and a split on a one-direction order). On a building with
+   an authored day the run uses the day's record, which authors its phases and varies its mix, and
+   `core` refuses all of those against it: the worker's refusal was *templateOverrides (peakWindowS,
+   baselineFraction) cannot be applied to demand template "office-day"*. Every saved pattern on every
+   whole authored day failed the same way.
+2. **The week was the sandbox's.** The press went through `applyBuildingSpec` and `withBuilding`,
+   which stood the player's own week on `SANDBOX_CONTRACT_ID` and the building on a copy (`bld-1`).
+   The save wrote that pair the moment the week moved; a sandbox week names no tower, so the restore
+   answered with the state's default building, Garden Apartments. The copy also lost the contract's
+   rung, which is where *People 1,900* came from (Midtown is handed over at a third of its authored
+   population) and where car D's booking went.
+3. **Door dwell was written on the press of its chip**, into the levers the scored day runs under,
+   before any run; leaving the tuner kept it. And an untouched tuner pressed `startRun`, which begins
+   no attempt, so the day could be watched to its end from the tuner and begun afresh from the brief.
+
+**The ruling.**
+
+1. **A sandbox day stands on a week of its own** (`shift/week.ts#SANDBOX_DAY_CONTRACT_ID`), a copy of
+   the week's day (the day, the weekday, the history, the growth) with the week itself parked
+   (`openSandboxDay`). It is one of `MODE_WEEK_CONTRACT_IDS`, so the save takes it off the pair and
+   writes the week, and a reload taken on the sandbox stage opens on the week.
+2. **Leaving puts the week back.** `everyday/sandbox.ts` keeps every field a press writes (the week,
+   the parked weeks, the building id, the commissioning, the pattern, the levers, the crowd, the day's
+   shape and the sheet) and the host puts them back exactly when the player goes anywhere but the
+   stage and the report (`everyday/shell.ts#go`), *Tune the tower* included, so a second sandbox is
+   opened over the week. A run still generating is cancelled; one that landed unclosed is marked left,
+   so it cannot be filed as the week's day.
+3. **Only what moved is pressed.** The tower is copied only when one of its four controls moved, the
+   pattern only when one of the crowd's two did, and the dwell is held with the others until the run.
+   A tower left alone keeps its id, and `shift/ladder.ts#rungFor` hands a week on no contract that
+   tower's rung, so the sandbox meets the population and the booked car the day has. The tuner opens
+   on the day as it runs (`EverydayHost.sandboxStanding`: the tower its rung hands over, and the rate
+   the day runs at). With nothing moved, the tuner's primary is the brief's own `playDay`.
+4. **A saved pattern takes only what the run's template can take**
+   (`authoring/patternSpec.ts#demandTheTemplateTakes`, read in `shiftRunConfigOf`): on a template that
+   authors its phases the pattern's peak hold, off-peak level and mix swing are left out, and on one
+   that keeps its own mix its split is, with a withheld sentence naming them. Nothing a template can
+   take is touched, so no run that simulated before changes. On a day that keeps its own mix the tuner
+   does not offer *Arriving at the lobby*, and says why where the row would be.
+5. **It closes as practice.** `practiceGroundOf` answers `'sandbox'` first on a sandbox day's week, so
+   the stage carries *This run does not count toward the week: it is a sandbox day with the changes you
+   made, and your week is where you left it*, and the close leaves the week on its day, offers no next
+   day and says `shift/report.ts#PRACTICE_SANDBOX_NOTE`. The scoreboard guard in `closeDay` names both
+   sandbox ids.
+6. **The brief's *Locked for score* caveat names what its button opens**, from the tuner's own list
+   for the day (`tunerModel.ts#tuneControlsOffered`, the rows and labels the screen draws), in place of
+   *"Everything you can change from here changes the dispatcher, and nothing else"* (seat D, D7).
+
+[§ D496](#d496)'s ruling stands: a sandbox is a week on no assignment, arrived at and never chosen.
+What moves is which week it is.
+
+**Tests**, red on `b53ab48` and green after. `everyday/sandbox.test.ts` (9): a saved pattern on
+Midtown's whole day through `recordRun` (red with `core`'s refusal), each offered control moving the
+legs, the save writing the week, the restore putting back every kept field, the rung kept while the
+tower is unmoved, and the close moving no scoreboard. `everyday/sandboxDay.browser.test.ts` (2, red with
+*"Today's day could not be simulated"* on the stage): one value changed, run, played, *‹ Brief*, a
+reload, the brief reading as before each time and the stored week on Midtown's Monday; and the sandbox
+day closed, its sheet saying it banked nothing with no next day. `everyday/briefView.test.ts` (the
+caveat, red with the old sentence) and `everyday/tunerModel.test.ts` (the presses and the offer).
+
+**What it does not reach.** A changed tower runs without the contract's own bookings, since a rung
+belongs to the tower it names. The sandbox plays the day's crowd with the change and raises no call; it
+is offered while an attempt stands, as before, and whether it should be is the rehearsal question seat
+D's D1 and D2 put, which this lane does not rule on.
+
+## D1369 — a first day begun brings *Continue your week*, and keeps the first-visit page away
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (wave AO, lane AO-2, on the wave
+> brief's item for the post-AN panel's seat D, D4), not by the product owner, and to be read as an
+> agent ruling. **Amends [§ D1228](#d1228)**, whose entry was drawn only once a day was filed, and
+> what [§ D476](#d476)'s gate reads, as [§ D1143](#d1143) left it. Owner-reversible clauses: the
+> words *Monday under way*, and that the entry still opens the front door.
+
+**Why an entry.** [§ D405](#d405)'s second ground: it amends two recorded rulings.
+
+**What was wrong.** A fresh player started the pinned Monday, played to its call and reloaded. The
+page opened on the landing page, *Start playing* opened the tutorial, and the picker had no *Continue
+your week*; the way back was Scenario, *Play today's scenario*, *Set up today* and *Resume Monday*.
+Both reads asked what had been filed, and an attempt files nothing until it closes.
+
+**The ruling.** A day begun is an attempt standing on the week's day (`host.dayAttempt()`, § D1218).
+`everyday/tutorialModel.ts#tutorialIsDue` reads it as a fifth count, `daysBegun`, at both gate sites, so
+a player with a day begun is not a first arrival; and `everyday/continueWeek.ts#continueWeekEntryOf`
+offers a first week whose first day is begun, reading *Midtown Office, week 1, Monday under way*.
+Nothing new is stored: the attempt has its own slot (`persist/attempt.ts`), which the brief resumes
+from.
+
+**Tests**, red on `b53ab48` and green after: `everyday/tutorialModel.test.ts`,
+`everyday/continueWeek.test.ts`, and `everyday/dayOneReload.browser.test.ts` (red: the landing page came
+up after the reload), whose second case keeps a genuine first arrival on the landing page.
+
+**Not established.** A reload across UTC midnight with the first day begun and nothing else stored
+deals the first visit again for the new date, which may be another tower, and then neither read finds
+the attempt.
+
+## D1392 — a contract past its missed-day allowance is lost: no more of its days run, no renewal is offered, and the desk starts the month again as a lost contract
+
+> **Taken 2026-10-10 by an agent session under delegated authority** (wave AO, lane AO-5, on the lane
+> brief's item 1 for the post-AN panel's seat C, D2), not by the product owner. A later reader weighing
+> this against a product-owner ruling should treat it as an agent ruling and say so; [§ D626](#d626) is
+> the cautionary case. **Owner-reversible**: clause 1 (the contract document's wording is the reading
+> taken), clause 3 (one answer on the desk, with *hand it back* left off it), clause 4 (the month
+> restarts on the purse it opened with) and clause 5 (a new difficulty on a lost month counts the
+> loss). **Not put to a swarm**: the lane had no way to spawn one, and the readings not chosen are set
+> out below so the integrator can.
+
+**Why an entry.** [§ D405](#d405)'s first and second grounds. It amends [§ D1357](#d1357) clause 1 for
+a lost contract, gives `career.lost` its first writer, and binds `campaign/career.ts`,
+`everyday/campaignModel.ts`, `campaignScreens.ts`, `reportScreen.ts` and `reportView.ts`.
+
+**What was wrong** (seat C, reproduced from the record on this lane's tree). Garden Apartments on the
+standing order missed days 14, 17, 18 and 20. The desk read *4 of 3 missed days used* over *The managing
+agent has offered a renewal*, and signing it opened the second month, while clause 4 of the contract
+reads *More than 3 missed days and the contract is lost*. `economy.ts#contractIsLost` said so already,
+and nothing that runs a day asked it: `fileDay` filed days on a lost contract, `needOf` offered the
+renewal, and `career.lost` was written only by `openingCareer`. The contract sheet's red *Start the
+month again* (the guide's § 3.3 row) was drawn only on an impossible month, by reading the terms row's
+words, and its press ran the day whatever its label said.
+
+**The ruling.**
+
+1. **The contract document's reading.** A contract is lost when its missed days exceed the
+   difficulty's allowance (`contractIsLost`), on the close that files the miss past it, whichever day
+   of the month that is.
+2. **A lost contract runs no more of its days and is offered no renewal.** `fileDay` refuses a day on
+   it, and `needOf` asks the loss before the renewal, so a contract lost on day 20 meets the loss on its
+   desk and no offer.
+3. **The desk carries one answer, § 3.3's *Start the month again*.** The day's sheet goes to the desk
+   (*Open the desk at ⟨building⟩*, with `career.ts#contractLostSentenceOf`'s *4 days missed, and
+   standard allows 3, so this contract is lost.*), the contract sheet's primary is the red variant and
+   starts the month again without running a day, and the tower row reads *contract ended*.
+4. **Starting the month again counts the loss and restarts the month as it opened.** `career.lost`
+   grows by one; the day goes to 1; the misses and this month's bookings and answers go; the purse
+   returns to `carriedIn`, what the month opened with; the kit of earlier months, the top-ups, the rate
+   and the wear stay with the building.
+5. **A new difficulty pressed on a lost month counts the loss too**, so the difficulty buttons are no
+   free way to un-lose a contract. A running month's difficulty change is unchanged.
+
+**The readings not chosen.** (a) Reword clause 4 to match the renewal, so that no contract is ever
+lost: the brief named the contract's own reading. (b) The building is taken away, its standing banked
+and its slot freed: refused for now because banking a lost month can leave a career holding no building
+and no open slot (`slotsOpen` answers 0 below standing zero, and four misses from day 1 bank minus 12)
+with no offer it may take and the career not over, which is the dead end [§ D716](#d716) checked for
+and found unreachable only because no contract could be lost. (c) *Hand it back* beside *Start the
+month again* on the desk: the same dead end, by the player's press.
+
+**Tests**, red before and green after. `campaign/career.test.ts`'s *a contract past its missed-day
+allowance is lost* (five cases, four red before: the need was the renewal, a lost month filed day 5,
+`lost` stayed 0 on either restart); `everyday/campaignModel.test.ts`'s *a lost contract reads as lost
+on every screen that names it* (two cases); `everyday/reportView.test.ts`'s *sends a lost contract to
+the desk*. **On the built bundle**, `everyday/campaignJourney.browser.test.ts`'s *holds a lost contract
+as lost*, seeded on day 21 at 4 of 3: red before on *The contract is lost* (the desk read the renewal),
+green after, with the contract sheet's *Start the month again* starting the month at day 1 and running
+no day.
+
+**Not established.** What happens at the third loss beyond `careerIsOver` reading true is unchanged
+and unmeasured here: no screen was checked for what it does once the career is over.
+
+## D1393 — taking a career offer moves no week: the Scenario week stays on the tower the player put it on
+
+> **Taken 2026-10-10 by an agent session under delegated authority** (wave AO, lane AO-5, on the lane
+> brief's item 4 for the post-AN panel's seat C, D6), not by the product owner. [§ D964](#d964) said
+> that removing this write *is a ruling on § D510 that is the product owner's to make, not a lane's*;
+> this lane makes it on the integrator's brief under the owner's standing instructions for autonomous
+> work, and says so here so the owner can reverse it. **Owner-reversible**: the whole entry, which
+> restores [§ D510](#d510) clause 3's week switch when reversed. **Not put to a swarm**: the lane had
+> no way to spawn one.
+
+**Why an entry.** [§ D405](#d405)'s second ground: it amends § D510 clause 3 and § D964's *What this
+deliberately does not move*, and it changes `everyday/host.ts#campaignAct` and the offer card's note in
+`everyday/campaignModel.ts`.
+
+**What was wrong**, isolated from storage on the built bundle. A career seeded one slot up (standing
+14), Scenario's *Today's scenario* opened on Midtown Office, Career → *Take it* on St Jude Hospital,
+then back to Scenario: the door's selected tower read `c8`. The take parked the Scenario week and
+restarted it on the offered building with that building and length (`switchWeek(…, 'restart')`), as
+§ D510 clause 3 built it when a career day still ran on the Scenario week. Seat C met it as a St Jude
+week nobody chose, *moved here rather than drawn*, and a rush on St Jude, because the rush runs on the
+Scenario's standing building (`rush.ts#rushBuildingOf`).
+
+**The ruling.** A take writes the career record and nothing else. A career day has stood on a week of
+its own since § D964, so nothing of the Scenario's has to move: the Scenario week, its building, its
+crowd, its presses and any run in flight stay as they were, and the abandon or cancel the take used to
+press (GitHub issue #526 item 2, #531 item 4, [§ D565](#d565)) has no week to protect and is gone with
+it. The offer card's note reads *taking it adds the building to your career on a month of its own; your
+Scenario week stays where you left it*. Career and Rush now write no Scenario week: the career day
+parks and restores it (§ D964), and a rush parks and restores it ([§ D965](#d965)).
+
+**Tests**, red before and green after. `everyday/host.test.ts`'s *takes the offer into the career and
+leaves the Scenario week, its run and its day alone*, replacing the two cases that pinned the old
+write: red before with `abandonDay, applyPatch`. **On the built bundle**,
+`everyday/campaignJourney.browser.test.ts`'s *takes a career offer without moving the Scenario week*:
+red before on the door's tower (`c8` where `c2` was), green after.
+
+## D1394 — every Scenario week ends: a week the census does not deal closes on Sunday, numbered, on a sheet with no house, and a held one offers the next tower
+
+> **Taken 2026-10-10 by an agent session under delegated authority** (wave AO, lane AO-5, on the lane
+> brief's item 4, *a week on any tower, however it arrived there, carries its number, closes on the week
+> sheet and offers the next tower*), not by the product owner. **Owner-reversible**: clause 1 (the
+> close on day 7, read from § D1246's rule) and clause 3 (no house is run beside such a week). **Not put
+> to a swarm**: the lane had no way to spawn one, and the reading not chosen is set out below.
+
+**Why an entry.** [§ D405](#d405)'s second ground: it amends [§ D1177](#d1177)'s *every other week runs
+on as before*, [§ D1330](#d1330)'s *where the census deals the week*, and the scope of
+[§ D1259](#d1259)'s offer and [§ D1344](#d1344)'s roll, and it binds `shift/weekStake.ts`,
+`shift/nextWeek.ts`, `shift/report.ts`, `everyday/host.ts`, `continueWeek.ts` and `reportView.ts`.
+
+**What was wrong.** A week on a tower the week census does not deal (St Jude Hospital, Garden
+Apartments, Crown Hotel and the eight unmeasured towers) carried no number, never closed and ran on past
+day 7. Seat C's St Jude week met its target on Tuesday (*BANKED 2 of 2*) and after Sunday opened
+*MONDAY · DAY 8*, with no sheet, no *Go on* and no next tower. Every tower is pressable from Scenario's
+tower list, so a player reaches such a week by choosing it.
+
+**The ruling.**
+
+1. **Such a week ends on day 7.** Every clean day of it counts toward its `needClean` target
+   (§ D1176's rule for an unmeasured tower), so its last counted day is day 7, and § D1246's *the later
+   of Friday and the last counted day* closes it on Sunday (`weekStake.ts#weekPathEndFor`). A mode's or
+   the sandbox's week still has no ending.
+2. **It carries its number** on the brief, the door, Your week, the menu's continue entry and the
+   close's tomorrow heading, and **it rolls as a census week does**: held (target met) to the next week,
+   not held to itself again with *Go on to week N* beside it (§ D1344), dealing the same draw.
+3. **Its sheet has no house.** The house is the census's standing order run on each counted day's own
+   crowd, and no census row says what that order makes of this tower's days, so nothing is run beside
+   the week and the sheet says *Nothing was run beside you this week*. The close's lead stays without a
+   house tally on such a week, and the day's onward step reads *See the week's sheet*.
+4. **A held week offers the next tower** by § D1259's own rule (on the shipped census, Midtown Office),
+   and the tower's record of weeks counts it at its `needClean`.
+
+**The reading not chosen.** A census-measured target and house for these towers, run before they may
+close: honest, and a census of eleven towers this lane cannot run; the week would go on running past day
+7 until it lands.
+
+**Tests**, red before and green after. `shift/weekStake.test.ts`'s *closes a week the census does not
+speak for on day 7* (red before: not closed, no number, no sheet) with a sentinel control;
+`shift/week.test.ts`'s *ends every Scenario week on day 7*; `shift/nextWeek.test.ts`'s *deals next on a
+tower whose week the census does not deal*; `everyday/weekView.test.ts`'s *draws a closed St Jude week's
+sheet, without a house, and offers Midtown Office*. Six existing cases that pinned the old reading were
+moved to the new one: two day-boundary cases in `week.test.ts` now run on the sandbox's week, and the
+number on Garden Apartments' week is asserted in `today.test.ts`, `weekView.test.ts`,
+`continueWeek.test.ts` and `dayClose.test.ts`. On the built bundle, `everyday/weekSurvives.browser.test.ts`'s
+seven-day case on Garden Apartments now closes the week on Sunday's sheet.
+
+**Not established.** Whether a day of such a week is one a player decides is unmeasured, as it was;
+this entry gives the week an ending, and says nothing about the days in it.
+
+## D1395 — a filed career day keeps its own verdict: the month grid, the rolling calendar and the purse read which days were missed
+
+> **Taken 2026-10-10 by an agent session under delegated authority** (wave AO, lane AO-5, on the lane
+> brief's item 2 for the post-AN panel's seat C, D3), not by the product owner. **Owner-reversible**:
+> clause 3 (a filed day's verdict leads a booking's flag on the rolling calendar).
+
+**Why an entry.** [§ D405](#d405)'s first ground. It changes `campaign/economy.ts#earnedSoFar` and
+`calendarRow`, which carried the design's § 8.1 rule (*"the last `missed` days before today"*), adds a
+field the career's codec carries, and binds `everyday/campaignModel.ts`'s month grid.
+
+**What was wrong.** The record kept a count of missed days and no days, so the month grid, the rolling
+calendar and the purse all placed every miss at the tail of the past. A month missed on days 14, 17 and
+18 drew days 1 to 15 cleared and 16 to 18 missed on Contract & works, day 14 cleared and day 16 missed
+on the front page, and paid day 14 at week three's rate and day 16 nothing.
+
+**The ruling.**
+
+1. **`career.ts#fileDay` records which day it filed missed** (`TowerEconomy.missedDays`), and the two
+   presses that start a month empty it.
+2. **`economy.ts#missedDaysOf` is the one reading**, shared by the purse, the rolling calendar and the
+   month grid. It uses the list where it agrees with the count and the day, and falls back to the tail
+   rule for a month filed before the list existed (or carried through a build that did not append to
+   it), which is what such a month drew before. The envelope's version does not move, so no saved
+   career is set aside.
+3. **A filed day draws its verdict ahead of a booking's flag or a night of works** on the rolling
+   calendar, as the month grid already did, and its tip keeps the booking.
+
+**Tests**, red before and green after: `everyday/campaignModel.test.ts`'s *a filed day keeps its own
+verdict on the month and the rolling calendar* (three cases, all red before: day 14 drew cleared, day 4
+drew flagged, the purse read 68 where the days filed pay 69); `campaign/economy.test.ts`'s
+`missedDaysOf` case; `campaign/careerPersist.test.ts`'s round trip with and without the list.
+
+## D1396 — one source for the day's wrinkle: the run, the day's sheet, the rail and the identity line all read the wrinkle a mode handed the day
+
+> **Taken 2026-10-10 by an agent session under delegated authority** (wave AO, lane AO-5, on the lane
+> brief's item 3 for the post-AN panel's seat C, D4), not by the product owner. It carries out
+> [§ D507](#d507)'s *a campaign day's event is the campaign's* on the surfaces that describe the day.
+
+**Why an entry.** [§ D405](#d405)'s first ground: `shift/calendar.ts#scheduledEventFor` gains an
+argument, and `dev/main.ts`, `dev/state.ts`, `dev/leftRail.ts` and `scope/runIdentity.ts` pass it.
+
+**What was wrong.** Garden Apartments' day 20 ran *Two cars down*, the career's own event, which the
+stage card named; its sheet was headed *Something on upstairs*, the weekend wrinkle the week's schedule
+deals the career week's Saturday, over the run's own *car B out until 09:12*. The run was built from
+`ViewerState.campaignEventId` (`dev/state.ts`), and `dev/main.ts#closeShift` asked the schedule without
+it.
+
+**The ruling.** `scheduledEventFor` takes the wrinkle a mode assigned the day and answers it ahead of a
+booking and the draw, resolving a whole drawn id first and a template id after, and every caller that
+describes the stage's own day passes `state.campaignEventId`. `shift/eventSeam.test.ts` scans those four
+files and fails a call that does not.
+
+**Tests**, red before and green after: `shift/eventSeam.test.ts`'s *passes the state's campaignEventId
+at every call that reads the state's own day* (red before on `dev/main.ts`), and
+`shift/calendar.test.ts`'s *answers the assigned wrinkle where a mode handed one*.
+
+**Not established.** Whether a career day's sheet says anything about the next career day's wrinkle,
+and from which source, was not checked: the next day's event is chosen when its run is pressed.
+
+## D1384 — *Continue your week* opens where the player left: the stage at a held call, tomorrow's brief after a close
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (wave AO, lane AO-4, on the
+> post-AN panel's seat B, lost moments 7 and 8 and defect 1), not by the product owner, and to be read
+> as an agent ruling. **Amends [§ D1228](#d1228)**, whose entry opened the front door for a day to
+> play. **Owner-reversible**: each of the four destinations, and naming the clock the day was left at.
+> **Not put to a swarm**: the lane had no way to spawn one; the reading not chosen is set out below so
+> the integrator can.
+
+**Why an entry.** [§ D405](#d405)'s first two grounds. It moves a recorded ruling and binds
+`everyday/shell.ts`, `everyday/continueWeek.ts`, `everyday/host.ts` (a new `dayAttemptLeftAt`) and
+`everyday/weekSurvives.browser.test.ts`, which another lane wrote.
+
+**What was measured.** On a bundle of the base tree (`b53ab48`), Crown Hotel on 2026-10-03: a day
+left at its 08:39 call came back as the front door, then *Set up today*, then *Resume Tuesday*, and
+the stage stood paused at 08:39 with no card for about six seconds and *▶ Play* offered; a closed
+Monday came back as Monday's door with *Open the doors on Tuesday* as its primary; and a first day
+left part-way drew no entry at all.
+
+**The ruling.**
+
+1. **The entry goes where the screen it skips would have sent the player**, by that screen's own
+   calls. An attempt standing on the day opens the stage (`host.playDay`, the brief's *Resume*). A day
+   closed and banked opens tomorrow's brief (`host.openTomorrow`, the door's *Open the doors on
+   ⟨day⟩*). A day not yet started opens today's brief (the door's *Set up today*). A week whose last
+   day is closed opens its sheet, as before. The front door stays one rail press away.
+2. **An attempt standing on the day is under way whatever the history holds**, so a first day left
+   part-way draws the entry too. Its line names the instant it was left, on the hour the day is
+   planned at: *Midtown Office, week 1, Wednesday, left at 10:00 · 2 of the 4 clean counted days the
+   target asks for, so far*.
+3. **The stage it opens shows the held call without a press.** A resumed attempt reopens paused at
+   the instant it was left (§ D1218); while the call's runs are made the transport's button reads
+   *Running the day ahead…* and cannot be pressed, and the card comes up when they land (§ D1385).
+
+**The reading not chosen.** Opening the brief with *Resume* as its primary would keep one screen
+between the menu and the stage and keep the brief's held driver in view. Seat B's ranked change was
+*one step from Continue to the moment you left*, and the brief's only press there is *Resume*, so it
+was taken out.
+
+**Tests**, red before and green after. `everyday/continueWeek.test.ts`: the destinations, the
+first-day attempt and its control (red before: three cases, `goes` was `'door'`).
+`everyday/host.test.ts`, *says where the standing attempt was left*. `everyday/continueWhereLeft.browser.test.ts`
+cases 1 and 2 on the built bundle: the stage with the card up and Play never offered while the call
+is worked out, and Tuesday's brief after a close.
+
+**What it does not reach.** Seat D's D4 (a reload with the first day open lands on the landing page,
+which offers the tutorial) is lane AO-2's; this entry only makes the menu's entry exist there.
+
+## D1385 — the stage tells the truth about its own state: the chip the player chose, one line at a time, no Play while a call is worked out, and the building in view
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (wave AO, lane AO-4, on the
+> post-AN panel's seat B, lost moments 4, 5, 6 and 9 and defects 2, 3 and 9), not by the product
+> owner. It reads [§ D991](#d991) clause 2 (*every change shows on the lit chip*) for the state that
+> clause did not name, a stopped transport, and moves no clause. **Owner-reversible**: lighting the
+> player's chip while stopped, which of the two lines speaks, the waiting button's words, and the
+> half-in-view line for bringing the building back. **Not put to a swarm**: the lane had no way to
+> spawn one.
+
+**Why an entry.** It binds `everyday/stageScreen.ts`, `everyday/stageScreenModel.ts`,
+`everyday/stagePace.ts` and `everyday/stagePace.browser.test.ts`, which another lane wrote, and it
+reads a recorded ruling.
+
+**What was wrong**, each reproduced on a bundle of the base tree. At every call stop and at 18:00
+the lit chip read `30×` for a player who never left `4×`: the transport had stopped, and the chip
+named the rung it stopped from. The pace note and a skip's line were two spans side by side, so a
+skip that landed on a call read *stopped for the day's call skipped 09:46 to 10:40: …*, and a skip's
+line stood beside every later note until the next skip. While the stage waited at a call whose runs
+were being made it offered *▶ Play*, which played one frame and stopped again. At 390×844 the
+header's *▶ Play* left the canvas at y 756 to 1262 under a bar from y 725.
+
+**The ruling.**
+
+1. **A stopped transport lights the chip the player chose** (`stageScreenModel.ts#stageLitSpeedOf`);
+   a moving one lights the rung it moves at, as § D991 has it.
+2. **One message for one state** (`stagePace.ts#stageStatusOf`). A stop speaks alone; otherwise a
+   skip speaks, its beat while one is coming and its line while the stage stays in the state it
+   landed in; otherwise the pace note. A skip's line goes the frame the stage leaves that state, at a
+   call, and at a chip press. The words of § D1169 and § D1212 are unchanged.
+3. **While the stage waits at a call it says so** (`stageScreenModel.ts#STAGE_PLAY_CONTROL`): the
+   button reads *Running the day ahead…* and cannot be pressed, from the stop until the card is
+   drawn, on a resumed attempt as well as in play, where a resumed attempt used to sit silent with
+   no card until Play was pressed.
+4. **A press that sets the day playing brings the building into view** where less than half of it
+   can be seen (`stageScreenModel.ts#stageBuildingWantsBringing`), on the next frame, so the shell's
+   scroll keeper does not undo it. A desktop stage, which shows four fifths of its canvas, is not
+   moved.
+
+**Tests.** `everyday/stageScreenModel.test.ts` and `everyday/stagePace.test.ts` (the four rules,
+with their controls); `everyday/continueWhereLeft.browser.test.ts` cases 1 to 3 (the chip at a call
+stop and at the day's end, one line at the stop, no Play offered while the call is worked out, the
+canvas in view on a phone); `everyday/stagePace.browser.test.ts`, whose skip-line reads now hold the
+one-line rule.
+
+**Not established.** On a phone the building in view puts the header, and its *Pause*, above the
+fold; the panel has not played that layout.
+
+## D1386 — the front door's week strip starts on the week's first day, and its definitions sit behind one disclosure
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (wave AO, lane AO-4, on the
+> post-AN panel's seat B, lost moment 3), not by the product owner. **Amends [§ D517](#d517)** clause
+> 3's last sentence (*a chip from before the week began stays inert with the reason*): no such chip
+> is drawn. **Owner-reversible**: dropping the slots before day 1, stopping the stepper there, and the
+> disclosure. **Not put to a swarm**: the lane had no way to spawn one.
+
+**Why an entry.** It moves a recorded ruling, departs from the design handoff's seven-chip strip
+where the handoff draws nothing (its prototype shows a week of days played and no blank tile), and
+binds `everyday/dailyLoop.browser.test.ts`, `everyday/replay.browser.test.ts` and
+`honesty/surfaces.ts`.
+
+**The ruling.**
+
+1. **The strip draws the week's days so far**, from day 1 to today, up to seven
+   (`everyday/doorView.ts#earliestOffsetOf`). A first visit draws today alone.
+2. **The stepper stops at day 1**, and its dimmed arrow says why, true of the day it is dimmed on:
+   *This is the week's first day, so there is no day before it.*, or the seven-day reach as before.
+3. **The day's words sit behind one disclosure**, closed on arrival, whose line names exactly the
+   words inside (*What press, standing order and pinned crowd mean*). The definitions are
+   `mode/glossary.ts`'s, unchanged.
+
+**Tests.** `everyday/doorView.test.ts` (red before: seven chips, offsets −6 to 0, on a Friday);
+`everyday/dailyLoop.browser.test.ts` and `everyday/replay.browser.test.ts`, which named chips by
+position and now name them by their day.
+
+## D1387 — while a scored attempt stands, the Engineer surface draws the controls that run nothing as unavailable, with the reason, before they are pressed
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (wave AO, lane AO-4, on the
+> post-AN panel's seat B), not by the product owner. **Extends [§ D1323](#d1323)** clause 1, which
+> refuses those controls in words when pressed. **Owner-reversible**: `aria-disabled` rather than
+> `disabled`, and the dimming. **Not put to a swarm**: the lane had no way to spawn one.
+
+**Why an entry.** It binds `dev/main.ts`, `dev/rightRail.ts`, `index.html` and two browser journeys
+other lanes wrote (`everyday/autoFile.browser.test.ts`, `everyday/watchOnly.browser.test.ts`).
+
+**The ruling.** While an attempt stands on the week on screen, the building, pattern and part-of-day
+selects, *Run this shift* (not *Cancel this run*), *Save recording* (where its press refuses) and the
+rail's dispatcher, traffic and building cards carry `aria-disabled` and the `watch-only` class, which
+dims them. The selects and buttons carry the sentence their press gives as their `title`, and each
+card is described by the rule drawn above its list. A press still refuses in § D1323's words on the
+status line, so no clause of § D1323 moves. `aria-disabled` keeps them focusable and pressable, which
+is what lets the press keep saying why.
+
+**Tests.** `everyday/continueWhereLeft.browser.test.ts` case 4 (red before: none of the controls
+carried `aria-disabled` or a reason). The two journeys that press *Run this shift* and *Save
+recording* during an attempt now press past the drawn state (`force`), and still read the refusal.
+
+## D1388 — the close offers today again, as practice, beside the call that decided it
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (wave AO, lane AO-4, on the
+> post-AN panel's seat D, whose note was that *Take this call again* exists only on the pinned
+> Monday and practice on any other day is three screens deep), not by the product owner.
+> **Owner-reversible**: drawing the press at all, and its words. **Not put to a swarm**: the lane had
+> no way to spawn one.
+
+**Why an entry.** It adds a press to the close [§ D1247](#d1247) to [§ D1249](#d1249) laid out, and
+it is a practice under [§ D1218](#d1218)'s rule.
+
+**The ruling.** On the close of a counted day an ordinary call decided (the close's call line names
+it, `WeekDayReport.callDecided`), the press *Play today again, as practice* sits under that line. It
+is the brief's own press, `host.playDay`, which on a day already filed runs it again as practice from
+its start, under the driver it began with and with nothing pressed; the stage carries the practice
+line and a close of it banks nothing. A pinned day keeps its own *Take this call again*.
+
+**The reading not chosen.** A practice that opens at the deciding call with the earlier answers
+carried, as the pinned day's does. An ordinary day's calls open only on a log no press reached
+(`dev/state.ts#dayCallsOpenOn`), so that run would ask nothing; opening it would need the call
+session reopened mid-day on a practice run, which is not built. So the label says *today*, never
+*this call*.
+
+**Tests.** `everyday/reportView.test.ts`: drawn on a decided ordinary day, not where no call decided,
+on a practice close, a career sheet, a close with no week, or a pinned day.
+
+**Not established.** No browser case presses it: the browser tier's slice day (Crown Hotel) is
+decided by no call under any first answer, measured on this tree.
+
+## D1376 — the stage page and the hub row read one path, so a clear and its row give one par, and a cleared stage's practice line promises only the par it has
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (wave AO, lane AO-3), not by the
+> product owner: a correction the integrator's brief asked for from the post-AN panel's seats C (D1)
+> and D (D5). **Owner-reversible**: the words of the practice line's three arms.
+
+**Why an entry.** [§ D405](#d405)'s first and second grounds. It binds `campaign/stagePress.ts`,
+`everyday/scenarioLadderPort.ts`, `dev/main.ts` and `everyday/stagePlayScreen.ts`, and it amends
+[§ D1358](#d1358) clause 5, whose practice line promised a mark on every cleared stage.
+
+**What was wrong.** Stage 1's clear read *This stage has no par: no way through the census found on
+its page could be priced*, while the hub row for the same stage read *Par is free here*; stages 2, 3,
+5, 7, 8 and 9 read *no par* on their clears beside rows reading *At par* or *Par is 6 units*. The
+stage page asked `scenario/ladder.ts#scenarioLadderOf` for the hold (`routeRefusalsOf`) and not for
+the price (`routeUnitsOf`), so every stage page read its par as unpriced. The practice line, *a clear
+at or under par earns the mark*, stood on stage 1 too, where the par is free and nothing is marked.
+
+**The ruling.**
+
+1. **One composition.** `campaign/stagePress.ts#stagePathOf` asks the ladder with both of the one
+   check's answers, and the hub (through `scenarioLadderPort.ts#provideScenarioLadderFrom`) and the
+   stage page both read it. Neither may ask the ladder by hand.
+2. **The practice line says the stage's own par** (`everyday/stagePlay.ts#stagePracticeLineOf`): a
+   priced par names the mark and its price; a free par and a stage with no priced par say the hub
+   row's reason, with nothing spent. Amends [§ D1358](#d1358) clause 5's words, and nothing else.
+
+**Tests**, red before and green after: `everyday/stagePlay.test.ts`'s *the stage page and its hub row
+say one par* (every shipped offered stage, the page's verdict line against the row's at a clear priced
+at the par) and its practice arms; on the built bundle `everyday/stageClearPays.browser.test.ts` now
+asserts that stage 1's clear and its hub row read the same sentence and that the practice line is the
+free par's (red before: the clear read the *no par* sentence).
+
+## D1377 — the Career's sheets are worded from the tower and the contract: a shaft tier is named for the car it adds, a perfect month says what it pays, a renewal says *up* only of a rise, a career day is a weekday, and the desk counts today's tenants
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (wave AO, lane AO-3), not by the
+> product owner: corrections the integrator's brief asked for from the post-AN panel's seats C (D5)
+> and D (D6). **Owner-reversible**: every arm's words, and naming a single-bank shaft tier by its
+> ordinal rather than as *one more car*.
+
+**Why an entry.** [§ D405](#d405)'s first ground. It binds `campaign/economy.ts`,
+`everyday/campaignModel.ts`, `everyday/campaignScreens.ts` and `everyday/host.ts`, and it replaces
+design-handoff prose on three shop tiers (`docs/design/`'s tower, which the handoff wins on looks and
+the simulator wins on what a sentence means).
+
+**What was wrong**, on Garden Apartments, six floors and two cars: *A fourth car is 34 units* and *The
+tower stops being one car short*; *4.0 m/s: Modest on fourteen floors*; *Staggered start times:
+Negotiated with four tenants* beside the shop's own *nobody here keeps a start time to stagger*; *A
+perfect month pays 98 units* beside rates that sum to 90 (98 is § 8.1's on-hand total, the 8 a month
+opens with included); the desk and the renewal headers at *120 people* after the tenants grew past
+380; career days named Saturday and Sunday inside *twenty working days*; and a renewal reading *3 u a
+day, up from 3*.
+
+**The ruling.**
+
+1. **A tier is worded for the tower it is sold on** (`economy.ts#shopTierFaceOf`, from the contract's
+   tower as handed, `host.ts#buildingShape`). A shaft tier sinking its shafts in one bank of *n* cars
+   is named for car *n*+1 (or *n*+2) and its effect is the count before and after; in several banks it
+   is *one more car in each bank*. The machines tiers say the speed now and after on the tower's
+   floors and claim no gain. Staggered start times counts the floors that keep a start time, or says
+   nobody here does. With no tower known, the shipped words stand.
+2. **A perfect month says what it pays and what it leaves on hand** (`campaignModel.ts#perfectMonthLineOf`,
+   `economy.ts#perfectMonthPayUnits`), from the difficulty's rates and the purse's carry. The
+   impossible tier's note says 53 is on hand, the 3 it opens with among it.
+3. **A renewal says *up* only of a rise** (`campaignModel.ts#renewalRateHeadOf`): *the same as this
+   month* and *down from N* otherwise.
+4. **A career day is a weekday** (`economy.ts#careerDayIdxOf`, Monday to Friday and round). It moves no
+   run: a career day's event is the campaign's own and Everyday ships no calendar.
+5. **The desk describes a held tower on the day its next run builds** (`host.ts#careerTowerSpecLine`),
+   through `dev/state.ts#resolvedBuildingOf` on `runCampaignDay`'s fabric fields: the contract's tower,
+   the kit fitted by then, grown to the day.
+
+**Tests**, red before and green after: `campaign/shaftPlan.test.ts`'s three new cases (every contract
+tower's shaft tier names, Garden's *A third car*, the machines and start-time words, and the desk's
+line against the building `runCampaignDay` resolves), `campaign/economy.test.ts`'s impossible-month
+case and `everyday/campaignModel.test.ts`'s *Career sheets say what the contract and the tower are*.
+Red before for the desk line: with `campaignInputOf` reading the rung's spec, day 12 read the same
+589 people as day 1.
+
+**Not established.** The car-size tiers' *The morning shortens by a fifth* and the 5 m/s tier's
+*people load without hesitating* are still the handoff's claims, unmeasured, and were not reported.
+
+## D1378 — the report never advises a weight the day already carried: *Weight fairness up* is not pointed at on a day a driver weighted fairness, and says who did
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (wave AO, lane AO-3), not by the
+> product owner: a correction the integrator's brief asked for from the post-AN panel's seat B
+> (defect 8). **Owner-reversible**: keeping the card with the sentence rather than dropping it.
+
+**Why an entry.** [§ D405](#d405)'s first ground: it binds `shift/report.ts` and `dev/main.ts`, and it
+extends `report.ts#leversFor`'s rule that *a lever you have already pulled is not a lever you have*.
+
+**What was wrong.** The report read *Today points here … Weight fairness up* on a day driven with
+Fairness first from 12:20.
+
+**The ruling.** Fairness is the `starvation` weight, the term the workshop lever the card opens moves.
+Where any stretch of the day was driven by a profile weighting it above zero (the starting driver's
+weights, now on `DayReportInput.startingWeights`, and every handover's profile carried whole), the
+card is not pointed at and reads *Today already weighted it: ⟨drivers, from when⟩.* before its
+glossary sentence (`report.ts#fairnessDriversOf`). A weight is read, never a profile id.
+
+**Tests**, red before and green after: `shift/report.test.ts`'s *never points at weighting fairness on
+a day a driver already weighted it* (a handover to a fairness-weighted profile, the same day without
+it, and a day started on one).
+
+## D1379 — a close that names the call that decided the day names the earlier calls that could have too
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (wave AO, lane AO-3), not by the
+> product owner: a correction from the post-AN panel's seat B (defect 7). **Owner-reversible**: the
+> words.
+
+**Why an entry.** The sentence is the close's, read by `everyday/reportView.ts` and the corpus, and
+it changes the deciding call's choice where a pinned call fell between two rows.
+
+**The ruling.** *1 earlier call today could have turned it too* never said which; it now reads *The
+call at 10:40 could have turned it too.* (or *The calls at 08:42 and 10:40 …*), each by its row's
+clock. The calls are ordered by their instant before the latest is taken as deciding, so a pinned
+call between two rows no longer stands as the latest.
+
+**Tests**, red before and green after: `shift/dayClose.test.ts`'s *names the latest when several
+did* and *names every earlier call … the pinned one among them*.
+
+## D1380 — a settled house verdict is kept across a reload, so the close's tally never goes backwards
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (wave AO, lane AO-3), not by the
+> product owner: a correction the integrator's brief asked for from the post-AN panel's seats B
+> (defect 5) and D (D8). **Owner-reversible**: browser storage as the place, and the bound.
+
+**Why an entry.** [§ D405](#d405)'s first and second grounds: it adds `dev/settledReadings.ts`, binds
+`dev/main.ts`'s house and driver runs, and amends [§ D1227](#d1227)'s *a reading the sheet asks for and
+nobody asked yet (after a reload, which keeps nothing) is asked then*.
+
+**What was wrong.** After a reload the close read *The house is still being run on all 3 of them*
+about days earlier closes had settled, and caught up seconds later.
+
+**The ruling.** A verdict a run returned (*cleared*, *missed* or *ungraded*) is kept in browser
+storage under the run's own key, the house's (tower, day, wrinkle, seed) and the driver run's
+(the swapped record), bounded to the newest 512. `askWeekHouse` and `weekDriverRunReadingOf` read it
+before they ask a run. *Unrecorded* (a run that threw or a record this build cannot read) is never
+kept. A verdict is a pure function of the day's record, so the cache is safe to lose: lost, the run
+is asked as before.
+
+**Tests**, red before and green after: `dev/settledReadings.test.ts` (kept across a fresh sitting,
+the two runs apart, no failure kept, the bound, no storage), and on the built bundle
+`everyday/dayClose.browser.test.ts`'s *the house tally never goes backwards across a reload*.
+
+## D1381 — once the day has run out, a header figure is drawn in its goal's verdict, and ▶ Play is inert with its reason
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (wave AO, lane AO-3), not by the
+> product owner: a correction from the post-AN panel's seat B (defect 6). **Owner-reversible**: the
+> palette mapping.
+
+**Why an entry.** It departs from the handoff's *terracotta: live figures* once the figures stop being
+live, which is a disagreement about what a colour means rather than how the screen looks.
+
+**The ruling.** While the day runs a header figure keeps the live accent. Once the strip is judged
+(`stageGoalsOf`'s own `judged`), a figure that reads a goal takes its row's verdict, moss for met and
+alarm for missed, and a figure no goal grades is drawn in ink (`stageScreenModel.ts#stageFigureToneOf`).
+▶ Play at the day's end did nothing (a playing transport at its end is `ended`); it is inert, with
+*the day has already run out, so there is nothing left to play* on its face
+(`stageScreenModel.ts#stagePlayControlOf`), as the skip beside it already was.
+
+**Tests**, red before and green after: `everyday/stageScreenModel.test.ts`'s two new cases.
+
+## D1382 — four stale lines from D9: the banked line stands only while its run does, *Your week* lists a replayed day once, an Engineer Building card describes the building its press runs, and the chimes sentence says what pays nothing
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (wave AO, lane AO-3), not by the
+> product owner: corrections the integrator's brief asked for from the post-AN panel's seat D (D9).
+> **Owner-reversible**: the chimes sentence's words.
+
+**Why an entry.** It binds `everyday/host.ts`, `watch/library.ts`, `dev/rightRail.ts`,
+`everyday/chimesPanel.ts` and `everyday/campaignModel.ts`, four modules for four lines.
+
+**The ruling.**
+
+1. **The banked line** (*cleared day filed · 3 chimes*) is drawn while the run the turn finished is the
+   run on the stage, through the report, the door and the brief after it, and withdrawn once another
+   run stands there (`host.ts#chimeTally`, by recording identity). It stood on the next day's stage
+   and on a practice stage.
+2. **A replay week is not listed beside the week it copies** (`watch/library.ts#filedDayRuns`):
+   `shift/week.ts#openReplay` stands a replay on a copy of the earlier days, so *Monday · day 1* was
+   listed twice, both rows replaying one record.
+3. **An Engineer Building card describes the building a press of it runs** (`rightRail.ts#buildingCardOf`,
+   `state.ts#resolvedBuildingOf` over `withBuilding`), so Midtown reads the 589 people its week plays
+   rather than the file's 1,710.
+4. **One chimes sentence** (`chimesPanel.ts#CHIMES_EARN_RULE`), on Settings and on the Career: a
+   scenario or a stage pays its first clear, a counted day that clears pays, a rush pays only waves
+   past the best, and practice, a day that does not count and a missed day pay nothing. It read
+   *Chimes are what finishing something pays you* while a cleared Saturday and every practice paid 0.
+
+**Tests**, red before and green after: `everyday/host.test.ts`'s *withdraws the banked line once
+another run stands on the stage*, `watch/filedDay.test.ts`'s *lists the week a replay copies*,
+`dev/rightRail.test.ts`'s *a Building card describes the building its press runs* and
+`everyday/careerFrontPage.test.ts`'s chimes case. The rule's behaviour is held by `host.test.ts`'s
+existing *pays nothing for a clean day that does not count* and practice cases.
+
+## D1383 — lines read before or beside a run say the length and the place the screen does: the brief's measured day on the menu and the hub, the seed line's arrivals, the tutorial's floors, and the rush's text alternative
+
+> **Taken 2026-10-10 by agent sessions under delegated authority** (wave AO, lane AO-3), not by the
+> product owner: corrections the integrator's brief asked for from the post-AN panel's seats B (defect
+> 10, lost moments 1 and 2) and D (D9). **Owner-reversible**: every line's words.
+
+**Why an entry.** [§ D405](#d405)'s first and second grounds: it re-derives
+`SITTING_SHAPES.scenarioMode` and `.contractDay` (corrected by [§ D1169](#d1169) and [§ D1212](#d1212)),
+moves `pacedDayRealS` into `everyday/stagePace.ts`, adds a caller option to
+`render/describeFrame.ts`, and changes `docs/12`'s quotation.
+
+**The ruling.**
+
+1. **The menu and the hub lead with the brief's measured day**: *about 7-12 min a day at 4× on the
+   towers a first week can open on* (`firstDayLength.ts#pinnedDayMinutesSpan`, the pinned whole days'
+   middles, re-run by `firstDayLength.test.ts`). They read *1 min-1 h 49*, a floor no day reaches and a
+   reference tower nobody opens on, beside a brief saying *about 12 min*. The hub keeps the game
+   towers' longest and the reference tower's, said as what they are. `pacedDayRealS` moved to
+   `stagePace.ts` so `sittingShape.ts` reads `firstDayLength.ts` without an import cycle, and is
+   re-exported where it was.
+2. **The seed line quotes the arrivals** (`report.ts#runStretchOf`): *08:00 to 18:00, run on to 18:01
+   for the riders still travelling*, from the run's own schedule, where it quoted the whole span as one
+   range ending 18:01.
+3. **Tutorial screen one names the floors** (*the top three floors*), where its notes read *the floors
+   the letter is about* a screen before any letter.
+4. **A rush's text alternative quotes the climb** (`describeFrame.ts`'s `horizonS`): *of 1:30:00*, and
+   the run's status only past it, where at 0:00 it read *Run status timed-out … of 2:29:54*. With no
+   horizon nothing changes, so [§ D294](#d294)'s Engineer reading stands.
+
+**Tests**, red before and green after: `everyday/sittingShape.test.ts`'s *quotes the brief's measured
+day* (and its `docs/12` site), `shift/report.test.ts`'s *quotes the arrivals' stretch*,
+`everyday/tutorialModel.test.ts`'s stretch case and `render/describeFrame.test.ts`'s *quotes the
+length the screen states*.
+
+**Not established.** *About 7-12* is measured on the pinned first-day towers only; a later week on a
+reference tower can run longer, which the hub says and the menu tile does not.

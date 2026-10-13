@@ -676,7 +676,14 @@ export const CARRY_CHECKS: Readonly<Record<string, CarryCheck>> = Object.freeze(
       day: today,
       ...calendarAskInputOf(resources, state, authored),
       building,
-      event: scheduledEventFor(state.calendar, state.week.day, state.week.dayIdx, 'period', state.week),
+      event: scheduledEventFor(
+        state.calendar,
+        state.week.day,
+        state.week.dayIdx,
+        'period',
+        state.week,
+        state.campaignEventId,
+      ),
       playerHeldCarIds: state.outOfServiceCarIds,
     })
       .map((ask) => askClause(ask, today.shift))
@@ -840,7 +847,15 @@ function weekCarries(state: ViewerState): string | undefined {
    * `moving-week` was `ordinary` and this returned `undefined`, declaring a day the calendar had
    * made a move-in reproducible.
    */
-  const event = scheduledEventFor(state.calendar, state.week.day, state.week.dayIdx, 'period', state.week);
+  const event = scheduledEventFor(
+    state.calendar,
+    state.week.day,
+    state.week.dayIdx,
+    'period',
+    state.week,
+    /* The campaign's wrinkle where it handed the day one, as the run reads it (seat C's D4, wave AO). */
+    state.campaignEventId,
+  );
   if (!event.effect.changesNothing) facts.push(`the day schedules “${event.name}”`);
 
   if (facts.length === 0) return undefined;

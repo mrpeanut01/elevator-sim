@@ -123,6 +123,45 @@ import { STAGE_SPEEDS } from './stageScreenModel.js';
 export const BETWEEN_PEAKS_SIM_PER_REAL_S = 30;
 
 /**
+ * A whole authored day as the stage plays it — [§ D991](../../../../DECISIONS.md).
+ *
+ * `slowS` is the simulated seconds the stage plays at the **watching** rung: every act, plus every
+ * stretch between peaks with somebody on a landing past a minute. The rest of `recordedS` is crossed
+ * at the between-peaks rung. `recordedS` is the recording's own length, which a whole day overruns
+ * by the minutes its last riders take to drain; `periodS` is the authored day the span's end names.
+ */
+export interface PacedDay {
+  readonly periodS: number;
+  readonly recordedS: number;
+  readonly slowS: number;
+  /**
+   * **Simulated seconds the stage skips and never draws** — [§ D1212](../../../../DECISIONS.md), the
+   * quiet between a scored whole day's peaks, measured by `stagePace.test-helper.ts#scoredDayPlayOf` at the
+   * opening rung. Absent on a day measured before the skip, which is then an upper bound.
+   */
+  readonly skippedS?: number | undefined;
+}
+
+/**
+ * **Real seconds of watching for a whole day under § D991's pacing** — the slow part at the
+ * watching rung, the rest at the between-peaks rung or the watching rung, whichever is faster.
+ *
+ * Exact for the day it is handed, and derivable from the rung — rule 1 — because a day's slow part
+ * is a property of its recording, not of the speed it is played at: the stage holds the watching
+ * rung while somebody has waited past a minute **whatever** that rung is.
+ *
+ * Since [§ D1212](../../../../DECISIONS.md) a day may carry {@link PacedDay.skippedS}, the quiet
+ * between peaks the stage seeks over, which costs no real time. Its beats are in the fast part. It
+ * was measured at the opening rung, where every figure here is quoted; at a rung above the fast one
+ * the beat covers more of the day and this is short by at most two real seconds a skip.
+ */
+export function pacedDayRealS(day: PacedDay, watchingSimPerRealS: number): number {
+  const between = Math.max(watchingSimPerRealS, BETWEEN_PEAKS_SIM_PER_REAL_S);
+  return day.slowS / watchingSimPerRealS + (day.recordedS - day.slowS - (day.skippedS ?? 0)) / between;
+}
+
+
+/**
  * **The wait that holds the stage at the player's rung between peaks** — the third band's floor.
  *
  * `WAIT_BANDS`' *checking watch*, 60 s, read rather than restated: it is the band § D512's
@@ -486,4 +525,59 @@ export const STAGE_SKIP_BEAT_NOTE =
  */
 export function stageSkipLineOf(skip: StageSkip, dayStartS?: number | undefined): string {
   return `skipped ${clockAt(skip.fromS, dayStartS)}–${clockAt(skip.toS, dayStartS)}: nobody on a landing waited a minute`;
+}
+
+/*
+ * ---- Wave AO, lane AO-4: one message for one state ----
+ */
+
+/**
+ * **What the transport's line says: one message for one state** — wave AO, lane AO-4, the post-AN
+ * panel's seat B (lost moment 5, defect 3). The pace note and the skip's line were two spans side by
+ * side, each written by its own rule, so a skip that landed on a call read *stopped for the day's call
+ * skipped 09:46–10:40: nobody on a landing waited a minute*, and on a phone a skip's range stood
+ * beside every later note until the next skip replaced it (*skipped 08:31–08:41* still up at the
+ * 12:20 stop).
+ *
+ * Both spans stay, so a reader can tell the two kinds of line apart, but at most one of them has
+ * words at any instant, and this decides which:
+ *
+ * 1. **A stop speaks alone.** The stage stopped for a call, or is waiting at one while its runs are
+ *    made: that is the one thing the player has to act on.
+ * 2. **Otherwise a skip speaks while it stands**: the beat while one is coming, and the line one
+ *    left while {@link stageSkipLineStands} holds.
+ * 3. **Otherwise the pace note.**
+ *
+ * [§ D1385](../../../../DECISIONS.md) clause 2: it changes which of two lines § D1169 and § D1212
+ * already wrote is drawn, and the words of neither.
+ */
+export function stageStatusOf(input: {
+  /** The pace rule's note for the present frame, or the call's while the stage stops for one. */
+  readonly pace: string;
+  /** The stage is stopped for a call, or waiting at one. */
+  readonly stopped: boolean;
+  /** The beat's note while a skip is coming, else the line the last skip left, else `''`. */
+  readonly skip: string;
+}): { readonly pace: string; readonly skip: string } {
+  if (input.stopped) return { pace: input.pace, skip: '' };
+  if (input.skip !== '') return { pace: '', skip: input.skip };
+  return { pace: input.pace, skip: '' };
+}
+
+/**
+ * **Whether the line a skip left still describes the stage** — {@link stageStatusOf}'s *cleared when
+ * the state ends*. A skip lands somewhere the pace rule has a reason for (somebody has waited a
+ * minute, a peak has begun, a call is due); the line stands while the stage stays in that state and
+ * goes the first frame it leaves it, or the moment a call stops the transport.
+ *
+ * @param input.landedReason the pace reason on the first frame after the skip landed, or `undefined`
+ *   before that frame has been asked.
+ * @param input.reason the pace reason now.
+ */
+export function stageSkipLineStands(input: {
+  readonly landedReason: StagePaceReason | undefined;
+  readonly reason: StagePaceReason;
+}): boolean {
+  if (input.reason === 'call') return false;
+  return input.landedReason === undefined || input.landedReason === input.reason;
 }

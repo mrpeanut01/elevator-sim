@@ -43,6 +43,18 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
   Object.freeze([
     {
       reason:
+        'The settled-verdict store — wave AO, lane AO-3, § D1380. `dev/settledReadings.ts` keeps the ' +
+        'house’s and the driver run’s verdicts across a reload under a storage key; `SETTLED_READINGS_KEY` ' +
+        'is that key, and `keepSettled` and `settledReadingOf` read and write verdicts (`cleared`, ' +
+        '`missed`, `ungraded`), words the close draws through `shift/dayClose.ts`, never these.',
+      ids: [
+        'dev/settledReadings.ts#SETTLED_READINGS_KEY',
+        'dev/settledReadings.ts#keepSettled',
+        'dev/settledReadings.ts#settledReadingOf',
+      ],
+    },
+    {
+      reason:
         'The Engineer surface’s watch-only gate — wave AN, lane AN-6, § D1323. `VIEWER_KEY_ROLES` ' +
         'sorts every `ViewerState` key into `remakes-the-day` or `view`, two keys the gate compares ' +
         'and no surface draws; `patchRemakesTheDay` answers a boolean and `watchOnlyRefusal` returns ' +
@@ -770,8 +782,14 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         '`loadAttempts` returns the attempts it could read and drops the rest in silence, and ' +
         '`saveAttempts` returns whether the store took the write. None of them returns a sentence, ' +
         'and what a player reads about an attempt is `shift/attempt.ts#DAY_ATTEMPT_COPY`, which the ' +
-        '`EVERYDAY_MENU` adapter seeds by name.',
-      ids: ['persist/attempt.ts#ATTEMPT_KEY', 'persist/attempt.ts#loadAttempts', 'persist/attempt.ts#saveAttempts'],
+        '`EVERYDAY_MENU` adapter seeds by name. `writeAttemptSlot` (wave AO, lane AO-1, § D1361) ' +
+        'returns whether one tab\'s write stood and the slot as read, with no sentence in either.',
+      ids: [
+        'persist/attempt.ts#ATTEMPT_KEY',
+        'persist/attempt.ts#loadAttempts',
+        'persist/attempt.ts#saveAttempts',
+        'persist/attempt.ts#writeAttemptSlot',
+      ],
     },
     {
       reason:
@@ -1134,6 +1152,17 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'shift/week.ts#PARKED_WEEKS_MAX',
         'shift/week.ts#switchWeek',
         'everyday/replay.ts#replayPatchOf',
+        /*
+         * Wave AO, lane AO-2, § D1368: the sandbox day's week. `SANDBOX_DAY_CONTRACT_ID` is the
+         * string `sandbox-day`, derived for `FREE_PLAY_CONTRACT_ID`'s reason (the hyphen), and the
+         * list of mode weeks and the function that opens one inherit it; neither authors a sentence.
+         * What a player reads about a week carrying it is `coachWeekLines`' sandbox branch, driven
+         * through `WEEK_CONTRACT_SENTINELS`, and on the stage and the sheet the sandbox practice
+         * sentences, driven through `PRACTICE_DAY_SENTENCES` and `PRACTICE_SANDBOX_NOTE`.
+         */
+        'shift/week.ts#SANDBOX_DAY_CONTRACT_ID',
+        'shift/week.ts#MODE_WEEK_CONTRACT_IDS',
+        'shift/week.ts#openSandboxDay',
       ],
     },
     {
@@ -1992,8 +2021,13 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'what a player reads of it is `dayStakeSentenceOf`, which the week adapter seeds for every ' +
         'census tower. `houseRecordOf` returns a run record for the shell’s house run. What a player ' +
         'reads from the module is seeded by name in `honesty/surfaces.ts#seedWeekStake`. ' +
-        '`weekClosedByThisClose` (wave AM, § D1246) is a boolean for the tower’s record of weeks.',
+        '`weekClosedByThisClose` (wave AM, § D1246) is a boolean for the tower’s record of weeks. ' +
+        '`weekPathEndFor` and `weekAsksOf` (wave AO lane AO-5, § D1394) return a day number and a ' +
+        'target count, for any Scenario week, which the sheet and the close print through the ' +
+        'producers seeded above.',
       ids: [
+        'shift/weekStake.ts#weekPathEndFor',
+        'shift/weekStake.ts#weekAsksOf',
         'shift/weekStake.ts#weekClosedByThisClose',
         'shift/weekStake.ts#weekDealOf',
         'shift/weekStake.ts#dayCountsToward',

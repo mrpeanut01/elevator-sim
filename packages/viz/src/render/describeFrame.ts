@@ -84,6 +84,16 @@ export interface DescribeFrameInput {
   /** Cap on the number of cars named individually, so a 24-car tower is still a paragraph. */
   readonly maxCars?: number;
   /**
+   * **The length the screen tells the player the run has**, in simulated seconds from its start,
+   * where that is shorter than the recording — [§ D1383](../../../../DECISIONS.md), the post-AN
+   * panel's seat D (D9). A rush's recording runs on past its ninety-minute climb until the drain
+   * deadline, so at 0:00 the rush stage's text read *of 2:29:54* and *Run status timed-out* about a
+   * climb its page says runs 90 minutes and a status from past the climb's end. Given, the sentence
+   * quotes this length, and states the run's status only once the playhead stands past it, where the
+   * status is about what has been shown. Absent, the recording's own end, as every caller had.
+   */
+  readonly horizonS?: number | undefined;
+  /**
    * Per-floor rider queues — `docs/10` § 6.3, and *"not optional"* in the design's own words.
    *
    * *"This is how the individual-glyph information reaches a reader who cannot see it."* The
@@ -269,10 +279,13 @@ export function describeFrame(input: DescribeFrameInput): string {
   const maxCars = input.maxCars ?? 8;
   const parts: string[] = [];
 
+  /* § D1383: the length the screen states, where it states one shorter than the recording. */
+  const horizonS =
+    input.horizonS !== undefined && input.horizonS < recording.endedAt - recording.startedAt ? input.horizonS : undefined;
   parts.push(
     `${recording.buildingName}, dispatcher ${input.dispatcherName ?? recording.dispatcherProfileId}, ` +
       `seed ${recording.seed}, ` +
-      `at ${formatClock(frame.simTimeS)} of ${formatClock(recording.endedAt)}.`,
+      `at ${formatClock(frame.simTimeS)} of ${formatClock(horizonS === undefined ? recording.endedAt : recording.startedAt + horizonS)}.`,
   );
 
   /*
@@ -281,7 +294,8 @@ export function describeFrame(input: DescribeFrameInput): string {
    * sentence from exactly this reading, so the two cannot word the run's outcome differently, which
    * is the whole point of the sighted and non-sighted halves coming out of one recording.
    */
-  if (recording.status !== 'completed') {
+  const pastHorizon = horizonS === undefined || frame.simTimeS >= recording.startedAt + horizonS;
+  if (recording.status !== 'completed' && pastHorizon) {
     const undelivered = undeliveredAt(recording, frame);
     parts.push(
       undelivered.wholeRun

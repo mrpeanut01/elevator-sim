@@ -85,9 +85,10 @@
  *   {@link EverydayHost.playThisCrowd}, and every one of them arrived **with** its consumer — § 14's
  *   *Your week* picker and § 7's stage — which is the rule these absences exist to keep;
  * - **no saved-pattern or saved-building *shelf* to browse** — and the narrowing is the point.
- *   {@link EverydayHost.applyBuildingSpec} and {@link EverydayHost.applyPatternSpec} both *write* to
- *   those shelves and hand back the id they took, because § 13's designer and § 3.3's tuner press
- *   them. What no listed screen reads is the **list**, so no method answers one. The bullet used to
+ *   {@link EverydayHost.applyBuildingSpec} *writes* to the building shelf and hands back the id it
+ *   took, because § 13's designer presses it, and {@link EverydayHost.runSandbox} saves § 3.3's
+ *   tuner's changed tower and pattern to both shelves ([§ D1368](../../../../DECISIONS.md)). What
+ *   no listed screen reads is the **list**, so no method answers one. The bullet used to
  *   say the shelves were untouched, and a stated absence that has stopped being true is § D227's
  *   defect with its polarity reversed.
  *
@@ -165,8 +166,10 @@ import {
   CAREER_PURSE_TOP_UP_SINK_ID,
   DIFFICULTIES,
   contractIsLost,
+  careerDayIdxOf,
   purseOf,
   shopTierAt,
+  type ShopTowerShape,
   type TowerShafts,
 } from '../campaign/economy.js';
 import { fitOutOf, startTimeFloorIdsOf } from '../campaign/fitOut.js';
@@ -197,7 +200,6 @@ import {
 import type { VizRecording } from '../contract/types.js';
 import { savedBuildingFrom, stateRunningSaved } from '../dev/buildingEditor.js';
 import type { BrowserResources } from '../dev/data.js';
-import { nextSavedId } from '../dev/dispatcherEditor.js';
 import {
   allBuildingIds,
   allDispatchers,
@@ -206,6 +208,7 @@ import {
   pressDayCallOf,
   plannedDayOf,
   resolvedBuildingOf,
+  runRungContractIdOf,
   runSubmissionOf,
   shiftDemandTemplateId,
   shiftLengthForContract,
@@ -229,7 +232,7 @@ import {
 import type { BookedOutCar } from '../shift/bookedOut.js';
 import type { CalendarPeriod } from '../shift/calendar.js';
 import { contractById, statLineOf } from '../shift/contracts.js';
-import { admittedPressDayIds, ladderTowersOf, pressDayFor } from '../shift/ladder.js';
+import { admittedPressDayIds, ladderTowerConfig, ladderTowersOf, pressDayFor, rungFor } from '../shift/ladder.js';
 import { crowdIsShared, PRACTICE_DAY_SENTENCES, type PracticeGround } from '../shift/scoredCrowd.js';
 import { callOpeningOf, watchedCallOpeningOf } from './callOpening.js';
 import type { PressCall } from '../shift/pressCall.js';
@@ -266,8 +269,8 @@ import { nextDay, rollWeek } from '../shift/week.js';
 import {
   countedCleanOf,
   dayCountsToward,
+  weekAsksOf,
   weekClosedByThisClose,
-  weekDealOf,
   weekHasClosed,
   type HouseReading,
 } from '../shift/weekStake.js';
@@ -288,6 +291,8 @@ import {
   type CheckedRun,
 } from '../watch/library.js';
 import { postedRunOf } from '../watch/posted.js';
+import { watchRunPlanOf } from '../watch/record.js';
+import type { BriefYesterday } from './briefView.js';
 import type { WatchableRun } from '../watch/types.js';
 import { watchingViewOf, type WatchingView } from '../watch/view.js';
 
@@ -307,6 +312,13 @@ import {
 } from './rushSitting.js';
 import { rememberDriver } from './driverMemory.js';
 import { REPLAY_COPY, replayBeforeOf, replayPatchOf, replayRestorePatchOf, replayableDay, type ReplayBefore } from './replay.js';
+import {
+  sandboxBeforeOf,
+  sandboxPatchOf,
+  sandboxRestorePatchOf,
+  type SandboxBefore,
+  type SandboxPresses,
+} from './sandbox.js';
 
 import { campaignDayVerdict, campaignTestRows, type FiledDayRecord } from './campaignModel.js';
 
@@ -892,6 +904,16 @@ export interface CampaignDayFacts {
   readonly answered: boolean;
 }
 
+/** What *Tune the tower* opens on — {@link EverydayHost.sandboxStanding}, [§ D1368](../../../../DECISIONS.md). */
+export interface SandboxStanding {
+  /** The tower its contract's rung hands over, as the authoring model's spec. */
+  readonly building: BuildingSpec;
+  /** The pattern behind the selection, carrying the rate the day runs at. */
+  readonly pattern: PatternSpec;
+  /** The levers' door dwell, or `undefined` for *the dispatcher's own*. */
+  readonly dwell: DwellChoice | undefined;
+}
+
 export interface EverydayHost {
   /* ---------------------------------------------------------------- reads */
 
@@ -1177,6 +1199,25 @@ export interface EverydayHost {
   buildingShafts(id: string): TowerShafts | undefined;
 
   /**
+   * **The tower a building's contract hands over, as the shop's words need it** — floors, cars per
+   * bank and top speed, read off the same `shift/ladder.ts#ladderTowersOf` tower
+   * {@link buildingSpecLine} describes, or `undefined` for a building this build cannot resolve.
+   * [§ D1377](../../../../DECISIONS.md): three shop tiers were worded for the design file's tower.
+   * Optional so a fake host that knows no building reads every tier's shipped words.
+   */
+  buildingShape?(id: string): ShopTowerShape | undefined;
+
+  /**
+   * **A career tower's stat line on the day it stands at** — `shift/contracts.ts#statLineOf` over the
+   * building `dev/state.ts#shiftRunConfigOf` resolves for that tower's next day: the contract's
+   * tower, the kit fitted by then, grown to the day. [§ D1377](../../../../DECISIONS.md): the desk and
+   * the renewal kept *120 people* after the tenants had grown to 385 (the post-AN panel's seat C, D5).
+   * `undefined` for a tower the career does not hold or a building that will not resolve. Optional
+   * so a fake host falls back to {@link buildingSpecLine}.
+   */
+  careerTowerSpecLine?(towerId: string): string | undefined;
+
+  /**
    * The career GAMEPLAY § 8's three campaign screens read — the whole record, as plain data.
    *
    * One object for all three screens, which is § 16 rule 14: *"the brief, the stage, the report and
@@ -1246,21 +1287,20 @@ export interface EverydayHost {
   buildingSpec(): BuildingSpec | undefined;
 
   /**
-   * The demand the next run is under, as the pattern editor's spec.
+   * **What *Tune the tower* opens on: the day as it will run** — wave AO, lane AO-2,
+   * [§ D1368](../../../../DECISIONS.md), the post-AN panel's seat D (D3). `undefined` when the
+   * standing id names no building this build knows, on {@link buildingById}'s rule.
    *
-   * Read through the **selection**, never through the editor's working copy: `state.patternSpec` is
-   * what the Engineer traffic panel has under its sliders and reaches no run until it is saved, so
-   * a screen that read it would draw numbers the simulation is not using. What this answers is the
-   * spec behind `state.pattern` — the saved pattern it names, the shipped profile it names, or the
-   * building's own profile when the selection is `'building'`.
+   * It replaced three reads (the building as authored, the pattern behind the selection, and the
+   * levers' dwell), and the first two were not the day: the authored Midtown is let in full where
+   * its contract hands it over at about a third (`occupancy: 0.34`), which is how a tuned copy came
+   * to read *People 1,900* on the brief, and a rung that declares a rate runs at that rate while the
+   * profile's `typical` said another. So the tower is the one its contract's rung hands
+   * over (`shift/ladder.ts#ladderTowerConfig`, the scenario card's own derivation) and the pattern
+   * carries the rate the day runs at. Whether the day keeps its own mix is {@link dayAhead}'s
+   * `templateVariesMix`, which the tuner and the brief both read.
    */
-  patternSpec(): PatternSpec;
-
-  /**
-   * The door-dwell chip the group levers hold, or `undefined` for *the dispatcher's own* —
-   * `GroupLevers.dwell`'s fourth state, which is not a fourth chip and must not be defaulted.
-   */
-  doorDwell(): DwellChoice | undefined;
+  sandboxStanding(): SandboxStanding | undefined;
 
   /**
    * The four plain levers over the current working spec and group levers —
@@ -1331,17 +1371,32 @@ export interface EverydayHost {
 
   /* --------------------------------------- the workshop's own actions */
 
-  /** Replace the working spec wholesale — the term sliders, the flags and the name field. */
-  setWorkingSpec(spec: DispatcherSpec): void;
+  /**
+   * **The Everyday screens' refusal while a scored attempt stands** — wave AO, lane AO-1,
+   * [§ D1360](../../../../DECISIONS.md), the post-AN panel's seat D (D1). `shift/banking.ts#ATTEMPT_HOLDS_ITS_DAY`
+   * while an attempt stands on the week on screen, so a screen that would run that day or change
+   * how it runs draws its primary inert with these words; `undefined` where the week is free. The
+   * question is § D1323's (`dev/engineerWindow.ts#watchOnlyRefusal`), asked of the Everyday
+   * screens: every write and run below that would reach the attempt's day asks it first and
+   * refuses with it, so a screen that forgot to draw it still writes nothing.
+   */
+  attemptHold(): string | undefined;
 
-  /** Replace the group levers wholesale — the parking and express toggles, and the dwell chips. */
-  setGroupLevers(levers: GroupLevers): void;
+  /** Replace the working spec wholesale — the term sliders, the flags and the name field. Returns `ATTEMPT_HOLDS_ITS_DAY` and writes nothing while a scored
+   * attempt stands on the week on screen ({@link attemptHold}, [§ D1360](../../../../DECISIONS.md)). */
+  setWorkingSpec(spec: DispatcherSpec): string | undefined;
 
-  /** Replace the rule rows. Takes effect on the next run: rules are config, never mid-run. */
-  setRuleRows(rows: readonly RuleRow[]): void;
+  /** Replace the group levers wholesale — the parking and express toggles, and the dwell chips. Returns `ATTEMPT_HOLDS_ITS_DAY` and writes nothing while a scored
+   * attempt stands on the week on screen ({@link attemptHold}, [§ D1360](../../../../DECISIONS.md)). */
+  setGroupLevers(levers: GroupLevers): string | undefined;
 
-  /** Replace the switching spec. Also next-run, and for the same reason. */
-  setSelectorSpec(spec: SelectorSpec): void;
+  /** Replace the rule rows. Takes effect on the next run: rules are config, never mid-run. Returns `ATTEMPT_HOLDS_ITS_DAY` and writes nothing while a scored
+   * attempt stands on the week on screen ({@link attemptHold}, [§ D1360](../../../../DECISIONS.md)). */
+  setRuleRows(rows: readonly RuleRow[]): string | undefined;
+
+  /** Replace the switching spec. Also next-run, and for the same reason. Returns `ATTEMPT_HOLDS_ITS_DAY` and writes nothing while a scored
+   * attempt stands on the week on screen ({@link attemptHold}, [§ D1360](../../../../DECISIONS.md)). */
+  setSelectorSpec(spec: SelectorSpec): string | undefined;
 
   /**
    * Load a shipped or saved dispatcher into the working copy, with the two group settings a §11.2
@@ -1355,11 +1410,12 @@ export interface EverydayHost {
    * accident.
    *
    * An id this build does not know writes nothing — the honest lookup rule, as {@link buildingById}.
+   * And nothing while a scored attempt stands on the week on screen: § D1360, {@link attemptHold}.
    */
   startFromDispatcher(
     dispatcherId: string,
     settings?: { readonly parking: boolean; readonly zone: boolean },
-  ): void;
+  ): string | undefined;
 
   /**
    * The run on the stage, as GAMEPLAY § 18's state model asks for it.
@@ -1626,23 +1682,65 @@ export interface EverydayHost {
    * **Run this shift** (`MountContext.runShift`), so the run it produces may file. Returns before
    * the run lands (the simulation is on a worker); the landing arrives as a {@link subscribe}
    * notification.
+   *
+   * **Refused while a scored attempt stands on the week on screen** — wave AO, lane AO-1,
+   * [§ D1360](../../../../DECISIONS.md). Its callers are the workshop's *Run a day with this*, the
+   * tuner's and the drawing board's run presses, the stage's press outside the daily flow and
+   * *Take this call again*, and at a held call the workshop's ran the attempt's own crowd to the
+   * identical call. So it answers {@link attemptHold}'s sentence and writes and runs nothing; the
+   * attempt's day is run only by {@link playDay}. `undefined` when it pressed.
    */
-  startRun(): void;
+  startRun(): string | undefined;
 
   /**
    * **Today's day as the player asks for it** — the brief's *Start the day* and the stage's own
    * entry press. Resumes the attempt standing on the week's day where there is one, and otherwise
    * is {@link startRun} with the day's attempt begun on the run it presses — wave AL, lane AL-E,
    * [§ D1218](../../../../DECISIONS.md), `shift/attempt.ts`.
+   *
+   * **And one tab holds the attempt** — [§ D1361](../../../../DECISIONS.md). Where another tab holds
+   * it this starts nothing, unless `takeOver` says the player pressed {@link dayAttempt}'s takeover
+   * (*Continue ⟨day⟩ here*), which holds it here and resumes it from the attempt as last saved.
    */
-  playDay(): void;
+  playDay(options?: { readonly takeOver?: boolean }): void;
 
   /**
    * The attempt standing on the week's day, for the brief's *Resume ⟨day⟩* and the leave strip —
    * § D1218. `undefined` where none stands, which is every day before *Start the day* and every
-   * day after its close.
+   * day after its close. `heldElsewhere` is § D1361's: another tab holds it, so the brief and the
+   * stage offer *Continue ⟨day⟩ here* in place of *Resume*, and the stage shows the day no further.
    */
-  dayAttempt(): { readonly weekday: string } | undefined;
+  dayAttempt(): { readonly weekday: string; readonly heldElsewhere: boolean } | undefined;
+
+  /**
+   * **Whether this tab may play `recording` on the daily stage** — wave AO, lane AO-1,
+   * [§ D1361](../../../../DECISIONS.md). `'elsewhere'` while another tab holds the attempt standing on
+   * the week's day, whatever run is on screen; `'stale'` for the run this tab was playing when another
+   * tab took the attempt over, while the day stays open and nobody holds it. The stage holds either
+   * where its playhead stands, takes no press and offers the takeover or the resume; `undefined`
+   * where this tab may play it.
+   */
+  stageHold(recording: VizRecording | undefined): 'elsewhere' | 'stale' | undefined;
+
+  /**
+   * **Where the standing attempt was left, on the day's own clock** — wave AO, lane AO-4,
+   * [§ D1384](../../../../DECISIONS.md), for the mode picker's *Continue your week*. The furthest
+   * instant the stage had shown of it (`shift/attempt.ts#DayAttempt.shownToS`, where the stage
+   * reopens), on the hour {@link dayAhead} plans for the day, which is the hour the resumed run's
+   * stage prints: a page opened on the menu has no run of the day yet whose hour could be read.
+   * `undefined` where no attempt stands. Its own method so `dayAttempt`, asked on every bar, plans
+   * nothing.
+   */
+  dayAttemptLeftAt(): string | undefined;
+
+  /**
+   * **The day before this one, as the brief says what it carries** — wave AO, lane AO-4, the post-AN
+   * panel's seat B (lost moment 10), `briefView.ts#briefCarriedDriverLineOf`. The week's filed day
+   * before the one it stands on: its weekday, the dispatcher it started with, and the last handover
+   * made on its stage with that handover's clock, on the day's own hour. `undefined` on a first day
+   * and where that day was filed without a record of its run.
+   */
+  previousDayDriver(): BriefYesterday | undefined;
 
   /**
    * Where the stage opens `recording` when it is the standing attempt's run: the furthest instant
@@ -1761,7 +1859,7 @@ export interface EverydayHost {
    * ([§ D1318](../../../../DECISIONS.md), `everyday/driverMemory.ts`). Every other caller — the
    * rush's setup screen is the one today — passes nothing and keeps nothing.
    */
-  setDispatcher(dispatcherId: string, keep?: 'week'): void;
+  setDispatcher(dispatcherId: string, keep?: 'week'): string | undefined;
 
   /**
    * Write one plain lever — `mode/plainLevers.ts`'s seam, the identical route the Engineer
@@ -1790,7 +1888,7 @@ export interface EverydayHost {
    * field. That is a measurement at one cell and no refusal is drawn from it, because *no weight
    * can make this bite* is a claim nothing here has established.
    */
-  setPlainLever(id: PlainLeverId, value: number | boolean): void;
+  setPlainLever(id: PlainLeverId, value: number | boolean): string | undefined;
 
   /**
    * Move the career — `campaign/career.ts#applyCampaignAction`, and the only writer of it.
@@ -1862,27 +1960,35 @@ export interface EverydayHost {
    * *apply, then run*, and the two are separate because the designer's *Save as a new building*
    * is the same apply with no run after it. Composition beats a second method that differs by a
    * boolean.
+   *
+   * While a scored attempt stands on the week on screen it throws {@link attemptHold}'s sentence
+   * and writes nothing — § D1360, the loader's own refusal shape, which the designer already
+   * quotes; the tuner's primary is inert with the same words, so it never reaches this.
    */
   applyBuildingSpec(spec: BuildingSpec): string;
 
   /**
-   * Save a demand pattern and point the next run at it, answering the id it took.
+   * **Run a sandbox day: the day with what moved, over the week and never on it** — wave AO, lane
+   * AO-2, [§ D1368](../../../../DECISIONS.md), `everyday/sandbox.ts`. *Tune the tower*'s primary,
+   * whenever any of its seven moved.
    *
-   * `savedPatterns` **and** `pattern`, in one patch, for `dev/trafficEditor.ts`'s stated reason:
-   * *"a pattern the run cannot be pointed at is the dead seam this repository keeps finding"*.
-   * `patternSpec` is written alongside so the Engineer traffic panel opens on what is running
-   * rather than on whatever it was last left at.
+   * Keeps every field a press writes, stands the run on a copy of the week's day with the week
+   * parked behind it, writes what moved, and presses the run as {@link startRun} does. The day's
+   * own crowd and shape are read first, while the week still stands on its contract. One session at
+   * a time: a press while one stands puts it back first, so a sandbox day is always the week's day
+   * plus this press and never the last sandbox's. Throws {@link attemptHold}'s sentence and writes
+   * nothing while a scored attempt stands on the week on screen, because a sandbox day plays that
+   * day's crowd (§ D1360, joined at integration).
    */
-  applyPatternSpec(spec: PatternSpec): string;
+  runSandbox(presses: SandboxPresses): void;
 
   /**
-   * Write the door-dwell chip — `GroupLevers.dwell`, the seam that reaches the run as every car's
-   * `dwellCarCallS`/`dwellHallCallS` through `shiftRunConfigOf`'s `withDoorTiming`.
-   *
-   * `undefined` restores *the dispatcher's own*, which is a real fourth value rather than a
-   * missing one: writing a chip nobody pressed silently replaces an authored `dwellPolicy`.
+   * Put the week back — every field {@link runSandbox} kept, exactly — and refuse the sandbox's run
+   * on the week it leaves: a run still generating is cancelled, and one that landed and was not
+   * closed is marked left (`abandonDay`), so neither can be filed as the week's day. A no-op with no
+   * sandbox standing. `everyday/shell.ts#go` calls it on every screen but the stage and the report.
    */
-  setDoorDwell(choice: DwellChoice | undefined): void;
+  leaveSandbox(): void;
 
   /* ------------------------------------------------- § 14.1, the spectator */
 
@@ -2242,7 +2348,7 @@ export interface EverydayHost {
    * week the crowd would not be the one on the stage, so the Everyday primary is inert with that
    * sentence rather than pressing this and producing something else (§ 20.15, § D392).
    */
-  playThisCrowd(run: WatchableRun): void;
+  playThisCrowd(run: WatchableRun): string | undefined;
 
   /**
    * Hear about state changes, so a screen re-renders. Returns the unsubscribe. See the module
@@ -2326,9 +2432,22 @@ export interface EverydayHostBindings {
    * § D1218 — `dev/main.ts#resumeDayAttempt`: the standing attempt back on the stage, re-simulated
    * over `dayShape` where it is not already there. `false` when nothing was resumed.
    */
-  resumeDayAttempt?(dayShape: Partial<ViewerState>): boolean;
+  resumeDayAttempt?(dayShape: Partial<ViewerState>, takeOver?: boolean): boolean;
   /** § D1218 — the attempt standing on the week's day, or `undefined`. */
   dayAttempt?(): DayAttempt | undefined;
+  /** § D1361 — another tab holds the attempt standing on the week's day. Absent, no tab ever does. */
+  attemptHeldElsewhere?(): boolean;
+  /**
+   * § D1361 — `recording` is the run this tab was playing when another tab took the attempt over,
+   * and the attempt's day is still open. Absent, no run ever is.
+   */
+  attemptRunStale?(recording: VizRecording): boolean;
+  /**
+   * § D1360 — `dev/main.ts`'s refusal while a scored attempt stands: over the state as it stands with
+   * no patch (an ask for a run of its day), and with one over the state now and the state the write
+   * would make. Absent, nothing is refused, which is every test host that keeps no attempt.
+   */
+  attemptHold?(patch?: Partial<ViewerState>): string | undefined;
   /** § D1218 — where the stage opens the attempt's run, or `undefined`. */
   attemptResumeAtS?(recording: VizRecording): number | undefined;
   /** § D1239 — the ground the run on the stage would close as practice on, or `undefined` where it banks. */
@@ -2931,6 +3050,15 @@ export function createEverydayHost(
    */
   let chimeTally: EverydayChimeTally | undefined;
   /**
+   * **The run the last turn was banked on** — [§ D1382](../../../../DECISIONS.md), the post-AN panel's
+   * seat D (D9). The rail's *cleared day filed · 3 chimes* stood on the next day's stage and on a
+   * practice stage, about a day those stages were not. The acknowledgement is of a turn just
+   * finished, so it is drawn while the run it finished is the one standing, through the report, the
+   * door and the brief after it, and withdrawn once another run is put on the stage. The recording
+   * is compared by identity: every fresh ask writes a new one, and nothing else replaces it.
+   */
+  let chimeTallyOn: { readonly recording: VizRecording | undefined } | undefined;
+  /**
    * What the account owns, as the ledger last answered — the claim {@link bankTurn} and
    * {@link spendChime} keep current so a purchase reaches the next sitting without a reload.
    *
@@ -2949,6 +3077,8 @@ export function createEverydayHost(
    * failed would be a worse trade than a chime nobody banked.
    */
   const bankTurn = (turn: ChimeTurn): void => {
+    /* § D1382: the run this turn finished, taken on the close rather than when the ledger answers. */
+    chimeTallyOn = { recording: b.state().recording };
     const bank = b.bankCompletion;
     if (bank === undefined) {
       chimeTally = { turn: turn.completion, answer: { kind: 'no-server' } };
@@ -3008,10 +3138,14 @@ export function createEverydayHost(
       if (date !== undefined && seedText === date.toString()) {
         records = recordsWithDateCrowd(records, week.contractId, seedText);
       }
-      const deal = weekDealOf(week);
-      /* Once per week: at the close of the path's last day, and not again on a weekend day after it — § D1246. */
-      if (deal !== undefined && weekClosedByThisClose(week)) {
-        records = recordsWithClosedWeek(records, week.contractId, countedCleanOf(week), deal.target);
+      /*
+       * Once per week: at the close of the path's last day, and not again on a weekend day after it —
+       * § D1246. Every Scenario week since § D1394 (wave AO lane AO-5), at the target it asks: the
+       * census's, or an unmeasured week's `needClean`.
+       */
+      const asks = weekAsksOf(week);
+      if (asks !== undefined && weekClosedByThisClose(week)) {
+        records = recordsWithClosedWeek(records, week.contractId, countedCleanOf(week), asks);
       }
       if (records !== before) port.write(records);
     }
@@ -3082,6 +3216,37 @@ export function createEverydayHost(
    * in flight the replay's to cancel on the way out (GitHub issue #526 item 4).
    */
   let replaySession: { readonly day: number; readonly before: ReplayBefore; readonly pressed: boolean } | undefined;
+  /**
+   * The sandbox day standing — [§ D1368](../../../../DECISIONS.md), `everyday/sandbox.ts`. Opened by
+   * {@link EverydayHost.runSandbox}, which always presses a run, and ended by {@link leaveSandbox}.
+   * Host-scoped and never stored: a reload has no sandbox, and the save never wrote one.
+   */
+  let sandboxSession:
+    | {
+        readonly before: SandboxBefore;
+        /** The recording that stood when the sandbox pressed — see {@link leaveSandbox}. */
+        readonly recording: VizRecording | undefined;
+      }
+    | undefined;
+  /**
+   * Put the week back and refuse the sandbox's run on it — {@link EverydayHost.leaveSandbox}.
+   *
+   * The recording standing tells which: the one standing before the sandbox pressed means its run
+   * is still generating (or failed), so it is cancelled before it can land on the week put back, as
+   * `leaveReplay` cancels; a different one is the sandbox's own, and unless it was closed (filed into
+   * the sandbox day's week, which goes) it is marked left, so `closeShift` and the posting gate refuse
+   * it on the week (`shift/banking.ts`'s third ground) and the stage re-entered presses a fresh run.
+   */
+  const leaveSandbox = (): void => {
+    if (sandboxSession === undefined) return;
+    const { before, recording } = sandboxSession;
+    sandboxSession = undefined;
+    const standing = b.state().recording;
+    if (standing !== undefined && standing !== recording && !b.dayClosed()) b.abandonDay?.();
+    else b.cancelRun?.();
+    b.applyPatch(sandboxRestorePatchOf(before));
+    notifyCampaign();
+  };
   /**
    * **The run standing is a retake of the call** — § D1140. Set by `takeCallAgain` after its press
    * and cleared by every other `startRun`, so {@link EverydayHost.openingAtS} opens the retake at the
@@ -3654,6 +3819,22 @@ export function createEverydayHost(
     press();
   }
 
+  /**
+   * **One question before any Everyday write or run that would reach a scored attempt's day** —
+   * wave AO, lane AO-1, [§ D1360](../../../../DECISIONS.md). `dev/main.ts` answers it with § D1323's
+   * `watchOnlyRefusal` in the Everyday words: with no patch it is an ask for a run of the day on
+   * screen, and with one it is the write, judged over the state now and the state it would make. A
+   * shell that keeps no attempt binds nothing, and nothing is refused.
+   */
+  const attemptHoldOver = (patch?: Partial<ViewerState>): string | undefined => b.attemptHold?.(patch);
+  /** A write from a screen that edits the running configuration: refused, in words, while an attempt stands. */
+  const editorWrite = (patch: Partial<ViewerState>): string | undefined => {
+    const held = attemptHoldOver(patch);
+    if (held !== undefined) return held;
+    b.applyPatch(patch);
+    return undefined;
+  };
+
   const everydayHost: EverydayHost = {
     week: () => b.state().week,
     parkedWeeks: () => b.state().parkedWeeks,
@@ -3709,6 +3890,40 @@ export function createEverydayHost(
     },
     buildingStartTimeFloors: (id) => startTimeFloorsOf(id),
     buildingShafts: (id) => towerShaftsOf(id),
+    buildingShape: (id) => {
+      /* The same tower `buildingSpecLine` draws and `towerShaftsOf` prices (§ D1377). */
+      const resolved = ladderTowersOf(b.resources).find((building) => building.id === id);
+      if (resolved === undefined) return undefined;
+      const speeds = resolved.banks.flatMap((bank) => bank.cars.map((car) => car.ratedSpeedMps));
+      return {
+        floors: resolved.floors.length,
+        bankCars: new Map(resolved.banks.map((bank) => [bank.id, bank.cars.length])),
+        topSpeedMps: speeds.length === 0 ? 0 : Math.max(...speeds),
+      };
+    },
+    careerTowerSpecLine: (towerId) => {
+      const tower = towerById(career, towerId);
+      if (tower === undefined) return undefined;
+      /*
+       * `runCampaignDay`'s fabric fields — the building, the day it is grown to and the kit fitted
+       * by then — over the standing state, and nothing that moves the crowd: the seed, the event and
+       * the held cars change who rides, never the floors, the cars or the tenants this line counts.
+       */
+      const careerWeek = careerWeeks.get(tower.id) ?? openCareer();
+      try {
+        const resolved = resolvedBuildingOf(b.resources, {
+          ...b.state(),
+          buildingId: tower.buildingId,
+          week: { ...careerWeek, day: tower.day, dayIdx: careerDayIdxOf(tower.day) },
+          campaignFitOut: fitOutOf(tower),
+          shiftLengthS: shiftLengthForContract(tower.id),
+          windowStartS: null,
+        });
+        return resolved === undefined ? undefined : statLineOf(resolved);
+      } catch {
+        return undefined;
+      }
+    },
     campaign: () => career,
     priceSchedule: () => bindings.resources.priceSchedule,
     careerNotice: () => careerLoadNotice,
@@ -3753,17 +3968,31 @@ export function createEverydayHost(
       const config = buildingConfigOf(b.resources, state.savedBuildings, state.buildingId);
       return config === undefined ? undefined : specFromBuilding(config, state.buildingId);
     },
-    patternSpec: () => {
+    sandboxStanding: () => {
       const state = b.state();
-      if (state.pattern !== 'building') {
-        const saved = state.savedPatterns.find((entry) => entry.id === state.pattern);
-        if (saved !== undefined) return saved.spec;
-        return specFromTrafficProfile(b.resources.trafficProfiles, state.pattern);
-      }
       const config = buildingConfigOf(b.resources, state.savedBuildings, state.buildingId);
-      return specFromTrafficProfile(b.resources.trafficProfiles, config?.trafficProfile);
+      if (config === undefined) return undefined;
+      const rungId = runRungContractIdOf(b.resources, state);
+      const handed =
+        rungId === null
+          ? config
+          : ladderTowerConfig(config, rungId, specsWithSaved(b.resources, state.savedClasses));
+      const selected =
+        state.pattern === 'building'
+          ? undefined
+          : (state.savedPatterns.find((entry) => entry.id === state.pattern)?.spec ??
+            specFromTrafficProfile(b.resources.trafficProfiles, state.pattern));
+      /* The rung's declared rate, where the selection leaves the rate to it — `shiftRunConfigOf`'s `rungRate`. */
+      const rungRate = rungId === null ? undefined : rungFor(rungId, config.id)?.arrivalRatePctPop5min;
+      const own = specFromTrafficProfile(b.resources.trafficProfiles, config.trafficProfile);
+      const pattern =
+        selected ?? (rungRate === undefined ? own : { ...own, ratePctPop5min: rungRate });
+      return {
+        building: specFromBuilding(handed, state.buildingId),
+        pattern,
+        dwell: state.levers.dwell,
+      };
     },
-    doorDwell: () => b.state().levers.dwell,
     plainLevers: () => {
       const state = b.state();
       return plainLeversOf(state.dispatcherSpec, state.levers);
@@ -3790,17 +4019,18 @@ export function createEverydayHost(
         shiftDemandTemplateId(b.resources, state, building),
       );
     },
+    attemptHold: () => attemptHoldOver(),
     setWorkingSpec: (spec) => {
-      b.applyPatch({ dispatcherSpec: spec });
+      return editorWrite({ dispatcherSpec: spec });
     },
     setGroupLevers: (levers) => {
-      b.applyPatch({ levers });
+      return editorWrite({ levers });
     },
     setRuleRows: (rows) => {
-      b.applyPatch({ ruleRows: rows });
+      return editorWrite({ ruleRows: rows });
     },
     setSelectorSpec: (spec) => {
-      b.applyPatch({ selectorSpec: spec });
+      return editorWrite({ selectorSpec: spec });
     },
     startFromDispatcher: (dispatcherId, settings) => {
       const state = b.state();
@@ -3809,9 +4039,10 @@ export function createEverydayHost(
       );
       // Honest lookup — see the interface docstring. An unknown id writes nothing rather than
       // loading the first shipped profile under the name the player pressed.
-      if (wanted === undefined) return;
+      if (wanted === undefined) return undefined;
       const spec = specFromProfile(wanted, wanted.name);
-      b.applyPatch({
+      /* § D1360: a style card pressed while a scored attempt stands would change who drives it. */
+      return editorWrite({
         dispatcherId,
         editingDispatcherId: dispatcherId,
         dispatcherSpec:
@@ -3841,9 +4072,13 @@ export function createEverydayHost(
       b.state().recording === undefined ||
       runIdentityIssues(b.state(), b.resources, 'ranked').length === 0,
     startRun: () => {
+      /* § D1360: before the press's own patch, so a refused press moves nothing on the attempt's week. */
+      const held = attemptHoldOver();
+      if (held !== undefined) return held;
       pressTodaysRun(() => {
         b.startRun();
       });
+      return undefined;
     },
     /*
      * **Today's day, as § 6.2's *Start the day* and the stage's own entry press ask for it** — wave
@@ -3853,15 +4088,23 @@ export function createEverydayHost(
      * is not already there. Otherwise this is {@link EverydayHost.startRun} with the attempt begun
      * on the run it presses, where the day counts.
      */
-    playDay: () => {
+    playDay: (options) => {
+      const takeOver = options?.takeOver === true;
       if (b.dayAttempt?.() !== undefined) {
+        /*
+         * § D1361: another tab holds the attempt, so nothing starts here unless the player pressed the
+         * takeover. The stage reads the same fact and shows the day no further.
+         */
+        if (b.attemptHeldElsewhere?.() === true && !takeOver) return;
         retakeOfCall = false;
         releaseCareer();
         campaignDayTowerId = undefined;
         campaignDayIncident = undefined;
         const kitToClear = b.state().campaignFitOut === undefined ? {} : { campaignFitOut: undefined };
         const eventToClear = b.state().campaignEventId === undefined ? {} : { campaignEventId: undefined };
-        if (b.resumeDayAttempt?.({ ...dayPatchFor(b), ...kitToClear, ...eventToClear }) === true) return;
+        if (b.resumeDayAttempt?.({ ...dayPatchFor(b), ...kitToClear, ...eventToClear }, takeOver) === true) return;
+        /* A takeover another tab won first, or a claim refused: still nothing starts here. */
+        if (b.attemptHeldElsewhere?.() === true) return;
       }
       pressTodaysRun(() => {
         if (b.beginDayAttempt === undefined) b.startRun();
@@ -3870,7 +4113,46 @@ export function createEverydayHost(
     },
     dayAttempt: () => {
       const attempt = b.dayAttempt?.();
-      return attempt === undefined ? undefined : { weekday: weekdayOf(attempt.dayIdx) };
+      return attempt === undefined
+        ? undefined
+        : { weekday: weekdayOf(attempt.dayIdx), heldElsewhere: b.attemptHeldElsewhere?.() === true };
+    },
+    stageHold: (recording) => {
+      if (b.dayAttempt?.() === undefined) return undefined;
+      if (b.attemptHeldElsewhere?.() === true) return 'elsewhere';
+      return recording !== undefined && b.attemptRunStale?.(recording) === true ? 'stale' : undefined;
+    },
+    previousDayDriver: () => {
+      const state = b.state();
+      const entry = state.week.history.find((outcome) => outcome.day === state.week.day - 1);
+      const record = entry?.record;
+      if (entry === undefined || record === null || record === undefined) return undefined;
+      const weekday = weekdayOf(entry.dayIdx);
+      let last: { readonly atS: number; readonly toId: string; readonly toName: string } | undefined;
+      for (const press of record.interventions) {
+        if (press.change.kind === 'adopt-dispatcher' || press.change.kind === 'switch-dispatcher') {
+          last = { atS: press.atS, toId: press.change.profile.id, toName: press.change.profile.name };
+        }
+      }
+      if (last === undefined) return { weekday, startedWithId: record.dispatcherId };
+      let dayStartS: number | undefined;
+      try {
+        dayStartS = watchRunPlanOf(state, b.resources, record).startOfDayS;
+      } catch {
+        /* A record this build cannot plan keeps the clock's fallback hour rather than losing the line. */
+        dayStartS = undefined;
+      }
+      return {
+        weekday,
+        startedWithId: record.dispatcherId,
+        handover: { toId: last.toId, toName: last.toName, clock: clockOf(last.atS, dayStartS ?? DAY_START_S) },
+      };
+    },
+    dayAttemptLeftAt: () => {
+      const attempt = b.dayAttempt?.();
+      if (attempt === undefined) return undefined;
+      const dayStartS = plannedDayOf(b.resources, { ...b.state(), ...dayPatchFor(b) }).startOfDayS;
+      return clockOf(attempt.shownToS, dayStartS ?? DAY_START_S);
     },
     attemptResumeAtS: (recording) => b.attemptResumeAtS?.(recording),
     practiceOnStage: () => {
@@ -4038,12 +4320,16 @@ export function createEverydayHost(
        * The three fields `withDispatcher` writes, patched rather than the whole state replaced —
        * `applyPatch` is `MountContext.update`, which merges, and handing it a full `ViewerState`
        * would make this host the writer of every field a concurrent press had just changed.
+       *
+       * § D1360: the brief holds its driver cards while an attempt stands (§ D1218), and this is the
+       * second lock on the same rule, for every screen that presses it.
        */
-      b.applyPatch({
+      const held = editorWrite({
         dispatcherId: next.dispatcherId,
         dispatcherSpec: next.dispatcherSpec,
         editingDispatcherId: next.editingDispatcherId,
       });
+      if (held !== undefined) return held;
       /*
        * **And kept, when it is the week's own pick** — [§ D1318](../../../../DECISIONS.md), the
        * post-AM panel's seat A: the brief's, said by `keep`. A rush's driver, a replay's and a career day's are their mode's,
@@ -4056,6 +4342,7 @@ export function createEverydayHost(
       if (keep === 'week' && offered && ownMode) {
         rememberDriver(b.driverStore, next.dispatcherId);
       }
+      return undefined;
     },
     setPlainLever: (id, value) => {
       const state = b.state();
@@ -4068,7 +4355,7 @@ export function createEverydayHost(
        * second opinion about a classification that already has an owner.
        */
       const applied = applyPlainLever(state.dispatcherSpec, state.levers, id, value);
-      b.applyPatch({ dispatcherSpec: applied.spec, levers: applied.levers });
+      return editorWrite({ dispatcherSpec: applied.spec, levers: applied.levers });
     },
     campaignAct: (action) => {
       /*
@@ -4095,60 +4382,16 @@ export function createEverydayHost(
       if (next === career) return;
       setCareer(next);
       /*
-       * **§ 8.8: taking an offer moves a week between assignments** — GitHub issue #169 item 3,
-       * § D510. The record above is the campaign's; the week is `ViewerState`'s, and it moves the
-       * way `dev/scenariosPanel.ts`'s *take* moves it: the destination restarts (the card's own
-       * promise — a fresh week on this building) and the week being left is **parked**, not lost.
-       * The length is the contract's, for `runCampaignDay`'s reason.
+       * **Taking an offer moves no week** — the post-AN panel's seat C, D6, wave AO lane AO-5,
+       * [§ D1393](../../../../DECISIONS.md), amending [§ D510](../../../../DECISIONS.md) clause 3's
+       * week switch. A take used to park the Scenario week and restart it on the offered building
+       * (`switchWeek(…, contract.id, 'restart')`, with the building and the length), so a player who
+       * took St Jude in the career opened Scenario's *Today's scenario* on a St Jude week they never
+       * chose, numbered nowhere and closing on no sheet, and their rush ran on St Jude. A career
+       * day has stood on a week of its own since § D964, so the take has nothing of the Scenario's
+       * to move: the record above holds the new tower, and the Scenario week, its building, its
+       * crowd and its presses stay exactly where the player left them.
        */
-      if (action.kind === 'take-offer') {
-        const contract = contractById(action.contractId);
-        if (contract !== undefined) {
-          /*
-           * **The day being left goes with the week being parked** — GitHub issue #526 item 2. A run in
-           * flight here was asked for the old week and landed on the new one, where the Engineer surface's
-           * filing presses filed it; a landed, unclosed run was filed there the same way. So the run in
-           * flight is stopped and the run standing is refused, first — *unclosed* being the word the
-           * block below adds, because a day that has already filed is neither of those things.
-           * Starting the new contract's run
-           * instead would put a run nobody pressed on the new week, which those same presses would file.
-           */
-          /*
-           * **And a day already filed is stopped rather than refused** — GitHub issue #531 item 4,
-           * [§ D565](../../../../DECISIONS.md). `abandonDay` does two things: it cancels whatever is
-           * in flight, and it marks the recording that stands as one this shell may not file
-           * (`shift/banking.ts#LEFT_UNFINISHED_CANNOT_BANK`). The first is right whatever the day
-           * has done — a run in flight was asked for the week being parked. The second is a claim,
-           * and on a day that has already closed it is a **false** one: the posting gate asks
-           * `bankingRefusalFor` before it asks about identity, so a filed day posted after an offer
-           * was refused with *“belongs to a day that was left unfinished”* about a day that was
-           * finished and filed. It would have been refused anyway, on the selection the offer had
-           * just moved, and a true refusal for the wrong reason is still the product accusing a
-           * player of something they did not do — which is the one accusation `scope/runIdentity.ts`
-           * spends a docstring on not spending.
-           *
-           * So the mark is gated on {@link EverydayHostBindings.dayClosed} and the cancel is not.
-           * {@link EverydayHost.leaveDayUnfinished} needs no such gate and deliberately does not get
-           * one: § 3.4's strip is only drawn while `runState().open` is true, and that is false for
-           * a closed day, so the other caller cannot arrive here with one.
-           */
-          if (b.dayClosed()) b.cancelRun?.();
-          else b.abandonDay?.();
-          /* The offer's promise is about the Scenario week, so that is the week it moves (#594). */
-          releaseCareer();
-          const state = b.state();
-          const moved = switchWeek(state.week, state.parkedWeeks, contract.id, 'restart');
-          b.applyPatch({
-            week: moved.week,
-            parkedWeeks: moved.parked,
-            buildingId: contract.buildingId,
-            shiftLengthS: shiftLengthForContract(contract.id),
-            windowStartS: null,
-            /* A fresh week on another tower keeps no presses — `moveWeekTo`'s line, § D1002. */
-            interventions: [],
-          });
-        }
-      }
       notifyCampaign();
     },
     runCampaignDay: (towerId) => {
@@ -4258,7 +4501,8 @@ export function createEverydayHost(
           ...careerWeek,
           completed: parking.week.completed,
           day: tower.day,
-          dayIdx: (tower.day - 1) % 7,
+          /* § D1377: a contract is twenty working days, so a career day is never named Saturday or Sunday. */
+          dayIdx: careerDayIdxOf(tower.day),
         },
         /*
          * **And the car today's works hold** — GitHub issue #353, `docs/32` GD11's first half,
@@ -4363,7 +4607,7 @@ export function createEverydayHost(
         interventions: [],
         buildingId: tower.buildingId,
         seed: careerDaySeedFor(base, tower.id, tower.day),
-        week: { ...careerWeek, day: tower.day, dayIdx: (tower.day - 1) % 7 },
+        week: { ...careerWeek, day: tower.day, dayIdx: careerDayIdxOf(tower.day) },
         outOfServiceCarIds: worksHeldCarsOf(tower, towerBuilding),
         campaignFitOut: fitOutOf(tower),
         shiftLengthS: shiftLengthForContract(tower.id),
@@ -4441,28 +4685,36 @@ export function createEverydayHost(
        * learns to carry one more thing. It is a patch over the same `state` this call read, so
        * nothing else can have moved underneath it.
        */
+      /* § D1360: the loader's refusal shape, which the designer quotes; nothing is written. */
+      const held = attemptHoldOver({ ...next });
+      if (held !== undefined) throw new Error(held);
       b.applyPatch({ ...next });
       return saved.id;
     },
-    applyPatternSpec: (spec) => {
-      const state = b.state();
-      const id = nextSavedId('pat', [
-        ...state.savedPatterns.map((entry) => entry.id),
-        ...b.resources.trafficProfiles.profiles.map((profile) => profile.id),
-      ]);
-      const named: PatternSpec = {
-        ...spec,
-        name: spec.name.trim() === '' ? 'My pattern' : spec.name.trim(),
-      };
-      b.applyPatch({
-        savedPatterns: [...state.savedPatterns, { id, spec: named }],
-        pattern: id,
-        patternSpec: named,
+    runSandbox: (presses) => {
+      /* § D1360: a sandbox day plays the attempt's crowd, so it is refused while an attempt stands. */
+      const held = attemptHoldOver();
+      if (held !== undefined) throw new Error(held);
+      /* The career's record back first, so what is kept is the Scenario week (`pressTodaysRun`'s own first step). */
+      releaseCareer();
+      leaveSandbox();
+      /*
+       * The day's crowd and shape **while the week still stands on its contract**: on the sandbox
+       * day's week `dealPatchFor` and `contractSliceFor` answer nothing, so a slice-day tower would
+       * otherwise run whatever length stood rather than its day's.
+       */
+      const before = sandboxBeforeOf(b.state());
+      const dealt = dealPatchFor(b, b.state());
+      const shape = dayPatchFor(b, { ...b.state(), ...dealt });
+      sandboxSession = { before, recording: b.state().recording };
+      b.applyPatch({ ...dealt, ...shape, ...sandboxPatchOf({ ...b.state(), ...dealt, ...shape }, b.resources, presses) });
+      notifyCampaign();
+      pressTodaysRun(() => {
+        b.startRun();
       });
-      return id;
     },
-    setDoorDwell: (choice) => {
-      b.applyPatch({ levers: { ...b.state().levers, dwell: choice } });
+    leaveSandbox: () => {
+      leaveSandbox();
     },
     /* ----------------------------------------------- § 14.1, the spectator */
     dailyBoard: async () => {
@@ -4773,7 +5025,9 @@ export function createEverydayHost(
     bankScenarioClear: (scenarioId) => {
       bankTurn({ completion: 'scenario-cleared', scenarioId });
     },
-    chimeTally: () => chimeTally,
+    /* § D1382: the acknowledgement stands while the run it was banked on does, and no longer. */
+    chimeTally: () =>
+      chimeTallyOn !== undefined && chimeTallyOn.recording !== b.state().recording ? undefined : chimeTally,
     rushStartsFitted: () => rushClaims().some((claim) => claim.sinkId === RUSH_PREFIT_SINK_ID),
     rushRebuild: () => rushRebuildInput(),
     pickRushRebuild: (priceId) => {
@@ -4881,12 +5135,23 @@ export function createEverydayHost(
       pressDaySeedBase ??= b.state().seed;
       moveWeekTo(contractId);
       const next = withDispatcher(b.state(), b.resources, press.standingOrder);
-      b.applyPatch({
+      const pinned: Partial<ViewerState> = {
         seed: BigInt(press.seedText),
         dispatcherId: next.dispatcherId,
         dispatcherSpec: next.dispatcherSpec,
         editingDispatcherId: next.editingDispatcherId,
-      });
+      };
+      /*
+       * § D1360: the move above may land on a week whose day an attempt stands on, and the pin's crowd
+       * and standing order written over it would change the run that attempt resumes. The week moves,
+       * as the door's tower choice moves it; the pin is not written, and the brief resumes the attempt.
+       */
+      const held = attemptHoldOver(pinned);
+      if (held !== undefined) {
+        notifyCampaign();
+        return held;
+      }
+      b.applyPatch(pinned);
       notifyCampaign();
       return undefined;
     },
@@ -4905,6 +5170,9 @@ export function createEverydayHost(
       b.skipPressCall?.();
     },
     takeCallAgain: () => {
+      /* § D1360: a retake of the call is a run of the day, so not while that day's attempt stands. */
+      const held = attemptHoldOver();
+      if (held !== undefined) return held;
       releaseCareer();
       const state = b.state();
       const contractId = state.week.contractId;
@@ -5021,7 +5289,25 @@ export function createEverydayHost(
       b.abandonDay?.();
     },
     playThisCrowd: (run) => {
+      /*
+       * § D1360: the watched record's crowd set up on the week on screen is a run of its day, so not
+       * while an attempt stands on it. Asked of the fields `dev/main.ts#playThisCrowd` writes, which
+       * asks again before it writes them.
+       */
+      const record = run.record;
+      if (record !== undefined && record !== null) {
+        const held = attemptHoldOver({
+          buildingId: record.buildingId,
+          dispatcherId: record.dispatcherId,
+          pattern: record.pattern,
+          shiftLengthS: record.shiftLengthS,
+          windowStartS: record.windowStartS,
+          seed: BigInt(record.seed),
+        });
+        if (held !== undefined) return held;
+      }
       b.playThisCrowd(run);
+      return undefined;
     },
     /*
      * The campaign arm of this is the merge's, not either branch's: the career lives beside

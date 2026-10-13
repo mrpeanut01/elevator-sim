@@ -444,6 +444,45 @@ describe('a verdict may not claim more than the run measured — docs/20 defect 
     expect(flat.head).toBe('No change, and the complaint still stands.');
   });
 
+  /**
+   * **The head follows the whole verdict** — the post-AN panel's seat C, D7, wave AO lane AO-5. A fix
+   * that took 71 % of the complaint away read *"Better, and the complaint still stands."* over the
+   * rest of the building falling 21.3 points, past the 2-point floor the row beside it states. The
+   * head names both halves, and no word claims a gain for the building as a whole.
+   */
+  it('says the rest of the building fell when it did, and Better never leads a fall', () => {
+    const spend = spendOf(CASE, emptyFixitState(), shippedPriceSchedule());
+    const fell = { restAwayBeforePct: 95, restAwayAfterPct: 73.8, restDeltaPoints: -21.3 };
+    const helped = classifyOutcome(CASE, { ...MEASURED, complaintGonePct: 71, ...fell }, spend);
+    expect(helped.kind).toBe('not-enough');
+    expect(helped.rows[1]?.passed).toBe(false);
+    expect(helped.head).not.toMatch(/^Better/);
+    expect(helped.head).toContain('complaint');
+    expect(helped.head).toContain('rest of the building');
+    expect(helped.head).toBe('Some of the complaint went, and the rest of the building paid for it.');
+
+    const flat = classifyOutcome(CASE, { ...MEASURED, complaintGonePct: 0, ...fell }, spend);
+    expect(flat.head).not.toMatch(/^No change,/);
+    expect(flat.head).toContain('rest of the building');
+
+    const grew = classifyOutcome(
+      CASE,
+      { ...MEASURED, complaintBefore: 32, complaintAfter: 37, complaintGonePct: 0, ...fell },
+      spend,
+    );
+    expect(grew.head).toMatch(/^Worse/);
+    expect(grew.head).toContain('rest of the building');
+
+    /* The control: inside the 2-point floor the rest held, and the head is the one it always was. */
+    const held = classifyOutcome(
+      CASE,
+      { ...MEASURED, complaintGonePct: 71, restAwayAfterPct: 94, restDeltaPoints: -1 },
+      spend,
+    );
+    expect(held.rows[1]?.passed).toBe(true);
+    expect(held.head).toBe('Better, and the complaint still stands.');
+  });
+
   it('says No change when the run showed none of the complaint to remove', () => {
     /*
      * `null` is *this run shows none of it*. A complaint that was never there cannot have been

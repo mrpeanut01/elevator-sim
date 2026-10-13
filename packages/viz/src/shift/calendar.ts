@@ -98,7 +98,14 @@ import {
   type SimulationDemandOptions,
 } from '@elevator-sim/core/browser';
 
-import { SHIFT_EVENTS, demandTemplateVariesMix, eventCarChoice, eventFor, eventOfDrawnId } from './events.js';
+import {
+  SHIFT_EVENTS,
+  demandTemplateVariesMix,
+  eventById,
+  eventCarChoice,
+  eventFor,
+  eventOfDrawnId,
+} from './events.js';
 import { scaledBuilding } from './growth.js';
 import { carsToDerate, type CarRef, type Incident } from './incidents.js';
 import { weekdayOf, type RunHorizon, type ShiftEvent, type ShiftEventId, type Weekday } from './types.js';
@@ -620,7 +627,23 @@ export function scheduledEventFor(
    * calendar booking still wins, as it wins over the draw.
    */
   week?: WeekOrderKey,
+  /*
+   * **The wrinkle a mode already handed this day, which outranks everything above** — wave AO lane
+   * AO-5, the post-AN panel's seat C, D4. A career day's event is the career's own
+   * (`everyday/host.ts#runCampaignDay` writes `ViewerState.campaignEventId` from the contract's
+   * calendar and § 8.3's odds, § D507), and the run was built from it while the day's sheet asked
+   * the week's schedule: Garden Apartments' day 20 ran *Two cars down* under a sheet headed
+   * *Something on upstairs*, the weekend wrinkle of a week day 20 does not belong to. So the run,
+   * the sheet, the rail and the identity line all pass `state.campaignEventId` here, and one
+   * function answers which wrinkle the day is under. A whole drawn id first
+   * (`caterers:before-the-rush`), then a template id; an id the library no longer has is an
+   * ordinary day, as it was where `dev/state.ts` resolved it before. `undefined` changes nothing.
+   */
+  assigned?: string,
 ): ShiftEvent {
+  if (assigned !== undefined) {
+    return eventOfDrawnId(assigned) ?? eventById(assigned) ?? SHIFT_EVENTS.ordinary;
+  }
   const today = calendarDayFor(period, day, dayIdx);
   const booked = today?.shift.eventId;
   if (booked != null) return SHIFT_EVENTS[booked];

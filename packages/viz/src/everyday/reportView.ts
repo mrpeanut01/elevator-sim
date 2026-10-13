@@ -89,9 +89,10 @@ import { reportViewOf } from '../dev/reportPanel.js';
 import type { TabName } from '../dev/elementMap.js';
 import type { ShapedDayReport } from '../shift/report.js';
 import type { TomorrowBriefing } from '../shift/tomorrow.js';
+import { PRESS_CALL_ROW_ID } from '../shift/callRow.js';
 import { dayCloseOf, type DayCloseView } from '../shift/dayClose.js';
 import type { WeekState } from '../shift/types.js';
-import type { HouseReading } from '../shift/weekStake.js';
+import { weekDealOf, type HouseReading } from '../shift/weekStake.js';
 
 /**
  * Where a lever's press goes — GitHub issue #213, the owner's ruling on it, and GAMEPLAY § 6.5.
@@ -219,6 +220,16 @@ export const WEEK_SHEET_STEP: EverydayOnwardStep = Object.freeze({
   goes: 'week-sheet',
 });
 
+/**
+ * {@link WEEK_SHEET_STEP} for a week the census does not deal, which closes on Sunday since § D1394
+ * (wave AO lane AO-5) and whose sheet sets no house beside the player.
+ */
+export const UNMEASURED_WEEK_SHEET_STEP: EverydayOnwardStep = Object.freeze({
+  label: 'See the week’s sheet',
+  note: 'Opens this week’s sheet: your seven days against its target. The next week starts from there.',
+  goes: 'week-sheet',
+});
+
 /** The whole screen, as data. */
 export interface EverydayReportView {
   /** Whether there is a sheet at all. `false` draws {@link emptyLede} and nothing else. */
@@ -281,11 +292,34 @@ export interface EverydayReportView {
    */
   readonly close: DayCloseView | undefined;
   /**
+   * **Today again, as practice, beside the call that decided it** — wave AO, lane AO-4,
+   * [§ D1388](../../../../DECISIONS.md), {@link REPORT_PRACTICE_AGAIN}. `undefined` except on the close of
+   * a counted day an ordinary call decided; a pinned day's call keeps its own *Take this call again*.
+   */
+  readonly practiceAgain: { readonly label: string; readonly note: string } | undefined;
+  /**
    * The two secondary presses beside the onward one on the close: *Your week* and the menu. Words
    * only; `reportScreen.ts` owns where each goes.
    */
   readonly secondary: { readonly week: string; readonly menu: string };
 }
+
+/**
+ * **Today again, as practice** — wave AO, lane AO-4, [§ D1388](../../../../DECISIONS.md), the post-AN
+ * panel's seat D: *Take this call again* is drawn only on the pinned Monday, so practising a day an
+ * ordinary call decided was three screens deep (*Your week*, *Replay today's tower*, *Run today
+ * again*). The close now offers it where it names the call. It is the whole day from its start: an
+ * ordinary call is asked by the day's own calls from no presses (`dev/state.ts#dayCallsOpenOn`), so a
+ * run opened at that call with the earlier answers carried would ask nothing, and the label says
+ * *today*, never *this call*. A close of it is practice (§ D1138 clause 4), and its stage says so.
+ */
+export const REPORT_PRACTICE_AGAIN = Object.freeze({
+  label: 'Play today again, as practice',
+  note:
+    'The same crowd from the start, under the driver the day began with and with nothing pressed, ' +
+    'and the day asks its calls again as it reaches them. It banks nothing: your week keeps the day ' +
+    'as you closed it.',
+});
 
 /** The close's two secondary presses — {@link EverydayReportView.secondary}. */
 export const REPORT_SECONDARY = Object.freeze({ week: 'Your week', menu: 'Main menu' });
@@ -374,6 +408,13 @@ export interface EverydayReportCareer {
    * sheet. Passed in for {@link renewalDue}'s reason: the date is `campaign/`'s rule.
    */
   readonly renewalAhead?: string | undefined;
+  /**
+   * The contract is lost, in `campaign/career.ts#contractLostSentenceOf`'s words, or `undefined` —
+   * wave AO lane AO-5, [§ D1392](../../../../DECISIONS.md). Passed in for {@link renewalDue}'s
+   * reason: when a contract is lost is `campaign/`'s rule. The step goes to the desk, where the
+   * month is started again, and outranks a renewal, which a lost contract is not offered.
+   */
+  readonly contractLost?: string | undefined;
 }
 
 /**
@@ -630,6 +671,7 @@ function onwardStepOf(
   canAdvance: boolean,
   nextDayLabel: string,
   weekClosed = false,
+  weekStep: EverydayOnwardStep = WEEK_SHEET_STEP,
 ): EverydayOnwardStep | undefined {
   /*
    * An unfiled sheet advances from nothing, on either flow. The screen returns before this block
@@ -639,7 +681,7 @@ function onwardStepOf(
    * `canAdvance`, so it has to carry it here.
    */
   if (!filed) return undefined;
-  if (weekClosed && career === undefined) return WEEK_SHEET_STEP;
+  if (weekClosed && career === undefined) return weekStep;
   if (career !== undefined) {
     /*
      * **The renewal comes before the next day, and the step says so** — GitHub issue #582 item 3,
@@ -654,6 +696,13 @@ function onwardStepOf(
      * Since [§ D1357](../../../../DECISIONS.md) the renewal stands once day 20 has closed, so this arm
      * is day 20's sheet (and any later one), and the note names the day that waits on the answer.
      */
+    if (career.contractLost !== undefined) {
+      return {
+        label: `Open the desk at ${career.buildingName}`,
+        note: `${career.contractLost} No more of its days run. This opens the building’s desk, where the month can be started again. You stay in the career.`,
+        goes: 'career-desk',
+      };
+    }
     if (career.renewalDue) {
       return {
         label: `Answer the renewal at ${career.buildingName}`,
@@ -758,6 +807,8 @@ export function everydayReportViewOf(input: EverydayReportInput): EverydayReport
       canAdvance,
       framing.kind === 'week-day' ? framing.nextDayLabel : '',
       framing.kind === 'week-day' && framing.weekClosed === true,
+      /* No house beside a week the census does not deal (§ D1394), so its step does not name one. */
+      input.week !== undefined && weekDealOf(input.week) === undefined ? UNMEASURED_WEEK_SHEET_STEP : WEEK_SHEET_STEP,
     ),
     staleNote: input.newerRunOnStage
       ? 'A newer run is standing on the stage and has not been closed. This sheet is the last day ' +
@@ -765,6 +816,15 @@ export function everydayReportViewOf(input: EverydayReportInput): EverydayReport
       : undefined,
     practiceNote: framing.kind === 'week-day' ? framing.practiceNote : undefined,
     weekMark: framing.kind === 'week-day' ? framing.weekMark : undefined,
+    practiceAgain:
+      input.week !== undefined &&
+      input.career === undefined &&
+      input.report?.of === 'week-day' &&
+      input.report.callDecided === true &&
+      input.report.practiceNote === undefined &&
+      !input.report.diagnosis.some((entry) => entry.id === PRESS_CALL_ROW_ID)
+        ? REPORT_PRACTICE_AGAIN
+        : undefined,
     close:
       input.week === undefined || input.report?.of !== 'week-day' || input.career !== undefined
         ? undefined

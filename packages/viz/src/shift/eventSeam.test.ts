@@ -158,3 +158,49 @@ describe('the event seam has exactly one composition — issue #135', () => {
     }
   });
 });
+
+/**
+ * **A mode's own wrinkle reaches every surface that describes the stage's day** — the post-AN panel's
+ * seat C, D4, wave AO lane AO-5. A career day runs the career's event (`ViewerState.campaignEventId`,
+ * § D507), and Garden Apartments' day 20 ran *Two cars down* under a sheet headed *Something on
+ * upstairs*, because `dev/main.ts#closeShift` asked the schedule without it. Red before on
+ * `dev/main.ts`, `dev/leftRail.ts` and `scope/runIdentity.ts`; `dev/state.ts`, the run itself, was
+ * the one that read it.
+ */
+describe('the day the stage stands on is asked with its assigned wrinkle — seat C’s D4', () => {
+  /** The argument list of every `scheduledEventFor(` call in a source, parentheses balanced. */
+  function callsIn(source: string): readonly string[] {
+    const calls: string[] = [];
+    const token = /\bscheduledEventFor\s*\(/g;
+    for (let match = token.exec(source); match !== null; match = token.exec(source)) {
+      let depth = 1;
+      let at = match.index + match[0].length;
+      const from = at;
+      while (at < source.length && depth > 0) {
+        const ch = source[at];
+        if (ch === '(') depth += 1;
+        else if (ch === ')') depth -= 1;
+        at += 1;
+      }
+      calls.push(source.slice(from, at - 1));
+    }
+    return calls;
+  }
+
+  it('passes the state’s campaignEventId at every call that reads the state’s own day', async () => {
+    const files = ['dev/main.ts', 'dev/state.ts', 'dev/leftRail.ts', 'scope/runIdentity.ts'];
+    let asked = 0;
+    for (const file of files) {
+      const source = withoutComments(await readFile(new URL(file, `file://${SRC}`), 'utf8'));
+      const calls = callsIn(source);
+      expect(calls.length, `${file} no longer asks the calendar at all`).toBeGreaterThan(0);
+      for (const args of calls) {
+        asked += 1;
+        expect(args, `${file}: a day described without the wrinkle the run was handed`).toContain(
+          'campaignEventId',
+        );
+      }
+    }
+    expect(asked).toBeGreaterThanOrEqual(5);
+  });
+});

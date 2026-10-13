@@ -125,6 +125,11 @@ export interface DoorScreenView {
   readonly stepper: {
     readonly label: string;
     readonly backEnabled: boolean;
+    /**
+     * Why the back arrow is dimmed, true of the day it is dimmed on — lane AO-4: the strip now stops
+     * at the week's first day, which is not the same reason as the seven-day reach.
+     */
+    readonly backRefusal: string;
     readonly forwardEnabled: boolean;
   };
   readonly weekHeading: string;
@@ -137,8 +142,19 @@ export interface DoorScreenView {
    * nothing saying what any of them was. Each is `mode/glossary.ts`'s one definition, chosen by
    * `dayWordsFor` from the text this screen actually prints, so a word the door stops printing
    * stops being defined here. Empty when the door prints none of them.
+   *
+   * **Behind one disclosure, headed {@link wordsHeading}** — wave AO, lane AO-4, the post-AN panel's
+   * seat B (lost moment 3): three definition paragraphs stood open under the rule on every visit, so
+   * the door read as a glossary before it read as a day. A reader who meets a word and wants it opens
+   * the one line that names all three.
    */
   readonly words: readonly string[];
+  /**
+   * The disclosure's own line, naming the words it defines — *What press, standing order and pinned
+   * crowd mean* — from the same `dayWordsFor` pick, so it names exactly the words under it. Empty
+   * where {@link words} is.
+   */
+  readonly wordsHeading: string;
   readonly lede: string;
   readonly world: WorldBandView;
   readonly stepsHeading: string;
@@ -351,7 +367,7 @@ function chipsOf(input: DoorScreenInput): readonly DoorDayChip[] {
   const { week } = input;
   const byDay = new Map<number, DayOutcome>(week.history.map((entry) => [entry.day, entry]));
   const chips: DoorDayChip[] = [];
-  for (let offset = DAY_OFFSET_MIN; offset <= 0; offset += 1) {
+  for (let offset = earliestOffsetOf(week); offset <= 0; offset += 1) {
     const day = week.day + offset;
     const closed = day < 1 ? undefined : byDay.get(day);
     const isToday = offset === 0;
@@ -374,6 +390,33 @@ function chipsOf(input: DoorScreenInput): readonly DoorDayChip[] {
     });
   }
   return Object.freeze(chips);
+}
+
+/**
+ * **The strip starts on the week's first day** — wave AO, lane AO-4, the post-AN panel's seat B (lost
+ * moment 3). The strip always drew seven slots, so a Tuesday drew five blank *before this week* tiles
+ * to the left of Monday, and a first visit six, each with an em dash for a tower and a score: the
+ * first thing the door showed a newcomer was a row of nothing. The prototype's strip is a week of
+ * days played and draws no such tile, so the handoff is silent on them. The strip, and the stepper
+ * over it, now start on day 1, and go back at most {@link DAY_OFFSET_MIN} days as before
+ * ([§ D1386](../../../../DECISIONS.md), which amends § D517 clause 3's before-the-week chip).
+ */
+export function earliestOffsetOf(week: Pick<WeekState, 'day'>): number {
+  return Math.min(0, Math.max(DAY_OFFSET_MIN, 1 - week.day));
+}
+
+/** Why the stepper's back arrow is dimmed — {@link DoorScreenView.stepper}'s `backRefusal`. */
+export const DOOR_BACK_REFUSAL = Object.freeze({
+  reach: 'The week only goes back seven days.',
+  firstDay: 'This is the week’s first day, so there is no day before it.',
+});
+
+/** `What press, standing order and pinned crowd mean` — the door's words, named in one line. */
+export function doorWordsHeadingOf(terms: readonly string[]): string {
+  if (terms.length === 0) return '';
+  const list =
+    terms.length === 1 ? terms[0] : `${terms.slice(0, -1).join(', ')} and ${terms[terms.length - 1] ?? ''}`;
+  return `What ${list ?? ''} ${terms.length === 1 ? 'means' : 'mean'}`;
 }
 
 /**
@@ -518,7 +561,8 @@ export function todayIsBanked(input: Pick<DoorScreenInput, 'week'>): boolean {
 
 /** § 6.1, resolved. Total: every arm answers something a player can read. */
 export function doorScreenViewOf(input: DoorScreenInput): DoorScreenView {
-  const offset = Math.min(0, Math.max(DAY_OFFSET_MIN, Math.trunc(input.dayOffset)));
+  const earliest = earliestOffsetOf(input.week);
+  const offset = Math.min(0, Math.max(earliest, Math.trunc(input.dayOffset)));
   const clamped: DoorScreenInput = { ...input, dayOffset: offset };
   const chips = chipsOf(clamped);
   const selected = chips.find((chip) => chip.offset === offset);
@@ -537,6 +581,7 @@ export function doorScreenViewOf(input: DoorScreenInput): DoorScreenView {
     sameForEveryone,
     ...(input.alsoOnScreen ?? []),
   ];
+  const dayWords = dayWordsFor(printed);
   return {
     eyebrow: input.today.dayLabel,
     title: input.today.towerName,
@@ -547,14 +592,16 @@ export function doorScreenViewOf(input: DoorScreenInput): DoorScreenView {
         selected?.day === undefined
           ? 'Before this week'
           : `${weekdayOf(input.week.dayIdx + offset)} · day ${String(selected.day)}`,
-      backEnabled: offset > DAY_OFFSET_MIN,
+      backEnabled: offset > earliest,
+      backRefusal: earliest > DAY_OFFSET_MIN ? DOOR_BACK_REFUSAL.firstDay : DOOR_BACK_REFUSAL.reach,
       // § 6.1: *"The forward arrow dims at 0."*
       forwardEnabled: offset < 0,
     },
     weekHeading: 'THE WEEK SO FAR',
     chips,
     rule: DOOR_RULE,
-    words: dayWordsFor(printed).map((entry) => entry.plain),
+    words: dayWords.map((entry) => entry.plain),
+    wordsHeading: doorWordsHeadingOf(dayWords.map((entry) => entry.term)),
     lede: input.today.lede,
     world: WORLD_BAND,
     stepsHeading: 'WHAT THE JOB IS',

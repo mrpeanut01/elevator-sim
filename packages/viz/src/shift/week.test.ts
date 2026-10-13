@@ -25,6 +25,7 @@ import {
   HISTORY_DAYS,
   PARKED_WEEKS_MAX,
   SANDBOX_CONTRACT_ID,
+  SANDBOX_DAY_CONTRACT_ID,
   WEEK_CONTRACT_SENTINELS,
   closeDay,
   nextDay,
@@ -239,7 +240,12 @@ describe('banking a scenario', () => {
 
 describe('the day boundary', () => {
   it('advances the day and wraps the weekday', () => {
-    let week = openWeek('c1');
+    /*
+     * On the sandbox's week, which has no ending: since § D1394 (wave AO lane AO-5) every Scenario
+     * week ends on day 7, so the wrap past Sunday is a sentinel week's and a Scenario week's day 8 is
+     * the next week's day 1.
+     */
+    let week = openWeek(SANDBOX_CONTRACT_ID);
     for (let i = 0; i < 7; i += 1) week = nextDay(week);
     expect(week.day).toBe(8);
     expect(week.dayIdx).toBe(0);
@@ -252,7 +258,8 @@ describe('the day boundary', () => {
   });
 
   it('keeps seven days of history, oldest falling off', () => {
-    let week = openWeek('c1');
+    /* A week that runs past seven days, which since § D1394 is a sentinel's and no Scenario's. */
+    let week = openWeek(SANDBOX_CONTRACT_ID);
     for (let i = 0; i < 10; i += 1) {
       week = closeDay(week, day(week, 'met'));
       week = nextDay(week);
@@ -727,12 +734,14 @@ describe('a sandbox day leaves the scoreboard where it found it — GitHub issue
    */
   const relabelled = (contractId: string): WeekState => withContract(scored(), contractId);
 
-  it('raises the best on every week except the sandbox', () => {
+  it('raises the best on every week except the two sandboxes', () => {
     for (const [name, id] of Object.entries(WEEK_CONTRACT_SENTINELS)) {
       const week = relabelled(id);
       expect(week.bestMinutePct, name).toBe(74);
       const after = closeDay(week, day(week, 'met', 97));
-      expect(after.bestMinutePct, name).toBe(id === SANDBOX_CONTRACT_ID ? 74 : 97);
+      /* The sandbox day's week (wave AO, § D1368) is the same promise from *Tune the tower*. */
+      const sandbox = id === SANDBOX_CONTRACT_ID || id === SANDBOX_DAY_CONTRACT_ID;
+      expect(after.bestMinutePct, name).toBe(sandbox ? 74 : 97);
     }
     // The scored arm, so *does not move* is read beside a *does*: the guard is the sentinel, not
     // the arithmetic having quietly stopped working.
@@ -859,9 +868,22 @@ describe('a week with a stake and an ending — § D1176, § D1177', () => {
     expect([week.week, rolled.week]).toEqual([1, 1]);
   });
 
-  it('leaves every week the census does not speak for rolling on past day 7, as before', () => {
-    let week = openWeek('c1');
-    for (let index = 0; index < 7; index += 1) week = nextDay(week);
-    expect(week.day).toBe(8);
+  /**
+   * **A week the census does not speak for ends on day 7 as well** — the post-AN panel's seat C, D6,
+   * wave AO lane AO-5, § D1394. St Jude Hospital's week ran on to *MONDAY · DAY 8* with no sheet. Red
+   * before: this read `day 8`, as § D1177's *every other week runs on as before* had it. The
+   * control: a sentinel week (the sandbox's) still runs on.
+   */
+  it('ends every Scenario week on day 7, the ones the census does not speak for included — § D1394', () => {
+    for (const contractId of ['c1', 'c8']) {
+      let week = openWeek(contractId);
+      for (let index = 0; index < 6; index += 1) week = nextDay(week);
+      expect(week.day).toBe(7);
+      const rolled = nextDay(week);
+      expect([rolled.contractId, rolled.day, rolled.dayIdx]).toEqual([contractId, 1, 0]);
+    }
+    let sandbox = openWeek(SANDBOX_CONTRACT_ID);
+    for (let index = 0; index < 7; index += 1) sandbox = nextDay(sandbox);
+    expect(sandbox.day).toBe(8);
   });
 });

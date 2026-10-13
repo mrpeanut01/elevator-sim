@@ -32,16 +32,16 @@ import {
   specFromTrafficProfile,
   type PatternSpec,
 } from '../authoring/patternSpec.js';
-import { savedBuildingFrom, stateRunningSaved } from '../dev/buildingEditor.js';
 import { buildingConfigOf, shiftRunConfigOf, type ViewerState } from '../dev/state.js';
 import { DATA_DIR } from '../fixtures.test-helper.js';
 import { baseState, legsOf, RESOURCES } from '../scope/probes.test-helper.js';
 import { goalsForDay, readGoals } from '../shift/goals.js';
 import { shiftReportWindowFor } from '../shift/reportWindow.js';
 import type { WeekState } from '../shift/types.js';
-import { closeDay, outcomeOf, SANDBOX_CONTRACT_ID } from '../shift/week.js';
+import { closeDay, outcomeOf, SANDBOX_DAY_CONTRACT_ID } from '../shift/week.js';
 import { actionBarFor } from './actionBar.js';
 import { railModel } from './rail.js';
+import { sandboxMoves, sandboxPatchOf } from './sandbox.js';
 import {
   classOfSpec,
   designerClasses,
@@ -63,7 +63,10 @@ import {
   tuneStateFrom,
   tunerBarModel,
   tunerNoteFor,
+  tuneControlsOffered,
+  tuneRowsOffered,
   TUNE_CARDS,
+  TUNER_COPY,
   type TunePresses,
   type TuneState,
 } from './tunerModel.js';
@@ -176,7 +179,7 @@ describe('move the control and the run changes — compared on the document, not
   /**
    * The building document a tune produces, as the loader would read it.
    *
-   * `buildingFromSpec` is the exact call `host.applyBuildingSpec` makes through
+   * `buildingFromSpec` is the exact call `everyday/sandbox.ts#sandboxPatchOf` makes through
    * `savedBuildingFrom`, so a field that moved here is a field the simulator sees.
    */
   const documentFor = (tune: TuneState): string =>
@@ -413,17 +416,15 @@ describe('opening the tuner changes nothing — the mount, over every shipped bu
 
 describe('an untouched tuner runs the standing day — GitHub issue #289', () => {
   /**
-   * The press, exactly as `everyday/host.ts#applyBuildingSpec` makes it.
-   *
-   * `savedBuildingFrom` then `stateRunningSaved` **are** that method's body — the two calls it
-   * composes, in its order. A helper that instead wrote `{ ...state, buildingId }` would skip
-   * `withBuilding`, which is where the week takes the sandbox contract, and would therefore be
-   * measuring a press the product does not make.
+   * The press, exactly as `everyday/host.ts#runSandbox` makes it — since wave AO
+   * ([§ D1368](../../../../DECISIONS.md)) `everyday/sandbox.ts#sandboxPatchOf` over the state, and
+   * nothing at all when nothing moved, because the tuner's primary then presses the brief's own
+   * `playDay`. It was `applyBuildingSpec`'s body (`savedBuildingFrom`, `stateRunningSaved`), which
+   * stood the player's own week on `SANDBOX_CONTRACT_ID` and is the post-AN panel's seat D (D3).
    */
   function pressed(state: ViewerState, presses: TunePresses): ViewerState {
-    if (presses.building === undefined) return state;
-    const saved = savedBuildingFrom(presses.building, state, RESOURCES);
-    return stateRunningSaved(state, RESOURCES, saved);
+    if (!sandboxMoves(presses)) return state;
+    return { ...state, ...sandboxPatchOf(state, RESOURCES, presses) };
   }
 
   /**
@@ -485,7 +486,7 @@ describe('an untouched tuner runs the standing day — GitHub issue #289', () =>
     const after = pressed(state, presses);
     expect(after.buildingId).toBe(state.buildingId);
     expect(after.week.contractId).toBe(state.week.contractId);
-    expect(after.week.contractId).not.toBe(SANDBOX_CONTRACT_ID);
+    expect(after.week.contractId).not.toBe(SANDBOX_DAY_CONTRACT_ID);
     // The legs, never a window statistic — `docs/05`'s standing requirement in its contrapositive.
     expect(legsOf(after)).toBe(legsOf(state));
   }, 60_000);
@@ -514,20 +515,19 @@ describe('an untouched tuner runs the standing day — GitHub issue #289', () =>
     const moved = { ...at.tune, cars: at.tune.cars + 2 };
     const tuned = pressed(state, tunePresses(at.building, at.pattern, at.standing, moved));
     expect(tuned.buildingId).not.toBe(state.buildingId);
-    expect(tuned.week.contractId).toBe(SANDBOX_CONTRACT_ID);
+    expect(tuned.week.contractId).toBe(SANDBOX_DAY_CONTRACT_ID);
     expect(shiftRunConfigOf(RESOURCES, tuned).config.reportWindow).toBeUndefined();
   });
 
-  it('takes the sandbox contract whenever any of the seven moved, not only the building four', () => {
+  it('stands on a sandbox day whenever any of the seven moved, and copies the tower only when it moved', () => {
     /*
-     * The narrow guard — *press the building only when a building key moved* — is the tempting one,
-     * and it would have shipped a new defect to close this one. `applyBuildingSpec` is the only
-     * door to `SANDBOX_CONTRACT_ID`, so a press that skipped it because only *How busy* had moved
-     * would run a re-timed crowd **against a scored assignment**, with the strip saying
-     * *Sandbox — nothing counts* over a day `closeDay` banks against Scenario 1.
-     *
-     * So the crowd and dwell keys are asserted here beside the building four: the predicate is
-     * `movedKeys`, which is the same one the strip, the stamp and § 3.3's note already read.
+     * This case read *takes the sandbox contract whenever any of the seven moved, not only the
+     * building four*, and asserted that a crowd or dwell move pressed the building too, because
+     * `applyBuildingSpec` was then the only door to `SANDBOX_CONTRACT_ID`. Since wave AO
+     * ([§ D1368](../../../../DECISIONS.md)) the host's `runSandbox` stands every sandbox run on a
+     * sandbox day's week whatever moved, so the reason is gone; and pressing the building for a
+     * crowd move is now a defect of its own, because a copied tower loses the contract's rung. So
+     * the week is asserted for all seven, and the tower copy for the building four alone.
      */
     const state = { ...baseState(), shiftLengthS: 3600 };
     const at = standingAt(state);
@@ -535,14 +535,17 @@ describe('an untouched tuner runs the standing day — GitHub issue #289', () =>
       { rate: at.tune.rate + 3 },
       { lobbyShare: at.tune.lobbyShare - 10 },
       { dwell: 'snappy' },
+      { cars: at.tune.cars + 2 },
     ];
     for (const patch of patches) {
       const presses = tunePresses(at.building, at.pattern, at.standing, { ...at.tune, ...patch });
-      expect(presses.building, JSON.stringify(patch)).toBeDefined();
-      expect(presses.pattern, JSON.stringify(patch)).toBeDefined();
-      expect(pressed(state, presses).week.contractId, JSON.stringify(patch)).toBe(
-        SANDBOX_CONTRACT_ID,
-      );
+      const towerMoved = 'cars' in patch;
+      expect(presses.building !== undefined, JSON.stringify(patch)).toBe(towerMoved);
+      expect(presses.pattern !== undefined, JSON.stringify(patch)).toBe('rate' in patch || 'lobbyShare' in patch);
+      expect(presses.dwell !== undefined, JSON.stringify(patch)).toBe('dwell' in patch);
+      const after = pressed(state, presses);
+      expect(after.week.contractId, JSON.stringify(patch)).toBe(SANDBOX_DAY_CONTRACT_ID);
+      expect(after.buildingId === state.buildingId, JSON.stringify(patch)).toBe(!towerMoved);
     }
   });
 
@@ -618,7 +621,7 @@ describe('an untouched tuner runs the standing day — GitHub issue #289', () =>
       const state = baseState();
       const at = standingAt(state);
       const after = pressed(state, tunePresses(at.building, at.pattern, at.standing, at.tune));
-      expect(after.week.contractId).not.toBe(SANDBOX_CONTRACT_ID);
+      expect(after.week.contractId).not.toBe(SANDBOX_DAY_CONTRACT_ID);
       expect(careerLine(closed(after.week, 26, 'missed'))).toBe('0 days running · best 26%');
       expect(careerLine(closed(after.week, 97, 'met'))).toBe('1 day running · best 97%');
     });
@@ -646,28 +649,64 @@ describe('an untouched tuner runs the standing day — GitHub issue #289', () =>
       const at = standingAt(state);
       const moved = { ...at.tune, cars: at.tune.cars + 2 };
       const after = pressed(state, tunePresses(at.building, at.pattern, at.standing, moved));
-      expect(after.week.contractId).toBe(SANDBOX_CONTRACT_ID);
+      expect(after.week.contractId).toBe(SANDBOX_DAY_CONTRACT_ID);
       expect(careerLine(closed(after.week, 26, 'missed'))).toBe('0 days running · best 0%');
       expect(careerLine(closed(after.week, 97, 'met'))).toBe('0 days running · best 0%');
     });
 
     it('leaves a best a player already earned exactly where it was', () => {
       /*
-       * The high-water rule, preserved rather than deleted. The sandbox week is the player's own
-       * week relabelled — `withBuilding` reaches it through `switchWeek(…, 'resume')`, whose sandbox
-       * arm is `withContract` — so the figure it carries in is a real best, and a guard that zeroed
-       * it would be the loss `closeDay`'s docstring was written to prevent, arriving from the other
-       * side.
+       * The high-water rule, preserved rather than deleted. The sandbox day's week is the player's
+       * own week relabelled — `shift/week.ts#openSandboxDay` is `withContract` over it — so the figure
+       * it carries in is a real best, and a guard that zeroed it would be the loss `closeDay`'s
+       * docstring was written to prevent, arriving from the other side.
        */
       const state = baseState();
       const at = standingAt(state);
       const scored = { ...state, week: closed(state.week, 74, 'met') };
       const moved = { ...at.tune, cars: at.tune.cars + 2 };
       const after = pressed(scored, tunePresses(at.building, at.pattern, at.standing, moved));
-      expect(after.week.contractId).toBe(SANDBOX_CONTRACT_ID);
+      expect(after.week.contractId).toBe(SANDBOX_DAY_CONTRACT_ID);
       expect(after.week.bestMinutePct).toBe(74);
       expect(closed(after.week, 99, 'met').bestMinutePct).toBe(74);
       expect(closed(after.week, 3, 'missed').bestMinutePct).toBe(74);
     });
+  });
+});
+
+describe('what the tuner offers on the day it opens over — wave AO, § D1368', () => {
+  it('does not offer *Arriving at the lobby* on a day that keeps its own mix', () => {
+    /*
+     * Once a tuned pattern could run on a whole authored day, the lobby share became a control that
+     * writes nothing the run reads there: `core` refuses a split beside a template that varies its
+     * mix, so `dev/state.ts#shiftRunConfigOf` leaves it out (`demandTheTemplateTakes`). A control
+     * that changes nothing is not drawn, and the screen says why in its place.
+     */
+    const crowd = TUNE_CARDS.find((card) => card.rows.some((row) => row.key === 'lobbyShare'));
+    expect(crowd).toBeDefined();
+    expect(tuneRowsOffered(crowd!, { mixIsTheDays: false }).map((row) => row.key)).toEqual(['rate', 'lobbyShare']);
+    expect(tuneRowsOffered(crowd!, { mixIsTheDays: true }).map((row) => row.key)).toEqual(['rate']);
+    expect(TUNER_COPY.lobbyShareIsTheDays).toMatch(/not offered on this day/u);
+  });
+
+  it('lists every control it draws, by card, in the screen’s own words — the list the brief names', () => {
+    expect(tuneControlsOffered({ mixIsTheDays: false, machineSteps: true })).toEqual([
+      { card: 'The tower', controls: ['Floors above the lobby', 'Shafts'] },
+      { card: 'The machines', controls: ['Rated speed', 'Capacity', 'Door dwell'] },
+      { card: 'The crowd', controls: ['How busy', 'Arriving at the lobby'] },
+    ]);
+    expect(tuneControlsOffered({ mixIsTheDays: true, machineSteps: false })).toEqual([
+      { card: 'The tower', controls: ['Floors above the lobby', 'Shafts'] },
+      { card: 'The machines', controls: ['Door dwell'] },
+      { card: 'The crowd', controls: ['How busy'] },
+    ]);
+  });
+
+  it('draws its rows and machine labels from those same two sources, so the list cannot drift', () => {
+    const screen = readFileSync(join(DATA_DIR, '..', 'packages/viz/src/everyday/tunerScreen.ts'), 'utf8');
+    expect(screen).toContain('for (const row of tuneRowsOffered(card, { mixIsTheDays })) drawSliderRow(body, row);');
+    expect(screen).toContain('COPY.speedLabel');
+    expect(screen).toContain('COPY.capLabel');
+    expect(screen).toContain('COPY.dwellLabel');
   });
 });

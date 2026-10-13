@@ -215,6 +215,26 @@ export const REPLAY_CONTRACT_ID = 'replay';
  */
 export const CAREER_CONTRACT_ID = 'career';
 
+/**
+ * The id of a **sandbox day's** week — the run *Tune the tower* makes from a scored day's brief,
+ * wave AO, lane AO-2, [§ D1368](../../../../DECISIONS.md).
+ *
+ * The post-AN panel's seat D (D3): the tuner put its run on {@link SANDBOX_CONTRACT_ID} through
+ * `withBuilding`, which is a week the player owns, so the save wrote it over the Scenario week and a
+ * reload opened on a sandbox week with no tower behind it (Garden Apartments, the state's default),
+ * and the brief read the tuned copy's name and population until then. A sandbox is practice: it
+ * stands on one of these instead, a copy of the Scenario week's day on no contract, parked over the
+ * week exactly as {@link REPLAY_CONTRACT_ID} is, and put back by `everyday/sandbox.ts` when the
+ * player leaves the stage and the report. It is one of {@link MODE_WEEK_CONTRACT_IDS}, so the save
+ * never writes it and a reload taken on the sandbox stage opens on the week it parked.
+ *
+ * Resolving to no contract is what makes it safe to run on: {@link closeDay} banks nothing and
+ * clears nothing on it, the scoreboard does not move (the sandbox guard there names both ids), and
+ * `shift/ladder.ts#rungFor` hands a week on no contract the building's own rung, so a sandbox run
+ * that left the tower alone meets the tower its day hands over.
+ */
+export const SANDBOX_DAY_CONTRACT_ID = 'sandbox-day';
+
 export const WEEK_CONTRACT_SENTINELS: Readonly<Record<string, string>> = Object.freeze({
   endless: ENDLESS_CONTRACT_ID,
   sandbox: SANDBOX_CONTRACT_ID,
@@ -222,6 +242,7 @@ export const WEEK_CONTRACT_SENTINELS: Readonly<Record<string, string>> = Object.
   rush: RUSH_CONTRACT_ID,
   replay: REPLAY_CONTRACT_ID,
   career: CAREER_CONTRACT_ID,
+  'sandbox day': SANDBOX_DAY_CONTRACT_ID,
 });
 
 /**
@@ -244,6 +265,8 @@ export const MODE_WEEK_CONTRACT_IDS: readonly string[] = Object.freeze([
   RUSH_CONTRACT_ID,
   REPLAY_CONTRACT_ID,
   CAREER_CONTRACT_ID,
+  /* A sandbox day is practice and never the player's week — § D1368. */
+  SANDBOX_DAY_CONTRACT_ID,
 ]);
 
 /**
@@ -299,6 +322,25 @@ export function openReplay(day: number, dayIdx: number, history: readonly DayOut
     day: Math.max(1, Math.floor(day)),
     dayIdx: ((Math.floor(dayIdx) % 7) + 7) % 7,
     history: history.filter((entry) => entry.day < day),
+  };
+}
+
+/**
+ * A sandbox day over `week` — {@link SANDBOX_DAY_CONTRACT_ID}, [§ D1368](../../../../DECISIONS.md).
+ *
+ * The live week becomes a copy of itself on the sandbox day's id, so the day, the weekday, the
+ * history and the growth are the day the player was looking at; and the week itself is parked, as
+ * {@link switchWeek} parks the week it leaves, so the save (which takes every mode's week off the
+ * pair) writes the week and never the copy. Any sandbox day already parked goes, because there is
+ * one sandbox day at a time and it is always a fresh copy of the week it stands over.
+ */
+export function openSandboxDay(week: WeekState, parked: readonly WeekState[]): WeekSwitch {
+  const kept = parked.filter(
+    (entry) => entry.contractId !== SANDBOX_DAY_CONTRACT_ID && entry.contractId !== week.contractId,
+  );
+  return {
+    week: withContract(week, SANDBOX_DAY_CONTRACT_ID),
+    parked: Object.freeze([...kept, week].slice(-PARKED_WEEKS_MAX)),
   };
 }
 
@@ -544,7 +586,8 @@ export function closeDay(week: WeekState, outcome: DayOutcome, recordGrew = fals
    * sentinel, so `clears` is already `false` on this week. The three below had no such accident
    * protecting them.
    */
-  const posted = week.contractId !== SANDBOX_CONTRACT_ID;
+  /* A sandbox day's week is the same promise from *Tune the tower* — § D1368. */
+  const posted = week.contractId !== SANDBOX_CONTRACT_ID && week.contractId !== SANDBOX_DAY_CONTRACT_ID;
 
   /*
    * The target is derived where the census speaks and authored where it does not — § D1176,

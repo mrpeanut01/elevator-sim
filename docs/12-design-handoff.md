@@ -812,8 +812,8 @@ player's rung and the hours between them at `30×` — which makes it 51 minutes
 game's own towers and about 109 on the reference towers, measured over every contract.)
 **The handoff still wins every disagreement about what the screen looks like; the simulator wins
 every disagreement about what a number means**, and a session length is a number. So the hub's *Today's scenario* entry now
-reads *1 min-1 h 49 a day at 4×, and 30× wherever nobody on a landing has waited a minute, the quiet between peaks skipped; 34 min at most on the game’s own towers — the long end is a reference tower’s · no losing — a day is a score, not a pass*
-(*8 min-2 h 30 a day at 4× · no losing — a day is a score, not a pass* until § D991, *8 min-1 h 49 … the hours between peaks at 30×* until [§ D1169](../DECISIONS.md), and *… 51 min at most on the game’s own towers …* until [§ D1212](../DECISIONS.md)), and its *Fix a building*
+reads *about 7-12 min a day at 4× on the towers a first week can open on, and 30× wherever nobody on a landing has waited a minute, the quiet between peaks skipped; 34 min at most on the game’s own towers, and up to 1 h 49 on a reference tower · no losing — a day is a score, not a pass*
+(*8 min-2 h 30 a day at 4× · no losing — a day is a score, not a pass* until § D991, *8 min-1 h 49 … the hours between peaks at 30×* until [§ D1169](../DECISIONS.md), *… 51 min at most on the game’s own towers …* until [§ D1212](../DECISIONS.md), and *1 min-1 h 49 a day at 4× …* until [§ D1383](../DECISIONS.md) led it with the brief's measured day), and its *Fix a building*
 entry reads *13-23 min a case at 4×, skippable · retry as often as you like* — the wording the
 handoff authored, carrying a figure it did not.
 
@@ -1085,6 +1085,19 @@ the day with that*, retiring #569's *Open the day…*, since the press does run 
 is held from the table: no stage-reaching primary shares a verb with the overlay
 (`everyday/actionBar.test.ts`, `everyday/firstTwoMinutes.browser.test.ts`). **Owner-reversible**:
 the owner's question 17 offers this reading, and reversing it is the one constant.
+
+### 4.21 The front door's week strip starts on the week's first day, and its definitions sit behind one disclosure
+
+**The deviation.** The prototype's door strip is seven days played, so it draws no tile for a day
+that does not exist; this build drew one for every slot before day 1, an em dash for a tower and a
+score with *before this week* under it, six of them on a first visit. The post-AN panel's newcomer
+seat named them and the three definition paragraphs under the rule as clutter before the day
+(lost moment 3). [§ D1386](../DECISIONS.md) draws the week's days so far, up to seven, stops the
+stepper at day 1 with a sentence saying why, and puts the day's definitions behind one disclosure
+whose line names the words inside.
+
+**What it does not change.** A day that exists is drawn exactly as § 6.1 has it, and a week on its
+seventh day draws the full seven. The definitions are `mode/glossary.ts`'s, unchanged.
 
 The refactor is done when all of the following are true, and not before.
 

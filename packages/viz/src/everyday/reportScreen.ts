@@ -81,7 +81,13 @@ import {
   type HonestyPart,
 } from './reportView.js';
 import { DAY_CLOSE_HEADING, type DayCloseView } from '../shift/dayClose.js';
-import { RENEWAL_AHEAD_ON_SHEET_DAYS, needOf, openTowerOf, renewalAheadSentenceOf } from '../campaign/career.js';
+import {
+  RENEWAL_AHEAD_ON_SHEET_DAYS,
+  contractLostSentenceOf,
+  needOf,
+  openTowerOf,
+  renewalAheadSentenceOf,
+} from '../campaign/career.js';
 /* GitHub issue #577: `fileDay`'s twenty-day month, read rather than restated. */
 import { CONTRACT_DAYS } from '../campaign/economy.js';
 import { everydayAccount, onEverydayAccount } from './accountPort.js';
@@ -266,7 +272,7 @@ function mountReportScreen(
        * `CONTRACT_DAYS` while the contract does and reaches `CONTRACT_DAYS + 1` when the last day
        * is filed. Past that the next press is § 8.9's renewal, which lives on the desk.
        */
-      canRunAnother: tower.day <= CONTRACT_DAYS,
+      canRunAnother: tower.day <= CONTRACT_DAYS && needOf(tower)?.kind !== 'lost',
       /*
        * The desk's own gate, read the way the desk reads it — GitHub issue #582 item 3, § D1274.
        * `campaignScreens.ts#mountBuilding` will not run a day while `needOf` stands, and only the
@@ -281,6 +287,11 @@ function mountReportScreen(
        * How far ahead is `career.ts`'s, as is the sentence.
        */
       renewalAhead: renewalAheadSentenceOf(tower, RENEWAL_AHEAD_ON_SHEET_DAYS),
+      /*
+       * A lost contract, in `career.ts`'s own sentence — wave AO lane AO-5, § D1392. The day that
+       * spent the allowance goes to the desk rather than to the next day, which no door runs.
+       */
+      contractLost: contractLostSentenceOf(tower),
     };
   }
 
@@ -1146,6 +1157,35 @@ function mountReportScreen(
       const line = el(doc, 'p', cls, text);
       line.style.cssText = `${BODY};margin:0;max-width:78ch${strong ? `;color:${C.ink};font-weight:600` : ''}`;
       block.append(line);
+      /*
+       * **Today again, as practice, under the call that decided it** — wave AO, lane AO-4,
+       * [§ D1388](../../../../DECISIONS.md). The brief's own press (`host.playDay`), which on a day
+       * already filed runs it again as practice, and then the stage, where the practice line says so.
+       */
+      if (cls === 'everyday-report-close-call' && view.practiceAgain !== undefined) {
+        const again = el(doc, 'div', 'everyday-report-practice-again');
+        again.style.cssText = 'display:flex;align-items:center;gap:11px;flex-wrap:wrap';
+        const button = el(doc, 'button', 'everyday-report-practice-again-press', view.practiceAgain.label);
+        button.type = 'button';
+        button.style.cssText = [
+          'cursor:pointer',
+          'background:transparent',
+          `border:1px solid ${C.rule}`,
+          `border-radius:${String(R.control)}px`,
+          'padding:6px 12px',
+          `color:${C.ink}`,
+          'font-size:12.5px',
+          'font-weight:600',
+        ].join(';');
+        button.addEventListener('click', () => {
+          context.host.playDay();
+          context.go('stage');
+        });
+        const note = el(doc, 'span', 'everyday-report-practice-again-note', view.practiceAgain.note);
+        note.style.cssText = QUIET;
+        again.append(button, note);
+        block.append(again);
+      }
     }
     const tomorrow = el(doc, 'div', 'everyday-report-close-tomorrow');
     tomorrow.style.cssText = `${WELL};padding:8px 11px;display:grid;gap:3px;margin-top:2px`;

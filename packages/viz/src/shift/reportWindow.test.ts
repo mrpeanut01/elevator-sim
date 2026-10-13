@@ -130,14 +130,19 @@ const ID_MOVERS: Readonly<Record<string, string>> = Object.freeze({
   'dev/rightRail.ts': 'the rail’s building picker: the same named-selection case.',
   'menu/enterFreePlay.ts': 'free play’s own selection — again a building the player named.',
   'everyday/host.ts':
-    'declares and implements `applyBuildingSpec`, the Everyday port onto `stateRunningSaved`.',
+    'declares and implements `applyBuildingSpec`, the Everyday port onto `stateRunningSaved`, and ' +
+    '`runSandbox`, which presses `everyday/sandbox.ts#sandboxPatchOf` (wave AO, § D1368).',
   'everyday/designerScreen.ts':
     '*Save as a new building* — the drawing board’s whole purpose, so the fresh id is what the ' +
     'player asked for.',
-  'everyday/tunerScreen.ts':
-    'issue #289. Guarded on `tunerModel.ts#tunePresses`: an untouched tuner presses nothing, so ' +
-    'the id stays the authored one and the window stays the building’s own answer. A tuned one ' +
-    'presses, and the fall-through is then correct.',
+  'everyday/sandbox.ts':
+    'issue #289 and wave AO’s § D1368. `sandboxPatchOf` writes a copied tower’s id only when one of ' +
+    'the tower’s four controls moved (`tunerModel.ts#tunePresses`): an untouched tower keeps the ' +
+    'authored id, so the window stays the building’s own answer, and a tuned one is a drawn tower ' +
+    'the matrix has not measured, so the fall-through is correct. It writes the id directly rather ' +
+    'than through `withBuilding`, whose week arm would stand the run on the player’s own week, so it ' +
+    'is registered here by name: the scan below asks for its call as well as the three wrappers. ' +
+    'The week’s own id comes back when the player leaves the sandbox.',
 });
 
 describe('who can move this window — the producer set, derived from disk', () => {
@@ -153,7 +158,7 @@ describe('who can move this window — the producer set, derived from disk', () 
      * report `everyday/host.ts` and stay silent about the screens pressing it — which is exactly
      * the blindness that let the tuner ship.
      */
-    const found = await filesCalling(/\b(withBuilding|stateRunningSaved|applyBuildingSpec)\s*\(/);
+    const found = await filesCalling(/\b(withBuilding|stateRunningSaved|applyBuildingSpec|sandboxPatchOf)\s*\(/);
     expect(found).toEqual(Object.keys(ID_MOVERS).sort((a, b) => a.localeCompare(b)));
   });
 
@@ -170,15 +175,17 @@ describe('who can move this window — the producer set, derived from disk', () 
     /*
      * The instrument, checked against a file that is known to say the words and known not to make
      * the call. `everyday/tunerModel.ts` quotes `applyBuildingSpec(buildingWithTune(…))` in the
-     * docstring that explains issue #289; it must be absent from the movers, and `tunerScreen.ts`
-     * — which makes the call — must be present. A scan that could not tell them apart would report
-     * a green over a set it had not actually derived.
+     * docstring that explains issue #289; it must be absent from the movers, and `designerScreen.ts`
+     * — which makes the call — must be present. (`tunerScreen.ts` made it until wave AO's § D1368
+     * moved the tuner's press to the sandbox's own, which is `sandbox.ts`'s entry above.) A scan that
+     * could not tell them apart would report a green over a set it had not actually derived.
      */
-    const movers = await filesCalling(/\b(withBuilding|stateRunningSaved|applyBuildingSpec)\s*\(/);
+    const movers = await filesCalling(/\b(withBuilding|stateRunningSaved|applyBuildingSpec|sandboxPatchOf)\s*\(/);
     const prose = await readFile(join(VIZ_SRC, 'everyday/tunerModel.ts'), 'utf8');
     expect(prose).toContain('applyBuildingSpec(');
     expect(movers).not.toContain('everyday/tunerModel.ts');
-    expect(movers).toContain('everyday/tunerScreen.ts');
+    expect(movers).toContain('everyday/designerScreen.ts');
+    expect(movers).toContain('everyday/sandbox.ts');
   });
 });
 

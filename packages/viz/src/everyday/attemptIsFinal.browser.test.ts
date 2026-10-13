@@ -25,7 +25,9 @@
  *    reached the way a player leaves a day: the leave strip, then the door (`watchOnly.browser.test.ts`
  *    holds the card's refusal).
  * 3. A tab closing a day another tab has already closed files practice, says so, and leaves the
- *    stored week as the first close wrote it.
+ *    stored week as the first close wrote it. Since § D1361 (wave AO, lane AO-1) the second tab
+ *    reaches the attempt by the pressed takeover, *Continue ⟨day⟩ here*, rather than by *Resume*,
+ *    because the first tab holds it; `attemptHolder.browser.test.ts` holds the takeover itself.
  *
  * Crown Hotel on 2026-10-03, `oneAttempt.browser.test.ts`'s day: a slice whose first call comes
  * about nine minutes in, so a skip stops at it quickly.
@@ -303,10 +305,10 @@ describe.skipIf(!HAS_BROWSER)('the one attempt is final — § D1239', () => {
       await ontoTheStage(first);
       await skipToTheFirstCall(first);
 
-      /* The second tab resumes the same attempt and closes it: that close banks. */
+      /* The second tab takes the same attempt over (the first tab holds it, § D1361) and closes it: that close banks. */
       await load(second);
       await toCrownsBrief(second);
-      expect(await textOf(second, '.everyday-bar-primary')).toMatch(/^Resume /u);
+      expect(await textOf(second, '.everyday-bar-primary')).toMatch(/^Continue .* here$/u);
       await ontoTheStage(second);
       await skipAll(second);
       expect(await closeTheDay(second)).not.toMatch(/Practice\./u);

@@ -55,7 +55,7 @@ import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
 import { GOAL_KINDS, goalLabel } from '../scenario/goals.js';
 import type { PublishedGoalRates, PublishedScenario } from '../scenario/published.js';
 
-import { judgeStage, stageGoalNameOf } from './judge.js';
+import { holdoutSentenceOf, judgeStage, stageGoalNameOf } from './judge.js';
 import { parseCampaign, type CampaignContext } from './parse.js';
 import {
   batchRequestForStage,
@@ -473,6 +473,49 @@ describe('a campaign goal is named for what it grades, in plain words — § D11
       expect(sentence, stage.id).not.toContain('(seed ');
       expect(sentence, stage.id).toContain('held-back crowds');
     }
+  });
+
+  /**
+   * **A held-back verdict names the goal it missed** — the post-AN panel's seat C, D7 (wave AO lane
+   * AO-5). Stage 5 with Fairness first read *"The held-back crowds do not agree: 4 of 5 goals
+   * reached"* and named none, so the player could not tell which goal the held-back crowds refused.
+   */
+  it('names every goal the held-back crowds missed, by its plain name, and no goal they met', () => {
+    /* Stage 5's five goals, the stage seat C ran: four met, the fourth missed, as its verdict read. */
+    const stage = campaign.stages.find((candidate) => candidate.goals.length === 5) ?? stageAt(0);
+    expect(stage.goals.length).toBe(5);
+    const goals = stage.goals.map((spec, index) => ({
+      kind: spec.kind,
+      label: stageGoalNameOf(spec),
+      met: index !== 3,
+      reproduced: true,
+      sentence: '',
+      note: '',
+    }));
+    const missed = goals[3];
+    expect(missed).toBeDefined();
+    if (missed === undefined) return;
+    const sentence = holdoutSentenceOf(goals, stage.replications);
+    expect(sentence).toContain(`${String(goals.length - 1)} of ${String(goals.length)} goals reached`);
+    expect(sentence).toContain(missed.label);
+    for (const goal of goals.filter((entry) => entry.met)) {
+      if (goal.label !== missed.label) expect(sentence).not.toContain(goal.label);
+    }
+
+    /* Two missed: both named. An unjudged goal is counted, never named as missed. */
+    const two = goals.map((goal, index) => (index === 0 ? { ...goal, met: false } : goal));
+    const both = holdoutSentenceOf(two, stage.replications);
+    expect(both).toContain(two[0]?.label ?? '?');
+    expect(both).toContain(missed.label);
+    const unjudged = goals.map((goal, index) => (index === 3 ? { ...goal, met: null } : goal));
+    const counted = holdoutSentenceOf(unjudged, stage.replications);
+    expect(counted).not.toContain(missed.label);
+    expect(counted).toContain('could not be judged there');
+
+    /* The control: a holdout that held names nothing missed. */
+    const held = holdoutSentenceOf(goals.map((goal) => ({ ...goal, met: true })), stage.replications);
+    expect(held).toContain('The held-back crowds agree');
+    expect(held).not.toContain('did not reach');
   });
 
   it('stage 3’s brief no longer says it cannot be won, and its “every run” is the published table', () => {

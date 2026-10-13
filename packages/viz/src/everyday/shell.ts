@@ -1364,6 +1364,14 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     if (state.ctx === 'rush' && screen !== 'stage' && screen !== 'report') leaveRush();
     if (state.ctx === 'replay' && screen !== 'brief' && screen !== 'stage' && screen !== 'report') leaveReplay();
     /*
+     * **A sandbox day ends when its stage and its report do** — wave AO, lane AO-2,
+     * [§ D1368](../../../../DECISIONS.md). The host parked the week behind it (`everyday/sandbox.ts`);
+     * any other screen reads the week, so the week comes back first, exactly as it was. That includes
+     * *Tune the tower* itself, so a second sandbox is opened over the week rather than over the last
+     * sandbox. A no-op with none standing, whatever the context.
+     */
+    if (screen !== 'stage' && screen !== 'report') dataHost?.leaveSandbox();
+    /*
      * **A career day's state goes when the career's screens do** — GitHub issue #594, § D964. The
      * host parked the Scenario record behind the career day; any screen outside § 8's own five is
      * a screen that reads the Scenario record, so the record comes back first. The host's release
@@ -2311,9 +2319,21 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     const stay = el(doc, 'button', 'everyday-bar-confirm-stay', stayLabel);
     stay.type = 'button';
     stay.style.cssText = PRIMARY;
-    stay.addEventListener('click', drawBar);
+    stay.addEventListener('click', () => {
+      drawBar();
+      /* Back to the control that asked, so a keyboard player is where they were. */
+      bar.querySelector<HTMLElement>('.everyday-bar-leave')?.focus({ preventScroll: true });
+    });
     bar.append(q, why, spacer, leaveIt, stay);
     confirmShowing = true;
+    /*
+     * **Focus goes to the safe answer** — wave AO, lane AO-4, the post-AN panel's seat B. The strip
+     * replaces the bar, so the leave button that had focus left the document and focus fell to the
+     * body, from where the next Tab reached the covered Engineer page's *Skip to the building* link.
+     * *Stay* changes nothing, so it takes focus, as the stage's own questions put focus on *Back to
+     * the call* ([§ D1240](../../../../DECISIONS.md)).
+     */
+    stay.focus({ preventScroll: true });
   }
 
   /* ---------------------------------------------------------------- *
@@ -2563,19 +2583,29 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
    * *Continue your week* — swarm DN's Q2.4, lane AL-F, [§ D1228](../../../../DECISIONS.md). One
    * entry above the tiles while a Scenario week is under way, derived from the week on every draw
    * (`everyday/continueWeek.ts`), so nothing is stored for it and the page still opens here (§ 3.5).
-   * The press is the Scenario tile's commitment with the week's own destination: the front door for
-   * a day to play, or the week's sheet where the week has closed.
+   * The press is the Scenario tile's commitment with the week's own destination.
+   *
+   * **One press to where the player left** — wave AO, lane AO-4, [§ D1384](../../../../DECISIONS.md).
+   * Each destination is reached by the same calls the screen it skips would have made: a standing
+   * attempt by the brief's primary (`host.playDay`, then the stage), a banked today by the door's
+   * *Open the doors on ⟨day⟩* (`host.openTomorrow`, then the brief), and a day not yet started by
+   * the door's *Set up today*, which only navigates. So a day reached here and one reached through
+   * the door cannot differ.
    */
   function continueWeekTile(): HTMLElement | undefined {
     if (dataHost === undefined) return undefined;
-    const week = dataHost.week();
+    const host = dataHost;
+    const week = host.week();
     const buildingId = contractById(week.contractId)?.buildingId;
-    const towerName = buildingId === undefined ? '' : (dataHost.buildingById(buildingId)?.name ?? buildingId);
-    const entry = continueWeekEntryOf(week, towerName);
+    const towerName = buildingId === undefined ? '' : (host.buildingById(buildingId)?.name ?? buildingId);
+    const leftAt = host.dayAttempt() === undefined ? undefined : host.dayAttemptLeftAt();
+    const entry = continueWeekEntryOf(week, towerName, leftAt === undefined ? undefined : { clock: leftAt });
     if (entry === undefined) return undefined;
     const tile = el(doc, 'button', 'everyday-continue-week');
     tile.type = 'button';
-    tile.setAttribute('data-screen', entry.goes);
+    /* The screen the press lands on, and the press itself where the two differ (tomorrow opens a brief). */
+    tile.setAttribute('data-screen', entry.goes === 'tomorrow' ? 'brief' : entry.goes);
+    tile.dataset['goes'] = entry.goes;
     tile.style.cssText = [
       'text-align:left',
       'display:block',
@@ -2594,7 +2624,20 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     tile.append(title, line);
     tile.addEventListener('click', () => {
       state = { ...state, modePick: 'scenario', ctx: 'daily' };
-      go(entry.goes);
+      switch (entry.goes) {
+        case 'stage':
+          host.playDay();
+          go('stage');
+          return;
+        case 'tomorrow':
+          host.openTomorrow();
+          go('brief');
+          return;
+        case 'brief':
+        case 'week':
+          go(entry.goes);
+          return;
+      }
     });
     return tile;
   }
@@ -2964,6 +3007,8 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
       solvedCases: progress.solvedCaseIds.length,
       ratings: progress.ratings.length,
       careerDays: host.campaign().today - 1,
+      /* A day begun is a player met — § D1369: the attempt the reload kept is not a first arrival. */
+      daysBegun: host.dayAttempt() === undefined ? 0 : 1,
     });
     if (due) go('landing');
   }

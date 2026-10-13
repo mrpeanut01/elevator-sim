@@ -66,9 +66,9 @@ import { POST_RUN_COPY } from '../everyday/postRun.js';
 import { forgetDriver, rememberedDriverOf } from '../everyday/driverMemory.js';
 import { reportSignInLink } from '../everyday/signInLink.js';
 import { provideScenarioLadderFrom } from '../everyday/scenarioLadderPort.js';
+import { keepSettled, settledReadingOf } from './settledReadings.js';
 import { namedStageMoveOf } from '../everyday/stagePlay.js';
 import { provideScenarioOpen } from '../everyday/scenarioOpenPort.js';
-import { routeRefusalsOf, routeUnitsOf } from '../campaign/stagePress.js';
 import { everydaySwap, onEverydaySwapProvided } from '../everyday/swap.js';
 import {
   ENGINEER_RETURN_LABEL,
@@ -215,18 +215,25 @@ import {
   ATTEMPT_CLOSES_ON_ITS_STAGE,
   ATTEMPT_DAY_SHOWN_TO_ITS_REACH,
   ATTEMPT_ENGINEER_WATCHES_ONLY,
+  ATTEMPT_HELD_IN_ANOTHER_TAB,
+  ATTEMPT_HOLDS_ITS_DAY,
+  ATTEMPT_MOVED_ON_ELSEWHERE,
   ATTEMPT_LEFT_CANNOT_BANK,
+  ATTEMPT_NOT_POSTED,
   ATTEMPT_NOT_SAVED,
   ATTEMPT_SHOWN_TO_ITS_REACH,
   bankingRefusalFor,
   UNCHOSEN_RUN_CANNOT_BANK,
 } from '../shift/banking.js';
 import {
+  attemptHoldOf,
   attemptResumeAtS,
   attemptShownTo,
+  attemptSlotAfter,
   attemptStandingAmong,
   attemptStandsOn,
   dayFiledElsewhere,
+  type AttemptWrite,
   type DayAttempt,
 } from '../shift/attempt.js';
 import { shiftObservationsOf } from '../shift/observations.js';
@@ -332,7 +339,7 @@ import {
   saveSession,
 } from '../persist/session.js';
 import type { SessionStore } from '../persist/types.js';
-import { loadAttempts, saveAttempts } from '../persist/attempt.js';
+import { ATTEMPT_KEY, loadAttempts, saveAttempts, writeAttemptSlot } from '../persist/attempt.js';
 import type { MountContext, Panel, UnfiledSheetFacts, ViewAt } from './mountTypes.js';
 import {
   allBuildingIds,
@@ -1737,6 +1744,15 @@ function boot(ui: Elements, resources: BrowserResources): void {
       if (record === null || !dayCountsToward(week, entry) || houseNeedOf(entry) !== 'run') return [];
       const key = houseKeyOf(week.contractId, entry);
       if (houseReadings.has(key)) return [];
+      /*
+       * A verdict an earlier close settled, kept across a reload — § D1380. Read from where it was
+       * kept rather than asked again, so the tally never reads it as still being run.
+       */
+      const kept = settledReadingOf('house', key);
+      if (kept !== undefined) {
+        houseReadings.set(key, kept);
+        return [];
+      }
       /* A record this build cannot replay is no record of the crowd for the house either. */
       if (recordUnreadableReason(record, resources) !== null) {
         houseReadings.set(key, 'unrecorded');
@@ -1760,7 +1776,9 @@ function boot(ui: Elements, resources: BrowserResources): void {
         recordings.forEach((recording, index) => {
           const need = needs[index];
           if (need === undefined) return;
-          houseReadings.set(need.key, dayRunReadingOf(need.entry, recording));
+          const reading = dayRunReadingOf(need.entry, recording);
+          houseReadings.set(need.key, reading);
+          keepSettled('house', need.key, reading);
         });
         renderAll();
       },
@@ -1819,6 +1837,12 @@ function boot(ui: Elements, resources: BrowserResources): void {
     const key = `${week.contractId}|${entry.eventId}|${JSON.stringify(swapped)}`;
     const known = driverReadings.get(key);
     if (known !== undefined) return known;
+    /* § D1380: a driver run an earlier close settled, kept across a reload. */
+    const kept = settledReadingOf('driver', key);
+    if (kept !== undefined) {
+      driverReadings.set(key, kept);
+      return kept;
+    }
     /* A record this build cannot replay is no record of the crowd for the driver run either. */
     if (recordUnreadableReason(record, resources) !== null) {
       driverReadings.set(key, 'unrecorded');
@@ -1831,7 +1855,9 @@ function boot(ui: Elements, resources: BrowserResources): void {
       runs: [{ config: plan.config, outOfServiceCarIds: plan.outOfServiceCarIds, recordDecisions: false }],
       onDone: ([recording]) => {
         if (driverAsked === key) driverAsked = undefined;
-        driverReadings.set(key, recording === undefined ? 'unrecorded' : dayRunReadingOf(entry, recording));
+        const reading = recording === undefined ? 'unrecorded' : dayRunReadingOf(entry, recording);
+        driverReadings.set(key, reading);
+        keepSettled('driver', key, reading);
         renderAll();
       },
       /* A run that threw: the close says the run could not be made, and claims nothing. */
@@ -1911,11 +1937,113 @@ function boot(ui: Elements, resources: BrowserResources): void {
    */
   const ATTEMPT_WRITE_EVERY_S = 60;
 
+  /**
+   * **This tab's name in the attempt slot** — wave AO, lane AO-1, [§ D1361](../../../../DECISIONS.md),
+   * `shift/attempt.ts#AttemptHold`. Drawn once per page load from the browser's own random source
+   * and kept nowhere, so a reload is a new name and a duplicated tab never shares one. It decides
+   * nothing about any run: it only says which tab holds a saved attempt.
+   */
+  const attemptTab = (() => {
+    const words = new Uint32Array(2);
+    crypto.getRandomValues(words);
+    return [...words].map((word) => word.toString(16).padStart(8, '0')).join('');
+  })();
+  /**
+   * The run this tab was playing as the attempt when another tab took the attempt over, and the
+   * furthest instant it had shown — § D1361. That run is the attempt's day without the other tab's
+   * later presses, so both transports hold it at this tab's own reach rather than at the attempt's,
+   * which the other tab moves on.
+   */
+  let lostAttemptRun: { readonly recording: VizRecording; readonly atS: number } | undefined;
+
   /** The attempt standing on the week's own day, or `undefined`. */
   function standingAttempt(): DayAttempt | undefined {
     const attempt = dayAttempts.get(state.week.contractId);
     return attemptStandsOn(attempt, state.week) ? attempt : undefined;
   }
+
+  /** Whether another tab holds the attempt standing on the week's own day — § D1361. */
+  function attemptHeldElsewhere(): boolean {
+    const attempt = standingAttempt();
+    return attempt !== undefined && attemptHoldOf(attempt, attemptTab) === 'elsewhere';
+  }
+
+  /**
+   * Whether `recording` is the run this tab was playing when another tab took the attempt over, with
+   * the attempt's day still open — § D1361. Held where this tab had shown it, pressed and filed by
+   * nothing here, until this tab resumes the attempt (which re-simulates it from the slot) or the day
+   * is filed elsewhere.
+   */
+  function attemptRunStale(recording: VizRecording | undefined): boolean {
+    return (
+      recording !== undefined &&
+      lostAttemptRun !== undefined &&
+      recording === lostAttemptRun.recording &&
+      standingAttempt() !== undefined
+    );
+  }
+
+  /** § D1361: this tab may not play the day on screen, and the sentence the status line gives why. */
+  function attemptNotPlayableHere(): string | undefined {
+    if (!advancesTheWeek(state.playMode)) return undefined;
+    if (attemptHeldElsewhere()) return ATTEMPT_HELD_IN_ANOTHER_TAB;
+    return attemptRunStale(state.recording) ? ATTEMPT_MOVED_ON_ELSEWHERE : undefined;
+  }
+
+  /**
+   * One write to the attempt slot, through § D1361's rule (`shift/attempt.ts#attemptSlotAfter`),
+   * read fresh and merged by `persist/attempt.ts#writeAttemptSlot`. A refused write means another
+   * tab holds the attempt now, so this tab takes the slot as stored and stops playing it
+   * ({@link attemptLostHere}). `true` when the write stood. A sealed shell writes nothing, as it
+   * always has, and keeps the change in memory.
+   */
+  function writeAttemptSlotNow(contractId: string, write: AttemptWrite): boolean {
+    if (sessionSealed) {
+      const after = attemptSlotAfter(dayAttempts, contractId, write, attemptTab);
+      if (after === undefined) return false;
+      dayAttempts = after;
+      return true;
+    }
+    const shownHere = standingAttempt()?.shownToS;
+    const result = writeAttemptSlot(sessionStore, contractId, write, attemptTab);
+    dayAttempts = result.slot;
+    if (!result.ok) attemptLostHere(shownHere);
+    return result.ok;
+  }
+
+  /**
+   * **Another tab holds the attempt this tab was playing** — § D1361. Whatever this tab had in
+   * flight for the attempt is dropped, the run it was playing stops being the attempt's (so no close
+   * here files it and no press here grows it), and both transports hold that run at `shownHereS`,
+   * the furthest instant this tab had shown it, read before the slot was taken as stored. A takeover
+   * pressed here later re-reads the slot and resumes the attempt as stored.
+   */
+  function attemptLostHere(shownHereS: number | undefined): void {
+    if (attemptRecording !== undefined) {
+      const reach = Math.min(attemptRecording.endedAt, Math.max(attemptRecording.startedAt, shownHereS ?? attemptRecording.startedAt));
+      lostAttemptRun = { recording: attemptRecording, atS: reach };
+    }
+    if (attemptAsk !== undefined) shiftRunner.cancel();
+    attemptAsk = undefined;
+    nextAttemptAsk = undefined;
+    attemptRecording = undefined;
+  }
+
+  /**
+   * The slot changed in another tab — the `storage` event, § D1361. This tab takes the slot as
+   * stored; where it was playing the attempt and another tab now holds it, it stops.
+   */
+  function attemptsChangedElsewhere(): void {
+    if (sessionSealed) return;
+    const playing = attemptOnScreen();
+    const shownHere = standingAttempt()?.shownToS;
+    dayAttempts = loadAttempts(sessionStore);
+    if (playing && attemptHeldElsewhere()) attemptLostHere(shownHere);
+    renderAll();
+  }
+  window.addEventListener('storage', (event) => {
+    if (event.key === ATTEMPT_KEY || event.key === null) attemptsChangedElsewhere();
+  });
 
   /**
    * **The Engineer surface only watches while a scored attempt stands on `over`'s week** — wave AN,
@@ -1926,6 +2054,32 @@ function boot(ui: Elements, resources: BrowserResources): void {
   function engineerWatchOnlySentence(over: ViewerState): string | undefined {
     if (!advancesTheWeek(over.playMode)) return undefined;
     return attemptStandsOn(dayAttempts.get(over.week.contractId), over.week) ? ATTEMPT_ENGINEER_WATCHES_ONLY : undefined;
+  }
+
+  /**
+   * **The Everyday screens that would run the day only show while a scored attempt stands on
+   * `over`'s week** — wave AO, lane AO-1, [§ D1360](../../../../DECISIONS.md). § D1323's question in
+   * the Everyday words (`shift/banking.ts#ATTEMPT_HOLDS_ITS_DAY`), asked by the host before the
+   * workshop, the tuner, the drawing board, *Take this call again* or *Play this crowd* writes or
+   * runs anything, through the same `watchOnlyRefusal` so the two surfaces cannot sort a write
+   * differently.
+   */
+  function everydayHoldSentence(over: ViewerState): string | undefined {
+    return engineerWatchOnlySentence(over) === undefined ? undefined : ATTEMPT_HOLDS_ITS_DAY;
+  }
+
+  /**
+   * **The backstop: a run of the day while its attempt stands is the attempt's own or none** —
+   * § D1360. Every door above asks first and says why in its own place; this is what holds when a
+   * door does not. A player's ask on the week on screen while an attempt stands on it runs only
+   * where it is the attempt's own (`'begin'`, `'resume'`) or boot's (held at the attempt's reach by
+   * § D1323). `true` when it refused, having said why on the status line.
+   */
+  function attemptRefusesTheRun(): boolean {
+    if (!urlWritable || nextAttemptAsk !== undefined) return false;
+    if (engineerWatchOnlySentence(state) === undefined) return false;
+    setText(ui.transport.status, ATTEMPT_ENGINEER_WATCHES_ONLY);
+    return true;
   }
 
   /** Whether {@link engineerRefuses} is redrawing the page, so a refusal inside that redraw does not redraw again. */
@@ -1956,14 +2110,20 @@ function boot(ui: Elements, resources: BrowserResources): void {
     return standingAttempt() !== undefined && state.recording !== undefined && state.recording === attemptRecording;
   }
 
-  /** Put `attempt` in the week's slot, or clear it, and write the slot. */
-  function setAttempt(contractId: string, attempt: DayAttempt | undefined): void {
-    const next = new Map(dayAttempts);
-    if (attempt === undefined) next.delete(contractId);
-    else next.set(contractId, attempt);
-    dayAttempts = next;
-    attemptSavedShownS = attempt?.shownToS ?? Number.NEGATIVE_INFINITY;
-    if (!sessionSealed) saveAttempts(sessionStore, dayAttempts);
+  /**
+   * Put `attempt` in the week's slot, or clear it, and write the slot — through § D1361's rule, so
+   * a tab another has taken the attempt from writes nothing and stops ({@link writeAttemptSlotNow}).
+   * `true` when the write stood.
+   */
+  function setAttempt(contractId: string, attempt: DayAttempt | undefined): boolean {
+    const ok = writeAttemptSlotNow(contractId, attempt === undefined ? { kind: 'clear' } : { kind: 'write', attempt });
+    if (ok) attemptSavedShownS = attempt?.shownToS ?? Number.NEGATIVE_INFINITY;
+    return ok;
+  }
+
+  /** § D1361: the slot as stored, read now rather than remembered from the last write or event. */
+  function refreshAttempts(): void {
+    if (!sessionSealed) dayAttempts = loadAttempts(sessionStore);
   }
 
   /**
@@ -1973,7 +2133,13 @@ function boot(ui: Elements, resources: BrowserResources): void {
   function writeAttempt(change: Partial<DayAttempt> = {}): void {
     const attempt = standingAttempt();
     if (attempt === undefined) return;
+    /*
+     * § D1361: an attempt another tab holds is that tab's to write, and one nobody holds is written
+     * only by a tab playing it (the next write then holds it here again).
+     */
     const onScreen = attemptOnScreen();
+    const hold = attemptHoldOf(attempt, attemptTab);
+    if (hold === 'elsewhere' || (hold === 'free' && !onScreen)) return;
     setAttempt(attempt.contractId, {
       ...attempt,
       ...(onScreen && dayCallSession !== undefined ? { calls: dayCallSession.snapshot() } : {}),
@@ -2011,7 +2177,12 @@ function boot(ui: Elements, resources: BrowserResources): void {
       return;
     }
     if (ask === 'resume') {
-      if (standingAttempt() !== undefined) attemptRecording = recording;
+      /*
+       * § D1361: a takeover pressed in another tab while this resume was being made leaves this run
+       * a run of the day this tab does not hold, held at its start.
+       */
+      if (attemptHeldElsewhere()) lostAttemptRun = { recording, atS: recording.startedAt };
+      else if (standingAttempt() !== undefined) attemptRecording = recording;
       attemptLeft = false;
       return;
     }
@@ -2051,6 +2222,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * or § D1141's practice exactly as before.
    */
   function beginDayAttempt(): void {
+    /* § D1361: an attempt another tab began on this day since this tab last looked stands here too. */
+    refreshAttempts();
     /*
      * The day's crowd as the close will read it — {@link dealtDaySeedNow}, the value `runShift`
      * latches into {@link runDaySeed} — so a day dealt a derived crowd (§ D1229) begins the attempt
@@ -2072,15 +2245,43 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * which is the same run by determinism. A week that has moved under the attempt (the run it
    * describes is no longer the one this state would make) drops it rather than resume a different
    * run: `false` then, and the caller starts the day afresh.
+   *
+   * **And it holds the attempt in this tab** — wave AO, lane AO-1, [§ D1361](../../../../DECISIONS.md).
+   * The slot is read as stored and claimed here before anything runs. Another tab's attempt is
+   * claimed only with `takeOver`, the player's pressed takeover; without it this answers `false`
+   * and the host, which asks `attemptHeldElsewhere` before and after, starts nothing. A takeover
+   * re-simulates from the slot, so it carries every press the other tab wrote and opens at the
+   * reach that tab last saved, never further on.
    */
-  function resumeDayAttempt(dayShape: Partial<ViewerState>): boolean {
-    const attempt = standingAttempt();
-    if (attempt === undefined) return false;
-    attemptLeft = false;
-    if (attemptOnScreen()) {
+  function resumeDayAttempt(dayShape: Partial<ViewerState>, takeOver = false): boolean {
+    const mine = standingAttempt();
+    /* Held here and on the stage already: nobody else can have written it, so nothing is read or run. */
+    if (mine !== undefined && attemptHoldOf(mine, attemptTab) === 'here' && attemptOnScreen()) {
+      attemptLeft = false;
       renderAll();
       return true;
     }
+    refreshAttempts();
+    const stored = standingAttempt();
+    if (stored === undefined) return false;
+    if (attemptHoldOf(stored, attemptTab) === 'elsewhere' && !takeOver) return false;
+    if (!writeAttemptSlotNow(stored.contractId, { kind: 'claim', takeOver })) return false;
+    const attempt = standingAttempt() ?? stored;
+    lostAttemptRun = undefined;
+    attemptLeft = false;
+    /*
+     * The run in memory is the attempt's only where it carries the attempt's whole press log: a tab
+     * that let the attempt go (a page restored from the back-forward cache) and finds it moved on by
+     * another tab re-simulates it from the slot instead.
+     */
+    const sameLog =
+      JSON.stringify(state.interventions.map((entry) => [entry.atS, entry.change])) ===
+      JSON.stringify(attempt.interventions.map((entry) => [entry.atS, entry.change]));
+    if (attemptOnScreen() && sameLog && !takeOver) {
+      renderAll();
+      return true;
+    }
+    attemptRecording = undefined;
     const handed = withDispatcher({ ...state, ...dayShape }, resources, attempt.dispatcherId);
     const patch: Partial<ViewerState> = {
       ...dayShape,
@@ -2115,7 +2316,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
   function noteAttemptShown(recording: VizRecording, atS: number): void {
     if (recording !== state.recording || !attemptOnScreen()) return;
     const attempt = standingAttempt();
-    if (attempt === undefined) return;
+    if (attempt === undefined || attemptHoldOf(attempt, attemptTab) === 'elsewhere') return;
     const moved = attemptShownTo(attempt, atS);
     if (moved === attempt) return;
     if (moved.shownToS - attemptSavedShownS >= ATTEMPT_WRITE_EVERY_S) {
@@ -2131,7 +2332,21 @@ function boot(ui: Elements, resources: BrowserResources): void {
    */
   window.addEventListener('pagehide', () => {
     writeAttempt();
+    releaseHeldAttempts();
   });
+
+  /**
+   * **A tab that goes lets go** — § D1361. On `pagehide` (a closed tab, a reload, a navigation away)
+   * every attempt this tab holds is written as held by nobody, so the reloaded page or the next tab
+   * resumes it with no question. A tab that dies without a `pagehide` keeps its name on the slot,
+   * and the next tab offers the pressed takeover instead; no clock decides it.
+   */
+  function releaseHeldAttempts(): void {
+    if (sessionSealed) return;
+    for (const [contractId, attempt] of dayAttempts) {
+      if (attemptHoldOf(attempt, attemptTab) === 'here') writeAttemptSlotNow(contractId, { kind: 'release' });
+    }
+  }
 
   /** § D1152 — what the report says on a day that raised no ordinary call, or nothing. */
   function dayCallsQuietForReport(): DayCallsQuiet | undefined {
@@ -2153,6 +2368,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
     if (shiftInFlight) return undefined;
     if (state.playMode !== 'shift-week' || watching !== undefined) return undefined;
     if (contractById(state.week.contractId) === undefined) return undefined;
+    /* § D1361: nothing is asked of a day whose attempt another tab holds; that tab asks it. */
+    if (attemptNotPlayableHere() !== undefined) return undefined;
     if (dayCallSession === undefined) {
       /*
        * § D1218: a resumed attempt's run carries its presses already, and its session opens where
@@ -2264,6 +2481,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * has already grown the log, and the run this call made would not carry it.
      */
     if (session === undefined || shiftInFlight || session.recording() !== state.recording) return;
+    /* § D1361: the call of a day whose attempt another tab holds is answered there. */
+    if (attemptNotPlayableHere() !== undefined) return;
     const answered = session.answer(answer, (adoption) => {
       state = { ...state, interventions: [...state.interventions, adoption.entry] };
       runCause = 'intervention';
@@ -3048,10 +3267,17 @@ function boot(ui: Elements, resources: BrowserResources): void {
         const period = CALENDAR_PERIODS[intent.periodId as CalendarPeriodId] as
           | CalendarPeriod
           | undefined;
-        state = {
-          ...state,
-          calendar: period === undefined ? null : periodOnDays(period, 1, HISTORY_DAYS),
-        };
+        const calendar = period === undefined ? null : periodOnDays(period, 1, HISTORY_DAYS);
+        /*
+         * § D1360: the Engineer menu's calendar re-runs the week on screen, so while a scored attempt
+         * stands on it the period is refused as § D1323 refuses the surface's own controls, before
+         * the week's calendar moves under the attempt.
+         */
+        if (engineerRefuses({ calendar })) {
+          drawMenu();
+          return;
+        }
+        state = { ...state, calendar };
         drawMenu();
         runShift();
         return;
@@ -3464,6 +3690,12 @@ function boot(ui: Elements, resources: BrowserResources): void {
       };
     }
     if (client === undefined) return { kind: 'no-server', detail: NO_SERVER_POST };
+    /*
+     * § D1360: a posted run is replayed whole by the server and answered with the whole day's
+     * figures, so while a scored attempt stands on the week on screen, a run of its day is not
+     * posted, for the reason *Save recording* refuses (§ D1323 clause 3).
+     */
+    if (engineerWatchOnlySentence(state) !== undefined) return { kind: 'refused', detail: ATTEMPT_NOT_POSTED };
     const token = accountState.token;
     if (token === undefined) {
       return { kind: 'signed-out', detail: postingRefusal(accountState) ?? NO_SERVER_SIGN_IN };
@@ -4590,6 +4822,13 @@ function boot(ui: Elements, resources: BrowserResources): void {
    */
   function interveneAt(atS: number, change: RunInterventionConfig['change']): void {
     if (state.recording === undefined) return;
+    /* § D1361: a day whose attempt another tab holds takes no press here, on either surface. */
+    const notHere = attemptNotPlayableHere();
+    if (notHere !== undefined) {
+      setText(ui.transport.status, notHere);
+      renderAll();
+      return;
+    }
     state = { ...state, interventions: [...state.interventions, { atS, change }] };
     renderAll();
     settleRecompute();
@@ -5019,10 +5258,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
         /* § D1183: the stage page's own choices are published under its own names. */
         moveNamed: (name: string) => namedStageMoveOf(name, resources.dispatcherProfiles.profiles, loaded.space),
       };
-      const refusals = routeRefusalsOf(loaded.campaign.stages, routeResources);
-      /* § D1234: the same check read for its price, so a cleared stage's row can carry its par mark. */
-      const units = routeUnitsOf(loaded.campaign.stages, routeResources);
-      provideScenarioLadderFrom(loaded.campaign.stages, loaded.survivors, refusals, units);
+      /* § D1234: the same check read for its price, so a cleared stage's row can carry its par mark (§ D1376). */
+      provideScenarioLadderFrom(loaded.campaign.stages, loaded.survivors, routeResources);
     })
     .catch((error: unknown) => {
       setText(ui.campaign.error, error instanceof Error ? error.message : String(error));
@@ -5483,8 +5720,13 @@ function boot(ui: Elements, resources: BrowserResources): void {
     beginDayAttempt: () => {
       beginDayAttempt();
     },
-    resumeDayAttempt: (dayShape) => resumeDayAttempt(dayShape),
+    resumeDayAttempt: (dayShape, takeOver) => resumeDayAttempt(dayShape, takeOver),
     dayAttempt: () => standingAttempt(),
+    /* § D1361 — another tab holds the attempt on the week's day, or this run is one that moved on there. */
+    attemptHeldElsewhere: () => attemptHeldElsewhere(),
+    attemptRunStale: (recording) => attemptRunStale(recording),
+    /* § D1360 — the Everyday screens' refusal over the day an attempt stands on, or over the write. */
+    attemptHold: (patch) => watchOnlyRefusal(state, patch, everydayHoldSentence),
     attemptResumeAtS: (recording) => {
       const attempt = standingAttempt();
       if (attempt === undefined || recording !== attemptRecording || recording !== state.recording) return undefined;
@@ -5636,9 +5878,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
     stopWatching: () => {
       stopWatching();
     },
-    playThisCrowd: (run) => {
-      playThisCrowd(run);
-    },
+    playThisCrowd: (run) => playThisCrowd(run),
     watching: () =>
       watching === undefined
         ? undefined
@@ -5775,6 +6015,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
     drawCoach(view);
     drawFooter(view);
     drawTransportChrome(view);
+    drawWatchOnlyControls();
     drawParity();
     drawLegend(view);
     drawRaceStrip(view);
@@ -6257,8 +6498,18 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * gate), so a simulated run on screen is one of these two.
      */
     const ofItsDay = attempt !== undefined && !own && playback.recording === simulatedRecording;
+    /*
+     * § D1361: the run this tab was playing when another tab took the attempt over is held at this
+     * tab's own reach, never at the attempt's, which the other tab moves on.
+     */
+    const lost = lostAttemptRun !== undefined && playback.recording === lostAttemptRun.recording ? lostAttemptRun : undefined;
     const held = own || ofItsDay;
-    const reach = held ? Math.max(attempt.shownToS, playback.recording.startedAt) : null;
+    const reach =
+      lost !== undefined
+        ? lost.atS
+        : held
+          ? Math.max(attempt.shownToS, playback.recording.startedAt)
+          : null;
     if (playback.reach !== reach) playback.setReach(reach);
     if (!held || heldRunId === playback.recording.runId + String(playback.recording.startedAt)) return;
     heldRunId = playback.recording.runId + String(playback.recording.startedAt);
@@ -6881,6 +7132,42 @@ function boot(ui: Elements, resources: BrowserResources): void {
     setText(ui.coach.hint, coachHint(view));
   }
 
+  /**
+   * **The controls that run nothing while an attempt stands, drawn so before they are pressed** —
+   * wave AO, lane AO-4, the post-AN panel's seat B, [§ D1387](../../../../DECISIONS.md) extending
+   * [§ D1323](../../../../DECISIONS.md). The
+   * building, pattern and part-of-day selects, *Run this shift* and *Save recording* refuse while a
+   * scored attempt stands on the week on screen, and looked live until they were pressed. Each is
+   * drawn unavailable (`aria-disabled`, dimmed by `index.html`'s `.watch-only`) with the sentence its
+   * press gives as its `title`; a press still refuses in those words on the status line, so nothing
+   * about the rule moves. *Save recording* is marked only where its press refuses: a run this shell
+   * simulated.
+   */
+  function drawWatchOnlyControls(): void {
+    const sentence = engineerWatchOnlySentence(state);
+    const mark = (control: HTMLElement, reason: string | undefined): void => {
+      control.classList.toggle('watch-only', reason !== undefined);
+      if (reason !== undefined) {
+        control.setAttribute('aria-disabled', 'true');
+        control.title = reason;
+        control.dataset['watchOnly'] = 'true';
+      } else if (control.dataset['watchOnly'] === 'true') {
+        control.removeAttribute('aria-disabled');
+        control.removeAttribute('title');
+        delete control.dataset['watchOnly'];
+      }
+    };
+    for (const control of [ui.coach.building, ui.coach.pattern, ui.coach.shiftLength]) mark(control, sentence);
+    /* *Cancel this run* is never held: it stops a run, it makes none. */
+    mark(ui.coach.run, shiftRunner.isRunning() ? undefined : sentence);
+    mark(
+      ui.transport.saveRecording,
+      sentence !== undefined && state.recording !== undefined && state.recording === simulatedRecording
+        ? ATTEMPT_NOT_SAVED
+        : undefined,
+    );
+  }
+
   function coachHint(view: ViewAt): string {
     // Ahead of the withheld refusals: those are about the run on screen, and this is about whether
     // the run on screen is the one the player left. Both outrank advice.
@@ -6981,6 +7268,15 @@ function boot(ui: Elements, resources: BrowserResources): void {
     onRan?: (recording: VizRecording) => void,
     cause: 'player' | 'intervention' = 'player',
   ): void {
+    /*
+     * § D1360's backstop, first and before anything is latched or cleared: a player's ask for a run
+     * of a day whose attempt stands is the attempt's own or nothing. An intervention is the record
+     * of the run on screen growing, and its own gates (`interveneAt`) decide it.
+     */
+    if (cause === 'player' && attemptRefusesTheRun()) {
+      renderAll();
+      return;
+    }
     // Latched per start, so the value `closeShift` reads is about the run that will land — the
     // runner supersedes in-flight asks, and the latest ask is the one whose recording files. See
     // {@link runCause}; `'player'` is the default because every press but one means *a new ask*.
@@ -7341,10 +7637,31 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * else's schedule. Both are omissions with reasons rather than oversights, which is why they are
    * written here — `docs/16` S1.
    */
-  function playThisCrowd(run: WatchableRun): void {
+  function playThisCrowd(run: WatchableRun): string | undefined {
     const record = run.record;
+    if (record === undefined || record === null) {
+      stopWatching();
+      return undefined;
+    }
+    const crowd: Partial<ViewerState> = {
+      buildingId: record.buildingId,
+      dispatcherId: record.dispatcherId,
+      pattern: record.pattern,
+      shiftLengthS: record.shiftLengthS,
+      windowStartS: record.windowStartS,
+      seed: BigInt(record.seed),
+    };
+    /*
+     * § D1360: a watched crowd set up on a week whose day an attempt stands on would be a run of that
+     * day the stage never asked for, and the write would land on the attempt's week before the run
+     * was refused. Asked before anything moves, and the watch is left standing.
+     */
+    const held = watchOnlyRefusal(state, crowd, everydayHoldSentence);
+    if (held !== undefined) {
+      setText(ui.transport.status, ATTEMPT_ENGINEER_WATCHES_ONLY);
+      return held;
+    }
     stopWatching();
-    if (record === undefined || record === null) return;
     state = {
       ...state,
       buildingId: record.buildingId,
@@ -7365,6 +7682,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
     };
     renderAll();
     runShift();
+    return undefined;
   }
 
   function adoptEditedBuilding(config: BuildingConfig): void {
@@ -7665,6 +7983,27 @@ function boot(ui: Elements, resources: BrowserResources): void {
     if (filedElsewhere !== undefined) {
       dayAttempts = loadAttempts(sessionStore);
       attemptRecording = undefined;
+    } else if (advancesTheWeek(state.playMode)) {
+      /*
+       * **And only the tab holding the attempt files its day** — wave AO, lane AO-1,
+       * [§ D1361](../../../../DECISIONS.md). While another tab holds the attempt on this day, or the
+       * run here is one the attempt moved on from there, no close here files anything. The stage's
+       * own close reads the slot as stored first, so a takeover whose event has not arrived yet is
+       * seen; the Engineer's end-of-run close is asked every frame and reads the slot the `storage`
+       * event keeps, and neither redraws from here but the stage's one press.
+       */
+      if (via === 'stage') {
+        const shownHere = standingAttempt()?.shownToS;
+        const playing = attemptOnScreen();
+        refreshAttempts();
+        if (playing && attemptHeldElsewhere()) attemptLostHere(shownHere);
+      }
+      const notHere = attemptNotPlayableHere();
+      if (notHere !== undefined) {
+        setText(ui.transport.status, notHere);
+        if (via === 'stage') renderAll();
+        return;
+      }
     }
     const attemptStanding = advancesTheWeek(state.playMode) ? standingAttempt() : undefined;
     const isTheAttempt = attemptStanding !== undefined && recording === attemptRecording;
@@ -7709,7 +8048,21 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * week-day arm, where a wrong id makes a calendar-overridden day pair with an ordinary one as
      * one question — the exact comparison § D311 built the basis to refuse.
      */
-    const event = scheduledEventFor(state.calendar, state.week.day, state.week.dayIdx, 'period', state.week);
+    /*
+     * **And the campaign's own wrinkle where it handed the day one** — the post-AN panel's seat C, D4
+     * (wave AO lane AO-5). This asked the week's schedule alone, while the run was built from
+     * `state.campaignEventId` (`dev/state.ts#shiftRunConfigOf`): Garden Apartments' day 20 ran *Two
+     * cars down*, as its stage card said, under a sheet headed *Something on upstairs*. One function
+     * answers both now.
+     */
+    const event = scheduledEventFor(
+      state.calendar,
+      state.week.day,
+      state.week.dayIdx,
+      'period',
+      state.week,
+      state.campaignEventId,
+    );
     /*
      * The run this sheet reports, read back the way the brief read it before the press — its
      * building's windows, the cars the day's event took and whether its template kept its mix
@@ -7789,13 +8142,15 @@ function boot(ui: Elements, resources: BrowserResources): void {
       ? practiceGroundOf(state.week, state.seed, runDaySeed, attemptStanding !== undefined && !isTheAttempt)
       : undefined;
     const crowdPractice = practiceGround === 'crowd';
+    /* § D1368: a sandbox day's week is parked practice; its close moves nothing and offers no tomorrow. */
+    const sandboxPractice = practiceGround === 'sandbox';
     /* § D1218: a run that is not the standing attempt leaves the week on its day, as a link's crowd does. */
     const attemptPractice = practiceGround === 'attempt';
     /* § D1239: another tab filed the day, or an attempt stands while the Engineer surface closes. */
     const otherTabPractice = filedElsewhere !== undefined;
     const elsewherePractice = otherTabPractice || (engineerPractice && practiceGround === undefined);
     const week =
-      crowdPractice || attemptPractice || elsewherePractice
+      crowdPractice || attemptPractice || elsewherePractice || sandboxPractice
         ? state.week
         : closedWeekOf(state, outcome, runCause === 'intervention');
     const practice = practiceGround !== undefined || elsewherePractice;
@@ -7817,6 +8172,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
       /* Which ground made it practice, so the sheet says the true one — § D1141. */
       ...(crowdPractice ? { practiceCrowd: state.seed } : {}),
       ...(attemptPractice ? { practiceAttempt: true } : {}),
+      ...(sandboxPractice ? { practiceSandbox: true } : {}),
       ...(otherTabPractice ? { practiceOtherTab: true } : elsewherePractice ? { practiceEngineer: true } : {}),
       /*
        * § D1138 clause 3 — the ordinary day's calls, from the session that raised them over the run
@@ -7899,6 +8255,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
           ? undefined
           : { today: building.totalPopulation, tomorrow: facts.population, onward: facts.onward.population },
       dispatcherName: profileById(resources, state.savedDispatchers, state.dispatcherId).name,
+      /* § D1378: the weights the day started with, so the report never advises a weight it carried. */
+      startingWeights: profileById(resources, state.savedDispatchers, state.dispatcherId).weights,
       /*
        * The run's own hour, not a flat 06:00 — issue #83. `DAY_START_S` survives as the fallback for
        * a template that declares none (`constant-iso`) and for a recording restored from a file.

@@ -374,6 +374,8 @@ function firstSessionFor(context: EverydayScreenShellContext): boolean {
     solvedCases: progress.solvedCaseIds.length,
     ratings: progress.ratings.length,
     careerDays: context.host.campaign().today - 1,
+    /* The walkthrough's gate, so the page and the offer agree — § D1369. */
+    daysBegun: context.host.dayAttempt() === undefined ? 0 : 1,
   });
 }
 

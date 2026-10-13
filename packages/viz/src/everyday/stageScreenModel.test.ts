@@ -40,6 +40,7 @@ import { syntheticFloor, syntheticShaft } from '../live/synthetic.test-helper.js
 import { ManualClock } from '../playback/clock.js';
 import { MAX_SPEED, MIN_SPEED } from '../playback/mapping.js';
 import { Playback } from '../playback/playback.js';
+import { DAY_ATTEMPT_COPY } from '../shift/attempt.js';
 import { actionBarFor } from './actionBar.js';
 import { EVERYDAY_COLORS } from './tokens.js';
 import { RUN_CONTEXTS } from './types.js';
@@ -83,6 +84,9 @@ import {
   stageGoalsOf,
   STAGE_GOALS_COPY,
   type StageGoalsView,
+  stageFigureToneOf,
+  stagePlayControlOf,
+  STAGE_PLAY_DONE_REASON,
 } from './stageScreenModel.js';
 import { restBarWidthPx } from '../render/carRest.js';
 /* Pillar 3's strip is read against the rail's own fold and the shift's own goals — issue #277. */
@@ -987,6 +991,24 @@ describe('§ 3.3 — the stage row, refined', () => {
    * the transport, the second because `dayEnded` cannot be true without a run and a caller that
    * passed both anyway must not get a sentence about closing a day that does not exist.
    */
+  /*
+   * Wave AO, lane AO-1, § D1361: while another tab holds the day's attempt, the stage's primary is
+   * the takeover the brief offers, pressable, with the note that says what it does; over the run this
+   * tab was playing before the attempt moved on, it is the resume. Above every other state, because
+   * none of them is this tab's to act on.
+   */
+  it('offers the takeover while another tab holds the day, and the resume over a run that moved on', () => {
+    const flags = { hasRun: true, dayClosed: false, recomputing: false, dayEnded: true };
+    const elsewhere = stageBarModelOf(state, { ...flags, held: { kind: 'elsewhere', weekday: 'Monday' } });
+    expect(elsewhere.primary.label).toBe('Continue Monday here');
+    expect(elsewhere.primary.inert).toBeUndefined();
+    expect(elsewhere.note).toBe(DAY_ATTEMPT_COPY.elsewhereNote);
+    const stale = stageBarModelOf(state, { ...flags, held: { kind: 'stale', weekday: 'Monday' } });
+    expect(stale.primary.label).toBe('Resume Monday');
+    expect(stale.note).toBe(DAY_ATTEMPT_COPY.resumeNote);
+    expect(stageBarModelOf(state, flags).primary.label).toBe('Close the day');
+  });
+
   it('lets each refusal outrank it, so the row never points at an inert button', () => {
     for (const flags of [
       { hasRun: true, dayClosed: true, recomputing: false, dayEnded: true },
@@ -1815,6 +1837,54 @@ describe('the § 7 goal strip', () => {
     ).toEqual(rail.map((row) => [row.glyph, row.value, row.was, row.barPct, row.beside]));
   });
 
+  /*
+   * [§ D1381](../../../../DECISIONS.md), the post-AN panel's seat B (defect 6): at 18:00 the header
+   * drew 93 % against a 61 % bar and 220 s against 460 s in the red family beside met goal rows.
+   * Once the strip is judged, a header figure takes its own goal's verdict; before, the live accent.
+   */
+  it('draws a header figure in its goal’s verdict once the day has run out, and in the live accent before', () => {
+    const recording = spreadRun({ every: 8, waitS: 30 });
+    const atEnd = shiftObservationsOf(observationsAt(recording, recording.endedAt));
+    const readings = readGoals(goalsForDay(DAY), atEnd);
+    const head = stageHeaderOf({
+      simTimeS: recording.endedAt,
+      recording,
+      observations: observationsAt(recording, recording.endedAt),
+      driverName: 'the plain baseline',
+    });
+    const strip = stripAt(recording, recording.endedAt);
+    let compared = 0;
+    for (const figure of head.figures) {
+      const tone = stageFigureToneOf(figure, readings, strip.judged);
+      const goal = readings.find((reading) => reading.goal.reads === figure.reads);
+      if (figure.reads === undefined || goal === undefined) {
+        expect(tone, figure.label).toBe('still');
+        continue;
+      }
+      compared += 1;
+      expect(tone, figure.label).toBe(goal.state === 'met' ? 'met' : goal.state === 'missed' ? 'missed' : 'still');
+      /* Mid-day the same figure is a reading at the clock, never a verdict. */
+      expect(stageFigureToneOf(figure, readings, false), figure.label).toBe('live');
+    }
+    expect(compared, 'no header figure reads a goal; the tone has nothing to follow').toBe(2);
+    /* A met reading is drawn in the palette's cleared colour, never the live accent. */
+    const met = stageFigureToneOf(
+      { label: 'away inside a minute', value: '93%', reads: 'minutePct' },
+      readings.map((reading) => (reading.goal.reads === 'minutePct' ? { ...reading, state: 'met' as const } : reading)),
+      true,
+    );
+    expect(met).toBe('met');
+  });
+
+  it('draws ▶ Play inert once the day has run out, with the reason on it', () => {
+    expect(stagePlayControlOf({ hasRun: true, playing: false, dayEnded: false })).toEqual({ label: '▶ Play', disabled: false, inert: false, note: undefined });
+    expect(stagePlayControlOf({ hasRun: true, playing: true, dayEnded: false }).label).toBe('⏸ Pause');
+    const ended = stagePlayControlOf({ hasRun: true, playing: false, dayEnded: true });
+    expect(ended.inert).toBe(true);
+    expect(ended.note).toBe(STAGE_PLAY_DONE_REASON);
+    expect(stagePlayControlOf({ hasRun: false, playing: false, dayEnded: false }).inert).toBe(true);
+  });
+
   /**
    * **The energy bar refuses for the whole day, and it refuses in the product rather than here.**
    *
@@ -1843,10 +1913,13 @@ import { DATA_DIR } from '../fixtures.test-helper.js';
 import { RESOURCES } from '../scope/probes.test-helper.js';
 import {
   STAGE_CAMERAS,
+  STAGE_PLAY_CONTROL,
   legibleFloorCount,
+  stageBuildingWantsBringing,
   stageCameraChipsOf,
   stageCameraWindowOf,
   stageFloorJumpOptionsOf,
+  stageLitSpeedOf,
   wholeTowerIsLegible,
 } from './stageScreenModel.js';
 
@@ -2202,5 +2275,56 @@ describe('the booked-out car’s pill — GitHub issue #596 item 3, § D983', ()
 
   it('draws nothing on a tower that books nothing', () => {
     expect(stageBookedOutOf({ bookedOut: [], simTimeS: 700 })).toEqual([]);
+  });
+});
+
+/*
+ * ---- Wave AO, lane AO-4: the stage tells the truth about its own state ----
+ */
+describe('the stage’s own state — wave AO, lane AO-4', () => {
+  /*
+   * The post-AN panel's seat B (defect 2): `30×` lit at every call stop and at 18:00 for a player who
+   * never left `4×`. Red before: the lit chip was `Playback.speed` whatever the transport was doing.
+   */
+  it('lights the player’s chip while the transport is stopped, and the rung it runs at while it moves', () => {
+    expect(stageLitSpeedOf({ moving: false, runningSimPerRealS: 30, chosenSimPerRealS: 4 })).toBe(4);
+    expect(stageLitSpeedOf({ moving: true, runningSimPerRealS: 30, chosenSimPerRealS: 4 })).toBe(30);
+    expect(stageLitSpeedOf({ moving: true, runningSimPerRealS: 4, chosenSimPerRealS: 4 })).toBe(4);
+  });
+
+  /* Seat B (lost moment 6): *▶ Play* offered for 5 to 10 s while the stage worked out a call. */
+  it('does not offer Play while the stage is stopped working out a call, and says what it is doing', () => {
+    expect(stagePlayControlOf({ playing: false, hasRun: true, waitingOnCall: true })).toEqual({
+      label: STAGE_PLAY_CONTROL.waiting,
+      disabled: true,
+      inert: true,
+      note: undefined,
+    });
+    expect(stagePlayControlOf({ playing: false, hasRun: true, waitingOnCall: false })).toEqual({
+      label: STAGE_PLAY_CONTROL.play,
+      disabled: false,
+      inert: false,
+      note: undefined,
+    });
+    expect(stagePlayControlOf({ playing: true, hasRun: true, waitingOnCall: false }).label).toBe(STAGE_PLAY_CONTROL.pause);
+    expect(stagePlayControlOf({ playing: false, hasRun: false, waitingOnCall: false }).disabled).toBe(true);
+    /* It names no call, because the call may not be raised. */
+    expect(STAGE_PLAY_CONTROL.waiting).not.toMatch(/call/iu);
+  });
+
+  /*
+   * Seat B (defect 9), measured on the bundle at 390×844: the canvas at y 756–1262 under a bar from
+   * y 725 after the header's Play. A desktop stage showing four fifths of it is left alone.
+   */
+  it('brings the building into view only when less than half of it can be seen', () => {
+    const phoneRegion = { top: 50, bottom: 725 };
+    expect(stageBuildingWantsBringing({ top: 756, bottom: 1262 }, phoneRegion)).toBe(true);
+    expect(stageBuildingWantsBringing({ top: 219, bottom: 725 }, phoneRegion)).toBe(false);
+    expect(stageBuildingWantsBringing({ top: 411, bottom: 951 }, { top: 0, bottom: 844 })).toBe(false);
+    /* Exactly half is being watched. */
+    expect(stageBuildingWantsBringing({ top: 0, bottom: 200 }, { top: 100, bottom: 900 })).toBe(false);
+    /* A box with no height, or a region with none, asks for nothing. */
+    expect(stageBuildingWantsBringing({ top: 10, bottom: 10 }, phoneRegion)).toBe(false);
+    expect(stageBuildingWantsBringing({ top: 756, bottom: 1262 }, { top: 0, bottom: 0 })).toBe(false);
   });
 });

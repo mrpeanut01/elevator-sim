@@ -1077,6 +1077,11 @@ export function fixKeptLineOf(fixedBefore: boolean, outcome: FixitOutcome): stri
  * | it grew — more of it after than before | *Worse, and the complaint still stands.* |
  * | none of it did, or the run showed none to remove | *No change, and the complaint still stands.* |
  *
+ * Each of those three is the head only while the rest of the building held its 2-point floor. Where
+ * the rest fell past it, the head says so beside the complaint's half (*Some of the complaint went,
+ * and the rest of the building paid for it.*), so a fall is never headed *Better* (seat C's D7,
+ * wave AO).
+ *
  * The threshold is **greater than zero**, not a second bar: § 9's `COMPLAINT_GONE_PCT` is what
  * decides *fixed*, and inventing a *slightly better* bar here would be a third threshold nobody
  * argued. `null` — the run showed none of the complaint — takes the no-change arm, because a
@@ -1158,6 +1163,32 @@ export function classifyOutcome(
   }
   // *Better* and *Worse* are claims about the measurement in the row above them. See the docstring.
   const improved = measurement.complaintGonePct !== null && measurement.complaintGonePct > 0;
+  /*
+   * **And the head follows the whole verdict, the rest of the building included** — the post-AN
+   * panel's seat C, D7 (wave AO lane AO-5, § D405: the rows and the bar are this module's). Three
+   * fix-its read *"Better, and the complaint still stands."* over the rest of the building falling
+   * 21.3, 16.2 and 3.5 points, past the 2-point floor the row beside the head states. A run that
+   * fails both rows says both, and the word for the complaint's half never stands as the verdict on
+   * the building. Only a measured fall: a rest nobody rode (`restDeltaPoints` null) fails its row
+   * without having fallen, and keeps the heads below.
+   */
+  if (measurement.restDeltaPoints !== null && !restRow.passed) {
+    const grew = complaintGrew(measurement);
+    return {
+      kind: 'not-enough',
+      head: grew
+        ? 'Worse: the complaint grew, and the rest of the building fell.'
+        : improved
+          ? 'Some of the complaint went, and the rest of the building paid for it.'
+          : 'No change to the complaint, and the rest of the building fell.',
+      body:
+        'Everyone else is away inside a minute less often than this morning, by more than the ' +
+        '2-point floor. Change something else and run it again.',
+      rows,
+      basis: basisOf(measurement),
+      attribution: 'order',
+    };
+  }
   if (complaintGrew(measurement)) {
     return {
       kind: 'not-enough',

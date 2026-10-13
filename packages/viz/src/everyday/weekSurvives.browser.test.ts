@@ -155,7 +155,7 @@ describe.skipIf(!HAS_BROWSER)('GitHub issue #593 — a Scenario week plays from 
           if (day === 7) break;
           /* The report's own way into tomorrow — `openTomorrow`, then the brief. */
           await page.locator('.everyday-report-tomorrow').first().click();
-          if (reached.at(-1) === 'See the week against the house') {
+          if (reached.at(-1) === 'See the week against the house' || reached.at(-1) === 'See the week’s sheet') {
             /*
              * The weekend is off the main path (§ D1246): the close that closed the week opens its
              * sheet, and the weekend day is one press on the sheet, counting toward nothing.
@@ -170,13 +170,24 @@ describe.skipIf(!HAS_BROWSER)('GitHub issue #593 — a Scenario week plays from 
          * Friday's close closes the week (§ D1246, the weekend off the main path), and every close
          * from there opens the week's sheet rather than the next day — swarm DN's Q2.3, § D1227 —
          * whose own primary starts the next week on the brief, while Saturday and Sunday are one
-         * press each on the sheet. Garden Apartments' week has no ending and offers Monday.
+         * press each on the sheet. Garden Apartments' week, which the census does not deal, closes on
+         * Sunday since § D1394 (wave AO lane AO-5): every day of it counts, so Saturday and Sunday are
+         * on its main path, and Sunday's close opens its sheet, which sets no house beside the player.
          */
         expect(reached).toHaveLength(7);
         const closesAWeek = building === 'midtown-office';
-        const offersNext = closesAWeek ? reached.slice(0, 4) : reached;
+        const offersNext = closesAWeek ? reached.slice(0, 4) : reached.slice(0, 6);
         expect(offersNext.every((label) => label.startsWith('Open the doors on'))).toBe(true);
         expect(new Set(offersNext).size).toBe(offersNext.length);
+        if (!closesAWeek) {
+          /* Red before § D1394: Sunday's close offered *Open the doors on Monday*, day 8. */
+          expect(reached[6]).toBe('See the week’s sheet');
+          await page.locator('.everyday-report-tomorrow').click();
+          await page.waitForSelector('.everyday-week-sheet', { timeout: 15_000 });
+          expect(await page.locator('.everyday-week-sheet-row').count()).toBe(7);
+          expect(await textOf(page, '.everyday-week-sheet-house')).toContain('Nothing was run beside you this week');
+          expect(await textOf(page, '.everyday-week')).toContain('EVERYDAY MODE · WEEK 1');
+        }
         if (closesAWeek) {
           expect(reached.slice(4)).toEqual([
             'See the week against the house',
@@ -241,13 +252,14 @@ describe.skipIf(!HAS_BROWSER)('GitHub issue #594 — no mode but Scenario writes
       await toModes(page);
       /*
        * The mode picker offers the week back — swarm DN's Q2.4, § D1228 — naming the tower and the
-       * day standing, and its press opens the front door on that week.
+       * day standing. Since wave AO, lane AO-4 (§ D1384) its press after a close opens tomorrow's
+       * brief, as the door's own *Open the doors on Tuesday* does, rather than the door.
        */
       await page.waitForSelector('.everyday-continue-week', { timeout: 15_000 });
       /* With the week's number since wave AN, lane AN-7 (§ D1330). */
       expect(await textOf(page, '.everyday-continue-week')).toContain('Midtown Office, week 1, Monday filed, Tuesday next');
       await page.locator('.everyday-continue-week').click();
-      await page.waitForSelector('.everyday-door', { timeout: 15_000 });
+      await page.waitForSelector('.everyday-brief', { timeout: 15_000 });
       await toModes(page);
       const before = await weekAtTheDoor(page);
       /*

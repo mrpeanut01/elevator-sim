@@ -124,6 +124,7 @@ import {
   buildingConfigOf,
   disclosureOf,
   profileById,
+  resolvedBuildingOf,
   withBuilding,
   withDispatcher,
   type SavedPattern,
@@ -1783,6 +1784,21 @@ export function mountRightRail(ui: RightRailElements, context: MountContext): Pa
    */
   const scopeNotes: HTMLElement[] = [];
   const watchNotes: HTMLElement[] = [];
+  const watchNoteOf = new Map<HTMLElement, HTMLElement>();
+  /** Lane AO-4: the cards of a list drawn unavailable while the attempt rule holds, described by its note. */
+  const markWatchOnlyCards = (list: HTMLElement, watchOnly: boolean, note: HTMLElement | undefined, index: number): void => {
+    if (note !== undefined && note.id === '') note.id = `rail-attempt-note-${String(index)}`;
+    for (const card of list.querySelectorAll<HTMLElement>('button')) {
+      card.classList.toggle('watch-only', watchOnly);
+      if (watchOnly) {
+        card.setAttribute('aria-disabled', 'true');
+        if (note !== undefined) card.setAttribute('aria-describedby', note.id);
+      } else if (card.getAttribute('aria-disabled') === 'true') {
+        card.removeAttribute('aria-disabled');
+        if (note !== undefined && card.getAttribute('aria-describedby') === note.id) card.removeAttribute('aria-describedby');
+      }
+    }
+  };
   const scopeNote = (list: HTMLElement, key: SurfaceKey): void => {
     if (commitmentOf(key, 'runs-the-shift') !== 're-runs-now') return;
     const scope = el(doc, 'p', { className: 'rail-prose', text: PICKS_RE_RUN });
@@ -1792,6 +1808,7 @@ export function mountRightRail(ui: RightRailElements, context: MountContext): Pa
     list.parentElement?.insertBefore(watch, list);
     scopeNotes.push(scope);
     watchNotes.push(watch);
+    watchNoteOf.set(list, watch);
   };
   scopeNote(ui.dispatcherList, 'viewer.dispatcherId');
   scopeNote(ui.trafficList, 'viewer.pattern');
@@ -1908,7 +1925,14 @@ export function mountRightRail(ui: RightRailElements, context: MountContext): Pa
       const buildingIds = allBuildingIds(resources, state.savedBuildings);
       setText(ui.buildingNote, buildingNoteOf(building));
       buildingList(
-        buildingIds.map((id) => `${id}${id === state.buildingId ? '*' : ''}`).join('|'),
+        /*
+         * § D1382: the weeks are in the key, because each card describes the building a press would
+         * run and that moves with the day the building's week stands at.
+         */
+        [
+          ...buildingIds.map((id) => `${id}${id === state.buildingId ? '*' : ''}`),
+          ...[state.week, ...state.parkedWeeks].map((week) => `${week.contractId}:${String(week.week)}:${String(week.day)}`),
+        ].join('|'),
         () =>
           buildingIds.map((id) => {
             const card = buildingCardOf(resources, state, id);
@@ -1955,6 +1979,16 @@ export function mountRightRail(ui: RightRailElements, context: MountContext): Pa
        * what is drawn now is what the building is built to. Nothing in this block can change a
        * run, which is why it is the only one of the four that never calls `runShift`.
        */
+      /*
+       * **And the cards that run nothing say so before they are pressed** — wave AO, lane AO-4, the
+       * post-AN panel's seat B, [§ D1387](../../../../DECISIONS.md) extending § D1323. While a scored attempt stands
+       * the three lists' cards refuse when picked; they looked live until then. Each is drawn
+       * unavailable (`aria-disabled`, dimmed by `index.html`'s `.watch-only`) and described by the
+       * rule drawn above it, and a press still says the rule on the status line.
+       */
+      for (const [index, list] of [ui.dispatcherList, ui.trafficList, ui.buildingList].entries()) {
+        markWatchOnlyCards(list, watchOnly, watchNoteOf.get(list), index);
+      }
       const running = runningClassesOf(building, allClasses(resources, state.savedClasses));
       const shownClass = running[0]?.machineClass;
       setText(ui.machinesNote, machinesNoteOf(building));
@@ -2001,14 +2035,28 @@ interface BuildingCard {
  * card cannot describe a building the runner would refuse. When it *is* refused the card says so
  * and names the refusal, which is the state the building editor exists to get the reader out of.
  */
-function buildingCardOf(
+export function buildingCardOf(
   resources: BrowserResources,
   state: ViewerState,
   id: string,
 ): BuildingCard {
   const shipped = resources.entries.find((entry) => entry.config.id === id);
   if (shipped !== undefined) {
-    return { label: shipped.resolved.name, sub: statLineOf(shipped.resolved) };
+    /*
+     * **The building a press of this card runs**, not the file's — [§ D1382](../../../../DECISIONS.md),
+     * the post-AN panel's seat D (D9). The cards listed Midtown Office at 1,710 people and Harbour
+     * Point at 1,560 while the week played them at 589 and 930: the stat line was the shipped
+     * building's, and a press runs the building `withBuilding` stands the week on, as handed by its
+     * contract and grown to that week's day. Asked of the run (`state.ts#resolvedBuildingOf`), the
+     * header's own question; the shipped line stands where that cannot be asked.
+     */
+    let running: ResolvedBuilding | undefined;
+    try {
+      running = resolvedBuildingOf(resources, withBuilding(state, resources, id));
+    } catch {
+      running = undefined;
+    }
+    return { label: shipped.resolved.name, sub: statLineOf(running ?? shipped.resolved) };
   }
   const config = buildingConfigOf(resources, state.savedBuildings, id);
   if (config === undefined) return { label: id, sub: 'not loaded' };

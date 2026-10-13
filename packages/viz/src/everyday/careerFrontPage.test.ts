@@ -8,6 +8,7 @@
  * `checking watch`). A synthetic recording would let the test choose the band it then asserts.
  */
 
+import { CHIMES_EARN_RULE } from './chimesPanel.js';
 import { loadConfig, type LoadedConfig, type SimulationConfig } from '@elevator-sim/core';
 import { beforeAll, describe, expect, it } from 'vitest';
 
@@ -127,7 +128,14 @@ describe('a fresh career opens on an intro to the career and to chimes — #536'
     /* The second slot's standing is read from SLOTS, never typed. */
     expect(fresh.intro?.paragraphs.join(' ')).toContain('the second opens at 14.');
     expect(fresh.intro?.chimesHeading).toBe('CHIMES');
-    expect(fresh.intro?.chimes.join(' ')).toContain('Chimes are what finishing something pays you');
+    /*
+     * § D1382, the post-AN panel's seat D (D9): it read *Chimes are what finishing something pays
+     * you* while a cleared Saturday and every practice paid nothing. The Career states Settings' own
+     * rule, which names what pays nothing.
+     */
+    expect(fresh.intro?.chimes.join(' ')).toContain(CHIMES_EARN_RULE);
+    expect(fresh.intro?.chimes.join(' ')).not.toContain('what finishing something pays you');
+    expect(CHIMES_EARN_RULE).toContain('Practice, a day that does not count and a missed day pay nothing.');
     expect(fresh.intro?.chimes.join(' ')).toContain('never buy back a missed day');
     expect(towersView(inputOf(afterDayOne())).intro).toBeUndefined();
   });

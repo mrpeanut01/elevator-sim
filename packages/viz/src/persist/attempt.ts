@@ -26,7 +26,7 @@
  * uses.
  */
 
-import type { DayAttempt } from '../shift/attempt.js';
+import { attemptSlotAfter, type AttemptWrite, type DayAttempt } from '../shift/attempt.js';
 
 import type { SessionStore } from './types.js';
 
@@ -80,6 +80,11 @@ function attemptIssue(value: unknown): string | undefined {
     if (typeof entry['change']['kind'] !== 'string') return 'an intervention names no change';
   }
   if (value['record'] !== null && !isObject(value['record'])) return 'record is not a record';
+  /* § D1361: which tab holds it. Absent on an attempt stored before wave AO, which is read as free. */
+  const holder = value['holder'];
+  if (holder !== undefined && holder !== null && !(typeof holder === 'string' && /^[0-9a-z]{1,64}$/u.test(holder))) {
+    return 'holder is not a tab';
+  }
   /* § D1239: the pinned call's counted record, shallow for the calls' records' reason. */
   const pinned = value['pinnedCall'];
   if (pinned !== undefined && !(isObject(pinned) && isNumber(pinned['atS']) && isObject(pinned['counts']))) {
@@ -161,8 +166,34 @@ export function loadAttempts(store: SessionStore): ReadonlyMap<string, DayAttemp
 }
 
 /**
+ * **One tab's write to the slot, read fresh and merged** — wave AO, lane AO-1,
+ * [§ D1361](../../../../DECISIONS.md). The slot is read at the write rather than remembered, the
+ * write is judged by `shift/attempt.ts#attemptSlotAfter`, and only then is anything written, so a
+ * tab whose memory of the slot is older than another tab's write cannot put it back.
+ *
+ * `ok: false` is a refusal: another tab holds the attempt (or, for a claim, nothing is stored), and
+ * `slot` is the slot as it stands, so the caller learns what it lost. `ok: true` with `stored:
+ * false` is a store that would not take the write; the caller keeps `slot` in memory as before,
+ * and only a reload would lose it.
+ */
+export function writeAttemptSlot(
+  store: SessionStore,
+  contractId: string,
+  write: AttemptWrite,
+  tab: string,
+): { readonly ok: boolean; readonly stored: boolean; readonly slot: ReadonlyMap<string, DayAttempt> } {
+  const before = loadAttempts(store);
+  const after = attemptSlotAfter(before, contractId, write, tab);
+  if (after === undefined) return { ok: false, stored: false, slot: before };
+  if (after === before) return { ok: true, stored: true, slot: before };
+  return { ok: true, stored: saveAttempts(store, after), slot: after };
+}
+
+/**
  * Write every standing attempt, or clear the slot when none stands. `false` when the store refused;
- * the attempt still stands in memory, and only a reload would lose it.
+ * the attempt still stands in memory, and only a reload would lose it. A whole-map write, so since
+ * § D1361 its one caller outside this file is *Clear saved progress*, which writes the empty map;
+ * every attempt write goes through {@link writeAttemptSlot}.
  */
 export function saveAttempts(store: SessionStore, attempts: ReadonlyMap<string, DayAttempt>): boolean {
   try {

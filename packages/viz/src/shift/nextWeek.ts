@@ -36,7 +36,7 @@ import { intervalContainsZero, pairedDifferenceEstimate, type MeanEstimate } fro
 import { scheduledEventFor } from './calendar.js';
 import type { WeekState } from './types.js';
 import { weekOrderIndexOf } from './weekOrders.js';
-import { weekDealOf, weekTargetMetDayOf } from './weekStake.js';
+import { weekAsksOf, weekDealOf, weekTargetMetDayOf } from './weekStake.js';
 import { WEEK_WAY, weekWayRowFor, type WeekWay } from './weekWay.js';
 import { wrinkleOfDrawnId } from '../wrinkles/draw.js';
 import { WRINKLE_LIBRARY } from '../wrinkles/library.js';
@@ -204,12 +204,17 @@ function wrinkleClause(contractId: string, a: number, b: number, census: WeekWay
 }
 
 /**
- * **What a closed week's sheet deals next**, or `undefined` where the census does not deal the
- * tower's week (its days run on and never roll). See the module docstring.
+ * **What a closed week's sheet deals next**, or `undefined` for a week that is no Scenario's. See the
+ * module docstring; a week the census does not deal is answered too since § D1394.
  */
 export function nextWeekOf(week: WeekState, census: WeekWay = WEEK_WAY): NextWeekView | undefined {
-  const deal = weekDealOf(week, census);
-  if (deal === undefined) return undefined;
+  /*
+   * Any Scenario week, since § D1394 (wave AO lane AO-5): a week the census does not deal closes on
+   * Sunday too, and asks its `needClean` (`weekStake.ts#weekAsksOf`). Its next week deals the same
+   * draw, which {@link wrinkleClause} says, and no house census calls it harder.
+   */
+  const target = weekAsksOf(week, census);
+  if (target === undefined) return undefined;
   const contractId = week.contractId;
   const here = week.week;
   const next = here + 1;
@@ -228,7 +233,7 @@ export function nextWeekOf(week: WeekState, census: WeekWay = WEEK_WAY): NextWee
   const onwardLabel = `Go on to week ${String(next)}`;
   const lead =
     /* A week that counts no day has no target to miss, and the sheet says *This week had no target*. */
-    `${deal.target === 0 ? 'This week had no target to meet' : 'This week’s target was not met'}, so ` +
+    `${target === 0 ? 'This week had no target to meet' : 'This week’s target was not met'}, so ` +
     `${again} deals the same wrinkles on new crowds. Nothing is ` +
     `locked: ${onwardLabel} deals the next week instead, with ${wrinkleClause(contractId, here, next, census)}.`;
   return {

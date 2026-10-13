@@ -32,7 +32,7 @@ import { CONTRACTS } from '../shift/contracts.js';
 import { pressDayFor } from '../shift/ladder.js';
 import type { CareerStore } from './careerStore.js';
 
-import { offerRefusalOf, openingCareer, towerById, type CampaignTower } from '../campaign/career.js';
+import { offerRefusalOf, openingCareer, towerById, type CampaignCareer, type CampaignTower } from '../campaign/career.js';
 import { clearedDays, purseOf, spentTodayUnits, type ShopCategoryId } from '../campaign/economy.js';
 import { TECHNICIAN_UNITS, campaignEventFor } from '../campaign/incidents.js';
 import { CAMPAIGN_DOCK_COPY } from './campaignDock.js';
@@ -2537,6 +2537,29 @@ describe('what the host banks — GitHub issue #499, first time only', () => {
     expect(h.banked).toEqual([]);
   });
 
+  /*
+   * [§ D1382](../../../../DECISIONS.md), the post-AN panel's seat D (D9): *cleared day filed · 3 chimes*
+   * stood on the next day's stage and on a practice stage. The acknowledgement stands while the run
+   * it was banked on does — the report, the door, the brief — and is withdrawn once another run is
+   * put on the stage.
+   */
+  it('withdraws the banked line once another run stands on the stage', async () => {
+    const h = harnessOf({ ...base(), recording: A_RECORDING });
+    const host = createEverydayHost(h.bindings);
+    host.bankScenarioClear('sleeping-sky-lobby');
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(host.chimeTally()?.turn).toBe('scenario-cleared');
+    /* The same run still standing, as on the report and the door after a close. */
+    h.state = { ...h.state };
+    expect(host.chimeTally()?.turn).toBe('scenario-cleared');
+    /* A fresh ask clears the run, and the next one lands: neither is the run the turn finished. */
+    h.state = { ...h.state, recording: undefined };
+    expect(host.chimeTally()).toBeUndefined();
+    h.state = { ...h.state, recording: { ...A_RECORDING } };
+    expect(host.chimeTally()).toBeUndefined();
+  });
+
 });
 
 describe('the replay — GitHub issue #177 item 1, § D517', () => {
@@ -2629,59 +2652,38 @@ describe('a run in flight when a day is left — GitHub issue #526', () => {
     expect(h.calls.slice(beforeLeaving)).toEqual(['abandonDay']);
   });
 
-  it('taking a campaign offer abandons the day before the week moves — item 2', () => {
-    /*
-     * A career one slot up, so the reducer takes the offer rather than refusing it: standing 14 opens
-     * the second slot. The day in flight was asked for the week being parked, so it goes first, and the
-     * week then moves exactly as it did.
-     */
-    const career = { ...openingCareer(base().dispatcherId), carry: 14 };
-    const store: CareerStore = {
-      load: () => ({ career, refusal: undefined, notice: undefined }),
-      save: () => {},
-      clear: () => {},
-    };
-    const offer = CONTRACTS.find((contract) => offerRefusalOf(career, contract.id) === undefined);
-    if (offer === undefined) throw new Error('no contract is takeable on a career one slot up — the fixture no longer opens one');
-    const h = harnessOf(base());
-    const host = createEverydayHost(h.bindings, store);
-    const beforeTaking = h.calls.length;
-    host.campaignAct({ kind: 'take-offer', contractId: offer.id });
-    expect(h.calls.slice(beforeTaking)).toEqual(['abandonDay', 'applyPatch']);
-    expect(h.patches.at(-1)?.buildingId).toBe(offer.buildingId);
-    expect(h.patches.at(-1)?.week?.contractId).toBe(offer.id);
-  });
-
   /**
-   * **A day already filed is stopped, not accused** — GitHub issue #531 item 4, § D565.
-   *
-   * `abandonDay` cancels *and* marks: `dev/main.ts` writes the standing recording into
-   * `abandonedRecording`, which `shift/banking.ts#bankingRefusalFor` then refuses with *“belongs to
-   * a day that was left unfinished”*. `dev/main.ts#postCurrentRun` asks that refusal **before** it
-   * asks whether the run reproduces from the selection, so after an offer a filed day was refused
-   * with a sentence that is false about it. The cancel is still right — a run in flight was asked
-   * for the week being parked — so the two halves are split by the fact that decides them, and the
-   * assertion is on which binding was called.
-   *
-   * The refusal itself is `shift/banking.test.ts`'s and is not restated here: what this file owns is
-   * which of `dev/main.ts`'s two presses this façade reaches, which is the whole of the fix.
+   * **Taking a campaign offer moves no week, so it has no day to stop** — the post-AN panel's seat C,
+   * D6, wave AO lane AO-5, § D1393. The take used to park the Scenario week and restart it on the
+   * offered building, abandoning the day in flight first (GitHub issue #526 item 2) or cancelling it
+   * where the day had filed (#531 item 4, § D565). Seat C took St Jude in the career and opened
+   * Scenario on a St Jude week nobody chose. Red before: the calls read `abandonDay, applyPatch` and
+   * `cancelRun, applyPatch`, and the patch named the offer's contract and building.
    */
-  it('stops the run but does not refuse a day that has already filed — item 4', () => {
+  it('takes the offer into the career and leaves the Scenario week, its run and its day alone — § D1393', () => {
     const career = { ...openingCareer(base().dispatcherId), carry: 14 };
-    const store: CareerStore = {
-      load: () => ({ career, refusal: undefined, notice: undefined }),
-      save: () => {},
-      clear: () => {},
-    };
     const offer = CONTRACTS.find((contract) => offerRefusalOf(career, contract.id) === undefined);
     if (offer === undefined) throw new Error('no contract is takeable on a career one slot up — the fixture no longer opens one');
-    const h = harnessOf(base(), { dayClosed: true });
-    const host = createEverydayHost(h.bindings, store);
-    const beforeTaking = h.calls.length;
-    host.campaignAct({ kind: 'take-offer', contractId: offer.id });
-    expect(h.calls.slice(beforeTaking)).toEqual(['cancelRun', 'applyPatch']);
-    /* And the week still moves, so this is the refusal being dropped rather than the arm being skipped. */
-    expect(h.patches.at(-1)?.week?.contractId).toBe(offer.id);
+    for (const dayClosed of [false, true]) {
+      let saved: CampaignCareer | undefined;
+      const store: CareerStore = {
+        load: () => ({ career, refusal: undefined, notice: undefined }),
+        save: (next) => {
+          saved = next;
+        },
+        clear: () => {},
+      };
+      const h = harnessOf(base(), { dayClosed });
+      const host = createEverydayHost(h.bindings, store);
+      const beforeTaking = h.calls.length;
+      const patchesBefore = h.patches.length;
+      host.campaignAct({ kind: 'take-offer', contractId: offer.id });
+      expect(h.calls.slice(beforeTaking), `dayClosed ${String(dayClosed)}`).toEqual([]);
+      expect(h.patches.length).toBe(patchesBefore);
+      /* The control: the career did take it. */
+      expect(saved?.towers.map((tower) => tower.id)).toContain(offer.id);
+      expect(host.campaign().towers.map((tower) => tower.id)).toContain(offer.id);
+    }
   });
 });
 
@@ -3025,13 +3027,104 @@ describe('one attempt per scored day — § D1218', () => {
       },
     };
     const host = createEverydayHost(bindings);
-    expect(host.dayAttempt()).toEqual({ weekday: 'Monday' });
+    expect(host.dayAttempt()).toEqual({ weekday: 'Monday', heldElsewhere: false });
     host.playDay();
     expect(h.calls).toEqual(['resumeDayAttempt']);
     expect(resumed).toHaveLength(1);
-    /* `startRun` itself is unchanged: the designer's and the tuner's runs still start a run. */
+    /*
+     * A shell that binds no `attemptHold` refuses nothing, so `startRun` still presses here. With the
+     * binding, the workshop's, the tuner's and the drawing board's runs refuse while an attempt
+     * stands — wave AO, § D1360, held door by door in `attemptDoors.test.ts`.
+     */
     host.startRun();
     expect(h.calls).toEqual(['resumeDayAttempt', 'startRun']);
+    const held = createEverydayHost({ ...bindings, attemptHold: () => 'held' });
+    expect(held.startRun()).toBe('held');
+    expect(h.calls).toEqual(['resumeDayAttempt', 'startRun']);
+  });
+
+  /*
+   * Wave AO, lane AO-1, § D1361 — the saved attempt belongs to one tab at a time. Where another tab
+   * holds it, *Start the day* and the stage's entry press start nothing; the pressed takeover resumes
+   * it here; and the stage is told to show the day no further.
+   */
+  it('starts nothing where another tab holds the attempt, and resumes it here only on the pressed takeover', () => {
+    const h = harnessOf(base());
+    const resumes: boolean[] = [];
+    let elsewhere = true;
+    const bindings: EverydayHostBindings = {
+      ...h.bindings,
+      beginDayAttempt: () => {
+        h.calls.push('beginDayAttempt');
+      },
+      dayAttempt: () => ATTEMPT,
+      attemptHeldElsewhere: () => elsewhere,
+      resumeDayAttempt: (_shape, takeOver) => {
+        h.calls.push('resumeDayAttempt');
+        resumes.push(takeOver === true);
+        if (takeOver === true) elsewhere = false;
+        return takeOver === true;
+      },
+    };
+    const host = createEverydayHost(bindings);
+    expect(host.dayAttempt()).toEqual({ weekday: 'Monday', heldElsewhere: true });
+    expect(host.stageHold(A_RECORDING)).toBe('elsewhere');
+    host.playDay();
+    expect(h.calls, 'the stage’s own entry press resumed or began the day').toEqual([]);
+    host.playDay({ takeOver: true });
+    expect(h.calls).toEqual(['resumeDayAttempt']);
+    expect(resumes).toEqual([true]);
+    expect(host.stageHold(A_RECORDING)).toBeUndefined();
+  });
+
+  it('begins nothing when a takeover loses to another tab, rather than starting the day afresh', () => {
+    const h = harnessOf(base());
+    const bindings: EverydayHostBindings = {
+      ...h.bindings,
+      beginDayAttempt: () => {
+        h.calls.push('beginDayAttempt');
+      },
+      dayAttempt: () => ATTEMPT,
+      attemptHeldElsewhere: () => true,
+      resumeDayAttempt: () => {
+        h.calls.push('resumeDayAttempt');
+        return false;
+      },
+    };
+    createEverydayHost(bindings).playDay({ takeOver: true });
+    expect(h.calls).toEqual(['resumeDayAttempt']);
+  });
+
+  it('holds the run this tab was playing when the attempt moved on in another tab, and no other', () => {
+    const h = harnessOf(base());
+    const stale = { runId: 'stale' } as unknown as VizRecording;
+    const host = createEverydayHost({
+      ...h.bindings,
+      dayAttempt: () => ATTEMPT,
+      attemptHeldElsewhere: () => false,
+      attemptRunStale: (recording) => recording === stale,
+    });
+    expect(host.stageHold(stale)).toBe('stale');
+    expect(host.stageHold(A_RECORDING)).toBeUndefined();
+    expect(createEverydayHost({ ...h.bindings, attemptRunStale: () => true }).stageHold(stale), 'no attempt stands').toBeUndefined();
+  });
+
+  /*
+   * Wave AO, lane AO-4, § D1384: *Continue your week* names the instant the attempt was left, on the
+   * hour the day is planned at (the hour its resumed stage prints), and nothing where none stands.
+   */
+  it('says where the standing attempt was left, on the hour the day is planned at', () => {
+    const h = harnessOf(base());
+    const none = createEverydayHost({ ...h.bindings, dayAttempt: () => undefined });
+    expect(none.dayAttemptLeftAt()).toBeUndefined();
+    const host = createEverydayHost({ ...h.bindings, dayAttempt: () => ATTEMPT });
+    const hour = host.dayAhead().startOfDayS ?? 6 * 3600;
+    const total = hour + ATTEMPT.shownToS;
+    const expected = `${String(Math.floor(total / 3600) % 24).padStart(2, '0')}:${String(Math.floor((total % 3600) / 60)).padStart(2, '0')}`;
+    expect(host.dayAttemptLeftAt()).toBe(expected);
+    /* The control: moved on by ten minutes, the clock moves by ten minutes. */
+    const later = createEverydayHost({ ...h.bindings, dayAttempt: () => ({ ...ATTEMPT, shownToS: ATTEMPT.shownToS + 600 }) });
+    expect(later.dayAttemptLeftAt()).not.toBe(expected);
   });
 
   it('starts afresh where the attempt could not be resumed exactly', () => {

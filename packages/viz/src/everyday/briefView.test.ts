@@ -11,11 +11,16 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { BRIEF_WAY_THROUGH_HEADING, BRIEF_WEEK_HEADING, briefScreenViewOf, lockedForScore, raceAgainstCard, RECOMMENDED_CARDS,
+import { BRIEF_WAY_THROUGH_HEADING, BRIEF_WEEK_HEADING, briefBarModel, briefCarriedDriverLineOf, briefScreenViewOf, lockedForScore, raceAgainstCard, RECOMMENDED_CARDS,
   SANDBOX_DOOR_LABEL,
+  TUNE_OFFER_EVERYTHING,
+  type BriefYesterday,
 } from './briefView.js';
+import { actionBarFor } from './actionBar.js';
+import { CONTINUE_HERE_CELL, DAY_ATTEMPT_COPY } from '../shift/attempt.js';
 import { GHOST_OPTIONS } from '../live/raceStrip.js';
 import { isScreenBuilt } from './screens.js';
+import { tuneControlsOffered } from './tunerModel.js';
 import { DAY_COUNTS_SENTENCE } from '../shift/weekStake.js';
 import type { TodayRecord } from './today.js';
 
@@ -213,6 +218,33 @@ describe('the two cards this build states rather than draws as a live control', 
     expect(card.why).not.toMatch(/not built/);
   });
 
+  it('names what its button opens, from the tuner’s own list, and none of it as the dispatcher — § D1368', () => {
+    /*
+     * The post-AN panel's seat D (D7): the caveat read *"Everything you can change from here changes
+     * the dispatcher, and nothing else"* above a button that opens floors, shafts, speed, capacity,
+     * door dwell, arrival rate and lobby share. Red before: that sentence.
+     */
+    const card = lockedForScore(true);
+    expect(card.caveat).toBe(
+      'What it opens: the tower (floors above the lobby, shafts), the machines (rated speed, capacity, ' +
+        'door dwell) and the crowd (how busy, arriving at the lobby).',
+    );
+    expect(card.caveat).not.toMatch(/dispatcher/u);
+    for (const { controls } of tuneControlsOffered(TUNE_OFFER_EVERYTHING)) {
+      for (const label of controls) expect(card.caveat).toContain(label.toLowerCase());
+    }
+    /* On a day that keeps its own mix the tuner draws no lobby share, and the brief names none. */
+    const mixDay = briefScreenViewOf({
+      today: TODAY,
+      dispatchers: DISPATCHERS,
+      savedIds: [],
+      selectedId: 'collective',
+      tunerOffer: { mixIsTheDays: true, machineSteps: true },
+    });
+    expect(mixDay.locked.caveat).toMatch(/the crowd \(how busy\)\.$/u);
+    expect(mixDay.locked.caveat).not.toMatch(/arriving at the lobby/u);
+  });
+
   it('names a state rather than a destination on the door — GitHub issue #225, § D496', () => {
     /*
      * Sandbox is a week on no assignment, arrived at and never chosen: no ninth PlayMode, no toggle,
@@ -310,5 +342,74 @@ describe('everything else on the card is the day record’s, unedited', () => {
     });
     expect(view.load).toBeUndefined();
     expect(view.outOfService).toBeUndefined();
+  });
+});
+
+/*
+ * Wave AO, lane AO-1, § D1361: the saved attempt belongs to one tab at a time. Where another tab
+ * holds it, the brief offers the takeover, named, with the note that says what it does before it is
+ * pressed; where this tab may resume it, the resume stands as § D1218 left it.
+ */
+describe('the brief’s primary over an attempt another tab holds — § D1361', () => {
+  const base = actionBarFor({ screen: 'brief', ctx: 'daily' });
+
+  it('offers the takeover by name, with its consequence beside it, and the resume otherwise', () => {
+    const elsewhere = briefBarModel(base, 'Steady hand', 'Monday', true);
+    expect(elsewhere.primary.label).toBe('Continue Monday here');
+    expect(elsewhere.primary.inert).toBeUndefined();
+    expect(elsewhere.note).toBe(DAY_ATTEMPT_COPY.elsewhereNote);
+    expect(base.primary.variants).toContain(CONTINUE_HERE_CELL);
+    const here = briefBarModel(base, 'Steady hand', 'Monday', false);
+    expect(here.primary.label).toBe('Resume Monday');
+    expect(here.note).toBe(DAY_ATTEMPT_COPY.resumeNote);
+    expect(briefBarModel(base, 'Steady hand').primary.label).toBe('Start the day');
+  });
+});
+
+/**
+ * Wave AO, lane AO-4, the post-AN panel's seat B (lost moment 10): a newcomer handed Monday to
+ * another driver on the stage, and Tuesday's brief opened on the house with nothing said. § D1318's
+ * rule is unchanged (the brief's pick carries, a stage handover does not); the brief now says it.
+ */
+describe('which driver the day opens on, and why — wave AO, lane AO-4', () => {
+  const HANDED: BriefYesterday = {
+    weekday: 'Tuesday',
+    startedWithId: 'collective',
+    handover: { toId: 'eta', toName: 'Estimated time', clock: '12:20' },
+  };
+  const brief = (input: { selectedId?: string; yesterday?: BriefYesterday; attemptWeekday?: string; today?: TodayRecord }) =>
+    briefScreenViewOf({
+      today: input.today ?? TODAY,
+      dispatchers: DISPATCHERS,
+      savedIds: [],
+      selectedId: input.selectedId ?? 'collective',
+      ...(input.yesterday === undefined ? {} : { yesterday: input.yesterday }),
+      ...(input.attemptWeekday === undefined ? {} : { attemptWeekday: input.attemptWeekday }),
+    });
+
+  it('names the driver the day opens on, the handover the day before made, and how to drive with it today', () => {
+    expect(brief({ yesterday: HANDED }).drivers.carried).toBe(
+      'Wednesday opens on Steady hand, the driver Tuesday started with. Tuesday’s handover to Estimated time ' +
+        'at 12:20 kept to Tuesday: a handover on the stage lasts the rest of its own day, and only the driver ' +
+        'picked on this brief carries over. To drive with Estimated time today, pick it here.',
+    );
+    /* Picked something else since: the line names the driver and claims no history for it. */
+    expect(brief({ selectedId: 'nearest-car', yesterday: HANDED }).drivers.carried).toMatch(/^Wednesday opens on Steady hand\. /u);
+  });
+
+  it('says nothing where nothing was handed back', () => {
+    /* No day before, no handover on it, or the day opens on the driver the handover named. */
+    expect(brief({}).drivers.carried).toBeUndefined();
+    expect(brief({ yesterday: { weekday: 'Tuesday', startedWithId: 'collective' } }).drivers.carried).toBeUndefined();
+    expect(brief({ selectedId: 'eta', yesterday: HANDED }).drivers.carried).toBeUndefined();
+    /* A held driver has its own sentence on this line: an attempt under way, a pinned day's order. */
+    expect(brief({ yesterday: HANDED, attemptWeekday: 'Wednesday' }).drivers.carried).toBeUndefined();
+    expect(brief({ yesterday: HANDED, today: { ...TODAY, driverHeld: 'held' } }).drivers.carried).toBeUndefined();
+  });
+
+  it('is the pure function the view draws', () => {
+    expect(
+      briefCarriedDriverLineOf({ weekday: 'Wednesday', driverId: 'collective', driverName: 'Collective', yesterday: HANDED }),
+    ).toContain('Wednesday opens on Collective, the driver Tuesday started with.');
   });
 });

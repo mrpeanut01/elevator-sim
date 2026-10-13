@@ -47,8 +47,12 @@ import { meansAreSuppressed } from '../frame/overlay.js';
 import { recordRun } from '../record/recordRun.js';
 
 import type { BrowserResources } from './data.js';
+import { RESOURCES, baseState } from '../scope/probes.test-helper.js';
+import { statLineOf } from '../shift/contracts.js';
+import { resolvedBuildingOf, withBuilding } from './state.js';
 import type { PlateEntry } from './dom.js';
 import {
+  buildingCardOf,
   buildingPlateOf,
   closedFormRowsOf,
   authoredBlurbOf,
@@ -527,6 +531,25 @@ describe('buildingPlateOf', () => {
 /* -------------------------------------------------------------------------- *
  * The closed form on the plate — `docs/21` § 3.7 (1)
  * -------------------------------------------------------------------------- */
+
+/*
+ * [§ D1382](../../../../DECISIONS.md), the post-AN panel's seat D (D9): the Engineer's Building cards
+ * listed Midtown Office at 1,710 people while the week played it at 589. A card now describes the
+ * building a press of it runs: the week it stands on, the tower its contract hands over, grown.
+ */
+describe('a Building card describes the building its press runs — § D1382', () => {
+  it('quotes the week’s own tower rather than the file’s, on a building the week does not stand on', () => {
+    const state = baseState();
+    expect(state.buildingId).not.toBe('midtown-office');
+    const card = buildingCardOf(RESOURCES, state, 'midtown-office');
+    const pressed = resolvedBuildingOf(RESOURCES, withBuilding(state, RESOURCES, 'midtown-office'));
+    expect(pressed).toBeDefined();
+    expect(card.sub).toBe(statLineOf(pressed!));
+    const shipped = RESOURCES.entries.find((entry) => entry.config.id === 'midtown-office')!.resolved;
+    expect(pressed!.totalPopulation, 'the fixture no longer tells the two towers apart').not.toBe(shipped.totalPopulation);
+    expect(card.sub).not.toBe(statLineOf(shipped));
+  });
+});
 
 describe('closedFormRowsOf', () => {
   it('reads the same closed form the correctness oracle uses, per bank', () => {

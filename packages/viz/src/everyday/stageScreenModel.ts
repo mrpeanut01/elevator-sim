@@ -116,6 +116,7 @@ import { sameLegs, type CrowdSource } from '../record/crowd.js';
  */
 import type { PriceSchedule } from '../pricing/types.js';
 import { goalRowsOf } from '../dev/leftRail.js';
+import { continueHereLabelOf, DAY_ATTEMPT_COPY, resumeLabelOf } from '../shift/attempt.js';
 import type { BookedOutCar } from '../shift/bookedOut.js';
 import { GOAL_GLYPHS, readGoals, TODAY_ASKS_DECIDES, TODAY_ASKS_HEADING } from '../shift/goals.js';
 import { shiftObservationsOf } from '../shift/observations.js';
@@ -396,7 +397,47 @@ export interface StageFigure {
   readonly value: string;
   readonly count?: string | undefined;
   readonly refusal?: string | undefined;
+  /**
+   * The goal this figure is the reading of, where one grades it — so once the day has run out the
+   * figure is drawn in its goal's verdict rather than in the live accent ({@link stageFigureToneOf},
+   * [§ D1381](../../../../DECISIONS.md)). Absent on a figure no goal grades.
+   */
+  readonly reads?: ShiftGoal['reads'] | undefined;
 }
+
+/**
+ * **How a header figure is drawn** — [§ D1381](../../../../DECISIONS.md), the post-AN panel's seat B
+ * (defect 6). Every figure was drawn in terracotta, the handoff's *live figures* accent, at every
+ * playhead, so at 18:00 *93 %* against a 61 % bar and *220 s* against 460 s were drawn in the red
+ * family beside goal rows reading met.
+ *
+ * - `live`: the day is still running. The handoff's accent, and no verdict: a reading at the clock.
+ * - `met` / `missed`: the day has run out and the goal this figure reads is judged; the goal row's
+ *   own verdict, in the palette's *cleared* and *missed* colours.
+ * - `still`: the day has run out and no goal grades this figure, or it carries a refusal.
+ */
+export type StageFigureTone = 'live' | 'met' | 'missed' | 'still';
+
+/**
+ * The tone of one header figure — the goal strip's verdict for the goal it reads, once the strip is
+ * judged ({@link stageGoalsOf}'s own `judged`: the playhead at the run's end), and the live accent
+ * before. Pure, so the mount and the corpus read one answer.
+ */
+export function stageFigureToneOf(
+  figure: StageFigure,
+  readings: readonly GoalReading[],
+  judged: boolean,
+): StageFigureTone {
+  if (figure.refusal !== undefined) return 'still';
+  if (!judged) return 'live';
+  const reading = figure.reads === undefined ? undefined : readings.find((entry) => entry.goal.reads === figure.reads);
+  if (reading?.state === 'met') return 'met';
+  if (reading?.state === 'missed') return 'missed';
+  return 'still';
+}
+
+/** Why ▶ Play is inert once the day has run out (§ D1381). Describes, as {@link STAGE_DAY_OVER} does. */
+export const STAGE_PLAY_DONE_REASON = 'the day has already run out, so there is nothing left to play';
 
 /** § 7.1's header row, resolved at one playhead. */
 export interface StageHeaderView {
@@ -784,6 +825,7 @@ function awayInsideOf(o: LiveObservations): StageFigure {
     label,
     value: `${String(Math.round(o.servedUnderThresholdPct))}%`,
     count: `of ${String(o.servedCount)} away`,
+    reads: 'minutePct',
   };
 }
 
@@ -809,6 +851,7 @@ function longestSoFarOf(o: LiveObservations): StageFigure {
   return {
     label: 'longest so far',
     value: o.worstWaitIsCensored ? `${seconds} and counting` : seconds,
+    reads: 'worstWaitS',
   };
 }
 
@@ -1842,6 +1885,13 @@ export interface StageBarInput {
    * only thing that does, and it writes it through `everyday/stageScreen.ts`'s `barFacts`.
    */
   readonly dayEnded?: boolean | undefined;
+  /**
+   * Why this tab may not play the stage's day, with the attempt's weekday — wave AO, lane AO-1,
+   * [§ D1361](../../../../DECISIONS.md). `'elsewhere'`: another tab holds the attempt. `'stale'`:
+   * this run is the one this tab was playing before another tab took the attempt over, and the
+   * attempt has moved on since. Absent everywhere else, which is every stage before this wave.
+   */
+  readonly held?: { readonly kind: 'elsewhere' | 'stale'; readonly weekday: string } | undefined;
 }
 
 /**
@@ -2000,6 +2050,22 @@ export function stageBarModelOf(state: EverydayState, input: StageBarInput): Act
     table.back?.label.includes('⟨') === true
       ? { ...table, back: { ...table.back, label: input.buildingName ?? 'the building' } }
       : table;
+  /*
+   * **Another tab holds this day's attempt** — § D1361, above every other state, because none of
+   * them is this tab's to act on: the day is closed where it is held, so the primary is the takeover
+   * the brief offers, with the note that says what it does before it is pressed.
+   */
+  if (input.held !== undefined) {
+    const elsewhere = input.held.kind === 'elsewhere';
+    return {
+      ...base,
+      primary: {
+        ...base.primary,
+        label: elsewhere ? continueHereLabelOf(input.held.weekday) : resumeLabelOf(input.held.weekday),
+      },
+      note: elsewhere ? DAY_ATTEMPT_COPY.elsewhereNote : DAY_ATTEMPT_COPY.resumeNote,
+    };
+  }
   const refusal = !input.hasRun
     ? 'the day has not started yet — there is nothing to file'
     : input.recomputing
@@ -2811,4 +2877,96 @@ export function stageCarRestBarOf(input: StageCarRestBarInput): StageCarRect {
     width,
     height: REST_BAR_THICKNESS_PX,
   };
+}
+
+/*
+ * ---- Wave AO, lane AO-4: the stage tells the truth about its own state, § D1385 ----
+ */
+
+/**
+ * **Which speed chip is lit** — wave AO, lane AO-4, the post-AN panel's seat B (lost moment 4,
+ * defect 2). § D991 clause 2 lights *the rung the transport is at*, so a scored day's pace, which
+ * crosses quiet stretches at `30×` on its own (§ D1169), left `30×` lit at every call stop and at
+ * 18:00 for a player who had never left `4×`: the transport had stopped, and the chip still named
+ * the rung it stopped from.
+ *
+ * A stopped transport is at no rung, so the lit chip is then the one the player chose, which is the
+ * rung a fresh day opens on (§ 4.6) and the one the pace measures every later stretch from. While
+ * the transport moves the lit chip is still the rung it moves at, so § D991's *every change shows on
+ * the lit chip* holds wherever there is a change to show, and the note beside the chips says why.
+ * [§ D1385](../../../../DECISIONS.md) clause 1: it reads § D991 clause 2 for a state the clause did
+ * not name, and moves nothing it did.
+ *
+ * @returns the multiplier, in simulated seconds per real second, whose chip is lit.
+ */
+export function stageLitSpeedOf(input: {
+  /** The transport is playing (not paused, and not stopped at a call or at the day's end). */
+  readonly moving: boolean;
+  /** The rung the transport would run at — `Playback.speed`. */
+  readonly runningSimPerRealS: number;
+  /** The rung the player chose — the chip they last pressed, or the default. */
+  readonly chosenSimPerRealS: number;
+}): number {
+  return input.moving ? input.runningSimPerRealS : input.chosenSimPerRealS;
+}
+
+/**
+ * **The transport's button while the stage is working out a call** — wave AO, lane AO-4, the
+ * post-AN panel's seat B (lost moment 6). The stage stops at an ordinary call's instant while the
+ * call's runs are made (§ D1138), which took 5 to 10 s on a whole day, with *▶ Play* offered beside
+ * *stopped while the day is run ahead from here*. Pressed, it played one frame and stopped again. So
+ * while the stage waits there the button says what the stage is doing and cannot be pressed; it
+ * names no call, because the call may not be raised (`stageCall.ts#STAGE_CALL_COPY.waiting`'s rule).
+ */
+export const STAGE_PLAY_CONTROL = Object.freeze({
+  play: '▶ Play',
+  pause: '⏸ Pause',
+  waiting: 'Running the day ahead…',
+});
+
+/**
+ * The transport button's words, whether it can be pressed, and why not. One rule over two lanes'
+ * findings, joined at integration: with no run, or once the day has run out, it is inert with the
+ * reason on its face ([§ D1381](../../../../DECISIONS.md), lane AO-3: at 18:00 it stood live beside
+ * *the stage will not move again on its own*, and a press did nothing); stopped at a call whose runs
+ * have not landed, it says the stage is working and cannot be pressed (lane AO-4, § D1385).
+ * `disabled` and `inert` are the same fact under the two names the lanes' callers read.
+ */
+export function stagePlayControlOf(input: {
+  readonly playing: boolean;
+  readonly hasRun: boolean;
+  /** The stage is stopped at a call whose runs have not landed. */
+  readonly waitingOnCall?: boolean;
+  /** The day has run out on the stage. */
+  readonly dayEnded?: boolean;
+}): { readonly label: string; readonly disabled: boolean; readonly inert: boolean; readonly note: string | undefined } {
+  const held = (label: string, note: string | undefined) => ({ label, disabled: true, inert: true, note });
+  if (!input.hasRun) return held(STAGE_PLAY_CONTROL.play, STAGE_SKIP_COPY.pendingReason);
+  if (input.dayEnded === true) return held(STAGE_PLAY_CONTROL.play, STAGE_PLAY_DONE_REASON);
+  if (input.playing) return { label: STAGE_PLAY_CONTROL.pause, disabled: false, inert: false, note: undefined };
+  if (input.waitingOnCall === true) return held(STAGE_PLAY_CONTROL.waiting, undefined);
+  return { label: STAGE_PLAY_CONTROL.play, disabled: false, inert: false, note: undefined };
+}
+
+/**
+ * **Whether the building has to be brought into view when the day starts playing** — wave AO, lane
+ * AO-4, the post-AN panel's seat B (lost moment 9, defect 9). At 390×844 the header and the goals
+ * are taller than the screen region above the fixed bar, so after the header's *▶ Play* the canvas
+ * sat at y 756–1262 under a bar from y 725, and the day played with nobody able to see it. A desktop
+ * stage shows four fifths of the canvas from the same press and is left where it is.
+ *
+ * Half is the line: a canvas at least half in view is being watched, and moving it would scroll the
+ * page under a reader for nothing; one less than half in view is not.
+ *
+ * @param canvas the canvas's laid-out top and bottom, in viewport pixels.
+ * @param view the top and bottom of what the player can see of the screen region, in viewport pixels.
+ */
+export function stageBuildingWantsBringing(
+  canvas: { readonly top: number; readonly bottom: number },
+  view: { readonly top: number; readonly bottom: number },
+): boolean {
+  const height = canvas.bottom - canvas.top;
+  if (!(height > 0) || !(view.bottom > view.top)) return false;
+  const shown = Math.max(0, Math.min(canvas.bottom, view.bottom) - Math.max(canvas.top, view.top));
+  return shown / height < 0.5;
 }

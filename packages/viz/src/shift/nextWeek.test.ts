@@ -123,8 +123,20 @@ describe('the sheet: what it deals next, and its presses', () => {
     expect(next?.line).toMatch(/^This week had no target to meet, so Play week 1 again deals /u);
   });
 
-  it('says nothing on a tower whose week the census does not deal', () => {
-    expect(nextWeekOf({ ...midtownWeek(1, HELD), contractId: 'c1' })).toBeUndefined();
+  /**
+   * Since § D1394 (wave AO lane AO-5) a week the census does not deal closes on Sunday too, so its
+   * sheet says what it deals next: the same draw, held or not, against the contract's `needClean`.
+   * Red before: `undefined`, the week running on with no sheet. The control: a sentinel week.
+   */
+  it('deals next on a tower whose week the census does not deal, and says nothing on a sentinel’s — § D1394', () => {
+    const held = nextWeekOf({ ...midtownWeek(1, HELD), contractId: 'c1' });
+    expect(held?.held).toBe(true);
+    expect(held?.week).toBe(2);
+    expect(held?.line).toContain('the same wrinkles as this week');
+    const notHeld = nextWeekOf({ ...midtownWeek(1, [false, false, false, false, false]), contractId: 'c8' });
+    expect(notHeld?.held).toBe(false);
+    expect(notHeld?.label).toBe('Play week 1 again');
+    expect(nextWeekOf({ ...midtownWeek(1, HELD), contractId: 'sandbox' })).toBeUndefined();
   });
 
   it('names the wrinkles honestly: the same ones where the next week is dealt the same order', () => {

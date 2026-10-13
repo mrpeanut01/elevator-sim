@@ -43,10 +43,9 @@ import { restrictedFloorIds } from '../access/zoning.js';
 import { credentialCapabilityOf } from '../access/dispatcherCredentials.js';
 import { recordRun } from '../record/recordRun.js';
 import type { PublishedScenario } from '../scenario/published.js';
-import { routeRefusalsOf, routeUnitsOf } from '../campaign/stagePress.js';
+import { stagePathOf } from '../campaign/stagePress.js';
 import { namedStageMoveOf } from '../everyday/stagePlay.js';
 import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
-import { scenarioLadderOf } from '../scenario/ladder.js';
 import type { PublishedSurvivors } from '../scenario/survivors.js';
 import type { CampaignFitOut } from '../campaign/fitOut.js';
 import { fitOutForCase, fittedBuildingFor, fittedProfileFor } from './fitOut.js';
@@ -486,33 +485,18 @@ export function contextFor(honestyCase: HonestyCase, resources: HonestyResources
     scenarioPath:
       resources.stagesById === undefined
         ? []
-        : scenarioLadderOf({
-            stages: [...resources.stagesById.values()].map((entry) => entry.stage),
-            survivors: resources.survivors,
-            /* § D1129 clause 3: the one admission check's answer for each named way through. */
-            refusalOf: routeRefusalsOf(
-              [...resources.stagesById.values()].map((entry) => entry.stage),
-              {
-                space: resources.space,
-                schedule: shippedPriceSchedule(),
-                profiles: resources.dispatcherProfiles.profiles,
-                buildings: [...resources.buildingsById.values()],
-                elevatorSpecs: resources.elevatorSpecs,
-                moveNamed: (name) => namedStageMoveOf(name, resources.dispatcherProfiles.profiles, resources.space),
-              },
-            ),
-            /* § D1234: the same check read for its price, so a cleared row's par mark is swept too. */
-            unitsOf: routeUnitsOf(
-              [...resources.stagesById.values()].map((entry) => entry.stage),
-              {
-                space: resources.space,
-                schedule: shippedPriceSchedule(),
-                profiles: resources.dispatcherProfiles.profiles,
-                buildings: [...resources.buildingsById.values()],
-                elevatorSpecs: resources.elevatorSpecs,
-                moveNamed: (name) => namedStageMoveOf(name, resources.dispatcherProfiles.profiles, resources.space),
-              },
-            ),
+        : /*
+           * § D1376: the one composition the hub and the stage page both read
+           * (`campaign/stagePress.ts#stagePathOf`), with the hold (§ D1129 clause 3) and the par
+           * (§ D1234), so the sweep reads the path a player meets.
+           */
+          stagePathOf([...resources.stagesById.values()].map((entry) => entry.stage), resources.survivors, {
+            space: resources.space,
+            schedule: shippedPriceSchedule(),
+            profiles: resources.dispatcherProfiles.profiles,
+            buildings: [...resources.buildingsById.values()],
+            elevatorSpecs: resources.elevatorSpecs,
+            moveNamed: (name) => namedStageMoveOf(name, resources.dispatcherProfiles.profiles, resources.space),
           }),
     bundleAt: memoisedBundles(recording, access),
   };

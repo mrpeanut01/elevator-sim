@@ -136,7 +136,7 @@ export const TUTORIAL_CASE_ID = 'three-cars-one-cars-work';
  * -------------------------------------------------------------------------- */
 
 /**
- * Everything {@link tutorialIsDue} is allowed to look at, and it is deliberately four counts.
+ * Everything {@link tutorialIsDue} is allowed to look at, and it is deliberately five counts.
  *
  * Each is a quantity the player produced by playing and each already persists for its own reasons:
  * `WeekState.history` through `persist/session.ts`, both progress lists through
@@ -171,6 +171,18 @@ export interface TutorialProgress {
    * count the player produced by playing and nothing stores it for the gate.
    */
   readonly careerDays: number;
+  /**
+   * Days begun and not yet filed — `1` where an attempt stands on the week's day
+   * (`host.dayAttempt()`, [§ D1218](../../../../DECISIONS.md)), `0` otherwise. Wave AO, lane AO-2,
+   * [§ D1369](../../../../DECISIONS.md), the post-AN panel's seat D (D4).
+   *
+   * A fresh player who started the pinned Monday and reloaded before closing it had filed nothing,
+   * so the page put them on the landing page and *Start playing* into the walkthrough, over a day
+   * they had begun and could resume. An attempt is begun only by *Start the day*, which a player
+   * reaches by playing, and it persists on its own slot (`persist/attempt.ts`), so it is a count the
+   * player produced in the sense the other four are.
+   */
+  readonly daysBegun: number;
 }
 
 /**
@@ -206,7 +218,8 @@ export function tutorialIsDue(progress: TutorialProgress): boolean {
     progress.filedDays === 0 &&
     progress.solvedCases === 0 &&
     progress.ratings === 0 &&
-    progress.careerDays === 0
+    progress.careerDays === 0 &&
+    progress.daysBegun === 0
   );
 }
 
@@ -479,12 +492,19 @@ export function tutorialClockOf(input: {
  * own sentence here, keyed by kind so a new kind fails to type rather than inheriting a neighbour's.
  * None carries a digit: the figure is the card's value, read off the run.
  */
+/*
+ * **Named by the floors, not by a letter the player has not met** — [§ D1383](../../../../DECISIONS.md),
+ * the post-AN panel's seat B (lost moment 1). These read *the floors the letter is about* on screen
+ * one, and the letter is screen two's. They name the stretch the case measures, *the top three
+ * floors*, which is the stretch screen two's lede names too; `tutorialModel.test.ts` derives it from
+ * the case and the building and holds both sentences to it.
+ */
 export const TUTORIAL_FIGURE_NOTES: Readonly<Record<FigureSpec['kind'], string>> = Object.freeze({
-  complaint: 'The thing the letter is about, counted over this morning.',
-  'scope-long-waits': 'Journeys starting on the floors the letter is about that waited over a minute for a car.',
-  'scope-mean-wait': 'The wait for a car on the floors the letter is about, taken over the journeys that boarded.',
-  'scope-worst-wait': 'The longest anybody on the floors the letter is about waited for a car.',
-  'rest-away-pct': 'Every other journey in the building, for comparison with the floors the letter is about.',
+  complaint: 'What the resident keeps running into, counted over this morning on the top three floors.',
+  'scope-long-waits': 'Journeys starting on the top three floors that waited over a minute for a car.',
+  'scope-mean-wait': 'The wait for a car on the top three floors, taken over the journeys that boarded.',
+  'scope-worst-wait': 'The longest anybody on the top three floors waited for a car.',
+  'rest-away-pct': 'Every other journey in the building, for comparison with the top three floors.',
 });
 
 /**

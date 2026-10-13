@@ -448,10 +448,35 @@ describe('the week’s stake on the strip, and its sheet at the close — § D11
  * week, and nothing where the census does not deal the tower's week.
  */
 describe('the week’s number on Your week', () => {
-  it('reads WEEK n on a census tower’s week, and no number elsewhere', () => {
+  it('reads WEEK n on every Scenario week, and no number on a sentinel’s — § D1394', () => {
     expect(viewOf({ ...openWeek('c2'), week: 2, day: 1, dayIdx: 0 }, false).eyebrow).toBe(
       'ELEVATOR SIM · EVERYDAY MODE · WEEK 2',
     );
-    expect(viewOf(weekWith(3, []), false).eyebrow).toBe('ELEVATOR SIM · EVERYDAY MODE');
+    /* Garden Apartments, which the census does not deal: numbered since § D1394 (wave AO lane AO-5). */
+    expect(viewOf(weekWith(3, []), false).eyebrow).toBe('ELEVATOR SIM · EVERYDAY MODE · WEEK 1');
+    expect(viewOf({ ...openWeek('sandbox'), day: 3, dayIdx: 2 }, false).eyebrow).toBe('ELEVATOR SIM · EVERYDAY MODE');
+  });
+
+  /**
+   * **A held week on a tower the census does not deal closes on its sheet and offers the next tower**
+   * — the post-AN panel's seat C, D6, wave AO lane AO-5, § D1394. St Jude Hospital's week met its
+   * target on Tuesday and, after Sunday, opened *MONDAY · DAY 8* with no sheet and no next tower. Red
+   * before: no sheet, no onward offer and no primary on Your week.
+   */
+  it('draws a closed St Jude week’s sheet, without a house, and offers Midtown Office — § D1394', () => {
+    const days = [1, 2, 3, 4, 5, 6, 7].map((day) => dayOf(day, day <= 2 ? MET : MISSED));
+    const week: WeekState = { ...openWeek('c8'), day: 7, dayIdx: 6, closedDay: 7, history: days, cleanRun: 2 };
+    expect(weekDealOf(week)).toBeUndefined();
+    const view = viewOf(week, true);
+    expect(view.eyebrow).toBe('ELEVATOR SIM · EVERYDAY MODE · WEEK 1');
+    expect(view.sheet?.rows).toHaveLength(7);
+    expect(view.sheet?.targetLine).toBe('Target 2: met.');
+    expect(view.sheet?.houseLine).toContain('Nothing was run beside you this week');
+    expect(view.onward?.contractId).toBe('c2');
+    expect(view.primary).toBe('Play Midtown Office’s week');
+    /* The control: the same week not held deals itself again, as a census week does (§ D1344). */
+    const notHeld = viewOf({ ...week, history: days.map((day) => (day.day <= 2 ? dayOf(day.day, MISSED) : day)), cleanRun: 0 }, true);
+    expect(notHeld.onward).toBeUndefined();
+    expect(notHeld.primary).toBe('Play week 1 again');
   });
 });

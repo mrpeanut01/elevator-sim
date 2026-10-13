@@ -121,12 +121,29 @@ export const DIFFICULTIES: Readonly<Record<DifficultyId, Difficulty>> = Object.f
     rates: Object.freeze([2, 2, 3, 3]) as unknown as readonly [number, number, number, number],
     miss: 0,
     tests: Object.freeze({ away: 88, worstS: 120, queue: 12, trips: 430 }),
-    note: 'No missed days, and the whole month pays 53 units. It has been cleared — with staggered start times bought on day one and never a wasted trip after.',
+    /*
+     * It read *the whole month pays 53 units*, and 53 is § 8.1's on-hand total: the month pays 50 and
+     * opens with 3 (§ D1377). `economy.test.ts` derives both from this row.
+     */
+    note: 'No missed days, and a perfect month leaves 53 units on hand, the 3 it opens with among them. It has been cleared — with staggered start times bought on day one and never a wasted trip after.',
   }),
 });
 
 /** A contract is twenty working days — § 8.7, and the bound in every booking rule. */
 export const CONTRACT_DAYS = 20;
+
+/** The working days in a contract week — § 8.1's *"rates step every five days"*. */
+export const CONTRACT_WEEK_DAYS = 5;
+
+/**
+ * **The weekday a career day falls on**, as an index into `shift/types.ts#WEEKDAYS` — Monday to
+ * Friday and round again, [§ D1377](../../../../DECISIONS.md). It was `(day − 1) % 7`, so days 6, 7,
+ * 13, 14 and 20 of *twenty working days* were filed as Saturday and Sunday (the post-AN panel's seat
+ * C, D5). It names the day and moves no run: a career day's event is the campaign's own.
+ */
+export function careerDayIdxOf(day: number): number {
+  return (Math.max(1, Math.floor(day)) - 1) % CONTRACT_WEEK_DAYS;
+}
 
 /**
  * The rate in force on a 0-based day index — § 8.1's *"rates step every five days"*.
@@ -148,7 +165,17 @@ export function rateOnDay(difficulty: Difficulty, dayIdx: number): number {
  * mistyped rate fails a test rather than moving the contract screen's lede by a unit.
  */
 export function perfectMonthUnits(difficulty: Difficulty): number {
-  return difficulty.purse + difficulty.rates.reduce((total, rate) => total + rate * 5, 0);
+  return difficulty.purse + perfectMonthPayUnits(difficulty);
+}
+
+/**
+ * **What a perfect month pays**: the four weekly rates over five cleared days each, and nothing the
+ * month opened with — standard `90`. [§ D1377](../../../../DECISIONS.md): the contract sheet said *A
+ * perfect month pays 98 units* beside rates that sum to 90 (the post-AN panel's seat D, D6), because
+ * {@link perfectMonthUnits} is § 8.1's on-hand total and includes the purse.
+ */
+export function perfectMonthPayUnits(difficulty: Difficulty): number {
+  return difficulty.rates.reduce((total, rate) => total + rate * CONTRACT_WEEK_DAYS, 0);
 }
 
 /* -------------------------------------------------------------------------- *
@@ -679,6 +706,118 @@ export function shopTierPrice(
   return { units, nights: priced.nights, shafts: added.length };
 }
 
+/* -------------------------------------------------------------------------- *
+ * § 8.2 — a tier's name and effect, worded for the tower it is sold on
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **The tower a shop row describes**, as the tiers whose words depend on it need it —
+ * [§ D1377](../../../../DECISIONS.md). Read off the tower the contract hands over, before any shop
+ * shaft: `everyday/host.ts#buildingShape`, from `shift/ladder.ts#ladderTowersOf`, the derivation
+ * `campaign/shaftPlan.ts#careerTowerShaftsOf` prices the shafts on.
+ */
+export interface ShopTowerShape {
+  readonly floors: number;
+  /** Cars in each bank, by bank id. */
+  readonly bankCars: ReadonlyMap<string, number>;
+  /** The fastest rated speed on the tower, m/s. */
+  readonly topSpeedMps: number;
+}
+
+/** What a tier is called and what it does, on one tower. */
+export interface ShopTierFace {
+  readonly name: string;
+  readonly effect: string;
+}
+
+/** What {@link shopTierFaceOf} reads about the tower, every field optional for a desk that knows none. */
+export interface ShopTierTower {
+  readonly shape?: ShopTowerShape | undefined;
+  readonly shafts?: TowerShafts | undefined;
+  readonly startTimeFloors?: number | undefined;
+}
+
+const ORDINAL_WORDS: readonly string[] = Object.freeze([
+  'zeroth', 'first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth', 'ninth', 'tenth',
+  'eleventh', 'twelfth',
+]);
+const COUNT_WORDS: readonly string[] = Object.freeze([
+  'no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve',
+]);
+const countWord = (count: number): string => COUNT_WORDS[count] ?? String(count);
+const capitalised = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1);
+
+/** `0.63`, `4` — at most two decimals, trailing zeros trimmed, as `shift/contracts.ts#statLineOf` writes a speed. */
+function speedWord(mps: number): string {
+  return String(Math.round(mps * 100) / 100);
+}
+
+/**
+ * **A tier's name and effect on the tower it is sold on** — [§ D1377](../../../../DECISIONS.md), the
+ * post-AN panel's seats C (D5) and D (D6).
+ *
+ * Three tiers carried the design file's own building in their words, and every contract tower read
+ * them: *A fourth car* and *The tower stops being one car short* on a two-car building, *Modest on
+ * fourteen floors* on six, and *Negotiated with four tenants* beside the shop's own *nobody here
+ * keeps a start time to stagger*. Each is now worded from the tower:
+ *
+ * - a **shaft tier** is named for the car it adds where the shop sinks its shafts in one bank (*A
+ *   third car* on two), and as more cars in each bank where it sinks them in several, and its effect
+ *   is the count before and after;
+ * - the **machines** tiers' effect is the speed now and after, on the tower's floors, and claims no
+ *   gain the run has not measured;
+ * - **staggered start times** counts the floors that keep a start time, or says nobody here does.
+ *
+ * With no tower known (a fixture, a cold desk) every tier reads its shipped words, as the shop
+ * prices a row alone. Every other tier reads its shipped words always.
+ */
+export function shopTierFaceOf(tier: ShopTier, tower: ShopTierTower = {}): ShopTierFace {
+  const extra = tier.fits.extraShafts;
+  const shape = tower.shape;
+  if (extra !== undefined && shape !== undefined) {
+    const first = shopTierAt('shafts', 1);
+    const added = first === undefined ? [] : (shaftsAddedBy(first, tower.shafts) ?? []);
+    const banks = [...new Set(added.map((shaft) => shaft.bankId))];
+    const [only] = banks;
+    const before = only === undefined ? undefined : shape.bankCars.get(only);
+    if (banks.length === 1 && before !== undefined) {
+      const after = before + extra;
+      return {
+        name: `A ${ORDINAL_WORDS[after] ?? `${String(after)}th`} car`,
+        effect: `${capitalised(countWord(before))} ${before === 1 ? 'car becomes' : 'cars become'} ${countWord(after)}.`,
+      };
+    }
+    const more = extra === 1 ? 'one more car' : `${countWord(extra)} more cars`;
+    return banks.length === 0
+      ? { name: capitalised(more), effect: `${capitalised(more)} in a bank the shop can sink a shaft in.` }
+      : {
+          name: `${capitalised(more)} in each bank`,
+          effect: `Each of the ${countWord(banks.length)} banks the shop can sink a shaft in gets ${more}.`,
+        };
+  }
+  const speed = tier.fits.ratedSpeedMps;
+  if (speed !== undefined && shape !== undefined) {
+    return {
+      name: tier.name,
+      effect: `Every car rebuilt to ${speedWord(speed)} m/s, from ${speedWord(shape.topSpeedMps)} m/s now, on a tower of ${countWord(shape.floors)} floors.`,
+    };
+  }
+  const keep = tier.fits.arrivalRateFactor;
+  if (keep !== undefined && tower.startTimeFloors !== undefined) {
+    const floors = tower.startTimeFloors;
+    const cut = 1 - keep;
+    const share = Math.abs(cut - 1 / 3) < 1e-9 ? 'a third' : `${String(Math.round(cut * 100))} %`;
+    return {
+      name: tier.name,
+      effect:
+        floors === 0
+          ? 'Agreed with the tenants who keep a start time, and nobody on this tower keeps one.'
+          : `Agreed with the tenants on the ${countWord(floors)} ${floors === 1 ? 'floor' : 'floors'} that keep a start time: ${share} fewer journeys from ${floors === 1 ? 'it' : 'them'} in the day.`,
+    };
+  }
+  return { name: tier.name, effect: tier.effect };
+}
+
 /** The category for an id, or `undefined`. */
 export function shopCategoryById(id: string): ShopCategory | undefined {
   return SHOP.find((category) => category.id === id);
@@ -779,6 +918,23 @@ export interface TowerEconomy {
   /** 1-based, 1…{@link CONTRACT_DAYS}. */
   readonly day: number;
   readonly missed: number;
+  /**
+   * **Which contract days of this month were filed missed**, 1-based and ascending — the post-AN
+   * panel's seat C, D3, wave AO lane AO-5. `career.ts#fileDay` appends the day it files missed, and
+   * the two writers that start a month (`set-difficulty` and the renewal) empty it.
+   *
+   * The month grid, the rolling calendar and the purse read it through {@link missedDaysOf}. They
+   * used to place every miss at the tail of the past (§ 8.1's *"the last `missed` days before
+   * today"*, the design prototype's simplification for a record that kept only a count), so a month
+   * missed on days 14, 17, 18 and 20 drew day 14 cleared and day 19 missed, and paid week three's
+   * rate for day 14 and nothing for day 19.
+   *
+   * Optional, and that is the persistence rather than a shortcut: a month filed by a build that kept
+   * only the count has no list, and an older build reading a newer save carries the list without
+   * appending to it. {@link missedDaysOf} uses the list only where it agrees with `missed` and
+   * `day`, and falls back to the tail rule otherwise, which is exactly what those months drew before.
+   */
+  readonly missedDays?: readonly number[] | undefined;
   /** Whole months held. Feeds § 8.1's `carriedIn` when no explicit carry is set. */
   readonly months: number;
   /** An explicit purse carried in from an earlier month, or `undefined` for § 8.1's fallback. */
@@ -831,20 +987,49 @@ export function clearedDays(tower: TowerEconomy): number {
 }
 
 /**
+ * **The contract days of this month that were filed missed**, 1-based — the one reading of
+ * {@link TowerEconomy.missedDays} the purse, the rolling calendar and the month grid share (seat C's
+ * D3, wave AO lane AO-5).
+ *
+ * The recorded list where it is consistent with the count: as many entries as `missed`, each a
+ * distinct past day. Anything else is a month filed before the record kept its days, or carried
+ * through a build that did not append to it, and takes § 8.1's own rule, *"the last `missed` days
+ * before today"*, which is what every view drew before the list existed. A placement nobody recorded
+ * is not invented: the fallback is the rule the design states, said here as the fallback it is.
+ */
+export function missedDaysOf(tower: TowerEconomy): ReadonlySet<number> {
+  const past = tower.day - 1;
+  const recorded = tower.missedDays;
+  if (Array.isArray(recorded)) {
+    const days = new Set(recorded);
+    const consistent =
+      days.size === tower.missed &&
+      recorded.length === tower.missed &&
+      recorded.every((day) => Number.isInteger(day) && day >= 1 && day <= past);
+    if (consistent) return days;
+  }
+  const tail = new Set<number>();
+  for (let day = Math.max(1, past - tower.missed + 1); day <= past; day += 1) tail.add(day);
+  return tail;
+}
+
+/**
  * § 8.1's `earnedSoFar` — the sum over past, non-missed days of that day's rate.
  *
- * *"`missedDays` = the last `missed` days before today"*, so the missed days are the tail of the
- * past and the earned ones are the head. Written as a filter over the past rather than a
- * multiplication, because the rate steps every five days and a mean rate would be wrong in exactly
- * the months a player cares about.
+ * The missed days are {@link missedDaysOf}'s: the days actually filed missed, where the record kept
+ * them, so a cleared day pays the rate of the week it fell in and a missed day pays nothing whichever
+ * week it fell in (seat C's D3, wave AO). It read *"`missedDays` = the last `missed` days before
+ * today"* alone, the design's rule for a record that kept only a count, which is still the answer
+ * for such a month. Written as a filter over the past rather than a multiplication, because the rate
+ * steps every five days and a mean rate would be wrong in exactly the months a player cares about.
  */
 export function earnedSoFar(tower: TowerEconomy): number {
   const difficulty = DIFFICULTIES[tower.difficultyId];
   const past = dayIndexOf(tower);
-  const firstMissed = past - tower.missed;
+  const missed = missedDaysOf(tower);
   let earned = 0;
   for (let index = 0; index < past; index += 1) {
-    if (index >= firstMissed) continue;
+    if (missed.has(index + 1)) continue;
     earned += rateOnDay(difficulty, index);
   }
   return earned;
@@ -1494,10 +1679,11 @@ export interface CalendarMarks {
 /**
  * One row of § 8.6's grid.
  *
- * `missedHere` is the contract's own rule — *"`d > t.day − 1 − t.missed` among past days"* — which
- * places the missed days at the tail of the past, exactly as {@link earnedSoFar} does. The two
- * derivations agree because they are the same sentence read twice, and `economy.test.ts` holds
- * them to each other.
+ * A past day's mark is its own verdict, read through {@link missedDaysOf} exactly as
+ * {@link earnedSoFar} reads it, so the grid and the purse cannot disagree about which days paid.
+ * It was the prototype's *"`d > t.day − 1 − t.missed` among past days"*, which drew every miss at
+ * the tail of the past: a month missed on day 14 drew day 14 cleared and a later clear missed
+ * (seat C's D3, wave AO).
  */
 export function calendarRow(
   careerToday: number,
@@ -1507,26 +1693,33 @@ export function calendarRow(
   const start = contractStartDay(careerToday, tower);
   const end = contractEndDay(careerToday, tower);
   const occupied = occupiedDayIndices(tower);
-  const lastCleared = tower.day - 1 - tower.missed;
+  const missed = missedDaysOf(tower);
   return calendarColumns(careerToday).map((careerDay): CalendarCell => {
     if (careerDay < start || careerDay > end) {
       return { careerDay, towerDay: undefined, mark: 'blank' };
     }
     const towerDay = careerDay - start + 1;
     const past = towerDay < tower.day;
+    /*
+     * **A filed day shows its own verdict**, ahead of a booking or a night of works that fell on it
+     * (seat C's D3, wave AO): the flag and the hammer are for a day a player can still plan around,
+     * and on a day already filed they hid whether it cleared. Contract & works' month grid already
+     * put a past day's verdict first, so the two views now draw the same mark for the same day. The
+     * cell's tip still names what was booked (`everyday/campaignModel.ts#calendarView`).
+     */
     const mark: CalendarMarkId =
       careerDay === careerToday
         ? 'today'
-        : marks.dueDays.includes(towerDay)
-          ? 'due'
-          : occupied.has(towerDay - 1)
-            ? 'works'
-            : marks.flaggedDays.includes(towerDay)
-              ? 'flagged'
-              : past
-                ? towerDay > lastCleared
-                  ? 'missed'
-                  : 'cleared'
+        : past
+          ? missed.has(towerDay)
+            ? 'missed'
+            : 'cleared'
+          : marks.dueDays.includes(towerDay)
+            ? 'due'
+            : occupied.has(towerDay - 1)
+              ? 'works'
+              : marks.flaggedDays.includes(towerDay)
+                ? 'flagged'
                 : 'ahead';
     return { careerDay, towerDay, mark };
   });

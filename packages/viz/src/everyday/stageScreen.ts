@@ -82,6 +82,7 @@ import type { LiveObservations } from '../live/types.js';
 import type { GoalState } from '../shift/types.js';
 import { actionBarFor, type ActionBarModel } from './actionBar.js';
 import { RUSH_NOT_LANDED, rushStageHeaderOf } from './rush.js';
+import { RUSH_STREAM } from './rushScreenModel.js';
 import type { EverydayHost } from './host.js';
 import { SCREEN_NAMES, type EverydayScreenModule } from './screens.js';
 import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.js';
@@ -105,6 +106,8 @@ import {
   type StageCameraId,
   stageCameraWindowOf,
   type StageFigure,
+  type StageFigureTone,
+  stageFigureToneOf,
   stageFloorJumpOptionsOf,
   stageFilingLandsOn,
   stageGeometryOf,
@@ -117,6 +120,9 @@ import {
   stageMayAdopt,
   stageOpeningLineOf,
   STAGE_OVERLAY_PLAY,
+  stageBuildingWantsBringing,
+  stageLitSpeedOf,
+  stagePlayControlOf,
   stageHandoverVerdictOf,
   type StageHandoverVerdict,
   stagePressChangedNobody,
@@ -126,6 +132,7 @@ import {
   type StageSwitchTarget,
 } from './stageScreenModel.js';
 import { everydayProfileStore } from './profileStore.js';
+import { DAY_ATTEMPT_COPY } from '../shift/attempt.js';
 import { carAbsencesOf, type BookedOutCar } from '../shift/bookedOut.js';
 /* GitHub issue #592, § D991 — the whole day's acts and the pace rule over them. */
 import { actsOf, type DayAct } from '../shift/dayLength.js';
@@ -134,6 +141,8 @@ import {
   STAGE_SKIP_BEAT_NOTE,
   stagePaceNoteOf,
   stagePaceOf,
+  stageSkipLineStands,
+  stageStatusOf,
   stageSkipApplies,
   stageSkipLineOf,
   stageSkipOf,
@@ -199,7 +208,14 @@ import { campaignDockViewOf, type CampaignDockView } from './campaignDock.js';
  * `dayEnded` is a fact about the transport *this* screen owns, and `everyday/host.ts` deliberately
  * exposes none. {@link syncTransport} is its one writer, on the edge rather than on every frame.
  */
-const barFacts = { hasRun: false, dayClosed: false, recomputing: false, dayEnded: false };
+const barFacts: {
+  hasRun: boolean;
+  dayClosed: boolean;
+  recomputing: boolean;
+  dayEnded: boolean;
+  /** § D1361: why this tab may not play the stage's day, with the attempt's weekday. */
+  held: { readonly kind: 'elsewhere' | 'stale'; readonly weekday: string } | undefined;
+} = { hasRun: false, dayClosed: false, recomputing: false, dayEnded: false, held: undefined };
 
 /**
  * Whether this session has already seen visible trouble — GitHub issue #340, `docs/26` § 7.2 E3.
@@ -265,6 +281,14 @@ const EYEBROW = `font:500 9.5px ${TYPE.mono};letter-spacing:.14em;color:${C.labe
  * KB-15 — *no colour-only signal* — is kept by the row rather than by this table: `GOAL_GLYPHS`'
  * `✓ × ·` sits at the head of every line and the value or the em dash sits at its end.
  */
+/** § D1381: a header figure's ink by its tone — the handoff's live accent, then the palette's verdicts. */
+const FIGURE_INK: Readonly<Record<StageFigureTone, string>> = Object.freeze({
+  live: C.terracotta,
+  met: C.moss,
+  missed: C.alarm,
+  still: C.ink,
+});
+
 const GOAL_INK: Readonly<Record<GoalState, string>> = Object.freeze({
   met: C.moss,
   missed: C.alarm,
@@ -359,6 +383,13 @@ function mountStage(
 
   let alive = true;
   let playback: Playback | undefined;
+  /**
+   * **Where this stage is held while another tab holds the day's attempt** — wave AO, lane AO-1,
+   * [§ D1361](../../../../DECISIONS.md). The playhead where it stood when the hold began (or the
+   * run's start, for a run adopted under the hold), so this tab shows nothing it had not already
+   * shown; `undefined` while this tab may play the day. {@link holdForAnotherTab} keeps it.
+   */
+  let heldAtS: number | undefined;
   /** Display time of the last live-region write — see {@link STAGE_ANNOUNCE_MS}. */
   let lastAnnouncedMs = Number.NEGATIVE_INFINITY;
   /** A stopped frame's sentence, waiting for the rate limit to lift — see `announce`. */
@@ -419,6 +450,19 @@ function mountStage(
   let skipArmedAtS: number | undefined;
   let skipLandedAtS: number | undefined;
   let skipLine = '';
+  /*
+   * ---- Wave AO, lane AO-4: one message for one state (`stagePace.ts#stageStatusOf`). ----
+   *
+   * `paceText` is what the pace rule (or a call's stop) says now and `paceStopped` whether that is a
+   * stop; `skipLineReason` is the pace reason on the first frame after the last skip landed, so the
+   * line goes the frame the stage leaves that state (`stageSkipLineStands`). {@link showStatus} is
+   * the one writer of both spans.
+   */
+  let paceText = '';
+  let paceStopped = false;
+  let skipLineReason: StagePaceReason | undefined;
+  /** A press set the day playing, and the next frame brings the building into view — {@link bringBuildingIntoView}. */
+  let bringBuildingPending = false;
   /*
    * ---- § D1029's call — wave AI. Two cells, both set in `adopt`. ----
    *
@@ -1642,6 +1686,10 @@ function mountStage(
   function tick(): void {
     pendingFrame = undefined;
     if (!alive) return;
+    if (bringBuildingPending) {
+      bringBuildingPending = false;
+      bringBuildingIntoView();
+    }
     draw();
     if (playback?.state === 'playing') requestFrame();
     else syncTransport();
@@ -1649,11 +1697,15 @@ function mountStage(
 
   function togglePlay(): void {
     if (playback === undefined) return;
+    /* § D1361: a day another tab holds is shown here no further. */
+    if (heldAtS !== undefined) return;
     if (playback.state === 'playing') {
       playback.pause();
       /* § D1212: a pause stops a skip that is coming; *Play* starts a fresh beat. */
       dropSkipBeat();
     } else {
+      /* Lane AO-4: the button is held while the stage works out a call; a key press is held with it. */
+      if (waitingAtCall()) return;
       started = true;
       /*
        * The one place a player gesture reaches the sound — GitHub issue #258. A browser suspends
@@ -1662,9 +1714,30 @@ function mountStage(
        */
       audioSink?.wake();
       playback.play();
+      bringBuildingPending = true;
     }
     syncTransport();
     requestFrame();
+  }
+
+  /**
+   * **Keep the building in view while the day plays** — wave AO, lane AO-4, the post-AN panel's seat
+   * B (lost moment 9, defect 9), [§ D1385](../../../../DECISIONS.md) clause 4. Asked when a press sets the day playing: on a phone the header's
+   * *▶ Play* sits above the goals, and the canvas under them was below the fixed bar for the whole of
+   * the day it started. `stageScreenModel.ts#stageBuildingWantsBringing` decides, so a desktop stage
+   * that already shows most of its building is not scrolled under the reader.
+   *
+   * **On the next frame, never inside the press** ({@link bringBuildingPending}): the shell keeps the
+   * region's offset across the first re-render after a player's press (`shell.ts#keepScrollAcrossRerender`),
+   * so a scroll made in the press is put back by the press's own button-text change. The call
+   * card's scroll is made from a frame for the same reason.
+   */
+  function bringBuildingIntoView(): void {
+    const box = canvas.getBoundingClientRect();
+    const shown = region.getBoundingClientRect();
+    const viewportBottom = view?.innerHeight ?? doc.documentElement.clientHeight;
+    const seen = { top: Math.max(0, shown.top), bottom: Math.min(viewportBottom, shown.bottom) };
+    if (stageBuildingWantsBringing(box, seen)) canvas.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   }
 
   function setSpeed(index: number): void {
@@ -1679,6 +1752,12 @@ function mountStage(
      * somebody next waits a minute.
      */
     playerChoseSpeedAtS = paceScored && lastPaceReason === 'watching' ? undefined : (playback?.simTimeS ?? 0);
+    /* Lane AO-4: a chip press is a state of the player's making, so a skip's line from before it is over. */
+    if (skipLine !== '') {
+      skipLine = '';
+      skipLineReason = undefined;
+      showStatus();
+    }
     playback?.setSpeed(stageSpeedAt(index).simPerRealS);
     syncTransport();
     requestFrame();
@@ -1712,7 +1791,14 @@ function mountStage(
        * *stopped for the day's call* and *fast-forwarding at 30×* stood under an 18:00 clock after a
        * skip had run the day out. The bar says the day has run out; the note says nothing more.
        */
-      if (playback.simTimeS >= playback.recording.endedAt && paceNote.textContent !== '') paceNote.textContent = '';
+      if (playback.simTimeS >= playback.recording.endedAt && (paceText !== '' || skipLine !== '')) {
+        /* Wave AO, lane AO-4: and nor does a skip's line — the day's end is one state, said by the bar. */
+        skipLine = '';
+        skipLineReason = undefined;
+        setPace('', false);
+      }
+      /* A stop the stage is waiting at says so, on a resumed attempt too (lane AO-4). */
+      syncWaitingNote();
       return;
     }
     const answer = stagePaceOf({
@@ -1736,7 +1822,20 @@ function mountStage(
     const note = waiting
       ? STAGE_CALL_COPY.waiting
       : (stagePaceNoteOf(answer, { acts: paceActs, simTimeS, dayStartS: host.dayStartS() }) ?? '');
-    if (paceNote.textContent !== note) paceNote.textContent = note;
+    /*
+     * Wave AO, lane AO-4 — one message for one state (`stagePace.ts#stageStatusOf`): the line a skip
+     * left stands while the stage stays where it landed, and goes the frame it leaves (or a call
+     * stops it); the pace note is drawn only where neither a stop nor a skip is speaking.
+     */
+    if (skipLine !== '') {
+      if (!stageSkipLineStands({ landedReason: skipLineReason, reason: answer.reason })) {
+        skipLine = '';
+        skipLineReason = undefined;
+      } else if (skipLineReason === undefined) {
+        skipLineReason = answer.reason;
+      }
+    }
+    setPace(note, answer.reason === 'call');
     if (answer.reason === 'call') waitingOnCall = waiting;
     /*
      * **The call stops the transport** — § D1029. At any rung, and after a chip press, because the
@@ -1800,7 +1899,7 @@ function mountStage(
     }
     if (skipArmedAtS === undefined || simTimeS < skipArmedAtS) {
       skipArmedAtS = simTimeS;
-      if (skipNote.textContent !== STAGE_SKIP_BEAT_NOTE) skipNote.textContent = STAGE_SKIP_BEAT_NOTE;
+      showStatus();
       return;
     }
     const skip = stageSkipOf({
@@ -1817,7 +1916,8 @@ function mountStage(
     skipArmedAtS = undefined;
     skipLandedAtS = skip.toS;
     skipLine = stageSkipLineOf(skip, host.dayStartS());
-    skipNote.textContent = skipLine;
+    skipLineReason = undefined;
+    showStatus();
     playback.seekTo(skip.toS);
     syncTransport();
     requestFrame();
@@ -1827,7 +1927,64 @@ function mountStage(
   function dropSkipBeat(): void {
     if (skipArmedAtS === undefined) return;
     skipArmedAtS = undefined;
-    if (skipNote.textContent !== skipLine) skipNote.textContent = skipLine;
+    showStatus();
+  }
+
+  /**
+   * **The one writer of the transport's two lines** — wave AO, lane AO-4, the post-AN panel's seat B
+   * (lost moment 5): `stagePace.ts#stageStatusOf` decides which of them speaks, so the two can never
+   * run together.
+   */
+  function showStatus(): void {
+    const lines = stageStatusOf({
+      pace: paceText,
+      stopped: paceStopped,
+      skip: skipArmedAtS !== undefined ? STAGE_SKIP_BEAT_NOTE : skipLine,
+    });
+    if (paceNote.textContent !== lines.pace) paceNote.textContent = lines.pace;
+    if (skipNote.textContent !== lines.skip) skipNote.textContent = lines.skip;
+  }
+
+  /** What the pace rule, or a call's stop, says now. */
+  function setPace(text: string, stopped: boolean): void {
+    paceText = text;
+    paceStopped = stopped;
+    showStatus();
+  }
+
+  /**
+   * **Whether the stage is stopped at a call whose runs have not landed** — wave AO, lane AO-4, the
+   * post-AN panel's seat B (lost moments 6 and 7). True while the transport is paused, short of the
+   * day's end, with an ordinary candidate standing at or before the playhead and not yet raised:
+   * the pace stopped there (§ D1138), or a resumed attempt reopened there (§ D1218). The transport's
+   * button says so and cannot be pressed ({@link syncTransport}), and the note says what the stage
+   * is doing ({@link syncWaitingNote}).
+   */
+  function waitingAtCall(): boolean {
+    if (playback === undefined || playback.state === 'playing') return false;
+    if (playback.simTimeS >= playback.recording.endedAt) return false;
+    const standing = activeCall();
+    if (standing === undefined || standing.call.atS > playback.simTimeS) return false;
+    /*
+     * Raised but not yet drawn is still waiting: the host's notification reaches the transport a
+     * frame before the card is drawn, and *Play* offered in that frame would be the same false offer.
+     */
+    return !standing.raised || callCard.hidden !== false;
+  }
+
+  /**
+   * The paused stage's note while it waits at a call, and back to nothing once it no longer does —
+   * a resumed attempt reopens paused at the instant it was left, where the pace (which is asked only
+   * while playing) would say nothing at all. A stop the pace made itself is left to the pace.
+   */
+  function syncWaitingNote(): void {
+    if (playback === undefined || playback.state === 'playing') return;
+    const waiting = waitingAtCall();
+    if (waiting && paceText !== STAGE_CALL_COPY.waiting && callCard.hidden) {
+      setPace(STAGE_CALL_COPY.waiting, true);
+    } else if (!waiting && !waitingOnCall && paceText === STAGE_CALL_COPY.waiting) {
+      setPace('', false);
+    }
   }
 
   /**
@@ -1850,7 +2007,13 @@ function mountStage(
    * from the frame it describes.
    */
   function announce(recording: VizRecording, frame: Frame, dispatcherName: string): void {
-    const sentence = describeFrame({ recording, frame, dispatcherName });
+    /* § D1383: a rush's text quotes the climb its page states, not the drain the recording runs on into. */
+    const sentence = describeFrame({
+      recording,
+      frame,
+      dispatcherName,
+      ...(context.ctx === 'rush' ? { horizonS: RUSH_STREAM.lengthS } : {}),
+    });
     canvas.setAttribute('aria-label', sentence);
     if (pendingSay !== undefined) {
       view?.clearTimeout(pendingSay);
@@ -1902,6 +2065,7 @@ function mountStage(
    */
   function skipToEnd(confirmed = false): void {
     if (playback === undefined) return;
+    if (heldAtS !== undefined) return;
     /*
      * **And the day has been started** — GitHub issue #565's third defect, § D947.
      *
@@ -2068,6 +2232,8 @@ function mountStage(
       }
     }
     playback.play();
+    /* Lane AO-4: the card has gone and the day plays on, so the building comes back into view. */
+    bringBuildingPending = true;
     syncTransport();
     requestFrame();
   }
@@ -2114,14 +2280,22 @@ function mountStage(
       playback.seekTo(call.atS);
       const stopNote =
         stagePaceNoteOf({ simPerRealS: stageSpeedAt(speedIndex).simPerRealS, reason: 'call' }, { acts: paceActs, simTimeS: call.atS }) ?? '';
-      if (paceNote.textContent !== stopNote) paceNote.textContent = stopNote;
+      /* Lane AO-4: a stop speaks alone, and the skip that ran past it is over. */
+      skipLine = '';
+      skipLineReason = undefined;
+      setPace(stopNote, true);
       syncTransport();
       requestFrame();
     }
     /* The wait is over and the call is raised: the note says what the stop now is. */
-    if (paceNote.textContent === STAGE_CALL_COPY.waiting) {
-      paceNote.textContent =
-        stagePaceNoteOf({ simPerRealS: stageSpeedAt(speedIndex).simPerRealS, reason: 'call' }, { acts: paceActs, simTimeS }) ?? '';
+    if (paceText === STAGE_CALL_COPY.waiting || paceText === '') {
+      /* Lane AO-4: and on a resumed attempt, whose paused stage the pace never wrote, it says so too. */
+      skipLine = '';
+      skipLineReason = undefined;
+      setPace(
+        stagePaceNoteOf({ simPerRealS: stageSpeedAt(speedIndex).simPerRealS, reason: 'call' }, { acts: paceActs, simTimeS }) ?? '',
+        true,
+      );
     }
     waitingOnCall = false;
     /* § D1151: the skip has arrived at a call; the next press of it is the player's answer. */
@@ -2465,7 +2639,8 @@ function mountStage(
     if (resumeAtS === undefined) {
       skipLandedAtS = undefined;
       skipLine = '';
-      skipNote.textContent = '';
+      skipLineReason = undefined;
+      showStatus();
     }
     /*
      * A new recording is a new building — GitHub issue #258. The crossover is the old tower's
@@ -2500,8 +2675,13 @@ function mountStage(
       speed: stageSpeedAt(speedIndex).simPerRealS,
       ...(startAtS === undefined ? {} : { startAtS }),
     });
-    if (wasPlaying) playback.play();
-    if (openAtS !== undefined) {
+    /* § D1361: a run adopted while another tab holds the day opens held at its start, and does not play. */
+    if (heldAtS !== undefined) {
+      heldAtS = recording.startedAt;
+      playback.setReach(heldAtS);
+    }
+    if (wasPlaying && heldAtS === undefined) playback.play();
+    if (openAtS !== undefined && heldAtS === undefined) {
       started = true;
       playback.play();
     }
@@ -2536,6 +2716,32 @@ function mountStage(
     return context.ctx === 'watch' ? host.watching()?.view : undefined;
   }
 
+  /**
+   * **A day whose attempt another tab holds is shown here no further** — wave AO, lane AO-1,
+   * [§ D1361](../../../../DECISIONS.md), the post-AN panel's seat D (D2). The saved attempt belongs
+   * to one tab at a time. While another tab holds it, this stage pauses where it stands and holds
+   * its playhead there (`Playback.setReach`), its transport and presses do nothing, and § 3.3's
+   * primary is the takeover. Let go the moment this tab holds the day again, which a takeover's
+   * re-simulated run replaces anyway. Only the daily flow carries a scored attempt.
+   */
+  function holdForAnotherTab(): void {
+    const attempt = context.ctx === 'daily' ? host.dayAttempt() : undefined;
+    const kind = attempt === undefined ? undefined : host.stageHold(adopted);
+    barFacts.held = attempt === undefined || kind === undefined ? undefined : { kind, weekday: attempt.weekday };
+    if (barFacts.held !== undefined) {
+      if (heldAtS === undefined) {
+        heldAtS = playback?.simTimeS ?? adopted?.startedAt ?? 0;
+        playback?.pause();
+        dropSkipBeat();
+      }
+      if (playback !== undefined && playback.reach !== heldAtS) playback.setReach(heldAtS);
+      return;
+    }
+    if (heldAtS === undefined) return;
+    heldAtS = undefined;
+    playback?.setReach(null);
+  }
+
   /** The host said something changed. Adopt a new recording; otherwise just redraw the facts. */
   function onHostChange(): void {
     if (!alive) return;
@@ -2551,6 +2757,7 @@ function mountStage(
       runFailed: host.runFailure?.() !== undefined,
     });
     if (mayAdopt && recording !== undefined) adopt(recording);
+    holdForAnotherTab();
     /*
      * § 3.3's row asks *this* stage what it has, and while the third clause of {@link stageMayAdopt}
      * is holding, what it has is nothing — GitHub issue #548. Unguarded, `runState().hasRun` is true
@@ -2633,8 +2840,20 @@ function mountStage(
         });
       }
     }
-    playButton.textContent = playing ? '⏸ Pause' : '▶ Play';
-    playButton.disabled = playback === undefined;
+    /*
+     * The transport's button, one rule over two lanes (joined at integration): stopped at a call whose
+     * runs are still being made it says the stage is working and is not offered as *Play* (lane AO-4,
+     * the post-AN panel's seat B, lost moment 6); once the day has run out it is inert with the reason
+     * on its face, as the skip beside it is (§ D1381, lane AO-3).
+     */
+    const waitingNow = waitingAtCall();
+    const play = stagePlayControlOf({ playing, hasRun: playback !== undefined, waitingOnCall: waitingNow, dayEnded: ended });
+    playButton.textContent = play.label;
+    playButton.disabled = play.inert;
+    /* A held button says why to a reader on it, in the line a sighted player reads beside it. */
+    playButton.title = waitingNow ? STAGE_CALL_COPY.waiting : (play.note ?? '');
+    playButton.style.opacity = play.inert && playback !== undefined ? '0.55' : '';
+    playButton.style.cursor = play.inert ? 'default' : 'pointer';
     /*
      * § 2.3's skip control, resolved from the same fact the bar reads — GitHub issue #369. Inert
      * once there is nothing left to skip, with the reason on the button's own `title` rather than
@@ -2655,11 +2874,18 @@ function mountStage(
       `cursor:${skipButton.disabled ? 'default' : 'pointer'}`,
     ].join(';');
     /*
-     * The chip that is lit is the rung the transport is **at**, which between a whole day's peaks
-     * may be faster than the player's own (§ D991: *every change shows on the chip*). The label is
+     * The chip that is lit is the rung the transport is **at** while it moves, which on a scored day
+     * may be faster than the player's own (§ D991: *every change shows on the chip*), and the
+     * player's own rung while it is stopped — wave AO, lane AO-4, `stageScreenModel.ts#stageLitSpeedOf`:
+     * a call stop and the day's end lit `30×` for a player who had never left `4×`. The label is
      * always the multiplier, so the lit chip is never a claim the transport contradicts.
      */
-    const runningAt = playback?.speed ?? stageSpeedAt(speedIndex).simPerRealS;
+    const chosenAt = stageSpeedAt(speedIndex).simPerRealS;
+    const runningAt = stageLitSpeedOf({
+      moving: playing,
+      runningSimPerRealS: playback?.speed ?? chosenAt,
+      chosenSimPerRealS: chosenAt,
+    });
     for (const [index, button] of speedButtons.entries()) {
       const on = stageSpeedAt(index).simPerRealS === runningAt;
       button.disabled = playback === undefined;
@@ -2685,6 +2911,18 @@ function mountStage(
      * press of *Try the day again* clears the host's failure as it starts the next run, so the
      * waiting line takes over on the same notification.
      */
+    /*
+     * § D1361: another tab holds this day's attempt. Above every other state, because the picture
+     * under it is held and none of the controls below act; the bar's primary is the takeover.
+     */
+    if (heldAtS !== undefined) {
+      failedRow.style.display = 'none';
+      statusText.textContent =
+        barFacts.held?.kind === 'stale' ? DAY_ATTEMPT_COPY.staleStage : DAY_ATTEMPT_COPY.elsewhereStage;
+      startButton.style.display = 'none';
+      status.style.display = 'flex';
+      return;
+    }
     const failed =
       context.ctx !== 'watch' &&
       host.runFailure?.() !== undefined &&
@@ -2831,6 +3069,10 @@ function mountStage(
     view: StageInterventionView,
     watching: WatchingView | undefined,
   ): string | undefined {
+    /* § D1361: every arm at once, while another tab holds this day's attempt. */
+    if (heldAtS !== undefined) {
+      return barFacts.held?.kind === 'stale' ? DAY_ATTEMPT_COPY.staleStage : DAY_ATTEMPT_COPY.elsewhereStage;
+    }
     return (watching === undefined ? undefined : SPECTATOR_MAKES_NO_CHANGES) ?? view.refusal;
   }
 
@@ -3001,7 +3243,13 @@ function mountStage(
     if (practiceLine.textContent !== (practice ?? '')) practiceLine.textContent = practice ?? '';
     const practiceDisplay = practice === undefined ? 'none' : '';
     if (practiceLine.style.display !== practiceDisplay) practiceLine.style.display = practiceDisplay;
-    drawFigures(head.figures);
+    /* § D1381: the strip's own judgement, at the strip's own instant — a rush and a watched run grade nothing. */
+    const figureJudged = simTimeS >= recording.endedAt;
+    const figureReadings = context.ctx === 'rush' || watching !== undefined ? [] : host.goalsAt(simTimeS);
+    drawFigures(
+      head.figures,
+      head.figures.map((figure) => stageFigureToneOf(figure, figureReadings, figureJudged)),
+    );
     drawGoals(recording, simTimeS, watching);
     drawEndDay(recording, simTimeS, watching);
     /* A rush asks nothing of the day: § 9.2 has no brief and no goals to grade. */
@@ -3485,15 +3733,21 @@ function mountStage(
     }
   }
 
-  function drawFigures(list: readonly StageFigure[]): void {
+  function drawFigures(list: readonly StageFigure[], tones: readonly StageFigureTone[] = []): void {
     figures.replaceChildren();
-    for (const figure of list) {
+    for (const [index, figure] of list.entries()) {
       const box = el(doc, 'div', 'everyday-stage-figure');
       box.style.cssText = 'display:flex;flex-direction:column;gap:1px';
       const label = el(doc, 'span', undefined, figure.label);
       label.style.cssText = EYEBROW;
       const value = el(doc, 'span', 'everyday-stage-figure-value', figure.value);
-      value.style.cssText = `font:500 16px ${TYPE.mono};color:${figure.refusal === undefined ? C.terracotta : C.faint}`;
+      /*
+       * § D1381: the live accent while the day runs, the goal row's own verdict once it has run out,
+       * so a passing reading at 18:00 is not drawn in the red family beside a met goal.
+       */
+      const tone = tones[index] ?? (figure.refusal === undefined ? 'live' : 'still');
+      value.dataset['tone'] = tone;
+      value.style.cssText = `font:500 16px ${TYPE.mono};color:${figure.refusal !== undefined ? C.faint : FIGURE_INK[tone]}`;
       box.append(label, value);
       /*
        * R13: a ratio carries the count it was taken over, in its own box. A count is its own `n`
@@ -3762,6 +4016,16 @@ function mountStage(
      * docstring is the argument; what happens here is that it is asked.
      */
     primary: () => {
+      /*
+       * § D1361: while another tab holds this day's attempt, § 3.3's primary reads *Continue ⟨day⟩
+       * here* with the note that says what it does, so this press is the player's takeover. The run
+       * it lands is the attempt as last saved, re-simulated, and lets this stage's hold go.
+       */
+      if (barFacts.held !== undefined && context.ctx === 'daily') {
+        host.playDay({ takeOver: barFacts.held.kind === 'elsewhere' });
+        syncTransport();
+        return;
+      }
       /*
        * § 14.1's primary on a watched stage is a different press entirely — *"drops the spectator
        * state and opens the brief for the same day, which is the whole reason watching exists"* —

@@ -46,7 +46,9 @@ import {
   stagePaceOf,
   stageSkipApplies,
   stageSkipLineOf,
+  stageSkipLineStands,
   stageSkipOf,
+  stageStatusOf,
   type StagePaceInput,
   type StageSkip,
 } from './stagePace.js';
@@ -733,5 +735,44 @@ describe('the skip across a scored whole day’s quiet — § D1212, widened by 
     expect(observationsAt(skipped, skipped.endedAt)).toEqual(observationsAt(watched, watched.endedAt));
     /* Positive control: the presses do change the run, so equal legs are not equal by accident. */
     expect(skipped.legs).not.toEqual(day.legs);
+  });
+});
+
+/*
+ * ---- Wave AO, lane AO-4: one message for one state ----
+ *
+ * The post-AN panel's seat B (lost moment 5, defect 3): a skip that landed on a call read *stopped
+ * for the day's call skipped 09:46–10:40: …*, the two spans side by side, and on a phone a skip's
+ * range stood beside every later note until the next skip.
+ */
+describe('one message for one state — wave AO, lane AO-4', () => {
+  const SKIPPED = 'skipped 09:46–10:40: nobody on a landing waited a minute';
+  const STOP = 'stopped for the day’s call';
+
+  it('lets a stop speak alone, then a skip, then the pace note, and never two at once', () => {
+    expect(stageStatusOf({ pace: STOP, stopped: true, skip: SKIPPED })).toEqual({ pace: STOP, skip: '' });
+    expect(stageStatusOf({ pace: 'fast-forwarding at 30×', stopped: false, skip: SKIPPED })).toEqual({ pace: '', skip: SKIPPED });
+    expect(stageStatusOf({ pace: 'fast-forwarding at 30×', stopped: false, skip: STAGE_SKIP_BEAT_NOTE })).toEqual({
+      pace: '',
+      skip: STAGE_SKIP_BEAT_NOTE,
+    });
+    expect(stageStatusOf({ pace: 'fast-forwarding at 30×', stopped: false, skip: '' })).toEqual({ pace: 'fast-forwarding at 30×', skip: '' });
+    for (const stopped of [true, false]) {
+      for (const skip of ['', SKIPPED]) {
+        const lines = stageStatusOf({ pace: STOP, stopped, skip });
+        expect([lines.pace, lines.skip].filter((line) => line !== '').length, `${String(stopped)} ${skip}`).toBeLessThanOrEqual(1);
+      }
+    }
+  });
+
+  it('keeps a skip’s line while the stage stays where it landed, and drops it when it leaves or a call stops it', () => {
+    /* The frame after landing has not been asked yet: the line stands. */
+    expect(stageSkipLineStands({ landedReason: undefined, reason: 'watching' })).toBe(true);
+    expect(stageSkipLineStands({ landedReason: 'watching', reason: 'watching' })).toBe(true);
+    /* Somebody stopped waiting and the stage is fast again: a new state, the old line goes. */
+    expect(stageSkipLineStands({ landedReason: 'watching', reason: 'fast' })).toBe(false);
+    /* A call stops the transport: a stop speaks alone, even on the frame it lands. */
+    expect(stageSkipLineStands({ landedReason: undefined, reason: 'call' })).toBe(false);
+    expect(stageSkipLineStands({ landedReason: 'fast', reason: 'call' })).toBe(false);
   });
 });

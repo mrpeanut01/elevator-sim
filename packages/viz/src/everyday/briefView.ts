@@ -46,7 +46,7 @@
  * gate), so this card prints `ShiftGoal.label` and never a value.
  */
 
-import { DAY_ATTEMPT_COPY, resumeLabelOf } from '../shift/attempt.js';
+import { continueHereLabelOf, DAY_ATTEMPT_COPY, resumeLabelOf } from '../shift/attempt.js';
 import { TODAY_ASKS_HEADING } from '../shift/goals.js';
 
 import type { GoalReading } from '../shift/types.js';
@@ -54,6 +54,7 @@ import type { GoalReading } from '../shift/types.js';
 import type { ActionBarModel } from './actionBar.js';
 import type { EverydayHost } from './host.js';
 import { isScreenBuilt, unbuiltReasonFor } from './screens.js';
+import { tuneControlsOffered, type TuneOffer } from './tunerModel.js';
 import type { TodayRecord } from './today.js';
 import type { EverydayScreen } from './types.js';
 
@@ -172,6 +173,11 @@ export interface BriefScreenView {
      * `driverHeld`, § D1029. Drawn beside the control rather than as a tooltip, § 7.6's fourth rule.
      */
     readonly held: string | undefined;
+    /**
+     * Which driver the day opens on and why, where the day before ended on another — wave AO, lane
+     * AO-4, {@link briefCarriedDriverLineOf}. `undefined` where nothing was handed back.
+     */
+    readonly carried: string | undefined;
   };
   readonly ghost: BriefRefusalCard;
   readonly locked: BriefRefusalCard;
@@ -203,7 +209,21 @@ export function briefBarModel(
   base: ActionBarModel,
   driver: string | undefined,
   attemptWeekday?: string,
+  attemptHeldElsewhere = false,
 ): ActionBarModel {
+  /*
+   * **An attempt another tab holds is taken over on purpose, never resumed by default** — wave AO,
+   * lane AO-1, [§ D1361](../../../../DECISIONS.md). The table's third variant with the weekday
+   * filled in, and the note says what the press does before it is pressed: the other tab stops where
+   * it is. The press is the player's confirmation, so it is a label and a note rather than a dialog.
+   */
+  if (attemptWeekday !== undefined && attemptHeldElsewhere) {
+    return {
+      ...base,
+      primary: { ...base.primary, label: continueHereLabelOf(attemptWeekday) },
+      note: DAY_ATTEMPT_COPY.elsewhereNote,
+    };
+  }
   /*
    * **An attempt standing on the day is resumed, never started again** — [§ D1218](../../../../DECISIONS.md).
    * The primary is the table's second variant with the weekday filled in, and the note says what the
@@ -253,7 +273,65 @@ export interface BriefScreenInput {
    * with and a handover is the stage's to make.
    */
   readonly attemptWeekday?: string | undefined;
+  /**
+   * What *Tune the tower* draws on this day, which the *Locked for score* caveat names — wave AO,
+   * lane AO-2 ([§ D1368](../../../../DECISIONS.md)). Absent is {@link TUNE_OFFER_EVERYTHING}.
+   */
+  readonly tunerOffer?: TuneOffer | undefined;
+  /**
+   * The day before this one in the week, as {@link briefCarriedDriverLineOf} reads it —
+   * `everyday/host.ts#previousDayDriver`. Absent on a first day, and on a day before which nothing
+   * was filed.
+   */
+  readonly yesterday?: BriefYesterday | undefined;
 }
+
+/** The day before, for {@link briefCarriedDriverLineOf}. */
+export interface BriefYesterday {
+  readonly weekday: string;
+  /** The dispatcher the day was started with — its record's `dispatcherId`. */
+  readonly startedWithId: string;
+  /** The last handover made on its stage, or `undefined` where none was. */
+  readonly handover?: { readonly toId: string; readonly toName: string; readonly clock: string } | undefined;
+}
+
+/**
+ * **Say which driver the day opens on, and why** — wave AO, lane AO-4, the post-AN panel's seat B
+ * (lost moment 10). A newcomer handed Monday to *Fairness first* on the stage at 12:20, and Tuesday's
+ * brief opened on *Conventional collective* with nothing saying it had changed back. It had, by
+ * [§ D1318](../../../../DECISIONS.md)'s rule, which this line states and does not move: the brief's
+ * pick is kept from day to day, and a handover on the stage is not.
+ *
+ * Drawn only where the day before ended under a driver other than the one this day opens on, which
+ * is the one case where the brief would otherwise hand the day back silently. It names the driver,
+ * says it is the one the day before started with where it is, names the handover and its clock, and
+ * says how to drive with that dispatcher today: a statement of the control, not advice about which
+ * dispatcher is better.
+ */
+export function briefCarriedDriverLineOf(input: {
+  /** This day's weekday. */
+  readonly weekday: string;
+  /** Who drives as the brief opens, by id and by name. */
+  readonly driverId: string;
+  readonly driverName: string;
+  readonly yesterday?: BriefYesterday | undefined;
+}): string | undefined {
+  const before = input.yesterday;
+  const handover = before?.handover;
+  if (before === undefined || handover === undefined || handover.toId === input.driverId) return undefined;
+  const why = input.driverId === before.startedWithId ? `, the driver ${before.weekday} started with` : '';
+  return (
+    `${input.weekday} opens on ${input.driverName}${why}. ${before.weekday}’s handover to ${handover.toName} ` +
+    `at ${handover.clock} kept to ${before.weekday}: a handover on the stage lasts the rest of its own day, ` +
+    `and only the driver picked on this brief carries over. To drive with ${handover.toName} today, pick it here.`
+  );
+}
+
+/**
+ * Every control the tuner can draw: a day that keeps no mix of its own, on a machine class this build
+ * knows. {@link lockedForScore}'s default, for a caller with no day to ask; the brief passes the day's.
+ */
+export const TUNE_OFFER_EVERYTHING: TuneOffer = Object.freeze({ mixIsTheDays: false, machineSteps: true });
 
 /** How many style cards § 6.2 puts above the dropdown. */
 export const RECOMMENDED_CARDS = 3;
@@ -359,7 +437,10 @@ export function raceAgainstCard(): BriefRefusalCard {
  */
 export const SANDBOX_DOOR_LABEL = 'Change it anyway — the day stops counting';
 
-export function lockedForScore(crowdIsToday: boolean): BriefRefusalCard {
+export function lockedForScore(
+  crowdIsToday: boolean,
+  offer: TuneOffer = TUNE_OFFER_EVERYTHING,
+): BriefRefusalCard {
   const built = isScreenBuilt('tuner');
   return {
     heading: 'LOCKED FOR SCORE',
@@ -406,9 +487,25 @@ export function lockedForScore(crowdIsToday: boolean): BriefRefusalCard {
       ? 'Change anything you like: the day still runs with what you changed, it just stops ' +
         'counting on today’s board — a sandbox day, not a scored one.'
       : `Change it here: ${unbuiltReasonFor('tuner')}.`,
-    caveat: 'Everything you can change from here changes the dispatcher, and nothing else.',
+    /*
+     * **What the door opens, named from the screen's own control list** — wave AO, lane AO-2,
+     * [§ D1368](../../../../DECISIONS.md), the post-AN panel's seat D (D7). This read *"Everything
+     * you can change from here changes the dispatcher, and nothing else"*, directly above a button
+     * that opens floors, shafts, speed, capacity, door dwell, arrival rate and lobby share, none of
+     * which is the dispatcher. `tunerModel.ts#tuneControlsOffered` is the tuner's own list for the
+     * day, so a control the screen adds or stops offering moves this line on the same commit.
+     */
+    caveat: built ? `What it opens: ${tunerControlsLine(offer)}.` : '',
     door: built ? { label: SANDBOX_DOOR_LABEL, screen: 'tuner' } : undefined,
   };
+}
+
+/** `the tower (floors above the lobby, shafts), the machines (…) and the crowd (…)`. */
+function tunerControlsLine(offer: TuneOffer): string {
+  const cards = tuneControlsOffered(offer).map(
+    (entry) => `${entry.card.toLowerCase()} (${entry.controls.map((label) => label.toLowerCase()).join(', ')})`,
+  );
+  return cards.length <= 1 ? (cards[0] ?? '') : `${cards.slice(0, -1).join(', ')} and ${String(cards.at(-1))}`;
 }
 
 /** § 6.2, resolved. */
@@ -475,9 +572,22 @@ export function briefScreenViewOf(input: BriefScreenInput): BriefScreenView {
        */
       count: `${String(options.length)} to choose from · ${String(mine)} of yours`,
       held: input.attemptWeekday === undefined ? today.driverHeld : DAY_ATTEMPT_COPY.driverHeld,
+      /*
+       * Lane AO-4: only on a day whose driver can still be picked here — a held driver (an attempt
+       * under way, a pinned day's standing order) has its own sentence on this line.
+       */
+      carried:
+        input.attemptWeekday === undefined && today.driverHeld === undefined
+          ? briefCarriedDriverLineOf({
+              weekday: today.weekday,
+              driverId: input.selectedId,
+              driverName: today.driver,
+              yesterday: input.yesterday,
+            })
+          : undefined,
     },
     ghost: raceAgainstCard(),
-    locked: lockedForScore(today.crowdIsToday),
+    locked: lockedForScore(today.crowdIsToday, input.tunerOffer),
     barNote: `${BRIEF_NOTE_LEAD}${today.driver}`,
   };
 }

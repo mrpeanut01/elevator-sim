@@ -39,6 +39,7 @@
 import { chromium, type Browser, type Page } from 'playwright-core';
 import {
   leaveTutorialIfOffered,
+  openEverydayDoor,
   openScenarioEntry,
 } from '../dev/browserTier.test-helper.js';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -53,7 +54,7 @@ import {
   type ShippedSite,
 } from '../dev/browserTier.test-helper.js';
 import { DIFFICULTIES, rateOnDay } from '../campaign/economy.js';
-import { openingCareer } from '../campaign/career.js';
+import { openingCareer, type CampaignCareer } from '../campaign/career.js';
 import { CAREER_STORAGE_KEY, encodeCareer } from '../campaign/careerPersist.js';
 import { CONTRACT_COPY } from './campaignModel.js';
 
@@ -94,13 +95,20 @@ async function coldLoad(): Promise<Page> {
  * the record is what the presses read, so the record is what is seeded.
  */
 async function coldLoadOnContractDay(day: number): Promise<Page> {
-  const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
-  const opening = openingCareer('collective');
-  const stored = encodeCareer({
+  return coldLoadWithCareer((opening) => ({
     ...opening,
     today: day,
     towers: opening.towers.map((tower) => ({ ...tower, day })),
-  });
+  }));
+}
+
+/** {@link coldLoadOnContractDay}'s seeding, for any career a case needs the device to carry. */
+async function coldLoadWithCareer(
+  edit: (opening: CampaignCareer) => CampaignCareer,
+  query = 'building=garden-apartments&seed=424242',
+): Promise<Page> {
+  const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
+  const stored = encodeCareer(edit(openingCareer('collective')));
   await page.addInitScript(
     ({ key, value }) => {
       try {
@@ -111,7 +119,7 @@ async function coldLoadOnContractDay(day: number): Promise<Page> {
     },
     { key: CAREER_STORAGE_KEY, value: stored },
   );
-  await page.goto(`${origin}?building=garden-apartments&seed=424242`, { waitUntil: 'load' });
+  await page.goto(`${origin}?${query}`, { waitUntil: 'load' });
   await page.waitForFunction(
     () => document.querySelector<HTMLElement>('.menu-overlay')?.hidden === true,
     undefined,
@@ -560,4 +568,72 @@ describe.skipIf(!HAS_BROWSER)('a campaign day, filed — issue #223', () => {
 
     await page.close();
   }, 300_000);
+
+  /**
+   * **A contract past its allowance is lost, on the built bundle** — the post-AN panel's seat C, D2,
+   * wave AO lane AO-5, § D1392. Seeded where the seat stood: Garden Apartments with day 20 closed and
+   * days 14, 17, 18 and 20 missed. Red before: the desk read *The managing agent has offered a
+   * renewal* beside *4 of 3 missed days used*, and the contract sheet's press read *Lock it in and run
+   * day 1*.
+   */
+  it('holds a lost contract as lost: no renewal, and the contract sheet starts the month again — § D1392', async () => {
+    const page = await coldLoadWithCareer((opening) => ({
+      ...opening,
+      today: 21,
+      towers: opening.towers.map((tower) => ({ ...tower, day: 21, missed: 4, missedDays: [14, 17, 18, 20] })),
+    }));
+    await enterCampaign(page);
+    await openDesk(page);
+    const desk = (await page.textContent('.everyday-building')) ?? '';
+    expect(desk).toContain('The contract is lost');
+    expect(desk).toContain('4 of 3 missed days used');
+    expect(desk).not.toContain('offered a renewal');
+    await openContract(page);
+    const primary = page.locator('.everyday-bar-primary');
+    expect(await primary.textContent()).toBe('Start the month again');
+    expect(await page.textContent('.everyday-bar-note')).toContain(
+      '4 days missed, and standard allows 3, so this contract is lost.',
+    );
+    await primary.click();
+    await page.waitForFunction(
+      () => document.querySelector('.everyday-bar-primary')?.textContent === 'Lock it in and run day 1',
+      undefined,
+      { timeout: 30_000 },
+    );
+    /* It ran nothing on the way: the month started again on the sheet, and the desk is quiet. */
+    expect(await page.locator('.everyday-stage-canvas').count()).toBe(0);
+    await page.click('.everyday-bar-back');
+    await page.waitForSelector('.everyday-towers', { timeout: 30_000 });
+    await openDesk(page);
+    expect(await monthFigures(page)).toEqual({ day: 1, cleared: 0, missed: 0 });
+    expect(await page.textContent('.everyday-building')).not.toContain('The contract is lost');
+    await page.close();
+  });
+
+  /**
+   * **A career offer leaves the Scenario week where the player put it** — the post-AN panel's seat C,
+   * D6, wave AO lane AO-5, § D1393. Seat C took St Jude in the career and opened Scenario's *Today's
+   * scenario* on St Jude, *moved here rather than drawn*. Red before: the door's selected tower read
+   * `c8` after the take.
+   */
+  it('takes a career offer without moving the Scenario week — § D1393', async () => {
+    const page = await coldLoadWithCareer((opening) => ({ ...opening, carry: 14 }), 'building=midtown-office&seed=424242');
+    await leaveTutorialIfOffered(page);
+    await openEverydayDoor(page);
+    const before = await page.getAttribute('.everyday-door-tower[data-selected="true"]', 'data-contract');
+    expect(before).not.toBeNull();
+    expect(before).not.toBe('c8');
+    await toMainMenu(page);
+    await enterCampaign(page);
+    const offer = page.locator('.everyday-towers-offer', { hasText: 'St Jude Hospital' });
+    expect(await offer.count()).toBe(1);
+    await offer.locator('.everyday-towers-offer-take').click();
+    await page.waitForSelector('.everyday-building', { timeout: 30_000 });
+    expect(await page.textContent('.everyday-building')).toContain('St Jude Hospital');
+    await toMainMenu(page);
+    await openEverydayDoor(page);
+    expect(await page.getAttribute('.everyday-door-tower[data-selected="true"]', 'data-contract')).toBe(before);
+    expect(await page.textContent('.everyday-door')).not.toContain('moved here rather than drawn');
+    await page.close();
+  });
 });

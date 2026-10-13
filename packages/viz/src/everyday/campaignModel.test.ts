@@ -29,7 +29,9 @@ import {
   campaignTestRows,
   careerStageLabel,
   contractView,
+  perfectMonthLineOf,
   recordLine,
+  renewalRateHeadOf,
   testsHeldLine,
   towersView,
   units,
@@ -45,10 +47,14 @@ import {
 import {
   CONTRACT_DAYS,
   DIFFICULTIES,
+  DIFFICULTY_IDS,
+  careerDayIdxOf,
+  carriedIn,
   clearedDays,
   purseOf,
   type Difficulty,
 } from '../campaign/economy.js';
+import { WEEKDAYS } from '../shift/types.js';
 import { CONTRACTS } from '../shift/contracts.js';
 import type { DayOutcome, GoalObservations } from '../shift/types.js';
 import { outcomeOf } from '../shift/week.js';
@@ -382,6 +388,109 @@ describe('the month’s end, once day 20 has closed (§ D1357)', () => {
   });
 });
 
+/**
+ * **Each filed day keeps its own verdict, on both calendars** — the post-AN panel's seat C, D3, wave
+ * AO lane AO-5. Garden Apartments filed through `file-day` with misses on days 14, 17 and 18, read
+ * before day 19 as the seat read it. Red before: Contract & works' month drew days 1 to 15 ✓ and 16
+ * to 18 ×, and the front page's rolling schedule drew day 14 ✓ and day 16 ×, because both placed the
+ * three misses at the tail of the past; and the purse paid week three's rate for day 14 and nothing
+ * for day 16.
+ */
+describe('a filed day keeps its own verdict on the month and the rolling calendar (seat C’s D3)', () => {
+  const MISSED = [14, 17, 18];
+  const filed = (): CampaignCareer => {
+    let career = openingCareer('eta');
+    const id = career.towers[0]!.id;
+    for (let day = 1; day <= 18; day += 1) {
+      career = applyCampaignAction(
+        career,
+        { kind: 'file-day', towerId: id, verdict: MISSED.includes(day) ? 'missed' : 'cleared', trips: 400 },
+        shippedPriceSchedule(),
+      );
+    }
+    return career;
+  };
+
+  it('draws every past day from its own filing on Contract & works', () => {
+    const career = filed();
+    expect(career.towers[0]?.day).toBe(19);
+    const month = contractView(inputOf(career))!.month;
+    const cells = month.weeks.flatMap((week) => week.cells);
+    for (const cell of cells.filter((entry) => entry.dayIdx < 18)) {
+      const day = cell.dayIdx + 1;
+      expect(cell.state, `day ${String(day)}`).toBe(MISSED.includes(day) ? 'missed' : 'cleared');
+      expect(cell.mark, `day ${String(day)}`).toBe(MISSED.includes(day) ? '×' : '✓');
+    }
+  });
+
+  it('draws the same verdicts on the front page’s rolling schedule, a booked day included', () => {
+    const career = filed();
+    const row = calendarView(inputOf(career)).rows[0]!;
+    const byDay = new Map<number, (typeof row.cells)[number]>();
+    for (const cell of row.cells) {
+      const day = /its day (\d+) of/u.exec(cell.tip)?.[1];
+      if (day !== undefined) byDay.set(Number(day), cell);
+    }
+    for (let day = 1; day <= 18; day += 1) {
+      const cell = byDay.get(day);
+      expect(cell, `day ${String(day)} is in the window`).toBeDefined();
+      expect(cell?.mark, `day ${String(day)}`).toBe(MISSED.includes(day) ? 'missed' : 'cleared');
+    }
+    /* Day 17 is a booked move-in: the verdict leads and the tip keeps the booking. */
+    expect(byDay.get(17)?.tip).toContain('missed · booked:');
+    expect(byDay.get(19)?.mark).toBe('today');
+  });
+
+  it('pays each cleared day the rate of the week it fell in, and nothing for a miss', () => {
+    const tower = filed().towers[0]!;
+    const [w1, w2, w3, w4] = DIFFICULTIES.standard.rates;
+    /* Days 1 to 5, 6 to 10, then 11, 12, 13, 15 of week three, then 16 of week four. */
+    const earned = 5 * w1! + 5 * w2! + 4 * w3! + 1 * w4!;
+    expect(purseOf(tower)).toBe(DIFFICULTIES.standard.purse + earned);
+  });
+});
+
+/**
+ * **A lost contract on the desk, the tower row and the contract** — the post-AN panel's seat C, D2,
+ * wave AO lane AO-5, § D1392. Red before: the desk read *4 of 3 missed days used* beside *The managing
+ * agent has offered a renewal*, the tower row read *renewal offered*, and clause 4 stated a loss
+ * nothing enforced.
+ */
+describe('a lost contract reads as lost on every screen that names it (§ D1392)', () => {
+  const lostAt20 = (): CampaignCareer => {
+    let career = openingCareer('eta');
+    const id = career.towers[0]!.id;
+    for (let day = 1; day <= CONTRACT_DAYS; day += 1) {
+      career = applyCampaignAction(
+        career,
+        { kind: 'file-day', towerId: id, verdict: [14, 17, 18, 20].includes(day) ? 'missed' : 'cleared', trips: 400 },
+        shippedPriceSchedule(),
+      );
+    }
+    return career;
+  };
+
+  it('puts the loss on the desk with one answer, and no renewal offer', () => {
+    const view = buildingView(inputOf(lostAt20()))!;
+    expect(view.need?.title).toBe('The contract is lost');
+    expect(view.need?.allowance).toBe('4 of 3 missed days used · standard');
+    expect(view.need?.offer).toBeUndefined();
+    expect(view.options?.rows.map((row) => row.label)).toEqual(['Start the month again']);
+    expect(view.options?.note).toBe(BUILDING_COPY.optionsNoteLost);
+    expect(JSON.stringify(view)).not.toContain('offered a renewal');
+    const row = towersView(inputOf(lostAt20())).rows[0]!;
+    expect(row.status).toBe('The contract is lost');
+    expect(row.cta).not.toBe('Renew');
+  });
+
+  it('says on the contract what a loss does', () => {
+    const clause = contractView(inputOf(lostAt20()))!;
+    const all = JSON.stringify(clause);
+    expect(all).toContain('More than 3 missed days and the contract is lost.');
+    expect(all).toContain('runs no more of its days and is offered no renewal');
+  });
+});
+
 describe('the four daily tests (§ 7, § 8.6)', () => {
   const tower = (): CampaignTower => openingCareer('eta').towers[0]!;
 
@@ -479,6 +588,44 @@ describe('the four daily tests (§ 7, § 8.6)', () => {
   });
 });
 
+/*
+ * [§ D1377](../../../../DECISIONS.md), the post-AN panel's seats C (D5) and D (D6): figures on the
+ * Career's sheets derived from the contract rather than written once for a design file's tower.
+ */
+describe('the Career sheets say what the contract and the tower are — § D1377', () => {
+  it('says what a perfect month pays and what it leaves on hand, for every difficulty, from its own rates', () => {
+    for (const id of DIFFICULTY_IDS) {
+      const difficulty = DIFFICULTIES[id];
+      const paid = difficulty.rates.reduce((sum, rate) => sum + rate * 5, 0);
+      const line = perfectMonthLineOf(difficulty, difficulty.purse, 100);
+      expect(line, id).toContain(`pays ${String(paid)} units`);
+      expect(line, id).toContain(`with the ${String(difficulty.purse)} carried in, that is ${String(difficulty.purse + paid)} on hand`);
+      for (const rate of difficulty.rates) expect(line, id).toContain(String(rate));
+    }
+    /* The impossible tier's own note no longer calls the on-hand total a month's pay. */
+    expect(DIFFICULTIES.impossible.note).not.toMatch(/month pays 53/u);
+  });
+
+  it('says a renewal rate rose only where it rose', () => {
+    expect(renewalRateHeadOf(4, 3)).toBe('a day, up from 3 — their offer, not yours to set');
+    expect(renewalRateHeadOf(3, 3)).toBe('a day, the same as this month — their offer, not yours to set');
+    expect(renewalRateHeadOf(2, 3)).toBe('a day, down from 3 — their offer, not yours to set');
+  });
+
+  it('names twenty career days Monday to Friday, never Saturday or Sunday', () => {
+    const names = Array.from({ length: CONTRACT_DAYS }, (_, index) => WEEKDAYS[careerDayIdxOf(index + 1)]);
+    expect(names.slice(0, 7)).toEqual(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Monday', 'Tuesday']);
+    expect(names).not.toContain('Saturday');
+    expect(names).not.toContain('Sunday');
+  });
+
+  it('carries the purse a month opens with into its line, not a constant', () => {
+    const tower = { ...openingCareer('eta').towers[0]!, months: 2 };
+    const view = contractView(inputOf({ ...openingCareer('eta'), towers: [tower] }))!;
+    expect(view.purse.totalNote).toContain(`with the ${String(carriedIn(tower))} carried in`);
+  });
+});
+
 describe('the contract sheet (§ 8.3, § 8.4)', () => {
   const openMonth = (patch: Partial<CampaignTower> = {}): CampaignCareer => {
     const base = openingCareer('eta');
@@ -487,8 +634,18 @@ describe('the contract sheet (§ 8.3, § 8.4)', () => {
 
   it('quotes the month against the shop, and both figures are the tables’ own', () => {
     const view = contractView(inputOf(openMonth()))!;
-    expect(view.purse.totalNote).toContain('A perfect month pays 98 units');
+    /*
+     * § D1377, the post-AN panel's seat D (D6): it read *A perfect month pays 98 units* beside four
+     * rates that sum to 90. What it pays and what it leaves on hand are now both said, from the rates
+     * the sheet prints and the purse's own carry.
+     */
+    expect(view.purse.totalNote).toContain(
+      'A perfect month pays 90 units, 3, 4, 5 and 6 a cleared day across its four weeks; with the 8 carried in, that is 98 on hand.',
+    );
     expect(view.purse.totalNote).toContain('worth 324');
+    const weekRates = view.purse.weeks.map((week) => Number.parseInt(week.value, 10));
+    const paid = weekRates.reduce((sum, rate) => sum + rate * 5, 0);
+    expect(view.purse.totalNote).toContain(`pays ${String(paid)} units`);
     /*
      * Read *"about a third of the shop"* until § D1312 made the shop's worth the tower's own; the
      * fraction was true of four contracts in sixteen. `campaign/shaftPlan.test.ts` holds the new

@@ -24,7 +24,8 @@ import {
   startShippedSite,
   type ShippedSite,
 } from '../dev/browserTier.test-helper.js';
-import { STAGE_PLAY_COPY } from './stagePlay.js';
+import { SCENARIO_COPY } from './scenarioModel.js';
+import { STAGE_PLAY_COPY, stagePracticeLineOf } from './stagePlay.js';
 
 let site: ShippedSite;
 let browser: Browser;
@@ -135,18 +136,27 @@ describe.skipIf(!HAS_BROWSER)('a campaign stage is played from the hub, and a cl
       await page.waitForSelector(`.everyday-scenario-path-card[data-stage="${STAGE}"][data-cleared="yes"]`, {
         timeout: 30_000,
       });
-      expect(
-        await page
-          .locator(`.everyday-scenario-path-card[data-stage="${STAGE}"] :is(.everyday-scenario-path-par, .everyday-scenario-path-par-note)`)
-          .count(),
-      ).toBe(1);
+      const rowPar = page.locator(
+        `.everyday-scenario-path-card[data-stage="${STAGE}"] :is(.everyday-scenario-path-par, .everyday-scenario-path-par-note)`,
+      );
+      expect(await rowPar.count()).toBe(1);
+      /*
+       * § D1376: the clear and the row give one reason. Red before: the clear read *This stage has no
+       * par: no way through … could be priced* while the row read *Par is free here* (seat D, D5).
+       */
+      const rowLine = (await rowPar.textContent()) ?? '';
+      expect(parLine, 'the clear and the hub row give two different pars').toBe(rowLine);
+      expect(parLine).not.toBe(SCENARIO_COPY.parNone);
 
       /*
        * A second clear of the same stage pays nothing, and the ledger holds one turn for it. § D1358:
        * the page says before the press that this run is practice, and the bar says so too.
        */
       await openStageOne(page);
-      expect(await page.textContent('.everyday-stage-play-practice')).toBe(STAGE_PLAY_COPY.practice);
+      /* § D1376: the practice line's par clause is the row's own reason, never a mark there is not. */
+      const practice = (await page.textContent('.everyday-stage-play-practice')) ?? '';
+      expect(practice.startsWith(STAGE_PLAY_COPY.practice)).toBe(true);
+      if (rowLine.startsWith(SCENARIO_COPY.parFree)) expect(practice).toBe(stagePracticeLineOf(0));
       expect(await page.textContent('.everyday-bar-primary')).toBe('Run it again');
       expect(await page.textContent('.everyday-bar-note')).toBe(STAGE_PLAY_COPY.notePractice);
       await runWithSetting(page, 'zoned-uppeak');

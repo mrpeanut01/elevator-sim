@@ -201,7 +201,14 @@ import {
   type SupportInput,
   type SupportRun,
 } from '../everyday/support.js';
-import { FIGURE_NOTE_HANDLE, everydayReportViewOf, REPORT_SECONDARY, WEEK_SHEET_STEP } from '../everyday/reportView.js';
+import {
+  FIGURE_NOTE_HANDLE,
+  everydayReportViewOf,
+  REPORT_PRACTICE_AGAIN,
+  REPORT_SECONDARY,
+  UNMEASURED_WEEK_SHEET_STEP,
+  WEEK_SHEET_STEP,
+} from '../everyday/reportView.js';
 import {
   DAY_CLOSE_HEADING,
   DAY_CLOSE_WEEKEND_LINE,
@@ -248,6 +255,7 @@ import {
   stageInterventionsOf,
   stageLegend,
   stageOpeningLineOf,
+  stagePlayControlOf,
   stageSkipViewOf,
   type StageSwitchTarget,
 } from '../everyday/stageScreenModel.js';
@@ -294,7 +302,7 @@ import {
   stageCallWrinkleQuietDueAtS,
   stageCallWrinkleQuietRowsOf,
 } from '../everyday/stageCallRow.js';
-import { DAY_ATTEMPT_COPY, resumeLabelOf } from '../shift/attempt.js';
+import { continueHereLabelOf, DAY_ATTEMPT_COPY, resumeLabelOf } from '../shift/attempt.js';
 import type { PressCall } from '../shift/pressCall.js';
 import { PRESS_CALL_AGAIN, pressCallRowOf } from '../shift/callRow.js';
 import {
@@ -335,6 +343,7 @@ import type { TowerShafts } from '../campaign/economy.js';
 import {
   applyCampaignAction,
   CAMPAIGN_ABSENCES,
+  contractLostSentenceOf,
   freshTower,
   openingCareer,
   RENEWAL_AHEAD_ON_SHEET_DAYS,
@@ -353,6 +362,7 @@ import {
   STAGE_PLAY_COPY,
   stageFactsOf,
   stagePlayViewOf,
+  stagePracticeLineOf,
   verdictFactsOf,
   type StagePlayChoice,
   type StagePlayPhase,
@@ -596,6 +606,8 @@ import {
 } from '../authoring/machineSpec.js';
 import {
   DEFAULT_PATTERN,
+  demandFromSpec,
+  demandTheTemplateTakes,
   PATTERN_ROWS,
   patternSummary,
   PEAK_ORDERS,
@@ -678,6 +690,7 @@ import {
   type ReportDeltaView,
 } from '../dev/reportPanel.js';
 import {
+  buildingCardOf,
   buildingPlateOf,
   dispatcherBlurbOf,
   dispatcherCardOf,
@@ -704,7 +717,11 @@ import {
   ATTEMPT_CLOSES_ON_ITS_STAGE,
   ATTEMPT_DAY_SHOWN_TO_ITS_REACH,
   ATTEMPT_ENGINEER_WATCHES_ONLY,
+  ATTEMPT_HELD_IN_ANOTHER_TAB,
+  ATTEMPT_HOLDS_ITS_DAY,
   ATTEMPT_LEFT_CANNOT_BANK,
+  ATTEMPT_MOVED_ON_ELSEWHERE,
+  ATTEMPT_NOT_POSTED,
   ATTEMPT_NOT_SAVED,
   ATTEMPT_RAIL_NOTE,
   ATTEMPT_SHOWN_TO_ITS_REACH,
@@ -740,6 +757,7 @@ import {
   PRACTICE_ATTEMPT_NOTE,
   PRACTICE_ENGINEER_NOTE,
   PRACTICE_OTHER_TAB_NOTE,
+  PRACTICE_SANDBOX_NOTE,
   type DayReportInput,
   type ShapedDayReport,
   type ShiftPlan,
@@ -815,6 +833,9 @@ import { coachWeekLines, weekKeptLine } from '../shift/weekLabel.js';
 import {
   DAY_UNMEASURED_SENTENCE,
   dayStakeSentenceOf,
+  UNMEASURED_WEEK_CLOSED_LINE,
+  UNMEASURED_WEEK_HOUSE_LINE,
+  UNMEASURED_WEEK_SHEET_NOTE,
   WEEK_CLOSED_LINE,
   houseStandingOrder,
   weekDealOf,
@@ -2289,6 +2310,14 @@ const REPLAY: SurfaceAdapter = {
     'shift/banking.ts#ATTEMPT_ENGINEER_WATCHES_ONLY',
     'shift/banking.ts#ATTEMPT_RAIL_NOTE',
     'shift/banking.ts#ATTEMPT_NOT_SAVED',
+    /*
+     * Wave AO, lane AO-1, § D1360 — the Everyday screens that would run a scored attempt's day only
+     * show, and a run of that day is not posted; § D1361 — one tab holds the attempt at a time.
+     */
+    'shift/banking.ts#ATTEMPT_HOLDS_ITS_DAY',
+    'shift/banking.ts#ATTEMPT_NOT_POSTED',
+    'shift/banking.ts#ATTEMPT_HELD_IN_ANOTHER_TAB',
+    'shift/banking.ts#ATTEMPT_MOVED_ON_ELSEWHERE',
   ],
   render(context) {
     const verdict = verifyReplay(context.recording, context.recording);
@@ -2372,6 +2401,32 @@ const REPLAY: SurfaceAdapter = {
       {
         field: 'attemptNotSaved',
         text: ATTEMPT_NOT_SAVED,
+        role: 'reason',
+        provenance: 'authored',
+      },
+      /* Wave AO, § D1360: the Everyday screens' hold over a scored attempt's day, and the post's refusal. */
+      {
+        field: 'attemptHoldsItsDay',
+        text: ATTEMPT_HOLDS_ITS_DAY,
+        role: 'reason',
+        provenance: 'authored',
+      },
+      {
+        field: 'attemptNotPosted',
+        text: ATTEMPT_NOT_POSTED,
+        role: 'reason',
+        provenance: 'authored',
+      },
+      /* Wave AO, § D1361: a day whose attempt another tab holds, and a run of it that moved on there. */
+      {
+        field: 'attemptHeldInAnotherTab',
+        text: ATTEMPT_HELD_IN_ANOTHER_TAB,
+        role: 'reason',
+        provenance: 'authored',
+      },
+      {
+        field: 'attemptMovedOnElsewhere',
+        text: ATTEMPT_MOVED_ON_ELSEWHERE,
         role: 'reason',
         provenance: 'authored',
       },
@@ -3069,6 +3124,8 @@ const CAMPAIGN: SurfaceAdapter = {
   covers: [
     'campaign/judge.ts#judgeStage',
     'campaign/judge.ts#stageGoalNameOf',
+    /* Wave AO lane AO-5: the held-back crowds' sentence, which `judgeStage` composes for its holdout. */
+    'campaign/judge.ts#holdoutSentenceOf',
     'campaign/brief.ts#briefingFor',
     'campaign/failStates.ts#failStateReports',
     'campaign/failStates.ts#failStateCounts',
@@ -3285,6 +3342,11 @@ interface ShiftDay {
    * this block exists to draw"*), so this is the pairing whose figure rows are actually drawn.
    */
   readonly swapped: WeekDayReport;
+  /**
+   * The same day started on a driver that weights fairness — [§ D1378](../../../../DECISIONS.md). Its
+   * *Weight fairness up* card says the day already weighted it rather than pointing at it.
+   */
+  readonly fairnessWeighted: WeekDayReport;
   /**
    * The same day run over a **different stretch** — issue #126's first new refusal axis.
    *
@@ -3642,6 +3704,12 @@ function shiftBundleOf(context: HonestyContext): ShiftBundle {
       subject: { kind: 'week-day' },
       plan: shiftPlan,
     }) as WeekDayReport;
+    const fairnessWeighted = dayReportOf({
+      ...common,
+      subject: { kind: 'week-day' },
+      plan: shiftPlan,
+      startingWeights: { waitTime: 0.5, starvation: 0.5 },
+    }) as WeekDayReport;
     const shorterShift = dayReportOf({
       ...common,
       subject: { kind: 'week-day' },
@@ -3712,6 +3780,7 @@ function shiftBundleOf(context: HonestyContext): ShiftBundle {
       singleRunReport,
       retried,
       swapped,
+      fairnessWeighted,
       shorterShift,
       otherPattern,
       otherEquipment,
@@ -3792,6 +3861,10 @@ const SHIFT_REPORT: SurfaceAdapter = {
     'shift/goals.ts#horizonLabelOf',
     'shift/report.ts#averageWaitFigure',
     'shift/report.ts#clockRange',
+    /* § D1383: the seed line's arrivals stretch, on every sheet's meta line. */
+    'shift/report.ts#runStretchOf',
+    /* § D1378: who drove with fairness weighted, on the fairness-weighted sheet seeded below. */
+    'shift/report.ts#fairnessDriversOf',
     'shift/report.ts#NOT_RECORDED',
     /*
      * The filed sheet's intervention log — `docs/19` defect 10. Authored in `live/` beside the
@@ -3893,6 +3966,8 @@ const SHIFT_REPORT: SurfaceAdapter = {
      */
     'shift/report.ts#PRACTICE_ENGINEER_NOTE',
     'shift/report.ts#PRACTICE_OTHER_TAB_NOTE',
+    /* Wave AO, lane AO-2, § D1368: a sandbox day's sheet, by name for the same reason. */
+    'shift/report.ts#PRACTICE_SANDBOX_NOTE',
     'shift/callRow.ts#PRESS_CALL_LATER_NOTE',
     'shift/dayCalls.ts#dayCallCountsLineOf',
     'shift/goals.ts#GOAL_PLAIN_NAMES',
@@ -4265,6 +4340,8 @@ const SHIFT_REPORT: SurfaceAdapter = {
       /* § D1239's two practice notes, by name — see the `covers` entries above. */
       seeds.push({ field: `${at}.practiceEngineerNote`, text: PRACTICE_ENGINEER_NOTE, role: 'prose' });
       seeds.push({ field: `${at}.practiceOtherTabNote`, text: PRACTICE_OTHER_TAB_NOTE, role: 'prose' });
+      /* § D1368's sandbox day sheet, by name — see the `covers` entry above. */
+      seeds.push({ field: `${at}.practiceSandboxNote`, text: PRACTICE_SANDBOX_NOTE, role: 'prose' });
       /* Wave AL: the title line after a handover, on the run's own clock. */
       seeds.push({
         field: `${at}.driversLine(handover)`,
@@ -4290,6 +4367,11 @@ const SHIFT_REPORT: SurfaceAdapter = {
       for (const lever of report.levers) {
         seeds.push({ field: `${at}.levers(${lever.id}).title`, text: lever.title, role: 'label' });
         seeds.push({ field: `${at}.levers(${lever.id}).body`, text: lever.body, role: 'prose' });
+      }
+      /* § D1378: the fairness card on a day a fairness-weighted driver started. */
+      const weighted = entry.fairnessWeighted.levers.find((lever) => lever.id === 'weight-fairness');
+      if (weighted !== undefined) {
+        seeds.push({ field: `${at}.fairnessWeighted.levers(weight-fairness).body`, text: weighted.body, role: 'prose' });
       }
       seeds.push({ field: `${at}.forecast.name`, text: report.forecast.name, role: 'label' });
       seeds.push({ field: `${at}.forecast.note`, text: report.forecast.note, role: 'prose' });
@@ -4674,6 +4756,8 @@ const AUTHORING: SurfaceAdapter = {
     'authoring/patternSpec.ts#rowsFor',
     'authoring/patternSpec.ts#DEFAULT_PATTERN',
     'authoring/patternSpec.ts#specFromTrafficProfile',
+    /* Wave AO, lane AO-2, § D1368: what a saved pattern's run says it left out on an authored day. */
+    'authoring/patternSpec.ts#demandTheTemplateTakes',
   ],
   render(context) {
     const seeds: TextSeed[] = [];
@@ -4827,6 +4911,19 @@ const AUTHORING: SurfaceAdapter = {
       role: 'observation',
     });
     seeds.push({ field: 'DEFAULT_PATTERN.name', text: DEFAULT_PATTERN.name, role: 'label' });
+    /*
+     * § D1368: the withheld sentence a saved pattern's run carries on a day that authors its hours
+     * and keeps its own mix, for each order (the two-way order writes a mix swing and no split).
+     */
+    for (const order of PEAK_ORDERS) {
+      const taken = demandTheTemplateTakes(demandFromSpec({ ...DEFAULT_PATTERN, order }).demand, {
+        authorsItsPhases: true,
+        variesMix: true,
+      });
+      if (taken.withheld !== undefined) {
+        seeds.push({ field: `demandTheTemplateTakes(${order})`, text: taken.withheld, role: 'reason' });
+      }
+    }
 
     /* ---- M8, the dispatcher ---- */
     for (const [choice, hint] of Object.entries(DWELL_HINTS)) {
@@ -5783,10 +5880,23 @@ const RIGHT_RAIL: SurfaceAdapter = {
     'dev/rightRail.ts#nameplateOf',
     'dev/rightRail.ts#machineWarningOf',
     'dev/rightRail.ts#patternOptionsOf',
+    /* § D1382: each Building card, worded as the building a press of it runs, seeded below. */
+    'dev/rightRail.ts#buildingCardOf',
   ],
   render(context) {
     const seeds: TextSeed[] = [];
     const specs = context.elevatorSpecs as ElevatorSpecs;
+
+    /* § D1382 — the Building list's cards, every building the case carries, on a day-1 state. */
+    {
+      const resources = browserResourcesOf(context);
+      const state = initialState(resources, 1n);
+      for (const building of context.buildings) {
+        const card = buildingCardOf(resources, state, building.id);
+        seeds.push({ field: `buildingCardOf(${building.id}).label`, text: card.label, role: 'label' });
+        seeds.push({ field: `buildingCardOf(${building.id}).sub`, text: card.sub, role: 'observation' });
+      }
+    }
 
     /*
      * R2 — the dispatcher list, every shipped profile, **both registers** (GitHub issue #100).
@@ -10279,6 +10389,11 @@ const EVERYDAY_MENU: SurfaceAdapter = {
       seeds.push({ field: 'bar.brief.attempt.driverHeld', text: DAY_ATTEMPT_COPY.driverHeld, role: 'prose' });
       seeds.push({ field: 'bar.brief.attempt.resumeNote', text: DAY_ATTEMPT_COPY.resumeNote, role: 'prose' });
       seeds.push({ field: 'bar.brief.attempt.resume', text: resumeLabelOf(weekdayOf(0)), role: 'label' });
+      /* Wave AO, § D1361: the takeover, its note, and the stage's two lines while this tab may not play the day. */
+      seeds.push({ field: 'bar.brief.attempt.continueHere', text: continueHereLabelOf(weekdayOf(0)), role: 'label' });
+      seeds.push({ field: 'bar.brief.attempt.elsewhereNote', text: DAY_ATTEMPT_COPY.elsewhereNote, role: 'prose' });
+      seeds.push({ field: 'stage.attempt.elsewhere', text: DAY_ATTEMPT_COPY.elsewhereStage, role: 'prose' });
+      seeds.push({ field: 'stage.attempt.stale', text: DAY_ATTEMPT_COPY.staleStage, role: 'prose' });
     }
 
     /*
@@ -10857,6 +10972,8 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
      */
     'everyday/chimesPanel.ts#chimesPanelViewOf',
     'everyday/chimesPanel.ts#CHIMES_PANEL_COPY',
+    /* § D1382: the one rule Settings and the Career both state; seeded inside the lede above. */
+    'everyday/chimesPanel.ts#CHIMES_EARN_RULE',
     /*
      * **`CHIME_PRICES` was claimed here and the claim is deleted** — GitHub issue #579,
      * [§ D911](../../../../DECISIONS.md), and it is worth four lines because the reason is a
@@ -11322,6 +11439,14 @@ const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
     'everyday/campaignModel.ts#SHOP_NO_SHAFT',
     'everyday/campaignModel.ts#SHOP_NO_SHAFT_COST',
     'everyday/campaignModel.ts#shaftDecisionOf',
+    /*
+     * § D1377: a tier worded for the tower it is sold on, a perfect month's pay and what it leaves on
+     * hand, and the renewal's comparison. Seeded through the contract sheets and the desks below, each
+     * fixture carrying the tower's shape, and the shop rows' names and effects seeded by name.
+     */
+    'campaign/economy.ts#shopTierFaceOf',
+    'everyday/campaignModel.ts#perfectMonthLineOf',
+    'everyday/campaignModel.ts#renewalRateHeadOf',
     'everyday/campaignModel.ts#CALENDAR_LEGEND',
     'everyday/campaignModel.ts#MONTH_LEGEND',
     /* Reached through the three views above: every figure they print is one of these. */
@@ -11355,6 +11480,12 @@ const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
      */
     'campaign/career.ts#RENEWAL_DUE_CELL',
     'campaign/career.ts#renewalAheadSentenceOf',
+    /*
+     * § D1392 (wave AO lane AO-5): a lost contract's sentence, read by the desk's brief, the contract
+     * sheet's bar and the day sheet's onward step. Seeded through the `lost` desk below and the
+     * career sheet's lost arm.
+     */
+    'campaign/career.ts#contractLostSentenceOf',
     'campaign/career.ts#BUILD_LABELS',
     'campaign/career.ts#openingCareer',
     'campaign/career.ts#freshTower',
@@ -11387,6 +11518,7 @@ const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
           spec: '7 floors · 2 cars · 0.63 m/s · 240 people',
           startTimeFloors: 0,
           shafts: oneBank(0),
+          shape: { floors: 7, bankCars: new Map([['main', 2]]), topSpeedMps: 0.63 },
         },
       ],
       [
@@ -11396,6 +11528,7 @@ const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
           spec: '20 floors · 6 cars · 5 m/s · 612 people',
           startTimeFloors: 18,
           shafts: oneBank(1),
+          shape: { floors: 20, bankCars: new Map([['main', 6]]), topSpeedMps: 5 },
         },
       ],
     ]);
@@ -11486,6 +11619,17 @@ const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
       /* § D1357: days 19 and 20 play, and the quiet desk says when the renewal falls due. */
       ['last-days', { ...first, today: 19, towers: [{ ...first.towers[0]!, day: 19 }] }, undefined, 'whole-run'],
       ['second-month', { ...second, openTowerId: 'c6' }, observations, 'whole-run'],
+      /* § D1392: day 20 closed at 4 of 3 missed, so the desk holds the loss and no renewal. */
+      [
+        'lost',
+        {
+          ...first,
+          today: CONTRACT_DAYS + 1,
+          towers: [{ ...first.towers[0]!, day: CONTRACT_DAYS + 1, missed: 4, missedDays: [14, 17, 18, 20] }],
+        },
+        undefined,
+        'whole-run',
+      ],
       ['booked', booked, observations, 'now'],
       ['picking-a-night', pending, undefined, 'whole-run'],
     ];
@@ -11771,6 +11915,7 @@ const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
             ['new-car', [{ bankId: 'low', band: 1 }, { bankId: 'high', band: 1 }]],
             ['fifth-car', [{ bankId: 'low', band: 1 }, { bankId: 'high', band: 1 }]],
           ]),
+          shape: { floors: 30, bankCars: new Map([['low', 3], ['high', 3]]), topSpeedMps: 3.5 },
         },
       ],
       [
@@ -11784,6 +11929,7 @@ const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
             ['new-car', []],
             ['fifth-car', []],
           ]),
+          shape: { floors: 12, bankCars: new Map([['main', 4]]), topSpeedMps: 2.5 },
         },
       ],
     ];
@@ -11807,6 +11953,9 @@ const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
       seeds.push({ field: `${label}.contract.purse.total`, text: sheet.purse.totalNote, role: 'prose' });
       for (const row of sheet.shop.categories.find((category) => category.id === 'shafts')?.rows ?? []) {
         const tier = `${label}.contract.shop.shafts.${row.levelLabel}`;
+        /* § D1377: the tier's name and effect on this tower — one bank, several, or none sold. */
+        seeds.push({ field: `${tier}.name`, text: row.name, role: 'label' });
+        seeds.push({ field: `${tier}.effect`, text: row.effect, role: 'prose' });
         seeds.push({ field: `${tier}.cost`, text: row.cost, role: 'observation' });
         seeds.push({ field: `${tier}.state`, text: row.state, role: row.pressable ? 'observation' : 'reason' });
       }
@@ -12502,6 +12651,9 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
      */
     'everyday/stageScreenModel.ts#stageSkipViewOf',
     'everyday/stageScreenModel.ts#STAGE_SKIP_COPY',
+    /* § D1381: ▶ Play beside it, resolved the same way, and its reason once the day has run out. */
+    'everyday/stageScreenModel.ts#stagePlayControlOf',
+    'everyday/stageScreenModel.ts#STAGE_PLAY_DONE_REASON',
     'everyday/stageScreenModel.ts#STAGE_NO_PHASE',
     'everyday/stageScreenModel.ts#STAGE_RECOMPUTING',
     /*
@@ -12546,6 +12698,12 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
     'everyday/stageCall.ts#stageCallCardOf',
     'everyday/stageCall.ts#STAGE_CALL_COPY',
     'everyday/stageCall.ts#stageCallWrinkleLineOf',
+    /*
+     * Wave AO, lane AO-4: the transport's button in its three states — playing, paused, and stopped
+     * while a call's runs are made — seeded below beside the wait's own note.
+     */
+    'everyday/stageScreenModel.ts#STAGE_PLAY_CONTROL',
+    'everyday/stageScreenModel.ts#stagePlayControlOf',
     /*
      * Wave AL, lane AL-E, § D1219: each answered call's row on the stage once its window can be
      * observed. Seeded below over a call on this case's own run at a playhead the call plus 660 s
@@ -12744,6 +12902,10 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
       ['pending', { dayEnded: false, hasRun: false }],
     ];
     for (const [arm, state] of skipStates) {
+      /* § D1381: the header's ▶ Play over the same three states. */
+      const play = stagePlayControlOf({ ...state, playing: false });
+      seeds.push({ field: `stage.play.${arm}.label`, text: play.label, role: 'label' });
+      if (play.note !== undefined) seeds.push({ field: `stage.play.${arm}.note`, text: play.note, role: 'reason' });
       const skip = stageSkipViewOf(state);
       seeds.push({ field: `stage.skip.${arm}.label`, text: skip.label, role: 'label' });
       /*
@@ -13219,6 +13381,14 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
         role: 'label',
         playhead: atPlayhead(recording, recording.startedAt + span * 0.3),
       });
+      /* Wave AO, lane AO-4: the transport's button, through its own function, in each of its states. */
+      for (const [state, input] of [
+        ['playing', { playing: true, hasRun: true, waitingOnCall: false }],
+        ['paused', { playing: false, hasRun: true, waitingOnCall: false }],
+        ['waiting', { playing: false, hasRun: true, waitingOnCall: true }],
+      ] as const) {
+        seeds.push({ field: `stage.play(${state})`, text: stagePlayControlOf(input).label, role: 'label' });
+      }
       /*
        * And the pace note's two arms the sampled loop below never reaches: `call`, drawn while the
        * card is up, and `chosen`, since § D1029 bounded to the next act boundary.
@@ -14727,11 +14897,18 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     'everyday/replay.ts#REPLAY_COPY',
     'everyday/doorView.ts#DOOR_STEPS',
     'everyday/doorView.ts#sameForEveryoneLine',
+    /* Wave AO, lane AO-4: the back arrow's refusal and the line the day's words sit behind, through the view. */
+    'everyday/doorView.ts#DOOR_BACK_REFUSAL',
+    'everyday/doorView.ts#doorWordsHeadingOf',
     'everyday/briefView.ts#briefScreenViewOf',
+    /* Wave AO, lane AO-4: which driver the day opens on, seeded through the view over a handed-over day. */
+    'everyday/briefView.ts#briefCarriedDriverLineOf',
     'everyday/briefView.ts#briefBarModel',
     'everyday/briefView.ts#BRIEF_NOTE_LEAD',
     'everyday/briefView.ts#raceAgainstCard',
     'everyday/briefView.ts#lockedForScore',
+    /* § D1368: the controls the locked card's caveat names, seeded through each case's brief card. */
+    'everyday/tunerModel.ts#tuneControlsOffered',
     /* GitHub issue #225's door into the sandbox, drawn on the brief once the tuner is built. */
     'everyday/briefView.ts#SANDBOX_DOOR_LABEL',
     /* GitHub issue #364: § D525's Scenario hub — the words the first tile opens on. */
@@ -14774,6 +14951,11 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
      * reaches this screen through that function and never through this one.
      */
     'campaign/stagePress.ts#routeUnitsOf',
+    /*
+     * § D1376: the composition of the two above that `honesty/run.ts` now seeds the path through,
+     * the same one the hub and the stage page read; its only sentence is theirs.
+     */
+    'campaign/stagePress.ts#stagePathOf',
     'everyday/weekView.ts#weekScreenViewOf',
     'everyday/reportView.ts#everydayReportViewOf',
     /* GitHub issue #211: the handle on a folded card note, seeded once — the note itself is the producer's whole string. */
@@ -14847,6 +15029,14 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     'shift/weekStake.ts#WEEK_SHEET_NOTE',
     'shift/weekStake.ts#WEEK_SHEET_ROLL_LINE',
     'shift/weekStake.ts#WEEK_CLOSED_LINE',
+    /*
+     * § D1394 (wave AO lane AO-5): a week the census does not deal closes on Sunday on a sheet with no
+     * house. Seeded in `seedWeekStake` over St Jude Hospital's week played on the case's own readings.
+     */
+    'shift/weekStake.ts#UNMEASURED_WEEK_HOUSE_LINE',
+    'shift/weekStake.ts#UNMEASURED_WEEK_SHEET_NOTE',
+    'shift/weekStake.ts#UNMEASURED_WEEK_CLOSED_LINE',
+    'everyday/reportView.ts#UNMEASURED_WEEK_SHEET_STEP',
     'everyday/briefView.ts#BRIEF_WEEK_HEADING',
     /*
      * Wave AL, lane AL-F (§ D1226 to § D1230): the target's mark on the close that met it, the
@@ -14887,6 +15077,8 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     'shift/weekStake.ts#weekOrdinalOf',
     'shift/dayCalls.ts#dayCallAnswerWordsOf',
     'everyday/reportView.ts#REPORT_SECONDARY',
+    /* Wave AO, lane AO-4 (§ D1388): today again as practice, under the call that decided it. */
+    'everyday/reportView.ts#REPORT_PRACTICE_AGAIN',
     'shift/weekStake.ts#WEEKEND_NOTE',
     'everyday/weekView.ts#WEEK_START_NEXT_LABEL',
     'shift/weekRecord.ts#weekRecordLineOf',
@@ -15223,7 +15415,11 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
           const where = `${arm}.door${String(offset)}`;
           seeds.push({ field: `${where}.kind`, text: door.kindPill, role: 'label' });
           seeds.push({ field: `${where}.stepper`, text: door.stepper.label, role: 'label' });
+          /* Lane AO-4: the back arrow's refusal, drawn where the arrow is dimmed. */
+          if (!door.stepper.backEnabled) seeds.push({ field: `${where}.stepper.back`, text: door.stepper.backRefusal, role: 'reason' });
           seeds.push({ field: `${where}.rule`, text: door.rule, role: 'prose' });
+          /* Wave AO, lane AO-4: the one line the day's words now sit behind. */
+          if (door.wordsHeading !== '') seeds.push({ field: `${where}.words.heading`, text: door.wordsHeading, role: 'label' });
           for (const chip of door.chips) {
             /* The tower a chip names — GitHub issue #599: an id on a closed chip, a name on today's. */
             seeds.push({ field: `${where}.chip.tower`, text: chip.tower, role: 'label' });
@@ -15437,6 +15633,26 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
       seeds.push({ field: `${at}.brief.asks.note`, text: brief.asks.note, role: 'prose' });
       seeds.push({ field: `${at}.brief.count`, text: brief.drivers.count, role: 'observation' });
       seeds.push({ field: `${at}.brief.bar`, text: brief.barNote, role: 'label' });
+      /*
+       * Wave AO, lane AO-4: the line that says which driver the day opens on, over a day before that
+       * started on the first profile and was handed to the second on its stage.
+       */
+      const first = options[0];
+      const second = options[1];
+      if (first !== undefined && second !== undefined) {
+        const carried = briefScreenViewOf({
+          today,
+          dispatchers: options,
+          savedIds: [],
+          selectedId: first.id,
+          yesterday: {
+            weekday: 'Monday',
+            startedWithId: first.id,
+            handover: { toId: second.id, toName: second.name, clock: '12:20' },
+          },
+        }).drivers.carried;
+        if (carried !== undefined) seeds.push({ field: `${at}.brief.carried`, text: carried, role: 'prose' });
+      }
       for (const [name, card] of [
         ['ghost', brief.ghost],
         ['locked', brief.locked],
@@ -15588,6 +15804,25 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
         if (view.tomorrow === undefined) continue;
         seeds.push({ field: `career.report.${label}.tomorrow.label`, text: view.tomorrow.label, role: 'label' });
         seeds.push({ field: `career.report.${label}.tomorrow.note`, text: view.tomorrow.note, role: 'prose' });
+      }
+      /* § D1392 (wave AO lane AO-5): the sheet of the day that lost the contract goes to the desk. */
+      const lostTower = { ...openingCareer('eta').towers[0]!, day: CONTRACT_DAYS + 1, missed: 4 };
+      const lost = everydayReportViewOf({
+        report: careerSheet,
+        previous: undefined,
+        overnight: undefined,
+        newerRunOnStage: false,
+        career: {
+          buildingName: careerBuilding,
+          day: CONTRACT_DAYS + 1,
+          canRunAnother: false,
+          renewalDue: false,
+          contractLost: contractLostSentenceOf(lostTower),
+        },
+      });
+      if (lost.tomorrow !== undefined) {
+        seeds.push({ field: 'career.report.lost.tomorrow.label', text: lost.tomorrow.label, role: 'label' });
+        seeds.push({ field: 'career.report.lost.tomorrow.note', text: lost.tomorrow.note, role: 'reason' });
       }
     }
 
@@ -17310,6 +17545,8 @@ const EVERYDAY_STAGE_PLAY: SurfaceAdapter = {
     'everyday/stagePlay.ts#stagePlayViewOf',
     'everyday/stagePlay.ts#STAGE_PLAY_COPY',
     'everyday/stagePlay.ts#stageFactsOf',
+    /* § D1376: a cleared stage's practice line in each par arm, seeded by name below. */
+    'everyday/stagePlay.ts#stagePracticeLineOf',
   ],
   render(this: SurfaceAdapter, context) {
     const seeds: TextSeed[] = [];
@@ -17409,6 +17646,10 @@ const EVERYDAY_STAGE_PLAY: SurfaceAdapter = {
     }
     /* § D1358: the bar's note on a stage this device has cleared. */
     seeds.push({ field: 'stagePlay.bar.practice', text: STAGE_PLAY_COPY.notePractice, role: 'prose' });
+    /* § D1376: the practice line's three par arms — priced, free and unpriced. */
+    for (const [arm, par] of [['priced', 4], ['free', 0], ['unpriced', undefined]] as const) {
+      seeds.push({ field: `stagePlay.practice.${arm}`, text: stagePracticeLineOf(par), role: 'prose' });
+    }
     /* `verdictFactsOf` is the screen's only way to a verdict; touched so its claim is checked by compile. */
     void verdictFactsOf;
     void STAGE_PLAY_COPY.loading;
@@ -18032,6 +18273,48 @@ function seedWeekStake(
     if (entry !== undefined) seeds.push({ field: `${at}.continue`, text: entry.line, role: 'observation' });
   }
   /*
+   * § D1394 (wave AO lane AO-5): St Jude Hospital's week, which the census does not deal, closed on
+   * Sunday on the case's own readings, so its sheet, its seven rows and the entry back into it are
+   * drawn as a player meets them, with the three lines that stand in for the house.
+   */
+  {
+    let week = openWeek('c8');
+    for (let day = 1; day <= 7; day += 1) {
+      const dayIdx = (day - 1) % 7;
+      week = closeDay(
+        week,
+        outcomeOf({
+          record: null,
+          recordRefusal: null,
+          day,
+          dayIdx,
+          eventId: scheduledEventFor(null, day, dayIdx).id,
+          arrived: observations.arrived,
+          carried: observations.carried,
+          minutePct: observations.minutePct,
+          readings: readGoals(goalsForDay(day), observations),
+        }),
+      );
+      if (day < 7) week = nextDay(week);
+    }
+    const sheet = weekSheetOf(week, () => undefined);
+    if (sheet !== undefined) {
+      const at = 'week.sheet.unmeasured';
+      seeds.push({ field: `${at}.yours`, text: sheet.yoursLine, role: 'observation' });
+      seeds.push({ field: `${at}.house`, text: sheet.houseLine, role: 'reason' });
+      seeds.push({ field: `${at}.target`, text: sheet.targetLine, role: 'observation' });
+      seeds.push({ field: `${at}.note`, text: sheet.note, role: 'prose' });
+      for (const row of sheet.rows) seeds.push({ field: `${at}.row(${row.weekday})`, text: row.line, role: 'observation' });
+      const entry = continueWeekEntryOf(week, 'St Jude Hospital');
+      if (entry !== undefined) seeds.push({ field: `${at}.continue`, text: entry.line, role: 'observation' });
+    }
+    seeds.push({ field: 'week.unmeasured.house', text: UNMEASURED_WEEK_HOUSE_LINE, role: 'reason' });
+    seeds.push({ field: 'week.unmeasured.note', text: UNMEASURED_WEEK_SHEET_NOTE, role: 'prose' });
+    seeds.push({ field: 'week.unmeasured.closed', text: UNMEASURED_WEEK_CLOSED_LINE, role: 'prose' });
+    seeds.push({ field: 'week.unmeasured.sheetStep.label', text: UNMEASURED_WEEK_SHEET_STEP.label, role: 'label' });
+    seeds.push({ field: 'week.unmeasured.sheetStep.note', text: UNMEASURED_WEEK_SHEET_STEP.note, role: 'prose' });
+  }
+  /*
    * Lane AL-F (§ D1226, § D1228): the week closed day by day on the case's own readings, so the
    * target's mark is drawn on the close that met it, and the mode picker's entry in each state the
    * week passes through. Only where the case's readings clear; a missed week marks nothing.
@@ -18064,6 +18347,9 @@ function seedWeekStake(
   /* `onward`: the next week whatever the case's readings did, since a week not held is dealt itself again (§ D1344). */
   const freshWeek = continueWeekEntryOf(rollWeek(week, true), 'Midtown Office');
   if (freshWeek !== undefined) seeds.push({ field: 'week.continue.freshWeek', text: freshWeek.line, role: 'observation' });
+  /* Wave AO, lane AO-2, § D1369: a first week whose first day is begun, offered before anything is filed. */
+  const begun = continueWeekEntryOf(openWeek('c2'), 'Midtown Office', { clock: '08:39' });
+  if (begun !== undefined) seeds.push({ field: 'week.continue.dayBegun', text: begun.line, role: 'observation' });
   seeds.push({ field: 'week.sheetStep.label', text: WEEK_SHEET_STEP.label, role: 'label' });
   seeds.push({ field: 'week.sheetStep.note', text: WEEK_SHEET_STEP.note, role: 'prose' });
   seeds.push({ field: 'week.startNext', text: WEEK_START_NEXT_LABEL, role: 'label' });
@@ -18290,6 +18576,8 @@ function seedDayClose(seeds: TextSeed[], context: HonestyContext, bundle: ShiftB
   seeds.push({ field: 'week.close.weekendNote', text: WEEKEND_NOTE, role: 'prose' });
   seeds.push({ field: 'week.close.secondary.week', text: REPORT_SECONDARY.week, role: 'label' });
   seeds.push({ field: 'week.close.secondary.menu', text: REPORT_SECONDARY.menu, role: 'label' });
+  seeds.push({ field: 'week.close.practiceAgain.label', text: REPORT_PRACTICE_AGAIN.label, role: 'label' });
+  seeds.push({ field: 'week.close.practiceAgain.note', text: REPORT_PRACTICE_AGAIN.note, role: 'prose' });
 }
 
 /**

@@ -100,19 +100,47 @@ async function untilNote(page: Page, prefix: string, timeout: number): Promise<v
   );
 }
 
+/**
+ * **The transport is in a pace state, read off its chip and its one line** — wave AO, lane AO-4.
+ * Since the transport's line says one thing at a time (`stagePace.ts#stageStatusOf`), the pace note
+ * is not drawn while a skip speaks for the stage: the beat before a skip says the stage is fast and
+ * why, and a skip's line stands while the stage stays where it landed. So *fast* is the lit `30×`
+ * with either the pace note or the beat, and *watching* is the player's lit rung with either the
+ * pace note or the line of the skip that landed on the wait.
+ */
+async function untilPace(page: Page, state: 'fast' | 'watching', rung: string, timeout: number): Promise<void> {
+  await page.waitForFunction(
+    ([wanted, chip]) => {
+      const leave = document.querySelector<HTMLButtonElement>(
+        '.everyday-stage-call:not([hidden]) .everyday-stage-call-answer[data-answer="leave"]',
+      );
+      leave?.click();
+      const lit = document.querySelector('.everyday-stage-speed[aria-pressed="true"]')?.textContent ?? '';
+      const pace = document.querySelector('.everyday-stage-pace')?.textContent ?? '';
+      const skip = document.querySelector('.everyday-stage-skip-line')?.textContent ?? '';
+      if (lit !== chip) return false;
+      return wanted === 'fast'
+        ? pace.startsWith(`fast-forwarding at ${chip}`) || skip.startsWith('nobody on a landing has waited a minute: skipping ahead')
+        : pace.startsWith(`at your speed, ${chip}`) || skip.startsWith('skipped ');
+    },
+    [state, rung] as const,
+    { timeout, polling: 100 },
+  );
+}
+
 describe.skipIf(!HAS_BROWSER)('§ D1169 — a scored day is paced by the tutorial’s rule on the stage a player uses', () => {
   it('is fast while nobody has waited a minute, at the player’s speed while somebody has, and keeps a chip', async () => {
     const page = await playDayOn('c2');
     try {
       /* 08:00, the quiet head: nobody on a landing has waited a minute, so the transport is fast. */
-      await untilNote(page, 'fast-forwarding at 30×', 30_000);
+      await untilPace(page, 'fast', '30×', 30_000);
       expect(await litChip(page)).toBe('30×');
-      expect(await paceNote(page)).toBe('fast-forwarding at 30× while nobody on a landing has waited a minute');
+      expect(['', 'fast-forwarding at 30× while nobody on a landing has waited a minute']).toContain(await paceNote(page));
 
-      /* Somebody passes a minute: the player's rung, and the note says why. */
-      await untilNote(page, 'at your speed', 240_000);
+      /* Somebody passes a minute: the player's rung, and the line says why. */
+      await untilPace(page, 'watching', '4×', 240_000);
       expect(await litChip(page)).toBe('4×');
-      expect(await paceNote(page)).toBe('at your speed, 4×, while somebody on a landing has waited over a minute');
+      expect(['', 'at your speed, 4×, while somebody on a landing has waited over a minute']).toContain(await paceNote(page));
 
       /* A chip pressed while somebody waits is the rung that wait plays at, and stays the player's rung. */
       await page.click('.everyday-stage-speed:text-is("8×")');
@@ -120,7 +148,7 @@ describe.skipIf(!HAS_BROWSER)('§ D1169 — a scored day is paced by the tutoria
       expect(await litChip(page)).toBe('8×');
 
       /* When the landings clear, fast again: the chip did not pin the rest of the day. */
-      await untilNote(page, 'fast-forwarding at 30×', 240_000);
+      await untilPace(page, 'fast', '30×', 240_000);
       expect(await litChip(page)).toBe('30×');
 
       /* A chip pressed while fast holds until somebody next waits a minute, and says so. */
@@ -167,7 +195,7 @@ describe.skipIf(!HAS_BROWSER)('§ D1169 — a scored day is paced by the tutoria
        * § D1169 makes the rung every wait plays at and leaves the skip alone, so the next beat comes
        * sooner.
        */
-      await untilNote(page, 'at your speed', 240_000);
+      await untilPace(page, 'watching', '4×', 240_000);
       await page.click('.everyday-stage-speed:text-is("30×")');
       /* A pause stops a coming skip where it stands: the beat's note goes, and no seek follows. */
       await untilSkipLine(BEAT, 480_000);
@@ -189,11 +217,16 @@ describe.skipIf(!HAS_BROWSER)('§ D1169 — a scored day is paced by the tutoria
       /* It skipped from where the stage stood, to where it now stands. */
       expect(line.slice('skipped '.length, 'skipped '.length + 5) >= pausedAt).toBe(true);
 
-      /* The next beat, stopped by a chip: the player's speed until somebody waits, and no skip. */
+      /*
+       * The next beat, stopped by a chip: the player's speed until somebody waits, and no skip.
+       * Since wave AO, lane AO-4 the transport's line says one thing at a time
+       * (`stagePace.ts#stageStatusOf`): the chip moved the stage out of the state the last skip
+       * landed in, so that skip's line has gone and the pace note speaks alone.
+       */
       await untilSkipLine(BEAT, 480_000);
       await page.click('.everyday-stage-speed:text-is("30×")');
       await untilNote(page, 'your speed, 30×', 5_000);
-      expect(await skipLine(), 'the chip did not stop the skip').toBe(line);
+      expect(await skipLine(), 'the chip did not stop the skip, or two lines spoke at once').toBe('');
       /*
        * For as long as the chip stands, no beat and no skip. It stands until somebody next waits a
        * minute (§ D1169), after which the next quiet stretch may be skipped again, so the line is
@@ -205,9 +238,11 @@ describe.skipIf(!HAS_BROWSER)('§ D1169 — a scored day is paced by the tutoria
           document.querySelector('.everyday-stage-skip-line')?.textContent ?? '',
         ]);
         if (!note.startsWith('your speed')) break;
-        expect(now, 'a skip came while the chip stood').toBe(line);
+        expect(now, 'a skip came while the chip stood').toBe('');
         await page.waitForTimeout(100);
       }
+      /* The line that skip left was the one read above, and it named the stretch it passed over. */
+      expect(line).toMatch(/^skipped /u);
     } finally {
       await page.close();
     }

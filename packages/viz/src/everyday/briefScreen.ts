@@ -50,6 +50,7 @@ import {
 } from './screenDom.js';
 import { everydayProfileStore } from './profileStore.js';
 import { drawElevation } from './elevation.js';
+import { classOfSpec, designerClasses } from './designerModel.js';
 import { isFirstDayOnALegibleTower } from '../shift/firstSession.js';
 import { dailySeedAt, isDailySeed } from '../shift/dailySeed.js';
 import { deviceNowMs } from '../shift/deviceDate.js';
@@ -159,6 +160,19 @@ function mountBrief(
         selectedId: selection.dispatcherId,
         /* § D1218 — an attempt standing on this day holds the driver it began with. */
         attemptWeekday: context.host.dayAttempt()?.weekday,
+        /*
+         * What the tuner behind *Locked for score* draws on this day — § D1368. The same two facts
+         * `tunerScreen.ts` reads when it mounts: the planned day's mix and the standing tower's class.
+         */
+        tunerOffer: {
+          mixIsTheDays: dayAhead.templateVariesMix,
+          machineSteps: (() => {
+            const standing = data.sandboxStanding()?.building;
+            return standing !== undefined && classOfSpec(designerClasses(data.elevatorSpecs()), standing) !== undefined;
+          })(),
+        },
+        /* Lane AO-4 — the day before, so the brief says which driver this one opens on and why. */
+        yesterday: context.host.previousDayDriver(),
       }),
     };
   }
@@ -170,6 +184,7 @@ function mountBrief(
     // changed on this screen moves the bar's sentence with the card the reader pressed.
     briefDriver = today.driver;
     briefAttemptWeekday = context.host.dayAttempt()?.weekday;
+    briefAttemptElsewhere = context.host.dayAttempt()?.heldElsewhere === true;
     root.replaceChildren();
     const left = leftColumn(view);
     const right = rightColumn(view);
@@ -470,6 +485,15 @@ function mountBrief(
     count.style.cssText = MONO(11, C.label);
     pickerRow.append(pickerLabel, select, count);
     drivers.append(pickerRow);
+    /*
+     * Lane AO-4, the post-AN panel's seat B (lost moment 10): where the day before ended on another
+     * driver, which driver this day opens on and why, beside the control that changes it.
+     */
+    if (view.drivers.carried !== undefined) {
+      const carried = el(doc, 'p', 'everyday-brief-driver-carried', view.drivers.carried);
+      carried.style.cssText = `margin:9px 0 0;font-size:12px;line-height:1.45;color:${C.inkSoft}`;
+      drivers.append(carried);
+    }
     if (view.drivers.held !== undefined) {
       const held = el(doc, 'p', 'everyday-brief-driver-held', view.drivers.held);
       held.style.cssText = `margin:9px 0 0;font-size:12px;line-height:1.45;color:${C.warmGrey}`;
@@ -542,6 +566,7 @@ function mountBrief(
       alive = false;
       briefDriver = undefined;
       briefAttemptWeekday = undefined;
+      briefAttemptElsewhere = false;
       stopListening();
       view?.removeEventListener('resize', onResize);
     },
@@ -570,7 +595,12 @@ function mountBrief(
        * the press begins the day's one attempt, and where one already stands it resumes it, so this
        * screen can no longer rewind a day the stage has shown.
        */
-      context.host.playDay();
+      /*
+       * § D1361: where another tab holds the attempt the primary reads *Continue ⟨day⟩ here* with its
+       * note, so this press is the player's takeover; it is asked of the host as it stands now, so a
+       * label drawn before another tab moved never takes over by itself.
+       */
+      context.host.playDay({ takeOver: context.host.dayAttempt()?.heldElsewhere === true && briefAttemptElsewhere });
       context.go('stage');
     },
   };
@@ -607,9 +637,12 @@ let briefDriver: string | undefined;
 /** The weekday of the attempt standing on the day the last draw described — § D1218, {@link briefBar}. */
 let briefAttemptWeekday: string | undefined;
 
+/** Whether the last draw found that attempt held by another tab — § D1361, {@link briefBar}. */
+let briefAttemptElsewhere = false;
+
 /** § 3.3's brief row with this run's dispatcher named — see {@link briefBarModel} for the defect. */
 function briefBar(state: EverydayState): ActionBarModel {
-  return briefBarModel(actionBarFor(state), briefDriver, briefAttemptWeekday);
+  return briefBarModel(actionBarFor(state), briefDriver, briefAttemptWeekday, briefAttemptElsewhere);
 }
 
 export const BRIEF_SCREEN: EverydayScreenModule = {

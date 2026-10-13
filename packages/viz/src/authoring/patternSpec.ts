@@ -244,6 +244,82 @@ export function demandFromSpec(spec: PatternSpec): {
   };
 }
 
+/** What the template a run actually uses will take from a pattern's demand — {@link demandTheTemplateTakes}. */
+export interface TemplateTakes {
+  /** The template's record authors its phases outright (`core`'s phase-list path, § D273). */
+  readonly authorsItsPhases: boolean;
+  /** The template varies the directional mix within the run (`shift/events.ts#demandTemplateVariesMix`). */
+  readonly variesMix: boolean;
+}
+
+/**
+ * The pattern's demand fields that are a template's **geometry**, keyed by the row that writes each,
+ * so the sentence {@link demandTheTemplateTakes} writes names them in the editor's own words. They
+ * are the three `core`'s `traceConfigFor` folds into `templateOverrides`.
+ */
+const GEOMETRY_ROWS: Readonly<Record<'peakWindowS' | 'baselineFraction' | 'mixAmplitude', keyof PatternSpec>> =
+  Object.freeze({
+    baselineFraction: 'baselineFraction',
+    peakWindowS: 'peakWindowS',
+    mixAmplitude: 'mixAmplitude',
+  });
+
+/**
+ * **A pattern's demand, narrowed to what the run's template can take** — wave AO, lane AO-2, the
+ * post-AN panel's seat D (D3), recorded under [§ D1368](../../../../DECISIONS.md).
+ *
+ * {@link demandFromSpec} writes `peakWindowS` and `baselineFraction` on every pattern, a split on
+ * every one-direction order and `mixAmplitude` on two-way, because each is a knob of the template
+ * the pattern selects. A run does not always use that template: on a building with an authored day,
+ * `dev/state.ts#shiftDemandTemplateId` runs the day's own record, which authors its phases and
+ * varies its mix, and `core` refuses all four there (`requireNoPhaseListOverrides`, and the
+ * generator's split refusal). So **every** saved pattern on a whole day failed to simulate, and the
+ * Everyday stage said *"Today's day could not be simulated"* to any change made in *Tune the tower*.
+ *
+ * The fields the template cannot take are left out, and the sentence says which; the rate, the
+ * group size and whether a group shares a floor still reach the run. Nothing a template can take is
+ * touched, so a run that simulated before this function existed is the same run after it.
+ *
+ * @returns the narrowed demand, and the withheld sentence or `undefined` where nothing was left out
+ */
+export function demandTheTemplateTakes(
+  demand: NonNullable<SimulationConfig['demand']>,
+  takes: TemplateTakes,
+): { readonly demand: NonNullable<SimulationConfig['demand']>; readonly withheld: string | undefined } {
+  const narrowed: Record<string, unknown> = { ...demand };
+  const left: string[] = [];
+  const reasons: string[] = [];
+  if (takes.authorsItsPhases) {
+    for (const [field, row] of Object.entries(GEOMETRY_ROWS)) {
+      if (narrowed[field] === undefined) continue;
+      delete narrowed[field];
+      left.push(labelOf(row));
+    }
+    if (left.length > 0) reasons.push('its own hours');
+  }
+  if (takes.variesMix && narrowed['directionalSplit'] !== undefined) {
+    delete narrowed['directionalSplit'];
+    left.push(labelOf('interfloorShare'));
+    reasons.push('its own mix');
+  }
+  if (left.length === 0) return { demand, withheld: undefined };
+  return {
+    demand: narrowed as NonNullable<SimulationConfig['demand']>,
+    withheld:
+      `This day sets ${reasons.join(' and ')}, so the selected pattern’s ${listOf(left)} ` +
+      `${left.length === 1 ? 'was' : 'were'} not applied; its arrival rate and group size were.`,
+  };
+}
+
+/** `a`, `a and b`, `a, b and c`. */
+function listOf(items: readonly string[]): string {
+  return items.length <= 1 ? (items[0] ?? '') : `${items.slice(0, -1).join(', ')} and ${String(items.at(-1))}`;
+}
+
+function labelOf(key: keyof PatternSpec): string {
+  return (PATTERN_ROWS.find((row) => row.key === key)?.label ?? key).toLowerCase();
+}
+
 /**
  * Move the interfloor share and put the difference back into the other two, in proportion.
  *

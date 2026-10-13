@@ -80,6 +80,8 @@ import {
   type DifficultyId,
   type ShopCategory,
   type ShopTier,
+  type ShopTierFace,
+  type ShopTowerShape,
   type ShopTierPrice,
   type ShopTierState,
   type TowerShafts,
@@ -98,16 +100,18 @@ import {
   fittedLevel,
   bookedLevel,
   legalStarts,
+  missedDaysOf,
   nextSlot,
   oddsAfterWorksPct,
   offerFeeOf,
   occupiedDayIndices,
-  perfectMonthUnits,
+  perfectMonthPayUnits,
   purseOf,
   rateOnDay,
   renewalOffer,
   serviceDaysLeft,
   shopTierAt,
+  shopTierFaceOf,
   shopTierState,
   shopTotalUnits,
   slotsOpen,
@@ -137,6 +141,7 @@ import {
   renewalIsDue,
 } from '../campaign/career.js';
 import { worksTodayOf } from '../campaign/works.js';
+import { CHIMES_EARN_RULE } from './chimesPanel.js';
 
 /* -------------------------------------------------------------------------- *
  * What the screens are given
@@ -162,6 +167,13 @@ export interface BuildingFacts {
    * path (`campaignScreens.ts#campaignInputOf`) always writes it.
    */
   readonly shafts?: TowerShafts | undefined;
+  /**
+   * The tower as the contract hands it over — floors, cars per bank and top speed — for the shop
+   * tiers whose words depend on it (`campaign/economy.ts#shopTierFaceOf`, [§ D1377](../../../../DECISIONS.md)).
+   * Optional for {@link startTimeFloors}' reason: a fixture that knows no building reads every tier's
+   * shipped words, and the shipped path (`campaignScreens.ts#campaignInputOf`) always writes it.
+   */
+  readonly shape?: ShopTowerShape | undefined;
 }
 
 /** One dispatcher on offer, for the standing-order selects. */
@@ -336,6 +348,17 @@ const UNKNOWN_BUILDING: BuildingFacts = Object.freeze({ name: 'a building this b
 
 function factsFor(input: CampaignInput, tower: CampaignTower): BuildingFacts {
   return input.buildings.get(tower.buildingId) ?? UNKNOWN_BUILDING;
+}
+
+/** The name of a category's tier at `level` on this tower, or the category's own where it has no such tier. */
+function tierNameAt(category: ShopCategory, level: number, facts: BuildingFacts): string {
+  const tier = category.tiers.find((entry) => entry.level === level);
+  return tier === undefined ? category.name : tierFaceOn(tier, facts).name;
+}
+
+/** A tier's name and effect on the tower these facts describe — [§ D1377](../../../../DECISIONS.md). */
+function tierFaceOn(tier: ShopTier, facts: BuildingFacts): ShopTierFace {
+  return shopTierFaceOf(tier, { shape: facts.shape, shafts: facts.shafts, startTimeFloors: facts.startTimeFloors });
 }
 
 /** `4 u` — § 2's vocabulary, which writes a unit as `4 u` and never as a coin or a credit. */
@@ -651,7 +674,7 @@ export const TOWERS_COPY = Object.freeze({
    * here yet — a building is offered on a complexity and a fee, and taking one moves a week between
    * assignments; neither of those reaches this screen in this build"*) is deleted on the commit
    * that built both halves: `economy.ts#OFFER_FEES` prices the offer and `career.ts#offerRefusalOf`
-   * gates it, and `everyday/host.ts#campaignAct` moves the week on a take.
+   * gates it. Since § D1393 a take moves no week (`everyday/host.ts#campaignAct`).
    */
   offersTake: 'Take it',
   offersNotYet: 'Not yet',
@@ -660,7 +683,12 @@ export const TOWERS_COPY = Object.freeze({
   offersAtRisk: 'A tower is one miss from ending. Fix that before adding another.',
   /* `offersUnpriced` (*complexity unpublished — not offered until somebody measures one*) left on
      the commit that priced the last two buildings — GitHub issue #169 item 4, § D519, § D227. */
-  offersFreshWeek: 'taking it starts a fresh week on this building; the week you are on is parked, not lost',
+  /*
+   * What a take does to the rest of the game, which since § D1393 (wave AO lane AO-5) is nothing: it
+   * read *taking it starts a fresh week on this building; the week you are on is parked, not lost*,
+   * and the take moved the Scenario week to the offered building.
+   */
+  offersKeepsWeek: 'taking it adds the building to your career on a month of its own; your Scenario week stays where you left it',
   incidentsHeading: 'WHAT HAS HAPPENED LATELY',
   incidentsSub: 'none of it was your doing',
   incidentsRefusal:
@@ -728,9 +756,8 @@ export const CAREER_INTRO_COPY = Object.freeze({
     'Standing is two for every cleared day, less three for every missed one. It opens slots, which ' +
     'is how you come to hold more than one building: the second opens at {n}.',
   chimesHeading: 'CHIMES',
-  chimesEarn:
-    'Chimes are what finishing something pays you, in every mode. Here, each day the contract pays ' +
-    'for earns some, and a missed day earns none.',
+  /* § D1382: the one rule Settings states too, then what it means on a contract. */
+  chimesEarn: `${CHIMES_EARN_RULE} Here, each day the contract pays for earns some.`,
   chimesSpend:
     'Signed in, you can spend them from Settings to top up the purse of the building your desk is ' +
     'open on. They never open a slot and never buy back a missed day: standing opens slots, and a ' +
@@ -1053,7 +1080,7 @@ export function offersView(career: CampaignCareer, buildingNameOf: (id: string) 
     caption: `${String(rows.length)} ${rows.length === 1 ? 'offer' : 'offers'}`,
     rows,
     empty: rows.length === 0 ? TOWERS_COPY.offersNone : undefined,
-    note: TOWERS_COPY.offersFreshWeek,
+    note: TOWERS_COPY.offersKeepsWeek,
   };
 }
 
@@ -1086,9 +1113,10 @@ function standingNote(standing: number, open: number, atRisk: number): string {
 /** The status of a quiet tower's contract — § 8.1's `statusSub`, derived from the allowance. */
 function contractStatusLine(tower: CampaignTower): string {
   const allowance = DIFFICULTIES[tower.difficultyId].miss;
-  if (renewalIsDue(tower)) return 'renewal offered';
   const left = allowance - tower.missed;
+  /* Lost before renewed: a contract lost on day 20 is offered no renewal (§ D1392, wave AO). */
   if (left < 0) return `contract ended — ${String(tower.missed)} missed`;
+  if (renewalIsDue(tower)) return 'renewal offered';
   if (left === 0) return 'one more miss ends it';
   if (left === 1) return 'one miss left';
   return `${String(left)} misses left`;
@@ -1245,10 +1273,11 @@ function tipSuffix(mark: CalendarCell['mark'], booked?: string): string {
        * that array is empty in this build, so the arm is there for the day it is not.
        */
       return booked === undefined ? ' · something is booked' : ` · booked: ${booked}`;
+    /* A filed day draws its verdict over a booking, so the tip keeps the booking (seat C's D3, wave AO). */
     case 'cleared':
-      return ' · cleared';
+      return booked === undefined ? ' · cleared' : ` · cleared · booked: ${booked}`;
     case 'missed':
-      return ' · missed';
+      return booked === undefined ? ' · missed' : ` · missed · booked: ${booked}`;
     default:
       return '';
   }
@@ -1360,6 +1389,8 @@ export const BUILDING_COPY = Object.freeze({
   optionsEyebrow: 'WHAT DO YOU WANT DONE',
   optionsNote: 'maintenance can handle any of it — they need you to choose',
   optionsNoteRenewal: 'a finished contract frees its slot — that is how you move up',
+  /* § D1392: the desk's note over a lost contract's one answer. */
+  optionsNoteLost: 'a lost contract counts toward the three that end the career',
   quietHeading: 'Running itself',
   quietBody:
     'Your standing order is holding and nothing is booked. Maintenance will carry on without you, and ' +
@@ -1600,7 +1631,7 @@ export function buildingView(input: CampaignInput): BuildingView | undefined {
                 ? undefined
                 : {
                     rate: units(offer.offered),
-                    head: `a day, up from ${String(offer.wasRate)} — their offer, not yours to set`,
+                    head: renewalRateHeadOf(offer.offered, offer.wasRate),
                     why: `${recordLine(tower)}. A harder building pays more because it will cost you more days; a record like yours moves the rate by ${offer.bonus >= 0 ? '+' : ''}${String(offer.bonus)}.`,
                   },
           },
@@ -1612,7 +1643,9 @@ export function buildingView(input: CampaignInput): BuildingView | undefined {
             note:
               need.kind === 'renewal'
                 ? BUILDING_COPY.optionsNoteRenewal
-                : BUILDING_COPY.optionsNote,
+                : need.kind === 'lost'
+                  ? BUILDING_COPY.optionsNoteLost
+                  : BUILDING_COPY.optionsNote,
             /*
              * § D1357: once day 20 has closed there is no cleared day left in this month to quote,
              * and the next one is a new month's at its own week-one rate, so the line says the month
@@ -1649,7 +1682,7 @@ export function buildingView(input: CampaignInput): BuildingView | undefined {
         if (live > 0) {
           return {
             categoryId: category.id,
-            label: category.tiers.find((tier) => tier.level === live)?.name ?? category.name,
+            label: tierNameAt(category, live, facts),
             level: `L${String(live)}`,
             state: 'live',
           };
@@ -1657,7 +1690,7 @@ export function buildingView(input: CampaignInput): BuildingView | undefined {
         if (booked > 0) {
           return {
             categoryId: category.id,
-            label: category.tiers.find((tier) => tier.level === booked)?.name ?? category.name,
+            label: tierNameAt(category, booked, facts),
             level: 'booked',
             state: 'booked',
           };
@@ -1986,6 +2019,12 @@ export function contractDocumentOf(
     difficulty.miss === 0
       ? 'A single missed day loses the contract.'
       : `More than ${String(difficulty.miss)} missed ${difficulty.miss === 1 ? 'day' : 'days'} and the contract is lost.`;
+  /*
+   * What *lost* does, said where the term is (§ D1392, wave AO lane AO-5): it was stated and not
+   * enforced, and a desk at 4 of 3 offered a renewal under this clause.
+   */
+  const lostMeans =
+    'A lost contract runs no more of its days and is offered no renewal; the month can be started again from day 1, which counts the loss.';
   return {
     title: 'SERVICE CONTRACT',
     parties: `Between the managing agent of ${buildingName} and you, on ${difficulty.name} terms.`,
@@ -2014,7 +2053,7 @@ export function contractDocumentOf(
       {
         number: '4',
         heading: 'Missed days',
-        body: `A missed day pays nothing and costs three standing. ${allowance} Three contracts lost and the career ends.`,
+        body: `A missed day pays nothing and costs three standing. ${allowance} ${lostMeans} Three contracts lost and the career ends.`,
         levels: undefined,
         basisNote: undefined,
       },
@@ -2045,13 +2084,14 @@ function shopTierRow(
 ): ShopTierRowView {
   const state = shopTierState(tower, category.id, tier, schedule, facts.startTimeFloors, facts.shafts);
   const priced = shopTierPrice(schedule, tier, facts.shafts);
+  const face = tierFaceOn(tier, facts);
   return {
     categoryId: category.id,
     level: tier.level,
     levelLabel: `L${String(tier.level)}`,
-    name: tier.name,
+    name: face.name,
     cost: shopCostLine(priced),
-    effect: tier.effect,
+    effect: face.effect,
     state: shopStateLine(tower, tier, state, schedule),
     stateId: state.id,
     pressable: state.pressable,
@@ -2148,6 +2188,8 @@ function dayWord(count: number): string {
 export function shaftDecisionOf(
   schedule: PriceSchedule,
   shafts: TowerShafts | undefined,
+  /* § D1377: the tower as handed, so the tier is named for the car it adds rather than the design file's fourth. */
+  shape?: ShopTowerShape,
 ): { readonly body: string; readonly body2: string } {
   const tier = shopTierAt('shafts', 1);
   if (tier === undefined) return { body: CONTRACT_COPY.shaftNotSold, body2: CONTRACT_COPY.shaftNotSold2 };
@@ -2157,12 +2199,13 @@ export function shaftDecisionOf(
   const added = shaftsAddedBy(tier, shafts) ?? [];
   const banks = new Set(added.map((shaft) => shaft.bankId)).size;
   const count = priced.shafts ?? 1;
+  const name = shopTierFaceOf(tier, { shape, shafts }).name;
   const what =
     count === 1
-      ? `${tier.name} is`
+      ? `${name} is`
       : banks === count
-        ? `${tier.name} here is a new shaft in each of ${dayWord(count)} banks, for`
-        : `${tier.name} here is ${dayWord(count)} new shafts, for`;
+        ? `${name}: a new shaft in each of ${dayWord(count)} banks, for`
+        : `${name}: ${dayWord(count)} new shafts, for`;
   /* Week two opens on the day after week one's last; the booking starts that day (0-based index). */
   const weekTwo = WEEKDAY_HEADS.length;
   const liveDay = weekTwo + nights + 1;
@@ -2178,6 +2221,39 @@ export function shaftDecisionOf(
     body: `${what} ${String(priced.units)} units and ${dayWord(nights)} nights. ${timing}`,
     body2: CONTRACT_COPY.shaftBody2,
   };
+}
+
+/**
+ * The renewal rate's comparison with the rate it replaces — [§ D1377](../../../../DECISIONS.md). It
+ * read *3 u a day, up from 3* on an offer equal to the rate it renews (the post-AN panel's seat C,
+ * D5): *up* is now said only of a rise, and a fall or no change is said as what it is.
+ */
+export function renewalRateHeadOf(offered: number, was: number): string {
+  const against =
+    offered > was
+      ? `up from ${String(was)}`
+      : offered < was
+        ? `down from ${String(was)}`
+        : 'the same as this month';
+  return `a day, ${against} — their offer, not yours to set`;
+}
+
+/**
+ * **What a perfect month pays, and what it leaves on hand** — [§ D1377](../../../../DECISIONS.md). It
+ * read *A perfect month pays 98 units* beside the four rates it prints, which sum to 90 (the post-AN
+ * panel's seat D, D6): 98 was § 8.1's on-hand total, the 8 a month opens with included. Every figure
+ * here is the difficulty's own rates and the purse's own carry, so the sentence is checkable against
+ * the four week cells above it.
+ */
+export function perfectMonthLineOf(difficulty: Difficulty, carried: number, shopWorth: number): string {
+  const paid = perfectMonthPayUnits(difficulty);
+  const rates = difficulty.rates.map(String);
+  const rateList = `${rates.slice(0, -1).join(', ')} and ${rates.at(-1) ?? ''}`;
+  return (
+    `A perfect month pays ${String(paid)} units, ${rateList} a cleared day across its four weeks; with the ` +
+    `${String(carried)} carried in, that is ${String(carried + paid)} on hand. The shop below is worth ` +
+    `${String(shopWorth)}. You are choosing what this building does not get.`
+  );
 }
 
 /** § 8.3's whole contract sheet. */
@@ -2200,7 +2276,8 @@ export function contractView(input: CampaignInput): ContractView | undefined {
     pendingTier === undefined ? 0 : shopTierPrice(input.schedule, pendingTier).nights;
   const starts = pendingTier === undefined ? [] : legalStarts(tower, pendingNights);
   const occupied = occupiedDayIndices(tower);
-  const lastCleared = tower.day - 1 - tower.missed;
+  /* Each past day's own verdict, as the purse and the rolling calendar read it (seat C's D3, wave AO). */
+  const missedDays = missedDaysOf(tower);
   const worksDays = [...occupied].filter((index) => index >= dayIdx);
   const rows = campaignTestRows(
     difficulty,
@@ -2225,7 +2302,7 @@ export function contractView(input: CampaignInput): ContractView | undefined {
         : index === dayIdx
         ? 'today'
         : index < dayIdx
-          ? index + 1 > lastCleared
+          ? missedDays.has(index + 1)
             ? 'missed'
             : 'cleared'
           : occupied.has(index)
@@ -2250,7 +2327,7 @@ export function contractView(input: CampaignInput): ContractView | undefined {
      */
     const tip =
       state === 'bookable' && pendingTier !== undefined
-        ? `book ${pendingTier.name} — ${String(pendingNights)} ${pendingNights === 1 ? 'night' : 'nights'} from day ${String(index + 1)}, live on day ${String(index + 1 + pendingNights)}`
+        ? `book ${tierFaceOn(pendingTier, facts).name} — ${String(pendingNights)} ${pendingNights === 1 ? 'night' : 'nights'} from day ${String(index + 1)}, live on day ${String(index + 1 + pendingNights)}`
         : `day ${String(index + 1)}${
             state === 'works'
               ? ' · works are booked, one car out for the day'
@@ -2271,10 +2348,9 @@ export function contractView(input: CampaignInput): ContractView | undefined {
   const booked = tower.bookings
     .filter((booking) => booking.nights > 0)
     .map((booking) => ({
-      name:
-        SHOP.find((category) => category.id === booking.categoryId)?.tiers.find(
-          (tier) => tier.level === booking.level,
-        )?.name ?? 'Works on the machines',
+      name: ((category) => (category === undefined ? 'Works on the machines' : tierNameAt(category, booking.level, facts)))(
+        SHOP.find((category) => category.id === booking.categoryId),
+      ),
       when:
         booking.nights === 1
           ? `day ${String(booking.startIdx + 1)}`
@@ -2303,7 +2379,7 @@ export function contractView(input: CampaignInput): ContractView | undefined {
       prompt:
         pendingTier === undefined
           ? undefined
-          : `Pick the night ${pendingTier.name} goes in. ${String(pendingNights)} ${pendingNights === 1 ? 'night' : 'nights'} of works, and it is live the day after the last of them.`,
+          : `Pick the night ${tierFaceOn(pendingTier, facts).name} goes in. ${String(pendingNights)} ${pendingNights === 1 ? 'night' : 'nights'} of works, and it is live the day after the last of them.`,
       cancel: CONTRACT_COPY.cancel,
       booked,
       /*
@@ -2337,7 +2413,7 @@ export function contractView(input: CampaignInput): ContractView | undefined {
         tower.bookings.length === 0
           ? 'Nothing booked yet, so this keeps climbing with every trip. Machine and door work is what moves this number.'
           : 'With the nights you have booked. Machines and doors both take load off the gear, which pushes the service window further out.',
-      totalNote: `A perfect month pays ${String(perfectMonthUnits(difficulty))} units. The shop below is worth ${String(shopTotalUnits(input.schedule, facts.shafts))}. You are choosing what this building does not get.`,
+      totalNote: perfectMonthLineOf(difficulty, carriedIn(tower), shopTotalUnits(input.schedule, facts.shafts)),
       carryNote: `This purse belongs to ${facts.name} alone and ${CONTRACT_COPY.purseCarryNote}`,
       kitNote: CONTRACT_COPY.purseKitNote,
     },
@@ -2394,6 +2470,6 @@ export function contractView(input: CampaignInput): ContractView | undefined {
       ],
     },
     document: contractDocumentOf(facts.name, difficulty),
-    shaft: { heading: CONTRACT_COPY.shaftHeading, ...shaftDecisionOf(input.schedule, facts.shafts) },
+    shaft: { heading: CONTRACT_COPY.shaftHeading, ...shaftDecisionOf(input.schedule, facts.shafts, facts.shape) },
   };
 }

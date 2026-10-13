@@ -27,6 +27,7 @@ import { join } from 'node:path';
 import {
   loadConfig,
   parseBuilding,
+  resolveBuilding,
   type BuildingConfig,
   type LoadedConfig,
 } from '@elevator-sim/core';
@@ -52,7 +53,7 @@ import { repairPriceUnits } from '../pricing/repairPrice.js';
 import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
 import type { PriceSchedule } from '../pricing/types.js';
 import { RESOURCES, baseState } from '../scope/probes.test-helper.js';
-import { CONTRACTS, contractForBuilding } from '../shift/contracts.js';
+import { CONTRACTS, contractForBuilding, statLineOf } from '../shift/contracts.js';
 import { ladderTowerConfig } from '../shift/ladder.js';
 import type { ViewerState } from '../dev/state.js';
 
@@ -71,10 +72,12 @@ import {
   perfectMonthUnits,
   purseOf,
   shopTierAt,
+  shopTierFaceOf,
   shopTierPrice,
   shopTierState,
   shopTotalUnits,
   type AddedShaft,
+  type ShopTowerShape,
   type TowerShafts,
 } from './economy.js';
 import { AS_BUILT, fittedBuilding } from './fitOut.js';
@@ -116,6 +119,18 @@ function shaftsFor(schedule: PriceSchedule, buildingId: string): TowerShafts {
       : careerTowerShaftsOf(careerResources(schedule), buildingId);
   if (shafts === undefined) throw new Error(`${buildingId} resolves no shafts`);
   return shafts;
+}
+
+/** The tower a contract hands over, as the shop's words read it — `everyday/host.ts#buildingShape`'s fold. */
+function shapeFor(buildingId: string): ShopTowerShape {
+  const handed = ladderTowerConfig(authored.get(buildingId)!, contractForBuilding(buildingId)?.id, config.elevatorSpecs);
+  const resolved = resolveBuilding(parseBuilding(handed as unknown), config.elevatorSpecs);
+  const speeds = resolved.banks.flatMap((bank) => bank.cars.map((car) => car.ratedSpeedMps));
+  return {
+    floors: resolved.floors.length,
+    bankCars: new Map(resolved.banks.map((bank) => [bank.id, bank.cars.length])),
+    topSpeedMps: Math.max(...speeds),
+  };
 }
 
 /** What a fix-it case charges for one new shaft in a bank — `fixit/parse.ts`'s own path. */
@@ -437,15 +452,70 @@ describe('a shaft tier that sinks no shaft is refused, and the copy around the s
         'ends, and the shop will not book it.',
     );
     expect(shaftDecisionOf(schedule, shaftsFor(schedule, 'willis-class-reference')).body).toMatch(
-      /^A fourth car here is a new shaft in each of seven banks, for 318 units and eight nights\. /u,
+      /^A fourth car: a new shaft in each of seven banks, for 318 units and eight nights\. /u,
     );
+  });
+
+  /*
+   * [§ D1377](../../../../DECISIONS.md), the post-AN panel's seats C (D5) and D (D6): *A fourth car is
+   * 34 units* and *The tower stops being one car short* on Garden Apartments, a two-car building. The
+   * tier is now named for the car it adds on the tower as handed, and its effect is the count.
+   */
+  it('names the shaft tier for the car it adds on the tower as handed, on every contract tower', () => {
+    const schedule = shippedPriceSchedule();
+    const ordinals = ['zeroth', 'first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth', 'ninth', 'tenth'];
+    let single = 0;
+    for (const contract of CONTRACTS) {
+      const shape = shapeFor(contract.buildingId);
+      const shafts = shaftsFor(schedule, contract.buildingId);
+      const first = shopTierAt('shafts', 1)!;
+      const second = shopTierAt('shafts', 2)!;
+      const banks = [...new Set((shafts.get(first.priceId) ?? []).map((shaft) => shaft.bankId))];
+      const faceOne = shopTierFaceOf(first, { shape, shafts });
+      const faceTwo = shopTierFaceOf(second, { shape, shafts });
+      if (banks.length === 1) {
+        single += 1;
+        const before = shape.bankCars.get(banks[0]!)!;
+        expect(faceOne.name, contract.id).toBe(`A ${ordinals[before + 1]!} car`);
+        expect(faceTwo.name, contract.id).toBe(`A ${ordinals[before + 2]!} car`);
+        expect(shaftDecisionOf(schedule, shafts, shape).body.startsWith(`${faceOne.name} is `), contract.id).toBe(true);
+      } else if (banks.length > 1) {
+        expect(faceOne.name, contract.id).toBe('One more car in each bank');
+        expect(shaftDecisionOf(schedule, shafts, shape).body.startsWith('One more car in each bank: a new shaft in each of'), contract.id).toBe(true);
+      }
+      for (const face of [faceOne, faceTwo]) expect(face.effect, contract.id).not.toMatch(/one car short|any occupancy/u);
+    }
+    expect(single, 'no contract tower sinks its shafts in one bank; the single-bank arm is untested').toBeGreaterThan(0);
+    /* The building seat D read it on: two cars, so a third. */
+    const garden = shapeFor('garden-apartments');
+    expect([...garden.bankCars.values()]).toEqual([2]);
+    const gardenShafts = shaftsFor(schedule, 'garden-apartments');
+    expect(shaftDecisionOf(schedule, gardenShafts, garden).body).toMatch(/^A third car is \d+ units and eight nights\. /u);
+    expect(shopTierFaceOf(shopTierAt('shafts', 1)!, { shape: garden, shafts: gardenShafts }).effect).toBe('Two cars become three.');
+  });
+
+  it('words the machines and the start-time tiers from the tower, never the design file’s', () => {
+    const garden = shapeFor('garden-apartments');
+    const machines = shopTierFaceOf(shopTierAt('machines', 1)!, { shape: garden });
+    expect(machines.effect).toBe(
+      `Every car rebuilt to 4 m/s, from ${String(garden.topSpeedMps)} m/s now, on a tower of ${['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven'][garden.floors] ?? String(garden.floors)} floors.`,
+    );
+    expect(machines.effect).not.toContain('fourteen');
+    const stagger = shopTierAt('tenants', 2)!;
+    expect(shopTierFaceOf(stagger, { startTimeFloors: 0 }).effect).not.toMatch(/four tenants/u);
+    expect(shopTierFaceOf(stagger, { startTimeFloors: 0 }).effect).toContain('nobody on this tower keeps one');
+    expect(shopTierFaceOf(stagger, { startTimeFloors: 3 }).effect).toBe(
+      'Agreed with the tenants on the three floors that keep a start time: a third fewer journeys from them in the day.',
+    );
+    /* With nothing known about the tower, the shipped words stand, as the shop prices a row alone. */
+    expect(shopTierFaceOf(shopTierAt('shafts', 1)!).name).toBe('A fourth car');
   });
 });
 
 describe('the host hands the shop and the reducer the same shafts', () => {
   /** A desk on Midtown Office's contract with money to spend, through the real host. */
-  function hostOnMidtown(): { readonly host: EverydayHost } {
-    const state: ViewerState = { ...baseState(), buildingId: 'midtown-office' };
+  function hostOnMidtown(day = 1): { readonly host: EverydayHost; readonly state: () => ViewerState } {
+    let state: ViewerState = { ...baseState(), buildingId: 'midtown-office' };
     let held: CampaignCareer | undefined = {
       carry: 0,
       today: 1,
@@ -455,6 +525,7 @@ describe('the host hands the shop and the reducer the same shafts', () => {
         {
           ...freshTower({ contractId: 'c2', buildingId: 'midtown-office', dispatcherId: 'eta', rate: 5 }),
           carry: 100,
+          day,
         },
       ],
       openTowerId: 'c2',
@@ -486,7 +557,9 @@ describe('the host hands the shop and the reducer the same shafts', () => {
       openRunTab: () => {},
       ghostRace: () => ({ pick: 'none' as const, rival: undefined, refusal: undefined, pending: false }),
       raceAgainst: () => {},
-      applyPatch: () => {},
+      applyPatch: (patch) => {
+        state = { ...state, ...patch };
+      },
       loadReferenceRuns: unused,
       simulateRecord: unused,
       enterWatch: unused,
@@ -496,8 +569,26 @@ describe('the host hands the shop and the reducer the same shafts', () => {
       dailyBoard: undefined,
       onChange: () => () => {},
     };
-    return { host: createEverydayHost(bindings, store) };
+    return { host: createEverydayHost(bindings, store), state: () => state };
   }
+
+  /*
+   * [§ D1377](../../../../DECISIONS.md), the post-AN panel's seat C (D5): the desk and the renewal kept
+   * *120 people* after the tenants had grown to 385. The desk's line is now the building the day's
+   * press resolves, read before the press and compared after it.
+   */
+  it('describes a held tower on the desk as the building its next day runs on', () => {
+    const early = campaignInputOf(hostOnMidtown(1).host).buildings.get('midtown-office')?.spec;
+    const { host, state } = hostOnMidtown(12);
+    const desk = campaignInputOf(host).buildings.get('midtown-office')?.spec;
+    expect(desk).toBeDefined();
+    expect(desk, 'a tower twelve days in reads the tenants it was handed').not.toBe(early);
+    host.runCampaignDay('c2');
+    expect(state().week.day).toBe(12);
+    const ran = host.resolvedBuilding();
+    expect(ran).toBeDefined();
+    expect(desk).toBe(statLineOf(ran!));
+  });
 
   it('quotes 42 u on the desk and books 42 u when the player buys it', () => {
     const { host } = hostOnMidtown();

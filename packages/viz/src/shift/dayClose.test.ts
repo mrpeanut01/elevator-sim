@@ -234,8 +234,11 @@ describe('the week’s arithmetic — § D1247', () => {
       undefined,
       undefined,
     ]);
-    /* No week number where none is true of the week: the census does not deal this tower's. */
-    expect(close?.tomorrow.heading).toBe('TOMORROW · TUESDAY, DAY 2');
+    /*
+     * The week's number, which since § D1394 (wave AO lane AO-5) is true of every Scenario week:
+     * the census does not deal this tower's, and its week still ends on Sunday and rolls.
+     */
+    expect(close?.tomorrow.heading).toBe('TOMORROW · WEEK 1 · TUESDAY, DAY 2');
   });
 });
 
@@ -377,7 +380,26 @@ describe('the call that decided today — § D1248', () => {
     });
     expect(line).toContain('came at 10:00, where the day was skipped past the call');
     expect(line).toContain('read Shift cleared.');
-    expect(line).toContain('1 earlier call today could have turned it too.');
+    /* § D1379, the post-AN panel's seat B (defect 7): the earlier call is named, by its row's clock. */
+    expect(line).toContain(`The call at ${clockOf(0)} could have turned it too.`);
+    expect(line).not.toMatch(/\d+ earlier calls? today/u);
+  });
+
+  it('names every earlier call that could have turned the day, in the day’s order, the pinned one among them', () => {
+    const line = decidingCallLineOf({
+      verdict: 'missed',
+      records: [
+        call(0, 'leave', { 'park-cars-lobby': CLEARS, 'spread-cars': MISSES, leave: MISSES }),
+        call(7200, 'leave', { 'park-cars-lobby': MISSES, 'spread-cars': CLEARS, leave: MISSES }),
+      ],
+      pinned: { atS: 3600, clearedBy: 'park-cars-lobby', missedBy: 'spread-cars', answered: 'spread-cars' },
+      verdictOf,
+      lineOf,
+      clockOf,
+    });
+    /* The pinned call at 09:00 falls between the two rows, so the latest is still the deciding one. */
+    expect(line).toContain(`came at ${clockOf(7200)}`);
+    expect(line).toContain(`The calls at ${clockOf(0)} and ${clockOf(3600)} could have turned it too.`);
   });
 
   it('says plainly that none did, and that none was raised', () => {

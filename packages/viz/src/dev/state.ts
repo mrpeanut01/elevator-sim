@@ -66,6 +66,7 @@ import {
 import {
   DEFAULT_PATTERN,
   demandFromSpec,
+  demandTheTemplateTakes,
   patternIsDirty,
   specFromTrafficProfile,
   trafficProfilesWithPattern,
@@ -92,12 +93,9 @@ import { contractById, contractForBuilding, CONTRACTS } from '../shift/contracts
 import { firstSessionContractFor, firstSessionDayFor } from '../shift/firstSession.js';
 import { actsOf, runHorizonOf, runsWholeDay, wholeDayFor } from '../shift/dayLength.js';
 import {
-  SHIFT_EVENTS,
   baseDemandOf,
   demandTemplateVariesMix,
   eventCarChoice,
-  eventById,
-  eventOfDrawnId,
   shiftRunPatch,
   wholeDayEpisodeOf,
 } from '../shift/events.js';
@@ -2305,24 +2303,21 @@ export function shiftRunConfigOf(
    * before. Read here, at the one seam the run is built from, so the caption and the run agree for
    * the reason `scheduledEventFor`'s comment above gives.
    */
-  const event =
-    state.campaignEventId === undefined
-      ? scheduledEventFor(
-          state.calendar,
-          state.week.day,
-          state.week.dayIdx,
-          wholeDayRun ? 'whole-day' : 'period',
-          state.week,
-        )
-      : /*
-         * A whole drawn id first, so a day handed one named wrinkle (`caterers:before-the-rush`)
-         * runs that wrinkle's axis values rather than its template's base: the week census hands a
-         * run an authored week order's day this way (lane AM-D, § D1252). A template id reads the
-         * same through either lookup, so a campaign day is unchanged.
-         */
-        (eventOfDrawnId(state.campaignEventId) ??
-        eventById(state.campaignEventId) ??
-        SHIFT_EVENTS.ordinary);
+  const event = scheduledEventFor(
+    state.calendar,
+    state.week.day,
+    state.week.dayIdx,
+    wholeDayRun ? 'whole-day' : 'period',
+    state.week,
+    /*
+     * The campaign's own wrinkle where it handed one — `scheduledEventFor`'s `assigned`, which
+     * resolves a whole drawn id first (`caterers:before-the-rush`, how the week census hands a run
+     * an authored order's day, lane AM-D, § D1252) and then a template id. It was a ternary here,
+     * and the day's sheet in `dev/main.ts#closeShift` asked the schedule without it (wave AO, seat
+     * C's D4), so the one function now answers for both.
+     */
+    state.campaignEventId,
+  );
   const spec = selectedPatternSpec(resources, state, authored);
   const pattern = spec === undefined ? { demandTemplate: 'rise-and-fall' as const, demand: {} } : demandFromSpec(spec);
   /*
@@ -2511,6 +2506,22 @@ export function shiftRunConfigOf(
    */
   const reportWindow = shiftReportWindowFor(authored.id);
 
+  /*
+   * 7 — **the pattern's demand, narrowed to what the run's template takes** — wave AO, lane AO-2,
+   * the post-AN panel's seat D (D3), under [§ D1368](../../../../DECISIONS.md). A pattern writes
+   * the knobs of its own template; on a building with an authored day the run uses the day's record
+   * instead, which authors its phases and varies its mix, and `core` refused the pattern's peak
+   * hold, off-peak level and split there, so every saved pattern failed on a whole day and *Tune
+   * the tower* could simulate no change at all. Asked of the template the config names below and of
+   * the file it resolves against, so the question is the one `core` will ask.
+   */
+  const runTemplateId = calendar.demandTemplateId ?? demandTemplate;
+  const takenDemand = demandTheTemplateTakes(demand, {
+    authorsItsPhases:
+      runProfiles.demandTemplates.find((entry) => entry.id === runTemplateId)?.phases !== undefined,
+    variesMix: demandTemplateVariesMix(runTemplateId, runProfiles.demandTemplates),
+  });
+
   return {
     building: finalBuilding,
     event,
@@ -2526,7 +2537,11 @@ export function shiftRunConfigOf(
       holds: patch.outOfServiceCarIds.length === 0 ? [] : eventCarChoice(event.effect, building, booked).holdCars.map((car) => car.carId),
       windows: patch.incidents.map((incident) => incident.car.carId),
     },
-    withheld: [...patch.withheld, ...calendar.withheld],
+    withheld: [
+      ...patch.withheld,
+      ...calendar.withheld,
+      ...(takenDemand.withheld === undefined ? [] : [takenDemand.withheld]),
+    ],
     wholeDayRun,
     episode: spliced === undefined ? undefined : { startS: spliced.startS, endS: spliced.endS },
     config: {
@@ -2595,7 +2610,7 @@ export function shiftRunConfigOf(
        * would have run before the field existed.
        */
       demand: {
-        ...demand,
+        ...takenDemand.demand,
         ...patch.demand,
         ...calendar.demand,
         ...(state.paramDemand === null ? {} : state.paramDemand),

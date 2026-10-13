@@ -426,6 +426,28 @@ describe('one answer to what event a day is under — issue #135', () => {
     );
   });
 
+  /**
+   * **A wrinkle a mode handed the day outranks the schedule and the period** — the post-AN panel's
+   * seat C, D4, wave AO lane AO-5. Career day 20 stands on the career week's Saturday, where the
+   * schedule deals the weekend's *Something on upstairs*; the career handed it *Two cars down*, which
+   * the run was built from and the stage card named. The sheet now asks the same function with the
+   * same id. The control: no id, and the answer is the schedule's to the byte.
+   */
+  it('answers the assigned wrinkle where a mode handed one, and the schedule where none was', () => {
+    const scheduled = scheduledEventFor(null, 20, 5);
+    expect(scheduled.id).not.toBe('two-cars-down');
+    const assigned = scheduledEventFor(null, 20, 5, 'period', undefined, 'two-cars-down');
+    expect(assigned.id).toBe('two-cars-down');
+    expect(assigned.name).toBe('Two cars down');
+    /* Over a period's booking too, because the run reads the mode's id first. */
+    expect(scheduledEventFor(CALENDAR_PERIODS['moving-week'], 1, 0, 'period', undefined, 'two-cars-down').id).toBe(
+      'two-cars-down',
+    );
+    /* An id the library does not have is an ordinary day, as the run resolved it before. */
+    expect(scheduledEventFor(null, 20, 5, 'period', undefined, 'no-such-wrinkle').id).toBe(SHIFT_EVENTS.ordinary.id);
+    expect(scheduledEventFor(null, 20, 5, 'period', undefined, undefined)).toEqual(scheduled);
+  });
+
   it('hands the day back when a period names no event, rather than inventing a quiet one', () => {
     const moving = CALENDAR_PERIODS['moving-week'];
     // Sunday's override is an explicit `null` — the movers do not work Sunday — and `vacation`

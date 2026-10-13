@@ -48,6 +48,7 @@ import type { ViewerState } from '../dev/state.js';
 import type { SimulationConfig } from '@elevator-sim/core/browser';
 import { WEEKDAYS, type DayOutcome } from '../shift/types.js';
 import type { WeekState } from '../shift/types.js';
+import { REPLAY_CONTRACT_ID } from '../shift/week.js';
 
 import { recordUnreadableReason, watchRunPlanOf } from './record.js';
 import { claimRefusalFor, postedResultOf, reproductionRefusalFor } from './reproduce.js';
@@ -123,6 +124,13 @@ export function filedDayRuns(
 ): readonly WatchableRun[] {
   const rows: WatchableRun[] = [];
   for (const week of weeks) {
+    /*
+     * **A replay week's days are the week it replays, copied** — [§ D1382](../../../../DECISIONS.md),
+     * the post-AN panel's seat D (D9). `shift/week.ts#openReplay` stands the replay on the replayed
+     * week's earlier days, so while a replay stood or lay parked the picker listed *Monday · day 1*
+     * twice, both rows replaying one record. The week it copies is listed; the copy is not.
+     */
+    if (week.contractId === REPLAY_CONTRACT_ID) continue;
     for (const outcome of week.history) {
       rows.push(rowForDay(week.contractId, outcome, buildingNameOf));
     }

@@ -40,7 +40,14 @@ describe('the Engineer rail’s today', () => {
   });
 
   it('keeps the calendar’s name on a day that is not the pinned one', () => {
-    const state = contractDayState('c8', { seed: 1n, over: { week: { ...openWeek('c8'), day: 2, dayIdx: 1 } } });
+    /*
+     * A Scenario day carries no career wrinkle: the fixture's `campaignEventId: 'ordinary'` is for its
+     * sweeps' day-1 cells, and since § D1396 the rail reads that field as the run does.
+     */
+    const state = contractDayState('c8', {
+      seed: 1n,
+      over: { week: { ...openWeek('c8'), day: 2, dayIdx: 1 }, campaignEventId: undefined },
+    });
     const shift = todaysShiftOf(resources, state);
     expect(shift.name).not.toBe(CALL_DAY_NAME);
     const today = briefTodayOf(resources, state);

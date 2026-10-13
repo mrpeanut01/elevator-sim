@@ -110,6 +110,12 @@ function orList(parts: readonly string[]): string {
   return `${parts.slice(0, -1).join(', ')} or ${String(parts[parts.length - 1])}`;
 }
 
+/** `a`, `a and b`, `a, b and c`. */
+function andList(parts: readonly string[]): string {
+  if (parts.length <= 1) return parts[0] ?? '';
+  return `${parts.slice(0, -1).join(', ')} and ${String(parts[parts.length - 1])}`;
+}
+
 /** A pinned press's words, lower-cased for the middle of a sentence — the call row's own labels. */
 function pressWordsOf(kind: string): string {
   return dayCallAnswerWordsOf(
@@ -154,7 +160,13 @@ export interface DecidingCall {
 export function decidingCallOf(input: DecidingCallInput): DecidingCall | undefined {
   const { verdict } = input;
   if (verdict === 'ungraded') return undefined;
-  const decided: { readonly at: string; readonly chose: string; readonly others: readonly string[]; readonly reads: CloseVerdict }[] = [];
+  const decided: {
+    readonly atS: number;
+    readonly at: string;
+    readonly chose: string;
+    readonly others: readonly string[];
+    readonly reads: CloseVerdict;
+  }[] = [];
 
   const pinned = input.pinned;
   if (pinned !== undefined) {
@@ -169,6 +181,7 @@ export function decidingCallOf(input: DecidingCallInput): DecidingCall | undefin
             : { words: pressWordsOf(pinned.missedBy), reads: 'missed' as const };
     if (other.reads !== verdict) {
       decided.push({
+        atS: pinned.atS,
         at,
         chose:
           pinned.answered !== undefined
@@ -195,6 +208,7 @@ export function decidingCallOf(input: DecidingCallInput): DecidingCall | undefin
     }
     for (const [reads, others] of flipped) {
       decided.push({
+        atS: record.atS,
         at: input.clockOf(record.atS),
         chose:
           record.answer === 'skipped'
@@ -206,6 +220,8 @@ export function decidingCallOf(input: DecidingCallInput): DecidingCall | undefin
     }
   }
 
+  /* In the day's order, so the deciding call is the last that could turn it and the rest came before it. */
+  decided.sort((a, b) => a.atS - b.atS);
   const last = decided.at(-1);
   if (last === undefined) {
     return {
@@ -213,10 +229,16 @@ export function decidingCallOf(input: DecidingCallInput): DecidingCall | undefin
       decided: false,
     };
   }
+  /*
+   * **The earlier calls are named** — [§ D1379](../../../../DECISIONS.md), the post-AN panel's seat B
+   * (defect 7). It read *1 earlier call today could have turned it too* and never said which, so a
+   * player could not find it among the day's rows. Each is named by its clock, as its row is.
+   */
+  const earlier = [...new Set(decided.slice(0, -1).map((entry) => entry.at))];
   const more =
-    decided.length === 1
+    earlier.length === 0
       ? ''
-      : ` ${String(decided.length - 1)} earlier ${decided.length === 2 ? 'call' : 'calls'} today could have turned it too.`;
+      : ` The ${earlier.length === 1 ? 'call' : 'calls'} at ${andList(earlier)} could have turned it too.`;
   return {
     line:
       `The call that decided today came at ${last.at}, where ${last.chose}: on this crowd, the day run ` +

@@ -566,6 +566,91 @@ describe('§ 8.10’s ceiling', () => {
   });
 });
 
+/**
+ * **More than the allowance and the contract is lost** — the post-AN panel's seat C, D2, wave AO lane
+ * AO-5, § D1392. Garden Apartments on the standing order missed days 14, 17, 18 and 20; the desk read
+ * *4 of 3 missed days used* over *The managing agent has offered a renewal*, and signing it opened the
+ * next month, while the contract's clause 4 says *more than 3 missed days and the contract is lost*.
+ * Red before on the first assertion about the need: it was the renewal.
+ */
+describe('a contract past its missed-day allowance is lost (§ D1392)', () => {
+  const schedule = shippedPriceSchedule();
+  const fileMonth = (missed: readonly number[], through: number): CampaignCareer => {
+    let career = openingCareer('eta');
+    const id = career.towers[0]!.id;
+    for (let day = 1; day <= through; day += 1) {
+      career = applyCampaignAction(
+        career,
+        { kind: 'file-day', towerId: id, verdict: missed.includes(day) ? 'missed' : 'cleared', trips: 400 },
+        schedule,
+      );
+    }
+    return career;
+  };
+
+  it('offers no renewal at 4 of 3: the desk asks for the loss, and signing is refused', () => {
+    const career = fileMonth([14, 17, 18, 20], 20);
+    const tower = career.towers[0]!;
+    expect(tower.missed).toBe(4);
+    expect(contractIsLost(tower)).toBe(true);
+    const need = needOf(tower);
+    expect(need?.kind).toBe('lost');
+    expect(need?.title).toBe('The contract is lost');
+    expect(need?.brief).toContain('4 days missed, and standard allows 3, so this contract is lost.');
+    expect(need?.options.map((option) => option.id)).toEqual(['start-again']);
+    /* The renewal's answers are not on this desk, so the reducer refuses them. */
+    for (const optionId of ['sign', 'push', 'refurbish', 'hand-back']) {
+      expect(applyCampaignAction(career, { kind: 'answer-need', towerId: tower.id, optionId }, schedule)).toBe(career);
+    }
+  });
+
+  it('runs no more of a contract lost mid-month', () => {
+    const career = fileMonth([1, 2, 3, 4], 4);
+    const tower = career.towers[0]!;
+    expect(tower.day).toBe(5);
+    expect(needOf(tower)?.kind).toBe('lost');
+    expect(
+      applyCampaignAction(career, { kind: 'file-day', towerId: tower.id, verdict: 'cleared', trips: 400 }, schedule),
+    ).toBe(career);
+  });
+
+  it('starts the month again from day 1 on its own purse, and counts the loss', () => {
+    const career = fileMonth([14, 17, 18, 20], 20);
+    const tower = career.towers[0]!;
+    const opened = purseOf({ ...tower, day: 1, missed: 0, missedDays: [], bookings: [], spends: [] });
+    const again = applyCampaignAction(career, { kind: 'answer-need', towerId: tower.id, optionId: 'start-again' }, schedule);
+    const restarted = again.towers[0]!;
+    expect(again.lost).toBe(career.lost + 1);
+    expect(restarted.day).toBe(1);
+    expect(restarted.missed).toBe(0);
+    expect(restarted.missedDays).toEqual([]);
+    expect(restarted.bookings).toEqual([]);
+    expect(purseOf(restarted)).toBe(opened);
+    expect(needOf(restarted)).toBeUndefined();
+    /* The career counts it once: three lost ends it, and this loss is no longer a failing tower too. */
+    expect(careerIsOver(again)).toBe(careerIsOver(career));
+  });
+
+  it('counts the loss when a new difficulty starts the lost month, and not when the month is running', () => {
+    const lost = fileMonth([1, 2, 3, 4], 4);
+    const id = lost.towers[0]!.id;
+    expect(applyCampaignAction(lost, { kind: 'set-difficulty', towerId: id, difficultyId: 'easy' }, schedule).lost).toBe(
+      lost.lost + 1,
+    );
+    const running = fileMonth([1, 2, 3], 3);
+    expect(
+      applyCampaignAction(running, { kind: 'set-difficulty', towerId: id, difficultyId: 'easy' }, schedule).lost,
+    ).toBe(running.lost);
+  });
+
+  it('keeps the renewal for a month inside its allowance — the control', () => {
+    const career = fileMonth([14, 17, 18], 20);
+    const tower = career.towers[0]!;
+    expect(contractIsLost(tower)).toBe(false);
+    expect(needOf(tower)?.kind).toBe('renewal');
+  });
+});
+
 describe('§ 8.12’s snapshots, as the regression fixtures the design asks for', () => {
   it('reads the second month the way § 8.12 describes it', () => {
     expect(SECOND_MONTH.towers).toHaveLength(3);

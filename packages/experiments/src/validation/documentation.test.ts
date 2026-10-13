@@ -2234,7 +2234,13 @@ type DecisionReservation = {
  * is registered in `KNOWN_DECISION_HOLES`; **D1360-D1400 are free rather than holed**, since nothing
  * is written above them (§ D430), and the charter row moves to **D1360**.
  */
-const OPEN_RESERVATION = null as DecisionReservation | null;
+/*
+ * **Wave AO is OPEN and reserves D1360-D1460**: the defects the post-AN re-panel found first, then the
+ * lanes a swarm's rulings on that panel make necessary. Committed on `ao-int` before any lane worktree
+ * exists, and closed in the wave's own merge commit. Wave AN left D1360-D1400 free rather than holed
+ * (§ D430), so this block opens over them.
+ */
+const OPEN_RESERVATION = { wave: 'AO', from: 1360, to: 1460 } as DecisionReservation | null;
 /*
  * **Wave AC's reservation, D619-D620, is closed.** It opened on the pair wave AB left free.
  * GitHub issue #437 stage 2 wrote D619 first, on a lane that started from the same pre-#422 base as
