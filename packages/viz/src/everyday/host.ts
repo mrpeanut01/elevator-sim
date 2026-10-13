@@ -1792,6 +1792,16 @@ export interface EverydayHost {
   stageHold(recording: VizRecording | undefined): 'elsewhere' | 'stale' | undefined;
 
   /**
+   * **Whether the run on `recording` is another day than the attempt another tab holds** — wave AP,
+   * lane AP-D1, [§ D1447](../../../../DECISIONS.md), the post-AO panel's seat D (D7). `true` while
+   * another tab holds the attempt standing on the week's day and `recording` is not this tab's run
+   * of it (the one it plays, or the one it was playing when the other tab took it over): a second
+   * tab opened on *Continue your week* had the page's own run on its stage, an 08:30 hour on another
+   * seed, behind the line saying the attempt was open elsewhere. The stage shows no such run.
+   */
+  stageHoldsAnotherDay(recording: VizRecording | undefined): boolean;
+
+  /**
    * **Where the standing attempt was left, on the day's own clock** — wave AO, lane AO-4,
    * [§ D1384](../../../../DECISIONS.md), for the mode picker's *Continue your week*. The furthest
    * instant the stage had shown of it (`shift/attempt.ts#DayAttempt.shownToS`, where the stage
@@ -2525,6 +2535,11 @@ export interface EverydayHostBindings {
    * and the attempt's day is still open. Absent, no run ever is.
    */
   attemptRunStale?(recording: VizRecording): boolean;
+  /**
+   * § D1447 — `recording` is this tab's run of the standing attempt: the one it plays, or the one it
+   * was playing when another tab took the attempt over. Absent, no run is.
+   */
+  attemptRunHere?(recording: VizRecording): boolean;
   /**
    * § D1360 — `dev/main.ts`'s refusal while a scored attempt stands: over the state as it stands with
    * no patch (an ask for a run of its day), and with one over the state now and the state the write
@@ -4455,6 +4470,11 @@ export function createEverydayHost(
       if (b.attemptHeldElsewhere?.() === true) return 'elsewhere';
       return recording !== undefined && b.attemptRunStale?.(recording) === true ? 'stale' : undefined;
     },
+    stageHoldsAnotherDay: (recording) =>
+      recording !== undefined &&
+      b.dayAttempt?.() !== undefined &&
+      b.attemptHeldElsewhere?.() === true &&
+      b.attemptRunHere?.(recording) !== true,
     previousDayDriver: () => {
       const state = b.state();
       const entry = state.week.history.find((outcome) => outcome.day === state.week.day - 1);

@@ -144,6 +144,7 @@ const DOORS: Readonly<Record<keyof EverydayHost, Door>> = Object.freeze({
   playDay: 'attempt',
   dayAttempt: 'reads',
   stageHold: 'reads',
+  stageHoldsAnotherDay: 'reads',
   attemptResumeAtS: 'reads',
   practiceOnStage: 'reads',
   noteShown: 'attempt',

@@ -139,6 +139,7 @@ import { carAbsencesOf, type BookedOutCar } from '../shift/bookedOut.js';
 import { actsOf, type DayAct } from '../shift/dayLength.js';
 import type { RunHorizon } from '../shift/types.js';
 import {
+  firstLostInstantOf,
   STAGE_SKIP_BEAT_NOTE,
   stagePaceNoteOf,
   stagePaceOf,
@@ -148,9 +149,10 @@ import {
   stageSkipLineOf,
   stageSkipOf,
   type StagePaceReason,
+  worstWaitLossBeginsOf,
 } from './stagePace.js';
 /* Wave AI, § D1029 — the pinned day's call. */
-import type { DayCallDriverNames } from '../shift/dayCalls.js';
+import { DAY_CALL_FINAL_GOAL_IDS, type DayCallDriverNames } from '../shift/dayCalls.js';
 import type { PressCall } from '../shift/pressCall.js';
 import {
   STAGE_CALL_COPY,
@@ -1614,31 +1616,97 @@ function mountStage(
   /** Where the stage first read the adopted run lost, and whether its card has stopped the stage yet. */
   let lostAtS: number | undefined;
   let lostCardShown = false;
+  /**
+   * The furthest instant the stage has read the day not lost at, on the run it is playing: the
+   * previous frame's playhead, so each frame reads the stretch since it (§ D1445). `undefined`
+   * before the first read and after a fresh adoption.
+   */
+  let lostReadToS: number | undefined;
+  /** {@link worstWaitLossBeginsOf} on the adopted run, worked out once per recording. */
+  let lostBegins: { readonly recording: VizRecording; readonly atS: readonly number[] } | undefined;
+
+  function lostBeginsOn(recording: VizRecording): readonly number[] {
+    if (lostBegins?.recording === recording) return lostBegins.atS;
+    const bar = host
+      .goalsAt(recording.startedAt)
+      .find((reading) => DAY_CALL_FINAL_GOAL_IDS.includes(reading.goal.id) && reading.goal.reads === 'worstWaitS')?.goal.bar;
+    lostBegins = { recording, atS: bar === undefined ? [] : worstWaitLossBeginsOf(recording.legs, bar) };
+    return lostBegins.atS;
+  }
 
   /**
-   * § D1435: on the first frame of the player's own scored day at which a goal graded on a maximum
-   * reads past its bar, note the instant (the pace reads it), stop the stage and show the card once,
-   * focusing *End the day*. A pinned day's call still standing is answered first (§ D1168 clause 2);
-   * a card is never drawn over a call's. Once the transport plays again the card goes.
+   * **Where in `(fromS, toS]` the stage should stop on the lost day's card**, or `undefined`: wave
+   * AP, lane AP-D1, [§ D1445](../../../../DECISIONS.md), the post-AO panel's seat D (D1). Only on the
+   * player's own scored day, once per attempt, never over a call's card or a pinned call still
+   * standing (§ D1435), and never at the day's last instant, which the bar already says has run out.
    */
-  function drawLost(recording: VizRecording, simTimeS: number, watching: WatchingView | undefined): void {
+  function lostStopIn(recording: VizRecording, fromS: number, toS: number): number | undefined {
+    if (lostCardShown || context.ctx !== 'daily' || watchingNow() !== undefined) return undefined;
+    if (activeCall()?.pinned === true || !callCard.hidden) return undefined;
+    const atS = firstLostInstantOf(
+      (at) => stageLostCardOf(host.goalsAt(at), '') !== undefined,
+      fromS,
+      Math.min(toS, recording.endedAt),
+      lostBeginsOn(recording),
+    );
+    return atS === undefined || atS >= recording.endedAt ? undefined : atS;
+  }
+
+  /**
+   * **Stop on the lost day's card at `atS`**: § D1435's stop, put on the instant the day was lost
+   * (§ D1445) as § D1153 puts the stage on a call's second. The playhead goes back to it, so the
+   * clock, the header and the card's fact describe one instant. Whatever was carrying the stage on
+   * (a skip, a wait at a call that has not been raised) ends here, because a lost day asks no call
+   * and the stage never ends the day for the player.
+   */
+  function stopOnLoss(atS: number): void {
     if (playback === undefined) return;
-    if (!lostCard.hidden && playback.state === 'playing') lostCard.hidden = true;
-    if (lostCardShown && lostAtS !== undefined) return;
-    if (context.ctx !== 'daily' || watching !== undefined || simTimeS >= recording.endedAt) return;
-    if (activeCall()?.pinned === true || !callCard.hidden) return;
-    const view = stageLostCardOf(host.goalsAt(simTimeS), clockAt(simTimeS, host.dayStartS()));
+    const view = stageLostCardOf(host.goalsAt(atS), clockAt(atS, host.dayStartS()));
     if (view === undefined) return;
-    lostAtS ??= simTimeS;
-    if (lostCardShown) return;
+    lostAtS = atS;
     lostCardShown = true;
+    lostReadToS = atS;
     playback.pause();
+    if (playback.simTimeS !== atS) playback.seekTo(atS);
     dropSkipBeat();
+    skipping = false;
+    waitingOnCall = false;
+    if (skipLine !== '') {
+      skipLine = '';
+      skipLineReason = undefined;
+      showStatus();
+    }
     lostFact.textContent = view.fact;
     lostCard.hidden = false;
     lostCard.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     lostEnd.focus({ preventScroll: true });
     syncTransport();
+    requestFrame();
+  }
+
+  /**
+   * § D1435: the first instant of the player's own scored day at which a goal graded on a maximum
+   * reads past its bar stops the stage once, on the card, focusing *End the day*. A pinned day's call
+   * still standing is answered first (§ D1168 clause 2); a card is never drawn over a call's. Once
+   * the transport plays again the card goes.
+   *
+   * **The stretch since the last frame, read at the playhead the frame ends on**: wave AP, lane
+   * AP-D1, [§ D1445](../../../../DECISIONS.md), the post-AO panel's seat D (D1). It read one
+   * instant, the frame's, and read it before the frame's own stops. A frame at `600×` that crossed a
+   * call and then the loss latched the card at an instant past the call, the stage went back to the
+   * call, and after the answer the card was spent, so the rest played under the `lost` line with no
+   * card; and a frame could step over the few seconds a worst-wait miss reads before the next long
+   * waiter censors it.
+   */
+  function drawLost(recording: VizRecording): void {
+    if (playback === undefined) return;
+    if (!lostCard.hidden && playback.state === 'playing') lostCard.hidden = true;
+    if (lostCardShown) return;
+    const toS = Math.min(playback.simTimeS, recording.endedAt);
+    const fromS = lostReadToS !== undefined && lostReadToS < toS ? lostReadToS : toS;
+    const atS = lostStopIn(recording, fromS, toS);
+    lostReadToS = toS;
+    if (atS !== undefined) stopOnLoss(atS);
   }
   /**
    * Show or hide the card — and, **on the frame it appears and on no other**, bring it into the
@@ -1807,8 +1875,22 @@ function mountStage(
       /* § D1212: a pause stops a skip that is coming; *Play* starts a fresh beat. */
       dropSkipBeat();
     } else {
-      /* Lane AO-4: the button is held while the stage works out a call; a key press is held with it. */
-      if (waitingAtCall()) return;
+      /*
+       * Lane AO-4: the button is held while the stage works out a call; a key press is held with it.
+       * **But the press is kept**: wave AP, lane AP-D1, [§ D1446](../../../../DECISIONS.md), the
+       * post-AO panel's seats D (D2) and A (defect 4). A call can stand at the day's first instant
+       * (a wrinkle that begins as the day does, the lift-service Wednesday's car C from 08:00), so
+       * § 7.3's *Start* was pressed while the stage worked it out and was swallowed: the day had not
+       * started, nothing waited on the call, and once its runs landed unraised the stage sat at
+       * 08:00. The press now marks the day started and waiting, so it plays on, or stops on the card,
+       * when the runs land, exactly as a stage that met the call while playing does.
+       */
+      if (waitingAtCall()) {
+        started = true;
+        waitingOnCall = true;
+        syncTransport();
+        return;
+      }
       started = true;
       /*
        * The one place a player gesture reaches the sound — GitHub issue #258. A browser suspends
@@ -2241,6 +2323,17 @@ function mountStage(
       showCallCard(false);
     }
     waitingOnCall = false;
+    /*
+     * **A skip that would run past the instant the day was lost stops there, on the card, once** —
+     * wave AP, lane AP-D1, [§ D1445](../../../../DECISIONS.md), reading swarm DR's § Q4 (*the stage
+     * stops once*) as binding a skip as it binds a frame, the way § D1151 stops a skip at a call. The
+     * card's *End the day* files the day, and a second press of the skip runs it to the end.
+     */
+    const lostS = lostStopIn(playback.recording, playback.simTimeS, playback.recording.endedAt);
+    if (lostS !== undefined) {
+      stopOnLoss(lostS);
+      return;
+    }
     playback.play();
     playback.seekTo(playback.recording.endedAt);
     syncTransport();
@@ -2356,7 +2449,15 @@ function mountStage(
      * plays on by itself — the player did not pause it, and a stage left paused here would be a
      * stop with no call behind it.
      */
-    if (waitingOnCall && playback !== undefined && (standing === undefined || standing.call.atS > simTimeS)) {
+    /*
+     * Wave AP, lane AP-D1, [§ D1446](../../../../DECISIONS.md): **a skip carried across the wait is a
+     * reason to go on by itself.** {@link skipToEnd} marks it, and only {@link pace} marked the wait,
+     * which it does only while the transport plays; a skip pressed at a call standing at the day's
+     * first instant, before anything played, was carried and never read, so the first press did
+     * nothing and the second reached the call (the post-AO panel's seats D, D2, and A, defect 4).
+     */
+    const carried = waitingOnCall || (skipping && recomputingOver === undefined);
+    if (carried && playback !== undefined && (standing === undefined || standing.call.atS > simTimeS)) {
       waitingOnCall = false;
       /* § D1151: a skip that was waiting here goes on to the next call, or to the end. */
       if (skipping) {
@@ -2736,6 +2837,10 @@ function mountStage(
       lostAtS = undefined;
       lostCardShown = false;
       lostCard.hidden = true;
+      lostReadToS = undefined;
+    } else if (lostReadToS !== undefined && lostReadToS > resumeAtS) {
+      /* § D1445: the re-simulated run is the same day only up to the press, so it is read on from there. */
+      lostReadToS = resumeAtS;
     }
     /*
      * § D1029 — the call, latched per attempt. A fresh attempt asks the host once, of the recording
@@ -2884,7 +2989,16 @@ function mountStage(
       standingAtEntry,
       runFailed: host.runFailure?.() !== undefined,
     });
-    if (mayAdopt && recording !== undefined) adopt(recording);
+    /*
+     * **Behind the veil, no other day** — wave AP, lane AP-D1, [§ D1447](../../../../DECISIONS.md),
+     * the post-AO panel's seats D (D7) and A (6). A second tab opened on *Continue your week* while
+     * the first held the attempt adopted the page's own run (an 08:30 hour on another seed, another
+     * car booked out, other bars) and drew it under *your attempt at this day is still open*, with a
+     * *▶ Play* that looked live. Such a run is not adopted: the stage stays empty under § D1361's
+     * line, with nothing to play, until a takeover brings the attempt's own run.
+     */
+    const anotherDay = context.ctx === 'daily' && recording !== undefined && host.stageHoldsAnotherDay(recording);
+    if (mayAdopt && recording !== undefined && !anotherDay) adopt(recording);
     holdForAnotherTab();
     /*
      * § 3.3's row asks *this* stage what it has, and while the third clause of {@link stageMayAdopt}
@@ -2893,7 +3007,7 @@ function mountStage(
      * a day that is not on screen and `closeDay` would file it. `stageBarModelOf` says the honest
      * thing instead: *the day has not started yet — there is nothing to file*.
      */
-    const awaitingToday = adopted === undefined && recording !== undefined && !mayAdopt;
+    const awaitingToday = adopted === undefined && recording !== undefined && (!mayAdopt || anotherDay);
     barFacts.hasRun = runState.hasRun && !awaitingToday;
     /*
      * § 20.15's withdrawal, re-read on every notification rather than latched at mount — GitHub
@@ -2975,7 +3089,14 @@ function mountStage(
      * on its face, as the skip beside it is (§ D1381, lane AO-3).
      */
     const waitingNow = waitingAtCall();
-    const play = stagePlayControlOf({ playing, hasRun: playback !== undefined, waitingOnCall: waitingNow, dayEnded: ended });
+    /* § D1447: while another tab holds the day, neither control is drawn as if it would act. */
+    const heldBy =
+      heldAtS === undefined
+        ? undefined
+        : barFacts.held?.kind === 'stale'
+          ? DAY_ATTEMPT_COPY.staleStage
+          : DAY_ATTEMPT_COPY.elsewhereStage;
+    const play = stagePlayControlOf({ playing, hasRun: playback !== undefined, waitingOnCall: waitingNow, dayEnded: ended, heldBy });
     playButton.textContent = play.label;
     playButton.disabled = play.inert;
     /* A held button says why to a reader on it, in the line a sighted player reads beside it. */
@@ -2988,7 +3109,7 @@ function mountStage(
      * only in a docstring: `stageSkipViewOf` is the one place that decides, so the mount cannot
      * disagree with the corpus about what this control says.
      */
-    const skip = stageSkipViewOf({ dayEnded: ended, hasRun: playback !== undefined });
+    const skip = stageSkipViewOf({ dayEnded: ended, hasRun: playback !== undefined, heldBy });
     skipButton.textContent = skip.label;
     skipButton.title = skip.note;
     skipButton.disabled = skip.inert;
@@ -3264,8 +3385,6 @@ function mountStage(
     const recording = adopted;
     if (recording === undefined || playback === undefined) return;
     const simTimeS = playback.simTimeS;
-    /* § D1218 — how far the day's attempt has been shown, so leaving and coming back resumes here. */
-    if (context.ctx === 'daily') host.noteShown(recording, simTimeS);
     const observations: LiveObservations = observationsAt(recording, simTimeS);
     pace(simTimeS, observations.longestCurrentWaitS);
     drawCall(playback.simTimeS);
@@ -3380,7 +3499,14 @@ function mountStage(
     );
     drawGoals(recording, simTimeS, watching);
     drawEndDay(recording, simTimeS, watching);
-    drawLost(recording, simTimeS, watching);
+    drawLost(recording);
+    /*
+     * § D1218: how far the day's attempt has been shown, so leaving and coming back resumes here.
+     * Noted at the playhead the frame ends on, after the stops that put it back (a call's second,
+     * § D1153; the lost instant, § D1445), so the reach is never a frame past where the stage
+     * stopped. Wave AP, lane AP-D1: the Engineer transport follows this reach (§ D1448).
+     */
+    if (context.ctx === 'daily') host.noteShown(recording, playback.simTimeS);
     /* A rush asks nothing of the day: § 9.2 has no brief and no goals to grade. */
     goals.style.display = context.ctx === 'rush' ? 'none' : '';
     drawWatching(watching);
@@ -3740,6 +3866,8 @@ function mountStage(
     started = true;
     skipping = false;
     waitingOnCall = false;
+    /* § D1445: the player has ended the day, so the run out to its end stops on no card. */
+    lostCardShown = true;
     showCallCard(false);
     host.endDayEarly(atS);
     playback.play();

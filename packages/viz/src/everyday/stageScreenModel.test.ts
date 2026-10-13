@@ -87,6 +87,8 @@ import {
   stageFigureToneOf,
   stagePlayControlOf,
   STAGE_PLAY_DONE_REASON,
+  STAGE_SKIP_COPY,
+  stageSkipViewOf,
 } from './stageScreenModel.js';
 import { restBarWidthPx } from '../render/carRest.js';
 /* Pillar 3's strip is read against the rail's own fold and the shift's own goals — issue #277. */
@@ -2310,6 +2312,25 @@ describe('the stage’s own state — wave AO, lane AO-4', () => {
     expect(stagePlayControlOf({ playing: false, hasRun: false, waitingOnCall: false }).disabled).toBe(true);
     /* It names no call, because the call may not be raised. */
     expect(STAGE_PLAY_CONTROL.waiting).not.toMatch(/call/iu);
+  });
+
+  /*
+   * Wave AP, lane AP-D1, § D1447, the post-AO panel's seat D (D7): behind § D1361's veil the stage
+   * takes no press, and *▶ Play* and the skip were drawn live over it. Red before: `heldBy` was not
+   * read, so a held stage with a run offered both.
+   */
+  it('draws Play and the skip inert, with the veil’s own sentence, while another tab holds the day', () => {
+    const line = DAY_ATTEMPT_COPY.elsewhereStage;
+    expect(stagePlayControlOf({ playing: false, hasRun: true, heldBy: line })).toEqual({
+      label: STAGE_PLAY_CONTROL.play,
+      disabled: true,
+      inert: true,
+      note: line,
+    });
+    expect(stagePlayControlOf({ playing: false, hasRun: false, heldBy: line }).note, 'an empty stage behind the veil is not waiting for a run').toBe(line);
+    expect(stageSkipViewOf({ dayEnded: false, hasRun: true, heldBy: line })).toEqual({ label: STAGE_SKIP_COPY.label, note: line, inert: true });
+    expect(stagePlayControlOf({ playing: false, hasRun: true }).inert, 'the stage this tab holds still plays').toBe(false);
+    expect(stageSkipViewOf({ dayEnded: false, hasRun: true }).inert).toBe(false);
   });
 
   /*

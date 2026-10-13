@@ -222,6 +222,101 @@ export type ScoredPaceReason = 'watching' | 'fast' | 'yours' | 'lost';
  * to the end. It narrows § D1169 clause 1 for a lost day alone.
  */
 
+/**
+ * **How finely the stage finds the instant a day was lost**, in simulated seconds: wave AP, lane
+ * AP-D1, [§ D1445](../../../../DECISIONS.md). The clock prints minutes, so a second is finer than
+ * anything the card says; it bounds the bisection in {@link firstLostInstantOf} to about seventeen
+ * reads across a ten-hour day.
+ */
+export const LOST_INSTANT_RESOLUTION_S = 1;
+
+/**
+ * **The coarse step {@link firstLostInstantOf} walks before it bisects**, in simulated seconds. Sixty
+ * reads across a ten-hour day, once per skip; a frame moves the playhead far less, so a frame costs
+ * the one read at its own instant that the stage made before.
+ */
+export const LOST_SCAN_STEP_S = 600;
+
+/**
+ * **The instants at which the worst-wait goal can begin to read missed**, ascending: wave AP, lane
+ * AP-D1, [§ D1445](../../../../DECISIONS.md), the post-AO panel's seat D (D1).
+ *
+ * The worst-wait reading is not monotone in time. `shift/goals.ts#readGoal` grades a censored
+ * maximum `pending` in either direction, and the maximum is censored whenever somebody still
+ * standing has waited longer than any wait that has ended (`live/observations.ts`). So on a day
+ * past its bar the goal reads *missed* from the instant the longest waiter boards until somebody
+ * still standing has waited longer, which in a backed-up morning is a few seconds, and then
+ * *pending* again. A frame at `600×` moves the playhead ten simulated seconds or more, so a reading
+ * at each frame's instant can step over every such window.
+ *
+ * Between two of these instants nothing can turn the reading to *missed*: the waits that have
+ * ended are fixed, and the waits still running only grow, which can censor the maximum and never
+ * uncensor it. So the reading can begin to be *missed* only where a wait ends, and only a wait
+ * past the bar can make it so. This lists the instant each such wait ended (`boardedAt`, else
+ * `refusedAt`), once each, with a second's margin under the bar for the whole-second rounding the
+ * goal row prints. It decides nothing: {@link firstLostInstantOf} reads the goals at each instant listed.
+ * The queue goal needs no list, because its maximum is never censored and only grows.
+ */
+export function worstWaitLossBeginsOf(legs: readonly VizLeg[], barS: number): readonly number[] {
+  const ends = new Set<number>();
+  for (const leg of legs) {
+    const endedAt = leg.boardedAt ?? leg.refusedAt;
+    if (endedAt !== undefined && endedAt - leg.arrivedAt > barS - 1) ends.add(endedAt);
+  }
+  return [...ends].sort((a, b) => a - b);
+}
+
+/**
+ * **The first instant in `(fromS, toS]` at which the day reads lost**, or `undefined` where none
+ * does: wave AP, lane AP-D1, [§ D1445](../../../../DECISIONS.md), the post-AO panel's seat D (D1).
+ *
+ * `readsLost` is the stage's own reading at an instant (`stageCall.ts#stageLostCardOf` over
+ * `EverydayHost.goalsAt`), so the instant answered is one at which the card has words. `fromS` is
+ * the instant the stage last read and found not lost (the previous frame's playhead); where
+ * `toS` is not after it, the one instant `toS` is read.
+ *
+ * Two searches, and the earlier answer wins. The queue goal's maximum only grows, so the stretch is
+ * walked in steps of {@link LOST_SCAN_STEP_S} to the first read that is lost and the step before it
+ * is bisected to {@link LOST_INSTANT_RESOLUTION_S}. The worst-wait goal can read lost in a window
+ * shorter than a frame, so each instant in `beginsAtS` ({@link worstWaitLossBeginsOf}) inside the
+ * stretch and before the walk's answer is read in turn.
+ *
+ * Why the stage needs it: a frame at `600×` moves the playhead ten simulated seconds at sixty frames
+ * a second and a minute or more on a loaded machine, and a skip moves it by hours. The stage stops on
+ * the instant the day was lost rather than wherever the frame or the skip landed, as § D1153 puts the
+ * stage back on a call's second.
+ */
+export function firstLostInstantOf(
+  readsLost: (atS: number) => boolean,
+  fromS: number,
+  toS: number,
+  beginsAtS: readonly number[] = [],
+): number | undefined {
+  if (!(toS > fromS)) return readsLost(toS) ? toS : undefined;
+  let walked: number | undefined;
+  let before = fromS;
+  while (before < toS) {
+    const next = Math.min(toS, before + LOST_SCAN_STEP_S);
+    if (readsLost(next)) {
+      let after = next;
+      while (after - before > LOST_INSTANT_RESOLUTION_S) {
+        const mid = before + (after - before) / 2;
+        if (readsLost(mid)) after = mid;
+        else before = mid;
+      }
+      walked = after;
+      break;
+    }
+    before = next;
+  }
+  for (const atS of beginsAtS) {
+    if (atS <= fromS) continue;
+    if (atS > toS || (walked !== undefined && atS >= walked)) break;
+    if (readsLost(atS)) return atS;
+  }
+  return walked;
+}
+
 export interface StagePace {
   readonly simPerRealS: number;
   readonly reason: StagePaceReason;
