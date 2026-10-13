@@ -618,14 +618,27 @@ const TIERS: Readonly<Record<string, Tier>> = Object.freeze({
   'packages/viz/src/everyday/callCadence.sweep.test.ts': {
     gates: ['CALL_CADENCE_SWEEP'],
     reason:
-      'Wave AN lane DQ-1, § D1338 and § D1337 — Midtown’s week 1 on the first four census crowds, ' +
-      'played by the sitting bot’s careful policy through the shipped call session, held to floors ' +
-      'written before the run: a median of four calls a day, no weekday without one, an evening call ' +
-      'on three of each week’s five, and no who-drives answer lowest on under a tenth or over three ' +
-      'fifths of the rows; the longest silence published. Scheduled, unlike the sitting bot beside ' +
+      'Wave AN lane DQ-1, § D1338 and § D1337 — Midtown’s week 1 on census crowds 0, 5, 10 and 15 ' +
+      '(the first four until § D1440), played by the sitting bot’s careful policy through the ' +
+      'shipped call session, held to floors written before the run: a median of four calls a day, no ' +
+      'weekday without one, an evening call on three of each week’s five; the longest silence and ' +
+      '§ D1337’s count check published, the count check gating nothing since § D1440. Scheduled, unlike the sitting bot beside ' +
       'it, because it is a check rather than a compute job: the post-AM panel’s cadence was a stale ' +
       'bundle’s, and a floor nothing runs is #163 again. callCadence.test.ts holds the arithmetic on ' +
       'every run. About 70 s a day on a contended four-core container, twenty days',
+    scheduled: true,
+  },
+  'packages/viz/src/everyday/callBands.sweep.test.ts': {
+    gates: ['CALL_BANDS_SWEEP'],
+    reason:
+      'Wave AO lane DR-2, § D1441 to § D1443, swarm DR’s Q2 — every week order Midtown deals from ' +
+      'week 2, on census crowds 0, 5, 10 and 15, under the two profiles DC-11 shows holding it most, ' +
+      'played through the shipped call session with the careful answers and every offer candidate ' +
+      'run beside the card at each who-drives call, matched row for row against data/call-bands.json. ' +
+      'Scheduled because it is a check rather than a compute job: the keep band, the switch floor, ' +
+      'the answer ceiling, the offer list and the week sheet’s DC-13 line are all arithmetic over ' +
+      'those rows, and a pinned census nothing re-runs goes stale unseen. callBands.test.ts holds the ' +
+      'arithmetic on every run. About 20 to 27 minutes a profile on a contended four-core container',
     scheduled: true,
   },
   'packages/viz/src/everyday/sittingBot.sweep.test.ts': {

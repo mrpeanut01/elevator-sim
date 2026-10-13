@@ -7,7 +7,9 @@
  * [§ D1204](../../../../DECISIONS.md) (a pinned day's session opens after its pinned call) and
  * [§ D1205](../../../../DECISIONS.md) (two calls a peak, no question repeated within ten minutes, no
  * driver question after *keep* in that peak, and the driver question asked again after a handover
- * with the pair re-derived from whoever now drives).
+ * with the pair re-derived from whoever now drives). Wave AO's lane DR-2 amended the third
+ * ([§ D1444](../../../../DECISIONS.md)): after *keep*, who drives is raised again in that peak where
+ * its three runs' day verdicts differ, and on nothing else.
  *
  * ## What it holds, and for how long
  *
@@ -57,14 +59,17 @@
  *   dispatcher now driving ([§ D1205](../../../../DECISIONS.md)); after a handover the shell cannot
  *   name, the driver question stops for the day, because *keep who drives* would name nobody.
  * - **No third call in a peak, no question twice inside {@link DAY_CALL_REPEAT_S}, and no driver
- *   question after *keep* in the same peak** ([§ D1205](../../../../DECISIONS.md)). A candidate where
- *   both questions are held costs no run and is not counted as asked.
+ *   question after *keep* in the same peak** ([§ D1205](../../../../DECISIONS.md)) **unless its runs
+ *   split the day's verdict** ([§ D1444](../../../../DECISIONS.md)). A candidate where both questions
+ *   are held costs no run and is not counted as asked.
  */
 
 import type { DispatcherProfile, RunInterventionConfig } from '@elevator-sim/core/browser';
 
 import type { VizRecording } from '../contract/types.js';
+import { queueAt } from '../frame/overlay.js';
 import { observationsAt } from '../live/observations.js';
+import { dayCallMaximaOf } from '../shift/dayCallMaxima.js';
 import type { BookedOutCar } from '../shift/bookedOut.js';
 import { actsOf } from '../shift/dayLength.js';
 import {
@@ -336,11 +341,20 @@ export function openDayCallSession(
     return last !== undefined && atS - last < DAY_CALL_REPEAT_S;
   }
 
-  /** Whether the driver question may be asked of `call` — a pair, and neither § D1205 hold. */
+  /** Whether *keep who drives* was answered earlier in `call`'s peak (§ D1205 clause 3). */
+  function keptHere(call: PressCall): boolean {
+    return call.act !== undefined && keptInPeakS === call.act.startS;
+  }
+
+  /**
+   * Whether the driver question may be asked of `call` — a pair, and § D1205's ten minutes. After
+   * *keep* in the same peak it is asked only where the day's goals can grade its runs, because there
+   * the day's verdict differing is its only ground (§ D1444, below).
+   */
   function driverAskable(call: PressCall): boolean {
     if (pair === undefined || driverNames === undefined) return false;
     if (heldByRepeat('driver', call.atS)) return false;
-    return call.act === undefined || keptInPeakS !== call.act.startS;
+    return !keptHere(call) || opening.goals !== undefined;
   }
 
   function inputOf(recording: VizRecording) {
@@ -430,9 +444,34 @@ export function openDayCallSession(
     return verdicts.size > 1;
   }
 
-  /** § D1138's admission, and at a wrinkle's start § D1336's verdict ground beside it. */
-  function admits(counted: DayCallRecord, verdictGround: boolean): boolean {
-    return dayCallAdmits(counted.counts) || (verdictGround && verdictsSplit(counted.observations));
+  /**
+   * § D1138's admission, and at a wrinkle's start § D1336's verdict ground beside it.
+   *
+   * **The verdict ground asks only where somebody is standing** — wave AO, lane DR-1,
+   * [§ D1434](../../../../DECISIONS.md), swarm DR's ruling § Q1 item 4. A call admitted on that
+   * ground alone, with nobody at a landing at its second, put a card saying *Nobody is standing at
+   * the landings* over a row of zeros: nothing on the frame to read, and the day split on it. `leave`
+   * is the run standing, identical to the other two up to the call, read by the card's own fold
+   * (`frame/overlay.ts#queueAt`, as `everyday/stageCall.ts#stageCallPresentOf` reads it). A call the
+   * counts admit is asked whoever stands.
+   */
+  function admits(counted: DayCallRecord, verdictGround: boolean, leave: VizRecording): boolean {
+    if (dayCallAdmits(counted.counts)) return true;
+    if (!verdictGround || !verdictsSplit(counted.observations)) return false;
+    return queueAt(leave, counted.atS).some((queue) => queue.total > 0);
+  }
+
+  /**
+   * The raised call's record with each answer's two final goals read through the day — § D1433,
+   * `shift/dayCallMaxima.ts`. Taken once, at the raise, while the three runs are in hand, so a row
+   * on a resumed attempt reads them from the record as an unbroken one does.
+   */
+  function withMaxima(counted: DayCallRecord, runs: Partial<Record<DayCallAnswer, VizRecording>>): DayCallRecord {
+    const maxima: Partial<Record<DayCallAnswer, ReturnType<typeof dayCallMaximaOf>>> = {};
+    for (const [answer, recording] of Object.entries(runs) as [DayCallAnswer, VizRecording | undefined][]) {
+      if (recording !== undefined) maxima[answer] = dayCallMaximaOf(recording, counted.atS);
+    }
+    return Object.freeze({ ...counted, maxima: Object.freeze(maxima) });
   }
 
   function refuse(asking: Pending): void {
@@ -579,8 +618,8 @@ export function openDayCallSession(
             leave: wholeRunOf(leave),
           },
         });
-        if (admits(counted, verdictGround)) {
-          raise(asking, 'placement', counted, {
+        if (admits(counted, verdictGround, leave)) {
+          raise(asking, 'placement', withMaxima(counted, { 'park-cars-lobby': parked, 'spread-cars': spreadOut, leave }), {
             'park-cars-lobby': { recording: parked, entry: park },
             'spread-cars': { recording: spreadOut, entry: spread },
           });
@@ -647,12 +686,22 @@ export function openDayCallSession(
             leave: wholeRunOf(leave),
           },
         });
-        if (!admits(counted, verdictGround)) {
+        /*
+         * § D1444, amending § D1205 clause 3: after *keep* in this peak, who drives is raised again
+         * only where its three runs' day verdicts differ (§ D1336's ground), never on the counts
+         * alone, so a peak that kept its driver is asked again where the day hangs on it. That is a
+         * verdict-ground call, so § D1434's rule holds on it too (joined at integration): with
+         * nobody standing at its instant it is not asked.
+         */
+        const admitted = keptHere(call)
+          ? verdictsSplit(counted.observations) && queueAt(leave, counted.atS).some((queue) => queue.total > 0)
+          : admits(counted, verdictGround, leave);
+        if (!admitted) {
           asking.refusedCounted ??= counted;
           onRefused();
           return;
         }
-        raise(asking, 'driver', counted, {
+        raise(asking, 'driver', withMaxima(counted, { 'driver-a': handedA, 'driver-b': handedB, leave }), {
           'driver-a': { recording: handedA, entry: toA },
           'driver-b': { recording: handedB, entry: toB },
         });
@@ -743,7 +792,7 @@ export function openDayCallSession(
       if (record !== undefined) records.push(record);
       searchFromS = dayCallSearchFrom(raised.call);
       const pressed = answer === 'leave' ? undefined : raised.runs?.[answer];
-      /* § D1205: *keep who drives* holds the driver question for the rest of that peak. */
+      /* § D1205, as § D1444 amends it: after *keep who drives*, that peak asks it again only on a split verdict. */
       if (raised.question === 'driver' && answer === 'leave' && raised.call.act !== undefined) {
         keptInPeakS = raised.call.act.startS;
       }

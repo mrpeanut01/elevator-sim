@@ -9,6 +9,7 @@ import {
   attemptHoldOf,
   attemptResumeAtS,
   attemptShownTo,
+  attemptShownToHeld,
   attemptSlotAfter,
   attemptStandingAmong,
   attemptStandsOn,
@@ -74,6 +75,22 @@ describe('the attempt standing on a scored day — § D1218', () => {
     expect(attemptShownTo(moved, 600)).toBe(moved);
     expect(attemptShownTo(moved, Number.NaN)).toBe(moved);
     expect(ATTEMPT.shownToS).toBe(0);
+  });
+
+  it('never moves the reach past a held call, and puts a reach already past it back on it — § D1364', () => {
+    /* The built bundle's frame at 240×: 559.2 s drawn over a call at 549.2 s. */
+    const held = attemptShownToHeld(ATTEMPT, 559.2, 549.2);
+    expect(held.shownToS).toBe(549.2);
+    expect(attemptShownToHeld(held, 600, 549.2)).toBe(held);
+    /* Short of the call the reach moves as before, and with nothing held it is attemptShownTo. */
+    expect(attemptShownToHeld(ATTEMPT, 300, 549.2).shownToS).toBe(300);
+    expect(attemptShownToHeld(ATTEMPT, 559.2, undefined).shownToS).toBe(559.2);
+    expect(attemptShownToHeld(ATTEMPT, 559.2, Number.NaN).shownToS).toBe(559.2);
+    /* A call found after the frame that passed it: the reach goes back to it. */
+    const past = attemptShownTo(ATTEMPT, 559.2);
+    expect(attemptShownToHeld(past, 560, 549.2).shownToS).toBe(549.2);
+    /* Answered, nothing holds it, and it moves on from the call. */
+    expect(attemptShownToHeld(held, 600, undefined).shownToS).toBe(600);
   });
 
   it('resumes where it had reached, inside the run, and opens a day never started at its start', () => {

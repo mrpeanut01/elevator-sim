@@ -77,6 +77,7 @@ import { engineerSettings, onEngineerSettingsProvided } from './engineerBridge.j
 import { DEFAULT_EVERYDAY_PROFILE } from './profile.js';
 import { everydayCareerStore } from './careerStore.js';
 import { everydayDeviceChimeStore } from './chimeStore.js';
+import { deviceOwnedOf } from './deviceChimes.js';
 import { everydayProfileStore } from './profileStore.js';
 import { everydayTelemetry } from './telemetryPort.js';
 import { STAGE_SPEEDS } from './stageScreenModel.js';
@@ -272,6 +273,8 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
       chimeBalance,
       deviceChimes: deviceChimes.balance(),
       deviceDurable: deviceChimes.durable(),
+      /* § D1418: what this device bought, so a row bought to its cap here says so. Read at draw time. */
+      deviceOwns: deviceOwnedOf(deviceChimes.record()),
       chimeOwns,
       chimeSpendable,
       chimeNotice,
@@ -1435,6 +1438,10 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
       lastReadToken = null;
       readChimeBalance();
     }
+    /*
+     * § D1418: bought from this device's tally. Nothing to re-read from a server: the balance and
+     * what this device owns are read off the store at draw time, so the redraw below is the update.
+     */
     redrawIdentity();
   }
 

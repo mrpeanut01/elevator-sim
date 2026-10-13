@@ -42,7 +42,7 @@
  * the temporal axis for that reason.
  */
 
-import type { InterventionChange } from '@elevator-sim/core/browser';
+import { COST_TERMS_BY_ID, type DispatcherProfile, type InterventionChange } from '@elevator-sim/core/browser';
 
 import type { VizRecording } from '../contract/types.js';
 import { queueAt } from '../frame/overlay.js';
@@ -51,6 +51,7 @@ import { clockAt } from '../live/timeline.js';
 import { carsPhraseOf, type BookedOutCar } from '../shift/bookedOut.js';
 import {
   DAY_CALL_DRIVER_COPY,
+  DAY_CALL_FINAL_GOAL_IDS,
   DAY_CALL_LEAVE_LABEL,
   dayCallLostGoalOf,
   type DayCallAnswer,
@@ -179,6 +180,91 @@ export interface StageCallOption {
   readonly label: string;
   readonly change: InterventionChange | undefined;
   readonly answer: DayCallAnswer;
+  /**
+   * **What the answer is, in one line** — wave AO, lane DR-1, [§ D1432](../../../../DECISIONS.md):
+   * for a driver, what its profile weighs ({@link stageCallDriverLineOf}); for a car order, what the
+   * order sets ({@link STAGE_CALL_ANSWER_LINES}). Never what it does to this crowd. Absent where the
+   * card was drawn without the driver's profile.
+   */
+  readonly line?: string | undefined;
+}
+
+/**
+ * **What each car order is, in the order's own words** — wave AO, lane DR-1,
+ * [§ D1432](../../../../DECISIONS.md). The two presses write one setting, where an idle car waits
+ * (`core`'s `idle.parkingStrategy`: the lobby for *park*, spread across the tower for *spread*,
+ * `sim/simulation.ts`'s mapping), and *leave them* writes nothing. Each line says that and no more:
+ * no effect on the crowd, no *will*, nothing the three runs differ in.
+ */
+export const STAGE_CALL_ANSWER_LINES: Readonly<Record<'park-cars-lobby' | 'spread-cars' | 'leave', string>> = Object.freeze({
+  'park-cars-lobby': `${PARK_CARS_LOBBY_LABEL}: from the call, each car that falls idle heads for the lobby and waits there.`,
+  'spread-cars':
+    `${SPREAD_CARS_LABEL}: from the call, idle cars wait spread across the tower, and which car takes ` +
+    'which call stays the driver’s own choice.',
+  leave: `${DAY_CALL_LEAVE_LABEL}: nothing is pressed, and the cars go on as the driver runs them.`,
+});
+
+/** How many of a profile's terms a driver's line names by name before it counts the rest. */
+const DRIVER_LINE_TERMS = 3;
+
+/**
+ * **What a driver weighs, from its own profile** — wave AO, lane DR-1,
+ * [§ D1432](../../../../DECISIONS.md), swarm DR's ruling § Q1 item 1 (S3's *what it weighs*). The
+ * terms its weights carry, heaviest first, each by `core`'s player name for it (`PlayerTermWords`),
+ * so the line is derived from the data and cannot drift from the vector the handover hands the day
+ * to: *Fairness first weighs wait time and starvation.* A profile of more than three terms names
+ * its three heaviest and counts the rest. It describes the control and claims nothing about any
+ * crowd; the profile's authored blurb is not used, because some blurbs state an effect.
+ */
+export function stageCallDriverLineOf(profile: Pick<DispatcherProfile, 'name' | 'weights'>): string {
+  const terms = Object.entries(profile.weights)
+    .filter(([, weight]) => weight > 0)
+    .map(([id, weight], index) => ({ name: COST_TERMS_BY_ID.get(id)?.player.name ?? id, weight, index }))
+    .sort((a, b) => b.weight - a.weight || a.index - b.index)
+    .map((term) => term.name);
+  if (terms.length === 0) return `${profile.name} weighs nothing it can name.`;
+  if (terms.length === 1) return `${profile.name} weighs only ${terms[0]!}.`;
+  if (terms.length <= DRIVER_LINE_TERMS) return `${profile.name} weighs ${listOfLabels(terms)}.`;
+  return `${profile.name} weighs ${String(terms.length)} things, most of all ${listOfLabels(terms.slice(0, DRIVER_LINE_TERMS))}.`;
+}
+
+/**
+ * **The goal graded on a maximum that stands nearest its bar, at the call second** — wave AO, lane
+ * DR-1, [§ D1432](../../../../DECISIONS.md), swarm DR's ruling § Q1 item 1. Of the deepest landing
+ * and the longest wait, the one whose reading is the larger share of its bar, with the reading and
+ * the bar: *Nearest its bar: the longest wait so far is 252 s, against a bar of 380 s.* `readings`
+ * are the rail's at the call second (`host.goalsAt`), identical off all three runs, and a maximum so
+ * far is a floor under the day's figure, so the line is true of the instant and claims nothing
+ * after it. A goal the rail reads as pending (a wait still under way, or too few arrivals) is not
+ * named; with neither readable, nothing is said. The share goals move both ways and are not named.
+ */
+export function stageCallNearestBarLineOf(readings: readonly GoalReading[]): string | undefined {
+  const readable = readings.filter(
+    (reading) =>
+      DAY_CALL_FINAL_GOAL_IDS.includes(reading.goal.id) &&
+      reading.state === 'met' &&
+      reading.observed !== null &&
+      reading.goal.bar > 0,
+  );
+  let nearest: GoalReading | undefined;
+  for (const reading of readable) {
+    if (nearest === undefined || (reading.observed ?? 0) / reading.goal.bar > (nearest.observed ?? 0) / nearest.goal.bar) {
+      nearest = reading;
+    }
+  }
+  if (nearest === undefined || nearest.observed === null) return undefined;
+  const unit = nearest.goal.unit;
+  const what = nearest.goal.id === 'queue' ? 'the deepest landing so far is' : 'the longest wait so far is';
+  return `Nearest its bar: ${what} ${String(nearest.observed)}${unit}, against a bar of ${String(nearest.goal.bar)}${unit}.`;
+}
+
+/**
+ * What the card needs to teach as well as ask — § D1432. `readings` are the rail's at the call
+ * second; `driverOf` finds a driver's profile by the name the card offers it under.
+ */
+export interface StageCallTeaching {
+  readonly readings?: readonly GoalReading[] | undefined;
+  readonly driverOf?: ((name: string) => Pick<DispatcherProfile, 'name' | 'weights'> | undefined) | undefined;
 }
 
 export interface StageCallCard {
@@ -219,6 +305,11 @@ export function stageCallCardOf(
    * ruling's three facts only.
    */
   present?: StageCallPresent | undefined,
+  /**
+   * The goal nearest its bar and each answer's line ([§ D1432](../../../../DECISIONS.md)). Absent,
+   * the card draws neither, which is how every caller before it drew the card.
+   */
+  teaching?: StageCallTeaching | undefined,
 ): StageCallCard {
   /*
    * The car lines only where a car is out at the call. A pinned call is always inside its car's
@@ -248,15 +339,23 @@ export function stageCallCardOf(
    */
   if (call.wrinkle !== undefined) facts.push(stageCallWrinkleLineOf(call.wrinkle, dayStartS));
   if (present !== undefined) facts.push(presentLineOf(present));
+  /* § D1432: the goal nearest its bar, read at the call second, last. */
+  const nearest = teaching?.readings === undefined ? undefined : stageCallNearestBarLineOf(teaching.readings);
+  if (nearest !== undefined) facts.push(nearest);
+  const teach = teaching !== undefined;
   if (drivers !== undefined) {
+    const lineOf = (name: string): { readonly line?: string } => {
+      const profile = teaching?.driverOf?.(name);
+      return profile === undefined ? {} : { line: stageCallDriverLineOf(profile) };
+    };
     return Object.freeze({
       heading: STAGE_CALL_COPY.heading,
       facts: Object.freeze(facts),
       question: DAY_CALL_DRIVER_COPY.question,
       options: Object.freeze([
-        Object.freeze({ label: switchDispatcherLabelOf(drivers['driver-a']), change: undefined, answer: 'driver-a' as const }),
-        Object.freeze({ label: switchDispatcherLabelOf(drivers['driver-b']), change: undefined, answer: 'driver-b' as const }),
-        Object.freeze({ label: DAY_CALL_DRIVER_COPY.keep(drivers.leave), change: undefined, answer: 'leave' as const }),
+        Object.freeze({ label: switchDispatcherLabelOf(drivers['driver-a']), change: undefined, answer: 'driver-a' as const, ...lineOf(drivers['driver-a']) }),
+        Object.freeze({ label: switchDispatcherLabelOf(drivers['driver-b']), change: undefined, answer: 'driver-b' as const, ...lineOf(drivers['driver-b']) }),
+        Object.freeze({ label: DAY_CALL_DRIVER_COPY.keep(drivers.leave), change: undefined, answer: 'leave' as const, ...lineOf(drivers.leave) }),
       ]),
     });
   }
@@ -269,13 +368,20 @@ export function stageCallCardOf(
         label: PARK_CARS_LOBBY_LABEL,
         change: Object.freeze({ kind: 'park-cars-lobby' as const }),
         answer: 'park-cars-lobby' as const,
+        ...(teach ? { line: STAGE_CALL_ANSWER_LINES['park-cars-lobby'] } : {}),
       }),
       Object.freeze({
         label: SPREAD_CARS_LABEL,
         change: Object.freeze({ kind: 'spread-cars' as const }),
         answer: 'spread-cars' as const,
+        ...(teach ? { line: STAGE_CALL_ANSWER_LINES['spread-cars'] } : {}),
       }),
-      Object.freeze({ label: STAGE_CALL_COPY.leave, change: undefined, answer: 'leave' as const }),
+      Object.freeze({
+        label: STAGE_CALL_COPY.leave,
+        change: undefined,
+        answer: 'leave' as const,
+        ...(teach ? { line: STAGE_CALL_ANSWER_LINES.leave } : {}),
+      }),
     ]),
   });
 }
@@ -359,4 +465,39 @@ export function stageEndDayOf(
   return lost === undefined
     ? undefined
     : Object.freeze({ label: STAGE_END_DAY_COPY.label, note: STAGE_END_DAY_COPY.note(goalPlainNameOf(lost.goal)) });
+}
+
+/**
+ * **The lost day's card** — wave AO, lane DR-1, [§ D1435](../../../../DECISIONS.md), swarm DR's
+ * ruling § Q4 (three of three). Once a goal graded on a maximum reads past its bar at the playhead
+ * (§ D1168's reading, {@link stageEndDayOf}'s), the day can no longer clear. The stage stops there
+ * once, on this card in the call card's place: *End the day* is its primary and takes focus, and
+ * *Watch the rest* plays on at the fast rung under `stagePace.ts`'s `lost` line. The stage never
+ * ends the day itself (§ D525 clause 4).
+ */
+export const STAGE_LOST_COPY = Object.freeze({
+  heading: 'THE DAY CAN NO LONGER CLEAR',
+  end: 'End the day',
+  watch: 'Watch the rest',
+  choices:
+    'End the day files it as it runs from here, with nothing more pressed, and every figure on the sheet ' +
+    'is the whole day’s. Watch the rest plays it on at 30×.',
+});
+
+/** The card's words for the readings at the playhead, or `undefined` while the day can still clear. */
+export function stageLostCardOf(
+  readings: readonly GoalReading[],
+  clock: string,
+): { readonly heading: string; readonly fact: string; readonly choices: string } | undefined {
+  const lost = dayCallLostGoalOf(readings);
+  if (lost === undefined || lost.observed === null) return undefined;
+  const unit = lost.goal.unit;
+  const what = lost.goal.id === 'queue' ? 'The deepest landing' : 'The longest wait';
+  return Object.freeze({
+    heading: STAGE_LOST_COPY.heading,
+    fact:
+      `${what} reached ${String(lost.observed)}${unit} by ${clock}, past its bar of ${String(lost.goal.bar)}${unit}. ` +
+      'A maximum past its bar stays past it, and the stage asks nothing more today.',
+    choices: STAGE_LOST_COPY.choices,
+  });
 }

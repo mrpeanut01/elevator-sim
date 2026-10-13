@@ -87,6 +87,9 @@ import {
 import { WAIT_BANDS } from '../live/bands.js';
 
 import type { BookedOutCar } from './bookedOut.js';
+import { CALL_BANDS, driverOfferOf } from './callBands.js';
+import type { DayCallMaxima } from './dayCallMaxima.js';
+import { goalPlainNameOf } from './goals.js';
 import { PRESS_CALL_SKIPPED_WHAT } from './callRow.js';
 import type { DayAct } from './dayLength.js';
 import { firstMinuteWaitIn, type PressCall, type PressCallRule } from './pressCall.js';
@@ -257,37 +260,26 @@ export type DayCallTriple<T> = Readonly<Partial<Record<DayCallAnswer, T>>>;
 /**
  * **The dispatchers the driver question may offer, in the order the pair is taken** —
  * [§ D1167](../../../../DECISIONS.md), the decide-al ruling's *a fixed pair per tower*, with the
- * house taken out by wave AN, lane DQ-1, [§ D1337](../../../../DECISIONS.md).
+ * house taken out by wave AN, lane DQ-1, [§ D1337](../../../../DECISIONS.md), and **derived from the
+ * census since wave AO, lane DR-2**, [§ D1442](../../../../DECISIONS.md).
  *
- * § D1167's list was Conventional collective, Minimum estimated wait and Fairness first. Swarm DQ
- * found what that did to a player on a good driver: the pair was the house and Minimum estimated
- * wait, the house's ten-minute count was lowest on 3 of 69 such rows, and 27 of the 32 rows that
- * split the day read *the house loses*, so the question taught *never hand it back* by Tuesday and
- * stopped being a choice. So the house (`shift/weekStake.ts#houseStandingOrder`, Conventional
- * collective) is on this list no more, and **a switch target is always a contender**: the
- * conventional-panel drivers the week census and swarm DQ's player member found clearing nearly every
- * Midtown day left alone. A player on the house still meets it, as *keep*.
- *
- * **Minimum estimated wait is last, and that is measured.** With it second, a player on Fairness
- * first was offered it beside Predictive balanced, and on the careful policy's first census crowd
- * its ten-minute count was lowest on 12 of the 18 who-drives rows (66.7 %): a formula, because the
- * ten-minute count is what that driver chases. With Energy aware in its place, over the first four
- * census crowds' week 1, the 68 rows were lowest under Predictive balanced on 22.1 %, Energy aware
- * on 36.8 % and *keep* on 55.9 % (ties counted for each). The auction is not here because a
- * handover cannot reach it from a central driver (`live/interventions.ts#switchRefusalOf`).
+ * § D1337 wrote the list here: Fairness first, Predictive balanced, Energy aware and Minimum
+ * estimated wait, gated by a check on the row's ten-minute counts. Swarm DR measured what that list
+ * did on the day's verdict: offered to a player on Predictive balanced, Energy aware cleared 2 of the
+ * 18 who-drives rows whose answers split the day (S1), and it was the day-safe side on 1 of 21
+ * danger instants (S2), so the card offered a trap. So the list is no longer written in code: it is
+ * `callBands.ts#driverOfferOf` over `data/call-bands.json`, the candidates in the census's order
+ * less every one that clears the day on under one split row in five where it was measured. A
+ * candidate the census has not placed keeps its place. The house is not a candidate, so a switch
+ * target is still always a contender, and a player on the house still meets it as *keep*.
  *
  * A tower's pair is the first two of these that differ from the one driving and that a handover can
  * reach ({@link dayCallDriversOf}), so it is fixed from who is driving and never chosen by which
- * answer clears. Gated by `everyday/callCadence.sweep.test.ts`: on the careful policy's census week,
- * no answer has the lowest count on under a tenth or over three fifths of the driver rows.
- * Owner-reversible: it is this list.
+ * answer clears on the day being played. `everyday/callBands.sweep.test.ts` re-measures the census
+ * nightly and requires the rows this is derived from. Owner-reversible: the census's candidates and
+ * their order, and the floor.
  */
-export const DAY_CALL_DRIVER_OFFER: readonly string[] = Object.freeze([
-  'fairness-first',
-  'predictive-balanced',
-  'energy-aware',
-  'eta',
-]);
+export const DAY_CALL_DRIVER_OFFER: readonly string[] = driverOfferOf(CALL_BANDS);
 
 /**
  * **A tower's driver pair for one day** — the first two of {@link DAY_CALL_DRIVER_OFFER} that a
@@ -637,6 +629,13 @@ export interface DayCallRecord {
    * instant alone. Absent on a peak's call, and on a record written before it.
    */
   readonly wrinkle?: true | undefined;
+  /**
+   * **Each answer's two final goals, read through the day from the call** — wave AO, lane DR-1,
+   * [§ D1433](../../../../DECISIONS.md), `shift/dayCallMaxima.ts`. Taken at the raise from the three
+   * runs, so the stage's row reads them at its playhead on a resumed attempt as on an unbroken one.
+   * Absent on a record written before it, which keeps its counts-only row.
+   */
+  readonly maxima?: DayCallTriple<DayCallMaxima> | undefined;
 }
 
 /**
@@ -938,6 +937,12 @@ export function dayCallRowOf(
   index: number,
   gradeOf: (observations: Observations) => string,
   clockOf: (simTimeS: SimTime) => string,
+  /**
+   * The report's own judgement of one run — its verdict and its readings against the sheet's goals —
+   * for {@link dayCallGapSentenceOf} (wave AO, lane DR-1, [§ D1433](../../../../DECISIONS.md)).
+   * Absent, the row says nothing about the count's favourite.
+   */
+  judgeOf?: (observations: Observations) => DayCallRunJudgement,
 ): ReportDiagnosis {
   const at = clockOf(record.atS);
   const question = record.question ?? 'placement';
@@ -969,15 +974,68 @@ export function dayCallRowOf(
       : ` The day read ${listOf(
           [...grades.entries()].map(([line, answered]) => `${line} with ${listOf(answered.map(wordsOf))}`),
         )}.`;
+  const gap = judgeOf === undefined ? undefined : dayCallGapSentenceOf(record, judgeOf);
   return {
     id: dayCallRowIdOf(index),
     when: at,
     what,
     why:
       'On this crowd the day was run three ways from the call, with every press before it kept and ' +
-      `nothing pressed after it. ${dayCallCountsLineOf(record, clockOf)}${verdict} ${DAY_CALL_ROW_NOTE}`,
+      `nothing pressed after it. ${dayCallCountsLineOf(record, clockOf)}${verdict}${gap === undefined ? '' : ` ${gap}`} ` +
+      DAY_CALL_ROW_NOTE,
     tone: 'plain',
   };
+}
+
+/** One run as the report judges it: the day's verdict and its readings against the sheet's goals. */
+export interface DayCallRunJudgement {
+  readonly verdict: 'cleared' | 'missed' | 'ungraded';
+  readonly readings: readonly GoalReading[];
+}
+
+/**
+ * **Where the count's favourite missed the day** — wave AO, lane DR-1,
+ * [§ D1433](../../../../DECISIONS.md), swarm DR's ruling § Q1 item 3 (three of three).
+ *
+ * A call's row counts riders who waited a minute over ten minutes; the day is graded on its goals.
+ * The panel's members measured the answer with the fewest such riders missing the day on 10 of 21
+ * deciding rows (S2), 14 of 22 split rows (S3) and 20 of 55 (S1), and a player reading the row took
+ * the count for the verdict. So where the answers split the day, and every answer with the fewest
+ * one-minute waits missed it, the close says so and names the goal it missed with its figure:
+ * *The fewest riders waited a minute with Energy aware driving, and the day missed with it: the
+ * landing-queue goal read 31 against a bar of 24.* Each answer the count favoured gets its own
+ * clause. No *because*: why the count and the day disagree is unmeasured. `undefined` where the
+ * three agree on the day (no split to set the count against) or a fewest-count answer cleared.
+ */
+export function dayCallGapSentenceOf(
+  record: DayCallRecord,
+  judgeOf: (observations: Observations) => DayCallRunJudgement,
+): string | undefined {
+  const answers = dayCallAnswersOf(record.question ?? 'placement');
+  const judged = answers.flatMap((answer) => {
+    const observations = record.observations[answer];
+    return observations === undefined ? [] : [{ answer, count: record.counts[answer] ?? 0, judgement: judgeOf(observations) }];
+  });
+  if (!judged.some((entry) => entry.judgement.verdict === 'cleared')) return undefined;
+  const fewest = Math.min(...judged.map((entry) => entry.count));
+  const favoured = judged.filter((entry) => entry.count === fewest);
+  if (favoured.length === 0 || favoured.some((entry) => entry.judgement.verdict !== 'missed')) return undefined;
+  const clauses = favoured.map(({ answer, judgement }) => {
+    const missed = judgement.readings.find((reading) => reading.state === 'missed');
+    const figure =
+      missed === undefined || missed.observed === null
+        ? undefined
+        : `${goalPlainNameOf(missed.goal)} read ${String(missed.observed)}${missed.goal.unit} against a bar of ` +
+          `${String(missed.goal.bar)}${missed.goal.unit}`;
+    return { words: dayCallAnswerWordsOf(record, answer), figure };
+  });
+  const names = listOf(clauses.map((clause) => clause.words));
+  if (clauses.length === 1) {
+    const [only] = clauses;
+    return `The fewest riders waited a minute with ${names}, and the day missed with it${only?.figure === undefined ? '' : `: ${only.figure}`}.`;
+  }
+  const figures = clauses.filter((clause) => clause.figure !== undefined).map((clause) => `with ${clause.words} ${String(clause.figure)}`);
+  return `The fewest riders waited a minute with ${names}, and the day missed with each${figures.length === 0 ? '' : `: ${figures.join('; ')}`}.`;
 }
 
 /**

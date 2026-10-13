@@ -372,6 +372,32 @@ describe('a scored day — § D1169', () => {
     expect(stagePaceOf(inputAt(day, morning!.startS + 60, { longestStandingS: 10 })).reason).toBe('act');
   });
 
+  /*
+   * Wave AO, lane DR-1, § D1435: once the stage has read the day lost, the rest plays at the fast rung
+   * whoever is waiting (red before: `watching` at the player's rung), a chip pressed after that
+   * instant is the player's to the end, and nothing changes before it.
+   */
+  it('plays a lost day fast whoever waits, keeps a chip pressed after the loss, and nothing before it — § D1435', () => {
+    const lostAtS = 4000;
+    const held = stagePaceOf(scored(lostAtS + 60, { longestStandingS: PACE_HOLD_WAIT_S + 30, lostAtS }));
+    expect(held).toEqual({ simPerRealS: BETWEEN_PEAKS_SIM_PER_REAL_S, reason: 'lost' });
+    expect(stagePaceNoteOf(held, { acts: [], simTimeS: lostAtS + 60 })).toBe(
+      'the day can no longer clear: playing the rest at 30×, and no call is asked',
+    );
+    /* A chip pressed after the loss is the player's rung, even a slow one; one pressed before it is not. */
+    const chosen = stagePaceOf(scored(lostAtS + 60, { longestStandingS: PACE_HOLD_WAIT_S + 30, lostAtS, playerChoseSpeedAtS: lostAtS + 10 }));
+    expect(chosen).toEqual({ simPerRealS: WATCHING, reason: 'lost' });
+    expect(stagePaceOf(scored(lostAtS + 60, { longestStandingS: 10, lostAtS, playerChoseSpeedAtS: lostAtS - 10 })).simPerRealS).toBe(
+      BETWEEN_PEAKS_SIM_PER_REAL_S,
+    );
+    /* Before the loss, or with none, § D1169's rule as it was; and a call still stops the transport first. */
+    expect(stagePaceOf(scored(lostAtS - 1, { longestStandingS: PACE_HOLD_WAIT_S + 30, lostAtS })).reason).toBe('watching');
+    expect(stagePaceOf(scored(lostAtS + 60, { longestStandingS: PACE_HOLD_WAIT_S + 30 })).reason).toBe('watching');
+    expect(stagePaceOf(scored(lostAtS + 60, { lostAtS, callAtS: lostAtS + 30 })).reason).toBe('call');
+    /* Unscored, nothing is lost. */
+    expect(stagePaceOf(inputAt(day, lostAtS + 60, { lostAtS })).reason).not.toBe('lost');
+  });
+
   it('paces a slice the same way, where § D991 left a slice at one rung', () => {
     expect(stagePaceOf(scored(600, { horizon: 'period', longestStandingS: undefined })).reason).toBe('fast');
     expect(stagePaceOf(scored(600, { horizon: 'period', longestStandingS: 75 })).reason).toBe('watching');

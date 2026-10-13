@@ -65,7 +65,10 @@ import {
   chimeGrantUnits,
   chimeSinkById,
   chimeSpendPrice,
+  chimeTurnKeyOwnerOf,
+  chimeTurnKeysOf,
   parseChimeLedger,
+  weekLevelTurnKeyOf,
   type ChimeLedgerTable,
   type ChimeTurn,
   type TrafficProfiles,
@@ -98,6 +101,14 @@ export type ChimeRefusal =
   | 'unknown-completion'
   | 'unknown-scenario'
   | 'unknown-wave'
+  /**
+   * A keyed turn (a contract day, a held level, or any other `CHIME_KEYED_COMPLETIONS` member) whose
+   * key no composer writes, or whose contract this build's ladder does not hold, or, for a held level,
+   * a level the ladder does not author — [§ D1416](../../../../DECISIONS.md), [§ D1402](../../../../DECISIONS.md).
+   */
+  | 'unknown-key'
+  /** A par turn for a scenario whose clear this account has not been paid — [§ D1417](../../../../DECISIONS.md). */
+  | 'not-cleared'
   | 'unknown-modifier'
   | 'not-enough-chimes';
 
@@ -125,6 +136,49 @@ export interface ChimeTurnBounds {
   readonly scenarioIds: ReadonlySet<string>;
   /** How many waves the rush's stream generates — the most a run can outlast before it breaks. */
   readonly rushWaves: number;
+  /**
+   * Every contract a day's turn key may name — `data/contract-ladder.json`'s, which a Career tower's
+   * id and a Scenario week's contract both are ([§ D1416](../../../../DECISIONS.md)). A day key is
+   * a name a client composes, and a name a client can invent is a turn a client can farm, so the
+   * contract inside it is bounded the way a scenario id is.
+   */
+  readonly contractIds: ReadonlySet<string>;
+  /**
+   * **Every level of a tower's week a held week can pay for**, by key (`c2/3`) — wave AO, lane DS-1,
+   * [§ D1402](../../../../DECISIONS.md). Read off `data/contract-ladder.json` by {@link weekLevelKeysOf}:
+   * week 1 of every rung, week 2 where the rung authors an order, and one week per authored week
+   * booking above it. Which of them the census admits is the viewer's reading, and this package may
+   * not import it; the bound is the authored ladder, so an unadmitted level is the most a hand-built
+   * request can claim beyond what a player can hold, and each pays once. A held level is a keyed
+   * completion ([§ D1416](../../../../DECISIONS.md)), so its key passes {@link contractIds}' bound
+   * first; this set is the tighter one, because a level, unlike a day, can be enumerated.
+   */
+  readonly weekLevels: ReadonlySet<string>;
+}
+
+/**
+ * **The level keys {@link ChimeTurnBounds.weekLevels} holds**, from the ladder document's rows — see
+ * that field. Each is `core`'s `weekLevelTurnKeyOf`, the composer the viewer posts with. Throws on a
+ * document with no rows, on {@link loadChimeTurnBounds}' ground.
+ */
+export function weekLevelKeysOf(ladder: unknown): ReadonlySet<string> {
+  const rows: unknown = (ladder as Record<string, unknown> | null)?.['contracts'];
+  if (!Array.isArray(rows) || rows.length === 0) {
+    throw new Error('chime turns: the contract ladder has no "contracts" list, so no held week could be paid.');
+  }
+  const keys = new Set<string>();
+  for (const raw of rows) {
+    const row = raw as Record<string, unknown> | null;
+    const contractId = row?.['contractId'];
+    if (typeof contractId !== 'string' || contractId === '') {
+      throw new Error('chime turns: a contract ladder row has no contractId.');
+    }
+    const orders = Array.isArray(row?.['weekOrders']) ? (row['weekOrders'] as unknown[]).length : 0;
+    const bookings = Array.isArray(row?.['weekBookings']) ? (row['weekBookings'] as unknown[]).length : 0;
+    const top = orders === 0 ? 1 : 2 + bookings;
+    for (let week = 1; week <= top; week += 1) keys.add(weekLevelTurnKeyOf({ contractId, week }));
+  }
+  return keys;
 }
 
 /**
@@ -182,7 +236,9 @@ export async function loadChimeTurnBounds(dataDir: string, profiles: TrafficProf
       `chime turns: the traffic profiles carry no "${RUSH_TEMPLATE_ID}" template with waves in it, so no rush result can be bounded.`,
     );
   }
-  return Object.freeze({ scenarioIds: new Set([...cases, ...stages]), rushWaves });
+  const contracts = await idsIn(join(dataDir, 'contract-ladder.json'), 'contracts', 'contractId');
+  const weekLevels = weekLevelKeysOf(JSON.parse(await readFile(join(dataDir, 'contract-ladder.json'), 'utf8')));
+  return Object.freeze({ scenarioIds: new Set([...cases, ...stages]), rushWaves, contractIds: new Set(contracts), weekLevels });
 }
 
 /**
@@ -255,8 +311,14 @@ async function idsIn(path: string, key: string, field: string): Promise<readonly
  *   numbered from one, so the account's best is the waves already paid rather than a second figure
  *   that could disagree with them. A run that beats the best writes the waves above it; one that
  *   does not writes none.
- * - **A contract day is untouched.** The ruling does not reach it, and nothing here can tell a second
- *   day from one day posted twice.
+ * - **A contract day pays once per day** — [§ D1416](../../../../DECISIONS.md). The ruling above
+ *   does not reach it and every day still pays; but this bullet used to read *"nothing here can tell a
+ *   second day from one day posted twice"*, and that was the defect swarm DS's S2 measured: the same
+ *   day posted twice paid twice. The turn now names its day, and the day is its key.
+ * - **A par pays once per scenario**, and only on an account the scenario's clear has been paid to
+ *   ([§ D1417](../../../../DECISIONS.md)).
+ * - **A held level pays once per level** ([§ D1402](../../../../DECISIONS.md)): its key is the level,
+ *   bounded by the levels the ladder authors, so a run of held weeks buys nothing by its length.
  *
  * Every entry is the table's flat award whatever the run measured, which is § D526 clause 2: a wave
  * count is a count of turns, and nothing else a run measured reaches this function.
@@ -297,45 +359,78 @@ export async function earnCompletion(input: {
 }): Promise<ChimeOutcome> {
   const { store, table, bounds, userId, turn } = input;
   const award = chimeAwardFor(table, turn.completion);
-  const source = table.sources.find(
-    (candidate) => candidate.earnedBy === 'completion' && candidate.completion === turn.completion,
-  );
+  const source = sourceOf(table, turn.completion);
   if (award === undefined || source === undefined) return { ok: false, reason: 'unknown-completion' };
-  const entry = { userId, direction: 'earn', entryKey: source.id, chimes: award } as const;
+  /* What a shipped build can name for each completion — the bound a turn is believed within. */
   switch (turn.completion) {
-    case 'career-day-paid': {
-      const written = await store.recordChimeEntry(entry);
+    case 'career-day-paid':
+    case 'week-held': {
       /*
-       * An earn with no turn cannot be refused by the balance — it only ever moves it up — so
-       * `undefined` here is unreachable. Answered rather than asserted, so a future guard on this
-       * statement refuses instead of reporting a balance nobody wrote.
+       * Every keyed completion is bounded here, by `core`'s shape table and this build's ladder: a
+       * member added to `CHIME_KEYED_COMPLETIONS` joins this arm and needs no route or store change.
        */
-      return written === undefined
-        ? { ok: false, reason: 'unknown-completion' }
-        : { ok: true, balanceChimes: written.balanceAfter };
+      const contract = chimeTurnKeyOwnerOf(turn.completion, turn.key);
+      if (contract === undefined || !bounds.contractIds.has(contract)) return { ok: false, reason: 'unknown-key' };
+      /*
+       * Wave AO lane DS-1, § D1402: a held level is also one the ladder authors, which a day's key
+       * cannot be checked against because a day is not enumerable. Paid once per level per account
+       * by the one rule below, like every other key.
+       */
+      if (turn.completion === 'week-held' && !bounds.weekLevels.has(turn.key)) return { ok: false, reason: 'unknown-key' };
+      break;
     }
     case 'scenario-cleared': {
       if (!bounds.scenarioIds.has(turn.scenarioId)) return { ok: false, reason: 'unknown-scenario' };
-      const written = await store.recordChimeEntry({ ...entry, turnKey: turn.scenarioId });
-      /* `undefined` is the clear already paid: answered with the balance, because re-posting is not a fault. */
-      return { ok: true, balanceChimes: written?.balanceAfter ?? (await store.chimeBalance(userId)) };
+      break;
+    }
+    case 'scenario-at-par': {
+      if (!bounds.scenarioIds.has(turn.scenarioId)) return { ok: false, reason: 'unknown-scenario' };
+      /*
+       * **A clear at par is a clear** — [§ D1417](../../../../DECISIONS.md). Whether the clear met
+       * its par is believed, as the clear itself is; what is checked is that this account has been
+       * paid that scenario's clear, so a par can never be the first thing a scenario pays.
+       */
+      const clear = sourceOf(table, 'scenario-cleared');
+      if (clear === undefined || !(await store.chimeTurnKeys(userId, clear.id)).has(turn.scenarioId)) {
+        return { ok: false, reason: 'not-cleared' };
+      }
+      break;
     }
     case 'rush-wave-survived': {
       if (!Number.isInteger(turn.waves) || turn.waves < 1 || turn.waves > bounds.rushWaves) {
         return { ok: false, reason: 'unknown-wave' };
       }
-      /*
-       * Ascending, so the waves paid are always a run from one: a write that fails part-way leaves
-       * the best where the last written wave put it, and the next post pays the rest. The read is a
-       * shortcut past waves already paid; the statement's turn clause is the guard.
-       */
-      const paid = await store.chimeTurnKeys(userId, source.id);
-      for (let wave = 1; wave <= turn.waves; wave += 1) {
-        if (!paid.has(String(wave))) await store.recordChimeEntry({ ...entry, turnKey: String(wave) });
-      }
-      return { ok: true, balanceChimes: await store.chimeBalance(userId) };
+      break;
+    }
+    default: {
+      /* Exhaustive: a completion added to the union without a bound here fails the build. */
+      const unbounded: never = turn;
+      return unbounded;
     }
   }
+  /*
+   * **One rule for every award: an entry per key not yet paid** — [§ D1416](../../../../DECISIONS.md).
+   * `core`'s `chimeTurnKeysOf` names the keys (a scenario's id, each wave outlasted, the day, the
+   * level), and the store's turn clause refuses a second entry for a key in the statement that
+   * writes it, so a repeated post — later, or twice at once — answers the balance and pays
+   * nothing. Ascending for a rush, so the waves paid are always a run from one: a write that fails
+   * part-way leaves the best where the last written wave put it. The read is a shortcut past keys
+   * already paid; the statement's turn clause is the guard.
+   */
+  const entry = { userId, direction: 'earn', entryKey: source.id, chimes: award } as const;
+  const paid = await store.chimeTurnKeys(userId, source.id);
+  for (const turnKey of chimeTurnKeysOf(turn)) {
+    if (!paid.has(turnKey)) await store.recordChimeEntry({ ...entry, turnKey });
+  }
+  return { ok: true, balanceChimes: await store.chimeBalance(userId) };
+}
+
+/** The source that pays a completion, or `undefined` where the table claims none. */
+function sourceOf(
+  table: ChimeLedgerTable,
+  completion: ChimeTurn['completion'],
+): ChimeLedgerTable['sources'][number] | undefined {
+  return table.sources.find((candidate) => candidate.earnedBy === 'completion' && candidate.completion === completion);
 }
 
 /**

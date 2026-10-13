@@ -20,6 +20,7 @@ import type { DispatcherProfile, RunInterventionConfig } from '@elevator-sim/cor
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import type { VizRecording } from '../contract/types.js';
+import { queueAt } from '../frame/overlay.js';
 import { recordRun } from '../record/recordRun.js';
 import { todaysScenarioDayState } from '../shift/contractDay.test-helper.js';
 import {
@@ -699,8 +700,14 @@ describe('a wrinkle asks who drives at its start, admitted where the day’s ver
     } as VizRecording;
   }
 
-  function lateFinishSession(goals: readonly ShiftGoal[] | undefined, asked: string[] = [], inFlight?: (() => void)[], split = true) {
-    const day = threePeakDay();
+  function lateFinishSession(
+    goals: readonly ShiftGoal[] | undefined,
+    asked: string[] = [],
+    inFlight?: (() => void)[],
+    split = true,
+    shape: (day: VizRecording) => VizRecording = (day) => day,
+  ) {
+    const day = shape(threePeakDay());
     return openDayCallSession(
       {
         planWith: fakePlan,
@@ -753,6 +760,35 @@ describe('a wrinkle asks who drives at its start, admitted where the day’s ver
     const grade = (observations: Observations): string =>
       readGoals(worstWaitOnly(), observations).every((reading) => reading.state === 'met') ? 'Shift cleared' : 'Shift missed';
     expect(dayCallRowOf(record!, 1, grade, String).why).toContain('The day read');
+  });
+
+  /*
+   * Wave AO, lane DR-1, § D1434: a call admitted on the verdict alone, with nobody standing at its
+   * second, put *Nobody is standing at the landings* over a row of zeros. It is turned down; the
+   * same start with somebody standing (the case above) is still raised.
+   */
+  it('turns down a start admitted on the verdict alone where nobody is standing at its second — § D1434', () => {
+    /* Everybody who arrived in the 100 s up to the start boards as they arrive, so nobody stands at 5 460 s. */
+    const empty = (day: VizRecording): VizRecording =>
+      ({
+        ...day,
+        legs: day.legs.map((leg) =>
+          leg.arrivedAt < lateFinish.startS - 100 || leg.arrivedAt > lateFinish.startS
+            ? leg
+            : { ...leg, boardedAt: leg.arrivedAt, alightedAt: leg.arrivedAt + 30 },
+        ),
+      }) as VizRecording;
+    expect(queueAt(empty(threePeakDay()), lateFinish.startS).every((queue) => queue.total === 0)).toBe(true);
+    expect(queueAt(threePeakDay(), lateFinish.startS).some((queue) => queue.total > 0)).toBe(true);
+    const session = lateFinishSession(worstWaitOnly(), [], undefined, true, empty);
+    const raised: number[] = [];
+    for (let call = session.onStage(); call?.raised === true; call = session.onStage()) {
+      raised.push(call.call.atS);
+      session.answer('leave', () => {});
+    }
+    /* Red before § D1434: the start was raised here, on the verdict, over nobody. */
+    expect(raised).toEqual([]);
+    expect(session.records()).toEqual([]);
   });
 
   it('raises nothing on the verdict elsewhere, and nothing at the start without the day’s goals — the negative controls', () => {
@@ -895,9 +931,12 @@ describe('wave AL: calls across the whole day — § D1205', () => {
      * The pair never offers the dispatcher driving, and *keep* names it. Since § D1337 it never
      * offers the house either: § D1167's list put Conventional collective first here.
      */
+    /* The pair's second is the census's (§ D1442): the offer list is derived, not written here. */
+    const fromFairness = dayCallDriversOf(profiles(), byId('fairness-first'))!;
+    expect(fromFairness.map((profile) => profile.id)).not.toContain('collective');
     expect(second?.drivers).toEqual({
       'driver-a': byId('predictive-balanced').name,
-      'driver-b': byId('energy-aware').name,
+      'driver-b': fromFairness[1].name,
       leave: byId('fairness-first').name,
     });
     /* And the second call's record carries the names it was asked with. */
@@ -915,6 +954,108 @@ describe('wave AL: calls across the whole day — § D1205', () => {
     const unnamed = driverSession(day, ['collective', 'eta', 'fairness-first']);
     unnamed.grew({ ...day } as VizRecording, 100, true);
     expect(unnamed.onStage()).toBeUndefined();
+  });
+});
+
+/*
+ * Wave AO, lane DR-2, § D1444: § D1205 clause 3 held who drives for the rest of a peak once *keep*
+ * was answered, and swarm DR's honesty member found the census's lost days inside those very peaks
+ * (crowd 14's Thursday: *keep* at 12:33, the day lost at 12:37, nothing more asked). Amended: a later
+ * candidate in the kept peak asks who drives again, and raises it only where its three runs' day
+ * verdicts differ; the counts alone still raise nothing there.
+ */
+describe('after *keep who drives*, its peak asks again only where the day hangs on who drives — § D1444', () => {
+  const profiles = (): readonly DispatcherProfile[] => PRESS_DAY_RESOURCES.dispatcherProfiles.profiles;
+  const collective = (): DispatcherProfile => profiles().find((profile) => profile.id === 'collective')!;
+  const worstWaitOnly = (): readonly ShiftGoal[] =>
+    goalsForDay(1)
+      .filter((goal) => goal.id === 'worst-wait')
+      .map((goal) => ({ ...goal, bar: 300 }));
+
+  /** The run with one rider, arriving at 6 500 s, waiting 400 s: after any ten-minute window here, inside the day. */
+  function lateWait(day: VizRecording): VizRecording {
+    return {
+      ...day,
+      legs: day.legs.map((leg) => (leg.arrivedAt === 6500 ? { ...leg, boardedAt: 6900, alightedAt: 6930 } : leg)),
+    } as VizRecording;
+  }
+
+  /**
+   * Parking changes nothing, so every candidate asks who drives. Every handover empties the landings
+   * for ten minutes, so the counts admit every driver question; where `split`, handing the day to
+   * the pair's first after the first driver call also leaves a 400 s wait late in the day, so the
+   * day's verdict differs there.
+   */
+  function keptPeakSession(split: boolean, graded = true) {
+    const goals = graded ? worstWaitOnly() : undefined;
+    const day = threePeakDay();
+    const first = dayCallDriversOf(profiles(), collective())![0].id;
+    let firstDriverAtS: number | undefined;
+    return openDayCallSession(
+      {
+        planWith: fakePlan,
+        simulate: (runs, done) => {
+          done(
+            runs.map((ask) => {
+              const press = pressOf(ask);
+              if (press.change.kind !== 'adopt-dispatcher') return day;
+              firstDriverAtS ??= press.atS;
+              const calm = calmBetween(day, press.atS, press.atS + DAY_CALL_REPEAT_S);
+              return split && press.atS > firstDriverAtS && press.change.profile.id === first ? lateWait(calm) : calm;
+            }),
+          );
+        },
+        cancel: () => {},
+        changed: () => {},
+      },
+      {
+        recording: day,
+        bookedOut: [],
+        horizon: 'whole-day',
+        goals,
+        drivers: { profiles: profiles(), driving: collective() },
+      },
+    );
+  }
+
+  /** Keep the driver at every call; what was raised, by peak. */
+  function keepEverything(
+    session: ReturnType<typeof keptPeakSession>,
+  ): { atS: number; peak: number; question: string | undefined }[] {
+    const raised: { atS: number; peak: number; question: string | undefined }[] = [];
+    for (let call = session.onStage(); call?.raised === true; call = session.onStage()) {
+      raised.push({ atS: call.call.atS, peak: peakIndexOf(call.call.atS), question: call.question });
+      session.answer('leave', () => {});
+    }
+    return raised;
+  }
+
+  it('raises who drives a second time in the kept peak where its runs split the day, ten minutes on', () => {
+    const session = keptPeakSession(true);
+    const raised = keepEverything(session);
+    const kept = raised.filter((call) => call.peak === 0);
+    /* Red before § D1444: *keep* held the driver question for the rest of the peak, so peak 0 raised one call. */
+    expect(kept.map((call) => call.question)).toEqual(['driver', 'driver']);
+    expect(kept[1]!.atS - kept[0]!.atS).toBeGreaterThanOrEqual(DAY_CALL_REPEAT_S);
+    /* Its record carries the split it was raised on: the pair's first misses the day, *keep* clears it. */
+    const record = session.records().find((entry) => entry.atS === kept[1]!.atS)!;
+    const verdict = (observations: Observations | undefined): boolean =>
+      readGoals(worstWaitOnly(), observations!).every((reading) => reading.state === 'met');
+    expect([verdict(record.observations['driver-a']), verdict(record.observations.leave)]).toEqual([false, true]);
+    /* The peak's two, and § D1205's other clauses, stand. */
+    expect(kept).toHaveLength(DAY_CALL_PER_PEAK);
+  });
+
+  it('raises nothing more in the kept peak where the verdicts agree, though the counts differ — the negative control', () => {
+    const raised = keepEverything(keptPeakSession(false));
+    expect(raised.filter((call) => call.peak === 0).map((call) => call.question)).toEqual(['driver']);
+    /* *Keep* still holds one peak, not the day: the next peak asks on its counts. */
+    expect(raised.some((call) => call.peak === 1 && call.question === 'driver')).toBe(true);
+  });
+
+  it('runs nothing for who drives in the kept peak without the day’s goals, since no verdict can raise it there', () => {
+    const raised = keepEverything(keptPeakSession(true, false));
+    expect(raised.filter((call) => call.peak === 0).map((call) => call.question)).toEqual(['driver']);
   });
 });
 

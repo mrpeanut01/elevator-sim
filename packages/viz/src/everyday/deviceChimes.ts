@@ -35,9 +35,25 @@
  * the same seed, a repair the base budget refuses and the bought rung admits, compared on the
  * boarding legs.
  *
- * **The three ledger sinks are untouched by that and stay refused off an account**, each for its
- * own cause, which `everyday/chimesPanel.ts` draws per row. A scenario rung is not one of them and
- * may not become one.
+ * ~~**The three ledger sinks are untouched by that and stay refused off an account**, each for its
+ * own cause, which `everyday/chimesPanel.ts` draws per row.~~ *Replaced in writing by
+ * [§ D1418](../../../../DECISIONS.md), swarm DS's Q3 ruling (three of three): with no server or no
+ * sign-in, the three sinks are spent from this tally for play on this device* — a career purse
+ * top-up lands in this device's career, and the two rush modifiers start this device's sittings.
+ * {@link withSinkSpend} is the charge, at the ledger's own price and step cap, and
+ * {@link deviceOwnedOf} is what a sitting may claim. **Integrity stays at the post**: a sitting
+ * started with a device-bought modifier is never offered for posting (`rushSitting.ts`), and a
+ * post that claimed one anyway meets the server's `chimes/ledger.ts#unbackedModifiers`, which
+ * refuses a modifier the account did not buy. A scenario rung is still not a ledger sink and may
+ * not become one.
+ *
+ * ## Every turn is keyed — [§ D1416](../../../../DECISIONS.md)
+ *
+ * A contract day used to be recorded under a count of the days already held, because nothing on
+ * the wire could tell a second day from one day posted twice. The turn names its day now, and
+ * `core`'s `chimeTurnKeysOf` is the one rule both ledgers apply to every completion: a turn pays
+ * under each key it names that this device has not yet paid. A version-1 record's day rows keep
+ * their count keys, which no composed day key can equal, so they are read and never paid again.
  *
  * ## What is deliberately not here
  *
@@ -53,9 +69,14 @@
 import {
   CHIME_COMPLETIONS,
   chimeEarnTableOf,
+  chimeGrantUnits,
+  chimeSpendPrice,
+  chimeSpendTableOf,
+  chimeTurnKeysOf,
   parseChimeLedger,
   type ChimeCompletion,
   type ChimeEarnTable,
+  type ChimeSpendTable,
   type ChimeTurn,
 } from '@elevator-sim/core/browser';
 
@@ -75,22 +96,36 @@ import chimeLedgerDocument from '../../../../data/chime-ledger.json' with { type
  */
 export const CHIME_AWARDS: ChimeEarnTable = chimeEarnTableOf(parseChimeLedger(chimeLedgerDocument));
 
+/**
+ * The shipped table's **spend half** — what {@link withSinkSpend} charges, [§ D1418](../../../../DECISIONS.md).
+ *
+ * Projected the way {@link CHIME_AWARDS} is, so no binding here holds a source. The price is the
+ * ledger's own `priceChimes`, the same figure the server charges an account, so a sink costs one
+ * amount wherever it is bought.
+ */
+export const DEVICE_SINK_PRICES: ChimeSpendTable = chimeSpendTableOf(parseChimeLedger(chimeLedgerDocument));
+
 /** The slot this device keeps its turns in. */
 export const DEVICE_CHIMES_KEY = 'elevator-sim.device-chimes.v1';
 /** Where a record this build cannot read is set aside — `careerStore.ts`' shape and its reason. */
 export const DEVICE_CHIMES_QUARANTINE_KEY = 'elevator-sim.device-chimes.quarantine';
-/** The shape this build writes and reads. A record at another version is quarantined, never coerced. */
-export const DEVICE_CHIMES_VERSION = 1;
+/**
+ * The shape this build writes. Version 2 adds {@link DeviceChimeRecord.sinks} and keys a contract
+ * day by the day it names ([§ D1418](../../../../DECISIONS.md), [§ D1416](../../../../DECISIONS.md)).
+ * A record at a version this build does not read is quarantined, never coerced.
+ */
+export const DEVICE_CHIMES_VERSION = 2;
+/** The versions this build reads: its own, and version 1, which is version 2 with no sink spends. */
+const DEVICE_CHIMES_VERSIONS_READ: readonly number[] = Object.freeze([1, 2]);
 
 /**
  * One finished turn, as this device recorded it.
  *
- * `key` is what makes a turn distinguishable from the same turn again — a fix case's id for a
- * scenario, the wave number for a rush — and it is **the empty string for a contract day**, which
- * is [§ D533](../../../../DECISIONS.md) clause 4 arriving as a field rather than as a caveat:
- * nothing on the wire can tell a second day from one day posted twice, so nothing here can either,
- * and a career day is therefore counted rather than de-duplicated. {@link withTurn} is where that
- * distinction lives and it is the clause to distrust first.
+ * `key` is what makes a turn distinguishable from the same turn again — a scenario's id, the wave
+ * number for a rush, the day a contract day names — `core`'s `chimeTurnKeysOf`, the rule the server
+ * applies too ([§ D1416](../../../../DECISIONS.md)). It used to be a count for a contract day,
+ * because the day carried no identity; a version-1 record still holds those rows and they still pay
+ * what they paid.
  */
 export interface DeviceTurn {
   readonly completion: ChimeCompletion;
@@ -112,16 +147,31 @@ export interface DeviceSpend {
   readonly chimes: number;
 }
 
+/**
+ * One step of a ledger sink this device bought, for play on this device — [§ D1418](../../../../DECISIONS.md).
+ *
+ * Named by the sink, as an account's purchase is (§ D671's `{sinkId, steps}`), with what it cost
+ * when it was bought kept beside it for {@link DeviceSpend.chimes}' reason: a later rebalance of
+ * `data/chime-ledger.json` may not rewrite what a player already paid.
+ */
+export interface DeviceSinkSpend {
+  readonly sinkId: string;
+  readonly steps: number;
+  readonly chimes: number;
+}
+
 /** What this device has finished and what it bought with it. No balance is stored — see the docstring. */
 export interface DeviceChimeRecord {
   readonly version: number;
   readonly turns: readonly DeviceTurn[];
   readonly spends: readonly DeviceSpend[];
+  /** The ledger sinks bought from this tally, in the order they were bought. */
+  readonly sinks: readonly DeviceSinkSpend[];
 }
 
 /** Nothing finished and nothing bought. What a device that has never played reads as. */
 export function emptyDeviceChimes(): DeviceChimeRecord {
-  return Object.freeze({ version: DEVICE_CHIMES_VERSION, turns: [], spends: [] });
+  return Object.freeze({ version: DEVICE_CHIMES_VERSION, turns: [], spends: [], sinks: [] });
 }
 
 /* -------------------------------------------------------------------------- *
@@ -140,9 +190,12 @@ export function deviceEarnedOf(record: DeviceChimeRecord, awards: ChimeEarnTable
   return record.turns.reduce((sum, turn) => sum + (awards.awards[turn.completion] ?? 0), 0);
 }
 
-/** What this device has spent, in whole chimes — the sum of what each rung cost when it was bought. */
+/** What this device has spent, in whole chimes — what each rung and each sink step cost when it was bought. */
 export function deviceSpentOf(record: DeviceChimeRecord): number {
-  return record.spends.reduce((sum, spend) => sum + spend.chimes, 0);
+  return (
+    record.spends.reduce((sum, spend) => sum + spend.chimes, 0) +
+    record.sinks.reduce((sum, spend) => sum + spend.chimes, 0)
+  );
 }
 
 /**
@@ -161,59 +214,38 @@ export function deviceBalanceOf(record: DeviceChimeRecord, awards: ChimeEarnTabl
  * Writing
  * -------------------------------------------------------------------------- */
 
-/** The turn key for a posted completion — see {@link DeviceTurn.key} for why a day has none. */
-export function turnKeyOf(turn: ChimeTurn): string {
-  switch (turn.completion) {
-    case 'scenario-cleared':
-      return turn.scenarioId;
-    case 'rush-wave-survived':
-      return String(turn.waves);
-    default:
-      return '';
-  }
-}
-
 /**
- * Record a finished turn, **first time only** where the turn has an identity.
+ * Record a finished turn, **once under each key it names** — [§ D1416](../../../../DECISIONS.md).
  *
  * [§ D533](../../../../DECISIONS.md)'s rule, kept on the device rather than re-derived: a scenario
- * pays once and a rush pays only the waves beyond the best this device has seen, so a re-clear and
- * a replayed climb add nothing. Returns the record unchanged where nothing is owed, so a caller can
- * compare by identity to learn whether a turn was new.
+ * pays once, a rush pays only the waves beyond the best this device has seen, a par once per
+ * scenario, a contract day once per day, and a held level once per level
+ * ([§ D1402](../../../../DECISIONS.md)). `core`'s `chimeTurnKeysOf` names the keys, so the
+ * device and the server cannot come to disagree about which turn is new. Returns the record
+ * unchanged where nothing is owed, so a caller can compare by identity to learn whether a turn was
+ * new.
  *
  * **A rush turn is recorded per wave rather than as a high-water mark**, because the award is per
- * wave: outlasting five waves after a best of three pays two. Each wave is its own key, so a second
- * run that reaches five pays nothing and a run that reaches seven pays the two above five.
+ * wave: outlasting five waves after a best of three pays two.
  */
 export function withTurn(record: DeviceChimeRecord, turn: ChimeTurn): DeviceChimeRecord {
-  const add = (keys: readonly string[]): DeviceChimeRecord => {
-    const held = new Set(
-      record.turns.filter((held_) => held_.completion === turn.completion).map((held_) => held_.key),
-    );
-    const fresh = keys.filter((key) => !held.has(key));
-    if (fresh.length === 0) return record;
-    return Object.freeze({
-      ...record,
-      turns: Object.freeze([
-        ...record.turns,
-        ...fresh.map((key) => Object.freeze({ completion: turn.completion, key })),
-      ]),
-    });
-  };
-  if (turn.completion === 'rush-wave-survived') {
-    if (!Number.isInteger(turn.waves) || turn.waves < 1) return record;
-    return add(Array.from({ length: turn.waves }, (_, index) => String(index + 1)));
-  }
-  if (turn.completion === 'career-day-paid') {
-    /*
-     * No identity, so no de-duplication — § D533 clause 4 in the one place it can be honoured. The
-     * key is the count of days already recorded, which makes each day its own row without claiming
-     * to tell a second day from a re-post.
-     */
-    const days = record.turns.filter((held) => held.completion === 'career-day-paid').length;
-    return add([String(days + 1)]);
-  }
-  return add([turnKeyOf(turn)]);
+  const held = new Set(
+    record.turns.filter((entry) => entry.completion === turn.completion).map((entry) => entry.key),
+  );
+  const fresh = chimeTurnKeysOf(turn).filter((key) => !held.has(key));
+  if (fresh.length === 0) return record;
+  return Object.freeze({
+    ...record,
+    turns: Object.freeze([
+      ...record.turns,
+      ...fresh.map((key) => Object.freeze({ completion: turn.completion, key })),
+    ]),
+  });
+}
+
+/** Whether this device holds a turn of `completion` under `key` — a scenario cleared, a par met. */
+export function deviceHoldsTurn(record: DeviceChimeRecord, completion: ChimeCompletion, key: string): boolean {
+  return record.turns.some((turn) => turn.completion === completion && turn.key === key);
 }
 
 /** Why a rung could not be bought. Never `undefined` on a refusal — a caller draws this as it stands. */
@@ -263,6 +295,73 @@ export function boughtStepIdOf(record: DeviceChimeRecord, scenarioId: string): s
   return bought[bought.length - 1]?.stepId;
 }
 
+/**
+ * **What this device owns of each ledger sink, summed** — the device's half of § D671's `owns`,
+ * [§ D1418](../../../../DECISIONS.md). One row per sink, in the order first bought, so a reader that
+ * claims from it (`everyday/host.ts#rushClaims`) treats a device's purchase exactly as it treats an
+ * account's.
+ */
+export function deviceOwnedOf(
+  record: DeviceChimeRecord,
+): readonly { readonly sinkId: string; readonly steps: number }[] {
+  const steps = new Map<string, number>();
+  for (const spend of record.sinks) steps.set(spend.sinkId, (steps.get(spend.sinkId) ?? 0) + spend.steps);
+  return Object.freeze([...steps].map(([sinkId, held]) => Object.freeze({ sinkId, steps: held })));
+}
+
+/** Why a sink step could not be bought on this device. Never `undefined` on a refusal. */
+export type DeviceSinkRefusal =
+  /** The shipped table sells no such sink, or not that many steps at once. */
+  | { readonly kind: 'unknown' }
+  /** Already bought to the sink's own cap: a further step would buy nothing a run could claim. */
+  | { readonly kind: 'owned' }
+  /** The tally does not cover it. `shortBy` is the subtraction, in chimes. */
+  | { readonly kind: 'short'; readonly shortBy: number };
+
+/** What {@link withSinkSpend} answers: the record to keep and what the step granted, or why nothing was bought. */
+export type DeviceSinkOutcome =
+  | { readonly kind: 'bought'; readonly record: DeviceChimeRecord; readonly grantUnits: number }
+  | { readonly kind: 'refused'; readonly refusal: DeviceSinkRefusal };
+
+/**
+ * **Buy `steps` of a ledger sink out of this device's tally** — [§ D1418](../../../../DECISIONS.md),
+ * replacing [§ D911](../../../../DECISIONS.md) clause 6 in writing.
+ *
+ * The server's spend verb, on the device: the price is the ledger's (`chimeSpendPrice`, which also
+ * refuses more steps than one purchase may take), the cap is the sink's own `maxSteps` counted over
+ * everything this device bought of it, which is the most a run may claim (`unbackedModifiers`
+ * caps a claim there), and the shortfall is computed here rather than by a screen, on
+ * {@link withSpend}'s ground. **No amount arrives from a caller**: the argument is a sink and a
+ * number of steps, the same signature the server's verb has.
+ *
+ * What a step grants is answered beside the record, from the sink's own authored `grantUnits`, so
+ * the career's top-up lands with the figure the ledger authors and no second copy of it.
+ */
+export function withSinkSpend(
+  record: DeviceChimeRecord,
+  sinkId: string,
+  steps: number,
+  awards: ChimeEarnTable = CHIME_AWARDS,
+  prices: ChimeSpendTable = DEVICE_SINK_PRICES,
+): DeviceSinkOutcome {
+  const sink = prices.sinks.find((candidate) => candidate.id === sinkId);
+  const price = sink === undefined ? undefined : chimeSpendPrice(sink, steps);
+  if (sink === undefined || price === undefined) return { kind: 'refused', refusal: { kind: 'unknown' } };
+  const held = deviceOwnedOf(record).find((entry) => entry.sinkId === sinkId)?.steps ?? 0;
+  if (held + steps > sink.maxSteps) return { kind: 'refused', refusal: { kind: 'owned' } };
+  const balance = deviceBalanceOf(record, awards);
+  if (balance < price) return { kind: 'refused', refusal: { kind: 'short', shortBy: price - balance } };
+  return {
+    kind: 'bought',
+    record: Object.freeze({
+      ...record,
+      sinks: Object.freeze([...record.sinks, Object.freeze({ sinkId, steps, chimes: price })]),
+    }),
+    /* `core`'s own grant, the one the server's spend route answers with, so there is one multiplication. */
+    grantUnits: chimeGrantUnits(sink, steps),
+  };
+}
+
 /* -------------------------------------------------------------------------- *
  * The envelope
  * -------------------------------------------------------------------------- */
@@ -297,6 +396,20 @@ function isSpend(raw: unknown): raw is DeviceSpend {
   );
 }
 
+function isSinkSpend(raw: unknown): raw is DeviceSinkSpend {
+  if (typeof raw !== 'object' || raw === null) return false;
+  const row = raw as Record<string, unknown>;
+  return (
+    typeof row['sinkId'] === 'string' &&
+    typeof row['steps'] === 'number' &&
+    Number.isInteger(row['steps']) &&
+    row['steps'] >= 1 &&
+    typeof row['chimes'] === 'number' &&
+    Number.isInteger(row['chimes']) &&
+    row['chimes'] >= 0
+  );
+}
+
 /**
  * Read a stored record, or say why not.
  *
@@ -323,15 +436,18 @@ export function decodeDeviceChimes(raw: string | null): DeviceChimeLoad {
     return { record: emptyDeviceChimes(), refusal: 'wrong-shape' };
   }
   const row = parsed as Record<string, unknown>;
-  if (row['version'] !== DEVICE_CHIMES_VERSION) {
+  const version = row['version'];
+  if (typeof version !== 'number' || !DEVICE_CHIMES_VERSIONS_READ.includes(version)) {
     return { record: emptyDeviceChimes(), refusal: 'wrong-version' };
   }
   const turns = row['turns'];
   const spends = row['spends'];
-  if (!Array.isArray(turns) || !Array.isArray(spends)) {
+  /* Version 1 had no sink spends: read as none, which is what it recorded (§ D1418). */
+  const sinks = version === 1 ? [] : row['sinks'];
+  if (!Array.isArray(turns) || !Array.isArray(spends) || !Array.isArray(sinks)) {
     return { record: emptyDeviceChimes(), refusal: 'wrong-shape' };
   }
-  if (!turns.every(isTurn) || !spends.every(isSpend)) {
+  if (!turns.every(isTurn) || !spends.every(isSpend) || !sinks.every(isSinkSpend)) {
     return { record: emptyDeviceChimes(), refusal: 'wrong-shape' };
   }
   return {
@@ -339,6 +455,7 @@ export function decodeDeviceChimes(raw: string | null): DeviceChimeLoad {
       version: DEVICE_CHIMES_VERSION,
       turns: Object.freeze(turns.map((turn) => Object.freeze({ ...turn }))),
       spends: Object.freeze(spends.map((spend) => Object.freeze({ ...spend }))),
+      sinks: Object.freeze(sinks.map((spend) => Object.freeze({ ...spend }))),
     }),
     refusal: undefined,
   };
@@ -350,5 +467,6 @@ export function encodeDeviceChimes(record: DeviceChimeRecord): string {
     version: DEVICE_CHIMES_VERSION,
     turns: record.turns,
     spends: record.spends,
+    sinks: record.sinks,
   });
 }

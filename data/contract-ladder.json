@@ -3,6 +3,7 @@
   "version": 1,
   "$growthComment": "THE WEEK'S GROWTH, moved here from shift/types.ts#GROWTH_PER_DAY by DECISIONS.md \u00a7 D1066 (wave AJ). A week's building on day d carries 1 + g \u00d7 (d \u2212 1) of its day-1 population, linearly (shift/growth.ts argues the linear form). defaultGrowthPerDay is the design's own 0.11 (design.html :1568) and applies wherever a rung declares no growthPerDay of its own: the career, Endless, a replay on a building with no rung, and every contract the week census has not re-derived. A rung's growthPerDay is RE-DERIVED BY A CENSUS, never chosen: shift/weekWay.sweep.test.ts measures each weekday against docs/33 DC-10 and data/week-way.json carries what it found, with the growth each row was measured under so a slope moved here without a re-run is refused as stale by shift/weekWay.test.ts. Bounded by shift/ladder.ts#GROWTH_PER_DAY_BOUNDS. No bar moves with it (shift/goals.ts#GOAL_BARS is pinned by goals.test.ts). Chancery House (c6) and Ashgate (c10) grow at 0: swarm DO's screen measured each one's day 5 at 6 of 8 tuning crowds at slope 0 and at 3 and 2 of 8 at Midtown's 0.02, and the held-out census taken at slope 0 is what their rows in data/week-way.json carry (DECISIONS.md § D1258, docs/33 DC-10's table). 0 is the bound's floor, so no lower slope was open to either tower.",
   "defaultGrowthPerDay": 0.11,
+  "$weekBookingsComment": "THE WEEK'S LEVELS, wave AO lane DS-1, DECISIONS.md \u00a7 D1400 and \u00a7 D1401, swarm DS's Q1 ruling. From week 3 a held week deals the next LEVEL: the order the cycle deals that week plus the rung's first n \u2212 2 weekBookings, so week 3 adds the first, week 4 the second, and a booking once added stays. Each booking is one car out of passenger service on one named weekday (day 1 Monday to 5 Friday), in the rung's own incidents vocabulary (kind, bankId, carId, fromFraction, toFraction of the run) plus the day; shift/ladder.ts#ContractWeekBooking declares it and contractLadderIssues checks it. A level is DEALT only where DC-10 admits each booked day (a data/week-way.json row measured with exactly those bookings), DC-11 admits the week (a data/week-dominance.json row for the order with them), and no shipped profile holds it on more crowds than it held the week before: shift/weekLevels.ts reads all three, and the first level refused ends the tower's ladder. Each booking sits on the day with the most room, the weekday with no booking yet whose chosen play cleared the most held-out crowds, which shift/weekLevels.ts#weekLevelIssues holds against the census. PROVENANCE: the bookings are CHOSEN (car C from the start of the day to 0.4 of it, S1's measured booking, on the day the rule names); whether each level is dealt is MEASURED, and a refused booking stays authored with its refusal readable, as \u00a7 D1345 keeps refused orders.",
   "contracts": [
     {
       "contractId": "c1",
@@ -47,6 +48,11 @@
           "id": "midtown-early-lift",
           "days": ["shift-change:tight", "evacuation-drill:all-at-once", "lift-service:early", "goods-inward", "open-day:busy"]
         }
+      ],
+      "weekBookings": [
+        { "kind": "maintenance", "bankId": "main", "carId": "C", "fromFraction": 0, "toFraction": 0.4, "day": 1 },
+        { "kind": "maintenance", "bankId": "main", "carId": "C", "fromFraction": 0, "toFraction": 0.4, "day": 2 },
+        { "kind": "maintenance", "bankId": "main", "carId": "C", "fromFraction": 0, "toFraction": 0.4, "day": 4 }
       ],
       "demand": {},
       "fabric": {

@@ -34,7 +34,16 @@
 import { intervalContainsZero, pairedDifferenceEstimate, type MeanEstimate } from '@elevator-sim/experiments/browser';
 
 import { scheduledEventFor } from './calendar.js';
+import type { ContractIncident } from './ladder.js';
 import type { WeekState } from './types.js';
+import {
+  bookingPhraseOf,
+  bookingsAddedBetween,
+  dealtLevelOf,
+  dealtWeekOf,
+  hasFurtherWeek,
+  weekBookingsOn,
+} from './weekLevels.js';
 import { weekOrderIndexOf } from './weekOrders.js';
 import { weekAsksOf, weekDealOf, weekTargetMetDayOf } from './weekStake.js';
 import { WEEK_WAY, weekWayRowFor, type WeekWay } from './weekWay.js';
@@ -74,20 +83,26 @@ function weekdayIdsOf(key: WeekNumberKey, census: WeekWay): readonly string[] {
  * and a sum with a day borrowed from another wrinkle is a different week's.
  */
 export function houseWeekCensusOf(key: WeekNumberKey, census: WeekWay = WEEK_WAY): HouseWeekCensus | undefined {
-  return houseCensusOverDays(key.contractId, weekdayIdsOf(key, census), census);
+  /*
+   * Each weekday with the week level's bookings on it (wave AO lane DS-1, § D1400): a level's
+   * booked day is read off the row measured with the car out, because the house ran that day.
+   */
+  const booked = Array.from({ length: WEEKDAYS }, (_, index) => weekBookingsOn(key, index + 1, index, census));
+  return houseCensusOverDays(key.contractId, weekdayIdsOf(key, census), census, booked);
 }
 
-/** {@link houseWeekCensusOf} over named weekday wrinkles, Monday first. */
+/** {@link houseWeekCensusOf} over named weekday wrinkles, Monday first, each with its week bookings. */
 export function houseCensusOverDays(
   contractId: string,
   ids: readonly string[],
   census: WeekWay = WEEK_WAY,
+  bookings: readonly (readonly ContractIncident[])[] = [],
 ): HouseWeekCensus | undefined {
   const crowds = census.protocol.heldOutCount;
   const perCrowd = Array.from({ length: crowds }, () => 0);
   if (ids.length !== WEEKDAYS) return undefined;
   for (const [index, eventId] of ids.entries()) {
-    const row = weekWayRowFor(contractId, index + 1, eventId, census.protocol.horizon, census);
+    const row = weekWayRowFor(contractId, index + 1, eventId, census.protocol.horizon, census, bookings[index] ?? []);
     if (row?.eventId !== eventId || row.standingVerdicts.length !== crowds) return undefined;
     for (let crowd = 0; crowd < crowds; crowd += 1) {
       if (row.standingVerdicts[crowd] === 'C') perCrowd[crowd] = (perCrowd[crowd] ?? 0) + 1;
@@ -195,7 +210,12 @@ export function weekWasHeldBy(week: Pick<WeekState, 'contractId' | 'week' | 'his
 
 /** *a different wrinkle on each weekday* or the honest alternative, for weeks `a` and `b`. */
 function wrinkleClause(contractId: string, a: number, b: number, census: WeekWay): string {
-  if (weekOrderIndexOf({ contractId, week: a }, census) === weekOrderIndexOf({ contractId, week: b }, census)) {
+  /*
+   * The order half of the week as dealt (wave AO lane DS-1): two weeks dealt one level, or one order
+   * at two levels, deal the same wrinkles, whatever their numbers.
+   */
+  const orderOf = (week: number): number => weekOrderIndexOf({ contractId, week: dealtWeekOf({ contractId, week }, census) }, census);
+  if (orderOf(a) === orderOf(b)) {
     return 'the same wrinkles as this week';
   }
   const differ = weekdaysThatDiffer(contractId, a, b, census);
@@ -204,10 +224,37 @@ function wrinkleClause(contractId: string, a: number, b: number, census: WeekWay
 }
 
 /**
+ * **What the next level adds, in words** — wave AO, lane DS-1 ([§ D1400](../../../../DECISIONS.md)):
+ * *and one more car out of passenger service: car C on Monday from 08:00 until 12:00*, or `''` where
+ * week `b` books no car week `a` does not. A booking is always said where it is new; whether the week
+ * is harder is not this clause's to say (§ D1344 clause 3 is {@link weekHarderSentenceOf}'s).
+ */
+function bookingClause(contractId: string, a: number, b: number, census: WeekWay, clock: BookingClock | undefined): string {
+  const added = bookingsAddedBetween(contractId, a, b, census);
+  if (added.length === 0) return '';
+  const cars = added.length === 1 ? 'one more car' : `${String(added.length)} more cars`;
+  return ` and ${cars} out of passenger service: ${added.map((booking) => bookingPhraseOf(booking, clock, 'short')).join('; ')}`;
+}
+
+/**
+ * A fraction of the run as the day's clock reads it (`08:00`), from the run's own start and length:
+ * `everyday/weekScreen.ts` and `everyday/doorScreen.ts` build it from `dev/state.ts#plannedDayOf`.
+ * A booking's window is authored in fractions of the run (`shift/ladder.ts#ContractIncident`).
+ */
+export type BookingClock = (fraction: number) => string;
+
+/**
  * **What a closed week's sheet deals next**, or `undefined` for a week that is no Scenario's. See the
  * module docstring; a week the census does not deal is answered too since § D1394.
+ *
+ * **From week 3 the next week is a level** (wave AO lane DS-1, [§ D1400](../../../../DECISIONS.md),
+ * `weekLevels.ts`): the line names the booking it adds, with `clock`'s times where the caller has the
+ * run's clock. **Where the census deals the week and no level is left above it**, the line says the
+ * tower has no further week, and a week that was not held offers no *Go on*: the next number would
+ * deal this week again, and a press that promises *the next week* would promise one that does not
+ * exist. A held week's sheet offers the next tower beside it (`nextTower.ts`, § D1259).
  */
-export function nextWeekOf(week: WeekState, census: WeekWay = WEEK_WAY): NextWeekView | undefined {
+export function nextWeekOf(week: WeekState, census: WeekWay = WEEK_WAY, clock?: BookingClock): NextWeekView | undefined {
   /*
    * Any Scenario week, since § D1394 (wave AO lane AO-5): a week the census does not deal closes on
    * Sunday too, and asks its `needClean` (`weekStake.ts#weekAsksOf`). Its next week deals the same
@@ -219,8 +266,16 @@ export function nextWeekOf(week: WeekState, census: WeekWay = WEEK_WAY): NextWee
   const here = week.week;
   const next = here + 1;
   const harder = weekHarderSentenceOf(contractId, here, next, census);
+  /* The ladder's end: the census deals this tower's week and no level is admitted above this one. */
+  const atTop = weekDealOf(week, census) !== undefined && !hasFurtherWeek(week, census);
+  const sameCars = dealtLevelOf(week, census) === undefined ? '' : ' and the same cars out';
+  const whatComes = (): string =>
+    `${wrinkleClause(contractId, here, next, census)}${bookingClause(contractId, here, next, census, clock)}`;
   if (weekWasHeldBy(week, census)) {
-    const lead = `You held week ${String(here)}, so ${NEXT_WEEK_LABEL} deals week ${String(next)}, with ${wrinkleClause(contractId, here, next, census)}.`;
+    const lead = atTop
+      ? `You held week ${String(here)}. This tower deals no further week: ${NEXT_WEEK_LABEL} deals ` +
+        `week ${String(next)} as this week was dealt, the same wrinkles${sameCars}, on new crowds.`
+      : `You held week ${String(here)}, so ${NEXT_WEEK_LABEL} deals week ${String(next)}, with ${whatComes()}.`;
     return {
       held: true,
       week: next,
@@ -231,11 +286,14 @@ export function nextWeekOf(week: WeekState, census: WeekWay = WEEK_WAY): NextWee
   }
   const again = `Play week ${String(here)} again`;
   const onwardLabel = `Go on to week ${String(next)}`;
-  const lead =
+  const missed =
     /* A week that counts no day has no target to miss, and the sheet says *This week had no target*. */
     `${target === 0 ? 'This week had no target to meet' : 'This week’s target was not met'}, so ` +
-    `${again} deals the same wrinkles on new crowds. Nothing is ` +
-    `locked: ${onwardLabel} deals the next week instead, with ${wrinkleClause(contractId, here, next, census)}.`;
+    `${again} deals the same wrinkles${sameCars} on new crowds.`;
+  if (atTop) {
+    return { held: false, week: here, label: again, line: `${missed} This tower deals no further week.`, onward: undefined };
+  }
+  const lead = `${missed} Nothing is locked: ${onwardLabel} deals the next week instead, with ${whatComes()}.`;
   return {
     held: false,
     week: here,
@@ -243,6 +301,28 @@ export function nextWeekOf(week: WeekState, census: WeekWay = WEEK_WAY): NextWee
     line: harder === undefined ? lead : `${lead} ${harder}`,
     onward: { week: next, label: onwardLabel },
   };
+}
+
+/**
+ * **The door's line about the cars the week under way books out** — wave AO, lane DS-1
+ * ([§ D1400](../../../../DECISIONS.md)): *Booked this week: car C is out of passenger service on
+ * Monday from 08:00 until 12:00, new this week.* `undefined` for a week dealt no level. It names
+ * the bookings and nothing about difficulty, which is {@link weekUnderWayHarderLineOf}'s and only
+ * where the house's census fell (§ D1344).
+ */
+export function weekBookingsLineOf(
+  week: Pick<WeekState, 'contractId' | 'week'>,
+  census: WeekWay = WEEK_WAY,
+  clock?: BookingClock,
+): string | undefined {
+  const level = dealtLevelOf(week, census);
+  if (level === undefined) return undefined;
+  /* The booking this week adds is new only where the week is dealt its own level, not the top again. */
+  const fresh = dealtWeekOf(week, census) === Math.trunc(week.week) ? level.added : undefined;
+  const phrases = level.bookings.map(
+    (booking) => `${bookingPhraseOf(booking, clock)}${booking === fresh ? ', new this week' : ''}`,
+  );
+  return `Booked this week: ${phrases.join('; ')}.`;
 }
 
 /**

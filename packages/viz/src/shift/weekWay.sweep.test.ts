@@ -42,6 +42,10 @@
  *   cells instead of `WEEK_WAY_DAYS`: each day runs exactly the drawn id after its `=`. That is how
  *   an authored week order (`data/contract-ladder.json`'s `weekOrders`, lane AM-D, § D1252) is
  *   measured, one row per day of the order, before the census admits it.
+ * - `WEEK_WAY_BOOKINGS='[{"kind":"maintenance","bankId":"main","carId":"C","fromFraction":0,"toFraction":0.4}]'`
+ *   runs every named cell with those cars out of passenger service beside the rung's own, and writes
+ *   them on each line as `bookings`: a week level's booked day (wave AO lane DS-1, § D1400, § D1401),
+ *   measured for both DC-10's row and the one-profile screen before the level is dealt.
  *
  * `WEEK_WAY_CONTRACTS`, `WEEK_WAY_DAYS` and `WEEK_WAY_OUT` name the cells and the file. It writes a
  * file because vitest intercepts `console.log` (`pressLadder.sweep.test.ts` records the trap).
@@ -77,9 +81,9 @@ vi.mock('../../../../data/contract-ladder.json', async (importOriginal) => {
 });
 
 import { scheduledEventFor } from './calendar.js';
-import { growthPerDayOf, ladderRowFor } from './ladder.js';
+import { growthPerDayOf, ladderRowFor, type ContractIncident } from './ladder.js';
 import { WEEK_WAY, type WeekWayConfig } from './weekWay.js';
-import { crowdSeeds, WEEK_WAY_RESOURCES as resources, weekWayCell as runDay, type WeekWayVerdict as Verdict } from './weekWay.test-helper.js';
+import { crowdSeeds, WEEK_WAY_RESOURCES as resources, weekWayCell as runCell, type WeekWayVerdict as Verdict } from './weekWay.test-helper.js';
 
 function configsOf(): readonly WeekWayConfig[] {
   const out: WeekWayConfig[] = [];
@@ -130,6 +134,16 @@ describe.runIf(process.env['WEEK_WAY_SWEEP'] === '1')('the week census', () => {
     const heldOutSeeds = crowdSeeds(p.heldOutFrom, p.heldOutCount);
     const configs = configsOf();
     const standing: WeekWayConfig = { dispatcherId: p.standingOrder, press: '', atFraction: 0 };
+    /*
+     * **A candidate week level's bookings** — wave AO, lane DS-1 (`shift/weekLevels.ts`, § D1400).
+     * `WEEK_WAY_BOOKINGS` is a JSON list of `data/contract-ladder.json` incidents (kind, bankId,
+     * carId, fromFraction, toFraction): every named cell runs with those cars out beside the rung's
+     * own, through `shiftRunConfigOf`'s week-bookings argument, and each line carries the list as
+     * `bookings` so the copied row is matched only to a week that deals exactly them.
+     */
+    const bookings: readonly ContractIncident[] = JSON.parse(process.env['WEEK_WAY_BOOKINGS'] ?? '[]') as ContractIncident[];
+    const runDay = (contractId: string, day: number, seed: bigint, config: WeekWayConfig, scheduledDay: boolean, eventId: string | undefined): Verdict =>
+      runCell(contractId, day, seed, config, scheduledDay, eventId, bookings);
 
     if (stage === 'profiles') {
       /*
@@ -166,6 +180,7 @@ describe.runIf(process.env['WEEK_WAY_SWEEP'] === '1')('the week census', () => {
               contractId,
               day,
               eventId: eventId ?? 'ordinary',
+              ...(bookings.length === 0 ? {} : { bookings }),
               heldOutFrom: p.heldOutFrom,
               heldOutCount: p.heldOutCount,
               verdicts,
@@ -237,6 +252,7 @@ describe.runIf(process.env['WEEK_WAY_SWEEP'] === '1')('the week census', () => {
             eventId ??
             (scheduled ? scheduledEventFor(null, day, (day - 1) % 7, WEEK_WAY.protocol.horizon).id : 'ordinary'),
           growthPerDay: slope,
+          ...(bookings.length === 0 ? {} : { bookings }),
           chosen,
           tuningClears: chosenTuning?.clears ?? 0,
           tuningN: chosenTuning?.n ?? 0,

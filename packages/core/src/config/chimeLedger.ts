@@ -86,10 +86,40 @@
  * turn, never by a run's figures* — every member here is a turn that either happened or did not,
  * and none of them is a quantity a run can suppress.
  */
-export const CHIME_COMPLETIONS = ['scenario-cleared', 'career-day-paid', 'rush-wave-survived'] as const;
+export const CHIME_COMPLETIONS = [
+  'scenario-cleared',
+  'scenario-at-par',
+  'career-day-paid',
+  'rush-wave-survived',
+  'week-held',
+] as const;
 
 /** One member of {@link CHIME_COMPLETIONS}. */
 export type ChimeCompletion = (typeof CHIME_COMPLETIONS)[number];
+
+/**
+ * **The completions paid once under a key the play surface composes** — [§ D1416](../../../../DECISIONS.md),
+ * the general half of swarm DS's turn keys.
+ *
+ * A keyed completion's turn is `{ completion, key }` and nothing else, and adding one is four edits
+ * that touch neither route nor store: the id here and in {@link CHIME_COMPLETIONS}, a composer for
+ * its key, the key's shape in {@link KEYED_TURN_SHAPES} (whose first capture names the contract that
+ * owns it), and the source in `data/chime-ledger.json`. The server's earn route reads `key` for every
+ * member, the ledger refuses a key whose shape no composer writes or whose contract the ladder does
+ * not name, and both ledgers pay each key once through {@link chimeTurnKeysOf}. A held level
+ * (`week-held`, swarm DS's Q1, lane DS-1, [§ D1402](../../../../DECISIONS.md)) joined it exactly that
+ * way, with {@link weekLevelTurnKeyOf} as its composer; its keys are few enough for the server to
+ * enumerate, so its bound is the authored ladder's levels rather than only their contract.
+ */
+export const CHIME_KEYED_COMPLETIONS = ['career-day-paid', 'week-held'] as const;
+
+/** One member of {@link CHIME_KEYED_COMPLETIONS}. */
+export type ChimeKeyedCompletion = (typeof CHIME_KEYED_COMPLETIONS)[number];
+
+/** Whether `completion` is paid under a composed key — the wire's one question about a keyed turn. */
+export function isChimeKeyedCompletion(completion: string): completion is ChimeKeyedCompletion {
+  return (CHIME_KEYED_COMPLETIONS as readonly string[]).includes(completion);
+}
 
 /**
  * One finished turn, as the play surface posts it — GitHub issue **#499**, the product owner's
@@ -109,17 +139,132 @@ export type ChimeCompletion = (typeof CHIME_COMPLETIONS)[number];
  * - `waves` is how many whole waves the rush **outlasted** before its breaking point; the wave the
  *   line was crossed in was reached and not survived. The server refuses a count above the waves the
  *   stream generates.
- * - A contract day carries nothing. The ruling does not reach it, and each posted day still pays.
+ * - `key` names **which** day (or, for any other {@link CHIME_KEYED_COMPLETIONS} member, which turn)
+ *   was paid — [§ D1416](../../../../DECISIONS.md). A contract day carried nothing until wave AO, so
+ *   nothing on the wire could tell a second day from one day posted twice, and the server paid every
+ *   post (swarm DS's S2, M7). Each day still pays; the same day pays once. {@link careerDayTurnKeyOf}
+ *   and {@link weekDayTurnKeyOf} compose it, and {@link chimeTurnKeyOwnerOf} is the server's bound.
+ * - A held level's `key` (`week-held`, wave AO lane DS-1, [§ D1402](../../../../DECISIONS.md)) names
+ *   the level of a tower's week that was held: `c2/3` is Midtown Office's week 3 as dealt,
+ *   {@link weekLevelTurnKeyOf}'s. It is the turn key, so a level pays once per account however often
+ *   it is held; a held week dealt the top again names the top's level and pays nothing more. The
+ *   server refuses a key outside the levels `data/contract-ladder.json` authors.
+ * - A par turn (`scenario-at-par`, [§ D1417](../../../../DECISIONS.md)) names the scenario whose
+ *   priced par a clear met or beat, and pays once per scenario.
  *
- * **What the server cannot check, stated rather than hidden:** that the clear happened, or that the
- * run reached the waves it claims. Nothing replays a scenario clear or a rush result before paying
- * it — a rush result's replay is GitHub issue #372's — so these fields are believed within their
- * bounds, and first-time-only is what caps what believing them can cost.
+ * **What the server cannot check, stated rather than hidden:** that the clear happened, that it was
+ * at par, or that the run reached the waves it claims. Nothing replays a scenario clear before paying
+ * it, so these fields are believed within their bounds, and first-time-only is what caps what
+ * believing them can cost.
  */
 export type ChimeTurn =
   | { readonly completion: 'scenario-cleared'; readonly scenarioId: string }
-  | { readonly completion: 'career-day-paid' }
+  | { readonly completion: 'scenario-at-par'; readonly scenarioId: string }
+  | { readonly completion: ChimeKeyedCompletion; readonly key: string }
   | { readonly completion: 'rush-wave-survived'; readonly waves: number };
+
+/**
+ * **The keys a turn pays under — one per turn it finishes, and every award has one** —
+ * [§ D1416](../../../../DECISIONS.md), swarm DS's Q3 ruling (S2's integrity finding).
+ *
+ * The one rule both ledgers apply: an entry is written for a key the ledger has not yet paid under
+ * the same completion, and for no other. A scenario's key is its id, so a re-clear pays nothing
+ * (§ D533); a rush's keys are the waves it outlasted, one each, so only the waves beyond the best
+ * pay; a keyed completion's key is the one it names (a contract day's is the day, a held level's
+ * the level), so the same day posted twice pays once. A completion added to {@link CHIME_KEYED_COMPLETIONS} is keyed here with no
+ * new arm; any other new completion adds one, because `switch` over the union is exhaustive.
+ *
+ * Empty means the turn names nothing payable — a rush that outlasted no whole wave, or a key that is
+ * empty — and both ledgers write nothing for it.
+ */
+export function chimeTurnKeysOf(turn: ChimeTurn): readonly string[] {
+  switch (turn.completion) {
+    case 'scenario-cleared':
+    case 'scenario-at-par':
+      return turn.scenarioId === '' ? [] : [turn.scenarioId];
+    case 'career-day-paid':
+    case 'week-held':
+      return turn.key === '' ? [] : [turn.key];
+    case 'rush-wave-survived':
+      return !Number.isInteger(turn.waves) || turn.waves < 1
+        ? []
+        : Array.from({ length: turn.waves }, (_, index) => String(index + 1));
+  }
+}
+
+/**
+ * **A Career contract day's turn key** — the tower (a contract id), the month of that contract it
+ * falls in, the contract day, and the career day it was filed on ([§ D1416](../../../../DECISIONS.md)).
+ *
+ * S2 named the first three. The career day is the fourth because a tower handed back and taken again
+ * starts its month and its days from the beginning, and those days were never paid; the career day
+ * only ever rises inside one career, so two filed days never share it.
+ */
+export function careerDayTurnKeyOf(input: {
+  readonly towerId: string;
+  readonly month: number;
+  readonly day: number;
+  readonly careerDay: number;
+}): string {
+  return `career:${input.towerId}:m${String(input.month)}:d${String(input.day)}:t${String(input.careerDay)}`;
+}
+
+/**
+ * **A Scenario week's counted day's turn key** — the contract and the crowd the day was dealt
+ * ([§ D1416](../../../../DECISIONS.md), on [§ D1231](../../../../DECISIONS.md)'s pay).
+ *
+ * The crowd rather than the week's ordinal, because a week opened again by taking the scenario again
+ * starts at week 1 and deals new crowds, and those are new days; while no later day on a device is
+ * dealt a crowd the tower already met (`shift/weekRecord.ts#dealtCrowdOf`). Where the day carries no
+ * seed, the week and day numbers stand in.
+ */
+export function weekDayTurnKeyOf(input: {
+  readonly contractId: string;
+  readonly week: number;
+  readonly day: number;
+  readonly seed: string | undefined;
+}): string {
+  return input.seed === undefined || input.seed === ''
+    ? `week:${input.contractId}:w${String(input.week)}:d${String(input.day)}`
+    : `week:${input.contractId}:s${input.seed}`;
+}
+
+/**
+ * **A held level's turn key** — the contract and the week as dealt, `c2/3` (wave AO, lane DS-1,
+ * [§ D1402](../../../../DECISIONS.md), a member of [§ D1416](../../../../DECISIONS.md)'s keyed table).
+ *
+ * Which week a held week is dealt is the viewer's reading (`viz/shift/weekLevels.ts#weekLevelAwardKeyOf`,
+ * which never names a level past the ones the rung authors); the server's bound enumerates the
+ * authored levels with this same composer (`server/chimes/ledger.ts#weekLevelKeysOf`), so the two
+ * sides cannot come to spell one level two ways.
+ */
+export function weekLevelTurnKeyOf(input: { readonly contractId: string; readonly week: number }): string {
+  return `${input.contractId}/${String(input.week)}`;
+}
+
+/**
+ * **What each keyed completion's composers write, and nothing else** — the server's shape bound on a
+ * keyed turn ([§ D1416](../../../../DECISIONS.md)). The first capture that matched names the contract
+ * the key belongs to. A contract day's key is {@link careerDayTurnKeyOf}'s or {@link weekDayTurnKeyOf}'s;
+ * a held level's is {@link weekLevelTurnKeyOf}'s.
+ */
+const KEYED_TURN_SHAPES: Readonly<Record<ChimeKeyedCompletion, RegExp>> = Object.freeze({
+  'career-day-paid':
+    /^(?:career:([a-z0-9][a-z0-9-]{0,39}):m\d{1,4}:d\d{1,3}:t\d{1,6}|week:([a-z0-9][a-z0-9-]{0,39}):(?:s\d{1,24}|w\d{1,4}:d\d{1,3}))$/u,
+  'week-held': /^([a-z0-9][a-z0-9-]{0,39})\/[1-9]\d{0,3}$/u,
+});
+
+/**
+ * The contract a keyed turn's key names, or `undefined` for a key no composer of that completion
+ * writes — the server's shape bound ([§ D1416](../../../../DECISIONS.md)). The server then refuses a
+ * contract its ladder does not name, so a client inventing keys meets the same wall a client inventing
+ * scenario ids does.
+ */
+export function chimeTurnKeyOwnerOf(completion: ChimeKeyedCompletion, key: string): string | undefined {
+  const match = KEYED_TURN_SHAPES[completion].exec(key);
+  if (match === null) return undefined;
+  return match.slice(1).find((group) => group !== undefined);
+}
 
 /**
  * How a source came to exist. **Two values, and there is no third.**

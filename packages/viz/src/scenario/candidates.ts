@@ -258,7 +258,19 @@ export const CANDIDATE_SCENARIOS: readonly GoalScenario[] = [
    * `long-waits-under` became live under the new setting, so `data/campaign.json` declares it there,
    * because `campaign/parse.ts` refuses a stage that leaves out a goal this table measures as live.
    */
-  stage('stage-7-prove-it', 'Tune it', 'midtown-office', 'zoned-uppeak', 1.25),
+  /*
+   * **2.25 rather than 1.25, and it is DC-12's rebalance by demand** — wave AO lane P2-4,
+   * [§ D1426](../../../../DECISIONS.md), `docs/33` § 3.3h, GitHub issue #234. At 1.25 four of the
+   * stage's eleven ways through were earlier stages' answers (stage 2's lobby parking among them),
+   * so a player who had cleared stage 2 cleared this one on the first attempt. At 2.25 the survivor
+   * census names two ways through at the base rung, `destination-eta-parked-lobby` and
+   * `predictive-balanced-parked-zone-center`, neither a way through any earlier stage nor a bare
+   * pick, and only `predictive-balanced` of the dropdown meets every bar on the tuning crowds, which
+   * the holdout refuses. The demand moved and no bar did (DC-R1): the goals are re-measured here.
+   * **Measured as a point, not a plateau**: at 2.1, 2.2, 2.3 and 2.4 a carried answer clears again
+   * on these seeds, which § D1426 records rather than hides.
+   */
+  stage('stage-7-prove-it', 'Tune it', 'midtown-office', 'zoned-uppeak', 2.25),
   stage('stage-8-the-headline-address', 'The headline address', 'chancery-house', 'zoned-uppeak', 3),
   /*
    * **3.5 rather than 2.5, and it is #234's rebalance by demand** (wave AN lane AP-1, § D1288). At

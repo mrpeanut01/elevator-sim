@@ -19,8 +19,8 @@
  * - **Save as a new building** — `host.applyBuildingSpec`, which allocates an id, runs the drawn
  *   document through the real loader, and stands the next run on it through `withBuilding`. It does
  *   not run.
- * - **Run a day in it** (§ 3.3's primary, which is the shell's button) — the same apply, then
- *   `startRun`, then `go('stage')`.
+ * - **Run a day in it** (§ 3.3's primary, which is the shell's button) — `host.runSandbox` with the
+ *   drawn tower, then `go('stage')`: a sandbox day in it over the week and never on it (§ D1363).
  *
  * A spec the loader refuses throws out of the apply. The refusal is drawn where the reader is
  * rather than thrown at the console: `validateSpec` says what would be lost *before* the press, and
@@ -1032,14 +1032,24 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
     unmount: () => {
       designerHost = undefined;
     },
-    /* § 3.3's primary — *Run a day in it*: apply, run, and hand off to the stage. */
+    /*
+     * § 3.3's primary — *Run a day in it*: a sandbox day in the drawn tower, then the stage. Wave AO,
+     * lane AO-1b, [§ D1363](../../../../DECISIONS.md): it used to apply through `applyBuildingSpec`,
+     * which stands the player's own week on the sandbox contract, so the save wrote that week and a
+     * reload opened on Garden Apartments (§ D1368's tuner fault, found here by lane AO-2). The
+     * sandbox day (`everyday/sandbox.ts`) saves the tower to the shelf, runs the week's day in it over
+     * the week, and puts the week back when the player leaves the stage and the report; before the
+     * day's attempt has begun it meets a practice crowd (§ D1362). The loader's refusal and § D1360's
+     * are quoted under the plate, as the apply's were.
+     */
     primary: () => {
-      if (applyAndReport() === undefined) {
+      try {
+        context.host.runSandbox({ building: spec, pattern: undefined, dwell: undefined });
+      } catch (error) {
+        savedLine = error instanceof Error ? error.message : String(error);
         savedNote.textContent = savedLine;
         return;
       }
-      savedNote.textContent = savedLine;
-      context.host.startRun();
       context.go('stage');
     },
   };

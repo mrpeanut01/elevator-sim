@@ -197,7 +197,8 @@ import {
 } from '../fixit/judge.js';
 import { shippedAsBuiltMorningsOf } from '../fixit/asBuiltMornings.js';
 import { opensWithDiagnosis, routeCensusOf } from '../fixit/routeCensus.js';
-import { fixitParLineOf, fixitParTagOf } from '../fixit/par.js';
+import { fixitParLineOf, fixitParOf, fixitParTagOf } from '../fixit/par.js';
+import { parMarkOf } from '../scenario/par.js';
 import { heldReasonOf, isOffered } from '../fixit/held.js';
 import { createOffThreadMornings, morningWorkerCountOf } from '../dev/offThreadMornings.js';
 import type {
@@ -2051,7 +2052,13 @@ function mountFixit(
        * screen is still the wrong place for it. `everyday/rail.ts#bankedLineOf` carries the
        * argument; this call answers nothing to this closure.
        */
-      if (outcome.kind === 'fixed') scenarioHost.bankScenarioClear(entry.id);
+      /*
+       * § D1417: a fix at or under a priced par files the par award too, by the mark's own rule over
+       * the figure `keepSolved` kept, so a fix that earns no mark earns no par award.
+       */
+      if (outcome.kind === 'fixed') {
+        scenarioHost.bankScenarioClear(entry.id, parMarkOf(fixitParOf(entry.id)?.units, spend.totalUnits) !== undefined);
+      }
     };
     pressThroughTheJudge({
       entry,

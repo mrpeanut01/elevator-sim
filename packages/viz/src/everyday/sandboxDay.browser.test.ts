@@ -20,6 +20,10 @@
  * 2. The same with the sandbox day closed: its sheet says it banked nothing and offers no next day,
  *    and the week is still on its first day with nothing filed.
  *
+ * Both run before *Start the day*, so since wave AO's lane AO-1b ([§ D1362](../../../../DECISIONS.md))
+ * the sandbox day meets the practice crowd, and the stage line and the sheet say so in the practice
+ * crowd's words rather than the plain sandbox's.
+ *
  * Midtown Office on 2026-10-10, the day seat D played: a whole authored day, so the run is the one
  * that could not be simulated, and a contract that books car D, so a sandbox that left the tower
  * alone is seen to keep it.
@@ -42,7 +46,7 @@ import {
 } from '../dev/browserTier.test-helper.js';
 import { SESSION_KEY } from '../persist/types.js';
 import { PRACTICE_DAY_SENTENCES } from '../shift/scoredCrowd.js';
-import { PRACTICE_SANDBOX_NOTE } from '../shift/report.js';
+import { PRACTICE_REHEARSAL_NOTE } from '../shift/report.js';
 import { STAGE_RUN_FAILED_COPY } from './stageScreenModel.js';
 
 let site: ShippedSite;
@@ -134,8 +138,8 @@ describe.skipIf(!HAS_BROWSER)('a sandbox day runs and cannot touch the week — 
       expect(before).toContain('tower midtown-office');
 
       await runASandboxDay(page);
-      /* The stage says what the run is, in the practice sentences' frame. */
-      expect(await textOf(page, '.everyday-screen')).toContain(PRACTICE_DAY_SENTENCES.sandbox);
+      /* The stage says what the run is, in the practice sentences' frame: before the attempt, on a practice crowd (§ D1362). */
+      expect(await textOf(page, '.everyday-screen')).toContain(PRACTICE_DAY_SENTENCES.practiceCrowd);
       /* And it plays: the clock moves off the opening once Start is pressed. */
       const opening = await textOf(page, '.everyday-stage-clock');
       await page.click('.everyday-stage-start');
@@ -176,7 +180,7 @@ describe.skipIf(!HAS_BROWSER)('a sandbox day runs and cannot touch the week — 
       if (await asStands.isVisible().catch(() => false)) await asStands.click();
       await page.waitForSelector('.everyday-report', { timeout: 90_000 });
       const report = await textOf(page, '.everyday-report');
-      expect(report).toContain(PRACTICE_SANDBOX_NOTE);
+      expect(report).toContain(PRACTICE_REHEARSAL_NOTE);
       expect(await textOf(page, '.everyday-bar-primary')).not.toMatch(/Open the doors/u);
 
       const stored = await storedWeeks(page);

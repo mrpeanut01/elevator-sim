@@ -50,7 +50,7 @@
  */
 
 import { scheduledEventFor } from './calendar.js';
-import { weekOrderIndexOf } from './weekOrders.js';
+import { weekBookingsOn, weekLevelKeyOf } from './weekLevels.js';
 import {
   dayStakeReasonOf,
   dc10Of,
@@ -164,7 +164,8 @@ function dealtDayOf(key: WeekKey, day: number, census: WeekWay, dealing: WeekDea
   const dayIdx = (day - 1) % 7;
   const horizon = census.protocol.horizon;
   const eventId = dealing(day, dayIdx, census, key);
-  const found = weekWayRowFor(contractId, day, eventId, horizon, census);
+  /* The week level's bookings on the day (wave AO lane DS-1, § D1400): a booked day is read off its own row. */
+  const found = weekWayRowFor(contractId, day, eventId, horizon, census, weekBookingsOn(key, day, dayIdx, census));
   /* The day as it is dealt: a row measured without today's wrinkle describes a different day. */
   const row = found?.eventId === eventId ? found : undefined;
   /* The rule itself is `weekWay.ts#dayStakeReasonOf`'s, so the one-profile screen counts the same days. */
@@ -206,8 +207,12 @@ export function weekDealOf(
     cache = new Map();
     DEALS.set(census, cache);
   }
-  /* Weeks dealt the same order are the same deal, so the cache is keyed by the order dealt. */
-  const slot = `${key.contractId}/${String(weekOrderIndexOf(key))}`;
+  /*
+   * Weeks dealt the same order with the same bookings are the same deal, so the cache is keyed by the
+   * week as dealt (`weekLevels.ts#weekLevelKeyOf`, wave AO lane DS-1): the order alone stopped being
+   * enough once two weeks could deal one order with different bookings.
+   */
+  const slot = `${key.contractId}/${weekLevelKeyOf(key, census)}`;
   if (cache.has(slot)) return cache.get(slot);
   const deal = dealOf(key, census, dealing);
   cache.set(slot, deal);

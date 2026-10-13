@@ -36,8 +36,9 @@
  * its `cleared | missed | ungraded` from exactly this pair. Two readers, one rule.
  */
 
+import { weekBandsLinesOf } from '../shift/callBands.js';
 import { nextTowerOfferOf, type NextTowerOffer } from '../shift/nextTower.js';
-import { nextWeekOf, type NextWeekView } from '../shift/nextWeek.js';
+import { nextWeekOf, type BookingClock, type NextWeekView } from '../shift/nextWeek.js';
 import { wasGraded } from '../shift/week.js';
 import {
   DAY_UNMEASURED_SENTENCE,
@@ -50,6 +51,7 @@ import {
   type WeekSheetView,
 } from '../shift/weekStake.js';
 import type { DayOutcome, WeekState } from '../shift/types.js';
+import { weekOrderFor } from '../shift/weekOrders.js';
 import { weekRecordLineOf, weeksHeldLineOf, type WeekRecord } from '../shift/weekRecord.js';
 import { weekdayOf } from '../shift/types.js';
 
@@ -193,6 +195,19 @@ export interface WeekScreenView {
    */
   readonly held: string | undefined;
   /**
+   * **DC-13: whether this week passes the call bands in play** — wave AO, lane DR-2,
+   * [§ D1443](../../../../DECISIONS.md), swarm DR's Q3: on a week dealt from week 2, the census's
+   * check on its who-drives calls, a miss stated with its counts (`shift/callBands.ts#weekBandsLinesOf`).
+   * Empty on week 1's draw and on a week the census has not measured.
+   */
+  readonly bands: readonly string[];
+  /**
+   * **Your record with each driver this week** — § D1443, swarm DR's Q3 (S2's line): for each driver
+   * picked at a brief, the counted days it started and how they came out, from this device's own
+   * filed days and never from a census. Empty before a counted day with a record has closed.
+   */
+  readonly drivers: readonly string[];
+  /**
    * The screen's one button while the week's sheet stands — the onward tower's label where a held
    * week offers one, {@link next}'s label otherwise (*Start next week* on a held week, *Play week 2
    * again* on one that was not) — and `undefined` when no sheet stands, when the button is the week
@@ -252,6 +267,51 @@ export interface WeekScreenInput {
    * screen says nothing about a record, which is what a tower with none gets anyway.
    */
   readonly record?: WeekRecord | undefined;
+  /**
+   * A fraction of the run as the day's clock reads it — `shift/nextWeek.ts#BookingClock`, built by
+   * `weekScreen.ts` from the run's own start and length. Wave AO, lane DS-1
+   * ([§ D1400](../../../../DECISIONS.md)): the sheet names the booking the next level adds with its
+   * times. Optional: absent, the booking is named by its car and its day alone.
+   */
+  readonly bookingClock?: BookingClock | undefined;
+  /**
+   * A dispatcher's own name, by id — for {@link WeekScreenView.bands} and
+   * {@link WeekScreenView.drivers} (§ D1443). Optional: absent, both name the id, which is what is
+   * true where no name is known.
+   */
+  readonly profileNameOf?: ((profileId: string) => string | undefined) | undefined;
+}
+
+/**
+ * **Your record with each driver this week** — § D1443. The days this week has closed with a
+ * record, counted days only where the census deals the week (every closed day elsewhere), grouped
+ * by the driver picked at the brief (`WatchRecord.dispatcherId`), each with how its days came out.
+ * *Started* rather than *drove*: a call or a press may have handed a day to another driver.
+ */
+export function driverRecordLinesOf(
+  week: WeekState,
+  nameOf: (profileId: string) => string | undefined = () => undefined,
+): readonly string[] {
+  const dealt = weekDealOf(week) !== undefined;
+  const byDriver = new Map<string, { days: number; cleared: number; missed: number }>();
+  for (const entry of week.history) {
+    if (entry.record === null) continue;
+    if (dealt && !dayCountsToward(week, entry)) continue;
+    const verdict = verdictOf(entry);
+    if (verdict === 'ungraded') continue;
+    const tally = byDriver.get(entry.record.dispatcherId) ?? { days: 0, cleared: 0, missed: 0 };
+    tally.days += 1;
+    if (verdict === 'cleared') tally.cleared += 1;
+    else tally.missed += 1;
+    byDriver.set(entry.record.dispatcherId, tally);
+  }
+  const kind = dealt ? 'counted day' : 'day';
+  return Object.freeze(
+    [...byDriver].map(([id, tally]) => {
+      const days = `${String(tally.days)} ${kind}${tally.days === 1 ? '' : 's'}`;
+      return `You started ${days} this week with ${nameOf(id) ?? id}: ${String(tally.cleared)} cleared, ${String(tally.missed)} missed.`;
+    }),
+  );
 }
 
 /** How many cards § 14 draws. Seven, and `HISTORY_DAYS` is the same seven one layer down. */
@@ -455,7 +515,7 @@ export function weekScreenViewOf(input: WeekScreenInput): WeekScreenView {
   const todayClosed = todayIsBanked(input);
   const sheet = weekSheetOf(input.week, input.house ?? (() => undefined));
   const onward = nextTowerOfferOf(input.week.contractId, sheet, input.nameOf);
-  const next = sheet === undefined ? undefined : nextWeekOf(input.week);
+  const next = sheet === undefined ? undefined : nextWeekOf(input.week, undefined, input.bookingClock);
   return {
     /* Wave AN, lane AN-7: the week's number, where one is true of it (`weekStake.ts#weekOrdinalOf`). */
     eyebrow: `ELEVATOR SIM · EVERYDAY MODE${weekEyebrowOf(input.week)}`,
@@ -491,6 +551,13 @@ export function weekScreenViewOf(input: WeekScreenInput): WeekScreenView {
     onward,
     next,
     held: input.record === undefined ? undefined : weeksHeldLineOf(input.record),
+    /* § D1443: DC-13's check on a week dealt from week 2, and this week's record with each driver. */
+    bands: weekBandsLinesOf(
+      input.week.contractId,
+      weekOrderFor({ contractId: input.week.contractId, week: input.week.week }),
+      input.profileNameOf ?? (() => undefined),
+    ),
+    drivers: driverRecordLinesOf(input.week, input.profileNameOf),
     primary: sheet === undefined ? undefined : (onward?.label ?? next?.label ?? WEEK_START_NEXT_LABEL),
   };
 }

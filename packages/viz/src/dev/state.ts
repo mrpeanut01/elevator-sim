@@ -106,9 +106,12 @@ import {
   pressDayStanding,
   rungFor,
   rungIncidents,
+  incidentsOfBookings,
+  type ContractIncident,
   type ContractPressDay,
 } from '../shift/ladder.js';
 import { bookedOutCarsOf, carAbsencesOf, type BookedOutCar } from '../shift/bookedOut.js';
+import { weekBookingsOn } from '../shift/weekLevels.js';
 import { dayCallsOffered, type DayCallWrinkle } from '../shift/dayCalls.js';
 import { pressCallOf, type PressCall } from '../shift/pressCall.js';
 import { grownBuilding } from '../shift/growth.js';
@@ -1976,6 +1979,13 @@ export interface PlannedDay {
   readonly wholeDayRun: boolean;
   /** {@link ShiftRunConfig.dayCars} for the same run — the cars today's event takes. */
   readonly dayCars: ShiftRunConfig['dayCars'];
+  /**
+   * The run's length in simulated seconds, `ViewerState.shiftLengthS`: what a fraction of the run is
+   * a fraction of. A booking's window is authored in fractions (`shift/ladder.ts#ContractIncident`),
+   * so the week's sheet and the door turn a level's booking into clock times with this and
+   * {@link startOfDayS} (wave AO, lane DS-1, [§ D1400](../../../../DECISIONS.md)).
+   */
+  readonly lengthS: number;
 }
 
 /**
@@ -2031,6 +2041,7 @@ export function plannedDayOf(resources: BrowserResources, state: ViewerState): P
       templateVariesMix: false,
       wholeDayRun: false,
       dayCars: { holds: [], windows: [] },
+      lengthS: state.shiftLengthS,
     };
   }
   const plan = shiftRunConfigOf(resources, state);
@@ -2040,6 +2051,7 @@ export function plannedDayOf(resources: BrowserResources, state: ViewerState): P
     startOfDayS: startOfDayOfConfig(config),
     dayCars: plan.dayCars,
     wholeDayRun: plan.wholeDayRun,
+    lengthS: state.shiftLengthS,
     templateVariesMix:
       typeof config.demandTemplate === 'string'
         ? demandTemplateVariesMix(config.demandTemplate, config.trafficProfiles.demandTemplates)
@@ -2160,6 +2172,16 @@ export function weekGrowthPerDayOf(resources: BrowserResources, state: ViewerSta
 export function shiftRunConfigOf(
   resources: BrowserResources,
   state: ViewerState,
+  /*
+   * **The week level's bookings for this day** — wave AO, lane DS-1, [§ D1400](../../../../DECISIONS.md):
+   * the cars the level the week is dealt takes out of passenger service on this morning, beside the
+   * rung's own. Derived from the week by default (`shift/weekLevels.ts#weekBookingsOn`), which is
+   * the only way a shipped caller reaches it; the census passes a candidate level's bookings to
+   * measure a day before the level is dealt (`shift/weekWay.test-helper.ts#weekWayCell`), exactly
+   * as it hands an undealt order's wrinkle through `campaignEventId`. Read only where a rung reaches
+   * the run (`booked` below), so Free Play and Endless never meet a booking.
+   */
+  weekBookings: readonly ContractIncident[] = weekBookingsOn(state.week, state.week.day, state.week.dayIdx),
 ): ShiftRunConfig {
   const authored = buildingConfigOf(resources, state.savedBuildings, state.buildingId);
   if (authored === undefined) {
@@ -2376,7 +2398,14 @@ export function shiftRunConfigOf(
    * The tower's own bookings for today, spoken for by the day's car choice — § D1038. Named once
    * here so the patch, the calendar's reservation and {@link ShiftRunConfig.dayCars} ask one list.
    */
-  const booked = rungIncidents(rung);
+  /*
+   * … and the week level's bookings for this day beside them (wave AO, lane DS-1, § D1400): a car
+   * the level takes out on this morning is the tower's booking exactly as car D is, so the day's
+   * wrinkle treats it as spoken for, the calendar reserves around it, the strip and the tomorrow card
+   * name it off the run's building, and the stage's calls see it go.
+   */
+  const booked =
+    rung === undefined ? [] : [...rungIncidents(rung), ...incidentsOfBookings(weekBookings)];
   /*
    * **Today's wrinkle as an episode inside the day** — [§ D1057](../../../../DECISIONS.md). On the
    * whole authored day, a wrinkle that sets a mix is written into the run's own copy of the day's

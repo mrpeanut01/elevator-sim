@@ -67,6 +67,7 @@ import { describeFrame } from '../render/describeFrame.js';
 import { frameAt } from '../frame/frameAt.js';
 import { queueAt } from '../frame/overlay.js';
 import { observationsAt } from '../live/observations.js';
+import { clockAt } from '../live/timeline.js';
 // AD-S17 — one derivation of *standing still* for both stages; see `render/carRest.ts`.
 import {
   GHOST_OPTIONS,
@@ -157,6 +158,8 @@ import {
   stageCallPresentOf,
   stageCallPhaseOf,
   stageEndDayOf,
+  stageLostCardOf,
+  STAGE_LOST_COPY,
   type StageCallOption,
 } from './stageCall.js';
 import { STAGE_CALL_ROWS_HEADING } from './stageCallRow.js';
@@ -182,7 +185,7 @@ import {
   EVERYDAY_RADII as R,
   EVERYDAY_TYPE as TYPE,
 } from './tokens.js';
-import type { EverydayState } from './types.js';
+import type { EverydayState, RunContext } from './types.js';
 import {
   playThisCrowdRefusalFor,
   watchStageBarOf,
@@ -1563,6 +1566,80 @@ function mountStage(
   skipAsk.append(skipAskInner);
   callCard.append(callBody, closeAsk, skipAsk);
   let callCardKey = '';
+
+  /*
+   * **The lost day's card** — wave AO, lane DR-1, [§ D1435](../../../../DECISIONS.md), swarm DR's
+   * ruling § Q4. Once a goal graded on a maximum reads past its bar at the playhead the stage stops
+   * there once and puts this in the call card's place: *End the day* (focused) or *Watch the rest*,
+   * which plays on under `stagePace.ts`'s `lost` line. Hidden by its attribute alone, with its
+   * layout on an inner body, for `callBody`'s reason above. The stage never ends the day itself.
+   */
+  const lostCard = el(doc, 'div', 'everyday-stage-lost');
+  lostCard.setAttribute('role', 'group');
+  lostCard.setAttribute('aria-label', STAGE_LOST_COPY.heading);
+  lostCard.tabIndex = -1;
+  lostCard.hidden = true;
+  lostCard.style.cssText = callCard.style.cssText;
+  const lostBody = el(doc, 'div', 'everyday-stage-lost-body');
+  lostBody.style.cssText = 'display:grid;gap:7px';
+  const lostHeading = el(doc, 'div', 'everyday-stage-lost-heading', STAGE_LOST_COPY.heading);
+  lostHeading.style.cssText = `font:600 11px ${TYPE.mono};letter-spacing:0.08em;color:${C.label}`;
+  const lostFact = el(doc, 'p', 'everyday-stage-lost-fact');
+  lostFact.style.cssText = 'margin:0;font-size:13.5px;line-height:1.45;font-weight:600';
+  const lostChoices = el(doc, 'p', 'everyday-stage-lost-choices', STAGE_LOST_COPY.choices);
+  lostChoices.style.cssText = `margin:0;font-size:13px;line-height:1.45;color:${C.inkSoft}`;
+  const lostRow = el(doc, 'div');
+  lostRow.style.cssText = `display:flex;flex-wrap:wrap;gap:${String(GAP.row)}px`;
+  const lostEnd = el(doc, 'button', 'everyday-stage-lost-end', STAGE_LOST_COPY.end);
+  lostEnd.type = 'button';
+  lostEnd.style.cssText = `${ARM_BUTTON_CSS};background:${C.ink};color:${C.card};border-color:${C.ink}`;
+  const lostWatch = el(doc, 'button', 'everyday-stage-lost-watch', STAGE_LOST_COPY.watch);
+  lostWatch.type = 'button';
+  lostWatch.style.cssText = ARM_BUTTON_CSS;
+  lostEnd.addEventListener('click', () => {
+    lostCard.hidden = true;
+    endTheDay();
+  });
+  lostWatch.addEventListener('click', () => {
+    lostCard.hidden = true;
+    if (playback === undefined) return;
+    started = true;
+    playback.play();
+    syncTransport();
+    requestFrame();
+  });
+  lostRow.append(lostEnd, lostWatch);
+  lostBody.append(lostHeading, lostFact, lostRow, lostChoices);
+  lostCard.append(lostBody);
+  /** Where the stage first read the adopted run lost, and whether its card has stopped the stage yet. */
+  let lostAtS: number | undefined;
+  let lostCardShown = false;
+
+  /**
+   * § D1435: on the first frame of the player's own scored day at which a goal graded on a maximum
+   * reads past its bar, note the instant (the pace reads it), stop the stage and show the card once,
+   * focusing *End the day*. A pinned day's call still standing is answered first (§ D1168 clause 2);
+   * a card is never drawn over a call's. Once the transport plays again the card goes.
+   */
+  function drawLost(recording: VizRecording, simTimeS: number, watching: WatchingView | undefined): void {
+    if (playback === undefined) return;
+    if (!lostCard.hidden && playback.state === 'playing') lostCard.hidden = true;
+    if (lostCardShown && lostAtS !== undefined) return;
+    if (context.ctx !== 'daily' || watching !== undefined || simTimeS >= recording.endedAt) return;
+    if (activeCall()?.pinned === true || !callCard.hidden) return;
+    const view = stageLostCardOf(host.goalsAt(simTimeS), clockAt(simTimeS, host.dayStartS()));
+    if (view === undefined) return;
+    lostAtS ??= simTimeS;
+    if (lostCardShown) return;
+    lostCardShown = true;
+    playback.pause();
+    dropSkipBeat();
+    lostFact.textContent = view.fact;
+    lostCard.hidden = false;
+    lostCard.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    lostEnd.focus({ preventScroll: true });
+    syncTransport();
+  }
   /**
    * Show or hide the card — and, **on the frame it appears and on no other**, bring it into the
    * screen region's view and put focus on it.
@@ -1578,6 +1655,24 @@ function mountStage(
    * After an answer the card leaves the document flow, and focus would fall to the body; it goes to
    * the transport instead, which is what the answer set moving.
    */
+  /**
+   * **A card taller than the screen region scrolls inside itself** — wave AO, joined at integration.
+   * Lane P2-1's answer lines (§ D1432) made the card about 450 px tall, and at 390×844 the screen
+   * region shows about 336, so `nearest` could bring only its foot into view and the question sat
+   * above the region. The card keeps its height where it fits; where it does not, it is capped at the
+   * region's own height and scrolls, so the question, the focus and every answer stay in the region.
+   */
+  function fitCallCardToRegion(): void {
+    callCard.style.maxHeight = '';
+    callCard.style.overflowY = '';
+    const region = callCard.closest<HTMLElement>('.everyday-screen');
+    if (region === null) return;
+    const room = region.clientHeight - 16;
+    if (room > 0 && callCard.offsetHeight > room) {
+      callCard.style.maxHeight = `${String(room)}px`;
+      callCard.style.overflowY = 'auto';
+    }
+  }
   function showCallCard(shown: boolean): void {
     const appearing = shown && callCard.hidden;
     const leaving = !shown && !callCard.hidden;
@@ -1589,6 +1684,7 @@ function mountStage(
       skipAsk.hidden = true;
     }
     if (appearing) {
+      fitCallCardToRegion();
       callCard.scrollIntoView({ block: 'nearest', inline: 'nearest' });
       callCard.focus({ preventScroll: true });
     } else if (hadFocus) {
@@ -1616,8 +1712,8 @@ function mountStage(
   /** Redraw the rows when the set due at the playhead changes, and at no other frame. */
   function drawCallRows(recording: VizRecording, simTimeS: number): void {
     const rows =
-      context.ctx === 'daily' && watchingNow() === undefined ? host.dayCallRowsAt(recording, simTimeS) : [];
-    const key = rows.map((row) => `${row.id}|${row.counts}|${row.note}`).join('\n');
+      dayCallsAskedIn(context.ctx) && watchingNow() === undefined ? host.dayCallRowsAt(recording, simTimeS) : [];
+    const key = rows.map((row) => `${row.id}|${row.counts}|${row.goals ?? ''}|${row.note}`).join('\n');
     if (key === callRowsKey) return;
     callRowsKey = key;
     callRows.replaceChildren();
@@ -1638,7 +1734,13 @@ function mountStage(
       counts.style.cssText = 'margin:0;font-size:13px;line-height:1.45';
       const note = el(doc, 'p', 'everyday-stage-call-row-note', row.note);
       note.style.cssText = `margin:0;font-size:12px;line-height:1.45;color:${C.inkSoft}`;
-      item.append(title, counts, note);
+      /* § D1433: each answer's two final goals so far, under the counts they are set against. */
+      if (row.goals === undefined) item.append(title, counts, note);
+      else {
+        const goalsLine = el(doc, 'p', 'everyday-stage-call-row-goals', row.goals);
+        goalsLine.style.cssText = 'margin:0;font-size:13px;line-height:1.45';
+        item.append(title, counts, goalsLine, note);
+      }
       body.append(item);
     }
     callRows.append(body);
@@ -1656,6 +1758,7 @@ function mountStage(
     title,
     header,
     callCard,
+    lostCard,
     callRows,
     goals,
     watchBand,
@@ -1810,6 +1913,7 @@ function mountStage(
       playerChoseSpeedAtS,
       callAtS: activeCall()?.call.atS,
       scored: paceScored,
+      lostAtS,
     });
     lastPaceReason = answer.reason;
     /* § D1169: a chip pressed while fast stands until somebody next waits a minute, and not past it. */
@@ -2161,7 +2265,11 @@ function mountStage(
     | undefined {
     if (watchingNow() !== undefined) return undefined;
     if (stageCall !== undefined && !callAnswered) return { call: stageCall, raised: true, pinned: true };
-    if (context.ctx !== 'daily' || adopted === undefined || recomputingOver !== undefined) return undefined;
+    /*
+     * § D1408: a career day asks too, where its event makes it a day that asks; the host decides
+     * which career days those are (`everyday/careerCalls.ts`) and answers `undefined` for the rest.
+     */
+    if (!dayCallsAskedIn(context.ctx) || adopted === undefined || recomputingOver !== undefined) return undefined;
     /*
      * § D1204: once the pinned call is answered, the day asks on. The host opens the ordinary
      * session after it, searched from five minutes past it, and refuses it where the call was
@@ -2305,7 +2413,15 @@ function mountStage(
       callCardKey = key;
       /* § D1206: who stands at the call second, read off the run on the stage and nothing after it. */
       const present = adopted === undefined ? undefined : stageCallPresentOf(adopted, call.atS);
-      const card = stageCallCardOf(call, host.dayStartS(), bookedCars, standing.drivers, present);
+      /*
+       * § D1432: the goal nearest its bar, off the rail's own readings at the call second, and each
+       * answer's line, a driver's from its own profile (the one driving now where it is the keep).
+       */
+      const driving = host.drivingProfile();
+      const card = stageCallCardOf(call, host.dayStartS(), bookedCars, standing.drivers, present, {
+        readings: host.goalsAt(call.atS),
+        driverOf: (name) => (driving.name === name ? driving : host.dispatchers().find((profile) => profile.name === name)),
+      });
       const heading = el(doc, 'div', 'everyday-stage-call-heading', card.heading);
       heading.style.cssText = `font:600 11px ${TYPE.mono};letter-spacing:0.08em;color:${C.label}`;
       const facts = card.facts.map((fact) => {
@@ -2328,8 +2444,16 @@ function mountStage(
         });
         row.append(button);
       }
+      /* § D1432: one line per answer saying what it is, in the buttons' order, under them. */
+      const lines = card.options.flatMap((option) => {
+        if (option.line === undefined) return [];
+        const line = el(doc, 'p', 'everyday-stage-call-answer-line', option.line);
+        line.dataset['answer'] = option.answer;
+        line.style.cssText = `margin:0;font-size:12.5px;line-height:1.45;color:${C.inkSoft}`;
+        return [line];
+      });
       callCard.setAttribute('aria-label', card.heading);
-      callBody.replaceChildren(heading, ...facts, question, row);
+      callBody.replaceChildren(heading, ...facts, question, row, ...lines);
     }
     showCallCard(true);
   }
@@ -2608,6 +2732,10 @@ function mountStage(
       speedIndex = defaultSpeedIndex();
       started = false;
       playerChoseSpeedAtS = undefined;
+      /* § D1435: a fresh day has not been lost; a re-simulation after a press keeps the stop it had. */
+      lostAtS = undefined;
+      lostCardShown = false;
+      lostCard.hidden = true;
     }
     /*
      * § D1029 — the call, latched per attempt. A fresh attempt asks the host once, of the recording
@@ -3252,6 +3380,7 @@ function mountStage(
     );
     drawGoals(recording, simTimeS, watching);
     drawEndDay(recording, simTimeS, watching);
+    drawLost(recording, simTimeS, watching);
     /* A rush asks nothing of the day: § 9.2 has no brief and no goals to grade. */
     goals.style.display = context.ctx === 'rush' ? 'none' : '';
     drawWatching(watching);
@@ -4124,6 +4253,17 @@ export function stageEntryStartsARun(run: {
   readonly dayClosed: boolean;
 }): boolean {
   return !run.open && !run.dayClosed;
+}
+
+/**
+ * **The stage contexts that ask the day's calls** — the daily stage since § D1138, and a career day
+ * since wave AO, lane DS-2 ([§ D1408](../../../../DECISIONS.md)). Which career days ask is the host's
+ * (`everyday/careerCalls.ts#careerDayCallsOf`: a day with an event), so an ordinary career day still
+ * meets no card; a watch, a rush and a fix case never ask. Pure and exported for
+ * `stageScreen.test.ts`; its non-test callers are {@link mountStage}'s `activeCall` and its call rows.
+ */
+export function dayCallsAskedIn(ctx: RunContext): boolean {
+  return ctx === 'daily' || ctx === 'campaign';
 }
 
 /** One lane of § 7.4's strip: a caption, a dashed marker and your line. */

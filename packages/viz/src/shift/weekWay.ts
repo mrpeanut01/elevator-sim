@@ -38,7 +38,14 @@
 import weekWayDocument from '../../../../data/week-way.json' with { type: 'json' };
 
 import { goalsForDay } from './goals.js';
-import { CONTRACT_LADDER, growthPerDayOf, ladderRowFor, type ContractLadder } from './ladder.js';
+import {
+  CONTRACT_LADDER,
+  growthPerDayOf,
+  ladderRowFor,
+  type ContractIncident,
+  type ContractLadder,
+} from './ladder.js';
+import { INCIDENT_KINDS } from './incidents.js';
 import type { RunHorizon } from './types.js';
 
 /** The census's fixed settings — what every row was measured under. */
@@ -84,6 +91,14 @@ export interface WeekWayRow {
   readonly day: number;
   /** The wrinkle the day was measured under — `'ordinary'` for the unwrinkled day. */
   readonly eventId: string;
+  /**
+   * **The week bookings the day was measured with** — wave AO, lane DS-1, [§ D1400](../../../../DECISIONS.md):
+   * cars a week level takes out of passenger service on this day beside the rung's own, in the
+   * ladder's own vocabulary (`data/contract-ladder.json`'s `weekBookings`, without the day, which is
+   * {@link day}). Empty for a day with no week booking, which is every row measured before levels.
+   * A row describes only a day dealt with exactly these bookings ({@link weekWayRowFor}).
+   */
+  readonly bookings: readonly ContractIncident[];
   /** The slope the tower was grown at when this row was measured. */
   readonly growthPerDay: number;
   /** A declared breather: DC-10's second half does not apply. */
@@ -312,6 +327,36 @@ function asNumbers(value: unknown): readonly number[] {
   return Object.freeze(Array.isArray(value) ? value.map(asNumber) : []);
 }
 
+/** A row's week bookings, structure only: a malformed entry keeps `''` or `NaN` for {@link weekWayIssues} to name. */
+function bookingsOf(value: unknown): readonly ContractIncident[] {
+  if (!Array.isArray(value)) return Object.freeze([]);
+  return Object.freeze(
+    value.map((raw) => {
+      const entry = asRecord(raw);
+      return Object.freeze({
+        kind: asString(entry['kind']) as ContractIncident['kind'],
+        bankId: asString(entry['bankId']),
+        carId: asString(entry['carId']),
+        fromFraction: asNumber(entry['fromFraction']),
+        toFraction: asNumber(entry['toFraction']),
+      });
+    }),
+  );
+}
+
+/**
+ * **One spelling of a list of bookings**, so a row and a day are matched on what was booked rather
+ * than on how the list was ordered: each entry as `kind:bank/car@from-to`, sorted. `''` for none.
+ * The run reads the bookings through `withIncidents`, whose service events are sorted by time, bank
+ * and car (`dev/state.ts`'s step 5), so two orders of one list are one run.
+ */
+export function bookingsKeyOf(bookings: readonly ContractIncident[]): string {
+  return bookings
+    .map((b) => `${b.kind}:${b.bankId}/${b.carId}@${String(b.fromFraction)}-${String(b.toFraction)}`)
+    .sort()
+    .join(',');
+}
+
 /** Structure only; {@link weekWayIssues} is where a malformed field is named. */
 export function parseWeekWay(input: unknown): WeekWay {
   const record = asRecord(input);
@@ -344,6 +389,7 @@ export function parseWeekWay(input: unknown): WeekWay {
           contractId: asString(row['contractId']),
           day: asNumber(row['day']),
           eventId: asString(row['eventId']),
+          bookings: bookingsOf(row['bookings']),
           growthPerDay: asNumber(row['growthPerDay']),
           breather: row['breather'] === true,
           chosen: Object.freeze({
@@ -414,8 +460,19 @@ export function weekWayIssues(
   const breathers = new Map<string, number>();
   const seen = new Set<string>();
   for (const row of census.rows) {
-    const key = `${row.contractId}/${String(row.day)}/${row.eventId}`;
+    const booked = bookingsKeyOf(row.bookings);
+    const key = `${row.contractId}/${String(row.day)}/${row.eventId}${booked === '' ? '' : `+${booked}`}`;
     if (seen.has(key)) issues.push(`row ${key} is measured twice`);
+    for (const booking of row.bookings) {
+      if (
+        !(INCIDENT_KINDS as readonly string[]).includes(booking.kind) ||
+        booking.bankId === '' ||
+        booking.carId === '' ||
+        !(booking.fromFraction >= 0 && booking.fromFraction < 1 && booking.toFraction > booking.fromFraction)
+      ) {
+        issues.push(`row ${key} carries a booking that is not a car out of service over a window of the run`);
+      }
+    }
     seen.add(key);
     const rung = ladderRowFor(row.contractId);
     if (rung === undefined) {
@@ -473,13 +530,24 @@ export function weekWayRowFor(
   eventId: string,
   horizon: RunHorizon | undefined,
   census: WeekWay = WEEK_WAY,
+  /*
+   * The week bookings the day is dealt with (wave AO lane DS-1, § D1400; `shift/weekLevels.ts#weekBookingsOn`).
+   * Only a row measured with exactly these describes the day, the ordinary fallback included: a day
+   * with car C booked out is a different day from the one measured without it.
+   */
+  bookings: readonly ContractIncident[] = [],
 ): WeekWayRow | undefined {
   if (horizon !== census.protocol.horizon) return undefined;
   const rung = ladderRowFor(contractId);
   if (rung === undefined) return undefined;
   const slope = growthPerDayOf(rung);
+  const booked = bookingsKeyOf(bookings);
   const current = census.rows.filter(
-    (row) => row.contractId === contractId && row.day === day && measuredAtSlope(row, slope),
+    (row) =>
+      row.contractId === contractId &&
+      row.day === day &&
+      measuredAtSlope(row, slope) &&
+      bookingsKeyOf(row.bookings) === booked,
   );
   return current.find((row) => row.eventId === eventId) ?? current.find((row) => row.eventId === 'ordinary');
 }

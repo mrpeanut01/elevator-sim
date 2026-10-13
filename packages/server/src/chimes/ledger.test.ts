@@ -20,7 +20,15 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it, onTestFinished, vi } from 'vitest';
 
-import { parseChimeLedger, parseTrafficProfiles, type ChimeLedgerTable, type ChimeTurn } from '@elevator-sim/core';
+import {
+  careerDayTurnKeyOf,
+  parseChimeLedger,
+  parseTrafficProfiles,
+  weekDayTurnKeyOf,
+  weekLevelTurnKeyOf,
+  type ChimeLedgerTable,
+  type ChimeTurn,
+} from '@elevator-sim/core';
 
 import { PgliteSql } from '../store/pglite.test-helper.js';
 import { Store } from '../store/store.js';
@@ -57,7 +65,14 @@ function scenario(index: number): string {
 const BOUNDS: ChimeTurnBounds = Object.freeze({
   scenarioIds: new Set(Array.from({ length: 40 }, (_, index) => scenario(index))),
   rushWaves: 30,
+  contractIds: new Set(['c1', 'c2']),
+  weekLevels: new Set(['c2/1', 'c2/2', 'c2/3']),
 });
+
+/** A Career contract day these cases may file — `core`'s own composer, so the shape is the one a client posts. */
+function careerDay(day: number, towerId = 'c1'): string {
+  return careerDayTurnKeyOf({ towerId, month: 0, day, careerDay: day });
+}
 
 function earn(store: Store, userId: string, turn: ChimeTurn): ReturnType<typeof earnCompletion> {
   return earnCompletion({ store, table: TABLE, bounds: BOUNDS, userId, turn });
@@ -108,9 +123,9 @@ describe('the chime ledger — issue #368', () => {
 
   it('banks a completed turn at the amount the table says, never one a caller names', async () => {
     const { store, userId } = await fixture();
-    const first = await earn(store, userId, { completion: 'career-day-paid' });
+    const first = await earn(store, userId, { completion: 'career-day-paid', key: careerDay(1) });
     expect(first).toEqual({ ok: true, balanceChimes: 3 });
-    const second = await earn(store, userId, { completion: 'career-day-paid' });
+    const second = await earn(store, userId, { completion: 'career-day-paid', key: careerDay(2) });
     expect(second).toEqual({ ok: true, balanceChimes: 6 });
   });
 
@@ -439,11 +454,67 @@ describe('earnCompletion pays a scenario once and a rush its new best — issue 
     expect(await store.chimeBalance(userId)).toBe(0);
   });
 
-  it('still pays a contract day every time it is posted, which the ruling does not reach', async () => {
+  it('pays a held level once per account, another level again, and refuses a level the ladder does not author — § D1402', async () => {
+    /*
+     * A held level is a keyed completion (§ D1416): `{ completion, key }`, composed by `core`'s
+     * `weekLevelTurnKeyOf`, and refused as any other keyed turn is, `unknown-key`.
+     */
     const { store, userId } = await fixture();
-    await earn(store, userId, { completion: 'career-day-paid' });
-    await earn(store, userId, { completion: 'career-day-paid' });
-    expect(await store.chimeBalance(userId)).toBe(2 * dayAward);
+    const levelAward = sourceFor('week-held').awardChimes;
+    const held = (key: string): ReturnType<typeof earn> => earn(store, userId, { completion: 'week-held', key });
+    expect(await held(weekLevelTurnKeyOf({ contractId: 'c2', week: 3 }))).toEqual({ ok: true, balanceChimes: levelAward });
+    expect(await held('c2/3'), 'a second hold of one level paid').toEqual({ ok: true, balanceChimes: levelAward });
+    expect(await held('c2/2')).toEqual({ ok: true, balanceChimes: 2 * levelAward });
+    for (const key of ['', 'c2/4', 'c9/1', 'c2/3 ', 'c2/0', careerDay(1)]) {
+      expect(await held(key), JSON.stringify(key)).toEqual({ ok: false, reason: 'unknown-key' });
+    }
+    expect(await store.chimeBalance(userId)).toBe(2 * levelAward);
+    expect([...(await store.chimeTurnKeys(userId, sourceFor('week-held').id))].sort()).toEqual(['c2/2', 'c2/3']);
+  });
+
+  it('pays a contract day once however often the same day is posted, and every different day — § D1416', async () => {
+    /*
+     * The inverse of the case that stood here: *"still pays a contract day every time it is posted"*.
+     * That was swarm DS's S2 measuring the defect (M7): one day posted twice paid twice. The turn
+     * names its day now, so it is keyed like every other award.
+     */
+    const { store, userId } = await fixture();
+    await earn(store, userId, { completion: 'career-day-paid', key: careerDay(1) });
+    await earn(store, userId, { completion: 'career-day-paid', key: careerDay(1) });
+    expect(await store.chimeBalance(userId), 'one day posted twice paid twice').toBe(dayAward);
+    await earn(store, userId, { completion: 'career-day-paid', key: careerDay(2) });
+    await earn(store, userId, {
+      completion: 'career-day-paid',
+      key: weekDayTurnKeyOf({ contractId: 'c2', week: 1, day: 1, seed: '20260901' }),
+    });
+    expect(await store.chimeBalance(userId)).toBe(3 * dayAward);
+  });
+
+  it('refuses a day key no composer writes, or one naming a contract the ladder does not hold, writing nothing', async () => {
+    const { store, userId } = await fixture();
+    for (const day of ['', 'monday', 'career:c1', careerDay(1, 'c99'), 'week:c1:s1; drop table']) {
+      expect(await earn(store, userId, { completion: 'career-day-paid', key: day }), day).toEqual({ ok: false, reason: 'unknown-key' });
+    }
+    expect(await store.chimeBalance(userId)).toBe(0);
+  });
+});
+
+describe('earnCompletion pays a par once per scenario, and only after its clear — § D1417', () => {
+  const scenarioAward = sourceFor('scenario-cleared').awardChimes;
+  const parAward = sourceFor('scenario-at-par').awardChimes;
+
+  it('refuses a par for a scenario this account was never paid a clear for, then pays it once after the clear', async () => {
+    const { store, userId } = await fixture();
+    const par = (): ReturnType<typeof earn> => earn(store, userId, { completion: 'scenario-at-par', scenarioId: scenario(3) });
+    expect(await par(), 'a par paid before its clear').toEqual({ ok: false, reason: 'not-cleared' });
+    expect(await store.chimeBalance(userId)).toBe(0);
+    await earn(store, userId, { completion: 'scenario-cleared', scenarioId: scenario(3) });
+    expect(await par()).toEqual({ ok: true, balanceChimes: scenarioAward + parAward });
+    expect(await par(), 'a second par paid').toEqual({ ok: true, balanceChimes: scenarioAward + parAward });
+    expect(await earn(store, userId, { completion: 'scenario-at-par', scenarioId: 'nobody-wrote-this' })).toEqual({
+      ok: false,
+      reason: 'unknown-scenario',
+    });
   });
 });
 
@@ -500,6 +571,22 @@ describe('the turns a shipped build will pay for — loadChimeTurnBounds, issue 
      */
     expect(bounds.rushWaves).toBe(30);
     expect(rushWaveCountOf(profiles)).toBe(bounds.rushWaves);
+    /* § D1416: a day key may name any contract on the ladder, and no other. */
+    expect([...bounds.contractIds].sort()).toEqual([...contracts].sort());
+    /*
+     * § D1402: a held week pays once per level, and the levels are the authored ladder's — week 1 on
+     * every rung, week 2 where a rung authors an order, and one week per authored booking above it.
+     */
+    const ladder = JSON.parse(readFileSync(join(DATA_DIR, 'contract-ladder.json'), 'utf8')) as {
+      readonly contracts: readonly { readonly contractId: string; readonly weekOrders?: readonly unknown[]; readonly weekBookings?: readonly unknown[] }[];
+    };
+    const expected = ladder.contracts.flatMap((row) => {
+      const top = (row.weekOrders ?? []).length === 0 ? 1 : 2 + (row.weekBookings ?? []).length;
+      return Array.from({ length: top }, (_, index) => `${row.contractId}/${String(index + 1)}`);
+    });
+    expect([...bounds.weekLevels].sort()).toEqual(expected.sort());
+    expect(bounds.weekLevels.has('c2/3'), 'Midtown Office authors no level above week 2').toBe(true);
+    expect(bounds.weekLevels.has('c1/2'), 'a rung with no order pays a week 2').toBe(false);
   });
 
   it('refuses to start when the rush cannot be read or the case file names one id twice', async () => {

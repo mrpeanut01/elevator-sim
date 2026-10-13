@@ -696,6 +696,13 @@ export function rollWeek(week: WeekState, onward = false): WeekState {
      * counts the closed week), and `onward` is the sheet's second press, which goes on to the next
      * week whatever the week did: nothing is locked. The week number is which week of the tower's
      * orders this is, so a week dealt again keeps its number.
+     *
+     * **The number goes on past the tower's top, and the deal does not** — wave AO, lane DS-1
+     * ([§ D1400](../../../../DECISIONS.md)). From week 3 a week is a level, dealt only where the
+     * census admits it (`weekLevels.ts#weekTopOf`), and a week numbered above the top is dealt the
+     * top (`weekLevels.ts#dealtWeekOf`), so its sheet says the tower has no further week. The number
+     * still counts on, as [§ D1394](../../../../DECISIONS.md) counts on a week the census does not
+     * deal: it is which week on this tower the player is in, and the deal is read from it.
      */
     week: onward || weekTargetMetDayOf(week) !== undefined ? week.week + 1 : week.week,
     completed: week.completed,

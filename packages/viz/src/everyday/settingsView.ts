@@ -782,6 +782,12 @@ export interface SettingsScreenInput {
   readonly deviceChimes?: number | undefined;
   /** Whether this device will keep that tally past the tab. Never claimed — see the panel's field. */
   readonly deviceDurable?: boolean | undefined;
+  /**
+   * What this device bought of each ledger sink — `deviceChimes.ts#deviceOwnedOf`, read off the
+   * store by `settingsScreen.ts` and passed through to `chimesPanel.ts#ChimesPanelInput.deviceOwns`
+   * ([§ D1418](../../../../DECISIONS.md)).
+   */
+  readonly deviceOwns?: readonly { readonly sinkId: string; readonly steps: number }[] | undefined;
 }
 
 /** § 15.1's screen for this state. Total; every sentence a player can meet starts here. */
@@ -852,6 +858,7 @@ export function settingsScreenViewOf(input: SettingsScreenInput): SettingsScreen
          * whole of `owns`' meaning: absent is *nobody has asked yet*.
          */
         ...(input.chimeOwns === undefined ? {} : { owns: input.chimeOwns }),
+        ...(input.deviceOwns === undefined ? {} : { deviceOwns: input.deviceOwns }),
         ...(input.chimeSpendable === undefined ? {} : { spendable: input.chimeSpendable }),
         ...(input.chimeNotice === undefined ? {} : { notice: input.chimeNotice }),
         ...(input.careerTowerOpen === undefined ? {} : { careerTowerOpen: input.careerTowerOpen }),

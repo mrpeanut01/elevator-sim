@@ -23,12 +23,27 @@
       }
     },
     {
+      "id": "earn-scenario-par",
+      "name": "A scenario cleared at or under its par",
+      "earnedBy": "completion",
+      "completion": "scenario-at-par",
+      "awardChimes": 3,
+      "note": "DECISIONS.md § D1417, swarm DS's Q3 ruling (S3's figure; S1 proposed 4 and S2 a flat award once; owner-reversible). A clear whose cost is at or under the scenario's PRICED par pays this once per scenario, the first time a clear meets or beats it, whether that is the first clear or a practice run after it. The rule for when a clear meets a par is the mark's own (packages/viz/src/scenario/par.ts#parMarkOf, DECISIONS.md § D1234 and § D1358): a free par is met by every clear that buys nothing, so it never pays, and a clear above the par never pays. FLAT, on earn-scenario-clear's ground: a par is the price of a configuration, a property of the scenario rather than a figure the run measures, so § D526 clause 2 holds. CHOSEN: 3, half a scenario cleared, so chasing a par is worth a run and never worth more than finishing the scenario. PAID ONCE PER ACCOUNT PER SCENARIO, keyed by the scenario id like a clear; the server pays it only to an account the same scenario's clear has already been paid to, because a clear at par is a clear, and it cannot check that the clear was at par: that is believed within that bound, as a clear is believed.",
+      "schema": {
+        "type": "integer",
+        "unit": "chimes",
+        "min": 1,
+        "max": 50,
+        "default": 3
+      }
+    },
+    {
       "id": "earn-career-day",
       "name": "A contract day paid",
       "earnedBy": "completion",
       "completion": "career-day-paid",
       "awardChimes": 3,
-      "note": "A day the contract paid for — the completed turn, not the day's figures. A missed day earns nothing and costs nothing, because § D526 clause 4 forbids anything that decays and clause 3 forbids buying relief on a miss. CHOSEN: 3, half a scenario, because a career day is a shorter turn and there are twenty of them in a week. A Scenario week's counted day that clears pays it too, once, on the close that banks it; a practice close, a missed day and a day that does not count pay nothing, and there is no separate award for a week (DECISIONS.md § D1231).",
+      "note": "A day the contract paid for — the completed turn, not the day's figures. A missed day earns nothing and costs nothing, because § D526 clause 4 forbids anything that decays and clause 3 forbids buying relief on a miss. CHOSEN: 3, half a scenario, because a career day is a shorter turn and there are twenty of them in a week. A Scenario week's counted day that clears pays it too, once, on the close that banks it; a practice close, a missed day and a day that does not count pay nothing (DECISIONS.md § D1231). A held week is paid besides, once per level, by earn-week-held (DECISIONS.md § D1402), which amends § D1231's 'no separate award for a week' for a held week only. PAID ONCE PER DAY (DECISIONS.md § D1416, swarm DS's Q3 ruling on S2's finding that the server paid every post of one day): the turn names its day, a Career tower's contract, month, day and career day, or a Scenario week's contract and the crowd it dealt, and the server writes one entry per day named, so the same day posted again pays nothing. Every day still pays; what is capped is the post, and the server refuses a day key whose contract its contract ladder does not name.",
       "schema": {
         "type": "integer",
         "unit": "chimes",
@@ -50,6 +65,21 @@
         "min": 1,
         "max": 50,
         "default": 2
+      }
+    },
+    {
+      "id": "earn-week-held",
+      "name": "A level of a tower's week held",
+      "earnedBy": "completion",
+      "completion": "week-held",
+      "awardChimes": 10,
+      "note": "A Scenario week whose target was met, paid once per level of that tower's week (wave AO, lane DS-1, DECISIONS.md § D1402, swarm DS's Q1 award). The turn key is the level: the tower and the week as dealt (c2/3), and the award is a keyed completion on DECISIONS.md § D1416's one rule, so holding week 3 again, or holding a week numbered past the tower's top that is dealt the top again, pays nothing more, and a run of held weeks buys nothing by its length (§ D1253 stays a record). A held week also pays each counted day it cleared, through earn-career-day, as it did before (§ D1231); this amends § D1231's 'there is no award for a week' for the held week only. CHOSEN: 10, swarm DS's figure (S1 and S3; S2 agreed on one flat award), a little over three cleared days, because a held week is the longest turn the Scenario has. The server refuses a level key outside the levels data/contract-ladder.json authors for a tower (week 1, week 2 where the rung authors an order, and one week per authored week booking), which bounds what a hand-built request can claim.",
+      "schema": {
+        "type": "integer",
+        "unit": "chimes",
+        "min": 1,
+        "max": 50,
+        "default": 10
       }
     },
     {

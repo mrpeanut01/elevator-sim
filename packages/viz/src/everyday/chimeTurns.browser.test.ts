@@ -376,10 +376,14 @@ describe.skipIf(!HAS_BROWSER)('what the chime ledger is told when a turn ends โ€
        * `closeShift` returns, so any post `closeShift` made is already on the wire by then.
        */
       await expect
-        .poll(() => earnedBodies(wire), { timeout: 10_000, message: `no contract day was posted; the page asked for ${wire.asked.join(', ')}` })
-        .toContainEqual({ completion: 'career-day-paid' });
+        .poll(() => earnedBodies(wire).map((body) => (body as Record<string, unknown>)['completion']), {
+          timeout: 10_000,
+          message: `no contract day was posted; the page asked for ${wire.asked.join(', ')}`,
+        })
+        .toContain('career-day-paid');
+      /* ยง D1416: the day names itself, the tower, its month, the contract day and the career day. */
       expect(earnedBodies(wire), 'a Career day posted a scenario clear for the week standing behind it').toEqual([
-        { completion: 'career-day-paid' },
+        { completion: 'career-day-paid', key: expect.stringMatching(/^career:[a-z0-9-]+:m\d+:d1:t\d+$/u) },
       ]);
     } finally {
       await page.close();

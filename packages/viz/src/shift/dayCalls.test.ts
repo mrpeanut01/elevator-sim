@@ -12,6 +12,7 @@ import { describe, expect, it } from 'vitest';
 import type { VizLeg } from '../contract/types.js';
 
 import type { BookedOutCar } from './bookedOut.js';
+import { CALL_BANDS, driverOfferOf } from './callBands.js';
 import {
   DAY_CALL_ANSWERS,
   DAY_CALL_DRIVER_ANSWERS,
@@ -45,6 +46,7 @@ import {
   nextDayCallOf,
   type DayCallInput,
   type DayCallRecord,
+  dayCallGapSentenceOf,
 } from './dayCalls.js';
 import { contractBuildings } from './contractDay.test-helper.js';
 import { goalsForDay } from './goals.js';
@@ -343,6 +345,38 @@ describe('the report’s row for a call', () => {
     }
   });
 
+  /*
+   * Wave AO, lane DR-1, § D1433: the answer with the fewest one-minute waits is spread (7), and where
+   * the day split and spread missed, the row names the goal it missed with its figure.
+   */
+  it('says where the count’s favourite missed the day, with the goal and its figure, and not otherwise', () => {
+    const worst = goalsForDay(1).find((goal) => goal.id === 'worst-wait');
+    if (worst === undefined) throw new Error('the day has a worst-wait goal');
+    const goal = { ...worst, bar: 200 };
+    const judge = (observations: Observations) =>
+      observations.worstWaitS > 200
+        ? {
+            verdict: 'missed' as const,
+            readings: [{ goal, state: 'missed' as const, observed: observations.worstWaitS, display: '', progressPct: 100, glyph: '' }],
+          }
+        : { verdict: 'cleared' as const, readings: [] };
+    const missedByFavourite = dayCallRowOf(record('park-cars-lobby', [150, 250, 250]), 1, grade, clock, judge);
+    expect(missedByFavourite.why).toContain(
+      'The fewest riders waited a minute with spread the cars across the tower, and the day missed with it: the ' +
+        'worst-wait goal read 250 s against a bar of 200 s.',
+    );
+    expect(dayCallGapSentenceOf(record('park-cars-lobby', [150, 250, 250]), judge)).toBeDefined();
+    /* Controls: the favourite cleared; nobody cleared, so there is no split to set the count against. */
+    expect(dayCallGapSentenceOf(record('leave', [250, 150, 250]), judge)).toBeUndefined();
+    expect(dayCallGapSentenceOf(record('leave', [250, 250, 250]), judge)).toBeUndefined();
+    expect(dayCallRowOf(record('leave', [250, 150, 250]), 1, grade, clock, judge).why).not.toContain('The fewest riders');
+    /* And without the report's judgement the row says nothing of it, as before. */
+    expect(dayCallRowOf(record('park-cars-lobby', [150, 250, 250]), 1, grade, clock).why).not.toContain('The fewest riders');
+    for (const phrase of [...CAUSAL, ...ESTIMATE, ...MECHANISM, ...GENERAL]) {
+      expect(says(dayCallGapSentenceOf(record('park-cars-lobby', [150, 250, 250]), judge) ?? '', phrase), phrase).toBe(false);
+    }
+  });
+
   it('names the day’s verdict only where the three runs split', () => {
     const [split, level] = [ARMS[0][1], ARMS[1][1]];
     expect(split.why).toContain(
@@ -427,16 +461,19 @@ describe('the driver question', () => {
     return profile;
   };
 
-  it('offers the first two of Fairness first, Predictive balanced, Energy aware and Minimum estimated wait that are not driving — § D1337', () => {
-    expect(DAY_CALL_DRIVER_OFFER).toEqual(['fairness-first', 'predictive-balanced', 'energy-aware', 'eta']);
-    expect(dayCallDriversOf(profiles, byId('collective'))?.map((profile) => profile.id)).toEqual([
-      'fairness-first',
-      'predictive-balanced',
-    ]);
-    expect(dayCallDriversOf(profiles, byId('eta'))?.map((profile) => profile.id)).toEqual(['fairness-first', 'predictive-balanced']);
+  it('offers the first two of the census’s offer list that are not driving — § D1337, derived since § D1442', () => {
+    /* The list is the census's (`data/call-bands.json`), never names written in code. */
+    expect(DAY_CALL_DRIVER_OFFER).toEqual(driverOfferOf(CALL_BANDS));
+    const firstTwo = (driving: string): readonly string[] =>
+      DAY_CALL_DRIVER_OFFER.filter((id) => id !== driving).slice(0, 2);
+    for (const driving of ['collective', 'eta', 'fairness-first', 'predictive-balanced']) {
+      expect(dayCallDriversOf(profiles, byId(driving))?.map((profile) => profile.id), driving).toEqual(firstTwo(driving));
+    }
+    /* Today's census: Energy aware is under the floor and Capacity aware takes its place (§ D1442). */
+    expect(DAY_CALL_DRIVER_OFFER.slice(0, 3)).toEqual(['fairness-first', 'predictive-balanced', 'capacity-aware']);
     expect(dayCallDriversOf(profiles, byId('predictive-balanced'))?.map((profile) => profile.id)).toEqual([
       'fairness-first',
-      'energy-aware',
+      'capacity-aware',
     ]);
   });
 
@@ -446,7 +483,7 @@ describe('the driver question', () => {
     /* Red before § D1337: a player on Fairness first was offered the house and Minimum estimated wait. */
     expect(dayCallDriversOf(profiles, byId('fairness-first'))?.map((profile) => profile.id)).toEqual([
       'predictive-balanced',
-      'energy-aware',
+      'capacity-aware',
     ]);
     for (const driving of profiles) {
       const pair = dayCallDriversOf(profiles, driving);

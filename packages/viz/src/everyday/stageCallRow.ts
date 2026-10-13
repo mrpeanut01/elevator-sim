@@ -34,8 +34,11 @@
 
 import type { RunInterventionConfig } from '@elevator-sim/core/browser';
 
+import { dayCallMaximaReadingsAt, type DayCallMaximaReadings } from '../shift/dayCallMaxima.js';
 import {
   DAY_CALL_LONG_WAIT_S,
+  dayCallAnswersOf,
+  dayCallAnswerWordsOf,
   dayCallCountsLineOf,
   dayCallFailedSentenceOf,
   dayCallWrinkleQuietSentenceOf,
@@ -43,6 +46,7 @@ import {
   type DayCallRecord,
   type DayCallWrinkleQuiet,
 } from '../shift/dayCalls.js';
+import type { ShiftGoal } from '../shift/types.js';
 
 /** One row on the stage. */
 export interface StageCallRowView {
@@ -51,6 +55,13 @@ export interface StageCallRowView {
   readonly heading: string;
   /** The report's counts sentence, word for word. */
   readonly counts: string;
+  /**
+   * Each answer's deepest landing and longest wait so far, at the last whole minute the stage has
+   * reached, and which answer's run could no longer clear and from when — wave AO, lane DR-1,
+   * [§ D1433](../../../../DECISIONS.md), {@link stageCallGoalsLineOf}. Absent on a record that
+   * carries no readings (one written before them) and where no goals were handed in.
+   */
+  readonly goals?: string | undefined;
   /** What the counts are about, and a later press inside the window where there was one. */
   readonly note: string;
 }
@@ -58,10 +69,73 @@ export interface StageCallRowView {
 /** The heading over the rows, once one is due. */
 export const STAGE_CALL_ROWS_HEADING = 'WHAT THE CALLS DID';
 
-/** The clause every row carries: whose runs, and what they held. No figure. */
+/**
+ * The clause every row carries: whose runs, what they held, and that the count is not a goal. No
+ * figure. The middle sentence is wave AO's lane DR-1 ([§ D1433](../../../../DECISIONS.md)): the
+ * answer with the fewest one-minute waits missed the day on 10 of 21 deciding rows (swarm DR's S2),
+ * so the row says what its count is not.
+ */
 export const STAGE_CALL_ROW_NOTE =
-  'On this crowd, with every press before the call kept and nothing pressed after it. Whether the ' +
-  'day cleared is on the report when the day closes.';
+  'On this crowd, with every press before the call kept and nothing pressed after it. The count of ' +
+  'riders who waited a minute is not one of the day’s goals. Whether the day cleared is on the ' +
+  'report when the day closes.';
+
+/**
+ * **Each answer's two final goals so far, in one sentence** — wave AO, lane DR-1,
+ * [§ D1433](../../../../DECISIONS.md), swarm DR's ruling § Q1 item 2. Read off each answer's run at
+ * the last whole minute the stage has reached (`shift/dayCallMaxima.ts`), in the counts sentence's
+ * order and naming: *By 10:41, the deepest landing and the longest wait so far: 22 and 340 s with
+ * Energy aware driving; …*. A reading past its bar says so with the bar, and a run with one past its
+ * bar could no longer clear, from the first minute it read so (§ D1168's one verdict, which amends
+ * § D1219 clause 2 for that fact alone). A longest wait that is a rider still standing is pending on
+ * the rail, and is said as such. `undefined` where the record carries no readings.
+ */
+export function stageCallGoalsLineOf(
+  record: DayCallRecord,
+  goals: readonly ShiftGoal[],
+  playheadS: number,
+  clockOf: (simTimeS: number) => string,
+): string | undefined {
+  const maxima = record.maxima;
+  if (maxima === undefined) return undefined;
+  const answers = dayCallAnswersOf(record.question ?? 'placement');
+  const read: { answer: (typeof answers)[number]; at: DayCallMaximaReadings }[] = [];
+  for (const answer of answers) {
+    const series = maxima[answer];
+    const at = series === undefined ? undefined : dayCallMaximaReadingsAt(series, goals, playheadS);
+    if (at !== undefined) read.push({ answer, at });
+  }
+  const first = read[0];
+  if (first === undefined) return undefined;
+  const pastBar = (reading: DayCallMaximaReadings['queue'], unit: string): string =>
+    reading?.state === 'missed' ? ` (past its bar of ${String(reading.goal.bar)}${unit})` : '';
+  const clauses = read.map(({ answer, at }) => {
+    const queue =
+      at.queue === undefined || at.queue.observed === null ? 'not yet graded' : `${String(at.queue.observed)}${pastBar(at.queue, '')}`;
+    const wait =
+      at.worstWait === undefined || at.worstWait.observed === null
+        ? 'a wait still under way'
+        : `${String(at.worstWait.observed)} s${pastBar(at.worstWait, ' s')}`;
+    return `${queue} and ${wait} with ${dayCallAnswerWordsOf(record, answer)}`;
+  });
+  const lost = read
+    .filter(({ at }) => at.pastBarFromS !== undefined)
+    .map(({ answer, at }) => `with ${dayCallAnswerWordsOf(record, answer)} from ${clockOf(at.pastBarFromS ?? at.atS)}`);
+  const lostLine =
+    lost.length === 0
+      ? ''
+      : ` A landing’s deepest stack and the longest wait cannot come back under a bar once past it: the ` +
+        `day could no longer clear ${listOfClauses(lost)}.`;
+  return (
+    `By ${clockOf(first.at.atS)}, the deepest landing and the longest wait so far: ${clauses.join('; ')}.` + lostLine
+  );
+}
+
+/** `a`, `a and b`, `a, b and c`. */
+function listOfClauses(parts: readonly string[]): string {
+  if (parts.length <= 1) return parts[0] ?? '';
+  return `${parts.slice(0, -1).join(', ')} and ${String(parts[parts.length - 1])}`;
+}
 
 /** The instant a record's row can be printed: its window observed, or the run over. */
 export function stageCallRowDueAtS(record: Pick<DayCallRecord, 'windowEndS'>, endedAt: number): number {
@@ -78,6 +152,8 @@ export function stageCallRowsOf(input: {
   readonly endedAt: number;
   readonly log: readonly RunInterventionConfig[];
   readonly clockOf: (simTimeS: number) => string;
+  /** The day's goals, for each row's goal readings (§ D1433); absent, the rows print counts only. */
+  readonly goals?: readonly ShiftGoal[] | undefined;
 }): readonly StageCallRowView[] {
   const rows: StageCallRowView[] = [];
   for (const [index, record] of input.records.entries()) {
@@ -89,10 +165,12 @@ export function stageCallRowsOf(input: {
         : ` Your ${later.length === 1 ? 'press' : 'presses'} at ${later
             .map((entry) => input.clockOf(entry.atS))
             .join(', ')} ${later.length === 1 ? 'is' : 'are'} not in these counts.`;
+    const goals = input.goals === undefined ? undefined : stageCallGoalsLineOf(record, input.goals, input.playheadS, input.clockOf);
     rows.push({
       id: `stage-call-row-${String(index + 1)}`,
       heading: `The call at ${input.clockOf(record.atS)}`,
       counts: dayCallCountsLineOf(record, input.clockOf),
+      ...(goals === undefined ? {} : { goals }),
       note: `${STAGE_CALL_ROW_NOTE}${pressNote}`,
     });
   }

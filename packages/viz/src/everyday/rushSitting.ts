@@ -412,6 +412,14 @@ export const RUSH_SITTING_COPY = Object.freeze({
   noRounds:
     'There is no finished round to post yet. Run the rush and play a round out — a sitting is ' +
     'every round you have played since the building was as shipped.',
+  /**
+   * **A sitting started with something bought from this device's tally** — [§ D1418](../../../../DECISIONS.md).
+   * A device spend is for play on this device, and the server refuses a modifier the account did not
+   * buy (`chimes/ledger.ts#unbackedModifiers`), so this one is refused before anything is sent.
+   */
+  boughtOnDevice:
+    'This sitting cannot be posted: it started with something bought from this device\u2019s chimes, and ' +
+    'a device purchase stays on this device. It is kept here as your best on this device if it is one.',
 });
 
 /**
@@ -434,11 +442,14 @@ export function rushSittingOf(input: {
   readonly buildingId: string;
   readonly rounds: readonly RushRoundRecord[];
   readonly modifiers?: readonly ClaimedRushModifier[] | undefined;
+  /** Whether {@link modifiers} were bought from this device's tally — [§ D1418](../../../../DECISIONS.md). */
+  readonly boughtOnDevice?: boolean | undefined;
 }): RushSittingCheck {
   const rounds = input.rounds;
   if (rounds.length === 0) return { ok: false, reasons: Object.freeze([RUSH_SITTING_COPY.noRounds]) };
 
   const reasons: string[] = [];
+  if (input.boughtOnDevice === true) reasons.push(RUSH_SITTING_COPY.boughtOnDevice);
   if (rounds.length > MAX_SITTING_ROUNDS) reasons.push(RUSH_SITTING_COPY.tooLong(rounds.length));
   for (const [index, round] of rounds.entries()) {
     for (const reason of round.unpostable) reasons.push(`Round ${String(index + 1)}: ${reason}.`);
@@ -456,31 +467,44 @@ export function rushSittingOf(input: {
   }
 
   if (reasons.length > 0) return { ok: false, reasons: Object.freeze(reasons) };
+  return { ok: true, body: rushSittingBodyOf(input) };
+}
+
+/**
+ * **A sitting's causes, as the wire carries them** — every round's dispatcher, rules, log and
+ * rebuild, and the sitting's modifiers, with no check made. {@link rushSittingOf} sends it once every
+ * check passes; on a build with no rush board `everyday/host.ts` keeps the same body on the device
+ * whatever the device bought, because a sitting that stays on this device is still this device's,
+ * and `everyday/rushDeviceBest.ts` replays it ([§ D1420](../../../../DECISIONS.md)).
+ */
+export function rushSittingBodyOf(input: {
+  readonly buildingId: string;
+  readonly rounds: readonly RushRoundRecord[];
+  readonly modifiers?: readonly ClaimedRushModifier[] | undefined;
+}): RushSittingBody {
+  const rounds = input.rounds;
   const modifiers = input.modifiers ?? [];
-  return {
-    ok: true,
-    body: Object.freeze({
-      buildingId: input.buildingId,
-      rounds: Object.freeze(
-        rounds.map((round) =>
-          Object.freeze({
-            dispatcherProfileId: round.dispatcherProfileId,
-            ...(round.ruleRows.length === 0 ? {} : { ruleRows: round.ruleRows }),
-            /*
-             * An empty log carries **no key at all**, which is `verify.ts#rushRoundConfigFor`'s own
-             * spread and `core`'s promise that a run with no `interventions` key is byte-identical
-             * to one built before the field existed.
-             */
-            ...(round.wireInterventions === undefined || round.wireInterventions.length === 0
-              ? {}
-              : { interventions: round.wireInterventions }),
-            /* And an empty rebuild the same way: a round nothing was bought for carries no key. */
-            ...(round.rebuild === undefined || round.rebuild.length === 0 ? {} : { rebuild: round.rebuild }),
-            claimedHeldS: round.holdS,
-          }),
-        ),
+  return Object.freeze({
+    buildingId: input.buildingId,
+    rounds: Object.freeze(
+      rounds.map((round) =>
+        Object.freeze({
+          dispatcherProfileId: round.dispatcherProfileId,
+          ...(round.ruleRows.length === 0 ? {} : { ruleRows: round.ruleRows }),
+          /*
+           * An empty log carries **no key at all**, which is `verify.ts#rushRoundConfigFor`'s own
+           * spread and `core`'s promise that a run with no `interventions` key is byte-identical
+           * to one built before the field existed.
+           */
+          ...(round.wireInterventions === undefined || round.wireInterventions.length === 0
+            ? {}
+            : { interventions: round.wireInterventions }),
+          /* And an empty rebuild the same way: a round nothing was bought for carries no key. */
+          ...(round.rebuild === undefined || round.rebuild.length === 0 ? {} : { rebuild: round.rebuild }),
+          claimedHeldS: round.holdS,
+        }),
       ),
-      ...(modifiers.length === 0 ? {} : { modifiers: Object.freeze([...modifiers]) }),
-    }),
-  };
+    ),
+    ...(modifiers.length === 0 ? {} : { modifiers: Object.freeze([...modifiers]) }),
+  });
 }

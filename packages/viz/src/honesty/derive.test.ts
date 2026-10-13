@@ -2015,6 +2015,31 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'The week levels’ plumbing — wave AO, lane DS-1, § D1400. `weekLevelAdmissionOf` returns a ' +
+        'reading whose one clause, why a level is not dealt, is read by `weekLevels.test.ts` and by no ' +
+        'screen: a refused or unmeasured level is simply not dealt, and the sheet says the tower has no ' +
+        'further week in `nextWeek.ts#nextWeekOf`’s words, which the shift adapter seeds. ' +
+        '`weekLevelIssues` is `weekOrderIssues`’ twin for the bookings, a content-author refusal ' +
+        '`dev/data.ts` lists as a load warning. The rest return a week number, a level, a list of ' +
+        'bookings, a drawn id, a boolean or a key (`weekLevelKeyOf` for the house’s cache, ' +
+        '`weekLevelAwardKeyOf` for the ledger’s turn key), none of them words; they are derived only ' +
+        'because they sit after the admission’s clause in the file.',
+      ids: [
+        'shift/weekLevels.ts#weekLevelAdmissionOf',
+        'shift/weekLevels.ts#weekLevelIssues',
+        'shift/weekLevels.ts#weekLevelKeyOf',
+        'shift/weekLevels.ts#weekLevelAwardKeyOf',
+        'shift/weekLevels.ts#weekTopOf',
+        'shift/weekLevels.ts#dealtWeekOf',
+        'shift/weekLevels.ts#dealtLevelOf',
+        'shift/weekLevels.ts#hasFurtherWeek',
+        'shift/weekLevels.ts#levelWrinkleIdFor',
+        'shift/weekLevels.ts#weekBookingsOn',
+        'shift/weekLevels.ts#bookingsAddedBetween',
+      ],
+    },
+    {
+      reason:
         'The week stake’s plumbing — wave AK, § D1176 to § D1178. `weekDealOf`, ' +
         '`dayCountsToward`, `countedCleanOf`, `weekNeedOf`, `weekHasClosed`, `weekRollsOver` and ' +
         '`weekAdmitsANewcomer` return a deal, counts or booleans: a dealt day carries a sentence, and ' +
@@ -2055,6 +2080,14 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'A practice crowd, plumbing only — wave AO, lane AO-1b, § D1362. `practiceCrowdOf` returns a ' +
+        'seed built from the shared one’s digits; what a player reads about it is the stage line ' +
+        '`PRACTICE_DAY_SENTENCES.practiceCrowd` and the sheet’s `PRACTICE_REHEARSAL_NOTE`, both seeded ' +
+        'by their adapters.',
+      ids: ['shift/scoredCrowd.ts#practiceCrowdOf'],
+    },
+    {
+      reason:
         'The press-moment ruling’s plumbing — wave AI, § D1029. `admittedPressDayIds` and ' +
         '`pressDayMeasuredAs` return ids and a pin, and are derived only because they reach ' +
         '`contractLadderIssues`’ own call-block check, whose content-author strings the entry above ' +
@@ -2089,9 +2122,9 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'function’s adapters sweep. What a player reads about an ordinary call is the stage card ' +
         '(`everyday/stageCall.ts`, seeded by name) and the report row (`shift/dayCalls.ts#dayCallRowOf`, ' +
         'seeded by the report adapter). Wave AK (§ D1166 to § D1168) adds more of the same kind: ' +
-        '`DAY_CALL_DRIVER_ANSWERS` and `dayCallAnswersOf` are answer ids, `DAY_CALL_DRIVER_OFFER` is ' +
-        'profile ids (four since § D1337) and `dayCallDriversOf` returns profiles, whose names reach a player only ' +
-        'through the card and the row; `dayCallChangeOf` returns an intervention, ' +
+        '`DAY_CALL_DRIVER_ANSWERS` and `dayCallAnswersOf` are answer ids (`DAY_CALL_DRIVER_OFFER` and ' +
+        '`dayCallDriversOf` left this list in wave AO, lane DR-2, § D1442, when the offer came to be derived ' +
+        'from `data/call-bands.json` and no literal stayed in either); `dayCallChangeOf` returns an intervention, ' +
         '`DAY_CALL_FINAL_GOAL_IDS` is two goal ids, `dayCallLostGoalOf` returns a reading, and ' +
         '`DAY_ENDED_EARLY_ROW_ID` is a row id. `dayCallAdmits` left this list when it stopped ' +
         'reading `DAY_CALL_ANSWERS`.' +
@@ -2108,8 +2141,6 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'shift/dayCalls.ts#DAY_CALL_ANSWERS',
         'shift/dayCalls.ts#DAY_CALL_DRIVER_ANSWERS',
         'shift/dayCalls.ts#dayCallAnswersOf',
-        'shift/dayCalls.ts#DAY_CALL_DRIVER_OFFER',
-        'shift/dayCalls.ts#dayCallDriversOf',
         'shift/dayCalls.ts#dayCallChangeOf',
         'shift/dayCalls.ts#DAY_CALL_FINAL_GOAL_IDS',
         'shift/dayCalls.ts#dayCallLostGoalOf',
@@ -2120,6 +2151,29 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'dev/state.ts#dayCallFactsOf',
         'dev/state.ts#dayCallsOpenOn',
         'dev/dayCallSession.ts#openDayCallSession',
+      ],
+    },
+    {
+      reason:
+        'The call bands’ census and the career’s close, plumbing only — wave AO, lanes DR-2 and DS-2, ' +
+        '§ D1441 to § D1443 and § D1409. `shift/callBands.ts#CALL_BANDS` and `parseCallBands` are ' +
+        '`data/call-bands.json` parsed, derived only because a placement id is a literal; ' +
+        '`callBandsIssues` is `weekDominanceIssues`’ twin, content-author refusals that `dev/data.ts` ' +
+        'folds into warnings and `callBands.test.ts` turns into a failing test; `callBandsReadingOf` ' +
+        'returns counts and the sweep’s own summary lines, which the nightly job writes to a file and ' +
+        'no screen draws; `driverOfferOf` returns profile ids. `shift/weekDominance.ts#bandedProfilesOf` ' +
+        'returns two profile ids, derived only through `weekDominanceOf`’s unmeasured clause. ' +
+        '`everyday/careerCalls.ts#careerDeciderOf` returns one of § D1351’s arms as data, whose words ' +
+        'are `careerCloseLineOf`’s, seeded arm by arm. What a player reads of the census is ' +
+        '`weekBandsLinesOf`, seeded in `seedWeekBands`.',
+      ids: [
+        'shift/callBands.ts#CALL_BANDS',
+        'shift/callBands.ts#parseCallBands',
+        'shift/callBands.ts#callBandsIssues',
+        'shift/callBands.ts#callBandsReadingOf',
+        'shift/callBands.ts#driverOfferOf',
+        'shift/weekDominance.ts#bandedProfilesOf',
+        'everyday/careerCalls.ts#careerDeciderOf',
       ],
     },
     {
@@ -2374,11 +2428,33 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
       ids: [
         'everyday/deviceChimes.ts#DEVICE_CHIMES_KEY',
         'everyday/deviceChimes.ts#DEVICE_CHIMES_QUARANTINE_KEY',
-        'everyday/deviceChimes.ts#withTurn',
-        'everyday/deviceChimes.ts#turnKeyOf',
-        'everyday/deviceChimes.ts#boughtStepIdOf',
         'everyday/deviceChimes.ts#decodeDeviceChimes',
+        /* § D1418: the sink spend's arithmetic; its refusals are worded by `host.ts#DEVICE_SPEND_COPY`. */
+        'everyday/deviceChimes.ts#withSinkSpend',
       ],
+    },
+    {
+      reason:
+        'This device’s best rush sitting, kept and replayed \u2014 DECISIONS.md § D1420. The two keys ' +
+        'are its `localStorage` slots, on `DEVICE_CHIMES_KEY`’s ground one entry up, and ' +
+        '`rushDeviceReplayOf` builds a simulation configuration whose only sentences are ' +
+        '`RUSH_DEVICE_REPLAY_REFUSAL`’s, which the rush adapter drives through the line the standings ' +
+        'draw. The deriver collected all three for their comments.',
+      ids: [
+        'everyday/rushDeviceBest.ts#RUSH_DEVICE_BEST_KEY',
+        'everyday/rushDeviceBest.ts#RUSH_DEVICE_BEST_QUARANTINE_KEY',
+        'everyday/rushDeviceBest.ts#rushDeviceReplayOf',
+      ],
+    },
+    {
+      reason:
+        'Load-time checks and a figure, not sentences a player meets \u2014 DECISIONS.md § D1425 and ' +
+        '§ D1417. `fixit/parse.ts#symptomLeverIn` answers the word and the family a line breaks, for ' +
+        'the author-facing refusal `parseFixitCases` prints when `data/fixit-cases.json` fails, and a ' +
+        'file that fails does not ship. `scenario/par.ts#PAR_AWARD_CHIMES` is a number read off the ' +
+        'ledger; the sentence it reaches a player in is `PAR_PAYS_LINE`, which the stage and fix-it ' +
+        'adapters drive inside every par line.',
+      ids: ['fixit/parse.ts#symptomLeverIn', 'scenario/par.ts#PAR_AWARD_CHIMES'],
     },
     {
       reason:

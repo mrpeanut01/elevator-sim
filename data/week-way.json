@@ -1,5 +1,5 @@
 {
-  "$comment": "THE WEEK CENSUS, docs/33 DC-10 and DECISIONS.md § D1067 (wave AJ lane AJ-C). One row per (contract, day of the week, wrinkle) the census measured: the configuration chosen on the TUNING crowds (every shipped dispatcher with no press or one parking press at one of pressAtFractions of the day, screened on screenCount crowds, the best finalists on the rest), then that one configuration and the tower's standing order each run once on every HELD-OUT crowd. chosenVerdicts and standingVerdicts are one mark per held-out crowd in date order, C cleared and m missed, where missed means any goalsForDay(day, 'whole-day') goal not met. Whether a row is admitted is NOT stored: shift/weekWay.ts#dc10Of derives it from the marks and the protocol, so no row can say admitted over counts that do not support it. growthPerDay is the slope the tower was grown at when the row was measured; a row whose slope is not the ladder's current slope for that tower is stale and is refused by shift/weekWay.ts#weekWayIssues (day 1 excepted, being the same building at every slope). queueOnlyMisses counts held-out crowds the chosen configuration missed on the queue goal and nothing else, for the queue-bar ruling to read. eventId 'ordinary' is the UNWRINKLED day (campaignEventId ordinary); any other id is the wrinkle the week draws for that day at the whole-day horizon, measured with lane AJ-B's episode splice (§ D1057) in the tree. PROVENANCE: every mark is a measurement, run by `WEEK_WAY_SWEEP=1 WEEK_WAY_OUT=<file> WEEK_WAY_CONTRACTS=<ids> WEEK_WAY_DAYS=<days> [WEEK_WAY_EVENTS=scheduled | WEEK_WAY_CELLS=<day>=<drawn id>;...] npx vitest run --project viz --maxWorkers=1 --testTimeout=36000000 packages/viz/src/shift/weekWay.sweep.test.ts` and copied row for row; a row whose eventId week 1 does not draw on its day is a day of an authored week order (data/contract-ladder.json weekOrders, DECISIONS.md § D1252 and § D1254), measured with WEEK_WAY_CELLS; the thresholds and crowd counts in the protocol block are CHOSEN, an agent's proposal for the owner to accept, tighten or reject, and docs/33 DC-10 gives the reasoning and the cost. shift/weekWay.verify.test.ts re-runs every row weekly (deep-tiers.yml, job week-census) and fails on a moved mark: the remedy is a census re-run, never an edit to a mark.",
+  "$comment": "THE WEEK CENSUS, docs/33 DC-10 and DECISIONS.md § D1067 (wave AJ lane AJ-C). One row per (contract, day of the week, wrinkle) the census measured: the configuration chosen on the TUNING crowds (every shipped dispatcher with no press or one parking press at one of pressAtFractions of the day, screened on screenCount crowds, the best finalists on the rest), then that one configuration and the tower's standing order each run once on every HELD-OUT crowd. chosenVerdicts and standingVerdicts are one mark per held-out crowd in date order, C cleared and m missed, where missed means any goalsForDay(day, 'whole-day') goal not met. Whether a row is admitted is NOT stored: shift/weekWay.ts#dc10Of derives it from the marks and the protocol, so no row can say admitted over counts that do not support it. growthPerDay is the slope the tower was grown at when the row was measured; a row whose slope is not the ladder's current slope for that tower is stale and is refused by shift/weekWay.ts#weekWayIssues (day 1 excepted, being the same building at every slope). queueOnlyMisses counts held-out crowds the chosen configuration missed on the queue goal and nothing else, for the queue-bar ruling to read. eventId 'ordinary' is the UNWRINKLED day (campaignEventId ordinary); any other id is the wrinkle the week draws for that day at the whole-day horizon, measured with lane AJ-B's episode splice (§ D1057) in the tree. PROVENANCE: every mark is a measurement, run by `WEEK_WAY_SWEEP=1 WEEK_WAY_OUT=<file> WEEK_WAY_CONTRACTS=<ids> WEEK_WAY_DAYS=<days> [WEEK_WAY_EVENTS=scheduled | WEEK_WAY_CELLS=<day>=<drawn id>;...] npx vitest run --project viz --maxWorkers=1 --testTimeout=36000000 packages/viz/src/shift/weekWay.sweep.test.ts` and copied row for row; a row whose eventId week 1 does not draw on its day is a day of an authored week order (data/contract-ladder.json weekOrders, DECISIONS.md § D1252 and § D1254), measured with WEEK_WAY_CELLS; the thresholds and crowd counts in the protocol block are CHOSEN, an agent's proposal for the owner to accept, tighten or reject, and docs/33 DC-10 gives the reasoning and the cost. shift/weekWay.verify.test.ts re-runs every row weekly (deep-tiers.yml, job week-census) and fails on a moved mark: the remedy is a census re-run, never an edit to a mark. A row carrying `bookings` is a week level's booked day (wave AO lane DS-1, DECISIONS.md § D1400 and § D1401): measured with those cars out of passenger service beside the rung's own, by WEEK_WAY_BOOKINGS=<json list> on the same command, and it describes only a day dealt with exactly those bookings (shift/weekWay.ts#weekWayRowFor).",
   "version": 1,
   "protocol": {
     "horizon": "whole-day",
@@ -1124,6 +1124,90 @@
       "standingVerdicts": "mmmmmmmmmmmmmmmmmmmm",
       "queueOnlyMisses": 3,
       "lowestPeakQueue": 13,
+      "screenRuns": 130
+    },
+    {
+      "contractId": "c2",
+      "day": 1,
+      "eventId": "shift-change:tight",
+      "bookings": [
+        {
+          "kind": "maintenance",
+          "bankId": "main",
+          "carId": "C",
+          "fromFraction": 0,
+          "toFraction": 0.4
+        }
+      ],
+      "growthPerDay": 0.02,
+      "breather": false,
+      "chosen": {
+        "dispatcherId": "fairness-first",
+        "press": "spread-cars",
+        "atFraction": 0.2
+      },
+      "tuningClears": 7,
+      "tuningN": 8,
+      "chosenVerdicts": "CCCCCCCmCCmCmmCmCCCC",
+      "standingVerdicts": "CmmmmmmmmCmmmmmmCmmC",
+      "queueOnlyMisses": 1,
+      "lowestPeakQueue": 16,
+      "screenRuns": 130
+    },
+    {
+      "contractId": "c2",
+      "day": 2,
+      "eventId": "evacuation-drill:all-at-once",
+      "bookings": [
+        {
+          "kind": "maintenance",
+          "bankId": "main",
+          "carId": "C",
+          "fromFraction": 0,
+          "toFraction": 0.4
+        }
+      ],
+      "growthPerDay": 0.02,
+      "breather": false,
+      "chosen": {
+        "dispatcherId": "fairness-first",
+        "press": "park-cars-lobby",
+        "atFraction": 0.43
+      },
+      "tuningClears": 5,
+      "tuningN": 8,
+      "chosenVerdicts": "CCCCCCCmmCmCmmCmCmmC",
+      "standingVerdicts": "mCmmmCmmmmmmmmmmmmmm",
+      "queueOnlyMisses": 3,
+      "lowestPeakQueue": 17,
+      "screenRuns": 130
+    },
+    {
+      "contractId": "c2",
+      "day": 4,
+      "eventId": "goods-inward",
+      "bookings": [
+        {
+          "kind": "maintenance",
+          "bankId": "main",
+          "carId": "C",
+          "fromFraction": 0,
+          "toFraction": 0.4
+        }
+      ],
+      "growthPerDay": 0.02,
+      "breather": false,
+      "chosen": {
+        "dispatcherId": "fairness-first",
+        "press": "spread-cars",
+        "atFraction": 0.2
+      },
+      "tuningClears": 2,
+      "tuningN": 8,
+      "chosenVerdicts": "CCmmmCmmmmmmmmCmCCmC",
+      "standingVerdicts": "mCmmmmmmmmmmmmmmmmmm",
+      "queueOnlyMisses": 2,
+      "lowestPeakQueue": 21,
       "screenRuns": 130
     }
   ],

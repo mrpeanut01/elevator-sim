@@ -40,6 +40,7 @@ import {
   startShippedSite,
   type ShippedSite,
 } from '../dev/browserTier.test-helper.js';
+import { SESSION_KEY } from '../persist/types.js';
 
 let site: ShippedSite;
 let browser: Browser;
@@ -233,6 +234,58 @@ describe.skipIf(!HAS_BROWSER)('GitHub issue #593 — a Scenario week plays from 
       }
     }, 600_000);
   }
+});
+
+describe.skipIf(!HAS_BROWSER)('wave AO lane DS-1 — a held week 2 deals a level with a car booked out (§ D1400)', () => {
+  /*
+   * Wave AO, lane DS-1 (§ D1400): Midtown's week 3 is week 2's order with car C booked out of
+   * passenger service on Monday from 08:00 until 12:00. The control is the stored week's number, moved
+   * on the page's own saved session and nothing else; the brief's strip reads the run's own building,
+   * so car C appearing there is the booking on the run the next press makes. Red before: week 3's
+   * Monday read as week 2's, with no booking on the door or the strip.
+   */
+  it('deals week 3’s booking on the door and on the brief’s strip once the stored week is week 3', async () => {
+    const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
+    const BOOKED = 'Car C is booked out of passenger service from the start of the day until 12:00';
+    try {
+      await coldLoad(page, `building=midtown-office&seed=${String(SEED)}`);
+      await openEverydayDoor(page);
+      expect(await page.locator('.everyday-door-week-booked').count(), 'week 1 named a booking').toBe(0);
+      await page.locator('.everyday-bar-primary').click();
+      await page.waitForSelector('.everyday-brief', { timeout: 15_000 });
+      expect(await textOf(page, '.everyday-brief'), 'week 1’s Monday booked car C').not.toContain(BOOKED);
+      /*
+       * The page's own saved week, its number moved to 3 and nothing else. A week is saved when a
+       * press moves it, so the door's own tower press goes to Garden Apartments and back, which
+       * parks Midtown's week and restores it as it was.
+       */
+      await toModes(page);
+      await openEverydayDoor(page);
+      await page.locator('.everyday-door-tower[data-contract="c1"]').click();
+      await page.locator('.everyday-door-tower[data-contract="c2"]').click();
+      await page.waitForFunction(
+        (key) => (JSON.parse(window.localStorage.getItem(key) ?? '{}') as { session?: { week?: { contractId?: string } } }).session?.week?.contractId === 'c2',
+        SESSION_KEY,
+        { timeout: 15_000 },
+      );
+      await page.evaluate((key) => {
+        const stored = JSON.parse(window.localStorage.getItem(key) ?? '{}') as { session?: { week?: { week?: number } } };
+        if (stored.session?.week !== undefined) stored.session.week.week = 3;
+        window.localStorage.setItem(key, JSON.stringify(stored));
+      }, SESSION_KEY);
+      await coldLoad(page, `building=midtown-office&seed=${String(SEED)}`);
+      await openEverydayDoor(page);
+      expect(await textOf(page, '.everyday-door-week-booked')).toBe(
+        'Booked this week: car C is out of passenger service on Monday from 08:00 until 12:00, new this week.',
+      );
+      await page.locator('.everyday-bar-primary').click();
+      await page.waitForSelector('.everyday-brief', { timeout: 15_000 });
+      expect(await textOf(page, '.everyday-brief-eyebrow')).toMatch(/^WEEK 3 · MONDAY/u);
+      expect(await textOf(page, '.everyday-brief')).toContain(BOOKED);
+    } finally {
+      await page.close();
+    }
+  });
 });
 
 describe.skipIf(!HAS_BROWSER)('GitHub issue #594 — no mode but Scenario writes the Scenario week', () => {

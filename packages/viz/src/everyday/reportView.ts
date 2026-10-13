@@ -292,6 +292,13 @@ export interface EverydayReportView {
    */
   readonly close: DayCloseView | undefined;
   /**
+   * **What decided a career day** — wave AO, lane DS-2, [§ D1409](../../../../DECISIONS.md): the call
+   * line graded on the contract's tests, then what decided the day where no call did
+   * (`careerCalls.ts#careerCloseLineOf`). `undefined` on every sheet that is not a career day's, and
+   * on a career day whose account has not been started.
+   */
+  readonly careerCall: string | undefined;
+  /**
    * **Today again, as practice, beside the call that decided it** — wave AO, lane AO-4,
    * [§ D1388](../../../../DECISIONS.md), {@link REPORT_PRACTICE_AGAIN}. `undefined` except on the close of
    * a counted day an ordinary call decided; a pinned day's call keeps its own *Take this call again*.
@@ -415,6 +422,12 @@ export interface EverydayReportCareer {
    * month is started again, and outranks a renewal, which a lost contract is not offered.
    */
   readonly contractLost?: string | undefined;
+  /**
+   * What decided the day, from `EverydayHost.careerCloseLine` — wave AO, lane DS-2,
+   * [§ D1409](../../../../DECISIONS.md). Passed in for {@link renewalDue}'s reason: the runs are the
+   * host's.
+   */
+  readonly call?: string | undefined;
 }
 
 /**
@@ -836,6 +849,7 @@ export function everydayReportViewOf(input: EverydayReportInput): EverydayReport
             population: input.overnight?.population,
             onward: input.overnight?.onward,
           }),
+    careerCall: input.career?.call,
     secondary: REPORT_SECONDARY,
   };
 }

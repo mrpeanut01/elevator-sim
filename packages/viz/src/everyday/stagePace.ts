@@ -210,7 +210,17 @@ export type StagePaceReason =
  *   waits a minute ({@link StagePaceInput.playerChoseSpeedAtS}). A chip pressed while `watching` is
  *   the rung `watching` plays at, so it is kept for every later stretch with somebody waiting.
  */
-export type ScoredPaceReason = 'watching' | 'fast' | 'yours';
+export type ScoredPaceReason = 'watching' | 'fast' | 'yours' | 'lost';
+
+/*
+ * `lost` is wave AO's lane DR-1, [§ D1435](../../../../DECISIONS.md), swarm DR's ruling § Q4: a goal
+ * graded on a maximum already reads past its bar at the playhead, so the day can no longer clear and
+ * no call can follow (§ D1168). From the instant the stage first read it so
+ * ({@link StagePaceInput.lostAtS}) the rest plays at {@link BETWEEN_PEAKS_SIM_PER_REAL_S} or the
+ * player's rung, whichever is faster, whoever is waiting, since § D1169's hold exists to give time to
+ * decide and nothing is left to decide; a chip the player presses after that instant is their rung
+ * to the end. It narrows § D1169 clause 1 for a lost day alone.
+ */
 
 export interface StagePace {
   readonly simPerRealS: number;
@@ -252,6 +262,12 @@ export interface StagePaceInput {
    * somebody next waits a minute, so it stands exactly until then.
    */
   readonly scored?: boolean | undefined;
+  /**
+   * **Where the stage first read the day lost**, on a scored day — § D1435: the playhead of the
+   * first frame at which a goal graded on a maximum read past its bar. `undefined` while it can still
+   * clear. Read only on a scored day and never ahead of the playhead.
+   */
+  readonly lostAtS?: number | undefined;
 }
 
 /** The act boundary after `fromS` — a peak opening or closing — or `undefined` when none remains. */
@@ -289,6 +305,11 @@ export function stagePaceOf(input: StagePaceInput): StagePace {
     return { simPerRealS: watching, reason: 'call' };
   }
   if (input.scored === true) {
+    /* § D1435: a lost day plays the rest fast whoever waits, unless a chip was pressed since. */
+    if (input.lostAtS !== undefined && input.simTimeS >= input.lostAtS) {
+      const chosenSince = input.playerChoseSpeedAtS !== undefined && input.playerChoseSpeedAtS >= input.lostAtS;
+      return { simPerRealS: chosenSince ? watching : Math.max(watching, BETWEEN_PEAKS_SIM_PER_REAL_S), reason: 'lost' };
+    }
     /* § D1169: the tutorial's rule, on the present frame only. */
     if (input.longestStandingS !== undefined && input.longestStandingS >= PACE_HOLD_WAIT_S) {
       return { simPerRealS: watching, reason: 'watching' };
@@ -368,6 +389,9 @@ export function stagePaceNoteOf(
       return `at your speed, ${rung}, while somebody on a landing has waited over a minute`;
     case 'yours':
       return `your speed, ${rung}, until somebody on a landing has waited a minute`;
+    /* § D1435: the line *Watch the rest* plays under. */
+    case 'lost':
+      return `the day can no longer clear: playing the rest at ${rung}, and no call is asked`;
   }
 }
 

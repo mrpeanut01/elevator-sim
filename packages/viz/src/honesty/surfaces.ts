@@ -222,11 +222,13 @@ import {
   type DayDecider,
 } from '../shift/dayClose.js';
 import { NEXT_TOWER_STAY_LABEL, nextTowerOfferOf } from '../shift/nextTower.js';
-import { NEXT_WEEK_LABEL, nextWeekOf, weekUnderWayHarderLineOf } from '../shift/nextWeek.js';
+import { NEXT_WEEK_LABEL, nextWeekOf, weekBookingsLineOf, weekUnderWayHarderLineOf, type BookingClock } from '../shift/nextWeek.js';
+import { weekTopOf } from '../shift/weekLevels.js';
 import { dealtWeekOrdersOf } from '../shift/weekOrders.js';
 // GitHub issue #221's post block — the decision, seeded in all seven states by the report adapter.
 import { postRunViewOf } from '../everyday/postRun.js';
-import { CHIMES_PANEL_COPY } from '../everyday/chimesPanel.js';
+import {
+  CHIME_PRICES, CHIMES_PANEL_COPY } from '../everyday/chimesPanel.js';
 import { SETTINGS_ABSENCES, SIGN_IN_COPY, settingsScreenViewOf } from '../everyday/settingsView.js';
 import { EVERYDAY_UNITS, lengthFigure, speedRangeFigure } from '../everyday/units.js';
 import {
@@ -263,7 +265,15 @@ import { todayOf, type TodayRecord } from '../everyday/today.js';
 import { RUSH_NOT_LANDED, RUSH_RESULT_EMPTY_LEDE, rushDisclosureOf, rushOutcomeOf, rushResultViewOf, rushStageHeaderOf, type RushOutcome } from '../everyday/rush.js';
 import { rushPostViewOf } from '../everyday/rushPost.js';
 import { RUSH_SITTING_COPY, rushSittingOf, type RushRoundRecord } from '../everyday/rushSitting.js';
-import { CAREER_TOP_UP_NO_TOWER, RUSH_NOT_STANDING, RUSH_REBUILD_NOT_YET } from '../everyday/host.js';
+import {
+  CAREER_TOP_UP_NO_TOWER,
+  CHIME_HOME_BOOTING,
+  DEVICE_SPEND_COPY,
+  RUSH_DEVICE_HELD_THROUGH,
+  RUSH_NOT_STANDING,
+  RUSH_REBUILD_NOT_YET,
+} from '../everyday/host.js';
+import { RUSH_DEVICE_COPY, RUSH_DEVICE_REPLAY_REFUSAL } from '../everyday/rushDeviceBest.js';
 import {
   ENGINEER_RETURN_LABEL,
   ENGINEER_RETURN_TITLE,
@@ -293,7 +303,15 @@ import {
   stageSkipLineOf,
   stageSkipOf,
 } from '../everyday/stagePace.js';
-import { STAGE_CALL_COPY, stageCallCardOf, stageCallPresentOf, stageEndDayOf } from '../everyday/stageCall.js';
+import {
+  STAGE_CALL_COPY,
+  stageCallCardOf,
+  stageCallPresentOf,
+  stageEndDayOf,
+  stageLostCardOf,
+  STAGE_LOST_COPY,
+} from '../everyday/stageCall.js';
+import { dayCallMaximaOf } from '../shift/dayCallMaxima.js';
 import {
   stageCallFailedRowsOf,
   stageCallRowDueAtS,
@@ -308,6 +326,7 @@ import { PRESS_CALL_AGAIN, pressCallRowOf } from '../shift/callRow.js';
 import {
   dayCallCountsLineOf,
   dayCallFailedRowOf,
+  dayCallGapSentenceOf,
   dayCallRecordOf,
   dayCallsQuietSentenceOf,
   dayCallWrinkleQuietRowOf,
@@ -328,10 +347,13 @@ const DAY_CALL_FIXTURE_DRIVERS: DayCallDriverNames = Object.freeze({
 import { wayThroughSentenceOf, WEEK_WAY } from '../shift/weekWay.js';
 import { admittedPressDayIds, pressDayFor } from '../shift/ladder.js';
 import { PRESS_DAY_DRIVER_HELD } from '../everyday/today.js';
-import { actsOf } from '../shift/dayLength.js';
+import { actsOf, wholeDayFor } from '../shift/dayLength.js';
 import { rushTutorialWorkedAnswerOf } from '../everyday/rushScreenModel.js';
 import { WORKED_ANSWER_COPY, type WorkedAnswerFacts, type WorkedAnswerView } from '../everyday/workedAnswer.js';
-import { WEEK_START_NEXT_LABEL, weekScreenViewOf } from '../everyday/weekView.js';
+import { WEEK_START_NEXT_LABEL, driverRecordLinesOf, weekScreenViewOf } from '../everyday/weekView.js';
+import { CAREER_MARK_WORDS, careerCloseLineOf, type CareerCloseInput } from '../everyday/careerCalls.js';
+import { CALL_BANDS, weekBandsLinesOf, type CallBandsCall } from '../shift/callBands.js';
+import { weekOrderFor } from '../shift/weekOrders.js';
 import { percentileLine, WORLD_FIGURES_ABSENT, WORLD_FIGURES_LABEL, WORLD_FIGURES_REASON } from '../everyday/world.js';
 import { weekdayOf, type GoalObservations } from '../shift/types.js';
 import { buildingView, CONTRACT_COPY, contractView, towersView, type BuildingFacts } from '../everyday/campaignModel.js';
@@ -359,6 +381,8 @@ import { admitStageMove, stageUnitsAt } from '../campaign/stagePress.js';
 import { playerSafeDescription } from '../campaign/words.js';
 import type { CampaignStage } from '../campaign/types.js';
 import {
+  stageRungsOf,
+  stageRungRowOf,
   STAGE_PLAY_COPY,
   stageFactsOf,
   stagePlayViewOf,
@@ -719,6 +743,7 @@ import {
   ATTEMPT_ENGINEER_WATCHES_ONLY,
   ATTEMPT_HELD_IN_ANOTHER_TAB,
   ATTEMPT_HOLDS_ITS_DAY,
+  DAY_NOT_BEGUN_HOLDS_ITS_CROWD,
   ATTEMPT_LEFT_CANNOT_BANK,
   ATTEMPT_MOVED_ON_ELSEWHERE,
   ATTEMPT_NOT_POSTED,
@@ -758,6 +783,7 @@ import {
   PRACTICE_ENGINEER_NOTE,
   PRACTICE_OTHER_TAB_NOTE,
   PRACTICE_SANDBOX_NOTE,
+  PRACTICE_REHEARSAL_NOTE,
   type DayReportInput,
   type ShapedDayReport,
   type ShiftPlan,
@@ -2315,6 +2341,8 @@ const REPLAY: SurfaceAdapter = {
      * show, and a run of that day is not posted; § D1361 — one tab holds the attempt at a time.
      */
     'shift/banking.ts#ATTEMPT_HOLDS_ITS_DAY',
+    /* Wave AO, lane AO-1b, § D1362 — before the attempt, the day's own crowd plays only from *Start the day*. */
+    'shift/banking.ts#DAY_NOT_BEGUN_HOLDS_ITS_CROWD',
     'shift/banking.ts#ATTEMPT_NOT_POSTED',
     'shift/banking.ts#ATTEMPT_HELD_IN_ANOTHER_TAB',
     'shift/banking.ts#ATTEMPT_MOVED_ON_ELSEWHERE',
@@ -2408,6 +2436,13 @@ const REPLAY: SurfaceAdapter = {
       {
         field: 'attemptHoldsItsDay',
         text: ATTEMPT_HOLDS_ITS_DAY,
+        role: 'reason',
+        provenance: 'authored',
+      },
+      /* Wave AO, lane AO-1b, § D1362: *Take this call again* and *Play this crowd* before the attempt. */
+      {
+        field: 'dayNotBegunHoldsItsCrowd',
+        text: DAY_NOT_BEGUN_HOLDS_ITS_CROWD,
         role: 'reason',
         provenance: 'authored',
       },
@@ -3922,6 +3957,8 @@ const SHIFT_REPORT: SurfaceAdapter = {
      * builder over this case's two runs, and on {@link ShiftDay.retried}, a practice close.
      */
     'shift/dayCalls.ts#dayCallRowOf',
+    /* Wave AO, lane DR-1, § D1433: the row's sentence where the count's favourite missed, seeded below. */
+    'shift/dayCalls.ts#dayCallGapSentenceOf',
     'shift/dayCalls.ts#DAY_CALL_ROW_NOTE',
     'shift/dayCalls.ts#DAY_CALL_LEAVE_LABEL',
     /*
@@ -3968,6 +4005,8 @@ const SHIFT_REPORT: SurfaceAdapter = {
     'shift/report.ts#PRACTICE_OTHER_TAB_NOTE',
     /* Wave AO, lane AO-2, § D1368: a sandbox day's sheet, by name for the same reason. */
     'shift/report.ts#PRACTICE_SANDBOX_NOTE',
+    /* Wave AO, lane AO-1b, § D1362: a sandbox day dealt a practice crowd, by name for the same reason. */
+    'shift/report.ts#PRACTICE_REHEARSAL_NOTE',
     'shift/callRow.ts#PRESS_CALL_LATER_NOTE',
     'shift/dayCalls.ts#dayCallCountsLineOf',
     'shift/goals.ts#GOAL_PLAIN_NAMES',
@@ -4329,6 +4368,33 @@ const SHIFT_REPORT: SurfaceAdapter = {
         seeds.push({ field: `${at}.dayCalls(${row.id}).when`, text: row.when, role: 'label' });
         seeds.push({ field: `${at}.dayCalls(${row.id}).what`, text: row.what, role: 'observation' });
       }
+      /*
+       * Wave AO, lane DR-1, § D1433: where the answer with the fewest one-minute waits missed the day
+       * while another cleared, the row names the goal it missed with its figure. Seeded on this case's
+       * whole-run readings with the landing goal read missed under the fewest-count answer only.
+       */
+      {
+        const whole = shiftObservationsOf(observationsAt(recording, recording.endedAt));
+        const favoured = { ...whole } as Observations;
+        const readings = readGoals(goalsForDay(1), whole);
+        const gap = dayCallGapSentenceOf(
+          {
+            atS: recording.startedAt,
+            windowEndS: dayCallWindowEndOf(recording.startedAt, recording.endedAt),
+            answer: 'leave',
+            counts: { 'park-cars-lobby': 3, 'spread-cars': 9, leave: 6 },
+            observations: { 'park-cars-lobby': favoured, 'spread-cars': whole, leave: whole },
+          },
+          (observations) =>
+            observations === favoured
+              ? {
+                  verdict: 'missed',
+                  readings: readings.map((reading) => (reading.goal.id === 'queue' ? { ...reading, state: 'missed' as const } : reading)),
+                }
+              : { verdict: 'cleared', readings },
+        );
+        if (gap !== undefined) seeds.push({ field: `${at}.dayCalls.gap`, text: gap, role: 'observation' });
+      }
       /* § D1138 clause 4's practice sheet: its note, and its streak line, which carries the same words. */
       if (entry.retried.practiceNote !== undefined) {
         seeds.push({ field: `${at}.retried.practiceNote`, text: entry.retried.practiceNote, role: 'prose' });
@@ -4342,6 +4408,8 @@ const SHIFT_REPORT: SurfaceAdapter = {
       seeds.push({ field: `${at}.practiceOtherTabNote`, text: PRACTICE_OTHER_TAB_NOTE, role: 'prose' });
       /* § D1368's sandbox day sheet, by name — see the `covers` entry above. */
       seeds.push({ field: `${at}.practiceSandboxNote`, text: PRACTICE_SANDBOX_NOTE, role: 'prose' });
+      /* § D1362's practice-crowd sheet, by name — see the `covers` entry above. */
+      seeds.push({ field: `${at}.practiceRehearsalNote`, text: PRACTICE_REHEARSAL_NOTE, role: 'prose' });
       /* Wave AL: the title line after a handover, on the run's own clock. */
       seeds.push({
         field: `${at}.driversLine(handover)`,
@@ -10302,7 +10370,7 @@ const EVERYDAY_MENU: SurfaceAdapter = {
      * string for the search to read — and `rail.test.ts` asserts that absence, which is what keeps
      * GD13 clause 2 mechanical rather than remembered.
      */
-    for (const turn of ['scenario-cleared', 'career-day-paid', 'rush-wave-survived'] as const) {
+    for (const turn of ['scenario-cleared', 'career-day-paid', 'rush-wave-survived', 'week-held'] as const) {
       for (const [arm, answer] of [
         ['one', { kind: 'balance', chimes: 1 }],
         ['many', { kind: 'balance', chimes: 40 }],
@@ -10472,6 +10540,13 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
      */
     'everyday/rushHouse.ts#RUSH_HOUSE_COPY',
     'everyday/rushHouse.ts#rushStandingsOf',
+    /*
+     * § D1420: this device's best sitting on a build with no board, its row and every line the
+     * standings say about it (replayed, nothing kept, or kept and not replayable here), seeded below.
+     */
+    'everyday/rushDeviceBest.ts#RUSH_DEVICE_COPY',
+    'everyday/rushDeviceBest.ts#RUSH_DEVICE_REPLAY_REFUSAL',
+    'everyday/host.ts#RUSH_DEVICE_HELD_THROUGH',
     'everyday/rushScreenModel.ts#rushBandViews',
     'everyday/rushScreenModel.ts#rushFactViews',
     'everyday/rushScreenModel.ts#rushDrivingLine',
@@ -10679,6 +10754,29 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
             seeds.push({ field: 'rush.yours.note', text: withYours.yoursLine, role: 'prose' });
           }
         }
+      }
+      /* § D1420: the device's own row, and the line in each of its three states. */
+      if (firstBroke !== undefined && firstBroke !== null) {
+        const onDevice = rushStandingsOf(context.building.id, nameOf, undefined, undefined, { kind: 'silent' }, {
+          kind: 'row',
+          heldS: firstBroke,
+          roundCount: 3,
+          modifiers: [{ sinkId: 'rush-prefit', steps: 1 }],
+        });
+        if (onDevice.kind === 'rows') {
+          for (const row of onDevice.yours) {
+            seeds.push({ field: 'rush.device.name', text: row.name, role: 'label' });
+            seeds.push({ field: 'rush.device.tag', text: row.tag, role: 'label' });
+            seeds.push({ field: 'rush.device.detail', text: row.detail, role: 'label' });
+            seeds.push({ field: 'rush.device.wave', text: row.wave, role: 'observation' });
+            seeds.push({ field: 'rush.device.held', text: row.held, role: 'observation' });
+          }
+          if (onDevice.yoursLine !== undefined) seeds.push({ field: 'rush.device.note', text: onDevice.yoursLine, role: 'prose' });
+        }
+      }
+      seeds.push({ field: 'rush.device.none', text: RUSH_DEVICE_COPY.none, role: 'reason' });
+      for (const [key, reason] of [...Object.entries(RUSH_DEVICE_REPLAY_REFUSAL), ['heldThrough', RUSH_DEVICE_HELD_THROUGH] as const]) {
+        seeds.push({ field: `rush.device.unreplayable.${key}`, text: RUSH_DEVICE_COPY.unreplayable(reason), role: 'reason' });
       }
       seeds.push({ field: 'rush.yours.none', text: RUSH_HOUSE_COPY.yoursNone, role: 'reason' });
       seeds.push({ field: 'rush.yours.signedOut', text: RUSH_HOUSE_COPY.yoursSignedOut, role: 'reason' });
@@ -11028,6 +11126,13 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
      */
     'everyday/host.ts#CAREER_TOP_UP_NO_TOWER',
     /*
+     * § D1418: what a spend from this device's tally says when it is refused, and the moment the
+     * account bridge has not answered. The host decides those arms, so it holds the words; each is
+     * seeded below as the notice a press on the device home carries.
+     */
+    'everyday/host.ts#DEVICE_SPEND_COPY',
+    'everyday/host.ts#CHIME_HOME_BOOTING',
+    /*
      * The DISPLAY NAME field's note, which is **two** sentences because it is about two different
      * names — § D490. Both arms are reached below: all but one of the cases draw the device one, and
      * `not-durable` is signed in and named and draws the account one. A pair of sentences with one
@@ -11168,11 +11273,48 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
        * `account: undefined` is what makes the home `device` rather than `booting`: the bridge has
        * answered and there is nobody signed in.
        */
-      ['device-tally', { profile: stored, reduceMotion: false, account: SIGNED_OUT, deviceChimes: 6 }],
+      /*
+       * § D1418: the device home sells the three sinks. `device-tally` holds enough for every row and
+       * a desk open, so each row's device offer is swept; `device-not-durable` holds every sink at its
+       * cap, so each device *bought* line is; `device-short` holds too little, with the host's own
+       * refusal as its notice.
+       */
+      [
+        'device-tally',
+        {
+          profile: stored,
+          reduceMotion: false,
+          account: SIGNED_OUT,
+          deviceChimes: 999,
+          deviceOwns: [],
+          careerTowerOpen: true,
+          chimeNotice: DEVICE_SPEND_COPY.owned,
+        },
+      ],
       [
         'device-not-durable',
-        { profile: stored, reduceMotion: false, account: SIGNED_OUT, deviceChimes: 1, deviceDurable: false },
+        {
+          profile: stored,
+          reduceMotion: false,
+          account: SIGNED_OUT,
+          deviceChimes: 1,
+          deviceDurable: false,
+          deviceOwns: CHIME_PRICES.sinks.map((sink) => ({ sinkId: sink.id, steps: sink.maxSteps })),
+          chimeNotice: DEVICE_SPEND_COPY.unknown,
+        },
       ],
+      [
+        'device-short',
+        {
+          profile: stored,
+          reduceMotion: false,
+          account: SIGNED_OUT,
+          deviceChimes: 2,
+          deviceOwns: [],
+          chimeNotice: DEVICE_SPEND_COPY.short(4),
+        },
+      ],
+      ['device-booting-notice', { profile: stored, reduceMotion: false, account: SIGNED_OUT, deviceChimes: 3, chimeNotice: CHIME_HOME_BOOTING }],
       /*
        * § D672's spend, in the arms a balance and an account alone cannot reach. Every case above
        * leaves `chimeSpendable` unset, so every row draws its *there is no ledger on this build*
@@ -12727,6 +12869,19 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
      */
     'everyday/stageCall.ts#STAGE_END_DAY_COPY',
     'everyday/stageCall.ts#stageEndDayOf',
+    /*
+     * Wave AO, lane DR-1: the card's goal nearest its bar and each answer's line (§ D1432), seeded on
+     * this case's readings at a call second and the shipped profiles; each row's goals so far
+     * (§ D1433), off this case's run; and the lost day's card (§ D1435), where the queue goal reads
+     * missed at mid-run.
+     */
+    'everyday/stageCall.ts#STAGE_CALL_ANSWER_LINES',
+    'everyday/stageCall.ts#stageCallDriverLineOf',
+    'everyday/stageCall.ts#stageCallNearestBarLineOf',
+    'everyday/stageCall.ts#STAGE_LOST_COPY',
+    'everyday/stageCall.ts#stageLostCardOf',
+    'everyday/stageCallRow.ts#stageCallGoalsLineOf',
+    'shift/dayCallMaxima.ts#dayCallMaximaReadingsAt',
     /* Pillar 3's strip — GitHub issue #277, § D470. Driven at every sample time below. */
     'everyday/stageScreenModel.ts#stageGoalsOf',
     /*
@@ -13269,6 +13424,35 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
           seeds.push({ field: 'stage.endDay.label', text: end.label, role: 'label' });
           seeds.push({ field: 'stage.endDay.note', text: end.note, role: 'prose', playhead: atPlayhead(recording, at) });
         }
+        /* Wave AO, lane DR-1, § D1435: the lost day's card on the same readings, at the same playhead. */
+        const lost = stageLostCardOf(readings, clockOf(at, DAY_START_S));
+        if (lost !== undefined) {
+          seeds.push({ field: 'stage.lost.heading', text: lost.heading, role: 'label' });
+          seeds.push({ field: 'stage.lost.fact', text: lost.fact, role: 'observation', playhead: atPlayhead(recording, at) });
+          seeds.push({ field: 'stage.lost.choices', text: lost.choices, role: 'prose' });
+        }
+        seeds.push({ field: 'stage.lost.end', text: STAGE_LOST_COPY.end, role: 'label' });
+        seeds.push({ field: 'stage.lost.watch', text: STAGE_LOST_COPY.watch, role: 'label' });
+      }
+      /*
+       * Wave AO, lane DR-1, § D1432: the card's teaching, on both questions — the goal nearest its bar
+       * off this case's readings at the call second, and each answer's line, a driver's from the
+       * shipped profile it names.
+       */
+      for (const drivers of [undefined, DAY_CALL_FIXTURE_DRIVERS]) {
+        const call = calls[2]!;
+        const card = stageCallCardOf(call, undefined, [], drivers, undefined, {
+          readings: readGoals(goalsForDay(1), shiftObservationsOf(observationsAt(recording, call.atS))),
+          driverOf: (name) => context.dispatcherProfiles.profiles.find((profile) => profile.name === name),
+        });
+        const at = `stage.call(${drivers === undefined ? 'placement' : 'driver'},taught)`;
+        const plain = stageCallCardOf(call, undefined, [], drivers);
+        for (const fact of card.facts.slice(plain.facts.length)) {
+          seeds.push({ field: `${at}.nearestBar`, text: fact, role: 'observation', playhead: atPlayhead(recording, call.atS) });
+        }
+        for (const option of card.options) {
+          if (option.line !== undefined) seeds.push({ field: `${at}.line(${option.answer})`, text: option.line, role: 'prose' });
+        }
       }
       for (const call of calls) {
         /* § D1206: the present-tense line, read off this case's run at the call second. */
@@ -13301,19 +13485,23 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
         const callAtS = recording.startedAt + 60;
         const windowEndS = Math.min(callAtS + 600, recording.endedAt);
         const legs = recording.legs;
-        const record = dayCallRecordOf({
+        const counted = dayCallRecordOf({
           atS: callAtS,
           windowEndS,
           answer: 'spread-cars',
           legs: { 'park-cars-lobby': legs, 'spread-cars': legs, leave: legs },
           observations: {},
         });
+        /* § D1433: each answer's two final goals through the day, off this case's own run. */
+        const maxima = dayCallMaximaOf(recording, callAtS);
+        const record = { ...counted, maxima: { 'park-cars-lobby': maxima, 'spread-cars': maxima, leave: maxima } };
         const rows = stageCallRowsOf({
           records: [record],
           playheadS: recording.endedAt,
           endedAt: recording.endedAt,
           log: [{ atS: callAtS + 120, change: { kind: 'park-cars-lobby' } }],
           clockOf: (simTimeS) => clockOf(simTimeS, DAY_START_S),
+          goals: goalsForDay(1),
         });
         seeds.push({ field: 'stage.callRows.heading', text: STAGE_CALL_ROWS_HEADING, role: 'label' });
         for (const row of rows) {
@@ -13325,6 +13513,14 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
             playhead: atPlayhead(recording, stageCallRowDueAtS(record, recording.endedAt)),
           });
           seeds.push({ field: `stage.callRows(${row.id}).note`, text: row.note, role: 'prose' });
+          if (row.goals !== undefined) {
+            seeds.push({
+              field: `stage.callRows(${row.id}).goals`,
+              text: row.goals,
+              role: 'observation',
+              playhead: atPlayhead(recording, recording.endedAt),
+            });
+          }
         }
         /* § D1335 — the failed moment's row, at two instants of this run, each drawn once it is reached. */
         const failures = [
@@ -15084,6 +15280,20 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     'shift/weekRecord.ts#weekRecordLineOf',
     /* Weeks held on this tower — lane AM-D, § D1253: the run's two arms, drawn on the sheet and the door. */
     'shift/weekRecord.ts#weeksHeldLineOf',
+    /*
+     * Wave AO, lane DR-2 (§ D1443): DC-13 on a week dealt from week 2, and this week's record with
+     * each driver, on Your week. Seeded in `seedWeekStake`: Midtown's week 2 from the shipped census,
+     * the passing arm over a synthetic row, and the record over the week played on the case's readings.
+     */
+    'shift/callBands.ts#weekBandsLinesOf',
+    'shift/callBands.ts#shareWordsOf',
+    'everyday/weekView.ts#driverRecordLinesOf',
+    /*
+     * Wave AO, lane DS-2 (§ D1409): the career report's account of the day, graded on the contract's
+     * tests. A career day is no corpus case's, so every arm is seeded by name in `seedCareerClose`.
+     */
+    'everyday/careerCalls.ts#careerCloseLineOf',
+    'everyday/careerCalls.ts#CAREER_MARK_WORDS',
     'everyday/continueWeek.ts#continueWeekEntryOf',
     'everyday/continueWeek.ts#CONTINUE_WEEK_TITLE',
     /* Lane AM-E (§ D1259): a held week's next tower, seeded in `seedWeekStake` for the same reason. */
@@ -15098,15 +15308,31 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     'shift/nextWeek.ts#NEXT_WEEK_LABEL',
     'shift/nextWeek.ts#weekHarderSentenceOf',
     'shift/nextWeek.ts#weekUnderWayHarderLineOf',
+    /*
+     * Wave AO, lane DS-1 (§ D1400): the booking a level adds, on the sheet's next-week line and the
+     * door's own line, seeded in `seedNextWeek` over every level Midtown deals and one past its top,
+     * on Midtown's own run clock as the screens hand it.
+     */
+    'shift/nextWeek.ts#weekBookingsLineOf',
+    'shift/weekLevels.ts#bookingPhraseOf',
   ],
   render(context) {
     const seeds: TextSeed[] = [];
     const bundle = shiftBundleOf(context);
     seeds.push({ field: 'today.driverHeld', text: PRESS_DAY_DRIVER_HELD, role: 'prose' });
-    seedWeekStake(seeds, bundle.observations, (buildingId) =>
-      context.buildings.find((building) => building.id === buildingId)?.name,
+    /* Midtown's run clock, from its whole authored day: a booking's window is a fraction of that run. */
+    const midtownDay = wholeDayFor(context.trafficProfiles, context.buildings.find((building) => building.id === 'midtown-office'));
+    const clock: BookingClock | undefined =
+      midtownDay === undefined ? undefined : (fraction) => clockOf(fraction * midtownDay.periodS, midtownDay.startOfDayS);
+    seedWeekStake(
+      seeds,
+      bundle.observations,
+      (buildingId) => context.buildings.find((building) => building.id === buildingId)?.name,
+      clock,
+      (profileId) => context.dispatcherProfiles.profiles.find((profile) => profile.id === profileId)?.name,
     );
     seedDayClose(seeds, context, bundle);
+    seedCareerClose(seeds);
     seeds.push({ field: 'brief.wayThrough.heading', text: BRIEF_WAY_THROUGH_HEADING, role: 'label' });
     for (const row of WEEK_WAY.rows) {
       for (const eventId of [row.eventId, 'another-wrinkle']) {
@@ -17547,6 +17773,15 @@ const EVERYDAY_STAGE_PLAY: SurfaceAdapter = {
     'everyday/stagePlay.ts#stageFactsOf',
     /* § D1376: a cleared stage's practice line in each par arm, seeded by name below. */
     'everyday/stagePlay.ts#stagePracticeLineOf',
+    /*
+     * § D1419: the wider budgets, sold from the device tally where the census adds a way through and
+     * drawn with the measured reason elsewhere. Seeded over every shipped stage's ladder below, in the
+     * buy, short and bought arms, so the sold and the unsold sentences are both read.
+     */
+    'everyday/stagePlay.ts#stageRungRowOf',
+    'everyday/stagePlay.ts#stageRungsOf',
+    /* § D1417: the sentence every par line ends with, read inside each verdict's par line. */
+    'scenario/par.ts#PAR_PAYS_LINE',
   ],
   render(this: SurfaceAdapter, context) {
     const seeds: TextSeed[] = [];
@@ -17644,6 +17879,30 @@ const EVERYDAY_STAGE_PLAY: SurfaceAdapter = {
       seeds.push({ field: `${at}.lab`, text: view.labLink, role: 'label' });
       seeds.push({ field: `${at}.labNote`, text: view.labNote, role: 'prose' });
     }
+    /* § D1417: the pay line on a clear that also met the par, first time and again. */
+    for (const [state, paid] of [['first', 'first'], ['again', 'again']] as const) {
+      const view = stagePlayViewOf(
+        { ...factsFor(standing, undefined, paid === 'again'), parAward: CHIME_AWARDS.awards['scenario-at-par'] ?? 0 },
+        { kind: 'judged', verdict: { ...verdict(true, true, paid, parUnits ?? 0), parPaid: 'first', boughtUnits: 24 }, stale: false },
+      );
+      if (view.verdict?.pay !== undefined) seeds.push({ field: `stagePlay.parPaid.${state}.pay`, text: view.verdict.pay, role: 'prose' });
+      if (view.verdict?.rung !== undefined) seeds.push({ field: `stagePlay.parPaid.${state}.rung`, text: view.verdict.rung, role: 'prose' });
+    }
+    /* § D1419: every shipped stage's ladder, in the arms a device can stand in. */
+    for (const each of stages) {
+      const census = context.survivors.scenarios.find((row) => row.id === each.id);
+      for (const [arm, owned, balance] of [['buy', false, 999], ['short', false, 0], ['owned', true, 0]] as const) {
+        const rungs = stageRungsOf(each, census, owned ? new Set(each.budget.steps.map((step) => step.id)) : new Set());
+        for (const rung of rungs) {
+          const row = stageRungRowOf(rung, balance);
+          seeds.push({ field: `stagePlay.rung.${each.id}.${rung.stepId}.${arm}`, text: row.text, role: 'reason' });
+          if (row.buyLabel !== undefined) {
+            seeds.push({ field: `stagePlay.rung.${each.id}.${rung.stepId}.${arm}.buy`, text: row.buyLabel, role: 'label' });
+          }
+        }
+      }
+    }
+    seeds.push({ field: 'stagePlay.rung.heading', text: STAGE_PLAY_COPY.rungHeading, role: 'label' });
     /* § D1358: the bar's note on a stage this device has cleared. */
     seeds.push({ field: 'stagePlay.bar.practice', text: STAGE_PLAY_COPY.notePractice, role: 'prose' });
     /* § D1376: the practice line's three par arms — priced, free and unpriced. */
@@ -18187,7 +18446,10 @@ function seedWeekStake(
   seeds: TextSeed[],
   observations: Observations,
   nameOf: (buildingId: string) => string | undefined,
+  clock?: BookingClock,
+  profileNameOf: (profileId: string) => string | undefined = () => undefined,
 ): void {
+  seedWeekBands(seeds, profileNameOf);
   seeds.push({ field: 'brief.week.heading', text: BRIEF_WEEK_HEADING, role: 'label' });
   seeds.push({ field: 'week.stake.short', text: WEEK_WITHOUT_COUNTED_DAYS_SHORT, role: 'reason' });
   seeds.push({ field: 'week.day.unmeasured', text: DAY_UNMEASURED_SENTENCE, role: 'reason' });
@@ -18367,7 +18629,7 @@ function seedWeekStake(
     seeds.push({ field: `week.onward.${contract.id}.line`, text: offer.line, role: 'observation' });
   }
   seeds.push({ field: 'week.onward.stay', text: NEXT_TOWER_STAY_LABEL, role: 'label' });
-  seedNextWeek(seeds, observations);
+  seedNextWeek(seeds, observations, clock);
   for (const [arm, record] of [
     ['one', { contractId: 'c2', closed: 1, met: 0, best: 3 }],
     ['several', { contractId: 'c2', closed: 3, met: 2, best: 5 }],
@@ -18381,6 +18643,107 @@ function seedWeekStake(
   ] as const) {
     seeds.push({ field: `week.held.${arm}`, text: weeksHeldLineOf(record) ?? '', role: 'observation' });
   }
+  /*
+   * § D1443: this week's record with each driver, over Midtown's weekdays closed on the case's own
+   * readings with a record each, Monday to Wednesday picked Fairness first and Thursday and Friday
+   * Predictive balanced (the week above keeps no record, so it would draw nothing).
+   */
+  let driven = openWeek('c2');
+  for (let day = 1; day <= 5; day += 1) {
+    const dayIdx = (day - 1) % 7;
+    driven = closeDay(
+      driven,
+      outcomeOf({
+        record: weekStakeRecord(day, day <= 3 ? 'fairness-first' : 'predictive-balanced'),
+        recordRefusal: null,
+        day,
+        dayIdx,
+        eventId: scheduledEventFor(null, day, dayIdx, 'whole-day').id,
+        arrived: observations.arrived,
+        carried: observations.carried,
+        minutePct: observations.minutePct,
+        readings: readGoals(goalsForDay(day), observations),
+      }),
+    );
+    if (day < 5) driven = nextDay(driven);
+  }
+  for (const [index, line] of driverRecordLinesOf(driven, profileNameOf).entries()) {
+    seeds.push({ field: `week.drivers.${String(index)}`, text: line, role: 'observation' });
+  }
+}
+
+/**
+ * **DC-13 on Your week** — wave AO, lane DR-2, § D1443. Midtown's week 2 from the shipped census, in
+ * whichever arm the pinned rows take, and the passing arm over a synthetic row (keep lost 4 of 9
+ * split calls, each switch on the card cleared 5 and 4), because the shipped week misses.
+ */
+function seedWeekBands(seeds: TextSeed[], profileNameOf: (profileId: string) => string | undefined): void {
+  const order = weekOrderFor({ contractId: 'c2', week: 2 });
+  for (const [index, line] of weekBandsLinesOf('c2', order, profileNameOf).entries()) {
+    seeds.push({ field: `week.bands.shipped.${String(index)}`, text: line, role: index === 0 ? 'prose' : 'observation' });
+  }
+  if (order === undefined) return;
+  const calls: CallBandsCall[] = Array.from({ length: 10 }, (_, k) => ({
+    crowd: 0,
+    day: 1,
+    atS: 0,
+    offered: ['predictive-balanced', 'capacity-aware'],
+    marks: {
+      keep: k < 4 ? 'm' : 'C',
+      'predictive-balanced': k < 6 ? 'C' : 'm',
+      'capacity-aware': k >= 5 ? 'C' : 'm',
+    },
+  }));
+  const passing = {
+    ...CALL_BANDS,
+    rows: [{ orderId: order.id, week: 2, briefDriver: 'fairness-first', days: order.days, dayMarks: [], calls }],
+  };
+  for (const [index, line] of weekBandsLinesOf('c2', order, profileNameOf, passing).entries()) {
+    seeds.push({ field: `week.bands.passing.${String(index)}`, text: line, role: 'observation' });
+  }
+}
+
+/**
+ * **The career report's account, every arm** — wave AO, lane DS-2, § D1409. The call line no call
+ * decided, then each of § D1351's arms on a career day as `everyday/careerCalls.ts#careerCloseLineOf`
+ * words them, from the runs each needs, for a day marked cleared and one marked missed.
+ */
+function seedCareerClose(seeds: TextSeed[]): void {
+  for (const [reads, words] of Object.entries(CAREER_MARK_WORDS)) {
+    seeds.push({ field: `career.close.mark.${reads}`, text: words, role: 'prose' });
+  }
+  for (const verdict of ['cleared', 'missed'] as const) {
+    const other = verdict === 'cleared' ? 'missed' : 'cleared';
+    const base: CareerCloseInput = {
+      verdict,
+      lead: { line: NO_CALL_DECIDED_LINE, decided: false },
+      need: 'run',
+      driverRun: undefined,
+      house: undefined,
+      houseName: 'Conventional collective',
+    };
+    const arms: readonly (readonly [string, Partial<CareerCloseInput>])[] = [
+      ['driver.pressed', { need: 'run', driverRun: other }],
+      ['driver.alone', { need: 'house', house: other }],
+      ['presses.swapped', { need: 'run', driverRun: verdict, house: other }],
+      ['presses.houseDrove', { need: 'same', house: other }],
+      ['nothing.both', { need: 'run', driverRun: verdict, house: verdict }],
+      ['nothing.alone', { need: 'house', house: verdict }],
+      ['pending.driverRun', { need: 'run' }],
+      ['pending.house.known', { need: 'run', driverRun: verdict }],
+      ['pending.house', { need: 'same' }],
+      ['unrun.driverRun', { need: 'run', driverRun: 'unrecorded' }],
+      ['unrun.house.known', { need: 'run', driverRun: verdict, house: 'unrecorded' }],
+      ['unrun.house', { need: 'same', house: 'unrecorded' }],
+      ['own', { need: 'own' }],
+    ];
+    for (const [arm, over] of arms) {
+      const line = careerCloseLineOf({ ...base, ...over });
+      if (line === undefined) continue;
+      const role = arm.startsWith('pending') || arm.startsWith('unrun') ? 'reason' : 'observation';
+      seeds.push({ field: `career.close.${verdict}.${arm}`, text: line, role });
+    }
+  }
 }
 
 /**
@@ -18389,9 +18752,13 @@ function seedWeekStake(
  * orders repeat and one past it, on the case's own readings with the verdict forced each way (the
  * sentences read held-ness and the week number, never a reading's figure).
  */
-function seedNextWeek(seeds: TextSeed[], observations: Observations): void {
+function seedNextWeek(seeds: TextSeed[], observations: Observations, clock?: BookingClock): void {
   seeds.push({ field: 'week.next.label', text: NEXT_WEEK_LABEL, role: 'label' });
-  const weeks = dealtWeekOrdersOf('c2').length + 1;
+  /*
+   * Every week up to one past the top (wave AO lane DS-1, § D1400): the orders before they repeat,
+   * then each level the census deals, then the week the sheet says no further week of.
+   */
+  const weeks = Math.max(dealtWeekOrdersOf('c2').length, weekTopOf('c2')) + 1;
   for (let number = 1; number <= weeks; number += 1) {
     for (const [arm, met] of [['held', true], ['notHeld', false]] as const) {
       let week: WeekState = { ...openWeek('c2'), week: number };
@@ -18411,7 +18778,7 @@ function seedNextWeek(seeds: TextSeed[], observations: Observations): void {
         /* Held: four of five clean, the target; not held: none clean. */
         week = closeDay(week, { ...outcome, allMet: met && day < 5 });
       }
-      const next = nextWeekOf(week);
+      const next = nextWeekOf(week, undefined, clock);
       if (next === undefined) continue;
       const at = `week.next.week${String(number)}.${arm}`;
       seeds.push({ field: `${at}.label`, text: next.label, role: 'label' });
@@ -18420,6 +18787,8 @@ function seedNextWeek(seeds: TextSeed[], observations: Observations): void {
     }
     const harder = weekUnderWayHarderLineOf({ contractId: 'c2', week: number });
     if (harder !== undefined) seeds.push({ field: `door.weekHarder.week${String(number)}`, text: harder, role: 'observation' });
+    const booked = weekBookingsLineOf({ contractId: 'c2', week: number }, undefined, clock);
+    if (booked !== undefined) seeds.push({ field: `door.weekBookings.week${String(number)}`, text: booked, role: 'observation' });
   }
 }
 

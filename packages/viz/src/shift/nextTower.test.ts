@@ -38,6 +38,7 @@ function rowFor(contractId: string, day: number, admitted: boolean): WeekWayRow 
     contractId,
     day,
     eventId,
+    bookings: [],
     growthPerDay: growthPerDayOf(ladderRowFor(contractId)),
     breather: false,
     chosen: { dispatcherId: 'predictive-balanced', press: '', atFraction: 0 },

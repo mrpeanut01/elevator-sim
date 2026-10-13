@@ -41,7 +41,7 @@
 import { dayWordsFor } from '../mode/glossary.js';
 import { HISTORY_DAYS } from '../shift/week.js';
 import { dayVerdictOf } from '../shift/weekStake.js';
-import { weekUnderWayHarderLineOf } from '../shift/nextWeek.js';
+import { weekBookingsLineOf, weekUnderWayHarderLineOf, type BookingClock } from '../shift/nextWeek.js';
 import { weeksHeldLineOf, type WeekRecord } from '../shift/weekRecord.js';
 import type { DayOutcome, WeekState } from '../shift/types.js';
 import { weekdayOf } from '../shift/types.js';
@@ -175,6 +175,12 @@ export interface DoorScreenView {
    * `undefined` on week 1 and wherever it did not fall.
    */
   readonly weekHarder: string | undefined;
+  /**
+   * **The cars this week's level books out, the new one marked** — wave AO, lane DS-1,
+   * `shift/nextWeek.ts#weekBookingsLineOf` ([§ D1400](../../../../DECISIONS.md)) — or `undefined`
+   * for a week dealt no level. It names bookings and says nothing about difficulty.
+   */
+  readonly weekBookings: string | undefined;
   readonly sameForEveryone: string;
   readonly primary: DoorPrimaryView;
 }
@@ -183,6 +189,12 @@ export interface DoorScreenView {
 export interface DoorScreenInput {
   readonly week: WeekState;
   readonly today: TodayRecord;
+  /**
+   * A fraction of the run as the day's clock reads it, for {@link DoorScreenView.weekBookings}'s
+   * times — `shift/nextWeek.ts#BookingClock`, built by `doorScreen.ts` from the run's own start and
+   * length (wave AO, lane DS-1). Optional: absent, a booking is named by its car and its day alone.
+   */
+  readonly bookingClock?: BookingClock | undefined;
   /** The stepper's position, `−6`…`0`. Clamped, so a caller cannot select off the strip. */
   readonly dayOffset: number;
   /** Whether the run standing on the stage has been filed — `host.runState().dayClosed`. */
@@ -615,6 +627,7 @@ export function doorScreenViewOf(input: DoorScreenInput): DoorScreenView {
     firstSessionLine: input.today.firstSessionLine,
     weeksHeld: input.record === undefined ? undefined : weeksHeldLineOf(input.record),
     weekHarder: weekUnderWayHarderLineOf(input.week),
+    weekBookings: weekBookingsLineOf(input.week, undefined, input.bookingClock),
     sameForEveryone,
     primary: primaryOf(clamped, chips),
   };

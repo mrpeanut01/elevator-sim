@@ -142,12 +142,14 @@ describe('the shipped ladder is legal against the shipped data', () => {
        * `horizon`, which names the kind of run the pin was measured on and grades nothing. § D1066
        * added the optional `growthPerDay`, a slope of population — fabric, and no bar. § D1252
        * added the optional `weekOrders`, which names wrinkles by drawn id and grades nothing: whether
-       * a day counts and the target are still the census's.
+       * a day counts and the target are still the census's. Wave AO lane DS-1 (§ D1400) added the
+       * optional `weekBookings`, a car out of passenger service on a named weekday in the fabric's
+       * own `incidents` vocabulary: fabric again, and no bar.
        */
       expect(
         Object.keys(row)
           .sort()
-          .filter((key) => key !== 'pressDay' && key !== 'growthPerDay' && key !== 'weekOrders'),
+          .filter((key) => key !== 'pressDay' && key !== 'growthPerDay' && key !== 'weekOrders' && key !== 'weekBookings'),
       ).toEqual([
         'buildingId',
         'contractId',
@@ -273,6 +275,45 @@ describe('a rung’s booked absence reaches the run, and no other rung’s does 
     const declaring = CONTRACT_LADDER.rows.filter((row) => row.fabric.incidents.length > 0).length;
     expect(issues.length).toBe(declaring);
     for (const issue of issues) expect(issue).toContain('takes car Z out of');
+  });
+});
+
+describe('a week booking is a car out on a named weekday, checked as a rung’s absence is (§ D1400)', () => {
+  /* Midtown's bookings replaced; the shipped rung's own car D is out every day from 0.25 to 0.5. */
+  const withBookings = (bookings: readonly Record<string, unknown>[]): typeof CONTRACT_LADDER => ({
+    ...CONTRACT_LADDER,
+    rows: CONTRACT_LADDER.rows.map((row) =>
+      row.contractId === 'c2' ? { ...row, weekBookings: bookings as unknown as typeof row.weekBookings } : row,
+    ),
+  });
+  const booking = { kind: 'maintenance', bankId: 'main', carId: 'C', fromFraction: 0, toFraction: 0.4, day: 1 };
+
+  it('refuses a weekend day, a car the bank lacks, a car booked twice on a day and the rung’s own car', () => {
+    const issues = contractLadderIssues(
+      withBookings([
+        { ...booking, day: 6 },
+        { ...booking, carId: 'Z' },
+        { ...booking, day: 2 },
+        { ...booking, day: 2 },
+        { ...booking, carId: 'D', day: 3 },
+        { ...booking, toFraction: 0, day: 4 },
+      ]),
+      validationInput(),
+    );
+    expect(issues.some((issue) => issue.includes('on day 6, and a booking falls on a weekday, 1 to 5'))).toBe(true);
+    expect(issues.some((issue) => issue.startsWith(`ladder row c2 books car Z out on day 1, and midtown-office's main has`))).toBe(true);
+    expect(issues.some((issue) => issue.endsWith('on day 2 twice; one car is booked once on a day'))).toBe(true);
+    expect(issues.some((issue) => issue.endsWith('a car the rung already takes out every day'))).toBe(true);
+    expect(issues.some((issue) => issue.includes('on day 4 and returns it at 0, at or before it leaves'))).toBe(true);
+  });
+
+  it('refuses bookings that, with the rung’s own absence, take every car in the bank on one day', () => {
+    const carIds = validationInput().carIdsFor('midtown-office', 'main') ?? [];
+    const others = carIds.filter((carId) => carId !== 'D').map((carId) => ({ ...booking, carId }));
+    const issues = contractLadderIssues(withBookings(others), validationInput());
+    expect(issues.some((issue) => issue.endsWith('takes every car in main that day'))).toBe(true);
+    /* One car fewer leaves a car in passenger service, and nothing is refused. */
+    expect(contractLadderIssues(withBookings(others.slice(1)), validationInput())).toEqual([]);
   });
 });
 

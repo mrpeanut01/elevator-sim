@@ -23,7 +23,7 @@
  *   between two decisions (the day's start and end count as decisions), and the part of it played at
  *   the watching rate because somebody had waited a minute.
  *
- * ## The trap check
+ * ## The trap check, published since wave AO
  *
  * Within the who-drives question, the answer whose run left the fewest riders waiting a minute over
  * the call's ten minutes is the one the row favours. An answer that is lowest on under
@@ -31,6 +31,13 @@
  * lowest on over {@link CADENCE_FORMULA_SHARE} is a formula (swarm DQ's player member). Ties count for
  * every answer tied lowest. It reads which answer is lowest only to say how often each is; nothing
  * the product shows reads it.
+ *
+ * **It no longer gates** — wave AO, lane DR-2, [§ D1440](../../../../DECISIONS.md), swarm DR's ruling
+ * Q2 item 1. The row's favourite lost the day about as often as it won (swarm DR's S1: on 20 of 55
+ * split rows every answer with the lowest count missed), so the check is judged on the day's verdict
+ * instead, on the weeks dealt from week 2 (`callBands.sweep.test.ts`, `shift/callBands.ts`). Here it
+ * is published beside the floors ({@link countTrapNotesOf}), with each who-drives row's verdict split
+ * ({@link verdictReadingOf}), on week 1, which DC-11 exempts and the bands do not read.
  */
 
 import type { DayCallAnswer, DayCallQuestion } from '../shift/dayCalls.js';
@@ -49,6 +56,18 @@ export interface CadenceCall {
   readonly atS: number;
   readonly question: DayCallQuestion | 'pinned';
   readonly counts: Readonly<Partial<Record<DayCallAnswer, number>>>;
+  /** Each answer's run graded with the day's goals, `true` cleared; absent where not graded. */
+  readonly clears?: Readonly<Partial<Record<DayCallAnswer, boolean>>> | undefined;
+}
+
+/**
+ * **The who-drives rows on the day's verdict** — published on week 1, never banded (§ D1440): how
+ * many rows split the day, and on how many of those *keep* missed while another answer cleared.
+ */
+export function verdictReadingOf(calls: readonly CadenceCall[]): { readonly rows: number; readonly split: number; readonly keepLoses: number } {
+  const rows = calls.filter((call) => call.question === 'driver' && call.clears !== undefined);
+  const split = rows.filter((call) => new Set(Object.values(call.clears ?? {})).size > 1);
+  return { rows: rows.length, split: split.length, keepLoses: split.filter((call) => call.clears?.leave === false).length };
 }
 
 /** One played weekday. */
@@ -144,10 +163,19 @@ export function cadenceMissesOf(summary: CadenceSummary): readonly string[] {
       misses.push(`crowd ${String(crowd)} had an evening call on ${String(evening)} of ${String(days)} weekdays`);
     }
   }
+  return misses;
+}
+
+/**
+ * **§ D1337's count check, published and not gated** — § D1440. Every who-drives answer lowest on
+ * under a tenth or over three fifths of the rows, in words; the sweep writes them beside the floors.
+ */
+export function countTrapNotesOf(summary: CadenceSummary): readonly string[] {
+  const notes: string[] = [];
   for (const [answer, share] of Object.entries(summary.driver.shares)) {
     if (share < CADENCE_TRAP_SHARE || share > CADENCE_FORMULA_SHARE) {
-      misses.push(`who drives: ${answer} was lowest on ${(share * 100).toFixed(1)} % of ${String(summary.driver.rows)} rows`);
+      notes.push(`who drives: ${answer} was lowest on ${(share * 100).toFixed(1)} % of ${String(summary.driver.rows)} rows`);
     }
   }
-  return misses;
+  return notes;
 }

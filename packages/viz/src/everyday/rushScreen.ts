@@ -54,6 +54,7 @@ import {
   RUSH_SCREEN_COPY as COPY,
 } from './rushScreenModel.js';
 import { rushStandingsOf, type RushPostedStandings, type RushYoursRowView } from './rushHouse.js';
+import type { RushDeviceStanding } from './rushDeviceBest.js';
 import { RUSH_PURSE } from './rushRebuild.js';
 import { mountWorkedAnswer } from './tutorialScreens.js';
 import {
@@ -214,6 +215,11 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
    * player has left draws nothing.
    */
   let posted: RushPostedStandings = { kind: 'silent' };
+  /*
+   * § D1420: on a build with no server, this device's kept sitting, replayed off this thread once per
+   * mount and drawn by {@link syncDriver} when the replay lands. Nothing is said until it does.
+   */
+  let device: RushDeviceStanding = { kind: 'silent' };
   let alive = true;
   const askedFor = context.host.selection().buildingId;
 
@@ -361,6 +367,7 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
       undefined,
       selection.dispatcherId,
       selection.buildingId === askedFor ? posted : { kind: 'silent' },
+      selection.buildingId === askedFor ? device : { kind: 'silent' },
     );
     standingsBody.replaceChildren();
     if (standings.kind === 'withheld') {
@@ -452,6 +459,12 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
       syncDriver();
     },
   );
+  /* § D1420: the device's kept sitting, replayed off this thread; `silent` on a build with a board. */
+  void context.host.rushDeviceBest(askedFor).then((answer) => {
+    if (!alive) return;
+    device = answer;
+    syncDriver();
+  });
 
   root.append(paper, ink);
   host.append(root);

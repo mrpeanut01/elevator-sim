@@ -18,6 +18,7 @@ import type { DayOutcome, GoalObservations, WeekState } from '../shift/types.js'
 import type { WatchRecord } from '../watch/types.js';
 import type { WeekRecord } from '../shift/weekRecord.js';
 import { weekUnderWayHarderLineOf } from '../shift/nextWeek.js';
+import { clockOf } from '../shift/report.js';
 import { closeDay, HISTORY_DAYS, openWeek, outcomeOf } from '../shift/week.js';
 
 import { GLOSSARY_TERMS } from '../mode/glossary.js';
@@ -534,5 +535,30 @@ describe('a later week, harder only where the house’s census fell — § D1344
       if (number === 1) expect(view.weekHarder).toBeUndefined();
       if (view.weekHarder !== undefined) expect(view.weekHarder).toMatch(/^Week \d is harder than week \d by the house’s measure: left alone/u);
     }
+  });
+});
+
+/*
+ * Wave AO, lane DS-1 (§ D1400): from week 3 the door names the cars the week's level books out, the
+ * new one marked, on the run's clock the screen hands it, and says nothing about difficulty.
+ */
+describe('a level’s bookings on the door — § D1400', () => {
+  const clock = (fraction: number): string => clockOf(fraction * 10 * 3600, 8 * 3600);
+  const doorOn = (number: number) =>
+    doorScreenViewOf({
+      week: { ...openWeek('c2'), week: number },
+      bookingClock: clock,
+      today: { ...TODAY, day: 1 },
+      dayOffset: 0,
+      dayClosed: false,
+      nameOf: NAME_OF,
+    });
+
+  it('names week 3’s Monday booking as new, and nothing in week 2', () => {
+    expect(doorOn(3).weekBookings).toBe(
+      'Booked this week: car C is out of passenger service on Monday from 08:00 until 12:00, new this week.',
+    );
+    expect(doorOn(2).weekBookings).toBeUndefined();
+    expect(doorOn(3).weekBookings).not.toMatch(/harder|easier/u);
   });
 });

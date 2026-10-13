@@ -14,10 +14,12 @@ import {
   NEXT_WEEK_LABEL,
   nextWeekOf,
   weekHarderOf,
+  weekBookingsLineOf,
   weekHarderSentenceOf,
   weekUnderWayHarderLineOf,
   type HouseWeekCensus,
 } from './nextWeek.js';
+import { clockOf } from './report.js';
 import type { DayOutcome, WeekState } from './types.js';
 import { closeDay, nextDay, openWeek, outcomeOf, rollWeek } from './week.js';
 import { weekOrderIndexOf } from './weekOrders.js';
@@ -218,10 +220,60 @@ describe('Midtown’s next week, as the census measured it', () => {
     expect(weekUnderWayHarderLineOf({ contractId: 'c2', week: 2 })).toBe(HARDER);
   });
 
-  it('deals week 3 the same order, and calls it nothing', () => {
-    expect(nextWeekOf(midtownWeek(2, HELD))?.line).toBe(
-      'You held week 2, so Start next week deals week 3, with the same wrinkles as this week.',
+  /*
+   * Wave AO, lane DS-1 (§ D1400, § D1401): from week 3 a held week deals the next level, the same
+   * order with one more car out. Red before: *with the same wrinkles as this week.*, nothing new.
+   */
+  it('deals week 3 the same order with car C out on Monday morning, and calls it nothing harder', () => {
+    expect(nextWeekOf(midtownWeek(2, HELD), WEEK_WAY, MIDTOWN_CLOCK)?.line).toBe(
+      'You held week 2, so Start next week deals week 3, with the same wrinkles as this week and one ' +
+        'more car out of passenger service: car C on Monday from 08:00 until 12:00.',
     );
     expect(weekUnderWayHarderLineOf({ contractId: 'c2', week: 3 })).toBeUndefined();
+    /* The house fell by one crowd's Monday, an interval that holds zero: no *harder*, and no *easier*. */
+    const reading = weekHarderOf('c2', 2, 3);
+    expect([reading?.from.cleared, reading?.to.cleared, reading?.harder]).toEqual([12, 11, false]);
+  });
+
+  it('deals week 4 with Tuesday’s booking beside Monday’s, and names on the door which one is new', () => {
+    expect(nextWeekOf(midtownWeek(3, HELD), WEEK_WAY, MIDTOWN_CLOCK)?.line).toBe(
+      'You held week 3, so Start next week deals week 4, with the same wrinkles as this week and one ' +
+        'more car out of passenger service: car C on Tuesday from 08:00 until 12:00.',
+    );
+    expect(weekBookingsLineOf({ contractId: 'c2', week: 3 }, WEEK_WAY, MIDTOWN_CLOCK)).toBe(
+      'Booked this week: car C is out of passenger service on Monday from 08:00 until 12:00, new this week.',
+    );
+    expect(weekBookingsLineOf({ contractId: 'c2', week: 4 }, WEEK_WAY, MIDTOWN_CLOCK)).toBe(
+      'Booked this week: car C is out of passenger service on Monday from 08:00 until 12:00; car C is out ' +
+        'of passenger service on Tuesday from 08:00 until 12:00, new this week.',
+    );
+    expect(weekBookingsLineOf({ contractId: 'c2', week: 2 })).toBeUndefined();
+    expect(weekBookingsLineOf({ contractId: 'c1', week: 4 })).toBeUndefined();
+  });
+
+  /*
+   * The census refuses week 5 (Thursday with car C out clears 7 of 20 under the chosen play), so
+   * week 4 is Midtown's last level. Red before: *deals week 5, with the same wrinkles*.
+   */
+  it('says Midtown deals no further week after week 4, and offers no Go on beside a week 4 not held', () => {
+    const held = nextWeekOf(midtownWeek(4, HELD), WEEK_WAY, MIDTOWN_CLOCK);
+    expect(held?.line).toBe(
+      'You held week 4. This tower deals no further week: Start next week deals week 5 as this week was ' +
+        'dealt, the same wrinkles and the same cars out, on new crowds.',
+    );
+    expect(held?.week).toBe(5);
+    const missed = nextWeekOf(midtownWeek(4, NOT_HELD), WEEK_WAY, MIDTOWN_CLOCK);
+    expect(missed?.line).toBe(
+      'This week’s target was not met, so Play week 4 again deals the same wrinkles and the same cars out ' +
+        'on new crowds. This tower deals no further week.',
+    );
+    expect(missed?.onward).toBeUndefined();
+    /* Week 5 is dealt week 4: its door names the same bookings and none as new. */
+    expect(weekBookingsLineOf({ contractId: 'c2', week: 5 }, WEEK_WAY, MIDTOWN_CLOCK)).not.toContain('new this week');
   });
 });
+
+/** Midtown's run clock: the office day starts at 08:00 and runs ten hours (`dayLength.ts#wholeDayFor`). */
+function MIDTOWN_CLOCK(fraction: number): string {
+  return clockOf(fraction * 10 * 3600, 8 * 3600);
+}

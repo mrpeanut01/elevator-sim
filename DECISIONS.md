@@ -36881,6 +36881,8 @@ Building that spend now would ship **a purchase that changes no run**: a wider p
 
 ## D611 — Stage 7 stops clearing from the dropdown, by moving its demand down; the bar follows the demand rather than being moved
 
+> **Status 2026-10-13: AMENDED by [§ D1426](#d1426).** Stage 7 runs at 2.25 %pop/5 min, where DC-12 holds on the census. See [`docs/39`](docs/39-decisions-in-force.md).
+
 **Date: 2026-09-15 · GitHub issue [#234](https://github.com/mrpeanut01/elevator-sim/issues/234) · Rules on: [`data/campaign.json`](data/campaign.json), `packages/viz/src/scenario/candidates.ts`, [`data/scenario-goals.json`](data/scenario-goals.json), `campaign/difficultyCurve.test.ts#DROPDOWN_CLEARS`, [`docs/33`](docs/33-difficulty-curve.md) § 3.3f and § 6 C2, [`docs/10`](docs/10-experience-layer-contract.md) M30.**
 
 **Why an entry.** [§ D405](#d405)'s second and third grounds: it moves something already recorded — [§ D520](#d520)'s pinned three-row register and `docs/10` M30's published cell — and it binds a `data/` file, a `.ts` constant and two documents that no one module owns.
@@ -41610,6 +41612,8 @@ The rest of the sweep, for the same reason — reported either way, because a nu
 
 ## D911 — the chimes loop closes for one sink in one mode with no account and no server: a device ledger that spends, and a scenario budget rung priced by the scenario
 
+> **Status 2026-10-13: AMENDED by [§ D1418](#d1418) and [§ D1419](#d1419).** Clause 6 is replaced: off an account the three ledger sinks are bought from the device tally for play on that device; and a stage sells a wider budget where the census says it adds a way through. See [`docs/39`](docs/39-decisions-in-force.md).
+
 **Date: 2026-09-22 · GitHub issue [#579](https://github.com/mrpeanut01/elevator-sim/issues/579) · Rules on: [`docs/38`](docs/38-what-the-game-is.md) §§ 2.1 and 2.4, [§ D711](#d711) clause 7 and its § 5, [§ D227](#d227), `packages/viz/src/everyday/deviceChimes.ts`, `packages/viz/src/everyday/chimeStore.ts`, `packages/viz/src/fixit/budgetRungs.ts`, `packages/viz/src/everyday/chimesPanel.ts`, `packages/viz/src/everyday/rail.ts`, `packages/core/src/config/chimeLedger.ts`, `data/fixit-cases.json`. Cites [§ D526](#d526), [§ D530](#d530), [§ D533](#d533), [§ D490](#d490), [§ D672](#d672), [§ D738](#d738), [§ D606](#d606), [§ D256](#d256), [§ D343](#d343), [§ D405](#d405).**
 
 **Why an entry.** All three of [§ D405](#d405)'s grounds. It binds modules in two packages that no one of them owns — `core`'s table projections, the viewer's device ledger, the fix-it screen, the Settings panel and the rail; it **moves something already recorded**, because [§ D711](#d711) clause 7 says in terms that the device ledger *does not spend*; and it answers a question two documents refuse to close without one.
@@ -43703,6 +43707,8 @@ This lane held **D1020–D1028** and spent **D1020 only**. D1021 to D1028 are un
 integrator registers them in `documentation.test.ts#KNOWN_DECISION_HOLES`.
 
 ## D1029 — the press becomes a call: the stage stops once at an instant it can name, a pin is admitted only over a window from it, and the day runs under its standing order until the call is answered
+
+> **Status 2026-10-13: AMENDED by [§ D1432](#d1432)** (an agent ruling). Before the answer the card states the goal nearest its bar and one line per answer saying what it is; nothing about an answer's effect on this crowd. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Status 2026-09-26: CARD EXTENDED by [§ D1206](#d1206), AND NO LONGER THE DAY'S ONLY STOP by [§ D1204](#d1204)** (agent rulings). The card also says who is standing at the call second; after the call is answered the day's ordinary calls open. See [`docs/39`](docs/39-decisions-in-force.md).
 
@@ -46753,6 +46759,8 @@ run differs after it.
 
 ## D1168 — no call once the day is lost, and *End the day*
 
+> **Status 2026-10-13: AMENDED by [§ D1435](#d1435)** (an agent ruling). The stage stops once on a card whose focused primary is *End the day*, and *Watch the rest* plays on at 30×. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-09-26 by agent sessions under delegated authority** (the decide-al swarm, ruling § Q1
 > clause 4, two of three; the player lens would raise the call and say so; built by wave AK lane
 > AK-D), not by the product owner. **Narrows [§ D371](#d371)** for one case, and amends
@@ -46787,6 +46795,8 @@ every call left, offers *End the day* (by 960 s on the run as built, measured in
 after it, and files a report that says when.
 
 ## D1169 — a scored day is paced by the tutorial's hold rule
+
+> **Status 2026-10-13: NARROWED by [§ D1435](#d1435)** (an agent ruling). A lost day plays the rest at the fast rung whoever waits, unless a chip is pressed after the loss. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Taken 2026-09-26 by agent sessions under delegated authority** (the decide-al swarm, ruling § Q1
 > clause 1, three of three; built by wave AK lane AK-D), not by the product owner. **Amends
@@ -46823,6 +46833,8 @@ now an upper bound rather than the longest day; the sixteen-contract re-measurem
 it the longest again was not taken in wave AK.
 
 ## D1176 — only contested days count toward a census week, and its target is derived: counted days dealt, minus one
+
+> **Status 2026-10-13: EXTENDED by [§ D1400](#d1400)** (an agent ruling). Clause 1's *as it is dealt* includes the week level's bookings: a booked day counts by the census row measured with its car out. The target rule is unchanged. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Status 2026-09-26: AMENDED by [§ D1179](#d1179) and [§ D1180](#d1180)** (agent rulings). A week that counts no day holds its scenario's clear with a reason that tells a refused day from an unmeasured one, replacing this entry's *cannot clear its scenario* line; and Midtown's week reads 4 of 5 as dealt since Tuesday's and Friday's wrinkles moved off the lunch peak. See [`docs/39`](docs/39-decisions-in-force.md).
 
@@ -47615,6 +47627,8 @@ a second card before the report.
 
 ## D1205 — calls across the whole day: two a peak, no question twice in ten minutes, and who drives asked again after a handover
 
+> **Status 2026-10-13: AMENDED by [§ D1444](#d1444)** (an agent ruling). Clause 3: after *keep who drives*, a later candidate in that peak asks who drives again and raises it only where its three runs' day verdicts differ. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Status 2026-09-26: EXTENDED by [§ D1265](#d1265)** (an agent ruling). The day's wrinkle, where it has a window clear of every peak, is searched like a peak and holds one call, which is not counted against the day's six. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Taken 2026-09-26 by agent sessions under delegated authority** (swarm DN, ruling § Q1(b): the
@@ -47913,6 +47927,8 @@ from the Engineer transport are not held to the attempt's reach.
 
 ## D1219 — each call's row on the stage once its window can be observed: counts only, never the day's verdict
 
+> **Status 2026-10-13: AMENDED by [§ D1433](#d1433)** (an agent ruling). From its due instant the row reads each answer's two final goals at the playhead and says a run could no longer clear once one reads past its bar. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-09-26 by agent sessions under delegated authority** (the decide-an swarm, ruling § Q1
 > clause (d), three of three; built by wave AL lane AL-E), not by the product owner, and to be read
 > as an agent ruling. **Amends [§ D1138](#d1138) clause 3** from *nothing about the other answers
@@ -48097,6 +48113,10 @@ malformed refused), `everyday/weekView.test.ts` and `everyday/host.test.ts` (a c
 
 ## D1231 — a Scenario week's counted day that clears pays `career-day-paid`, once
 
+> **Status 2026-10-13: AMENDED by [§ D1402](#d1402)** (an agent ruling, owner-reversible). *There is no award for a week* no longer holds for a held week: it pays `week-held`, 10 chimes, once per level of the tower's week. The days pay as here. See [`docs/39`](docs/39-decisions-in-force.md).
+
+> **Status 2026-10-13: AMENDED by [§ D1416](#d1416).** The day still pays once, and the turn now names it, so the same day posted again pays nothing at the server too. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-09-26 by agent sessions under delegated authority** (wave AL, lane AL-F, on swarm DN's
 > Q2 ruling, item 7, three of three; no separate week award, two of three). It makes true the premise
 > of [§ D533](#d533)'s second ruling, which is the product owner's, and changes neither ruling.
@@ -48178,6 +48198,8 @@ cases against the retired lines, which is its own control arm.
 
 ## D1234 — a clear at or under its par carries a mark, on fix cases and on cleared stages, and a free par is never marked
 
+> **Status 2026-10-13: AMENDED by [§ D1417](#d1417).** A clear that earns the mark pays 3 chimes once per stage or case; a free par still earns no mark and pays nothing. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Status 2026-10-10: AMENDED by [§ D1358](#d1358)** (an agent ruling). A free par is still never marked, and is now said on the line and the row; a cleared stage says why it earns no mark; the device keeps the cheapest clear; a fixed case and a cleared stage run again as practice. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Taken 2026-09-26 by agent sessions under delegated authority**, not by the product owner: the
@@ -48223,6 +48245,8 @@ par is the minimum over priced names, and absent without pricing), `everyday/sce
 reload, on the built bundle).
 
 ## D1235 — no earlier stage's whole set of ways through may clear a later stage, and stages 7 and 8 start on `zoned-uppeak` to meet it
+
+> **Status 2026-10-13: AMENDED by [§ D1426](#d1426).** Stage 7 keeps `zoned-uppeak` and moves to 2.25 %pop/5 min. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Taken 2026-09-26 by agent sessions under delegated authority**, not by the product owner: the
 > `decide-an` swarm's Q3 ruling item 2 (S1 and S2 on the criterion, S3's census as the
@@ -48359,6 +48383,8 @@ it. Shown red on a 130-word row added to each document.
 measurement of how much the lighter file changes a lane's cost, which is unmeasured.
 
 ## D1239 — the one attempt is final: the Engineer surface shows it only to its reach and never files it, and a close reads the week this device has stored
+
+> **Status 2026-10-13: NARROWED by [§ D1364](#d1364)** (an agent ruling). The attempt's reach never passes a call it is held at. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Status 2026-10-10: AMENDED by [§ D1361](#d1361)** (an agent ruling). The saved attempt belongs to one tab at a time: a tab that does not hold it shows the day no further, presses and files nothing of it, and takes it over only by a pressed *Continue ⟨day⟩ here*. See [`docs/39`](docs/39-decisions-in-force.md).
 
@@ -50240,6 +50266,8 @@ instant and not before.
 
 ## D1336 — a wrinkle asks who drives at its start, inside a peak too, admitted where the day's verdict differs, and a wrinkle that raised nothing says so after its window
 
+> **Status 2026-10-13: AMENDED by [§ D1434](#d1434)** (an agent ruling). A start admitted on the verdict alone with nobody standing at its second is not asked. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-10-10 by agent sessions under delegated authority** (swarm DQ, ruling Q1 item 4: the
 > start call and its ground are the engineering member's, measured, with the player member agreeing
 > on the question; the past-tense line is the honesty member's; reconciled by wave AN's integrator;
@@ -50307,6 +50335,8 @@ before, in one sentence.
 
 ## D1337 — the who-drives card never offers the house as a switch target, and no answer on it is a trap or a formula
 
+> **Status 2026-10-13: AMENDED by [§ D1440](#d1440) and [§ D1442](#d1442)** (agent rulings). The trap check is judged on the day's verdict on census crowds 0, 5, 10 and 15, the count check published beside it; the list is derived from `data/call-bands.json`. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-10-10 by agent sessions under delegated authority** (swarm DQ, ruling Q1 item 5: the
 > player member's, with the engineering member measuring the same fact; reconciled by wave AN's
 > integrator; built and measured by lane DQ-1), not by the product owner. A later reader weighing
@@ -50359,6 +50389,8 @@ ten. `everyday/callCadence.sweep.test.ts`, gated and scheduled: the check on the
 
 ## D1338 — the careful day's cadence on a correct build is a set of floors, held nightly
 
+> **Status 2026-10-13: AMENDED by [§ D1440](#d1440)** (an agent ruling). The floors are held on census crowds 0, 5, 10 and 15; their values stand. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-10-10 by agent sessions under delegated authority** (swarm DQ, ruling Q1 item 3: the
 > honesty and engineering members, with the player member agreeing that § D1138 stays; reconciled by
 > wave AN's integrator; built and measured by lane DQ-1), not by the product owner. A later reader
@@ -50404,6 +50436,8 @@ silent, no evening) misses all three floors.
 under Q2, which lane DQ-2 carries; nothing here moves it.
 
 ## D1343 — DC-11: from week 2 a week order is dealt only where no single shipped profile, left alone, holds its target on more than half of the census crowds
+
+> **Status 2026-10-13: AMENDED by [§ D1400](#d1400)** (an agent ruling, owner-reversible). Clause 4's sole order repeats from week 3 with one more booking a level, and stops at the tower's top; a level is admitted by a `data/week-dominance.json` row for the order with its bookings, and by the monotone clause. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Taken 2026-10-10 by agent sessions under delegated authority**, carrying out swarm DQ's Q2
 > rule 2 as wave AN's lane DQ-2, not by the product owner. The ruling is the swarm's; the shape
@@ -50464,6 +50498,8 @@ dealt, and one crowd of one shipped row re-run); `shift/weekOrders.test.ts` (the
 shipped orders' verdicts).
 
 ## D1344 — a held week deals the next week; a week not held deals itself again, with the next one press away; and the next week is called harder only where the house's census fell
+
+> **Status 2026-10-13: AMENDED by [§ D1400](#d1400)** (an agent ruling, owner-reversible). Clause 1 from week 3: a held week deals the next level, the same order with one more car booked out, only where the census admits it; where no level is left the sheet says the tower deals no further week, and clause 2's *Go on to week N* is not offered there. Clause 3 is read off the booked rows. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Taken 2026-10-10 by agent sessions under delegated authority**, carrying out swarm DQ's Q3
 > primary as wave AN's lane DQ-2, not by the product owner. The ruling decided what a held week
@@ -50570,6 +50606,8 @@ always-on test re-runs one crowd of one row, and the standing order's strings ar
 which `weekWay.verify.test.ts` re-runs weekly.
 
 ## D1351 — the close says what decided a day no call decided, from one more run: your driver, your presses, or nothing
+
+> **Status 2026-10-13: EXTENDED by [§ D1409](#d1409)** (an agent ruling). The career report says what decided a career day, graded on the contract's tests. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Taken 2026-10-10 by agent sessions under delegated authority** (swarm DQ, Q2 rule 3, three of
 > three, reconciled by wave AN's integrator; the mechanism is lane DQ-3's), not by the product owner.
@@ -50733,6 +50771,8 @@ window goes on asking after *Leave it to maintenance*) is unchanged and unmeasur
 
 ## D1358 — a par is said on every clear: a free par says it is free, a cleared stage says why it earns no mark, the cheapest clear is kept, and a fixed case or a cleared stage runs again as practice
 
+> **Status 2026-10-13: AMENDED by [§ D1417](#d1417).** Clause 6 is narrowed: a practice run that first meets a priced par pays the par award, once. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-10-10 by agent sessions under delegated authority** (wave AN, lane DQ-4), not by the
 > product owner: swarm DQ's Q3 ruling, its supporting payoffs (three of three on the shape), built
 > by this lane. **Owner-reversible**: the words of every arm; drawing the free par rather than nothing;
@@ -50834,6 +50874,8 @@ posted sitting. The row is pinned by its model, the route and the client, and
 `everyday/rush.browser.test.ts` still passes with the read in place (no server, so it says nothing).
 
 ## D1360 — while a scored attempt stands, every Everyday screen that would run its day or change how it runs only shows, and the shell runs that day only as the attempt
+
+> **Status 2026-10-13: AMENDED by [§ D1362](#d1362)** (an agent ruling). Before a scored day's attempt begins, the workshop's, the tuner's and the drawing board's runs are sandbox days on a practice crowd, and *Take this call again* and *Play this crowd* refuse on the day's own crowd. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Taken 2026-10-10 by agent sessions under delegated authority** (wave AO, lane AO-1, on the
 > post-AN panel's seat D, defect D1), not by the product owner, and to be read as an agent ruling;
@@ -50975,7 +51017,133 @@ stale run. A begin reads the slot fresh first, so the later of two begins finds 
 writes inside the same instant are not serialised by `localStorage`, and that race is not
 established.
 
+## D1362 — before a scored day's attempt begins, a run of its crowd from any door but *Start the day* meets a practice crowd, or is refused in words
+
+> **Taken 2026-10-13 by agent sessions under delegated authority** (wave AO, lane AO-1b, the
+> integration follow-up to lane AO-1, on the post-AN panel's seat D, D1 and D2), not by the product
+> owner, and to be read as an agent ruling; [§ D626](#d626) is the cautionary case. **Amends
+> [§ D1360](#d1360)**, whose hold bound only while an attempt stood, and **[§ D1368](#d1368)**'s
+> *What it does not reach*, which left the sandbox day free to play the day's crowd before the
+> attempt. Owner-reversible clauses: a practice crowd for the workshop, the tuner and the drawing
+> board rather than a refusal (clause 2); a fixed practice crowd per day rather than one drawn afresh
+> (clause 3); refusing *Take this call again* and *Play this crowd* rather than dealing them a
+> practice crowd (clause 4); and the words of the stage line, the sheet's note and the refusal.
+> **Not put to a swarm**: the lane had no way to spawn one, and the brief named the two readings.
+
+**Why an entry.** [§ D405](#d405)'s first two grounds. It moves two recorded rulings, adds a fifth
+practice ground beside [§ D1141](#d1141)'s, [§ D1218](#d1218)'s and § D1368's, and binds
+`shift/scoredCrowd.ts`, `shift/banking.ts`, `shift/report.ts`, `everyday/host.ts`, `dev/main.ts`,
+`everyday/designerScreen.ts` and the honesty register.
+
+**What was wrong.** § D1218 begins the attempt at *Start the day*, and § D1360 holds every other
+door only while an attempt stands. Before it begins, the workshop's *Run a day with this* and a
+sandbox day from *Change it anyway* still played the scored day's shared crowd, so a player could
+run each driver on it, read which cleared, and then press *Start the day* with the answer known.
+The workshop's run stood on the week itself, so its close would also have banked the day.
+
+**What the three rulings imply.** § D1218 makes the attempt the only run of the day the week banks
+and starts it at *Start the day*; § D1360 and [§ D1323](#d1323) refused every other run of the day
+while it stands, because a different crowd still rehearses the call's timing at a held call. Before
+the attempt nothing is held: the call has not been met, the brief already states the day's wrinkle
+and its hour, and the answer key is the shared crowd under each driver. So the crowd is what must not
+be rehearsed, and a practice crowd keeps the workshop and the sandbox usable, which the brief asked
+for where the rulings allowed it.
+
+**The ruling.**
+
+1. **A day that has not begun** is a scored week day on which *Start the day* would begin an
+   attempt: a week on a scenario, the day not closed, no attempt standing, and the crowd the one it
+   banks on (`dev/main.ts#dayWouldBeginOn`, the condition `beginDayAttempt` now reads too).
+2. **On such a day the workshop's run, the tuner's sandbox and the drawing board's run are a sandbox
+   day on a practice crowd** (`everyday/host.ts#runSandboxDay`): the week is parked and put back on
+   leaving, exactly as § D1368 does, and the crowd is swapped after the day's shape is read, so the
+   practice day is the shared day's length. The stage says *This run does not count toward the week:
+   it is a sandbox day on a practice crowd, not the day's shared one, and your week is where you left
+   it* (`PRACTICE_DAY_SENTENCES.practiceCrowd`), and the close says `PRACTICE_REHEARSAL_NOTE`.
+3. **The practice crowd is the shared crowd's digits behind a 9**
+   (`shift/scoredCrowd.ts#practiceCrowdOf`): one digit longer than the shared crowd, so never it, and
+   never a date, a crowd derived from a date or a pinned day, all of which begin with the year. It is
+   fixed for the day and drawn from no random source.
+4. ***Take this call again* and *Play this crowd*** exist for one crowd in particular, so on the
+   crowd an unbegun day counts on they refuse with `shift/banking.ts#DAY_NOT_BEGUN_HOLDS_ITS_CROWD`.
+5. **Only *Start the day* plays the day's own crowd before the attempt**, and it begins the attempt.
+
+**What holds it.** `everyday/attemptDoors.test.ts` drives every held door before the attempt as well
+as during it: a door that runs runs a sandbox day on the practice crowd and never the day's, a refusal
+is in words, an editor write still writes, and only `playDay` runs the shared crowd; and every held
+door that runs asks the question in its own body. Against `c5f57a9`'s host two of its eight cases
+fail (*startRun ran the day's own crowd*). `shift/scoredCrowd.test.ts` (the practice crowd is never a
+shared one; the ground), `shift/report.test.ts` (the note), `everyday/sandbox.test.ts` (the ground on
+a sandbox day, legs differing from the shared crowd's), and `everyday/attemptRoutes.browser.test.ts`'s
+first case on the built bundle: the workshop's run before *Start the day* carries the practice line,
+begins no attempt, *‹ Brief* finds the brief unchanged, and *Start the day* then begins the attempt on
+the day's own crowd.
+
+**What it does not reach.** The Engineer surface's own run of the week's day before *Start the day*
+is still free, as § D1323 and § D1218 named: its close banks the day when no attempt stands, so it is
+an Engineer road to the week rather than a rehearsal door, and refusing it would take Engineer play
+of the week away; it is listed for the owner. A posted run of today's crowd on the board can still be
+watched (§ D1360's *What it does not reach*). A practice crowd still rehearses the day's wrinkle and
+growth on another crowd, which the brief already states.
+
+## D1363 — the drawing board's *Run a day in it* is a sandbox day
+
+> **Taken 2026-10-13 by agent sessions under delegated authority** (wave AO, lane AO-1b, on lane
+> AO-2's finding), not by the product owner, and to be read as an agent ruling. **Extends
+> [§ D1368](#d1368)** clause 1 from the tuner to the drawing board. Owner-reversible clause: that the
+> drawn tower runs the week's day (its crowd, its length, its wrinkle) rather than a free day on no
+> scenario. **Not put to a swarm**, as § D1362.
+
+**Why an entry.** It extends a recorded ruling to a screen that ruling did not reach, and binds
+`everyday/designerScreen.ts` and `everyday/host.ts`.
+
+**What was wrong.** *Run a day in it* applied the drawn tower through `applyBuildingSpec`, whose
+`withBuilding` stood the player's own week on `SANDBOX_CONTRACT_ID`; the save wrote that week, and a
+reload opened the week on Garden Apartments, the fault § D1368 fixed for the tuner.
+
+**The ruling.** The press hands the drawn tower to `EverydayHost.runSandbox` (`everyday/sandbox.ts`),
+which saves it to the shelf, runs the week's day in it over the week, and puts the week back when the
+player leaves the stage and the report. Before the day's attempt it meets the practice crowd
+(§ D1362), and while an attempt stands it refuses in § D1360's words, quoted under the plate.
+
+**What holds it.** `everyday/sandbox.test.ts` (a drawn tower, the standing one widened and the blank
+board, simulates on Midtown's whole day and the save writes the week) and
+`everyday/attemptRoutes.browser.test.ts`'s second case: a designed day runs, the page reloads, and the
+stored week is on Crown Hotel's first day with nothing filed and no sandbox week stored.
+
+**What it does not reach.** *Save as a new building* still applies through `applyBuildingSpec`, so a
+reload after a save with no run still opens on the sandbox contract's week; that press is the
+designer's own statement that *the next run stands on it*, and it is listed rather than changed here.
+
+## D1364 — the attempt's reach never passes a call it is held at
+
+> **Taken 2026-10-13 by agent sessions under delegated authority** (wave AO, lane AO-1b, on lane
+> AO-3's trace), not by the product owner, and to be read as an agent ruling. **Narrows
+> [§ D1239](#d1239)** clause 1's reach and [§ D1218](#d1218) clause 2's *furthest instant the stage
+> has shown*. Owner-reversible clause: putting a stored reach back on the call when the call is found
+> after the frame that passed it, rather than leaving it where the frame had drawn.
+
+**Why an entry.** It narrows two recorded rulings and binds `shift/attempt.ts` and `dev/main.ts`.
+
+**What was wrong.** The Engineer surface showed about three seconds of a held call's unanswered
+branch (2:40:16 against a call at 2:40:13): the stage noted its reach from the frame it drew, which at
+a fast chip is past the call before the stop puts the playhead back on the call second, and the
+Engineer transport is held at that reach.
+
+**The ruling.** While a call stands unanswered on the attempt's run (the pinned call until answered or
+skipped, else the ordinary call the session is asking or has raised, which the stage waits at either
+way), the reach goes no further than its second, and a reach already past it is put back on it
+(`shift/attempt.ts#attemptShownToHeld`, `dev/main.ts#heldCallAtS`). The Engineer transport is held at
+the lesser of the reach and the call. Once the call is answered the reach moves on as before.
+
+**What holds it.** `shift/attempt.test.ts` (never past a held call, put back where it was, unchanged
+with none held) and `everyday/attemptRoutes.browser.test.ts`'s third case at the fastest chip but one:
+stopped at the call, the stored reach is within a second at or before the call, and the Engineer
+playhead scrubbed to its end is at or before it.
+
 ## D1368 — a sandbox day runs the day with the player's changes, over the week and never on it
+
+> **Status 2026-10-13: AMENDED by [§ D1362](#d1362) and EXTENDED by [§ D1363](#d1363)** (agent rulings). Before the day's attempt begins a sandbox day meets a practice crowd, and the drawing board's *Run a day in it* is a sandbox day too. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Taken 2026-10-10 by agent sessions under delegated authority** (wave AO, lane AO-2, on the wave
 > brief's item for the post-AN panel's seat D, D3 and D7), not by the product owner, and to be read as
@@ -51708,3 +51876,808 @@ length the screen states*.
 
 **Not established.** *About 7-12* is measured on the pinned first-day towers only; a later week on a
 reference tower can run longer, which the hub says and the menu tile does not.
+
+## D1400 — from week 3 a held week deals the next level: the same order with one more car booked out of passenger service on a named morning, dealt only where the census admits it, and a tower with no level left says so
+
+> **Taken 2026-10-13 by agent sessions under delegated authority** (wave AO, lane DS-1, carrying out
+> swarm DS's reconciled Q1 ruling), not by the product owner. The ruling is the swarm's; the shapes
+> below that it did not fix are the lane's. A later reader weighing this against a product-owner
+> ruling should treat it as an agent ruling and say so; [§ D626](#d626) is the cautionary case.
+> **Owner-reversible**: the booking vocabulary (a whole car, out from the start of the day to 0.4
+> of the run); the monotone clause, and reading it per profile; *no further week*, and withdrawing
+> *Go on* at the top; and counting the week number on past the top.
+
+**Why an entry.** [§ D405](#d405)'s first and second grounds. It amends [§ D1344](#d1344) clauses 1
+and 2 and [§ D1343](#d1343) clause 4 (what a held week deals after week 2, and the sole order's
+repeat), extends [§ D1176](#d1176) clause 1's *as it is dealt* to the week's bookings, adds a field
+to `data/contract-ladder.json`, `data/week-way.json` and `data/week-dominance.json`, and binds
+`dev/state.ts#shiftRunConfigOf`, `shift/calendar.ts`, `shift/week.ts`, `shift/weekStake.ts`,
+`shift/nextWeek.ts`, the week's sheet and the door, none of which `shift/weekLevels.ts` owns.
+
+**What was wrong.** Midtown dealt week 1's draw and then `midtown-early-lift` every week after it
+([§ D1345](#d1345)), and the sheet of every held week from the second said *the same wrinkles as
+this week*. Swarm DS found, three of three, that no new week 3 can be built from the wrinkle
+library: S3 measured that every buildable order DC-11 admits deals `lift-service:early` on
+Wednesday, and S2 that of 324 weeks from the measured cells 16 pass DC-11, all on the line, none
+harder than week 2. A held week bought nothing a player could see.
+
+**The members, and how they split.** S1 (player) ruled for a week booking stacked through the
+rung's `incidents`, measured on `midtown-week-2`: car C out from 08:00 to 12:00 on Monday and
+Tuesday cut the strongest single profiles from 15, 14 and 12 holds to 9, 11 and 7, both booked days
+still at DC-10's line. S2 (honesty) ruled for a ladder of levels, each stacking one measured load on
+the counted day with the most headroom, never measurably easier. S3 (engineering) ruled for
+raising the week's target to every counted day from week 3. The ruling took S1's and S2's
+mechanism and refused S3's target as `docs/38` § 4's *difficulty setting that moves a bar*; it also
+refused tenant ramps (S1 measured 10 % more tenants breaking Friday at 4 and 1 clears) and more than
+one new booking per level.
+
+**The rule** (`shift/weekLevels.ts`).
+
+1. **A level.** Week `n ≥ 3` is the order the cycle deals that week with the rung's first `n − 2`
+   week bookings (`ContractLadderRow.weekBookings`). A booking is one car out of passenger service
+   on one weekday, written in the rung's own incident vocabulary (kind, bank, car, the fractions of
+   the run it leaves and returns) plus `day`, 1 to 5, declared with its bounds
+   (`WEEK_BOOKING_DAY_BOUNDS`, invariant 8) and checked by `contractLadderIssues` with every rule a
+   rung's absence meets, and one more: the bank keeps a car on that day once the rung's own absences
+   and every booking on the day are counted. Level `n` carries the first `n − 2`, so bookings
+   accumulate and never shrink by construction.
+2. **Where a booking goes.** On the day with the most room: among the weekdays with no booking yet,
+   the one whose census row (with the bookings it inherits) has the most held-out clears for the
+   chosen play, the earlier on a tie. `weekLevelIssues` refuses a ladder that authors one anywhere
+   else, and `dev/data.ts` lists it as a load warning beside the orders'.
+3. **When a level is dealt.** Only where all three hold: DC-10 admits every day as the level deals
+   it, each booked day read off a `data/week-way.json` row measured with exactly that day's
+   bookings (`weekWayRowFor` matches on them, the ordinary fallback included); DC-11 admits the
+   week, read off a `data/week-dominance.json` row for the order with those bookings; and **the
+   monotone clause**: no shipped profile, left alone, holds it on more crowds than it held the week
+   before. The ruling's sentence allows *no single profile* to be read of the strongest only or of
+   each; the lane reads it of each, the stricter, owner-reversible. The first level refused or
+   unmeasured ends the ladder, so a level above it is never dealt.
+4. **The top, and the number.** The highest week dealt is the tower's top (`weekTopOf`): week 1 on a
+   tower with no admitted order, week 2 on one with an order and no admitted level. A tower that
+   cycles admitted orders and authors no booking keeps [§ D1343](#d1343)'s cycle and has no top; no
+   shipped tower is that tower today, and the arm is there so the rule cannot stop the next one's
+   orders. A week numbered
+   above the top is dealt the top (`dealtWeekOf`), on every reader at once: the run's bookings
+   (`weekBookingsOn`), the day's wrinkle (`calendar.ts#scheduledEventFor` through
+   `levelWrinkleIdFor`), the week's deal and its cache, and the house's census. The number itself
+   still counts on with each held week, as [§ D1394](#d1394) counts it on a week the census does
+   not deal; the lane's first draft capped it at the top and § D1394's own test refused that.
+5. **The run reads it.** `dev/state.ts#shiftRunConfigOf` takes the day's bookings from the week by
+   default and adds them to the rung's own absences, so the run, the brief's strip, the tomorrow
+   card, the calls and the house's run read one composition; a run on no rung (Free Play, Endless, a
+   career day on its own week) never meets one.
+6. **The words.** The held week's sheet names the booking the next level adds, *with the same
+   wrinkles as this week and one more car out of passenger service: car C on Monday from 08:00
+   until 12:00*, on the run's clock the screen hands it (`dev/state.ts#PlannedDay.lengthS` and
+   `startOfDayS`), and the door names the week's bookings with the new one marked
+   (`everyday-door-week-booked`). *Harder* is said only by [§ D1344](#d1344) clause 3's paired
+   house measure, now read off the booked rows; on the shipped census it falls by one crowd's
+   Monday from week 2 to week 3 and one crowd's Tuesday from week 3 to week 4, an interval holding
+   zero, so neither sheet says harder, and nothing says easier.
+7. **No further week.** Where the census deals the tower's week and no level is left above it, the
+   held week's sheet says *This tower deals no further week: Start next week deals week 5 as this
+   week was dealt, the same wrinkles and the same cars out, on new crowds*, and a week not held
+   there offers no *Go on to week N*: the next number would deal this week again, and a press that
+   promises the next week would promise one that does not exist. The onward tower (`nextTower.ts`,
+   [§ D1259](#d1259)) is offered beside a held week as before; on the shipped census no tower above
+   Midtown passes it, so Midtown's top offers none, as S1 recorded. Other towers enter at their own
+   week 1 and are never called harder than Midtown (S3 measured them easier by the house, 50 and 31
+   of 100). A week the census does not deal keeps [§ D1394](#d1394)'s words.
+
+**What it refuses.** A tighter target or bar by week (`docs/38` § 4); tenants rising by week; two
+new bookings in one level; and a level dealt on argument where the census has no row.
+
+**Tests**, red before and green after. `shift/weekLevels.test.ts` (twelve cases: the shipped levels
+and the top; the monotone clause, DC-11 and an unmeasured screen each moved and the verdict
+following; a booking placed off the day with the most room refused). `shift/weekBookingReachesTheRun.test.ts`
+(the control and the run: week 3's Monday stands car C down from 0 to 0.4 of the run and moves the
+legs, its Tuesday is week 2's run leg for leg, week 5 deals week 4, Free Play books nothing; red
+before, no booking reached the run). `shift/nextWeek.test.ts` (the sheet's level, Tuesday's
+booking and the door, and no further week; red before on *with the same wrinkles as this week.*).
+`shift/ladder.test.ts` (the booking schema's refusals), `everyday/doorView.test.ts`,
+`everyday/weekView.test.ts`, and `shift/weekStake.test.ts`'s § D1394 case, which refused the capped
+number.
+
+## D1401 — the census of Midtown's first levels: car C booked out on Monday morning, then Tuesday, both dealt; Thursday refused, so Midtown tops out at week 4
+
+> **Taken 2026-10-13 by agent sessions under delegated authority** (wave AO, lane DS-1, under
+> [§ D1400](#d1400)), not by the product owner. The measurements are the census's; which car,
+> which window, and the one extra window tried on Thursday are the lane's choices.
+> **Owner-reversible**: the booking (car C, from the start of the day to 0.4 of the run, 08:00 to
+> 12:00 on Midtown's office day) and keeping the refused Thursday booking authored.
+
+**Why an entry.** [§ D405](#d405)'s second ground: it authors three week bookings in
+`data/contract-ladder.json`, three booked rows in `data/week-way.json` and two level rows in
+`data/week-dominance.json`.
+
+**How it was measured.** Every cell is one weekday of `midtown-early-lift` on Midtown Office at its
+growth, with car C booked out from 0 to 0.4 of the run beside the rung's car D, on DC-10's protocol
+(`WEEK_WAY_BOOKINGS` on the census command, the default stage for the DC-10 row and
+`WEEK_WAY_STAGE=profiles` for the thirteen-profile screen on the twenty held-out crowds). The
+census ran on a frozen copy of the tree, one vitest process and one worker at a time, detached.
+1 732 whole days in all: 660 on 2026-10-10 (Monday's DC-10 row and screen, Tuesday's DC-10 row), and
+1 072 on 2026-10-13, 12 of them a smoke. The smoke re-ran six crowds of Monday's screen on the
+integrated base for two profiles and reproduced all twelve marks, and Tuesday's screen, taken on the
+base, reproduced the standing order's string its 2026-10-10 DC-10 row carries, mark for mark. The
+rows were copied by script, row for row.
+
+**What it found.**
+
+1. **Placement.** Week 2 as dealt clears Monday on 20 of 20 crowds under its chosen play, Tuesday
+   19, Thursday 15, Wednesday and Friday 12 each, so the bookings fall Monday, Tuesday, Thursday.
+2. **Week 3 (Monday booked) is dealt.** DC-10: 15 of 20 under the chosen play (Fairness first, a
+   spread at a fifth of the day), the standing order missing 16. DC-11: Predictive balanced holds
+   it on 10 of 20, exactly half, Fairness first on 9, no other profile above 7. Monotone: no profile
+   rose (Predictive balanced 10 against 10, Fairness first 9 against 9, five fell).
+3. **Week 4 (Tuesday booked too) is dealt.** DC-10: Tuesday 12 of 20, on the line. DC-11:
+   Predictive balanced 8, Fairness first 6. Monotone: no profile held it more often than week 3, and
+   seven held it less often.
+4. **Week 5 (Thursday booked too) is refused.** DC-10: Thursday 7 of 20. A shorter morning, car C
+   from 08:00 to 10:00, read 5 of 20, and Wednesday and Friday with the 08:00 to 12:00 booking read 0
+   and 2: no weekday has room left. Week 4 is Midtown's top. The Thursday booking stays authored,
+   refusal readable, as [§ D1345](#d1345) keeps refused orders; the two other days and the shorter
+   window are recorded here only.
+5. **Harder.** The house, left alone, cleared 12 of week 2's 100 weekdays, 11 of week 3's and 10 of
+   week 4's; each step is one crowd, and the paired interval holds zero, so neither level is called
+   harder.
+
+**Not done.** No second car, no other window on Monday or Tuesday, and no level on another tower:
+no other tower deals an order, so none has a week 2 to build on.
+
+## D1402 — a held week pays 10 chimes, once per level of a tower's week, through the ledger with the level as its turn key
+
+> **Taken 2026-10-13 by agent sessions under delegated authority** (wave AO, lane DS-1, carrying out
+> swarm DS's Q1 award: S1 and S3 for 10 chimes, S2 for one flat award), not by the product owner.
+> It amends [§ D1231](#d1231)'s *there is no award for a week*, which carried swarm DN's two of
+> three. **Owner-reversible**: the figure, and paying a tower's week 1 and week 2 as levels too.
+> **Owner-reserved under [§ D533](#d533)**: whether a Scenario turn pays at all.
+
+**Why an entry.** [§ D405](#d405)'s first and second grounds: it adds a completion to `core`'s
+closed vocabulary and a source to `data/chime-ledger.json`, and binds the server's earn route and
+bounds, the device's tally and the host's close.
+
+**The rule.** The close that closes a Scenario week, where its target was met, posts `week-held`
+with a `key`: the tower and the week as dealt, `c2/3` (`weekLevels.ts#weekLevelAwardKeyOf`),
+never past the levels the rung authors, so a tower whose weeks cycle orders with no booking pays its
+week 2 once.
+The ledger pays it `earn-week-held`, 10 chimes, flat. The level is the turn key: on the device
+`core`'s `chimeTurnKeysOf` keys it and `withTurn` records it once, and on the server
+`chimes/ledger.ts#earnCompletion` writes it with that key, so the store refuses a second entry in
+the statement that writes it, the mechanism a scenario clear already uses. A level held again, or a
+week numbered past the top that is dealt the top again, pays nothing more, so a run of held weeks
+buys nothing by its length ([§ D1253](#d1253) stays a record). The server bounds the key by the
+authored ladder (`weekLevelKeysOf`): week 1 on every rung, week 2 where a rung authors an order,
+and one week per authored booking, so a hand-built request can claim at most the levels a ladder
+authors, each once. Each counted day that cleared still pays `career-day-paid` as before.
+
+**Lane DS-3's turn keys.** DS-3 adds a turn key to every award, `career-day-paid` included. This
+award is written as a keyed ledger entry on the mechanism that exists on this lane's base, so DS-3's
+general mechanism can key it without a change of shape. At integration it joined
+[§ D1416](#d1416)'s `CHIME_KEYED_COMPLETIONS`: its composer is `core`'s `weekLevelTurnKeyOf`, its
+shape is in `KEYED_TURN_SHAPES`, and a key outside `weekLevelKeysOf`'s set is refused as
+`unknown-key`.
+
+**Tests**, red before and green after: `everyday/host.test.ts` (a held week posts `week-held` keyed
+`c2/1` once, on its closing day; a week not held posts none; red before, nothing beyond the days);
+`everyday/deviceChimes.test.ts` (a level held twice records once, another level pays again);
+`packages/server/src/chimes/ledger.test.ts` (once per account per level, a key the ladder does not
+author refused, and the bounds read off the shipped ladder).
+
+## D1408 — a career day with an event raises the Scenario day's own calls, graded on the contract's tests; an ordinary career day raises none, and a call pays nothing
+
+> **Taken 2026-10-13 by agent sessions under delegated authority** (swarm DS, ruling Q2: opening the
+> path three of three, the event-day scope S1's and S2's against S3's every day; built by wave AO lane
+> DS-2), not by the product owner. A later reader weighing this against a product-owner ruling should
+> treat it as an agent ruling and say so. **Extends [§ D1138](#d1138)** and its amendments
+> ([§ D1166](#d1166), [§ D1205](#d1205), [§ D1265](#d1265), [§ D1336](#d1336)) from the Scenario's
+> scored days to a career day with an event. **Owner-reversible**: the event-day scope, a breakdown
+> counting as an event, and grading on the contract's tests.
+
+**Why an entry.** [§ D405](#d405)'s first ground: it binds `dev/main.ts#dayCallOnStage`,
+`everyday/host.ts`, `everyday/stageScreen.ts` and the new `everyday/careerCalls.ts`, and moves where
+§ D1138's calls are asked.
+
+**What was wrong.** The post-AN re-panel's seat C played 22 career days and every one offered a single
+press, the dock's *Let the day run as it is*. Two gates kept the Scenario's calls off every career day:
+`dev/main.ts#dayCallOnStage` refused any week whose contract the Scenario does not know (the career's
+week names none), and the stage asked for a call on the daily context alone. Swarm DS's S3 named the
+first; the second was found building it.
+
+**The ruling.**
+
+1. **A career day with an event asks.** An event is `campaign/incidents.ts#campaignEventFor`'s answer
+   where it changes something about the day: a calendar booking, a breakdown, or the building's own
+   drawn wrinkle. The host hands the shell that day's calls (`careerCalls.ts#careerDayCallsOf`), and
+   the shell opens the same session (`dev/dayCallSession.ts`) with the same admission, caps, spacing
+   and cards as a Scenario day.
+2. **An ordinary career day asks nothing.** § D1301 measured 361 of Garden Apartments' 400 crowd-days
+   cleared under every one of the thirteen drivers, so an ordinary day's call would move ten minutes
+   and never the day (S1, S2). S3's every-day scope is refused for that reason, as the ruling records.
+3. **Graded on the contract's tests.** The session reads its runs' verdicts against
+   `campaignModel.ts#campaignTestGoals` at the tower's difficulty, the four tests the career files the
+   day on, so the verdict ground, the day-lost stop and the close speak about the career's mark.
+4. **A call costs nothing and pays nothing.** An answer adopts a run the session already made; no
+   unit leaves the purse, and the day's mark pays as it did.
+
+**Measured** (Garden Apartments, base `424242`, the opening career on Conventional collective, every
+call answered *leave*, one base and one driver, so counts and no rate): 9 of the contract's 20 days
+carry an event; 3 of those raise a call (day 7's caterers one, day 17's booked move-in one, day 20's
+all-hands three); days 16 and 19 are ordinary and the same session, if asked, would raise one call
+each, so on those days the gate is what keeps the stage quiet.
+
+**Tests.** `everyday/careerCalls.test.ts` (red with the host's hand-in removed: day 17's call was never
+raised): the rule; through the host on real runs, day 16 hands nothing and a session on it would still
+raise a call, day 17 hands the contract's tests and its who-drives call is raised, the answer moves no
+unit, and the purse after the close is the reducer's for that mark. `everyday/careerCalls.browser.test.ts`
+on the shipped bundle: day 16's skip runs to the end with no card, day 17's stops at the move-in's
+card, which is answered, and the report carries the account (§ D1409).
+
+**A seam left standing, said.** The career's report sheet grades its own verdict line and its call
+rows on the Scenario day's goals, as it did before this entry (§ D1395 moved the month grid, the
+calendar and the purse to the career's mark, not the sheet). The account § D1409 adds says which tests
+it reads, so the two cannot be mistaken for one figure; moving the sheet's own verdict is another
+lane's.
+
+## D1409 — the career report says what decided the day, from the day's calls and one or two more runs, graded on the contract's tests
+
+> **Taken 2026-10-13 by agent sessions under delegated authority** (swarm DS, ruling Q2's *the career
+> report adds § D1351's what decided the day*, three of three; built by wave AO lane DS-2), not by the
+> product owner. A later reader weighing this against a product-owner ruling should treat it as an
+> agent ruling and say so. **Extends [§ D1351](#d1351)** to a career day, where clause 3's *adds
+> nothing where the census does not speak for the tower* had kept it silent. **Owner-reversible**: the
+> runs at a career close, the house's driver as the one swapped in, and the words.
+
+**Why an entry.** It extends a recorded ruling to another mode and binds `everyday/careerCalls.ts`,
+`everyday/host.ts#closeDay`, `reportView.ts`, `reportScreen.ts` and the honesty corpus.
+
+**The ruling.**
+
+1. **The call line** is `shift/dayClose.ts#decidingCallOf` over the day's calls, graded on the
+   contract's tests and worded *a cleared day on the contract's tests* or *a missed day on the
+   contract's tests*.
+2. **Where no call decided the day**, § D1351's arms in its order (`careerCalls.ts#careerDeciderOf`):
+   the driver run (the day run by the house's driver, Conventional collective, in place of the player's
+   standing order, every press kept) and the house (that driver with nothing pressed), each made from
+   the day's own state at the close (its seed, event, kit and the works' held cars, none of which a
+   Scenario record carries) and graded on the contract's tests. *Your standing order did*, *your
+   presses did*, *nothing you chose decided it either*, *still being run* and *not said* are the arms.
+3. **No ranking and no forecast.** Each arm states the runs it read on this crowd.
+
+**Tests.** `everyday/careerCalls.test.ts`: every arm, the need read off the day, both runs planned from
+the day, and through the host the line on day 17's sheet withdrawn once another run stands; the
+browser case reads it on the shipped bundle once the house's run lands. Every arm is seeded in the
+honesty corpus (`honesty/surfaces.ts#seedCareerClose`).
+
+## D1440 — the gates on who drives move onto census crowds 0, 5, 10 and 15, and are judged on the day's verdict rather than the row's count
+
+> **Taken 2026-10-13 by agent sessions under delegated authority** (swarm DR, ruling Q2 item 1: the
+> crowds S3's, the verdict three of three; built by wave AO lane DR-2), not by the product owner. A
+> later reader weighing this against a product-owner ruling should treat it as an agent ruling and
+> say so. **Amends [§ D1337](#d1337) clause 2 and [§ D1338](#d1338)'s gate.** No floor's value moves.
+> **Owner-reversible**: the crowds, and the count check published rather than gating.
+
+**Why an entry.** It moves two recorded rulings' gate and binds `everyday/callCadence.*`,
+`.github/workflows/deep-tiers.yml` and `deepTiers.test.ts`.
+
+**What was wrong.** § D1337's trap check and § D1338's floors read census crowds 0 to 3, the census's
+easy end: the careful line cleared 20 of 20 days there against 82 of 100 over all twenty (swarm DR's
+S3), and the check read the row's ten-minute count, whose favourite lost the day on 20 of 55 split
+rows (S1).
+
+**The ruling.** The cadence floors (a median of four calls a day, no silent weekday, an evening call
+on three of five) are held nightly on week 1 at crowds 0, 5, 10 and 15. § D1337's count check is
+published beside them and gates nothing, with each who-drives row's verdict split published too. The
+gate on who drives is the day's verdict, on the weeks dealt from week 2, which is [§ D1441](#d1441).
+
+**Measured** on this lane's tree, with § D1442's offer and § D1444's amendment in
+(`everyday/callCadence.sweep.test.ts`, crowds 0, 5, 10 and 15, twenty days): the median day raised 4 calls (from 1 to 7), no weekday raised none, and crowds 0, 5, 10 and 15 had an evening call on 5, 3, 3 and 4 of their five weekdays, so every floor holds, crowds 5 and 10 on it. The careful line cleared 16 of the 20 days, where it cleared 20 of 20 on crowds 0 to 3 (§ D1338). The longest silence was 3.9 real minutes at the median and 9.6 at the longest. Published and not gated: of 67 who-drives rows the count was lowest under the pair's first on 14.9 %, under its second (Capacity aware for a Fairness first player since § D1442) on 59.7 % and under *keep* on 38.8 %, so no answer stands outside a tenth to three fifths; on the day's verdict 16 of the 67 rows split the day and *keep* lost 7.
+
+## D1441 — keep can be wrong, checked nightly on the day's verdict: the call bands on every week dealt from week 2
+
+> **Taken 2026-10-13 by agent sessions under delegated authority** (swarm DR, ruling Q2 item 2: the
+> two profiles S1's, the keep band where S1's and S2's overlap, the floor S1's, the ceiling S3's;
+> built by wave AO lane DR-2), not by the product owner. A later reader weighing this against a
+> product-owner ruling should treat it as an agent ruling and say so. **Owner-reversible**: the band of
+> a fifth to three fifths, the floor of one in five, the ceiling of two thirds, which two profiles they
+> are read under, and the crowds.
+
+**Why an entry.** [§ D405](#d405)'s first ground: it adds `data/call-bands.json`, a scheduled tier
+(`call-bands`) and a load-time warning in `dev/data.ts`, and its rows decide the offer list
+(§ D1442) and a line on Your week (§ D1443).
+
+**The ruling.** For every week order a tower deals from week 2, under each of the two profiles DC-11
+shows holding that week on the most crowds (`weekDominance.ts#bandedProfilesOf`: Predictive balanced
+with 10 holds, Fairness first with 9, on `midtown-early-lift`), the careful line (that profile at the
+brief, *keep* who drives, *park* the cars) is played through the shipped session on census crowds 0, 5,
+10 and 15, and every offer candidate the card does not offer is run beside each raised who-drives call.
+Among who-drives calls whose card answers split the day:
+
+1. *keep* is the losing answer on at least a fifth and at most three fifths;
+2. every switch target on the card clears on at least one in five;
+3. no answer on the card clears on more than two thirds.
+
+The rows are pinned in `data/call-bands.json` and the nightly job requires them exactly; the bands are
+arithmetic over them (`shift/callBands.ts`), held on every run by `shift/callBands.test.ts` on a fixture
+built from S1's figures (13 of 25 in, 3 of 18 out; 5 of 25 in, 2 of 18 out). A miss is a finding for a
+ruling, never a moved band.
+
+**Measured** (`midtown-early-lift`, crowds 0, 5, 10 and 15, this lane's tree, § D1442's offer and
+§ D1444 in): under Predictive balanced, 63 who-drives calls, 14 of them splitting the day: *keep* lost 7 and cleared 7, Fairness first cleared 6 and Capacity aware 7, so every band holds. Under Fairness first, 62 calls, 20 splitting the day: *keep* lost 13, over three fifths, Predictive balanced cleared 16, over two thirds, and Capacity aware 5, on the floor. Beside the card, Energy aware would have cleared 2 of the 14 and 5 of the 20, and Minimum estimated wait 2 and 6. The careful line cleared 13 of 20 days under Predictive balanced and 12 of 20 under Fairness first. So the ruling's *today* moved with § D1442 and § D1444: the week now misses under Fairness first and passes under Predictive balanced, where the ruling, measured with Energy aware offered, read the reverse for the keep band.
+
+**What the base list measured, for the record** (the same census with § D1337's list, Energy aware
+offered, before § D1442 and § D1444): under Fairness first, 59 who-drives calls, 21 split, *keep*
+lost 9, Predictive balanced cleared 20 and Energy aware 2 on the card, Capacity aware would have
+cleared 10 and Minimum estimated wait 8; under Predictive balanced, 68 calls, 21 split, *keep* lost 2
+and cleared 19, Fairness first cleared 16 and Energy aware 1 on the card, Capacity aware would have
+cleared 15 and Minimum estimated wait 4.
+
+## D1442 — the who-drives offer is derived from the census: a candidate under the floor is not offered
+
+> **Taken 2026-10-13 by agent sessions under delegated authority** (swarm DR, ruling Q2 item 3: S1 and
+> S2, Capacity aware first for Energy aware's place S1's; built by wave AO lane DR-2), not by the product
+> owner. A later reader weighing this against a product-owner ruling should treat it as an agent ruling
+> and say so. **Amends [§ D1337](#d1337) clause 1's owner-reversible list.** **Owner-reversible**: the
+> candidates and their order, and the floor.
+
+**Why an entry.** It replaces a recorded ruling's list and changes the card a player on a contender
+meets.
+
+**The ruling.** `shift/dayCalls.ts#DAY_CALL_DRIVER_OFFER` is `shift/callBands.ts#driverOfferOf` over
+the shipped census: the protocol's candidates in order (Fairness first, Predictive balanced, Capacity
+aware, Energy aware, Minimum estimated wait) less every candidate that clears the day on under one
+split who-drives row in five on a row where it was measured, offered or run beside the card. A
+candidate the census has not placed keeps its place. The house is not a candidate.
+
+**Today**: the census leaves Fairness first, Predictive balanced and Capacity aware. Energy aware is under the floor under Predictive balanced (2 of 14 split rows) and so is Minimum estimated wait (2 of 14), so a player on the house is offered Fairness first and Predictive balanced, a player on Fairness first Predictive balanced and Capacity aware, and a player on Predictive balanced Fairness first and Capacity aware. The derivation is a fixed point: the census taken with § D1337's list dropped the same two (Energy aware 1 of 21 and Minimum estimated wait 4 of 21 under Predictive balanced), and the census taken with the derived list drops them again, so the pinned rows are the rows the shipped list makes.
+
+**Tests.** `shift/callBands.test.ts` (the derivation on the fixture, and the shipped list equal to it,
+no house); `dev/dayCallSession.test.ts`'s re-derived pair reads the list rather than naming it.
+
+## D1443 — DC-13: a week dealt from week 2 says on Your week whether it passes the call bands in play, and the player's record with each driver is shown
+
+> **Taken 2026-10-13 by agent sessions under delegated authority** (swarm DR, ruling Q3: DC-13 S1's
+> check, named here because swarm DS took DC-12; the record S2's; built by wave AO lane DR-2), not by
+> the product owner. A later reader weighing this against a product-owner ruling should treat it as an
+> agent ruling and say so. **Adds DC-13 to `docs/33`**, beside DC-11. **Owner-reversible**: stating
+> the miss on Your week, the incumbent kept dealt, and the record's wording.
+
+**Why an entry.** It adds a criterion to `docs/33` and binds `everyday/weekView.ts`, `weekScreen.ts`
+and the honesty corpus.
+
+**The ruling.** Your week draws, on a week dealt from week 2, `callBands.ts#weekBandsLinesOf` over the
+week's order: one line saying the week misses the check and is dealt with the miss stated, and one per
+banded profile that misses, naming each bound it missed with the census's own counts; or one line that
+it passes. Week 1's draw and an unmeasured order draw nothing. `midtown-early-lift` misses today and
+stays dealt, because refusing it would deal week 1's draw again ([§ D1343](#d1343)). Your week also
+draws the player's record with each driver this week (`weekView.ts#driverRecordLinesOf`): for each
+driver picked at a brief, the counted days it started and how they came out, from this device's filed
+days and never from a census. *Started*, because a call or a press may hand a day on.
+
+**Today, on Midtown's week 2**: *This week misses the census’s check on its who-drives calls, and is dealt with the miss stated.* and *With Fairness first picked and every who-drives call kept, over 4 census crowds, 20 of 62 who-drives calls split the day: keeping the driver lost 13 of them, over the three fifths the check allows; Predictive balanced cleared 16 of them, over the two thirds the check allows any one answer.*
+
+**Tests.** `shift/callBands.test.ts` (the miss line word for word on a fixture, the passing line, and
+nothing for week 1 or an unmeasured order); `everyday/weekView.test.ts` (Midtown's week 2 from the
+shipped census, nothing on week 1; the record over a week of three drivers, an ungraded day left out).
+
+## D1444 — after *keep who drives*, a peak asks who drives again where the day hangs on it: § D1205 clause 3 amended
+
+> **Taken 2026-10-13 by agent sessions under delegated authority** (swarm DR, ruling Q2 item 4: S2's
+> diagnosis, S3's adoption of the verdict ground; built by wave AO lane DR-2), not by the product
+> owner. A later reader weighing this against a product-owner ruling should treat it as an agent ruling
+> and say so. **Amends [§ D1205](#d1205) clause 3.** Two a peak, ten minutes between repeats, six a day
+> and § D1138's admission elsewhere all stand. **Owner-reversible**: the amendment.
+
+**Why an entry.** It amends a recorded ruling in writing and binds `dev/dayCallSession.ts`.
+
+**What was wrong.** § D1205 clause 3 closed the driver question for the rest of a peak once *keep* was
+answered, and swarm DR's honesty member found the census's lost days inside those very peaks (crowd
+14's Thursday: *keep* at 12:33 with the worst wait at 267 of 400 s, the day lost at 12:37, nothing more
+asked).
+
+**The ruling.** After *keep* in a peak, a later candidate in that peak may ask who drives again, and
+raises it only where its three runs' day verdicts differ ([§ D1336](#d1336)'s ground, read the same
+way: whether they differ, never which is ahead); the ten-minute counts alone raise nothing there.
+Without the day's goals no verdict can raise it, so no run is made. Elsewhere admission is as before:
+the verdict ground stays a wrinkle start's alone outside a kept peak. S3 measured extending it to every
+who-drives candidate; the ruling's item names clause 3, so this entry takes that clause and no more.
+
+**Measured** (on `midtown-early-lift`, crowds 0, 5, 10 and 15, the careful line under both banded profiles, 40 days, with § D1442's offer in both runs, `c5f57a9`'s session against this one: who-drives calls raised went from 58 to 62 under Fairness first and from 60 to 63 under Predictive balanced. Eight calls were added, each splitting the day, as the ground requires, and *keep* was the losing answer on 4 of them; one who-drives call later in a Predictive balanced day was no longer raised, a consequence of the added one that this lane did not trace. No day's verdict moved under the careful line, which keeps at every call. S3 measured 3 added over 17 days with *keep* losing 2, with the ground extended to every who-drives candidate. Placement calls are not in the census rows, so a placement call an added one displaced is not counted here).
+
+**Tests.** `dev/dayCallSession.test.ts`, three cases on a synthetic three-peak day with the day's
+goals: a second who-drives call in the kept peak, ten minutes on, where the pair's first misses the day
+and *keep* clears it (red on `c5f57a9`: one call in that peak); none where the verdicts agree though the
+counts differ (the control); none, and no run, without the day's goals.
+
+## D1416 — every award pays once under a turn key, and a contract day is keyed by the day it names
+
+> **Taken 2026-10-13 by agent sessions under delegated authority** (wave AO part 2, lane P2-4), not by
+> the product owner: swarm DS's Q3 ruling on S2's integrity finding (M7), built by this lane.
+> **Owner-reversible**: the shape of the two day keys.
+
+**Why an entry.** [§ D405](#d405)'s first and second grounds. It binds `core`'s
+`config/chimeLedger.ts`, the server's `chimes/ledger.ts` and `http/api.ts`, and the viewer's
+`everyday/deviceChimes.ts` and `everyday/host.ts`, and it amends [§ D1231](#d1231), whose pay it keys.
+
+**What was wrong.** The server paid `career-day-paid` on every post, because the turn carried nothing
+that could tell a second day from one day posted twice.
+
+**The ruling.**
+
+1. **One rule for every award**: a ledger writes an entry for each key a turn names that it has not
+   yet paid under the same completion (`chimeTurnKeysOf`). A scenario's key is its id, a rush's are
+   the waves it outlasted, a par's is its scenario, and a contract day's is the day it names.
+2. **A contract day names itself**: a Career day as tower, month, contract day and career day
+   (`careerDayTurnKeyOf`), and a Scenario week's counted day as its contract and the crowd it was
+   dealt (`weekDayTurnKeyOf`). Every day still pays; the same day posted again pays nothing.
+3. **Keyed completions are general.** `CHIME_KEYED_COMPLETIONS` lists the completions paid under a
+   composed key. Each carries `{ completion, key }` on the wire, the route reads `key` for every
+   member, and the ledger refuses a key whose shape no composer writes (`KEYED_TURN_SHAPES`) or whose
+   contract `data/contract-ladder.json` does not hold (`unknown-key`). A held level (swarm DS's Q1)
+   joins by adding its id, a composer, a shape and a ledger source, with no route or store change.
+4. A device record of version 1 keeps its day rows under their old count keys, which no composed key
+   equals, so they are read and never paid again.
+
+**Tests**, red before and green after: `server/chimes/ledger.test.ts`'s *pays a contract day once
+however often the same day is posted* and its refusal case, `server/http/api.test.ts`'s *pays a
+contract day once when the same day is posted twice* (red: two posts paid twice),
+`core/config/chimeLedger.test.ts`'s four turn-key cases, `everyday/deviceChimes.test.ts`'s day cases,
+`everyday/host.test.ts`'s keyed week day and `everyday/chimeTurns.browser.test.ts`'s Career day key.
+
+## D1417 — a clear at or under a priced par pays 3 chimes, once per stage or case
+
+> **Taken 2026-10-13 by agent sessions under delegated authority** (wave AO part 2, lane P2-4), not by
+> the product owner: swarm DS's Q3 ruling (S3's figure; S1 proposed 4 and S2 a flat award once).
+> **Owner-reversible**: the figure, 3.
+
+**Why an entry.** It amends [§ D1234](#d1234) (*the mark pays nothing*) and [§ D1358](#d1358)
+clause 6 (*it pays nothing new*), and binds `data/chime-ledger.json`, the server's ledger and the
+stage and fix-it screens.
+
+**The ruling.**
+
+1. A new completion, `scenario-at-par`, pays `earn-scenario-par`, 3 chimes, flat, keyed by the
+   scenario. It is filed where `scenario/par.ts#parMarkOf` draws a mark, so a free par, no par and a
+   clear above the par pay nothing. A practice run that first meets the par pays it then, once.
+2. The server pays a par only to an account its scenario's clear has been paid to (`not-cleared`),
+   and the host files the par after the clear's own answer, so two posts in flight cannot arrive in
+   the wrong order. Whether the clear was at par is believed within that bound, as a clear is.
+3. Every par line ends with one sentence, `scenario/par.ts#PAR_PAYS_LINE`: *Matching it or beating
+   it pays 3 chimes, once.* The stage page's pay line says the par award on the clear that banked it.
+
+A par is the price of a configuration and never a figure a run measured, so [§ D526](#d526) clause 2
+holds.
+
+**Tests**: `everyday/stagePlay.test.ts`'s *a clear at or under a priced par pays once* (three cases),
+`server/chimes/ledger.test.ts`'s par cases (paid once, only after the clear),
+`everyday/deviceChimes.test.ts`'s par case and `menu/client.test.ts`'s wire case.
+
+## D1418 — with no server or no sign-in, the three ledger sinks are spent from the device tally, for play on that device
+
+> **Taken 2026-10-13 by agent sessions under delegated authority** (wave AO part 2, lane P2-4), not by
+> the product owner: swarm DS's Q3 ruling, three of three. **Owner-reversible**: the device spends.
+
+**Why an entry.** It replaces [§ D911](#d911) clause 6 (*the three ledger sinks are untouched and stay
+refused off an account*) in writing, amends `docs/38` § 2.4's *still need an account*, and binds
+`everyday/deviceChimes.ts`, `chimeStore.ts`, `host.ts`, `chimesPanel.ts`, `settingsView.ts`,
+`settingsScreen.ts`, `campaignModel.ts`, `rushSitting.ts` and `dev/main.ts`.
+
+**The ruling.**
+
+1. With no server, or with one and nobody signed in, `career-purse-top-up`, `rush-prefit` and
+   `rush-purse-top-up` are bought from this device's tally (`deviceChimes.ts#withSinkSpend`) at the
+   ledger's own price and step cap. The device record goes to version 2, which reads version 1.
+2. A career top-up lands in this device's career through the reducer an account's lands through; a
+   rush modifier starts this device's sittings.
+3. **Integrity stays at the post.** A sitting started with a device purchase is never offered for
+   posting (`RUSH_SITTING_COPY.boughtOnDevice`), and the server's post route refuses any modifier the
+   account did not buy ([§ D671](#d671)), which `server/http/api.test.ts` now proves for a sitting
+   claiming both rush sinks.
+4. **Settings and the chimes panel say it plainly**: off an account each row is buyable from this
+   device and says that what it buys stays on this device, and the panel's home line says a run using
+   it is kept here and never posted. The row that read *bought against your account, so signing in is
+   what makes this one spendable* is deleted rather than reworded ([§ D227](#d227)). The Career's
+   opening page says the same of the top-up.
+
+**Tests**: `everyday/chimesPanel.test.ts`'s *off an account, sells all three from this device* (red
+on the base: three `unavailable` rows) and its cap, desk and shortfall case;
+`campaign/purseTopUpReachesTheRun.test.ts`'s device arm (the grant lands and the legs are the account
+arm's, red on the base: `no-server`); `everyday/rushDeviceBest.test.ts`'s device pre-fit (the tower is
+fitted, the legs move, and the post is refused with its reason); `everyday/deviceChimes.test.ts`'s sink
+cases; `server/http/api.test.ts`'s device-bought sitting.
+
+## D1419 — a stage sells a wider budget from the device tally only where the survivor census says it adds a way through
+
+> **Taken 2026-10-13 by agent sessions under delegated authority** (wave AO part 2, lane P2-4), not by
+> the product owner: swarm DS's Q3 ruling (S2 and S3; S1's *every authored rung* refused).
+> **Owner-reversible**: selling only rungs that add survivors.
+
+**Why an entry.** It amends [§ D911](#d911)'s *it is still exactly true of these ten stages* (no
+screen sells a stage a wider budget), and binds `everyday/stagePlay.ts` and `stagePlayScreen.ts`.
+
+**The ruling.** `stagePlay.ts#stageRungsOf` sells a rung where the pinned survivor count at it exceeds
+the count at the rung below, read off `data/scenario-survivors.json` on every draw and never written
+down. On the census this tree pins that is the equipment rung on stages 1, 2 and 8. Every other rung
+is drawn with its measured reason (*the census found N ways through at it, the same as at M units, so
+it would buy no new way through*). A sold rung is bought from this device's tally on the record a fix
+case's rung uses, and the stage is then pressed at that budget. A clear at a bought rung pays exactly
+what a clear at the base pays, once, and the verdict says the budget it was run at. A rung bought and
+later unsold by a regenerated census is still stood on. The Scenario hub's row says the same: it prices
+the rungs the page sells and gives the census's reason on a row that sells none
+(`scenario/ladder.ts#budgetLineOf`), and *"Nothing sells a wider budget for these ten"* is deleted
+rather than reworded ([§ D227](#d227)). The row's open note says a stage opens at a rung this device
+bought and that the first clear at par pays more.
+
+**Tests**: `scenario/ladder.test.ts`'s *prices on the budget line exactly the rungs the stage page
+sells*, and `everyday/stagePlay.test.ts`'s three § D1419 cases: the sold set equals the census's
+answer in both directions, a raised count in a copy of the census sells a rung, and on a found stage a
+page choice the base refuses runs at the bought rung, moves the legs, and leaves the run plan carrying
+no budget. Red on the base: `stageRungsOf` did not exist and every press used the base rung.
+
+## D1420 — on a build with no rush board, the device keeps its best sitting per tower and draws its replayed last round among the house's rows
+
+> **Taken 2026-10-13 by agent sessions under delegated authority** (wave AO part 2, lane P2-4), not by
+> the product owner: swarm DS's Q3 ruling (S3's form). **Owner-reversible**: the device row.
+
+**Why an entry.** It extends [§ D1359](#d1359) to a build with no server, and binds
+`everyday/rushDeviceBest.ts`, `rushDeviceStore.ts`, `rushHouse.ts`, `rushScreen.ts`, `host.ts` and
+`dev/main.ts`.
+
+**The ruling.**
+
+1. At each round's settle, on a build with no rush board, the host keeps the sitting's causes (the
+   body a server would replay) as the tower's best on this device when its last round held longer
+   than the kept one's. Only a sitting whose rounds could all travel, and whose last round crossed
+   the line, is kept.
+2. **No stored figure is drawn.** The setup screen asks `EverydayHost.rushDeviceBest`, which replays
+   the kept sitting's last round off this thread (its dispatcher, rules and log, at the fit its claims
+   and rebuilds fold to, on the rush's one seed) and reads the hold line off that recording. Only the
+   last round is replayed, because a sitting ranks on it and its tower needs no earlier simulation.
+3. The row is tagged *yours, on this device* and placed among the house's rows by § D1359's rule,
+   under a line saying it was posted nowhere, no server checked it, and it is ranked against nobody.
+   A served build draws § D1359's row and never this one.
+
+**Tests**: `everyday/rushDeviceBest.test.ts`, ten cases on the row: the replay of a sitting built from the
+house's own garden cell holds exactly where the house table says, a hand-edited figure moves nothing
+drawn, a rebuild before the last round reaches its replay, the host keeps a played sitting only with
+no board, and the row and its lines. Red on the base: none of it existed.
+
+**Not established.** The replay runs once per visit to the setup screen; its cost on the largest
+tower in a browser was not measured.
+
+## D1424 — DC-12, a carried answer does not clear: from path position 3 a stage's base-rung ways through share no name with an earlier stage's and include no bare dropdown pick
+
+> **Taken 2026-10-13 by agent sessions under delegated authority** (wave AO part 2, lane P2-4), not by
+> the product owner: swarm DS's Q4 ruling, three of three on a census criterion. **Owner-reversible**:
+> whether DC-12 reads any earlier survivor or only each earlier stage's par configuration, and the
+> exemption of positions 1 and 2.
+
+**Why an entry.** It adds a criterion to `docs/33` (§ 3.3h) beside DC-10 and DC-11 and a register,
+`scenario/carriedAnswers.test.ts#CARRIED_ANSWERS`, that later rebalances must empty.
+
+**The ruling.** From path position 3, a stage's base-rung survivors on the pinned census must number
+at least one, share no configuration name with an earlier stage's base-rung survivors, and include no
+shipped profile picked by name alone. A drawn dial (`edit-<n>`) is never carried, since the name is a
+position in one cell's draw. The census's named configurations only, at the base rung only.
+
+**The reading taken, and why.** The ruling's text says *at least one survivor that clears no earlier
+stage and is not a bare dropdown pick*, and its register (stages 3, 6, 7 and 8 failing, 5 and 9 as
+dropdown breaches) is derived only by the stronger reading: stages 6, 7 and 8 each held one fresh
+survivor beside their carried ones, and stage 5's second survivor is not a bare pick. Every swarm
+member wrote the rule as *shares no configuration name*. So the test reads it that way, and says so.
+
+**The register**, checked in both directions with no simulation: stages 3, 6, 7 and 8 carried; 5 and
+9 named dropdown breaches ([§ D1288](#d1288) for 9); 4 and 10 held for no way through. Stage 7 leaves
+it with § D1426.
+
+**Tests**: `scenario/carriedAnswers.test.ts`, seven cases, among them red on a new carried answer
+and red on a registered stage that stops breaking.
+
+## D1425 — fix-it as-built lines name the tenant's symptom, held by a word test derived from each case's patch
+
+> **Taken 2026-10-13 by agent sessions under delegated authority** (wave AO part 2, lane P2-4), not by
+> the product owner: swarm DS's Q4 ruling. **Owner-reversible**: the symptom word families and every
+> new line's words.
+
+**Why an entry.** It replaces PM-FB2's examples (*cars standing together, doors held*) in writing,
+and binds `data/fixit-cases.json` and `fixit/parse.ts`, which now refuses a line at load time.
+
+**The ruling.** A case's `symptom` has people, or a place where people stand, as its subject, and
+names no machinery, no setting its as-built patch writes and no figure. `fixit/parse.ts#symptomLeverIn`
+derives the word families from the patch (dwell, parking, banks and car counts, tenancy, weighing,
+assignment) and `symptomFigureIn` reads figures in words as well as numerals (*eleven seconds*).
+Sixteen lines are new: the union of the members' lists (S1 fifteen, S2 sixteen, S3 fourteen) and the
+test's own fifteen. Two stand.
+
+**Each new line was checked against the as-built morning it describes.** Fifteen of them end on a
+contrast (*while the lower floors get away*), and on each case's own as-built morning the journeys
+outside the complaint's scope boarded under its threshold for 92.7 % to 100 % of boarders
+(`fixit/run.ts#morningReadingOf`'s `restAwayPct`, run 2026-10-13). On `let-faster-than-the-lifts`
+it was 75 % of 12, so that line drops its contrast and reads *a crowd waiting in the lobby*.
+
+**Tests**: `fixit/symptomNamesNoLever.test.ts` (red on the sixteen old lines, with *doors held* kept
+red on a dwell case) and `fixit/parse.test.ts`'s refusal cases.
+
+## D1426 — stage 7 moves to 2.25 %pop/5 min and meets DC-12; stage 8 was measured at forty-one demands and stays registered
+
+> **Taken 2026-10-13 by agent sessions under delegated authority** (wave AO part 2, lane P2-4), not by
+> the product owner: swarm DS's Q4 rebalance of stages 7 and 8, by demand and never by a goal (DC-R1).
+> **Owner-reversible**: stage 7's demand.
+
+**Why an entry.** It amends [§ D611](#d611)'s and [§ D1235](#d1235)'s stage 7 demand of 1.25 %pop/5
+min, and binds `data/campaign.json`, `scenario/candidates.ts`, `data/scenario-goals.json`, the
+survivor census and four registers.
+
+**Stage 7.** At 2.25 the census names two base-rung ways through, `destination-eta-parked-lobby` and
+`predictive-balanced-parked-zone-center`, neither an earlier stage's nor a bare pick, so DC-12 holds.
+Of the dropdown only `predictive-balanced` meets every bar on the tuning crowds, and the holdout
+refuses it (DC-2's register goes from three names to one). Two of 63 is inside the 5 to 7 band
+(0 to 0.15), where 11 of 63 was above it. The goals are re-measured, not moved: `answer-the-demand`
+29/50, 22/50 and `long-waits-under` 36/50, 32/50, both still batch goals. 17 of 63 configurations
+now refuse a mean somewhere, and the brief's first line says some settings refuse to stand behind
+their numbers.
+
+**Measured as a point and said so.** Screens at 1.1, 1.15, 1.2, 1.3, 1.65, 1.7, 1.8, 1.9, 2.1, 2.2,
+2.3 and 2.4 each found a carried answer clearing on these seeds (with the earlier lane's 0.75 to 1.6,
+2.0 and 4.0), so DC-12 holds at 2.25 on the pinned seeds rather than over a range of demand.
+
+**Stage 8 is not rebalanced.** Rate alone, eleven demands from 0.75 to 7: `eta-parked-lobby` (stage
+2's) clears from 1.5 to 7, and nothing at all clears at 0.75 or 1. A directional split, thirty cells
+at rates 2 to 6: with 68 % or more of trips arriving a lobby answer clears, with 55 % or fewer stage
+1's `eta-parked-zone-center` does, and between them the answer changes from cell to cell, three cells
+clearing nothing. Two cells pass DC-12 (3 at 0.65/0.20/0.15, base survivor `edit-7`; 2 at 0.62/0.18/0.20, `edit-7` and
+`edit-11`). Both pass only because the holdout refuses about twenty configurations that meet every bar
+on the tuning crowds, five of them bare picks, which would enter stage 8 into DC-2's register; their
+neighbours a step away fail. So stage 8 stays registered, the split field built to carry a stage's
+demand shape was withdrawn because no shipped stage would call it, and the cells are in this lane's
+report for the next wave.
+
+**Tests**: `scenario/carriedAnswers.test.ts` with stage 7's row deleted, `campaign/difficultyCurve.test.ts`
+and `scenario/survivorBands.test.ts` with stage 7's rows moved, against the regenerated census.
+
+**Not established.** Whether a carried answer is always this close to clearing on Midtown's up-peak;
+twelve demands is a screen, and nothing here measures the distance.
+
+
+## D1432 — before the answer the call card states the goal nearest its bar and what each answer is, and nothing ahead
+
+> **Taken 2026-10-13 by agent sessions under delegated authority** (swarm DR, ruling § Q1 item 1,
+> three of three on the shape: S1 the player lens, S2 honesty, S3 engineering and measurement;
+> reconciled by wave AO's integrator; built by lane DR-1), not by the product owner, and to be read as
+> an agent ruling. **Amends [§ D1029](#d1029)**'s fourth refusal, *nothing on the card describes either
+> one's effect*, to *nothing on the card describes an answer's effect on this crowd*, and **extends
+> [§ D1206](#d1206)** by one fact. Owner-reversible clauses: the nearest-bar line and which goals it
+> may name; that a driver's line is generated from its weights rather than authored (S1's `cardLine`
+> was the alternative); the three car orders' lines.
+
+**Why an entry.** [§ D405](#d405)'s first two grounds: it moves a recorded ruling about what the card
+may say, and binds `everyday/stageCall.ts`, `everyday/stageScreen.ts` and the honesty register.
+
+**What was wrong.** The post-AN panel (seats A and B) met cards that stated the present and offered
+three buttons with nothing to reason from: who the drivers were, what an order sets, or which of the
+day's goals stood near its bar. Swarm DR measured that the card's own row then taught the wrong
+lesson (§ D1433).
+
+**The ruling.**
+
+1. **The goal graded on a maximum that stands nearest its bar**, the deepest landing or the longest
+   wait, whichever reading is the larger share of its bar, with the reading and the bar:
+   *Nearest its bar: the longest wait so far is 252 s, against a bar of 380 s*
+   (`stageCallNearestBarLineOf`, the rail's own readings at the call second, identical off all three
+   runs). A goal the rail reads as pending is not named; the share goals are not named.
+2. **One line per answer saying what it is.** A driver's is what its profile weighs, heaviest first,
+   by `core`'s player names, three named and the rest counted (`stageCallDriverLineOf`), from the
+   vector the handover hands the day to, so it cannot drift; the keep answer carries the line of the
+   driver driving. A profile's authored blurb is not used, because several state effects. A car
+   order's line says what it sets (`STAGE_CALL_ANSWER_LINES`).
+3. **Refused, as by all three members:** cleared or missed under each answer, an effect, a cause, or
+   what a driver would do now. S3 measured that the nearest-bar reading did not predict the right
+   answer on its 18 split rows, so the next panel says whether these lines help.
+
+**What holds it.** `everyday/stageCall.test.ts`: landing 13 of 24 and wait 252 of 380 s name the wait,
+22 of 24 names the landing, a pending wait is never named; every shipped profile's line is derived
+from its weights, carries no engine id and moves when a fixture weight moves; the card's ban lists and
+a forward-word list hold on every new line. Red before: the functions did not exist.
+
+## D1433 — after the answer each call's row reads the day's two final goals at the playhead, and the close names where the count's favourite missed
+
+> **Taken 2026-10-13 by agent sessions under delegated authority** (swarm DR, ruling § Q1 items 2
+> and 3, three of three; built by lane DR-1), not by the product owner, and to be read as an agent
+> ruling. **Amends [§ D1219](#d1219) clause 2** (*never the day's verdict*) for one fact: a run whose
+> maximum reads past its bar could no longer clear, said only once it reads so. **Extends
+> [§ D1138](#d1138) clause 3's** report row by one sentence. Owner-reversible clauses: the readings
+> line and its minute grid; *could no longer clear*; the count's label; the close's sentence and the
+> reading that it is said only where the three answers split the day.
+
+**Why an entry.** It amends two recorded rulings and binds `shift/dayCalls.ts` (the record gains
+`maxima`), `shift/dayCallMaxima.ts`, `dev/dayCallSession.ts`, `everyday/stageCallRow.ts`,
+`everyday/host.ts`, `everyday/stageScreen.ts`, `shift/report.ts` and the honesty register.
+
+**What was measured.** The answer with the fewest one-minute waits missed the day on 10 of 21
+deciding rows (S2), 14 of 22 split rows (S3) and on 20 of 55 split rows every lowest-count answer
+missed (S1). On 8 of 22 split rows the readings at the window's end were identical under all three
+answers (S1, S3), so a row frozen at the call plus 660 s misses most of what it could teach.
+
+**The ruling.**
+
+1. **From its due instant, each call's row reads each answer's deepest landing and longest wait so
+   far**, at the last whole minute the stage has reached, in the counts sentence's order: *By 10:41,
+   the deepest landing and the longest wait so far: 22 and 340 s with Energy aware driving; …*. A
+   reading past its bar says *past its bar of N*, and a run with one past its bar *could no longer
+   clear* from the first minute it read so: § D1168's one verdict, applied to the call's runs. A wait
+   still under way is pending on the rail and is said so. The readings are kept on the record when
+   the call is raised (`shift/dayCallMaxima.ts`: the rail's fold at each whole minute from the call,
+   kept where it moves), so a resumed attempt reads them as an unbroken one does; a record written
+   before this keeps its counts-only row, and the attempt slot's version does not move.
+2. **The row's note says the count is not one of the day's goals.**
+3. **The close names the gap.** Where the three answers split the day and every answer with the
+   fewest one-minute waits missed it, the report row says so and names the goal it missed with its
+   figure (`dayCallGapSentenceOf`). The ruling's text says *where the answer with the fewest waits
+   missed the day*; all three members measured and worded it on split rows, so this lane reads it
+   there, and the owner may widen it to every row where the favourite missed.
+
+**What holds it.** `shift/dayCallMaxima.test.ts`: at every whole minute from a call to the end of two
+shipped runs the readings equal `readGoal` over `observationsAt` (state and figure), and the honesty
+pair: *past its bar* and the lost instant are said exactly where the rail reads the goal missed and
+never a minute before, a censored wait reads pending. `everyday/stageCallRow.test.ts`: the line at the
+minute reached, the pair on a synthetic record (not before 7 800 s, from it; spread's crossing not at
+8 399 s, from 8 400 s), the count's label, counts only on an old record. `shift/dayCalls.test.ts`: the
+sentence with the goal and figure where the favourite missed, none where it cleared or nobody cleared,
+and the row's ban lists. Red before: the functions did not exist.
+
+**Not established.** A stage row on the built bundle with readings past a bar was not walked in a
+browser; the readings are unit-held against the rail's fold.
+
+## D1434 — a call admitted only on the verdict ground with nobody standing is not asked
+
+> **Taken 2026-10-13 by agent sessions under delegated authority** (swarm DR, ruling § Q1 item 4,
+> two of three: S1 and S2 for the drop, S3 against; built by lane DR-1), not by the product owner, and
+> to be read as an agent ruling. **Amends [§ D1336](#d1336) clause 3.** Owner-reversible in full; S3's
+> one save is the recorded cost.
+
+**Why an entry.** It amends a recorded admission rule and binds `dev/dayCallSession.ts`.
+
+**The ruling.** A candidate the counts do not admit, admitted on § D1336's verdict ground alone, is
+turned down where nobody stands at a landing at its second on the run standing (the card's own fold,
+`frame/overlay.ts#queueAt`). A call the counts admit is asked whoever stands; nothing else moves.
+
+**The dissent.** S3 kept such calls: on crowd 15's Thursday a call whose counts read 0, 0 and 0 at the
+09:30 goods-inward start was its sample's only save of a day no profile clears alone. S1 measured the
+drop at 5 of 130 calls, each a card saying nobody was standing over a row of zeros.
+
+**What holds it.** `dev/dayCallSession.test.ts`: the late finish's start with the landings emptied
+for the hundred seconds before it raises nothing (red without the drop: raised at 5 460 s), and the
+same start with riders standing is raised (the existing case).
+
+## D1435 — a lost day stops once on *End the day*, and *Watch the rest* plays on at 30×
+
+> **Taken 2026-10-13 by agent sessions under delegated authority** (swarm DR, ruling § Q4, three of
+> three; built by lane DR-1), not by the product owner, and to be read as an agent ruling. **Amends
+> [§ D1168](#d1168) clause 2** (the chip becomes a card whose primary takes focus) and **narrows
+> [§ D1169](#d1169) clause 1** for a lost day alone. Owner-reversible clauses: the stop, the fast rung
+> after the loss, and that a chip pressed after the loss is the player's rung to the end. Reversing
+> them restores § D1168's chip and § D1169's hold.
+
+**Why an entry.** It moves two recorded rulings and binds `everyday/stagePace.ts`,
+`everyday/stageCall.ts`, `everyday/stageScreen.ts` and the honesty register.
+
+**What was measured.** 110 of 332 real minutes were played after the day was already lost (S1); a
+day lost by 08:49 played on for 9.3 to 13.3 real minutes (S3); *End the day* was an 11 px chip with
+its reason in a tooltip.
+
+**The ruling.** On the first frame of the player's own scored day at which a goal graded on a maximum
+reads past its bar, the stage pauses once and puts a card in the call card's place
+(`stageLostCardOf`): which goal, its figure, the clock and the bar, and that a maximum past its bar
+stays past it. *End the day* is its primary and takes focus; *Watch the rest* plays on under the pace
+note *the day can no longer clear: playing the rest at 30×, and no call is asked* (`stagePace.ts`'s
+`lost`), whoever is waiting. A chip pressed after the loss is the player's rung. A pinned call still
+standing is answered first. The stage never ends the day itself. § D1266's skip is not extended to the
+lost stretch (S1 asked for it; the ruling did not), so a day lost early still plays its afternoon at
+30×.
+
+**What holds it.** `everyday/stagePace.test.ts`: lost with somebody waiting paces `lost` at 30× (red
+before: `watching`), a chip after the loss stands, one before it does not, a call still stops first.
+`everyday/stageCall.test.ts`: the card names the goal and figure and is absent while the day can clear.
+`everyday/lostDay.browser.test.ts` on the built bundle, Crown Hotel on 2026-10-05: the stage stops on
+the card with *End the day* focused and the clock still; *Watch the rest* plays on under the `lost`
+line, raises no call, never stops on the card again, and reaches the day's end with no report filed.

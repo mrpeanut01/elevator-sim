@@ -414,14 +414,34 @@ describe('parseFixitCases', () => {
     expect(symptomFigureIn('the average wait')).toBe('average');
   });
 
-  it('keeps a sight — including one that counts in words', () => {
+  /*
+   * § D1425 turned the first two of this case's old examples red: *doors held eleven seconds* spells
+   * a figure, and *three cars stand together* names the machinery a parking case's as-built patch
+   * writes. What stands is a sight with people or a place as its subject, a spelled count with no
+   * unit included.
+   */
+  it('keeps a sight — including a spelled count with no unit after it', () => {
     for (const symptom of [
-      'doors held eleven seconds at every stop, on every car',
-      'waits over a minute for a car up, while three cars stand together below',
-      'seven hundred appointment letters, one printed time',
+      'residents on the upper flats waiting, while the lower floors get away',
+      'a landing crowd of hundreds, served one carload at a time',
+      'a wall of people on the outpatients landing',
     ]) {
       expect(symptomFigureIn(symptom), symptom).toBeNull();
       expect(violationsOf(fileWith((entry) => { entry['symptom'] = symptom; })), symptom).toEqual([]);
+    }
+  });
+
+  it('refuses a figure in words and a symptom naming what the as-built setting writes (§ D1425)', () => {
+    const figure = violationsOf(fileWith((entry) => { entry['symptom'] = 'doors held eleven seconds at every stop'; }));
+    expect(figure.join('\n')).toContain('states a figure ("eleven seconds")');
+    /* The fixture's as-built patch parks the idle cars, so the parking words and the machinery are refused. */
+    for (const [symptom, word] of [
+      ['waits over a minute for a car up, while three cars stand together below', 'car'],
+      ['people waiting while the fleet sits parked downstairs', 'parked'],
+    ] as const) {
+      const violations = violationsOf(fileWith((entry) => { entry['symptom'] = symptom; }));
+      expect(violations.join('\n'), symptom).toContain(`says "${word}", which names the parking`);
+      expect(violations.join('\n'), symptom).toContain('§ D1425');
     }
   });
 

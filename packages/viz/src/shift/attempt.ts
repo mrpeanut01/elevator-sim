@@ -288,6 +288,25 @@ export function attemptShownTo(attempt: DayAttempt, atS: number): DayAttempt {
 }
 
 /**
+ * **{@link attemptShownTo}, never past a call the attempt is held at** — wave AO, lane AO-1,
+ * [§ D1364](../../../../DECISIONS.md). `heldAtS` is the second of the call standing unanswered on the
+ * attempt's run (the pinned call, or the ordinary call raised or being asked), and `undefined` where
+ * none stands.
+ *
+ * The stage notes its reach from the frame it draws, and at a fast chip that frame is a few seconds
+ * past the call before the stop puts the playhead back on the call second: measured on the built
+ * bundle at 240×, a reach of 559.2 s over a call at 549.2 s, which the Engineer transport (held at
+ * the reach, § D1239) then showed of the call's unanswered branch. So the reach goes no further than
+ * the call, and a reach already past it (a call found after the frame that passed it) is put back on
+ * it. Once the call is answered or skipped nothing holds it and the reach moves on as before.
+ */
+export function attemptShownToHeld(attempt: DayAttempt, atS: number, heldAtS: number | undefined): DayAttempt {
+  if (heldAtS === undefined || !Number.isFinite(heldAtS)) return attemptShownTo(attempt, atS);
+  if (attempt.shownToS > heldAtS) return { ...attempt, shownToS: heldAtS };
+  return attemptShownTo(attempt, Math.min(atS, heldAtS));
+}
+
+/**
  * Where a resumed attempt's stage opens: the furthest instant it had shown, when that is past the
  * run's start and inside it; `undefined` where it never left the start, so the stage opens as a
  * fresh day does, paused at its start with § 7.3's *Start* up.

@@ -64,6 +64,8 @@ import {
   PRACTICE_ENGINEER_NOTE,
   PRACTICE_NOTE,
   PRACTICE_OTHER_TAB_NOTE,
+  PRACTICE_REHEARSAL_NOTE,
+  PRACTICE_SANDBOX_NOTE,
   WITHHELD,
   averageWaitFigure,
   clockOf,
@@ -2612,6 +2614,18 @@ describe('the ordinary day’s calls and a practice close — § D1138', () => {
     expect(byCrowd.streakLine).toBe(PRACTICE_CROWD_NOTE);
     expect(byCrowd.practiceNote).not.toMatch(/first attempt/u);
     expect(byCrowd.practiceNote).not.toMatch(/\d/u);
+  });
+
+  it('says a sandbox day dealt a practice crowd is practice on that crowd, and keeps the day open — § D1362', () => {
+    const open = { ...WEEK, attempt: 1, closedDay: null };
+    const rehearsal = weekDay(sheet({ practice: true, practiceSandbox: true, practiceRehearsal: true, week: open }));
+    expect(rehearsal.practiceNote).toBe(PRACTICE_REHEARSAL_NOTE);
+    expect(rehearsal.streakLine).toBe(PRACTICE_REHEARSAL_NOTE);
+    expect(rehearsal.dayStaysOpen).toBe(true);
+    /* A sandbox day on the day's own crowd keeps § D1368's note. */
+    expect(weekDay(sheet({ practice: true, practiceSandbox: true, week: open })).practiceNote).toBe(PRACTICE_SANDBOX_NOTE);
+    expect(PRACTICE_REHEARSAL_NOTE).toMatch(/practice crowd/u);
+    expect(PRACTICE_REHEARSAL_NOTE).not.toMatch(/\d/u);
   });
 
   it('says a close from the Engineer surface under a standing attempt, and a close another tab beat, are practice for those reasons — § D1239', () => {

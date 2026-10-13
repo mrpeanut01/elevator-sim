@@ -18,14 +18,14 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { specFromBuilding, type BuildingSpec } from '../authoring/buildingSpec.js';
+import { BLANK_SPEC, specFromBuilding, type BuildingSpec } from '../authoring/buildingSpec.js';
 import { demandTheTemplateTakes, specFromTrafficProfile, type PatternSpec } from '../authoring/patternSpec.js';
 import { buildingConfigOf, shiftRunConfigOf, weeksForSession, type ViewerState } from '../dev/state.js';
 import { recordRun } from '../record/recordRun.js';
 import { contractBuildings, todaysScenarioDayState } from '../shift/contractDay.test-helper.js';
 import { goalsForDay, readGoals } from '../shift/goals.js';
 import { ladderTowerConfig } from '../shift/ladder.js';
-import { PRACTICE_DAY_SENTENCES, practiceGroundOf } from '../shift/scoredCrowd.js';
+import { PRACTICE_DAY_SENTENCES, practiceCrowdOf, practiceGroundOf } from '../shift/scoredCrowd.js';
 import {
   closeDay,
   MODE_WEEK_CONTRACT_IDS,
@@ -217,5 +217,40 @@ describe('the sandbox stands over the week and never on it', () => {
     expect(closed.streak).toBe(during.week.streak);
     expect(closed.cleanRun).toBe(during.week.cleanRun);
     expect(closed.bestMinutePct).toBe(during.week.bestMinutePct);
+  });
+});
+
+/*
+ * Wave AO, lane AO-1b, § D1363: the drawing board's *Run a day in it* went through
+ * `applyBuildingSpec`, whose `withBuilding` stood the player's own week on `SANDBOX_CONTRACT_ID`,
+ * so the save wrote that week and a reload opened on Garden Apartments. It is a sandbox day now.
+ */
+describe('a drawn tower runs as a sandbox day over the week — § D1363', () => {
+  const drawn: readonly BuildingSpec[] = [
+    { ...standingOf(MIDTOWN).building, floors: standingOf(MIDTOWN).building.floors + 4, cars: 6 },
+    BLANK_SPEC,
+  ];
+
+  it('simulates the day in the drawn tower, and the save writes the week, never the sandbox', () => {
+    for (const spec of drawn) {
+      const during = sandboxed(MIDTOWN, { building: spec, pattern: undefined, dwell: undefined });
+      expect(during.week.contractId, spec.name).toBe(SANDBOX_DAY_CONTRACT_ID);
+      expect(during.buildingId, spec.name).not.toBe(MIDTOWN.buildingId);
+      expect(during.savedBuildings.map((entry) => entry.id), spec.name).toContain(during.buildingId);
+      const plan = shiftRunConfigOf(RESOURCES, during);
+      expect(() => recordRun(plan.config, { recordDecisions: false, outOfServiceCarIds: plan.outOfServiceCarIds }), spec.name).not.toThrow();
+      const saved = weeksForSession(during, undefined);
+      expect(saved.week, spec.name).toBe(MIDTOWN.week);
+      expect([saved.week, ...saved.parkedWeeks].map((week) => week.contractId), spec.name).not.toContain(SANDBOX_CONTRACT_ID);
+    }
+  });
+
+  it('closes on the practice crowd’s ground when the day it stood over had not begun — § D1362', () => {
+    const practice = practiceCrowdOf(MIDTOWN.seed);
+    const during = { ...sandboxed(MIDTOWN, { building: drawn[0], pattern: undefined, dwell: undefined }), seed: practice };
+    expect(practiceGroundOf(during.week, during.seed, MIDTOWN.seed, false, practice)).toBe('practiceCrowd');
+    /* The practice crowd is a different day: the legs differ from the shared crowd's in the same tower. */
+    const shared = { ...during, seed: MIDTOWN.seed };
+    expect(legsOf(during)).not.toBe(legsOf(shared));
   });
 });

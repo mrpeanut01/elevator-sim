@@ -52,6 +52,7 @@ import { WEEK_START_NEXT_LABEL, weekScreenViewOf, type WeekDayCard, type WeekScr
 import { weekHasClosed } from '../shift/weekStake.js';
 import type { NextTowerOffer } from '../shift/nextTower.js';
 import type { NextWeekView } from '../shift/nextWeek.js';
+import { clockOf } from '../shift/report.js';
 import type { EverydayScreenModule } from './screens.js';
 import {
   BODY,
@@ -171,6 +172,16 @@ function mountWeek(
       house: (day) => data.weekHouse(day),
       /* The tower's record of closed weeks — § D1230. */
       record: data.weekRecord(),
+      /*
+       * The run's own clock for a booking's window — wave AO, lane DS-1, § D1400. Planned only when
+       * a booking is named, since the plan builds the run's tower.
+       */
+      bookingClock: (fraction) => {
+        const ahead = data.dayAhead();
+        return clockOf(fraction * ahead.lengthS, ahead.startOfDayS);
+      },
+      /* § D1443: the drivers' own names for DC-13's line and this week's record with each driver. */
+      profileNameOf: (profileId) => data.dispatcherById(profileId)?.name,
     });
     onwardTower = weekSheetStands ? view.onward : undefined;
     nextWeek = weekSheetStands ? view.next : undefined;
@@ -235,6 +246,17 @@ function mountWeek(
       const stake = el(doc, 'p', 'everyday-week-stake', view.stake);
       stake.style.cssText = `${BODY};margin:8px 0 0`;
       root.append(stake);
+    }
+    /* DC-13 on a week dealt from week 2, and this week's record with each driver — § D1443. */
+    for (const [cls, lines] of [
+      ['everyday-week-bands', view.bands],
+      ['everyday-week-driver', view.drivers],
+    ] as const) {
+      for (const text of lines) {
+        const line = el(doc, 'p', cls, text);
+        line.style.cssText = `${QUIET};margin:6px 0 0;max-width:74ch`;
+        root.append(line);
+      }
     }
 
     /*

@@ -292,6 +292,8 @@ function mountReportScreen(
        * spent the allowance goes to the desk rather than to the next day, which no door runs.
        */
       contractLost: contractLostSentenceOf(tower),
+      /* Wave AO, lane DS-2 (§ D1409): what decided the day, graded on the contract's tests. */
+      call: context.host.careerCloseLine?.(),
     };
   }
 
@@ -765,6 +767,12 @@ function mountReportScreen(
      */
     const closeBlock = view.close === undefined ? undefined : drawClose(view, view.close);
     if (closeBlock !== undefined) head.append(closeBlock);
+    /* § D1409: a career day's account of what decided it, where the close would stand. */
+    if (view.careerCall !== undefined) {
+      const call = el(doc, 'p', 'everyday-report-career-call', view.careerCall);
+      call.style.cssText = `${QUIET};margin:12px 0 0;max-width:74ch`;
+      head.append(call);
+    }
     head.append(lede);
     /*
      * § D1138 clause 4 — a practice close says so under the verdict, where the player reads whether

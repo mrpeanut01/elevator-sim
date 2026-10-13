@@ -378,9 +378,13 @@ account owns, so a device spend would buy nothing.~~ *That second half is amende
 itself — "the day a device-reachable sink exists is the day this clause is revisited, by a decision
 that cites a run rather than a plan." One exists: a **scenario's budget rung** is priced by the
 scenario rather than by the ledger, so it needs no sink, no route and no account, and it is bought
-from the device tally. The three ledger sinks are unchanged and still need an account, each saying
-so on its own row.* A signed-out run stays playable and unpostable, as
-it already is.
+from the device tally. ~~The three ledger sinks are unchanged and still need an account, each saying
+so on its own row.~~* *That sentence is replaced by [§ D1418](../DECISIONS.md) on 2026-10-13, swarm
+DS's Q3 ruling: with no server or no sign-in, the career purse top-up, the rush pre-fit and the rush
+purse top-up are bought from the device tally for play on that device, a sitting started with one is
+never offered for posting, and Settings and the chimes panel say a device spend stays on the device.
+The server still refuses a posted modifier the account did not buy ([§ D671](../DECISIONS.md)).* A
+signed-out run stays playable and unpostable, as it already is.
 
 **What happens when an account arrives no longer needs an answer, because nothing crosses but a
 turn.** On sign-in the device posts the turns it has not yet posted for that account, through the
@@ -472,7 +476,12 @@ Named so the next lane does not discover it. None of it is built by this page.
   ([§ D738](../DECISIONS.md)), and a fix case's budget rung, priced by the scenario and bought from
   the device tally with no account ([§ D911](../DECISIONS.md)). `rush-purse-top-up` is still
   refused, on its own row in the panel, because no between-round rebuild exists to spend it on
-  ([§ D606](../DECISIONS.md) § 2).
+  ([§ D606](../DECISIONS.md) § 2). *Updated 2026-10-13 (wave AO):* off an account all three ledger
+  sinks are bought from the device tally for play on that device ([§ D1418](../DECISIONS.md)); a
+  campaign stage sells, from the device tally, a wider budget where the survivor census says it adds a
+  way through ([§ D1419](../DECISIONS.md)); a clear at or under a priced par pays 3 chimes once
+  ([§ D1417](../DECISIONS.md)); and every award pays once under a key, a contract day included
+  ([§ D1416](../DECISIONS.md)).
 - The stage's opening speed moves to a watching rung, reopening [§ D354](../DECISIONS.md)'s
   default, and a *skip to the end* control is added.
 - ~~Two new intervention kinds, equipment and building changes, on the run record.~~ **Built**

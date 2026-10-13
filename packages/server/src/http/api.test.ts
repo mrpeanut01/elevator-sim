@@ -26,6 +26,7 @@ import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it, onTestFinished } from 'vitest';
 
 import {
+  careerDayTurnKeyOf,
   chimeAwardFor,
   chimeGrantUnits,
   chimeSinkById,
@@ -1888,7 +1889,7 @@ describe('the chime ledger over the wire', () => {
 
     const earned = await call('POST', '/api/chimes/earn', {
       token: player.token,
-      body: { completion: 'career-day-paid' },
+      body: { completion: 'career-day-paid', key: careerDayTurnKeyOf({ towerId: 'c1', month: 0, day: 1, careerDay: 1 }) },
     });
     expect(earned.status).toBe(200);
     expect(Number(bodyOf(earned)['balanceChimes'])).toBeGreaterThan(before);
@@ -2235,16 +2236,26 @@ describe('a scenario and a rush pay first time only, and the server keeps the re
     expect(Number(bodyOf(top)['balanceChimes'])).toBe(before + ceiling * RUSH_WAVE_AWARD);
   });
 
-  it('still pays a contract day on every post, which the ruling does not reach — stated, not hidden', async () => {
+  it('pays a contract day once when the same day is posted twice, and each different day — § D1416', async () => {
     /*
-     * The ruling names two awards. A contract day is a different turn each time and the route is
-     * told nothing that could tell a second day from one day posted twice, so it pays per post.
-     * This case exists so that keying it later is a deliberate change to a green test.
+     * **The deliberate change to a green test this case was kept for.** It read *"still pays a
+     * contract day on every post … the route is told nothing that could tell a second day from one
+     * day posted twice"*, and swarm DS's S2 measured what that cost: the same day posted twice paid
+     * twice. The body names its day now, keyed like every other award.
      */
     const player = await signIn();
     const before = await balanceOf(player.token);
-    await earn(player.token, { completion: 'career-day-paid' });
-    await earn(player.token, { completion: 'career-day-paid' });
+    const monday = careerDayTurnKeyOf({ towerId: 'c1', month: 0, day: 1, careerDay: 1 });
+    const tuesday = careerDayTurnKeyOf({ towerId: 'c1', month: 0, day: 2, careerDay: 2 });
+    await earn(player.token, { completion: 'career-day-paid', key: monday });
+    await earn(player.token, { completion: 'career-day-paid', key: monday });
+    expect(await balanceOf(player.token), 'one day posted twice paid twice').toBe(before + CAREER_DAY_AWARD);
+    await earn(player.token, { completion: 'career-day-paid', key: tuesday });
+    expect(await balanceOf(player.token)).toBe(before + 2 * CAREER_DAY_AWARD);
+    /* A day with no key, or one naming no contract on the ladder, is refused and pays nothing. */
+    const unkeyed = await call('POST', '/api/chimes/earn', { token: player.token, body: { completion: 'career-day-paid' } });
+    expect(unkeyed.status).toBe(400);
+    expect(bodyOf(unkeyed)['error']).toBe('unknown-key');
     expect(await balanceOf(player.token)).toBe(before + 2 * CAREER_DAY_AWARD);
   });
 });
@@ -2606,6 +2617,27 @@ describe('a rush sitting, posted whole — GitHub issue #372', () => {
     expect(row?.['heldS']).toBe(gardenHeldS);
     expect(row?.['roundCount']).toBe(2);
   }, 300_000);
+
+  it('refuses a sitting claiming what only a device bought: the account owns neither sink, so neither claim is backed — § D1418', async () => {
+    /*
+     * A device spend is for play on that device, and the viewer never offers such a sitting for
+     * posting (`rushSitting.ts#RUSH_SITTING_COPY.boughtOnDevice`). This is the server's half, the
+     * one a client that posted anyway would meet: § D671's check, before any replay is commanded,
+     * naming both sinks.
+     */
+    const player = await signIn();
+    const deviceBought = sitting(1, {
+      modifiers: [
+        { sinkId: 'rush-prefit', steps: 1 },
+        { sinkId: 'rush-purse-top-up', steps: 1 },
+      ],
+    });
+    const refused = await call('POST', '/api/rush-sittings', { token: player.token, body: deviceBought });
+    expect(refused.status).toBe(422);
+    expect(bodyOf(refused)['error']).toBe('modifier-not-bought');
+    expect(String(bodyOf(refused)['detail'])).toContain('rush-prefit');
+    expect(String(bodyOf(refused)['detail'])).toContain('rush-purse-top-up');
+  });
 
   it('refuses a top-up the account never bought, and once it is bought posts on that set’s board carrying the modifier and never the spend', async () => {
     const player = await signIn();

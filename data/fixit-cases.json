@@ -63,7 +63,7 @@
           }
         }
       },
-      "symptom": "waits over a minute for a car down, while the shuttles sit at the street",
+      "symptom": "people on the sky lobbies waiting for the way down to the street, while the rest of the tower gets away",
       "figures": [
         {
           "kind": "complaint",
@@ -318,7 +318,7 @@
           }
         }
       },
-      "symptom": "one car answering nine dense floors, and a crowd stood at every landing it serves",
+      "symptom": "crowds on the upper landings, while the lower floors come and go",
       "figures": [
         {
           "kind": "complaint",
@@ -532,7 +532,7 @@
           }
         }
       },
-      "symptom": "waits over a minute for a car up, while three cars stand together below",
+      "symptom": "residents on the upper flats waiting, while the lower floors get away",
       "figures": [
         {
           "kind": "complaint",
@@ -686,7 +686,7 @@
           }
         }
       },
-      "symptom": "doors held eleven seconds at every stop, on every car",
+      "symptom": "queues at reception and the dock that are slow to clear, while the guest floors move freely",
       "figures": [
         {
           "kind": "complaint",
@@ -858,7 +858,7 @@
           }
         }
       },
-      "symptom": "waits over a minute at the top of the tower, while the cars wait at its bottom",
+      "symptom": "residents high in the tower waiting on their landings, while the rest of the building gets away",
       "figures": [
         {
           "kind": "complaint",
@@ -1080,7 +1080,7 @@
           }
         }
       },
-      "symptom": "one car for the garage, and a crowd on its landing beside a hoistway standing empty",
+      "symptom": "a crowd on the garage landing, while the floors above come and go",
       "figures": [
         {
           "kind": "complaint",
@@ -1421,7 +1421,7 @@
           }
         }
       },
-      "symptom": "express cars stopping at every floor below the zone they were built for",
+      "symptom": "tenants on the upper floors waiting, while the low floors get away",
       "figures": [
         {
           "kind": "complaint",
@@ -1665,7 +1665,7 @@
           }
         }
       },
-      "symptom": "two cars standing doors-open twenty-five seconds at every stop, through the busiest hours",
+      "symptom": "queues at the entrance and at outpatients, while ward-to-ward trips move freely",
       "figures": [
         {
           "kind": "complaint",
@@ -1931,7 +1931,7 @@
           }
         }
       },
-      "symptom": "a lobby queue that outgrows four cars every morning at nine",
+      "symptom": "a lobby queue that grows faster than it clears, while journeys from upstairs get away",
       "figures": [
         {
           "kind": "complaint",
@@ -2122,7 +2122,7 @@
           }
         }
       },
-      "symptom": "seven hundred appointment letters, one printed time",
+      "symptom": "a wall of people on the outpatients landing, while the rest of the hospital moves freely",
       "figures": [
         {
           "kind": "complaint",
@@ -2555,7 +2555,7 @@
           }
         }
       },
-      "symptom": "the two bed cars pass the surgical floors without stopping",
+      "symptom": "people waiting at the surgical floors, while the rest of the hospital gets away",
       "figures": [
         {
           "kind": "complaint",
@@ -2921,7 +2921,7 @@
           }
         }
       },
-      "symptom": "one car in service for the whole upper zone",
+      "symptom": "landings crowded across the upper floors, while the low floors move freely",
       "figures": [
         {
           "kind": "complaint",
@@ -3786,7 +3786,7 @@
           }
         }
       },
-      "symptom": "decks that stop boarding at a fraction of their plated load",
+      "symptom": "commuters left behind at the street lobby, the queue barely shortening",
       "figures": [
         {
           "kind": "complaint",
@@ -4682,7 +4682,7 @@
           }
         }
       },
-      "symptom": "two cars answering where one was wanted",
+      "symptom": "residents in the tower flats waiting, while the offices get away",
       "figures": [
         {
           "kind": "complaint",
@@ -5044,7 +5044,7 @@
           }
         }
       },
-      "symptom": "a lobby sized for a smaller building than the one above it",
+      "symptom": "a crowd waiting in the lobby",
       "figures": [
         {
           "kind": "complaint",
@@ -5236,7 +5236,7 @@
           }
         }
       },
-      "symptom": "gym journeys waiting for cars parked at the door",
+      "symptom": "residents waiting on the way to and from the gym, while the rest of the block gets away",
       "figures": [
         {
           "kind": "complaint",
