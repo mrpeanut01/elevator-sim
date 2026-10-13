@@ -69,6 +69,7 @@
 import {
   CHIME_COMPLETIONS,
   chimeEarnTableOf,
+  chimeGrantUnits,
   chimeSpendPrice,
   chimeSpendTableOf,
   chimeTurnKeysOf,
@@ -356,7 +357,8 @@ export function withSinkSpend(
       ...record,
       sinks: Object.freeze([...record.sinks, Object.freeze({ sinkId, steps, chimes: price })]),
     }),
-    grantUnits: sink.modifier.grantUnits * steps,
+    /* `core`'s own grant, the one the server's spend route answers with, so there is one multiplication. */
+    grantUnits: chimeGrantUnits(sink, steps),
   };
 }
 
