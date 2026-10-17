@@ -31,6 +31,7 @@ import {
   stageCallNearestBarLineOf,
   stageCallPhaseOf,
   stageCallPresentOf,
+  stageCallStandingOrderOf,
   stageEndDayOf,
   stageLostCardOf,
   STAGE_LOST_COPY,
@@ -528,5 +529,44 @@ describe('the lost day’s card — § D1435', () => {
       expect(text).not.toMatch(/\b(would|could have|if you|better|worse|because|should)\b/iu);
     }
     expect([STAGE_LOST_COPY.end, STAGE_LOST_COPY.watch]).toEqual(['End the day', 'Watch the rest']);
+  });
+});
+
+/*
+ * Wave AR, lane AR-2, § D1528: on Midtown's Monday the 12:20 and 17:20 calls asked *What do the cars
+ * do?* after the player had parked them at 10:40, as if nothing had been answered. The calls are not
+ * moved or dropped (they feed the call census and its bands); the card says what is in force.
+ */
+describe('a placement call asked again names the order in force — § D1528', () => {
+  const later: PressCall = { atS: 15_600, rule: 'first-minute-wait', carId: '', awayAtS: 15_600, backAtS: null, act: { startS: 15_300, endS: 17_100 }, carAway: false };
+  const parkAt = (atS: number) => ({ atS, change: { kind: 'park-cars-lobby' } });
+
+  it('finds the last park or spread press before the call, and nothing else', () => {
+    expect(stageCallStandingOrderOf([], 15_600)).toBeUndefined();
+    expect(stageCallStandingOrderOf([parkAt(9600)], 15_600)).toEqual({ kind: 'park-cars-lobby', atS: 9600 });
+    expect(
+      stageCallStandingOrderOf([parkAt(9600), { atS: 12_000, change: { kind: 'spread-cars' } }], 15_600),
+    ).toEqual({ kind: 'spread-cars', atS: 12_000 });
+    /* A driver handover is not a car order, and a press at or after the call is not before it. */
+    expect(stageCallStandingOrderOf([{ atS: 9600, change: { kind: 'adopt-dispatcher' } }], 15_600)).toBeUndefined();
+    expect(stageCallStandingOrderOf([parkAt(15_600), parkAt(16_000)], 15_600)).toBeUndefined();
+  });
+
+  it('asks whether to keep it, with the clock it was pressed at, and draws the same three answers', () => {
+    const plain = stageCallCardOf(later, DAY_START_S, []);
+    expect(plain.question).toBe(STAGE_CALL_COPY.questionAllCars);
+    const again = stageCallCardOf(later, DAY_START_S, [], undefined, undefined, undefined, { kind: 'park-cars-lobby', atS: 9600 });
+    expect(again.question).toBe('You parked the cars at 10:40. Keep that, or change it?');
+    expect(again.options.map((option) => option.answer)).toEqual(plain.options.map((option) => option.answer));
+    expect(again.facts).toEqual(plain.facts);
+    expect(stageCallCardOf(later, DAY_START_S, [], undefined, undefined, undefined, { kind: 'spread-cars', atS: 12_000 }).question).toBe(
+      'You spread the cars at 11:20. Keep that, or change it?',
+    );
+    for (const [what, pattern] of BANNED) expect(again.question, what).not.toMatch(pattern);
+    /* The driver question is its own and keeps its words. */
+    const drivers = { 'driver-a': 'A', 'driver-b': 'B', leave: 'C' };
+    expect(stageCallCardOf(later, DAY_START_S, [], drivers, undefined, undefined, { kind: 'park-cars-lobby', atS: 9600 }).question).not.toContain(
+      'parked',
+    );
   });
 });

@@ -305,7 +305,43 @@ export function stageCallRowsOf(input: {
       note: pressNote === '' ? STAGE_CALL_ROW_NOTE : `${STAGE_CALL_ROW_NOTE} ${pressNote}`,
     });
   }
-  return rows;
+  return sameNoDifferenceOnce(rows, input.records, input.clockOf);
+}
+
+/**
+ * **Calls in a row that say the same *no difference* are said once** — wave AR, lane AR-2,
+ * [§ D1529](../../../../DECISIONS.md). The re-play met the 17:20 and 17:25 calls as two blocks, each
+ * *No answer has crossed a bar yet* and *By 18:00, no answer has made a difference …*, word for word.
+ * Neighbouring goal rows whose lead, readings and note are the same string and read
+ * {@link STAGE_CALL_NO_DIFFERENCE} become one row headed *The calls at 17:20 and 17:25*. A row with
+ * any word of its own (a crossing, a figure that differs, a later press) stands alone.
+ */
+function sameNoDifferenceOnce(
+  rows: readonly StageCallRowView[],
+  records: readonly DayCallRecord[],
+  clockOf: (simTimeS: number) => string,
+): readonly StageCallRowView[] {
+  const atOf = new Map(records.map((record, index) => [`stage-call-row-${String(index + 1)}`, record.atS]));
+  const out: { row: StageCallRowView; clocks: string[] }[] = [];
+  for (const row of rows) {
+    const last = out[out.length - 1];
+    const plain = row.kind === 'call' && row.goals !== undefined && row.goals.includes(STAGE_CALL_NO_DIFFERENCE);
+    if (
+      plain &&
+      last !== undefined &&
+      last.row.kind === 'call' &&
+      last.row.goals === row.goals &&
+      last.row.lead === row.lead &&
+      last.row.note === row.note
+    ) {
+      last.clocks.push(clockOf(atOf.get(row.id) ?? 0));
+      continue;
+    }
+    out.push({ row, clocks: [clockOf(atOf.get(row.id) ?? 0)] });
+  }
+  return out.map(({ row, clocks }) =>
+    clocks.length < 2 ? row : { ...row, heading: `The calls at ${clocks.slice(0, -1).join(', ')} and ${clocks.at(-1) ?? ''}` },
+  );
 }
 
 /**

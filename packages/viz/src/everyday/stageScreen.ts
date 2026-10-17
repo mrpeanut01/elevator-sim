@@ -165,6 +165,7 @@ import type { PressCall } from '../shift/pressCall.js';
 import {
   STAGE_CALL_COPY,
   stageCallCardOf,
+  stageCallStandingOrderOf,
   stageCallPresentOf,
   stageCallPhaseOf,
   stageEndDayOf,
@@ -2707,10 +2708,19 @@ function mountStage(
        * answer's line, a driver's from its own profile (the one driving now where it is the keep).
        */
       const driving = host.drivingProfile();
-      const card = stageCallCardOf(call, host.dayStartS(), bookedCars, standing.drivers, present, {
-        readings: host.goalsAt(call.atS),
-        driverOf: (name) => (driving.name === name ? driving : host.dispatchers().find((profile) => profile.name === name)),
-      });
+      const card = stageCallCardOf(
+        call,
+        host.dayStartS(),
+        bookedCars,
+        standing.drivers,
+        present,
+        {
+          readings: host.goalsAt(call.atS),
+          driverOf: (name) => (driving.name === name ? driving : host.dispatchers().find((profile) => profile.name === name)),
+        },
+        /* § D1528: a placement call after an earlier park or spread says so. */
+        stageCallStandingOrderOf(host.interventions(), call.atS),
+      );
       const heading = el(doc, 'div', 'everyday-stage-call-heading', card.heading);
       heading.style.cssText = `font:600 11px ${TYPE.mono};letter-spacing:0.08em;color:${C.label}`;
       const facts = card.facts.map((fact) => {
