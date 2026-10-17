@@ -912,6 +912,7 @@ import {
   weekOfferOf,
   weekSheetOf,
   weekStakeLineOf,
+  weekStripTargetOf,
   weekTargetMetLineOf,
   WEEK_WITHOUT_COUNTED_DAYS_SHORT,
   WEEKEND_NOTE,
@@ -15359,6 +15360,8 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
      * states — unanswered, answered, and days that kept no record of their crowd.
      */
     'shift/weekStake.ts#weekStakeLineOf',
+    /* Wave AQ, lane AQ-4 (GitHub issue #631): the same target on the front door's strip. */
+    'shift/weekStake.ts#weekStripTargetOf',
     'shift/weekStake.ts#dayStakeSentenceOf',
     'shift/weekStake.ts#DAY_COUNTS_SENTENCE',
     'shift/weekStake.ts#DAY_UNMEASURED_SENTENCE',
@@ -15833,6 +15836,12 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
             seeds.push({ field: `${where}.chip.score`, text: chip.score, role: 'observation' });
             seeds.push({ field: `${where}.chip.note`, text: chip.note, role: 'label' });
           }
+          /* Wave AQ, lane AQ-4 (GitHub issue #631): the days still to come, and the target on the strip. */
+          for (const slot of door.upcoming) {
+            seeds.push({ field: `${where}.upcoming.score`, text: slot.score, role: 'observation' });
+            seeds.push({ field: `${where}.upcoming.note`, text: slot.note, role: 'label' });
+          }
+          if (door.stripTarget !== undefined) seeds.push({ field: `${where}.strip.target`, text: door.stripTarget, role: 'observation' });
           seeds.push({ field: `${where}.world.label`, text: door.world.label, role: 'label' });
           seeds.push({ field: `${where}.world.reason`, text: door.world.reason, role: 'reason' });
           for (const absent of door.world.absent) {
@@ -18776,6 +18785,9 @@ function seedWeekStake(
     if (deal === undefined) continue;
     const line = weekStakeLineOf(openWeek(contract.id));
     if (line !== undefined) seeds.push({ field: `week.stake.${contract.id}`, text: line, role: 'observation' });
+    /* Wave AQ, lane AQ-4 (GitHub issue #631): the same target, on the front door's strip. */
+    const strip = weekStripTargetOf(openWeek(contract.id));
+    if (strip !== undefined) seeds.push({ field: `week.strip.${contract.id}`, text: strip, role: 'observation' });
     for (const dealt of deal.days) {
       const sentence = dayStakeSentenceOf(contract.id, dealt.day, dealt.eventId) ?? '';
       seeds.push({ field: `week.day.${contract.id}.${String(dealt.day)}`, text: sentence, role: 'observation' });

@@ -297,12 +297,13 @@ export function weekStakeLineOf(
 ): string | undefined {
   const deal = weekDealOf(week, census);
   if (deal === undefined) return undefined;
-  if (deal.counted === 0) return weekHeldReasonOf(deal);
-  const clean = countedCleanOf(week, census);
+  const stake = weekTargetOf(week, census);
+  if (stake === undefined) return weekHeldReasonOf(deal);
+  const { target, counted, clean } = stake;
   /* The day the target was met, once it has been — the day's report said so first (lane AL-F). */
   const metOn = weekTargetMetDayOf(week, census);
   const met = metOn === undefined ? '' : ` Met on ${metOn.weekday}.`;
-  const only = deal.counted === 1 ? deal.days.find((day) => day.counts) : undefined;
+  const only = counted === 1 ? deal.days.find((day) => day.counts) : undefined;
   if (only !== undefined) {
     return (
       `This week’s target: 1 of 1 counted day clean, and the one day that counts is ` +
@@ -310,8 +311,40 @@ export function weekStakeLineOf(
     );
   }
   return (
-    `This week’s target: ${String(deal.target)} of ${String(deal.counted)} counted days clean. ` +
+    `This week’s target: ${String(target)} of ${String(counted)} counted days clean. ` +
     `${String(clean)} so far.${met}`
+  );
+}
+
+/**
+ * **The week's target as numbers** — *k of N counted days clean, and how many so far* — or
+ * `undefined` where the census does not speak or no day counts. {@link weekStakeLineOf}'s numbers,
+ * read here once, so the brief's sentence and the front door's strip ({@link weekStripTargetOf})
+ * cannot state two targets (GitHub issue #631, wave AQ lane AQ-4).
+ */
+export function weekTargetOf(
+  week: Pick<WeekState, 'contractId' | 'week' | 'history'>,
+  census: WeekWay = WEEK_WAY,
+): { readonly target: number; readonly counted: number; readonly clean: number } | undefined {
+  const deal = weekDealOf(week, census);
+  if (deal === undefined || deal.counted === 0) return undefined;
+  return { target: deal.target, counted: deal.counted, clean: countedCleanOf(week, census) };
+}
+
+/**
+ * **The target, on the strip** — `4 of 5 counted days clean to hold the week · 1 so far`, or
+ * `undefined` where {@link weekTargetOf} is. The playtest behind GitHub issue #631 met a strip of
+ * played days only, with the target in a sentence elsewhere; the strip now carries it in short.
+ */
+export function weekStripTargetOf(
+  week: Pick<WeekState, 'contractId' | 'week' | 'history'>,
+  census: WeekWay = WEEK_WAY,
+): string | undefined {
+  const target = weekTargetOf(week, census);
+  if (target === undefined) return undefined;
+  return (
+    `${String(target.target)} of ${String(target.counted)} counted ${target.counted === 1 ? 'day' : 'days'} ` +
+    `clean to hold the week · ${String(target.clean)} so far`
   );
 }
 

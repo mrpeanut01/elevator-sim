@@ -2081,8 +2081,11 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         '`weekClosedByThisClose` (wave AM, § D1246) is a boolean for the tower’s record of weeks. ' +
         '`weekPathEndFor` and `weekAsksOf` (wave AO lane AO-5, § D1394) return a day number and a ' +
         'target count, for any Scenario week, which the sheet and the close print through the ' +
-        'producers seeded above.',
+        'producers seeded above. `weekTargetOf` (wave AQ, lane AQ-4, GitHub issue #631) returns the ' +
+        'target and the clean count, which a player reads through `weekStakeLineOf` and ' +
+        '`weekStripTargetOf`, both seeded.',
       ids: [
+        'shift/weekStake.ts#weekTargetOf',
         'shift/weekStake.ts#weekPathEndFor',
         'shift/weekStake.ts#weekAsksOf',
         'shift/weekStake.ts#weekClosedByThisClose',

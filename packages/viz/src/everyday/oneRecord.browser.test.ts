@@ -139,7 +139,7 @@ describe.skipIf(!HAS_BROWSER)('one record of the day', () => {
 
       /* The week did not move: today is still open, on the door's chip and on its primary. */
       await backToTheDoor(page);
-      expect(await textOf(page, '.everyday-door-chip:last-child .everyday-door-chip-note')).toBe('today · not closed yet');
+      expect(await textOf(page, 'button.everyday-door-chip:last-of-type .everyday-door-chip-note')).toBe('today · not closed yet');
       const primary = await textOf(page, '.everyday-bar-primary');
       expect(primary, 'the link’s day was closed into the week').toContain('Set up today');
     } finally {

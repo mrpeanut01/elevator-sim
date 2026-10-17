@@ -40,7 +40,7 @@
 
 import { dayWordsFor } from '../mode/glossary.js';
 import { HISTORY_DAYS } from '../shift/week.js';
-import { dayVerdictOf } from '../shift/weekStake.js';
+import { dayVerdictOf, WEEK_LENGTH, weekDealOf, weekStripTargetOf } from '../shift/weekStake.js';
 import { weekBookingsLineOf, weekUnderWayHarderLineOf, type BookingClock } from '../shift/nextWeek.js';
 import { weeksHeldLineOf, type WeekRecord } from '../shift/weekRecord.js';
 import type { DayOutcome, WeekState } from '../shift/types.js';
@@ -73,6 +73,20 @@ export interface DoorDayChip {
   /** *today · clean day*, *today · not closed yet*, *missed*, *clean day · showing*, *not played*. */
   readonly note: string;
   readonly selected: boolean;
+}
+
+/**
+ * **A day of the week still to come** — GitHub issue #631, wave AQ lane AQ-4. Drawn after today on
+ * the strip, empty and inert: it is a slot, not a day anybody can open yet.
+ */
+export interface DoorUpcomingSlot {
+  readonly day: number;
+  /** `WED`, as a chip's. */
+  readonly weekday: string;
+  /** Always the em dash: nothing has been played. */
+  readonly score: string;
+  /** `to play`, or `to play · not counted` on a day the census does not count. */
+  readonly note: string;
 }
 
 /** § 6.1's three numbered steps. */
@@ -134,6 +148,13 @@ export interface DoorScreenView {
   };
   readonly weekHeading: string;
   readonly chips: readonly DoorDayChip[];
+  /** The days after today through the week's last, empty — GitHub issue #631. Empty on the last day. */
+  readonly upcoming: readonly DoorUpcomingSlot[];
+  /**
+   * **The week's target on the strip** — `shift/weekStake.ts#weekStripTargetOf`, the numbers the
+   * brief's `weekStakeLineOf` states — or `undefined` where the census sets no target. Issue #631.
+   */
+  readonly stripTarget: string | undefined;
   /** § 6.1's *One tower a day…* line, under the stepper. */
   readonly rule: string;
   /**
@@ -404,6 +425,22 @@ function chipsOf(input: DoorScreenInput): readonly DoorDayChip[] {
   return Object.freeze(chips);
 }
 
+/** The days still to come, after today through the week's last — {@link DoorScreenView.upcoming}. */
+function upcomingOf(week: WeekState): readonly DoorUpcomingSlot[] {
+  const dealt = weekDealOf(week)?.days;
+  const slots: DoorUpcomingSlot[] = [];
+  for (let day = week.day + 1; day <= WEEK_LENGTH; day += 1) {
+    const counts = dealt?.[day - 1]?.counts;
+    slots.push({
+      day,
+      weekday: shortWeekday(week.dayIdx + (day - week.day)),
+      score: EM_DASH,
+      note: counts === false ? 'to play · not counted' : 'to play',
+    });
+  }
+  return Object.freeze(slots);
+}
+
 /**
  * **The strip starts on the week's first day** — wave AO, lane AO-4, the post-AN panel's seat B (lost
  * moment 3). The strip always drew seven slots, so a Tuesday drew five blank *before this week* tiles
@@ -619,8 +656,10 @@ export function doorScreenViewOf(input: DoorScreenInput): DoorScreenView {
       // § 6.1: *"The forward arrow dims at 0."*
       forwardEnabled: offset < 0,
     },
-    weekHeading: 'THE WEEK SO FAR',
+    weekHeading: 'THIS WEEK',
     chips,
+    upcoming: upcomingOf(input.week),
+    stripTarget: weekStripTargetOf(input.week),
     rule: DOOR_RULE,
     words: dayWords.map((entry) => entry.plain),
     wordsHeading: doorWordsHeadingOf(dayWords.map((entry) => entry.term)),
