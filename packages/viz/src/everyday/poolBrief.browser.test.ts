@@ -26,7 +26,7 @@ beforeAll(async () => {
   if (!HAS_BROWSER) return;
   site = await startShippedSite({ preview: { port: 6013, strictPort: false } });
   browser = await chromium.launch({ executablePath: CHROMIUM });
-}, 120_000);
+});
 
 afterAll(async () => {
   await browser?.close();
