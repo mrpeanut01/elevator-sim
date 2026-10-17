@@ -115,10 +115,18 @@ const P = Object.freeze({
 const DOOR_EASING = 'cubic-bezier(.65,0,.25,1)';
 
 /**
- * The least the fit may scale the panel to on a phone: the 36 px floor buttons then draw 27 px tall,
- * over SC 2.5.8's 24 (`docs/36` § 1), and every other control on the panel is larger.
+ * The least the fit may scale the panel to once the car is called, at any window size: the 36 px
+ * floor buttons then draw 27 px tall, over SC 2.5.8's 24 (`docs/36` § 1) with room for sub-pixel
+ * rounding, and every other control on the panel is larger (OPEN, CLOSE, HOLD and the key 33 px).
+ *
+ * It held only at phone width until GitHub issue #627, which measured a short window wider than the
+ * drawer breakpoint drawing the floor buttons 15 px tall at 1280 × 540 and 9.7 px at 844 × 390.
+ * Where the window cannot hold the panel at this scale the lobby grows and its region scrolls, as
+ * the phone path always did. `lobby.browser.test.ts` drives it down to a 320 × 320 window, WCAG
+ * 1.4.10's reflow width taken as both sides: below that the panel's own 304 px is wider than the
+ * opening can show at this scale.
  */
-const NARROW_MIN_SCALE = 0.75;
+const MIN_SCALE = 0.75;
 
 /** The frame's height on a phone before the call, short enough to keep CALL above the fold. */
 const NARROW_IDLE_FRAME_PX = 180;
@@ -725,11 +733,12 @@ export function mountLobby(region: HTMLElement, ports: LobbyPorts): MountedLobby
    * and the display drops its minimum height. Nothing about the machine or the words changes.
    */
   /*
-   * And on a phone the fit may not shrink the panel past {@link NARROW_MIN_SCALE}: at 390 × 844 it
+   * And on a phone the fit may not shrink the panel past {@link MIN_SCALE}: at 390 × 844 it
    * scaled to 0.57 with the consent ask answered and to 0.29 with it up, which drew the floor buttons
    * 10 to 20 px tall, under SC 2.5.8's 24 px (`docs/36` § 1). Once the car is called the frame grows
    * to hold the panel at that scale and the page scrolls instead; before the call the frame stays
-   * short, because a tall frame pushed the call plate under the doors and below the fold.
+   * short, because a tall frame pushed the call plate under the doors and below the fold. The wide
+   * geometry does the same in {@link refit}, by height rather than by breakpoint (GitHub issue #627).
    */
   let narrowNow = false;
   const narrowQuery = win?.matchMedia(`(max-width: ${String(EVERYDAY_RAIL_DRAWER_MAX_PX)}px)`);
@@ -766,20 +775,52 @@ export function mountLobby(region: HTMLElement, ports: LobbyPorts): MountedLobby
    * Fit the panel to the opening's height — the handoff's § 2
    * ---------------------------------------------------------------- */
 
+  /*
+   * The wide geometry's answer to a short window (GitHub issue #627): once the car is called, the
+   * root may not be shorter than the frame that holds the panel at {@link MIN_SCALE} plus everything
+   * else in the column, so the region scrolls rather than the panel shrinking. `extra` is the column
+   * less the frame, which the growth does not change, so the observer settles on its first pass.
+   * Where the opening is too narrow to set the display beside the panel, they wrap and the frame
+   * needs more than its drawn 720 px cap; the cap lifts for exactly that case.
+   */
+  const growWide = (needed: number | undefined): void => {
+    if (needed === undefined) {
+      root.style.minHeight = '520px';
+      frame.style.maxHeight = '720px';
+      doorRow.style.maxHeight = '730px';
+      return;
+    }
+    const extra = root.offsetHeight - frame.offsetHeight;
+    root.style.minHeight = `${String(Math.max(520, Math.ceil(extra + needed)))}px`;
+    frame.style.maxHeight = needed > 720 ? 'none' : '720px';
+    doorRow.style.maxHeight = needed > 720 ? 'none' : '730px';
+  };
+
   const refit = (): void => {
     const styles = win?.getComputedStyle(fitBox);
     if (styles === undefined) return;
     const padding = parseFloat(styles.paddingTop) + parseFloat(styles.paddingBottom);
     const height = fitInner.offsetHeight;
-    if (narrowNow && height > 0) {
+    /* The panel's 304 px can overhang a phone's opening, which the box's own width does not show. */
+    const width = Math.max(fitInner.offsetWidth, panel.offsetWidth);
+    if (height > 0) {
       const called = state.phase !== 'idle';
-      const opening = Math.ceil(height * NARROW_MIN_SCALE + padding);
-      frame.style.minHeight = called
-        ? `${String(opening + parseFloat(win?.getComputedStyle(frame).paddingTop ?? '0'))}px`
-        : `${String(NARROW_IDLE_FRAME_PX)}px`;
+      const needed =
+        Math.ceil(height * MIN_SCALE + padding) + parseFloat(win?.getComputedStyle(frame).paddingTop ?? '0');
+      if (narrowNow) {
+        frame.style.minHeight = called ? `${String(needed)}px` : `${String(NARROW_IDLE_FRAME_PX)}px`;
+        frame.style.maxHeight = called && needed > 720 ? 'none' : '720px';
+      } else {
+        growWide(called ? needed : undefined);
+      }
+    } else if (!narrowNow) {
+      /* The arrival view has no panel to hold, and a grown frame would centre *Step out* below the fold. */
+      growWide(undefined);
     }
     const available = fitBox.clientHeight - padding;
-    const scale = height > 0 && available > 0 ? Math.min(1, available / height) : 1;
+    const across = fitBox.clientWidth - parseFloat(styles.paddingLeft) - parseFloat(styles.paddingRight);
+    const scale =
+      height > 0 && available > 0 && across > 0 ? Math.min(1, available / height, across / width) : 1;
     fitInner.style.transform = `scale(${String(scale)})`;
   };
   const observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(refit);
