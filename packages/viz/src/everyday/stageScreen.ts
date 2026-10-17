@@ -1950,6 +1950,18 @@ function mountStage(
   if (context.ctx === 'rush') {
     root.insertBefore(interventions, header.nextSibling);
     root.insertBefore(endAsk, header.nextSibling);
+    /*
+     * **And the chips' notes go under the building** — wave AR, lane AR-1 (GitHub issue #633): on a
+     * 390×844 phone the header and the chips with their three notes filled the screen, so the
+     * building sat below the fold until *Play* scrolled it up and the chips off. Without the notes
+     * the chips are four short rows, and the stage starts on the first screen; *Play*'s scroll to the
+     * lobby rows (§ D1508) then leaves the chips in view. The notes keep their ids, so the picker's
+     * `aria-describedby` still names its note. Rush only. Recorded under [§ D405](../../../../DECISIONS.md).
+     */
+    const rushNotes = el(doc, 'div', 'everyday-stage-rush-notes');
+    rushNotes.style.cssText = `display:flex;flex-wrap:wrap;gap:${String(GAP.row)}px`;
+    rushNotes.append(switchPickerNote, interventionNote, parkingNote);
+    root.insertBefore(rushNotes, stageRow.nextSibling);
   }
   region.append(root);
 
@@ -3121,7 +3133,28 @@ function mountStage(
     rushEntryFocusPending = false;
     const active = doc.activeElement;
     if (active === null || active === doc.body || active === doc.documentElement) playButton.focus({ preventScroll: true });
+    if (rushPlayOnArrival) {
+      rushPlayOnArrival = false;
+      if (playback?.state !== 'playing') togglePlay();
+    }
   }
+
+  /**
+   * **An Enter pressed before *Play* can take focus is kept** — wave AR, lane AR-1 (GitHub issue #633).
+   * Focus reaches *Play* only once the round's run lands, 0.6–2.1 s after *Start the rush*, and an
+   * Enter in that gap went to the page body and was lost. So while the entry focus is still owed and
+   * focus is nowhere, Enter or Space is the press of *Play*, carried out the moment *Play* can act.
+   * Rush only. Recorded under [§ D405](../../../../DECISIONS.md).
+   */
+  let rushPlayOnArrival = false;
+  function onRushEntryKey(event: KeyboardEvent): void {
+    if (!rushEntryFocusPending || (event.key !== 'Enter' && event.key !== ' ')) return;
+    const active = doc.activeElement;
+    if (active !== null && active !== doc.body && active !== doc.documentElement) return;
+    event.preventDefault();
+    rushPlayOnArrival = true;
+  }
+  if (context.ctx === 'rush') doc.addEventListener('keydown', onRushEntryKey);
 
   /**
    * **A day whose attempt another tab holds is shown here no further** — wave AO, lane AO-1,
@@ -3604,6 +3637,8 @@ function mountStage(
      */
     if (context.ctx === 'rush') {
       const session = host.rush();
+      /* Wave AR, lane AR-1: a round counts as running once its clock has moved, not at the press. */
+      if (session !== undefined && session.endedAtS === undefined && simTimeS > recording.startedAt) host.rushRoundPlaying();
       if (session?.holdAtS !== undefined && session.endedAtS === undefined && simTimeS >= session.holdAtS) {
         playback.pause();
         host.endRush(session.holdAtS);
@@ -4426,6 +4461,7 @@ function mountStage(
       }
       pendingFrame = undefined;
       view?.removeEventListener('resize', onResize);
+      doc.removeEventListener('keydown', onRushEntryKey);
       unsubscribe();
       playback = undefined;
       adopted = undefined;

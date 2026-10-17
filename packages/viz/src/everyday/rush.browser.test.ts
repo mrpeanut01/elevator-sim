@@ -513,9 +513,15 @@ describe.skipIf(!HAS_BROWSER)('Endless rush — GitHub issue #220', () => {
         undefined,
         { timeout: 60_000 },
       );
-      await page.locator('.everyday-bar-primary').click(); // End the rush
-      await page.locator('.everyday-stage-end-confirm-go').click(); // wave AQ lane AQ-3: End asks once
-      await page.waitForSelector('.everyday-rush-rebuild', { timeout: 15_000 });
+      /*
+       * Played out rather than ended at 0:00: since § D1516 a round ended by hand is paid only for the
+       * waves it got through, so a round stopped before its first wave has nothing to rebuild with.
+       */
+      await page.waitForFunction(() => document.querySelector<HTMLButtonElement>('.everyday-stage-skip')?.disabled === false, undefined, {
+        timeout: 30_000,
+      });
+      await page.locator('.everyday-stage-skip').click();
+      await page.waitForSelector('.everyday-rush-rebuild', { timeout: 60_000 });
 
       const menu = await page.evaluate(() => {
         const block = document.querySelector('.everyday-rush-rebuild');

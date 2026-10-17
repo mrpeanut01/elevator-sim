@@ -29,6 +29,8 @@ import {
   rushStandingsOf,
   type RushHouseRowView,
   type RushHouseTable,
+  RUSH_HOUSE_LINE_COPY,
+  rushHouseLineOf,
 } from './rushHouse.js';
 import { RUSH_HOUSE_COMMAND, browserResourcesFrom, measureRushHouseRun } from './rushHouse.test-helper.js';
 import { LAST_GENERATED_WAVE, RUSH_HOLD_LINE, RUSH_STREAM, playerWaveAt } from './rushScreenModel.js';
@@ -325,5 +327,35 @@ describe('the schema refuses a table that does not say what it is', () => {
     const doc = raw();
     mutate(doc);
     expect(() => parseRushHouseTable(doc)).toThrow(message);
+  });
+});
+
+describe('the house run beside the player’s round — wave AR, lane AR-1', () => {
+  const midtown = { buildingId: 'midtown-office', dispatcherId: 'collective', dispatcherName: 'Conventional collective' };
+
+  it('states both figures on the same crowd, and no verdict', () => {
+    const line = rushHouseLineOf({ ...midtown, outcome: { kind: 'broke', heldS: 1538, wave: 9 } });
+    expect(line).toBe(
+      'This round held 25:38, into wave 9. The house run on the same crowd, Conventional collective with no changes, ' +
+        'held 27:20, into wave 10. One run of each.',
+    );
+    const stopped = rushHouseLineOf({ ...midtown, outcome: { kind: 'stopped', heldS: 200, wave: 2 } });
+    expect(stopped).toMatch(/^This round was ended by hand at 3:20, in wave 2\. /u);
+    for (const text of [line, stopped]) expect(text).not.toMatch(/\b(better|worse|cost|helped|beat|lost|improv|win|won)/iu);
+  });
+
+  it('says the house held every wave when its run never broke', () => {
+    const held = RUSH_HOUSE_TABLE.runs.find((run) => run.brokeAtS === null);
+    if (held === undefined) throw new Error('no house run held every wave, so this case tests nothing');
+    const line = rushHouseLineOf({ buildingId: held.buildingId, dispatcherId: held.dispatcherId, dispatcherName: 'X', outcome: { kind: 'broke', heldS: 600, wave: 4 } });
+    expect(line).toContain(RUSH_HOUSE_LINE_COPY.houseHeld('X'));
+  });
+
+  it('draws nothing for a dispatcher or a tower the house did not run, or a table from another climb', () => {
+    const outcome = { kind: 'broke', heldS: 600, wave: 4 } as const;
+    expect(rushHouseLineOf({ ...midtown, dispatcherId: 'saved-on-a-device', outcome })).toBeUndefined();
+    expect(rushHouseLineOf({ ...midtown, buildingId: 'drawn-in-the-designer', outcome })).toBeUndefined();
+    const stale = { ...RUSH_HOUSE_TABLE, provenance: { ...RUSH_HOUSE_TABLE.provenance, seed: '1' } };
+    expect(rushHouseLineOf({ ...midtown, outcome, table: stale })).toBeUndefined();
   });
 });

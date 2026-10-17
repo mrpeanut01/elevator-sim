@@ -492,3 +492,55 @@ function yoursLineOf(posted: RushPostedStandings): string | undefined {
       return undefined;
   }
 }
+
+/* -------------------------------------------------------------------------- *
+ * The house run beside the player's round
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The words of {@link rushHouseLineOf}. Facts only: how the round ended, how the house's run on the
+ * same crowd ended, and that each is one run. **No verdict word** (better, worse, cost, helped): one
+ * seed and no paired interval is not a comparison this project draws a conclusion from (`CLAUDE.md`).
+ */
+export const RUSH_HOUSE_LINE_COPY = Object.freeze({
+  roundBroke: (held: string, wave: number): string => `This round held ${held}, into wave ${String(wave)}.`,
+  roundStopped: (held: string, wave: number): string => `This round was ended by hand at ${held}, in wave ${String(wave)}.`,
+  houseBroke: (name: string, held: string, wave: number): string =>
+    `The house run on the same crowd, ${name} with no changes, held ${held}, into wave ${String(wave)}.`,
+  houseHeld: (name: string): string =>
+    `The house run on the same crowd, ${name} with no changes, held all ${String(LAST_GENERATED_WAVE)} waves.`,
+  oneRunEach: 'One run of each.',
+});
+
+/**
+ * **The house's run on the same crowd, beside the round that just ended** — wave AR, lane AR-1
+ * (GitHub issue #633): the result page gave a choice no felt consequence. The house row for the
+ * round's opening dispatcher on this tower is the same seeded crowd from the first second with no
+ * presses and no rebuild, so both figures are stated and nothing is concluded from them.
+ *
+ * `undefined` when there is no such row: a stale table, a tower the house has not run, or a
+ * dispatcher it did not run (a saved one). Its non-test caller is `everyday/reportScreen.ts`'s rush
+ * result. Recorded under [§ D405](../../../../DECISIONS.md).
+ */
+export function rushHouseLineOf(input: {
+  readonly buildingId: string;
+  readonly dispatcherId: string;
+  readonly dispatcherName: string;
+  readonly outcome: { readonly kind: 'broke' | 'stopped'; readonly heldS: number; readonly wave: number };
+  readonly table?: RushHouseTable;
+}): string | undefined {
+  const table = input.table ?? RUSH_HOUSE_TABLE;
+  if (!measuredOnThisStream(table)) return undefined;
+  const run = table.runs.find((entry) => entry.buildingId === input.buildingId && entry.dispatcherId === input.dispatcherId);
+  if (run === undefined) return undefined;
+  const { outcome } = input;
+  const round =
+    outcome.kind === 'broke'
+      ? RUSH_HOUSE_LINE_COPY.roundBroke(heldClock(outcome.heldS), outcome.wave)
+      : RUSH_HOUSE_LINE_COPY.roundStopped(heldClock(outcome.heldS), outcome.wave);
+  const house =
+    run.brokeAtS === null
+      ? RUSH_HOUSE_LINE_COPY.houseHeld(input.dispatcherName)
+      : RUSH_HOUSE_LINE_COPY.houseBroke(input.dispatcherName, heldClock(run.brokeAtS), playerWaveAt(run.brokeAtS));
+  return `${round} ${house} ${RUSH_HOUSE_LINE_COPY.oneRunEach}`;
+}

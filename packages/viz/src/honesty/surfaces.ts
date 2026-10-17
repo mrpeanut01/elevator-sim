@@ -187,7 +187,7 @@ import {
   rushRebuildViewOf,
   type RushRebuildInput,
 } from '../everyday/rushRebuild.js';
-import { RUSH_HOUSE_COPY, RUSH_HOUSE_TABLE, rushStandingsOf } from '../everyday/rushHouse.js';
+import { RUSH_HOUSE_COPY, RUSH_HOUSE_TABLE, rushHouseLineOf, rushStandingsOf } from '../everyday/rushHouse.js';
 import {
   TUNER_COPY,
   TUNE_CARDS,
@@ -10623,6 +10623,9 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
      */
     'everyday/rushHouse.ts#RUSH_HOUSE_COPY',
     'everyday/rushHouse.ts#rushStandingsOf',
+    /* Wave AR lane AR-1: the house run on the same crowd beside the round's result, seeded below. */
+    'everyday/rushHouse.ts#RUSH_HOUSE_LINE_COPY',
+    'everyday/rushHouse.ts#rushHouseLineOf',
     /*
      * § D1420: this device's best sitting on a build with no board, its row and every line the
      * standings say about it (replayed, nothing kept, or kept and not replayable here), seeded below.
@@ -10758,6 +10761,19 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
     /* § D1295's setup line, on the standard purse and on one opened by the top-up's three steps. */
     seeds.push({ field: 'rush.rebuildLine(standard)', text: rushRebuildLineOf(RUSH_PURSE.unitsPerWaveOutlasted, 0), role: 'prose' });
     seeds.push({ field: 'rush.rebuildLine(topped)', text: rushRebuildLineOf(RUSH_PURSE.unitsPerWaveOutlasted, 15), role: 'prose' });
+    /* Wave AR lane AR-1: the house run beside a round that broke, one ended by hand, and a house run that held. */
+    {
+      const midtown = { buildingId: 'midtown-office', dispatcherId: 'collective', dispatcherName: 'Conventional collective' };
+      const held = RUSH_HOUSE_TABLE.runs.find((run) => run.brokeAtS === null);
+      const arms: [string, Parameters<typeof rushHouseLineOf>[0]][] = [
+        ['broke', { ...midtown, outcome: { kind: 'broke', heldS: 1538, wave: 9 } }],
+        ['stopped', { ...midtown, outcome: { kind: 'stopped', heldS: 200, wave: 2 } }],
+      ];
+      if (held !== undefined) {
+        arms.push(['house-held', { buildingId: held.buildingId, dispatcherId: held.dispatcherId, dispatcherName: held.dispatcherId, outcome: { kind: 'broke', heldS: 600, wave: 4 } }]);
+      }
+      for (const [arm, input] of arms) seeds.push({ field: `rush.houseLine.${arm}`, text: rushHouseLineOf(input) ?? '', role: 'prose' });
+    }
     seeds.push({
       field: 'rush.driving',
       text: rushDrivingLine('Collective control'),
