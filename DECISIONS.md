@@ -53513,10 +53513,12 @@ tables of § D1138, § D1166 and § D1205 (`dayCalls.sweep.test.ts`), and the as
 `firstDayLength.ts`. Merging calls under ten minutes apart, or skipping a placement call after one
 was answered, changes which runs exist and so those figures. Reported, not done.
 
-**The ruling.** A placement call after a park or spread press says *You parked the cars at 10:40.
-Keep that, or change it?* (`stageCall.ts#stageCallAskedAgainOf`, from the last such press before the
+**The ruling.** A placement call after a park or spread press says *Since 10:40, idle cars wait at
+the lobby. Keep that, or change it?* (`stageCall.ts#stageCallAskedAgainOf`, from the last such press before the
 call, `stageCallStandingOrderOf`, which is `core`'s own rule for the order in force). The answers and
-the runs are unchanged.
+the runs are unchanged. The issue's wording, *You parked the cars at 10:40*, credits the press, which
+the honesty corpus refuses without a declared attribution ([§ D1011](#d1011)), so the card states
+the order in force instead.
 
 **What holds it.** `everyday/stageCall.test.ts`, *a placement call asked again names the order in
 force*.

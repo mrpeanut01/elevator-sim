@@ -461,11 +461,15 @@ export function stageCallStandingOrderOf(
 /**
  * **The placement question, asked again** — [§ D1528](../../../../DECISIONS.md). The 12:20 and 17:20
  * calls asked *What do the cars do?* after the player had parked them at 10:40, as if nothing had been
- * answered. The card now names the order in force and asks whether to keep it.
+ * answered. The card now names the order in force, from the clock it was pressed at, and asks whether
+ * to keep it. It states the order rather than crediting the press (*You parked the cars*), which
+ * `honesty/properties.ts#SECOND_PERSON_ACT` refuses without a declared attribution.
  */
 export function stageCallAskedAgainOf(order: StageCallStandingOrder, dayStartS: number | undefined): string {
-  const done = order.kind === 'park-cars-lobby' ? 'parked the cars' : 'spread the cars';
-  return `You ${done} at ${clockAt(order.atS, dayStartS)}. Keep that, or change it?`;
+  const since = clockAt(order.atS, dayStartS);
+  return order.kind === 'park-cars-lobby'
+    ? `Since ${since}, idle cars wait at the lobby. Keep that, or change it?`
+    : `Since ${since}, idle cars wait spread across the tower. Keep that, or change it?`;
 }
 
 /**

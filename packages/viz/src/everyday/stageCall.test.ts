@@ -556,17 +556,17 @@ describe('a placement call asked again names the order in force — § D1528', (
     const plain = stageCallCardOf(later, DAY_START_S, []);
     expect(plain.question).toBe(STAGE_CALL_COPY.questionAllCars);
     const again = stageCallCardOf(later, DAY_START_S, [], undefined, undefined, undefined, { kind: 'park-cars-lobby', atS: 9600 });
-    expect(again.question).toBe('You parked the cars at 10:40. Keep that, or change it?');
+    expect(again.question).toBe('Since 10:40, idle cars wait at the lobby. Keep that, or change it?');
     expect(again.options.map((option) => option.answer)).toEqual(plain.options.map((option) => option.answer));
     expect(again.facts).toEqual(plain.facts);
     expect(stageCallCardOf(later, DAY_START_S, [], undefined, undefined, undefined, { kind: 'spread-cars', atS: 12_000 }).question).toBe(
-      'You spread the cars at 11:20. Keep that, or change it?',
+      'Since 11:20, idle cars wait spread across the tower. Keep that, or change it?',
     );
     for (const [what, pattern] of BANNED) expect(again.question, what).not.toMatch(pattern);
     /* The driver question is its own and keeps its words. */
     const drivers = { 'driver-a': 'A', 'driver-b': 'B', leave: 'C' };
     expect(stageCallCardOf(later, DAY_START_S, [], drivers, undefined, undefined, { kind: 'park-cars-lobby', atS: 9600 }).question).not.toContain(
-      'parked',
+      'idle cars wait',
     );
   });
 });
