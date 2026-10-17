@@ -67,7 +67,7 @@ import {
   type StageAdmissionContext,
   type StageMove,
 } from '../campaign/stagePress.js';
-import type { StageReport } from '../campaign/judge.js';
+import { stageGoalNameOf, type StageReport } from '../campaign/judge.js';
 import type { CampaignStage } from '../campaign/types.js';
 import { emptyFixitState, parkingPriceUnits } from '../fixit/engine.js';
 import type { EditorParkingStrategy } from '../fixit/types.js';
@@ -149,6 +149,11 @@ export const STAGE_PLAY_COPY = Object.freeze({
   spendsNothing: 'As the building stands, nothing is spent.',
   refusedCannotRun: 'These settings cannot run together on this building, so the stage is not run.',
   refusedWithheld: 'This setting moves something no scenario sells, so the stage is not run.',
+  /*
+   * Issue #626 item 1: the goals were first named in the verdict, so a player ran the stage without
+   * knowing what it asked. The page now lists them before the press, in the verdict's own words.
+   */
+  goalsHeading: 'TO CLEAR THIS STAGE',
   runLabel: 'Run the stage',
   runAgainLabel: 'Run it again',
   backLabel: 'Back to the path',
@@ -308,6 +313,8 @@ export interface StagePlayFacts {
   readonly title: string;
   readonly teaches: string;
   readonly brief: readonly string[];
+  /** The stage's goals, named by `campaign/judge.ts#stageGoalNameOf`, the verdict's own labels. */
+  readonly goalNames: readonly string[];
   readonly buildingName: string;
   readonly statLine: string;
   readonly budgetUnits: number;
@@ -396,6 +403,9 @@ export interface StagePlayView {
   readonly buildingLine: string;
   readonly teaches: string;
   readonly letter: readonly string[];
+  /** The goals the verdict will judge, said before the first press (issue #626 item 1). */
+  readonly goalsHeading: string;
+  readonly goals: readonly string[];
   readonly held: string | undefined;
   readonly budgetLine: string;
   readonly refusal: string | undefined;
@@ -577,6 +587,7 @@ export function stageFactsOf(input: StageFactsInput): StagePlayFacts {
     title: stage.name,
     teaches: stage.teaches,
     brief: stage.brief,
+    goalNames: stage.goals.map(stageGoalNameOf),
     buildingName: input.building.name,
     statLine: statLineOf(input.building),
     budgetUnits,
@@ -668,13 +679,19 @@ function refusalOf(facts: StagePlayFacts): string | undefined {
   }
 }
 
-function statusOf(phase: StagePlayPhase): string | undefined {
+/**
+ * The running line, counted in crowds — issue #626 item 9. The worker counts arm-runs (both settings
+ * on each crowd), so it read *"Running 35 of 100"* on a batch of fifty crowds that stops at fifty
+ * when a goal is missed. A crowd is counted once both settings have run it.
+ */
+function statusOf(phase: StagePlayPhase, replications: number): string | undefined {
   if (phase.kind === 'failed') return STAGE_PLAY_COPY.failed;
   if (phase.kind !== 'running') return undefined;
-  const done = `${String(phase.completed)} of ${String(phase.total)}`;
+  const crowds = phase.total > 0 ? Math.floor((phase.completed * replications) / phase.total) : 0;
+  const done = `${String(crowds)} of ${String(replications)}`;
   return phase.seedSet === 'tuning'
-    ? `Running ${done} runs on the stage’s own crowds, both settings on the same passengers.`
-    : `Every goal met. Now ${done} runs on crowds you could not have tuned against; these decide the clear.`;
+    ? `Running ${done} of the stage’s own crowds, both settings on the same passengers.`
+    : `Every goal met. Now ${done} crowds you could not have tuned against; these decide the clear.`;
 }
 
 function verdictViewOf(facts: StagePlayFacts, verdict: StagePlayVerdictFacts, stale: boolean): StagePlayVerdictView {
@@ -811,6 +828,8 @@ export function stagePlayViewOf(facts: StagePlayFacts, phase: StagePlayPhase): S
     buildingLine: `${facts.buildingName} · ${facts.statLine}`,
     teaches: facts.teaches,
     letter: facts.brief,
+    goalsHeading: STAGE_PLAY_COPY.goalsHeading,
+    goals: facts.goalNames,
     held: facts.held === undefined ? undefined : `${STAGE_PLAY_COPY.heldHead}: ${facts.held}`,
     budgetLine: budgetLineOf(facts),
     refusal: refusalOf(facts),
@@ -827,7 +846,7 @@ export function stagePlayViewOf(facts: StagePlayFacts, phase: StagePlayPhase): S
       `stage’s own crowds, your settings and the building’s on the same passengers. If every goal is met, ` +
       `${String(facts.replications)} more follow on crowds you could not have tuned against, and those decide the clear.`,
     practice: facts.clearedBefore === true ? stagePracticeLineOf(facts.parUnits, facts.keptSpentUnits) : undefined,
-    status: statusOf(phase),
+    status: statusOf(phase, facts.replications),
     verdict: phase.kind === 'judged' ? verdictViewOf(facts, phase.verdict, phase.stale) : undefined,
     rungs: (facts.rungs ?? []).map((rung) => stageRungRowOf(rung, facts.balanceChimes ?? 0)),
     labLink: STAGE_PLAY_COPY.labLink,

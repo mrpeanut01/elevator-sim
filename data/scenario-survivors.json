@@ -58,7 +58,7 @@
   "scenarios": [
     {
       "id": "stage-1-first-call",
-      "name": "One shaft, low demand",
+      "name": "Two cars, low demand",
       "ladderPosition": 1,
       "inFirstHour": true,
       "buildingId": "garden-apartments",

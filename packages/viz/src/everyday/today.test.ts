@@ -46,7 +46,7 @@ import { recordRun } from '../record/recordRun.js';
 import { plannedDayOf } from '../dev/state.js';
 
 import { EM_DASH, groupThousands } from './figures.js';
-import { PRESS_DAY_DRIVER_HELD, TODAY_CHOICE_LINE, mootCountClause, todayOf } from './today.js';
+import { PRESS_DAY_DRIVER_HELD, TODAY_CHOICE_LINE, TODAY_CHOICE_LINE_HELD, mootCountClause, todayOf, type TodayRecord } from './today.js';
 import { pinnedDayLengthLineOf } from './firstDayLength.js';
 import { dailySeedFor } from '../shift/dailySeed.js';
 import { FIRST_SESSION_LINE_PINNED, firstSessionContractFor } from '../shift/firstSession.js';
@@ -901,6 +901,10 @@ describe('the moot sentence is drawn only over the run it was measured on — is
 
 describe('the brief holds the driver on an admitted pinned day under its standing order — § D1029', () => {
   function crownHeld(overrides: { readonly dispatcherId?: string; readonly seed?: bigint }): string | undefined {
+    return crownRecord(overrides).driverHeld;
+  }
+
+  function crownRecord(overrides: { readonly dispatcherId?: string; readonly seed?: bigint }): TodayRecord {
     const press = ladderRowFor('c7')?.pressDay;
     if (press === undefined) throw new Error('c7 pins no day');
     const resources = resourcesWith('crown-hotel');
@@ -929,8 +933,19 @@ describe('the brief holds the driver on an admitted pinned day under its standin
       daySeed: 20_260_925n,
       firstSession: false,
       units: 'metric',
-    }).driverHeld;
+    });
   }
+
+  it('says the hold on the lede rather than promising a choice the brief withholds — GitHub issue #626', () => {
+    const standing = ladderRowFor('c7')?.pressDay?.standingOrder ?? '';
+    const held = crownRecord({ dispatcherId: standing });
+    expect(held.driverHeld).toBe(PRESS_DAY_DRIVER_HELD);
+    expect(held.lede).toContain(TODAY_CHOICE_LINE_HELD);
+    expect(held.lede).not.toContain('You choose who drives before the day starts');
+    const free = crownRecord({ dispatcherId: 'eta' });
+    expect(free.driverHeld).toBeUndefined();
+    expect(free.lede).toContain(TODAY_CHOICE_LINE);
+  });
 
   it('holds it, with the reason, exactly when the driver is the standing order on the day as measured', () => {
     const standing = ladderRowFor('c7')?.pressDay?.standingOrder ?? '';
