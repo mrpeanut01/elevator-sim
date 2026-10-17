@@ -200,6 +200,16 @@ describe.skipIf(!HAS_BROWSER)('the stage’s record of a scored day — § D1239
       /* Seats B and D: the pinned call's own row, on the stage and on the report. */
       const rows = await textOf(page, '.everyday-stage-call-rows');
       expect.soft(rows, 'the stage printed no row for the pinned call').toContain(`The call at ${pinnedClock}`);
+      /*
+       * Wave AP, lane DT-2, swarm DT's Q3 item 4: the pinned call's row reads goals from its three runs,
+       * as an ordinary call's does, and prints no count. Red before: it printed the counts only.
+       */
+      expect.soft(rows, 'the pinned call’s row printed counts rather than goals').not.toContain(
+        `Riders who arrived from ${pinnedClock} to`,
+      );
+      expect.soft(rows, 'the pinned call’s row read no goals').toMatch(
+        new RegExp(`The call at ${pinnedClock}\\s*(No answer has crossed a bar yet\\.|From \\d{2}:\\d{2}, the day could no longer clear)`, 'u'),
+      );
       await page.locator('.everyday-bar-primary').click();
       await page.waitForSelector('.everyday-report', { timeout: 60_000 });
       const report = await textOf(page, '.everyday-report');

@@ -221,7 +221,7 @@ import {
   type DayCloseView,
   type DayDecider,
 } from '../shift/dayClose.js';
-import { NEXT_TOWER_STAY_LABEL, nextTowerOfferOf } from '../shift/nextTower.js';
+import { NEXT_TOWER_STAY_LABEL, heldTopOnwardOf, nextTowerOfferOf } from '../shift/nextTower.js';
 import { NEXT_WEEK_LABEL, nextWeekOf, weekBookingsLineOf, weekUnderWayHarderLineOf, type BookingClock } from '../shift/nextWeek.js';
 import { weekTopOf } from '../shift/weekLevels.js';
 import { dealtWeekOrdersOf } from '../shift/weekOrders.js';
@@ -328,6 +328,8 @@ import {
   dayCallCountsLineOf,
   dayCallFailedRowOf,
   dayCallGapSentenceOf,
+  dayCallSplitVerdictsOf,
+  DAY_CALL_COUNT_LABEL,
   dayCallRecordOf,
   dayCallsQuietSentenceOf,
   dayCallWrinkleQuietRowOf,
@@ -352,7 +354,7 @@ import { PRESS_DAY_DRIVER_HELD } from '../everyday/today.js';
 import { actsOf, wholeDayFor } from '../shift/dayLength.js';
 import { rushTutorialWorkedAnswerOf } from '../everyday/rushScreenModel.js';
 import { WORKED_ANSWER_COPY, type WorkedAnswerFacts, type WorkedAnswerView } from '../everyday/workedAnswer.js';
-import { WEEK_START_NEXT_LABEL, driverRecordLinesOf, weekScreenViewOf } from '../everyday/weekView.js';
+import { WEEK_START_NEXT_LABEL, WEEK_TOP_RUSH_COPY, driverRecordLinesOf, weekScreenViewOf, weekTopRushOf } from '../everyday/weekView.js';
 import { CAREER_MARK_WORDS, careerCloseLineOf, type CareerCloseInput } from '../everyday/careerCalls.js';
 import { CALL_BANDS, weekBandsLinesOf, type CallBandsCall } from '../shift/callBands.js';
 import { weekOrderFor } from '../shift/weekOrders.js';
@@ -3981,6 +3983,9 @@ const SHIFT_REPORT: SurfaceAdapter = {
     'shift/dayCalls.ts#dayCallRowOf',
     /* Wave AO, lane DR-1, § D1433: the row's sentence where the count's favourite missed, seeded below. */
     'shift/dayCalls.ts#dayCallGapSentenceOf',
+    /* Wave AP, lane DT-2 (swarm DT's Q3 items 2 and 5): every answer's verdict on a split row, and the count's label. */
+    'shift/dayCalls.ts#dayCallSplitVerdictsOf',
+    'shift/dayCalls.ts#DAY_CALL_COUNT_LABEL',
     'shift/dayCalls.ts#DAY_CALL_ROW_NOTE',
     'shift/dayCalls.ts#DAY_CALL_LEAVE_LABEL',
     /*
@@ -4416,6 +4421,32 @@ const SHIFT_REPORT: SurfaceAdapter = {
               : { verdict: 'cleared', readings },
         );
         if (gap !== undefined) seeds.push({ field: `${at}.dayCalls.gap`, text: gap, role: 'observation' });
+        /*
+         * Wave AP, lane DT-2, swarm DT's Q3 item 5: the same split row naming every answer's verdict,
+         * with this run's own readings through the day, so a missed goal's clock is the run's crossing
+         * where it has one and absent where it has none.
+         */
+        const maxima = dayCallMaximaOf(recording, recording.startedAt);
+        const split = dayCallSplitVerdictsOf(
+          {
+            atS: recording.startedAt,
+            windowEndS: dayCallWindowEndOf(recording.startedAt, recording.endedAt),
+            answer: 'leave',
+            counts: { 'park-cars-lobby': 3, 'spread-cars': 9, leave: 6 },
+            observations: { 'park-cars-lobby': favoured, 'spread-cars': whole, leave: whole },
+            maxima: { 'park-cars-lobby': maxima, 'spread-cars': maxima, leave: maxima },
+          },
+          (observations) =>
+            observations === favoured
+              ? {
+                  verdict: 'missed',
+                  readings: readings.map((reading) => (reading.goal.id === 'queue' ? { ...reading, state: 'missed' as const } : reading)),
+                }
+              : { verdict: 'cleared', readings },
+          (simTimeS) => clockOf(simTimeS, DAY_START_S),
+        );
+        if (split !== undefined) seeds.push({ field: `${at}.dayCalls.split`, text: split, role: 'observation' });
+        seeds.push({ field: `${at}.dayCalls.countLabel`, text: DAY_CALL_COUNT_LABEL, role: 'prose' });
       }
       /* § D1138 clause 4's practice sheet: its note, and its streak line, which carries the same words. */
       if (entry.retried.practiceNote !== undefined) {
@@ -12893,7 +12924,6 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
     'everyday/stageCallRow.ts#STAGE_CALL_TAKEN',
     'everyday/stageCallRow.ts#stageCallRowsCaveatOf',
     'everyday/stageCallRow.ts#STAGE_CALL_ROWS_CAVEAT',
-    'everyday/stageCallRow.ts#STAGE_CALL_COUNT_LABEL',
     'shift/dayCallMaxima.ts#dayCallCrossingPhraseOf',
     /*
      * Wave AN, lane DQ-1, § D1335: a moment whose question a run that could not be made cost, on the
@@ -15354,6 +15384,14 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     /* Lane AM-E (§ D1259): a held week's next tower, seeded in `seedWeekStake` for the same reason. */
     'shift/nextTower.ts#nextTowerOfferOf',
     'shift/nextTower.ts#NEXT_TOWER_STAY_LABEL',
+    /*
+     * Wave AP, lane DT-2 (swarm DT's Q4): the held top's onward tower where its ladder is harder, and
+     * the tower's Rush beside the top's primary, seeded in `seedWeekStake` for every census tower and
+     * every answer the device's best can give.
+     */
+    'shift/nextTower.ts#heldTopOnwardOf',
+    'everyday/weekView.ts#weekTopRushOf',
+    'everyday/weekView.ts#WEEK_TOP_RUSH_COPY',
     /*
      * Wave AN, lane DQ-2 (§ D1344): what a closed week's sheet deals next, held and not held, and
      * the door's line calling a week harder where the house's census fell. Seeded in `seedNextWeek`
@@ -18798,6 +18836,23 @@ function seedWeekStake(
     seeds.push({ field: `week.onward.${contract.id}.line`, text: offer.line, role: 'observation' });
   }
   seeds.push({ field: 'week.onward.stay', text: NEXT_TOWER_STAY_LABEL, role: 'label' });
+  /* Wave AP, lane DT-2: the held top's onward tower, where its ladder is harder, and its Rush line. */
+  for (const contract of CONTRACTS) {
+    const deal = weekDealOf(contract.id);
+    if (deal === undefined || deal.target === 0) continue;
+    const top = heldTopOnwardOf(contract.id, { yours: deal.target, target: deal.target }, nameOf);
+    if (top !== undefined) seeds.push({ field: `week.topOnward.${contract.id}.line`, text: top.line, role: 'observation' });
+  }
+  seeds.push({ field: 'week.topRush.label', text: WEEK_TOP_RUSH_COPY.label, role: 'label' });
+  for (const [arm, best] of [
+    ['unasked', undefined],
+    ['silent', { kind: 'silent' }],
+    ['none', { kind: 'none' }],
+    ['row', { kind: 'row', heldS: 1325, roundCount: 3, modifiers: [] }],
+    ['unreplayable', { kind: 'unreplayable', reason: 'this build cannot replay it' }],
+  ] as const) {
+    seeds.push({ field: `week.topRush.${arm}`, text: weekTopRushOf(best).line, role: 'prose' });
+  }
   seedNextWeek(seeds, observations, clock);
   for (const [arm, record] of [
     ['one', { contractId: 'c2', closed: 1, met: 0, best: 3 }],

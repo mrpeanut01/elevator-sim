@@ -6,6 +6,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  DAY_CALL_COUNT_LABEL,
   DAY_CALL_LONG_WAIT_S,
   dayCallFailedRowOf,
   dayCallRowOf,
@@ -18,7 +19,6 @@ import { clockOf } from '../shift/report.js';
 import type { Observations, ShiftGoal } from '../shift/types.js';
 
 import {
-  STAGE_CALL_COUNT_LABEL,
   STAGE_CALL_FAILED_NOTE,
   STAGE_CALL_NO_CROSSING,
   STAGE_CALL_ROWS_CAVEAT,
@@ -224,7 +224,7 @@ describe('a call’s row leads with the first crossing and reads the goals at th
     const old = stageCallRowsOf({ records: [RECORD, READ], playheadS: 7860, endedAt: 36_000, log: [], clockOf: clock, goals: GOALS });
     expect(old[0]?.counts).toBe(dayCallRowOf(RECORD, 1, () => 'Shift cleared', clock).why.match(/Riders who arrived[^.]*\./u)?.[0]);
     expect(old[0]?.lead).toBeUndefined();
-    expect(stageCallRowsCaveatOf(old)).toBe(`${STAGE_CALL_ROWS_CAVEAT} ${STAGE_CALL_COUNT_LABEL}`);
+    expect(stageCallRowsCaveatOf(old)).toBe(`${STAGE_CALL_ROWS_CAVEAT} ${DAY_CALL_COUNT_LABEL}`);
     expect(stageCallLeadOf(RECORD, GOALS, 7860, clock)).toBeUndefined();
     /* The failed and quiet rows are not calls' rows, and draw no caveat alone. */
     expect(stageCallRowsCaveatOf(stageCallFailedRowsOf({ failures: [{ atS: 7200, question: 'driver' }], playheadS: 7200, clockOf: clock }))).toBeUndefined();

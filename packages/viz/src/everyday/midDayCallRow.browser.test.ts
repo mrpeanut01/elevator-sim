@@ -10,8 +10,9 @@
  * 1. while a later card is up inside the window, no row is on the page: the first call's window has
  *    not been observed yet, and nothing about the answers not taken prints before it is;
  * 2. played on, the first call's row appears mid-day, with the day still running, at a clock at
- *    least eleven minutes past the call's, carrying three counts in the report row's words and no
- *    verdict.
+ *    least eleven minutes past the call's, leading with its first crossing or *No answer has crossed
+ *    a bar yet*, each answer read at the playhead with the answer taken first, no count, the caveat
+ *    once above the rows, and no verdict (wave AP, lane DT-2, swarm DT's Q3).
  *
  * The report row's words are the same sentence by construction (`shift/dayCalls.ts#dayCallCountsLineOf`)
  * and are held by `stageCallRow.test.ts` and the `day-call-stage-row` pair rather than by a close
@@ -131,25 +132,37 @@ describe.skipIf(!HAS_BROWSER)('a call’s row on the stage mid-day — § D1219'
       }
       expect(cardsBeforeRow, 'no call fell inside the first call’s window, so nothing was held back').toBeGreaterThan(0);
 
-      /* The first call's row, mid-day. */
+      /*
+       * The first call's row, mid-day. Since wave AP's lane DT-2 (swarm DT's Q3) a row that reads goals
+       * leads with the first crossing or says none has happened, reads each answer at the playhead with
+       * the answer taken first, prints no count, and the caveat stands once above the rows.
+       */
       await page.waitForSelector('.everyday-stage-call-row', { timeout: 60_000 });
-      const shown = await page.evaluate(() => ({
-        clock: document.querySelector('.everyday-stage-clock')?.textContent ?? '',
-        heading: document.querySelector('.everyday-stage-call-row-heading')?.textContent ?? '',
-        counts: document.querySelector('.everyday-stage-call-row-counts')?.textContent ?? '',
-        note: document.querySelector('.everyday-stage-call-row-note')?.textContent ?? '',
-        dayRunning: document.querySelector<HTMLButtonElement>('.everyday-stage-skip')?.disabled === false,
-        report: document.querySelector('.everyday-report') !== null,
-      }));
+      const shown = await page.evaluate(() => {
+        const first = document.querySelector('.everyday-stage-call-row');
+        return {
+          clock: document.querySelector('.everyday-stage-clock')?.textContent ?? '',
+          heading: first?.querySelector('.everyday-stage-call-row-heading')?.textContent ?? '',
+          lead: first?.querySelector('.everyday-stage-call-row-lead')?.textContent ?? '',
+          goals: first?.querySelector('.everyday-stage-call-row-goals')?.textContent ?? '',
+          counts: first?.querySelector('.everyday-stage-call-row-counts')?.textContent ?? null,
+          caveats: document.querySelectorAll('.everyday-stage-call-rows-caveat').length,
+          caveat: document.querySelector('.everyday-stage-call-rows-caveat')?.textContent ?? '',
+          dayRunning: document.querySelector<HTMLButtonElement>('.everyday-stage-skip')?.disabled === false,
+          report: document.querySelector('.everyday-report') !== null,
+        };
+      });
       expect(shown.report).toBe(false);
       expect(shown.dayRunning, 'the row arrived only at the day’s end').toBe(true);
       expect(minutesOf(shown.clock) - minutesOf(shown.heading), 'the row printed before the call plus 660 s').toBeGreaterThanOrEqual(11);
       expect(minutesOf(shown.heading)).toBe(firstClock);
-      expect(shown.counts).toMatch(
-        /^Riders who arrived from \d{2}:\d{2} to \d{2}:\d{2} and waited a minute or more: \d+ with .+, \d+ with .+ and \d+ with .+\.$/u,
-      );
-      for (const text of [shown.heading, shown.counts, shown.note]) {
-        expect(text).not.toMatch(/Shift (cleared|missed)|cleared with|missed with/u);
+      expect(shown.lead).toMatch(/^(No answer has crossed a bar yet\.|From \d{2}:\d{2}, the day could no longer clear with .+\.)$/u);
+      expect(shown.goals).toMatch(/^By \d{2}:\d{2}, the deepest landing and the longest wait so far: .+, your answer; .+\.$/u);
+      expect(shown.counts, 'a row that reads goals printed a count').toBeNull();
+      expect(shown.caveats).toBe(1);
+      expect(shown.caveat).toContain('Whether the day cleared is on the report when the day closes.');
+      for (const text of [shown.heading, shown.lead, shown.goals]) {
+        expect(text).not.toMatch(/Shift (cleared|missed)|cleared with|missed with|the day cleared/u);
       }
     } finally {
       await page.close();

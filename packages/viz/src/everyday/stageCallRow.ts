@@ -114,16 +114,13 @@ export const STAGE_CALL_ROWS_CAVEAT =
   'it. Whether the day cleared is on the report when the day closes.';
 
 /**
- * The caveat's last sentence where a row still prints counts: a record written before the readings,
- * whose counts are all its row has. Wave AO's label, kept for that row.
+ * The caveat for `rows`, or `undefined` where none of them is a call's. Where a row still prints counts (a
+ * record written before the readings) it ends with the count's label, `shift/dayCalls.ts#DAY_CALL_COUNT_LABEL`.
  */
-export const STAGE_CALL_COUNT_LABEL = DAY_CALL_COUNT_LABEL;
-
-/** The caveat for `rows`, or `undefined` where none of them is a call's. */
 export function stageCallRowsCaveatOf(rows: readonly StageCallRowView[]): string | undefined {
   const calls = rows.filter((row) => row.kind === 'call');
   if (calls.length === 0) return undefined;
-  return calls.some((row) => row.counts !== undefined) ? `${STAGE_CALL_ROWS_CAVEAT} ${STAGE_CALL_COUNT_LABEL}` : STAGE_CALL_ROWS_CAVEAT;
+  return calls.some((row) => row.counts !== undefined) ? `${STAGE_CALL_ROWS_CAVEAT} ${DAY_CALL_COUNT_LABEL}` : STAGE_CALL_ROWS_CAVEAT;
 }
 
 /** The row's lead before any answer's run has crossed a bar at the playhead. Never *cleared*. */
