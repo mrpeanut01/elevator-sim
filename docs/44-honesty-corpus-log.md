@@ -19,6 +19,26 @@ after this split; the entries below are older than the cap and are registered th
 The always-on row is measured on the integrated head; the deep row is read from the nightly
 `corpus-figures` job in [`.github/workflows/deep-tiers.yml`](../.github/workflows/deep-tiers.yml).
 
+## Wave AP
+
+**Wave AP's head moves 323.80 strings a case always-on, with one surface, and the surface is
+main's.** The base, `5228fab`, reproduced wave AO's row to the string. Each merge on the integration
+branch was measured in turn, so the move below is tallied by tree, not by quotient (§ D256); the WIP
+snapshots landed together and are not split between their lanes. Measured at `dbb3be9`, before the
+survivor census rewrote `data/scenario-survivors.json`; the deep tier is left to the nightly job.
+
+| step (merge order) | strings | move | per case | surfaces |
+|---|---|---|---|---|
+| base `5228fab` | 1 028 626 | | | 79 |
+| `main`'s lobby and cycle-1 fixes (`5493fc0`) | 1 038 524 | **+9 898** | 202.00 | **+1**, `everyday/lobbyModel.ts#lobbyViewOf` |
+| four lanes' WIP snapshots (`f8fff51`) | 1 038 328 | −196 | −4.00 | 0 |
+| AP-D2 · DT-2 · AP-D1 · main #629 | 1 039 553 | +686 · +539 · 0 · 0 | 25.00 | 0 |
+| DT-1 · G-1 · G-3 · G-2 (and two fixes, 0 each) | **1 044 492** | +735 · +2 195 · +49 · +1 960 | 100.80 | 0 |
+| **wave AP's lanes, net of main** | | **+5 968** | **121.80** | **0** |
+| cases · simulations · failing cases | 49 · 606 · 0 | **unmoved** | | |
+
+**The surface sets were diffed** at every step: the only change is the lobby's, from `main`.
+
 ## Wave AO
 
 **Wave AO's move is 538.37 strings a case always-on, with no new surface.** The base, `main` at
