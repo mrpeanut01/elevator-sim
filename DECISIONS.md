@@ -52985,6 +52985,11 @@ changes the run* compares two crowds' legs.
 > **Taken 2026-10-17 by agent sessions under delegated authority, not by the product owner**: lane
 > DT-1, swarm DT's Q1 and Q2 item 3. **Amends [§ D1400](#d1400)'s admission** (the pool gates are
 > read on top of it, never in place of it).
+>
+> **Owner, 2026-10-17:** on Midtown the gates withdraw weeks 3 and 4 (the monotone clause, read per
+> profile, refuses week 3 on Contract-net auction's 0 to 4.7 % rise), so Midtown's top is week 2. The
+> product owner ruled to keep week 2 as the top for now. Reversing § D1400's per-profile reading
+> would re-admit week 3 without a new census.
 
 **The ruling.** `weekPool.ts#poolLevelReadingOf` re-reads, over the pool as dealt: DC-10's second
 half (the standing order, left alone, misses at least a third of each counted day as dealt), DC-11
