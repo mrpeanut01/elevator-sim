@@ -408,7 +408,13 @@ describe('the draw is reproducible, affordable and live', () => {
     );
   });
 
-  it('never draws a configuration the rung cannot pay for', () => {
+  /*
+   * This case used to read *"never draws a configuration the rung cannot pay for"*, and it held only
+   * because it priced the drawn dials alone. The press prices the dispatcher they resolve to, which
+   * can cost more (GitHub issue #628), so the claim is now the narrower true one: every draw's bundle
+   * fits the rung, and a draw the press prices above it says so.
+   */
+  it('draws only bundles the rung can pay for, and flags a draw the press prices above it', () => {
     for (const units of [4, 15, 24, 54]) {
       const drawn = sampleReachableConfigurations({
         space: fixture.space,
@@ -421,11 +427,13 @@ describe('the draw is reproducible, affordable and live', () => {
       });
       expect(drawn.configurations.length, `at ${String(units)} units`).toBeGreaterThan(0);
       for (const configuration of drawn.configurations) {
-        expect(configuration.units, `${configuration.changeIds.join('+')}`).toBeLessThanOrEqual(units);
         expect(
           admitPurchase(schedule, units, Object.keys(configuration.values)).admitted,
           `${configuration.changeIds.join('+')} at ${String(units)} units`,
         ).toBe(true);
+        expect(configuration.affordable, `${configuration.changeIds.join('+')}`).toBe(
+          configuration.units <= units,
+        );
       }
     }
   });
