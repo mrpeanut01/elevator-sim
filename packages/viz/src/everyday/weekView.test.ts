@@ -503,14 +503,22 @@ describe('the week’s stake on the strip, and its sheet at the close — § D11
     );
     expect(heldOn('c6', { kind: 'none' }).rush?.line).toContain(WEEK_TOP_RUSH_COPY.none);
     expect(heldOn('c6', { kind: 'silent' }).rush?.line).toBe(`${WEEK_TOP_RUSH_COPY.what} ${WEEK_TOP_RUSH_COPY.chimes}`);
-    /* Ashgate's top: Midtown follows it, and the house's census does not read Midtown's ladder harder. */
+    /*
+     * Ashgate's top: since lane DT-1's pool (§ D1459) Midtown's top week is its pooled week 2, and the
+     * house's census reads it harder than Ashgate's top too (the paired interval excludes zero), so
+     * Midtown is offered here as from Chancery House.
+     */
     const ashgate = heldOn('c10');
     expect(ashgate.next?.top).toBe(true);
     expect(nextAdmittedTowerAfter('c10')).toBe('c2');
-    expect(ladderHarderThanTopOf('c10', 'c2')?.harder).toBe(false);
-    expect(ashgate.onward).toBeUndefined();
+    expect(ladderHarderThanTopOf('c10', 'c2')?.harder).toBe(true);
+    expect(ashgate.onward?.contractId).toBe('c2');
     expect(ashgate.primary).toBe(WEEK_START_NEXT_LABEL);
+    expect(ashgate.onwardPrimary).toBe(false);
     expect(ashgate.rush).toBeDefined();
+    /* Where the census has no reading of the next tower against this one, no tower is offered. */
+    expect(ladderHarderThanTopOf('c3', 'c2')).toBeUndefined();
+    expect(heldOn('c3').onward).toBeUndefined();
     /* No word of unlocking, and *harder* only in the house's measure's sentence. */
     for (const view of [chancery, ashgate]) {
       for (const text of [view.rush?.line ?? '', view.onward?.line ?? '']) {
