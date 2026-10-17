@@ -29,7 +29,12 @@ import { admitStageMove, routeRefusalsOf, routeUnitsOf, stagePathOf, stageUnitsA
 import type { CampaignStage } from '../campaign/types.js';
 import { DATA_DIR, requireBuilding } from '../fixtures.test-helper.js';
 import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
+import { frameAt } from '../frame/frameAt.js';
 import { recordRun } from '../record/recordRun.js';
+import type { VizRecording } from '../contract/types.js';
+import { DEFAULT_STAGE_SIM_PER_REAL_S } from './stageScreenModel.js';
+import { tutorialPaceOf } from './tutorialModel.js';
+import { waitBandsAt } from '../live/bands.js';
 import type { PublishedGoalRates } from '../scenario/published.js';
 import type { PublishedSurvivors } from '../scenario/survivors.js';
 import { PAR_MARK_COPY } from '../scenario/par.js';
@@ -44,6 +49,9 @@ import {
   stagePageMovesOf,
   stagePlayViewOf,
   stagePracticeLineOf,
+  stageWatchAfterEndOf,
+  stageWatchBusy,
+  stageWatchPaceOf,
   verdictFactsOf,
   type StagePlayChoice,
   type StagePlayVerdictFacts,
@@ -708,5 +716,86 @@ describe('a press plays one of the stage’s crowds, and the words over it carry
     expect(judged.verdict).toBeDefined();
     const held = stagePlayViewOf(factsOf(stage, choice, 'held for a reason'), { kind: 'running', seedSet: 'tuning', completed: 0, total: 100 });
     expect(held.watch).toBeUndefined();
+  });
+});
+
+/**
+ * Play a pair the way `caseStage.ts` does, at 60 frames a real second, with `speedAt` read off each
+ * frame, and say how many real seconds passed before anything moved and how many showed something.
+ */
+function playedSeconds(
+  panes: readonly VizRecording[],
+  speedAt: (simTimeS: number) => number,
+): { readonly toFirstMotionS: number | undefined; readonly busyS: number; readonly totalS: number } {
+  const step = 1 / 60;
+  const end = Math.max(...panes.map((pane) => pane.endedAt));
+  let sim = Math.min(...panes.map((pane) => pane.startedAt));
+  let real = 0;
+  let busy = 0;
+  let first: number | undefined;
+  while (sim < end) {
+    const frames = panes.map((pane) => frameAt(pane, sim));
+    if (stageWatchBusy(frames)) {
+      busy += step;
+      first ??= real;
+    }
+    sim += speedAt(sim) * step;
+    real += step;
+  }
+  return { toFirstMotionS: first, busyS: busy, totalS: real };
+}
+
+describe('the pair crosses its quiet fast and plays what moves at the player’s speed — wave AQ lane AQ-1', () => {
+  it('shows movement on stage 1 within the first second and plays its rides long enough to see', () => {
+    const stage = stageAt(0);
+    const baseline = config.dispatcherProfilesById.get(stage.dispatcher.startingProfileId);
+    if (baseline === undefined) throw new Error('no baseline');
+    const recording = recordRun(
+      demonstrationConfigFor({
+        stage,
+        building: requireBuilding(config, stage.building),
+        dispatcherProfile: baseline,
+        trafficProfiles: config.trafficProfiles,
+        elevatorSpecs: config.elevatorSpecs,
+        dispatcherProfiles: config.dispatcherProfiles,
+      }),
+      { recordDecisions: false },
+    ).recording;
+    const panes = [recording, recording];
+    const watching = DEFAULT_STAGE_SIM_PER_REAL_S;
+    const now = playedSeconds(panes, (simTimeS) =>
+      stageWatchPaceOf({ frames: panes.map((pane) => frameAt(pane, simTimeS)), watchingSimPerRealS: watching }),
+    );
+    /* The defect, measured: the tutorial's rule crossed the whole morning in about ten seconds of quiet. */
+    const before = playedSeconds(panes, (simTimeS) =>
+      tutorialPaceOf({ longestStandingS: waitBandsAt(recording, simTimeS).longestCurrentWaitS, watchingSimPerRealS: watching }),
+    );
+    expect(before.busyS, 'the old rule already showed the rides; this case tests nothing').toBeLessThan(5);
+    expect(now.toFirstMotionS).toBeDefined();
+    expect(now.toFirstMotionS ?? Infinity).toBeLessThan(1);
+    expect(now.busyS).toBeGreaterThan(20);
+    /* Most of what the pair plays is something happening, not two cars standing still. */
+    expect(now.busyS / now.totalS).toBeGreaterThan(0.7);
+  }, 60_000);
+
+  it('never moves the playhead: a quiet frame and a busy one differ only in speed', () => {
+    const quiet = stageWatchPaceOf({ frames: [], watchingSimPerRealS: 4 });
+    expect(quiet).toBeGreaterThan(4);
+    expect(stageWatchPaceOf({ frames: [], watchingSimPerRealS: 200 })).toBe(200);
+  });
+
+  it('plays the pair again at its end, after the verdict as during the batch, and only a skip ends it', () => {
+    expect(stageWatchAfterEndOf('ended')).toBe('replay');
+    expect(stageWatchAfterEndOf('skipped')).toBe('drop');
+  });
+
+  it('takes the pair away once the verdict is stale, because it was of the settings before the move', () => {
+    const stage = stageAt(0);
+    const facts = factsOf(stage, { profileId: stage.dispatcher.startingProfileId, parking: null });
+    const verdict: StagePlayVerdictFacts = {
+      headline: 'h', goals: [], holdoutSentence: null, metOnTuningSeeds: false, cleared: false, paid: undefined,
+    };
+    expect(stagePlayViewOf(facts, { kind: 'judged', verdict, stale: false }).watch).toBeDefined();
+    expect(stagePlayViewOf(facts, { kind: 'judged', verdict, stale: true }).watch).toBeUndefined();
   });
 });

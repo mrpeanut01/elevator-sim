@@ -65,6 +65,8 @@ import {
   stageFactsOf,
   stageMoveOf,
   stagePlayViewOf,
+  stageWatchAfterEndOf,
+  stageWatchPaceOf,
   verdictFactsOf,
   type StagePlayChoice,
   type StagePlayFacts,
@@ -72,7 +74,6 @@ import {
   type StagePlayView,
 } from './stagePlay.js';
 import { EVERYDAY_COLORS as C, EVERYDAY_RADII as R, EVERYDAY_TYPE as TYPE } from './tokens.js';
-import { tutorialPaceOf } from './tutorialModel.js';
 import type { EverydayState } from './types.js';
 
 /* ------------------------------------------------------------------------- *
@@ -155,6 +156,12 @@ interface Session {
   watch: readonly [VizRecording, VizRecording] | undefined;
   /** The block playing {@link watch}, built once per press and re-appended on every redraw. */
   watchStage: CaseStage | undefined;
+  /**
+   * What a press still owes the player's eye — wave AQ lane AQ-1, the playtest's P1: at 1280 × 800
+   * *Run the stage* changed only its own label, because the counter, the pair and the verdict are
+   * all drawn below the controls. Each is scrolled into view once, as it arrives.
+   */
+  reveal: { status: boolean; pair: boolean; verdict: boolean };
 }
 
 const sessions = new Map<string, Session>();
@@ -172,6 +179,7 @@ function sessionOf(stage: CampaignStage): Session {
       pressed: undefined,
       watch: undefined,
       watchStage: undefined,
+      reveal: { status: false, pair: false, verdict: false },
     };
     sessions.set(stage.id, session);
   }
@@ -409,6 +417,7 @@ function press(data: Loaded, stageId: string, context: EverydayScreenShellContex
   const token = ++runToken;
   const host = context.host;
   session.pressed = pressedChoice;
+  session.reveal = { status: true, pair: true, verdict: true };
   session.phase = { kind: 'running', seedSet: 'tuning', completed: 0, total: 0 };
   live?.redraw();
   live?.refreshBar();
@@ -481,6 +490,29 @@ function press(data: Loaded, stageId: string, context: EverydayScreenShellContex
 /* ------------------------------------------------------------------------- *
  * The mount
  * ------------------------------------------------------------------------- */
+
+/**
+ * Scroll each of a press's arrivals into view once — {@link Session.reveal}. The counter as the
+ * press lands, the pair to the top of the view when it starts playing, and the verdict's head by the
+ * least scroll that shows it, so the pair stays in sight above it where the window has room.
+ */
+function revealArrivals(session: Session, root: HTMLElement): void {
+  const show = (selector: string, block: ScrollLogicalPosition): boolean => {
+    const node = root.querySelector<HTMLElement>(selector);
+    if (node === null || !node.isConnected) return false;
+    node.scrollIntoView({ block, inline: 'nearest' });
+    return true;
+  };
+  if (session.reveal.pair && session.watchStage !== undefined && show('.everyday-stage-play-watch', 'start')) {
+    session.reveal.pair = false;
+    session.reveal.status = false;
+  }
+  if (session.reveal.status && show('.everyday-stage-play-status', 'nearest')) session.reveal.status = false;
+  if (session.reveal.verdict && show('.everyday-stage-play-verdict-head', 'nearest')) {
+    session.reveal.verdict = false;
+    session.reveal.status = false;
+  }
+}
 
 const WATCH_CLASSES = Object.freeze({
   root: 'everyday-stage-play-watch',
@@ -676,16 +708,18 @@ export function mountStagePlay(host: HTMLElement, context: EverydayScreenShellCo
           { recording: candidateRun, caption: view.watch.candidateCaption },
         ],
         speedSimPerRealS: watching,
-        pace: (longestStandingS) => tutorialPaceOf({ longestStandingS, watchingSimPerRealS: watching }),
+        /* Quiet minutes crossed fast and anything moving at the player's speed (wave AQ, AQ-1). */
+        pace: (_longestStandingS, frames) => stageWatchPaceOf({ frames, watchingSimPerRealS: watching }),
         copy: { eyebrow: view.watch.eyebrow, note: view.watch.note, skip: view.watch.skip },
         wide: true,
         classes: WATCH_CLASSES,
         /*
-         * A pair that ends while the batch still counts plays again from its first minute, so the
-         * wait is never back to a counter alone; once the verdict is in, its end or a skip ends it.
+         * A pair that ends plays again from its first minute, while the batch counts and after the
+         * verdict alike, so the verdict always has the pair beside it; only a skip ends it
+         * (`stagePlay.ts#stageWatchAfterEndOf`).
          */
         onDone: (how) => {
-          if (how === 'ended' && session.phase.kind === 'running') {
+          if (stageWatchAfterEndOf(how) === 'replay') {
             session.watchStage?.dispose();
             session.watchStage = undefined;
           } else {
@@ -695,6 +729,10 @@ export function mountStagePlay(host: HTMLElement, context: EverydayScreenShellCo
         },
       });
       root.append(session.watchStage.root);
+    } else if (session.watchStage !== undefined) {
+      /* The verdict went stale under a moved setting: the pair was of the old one, so it stops. */
+      session.watchStage.dispose();
+      session.watchStage = undefined;
     }
     if (view.status !== undefined) {
       const status = para(doc, 'everyday-stage-play-status', view.status, `font:500 12.5px ${TYPE.mono};color:${C.inkSoft}`);
@@ -736,6 +774,7 @@ export function mountStagePlay(host: HTMLElement, context: EverydayScreenShellCo
       }
       root.append(verdict);
     }
+    revealArrivals(session, root);
 
     const lab = el(doc, 'div', 'everyday-stage-play-lab');
     lab.style.cssText = 'display:grid;gap:4px;min-width:0';

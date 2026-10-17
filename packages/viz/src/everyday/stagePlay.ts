@@ -69,6 +69,7 @@ import {
 } from '../campaign/stagePress.js';
 import { stageGoalNameOf, type StageReport } from '../campaign/judge.js';
 import type { CampaignStage } from '../campaign/types.js';
+import type { Frame } from '../contract/types.js';
 import { emptyFixitState, parkingPriceUnits } from '../fixit/engine.js';
 import type { EditorParkingStrategy } from '../fixit/types.js';
 import type { PriceSchedule } from '../pricing/types.js';
@@ -78,6 +79,7 @@ import type { PublishedSurvivorScenario } from '../scenario/survivors.js';
 import { statLineOf } from '../shift/contracts.js';
 import { fixitParkingRow, type FixitParkingRow } from './fixitScreenModel.js';
 import { stageParLineOf, stageParNoteOf } from './scenarioModel.js';
+import { TUTORIAL_QUIET_SIM_PER_REAL_S } from './tutorialModel.js';
 
 /** The dimension the parking select writes. The fix-it editor's own control, one id. */
 const PARKING_DIMENSION = 'idle.parkingStrategy';
@@ -869,7 +871,7 @@ export function stagePlayViewOf(facts: StagePlayFacts, phase: StagePlayPhase): S
     practice: facts.clearedBefore === true ? stagePracticeLineOf(facts.parUnits, facts.keptSpentUnits) : undefined,
     status: statusOf(phase, facts.replications),
     watch:
-      facts.held === undefined && (phase.kind === 'running' || phase.kind === 'judged')
+      facts.held === undefined && (phase.kind === 'running' || (phase.kind === 'judged' && !phase.stale))
         ? {
             eyebrow: STAGE_PLAY_COPY.watchEyebrow,
             note: STAGE_PLAY_COPY.watchNote,
@@ -883,4 +885,50 @@ export function stagePlayViewOf(facts: StagePlayFacts, phase: StagePlayPhase): S
     labLink: STAGE_PLAY_COPY.labLink,
     labNote: STAGE_PLAY_COPY.labNote,
   };
+}
+
+/* -------------------------------------------------------------------------- *
+ * The pair's pace
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **Whether anything is happening on the pair at this instant** — wave AQ lane AQ-1, the playtest's
+ * stage 1 finding: Garden Apartments' two cars sat idle at the Lobby for the whole of the first
+ * ten seconds. Somebody waiting, somebody aboard, a car between floors or a door not shut, on either
+ * pane. A parking move is a car between floors, so a stage about where idle cars wait shows them go.
+ */
+export function stageWatchBusy(frames: readonly Frame[]): boolean {
+  return frames.some(
+    (frame) =>
+      frame.totalWaiting > 0 ||
+      frame.cars.some((car) => car.occupants > 0 || car.direction !== 0 || car.doorPhase !== 'closed'),
+  );
+}
+
+/**
+ * **The pair's speed at a frame** — the tutorial's quiet rate (`tutorialModel.ts`) while nothing
+ * happens on either pane, and the player's own speed the moment anything does. It replaces
+ * `tutorialPaceOf` on this screen because that rule slows down only for a wait of a minute, so a
+ * stage whose riders are all served quickly crossed its whole morning at the quiet rate and showed
+ * every ride as a blink. Speed only, never the playhead: the two panes stay at one minute, and the
+ * verdict is the fifty crowds' whatever the pair plays at.
+ */
+export function stageWatchPaceOf(input: {
+  readonly frames: readonly Frame[];
+  readonly watchingSimPerRealS: number;
+}): number {
+  return stageWatchBusy(input.frames)
+    ? input.watchingSimPerRealS
+    : Math.max(input.watchingSimPerRealS, TUTORIAL_QUIET_SIM_PER_REAL_S);
+}
+
+/**
+ * **What the pair does when it reaches its end** — the playtest's second stage finding: after a miss
+ * the pair took itself away a few seconds after the verdict, leaving the verdict with nothing to
+ * read it against. It plays again from its first minute whether the batch is still counting or the
+ * verdict is in, and only the player's skip ends it; a new press, a setting that makes the verdict
+ * stale, or leaving the page replaces or removes it.
+ */
+export function stageWatchAfterEndOf(how: 'skipped' | 'ended'): 'replay' | 'drop' {
+  return how === 'skipped' ? 'drop' : 'replay';
 }
