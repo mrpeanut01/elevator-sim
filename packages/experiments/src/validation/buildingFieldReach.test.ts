@@ -53,6 +53,9 @@
  * directions: an entry whose run starts to differ is stale and goes red too. The data is not edited
  * here; whether the field is removed, re-authored or the reader extended is the owner's call.
  *
+ * The three entries below were ruled on in GitHub issue #625 (a decision swarm on 2026-10-17): each
+ * is kept as authored intent, permanently, and is not owed. A new entry is owed until it is ruled.
+ *
  * Three were found on the tree this landed on (2026-10-17): `ctf-class-reference`'s pressurised
  * shuttle cabins, `burj-class-reference`'s four escalators, and `st-jude-hospital`'s bed-car duty.
  * Each entry states its cause and how far that cause is measured.
@@ -208,7 +211,10 @@ const KNOWN_INERT: ReadonlyMap<string, { readonly issue: string; readonly why: s
         '(config/resolveCar.ts#descentSpeedOf takes the lower), so the cabin buys nothing. The ' +
         'loader now says so: since GitHub issue #625, pressurisation-buys-nothing compares the ' +
         'effective descent with and without the cabin, and is raised on this shuttle. The data is ' +
-        'unchanged, so the field stays inert. Identical legs measured at 300, 1 800 and 7 200 s.',
+        'unchanged, so the field stays inert. Identical legs measured at 300, 1 800 and 7 200 s. ' +
+        'Kept on purpose (#625): without it the air-pressure cap re-imposes 10 m/s and ' +
+        'descentSpeedMps becomes the dead field instead (core/src/sim/directionalSpeedSeam.test.ts). ' +
+        'Permanent; not owed.',
     },
   ],
   [
@@ -216,11 +222,13 @@ const KNOWN_INERT: ReadonlyMap<string, { readonly issue: string; readonly why: s
     {
       issue: '#232',
       why:
-        'Its four escalators join G-1, 43-44, 76-77 and 123-124, and each pair is also served by a ' +
-        'bank that serves the floors beyond it, so no journey to a populated floor is shorter by the ' +
-        'escalator; their own $comment notes each was placed for a double-deck shuttle that GitHub ' +
-        'issue #438 removed. Identical legs measured at 300, 1 800 and 7 200 s under eta; that the ' +
-        'routing rule is the cause is read from traffic/route.ts, not measured.',
+        'Its four escalators join G-1, 43-44, 76-77 and 123-124. Routing uses them: 832 of the ' +
+        '27 060 floor-pair shortest routes, pinned in viz/src/record/burjReference.test.ts. The ' +
+        'demand the tree ships never takes them: identical legs at 300, 1 800 and 7 200 s under ' +
+        'eta. The cause is unmeasured; a plausible guess is that those routes start or end on ' +
+        'levels the shipped traffic does not populate. Kept as the reference tower\'s plan (#625). ' +
+        'Permanent; not owed. Revisit only if a demand-weighted count is zero under every shipped ' +
+        'dispatcher and template.',
     },
   ],
   [
@@ -231,8 +239,10 @@ const KNOWN_INERT: ReadonlyMap<string, { readonly issue: string; readonly why: s
         'Duty binds dispatch only through the dutyMismatch cost term (§ D549), and no shipped ' +
         'dispatcher profile weights it, so the bed car is dispatched exactly as a passenger car. ' +
         'The trace changes (riders are drawn with duties) and no leg does. It is live under a ' +
-        'profile that weights the term, which sim/searchSpaceLiveness.test.ts executes; the case ' +
-        'below goes red when a shipped profile starts weighting it.',
+        'profile that weights the term, which sim/searchSpaceLiveness.test.ts executes and ' +
+        'viz/src/authoring/stJudeDuty.test.ts pins (§ D1290); the case below goes red when a ' +
+        'shipped profile starts weighting it. Intentional and permanent (#625): inert only under ' +
+        'the profiles the tree ships.',
     },
   ],
 ]);
