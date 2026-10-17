@@ -246,6 +246,11 @@ export const WATCH_ALLOWANCE_REAL_S = 20;
  * chip moves at most four times before the stage plays on. Ten real seconds at `4×` is forty simulated seconds, four door cycles (9.8 s each), which is
  * also long enough to read the line once. The lingering seconds count toward the allowance, so the
  * hold is no longer than it was. Owner-reversible: `0` is the hold with no dwell.
+ *
+ * **Kept at ten after the re-play** ([§ D1526](../../../../DECISIONS.md)): the chip still moved three to
+ * five times in thirty real seconds just after a call, which is this bound read twice across a call.
+ * Twenty would make the bound two moves, and puts the press day's first call at about 67 real seconds
+ * (`scoredDayPlayOf`), past the minute § D1493 bought; fifteen keeps the bound at four.
  */
 export const RUNG_DWELL_REAL_S = 10;
 

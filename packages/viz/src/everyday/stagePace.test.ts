@@ -509,6 +509,8 @@ function play(recording: VizRecording, stops: readonly number[], skip: boolean, 
   /* § D1493 and § D1506, counted as `stageScreen.ts#pace` counts them, frame by frame. */
   let counters: PaceCounters = FRESH_PACE_COUNTERS;
   let last: { pace: StagePace; atS: number; simPerRealS: number } | undefined;
+  /* Where the chip's lit rung moved, in real seconds from the start. */
+  const rungChangedRealS: number[] = [];
   while (playback.state !== 'ended') {
     const t = playback.simTimeS;
     const stop = pending[0];
@@ -533,7 +535,10 @@ function play(recording: VizRecording, stops: readonly number[], skip: boolean, 
       last = undefined;
       continue;
     }
-    if (playback.speed !== answer.simPerRealS) playback.setSpeed(answer.simPerRealS);
+    if (playback.speed !== answer.simPerRealS) {
+      playback.setSpeed(answer.simPerRealS);
+      rungChangedRealS.push(clock.now() / 1000);
+    }
     const applies =
       skip &&
       !(landedAtS !== undefined && Math.abs(t - landedAtS) < 1) &&
@@ -560,7 +565,7 @@ function play(recording: VizRecording, stops: readonly number[], skip: boolean, 
     }
     clock.advance(frameMs);
   }
-  return { realS: clock.now() / 1000, stoppedAt, stoppedRealS, skips, endedAtS: playback.simTimeS };
+  return { realS: clock.now() / 1000, stoppedAt, stoppedRealS, skips, endedAtS: playback.simTimeS, rungChangedRealS };
 }
 
 /**
@@ -1112,5 +1117,44 @@ describe('the line holds while the rung does — § D1525', () => {
     expect(stageSkipLineStands({ landedReason: 'unheld', reason: stagePaceStateOf(quiet) })).toBe(true);
     expect(stageSkipLineStands({ landedReason: 'unheld', reason: 'call' })).toBe(false);
     expect(stagePaceStateOf(early)).toBe('fast');
+  });
+});
+
+/*
+ * ---- Wave AR, lane AR-2: how often the chip may move — § D1526 ----
+ *
+ * GitHub issue #633: the chips still switched on their own every 2 to 15 real seconds, three to five
+ * times in thirty around 10:44 and 17:25, both just after a call. § D1506's bound is at most four
+ * moves between two decisions, because a call restarts § D1493's allowance. This holds that bound on
+ * the real day, through the real transport, and is why the dwell was not lengthened (§ D1526): a
+ * twenty-second dwell would make it two, at the cost of the press day's first call (about 67 real
+ * seconds by `scoredDayPlayOf`, against a 65-second ceiling).
+ */
+describe('how often the chip may move between two decisions — § D1526', () => {
+  /* The first frame's move from the player's rung, at the press of Play, is not one the stage made on its own. */
+  const movesBetween = (moves: readonly number[], stopsRealS: readonly number[]): number[] => {
+    const edges = [0, ...stopsRealS, Number.POSITIVE_INFINITY];
+    return edges.slice(1).map((to, i) => moves.filter((at) => at > 0 && at >= edges[i]! && at < to).length);
+  };
+
+  it('moves at most four times between two decisions on Midtown’s whole day, with and without a call', () => {
+    const quiet = play(day, [], true);
+    expect(movesBetween(quiet.rungChangedRealS, [])).toEqual([expect.any(Number)]);
+    expect(Math.max(...movesBetween(quiet.rungChangedRealS, []))).toBeLessThanOrEqual(4);
+    const opened = todaysScenarioDayState(RESOURCES, 'c2', {
+      seed: SEED + 7_919n * 2n,
+      over: { week: { ...openWeek('c2'), day: 1, dayIdx: 0 }, campaignEventId: undefined },
+    });
+    const plan = shiftRunConfigOf(RESOURCES, opened.state);
+    const press = recordRun(plan.config, { recordDecisions: false, outOfServiceCarIds: plan.outOfServiceCarIds }).recording;
+    const call = pressDayCallOf(RESOURCES, opened.state, press)?.call;
+    if (call === undefined) throw new Error('the press day has no call');
+    /* A second stop five game-minutes later, as the playtest's 17:20 and 17:25 were. */
+    const asked = play(press, [call.atS, call.atS + 300], true);
+    const perStretch = movesBetween(asked.rungChangedRealS, asked.stoppedRealS);
+    expect(perStretch).toHaveLength(3);
+    for (const moves of perStretch) expect(moves).toBeLessThanOrEqual(4);
+    /* Not vacuous: measured 4 on the quiet day, and 2, 2 and 4 around the two stops. */
+    expect(Math.max(...perStretch)).toBe(4);
   });
 });
