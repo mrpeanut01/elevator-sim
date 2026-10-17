@@ -396,6 +396,8 @@ export interface EverydayReportInput {
    * wave AN, lane DQ-3, [§ D1351](../../../../DECISIONS.md)).
    */
   readonly driver?: ((day: number) => HouseReading | undefined) | undefined;
+  /** Display names for the close's pool line (§ D1463). */
+  readonly profileNameOf?: ((profileId: string) => string | undefined) | undefined;
 }
 
 /** What a career sheet's onward step is drawn from — {@link EverydayReportInput.career}. */
@@ -874,6 +876,7 @@ export function everydayReportViewOf(input: EverydayReportInput): EverydayReport
             report: input.report,
             houseOf: input.house ?? (() => undefined),
             driverOf: input.driver,
+            profileNameOf: input.profileNameOf,
             population: input.overnight?.population,
             onward: input.overnight?.onward,
           }),

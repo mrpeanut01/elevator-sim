@@ -206,7 +206,7 @@ describe('a different pool crowd changes the run — the integration seam', () =
       });
       const plan = shiftRunConfigOf(resources, state);
       const recording = recordRun(plan.config, { recordDecisions: false, outOfServiceCarIds: plan.outOfServiceCarIds }).recording;
-      return JSON.stringify(recording.legs.slice(0, 200).map((leg) => [leg.arrivedAt, leg.origin, leg.destination]));
+      return JSON.stringify(recording.legs.slice(0, 200).map((leg) => [leg.arrivedAt, leg.originFloorId, leg.destinationFloorId]));
     };
     expect(legsOf(0)).not.toBe(legsOf(1));
   }, 120_000);
