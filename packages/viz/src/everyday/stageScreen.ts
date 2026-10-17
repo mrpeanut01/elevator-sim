@@ -124,6 +124,7 @@ import {
   stageOpeningLineOf,
   STAGE_OVERLAY_PLAY,
   stageBuildingScrollOf,
+  stageHeaderSticksOf,
   stageLitSpeedOf,
   stagePlayControlOf,
   stageHandoverVerdictOf,
@@ -142,10 +143,11 @@ import { actsOf, type DayAct } from '../shift/dayLength.js';
 import type { RunHorizon } from '../shift/types.js';
 import {
   firstLostInstantOf,
-  STAGE_SKIP_BEAT_NOTE,
   stagePaceNoteOf,
   stagePaceOf,
   stageSkipLineStands,
+  stageSkipSpeechOf,
+  stagePaceStateOf,
   stageStatusOf,
   stageSkipApplies,
   stageSkipLineOf,
@@ -163,6 +165,7 @@ import type { PressCall } from '../shift/pressCall.js';
 import {
   STAGE_CALL_COPY,
   stageCallCardOf,
+  stageCallStandingOrderOf,
   stageCallPresentOf,
   stageCallPhaseOf,
   stageEndDayOf,
@@ -1818,7 +1821,8 @@ function mountStage(
     callCard.style.overflowY = '';
     const region = callCard.closest<HTMLElement>('.everyday-screen');
     if (region === null) return;
-    const room = region.clientHeight - 16;
+    /* § D1527: under a pinned header the card has the region less the header. */
+    const room = region.clientHeight - 16 - (headerSticks ? header.offsetHeight : 0);
     if (room > 0 && callCard.offsetHeight > room) {
       callCard.style.maxHeight = `${String(room)}px`;
       callCard.style.overflowY = 'auto';
@@ -2031,6 +2035,30 @@ function mountStage(
     requestFrame();
   }
 
+  /** Whether the header is pinned at the top of the page now — {@link syncHeaderStick}. */
+  let headerSticks = false;
+
+  /**
+   * **Pin the header while the building scrolls under it** — wave AR, lane AR-2,
+   * [§ D1527](../../../../DECISIONS.md), `stageScreenModel.ts#stageHeaderSticksOf`. Asked when the day
+   * starts playing and on a resize, never per frame, because it reads the header's laid-out height.
+   * The cards that scroll themselves into view keep a top margin of the header's height, so a pinned
+   * header never covers the call it stopped for.
+   */
+  function syncHeaderStick(): void {
+    const sticks = stageHeaderSticksOf({
+      headerHeight: header.offsetHeight,
+      regionHeight: region.clientHeight,
+      rush: context.ctx === 'rush',
+    });
+    headerSticks = sticks;
+    header.style.position = sticks ? 'sticky' : '';
+    header.style.top = sticks ? '0' : '';
+    header.style.zIndex = sticks ? '3' : '';
+    const margin = sticks ? `${String(header.offsetHeight + GAP.block)}px` : '';
+    for (const card of [callCard, lostCard, closeAsk, skipAsk]) card.style.scrollMarginTop = margin;
+  }
+
   /**
    * **Keep the building in view while the day plays** — wave AO, lane AO-4, the post-AN panel's seat
    * B (lost moment 9, defect 9), [§ D1385](../../../../DECISIONS.md) clause 4. Asked when a press sets the day playing: on a phone the header's
@@ -2045,10 +2073,13 @@ function mountStage(
    * card's scroll is made from a frame for the same reason.
    */
   function bringBuildingIntoView(): void {
+    syncHeaderStick();
     const box = canvas.getBoundingClientRect();
     const shown = region.getBoundingClientRect();
     const viewportBottom = view?.innerHeight ?? doc.documentElement.clientHeight;
     const seen = { top: Math.max(0, shown.top), bottom: Math.min(viewportBottom, shown.bottom) };
+    /* § D1527: a pinned header covers the top of what the player can see. */
+    if (headerSticks) seen.top = Math.max(seen.top, shown.top + header.offsetHeight);
     /* Wave AQ, lane AQ-2 (§ D1508): the lobby rows, where the day's deepest queue usually stands. */
     const by = stageBuildingScrollOf(box, seen);
     if (by !== 0) region.scrollTop += by;
@@ -2164,11 +2195,13 @@ function mountStage(
      * stops it); the pace note is drawn only where neither a stop nor a skip is speaking.
      */
     if (skipLine !== '') {
-      if (!stageSkipLineStands({ landedReason: skipLineReason, reason: answer.reason })) {
+      /* § D1525: past the allowance a waiter crossing the minute does not end the state the line names. */
+      const state = stagePaceStateOf(answer);
+      if (!stageSkipLineStands({ landedReason: skipLineReason, reason: state })) {
         skipLine = '';
         skipLineReason = undefined;
       } else if (skipLineReason === undefined) {
-        skipLineReason = answer.reason;
+        skipLineReason = state;
       }
     }
     setPace(note, answer.reason === 'call');
@@ -2275,7 +2308,7 @@ function mountStage(
     const lines = stageStatusOf({
       pace: paceText,
       stopped: paceStopped,
-      skip: skipArmedAtS !== undefined ? STAGE_SKIP_BEAT_NOTE : skipLine,
+      skip: stageSkipSpeechOf({ armed: skipArmedAtS !== undefined, pace: watchedFrame?.pace, line: skipLine }),
     });
     if (paceNote.textContent !== lines.pace) paceNote.textContent = lines.pace;
     if (skipNote.textContent !== lines.skip) skipNote.textContent = lines.skip;
@@ -2687,10 +2720,19 @@ function mountStage(
        * answer's line, a driver's from its own profile (the one driving now where it is the keep).
        */
       const driving = host.drivingProfile();
-      const card = stageCallCardOf(call, host.dayStartS(), bookedCars, standing.drivers, present, {
-        readings: host.goalsAt(call.atS),
-        driverOf: (name) => (driving.name === name ? driving : host.dispatchers().find((profile) => profile.name === name)),
-      });
+      const card = stageCallCardOf(
+        call,
+        host.dayStartS(),
+        bookedCars,
+        standing.drivers,
+        present,
+        {
+          readings: host.goalsAt(call.atS),
+          driverOf: (name) => (driving.name === name ? driving : host.dispatchers().find((profile) => profile.name === name)),
+        },
+        /* § D1528: a placement call after an earlier park or spread says so. */
+        stageCallStandingOrderOf(host.interventions(), call.atS),
+      );
       const heading = el(doc, 'div', 'everyday-stage-call-heading', card.heading);
       heading.style.cssText = `font:600 11px ${TYPE.mono};letter-spacing:0.08em;color:${C.label}`;
       const facts = card.facts.map((fact) => {
@@ -4406,6 +4448,7 @@ function mountStage(
 
   const unsubscribe = host.subscribe(onHostChange);
   const onResize = (): void => {
+    syncHeaderStick();
     requestFrame();
   };
   view?.addEventListener('resize', onResize);

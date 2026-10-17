@@ -81,7 +81,7 @@ export interface BriefDispatcherOption {
   readonly name: string;
   /** The profile's own first sentence, or the empty string when it carries no description. */
   readonly blurb: string;
-  /** `driving today` / `tap to choose` — § 6.2's own two words. */
+  /** `driving today` / `tap to choose` — § 6.2's own two words — or {@link BRIEF_DRIVER_LOCKED} on a held day. */
   readonly meta: string;
   readonly selected: boolean;
   /** Whether this is one the reader saved — the dropdown appends *— yours* to those. */
@@ -510,14 +510,22 @@ function tunerControlsLine(offer: TuneOffer): string {
   return cards.length <= 1 ? (cards[0] ?? '') : `${cards.slice(0, -1).join(', ')} and ${String(cards.at(-1))}`;
 }
 
+/**
+ * A driver card's word on a day whose driver is held — wave AR, lane AR-2, [§ D1530](../../../../DECISIONS.md).
+ * The cards are disabled there and the held line says why; *tap to choose* invited a press that did nothing.
+ */
+export const BRIEF_DRIVER_LOCKED = 'locked today';
+
 /** § 6.2, resolved. */
 export function briefScreenViewOf(input: BriefScreenInput): BriefScreenView {
   const saved = new Set(input.savedIds);
+  const held = input.attemptWeekday === undefined ? input.today.driverHeld : DAY_ATTEMPT_COPY.driverHeld;
   const options: readonly BriefDispatcherOption[] = input.dispatchers.map((profile) => ({
     id: profile.id,
     name: profile.name,
     blurb: firstSentence(profile.description),
-    meta: profile.id === input.selectedId ? 'driving today' : 'tap to choose',
+    /* § D1530: a held day's cards cannot be pressed, so they do not invite a tap. */
+    meta: profile.id === input.selectedId ? 'driving today' : held !== undefined ? BRIEF_DRIVER_LOCKED : 'tap to choose',
     selected: profile.id === input.selectedId,
     mine: saved.has(profile.id),
   }));
@@ -574,7 +582,7 @@ export function briefScreenViewOf(input: BriefScreenInput): BriefScreenView {
        * in it eventually contradicted something.
        */
       count: `${String(options.length)} to choose from · ${String(mine)} of yours`,
-      held: input.attemptWeekday === undefined ? today.driverHeld : DAY_ATTEMPT_COPY.driverHeld,
+      held,
       /*
        * Lane AO-4: only on a day whose driver can still be picked here — a held driver (an attempt
        * under way, a pinned day's standing order) has its own sentence on this line.

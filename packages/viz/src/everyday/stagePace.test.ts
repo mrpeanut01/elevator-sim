@@ -51,6 +51,8 @@ import {
   stageSkipLineOf,
   stageSkipLineStands,
   stageSkipOf,
+  stageSkipSpeechOf,
+  stagePaceStateOf,
   stageStatusOf,
   watchedRealAfter,
   FRESH_PACE_COUNTERS,
@@ -434,7 +436,7 @@ describe('a scored day — § D1169', () => {
       'fast-forwarding at 30×: nobody on a landing has waited a minute',
     );
     expect(stagePaceNoteOf({ simPerRealS: 4, reason: 'watching' }, { acts, simTimeS: 0 })).toBe(
-      'slowed to your speed, 4×: somebody on a landing has waited over a minute',
+      'slowed to your speed, 4×, for a wait on a landing of over a minute',
     );
     expect(stagePaceNoteOf({ simPerRealS: 4, reason: 'yours' }, { acts, simTimeS: 0 })).toBe(
       'your speed, 4×, until somebody on a landing has waited a minute',
@@ -507,6 +509,8 @@ function play(recording: VizRecording, stops: readonly number[], skip: boolean, 
   /* § D1493 and § D1506, counted as `stageScreen.ts#pace` counts them, frame by frame. */
   let counters: PaceCounters = FRESH_PACE_COUNTERS;
   let last: { pace: StagePace; atS: number; simPerRealS: number } | undefined;
+  /* Where the chip's lit rung moved, in real seconds from the start. */
+  const rungChangedRealS: number[] = [];
   while (playback.state !== 'ended') {
     const t = playback.simTimeS;
     const stop = pending[0];
@@ -531,7 +535,10 @@ function play(recording: VizRecording, stops: readonly number[], skip: boolean, 
       last = undefined;
       continue;
     }
-    if (playback.speed !== answer.simPerRealS) playback.setSpeed(answer.simPerRealS);
+    if (playback.speed !== answer.simPerRealS) {
+      playback.setSpeed(answer.simPerRealS);
+      rungChangedRealS.push(clock.now() / 1000);
+    }
     const applies =
       skip &&
       !(landedAtS !== undefined && Math.abs(t - landedAtS) < 1) &&
@@ -558,7 +565,7 @@ function play(recording: VizRecording, stops: readonly number[], skip: boolean, 
     }
     clock.advance(frameMs);
   }
-  return { realS: clock.now() / 1000, stoppedAt, stoppedRealS, skips, endedAtS: playback.simTimeS };
+  return { realS: clock.now() / 1000, stoppedAt, stoppedRealS, skips, endedAtS: playback.simTimeS, rungChangedRealS };
 }
 
 /**
@@ -991,19 +998,163 @@ describe('the chip does not flicker — § D1506', () => {
       expect(row.note, row.note).toContain(rung);
       const past = row.standing !== undefined && row.standing >= PACE_HOLD_WAIT_S;
       if (row.note.includes('somebody on a landing has waited over a minute')) expect(past).toBe(true);
+      /* § D1525: the slowed line is true while the wait stands and through the dwell after it. */
+      if (row.note.includes('for a wait on a landing of over a minute')) expect(past || row.pace.lingering === true).toBe(true);
       if (row.note.includes('nobody on a landing has waited a minute')) expect(past).toBe(false);
       /* Slowed means the player's rung, and fast-forwarding means faster than it. */
       if (row.note.startsWith('slowed')) expect(row.pace.simPerRealS).toBe(WATCHING);
       if (row.note.startsWith('fast-forwarding')) expect(row.pace.simPerRealS).toBeGreaterThan(WATCHING);
     }
-    /* The lines it drew: slowed, slowed a little longer, and fast-forwarding with and without a wait. */
+    /*
+     * The lines it drew: slowed, and fast-forwarding once the allowance has run out. § D1525: one line
+     * for each rung, so a waiter crossing the minute moves neither, and past the allowance a frame
+     * with nobody past a minute reads *you have watched a while*, never *nobody … has waited a minute*.
+     */
     expect([...seen].sort()).toEqual(
       [
         'fast-forwarding at 30×: you have watched a while and there is nothing to decide yet · pick a speed to watch',
-        'fast-forwarding at 30×: nobody on a landing has waited a minute',
-        'slowed to your speed, 4×, for a few seconds after a wait of over a minute',
-        'slowed to your speed, 4×: somebody on a landing has waited over a minute',
+        'slowed to your speed, 4×, for a wait on a landing of over a minute',
       ].sort(),
     );
+  });
+});
+
+/*
+ * ---- Wave AR, lane AR-2: the line holds while the rung does — § D1525 ----
+ *
+ * GitHub issue #633: on Midtown's Monday at 4×, at 12:27 and 17:33, the line flipped up to four times
+ * a real second between *nobody on a landing has waited a minute: skipping ahead…* and
+ * *fast-forwarding at 30×: you have watched a while…* while the 30× chip stayed lit. Past § D1493's
+ * allowance, a waiter crossing the minute moves the stage between `unheld` and `fast` at the same
+ * rung; `fast` armed the skip's beat, whose note spoke over the pace line, and `unheld` dropped it.
+ * This replays the stage's frame loop and its status writer (`stageScreen.ts#pace`,
+ * `#skipBetweenPeaks`, `#showStatus`) over a scripted series that crosses the minute every 7.5
+ * simulated seconds, which is four times a real second at 30×.
+ */
+describe('the line holds while the rung does — § D1525', () => {
+  const flipping = (simTimeS: number): number => (simTimeS % 15 < 7.5 ? PACE_HOLD_WAIT_S + 2 : PACE_HOLD_WAIT_S - 5);
+
+  function lines(input: { readonly realS: number; readonly fixed: boolean }) {
+    const frameS = 1 / 20;
+    const acts = actsOf(day.demandPhases);
+    /* A multiple of fifteen, so the first frame has somebody past a minute. */
+    let simTimeS = 13_005;
+    let counters: PaceCounters = FRESH_PACE_COUNTERS;
+    let last: { pace: StagePace; atS: number } | undefined;
+    let armedAtRealS: number | undefined;
+    const out: { realS: number; simPerRealS: number; line: string; reason: StagePaceReason }[] = [];
+    for (let realS = 0; realS < input.realS; realS += frameS) {
+      if (last !== undefined) {
+        counters = paceCountersAfter(counters, { pace: last.pace, fromS: last.atS, toS: simTimeS, simPerRealS: last.pace.simPerRealS });
+      }
+      let pace = stagePaceOf({
+        horizon: 'whole-day',
+        acts,
+        simTimeS,
+        watchingSimPerRealS: WATCHING,
+        longestStandingS: flipping(simTimeS),
+        playerChoseSpeedAtS: undefined,
+        scored: true,
+        watchedRealS: counters.watchedRealS,
+        lingerRealS: counters.lingerRealS,
+      });
+      /* Before § D1525 a `fast` frame past the allowance carried nothing to say so. */
+      if (!input.fixed && pace.playedOn === true) pace = { simPerRealS: pace.simPerRealS, reason: pace.reason };
+      const applies = stageSkipApplies({ horizon: 'whole-day', scored: true, acts, simTimeS, reason: pace.reason });
+      if (!applies) armedAtRealS = undefined;
+      else if (armedAtRealS === undefined) armedAtRealS = realS;
+      /* No fast stretch here lasts the beat, so no skip lands; the case below holds a landing. */
+      expect(armedAtRealS === undefined || realS - armedAtRealS < SKIP_BEAT_REAL_S).toBe(true);
+      const status = stageStatusOf({
+        pace: stagePaceNoteOf(pace, { acts, simTimeS }) ?? '',
+        stopped: false,
+        skip: stageSkipSpeechOf({ armed: armedAtRealS !== undefined, pace, line: '' }),
+      });
+      out.push({ realS, simPerRealS: pace.simPerRealS, line: status.pace || status.skip, reason: pace.reason });
+      last = { pace, atS: simTimeS };
+      simTimeS += pace.simPerRealS * frameS;
+    }
+    return out;
+  }
+
+  const lineChangesWithoutRungChange = (rows: readonly { simPerRealS: number; line: string }[]): number =>
+    rows.reduce(
+      (n, row, i) => n + (i > 0 && row.line !== rows[i - 1]!.line && row.simPerRealS === rows[i - 1]!.simPerRealS ? 1 : 0),
+      0,
+    );
+
+  it('flipped the line about four times a real second at a lit 30× before, and changes it only with the rung after', () => {
+    const before = lines({ realS: 40, fixed: false });
+    const after = lines({ realS: 40, fixed: true });
+    /* The series does play on: twenty real seconds slowed, then the fast rung to the end. */
+    expect(after.at(-1)!.simPerRealS).toBe(BETWEEN_PEAKS_SIM_PER_REAL_S);
+    expect(after.some((row) => row.reason === 'fast') && after.some((row) => row.reason === 'unheld')).toBe(true);
+    /* Red before: the playtest's flip, over a dozen times in the last ten real seconds alone. */
+    const lastTen = (rows: typeof before) => rows.filter((row) => row.realS >= 30);
+    expect(lineChangesWithoutRungChange(lastTen(before))).toBeGreaterThanOrEqual(30);
+    expect(before.some((row) => row.line === STAGE_SKIP_BEAT_NOTE)).toBe(true);
+    /* Green after: the line moves only where the chip does. */
+    expect(lineChangesWithoutRungChange(after)).toBe(0);
+    expect(new Set(after.filter((row) => row.simPerRealS === BETWEEN_PEAKS_SIM_PER_REAL_S).map((row) => row.line))).toEqual(
+      new Set(['fast-forwarding at 30×: you have watched a while and there is nothing to decide yet · pick a speed to watch']),
+    );
+  });
+
+  it('leaves the speed and the skip as they were: only the words and the beat’s note move', () => {
+    const base = { horizon: 'whole-day', acts: actsOf(day.demandPhases), simTimeS: 13_000, watchingSimPerRealS: WATCHING, playerChoseSpeedAtS: undefined, scored: true } as const;
+    const quiet = stagePaceOf({ ...base, longestStandingS: 10, watchedRealS: WATCH_ALLOWANCE_REAL_S });
+    expect(quiet).toEqual({ simPerRealS: BETWEEN_PEAKS_SIM_PER_REAL_S, reason: 'fast', playedOn: true });
+    expect(stageSkipApplies({ ...base, reason: quiet.reason })).toBe(true);
+    /* Inside the allowance nothing changes: the `fast` line and the beat's note, as § D1506 drew them. */
+    const early = stagePaceOf({ ...base, longestStandingS: 10, watchedRealS: 3 });
+    expect(early).toEqual({ simPerRealS: BETWEEN_PEAKS_SIM_PER_REAL_S, reason: 'fast' });
+    expect(stageSkipSpeechOf({ armed: true, pace: early, line: '' })).toBe(STAGE_SKIP_BEAT_NOTE);
+    expect(stageSkipSpeechOf({ armed: true, pace: quiet, line: 'skipped 12:20–12:30: nobody on a landing waited a minute' })).toBe(
+      'skipped 12:20–12:30: nobody on a landing waited a minute',
+    );
+    /* And a skip's line stands across the minute and back once played on, and still goes at a call. */
+    expect(stagePaceStateOf(quiet)).toBe('unheld');
+    expect(stageSkipLineStands({ landedReason: 'unheld', reason: stagePaceStateOf(quiet) })).toBe(true);
+    expect(stageSkipLineStands({ landedReason: 'unheld', reason: 'call' })).toBe(false);
+    expect(stagePaceStateOf(early)).toBe('fast');
+  });
+});
+
+/*
+ * ---- Wave AR, lane AR-2: how often the chip may move — § D1526 ----
+ *
+ * GitHub issue #633: the chips still switched on their own every 2 to 15 real seconds, three to five
+ * times in thirty around 10:44 and 17:25, both just after a call. § D1506's bound is at most four
+ * moves between two decisions, because a call restarts § D1493's allowance. This holds that bound on
+ * the real day, through the real transport, and is why the dwell was not lengthened (§ D1526): a
+ * twenty-second dwell would make it two, at the cost of the press day's first call (about 67 real
+ * seconds by `scoredDayPlayOf`, against a 65-second ceiling).
+ */
+describe('how often the chip may move between two decisions — § D1526', () => {
+  /* The first frame's move from the player's rung, at the press of Play, is not one the stage made on its own. */
+  const movesBetween = (moves: readonly number[], stopsRealS: readonly number[]): number[] => {
+    const edges = [0, ...stopsRealS, Number.POSITIVE_INFINITY];
+    return edges.slice(1).map((to, i) => moves.filter((at) => at > 0 && at >= edges[i]! && at < to).length);
+  };
+
+  it('moves at most four times between two decisions on Midtown’s whole day, with and without a call', () => {
+    const quiet = play(day, [], true);
+    expect(movesBetween(quiet.rungChangedRealS, [])).toEqual([expect.any(Number)]);
+    expect(Math.max(...movesBetween(quiet.rungChangedRealS, []))).toBeLessThanOrEqual(4);
+    const opened = todaysScenarioDayState(RESOURCES, 'c2', {
+      seed: SEED + 7_919n * 2n,
+      over: { week: { ...openWeek('c2'), day: 1, dayIdx: 0 }, campaignEventId: undefined },
+    });
+    const plan = shiftRunConfigOf(RESOURCES, opened.state);
+    const press = recordRun(plan.config, { recordDecisions: false, outOfServiceCarIds: plan.outOfServiceCarIds }).recording;
+    const call = pressDayCallOf(RESOURCES, opened.state, press)?.call;
+    if (call === undefined) throw new Error('the press day has no call');
+    /* A second stop five game-minutes later, as the playtest's 17:20 and 17:25 were. */
+    const asked = play(press, [call.atS, call.atS + 300], true);
+    const perStretch = movesBetween(asked.rungChangedRealS, asked.stoppedRealS);
+    expect(perStretch).toHaveLength(3);
+    for (const moves of perStretch) expect(moves).toBeLessThanOrEqual(4);
+    /* Not vacuous: measured 4 on the quiet day, and 2, 2 and 4 around the two stops. */
+    expect(Math.max(...perStretch)).toBe(4);
   });
 });

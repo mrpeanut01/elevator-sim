@@ -343,6 +343,11 @@ export function stageCallCardOf(
    * the card draws neither, which is how every caller before it drew the card.
    */
   teaching?: StageCallTeaching | undefined,
+  /**
+   * The car order already in force at the call, from an earlier answer ({@link stageCallStandingOrderOf}).
+   * A placement call that asks again says so and names it — [§ D1528](../../../../DECISIONS.md).
+   */
+  standingOrder?: StageCallStandingOrder | undefined,
 ): StageCallCard {
   /*
    * The car lines only where a car is out at the call. A pinned call is always inside its car's
@@ -396,7 +401,12 @@ export function stageCallCardOf(
   return Object.freeze({
     heading: STAGE_CALL_COPY.heading,
     facts: Object.freeze(facts),
-    question: away.length > 0 ? STAGE_CALL_COPY.question : STAGE_CALL_COPY.questionAllCars,
+    question:
+      standingOrder !== undefined
+        ? stageCallAskedAgainOf(standingOrder, dayStartS)
+        : away.length > 0
+          ? STAGE_CALL_COPY.question
+          : STAGE_CALL_COPY.questionAllCars,
     options: Object.freeze([
       Object.freeze({
         label: PARK_CARS_LOBBY_LABEL,
@@ -418,6 +428,48 @@ export function stageCallCardOf(
       }),
     ]),
   });
+}
+
+/** A car order an earlier answer pressed, still in force at a later call. */
+export interface StageCallStandingOrder {
+  readonly kind: 'park-cars-lobby' | 'spread-cars';
+  /** The second it was pressed at. */
+  readonly atS: number;
+}
+
+/**
+ * **The car order in force at a call**, or `undefined` where nothing was pressed before it —
+ * wave AR, lane AR-2, [§ D1528](../../../../DECISIONS.md). The last park or spread press filed before
+ * the call second. Each writes one setting that stands until the other is pressed (`core`'s
+ * `idle.parkingStrategy`), and *leave them* presses nothing, so the latest press is the order the
+ * cars are under at the call.
+ */
+export function stageCallStandingOrderOf(
+  interventions: readonly { readonly atS: number; readonly change: { readonly kind: string } }[],
+  callAtS: number,
+): StageCallStandingOrder | undefined {
+  let found: StageCallStandingOrder | undefined;
+  for (const entry of interventions) {
+    const kind = entry.change.kind;
+    if (kind !== 'park-cars-lobby' && kind !== 'spread-cars') continue;
+    if (!(entry.atS < callAtS)) continue;
+    if (found === undefined || entry.atS >= found.atS) found = { kind, atS: entry.atS };
+  }
+  return found === undefined ? undefined : Object.freeze(found);
+}
+
+/**
+ * **The placement question, asked again** — [§ D1528](../../../../DECISIONS.md). The 12:20 and 17:20
+ * calls asked *What do the cars do?* after the player had parked them at 10:40, as if nothing had been
+ * answered. The card now names the order in force, from the clock it was pressed at, and asks whether
+ * to keep it. It states the order rather than crediting the press (*You parked the cars*), which
+ * `honesty/properties.ts#SECOND_PERSON_ACT` refuses without a declared attribution.
+ */
+export function stageCallAskedAgainOf(order: StageCallStandingOrder, dayStartS: number | undefined): string {
+  const since = clockAt(order.atS, dayStartS);
+  return order.kind === 'park-cars-lobby'
+    ? `Since ${since}, idle cars wait at the lobby. Keep that, or change it?`
+    : `Since ${since}, idle cars wait spread across the tower. Keep that, or change it?`;
 }
 
 /**

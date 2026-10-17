@@ -11,7 +11,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { BRIEF_WAY_THROUGH_HEADING, BRIEF_WEEK_HEADING, briefBarModel, briefCarriedDriverLineOf, briefScreenViewOf, lockedForScore, raceAgainstCard, RECOMMENDED_CARDS,
+import { BRIEF_DRIVER_LOCKED, BRIEF_WAY_THROUGH_HEADING, BRIEF_WEEK_HEADING, briefBarModel, briefCarriedDriverLineOf, briefScreenViewOf, lockedForScore, raceAgainstCard, RECOMMENDED_CARDS,
   SANDBOX_DOOR_LABEL,
   TUNE_OFFER_EVERYTHING,
   type BriefYesterday,
@@ -115,6 +115,15 @@ describe('who drives today', () => {
     expect(view.drivers.options.find((option) => option.id === 'collective')?.meta).toBe(
       'tap to choose',
     );
+  });
+
+  /* Wave AR, lane AR-2, § D1530: a held day's cards are disabled, and said *tap to choose*. */
+  it('shows the other cards as locked on a day whose driver is held, and the driving one as driving', () => {
+    const held = briefScreenViewOf({ today: { ...TODAY, driverHeld: 'held' }, dispatchers: DISPATCHERS, savedIds: [], selectedId: 'eta' });
+    expect(held.drivers.held).toBe('held');
+    expect(held.drivers.options.find((option) => option.id === 'eta')?.meta).toBe('driving today');
+    for (const option of held.drivers.options.filter((entry) => !entry.selected)) expect(option.meta).toBe(BRIEF_DRIVER_LOCKED);
+    expect(held.drivers.options.some((option) => option.meta === 'tap to choose')).toBe(false);
   });
 
   it('recommends the head of the same list the dropdown carries, never a second list', () => {

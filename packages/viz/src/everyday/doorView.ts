@@ -234,6 +234,11 @@ export interface DoorScreenInput {
   readonly alsoOnScreen?: readonly string[] | undefined;
   /** The week's tower's record of closed weeks — `EverydayHost.weekRecord()`. Absent draws no run. */
   readonly record?: WeekRecord | undefined;
+  /**
+   * Whether the attempt on the stage has answered or skipped its pinned call —
+   * `EverydayHost.pinnedCallDone`, [§ D1530](../../../../DECISIONS.md). Absent reads as not.
+   */
+  readonly pinnedCallDone?: boolean | undefined;
 }
 
 /**
@@ -620,6 +625,13 @@ export const DOOR_DRIVER_NOTE_HELD =
   'Held until the stage’s call is answered; the brief, which is the next screen, says why.';
 
 /**
+ * The same note once the hold is over — wave AR, lane AR-2, [§ D1530](../../../../DECISIONS.md). After
+ * the call was answered, or the day closed, the door still said *Held until the stage's call is
+ * answered* about a call that was behind the player.
+ */
+export const DOOR_DRIVER_NOTE_HELD_PAST = 'Held for the stage’s call, which is over.';
+
+/**
  * **Step 1 and the footer on a day whose driver is held** — GitHub issue #626's leftover, wave AQ
  * lane AQ-1. *"Pick who drives"* and *"Pick who drives, then run it"* sat beside *"Held until the
  * stage's call is answered"* on the same screen. On that day the step says who drives instead, and
@@ -690,7 +702,12 @@ export function doorScreenViewOf(input: DoorScreenInput): DoorScreenView {
     driver: {
       heading: 'DRIVING TODAY',
       name: input.today.driver,
-      note: input.today.driverHeld === undefined ? DOOR_DRIVER_NOTE : DOOR_DRIVER_NOTE_HELD,
+      note:
+        input.today.driverHeld === undefined
+          ? DOOR_DRIVER_NOTE
+          : input.pinnedCallDone === true || todayIsBanked(input)
+            ? DOOR_DRIVER_NOTE_HELD_PAST
+            : DOOR_DRIVER_NOTE_HELD,
     },
     seedLine: input.today.seedLine,
     firstSessionLine: input.today.firstSessionLine,
