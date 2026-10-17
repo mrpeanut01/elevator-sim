@@ -504,7 +504,7 @@ function play(recording: VizRecording, stops: readonly number[], skip: boolean, 
   const skips: StageSkip[] = [];
   let armedAtS: number | undefined;
   let landedAtS: number | undefined;
-  /* § D1493, § D1506 and § D1507, counted as `stageScreen.ts#pace` counts them, frame by frame. */
+  /* § D1493 and § D1506, counted as `stageScreen.ts#pace` counts them, frame by frame. */
   let counters: PaceCounters = FRESH_PACE_COUNTERS;
   let last: { pace: StagePace; atS: number; simPerRealS: number } | undefined;
   while (playback.state !== 'ended') {
@@ -913,7 +913,7 @@ describe('one message for one state — wave AO, lane AO-4', () => {
 });
 
 /*
- * ---- Wave AQ, lane AQ-2: the chip does not flicker — § D1506 and § D1507 ----
+ * ---- Wave AQ, lane AQ-2: the chip does not flicker — § D1506 ----
  *
  * The playtest (GitHub issue #631): on Midtown's Monday at 4×, 17:25 to 17:32, the chip switched
  * between 4× and 30× twelve times in about thirty real seconds, and the line cycled through three

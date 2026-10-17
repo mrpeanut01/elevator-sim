@@ -95,6 +95,8 @@ import {
   STAGE_INTERVENTIONS,
   STAGE_RACE_PICKER_LABEL,
   STAGE_RECOMPUTING,
+  stageCallAnsweredLineOf,
+  stageRecomputingLineOf,
   STAGE_SPEEDS,
   STAGE_SWITCH_PICKER_LABEL,
   STAGE_SWITCH_PICKER_NOTE,
@@ -539,6 +541,8 @@ function mountStage(
    * only signal the façade offers and the correct one — § 1.4's re-simulation keeps the `runId`.
    */
   let recomputingOver: VizRecording | undefined;
+  /** Wave AQ, lane AQ-2: what the player chose, when the recomputing beat follows a call's answer. */
+  let answeredLine: string | undefined;
   /**
    * **The parking press whose re-simulation is in flight, and the verdict on the last one that
    * landed** — GitHub issue #588, [§ D1278](../../../../DECISIONS.md).
@@ -1949,7 +1953,7 @@ function mountStage(
    * B (lost moment 9, defect 9), [§ D1385](../../../../DECISIONS.md) clause 4. Asked when a press sets the day playing: on a phone the header's
    * *▶ Play* sits above the goals, and the canvas under them was below the fixed bar for the whole of
    * the day it started. `stageScreenModel.ts#stageBuildingScrollOf` decides: since wave AQ
-   * ([§ D1509](../../../../DECISIONS.md)) it keeps the canvas's bottom, the lobby rows, in view, and a
+   * ([§ D1508](../../../../DECISIONS.md)) it keeps the canvas's bottom, the lobby rows, in view, and a
    * stage whose lobby already shows is not scrolled under the reader.
    *
    * **On the next frame, never inside the press** ({@link bringBuildingPending}): the shell keeps the
@@ -1962,7 +1966,7 @@ function mountStage(
     const shown = region.getBoundingClientRect();
     const viewportBottom = view?.innerHeight ?? doc.documentElement.clientHeight;
     const seen = { top: Math.max(0, shown.top), bottom: Math.min(viewportBottom, shown.bottom) };
-    /* Wave AQ, lane AQ-2 (§ D1509): the lobby rows, where the day's deepest queue usually stands. */
+    /* Wave AQ, lane AQ-2 (§ D1508): the lobby rows, where the day's deepest queue usually stands. */
     const by = stageBuildingScrollOf(box, seen);
     if (by !== 0) region.scrollTop += by;
   }
@@ -2477,21 +2481,31 @@ function mountStage(
     showCallCard(false);
     started = true;
     waitingOnCall = false;
+    /* Wave AQ, lane AQ-2: the recomputing beat after an answer says what was chosen. */
+    const said = stageCallAnsweredLineOf(option);
     if (standing.pinned) {
       callAnswered = true;
       host.notePinnedCallDone();
       if (change !== undefined) {
-        withRecomputeBeat(current, () => {
-          host.intervene(call.atS, change);
-        });
+        withRecomputeBeat(
+          current,
+          () => {
+            host.intervene(call.atS, change);
+          },
+          said,
+        );
       }
     } else if (option.answer === 'leave') {
       host.answerDayCall('leave');
     } else {
       /* § D1167: a driver answer adopts the handover run the session made, as a parking answer does. */
-      withRecomputeBeat(current, () => {
-        host.answerDayCall(option.answer);
-      });
+      withRecomputeBeat(
+        current,
+        () => {
+          host.answerDayCall(option.answer);
+        },
+        said,
+      );
       /*
        * The adoption is synchronous, so the beat has already ended on the new recording. If the host
        * refused the answer (a run it did not make stands, or one is in flight), nothing was adopted
@@ -2654,7 +2668,8 @@ function mountStage(
    * beat rather than freezing silently*, and the freeze starts here. It comes down when the host
    * notifies with a different recording ({@link adopt}).
    */
-  function withRecomputeBeat(current: VizRecording, press: () => void): void {
+  function withRecomputeBeat(current: VizRecording, press: () => void, answered?: string): void {
+    answeredLine = answered;
     recomputingOver = current;
     barFacts.recomputing = true;
     context.refreshBar();
@@ -3264,13 +3279,13 @@ function mountStage(
     }
     if (adopted === undefined) {
       statusText.textContent =
-        recomputingOver !== undefined ? STAGE_RECOMPUTING : STAGE_AWAITING_RUN;
+        recomputingOver !== undefined ? stageRecomputingLineOf(answeredLine) : STAGE_AWAITING_RUN;
       startButton.style.display = 'none';
       status.style.display = 'flex';
       return;
     }
     if (recomputingOver !== undefined) {
-      statusText.textContent = STAGE_RECOMPUTING;
+      statusText.textContent = stageRecomputingLineOf(answeredLine);
       startButton.style.display = 'none';
       status.style.display = 'flex';
       return;
@@ -4474,7 +4489,7 @@ export function dayCallsAskedIn(ctx: RunContext): boolean {
 /**
  * **The stage contexts paced as a scored day** ([§ D1169](../../../../DECISIONS.md)): fast while nobody
  * on a landing has waited a minute, the player's rung while somebody has. The daily stage since
- * § D1169, and a career day since wave AQ, lane AQ-2 ([§ D1508](../../../../DECISIONS.md)): Garden
+ * § D1169, and a career day since wave AQ, lane AQ-2 ([§ D1507](../../../../DECISIONS.md)): Garden
  * Apartments' day 1 opened on eighteen simulated minutes of empty landings, four and a half real
  * minutes at `4×`, under *nobody has called a lift yet*. A watch, a rush and a fix case play at the
  * player's rung. Pure and exported for `stageScreen.test.ts`; its non-test caller is

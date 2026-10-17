@@ -1567,6 +1567,24 @@ export interface StageSwitchTarget {
 /** § 7.6's `recomputing` beat, so a re-simulation is a state rather than a freeze. */
 export const STAGE_RECOMPUTING = 'recomputing the day from the start…';
 
+/**
+ * **What the player chose at a call, said back to them** — wave AQ, lane AQ-2, the playtest's P3
+ * (GitHub issue #631): after an answer the card vanished behind {@link STAGE_RECOMPUTING} with
+ * nothing to say the press was heard. One line naming the choice, in the button's own words. It
+ * names the press and nothing it did to the crowd, which is not known until the day is recomputed,
+ * and it is not *You parked the cars*: § D1011's `unbacked-attribution` refuses a sentence crediting
+ * the player with an act on a surface that declares no attribution, and quoting the answer pressed
+ * says the same thing without crediting the run with it.
+ */
+export function stageCallAnsweredLineOf(option: { readonly label: string }): string {
+  return `Your answer: ${option.label}`;
+}
+
+/** The recomputing beat, after the line that says what was chosen when the beat follows a call's answer. */
+export function stageRecomputingLineOf(answered: string | undefined): string {
+  return answered === undefined ? STAGE_RECOMPUTING : `${answered} · ${STAGE_RECOMPUTING}`;
+}
+
 export function stageInterventionsOf(input: StageInterventionInput): StageInterventionView {
   const stamp = interventionStampOf(input.interventions, input.simTimeS, input.dayStartS);
   const refusal = !input.hasRun
@@ -2964,7 +2982,7 @@ export function stagePlayControlOf(input: {
 /**
  * **How far to scroll the stage so the building's lobby rows are in view when the day starts
  * playing**, in pixels (positive scrolls the page down), or `0` to leave it: wave AQ, lane AQ-2,
- * [§ D1509](../../../../DECISIONS.md), which amends wave AO's rule ([§ D1385](../../../../DECISIONS.md)
+ * [§ D1508](../../../../DECISIONS.md), which amends wave AO's rule ([§ D1385](../../../../DECISIONS.md)
  * clause 4).
  *
  * Wave AO brought the canvas into view only when less than half of it could be seen, so a desktop

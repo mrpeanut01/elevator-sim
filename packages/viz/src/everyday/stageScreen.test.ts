@@ -315,14 +315,14 @@ describe('what the stage adopts on the way in — GitHub issue #548', () => {
 });
 
 /*
- * ---- Wave AQ, lane AQ-2: a career day is paced as a scored day — § D1508 ----
+ * ---- Wave AQ, lane AQ-2: a career day is paced as a scored day — § D1507 ----
  *
  * The playtest (GitHub issue #631): at Garden Apartments, *Run the day and decide as it goes* then
  * *Play* gave ninety real seconds of *nobody has called a lift yet*, with the day's peak about six
  * minutes away at 4×. The daily stage crossed such a stretch at 30× under § D1169; the career's did
  * not, because the mount paced only `ctx === 'daily'` as a scored day.
  */
-describe('a career day is paced as a scored day — § D1508', () => {
+describe('a career day is paced as a scored day — § D1507', () => {
   const source = readFileSync(fileURLToPath(new URL('./stageScreen.ts', import.meta.url)), 'utf8');
 
   it('paces the daily stage and a career day, and nothing else', () => {

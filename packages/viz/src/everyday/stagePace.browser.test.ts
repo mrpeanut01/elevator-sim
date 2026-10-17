@@ -265,7 +265,7 @@ describe.skipIf(!HAS_BROWSER)('§ D1169 — a scored day is paced by the tutoria
   }, 300_000);
 
   /*
-   * Wave AQ, lane AQ-2 (§ D1509), the playtest at 1280×800: the canvas started below the goals and
+   * Wave AQ, lane AQ-2 (§ D1508), the playtest at 1280×800: the canvas started below the goals and
    * showed floors 20 down to about 6, so the lobby's queue, *Floor G stacked 16 deep* at 08:43, was
    * never on screen. Red before: wave AO's rule left a canvas that was mostly in view where it was.
    */
@@ -296,6 +296,6 @@ describe.skipIf(!HAS_BROWSER)('§ D1169 — a scored day is paced by the tutoria
       } finally {
         await page.close();
       }
-    }, 300_000);
+    }, 120_000);
   }
 });

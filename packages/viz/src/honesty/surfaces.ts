@@ -251,6 +251,8 @@ import {
   STAGE_OUT_OF_SERVICE,
   STAGE_RACE_PICKER_LABEL,
   STAGE_RECOMPUTING,
+  stageCallAnsweredLineOf,
+  stageRecomputingLineOf,
   STAGE_SPEEDS,
   STAGE_SWITCH_PICKER_LABEL,
   STAGE_SWITCH_PICKER_NOTE,
@@ -339,6 +341,8 @@ import {
   dayCallGapSentenceOf,
   dayCallSplitVerdictsOf,
   DAY_CALL_COUNT_LABEL,
+  DAY_CALL_DRIVER_COPY,
+  DAY_CALL_LEAVE_LABEL,
   dayCallRecordOf,
   dayCallsQuietSentenceOf,
   dayCallWrinkleQuietRowOf,
@@ -12917,6 +12921,9 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
     'everyday/stageScreenModel.ts#STAGE_PLAY_DONE_REASON',
     'everyday/stageScreenModel.ts#STAGE_NO_PHASE',
     'everyday/stageScreenModel.ts#STAGE_RECOMPUTING',
+    /* Wave AQ, lane AQ-2: the beat after a call's answer says what was chosen; every answer driven below. */
+    'everyday/stageScreenModel.ts#stageCallAnsweredLineOf',
+    'everyday/stageScreenModel.ts#stageRecomputingLineOf',
     /*
      * § D347's, and `#stageCarReadoutOf` is deliberately **absent** from the list while being
      * driven below. `derive.test.ts` derives a text producer from *prose* — two adjacent alphabetic
@@ -13747,6 +13754,16 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
           seeds.push({ field: `stage.pace(${reason})`, text: note, role: 'label', playhead: atPlayhead(recording, recording.startedAt) });
         }
       }
+      /* Wave AQ, lane AQ-2 (§ D1506): the line while the stage stays slowed after a wait, which needs the stage's dwell count. */
+      {
+        const note = stagePaceNoteOf(
+          { simPerRealS: DEFAULT_STAGE_SIM_PER_REAL_S, reason: 'watching', lingering: true },
+          { acts, simTimeS: recording.startedAt },
+        );
+        if (note !== undefined) {
+          seeds.push({ field: 'stage.pace(lingering)', text: note, role: 'label', playhead: atPlayhead(recording, recording.startedAt) });
+        }
+      }
       /*
        * § D1212: the beat's note, and a skip's line drawn where it lands. The fixture skip crosses
        * the first third of the run and is drawn at its end, so the line names only instants at or
@@ -14058,6 +14075,19 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
       seeds.push({ field: `stage.bar(${label}).primary`, text: bar.primary.label, role: 'label' });
     }
     seeds.push({ field: 'stage.recomputing', text: STAGE_RECOMPUTING, role: 'prose' });
+    for (const option of [
+      { label: PARK_CARS_LOBBY_LABEL, answer: 'park-cars-lobby' },
+      { label: SPREAD_CARS_LABEL, answer: 'spread-cars' },
+      { label: switchDispatcherLabelOf(DAY_CALL_FIXTURE_DRIVERS['driver-b']), answer: 'driver-b' },
+      { label: DAY_CALL_DRIVER_COPY.keep(DAY_CALL_FIXTURE_DRIVERS.leave), answer: 'leave' },
+      { label: DAY_CALL_LEAVE_LABEL, answer: 'leave' },
+    ] as const) {
+      seeds.push({
+        field: `stage.recomputing(${option.answer}:${option.label})`,
+        text: stageRecomputingLineOf(stageCallAnsweredLineOf(option)),
+        role: 'prose',
+      });
+    }
     /*
      * § 3.3's fourth state — GitHub issue **#287**. Seeded here rather than as a fourth row of
      * `interventionStates` above, and the placement is forced rather than chosen: that array's
