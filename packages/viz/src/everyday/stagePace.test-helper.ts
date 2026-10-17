@@ -12,14 +12,22 @@ import type { VizLeg } from '../contract/types.js';
 import { isWaitingAt } from '../frame/overlay.js';
 import type { DayAct } from '../shift/dayLength.js';
 
-import { BETWEEN_PEAKS_SIM_PER_REAL_S, PACE_HOLD_WAIT_S, SKIP_BEAT_REAL_S } from './stagePace.js';
+import { BETWEEN_PEAKS_SIM_PER_REAL_S, PACE_HOLD_WAIT_S, SKIP_BEAT_REAL_S, WATCH_ALLOWANCE_REAL_S } from './stagePace.js';
 
 /** A scored whole day as the stage plays it, read off its legs — {@link scoredDayPlayOf}. */
 export interface ScoredDayPlay {
   /** Real seconds from the start of the recording to `untilS` (or its end). */
   readonly realS: number;
-  /** Simulated seconds at the watching rung: somebody on a landing past a minute. */
+  /**
+   * Simulated seconds at the watching rung: somebody on a landing past a minute, inside the
+   * allowance § D1493 gives between two decisions.
+   */
   readonly slowS: number;
+  /**
+   * Simulated seconds with somebody past a minute that the stage played on at the fast rung, drawn,
+   * because the allowance had run out with no call raised or answered — [§ D1493](../../../../DECISIONS.md).
+   */
+  readonly playedOnS: number;
   /** Simulated seconds the stage seeks over and never draws. */
   readonly skippedS: number;
   /** How many skips, each costing one beat. */
@@ -53,6 +61,12 @@ export function scoredDayPlayOf(input: {
    */
   readonly skip: boolean | 'between-peaks';
   readonly untilS?: number | undefined;
+  /**
+   * Real seconds of watching between two stops before the stage plays on —
+   * [§ D1493](../../../../DECISIONS.md)'s {@link WATCH_ALLOWANCE_REAL_S} unless given;
+   * `Number.POSITIVE_INFINITY` is § D1169's hold as it was, the *before* of § D1493's measurement.
+   */
+  readonly watchAllowanceRealS?: number | undefined;
 }): ScoredDayPlay {
   const until = Math.min(input.untilS ?? input.endedAt, input.endedAt);
   const fast = Math.max(input.watchingSimPerRealS, BETWEEN_PEAKS_SIM_PER_REAL_S);
@@ -73,8 +87,34 @@ export function scoredDayPlayOf(input: {
   }
   const overlap = (a: number, b: number, x: number, y: number): number =>
     Math.max(0, Math.min(b, y) - Math.max(a, x));
+  /*
+   * § D1493: the slow set is watched for the allowance's real seconds after each stop, and played on
+   * at the fast rung past it. A stop inside a slow stretch cuts it, and the allowance starts again.
+   */
+  const allowanceS = input.watchAllowanceRealS ?? WATCH_ALLOWANCE_REAL_S;
+  const stops = [...input.stopsAtS].sort((a, b) => a - b);
+  let stopAt = 0;
+  let leftRealS = allowanceS;
   let slowS = 0;
-  for (const [a, b] of slow) slowS += overlap(a, b, input.startedAt, until);
+  let playedOnS = 0;
+  for (const [a, b] of slow) {
+    const from = Math.max(a, input.startedAt);
+    const to = Math.min(b, until);
+    if (!(to > from)) continue;
+    const edges = [from, ...stops.filter((stop) => stop > from && stop < to), to];
+    for (let j = 0; j + 1 < edges.length; j += 1) {
+      const x = edges[j]!;
+      const y = edges[j + 1]!;
+      while (stopAt < stops.length && stops[stopAt]! <= x) {
+        leftRealS = allowanceS;
+        stopAt += 1;
+      }
+      const watchedS = Math.min(y - x, leftRealS * input.watchingSimPerRealS);
+      slowS += watchedS;
+      playedOnS += y - x - watchedS;
+      leftRealS -= watchedS / input.watchingSimPerRealS;
+    }
+  }
   let skippedS = 0;
   let skips = 0;
   /*
@@ -109,6 +149,7 @@ export function scoredDayPlayOf(input: {
   return Object.freeze({
     realS: slowS / input.watchingSimPerRealS + (spanS - slowS - skippedS) / fast,
     slowS,
+    playedOnS,
     skippedS,
     skips,
   });

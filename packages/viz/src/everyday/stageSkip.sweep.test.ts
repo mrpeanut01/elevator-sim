@@ -21,7 +21,9 @@
  * and the pause at a stop is the player's and is not counted. Since wave AM the *after* columns are
  * the skip as it now runs anywhere in the day ([§ D1266](../../../../DECISIONS.md)), and three
  * `d1212` columns carry § D1212's skip as it shipped, between two peaks only, so the step between the
- * two is read off one tree. **Decisions** are § D1166's measure:
+ * two is read off one tree. Since wave AP every column carries [§ D1493](../../../../DECISIONS.md)'s
+ * limit on the hold, and four `held` columns (`firstCallRealS` beside them) carry § D1169's hold
+ * uncapped, so § D1493's step is read off one tree too. **Decisions** are § D1166's measure:
  * the brief's one choice of driver plus the day's calls, over the day's real minutes. The **longest
  * gap** is between two decisions in real seconds, with the day's start and end as edges.
  *
@@ -61,7 +63,7 @@ describe.runIf(process.env['STAGE_SKIP_SWEEP'] === '1')('§ D1212: a Midtown wee
   it('measures real minutes and decisions a real minute, before and after', () => {
     const resources = contractBuildings();
     const rows: string[] = [
-      'contract\tday\twrinkle\tn\tstatus\tcalls\tstops\tskips\tbeforeRealS\tafterRealS\tbeforePerMin\tafterPerMin\tbeforeGapMaxS\tafterGapMaxS\td1212RealS\td1212PerMin\td1212GapMaxS',
+      'contract\tday\twrinkle\tn\tstatus\tcalls\tstops\tskips\tbeforeRealS\tafterRealS\tbeforePerMin\tafterPerMin\tbeforeGapMaxS\tafterGapMaxS\td1212RealS\td1212PerMin\td1212GapMaxS\tfirstCallRealS\theldRealS\theldFirstCallRealS\theldGapMaxS',
     ];
     const out = process.env['STAGE_SKIP_OUT'];
     const run = (plan: ReturnType<typeof shiftRunConfigOf>): VizRecording =>
@@ -138,7 +140,7 @@ describe.runIf(process.env['STAGE_SKIP_SWEEP'] === '1')('§ D1212: a Midtown wee
             }
           }
           const acts = actsOf(ended.demandPhases);
-          const playOf = (skip: boolean | 'between-peaks', untilS?: number) =>
+          const playOf = (skip: boolean | 'between-peaks', untilS?: number, watchAllowanceRealS?: number) =>
             scoredDayPlayOf({
               legs: ended.legs,
               acts,
@@ -148,17 +150,20 @@ describe.runIf(process.env['STAGE_SKIP_SWEEP'] === '1')('§ D1212: a Midtown wee
               watchingSimPerRealS: DEFAULT_STAGE_SIM_PER_REAL_S,
               skip,
               untilS,
+              watchAllowanceRealS,
             });
-          const measure = (skip: boolean | 'between-peaks') => {
-            const whole = playOf(skip);
-            const marks = [0, ...calls.map((atS) => playOf(skip, atS).realS), whole.realS];
+          const measure = (skip: boolean | 'between-peaks', watchAllowanceRealS?: number) => {
+            const whole = playOf(skip, undefined, watchAllowanceRealS);
+            const marks = [0, ...calls.map((atS) => playOf(skip, atS, watchAllowanceRealS).realS), whole.realS];
             const gaps = marks.slice(1).map((mark, i) => mark - (marks[i] ?? 0));
-            return { whole, perMin: (1 + calls.length) / (whole.realS / 60), gapMax: Math.max(...gaps) };
+            return { whole, perMin: (1 + calls.length) / (whole.realS / 60), gapMax: Math.max(...gaps), firstCall: marks[1] ?? whole.realS };
           };
           const before = measure(false);
           const after = measure(true);
           /* § D1212's skip as it shipped, between two peaks only: the step § D1266 is measured from. */
           const d1212 = measure('between-peaks');
+          /* § D1493's *before*: the skip as it runs now, with § D1169's hold uncapped. */
+          const held = measure(true, Number.POSITIVE_INFINITY);
           rows.push(
             [
               contractId,
@@ -178,6 +183,10 @@ describe.runIf(process.env['STAGE_SKIP_SWEEP'] === '1')('§ D1212: a Midtown wee
               d1212.whole.realS.toFixed(1),
               d1212.perMin.toFixed(3),
               d1212.gapMax.toFixed(1),
+              after.firstCall.toFixed(1),
+              held.whole.realS.toFixed(1),
+              held.firstCall.toFixed(1),
+              held.gapMax.toFixed(1),
             ].join('\t'),
           );
           if (out !== undefined) writeFileSync(out, `${rows.join('\n')}\n`);

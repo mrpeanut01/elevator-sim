@@ -13733,10 +13733,12 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
       }
       /*
        * And the pace note's two arms the sampled loop below never reaches: `call`, drawn while the
-       * card is up, and `chosen`, since § D1029 bounded to the next act boundary.
+       * card is up, and `chosen`, since § D1029 bounded to the next act boundary; and `unheld`,
+       * § D1493's line once the hold has run out with nothing to decide, which needs the stage's count
+       * of real seconds watched.
        */
       const acts = actsOf(recording.demandPhases);
-      for (const reason of ['call', 'chosen', 'yours'] as const) {
+      for (const reason of ['call', 'chosen', 'yours', 'unheld'] as const) {
         const note = stagePaceNoteOf(
           { simPerRealS: DEFAULT_STAGE_SIM_PER_REAL_S, reason },
           { acts, simTimeS: recording.startedAt },

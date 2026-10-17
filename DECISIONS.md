@@ -46802,6 +46802,8 @@ after it, and files a report that says when.
 
 ## D1169 — a scored day is paced by the tutorial's hold rule
 
+> **Status 2026-10-17: AMENDED by [§ D1493](#d1493)** (an agent ruling). The hold lasts at most twenty real seconds of watching with no decision in between, and then the stage plays on at 30×. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Status 2026-10-13: NARROWED by [§ D1435](#d1435)** (an agent ruling). A lost day plays the rest at the fast rung whoever waits, unless a chip is pressed after the loss. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Taken 2026-09-26 by agent sessions under delegated authority** (the decide-al swarm, ruling § Q1
@@ -53142,3 +53144,48 @@ offered no Rush.
 **Not established.** No browser case presses *Play this tower's Rush* from the sheet; the press is
 `context.go('rush')`, the menu tile's own destination. The tops read here move with lane DT-1's pool
 (§ D1462), which on this tree caps every tower at week 1.
+
+## D1493 — the hold lasts twenty real seconds with nothing to decide, and then the stage plays on at 30×
+
+> **Taken 2026-10-17 by agent sessions under delegated authority** (a decision swarm's judge on
+> GitHub issue #626 item 5, pillar 4; built by wave AP lane G-3), not by the product owner, and to
+> be read as an agent ruling. **Amends [§ D1169](#d1169) clause 1**; clause 3 stands.
+> Owner-reversible clauses: the twenty seconds (`stagePace.ts#WATCH_ALLOWANCE_REAL_S`; infinity
+> restores § D1169's hold) and the rung played on at (`BETWEEN_PEAKS_SIM_PER_REAL_S`, 30×).
+
+**Why an entry.** It moves a recorded ruling and binds `everyday/stagePace.ts`,
+`everyday/stageScreen.ts`, `everyday/firstDayLength.ts`, the brief's sentence and the hub's figure.
+
+**What was measured.** On Midtown's day 1 at crowd n = 2 (seed 20 260 824 + 7 919 · 2, a pinned
+press day whose call is at 10:40), a first-time player at 4× reached the first call 181.3 real
+seconds in: 161.1 watching, 10.2 at 30×, 10 of beats. The other 15 of 16 sampled days (days 1 and 5,
+n = 0 to 7) reach their first call in 4.0 seconds.
+
+**The ruling.**
+
+1. § D1169's hold (the player's rung while somebody on a landing has waited a minute) lasts at most
+   twenty real seconds of watching with no decision in between. Past them the stage plays at 30× (or
+   the player's rung, if faster), drawn and never skipped, under the line *nothing to decide yet:
+   playing on at 30× though somebody has waited over a minute · pick a speed to watch*.
+2. The twenty seconds add up across held stretches and start again when a call is raised, waited at
+   or answered, or a chip is pressed. A chip pressed while the stage plays on is the player's speed
+   until the next call.
+3. A lost day (§ D1435), the Rush, an unscored run and a replay are untouched; only the scored
+   branch reads the allowance.
+
+**What moved with it.** On those 16 days (`stageSkip.sweep.test.ts`, whole days with every call):
+the press day reaches its call at 59.0 real seconds (was 181.3) and the other 15 stay at 4.0. A whole
+day takes 168 to 343 real seconds where the uncapped hold took 315 to 947, and the longest stretch
+between two decisions falls from 115 to 531 real seconds to 55 to 167. The pinned days' brief now
+reads *about 3 min of watching at 4×* (re-measured by `firstDayLength.test.ts`, which knows only the
+pinned call), and the hub *about 2-3 min a day*. The game and reference towers' longest days are
+measured with the hold uncapped and are upper bounds.
+
+**What holds it.** `everyday/stagePace.test.ts`, *the hold with nothing to decide*: the press day
+played through the real `Playback` at 50 ms frames stops for its call at 180.5 real seconds without
+the allowance and within a minute with it, on the same second, with the same legs, and
+`stagePace.test-helper.ts#scoredDayPlayOf` agrees both ways (red before: 180.5 with the constant at
+infinity).
+
+**Not established.** No browser case plays the press day to its call; the 59.0 seconds is one
+second under the minute, so a frame-rate stall could push a real sitting past it.

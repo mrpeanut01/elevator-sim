@@ -149,6 +149,7 @@ import {
   stageSkipLineOf,
   stageSkipOf,
   type StagePaceReason,
+  watchedRealAfter,
   worstWaitLossBeginsOf,
 } from './stagePace.js';
 /* Wave AI, § D1029 — the pinned day's call. */
@@ -443,6 +444,14 @@ function mountStage(
   let paceScored = false;
   /** The reason the last paced frame gave, so a chip press knows whether the stage was fast. */
   let lastPaceReason: StagePaceReason | undefined;
+  /*
+   * § D1493 (wave AP, lane G-3): the real seconds of `watching` since the last decision, the playing
+   * frame they were last counted at and its speed, and whether a chip pressed while the stage played
+   * on has set the allowance aside until the next call.
+   */
+  let watchedRealS = 0;
+  let watchedFrame: { readonly atS: number; readonly simPerRealS: number } | undefined;
+  let watchAllowanceOff = false;
   /** When a chip was pressed on this day — § D991 clause 2 as § D1029 amends it. */
   let playerChoseSpeedAtS: number | undefined;
   /*
@@ -1963,6 +1972,9 @@ function mountStage(
      * somebody next waits a minute.
      */
     playerChoseSpeedAtS = paceScored && lastPaceReason === 'watching' ? undefined : (playback?.simTimeS ?? 0);
+    /* § D1493: a chip press is a decision; pressed while the stage played on, it stands to the next call. */
+    watchedRealS = 0;
+    if (lastPaceReason === 'unheld') watchAllowanceOff = true;
     /* Lane AO-4: a chip press is a state of the player's making, so a skip's line from before it is over. */
     if (skipLine !== '') {
       skipLine = '';
@@ -1995,6 +2007,8 @@ function mountStage(
      * on a day nobody has started that is the rung the player set and no note at all.
      */
     if (playback.state !== 'playing') {
+      /* § D1493: a paused transport watches nothing, and a seek made while paused is not watching. */
+      watchedFrame = undefined;
       /* § D1212: whatever stopped the transport stopped a skip that was coming. */
       dropSkipBeat();
       /*
@@ -2012,6 +2026,14 @@ function mountStage(
       syncWaitingNote();
       return;
     }
+    if (watchedFrame !== undefined) {
+      watchedRealS = watchedRealAfter(watchedRealS, {
+        reason: lastPaceReason,
+        fromS: watchedFrame.atS,
+        toS: simTimeS,
+        simPerRealS: watchedFrame.simPerRealS,
+      });
+    }
     const answer = stagePaceOf({
       horizon: paceHorizon,
       acts: paceActs,
@@ -2022,8 +2044,15 @@ function mountStage(
       callAtS: activeCall()?.call.atS,
       scored: paceScored,
       lostAtS,
+      watchedRealS: watchAllowanceOff ? undefined : watchedRealS,
     });
     lastPaceReason = answer.reason;
+    watchedFrame = { atS: simTimeS, simPerRealS: answer.simPerRealS };
+    /* § D1493: a call raised, or waited at, or answered, is a decision, and the allowance starts again. */
+    if (answer.reason === 'call') {
+      watchedRealS = 0;
+      watchAllowanceOff = false;
+    }
     /* § D1169: a chip pressed while fast stands until somebody next waits a minute, and not past it. */
     if (answer.reason === 'watching') playerChoseSpeedAtS = undefined;
     /*
@@ -2901,6 +2930,10 @@ function mountStage(
     paceActs = actsOf(recording.demandPhases);
     paceScored = context.ctx === 'daily';
     if (resumeAtS === undefined) lastPaceReason = undefined;
+    /* § D1493: a new recording is a new day, or the run an answer just made; either way nothing is owed. */
+    watchedRealS = 0;
+    watchedFrame = undefined;
+    watchAllowanceOff = false;
     /* § D1212: a fresh day has skipped nothing; a re-simulation keeps the line it had. */
     skipArmedAtS = undefined;
     if (resumeAtS === undefined) {
