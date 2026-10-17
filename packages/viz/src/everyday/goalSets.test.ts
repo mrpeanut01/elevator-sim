@@ -229,3 +229,40 @@ describe('§ 567 — the two goal sets a career player meets one click apart', (
     expect(Object.keys(BUILDING_COPY)).not.toContain('testsEyebrow');
   });
 });
+
+/*
+ * ---- Wave AR, lane AR-4: the career day leads with the contract's four — GitHub issue #633 ----
+ *
+ * The playtest read the career day's strip lead with the week's five, which *"the contract counts
+ * none of"*, while the four that file the day sat only on the building desk.
+ */
+describe('§ D1543 — the career stage leads with the four that file the day', () => {
+  const four = campaignTestGoals(DIFFICULTIES.standard);
+  const strip = stageGoalsOf({
+    readings: [],
+    observations: NO_RUN,
+    simTimeS: 0,
+    endedAt: 600,
+    history: [],
+    day: 1,
+    contract: true,
+    contractGoals: { heading: contractAsksEyebrow(1), goals: four },
+  });
+
+  it('heads the strip with the contract’s own eyebrow and draws its four rows', () => {
+    expect(strip.heading).toBe(contractAsksEyebrow(1));
+    expect(strip.rows.map((row) => row.label)).toEqual(four.map((goal) => goal.label));
+    expect(strip.contract).toBe(STAGE_GOALS_COPY.contractLead);
+    expect(strip.contract).toMatch(/cleared or missed/u);
+  });
+
+  it('keeps the week’s five, second, under their own heading and saying the contract counts none', () => {
+    expect(strip.secondary?.heading).toBe(TODAY_ASKS_HEADING);
+    expect(strip.secondary?.note).toBe(STAGE_GOALS_COPY.weekNote);
+    expect(strip.secondary?.note).toMatch(/counts none/u);
+  });
+
+  it('is graded on the same fold and stands down short of the end, as the five do', () => {
+    expect(strip.rows.every((row) => row.state === 'pending')).toBe(true);
+  });
+});

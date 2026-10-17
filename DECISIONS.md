@@ -53617,3 +53617,53 @@ before; the same-counts line in view), `stageClearPays.browser.test.ts` (*Next s
 the path, the path's *Play stage ⟨n⟩*) and `scenarioScreen.browser.test.ts` (held reasons folded).
 
 **Numbers spent.** This lane held **D1534 to D1542** and spent **D1534 only**.
+
+## D1543 — the career day leads with the contract's four, says when it is over, and points a quiet day at Skip
+
+> **Taken 2026-10-17 by an agent session** (wave AR, lane AR-4, on GitHub issue #633's Career rows),
+> not by the product owner, and to be read as an agent ruling. **Amends [§ D1301](#d1301)**'s desk
+> census (it now leads somewhere) and **[§ D1452](#d1452)**'s two-set reading on the stage.
+> Owner-reversible: every clause.
+
+**Why an entry.** It binds `everyday/stageScreen.ts` and `everyday/reportView.ts`, which the career
+modules do not own, and moves what § 567's stage strip leads with.
+
+1. **The stage leads with the four that file the day.** On a career day the strip is headed
+   `contractAsksEyebrow(day)` over `campaignTestGoals` at the tower's difficulty, read on the same fold
+   and stood down the same way as the five (`stageScreenModel.ts#stageGoalsOf`'s `contractGoals`); the
+   week's five fold beneath, closed, saying the contract counts none of them.
+2. **The heading no longer runs into its sentence.** The frame wrote `display:''` over the strip's
+   `flex`; only a rush writes the strip's display there now.
+3. **The dock says the day is over**: *DAY OVER · The day is over. Close it to file.*, on the edge the
+   bar hears it, over a quiet or unanswered dock (`campaignDock.ts`).
+4. **A day the census says every driver clears is offered as one to watch.** The desk's primary is
+   the guide's *Watch a day here*, and its note says the day needs no decision and *Skip to the end*
+   files it in seconds. Skip still stops at any call the day raises.
+5. **A cleared day's levers are optional**: *Nothing needed today. If you want to try something
+   anyway*, over the same cards in the same order.
+6. **The building desk stacks below about 690 px** (flex-wrap sidebar), so the quiet card is never
+   behind the standing order.
+
+**What holds it.** `everyday/goalSets.test.ts`, `everyday/campaignDock.test.ts`,
+`everyday/reportView.test.ts` and three cases in `everyday/campaignScreens.browser.test.ts` (390×844,
+desktop, and the day). Red on the base: the three browser cases (the quiet card measured 38 px).
+
+**Not established.** See [§ D1544](#d1544).
+
+## D1544 — Not established: whether the opening career day should raise a call
+
+> **Opened 2026-10-17 by an agent session** (wave AR, lane AR-4) for the product owner. Nothing is
+> built on it.
+
+The playtest's day 1 at Garden Apartments had 21 riders and no call, because a call needs somebody
+to wait a minute. § 8.12 opens the career on *"one forgiving building and a trivial choice"*, and
+`campaign/calendar.ts` books nothing before day 3 under `docs/33` § 20.13. § D1543 clause 4 shortens
+that day honestly; it does not give it a decision. The options, none taken:
+
+- **A.** Open the career on a contract whose first day raises a call (none measured yet). Moves
+  § 8.12's arc and the opening purse; the economy tests would need re-deriving.
+- **B.** Book a calendar day on `c1` day 1 (a move-in). Overrides § 20.13's *nothing before day 3*.
+- **C.** Grow day 1's crowd on `c1`. Moves a measured figure (§ D1066's growth slope).
+- **D.** Keep a quiet first day and § D1543's short path (what ships).
+
+**Numbers spent.** This lane held **D1543 to D1551** and spent **D1543 and D1544**.

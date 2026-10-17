@@ -309,6 +309,13 @@ export const DAY_CENSUS_COPY = Object.freeze({
   allClear:
     'Measured on this day’s crowd before you run it: every driver on the list clears it with no ' +
     'press at all.',
+  /**
+   * **Where the census leads** — wave AR, lane AR-4, GitHub issue #633, [§ D1543](../../../../DECISIONS.md).
+   * The bar's note under *Watch a day here* on a day {@link allClear} is drawn: the playtest ran this
+   * day for two minutes with nothing to decide. *Skip to the end* is the stage's own control, and it
+   * still stops at a call if the day raises one.
+   */
+  shortPath: 'Nothing today needs a decision. On the day, Skip to the end files it in seconds.',
 } as const);
 
 /**
