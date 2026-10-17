@@ -82,7 +82,7 @@ export const RAIL_EYEBROW_WATCHING = 'The week on this device';
  * AP-D2 (the post-AO panel's seats A and B): a day is filed missed and a week can miss its target.
  */
 export const RAIL_NOTE_PLAYER =
-  'Share of riders away within a minute, day by day. A day can be missed, and a week can miss its target.';
+  'Share of riders away within a minute, day by day. A day you play can be missed, and a week can miss its target.';
 
 /** L4's note while watching — the same figures, told apart from the day on the stage. */
 export const RAIL_NOTE_WATCHING =
