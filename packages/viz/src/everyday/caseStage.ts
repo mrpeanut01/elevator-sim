@@ -54,7 +54,7 @@
  * finished with is disposed by name.
  */
 
-import type { VizRecording } from '../contract/types.js';
+import type { Frame, VizRecording } from '../contract/types.js';
 import { frameAt } from '../frame/frameAt.js';
 import { queueAt } from '../frame/overlay.js';
 import { waitBandsAt } from '../live/bands.js';
@@ -132,9 +132,11 @@ export interface CaseStageInput {
    * GitHub issue #598, [§ D992](../../../../DECISIONS.md). Absent on the fix-it screen, which plays
    * at one rung as it always has; the tutorial passes `tutorialModel.ts#tutorialPaceOf`, so its
    * quiet minutes are crossed fast and its trouble plays at the player's speed. Speed only — the
-   * playhead is never moved, and a pane's picture is the same frame at any speed.
+   * playhead is never moved, and a pane's picture is the same frame at any speed. The second
+   * argument is every pane's frame at that instant, which the stage screen's pace reads to tell a
+   * quiet building from a moving one (`stagePlay.ts#stageWatchPaceOf`).
    */
-  readonly pace?: ((longestStandingS: number | undefined) => number) | undefined;
+  readonly pace?: ((longestStandingS: number | undefined, frames: readonly Frame[]) => number) | undefined;
   /**
    * A clock and a line saying why the transport is at its speed, drawn above the canvases and
    * rewritten on change. Absent draws neither — GitHub issue #598's *no clock*, opt-in so the fix-it
@@ -371,6 +373,7 @@ export function mountCaseStage(doc: Document, input: CaseStageInput): CaseStage 
       return;
     }
     const simTimeS = playback.simTimeS;
+    const frames = panes.map((pane) => frameAt(pane.recording, simTimeS));
     /*
      * GitHub issue #598, § D992 — the present frame's longest wait over every pane, only when a
      * caller asked for pace or for frames. `waitBandsAt` folds at `t` and reads nothing later.
@@ -382,7 +385,7 @@ export function mountCaseStage(doc: Document, input: CaseStageInput): CaseStage 
         if (here !== undefined && (longest === undefined || here > longest)) longest = here;
       }
       if (input.pace !== undefined) {
-        const speed = input.pace(longest);
+        const speed = input.pace(longest, frames);
         if (playback.speed !== speed) playback.setSpeed(speed);
       }
       input.onFrame?.({ simTimeS, longestStandingS: longest });
@@ -431,7 +434,7 @@ export function mountCaseStage(doc: Document, input: CaseStageInput): CaseStage 
         shownBank === undefined ? recording.shafts : recording.shafts.filter((shaft) => shaft.bankId === shownBank);
       drawCutaway(ctx, {
         recording,
-        frame: frameAt(recording, simTimeS),
+        frame: frames[index] ?? frameAt(recording, simTimeS),
         queues: queueAt(recording, simTimeS),
         geometry: stageGeometryOf({
           width: rect.width,

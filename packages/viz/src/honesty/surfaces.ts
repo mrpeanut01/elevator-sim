@@ -132,6 +132,8 @@ import {
   DAY_OFFSET_MIN,
   DOOR_DRIVER_NOTE,
   DOOR_DRIVER_NOTE_HELD,
+  DOOR_PRIMARY_NOTE_HELD,
+  DOOR_STEP_ONE_HELD,
   DOOR_STEPS,
   sameForEveryoneLine,
 } from '../everyday/doorView.js';
@@ -290,7 +292,7 @@ import {
   RUN_CONTEXTS,
   SHELL_SKIP_LABEL,
 } from '../everyday/types.js';
-import { SCENARIO_ENTRIES, scenarioHubViewOf } from '../everyday/scenarioModel.js';
+import { SCENARIO_COPY, SCENARIO_ENTRIES, scenarioHubViewOf } from '../everyday/scenarioModel.js';
 import { SCENARIO_LADDER_COPY, type ScenarioLadderRung } from '../scenario/ladder.js';
 import {
   TUTORIAL_ABSENCES,
@@ -15345,6 +15347,9 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     'everyday/today.ts#TODAY_CHOICE_LINE_HELD',
     'everyday/doorView.ts#DOOR_DRIVER_NOTE',
     'everyday/doorView.ts#DOOR_DRIVER_NOTE_HELD',
+    /* Wave AQ lane AQ-1: step 1 and the press's note on that held day, #626's leftover. */
+    'everyday/doorView.ts#DOOR_STEP_ONE_HELD',
+    'everyday/doorView.ts#DOOR_PRIMARY_NOTE_HELD',
     /*
      * The week census's sentence on a day DC-10 does not admit, and its heading — § D1067. Drawn
      * only on a whole-day Scenario day at the tower's own rung, which no corpus case is, so every
@@ -15506,6 +15511,9 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     seeds.push({ field: 'today.lede.held', text: TODAY_CHOICE_LINE_HELD, role: 'prose' });
     seeds.push({ field: 'door.driver.note', text: DOOR_DRIVER_NOTE, role: 'prose' });
     seeds.push({ field: 'door.driver.note.held', text: DOOR_DRIVER_NOTE_HELD, role: 'prose' });
+    seeds.push({ field: 'door.step1.held.head', text: DOOR_STEP_ONE_HELD.head, role: 'label' });
+    seeds.push({ field: 'door.step1.held.body', text: DOOR_STEP_ONE_HELD.body, role: 'prose' });
+    seeds.push({ field: 'door.primary.note.held', text: DOOR_PRIMARY_NOTE_HELD, role: 'prose' });
     /* Midtown's run clock, from its whole authored day: a booking's window is a fraction of that run. */
     const midtownDay = wholeDayFor(context.trafficProfiles, context.buildings.find((building) => building.id === 'midtown-office'));
     const clock: BookingClock | undefined =
@@ -15897,6 +15905,11 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
         if (hub.path !== undefined) {
           const path = hub.path;
           seeds.push({ field: `${arm}.scenario.path.heading`, text: path.heading, role: 'label' });
+          /* Wave AQ lane AQ-1: each card's fold, and the primary a first visit's bar draws. */
+          seeds.push({ field: `${arm}.scenario.path.details`, text: SCENARIO_COPY.pathDetails, role: 'label' });
+          if (hub.startHere !== undefined) {
+            seeds.push({ field: `${arm}.scenario.startHere`, text: SCENARIO_COPY.startHere, role: 'label' });
+          }
           seeds.push({ field: `${arm}.scenario.path.lede`, text: path.lede, role: 'prose' });
           seeds.push({
             field: `${arm}.scenario.path.offer`,
@@ -18210,6 +18223,17 @@ const EVERYDAY_STAGE_PLAY: SurfaceAdapter = {
       );
       if (view.verdict?.pay !== undefined) seeds.push({ field: `stagePlay.parPaid.${state}.pay`, text: view.verdict.pay, role: 'prose' });
       if (view.verdict?.rung !== undefined) seeds.push({ field: `stagePlay.parPaid.${state}.rung`, text: view.verdict.rung, role: 'prose' });
+    }
+    /* Wave AQ lane AQ-1: the verdict's sentence when a change moved no count, both arms. */
+    for (const sameCounts of ['shipped', 'previous'] as const) {
+      const view = stagePlayViewOf(factsFor(standing), {
+        kind: 'judged',
+        verdict: { ...verdict(false, false, undefined), sameCounts },
+        stale: false,
+      });
+      if (view.verdict?.sameCounts !== undefined) {
+        seeds.push({ field: `stagePlay.sameCounts.${sameCounts}`, text: view.verdict.sameCounts, role: 'prose' });
+      }
     }
     /* § D1419: every shipped stage's ladder, in the arms a device can stand in. */
     for (const each of stages) {
