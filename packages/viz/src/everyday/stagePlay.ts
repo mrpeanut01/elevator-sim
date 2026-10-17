@@ -204,6 +204,16 @@ export const STAGE_PLAY_COPY = Object.freeze({
   rungBuy: 'Buy it',
   rungUnmeasured: 'The census has no count at this rung, so whether it adds a way through is not known.',
   rungAboveUnbought: 'Sold once the rung below it is bought.',
+  /*
+   * GitHub issue #626 item 4, § D1496: a press plays one of the stage's crowds under both settings
+   * while the verdict is measured on all of them. No digit in any of these: the block stands over the
+   * verdict and publishes no figure (§ D644 ruling 4).
+   */
+  watchEyebrow: 'One of the stage\u2019s crowds, watched',
+  watchNote: 'The verdict is all of them, both settings on the same passengers.',
+  watchBaselineCaption: 'As the building has it',
+  watchCandidateCaption: 'With your settings',
+  watchSkip: 'Stop watching',
   labLink: 'Open this stage on the Engineer surface',
   labNote: 'The Engineer surface draws every dial the stage’s budget reaches and the full report. A clear there pays nothing.',
 });
@@ -416,11 +426,22 @@ export interface StagePlayView {
   /** On a stage this device has cleared: that a run here is practice (§ D1358). */
   readonly practice: string | undefined;
   readonly status: string | undefined;
+  /** The pair a press plays, while it runs and after (§ D1496); absent before a press and while held. */
+  readonly watch: StageWatchView | undefined;
   readonly verdict: StagePlayVerdictView | undefined;
   /** The wider budgets, each sold from this device or with its measured reason (§ D1419). */
   readonly rungs: readonly StageRungRowView[];
   readonly labLink: string;
   readonly labNote: string;
+}
+
+/** The words on the pair a press plays (§ D1496): `caseStage.ts`'s copy and its two captions. */
+export interface StageWatchView {
+  readonly eyebrow: string;
+  readonly note: string;
+  readonly skip: string;
+  readonly baselineCaption: string;
+  readonly candidateCaption: string;
 }
 
 /** One rung as a row: a sentence, and a press where it can be bought now (§ D1419). */
@@ -847,6 +868,16 @@ export function stagePlayViewOf(facts: StagePlayFacts, phase: StagePlayPhase): S
       `${String(facts.replications)} more follow on crowds you could not have tuned against, and those decide the clear.`,
     practice: facts.clearedBefore === true ? stagePracticeLineOf(facts.parUnits, facts.keptSpentUnits) : undefined,
     status: statusOf(phase, facts.replications),
+    watch:
+      facts.held === undefined && (phase.kind === 'running' || phase.kind === 'judged')
+        ? {
+            eyebrow: STAGE_PLAY_COPY.watchEyebrow,
+            note: STAGE_PLAY_COPY.watchNote,
+            skip: STAGE_PLAY_COPY.watchSkip,
+            baselineCaption: STAGE_PLAY_COPY.watchBaselineCaption,
+            candidateCaption: STAGE_PLAY_COPY.watchCandidateCaption,
+          }
+        : undefined,
     verdict: phase.kind === 'judged' ? verdictViewOf(facts, phase.verdict, phase.stale) : undefined,
     rungs: (facts.rungs ?? []).map((rung) => stageRungRowOf(rung, facts.balanceChimes ?? 0)),
     labLink: STAGE_PLAY_COPY.labLink,

@@ -18170,6 +18170,14 @@ const EVERYDAY_STAGE_PLAY: SurfaceAdapter = {
       seeds.push({ field: `${at}.runNote`, text: view.runNote, role: 'prose' });
       if (view.practice !== undefined) seeds.push({ field: `${at}.practice`, text: view.practice, role: 'prose' });
       if (view.status !== undefined) seeds.push({ field: `${at}.status`, text: view.status, role: 'prose' });
+      /* § D1496: the pair a press plays, captioned as one crowd of the many the verdict reads. */
+      if (view.watch !== undefined) {
+        seeds.push({ field: `${at}.watch.eyebrow`, text: view.watch.eyebrow, role: 'label' });
+        seeds.push({ field: `${at}.watch.note`, text: view.watch.note, role: 'prose' });
+        seeds.push({ field: `${at}.watch.skip`, text: view.watch.skip, role: 'label' });
+        seeds.push({ field: `${at}.watch.baseline`, text: view.watch.baselineCaption, role: 'label' });
+        seeds.push({ field: `${at}.watch.candidate`, text: view.watch.candidateCaption, role: 'label' });
+      }
       if (view.verdict !== undefined) {
         seeds.push({ field: `${at}.verdict.head`, text: view.verdict.head, role: 'prose' });
         if (phase.kind === 'judged' && !phase.verdict.metOnTuningSeeds) {

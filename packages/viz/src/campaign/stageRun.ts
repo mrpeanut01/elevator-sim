@@ -232,3 +232,34 @@ export function demonstrationConfigFor(input: DemonstrationInput): SimulationCon
     ...(reportWindow === undefined ? {} : { reportWindow }),
   };
 }
+
+/** What {@link stageWatchConfigsOf} needs: a demonstration's resources, and the two dispatchers. */
+export interface StageWatchInput extends Omit<DemonstrationInput, 'dispatcherProfile' | 'replication'> {
+  /** The stage's own setting, the batch's first arm. */
+  readonly baseline: DispatcherProfile;
+  /** The dispatcher the candidate arm runs: `stagePress.ts#admitStageMove`'s resolved `candidate`. */
+  readonly candidate: DispatcherProfile;
+}
+
+/**
+ * **The pair a stage's press plays while its verdict is measured** — GitHub issue #626 item 4,
+ * [§ D1496](../../../../DECISIONS.md), which extends [§ D644](../../../../DECISIONS.md) to the stage
+ * screen.
+ *
+ * Replication 0 of the **tuning** set, both arms, through {@link demonstrationConfigFor}: one seed,
+ * one horizon, one demand, one window, and only the dispatcher differs, so the two panes are the
+ * same crowd under the two settings. That makes the docstring claim on
+ * {@link demonstrationConfigFor} a tested one: `stageWatch.test.ts` requires the candidate pane's
+ * legs to equal the legs of the batch's own replication 0 candidate run, built through
+ * `batch/runBatch.ts#armConfigOf`, and requires a different move to change them.
+ */
+export function stageWatchConfigsOf(input: StageWatchInput): {
+  readonly baseline: SimulationConfig;
+  readonly candidate: SimulationConfig;
+} {
+  const { baseline, candidate, ...shared } = input;
+  return {
+    baseline: demonstrationConfigFor({ ...shared, dispatcherProfile: baseline, replication: 0 }),
+    candidate: demonstrationConfigFor({ ...shared, dispatcherProfile: candidate, replication: 0 }),
+  };
+}

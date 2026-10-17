@@ -676,3 +676,37 @@ describe('a first-time player reads the stage before running it — GitHub issue
     expect(named, 'no stage title counts its cars, so this case tests nothing').toBeGreaterThan(0);
   });
 });
+
+describe('a press plays one of the stage’s crowds, and the words over it carry no figure — issue #626 item 4, § D1496', () => {
+  it('offers the pair while the stage runs and after its verdict, never before a press or on a held stage', () => {
+    const stage = stageAt(0);
+    const choice = { profileId: stage.dispatcher.startingProfileId, parking: null };
+    const facts = factsOf(stage, choice);
+    const verdict: StagePlayVerdictFacts = {
+      headline: 'judge headline',
+      goals: [],
+      holdoutSentence: null,
+      metOnTuningSeeds: false,
+      cleared: false,
+      paid: undefined,
+    };
+    expect(stagePlayViewOf(facts, { kind: 'idle' }).watch).toBeUndefined();
+    expect(stagePlayViewOf(facts, { kind: 'failed' }).watch).toBeUndefined();
+    const running = stagePlayViewOf(facts, { kind: 'running', seedSet: 'tuning', completed: 3, total: 100 });
+    const judged = stagePlayViewOf(facts, { kind: 'judged', verdict, stale: false });
+    for (const view of [running, judged]) {
+      expect(view.watch).toEqual({
+        eyebrow: 'One of the stage’s crowds, watched',
+        note: 'The verdict is all of them, both settings on the same passengers.',
+        skip: STAGE_PLAY_COPY.watchSkip,
+        baselineCaption: STAGE_PLAY_COPY.watchBaselineCaption,
+        candidateCaption: STAGE_PLAY_COPY.watchCandidateCaption,
+      });
+      expect(Object.values(view.watch ?? {}).join(' ')).not.toMatch(/\d/u);
+    }
+    /* The verdict is drawn beside a pair still playing: the view holds both at once. */
+    expect(judged.verdict).toBeDefined();
+    const held = stagePlayViewOf(factsOf(stage, choice, 'held for a reason'), { kind: 'running', seedSet: 'tuning', completed: 0, total: 100 });
+    expect(held.watch).toBeUndefined();
+  });
+});
