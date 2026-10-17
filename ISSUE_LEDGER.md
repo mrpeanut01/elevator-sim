@@ -11,7 +11,7 @@ Pillars: 1 playable · 2 understandable · 3 simple · 4 engaging during a run.
 
 | task | issue | branch | state |
 |---|---|---|---|
-| B-628 | #628 census and press price mismatch | `fix/628-census-price` (worktree) | building |
+| none | | | cycle 1 is closed |
 
 **Do not collide with PR #622** (wave AP, paused by the owner). It touches `packages/viz/src/everyday/*`,
 `shift/*` (including `goals.ts`), `data/week-pool.json` and `campaign/career.ts`. It also reserved
@@ -25,7 +25,7 @@ decisions **D1445–D1540**, which overlap § D1445 (the lobby) on main; this cy
 
 | # | title (short) | P | pillar | next action |
 |---|---|---|---|---|
-| 628 | Census sampler and press price destination panels differently | P2 | 1 | In flight. Stop and report if any published survivor count would move |
+| 628 | Census sampler and press price destination panels differently | P2 | 1 | **Fixed** on PR #624, with no published count moved. Open for the owner: should a weight that opens at its default of 0 cost 2 u? A cleaner sampler would regenerate four cells, which is a decision |
 | 232 | Building set to the content-plan target | P1 | 2, 4 | **AC4 done** on PR #624 (`buildingFieldReach.test.ts`), with three inert fields filed as #625. AC1 has 17 of 22 buildings. AC2: owner sign-off on harbour-point and ashgate |
 | 590 | Re-measure five rungs at n = 50 | P2 | 4 | **Done** on PR #624: all five are in band at 50 (c2 0.48, c3 0.56, c6 0.46, c8 0.56, c10 0.44), re-run independently. Closes when #624 merges |
 | 625 | Three shipped building fields change no leg | P2 | 1 | Item 1's loader warning is fixed on PR #624. Owner: fix the data or keep each field with a reason |
