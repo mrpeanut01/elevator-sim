@@ -53430,3 +53430,35 @@ second tab's exact locked-out state was not reproduced, so the disabled chips ar
 no-run rule.
 
 **Numbers spent.** This lane held **D1515 to D1523** and spent **D1515 only**.
+
+---
+
+## D1516 — a rush round ended by hand is paid only for the waves it got through before the stop
+
+> **Taken 2026-10-17 by an agent session** (wave AR, lane AR-1, on GitHub issue #633's Rush P1), not
+> by the product owner, and to be read as an agent ruling. **Amends [§ D542](#d542) clause 3**
+> (*"a replay has no hand stop, so a round whose replay never crosses the line outlasted every
+> generated wave"*), which stays as written. Owner-reversible.
+
+**Why an entry.** It moves a recorded reading and binds `core` (`sim/rush.ts#rushWavesOutlasted`),
+the server's replay (`leaderboard/rushSitting.ts`) and the sitting's wire, none of which the rush
+screens own.
+
+1. **The defect.** The purse paid a round on its recording's hold moment, which lies past a hand
+   stop. A round ended by hand in wave 2 on Midtown Office was paid the nine waves the whole run
+   outlasts (18 units), more than a round played to the line in wave 9 (16). That contradicts the
+   setup page's *"Each wave a round outlasts pays 2 units"*, whose sentence is kept.
+2. **The rule.** A stop is read exactly like a crossing: a round stopped in wave `n` pays `n − 1`,
+   and a stop after the crossing changes nothing. `rushWavesOutlasted` takes the stop as a third
+   argument and both ends call it.
+3. **The wire carries the stop as a cause.** A round gains `stoppedS` (seconds from its start, absent
+   when the line or the run's end ended it). The server reads it and never compares it, because its
+   replay runs past the stop and cannot see it. A stop can only lower a round's pay, so a client gains
+   nothing by sending one. A client that omits it is paid as before, which no server can tell apart.
+4. **A last round with a stop before its line is refused `no-breaking-point`**, in its own words:
+   § D515's hand-stop rule, now enforced by the server as well as the client.
+
+**What holds it.** `core`'s `sim/rush.test.ts` (the arithmetic, and that a stop never raises pay),
+`packages/viz/src/everyday/host.test.ts` (a round stopped in wave 2 pays one wave through the host's
+own verbs, red on the base at 12 units), and `packages/server/src/leaderboard/rushSitting.test.ts`
+(the replay pays the stop, keeps its held time, refuses a stopped last round and a malformed stop).

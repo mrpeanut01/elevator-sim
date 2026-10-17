@@ -188,7 +188,7 @@ export function rushHoldAtLegs(
  * The wave the line was crossed in was reached and not outlasted, so a crossing in wave `n` outlasted
  * `n − 1` — `packages/viz/src/everyday/rush.ts#rushWavesOutlastedOf`'s reading for the chime ledger,
  * applied to a replay rather than to what a screen showed. Two readings differ from that one, and
- * both are because a replay has no hand stop:
+ * both are because a replay runs on past where the player stopped it:
  *
  * - **A replay that never crosses the line outlasted every generated wave.** The chime route is told
  *   a count by a client that cannot tell a hand stop from a run that held, so it banks nothing for
@@ -197,11 +197,20 @@ export function rushHoldAtLegs(
  *   stream generates {@link LAST_GENERATED_WAVE} waves; a queue that crosses the line during the
  *   drain outlasted all of them, and no more.
  *
+ * - **A round the player ended by hand is paid only for the waves it got through before the stop**
+ *   ([§ D1516](../../../../DECISIONS.md), amending § D542 clause 3). `stoppedAtS` is that stop, in the
+ *   same clock as `holdAtS`; a stop is read exactly like a crossing, so a stop in wave `n` pays `n − 1`.
+ *   It is a cause the round carries rather than an effect it claims: a stop can only lower a round's
+ *   pay, never raise it, so a client cannot buy anything by sending one. Before this, the replay
+ *   could not see the stop at all, and a round ended in wave 2 was paid the waves the whole run would
+ *   have outlasted, which was more than a round played out to the line.
+ *
  * Nothing else the run measured reaches this: how long anybody waited, how many were carried and
  * whether the mean is quotable are all on the run, and none of them is a count of waves. That is what
  * keeps a purse from varying with a measurement (§ D526 clause 2's rule, applied to units).
  */
-export function rushWavesOutlasted(holdAtS: number | undefined, startedAt: number): number {
-  if (holdAtS === undefined) return LAST_GENERATED_WAVE;
-  return Math.min(LAST_GENERATED_WAVE, Math.max(0, playerWaveAt(holdAtS - startedAt) - 1));
+export function rushWavesOutlasted(holdAtS: number | undefined, startedAt: number, stoppedAtS?: number): number {
+  const endAtS = stoppedAtS !== undefined && (holdAtS === undefined || stoppedAtS < holdAtS) ? stoppedAtS : holdAtS;
+  if (endAtS === undefined) return LAST_GENERATED_WAVE;
+  return Math.min(LAST_GENERATED_WAVE, Math.max(0, playerWaveAt(endAtS - startedAt) - 1));
 }

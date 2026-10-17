@@ -2172,6 +2172,13 @@ export interface EverydayHost {
    * non-test caller is `everyday/rushScreen.ts`.
    */
   rushUnfinished(): string | undefined;
+  /**
+   * **The round on the stage has played past its first second** — wave AR, lane AR-1 (GitHub issue
+   * #633). Only from then is a page that closes said to have lost a round: a round started again and
+   * left at 0:00 was played by nobody. Idempotent within a round. Its non-test caller is
+   * `everyday/stageScreen.ts`'s draw, in the rush context.
+   */
+  rushRoundPlaying(): void;
 
   /**
    * Today's challenge and its board — GitHub issue #221's third criterion, *reachable without
@@ -3529,6 +3536,8 @@ export function createEverydayHost(
    * `RushDeviceStore.setRunning` was last told. Wave AQ, lane AQ-3.
    */
   let rushUnfinishedAtLoad = b.rushDeviceBest?.unfinished();
+  /** Whether the round on the stage has been marked running — {@link EverydayHost.rushRoundPlaying}. */
+  let rushRoundMarked = false;
   /**
    * What the next sitting may claim, from what the ledger says this account owns —
    * [§ D672](../../../../DECISIONS.md).
@@ -5495,8 +5504,13 @@ export function createEverydayHost(
       const patch = rushPatchOf(b.resources, state, rushSession.modifiers, rushSession.levels);
       if (patch !== undefined) b.applyPatch(patch);
       b.startRun();
-      /* Wave AQ lane AQ-3: a round is running, so a page closed now goes unkept and says so next time. */
-      b.rushDeviceBest?.setRunning(rushSession.buildingId);
+      /*
+       * Wave AQ lane AQ-3 marked the round running here, at the press. Wave AR lane AR-1 moved the
+       * mark to {@link EverydayHost.rushRoundPlaying}: a round started again and never played is not
+       * a round lost. Until it plays, a page closed now leaves nothing to say.
+       */
+      b.rushDeviceBest?.setRunning(undefined);
+      rushRoundMarked = false;
       notifyCampaign();
       return undefined;
     },
@@ -5550,6 +5564,11 @@ export function createEverydayHost(
       settleRushRound();
     },
     rushBest: () => rushBestThisVisit.get(b.state().buildingId),
+    rushRoundPlaying: () => {
+      if (rushSession === undefined || rushSession.endedAtS !== undefined || rushRoundMarked) return;
+      rushRoundMarked = true;
+      b.rushDeviceBest?.setRunning(rushSession.buildingId);
+    },
     rushUnfinished: () => {
       if (rushUnfinishedAtLoad === undefined) return undefined;
       rushUnfinishedAtLoad = undefined;
