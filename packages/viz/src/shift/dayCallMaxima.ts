@@ -39,6 +39,7 @@ import type { VizRecording } from '../contract/types.js';
 
 import { readGoal } from './goals.js';
 import { WAKE_UP_ARRIVALS, type GoalObservations, type GoalReading, type ShiftGoal } from './types.js';
+import type { DayCallAnswer, DayCallRecord } from './dayCalls.js';
 
 /**
  * One reading of a run: `[atS, arrived, deepest landing, longest wait]`. `arrived` is capped at
@@ -306,4 +307,23 @@ export function dayCallCrossingPhraseOf(pastBar: readonly GoalReading[]): string
     return [`${what} reached ${String(reading.observed)}${unit} against a bar of ${String(reading.goal.bar)}${unit}`];
   });
   return parts.join(' and ');
+}
+
+/**
+ * **A call's record with each answer's readings taken from its runs** — the one place § D1433's
+ * maxima are attached to a counted record, so an ordinary call (`dev/dayCallSession.ts`) and the
+ * pinned day's call (`dev/main.ts#measurePinnedCall`, wave AP's lane DT-2, swarm DT's Q3 item 4)
+ * carry the same readings and draw the same row. Taken while the runs are in hand, so a resumed
+ * attempt reads them from the record. An answer with no run is left out, and its row reads the
+ * others.
+ */
+export function dayCallRecordWithMaximaOf(
+  counted: DayCallRecord,
+  runs: Partial<Record<DayCallAnswer, VizRecording>>,
+): DayCallRecord {
+  const maxima: Partial<Record<DayCallAnswer, DayCallMaxima>> = {};
+  for (const [answer, recording] of Object.entries(runs) as [DayCallAnswer, VizRecording | undefined][]) {
+    if (recording !== undefined) maxima[answer] = dayCallMaximaOf(recording, counted.atS);
+  }
+  return Object.freeze({ ...counted, maxima: Object.freeze(maxima) });
 }

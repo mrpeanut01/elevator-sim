@@ -50,6 +50,7 @@ import {
   type DayCallMaximaReadings,
 } from '../shift/dayCallMaxima.js';
 import {
+  DAY_CALL_COUNT_LABEL,
   DAY_CALL_LONG_WAIT_S,
   dayCallAnswersOf,
   dayCallAnswerWordsOf,
@@ -116,7 +117,7 @@ export const STAGE_CALL_ROWS_CAVEAT =
  * The caveat's last sentence where a row still prints counts: a record written before the readings,
  * whose counts are all its row has. Wave AO's label, kept for that row.
  */
-export const STAGE_CALL_COUNT_LABEL = 'The count of riders who waited a minute is not one of the day’s goals.';
+export const STAGE_CALL_COUNT_LABEL = DAY_CALL_COUNT_LABEL;
 
 /** The caveat for `rows`, or `undefined` where none of them is a call's. */
 export function stageCallRowsCaveatOf(rows: readonly StageCallRowView[]): string | undefined {
