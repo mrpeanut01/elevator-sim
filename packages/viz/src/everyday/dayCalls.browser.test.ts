@@ -222,6 +222,8 @@ describe.skipIf(!HAS_BROWSER)('an ordinary day’s calls — § D1138', () => {
        */
       let placementsAnswered = 1;
       let driversAnswered = 0;
+      /* § D1528: the order in force, which a placement call asked again names. Spread, from the first call. */
+      let inForce = 'spread across the tower';
       for (let k = 0; k < 6; k += 1) {
         const up = await page
           .waitForSelector('.everyday-stage-call:not([hidden])', { timeout: 60_000 })
@@ -237,8 +239,16 @@ describe.skipIf(!HAS_BROWSER)('an ordinary day’s calls — § D1138', () => {
           await answer(page, 'leave');
           driversAnswered += 1;
         } else {
-          expect(card).toContain(card.includes('out of passenger service') ? 'What do the cars that are left do?' : 'What do the cars do?');
+          /*
+           * § D1528: a placement call after a park or spread names the order in force and asks
+           * whether to keep it, in place of the first ask's question. The order named must be the
+           * last one pressed.
+           */
+          const again = /Since \d\d:\d\d, idle cars wait (spread across the tower|at the lobby)\. Keep that, or change it\?/u.exec(card);
+          expect(again?.[1], card).toBe(inForce);
+          expect(card).not.toContain('What do the cars');
           await answer(page, 'park-cars-lobby');
+          inForce = 'at the lobby';
           placementsAnswered += 1;
         }
         if (placementsAnswered >= 2 && driversAnswered >= 1) break;

@@ -321,6 +321,7 @@ import {
   stageSkipLineOf,
   stageSkipOf,
   stageSkipSpeechOf,
+  SKIP_BEAT_REAL_S,
 } from '../everyday/stagePace.js';
 import {
   STAGE_CALL_COPY,
@@ -13847,7 +13848,7 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
         { simPerRealS: 30, reason: 'fast' as const },
         { simPerRealS: 30, reason: 'fast' as const, playedOn: true as const },
       ]) {
-        const text = stageSkipSpeechOf({ armed: true, pace, line: '' });
+        const text = stageSkipSpeechOf({ armedRealS: SKIP_BEAT_REAL_S, pace, line: '' });
         if (text !== '') seeds.push({ field: `stage.skip.speech(${pace.playedOn === true ? 'playedOn' : 'fast'})`, text, role: 'label' });
       }
       {

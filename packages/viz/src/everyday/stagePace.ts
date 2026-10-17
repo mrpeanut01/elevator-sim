@@ -857,16 +857,32 @@ export function stagePaceStateOf(pace: StagePace): StagePaceReason {
 }
 
 /**
+ * **How long a beat has run, in real seconds, before its note is drawn past the allowance** —
+ * [§ D1525](../../../../DECISIONS.md), as corrected after the integrated browser run. Half of
+ * {@link SKIP_BEAT_REAL_S}: every skip is still warned for at least a real second before it lands,
+ * and a beat that a waiter crossing the minute ends sooner, the flip the re-play saw at four a real
+ * second, never draws its note.
+ */
+export const SKIP_BEAT_SHOWN_PLAYED_ON_REAL_S = SKIP_BEAT_REAL_S / 2;
+
+/**
  * **What the skip's span says**, for {@link stageStatusOf}'s `skip` — [§ D1525](../../../../DECISIONS.md).
- * The beat's note while a skip is coming, except past the allowance, where the pace line already says
- * how to stop it (*pick a speed to watch*) and the beat would flip with every waiter who crosses the
- * minute; otherwise the line the last skip left, or `''`.
+ * The beat's note while a skip is coming, so a player can stop it (§ D1212, § D1266). Past the
+ * allowance ({@link StagePace.playedOn}) only once the beat has run
+ * {@link SKIP_BEAT_SHOWN_PLAYED_ON_REAL_S}: there a waiter crossing the minute arms and drops the beat
+ * several times a real second, and a note drawn on every arming flipped the line with it. Otherwise
+ * the line the last skip left, or `''`.
+ *
+ * @param input.armedRealS real seconds since the beat was armed, or `undefined` with no beat coming.
  */
 export function stageSkipSpeechOf(input: {
-  readonly armed: boolean;
+  readonly armedRealS: number | undefined;
   readonly pace: StagePace | undefined;
   readonly line: string;
 }): string {
-  if (input.armed && input.pace?.playedOn !== true) return STAGE_SKIP_BEAT_NOTE;
+  const armed = input.armedRealS;
+  if (armed !== undefined && (input.pace?.playedOn !== true || armed >= SKIP_BEAT_SHOWN_PLAYED_ON_REAL_S)) {
+    return STAGE_SKIP_BEAT_NOTE;
+  }
   return input.line;
 }

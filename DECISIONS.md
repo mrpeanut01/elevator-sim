@@ -53296,7 +53296,7 @@ hashes prose it does not read, so it is left for a lane that may regenerate or n
 
 ## D1506 — once slowed for a wait the stage stays slowed ten real seconds, and its three lines tell one story
 
-> **Status 2026-10-17: AMENDED by [§ D1525](#d1525)** (an agent ruling). Clause 2's lines: the slowed rung has one line through its dwell, *slowed to your speed, 4×, for a wait on a landing of over a minute*, and past the allowance a frame with nobody past a minute reads the played-on line, with the skip's beat quiet. See [`docs/39`](docs/39-decisions-in-force.md).
+> **Status 2026-10-17: AMENDED by [§ D1525](#d1525)** (an agent ruling). Clause 2's lines: the slowed rung has one line through its dwell, *slowed to your speed, 4×, for a wait on a landing of over a minute*, and past the allowance a frame with nobody past a minute reads the played-on line, with the skip's beat drawn once it has run a real second. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Taken 2026-10-17 by an agent session under delegated authority** (wave AQ, lane AQ-2, on the
 > first-time-player playtest, GitHub issue #631), not by the product owner, and to be read as an
@@ -53480,12 +53480,19 @@ times a real second between *nobody on a landing has waited a minute: skipping a
 dropped it. Inside the allowance the slowed rung did the same between § D1506's two slowed lines.
 
 **The ruling.** A `fast` frame past the allowance carries `playedOn` and reads the `unheld` line; the
-beat's note is not drawn there (the line already says *pick a speed to watch*); a skip's line stands
+beat's note is drawn there only once the beat has run a real second (corrected below); a skip's line stands
 across `unheld` and `fast` there (`stagePaceStateOf`). The slowed rung has one line, *slowed to your
 speed, 4×, for a wait on a landing of over a minute*, true while the wait stands and through the
 dwell. **The speed and the skip are unchanged**, so no day length or first-call figure moves. A
 ten-second dwell on the played-on rung was built and withdrawn: it moved the press day's first call
 from 63.0 to 87.2 real seconds.
+
+**Corrected on the integrated head.** The first cut drew the skip's beat note nowhere past the
+allowance, so skips there landed with no warning a pause or a chip could act on (§ D1212, § D1266),
+and the browser tier's skip case waited 480 s for a beat that never came. Past the allowance the beat
+note is now drawn once the beat has run half its length (`stagePace.ts#SKIP_BEAT_SHOWN_PLAYED_ON_REAL_S`,
+one real second), so every skip is warned for at least a second and a beat a waiter ends sooner,
+the flip, is never drawn. Beat timing is unchanged.
 
 **What holds it.** `everyday/stagePace.test.ts`, *the line holds while the rung does*: the stage's
 frame loop and status writer over a series crossing the minute every 7.5 simulated seconds changes

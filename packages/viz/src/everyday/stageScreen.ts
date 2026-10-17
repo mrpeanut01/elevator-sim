@@ -2332,10 +2332,16 @@ function mountStage(
     const lines = stageStatusOf({
       pace: paceText,
       stopped: paceStopped,
-      skip: stageSkipSpeechOf({ armed: skipArmedAtS !== undefined, pace: watchedFrame?.pace, line: skipLine }),
+      skip: stageSkipSpeechOf({ armedRealS: beatArmedRealS(), pace: watchedFrame?.pace, line: skipLine }),
     });
     if (paceNote.textContent !== lines.pace) paceNote.textContent = lines.pace;
     if (skipNote.textContent !== lines.skip) skipNote.textContent = lines.skip;
+  }
+
+  /** Real seconds the coming skip's beat has run, read off the transport, or `undefined` with none coming. */
+  function beatArmedRealS(): number | undefined {
+    if (skipArmedAtS === undefined || playback === undefined || !(playback.speed > 0)) return undefined;
+    return Math.max(0, (playback.simTimeS - skipArmedAtS) / playback.speed);
   }
 
   /** What the pace rule, or a call's stop, says now. */

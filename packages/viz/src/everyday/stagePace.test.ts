@@ -52,6 +52,7 @@ import {
   stageSkipLineStands,
   stageSkipOf,
   stageSkipSpeechOf,
+  SKIP_BEAT_SHOWN_PLAYED_ON_REAL_S,
   stagePaceStateOf,
   stageStatusOf,
   watchedRealAfter,
@@ -1068,7 +1069,7 @@ describe('the line holds while the rung does — § D1525', () => {
       const status = stageStatusOf({
         pace: stagePaceNoteOf(pace, { acts, simTimeS }) ?? '',
         stopped: false,
-        skip: stageSkipSpeechOf({ armed: armedAtRealS !== undefined, pace, line: '' }),
+        skip: stageSkipSpeechOf({ armedRealS: armedAtRealS === undefined ? undefined : realS - armedAtRealS, pace, line: '' }),
       });
       out.push({ realS, simPerRealS: pace.simPerRealS, line: status.pace || status.skip, reason: pace.reason });
       last = { pace, atS: simTimeS };
@@ -1108,10 +1109,19 @@ describe('the line holds while the rung does — § D1525', () => {
     /* Inside the allowance nothing changes: the `fast` line and the beat's note, as § D1506 drew them. */
     const early = stagePaceOf({ ...base, longestStandingS: 10, watchedRealS: 3 });
     expect(early).toEqual({ simPerRealS: BETWEEN_PEAKS_SIM_PER_REAL_S, reason: 'fast' });
-    expect(stageSkipSpeechOf({ armed: true, pace: early, line: '' })).toBe(STAGE_SKIP_BEAT_NOTE);
-    expect(stageSkipSpeechOf({ armed: true, pace: quiet, line: 'skipped 12:20–12:30: nobody on a landing waited a minute' })).toBe(
+    expect(stageSkipSpeechOf({ armedRealS: 0, pace: early, line: '' })).toBe(STAGE_SKIP_BEAT_NOTE);
+    /* Past the allowance a beat younger than half its length is not drawn, so a flip never draws it... */
+    expect(stageSkipSpeechOf({ armedRealS: 0.4, pace: quiet, line: 'skipped 12:20–12:30: nobody on a landing waited a minute' })).toBe(
       'skipped 12:20–12:30: nobody on a landing waited a minute',
     );
+    /*
+     * ...and one that will land is drawn for at least a real second before it does (§ D1212's
+     * warning, which a pause or a chip acts on). Red under the first cut of § D1525, which never
+     * drew it past the allowance and let skips land unwarned.
+     */
+    expect(SKIP_BEAT_SHOWN_PLAYED_ON_REAL_S).toBeLessThanOrEqual(SKIP_BEAT_REAL_S - 1);
+    expect(stageSkipSpeechOf({ armedRealS: SKIP_BEAT_SHOWN_PLAYED_ON_REAL_S, pace: quiet, line: '' })).toBe(STAGE_SKIP_BEAT_NOTE);
+    expect(stageSkipSpeechOf({ armedRealS: undefined, pace: quiet, line: '' })).toBe('');
     /* And a skip's line stands across the minute and back once played on, and still goes at a call. */
     expect(stagePaceStateOf(quiet)).toBe('unheld');
     expect(stageSkipLineStands({ landedReason: 'unheld', reason: stagePaceStateOf(quiet) })).toBe(true);
