@@ -432,7 +432,9 @@ travel and applies it. Where a car declares its own `descentSpeedMps` as well, *
 Three advisory warnings come out of it, and each names a state that is legal and probably not what
 the author meant: `descent-capped-by-air-pressure` (the cap is biting on this car),
 `descent-above-rated-speed` (a car quicker down than up — legal, and no reference asymmetry is of
-that sign) and `pressurisation-buys-nothing` (a cabin fitted where nothing was capping it).
+that sign) and `pressurisation-buys-nothing` (a cabin fitted where pressurising does not raise the
+descent the car actually flies: nothing was capping it, or the car's own `descentSpeedMps` binds at
+or below the cap).
 
 ## The rope, and the only travel ceiling that refuses
 

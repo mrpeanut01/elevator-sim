@@ -206,9 +206,9 @@ const KNOWN_INERT: ReadonlyMap<string, { readonly issue: string; readonly why: s
         'The shuttle cars declare cabinPressurised: true and descentSpeedMps: 10. Pressurising lifts ' +
         'the 10 m/s air-pressure cap, and the authored descent limit then binds at the same 10 m/s ' +
         '(config/resolveCar.ts#descentSpeedOf takes the lower), so the cabin buys nothing. The ' +
-        'loader does not say so: pressurisation-buys-nothing asks only whether the unpressurised cap ' +
-        'would have bitten, not whether another limit binds at or below it. Identical legs measured ' +
-        'at 300, 1 800 and 7 200 s.',
+        'loader now says so: since GitHub issue #625, pressurisation-buys-nothing compares the ' +
+        'effective descent with and without the cabin, and is raised on this shuttle. The data is ' +
+        'unchanged, so the field stays inert. Identical legs measured at 300, 1 800 and 7 200 s.',
     },
   ],
   [

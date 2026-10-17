@@ -202,6 +202,35 @@ function descentSpeedOf(
 }
 
 /**
+ * The car's effective top speed downwards, m/s, as `resolveCar` would fly it with the cabin
+ * pressurised or not — the rated speed when nothing binds.
+ *
+ * Exported so `resolveBuilding`'s `pressurisation-buys-nothing` warning asks the same question the
+ * resolver answers, *"does pressurising raise the descent this car actually flies?"*, rather than
+ * re-deriving one limit of several. GitHub issue #625: asking only whether the unpressurised cap
+ * would have bitten missed `ctf-class-reference`'s shuttle, whose own `descentSpeedMps` binds at
+ * the cap's 10 m/s, so the cabin it fits raises nothing.
+ *
+ * Pure, and built on {@link descentSpeedOf} and {@link airPressureDescentCapMps}, so there is one
+ * rule for the descent limit rather than two.
+ */
+export function effectiveDescentSpeedMps(
+  ratedSpeedMps: number,
+  authoredDescentMps: number | undefined,
+  airPressure: AirPressureLimit | undefined,
+  travelM: number | undefined,
+  cabinPressurised: boolean,
+): number {
+  return (
+    descentSpeedOf(
+      ratedSpeedMps,
+      authoredDescentMps,
+      airPressureDescentCapMps(airPressure, travelM, cabinPressurised),
+    ) ?? ratedSpeedMps
+  );
+}
+
+/**
  * Merge a car with its class defaults. Explicit car fields win; anything omitted falls
  * back to the class typical (or, for rated load, to the low end of the class capacity
  * range — the conservative choice, since overstating capacity flatters the simulation).

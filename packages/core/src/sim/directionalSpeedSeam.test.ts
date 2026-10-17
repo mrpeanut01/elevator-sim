@@ -186,7 +186,7 @@ describe('CTF-class: 20 m/s up and 10 m/s down, and the pair is what moves the r
     return resolve(ID, document);
   }
 
-  it('declares the asymmetry on exactly one bank, and loads clean doing it', () => {
+  it('declares the asymmetry on exactly one bank, and loads with only the pressurisation advisory', () => {
     // Asserted rather than left to the JSON, because every case below is a claim about this
     // arrangement and would quietly become a claim about a different one.
     const building = ctf(false);
@@ -200,7 +200,13 @@ describe('CTF-class: 20 m/s up and 10 m/s down, and the pair is what moves the r
       // The half a reader will not expect, and the half the building's own `$comment` argues for.
       expect(car.cabinPressurised).toBe(true);
     }
-    expect(building.warnings.map((warning) => warning.code)).toEqual([]);
+    // One advisory per shuttle car and nothing else: the authored 10 m/s descent binds at the
+    // air-pressure cap's own 10 m/s, so the pressurised cabin raises nothing, and since GitHub
+    // issue #625 the loader says so rather than staying silent.
+    expect(building.warnings.map((warning) => warning.code)).toEqual(
+      (asymmetric[0]?.cars ?? []).map(() => 'pressurisation-buys-nothing'),
+    );
+    expect(asymmetric[0]?.cars.length).toBeGreaterThan(0);
   });
 
   it('would have been a dead field on an unpressurised cabin, and that is measured', () => {
