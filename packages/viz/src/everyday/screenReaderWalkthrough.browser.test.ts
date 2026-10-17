@@ -821,6 +821,7 @@ describe.skipIf(!HAS_BROWSER)('a walkthrough of the accessibility tree — GitHu
       pressable[0]?.click();
       let frames = 0;
       let alarmUpFrames = 0;
+      const began = performance.now();
       await new Promise<void>((done) => {
         const tick = (): void => {
           frames += 1;
@@ -837,8 +838,13 @@ describe.skipIf(!HAS_BROWSER)('a walkthrough of the accessibility tree — GitHu
            * in three runs of five, one frame from red on either tree, and under load it went red. The
            * assertion below is unchanged; this only stops the window ending a frame before the
            * thing it is there to see.
+           *
+           * The bound is wall-clock, not a frame count. 1 200 frames still went red in PR #624's CI
+           * with this case unchanged, because under batch load the playhead crosses less of the
+           * morning per frame, so a frame cap ends before 08:38. Waiting up to 45 s for the alarm
+           * keeps the case inside its 120 s budget, and the assertion below is still unchanged.
            */
-          if (frames >= 1200 || (frames >= 300 && alarmUpFrames > 0)) {
+          if ((frames >= 300 && alarmUpFrames > 0) || performance.now() - began > 45_000) {
             done();
             return;
           }
