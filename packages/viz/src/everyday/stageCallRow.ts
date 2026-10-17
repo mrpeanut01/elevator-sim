@@ -185,6 +185,9 @@ export function stageCallLeadOf(
     .join(' ');
 }
 
+/** What a row says while every answer reads the same two figures — GitHub issue #631. */
+export const STAGE_CALL_NO_DIFFERENCE = 'no answer has made a difference to these two goals yet';
+
 /** The words that mark the answer taken among the readings. */
 export const STAGE_CALL_TAKEN = 'your answer';
 
@@ -209,15 +212,31 @@ export function stageCallReadingsLineOf(
   if (read === undefined || first === undefined) return undefined;
   const pastBar = (reading: DayCallMaximaReadings['queue'], unit: string): string =>
     reading?.state === 'missed' ? ` (past its bar of ${String(reading.goal.bar)}${unit})` : '';
-  const clauses = read.map(({ answer, at }) => {
+  const figures = read.map(({ at }) => {
     const queue =
       at.queue === undefined || at.queue.observed === null ? 'not yet graded' : `${String(at.queue.observed)}${pastBar(at.queue, '')}`;
     const wait =
       at.worstWait === undefined || at.worstWait.observed === null
         ? 'a wait still under way'
         : `${String(at.worstWait.observed)} s${pastBar(at.worstWait, ' s')}`;
+    return `${queue} and ${wait}`;
+  });
+  /*
+   * **Every answer reading alike is said once** — GitHub issue #631, wave AQ lane AQ-4. The readings
+   * are running maxima over the whole day, and the three runs share every second before the call,
+   * so a maximum set before it stands under every answer until one run passes it. The playtest met
+   * three identical clauses and read the answer as meaningless; the figures are still named.
+   */
+  const [shared] = figures;
+  if (read.length > 1 && shared !== undefined && figures.every((figure) => figure === shared)) {
+    return (
+      `By ${clockOf(first.at.atS)}, ${STAGE_CALL_NO_DIFFERENCE}: the deepest landing and the longest wait ` +
+      `so far are ${shared} with every answer.`
+    );
+  }
+  const clauses = read.map(({ answer }, index) => {
     const taken = answer === record.answer ? `, ${STAGE_CALL_TAKEN}` : '';
-    return `${queue} and ${wait} with ${dayCallAnswerWordsOf(record, answer)}${taken}`;
+    return `${figures[index] ?? ''} with ${dayCallAnswerWordsOf(record, answer)}${taken}`;
   });
   return `By ${clockOf(first.at.atS)}, the deepest landing and the longest wait so far: ${clauses.join('; ')}.`;
 }

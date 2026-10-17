@@ -220,6 +220,17 @@ describe.skipIf(!HAS_BROWSER)('the daily loop is walkable end to end', () => {
       expect(beforeDoor.chips).toBe(1);
       expect(beforeDoor.score).toBe('—');
       expect(beforeDoor.note).toBe('today · not closed yet');
+      /*
+       * GitHub issue #631, wave AQ lane AQ-4: the rest of the week stands on the strip as empty
+       * slots, so a first visit sees seven days and not one. The target line is drawn only where the
+       * census sets one, so it is not asserted on this tower.
+       */
+      const upcoming = await page.evaluate(() =>
+        [...document.querySelectorAll('.everyday-door-strip .everyday-door-chip-upcoming')].map(
+          (node) => node.querySelector('.everyday-door-upcoming-day')?.textContent ?? '',
+        ),
+      );
+      expect(upcoming).toHaveLength(6);
 
       // And in Your week, reached from the rail — a navigation, which § 16 rule 9 says scores
       // nothing and § 16 rule 1 says must not fill today's card in.
