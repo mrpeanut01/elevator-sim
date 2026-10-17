@@ -647,6 +647,11 @@ export function scheduledEventFor(
   if (assigned !== undefined) {
     return eventOfDrawnId(assigned) ?? eventById(assigned) ?? SHIFT_EVENTS.ordinary;
   }
+  /*
+   * A sandbox day the player left plain is an ordinary day (§ D1451): the week-1 draw is every
+   * tower's, so dealing the copy as a sandbox week still drew the day's wrinkle.
+   */
+  if (week?.sandboxOf?.plain === true) return SHIFT_EVENTS.ordinary;
   const today = calendarDayFor(period, day, dayIdx);
   const booked = today?.shift.eventId;
   if (booked != null) return SHIFT_EVENTS[booked];

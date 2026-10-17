@@ -2139,6 +2139,11 @@ function sandboxDealtOf(state: ViewerState): boolean {
   return state.playMode === 'shift-week' && state.week.sandboxOf !== undefined && !state.week.sandboxOf.plain;
 }
 
+/** Whether the standing week is a sandbox day's copy the player left plain, with nothing of the day (§ D1451). */
+function sandboxPlainOf(state: ViewerState): boolean {
+  return state.playMode === 'shift-week' && state.week.sandboxOf?.plain === true;
+}
+
 /**
  * **The rung the tower a changed sandbox day was copied from was handed** — wave AP lane AP-D2,
  * [§ D1451](../../../../DECISIONS.md). Read for its bookings alone: the copy was already taken from
@@ -2459,7 +2464,15 @@ export function shiftRunConfigOf(
         : sandboxDealtOf(state)
           ? incidentsOfBookings(weekBookings)
           : [];
-  const booked = sandboxDealtOf(state) ? bookingsOnCarsOf(dealtBookings, commissioned) : dealtBookings;
+  /*
+   * A sandbox day the player left plain carries no booking at all, the tower's own rung included:
+   * the box says *the day's wrinkle and booked cars*, and an untouched tower keeps its rung above.
+   */
+  const booked = sandboxPlainOf(state)
+    ? []
+    : sandboxDealtOf(state)
+      ? bookingsOnCarsOf(dealtBookings, commissioned)
+      : dealtBookings;
   /*
    * **Today's wrinkle as an episode inside the day** — [§ D1057](../../../../DECISIONS.md). On the
    * whole authored day, a wrinkle that sets a mix is written into the run's own copy of the day's
