@@ -250,6 +250,43 @@ describe.skipIf(!HAS_BROWSER)('the one attempt is final — § D1239', () => {
     }
   });
 
+  /*
+   * Wave AP, lane AP-D1, § D1449, the post-AO panel's seat D (D9: the Engineer clock read 08:10 while
+   * the stage was held at 08:36). The Engineer transport paused on an earlier visit stayed where it
+   * was paused. Red before on the bundle: paused at 08:32, the stage held at its call at 08:39, and
+   * the Engineer clock still read 08:32.
+   */
+  it('the Engineer clock follows the stage to its held call after a visit that paused it', async () => {
+    const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
+    try {
+      await load(page);
+      await toCrownsBrief(page);
+      await ontoTheStage(page);
+      await page.locator('.everyday-stage-speed', { hasText: '30×' }).click();
+      await page.locator('.everyday-stage-start').click();
+      await page.waitForTimeout(4_000);
+      if ((await page.locator('.everyday-stage-call:not([hidden])').count()) === 0) await page.locator('.everyday-stage-play').click();
+      const early = await textOf(page, '.everyday-stage-clock');
+      await toEngineer(page);
+      if ((await page.getAttribute('#play-pause', 'aria-label')) === 'Pause') await page.locator('#play-pause').click();
+      expect(minutesOf(await textOf(page, '#clock'))).toBeLessThanOrEqual(minutesOf(early));
+      await backToEveryday(page);
+      await page.locator('.everyday-stage-skip').click();
+      await page.waitForSelector('.everyday-stage-call:not([hidden])', { timeout: 240_000 });
+      const stageClock = await textOf(page, '.everyday-stage-clock');
+      expect(minutesOf(stageClock), 'the case needs the call after the early visit').toBeGreaterThan(minutesOf(early));
+
+      await toEngineer(page);
+      await page.waitForTimeout(2_000);
+      expect(await textOf(page, '#clock'), 'the Engineer clock stayed where an earlier visit paused it').toBe(stageClock);
+      await backToEveryday(page);
+      await skipAll(page);
+      expect(await closeTheDay(page)).not.toMatch(/Practice\./u);
+    } finally {
+      await page.close();
+    }
+  });
+
   it('another tower run on the Engineer surface while the attempt stands parked banks nothing into its week', async () => {
     const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
     try {

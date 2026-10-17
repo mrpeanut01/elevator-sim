@@ -52725,6 +52725,107 @@ tutorial below L, and the door machine's CALL, pick, CLOSE, OPEN, HOLD, countdow
 behave as the handoff's table says. The browser tier reaches the menu through the lobby's own *Main
 menu* (`leaveTutorialIfOffered`) and the landing page through its *What this is*.
 
+## D1446 — the lost day's card stops on the instant the day was lost, at every speed, and a skip stops there too
+
+> **Taken 2026-10-17 by agent sessions under delegated authority** (wave AP, lane AP-D1, from the
+> post-AO panel's seat D, defect D1), not by the product owner, and to be read as an agent ruling.
+> **Amends [§ D1435](#d1435)** (the stop is put on the instant of loss, not on the frame that first
+> read it) and **[§ D1151](#d1151)** (a skip with no call standing stops on the lost card before it
+> stops at the end). Owner-reversible clause: that a skip stops on the card. Reversing it restores
+> § D1151's skip to the end, and the frame's stop is kept.
+
+**Why an entry.** It moves two recorded rulings and binds `everyday/stagePace.ts` and
+`everyday/stageScreen.ts`.
+
+**What was measured.** Seat D saw a day lost at `600×` play on under *playing the rest at 600×* with
+no card, on the pinned Monday and on week 1's Wednesday. On the bundle before this entry, with the
+page's CPU slowed twelvefold, Crown Hotel on 2026-10-05 stopped with the clock at 08:45 under
+*stopped for the day's call* beside a card reading *267 s by 08:46*: one frame crossed a call and the
+loss, the card latched at an instant past the call, and the stage went back to the call.
+
+**The ruling.** Each frame reads the whole stretch since the last frame
+(`stagePace.ts#firstLostInstantOf`), walking it in ten-minute steps and bisecting to a second, and
+also reads every instant at which a wait past the bar ended (`#worstWaitLossBeginsOf`), because the
+worst-wait goal can read missed for only a few seconds before a longer waiter censors it. The stage
+stops on the first instant found, puts the playhead there, and ends whatever was carrying it on. A
+skip with no call standing stops on the card the same way, once; the card's *End the day* files the
+day and a second skip runs it to the end. A skip pressed with a call's card up is that call's
+answer and runs to the end as § D1151 says, and the stretch it jumps is marked read. The card is
+never raised over a call's card; a loss read while one stands is raised at the next frame that reads
+lost after the answer.
+
+**What holds it.** `everyday/stageLostInstant.test.ts` (the two searches on readers whose answer is
+known, red before on the frame's own instant alone); `everyday/lostDay.browser.test.ts`'s second case
+(600× under a twelvefold CPU slowdown stops on the card with the 90× run's fact and its own clock);
+`everyday/pressCall.browser.test.ts` (a skip answering a pinned call still runs to the end).
+
+## D1447 — *Start* and *Skip* pressed while the stage works out a call are kept
+
+> **Taken 2026-10-17 by agent sessions under delegated authority** (wave AP, lane AP-D1, from the
+> post-AO panel's seat D, defect D2, and seat A, defect 4), not by the product owner, and to be read
+> as an agent ruling. It amends no recorded ruling: lane AO-4's hold on the button while a call is
+> worked out is kept, and only the press is no longer dropped. Owner-reversible as a whole.
+
+**Why an entry.** `everyday/stageScreen.ts` cites it from two places.
+
+**What was reported.** On Midtown's lift-service Wednesday (car C out from 08:00, weeks 2 to 4) the
+first *Skip to the end* after *Start the day* left the clock at 08:00 with no card, and a second press
+reached the 08:38 call; seat A saw the page sit for seven real minutes. A call standing at the day's
+first instant was being worked out when *Start* was pressed, so the press was swallowed, and a skip
+carried across the wait was never read because only a playing transport marked the wait.
+
+**The ruling.** A *Start* pressed while the stage waits at a call marks the day started and waiting,
+and the stage plays on, or stops on the card, when the call's runs land. A skip carried across that
+wait goes on by itself when the call is not raised.
+
+**Not established on the shipped path.** On this base the census does not deal Midtown's
+`midtown-early-lift` order (`weekLevels.ts#dealtWeekOf` holds the tower at week 1), and no other
+reachable day has a call at its first instant, so no browser case can reach the defect; the change is
+held by reading and by `pressCall.browser.test.ts` not regressing.
+
+## D1448 — behind another tab's veil the stage shows no other day, and Play and Skip are inert
+
+> **Taken 2026-10-17 by agent sessions under delegated authority** (wave AP, lane AP-D1, from the
+> post-AO panel's seat D, defect D7), not by the product owner, and to be read as an agent ruling.
+> **Narrows [§ D1361](#d1361)**: the tab that does not hold the attempt draws no run but this tab's
+> own run of the attempt. Owner-reversible as a whole.
+
+**Why an entry.** It narrows a recorded ruling and binds `everyday/host.ts`,
+`everyday/stageScreen.ts`, `everyday/stageScreenModel.ts` and `dev/main.ts`.
+
+**What was measured.** A second tab sent to the stage by *Continue your week* while the first held the
+attempt drew the page's own run under *your attempt at this day is still open*: an 08:30 hour, *Car D
+booked out* from 08:45 to 09:00, other bars and a pressable *▶ Play*, on the bundle as on the panel's.
+
+**The ruling.** While another tab holds the attempt, the stage adopts no run but the one this tab
+plays of the attempt or was playing when the other tab took it over
+(`EverydayHost.stageHoldsAnotherDay`); the stage stays empty under § D1361's line. *▶ Play* and the
+skip are drawn inert with that line as their reason (`stagePlayControlOf`, `stageSkipViewOf`).
+
+**What holds it.** `everyday/stageScreenModel.test.ts` (both controls inert with the line, and live on
+the tab that holds the day); `everyday/attemptHolder.browser.test.ts`'s Continue your week case.
+
+## D1449 — while the stage has the page the Engineer transport stands where the stage does
+
+> **Taken 2026-10-17 by agent sessions under delegated authority** (wave AP, lane AP-D1, from the
+> post-AO panel's seat D, defect D9), not by the product owner, and to be read as an agent ruling.
+> **Amends [§ D1239](#d1239) clause 1**: the transport is moved to the attempt's reach, not only
+> capped by it. Owner-reversible as a whole.
+
+**Why an entry.** It amends a recorded ruling and binds `dev/main.ts` from the Everyday side.
+
+**What was measured.** The Engineer clock read 08:10 while the stage was held at 08:36 (seat D). On
+the bundle before this entry, an Engineer visit that paused its transport at 08:32 left it there, so
+after the stage was skipped to its call at 08:39 *Switch to Engineer* opened on 08:32.
+
+**The ruling.** While the Everyday stage has the page, the Engineer transport is put on the reach the
+stage notes (`EverydayHost.noteShown`, now noted after the frame's own stops so it is the instant the
+stage stopped on). On the Engineer surface it stays the player's to pause and scrub, as far as the
+reach.
+
+**What holds it.** `everyday/attemptIsFinal.browser.test.ts`'s case: the Engineer clock reads the
+stage's call minute after an earlier visit paused it.
+
 ## D1451 — a sandbox day runs the day it copies, wrinkle and bookings, and no press on the tuner starts the counted day
 
 > **Taken 2026-10-17 by agent sessions under delegated authority** (wave AP, lane AP-D2, on the

@@ -18,6 +18,14 @@
  * plays on under the `lost` line at 30×, raises no call, does not stop on the card again, and runs
  * the day to its end without filing it: the stage never ends the day for the player.
  *
+ * **And at `600×`, on a page too slow to draw every second** — wave AP, lane AP-D1,
+ * [§ D1446](../../../../DECISIONS.md), the post-AO panel's seat D (D1: at `600×` the stage played
+ * the day on under *playing the rest at 600×* with no card). The second case slows the page's CPU
+ * twelvefold, so a frame carries the playhead a minute or more, and holds that the stage stops on
+ * the card with its clock on the card's own minute, at the same instant and figure a `90×` run of
+ * the same day stops on. Red before on the bundle: the stage stood at 08:45 under *stopped for the
+ * day's call* with a card reading *267 s by 08:46*, where `90×` read *243 s by 08:45*.
+ *
  * Gate: without `ELEVATOR_SIM_CHROMIUM` every case here skips and the file reports a pass, which is
  * why the tier is run with it set and the case count is what is read. Port 5973 (5972 at the lane, where lane P2-2 holds it), moving if taken.
  */
@@ -53,6 +61,29 @@ afterAll(async () => {
 });
 
 const TOWER = 'c7';
+
+/** Plays the day from its start at `speed`, answering every call *leave them*, to the lost card; the card's fact and the stage clock. */
+async function playToTheLostCard(page: Page, speed: string): Promise<{ readonly fact: string; readonly clock: string; readonly pace: string }> {
+  await page.locator('.everyday-stage-speed', { hasText: speed }).click();
+  await page.locator('.everyday-stage-start').click();
+  const ended = await page.waitForFunction(
+    () => {
+      document
+        .querySelector<HTMLButtonElement>('.everyday-stage-call:not([hidden]) .everyday-stage-call-answer[data-answer="leave"]')
+        ?.click();
+      if (document.querySelector<HTMLElement>('.everyday-stage-lost')?.hidden === false) return 'card';
+      return document.querySelector<HTMLButtonElement>('.everyday-stage-skip')?.disabled === true ? 'end' : false;
+    },
+    undefined,
+    { timeout: 240_000, polling: 100 },
+  );
+  expect(await ended.jsonValue(), `the day ran out at ${speed} with no card`).toBe('card');
+  return {
+    fact: await textOf(page, '.everyday-stage-lost-fact'),
+    clock: await textOf(page, '.everyday-stage-clock'),
+    pace: await textOf(page, '.everyday-stage-pace'),
+  };
+}
 
 async function textOf(page: Page, selector: string): Promise<string> {
   const text = await page.textContent(selector).catch(() => null);
@@ -144,6 +175,31 @@ describe.skipIf(!HAS_BROWSER)('the lost day — § D1435', () => {
       expect(await page.locator('.everyday-stage-call:not([hidden])').count(), 'a call after the day was lost').toBe(0);
       expect(await page.locator('.everyday-report').count(), 'the stage ended the day itself').toBe(0);
       expect(await textOf(page, '.everyday-bar-primary')).toContain('Close the day');
+    } finally {
+      await page.close();
+    }
+  });
+
+  it('stops on the card at 600× on a slow page, on the instant and figure a 90× run stops on', async () => {
+    const steady = await openPage(browser, { viewport: { width: 1440, height: 900 } });
+    let reference = { fact: '', clock: '' };
+    try {
+      await onCrownsDay(steady, '2026-10-05');
+      reference = await playToTheLostCard(steady, '90×');
+    } finally {
+      await steady.close();
+    }
+    const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
+    try {
+      await onCrownsDay(page, '2026-10-05');
+      const cdp = await page.context().newCDPSession(page);
+      await cdp.send('Emulation.setCPUThrottlingRate', { rate: 12 });
+      const fast = await playToTheLostCard(page, '600×');
+      expect(fast.fact, 'the 600× card read another instant or figure than the 90× one').toBe(reference.fact);
+      expect(fast.fact).toContain(`by ${fast.clock},`);
+      expect(fast.pace, 'the lost card stood over a call').not.toContain('stopped for the day');
+      expect(await page.locator('.everyday-stage-call:not([hidden])').count()).toBe(0);
+      expect(await page.evaluate(() => document.activeElement?.className ?? '')).toBe('everyday-stage-lost-end');
     } finally {
       await page.close();
     }

@@ -279,6 +279,48 @@ describe.skipIf(!HAS_BROWSER)('the one attempt is final through every door — w
     }
   });
 
+  /*
+   * Wave AP, lane AP-D1, § D1448, the post-AO panel's seat D (D7). A second tab sent to the stage by
+   * the mode picker's *Continue your week* while the first held the attempt drew the page's own run
+   * under the veil: an 08:30 hour, another car booked out, other bars, and a live *▶ Play*. Red before
+   * on the bundle: clock 08:30, *Car D booked out 08:45–09:00*, Play and Skip both pressable.
+   */
+  it('a second tab sent to the stage by Continue your week shows no other day behind the veil, and takes no press', async () => {
+    const device = await openTwoTabs(browser, { viewport: { width: 1440, height: 900 } });
+    try {
+      const [first, second] = device.tabs;
+      await load(first);
+      await toCrownsBrief(first);
+      await ontoTheStage(first);
+      await skipToTheCall(first);
+      await first.waitForTimeout(1_000);
+      const held = await storedAttempt(first);
+
+      await load(second);
+      await leaveTutorialIfOffered(second);
+      await second.locator('.everyday-continue-week').click();
+      await second.waitForSelector('.everyday-stage-canvas', { timeout: 30_000 });
+      await second.waitForFunction(
+        (line) => (document.querySelector('.everyday-stage-status-text')?.textContent ?? '').includes(line),
+        DAY_ATTEMPT_COPY.elsewhereStage,
+        { timeout: 60_000 },
+      );
+      await second.waitForTimeout(3_000);
+      expect(await textOf(second, '.everyday-stage-clock'), 'a run stood behind the veil').toBe('');
+      expect(await textOf(second, '.everyday-stage'), 'another day’s booking behind the veil').not.toMatch(/booked out/u);
+      expect(await second.locator('.everyday-stage-play').isDisabled(), '▶ Play was live behind the veil').toBe(true);
+      expect(await second.locator('.everyday-stage-skip').isDisabled(), 'the skip was live behind the veil').toBe(true);
+      expect(await second.getAttribute('.everyday-stage-play', 'title')).toBe(DAY_ATTEMPT_COPY.elsewhereStage);
+      expect(await storedAttempt(second), 'the second tab wrote the attempt').toEqual(held);
+
+      await first.bringToFront();
+      await skipAll(first);
+      expect(await closeTheDay(first)).not.toMatch(/Practice\./u);
+    } finally {
+      await device.close();
+    }
+  });
+
   it('a takeover pressed in the second tab opens no further than the attempt was shown, and only that tab banks', async () => {
     const device = await openTwoTabs(browser, { viewport: { width: 1440, height: 900 } });
     try {
