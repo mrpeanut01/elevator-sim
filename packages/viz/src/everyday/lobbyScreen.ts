@@ -114,6 +114,15 @@ const P = Object.freeze({
 /** The handoff's door easing, verbatim. */
 const DOOR_EASING = 'cubic-bezier(.65,0,.25,1)';
 
+/**
+ * The least the fit may scale the panel to on a phone: the 36 px floor buttons then draw 27 px tall,
+ * over SC 2.5.8's 24 (`docs/36` § 1), and every other control on the panel is larger.
+ */
+const NARROW_MIN_SCALE = 0.75;
+
+/** The frame's height on a phone before the call, short enough to keep CALL above the fold. */
+const NARROW_IDLE_FRAME_PX = 180;
+
 const STEEL =
   'repeating-linear-gradient(90deg,rgba(255,255,255,.025) 0 1px,transparent 1px 3px),' +
   'linear-gradient(180deg,#38332C,#26221D)';
@@ -533,16 +542,40 @@ export function mountLobby(region: HTMLElement, ports: LobbyPorts): MountedLobby
   keyButton.type = 'button';
   keyButton.setAttribute('role', 'switch');
   keyButton.setAttribute('aria-label', 'Engineer key');
+  /*
+   * The handoff's keyhole is 30 px, which the fit takes below SC 2.5.8's 24 px on any screen that
+   * scales the panel under 0.8 (`docs/36` § 1). So the button is a 44 px hit area with a 7 px
+   * negative margin, which lays out exactly as the 30 px circle did, and the circle is drawn inside.
+   */
   keyButton.style.cssText =
-    'width:30px;height:30px;border-radius:50%;border:0;padding:0;cursor:pointer;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle,#8D8271,#4A443A)';
+    'width:44px;height:44px;margin:-7px;border-radius:50%;border:0;padding:0;cursor:pointer;display:flex;align-items:center;justify-content:center;background:none';
+  const keyhole = el(doc, 'span');
+  keyhole.setAttribute('aria-hidden', 'true');
+  keyhole.style.cssText =
+    'width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle,#8D8271,#4A443A)';
   const slot = el(doc, 'span');
   slot.style.cssText = `width:4px;height:18px;border-radius:2px;background:${P.screen};transition:transform .3s`;
-  keyButton.append(slot);
+  keyhole.append(slot);
+  keyButton.append(keyhole);
   keyButton.addEventListener('click', () => {
     apply(lobbyTurnKey(state));
   });
   keyRow.append(casualCaption, keyButton, engineerCaption);
   panel.append(keyRow);
+
+  /*
+   * Everything on the panel, which sits behind the doors: out of the Tab order while they are shut,
+   * so a keyboard reaches CALL first rather than fourteen stops nobody can see. `tabIndex` rather
+   * than `inert`, whose three writers are the shells' (see CLAUDE.md); a pointer is already stopped
+   * by the doors themselves.
+   */
+  const panelControls: readonly HTMLButtonElement[] = [
+    ...[...floorButtons.values()].map((parts) => parts.button),
+    openControl.button,
+    closeControl.button,
+    holdControl.button,
+    keyButton,
+  ];
 
   /* --- The arrival view --- */
   const arrival = el(doc, 'div', 'everyday-lobby-arrival');
@@ -638,7 +671,8 @@ export function mountLobby(region: HTMLElement, ports: LobbyPorts): MountedLobby
     link.style.cssText = MONO(
       500,
       10.5,
-      `letter-spacing:.08em;color:${P.taupe};background:none;border:0;padding:4px 2px;cursor:pointer;text-decoration:underline;text-underline-offset:3px`,
+      /* 7 px above and below rather than the drawn 4, for SC 2.5.8's 24 px height (`docs/36` § 1). */
+      `letter-spacing:.08em;color:${P.taupe};background:none;border:0;padding:7px 2px;cursor:pointer;text-decoration:underline;text-underline-offset:3px`,
     );
     link.addEventListener('click', onPress);
     return link;
@@ -690,13 +724,28 @@ export function mountLobby(region: HTMLElement, ports: LobbyPorts): MountedLobby
    * drawer breakpoint the plate becomes a slim row under the sill, the frame takes the full width,
    * and the display drops its minimum height. Nothing about the machine or the words changes.
    */
+  /*
+   * And on a phone the fit may not shrink the panel past {@link NARROW_MIN_SCALE}: at 390 × 844 it
+   * scaled to 0.57 with the consent ask answered and to 0.29 with it up, which drew the floor buttons
+   * 10 to 20 px tall, under SC 2.5.8's 24 px (`docs/36` § 1). Once the car is called the frame grows
+   * to hold the panel at that scale and the page scrolls instead; before the call the frame stays
+   * short, because a tall frame pushed the call plate under the doors and below the fold.
+   */
+  let narrowNow = false;
   const narrowQuery = win?.matchMedia(`(max-width: ${String(EVERYDAY_RAIL_DRAWER_MAX_PX)}px)`);
   const applyNarrow = (narrow: boolean): void => {
+    narrowNow = narrow;
+    root.style.height = narrow ? 'auto' : '100%';
+    root.style.minHeight = narrow ? '100%' : '520px';
     doorRow.style.flexDirection = narrow ? 'column' : 'row';
     doorRow.style.gap = narrow ? '10px' : '22px';
     doorRow.style.width = narrow ? '100%' : '';
+    doorRow.style.maxHeight = narrow ? 'none' : '730px';
     frameColumn.style.width = narrow ? '100%' : '';
+    frameColumn.style.height = narrow ? 'auto' : '100%';
+    frameColumn.style.flex = narrow ? '1 1 auto' : '';
     frame.style.width = narrow ? '100%' : 'min(76vw,820px)';
+    frame.style.minHeight = narrow ? `${String(NARROW_IDLE_FRAME_PX)}px` : '320px';
     sill.style.width = narrow ? 'calc(100% + 12px)' : 'calc(min(76vw,820px) + 24px)';
     plate.style.flexDirection = narrow ? 'row' : 'column';
     plate.style.width = narrow ? 'auto' : '86px';
@@ -720,9 +769,16 @@ export function mountLobby(region: HTMLElement, ports: LobbyPorts): MountedLobby
   const refit = (): void => {
     const styles = win?.getComputedStyle(fitBox);
     if (styles === undefined) return;
-    const available =
-      fitBox.clientHeight - parseFloat(styles.paddingTop) - parseFloat(styles.paddingBottom);
+    const padding = parseFloat(styles.paddingTop) + parseFloat(styles.paddingBottom);
     const height = fitInner.offsetHeight;
+    if (narrowNow && height > 0) {
+      const called = state.phase !== 'idle';
+      const opening = Math.ceil(height * NARROW_MIN_SCALE + padding);
+      frame.style.minHeight = called
+        ? `${String(opening + parseFloat(win?.getComputedStyle(frame).paddingTop ?? '0'))}px`
+        : `${String(NARROW_IDLE_FRAME_PX)}px`;
+    }
+    const available = fitBox.clientHeight - padding;
     const scale = height > 0 && available > 0 ? Math.min(1, available / height) : 1;
     fitInner.style.transform = `scale(${String(scale)})`;
   };
@@ -784,6 +840,7 @@ export function mountLobby(region: HTMLElement, ports: LobbyPorts): MountedLobby
           state = lobbyArrived(state);
           render();
           if (state.phase === 'arrived') stepOut.focus();
+          else if (state.phase === 'open') focusPanel();
         }, timings().chimeToDoorsMs);
         return;
       }
@@ -792,6 +849,17 @@ export function mountLobby(region: HTMLElement, ports: LobbyPorts): MountedLobby
       later(step, timings().stepMs);
     };
     later(step, timings().stepMs);
+  }
+
+  /*
+   * The doors opened on a press of CALL, or on the ride back from a floor: focus goes to the first
+   * floor, which is the next thing to press. Only from CALL or from a control the doors just put out
+   * of reach, so a player who tabbed elsewhere while the car came is left where they are.
+   */
+  function focusPanel(): void {
+    const active = doc.activeElement;
+    const lost = active === null || active === doc.body || active === callButton || active === stepOut || active === backButton;
+    if (lost) panelControls[0]?.focus();
   }
 
   const tick = win?.setInterval(() => {
@@ -863,6 +931,9 @@ export function mountLobby(region: HTMLElement, ports: LobbyPorts): MountedLobby
       parts.label.style.color = lit ? P.cream : P.stone;
       parts.button.setAttribute('aria-pressed', lit ? 'true' : 'false');
     }
+
+    const reachable = view.doorsOpen || state.phase === 'closing';
+    for (const control of panelControls) control.tabIndex = reachable ? 0 : -1;
 
     paintRound(openControl.button, pressed === 'open', '0 2px 0 #15130F');
     paintRound(closeControl.button, pressed === 'close' || view.closeLit, '0 2px 0 #15130F');

@@ -424,6 +424,11 @@
         color: var(--text); background: var(--rail);
         border: 1px solid var(--edge-strong); border-radius: var(--r-control);
       }
+      /* A select's automatic minimum width is its longest option, so in a grid or flex column it
+         widens its track past the column: at 390 px Scenario stage 1's standing order drew 431 px
+         wide inside a 302 px column and pushed the screen sideways. With no minimum, a select is
+         its usual width wherever it fits and shrinks only where it would otherwise overflow. */
+      .everyday select { min-width: 0; }
 
       ::-webkit-scrollbar { width: 9px; height: 9px; }
       ::-webkit-scrollbar-thumb { background: var(--edge-mid); border-radius: 9px; }
