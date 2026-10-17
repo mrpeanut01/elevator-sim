@@ -170,6 +170,11 @@ export interface CaseStageInput {
    * sets its own width around this block.
    */
   readonly wide?: boolean | undefined;
+  /**
+   * Where the playhead starts, simulated seconds; absent is the run's start. The stage screen's pair
+   * starts just before its two runs first differ (`stagePlay.ts#stageWatchStartOf`).
+   */
+  readonly startAtS?: number | undefined;
   /** Told on each frame what the canvas shows now, so a screen can latch what has been seen. */
   readonly onFrame?:
     | ((frame: { readonly simTimeS: number; readonly longestStandingS: number | undefined }) => void)
@@ -345,6 +350,7 @@ export function mountCaseStage(doc: Document, input: CaseStageInput): CaseStage 
   const playback = new Playback(longest, systemClock(), {
     speed: input.speedSimPerRealS,
     autoplay: true,
+    ...(input.startAtS === undefined ? {} : { startAtS: input.startAtS }),
   });
   const labelOf =
     (recording: VizRecording) =>

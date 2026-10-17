@@ -47,6 +47,7 @@ import { stageWatchConfigsOf, type StageSeedSet } from '../campaign/stageRun.js'
 import type { VizRecording } from '../contract/types.js';
 import { createOffThreadRunner } from '../dev/offThreadRuns.js';
 import type { CampaignStage } from '../campaign/types.js';
+import type { ScenarioLadderRung } from '../scenario/ladder.js';
 import type { PublishedSurvivorScenario } from '../scenario/survivors.js';
 import type { EditorParkingStrategy } from '../fixit/types.js';
 import { actionBarFor, type ActionBarModel } from './actionBar.js';
@@ -55,6 +56,7 @@ import { everydayDeviceChimeStore } from './chimeStore.js';
 import { CHIME_AWARDS, deviceHoldsTurn } from './deviceChimes.js';
 import { fixSpentUnitsOf, progressWithFixSpent } from './profile.js';
 import { everydayProfileStore } from './profileStore.js';
+import { scenarioHubViewOf } from './scenarioModel.js';
 import { scenarioOpen } from './scenarioOpenPort.js';
 import { el } from './screenDom.js';
 import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.js';
@@ -69,6 +71,7 @@ import {
   stageRunCountsOf,
   stageWatchAfterEndOf,
   stageWatchPaceOf,
+  stageWatchStartOf,
   verdictFactsOf,
   type StageRunCounts,
   type StagePlayChoice,
@@ -157,6 +160,8 @@ interface Session {
    * then the pressed one. `undefined` until the worker returns them, and after the pair is done.
    */
   watch: readonly [VizRecording, VizRecording] | undefined;
+  /** Where the pair starts, once per press (`stagePlay.ts#stageWatchStartOf`). */
+  watchStartS: number | undefined;
   /** The block playing {@link watch}, built once per press and re-appended on every redraw. */
   watchStage: CaseStage | undefined;
   /**
@@ -183,6 +188,7 @@ function sessionOf(stage: CampaignStage): Session {
       phase: { kind: 'idle' },
       pressed: undefined,
       watch: undefined,
+      watchStartS: undefined,
       watchStage: undefined,
       reveal: { status: false, pair: false, verdict: false },
       lastRun: undefined,
@@ -196,8 +202,66 @@ function sameChoice(a: StagePlayChoice | undefined, b: StagePlayChoice): boolean
   return a !== undefined && a.profileId === b.profileId && a.parking === b.parking;
 }
 
+type StageContext = NonNullable<ReturnType<typeof stageContextUncached>>;
+
+/**
+ * Each stage's context, once per loaded data (wave AR lane AR-3, GitHub issue #633). The path
+ * {@link stagePathOf} asks the one check of every route on every stage, which validates each named
+ * route's profile; it read nothing but `data`, yet it was asked again on every redraw and on every
+ * progress message, so the fifty crowds' counter held the painting thread for seconds and the
+ * watched pair froze. The context reads only `data`, so caching it on `data` changes no answer.
+ */
+const contextCache = new WeakMap<Loaded, Map<string, StageContext | undefined>>();
+
+/** The path as the hub reads it, once per loaded data; the same composition the ladder port provides. */
+const pathCache = new WeakMap<Loaded, readonly ScenarioLadderRung[]>();
+
+function pathOf(data: Loaded): readonly ScenarioLadderRung[] {
+  let path = pathCache.get(data);
+  if (path === undefined) {
+    const profiles = data.resources.dispatcherProfiles.profiles;
+    path = stagePathOf(data.campaign.campaign.stages, data.campaign.survivors, {
+      space: data.campaign.space,
+      schedule: data.resources.priceSchedule,
+      profiles,
+      buildings: data.resources.buildings,
+      elevatorSpecs: data.resources.elevatorSpecs,
+      /* § D1183: a way through the census found on this page is published under the page's own name. */
+      moveNamed: (name: string) => namedStageMoveOf(name, profiles, data.campaign.space),
+    });
+    pathCache.set(data, path);
+  }
+  return path;
+}
+
+/**
+ * **The stage a cleared page's primary opens** — wave AR lane AR-3, GitHub issue #633: a cleared
+ * stage offered *Return to Main Menu*. It is the hub's own next stage
+ * (`scenarioModel.ts#ScenarioHubView.startHere`), the first offered row this device has not
+ * cleared, so the page and the path's main button never name two different stages.
+ */
+function nextStageOf(data: Loaded): string | undefined {
+  const cleared = new Set(
+    everydayDeviceChimeStore()
+      .record()
+      .turns.filter((turn) => turn.completion === 'scenario-cleared')
+      .map((turn) => turn.key),
+  );
+  return scenarioHubViewOf(pathOf(data), cleared).startHere;
+}
+
+function stageContextOf(data: Loaded, stageId: string): StageContext | undefined {
+  let byStage = contextCache.get(data);
+  if (byStage === undefined) {
+    byStage = new Map();
+    contextCache.set(data, byStage);
+  }
+  if (!byStage.has(stageId)) byStage.set(stageId, stageContextUncached(data, stageId));
+  return byStage.get(stageId);
+}
+
 /** Everything one stage's facts are derived from, or `undefined` while it cannot be read. */
-function stageContextOf(data: Loaded, stageId: string):
+function stageContextUncached(data: Loaded, stageId: string):
   | {
       readonly stage: CampaignStage;
       readonly position: number;
@@ -216,21 +280,12 @@ function stageContextOf(data: Loaded, stageId: string):
   const baseline = profiles.find((profile) => profile.id === stage.dispatcher.startingProfileId);
   const building = data.resources.buildings.find((entry) => entry.id === stage.building);
   if (baseline === undefined || building === undefined) return undefined;
-  const route = {
-    space: data.campaign.space,
-    schedule: data.resources.priceSchedule,
-    profiles,
-    buildings: data.resources.buildings,
-    elevatorSpecs: data.resources.elevatorSpecs,
-    /* § D1183: a way through the census found on this page is published under the page's own name. */
-    moveNamed: (name: string) => namedStageMoveOf(name, profiles, data.campaign.space),
-  };
   /*
    * The hub's own derivation, so this page holds a stage exactly when the hub's row does, and prices
    * its par with the same figure: it asked the ladder for the hold and not the par, so every clear
    * here read *no par* beside a hub row that priced one (§ D1376).
    */
-  const rung = stagePathOf(stages, data.campaign.survivors, route).find((entry) => entry.id === stage.id);
+  const rung = pathOf(data).find((entry) => entry.id === stage.id);
   return {
     stage,
     position: position + 1,
@@ -380,6 +435,7 @@ function startWatch(session: Session, configs: ReturnType<typeof stageWatchConfi
       const [baseline, candidate] = recordings;
       if (baseline === undefined || candidate === undefined) return;
       session.watch = [baseline, candidate];
+      session.watchStartS = stageWatchStartOf(baseline, candidate);
       live?.redraw();
     },
     onFailed: () => {
@@ -525,7 +581,14 @@ function revealArrivals(session: Session, root: HTMLElement): void {
     session.reveal.status = false;
   }
   if (session.reveal.status && show('.everyday-stage-play-status', 'nearest')) session.reveal.status = false;
-  if (session.reveal.verdict && show('.everyday-stage-play-verdict-head', 'nearest')) {
+  /*
+   * The verdict's head, and the same-counts line under it where there is one, so *your change moved
+   * no count* arrives in view with the verdict rather than below the fold (wave AR, AR-3, #633).
+   */
+  const verdictLead = root.querySelector('.everyday-stage-play-same-counts') !== null
+    ? '.everyday-stage-play-same-counts'
+    : '.everyday-stage-play-verdict-head';
+  if (session.reveal.verdict && show(verdictLead, 'nearest')) {
     session.reveal.verdict = false;
     session.reveal.status = false;
   }
@@ -725,13 +788,15 @@ export function mountStagePlay(host: HTMLElement, context: EverydayScreenShellCo
           { recording: candidateRun, caption: view.watch.candidateCaption },
         ],
         speedSimPerRealS: watching,
+        /* Just before the two settings' runs first differ, so the pair opens on a difference (#633). */
+        startAtS: session.watchStartS,
         /* Quiet minutes crossed fast and anything moving at the player's speed (wave AQ, AQ-1). */
         pace: (_longestStandingS, frames) => stageWatchPaceOf({ frames, watchingSimPerRealS: watching }),
         copy: { eyebrow: view.watch.eyebrow, note: view.watch.note, skip: view.watch.skip },
         wide: true,
         classes: WATCH_CLASSES,
         /*
-         * A pair that ends plays again from its first minute, while the batch counts and after the
+         * A pair that ends plays again from where it opened, while the batch counts and after the
          * verdict alike, so the verdict always has the pair beside it; only a skip ends it
          * (`stagePlay.ts#stageWatchAfterEndOf`).
          */
@@ -767,10 +832,11 @@ export function mountStagePlay(host: HTMLElement, context: EverydayScreenShellCo
       if (view.verdict.stale !== undefined) {
         verdict.append(para(doc, 'everyday-stage-play-stale', view.verdict.stale, `font-size:13px;color:${C.alarm}`));
       }
-      verdict.append(para(doc, 'everyday-stage-play-headline', view.verdict.headline, `font-size:14px;line-height:1.5;color:${C.inkSoft}`));
+      /* Under the head, where the reveal brings it into view with the head (wave AR, AR-3, #633). */
       if (view.verdict.sameCounts !== undefined) {
         verdict.append(para(doc, 'everyday-stage-play-same-counts', view.verdict.sameCounts, `font-size:14px;line-height:1.5;font-weight:600;color:${C.ink}`));
       }
+      verdict.append(para(doc, 'everyday-stage-play-headline', view.verdict.headline, `font-size:14px;line-height:1.5;color:${C.inkSoft}`));
       const goals = el(doc, 'ul', 'everyday-stage-play-goals');
       goals.style.cssText = 'list-style:none;margin:0;padding:0;display:grid;gap:6px';
       for (const goal of view.verdict.goals) {
@@ -841,8 +907,23 @@ export function mountStagePlay(host: HTMLElement, context: EverydayScreenShellCo
       const stage = stageContextOf(loaded, stageId)?.stage;
       if (stage === undefined) return;
       if (stageSettled(stage)) {
-        closeStageInFixit();
-        context.go('scenario');
+        /* Wave AR lane AR-3, #633: a clear's press opens the next stage, or goes back to the path. */
+        const next = nextStageOf(loaded);
+        if (next === undefined || next === stageId) {
+          closeStageInFixit();
+          context.go('scenario');
+          return;
+        }
+        const leaving = sessions.get(stageId);
+        if (leaving !== undefined) {
+          leaving.watchStage?.dispose();
+          leaving.watchStage = undefined;
+        }
+        openStageInFixit(next);
+        render();
+        context.refreshBar();
+        host.closest('.everyday-screen')?.scrollTo?.(0, 0);
+        doc.defaultView?.scrollTo(0, 0);
         return;
       }
       press(loaded, stageId, context);
@@ -872,8 +953,14 @@ function stageSettled(stage: CampaignStage): boolean {
  * each be false of a stage.
  */
 export function stagePlayBar(state: EverydayState): ActionBarModel {
-  const base = actionBarFor(state);
-  const variants = [COPY.runLabel, COPY.runAgainLabel, COPY.backLabel];
+  const table = actionBarFor(state);
+  /*
+   * Wave AR lane AR-3, GitHub issue #633: while a stage is open its way out goes back to the path it
+   * was opened from, as the fix-it row's *Leave this building* went to Modes.
+   */
+  const base: ActionBarModel =
+    openStageId === undefined ? table : { ...table, leave: { ...table.leave, screen: 'scenario' } };
+  const variants = [COPY.runLabel, COPY.runAgainLabel, COPY.nextStageLabel, COPY.backLabel];
   const primaryWith = (label: string, inert?: string): ActionBarModel['primary'] => ({
     ...base.primary,
     label,
@@ -894,7 +981,10 @@ export function stagePlayBar(state: EverydayState): ActionBarModel {
     return { ...base, primary: primaryWith(COPY.runningLabel, COPY.runningWhy), note: COPY.noteReady };
   }
   if (stageSettled(found.stage)) {
-    return { ...base, primary: primaryWith(COPY.backLabel), note: COPY.noteSolved, inverted: true };
+    /* Wave AR lane AR-3, #633: the onward press is the next stage, not the menu. */
+    const next = nextStageOf(loaded);
+    const onward = next !== undefined && next !== found.stage.id;
+    return { ...base, primary: primaryWith(onward ? COPY.nextStageLabel : COPY.backLabel), note: COPY.noteSolved, inverted: false };
   }
   if (!drawn.admitted) {
     return { ...base, primary: primaryWith(COPY.runLabel, COPY.refusedWhy), note: COPY.noteReady };

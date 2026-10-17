@@ -248,6 +248,8 @@ describe.skipIf(!HAS_BROWSER)('the Scenario hub opens the stage that was pressed
           waysShown: cards.filter((card) => shown(card.querySelector('.everyday-scenario-path-ways'))).length,
           notesShown: cards.filter((card) => shown(card.querySelector('.everyday-scenario-path-note'))).length,
           refusalsShown: cards.filter((card) => shown(card.querySelector('.everyday-scenario-path-refusal'))).length,
+          refusalsFolded: cards.filter((card) => card.querySelector('details .everyday-scenario-path-refusal') !== null).length,
+          heldFaces: cards.filter((card) => shown(card.querySelector('.everyday-scenario-path-held'))).length,
           held: cards.filter((card) => card.dataset['playable'] === 'no').length,
           startHere: cards.filter((card) => card.dataset['startHere'] === 'yes').map((card) => card.dataset['stage']),
         };
@@ -255,8 +257,15 @@ describe.skipIf(!HAS_BROWSER)('the Scenario hub opens the stage that was pressed
       expect(shape.cards).toBeGreaterThan(0);
       expect(shape.folds).toBe(shape.cards);
       expect(shape.budgetsShown + shape.waysShown + shape.notesShown).toBe(0);
-      /* A held row's reason is not census text: it stays on the card's face. */
-      expect(shape.refusalsShown).toBe(shape.held);
+      /*
+       * Wave AR lane AR-3 (§ D1534, GitHub issue #633): stages 4 and 10 still read as census text,
+       * because a held row's reason stayed on the face. It folds with the rest, and the face says the
+       * row is held in one short line.
+       */
+      expect(shape.held).toBeGreaterThan(0);
+      expect(shape.refusalsShown).toBe(0);
+      expect(shape.refusalsFolded).toBe(shape.held);
+      expect(shape.heldFaces).toBe(shape.held);
       expect(shape.startHere).toEqual(['stage-1-first-call']);
 
       /* Every word is one press away. */

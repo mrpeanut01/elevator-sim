@@ -122,7 +122,15 @@ export interface BarPrimary {
 export interface ActionBarModel {
   readonly screen: EverydayScreen;
   /** Names what is abandoned (§ 3.4) — never "Back", never "Exit". Inert only on the menu. */
-  readonly leave: { readonly label: string; readonly inert: boolean };
+  readonly leave: {
+    readonly label: string;
+    readonly inert: boolean;
+    /**
+     * Where the leave goes, where that is not the menu — set only by a screen's `bar()` refinement:
+     * a Scenario stage opened from the path leaves to the path (wave AR lane AR-3, #633).
+     */
+    readonly screen?: EverydayScreen | undefined;
+  };
   readonly back?: BarBack | undefined;
   readonly timeline?: BarTimeline | undefined;
   readonly primary: BarPrimary;
@@ -373,8 +381,11 @@ export const ACTION_BAR_ROWS: readonly ActionBarRow[] = Object.freeze([
      */
     guide: false,
     leave: { label: MODES, inert: false },
-    /* The second variant is wave AQ lane AQ-1's: a first visit's press opens stage 1 (`scenarioScreen.ts`). */
-    primary: primary(["Play today's scenario", 'Play stage 1']),
+    /*
+     * The second variant is wave AQ lane AQ-1's, filled by wave AR lane AR-3: while a stage on the
+     * path is left to clear the press opens it (`scenarioScreen.ts`), which names its number.
+     */
+    primary: primary(["Play today's scenario", 'Play stage ⟨n⟩']),
     note: 'Or pick another from the list.',
     inverted: false,
   }),
