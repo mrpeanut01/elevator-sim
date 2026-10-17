@@ -214,9 +214,12 @@ export const WARNING_CODES = {
    */
   descentAboveRatedSpeed: 'descent-above-rated-speed',
   /**
-   * A car declares `cabinPressurised` where nothing is capping it — either the data directory
-   * declares no `airPressure` block, or the bank's travel is below the threshold, or the car is
-   * not rated above the cap. The purchase is inert on this building.
+   * A car declares `cabinPressurised` and pressurising does not raise the descent speed it
+   * actually flies — either the data directory declares no `airPressure` block, or the bank's
+   * travel is below the threshold, or the car is not rated above the cap, or another limit (the
+   * car's own `descentSpeedMps`) binds at or below the cap. The purchase is inert on this
+   * building. Since GitHub issue #625 it is raised on `ctf-class-reference`'s shuttle, whose
+   * authored 10 m/s descent equals the cap.
    */
   pressurisationBuysNothing: 'pressurisation-buys-nothing',
   /**

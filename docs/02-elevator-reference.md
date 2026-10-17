@@ -44,7 +44,9 @@ The simulator models it as data, in `data/elevator-specs.json`'s `airPressure` b
 `config/parse.ts#resolveBuilding` applies it: a bank whose travel exceeds `appliesAboveTravelM`,
 carrying an unpressurised car rated above `descentCapMps`, resolves that car with a separate
 `descentSpeedMps`. It raises `descent-capped-by-air-pressure` when it bites, and
-`pressurisation-buys-nothing` when a cabin is fitted where nothing was capping it.
+`pressurisation-buys-nothing` when a cabin is fitted and pressurising does not raise the descent
+the car actually flies — nothing was capping it, or another limit, such as the car's own
+`descentSpeedMps`, binds at or below the cap (GitHub issue #625).
 
 **It binds no shipped building.** The fastest car in `data/buildings/` is 10.0 m/s, which is
 exactly the cap, so every shipped run is byte-identical with the block and without it. It is a

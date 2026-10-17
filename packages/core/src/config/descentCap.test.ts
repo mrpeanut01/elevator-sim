@@ -320,6 +320,41 @@ describe('pressurisation lifts the cap, and its absence does not', () => {
     const working = tower(cfg, { floors: 96, ratedSpeedMps: 14, cabinPressurised: true });
     expect(warningCodes(working)).not.toContain(WARNING_CODES.pressurisationBuysNothing);
   });
+
+  it('says so when another limit binds at or below the cap, which is ctf-class-reference\'s shape', async () => {
+    /*
+     * GitHub issue #625. The predicate used to ask only whether the unpressurised cap would have
+     * bitten, and on a fast car in a tall shaft it would — so it stayed silent even when the car's
+     * own `descentSpeedMps` held it to the cap's figure or below, and the cabin raised nothing.
+     * The shipped shuttle is 20 m/s up and 10 m/s down against a 10 m/s cap; both are probed,
+     * and the authored limit below the cap too.
+     */
+    const cfg = await load();
+    for (const descentSpeedMps of [10, 9]) {
+      const atOrBelowCap = tower(cfg, {
+        floors: 96,
+        ratedSpeedMps: 14,
+        descentSpeedMps,
+        cabinPressurised: true,
+      });
+      expect(carOf(atOrBelowCap)?.descentSpeedMps).toBe(descentSpeedMps);
+      expect(warningCodes(atOrBelowCap), `authored ${String(descentSpeedMps)} m/s`).toContain(
+        WARNING_CODES.pressurisationBuysNothing,
+      );
+    }
+    // The positive control: an authored 12 m/s descent is capped to 10 without the cabin and
+    // flies at 12 with it, so pressurising raises the effective descent and nothing is said.
+    const raised = tower(cfg, {
+      floors: 96,
+      ratedSpeedMps: 14,
+      descentSpeedMps: 12,
+      cabinPressurised: true,
+    });
+    expect(carOf(raised)?.descentSpeedMps).toBe(12);
+    const raisedWithout = tower(cfg, { floors: 96, ratedSpeedMps: 14, descentSpeedMps: 12 });
+    expect(carOf(raisedWithout)?.descentSpeedMps).toBe(10);
+    expect(warningCodes(raised)).not.toContain(WARNING_CODES.pressurisationBuysNothing);
+  });
 });
 
 /* -------------------------------------------------------------------------- *
@@ -357,8 +392,19 @@ const PRESSURISED_SHIPPED: ReadonlyMap<string, readonly string[]> = new Map([
   ['shanghai-class-reference', ['shuttle']],
 ]);
 
+/**
+ * The shipped pressurised banks whose cabin raises nothing, so `pressurisation-buys-nothing` is
+ * raised on every car of them and on no other car in the set — GitHub issue #625.
+ * `ctf-class-reference`'s shuttle authors a 10 m/s descent, which binds at the air-pressure cap's
+ * own 10 m/s. The data is left as authored; `buildingFieldReach.test.ts#KNOWN_INERT` registers
+ * the field as inert there.
+ */
+const PRESSURISATION_INERT_SHIPPED: ReadonlyMap<string, readonly string[]> = new Map([
+  ['ctf-class-reference', ['shuttle']],
+]);
+
 describe('every shipped building is symmetric but the one authored not to be', () => {
-  it('resolves no descent speed and raises none of the three advisories', async () => {
+  it('resolves no descent speed and raises the three advisories only where named', async () => {
     const cfg = await load();
     const banks = shippedBanks(cfg);
     expect(banks.length).toBeGreaterThan(10);
@@ -385,10 +431,21 @@ describe('every shipped building is symmetric but the one authored not to be', (
       for (const code of [
         WARNING_CODES.descentCappedByAirPressure,
         WARNING_CODES.descentAboveRatedSpeed,
-        WARNING_CODES.pressurisationBuysNothing,
       ]) {
         expect(warningCodes(building), `${buildingId} raises ${code}`).not.toContain(code);
       }
+      const inertBanks = PRESSURISATION_INERT_SHIPPED.get(buildingId) ?? [];
+      const expectedPaths = building.banks.flatMap((bank, bankIndex) =>
+        inertBanks.includes(bank.id)
+          ? bank.cars.map((_, carIndex) => `banks[${bankIndex}].cars[${carIndex}].cabinPressurised`)
+          : [],
+      );
+      expect(
+        building.warnings
+          .filter((warning) => warning.code === WARNING_CODES.pressurisationBuysNothing)
+          .map((warning) => warning.path),
+        `${buildingId} raises ${WARNING_CODES.pressurisationBuysNothing} on the wrong cars`,
+      ).toEqual(expectedPaths);
     }
   });
 
@@ -401,6 +458,12 @@ describe('every shipped building is symmetric but the one authored not to be', (
     const cfg = await load();
     expect(ASYMMETRIC_SHIPPED.size).toBeGreaterThan(0);
     expect(PRESSURISED_SHIPPED.size).toBeGreaterThan(0);
+    expect(PRESSURISATION_INERT_SHIPPED.size).toBeGreaterThan(0);
+    for (const [buildingId, bankIds] of PRESSURISATION_INERT_SHIPPED) {
+      for (const bankId of bankIds) {
+        expect(PRESSURISED_SHIPPED.get(buildingId) ?? []).toContain(bankId);
+      }
+    }
     // Every asymmetric bank is pressurised, and the reverse does not hold — which is the whole
     // difference between the two maps and is asserted rather than left to the docstrings.
     for (const [buildingId, bankIds] of ASYMMETRIC_SHIPPED) {
