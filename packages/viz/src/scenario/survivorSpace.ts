@@ -141,6 +141,12 @@
  * dispatcher-tier budget reaches. That distinction is the whole of issue #367's *"reportable per
  * price tier"* clause, which is DC-2's replacement.
  *
+ * **And what moved is what the dispatcher runs, not only the dials drawn** — GitHub issue #628.
+ * Both fields come from `campaign/stagePress.ts#admitStageMove`, the player's own price, which
+ * charges for every dimension on which the *resolved* dispatcher differs from the baseline. A drawn
+ * gate can open a dimension no drawn change covers (destination panels open `weights.rideTime`),
+ * and the press charges for it, so the census does too.
+ *
  * The decision this module took is recorded in this docstring and cites
  * [§ D405](../../../../DECISIONS.md): it binds nothing outside `scenario/` and the data file that
  * directory publishes, so no `DECISIONS.md` number is owed for it.
@@ -437,21 +443,10 @@ export function dropdownConfigurationsOf(
     const admission = admitStageMove(context, { profile: candidate }, Number.MAX_SAFE_INTEGER);
     if (admission.moved.length === 0) continue;
     if (admission.withheld.length > 0) continue;
-    const bought = admission.changeIds
-      .map((id) => byId.get(id))
-      .filter((change): change is PricedChange => change !== undefined);
     out.push({
       profileId: candidate.id,
       changeIds: admission.changeIds,
-      tier: dearestTierOf(
-        bought.map((change) => ({
-          changeId: change.id,
-          tier: change.tier,
-          priceUnits: purchaseUnits(change),
-          dimensionIds: [],
-        })),
-        order,
-      ),
+      tier: admittedTierOf(admission.changeIds, byId, order),
       units: admission.units,
       unpricedDimensionIds: admission.unpriced,
     });
@@ -518,22 +513,11 @@ export function pageConfigurationsOf(
     }
     if (admission.moved.length === 0) continue;
     if (admission.withheld.length > 0) continue;
-    const bought = admission.changeIds
-      .map((id) => byId.get(id))
-      .filter((change): change is PricedChange => change !== undefined);
     configurations.push({
       name,
       move,
       changeIds: admission.changeIds,
-      tier: dearestTierOf(
-        bought.map((change) => ({
-          changeId: change.id,
-          tier: change.tier,
-          priceUnits: purchaseUnits(change),
-          dimensionIds: [],
-        })),
-        order,
-      ),
+      tier: admittedTierOf(admission.changeIds, byId, order),
       units: admission.units,
     });
   }
@@ -546,12 +530,22 @@ export function pageConfigurationsOf(
 
 /** One configuration a rung reaches: what was bought, what it cost, and where the dials went. */
 export interface DrawnConfiguration {
-  /** Price-schedule change ids, in schedule order. What the player bought. */
+  /**
+   * Price-schedule change ids the player's press charges for this vector, in the order
+   * `campaign/stagePress.ts#admitStageMove` reports them — GitHub issue #628. Can name a change the
+   * drawn bundle did not, where a drawn gate opened a dimension the bundle does not cover.
+   */
   readonly changeIds: readonly string[];
-  /** The dearest tier in the bundle, by `PriceTier.order` — the tier the player had to reach. */
+  /** The dearest tier among {@link changeIds}, by `PriceTier.order` — the tier the player had to reach. */
   readonly tier: string;
-  /** What the bundle cost, distinct changes summed once. */
+  /** What the press charges for it, distinct changes summed once. */
   readonly units: number;
+  /**
+   * Whether the press admits it at the rung's own units. `false` for a draw whose bundle fits the
+   * rung while the dispatcher it resolves to costs more than the rung holds; such a draw stays in
+   * the sample, so the published draw does not move, and the census records it as unbuildable.
+   */
+  readonly affordable: boolean;
   /** Dimension id → drawn value, the shape `controls/editedProfile.ts#EditedVector` carries. */
   readonly values: Readonly<Record<string, ParameterValue>>;
 }
@@ -640,6 +634,7 @@ export function sampleReachableConfigurations(request: SampleRequest): SampledSp
   const reachable = reachableChangesOf(space, schedule);
   const { bundles } = bundleSpaceOf(space, reachable, units);
   const order = tierOrderOf(schedule);
+  const byId = new Map(schedule.changes.map((change) => [change.id, change]));
   const rng = policyNoiseStream(seed);
   const held = valuesFromProfile(space, baseline);
   /* What this building lets a player be offered — see the module docstring on why before the draw. */
@@ -689,6 +684,7 @@ export function sampleReachableConfigurations(request: SampleRequest): SampledSp
       continue;
     }
 
+    /* The duplicate key stays on the bundle, so pricing by the press (#628) moves no draw. */
     const bought = bundle.filter((change) =>
       change.dimensionIds.some((id) => movedIds.includes(id)),
     );
@@ -698,10 +694,35 @@ export function sampleReachableConfigurations(request: SampleRequest): SampledSp
       continue;
     }
     seen.add(key);
+    /*
+     * **Priced by the player's press, not by the bundle** — GitHub issue #628, and the rule the
+     * dropdown and page strata already followed (§ D1129). The bundle is what the draw *proposed*;
+     * the press charges for every dimension on which the resolved dispatcher differs from the
+     * baseline, and that can be more than the bundle covers: setting `dispatch.callType` to a
+     * destination call type opens `weights.rideTime`'s gate, so a draw that bought only
+     * "Destination panels" resolves to a dispatcher with one more live weight, and the press
+     * charges "How calls are assigned" for it. Priced off the bundle, 42 of the 360 published draws
+     * read 2 u cheaper than a player pays, four of them under a rung that cannot afford them.
+     *
+     * Acceptance is deliberately left where it was, so the draw stream — and with it every
+     * published cell, which `witnessSearch.test-helper.ts` relies on as a prefix — does not move.
+     * A draw the press prices above the rung stays in the sample and says so through
+     * {@link DrawnConfiguration.affordable}; `measureSurvivors.ts` already plays every draw through
+     * the press at the rung's own units, which refuses it and records it as unbuildable.
+     */
+    const admission = admitStageMove(
+      { space, schedule, baseline, building, elevatorSpecs },
+      {
+        profile: baseline,
+        edit: { baseProfileId: baseline.id, profileId: `${baseline.id}-drawn`, values: moved },
+      },
+      units,
+    );
     configurations.push({
-      changeIds: bought.map((change) => change.changeId),
-      tier: dearestTierOf(bought, order),
-      units: bought.reduce((sum, change) => sum + change.priceUnits, 0),
+      changeIds: admission.changeIds,
+      tier: admittedTierOf(admission.changeIds, byId, order),
+      units: admission.units,
+      affordable: admission.admitted,
       values: moved,
     });
   }
@@ -736,6 +757,26 @@ export function samplerSeedFor(master: number, scenarioId: string, stepId: strin
     hash = Math.imul(hash, 0x01000193) >>> 0;
   }
   return (master + hash) % 0x7fffffff;
+}
+
+/** The dearest tier among the change ids the one admission check charged for. */
+function admittedTierOf(
+  changeIds: readonly string[],
+  byId: ReadonlyMap<string, PricedChange>,
+  order: ReadonlyMap<string, number>,
+): string {
+  return dearestTierOf(
+    changeIds
+      .map((id) => byId.get(id))
+      .filter((change): change is PricedChange => change !== undefined)
+      .map((change) => ({
+        changeId: change.id,
+        tier: change.tier,
+        priceUnits: purchaseUnits(change),
+        dimensionIds: [],
+      })),
+    order,
+  );
 }
 
 /** Tier id → `PriceTier.order`, so nothing below branches on the word *dispatcher*. */
