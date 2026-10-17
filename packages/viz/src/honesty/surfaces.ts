@@ -165,6 +165,8 @@ import {
   RUSH_HOLD_LINE,
   RUSH_FITTED_LINE,
   RUSH_FITTED_DEVICE_LINE,
+  RUSH_END_ASK_COPY,
+  RUSH_UNFINISHED_COPY,
   rushFittedLineOf,
   RUSH_SCREEN_COPY,
   rushBandViews,
@@ -10626,6 +10628,10 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
     'everyday/host.ts#RUSH_DEVICE_HELD_THROUGH',
     'everyday/rushScreenModel.ts#rushBandViews',
     'everyday/rushScreenModel.ts#rushFactViews',
+    /* Wave AQ lane AQ-3: the rush stage's end-ask, the first fact's words and the lost-round line, seeded below. */
+    'everyday/rushScreenModel.ts#RUSH_END_ASK_COPY',
+    'everyday/rushScreenModel.ts#RUSH_FURTHEST_COPY',
+    'everyday/rushScreenModel.ts#RUSH_UNFINISHED_COPY',
     'everyday/rushScreenModel.ts#rushDrivingLine',
     'everyday/rushScreenModel.ts#rushLeftBehindLine',
     'everyday/rushScreenModel.ts#rushHoldLineFigure',
@@ -10794,8 +10800,23 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
      * state a player reaches by pressing *Leave the rush* once, so it is swept by name here with a
      * fixture round rather than left to a case that never plays one.
      */
-    for (const best of [undefined, { wave: 9, heldS: 1538, held: '25:38', driverName: 'Steady hand then Contract-net auction' }]) {
-      for (const fact of rushFactViews(best)) {
+    seeds.push({ field: 'rush.unfinished', text: RUSH_UNFINISHED_COPY, role: 'prose' });
+    for (const [key, text] of Object.entries(RUSH_END_ASK_COPY)) {
+      seeds.push({ field: `rush.endAsk.${key}`, text, role: key === 'question' || key === 'consequence' ? 'prose' : 'label' });
+    }
+    /*
+     * § D1515 adds the device's replayed furthest round, with its four states: checking, nothing kept,
+     * kept and drawn, and kept but not replayable here.
+     */
+    const visitBest = { wave: 9, heldS: 1538, held: '25:38', driverName: 'Steady hand then Contract-net auction' };
+    for (const [best, device] of [
+      [undefined, undefined],
+      [visitBest, undefined],
+      [undefined, { kind: 'pending' }],
+      [undefined, { kind: 'row', best: { ...visitBest, wave: 10, driverName: 'Collective control' } }],
+      [undefined, { kind: 'unreplayable', reason: RUSH_DEVICE_REPLAY_REFUSAL.dispatcher }],
+    ] as const) {
+      for (const fact of rushFactViews(best, device)) {
         seeds.push({
           field: `rush.fact.${fact.label}`,
           text: fact.value,

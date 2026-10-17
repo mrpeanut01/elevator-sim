@@ -197,6 +197,7 @@ import {
 import { everydayCareerStore, type CareerStore } from './careerStore.js';
 import type { DeviceChimeStore } from './chimeStore.js';
 import { rushDeviceReplayOf, rushDeviceSittingOf, type RushDeviceStanding } from './rushDeviceBest.js';
+import { rushDeviceFurthestOf } from './rushDeviceFurthest.js';
 import type { RushDeviceStore } from './rushDeviceStore.js';
 import { deviceOwnedOf } from './deviceChimes.js';
 import { CAMPAIGN_DOCK_COPY, purseRefusalOf } from './campaignDock.js';
@@ -315,12 +316,13 @@ import type { WatchableRun } from '../watch/types.js';
 import { watchingViewOf, type WatchingView } from '../watch/view.js';
 
 import type { DemandBand } from '../fixit/parse.js';
-import type { RushBest } from './rushScreenModel.js';
+import { RUSH_UNFINISHED_COPY, type RushBest, type RushFurthestStanding } from './rushScreenModel.js';
 import type { RushPostedStandings } from './rushHouse.js';
 import { heldClock, rushBeforeOf, rushBuildingOf, rushDisclosureOf, rushHoldAt, rushOutcomeOf, rushPatchOf, rushRestorePatchOf, rushStartLevelsOf, rushTopRatePctPop5min, rushWavesOutlastedOf, type RushBefore } from './rush.js';
 import { rushPurseBeforeNextOf, rushRebuildPressOf, rushTopUpClaimsOf, type RushRebuildInput } from './rushRebuild.js';
 import {
   rushRoundRecordOf,
+  rushSittingBodyOf,
   rushSittingOf,
   type ClaimedRushModifier,
   type RushPostedRound,
@@ -2156,6 +2158,20 @@ export interface EverydayHost {
    * with a board, where § D1359's row is drawn instead. Its non-test caller is `everyday/rushScreen.ts`.
    */
   rushDeviceBest(buildingId: string): Promise<RushDeviceStanding>;
+  /**
+   * **The furthest round this device finished on `buildingId`, replayed** — wave AQ, lane AQ-3,
+   * [§ D1515](../../../../DECISIONS.md). A round ended by hand counts, unlike § D1420's sitting. The
+   * figures are the replay's, read at the second the round ended, never the stored ones. On every
+   * build, because the fact it feeds is this device's on every build. Its non-test caller is
+   * `everyday/rushScreen.ts`.
+   */
+  rushFurthest(buildingId: string): Promise<RushFurthestStanding>;
+  /**
+   * **The rush round the last page closed on, said once** — wave AQ, lane AQ-3. `RUSH_UNFINISHED_COPY`
+   * the first time it is asked after a page went away mid-round, and `undefined` otherwise. Its
+   * non-test caller is `everyday/rushScreen.ts`.
+   */
+  rushUnfinished(): string | undefined;
 
   /**
    * Today's challenge and its board — GitHub issue #221's third criterion, *reachable without
@@ -3500,12 +3516,19 @@ export function createEverydayHost(
       }
     | undefined;
   /**
-   * The furthest any round has got since this page opened — {@link EverydayHost.rushBest}. Kept
-   * past the sitting, because the rush front is drawn **between** sittings (entering it from a
-   * sitting leaves it) and read what it had nothing to show. Not persisted, for § 3.5's reason: a
-   * reload is a new visit, and the front says *this visit*.
+   * The furthest any round has got on each tower since this page opened — {@link EverydayHost.rushBest}.
+   * Kept past the sitting, because the rush front is drawn **between** sittings (entering it from a
+   * sitting leaves it) and read what it had nothing to show. Not itself persisted: what survives a
+   * reload is the round's causes, kept by {@link keepFurthestOnDevice} and replayed by
+   * {@link EverydayHost.rushFurthest} ([§ D1515](../../../../DECISIONS.md)).
    */
-  let rushBestThisVisit: RushBest | undefined;
+  const rushBestThisVisit = new Map<string, RushBest>();
+  /**
+   * A round the last page closed on — read once, as this host starts, so a round this page plays
+   * cannot be mistaken for it. Written at `pagehide` by `rushDeviceStore.ts` from what
+   * `RushDeviceStore.setRunning` was last told. Wave AQ, lane AQ-3.
+   */
+  let rushUnfinishedAtLoad = b.rushDeviceBest?.unfinished();
   /**
    * What the next sitting may claim, from what the ledger says this account owns —
    * [§ D672](../../../../DECISIONS.md).
@@ -3804,22 +3827,41 @@ export function createEverydayHost(
       rounds: Object.freeze([...rushSession.rounds, round]),
     };
     const { outcome } = round;
-    const best = rushBestThisVisit;
+    const best = rushBestThisVisit.get(rushSession.buildingId);
     if (
       best === undefined ||
       outcome.wave > best.wave ||
       (outcome.wave === best.wave && outcome.heldS > best.heldS)
     ) {
-      rushBestThisVisit = {
+      rushBestThisVisit.set(rushSession.buildingId, {
         wave: outcome.wave,
         heldS: outcome.heldS,
         held: heldClock(outcome.heldS),
         driverName: round.drivers.join(' then '),
-      };
+      });
     }
     const waves = rushWavesOutlastedOf(outcome);
     if (waves !== undefined) void bankTurn({ completion: 'rush-wave-survived', waves });
     keepRushOnDevice();
+    keepFurthestOnDevice(round);
+  };
+
+  /**
+   * **This device keeps its furthest round per tower, ended by hand or at the line** —
+   * [§ D1515](../../../../DECISIONS.md). On every build, as the round's causes: the sitting up to this
+   * round and the second it ended at. A round whose presses cannot be written as causes is not kept,
+   * because its replay would be a different round (`rushDeviceFurthest.ts`).
+   */
+  const keepFurthestOnDevice = (round: RushRoundRecord): void => {
+    const store = b.rushDeviceBest;
+    if (store === undefined || rushSession === undefined || round.unpostable.length > 0) return;
+    store.offerFurthest({
+      buildingId: rushSession.buildingId,
+      body: rushSittingBodyOf({ buildingId: rushSession.buildingId, rounds: rushSession.rounds, modifiers: rushSession.modifiers }),
+      endedAfterS: round.outcome.heldS,
+      keptWave: round.outcome.wave,
+      keptHeldS: round.outcome.heldS,
+    });
   };
 
   /**
@@ -5231,6 +5273,51 @@ export function createEverydayHost(
         );
       });
     },
+    /* § D1515: this device's furthest round on the tower, replayed and read where the round ended. */
+    rushFurthest: (buildingId) => {
+      const store = b.rushDeviceBest;
+      if (store === undefined) return Promise.resolve({ kind: 'none' });
+      const kept = rushDeviceFurthestOf(store.furthest(), buildingId);
+      if (kept === undefined) return Promise.resolve({ kind: 'none' });
+      const replay = rushDeviceReplayOf(b.resources, kept.body);
+      if (typeof replay === 'string') return Promise.resolve({ kind: 'unreplayable', reason: replay });
+      const shelf = allDispatchers(b.resources, b.state().savedDispatchers);
+      const nameOf = (id: string): string => shelf.find((profile) => profile.id === id)?.name ?? id;
+      const last = kept.body.rounds[kept.body.rounds.length - 1];
+      const drivers = last === undefined
+        ? []
+        : [
+            nameOf(last.dispatcherProfileId),
+            ...[...(last.interventions ?? [])]
+              .sort((x, y) => x.atS - y.atS)
+              .flatMap((entry) =>
+                entry.change.kind === 'switch-dispatcher' || entry.change.kind === 'adopt-dispatcher'
+                  ? [nameOf(entry.change.toProfileId)]
+                  : [],
+              ),
+          ];
+      return new Promise<RushFurthestStanding>((resolve) => {
+        b.simulateRecord(
+          replay.config,
+          (recording) => {
+            const outcome = rushOutcomeOf(recording, recording.startedAt + kept.endedAfterS);
+            resolve({
+              kind: 'row',
+              best: {
+                wave: outcome.wave,
+                heldS: outcome.heldS,
+                held: heldClock(outcome.heldS),
+                driverName: drivers.join(' then '),
+              },
+            });
+          },
+          (message) => {
+            resolve({ kind: 'unreplayable', reason: `its replay did not complete here (${message})` });
+          },
+          replay.outOfServiceCarIds,
+        );
+      });
+    },
     /* Read-only, and the same split. See {@link EverydayHost.challengeToday}. */
     challengeToday: async () => {
       const read = b.challengeToday;
@@ -5408,6 +5495,8 @@ export function createEverydayHost(
       const patch = rushPatchOf(b.resources, state, rushSession.modifiers, rushSession.levels);
       if (patch !== undefined) b.applyPatch(patch);
       b.startRun();
+      /* Wave AQ lane AQ-3: a round is running, so a page closed now goes unkept and says so next time. */
+      b.rushDeviceBest?.setRunning(rushSession.buildingId);
       notifyCampaign();
       return undefined;
     },
@@ -5442,6 +5531,7 @@ export function createEverydayHost(
     },
     endRush: (atS) => {
       if (rushSession === undefined) return;
+      b.rushDeviceBest?.setRunning(undefined);
       const firstEnd = rushSession.endedAtS === undefined;
       rushSession = { ...rushSession, endedAtS: atS };
       notifyCampaign();
@@ -5459,9 +5549,16 @@ export function createEverydayHost(
       rushSession = { ...rushSession, unsettledEndS: atS };
       settleRushRound();
     },
-    rushBest: () => rushBestThisVisit,
+    rushBest: () => rushBestThisVisit.get(b.state().buildingId),
+    rushUnfinished: () => {
+      if (rushUnfinishedAtLoad === undefined) return undefined;
+      rushUnfinishedAtLoad = undefined;
+      b.rushDeviceBest?.clearUnfinished();
+      return RUSH_UNFINISHED_COPY;
+    },
     leaveRush: () => {
       if (rushSession === undefined) return;
+      b.rushDeviceBest?.setRunning(undefined);
       const before = rushSession.before;
       rushSession = undefined;
       /*

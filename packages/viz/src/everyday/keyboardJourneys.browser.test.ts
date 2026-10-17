@@ -414,6 +414,9 @@ const JOURNEYS: Readonly<Record<ModePick, (page: Page) => Promise<Completion>>> 
       { timeout: 60_000 },
     );
     await pressPrimaryWhenItReads(page, 'End the rush');
+    /* Wave AQ lane AQ-3: the first press asks; a second press of the primary ends the round. */
+    await page.waitForSelector('.everyday-stage-end-confirm:not([hidden])', { timeout: 15_000 });
+    await pressPrimaryWhenItReads(page, 'End the rush');
     await page.waitForSelector('.everyday-rush-result', { timeout: 15_000 });
     return page.evaluate(() => ({
       outcome: document.querySelector<HTMLElement>('.everyday-rush-result')?.dataset['outcome'] ?? '',

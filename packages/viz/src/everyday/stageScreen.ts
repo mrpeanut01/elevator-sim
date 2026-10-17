@@ -83,7 +83,7 @@ import type { LiveObservations } from '../live/types.js';
 import type { GoalState } from '../shift/types.js';
 import { actionBarFor, type ActionBarModel } from './actionBar.js';
 import { RUSH_NOT_LANDED, rushStageHeaderOf } from './rush.js';
-import { RUSH_STREAM } from './rushScreenModel.js';
+import { RUSH_END_ASK_COPY, RUSH_STREAM } from './rushScreenModel.js';
 import type { EverydayHost } from './host.js';
 import { SCREEN_NAMES, type EverydayScreenModule } from './screens.js';
 import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.js';
@@ -699,6 +699,8 @@ function mountStage(
   figures.style.cssText = `display:flex;flex-wrap:wrap;gap:${String(GAP.section)}px;margin-left:auto`;
 
   const playButton = el(doc, 'button', 'everyday-stage-play');
+  /** {@link focusPlayOnRushEntry}'s once-only flag, here so no early call meets it uninitialised. */
+  let rushEntryFocusPending = context.ctx === 'rush';
   playButton.type = 'button';
   playButton.style.cssText = [
     `background:${C.sun}`,
@@ -1161,6 +1163,12 @@ function mountStage(
   const interventionButtons = STAGE_INTERVENTIONS.map((arm) => {
     const button = el(doc, 'button', 'everyday-stage-intervene', arm.label);
     button.type = 'button';
+    /*
+     * Disabled until a run is on this stage — wave AQ, lane AQ-3. {@link intervene} does nothing
+     * without one, and a tab whose run was refused (another tab holds the week's day) drew both arms
+     * pressable over a press that did nothing. {@link draw} enables them once a run is adopted.
+     */
+    button.disabled = true;
     button.dataset['interventionKind'] = arm.change.kind;
     button.title = arm.explains;
     button.style.cssText = ARM_BUTTON_CSS;
@@ -1261,6 +1269,8 @@ function mountStage(
   }
   const switchButton = el(doc, 'button', 'everyday-stage-intervene');
   switchButton.type = 'button';
+  /* Disabled until a run is on this stage, for the parking arms' reason above. */
+  switchButton.disabled = true;
   switchButton.dataset['interventionKind'] = 'adopt-dispatcher';
   switchButton.style.cssText = ARM_BUTTON_CSS;
   /** The handover row as of the last {@link draw} — the model's, never composed here. */
@@ -1581,6 +1591,56 @@ function mountStage(
   skipAskInner.append(skipAskQuestion, skipAskConsequence, skipAskRow);
   skipAsk.append(skipAskInner);
   callCard.append(callBody, closeAsk, skipAsk);
+  /*
+   * **The rush's end asks once** — wave AQ, lane AQ-3, the post-AP playtest. Drawn under the header
+   * in a rush only, hidden by its attribute alone (layout on an inner row, for `callBody`'s reason).
+   * Words: `rushScreenModel.ts#RUSH_END_ASK_COPY`.
+   */
+  const endAsk = el(doc, 'div', 'everyday-stage-end-confirm');
+  endAsk.hidden = true;
+  endAsk.setAttribute('role', 'group');
+  endAsk.setAttribute('aria-label', RUSH_END_ASK_COPY.question);
+  const endAskInner = el(doc, 'div');
+  endAskInner.style.cssText = [
+    'display:grid;gap:7px',
+    `border:1.5px solid ${C.ink}`,
+    `border-radius:${String(R.row)}px`,
+    `background:${C.card}`,
+    'padding:12px 14px',
+  ].join(';');
+  const endAskQuestion = el(doc, 'p', 'everyday-stage-end-confirm-question', RUSH_END_ASK_COPY.question);
+  endAskQuestion.style.cssText = closeAskQuestion.style.cssText;
+  const endAskConsequence = el(doc, 'p', undefined, RUSH_END_ASK_COPY.consequence);
+  endAskConsequence.style.cssText = closeAskConsequence.style.cssText;
+  const endAskRow = el(doc, 'div');
+  endAskRow.style.cssText = closeAskRow.style.cssText;
+  const endAskGo = el(doc, 'button', 'everyday-stage-end-confirm-go', RUSH_END_ASK_COPY.end);
+  endAskGo.type = 'button';
+  endAskGo.style.cssText = ARM_BUTTON_CSS + ';min-height:44px';
+  const endAskBack = el(doc, 'button', 'everyday-stage-end-confirm-back', RUSH_END_ASK_COPY.keep);
+  endAskBack.type = 'button';
+  endAskBack.style.cssText = ARM_BUTTON_CSS + ';min-height:44px';
+  /** Whether the stage was playing when the ask went up, so *Keep playing* plays on. */
+  let endAskResume = false;
+  endAskGo.addEventListener('click', () => {
+    endRushNow();
+  });
+  endAskBack.addEventListener('click', () => {
+    endAsk.hidden = true;
+    if (endAskResume && playback !== undefined && playback.state !== 'playing') togglePlay();
+    endAskResume = false;
+    syncTransport();
+  });
+  endAskRow.append(endAskGo, endAskBack);
+  endAskInner.append(endAskQuestion, endAskConsequence, endAskRow);
+  endAsk.append(endAskInner);
+  /** § 9.2's *End the rush*: stopped by hand, at the playhead, and straight to its own result. */
+  function endRushNow(): void {
+    endAsk.hidden = true;
+    playback?.pause();
+    host.endRush(playback?.simTimeS ?? adopted?.startedAt ?? 0);
+    context.go('report');
+  }
   let callCardKey = '';
 
   /*
@@ -1872,6 +1932,17 @@ function mountStage(
     interventions,
     race,
   );
+  /*
+   * **In a rush the choice chips sit under the header** — wave AQ, lane AQ-3, the post-AP playtest:
+   * under the building they were below the fixed footer at 1280×600 and below the fold on a 390×844
+   * phone, so the rush's only choices were out of reach while the climb ran. A rush has no call card,
+   * goals or race to keep above them. Every other context keeps its order. Recorded here under
+   * [§ D405](../../../../DECISIONS.md).
+   */
+  if (context.ctx === 'rush') {
+    root.insertBefore(interventions, header.nextSibling);
+    root.insertBefore(endAsk, header.nextSibling);
+  }
   region.append(root);
 
   /* ------------------------------------------------------------- behaviour */
@@ -3017,6 +3088,19 @@ function mountStage(
   }
 
   /**
+   * **After *Start the rush*, keyboard focus lands on *Play*** — wave AQ, lane AQ-3, the post-AP
+   * playtest: the setup screen's primary is unmounted by the press and focus fell to the page body.
+   * Once, when the round's run is on the stage and *Play* can be pressed, and only if focus is still
+   * nowhere, so a player who has already moved it keeps it. Recorded here under § D405.
+   */
+  function focusPlayOnRushEntry(): void {
+    if (!rushEntryFocusPending || adopted === undefined || playButton.disabled) return;
+    rushEntryFocusPending = false;
+    const active = doc.activeElement;
+    if (active === null || active === doc.body || active === doc.documentElement) playButton.focus({ preventScroll: true });
+  }
+
+  /**
    * **A day whose attempt another tab holds is shown here no further** — wave AO, lane AO-1,
    * [§ D1361](../../../../DECISIONS.md), the post-AN panel's seat D (D2). The saved attempt belongs
    * to one tab at a time. While another tab holds it, this stage pauses where it stands and holds
@@ -3110,6 +3194,7 @@ function mountStage(
 
   function syncTransport(): void {
     const playing = playback?.state === 'playing';
+    focusPlayOnRushEntry();
     /*
      * § 3.3's row hears the day run out — GitHub issue **#287**'s fourth criterion.
      *
@@ -3450,7 +3535,12 @@ function mountStage(
   /** One paint: the header, the cutaway, the alarm, the strip. */
   function draw(): void {
     const recording = adopted;
-    if (recording === undefined || playback === undefined) return;
+    if (recording === undefined || playback === undefined) {
+      /* No run on this stage: no press can act, so none is offered — the parking arms' reason. */
+      for (const button of interventionButtons) button.disabled = true;
+      switchButton.disabled = true;
+      return;
+    }
     const simTimeS = playback.simTimeS;
     const observations: LiveObservations = observationsAt(recording, simTimeS);
     pace(simTimeS, observations.longestCurrentWaitS);
@@ -4375,11 +4465,20 @@ function mountStage(
         context.go('brief');
         return;
       }
-      /* § 9.2's *End the rush*: stopped by hand, at the playhead, and straight to its own result. */
+      /*
+       * § 9.2's *End the rush*, asked once (wave AQ, lane AQ-3): the first press pauses the climb and
+       * puts {@link endAsk} under the header with focus on *Keep playing*; a second press ends it.
+       */
       if (context.ctx === 'rush') {
-        playback?.pause();
-        host.endRush(playback?.simTimeS ?? adopted?.startedAt ?? 0);
-        context.go('report');
+        if (endAsk.hidden && adopted !== undefined) {
+          endAskResume = playback?.state === 'playing';
+          playback?.pause();
+          endAsk.hidden = false;
+          syncTransport();
+          endAskBack.focus({ preventScroll: false });
+          return;
+        }
+        endRushNow();
         return;
       }
       /*
