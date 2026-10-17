@@ -3007,3 +3007,28 @@ export function stageBuildingScrollOf(
   if (canvas.bottom <= view.bottom && canvas.bottom > view.top) return 0;
   return canvas.bottom - view.bottom;
 }
+
+/**
+ * **The share of the screen region the stage's header may take and still stay at the top while the
+ * page scrolls** — wave AR, lane AR-2, [§ D1527](../../../../DECISIONS.md). Owner-reversible: `0`
+ * never pins it.
+ */
+export const STAGE_HEADER_STICKY_SHARE = 0.3;
+
+/**
+ * **Whether the stage's header stays at the top of the page while the building scrolls under it** —
+ * [§ D1527](../../../../DECISIONS.md). § D1508 scrolls the page to the lobby rows when the day starts
+ * playing, and at 1280×800 that took the clock, *standing right now* and *away inside a minute* off the
+ * top. Pinned, the header keeps the clock and the live readouts beside the lobby. Only where it is
+ * short against the region, because a phone's header wraps to several rows and pinned it would cover
+ * the building it describes; and never in a rush, whose choice chips sit directly under the header.
+ */
+export function stageHeaderSticksOf(input: {
+  readonly headerHeight: number;
+  readonly regionHeight: number;
+  readonly rush: boolean;
+}): boolean {
+  if (input.rush) return false;
+  if (!(input.headerHeight > 0) || !(input.regionHeight > 0)) return false;
+  return input.headerHeight <= input.regionHeight * STAGE_HEADER_STICKY_SHARE;
+}

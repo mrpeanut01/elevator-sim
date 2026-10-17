@@ -1919,6 +1919,8 @@ import {
   STAGE_PLAY_CONTROL,
   legibleFloorCount,
   stageBuildingScrollOf,
+  stageHeaderSticksOf,
+  STAGE_HEADER_STICKY_SHARE,
   stageCallAnsweredLineOf,
   stageRecomputingLineOf,
   stageCameraChipsOf,
@@ -2383,5 +2385,16 @@ describe('the beat after an answer says what was chosen', () => {
     expect(source).toContain('statusText.textContent = stageRecomputingLineOf(answeredLine);');
     expect(source).not.toContain('statusText.textContent = STAGE_RECOMPUTING;');
   });
-});
 
+  /* Wave AR, lane AR-2 (§ D1527): the header is pinned where it is short against the region, never in a rush. */
+  it('pins the header on a desktop stage, not on a phone whose header wraps, and never in a rush', () => {
+    expect(STAGE_HEADER_STICKY_SHARE).toBe(0.3);
+    /* 1280×800: a header of about 120 px over a region of about 745. */
+    expect(stageHeaderSticksOf({ headerHeight: 120, regionHeight: 745, rush: false })).toBe(true);
+    expect(stageHeaderSticksOf({ headerHeight: 120, regionHeight: 745, rush: true })).toBe(false);
+    /* 390×844: the header wraps to several rows. */
+    expect(stageHeaderSticksOf({ headerHeight: 330, regionHeight: 790, rush: false })).toBe(false);
+    expect(stageHeaderSticksOf({ headerHeight: 0, regionHeight: 745, rush: false })).toBe(false);
+    expect(stageHeaderSticksOf({ headerHeight: 120, regionHeight: 0, rush: false })).toBe(false);
+  });
+});

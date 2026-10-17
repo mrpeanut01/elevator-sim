@@ -298,4 +298,58 @@ describe.skipIf(!HAS_BROWSER)('§ D1169 — a scored day is paced by the tutoria
       }
     }, 120_000);
   }
+
+  /*
+   * Wave AR, lane AR-2 (§ D1527), the re-play at 1280×800: § D1508 scrolled the page to the lobby once
+   * the day played, which took the clock, *standing right now* and *away inside a minute* off the top.
+   * The header now stays at the top of the page while the building scrolls under it. Red before: the
+   * clock's box sat above the page's visible top once the scroll was made.
+   */
+  it('keeps the clock, the live readouts and the lobby rows in view together after Play, at 1280×800', async () => {
+    const page = await playDayOn('c2', { width: 1280, height: 800 });
+    try {
+      const inView = () =>
+        page.evaluate(() => {
+          const region = document.querySelector('.everyday-screen')?.getBoundingClientRect();
+          const bar = document.querySelector('.everyday-bar')?.getBoundingClientRect();
+          const canvas = document.querySelector('.everyday-stage-canvas')?.getBoundingClientRect();
+          if (region === undefined || canvas === undefined || canvas.height === 0) return undefined;
+          const top = Math.max(region.top, 0);
+          const bottom = Math.min(region.bottom, bar?.top ?? innerHeight, innerHeight);
+          /* Seen means inside the page's visible band and the topmost thing at its centre. */
+          const seen = (node: Element | null | undefined): boolean => {
+            if (node === null || node === undefined) return false;
+            const box = node.getBoundingClientRect();
+            if (!(box.height > 0 && box.top >= top - 1 && box.bottom <= bottom + 1)) return false;
+            const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+            return hit !== null && (hit === node || node.contains(hit));
+          };
+          const figures = [...document.querySelectorAll('.everyday-stage-header .everyday-stage-figure')];
+          const labelled = (label: string) => figures.find((figure) => (figure.textContent ?? '').toLowerCase().includes(label));
+          return {
+            clock: seen(document.querySelector('.everyday-stage-clock')),
+            standing: seen(labelled('standing right now')),
+            away: seen(labelled('away inside a minute')),
+            /* Within a floor row of the bottom, as the § D1508 case reads it. */
+            lobby: canvas.bottom <= bottom + 24 && canvas.bottom > top,
+          };
+        });
+      /* The scroll is made on the frame after the press, and the clock is drawn on frames after it. */
+      await page.waitForFunction(
+        () => {
+          const canvas = document.querySelector('.everyday-stage-canvas')?.getBoundingClientRect();
+          const bar = document.querySelector('.everyday-bar')?.getBoundingClientRect();
+          return canvas !== undefined && canvas.height > 0 && canvas.bottom <= (bar?.top ?? innerHeight) + 24;
+        },
+        undefined,
+        { timeout: 10_000, polling: 100 },
+      );
+      expect(await inView()).toEqual({ clock: true, standing: true, away: true, lobby: true });
+      /* And still so a few seconds into the day, once the lines above the building have been written. */
+      await page.waitForTimeout(3_000);
+      expect(await inView()).toEqual({ clock: true, standing: true, away: true, lobby: true });
+    } finally {
+      await page.close();
+    }
+  }, 120_000);
 });
