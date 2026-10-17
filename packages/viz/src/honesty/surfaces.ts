@@ -355,6 +355,8 @@ import { WORKED_ANSWER_COPY, type WorkedAnswerFacts, type WorkedAnswerView } fro
 import { WEEK_START_NEXT_LABEL, driverRecordLinesOf, weekScreenViewOf } from '../everyday/weekView.js';
 import { CAREER_MARK_WORDS, careerCloseLineOf, type CareerCloseInput } from '../everyday/careerCalls.js';
 import { CALL_BANDS, weekBandsLinesOf, type CallBandsCall } from '../shift/callBands.js';
+import { poolCloseLineOf, poolWaysLineOf, weekKeepDaysLinesOf } from '../shift/poolWays.js';
+import { WEEK_POOL, type PoolCrowd } from '../shift/weekPool.js';
 import { weekOrderFor } from '../shift/weekOrders.js';
 import { percentileLine, WORLD_FIGURES_ABSENT, WORLD_FIGURES_LABEL, WORLD_FIGURES_REASON } from '../everyday/world.js';
 import { weekdayOf, type GoalObservations } from '../shift/types.js';
@@ -15342,6 +15344,13 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
      */
     'shift/callBands.ts#weekBandsLinesOf',
     'shift/callBands.ts#shareWordsOf',
+    /*
+     * Wave AP, lane DT-1 (§ D1462, § D1463): the brief's ways line, the close's names and DC-13 in
+     * days, seeded in `seedPoolWays` over built crowds and the shipped pool.
+     */
+    'shift/poolWays.ts#poolWaysLineOf',
+    'shift/poolWays.ts#poolCloseLineOf',
+    'shift/poolWays.ts#weekKeepDaysLinesOf',
     'everyday/weekView.ts#driverRecordLinesOf',
     /*
      * Wave AO, lane DS-2 (§ D1409): the career report's account of the day, graded on the contract's
@@ -18619,6 +18628,7 @@ function seedWeekStake(
   profileNameOf: (profileId: string) => string | undefined = () => undefined,
 ): void {
   seedWeekBands(seeds, profileNameOf);
+  seedPoolWays(seeds, profileNameOf);
   seeds.push({ field: 'brief.week.heading', text: BRIEF_WEEK_HEADING, role: 'label' });
   seeds.push({ field: 'week.stake.short', text: WEEK_WITHOUT_COUNTED_DAYS_SHORT, role: 'reason' });
   seeds.push({ field: 'week.day.unmeasured', text: DAY_UNMEASURED_SENTENCE, role: 'reason' });
@@ -18838,6 +18848,39 @@ function seedWeekStake(
   }
   for (const [index, line] of driverRecordLinesOf(driven, profileNameOf).entries()) {
     seeds.push({ field: `week.drivers.${String(index)}`, text: line, role: 'observation' });
+  }
+}
+
+/**
+ * **The pool's words** — wave AP, lane DT-1, § D1462 and § D1463. The brief's count and the close's
+ * names on a crowd two drivers clear, and on one only a raised call's answer clears; DC-13 in days on
+ * the shipped pool's weeks 2 to 4, which say nothing for a level the pool does not deal.
+ */
+function seedPoolWays(seeds: TextSeed[], profileNameOf: (profileId: string) => string | undefined): void {
+  const profiles = WEEK_POOL.protocol.profiles;
+  const marksOf = (cleared: readonly string[]): string => profiles.map((id) => (cleared.includes(id) ? 'C' : 'm')).join('');
+  const crowds: readonly [string, PoolCrowd][] = [
+    ['drivers', { seed: '20260701100', tag: 'live', alone: marksOf(['fairness-first', 'collective']), calls: [] }],
+    [
+      'call',
+      {
+        seed: '20260724200',
+        tag: 'need',
+        alone: marksOf([]),
+        calls: [{ by: 'fairness-first', atS: 2648, question: 'driver', offered: ['predictive-balanced', 'capacity-aware'], clears: ['predictive-balanced'] }],
+      },
+    ],
+  ];
+  for (const [arm, crowd] of crowds) {
+    const ways = poolWaysLineOf(crowd);
+    if (ways !== undefined) seeds.push({ field: `brief.ways.${arm}`, text: ways, role: 'observation' });
+    const close = poolCloseLineOf(crowd, profileNameOf);
+    if (close !== undefined) seeds.push({ field: `report.close.ways.${arm}`, text: close, role: 'observation' });
+  }
+  for (const week of [2, 3, 4]) {
+    for (const [index, line] of weekKeepDaysLinesOf({ contractId: 'c2', week }, profileNameOf).entries()) {
+      seeds.push({ field: `week.keepDays.${String(week)}.${String(index)}`, text: line, role: 'observation' });
+    }
   }
 }
 

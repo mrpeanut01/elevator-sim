@@ -222,7 +222,7 @@ describe('a different pool crowd changes the run — the integration seam', () =
       return JSON.stringify(recording.legs.slice(0, 200).map((leg) => [leg.arrivedAt, leg.originFloorId, leg.destinationFloorId]));
     };
     expect(legsOf(0)).not.toBe(legsOf(1));
-  }, 120_000);
+  });
 });
 
 describe('the shipped pool — § D1459', () => {

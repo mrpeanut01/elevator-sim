@@ -43,6 +43,22 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
   Object.freeze([
     {
       reason:
+        'The week pool’s arithmetic — wave AP, lane DT-1, § D1459 to § D1461. `shift/weekPool.ts` reads ' +
+        '`data/week-pool.json` for the dealer and the gates; `poolLevelReadingOf`’s `because` is the ' +
+        'gates’ reason for a withdrawn level, read by tests and the census and drawn by no screen, ' +
+        '`poolCrowdSeedOf` throws only on a crowd index past the protocol’s, and `poolTopOf`, ' +
+        '`poolDealOf` and `poolCrowdFor` return numbers and records. The player-facing words over the ' +
+        'pool are `shift/poolWays.ts`’s, seeded in `seedPoolWays`.',
+      ids: [
+        'shift/weekPool.ts#poolLevelReadingOf',
+        'shift/weekPool.ts#poolCrowdSeedOf',
+        'shift/weekPool.ts#poolTopOf',
+        'shift/weekPool.ts#poolDealOf',
+        'shift/weekPool.ts#poolCrowdFor',
+      ],
+    },
+    {
+      reason:
         'The settled-verdict store — wave AO, lane AO-3, § D1380. `dev/settledReadings.ts` keeps the ' +
         'house’s and the driver run’s verdicts across a reload under a storage key; `SETTLED_READINGS_KEY` ' +
         'is that key, and `keepSettled` and `settledReadingOf` read and write verdicts (`cleared`, ' +

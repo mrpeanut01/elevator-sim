@@ -252,6 +252,15 @@ const PUBLIC_API_ONLY: Readonly<Record<string, string>> = Object.freeze({
    * firstSessionContractFor`, reached from `dev/state.ts#withFirstSession`), the staleness rule
    * below went red on that commit exactly as the handover said it would, and the entry went with it.
    */
+  /*
+   * -- The week pool's census (wave AP, lane DT-1, § D1459). `poolCellsOf` and `poolCrowdSeedOf`
+   * name the cells and crowds the census measures; their consumer is `shift/weekPool.sweep.test.ts`,
+   * the offline instrument that writes `data/week-pool.json`, and `weekPool.test.ts`. The dealer
+   * reads the file's stored seeds, never these, so a shipped-runtime caller would be a second source
+   * of the same numbers.
+   */
+  'shift/poolCellsOf': 'the pool census’s cells; its consumer is weekPool.sweep.test.ts, which writes the file',
+  'shift/poolCrowdSeedOf': 'the pool census’s crowd seeds; its consumer is weekPool.sweep.test.ts, which writes the file',
   'wrinkles/gateLibrary':
     '§ 17’s content gate, swept over a library; its consumer is gate.test.ts, which drives it',
   /*
