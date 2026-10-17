@@ -132,6 +132,8 @@ import {
   DAY_OFFSET_MIN,
   DOOR_DRIVER_NOTE,
   DOOR_DRIVER_NOTE_HELD,
+  DOOR_PRIMARY_NOTE_HELD,
+  DOOR_STEP_ONE_HELD,
   DOOR_STEPS,
   sameForEveryoneLine,
 } from '../everyday/doorView.js';
@@ -163,6 +165,8 @@ import {
   RUSH_HOLD_LINE,
   RUSH_FITTED_LINE,
   RUSH_FITTED_DEVICE_LINE,
+  RUSH_END_ASK_COPY,
+  RUSH_UNFINISHED_COPY,
   rushFittedLineOf,
   RUSH_SCREEN_COPY,
   rushBandViews,
@@ -251,6 +255,8 @@ import {
   STAGE_OUT_OF_SERVICE,
   STAGE_RACE_PICKER_LABEL,
   STAGE_RECOMPUTING,
+  stageCallAnsweredLineOf,
+  stageRecomputingLineOf,
   STAGE_SPEEDS,
   STAGE_SWITCH_PICKER_LABEL,
   STAGE_SWITCH_PICKER_NOTE,
@@ -290,7 +296,7 @@ import {
   RUN_CONTEXTS,
   SHELL_SKIP_LABEL,
 } from '../everyday/types.js';
-import { SCENARIO_ENTRIES, scenarioHubViewOf } from '../everyday/scenarioModel.js';
+import { SCENARIO_COPY, SCENARIO_ENTRIES, scenarioHubViewOf } from '../everyday/scenarioModel.js';
 import { SCENARIO_LADDER_COPY, type ScenarioLadderRung } from '../scenario/ladder.js';
 import {
   TUTORIAL_ABSENCES,
@@ -339,6 +345,8 @@ import {
   dayCallGapSentenceOf,
   dayCallSplitVerdictsOf,
   DAY_CALL_COUNT_LABEL,
+  DAY_CALL_DRIVER_COPY,
+  DAY_CALL_LEAVE_LABEL,
   dayCallRecordOf,
   dayCallsQuietSentenceOf,
   dayCallWrinkleQuietRowOf,
@@ -912,6 +920,7 @@ import {
   weekOfferOf,
   weekSheetOf,
   weekStakeLineOf,
+  weekStripTargetOf,
   weekTargetMetLineOf,
   WEEK_WITHOUT_COUNTED_DAYS_SHORT,
   WEEKEND_NOTE,
@@ -10623,6 +10632,10 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
     'everyday/host.ts#RUSH_DEVICE_HELD_THROUGH',
     'everyday/rushScreenModel.ts#rushBandViews',
     'everyday/rushScreenModel.ts#rushFactViews',
+    /* Wave AQ lane AQ-3: the rush stage's end-ask, the first fact's words and the lost-round line, seeded below. */
+    'everyday/rushScreenModel.ts#RUSH_END_ASK_COPY',
+    'everyday/rushScreenModel.ts#RUSH_FURTHEST_COPY',
+    'everyday/rushScreenModel.ts#RUSH_UNFINISHED_COPY',
     'everyday/rushScreenModel.ts#rushDrivingLine',
     'everyday/rushScreenModel.ts#rushLeftBehindLine',
     'everyday/rushScreenModel.ts#rushHoldLineFigure',
@@ -10791,8 +10804,23 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
      * state a player reaches by pressing *Leave the rush* once, so it is swept by name here with a
      * fixture round rather than left to a case that never plays one.
      */
-    for (const best of [undefined, { wave: 9, heldS: 1538, held: '25:38', driverName: 'Steady hand then Contract-net auction' }]) {
-      for (const fact of rushFactViews(best)) {
+    seeds.push({ field: 'rush.unfinished', text: RUSH_UNFINISHED_COPY, role: 'prose' });
+    for (const [key, text] of Object.entries(RUSH_END_ASK_COPY)) {
+      seeds.push({ field: `rush.endAsk.${key}`, text, role: key === 'question' || key === 'consequence' ? 'prose' : 'label' });
+    }
+    /*
+     * § D1515 adds the device's replayed furthest round, with its four states: checking, nothing kept,
+     * kept and drawn, and kept but not replayable here.
+     */
+    const visitBest = { wave: 9, heldS: 1538, held: '25:38', driverName: 'Steady hand then Contract-net auction' };
+    for (const [best, device] of [
+      [undefined, undefined],
+      [visitBest, undefined],
+      [undefined, { kind: 'pending' }],
+      [undefined, { kind: 'row', best: { ...visitBest, wave: 10, driverName: 'Collective control' } }],
+      [undefined, { kind: 'unreplayable', reason: RUSH_DEVICE_REPLAY_REFUSAL.dispatcher }],
+    ] as const) {
+      for (const fact of rushFactViews(best, device)) {
         seeds.push({
           field: `rush.fact.${fact.label}`,
           text: fact.value,
@@ -12917,6 +12945,9 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
     'everyday/stageScreenModel.ts#STAGE_PLAY_DONE_REASON',
     'everyday/stageScreenModel.ts#STAGE_NO_PHASE',
     'everyday/stageScreenModel.ts#STAGE_RECOMPUTING',
+    /* Wave AQ, lane AQ-2: the beat after a call's answer says what was chosen; every answer driven below. */
+    'everyday/stageScreenModel.ts#stageCallAnsweredLineOf',
+    'everyday/stageScreenModel.ts#stageRecomputingLineOf',
     /*
      * § D347's, and `#stageCarReadoutOf` is deliberately **absent** from the list while being
      * driven below. `derive.test.ts` derives a text producer from *prose* — two adjacent alphabetic
@@ -12983,6 +13014,8 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
     'everyday/stageCallRow.ts#STAGE_CALL_NO_CROSSING',
     'everyday/stageCallRow.ts#stageCallReadingsLineOf',
     'everyday/stageCallRow.ts#STAGE_CALL_TAKEN',
+    /* Wave AQ, lane AQ-4 (GitHub issue #631): the row whose answers read alike, said once. */
+    'everyday/stageCallRow.ts#STAGE_CALL_NO_DIFFERENCE',
     'everyday/stageCallRow.ts#stageCallRowsCaveatOf',
     'everyday/stageCallRow.ts#STAGE_CALL_ROWS_CAVEAT',
     'shift/dayCallMaxima.ts#dayCallCrossingPhraseOf',
@@ -13747,6 +13780,16 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
           seeds.push({ field: `stage.pace(${reason})`, text: note, role: 'label', playhead: atPlayhead(recording, recording.startedAt) });
         }
       }
+      /* Wave AQ, lane AQ-2 (§ D1506): the line while the stage stays slowed after a wait, which needs the stage's dwell count. */
+      {
+        const note = stagePaceNoteOf(
+          { simPerRealS: DEFAULT_STAGE_SIM_PER_REAL_S, reason: 'watching', lingering: true },
+          { acts, simTimeS: recording.startedAt },
+        );
+        if (note !== undefined) {
+          seeds.push({ field: 'stage.pace(lingering)', text: note, role: 'label', playhead: atPlayhead(recording, recording.startedAt) });
+        }
+      }
       /*
        * § D1212: the beat's note, and a skip's line drawn where it lands. The fixture skip crosses
        * the first third of the run and is drawn at its end, so the line names only instants at or
@@ -14058,6 +14101,19 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
       seeds.push({ field: `stage.bar(${label}).primary`, text: bar.primary.label, role: 'label' });
     }
     seeds.push({ field: 'stage.recomputing', text: STAGE_RECOMPUTING, role: 'prose' });
+    for (const option of [
+      { label: PARK_CARS_LOBBY_LABEL, answer: 'park-cars-lobby' },
+      { label: SPREAD_CARS_LABEL, answer: 'spread-cars' },
+      { label: switchDispatcherLabelOf(DAY_CALL_FIXTURE_DRIVERS['driver-b']), answer: 'driver-b' },
+      { label: DAY_CALL_DRIVER_COPY.keep(DAY_CALL_FIXTURE_DRIVERS.leave), answer: 'leave' },
+      { label: DAY_CALL_LEAVE_LABEL, answer: 'leave' },
+    ] as const) {
+      seeds.push({
+        field: `stage.recomputing(${option.answer}:${option.label})`,
+        text: stageRecomputingLineOf(stageCallAnsweredLineOf(option)),
+        role: 'prose',
+      });
+    }
     /*
      * § 3.3's fourth state — GitHub issue **#287**. Seeded here rather than as a fourth row of
      * `interventionStates` above, and the placement is forced rather than chosen: that array's
@@ -15342,6 +15398,9 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     'everyday/today.ts#TODAY_CHOICE_LINE_HELD',
     'everyday/doorView.ts#DOOR_DRIVER_NOTE',
     'everyday/doorView.ts#DOOR_DRIVER_NOTE_HELD',
+    /* Wave AQ lane AQ-1: step 1 and the press's note on that held day, #626's leftover. */
+    'everyday/doorView.ts#DOOR_STEP_ONE_HELD',
+    'everyday/doorView.ts#DOOR_PRIMARY_NOTE_HELD',
     /*
      * The week census's sentence on a day DC-10 does not admit, and its heading — § D1067. Drawn
      * only on a whole-day Scenario day at the tower's own rung, which no corpus case is, so every
@@ -15359,6 +15418,8 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
      * states — unanswered, answered, and days that kept no record of their crowd.
      */
     'shift/weekStake.ts#weekStakeLineOf',
+    /* Wave AQ, lane AQ-4 (GitHub issue #631): the same target on the front door's strip. */
+    'shift/weekStake.ts#weekStripTargetOf',
     'shift/weekStake.ts#dayStakeSentenceOf',
     'shift/weekStake.ts#DAY_COUNTS_SENTENCE',
     'shift/weekStake.ts#DAY_UNMEASURED_SENTENCE',
@@ -15501,6 +15562,9 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     seeds.push({ field: 'today.lede.held', text: TODAY_CHOICE_LINE_HELD, role: 'prose' });
     seeds.push({ field: 'door.driver.note', text: DOOR_DRIVER_NOTE, role: 'prose' });
     seeds.push({ field: 'door.driver.note.held', text: DOOR_DRIVER_NOTE_HELD, role: 'prose' });
+    seeds.push({ field: 'door.step1.held.head', text: DOOR_STEP_ONE_HELD.head, role: 'label' });
+    seeds.push({ field: 'door.step1.held.body', text: DOOR_STEP_ONE_HELD.body, role: 'prose' });
+    seeds.push({ field: 'door.primary.note.held', text: DOOR_PRIMARY_NOTE_HELD, role: 'prose' });
     /* Midtown's run clock, from its whole authored day: a booking's window is a fraction of that run. */
     const midtownDay = wholeDayFor(context.trafficProfiles, context.buildings.find((building) => building.id === 'midtown-office'));
     const clock: BookingClock | undefined =
@@ -15833,6 +15897,12 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
             seeds.push({ field: `${where}.chip.score`, text: chip.score, role: 'observation' });
             seeds.push({ field: `${where}.chip.note`, text: chip.note, role: 'label' });
           }
+          /* Wave AQ, lane AQ-4 (GitHub issue #631): the days still to come, and the target on the strip. */
+          for (const slot of door.upcoming) {
+            seeds.push({ field: `${where}.upcoming.score`, text: slot.score, role: 'observation' });
+            seeds.push({ field: `${where}.upcoming.note`, text: slot.note, role: 'label' });
+          }
+          if (door.stripTarget !== undefined) seeds.push({ field: `${where}.strip.target`, text: door.stripTarget, role: 'observation' });
           seeds.push({ field: `${where}.world.label`, text: door.world.label, role: 'label' });
           seeds.push({ field: `${where}.world.reason`, text: door.world.reason, role: 'reason' });
           for (const absent of door.world.absent) {
@@ -15886,6 +15956,11 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
         if (hub.path !== undefined) {
           const path = hub.path;
           seeds.push({ field: `${arm}.scenario.path.heading`, text: path.heading, role: 'label' });
+          /* Wave AQ lane AQ-1: each card's fold, and the primary a first visit's bar draws. */
+          seeds.push({ field: `${arm}.scenario.path.details`, text: SCENARIO_COPY.pathDetails, role: 'label' });
+          if (hub.startHere !== undefined) {
+            seeds.push({ field: `${arm}.scenario.startHere`, text: SCENARIO_COPY.startHere, role: 'label' });
+          }
           seeds.push({ field: `${arm}.scenario.path.lede`, text: path.lede, role: 'prose' });
           seeds.push({
             field: `${arm}.scenario.path.offer`,
@@ -18200,6 +18275,17 @@ const EVERYDAY_STAGE_PLAY: SurfaceAdapter = {
       if (view.verdict?.pay !== undefined) seeds.push({ field: `stagePlay.parPaid.${state}.pay`, text: view.verdict.pay, role: 'prose' });
       if (view.verdict?.rung !== undefined) seeds.push({ field: `stagePlay.parPaid.${state}.rung`, text: view.verdict.rung, role: 'prose' });
     }
+    /* Wave AQ lane AQ-1: the verdict's sentence when a change moved no count, both arms. */
+    for (const sameCounts of ['shipped', 'previous'] as const) {
+      const view = stagePlayViewOf(factsFor(standing), {
+        kind: 'judged',
+        verdict: { ...verdict(false, false, undefined), sameCounts },
+        stale: false,
+      });
+      if (view.verdict?.sameCounts !== undefined) {
+        seeds.push({ field: `stagePlay.sameCounts.${sameCounts}`, text: view.verdict.sameCounts, role: 'prose' });
+      }
+    }
     /* § D1419: every shipped stage's ladder, in the arms a device can stand in. */
     for (const each of stages) {
       const census = context.survivors.scenarios.find((row) => row.id === each.id);
@@ -18776,6 +18862,9 @@ function seedWeekStake(
     if (deal === undefined) continue;
     const line = weekStakeLineOf(openWeek(contract.id));
     if (line !== undefined) seeds.push({ field: `week.stake.${contract.id}`, text: line, role: 'observation' });
+    /* Wave AQ, lane AQ-4 (GitHub issue #631): the same target, on the front door's strip. */
+    const strip = weekStripTargetOf(openWeek(contract.id));
+    if (strip !== undefined) seeds.push({ field: `week.strip.${contract.id}`, text: strip, role: 'observation' });
     for (const dealt of deal.days) {
       const sentence = dayStakeSentenceOf(contract.id, dealt.day, dealt.eventId) ?? '';
       seeds.push({ field: `week.day.${contract.id}.${String(dealt.day)}`, text: sentence, role: 'observation' });

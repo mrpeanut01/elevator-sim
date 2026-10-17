@@ -58,6 +58,8 @@ import {
   REPORT_PRACTICE_AGAIN,
   WEEK_SHEET_STEP,
   figureNotePartsOf,
+  REPORT_PROSE_BUDGET,
+  reportProsePartsOf,
 } from './reportView.js';
 import { PRESS_CALL_ROW_ID } from '../shift/callRow.js';
 
@@ -928,6 +930,43 @@ describe('a figure card’s note leads with its first sentence and folds the res
     /* Non-vacuity: at least one card on a real sheet is over the budget, or the fold is decoration. */
     expect(shaped.figures.some((cell) => figureNotePartsOf(cell.note).rest !== undefined)).toBe(true);
     expect(FIGURE_NOTE_HANDLE.length).toBeGreaterThan(3);
+  });
+});
+
+/*
+ * GitHub issue #631, wave AQ lane AQ-4: the playtest met a pressed day's *You switched to …* row whose
+ * why ran to about 200 words of single-replication caveats. The row below is that row's why, copied
+ * from a filed Garden Apartments day with Predictive balanced pressed at 08:50.
+ */
+describe('a long report paragraph leads with its first sentence and folds the rest — issue #631', () => {
+  const PRESSED_WHY =
+    '0 people were standing when the day ended, and 28 people were delivered between those two clock times. ' +
+    "By the end of the day 0 people had been picked up after a wait past the run's own long-wait mark. " +
+    'The same day, from the same seed and the same crowd, had also been run without that press and with nothing ' +
+    'else changed: read at those same two clock times, that run had 0 people standing at the landings, had ' +
+    'delivered 28 people between them, and had picked up 0 people after a wait past that same mark. Graded ' +
+    'against the same goals, this run reads Shift cleared; the run without that press, over its own whole day, ' +
+    'reads Shift cleared. Those are two runs of one day, and that is all they are. A with-and-without pair on ' +
+    'one seed is a single replication, and a single replication settles nothing in general: nothing here says ' +
+    'what that press does on another day, on another crowd, or on another tower. The bench is where a question ' +
+    'like that is answered, over many runs of the same crowd. The two verdicts are the same kind of fact as the ' +
+    'counts: how this crowd’s day was graded with that press and without it, and nothing about how a day is ' +
+    'graded for any other crowd, even in this tower.';
+  const words = (text: string): number => text.split(/\s+/u).filter(Boolean).length;
+
+  it('folds the pressed day’s caveats behind one press, and loses nothing', () => {
+    expect(words(PRESSED_WHY)).toBeGreaterThan(150);
+    const parts = reportProsePartsOf(PRESSED_WHY);
+    expect(parts.rest).toBeDefined();
+    expect(words(parts.lead)).toBeLessThanOrEqual(REPORT_PROSE_BUDGET.whole);
+    expect(`${parts.lead} ${parts.rest ?? ''}`).toBe(PRESSED_WHY);
+  });
+
+  it('draws a paragraph inside the budget whole, and a one-sentence paragraph whole at any length', () => {
+    const short = 'Floor 3 stacked 4 deep. The landing-queue goal allowed 32, so this stayed inside it.';
+    expect(reportProsePartsOf(short)).toEqual({ lead: short, rest: undefined });
+    const oneSentence = Array.from({ length: 90 }, () => 'word').join(' ');
+    expect(reportProsePartsOf(oneSentence)).toEqual({ lead: oneSentence, rest: undefined });
   });
 });
 

@@ -446,7 +446,7 @@ export function sittingLengthPhrase(span: SittingSpan, noun = ''): string {
 const SCENARIO_HUB_SPAN: SittingSpan = unionOf(SITTING_SPANS.contractDay, SITTING_SPANS.fixCase);
 
 /**
- * **A day as the brief measures it** — *about 2-3 min a day at 4×* since [§ D1493](../../../../DECISIONS.md) (*about 7-12* before it) — [§ D1383](../../../../DECISIONS.md),
+ * **A day as the brief measures it** — *about 2-4 min a day at 4×* since [§ D1506](../../../../DECISIONS.md) (*about 2-3* after [§ D1493](../../../../DECISIONS.md), *about 7-12* before it) — [§ D1383](../../../../DECISIONS.md),
  * the post-AN panel's seat B (lost moment 2). The menu and the hub quoted {@link SCENARIO_HUB_SPAN}'s
  * ends, *1 min-1 h 49*: a floor no day reaches and a reference tower nobody opens on, beside a brief
  * saying *about 12 min of watching at 4×*. This is the brief's own measurement

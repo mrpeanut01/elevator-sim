@@ -1910,6 +1910,7 @@ describe('the § 7 goal strip', () => {
 
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { parseBuilding, resolveBuilding } from '@elevator-sim/core/browser';
 import { DATA_DIR } from '../fixtures.test-helper.js';
 import { RESOURCES } from '../scope/probes.test-helper.js';
@@ -1917,7 +1918,9 @@ import {
   STAGE_CAMERAS,
   STAGE_PLAY_CONTROL,
   legibleFloorCount,
-  stageBuildingWantsBringing,
+  stageBuildingScrollOf,
+  stageCallAnsweredLineOf,
+  stageRecomputingLineOf,
   stageCameraChipsOf,
   stageCameraWindowOf,
   stageFloorJumpOptionsOf,
@@ -2335,17 +2338,50 @@ describe('the stage’s own state — wave AO, lane AO-4', () => {
 
   /*
    * Seat B (defect 9), measured on the bundle at 390×844: the canvas at y 756–1262 under a bar from
-   * y 725 after the header's Play. A desktop stage showing four fifths of it is left alone.
+   * y 725 after the header's Play. Wave AQ (§ D1508), the playtest at 1280×800: a canvas at y 411–951
+   * under a region ending at 744 showed floors 20 to about 6 and never the lobby's queue, and wave
+   * AO's half-in-view rule left it there.
    */
-  it('brings the building into view only when less than half of it can be seen', () => {
+  it('scrolls just far enough to put the lobby rows in view, and leaves a stage whose lobby shows', () => {
     const phoneRegion = { top: 50, bottom: 725 };
-    expect(stageBuildingWantsBringing({ top: 756, bottom: 1262 }, phoneRegion)).toBe(true);
-    expect(stageBuildingWantsBringing({ top: 219, bottom: 725 }, phoneRegion)).toBe(false);
-    expect(stageBuildingWantsBringing({ top: 411, bottom: 951 }, { top: 0, bottom: 844 })).toBe(false);
-    /* Exactly half is being watched. */
-    expect(stageBuildingWantsBringing({ top: 0, bottom: 200 }, { top: 100, bottom: 900 })).toBe(false);
+    expect(stageBuildingScrollOf({ top: 756, bottom: 1262 }, phoneRegion)).toBe(537);
+    expect(stageBuildingScrollOf({ top: 219, bottom: 725 }, phoneRegion)).toBe(0);
+    /* Red before: wave AO left this alone, because seven eighths of it showed. */
+    expect(stageBuildingScrollOf({ top: 411, bottom: 951 }, { top: 0, bottom: 744 })).toBe(207);
+    /* A reader who scrolled up to the top floors, lobby still showing, is not moved. */
+    expect(stageBuildingScrollOf({ top: -100, bottom: 600 }, { top: 0, bottom: 744 })).toBe(0);
+    /* A canvas scrolled wholly above the region is brought back down to it. */
+    expect(stageBuildingScrollOf({ top: -900, bottom: -400 }, { top: 0, bottom: 744 })).toBe(-1144);
     /* A box with no height, or a region with none, asks for nothing. */
-    expect(stageBuildingWantsBringing({ top: 10, bottom: 10 }, phoneRegion)).toBe(false);
-    expect(stageBuildingWantsBringing({ top: 756, bottom: 1262 }, { top: 0, bottom: 0 })).toBe(false);
+    expect(stageBuildingScrollOf({ top: 10, bottom: 10 }, phoneRegion)).toBe(0);
+    expect(stageBuildingScrollOf({ top: 756, bottom: 1262 }, { top: 0, bottom: 0 })).toBe(0);
   });
 });
+
+/*
+ * Wave AQ, lane AQ-2, the playtest's P3 (GitHub issue #631): after a call was answered the card
+ * vanished behind *recomputing the day from the start…* with nothing to say the press was heard.
+ */
+describe('the beat after an answer says what was chosen', () => {
+  it('names each answer in the button’s own words', () => {
+    expect(stageCallAnsweredLineOf({ label: 'Park the cars in the lobby' })).toBe('Your answer: Park the cars in the lobby');
+    expect(stageCallAnsweredLineOf({ label: 'Switch to Fairness first' })).toBe('Your answer: Switch to Fairness first');
+    expect(stageCallAnsweredLineOf({ label: 'Leave them' })).toBe('Your answer: Leave them');
+  });
+
+  it('puts the line before the beat after an answer, and leaves any other beat as it was', () => {
+    expect(stageRecomputingLineOf('Your answer: Park the cars in the lobby')).toBe(
+      'Your answer: Park the cars in the lobby · recomputing the day from the start…',
+    );
+    expect(stageRecomputingLineOf(undefined)).toBe(STAGE_RECOMPUTING);
+  });
+
+  it('is what the stage draws: the answer hands its line to the beat, and the status reads it', () => {
+    const source = readFileSync(fileURLToPath(new URL('./stageScreen.ts', import.meta.url)), 'utf8');
+    expect(source).toContain('const said = stageCallAnsweredLineOf(option);');
+    expect(source.match(/\n\s+said,\n/gu)?.length).toBe(2);
+    expect(source).toContain('statusText.textContent = stageRecomputingLineOf(answeredLine);');
+    expect(source).not.toContain('statusText.textContent = STAGE_RECOMPUTING;');
+  });
+});
+

@@ -40,7 +40,7 @@
 
 import { dayWordsFor } from '../mode/glossary.js';
 import { HISTORY_DAYS } from '../shift/week.js';
-import { dayVerdictOf } from '../shift/weekStake.js';
+import { dayVerdictOf, WEEK_LENGTH, weekDealOf, weekStripTargetOf } from '../shift/weekStake.js';
 import { weekBookingsLineOf, weekUnderWayHarderLineOf, type BookingClock } from '../shift/nextWeek.js';
 import { weeksHeldLineOf, type WeekRecord } from '../shift/weekRecord.js';
 import type { DayOutcome, WeekState } from '../shift/types.js';
@@ -73,6 +73,20 @@ export interface DoorDayChip {
   /** *today · clean day*, *today · not closed yet*, *missed*, *clean day · showing*, *not played*. */
   readonly note: string;
   readonly selected: boolean;
+}
+
+/**
+ * **A day of the week still to come** — GitHub issue #631, wave AQ lane AQ-4. Drawn after today on
+ * the strip, empty and inert: it is a slot, not a day anybody can open yet.
+ */
+export interface DoorUpcomingSlot {
+  readonly day: number;
+  /** `WED`, as a chip's. */
+  readonly weekday: string;
+  /** Always the em dash: nothing has been played. */
+  readonly score: string;
+  /** `to play`, or `to play · not counted` on a day the census does not count. */
+  readonly note: string;
 }
 
 /** § 6.1's three numbered steps. */
@@ -134,6 +148,13 @@ export interface DoorScreenView {
   };
   readonly weekHeading: string;
   readonly chips: readonly DoorDayChip[];
+  /** The days after today through the week's last, empty — GitHub issue #631. Empty on the last day. */
+  readonly upcoming: readonly DoorUpcomingSlot[];
+  /**
+   * **The week's target on the strip** — `shift/weekStake.ts#weekStripTargetOf`, the numbers the
+   * brief's `weekStakeLineOf` states — or `undefined` where the census sets no target. Issue #631.
+   */
+  readonly stripTarget: string | undefined;
   /** § 6.1's *One tower a day…* line, under the stepper. */
   readonly rule: string;
   /**
@@ -404,6 +425,22 @@ function chipsOf(input: DoorScreenInput): readonly DoorDayChip[] {
   return Object.freeze(chips);
 }
 
+/** The days still to come, after today through the week's last — {@link DoorScreenView.upcoming}. */
+function upcomingOf(week: WeekState): readonly DoorUpcomingSlot[] {
+  const dealt = weekDealOf(week)?.days;
+  const slots: DoorUpcomingSlot[] = [];
+  for (let day = week.day + 1; day <= WEEK_LENGTH; day += 1) {
+    const counts = dealt?.[day - 1]?.counts;
+    slots.push({
+      day,
+      weekday: shortWeekday(week.dayIdx + (day - week.day)),
+      score: EM_DASH,
+      note: counts === false ? 'to play · not counted' : 'to play',
+    });
+  }
+  return Object.freeze(slots);
+}
+
 /**
  * **The strip starts on the week's first day** — wave AO, lane AO-4, the post-AN panel's seat B (lost
  * moment 3). The strip always drew seven slots, so a Tuesday drew five blank *before this week* tiles
@@ -519,7 +556,8 @@ function primaryOf(input: DoorScreenInput, chips: readonly DoorDayChip[]): DoorP
     }
     return {
       label: 'Set up today',
-      note: 'Pick who drives, then run it.',
+      /* GitHub issue #626's leftover (wave AQ, AQ-1): a held driver is not picked today. */
+      note: input.today.driverHeld === undefined ? 'Pick who drives, then run it.' : DOOR_PRIMARY_NOTE_HELD,
       inert: false,
       goes: 'today',
       again: undefined,
@@ -581,6 +619,21 @@ export const DOOR_DRIVER_NOTE = 'Change it on the brief, which is the next scree
 export const DOOR_DRIVER_NOTE_HELD =
   'Held until the stage’s call is answered; the brief, which is the next screen, says why.';
 
+/**
+ * **Step 1 and the footer on a day whose driver is held** — GitHub issue #626's leftover, wave AQ
+ * lane AQ-1. *"Pick who drives"* and *"Pick who drives, then run it"* sat beside *"Held until the
+ * stage's call is answered"* on the same screen. On that day the step says who drives instead, and
+ * the footer says what the press does.
+ */
+export const DOOR_STEP_ONE_HELD: DoorStep = Object.freeze({
+  n: '1',
+  head: 'Who drives',
+  body: 'Today the tower’s own standing order drives until the stage’s call is answered. You pick on any other day.',
+});
+
+/** The § 3.3 note on today's press while its driver is held. */
+export const DOOR_PRIMARY_NOTE_HELD = 'Open the brief, then run it. The tower’s own order drives today.';
+
 /** § 6.1, resolved. Total: every arm answers something a player can read. */
 export function doorScreenViewOf(input: DoorScreenInput): DoorScreenView {
   const earliest = earliestOffsetOf(input.week);
@@ -594,10 +647,14 @@ export function doorScreenViewOf(input: DoorScreenInput): DoorScreenView {
     input.today.crowdIsPinned,
     input.today.crowdIsDerived === true,
   );
+  const steps =
+    input.today.driverHeld === undefined
+      ? DOOR_STEPS
+      : DOOR_STEPS.map((step, index) => (index === 0 ? DOOR_STEP_ONE_HELD : step));
   const printed = [
     DOOR_RULE,
     input.today.lede,
-    ...DOOR_STEPS.map((step) => step.body),
+    ...steps.map((step) => step.body),
     input.today.seedLine,
     input.today.firstSessionLine ?? '',
     sameForEveryone,
@@ -619,15 +676,17 @@ export function doorScreenViewOf(input: DoorScreenInput): DoorScreenView {
       // § 6.1: *"The forward arrow dims at 0."*
       forwardEnabled: offset < 0,
     },
-    weekHeading: 'THE WEEK SO FAR',
+    weekHeading: 'THIS WEEK',
     chips,
+    upcoming: upcomingOf(input.week),
+    stripTarget: weekStripTargetOf(input.week),
     rule: DOOR_RULE,
     words: dayWords.map((entry) => entry.plain),
     wordsHeading: doorWordsHeadingOf(dayWords.map((entry) => entry.term)),
     lede: input.today.lede,
     world: WORLD_BAND,
     stepsHeading: 'WHAT THE JOB IS',
-    steps: DOOR_STEPS,
+    steps,
     driver: {
       heading: 'DRIVING TODAY',
       name: input.today.driver,

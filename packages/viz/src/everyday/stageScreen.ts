@@ -83,7 +83,7 @@ import type { LiveObservations } from '../live/types.js';
 import type { GoalState } from '../shift/types.js';
 import { actionBarFor, type ActionBarModel } from './actionBar.js';
 import { RUSH_NOT_LANDED, rushStageHeaderOf } from './rush.js';
-import { RUSH_STREAM } from './rushScreenModel.js';
+import { RUSH_END_ASK_COPY, RUSH_STREAM } from './rushScreenModel.js';
 import type { EverydayHost } from './host.js';
 import { SCREEN_NAMES, type EverydayScreenModule } from './screens.js';
 import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.js';
@@ -95,6 +95,8 @@ import {
   STAGE_INTERVENTIONS,
   STAGE_RACE_PICKER_LABEL,
   STAGE_RECOMPUTING,
+  stageCallAnsweredLineOf,
+  stageRecomputingLineOf,
   STAGE_SPEEDS,
   STAGE_SWITCH_PICKER_LABEL,
   STAGE_SWITCH_PICKER_NOTE,
@@ -121,7 +123,7 @@ import {
   stageMayAdopt,
   stageOpeningLineOf,
   STAGE_OVERLAY_PLAY,
-  stageBuildingWantsBringing,
+  stageBuildingScrollOf,
   stageLitSpeedOf,
   stagePlayControlOf,
   stageHandoverVerdictOf,
@@ -149,7 +151,10 @@ import {
   stageSkipLineOf,
   stageSkipOf,
   type StagePaceReason,
-  watchedRealAfter,
+  FRESH_PACE_COUNTERS,
+  paceCountersAfter,
+  type PaceCounters,
+  type StagePace,
   worstWaitLossBeginsOf,
 } from './stagePace.js';
 /* Wave AI, § D1029 — the pinned day's call. */
@@ -449,8 +454,9 @@ function mountStage(
    * frame they were last counted at and its speed, and whether a chip pressed while the stage played
    * on has set the allowance aside until the next call.
    */
-  let watchedRealS = 0;
-  let watchedFrame: { readonly atS: number; readonly simPerRealS: number } | undefined;
+  let paceCounters: PaceCounters = FRESH_PACE_COUNTERS;
+  /* Wave AQ, lane AQ-2 (§ D1506): the last paced frame, whose answer the counters advance by. */
+  let watchedFrame: { readonly atS: number; readonly simPerRealS: number; readonly pace: StagePace } | undefined;
   let watchAllowanceOff = false;
   /** When a chip was pressed on this day — § D991 clause 2 as § D1029 amends it. */
   let playerChoseSpeedAtS: number | undefined;
@@ -535,6 +541,8 @@ function mountStage(
    * only signal the façade offers and the correct one — § 1.4's re-simulation keeps the `runId`.
    */
   let recomputingOver: VizRecording | undefined;
+  /** Wave AQ, lane AQ-2: what the player chose, when the recomputing beat follows a call's answer. */
+  let answeredLine: string | undefined;
   /**
    * **The parking press whose re-simulation is in flight, and the verdict on the last one that
    * landed** — GitHub issue #588, [§ D1278](../../../../DECISIONS.md).
@@ -699,6 +707,8 @@ function mountStage(
   figures.style.cssText = `display:flex;flex-wrap:wrap;gap:${String(GAP.section)}px;margin-left:auto`;
 
   const playButton = el(doc, 'button', 'everyday-stage-play');
+  /** {@link focusPlayOnRushEntry}'s once-only flag, here so no early call meets it uninitialised. */
+  let rushEntryFocusPending = context.ctx === 'rush';
   playButton.type = 'button';
   playButton.style.cssText = [
     `background:${C.sun}`,
@@ -1161,6 +1171,12 @@ function mountStage(
   const interventionButtons = STAGE_INTERVENTIONS.map((arm) => {
     const button = el(doc, 'button', 'everyday-stage-intervene', arm.label);
     button.type = 'button';
+    /*
+     * Disabled until a run is on this stage — wave AQ, lane AQ-3. {@link intervene} does nothing
+     * without one, and a tab whose run was refused (another tab holds the week's day) drew both arms
+     * pressable over a press that did nothing. {@link draw} enables them once a run is adopted.
+     */
+    button.disabled = true;
     button.dataset['interventionKind'] = arm.change.kind;
     button.title = arm.explains;
     button.style.cssText = ARM_BUTTON_CSS;
@@ -1261,6 +1277,8 @@ function mountStage(
   }
   const switchButton = el(doc, 'button', 'everyday-stage-intervene');
   switchButton.type = 'button';
+  /* Disabled until a run is on this stage, for the parking arms' reason above. */
+  switchButton.disabled = true;
   switchButton.dataset['interventionKind'] = 'adopt-dispatcher';
   switchButton.style.cssText = ARM_BUTTON_CSS;
   /** The handover row as of the last {@link draw} — the model's, never composed here. */
@@ -1581,6 +1599,56 @@ function mountStage(
   skipAskInner.append(skipAskQuestion, skipAskConsequence, skipAskRow);
   skipAsk.append(skipAskInner);
   callCard.append(callBody, closeAsk, skipAsk);
+  /*
+   * **The rush's end asks once** — wave AQ, lane AQ-3, the post-AP playtest. Drawn under the header
+   * in a rush only, hidden by its attribute alone (layout on an inner row, for `callBody`'s reason).
+   * Words: `rushScreenModel.ts#RUSH_END_ASK_COPY`.
+   */
+  const endAsk = el(doc, 'div', 'everyday-stage-end-confirm');
+  endAsk.hidden = true;
+  endAsk.setAttribute('role', 'group');
+  endAsk.setAttribute('aria-label', RUSH_END_ASK_COPY.question);
+  const endAskInner = el(doc, 'div');
+  endAskInner.style.cssText = [
+    'display:grid;gap:7px',
+    `border:1.5px solid ${C.ink}`,
+    `border-radius:${String(R.row)}px`,
+    `background:${C.card}`,
+    'padding:12px 14px',
+  ].join(';');
+  const endAskQuestion = el(doc, 'p', 'everyday-stage-end-confirm-question', RUSH_END_ASK_COPY.question);
+  endAskQuestion.style.cssText = closeAskQuestion.style.cssText;
+  const endAskConsequence = el(doc, 'p', undefined, RUSH_END_ASK_COPY.consequence);
+  endAskConsequence.style.cssText = closeAskConsequence.style.cssText;
+  const endAskRow = el(doc, 'div');
+  endAskRow.style.cssText = closeAskRow.style.cssText;
+  const endAskGo = el(doc, 'button', 'everyday-stage-end-confirm-go', RUSH_END_ASK_COPY.end);
+  endAskGo.type = 'button';
+  endAskGo.style.cssText = ARM_BUTTON_CSS + ';min-height:44px';
+  const endAskBack = el(doc, 'button', 'everyday-stage-end-confirm-back', RUSH_END_ASK_COPY.keep);
+  endAskBack.type = 'button';
+  endAskBack.style.cssText = ARM_BUTTON_CSS + ';min-height:44px';
+  /** Whether the stage was playing when the ask went up, so *Keep playing* plays on. */
+  let endAskResume = false;
+  endAskGo.addEventListener('click', () => {
+    endRushNow();
+  });
+  endAskBack.addEventListener('click', () => {
+    endAsk.hidden = true;
+    if (endAskResume && playback !== undefined && playback.state !== 'playing') togglePlay();
+    endAskResume = false;
+    syncTransport();
+  });
+  endAskRow.append(endAskGo, endAskBack);
+  endAskInner.append(endAskQuestion, endAskConsequence, endAskRow);
+  endAsk.append(endAskInner);
+  /** § 9.2's *End the rush*: stopped by hand, at the playhead, and straight to its own result. */
+  function endRushNow(): void {
+    endAsk.hidden = true;
+    playback?.pause();
+    host.endRush(playback?.simTimeS ?? adopted?.startedAt ?? 0);
+    context.go('report');
+  }
   let callCardKey = '';
 
   /*
@@ -1872,6 +1940,17 @@ function mountStage(
     interventions,
     race,
   );
+  /*
+   * **In a rush the choice chips sit under the header** — wave AQ, lane AQ-3, the post-AP playtest:
+   * under the building they were below the fixed footer at 1280×600 and below the fold on a 390×844
+   * phone, so the rush's only choices were out of reach while the climb ran. A rush has no call card,
+   * goals or race to keep above them. Every other context keeps its order. Recorded here under
+   * [§ D405](../../../../DECISIONS.md).
+   */
+  if (context.ctx === 'rush') {
+    root.insertBefore(interventions, header.nextSibling);
+    root.insertBefore(endAsk, header.nextSibling);
+  }
   region.append(root);
 
   /* ------------------------------------------------------------- behaviour */
@@ -1944,8 +2023,9 @@ function mountStage(
    * **Keep the building in view while the day plays** — wave AO, lane AO-4, the post-AN panel's seat
    * B (lost moment 9, defect 9), [§ D1385](../../../../DECISIONS.md) clause 4. Asked when a press sets the day playing: on a phone the header's
    * *▶ Play* sits above the goals, and the canvas under them was below the fixed bar for the whole of
-   * the day it started. `stageScreenModel.ts#stageBuildingWantsBringing` decides, so a desktop stage
-   * that already shows most of its building is not scrolled under the reader.
+   * the day it started. `stageScreenModel.ts#stageBuildingScrollOf` decides: since wave AQ
+   * ([§ D1508](../../../../DECISIONS.md)) it keeps the canvas's bottom, the lobby rows, in view, and a
+   * stage whose lobby already shows is not scrolled under the reader.
    *
    * **On the next frame, never inside the press** ({@link bringBuildingPending}): the shell keeps the
    * region's offset across the first re-render after a player's press (`shell.ts#keepScrollAcrossRerender`),
@@ -1957,7 +2037,9 @@ function mountStage(
     const shown = region.getBoundingClientRect();
     const viewportBottom = view?.innerHeight ?? doc.documentElement.clientHeight;
     const seen = { top: Math.max(0, shown.top), bottom: Math.min(viewportBottom, shown.bottom) };
-    if (stageBuildingWantsBringing(box, seen)) canvas.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    /* Wave AQ, lane AQ-2 (§ D1508): the lobby rows, where the day's deepest queue usually stands. */
+    const by = stageBuildingScrollOf(box, seen);
+    if (by !== 0) region.scrollTop += by;
   }
 
   function setSpeed(index: number): void {
@@ -1973,7 +2055,7 @@ function mountStage(
      */
     playerChoseSpeedAtS = paceScored && lastPaceReason === 'watching' ? undefined : (playback?.simTimeS ?? 0);
     /* § D1493: a chip press is a decision; pressed while the stage played on, it stands to the next call. */
-    watchedRealS = 0;
+    paceCounters = { ...paceCounters, watchedRealS: 0 };
     if (lastPaceReason === 'unheld') watchAllowanceOff = true;
     /* Lane AO-4: a chip press is a state of the player's making, so a skip's line from before it is over. */
     if (skipLine !== '') {
@@ -2027,8 +2109,8 @@ function mountStage(
       return;
     }
     if (watchedFrame !== undefined) {
-      watchedRealS = watchedRealAfter(watchedRealS, {
-        reason: lastPaceReason,
+      paceCounters = paceCountersAfter(paceCounters, {
+        pace: watchedFrame.pace,
         fromS: watchedFrame.atS,
         toS: simTimeS,
         simPerRealS: watchedFrame.simPerRealS,
@@ -2044,13 +2126,14 @@ function mountStage(
       callAtS: activeCall()?.call.atS,
       scored: paceScored,
       lostAtS,
-      watchedRealS: watchAllowanceOff ? undefined : watchedRealS,
+      watchedRealS: watchAllowanceOff ? undefined : paceCounters.watchedRealS,
+      lingerRealS: paceCounters.lingerRealS,
     });
     lastPaceReason = answer.reason;
-    watchedFrame = { atS: simTimeS, simPerRealS: answer.simPerRealS };
+    watchedFrame = { atS: simTimeS, simPerRealS: answer.simPerRealS, pace: answer };
     /* § D1493: a call raised, or waited at, or answered, is a decision, and the allowance starts again. */
     if (answer.reason === 'call') {
-      watchedRealS = 0;
+      paceCounters = FRESH_PACE_COUNTERS;
       watchAllowanceOff = false;
     }
     /* § D1169: a chip pressed while fast stands until somebody next waits a minute, and not past it. */
@@ -2469,21 +2552,31 @@ function mountStage(
     showCallCard(false);
     started = true;
     waitingOnCall = false;
+    /* Wave AQ, lane AQ-2: the recomputing beat after an answer says what was chosen. */
+    const said = stageCallAnsweredLineOf(option);
     if (standing.pinned) {
       callAnswered = true;
       host.notePinnedCallDone();
       if (change !== undefined) {
-        withRecomputeBeat(current, () => {
-          host.intervene(call.atS, change);
-        });
+        withRecomputeBeat(
+          current,
+          () => {
+            host.intervene(call.atS, change);
+          },
+          said,
+        );
       }
     } else if (option.answer === 'leave') {
       host.answerDayCall('leave');
     } else {
       /* § D1167: a driver answer adopts the handover run the session made, as a parking answer does. */
-      withRecomputeBeat(current, () => {
-        host.answerDayCall(option.answer);
-      });
+      withRecomputeBeat(
+        current,
+        () => {
+          host.answerDayCall(option.answer);
+        },
+        said,
+      );
       /*
        * The adoption is synchronous, so the beat has already ended on the new recording. If the host
        * refused the answer (a run it did not make stands, or one is in flight), nothing was adopted
@@ -2646,7 +2739,8 @@ function mountStage(
    * beat rather than freezing silently*, and the freeze starts here. It comes down when the host
    * notifies with a different recording ({@link adopt}).
    */
-  function withRecomputeBeat(current: VizRecording, press: () => void): void {
+  function withRecomputeBeat(current: VizRecording, press: () => void, answered?: string): void {
+    answeredLine = answered;
     recomputingOver = current;
     barFacts.recomputing = true;
     context.refreshBar();
@@ -2928,10 +3022,10 @@ function mountStage(
      */
     paceHorizon = context.ctx !== 'rush' ? host.runHorizon() : 'period';
     paceActs = actsOf(recording.demandPhases);
-    paceScored = context.ctx === 'daily';
+    paceScored = scoredPaceIn(context.ctx);
     if (resumeAtS === undefined) lastPaceReason = undefined;
     /* § D1493: a new recording is a new day, or the run an answer just made; either way nothing is owed. */
-    watchedRealS = 0;
+    paceCounters = FRESH_PACE_COUNTERS;
     watchedFrame = undefined;
     watchAllowanceOff = false;
     /* § D1212: a fresh day has skipped nothing; a re-simulation keeps the line it had. */
@@ -3014,6 +3108,19 @@ function mountStage(
    */
   function watchingNow(): WatchingView | undefined {
     return context.ctx === 'watch' ? host.watching()?.view : undefined;
+  }
+
+  /**
+   * **After *Start the rush*, keyboard focus lands on *Play*** — wave AQ, lane AQ-3, the post-AP
+   * playtest: the setup screen's primary is unmounted by the press and focus fell to the page body.
+   * Once, when the round's run is on the stage and *Play* can be pressed, and only if focus is still
+   * nowhere, so a player who has already moved it keeps it. Recorded here under § D405.
+   */
+  function focusPlayOnRushEntry(): void {
+    if (!rushEntryFocusPending || adopted === undefined || playButton.disabled) return;
+    rushEntryFocusPending = false;
+    const active = doc.activeElement;
+    if (active === null || active === doc.body || active === doc.documentElement) playButton.focus({ preventScroll: true });
   }
 
   /**
@@ -3110,6 +3217,7 @@ function mountStage(
 
   function syncTransport(): void {
     const playing = playback?.state === 'playing';
+    focusPlayOnRushEntry();
     /*
      * § 3.3's row hears the day run out — GitHub issue **#287**'s fourth criterion.
      *
@@ -3256,13 +3364,13 @@ function mountStage(
     }
     if (adopted === undefined) {
       statusText.textContent =
-        recomputingOver !== undefined ? STAGE_RECOMPUTING : STAGE_AWAITING_RUN;
+        recomputingOver !== undefined ? stageRecomputingLineOf(answeredLine) : STAGE_AWAITING_RUN;
       startButton.style.display = 'none';
       status.style.display = 'flex';
       return;
     }
     if (recomputingOver !== undefined) {
-      statusText.textContent = STAGE_RECOMPUTING;
+      statusText.textContent = stageRecomputingLineOf(answeredLine);
       startButton.style.display = 'none';
       status.style.display = 'flex';
       return;
@@ -3450,7 +3558,12 @@ function mountStage(
   /** One paint: the header, the cutaway, the alarm, the strip. */
   function draw(): void {
     const recording = adopted;
-    if (recording === undefined || playback === undefined) return;
+    if (recording === undefined || playback === undefined) {
+      /* No run on this stage: no press can act, so none is offered — the parking arms' reason. */
+      for (const button of interventionButtons) button.disabled = true;
+      switchButton.disabled = true;
+      return;
+    }
     const simTimeS = playback.simTimeS;
     const observations: LiveObservations = observationsAt(recording, simTimeS);
     pace(simTimeS, observations.longestCurrentWaitS);
@@ -4375,11 +4488,20 @@ function mountStage(
         context.go('brief');
         return;
       }
-      /* § 9.2's *End the rush*: stopped by hand, at the playhead, and straight to its own result. */
+      /*
+       * § 9.2's *End the rush*, asked once (wave AQ, lane AQ-3): the first press pauses the climb and
+       * puts {@link endAsk} under the header with focus on *Keep playing*; a second press ends it.
+       */
       if (context.ctx === 'rush') {
-        playback?.pause();
-        host.endRush(playback?.simTimeS ?? adopted?.startedAt ?? 0);
-        context.go('report');
+        if (endAsk.hidden && adopted !== undefined) {
+          endAskResume = playback?.state === 'playing';
+          playback?.pause();
+          endAsk.hidden = false;
+          syncTransport();
+          endAskBack.focus({ preventScroll: false });
+          return;
+        }
+        endRushNow();
         return;
       }
       /*
@@ -4460,6 +4582,19 @@ export function stageEntryStartsARun(run: {
  * `stageScreen.test.ts`; its non-test callers are {@link mountStage}'s `activeCall` and its call rows.
  */
 export function dayCallsAskedIn(ctx: RunContext): boolean {
+  return ctx === 'daily' || ctx === 'campaign';
+}
+
+/**
+ * **The stage contexts paced as a scored day** ([§ D1169](../../../../DECISIONS.md)): fast while nobody
+ * on a landing has waited a minute, the player's rung while somebody has. The daily stage since
+ * § D1169, and a career day since wave AQ, lane AQ-2 ([§ D1507](../../../../DECISIONS.md)): Garden
+ * Apartments' day 1 opened on eighteen simulated minutes of empty landings, four and a half real
+ * minutes at `4×`, under *nobody has called a lift yet*. A watch, a rush and a fix case play at the
+ * player's rung. Pure and exported for `stageScreen.test.ts`; its non-test caller is
+ * {@link mountStage}'s `adopt`.
+ */
+export function scoredPaceIn(ctx: RunContext): boolean {
   return ctx === 'daily' || ctx === 'campaign';
 }
 

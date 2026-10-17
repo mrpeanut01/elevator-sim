@@ -2081,8 +2081,11 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         '`weekClosedByThisClose` (wave AM, § D1246) is a boolean for the tower’s record of weeks. ' +
         '`weekPathEndFor` and `weekAsksOf` (wave AO lane AO-5, § D1394) return a day number and a ' +
         'target count, for any Scenario week, which the sheet and the close print through the ' +
-        'producers seeded above.',
+        'producers seeded above. `weekTargetOf` (wave AQ, lane AQ-4, GitHub issue #631) returns the ' +
+        'target and the clean count, which a player reads through `weekStakeLineOf` and ' +
+        '`weekStripTargetOf`, both seeded.',
       ids: [
+        'shift/weekStake.ts#weekTargetOf',
         'shift/weekStake.ts#weekPathEndFor',
         'shift/weekStake.ts#weekAsksOf',
         'shift/weekStake.ts#weekClosedByThisClose',
@@ -2483,6 +2486,20 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'everyday/rushDeviceBest.ts#RUSH_DEVICE_BEST_KEY',
         'everyday/rushDeviceBest.ts#RUSH_DEVICE_BEST_QUARANTINE_KEY',
         'everyday/rushDeviceBest.ts#rushDeviceReplayOf',
+      ],
+    },
+    {
+      reason:
+        'Storage slots, not sentences a player meets \u2014 DECISIONS.md § D1515, wave AQ lane AQ-3. The ' +
+        'furthest round and the round-left-running mark are `localStorage` slots beside § D1420\u2019s, and ' +
+        'the two store functions are collected only through the mark\u2019s key. The words for both are ' +
+        '`rushScreenModel.ts#RUSH_FURTHEST_COPY` and `RUSH_UNFINISHED_COPY`, which the rush adapter seeds.',
+      ids: [
+        'everyday/rushDeviceFurthest.ts#RUSH_DEVICE_FURTHEST_KEY',
+        'everyday/rushDeviceFurthest.ts#RUSH_DEVICE_FURTHEST_QUARANTINE_KEY',
+        'everyday/rushDeviceStore.ts#RUSH_UNFINISHED_KEY',
+        'everyday/rushDeviceStore.ts#createRushDeviceStore',
+        'everyday/rushDeviceStore.ts#everydayRushDeviceStore',
       ],
     },
     {

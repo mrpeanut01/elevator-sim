@@ -51,7 +51,8 @@
  */
 import type { EverydayScreenModule } from './screens.js';
 import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.js';
-import { scenarioHubViewOf } from './scenarioModel.js';
+import { actionBarFor } from './actionBar.js';
+import { SCENARIO_COPY, scenarioHubViewOf } from './scenarioModel.js';
 import { onScenarioLadderProvided, scenarioLadder } from './scenarioLadderPort.js';
 import { everydayDeviceChimeStore } from './chimeStore.js';
 import { fixSpentUnitsOf } from './profile.js';
@@ -64,6 +65,12 @@ import { EVERYDAY_COLORS as C, EVERYDAY_RADII as R, EVERYDAY_TYPE as TYPE } from
  * The stages this device has been paid a clear for — § D1129 clause 4. Read off the device ledger,
  * the record the pay line itself writes to, so the hub's mark and the award are one fact.
  */
+/** The hub as this device has it now: the provided path, its clears and their kept costs. */
+function hubNow(): ReturnType<typeof scenarioHubViewOf> {
+  const progress = everydayProfileStore().progress();
+  return scenarioHubViewOf(scenarioLadder(), clearedStageIds(), (stageId) => fixSpentUnitsOf(progress, stageId));
+}
+
 function clearedStageIds(): ReadonlySet<string> {
   return new Set(
     everydayDeviceChimeStore()
@@ -84,8 +91,7 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
      * exists one seam over to fix.
      */
     /* § D1234: the kept cost of each stage's clear, which the row's par mark compares. */
-    const progress = everydayProfileStore().progress();
-    const view = scenarioHubViewOf(scenarioLadder(), clearedStageIds(), (stageId) => fixSpentUnitsOf(progress, stageId));
+    const view = hubNow();
 
     const next = el(doc, 'div', 'everyday-scenario');
     next.style.cssText = `padding:30px 32px 34px;background:linear-gradient(160deg,${C.paper},${C.paperDeep} 65%,${C.paperDeeper});min-width:0`;
@@ -131,7 +137,7 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
     next.append(list);
 
     /* ---------------------------------------------------------------- path */
-    if (view.path !== undefined) next.append(pathBlock(doc, context, view.path));
+    if (view.path !== undefined) next.append(pathBlock(doc, context, view.path, view.startHere));
 
     /* ------------------------------------------------------------ absences */
     const note = el(doc, 'p', 'everyday-scenario-note', view.note);
@@ -163,12 +169,11 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
   const stopListening = onScenarioLadderProvided(() => {
     draw();
     /*
-     * **No `context.refreshBar()` here, and the absence is the point.** The § 3.3 primary is the
-     * first *entry*, which the path does not touch — see the comment on it below — so asking for a
-     * bar redraw would be motion over a row that cannot have changed, and `shell.ts` keeps a guard
-     * for a confirm strip a redraw would wipe. A screen asks for that redraw when one of its own
-     * bar facts moves; none of this screen's do.
+     * **A bar redraw here, since wave AQ lane AQ-1.** This said there must be none, because the
+     * primary was the first *entry* and the path could not move it. A first visit's primary now
+     * opens stage 1 and names it, which needs the path, so the arrival of the path is a bar fact.
      */
+    context.refreshBar();
   });
 
   /*
@@ -178,14 +183,23 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
    *
    * It stays the first **entry** rather than the path's first stage, and that is deliberate: the
    * path's first row may be held, and a § 3.3 primary that refused would be the dead control the
-   * rows themselves are careful not to be.
+   * rows themselves are careful not to be. The one exception is a first visit with the path's first
+   * row offered (`scenarioModel.ts#ScenarioHubView.startHere`): then the press opens that stage.
    */
   const first = scenarioHubViewOf().entries[0];
-  // Spread rather than assign `undefined`: `exactOptionalPropertyTypes` is on, so an explicit
-  // `primary: undefined` is a different type from an absent one.
-  return first === undefined
-    ? { unmount: stopListening }
-    : { unmount: stopListening, primary: () => context.go(first.screen) };
+  return {
+    unmount: stopListening,
+    primary: () => {
+      /* Wave AQ lane AQ-1: a first visit's press opens stage 1, as its card's head does. */
+      const start = hubNow().startHere;
+      if (start !== undefined) {
+        openStageInFixit(start);
+        context.go('fixit');
+        return;
+      }
+      if (first !== undefined) context.go(first.screen);
+    },
+  };
 }
 
 /**
@@ -201,6 +215,7 @@ function pathBlock(
   doc: Document,
   context: EverydayScreenShellContext,
   path: NonNullable<ReturnType<typeof scenarioHubViewOf>['path']>,
+  startHere: string | undefined,
 ): HTMLElement {
   const block = el(doc, 'section', 'everyday-scenario-path');
   block.style.cssText = `margin:30px 0 0;padding:22px 0 0;border-top:1px solid ${C.rule};max-width:760px;min-width:0`;
@@ -229,8 +244,11 @@ function pathBlock(
     const card = el(doc, 'div', 'everyday-scenario-path-card');
     card.dataset.stage = row.id;
     card.dataset.playable = row.playable ? 'yes' : 'no';
+    const starts = row.id === startHere;
+    if (starts) card.dataset.startHere = 'yes';
     card.style.cssText =
-      `display:block;width:100%;text-align:left;padding:16px 18px 17px;border:1px solid ${C.rule};` +
+      `display:block;width:100%;text-align:left;padding:16px 18px 17px;` +
+      `border:${starts ? `2px solid ${C.terracotta}` : `1px solid ${C.rule}`};` +
       `border-radius:${R.card};background:${row.playable ? C.paper : 'transparent'};min-width:0`;
 
     /*
@@ -294,7 +312,22 @@ function pathBlock(
     ways.style.cssText = `font-size:13px;line-height:1.5;color:${C.inkSoft};margin:7px 0 0;max-width:58ch;text-wrap:pretty`;
 
     head.append(position, name, teaches);
-    card.append(head, opening, shape, budget, ways);
+    /*
+     * Wave AQ lane AQ-1: the budget, the census and the press's own note fold under a small
+     * disclosure, on every row alike, so a card reads as its stage and its story. Every word is still
+     * there one press away, and a held row's reason stays out of the fold below.
+     */
+    const details = el(doc, 'details', 'everyday-scenario-path-details');
+    details.style.cssText = 'margin:8px 0 0;min-width:0';
+    const summary = el(doc, 'summary', 'everyday-scenario-path-details-summary', SCENARIO_COPY.pathDetails);
+    summary.style.cssText = `font:500 12px ${TYPE.body};color:${C.inkSoft};cursor:pointer;min-height:24px;padding:3px 0`;
+    details.append(summary, budget, ways);
+    if (row.playable && row.note !== undefined) {
+      const line = el(doc, 'div', 'everyday-scenario-path-note', row.note);
+      line.style.cssText = `font-size:13px;line-height:1.5;color:${C.inkSoft};margin:9px 0 0;max-width:58ch;text-wrap:pretty`;
+      details.append(line);
+    }
+    card.append(head, opening, shape);
 
     if (row.cleared !== undefined) {
       card.dataset.cleared = 'yes';
@@ -314,12 +347,12 @@ function pathBlock(
       card.append(note);
     }
 
-    const tail = row.playable ? row.note : row.refusal;
-    if (tail !== undefined) {
-      const line = el(doc, 'div', row.playable ? 'everyday-scenario-path-note' : 'everyday-scenario-path-refusal', tail);
+    if (!row.playable && row.refusal !== undefined) {
+      const line = el(doc, 'div', 'everyday-scenario-path-refusal', row.refusal);
       line.style.cssText = `font-size:13px;line-height:1.5;color:${C.inkSoft};margin:9px 0 0;max-width:58ch;text-wrap:pretty`;
       card.append(line);
     }
+    card.append(details);
 
     item.append(card);
     rows.append(item);
@@ -331,4 +364,10 @@ function pathBlock(
 export const SCENARIO_SCREEN: EverydayScreenModule = {
   key: 'scenario',
   mount,
+  /* Start from the table's own row; a first visit's primary names stage 1, the press it makes. */
+  bar: (state) => {
+    const base = actionBarFor(state);
+    if (hubNow().startHere === undefined) return base;
+    return { ...base, primary: { ...base.primary, label: SCENARIO_COPY.startHere } };
+  },
 };

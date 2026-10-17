@@ -278,7 +278,36 @@ function mountDoor(
       });
       strip.body.append(button);
     }
+    /*
+     * **The rest of the week, empty, and the target** — GitHub issue #631, wave AQ lane AQ-4. Plain
+     * boxes rather than buttons: a day still to come has nothing to open, so it is not a control.
+     */
+    for (const slot of view.upcoming) {
+      const box = el(document_, 'div', 'everyday-door-chip-upcoming');
+      box.dataset['day'] = String(slot.day);
+      box.style.cssText = [
+        'padding:9px 10px',
+        `border:1.5px dashed ${C.ruleLight}`,
+        `border-radius:${String(R.row)}px`,
+        'display:grid',
+        'gap:3px',
+        'min-width:0',
+      ].join(';');
+      const day = el(document_, 'span', 'everyday-door-upcoming-day', slot.weekday);
+      day.style.cssText = MONO(10.5, C.faint);
+      const score = el(document_, 'span', 'everyday-door-upcoming-score', slot.score);
+      score.style.cssText = MONO(15, C.faint);
+      const note = el(document_, 'span', 'everyday-door-upcoming-note', slot.note);
+      note.style.cssText = `font-size:10.5px;color:${C.faint}`;
+      box.append(day, score, note);
+      strip.body.append(box);
+    }
     column.append(strip.root);
+    if (view.stripTarget !== undefined) {
+      const target = el(document_, 'p', 'everyday-door-strip-target', view.stripTarget);
+      target.style.cssText = `font:600 13px ${TYPE.heading};margin:8px 0 0;color:${C.ink}`;
+      column.append(target);
+    }
 
     /* ---- the lede (item 5) ---- */
     const title = el(document_, 'h1', 'everyday-door-title', view.title);
@@ -689,7 +718,8 @@ function doorBar(state: EverydayState): ActionBarModel {
   return {
     ...base,
     primary: { ...base.primary, label, ...(inert === undefined ? {} : { inert }) },
-    note: view !== undefined && (replay || view.primary.goes === 'tomorrow') ? view.primary.note : base.note,
+    /* The view's own note: the table's on an ordinary today, and the held day's own (wave AQ, AQ-1). */
+    note: view !== undefined ? view.primary.note : base.note,
   };
 }
 

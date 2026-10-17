@@ -12,7 +12,13 @@ import type { VizLeg } from '../contract/types.js';
 import { isWaitingAt } from '../frame/overlay.js';
 import type { DayAct } from '../shift/dayLength.js';
 
-import { BETWEEN_PEAKS_SIM_PER_REAL_S, PACE_HOLD_WAIT_S, SKIP_BEAT_REAL_S, WATCH_ALLOWANCE_REAL_S } from './stagePace.js';
+import {
+  BETWEEN_PEAKS_SIM_PER_REAL_S,
+  PACE_HOLD_WAIT_S,
+  RUNG_DWELL_REAL_S,
+  SKIP_BEAT_REAL_S,
+  WATCH_ALLOWANCE_REAL_S,
+} from './stagePace.js';
 
 /** A scored whole day as the stage plays it, read off its legs — {@link scoredDayPlayOf}. */
 export interface ScoredDayPlay {
@@ -71,12 +77,17 @@ export function scoredDayPlayOf(input: {
   const until = Math.min(input.untilS ?? input.endedAt, input.endedAt);
   const fast = Math.max(input.watchingSimPerRealS, BETWEEN_PEAKS_SIM_PER_REAL_S);
   const beatSimS = SKIP_BEAT_REAL_S * fast;
-  /* The slow set: every stretch with somebody past a minute, merged. */
+  const allowanceS = input.watchAllowanceRealS ?? WATCH_ALLOWANCE_REAL_S;
+  /*
+   * The slow set: every stretch with somebody past a minute, merged, each kept slowed for § D1506's
+   * dwell after it ends. The dwell goes with the allowance, so § D1169's uncapped hold has none.
+   */
+  const dwellSimS = Number.isFinite(allowanceS) ? RUNG_DWELL_REAL_S * input.watchingSimPerRealS : 0;
   const raw: [number, number][] = [];
   for (const leg of input.legs) {
     const left = leg.refusedAt ?? leg.boardedAt ?? input.endedAt;
     const from = leg.arrivedAt + PACE_HOLD_WAIT_S;
-    if (left > from && isWaitingAt(leg, from)) raw.push([from, left]);
+    if (left > from && isWaitingAt(leg, from)) raw.push([from, Math.min(input.endedAt, left + dwellSimS)]);
   }
   raw.sort((a, b) => a[0] - b[0]);
   const slow: [number, number][] = [];
@@ -91,7 +102,6 @@ export function scoredDayPlayOf(input: {
    * § D1493: the slow set is watched for the allowance's real seconds after each stop, and played on
    * at the fast rung past it. A stop inside a slow stretch cuts it, and the allowance starts again.
    */
-  const allowanceS = input.watchAllowanceRealS ?? WATCH_ALLOWANCE_REAL_S;
   const stops = [...input.stopsAtS].sort((a, b) => a - b);
   let stopAt = 0;
   let leftRealS = allowanceS;

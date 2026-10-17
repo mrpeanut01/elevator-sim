@@ -17,6 +17,15 @@ import {
   withRushDeviceBest,
   type RushDeviceBestRecord,
 } from './rushDeviceBest.js';
+import {
+  RUSH_DEVICE_FURTHEST_KEY,
+  RUSH_DEVICE_FURTHEST_QUARANTINE_KEY,
+  decodeRushDeviceFurthest,
+  encodeRushDeviceFurthest,
+  withRushDeviceFurthest,
+  type RushDeviceFurthest,
+  type RushDeviceFurthestRecord,
+} from './rushDeviceFurthest.js';
 import type { RushSittingBody } from './rushSitting.js';
 import type { SessionStore } from '../persist/types.js';
 
@@ -26,7 +35,27 @@ export interface RushDeviceStore {
   record(): RushDeviceBestRecord;
   /** Keep `body` as `buildingId`'s best when it held longer than the kept one. Returns whether it was kept. */
   offer(buildingId: string, body: RushSittingBody, heldS: number): boolean;
+  /**
+   * The furthest round per tower, ended by hand or at the line — `rushDeviceFurthest.ts`,
+   * [§ D1515](../../../../DECISIONS.md). A slot of its own, on the same backing.
+   */
+  furthest(): RushDeviceFurthestRecord;
+  /** Keep `entry` when it went further than the kept round. Returns whether it was kept. */
+  offerFurthest(entry: RushDeviceFurthest): boolean;
+  /**
+   * **A round was still running when the page went away** — wave AQ, lane AQ-3. The tower it ran
+   * on, written at `pagehide` (`host.ts`), read once by the next page, and cleared once said.
+   */
+  unfinished(): string | undefined;
+  markUnfinished(buildingId: string): void;
+  clearUnfinished(): void;
+  /** The tower a round is running on now, or `undefined` — what `pagehide` marks. Told by `host.ts`. */
+  setRunning(buildingId: string | undefined): void;
+  running(): string | undefined;
 }
+
+/** The slot {@link RushDeviceStore.unfinished} reads. */
+export const RUSH_UNFINISHED_KEY = 'elevator-sim.rush-unfinished.v1';
 
 function browserBacking(): SessionStore | undefined {
   if (typeof window === 'undefined') return undefined;
@@ -47,26 +76,33 @@ function browserBacking(): SessionStore | undefined {
   }
 }
 
-export function createRushDeviceStore(backing: SessionStore | undefined): RushDeviceStore {
-  let held: RushDeviceBestRecord | undefined;
+/** One slot on the backing: read once and held, quarantined when unreadable, written on change. */
+function slotOf<R>(
+  backing: SessionStore | undefined,
+  key: string,
+  quarantineKey: string,
+  decode: (raw: string | null) => { readonly record: R; readonly refused: boolean },
+  encode: (record: R) => string,
+): { readonly load: () => R; readonly save: (record: R) => void } {
+  let held: R | undefined;
   let memory: string | null = null;
 
   const read = (): string | null => {
     if (backing === undefined) return memory;
     try {
-      return backing.read(RUSH_DEVICE_BEST_KEY);
+      return backing.read(key);
     } catch {
       return null;
     }
   };
 
-  const load = (): RushDeviceBestRecord => {
+  const load = (): R => {
     if (held !== undefined) return held;
     const raw = read();
-    const loaded = decodeRushDeviceBest(raw);
+    const loaded = decode(raw);
     if (loaded.refused && raw !== null && backing !== undefined) {
       try {
-        backing.write(RUSH_DEVICE_BEST_QUARANTINE_KEY, raw);
+        backing.write(quarantineKey, raw);
       } catch {
         /* Quota or a denied write: the bytes stay where they were. */
       }
@@ -75,27 +111,84 @@ export function createRushDeviceStore(backing: SessionStore | undefined): RushDe
     return held;
   };
 
-  const save = (record: RushDeviceBestRecord): void => {
+  const save = (record: R): void => {
     held = record;
-    const bytes = encodeRushDeviceBest(record);
+    const bytes = encode(record);
     if (backing === undefined) {
       memory = bytes;
       return;
     }
     try {
-      backing.write(RUSH_DEVICE_BEST_KEY, bytes);
+      backing.write(key, bytes);
     } catch {
-      /* A full quota throws on write; the sitting in memory still draws this session. */
+      /* A full quota throws on write; the record in memory still draws this session. */
     }
   };
 
+  return { load, save };
+}
+
+export function createRushDeviceStore(backing: SessionStore | undefined): RushDeviceStore {
+  const best = slotOf(backing, RUSH_DEVICE_BEST_KEY, RUSH_DEVICE_BEST_QUARANTINE_KEY, decodeRushDeviceBest, encodeRushDeviceBest);
+  const far = slotOf(
+    backing,
+    RUSH_DEVICE_FURTHEST_KEY,
+    RUSH_DEVICE_FURTHEST_QUARANTINE_KEY,
+    decodeRushDeviceFurthest,
+    encodeRushDeviceFurthest,
+  );
+
+  let unfinishedInMemory: string | undefined;
+  let runningOn: string | undefined;
+
   return {
-    record: () => load(),
+    record: () => best.load(),
     offer: (buildingId, body, heldS) => {
-      const before = load();
+      const before = best.load();
       const next = withRushDeviceBest(before, buildingId, body, heldS);
       if (next === before) return false;
-      save(next);
+      best.save(next);
+      return true;
+    },
+    unfinished: () => {
+      if (backing === undefined) return unfinishedInMemory;
+      try {
+        const raw = backing.read(RUSH_UNFINISHED_KEY);
+        return raw === null || raw === '' ? undefined : raw;
+      } catch {
+        return undefined;
+      }
+    },
+    markUnfinished: (buildingId) => {
+      if (backing === undefined) {
+        unfinishedInMemory = buildingId;
+        return;
+      }
+      try {
+        backing.write(RUSH_UNFINISHED_KEY, buildingId);
+      } catch {
+        /* Nothing to say next time, which is what happened before this slot existed. */
+      }
+    },
+    clearUnfinished: () => {
+      unfinishedInMemory = undefined;
+      if (backing === undefined) return;
+      try {
+        backing.remove(RUSH_UNFINISHED_KEY);
+      } catch {
+        /* A denied write leaves the line to be said once more. */
+      }
+    },
+    setRunning: (buildingId) => {
+      runningOn = buildingId;
+    },
+    running: () => runningOn,
+    furthest: () => far.load(),
+    offerFurthest: (entry) => {
+      const before = far.load();
+      const next = withRushDeviceFurthest(before, entry);
+      if (next === before) return false;
+      far.save(next);
       return true;
     },
   };
@@ -107,6 +200,21 @@ let shared: RushDeviceStore | undefined;
 export function everydayRushDeviceStore(): RushDeviceStore {
   const backing = browserBacking();
   if (backing === undefined) return createRushDeviceStore(undefined);
-  shared ??= createRushDeviceStore(backing);
+  if (shared === undefined) {
+    const store = createRushDeviceStore(backing);
+    shared = store;
+    /*
+     * Wave AQ lane AQ-3: a page that goes away while a round runs marks it, so the next page can say
+     * the round was not kept. A page restored from the back-forward cache is the same round, still
+     * running, so the mark comes off again.
+     */
+    window.addEventListener('pagehide', () => {
+      const on = store.running();
+      if (on !== undefined) store.markUnfinished(on);
+    });
+    window.addEventListener('pageshow', (event) => {
+      if (event.persisted) store.clearUnfinished();
+    });
+  }
   return shared;
 }

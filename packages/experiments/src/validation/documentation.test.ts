@@ -2236,6 +2236,13 @@ type DecisionReservation = {
  */
 const OPEN_RESERVATION = null as DecisionReservation | null;
 /*
+ * **Wave AQ's reservation, D1497-D1540, is closed** in the wave's own merge commit. Four lanes built on
+ * the playtest after wave AP (#626, #631) spent five headings: D1497, D1506-D1508 and D1515. AQ-1's and
+ * AQ-2's unspent numbers below the highest heading, D1515, are registered in `KNOWN_DECISION_HOLES`;
+ * AQ-4 spent none and its block D1524-D1532, with AQ-3's D1516-D1523, sits above D1515, so
+ * **D1516-D1540 are free rather than holed** (§ D430), and the charter row moves to **D1516**.
+ */
+/*
  * **Wave AP's reservation, D1446-D1540, is closed** in the wave's own merge commit. Seven lanes (the
  * post-AO panel's two defect lanes, swarm DT's DT-1 and DT-2, and the first playtest's G-1 to G-3)
  * spent seventeen headings; DT-3's block went out and was never started. **Every number below the
@@ -3680,6 +3687,26 @@ const KNOWN_DECISION_HOLES: ReadonlyMap<number, string> = new Map([
     "wave AP's lane G-3 held D1493-D1495 and spent D1493 only. Registered under D404 and D430.",
   ],
   [1495, "wave AP's lane G-3's block; unspent for § 1494's reason."],
+  [
+    1498,
+    "wave AQ's lane AQ-1 held D1497-D1505 and spent D1497 only. Registered under D404 and D430.",
+  ],
+  [1499, "wave AQ's lane AQ-1's block; unspent for § 1498's reason."],
+  [1500, "wave AQ's lane AQ-1's block; unspent for § 1498's reason."],
+  [1501, "wave AQ's lane AQ-1's block; unspent for § 1498's reason."],
+  [1502, "wave AQ's lane AQ-1's block; unspent for § 1498's reason."],
+  [1503, "wave AQ's lane AQ-1's block; unspent for § 1498's reason."],
+  [1504, "wave AQ's lane AQ-1's block; unspent for § 1498's reason."],
+  [1505, "wave AQ's lane AQ-1's block; unspent for § 1498's reason."],
+  [
+    1509,
+    "wave AQ's lane AQ-2 held D1506-D1514 and spent D1506-D1508. Registered under D404 and D430.",
+  ],
+  [1510, "wave AQ's lane AQ-2's block; unspent for § 1509's reason."],
+  [1511, "wave AQ's lane AQ-2's block; unspent for § 1509's reason."],
+  [1512, "wave AQ's lane AQ-2's block; unspent for § 1509's reason."],
+  [1513, "wave AQ's lane AQ-2's block; unspent for § 1509's reason."],
+  [1514, "wave AQ's lane AQ-2's block; unspent for § 1509's reason."],
   [
     1030,
     "wave AI's lane AI-D held D1029-D1037 and spent D1029. Registered under D404 and D430.",

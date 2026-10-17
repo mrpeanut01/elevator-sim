@@ -69,6 +69,7 @@ import {
 } from '../campaign/stagePress.js';
 import { stageGoalNameOf, type StageReport } from '../campaign/judge.js';
 import type { CampaignStage } from '../campaign/types.js';
+import type { Frame } from '../contract/types.js';
 import { emptyFixitState, parkingPriceUnits } from '../fixit/engine.js';
 import type { EditorParkingStrategy } from '../fixit/types.js';
 import type { PriceSchedule } from '../pricing/types.js';
@@ -78,6 +79,7 @@ import type { PublishedSurvivorScenario } from '../scenario/survivors.js';
 import { statLineOf } from '../shift/contracts.js';
 import { fixitParkingRow, type FixitParkingRow } from './fixitScreenModel.js';
 import { stageParLineOf, stageParNoteOf } from './scenarioModel.js';
+import { TUTORIAL_QUIET_SIM_PER_REAL_S } from './tutorialModel.js';
 
 /** The dimension the parking select writes. The fix-it editor's own control, one id. */
 const PARKING_DIMENSION = 'idle.parkingStrategy';
@@ -214,6 +216,13 @@ export const STAGE_PLAY_COPY = Object.freeze({
   watchBaselineCaption: 'As the building has it',
   watchCandidateCaption: 'With your settings',
   watchSkip: 'Stop watching',
+  /*
+   * Wave AQ lane AQ-1: a run whose every count equals the building's own, or the last run's on other
+   * settings. Said about the counts only, which are equal exactly; nothing here claims a mean moved
+   * or did not.
+   */
+  sameAsShipped: 'Every count here is the same as the building’s own setting got, so on this stage your change moved none of them.',
+  sameAsPrevious: 'Every count here is the same as your last run got on other settings, so that change moved none of them on this stage.',
   labLink: 'Open this stage on the Engineer surface',
   labNote: 'The Engineer surface draws every dial the stage’s budget reaches and the full report. A clear there pays nothing.',
 });
@@ -372,6 +381,8 @@ export interface StagePlayVerdictFacts {
     readonly sentence: string;
     /** Judged run by run against the shipped setting's own count, so its bar is relative. */
     readonly perRun: boolean;
+    /** The judge's two counts on a judged per-run goal (`judge.ts#StageGoalVerdict.counts`). */
+    readonly counts?: { readonly yours: number; readonly shipped: number; readonly runs: number } | undefined;
   }[];
   readonly holdoutSentence: string | null;
   readonly metOnTuningSeeds: boolean;
@@ -384,6 +395,8 @@ export interface StagePlayVerdictFacts {
   readonly parPaid?: 'first' | 'again' | undefined;
   /** The budget the press was made at, where this device bought a rung for it (§ D1419). */
   readonly boughtUnits?: number | undefined;
+  /** Whose counts this run's equal, where they all do: {@link sameCountsOf}. */
+  readonly sameCounts?: 'shipped' | 'previous' | undefined;
 }
 
 /** Where a press is. */
@@ -405,6 +418,8 @@ export interface StagePlayVerdictView {
   readonly rung: string | undefined;
   readonly unlock: string | undefined;
   readonly stale: string | undefined;
+  /** That the change moved no count, against the building's setting or the last run (wave AQ, AQ-1). */
+  readonly sameCounts: string | undefined;
 }
 
 export interface StagePlayView {
@@ -651,6 +666,7 @@ export function verdictFactsOf(
       met: goal.met,
       sentence: goal.sentence,
       perRun: isPerReplicationGoal(goal.kind),
+      ...(goal.counts === undefined ? {} : { counts: goal.counts }),
     })),
     holdoutSentence: report.holdout?.sentence ?? null,
     metOnTuningSeeds: report.metOnTuningSeeds,
@@ -761,6 +777,12 @@ function verdictViewOf(facts: StagePlayFacts, verdict: StagePlayVerdictFacts, st
         : `Run at the ${String(verdict.boughtUnits)}-unit budget this device bought for this stage. A clear pays the same at any budget.`,
     unlock: verdict.cleared ? STAGE_PLAY_COPY.unlocksNothing : undefined,
     stale: stale ? STAGE_PLAY_COPY.stale : undefined,
+    sameCounts:
+      verdict.sameCounts === 'shipped'
+        ? STAGE_PLAY_COPY.sameAsShipped
+        : verdict.sameCounts === 'previous'
+          ? STAGE_PLAY_COPY.sameAsPrevious
+          : undefined,
   };
 }
 
@@ -869,7 +891,7 @@ export function stagePlayViewOf(facts: StagePlayFacts, phase: StagePlayPhase): S
     practice: facts.clearedBefore === true ? stagePracticeLineOf(facts.parUnits, facts.keptSpentUnits) : undefined,
     status: statusOf(phase, facts.replications),
     watch:
-      facts.held === undefined && (phase.kind === 'running' || phase.kind === 'judged')
+      facts.held === undefined && (phase.kind === 'running' || (phase.kind === 'judged' && !phase.stale))
         ? {
             eyebrow: STAGE_PLAY_COPY.watchEyebrow,
             note: STAGE_PLAY_COPY.watchNote,
@@ -883,4 +905,88 @@ export function stagePlayViewOf(facts: StagePlayFacts, phase: StagePlayPhase): S
     labLink: STAGE_PLAY_COPY.labLink,
     labNote: STAGE_PLAY_COPY.labNote,
   };
+}
+
+/* -------------------------------------------------------------------------- *
+ * The pair's pace
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **Whether anything is happening on the pair at this instant** — wave AQ lane AQ-1, the playtest's
+ * stage 1 finding: Garden Apartments' two cars sat idle at the Lobby for the whole of the first
+ * ten seconds. Somebody waiting, somebody aboard, a car between floors or a door not shut, on either
+ * pane. A parking move is a car between floors, so a stage about where idle cars wait shows them go.
+ */
+export function stageWatchBusy(frames: readonly Frame[]): boolean {
+  return frames.some(
+    (frame) =>
+      frame.totalWaiting > 0 ||
+      frame.cars.some((car) => car.occupants > 0 || car.direction !== 0 || car.doorPhase !== 'closed'),
+  );
+}
+
+/**
+ * **The pair's speed at a frame** — the tutorial's quiet rate (`tutorialModel.ts`) while nothing
+ * happens on either pane, and the player's own speed the moment anything does. It replaces
+ * `tutorialPaceOf` on this screen because that rule slows down only for a wait of a minute, so a
+ * stage whose riders are all served quickly crossed its whole morning at the quiet rate and showed
+ * every ride as a blink. Speed only, never the playhead: the two panes stay at one minute, and the
+ * verdict is the fifty crowds' whatever the pair plays at.
+ */
+export function stageWatchPaceOf(input: {
+  readonly frames: readonly Frame[];
+  readonly watchingSimPerRealS: number;
+}): number {
+  return stageWatchBusy(input.frames)
+    ? input.watchingSimPerRealS
+    : Math.max(input.watchingSimPerRealS, TUTORIAL_QUIET_SIM_PER_REAL_S);
+}
+
+/**
+ * **What the pair does when it reaches its end** — the playtest's second stage finding: after a miss
+ * the pair took itself away a few seconds after the verdict, leaving the verdict with nothing to
+ * read it against. It plays again from its first minute whether the batch is still counting or the
+ * verdict is in, and only the player's skip ends it; a new press, a setting that makes the verdict
+ * stale, or leaving the page replaces or removes it.
+ */
+export function stageWatchAfterEndOf(how: 'skipped' | 'ended'): 'replay' | 'drop' {
+  return how === 'skipped' ? 'drop' : 'replay';
+}
+
+/** One run's per-run counts, by goal label: what {@link sameCountsOf} compares. */
+export type StageRunCounts = ReadonlyMap<string, { readonly yours: number; readonly shipped: number; readonly runs: number }>;
+
+/** The judged per-run counts of a verdict's goals, by label. Empty when no per-run goal was judged. */
+export function stageRunCountsOf(goals: StagePlayVerdictFacts['goals']): StageRunCounts {
+  const out = new Map<string, { readonly yours: number; readonly shipped: number; readonly runs: number }>();
+  for (const goal of goals) if (goal.counts !== undefined) out.set(goal.label, goal.counts);
+  return out;
+}
+
+/**
+ * **Whether a change moved any count** — wave AQ lane AQ-1, the playtest's stage 3 finding: *Min-wait
+ * with lobby parking* and *Min-wait as it stands* both passed 10 of 50 against 28, and nothing said
+ * the parking had changed nothing a count can see.
+ *
+ * `shipped` when the player moved something (`control` false) and every judged per-run count equals
+ * the shipped setting's on the same crowds; else `previous` when the last judged run was on other
+ * settings and every count equals its count. Equal counts are a fact about the counts and no more,
+ * which is all the two sentences say.
+ */
+export function sameCountsOf(input: {
+  readonly counts: StageRunCounts;
+  readonly control: boolean;
+  readonly previous: { readonly counts: StageRunCounts; readonly sameSettings: boolean } | undefined;
+}): 'shipped' | 'previous' | undefined {
+  const rows = [...input.counts.entries()];
+  if (rows.length === 0) return undefined;
+  if (!input.control && rows.every(([, row]) => row.yours === row.shipped)) return 'shipped';
+  const previous = input.previous;
+  if (previous === undefined || previous.sameSettings || previous.counts.size !== rows.length) return undefined;
+  return rows.every(([label, row]) => {
+    const before = previous.counts.get(label);
+    return before !== undefined && before.runs === row.runs && before.yours === row.yours;
+  })
+    ? 'previous'
+    : undefined;
 }

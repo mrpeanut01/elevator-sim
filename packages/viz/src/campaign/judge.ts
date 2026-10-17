@@ -137,6 +137,12 @@ export interface StageGoalVerdict {
   readonly sentence: string;
   /** Where the bar came from, and what a count comparison is and is not. */
   readonly note: string;
+  /**
+   * A judged per-run goal's two counts, as its {@link sentence} prints them: runs your setting
+   * passed, runs the shipped setting passed, and the runs counted. Absent on every other branch.
+   * The stage page reads it to say when a change moved no count (wave AQ lane AQ-1).
+   */
+  readonly counts?: { readonly yours: number; readonly shipped: number; readonly runs: number } | undefined;
 }
 
 /**
@@ -564,6 +570,7 @@ function judgeCountGoal(
     label,
     met,
     reproduced,
+    counts: { yours: candidate.passes, shipped: target, runs: candidate.n },
     sentence:
       `Your setting passed ${String(candidate.passes)} of ${String(candidate.n)} ` +
       `${runsAre}; the shipped setting passed ${String(target)} of ${String(publishedN)} on the ` +

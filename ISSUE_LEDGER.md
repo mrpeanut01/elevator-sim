@@ -2,7 +2,7 @@
 
 One row per open issue, judged against [`GAME_PILLARS.md`](GAME_PILLARS.md). GitHub is the source of
 truth; this file is the working view. It supersedes `ISSUE_WORKER_LEDGER.md`, whose last snapshot is
-2026-08-09. Snapshot: **2026-10-17, end of cycle 1**, against main `bc668c3`. The read-only triage was done
+2026-08-09. Snapshot: **2026-10-17, cycle 2** (wave AQ, PR #632), against main `9af743e`. Cycle 1's triage was done
 by three sub-agents; their evidence (file:line) is summarised in the *next action* column.
 
 Pillars: 1 playable · 2 understandable · 3 simple · 4 engaging during a run.
@@ -11,15 +11,22 @@ Pillars: 1 playable · 2 understandable · 3 simple · 4 engaging during a run.
 
 | task | issue | branch | state |
 |---|---|---|---|
-| none | | | cycle 1 is closed |
+| none | | | wave AQ's four lanes are merged on PR #632 |
 
-**Do not collide with PR #622** (wave AP, paused by the owner). It touches `packages/viz/src/everyday/*`,
-`shift/*` (including `goals.ts`), `data/week-pool.json` and `campaign/career.ts`. It also reserved
-decisions **D1445–D1540**, which overlap § D1445 (the lobby) on main; this cycle uses D1541 and up.
+## Done this cycle
 
-## Done this cycle (on PR #624)
+Wave AP merged (#622): the first call in about 60 s, a day in about 4 min, a lost day that stops at every speed.
+A three-persona playtest then re-checked #626 (comment on #626) and filed #631. Wave AQ (PR #632) fixed:
+the stage's watched pair in view and kept, stage 1 moving from its first second, "your change moved no count",
+folded path cards, held-driver copy (AQ-1); steady speed rungs, the career day's quiet crossed, the lobby rows in
+view, the answer named (AQ-2); Rush's furthest kept, a lost round said, chips in view, End asks once (AQ-3);
+the report's verdict as headline, the week strip with every day and its target, identical call rows said once (AQ-4).
 
-#590 re-measured, with all five rows in band at n = 50 · #232 AC4's field-reach audit · #625 item 1's loader warning · playtest defects 3, 4 and 5 in the lobby · AX-3 CI robustness. Measurements posted on #234 (stage 3) and #440 (cost probe).
+**Left open from the playtest:** long quiet stretches (a rung above 30× reopens § D991's refusal, so it is the
+owner's call); a passing readout's tone while the day runs (§ D1381 forbids it); stage 2's brief copy (editing
+`data/campaign.json` moves the survivor census's input hash, which covers prose the census never reads); the
+rail's "MID-DAY" with no clock; Rush's Lobby and Garage queues below the fold on a phone; "Switch to Engineer"
+clipped at 1280×600.
 
 ## Build now
 
@@ -27,10 +34,10 @@ decisions **D1445–D1540**, which overlap § D1445 (the lobby) on main; this cy
 |---|---|---|---|---|
 | 628 | Census sampler and press price destination panels differently | P2 | 1 | **Fixed** on PR #624, with no published count moved. Open for the owner: should a weight that opens at its default of 0 cost 2 u? A cleaner sampler would regenerate four cells, which is a decision |
 | 232 | Building set to the content-plan target | P1 | 2, 4 | **AC4 done** on PR #624 (`buildingFieldReach.test.ts`), with three inert fields filed as #625. AC1 has 17 of 22 buildings. AC2: owner sign-off on harbour-point and ashgate |
-| 590 | Re-measure five rungs at n = 50 | P2 | 4 | **Done** on PR #624: all five are in band at 50 (c2 0.48, c3 0.56, c6 0.46, c8 0.56, c10 0.44), re-run independently. Closes when #624 merges |
 | 625 | Three shipped building fields change no leg | P2 | 1 | Item 1's loader warning is fixed on PR #624. Owner: fix the data or keep each field with a reason |
 | 627 | Lobby tap targets on short windows wider than 720 px | P3 | 1 | Filed from the lobby review. Buildable |
-| 626 | Playtest: stage goal hidden before the run, nothing to watch, a 3-minute wait | P2 | 2, 4 | Filed this cycle. Collides with PR #622's stage files, so take it up when wave AP resumes |
+| 626 | Playtest: stage goal hidden before the run, nothing to watch, a 3-minute wait | P2 | 2, 4 | Wave AP fixed five of seven rows; wave AQ (#632) fixes the two "partly" rows. Close after #632 merges and a re-play confirms |
+| 631 | Playtest after wave AP: rungs flicker, Rush loses its best, the report buries its verdict | P2 | 1, 2, 4 | Wave AQ (#632) fixes most; the items under *Left open* above remain |
 
 ## Needs an owner decision
 
@@ -38,8 +45,8 @@ decisions **D1445–D1540**, which overlap § D1445 (the lobby) on main; this cy
 |---|---|---|---|---|
 | 234 | No stage clears from the dropdown alone | P1 | 2, 3, 4 | Stage 3: demand cannot close it. Demand was measured from 4 to 14.5, and at 11.5, the one gap, a witness search of 277 candidates found 0 clears. Choose (a) a stage-3-only building or (b) a named, reversible breach. Stages 4, 7 and 8 are still buildable one per lane; stage 10 waits on the § D1289 ruling |
 | 571 | Dispatcher choice inert on the opening tower | P2 | 2, 4 | Both built halves have landed. Should the Career opener move to a tower where dispatch matters? Then close |
-| 582 | Four usability findings, wave AE | P3 | 1, 2 | Items 1, 3 and 4 are resolved (§ D1048, § D1357, § D1129). Item 2: does the rush's pre-run select still lose to the 600× clock? Collides with #622 |
-| 439 | Congregation template, deadline goal | P2 | 4 | Which gate applies, § 17 or a new goal-kind gate? Touches `goals.ts` (#622) |
+| 582 | Four usability findings, wave AE | P3 | 1, 2 | Items 1, 3 and 4 are resolved (§ D1048, § D1357, § D1129). Item 2: does the rush's pre-run select still lose to the 600× clock? #622 has merged, so this is unblocked |
+| 439 | Congregation template, deadline goal | P2 | 4 | Which gate applies, § 17 or a new goal-kind gate? Touches `goals.ts` |
 | 434 | Hotel-over-office supertall | P3 | 4 | Does `shanghai-class-reference` already satisfy it? Likely close |
 | 429 | Shafts cost floor area | P2 | 4 | Sign off the `shaft-area` band rate; should lost lettable area become Career income? |
 | 248 | Operate the daily challenge | P2 | 4, 1 | Is the weekly total of daily boards still wanted? AC5 is blocked on #242 |
@@ -55,7 +62,7 @@ decisions **D1445–D1540**, which overlap § D1445 (the lobby) on main; this cy
 | 243 | Launch checklist | P1 | 12 rows need production access; AC4 needs #355 |
 | 241 | [EPIC] Launch readiness | P1 | #355, #242, #243 and an outside tester |
 | 409 | Gate main-thread block (B3) | P2 | A human timing it once on a named mid-range laptop |
-| 553 | Budget rung in force during play | P2 | PR #622 (`stageScreen*`, `rushScreen*`). The body should match #543's ruling |
+| 553 | Budget rung in force during play | P2 | Unblocked now #622 has merged; the body should match #543's ruling |
 | 443 | Retrofit archetype, payback goal | P3 | #439's goal-kind gate |
 | 436 | Observation-express tower | P3 | #442 |
 | 435 | Wind sway withdraws a bank | P3 | #234 and #372; owner-approved odds |

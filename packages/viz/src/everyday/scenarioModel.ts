@@ -145,6 +145,13 @@ export interface ScenarioHubView {
   readonly absences: readonly string[];
   /** The sentence that makes the list honest. Never omitted, even when `absences` empties. */
   readonly note: string;
+  /**
+   * **The stage a first visit starts on** — wave AQ lane AQ-1, the playtest's path finding. The
+   * path's first row, while it is offered and this device holds no stage's clear; `undefined`
+   * otherwise, and while no path is provided. The § 3.3 primary plays it, so a new player's one
+   * obvious press is the first stage rather than a list of three entries and ten cards.
+   */
+  readonly startHere: string | undefined;
 }
 
 export const SCENARIO_COPY = Object.freeze({
@@ -159,6 +166,10 @@ export const SCENARIO_COPY = Object.freeze({
    * says, and `SCENARIO_ABSENCES` carries what is missing.
    */
   note: 'Every row here says what it is and, where it is held back, why. What this list cannot reach yet is written under it.',
+  /** Wave AQ lane AQ-1: a path row's budget, census and press notes, folded under this. */
+  pathDetails: 'Details',
+  /** Wave AQ lane AQ-1: the § 3.3 primary on a first visit, which opens {@link ScenarioHubView.startHere}. */
+  startHere: 'Play stage 1',
   /** Drawn where nothing has provided the path — never an empty list, never a spinner. */
   pathAbsent:
     'The ten stages on the path are read from the campaign’s own file, and this page has not been handed it. Reload if it does not appear.',
@@ -421,5 +432,7 @@ export function scenarioHubViewOf(
       ...(view === undefined ? [SCENARIO_COPY.pathAbsent] : []),
     ]),
     note: SCENARIO_COPY.note,
+    startHere:
+      view !== undefined && clearedIds.size === 0 && view.rows[0]?.playable === true ? view.rows[0].id : undefined,
   });
 }

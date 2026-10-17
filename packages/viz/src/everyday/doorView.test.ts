@@ -38,6 +38,7 @@ import { PRESS_DAY_CHOICE_COPY } from './towerChoice.js';
 import { EM_DASH } from './figures.js';
 import type { TodayRecord } from './today.js';
 import { POOL_CENSUS } from '../shift/weekPool.js';
+import { weekDealOf, weekStakeLineOf, weekStripTargetOf, weekTargetOf } from '../shift/weekStake.js';
 
 /** A day that met every bar, so its outcome is a real closed day with a real score. */
 const MET: GoalObservations = {
@@ -398,6 +399,22 @@ describe('the rest of § 6.1', () => {
     expect(held.driver.note).not.toMatch(/^Change it/u);
   });
 
+  it('asks no pick of a held driver on step 1 or in the footer — #626’s leftover, wave AQ lane AQ-1', () => {
+    const week = weekWith(5, [closedDay(1), closedDay(2), closedDay(3), closedDay(4)]);
+    const at = (driverHeld: string | undefined) =>
+      doorScreenViewOf({ week, today: { ...TODAY, day: week.day, driverHeld }, dayOffset: 0, dayClosed: false, nameOf: NAME_OF });
+    const held = at('held');
+    const free = at(undefined);
+    expect(free.steps[0]?.head).toBe('Pick who drives');
+    expect(free.primary.note).toBe('Pick who drives, then run it.');
+    for (const text of [held.steps[0]?.head ?? '', held.steps[0]?.body ?? '', held.primary.note]) {
+      expect(text).not.toMatch(/\bpick who drives\b/iu);
+    }
+    expect(held.steps.map((step) => step.n)).toEqual(['1', '2', '3']);
+    expect(held.steps.slice(1)).toEqual(DOOR_STEPS.slice(1));
+    expect(held.primary.label).toBe('Set up today');
+  });
+
   it('promises no duration the run does not have — § D733', () => {
     /*
      * Step 2 read *“The whole shift in a couple of minutes”*. Ten of the eleven contracts a first
@@ -590,5 +607,43 @@ describe('a level’s bookings on the door — § D1400', () => {
     } finally {
       POOL_CENSUS.measuring = false;
     }
+  });
+});
+
+/*
+ * GitHub issue #631, wave AQ lane AQ-4: the strip showed only the days played (*MON 92% clean day*,
+ * *TUE today*), and the target lived in a sentence elsewhere. It now draws one slot for every day
+ * of the week, the unplayed ones empty, and carries the target on the strip — read from
+ * `weekStake.ts#weekTargetOf`, the numbers the brief's sentence states.
+ */
+describe('the strip shows the whole week and its target — issue #631', () => {
+  it('draws an empty slot for each day still to come, through the week’s last day', () => {
+    const view = viewAt(0, false, weekWith(2, [closedDay(1)]));
+    expect(view.chips.map((chip) => chip.day)).toEqual([1, 2]);
+    expect(view.upcoming.map((slot) => slot.day)).toEqual([3, 4, 5, 6, 7]);
+    expect(view.upcoming.map((slot) => slot.weekday)).toEqual(['WED', 'THU', 'FRI', 'SAT', 'SUN']);
+    for (const slot of view.upcoming) {
+      expect(slot.score).toBe(EM_DASH);
+      expect(slot.note).toMatch(/^to play( · not counted)?$/u);
+    }
+    /* A Sunday has nothing still to come. */
+    expect(viewAt(0, false, weekWith(7, [closedDay(1)])).upcoming).toEqual([]);
+  });
+
+  it('states the brief’s target on the strip, from the same numbers', () => {
+    const week: WeekState = { ...openWeek('c2'), day: 2, dayIdx: 1, history: [closedDay(1)] };
+    const target = weekTargetOf(week);
+    expect(target).toBeDefined();
+    const view = viewAt(0, false, week);
+    expect(view.stripTarget).toBe(weekStripTargetOf(week));
+    expect(view.stripTarget).toContain(`${String(target?.target)} of ${String(target?.counted)} counted days`);
+    expect(weekStakeLineOf(week)).toContain(`${String(target?.target)} of ${String(target?.counted)} counted days clean`);
+    /* Which days count is the census's: a day it does not count says so in its slot. */
+    const dealt = weekDealOf(week)?.days ?? [];
+    for (const slot of view.upcoming) {
+      expect(slot.note.endsWith('not counted')).toBe(dealt[slot.day - 1]?.counts === false);
+    }
+    /* A tower the census does not speak for draws no target rather than an invented one. */
+    expect(viewAt(0, false, weekWith(2, [closedDay(1)])).stripTarget).toBe(weekStripTargetOf(weekWith(2, [closedDay(1)])));
   });
 });

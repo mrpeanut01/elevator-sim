@@ -538,49 +538,78 @@ export interface RushBest {
 }
 
 /**
+ * **This device's furthest round on the standing tower** — what `EverydayHost.rushFurthest` answers,
+ * [§ D1515](../../../../DECISIONS.md). `pending` until the replay lands; `row` carries the replay's
+ * own figures, read where the kept round ended.
+ */
+export type RushFurthestStanding =
+  | { readonly kind: 'pending' }
+  | { readonly kind: 'none' }
+  | { readonly kind: 'row'; readonly best: RushBest }
+  | { readonly kind: 'unreplayable'; readonly reason: string };
+
+/** The words the first fact says about where its figure comes from. One object, for the sweep. */
+export const RUSH_FURTHEST_COPY = Object.freeze({
+  kept: (driverName: string): string => `your furthest on this tower, kept on this device, driven by ${driverName}`,
+  visit: (driverName: string): string => `your furthest on this tower this visit, driven by ${driverName}`,
+  none: 'your furthest on this tower: no round has finished here on this device yet',
+  pending: 'your furthest on this tower, kept on this device',
+  unreplayable: (reason: string): string =>
+    `your furthest on this tower is kept on this device, and it is not drawn because ${reason}`,
+  checking: '…',
+});
+
+/** Further means a later wave, or the same wave held longer — `host.ts`' rule. */
+function furtherThan(a: RushBest, b: RushBest): boolean {
+  return a.wave > b.wave || (a.wave === b.wave && a.heldS > b.heldS);
+}
+
+/**
  * § 9.1's three facts: your furthest wave and who drove it, how long that held, and the climb.
  *
  * ## The first two said no rush had ever run, straight after one had — the post-AH panel's N7
  *
- * They read *"your furthest so far — no rush has run in this build"* over `—`, under a docstring
- * saying they would stay `—` *until a rush can run*. Rushes run (GitHub issue #220, § D515), so the
- * refusal was § D227's stale refusal: a sentence describing a build that no longer exists, read by a
- * player who had finished a rush a minute earlier. What a rush keeps now is the host's
- * {@link RushBest} for this visit — the result sheet's own wave and held time, never recomputed —
- * and both arms say *this visit*, because that is the scope of what is kept: nothing survives a
- * reload, and a label saying *so far* over a figure that had would be the next stale claim.
+ * They read *"your furthest so far — no rush has run in this build"* over `—`, a stale refusal
+ * (§ D227) once rushes ran (GitHub issue #220, § D515). They then said *this visit*, because the host
+ * kept the furthest round in memory only.
  *
- * The third is real in both arms, because the climb is arithmetic rather than a measurement — and it
+ * ## And then a reload took it, under a note saying a best is kept — the post-AP playtest, § D1515
+ *
+ * The furthest round on the standing tower is now kept on this device as its causes and replayed
+ * (`everyday/rushDeviceFurthest.ts`), so the figure survives a reload and is still the replay's, never
+ * a stored one. `best` is this visit's, held by the host; `device` is the replayed record. The kept
+ * one is drawn unless this visit went further, which happens only when this visit's round could not
+ * be kept (a press the replay cannot write), and then the label says *this visit*, because that is the
+ * scope of what is held.
+ *
+ * The third is real in every arm, because the climb is arithmetic rather than a measurement — and it
  * is **computed**, off {@link climbPerWavePct}, so the *+11 %* on screen is the contract's own
  * coefficient.
  */
-export function rushFactViews(best: RushBest | undefined): readonly RushFactView[] {
-  const kept: readonly RushFactView[] =
-    best === undefined
-      ? [
-          {
-            value: RUSH_SCREEN_COPY.noRun,
-            label: 'your furthest this visit — no round has finished since this page opened',
-            withheld: true,
-          },
-          {
-            value: RUSH_SCREEN_COPY.noRun,
-            label: 'how long that held',
-            withheld: true,
-          },
-        ]
-      : [
-          {
-            value: `wave ${String(best.wave)}`,
-            label: `your furthest this visit, driven by ${best.driverName}`,
-            withheld: false,
-          },
-          {
-            value: best.held,
-            label: 'how long that held',
-            withheld: false,
-          },
-        ];
+export function rushFactViews(
+  best: RushBest | undefined,
+  device: RushFurthestStanding = { kind: 'none' },
+): readonly RushFactView[] {
+  const shown = (figure: RushBest, label: string): readonly RushFactView[] => [
+    { value: `wave ${String(figure.wave)}`, label, withheld: false },
+    { value: figure.held, label: 'how long that held', withheld: false },
+  ];
+  const withheld = (value: string, label: string): readonly RushFactView[] => [
+    { value, label, withheld: true },
+    { value, label: 'how long that held', withheld: true },
+  ];
+  let kept: readonly RushFactView[];
+  if (device.kind === 'row' && (best === undefined || !furtherThan(best, device.best))) {
+    kept = shown(device.best, RUSH_FURTHEST_COPY.kept(device.best.driverName));
+  } else if (best !== undefined) {
+    kept = shown(best, RUSH_FURTHEST_COPY.visit(best.driverName));
+  } else if (device.kind === 'pending') {
+    kept = withheld(RUSH_FURTHEST_COPY.checking, RUSH_FURTHEST_COPY.pending);
+  } else if (device.kind === 'unreplayable') {
+    kept = withheld(RUSH_SCREEN_COPY.noRun, RUSH_FURTHEST_COPY.unreplayable(device.reason));
+  } else {
+    kept = withheld(RUSH_SCREEN_COPY.noRun, RUSH_FURTHEST_COPY.none);
+  }
   return [
     ...kept,
     {
@@ -792,3 +821,29 @@ export const RUSH_TUTORIAL_WHY =
 export function rushTutorialWorkedAnswerOf(facts: WorkedAnswerFacts): WorkedAnswerView {
   return workedAnswerViewOf(facts, RUSH_TUTORIAL_WHY);
 }
+
+/**
+ * **End the rush asks once**, drawn by `stageScreen.ts` — wave AQ, lane AQ-3, the post-AP playtest: *End the rush* sat beside
+ * *Play* in the same orange, so a mis-tap ended the round. The first press puts this question under
+ * the stage's header with focus on *Keep playing*; a second press of the primary, or *End it*, ends
+ * the round. The day's close asks the same way (`stageCall.ts#STAGE_CALL_COPY.closeAsk`).
+ */
+export const RUSH_END_ASK_COPY = Object.freeze({
+  question: 'End the rush here?',
+  consequence: 'The round stops now and is not ranked. It still counts toward your furthest on this device.',
+  end: 'End it',
+  keep: 'Keep playing',
+});
+
+/**
+ * **A round the page closed on says so on the way back** — wave AQ, lane AQ-3, the post-AP playtest.
+ * `host.ts#rushUnfinished` answers it once, on the first rush setup screen after a page that went
+ * away mid-round, and `rushScreen.ts` draws it above the facts.
+ *
+ * A round is not resumed, and that is a choice: a rush round re-simulates deterministically from its
+ * causes, but resuming it means rebuilding the whole sitting (the parked week, every earlier round,
+ * the purse and what it bought) from storage, and one wrong field would replay a different round
+ * under the same wave count. Saying it was not kept is the honest, cheap half.
+ */
+export const RUSH_UNFINISHED_COPY =
+  'Your last rush round was still running when the page closed, so it was not kept. A round is kept on this device once it ends.';

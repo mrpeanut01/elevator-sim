@@ -237,3 +237,38 @@ describe('a call’s row leads with the first crossing and reads the goals at th
     expect(rowsOf(16_000, [press(16_500)])[0]?.note).toBeUndefined();
   });
 });
+
+/*
+ * GitHub issue #631, wave AQ lane AQ-4: the playtest's first row read *16 and 220 s with park …, your
+ * answer; 16 and 220 s with spread …; 16 and 220 s with leave them*. That is genuine, not a fault: the
+ * readings are the day's running maxima, the three runs share every second before the call, and a
+ * maximum set before the call stands under every answer until one run passes it. The row now says so
+ * once instead of three times, and still names the figures.
+ */
+describe('a row whose answers read alike says so once — issue #631', () => {
+  const series = (samples: DayCallMaxima['samples']): DayCallMaxima => ({ fromS: 7200, endedAt: 36_000, samples });
+  const ALIKE: DayCallRecord = {
+    ...RECORD,
+    maxima: {
+      'park-cars-lobby': series([[7200, 20, 16, 220]]),
+      'spread-cars': series([[7200, 20, 16, 220]]),
+      leave: series([[7200, 20, 16, 220], [9000, 20, 18, 220]]),
+    },
+  };
+  const GOALS: readonly ShiftGoal[] = goalsForDay(1).map((goal) =>
+    goal.id === 'queue' ? { ...goal, bar: 32 } : goal.id === 'worst-wait' ? { ...goal, bar: 460 } : goal,
+  );
+
+  it('reads one line, with the figures, while every answer reads the same', () => {
+    expect(stageCallReadingsLineOf(ALIKE, GOALS, 7860, clock)).toBe(
+      `By ${clock(7860)}, no answer has made a difference to these two goals yet: the deepest landing ` +
+        'and the longest wait so far are 16 and 220 s with every answer.',
+    );
+  });
+
+  it('goes back to one clause per answer as soon as one reads differently', () => {
+    const line = stageCallReadingsLineOf(ALIKE, GOALS, 9000, clock) ?? '';
+    expect(line).toContain(`${STAGE_CALL_TAKEN};`);
+    expect(line).toContain('18 and 220 s with leave them');
+  });
+});

@@ -146,4 +146,47 @@ describe.skipIf(!HAS_BROWSER)('a stage press plays one of its crowds, and the ve
       await page.close();
     }
   }, 120_000);
+
+  /*
+   * Wave AQ lane AQ-1, the playtest's P1 and its second stage finding. At 1280 × 800 the press
+   * changed only its own label, because the pair and the verdict were drawn below the fold; and after
+   * a miss the pair took itself away a few seconds after the verdict.
+   */
+  it('brings the pair into view at 1280 × 800 as it starts, then the verdict, and keeps the pair up beside it', async () => {
+    const page = await openPage(browser, { viewport: { width: 1280, height: 800 } });
+    try {
+      await page.goto(origin, { waitUntil: 'load' });
+      await leaveTutorialIfOffered(page);
+      await openStageOne(page);
+      /* The stage's own setting, which cannot beat itself: a miss. */
+      await page.locator('.everyday-bar-primary').click();
+
+      const inView = (selector: string): Promise<boolean> =>
+        page.evaluate((query) => {
+          const node = document.querySelector(query);
+          if (node === null) return false;
+          const box = node.getBoundingClientRect();
+          const bar = document.querySelector('.everyday-bar')?.getBoundingClientRect().top ?? window.innerHeight;
+          return box.top >= 0 && box.top < Math.min(window.innerHeight, bar) - 40;
+        }, selector);
+
+      await page.waitForFunction(
+        () => document.querySelectorAll('.everyday-stage-play-watch-canvas').length === 2,
+        undefined,
+        { timeout: 60_000 },
+      );
+      await expect.poll(() => inView('.everyday-stage-play-watch-canvas'), { timeout: 10_000 }).toBe(true);
+
+      await page.waitForSelector('.everyday-stage-play-verdict', { timeout: 70_000 });
+      await expect.poll(() => inView('.everyday-stage-play-verdict-head'), { timeout: 10_000 }).toBe(true);
+      expect(await page.getAttribute('.everyday-stage-play-verdict', 'data-cleared')).toBe('no');
+
+      /* The old pair ended inside ten seconds of the verdict and took itself away. */
+      await page.waitForTimeout(12_000);
+      expect(await page.locator('.everyday-stage-play-watch').count(), 'the pair left the verdict on its own').toBe(1);
+      expect(await pairPainting(page)).toBe(true);
+    } finally {
+      await page.close();
+    }
+  }, 120_000);
 });

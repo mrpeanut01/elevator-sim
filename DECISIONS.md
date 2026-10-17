@@ -46802,6 +46802,8 @@ after it, and files a report that says when.
 
 ## D1169 — a scored day is paced by the tutorial's hold rule
 
+> **Status 2026-10-17: EXTENDED by [§ D1507](#d1507)** (an agent ruling). A career day is paced by the same rule. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Status 2026-10-17: AMENDED by [§ D1493](#d1493)** (an agent ruling). The hold lasts at most twenty real seconds of watching with no decision in between, and then the stage plays on at 30×. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Status 2026-10-13: NARROWED by [§ D1435](#d1435)** (an agent ruling). A lost day plays the rest at the fast rung whoever waits, unless a chip is pressed after the loss. See [`docs/39`](docs/39-decisions-in-force.md).
@@ -51534,6 +51536,8 @@ which offers the tutorial) is lane AO-2's; this entry only makes the menu's entr
 
 ## D1385 — the stage tells the truth about its own state: the chip the player chose, one line at a time, no Play while a call is worked out, and the building in view
 
+> **Status 2026-10-17: AMENDED by [§ D1508](#d1508)** (an agent ruling). Clause 4: when the day starts playing the stage scrolls just far enough to put the canvas's bottom, the lobby rows, in view, wherever it is clipped, not only when less than half of the canvas shows. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-10-10 by agent sessions under delegated authority** (wave AO, lane AO-4, on the
 > post-AN panel's seat B, lost moments 4, 5, 6 and 9 and defects 2, 3 and 9), not by the product
 > owner. It reads [§ D991](#d991) clause 2 (*every change shows on the lit chip*) for the state that
@@ -53147,6 +53151,8 @@ offered no Rush.
 
 ## D1493 — the hold lasts twenty real seconds with nothing to decide, and then the stage plays on at 30×
 
+> **Status 2026-10-17: AMENDED by [§ D1506](#d1506)** (an agent ruling). Once slowed, the stage stays slowed ten real seconds after the last wait of over a minute, inside the same allowance, and clause 1's line now reads *fast-forwarding at 30×: you have watched a while and there is nothing to decide yet · pick a speed to watch*. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-10-17 by agent sessions under delegated authority** (a decision swarm's judge on
 > GitHub issue #626 item 5, pillar 4; built by wave AP lane G-3), not by the product owner, and to
 > be read as an agent ruling. **Amends [§ D1169](#d1169) clause 1**; clause 3 stands.
@@ -53239,3 +53245,188 @@ loop to a player; no assessor has watched it. The bank view is not offered on th
 
 **Numbers spent.** This lane held **D1496 to D1498** and spent **D1496 only**; D1497 and D1498 are
 unspent.
+
+## D1497 — the stage page shows what a press does, keeps the pair beside its verdict, and says when a change moved no count
+
+> **Taken 2026-10-17 by an agent session under delegated authority** (wave AQ lane AQ-1, on the
+> first-time-player playtest's findings on GitHub issues #626 and #631), not by the product owner, and
+> to be read as an agent ruling. **Amends [§ D1496](#d1496)** rulings 3 and its pace. Owner-reversible:
+> every sentence below, the scroll, the quiet rate, and the fold on the path cards.
+
+**Why an entry.** It moves two parts of a recorded ruling and binds `campaign/judge.ts` (a count field
+on a judged per-run goal), `everyday/caseStage.ts` (its pace is told every pane's frame),
+`everyday/actionBar.ts` (a second variant on the Scenario row) and `everyday/doorView.ts`.
+
+**The ruling.**
+
+1. **A press is seen.** At 1280 × 800 *Run the stage* changed only its label. The page now scrolls the
+   counter into view as the press lands, the pair to the top of the view when it starts, and the
+   verdict's head by the least scroll that shows it, once each per press.
+2. **The pair stays with its verdict.** § D1496 ruling 3 ended the pair at its end once the verdict was
+   in, so after a miss it left a few seconds later. It now plays again from its first minute after the
+   verdict too, and only a skip, a new press, a stale verdict or leaving the page ends it.
+3. **The pair's pace reads what is happening.** `tutorialPaceOf` slows only for a wait of a minute, so
+   stage 1 crossed its whole morning in ten seconds and showed each ride as a blink. The pair now plays
+   at the quiet rate only while nothing on either pane moves (nobody waiting or aboard, no car between
+   floors, every door shut) and at the player's speed otherwise (`stagePlay.ts#stageWatchPaceOf`).
+   Measured on stage 1's pair: 3.6 of 10 real seconds showed motion before, 81 of 87 after, with the
+   first motion at 0.9 s both times. Speed only; the verdict is the fifty crowds' as before.
+4. **Equal counts are said.** When every judged per-run count equals the shipped setting's on a move,
+   or the last run's on other settings, the verdict says so in one sentence about the counts and
+   nothing else. Stage 3 reproduces the finding: Min-wait and Min-wait with lobby parking both pass
+   10 of 50 against 28.
+5. **The path card folds** its budget, census and press notes under *Details*, and a device holding
+   no clear has *Play stage 1* as the Scenario screen's primary while stage 1 is offered.
+6. **A held driver is not picked.** On a day whose driver is held, the door's step 1 and its press note
+   say who drives and what the press does instead of *Pick who drives*.
+
+**What holds it.** `everyday/stageWatch.browser.test.ts` (pair and verdict head in view at 1280 × 800,
+the pair still painting twelve seconds after a miss's verdict; red on the base at the first);
+`everyday/stagePlay.test.ts` (the pace measured over stage 1's real pair, the end rule, the stale
+verdict, the sentence drawn); `everyday/stageSameCounts.test.ts` (stage 3 played twice through the
+shipped constructors); `everyday/scenarioScreen.browser.test.ts` and `scenarioModel.test.ts`;
+`everyday/doorView.test.ts`.
+
+**Not established.** Whether an 87-second pair reads as live play to a player; no assessor has
+watched it. Stage 2's brief still says it is *the first stage where a number changes when you change a
+setting*: rewording it moves the survivor census's input hash (`scenario/survivorInputs.test.ts`), which
+hashes prose it does not read, so it is left for a lane that may regenerate or narrow that hash.
+
+**Numbers spent.** This lane held **D1497 to D1505** and spent **D1497 only**.
+
+## D1506 — once slowed for a wait the stage stays slowed ten real seconds, and its three lines tell one story
+
+> **Taken 2026-10-17 by an agent session under delegated authority** (wave AQ, lane AQ-2, on the
+> first-time-player playtest, GitHub issue #631), not by the product owner, and to be read as an
+> agent ruling. **Amends [§ D1493](#d1493)** clause 1's line and its measured press day, and reads
+> [§ D1169](#d1169) clause 1's hold through a dwell. Owner-reversible: the ten seconds
+> (`stagePace.ts#RUNG_DWELL_REAL_S`; `0` is the hold with no dwell) and the three lines.
+
+**Why an entry.** It moves the line § D1493 recorded and the figure it published, and binds
+`everyday/stagePace.ts`, `everyday/stageScreen.ts`, `stagePace.test-helper.ts#scoredDayPlayOf`,
+`everyday/firstDayLength.ts`'s measured table and the honesty register.
+
+**What was found.** On Midtown's Monday at `4×` the lit chip switched between `4×` and `30×` twelve
+times in about thirty real seconds (17:25 to 17:32, and 10:44 to 10:57): the longest wait flips
+around the minute whenever the longest waiter boards and the next is a few seconds short. The line
+cycled through *at your speed, 4×, while somebody on a landing has waited over a minute*,
+*fast-forwarding at 30× while nobody on a landing has waited a minute* and § D1493's *nothing to
+decide yet: playing on at 30× though somebody has waited over a minute*, the third contradicting
+the first two.
+
+**The ruling.**
+
+1. Once the stage slows for a wait of over a minute it stays at the player's rung until nobody has
+   waited a minute for ten real seconds (half the allowance, so one allowance holds at most two
+   slowed stretches and the chip moves at most four times between two decisions). The lingering
+   seconds count toward § D1493's twenty, so the hold is no longer than it was; a call, a lost day
+   and a chip outrank it as before.
+2. The lines say the speed first and the reason second: *fast-forwarding at 30×: nobody on a landing
+   has waited a minute*; *slowed to your speed, 4×: somebody on a landing has waited over a minute*;
+   *slowed to your speed, 4×, for a few seconds after a wait of over a minute*; and, once the
+   allowance has run out, *fast-forwarding at 30×: you have watched a while and there is nothing to
+   decide yet · pick a speed to watch*. Each is true of the frame it is drawn on.
+
+**What moved with it.** The press day's first call (§ D1493's measurement, the same seed and frames)
+comes at 63.0 real seconds, was 59.0. The pinned days' skipped seconds in `firstDayLength.ts` fall by
+80 to 910 simulated seconds each; the brief's *about N min* is derived from them and its test passes
+unchanged.
+
+**What holds it.** `everyday/stagePace.test.ts`, *the chip does not flicker*: the stage's frame loop
+over a scripted longest wait that crosses the minute every ten simulated seconds switches the chip at
+least twelve times in thirty real seconds without the dwell (red before) and at most four with it;
+every line drawn names the rung it is at and is true of its frame.
+
+**Not established.** Item 2 of the playtest, the long stretches of playing on with nothing to decide
+(33 real seconds, 08:44 to 10:40), is not changed. A step to `90×` after ten seconds of playing on
+was built and withdrawn: it needs § D991's refusal of rungs above the cue budget reopened and the
+day-length model and every published day length re-measured, which is not a small change.
+
+## D1507 — a career day is paced as a scored day: § D1169 extended to the career
+
+> **Taken 2026-10-17 by an agent session under delegated authority** (wave AQ, lane AQ-2, on the
+> playtest, GitHub issue #631), not by the product owner. **Extends [§ D1169](#d1169)** from the
+> daily stage to a career day. Owner-reversible: `stageScreen.ts#scoredPaceIn`.
+
+**Why an entry.** It widens a recorded ruling to a second flow.
+
+**What was found.** At Garden Apartments, *Run the day and decide as it goes* then *Play* gave about
+ninety real seconds of *nobody has called a lift yet*. Measured on the browser tier's base (seed
+424 242), career day 1 is a one-hour period whose first rider arrives at 17:58 simulated: 270 real
+seconds at `4×`, because the stage paced only the daily stage as a scored day.
+
+**The ruling.** A career day plays at `30×` while nobody on a landing has waited a minute, at the
+player's rung while somebody has, with § D1493's allowance and § D1506's dwell; its event days' calls
+stop it as before. The skip ([§ D1212](#d1212), [§ D1266](#d1266)) stays a whole day's: a career
+day is a period, and a skip there would land on the day's end. The lost-day stop
+([§ D1435](#d1435)) stays the daily stage's.
+
+**What holds it.** `everyday/stageScreen.test.ts`, *a career day is paced as a scored day*: the
+stage's rule over Garden Apartments' day 1 reaches the first rider in under 40 real seconds where
+the unscored rule took over 240 (red before), and the mount asks `scoredPaceIn`.
+
+## D1508 — the stage keeps the lobby rows in view when the day starts playing
+
+> **Taken 2026-10-17 by an agent session under delegated authority** (wave AQ, lane AQ-2, on the
+> playtest, GitHub issue #631), not by the product owner. **Amends [§ D1385](#d1385) clause 4.**
+> Owner-reversible: `stageScreenModel.ts#stageBuildingScrollOf`.
+
+**What was found.** At 1280×800 the canvas started below the goals and showed floors 20 down to
+about 6, so the ground floor's queue, *Floor G stacked 16 deep* at 08:43 and the day's tightest
+moment, was never on screen. § D1385 clause 4 scrolled only when less than half of the canvas
+showed, and seven eighths did.
+
+**The ruling.** When the day starts playing, wherever the canvas's bottom edge (the lobby and garage
+rows) is below what the player can see, the stage scrolls just far enough to put it on the last
+visible row. A canvas that fits keeps its top in view; on a phone the top floors go before the lobby
+does. A stage whose lobby already shows is not moved.
+
+**What holds it.** `everyday/stageScreenModel.test.ts` (the rule) and `everyday/stagePace.browser.test.ts`,
+*keeps the lobby rows in view*, at 1280×800 (red under clause 4's half rule) and 390×844.
+
+**Not established.** The deepest queue is not always the lobby's (an evening's queues stand up the
+tower); following the deepest queue was not built.
+
+**Numbers spent.** This lane held **D1506 to D1514** and spent **D1506 to D1508**; D1509 to D1514
+are unspent.
+
+## D1515 — the rush keeps its furthest round on this device as causes, a lost round is said rather than resumed, and End the rush asks once
+
+> **Taken 2026-10-17 by an agent session** (wave AQ, lane AQ-3, on GitHub issue #631's Rush rows), not
+> by the product owner, and to be read as an agent ruling. **Extends [§ D1420](#d1420)**, whose replay
+> rule it reuses unchanged, and **replaces** the reading in `host.ts` that the rush front's furthest is
+> not persisted *"for § 3.5's reason"*. Owner-reversible: every clause.
+
+**Why an entry.** It moves a recorded behaviour (§ D1420's board note and the front's *this visit*)
+and binds `everyday/host.ts`, `everyday/stageScreen.ts` and `everyday/actionBar.ts`, which the rush
+modules do not own.
+
+1. **The furthest round per tower is kept on this device, ended by hand or at the line**
+   (`everyday/rushDeviceFurthest.ts`, a second slot in `rushDeviceStore.ts`), as the sitting up to
+   that round and the second it ended at. The setup screen's first two facts draw a **replay** of it
+   (`EverydayHost.rushFurthest`: `rushDeviceReplayOf`, then `rush.ts#rushOutcomeOf` at the kept
+   second), never a stored figure, on § D1420's rule. A round whose presses cannot be written as
+   causes is not kept. § D1420's board row is unchanged: it still ranks only a sitting whose last
+   round crossed the hold line, and its note now says so in words a player can act on.
+2. **A round the page closed on is said, not resumed.** Resuming means rebuilding the parked week,
+   every earlier round, the purse and its purchases from storage, and one wrong field replays a
+   different round under the same wave. So `pagehide` marks a running round and the next rush setup
+   screen says once that it was not kept (`RUSH_UNFINISHED_COPY`).
+3. **End the rush asks once**, under the stage header with focus on *Keep playing*; a second press of
+   the primary or *End it* ends the round. The rush result row is **not inverted** and drops its
+   duplicate *Leave the rush* way out, so *Run the rush again* is the loud button (a deviation from
+   GAMEPLAY § 3.3, named in `actionBar.test.ts`).
+4. In a rush the choice chips sit directly under the stage header, and they are disabled while no
+   run is on the stage.
+
+**What holds it.** `everyday/rushDeviceFurthest.test.ts` (a hand-ended round read back by a fresh host
+over the same storage, a hand-edited kept figure moving nothing drawn, the lost-round line said once)
+and `everyday/rushPlaytest.browser.test.ts` (reload keeps the wave, the mid-round reload line, chips
+in view and hit-testable at 1280×600 and 390×844, the ask, the result's primary, focus on *Play*).
+Red on the base: all of it.
+
+**Not established.** The Lobby and Garage queues on a 390×844 phone are still below the fold; a
+second tab's exact locked-out state was not reproduced, so the disabled chips are pinned only by the
+no-run rule.
+
+**Numbers spent.** This lane held **D1515 to D1523** and spent **D1515 only**.
