@@ -704,6 +704,14 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          * it is recorded here for the same reason.
          */
         'everyday/landingScreen.ts#LANDING_SCREEN',
+        /*
+         * § D1445's lobby, on the same ground: it draws the doors, the panel and the hall plate into
+         * the shell's region and owns their timers and two synthesised sounds. Every word it draws
+         * is `everyday/lobbyModel.ts`'s, which the `EVERYDAY_LOBBY` adapter drives through every
+         * stop of the door machine; what this mount authors of its own is geometry, colours, class
+         * names and the accessible names of its controls.
+         */
+        'everyday/lobbyScreen.ts#mountLobby',
         'everyday/tutorialScreens.ts#TUTORIAL_SCREEN',
         'everyday/tutorialScreens.ts#COLLAPSE_SCREEN',
         'everyday/tutorialScreens.ts#mountWorkedAnswer',
@@ -2441,6 +2449,13 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         '`RUSH_DEVICE_REPLAY_REFUSAL`’s, which the rush adapter drives through the line the standings ' +
         'draw. The deriver collected all three for their comments.',
       ids: [
+        /*
+         * § D1445: whether a cold launch skips the lobby. The key is its `localStorage` slot and the
+         * store reads and writes one boolean there; the words for the choice are
+         * `settingsView.ts#LOBBY_ROW_COPY`, which the settings adapter drives in both faces.
+         */
+        'everyday/lobbyStore.ts#LOBBY_SKIP_KEY',
+        'everyday/lobbyStore.ts#everydayLobbyStore',
         'everyday/rushDeviceBest.ts#RUSH_DEVICE_BEST_KEY',
         'everyday/rushDeviceBest.ts#RUSH_DEVICE_BEST_QUARANTINE_KEY',
         'everyday/rushDeviceBest.ts#rushDeviceReplayOf',

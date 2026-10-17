@@ -158,6 +158,13 @@ describe.skipIf(!HAS_BROWSER)('Continue lands where you left — wave AO, lane A
       const focused = await leaveForTheMenu(page);
       expect(focused, 'focus left the strip for the covered page').toContain('everyday-bar-confirm-stay');
       await page.reload({ waitUntil: 'load' });
+      /*
+       * § D1445: the reload opens the lobby, which offers the same *Continue* the menu's tile does,
+       * in the same words. Checked here, before {@link settle} leaves it by *Main menu* for the tile
+       * this case is about.
+       */
+      await page.waitForSelector('.everyday-lobby-continue', { state: 'visible', timeout: 30_000 });
+      expect(await textOf(page, '.everyday-lobby-continue')).toContain(`left at ${atCall.clock}`);
       await settle(page);
 
       /* Red before: no entry at all on a first day, and on a later day the entry opened the door. */

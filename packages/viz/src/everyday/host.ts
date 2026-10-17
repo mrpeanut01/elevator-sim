@@ -1796,7 +1796,7 @@ export interface EverydayHost {
 
   /**
    * **Whether the run on `recording` is another day than the attempt another tab holds** — wave AP,
-   * lane AP-D1, [§ D1447](../../../../DECISIONS.md), the post-AO panel's seat D (D7). `true` while
+   * lane AP-D1, [§ D1448](../../../../DECISIONS.md), the post-AO panel's seat D (D7). `true` while
    * another tab holds the attempt standing on the week's day and `recording` is not this tab's run
    * of it (the one it plays, or the one it was playing when the other tab took it over): a second
    * tab opened on *Continue your week* had the page's own run on its stage, an 08:30 hour on another
@@ -2554,7 +2554,7 @@ export interface EverydayHostBindings {
    */
   attemptRunStale?(recording: VizRecording): boolean;
   /**
-   * § D1447 — `recording` is this tab's run of the standing attempt: the one it plays, or the one it
+   * § D1448 — `recording` is this tab's run of the standing attempt: the one it plays, or the one it
    * was playing when another tab took the attempt over. Absent, no run is.
    */
   attemptRunHere?(recording: VizRecording): boolean;

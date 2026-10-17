@@ -413,9 +413,16 @@ function signInViewOf(input: SettingsScreenInput): SettingsSignInView {
   };
 }
 
+/** The *Skip the lobby* row's words — § D1445. */
+export const LOBBY_ROW_COPY = Object.freeze({
+  label: 'Skip the lobby',
+  note: 'open straight to the main menu instead of the elevator',
+  face: Object.freeze({ show: 'lobby', skip: 'skipped' }),
+});
+
 /** One shipped toggle row — label, one-clause effect, and the pill's two faces. */
 export interface SettingsToggleView {
-  readonly id: 'motion' | 'units' | 'default-speed' | 'sound' | 'telemetry';
+  readonly id: 'motion' | 'lobby' | 'units' | 'default-speed' | 'sound' | 'telemetry';
   readonly label: string;
   /** § 16's register: what the row does, in one clause. */
   readonly note: string;
@@ -693,6 +700,12 @@ export interface SettingsScreenInput {
    * pass it* and the shipped default is drawn. This row never has an absent arm.
    */
   readonly soundOn?: SoundPreference | undefined;
+  /**
+   * Whether a cold launch skips the lobby — § D1445, `lobbyStore.ts`. Total in its store like
+   * {@link soundOn}, so `undefined` means a caller did not pass it and the default, *show it*, is
+   * drawn.
+   */
+  readonly skipLobby?: boolean | undefined;
   readonly clearStage?: SettingsClearStage | undefined;
   /**
    * `everyday/accountPort.ts#everydayAccount()` — `undefined` while the Engineer surface is
@@ -902,6 +915,17 @@ export function settingsScreenViewOf(input: SettingsScreenInput): SettingsScreen
           value: (input.soundOn ?? DEFAULT_SOUND_ON) ? SOUND_ROW_COPY.face.on : SOUND_ROW_COPY.face.off,
           /* Filled while there is a sound to hear — the Motion row's reading, not the Units one. */
           on: input.soundOn ?? DEFAULT_SOUND_ON,
+        },
+        {
+          /*
+           * § D1445 — the lobby handoff's proposed *Skip the lobby*. Filled while it is skipped,
+           * the Units rule: the pill lights when the player has moved it off the default.
+           */
+          id: 'lobby',
+          label: LOBBY_ROW_COPY.label,
+          note: LOBBY_ROW_COPY.note,
+          value: input.skipLobby === true ? LOBBY_ROW_COPY.face.skip : LOBBY_ROW_COPY.face.show,
+          on: input.skipLobby === true,
         },
         {
           id: 'default-speed',

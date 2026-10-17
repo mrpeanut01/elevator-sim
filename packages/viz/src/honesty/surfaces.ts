@@ -281,7 +281,7 @@ import {
   RUN_CONTEXTS,
   SHELL_SKIP_LABEL,
 } from '../everyday/types.js';
-import { scenarioHubViewOf } from '../everyday/scenarioModel.js';
+import { SCENARIO_ENTRIES, scenarioHubViewOf } from '../everyday/scenarioModel.js';
 import { SCENARIO_LADDER_COPY, type ScenarioLadderRung } from '../scenario/ladder.js';
 import {
   TUTORIAL_ABSENCES,
@@ -590,6 +590,26 @@ import {
   LANDING_FIRST_SESSION_CALL_TO_ACTION,
   landingViewOf,
 } from '../everyday/landingView.js';
+import {
+  LOBBY_COPY,
+  LOBBY_FLOORS,
+  LOBBY_INITIAL,
+  LOBBY_WARNINGS,
+  lobbyArrived,
+  lobbyCall,
+  lobbyClose,
+  lobbyDepart,
+  lobbyFloorOf,
+  lobbyHold,
+  lobbyPick,
+  lobbyRideBack,
+  lobbyStepToward,
+  lobbyTick,
+  lobbyTurnKey,
+  lobbyViewOf,
+  type LobbyFloorKey,
+  type LobbyState,
+} from '../everyday/lobbyModel.js';
 import {
   SURVIVOR_COPY,
   survivorSentenceFor,
@@ -11163,6 +11183,11 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
      * shipped default, so the row is never swept in one state only.
      */
     'everyday/audio.ts#SOUND_ROW_COPY',
+    /*
+     * § D1445's *Skip the lobby* row. Both faces are reached: `muted` below also carries
+     * `skipLobby: true`, and every other case draws the default.
+     */
+    'everyday/settingsView.ts#LOBBY_ROW_COPY',
   ],
   render(context) {
     void context;
@@ -11246,7 +11271,7 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
        * without it the row's `off` face would ship unswept — which is the defect `keyedPlate`
        * shipped for a whole milestone and this corpus exists to catch.
        */
-      ['muted', { profile: stored, reduceMotion: false, soundOn: false }],
+      ['muted', { profile: stored, reduceMotion: false, soundOn: false, skipLobby: true }],
       /*
        * GitHub issue #368's tally in the two arms a balance of zero cannot reach — the review of
        * PR #485, medium 8. Every case above constructs no `chimeBalance`, so `balanceLineOf` drew
@@ -17772,6 +17797,119 @@ const EVERYDAY_LANDING: SurfaceAdapter = {
 };
 
 /* -------------------------------------------------------------------------- *
+ * The lobby — § D1445
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **The elevator a cold launch opens on, at every stop of its machine.**
+ *
+ * `everyday/lobbyModel.ts` carries the words and the door decisions; `everyday/lobbyScreen.ts` is
+ * the mount and is excluded on the DOM mounts' shared ground. The display changes with the phase,
+ * the choice, the hold, the key and the first-visit question, so the drive below rides the car the
+ * way a player does: CALL, every floor chosen in turn, a warning of each kind, a hold, a departure
+ * up and one down to the basement, an arrival with and without the key, and the ride back. Each
+ * state's whole view is seeded, so a sentence that only one of them draws is still read.
+ *
+ * The play floors' words are the menu tiles' and the Scenario hub's (`modes.ts`, `scenarioModel.ts`),
+ * which their own adapters already sweep; they are seeded here again because this is a second
+ * surface that draws them, and `SCENARIO_ENTRIES` is claimed here because the lobby is the reader
+ * that made it an export.
+ */
+const EVERYDAY_LOBBY: SurfaceAdapter = {
+  id: 'everyday/lobbyModel.ts#lobbyViewOf',
+  covers: [
+    'everyday/lobbyModel.ts#lobbyViewOf',
+    'everyday/lobbyModel.ts#LOBBY_COPY',
+    'everyday/lobbyModel.ts#LOBBY_FLOORS',
+    'everyday/lobbyModel.ts#LOBBY_WARNINGS',
+    'everyday/lobbyModel.ts#lobbyFloorOf',
+    'everyday/lobbyModel.ts#lobbyPick',
+    'everyday/lobbyModel.ts#lobbyClose',
+    'everyday/lobbyModel.ts#lobbyHold',
+    'everyday/lobbyModel.ts#lobbyTick',
+    'everyday/scenarioModel.ts#SCENARIO_ENTRIES',
+  ],
+  render(this: SurfaceAdapter, context) {
+    void context;
+    const seeds: TextSeed[] = [];
+    const seen = new Set<string>();
+    const seed = (arm: string, state: LobbyState, firstVisit: boolean): void => {
+      const view = lobbyViewOf(state, { firstVisit });
+      const fields: readonly (readonly [string, string, NonNullable<TextSeed['role']>])[] = [
+        ['kicker', view.kicker, 'label'],
+        ['title', view.title, 'label'],
+        ['body', view.body, 'prose'],
+        ['status', view.status, 'prose'],
+        ['statusLine', view.statusLine, 'reason'],
+        ['hint', view.hint, 'prose'],
+        ['lcdLine', view.lcdLine, 'label'],
+        ['arrivalFloor', view.arrivalFloor, 'label'],
+        ['arrivalName', view.arrivalName, 'label'],
+        ['arrivalBody', view.arrivalBody, 'prose'],
+        ['arrivalNote', view.arrivalNote, 'reason'],
+      ];
+      for (const [name, text, role] of fields) {
+        if (text === '' || seen.has(`${name}:${text}`)) continue;
+        seen.add(`${name}:${text}`);
+        seeds.push({ field: `lobby.${arm}.${name}`, text, role });
+      }
+    };
+    const ride = (from: LobbyState, to: LobbyFloorKey): LobbyState => {
+      let state = from;
+      for (let guard = 0; guard < 12 && state.car !== to; guard += 1) state = lobbyStepToward(state, to);
+      return state;
+    };
+
+    for (const firstVisit of [true, false]) {
+      const who = firstVisit ? 'first' : 'returning';
+      seed(`${who}.idle`, LOBBY_INITIAL, firstVisit);
+      seed(`${who}.idle.warned`, lobbyPick(LOBBY_INITIAL, '8').state, firstVisit);
+      seed(`${who}.idle.holdWarned`, lobbyHold(LOBBY_INITIAL).state, firstVisit);
+      const arriving = lobbyCall(LOBBY_INITIAL).state;
+      seed(`${who}.arriving`, lobbyStepToward(arriving, 'L'), firstVisit);
+      const open = lobbyArrived(ride(arriving, 'L'));
+      seed(`${who}.open`, open, firstVisit);
+      seed(`${who}.open.closeWarned`, lobbyClose(open).state, firstVisit);
+      for (const floor of LOBBY_FLOORS) {
+        const key = lobbyFloorOf(floor.key).key;
+        const picked = lobbyPick(open, key).state;
+        seed(`${who}.picked.${key}`, picked, firstVisit);
+        seed(`${who}.held.${key}`, lobbyHold(picked).state, firstVisit);
+        const closing = lobbyClose(picked).state;
+        seed(`${who}.closing.${key}`, closing, firstVisit);
+        const travel = lobbyDepart(closing).state;
+        seed(`${who}.travel.${key}`, lobbyStepToward(travel, key), firstVisit);
+        const arrived = lobbyArrived(ride(travel, key));
+        seed(`${who}.arrived.${key}`, arrived, firstVisit);
+        const keyed = lobbyArrived(ride(lobbyDepart(lobbyClose(lobbyPick(lobbyTurnKey(open).state, key).state).state).state, key));
+        seed(`${who}.arrived.${key}.engineer`, keyed, firstVisit);
+        const back = lobbyDepart(lobbyRideBack(arrived).state).state;
+        seed(`${who}.back.${key}`, lobbyStepToward(back, 'L'), firstVisit);
+      }
+      seed(`${who}.open.engineerKey`, lobbyTurnKey(open).state, firstVisit);
+      /* The auto-close counting down to its own departure, one second at a time. */
+      let counting = lobbyPick(open, '8').state;
+      for (let second = 0; second < 8 && counting.phase === 'open'; second += 1) {
+        counting = lobbyTick(counting).state;
+        seed(`${who}.countdown.${String(second)}`, counting, firstVisit);
+      }
+    }
+
+    /* The two tables the view reads, claimed by name above and touched here, as `EVERYDAY_LANDING` does. */
+    void [LOBBY_COPY, LOBBY_WARNINGS, SCENARIO_ENTRIES].length;
+    for (const entry of SCENARIO_ENTRIES) {
+      seeds.push({ field: `lobby.scenarioEntry.${entry.id}.title`, text: entry.title, role: 'label' });
+      seeds.push({ field: `lobby.scenarioEntry.${entry.id}.blurb`, text: entry.blurb, role: 'prose' });
+    }
+    for (const [name, text] of Object.entries(LOBBY_COPY)) {
+      seeds.push({ field: `lobby.copy.${name}`, text, role: 'label' });
+    }
+
+    return singleRun(this.id, seeds);
+  },
+};
+
+/* -------------------------------------------------------------------------- *
  * The consent ask and its settings row — `docs/26` §§ 4 and 15.2
  * -------------------------------------------------------------------------- */
 
@@ -18355,6 +18493,7 @@ export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
    * wording whose fault it could take off a surface that exists to carry one.
    */
   EVERYDAY_LANDING,
+  EVERYDAY_LOBBY,
   /*
    * And the week's tower picker — PR #587, § D912. Appended last in turn, and the
    * fault-ordering rule is free here for the landing page's reason rather than the tutorial's: the

@@ -5,7 +5,7 @@ The owner paused the studio so a separate agent can work on the Main Menu withou
 ## State
 - **Base:** main at `5228fab` (wave AO whole), plus `7d9e85e`, which opens wave AP's reservation **D1445–D1540**. No lane has written a decision heading yet.
 - **Four lane commits, one per lane, each a WIP snapshot.** Each commit message lists what is done, what is started and what remains. The combined tree passes `tsc -b packages/viz`; no test project was run on it.
-  - `wip(AP-D1)` the stage's play defects (block D1445–D1450). Brief: `brief-d1.md`.
+  - `wip(AP-D1)` the stage's play defects (block D1446–D1450; D1445 went to the lobby on main). Brief: `brief-d1.md`.
   - `wip(AP-D2)` true lines in the career, the sandbox and the copy (D1451–D1458). Brief: `brief-d2.md`.
   - `wip(DT-2)` rows that teach, and the held top (D1471–D1480). Brief: `brief-dt2.md`.
   - `wip(DT-1)` days that can be won (D1459–D1470). Brief: `brief-dt1.md`. **It stops Midtown dealing weeks 2 to 4 until `data/week-pool.json` is filled.** The census checkpoint is `wip-dt1/week-pool-census.jsonl` (91 rows: Monday, Tuesday and part of Wednesday), resumed by `wip-dt1/census.sh`.

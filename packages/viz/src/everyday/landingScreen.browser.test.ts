@@ -36,6 +36,7 @@ import {
   CHROMIUM,
   HAS_BROWSER,
   openPage,
+  skipTheLobby,
   startShippedSite,
   type ShippedSite,
 } from '../dev/browserTier.test-helper.js';
@@ -59,6 +60,7 @@ afterAll(async () => {
 /** A cold page — a fresh context is a first visit, which is the state this screen is about. */
 async function coldLoad(): Promise<Page> {
   const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
+  await skipTheLobby(page);
   await page.goto(origin, { waitUntil: 'load' });
   await page.waitForFunction(
     () => document.querySelector<HTMLElement>('.menu-overlay')?.hidden === true,
@@ -139,6 +141,7 @@ describe.skipIf(!HAS_BROWSER)('the landing page — GitHub issue #244', () => {
    */
   it('is never preceded by the mode picker, from the first frame the shell paints', async () => {
     const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
+    await skipTheLobby(page);
     try {
       await page.addInitScript(() => {
         const seen: string[] = [];
@@ -199,6 +202,7 @@ describe.skipIf(!HAS_BROWSER)('the landing page — GitHub issue #244', () => {
    */
   it('does not replace its one control when the run lands', async () => {
     const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
+    await skipTheLobby(page);
     try {
       await page.addInitScript(() => {
         const mark = (): void => {

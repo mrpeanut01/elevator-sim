@@ -1987,7 +1987,7 @@ export interface StageSkipState {
   readonly hasRun?: boolean | undefined;
   /**
    * § D1361's sentence while another tab holds the day, or `undefined`: wave AP, lane AP-D1,
-   * [§ D1447](../../../../DECISIONS.md). The control is inert with it, since the stage takes no press.
+   * [§ D1448](../../../../DECISIONS.md). The control is inert with it, since the stage takes no press.
    */
   readonly heldBy?: string | undefined;
 }
@@ -2947,7 +2947,7 @@ export function stagePlayControlOf(input: {
   readonly dayEnded?: boolean;
   /**
    * § D1361's sentence while another tab holds the day, or `undefined`: wave AP, lane AP-D1,
-   * [§ D1447](../../../../DECISIONS.md), the post-AO panel's seat D (D7). The stage takes no press
+   * [§ D1448](../../../../DECISIONS.md), the post-AO panel's seat D (D7). The stage takes no press
    * then, and *▶ Play* was drawn live over it.
    */
   readonly heldBy?: string | undefined;

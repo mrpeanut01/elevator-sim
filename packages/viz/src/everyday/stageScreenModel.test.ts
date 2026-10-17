@@ -2315,7 +2315,7 @@ describe('the stage’s own state — wave AO, lane AO-4', () => {
   });
 
   /*
-   * Wave AP, lane AP-D1, § D1447, the post-AO panel's seat D (D7): behind § D1361's veil the stage
+   * Wave AP, lane AP-D1, § D1448, the post-AO panel's seat D (D7): behind § D1361's veil the stage
    * takes no press, and *▶ Play* and the skip were drawn live over it. Red before: `heldBy` was not
    * read, so a held stage with a run offered both.
    */

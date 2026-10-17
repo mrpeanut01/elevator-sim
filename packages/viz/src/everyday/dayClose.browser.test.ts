@@ -26,6 +26,7 @@ import {
   openPage,
   startShippedSite,
   type ShippedSite,
+  leaveLobbyIfShown,
 } from '../dev/browserTier.test-helper.js';
 
 let site: ShippedSite;
@@ -162,6 +163,8 @@ describe.skipIf(!HAS_BROWSER)('the house tally never goes backwards across a rel
 
       /* A reload keeps no sitting's copy; the continue tile brings the week back. */
       await page.reload({ waitUntil: 'load' });
+      /* § D1445: the reload opens the lobby; its *Main menu* is the way to the tile this case presses. */
+      await leaveLobbyIfShown(page);
       await page.waitForSelector('.everyday-continue-week', { timeout: 60_000 });
       await page.locator('.everyday-continue-week').click();
       /* § D1384 (lane AO-4, joined at integration): a filed Monday's tile opens Tuesday's brief directly. */

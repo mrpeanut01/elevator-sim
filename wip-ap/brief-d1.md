@@ -1,6 +1,6 @@
 ## Lane AP-D1: the stage's play defects
 
-Decision block **D1445–D1450**. Browser port for your own Chromium: **6011**. A new browser test file needs a port no other browser file uses (`browserTier.test.ts` checks), and its count is in `M2_MEASUREMENT.md` and `docs/31` (`viewportGateClaims.test.ts`).
+Decision block **D1446–D1450** (D1445 is the lobby on main; this lane's code already cites D1446 to D1449, renumbered up by one on resume). Browser port for your own Chromium: **6011**. A new browser test file needs a port no other browser file uses (`browserTier.test.ts` checks), and its count is in `M2_MEASUREMENT.md` and `docs/31` (`viewportGateClaims.test.ts`).
 
 Source: the post-AO panel, seat D's defects D1, D2, D7 and D9 (Engineer clock) in `rescore-ap/D.md`, and seat A's defect 4 in `rescore-ap/A.md`. Fix each on the shipped path, with a test that is red before and green after.
 

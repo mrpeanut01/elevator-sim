@@ -224,7 +224,7 @@ export type ScoredPaceReason = 'watching' | 'fast' | 'yours' | 'lost';
 
 /**
  * **How finely the stage finds the instant a day was lost**, in simulated seconds: wave AP, lane
- * AP-D1, [§ D1445](../../../../DECISIONS.md). The clock prints minutes, so a second is finer than
+ * AP-D1, [§ D1446](../../../../DECISIONS.md). The clock prints minutes, so a second is finer than
  * anything the card says; it bounds the bisection in {@link firstLostInstantOf} to about seventeen
  * reads across a ten-hour day.
  */
@@ -239,7 +239,7 @@ export const LOST_SCAN_STEP_S = 600;
 
 /**
  * **The instants at which the worst-wait goal can begin to read missed**, ascending: wave AP, lane
- * AP-D1, [§ D1445](../../../../DECISIONS.md), the post-AO panel's seat D (D1).
+ * AP-D1, [§ D1446](../../../../DECISIONS.md), the post-AO panel's seat D (D1).
  *
  * The worst-wait reading is not monotone in time. `shift/goals.ts#readGoal` grades a censored
  * maximum `pending` in either direction, and the maximum is censored whenever somebody still
@@ -268,7 +268,7 @@ export function worstWaitLossBeginsOf(legs: readonly VizLeg[], barS: number): re
 
 /**
  * **The first instant in `(fromS, toS]` at which the day reads lost**, or `undefined` where none
- * does: wave AP, lane AP-D1, [§ D1445](../../../../DECISIONS.md), the post-AO panel's seat D (D1).
+ * does: wave AP, lane AP-D1, [§ D1446](../../../../DECISIONS.md), the post-AO panel's seat D (D1).
  *
  * `readsLost` is the stage's own reading at an instant (`stageCall.ts#stageLostCardOf` over
  * `EverydayHost.goalsAt`), so the instant answered is one at which the card has words. `fromS` is

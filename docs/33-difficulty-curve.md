@@ -2567,25 +2567,34 @@ always moved.** Adding the mid-shift absence alone takes the measured day-1 miss
 
 | contract | building | what moved | missed | of | rate | in band |
 |---|---|---|---|---|---|---|
-| c6 | `chancery-house` | 16 % → **15 %**, the office-prestige **minimum**; let unchanged at 1.06 | 14 | 30 | **0.47** | **yes** |
-| c8 | `st-jude-hospital` | 8.5 % → **10.5 %**, inside the hospital profile's 6–11 | 14 | 30 | **0.47** | **yes** |
+| c6 | `chancery-house` | 16 % → **15 %**, the office-prestige **minimum**; let unchanged at 1.06 | 23 | 50 | **0.46** | **yes** |
+| c8 | `st-jude-hospital` | 8.5 % → **10.5 %**, inside the hospital profile's 6–11 | 28 | 50 | **0.56** | **yes** |
 | c9 | `harbour-point` | **nothing** — in band with the absence as it stands | 28 | 50 | **0.56** | **yes** |
-| c2 | `midtown-office` | let 0.395 → **0.34** | 15 | 30 | **0.50** | **yes** |
+| c2 | `midtown-office` | let 0.395 → **0.34** | 24 | 50 | **0.48** | **yes** |
 | c7 | `crown-hotel` | **nothing** — § 4.7m's row, unmoved | 22 | 50 | **0.44** | **yes** |
-| c3 | `secure-tower` | 12 % → **11 %**, the office-standard **minimum** | 16 | 30 | **0.53** | **yes** |
-| c10 | `ashgate` | 13.5 % → **12 %**, inside the office-standard 11–15 | 13 | 30 | **0.43** | **yes** |
+| c3 | `secure-tower` | 12 % → **11 %**, the office-standard **minimum** | 28 | 50 | **0.56** | **yes** |
+| c10 | `ashgate` | 13.5 % → **12 %**, inside the office-standard 11–15 | 22 | 50 | **0.44** | **yes** |
 
-**Read the budget column.** Five of the seven are measured at **30** seeds and two at **50**, and
-that is stated rather than smoothed: § 4.7d's published budget is 50, so those five rows are a
-narrower measurement than the table they sit beside and a re-measurement at 50 is owed. They are
-published at 30 because the rebalance was bracketed at that budget — `c6` at 15 % on a 0.98 let
-reads **0.20 of 30**, under the floor, so the pair that ships is between two measured misses rather
-than at the first value that cleared, which is § 4.7j's own discipline.
+**Every row is now at the table's budget of 50.** Five rows were first published at **30** seeds,
+the budget the rebalance was bracketed at — `c6` at 15 % on a 0.98 let reads **0.20 of 30**, under
+the floor, so the pair that ships sits between two measured misses, § 4.7j's own discipline — and
+GitHub issue #590 asked for them at 50. **Re-measured 2026-10-17** on the head of
+`claude/game-issue-triage-build-fiht9l` (`0bf0c37`) with `CONTRACT_CURVE_SWEEP=1
+CONTRACT_CURVE_SEEDS=50 CONTRACT_CURVE_ONLY=c2,c3,c6,c8,c10,c7,c9 CONTRACT_CURVE_OUT=<path> npx
+vitest run packages/viz/src/shift/contractCurve.sweep.test.ts` — day 1, `collective`, seeds
+`20 260 824 + 7 919 n` for `n` = 0 to 49, the shipped five-goal set — and cross-checked seed by seed
+on the as-built arm of `PRESS_LADDER_SWEEP=1 PRESS_LADDER_SEEDS=50 PRESS_LADDER_FROM=0
+PRESS_LADDER_ONLY=c2,c3,c6,c8,c10`, which agrees on every count. **Seeds 0–29 reproduce the old
+figures exactly** (15, 16, 14, 14, 13 of 30), so what moved is the twenty new seeds, not the tree;
+`c7` and `c9` re-read 22 and 28 of 50, as published. **All five stay inside `[1/3, 2/3]`**: `c2`
+0.50 → **0.48**, `c3` 0.53 → **0.56**, `c6` 0.47 → **0.46**, `c8` 0.47 → **0.56**, `c10` 0.43 →
+**0.44**. No rung and no band moved. `c8`'s misses are all on the worst wait (28 of 28), which is
+the finding below read at the larger budget.
 
 **DC-6 is untouched**, because no `missRateTarget` moved: the declared order still reads 0.36, 0.36,
 0.40, 0.42, 0.46, 0.50, 0.52, 0.52, 0.65 × 8 and never falls. What moved is the **measurement**, and
-two rows now sit further from their target than they did — `c9` at 0.56 against 0.42, `c10` at 0.43
-against 0.52. A target is design intent and a rate is a measurement; this section has never claimed
+three rows now sit further from their target than they did — `c8` at 0.56 against 0.40, `c9`
+at 0.56 against 0.42, `c10` at 0.44 against 0.52. A target is design intent and a rate is a measurement; this section has never claimed
 they must meet.
 
 **`c8` is the row with a finding in it.** With **one** car booked out, every day-1 miss on that

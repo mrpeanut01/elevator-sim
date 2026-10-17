@@ -1618,7 +1618,7 @@ function mountStage(
   let lostCardShown = false;
   /**
    * The furthest instant the stage has read the day not lost at, on the run it is playing: the
-   * previous frame's playhead, so each frame reads the stretch since it (§ D1445). `undefined`
+   * previous frame's playhead, so each frame reads the stretch since it (§ D1446). `undefined`
    * before the first read and after a fresh adoption.
    */
   let lostReadToS: number | undefined;
@@ -1636,7 +1636,7 @@ function mountStage(
 
   /**
    * **Where in `(fromS, toS]` the stage should stop on the lost day's card**, or `undefined`: wave
-   * AP, lane AP-D1, [§ D1445](../../../../DECISIONS.md), the post-AO panel's seat D (D1). Only on the
+   * AP, lane AP-D1, [§ D1446](../../../../DECISIONS.md), the post-AO panel's seat D (D1). Only on the
    * player's own scored day, once per attempt, never over a call's card or a pinned call still
    * standing (§ D1435), and never at the day's last instant, which the bar already says has run out.
    */
@@ -1654,7 +1654,7 @@ function mountStage(
 
   /**
    * **Stop on the lost day's card at `atS`**: § D1435's stop, put on the instant the day was lost
-   * (§ D1445) as § D1153 puts the stage on a call's second. The playhead goes back to it, so the
+   * (§ D1446) as § D1153 puts the stage on a call's second. The playhead goes back to it, so the
    * clock, the header and the card's fact describe one instant. Whatever was carrying the stage on
    * (a skip, a wait at a call that has not been raised) ends here, because a lost day asks no call
    * and the stage never ends the day for the player.
@@ -1691,7 +1691,7 @@ function mountStage(
    * the transport plays again the card goes.
    *
    * **The stretch since the last frame, read at the playhead the frame ends on**: wave AP, lane
-   * AP-D1, [§ D1445](../../../../DECISIONS.md), the post-AO panel's seat D (D1). It read one
+   * AP-D1, [§ D1446](../../../../DECISIONS.md), the post-AO panel's seat D (D1). It read one
    * instant, the frame's, and read it before the frame's own stops. A frame at `600×` that crossed a
    * call and then the loss latched the card at an instant past the call, the stage went back to the
    * call, and after the answer the card was spent, so the rest played under the `lost` line with no
@@ -1897,7 +1897,7 @@ function mountStage(
     } else {
       /*
        * Lane AO-4: the button is held while the stage works out a call; a key press is held with it.
-       * **But the press is kept**: wave AP, lane AP-D1, [§ D1446](../../../../DECISIONS.md), the
+       * **But the press is kept**: wave AP, lane AP-D1, [§ D1447](../../../../DECISIONS.md), the
        * post-AO panel's seats D (D2) and A (defect 4). A call can stand at the day's first instant
        * (a wrinkle that begins as the day does, the lift-service Wednesday's car C from 08:00), so
        * § 7.3's *Start* was pressed while the stage worked it out and was swallowed: the day had not
@@ -2345,7 +2345,7 @@ function mountStage(
     waitingOnCall = false;
     /*
      * **A skip that would run past the instant the day was lost stops there, on the card, once** —
-     * wave AP, lane AP-D1, [§ D1445](../../../../DECISIONS.md), reading swarm DR's § Q4 (*the stage
+     * wave AP, lane AP-D1, [§ D1446](../../../../DECISIONS.md), reading swarm DR's § Q4 (*the stage
      * stops once*) as binding a skip as it binds a frame, the way § D1151 stops a skip at a call. The
      * card's *End the day* files the day, and a second press of the skip runs it to the end.
      */
@@ -2470,7 +2470,7 @@ function mountStage(
      * stop with no call behind it.
      */
     /*
-     * Wave AP, lane AP-D1, [§ D1446](../../../../DECISIONS.md): **a skip carried across the wait is a
+     * Wave AP, lane AP-D1, [§ D1447](../../../../DECISIONS.md): **a skip carried across the wait is a
      * reason to go on by itself.** {@link skipToEnd} marks it, and only {@link pace} marked the wait,
      * which it does only while the transport plays; a skip pressed at a call standing at the day's
      * first instant, before anything played, was carried and never read, so the first press did
@@ -2859,7 +2859,7 @@ function mountStage(
       lostCard.hidden = true;
       lostReadToS = undefined;
     } else if (lostReadToS !== undefined && lostReadToS > resumeAtS) {
-      /* § D1445: the re-simulated run is the same day only up to the press, so it is read on from there. */
+      /* § D1446: the re-simulated run is the same day only up to the press, so it is read on from there. */
       lostReadToS = resumeAtS;
     }
     /*
@@ -3010,7 +3010,7 @@ function mountStage(
       runFailed: host.runFailure?.() !== undefined,
     });
     /*
-     * **Behind the veil, no other day** — wave AP, lane AP-D1, [§ D1447](../../../../DECISIONS.md),
+     * **Behind the veil, no other day** — wave AP, lane AP-D1, [§ D1448](../../../../DECISIONS.md),
      * the post-AO panel's seats D (D7) and A (6). A second tab opened on *Continue your week* while
      * the first held the attempt adopted the page's own run (an 08:30 hour on another seed, another
      * car booked out, other bars) and drew it under *your attempt at this day is still open*, with a
@@ -3109,7 +3109,7 @@ function mountStage(
      * on its face, as the skip beside it is (§ D1381, lane AO-3).
      */
     const waitingNow = waitingAtCall();
-    /* § D1447: while another tab holds the day, neither control is drawn as if it would act. */
+    /* § D1448: while another tab holds the day, neither control is drawn as if it would act. */
     const heldBy =
       heldAtS === undefined
         ? undefined
@@ -3523,8 +3523,8 @@ function mountStage(
     /*
      * § D1218: how far the day's attempt has been shown, so leaving and coming back resumes here.
      * Noted at the playhead the frame ends on, after the stops that put it back (a call's second,
-     * § D1153; the lost instant, § D1445), so the reach is never a frame past where the stage
-     * stopped. Wave AP, lane AP-D1: the Engineer transport follows this reach (§ D1448).
+     * § D1153; the lost instant, § D1446), so the reach is never a frame past where the stage
+     * stopped. Wave AP, lane AP-D1: the Engineer transport follows this reach (§ D1449).
      */
     if (context.ctx === 'daily') host.noteShown(recording, playback.simTimeS);
     /* A rush asks nothing of the day: § 9.2 has no brief and no goals to grade. */
@@ -3886,7 +3886,7 @@ function mountStage(
     started = true;
     skipping = false;
     waitingOnCall = false;
-    /* § D1445: the player has ended the day, so the run out to its end stops on no card. */
+    /* § D1446: the player has ended the day, so the run out to its end stops on no card. */
     lostCardShown = true;
     showCallCard(false);
     host.endDayEarly(atS);

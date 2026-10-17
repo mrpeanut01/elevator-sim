@@ -547,7 +547,7 @@ async function coldLoad(): Promise<Page> {
     undefined,
     { timeout: 30_000 },
   );
-  await page.waitForSelector('.everyday-landing, .everyday-tutorial, .everyday-mode[data-screen]', {
+  await page.waitForSelector('.everyday-lobby, .everyday-landing, .everyday-tutorial, .everyday-mode[data-screen]', {
     timeout: 30_000,
   });
   return page;
@@ -821,6 +821,7 @@ describe.skipIf(!HAS_BROWSER)('a walkthrough of the accessibility tree — GitHu
       pressable[0]?.click();
       let frames = 0;
       let alarmUpFrames = 0;
+      const began = performance.now();
       await new Promise<void>((done) => {
         const tick = (): void => {
           frames += 1;
@@ -829,7 +830,21 @@ describe.skipIf(!HAS_BROWSER)('a walkthrough of the accessibility tree — GitHu
           ) {
             alarmUpFrames += 1;
           }
-          if (frames >= 300) {
+          /*
+           * At least 300 frames, and on until the alarm has been up for one, to a bound of 1 200.
+           * The window used to be exactly 300, which reaches 08:38 at 600× with a frame or two to
+           * spare when the run starts promptly and with none when it starts a beat late: measured on
+           * a 5-run probe, main and the § D1445 branch alike left the alarm up for 2 of 300 frames
+           * in three runs of five, one frame from red on either tree, and under load it went red. The
+           * assertion below is unchanged; this only stops the window ending a frame before the
+           * thing it is there to see.
+           *
+           * The bound is wall-clock, not a frame count. 1 200 frames still went red in PR #624's CI
+           * with this case unchanged, because under batch load the playhead crosses less of the
+           * morning per frame, so a frame cap ends before 08:38. Waiting up to 45 s for the alarm
+           * keeps the case inside its 120 s budget, and the assertion below is still unchanged.
+           */
+          if ((frames >= 300 && alarmUpFrames > 0) || performance.now() - began > 45_000) {
             done();
             return;
           }

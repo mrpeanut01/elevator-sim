@@ -5823,7 +5823,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
     /* § D1361 — another tab holds the attempt on the week's day, or this run is one that moved on there. */
     attemptHeldElsewhere: () => attemptHeldElsewhere(),
     attemptRunStale: (recording) => attemptRunStale(recording),
-    /* § D1447 — the run this tab plays of the attempt, or the one another tab took over. */
+    /* § D1448 — the run this tab plays of the attempt, or the one another tab took over. */
     attemptRunHere: (recording) => recording === attemptRecording || attemptRunStale(recording),
     /* § D1360 — the Everyday screens' refusal over the day an attempt stands on, or over the write. */
     attemptHold: (patch) => watchOnlyRefusal(state, patch, everydayHoldSentence),
@@ -6618,11 +6618,11 @@ function boot(ui: Elements, resources: BrowserResources): void {
     if (playback.reach !== reach) playback.setReach(reach);
     /*
      * **And while the stage has the page, this transport stands where the stage does** — wave AP,
-     * lane AP-D1, [§ D1448](../../../../DECISIONS.md), the post-AO panel's seat D (D9: the Engineer's
+     * lane AP-D1, [§ D1449](../../../../DECISIONS.md), the post-AO panel's seat D (D9: the Engineer's
      * clock read 08:10 while the stage was held at 08:36). The reach capped the transport and moved
      * nothing: a transport paused on an earlier visit stayed where it was paused, so *Switch to
      * Engineer* opened on an instant the stage had long left. Behind the cover it follows the reach,
-     * which the stage notes at the instant it stops on (§ D1153's call second, § D1445's loss); on
+     * which the stage notes at the instant it stops on (§ D1153's call second, § D1446's loss); on
      * this surface it is the player's to pause and scrub, as far as the reach.
      */
     if (reach !== null && !engineerHasThePage() && playback.simTimeS !== reach) playback.seekTo(reach);

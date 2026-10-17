@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+<link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@400;500;600;700&family=Instrument+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+html,body{height:100%;margin:0}
+body{background:#1C1A17;color:#F7F2E8;font-family:'Instrument Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:#F2A63B}a:hover{color:#F7F2E8}
+</style>
+</helmet>
+
+<div data-screen-label="Lobby" style="min-height:100vh;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:22px 18px 26px;background:repeating-linear-gradient(90deg,#2C2823 0 178px,#24211C 178px 180px);overflow:hidden">
+
+  <div style="display:flex;flex-direction:column;align-items:center;gap:3px">
+    <div style="font:500 10px 'DM Mono',ui-monospace,monospace;letter-spacing:.3em;color:#8D8271">EVERYDAY MODE</div>
+    <div style="font-family:'Familjen Grotesk',sans-serif;font-weight:700;font-size:22px;letter-spacing:.14em;color:#E6DCCB">ELEVATOR SIM</div>
+  </div>
+
+  <div style="display:flex;align-items:center;gap:16px;background:#141210;border:2px solid #4A443A;border-radius:8px;padding:7px 18px;box-shadow:inset 0 2px 8px rgba(0,0,0,.6)">
+    <span style="font:500 15px 'DM Mono',ui-monospace,monospace;color:{{ upColor }};width:14px;text-align:center">▲</span>
+    <span style="font:500 34px/1 'DM Mono',ui-monospace,monospace;color:#F2A63B;min-width:44px;text-align:center;text-shadow:0 0 10px rgba(242,166,59,.55)">{{ car }}</span>
+    <span style="font:500 15px 'DM Mono',ui-monospace,monospace;color:{{ downColor }};width:14px;text-align:center">▼</span>
+  </div>
+
+  <div style="display:flex;align-items:center;gap:22px;max-width:100%">
+
+    <div style="display:flex;flex-direction:column;align-items:center">
+      <div style="width:min(76vw,820px);height:min(calc(100vh - 170px),720px);box-sizing:border-box;padding:16px 16px 0;border-radius:6px 6px 0 0;background:linear-gradient(180deg,#A89C87,#7E7465);box-shadow:0 20px 50px rgba(0,0,0,.45)">
+        <div style="position:relative;width:100%;height:100%;overflow:hidden;background:linear-gradient(180deg,#F1E9DA,#D8CBB4);box-shadow:inset 0 0 0 2px #5C554A">
+
+          <div style="position:absolute;left:8%;right:8%;top:0;height:9px;background:#FFF8EA;box-shadow:0 0 40px 12px rgba(255,240,210,.55)"></div>
+          <div style="position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0 24.6%,rgba(110,102,90,.22) 24.6% 25%)"></div>
+          <div style="position:absolute;left:0;right:0;top:62%;height:7px;background:linear-gradient(180deg,#E8C27A,#A57A33);box-shadow:0 3px 4px rgba(0,0,0,.18)"></div>
+          <div style="position:absolute;left:0;right:0;bottom:0;height:7%;background:linear-gradient(180deg,#6E665A,#4C463D)"></div>
+
+          <sc-if value="{{ notArrived }}" hint-placeholder-val="{{ true }}">
+            <div ref="{{ fitBox }}" style="position:absolute;inset:0;box-sizing:border-box;padding:22px 4% 40px;display:flex;align-items:center;justify-content:center;overflow:hidden">
+            <div ref="{{ fitInner }}" style="flex:none;width:100%;display:flex;gap:28px;align-items:center;justify-content:center;transform:scale({{ fit }});transform-origin:center center">
+
+              <div style="flex:1 1 240px;max-width:380px;min-width:0;min-height:300px;box-sizing:border-box;background:#1B1916;border:7px solid #3A352E;border-radius:12px;padding:22px 22px 18px;display:flex;flex-direction:column;gap:10px;box-shadow:0 10px 26px rgba(0,0,0,.28)">
+                <div style="display:flex;align-items:center;gap:10px">
+                  <span style="font:500 10px 'DM Mono',ui-monospace,monospace;letter-spacing:.16em;color:#8D8271">{{ dKicker }}</span>
+                  <sc-if value="{{ held }}" hint-placeholder-val="{{ false }}">
+                    <span style="margin-left:auto;font:500 9.5px 'DM Mono',ui-monospace,monospace;letter-spacing:.14em;color:#23201C;background:#F2A63B;border-radius:4px;padding:3px 6px">DOORS HELD</span>
+                  </sc-if>
+                </div>
+                <div style="font-family:'Familjen Grotesk',sans-serif;font-size:30px;line-height:1.05;font-weight:700;letter-spacing:-.02em;color:#F7F2E8;text-wrap:pretty">{{ dTitle }}</div>
+                <div style="font-size:14.5px;line-height:1.55;color:#C6B79F;text-wrap:pretty">{{ dBody }}</div>
+                <div style="font:500 11.5px 'DM Mono',ui-monospace,monospace;color:#F2A63B">{{ dState }}</div>
+                <div style="margin-top:auto;padding-top:12px;border-top:1px solid #3A352E;display:flex;align-items:center;gap:10px">
+                  <span style="font:500 11px 'DM Mono',ui-monospace,monospace;color:{{ statusColor }};letter-spacing:.04em">{{ statusLine }}</span>
+                  <span style="margin-left:auto;height:4px;width:70px;border-radius:2px;background:#3A352E;overflow:hidden">
+                    <span style="display:block;height:100%;width:{{ countPct }};background:#F2A63B;transition:width 1s linear"></span>
+                  </span>
+                </div>
+              </div>
+
+              <div style="flex:none;width:304px;box-sizing:border-box;position:relative;border-radius:8px;padding:16px 18px 16px;background:repeating-linear-gradient(90deg,rgba(255,255,255,.025) 0 1px,transparent 1px 3px),linear-gradient(180deg,#38332C,#26221D);box-shadow:0 14px 30px rgba(0,0,0,.35),inset 0 0 0 1px #4A443A;display:flex;flex-direction:column;gap:9px">
+                <span style="position:absolute;top:7px;left:7px;width:6px;height:6px;border-radius:50%;background:#6E665A"></span>
+                <span style="position:absolute;top:7px;right:7px;width:6px;height:6px;border-radius:50%;background:#6E665A"></span>
+                <span style="position:absolute;bottom:7px;left:7px;width:6px;height:6px;border-radius:50%;background:#6E665A"></span>
+                <span style="position:absolute;bottom:7px;right:7px;width:6px;height:6px;border-radius:50%;background:#6E665A"></span>
+
+                <div style="background:#120F0C;border-radius:5px;padding:8px 12px;display:flex;align-items:center;gap:10px;box-shadow:inset 0 2px 6px rgba(0,0,0,.7)">
+                  <span style="font:500 26px/1 'DM Mono',ui-monospace,monospace;color:#F2A63B;min-width:30px;text-shadow:0 0 8px rgba(242,166,59,.5)">{{ car }}</span>
+                  <span style="font:500 12px 'DM Mono',ui-monospace,monospace;color:#F2A63B">{{ dirGlyph }}</span>
+                  <span style="margin-left:auto;font:500 10px 'DM Mono',ui-monospace,monospace;color:#C9893A;letter-spacing:.08em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px">{{ lcdLine }}</span>
+                </div>
+
+                <div style="font:500 9px 'DM Mono',ui-monospace,monospace;letter-spacing:.2em;color:#8D8271;border-bottom:1px solid #4A443A;padding:4px 0 3px">PLAY</div>
+                <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px 10px"><sc-for list="{{ playFloors }}" as="f" hint-placeholder-count="4">
+                  <button onClick="{{ f.press }}" style="display:flex;align-items:center;gap:8px;background:none;border:0;padding:0;cursor:pointer;text-align:left;width:100%;min-width:0">
+                    <span style="flex:none;width:36px;height:36px;border-radius:50%;box-sizing:border-box;border:2px solid {{ f.ring }};background:{{ f.bg }};box-shadow:{{ f.glow }};display:flex;align-items:center;justify-content:center;font:500 14px 'DM Mono',ui-monospace,monospace;color:{{ f.numColor }};transition:all .18s">{{ f.n }}</span>
+                    <span style="min-width:0;flex:1;font-size:12.5px;line-height:1.2;font-weight:600;color:{{ f.labelColor }}">{{ f.name }}</span>
+                  </button>
+                </sc-for></div>
+                <div style="font:500 9px 'DM Mono',ui-monospace,monospace;letter-spacing:.2em;color:#8D8271;border-bottom:1px solid #4A443A;padding:4px 0 3px">DESIGN</div>
+                <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px 10px"><sc-for list="{{ designFloors }}" as="f" hint-placeholder-count="3">
+                  <button onClick="{{ f.press }}" style="display:flex;align-items:center;gap:8px;background:none;border:0;padding:0;cursor:pointer;text-align:left;width:100%;min-width:0">
+                    <span style="flex:none;width:36px;height:36px;border-radius:50%;box-sizing:border-box;border:2px solid {{ f.ring }};background:{{ f.bg }};box-shadow:{{ f.glow }};display:flex;align-items:center;justify-content:center;font:500 14px 'DM Mono',ui-monospace,monospace;color:{{ f.numColor }};transition:all .18s">{{ f.n }}</span>
+                    <span style="min-width:0;flex:1;font-size:12.5px;line-height:1.2;font-weight:600;color:{{ f.labelColor }}">{{ f.name }}</span>
+                  </button>
+                </sc-for></div>
+                <div style="font:500 9px 'DM Mono',ui-monospace,monospace;letter-spacing:.2em;color:#8D8271;border-bottom:1px solid #4A443A;padding:4px 0 3px">WORLD</div>
+                <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px 10px"><sc-for list="{{ worldFloors }}" as="f" hint-placeholder-count="2">
+                  <button onClick="{{ f.press }}" style="display:flex;align-items:center;gap:8px;background:none;border:0;padding:0;cursor:pointer;text-align:left;width:100%;min-width:0">
+                    <span style="flex:none;width:36px;height:36px;border-radius:50%;box-sizing:border-box;border:2px solid {{ f.ring }};background:{{ f.bg }};box-shadow:{{ f.glow }};display:flex;align-items:center;justify-content:center;font:500 14px 'DM Mono',ui-monospace,monospace;color:{{ f.numColor }};transition:all .18s">{{ f.n }}</span>
+                    <span style="min-width:0;flex:1;font-size:12.5px;line-height:1.2;font-weight:600;color:{{ f.labelColor }}">{{ f.name }}</span>
+                  </button>
+                </sc-for></div>
+
+                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:6px;padding-top:12px;border-top:1px solid #4A443A">
+                  <button onClick="{{ openDoors }}" title="Open the doors, or stop them closing" style="display:flex;flex-direction:column;align-items:center;gap:5px;background:none;border:0;padding:0;cursor:pointer">
+                    <span style="width:44px;height:44px;border-radius:50%;box-sizing:border-box;border:2px solid {{ openRing }};background:radial-gradient(circle at 50% 35%,#4A443A,#26221D);display:flex;align-items:center;justify-content:center;color:{{ openRing }};transition:all .15s">
+                      <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M2 12l6-5v10zM22 12l-6-5v10z"></path><rect x="11" y="5" width="2" height="14"></rect></svg>
+                    </span>
+                    <span style="font:500 9px 'DM Mono',ui-monospace,monospace;letter-spacing:.16em;color:#C6B79F">OPEN</span>
+                  </button>
+                  <button onClick="{{ closeDoors }}" title="Close the doors and go" style="display:flex;flex-direction:column;align-items:center;gap:5px;background:none;border:0;padding:0;cursor:pointer">
+                    <span style="width:44px;height:44px;border-radius:50%;box-sizing:border-box;border:2px solid {{ closeRing }};background:radial-gradient(circle at 50% 35%,#4A443A,#26221D);display:flex;align-items:center;justify-content:center;color:{{ closeRing }};transition:all .15s">
+                      <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M10 12L4 7v10zM14 12l6-5v10z"></path><rect x="11" y="5" width="2" height="14"></rect></svg>
+                    </span>
+                    <span style="font:500 9px 'DM Mono',ui-monospace,monospace;letter-spacing:.16em;color:#C6B79F">CLOSE</span>
+                  </button>
+                  <button onClick="{{ toggleHold }}" title="Keep the doors open while you read" style="display:flex;flex-direction:column;align-items:center;gap:5px;background:none;border:0;padding:0;cursor:pointer">
+                    <span style="width:44px;height:44px;border-radius:50%;box-sizing:border-box;border:2px solid {{ holdRing }};background:{{ holdBg }};box-shadow:{{ holdGlow }};display:flex;align-items:center;justify-content:center;color:{{ holdRing }};transition:all .15s">
+                      <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"></rect><rect x="14" y="5" width="4" height="14" rx="1"></rect></svg>
+                    </span>
+                    <span style="font:500 9px 'DM Mono',ui-monospace,monospace;letter-spacing:.16em;color:#C6B79F">HOLD</span>
+                  </button>
+                </div>
+
+                <button onClick="{{ turnKey }}" title="Engineer key: floors open in the Engineer view" style="display:flex;align-items:center;gap:10px;background:none;border:0;padding:6px 0 0;cursor:pointer;width:100%">
+                  <span style="font:500 9px 'DM Mono',ui-monospace,monospace;letter-spacing:.14em;color:{{ keyOffColor }}">CASUAL</span>
+                  <span style="width:30px;height:30px;border-radius:50%;background:radial-gradient(circle,#8D8271,#4A443A);box-shadow:inset 0 1px 3px rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center">
+                    <span style="width:4px;height:18px;border-radius:2px;background:#1B1916;transform:{{ keyRot }};transition:transform .3s"></span>
+                  </span>
+                  <span style="font:500 9px 'DM Mono',ui-monospace,monospace;letter-spacing:.14em;color:{{ keyOnColor }}">ENGINEER</span>
+                </button>
+              </div>
+            </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ isArrived }}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute;inset:0;box-sizing:border-box;padding:6% 8% 10%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:12px">
+              <div style="font:500 11px 'DM Mono',ui-monospace,monospace;letter-spacing:.24em;color:#6E665A">FLOOR {{ arrFloor }}</div>
+              <div style="font-family:'Familjen Grotesk',sans-serif;font-size:clamp(34px,5vw,56px);line-height:1;font-weight:700;letter-spacing:-.03em;color:#23201C">{{ arrName }}</div>
+              <div style="font-size:16px;line-height:1.55;color:#4C463D;max-width:46ch;text-wrap:pretty">{{ arrBody }}</div>
+              <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:10px">
+                <a href="{{ href }}" style="text-decoration:none;background:#23201C;color:#F7F2E8;border-radius:10px;padding:12px 20px;font-family:'Familjen Grotesk',sans-serif;font-size:16px;font-weight:600" style-hover="background:#B8462B;color:#F7F2E8">Step out →</a>
+                <button onClick="{{ rideBack }}" style="cursor:pointer;background:transparent;color:#23201C;border:1.5px solid #8D8271;border-radius:10px;padding:11px 18px;font-family:'Familjen Grotesk',sans-serif;font-size:16px;font-weight:600" style-hover="border-color:#23201C">Back to the lobby</button>
+              </div>
+              <div style="font:500 11px 'DM Mono',ui-monospace,monospace;color:#6E665A;min-height:14px">{{ arrNote }}</div>
+            </div>
+          </sc-if>
+
+          <div style="position:absolute;top:0;bottom:0;left:0;width:50%;z-index:2;transform:{{ doorL }};transition:transform {{ doorDur }} cubic-bezier(.65,0,.25,1);background:repeating-linear-gradient(90deg,rgba(255,255,255,.07) 0 1px,rgba(0,0,0,.04) 1px 3px),linear-gradient(90deg,#A99C86,#CDC2AE 60%,#B4A893);box-shadow:inset -2px 0 0 rgba(0,0,0,.3)"></div>
+          <div style="position:absolute;top:0;bottom:0;right:0;width:50%;z-index:2;transform:{{ doorR }};transition:transform {{ doorDur }} cubic-bezier(.65,0,.25,1);background:repeating-linear-gradient(90deg,rgba(255,255,255,.07) 0 1px,rgba(0,0,0,.04) 1px 3px),linear-gradient(90deg,#B4A893,#CDC2AE 40%,#A99C86);box-shadow:inset 2px 0 0 rgba(255,255,255,.25)"></div>
+        </div>
+      </div>
+      <div style="width:calc(min(76vw,820px) + 24px);height:10px;background:linear-gradient(180deg,#C6B79F,#6E665A);border-radius:2px"></div>
+    </div>
+
+    <div style="flex:none;width:86px;box-sizing:border-box;border-radius:8px;padding:16px 0 14px;background:linear-gradient(180deg,#38332C,#26221D);box-shadow:0 10px 24px rgba(0,0,0,.35),inset 0 0 0 1px #4A443A;display:flex;flex-direction:column;align-items:center;gap:10px">
+      <span style="width:22px;height:8px;clip-path:polygon(50% 0,100% 100%,0 100%);background:{{ lanternColor }};transition:background .3s"></span>
+      <button onClick="{{ callCar }}" title="Call the car" style="width:52px;height:52px;border-radius:50%;box-sizing:border-box;cursor:pointer;border:2px solid {{ callRing }};background:radial-gradient(circle at 50% 35%,#4A443A,#26221D);box-shadow:{{ callGlow }};display:flex;align-items:center;justify-content:center;color:{{ callRing }};transition:all .2s;padding:0">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 5l7 10H5z"></path></svg>
+      </button>
+      <span style="font:500 9px 'DM Mono',ui-monospace,monospace;letter-spacing:.18em;color:#C6B79F">CALL</span>
+    </div>
+  </div>
+
+  <div style="font:500 11.5px 'DM Mono',ui-monospace,monospace;letter-spacing:.06em;color:#C6B79F;min-height:16px;text-align:center">{{ hint }}</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;autoClose&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:6,&quot;min&quot;:0,&quot;max&quot;:12,&quot;step&quot;:1,&quot;unit&quot;:&quot;s&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Doors&quot;},&quot;startOpen&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Doors&quot;},&quot;handoff&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Game&quot;},&quot;sound&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Game&quot;},&quot;motion&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;full&quot;,&quot;options&quot;:[&quot;full&quot;,&quot;reduced&quot;],&quot;tsType&quot;:&quot;'full' | 'reduced'&quot;,&quot;section&quot;:&quot;Game&quot;}}">
+const FLOORS = [
+  { k: 'today', n: '8', g: 'play', name: 'Today\u2019s tower', time: '3 MIN', screen: 'door',
+    body: 'The same building and crowd as everyone else, once a day. Your dispatcher against the world.', state: 'ready · counts on the board' },
+  { k: 'campaign', n: '7', g: 'play', name: 'Campaign', time: 'ONGOING', screen: 'towers',
+    body: 'Buildings hire you a month at a time. Earn per cleared day, spend it on the tower, and grow from one building to eight as your standing rises.', state: '8 buildings' },
+  { k: 'rush', n: '6', g: 'play', name: 'Endless rush', time: '5 MIN', screen: 'rush',
+    body: 'One tower, arrivals climbing every three minutes until nothing drains. How far does your dispatcher get?', state: 'your furthest · wave 14' },
+  { k: 'fixit', n: '5', g: 'play', name: 'Fix a building', time: '5 MIN', screen: 'fixit',
+    body: 'A tower with one thing wrong and a tenant who has written in. Work out what, then repair it.', state: '' },
+  { k: 'workshop', n: '4', g: 'design', name: 'Dispatcher workshop', screen: 'workshop',
+    body: 'Build a dispatcher from its weights, name it, and take it into any mode.', state: '' },
+  { k: 'bench', n: '3', g: 'design', name: 'Test bench', screen: 'bench',
+    body: 'Run two dispatchers on the same crowd and see where they part ways.', state: '' },
+  { k: 'designer', n: '2', g: 'design', name: 'Design a building', screen: 'designer',
+    body: 'Set the floors, the cars and the crowd for a building of your own.', state: '' },
+  { k: 'week', n: '1', g: 'world', name: 'Your week', screen: 'week',
+    body: 'The last seven days: what you ran, where you placed, and your streak.', state: '' },
+  { k: 'board', n: 'L', g: 'world', name: 'Boards & ladder', screen: 'board',
+    body: 'Today\u2019s board and the season ladder. Watch anyone\u2019s run from here.', state: '' },
+];
+const ORDER = ['L', '1', '2', '3', '4', '5', '6', '7', '8'];
+
+class Component extends DCLogic {
+  state = { phase: 'idle', car: '6', dir: null, sel: null, held: false, count: 0, keyOn: false, flash: '', lantern: false, pressed: '' };
+  T = [];
+  closeId = 0;
+
+  later(fn, ms) { this.T.push(setTimeout(fn, ms)); }
+  fitBoxEl = null; fitInnerEl = null;
+  fitBox = (el) => { this.fitBoxEl = el; this.observe(); };
+  fitInner = (el) => { this.fitInnerEl = el; this.observe(); };
+  observe() {
+    if (!this.fitBoxEl || !this.fitInnerEl || !window.ResizeObserver) return;
+    if (this.ro) this.ro.disconnect();
+    this.ro = new ResizeObserver(() => this.refit());
+    this.ro.observe(this.fitBoxEl); this.ro.observe(this.fitInnerEl);
+    this.refit();
+  }
+  refit() {
+    const b = this.fitBoxEl, i = this.fitInnerEl; if (!b || !i) return;
+    const cs = getComputedStyle(b);
+    const availH = b.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+    const fit = Math.min(1, availH / Math.max(1, i.offsetHeight));
+    if (Math.abs(fit - (this.state.fit || 1)) > 0.005) this.setState({ fit });
+  }
+  componentDidMount() {
+    if (this.props.startOpen) this.setState({ phase: 'open', car: 'L', lantern: true });
+    this.tick = setInterval(() => {
+      const s = this.state, ac = this.ac();
+      if (s.phase === 'open' && s.sel && !s.held && ac > 0) {
+        if (s.count <= 1) this.close(); else this.setState({ count: s.count - 1 });
+      }
+    }, 1000);
+  }
+  componentWillUnmount() { if (this.ro) this.ro.disconnect(); clearInterval(this.tick); this.T.forEach(clearTimeout); }
+  ac() { const v = this.props.autoClose; return v == null ? 6 : v; }
+  reduced() { return this.props.motion === 'reduced' || !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches); }
+  doorMs() { return this.reduced() ? 1 : 1150; }
+  stepMs() { return this.reduced() ? 90 : 420; }
+
+  audio() {
+    if (this.props.sound === false) return null;
+    if (!this.ctx) { try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; } }
+    if (this.ctx.state === 'suspended') this.ctx.resume();
+    return this.ctx;
+  }
+  tone(f, t0, dur, g, type) {
+    const c = this.audio(); if (!c) return;
+    const o = c.createOscillator(), a = c.createGain(), t = c.currentTime + t0;
+    o.type = type || 'sine'; o.frequency.value = f;
+    a.gain.setValueAtTime(0.0001, t);
+    a.gain.exponentialRampToValueAtTime(g, t + 0.012);
+    a.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(a); a.connect(c.destination); o.start(t); o.stop(t + dur + 0.05);
+  }
+  ding() { this.tone(1318.5, 0, 1.3, 0.16); this.tone(2637, 0, 0.4, 0.02); this.tone(1046.5, 0.38, 1.8, 0.16); this.tone(2093, 0.38, 0.4, 0.02); }
+  click() { this.tone(1700, 0, 0.035, 0.03, 'square'); }
+  press(which) { this.click(); this.setState({ pressed: which }); this.later(() => this.setState({ pressed: '' }), 260); }
+  flash(msg) { this.setState({ flash: msg }); const id = ++this.flashId || (this.flashId = 1); this.later(() => { if (this.state.flash === msg) this.setState({ flash: '' }); }, 2200); }
+
+  ride(to, done) {
+    const b = ORDER.indexOf(to);
+    let i = ORDER.indexOf(this.state.car);
+    const dir = b > i ? 1 : -1;
+    this.setState({ dir: b === i ? null : (dir > 0 ? 'up' : 'down') });
+    const go = () => {
+      if (i === b) { this.setState({ dir: null }); done(); return; }
+      i += dir; this.setState({ car: ORDER[i] }); this.later(go, this.stepMs());
+    };
+    this.later(go, this.stepMs());
+  }
+  arrive(then) { this.ding(); this.setState({ lantern: true }); this.later(then, this.reduced() ? 30 : 450); }
+
+  call = () => {
+    this.audio();
+    if (this.state.phase !== 'idle') return;
+    this.press('call');
+    this.setState({ phase: 'arriving' });
+    this.ride('L', () => this.arrive(() => this.setState({ phase: 'open', count: this.ac() })));
+  };
+  pick = (f) => () => {
+    const s = this.state;
+    if (s.phase === 'idle') { this.flash('Call the car first'); return; }
+    if (s.phase !== 'open' && s.phase !== 'closing') return;
+    this.click();
+    if (f.n === 'L' && s.car === 'L') { this.setState({ sel: f.k, count: this.ac() }); return; }
+    this.setState({ sel: f.k, count: this.ac() });
+  };
+  close = () => {
+    const s = this.state;
+    if (s.phase !== 'open') return;
+    if (!s.sel) { this.flash('Choose a floor first'); return; }
+    const id = ++this.closeId;
+    this.setState({ phase: 'closing', lantern: false });
+    this.later(() => {
+      if (this.state.phase !== 'closing' || this.closeId !== id) return;
+      this.setState({ phase: 'travel' });
+      const f = FLOORS.find((x) => x.k === this.state.sel);
+      this.ride(f.n, () => this.arrive(() => {
+        this.setState({ phase: 'arrived' });
+        if (this.props.handoff) this.later(() => { if (this.state.phase === 'arrived') window.location.href = this.href(); }, 2400);
+      }));
+    }, this.doorMs() + 150);
+  };
+  closeDoors = () => { this.press('close'); this.close(); };
+  openDoors = () => {
+    const s = this.state;
+    this.press('open');
+    if (s.phase === 'idle') { this.call(); return; }
+    if (s.phase === 'closing') { this.closeId++; this.setState({ phase: s.car === 'L' || s.sel ? 'open' : 'open', lantern: true, count: this.ac() }); return; }
+    if (s.phase === 'open') this.setState({ count: this.ac() });
+  };
+  toggleHold = () => {
+    const s = this.state;
+    this.click();
+    if (s.phase !== 'open' && s.phase !== 'closing') { this.flash('Hold works while the doors are open'); return; }
+    if (s.phase === 'closing') { this.closeId++; this.setState({ phase: 'open', lantern: true }); }
+    this.setState({ held: !s.held, count: this.ac() });
+  };
+  turnKey = () => { this.click(); this.setState((s) => ({ keyOn: !s.keyOn })); };
+  rideBack = () => {
+    if (this.state.phase !== 'arrived') return;
+    this.click();
+    this.setState({ phase: 'closing', lantern: false, held: false });
+    const id = ++this.closeId;
+    this.later(() => {
+      if (this.closeId !== id) return;
+      this.setState({ phase: 'travel' });
+      this.ride('L', () => this.arrive(() => this.setState({ phase: 'open', sel: null, count: this.ac() })));
+    }, this.doorMs() + 150);
+  };
+  href() {
+    const f = FLOORS.find((x) => x.k === this.state.sel) || FLOORS[0];
+    return 'Elevator Sim Casual.dc.html#go=' + f.screen + (this.state.keyOn ? '&view=engineer' : '');
+  }
+
+  renderVals() {
+    const s = this.state, ac = this.ac();
+    const sel = FLOORS.find((x) => x.k === s.sel);
+    const open = s.phase === 'open' || s.phase === 'arrived';
+    const ms = this.doorMs();
+    const floorVals = (g) => FLOORS.filter((f) => f.g === g).map((f) => {
+      const lit = s.sel === f.k && s.phase !== 'arrived';
+      return Object.assign({}, f, {
+        time: f.time || '',
+        press: this.pick(f),
+        ring: lit ? '#F2A63B' : '#6E665A',
+        bg: lit ? 'radial-gradient(circle at 50% 40%,#5A4426,#2A2218)' : 'radial-gradient(circle at 50% 35%,#4A443A,#26221D)',
+        glow: lit ? '0 0 0 3px rgba(242,166,59,.16),0 0 16px rgba(242,166,59,.5)' : '0 2px 0 #15130F',
+        numColor: lit ? '#FFC56B' : '#E6DCCB',
+        labelColor: lit ? '#F7F2E8' : '#C6B79F',
+      });
+    });
+    let statusLine = '', statusColor = '#8D8271';
+    if (s.flash) { statusLine = s.flash; statusColor = '#F2A63B'; }
+    else if (s.phase === 'closing') statusLine = 'Doors closing';
+    else if (s.phase === 'travel') statusLine = 'Going up';
+    else if (s.phase === 'open' && s.held) statusLine = 'Held until you press Close or Hold';
+    else if (s.phase === 'open' && sel && ac > 0) statusLine = 'Doors close in ' + s.count;
+    else if (s.phase === 'open' && sel) statusLine = 'Press Close to go';
+    else if (s.phase === 'open') statusLine = 'Doors open';
+    const pct = s.phase === 'open' && sel && !s.held && ac > 0 ? Math.round((s.count / ac) * 100) + '%' : (s.held ? '100%' : '0%');
+    const lit = (on) => (on ? '#F2A63B' : '#C6B79F');
+    const keyHint = s.keyOn ? ' · engineer view' : '';
+    let hint = '';
+    if (s.flash && s.phase === 'idle') hint = s.flash;
+    else if (s.phase === 'idle') hint = 'Press CALL';
+    else if (s.phase === 'arriving') hint = 'Car on its way';
+    else if (s.phase === 'open' && !sel) hint = 'Choose a floor';
+    else if (s.phase === 'open') hint = (s.held ? 'Doors held. Press Close when ready' : 'Press Close to go now') + keyHint;
+    else if (s.phase === 'travel' && sel) hint = 'To ' + sel.n + ' · ' + sel.name;
+    return {
+      car: s.car,
+      upColor: s.dir === 'up' ? '#F2A63B' : '#3A352E',
+      downColor: s.dir === 'down' ? '#F2A63B' : '#3A352E',
+      dirGlyph: s.dir === 'up' ? '▲' : s.dir === 'down' ? '▼' : '',
+      lcdLine: sel ? sel.name.toUpperCase() : (s.keyOn ? 'ENGINEER KEY' : 'SELECT FLOOR'),
+      doorL: open ? 'translateX(-100%)' : 'translateX(0)',
+      doorR: open ? 'translateX(100%)' : 'translateX(0)',
+      doorDur: ms + 'ms',
+      notArrived: s.phase !== 'arrived',
+      fitBox: this.fitBox, fitInner: this.fitInner, fit: String(s.fit || 1),
+      isArrived: s.phase === 'arrived',
+      held: s.held,
+      dKicker: sel ? 'FLOOR ' + sel.n + (sel.time ? ' · ' + sel.time : '') : 'WELCOME ABOARD',
+      dTitle: sel ? sel.name : 'Choose a floor',
+      dBody: sel ? sel.body : 'Every floor is a way to play. Pick one on the panel, then close the doors.',
+      dState: sel ? (sel.state || '') : '',
+      statusLine, statusColor, countPct: pct,
+      playFloors: floorVals('play'), designFloors: floorVals('design'), worldFloors: floorVals('world'),
+      openDoors: this.openDoors, closeDoors: this.closeDoors, toggleHold: this.toggleHold, turnKey: this.turnKey,
+      openRing: lit(s.pressed === 'open'),
+      closeRing: lit(s.pressed === 'close' || s.phase === 'closing'),
+      holdRing: lit(s.held),
+      holdBg: s.held ? 'radial-gradient(circle at 50% 40%,#5A4426,#2A2218)' : 'radial-gradient(circle at 50% 35%,#4A443A,#26221D)',
+      holdGlow: s.held ? '0 0 16px rgba(242,166,59,.5)' : 'none',
+      keyRot: s.keyOn ? 'rotate(90deg)' : 'rotate(0deg)',
+      keyOffColor: s.keyOn ? '#6E665A' : '#E6DCCB',
+      keyOnColor: s.keyOn ? '#F2A63B' : '#6E665A',
+      callCar: this.call,
+      callRing: s.phase === 'arriving' || s.pressed === 'call' ? '#F2A63B' : (s.phase === 'idle' ? '#E6DCCB' : '#6E665A'),
+      callGlow: s.phase === 'arriving' ? '0 0 18px rgba(242,166,59,.55)' : (s.phase === 'idle' ? '0 0 0 4px rgba(230,220,203,.08)' : 'none'),
+      lanternColor: s.lantern ? '#F2A63B' : '#3A352E',
+      arrFloor: sel ? sel.n : '',
+      arrName: sel ? sel.name : '',
+      arrBody: sel ? sel.body : '',
+      arrNote: this.props.handoff ? 'Stepping out…' : (s.keyOn ? 'Opens in the Engineer view' : ''),
+      href: this.href(),
+      rideBack: this.rideBack,
+      hint,
+    };
+  }
+}
+</script>
+</body>
+</html>

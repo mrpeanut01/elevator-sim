@@ -74,6 +74,7 @@
 import { everydayAccount, onEverydayAccount } from './accountPort.js';
 import { buildNotesSummaryOf, buildNotesViewOf } from './buildNotes.js';
 import { engineerSettings, onEngineerSettingsProvided } from './engineerBridge.js';
+import { everydayLobbyStore } from './lobbyStore.js';
 import { DEFAULT_EVERYDAY_PROFILE } from './profile.js';
 import { everydayCareerStore } from './careerStore.js';
 import { everydayDeviceChimeStore } from './chimeStore.js';
@@ -297,6 +298,7 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
       units: store.units(),
       defaultSpeedSimPerRealS: store.defaultSpeed(),
       soundOn: store.soundOn(),
+      skipLobby: everydayLobbyStore().skip(),
       clearStage,
       account: everydayAccount(),
       accountServer: actions !== undefined,
@@ -1228,6 +1230,14 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
       pill.addEventListener('click', () => {
         if (rowView.id === 'units') {
           durable = store.setUnits(store.units() === 'imperial' ? 'metric' : 'imperial');
+          redrawIdentity();
+          redrawPlaying();
+          return;
+        }
+        if (rowView.id === 'lobby') {
+          /* § D1445. Read off the store, never off the pill, on the Units row's rule. */
+          const lobby = everydayLobbyStore();
+          durable = lobby.setSkip(!lobby.skip());
           redrawIdentity();
           redrawPlaying();
           return;

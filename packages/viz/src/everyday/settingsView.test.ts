@@ -184,7 +184,7 @@ describe('Playing — two wired rows, never a dead toggle (§ 20.12)', () => {
 
   it('draws the Motion row’s absence — not the row — while the Engineer surface is booting', () => {
     const view = settingsScreenViewOf({ profile: undefined, reduceMotion: undefined });
-    expect(view.playing.rows.map((row) => row.id)).toEqual(['sound', 'default-speed', 'units']);
+    expect(view.playing.rows.map((row) => row.id)).toEqual(['sound', 'lobby', 'default-speed', 'units']);
     expect(view.playing.absentNote).toContain('still loading');
     // And never both: a sentence about a missing switch beside the switch would be a contradiction.
     expect(settingsScreenViewOf(BASE).playing.absentNote).toBeUndefined();
@@ -199,6 +199,13 @@ describe('Playing — two wired rows, never a dead toggle (§ 20.12)', () => {
      */
   });
 
+  it('draws Skip the lobby as a pill that lights only when the lobby is skipped — § D1445', () => {
+    const shown = settingsScreenViewOf(BASE).playing.rows.find((row) => row.id === 'lobby');
+    expect(shown).toMatchObject({ label: 'Skip the lobby', value: 'lobby', on: false });
+    const skipped = settingsScreenViewOf({ ...BASE, skipLobby: true }).playing.rows.find((row) => row.id === 'lobby');
+    expect(skipped).toMatchObject({ value: 'skipped', on: true });
+  });
+
   it('offers no posting toggle — that seam does not exist', () => {
     /*
      * The roster rule, asserted as a negative — and **Units, Default speed and now Sound have left
@@ -208,7 +215,7 @@ describe('Playing — two wired rows, never a dead toggle (§ 20.12)', () => {
      * reader its refusal said did not exist (GitHub issues #170, #229 and #258).
      */
     const ids = settingsScreenViewOf(BASE).playing.rows.map((row) => row.id);
-    expect(ids).toEqual(['motion', 'sound', 'default-speed', 'units']);
+    expect(ids).toEqual(['motion', 'sound', 'lobby', 'default-speed', 'units']);
   });
 
   /**

@@ -70,6 +70,8 @@ import { continueWeekEntryOf } from './continueWeek.js';
 import { contractById } from '../shift/contracts.js';
 import { everydayAccount, onEverydayAccount } from './accountPort.js';
 import { everydayProfileStore } from './profileStore.js';
+import { mountLobby } from './lobbyScreen.js';
+import { everydayLobbyStore } from './lobbyStore.js';
 import { filedDaysOf, tutorialIsDue } from './tutorialModel.js';
 import {
   RAIL_DRAWER_COPY,
@@ -346,7 +348,14 @@ export interface EverydayShellHost {
 export function mountEverydayShell(doc: Document, options: EverydayShellHost = {}): EverydayShell {
   // § D525: the first tile is Scenario, so it is what the shell opens selected. This read
   // `'today'` until that ruling retired the tile the pick named.
-  let state: EverydayState = { screen: EVERYDAY_ROOT, ctx: 'daily', modePick: 'scenario' };
+  /*
+   * **A cold launch opens the lobby** — [§ D1445](../../../../DECISIONS.md), the product owner's
+   * ruling that the elevator cold-open is the first screen for everybody, first visit included,
+   * unless Settings → *Skip the lobby* is on. With it on, the front door is exactly what it was:
+   * the menu, and on a first visit the landing page through {@link offerTutorial}.
+   */
+  const coldScreen: EverydayScreen = everydayLobbyStore().skip() ? EVERYDAY_ROOT : 'lobby';
+  let state: EverydayState = { screen: coldScreen, ctx: 'daily', modePick: 'scenario' };
 
   /** § 3.4's latch — see {@link EverydayShell.setRunOpen}. */
   let runOpen = false;
@@ -411,7 +420,13 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
    */
   const sessionClock = systemClock();
   /** Whether this shell has already asked whether the tutorial is due — see `offerTutorial`. */
-  let tutorialOffered = false;
+  /*
+   * Spent from the start when the page opens on the lobby: the lobby **replaces** the first-arrival
+   * offer (§ D1445), and its basement is the walkthrough. Without this a player who pressed the
+   * lobby's *Main menu* before the host published would be bounced to the landing page the moment
+   * it did, which is the front door moving under a reader that § D844 exists to prevent.
+   */
+  let tutorialOffered = coldScreen === 'lobby';
 
   const root = el(doc, 'div', EVERYDAY_ROOT_CLASS);
 
@@ -759,6 +774,11 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
   let drawerOpen = false;
   /** Which geometry is on the screen, so a media change that changes nothing does nothing. */
   let narrow: boolean | undefined;
+  /**
+   * Whether the lobby has the whole viewport — {@link applyChrome}. Declared here, ahead of the first
+   * {@link applyWidth} call below, because that call reads it while the shell is still being built.
+   */
+  let bare = false;
 
   /**
    * The drawer's own dismiss, built once and re-appended by every {@link drawRail}.
@@ -823,6 +843,8 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
       drawerOpen = false;
       railToggle.setAttribute('aria-expanded', 'false');
     }
+    /* The lobby keeps the whole viewport across a width change — see {@link applyChrome}. */
+    if (bare) paintBare();
   }
 
   railClose.addEventListener('click', () => {
@@ -2592,14 +2614,42 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
    * the door's *Set up today*, which only navigates. So a day reached here and one reached through
    * the door cannot differ.
    */
-  function continueWeekTile(): HTMLElement | undefined {
+  function continueWeekEntryNow(): ReturnType<typeof continueWeekEntryOf> {
     if (dataHost === undefined) return undefined;
     const host = dataHost;
     const week = host.week();
     const buildingId = contractById(week.contractId)?.buildingId;
     const towerName = buildingId === undefined ? '' : (host.buildingById(buildingId)?.name ?? buildingId);
     const leftAt = host.dayAttempt() === undefined ? undefined : host.dayAttemptLeftAt();
-    const entry = continueWeekEntryOf(week, towerName, leftAt === undefined ? undefined : { clock: leftAt });
+    return continueWeekEntryOf(week, towerName, leftAt === undefined ? undefined : { clock: leftAt });
+  }
+
+  /**
+   * The continue tile's press, shared with the lobby's *Continue* (§ D1445), so a returning player
+   * resumes the same way from either front door.
+   */
+  function continueWeek(entry: NonNullable<ReturnType<typeof continueWeekEntryOf>>): void {
+    const host = dataHost;
+    if (host === undefined) return;
+    state = { ...state, modePick: 'scenario', ctx: 'daily' };
+    switch (entry.goes) {
+      case 'stage':
+        host.playDay();
+        go('stage');
+        return;
+      case 'tomorrow':
+        host.openTomorrow();
+        go('brief');
+        return;
+      case 'brief':
+      case 'week':
+        go(entry.goes);
+        return;
+    }
+  }
+
+  function continueWeekTile(): HTMLElement | undefined {
+    const entry = continueWeekEntryNow();
     if (entry === undefined) return undefined;
     const tile = el(doc, 'button', 'everyday-continue-week');
     tile.type = 'button';
@@ -2623,21 +2673,7 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     line.style.cssText = `font-size:13px;color:${C.inkSoft};margin-top:3px`;
     tile.append(title, line);
     tile.addEventListener('click', () => {
-      state = { ...state, modePick: 'scenario', ctx: 'daily' };
-      switch (entry.goes) {
-        case 'stage':
-          host.playDay();
-          go('stage');
-          return;
-        case 'tomorrow':
-          host.openTomorrow();
-          go('brief');
-          return;
-        case 'brief':
-        case 'week':
-          go(entry.goes);
-          return;
-      }
+      continueWeek(entry);
     });
     return tile;
   }
@@ -2739,6 +2775,77 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     screenRegion.append(h, p, back);
   }
 
+  /**
+   * **The lobby** — [§ D1445](../../../../DECISIONS.md). The shell's own route, like the menu, because
+   * it draws before the host publishes; `lobbyScreen.ts` is the mount and these are its ports.
+   *
+   * *Step out* commits exactly as a menu tile does — the same `ctx` and `modePick` for a mode floor,
+   * so a Career floor puts the career's rail group up and a Rush floor the rush's — and then goes to
+   * the floor's screen. With the key turned it then crosses to the Engineer surface, so coming back
+   * through § 3.2's swap lands on that floor rather than in the lobby.
+   */
+  function drawLobby(): void {
+    screenRegion.replaceChildren();
+    mounted = mountLobby(screenRegion, {
+      stepOut: (floor, engineer) => {
+        if (floor.pick !== undefined) {
+          const ctx: RunContext = floor.pick === 'campaign' ? 'campaign' : floor.pick === 'rush' ? 'rush' : 'daily';
+          state = { ...state, modePick: floor.pick, ctx };
+        }
+        go(floor.screen);
+        if (engineer) enterEngineer();
+      },
+      toMenu: () => {
+        go(EVERYDAY_ROOT);
+      },
+      toLanding: () => {
+        go('landing');
+      },
+      firstVisit: () => (dataHost === undefined ? undefined : firstVisitOf(dataHost)),
+      resume: () => {
+        const entry = continueWeekEntryNow();
+        return entry === undefined ? undefined : { title: entry.title, line: entry.line };
+      },
+      pressResume: () => {
+        const entry = continueWeekEntryNow();
+        if (entry !== undefined) continueWeek(entry);
+      },
+    });
+  }
+
+  /**
+   * **The lobby has the whole viewport** — the handoff's *"the whole screen"*. The rail, the narrow
+   * header and the bar step aside while it shows and come back on the next screen; the lobby's own
+   * *Main menu* and *What this is* are the ways past it that do not ride the car.
+   *
+   * `display` on the chrome rather than on either root: the rule that neither *root* is ever hidden
+   * that way (canvases size from their laid-out box) is about `div.shell` and this shell's root, and
+   * the rail and the bar hold no canvas. The rail is hidden by exactly this property already, in the
+   * drawer's closed state.
+   */
+  function applyChrome(): void {
+    const wanted = state.screen === 'lobby';
+    if (wanted === bare) return;
+    bare = wanted;
+    if (bare) {
+      paintBare();
+      return;
+    }
+    const was = narrow ?? false;
+    narrow = undefined;
+    applyWidth(was);
+  }
+
+  function paintBare(): void {
+    root.style.cssText = COMMON + ';grid-template-columns:minmax(0,1fr)';
+    narrowHeader.style.display = 'none';
+    rail.style.display = 'none';
+    railScrim.style.display = 'none';
+    drawerOpen = false;
+    bar.style.display = 'none';
+    screenRegion.style.cssText = 'overflow-y:auto;min-width:0;padding:0;background:#2C2823';
+  }
+
   /** Unmount whatever registered screen is in the region, if one is. */
   function unmountCurrent(): void {
     mounted?.unmount?.();
@@ -2770,7 +2877,12 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
      */
     screenRegion.setAttribute('aria-label', SCREEN_NAMES[state.screen]);
     coverEngineer();
+    applyChrome();
     drawBar();
+    if (route === 'lobby') {
+      drawLobby();
+      return;
+    }
     if (route === 'menu') {
       /**
        * **The front door waits for the host, and [§ D227](../../../../DECISIONS.md) is why** —
@@ -2950,6 +3062,8 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
        */
       const bankedMoved = bankedLineNow() !== bankedLineDrawn;
       if (careerLineNow() !== careerLineDrawn || bankedMoved) drawRail();
+      /* § D1445: the lobby's welcome line and *Continue* are the host's answers; repaint them, not the car. */
+      if (state.screen === 'lobby') mounted?.reread?.();
     };
     sync();
     dataHostUnsubscribe = next.subscribe(sync);
@@ -3000,8 +3114,16 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     if (tutorialOffered) return;
     tutorialOffered = true;
     if (state.screen !== EVERYDAY_ROOT) return;
+    if (firstVisitOf(host)) go('landing');
+  }
+
+  /**
+   * *Is this visitor new* — the walkthrough's own gate, asked here by the offer above and by the
+   * lobby's welcome line, so the two cannot disagree (§ D1445).
+   */
+  function firstVisitOf(host: EverydayHost): boolean {
     const progress = profileStore.progress();
-    const due = tutorialIsDue({
+    return tutorialIsDue({
       /* Every week this device holds, not only the standing one — § D1143. */
       filedDays: filedDaysOf([host.week(), ...host.parkedWeeks()]),
       solvedCases: progress.solvedCaseIds.length,
@@ -3010,7 +3132,6 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
       /* A day begun is a player met — § D1369: the attempt the reload kept is not a first arrival. */
       daysBegun: host.dayAttempt() === undefined ? 0 : 1,
     });
-    if (due) go('landing');
   }
 
   /* ---------------------------------------------------------------- *
