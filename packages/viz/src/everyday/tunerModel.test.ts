@@ -41,7 +41,7 @@ import type { WeekState } from '../shift/types.js';
 import { closeDay, outcomeOf, SANDBOX_DAY_CONTRACT_ID } from '../shift/week.js';
 import { actionBarFor } from './actionBar.js';
 import { railModel } from './rail.js';
-import { sandboxMoves, sandboxPatchOf } from './sandbox.js';
+import { sandboxPatchOf } from './sandbox.js';
 import {
   classOfSpec,
   designerClasses,
@@ -635,7 +635,7 @@ describe('an untouched tuner runs the standing day — GitHub issue #289', () =>
       const state = baseState();
       const at = standingAt(state);
       const presses = tunePresses(at.building, at.pattern, at.standing, at.tune);
-      expect(sandboxMoves(presses)).toBe(false);
+      expect([presses.building, presses.pattern, presses.dwell, presses.plainDay]).toEqual([undefined, undefined, undefined, undefined]);
       const after = pressed(state, presses);
       expect(after.week.contractId).toBe(SANDBOX_DAY_CONTRACT_ID);
       expect(careerLine(closed(after.week, 97, 'met'))).toBe('0 days running · best 0%');

@@ -43,6 +43,13 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
   Object.freeze([
     {
       reason:
+        'Wave AP lane AP-D2, § D1451 and § D1453. `sandboxHandedRungOf` returns the rung a changed ' +
+        'sandbox tower takes its bookings from, a config the run reads, and `WEEK_HELD_AWARD_CHIMES` is ' +
+        'the ledger’s number, drawn only inside `WEEK_HELD_PAYS`, which the week adapter sweeps.',
+      ids: ['dev/state.ts#sandboxHandedRungOf', 'shift/weekRecord.ts#WEEK_HELD_AWARD_CHIMES'],
+    },
+    {
+      reason:
         'The settled-verdict store — wave AO, lane AO-3, § D1380. `dev/settledReadings.ts` keeps the ' +
         'house’s and the driver run’s verdicts across a reload under a storage key; `SETTLED_READINGS_KEY` ' +
         'is that key, and `keepSettled` and `settledReadingOf` read and write verdicts (`cleared`, ' +

@@ -25776,6 +25776,8 @@ lane's.
 
 ## D381 — the tuner applies a spec only when something moved, and the caller set is derived twice over
 
+> **Status 2026-10-17: AMENDED by [§ D1451](#d1451)** (agent ruling). An untouched *Run it and watch* runs a sandbox day too, so no press on the tuner runs the scored day. See [`docs/39`](docs/39-decisions-in-force.md).
+
 **Rules on:** GitHub issue #289. Settles `everyday/tunerModel.ts#tunePresses`.
 
 **Decision.** *Run it and watch* applies a building spec **only when a control has actually moved**. The
@@ -48677,6 +48679,8 @@ wrinkles, so the key carries the wrinkle (`dev/main.ts#houseKeyOf`).
 
 ## D1253 — weeks held on this tower: a run of met weeks, ended by a missed one, kept on the device's record and drawn on the week's sheet and the door
 
+> **Status 2026-10-17: AMENDED by [§ D1453](#d1453)** (agent ruling). The line no longer says the run buys nothing: it says what a held week pays under § D1402. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-09-26 by agent sessions under delegated authority**, carrying out swarm DO's ruling
 > § 2 (the chase S1 asked for, kept without carried growth) as wave AM's lane AM-D. A later reader
 > weighing this against a product-owner ruling should treat the shape as an agent ruling and say
@@ -51149,6 +51153,8 @@ playhead scrubbed to its end is at or before it.
 
 > **Status 2026-10-13: AMENDED by [§ D1362](#d1362) and EXTENDED by [§ D1363](#d1363)** (agent rulings). Before the day's attempt begins a sandbox day meets a practice crowd, and the drawing board's *Run a day in it* is a sandbox day too. See [`docs/39`](docs/39-decisions-in-force.md).
 
+> **Status 2026-10-17: AMENDED by [§ D1451](#d1451)** (agent ruling). A sandbox day is dealt the day it copies, its wrinkle and bookings included, and an untouched tuner runs a sandbox day too.
+
 > **Taken 2026-10-10 by agent sessions under delegated authority** (wave AO, lane AO-2, on the wave
 > brief's item for the post-AN panel's seat D, D3 and D7), not by the product owner, and to be read as
 > an agent ruling. **Amends [§ D965](#d965)**, whose list of mode weeks gains a fourth. Owner-reversible
@@ -52718,3 +52724,111 @@ floors read `modes.ts` and `scenarioModel.ts` word for word, no retired name is 
 tutorial below L, and the door machine's CALL, pick, CLOSE, OPEN, HOLD, countdown, ride and ride-back
 behave as the handoff's table says. The browser tier reaches the menu through the lobby's own *Main
 menu* (`leaveTutorialIfOffered`) and the landing page through its *What this is*.
+
+## D1451 — a sandbox day runs the day it copies, wrinkle and bookings, and no press on the tuner starts the counted day
+
+> **Taken 2026-10-17 by agent sessions under delegated authority** (wave AP, lane AP-D2, on the
+> post-AO panel's seat B, D1, and seat D, D8), not by the product owner, and to be read as an agent
+> ruling. **Amends [§ D1368](#d1368)**'s owner-reversible clause that a changed tower keeps the day's
+> population and not the contract's bookings, and its clause 3's untouched press, and **amends
+> [§ D381](#d381)**'s *What stays as it was*, under which an untouched *Run it and watch* ran the
+> scored day. Owner-reversible clauses: that the box carrying the day is ticked by default; that an
+> untouched tuner runs a sandbox day rather than a button saying it starts the counted day; and the
+> words of the carried line and the week line.
+
+**Why an entry.** It moves two recorded rulings and binds `shift/types.ts`, `shift/week.ts`,
+`shift/calendar.ts`, `dev/state.ts#shiftRunConfigOf`, `persist/validate.ts` and the report view as
+well as the Everyday sandbox, tuner and host.
+
+**What was wrong.** Seat B: week 2's Monday on Midtown Office (Shift change, car D booked out
+10:30–13:00), *Open the sandbox*, 3000 lb, *Run it and watch*: the run had no car D out and closed
+under *An ordinary day, nothing booked* and *Shift cleared*, so the clear read as *bigger cars fixed
+it*, and the close said *your week is still on this day* with the week on Tuesday. Seat D: an
+untouched tuner said *the day still matches everyone else's*, and its press began the day's counted
+attempt with the house driving.
+
+**The ruling.**
+
+1. **The copy is dealt as the day it copied** (`shift/types.ts#dealtKeyOf`, `WeekState.sandboxOf`):
+   the same order's wrinkle and level's bookings. A changed tower takes the bookings of the tower its
+   contract handed over, on the cars it still has; a booking on a car the drawn tower lost is left
+   out, because `core` refuses a service event on a car no bank declares.
+2. **The player may leave the day out** with the tuner's box, and then the day is ordinary with no
+   booking at all, the tower's own included.
+3. **Whatever is carried or left out is said** on the stage and the close
+   (`everyday/sandbox.ts#sandboxCarriedLineOf`), with the reason for each part left out, and the close
+   says where the week is (`sandboxWeekLineOf`).
+4. **Every press on the tuner is a sandbox day**, changed or not; the strip says so and that the
+   day that counts starts from its brief.
+
+**What holds it.** `everyday/sandbox.test.ts`: on Midtown's Tuesday (since lane DT-1's pool, `shift/weekPool.ts`, Midtown deals its
+first week's draw every week) a bigger car keeps the move-in and car D, compared on the legs; the box
+removes both on a changed and on an untouched tower; three shafts drop car D's booking, run, and say
+why. `everyday/tunerModel.test.ts` and `sandboxDay.browser.test.ts`'s third case on the bundle: an
+untouched press is a practice run that banks nothing, and a bigger car's stage and close name car D.
+
+## D1452 — a career day's report is graded on the contract's four tests and headed with their mark
+
+> **Taken 2026-10-17 by agent sessions under delegated authority** (wave AP, lane AP-D2, on the
+> post-AO panel's seat D, D10, and seat B's claim 7), not by the product owner, and to be read as an
+> agent ruling. Amends no recorded ruling: the sentence it corrects was GitHub issue #567's, recorded
+> under [§ D405](#d405). Owner-reversible clause: that the week's five still show on the career stage,
+> labelled as goals the contract does not count, rather than being hidden there.
+
+**Why an entry.** It binds `dev/main.ts#closeShift`, `everyday/host.ts#closeDay`,
+`everyday/reportView.ts`, `shift/goals.ts#TODAY_ASKS_DECIDES` and `everyday/campaignModel.ts`.
+
+**What was wrong.** Garden Apartments on Impossible, day 3: the report headed *Shift cleared · No
+call decided today*, graded on the week's five goals, while the contract's four tests filed the day
+missed and the desk said the contract was lost.
+
+**The ruling.** The career's close hands the shell the contract's four tests and the sheet is graded
+on them, so its headline is *Cleared on the contract's four tests* or *Missed on the contract's four
+tests*, the mark `campaignDayVerdict` files, and its goals are headed *WHAT THE CONTRACT ASKED*. A day
+too quiet to grade keeps the sheet's own words, and the career files nothing for it.
+
+**Claim 7, found and left as it is.** Day 9's move-in asked a call and day 4's did not. Day 4 had no
+admissible call under [§ D1336](#d1336): the move-in's car is out from the career day's first instant,
+a career day is a slice whose opening is not a moment to call, and the one moment the stage reached
+was turned down on [§ D1138](#d1138)'s counts. The sheet's quiet line already says so; nothing changes.
+
+**What holds it.** `everyday/careerCalls.test.ts` (day 4's move-in clears on the week's five and is
+filed missed on the four; the sheet is graded on the four and headed with their mark; a close with no
+career day is graded on the five; day 4 turns down its one moment) and `careerCalls.browser.test.ts`'s
+third case on the bundle, red before on *Shift cleared*.
+
+## D1453 — Scenario copy says a day and a week can be lost, and the allowance and the held week's award are stated once
+
+> **Taken 2026-10-17 by agent sessions under delegated authority** (wave AP, lane AP-D2, on the
+> post-AO panel's seats A, B and D, D4, D6 and D9), not by the product owner, and to be read as an
+> agent ruling. **Amends [§ D1253](#d1253)**'s *it buys nothing* and `docs/32` § 4.2's *There is
+> none* for today's tower, and **departs from the design handoff's words** *no losing* on the hub,
+> the guide and the rail. Owner-reversible: every sentence named below.
+
+**Why an entry.** It refuses part of a handoff the repository vendors and moves a recorded ruling's
+wording, across `everyday/sittingShape.ts`, `menu/screens.ts`, `watch/shell.ts`, `campaign/economy.ts`,
+`everyday/campaignModel.ts`, `shift/weekRecord.ts`, `everyday/today.ts`, `everyday/rushScreenModel.ts`
+and `everyday/stagePlay.ts`.
+
+**The ruling.**
+
+1. *No losing* is gone: the hub reads *a day can be missed, and a week can miss its target*, and the
+   Engineer guide and rail say the same, because the report files a scored day missed and a week's
+   sheet says it missed its target.
+2. The missed-day allowance is one sentence, `economy.ts#missAllowanceSentenceOf`, from the field
+   `contractIsLost` reads: Standard's note said *three missed days and the contract ends* beside
+   *more than 3* and *0 of 3 used*, and a standard month survives its third miss.
+3. Weeks held says what a held week paid ([§ D1402](#d1402)'s 10 chimes, once per level) and no
+   longer *it buys nothing*; a longer run pays nothing more.
+4. The brief counts floors as the sandbox does, *N above the lobby, M below it*; a rush pre-fit bought
+   on this device says it is never posted, as Settings does; a stage whose kept clear met par says the
+   mark is held rather than *earns the mark*.
+
+**Not reproduced.** Seat D's designer line naming Midtown Office on a blank tower: on this tree, after
+*blank tower*, the accessibility tree names *My building* and so does the stage's description after
+*Run a day in it*, from the garden-apartments link and from a cold load.
+
+**What holds it.** `scenarioModel.test.ts`, `howToPlay.test.ts`, `economy.test.ts`,
+`campaignModel.test.ts`, `doorView.test.ts`, `weekRecord.test.ts`, `today.test.ts`,
+`rushDeviceBest.test.ts`, `rushScreenModel.test.ts` and `stagePlay.test.ts`, each red on the tree
+before this lane.

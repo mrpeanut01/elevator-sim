@@ -520,8 +520,16 @@ const ABOVE_CEILING: ReadonlyMap<string, { readonly count: number; readonly tota
      * the report's account, whose house run lands off the thread. Two whole contract days, the work
      * `campaignJourney.browser.test.ts`'s cases are annotated at 300 000 ms for; it measured 34 s on
      * the lane's contended container. Nothing existing was raised: 27 360 000 + 300 000 = **27 660 000**.
+     *
+     * **101 → 102, and the one is named** — wave AP lane AP-D2's case in
+     * `everyday/careerCalls.browser.test.ts` at 300 000 ms (§ D1452): it seeds a career on contract
+     * day 4, runs that whole day with the house driving, leaves the call, closes the day and reads
+     * the report's headline, which must be the contract's mark. It runs and closes a whole contract
+     * day, the work its two siblings in that file are annotated at 300 000 ms for, and it failed on
+     * the tree before the fix (the headline read *Shift cleared*). Nothing existing was raised:
+     * 27 660 000 + 300 000 = **27 960 000**.
      */
-    ['viz-browser', { count: 101, totalMs: 27_660_000 }],
+    ['viz-browser', { count: 102, totalMs: 27_960_000 }],
   ]);
 
 /**
