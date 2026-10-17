@@ -62,7 +62,7 @@ export interface PinnedDayLength {
   readonly contractId: string;
   /** `pressCallOf` over the as-built run — seconds from the start of the day. */
   readonly callAtS: number;
-  /** Simulated seconds before the call that § D1169 plays at the watching rung. */
+  /** Simulated seconds before the call that § D1169 plays at the watching rung, inside § D1493's allowance. */
   readonly toCallSlowS: number;
   /** Simulated seconds before the call that the skip crosses (§ D1212, widened by § D1266). */
   readonly toCallSkippedS: number;
@@ -86,50 +86,55 @@ export interface PinnedDayLength {
 /**
  * **Measured** — every admitted whole-day pin, by `firstDayLength.test.ts`, which re-derives each row
  * from a run on every suite run. Contract order.
+ *
+ * Re-measured in wave AP under [§ D1493](../../../../DECISIONS.md): the hold lasts twenty real seconds
+ * of watching between two decisions, so a slow part is now 80 simulated seconds at `4×` before the
+ * call and as much after it. The day's later ordinary calls are not known to this measurement, and
+ * each would add up to the allowance and a beat, so *about N min* is the day with no later call.
  */
 export const PINNED_DAY_LENGTHS: readonly PinnedDayLength[] = Object.freeze([
   {
     contractId: 'c2',
     callAtS: 9613.907,
-    toCallSlowS: 644.207,
+    toCallSlowS: 80,
     toCallSkippedS: 8363.364,
     peaks: 3,
     peaksBefore: 1,
     inPeak: false,
-    middle: { recordedS: 36000, slowS: 2572.237, skippedS: 31341.541 },
+    middle: { recordedS: 36000, slowS: 160, skippedS: 31201.4 },
     asksOn: true,
   },
   {
     contractId: 'c3',
     callAtS: 9929.738,
-    toCallSlowS: 439.626,
+    toCallSlowS: 80,
     toCallSkippedS: 8813.316,
     peaks: 3,
     peaksBefore: 1,
     inPeak: false,
-    middle: { recordedS: 36000, slowS: 2486.097, skippedS: 30915.987 },
+    middle: { recordedS: 36000, slowS: 160, skippedS: 31056.147 },
     asksOn: true,
   },
   {
     contractId: 'c6',
     callAtS: 9809.566,
-    toCallSlowS: 107.664,
+    toCallSlowS: 80,
     toCallSkippedS: 9343.602,
     peaks: 3,
     peaksBefore: 1,
     inPeak: false,
-    middle: { recordedS: 36000, slowS: 1475.277, skippedS: 33262.791 },
+    middle: { recordedS: 36000, slowS: 160, skippedS: 33209.873 },
     asksOn: true,
   },
   {
     contractId: 'c10',
     callAtS: 12509.792,
-    toCallSlowS: 575.532,
+    toCallSlowS: 80,
     toCallSkippedS: 11293.007,
     peaks: 3,
     peaksBefore: 1,
     inPeak: false,
-    middle: { recordedS: 36062.614, slowS: 2164.072, skippedS: 31988.836 },
+    middle: { recordedS: 36046.787, slowS: 160, skippedS: 31835.386 },
     asksOn: true,
   },
 ]);

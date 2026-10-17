@@ -250,6 +250,10 @@ export const WHOLE_DAY_LONGEST: PacedDay = Object.freeze({
  * `c5`, seed `n = 39`, 8 486 s slow and nothing skipped, 51 minutes, while it was measured under
  * § D991, and that run reproduced the § D991 figure exactly, which is the check on the instrument.
  * `stagePace.sweep.test.ts` refuses it at that budget the day a run of the game towers disagrees.
+ *
+ * **Since [§ D1493](../../../../DECISIONS.md) it is an upper bound.** The hold now lasts at most
+ * twenty real seconds of watching between two decisions, and the sweep measures it uncapped, so a
+ * day as the stage plays it is never longer than this figure and is usually shorter.
  */
 export const WHOLE_DAY_LONGEST_GAME_TOWER: PacedDay = Object.freeze({
   periodS: AUTHORED_DAY_PERIOD_S,
@@ -442,7 +446,7 @@ export function sittingLengthPhrase(span: SittingSpan, noun = ''): string {
 const SCENARIO_HUB_SPAN: SittingSpan = unionOf(SITTING_SPANS.contractDay, SITTING_SPANS.fixCase);
 
 /**
- * **A day as the brief measures it** — *about 7-12 min a day at 4×* — [§ D1383](../../../../DECISIONS.md),
+ * **A day as the brief measures it** — *about 2-3 min a day at 4×* since [§ D1493](../../../../DECISIONS.md) (*about 7-12* before it) — [§ D1383](../../../../DECISIONS.md),
  * the post-AN panel's seat B (lost moment 2). The menu and the hub quoted {@link SCENARIO_HUB_SPAN}'s
  * ends, *1 min-1 h 49*: a floor no day reaches and a reference tower nobody opens on, beside a brief
  * saying *about 12 min of watching at 4×*. This is the brief's own measurement

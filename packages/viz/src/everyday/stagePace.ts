@@ -210,7 +210,25 @@ export type StagePaceReason =
  *   waits a minute ({@link StagePaceInput.playerChoseSpeedAtS}). A chip pressed while `watching` is
  *   the rung `watching` plays at, so it is kept for every later stretch with somebody waiting.
  */
-export type ScoredPaceReason = 'watching' | 'fast' | 'yours' | 'lost';
+export type ScoredPaceReason = 'watching' | 'fast' | 'yours' | 'lost' | 'unheld';
+
+/*
+ * `unheld` is wave AP, lane G-3, [§ D1493](../../../../DECISIONS.md), GitHub issue #626 item 5:
+ * § D1169's hold lasts at most {@link WATCH_ALLOWANCE_REAL_S} real seconds of watching with no
+ * decision in between, and after that the stage plays on at {@link BETWEEN_PEAKS_SIM_PER_REAL_S} or
+ * the player's rung, whichever is faster, drawn and never skipped, until a call is raised or answered
+ * or a chip is pressed ({@link StagePaceInput.watchedRealS}).
+ */
+
+/**
+ * **How long the stage holds the player's rung with nothing to decide**, in real seconds: wave AP,
+ * lane G-3, [§ D1493](../../../../DECISIONS.md). § D1169's hold exists to give time to decide; on
+ * Midtown's day 1 at seed n = 2 the first call came at 10:40 and a first-time player at `4×` watched
+ * 161 real seconds of it before anything was asked of them (181 to the call). Real seconds of
+ * `watching` add up across stretches and go back to nothing when a call is raised or answered or a
+ * chip is pressed. Owner-reversible: `Number.POSITIVE_INFINITY` is § D1169 as it was.
+ */
+export const WATCH_ALLOWANCE_REAL_S = 20;
 
 /*
  * `lost` is wave AO's lane DR-1, [§ D1435](../../../../DECISIONS.md), swarm DR's ruling § Q4: a goal
@@ -363,6 +381,14 @@ export interface StagePaceInput {
    * clear. Read only on a scored day and never ahead of the playhead.
    */
   readonly lostAtS?: number | undefined;
+  /**
+   * **Real seconds the stage has held the player's rung for `watching` since the last decision**, on
+   * a scored day — [§ D1493](../../../../DECISIONS.md): since the last call was raised or answered or a
+   * chip was pressed. At {@link WATCH_ALLOWANCE_REAL_S} or more the stage plays on (`unheld`)
+   * where it would hold. `undefined` where the allowance does not apply: an unscored run, and a chip
+   * pressed while the stage played on, which is the player's speed until the next decision.
+   */
+  readonly watchedRealS?: number | undefined;
 }
 
 /** The act boundary after `fromS` — a peak opening or closing — or `undefined` when none remains. */
@@ -407,6 +433,10 @@ export function stagePaceOf(input: StagePaceInput): StagePace {
     }
     /* § D1169: the tutorial's rule, on the present frame only. */
     if (input.longestStandingS !== undefined && input.longestStandingS >= PACE_HOLD_WAIT_S) {
+      /* § D1493: the hold is for deciding, and lasts so long with nothing to decide. */
+      if (input.watchedRealS !== undefined && input.watchedRealS >= WATCH_ALLOWANCE_REAL_S) {
+        return { simPerRealS: Math.max(watching, BETWEEN_PEAKS_SIM_PER_REAL_S), reason: 'unheld' };
+      }
       return { simPerRealS: watching, reason: 'watching' };
     }
     if (input.playerChoseSpeedAtS !== undefined && input.simTimeS >= input.playerChoseSpeedAtS) {
@@ -423,6 +453,20 @@ export function stagePaceOf(input: StagePaceInput): StagePace {
     return { simPerRealS: watching, reason: 'held' };
   }
   return { simPerRealS: Math.max(watching, BETWEEN_PEAKS_SIM_PER_REAL_S), reason: 'between' };
+}
+
+/**
+ * **The real seconds of `watching` after one frame**, for {@link StagePaceInput.watchedRealS} —
+ * [§ D1493](../../../../DECISIONS.md). The frame before held the player's rung for `watching` from
+ * `fromS` to `toS` at `simPerRealS`; anything else, or a step backwards, adds nothing. One frame adds
+ * at most a real second, so a seek made while playing is not counted as watching it.
+ */
+export function watchedRealAfter(
+  watchedRealS: number,
+  frame: { readonly reason: StagePaceReason | undefined; readonly fromS: number; readonly toS: number; readonly simPerRealS: number },
+): number {
+  if (frame.reason !== 'watching' || !(frame.toS > frame.fromS) || !(frame.simPerRealS > 0)) return watchedRealS;
+  return watchedRealS + Math.min(1, (frame.toS - frame.fromS) / frame.simPerRealS);
 }
 
 /** A rung's own chip label — § D354's rule that the label **is** the multiplier. */
@@ -484,6 +528,9 @@ export function stagePaceNoteOf(
       return `at your speed, ${rung}, while somebody on a landing has waited over a minute`;
     case 'yours':
       return `your speed, ${rung}, until somebody on a landing has waited a minute`;
+    /* § D1493: the hold has run out with nothing asked. */
+    case 'unheld':
+      return `nothing to decide yet: playing on at ${rung} though somebody has waited over a minute · pick a speed to watch`;
     /* § D1435: the line *Watch the rest* plays under. */
     case 'lost':
       return `the day can no longer clear: playing the rest at ${rung}, and no call is asked`;
