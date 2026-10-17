@@ -10,7 +10,7 @@
  * cards a reader can count, so a card that changes changes the count.
  */
 
-import { nextAdmittedTowerAfter, nextTowerOfferOf } from '../shift/nextTower.js';
+import { ladderHarderThanTopOf, nextAdmittedTowerAfter, nextTowerOfferOf } from '../shift/nextTower.js';
 import { NEXT_WEEK_LABEL } from '../shift/nextWeek.js';
 import { describe, expect, it } from 'vitest';
 
@@ -27,7 +27,7 @@ import { CALL_BANDS, callBandsReadingOf } from '../shift/callBands.js';
 import { weekOrderFor } from '../shift/weekOrders.js';
 
 import { EM_DASH } from './figures.js';
-import { driverRecordLinesOf, verdictOf, WEEK_CARDS, WEEK_START_NEXT_LABEL, weekScreenViewOf } from './weekView.js';
+import { driverRecordLinesOf, verdictOf, WEEK_CARDS, WEEK_START_NEXT_LABEL, WEEK_TOP_RUSH_COPY, weekScreenViewOf } from './weekView.js';
 
 const MET: GoalObservations = {
   arrived: 400,
@@ -457,8 +457,72 @@ describe('the week’s stake on the strip, and its sheet at the close — § D11
     });
     expect(chancery.sheet?.targetLine).toBe('Target 3: met.');
     expect(chancery.onward?.contractId).toBe('c2');
-    expect(chancery.primary).toBe('Play Midtown Office’s week');
+    /* Wave AP, lane DT-2 (swarm DT's Q4): at a held top the next week stays the primary. */
+    expect(chancery.primary).toBe(chancery.next?.top === true ? WEEK_START_NEXT_LABEL : 'Play Midtown Office’s week');
     expect(chancery.onward?.stayLabel).toBe('Start next week here');
+  });
+
+  /*
+   * Wave AP, lane DT-2, swarm DT's Q4 items 2 to 4. Red before: a held Chancery House week at its top
+   * made *Play Midtown Office’s week* the primary and offered no Rush; a held Ashgate week offered
+   * Midtown though the house's census does not read Midtown's ladder harder than Ashgate's top.
+   */
+  it('at a held top keeps Start next week the primary, offers the Rush beside it, and another tower only where its ladder is harder', () => {
+    const heldOn = (contractId: string, rushBest?: Parameters<typeof weekScreenViewOf>[0]['rushBest']) =>
+      weekScreenViewOf({
+        week: { ...midtown(7, [1, 2, 3, 4, 5, 6, 7].map((day) => midtownDay(day, MET, 'collective'))), contractId },
+        towerToday: 'Tower',
+        nameOf: NAME_OF,
+        dayClosed: true,
+        sheetStanding: true,
+        ...(rushBest === undefined ? {} : { rushBest }),
+      });
+    const chancery = heldOn('c6');
+    expect(chancery.next?.held).toBe(true);
+    expect(chancery.next?.top).toBe(true);
+    expect(chancery.primary).toBe(WEEK_START_NEXT_LABEL);
+    expect(chancery.onwardPrimary).toBe(false);
+    const harder = ladderHarderThanTopOf('c6', 'c2');
+    expect(harder?.harder).toBe(true);
+    expect(chancery.onward?.contractId).toBe('c2');
+    expect(chancery.onward?.label).toBe('Play Midtown Office’s week');
+    expect(chancery.onward?.line).toBe(
+      `Midtown Office’s ladder goes further than this tower’s top by the house’s measure: left alone on the same ` +
+        `${String(harder?.to.crowds)} crowds, the house cleared ${String(harder?.to.cleared)} of the ${String(harder?.to.of)} ` +
+        `weekdays of Midtown Office’s top week, against ${String(harder?.from.cleared)} of this one’s.`,
+    );
+    expect(chancery.rush?.label).toBe(WEEK_TOP_RUSH_COPY.label);
+    expect(chancery.rush?.line).toBe(`${WEEK_TOP_RUSH_COPY.what} ${WEEK_TOP_RUSH_COPY.chimes}`);
+    /* This device's best, as the host's replay answered it: the replay's hold, never a stored one. */
+    expect(heldOn('c6', { kind: 'row', heldS: 1325, roundCount: 3, modifiers: [] }).rush?.line).toContain(
+      'Your best sitting here on this device, replayed now from its last round, held 22:05 over 3 rounds.',
+    );
+    expect(heldOn('c6', { kind: 'none' }).rush?.line).toContain(WEEK_TOP_RUSH_COPY.none);
+    expect(heldOn('c6', { kind: 'silent' }).rush?.line).toBe(`${WEEK_TOP_RUSH_COPY.what} ${WEEK_TOP_RUSH_COPY.chimes}`);
+    /* Ashgate's top: Midtown follows it, and the house's census does not read Midtown's ladder harder. */
+    const ashgate = heldOn('c10');
+    expect(ashgate.next?.top).toBe(true);
+    expect(nextAdmittedTowerAfter('c10')).toBe('c2');
+    expect(ladderHarderThanTopOf('c10', 'c2')?.harder).toBe(false);
+    expect(ashgate.onward).toBeUndefined();
+    expect(ashgate.primary).toBe(WEEK_START_NEXT_LABEL);
+    expect(ashgate.rush).toBeDefined();
+    /* No word of unlocking, and *harder* only in the house's measure's sentence. */
+    for (const view of [chancery, ashgate]) {
+      for (const text of [view.rush?.line ?? '', view.onward?.line ?? '']) {
+        expect(text).not.toMatch(/unlock|easier|best tower|you should/iu);
+      }
+    }
+    /* A week not held offers neither. */
+    const missed = weekScreenViewOf({
+      week: { ...midtown(7, [1, 2, 3, 4, 5, 6, 7].map((day) => midtownDay(day, MISSED, 'collective'))), contractId: 'c6' },
+      towerToday: 'Tower',
+      nameOf: NAME_OF,
+      dayClosed: true,
+      sheetStanding: true,
+    });
+    expect(missed.rush).toBeUndefined();
+    expect(missed.onward).toBeUndefined();
   });
 
   it('draws the tower’s record of closed weeks, and nothing where none has closed', () => {
