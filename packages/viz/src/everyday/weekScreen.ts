@@ -51,6 +51,8 @@ import { actionBarFor } from './actionBar.js';
 import { WEEK_START_NEXT_LABEL, weekScreenViewOf, type WeekDayCard, type WeekScreenView } from './weekView.js';
 import { weekHasClosed } from '../shift/weekStake.js';
 import type { NextTowerOffer } from '../shift/nextTower.js';
+import { contractById } from '../shift/contracts.js';
+import type { RushDeviceStanding } from './rushDeviceBest.js';
 import type { NextWeekView } from '../shift/nextWeek.js';
 import { clockOf } from '../shift/report.js';
 import type { EverydayScreenModule } from './screens.js';
@@ -153,6 +155,9 @@ function mountWeek(
    */
   let checking: string | undefined;
 
+  /** The held top's Rush line's device best, by the tower it was asked for (§ D1420). */
+  let rushBest: { readonly buildingId: string; readonly standing: RushDeviceStanding | undefined } | undefined;
+
   const root = el(doc, 'div', 'everyday-week');
   root.style.cssText = 'max-width:900px';
   host.append(root);
@@ -182,8 +187,19 @@ function mountWeek(
       },
       /* § D1443: the drivers' own names for DC-13's line and this week's record with each driver. */
       profileNameOf: (profileId) => data.dispatcherById(profileId)?.name,
+      rushBest: rushBest?.standing,
     });
-    onwardTower = weekSheetStands ? view.onward : undefined;
+    onwardTower = weekSheetStands && view.onwardPrimary ? view.onward : undefined;
+    /* Wave AP, lane DT-2: the held top's Rush line names this device's best, asked once per tower. */
+    const towerId = contractById(data.week().contractId)?.buildingId;
+    if (view.rush !== undefined && towerId !== undefined && rushBest?.buildingId !== towerId) {
+      rushBest = { buildingId: towerId, standing: undefined };
+      void data.rushDeviceBest(towerId).then((standing) => {
+        if (!alive || rushBest?.buildingId !== towerId) return;
+        rushBest = { buildingId: towerId, standing };
+        render();
+      });
+    }
     nextWeek = weekSheetStands ? view.next : undefined;
     return view;
   }
@@ -321,7 +337,7 @@ function mountWeek(
        * is the bar's primary; this block names it and carries the other way on, so neither is a
        * hidden choice.
        */
-      if (view.onward !== undefined) {
+      if (view.onward !== undefined && view.onwardPrimary) {
         const onward = el(doc, 'p', 'everyday-week-sheet-onward', view.onward.line);
         onward.style.cssText = `${BODY};margin:0;max-width:74ch`;
         const stay = el(doc, 'button', 'everyday-week-sheet-stay', view.onward.stayLabel);
@@ -366,6 +382,48 @@ function mountWeek(
           goOn.addEventListener('click', goOnToNextWeek);
           sheet.body.append(goOn);
         }
+      }
+      /*
+       * The held top — wave AP, lane DT-2, swarm DT's Q4 items 2 and 3: *Start next week* is the
+       * bar's primary; the tower's Rush is offered beside it, and another tower only where its ladder
+       * is harder by the house's census, each a second press with its own line.
+       */
+      const secondPress = (className: string, label: string, onPress: () => void): HTMLButtonElement => {
+        const press = el(doc, 'button', className, label);
+        press.type = 'button';
+        press.style.cssText = [
+          'justify-self:start',
+          'cursor:pointer',
+          `border:1px solid ${C.ruleLight}`,
+          'background:transparent',
+          `border-radius:${String(R.row)}px`,
+          'padding:7px 13px',
+          `color:${C.ink}`,
+          'font-size:13px',
+        ].join(';');
+        press.addEventListener('click', onPress);
+        return press;
+      };
+      if (view.rush !== undefined) {
+        const line = el(doc, 'p', 'everyday-week-sheet-rush', view.rush.line);
+        line.style.cssText = `${BODY};margin:0;max-width:74ch`;
+        sheet.body.append(
+          line,
+          secondPress('everyday-week-sheet-rush-press', view.rush.label, () => {
+            context.go('rush');
+          }),
+        );
+      }
+      const topOnward = view.onward;
+      if (topOnward !== undefined && !view.onwardPrimary) {
+        const line = el(doc, 'p', 'everyday-week-sheet-onward', topOnward.line);
+        line.style.cssText = `${BODY};margin:0;max-width:74ch`;
+        sheet.body.append(
+          line,
+          secondPress('everyday-week-sheet-onward-press', topOnward.label, () => {
+            takeOnwardTower(topOnward);
+          }),
+        );
       }
       if (view.record !== undefined) {
         const record = el(doc, 'p', 'everyday-week-record', view.record);

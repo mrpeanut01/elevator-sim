@@ -88,7 +88,7 @@ import { WAIT_BANDS } from '../live/bands.js';
 
 import type { BookedOutCar } from './bookedOut.js';
 import { CALL_BANDS, driverOfferOf } from './callBands.js';
-import type { DayCallMaxima } from './dayCallMaxima.js';
+import { dayCallMaximaReadingsAt, type DayCallMaxima } from './dayCallMaxima.js';
 import { goalPlainNameOf } from './goals.js';
 import { PRESS_CALL_SKIPPED_WHAT } from './callRow.js';
 import type { DayAct } from './dayLength.js';
@@ -920,6 +920,13 @@ export const DAY_CALL_ROW_NOTE =
   'any other crowd, even in this tower.';
 
 /**
+ * **The count's label** — wave AO's (§ D1433 clause 2), moved here by wave AP's lane DT-2 so the report
+ * row and the stage's caveat say it in one set of words. On the report row it follows the count, which
+ * comes last (swarm DT's Q3 item 2).
+ */
+export const DAY_CALL_COUNT_LABEL = 'The count of riders who waited a minute is not one of the day’s goals.';
+
+/**
  * **The report's row for one call** — § D1138 clause 3, and [§ D1167](../../../../DECISIONS.md)'s
  * driver call in the same grammar.
  *
@@ -968,23 +975,92 @@ export function dayCallRowOf(
     const line = gradeOf(observations);
     grades.set(line, [...(grades.get(line) ?? []), answer]);
   }
+  /*
+   * Wave AP, lane DT-2, swarm DT's Q3 item 5: on a split row the report's judgement names every
+   * answer's verdict, and each missing answer's goal with its figure and the clock it crossed.
+   */
+  const verdicts =
+    grades.size <= 1
+      ? undefined
+      : judgeOf === undefined
+        ? undefined
+        : dayCallSplitVerdictsOf(record, judgeOf, clockOf);
   const verdict =
     grades.size <= 1
       ? ''
-      : ` The day read ${listOf(
-          [...grades.entries()].map(([line, answered]) => `${line} with ${listOf(answered.map(wordsOf))}`),
-        )}.`;
-  const gap = judgeOf === undefined ? undefined : dayCallGapSentenceOf(record, judgeOf);
+      : verdicts !== undefined
+        ? ` ${verdicts}`
+        : ` The day read ${listOf(
+            [...grades.entries()].map(([line, answered]) => `${line} with ${listOf(answered.map(wordsOf))}`),
+          )}.`;
+  const gap = judgeOf === undefined ? undefined : dayCallGapSentenceOf(record, judgeOf, { figures: verdicts === undefined });
+  /* Swarm DT's Q3 item 2: the count comes last, with its label, after what the runs are of. */
   return {
     id: dayCallRowIdOf(index),
     when: at,
     what,
     why:
       'On this crowd the day was run three ways from the call, with every press before it kept and ' +
-      `nothing pressed after it. ${dayCallCountsLineOf(record, clockOf)}${verdict}${gap === undefined ? '' : ` ${gap}`} ` +
-      DAY_CALL_ROW_NOTE,
+      `nothing pressed after it.${verdict} ${DAY_CALL_ROW_NOTE} ${dayCallCountsLineOf(record, clockOf)}` +
+      `${gap === undefined ? '' : ` ${gap}`} ${DAY_CALL_COUNT_LABEL}`,
     tone: 'plain',
   };
+}
+
+/**
+ * **Every answer's verdict on a split row** — wave AP, lane DT-2, [§ D1472](../../../../DECISIONS.md), swarm DT's Q3 item 5 (S2), widening
+ * § D1433 clause 3 from the count's favourite to every answer. The answer taken first, then the
+ * counts sentence's order: *With spread the cars across the tower, the day cleared. With leave them,
+ * the day missed: the deepest landing passed its bar of 32 at 12:38 and read 35 at the close.* The
+ * figure is the report's own reading of that run; the clock is the instant its readings first went
+ * past that goal's bar (`dayCallMaximaReadingsAt`, the stage row's own), said only for the two goals
+ * graded on a maximum and only where the record carries readings. No *because*. `undefined` where an
+ * answer has no observations, so the row falls back to the grouped verdict.
+ */
+export function dayCallSplitVerdictsOf(
+  record: DayCallRecord,
+  judgeOf: (observations: Observations) => DayCallRunJudgement,
+  clockOf: (simTimeS: SimTime) => string,
+): string | undefined {
+  const order = dayCallAnswersOf(record.question ?? 'placement');
+  const taken = record.answer === 'skipped' ? undefined : record.answer;
+  const answers = taken === undefined || !order.includes(taken) ? order : [taken, ...order.filter((answer) => answer !== taken)];
+  const sentences: string[] = [];
+  for (const answer of answers) {
+    const observations = record.observations[answer];
+    if (observations === undefined) return undefined;
+    const judgement = judgeOf(observations);
+    const words = dayCallAnswerWordsOf(record, answer);
+    const mine = answer === taken ? ', your answer,' : ',';
+    if (judgement.verdict !== 'missed') {
+      sentences.push(`With ${words}${mine} the day ${judgement.verdict === 'cleared' ? 'cleared' : 'was not graded'}.`);
+      continue;
+    }
+    const series = record.maxima?.[answer];
+    const crossed =
+      series === undefined
+        ? undefined
+        : dayCallMaximaReadingsAt(
+            series,
+            judgement.readings.map((reading) => reading.goal),
+            series.endedAt,
+          );
+    const clauses = judgement.readings
+      .filter((reading) => reading.state === 'missed' && reading.observed !== null)
+      .map((reading) => {
+        const unit = reading.goal.unit;
+        const name = goalPlainNameOf(reading.goal);
+        const at = crossed?.pastBarFromS !== undefined && crossed.pastBar.some((past) => past.goal.id === reading.goal.id)
+          ? crossed.pastBarFromS
+          : undefined;
+        return at === undefined
+          ? `${name} read ${String(reading.observed)}${unit} against a bar of ${String(reading.goal.bar)}${unit}`
+          : `${name} passed its bar of ${String(reading.goal.bar)}${unit} at ${clockOf(at)} and read ` +
+              `${String(reading.observed)}${unit} at the close`;
+      });
+    sentences.push(`With ${words}${mine} the day missed${clauses.length === 0 ? '' : `: ${clauses.join('; ')}`}.`);
+  }
+  return sentences.join(' ');
 }
 
 /** One run as the report judges it: the day's verdict and its readings against the sheet's goals. */
@@ -1010,7 +1086,10 @@ export interface DayCallRunJudgement {
 export function dayCallGapSentenceOf(
   record: DayCallRecord,
   judgeOf: (observations: Observations) => DayCallRunJudgement,
+  /** `false` where the row already named each answer's figure (wave AP, lane DT-2), so it is said once. */
+  options: { readonly figures?: boolean } = {},
 ): string | undefined {
+  const withFigures = options.figures !== false;
   const answers = dayCallAnswersOf(record.question ?? 'placement');
   const judged = answers.flatMap((answer) => {
     const observations = record.observations[answer];
@@ -1023,7 +1102,7 @@ export function dayCallGapSentenceOf(
   const clauses = favoured.map(({ answer, judgement }) => {
     const missed = judgement.readings.find((reading) => reading.state === 'missed');
     const figure =
-      missed === undefined || missed.observed === null
+      !withFigures || missed === undefined || missed.observed === null
         ? undefined
         : `${goalPlainNameOf(missed.goal)} read ${String(missed.observed)}${missed.goal.unit} against a bar of ` +
           `${String(missed.goal.bar)}${missed.goal.unit}`;

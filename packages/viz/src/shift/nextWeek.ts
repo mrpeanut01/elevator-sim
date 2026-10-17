@@ -198,6 +198,11 @@ export interface NextWeekView {
   readonly line: string;
   /** The second press on a week that was not held; `undefined` on a held week. */
   readonly onward: OnwardWeekPress | undefined;
+  /**
+   * The census deals this tower's week and no level is admitted above it: the ladder's top. Read by
+   * the held top's sheet (wave AP, lane DT-2, swarm DT's Q4), whose primary stays *Start next week*.
+   */
+  readonly top: boolean;
 }
 
 /** The held week's primary — `everyday/weekView.ts#WEEK_START_NEXT_LABEL`'s text, the label it always had. */
@@ -282,6 +287,7 @@ export function nextWeekOf(week: WeekState, census: WeekWay = WEEK_WAY, clock?: 
       label: NEXT_WEEK_LABEL,
       line: harder === undefined ? lead : `${lead} ${harder}`,
       onward: undefined,
+      top: atTop,
     };
   }
   const again = `Play week ${String(here)} again`;
@@ -291,7 +297,7 @@ export function nextWeekOf(week: WeekState, census: WeekWay = WEEK_WAY, clock?: 
     `${target === 0 ? 'This week had no target to meet' : 'This week’s target was not met'}, so ` +
     `${again} deals the same wrinkles${sameCars} on new crowds.`;
   if (atTop) {
-    return { held: false, week: here, label: again, line: `${missed} This tower deals no further week.`, onward: undefined };
+    return { held: false, week: here, label: again, line: `${missed} This tower deals no further week.`, onward: undefined, top: true };
   }
   const lead = `${missed} Nothing is locked: ${onwardLabel} deals the next week instead, with ${whatComes()}.`;
   return {
@@ -300,6 +306,7 @@ export function nextWeekOf(week: WeekState, census: WeekWay = WEEK_WAY, clock?: 
     label: again,
     line: harder === undefined ? lead : `${lead} ${harder}`,
     onward: { week: next, label: onwardLabel },
+    top: false,
   };
 }
 

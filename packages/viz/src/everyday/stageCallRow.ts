@@ -23,7 +23,7 @@
  *
  * ## What the row leads with since wave AP
  *
- * Swarm DT's Q3 (lane DT-2): the post-AO panel's seat B predicted 0 of 7 calls from the count and 3
+ * [§ D1471](../../../../DECISIONS.md), swarm DT's Q3 (lane DT-2): the post-AO panel's seat B predicted 0 of 7 calls from the count and 3
  * of 7 from the goal readings, and nothing said which decided. So a row that reads goals leads with
  * the first crossing once the playhead has reached it ({@link stageCallLeadOf}), or *No answer has
  * crossed a bar yet*; then each answer's readings at the playhead, the answer taken first; and no
@@ -50,6 +50,7 @@ import {
   type DayCallMaximaReadings,
 } from '../shift/dayCallMaxima.js';
 import {
+  DAY_CALL_COUNT_LABEL,
   DAY_CALL_LONG_WAIT_S,
   dayCallAnswersOf,
   dayCallAnswerWordsOf,
@@ -113,16 +114,13 @@ export const STAGE_CALL_ROWS_CAVEAT =
   'it. Whether the day cleared is on the report when the day closes.';
 
 /**
- * The caveat's last sentence where a row still prints counts: a record written before the readings,
- * whose counts are all its row has. Wave AO's label, kept for that row.
+ * The caveat for `rows`, or `undefined` where none of them is a call's. Where a row still prints counts (a
+ * record written before the readings) it ends with the count's label, `shift/dayCalls.ts#DAY_CALL_COUNT_LABEL`.
  */
-export const STAGE_CALL_COUNT_LABEL = 'The count of riders who waited a minute is not one of the day’s goals.';
-
-/** The caveat for `rows`, or `undefined` where none of them is a call's. */
 export function stageCallRowsCaveatOf(rows: readonly StageCallRowView[]): string | undefined {
   const calls = rows.filter((row) => row.kind === 'call');
   if (calls.length === 0) return undefined;
-  return calls.some((row) => row.counts !== undefined) ? `${STAGE_CALL_ROWS_CAVEAT} ${STAGE_CALL_COUNT_LABEL}` : STAGE_CALL_ROWS_CAVEAT;
+  return calls.some((row) => row.counts !== undefined) ? `${STAGE_CALL_ROWS_CAVEAT} ${DAY_CALL_COUNT_LABEL}` : STAGE_CALL_ROWS_CAVEAT;
 }
 
 /** The row's lead before any answer's run has crossed a bar at the playhead. Never *cleared*. */

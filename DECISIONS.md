@@ -52832,3 +52832,105 @@ and `everyday/stagePlay.ts`.
 `campaignModel.test.ts`, `doorView.test.ts`, `weekRecord.test.ts`, `today.test.ts`,
 `rushDeviceBest.test.ts`, `rushScreenModel.test.ts` and `stagePlay.test.ts`, each red on the tree
 before this lane.
+
+## D1471 — a call's row leads with the first crossing, reads every instant the rail moves, prints no count, and says its caveat once; the pinned call's row reads goals too
+
+> **Taken 2026-10-17 by agent sessions under delegated authority** (swarm DT's ruling § Q3 items 1 to 4
+> and 7, three of three on the shape; built by wave AP's lane DT-2), not by the product owner, and to be
+> read as an agent ruling. **Amends [§ D1433](#d1433) clauses 1 and 2** and extends
+> [§ D1239](#d1239)'s pinned row. Owner-reversible clauses: dropping the count from the stage row; the
+> lead's wording; the caveat said once rather than per row.
+
+**Why an entry.** It moves a recorded ruling and binds `shift/dayCallMaxima.ts`, `dev/dayCallSession.ts`,
+`dev/main.ts#measurePinnedCall`, `everyday/stageCallRow.ts`, `everyday/stageCall.ts`,
+`everyday/stageScreen.ts` and the honesty register.
+
+**The ruling.**
+
+1. **The row leads with the first crossing** once the playhead has reached it: *From 12:38, the day
+   could no longer clear with park the cars in the lobby: the deepest landing reached 33 against a
+   bar of 32*, each later crossing after it. Until then it reads *No answer has crossed a bar yet.*
+   Then each answer's deepest landing and longest wait at the playhead, the answer taken first and
+   marked *your answer*. Nothing is read past the playhead, and *cleared* is said only at the close.
+2. **The count leaves the stage row.** A record written before the readings keeps its counts-only
+   row. The caveat (whose runs they are, that a maximum past its bar stays past it, and that the
+   verdict is the report's) is said once above the rows, with the count's label only where a
+   counts-only row is drawn.
+3. **The readings are kept at every instant the rail's fold can move**, not at whole minutes, so the
+   card and the row read one source at one instant. Root cause of seat D's 08:48 disagreement (card
+   27, row 26): the row read the last whole minute's sample while the card read the frame; the
+   landing rose inside 08:48. A record written before keeps its minute samples and reads them the
+   same way.
+4. **A goal already past its bar ranks first** in the card's nearest-bar pick (seat A's Thursday
+   12:36, which named the landing while the wait read 473 s against 400 s).
+5. **The pinned call reads goals.** `measurePinnedCall` attaches each of its three runs' readings
+   through `dayCallRecordWithMaximaOf`, the one place an ordinary call's record gets them.
+
+**What holds it.** `shift/dayCallMaxima.test.ts` (the readings equal the rail's fold at every event
+and between them), `everyday/stageCallRow.test.ts` (the lead at the crossing instant and one minute
+before, the answer taken first, no count, the caveat once, a counts-only old record),
+`everyday/stageCall.test.ts` (a goal past its bar ranks first), `everyday/midDayCallRow.browser.test.ts`
+and `everyday/stageRecord.browser.test.ts` (the pinned call's row reads goals; red before: it printed
+counts). Red before: the stage row printed counts and the pinned row counts only.
+
+**Not established.** Whether the lead changes what players answer at the next call is unmeasured.
+
+## D1472 — on a split row the close names every answer's verdict, with each missing goal's figure and the clock it crossed; the count comes last, labelled
+
+> **Taken 2026-10-17 by agent sessions under delegated authority** (swarm DT's ruling § Q3 items 2 and
+> 5, S2; built by wave AP's lane DT-2), not by the product owner, and to be read as an agent ruling.
+> **Widens [§ D1433](#d1433) clause 3** from the count's favourite to every answer, and reorders
+> [§ D1138](#d1138) clause 3's report row. Owner-reversible: the order of the row's sentences.
+
+**Why an entry.** It moves a recorded ruling and binds `shift/dayCalls.ts`, `shift/report.ts`,
+`everyday/stageCallRow.ts` (the label is shared) and the honesty register.
+
+**The ruling.** Where the three answers split the day and the report's judgement is in hand, the row
+says, the answer taken first: *With leave them, your answer, the day missed: the worst-wait goal passed
+its bar of 200 s at 09:10 and read 250 s at the close. With park the cars in the lobby, the day
+cleared.* The figure is the report's own reading of that run; the clock is the instant that run's
+readings first went past that goal's bar, said only for the two goals graded on a maximum and only
+where the record carries readings. Then the note on what the runs are of, then the ten-minute count,
+the count's favourite sentence (its figure said once, above), and last *The count of riders who waited
+a minute is not one of the day's goals.* No *because*. A row with no split names no verdict, as before.
+
+**What holds it.** `shift/dayCalls.test.ts` (every answer's verdict with goal, figure and clock; no
+clock on an old record; a level row names none; the ban lists), `shift/report.test.ts` (the sheet's
+own grader). Red before: the row grouped verdicts and named only the favourite's figure.
+
+## D1473 — at a held top *Start next week* stays the primary, the tower's Rush is offered beside it, and another tower only where its ladder is harder by the house's census
+
+> **Taken 2026-10-17 by agent sessions under delegated authority** (swarm DT's ruling § Q4 items 2 to 4;
+> built by wave AP's lane DT-2), not by the product owner, and to be read as an agent ruling. **Amends
+> [§ D1259](#d1259)** at the ladder's top. Owner-reversible: the Rush beside the top's primary; the
+> harder-ladder condition.
+
+**Why an entry.** It amends a recorded ruling and binds `shift/nextWeek.ts`, `shift/nextTower.ts`,
+`everyday/weekView.ts`, `everyday/weekScreen.ts` and the honesty register.
+
+**The ruling.**
+
+1. **At a held week on the ladder's top** (the census deals the week and admits no level above it),
+   the sheet's primary is *Start next week*: the week keeps dealing new crowds. Below the top
+   § D1259 stands.
+2. **The tower's Rush is offered beside it** as a second press, with what a Rush is, this device's best
+   sitting on the tower as `EverydayHost.rushDeviceBest` replays it ([§ D1420](#d1420): the replay's
+   hold, never a stored figure; nothing on a build with a board), and that chimes buy a Rush its
+   pre-fit and a wider purse ([§ D1418](#d1418)).
+3. **Another tower is offered at the top only where its ladder is harder**, on
+   [§ D1344](#d1344)'s one measure: the house left alone, each tower's top week, paired crowd by crowd
+   over the held-out crowds, harder only where the interval lies wholly below zero. The line says so
+   with the house's figures. On the tree as built a held Chancery House top offers Midtown Office
+   (the house cleared 21 weekdays of its top week against 50 of Chancery House's); a held Ashgate top offers no tower (its interval contains
+   zero), where § D1259 had offered Midtown.
+4. What the next level adds is said where one exists (§ D1400's line, unchanged); *harder* only by
+   § D1344's measure.
+
+**What holds it.** `everyday/weekView.test.ts`'s held-top case (primary, Rush line under each answer
+the device's best can give, Chancery's harder line with its figures, Ashgate offered nothing, a week not
+held offered neither). Red before: Chancery's top made *Play Midtown Office's week* the primary and
+offered no Rush.
+
+**Not established.** No browser case presses *Play this tower's Rush* from the sheet; the press is
+`context.go('rush')`, the menu tile's own destination. The tops read here move with lane DT-1's pool
+(§ D1462), which on this tree caps every tower at week 1.

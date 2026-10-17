@@ -242,6 +242,7 @@ import { pressCounterfactualOf } from '../shift/counterfactual.js';
 import { carAbsencesOf, type BookedOutCar } from '../shift/bookedOut.js';
 import { readGoals } from '../shift/goals.js';
 import { dayDeciderOf } from '../shift/dayClose.js';
+import { dayCallRecordWithMaximaOf } from '../shift/dayCallMaxima.js';
 import {
   clockOf,
   clockRange,
@@ -4321,13 +4322,21 @@ function boot(ui: Elements, resources: BrowserResources): void {
         const [parked, spreadOut] = recordings;
         if (parked === undefined || spreadOut === undefined) return;
         const whole = (recording: VizRecording) => shiftObservationsOf(observationsAt(recording, recording.endedAt));
-        pinnedCallCounts = dayCallRecordOf({
-          atS,
-          windowEndS: dayCallWindowEndOf(atS, leave.endedAt),
-          answer: 'leave',
-          legs: { 'park-cars-lobby': parked.legs, 'spread-cars': spreadOut.legs, leave: leave.legs },
-          observations: { 'park-cars-lobby': whole(parked), 'spread-cars': whole(spreadOut), leave: whole(leave) },
-        });
+        /*
+         * Wave AP, lane DT-2, swarm DT's Q3 item 4: each answer's readings from the three runs, as an
+         * ordinary call's are, so the pinned call's row leads with its first crossing too. A record
+         * written before them (a resumed attempt's) keeps its counts-only row.
+         */
+        pinnedCallCounts = dayCallRecordWithMaximaOf(
+          dayCallRecordOf({
+            atS,
+            windowEndS: dayCallWindowEndOf(atS, leave.endedAt),
+            answer: 'leave',
+            legs: { 'park-cars-lobby': parked.legs, 'spread-cars': spreadOut.legs, leave: leave.legs },
+            observations: { 'park-cars-lobby': whole(parked), 'spread-cars': whole(spreadOut), leave: whole(leave) },
+          }),
+          { 'park-cars-lobby': parked, 'spread-cars': spreadOut, leave },
+        );
         /* Part of the attempt, so a resumed one still prints the row. */
         writeAttempt();
         renderAll();

@@ -94,7 +94,7 @@ import {
   type WeekState,
 } from './types.js';
 import { readGoals } from './goals.js';
-import { DAY_CALL_FAILED_ROW_ID, DAY_CALL_ROW_NOTE, DAY_CALL_WRINKLE_QUIET_ROW_ID, type DayCallRecord } from './dayCalls.js';
+import { DAY_CALL_FAILED_ROW_ID, DAY_CALL_COUNT_LABEL, DAY_CALL_ROW_NOTE, DAY_CALL_WRINKLE_QUIET_ROW_ID, type DayCallRecord } from './dayCalls.js';
 
 /**
  * The week-day sheet, narrowed — and the narrowing is an assertion, not a cast.
@@ -2533,9 +2533,13 @@ describe('the ordinary day’s calls and a practice close — § D1138', () => {
     expect(ids.slice(-2)).toEqual(['day-call-1', 'day-call-2']);
     const [first, second] = report.diagnosis.slice(-2);
     expect(first?.why).toContain('4 with park the cars in the lobby, 9 with spread the cars across the tower and 6 with leave them');
-    expect(first?.why).toMatch(/The day read Shift (cleared|missed) with park the cars in the lobby and leave them and Shift (cleared|missed) with spread the cars across the tower\./u);
-    expect(second?.why).not.toContain('The day read');
-    expect(second?.why.endsWith(DAY_CALL_ROW_NOTE)).toBe(true);
+    /* Wave AP, lane DT-2 (swarm DT's Q3 item 5): each answer's verdict by the sheet's own judgement, the answer taken first. */
+    expect(first?.why).toMatch(
+      /With spread the cars across the tower, your answer, the day missed: .+\. With park the cars in the lobby, the day cleared\. With leave them, the day cleared\./u,
+    );
+    expect(second?.why).not.toContain('the day missed');
+    expect(second?.why).toContain(DAY_CALL_ROW_NOTE);
+    expect(second?.why.endsWith(DAY_CALL_COUNT_LABEL)).toBe(true);
   });
 
   it('says where a run the stage needed could not be made, on a day that raised calls too — § D1335', () => {

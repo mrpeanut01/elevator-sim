@@ -46,6 +46,8 @@
  */
 
 import { CONTRACTS, contractById } from './contracts.js';
+import { harderReadingOf, houseWeekCensusOf, type WeekHarderReading } from './nextWeek.js';
+import { weekTopOf } from './weekLevels.js';
 import { WEEK_WAY, type WeekWay } from './weekWay.js';
 import { weekAdmitsANewcomer, weekDealOf, type WeekSheetView } from './weekStake.js';
 
@@ -136,5 +138,51 @@ export function nextTowerOfferOf(
       `${String(deal.counted)} of its days count, and its target is ${String(deal.target)} clean. ` +
       `${hereName} stays open, as every tower does, under This week’s tower on the front door.`,
     stayLabel: NEXT_TOWER_STAY_LABEL,
+  };
+}
+
+/**
+ * **Whether another tower's ladder is harder than this one's top** — wave AP, lane DT-2, [§ D1473](../../../../DECISIONS.md), swarm DT's
+ * Q4 item 3 (S1 and S3): at a held top the onward tower is offered only where a census admits a
+ * ladder harder than this top. Read on [§ D1344](../../../../DECISIONS.md)'s one measure: the house
+ * left alone over the held-out crowds, each tower's top week (`weekLevels.ts#weekTopOf`) against
+ * this one's, paired crowd by crowd, and harder only where the interval lies wholly below zero
+ * (`nextWeek.ts#harderReadingOf`). `undefined` where either top's census is incomplete, which offers
+ * nothing.
+ */
+export function ladderHarderThanTopOf(
+  fromContractId: string,
+  toContractId: string,
+  census: WeekWay = WEEK_WAY,
+): WeekHarderReading | undefined {
+  const from = houseWeekCensusOf({ contractId: fromContractId, week: weekTopOf(fromContractId, census) }, census);
+  const to = houseWeekCensusOf({ contractId: toContractId, week: weekTopOf(toContractId, census) }, census);
+  if (from === undefined || to === undefined) return undefined;
+  return harderReadingOf(from, to);
+}
+
+/**
+ * **The onward tower at a held top**, or `undefined` — wave AP, lane DT-2. The offer {@link nextTowerOfferOf}
+ * makes, kept only where {@link ladderHarderThanTopOf} reads its ladder harder, with a line that says
+ * so by the house's figures and nothing else. It is the sheet's second press: *Start next week* stays
+ * the primary at the top (swarm DT's Q4 item 2), so the stay label is not drawn beside it.
+ */
+export function heldTopOnwardOf(
+  contractId: string,
+  sheet: Pick<WeekSheetView, 'yours' | 'target'> | undefined,
+  nameOf: (buildingId: string) => string | undefined,
+  census: WeekWay = WEEK_WAY,
+): NextTowerOffer | undefined {
+  const offer = nextTowerOfferOf(contractId, sheet, nameOf, census);
+  if (offer === undefined) return undefined;
+  const reading = ladderHarderThanTopOf(contractId, offer.contractId, census);
+  if (reading === undefined || !reading.harder) return undefined;
+  const name = nameOf(offer.buildingId) ?? offer.buildingId;
+  return {
+    ...offer,
+    line:
+      `${name}’s ladder goes further than this tower’s top by the house’s measure: left alone on the same ` +
+      `${String(reading.to.crowds)} crowds, the house cleared ${String(reading.to.cleared)} of the ` +
+      `${String(reading.to.of)} weekdays of ${name}’s top week, against ${String(reading.from.cleared)} of this one’s.`,
   };
 }
