@@ -120,6 +120,7 @@ import {
   WORKSHOP_COPY,
 } from '../everyday/workshopModel.js';
 import {
+  BRIEF_DRIVER_LOCKED,
   BRIEF_WAY_THROUGH_HEADING,
   BRIEF_WEEK_HEADING,
   briefBarModel,
@@ -132,6 +133,7 @@ import {
   DAY_OFFSET_MIN,
   DOOR_DRIVER_NOTE,
   DOOR_DRIVER_NOTE_HELD,
+  DOOR_DRIVER_NOTE_HELD_PAST,
   DOOR_PRIMARY_NOTE_HELD,
   DOOR_STEP_ONE_HELD,
   DOOR_STEPS,
@@ -317,11 +319,14 @@ import {
   stageSkipApplies,
   stageSkipLineOf,
   stageSkipOf,
+  stageSkipSpeechOf,
 } from '../everyday/stagePace.js';
 import {
   STAGE_CALL_COPY,
+  stageCallAskedAgainOf,
   stageCallCardOf,
   stageCallPresentOf,
+  stageCallStandingOrderOf,
   stageEndDayOf,
   stageLostCardOf,
   STAGE_LOST_COPY,
@@ -12982,6 +12987,8 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
      */
     'everyday/stagePace.ts#STAGE_SKIP_BEAT_NOTE',
     'everyday/stagePace.ts#stageSkipLineOf',
+    /* Wave AR, lane AR-2, § D1525: which of the two the skip's span speaks, past the allowance or not. */
+    'everyday/stagePace.ts#stageSkipSpeechOf',
     /*
      * § D1029's call — the card over both rules and the hold the parking presses carry before it.
      * Seeded once per case below on fixture calls on the case's own first car, the corpus building
@@ -12990,6 +12997,9 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
     'everyday/stageCall.ts#stageCallCardOf',
     'everyday/stageCall.ts#STAGE_CALL_COPY',
     'everyday/stageCall.ts#stageCallWrinkleLineOf',
+    /* Wave AR, lane AR-2, § D1528: the placement question asked again, and the order it names. */
+    'everyday/stageCall.ts#stageCallAskedAgainOf',
+    'everyday/stageCall.ts#stageCallStandingOrderOf',
     /*
      * Wave AO, lane AO-4: the transport's button in its three states — playing, paused, and stopped
      * while a call's runs are made — seeded below beside the wait's own note.
@@ -13577,6 +13587,25 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
           seeds.push({ field: `${at}.option(${option.answer})`, text: option.label, role: 'label' });
         }
       }
+      /*
+       * Wave AR, lane AR-2, § D1528: the placement question asked again, naming the order an earlier
+       * press left in force and its clock, drawn at the call it is asked at.
+       */
+      {
+        const call = calls[2]!;
+        const pressedAtS = recording.startedAt + span * 0.05;
+        const order = stageCallStandingOrderOf([{ atS: pressedAtS, change: { kind: 'park-cars-lobby' } }], call.atS);
+        if (order !== undefined) {
+          const card = stageCallCardOf(call, undefined, [], undefined, undefined, undefined, order);
+          seeds.push({ field: 'stage.call(again).question', text: card.question, role: 'prose', playhead: atPlayhead(recording, call.atS) });
+        }
+        seeds.push({
+          field: 'stage.call(again,spread).question',
+          text: stageCallAskedAgainOf({ kind: 'spread-cars', atS: pressedAtS }, undefined),
+          role: 'prose',
+          playhead: atPlayhead(recording, call.atS),
+        });
+      }
       /* § D1168: *End the day*, where the landing-queue goal already reads missed at mid-run. */
       {
         const at = recording.startedAt + span * 0.5;
@@ -13796,6 +13825,14 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
        * before the playhead; the sampled loop below adds every skip the rule would take on this run.
        */
       seeds.push({ field: 'stage.skip.beat', text: STAGE_SKIP_BEAT_NOTE, role: 'label' });
+      /* Wave AR, lane AR-2, § D1525: the skip's span as the stage picks it, past the allowance and not. */
+      for (const pace of [
+        { simPerRealS: 30, reason: 'fast' as const },
+        { simPerRealS: 30, reason: 'fast' as const, playedOn: true as const },
+      ]) {
+        const text = stageSkipSpeechOf({ armed: true, pace, line: '' });
+        if (text !== '') seeds.push({ field: `stage.skip.speech(${pace.playedOn === true ? 'playedOn' : 'fast'})`, text, role: 'label' });
+      }
       {
         const landsAtS = recording.startedAt + span / 3;
         seeds.push({
@@ -15398,6 +15435,9 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     'everyday/today.ts#TODAY_CHOICE_LINE_HELD',
     'everyday/doorView.ts#DOOR_DRIVER_NOTE',
     'everyday/doorView.ts#DOOR_DRIVER_NOTE_HELD',
+    /* Wave AR, lane AR-2, § D1530: the note once the call is behind the player, and the brief's locked cards. */
+    'everyday/doorView.ts#DOOR_DRIVER_NOTE_HELD_PAST',
+    'everyday/briefView.ts#BRIEF_DRIVER_LOCKED',
     /* Wave AQ lane AQ-1: step 1 and the press's note on that held day, #626's leftover. */
     'everyday/doorView.ts#DOOR_STEP_ONE_HELD',
     'everyday/doorView.ts#DOOR_PRIMARY_NOTE_HELD',
@@ -15562,6 +15602,8 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     seeds.push({ field: 'today.lede.held', text: TODAY_CHOICE_LINE_HELD, role: 'prose' });
     seeds.push({ field: 'door.driver.note', text: DOOR_DRIVER_NOTE, role: 'prose' });
     seeds.push({ field: 'door.driver.note.held', text: DOOR_DRIVER_NOTE_HELD, role: 'prose' });
+    seeds.push({ field: 'door.driver.note.heldPast', text: DOOR_DRIVER_NOTE_HELD_PAST, role: 'prose' });
+    seeds.push({ field: 'brief.driver.locked', text: BRIEF_DRIVER_LOCKED, role: 'label' });
     seeds.push({ field: 'door.step1.held.head', text: DOOR_STEP_ONE_HELD.head, role: 'label' });
     seeds.push({ field: 'door.step1.held.body', text: DOOR_STEP_ONE_HELD.body, role: 'prose' });
     seeds.push({ field: 'door.primary.note.held', text: DOOR_PRIMARY_NOTE_HELD, role: 'prose' });
