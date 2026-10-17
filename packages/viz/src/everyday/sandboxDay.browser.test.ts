@@ -216,6 +216,14 @@ describe.skipIf(!HAS_BROWSER)('a sandbox day runs and cannot touch the week — 
       await page.waitForFunction(() => document.querySelector<HTMLElement>('.everyday-stage-start')?.style.display === '', undefined, {
         timeout: 90_000,
       });
+      /* The practice sentence is drawn with the stage's next frame, not with Start: wait for it, then hold it. */
+      await page
+        .waitForFunction(
+          (sentence) => (document.querySelector('.everyday-screen')?.textContent ?? '').includes(sentence),
+          PRACTICE_DAY_SENTENCES.practiceCrowd,
+          { timeout: 15_000 },
+        )
+        .catch(() => undefined);
       expect(await textOf(page, '.everyday-screen')).toContain(PRACTICE_DAY_SENTENCES.practiceCrowd);
       await page.locator('.everyday-bar-back').click();
       await page.waitForSelector('.everyday-brief', { timeout: 15_000 });
