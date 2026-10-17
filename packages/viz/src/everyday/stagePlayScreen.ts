@@ -42,12 +42,15 @@ import type { DispatcherProfile } from '@elevator-sim/core/browser';
 
 import { loadBrowserResources, loadCampaign, type BrowserResources, type LoadedCampaign } from '../dev/data.js';
 import type { BatchRequest, BatchResult, BatchWorkerMessage, BatchWorkerRequest } from '../batch/types.js';
-import { pressStage, stagePathOf, type StageAdmissionContext } from '../campaign/stagePress.js';
-import type { StageSeedSet } from '../campaign/stageRun.js';
+import { admitStageMove, pressStage, stagePathOf, type StageAdmissionContext } from '../campaign/stagePress.js';
+import { stageWatchConfigsOf, type StageSeedSet } from '../campaign/stageRun.js';
+import type { VizRecording } from '../contract/types.js';
+import { createOffThreadRunner } from '../dev/offThreadRuns.js';
 import type { CampaignStage } from '../campaign/types.js';
 import type { PublishedSurvivorScenario } from '../scenario/survivors.js';
 import type { EditorParkingStrategy } from '../fixit/types.js';
 import { actionBarFor, type ActionBarModel } from './actionBar.js';
+import { mountCaseStage, type CaseStage } from './caseStage.js';
 import { everydayDeviceChimeStore } from './chimeStore.js';
 import { CHIME_AWARDS, deviceHoldsTurn } from './deviceChimes.js';
 import { fixSpentUnitsOf, progressWithFixSpent } from './profile.js';
@@ -69,6 +72,7 @@ import {
   type StagePlayView,
 } from './stagePlay.js';
 import { EVERYDAY_COLORS as C, EVERYDAY_RADII as R, EVERYDAY_TYPE as TYPE } from './tokens.js';
+import { tutorialPaceOf } from './tutorialModel.js';
 import type { EverydayState } from './types.js';
 
 /* ------------------------------------------------------------------------- *
@@ -92,6 +96,7 @@ export function openStageInFixit(stageId: string): void {
   if (session !== undefined && session.phase.kind !== 'running') {
     session.phase = { kind: 'idle' };
     session.pressed = undefined;
+    dropWatch(session);
   }
 }
 
@@ -143,6 +148,13 @@ interface Session {
   phase: StagePlayPhase;
   /** The choice the phase's verdict or run was made on; a verdict is stale once `choice` leaves it. */
   pressed: StagePlayChoice | undefined;
+  /**
+   * The pair the last press plays (§ D1496): replication 0 of its tuning set, the stage's setting
+   * then the pressed one. `undefined` until the worker returns them, and after the pair is done.
+   */
+  watch: readonly [VizRecording, VizRecording] | undefined;
+  /** The block playing {@link watch}, built once per press and re-appended on every redraw. */
+  watchStage: CaseStage | undefined;
 }
 
 const sessions = new Map<string, Session>();
@@ -158,6 +170,8 @@ function sessionOf(stage: CampaignStage): Session {
       choice: { profileId: stage.dispatcher.startingProfileId, parking: null },
       phase: { kind: 'idle' },
       pressed: undefined,
+      watch: undefined,
+      watchStage: undefined,
     };
     sessions.set(stage.id, session);
   }
@@ -316,6 +330,51 @@ function runOneBatch(
   });
 }
 
+/*
+ * The pair's runs cross on `dev/shiftWorker.ts`, as the fix-it screen's do (`fixitScreen.ts#runner`),
+ * module-scope so its worker stays warm across mounts and lazy so nothing starts at import. A second
+ * worker beside the batch's, so the pair is not queued behind fifty crowds and the verdict is not
+ * queued behind the pair.
+ */
+const watchRunner = createOffThreadRunner({
+  spawn: () => new Worker(new URL('../dev/shiftWorker.ts', import.meta.url), { type: 'module' }),
+});
+let watchToken = 0;
+
+function dropWatch(session: Session): void {
+  session.watchStage?.dispose();
+  session.watchStage = undefined;
+  session.watch = undefined;
+}
+
+/**
+ * **Ask for the pair a press plays** — GitHub issue #626 item 4, [§ D1496](../../../../DECISIONS.md).
+ * The same crowd under both settings (`stageRun.ts#stageWatchConfigsOf`, replication 0 of the tuning
+ * set), simulated off this thread. The verdict never waits for it: the batch is its own worker and its
+ * own promise, and a pair that fails to record leaves the counter and the verdict as they were.
+ */
+function startWatch(session: Session, configs: ReturnType<typeof stageWatchConfigsOf>): void {
+  dropWatch(session);
+  const token = ++watchToken;
+  watchRunner.start({
+    runs: [
+      { config: configs.baseline, outOfServiceCarIds: [], recordDecisions: false },
+      { config: configs.candidate, outOfServiceCarIds: [], recordDecisions: false },
+    ],
+    onDone: (recordings) => {
+      if (token !== watchToken) return;
+      const [baseline, candidate] = recordings;
+      if (baseline === undefined || candidate === undefined) return;
+      session.watch = [baseline, candidate];
+      live?.redraw();
+    },
+    onFailed: () => {
+      if (token !== watchToken) return;
+      dropWatch(session);
+    },
+  });
+}
+
 /** Press the stage: the one check, then its own judge on both seed sets. */
 function press(data: Loaded, stageId: string, context: EverydayScreenShellContext): void {
   const found = stageContextOf(data, stageId);
@@ -331,6 +390,22 @@ function press(data: Loaded, stageId: string, context: EverydayScreenShellContex
   const budgetUnits = facts.budgetUnits;
   const boughtUnits = facts.boughtStepId === undefined ? undefined : budgetUnits;
   const pressedChoice = session.choice;
+  /* § D1496: the pair this press plays, from the admission's own resolved dispatcher. */
+  const admission = admitStageMove(found.context, move, budgetUnits);
+  if (admission.admitted && admission.candidate !== undefined && found.context.building !== undefined) {
+    startWatch(
+      session,
+      stageWatchConfigsOf({
+        stage: found.stage,
+        building: found.context.building,
+        baseline: found.context.baseline,
+        candidate: admission.candidate,
+        trafficProfiles: data.resources.trafficProfiles,
+        elevatorSpecs: data.resources.elevatorSpecs,
+        dispatcherProfiles: data.resources.dispatcherProfiles,
+      }),
+    );
+  }
   const token = ++runToken;
   const host = context.host;
   session.pressed = pressedChoice;
@@ -359,6 +434,7 @@ function press(data: Loaded, stageId: string, context: EverydayScreenShellContex
       if (token !== runToken) return;
       if (result.kind === 'refused') {
         session.phase = { kind: 'idle' };
+        dropWatch(session);
       } else {
         const report = result.outcome.verdict;
         let paid: 'first' | 'again' | undefined;
@@ -395,6 +471,7 @@ function press(data: Loaded, stageId: string, context: EverydayScreenShellContex
     () => {
       if (token !== runToken) return;
       session.phase = { kind: 'failed' };
+      dropWatch(session);
       live?.redraw();
       live?.refreshBar();
     },
@@ -404,6 +481,12 @@ function press(data: Loaded, stageId: string, context: EverydayScreenShellContex
 /* ------------------------------------------------------------------------- *
  * The mount
  * ------------------------------------------------------------------------- */
+
+const WATCH_CLASSES = Object.freeze({
+  root: 'everyday-stage-play-watch',
+  canvas: 'everyday-stage-play-watch-canvas',
+  skip: 'everyday-stage-play-watch-skip',
+});
 
 const EYEBROW = `font:500 10.5px ${TYPE.mono};letter-spacing:.14em;color:${C.label};text-transform:uppercase`;
 
@@ -577,12 +660,46 @@ export function mountStagePlay(host: HTMLElement, context: EverydayScreenShellCo
       if (view.practice !== undefined) {
         controls.append(para(doc, 'everyday-stage-play-practice', view.practice, `font-size:13px;line-height:1.5;color:${C.inkSoft}`));
       }
-      if (view.status !== undefined) {
-        const status = para(doc, 'everyday-stage-play-status', view.status, `font:500 12.5px ${TYPE.mono};color:${C.inkSoft}`);
-        status.setAttribute('role', 'status');
-        controls.append(status);
-      }
       root.append(controls);
+    }
+
+    /*
+     * § D1496: the pair first, then the counter under it, then the verdict. The verdict is drawn the
+     * moment the press lands and the pair keeps playing over it until it ends or is skipped.
+     */
+    if (view.watch !== undefined && session.watch !== undefined) {
+      const [baselineRun, candidateRun] = session.watch;
+      const watching = everydayProfileStore().defaultSpeed();
+      session.watchStage ??= mountCaseStage(doc, {
+        panes: [
+          { recording: baselineRun, caption: view.watch.baselineCaption },
+          { recording: candidateRun, caption: view.watch.candidateCaption },
+        ],
+        speedSimPerRealS: watching,
+        pace: (longestStandingS) => tutorialPaceOf({ longestStandingS, watchingSimPerRealS: watching }),
+        copy: { eyebrow: view.watch.eyebrow, note: view.watch.note, skip: view.watch.skip },
+        wide: true,
+        classes: WATCH_CLASSES,
+        /*
+         * A pair that ends while the batch still counts plays again from its first minute, so the
+         * wait is never back to a counter alone; once the verdict is in, its end or a skip ends it.
+         */
+        onDone: (how) => {
+          if (how === 'ended' && session.phase.kind === 'running') {
+            session.watchStage?.dispose();
+            session.watchStage = undefined;
+          } else {
+            dropWatch(session);
+          }
+          live?.redraw();
+        },
+      });
+      root.append(session.watchStage.root);
+    }
+    if (view.status !== undefined) {
+      const status = para(doc, 'everyday-stage-play-status', view.status, `font:500 12.5px ${TYPE.mono};color:${C.inkSoft}`);
+      status.setAttribute('role', 'status');
+      root.append(status);
     }
 
     if (view.verdict !== undefined) {
@@ -650,6 +767,12 @@ export function mountStagePlay(host: HTMLElement, context: EverydayScreenShellCo
     unmount: () => {
       alive = false;
       live = undefined;
+      /* The pair's loop goes with the page; a press still running brings its pair back on return. */
+      const open = openStageId === undefined ? undefined : sessions.get(openStageId);
+      if (open !== undefined) {
+        open.watchStage?.dispose();
+        open.watchStage = undefined;
+      }
       /* A stage is opened by pressing its row; leaving the screen closes it. The run in flight is its own. */
       closeStageInFixit();
     },

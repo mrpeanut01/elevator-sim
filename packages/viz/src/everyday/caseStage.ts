@@ -121,8 +121,12 @@ export interface CaseStageInput {
   readonly speedSimPerRealS: number;
   readonly copy: CaseStageCopy;
   readonly classes: CaseStageClasses;
-  /** Called once, on the skip press or the run's end, whichever comes first. */
-  readonly onDone: () => void;
+  /**
+   * Called once, on the skip press or the run's end, whichever comes first, told which. The stage
+   * screen plays its pair again while its batch is still running and only a skip ends it there
+   * ([§ D1496](../../../../DECISIONS.md)); every other caller ignores the argument.
+   */
+  readonly onDone: (how: 'skipped' | 'ended') => void;
   /**
    * **The transport's speed at a frame**, from the present frame's longest wait over every pane —
    * GitHub issue #598, [§ D992](../../../../DECISIONS.md). Absent on the fix-it screen, which plays
@@ -347,15 +351,15 @@ export function mountCaseStage(doc: Document, input: CaseStageInput): CaseStage 
 
   let done = false;
   let frameHandle: number | undefined;
-  const finish = (): void => {
+  const finish = (how: 'skipped' | 'ended'): void => {
     if (done) return;
     done = true;
     playback.pause();
     if (frameHandle !== undefined) doc.defaultView?.cancelAnimationFrame(frameHandle);
     frameHandle = undefined;
-    input.onDone();
+    input.onDone(how);
   };
-  skip.addEventListener('click', finish);
+  skip.addEventListener('click', () => finish('skipped'));
 
   const first = canvases[0];
   const paint = (): void => {
@@ -441,7 +445,7 @@ export function mountCaseStage(doc: Document, input: CaseStageInput): CaseStage 
       });
     });
     if (playback.state === 'ended') {
-      finish();
+      finish('ended');
       return;
     }
     frameHandle = doc.defaultView?.requestAnimationFrame(paint);

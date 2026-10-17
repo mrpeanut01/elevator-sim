@@ -53137,3 +53137,53 @@ offered no Rush.
 **Not established.** No browser case presses *Play this tower's Rush* from the sheet; the press is
 `context.go('rush')`, the menu tile's own destination. The tops read here move with lane DT-1's pool
 (§ D1462), which on this tree caps every tower at week 1.
+
+## D1496 — a stage's press plays one of its crowds under both settings while the verdict is measured: § D644 extended to the stage screen
+
+> **Taken 2026-10-17 by agent sessions under delegated authority** (the judge's ruling on GitHub issue
+> #626 item 4; built by wave AP's gameplay lane G-2), not by the product owner, and to be read as an
+> agent ruling. **Extends [§ D644](#d644)** from a fix case to a Scenario stage. Owner-reversible: the
+> two captions and the skip's label; the pace (`tutorialModel.ts#tutorialPaceOf`); the replay of a pair
+> that ends while the batch still runs.
+
+**Why an entry.** It extends a recorded ruling to a second screen, and binds `campaign/stageRun.ts`,
+`everyday/caseStage.ts` (whose `onDone` now says whether it was skipped or ended),
+`everyday/stagePlay.ts`, `everyday/stagePlayScreen.ts` and the honesty register.
+
+**What was found.** *Run the stage* drew a counter and a sentence for the whole of a batch, on the mode
+`docs/38` § 2.3 says plays live: nothing on the page moved but a number.
+
+**The ruling.**
+
+1. **What plays.** § D644's pair: the stage's own setting and the pressed one, on replication 0 of the
+   stage's tuning set (`stageRun.ts#stageWatchConfigsOf`, through `demonstrationConfigFor`), the
+   candidate being `stagePress.ts#admitStageMove`'s resolved dispatcher. One crowd for both panes,
+   simulated on `dev/shiftWorker.ts` through `dev/offThreadRuns.ts`, beside the batch's own worker.
+2. **Reading order.** The pair, then the counter under it, then the verdict card. Captions: *One of
+   the stage's crowds, watched*; *The verdict is all of them, both settings on the same passengers.*;
+   panes *As the building has it* and *With your settings*; skip *Stop watching*. No digit in the
+   block ([§ D644](#d644) ruling 4).
+3. **The verdict is never held for the watch** ([§ D644](#d644) ruling 2): it is drawn when the batch
+   lands, and the pair keeps playing beside it until it ends or is skipped. A pair that ends while the
+   batch still counts plays again from its first minute, so the wait never falls back to a counter
+   alone; this replay is this lane's addition, made because on stage 1 the pair (fast through its quiet
+   minutes) ended about ten seconds before the verdict.
+4. **No pause and no intervention** on the pair, for [§ D644](#d644) ruling 3's reason: it is the run
+   the verdict reads.
+
+**What holds it.** `campaign/stageWatch.test.ts`: the candidate pane's legs equal the legs of the
+batch's own replication 0 candidate run built through `batch/runBatch.ts#armConfigOf`, for a shipped
+profile and for a parking edit, and `runBatch`'s replication 0 reports the pane's AWT and seed (this
+closes `demonstrationConfigFor`'s docstring claim, which `campaign.test.ts` had pinned only by seed,
+horizon, demand and timeout); a different move changes the candidate pane's legs while the baseline
+pane stays the same crowd. Red with replication 1 in place of 0. `everyday/stagePlay.test.ts`: the
+watch words exist while running and judged, never idle, failed or held, and carry no digit.
+`everyday/stageWatch.browser.test.ts`: both canvases painting while the counter runs, pair above
+counter, the verdict drawn with the pair still up (a mutation observer installed before the press),
+no digit in the block, skip leaves the verdict. Red on the base: no pair appears.
+
+**Not established.** Whether replaying the pair while a long batch counts reads as live play or as a
+loop to a player; no assessor has watched it. The bank view is not offered on this block.
+
+**Numbers spent.** This lane held **D1496 to D1498** and spent **D1496 only**; D1497 and D1498 are
+unspent.
