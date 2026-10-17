@@ -312,7 +312,7 @@ export function dayCallCrossingPhraseOf(pastBar: readonly GoalReading[]): string
 /**
  * **A call's record with each answer's readings taken from its runs** — the one place § D1433's
  * maxima are attached to a counted record, so an ordinary call (`dev/dayCallSession.ts`) and the
- * pinned day's call (`dev/main.ts#measurePinnedCall`, wave AP's lane DT-2, swarm DT's Q3 item 4)
+ * pinned day's call (`dev/main.ts#measurePinnedCall`, wave AP's lane DT-2, [§ D1471](../../../../DECISIONS.md), swarm DT's Q3 item 4)
  * carry the same readings and draw the same row. Taken while the runs are in hand, so a resumed
  * attempt reads them from the record. An answer with no run is left out, and its row reads the
  * others.

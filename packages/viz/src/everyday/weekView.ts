@@ -324,7 +324,7 @@ export const WEEK_TOP_RUSH_COPY = Object.freeze({
 });
 
 /**
- * **The held top's Rush line** — wave AP, lane DT-2, swarm DT's Q4 item 2 (S1): what the Rush is, this
+ * **The held top's Rush line** — wave AP, lane DT-2, [§ D1473](../../../../DECISIONS.md), swarm DT's Q4 item 2 (S1): what the Rush is, this
  * device's best sitting on the tower where one is kept and replayed ([§ D1420](../../../../DECISIONS.md):
  * the replay's hold, never a stored one; a build with a board says nothing here), and that chimes buy its
  * pre-fit and purse ([§ D1418](../../../../DECISIONS.md)).

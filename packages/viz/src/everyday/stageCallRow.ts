@@ -23,7 +23,7 @@
  *
  * ## What the row leads with since wave AP
  *
- * Swarm DT's Q3 (lane DT-2): the post-AO panel's seat B predicted 0 of 7 calls from the count and 3
+ * [§ D1471](../../../../DECISIONS.md), swarm DT's Q3 (lane DT-2): the post-AO panel's seat B predicted 0 of 7 calls from the count and 3
  * of 7 from the goal readings, and nothing said which decided. So a row that reads goals leads with
  * the first crossing once the playhead has reached it ({@link stageCallLeadOf}), or *No answer has
  * crossed a bar yet*; then each answer's readings at the playhead, the answer taken first; and no

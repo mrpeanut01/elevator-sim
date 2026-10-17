@@ -142,7 +142,7 @@ export function nextTowerOfferOf(
 }
 
 /**
- * **Whether another tower's ladder is harder than this one's top** — wave AP, lane DT-2, swarm DT's
+ * **Whether another tower's ladder is harder than this one's top** — wave AP, lane DT-2, [§ D1473](../../../../DECISIONS.md), swarm DT's
  * Q4 item 3 (S1 and S3): at a held top the onward tower is offered only where a census admits a
  * ladder harder than this top. Read on [§ D1344](../../../../DECISIONS.md)'s one measure: the house
  * left alone over the held-out crowds, each tower's top week (`weekLevels.ts#weekTopOf`) against

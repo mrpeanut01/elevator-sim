@@ -1008,7 +1008,7 @@ export function dayCallRowOf(
 }
 
 /**
- * **Every answer's verdict on a split row** — wave AP, lane DT-2, swarm DT's Q3 item 5 (S2), widening
+ * **Every answer's verdict on a split row** — wave AP, lane DT-2, [§ D1472](../../../../DECISIONS.md), swarm DT's Q3 item 5 (S2), widening
  * § D1433 clause 3 from the count's favourite to every answer. The answer taken first, then the
  * counts sentence's order: *With spread the cars across the tower, the day cleared. With leave them,
  * the day missed: the deepest landing passed its bar of 32 at 12:38 and read 35 at the close.* The
