@@ -2234,7 +2234,12 @@ type DecisionReservation = {
  * is registered in `KNOWN_DECISION_HOLES`; **D1360-D1400 are free rather than holed**, since nothing
  * is written above them (§ D430), and the charter row moves to **D1360**.
  */
-const OPEN_RESERVATION = null as DecisionReservation | null;
+const OPEN_RESERVATION = { wave: 'AQ', from: 1497, to: 1540 } as DecisionReservation | null;
+/*
+ * **Wave AQ holds D1497-D1540.** Four lanes built on the playtest after wave AP (#626, #631), each
+ * with a contiguous block from its dispatch brief. The wave's merge commit closes this reservation and
+ * registers its unspent numbers below the highest heading.
+ */
 /*
  * **Wave AP's reservation, D1446-D1540, is closed** in the wave's own merge commit. Seven lanes (the
  * post-AO panel's two defect lanes, swarm DT's DT-1 and DT-2, and the first playtest's G-1 to G-3)
