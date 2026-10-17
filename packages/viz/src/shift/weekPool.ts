@@ -574,11 +574,19 @@ export const POOL_WEEKDAY_NAMES: readonly string[] = Object.freeze(['Monday', 'T
 const TOPS = new WeakMap<WeekPool, Map<string, number>>();
 
 /**
+ * **While the census measures, the pool caps nothing.** The census plays each cell at the authored
+ * week that first deals it, and `weekLevels.ts#weekTopOf` caps the dealt week by {@link poolTopOf}:
+ * with the cap on, an empty or partial pool would deal its own census week 1's draw and the census
+ * would tag the wrong day. Only `weekPool.sweep.test.ts` sets it, for the length of its run.
+ */
+export const POOL_CENSUS: { measuring: boolean } = { measuring: false };
+
+/**
  * **The highest week the pool deals on a tower**: `Infinity` for a tower the pool does not cover,
  * `1` where week 2 is not admitted over it, else the last week admitted in turn from week 2.
  */
 export function poolTopOf(contractId: string, pool: WeekPool = WEEK_POOL, census: WeekWay = WEEK_WAY): number {
-  if (pool.protocol.contractId !== contractId) return Number.POSITIVE_INFINITY;
+  if (pool.protocol.contractId !== contractId || POOL_CENSUS.measuring) return Number.POSITIVE_INFINITY;
   const shipped = pool === WEEK_POOL && census === WEEK_WAY;
   const cached = shipped ? TOPS.get(pool)?.get(contractId) : undefined;
   if (cached !== undefined) return cached;

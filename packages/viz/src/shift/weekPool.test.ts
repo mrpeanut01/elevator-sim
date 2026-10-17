@@ -16,6 +16,7 @@ import { contractBuildings, todaysScenarioDayState } from './contractDay.test-he
 import { openWeek } from './week.js';
 import { weekTopOf } from './weekLevels.js';
 import { dealtCrowdOf, weekRecordFor } from './weekRecord.js';
+import { weekKeepDaysLinesOf } from './poolWays.js';
 import {
   needDaysAt,
   poolCellsOf,
@@ -192,6 +193,18 @@ describe('the dealer — § D1460', () => {
     expect(poolDealOf(C2, 1, 1, 0, DATE, pool)).toBeUndefined();
     expect(poolDealOf('c7', 2, 1, 0, DATE, pool)).toBeUndefined();
     expect(poolDealOf(C2, 2, 1, 0, DATE, poolOf(() => ({ tag: 'live', cleared: BANDED })))).toBeUndefined();
+  });
+});
+
+describe('DC-13 in days — § D1462', () => {
+  it('states each banded driver’s keep band over the level as dealt, and nothing for a withdrawn one', () => {
+    const pool = poolOf(admittable);
+    const lines = weekKeepDaysLinesOf({ contractId: C2, week: 2 }, () => undefined, pool);
+    expect(lines).toHaveLength(2);
+    const reading = poolLevelReadingOf(C2, 2, pool)!;
+    expect(lines[0]).toContain(`each of the ${String(reading.keep[0]!.of)} need-day crowds`);
+    expect(lines[0]).toMatch(/cleared \d+ of them: about \d+ per cent of the counted days as dealt\.$/u);
+    expect(weekKeepDaysLinesOf({ contractId: C2, week: 2 }, () => undefined, poolOf(admittable, 12))).toEqual([]);
   });
 });
 

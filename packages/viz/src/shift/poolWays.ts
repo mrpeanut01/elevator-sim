@@ -22,7 +22,7 @@ import { PARK_CARS_LOBBY_LABEL, SPREAD_CARS_LABEL } from '../live/interventions.
 import { DAY_CALL_LEAVE_LABEL } from './dayCalls.js';
 import type { WeekState } from './types.js';
 import { dealtWeekOf } from './weekLevels.js';
-import { poolCrowdFor, WEEK_POOL, type PoolCall, type PoolCrowd, type WeekPool } from './weekPool.js';
+import { poolCrowdFor, poolLevelReadingOf, WEEK_POOL, type PoolCall, type PoolCrowd, type WeekPool } from './weekPool.js';
 
 /** A display name for a profile id, or `undefined` where the caller has none. */
 export type PoolNameOf = (profileId: string) => string | undefined;
@@ -103,4 +103,28 @@ export function poolCloseLineOf(crowd: PoolCrowd | undefined, nameOf: PoolNameOf
   if (cleared === undefined) return undefined;
   if (unique.length === 0) return 'On this crowd, no driver left alone and no answer at a raised call cleared the day.';
   return `On this crowd, no driver left alone cleared the day; ${listOf(unique)} would have.`;
+}
+
+/**
+ * **DC-13 in days, as *Your week* states it** — wave AP, lane DT-1, swarm DT's ruling Q1 and Q2
+ * item 4 ([§ D1462](../../../../DECISIONS.md)). For the level the week is dealt
+ * (`weekLevels.ts#dealtWeekOf`), one sentence per banded profile: of the need-day crowds this week
+ * can be dealt, how many an answer at one of its calls cleared where keeping lost, and that share of
+ * the counted days as dealt. `[]` where the pool does not deal the week, so weeks 3 and 4 never print
+ * week 2's figure and a withdrawn level prints none. Past tense: what the census found on its runs.
+ */
+export function weekKeepDaysLinesOf(week: Pick<WeekState, 'contractId' | 'week'>, nameOf: PoolNameOf, pool: WeekPool = WEEK_POOL): readonly string[] {
+  const dealt = pool === WEEK_POOL ? dealtWeekOf(week) : week.week;
+  const reading = poolLevelReadingOf(week.contractId, dealt, pool);
+  if (reading?.verdict !== 'admitted') return [];
+  return Object.freeze(
+    reading.keep.map((band) => {
+      const driver = nameOf(band.profileId) ?? band.profileId;
+      return (
+        `With ${driver} picked and every call kept, keeping lost on each of the ${String(band.of)} need-day ` +
+        `crowds this week can be dealt, and an answer at one of its calls cleared ${String(band.saved)} of them: ` +
+        `about ${(100 * band.share).toFixed(0)} per cent of the counted days as dealt.`
+      );
+    }),
+  );
 }
