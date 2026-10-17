@@ -121,7 +121,7 @@ async function untilPace(page: Page, state: 'fast' | 'watching', rung: string, t
       if (lit !== chip) return false;
       return wanted === 'fast'
         ? pace.startsWith(`fast-forwarding at ${chip}`) || skip.startsWith('nobody on a landing has waited a minute: skipping ahead')
-        : pace.startsWith(`at your speed, ${chip}`) || skip.startsWith('skipped ');
+        : pace.startsWith(`slowed to your speed, ${chip}`) || skip.startsWith('skipped ');
     },
     [state, rung] as const,
     { timeout, polling: 100 },
@@ -135,16 +135,16 @@ describe.skipIf(!HAS_BROWSER)('§ D1169 — a scored day is paced by the tutoria
       /* 08:00, the quiet head: nobody on a landing has waited a minute, so the transport is fast. */
       await untilPace(page, 'fast', '30×', 30_000);
       expect(await litChip(page)).toBe('30×');
-      expect(['', 'fast-forwarding at 30× while nobody on a landing has waited a minute']).toContain(await paceNote(page));
+      expect(['', 'fast-forwarding at 30×: nobody on a landing has waited a minute']).toContain(await paceNote(page));
 
       /* Somebody passes a minute: the player's rung, and the line says why. */
       await untilPace(page, 'watching', '4×', 240_000);
       expect(await litChip(page)).toBe('4×');
-      expect(['', 'at your speed, 4×, while somebody on a landing has waited over a minute']).toContain(await paceNote(page));
+      expect(['', 'slowed to your speed, 4×: somebody on a landing has waited over a minute', 'slowed to your speed, 4×, for a few seconds after a wait of over a minute']).toContain(await paceNote(page));
 
       /* A chip pressed while somebody waits is the rung that wait plays at, and stays the player's rung. */
       await page.click('.everyday-stage-speed:text-is("8×")');
-      await untilNote(page, 'at your speed, 8×', 15_000);
+      await untilNote(page, 'slowed to your speed, 8×', 15_000);
       expect(await litChip(page)).toBe('8×');
 
       /* When the landings clear, fast again: the chip did not pin the rest of the day. */

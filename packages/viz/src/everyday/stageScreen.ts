@@ -149,7 +149,10 @@ import {
   stageSkipLineOf,
   stageSkipOf,
   type StagePaceReason,
-  watchedRealAfter,
+  FRESH_PACE_COUNTERS,
+  paceCountersAfter,
+  type PaceCounters,
+  type StagePace,
   worstWaitLossBeginsOf,
 } from './stagePace.js';
 /* Wave AI, § D1029 — the pinned day's call. */
@@ -449,8 +452,9 @@ function mountStage(
    * frame they were last counted at and its speed, and whether a chip pressed while the stage played
    * on has set the allowance aside until the next call.
    */
-  let watchedRealS = 0;
-  let watchedFrame: { readonly atS: number; readonly simPerRealS: number } | undefined;
+  let paceCounters: PaceCounters = FRESH_PACE_COUNTERS;
+  /* Wave AQ, lane AQ-2 (§ D1506): the last paced frame, whose answer the counters advance by. */
+  let watchedFrame: { readonly atS: number; readonly simPerRealS: number; readonly pace: StagePace } | undefined;
   let watchAllowanceOff = false;
   /** When a chip was pressed on this day — § D991 clause 2 as § D1029 amends it. */
   let playerChoseSpeedAtS: number | undefined;
@@ -1973,7 +1977,7 @@ function mountStage(
      */
     playerChoseSpeedAtS = paceScored && lastPaceReason === 'watching' ? undefined : (playback?.simTimeS ?? 0);
     /* § D1493: a chip press is a decision; pressed while the stage played on, it stands to the next call. */
-    watchedRealS = 0;
+    paceCounters = { ...paceCounters, watchedRealS: 0 };
     if (lastPaceReason === 'unheld') watchAllowanceOff = true;
     /* Lane AO-4: a chip press is a state of the player's making, so a skip's line from before it is over. */
     if (skipLine !== '') {
@@ -2027,8 +2031,8 @@ function mountStage(
       return;
     }
     if (watchedFrame !== undefined) {
-      watchedRealS = watchedRealAfter(watchedRealS, {
-        reason: lastPaceReason,
+      paceCounters = paceCountersAfter(paceCounters, {
+        pace: watchedFrame.pace,
         fromS: watchedFrame.atS,
         toS: simTimeS,
         simPerRealS: watchedFrame.simPerRealS,
@@ -2044,13 +2048,14 @@ function mountStage(
       callAtS: activeCall()?.call.atS,
       scored: paceScored,
       lostAtS,
-      watchedRealS: watchAllowanceOff ? undefined : watchedRealS,
+      watchedRealS: watchAllowanceOff ? undefined : paceCounters.watchedRealS,
+      lingerRealS: paceCounters.lingerRealS,
     });
     lastPaceReason = answer.reason;
-    watchedFrame = { atS: simTimeS, simPerRealS: answer.simPerRealS };
+    watchedFrame = { atS: simTimeS, simPerRealS: answer.simPerRealS, pace: answer };
     /* § D1493: a call raised, or waited at, or answered, is a decision, and the allowance starts again. */
     if (answer.reason === 'call') {
-      watchedRealS = 0;
+      paceCounters = FRESH_PACE_COUNTERS;
       watchAllowanceOff = false;
     }
     /* § D1169: a chip pressed while fast stands until somebody next waits a minute, and not past it. */
@@ -2928,10 +2933,10 @@ function mountStage(
      */
     paceHorizon = context.ctx !== 'rush' ? host.runHorizon() : 'period';
     paceActs = actsOf(recording.demandPhases);
-    paceScored = context.ctx === 'daily';
+    paceScored = scoredPaceIn(context.ctx);
     if (resumeAtS === undefined) lastPaceReason = undefined;
     /* § D1493: a new recording is a new day, or the run an answer just made; either way nothing is owed. */
-    watchedRealS = 0;
+    paceCounters = FRESH_PACE_COUNTERS;
     watchedFrame = undefined;
     watchAllowanceOff = false;
     /* § D1212: a fresh day has skipped nothing; a re-simulation keeps the line it had. */
@@ -4460,6 +4465,19 @@ export function stageEntryStartsARun(run: {
  * `stageScreen.test.ts`; its non-test callers are {@link mountStage}'s `activeCall` and its call rows.
  */
 export function dayCallsAskedIn(ctx: RunContext): boolean {
+  return ctx === 'daily' || ctx === 'campaign';
+}
+
+/**
+ * **The stage contexts paced as a scored day** ([§ D1169](../../../../DECISIONS.md)): fast while nobody
+ * on a landing has waited a minute, the player's rung while somebody has. The daily stage since
+ * § D1169, and a career day since wave AQ, lane AQ-2 ([§ D1508](../../../../DECISIONS.md)): Garden
+ * Apartments' day 1 opened on eighteen simulated minutes of empty landings, four and a half real
+ * minutes at `4×`, under *nobody has called a lift yet*. A watch, a rush and a fix case play at the
+ * player's rung. Pure and exported for `stageScreen.test.ts`; its non-test caller is
+ * {@link mountStage}'s `adopt`.
+ */
+export function scoredPaceIn(ctx: RunContext): boolean {
   return ctx === 'daily' || ctx === 'campaign';
 }
 
