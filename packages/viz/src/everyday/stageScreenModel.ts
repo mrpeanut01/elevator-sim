@@ -912,6 +912,13 @@ export const STAGE_GOALS_COPY = Object.freeze({
     'these are readings at the clock above, not results · no goal is judged until the day ends',
   /** Under the rows once the playhead has reached it. */
   graded: 'the day has run out · these are the readings the report grades',
+  /**
+   * **What the contract's four decide, when the career stage leads with them** — wave AR, lane AR-4,
+   * GitHub issue #633. Under {@link StageGoalsInput.contractGoals}' heading on a career day.
+   */
+  contractLead: 'These four file today cleared or missed against the contract, and the day’s report is graded on them.',
+  /** Inside the folded week's five on a career day: what they are, and that the contract counts none. */
+  weekNote: 'These five are the week’s, and the contract counts none of them.',
 });
 
 /** One goal on the strip — {@link stageGoalsOf}'s row, projected from the rail's own. */
@@ -967,6 +974,11 @@ export interface StageGoalsView {
   /** Whether any verdict is being drawn — `false` at every playhead short of `endedAt`. */
   readonly judged: boolean;
   readonly rows: readonly StageGoalRow[];
+  /**
+   * **The week's five, folded under the contract's four** — wave AR, lane AR-4, GitHub issue #633.
+   * Present only when {@link StageGoalsInput.contractGoals} led the strip; the mount draws it closed.
+   */
+  readonly secondary?: { readonly heading: string; readonly note: string; readonly rows: readonly StageGoalRow[] } | undefined;
 }
 
 /** What {@link stageGoalsOf} needs. Plain data; the caller has already read the goals. */
@@ -994,6 +1006,17 @@ export interface StageGoalsInput {
    * four bars are one click away is which flow the player walked in on.
    */
   readonly contract?: boolean | undefined;
+  /**
+   * **The contract's four, to lead a career day's strip** — wave AR, lane AR-4, GitHub issue #633.
+   *
+   * The playtest found the career day leading with the week's five, which *"the contract counts none
+   * of"*, while the four that file the day sat only on the building desk. With this present the strip
+   * reads these goals at the same playhead and over the same fold as the five, heads them with
+   * `heading` (the desk's own `contractAsksEyebrow`), and folds the five under them as
+   * {@link StageGoalsView.secondary}. Absent, the strip is what it was. The goals are the caller's
+   * (`campaignModel.ts#campaignTestGoals` at the tower's difficulty), never a second list here.
+   */
+  readonly contractGoals?: { readonly heading: string; readonly goals: readonly ShiftGoal[] } | undefined;
 }
 
 /**
@@ -1100,13 +1123,32 @@ function unjudged(reading: GoalReading): GoalReading {
  */
 export function stageGoalsOf(input: StageGoalsInput): StageGoalsView {
   const judged = input.simTimeS >= input.endedAt;
-  const readings = judged ? input.readings : input.readings.map(unjudged);
+  const rowsOf = (raw: readonly GoalReading[]): readonly StageGoalRow[] => stageGoalRowsOf(input, raw, judged);
+  const note = judged ? STAGE_GOALS_COPY.graded : STAGE_GOALS_COPY.reading;
+  const lead = input.contractGoals;
+  if (lead !== undefined) {
+    return {
+      heading: lead.heading,
+      note,
+      contract: STAGE_GOALS_COPY.contractLead,
+      judged,
+      rows: rowsOf(readGoals(lead.goals, input.observations)),
+      secondary: { heading: STAGE_GOALS_COPY.heading, note: STAGE_GOALS_COPY.weekNote, rows: rowsOf(input.readings) },
+    };
+  }
   return {
     heading: STAGE_GOALS_COPY.heading,
-    note: judged ? STAGE_GOALS_COPY.graded : STAGE_GOALS_COPY.reading,
+    note,
     contract: input.contract === true ? STAGE_GOALS_COPY.contract : '',
     judged,
-    rows: goalRowsOf(
+    rows: rowsOf(input.readings),
+  };
+}
+
+/** One goal set's rows on the strip, ungraded short of the end — {@link stageGoalsOf}'s one projection. */
+function stageGoalRowsOf(input: StageGoalsInput, raw: readonly GoalReading[], judged: boolean): readonly StageGoalRow[] {
+  const readings = judged ? raw : raw.map(unjudged);
+  return goalRowsOf(
       readings,
       input.history,
       input.day,
@@ -1128,8 +1170,7 @@ export function stageGoalsOf(input: StageGoalsInput): StageGoalsView {
       glyph: row.glyph,
       state: row.state,
       barPct: row.barPct,
-    })),
-  };
+    }));
 }
 
 /* -------------------------------------------------------------------------- *

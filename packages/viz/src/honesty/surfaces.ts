@@ -217,6 +217,7 @@ import {
 import {
   FIGURE_NOTE_HANDLE,
   everydayReportViewOf,
+  REPORT_LEVERS_OPTIONAL_HEADING,
   REPORT_PRACTICE_AGAIN,
   REPORT_SECONDARY,
   UNMEASURED_WEEK_SHEET_STEP,
@@ -389,7 +390,7 @@ import { percentileLine, WORLD_FIGURES_ABSENT, WORLD_FIGURES_LABEL, WORLD_FIGURE
 import { weekdayOf, type GoalObservations } from '../shift/types.js';
 import { buildingView, CONTRACT_COPY, contractView, towersView, type BuildingFacts } from '../everyday/campaignModel.js';
 /* Wave AN lane AP-3's region — the Career's front page, § D1301. */
-import { TOWER_CARD_COPY, contractDocumentOf, type CampaignInput } from '../everyday/campaignModel.js';
+import { DAY_CENSUS_COPY, TOWER_CARD_COPY, contractDocumentOf, type CampaignInput } from '../everyday/campaignModel.js';
 import { mootCountClause } from '../everyday/today.js';
 import { CONTRACT_DAYS, DIFFICULTIES, DIFFICULTY_IDS, missAllowanceSentenceOf } from '../campaign/economy.js';
 import type { TowerShafts } from '../campaign/economy.js';
@@ -15493,6 +15494,8 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     'everyday/reportView.ts#REPORT_SECONDARY',
     /* Wave AO, lane AO-4 (§ D1388): today again as practice, under the call that decided it. */
     'everyday/reportView.ts#REPORT_PRACTICE_AGAIN',
+    /* Wave AR, lane AR-4 (§ D1543): the levers' heading over a cleared day, seeded by name. */
+    'everyday/reportView.ts#REPORT_LEVERS_OPTIONAL_HEADING',
     'shift/weekStake.ts#WEEKEND_NOTE',
     'everyday/weekView.ts#WEEK_START_NEXT_LABEL',
     'shift/weekRecord.ts#weekRecordLineOf',
@@ -18504,6 +18507,10 @@ const EVERYDAY_CAREER_FRONT: SurfaceAdapter = {
     };
     const line = buildingView(inputOf(fresh, { dayCensus: census }))?.order.census;
     if (line !== undefined) seeds.push({ field: 'careerFront.desk.census.fixture', text: line, role: 'observation' });
+    /* § D1543: the bar's note under *Watch a day here* when that line is drawn. */
+    if (line !== undefined) {
+      seeds.push({ field: 'careerFront.desk.census.shortPath', text: DAY_CENSUS_COPY.shortPath, role: 'prose' });
+    }
 
     /* The brief's moot count, in each of its three shapes. */
     for (const others of [0, 1, 10]) {
@@ -19406,6 +19413,7 @@ function seedDayClose(seeds: TextSeed[], context: HonestyContext, bundle: ShiftB
   seeds.push({ field: 'week.close.secondary.menu', text: REPORT_SECONDARY.menu, role: 'label' });
   seeds.push({ field: 'week.close.practiceAgain.label', text: REPORT_PRACTICE_AGAIN.label, role: 'label' });
   seeds.push({ field: 'week.close.practiceAgain.note', text: REPORT_PRACTICE_AGAIN.note, role: 'prose' });
+  seeds.push({ field: 'week.close.leversOptional', text: REPORT_LEVERS_OPTIONAL_HEADING, role: 'label' });
 }
 
 /**

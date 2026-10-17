@@ -60,6 +60,7 @@ import {
   figureNotePartsOf,
   REPORT_PROSE_BUDGET,
   reportProsePartsOf,
+  REPORT_LEVERS_OPTIONAL_HEADING,
 } from './reportView.js';
 import { PRESS_CALL_ROW_ID } from '../shift/callRow.js';
 
@@ -1021,5 +1022,19 @@ describe('today again, as practice, beside the call that decided it — wave AO,
       diagnosis: [...pinned.diagnosis, { id: PRESS_CALL_ROW_ID, when: '10:40', what: 'The stage called the day', why: 'At 10:40.', tone: 'plain' as const }],
     };
     expect(viewOf({ report: withRow, week }).practiceAgain).toBeUndefined();
+  });
+});
+
+/*
+ * ---- Wave AR, lane AR-4: no advice is pressed on a day every goal held — GitHub issue #633 ----
+ *
+ * The playtest read *Add a car* and *Zone the tower* under *What would make tomorrow better* after a
+ * perfect day at Garden Apartments.
+ */
+describe('§ D1543 — the levers after a cleared day are optional', () => {
+  it('heads them as optional when the day cleared, and as advice when it did not', () => {
+    expect(viewOf().headings.levers).toBe(REPORT_LEVERS_OPTIONAL_HEADING);
+    expect(viewOf().headings.levers).toMatch(/Nothing needed today/u);
+    expect(viewOf({ report: sheetOf({ verdict: 'missed' }) }).headings.levers).not.toBe(REPORT_LEVERS_OPTIONAL_HEADING);
   });
 });

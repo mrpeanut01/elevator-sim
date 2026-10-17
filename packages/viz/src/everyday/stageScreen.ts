@@ -115,6 +115,7 @@ import {
   stageFilingLandsOn,
   stageGeometryOf,
   stageGoalsOf,
+  type StageGoalRow,
   stageHeaderOf,
   type StageInterventionRow,
   stageInterventionsOf,
@@ -202,6 +203,8 @@ import {
 import type { WatchingView, WatchOwner } from '../watch/view.js';
 import { driverNameAt, interventionLogOf } from '../live/interventions.js';
 import { campaignDockViewOf, type CampaignDockView } from './campaignDock.js';
+import { DIFFICULTIES } from '../campaign/economy.js';
+import { campaignTestGoals, contractAsksEyebrow } from './campaignModel.js';
 
 /* -------------------------------------------------------------------------- *
  * The module store — what the § 3.3 refinement reads
@@ -912,7 +915,20 @@ function mountStage(
    */
   const goalContract = el(doc, 'span', 'everyday-stage-goals-contract');
   goalContract.style.cssText = `font-size:11px;line-height:1.4;color:${C.inkSoft}`;
-  goals.append(goalHeading, goalContract, goalRows, goalNote);
+  /*
+   * **The week's five, folded under the contract's four on a career day** — wave AR, lane AR-4,
+   * GitHub issue #633. Closed by default: the four above are what file the day. Down everywhere else.
+   */
+  const goalWeek = el(doc, 'details', 'everyday-stage-goals-week') as HTMLDetailsElement;
+  goalWeek.style.cssText = `display:none;border-top:1px solid ${C.ruleLight};padding-top:6px`;
+  const goalWeekSummary = el(doc, 'summary', 'everyday-stage-goals-week-heading');
+  goalWeekSummary.style.cssText = `${EYEBROW};cursor:pointer`;
+  const goalWeekNote = el(doc, 'span', 'everyday-stage-goals-week-note');
+  goalWeekNote.style.cssText = `display:block;font-size:11px;line-height:1.4;color:${C.inkSoft};margin:4px 0`;
+  const goalWeekRows = el(doc, 'div', 'everyday-stage-goals-week-rows');
+  goalWeekRows.style.cssText = goalRows.style.cssText;
+  goalWeek.append(goalWeekSummary, goalWeekNote, goalWeekRows);
+  goals.append(goalHeading, goalContract, goalRows, goalNote, goalWeek);
 
   /**
    * **The alarm strip is a picture again, and its announcement moved to {@link alarmSay}** —
@@ -2771,6 +2787,8 @@ function mountStage(
       dayStartS,
       answeredStamp: answer === undefined ? undefined : interventionLogOf([answer], dayStartS)[0],
       hasRun: adopted !== undefined && !barFacts.dayClosed && !barFacts.recomputing,
+      /* § D1543: the playhead at the end of an unfiled day, the bar's own `dayEnded`. */
+      dayOver: adopted !== undefined && barFacts.dayEnded && !barFacts.dayClosed,
     });
   }
 
@@ -3235,6 +3253,8 @@ function mountStage(
     if (ended !== barFacts.dayEnded) {
       barFacts.dayEnded = ended;
       context.refreshBar();
+      /* § D1543: the dock says the day is over on the same edge the bar hears it. */
+      syncDock();
       /*
        * § 7.2 E2 — `run_observed`, beat 1 of `docs/26 K2`'s chain, GitHub issue #340.
        *
@@ -3687,8 +3707,12 @@ function mountStage(
      * stopped. Wave AP, lane AP-D1: the Engineer transport follows this reach (§ D1449).
      */
     if (context.ctx === 'daily') host.noteShown(recording, playback.simTimeS);
-    /* A rush asks nothing of the day: § 9.2 has no brief and no goals to grade. */
-    goals.style.display = context.ctx === 'rush' ? 'none' : '';
+    /*
+     * A rush asks nothing of the day: § 9.2 has no brief and no goals to grade. Only the rush is
+     * written here: {@link drawGoals} owns the strip's display, and writing `''` over its `flex`
+     * dropped the column, so the heading ran into its sentence (wave AR, lane AR-4, GitHub #633).
+     */
+    if (context.ctx === 'rush') goals.style.display = 'none';
     drawWatching(watching);
 
     const alarmLine = stageAlarmOf(observations, labelOf);
@@ -4116,14 +4140,35 @@ function mountStage(
       day: week.day,
       /* The screen's own flow, never the recording's — GitHub issue #567. */
       contract: context.ctx === 'campaign',
+      /* § D1543: a career day leads with the contract's four, the tower's own, at its day. */
+      contractGoals: careerTowerGoals(),
     });
     goals.style.display = 'flex';
     goalHeading.textContent = strip.heading;
     goalContract.textContent = strip.contract;
     goalContract.style.display = strip.contract === '' ? 'none' : '';
     goalNote.textContent = strip.note;
+    drawGoalRows(goalRows, strip.rows);
+    const folded = strip.secondary;
+    goalWeek.style.display = folded === undefined ? 'none' : 'block';
+    if (folded !== undefined) {
+      if (goalWeekSummary.textContent !== folded.heading) goalWeekSummary.textContent = folded.heading;
+      if (goalWeekNote.textContent !== folded.note) goalWeekNote.textContent = folded.note;
+      drawGoalRows(goalWeekRows, folded.rows);
+    }
+  }
+
+  /** The open career tower's four tests, headed as the desk heads them, or `undefined` off a career day. */
+  function careerTowerGoals(): { readonly heading: string; readonly goals: ReturnType<typeof campaignTestGoals> } | undefined {
+    if (context.ctx !== 'campaign') return undefined;
+    const tower = host.campaignDay()?.tower;
+    if (tower === undefined) return undefined;
+    return { heading: contractAsksEyebrow(tower.day), goals: campaignTestGoals(DIFFICULTIES[tower.difficultyId]) };
+  }
+
+  function drawGoalRows(goalRows: HTMLElement, rows: readonly StageGoalRow[]): void {
     goalRows.replaceChildren();
-    for (const row of strip.rows) {
+    for (const row of rows) {
       const ink = GOAL_INK[row.state];
       const line = el(doc, 'div', 'everyday-stage-goal');
       line.dataset['goal'] = row.id;

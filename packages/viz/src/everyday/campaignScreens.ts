@@ -75,6 +75,7 @@ import { stageGeometryOf } from './stageScreenModel.js';
 import { towerLoopOf, type TowerLoop } from './towerLoop.js';
 import {
   DAY_CENSUS_CONTRACT_IDS,
+  DAY_CENSUS_COPY,
   censusVerdictOf,
   type CareerDayCensus,
   type CareerIntroView,
@@ -1098,10 +1099,18 @@ function mountBuilding(hostEl: HTMLElement, context: EverydayScreenContext): Mou
     header.append(title, spec, pill);
     root.append(header);
 
-    const columns = el(doc, 'div');
-    columns.style.cssText = `display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:${String(GAP.wide)}px;margin-top:${String(GAP.section)}px;align-items:start`;
-    const left = el(doc, 'div');
-    const right = el(doc, 'div');
+    /*
+     * **Two columns that stack below about 700 px** — wave AR, lane AR-4, GitHub issue #633. A fixed
+     * `1fr 340px` grid left the main column 38 px wide at 390 px, with the *Running itself* card
+     * behind the standing order. The sidebar pattern: the main column takes the spare width, and once
+     * the two bases no longer fit side by side the right column wraps under it at full width.
+     */
+    const columns = el(doc, 'div', 'everyday-building-columns');
+    columns.style.cssText = `display:flex;flex-wrap:wrap;gap:${String(GAP.wide)}px;margin-top:${String(GAP.section)}px;align-items:flex-start`;
+    const left = el(doc, 'div', 'everyday-building-main');
+    left.style.cssText = 'flex:999 1 320px;min-width:0';
+    const right = el(doc, 'div', 'everyday-building-side');
+    right.style.cssText = 'flex:1 1 340px;min-width:0';
     columns.append(left, right);
     root.append(columns);
 
@@ -1440,6 +1449,19 @@ function buildingBar(state: EverydayState): ActionBarModel {
        * it is answered. The renewal reached this arm on every month's end once days 19 and 20 played.
        */
       note: picked?.effect ?? NO_ANSWER_PICKED,
+    };
+  }
+  /*
+   * **A day the census says every driver clears is a day to watch, and it says the short way** — wave
+   * AR, lane AR-4, GitHub issue #633, [§ D1543](../../../../DECISIONS.md). The guide's *Watch a day
+   * here when quiet* variant, on the one measured quiet the desk has; *decide as it goes* promised
+   * decisions the day never asked for.
+   */
+  if (view.order.census !== undefined) {
+    return {
+      ...base,
+      primary: { ...base.primary, label: watchLabel ?? base.primary.label },
+      note: DAY_CENSUS_COPY.shortPath,
     };
   }
   return {
