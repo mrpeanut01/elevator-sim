@@ -340,17 +340,29 @@ function pathBlock(
       mark.style.cssText = `font-size:12.5px;line-height:1.5;color:${C.inkSoft};margin:5px 0 0;max-width:58ch`;
       card.append(mark);
     }
-    /* § D1358: a cleared row with no mark says why, so no cleared stage reads as a par forgotten. */
+    /*
+     * § D1358: a cleared row with no mark says why, so no cleared stage reads as a par forgotten.
+     * Folded with the census since wave AR lane AR-3 ([§ D1534](../../../../DECISIONS.md)): it is the
+     * census's reading of the par, and one press away it is still there.
+     */
     if (row.parNote !== undefined) {
       const note = el(doc, 'div', 'everyday-scenario-path-par-note', row.parNote);
-      note.style.cssText = `font-size:12.5px;line-height:1.5;color:${C.inkSoft};margin:5px 0 0;max-width:58ch`;
-      card.append(note);
+      note.style.cssText = `font-size:12.5px;line-height:1.5;color:${C.inkSoft};margin:9px 0 0;max-width:58ch`;
+      details.append(note);
     }
 
+    /*
+     * A held row says on its face that it is held, in a short line, and the census's reason folds
+     * under Details with the rest of the census (§ D1534, which moves wave AQ's rule that kept the
+     * reason on the face: stages 4 and 10 still read as walls of census text).
+     */
     if (!row.playable && row.refusal !== undefined) {
+      const held = el(doc, 'div', 'everyday-scenario-path-held', SCENARIO_COPY.heldShort);
+      held.style.cssText = `font:600 12.5px ${TYPE.body};color:${C.inkSoft};margin:9px 0 0;max-width:58ch`;
+      card.append(held);
       const line = el(doc, 'div', 'everyday-scenario-path-refusal', row.refusal);
       line.style.cssText = `font-size:13px;line-height:1.5;color:${C.inkSoft};margin:9px 0 0;max-width:58ch;text-wrap:pretty`;
-      card.append(line);
+      details.append(line);
     }
     card.append(details);
 
@@ -364,10 +376,11 @@ function pathBlock(
 export const SCENARIO_SCREEN: EverydayScreenModule = {
   key: 'scenario',
   mount,
-  /* Start from the table's own row; a first visit's primary names stage 1, the press it makes. */
+  /* Start from the table's own row; while a stage is left to clear the primary names it, the press it makes. */
   bar: (state) => {
     const base = actionBarFor(state);
-    if (hubNow().startHere === undefined) return base;
-    return { ...base, primary: { ...base.primary, label: SCENARIO_COPY.startHere } };
+    const label = hubNow().startHereLabel;
+    if (label === undefined) return base;
+    return { ...base, primary: { ...base.primary, label } };
   },
 };

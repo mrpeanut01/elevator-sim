@@ -15958,8 +15958,12 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
           seeds.push({ field: `${arm}.scenario.path.heading`, text: path.heading, role: 'label' });
           /* Wave AQ lane AQ-1: each card's fold, and the primary a first visit's bar draws. */
           seeds.push({ field: `${arm}.scenario.path.details`, text: SCENARIO_COPY.pathDetails, role: 'label' });
-          if (hub.startHere !== undefined) {
-            seeds.push({ field: `${arm}.scenario.startHere`, text: SCENARIO_COPY.startHere, role: 'label' });
+          /* Wave AR lane AR-3 (§ D1534): a held row's short face line; its reason is seeded below. */
+          if (path.rows.some((row) => !row.playable)) {
+            seeds.push({ field: `${arm}.scenario.path.heldShort`, text: SCENARIO_COPY.heldShort, role: 'label' });
+          }
+          if (hub.startHereLabel !== undefined) {
+            seeds.push({ field: `${arm}.scenario.startHere`, text: hub.startHereLabel, role: 'label' });
           }
           seeds.push({ field: `${arm}.scenario.path.lede`, text: path.lede, role: 'prose' });
           seeds.push({

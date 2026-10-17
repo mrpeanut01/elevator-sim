@@ -53430,3 +53430,43 @@ second tab's exact locked-out state was not reproduced, so the disabled chips ar
 no-run rule.
 
 **Numbers spent.** This lane held **D1515 to D1523** and spent **D1515 only**.
+
+## D1534 — a Scenario stage leads to the next stage, folds a held row's reason, and opens its pair where the settings part
+
+> **Taken 2026-10-17 by an agent session under delegated authority** (wave AR lane AR-3, on the
+> playtest after wave AQ, GitHub issue #633), not by the product owner, and to be read as an agent
+> ruling. **Amends [§ D1497](#d1497)** rulings 2 and 5, and wave AQ lane AQ-1's rule that a held path
+> row's reason stays on the card's face. Owner-reversible: every item below.
+
+**Why an entry.** It moves two parts of a recorded ruling and binds `everyday/actionBar.ts` (a leave
+cell may name its screen), `everyday/shell.ts` (which honours it), `everyday/scenarioModel.ts` and the
+honesty register.
+
+**The ruling.**
+
+1. **The path's primary plays the next stage.** `ScenarioHubView.startHere` is the first offered row
+   this device has not cleared, on every visit rather than the first, and the bar names it *Play stage
+   ⟨n⟩*. With every offered stage cleared it is the table's *Play today's scenario* as before.
+2. **A cleared stage's primary is *Next stage*,** the same next stage, opened on the page; the bar is
+   no longer inverted, so *Return to Main Menu* no longer takes the press. With nothing left it is
+   *Back to the path*.
+3. **A stage's *Leave this building* goes back to the path**, not to Modes.
+4. **A held row's reason folds under *Details*** with the census, and the face says *Not open to play
+   yet. Details says why.* A cleared row's par note (*Par is free here…*) folds too; the par mark
+   stays on the face.
+5. **The pair opens where the two runs first differ**, ten simulated seconds before
+   (`stagePlay.ts#stageWatchStartOf`), and replays from there; a press that moved nothing opens at the
+   start. On stage 2 with lobby parking the panes showed one picture for 10.5 real seconds before, 2.5
+   after. Where the pair starts only: the verdict is the fifty crowds' as before.
+6. **The moved-no-count line sits under the verdict's head**, and the reveal brings it into view.
+
+**Not a ruling, a defect.** The pair froze for seconds while the batch ran because each progress
+message redrew the page, and each redraw asked the one check of every route on every stage again. The
+stage context is now cached on the loaded data, which is all it reads, so no answer moves.
+
+**What holds it.** `scenarioModel.test.ts` (the next stage after a clear), `stagePlay.test.ts` (the
+pair's start on stage 2), `stageWatch.browser.test.ts` (no 1 s stall during the batch, measured 3.8 s
+before; the same-counts line in view), `stageClearPays.browser.test.ts` (*Next stage*, the leave to
+the path, the path's *Play stage ⟨n⟩*) and `scenarioScreen.browser.test.ts` (held reasons folded).
+
+**Numbers spent.** This lane held **D1534 to D1542** and spent **D1534 only**.

@@ -124,15 +124,20 @@ describe.skipIf(!HAS_BROWSER)('a campaign stage is played from the hub, and a cl
       expect(first.cleared, 'stage 1 did not clear under the census’s own way through').toBe('yes');
       expect(first.pay).toMatch(/^This clear pays \d+ chimes, the first time only\.$/u);
       expect(first.unlock).toContain('unlocks nothing');
-      expect(first.primary).toBe('Back to the path');
+      /* Wave AR lane AR-3 (§ D1534, #633): a clear's onward press is the next stage, not the menu. */
+      expect(first.primary).toBe(STAGE_PLAY_COPY.nextStageLabel);
+      expect(await page.locator('.everyday-bar-wayout').count(), 'a clear still hands the press to the menu').toBe(0);
       expect(await deviceTurns(page)).toEqual([{ completion: 'scenario-cleared', key: STAGE }]);
       /* § D1358: the clear says its par, the mark or why it earns none. Red before: no par line at all. */
       const parLine = (await page.textContent('.everyday-stage-play-par')) ?? '';
       expect(parLine).toMatch(/par/iu);
       expect(parLine).not.toContain('⟨');
 
-      /* The way back marks the row, and the row says its par (§ D1358): exactly one of the mark and the note. */
-      await page.locator('.everyday-bar-primary').click();
+      /*
+       * The way back marks the row, and the row says its par (§ D1358): exactly one of the mark and the
+       * note. The way back is *Leave this building*, which lands on the path rather than on Modes (#633).
+       */
+      await page.locator('.everyday-bar-leave').click();
       await page.waitForSelector(`.everyday-scenario-path-card[data-stage="${STAGE}"][data-cleared="yes"]`, {
         timeout: 30_000,
       });
@@ -164,12 +169,32 @@ describe.skipIf(!HAS_BROWSER)('a campaign stage is played from the hub, and a cl
       expect(again).toBe('A stage pays once, so this clear pays nothing.');
       expect(await deviceTurns(page)).toEqual([{ completion: 'scenario-cleared', key: STAGE }]);
 
-      /* Nothing unlocked: the path offers exactly what it offered before the clear. */
+      /* The onward press opens the next offered stage on this page (#633). */
+      const nextRow = playable.find((row) => row.endsWith(':yes') && !row.startsWith(`${STAGE}:`));
+      const nextId = nextRow?.slice(0, nextRow.lastIndexOf(':'));
+      expect(nextId, 'the path offers no second stage, so this case tests nothing').toBeDefined();
+      const nextPosition = playable.indexOf(nextRow ?? '') + 1;
+      expect(await page.textContent('.everyday-bar-primary')).toBe(STAGE_PLAY_COPY.nextStageLabel);
       await page.locator('.everyday-bar-primary').click();
+      await page.waitForFunction(
+        (position) => (document.querySelector('.everyday-stage-play-eyebrow')?.textContent ?? '').includes(`Stage ${String(position)} of`),
+        nextPosition,
+        { timeout: 30_000 },
+      );
+      expect(await page.locator('.everyday-stage-play-verdict').count()).toBe(0);
+
+      /* Nothing unlocked: the path offers exactly what it offered before the clear. */
+      await page.locator('.everyday-bar-leave').click();
       await page.waitForSelector(`.everyday-scenario-path-card[data-stage="${STAGE}"][data-cleared="yes"]`, {
         timeout: 30_000,
       });
       expect(await offeredRows(page), 'a clear opened or closed a stage on the path').toEqual(playable);
+      /* And the path's own primary names that next stage, where it read *Play today's scenario* (#633). */
+      await page.waitForFunction(
+        (label) => document.querySelector('.everyday-bar-primary')?.textContent === label,
+        `Play stage ${String(nextPosition)}`,
+        { timeout: 15_000 },
+      );
     } finally {
       await page.close();
     }
