@@ -45,7 +45,8 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
       reason:
         'The week pool’s arithmetic — wave AP, lane DT-1, § D1459 to § D1461. `shift/weekPool.ts` reads ' +
         '`data/week-pool.json` for the dealer and the gates; `poolLevelReadingOf`’s `because` is the ' +
-        'gates’ reason for a withdrawn level, read by tests and the census and drawn by no screen, ' +
+        'gates’ reason for a withdrawn level, which reaches a screen only through ' +
+        '`shift/poolWays.ts#poolWithdrawnLineOf` (seeded), ' +
         '`poolCrowdSeedOf` throws only on a crowd index past the protocol’s, and `poolTopOf`, ' +
         '`poolDealOf` and `poolCrowdFor` return numbers and records. The player-facing words over the ' +
         'pool are `shift/poolWays.ts`’s, seeded in `seedPoolWays`.',

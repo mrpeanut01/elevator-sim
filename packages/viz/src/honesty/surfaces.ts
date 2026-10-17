@@ -355,7 +355,7 @@ import { WORKED_ANSWER_COPY, type WorkedAnswerFacts, type WorkedAnswerView } fro
 import { WEEK_START_NEXT_LABEL, driverRecordLinesOf, weekScreenViewOf } from '../everyday/weekView.js';
 import { CAREER_MARK_WORDS, careerCloseLineOf, type CareerCloseInput } from '../everyday/careerCalls.js';
 import { CALL_BANDS, weekBandsLinesOf, type CallBandsCall } from '../shift/callBands.js';
-import { poolCloseLineOf, poolWaysLineOf, weekKeepDaysLinesOf } from '../shift/poolWays.js';
+import { poolCloseLineOf, poolWaysLineOf, poolWithdrawnLineOf, weekKeepDaysLinesOf } from '../shift/poolWays.js';
 import { WEEK_POOL, type PoolCrowd } from '../shift/weekPool.js';
 import { weekOrderFor } from '../shift/weekOrders.js';
 import { percentileLine, WORLD_FIGURES_ABSENT, WORLD_FIGURES_LABEL, WORLD_FIGURES_REASON } from '../everyday/world.js';
@@ -15351,6 +15351,7 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     'shift/poolWays.ts#poolWaysLineOf',
     'shift/poolWays.ts#poolCloseLineOf',
     'shift/poolWays.ts#weekKeepDaysLinesOf',
+    'shift/poolWays.ts#poolWithdrawnLineOf',
     'everyday/weekView.ts#driverRecordLinesOf',
     /*
      * Wave AO, lane DS-2 (§ D1409): the career report's account of the day, graded on the contract's
@@ -18881,6 +18882,8 @@ function seedPoolWays(seeds: TextSeed[], profileNameOf: (profileId: string) => s
     for (const [index, line] of weekKeepDaysLinesOf({ contractId: 'c2', week }, profileNameOf).entries()) {
       seeds.push({ field: `week.keepDays.${String(week)}.${String(index)}`, text: line, role: 'observation' });
     }
+    const withdrawn = poolWithdrawnLineOf('c2', week);
+    if (withdrawn !== undefined) seeds.push({ field: `week.withdrawn.${String(week)}`, text: withdrawn, role: 'observation' });
   }
 }
 

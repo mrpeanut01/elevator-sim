@@ -128,3 +128,14 @@ export function weekKeepDaysLinesOf(week: Pick<WeekState, 'contractId' | 'week'>
     }),
   );
 }
+
+/**
+ * **Why the sheet deals no further week, where the pool withdrew it** — wave AP, lane DT-1,
+ * [§ D1461](../../../../DECISIONS.md): *Week 3 is withdrawn: <the gate's reason>.* `undefined` where
+ * the pool admits the week or does not cover the tower, so the sheet says nothing the gates did not.
+ */
+export function poolWithdrawnLineOf(contractId: string, week: number, pool: WeekPool = WEEK_POOL): string | undefined {
+  const reading = poolLevelReadingOf(contractId, week, pool);
+  if (reading === undefined || reading.verdict === 'admitted' || reading.because === undefined) return undefined;
+  return `Week ${String(week)} is withdrawn: ${reading.because}.`;
+}

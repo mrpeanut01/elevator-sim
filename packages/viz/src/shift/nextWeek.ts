@@ -49,6 +49,7 @@ import { weekAsksOf, weekDealOf, weekTargetMetDayOf } from './weekStake.js';
 import { WEEK_WAY, weekWayRowFor, type WeekWay } from './weekWay.js';
 import { wrinkleOfDrawnId } from '../wrinkles/draw.js';
 import { WRINKLE_LIBRARY } from '../wrinkles/library.js';
+import { poolWithdrawnLineOf } from './poolWays.js';
 
 /** The weekdays a week order authors, and the house's census is read over. */
 const WEEKDAYS = 5;
@@ -268,13 +269,16 @@ export function nextWeekOf(week: WeekState, census: WeekWay = WEEK_WAY, clock?: 
   const harder = weekHarderSentenceOf(contractId, here, next, census);
   /* The ladder's end: the census deals this tower's week and no level is admitted above this one. */
   const atTop = weekDealOf(week, census) !== undefined && !hasFurtherWeek(week, census);
+  /* Wave AP, lane DT-1 (§ D1461): where the pool withdrew the next week, the sheet says why. */
+  const withdrawn = atTop && census === WEEK_WAY ? poolWithdrawnLineOf(contractId, next) : undefined;
+  const why = withdrawn === undefined ? '' : ` ${withdrawn}`;
   const sameCars = dealtLevelOf(week, census) === undefined ? '' : ' and the same cars out';
   const whatComes = (): string =>
     `${wrinkleClause(contractId, here, next, census)}${bookingClause(contractId, here, next, census, clock)}`;
   if (weekWasHeldBy(week, census)) {
     const lead = atTop
       ? `You held week ${String(here)}. This tower deals no further week: ${NEXT_WEEK_LABEL} deals ` +
-        `week ${String(next)} as this week was dealt, the same wrinkles${sameCars}, on new crowds.`
+        `week ${String(next)} as this week was dealt, the same wrinkles${sameCars}, on new crowds.${why}`
       : `You held week ${String(here)}, so ${NEXT_WEEK_LABEL} deals week ${String(next)}, with ${whatComes()}.`;
     return {
       held: true,
@@ -291,7 +295,7 @@ export function nextWeekOf(week: WeekState, census: WeekWay = WEEK_WAY, clock?: 
     `${target === 0 ? 'This week had no target to meet' : 'This week’s target was not met'}, so ` +
     `${again} deals the same wrinkles${sameCars} on new crowds.`;
   if (atTop) {
-    return { held: false, week: here, label: again, line: `${missed} This tower deals no further week.`, onward: undefined };
+    return { held: false, week: here, label: again, line: `${missed} This tower deals no further week.${why}`, onward: undefined };
   }
   const lead = `${missed} Nothing is locked: ${onwardLabel} deals the next week instead, with ${whatComes()}.`;
   return {
