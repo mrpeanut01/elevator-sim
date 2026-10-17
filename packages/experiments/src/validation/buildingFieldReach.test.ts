@@ -318,7 +318,7 @@ function declarationCode(source: string, symbol: string): string | undefined {
   const lines = source.split('\n');
   const opens = new RegExp(
     `^(?:export\\s+)?(?:default\\s+)?(?:declare\\s+)?(?:abstract\\s+)?(?:async\\s+)?` +
-      `(?:function\\*?|class|const|let|var)\\s+${symbol.replace(/[$]/gu, '\\$')}\\b`,
+      `(?:function\\*?|class|const|let|var)\\s+${symbol.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')}\\b`,
     'u',
   );
   const start = lines.findIndex((line) => opens.test(line));
