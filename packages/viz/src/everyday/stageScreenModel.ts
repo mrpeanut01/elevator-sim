@@ -2962,24 +2962,30 @@ export function stagePlayControlOf(input: {
 }
 
 /**
- * **Whether the building has to be brought into view when the day starts playing** — wave AO, lane
- * AO-4, the post-AN panel's seat B (lost moment 9, defect 9). At 390×844 the header and the goals
- * are taller than the screen region above the fixed bar, so after the header's *▶ Play* the canvas
- * sat at y 756–1262 under a bar from y 725, and the day played with nobody able to see it. A desktop
- * stage shows four fifths of the canvas from the same press and is left where it is.
+ * **How far to scroll the stage so the building's lobby rows are in view when the day starts
+ * playing**, in pixels (positive scrolls the page down), or `0` to leave it: wave AQ, lane AQ-2,
+ * [§ D1509](../../../../DECISIONS.md), which amends wave AO's rule ([§ D1385](../../../../DECISIONS.md)
+ * clause 4).
  *
- * Half is the line: a canvas at least half in view is being watched, and moving it would scroll the
- * page under a reader for nothing; one less than half in view is not.
+ * Wave AO brought the canvas into view only when less than half of it could be seen, so a desktop
+ * stage that showed most of its building was left where it was. The playtest (GitHub issue #631)
+ * found what that cost at 1280×800: the canvas started below the goals and showed floors 20 down to
+ * about 6, so the ground floor's queue, *Floor G stacked 16 deep* at 08:43 and the day's tightest
+ * moment, was never on screen. A day's deepest queue is most often the lobby's, and the lobby is the
+ * bottom of the canvas, so this keeps the bottom in view: where the canvas's bottom edge is below
+ * what the player can see, the stage scrolls just far enough to put it on the last visible row.
+ * Where the whole canvas fits, that leaves its top in view too; where it does not (a phone), the top
+ * floors go before the lobby does. A canvas whose bottom is already in view is left alone, so a
+ * reader who scrolled up to the top floors is not moved.
  *
  * @param canvas the canvas's laid-out top and bottom, in viewport pixels.
  * @param view the top and bottom of what the player can see of the screen region, in viewport pixels.
  */
-export function stageBuildingWantsBringing(
+export function stageBuildingScrollOf(
   canvas: { readonly top: number; readonly bottom: number },
   view: { readonly top: number; readonly bottom: number },
-): boolean {
-  const height = canvas.bottom - canvas.top;
-  if (!(height > 0) || !(view.bottom > view.top)) return false;
-  const shown = Math.max(0, Math.min(canvas.bottom, view.bottom) - Math.max(canvas.top, view.top));
-  return shown / height < 0.5;
+): number {
+  if (!(canvas.bottom > canvas.top) || !(view.bottom > view.top)) return 0;
+  if (canvas.bottom <= view.bottom && canvas.bottom > view.top) return 0;
+  return canvas.bottom - view.bottom;
 }

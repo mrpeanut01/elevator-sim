@@ -47,10 +47,15 @@ afterAll(async () => {
 });
 
 /** Open Today's scenario on `contractId`, start the day, and wait for the stage to be playing. */
-async function playDayOn(contractId: string): Promise<Page> {
-  const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
+async function playDayOn(
+  contractId: string,
+  viewport: { readonly width: number; readonly height: number } = { width: 1440, height: 900 },
+): Promise<Page> {
+  const page = await openPage(browser, { viewport });
   await page.goto(origin, { waitUntil: 'domcontentloaded' });
   await openEverydayDoor(page);
+  /* The first visit's consent ask sits over the top of every screen until it is answered. */
+  if ((await page.locator('.everyday-consent-no').count()) > 0) await page.locator('.everyday-consent-no').click();
   /*
    * The tower may already be the week standing: since § D1178 a newcomer's first week is Midtown, and
    * the door draws the week you are playing as a selected, disabled row. Press it only when it is not.
@@ -258,4 +263,39 @@ describe.skipIf(!HAS_BROWSER)('§ D1169 — a scored day is paced by the tutoria
       await page.close();
     }
   }, 300_000);
+
+  /*
+   * Wave AQ, lane AQ-2 (§ D1509), the playtest at 1280×800: the canvas started below the goals and
+   * showed floors 20 down to about 6, so the lobby's queue, *Floor G stacked 16 deep* at 08:43, was
+   * never on screen. Red before: wave AO's rule left a canvas that was mostly in view where it was.
+   */
+  for (const viewport of [
+    { width: 1280, height: 800 },
+    { width: 390, height: 844 },
+  ]) {
+    it(`keeps the lobby rows in view when the day starts playing, at ${String(viewport.width)}×${String(viewport.height)}`, async () => {
+      const page = await playDayOn('c2', viewport);
+      try {
+        /* The scroll is made on the frame after the press; wait for it rather than reading at once. */
+        await page.waitForFunction(
+          () => {
+            const canvas = document.querySelector('.everyday-stage-canvas')?.getBoundingClientRect();
+            const region = document.querySelector('.everyday-screen')?.getBoundingClientRect();
+            const bar = document.querySelector('.everyday-bar')?.getBoundingClientRect();
+            if (canvas === undefined || region === undefined || canvas.height === 0) return false;
+            const bottom = Math.min(region.bottom, bar?.top ?? innerHeight, innerHeight);
+            /*
+             * Within a floor row of the bottom: the pace and skip lines above the canvas are written
+             * on the frames after the scroll and can push it down by about one line of text.
+             */
+            return canvas.bottom <= bottom + 24 && canvas.bottom > region.top;
+          },
+          undefined,
+          { timeout: 10_000, polling: 100 },
+        );
+      } finally {
+        await page.close();
+      }
+    }, 300_000);
+  }
 });

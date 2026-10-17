@@ -121,7 +121,7 @@ import {
   stageMayAdopt,
   stageOpeningLineOf,
   STAGE_OVERLAY_PLAY,
-  stageBuildingWantsBringing,
+  stageBuildingScrollOf,
   stageLitSpeedOf,
   stagePlayControlOf,
   stageHandoverVerdictOf,
@@ -1948,8 +1948,9 @@ function mountStage(
    * **Keep the building in view while the day plays** — wave AO, lane AO-4, the post-AN panel's seat
    * B (lost moment 9, defect 9), [§ D1385](../../../../DECISIONS.md) clause 4. Asked when a press sets the day playing: on a phone the header's
    * *▶ Play* sits above the goals, and the canvas under them was below the fixed bar for the whole of
-   * the day it started. `stageScreenModel.ts#stageBuildingWantsBringing` decides, so a desktop stage
-   * that already shows most of its building is not scrolled under the reader.
+   * the day it started. `stageScreenModel.ts#stageBuildingScrollOf` decides: since wave AQ
+   * ([§ D1509](../../../../DECISIONS.md)) it keeps the canvas's bottom, the lobby rows, in view, and a
+   * stage whose lobby already shows is not scrolled under the reader.
    *
    * **On the next frame, never inside the press** ({@link bringBuildingPending}): the shell keeps the
    * region's offset across the first re-render after a player's press (`shell.ts#keepScrollAcrossRerender`),
@@ -1961,7 +1962,9 @@ function mountStage(
     const shown = region.getBoundingClientRect();
     const viewportBottom = view?.innerHeight ?? doc.documentElement.clientHeight;
     const seen = { top: Math.max(0, shown.top), bottom: Math.min(viewportBottom, shown.bottom) };
-    if (stageBuildingWantsBringing(box, seen)) canvas.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    /* Wave AQ, lane AQ-2 (§ D1509): the lobby rows, where the day's deepest queue usually stands. */
+    const by = stageBuildingScrollOf(box, seen);
+    if (by !== 0) region.scrollTop += by;
   }
 
   function setSpeed(index: number): void {

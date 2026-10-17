@@ -1917,7 +1917,7 @@ import {
   STAGE_CAMERAS,
   STAGE_PLAY_CONTROL,
   legibleFloorCount,
-  stageBuildingWantsBringing,
+  stageBuildingScrollOf,
   stageCameraChipsOf,
   stageCameraWindowOf,
   stageFloorJumpOptionsOf,
@@ -2335,17 +2335,22 @@ describe('the stage’s own state — wave AO, lane AO-4', () => {
 
   /*
    * Seat B (defect 9), measured on the bundle at 390×844: the canvas at y 756–1262 under a bar from
-   * y 725 after the header's Play. A desktop stage showing four fifths of it is left alone.
+   * y 725 after the header's Play. Wave AQ (§ D1509), the playtest at 1280×800: a canvas at y 411–951
+   * under a region ending at 744 showed floors 20 to about 6 and never the lobby's queue, and wave
+   * AO's half-in-view rule left it there.
    */
-  it('brings the building into view only when less than half of it can be seen', () => {
+  it('scrolls just far enough to put the lobby rows in view, and leaves a stage whose lobby shows', () => {
     const phoneRegion = { top: 50, bottom: 725 };
-    expect(stageBuildingWantsBringing({ top: 756, bottom: 1262 }, phoneRegion)).toBe(true);
-    expect(stageBuildingWantsBringing({ top: 219, bottom: 725 }, phoneRegion)).toBe(false);
-    expect(stageBuildingWantsBringing({ top: 411, bottom: 951 }, { top: 0, bottom: 844 })).toBe(false);
-    /* Exactly half is being watched. */
-    expect(stageBuildingWantsBringing({ top: 0, bottom: 200 }, { top: 100, bottom: 900 })).toBe(false);
+    expect(stageBuildingScrollOf({ top: 756, bottom: 1262 }, phoneRegion)).toBe(537);
+    expect(stageBuildingScrollOf({ top: 219, bottom: 725 }, phoneRegion)).toBe(0);
+    /* Red before: wave AO left this alone, because seven eighths of it showed. */
+    expect(stageBuildingScrollOf({ top: 411, bottom: 951 }, { top: 0, bottom: 744 })).toBe(207);
+    /* A reader who scrolled up to the top floors, lobby still showing, is not moved. */
+    expect(stageBuildingScrollOf({ top: -100, bottom: 600 }, { top: 0, bottom: 744 })).toBe(0);
+    /* A canvas scrolled wholly above the region is brought back down to it. */
+    expect(stageBuildingScrollOf({ top: -900, bottom: -400 }, { top: 0, bottom: 744 })).toBe(-1144);
     /* A box with no height, or a region with none, asks for nothing. */
-    expect(stageBuildingWantsBringing({ top: 10, bottom: 10 }, phoneRegion)).toBe(false);
-    expect(stageBuildingWantsBringing({ top: 756, bottom: 1262 }, { top: 0, bottom: 0 })).toBe(false);
+    expect(stageBuildingScrollOf({ top: 10, bottom: 10 }, phoneRegion)).toBe(0);
+    expect(stageBuildingScrollOf({ top: 756, bottom: 1262 }, { top: 0, bottom: 0 })).toBe(0);
   });
 });
