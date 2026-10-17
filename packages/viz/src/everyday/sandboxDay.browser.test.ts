@@ -238,6 +238,14 @@ describe.skipIf(!HAS_BROWSER)('a sandbox day runs and cannot touch the week — 
       await page.waitForFunction(() => document.querySelector<HTMLElement>('.everyday-stage-start')?.style.display === '', undefined, {
         timeout: 90_000,
       });
+      /* The booking lines are drawn with the stage's next frame too, so wait for them the same way. */
+      await page
+        .waitForFunction(
+          (lines) => lines.every((line) => (document.querySelector('.everyday-screen')?.textContent ?? '').includes(line)),
+          ['Car D booked out 10:30–13:00', 'This sandbox day keeps car D booked out of passenger service as the day had.'],
+          { timeout: 15_000 },
+        )
+        .catch(() => undefined);
       const stage = await textOf(page, '.everyday-screen');
       expect(stage).toContain('Car D booked out 10:30–13:00');
       expect(stage).toContain('This sandbox day keeps car D booked out of passenger service as the day had.');
