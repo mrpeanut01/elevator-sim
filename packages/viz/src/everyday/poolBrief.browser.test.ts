@@ -50,8 +50,10 @@ async function toBrief(page: Page): Promise<void> {
   await page.waitForSelector('.everyday-brief', { timeout: 15_000 });
 }
 
-describe.skipIf(!HAS_BROWSER || weekTopOf('c2') < 2)('a week-2 brief is dealt from the pool (§ D1460, § D1463)', () => {
+describe.skipIf(!HAS_BROWSER)('a week-2 brief is dealt from the pool (§ D1460, § D1463)', () => {
   it('names the pool as the crowd’s source and counts the ways through, naming no driver', async () => {
+    /* Midtown's pool reaches week 2 (§ D1461); a tree that withdrew it would leave nothing to see here. */
+    expect(weekTopOf('c2'), 'Midtown deals no week 2 on this tree').toBeGreaterThanOrEqual(2);
     const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
     try {
       await coldLoad(page);
