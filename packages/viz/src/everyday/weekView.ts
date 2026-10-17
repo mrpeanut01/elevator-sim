@@ -37,6 +37,7 @@
  */
 
 import { weekBandsLinesOf } from '../shift/callBands.js';
+import { weekKeepDaysLinesOf } from '../shift/poolWays.js';
 import { heldTopOnwardOf, nextTowerOfferOf, type NextTowerOffer } from '../shift/nextTower.js';
 import { contractById } from '../shift/contracts.js';
 import { nextWeekOf, type BookingClock, type NextWeekView } from '../shift/nextWeek.js';
@@ -622,11 +623,11 @@ export function weekScreenViewOf(input: WeekScreenInput): WeekScreenView {
     next,
     held: input.record === undefined ? undefined : weeksHeldLineOf(input.record),
     /* § D1443: DC-13's check on a week dealt from week 2, and this week's record with each driver. */
-    bands: weekBandsLinesOf(
-      input.week.contractId,
-      weekOrderFor({ contractId: input.week.contractId, week: input.week.week }),
-      input.profileNameOf ?? (() => undefined),
-    ),
+    /*
+     * Wave AP, lane DT-1 (§ D1462): DC-13 in days, for the level the week is dealt, from the pool.
+     * The row band (`callBands.ts#weekBandsLinesOf`) counts rows on one seed and is no sheet's figure.
+     */
+    bands: weekKeepDaysLinesOf(input.week, input.profileNameOf ?? (() => undefined)),
     drivers: driverRecordLinesOf(input.week, input.profileNameOf),
     primary: sheet === undefined ? undefined : ((onwardPrimary ? onward?.label : undefined) ?? next?.label ?? WEEK_START_NEXT_LABEL),
   };

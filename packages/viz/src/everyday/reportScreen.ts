@@ -245,6 +245,7 @@ function mountReportScreen(
             house: (day: number) => data.weekHouse(day),
             /* Wave AN, lane DQ-3 (§ D1351): what decided a day no call decided, from the shell's driver run. */
             driver: (day: number) => data.weekDriverRun(day),
+            profileNameOf: (profileId: string) => data.dispatcherById(profileId)?.name,
           }
         : {}),
     });
@@ -1168,6 +1169,7 @@ function mountReportScreen(
       ['everyday-report-close-tally', close.tally, false],
       ['everyday-report-close-call', close.call, false],
       ['everyday-report-close-arithmetic', close.arithmetic, true],
+      ['everyday-report-close-ways', close.ways, false],
     ] as const) {
       if (text === undefined) continue;
       const line = el(doc, 'p', cls, text);

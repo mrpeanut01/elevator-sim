@@ -3,7 +3,7 @@
  * DQ-2, [§ D1344](../../../../DECISIONS.md). See `nextWeek.ts`.
  */
 
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { scheduledEventFor } from './calendar.js';
 import { goalsForDay, readGoals } from './goals.js';
@@ -26,6 +26,7 @@ import { weekOrderIndexOf } from './weekOrders.js';
 import { CONTRACTS } from './contracts.js';
 import { weekDealOf } from './weekStake.js';
 import { WEEK_WAY, weekWayRowFor } from './weekWay.js';
+import { POOL_CENSUS } from './weekPool.js';
 
 const MET = {
   arrived: 400,
@@ -218,6 +219,29 @@ describe('Midtown’s next week, as the census measured it', () => {
       `You held week 1, so Start next week deals week 2, with a different wrinkle on every weekday. ${HARDER}`,
     );
     expect(weekUnderWayHarderLineOf({ contractId: 'c2', week: 2 })).toBe(HARDER);
+  });
+
+  /* Since § D1461 the pool withdraws week 3, which a held week 2's sheet now says. */
+  it('says Midtown deals no week past 2, and why the pool withdrew week 3', () => {
+    expect(nextWeekOf(midtownWeek(2, HELD), WEEK_WAY, MIDTOWN_CLOCK)?.line).toBe(
+      'You held week 2. This tower deals no further week: Start next week deals week 3 as this week was ' +
+        'dealt, the same wrinkles, on new crowds. Week 3 is withdrawn: left alone, Contract-net auction, ' +
+        'sealed bid holds it on 5 % of weeks against 0 % of week 2’s, and no driver may hold a week more ' +
+        'often than the week below it.',
+    );
+  });
+});
+
+/*
+ * § D1400's authored levels as the pool census plays them (`weekPool.ts#POOL_CENSUS`): the sentences
+ * a level's sheet and door would say, kept under test while the pool withdraws weeks 3 and 4.
+ */
+describe('Midtown’s authored levels, as the census plays them', () => {
+  beforeAll(() => {
+    POOL_CENSUS.measuring = true;
+  });
+  afterAll(() => {
+    POOL_CENSUS.measuring = false;
   });
 
   /*

@@ -44,6 +44,8 @@
 
 import { PRACTICE_DAY_SENTENCES, practiceGroundOf, type PracticeGround } from '../shift/scoredCrowd.js';
 import { isDerivedCrowdOn } from '../shift/weekRecord.js';
+import { pooledCrowdOf, poolWaysLineOf } from '../shift/poolWays.js';
+import { isPoolCrowdSeed } from '../shift/weekPool.js';
 import type { ResolvedBuilding } from '@elevator-sim/core/browser';
 import { floorsAroundLobbyOf } from '../authoring/buildingSpec.js';
 
@@ -204,6 +206,12 @@ export interface TodayRecord {
    * crowd it is.
    */
   readonly crowdIsDerived?: boolean | undefined;
+  /**
+   * **The ways through this crowd, as the pool measured them**, or `undefined` off the pool — wave
+   * AP, lane DT-1, [§ D1463](../../../../DECISIONS.md): how many of the shipped drivers clear it
+   * left alone, naming none, or that answering a call cleared it (`shift/poolWays.ts`).
+   */
+  readonly waysLine?: string | undefined;
   /**
    * `shift/firstSession.ts`'s line on a first day nobody has played on a legible tower, or
    * `undefined` on every other day — GitHub issue #208, § D514.
@@ -862,6 +870,11 @@ function crowdIsDerivedOf(input: TodayInput): boolean {
   return input.dealtCrowd !== undefined && input.seed === input.dealtCrowd && isDerivedCrowdOn(input.seed, input.daySeed);
 }
 
+/** The run's crowd is the one the day is dealt, and the pool dealt it (§ D1460). */
+function crowdIsPooledOf(input: TodayInput): boolean {
+  return input.dealtCrowd !== undefined && input.seed === input.dealtCrowd && isPoolCrowdSeed(input.seed);
+}
+
 function seedLineOf(input: TodayInput, crowdIsPinned: boolean, practice: PracticeGround | undefined): string {
   const crowd = `tower ${input.buildingId} · crowd ${input.seed.toString()}`;
   if (input.crowdIsToday) return `${crowd} · today’s date, so everyone playing today meets this crowd`;
@@ -878,6 +891,17 @@ function seedLineOf(input: TodayInput, crowdIsPinned: boolean, practice: Practic
    * meets the crowd derived from the date, the day of the week and the weeks closed. It is the same
    * for everyone who reaches that day of that week today, and it is not the date's board's crowd.
    */
+  /*
+   * **The fifth arm: a crowd from the measured pool** — wave AP, lane DT-1,
+   * [§ D1460](../../../../DECISIONS.md). From week 2 a counted day is dealt from the published pool
+   * for its weekday and level, by today's date, the day and the weeks closed here.
+   */
+  if (crowdIsPooledOf(input)) {
+    return (
+      `${crowd} · from this weekday’s measured pool, by today’s date, the day of the week and the ` +
+      'weeks you have closed here'
+    );
+  }
   if (crowdIsDerivedOf(input)) {
     return (
       `${crowd} · today’s date, then the day of the week, then the weeks you have closed here: ` +
@@ -985,6 +1009,7 @@ export function todayOf(input: TodayInput): TodayRecord {
     crowdIsToday: input.crowdIsToday,
     crowdIsPinned,
     crowdIsDerived: crowdIsDerivedOf(input),
+    waysLine: crowdIsPooledOf(input) ? poolWaysLineOf(pooledCrowdOf(week, week.day, input.seed)) : undefined,
     /*
      * Which arm is the draw's own answer rather than a guess about how the player arrived — GitHub
      * issue #595: the picker and the pinned days both reach a legible first day the seed did not

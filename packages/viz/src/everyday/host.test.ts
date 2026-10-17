@@ -83,6 +83,7 @@ import {
   type EverydayHostBindings,
   type EverydayRushPostOutcome,
 } from './host.js';
+import { isPoolCrowdSeed, poolDealOf } from '../shift/weekPool.js';
 
 const DATA = new URL('../../../../data/', import.meta.url);
 const read = (path: string): unknown =>
@@ -2997,7 +2998,9 @@ describe('a Scenario week’s days pay once, are recorded, and are dealt new cro
     s.tomorrow();
     expect(s.h.state.week.day).toBe(1);
     expect(seen.has(s.h.state.seed.toString()), 'the next week re-dealt a crowd this device filed').toBe(false);
-    expect(s.h.state.seed).toBe(derivedCrowdOf(DATE, 1, 1));
+    /* Since § D1460 week 2's counted Monday is dealt from the measured pool, by date, day and weeks closed. */
+    expect(s.h.state.seed).toBe(poolDealOf('c2', 2, 1, 1, DATE)?.seed);
+    expect(isPoolCrowdSeed(s.h.state.seed)).toBe(true);
   });
 });
 

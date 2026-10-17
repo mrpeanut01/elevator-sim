@@ -360,6 +360,7 @@ on:
           - week-census
           - call-cadence
           - call-bands
+          - week-pool
           - honesty-deep
           - corpus-figures
           - benchmark
@@ -878,6 +879,36 @@ jobs:
         env:
           CALL_BANDS_SWEEP: '1'
         run: npx vitest run --passWithNoTests=false --project viz --testTimeout=9000000 src/everyday/callBands.sweep.test.ts
+
+  # ---------------------------------------------------------------------------
+  # The week pool, re-tagged — DECISIONS.md § D1459 to § D1462 (swarm DT's Q1 and Q2). From week 2
+  # every counted Midtown day is dealt from `data/week-pool.json`, whose crowds carry a measured tag
+  # (dead, need, live), each driver's left-alone mark and each raised call's clearing answers. A
+  # sample of 24 pinned crowds, rotated by the run's date so every crowd is re-run in turn, is played
+  # again exactly as the census played it, and every mark, call and tag must be the pinned one. A tag
+  # that moved means the day under the pool moved: the remedy is a census re-run, never an edit.
+  #
+  # A gate of its own (`WEEK_POOL_SWEEP` with `WEEK_POOL_VERIFY`). The census measured 3 s a live
+  # crowd and 40 to 110 s a need or dead one on the lane's contended container; the sample is sized to
+  # stay inside about 30 minutes, and the minutes below are a ceiling.
+  # ---------------------------------------------------------------------------
+  week-pool:
+    name: weeks — the pool's tags re-run on a rotating sample
+    if: github.event_name == 'schedule' || inputs.tiers == 'all' || inputs.tiers == 'week-pool'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '26'
+          cache: npm
+      - run: npm ci
+      - name: Re-tag a rotating sample of the pool's crowds and match the pinned tags
+        env:
+          WEEK_POOL_SWEEP: '1'
+          WEEK_POOL_VERIFY: '24'
+        run: npx vitest run --passWithNoTests=false --project viz --testTimeout=2700000 src/shift/weekPool.sweep.test.ts
 
   honesty-deep:
     name: honesty — the deep corpus

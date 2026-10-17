@@ -299,6 +299,7 @@ import {
   weekRecordFor,
   type WeekRecord,
 } from '../shift/weekRecord.js';
+import { isPoolCrowdSeed } from '../shift/weekPool.js';
 /* GitHub issue #245's honest half — see {@link EverydayHost.runCarriedBySelection}. */
 import { runIdentityIssues } from '../scope/runIdentity.js';
 import {
@@ -2997,7 +2998,8 @@ function dealPatchFor(b: EverydayHostBindings, state: ViewerState): { readonly s
   if (contractById(state.week.contractId) === undefined) return {};
   const date = b.daySeed?.();
   if (date === undefined) return {};
-  if (state.seed !== date && !isDerivedCrowdOn(state.seed, date)) return {};
+  /* A pool crowd is a crowd of the day too (§ D1460): the next counted day re-deals over it. */
+  if (state.seed !== date && !isDerivedCrowdOn(state.seed, date) && !isPoolCrowdSeed(state.seed)) return {};
   const dealt = dealtCrowdFor(b, state.week);
   return dealt === undefined || dealt === state.seed ? {} : { seed: dealt };
 }

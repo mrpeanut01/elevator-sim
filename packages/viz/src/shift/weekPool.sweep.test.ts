@@ -42,7 +42,7 @@
 
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { shiftGoalsOf } from '../dev/leftRail.js';
 import { shiftRunConfigOf } from '../dev/state.js';
@@ -56,6 +56,7 @@ import { openWeek } from './week.js';
 import {
   poolCellsOf,
   poolCrowdSeedOf,
+  POOL_CENSUS,
   WEEK_POOL,
   type PoolCall,
   type PoolCell,
@@ -224,6 +225,13 @@ function measuredPrefixOf(crowds: readonly (PoolCrowd | undefined)[]): readonly 
 }
 
 describe.runIf(env('WEEK_POOL_SWEEP') === '1')('the week pool’s census', () => {
+  /* Every cell at its authored week, whatever the pool admits today (`weekPool.ts#POOL_CENSUS`). */
+  beforeAll(() => {
+    POOL_CENSUS.measuring = true;
+  });
+  afterAll(() => {
+    POOL_CENSUS.measuring = false;
+  });
   it('tags every crowd of every cell dealt from week 2, resuming from its own lines', () => {
     const cells = poolCellsOf(WEEK_POOL.protocol.contractId).filter(
       (cell) => env('WEEK_POOL_CELLS') === undefined || env('WEEK_POOL_CELLS')!.split(';').includes(cell.key),

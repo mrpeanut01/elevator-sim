@@ -1779,8 +1779,11 @@ DC-12). DC-11 asks whether one dropdown, left alone, holds a week. It cannot see
 calls in it: swarm DR's player member found that on `midtown-early-lift` a player on Predictive
 balanced who kept the driver lost only 3 of 18 split who-drives rows, so *keep* was nearly always
 safe, while switching to Predictive balanced cleared nearly every split row for a player on Fairness
-first. DC-13 measures the week where the player is. The bands and the offer list derived from the
-same rows are [§ D1441](../DECISIONS.md) and [§ D1442](../DECISIONS.md).
+first. The bands and the offer list derived from the same rows are [§ D1441](../DECISIONS.md) and
+[§ D1442](../DECISIONS.md). The row band counts rows on one seed, so it is an instrument no sheet
+quotes: since [§ D1462](../DECISIONS.md) DC-13 is read in days, as each banded profile's share of the
+need days in the week pool as dealt that an answer at one of its calls clears where keeping loses
+(`shift/weekPool.ts`, `shift/poolWays.ts#weekKeepDaysLinesOf`).
 
 **The protocol** (`data/call-bands.json`, read by `shift/callBands.ts`, run by
 `everyday/callBands.sweep.test.ts` and nightly as the `call-bands` job): every raised who-drives call

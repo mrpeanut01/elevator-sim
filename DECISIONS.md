@@ -52934,6 +52934,108 @@ and `everyday/stagePlay.ts`.
 `rushDeviceBest.test.ts`, `rushScreenModel.test.ts` and `stagePlay.test.ts`, each red on the tree
 before this lane.
 
+## D1459 — from week 2 a counted day is dealt from a measured pool, which replaces § D1229's derivation for those days
+
+> **Taken 2026-10-17 by agent sessions under delegated authority, not by the product owner**: wave
+> AP's lane DT-1 building swarm DT's reconciled ruling, Q1 and Q2 item 1. **Amends
+> [§ D1229](#d1229)** for counted days from week 2. Owner-reversible: the pool's size (40 crowds a
+> cell), the two banded drivers the tags read, and replacing § D1229's derivation with the pool.
+
+**Why an entry.** It replaces a recorded ruling's derivation, binds `shift/weekRecord.ts`,
+`everyday/host.ts`, `everyday/today.ts` and the nightly workflow, and adds `data/week-pool.json`.
+
+**The ruling.** `data/week-pool.json` holds, for every cell Midtown deals from week 2 through week 4
+(each weekday of each dealt level, `shift/weekPool.ts#poolCellsOf`; seven cells), forty crowds
+spelled from 2026-07-01 (eleven digits, never a date's, a derived or a practice crowd), each with a
+measured tag: **dead** (no shipped driver left alone and no answer at any call raised under either
+banded driver clears it), **need** (both banded drivers left alone miss it, and another driver left
+alone or one answer at a raised call clears it) or **live**; each crowd also carries all thirteen
+drivers' left-alone marks and every raised call's clearing answers. The census
+(`shift/weekPool.sweep.test.ts`) plays each crowd exactly as a player is dealt it, *leave* at every
+placement call, and while it runs the pool caps no week (`weekPool.ts#POOL_CENSUS`). One-press plays
+are not tagged. **§ D1229's "never dealt again" no longer holds from week 2**: a cell has few need
+crowds, so a device can meet a pool crowd it filed before. Week 1, an uncounted day and a tower the
+pool does not cover keep § D1229.
+
+**What holds it.** `shift/weekPool.test.ts` (*the shipped pool*): every stored cell is one the tower
+deals and every crowd's seed is its index's. The nightly `week-pool` job re-runs 24 pinned crowds,
+rotated by date, and fails on any mark, call or tag that moved.
+
+## D1460 — the dealer: no dead crowd, the least need days a week that hold DC-11, by date, day and weeks closed
+
+> **Taken 2026-10-17 by agent sessions under delegated authority, not by the product owner**: lane
+> DT-1, swarm DT's Q1 and Q2 item 2. Owner-reversible: the need-day count's rule.
+
+**The ruling.** `weekPool.ts#poolDealOf` deals a counted day from week 2 only from a level the gates
+admit (§ D1461). Its need days are `n` consecutive need-capable weekdays starting at the weeks-closed
+index; `n` is the least number at which no shipped profile, left alone, holds the week on more than
+half the deals, exact over the dealer (`needCount`). A need day deals a need crowd and every other
+counted day a live one, never a dead one, at `(date + 7 × day + 31 × weeks closed) mod n` over the
+cell's crowds of that kind. Everyone on a date, at that day of that week with the same weeks closed
+on the tower, meets one crowd. The brief's seed line names the pool as the crowd's source; the
+host re-deals over a pool crowd as over a date's.
+
+**What holds it.** `shift/weekPool.test.ts` (*the dealer*): over built pools, no dead crowd is
+dealt, each need day deals a need crowd, the week deals exactly `needCount` need days, the need days
+move through every need-capable weekday, and the date moves the crowd; *a different pool crowd
+changes the run* compares two crowds' legs.
+
+## D1461 — the gates read the pool as dealt, and a level they refuse or cannot read is withdrawn
+
+> **Taken 2026-10-17 by agent sessions under delegated authority, not by the product owner**: lane
+> DT-1, swarm DT's Q1 and Q2 item 3. **Amends [§ D1400](#d1400)'s admission** (the pool gates are
+> read on top of it, never in place of it).
+
+**The ruling.** `weekPool.ts#poolLevelReadingOf` re-reads, over the pool as dealt: DC-10's second
+half (the standing order, left alone, misses at least a third of each counted day as dealt), DC-11
+(through `needCount`), the monotone clause (no profile's hold rises from the week before) and
+§ D1337's trap check (no single answer, a brief pick or a raised call's answer, clears more than two
+thirds of need days). A level any gate refuses, or whose cells the census has not finished, is
+withdrawn: `weekLevels.ts#weekTopOf` stops the ladder below it, so the tower deals the highest
+admitted week's level, and week 1's draw where week 2 is not admitted. Nothing is dealt from a guess.
+
+**What the census found** (280 crowds tagged, 227 live crowds filled, 1.8 h of compute on the
+lane's contended container, 2026-10-13 and 2026-10-17): 227 live, 14 need, 39 dead, every cell with
+at least one need crowd; the 08:00 bookings turn 10 and 11 of 40 crowds dead. **Week 2 is
+admitted**, with two need days a week (the strongest hold left alone is Capacity aware's 5 %, the
+largest answer share three fifths). **Week 3 is refused by the monotone clause**: left alone,
+Contract-net auction, sealed bid holds it on 5 % of weeks against 0 % of week 2's. Week 4 falls with
+it. So Midtown's top is week 2 and a week numbered 3 or more is dealt as week 2; a held week 2's sheet
+says why week 3 is withdrawn (`poolWays.ts#poolWithdrawnLineOf`). The authored levels stay under test
+as the census plays them (`weekPool.ts#POOL_CENSUS`). The per-profile reading of the monotone clause
+is § D1400's owner-reversible one; a reversal re-admits week 3 without a census re-run.
+
+**What holds it.** `shift/weekPool.test.ts` (*the gates*): one built pool per gate, each refused
+with its reason, and an unfinished one withdrawn; *never deals week 4's Monday the dead crowd
+2026101313* is red on the commit before the pool. `weekLevels.test.ts` and `nextWeek.test.ts` pin the
+shipped top and the withdrawn line.
+
+## D1462 — DC-13 is read in days over the pool as dealt, and the row band is no sheet's figure
+
+> **Taken 2026-10-17 by agent sessions under delegated authority, not by the product owner**: lane
+> DT-1, swarm DT's Q1 and Q2 item 4. **Amends [§ D1443](#d1443)**: Your week no longer prints the
+> row band's pass or miss.
+
+**The ruling.** For the level a week is dealt, each banded profile's keep band is the need-day
+crowds of its pool on which keeping lost and an answer at one of its calls cleared, and that share
+of the counted days as dealt (`weekPool.ts#keepBandsOf`); Your week states it in one sentence per
+profile (`poolWays.ts#weekKeepDaysLinesOf`) and states nothing for a level the pool does not deal,
+so weeks 3 and 4 never print week 2's figure. `data/call-bands.json`'s rows stay an instrument, and
+"where the player is" is struck from `docs/33`.
+
+## D1463 — the brief counts the ways through a pooled crowd, naming none; the close names them
+
+> **Taken 2026-10-17 by agent sessions under delegated authority, not by the product owner**: lane
+> DT-1, swarm DT's Q1 and Q2 item 5. Owner-reversible: the brief's count form.
+
+**The ruling.** On a pooled day the brief reads the pool's record of the crowd, with no run in the
+browser, and says how many of the thirteen drivers clear it left alone, naming none; where none
+does, that answering a call cleared it. A crowd whose count is unfinished gets no line. After the
+close, the report names in the past tense every driver that cleared it left alone, or where none
+did, each answer at a raised call that would have and the driver whose run raised it
+(`shift/poolWays.ts`). Neither line says the player's run would have gone the same way after a
+press. Held by `shift/poolWays.test.ts`.
+
 ## D1471 — a call's row leads with the first crossing, reads every instant the rail moves, prints no count, and says its caveat once; the pinned call's row reads goals too
 
 > **Taken 2026-10-17 by agent sessions under delegated authority** (swarm DT's ruling § Q3 items 1 to 4

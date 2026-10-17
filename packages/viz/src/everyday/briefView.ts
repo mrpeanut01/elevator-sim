@@ -138,6 +138,8 @@ export interface BriefScreenView {
    * condition of dealing it.
    */
   readonly dayLength: string | undefined;
+  /** `today.ts`'s `waysLine`: the pool's count of ways through this crowd (§ D1463), or `undefined`. */
+  readonly waysLine: string | undefined;
   readonly facts: readonly { readonly label: string; readonly value: string }[];
   readonly load: { readonly heading: string; readonly word: string; readonly note: string } | undefined;
   readonly wrinkle: {
@@ -527,6 +529,7 @@ export function briefScreenViewOf(input: BriefScreenInput): BriefScreenView {
     seedLine: today.seedLine,
     outOfService: today.outOfService,
     dayLength: today.dayLength,
+    waysLine: today.waysLine,
     facts: today.facts,
     load:
       today.load === undefined

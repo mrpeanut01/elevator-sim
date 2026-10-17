@@ -28,6 +28,7 @@ import { weekOrderFor } from '../shift/weekOrders.js';
 
 import { EM_DASH } from './figures.js';
 import { driverRecordLinesOf, verdictOf, WEEK_CARDS, WEEK_START_NEXT_LABEL, WEEK_TOP_RUSH_COPY, weekScreenViewOf } from './weekView.js';
+import { poolLevelReadingOf } from '../shift/weekPool.js';
 
 const MET: GoalObservations = {
   arrived: 400,
@@ -320,9 +321,12 @@ describe('the week’s stake on the strip, and its sheet at the close — § D11
       bookingClock: (fraction) => clockOf(fraction * 10 * 3600, 8 * 3600),
     });
     expect(view.next?.held).toBe(true);
+    /* Since § D1461 the pool withdraws week 3, and the held week 2's sheet says why instead. */
     expect(view.next?.line).toBe(
-      'You held week 2, so Start next week deals week 3, with the same wrinkles as this week and one more ' +
-        'car out of passenger service: car C on Monday from 08:00 until 12:00.',
+      'You held week 2. This tower deals no further week: Start next week deals week 3 as this week was ' +
+        'dealt, the same wrinkles, on new crowds. Week 3 is withdrawn: left alone, Contract-net auction, ' +
+        'sealed bid holds it on 5 % of weeks against 0 % of week 2’s, and no driver may hold a week more ' +
+        'often than the week below it.',
     );
   });
 
@@ -588,23 +592,21 @@ describe('DC-13 and your record with each driver — § D1443', () => {
   const viewWithNames = (week: WeekState) =>
     weekScreenViewOf({ week, towerToday: 'Midtown Office', nameOf: NAME_OF, dayClosed: false, sheetStanding: false, profileNameOf });
 
-  it('states the census’s check on Midtown’s week 2, a miss with its counts, and nothing on week 1', () => {
+  /* Since § D1462 DC-13 is stated in days over the pool as dealt, one sentence per banded profile. */
+  it('states DC-13 in days for Midtown’s week 2 as the pool deals it, and nothing on week 1', () => {
     const week1: WeekState = { ...openWeek('c2'), day: 1, dayIdx: 0 };
     const week2: WeekState = { ...week1, week: 2 };
-    const order = weekOrderFor(week2);
-    expect(order?.id).toBe('midtown-early-lift');
     expect(viewWithNames(week1).bands).toEqual([]);
     const lines = viewWithNames(week2).bands;
-    expect(lines.length).toBeGreaterThan(0);
-    /* What it says follows the pinned rows: a miss names the driver it was measured under and its counts. */
-    const rows = CALL_BANDS.rows.filter((row) => row.orderId === order?.id);
-    const missing = rows.filter((row) => !callBandsReadingOf(row, CALL_BANDS.protocol).passes);
-    if (missing.length === 0) {
-      expect(lines).toHaveLength(1);
-    } else {
-      expect(lines[0]).toBe('This week misses the census’s check on its who-drives calls, and is dealt with the miss stated.');
-      for (const row of missing) expect(lines.join(' ')).toContain(`With ${String(profileNameOf(row.briefDriver))} picked`);
-    }
+    const reading = poolLevelReadingOf('c2', 2)!;
+    expect(lines).toHaveLength(reading.keep.length);
+    reading.keep.forEach((band, index) => {
+      expect(lines[index]).toBe(
+        `With ${String(profileNameOf(band.profileId))} picked and every call kept, keeping lost on each of the ${String(band.of)} ` +
+          `need-day crowds this week can be dealt, and an answer at one of its calls cleared ${String(band.saved)} of them: ` +
+          `about ${(100 * band.share).toFixed(0)} per cent of the counted days as dealt.`,
+      );
+    });
     /* No advice: what the census found, never what to press. */
     expect(lines.join(' ')).not.toMatch(/\b(should|try|better|best|worse|switch to)\b/iu);
   });

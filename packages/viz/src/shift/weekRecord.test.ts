@@ -28,6 +28,7 @@ import {
   type WeekRecord,
 } from './weekRecord.js';
 import type { WeekState } from './types.js';
+import { isPoolCrowdSeed } from './weekPool.js';
 import type { WatchRecord } from '../watch/types.js';
 
 const DATE = 20_260_926n;
@@ -115,13 +116,19 @@ describe('a new week is new — § D1229', () => {
     expect(dealtCrowdOf(week, weekRecordFor([], 'c2'), DATE + 5n)).toBe(DATE);
   });
 
-  it('never re-deals a crowd this device filed, over three weeks in one sitting and then a week across dates', () => {
+  /*
+   * Since § D1459 a counted day from week 2 is dealt from the measured pool, whose need crowds are few,
+   * so a pool crowd may meet the device again by design; every other crowd is still never re-dealt.
+   */
+  it('never re-deals a crowd this device filed outside the pool, over three weeks in one sitting and then a week across dates', () => {
     let records: readonly WeekRecord[] = [];
     let week = openWeek('c2');
     const filed = new Set<string>();
+    let pooled = 0;
     const play = (date: bigint): void => {
       const crowd = dealtCrowdOf(week, weekRecordFor(records, 'c2'), date);
-      expect(filed.has(crowd.toString()), `crowd ${crowd.toString()} was dealt twice`).toBe(false);
+      if (isPoolCrowdSeed(crowd)) pooled += 1;
+      else expect(filed.has(crowd.toString()), `crowd ${crowd.toString()} was dealt twice`).toBe(false);
       filed.add(crowd.toString());
       week = fileOn(week, crowd);
       records = recordClose(records, week, crowd, date);
@@ -129,7 +136,8 @@ describe('a new week is new — § D1229', () => {
     };
     for (let day = 0; day < 21; day += 1) play(DATE);
     for (let day = 0; day < 7; day += 1) play(DATE + BigInt(day + 1));
-    expect(filed.size).toBe(28);
+    const outside = [...filed].filter((seed) => !isPoolCrowdSeed(BigInt(seed)));
+    expect(outside.length + pooled).toBe(28);
     expect(weekRecordFor(records, 'c2').closed).toBe(4);
   });
 

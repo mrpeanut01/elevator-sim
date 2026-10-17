@@ -3,6 +3,7 @@
  * swarm DT's ruling Q1 and Q2 ([§ D1459](../../../../DECISIONS.md) to [§ D1462](../../../../DECISIONS.md)).
  */
 
+import dispatcherProfilesDocument from '../../../../data/dispatcher-profiles.json' with { type: 'json' };
 import weekPoolDocument from '../../../../data/week-pool.json' with { type: 'json' };
 
 import { drawWrinkle } from '../wrinkles/draw.js';
@@ -532,20 +533,22 @@ export function poolLevelReadingOf(
       because = 'some drivers have not been run left alone on every crowd it can deal';
     } else if (needCount === undefined) {
       verdict = 'refused';
-      because = `${strongest?.profileId ?? 'one driver'} left alone holds it on ${percentOf(strongest?.share ?? 0)} of weeks however many days need a choice, over DC-11’s half`;
+      because = `${strongest === undefined ? 'one driver' : profileNameOf(strongest.profileId)} left alone holds it on ${percentOf(strongest?.share ?? 0)} of weeks however many days need a choice, over DC-11’s half`;
     } else if (reasonToDecide !== undefined) {
       verdict = 'refused';
       because = `the tower’s standing order, left alone, clears ${dayName(reasonToDecide.day)} too often as it is dealt`;
     } else if (rising !== undefined) {
       verdict = 'refused';
       const was = before?.holds.find((entry) => entry.profileId === rising.profileId)?.share ?? 0;
-      because = `${rising.profileId} left alone holds it on ${percentOf(rising.share ?? 0)} of weeks against ${percentOf(was)} the week before`;
+      because =
+        `left alone, ${profileNameOf(rising.profileId)} holds it on ${percentOf(rising.share ?? 0)} of weeks against ${percentOf(was)} of week ${String(week - 1)}’s, ` +
+        'and no driver may hold a week more often than the week below it';
     } else if (before !== undefined && before.verdict !== 'admitted') {
       verdict = before.verdict;
       because = `week ${String(week - 1)} is not dealt`;
     } else if (trap !== undefined) {
       verdict = 'refused';
-      because = `one answer, ${trap.answer}, clears ${percentOf(trap.share)} of its need days, over § D1337’s two thirds`;
+      because = `one answer, ${answerNameOf(trap.answer)}, clears ${percentOf(trap.share)} of its need days, over § D1337’s two thirds`;
     }
   }
   return {
@@ -564,6 +567,24 @@ export function poolLevelReadingOf(
   };
 }
 
+/** A shipped profile's display name, from `data/dispatcher-profiles.json`, for the gates' reasons. */
+const PROFILE_NAMES: ReadonlyMap<string, string> = new Map(
+  (dispatcherProfilesDocument as { readonly profiles: readonly { readonly id: string; readonly name: string }[] }).profiles.map(
+    (profile) => [profile.id, profile.name],
+  ),
+);
+function profileNameOf(id: string): string {
+  return PROFILE_NAMES.get(id) ?? id;
+}
+
+/** An answer as § D1337's trap check names it: a brief pick, or an answer at a call on a banded line. */
+function answerNameOf(answer: string): string {
+  const [by, what = ''] = answer.split(':');
+  if (by === 'pick') return `picking ${profileNameOf(what)}`;
+  const words = what === 'park-cars-lobby' ? 'parking the cars in the lobby' : what === 'spread-cars' ? 'spreading the cars' : `handing the day to ${profileNameOf(what)}`;
+  return `${words} at a call under ${profileNameOf(by ?? '')}`;
+}
+
 function percentOf(share: number): string {
   return `${(100 * share).toFixed(0)} %`;
 }
@@ -574,11 +595,19 @@ export const POOL_WEEKDAY_NAMES: readonly string[] = Object.freeze(['Monday', 'T
 const TOPS = new WeakMap<WeekPool, Map<string, number>>();
 
 /**
+ * **While the census measures, the pool caps nothing.** The census plays each cell at the authored
+ * week that first deals it, and `weekLevels.ts#weekTopOf` caps the dealt week by {@link poolTopOf}:
+ * with the cap on, an empty or partial pool would deal its own census week 1's draw and the census
+ * would tag the wrong day. Only `weekPool.sweep.test.ts` sets it, for the length of its run.
+ */
+export const POOL_CENSUS: { measuring: boolean } = { measuring: false };
+
+/**
  * **The highest week the pool deals on a tower**: `Infinity` for a tower the pool does not cover,
  * `1` where week 2 is not admitted over it, else the last week admitted in turn from week 2.
  */
 export function poolTopOf(contractId: string, pool: WeekPool = WEEK_POOL, census: WeekWay = WEEK_WAY): number {
-  if (pool.protocol.contractId !== contractId) return Number.POSITIVE_INFINITY;
+  if (pool.protocol.contractId !== contractId || POOL_CENSUS.measuring) return Number.POSITIVE_INFINITY;
   const shipped = pool === WEEK_POOL && census === WEEK_WAY;
   const cached = shipped ? TOPS.get(pool)?.get(contractId) : undefined;
   if (cached !== undefined) return cached;
