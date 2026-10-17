@@ -12,9 +12,7 @@ Pillars: 1 playable · 2 understandable · 3 simple · 4 engaging during a run.
 | task | issue | branch | state |
 |---|---|---|---|
 | B-234 | #234 stage 3 | `fix/234-stage-3` (worktree) | building |
-| B-232 | #232 AC4 | `test/232-dead-building-fields` (worktree) | building |
-| B-590 | #590 | `test/590-rung-remeasure` (worktree) | measuring |
-| P-0 | baseline playtest | none (read-only) | running |
+| B-LOBBY | playtest defects 3, 4 and 5 (lobby keyboard focus, tap targets, phone select) | `fix/lobby-a11y` (worktree) | building |
 
 **Do not collide with PR #622** (wave AP, paused by the owner). It touches `packages/viz/src/everyday/*`,
 `shift/*` (including `goals.ts`), `data/week-pool.json` and `campaign/career.ts`. It also reserved
@@ -25,8 +23,10 @@ decisions **D1445–D1540**, which overlap § D1445 (the lobby) on main; this cy
 | # | title (short) | P | pillar | next action |
 |---|---|---|---|---|
 | 234 | No stage clears from the dropdown alone | P1 | 2, 3, 4 | Stage 3 first; stages 4, 7, 8 follow one per lane. Stage 10 waits on the § D1289 censoring ruling |
-| 232 | Building set to the content-plan target | P1 | 2, 4 | AC4 (dead-field check) is in flight. AC1 has 17 of 22 buildings. AC2: owner sign-off on harbour-point and ashgate |
-| 590 | Re-measure five rungs at n = 50 | P2 | 4 | In flight. If a rung leaves its band, that is a decision, and the band does not move |
+| 232 | Building set to the content-plan target | P1 | 2, 4 | **AC4 done** on PR #624 (`buildingFieldReach.test.ts`), with three inert fields filed as #625. AC1 has 17 of 22 buildings. AC2: owner sign-off on harbour-point and ashgate |
+| 590 | Re-measure five rungs at n = 50 | P2 | 4 | **Done** on PR #624: all five are in band at 50 (c2 0.48, c3 0.56, c6 0.46, c8 0.56, c10 0.44), re-run independently. Closes when #624 merges |
+| 625 | Three shipped building fields change no leg | P2 | 1 | Filed this cycle. Owner: fix the data or keep each field with a reason. The loader warning gap in item 1 is a small code fix |
+| 626 | Playtest: stage goal hidden before the run, nothing to watch, a 3-minute wait | P2 | 2, 4 | Filed this cycle. Collides with PR #622's stage files, so take it up when wave AP resumes |
 
 ## Needs an owner decision
 
