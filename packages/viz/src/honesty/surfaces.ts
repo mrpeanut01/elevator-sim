@@ -12984,6 +12984,8 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
     'everyday/stageCallRow.ts#STAGE_CALL_NO_CROSSING',
     'everyday/stageCallRow.ts#stageCallReadingsLineOf',
     'everyday/stageCallRow.ts#STAGE_CALL_TAKEN',
+    /* Wave AQ, lane AQ-4 (GitHub issue #631): the row whose answers read alike, said once. */
+    'everyday/stageCallRow.ts#STAGE_CALL_NO_DIFFERENCE',
     'everyday/stageCallRow.ts#stageCallRowsCaveatOf',
     'everyday/stageCallRow.ts#STAGE_CALL_ROWS_CAVEAT',
     'shift/dayCallMaxima.ts#dayCallCrossingPhraseOf',

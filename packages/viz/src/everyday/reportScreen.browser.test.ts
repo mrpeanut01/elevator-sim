@@ -425,5 +425,5 @@ describe.skipIf(!HAS_BROWSER)('the day report leads with its verdict — issue #
     } finally {
       await page.close();
     }
-  }, 180_000);
+  });
 });
