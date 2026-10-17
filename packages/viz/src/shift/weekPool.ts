@@ -3,6 +3,7 @@
  * swarm DT's ruling Q1 and Q2 ([§ D1459](../../../../DECISIONS.md) to [§ D1462](../../../../DECISIONS.md)).
  */
 
+import dispatcherProfilesDocument from '../../../../data/dispatcher-profiles.json' with { type: 'json' };
 import weekPoolDocument from '../../../../data/week-pool.json' with { type: 'json' };
 
 import { drawWrinkle } from '../wrinkles/draw.js';
@@ -532,20 +533,20 @@ export function poolLevelReadingOf(
       because = 'some drivers have not been run left alone on every crowd it can deal';
     } else if (needCount === undefined) {
       verdict = 'refused';
-      because = `${strongest?.profileId ?? 'one driver'} left alone holds it on ${percentOf(strongest?.share ?? 0)} of weeks however many days need a choice, over DC-11’s half`;
+      because = `${strongest === undefined ? 'one driver' : profileNameOf(strongest.profileId)} left alone holds it on ${percentOf(strongest?.share ?? 0)} of weeks however many days need a choice, over DC-11’s half`;
     } else if (reasonToDecide !== undefined) {
       verdict = 'refused';
       because = `the tower’s standing order, left alone, clears ${dayName(reasonToDecide.day)} too often as it is dealt`;
     } else if (rising !== undefined) {
       verdict = 'refused';
       const was = before?.holds.find((entry) => entry.profileId === rising.profileId)?.share ?? 0;
-      because = `${rising.profileId} left alone holds it on ${percentOf(rising.share ?? 0)} of weeks against ${percentOf(was)} the week before`;
+      because = `${profileNameOf(rising.profileId)} left alone holds it on ${percentOf(rising.share ?? 0)} of weeks against ${percentOf(was)} the week before`;
     } else if (before !== undefined && before.verdict !== 'admitted') {
       verdict = before.verdict;
       because = `week ${String(week - 1)} is not dealt`;
     } else if (trap !== undefined) {
       verdict = 'refused';
-      because = `one answer, ${trap.answer}, clears ${percentOf(trap.share)} of its need days, over § D1337’s two thirds`;
+      because = `one answer, ${answerNameOf(trap.answer)}, clears ${percentOf(trap.share)} of its need days, over § D1337’s two thirds`;
     }
   }
   return {
@@ -562,6 +563,24 @@ export function poolLevelReadingOf(
     verdict,
     because,
   };
+}
+
+/** A shipped profile's display name, from `data/dispatcher-profiles.json`, for the gates' reasons. */
+const PROFILE_NAMES: ReadonlyMap<string, string> = new Map(
+  (dispatcherProfilesDocument as { readonly profiles: readonly { readonly id: string; readonly name: string }[] }).profiles.map(
+    (profile) => [profile.id, profile.name],
+  ),
+);
+function profileNameOf(id: string): string {
+  return PROFILE_NAMES.get(id) ?? id;
+}
+
+/** An answer as § D1337's trap check names it: a brief pick, or an answer at a call on a banded line. */
+function answerNameOf(answer: string): string {
+  const [by, what = ''] = answer.split(':');
+  if (by === 'pick') return `picking ${profileNameOf(what)}`;
+  const words = what === 'park-cars-lobby' ? 'parking the cars in the lobby' : what === 'spread-cars' ? 'spreading the cars' : `handing the day to ${profileNameOf(what)}`;
+  return `${words} at a call under ${profileNameOf(by ?? '')}`;
 }
 
 function percentOf(share: number): string {
