@@ -115,6 +115,8 @@ function viewOf(context: EverydayScreenShellContext): DoorScreenView {
     alsoOnScreen: pressDayTextsOf(host.towerChoice().pressDays),
     /* Weeks held on this tower — § D1253. */
     record: host.weekRecord(),
+    /* § D1530: the held driver's note goes to the past tense once the call is behind the player. */
+    pinnedCallDone: ((recording) => recording !== undefined && host.pinnedCallDone(recording))(host.recording()),
   });
 }
 
