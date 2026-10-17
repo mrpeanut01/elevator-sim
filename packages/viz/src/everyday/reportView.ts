@@ -557,6 +557,28 @@ export function figureNotePartsOf(note: string): { readonly lead: string; readon
 }
 
 /**
+ * **The longest a report paragraph is drawn whole** — GitHub issue #631, wave AQ, lane AQ-4. The
+ * playtest met a pressed day's *You switched to …* row carrying about 200 words of single-replication
+ * caveats, and read the sheet as burying its verdict. Seventy is {@link SMALL_PRINT_BUDGET}'s
+ * paragraph ceiling, so a paragraph the small print would accept is drawn whole here too.
+ */
+export const REPORT_PROSE_BUDGET = Object.freeze({ whole: SMALL_PRINT_BUDGET.paragraph });
+
+/**
+ * A report paragraph as its first sentence and the rest, or the paragraph whole — a beat's *why*
+ * (`reportScreen.ts#drawSheet`). The close's lines are not folded: they say what decided the day,
+ * which is the result rather than its caveats. {@link figureNotePartsOf}'s contract at a larger
+ * budget: joined with one space, `lead` and `rest` are the paragraph byte for byte, so the fold hides
+ * nothing it does not keep one press away ({@link FIGURE_NOTE_HANDLE}), and the producer is unchanged.
+ */
+export function reportProsePartsOf(text: string): { readonly lead: string; readonly rest: string | undefined } {
+  const sentences = sentencesOf(text);
+  if (sentences.length < 2 || wordsIn(text) <= REPORT_PROSE_BUDGET.whole) return { lead: text, rest: undefined };
+  const [lead, ...tail] = sentences;
+  return { lead: lead ?? text, rest: tail.join(' ') };
+}
+
+/**
  * Sentences, split on the space between them and on nothing else.
  *
  * The lookahead is what keeps `06:05–06:10:` and `“Riders waited twenty-five seconds on average”`

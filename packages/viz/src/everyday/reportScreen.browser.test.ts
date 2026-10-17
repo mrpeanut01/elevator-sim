@@ -355,3 +355,75 @@ describe.skipIf(!HAS_BROWSER)('the report’s lever opens what it names — issu
     }
   }, 180_000);
 });
+
+/*
+ * GitHub issue #631, wave AQ lane AQ-4: the playtest read *Shift cleared* as small text under the big
+ * *Monday — day 1*, and then met a pressed day's *You switched to …* row carrying about 200 words of
+ * single-replication caveats. The verdict is the headline, and the long row folds behind *Read the
+ * rest* with every word still in the document.
+ */
+describe.skipIf(!HAS_BROWSER)('the day report leads with its verdict — issue #631', () => {
+  it('draws the verdict larger than the day’s title, and folds a pressed day’s caveats', async () => {
+    const page = await coldLoad();
+    try {
+      await enterEverydayStage(page);
+      await page.evaluate(
+        "import('/src/everyday/host.ts').then((module) => { window.__everydayHost = module.EVERYDAY_HOST; return true; })",
+      );
+      type Host = {
+        current(): {
+          runState(): { open: boolean };
+          runPending(): boolean;
+          recording(): unknown;
+          intervene(atS: number, change: unknown): void;
+          dispatcherById(id: string): unknown;
+          closeDay(): void;
+        } | undefined;
+      };
+      await page.waitForFunction(
+        () => (window as unknown as { __everydayHost?: Host }).__everydayHost?.current()?.runState().open === true,
+        undefined,
+        { timeout: 60_000 },
+      );
+      /* The press the playtest made: Predictive balanced, twenty minutes into the day. */
+      await page.evaluate(() => {
+        const host = (window as unknown as { __everydayHost: Host; __before?: unknown }).__everydayHost.current();
+        (window as unknown as { __before?: unknown }).__before = host?.recording();
+        host?.intervene(1200, { kind: 'switch-dispatcher', profile: host.dispatcherById('predictive-balanced') });
+      });
+      await page.waitForFunction(
+        () => {
+          const scope = window as unknown as { __everydayHost: Host; __before?: unknown };
+          const host = scope.__everydayHost.current();
+          return host !== undefined && host.recording() !== scope.__before && !host.runPending();
+        },
+        undefined,
+        { timeout: 60_000 },
+      );
+      await page.evaluate(() => (window as unknown as { __everydayHost: Host }).__everydayHost.current()?.closeDay());
+      await page.locator('.everyday-rail button', { hasText: 'Your week' }).first().click();
+      await page.waitForSelector('.everyday-week', { timeout: 15_000 });
+      await page.locator('.everyday-week-card-open').click();
+      await page.waitForSelector('.everyday-report-verdict', { timeout: 15_000 });
+
+      const sizes = await page.evaluate(() => {
+        const size = (selector: string): number =>
+          parseFloat(getComputedStyle(document.querySelector(selector) as Element).fontSize);
+        return { title: size('.everyday-report-title'), verdict: size('.everyday-report-verdict') };
+      });
+      expect(sizes.verdict, 'the verdict is the headline').toBeGreaterThan(sizes.title);
+
+      const beat = page.locator('.everyday-report-beat', { hasText: 'You switched to' });
+      await expect.poll(async () => beat.count(), { timeout: 15_000 }).toBe(1);
+      const drawn = flat(await beat.innerText());
+      const present = flat((await beat.textContent()) ?? '');
+      expect(wordsIn(present)).toBeGreaterThan(150);
+      expect(wordsIn(drawn), 'the caveats are folded until pressed').toBeLessThan(70);
+      expect(present).toContain('a single replication settles nothing in general');
+      await beat.locator('summary', { hasText: 'Read the rest' }).click();
+      expect(flat(await beat.innerText())).toContain('a single replication settles nothing in general');
+    } finally {
+      await page.close();
+    }
+  }, 180_000);
+});

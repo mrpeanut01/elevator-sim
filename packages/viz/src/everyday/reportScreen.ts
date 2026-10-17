@@ -75,6 +75,7 @@ import {
   FIGURE_NOTE_HANDLE,
   everydayReportViewOf,
   figureNotePartsOf,
+  reportProsePartsOf,
   type EverydayOnwardStep,
   type EverydayReportCareer,
   type EverydayReportView,
@@ -692,6 +693,24 @@ function mountReportScreen(
     rushPostBlock = next;
   }
 
+  /**
+   * The rest of a folded report paragraph, behind {@link FIGURE_NOTE_HANDLE} — GitHub issue #631.
+   * A native `<details>`, as the figure cards' fold is, so nothing is moved off the page.
+   */
+  function restFold(rest: string): HTMLElement {
+    const more = doc.createElement('details');
+    more.className = 'everyday-report-prose-more';
+    more.style.cssText = `${QUIET};margin:3px 0 0;max-width:78ch`;
+    const handle = doc.createElement('summary');
+    handle.className = 'everyday-report-prose-handle';
+    handle.textContent = FIGURE_NOTE_HANDLE;
+    handle.style.cssText = 'cursor:pointer';
+    const body = el(doc, 'p', 'everyday-report-prose-rest', rest);
+    body.style.cssText = 'margin:4px 0 0';
+    more.append(handle, body);
+    return more;
+  }
+
   function drawSheet(view: EverydayReportView): void {
     const sheet = view.sheet;
 
@@ -701,7 +720,13 @@ function mountReportScreen(
     meta.style.cssText = `${EYEBROW};display:flex;flex-wrap:wrap;gap:10px`;
     for (const line of sheet.metaLines) meta.append(el(doc, 'span', undefined, line));
     const title = el(doc, 'h1', 'everyday-report-title', sheet.title);
-    title.style.cssText = `font-family:${TYPE.heading};font-size:34px;font-weight:700;letter-spacing:-.02em;margin:10px 0 0`;
+    /*
+     * **The verdict is the headline** — GitHub issue #631, wave AQ lane AQ-4. The playtest read
+     * *Shift cleared* as 15 px text under a 34 px *Monday — day 1*: the day's name was the loudest
+     * thing on the sheet and its result one of the quietest. The two sizes swap; the title keeps its
+     * `h1` (focus lands on it, `keepFocus`) and names the day above the verdict it introduces.
+     */
+    title.style.cssText = `font-family:${TYPE.heading};font-size:17px;font-weight:600;margin:10px 0 0`;
     const verdict = el(doc, 'div', 'everyday-report-verdict', sheet.verdictLine);
     /*
      * The verdict's colour is `reportViewOf`'s, as a CSS variable off `index.html`'s palette —
@@ -710,7 +735,7 @@ function mountReportScreen(
      * nobody judged is not a day that went wrong, and amber is this palette's word for *went
      * wrong*.
      */
-    verdict.style.cssText = `font:700 15px ${TYPE.heading};margin-top:9px;color:${sheet.verdictColour}`;
+    verdict.style.cssText = `font:700 34px ${TYPE.heading};letter-spacing:-.02em;margin-top:4px;color:${sheet.verdictColour}`;
     /*
      * § 7.2 E6 and § 7.3 E9 — `verdict_shown` and `refusal_shown`, GitHub issue #340.
      *
@@ -893,9 +918,12 @@ function mountReportScreen(
         text.style.cssText = 'min-width:0';
         const what = el(doc, 'div', undefined, beat.what);
         what.style.cssText = 'font-size:13.5px;font-weight:600';
-        const why = el(doc, 'p', undefined, beat.why);
+        /* GitHub issue #631: a long why leads with its first sentence and keeps the rest one press away. */
+        const whyParts = reportProsePartsOf(beat.why);
+        const why = el(doc, 'p', undefined, whyParts.lead);
         why.style.cssText = `${QUIET};margin:3px 0 0`;
         text.append(what, why);
+        if (whyParts.rest !== undefined) text.append(restFold(whyParts.rest));
         row.append(when, text);
         beats.body.append(row);
       }
