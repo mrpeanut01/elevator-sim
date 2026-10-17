@@ -540,7 +540,9 @@ export function poolLevelReadingOf(
     } else if (rising !== undefined) {
       verdict = 'refused';
       const was = before?.holds.find((entry) => entry.profileId === rising.profileId)?.share ?? 0;
-      because = `${profileNameOf(rising.profileId)} left alone holds it on ${percentOf(rising.share ?? 0)} of weeks against ${percentOf(was)} the week before`;
+      because =
+        `left alone, ${profileNameOf(rising.profileId)} holds it on ${percentOf(rising.share ?? 0)} of weeks against ${percentOf(was)} of week ${String(week - 1)}’s, ` +
+        'and no driver may hold a week more often than the week below it';
     } else if (before !== undefined && before.verdict !== 'admitted') {
       verdict = before.verdict;
       because = `week ${String(week - 1)} is not dealt`;

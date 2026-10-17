@@ -14,7 +14,7 @@
  * in the recording's own order, never a mean.
  */
 
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { shiftRunConfigOf, type ViewerState } from '../dev/state.js';
 import { legsOf, RESOURCES } from '../scope/probes.test-helper.js';
@@ -22,6 +22,8 @@ import { legsOf, RESOURCES } from '../scope/probes.test-helper.js';
 import { carAbsencesOf } from './bookedOut.js';
 import { contractDayState } from './contractDay.test-helper.js';
 import { openWeek } from './week.js';
+import { weekTopOf } from './weekLevels.js';
+import { POOL_CENSUS } from './weekPool.js';
 
 /** Day `day` of Midtown's week `week`, as the week deals it, on one fixed crowd. */
 function midtownDay(week: number, day: number, over: Partial<ViewerState> = {}): ViewerState {
@@ -36,7 +38,19 @@ function carCOut(state: ViewerState): { readonly awayAtS: number; readonly backA
   return carAbsencesOf(shiftRunConfigOf(RESOURCES, state).building).find((car) => car.carId === 'C');
 }
 
-describe('a week level books its car out on the run itself', () => {
+/*
+ * Since § D1461 the week pool withdraws Midtown's weeks 3 and 4 (the monotone clause over the pool as
+ * dealt), so the authored levels are reached here as the census plays them (`weekPool.ts#POOL_CENSUS`):
+ * the wiring under test is the same path, and the next block pins what the shipped tower deals.
+ */
+describe('a week level books its car out on the run itself, as the census plays the authored levels', () => {
+  beforeAll(() => {
+    POOL_CENSUS.measuring = true;
+  });
+  afterAll(() => {
+    POOL_CENSUS.measuring = false;
+  });
+
   it('stands car C down on week 3’s Monday from the first instant to 0.4 of the run, and not on week 2’s', () => {
     const level = midtownDay(3, 1);
     expect(carCOut(level)).toMatchObject({ awayAtS: 0, backAtS: 0.4 * level.shiftLengthS });
@@ -59,5 +73,13 @@ describe('a week level books its car out on the run itself', () => {
 
   it('never books a car out of a run that stands on no rung', () => {
     expect(carCOut(midtownDay(3, 1, { playMode: 'free-play' }))).toBeUndefined();
+  });
+});
+
+describe('the shipped tower deals no level the pool withdrew — § D1461', () => {
+  it('deals week 3’s Monday as week 2 dealt it, with every car in service', () => {
+    expect(weekTopOf('c2')).toBe(2);
+    expect(carCOut(midtownDay(3, 1))).toBeUndefined();
+    expect(legsOf(midtownDay(3, 1))).toBe(legsOf(midtownDay(2, 1)));
   });
 });
