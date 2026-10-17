@@ -65,9 +65,12 @@ import {
   stageFactsOf,
   stageMoveOf,
   stagePlayViewOf,
+  sameCountsOf,
+  stageRunCountsOf,
   stageWatchAfterEndOf,
   stageWatchPaceOf,
   verdictFactsOf,
+  type StageRunCounts,
   type StagePlayChoice,
   type StagePlayFacts,
   type StagePlayPhase,
@@ -162,6 +165,8 @@ interface Session {
    * all drawn below the controls. Each is scrolled into view once, as it arrives.
    */
   reveal: { status: boolean; pair: boolean; verdict: boolean };
+  /** The last judged run's settings and per-run counts, which the next verdict compares (wave AQ, AQ-1). */
+  lastRun: { readonly choice: StagePlayChoice; readonly counts: StageRunCounts } | undefined;
 }
 
 const sessions = new Map<string, Session>();
@@ -180,6 +185,7 @@ function sessionOf(stage: CampaignStage): Session {
       watch: undefined,
       watchStage: undefined,
       reveal: { status: false, pair: false, verdict: false },
+      lastRun: undefined,
     };
     sessions.set(stage.id, session);
   }
@@ -468,9 +474,20 @@ function press(data: Loaded, stageId: string, context: EverydayScreenShellContex
           const store = everydayProfileStore();
           store.setProgress(progressWithFixSpent(store.progress(), found.stage.id, result.admission.units));
         }
+        const facts = verdictFactsOf(report, paid, result.admission.units, parPaid, boughtUnits);
+        const counts = stageRunCountsOf(facts.goals);
+        const sameCounts = sameCountsOf({
+          counts,
+          control: result.admission.moved.length === 0,
+          previous:
+            session.lastRun === undefined
+              ? undefined
+              : { counts: session.lastRun.counts, sameSettings: sameChoice(session.lastRun.choice, pressedChoice) },
+        });
+        session.lastRun = { choice: pressedChoice, counts };
         session.phase = {
           kind: 'judged',
-          verdict: verdictFactsOf(report, paid, result.admission.units, parPaid, boughtUnits),
+          verdict: sameCounts === undefined ? facts : { ...facts, sameCounts },
           stale: false,
         };
       }
@@ -751,6 +768,9 @@ export function mountStagePlay(host: HTMLElement, context: EverydayScreenShellCo
         verdict.append(para(doc, 'everyday-stage-play-stale', view.verdict.stale, `font-size:13px;color:${C.alarm}`));
       }
       verdict.append(para(doc, 'everyday-stage-play-headline', view.verdict.headline, `font-size:14px;line-height:1.5;color:${C.inkSoft}`));
+      if (view.verdict.sameCounts !== undefined) {
+        verdict.append(para(doc, 'everyday-stage-play-same-counts', view.verdict.sameCounts, `font-size:14px;line-height:1.5;font-weight:600;color:${C.ink}`));
+      }
       const goals = el(doc, 'ul', 'everyday-stage-play-goals');
       goals.style.cssText = 'list-style:none;margin:0;padding:0;display:grid;gap:6px';
       for (const goal of view.verdict.goals) {

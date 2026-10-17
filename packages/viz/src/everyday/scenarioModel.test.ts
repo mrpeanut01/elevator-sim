@@ -360,3 +360,16 @@ describe('the Scenario hub', () => {
     expect(scenarioHubViewOf(path)).toEqual(scenarioHubViewOf(path));
   });
 });
+
+describe('a first visit starts on stage 1 — wave AQ lane AQ-1', () => {
+  it('names the path’s first offered row while this device holds no clear, and nothing after one', () => {
+    const first = path[0];
+    expect(first?.offer).toBe('offered');
+    expect(scenarioHubViewOf(path).startHere).toBe(first?.id);
+    expect(scenarioHubViewOf(path, new Set([path[3]?.id ?? ''])).startHere).toBeUndefined();
+    expect(scenarioHubViewOf().startHere).toBeUndefined();
+    /* A held first row is never a primary: the bar would refuse it. */
+    const held = path.map((rung, index) => (index === 0 ? { ...rung, offer: 'held' as const } : rung));
+    expect(scenarioHubViewOf(held).startHere).toBeUndefined();
+  });
+});

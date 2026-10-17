@@ -689,7 +689,8 @@ function doorBar(state: EverydayState): ActionBarModel {
   return {
     ...base,
     primary: { ...base.primary, label, ...(inert === undefined ? {} : { inert }) },
-    note: view !== undefined && (replay || view.primary.goes === 'tomorrow') ? view.primary.note : base.note,
+    /* The view's own note: the table's on an ordinary today, and the held day's own (wave AQ, AQ-1). */
+    note: view !== undefined ? view.primary.note : base.note,
   };
 }
 

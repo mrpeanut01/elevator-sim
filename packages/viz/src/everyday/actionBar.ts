@@ -373,7 +373,8 @@ export const ACTION_BAR_ROWS: readonly ActionBarRow[] = Object.freeze([
      */
     guide: false,
     leave: { label: MODES, inert: false },
-    primary: primary(["Play today's scenario"]),
+    /* The second variant is wave AQ lane AQ-1's: a first visit's press opens stage 1 (`scenarioScreen.ts`). */
+    primary: primary(["Play today's scenario", 'Play stage 1']),
     note: 'Or pick another from the list.',
     inverted: false,
   }),

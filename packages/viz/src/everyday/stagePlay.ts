@@ -216,6 +216,13 @@ export const STAGE_PLAY_COPY = Object.freeze({
   watchBaselineCaption: 'As the building has it',
   watchCandidateCaption: 'With your settings',
   watchSkip: 'Stop watching',
+  /*
+   * Wave AQ lane AQ-1: a run whose every count equals the building's own, or the last run's on other
+   * settings. Said about the counts only, which are equal exactly; nothing here claims a mean moved
+   * or did not.
+   */
+  sameAsShipped: 'Every count here is the same as the building’s own setting got, so on this stage your change moved none of them.',
+  sameAsPrevious: 'Every count here is the same as your last run got on other settings, so that change moved none of them on this stage.',
   labLink: 'Open this stage on the Engineer surface',
   labNote: 'The Engineer surface draws every dial the stage’s budget reaches and the full report. A clear there pays nothing.',
 });
@@ -374,6 +381,8 @@ export interface StagePlayVerdictFacts {
     readonly sentence: string;
     /** Judged run by run against the shipped setting's own count, so its bar is relative. */
     readonly perRun: boolean;
+    /** The judge's two counts on a judged per-run goal (`judge.ts#StageGoalVerdict.counts`). */
+    readonly counts?: { readonly yours: number; readonly shipped: number; readonly runs: number } | undefined;
   }[];
   readonly holdoutSentence: string | null;
   readonly metOnTuningSeeds: boolean;
@@ -386,6 +395,8 @@ export interface StagePlayVerdictFacts {
   readonly parPaid?: 'first' | 'again' | undefined;
   /** The budget the press was made at, where this device bought a rung for it (§ D1419). */
   readonly boughtUnits?: number | undefined;
+  /** Whose counts this run's equal, where they all do: {@link sameCountsOf}. */
+  readonly sameCounts?: 'shipped' | 'previous' | undefined;
 }
 
 /** Where a press is. */
@@ -407,6 +418,8 @@ export interface StagePlayVerdictView {
   readonly rung: string | undefined;
   readonly unlock: string | undefined;
   readonly stale: string | undefined;
+  /** That the change moved no count, against the building's setting or the last run (wave AQ, AQ-1). */
+  readonly sameCounts: string | undefined;
 }
 
 export interface StagePlayView {
@@ -653,6 +666,7 @@ export function verdictFactsOf(
       met: goal.met,
       sentence: goal.sentence,
       perRun: isPerReplicationGoal(goal.kind),
+      ...(goal.counts === undefined ? {} : { counts: goal.counts }),
     })),
     holdoutSentence: report.holdout?.sentence ?? null,
     metOnTuningSeeds: report.metOnTuningSeeds,
@@ -763,6 +777,12 @@ function verdictViewOf(facts: StagePlayFacts, verdict: StagePlayVerdictFacts, st
         : `Run at the ${String(verdict.boughtUnits)}-unit budget this device bought for this stage. A clear pays the same at any budget.`,
     unlock: verdict.cleared ? STAGE_PLAY_COPY.unlocksNothing : undefined,
     stale: stale ? STAGE_PLAY_COPY.stale : undefined,
+    sameCounts:
+      verdict.sameCounts === 'shipped'
+        ? STAGE_PLAY_COPY.sameAsShipped
+        : verdict.sameCounts === 'previous'
+          ? STAGE_PLAY_COPY.sameAsPrevious
+          : undefined,
   };
 }
 
@@ -931,4 +951,42 @@ export function stageWatchPaceOf(input: {
  */
 export function stageWatchAfterEndOf(how: 'skipped' | 'ended'): 'replay' | 'drop' {
   return how === 'skipped' ? 'drop' : 'replay';
+}
+
+/** One run's per-run counts, by goal label: what {@link sameCountsOf} compares. */
+export type StageRunCounts = ReadonlyMap<string, { readonly yours: number; readonly shipped: number; readonly runs: number }>;
+
+/** The judged per-run counts of a verdict's goals, by label. Empty when no per-run goal was judged. */
+export function stageRunCountsOf(goals: StagePlayVerdictFacts['goals']): StageRunCounts {
+  const out = new Map<string, { readonly yours: number; readonly shipped: number; readonly runs: number }>();
+  for (const goal of goals) if (goal.counts !== undefined) out.set(goal.label, goal.counts);
+  return out;
+}
+
+/**
+ * **Whether a change moved any count** — wave AQ lane AQ-1, the playtest's stage 3 finding: *Min-wait
+ * with lobby parking* and *Min-wait as it stands* both passed 10 of 50 against 28, and nothing said
+ * the parking had changed nothing a count can see.
+ *
+ * `shipped` when the player moved something (`control` false) and every judged per-run count equals
+ * the shipped setting's on the same crowds; else `previous` when the last judged run was on other
+ * settings and every count equals its count. Equal counts are a fact about the counts and no more,
+ * which is all the two sentences say.
+ */
+export function sameCountsOf(input: {
+  readonly counts: StageRunCounts;
+  readonly control: boolean;
+  readonly previous: { readonly counts: StageRunCounts; readonly sameSettings: boolean } | undefined;
+}): 'shipped' | 'previous' | undefined {
+  const rows = [...input.counts.entries()];
+  if (rows.length === 0) return undefined;
+  if (!input.control && rows.every(([, row]) => row.yours === row.shipped)) return 'shipped';
+  const previous = input.previous;
+  if (previous === undefined || previous.sameSettings || previous.counts.size !== rows.length) return undefined;
+  return rows.every(([label, row]) => {
+    const before = previous.counts.get(label);
+    return before !== undefined && before.runs === row.runs && before.yours === row.yours;
+  })
+    ? 'previous'
+    : undefined;
 }

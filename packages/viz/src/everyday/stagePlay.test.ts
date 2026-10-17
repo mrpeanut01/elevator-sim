@@ -799,3 +799,18 @@ describe('the pair crosses its quiet fast and plays what moves at the player’s
     expect(stagePlayViewOf(facts, { kind: 'judged', verdict, stale: true }).watch).toBeUndefined();
   });
 });
+
+describe('the verdict draws the same-counts sentence it was given — wave AQ lane AQ-1', () => {
+  it('draws one sentence for each comparison and none without one', () => {
+    const stage = stageAt(0);
+    const facts = factsOf(stage, { profileId: stage.dispatcher.startingProfileId, parking: null });
+    const verdict: StagePlayVerdictFacts = {
+      headline: 'h', goals: [], holdoutSentence: null, metOnTuningSeeds: false, cleared: false, paid: undefined,
+    };
+    const drawn = (sameCounts: StagePlayVerdictFacts['sameCounts']) =>
+      stagePlayViewOf(facts, { kind: 'judged', verdict: { ...verdict, sameCounts }, stale: false }).verdict?.sameCounts;
+    expect(drawn(undefined)).toBeUndefined();
+    expect(drawn('shipped')).toBe(STAGE_PLAY_COPY.sameAsShipped);
+    expect(drawn('previous')).toBe(STAGE_PLAY_COPY.sameAsPrevious);
+  });
+});

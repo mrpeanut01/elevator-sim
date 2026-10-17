@@ -398,6 +398,22 @@ describe('the rest of § 6.1', () => {
     expect(held.driver.note).not.toMatch(/^Change it/u);
   });
 
+  it('asks no pick of a held driver on step 1 or in the footer — #626’s leftover, wave AQ lane AQ-1', () => {
+    const week = weekWith(5, [closedDay(1), closedDay(2), closedDay(3), closedDay(4)]);
+    const at = (driverHeld: string | undefined) =>
+      doorScreenViewOf({ week, today: { ...TODAY, day: week.day, driverHeld }, dayOffset: 0, dayClosed: false, nameOf: NAME_OF });
+    const held = at('held');
+    const free = at(undefined);
+    expect(free.steps[0]?.head).toBe('Pick who drives');
+    expect(free.primary.note).toBe('Pick who drives, then run it.');
+    for (const text of [held.steps[0]?.head ?? '', held.steps[0]?.body ?? '', held.primary.note]) {
+      expect(text).not.toMatch(/\bpick who drives\b/iu);
+    }
+    expect(held.steps.map((step) => step.n)).toEqual(['1', '2', '3']);
+    expect(held.steps.slice(1)).toEqual(DOOR_STEPS.slice(1));
+    expect(held.primary.label).toBe('Set up today');
+  });
+
   it('promises no duration the run does not have — § D733', () => {
     /*
      * Step 2 read *“The whole shift in a couple of minutes”*. Ten of the eleven contracts a first

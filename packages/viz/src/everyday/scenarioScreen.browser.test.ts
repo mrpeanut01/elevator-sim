@@ -226,4 +226,54 @@ describe.skipIf(!HAS_BROWSER)('the Scenario hub opens the stage that was pressed
       await page.close();
     }
   }, 180_000);
+
+  /*
+   * Wave AQ lane AQ-1, the playtest's path finding: each card carried three paragraphs of census and
+   * budget text, and a first visit had no obvious first press. The three fold under one small
+   * disclosure per card, and on a fresh device the bar's primary names and opens stage 1.
+   */
+  it('folds each card’s census and budget text behind Details, and a first visit’s primary opens stage 1', async () => {
+    const page = await openPage(browser, { viewport: { width: 1280, height: 800 } });
+    try {
+      await page.goto(origin, { waitUntil: 'load' });
+      await scenarioHub(page);
+      const shape = await page.evaluate(() => {
+        const cards = [...document.querySelectorAll<HTMLElement>('.everyday-scenario-path-card')];
+        const shown = (node: Element | null): boolean =>
+          node instanceof HTMLElement && node.checkVisibility({ contentVisibilityAuto: true, visibilityProperty: true });
+        return {
+          cards: cards.length,
+          folds: cards.filter((card) => card.querySelector('details.everyday-scenario-path-details:not([open])') !== null).length,
+          budgetsShown: cards.filter((card) => shown(card.querySelector('.everyday-scenario-path-budget'))).length,
+          waysShown: cards.filter((card) => shown(card.querySelector('.everyday-scenario-path-ways'))).length,
+          notesShown: cards.filter((card) => shown(card.querySelector('.everyday-scenario-path-note'))).length,
+          refusalsShown: cards.filter((card) => shown(card.querySelector('.everyday-scenario-path-refusal'))).length,
+          held: cards.filter((card) => card.dataset['playable'] === 'no').length,
+          startHere: cards.filter((card) => card.dataset['startHere'] === 'yes').map((card) => card.dataset['stage']),
+        };
+      });
+      expect(shape.cards).toBeGreaterThan(0);
+      expect(shape.folds).toBe(shape.cards);
+      expect(shape.budgetsShown + shape.waysShown + shape.notesShown).toBe(0);
+      /* A held row's reason is not census text: it stays on the card's face. */
+      expect(shape.refusalsShown).toBe(shape.held);
+      expect(shape.startHere).toEqual(['stage-1-first-call']);
+
+      /* Every word is one press away. */
+      await page.locator('.everyday-scenario-path-card[data-stage="stage-1-first-call"] summary').click();
+      expect(await page.locator('.everyday-scenario-path-card[data-stage="stage-1-first-call"] .everyday-scenario-path-budget').isVisible()).toBe(true);
+
+      await page.waitForFunction(
+        () => document.querySelector('.everyday-bar-primary')?.textContent?.includes('Play stage 1') === true,
+        undefined,
+        { timeout: 15_000 },
+      );
+      await page.locator('.everyday-bar-primary').click();
+      await page.waitForSelector('.everyday-stage-play-title', { timeout: 60_000 });
+      expect(await page.locator('.everyday-stage-play-setting-select').count()).toBe(1);
+      expect(await page.textContent('.everyday-stage-play-eyebrow')).toContain('Stage 1 of');
+    } finally {
+      await page.close();
+    }
+  }, 120_000);
 });

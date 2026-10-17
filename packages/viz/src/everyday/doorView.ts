@@ -519,7 +519,8 @@ function primaryOf(input: DoorScreenInput, chips: readonly DoorDayChip[]): DoorP
     }
     return {
       label: 'Set up today',
-      note: 'Pick who drives, then run it.',
+      /* GitHub issue #626's leftover (wave AQ, AQ-1): a held driver is not picked today. */
+      note: input.today.driverHeld === undefined ? 'Pick who drives, then run it.' : DOOR_PRIMARY_NOTE_HELD,
       inert: false,
       goes: 'today',
       again: undefined,
@@ -581,6 +582,21 @@ export const DOOR_DRIVER_NOTE = 'Change it on the brief, which is the next scree
 export const DOOR_DRIVER_NOTE_HELD =
   'Held until the stage’s call is answered; the brief, which is the next screen, says why.';
 
+/**
+ * **Step 1 and the footer on a day whose driver is held** — GitHub issue #626's leftover, wave AQ
+ * lane AQ-1. *"Pick who drives"* and *"Pick who drives, then run it"* sat beside *"Held until the
+ * stage's call is answered"* on the same screen. On that day the step says who drives instead, and
+ * the footer says what the press does.
+ */
+export const DOOR_STEP_ONE_HELD: DoorStep = Object.freeze({
+  n: '1',
+  head: 'Who drives',
+  body: 'Today the tower’s own standing order drives until the stage’s call is answered. You pick on any other day.',
+});
+
+/** The § 3.3 note on today's press while its driver is held. */
+export const DOOR_PRIMARY_NOTE_HELD = 'Open the brief, then run it. The tower’s own order drives today.';
+
 /** § 6.1, resolved. Total: every arm answers something a player can read. */
 export function doorScreenViewOf(input: DoorScreenInput): DoorScreenView {
   const earliest = earliestOffsetOf(input.week);
@@ -594,10 +610,14 @@ export function doorScreenViewOf(input: DoorScreenInput): DoorScreenView {
     input.today.crowdIsPinned,
     input.today.crowdIsDerived === true,
   );
+  const steps =
+    input.today.driverHeld === undefined
+      ? DOOR_STEPS
+      : DOOR_STEPS.map((step, index) => (index === 0 ? DOOR_STEP_ONE_HELD : step));
   const printed = [
     DOOR_RULE,
     input.today.lede,
-    ...DOOR_STEPS.map((step) => step.body),
+    ...steps.map((step) => step.body),
     input.today.seedLine,
     input.today.firstSessionLine ?? '',
     sameForEveryone,
@@ -627,7 +647,7 @@ export function doorScreenViewOf(input: DoorScreenInput): DoorScreenView {
     lede: input.today.lede,
     world: WORLD_BAND,
     stepsHeading: 'WHAT THE JOB IS',
-    steps: DOOR_STEPS,
+    steps,
     driver: {
       heading: 'DRIVING TODAY',
       name: input.today.driver,

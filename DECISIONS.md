@@ -53239,3 +53239,51 @@ loop to a player; no assessor has watched it. The bank view is not offered on th
 
 **Numbers spent.** This lane held **D1496 to D1498** and spent **D1496 only**; D1497 and D1498 are
 unspent.
+
+## D1497 — the stage page shows what a press does, keeps the pair beside its verdict, and says when a change moved no count
+
+> **Taken 2026-10-17 by an agent session under delegated authority** (wave AQ lane AQ-1, on the
+> first-time-player playtest's findings on GitHub issues #626 and #631), not by the product owner, and
+> to be read as an agent ruling. **Amends [§ D1496](#d1496)** rulings 3 and its pace. Owner-reversible:
+> every sentence below, the scroll, the quiet rate, and the fold on the path cards.
+
+**Why an entry.** It moves two parts of a recorded ruling and binds `campaign/judge.ts` (a count field
+on a judged per-run goal), `everyday/caseStage.ts` (its pace is told every pane's frame),
+`everyday/actionBar.ts` (a second variant on the Scenario row) and `everyday/doorView.ts`.
+
+**The ruling.**
+
+1. **A press is seen.** At 1280 × 800 *Run the stage* changed only its label. The page now scrolls the
+   counter into view as the press lands, the pair to the top of the view when it starts, and the
+   verdict's head by the least scroll that shows it, once each per press.
+2. **The pair stays with its verdict.** § D1496 ruling 3 ended the pair at its end once the verdict was
+   in, so after a miss it left a few seconds later. It now plays again from its first minute after the
+   verdict too, and only a skip, a new press, a stale verdict or leaving the page ends it.
+3. **The pair's pace reads what is happening.** `tutorialPaceOf` slows only for a wait of a minute, so
+   stage 1 crossed its whole morning in ten seconds and showed each ride as a blink. The pair now plays
+   at the quiet rate only while nothing on either pane moves (nobody waiting or aboard, no car between
+   floors, every door shut) and at the player's speed otherwise (`stagePlay.ts#stageWatchPaceOf`).
+   Measured on stage 1's pair: 3.6 of 10 real seconds showed motion before, 81 of 87 after, with the
+   first motion at 0.9 s both times. Speed only; the verdict is the fifty crowds' as before.
+4. **Equal counts are said.** When every judged per-run count equals the shipped setting's on a move,
+   or the last run's on other settings, the verdict says so in one sentence about the counts and
+   nothing else. Stage 3 reproduces the finding: Min-wait and Min-wait with lobby parking both pass
+   10 of 50 against 28.
+5. **The path card folds** its budget, census and press notes under *Details*, and a device holding
+   no clear has *Play stage 1* as the Scenario screen's primary while stage 1 is offered.
+6. **A held driver is not picked.** On a day whose driver is held, the door's step 1 and its press note
+   say who drives and what the press does instead of *Pick who drives*.
+
+**What holds it.** `everyday/stageWatch.browser.test.ts` (pair and verdict head in view at 1280 × 800,
+the pair still painting twelve seconds after a miss's verdict; red on the base at the first);
+`everyday/stagePlay.test.ts` (the pace measured over stage 1's real pair, the end rule, the stale
+verdict, the sentence drawn); `everyday/stageSameCounts.test.ts` (stage 3 played twice through the
+shipped constructors); `everyday/scenarioScreen.browser.test.ts` and `scenarioModel.test.ts`;
+`everyday/doorView.test.ts`.
+
+**Not established.** Whether an 87-second pair reads as live play to a player; no assessor has
+watched it. Stage 2's brief still says it is *the first stage where a number changes when you change a
+setting*: rewording it moves the survivor census's input hash (`scenario/survivorInputs.test.ts`), which
+hashes prose it does not read, so it is left for a lane that may regenerate or narrow that hash.
+
+**Numbers spent.** This lane held **D1497 to D1505** and spent **D1497 only**.

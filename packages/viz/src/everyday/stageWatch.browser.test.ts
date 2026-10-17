@@ -177,16 +177,16 @@ describe.skipIf(!HAS_BROWSER)('a stage press plays one of its crowds, and the ve
       );
       await expect.poll(() => inView('.everyday-stage-play-watch-canvas'), { timeout: 10_000 }).toBe(true);
 
-      await page.waitForSelector('.everyday-stage-play-verdict', { timeout: 110_000 });
+      await page.waitForSelector('.everyday-stage-play-verdict', { timeout: 70_000 });
       await expect.poll(() => inView('.everyday-stage-play-verdict-head'), { timeout: 10_000 }).toBe(true);
       expect(await page.getAttribute('.everyday-stage-play-verdict', 'data-cleared')).toBe('no');
 
       /* The old pair ended inside ten seconds of the verdict and took itself away. */
-      await page.waitForTimeout(15_000);
+      await page.waitForTimeout(12_000);
       expect(await page.locator('.everyday-stage-play-watch').count(), 'the pair left the verdict on its own').toBe(1);
       expect(await pairPainting(page)).toBe(true);
     } finally {
       await page.close();
     }
-  }, 180_000);
+  }, 120_000);
 });
