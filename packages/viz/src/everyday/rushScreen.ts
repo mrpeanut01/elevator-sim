@@ -52,6 +52,7 @@ import {
   rushTutorialWorkedAnswerOf,
   rushFittedLineOf,
   RUSH_SCREEN_COPY as COPY,
+  type RushFurthestStanding,
 } from './rushScreenModel.js';
 import { rushStandingsOf, type RushPostedStandings, type RushYoursRowView } from './rushHouse.js';
 import type { RushDeviceStanding } from './rushDeviceBest.js';
@@ -99,20 +100,37 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
   const lede = el(doc, 'p', undefined, COPY.lede);
   lede.style.cssText = `font-size:17px;line-height:1.55;color:${C.inkSoft};margin:13px 0 0;max-width:56ch;text-wrap:pretty`;
   paper.append(eyebrow, title, lede);
+  /* Wave AQ lane AQ-3: a round the last page closed on, said once, as a status a reader is told about. */
+  const unfinishedLine = context.host.rushUnfinished();
+  if (unfinishedLine !== undefined) {
+    const unfinished = el(doc, 'p', 'everyday-rush-unfinished', unfinishedLine);
+    unfinished.setAttribute('role', 'status');
+    unfinished.style.cssText = `font-size:14px;line-height:1.5;color:${C.ink};margin:14px 0 0;max-width:56ch;padding:10px 12px;border:1px solid ${C.amberEdge};background:${C.amberWash};border-radius:${String(R.well)}px`;
+    paper.append(unfinished);
+  }
 
   /* the three facts */
   const facts = el(doc, 'div', 'everyday-rush-facts');
   facts.style.cssText = `display:flex;gap:26px;margin:24px 0 0;padding:18px 0;border-top:1px solid ${C.rule};border-bottom:1px solid ${C.rule};max-width:620px;flex-wrap:wrap`;
-  for (const fact of rushFactViews(context.host.rushBest())) {
-    const cell = el(doc, 'div');
-    cell.style.cssText = 'min-width:0';
-    const value = el(doc, 'div', 'everyday-rush-fact-value', fact.value);
-    value.style.cssText = `font:500 21px ${TYPE.mono};letter-spacing:-.02em;color:${fact.withheld ? C.warmGrey : C.terracotta}`;
-    const label = el(doc, 'div', undefined, fact.label);
-    label.style.cssText = `font-size:12.5px;color:${C.warmGrey};line-height:1.35;margin-top:4px;max-width:26ch`;
-    cell.append(value, label);
-    facts.append(cell);
+  /*
+   * § D1515: the first two facts are this device's furthest round on the standing tower, replayed off
+   * this thread and drawn again when the replay lands; until then they say they are checking.
+   */
+  let furthest: RushFurthestStanding = { kind: 'pending' };
+  function drawFacts(): void {
+    facts.replaceChildren();
+    for (const fact of rushFactViews(context.host.rushBest(), furthest)) {
+      const cell = el(doc, 'div');
+      cell.style.cssText = 'min-width:0';
+      const value = el(doc, 'div', 'everyday-rush-fact-value', fact.value);
+      value.style.cssText = `font:500 21px ${TYPE.mono};letter-spacing:-.02em;color:${fact.withheld ? C.warmGrey : C.terracotta}`;
+      const label = el(doc, 'div', 'everyday-rush-fact-label', fact.label);
+      label.style.cssText = `font-size:12.5px;color:${C.warmGrey};line-height:1.35;margin-top:4px;max-width:26ch`;
+      cell.append(value, label);
+      facts.append(cell);
+    }
   }
+  drawFacts();
   paper.append(facts);
 
   /* § 9.1's bands, each a label on the ramp with its proportional bar */
@@ -459,6 +477,19 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
       if (!alive) return;
       posted = { kind: 'unreachable' };
       syncDriver();
+    },
+  );
+  /* § D1515: the device's furthest round on this tower, replayed off this thread. */
+  void context.host.rushFurthest(context.host.selection().buildingId).then(
+    (answer) => {
+      if (!alive) return;
+      furthest = answer;
+      drawFacts();
+    },
+    () => {
+      if (!alive) return;
+      furthest = { kind: 'none' };
+      drawFacts();
     },
   );
   /* § D1420: the device's kept sitting, replayed off this thread; `silent` on a build with a board. */

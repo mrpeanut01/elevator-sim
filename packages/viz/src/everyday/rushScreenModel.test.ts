@@ -252,7 +252,8 @@ describe('what the screen refuses, and where the refusal sits', () => {
      * The refusal names the scope of what is kept rather than the build.
      */
     expect(furthest?.label).not.toMatch(/in this build/u);
-    expect(furthest?.label).toContain('this visit');
+    /* § D1515: the furthest round is kept on this device now, so the refusal names the device. */
+    expect(furthest?.label).toContain('on this device');
     // The climb is arithmetic rather than a measurement, so it is the one fact that is not `—`.
     expect(climb?.withheld).toBe(false);
     expect(climb?.value).toBe(`+${climbPerWavePct().toFixed(0)}%`);
@@ -497,6 +498,12 @@ describe('every rush constant names the module that draws it — § D227, GitHub
      */
     RUSH_FITTED_LINE: 'rushScreenModel.ts',
     RUSH_FITTED_DEVICE_LINE: 'rushScreenModel.ts',
+    /* Wave AQ lane AQ-3, § D1515: `rushFactViews` words the first fact with these; the screen draws the views. */
+    RUSH_FURTHEST_COPY: 'rushScreenModel.ts',
+    /* Wave AQ lane AQ-3: the rush stage's end-ask, drawn under the stage header. */
+    RUSH_END_ASK_COPY: 'stageScreen.ts',
+    /* Wave AQ lane AQ-3: the host answers it once and the setup screen draws the answer. */
+    RUSH_UNFINISHED_COPY: 'host.ts',
   });
 
   it('declares a renderer for every exported constant, so a new one cannot arrive unclaimed', () => {

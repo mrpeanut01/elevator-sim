@@ -82,6 +82,12 @@ interface GuideRow {
   readonly primaryShipsInstead?: readonly string[];
   readonly inverted: boolean;
   readonly wayOut?: string;
+  /**
+   * What the build ships instead of {@link inverted} and {@link wayOut}. Present on the rush result
+   * row only: wave AQ, lane AQ-3 keeps *Run the rush again* loud and drops the duplicate *Leave the
+   * rush* (the post-AP playtest).
+   */
+  readonly emphasisShipsInstead?: { readonly inverted: boolean; readonly wayOut: string | undefined };
 }
 
 /** GAMEPLAY § 3.3's table, lines 168–188, row for row and in the guide's order. */
@@ -193,6 +199,7 @@ const GUIDE_TABLE: readonly GuideRow[] = [
     notes: ['Waves are identical for everyone.'],
     inverted: true,
     wayOut: '⤺ Leave the rush',
+    emphasisShipsInstead: { inverted: false, wayOut: undefined },
   },
   {
     screen: 'towers',
@@ -386,8 +393,8 @@ describe('the table matches the guide, cell for cell', () => {
       if (guide.notes === null) expect(notes, 'note').toEqual([]);
       else if (guide.shipsInstead !== undefined) expect(notes, 'note').toEqual([guide.shipsInstead]);
       else expect(notes, 'note').toEqual(guide.notes);
-      expect(data.inverted, 'inversion').toBe(guide.inverted);
-      expect(data.wayOut, 'way out').toBe(guide.wayOut);
+      expect(data.inverted, 'inversion').toBe(guide.emphasisShipsInstead?.inverted ?? guide.inverted);
+      expect(data.wayOut, 'way out').toBe(guide.emphasisShipsInstead === undefined ? guide.wayOut : guide.emphasisShipsInstead.wayOut);
     });
   }
 
@@ -544,12 +551,13 @@ describe('the § 3.3 rules, held over the data rather than the literals', () => 
     }
   });
 
-  it('inverts emphasis on every report and nowhere else in the shipped rows', () => {
+  it('inverts emphasis on every report but the rush’s, and nowhere else in the shipped rows', () => {
     // § 3.3: the report and the *solved* fix case invert. Solved is the fix screen's own state,
     // so the fixit row ships uninverted and carries its way out for the refinement to use.
     for (const row of ACTION_BAR_ROWS) {
       expect(row.inverted, keyOf(row.screen, row.ctx)).toBe(
-        row.screen === 'report' && row.ctx !== 'watch',
+        /* Wave AQ lane AQ-3: the rush result keeps *Run the rush again* loud — the table's `emphasisShipsInstead`. */
+        row.screen === 'report' && row.ctx !== 'watch' && row.ctx !== 'rush',
       );
       if (row.inverted) expect(row.wayOut, keyOf(row.screen, row.ctx)).toBeDefined();
     }

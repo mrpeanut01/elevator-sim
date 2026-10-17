@@ -53239,3 +53239,44 @@ loop to a player; no assessor has watched it. The bank view is not offered on th
 
 **Numbers spent.** This lane held **D1496 to D1498** and spent **D1496 only**; D1497 and D1498 are
 unspent.
+
+## D1515 — the rush keeps its furthest round on this device as causes, a lost round is said rather than resumed, and End the rush asks once
+
+> **Taken 2026-10-17 by an agent session** (wave AQ, lane AQ-3, on GitHub issue #631's Rush rows), not
+> by the product owner, and to be read as an agent ruling. **Extends [§ D1420](#d1420)**, whose replay
+> rule it reuses unchanged, and **replaces** the reading in `host.ts` that the rush front's furthest is
+> not persisted *"for § 3.5's reason"*. Owner-reversible: every clause.
+
+**Why an entry.** It moves a recorded behaviour (§ D1420's board note and the front's *this visit*)
+and binds `everyday/host.ts`, `everyday/stageScreen.ts` and `everyday/actionBar.ts`, which the rush
+modules do not own.
+
+1. **The furthest round per tower is kept on this device, ended by hand or at the line**
+   (`everyday/rushDeviceFurthest.ts`, a second slot in `rushDeviceStore.ts`), as the sitting up to
+   that round and the second it ended at. The setup screen's first two facts draw a **replay** of it
+   (`EverydayHost.rushFurthest`: `rushDeviceReplayOf`, then `rush.ts#rushOutcomeOf` at the kept
+   second), never a stored figure, on § D1420's rule. A round whose presses cannot be written as
+   causes is not kept. § D1420's board row is unchanged: it still ranks only a sitting whose last
+   round crossed the hold line, and its note now says so in words a player can act on.
+2. **A round the page closed on is said, not resumed.** Resuming means rebuilding the parked week,
+   every earlier round, the purse and its purchases from storage, and one wrong field replays a
+   different round under the same wave. So `pagehide` marks a running round and the next rush setup
+   screen says once that it was not kept (`RUSH_UNFINISHED_COPY`).
+3. **End the rush asks once**, under the stage header with focus on *Keep playing*; a second press of
+   the primary or *End it* ends the round. The rush result row is **not inverted** and drops its
+   duplicate *Leave the rush* way out, so *Run the rush again* is the loud button (a deviation from
+   GAMEPLAY § 3.3, named in `actionBar.test.ts`).
+4. In a rush the choice chips sit directly under the stage header, and they are disabled while no
+   run is on the stage.
+
+**What holds it.** `everyday/rushDeviceFurthest.test.ts` (a hand-ended round read back by a fresh host
+over the same storage, a hand-edited kept figure moving nothing drawn, the lost-round line said once)
+and `everyday/rushPlaytest.browser.test.ts` (reload keeps the wave, the mid-round reload line, chips
+in view and hit-testable at 1280×600 and 390×844, the ask, the result's primary, focus on *Play*).
+Red on the base: all of it.
+
+**Not established.** The Lobby and Garage queues on a 390×844 phone are still below the fold; a
+second tab's exact locked-out state was not reproduced, so the disabled chips are pinned only by the
+no-run rule.
+
+**Numbers spent.** This lane held **D1515 to D1523** and spent **D1515 only**.

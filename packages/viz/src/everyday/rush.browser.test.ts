@@ -99,6 +99,7 @@ describe.skipIf(!HAS_BROWSER)('Endless rush — GitHub issue #220', () => {
 
       /* Ended by hand, early: its own result, the stopped branch, and no day report anywhere. */
       await page.locator('.everyday-bar-primary').click();
+      await page.locator('.everyday-stage-end-confirm-go').click(); // wave AQ lane AQ-3: End asks once
       await page.waitForSelector('.everyday-rush-result', { timeout: 15_000 });
       const result = await page.evaluate(() => ({
         outcome: document.querySelector<HTMLElement>('.everyday-rush-result')?.dataset['outcome'] ?? '',
@@ -116,8 +117,8 @@ describe.skipIf(!HAS_BROWSER)('Endless rush — GitHub issue #220', () => {
       expect(result.primary).toBe('Run the rush again');
 
       /* The way out puts the parked week back: the door names the address's tower and crowd, not seed 90210. */
-      await page.locator('.everyday-bar-wayout').click();
-      await page.waitForSelector('.everyday-rush-driving', { timeout: 15_000 });
+      /* Wave AQ lane AQ-3: the result has one way out, the left button, and it leaves the rush. */
+      expect(await page.locator('.everyday-bar-wayout').count()).toBe(0);
       await page.locator('.everyday-bar-leave').click();
       await leaveTutorialIfOffered(page);
       await page.waitForSelector('.everyday-mode[data-screen="scenario"]', { timeout: 15_000 });
@@ -242,6 +243,7 @@ describe.skipIf(!HAS_BROWSER)('Endless rush — GitHub issue #220', () => {
         { timeout: 60_000 },
       );
       await page.locator('.everyday-bar-primary').click(); // End the rush
+      await page.locator('.everyday-stage-end-confirm-go').click(); // wave AQ lane AQ-3: End asks once
       await page.waitForSelector('.everyday-rush-result', { timeout: 15_000 });
 
       /*
@@ -450,6 +452,7 @@ describe.skipIf(!HAS_BROWSER)('Endless rush — GitHub issue #220', () => {
         { timeout: 60_000 },
       );
       await page.locator('.everyday-bar-primary').click(); // End the rush
+      await page.locator('.everyday-stage-end-confirm-go').click(); // wave AQ lane AQ-3: End asks once
       await page.waitForSelector('.everyday-rush-post', { timeout: 15_000 });
 
       const first = await page.evaluate(() => {
@@ -483,6 +486,7 @@ describe.skipIf(!HAS_BROWSER)('Endless rush — GitHub issue #220', () => {
         { timeout: 60_000 },
       );
       await page.locator('.everyday-bar-primary').click();
+      await page.locator('.everyday-stage-end-confirm-go').click(); // wave AQ lane AQ-3: End asks once
       await page.waitForSelector('.everyday-rush-post', { timeout: 15_000 });
       const second = await page.evaluate(() =>
         [...document.querySelectorAll('.everyday-rush-post-round-label')].map((node) => node.textContent ?? ''),
@@ -510,6 +514,7 @@ describe.skipIf(!HAS_BROWSER)('Endless rush — GitHub issue #220', () => {
         { timeout: 60_000 },
       );
       await page.locator('.everyday-bar-primary').click(); // End the rush
+      await page.locator('.everyday-stage-end-confirm-go').click(); // wave AQ lane AQ-3: End asks once
       await page.waitForSelector('.everyday-rush-rebuild', { timeout: 15_000 });
 
       const menu = await page.evaluate(() => {
@@ -551,6 +556,7 @@ describe.skipIf(!HAS_BROWSER)('Endless rush — GitHub issue #220', () => {
         { timeout: 60_000 },
       );
       await page.locator('.everyday-bar-primary').click();
+      await page.locator('.everyday-stage-end-confirm-go').click(); // wave AQ lane AQ-3: End asks once
       await page.waitForSelector('.everyday-rush-post-round-rebuilt', { timeout: 15_000 });
       const after = await page.evaluate(() => ({
         rebuilt: [...document.querySelectorAll('.everyday-rush-post-round-rebuilt')].map((node) => node.textContent ?? ''),

@@ -2487,6 +2487,20 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'Storage slots, not sentences a player meets \u2014 DECISIONS.md § D1515, wave AQ lane AQ-3. The ' +
+        'furthest round and the round-left-running mark are `localStorage` slots beside § D1420\u2019s, and ' +
+        'the two store functions are collected only through the mark\u2019s key. The words for both are ' +
+        '`rushScreenModel.ts#RUSH_FURTHEST_COPY` and `RUSH_UNFINISHED_COPY`, which the rush adapter seeds.',
+      ids: [
+        'everyday/rushDeviceFurthest.ts#RUSH_DEVICE_FURTHEST_KEY',
+        'everyday/rushDeviceFurthest.ts#RUSH_DEVICE_FURTHEST_QUARANTINE_KEY',
+        'everyday/rushDeviceStore.ts#RUSH_UNFINISHED_KEY',
+        'everyday/rushDeviceStore.ts#createRushDeviceStore',
+        'everyday/rushDeviceStore.ts#everydayRushDeviceStore',
+      ],
+    },
+    {
+      reason:
         'Load-time checks and a figure, not sentences a player meets \u2014 DECISIONS.md § D1425 and ' +
         '§ D1417. `fixit/parse.ts#symptomLeverIn` answers the word and the family a line breaks, for ' +
         'the author-facing refusal `parseFixitCases` prints when `data/fixit-cases.json` fails, and a ' +

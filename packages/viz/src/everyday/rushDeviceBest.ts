@@ -188,7 +188,14 @@ export const RUSH_DEVICE_COPY = Object.freeze({
     'The row marked yours, on this device is your best sitting on this tower, kept on this device. It was ' +
     'posted nowhere, no server checked it, and it is ranked against nobody: this site has no rush board. Its ' +
     'hold is replayed here from the sitting’s own last round, on the same waves the house’s rows met.',
-  none: 'This site has no rush board. Your best sitting on this tower is kept on this device once you have played one to its line.',
+  /*
+   * § D1515: this said *"once you have played one to its line"*, which a player who ended rounds by
+   * hand read as a promise the page then broke. It now says what earns the row, and that a round
+   * ended by hand is kept in the facts above rather than here.
+   */
+  none:
+    'This site has no rush board. Your best sitting on this tower shows here once a round of yours runs until ' +
+    'forty people have waited over two minutes at once. A round you end by hand is kept in your furthest above, not here.',
   unreplayable: (reason: string): string =>
     `Your best sitting on this tower is kept on this device, and it is not drawn because ${reason}.`,
 });
