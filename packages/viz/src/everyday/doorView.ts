@@ -571,6 +571,16 @@ export function todayIsBanked(input: Pick<DoorScreenInput, 'week'>): boolean {
   return input.week.history.some((entry) => entry.day === input.week.day);
 }
 
+/** The *Driving today* card's note on a day whose driver the brief lets the player change. */
+export const DOOR_DRIVER_NOTE = 'Change it on the brief, which is the next screen.';
+
+/**
+ * The note on a day whose driver is held (`today.ts#TodayRecord.driverHeld`) — GitHub issue #626
+ * item 2: *Change it on the brief* sat over a brief whose driver cards were held until the stage's call.
+ */
+export const DOOR_DRIVER_NOTE_HELD =
+  'Held until the stage’s call is answered; the brief, which is the next screen, says why.';
+
 /** § 6.1, resolved. Total: every arm answers something a player can read. */
 export function doorScreenViewOf(input: DoorScreenInput): DoorScreenView {
   const earliest = earliestOffsetOf(input.week);
@@ -621,7 +631,7 @@ export function doorScreenViewOf(input: DoorScreenInput): DoorScreenView {
     driver: {
       heading: 'DRIVING TODAY',
       name: input.today.driver,
-      note: 'Change it on the brief, which is the next screen.',
+      note: input.today.driverHeld === undefined ? DOOR_DRIVER_NOTE : DOOR_DRIVER_NOTE_HELD,
     },
     seedLine: input.today.seedLine,
     firstSessionLine: input.today.firstSessionLine,

@@ -25,6 +25,8 @@ import { GLOSSARY_TERMS } from '../mode/glossary.js';
 import {
   DAY_OFFSET_MIN,
   DOOR_BACK_REFUSAL,
+  DOOR_DRIVER_NOTE,
+  DOOR_DRIVER_NOTE_HELD,
   doorScreenViewOf,
   doorWordsHeadingOf,
   DOOR_STEPS,
@@ -379,6 +381,20 @@ describe('the rest of § 6.1', () => {
     expect(view.lede).toBe(TODAY.lede);
     expect(view.seedLine).toBe(TODAY.seedLine);
     expect(view.driver.name).toBe('Steady hand');
+  });
+
+  it('sends the player to the brief to change the driver only on a day the brief lets them — GitHub issue #626', () => {
+    expect(viewAt(0, false).driver.note).toBe(DOOR_DRIVER_NOTE);
+    const week = weekWith(5, [closedDay(1), closedDay(2), closedDay(3), closedDay(4)]);
+    const held = doorScreenViewOf({
+      week,
+      today: { ...TODAY, day: week.day, driverHeld: 'held' },
+      dayOffset: 0,
+      dayClosed: false,
+      nameOf: NAME_OF,
+    });
+    expect(held.driver.note).toBe(DOOR_DRIVER_NOTE_HELD);
+    expect(held.driver.note).not.toMatch(/^Change it/u);
   });
 
   it('promises no duration the run does not have — § D733', () => {

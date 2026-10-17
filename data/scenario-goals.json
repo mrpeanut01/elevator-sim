@@ -4,7 +4,7 @@
   "scenarios": [
     {
       "id": "stage-1-first-call",
-      "name": "One shaft, low demand",
+      "name": "Two cars, low demand",
       "buildingId": "garden-apartments",
       "dispatcherProfileId": "collective",
       "durationS": 900,

@@ -791,6 +791,16 @@ export const TODAY_CHOICE_LINE =
   'You choose who drives before the day starts, and what the cars do while it plays.';
 
 /**
+ * {@link TODAY_CHOICE_LINE} on a day whose driver is held ({@link TodayRecord.driverHeld}) — GitHub
+ * issue #626 item 2. The lede said *"You choose who drives before the day starts"* above a brief whose
+ * driver cards were held until the stage's call, so the two screens contradicted each other. The
+ * hold is the rule (§ D1029) and stands; the sentence now says it.
+ */
+export const TODAY_CHOICE_LINE_HELD =
+  'Today the tower’s standing order drives until the stage’s call is answered, and you choose what ' +
+  'the cars do while it plays.';
+
+/**
  * § 6.1's lede — the building in words a stranger understands, composed from its own facts.
  *
  * Composed rather than authored, because the prototype's lede is a sentence about Chancery House
@@ -812,6 +822,7 @@ function ledeOf(
   name: string,
   note: string,
   out: readonly CarOutToday[],
+  driverHeld = false,
 ): string {
   if (building === undefined) {
     return (
@@ -827,7 +838,7 @@ function ledeOf(
     `${String(building.floors.length)} floors, ` +
     `${groupThousands(building.totalPopulation)} people and ${lifts}. ` +
     `${name}: ${note} ` +
-    TODAY_CHOICE_LINE
+    (driverHeld ? TODAY_CHOICE_LINE_HELD : TODAY_CHOICE_LINE)
   );
 }
 
@@ -956,13 +967,14 @@ export function todayOf(input: TodayInput): TodayRecord {
     event,
     crowdIsPinned && admittedPressDayIds().includes(week.contractId),
   );
+  const driverHeld = driverHeldOf(input, event);
   return {
     day: week.day,
     weekday,
     /* Wave AN, lane AN-7: the week's number, where one is true of it (`weekStake.ts#weekOrdinalOf`). */
     dayLabel: `${ordinalEyebrowOf(week)}${weekday.toUpperCase()} · DAY ${String(week.day)}`,
     towerName: building?.name ?? input.buildingId,
-    lede: ledeOf(building, wrinkleName, wrinkleNote, out),
+    lede: ledeOf(building, wrinkleName, wrinkleNote, out, driverHeld !== undefined),
     wrinkle: event,
     wrinkleName,
     wrinkleNote,
@@ -997,7 +1009,7 @@ export function todayOf(input: TodayInput): TodayRecord {
       : undefined,
     dayLength: dayLengthOf(input, event),
     driver: input.dispatcherName ?? EM_DASH,
-    driverHeld: driverHeldOf(input, event),
+    driverHeld,
     wayThrough: wayThroughSentenceOf({
       contractId: week.contractId,
       day: week.day,

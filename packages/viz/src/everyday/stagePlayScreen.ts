@@ -482,6 +482,20 @@ export function mountStagePlay(host: HTMLElement, context: EverydayScreenShellCo
     }
     root.append(letter);
 
+    if (view.held === undefined && view.goals.length > 0) {
+      const goals = el(doc, 'section', 'everyday-stage-play-goals');
+      goals.style.cssText = 'display:grid;gap:4px;min-width:0';
+      const goalsHead = el(doc, 'div', 'everyday-stage-play-goals-head', view.goalsHeading);
+      goalsHead.style.cssText = EYEBROW;
+      const list = el(doc, 'ul', 'everyday-stage-play-goals-list');
+      list.style.cssText = `margin:0;padding-left:20px;display:grid;gap:2px;font-size:14px;line-height:1.5;color:${C.ink}`;
+      for (const name of view.goals) {
+        list.append(el(doc, 'li', 'everyday-stage-play-goal', name));
+      }
+      goals.append(goalsHead, list);
+      root.append(goals);
+    }
+
     if (view.held !== undefined) {
       root.append(para(doc, 'everyday-stage-play-held', view.held, `font-size:14px;line-height:1.55;color:${C.inkSoft}`));
     } else {

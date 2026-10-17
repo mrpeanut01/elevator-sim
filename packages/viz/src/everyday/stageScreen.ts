@@ -849,7 +849,12 @@ function mountStage(
   }
   syncCamera();
 
-  header.append(clock, phase, nextPhase, bookedPill, driving, practiceLine, figures, playButton, speeds, cameras, floorJump);
+  /*
+   * GitHub issue #626 item 7: the select was appended here with no `<option>` and stayed that way on a
+   * tower whose floors all fit, a control that did nothing. It joins the header only once it has
+   * floors to offer, beside the camera chips under the same gate, and leaves when it has none.
+   */
+  header.append(clock, phase, nextPhase, bookedPill, driving, practiceLine, figures, playButton, speeds, cameras);
 
   /*
    * **Pillar 3's strip** — GitHub issue **#277**, [§ D470](../../../../DECISIONS.md).
@@ -3651,7 +3656,7 @@ function mountStage(
          * under the same gate `stageCameraChipsOf` is, so the two controls appear and disappear
          * together.
          */
-        if (recording.floors !== floorJumpBuiltFor) {
+        if (recording.floors !== floorJumpBuiltFor || offered !== floorJump.isConnected) {
           floorJumpBuiltFor = recording.floors;
           const options = stageFloorJumpOptionsOf(recording.floors, rect.height);
           if (options.length > 0) {
@@ -3665,8 +3670,10 @@ function mountStage(
               return entry;
             });
             floorJump.replaceChildren(placeholder, ...entries);
+            if (!floorJump.isConnected) cameras.after(floorJump);
           } else {
             floorJump.replaceChildren();
+            floorJump.remove();
           }
           /* A rebuilt select has forgotten any floor a player had jumped to. */
           if (camera === 'floor') {

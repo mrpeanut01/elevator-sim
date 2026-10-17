@@ -22,6 +22,7 @@ import { collectSearchSpace, type SearchSpace } from '@elevator-sim/experiments/
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { restrictedFloorIds } from '../access/zoning.js';
+import { stageGoalNameOf } from '../campaign/judge.js';
 import { parseCampaign, type CampaignContext } from '../campaign/parse.js';
 import { batchRequestForStage, demonstrationConfigFor } from '../campaign/stageRun.js';
 import { admitStageMove, routeRefusalsOf, routeUnitsOf, stagePathOf, stageUnitsAt } from '../campaign/stagePress.js';
@@ -631,5 +632,47 @@ describe('a clear at or under a priced par pays once — § D1417', () => {
       stagePlayViewOf(facts, { kind: 'judged', verdict: { ...cleared(undefined, 'first'), boughtUnits }, stale: false }).verdict?.rung;
     expect(at(24)).toBe('Run at the 24-unit budget this device bought for this stage. A clear pays the same at any budget.');
     expect(at(undefined)).toBeUndefined();
+  });
+});
+
+describe('a first-time player reads the stage before running it — GitHub issue #626', () => {
+  const idleViewOf = (stage: CampaignStage) =>
+    stagePlayViewOf(factsOf(stage, { profileId: stage.dispatcher.startingProfileId, parking: null }), { kind: 'idle' });
+
+  it('states every goal before the first run, in the words the verdict judges by (item 1)', () => {
+    for (const stage of stages) {
+      const view = idleViewOf(stage);
+      expect(view.goalsHeading).toBe(STAGE_PLAY_COPY.goalsHeading);
+      expect(view.goals, stage.id).toEqual(stage.goals.map(stageGoalNameOf));
+      expect(view.goals.length, stage.id).toBeGreaterThan(0);
+    }
+    expect(idleViewOf(stageAt(0)).goals).toEqual(['Measurably ahead of the shipped setting']);
+  });
+
+  it('counts a running batch in the stage’s own crowds, so the count never passes where the batch can stop (item 9)', () => {
+    const stage = stageAt(0);
+    const facts = factsOf(stage, { profileId: stage.dispatcher.startingProfileId, parking: null });
+    const arms = 2;
+    const total = arms * stage.replications;
+    const tuning = stagePlayViewOf(facts, { kind: 'running', seedSet: 'tuning', completed: 70, total }).status;
+    expect(tuning).toBe(`Running 35 of ${String(stage.replications)} of the stage’s own crowds, both settings on the same passengers.`);
+    expect(tuning).not.toContain(`of ${String(total)}`);
+    const last = stagePlayViewOf(facts, { kind: 'running', seedSet: 'tuning', completed: total, total }).status;
+    expect(last).toContain(`${String(stage.replications)} of ${String(stage.replications)}`);
+    const holdout = stagePlayViewOf(facts, { kind: 'running', seedSet: 'holdout', completed: 1, total }).status;
+    expect(holdout).toContain(`Now 0 of ${String(stage.replications)} crowds`);
+  });
+
+  it('names no count of cars or shafts its building does not have (item 10)', () => {
+    const words = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
+    let named = 0;
+    for (const stage of stages) {
+      const cars = requireBuilding(config, stage.building).banks.reduce((sum, bank) => sum + bank.cars.length, 0);
+      for (const match of idleViewOf(stage).title.toLowerCase().matchAll(/\b(one|two|three|four|five|six|seven|eight|nine|ten) (?:shafts?|cars?|lifts?)\b/gu)) {
+        named += 1;
+        expect(words.indexOf(match[1] ?? '') + 1, `${stage.id}: "${stage.name}" on ${String(cars)} cars`).toBe(cars);
+      }
+    }
+    expect(named, 'no stage title counts its cars, so this case tests nothing').toBeGreaterThan(0);
   });
 });

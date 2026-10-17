@@ -5,7 +5,7 @@
   "stages": [
     {
       "id": "stage-1-first-call",
-      "name": "One shaft, low demand",
+      "name": "Two cars, low demand",
       "teaches": "a call, a car, a wait",
       "brief": [
         "Garden Apartments is a small building with a gentle trickle of demand. Watch a call appear at a landing, a car answer it, and the wait end \u2014 those three things are what every dispatcher in this simulator is made of.",

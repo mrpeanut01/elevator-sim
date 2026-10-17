@@ -231,7 +231,7 @@ const BRIEF_SCENARIOS: readonly GoalScenario[] = [
  * running it and watching it fail is § 5.4's stated teaching move).
  */
 export const CANDIDATE_SCENARIOS: readonly GoalScenario[] = [
-  stage('stage-1-first-call', 'One shaft, low demand', 'garden-apartments', 'collective', null),
+  stage('stage-1-first-call', 'Two cars, low demand', 'garden-apartments', 'collective', null),
   stage('stage-2-morning-rush', 'The morning rush', 'midtown-office', 'collective', 2.5),
   stage('stage-3-overwhelmed', 'Overwhelmed', 'midtown-office', 'collective', null),
   stage('stage-4-two-banks', 'Two banks', 'mixed-use-high-rise', 'collective', 1.5),
