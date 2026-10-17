@@ -142,10 +142,11 @@ import { actsOf, type DayAct } from '../shift/dayLength.js';
 import type { RunHorizon } from '../shift/types.js';
 import {
   firstLostInstantOf,
-  STAGE_SKIP_BEAT_NOTE,
   stagePaceNoteOf,
   stagePaceOf,
   stageSkipLineStands,
+  stageSkipSpeechOf,
+  stagePaceStateOf,
   stageStatusOf,
   stageSkipApplies,
   stageSkipLineOf,
@@ -2152,11 +2153,13 @@ function mountStage(
      * stops it); the pace note is drawn only where neither a stop nor a skip is speaking.
      */
     if (skipLine !== '') {
-      if (!stageSkipLineStands({ landedReason: skipLineReason, reason: answer.reason })) {
+      /* § D1525: past the allowance a waiter crossing the minute does not end the state the line names. */
+      const state = stagePaceStateOf(answer);
+      if (!stageSkipLineStands({ landedReason: skipLineReason, reason: state })) {
         skipLine = '';
         skipLineReason = undefined;
       } else if (skipLineReason === undefined) {
-        skipLineReason = answer.reason;
+        skipLineReason = state;
       }
     }
     setPace(note, answer.reason === 'call');
@@ -2263,7 +2266,7 @@ function mountStage(
     const lines = stageStatusOf({
       pace: paceText,
       stopped: paceStopped,
-      skip: skipArmedAtS !== undefined ? STAGE_SKIP_BEAT_NOTE : skipLine,
+      skip: stageSkipSpeechOf({ armed: skipArmedAtS !== undefined, pace: watchedFrame?.pace, line: skipLine }),
     });
     if (paceNote.textContent !== lines.pace) paceNote.textContent = lines.pace;
     if (skipNote.textContent !== lines.skip) skipNote.textContent = lines.skip;

@@ -145,7 +145,7 @@ describe.skipIf(!HAS_BROWSER)('§ D1169 — a scored day is paced by the tutoria
       /* Somebody passes a minute: the player's rung, and the line says why. */
       await untilPace(page, 'watching', '4×', 240_000);
       expect(await litChip(page)).toBe('4×');
-      expect(['', 'slowed to your speed, 4×: somebody on a landing has waited over a minute', 'slowed to your speed, 4×, for a few seconds after a wait of over a minute']).toContain(await paceNote(page));
+      expect(['', 'slowed to your speed, 4×, for a wait on a landing of over a minute']).toContain(await paceNote(page));
 
       /* A chip pressed while somebody waits is the rung that wait plays at, and stays the player's rung. */
       await page.click('.everyday-stage-speed:text-is("8×")');
