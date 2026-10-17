@@ -1705,7 +1705,8 @@ function mountStage(
     const toS = Math.min(playback.simTimeS, recording.endedAt);
     const fromS = lostReadToS !== undefined && lostReadToS < toS ? lostReadToS : toS;
     const atS = lostStopIn(recording, fromS, toS);
-    lostReadToS = toS;
+    /* Never moved back by a frame drawn before a skip's seek lands: what is marked read stays read. */
+    lostReadToS = Math.max(lostReadToS ?? toS, toS);
     if (atS !== undefined) stopOnLoss(atS);
   }
   /**
@@ -2348,11 +2349,19 @@ function mountStage(
      * wave AP, lane AP-D1, [§ D1446](../../../../DECISIONS.md), reading swarm DR's § Q4 (*the stage
      * stops once*) as binding a skip as it binds a frame, the way § D1151 stops a skip at a call. The
      * card's *End the day* files the day, and a second press of the skip runs it to the end.
+     *
+     * **Except the skip that answers a call**: § D1151 makes a skip pressed with the card up the
+     * player's answer, *and the day runs to its end*, so that press is not stopped again on the way.
+     * The stretch it jumps is marked read, or the next frame would find the loss inside it.
      */
-    const lostS = lostStopIn(playback.recording, playback.simTimeS, playback.recording.endedAt);
-    if (lostS !== undefined) {
-      stopOnLoss(lostS);
-      return;
+    if (standing !== undefined) {
+      lostReadToS = playback.recording.endedAt;
+    } else {
+      const lostS = lostStopIn(playback.recording, playback.simTimeS, playback.recording.endedAt);
+      if (lostS !== undefined) {
+        stopOnLoss(lostS);
+        return;
+      }
     }
     playback.play();
     playback.seekTo(playback.recording.endedAt);
