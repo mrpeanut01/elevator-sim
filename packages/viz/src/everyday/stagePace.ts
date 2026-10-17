@@ -230,6 +230,26 @@ export type ScoredPaceReason = 'watching' | 'fast' | 'yours' | 'lost' | 'unheld'
  */
 export const WATCH_ALLOWANCE_REAL_S = 20;
 
+/**
+ * **The least time the stage stays slowed once it has slowed for a wait**, in real seconds: wave AQ,
+ * lane AQ-2, [§ D1506](../../../../DECISIONS.md), the playtest's flicker (GitHub issue #631).
+ *
+ * § D1169's hold reads one fact of the present frame, *somebody on a landing has waited a minute*,
+ * and a busy landing makes that fact flip whenever the longest waiter boards and the next one is a
+ * few seconds short of the minute. On Midtown's Monday at `4×` the chip switched between `4×` and
+ * `30×` twelve times in about thirty real seconds (17:25 to 17:32, and again 10:44 to 10:57): a speed
+ * nobody could read, under a line that changed with it.
+ *
+ * So once the stage slows it stays slowed until nobody has waited a minute for this long. The value
+ * is half of {@link WATCH_ALLOWANCE_REAL_S}, written out so an uncapped allowance leaves it finite,
+ * chosen so that the allowance between two decisions holds at most two slowed stretches, and the
+ * chip moves at most four times before the stage plays on. Ten real seconds at `4×` is forty simulated seconds, four door cycles (9.8 s each), which is
+ * also long enough to read the line once. The lingering seconds count toward the allowance, so the
+ * hold is no longer than it was. Owner-reversible: `0` is the hold with no dwell.
+ */
+export const RUNG_DWELL_REAL_S = 10;
+
+
 /*
  * `lost` is wave AO's lane DR-1, [§ D1435](../../../../DECISIONS.md), swarm DR's ruling § Q4: a goal
  * graded on a maximum already reads past its bar at the playhead, so the day can no longer clear and
@@ -338,6 +358,11 @@ export function firstLostInstantOf(
 export interface StagePace {
   readonly simPerRealS: number;
   readonly reason: StagePaceReason;
+  /**
+   * `true` on a `watching` frame where nobody has waited a minute any more, and the stage stays
+   * slowed for {@link RUNG_DWELL_REAL_S} after the last one who had — [§ D1506](../../../../DECISIONS.md).
+   */
+  readonly lingering?: true | undefined;
 }
 
 /** Everything {@link stagePaceOf} reads. Plain data — the mount has already folded the frame. */
@@ -389,6 +414,12 @@ export interface StagePaceInput {
    * pressed while the stage played on, which is the player's speed until the next decision.
    */
   readonly watchedRealS?: number | undefined;
+  /**
+   * **Real seconds since the stage last read somebody past a minute while slowed for it**, on a scored
+   * day, or `undefined` when the last frame was not slowed — [§ D1506](../../../../DECISIONS.md),
+   * {@link paceCountersAfter}. Under {@link RUNG_DWELL_REAL_S} the stage stays slowed.
+   */
+  readonly lingerRealS?: number | undefined;
 }
 
 /** The act boundary after `fromS` — a peak opening or closing — or `undefined` when none remains. */
@@ -431,13 +462,16 @@ export function stagePaceOf(input: StagePaceInput): StagePace {
       const chosenSince = input.playerChoseSpeedAtS !== undefined && input.playerChoseSpeedAtS >= input.lostAtS;
       return { simPerRealS: chosenSince ? watching : Math.max(watching, BETWEEN_PEAKS_SIM_PER_REAL_S), reason: 'lost' };
     }
+    /* § D1493: the hold is for deciding, and lasts so long with nothing to decide. */
+    const allowanceSpent = input.watchedRealS !== undefined && input.watchedRealS >= WATCH_ALLOWANCE_REAL_S;
     /* § D1169: the tutorial's rule, on the present frame only. */
     if (input.longestStandingS !== undefined && input.longestStandingS >= PACE_HOLD_WAIT_S) {
-      /* § D1493: the hold is for deciding, and lasts so long with nothing to decide. */
-      if (input.watchedRealS !== undefined && input.watchedRealS >= WATCH_ALLOWANCE_REAL_S) {
-        return { simPerRealS: Math.max(watching, BETWEEN_PEAKS_SIM_PER_REAL_S), reason: 'unheld' };
-      }
+      if (allowanceSpent) return { simPerRealS: Math.max(watching, BETWEEN_PEAKS_SIM_PER_REAL_S), reason: 'unheld' };
       return { simPerRealS: watching, reason: 'watching' };
+    }
+    /* § D1506: once slowed, the stage stays slowed until nobody has waited a minute for a while. */
+    if (!allowanceSpent && input.lingerRealS !== undefined && input.lingerRealS < RUNG_DWELL_REAL_S) {
+      return { simPerRealS: watching, reason: 'watching', lingering: true };
     }
     if (input.playerChoseSpeedAtS !== undefined && input.simTimeS >= input.playerChoseSpeedAtS) {
       return { simPerRealS: watching, reason: 'yours' };
@@ -467,6 +501,44 @@ export function watchedRealAfter(
 ): number {
   if (frame.reason !== 'watching' || !(frame.toS > frame.fromS) || !(frame.simPerRealS > 0)) return watchedRealS;
   return watchedRealS + Math.min(1, (frame.toS - frame.fromS) / frame.simPerRealS);
+}
+
+/**
+ * **What the stage counts across frames to pace a scored day** — § D1493's allowance and § D1506's
+ * dwell. One value, advanced once a frame by {@link paceCountersAfter}, so the
+ * stage (`stageScreen.ts#pace`) and the tests that replay it count the same way.
+ */
+export interface PaceCounters {
+  /** {@link StagePaceInput.watchedRealS}: real seconds slowed for watching since the last decision. */
+  readonly watchedRealS: number;
+  /** {@link StagePaceInput.lingerRealS}. */
+  readonly lingerRealS: number | undefined;
+}
+
+/** A day nobody has played yet, or the moment after a decision. */
+export const FRESH_PACE_COUNTERS: PaceCounters = Object.freeze({
+  watchedRealS: 0,
+  lingerRealS: undefined,
+});
+
+/**
+ * **The counters after one frame** that played at `pace` from `fromS` to `toS` at `simPerRealS`. A
+ * frame adds at most a real second, so a seek is not counted as watching; a step backwards adds
+ * nothing and keeps the dwell where it was.
+ */
+export function paceCountersAfter(
+  counters: PaceCounters,
+  frame: { readonly pace: StagePace | undefined; readonly fromS: number; readonly toS: number; readonly simPerRealS: number },
+): PaceCounters {
+  const reason = frame.pace?.reason;
+  if (!(frame.toS > frame.fromS) || !(frame.simPerRealS > 0)) {
+    return reason === 'watching' ? counters : { ...counters, lingerRealS: undefined };
+  }
+  const realS = Math.min(1, (frame.toS - frame.fromS) / frame.simPerRealS);
+  const watchedRealS = watchedRealAfter(counters.watchedRealS, { ...frame, reason });
+  let lingerRealS: number | undefined;
+  if (reason === 'watching') lingerRealS = frame.pace?.lingering === true ? (counters.lingerRealS ?? 0) + realS : realS;
+  return Object.freeze({ watchedRealS, lingerRealS });
 }
 
 /** A rung's own chip label — § D354's rule that the label **is** the multiplier. */
@@ -522,15 +594,22 @@ export function stagePaceNoteOf(
         : `between peaks at ${rung}, next peak at ${clockAt(next.startS, context.dayStartS)}`;
     }
     /* § D1169: a scored day's three, each one line and each a fact of the present frame. */
+    /*
+     * § D1506: one story in three lines. The stage slows to watch a wait of over a minute, stays
+     * slowed a few seconds after it, and once it has watched a while with nothing to decide it
+     * fast-forwards again; every line says the speed first and the reason second.
+     */
     case 'fast':
-      return `fast-forwarding at ${rung} while nobody on a landing has waited a minute`;
+      return `fast-forwarding at ${rung}: nobody on a landing has waited a minute`;
     case 'watching':
-      return `at your speed, ${rung}, while somebody on a landing has waited over a minute`;
+      return pace.lingering === true
+        ? `slowed to your speed, ${rung}, for a few seconds after a wait of over a minute`
+        : `slowed to your speed, ${rung}: somebody on a landing has waited over a minute`;
     case 'yours':
       return `your speed, ${rung}, until somebody on a landing has waited a minute`;
     /* § D1493: the hold has run out with nothing asked. */
     case 'unheld':
-      return `nothing to decide yet: playing on at ${rung} though somebody has waited over a minute · pick a speed to watch`;
+      return `fast-forwarding at ${rung}: you have watched a while and there is nothing to decide yet · pick a speed to watch`;
     /* § D1435: the line *Watch the rest* plays under. */
     case 'lost':
       return `the day can no longer clear: playing the rest at ${rung}, and no call is asked`;

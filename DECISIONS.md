@@ -46802,6 +46802,8 @@ after it, and files a report that says when.
 
 ## D1169 — a scored day is paced by the tutorial's hold rule
 
+> **Status 2026-10-17: EXTENDED by [§ D1507](#d1507)** (an agent ruling). A career day is paced by the same rule. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Status 2026-10-17: AMENDED by [§ D1493](#d1493)** (an agent ruling). The hold lasts at most twenty real seconds of watching with no decision in between, and then the stage plays on at 30×. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Status 2026-10-13: NARROWED by [§ D1435](#d1435)** (an agent ruling). A lost day plays the rest at the fast rung whoever waits, unless a chip is pressed after the loss. See [`docs/39`](docs/39-decisions-in-force.md).
@@ -51534,6 +51536,8 @@ which offers the tutorial) is lane AO-2's; this entry only makes the menu's entr
 
 ## D1385 — the stage tells the truth about its own state: the chip the player chose, one line at a time, no Play while a call is worked out, and the building in view
 
+> **Status 2026-10-17: AMENDED by [§ D1508](#d1508)** (an agent ruling). Clause 4: when the day starts playing the stage scrolls just far enough to put the canvas's bottom, the lobby rows, in view, wherever it is clipped, not only when less than half of the canvas shows. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-10-10 by agent sessions under delegated authority** (wave AO, lane AO-4, on the
 > post-AN panel's seat B, lost moments 4, 5, 6 and 9 and defects 2, 3 and 9), not by the product
 > owner. It reads [§ D991](#d991) clause 2 (*every change shows on the lit chip*) for the state that
@@ -53147,6 +53151,8 @@ offered no Rush.
 
 ## D1493 — the hold lasts twenty real seconds with nothing to decide, and then the stage plays on at 30×
 
+> **Status 2026-10-17: AMENDED by [§ D1506](#d1506)** (an agent ruling). Once slowed, the stage stays slowed ten real seconds after the last wait of over a minute, inside the same allowance, and clause 1's line now reads *fast-forwarding at 30×: you have watched a while and there is nothing to decide yet · pick a speed to watch*. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-10-17 by agent sessions under delegated authority** (a decision swarm's judge on
 > GitHub issue #626 item 5, pillar 4; built by wave AP lane G-3), not by the product owner, and to
 > be read as an agent ruling. **Amends [§ D1169](#d1169) clause 1**; clause 3 stands.
@@ -53287,6 +53293,102 @@ setting*: rewording it moves the survivor census's input hash (`scenario/survivo
 hashes prose it does not read, so it is left for a lane that may regenerate or narrow that hash.
 
 **Numbers spent.** This lane held **D1497 to D1505** and spent **D1497 only**.
+
+## D1506 — once slowed for a wait the stage stays slowed ten real seconds, and its three lines tell one story
+
+> **Taken 2026-10-17 by an agent session under delegated authority** (wave AQ, lane AQ-2, on the
+> first-time-player playtest, GitHub issue #631), not by the product owner, and to be read as an
+> agent ruling. **Amends [§ D1493](#d1493)** clause 1's line and its measured press day, and reads
+> [§ D1169](#d1169) clause 1's hold through a dwell. Owner-reversible: the ten seconds
+> (`stagePace.ts#RUNG_DWELL_REAL_S`; `0` is the hold with no dwell) and the three lines.
+
+**Why an entry.** It moves the line § D1493 recorded and the figure it published, and binds
+`everyday/stagePace.ts`, `everyday/stageScreen.ts`, `stagePace.test-helper.ts#scoredDayPlayOf`,
+`everyday/firstDayLength.ts`'s measured table and the honesty register.
+
+**What was found.** On Midtown's Monday at `4×` the lit chip switched between `4×` and `30×` twelve
+times in about thirty real seconds (17:25 to 17:32, and 10:44 to 10:57): the longest wait flips
+around the minute whenever the longest waiter boards and the next is a few seconds short. The line
+cycled through *at your speed, 4×, while somebody on a landing has waited over a minute*,
+*fast-forwarding at 30× while nobody on a landing has waited a minute* and § D1493's *nothing to
+decide yet: playing on at 30× though somebody has waited over a minute*, the third contradicting
+the first two.
+
+**The ruling.**
+
+1. Once the stage slows for a wait of over a minute it stays at the player's rung until nobody has
+   waited a minute for ten real seconds (half the allowance, so one allowance holds at most two
+   slowed stretches and the chip moves at most four times between two decisions). The lingering
+   seconds count toward § D1493's twenty, so the hold is no longer than it was; a call, a lost day
+   and a chip outrank it as before.
+2. The lines say the speed first and the reason second: *fast-forwarding at 30×: nobody on a landing
+   has waited a minute*; *slowed to your speed, 4×: somebody on a landing has waited over a minute*;
+   *slowed to your speed, 4×, for a few seconds after a wait of over a minute*; and, once the
+   allowance has run out, *fast-forwarding at 30×: you have watched a while and there is nothing to
+   decide yet · pick a speed to watch*. Each is true of the frame it is drawn on.
+
+**What moved with it.** The press day's first call (§ D1493's measurement, the same seed and frames)
+comes at 63.0 real seconds, was 59.0. The pinned days' skipped seconds in `firstDayLength.ts` fall by
+80 to 910 simulated seconds each; the brief's *about N min* is derived from them and its test passes
+unchanged.
+
+**What holds it.** `everyday/stagePace.test.ts`, *the chip does not flicker*: the stage's frame loop
+over a scripted longest wait that crosses the minute every ten simulated seconds switches the chip at
+least twelve times in thirty real seconds without the dwell (red before) and at most four with it;
+every line drawn names the rung it is at and is true of its frame.
+
+**Not established.** Item 2 of the playtest, the long stretches of playing on with nothing to decide
+(33 real seconds, 08:44 to 10:40), is not changed. A step to `90×` after ten seconds of playing on
+was built and withdrawn: it needs § D991's refusal of rungs above the cue budget reopened and the
+day-length model and every published day length re-measured, which is not a small change.
+
+## D1507 — a career day is paced as a scored day: § D1169 extended to the career
+
+> **Taken 2026-10-17 by an agent session under delegated authority** (wave AQ, lane AQ-2, on the
+> playtest, GitHub issue #631), not by the product owner. **Extends [§ D1169](#d1169)** from the
+> daily stage to a career day. Owner-reversible: `stageScreen.ts#scoredPaceIn`.
+
+**Why an entry.** It widens a recorded ruling to a second flow.
+
+**What was found.** At Garden Apartments, *Run the day and decide as it goes* then *Play* gave about
+ninety real seconds of *nobody has called a lift yet*. Measured on the browser tier's base (seed
+424 242), career day 1 is a one-hour period whose first rider arrives at 17:58 simulated: 270 real
+seconds at `4×`, because the stage paced only the daily stage as a scored day.
+
+**The ruling.** A career day plays at `30×` while nobody on a landing has waited a minute, at the
+player's rung while somebody has, with § D1493's allowance and § D1506's dwell; its event days' calls
+stop it as before. The skip ([§ D1212](#d1212), [§ D1266](#d1266)) stays a whole day's: a career
+day is a period, and a skip there would land on the day's end. The lost-day stop
+([§ D1435](#d1435)) stays the daily stage's.
+
+**What holds it.** `everyday/stageScreen.test.ts`, *a career day is paced as a scored day*: the
+stage's rule over Garden Apartments' day 1 reaches the first rider in under 40 real seconds where
+the unscored rule took over 240 (red before), and the mount asks `scoredPaceIn`.
+
+## D1508 — the stage keeps the lobby rows in view when the day starts playing
+
+> **Taken 2026-10-17 by an agent session under delegated authority** (wave AQ, lane AQ-2, on the
+> playtest, GitHub issue #631), not by the product owner. **Amends [§ D1385](#d1385) clause 4.**
+> Owner-reversible: `stageScreenModel.ts#stageBuildingScrollOf`.
+
+**What was found.** At 1280×800 the canvas started below the goals and showed floors 20 down to
+about 6, so the ground floor's queue, *Floor G stacked 16 deep* at 08:43 and the day's tightest
+moment, was never on screen. § D1385 clause 4 scrolled only when less than half of the canvas
+showed, and seven eighths did.
+
+**The ruling.** When the day starts playing, wherever the canvas's bottom edge (the lobby and garage
+rows) is below what the player can see, the stage scrolls just far enough to put it on the last
+visible row. A canvas that fits keeps its top in view; on a phone the top floors go before the lobby
+does. A stage whose lobby already shows is not moved.
+
+**What holds it.** `everyday/stageScreenModel.test.ts` (the rule) and `everyday/stagePace.browser.test.ts`,
+*keeps the lobby rows in view*, at 1280×800 (red under clause 4's half rule) and 390×844.
+
+**Not established.** The deepest queue is not always the lobby's (an evening's queues stand up the
+tower); following the deepest queue was not built.
+
+**Numbers spent.** This lane held **D1506 to D1514** and spent **D1506 to D1508**; D1509 to D1514
+are unspent.
 
 ## D1515 — the rush keeps its furthest round on this device as causes, a lost round is said rather than resumed, and End the rush asks once
 

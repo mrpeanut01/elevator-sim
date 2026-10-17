@@ -95,6 +95,8 @@ import {
   STAGE_INTERVENTIONS,
   STAGE_RACE_PICKER_LABEL,
   STAGE_RECOMPUTING,
+  stageCallAnsweredLineOf,
+  stageRecomputingLineOf,
   STAGE_SPEEDS,
   STAGE_SWITCH_PICKER_LABEL,
   STAGE_SWITCH_PICKER_NOTE,
@@ -121,7 +123,7 @@ import {
   stageMayAdopt,
   stageOpeningLineOf,
   STAGE_OVERLAY_PLAY,
-  stageBuildingWantsBringing,
+  stageBuildingScrollOf,
   stageLitSpeedOf,
   stagePlayControlOf,
   stageHandoverVerdictOf,
@@ -149,7 +151,10 @@ import {
   stageSkipLineOf,
   stageSkipOf,
   type StagePaceReason,
-  watchedRealAfter,
+  FRESH_PACE_COUNTERS,
+  paceCountersAfter,
+  type PaceCounters,
+  type StagePace,
   worstWaitLossBeginsOf,
 } from './stagePace.js';
 /* Wave AI, § D1029 — the pinned day's call. */
@@ -449,8 +454,9 @@ function mountStage(
    * frame they were last counted at and its speed, and whether a chip pressed while the stage played
    * on has set the allowance aside until the next call.
    */
-  let watchedRealS = 0;
-  let watchedFrame: { readonly atS: number; readonly simPerRealS: number } | undefined;
+  let paceCounters: PaceCounters = FRESH_PACE_COUNTERS;
+  /* Wave AQ, lane AQ-2 (§ D1506): the last paced frame, whose answer the counters advance by. */
+  let watchedFrame: { readonly atS: number; readonly simPerRealS: number; readonly pace: StagePace } | undefined;
   let watchAllowanceOff = false;
   /** When a chip was pressed on this day — § D991 clause 2 as § D1029 amends it. */
   let playerChoseSpeedAtS: number | undefined;
@@ -535,6 +541,8 @@ function mountStage(
    * only signal the façade offers and the correct one — § 1.4's re-simulation keeps the `runId`.
    */
   let recomputingOver: VizRecording | undefined;
+  /** Wave AQ, lane AQ-2: what the player chose, when the recomputing beat follows a call's answer. */
+  let answeredLine: string | undefined;
   /**
    * **The parking press whose re-simulation is in flight, and the verdict on the last one that
    * landed** — GitHub issue #588, [§ D1278](../../../../DECISIONS.md).
@@ -2015,8 +2023,9 @@ function mountStage(
    * **Keep the building in view while the day plays** — wave AO, lane AO-4, the post-AN panel's seat
    * B (lost moment 9, defect 9), [§ D1385](../../../../DECISIONS.md) clause 4. Asked when a press sets the day playing: on a phone the header's
    * *▶ Play* sits above the goals, and the canvas under them was below the fixed bar for the whole of
-   * the day it started. `stageScreenModel.ts#stageBuildingWantsBringing` decides, so a desktop stage
-   * that already shows most of its building is not scrolled under the reader.
+   * the day it started. `stageScreenModel.ts#stageBuildingScrollOf` decides: since wave AQ
+   * ([§ D1508](../../../../DECISIONS.md)) it keeps the canvas's bottom, the lobby rows, in view, and a
+   * stage whose lobby already shows is not scrolled under the reader.
    *
    * **On the next frame, never inside the press** ({@link bringBuildingPending}): the shell keeps the
    * region's offset across the first re-render after a player's press (`shell.ts#keepScrollAcrossRerender`),
@@ -2028,7 +2037,9 @@ function mountStage(
     const shown = region.getBoundingClientRect();
     const viewportBottom = view?.innerHeight ?? doc.documentElement.clientHeight;
     const seen = { top: Math.max(0, shown.top), bottom: Math.min(viewportBottom, shown.bottom) };
-    if (stageBuildingWantsBringing(box, seen)) canvas.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    /* Wave AQ, lane AQ-2 (§ D1508): the lobby rows, where the day's deepest queue usually stands. */
+    const by = stageBuildingScrollOf(box, seen);
+    if (by !== 0) region.scrollTop += by;
   }
 
   function setSpeed(index: number): void {
@@ -2044,7 +2055,7 @@ function mountStage(
      */
     playerChoseSpeedAtS = paceScored && lastPaceReason === 'watching' ? undefined : (playback?.simTimeS ?? 0);
     /* § D1493: a chip press is a decision; pressed while the stage played on, it stands to the next call. */
-    watchedRealS = 0;
+    paceCounters = { ...paceCounters, watchedRealS: 0 };
     if (lastPaceReason === 'unheld') watchAllowanceOff = true;
     /* Lane AO-4: a chip press is a state of the player's making, so a skip's line from before it is over. */
     if (skipLine !== '') {
@@ -2098,8 +2109,8 @@ function mountStage(
       return;
     }
     if (watchedFrame !== undefined) {
-      watchedRealS = watchedRealAfter(watchedRealS, {
-        reason: lastPaceReason,
+      paceCounters = paceCountersAfter(paceCounters, {
+        pace: watchedFrame.pace,
         fromS: watchedFrame.atS,
         toS: simTimeS,
         simPerRealS: watchedFrame.simPerRealS,
@@ -2115,13 +2126,14 @@ function mountStage(
       callAtS: activeCall()?.call.atS,
       scored: paceScored,
       lostAtS,
-      watchedRealS: watchAllowanceOff ? undefined : watchedRealS,
+      watchedRealS: watchAllowanceOff ? undefined : paceCounters.watchedRealS,
+      lingerRealS: paceCounters.lingerRealS,
     });
     lastPaceReason = answer.reason;
-    watchedFrame = { atS: simTimeS, simPerRealS: answer.simPerRealS };
+    watchedFrame = { atS: simTimeS, simPerRealS: answer.simPerRealS, pace: answer };
     /* § D1493: a call raised, or waited at, or answered, is a decision, and the allowance starts again. */
     if (answer.reason === 'call') {
-      watchedRealS = 0;
+      paceCounters = FRESH_PACE_COUNTERS;
       watchAllowanceOff = false;
     }
     /* § D1169: a chip pressed while fast stands until somebody next waits a minute, and not past it. */
@@ -2540,21 +2552,31 @@ function mountStage(
     showCallCard(false);
     started = true;
     waitingOnCall = false;
+    /* Wave AQ, lane AQ-2: the recomputing beat after an answer says what was chosen. */
+    const said = stageCallAnsweredLineOf(option);
     if (standing.pinned) {
       callAnswered = true;
       host.notePinnedCallDone();
       if (change !== undefined) {
-        withRecomputeBeat(current, () => {
-          host.intervene(call.atS, change);
-        });
+        withRecomputeBeat(
+          current,
+          () => {
+            host.intervene(call.atS, change);
+          },
+          said,
+        );
       }
     } else if (option.answer === 'leave') {
       host.answerDayCall('leave');
     } else {
       /* § D1167: a driver answer adopts the handover run the session made, as a parking answer does. */
-      withRecomputeBeat(current, () => {
-        host.answerDayCall(option.answer);
-      });
+      withRecomputeBeat(
+        current,
+        () => {
+          host.answerDayCall(option.answer);
+        },
+        said,
+      );
       /*
        * The adoption is synchronous, so the beat has already ended on the new recording. If the host
        * refused the answer (a run it did not make stands, or one is in flight), nothing was adopted
@@ -2717,7 +2739,8 @@ function mountStage(
    * beat rather than freezing silently*, and the freeze starts here. It comes down when the host
    * notifies with a different recording ({@link adopt}).
    */
-  function withRecomputeBeat(current: VizRecording, press: () => void): void {
+  function withRecomputeBeat(current: VizRecording, press: () => void, answered?: string): void {
+    answeredLine = answered;
     recomputingOver = current;
     barFacts.recomputing = true;
     context.refreshBar();
@@ -2999,10 +3022,10 @@ function mountStage(
      */
     paceHorizon = context.ctx !== 'rush' ? host.runHorizon() : 'period';
     paceActs = actsOf(recording.demandPhases);
-    paceScored = context.ctx === 'daily';
+    paceScored = scoredPaceIn(context.ctx);
     if (resumeAtS === undefined) lastPaceReason = undefined;
     /* § D1493: a new recording is a new day, or the run an answer just made; either way nothing is owed. */
-    watchedRealS = 0;
+    paceCounters = FRESH_PACE_COUNTERS;
     watchedFrame = undefined;
     watchAllowanceOff = false;
     /* § D1212: a fresh day has skipped nothing; a re-simulation keeps the line it had. */
@@ -3341,13 +3364,13 @@ function mountStage(
     }
     if (adopted === undefined) {
       statusText.textContent =
-        recomputingOver !== undefined ? STAGE_RECOMPUTING : STAGE_AWAITING_RUN;
+        recomputingOver !== undefined ? stageRecomputingLineOf(answeredLine) : STAGE_AWAITING_RUN;
       startButton.style.display = 'none';
       status.style.display = 'flex';
       return;
     }
     if (recomputingOver !== undefined) {
-      statusText.textContent = STAGE_RECOMPUTING;
+      statusText.textContent = stageRecomputingLineOf(answeredLine);
       startButton.style.display = 'none';
       status.style.display = 'flex';
       return;
@@ -4559,6 +4582,19 @@ export function stageEntryStartsARun(run: {
  * `stageScreen.test.ts`; its non-test callers are {@link mountStage}'s `activeCall` and its call rows.
  */
 export function dayCallsAskedIn(ctx: RunContext): boolean {
+  return ctx === 'daily' || ctx === 'campaign';
+}
+
+/**
+ * **The stage contexts paced as a scored day** ([§ D1169](../../../../DECISIONS.md)): fast while nobody
+ * on a landing has waited a minute, the player's rung while somebody has. The daily stage since
+ * § D1169, and a career day since wave AQ, lane AQ-2 ([§ D1507](../../../../DECISIONS.md)): Garden
+ * Apartments' day 1 opened on eighteen simulated minutes of empty landings, four and a half real
+ * minutes at `4×`, under *nobody has called a lift yet*. A watch, a rush and a fix case play at the
+ * player's rung. Pure and exported for `stageScreen.test.ts`; its non-test caller is
+ * {@link mountStage}'s `adopt`.
+ */
+export function scoredPaceIn(ctx: RunContext): boolean {
   return ctx === 'daily' || ctx === 'campaign';
 }
 

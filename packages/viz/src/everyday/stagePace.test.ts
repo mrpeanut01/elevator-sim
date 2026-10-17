@@ -39,6 +39,7 @@ import { pacedDayRealS } from './sittingShape.js';
 import {
   BETWEEN_PEAKS_SIM_PER_REAL_S,
   PACE_HOLD_WAIT_S,
+  RUNG_DWELL_REAL_S,
   SKIP_BEAT_REAL_S,
   STAGE_SKIP_BEAT_NOTE,
   WATCH_ALLOWANCE_REAL_S,
@@ -52,6 +53,10 @@ import {
   stageSkipOf,
   stageStatusOf,
   watchedRealAfter,
+  FRESH_PACE_COUNTERS,
+  paceCountersAfter,
+  type PaceCounters,
+  type StagePace,
   type StagePaceInput,
   type StagePaceReason,
   type StageSkip,
@@ -426,10 +431,10 @@ describe('a scored day — § D1169', () => {
   it('says what it is doing in one line, from the present frame', () => {
     const acts = actsOf(day.demandPhases);
     expect(stagePaceNoteOf({ simPerRealS: 30, reason: 'fast' }, { acts, simTimeS: 0 })).toBe(
-      'fast-forwarding at 30× while nobody on a landing has waited a minute',
+      'fast-forwarding at 30×: nobody on a landing has waited a minute',
     );
     expect(stagePaceNoteOf({ simPerRealS: 4, reason: 'watching' }, { acts, simTimeS: 0 })).toBe(
-      'at your speed, 4×, while somebody on a landing has waited over a minute',
+      'slowed to your speed, 4×: somebody on a landing has waited over a minute',
     );
     expect(stagePaceNoteOf({ simPerRealS: 4, reason: 'yours' }, { acts, simTimeS: 0 })).toBe(
       'your speed, 4×, until somebody on a landing has waited a minute',
@@ -499,29 +504,30 @@ function play(recording: VizRecording, stops: readonly number[], skip: boolean, 
   const skips: StageSkip[] = [];
   let armedAtS: number | undefined;
   let landedAtS: number | undefined;
-  /* § D1493, as `stageScreen.ts#pace` counts it: watching since the last stop, frame by frame. */
-  let watchedRealS = 0;
-  let last: { reason: StagePaceReason; atS: number; simPerRealS: number } | undefined;
+  /* § D1493 and § D1506, counted as `stageScreen.ts#pace` counts them, frame by frame. */
+  let counters: PaceCounters = FRESH_PACE_COUNTERS;
+  let last: { pace: StagePace; atS: number; simPerRealS: number } | undefined;
   while (playback.state !== 'ended') {
     const t = playback.simTimeS;
     const stop = pending[0];
     if (last !== undefined) {
-      watchedRealS = watchedRealAfter(watchedRealS, { reason: last.reason, fromS: last.atS, toS: t, simPerRealS: last.simPerRealS });
+      counters = paceCountersAfter(counters, { pace: last.pace, fromS: last.atS, toS: t, simPerRealS: last.simPerRealS });
     }
     const answer = stagePaceOf({
       ...inputAt(recording, t, { longestStandingS: waitBandsAt(recording, t).longestCurrentWaitS }),
       scored: true,
       callAtS: stop,
-      watchedRealS: allowance ? watchedRealS : undefined,
+      watchedRealS: allowance ? counters.watchedRealS : undefined,
+      lingerRealS: allowance ? counters.lingerRealS : undefined,
     });
-    last = { reason: answer.reason, atS: t, simPerRealS: answer.simPerRealS };
+    last = { pace: answer, atS: t, simPerRealS: answer.simPerRealS };
     if (answer.reason === 'call' && stop !== undefined) {
       if (playback.simTimeS > stop) playback.seekTo(stop);
       stoppedAt.push(playback.simTimeS);
       stoppedRealS.push(clock.now() / 1000);
       pending.shift();
       armedAtS = undefined;
-      watchedRealS = 0;
+      counters = FRESH_PACE_COUNTERS;
       last = undefined;
       continue;
     }
@@ -810,7 +816,7 @@ describe('the hold with nothing to decide — § D1493', () => {
     /* Drawn, never skipped. */
     expect(stageSkipApplies({ horizon: 'whole-day', scored: true, acts: actsOf(day.demandPhases), simTimeS: 9000, reason: 'unheld' })).toBe(false);
     expect(stagePaceNoteOf(on, { acts: [], simTimeS: 9000 })).toBe(
-      'nothing to decide yet: playing on at 30× though somebody has waited over a minute · pick a speed to watch',
+      'fast-forwarding at 30×: you have watched a while and there is nothing to decide yet · pick a speed to watch',
     );
   });
 
@@ -826,7 +832,7 @@ describe('the hold with nothing to decide — § D1493', () => {
    * first call comes inside a minute, the stage stops on its second either way, and the recording is
    * the same, because the allowance moves the transport's speed and nothing else.
    */
-  it('brings the press day’s call inside a real minute at 4×, and stops on the same second with the same legs', () => {
+  it('brings the press day’s call near a real minute at 4×, and stops on the same second with the same legs', () => {
     const opened = todaysScenarioDayState(RESOURCES, 'c2', {
       seed: SEED + 7_919n * 2n,
       over: { week: { ...openWeek('c2'), day: 1, dayIdx: 0 }, campaignEventId: undefined },
@@ -840,7 +846,12 @@ describe('the hold with nothing to decide — § D1493', () => {
     const before = play(press, [call.atS], true, false, 50);
     const after = play(press, [call.atS], true, true, 50);
     expect(before.stoppedRealS[0]!).toBeGreaterThan(150);
-    expect(after.stoppedRealS[0]!).toBeLessThanOrEqual(60);
+    /*
+     * § D1506 moved this from 59.0 to 63.0 real seconds: the stage now stays slowed ten real seconds
+     * after a wait of over a minute, inside the same twenty-second allowance, so the chip stops
+     * flickering. The bound is the measured figure plus half a second of frame slack, not a minute.
+     */
+    expect(after.stoppedRealS[0]!).toBeLessThanOrEqual(63.5);
     expect(after.stoppedAt).toEqual(before.stoppedAt);
     expect(press.legs).toEqual(legs);
     /* `scoredDayPlayOf` mirrors the stage both ways, to within a few half-second frames. */
@@ -856,7 +867,7 @@ describe('the hold with nothing to decide — § D1493', () => {
         untilS: call.atS,
         watchAllowanceRealS,
       }).realS;
-    expect(model(undefined)).toBeLessThanOrEqual(60);
+    expect(model(undefined)).toBeLessThanOrEqual(65);
     expect(Math.abs(before.stoppedRealS[0]! - model(Number.POSITIVE_INFINITY))).toBeLessThan(5);
     expect(Math.abs(after.stoppedRealS[0]! - model(undefined))).toBeLessThan(5);
   });
@@ -898,5 +909,101 @@ describe('one message for one state — wave AO, lane AO-4', () => {
     /* A call stops the transport: a stop speaks alone, even on the frame it lands. */
     expect(stageSkipLineStands({ landedReason: undefined, reason: 'call' })).toBe(false);
     expect(stageSkipLineStands({ landedReason: 'fast', reason: 'call' })).toBe(false);
+  });
+});
+
+/*
+ * ---- Wave AQ, lane AQ-2: the chip does not flicker — § D1506 ----
+ *
+ * The playtest (GitHub issue #631): on Midtown's Monday at 4×, 17:25 to 17:32, the chip switched
+ * between 4× and 30× twelve times in about thirty real seconds, and the line cycled through three
+ * sentences that did not tell one story. The cause is a longest wait that flips around the minute
+ * whenever the longest waiter boards and the next is a few seconds short of it. This replays the
+ * stage's frame loop (`stageScreen.ts#pace`: `stagePaceOf`, then `paceCountersAfter`) over a
+ * scripted waiting-time series that does exactly that, with no call, no chip and no skip.
+ */
+describe('the chip does not flicker — § D1506', () => {
+  /** Every 10 simulated seconds the longest wait is past a minute for 4 of them, and 55 s otherwise. */
+  const flipping = (simTimeS: number): number => (simTimeS % 10 < 4 ? PACE_HOLD_WAIT_S + 2 : PACE_HOLD_WAIT_S - 5);
+
+  function frames(input: { readonly realS: number; readonly fixed: boolean; readonly standing: (atS: number) => number | undefined }) {
+    const frameS = 1 / 20;
+    let simTimeS = 9000;
+    let counters: PaceCounters = FRESH_PACE_COUNTERS;
+    let last: { pace: StagePace; atS: number } | undefined;
+    const out: { realS: number; simTimeS: number; pace: StagePace; standing: number | undefined; note: string }[] = [];
+    for (let realS = 0; realS < input.realS; realS += frameS) {
+      if (last !== undefined) {
+        counters = paceCountersAfter(counters, { pace: last.pace, fromS: last.atS, toS: simTimeS, simPerRealS: last.pace.simPerRealS });
+      }
+      const standing = input.standing(simTimeS);
+      const pace = stagePaceOf({
+        horizon: 'period',
+        acts: [],
+        simTimeS,
+        watchingSimPerRealS: WATCHING,
+        longestStandingS: standing,
+        playerChoseSpeedAtS: undefined,
+        scored: true,
+        watchedRealS: counters.watchedRealS,
+        /* Before § D1506 the stage did not count it. */
+        lingerRealS: input.fixed ? counters.lingerRealS : undefined,
+      });
+      out.push({ realS, simTimeS, pace, standing, note: stagePaceNoteOf(pace, { acts: [], simTimeS }) ?? '' });
+      last = { pace, atS: simTimeS };
+      simTimeS += pace.simPerRealS * frameS;
+    }
+    return out;
+  }
+
+  const changesOf = (rows: readonly { pace: StagePace }[]): number =>
+    rows.reduce((n, row, i) => n + (i > 0 && row.pace.simPerRealS !== rows[i - 1]!.pace.simPerRealS ? 1 : 0), 0);
+
+  it('switched the chip at every flip before, and at most four times between two decisions after', () => {
+    const before = frames({ realS: 30, fixed: false, standing: flipping });
+    const after = frames({ realS: 30, fixed: true, standing: flipping });
+    /* Red before: the playtest's twelve and more in thirty real seconds. */
+    expect(changesOf(before)).toBeGreaterThanOrEqual(12);
+    expect(changesOf(after)).toBeLessThanOrEqual(4);
+    /* The hold is no longer than it was: slowed for at most the allowance, then played on. */
+    const slowedRealS = after.filter((row) => row.pace.reason === 'watching').length / 20;
+    expect(slowedRealS).toBeLessThanOrEqual(WATCH_ALLOWANCE_REAL_S + 0.1);
+    expect(after.at(-1)!.pace.simPerRealS).toBeGreaterThan(WATCHING);
+  });
+
+  it('holds a slowed rung for the dwell after the last minute-long wait, and then fast-forwards', () => {
+    /* One wait past a minute for 8 simulated seconds, then nobody near it. */
+    const once = (atS: number): number | undefined => (atS < 9008 ? PACE_HOLD_WAIT_S + 1 : 10);
+    const rows = frames({ realS: 20, fixed: true, standing: once });
+    const lingering = rows.filter((row) => row.pace.lingering === true);
+    expect(lingering.length / 20).toBeGreaterThan(RUNG_DWELL_REAL_S - 0.2);
+    expect(lingering.length / 20).toBeLessThanOrEqual(RUNG_DWELL_REAL_S + 0.1);
+    expect(rows.at(-1)!.pace.reason).toBe('fast');
+    expect(changesOf(rows)).toBe(1);
+  });
+
+  it('tells one story: every line names the speed it is at and is true of the frame it is drawn on', () => {
+    const rows = frames({ realS: 60, fixed: true, standing: flipping });
+    const seen = new Set<string>();
+    for (const row of rows) {
+      seen.add(row.note);
+      const rung = STAGE_SPEEDS.find((speed) => speed.simPerRealS === row.pace.simPerRealS)!.label;
+      expect(row.note, row.note).toContain(rung);
+      const past = row.standing !== undefined && row.standing >= PACE_HOLD_WAIT_S;
+      if (row.note.includes('somebody on a landing has waited over a minute')) expect(past).toBe(true);
+      if (row.note.includes('nobody on a landing has waited a minute')) expect(past).toBe(false);
+      /* Slowed means the player's rung, and fast-forwarding means faster than it. */
+      if (row.note.startsWith('slowed')) expect(row.pace.simPerRealS).toBe(WATCHING);
+      if (row.note.startsWith('fast-forwarding')) expect(row.pace.simPerRealS).toBeGreaterThan(WATCHING);
+    }
+    /* The lines it drew: slowed, slowed a little longer, and fast-forwarding with and without a wait. */
+    expect([...seen].sort()).toEqual(
+      [
+        'fast-forwarding at 30×: you have watched a while and there is nothing to decide yet · pick a speed to watch',
+        'fast-forwarding at 30×: nobody on a landing has waited a minute',
+        'slowed to your speed, 4×, for a few seconds after a wait of over a minute',
+        'slowed to your speed, 4×: somebody on a landing has waited over a minute',
+      ].sort(),
+    );
   });
 });

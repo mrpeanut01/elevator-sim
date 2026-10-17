@@ -18,7 +18,17 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { stageEntryStartsARun } from './stageScreen.js';
+import { recordRun } from '../record/recordRun.js';
+import { shiftRunConfigOf, type ViewerState } from '../dev/state.js';
+import { observationsAt } from '../live/observations.js';
+import { RESOURCES, baseState } from '../scope/probes.test-helper.js';
+import { actsOf } from '../shift/dayLength.js';
+
+import { createEverydayHost, type EverydayHostBindings } from './host.js';
+import { stagePaceOf } from './stagePace.js';
+import { scoredPaceIn, stageEntryStartsARun } from './stageScreen.js';
+import { DEFAULT_STAGE_SIM_PER_REAL_S } from './stageScreenModel.js';
+import { RUN_CONTEXTS } from './types.js';
 
 /** The shape `EverydayHost.runState()` hands back, narrowed to what the entry rule reads. */
 const runState = (open: boolean, dayClosed: boolean): { open: boolean; dayClosed: boolean } => ({
@@ -301,5 +311,77 @@ describe('what the stage adopts on the way in — GitHub issue #548', () => {
   it('tells the bar there is no run while it is holding for today’s', () => {
     expect(source).toContain('barFacts.hasRun = runState.hasRun && !awaitingToday;');
     expect(source).not.toContain('barFacts.hasRun = runState.hasRun;');
+  });
+});
+
+/*
+ * ---- Wave AQ, lane AQ-2: a career day is paced as a scored day — § D1507 ----
+ *
+ * The playtest (GitHub issue #631): at Garden Apartments, *Run the day and decide as it goes* then
+ * *Play* gave ninety real seconds of *nobody has called a lift yet*, with the day's peak about six
+ * minutes away at 4×. The daily stage crossed such a stretch at 30× under § D1169; the career's did
+ * not, because the mount paced only `ctx === 'daily'` as a scored day.
+ */
+describe('a career day is paced as a scored day — § D1507', () => {
+  const source = readFileSync(fileURLToPath(new URL('./stageScreen.ts', import.meta.url)), 'utf8');
+
+  it('paces the daily stage and a career day, and nothing else', () => {
+    expect(RUN_CONTEXTS.filter(scoredPaceIn)).toEqual(['daily', 'campaign']);
+  });
+
+  it('is the rule the mount asks when it adopts a run', () => {
+    expect(source).toContain('paceScored = scoredPaceIn(context.ctx);');
+    expect(source).not.toContain("paceScored = context.ctx === 'daily';");
+  });
+
+  it('crosses Garden Apartments’ empty first minutes of day 1 in well under a minute, where it took four at 4×', () => {
+    let state: ViewerState = { ...baseState(), seed: 424_242n };
+    const host = createEverydayHost({
+      resources: RESOURCES,
+      state: () => state,
+      playheadS: () => 0,
+      dayClosed: () => false,
+      runIsOwn: () => true,
+      playerHasChosen: () => true,
+      dayStartS: () => undefined,
+      startRun: () => {
+        const plan = shiftRunConfigOf(RESOURCES, state);
+        const run = recordRun(plan.config, { recordDecisions: false, outOfServiceCarIds: plan.outOfServiceCarIds });
+        state = { ...state, recording: run.recording };
+      },
+      applyPatch: (patch: Partial<ViewerState>) => {
+        state = { ...state, ...patch };
+      },
+      openRunTab: () => {},
+      onChange: () => () => {},
+      watching: () => undefined,
+    } as unknown as EverydayHostBindings);
+    host.runCampaignDay('c1');
+    expect(state.buildingId).toBe('garden-apartments');
+    const recording = state.recording!;
+    const firstArrivalS = Math.min(...recording.legs.map((leg) => leg.arrivedAt));
+    /* The stage's frame loop up to the first rider, the scored rule asked as `pace` asks it. */
+    const realToFirstRider = (scored: boolean): number => {
+      let simTimeS = recording.startedAt;
+      let realS = 0;
+      while (simTimeS < firstArrivalS) {
+        const pace = stagePaceOf({
+          horizon: host.runHorizon(),
+          acts: actsOf(recording.demandPhases),
+          simTimeS,
+          watchingSimPerRealS: DEFAULT_STAGE_SIM_PER_REAL_S,
+          longestStandingS: observationsAt(recording, simTimeS).longestCurrentWaitS,
+          playerChoseSpeedAtS: undefined,
+          scored,
+          watchedRealS: 0,
+        });
+        simTimeS += pace.simPerRealS * 0.5;
+        realS += 0.5;
+      }
+      return realS;
+    };
+    /* Red before: the career was not scored, and the empty landings played at the player's 4×. */
+    expect(realToFirstRider(false)).toBeGreaterThan(240);
+    expect(realToFirstRider(scoredPaceIn('campaign'))).toBeLessThan(40);
   });
 });
