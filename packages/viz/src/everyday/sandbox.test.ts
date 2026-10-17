@@ -16,7 +16,7 @@
  *    contract hands over.
  */
 
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { BLANK_SPEC, specFromBuilding, type BuildingSpec } from '../authoring/buildingSpec.js';
 import { demandTheTemplateTakes, specFromTrafficProfile, type PatternSpec } from '../authoring/patternSpec.js';
@@ -44,6 +44,7 @@ import {
   type SandboxPresses,
 } from './sandbox.js';
 import { tunePresses, tuneStateFrom, type TuneState } from './tunerModel.js';
+import { POOL_CENSUS } from '../shift/weekPool.js';
 
 const RESOURCES = contractBuildings();
 /** Midtown Office's pinned Monday as Today's scenario plays it: the whole authored day, on c2's rung. */
@@ -265,6 +266,13 @@ describe('a drawn tower runs as a sandbox day over the week — § D1363', () =>
  * changed tower's run was an ordinary day with no booking at all.
  */
 describe('a sandbox day runs the day it copies, its wrinkle and its bookings — § D1451', () => {
+  /* Week 3's level is withdrawn by the pool (§ D1461); its booking is reached as the census plays it. */
+  beforeAll(() => {
+    POOL_CENSUS.measuring = true;
+  });
+  afterAll(() => {
+    POOL_CENSUS.measuring = false;
+  });
   /* The week deals the day's wrinkle: the helper pins `campaignEventId: 'ordinary'`, which no Scenario day carries. */
   const WEEK3: ViewerState = { ...MIDTOWN, campaignEventId: undefined, week: { ...MIDTOWN.week, week: 3, day: 1, dayIdx: 0 } };
   const cars = (state: ViewerState): readonly string[] =>

@@ -35,6 +35,7 @@ import {
 import { PRESS_DAY_CHOICE_COPY } from './towerChoice.js';
 import { EM_DASH } from './figures.js';
 import type { TodayRecord } from './today.js';
+import { POOL_CENSUS } from '../shift/weekPool.js';
 
 /** A day that met every bar, so its outcome is a real closed day with a real score. */
 const MET: GoalObservations = {
@@ -557,11 +558,21 @@ describe('a level’s bookings on the door — § D1400', () => {
       nameOf: NAME_OF,
     });
 
-  it('names week 3’s Monday booking as new, and nothing in week 2', () => {
-    expect(doorOn(3).weekBookings).toBe(
-      'Booked this week: car C is out of passenger service on Monday from 08:00 until 12:00, new this week.',
-    );
-    expect(doorOn(2).weekBookings).toBeUndefined();
-    expect(doorOn(3).weekBookings).not.toMatch(/harder|easier/u);
+  /* Since § D1461 the pool withdraws week 3: the shipped door names no booking, and the authored level's line is read as the census plays it. */
+  it('names no booking on week 3’s door while the pool withdraws its level', () => {
+    expect(doorOn(3).weekBookings).toBeUndefined();
+  });
+
+  it('names week 3’s Monday booking as new, and nothing in week 2, as the census plays the level', () => {
+    POOL_CENSUS.measuring = true;
+    try {
+      expect(doorOn(3).weekBookings).toBe(
+        'Booked this week: car C is out of passenger service on Monday from 08:00 until 12:00, new this week.',
+      );
+      expect(doorOn(2).weekBookings).toBeUndefined();
+      expect(doorOn(3).weekBookings).not.toMatch(/harder|easier/u);
+    } finally {
+      POOL_CENSUS.measuring = false;
+    }
   });
 });
