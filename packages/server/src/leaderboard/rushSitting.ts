@@ -278,6 +278,13 @@ export interface SubmittedRushRound {
    * rather than shown a number it never saw.
    */
   readonly claimedHeldS: number | null;
+  /**
+   * Where the player ended the round by hand, simulated seconds from its start, or absent when it was
+   * not — [§ D1516](../../../../DECISIONS.md). **A cause, read and never compared**: the replay runs past
+   * it and cannot see it, and the round is paid only for the waves it got through before it (`core`'s
+   * `rushWavesOutlasted`). A stop can only lower a round's pay, so a client gains nothing by sending one.
+   */
+  readonly stoppedS?: number | undefined;
 }
 
 /** A sitting as the wire carries it. */
@@ -329,7 +336,7 @@ export const MAX_RUSH_SITTING_BODY_BYTES = 1.5 * 1024 * 1024;
 /** The keys a sitting may carry. Every other key is refused, by name. */
 const SITTING_KEYS: readonly string[] = Object.freeze(['buildingId', 'rounds', 'modifiers']);
 /** The keys a round may carry. */
-const ROUND_KEYS: readonly string[] = Object.freeze(['dispatcherProfileId', 'ruleRows', 'interventions', 'rebuild', 'claimedHeldS']);
+const ROUND_KEYS: readonly string[] = Object.freeze(['dispatcherProfileId', 'ruleRows', 'interventions', 'rebuild', 'claimedHeldS', 'stoppedS']);
 /**
  * The keys below a round, each refused by name when something else is sent — the strictness that gives
  * the gate a maximum ({@link MAX_RUSH_SITTING_BODY_BYTES}). `submission.ts`'s gates check what a row and
@@ -542,6 +549,10 @@ export function rushSittingIssues(body: unknown, purse: RushPurseTable): readonl
       if (held !== null && !(typeof held === 'number' && Number.isFinite(held) && held >= 0)) {
         issues.push(`${where}.claimedHeldS must be the seconds the round held, or null when it never reached the line`);
       }
+      const stopped = round['stoppedS'];
+      if (stopped !== undefined && !(typeof stopped === 'number' && Number.isFinite(stopped) && stopped >= 0)) {
+        issues.push(`${where}.stoppedS must be the seconds into the round it was ended by hand, or absent`);
+      }
       issues.push(...ruleRowIssues(round['ruleRows'] as SubmittedRushRound['ruleRows']).map((issue) => `${where}.${issue}`));
       issues.push(
         ...interventionIssues(round['interventions'] as SubmittedRushRound['interventions']).map((issue) => `${where}.${issue}`),
@@ -741,6 +752,8 @@ export function replayRushSitting(sitting: SubmittedRushSitting, from: RushSitti
 
   const opening = rushPurseOpeningUnits(from.purse, from.ledger, sitting.modifiers ?? []);
   const held: (number | null)[] = [];
+  /* Whether each round was ended by hand before its line — § D1516. */
+  const stops: boolean[] = [];
   const waves: number[] = [];
   let simulations = 0;
   for (const [index, config] of configs.entries()) {
@@ -789,16 +802,22 @@ export function replayRushSitting(sitting: SubmittedRushSitting, from: RushSitti
         simulations,
       );
     }
+    const stoppedS = sitting.rounds[index]?.stoppedS;
     held.push(heldS);
-    waves.push(rushWavesOutlasted(holdAtS, record.startedAt));
+    stops.push(stoppedS !== undefined && (heldS === null || stoppedS < heldS));
+    waves.push(rushWavesOutlasted(holdAtS, record.startedAt, stoppedS === undefined ? undefined : record.startedAt + stoppedS));
   }
 
   const last = held[held.length - 1];
-  if (last === null || last === undefined) {
+  /* A last round ended by hand before its line has no breaking point either: § D515's rule, § D1516. */
+  if (last === null || last === undefined || stops[stops.length - 1] === true) {
     return refused(
       'no-breaking-point',
-      'The last round of this sitting held to the end of the stream without crossing the line, so it has ' +
-        'no breaking point to post — a rush posts how long it lasted, and this one did not break.',
+      last === null || last === undefined
+        ? 'The last round of this sitting held to the end of the stream without crossing the line, so it has ' +
+            'no breaking point to post — a rush posts how long it lasted, and this one did not break.'
+        : 'The last round of this sitting was ended by hand before it crossed the line, so it has no breaking ' +
+            'point to post. Play a round out to the line and the whole sitting goes up with it.',
       held.length,
       simulations,
     );

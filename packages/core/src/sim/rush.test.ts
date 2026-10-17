@@ -117,4 +117,19 @@ describe('waves outlasted — what a round pays its purse on', () => {
     // A crossing while the building drains after the stream has stopped is not a thirty-first wave.
     expect(rushWavesOutlasted(startedAt + RUSH_STREAM.lengthS + 600, startedAt)).toBe(LAST_GENERATED_WAVE);
   });
+
+  it('pays a round ended by hand only for the waves before the stop, and never more than the line would — § D1516', () => {
+    /* Stopped in wave 2 of a run that would have crossed in wave 10: one wave, not nine. */
+    expect(rushWavesOutlasted(startedAt + 9 * 180 + 20, startedAt, startedAt + 200)).toBe(1);
+    /* Stopped in wave 2 of a run that never crosses: one wave, not thirty. */
+    expect(rushWavesOutlasted(undefined, startedAt, startedAt + 200)).toBe(1);
+    /* A stop after the crossing changes nothing: the round ended at the line. */
+    expect(rushWavesOutlasted(startedAt + 4 * 180 + 1, startedAt, startedAt + 20 * 180)).toBe(4);
+    /* A stop can only lower the pay. */
+    for (const stop of [0, 179, 180, 1000, 5000, 20_000]) {
+      expect(rushWavesOutlasted(startedAt + 1640, startedAt, startedAt + stop)).toBeLessThanOrEqual(
+        rushWavesOutlasted(startedAt + 1640, startedAt),
+      );
+    }
+  });
 });

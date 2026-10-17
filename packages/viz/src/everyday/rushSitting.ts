@@ -175,6 +175,14 @@ export interface RushRoundRecord {
    * Whether a *hand-stopped* round may post at all is § D515's separate question, answered below.
    */
   readonly holdS: number | null;
+  /**
+   * Where the player ended the round by hand, seconds from its start, or `null` when it ended at the
+   * line or ran to the end of its run — [§ D1516](../../../../DECISIONS.md). Wire half: a round is paid
+   * only for the waves it got through before this, and the server cannot see a hand stop any other
+   * way, because it replays the whole run. Optional so a record built before the field reads as no
+   * stop, which is what every such record was.
+   */
+  readonly stoppedS?: number | null;
   /** The round as the player saw it end — what the result sheet is drawn from. */
   readonly outcome: RushOutcome;
   /**
@@ -253,6 +261,7 @@ export function rushRoundRecordOf(input: {
   unpostable.push(...wire.refusals);
 
   const holdAtS = rushHoldAt(recording);
+  const outcome = rushOutcomeOf(recording, input.endedAtS);
   /*
    * The changes and the drivers, in time order — GitHub issue #565, § D859. The log is authored in
    * press order, which is time order for a control that appends at the playhead, but the sheet's
@@ -278,7 +287,9 @@ export function rushRoundRecordOf(input: {
     wireInterventions: wire.log,
     interventionCount: state.interventions.length,
     holdS: holdAtS === undefined ? null : holdAtS - recording.startedAt,
-    outcome: rushOutcomeOf(recording, input.endedAtS),
+    /* A stop at or past the run's end is the run ending, not the player's hand. */
+    stoppedS: outcome.kind === 'stopped' && outcome.atS < recording.endedAt ? outcome.heldS : null,
+    outcome,
     unpostable: Object.freeze(unpostable),
     startKey: rushStartKeyOf(state),
   });
@@ -338,6 +349,8 @@ export interface RushSittingRoundBody {
   /** What was bought before the round — {@link RushRoundRecord.rebuild}. Absent when nothing was. */
   readonly rebuild?: readonly string[] | undefined;
   readonly claimedHeldS: number | null;
+  /** {@link RushRoundRecord.stoppedS}. Absent on a round that was not ended by hand. */
+  readonly stoppedS?: number | undefined;
 }
 
 /**
@@ -502,6 +515,7 @@ export function rushSittingBodyOf(input: {
           /* And an empty rebuild the same way: a round nothing was bought for carries no key. */
           ...(round.rebuild === undefined || round.rebuild.length === 0 ? {} : { rebuild: round.rebuild }),
           claimedHeldS: round.holdS,
+          ...(round.stoppedS === undefined || round.stoppedS === null ? {} : { stoppedS: round.stoppedS }),
         }),
       ),
     ),
