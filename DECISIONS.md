@@ -52779,9 +52779,21 @@ thirds of need days). A level any gate refuses, or whose cells the census has no
 withdrawn: `weekLevels.ts#weekTopOf` stops the ladder below it, so the tower deals the highest
 admitted week's level, and week 1's draw where week 2 is not admitted. Nothing is dealt from a guess.
 
+**What the census found** (280 crowds tagged, 227 live crowds filled, 1.8 h of compute on the
+lane's contended container, 2026-10-13 and 2026-10-17): 227 live, 14 need, 39 dead, every cell with
+at least one need crowd; the 08:00 bookings turn 10 and 11 of 40 crowds dead. **Week 2 is
+admitted**, with two need days a week (the strongest hold left alone is Capacity aware's 5 %, the
+largest answer share three fifths). **Week 3 is refused by the monotone clause**: left alone,
+Contract-net auction, sealed bid holds it on 5 % of weeks against 0 % of week 2's. Week 4 falls with
+it. So Midtown's top is week 2 and a week numbered 3 or more is dealt as week 2; a held week 2's sheet
+says why week 3 is withdrawn (`poolWays.ts#poolWithdrawnLineOf`). The authored levels stay under test
+as the census plays them (`weekPool.ts#POOL_CENSUS`). The per-profile reading of the monotone clause
+is § D1400's owner-reversible one; a reversal re-admits week 3 without a census re-run.
+
 **What holds it.** `shift/weekPool.test.ts` (*the gates*): one built pool per gate, each refused
 with its reason, and an unfinished one withdrawn; *never deals week 4's Monday the dead crowd
-2026101313* is red on the commit before the pool.
+2026101313* is red on the commit before the pool. `weekLevels.test.ts` and `nextWeek.test.ts` pin the
+shipped top and the withdrawn line.
 
 ## D1462 — DC-13 is read in days over the pool as dealt, and the row band is no sheet's figure
 
