@@ -85,7 +85,7 @@ describe.skipIf(!HAS_BROWSER)('a first-time player, as issue #626 found the game
     } finally {
       await page.close();
     }
-  }, 120_000);
+  });
 
   it('says on the front door whether today’s driver is the player’s to pick, as the brief then draws it', async () => {
     const page = await fresh();
@@ -109,7 +109,7 @@ describe.skipIf(!HAS_BROWSER)('a first-time player, as issue #626 found the game
     } finally {
       await page.close();
     }
-  }, 120_000);
+  });
 
   it('draws no Jump to floor select with nothing to jump to', async () => {
     const page = await fresh();
@@ -126,6 +126,6 @@ describe.skipIf(!HAS_BROWSER)('a first-time player, as issue #626 found the game
     } finally {
       await page.close();
     }
-  }, 120_000);
+  });
 });
 

@@ -127,7 +127,14 @@ import {
   lockedForScore,
   raceAgainstCard,
 } from '../everyday/briefView.js';
-import { doorScreenViewOf, DAY_OFFSET_MIN, DOOR_STEPS, sameForEveryoneLine } from '../everyday/doorView.js';
+import {
+  doorScreenViewOf,
+  DAY_OFFSET_MIN,
+  DOOR_DRIVER_NOTE,
+  DOOR_DRIVER_NOTE_HELD,
+  DOOR_STEPS,
+  sameForEveryoneLine,
+} from '../everyday/doorView.js';
 import { HOST_PENDING_REASON } from '../everyday/host.js';
 import {
   BUILD_NOTES_POINTER,
@@ -352,7 +359,7 @@ const DAY_CALL_FIXTURE_DRIVERS: DayCallDriverNames = Object.freeze({
 });
 import { wayThroughSentenceOf, WEEK_WAY } from '../shift/weekWay.js';
 import { admittedPressDayIds, pressDayFor } from '../shift/ladder.js';
-import { PRESS_DAY_DRIVER_HELD } from '../everyday/today.js';
+import { PRESS_DAY_DRIVER_HELD, TODAY_CHOICE_LINE_HELD } from '../everyday/today.js';
 import { actsOf, wholeDayFor } from '../shift/dayLength.js';
 import { rushTutorialWorkedAnswerOf } from '../everyday/rushScreenModel.js';
 import { WORKED_ANSWER_COPY, type WorkedAnswerFacts, type WorkedAnswerView } from '../everyday/workedAnswer.js';
@@ -15325,6 +15332,13 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
      */
     'everyday/today.ts#PRESS_DAY_DRIVER_HELD',
     /*
+     * GitHub issue #626 item 2: the lede's closing sentence and the door's driver note on that held
+     * day, and the note's other arm. Seeded by name beside the hold, for the hold's own reason.
+     */
+    'everyday/today.ts#TODAY_CHOICE_LINE_HELD',
+    'everyday/doorView.ts#DOOR_DRIVER_NOTE',
+    'everyday/doorView.ts#DOOR_DRIVER_NOTE_HELD',
+    /*
      * The week census's sentence on a day DC-10 does not admit, and its heading — § D1067. Drawn
      * only on a whole-day Scenario day at the tower's own rung, which no corpus case is, so every
      * shipped row's sentence is seeded by name below in both of its arms: measured under today's
@@ -15472,6 +15486,9 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     const seeds: TextSeed[] = [];
     const bundle = shiftBundleOf(context);
     seeds.push({ field: 'today.driverHeld', text: PRESS_DAY_DRIVER_HELD, role: 'prose' });
+    seeds.push({ field: 'today.lede.held', text: TODAY_CHOICE_LINE_HELD, role: 'prose' });
+    seeds.push({ field: 'door.driver.note', text: DOOR_DRIVER_NOTE, role: 'prose' });
+    seeds.push({ field: 'door.driver.note.held', text: DOOR_DRIVER_NOTE_HELD, role: 'prose' });
     /* Midtown's run clock, from its whole authored day: a booking's window is a fraction of that run. */
     const midtownDay = wholeDayFor(context.trafficProfiles, context.buildings.find((building) => building.id === 'midtown-office'));
     const clock: BookingClock | undefined =
@@ -18120,6 +18137,13 @@ const EVERYDAY_STAGE_PLAY: SurfaceAdapter = {
         seeds.push({ field: `${at}.letter[${String(index)}]`, text: line, role: 'prose' });
       }
       if (view.held !== undefined) seeds.push({ field: `${at}.held`, text: view.held, role: 'reason' });
+      /* GitHub issue #626 item 1: the goals said before the press, as `stagePlayScreen.ts` draws them unless held. */
+      if (view.held === undefined) {
+        seeds.push({ field: `${at}.goals.heading`, text: view.goalsHeading, role: 'label' });
+        for (const [index, goal] of view.goals.entries()) {
+          seeds.push({ field: `${at}.goals[${String(index)}]`, text: goal, role: 'label' });
+        }
+      }
       seeds.push({ field: `${at}.budget`, text: view.budgetLine, role: 'observation' });
       if (view.refusal !== undefined) seeds.push({ field: `${at}.refusal`, text: view.refusal, role: 'reason' });
       seeds.push({ field: `${at}.setting.label`, text: view.settingLabel, role: 'label' });
