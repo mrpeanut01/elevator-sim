@@ -237,7 +237,7 @@ describe.skipIf(!HAS_BROWSER)('GitHub issue #593 — a Scenario week plays from 
   }
 });
 
-describe.skipIf(!HAS_BROWSER)('wave AO lane DS-1 — a held week 2 deals a level with a car booked out (§ D1400)', () => {
+describe.skipIf(!HAS_BROWSER)('wave AO lane DS-1 — a held week 2 deals a level with a car booked out (§ D1400), withdrawn by the pool (§ D1461)', () => {
   /*
    * Wave AO, lane DS-1 (§ D1400): Midtown's week 3 is week 2's order with car C booked out of
    * passenger service on Monday from 08:00 until 12:00. The control is the stored week's number, moved
@@ -245,7 +245,7 @@ describe.skipIf(!HAS_BROWSER)('wave AO lane DS-1 — a held week 2 deals a level
    * so car C appearing there is the booking on the run the next press makes. Red before: week 3's
    * Monday read as week 2's, with no booking on the door or the strip.
    */
-  it('deals week 3’s booking on the door and on the brief’s strip once the stored week is week 3', async () => {
+  it('deals no booking on the door or the brief’s strip once the stored week is week 3, whose level the pool withdraws', async () => {
     const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
     const BOOKED = 'Car C is booked out of passenger service from the start of the day until 12:00';
     try {
@@ -276,13 +276,16 @@ describe.skipIf(!HAS_BROWSER)('wave AO lane DS-1 — a held week 2 deals a level
       }, SESSION_KEY);
       await coldLoad(page, `building=midtown-office&seed=${String(SEED)}`);
       await openEverydayDoor(page);
-      expect(await textOf(page, '.everyday-door-week-booked')).toBe(
-        'Booked this week: car C is out of passenger service on Monday from 08:00 until 12:00, new this week.',
-      );
+      /*
+       * Since § D1461 the week pool withdraws Midtown's week 3 (the monotone clause over the pool as
+       * dealt), so the stored week 3 is dealt as week 2: no booking on the door or the strip. The
+       * level's booking reaching the run is held as the census plays it (`weekBookingReachesTheRun.test.ts`).
+       */
+      expect(await page.locator('.everyday-door-week-booked').count(), 'a withdrawn level named its booking').toBe(0);
       await page.locator('.everyday-bar-primary').click();
       await page.waitForSelector('.everyday-brief', { timeout: 15_000 });
       expect(await textOf(page, '.everyday-brief-eyebrow')).toMatch(/^WEEK 3 · MONDAY/u);
-      expect(await textOf(page, '.everyday-brief')).toContain(BOOKED);
+      expect(await textOf(page, '.everyday-brief')).not.toContain(BOOKED);
     } finally {
       await page.close();
     }
