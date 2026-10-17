@@ -1,5 +1,7 @@
 # ISSUE_WORKER_LEDGER.md
 
+> **Superseded on 2026-10-17 by [`ISSUE_LEDGER.md`](ISSUE_LEDGER.md).** This file is kept as the record of waves 14 to 18.
+
 One row per open issue. Dispositions are evidence-backed; the evidence lives in
 [`ISSUE_VERIFICATION_FINDINGS.md`](ISSUE_VERIFICATION_FINDINGS.md) and the batch reasoning in
 [`ISSUE_TRIAGE_PLAN.md`](ISSUE_TRIAGE_PLAN.md).

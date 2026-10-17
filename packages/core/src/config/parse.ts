@@ -27,6 +27,7 @@ import { expandFloors } from './expandFloors.js';
 import { resolveFloorArea } from './floorArea.js';
 import {
   airPressureDescentCapMps,
+  effectiveDescentSpeedMps,
   findElevatorSpec,
   ratedLoadKgOf,
   resolveCar,
@@ -447,25 +448,42 @@ export function resolveBuilding(
         );
       }
       /*
-       * *"Buys nothing"* is asked of the **unpressurised** cabin, not of this one. A pressurised
-       * car's own effective cap is `undefined` by construction (`pressurisedDescentCapMps` is
-       * `null`), so testing it would say the equipment bought nothing on exactly the buildings
-       * where it bought everything — which is what the first draft of this warning did, and what
-       * `descentCap.test.ts`'s third arm caught.
+       * *"Buys nothing"* compares the descent the car **actually flies** with the cabin and
+       * without it, through the resolver's own rule (`effectiveDescentSpeedMps`). Two earlier
+       * predicates were each wrong one way. Testing this car's own cap said the equipment bought
+       * nothing on exactly the buildings where it bought everything, because a pressurised cap is
+       * `undefined` by construction (`descentCap.test.ts`'s third arm caught it). Asking only
+       * whether the unpressurised cap would have bitten missed every *other* limit at or below
+       * the cap: `ctf-class-reference`'s shuttle authors `descentSpeedMps: 10`, the cap is 10, and
+       * the cabin raised nothing while the loader stayed silent (GitHub issue #625).
        */
       const unpressurisedCapMps = airPressureDescentCapMps(specs.airPressure, riseM, false);
-      const wouldHaveBitten =
-        unpressurisedCapMps !== undefined && unpressurisedCapMps < resolved.ratedSpeedMps;
-      if (resolved.cabinPressurised === true && !wouldHaveBitten) {
+      const descentWithCabinMps = effectiveDescentSpeedMps(
+        resolved.ratedSpeedMps,
+        car.descentSpeedMps,
+        specs.airPressure,
+        riseM,
+        true,
+      );
+      const descentWithoutCabinMps = effectiveDescentSpeedMps(
+        resolved.ratedSpeedMps,
+        car.descentSpeedMps,
+        specs.airPressure,
+        riseM,
+        false,
+      );
+      if (resolved.cabinPressurised === true && descentWithCabinMps <= descentWithoutCabinMps) {
         const because =
           specs.airPressure === undefined
             ? 'this data directory declares no airPressure block'
             : riseM <= specs.airPressure.appliesAboveTravelM
               ? `bank "${bank.id}" spans ${Number(riseM.toFixed(1))} m, at or below the ${specs.airPressure.appliesAboveTravelM} m the cap applies above`
-              : `the car is rated ${resolved.ratedSpeedMps} m/s, at or below the ${specs.airPressure.descentCapMps} m/s cap`;
+              : unpressurisedCapMps === undefined || resolved.ratedSpeedMps <= unpressurisedCapMps
+                ? `the car is rated ${resolved.ratedSpeedMps} m/s, at or below the ${specs.airPressure.descentCapMps} m/s cap`
+                : `the car's own descentSpeedMps of ${car.descentSpeedMps} m/s binds at or below the ${specs.airPressure.descentCapMps} m/s cap`;
         addWarning(
           `${carPath}.cabinPressurised`,
-          `car "${car.id}" declares a pressurised cabin, but nothing is capping its descent: ${because}. The equipment is fitted and buys no seconds on this building.`,
+          `car "${car.id}" declares a pressurised cabin, but pressurising does not raise its descent: ${because}. The equipment is fitted and buys no seconds on this building.`,
           WARNING_CODES.pressurisationBuysNothing,
         );
       }

@@ -522,9 +522,10 @@ export async function measureScenarioSurvivors(
 /**
  * The player's press — `campaign/stagePress.ts#pressStage` — as the sweep consumes it: the judged
  * sequence, or a throw carrying the admission's own sentence, which {@link playOrRefuse} records as
- * an unplayable configuration. A census draw the press refuses is a disagreement between the sampler
- * and the one admission check ([§ D1129](../../../../DECISIONS.md)); it is named in the table rather
- * than counted either way.
+ * an unplayable configuration. A census draw the press refuses is one whose resolved dispatcher costs
+ * more than its rung holds: the sampler prices through the same check since GitHub issue #628 and
+ * marks it `affordable: false`, but keeps it so the published draw does not move
+ * ([§ D1129](../../../../DECISIONS.md)). It is named in the table rather than counted either way.
  */
 async function pressed(input: StagePressInput): Promise<StageSequenceOutcome> {
   const press = await pressStage(input);

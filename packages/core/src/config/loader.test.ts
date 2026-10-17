@@ -380,8 +380,13 @@ describe('loadConfig against the real data/ directory', () => {
     }
   });
 
-  it('reports exactly the one known advisory on the shipped data', () => {
+  it('reports exactly the two known advisories on the shipped data', () => {
     expect(config.warnings.map((warning) => warning.code)).toEqual([
+      // `ctf-class-reference`'s eight shuttle cars fit a pressurised cabin and author a 10 m/s
+      // descent, which binds at the air-pressure cap's own 10 m/s, so the cabin raises nothing.
+      // Raised since GitHub issue #625 fixed the predicate; the data is unchanged and the field's
+      // inertness is registered in `buildingFieldReach.test.ts#KNOWN_INERT`.
+      ...Array.from({ length: 8 }, () => WARNING_CODES.pressurisationBuysNothing),
       // Midtown's bank spans 76.9 m; geared traction is reference-rated to 76 m.
       WARNING_CODES.riseExceedsClass,
       // **A second advisory is gone, and gone because the data was wrong rather than the rule.**
@@ -400,8 +405,14 @@ describe('loadConfig against the real data/ directory', () => {
       // `missing-floor-pairs` carries the disclaimer over the one configuration where it is
       // still true, and no shipped bank is in that state.
     ]);
-    expect(config.warnings[0]?.message).toContain('76.9');
-    expect(config.warnings[0]?.file).toContain('midtown-office.json');
+    const rise = config.warnings.find((warning) => warning.code === WARNING_CODES.riseExceedsClass);
+    expect(rise?.message).toContain('76.9');
+    expect(rise?.file).toContain('midtown-office.json');
+    for (const warning of config.warnings) {
+      if (warning.code !== WARNING_CODES.pressurisationBuysNothing) continue;
+      expect(warning.file).toContain('ctf-class-reference.json');
+      expect(warning.path).toMatch(/^banks\[0\]\.cars\[\d\]\.cabinPressurised$/);
+    }
   });
 
   it('is deterministic: two loads produce identical results', async () => {

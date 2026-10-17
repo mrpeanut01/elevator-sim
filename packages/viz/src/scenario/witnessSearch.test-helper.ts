@@ -91,8 +91,12 @@ export interface DialDraw {
   readonly changeIds: readonly string[];
   /** The dearest price tier it reached. */
   readonly tier: string;
-  /** What it cost at this rung, distinct changes summed once. */
+  /** What the player's press charges for it, distinct changes summed once (GitHub issue #628). */
   readonly units: number;
+  /** The rung's own units: what a player standing on the rung this draw was made at holds. */
+  readonly budgetUnits: number;
+  /** Whether the press admits it at {@link budgetUnits}. See `survivorSpace.ts#DrawnConfiguration`. */
+  readonly affordable: boolean;
   /** The dials it moved off the baseline, and what to. */
   readonly values: Readonly<Record<string, ParameterValue>>;
 }
@@ -188,6 +192,8 @@ export async function drawDialConfigurations(input: {
     changeIds: configuration.changeIds,
     tier: configuration.tier,
     units: configuration.units,
+    budgetUnits: rung.units,
+    affordable: configuration.affordable,
     values: configuration.values,
   }));
 }
@@ -213,10 +219,18 @@ export async function judgeDialDraws(input: {
   const out: DialVerdict[] = [];
   for (const draw of draws) {
     /*
-     * Through the player's press (`campaign/stagePress.ts#pressStage`, § D1129), at the draw's own
-     * price: a witness is a clear a player can make, so the admission check is asked before the
-     * batches, and a draw it refuses at the price the sampler charged is a disagreement between the
-     * census and the press — thrown, with the check's sentence, for this function's stated reason.
+     * A draw the press prices above its rung is not a move a player on that rung can make, so it is
+     * not judged and yields no verdict — `measureSurvivors.ts` records the same draw as unbuildable
+     * rather than examined. Before GitHub issue #628 the sampler priced such a draw below the press
+     * and this loop threw on it.
+     */
+    if (!draw.affordable) continue;
+    /*
+     * Through the player's press (`campaign/stagePress.ts#pressStage`, § D1129), at the rung's own
+     * units, as `measureSurvivors.ts` asks it: a witness is a clear a player on that rung can make,
+     * so the admission check is asked before the batches. The sampler now prices through the same
+     * check, so a refusal here is a disagreement between the census and the press — thrown, with
+     * the check's sentence, for this function's stated reason.
      */
     const press = await pressStage({
       stage: fixture.stage,
@@ -236,7 +250,7 @@ export async function judgeDialDraws(input: {
           values: draw.values,
         },
       },
-      budgetUnits: draw.units,
+      budgetUnits: draw.budgetUnits,
       run: (request) => fixture.run(request),
     });
     if (press.kind === 'refused') {
