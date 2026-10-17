@@ -2494,10 +2494,29 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
       `background:${C.card}`,
       'min-width:0',
       'flex-wrap:wrap',
+      /*
+       * GitHub issue #630: at 320 × 320 the ask drew 511 px tall in a 320 px root that clips. The
+       * screen behind it had no height at all, so it waited on an answer (a gate, which `docs/26`
+       * § 4.4 forbids), and its last paragraph and half the one before it were cut off with no way
+       * to scroll to them. Half the height is the ask's at most, and the rest of it scrolls; `vh` first for a
+       * browser that has no `dvh`. The scroll padding is the answers' sticky strip below, so a
+       * paragraph brought into view is not left behind them.
+       */
+      'max-height:50vh',
+      'max-height:50dvh',
+      'overflow-y:auto',
+      'scroll-padding-bottom:46px',
     ].join(';');
 
+    /*
+     * A 160 px basis, so on a window too narrow for the words and both answers on one line the
+     * answers wrap below the words and the words keep the whole width. Without it the column was
+     * 121 px wide at 320 px, about twenty characters a line, which is what made the ask 511 px tall.
+     * The grow of 999 against the answers' 1 gives the words all of a shared line's spare width, as
+     * the old `flex:1` did, and lets the answers take a line of their own whole when they wrap.
+     */
     const said = el(doc, 'div');
-    said.style.cssText = 'min-width:0;flex:1';
+    said.style.cssText = 'min-width:0;flex:999 1 160px';
     const heading = el(doc, 'div', 'everyday-consent-heading', view.heading);
     heading.style.cssText = `font:600 13px ${TYPE.heading};color:${C.ink}`;
     const body = el(doc, 'div', 'everyday-consent-body', view.body);
@@ -2510,7 +2529,23 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     row.append(said);
 
     const answers = el(doc, 'div');
-    answers.style.cssText = `display:flex;gap:${String(GAP.row)}px;flex:none;align-items:center`;
+    /*
+     * Sticky to the bottom of the scrolling ask, so when the words scroll the two answers stay in
+     * view together, and each is as easy to reach as the other. The card background, across the
+     * whole line once they wrap, and its 8 px cap keep scrolled words from showing behind them;
+     * where the answers sit beside the words they never stick, and the cap lands on the row's own
+     * card.
+     */
+    answers.style.cssText = [
+      'display:flex',
+      `gap:${String(GAP.row)}px`,
+      'flex:1 0 auto',
+      'align-items:center',
+      'position:sticky',
+      'bottom:0',
+      `background:${C.card}`,
+      `box-shadow:0 -8px 0 ${C.card}`,
+    ].join(';');
     const answer = (className: string, label: string, press: () => void): HTMLElement => {
       const button = el(doc, 'button', className, label);
       button.type = 'button';
