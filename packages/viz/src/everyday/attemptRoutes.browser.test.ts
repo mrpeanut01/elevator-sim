@@ -203,7 +203,11 @@ describe.skipIf(!HAS_BROWSER)('the attempt’s routes, before it begins and at i
        */
       await expect
         .poll(() => textOf(page, '.everyday-stage-practice'), { message: 'the run was not labelled a practice crowd', timeout: 15_000 })
-        .toBe(PRACTICE_DAY_SENTENCES.practiceCrowd);
+        /*
+         * And what it kept of the day (wave AP lane AP-D2, § D1451): a sandbox day carries the day's
+         * bookings, so Crown Hotel's car D is out on this run too, and the stage says so.
+         */
+        .toBe(`${PRACTICE_DAY_SENTENCES.practiceCrowd} This sandbox day keeps car D booked out of passenger service as the day had.`);
       expect(await storedAttempt(page), 'the workshop’s run began the day’s attempt').toBeUndefined();
 
       await page.locator('.everyday-bar-back').click();

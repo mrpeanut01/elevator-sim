@@ -155,6 +155,8 @@ import {
   RUSH_ABSENCES,
   RUSH_HOLD_LINE,
   RUSH_FITTED_LINE,
+  RUSH_FITTED_DEVICE_LINE,
+  rushFittedLineOf,
   RUSH_SCREEN_COPY,
   rushBandViews,
   rushBarModel,
@@ -353,7 +355,15 @@ import { actsOf, wholeDayFor } from '../shift/dayLength.js';
 import { rushTutorialWorkedAnswerOf } from '../everyday/rushScreenModel.js';
 import { WORKED_ANSWER_COPY, type WorkedAnswerFacts, type WorkedAnswerView } from '../everyday/workedAnswer.js';
 import { WEEK_START_NEXT_LABEL, driverRecordLinesOf, weekScreenViewOf } from '../everyday/weekView.js';
-import { CAREER_MARK_WORDS, careerCloseLineOf, type CareerCloseInput } from '../everyday/careerCalls.js';
+import {
+  CAREER_GOALS_HEADING,
+  CAREER_MARK_WORDS,
+  CAREER_VERDICT_LINES,
+  careerCloseLineOf,
+  type CareerCloseInput,
+} from '../everyday/careerCalls.js';
+import { sandboxCarriedLineOf, sandboxWeekLineOf, type SandboxDayMakeup } from '../everyday/sandbox.js';
+import type { Incident } from '../shift/incidents.js';
 import { CALL_BANDS, weekBandsLinesOf, type CallBandsCall } from '../shift/callBands.js';
 import { weekOrderFor } from '../shift/weekOrders.js';
 import { percentileLine, WORLD_FIGURES_ABSENT, WORLD_FIGURES_LABEL, WORLD_FIGURES_REASON } from '../everyday/world.js';
@@ -362,7 +372,7 @@ import { buildingView, CONTRACT_COPY, contractView, towersView, type BuildingFac
 /* Wave AN lane AP-3's region — the Career's front page, § D1301. */
 import { TOWER_CARD_COPY, contractDocumentOf, type CampaignInput } from '../everyday/campaignModel.js';
 import { mootCountClause } from '../everyday/today.js';
-import { CONTRACT_DAYS, DIFFICULTIES, DIFFICULTY_IDS } from '../campaign/economy.js';
+import { CONTRACT_DAYS, DIFFICULTIES, DIFFICULTY_IDS, missAllowanceSentenceOf } from '../campaign/economy.js';
 import type { TowerShafts } from '../campaign/economy.js';
 import {
   applyCampaignAction,
@@ -10178,6 +10188,8 @@ const EVERYDAY_MENU: SurfaceAdapter = {
      * declaration rather than one per string.
      */
     'everyday/sittingShape.ts#SITTING_SHAPES',
+    /* Wave AP lane AP-D2 (§ D1453): the hub row's last clause, drawn inside `SITTING_SHAPES.contractDay`. */
+    'everyday/sittingShape.ts#SCENARIO_LOSS_CLAUSE',
     'everyday/sittingShape.ts#sittingLengthPhrase',
     'everyday/rail.ts#RAIL_DRAWER_COPY',
     /* The shell's skip link, GitHub issue #404 — chrome the shell draws and does not author. */
@@ -10583,6 +10595,9 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
      * from a fixture would reach it.
      */
     'everyday/rushScreenModel.ts#RUSH_FITTED_LINE',
+    /* Wave AP lane AP-D2 (§ D1453): the same disclosure for a kit bought from this device's tally, never posted. */
+    'everyday/rushScreenModel.ts#RUSH_FITTED_DEVICE_LINE',
+    'everyday/rushScreenModel.ts#rushFittedLineOf',
     /*
      * What the rebuild between rounds is, said before the first round — GitHub issue #372, § D1295.
      * Seeded in both arms below: the standard purse, and a sitting that opens with the top-up's
@@ -10606,6 +10621,12 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
     'everyday/tunerModel.ts#TUNER_COPY',
     'everyday/tunerModel.ts#TUNE_CARDS',
     'everyday/tunerModel.ts#tuneSandboxStrip',
+    /*
+     * Wave AP lane AP-D2 (§ D1451): what a sandbox day kept of the day and left out, and where the
+     * week is, drawn on its stage and its close. Seeded below over a move-in day with car D booked.
+     */
+    'everyday/sandbox.ts#sandboxCarriedLineOf',
+    'everyday/sandbox.ts#sandboxWeekLineOf',
     'everyday/tunerModel.ts#tuneDwellChips',
     'everyday/tunerModel.ts#tuneReadout',
     /*
@@ -10670,6 +10691,17 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
      * `rush.driving` carries one line up.
      */
     seeds.push({ field: 'rush.fitted', text: RUSH_FITTED_LINE, role: 'prose' });
+    /* § D1453: the line the setup screen picks, on the account's kit and on this device's. */
+    for (const [arm, device] of [
+      ['account', false],
+      ['device', true],
+    ] as const) {
+      seeds.push({
+        field: `rush.fitted.${arm}`,
+        text: rushFittedLineOf({ rushStartsFitted: () => true, rushBoughtOnDevice: () => device }) ?? '',
+        role: 'prose',
+      });
+    }
     /* § D1295's setup line, on the standard purse and on one opened by the top-up's three steps. */
     seeds.push({ field: 'rush.rebuildLine(standard)', text: rushRebuildLineOf(RUSH_PURSE.unitsPerWaveOutlasted, 0), role: 'prose' });
     seeds.push({ field: 'rush.rebuildLine(topped)', text: rushRebuildLineOf(RUSH_PURSE.unitsPerWaveOutlasted, 15), role: 'prose' });
@@ -10971,6 +11003,24 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
         text,
         role: key === 'lede' || key.endsWith('Body') || key === 'stepsHint' ? 'prose' : 'label',
       });
+    }
+    /*
+     * § D1451: a sandbox day's carried line over a move-in day with car D booked, kept whole, with the
+     * day left out, and on a tower that lost car D; then where the week is, open and closed.
+     */
+    {
+      const bookedD = { kind: 'out-of-service', car: { bankId: 'main', carId: 'D' }, fromFraction: 0, toFraction: 0.5 } as unknown as Incident;
+      const day: SandboxDayMakeup = { event: SHIFT_EVENTS['move-in'], bookings: [bookedD] };
+      for (const [arm, sandbox, plain] of [
+        ['kept', day, false],
+        ['plain', { event: SHIFT_EVENTS.ordinary, bookings: [] }, true],
+        ['lostCar', { event: SHIFT_EVENTS['move-in'], bookings: [] }, false],
+      ] as const) {
+        seeds.push({ field: `sandbox.carried.${arm}`, text: sandboxCarriedLineOf(day, sandbox, plain) ?? '', role: 'prose' });
+      }
+      const week = { ...openWeek('c2'), day: 2, dayIdx: 1 };
+      seeds.push({ field: 'sandbox.week.open', text: sandboxWeekLineOf(week), role: 'prose' });
+      seeds.push({ field: 'sandbox.week.closed', text: sandboxWeekLineOf({ ...week, closedDay: 2 }), role: 'prose' });
     }
     const standingTune = tuneStateFrom(sized, DEFAULT_PATTERN, undefined);
     const movedTune = { ...standingTune, cars: standingTune.cars + 1, rate: standingTune.rate + 2 };
@@ -11655,6 +11705,8 @@ const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
      * career sheet's lost arm.
      */
     'campaign/career.ts#contractLostSentenceOf',
+    /* Wave AP lane AP-D2 (§ D1453): the allowance in one form, seeded for every tier below. */
+    'campaign/economy.ts#missAllowanceSentenceOf',
     'campaign/career.ts#BUILD_LABELS',
     'campaign/career.ts#openingCareer',
     'campaign/career.ts#freshTower',
@@ -15123,6 +15175,8 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     'everyday/today.ts#todayOf',
     /* The lede's closing sentence — H13; every seeded lede ends on it. */
     'everyday/today.ts#TODAY_CHOICE_LINE',
+    /* Wave AP lane AP-D2 (§ D1453): the brief's *Floors* row, drawn in every seeded `todayOf`'s facts. */
+    'everyday/today.ts#floorsLineOf',
     'shift/firstSession.ts#FIRST_SESSION_LINE',
     /* The line's second arm, for a first day the draw did not choose — GitHub issue #595, § D973. */
     'shift/firstSession.ts#FIRST_SESSION_LINE_CHOSEN',
@@ -15335,6 +15389,8 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     'shift/weekRecord.ts#weekRecordLineOf',
     /* Weeks held on this tower — lane AM-D, § D1253: the run's two arms, drawn on the sheet and the door. */
     'shift/weekRecord.ts#weeksHeldLineOf',
+    /* Wave AP lane AP-D2 (§ D1453): what a held week paid, inside the running arm of the line above. */
+    'shift/weekRecord.ts#WEEK_HELD_PAYS',
     /*
      * Wave AO, lane DR-2 (§ D1443): DC-13 on a week dealt from week 2, and this week's record with
      * each driver, on Your week. Seeded in `seedWeekStake`: Midtown's week 2 from the shipped census,
@@ -15349,6 +15405,9 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
      */
     'everyday/careerCalls.ts#careerCloseLineOf',
     'everyday/careerCalls.ts#CAREER_MARK_WORDS',
+    /* Wave AP lane AP-D2 (§ D1452): a career day's headline and goals heading, seeded in `seedCareerClose`. */
+    'everyday/careerCalls.ts#CAREER_VERDICT_LINES',
+    'everyday/careerCalls.ts#CAREER_GOALS_HEADING',
     'everyday/continueWeek.ts#continueWeekEntryOf',
     'everyday/continueWeek.ts#CONTINUE_WEEK_TITLE',
     /* Lane AM-E (§ D1259): a held week's next tower, seeded in `seedWeekStake` for the same reason. */
@@ -16101,6 +16160,9 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
           contractLost: contractLostSentenceOf(lostTower),
         },
       });
+      for (const [tier, difficulty] of Object.entries(DIFFICULTIES)) {
+        seeds.push({ field: `career.allowance.${tier}`, text: missAllowanceSentenceOf(difficulty), role: 'prose' });
+      }
       if (lost.tomorrow !== undefined) {
         seeds.push({ field: 'career.report.lost.tomorrow.label', text: lost.tomorrow.label, role: 'label' });
         seeds.push({ field: 'career.report.lost.tomorrow.note', text: lost.tomorrow.note, role: 'reason' });
@@ -18881,6 +18943,10 @@ function seedCareerClose(seeds: TextSeed[]): void {
   for (const [reads, words] of Object.entries(CAREER_MARK_WORDS)) {
     seeds.push({ field: `career.close.mark.${reads}`, text: words, role: 'prose' });
   }
+  for (const [reads, words] of Object.entries(CAREER_VERDICT_LINES)) {
+    seeds.push({ field: `career.close.verdict.${reads}`, text: words, role: 'label' });
+  }
+  seeds.push({ field: 'career.close.goalsHeading', text: CAREER_GOALS_HEADING, role: 'label' });
   for (const verdict of ['cleared', 'missed'] as const) {
     const other = verdict === 'cleared' ? 'missed' : 'cleared';
     const base: CareerCloseInput = {

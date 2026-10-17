@@ -76,20 +76,6 @@ export interface SandboxPresses {
 }
 
 /**
- * Whether a press moves anything at all. Since wave AP lane AP-D2 ([§ D1451](../../../../DECISIONS.md))
- * an untouched tuner runs a sandbox day as well, so this decides the strip's words and no longer which
- * press is made.
- */
-export function sandboxMoves(presses: SandboxPresses): boolean {
-  return (
-    presses.building !== undefined ||
-    presses.pattern !== undefined ||
-    presses.dwell !== undefined ||
-    presses.plainDay === true
-  );
-}
-
-/**
  * Every field a sandbox press writes, as it stood — {@link sandboxRestorePatchOf}'s input.
  *
  * Not the recording: the run standing is the sandbox's once it lands, and the host refuses it on the

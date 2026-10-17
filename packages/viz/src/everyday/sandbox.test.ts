@@ -37,7 +37,6 @@ import {
 import {
   sandboxBeforeOf,
   sandboxCarriedLineOf,
-  sandboxMoves,
   sandboxPatchOf,
   sandboxRestorePatchOf,
   sandboxWeekLineOf,
@@ -125,7 +124,7 @@ describe('each control the tuner offers on the day moves the run — compared on
     const untouched = legsOf(MIDTOWN);
     for (const patch of [{ rate: 11.5 }, { dwell: 'patient' as const }, { cars: 5 }]) {
       const presses = pressesFor(MIDTOWN, patch);
-      expect(sandboxMoves(presses), JSON.stringify(patch)).toBe(true);
+      expect([presses.building, presses.pattern, presses.dwell].some((press) => press !== undefined), JSON.stringify(patch)).toBe(true);
       expect(legsOf(sandboxed(MIDTOWN, presses)), JSON.stringify(patch)).not.toBe(untouched);
     }
   });
@@ -261,7 +260,7 @@ describe('a drawn tower runs as a sandbox day over the week — § D1363', () =>
  * Wave AP lane AP-D2, [§ D1451](../../../../DECISIONS.md), the post-AO panel's seat B (D1): week 2's
  * Monday on Midtown Office (Shift change, car D booked out 10:30–13:00), *Open the sandbox*, 3000 lb,
  * *Run it and watch*, and the run had no car D out and an ordinary day, so its clear read as *bigger
- * cars fixed it*. Since swarm DT's pool (§ D1462) Midtown deals its first week's draw every week, so
+ * cars fixed it*. Since lane DT-1's pool (`shift/weekPool.ts`) Midtown deals its first week's draw every week, so
  * the case is Midtown's Tuesday: the move-in, with car D booked out. Red before: the changed tower's
  * run was an ordinary day with no booking at all.
  */
