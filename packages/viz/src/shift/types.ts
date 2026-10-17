@@ -861,6 +861,39 @@ export interface WeekState {
    * `nextDay`: it belongs to one report, not to the week.
    */
   readonly cleared: ClearedAward | null;
+  /**
+   * **The week and tower a sandbox day was copied from** — wave AP lane AP-D2,
+   * [§ D1451](../../../../DECISIONS.md), the post-AO panel's seat B (D1). Set on the sandbox day's
+   * copy alone (`week.ts#openSandboxDay`) and absent on every other week, so nothing that is saved
+   * carries it: the save takes the sandbox day's week off the pair (§ D1368). It is what deals the
+   * copy the day it copied: `calendar.ts#scheduledEventFor` reads the source contract's order for
+   * the wrinkle, and `dev/state.ts#shiftRunConfigOf` its level's bookings and, on a changed tower,
+   * the bookings of the tower the contract handed over, on the cars the changed tower still has.
+   */
+  readonly sandboxOf?: SandboxSource | undefined;
+}
+
+/**
+ * **The contract and week a week's day is dealt as** — wave AP lane AP-D2, [§ D1451](../../../../DECISIONS.md).
+ * A week's own, except on a sandbox day's copy that keeps its day ({@link WeekState.sandboxOf}, `week.ts#openSandboxDay`),
+ * which is dealt as the week it copied: the same order's wrinkle and the same level's bookings.
+ * Only what the day is made of reads this; what the day counts toward still reads the copy's own
+ * contract, which counts nothing.
+ */
+export function dealtKeyOf<K extends Pick<WeekState, 'contractId' | 'week' | 'sandboxOf'>>(week: K): Pick<WeekState, 'contractId' | 'week'> {
+  const from = week.sandboxOf;
+  return from === undefined || from.plain ? week : { contractId: from.contractId, week: week.week };
+}
+
+/** {@link WeekState.sandboxOf}: the contract the copied day was dealt under, and the tower it stood on. */
+export interface SandboxSource {
+  readonly contractId: string;
+  readonly buildingId: string;
+  /**
+   * The player left the day's wrinkle and bookings out (`everyday/sandbox.ts#SandboxPresses.plainDay`),
+   * so the copy is dealt as a sandbox week on no contract, with nothing carried.
+   */
+  readonly plain: boolean;
 }
 
 /* -------------------------------------------------------------------------- *

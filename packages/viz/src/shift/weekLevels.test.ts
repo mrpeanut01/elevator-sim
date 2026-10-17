@@ -8,7 +8,7 @@
  * Then each clause of the rule moved on a fixture and the verdict following it.
  */
 
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { CONTRACT_LADDER, type ContractLadder, type ContractWeekBooking } from './ladder.js';
 import { WEEK_DOMINANCE, type WeekDominance } from './weekDominance.js';
@@ -24,6 +24,7 @@ import {
   weekTopOf,
 } from './weekLevels.js';
 import { WEEK_WAY } from './weekWay.js';
+import { POOL_CENSUS } from './weekPool.js';
 
 /** The shipped ladder with Midtown's bookings replaced. */
 function ladderWith(bookings: readonly ContractWeekBooking[]): ContractLadder {
@@ -36,6 +37,17 @@ function ladderWith(bookings: readonly ContractWeekBooking[]): ContractLadder {
 const SHIPPED_BOOKINGS = CONTRACT_LADDER.rows.find((row) => row.contractId === 'c2')?.weekBookings ?? [];
 
 describe('Midtown’s levels, as the census measured them', () => {
+  /*
+   * § D1400's authored ladder, read as the pool census plays it (`weekPool.ts#POOL_CENSUS`): since
+   * § D1461 the pool withdraws weeks 3 and 4, which the block after this one pins.
+   */
+  beforeAll(() => {
+    POOL_CENSUS.measuring = true;
+  });
+  afterAll(() => {
+    POOL_CENSUS.measuring = false;
+  });
+
   it('authors three bookings, each car C out of passenger service from the start of the run to 0.4 of it', () => {
     expect(SHIPPED_BOOKINGS.map((booking) => [booking.day, booking.carId, booking.fromFraction, booking.toFraction])).toEqual([
       [1, 'C', 0, 0.4],
@@ -100,6 +112,16 @@ describe('Midtown’s levels, as the census measured them', () => {
     expect(bookingPhraseOf(monday, clock)).toBe('car C is out of passenger service on Monday from 8:00 until 12:00');
     expect(bookingPhraseOf(monday, clock, 'short')).toBe('car C on Monday from 8:00 until 12:00');
     expect(bookingPhraseOf(monday)).toBe('car C is out of passenger service on Monday for part of the day');
+  });
+});
+
+describe('Midtown’s levels as the pool deals them — § D1461', () => {
+  it('tops Midtown at week 2, where the monotone clause over the pool withdraws week 3', () => {
+    expect(weekTopOf('c2')).toBe(2);
+    expect(dealtWeekOf({ contractId: 'c2', week: 4 })).toBe(2);
+    expect(hasFurtherWeek({ contractId: 'c2', week: 2 })).toBe(false);
+    expect(weekBookingsOn({ contractId: 'c2', week: 3 }, 1, 0)).toEqual([]);
+    expect(weekLevelAwardKeyOf({ contractId: 'c2', week: 4 })).toBe(weekLevelAwardKeyOf({ contractId: 'c2', week: 2 }));
   });
 });
 

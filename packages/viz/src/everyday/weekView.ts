@@ -37,7 +37,9 @@
  */
 
 import { weekBandsLinesOf } from '../shift/callBands.js';
-import { nextTowerOfferOf, type NextTowerOffer } from '../shift/nextTower.js';
+import { weekKeepDaysLinesOf } from '../shift/poolWays.js';
+import { heldTopOnwardOf, nextTowerOfferOf, type NextTowerOffer } from '../shift/nextTower.js';
+import { contractById } from '../shift/contracts.js';
 import { nextWeekOf, type BookingClock, type NextWeekView } from '../shift/nextWeek.js';
 import { wasGraded } from '../shift/week.js';
 import {
@@ -56,6 +58,8 @@ import { weekRecordLineOf, weeksHeldLineOf, type WeekRecord } from '../shift/wee
 import { weekdayOf } from '../shift/types.js';
 
 import { DAY_VERDICT_NOTE, todayIsBanked, type WorldBandView } from './doorView.js';
+import { heldClock } from './rush.js';
+import { RUSH_DEVICE_COPY, type RushDeviceStanding } from './rushDeviceBest.js';
 import { EM_DASH, percentFigure } from './figures.js';
 import {
   percentileLine,
@@ -183,6 +187,18 @@ export interface WeekScreenView {
    */
   readonly onward: NextTowerOffer | undefined;
   /**
+   * Whether {@link onward} is the sheet's primary. True below a held top (lane AM-E's footing), false
+   * at a held top, where *Start next week* stays the primary and the onward tower, offered there only
+   * where its ladder is harder ({@link heldTopOnwardOf}), is the second press — wave AP, lane DT-2,
+   * swarm DT's Q4 items 2 and 3.
+   */
+  readonly onwardPrimary: boolean;
+  /**
+   * **The tower's Rush, beside a held top's primary** — wave AP, lane DT-2, swarm DT's Q4 item 2 (S1):
+   * {@link weekTopRushOf}. `undefined` everywhere but a held top.
+   */
+  readonly rush: WeekTopRush | undefined;
+  /**
    * **What the sheet deals next on this tower** — `shift/nextWeek.ts#nextWeekOf`, wave AN, lane DQ-2
    * ([§ D1344](../../../../DECISIONS.md)): the next week on a held week, this week again on one
    * that was not held with *Go on to week N* beside it, and *harder* only where the house's census
@@ -280,6 +296,50 @@ export interface WeekScreenInput {
    * true where no name is known.
    */
   readonly profileNameOf?: ((profileId: string) => string | undefined) | undefined;
+  /**
+   * This device's best Rush sitting on the week's tower, as `EverydayHost.rushDeviceBest` answered it
+   * ([§ D1420](../../../../DECISIONS.md)), for the held top's Rush line. Absent while it has not landed.
+   */
+  readonly rushBest?: RushDeviceStanding | undefined;
+}
+
+/** The held top's Rush press and its line. */
+export interface WeekTopRush {
+  readonly label: string;
+  readonly line: string;
+}
+
+/** The Rush's words on a held top's sheet. One object, for `honesty/surfaces.ts`' sweep. */
+export const WEEK_TOP_RUSH_COPY = Object.freeze({
+  label: 'Play this tower’s Rush',
+  what:
+    'This tower also has a Rush: one climbing day until the building stops draining, which ends when forty ' +
+    'people have waited over two minutes at once.',
+  best: (held: string, rounds: number): string =>
+    `Your best sitting here on this device, replayed now from its last round, held ${held} over ${String(rounds)} ` +
+    `${rounds === 1 ? 'round' : 'rounds'}.`,
+  none: 'This device keeps no sitting of it yet.',
+  chimes:
+    'Chimes buy a Rush its pre-fit and a wider purse, from the chimes panel; bought on this device, a sitting ' +
+    'started with them is kept here and never posted.',
+});
+
+/**
+ * **The held top's Rush line** — wave AP, lane DT-2, [§ D1473](../../../../DECISIONS.md), swarm DT's Q4 item 2 (S1): what the Rush is, this
+ * device's best sitting on the tower where one is kept and replayed ([§ D1420](../../../../DECISIONS.md):
+ * the replay's hold, never a stored one; a build with a board says nothing here), and that chimes buy its
+ * pre-fit and purse ([§ D1418](../../../../DECISIONS.md)).
+ */
+export function weekTopRushOf(best: RushDeviceStanding | undefined): WeekTopRush {
+  const kept =
+    best === undefined || best.kind === 'silent'
+      ? ''
+      : best.kind === 'row'
+        ? ` ${WEEK_TOP_RUSH_COPY.best(heldClock(best.heldS), best.roundCount)}`
+        : best.kind === 'none'
+          ? ` ${WEEK_TOP_RUSH_COPY.none}`
+          : ` ${RUSH_DEVICE_COPY.unreplayable(best.reason)}`;
+  return { label: WEEK_TOP_RUSH_COPY.label, line: `${WEEK_TOP_RUSH_COPY.what}${kept} ${WEEK_TOP_RUSH_COPY.chimes}` };
 }
 
 /**
@@ -514,8 +574,17 @@ export function weekScreenViewOf(input: WeekScreenInput): WeekScreenView {
   /* Today closed, by the week or by the sitting — `doorView.ts#todayIsBanked`, so the door agrees. */
   const todayClosed = todayIsBanked(input);
   const sheet = weekSheetOf(input.week, input.house ?? (() => undefined));
-  const onward = nextTowerOfferOf(input.week.contractId, sheet, input.nameOf);
   const next = sheet === undefined ? undefined : nextWeekOf(input.week, undefined, input.bookingClock);
+  /*
+   * Wave AP, lane DT-2, swarm DT's Q4: at a held top *Start next week* stays the primary, the tower's
+   * Rush is offered beside it, and another tower only where its ladder is harder by the house's census.
+   */
+  const heldTop = next?.held === true && next.top;
+  const onward = heldTop
+    ? heldTopOnwardOf(input.week.contractId, sheet, input.nameOf)
+    : nextTowerOfferOf(input.week.contractId, sheet, input.nameOf);
+  const onwardPrimary = onward !== undefined && !heldTop;
+  const rush = heldTop && contractById(input.week.contractId) !== undefined ? weekTopRushOf(input.rushBest) : undefined;
   return {
     /* Wave AN, lane AN-7: the week's number, where one is true of it (`weekStake.ts#weekOrdinalOf`). */
     eyebrow: `ELEVATOR SIM · EVERYDAY MODE${weekEyebrowOf(input.week)}`,
@@ -549,16 +618,18 @@ export function weekScreenViewOf(input: WeekScreenInput): WeekScreenView {
     sheet,
     record: input.record === undefined ? undefined : weekRecordLineOf(input.record),
     onward,
+    onwardPrimary,
+    rush,
     next,
     held: input.record === undefined ? undefined : weeksHeldLineOf(input.record),
     /* § D1443: DC-13's check on a week dealt from week 2, and this week's record with each driver. */
-    bands: weekBandsLinesOf(
-      input.week.contractId,
-      weekOrderFor({ contractId: input.week.contractId, week: input.week.week }),
-      input.profileNameOf ?? (() => undefined),
-    ),
+    /*
+     * Wave AP, lane DT-1 (§ D1462): DC-13 in days, for the level the week is dealt, from the pool.
+     * The row band (`callBands.ts#weekBandsLinesOf`) counts rows on one seed and is no sheet's figure.
+     */
+    bands: weekKeepDaysLinesOf(input.week, input.profileNameOf ?? (() => undefined)),
     drivers: driverRecordLinesOf(input.week, input.profileNameOf),
-    primary: sheet === undefined ? undefined : (onward?.label ?? next?.label ?? WEEK_START_NEXT_LABEL),
+    primary: sheet === undefined ? undefined : ((onwardPrimary ? onward?.label : undefined) ?? next?.label ?? WEEK_START_NEXT_LABEL),
   };
 }
 

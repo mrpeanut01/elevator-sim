@@ -6,6 +6,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  DAY_CALL_COUNT_LABEL,
   DAY_CALL_LONG_WAIT_S,
   dayCallFailedRowOf,
   dayCallRowOf,
@@ -19,9 +20,14 @@ import type { Observations, ShiftGoal } from '../shift/types.js';
 
 import {
   STAGE_CALL_FAILED_NOTE,
+  STAGE_CALL_NO_CROSSING,
+  STAGE_CALL_ROWS_CAVEAT,
+  STAGE_CALL_TAKEN,
   stageCallFailedRowsOf,
-  stageCallGoalsLineOf,
+  stageCallLeadOf,
+  stageCallReadingsLineOf,
   stageCallRowDueAtS,
+  stageCallRowsCaveatOf,
   stageCallRowsOf,
   STAGE_CALL_ROW_NOTE,
   stageCallWrinkleQuietDueAtS,
@@ -135,56 +141,99 @@ describe('a wrinkle that raised no call, on the stage — § D1336', () => {
   });
 });
 
+
 /*
- * Wave AO, lane DR-1, § D1433: once due, the row reads each answer's deepest landing and longest
- * wait so far at the last whole minute the stage has reached, says *past its bar* only where the
- * reading is past it, and that a run could no longer clear only from the minute it first read so.
+ * Wave AO, lane DR-1, § D1433, as wave AP's lane DT-2 reorders it (swarm DT's Q3): once due, a row
+ * that reads goals leads with the first crossing the playhead has reached, or says no answer has
+ * crossed a bar yet; then each answer's deepest landing and longest wait at the playhead, the answer
+ * taken first; and no count. *Past its bar* only where the reading is past it, a crossing only from
+ * the instant it happened, and the caveat once above the rows.
  */
-describe('a call’s row reads the day’s two final goals at the playhead — § D1433', () => {
+describe('a call’s row leads with the first crossing and reads the goals at the playhead — § D1433, swarm DT’s Q3', () => {
   const series = (samples: DayCallMaxima['samples']): DayCallMaxima => ({ fromS: 7200, endedAt: 36_000, samples });
-  /* Park's landing passes 24 at 7 800 s; spread's wait passes 380 s at 8 400 s; leave's longest wait is a rider still standing. */
+  /*
+   * Spread was the answer taken. Park's landing passes 24 at 16 700 s (04:38:20 on this test's clock); spread's wait
+   * passes 380 s at 17 000 s (04:43:20); leave's longest wait is a rider still standing.
+   */
   const READ: DayCallRecord = {
     ...RECORD,
     maxima: {
-      'park-cars-lobby': series([[7200, 20, 10, 100], [7800, 20, 25, 100]]),
-      'spread-cars': series([[7200, 20, 10, 100], [8400, 20, 12, 400]]),
+      'park-cars-lobby': series([[7200, 20, 10, 100], [16_700, 20, 25, 100], [17_500, 20, 27, 100]]),
+      'spread-cars': series([[7200, 20, 10, 100], [17_000, 20, 12, 400]]),
       leave: series([[7200, 20, 10, null]]),
     },
   };
   const GOALS: readonly ShiftGoal[] = goalsForDay(1).map((goal) =>
     goal.id === 'queue' ? { ...goal, bar: 24 } : goal.id === 'worst-wait' ? { ...goal, bar: 380 } : goal,
   );
+  const rowsOf = (playheadS: number, log: readonly { atS: number; change: { kind: 'park-cars-lobby' } }[] = []) =>
+    stageCallRowsOf({ records: [READ], playheadS, endedAt: 36_000, log, clockOf: clock, goals: GOALS });
 
-  it('reads each answer at the last whole minute reached, in the counts sentence’s order and naming', () => {
-    expect(stageCallGoalsLineOf(READ, GOALS, 7890, clock)).toBe(
-      `By ${clock(7860)}, the deepest landing and the longest wait so far: 25 (past its bar of 24) and 100 s with ` +
-        'park the cars in the lobby; 10 and 100 s with spread the cars across the tower; 10 and a wait still ' +
-        'under way with leave them. A landing’s deepest stack and the longest wait cannot come back under a bar ' +
-        `once past it: the day could no longer clear with park the cars in the lobby from ${clock(7800)}.`,
+  it('says no answer has crossed a bar a minute before the crossing, and leads with it at the crossing', () => {
+    expect(clock(16_700)).toBe('04:38');
+    /* A minute before, and at the minute's own start: nothing has crossed, and nothing ahead is read. */
+    for (const playheadS of [16_640, 16_680, 16_699]) {
+      expect(stageCallLeadOf(READ, GOALS, playheadS, clock), `at ${String(playheadS)}`).toBe(STAGE_CALL_NO_CROSSING);
+    }
+    expect(stageCallLeadOf(READ, GOALS, 16_700, clock)).toBe(
+      'From 04:38, the day could no longer clear with park the cars in the lobby: the deepest landing reached 25 against a bar of 24.',
+    );
+    /* The crossing's own figure, not the later 27: the row's lead is the instant it crossed. */
+    expect(stageCallLeadOf(READ, GOALS, 18_000, clock)).toContain('the deepest landing reached 25 against a bar of 24.');
+    /* A later crossing follows the first, in the order they happened. */
+    expect(stageCallLeadOf(READ, GOALS, 17_000, clock)).toBe(
+      'From 04:38, the day could no longer clear with park the cars in the lobby: the deepest landing reached 25 against a bar of 24. ' +
+        'From 04:43, the day could no longer clear with spread the cars across the tower: the longest wait reached 400 s against a bar of 380 s.',
     );
   });
 
-  it('says past its bar only where the reading is past it — the honesty pair', () => {
-    /* Before park's landing passed 24, nothing is past and no run is said to be lost. */
-    const before = stageCallGoalsLineOf(READ, GOALS, 7799, clock) ?? '';
-    expect(before).not.toMatch(/past its bar|could no longer clear/u);
-    /* Spread's wait passes its bar at 8 400 s: not said a minute earlier, said from then. */
-    expect(stageCallGoalsLineOf(READ, GOALS, 8399, clock)).not.toMatch(/400 s|with spread the cars across the tower from/u);
-    const after = stageCallGoalsLineOf(READ, GOALS, 8400, clock) ?? '';
-    expect(after).toContain('12 and 400 s (past its bar of 380 s) with spread the cars across the tower');
-    expect(after).toContain(`with park the cars in the lobby from ${clock(7800)} and with spread the cars across the tower from ${clock(8400)}`);
-    /* A wait still under way is pending on the rail, never past its bar, however long it has run. */
-    expect(after).toContain('a wait still under way with leave them');
-    expect(after).not.toMatch(/with leave them from/u);
+  it('reads each answer at the playhead, the answer taken first and marked, the others in the counts order', () => {
+    expect(stageCallReadingsLineOf(READ, GOALS, 16_730, clock)).toBe(
+      `By ${clock(16_730)}, the deepest landing and the longest wait so far: 10 and 100 s with spread the cars across ` +
+        'the tower, your answer; 25 (past its bar of 24) and 100 s with park the cars in the lobby; 10 and a wait still ' +
+        'under way with leave them.',
+    );
+    /* A skipped call has no answer taken: the counts sentence's order, nothing marked. */
+    const skipped = stageCallReadingsLineOf({ ...READ, answer: 'skipped' }, GOALS, 16_730, clock) ?? '';
+    expect(skipped).toMatch(/so far: 25 \(past its bar of 24\) and 100 s with park the cars in the lobby; 10 and 100 s with spread/u);
+    expect(skipped).not.toContain(STAGE_CALL_TAKEN);
   });
 
-  it('prints the readings on a due row, labels the count as no goal, and prints counts only on a record without readings', () => {
-    const [row] = stageCallRowsOf({ records: [READ], playheadS: 7860, endedAt: 36_000, log: [], clockOf: clock, goals: GOALS });
-    expect(row?.goals).toBe(stageCallGoalsLineOf(READ, GOALS, 7860, clock));
-    expect(row?.note).toContain('The count of riders who waited a minute is not one of the day’s goals.');
+  it('never says an answer cleared, and never names a crossing before its instant, at any playhead', () => {
+    for (let playheadS = 7860; playheadS <= 36_000; playheadS += 30) {
+      const [row] = rowsOf(playheadS);
+      for (const text of [row?.lead, row?.goals]) expect(text ?? '').not.toMatch(/\bcleared\b|could still clear|\bwill\b/u);
+      const named = ['park the cars in the lobby', 'spread the cars across the tower', 'leave them'].filter((words) =>
+        (row?.lead ?? '').includes(`clear with ${words}`),
+      );
+      const crossed = [playheadS >= 16_700 ? 'park the cars in the lobby' : undefined, playheadS >= 17_000 ? 'spread the cars across the tower' : undefined];
+      expect(named, `at ${String(playheadS)}`).toEqual(crossed.filter((words) => words !== undefined));
+    }
+  });
+
+  it('prints no count on a row that reads goals, says the caveat once above the rows, and keeps an old record’s counts', () => {
+    const [row] = rowsOf(7860);
+    expect(row?.kind).toBe('call');
+    expect(row?.lead).toBe(STAGE_CALL_NO_CROSSING);
+    expect(row?.goals).toBe(stageCallReadingsLineOf(READ, GOALS, 7860, clock));
+    expect(row?.counts).toBeUndefined();
+    expect(row?.note).toBeUndefined();
+    expect(stageCallRowsCaveatOf(rowsOf(7860))).toBe(STAGE_CALL_ROWS_CAVEAT);
     expect(stageCallRowsOf({ records: [READ], playheadS: 7859, endedAt: 36_000, log: [], clockOf: clock, goals: GOALS })).toEqual([]);
-    const [old] = stageCallRowsOf({ records: [RECORD], playheadS: 7860, endedAt: 36_000, log: [], clockOf: clock, goals: GOALS });
-    expect(old?.goals).toBeUndefined();
-    expect(stageCallGoalsLineOf(RECORD, GOALS, 7860, clock)).toBeUndefined();
+    /* A record written before the readings keeps its counts-only row, and the caveat labels its count. */
+    const old = stageCallRowsOf({ records: [RECORD, READ], playheadS: 7860, endedAt: 36_000, log: [], clockOf: clock, goals: GOALS });
+    expect(old[0]?.counts).toBe(dayCallRowOf(RECORD, 1, () => 'Shift cleared', clock).why.match(/Riders who arrived[^.]*\./u)?.[0]);
+    expect(old[0]?.lead).toBeUndefined();
+    expect(stageCallRowsCaveatOf(old)).toBe(`${STAGE_CALL_ROWS_CAVEAT} ${DAY_CALL_COUNT_LABEL}`);
+    expect(stageCallLeadOf(RECORD, GOALS, 7860, clock)).toBeUndefined();
+    /* The failed and quiet rows are not calls' rows, and draw no caveat alone. */
+    expect(stageCallRowsCaveatOf(stageCallFailedRowsOf({ failures: [{ atS: 7200, question: 'driver' }], playheadS: 7200, clockOf: clock }))).toBeUndefined();
+  });
+
+  it('names a press after the call as outside the runs, wherever it fell, and one after the playhead not at all', () => {
+    const press = (atS: number) => ({ atS, change: { kind: 'park-cars-lobby' as const } });
+    expect(rowsOf(16_000, [press(12_000)])[0]?.note).toBe(`Your press at ${clock(12_000)} is not in these runs.`);
+    expect(rowsOf(16_000, [press(7200)])[0]?.note).toBeUndefined();
+    expect(rowsOf(16_000, [press(16_500)])[0]?.note).toBeUndefined();
   });
 });

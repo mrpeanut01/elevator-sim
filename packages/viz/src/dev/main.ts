@@ -242,6 +242,7 @@ import { pressCounterfactualOf } from '../shift/counterfactual.js';
 import { carAbsencesOf, type BookedOutCar } from '../shift/bookedOut.js';
 import { readGoals } from '../shift/goals.js';
 import { dayDeciderOf } from '../shift/dayClose.js';
+import { dayCallRecordWithMaximaOf } from '../shift/dayCallMaxima.js';
 import {
   clockOf,
   clockRange,
@@ -4321,13 +4322,21 @@ function boot(ui: Elements, resources: BrowserResources): void {
         const [parked, spreadOut] = recordings;
         if (parked === undefined || spreadOut === undefined) return;
         const whole = (recording: VizRecording) => shiftObservationsOf(observationsAt(recording, recording.endedAt));
-        pinnedCallCounts = dayCallRecordOf({
-          atS,
-          windowEndS: dayCallWindowEndOf(atS, leave.endedAt),
-          answer: 'leave',
-          legs: { 'park-cars-lobby': parked.legs, 'spread-cars': spreadOut.legs, leave: leave.legs },
-          observations: { 'park-cars-lobby': whole(parked), 'spread-cars': whole(spreadOut), leave: whole(leave) },
-        });
+        /*
+         * Wave AP, lane DT-2, swarm DT's Q3 item 4: each answer's readings from the three runs, as an
+         * ordinary call's are, so the pinned call's row leads with its first crossing too. A record
+         * written before them (a resumed attempt's) keeps its counts-only row.
+         */
+        pinnedCallCounts = dayCallRecordWithMaximaOf(
+          dayCallRecordOf({
+            atS,
+            windowEndS: dayCallWindowEndOf(atS, leave.endedAt),
+            answer: 'leave',
+            legs: { 'park-cars-lobby': parked.legs, 'spread-cars': spreadOut.legs, leave: leave.legs },
+            observations: { 'park-cars-lobby': whole(parked), 'spread-cars': whole(spreadOut), leave: whole(leave) },
+          }),
+          { 'park-cars-lobby': parked, 'spread-cars': spreadOut, leave },
+        );
         /* Part of the attempt, so a resumed one still prints the row. */
         writeAttempt();
         renderAll();
@@ -5823,6 +5832,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
     /* § D1361 — another tab holds the attempt on the week's day, or this run is one that moved on there. */
     attemptHeldElsewhere: () => attemptHeldElsewhere(),
     attemptRunStale: (recording) => attemptRunStale(recording),
+    /* § D1448 — the run this tab plays of the attempt, or the one another tab took over. */
+    attemptRunHere: (recording) => recording === attemptRecording || attemptRunStale(recording),
     /* § D1360 — the Everyday screens' refusal over the day an attempt stands on, or over the write. */
     attemptHold: (patch) => watchOnlyRefusal(state, patch, everydayHoldSentence),
     /* § D1362 — a run of the unbegun day from any door but *Start the day* meets a practice crowd. */
@@ -5905,9 +5916,9 @@ function boot(ui: Elements, resources: BrowserResources): void {
       /* § D1239 — a skip at the call is an answer too, and its row counts all three. */
       measurePinnedCall();
     },
-    closeDay: () => {
+    closeDay: (grading) => {
       /* § D1239 — the Everyday stage's own close, the only one that files a scored attempt. */
-      closeShift('stage');
+      closeShift('stage', grading);
     },
     openRunTab: () => {
       context.openTab('run');
@@ -6614,6 +6625,16 @@ function boot(ui: Elements, resources: BrowserResources): void {
           ? Math.max(Math.min(attempt.shownToS, callAtS ?? Number.POSITIVE_INFINITY), playback.recording.startedAt)
           : null;
     if (playback.reach !== reach) playback.setReach(reach);
+    /*
+     * **And while the stage has the page, this transport stands where the stage does** — wave AP,
+     * lane AP-D1, [§ D1449](../../../../DECISIONS.md), the post-AO panel's seat D (D9: the Engineer's
+     * clock read 08:10 while the stage was held at 08:36). The reach capped the transport and moved
+     * nothing: a transport paused on an earlier visit stayed where it was paused, so *Switch to
+     * Engineer* opened on an instant the stage had long left. Behind the cover it follows the reach,
+     * which the stage notes at the instant it stops on (§ D1153's call second, § D1446's loss); on
+     * this surface it is the player's to pause and scrub, as far as the reach.
+     */
+    if (reach !== null && !engineerHasThePage() && playback.simTimeS !== reach) playback.seekTo(reach);
     if (!held || heldRunId === playback.recording.runId + String(playback.recording.startedAt)) return;
     heldRunId = playback.recording.runId + String(playback.recording.startedAt);
     setText(ui.transport.status, own ? ATTEMPT_SHOWN_TO_ITS_REACH : ATTEMPT_DAY_SHOWN_TO_ITS_REACH);
@@ -8035,8 +8056,17 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * tab and its export press. Wave AM, lane AM-B, [§ D1239](../../../../DECISIONS.md): a scored
    * attempt closes only by its own stage, and while one stands on this device an Engineer close banks
    * nothing into any week.
+   *
+   * `grading` is the goals the **sheet** is graded on where they are not the day's own five — wave
+   * AP lane AP-D2, [§ D1452](../../../../DECISIONS.md): a career day's report is graded on the
+   * contract's four tests (`everyday/host.ts#closeDay` hands them in), so its headline is the mark
+   * the career files. The week's outcome is still read against the five, so nothing the week keeps
+   * moves; only the sheet's verdict, rows and account follow the contract.
    */
-  function closeShift(via: 'stage' | 'engineer' = 'engineer'): void {
+  function closeShift(
+    via: 'stage' | 'engineer' = 'engineer',
+    grading?: { readonly goals: readonly ShiftGoal[] },
+  ): void {
     const recording = state.recording;
     if (recording === undefined || filedRunId === recording.runId) return;
     /*
@@ -8271,7 +8301,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
     filedReportInput = {
       recording,
       observations,
-      goals,
+      /* § D1452: a career day's sheet is graded on the contract's tests; every other sheet on the day's own. */
+      goals: grading?.goals ?? goals,
       week,
       practice,
       /* Which ground made it practice, so the sheet says the true one — § D1141. */

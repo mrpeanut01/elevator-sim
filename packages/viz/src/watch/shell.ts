@@ -76,9 +76,13 @@ export const RAIL_EYEBROW_PLAYER = 'Your run';
  */
 export const RAIL_EYEBROW_WATCHING = 'The week on this device';
 
-/** L4's note over a player's own run — `index.html`'s original sentence, now with one author. */
+/**
+ * L4's note over a player's own run — `index.html`'s original sentence, now with one author. Its
+ * second sentence read *No losing — just a line you are trying to bend upward* until wave AP lane
+ * AP-D2 (the post-AO panel's seats A and B): a day is filed missed and a week can miss its target.
+ */
 export const RAIL_NOTE_PLAYER =
-  'Share of riders away within a minute. No losing — just a line you are trying to bend upward.';
+  'Share of riders away within a minute, day by day. A day you play can be missed, and a week can miss its target.';
 
 /** L4's note while watching — the same figures, told apart from the day on the stage. */
 export const RAIL_NOTE_WATCHING =

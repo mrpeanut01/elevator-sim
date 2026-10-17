@@ -71,6 +71,7 @@ import {
   type WeekDominanceReading,
 } from './weekDominance.js';
 import { dealtWeekOrdersOf, orderedWrinkleIdFor, WEEK_ORDER_DAYS, weekOrderIndexOf, type WeekOrderDay } from './weekOrders.js';
+import { POOL_CENSUS, poolTopOf, WEEK_POOL } from './weekPool.js';
 import { dc10Of, WEEK_WAY, weekWayRowFor, type WeekWay } from './weekWay.js';
 
 /** A week, as far as dealing a level needs. */
@@ -253,7 +254,8 @@ export function weekTopOf(
   dominance: WeekDominance = WEEK_DOMINANCE,
   ladder: ContractLadder = CONTRACT_LADDER,
 ): number {
-  const shipped = ladder === CONTRACT_LADDER && dominance === WEEK_DOMINANCE;
+  /* The pool census plays authored weeks, so its run neither reads nor writes the cache (`POOL_CENSUS`). */
+  const shipped = ladder === CONTRACT_LADDER && dominance === WEEK_DOMINANCE && !POOL_CENSUS.measuring;
   let cache = shipped ? TOPS.get(census) : undefined;
   const cached = cache?.get(contractId);
   if (cached !== undefined) return cached;
@@ -272,6 +274,15 @@ export function weekTopOf(
       top = week;
     }
   }
+  /*
+   * **And the pool admits each week it deals** — wave AP, lane DT-1, [§ D1462](../../../../DECISIONS.md):
+   * from week 2 a counted day is dealt from `data/week-pool.json`, so a week is dealt only where
+   * DC-10, DC-11, the monotone clause and § D1337's trap check hold over the pool as dealt
+   * (`weekPool.ts#poolLevelReadingOf`). A week the pool refuses or has not measured ends the ladder
+   * below it, week 2 included, which leaves the tower its first week's draw. A tower the pool does
+   * not cover reads `Infinity` there and keeps its own top.
+   */
+  if (shipped && top > 1) top = Math.min(top, poolTopOf(contractId, WEEK_POOL, census));
   if (shipped) {
     if (cache === undefined) {
       cache = new Map();

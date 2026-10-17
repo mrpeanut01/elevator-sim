@@ -44,7 +44,10 @@
 
 import { PRACTICE_DAY_SENTENCES, practiceGroundOf, type PracticeGround } from '../shift/scoredCrowd.js';
 import { isDerivedCrowdOn } from '../shift/weekRecord.js';
+import { pooledCrowdOf, poolWaysLineOf } from '../shift/poolWays.js';
+import { isPoolCrowdSeed } from '../shift/weekPool.js';
 import type { ResolvedBuilding } from '@elevator-sim/core/browser';
+import { floorsAroundLobbyOf } from '../authoring/buildingSpec.js';
 
 import { absenceSpanPhraseOf, bookedOutCarsOf, carAbsencesOf, wrinkleNameOf, wrinkleNoteOf } from '../shift/bookedOut.js';
 import type { CalendarPeriod } from '../shift/calendar.js';
@@ -203,6 +206,12 @@ export interface TodayRecord {
    * crowd it is.
    */
   readonly crowdIsDerived?: boolean | undefined;
+  /**
+   * **The ways through this crowd, as the pool measured them**, or `undefined` off the pool — wave
+   * AP, lane DT-1, [§ D1463](../../../../DECISIONS.md): how many of the shipped drivers clear it
+   * left alone, naming none, or that answering a call cleared it (`shift/poolWays.ts`).
+   */
+  readonly waysLine?: string | undefined;
   /**
    * `shift/firstSession.ts`'s line on a first day nobody has played on a legible tower, or
    * `undefined` on every other day — GitHub issue #208, § D514.
@@ -673,6 +682,12 @@ function driverHeldOf(input: TodayInput, event: ShiftEvent): string | undefined 
   return PRESS_DAY_DRIVER_HELD;
 }
 
+/** `19 above the lobby, 1 below it` — `authoring/buildingSpec.ts#floorsAroundLobbyOf`, the sandbox's count. */
+export function floorsLineOf(building: Pick<ResolvedBuilding, 'floors'>): string {
+  const { above, below } = floorsAroundLobbyOf(building.floors);
+  return below === 0 ? `${String(above)} above the lobby` : `${String(above)} above the lobby, ${String(below)} below it`;
+}
+
 /** § 6.2's five rows, from the resolved building. Empty when there is no document to read. */
 function factsOf(
   building: ResolvedBuilding | undefined,
@@ -689,7 +704,12 @@ function factsOf(
   );
   const smallest = capacities.length === 0 ? undefined : Math.min(...capacities);
   return [
-    { label: 'Floors', value: `${String(building.floors.length)} above ground` },
+    /*
+     * The sandbox's count, from the same lobby (wave AP lane AP-D2, the post-AO panel's seat D, D9):
+     * this read `floors.length` *above ground*, which counts the lobby and any car park, so Midtown
+     * Office's brief said 21 where *Tune the tower* said 19 above the lobby.
+     */
+    { label: 'Floors', value: floorsLineOf(building) },
     { label: 'People', value: groupThousands(building.totalPopulation) },
     {
       label: 'Lifts',
@@ -779,6 +799,16 @@ export const TODAY_CHOICE_LINE =
   'You choose who drives before the day starts, and what the cars do while it plays.';
 
 /**
+ * {@link TODAY_CHOICE_LINE} on a day whose driver is held ({@link TodayRecord.driverHeld}) — GitHub
+ * issue #626 item 2. The lede said *"You choose who drives before the day starts"* above a brief whose
+ * driver cards were held until the stage's call, so the two screens contradicted each other. The
+ * hold is the rule (§ D1029) and stands; the sentence now says it.
+ */
+export const TODAY_CHOICE_LINE_HELD =
+  'Today the tower’s standing order drives until the stage’s call is answered, and you choose what ' +
+  'the cars do while it plays.';
+
+/**
  * § 6.1's lede — the building in words a stranger understands, composed from its own facts.
  *
  * Composed rather than authored, because the prototype's lede is a sentence about Chancery House
@@ -800,6 +830,7 @@ function ledeOf(
   name: string,
   note: string,
   out: readonly CarOutToday[],
+  driverHeld = false,
 ): string {
   if (building === undefined) {
     return (
@@ -815,7 +846,7 @@ function ledeOf(
     `${String(building.floors.length)} floors, ` +
     `${groupThousands(building.totalPopulation)} people and ${lifts}. ` +
     `${name}: ${note} ` +
-    TODAY_CHOICE_LINE
+    (driverHeld ? TODAY_CHOICE_LINE_HELD : TODAY_CHOICE_LINE)
   );
 }
 
@@ -850,6 +881,11 @@ function crowdIsDerivedOf(input: TodayInput): boolean {
   return input.dealtCrowd !== undefined && input.seed === input.dealtCrowd && isDerivedCrowdOn(input.seed, input.daySeed);
 }
 
+/** The run's crowd is the one the day is dealt, and the pool dealt it (§ D1460). */
+function crowdIsPooledOf(input: TodayInput): boolean {
+  return input.dealtCrowd !== undefined && input.seed === input.dealtCrowd && isPoolCrowdSeed(input.seed);
+}
+
 function seedLineOf(input: TodayInput, crowdIsPinned: boolean, practice: PracticeGround | undefined): string {
   const crowd = `tower ${input.buildingId} · crowd ${input.seed.toString()}`;
   if (input.crowdIsToday) return `${crowd} · today’s date, so everyone playing today meets this crowd`;
@@ -866,6 +902,17 @@ function seedLineOf(input: TodayInput, crowdIsPinned: boolean, practice: Practic
    * meets the crowd derived from the date, the day of the week and the weeks closed. It is the same
    * for everyone who reaches that day of that week today, and it is not the date's board's crowd.
    */
+  /*
+   * **The fifth arm: a crowd from the measured pool** — wave AP, lane DT-1,
+   * [§ D1460](../../../../DECISIONS.md). From week 2 a counted day is dealt from the published pool
+   * for its weekday and level, by today's date, the day and the weeks closed here.
+   */
+  if (crowdIsPooledOf(input)) {
+    return (
+      `${crowd} · from this weekday’s measured pool, by today’s date, the day of the week and the ` +
+      'weeks you have closed here'
+    );
+  }
   if (crowdIsDerivedOf(input)) {
     return (
       `${crowd} · today’s date, then the day of the week, then the weeks you have closed here: ` +
@@ -944,13 +991,14 @@ export function todayOf(input: TodayInput): TodayRecord {
     event,
     crowdIsPinned && admittedPressDayIds().includes(week.contractId),
   );
+  const driverHeld = driverHeldOf(input, event);
   return {
     day: week.day,
     weekday,
     /* Wave AN, lane AN-7: the week's number, where one is true of it (`weekStake.ts#weekOrdinalOf`). */
     dayLabel: `${ordinalEyebrowOf(week)}${weekday.toUpperCase()} · DAY ${String(week.day)}`,
     towerName: building?.name ?? input.buildingId,
-    lede: ledeOf(building, wrinkleName, wrinkleNote, out),
+    lede: ledeOf(building, wrinkleName, wrinkleNote, out, driverHeld !== undefined),
     wrinkle: event,
     wrinkleName,
     wrinkleNote,
@@ -973,6 +1021,7 @@ export function todayOf(input: TodayInput): TodayRecord {
     crowdIsToday: input.crowdIsToday,
     crowdIsPinned,
     crowdIsDerived: crowdIsDerivedOf(input),
+    waysLine: crowdIsPooledOf(input) ? poolWaysLineOf(pooledCrowdOf(week, week.day, input.seed)) : undefined,
     /*
      * Which arm is the draw's own answer rather than a guess about how the player arrived — GitHub
      * issue #595: the picker and the pinned days both reach a legible first day the seed did not
@@ -985,7 +1034,7 @@ export function todayOf(input: TodayInput): TodayRecord {
       : undefined,
     dayLength: dayLengthOf(input, event),
     driver: input.dispatcherName ?? EM_DASH,
-    driverHeld: driverHeldOf(input, event),
+    driverHeld,
     wayThrough: wayThroughSentenceOf({
       contractId: week.contractId,
       day: week.day,

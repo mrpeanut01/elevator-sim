@@ -21,14 +21,15 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import type { VizLeg, VizRecording } from '../contract/types.js';
-import { buildingConfigOf, shiftRunConfigOf, type ViewerState } from '../dev/state.js';
+import { buildingConfigOf, pressDayCallOf, shiftRunConfigOf, type ViewerState } from '../dev/state.js';
 import { waitBandsAt } from '../live/bands.js';
 import { observationsAt } from '../live/observations.js';
 import { ManualClock } from '../playback/clock.js';
 import { Playback } from '../playback/playback.js';
 import { recordRun } from '../record/recordRun.js';
 import { legibilityOf } from '../shift/legibility.js';
-import { contractBuildings, contractDayState } from '../shift/contractDay.test-helper.js';
+import { contractBuildings, contractDayState, todaysScenarioDayState } from '../shift/contractDay.test-helper.js';
+import { openWeek } from '../shift/week.js';
 import { actsOf, runHorizonOf, wholeDayFor, wholeDayRun } from '../shift/dayLength.js';
 
 import { clockAt } from '../live/timeline.js';
@@ -40,6 +41,7 @@ import {
   PACE_HOLD_WAIT_S,
   SKIP_BEAT_REAL_S,
   STAGE_SKIP_BEAT_NOTE,
+  WATCH_ALLOWANCE_REAL_S,
   firstMinuteWaitFrom,
   nextPeakStartAfter,
   stagePaceNoteOf,
@@ -49,7 +51,9 @@ import {
   stageSkipLineStands,
   stageSkipOf,
   stageStatusOf,
+  watchedRealAfter,
   type StagePaceInput,
+  type StagePaceReason,
   type StageSkip,
 } from './stagePace.js';
 import { scoredDayPlayOf } from './stagePace.test-helper.js';
@@ -478,6 +482,80 @@ describe('a scored day — § D1169', () => {
 });
 
 /**
+ * The stage's frame loop, over the real transport: § D1169's pace, § D1212's skip exactly as
+ * `stageScreen.ts#skipBetweenPeaks` asks it, and a stop at each of `stops` that puts the playhead on
+ * the stop's second (§ D1153) and records it. The pause at a stop is the player's and costs nothing.
+ * `allowance` is § D1493's limit on the hold, counted as `stageScreen.ts#pace` counts it; `false` is
+ * § D1169's hold as it was. `frameMs` is the frame interval, half a second unless a case needs the
+ * stage's own precision.
+ */
+function play(recording: VizRecording, stops: readonly number[], skip: boolean, allowance = true, frameMs = FRAME_MS) {
+  const clock = new ManualClock();
+  const playback = new Playback(recording, clock, { speed: WATCHING, autoplay: true });
+  const acts = actsOf(recording.demandPhases);
+  const pending = [...stops].sort((a, b) => a - b);
+  const stoppedAt: number[] = [];
+  const stoppedRealS: number[] = [];
+  const skips: StageSkip[] = [];
+  let armedAtS: number | undefined;
+  let landedAtS: number | undefined;
+  /* § D1493, as `stageScreen.ts#pace` counts it: watching since the last stop, frame by frame. */
+  let watchedRealS = 0;
+  let last: { reason: StagePaceReason; atS: number; simPerRealS: number } | undefined;
+  while (playback.state !== 'ended') {
+    const t = playback.simTimeS;
+    const stop = pending[0];
+    if (last !== undefined) {
+      watchedRealS = watchedRealAfter(watchedRealS, { reason: last.reason, fromS: last.atS, toS: t, simPerRealS: last.simPerRealS });
+    }
+    const answer = stagePaceOf({
+      ...inputAt(recording, t, { longestStandingS: waitBandsAt(recording, t).longestCurrentWaitS }),
+      scored: true,
+      callAtS: stop,
+      watchedRealS: allowance ? watchedRealS : undefined,
+    });
+    last = { reason: answer.reason, atS: t, simPerRealS: answer.simPerRealS };
+    if (answer.reason === 'call' && stop !== undefined) {
+      if (playback.simTimeS > stop) playback.seekTo(stop);
+      stoppedAt.push(playback.simTimeS);
+      stoppedRealS.push(clock.now() / 1000);
+      pending.shift();
+      armedAtS = undefined;
+      watchedRealS = 0;
+      last = undefined;
+      continue;
+    }
+    if (playback.speed !== answer.simPerRealS) playback.setSpeed(answer.simPerRealS);
+    const applies =
+      skip &&
+      !(landedAtS !== undefined && Math.abs(t - landedAtS) < 1) &&
+      stageSkipApplies({ horizon: 'whole-day', scored: true, acts, simTimeS: t, reason: answer.reason });
+    if (!applies) armedAtS = undefined;
+    else if (armedAtS === undefined) armedAtS = t;
+    else {
+      const taken = stageSkipOf({
+        acts,
+        legs: recording.legs,
+        simTimeS: t,
+        armedAtS,
+        simPerRealS: playback.speed,
+        stopAtS: stop,
+        endedAt: recording.endedAt,
+      });
+      if (taken !== undefined) {
+        skips.push(taken);
+        landedAtS = taken.toS;
+        armedAtS = undefined;
+        playback.seekTo(taken.toS);
+        continue;
+      }
+    }
+    clock.advance(frameMs);
+  }
+  return { realS: clock.now() / 1000, stoppedAt, stoppedRealS, skips, endedAtS: playback.simTimeS };
+}
+
+/**
  * **Between a scored whole day's peaks, the quiet is skipped** — [§ D1212](../../../../DECISIONS.md),
  * swarm DN's Q1 (c). The stage plays a beat, then seeks to the first instant anybody reaches a
  * minute, the next call or the next peak's start, read exactly off the recording; inside a peak
@@ -532,7 +610,7 @@ describe('the skip across a scored whole day’s quiet — § D1212, widened by 
       expect(stageSkipApplies({ ...gate, simTimeS }), String(simTimeS)).toBe(true);
     }
     /* Every other reason, every other horizon, an unscored day, and a day with no peaks: no skip. */
-    for (const reason of ['yours', 'watching', 'call', 'between', 'held', 'act', 'chosen', 'unmanaged'] as const) {
+    for (const reason of ['yours', 'watching', 'unheld', 'call', 'between', 'held', 'act', 'chosen', 'unmanaged'] as const) {
       expect(stageSkipApplies({ ...gate, reason }), reason).toBe(false);
     }
     expect(stageSkipApplies({ ...gate, horizon: 'period' }), 'a slice').toBe(false);
@@ -627,64 +705,6 @@ describe('the skip across a scored whole day’s quiet — § D1212, widened by 
     throw new Error('Midtown’s morning gap has no quiet stretch to skip');
   }
 
-  /**
-   * The stage's frame loop, over the real transport: § D1169's pace, § D1212's skip exactly as
-   * `stageScreen.ts#skipBetweenPeaks` asks it, and a stop at each of `stops` that puts the playhead on
-   * the stop's second (§ D1153) and records it. The pause at a stop is the player's and costs nothing.
-   */
-  function play(recording: VizRecording, stops: readonly number[], skip: boolean) {
-    const clock = new ManualClock();
-    const playback = new Playback(recording, clock, { speed: WATCHING, autoplay: true });
-    const acts = actsOf(recording.demandPhases);
-    const pending = [...stops].sort((a, b) => a - b);
-    const stoppedAt: number[] = [];
-    const skips: StageSkip[] = [];
-    let armedAtS: number | undefined;
-    let landedAtS: number | undefined;
-    while (playback.state !== 'ended') {
-      const t = playback.simTimeS;
-      const stop = pending[0];
-      const answer = stagePaceOf({
-        ...inputAt(recording, t, { longestStandingS: waitBandsAt(recording, t).longestCurrentWaitS }),
-        scored: true,
-        callAtS: stop,
-      });
-      if (answer.reason === 'call' && stop !== undefined) {
-        if (playback.simTimeS > stop) playback.seekTo(stop);
-        stoppedAt.push(playback.simTimeS);
-        pending.shift();
-        armedAtS = undefined;
-        continue;
-      }
-      if (playback.speed !== answer.simPerRealS) playback.setSpeed(answer.simPerRealS);
-      const applies =
-        skip &&
-        !(landedAtS !== undefined && Math.abs(t - landedAtS) < 1) &&
-        stageSkipApplies({ horizon: 'whole-day', scored: true, acts, simTimeS: t, reason: answer.reason });
-      if (!applies) armedAtS = undefined;
-      else if (armedAtS === undefined) armedAtS = t;
-      else {
-        const taken = stageSkipOf({
-          acts,
-          legs: recording.legs,
-          simTimeS: t,
-          armedAtS,
-          simPerRealS: playback.speed,
-          stopAtS: stop,
-          endedAt: recording.endedAt,
-        });
-        if (taken !== undefined) {
-          skips.push(taken);
-          landedAtS = taken.toS;
-          armedAtS = undefined;
-          playback.seekTo(taken.toS);
-          continue;
-        }
-      }
-      clock.advance(FRAME_MS);
-    }
-    return { realS: clock.now() / 1000, stoppedAt, skips, endedAtS: playback.simTimeS };
-  }
 
   it('plays Midtown’s day in the time its legs predict, both ways, and the skip takes most of the quiet out', () => {
     const acts = actsOf(day.demandPhases);
@@ -761,6 +781,84 @@ describe('the skip across a scored whole day’s quiet — § D1212, widened by 
     expect(observationsAt(skipped, skipped.endedAt)).toEqual(observationsAt(watched, watched.endedAt));
     /* Positive control: the presses do change the run, so equal legs are not equal by accident. */
     expect(skipped.legs).not.toEqual(day.legs);
+  });
+});
+
+/*
+ * ---- Wave AP, lane G-3: the hold lasts so long with nothing to decide — § D1493 ----
+ *
+ * GitHub issue #626 item 5: on Midtown's day 1 at seed n = 2, a pinned press day with its call at
+ * 10:40, a first-time player at 4× waited 181.3 real seconds for the first thing to decide, 161.1 of
+ * them held at their rung by § D1169 while somebody on a landing had waited a minute.
+ */
+describe('the hold with nothing to decide — § D1493', () => {
+  const held = { scored: true, longestStandingS: PACE_HOLD_WAIT_S + 30 } as const;
+
+  it('holds the player’s rung for the allowance, then plays on at the fast rung, and outranks nothing else', () => {
+    const just = stagePaceOf(inputAt(day, 9000, { ...held, watchedRealS: WATCH_ALLOWANCE_REAL_S - 0.1 }));
+    expect(just).toEqual({ simPerRealS: WATCHING, reason: 'watching' });
+    const on = stagePaceOf(inputAt(day, 9000, { ...held, watchedRealS: WATCH_ALLOWANCE_REAL_S }));
+    expect(on).toEqual({ simPerRealS: BETWEEN_PEAKS_SIM_PER_REAL_S, reason: 'unheld' });
+    /* A rung faster than the fast one is never slowed; with no allowance given, § D1169 as it was. */
+    expect(stagePaceOf(inputAt(day, 9000, { ...held, watchedRealS: 99, watchingSimPerRealS: 90 })).simPerRealS).toBe(90);
+    expect(stagePaceOf(inputAt(day, 9000, { ...held, watchedRealS: undefined })).reason).toBe('watching');
+    /* A call, a lost day and an unscored run are untouched; nobody waiting is `fast` as before. */
+    expect(stagePaceOf(inputAt(day, 9000, { ...held, watchedRealS: 99, callAtS: 8990 })).reason).toBe('call');
+    expect(stagePaceOf(inputAt(day, 9000, { ...held, watchedRealS: 99, lostAtS: 8000 })).reason).toBe('lost');
+    expect(stagePaceOf(inputAt(day, 9000, { longestStandingS: PACE_HOLD_WAIT_S + 30, watchedRealS: 99 })).reason).toBe('held');
+    expect(stagePaceOf(inputAt(day, 9000, { scored: true, longestStandingS: 5, watchedRealS: 99 })).reason).toBe('fast');
+    /* Drawn, never skipped. */
+    expect(stageSkipApplies({ horizon: 'whole-day', scored: true, acts: actsOf(day.demandPhases), simTimeS: 9000, reason: 'unheld' })).toBe(false);
+    expect(stagePaceNoteOf(on, { acts: [], simTimeS: 9000 })).toBe(
+      'nothing to decide yet: playing on at 30× though somebody has waited over a minute · pick a speed to watch',
+    );
+  });
+
+  it('counts only the frames it held for watching, a real second a frame at most', () => {
+    expect(watchedRealAfter(3, { reason: 'watching', fromS: 100, toS: 102, simPerRealS: 4 })).toBe(3.5);
+    expect(watchedRealAfter(3, { reason: 'fast', fromS: 100, toS: 160, simPerRealS: 30 })).toBe(3);
+    expect(watchedRealAfter(3, { reason: 'watching', fromS: 102, toS: 100, simPerRealS: 4 })).toBe(3);
+    expect(watchedRealAfter(3, { reason: 'watching', fromS: 100, toS: 5000, simPerRealS: 4 }), 'a seek').toBe(4);
+  });
+
+  /*
+   * Red before (181 real seconds through the real transport, with no allowance), green after: the
+   * first call comes inside a minute, the stage stops on its second either way, and the recording is
+   * the same, because the allowance moves the transport's speed and nothing else.
+   */
+  it('brings the press day’s call inside a real minute at 4×, and stops on the same second with the same legs', () => {
+    const opened = todaysScenarioDayState(RESOURCES, 'c2', {
+      seed: SEED + 7_919n * 2n,
+      over: { week: { ...openWeek('c2'), day: 1, dayIdx: 0 }, campaignEventId: undefined },
+    });
+    const plan = shiftRunConfigOf(RESOURCES, opened.state);
+    const press = recordRun(plan.config, { recordDecisions: false, outOfServiceCarIds: plan.outOfServiceCarIds }).recording;
+    const call = pressDayCallOf(RESOURCES, opened.state, press)?.call;
+    if (call === undefined) throw new Error('the press day has no call');
+    const legs = structuredClone(press.legs);
+    /* Frames a twentieth of a second apart: the limit is a minute and the rule lands at 59 seconds. */
+    const before = play(press, [call.atS], true, false, 50);
+    const after = play(press, [call.atS], true, true, 50);
+    expect(before.stoppedRealS[0]!).toBeGreaterThan(150);
+    expect(after.stoppedRealS[0]!).toBeLessThanOrEqual(60);
+    expect(after.stoppedAt).toEqual(before.stoppedAt);
+    expect(press.legs).toEqual(legs);
+    /* `scoredDayPlayOf` mirrors the stage both ways, to within a few half-second frames. */
+    const model = (watchAllowanceRealS: number | undefined) =>
+      scoredDayPlayOf({
+        legs: press.legs,
+        acts: actsOf(press.demandPhases),
+        startedAt: press.startedAt,
+        endedAt: press.endedAt,
+        stopsAtS: [call.atS],
+        watchingSimPerRealS: WATCHING,
+        skip: true,
+        untilS: call.atS,
+        watchAllowanceRealS,
+      }).realS;
+    expect(model(undefined)).toBeLessThanOrEqual(60);
+    expect(Math.abs(before.stoppedRealS[0]! - model(Number.POSITIVE_INFINITY))).toBeLessThan(5);
+    expect(Math.abs(after.stoppedRealS[0]! - model(undefined))).toBeLessThan(5);
   });
 });
 

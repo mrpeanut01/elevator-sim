@@ -80,6 +80,11 @@ function viewOf(context: EverydayScreenShellContext): DoorScreenView {
       dayCars: dayAhead.dayCars,
       buildingId: selection.buildingId,
       dispatcherName: host.dispatcherById(selection.dispatcherId)?.name,
+      /*
+       * § D1029's hold, which the brief reads off this same id. The door passed none, so its lede and
+       * its driver note said the driver could be picked on a day the brief then held (issue #626 item 2).
+       */
+      dispatcherId: selection.dispatcherId,
       /* Any profile's name, for the moot-dispatcher sentence — § D914. */
       dispatcherNameOf: (id) => host.dispatcherById(id)?.name,
       goals: host.goalsToday(),

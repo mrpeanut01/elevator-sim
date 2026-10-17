@@ -101,6 +101,7 @@ import {
   bookedLevel,
   legalStarts,
   missedDaysOf,
+  missAllowanceSentenceOf,
   nextSlot,
   oddsAfterWorksPct,
   offerFeeOf,
@@ -428,15 +429,18 @@ function contractDayLabelOf(tower: CampaignTower): string {
 
 /**
  * What {@link CONTRACT_ASKS_HEADING}'s bars decide, and what the other set decides, in the player's
- * words. `shift/goals.ts#TODAY_ASKS_DECIDES` is its mirror on the stage.
+ * words. `shift/goals.ts#TODAY_ASKS_DECIDES` is its mirror on the stage. Since wave AP lane AP-D2
+ * ([§ D1452](../../../../DECISIONS.md)) the career day's report is graded on these four as well, so
+ * the sentence no longer sends the report to the week's five.
  *
  * Its own key rather than an extension of {@link BUILDING_COPY.testsNote}: that line is about
  * *whether today can be read at all* and carries its own § D227 correction, and welding a second
  * subject onto it would put two arguments in one sentence for the next lane to separate again.
  */
 export const CONTRACT_ASKS_DECIDES =
-  'These four are the contract’s, and they are what files a day cleared or missed against it. The ' +
-  'day’s own report grades a separate five, under WHAT TODAY ASKS, and those decide your streak.';
+  'These four are the contract’s: they file a day cleared or missed against it, and the day’s report ' +
+  'is graded on them. The stage also shows the week’s five, under WHAT TODAY ASKS, and the contract ' +
+  'counts none of those.';
 
 /**
  * **All four** of § 8.6's tests, as `ShiftGoal`s.
@@ -2017,10 +2021,11 @@ export function contractDocumentOf(
     }),
   );
   const [w1, w2, w3, w4] = difficulty.rates;
-  const allowance =
-    difficulty.miss === 0
-      ? 'A single missed day loses the contract.'
-      : `More than ${String(difficulty.miss)} missed ${difficulty.miss === 1 ? 'day' : 'days'} and the contract is lost.`;
+  /*
+   * The allowance in the one form every surface states it (wave AP lane AP-D2, the post-AO panel's
+   * seat D, D4): `economy.ts#missAllowanceSentenceOf`, derived from the field `contractIsLost` reads.
+   */
+  const allowance = missAllowanceSentenceOf(difficulty);
   /*
    * What *lost* does, said where the term is (§ D1392, wave AO lane AO-5): it was stated and not
    * enforced, and a desk at 4 of 3 offered a renewal under this clause.

@@ -69,7 +69,7 @@ import type { DispatcherProfile, RunInterventionConfig } from '@elevator-sim/cor
 import type { VizRecording } from '../contract/types.js';
 import { queueAt } from '../frame/overlay.js';
 import { observationsAt } from '../live/observations.js';
-import { dayCallMaximaOf } from '../shift/dayCallMaxima.js';
+import { dayCallRecordWithMaximaOf } from '../shift/dayCallMaxima.js';
 import type { BookedOutCar } from '../shift/bookedOut.js';
 import { actsOf } from '../shift/dayLength.js';
 import {
@@ -461,19 +461,6 @@ export function openDayCallSession(
     return queueAt(leave, counted.atS).some((queue) => queue.total > 0);
   }
 
-  /**
-   * The raised call's record with each answer's two final goals read through the day — § D1433,
-   * `shift/dayCallMaxima.ts`. Taken once, at the raise, while the three runs are in hand, so a row
-   * on a resumed attempt reads them from the record as an unbroken one does.
-   */
-  function withMaxima(counted: DayCallRecord, runs: Partial<Record<DayCallAnswer, VizRecording>>): DayCallRecord {
-    const maxima: Partial<Record<DayCallAnswer, ReturnType<typeof dayCallMaximaOf>>> = {};
-    for (const [answer, recording] of Object.entries(runs) as [DayCallAnswer, VizRecording | undefined][]) {
-      if (recording !== undefined) maxima[answer] = dayCallMaximaOf(recording, counted.atS);
-    }
-    return Object.freeze({ ...counted, maxima: Object.freeze(maxima) });
-  }
-
   function refuse(asking: Pending): void {
     refused += 1;
     /* § D1336: a wrinkle's turned-down moment, counted from the runs already made, for its line. */
@@ -619,7 +606,7 @@ export function openDayCallSession(
           },
         });
         if (admits(counted, verdictGround, leave)) {
-          raise(asking, 'placement', withMaxima(counted, { 'park-cars-lobby': parked, 'spread-cars': spreadOut, leave }), {
+          raise(asking, 'placement', dayCallRecordWithMaximaOf(counted, { 'park-cars-lobby': parked, 'spread-cars': spreadOut, leave }), {
             'park-cars-lobby': { recording: parked, entry: park },
             'spread-cars': { recording: spreadOut, entry: spread },
           });
@@ -701,7 +688,7 @@ export function openDayCallSession(
           onRefused();
           return;
         }
-        raise(asking, 'driver', withMaxima(counted, { 'driver-a': handedA, 'driver-b': handedB, leave }), {
+        raise(asking, 'driver', dayCallRecordWithMaximaOf(counted, { 'driver-a': handedA, 'driver-b': handedB, leave }), {
           'driver-a': { recording: handedA, entry: toA },
           'driver-b': { recording: handedB, entry: toB },
         });

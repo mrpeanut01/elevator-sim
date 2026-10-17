@@ -116,7 +116,7 @@ import { dayCallsOffered, type DayCallWrinkle } from '../shift/dayCalls.js';
 import { pressCallOf, type PressCall } from '../shift/pressCall.js';
 import { grownBuilding } from '../shift/growth.js';
 import { spliceEpisode, trafficProfilesWithRecord } from '../shift/episode.js';
-import { withIncidents } from '../shift/incidents.js';
+import { withIncidents, type Incident } from '../shift/incidents.js';
 import { shiftReportWindowFor } from '../shift/reportWindow.js';
 import {
   calendarDayFor,
@@ -152,6 +152,7 @@ import {
 } from '../shift/week.js';
 import type { OnwardFacts, TomorrowBriefing } from '../shift/tomorrow.js';
 import type { DayOutcome, RunHorizon, ShiftEvent, ShiftEventId, WeekState } from '../shift/types.js';
+import { dealtKeyOf } from '../shift/types.js';
 import type { ShapedDayReport } from '../shift/report.js';
 import type { PlayMode } from '../scope/types.js';
 
@@ -2102,6 +2103,12 @@ export interface ShiftRunConfig {
    * day took is the run's answer rather than a second call that could forget the booking.
    */
   readonly dayCars: { readonly holds: readonly string[]; readonly windows: readonly string[] };
+  /**
+   * The tower's own bookings and the week level's, as this run took them — the list the day's car
+   * choice treats as spoken for. Optional so a hand-built plan reads as none. Wave AP lane AP-D2
+   * ([§ D1451](../../../../DECISIONS.md)): a sandbox day says which of the day's it carried.
+   */
+  readonly bookings?: readonly Incident[];
   /** Anything the shift patch refused to configure, with its reason. Shown, never swallowed. */
   readonly withheld: readonly string[];
   /**
@@ -2125,6 +2132,39 @@ export interface ShiftRunConfig {
  */
 function runRungOf(state: ViewerState, buildingId: string): ReturnType<typeof rungFor> {
   return state.playMode === 'shift-week' ? rungFor(state.week.contractId, buildingId) : undefined;
+}
+
+/** Whether the standing week is a sandbox day's copy that keeps the day it copied (§ D1451). */
+function sandboxDealtOf(state: ViewerState): boolean {
+  return state.playMode === 'shift-week' && state.week.sandboxOf !== undefined && !state.week.sandboxOf.plain;
+}
+
+/** Whether the standing week is a sandbox day's copy the player left plain, with nothing of the day (§ D1451). */
+function sandboxPlainOf(state: ViewerState): boolean {
+  return state.playMode === 'shift-week' && state.week.sandboxOf?.plain === true;
+}
+
+/**
+ * **The rung the tower a changed sandbox day was copied from was handed** — wave AP lane AP-D2,
+ * [§ D1451](../../../../DECISIONS.md). Read for its bookings alone: the copy was already taken from
+ * the tower as handed over (its population and its machines), so its fabric is in the copy, and
+ * applying the rung's fabric again would undo the player's change.
+ */
+export function sandboxHandedRungOf(state: ViewerState): ReturnType<typeof rungFor> {
+  const from = state.week.sandboxOf;
+  if (!sandboxDealtOf(state) || from === undefined || from.buildingId === state.buildingId) return undefined;
+  return rungFor(from.contractId, from.buildingId);
+}
+
+/**
+ * The incidents among `incidents` whose car `building` has — § D1451. A sandbox day's changed tower
+ * can have fewer shafts than the day it copied, and `core` refuses a service event naming a car no
+ * bank declares. Asked on a sandbox day alone, so no other run's bookings are touched.
+ */
+export function bookingsOnCarsOf(incidents: readonly Incident[], building: BuildingConfig): readonly Incident[] {
+  const has = (incident: Incident): boolean =>
+    building.banks.some((bank) => bank.id === incident.car.bankId && bank.cars.some((car) => car.id === incident.car.carId));
+  return incidents.every(has) ? incidents : incidents.filter(has);
 }
 
 /**
@@ -2181,7 +2221,8 @@ export function shiftRunConfigOf(
    * as it hands an undealt order's wrinkle through `campaignEventId`. Read only where a rung reaches
    * the run (`booked` below), so Free Play and Endless never meet a booking.
    */
-  weekBookings: readonly ContractIncident[] = weekBookingsOn(state.week, state.week.day, state.week.dayIdx),
+  /* A sandbox day's copy is dealt as the week it copied (`shift/types.ts#dealtKeyOf`, § D1451). */
+  weekBookings: readonly ContractIncident[] = weekBookingsOn(dealtKeyOf(state.week), state.week.day, state.week.dayIdx),
 ): ShiftRunConfig {
   const authored = buildingConfigOf(resources, state.savedBuildings, state.buildingId);
   if (authored === undefined) {
@@ -2404,8 +2445,34 @@ export function shiftRunConfigOf(
    * wrinkle treats it as spoken for, the calendar reserves around it, the strip and the tomorrow card
    * name it off the run's building, and the stage's calls see it go.
    */
-  const booked =
-    rung === undefined ? [] : [...rungIncidents(rung), ...incidentsOfBookings(weekBookings)];
+  /*
+   * **And a sandbox day's, on the tower the day stood on or a changed copy of it** — wave AP lane
+   * AP-D2, [§ D1451](../../../../DECISIONS.md), the post-AO panel's seat B (D1): week 2's Monday
+   * (car D booked out 10:30–13:00), *Open the sandbox*, 3000 lb, and the run had no car D out, so its
+   * clear read as *bigger cars fixed it*. A tower left alone keeps its rung above (`rungFor` hands a
+   * week on no contract that tower's rung), and the copy keeps the day's level through
+   * {@link dealtKeyOf}. A changed tower is a copy with no rung of its own, so it takes the bookings of
+   * the tower its contract handed over ({@link sandboxHandedRungOf}), and only on the cars it still
+   * has: a car the drawn tower lost cannot be booked, and the sandbox screen and its close say so.
+   */
+  const handed = rung === undefined ? sandboxHandedRungOf(state) : undefined;
+  const dealtBookings =
+    rung !== undefined
+      ? [...rungIncidents(rung), ...incidentsOfBookings(weekBookings)]
+      : handed !== undefined
+        ? [...rungIncidents(handed), ...incidentsOfBookings(weekBookings)]
+        : sandboxDealtOf(state)
+          ? incidentsOfBookings(weekBookings)
+          : [];
+  /*
+   * A sandbox day the player left plain carries no booking at all, the tower's own rung included:
+   * the box says *the day's wrinkle and booked cars*, and an untouched tower keeps its rung above.
+   */
+  const booked = sandboxPlainOf(state)
+    ? []
+    : sandboxDealtOf(state)
+      ? bookingsOnCarsOf(dealtBookings, commissioned)
+      : dealtBookings;
   /*
    * **Today's wrinkle as an episode inside the day** — [§ D1057](../../../../DECISIONS.md). On the
    * whole authored day, a wrinkle that sets a mix is written into the run's own copy of the day's
@@ -2566,6 +2633,7 @@ export function shiftRunConfigOf(
       holds: patch.outOfServiceCarIds.length === 0 ? [] : eventCarChoice(event.effect, building, booked).holdCars.map((car) => car.carId),
       windows: patch.incidents.map((incident) => incident.car.carId),
     },
+    bookings: booked,
     withheld: [
       ...patch.withheld,
       ...calendar.withheld,

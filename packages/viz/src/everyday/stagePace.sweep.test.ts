@@ -187,6 +187,12 @@ describe.runIf(process.env['STAGE_PACE_SWEEP'] === '1')('§ D512 on the whole da
               stopsAtS: [],
               watchingSimPerRealS: W,
               skip: true,
+              /*
+               * § D1493 limits the hold to twenty real seconds between two decisions, and this sweep
+               * knows no calls, so with the limit a day here would be twenty seconds of watching and
+               * the rest at the fast rung. It measures the hold uncapped, which no capped day exceeds.
+               */
+              watchAllowanceRealS: Number.POSITIVE_INFINITY,
             });
             const scoredDay: PacedDay = {
               periodS: WHOLE_DAY_LONGEST.periodS,

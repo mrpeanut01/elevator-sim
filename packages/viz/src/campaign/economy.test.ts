@@ -47,6 +47,7 @@ import {
   daysOfBenefit,
   earnedSoFar,
   missedDaysOf,
+  missAllowanceSentenceOf,
   failureOddsPct,
   fittedLevel,
   legalStarts,
@@ -480,6 +481,24 @@ describe('§ 8.4’s standing and slots', () => {
     expect(contractIsLost(tower({ missed: 4 }))).toBe(true);
     // Impossible allows none, so the first miss ends it.
     expect(contractIsLost(tower({ difficultyId: 'impossible', missed: 1 }))).toBe(true);
+  });
+
+  /*
+   * Wave AP lane AP-D2, the post-AO panel's seat D (D4): the allowance's one sentence names the
+   * count `contractIsLost` survives and the miss it does not, on every tier.
+   */
+  it('words the allowance as the count contractIsLost survives and the miss it does not, on every tier', () => {
+    const ordinal = ['first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh'];
+    for (const difficulty of Object.values(DIFFICULTIES)) {
+      const allowed = difficulty.miss;
+      expect(contractIsLost(tower({ difficultyId: difficulty.id, missed: allowed }))).toBe(false);
+      expect(contractIsLost(tower({ difficultyId: difficulty.id, missed: allowed + 1 }))).toBe(true);
+      const sentence = missAllowanceSentenceOf(difficulty);
+      expect(sentence).toContain(`${ordinal[allowed] ?? ''} loses the contract`);
+      expect(sentence).not.toMatch(/contract ends|More than/u);
+    }
+    expect(missAllowanceSentenceOf(DIFFICULTIES.standard)).toBe('Three missed days are allowed: a fourth loses the contract.');
+    expect(DIFFICULTIES.standard.note).not.toContain('Three missed days and the contract ends');
   });
 });
 

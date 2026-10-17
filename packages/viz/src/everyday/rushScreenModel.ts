@@ -258,6 +258,27 @@ export const RUSH_FITTED_LINE =
   'sitting is posted to its own board rather than ranked against towers as built.';
 
 /**
+ * **The same disclosure where the kit was bought from this device's tally** — wave AP lane AP-D2, the
+ * post-AO panel's seat D (D9), under [§ D1418](../../../../DECISIONS.md). {@link RUSH_FITTED_LINE}
+ * said *posted to its own board* on every fitted sitting while Settings said a device purchase is
+ * *never posted*, and the sitting check refuses the post (`rushSitting.ts`'s `boughtOnDevice`). The
+ * board half is the account's alone.
+ */
+export const RUSH_FITTED_DEVICE_LINE =
+  'This tower starts fitted: the doors, the control and the tenancies are already in, bought with ' +
+  'this device’s chimes. A sitting started fitted on this device is kept here and never posted.';
+
+/**
+ * Which fitted line the setup screen draws, or none: {@link RUSH_FITTED_DEVICE_LINE} where the claim is
+ * this device's purchase (`EverydayHost.rushBoughtOnDevice`, the derivation the sitting's own
+ * `boughtOnDevice` is), {@link RUSH_FITTED_LINE} where it is the account's.
+ */
+export function rushFittedLineOf(host: { rushStartsFitted(): boolean; rushBoughtOnDevice(): boolean }): string | undefined {
+  if (!host.rushStartsFitted()) return undefined;
+  return host.rushBoughtOnDevice() ? RUSH_FITTED_DEVICE_LINE : RUSH_FITTED_LINE;
+}
+
+/**
  * **What the rebuild between rounds is, said before the first round** — GitHub issue #372,
  * [§ D1295](../../../../DECISIONS.md). Drawn by `everyday/rushScreen.ts` in the driving block, under
  * the fitted line when there is one.

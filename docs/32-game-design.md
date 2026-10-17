@@ -559,8 +559,10 @@ and never becomes permitted by being called standing.
 
 ### 3.5 The daily loop's economy, which is deliberately empty
 
-**Today's tower has no currency and must not acquire one.** Its shape line is *"no losing — a day is
-a score, not a pass"*; its output is a day, a record of it in the week, and a place on the board. A
+**Today's tower has no currency and must not acquire one.** Its shape line read *"no losing — a day is
+a score, not a pass"* until wave AP ([§ D1453](../DECISIONS.md)) made it *"a day can be missed, and a
+week can miss its target"*, because the report files a scored day missed and a week's sheet says it
+missed its target; its output is a day, a record of it in the week, and a place on the board. A
 currency there would make the same day worth more to a player who had played more days, which
 breaks the one property the mode exists for: **the same day for everybody**. `docs/32 GD9` already
 forbids it buying access; this is the stronger statement that the mode holds no wallet at all.
@@ -614,7 +616,7 @@ with its reason rather than a zero.**
 | Mode | What losing is | What it costs | What happens next |
 |---|---|---|---|
 | **Fix a building** | Any of the three non-`fixed` outcomes: **`not-enough`**, **`building-worse`**, **`over-budget`** | **Nothing.** The retry is free and the mode says so | Retry, on the same screen. `fixit/engine.ts#BASIS_LINE` states what the verdict rests on — *"one run before, one run after — enough to see a repair this size; not enough to split hairs"* |
-| **Today's tower** | **There is none.** *"no losing — a day is a score, not a pass"* | — | The day is filed to the week; the board places it among other people's |
+| **Today's tower** | A missed day, one or more of the day's five goals unmet at close; a missed week, too few days cleared for the week's target. This row read *"There is none"* until [§ D1453](../DECISIONS.md) | The day's streak, and the run of weeks held on the tower | The day is filed to the week; the board places it among other people's |
 | **Campaign — a day** | A missed day: one or more of the four day-goals unmet at close | A day's rate not paid, and one against the difficulty's miss allowance (`6 / 3 / 1 / 0`) | The next day, with the building one day fuller (§ 5.2) |
 | **Campaign — a contract** | Missed days exceeding the allowance | The contract is lost; the tower's slot frees | One of `LOST_CONTRACTS_MAX` = **3** |
 | **Campaign — a career** | Three lost contracts | *"the agency stops calling"* (`career.ts#LOST_CONTRACTS_MAX`, § 8.10) | A new career. Standing banked from finished contracts carries |

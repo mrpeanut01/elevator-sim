@@ -21,6 +21,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { EVERYDAY_MODES } from './modes.js';
 import { isScreenBuilt } from './screens.js';
 import { SCENARIO_ABSENCES, SCENARIO_COPY, scenarioHubViewOf } from './scenarioModel.js';
+import { SCENARIO_LOSS_CLAUSE } from './sittingShape.js';
 import { EVERYDAY_SCREENS } from './types.js';
 import { restrictedFloorIds } from '../access/zoning.js';
 import { parseCampaign, type CampaignContext } from '../campaign/parse.js';
@@ -75,6 +76,17 @@ describe('the Scenario hub', () => {
       expect(EVERYDAY_SCREENS, entry.id).toContain(entry.screen);
       expect(isScreenBuilt(entry.screen), entry.id).toBe(true);
     }
+  });
+
+  /*
+   * Wave AP lane AP-D2, the post-AO panel's seats A and B: the today's-scenario row read *no losing
+   * — a day is a score, not a pass* while a scored day is filed missed and a week can miss its
+   * target. Red before: the row's shape carried the clause.
+   */
+  it('says a Scenario day and week can be lost, and never says no losing', () => {
+    const today = scenarioHubViewOf().entries.find((entry) => entry.screen === 'door');
+    expect(today?.shape).toContain(SCENARIO_LOSS_CLAUSE);
+    for (const entry of scenarioHubViewOf().entries) expect(`${entry.blurb} ${entry.shape}`).not.toMatch(/no losing/iu);
   });
 
   it('re-homes both retired tiles, which is the whole reason it exists', () => {

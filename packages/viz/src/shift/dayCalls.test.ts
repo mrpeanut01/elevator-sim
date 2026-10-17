@@ -31,7 +31,10 @@ import {
   dayCallDriversOf,
   dayCallLostGoalOf,
   dayEndedEarlyRowOf,
+  DAY_CALL_COUNT_LABEL,
   DAY_CALL_ROW_NOTE,
+  dayCallCountsLineOf,
+  dayCallSplitVerdictsOf,
   DAY_CALL_SPACING_S,
   DAY_CALL_WHOLE_DAY_MAX_LEGS,
   DAY_CALL_WINDOW_S,
@@ -341,7 +344,9 @@ describe('the report’s row for a call', () => {
       expect(row.why, arm).toContain(
         '12 with park the cars in the lobby, 7 with spread the cars across the tower and 15 with leave them',
       );
-      expect(row.why.endsWith(DAY_CALL_ROW_NOTE), arm).toBe(true);
+      /* Wave AP, lane DT-2 (swarm DT's Q3 item 2): the count comes last, labelled, after the note. */
+      expect(row.why.endsWith(`${DAY_CALL_ROW_NOTE} ${dayCallCountsLineOf(record('leave', [250, 250, 250]), clock)} ${DAY_CALL_COUNT_LABEL}`), arm).toBe(true);
+      expect(row.why.indexOf(DAY_CALL_ROW_NOTE), arm).toBeLessThan(row.why.indexOf('Riders who arrived'));
     }
   });
 
@@ -361,7 +366,11 @@ describe('the report’s row for a call', () => {
           }
         : { verdict: 'cleared' as const, readings: [] };
     const missedByFavourite = dayCallRowOf(record('park-cars-lobby', [150, 250, 250]), 1, grade, clock, judge);
+    /* Wave AP, lane DT-2: the split row has named each answer's figure, so the gap says it once. */
     expect(missedByFavourite.why).toContain(
+      'The fewest riders waited a minute with spread the cars across the tower, and the day missed with it.',
+    );
+    expect(dayCallGapSentenceOf(record('park-cars-lobby', [150, 250, 250]), judge)).toBe(
       'The fewest riders waited a minute with spread the cars across the tower, and the day missed with it: the ' +
         'worst-wait goal read 250 s against a bar of 200 s.',
     );
@@ -374,6 +383,52 @@ describe('the report’s row for a call', () => {
     expect(dayCallRowOf(record('park-cars-lobby', [150, 250, 250]), 1, grade, clock).why).not.toContain('The fewest riders');
     for (const phrase of [...CAUSAL, ...ESTIMATE, ...MECHANISM, ...GENERAL]) {
       expect(says(dayCallGapSentenceOf(record('park-cars-lobby', [150, 250, 250]), judge) ?? '', phrase), phrase).toBe(false);
+    }
+  });
+
+  /*
+   * Wave AP, lane DT-2, swarm DT's Q3 item 5: a split row names every answer's verdict, the answer
+   * taken first, with each missing answer's goal, its figure and, where the record carries readings,
+   * the clock its run crossed. Red before: the row grouped the verdicts and named only the favourite's.
+   */
+  it('names every answer’s verdict on a split row, with the missing goal, its figure and its clock', () => {
+    const worst = goalsForDay(1).find((goal) => goal.id === 'worst-wait');
+    if (worst === undefined) throw new Error('the day has a worst-wait goal');
+    const goal = { ...worst, bar: 200 };
+    const judge = (observations: Observations) =>
+      observations.worstWaitS > 200
+        ? {
+            verdict: 'missed' as const,
+            readings: [{ goal, state: 'missed' as const, observed: observations.worstWaitS, display: '', progressPct: 100, glyph: '' }],
+          }
+        : { verdict: 'cleared' as const, readings: [] };
+    const series = (crossAtS: number) => ({
+      fromS: 2400,
+      endedAt: 9000,
+      samples: [
+        [2400, 1000, 3, 50],
+        [crossAtS, 1000, 3, 250],
+      ] as const,
+    });
+    const split = {
+      ...record('leave', [150, 250, 250]),
+      maxima: { 'park-cars-lobby': series(2500), 'spread-cars': series(3000), leave: series(4200) },
+    };
+    const row = dayCallRowOf(split, 1, grade, clock, judge);
+    expect(row.why).toContain(
+      'With leave them, your answer, the day missed: the worst-wait goal passed its bar of 200 s at 09:10 and read ' +
+        '250 s at the close. With park the cars in the lobby, the day cleared. With spread the cars across the tower, ' +
+        'the day missed: the worst-wait goal passed its bar of 200 s at 08:50 and read 250 s at the close.',
+    );
+    expect(row.why).not.toContain('The day read');
+    /* A record written before the readings names the figure without a clock. */
+    expect(dayCallSplitVerdictsOf(record('leave', [150, 250, 250]), judge, clock)).toContain(
+      'With leave them, your answer, the day missed: the worst-wait goal read 250 s against a bar of 200 s.',
+    );
+    /* A level row names no verdict, as before. */
+    expect(dayCallRowOf(record('leave', [250, 250, 250]), 1, grade, clock, judge).why).not.toContain('the day missed');
+    for (const phrase of [...CAUSAL, ...ESTIMATE, ...MECHANISM, ...GENERAL]) {
+      expect(says(dayCallSplitVerdictsOf(split, judge, clock) ?? '', phrase), phrase).toBe(false);
     }
   });
 
@@ -538,7 +593,7 @@ describe('the driver question', () => {
         '21 with Minimum estimated wait driving, 30 with Fairness first driving and 38 with Conventional collective still driving',
       );
       expect(row.why, arm).toContain('On this crowd');
-      expect(row.why.endsWith(DAY_CALL_ROW_NOTE), arm).toBe(true);
+      expect(row.why.endsWith(DAY_CALL_COUNT_LABEL), arm).toBe(true);
     }
     expect(ARMS[0][1].why).toContain(
       'The day read Shift cleared with Minimum estimated wait driving and Shift missed with Fairness first driving and Conventional collective still driving.',

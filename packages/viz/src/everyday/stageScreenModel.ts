@@ -1985,6 +1985,11 @@ export interface StageSkipState {
    * worker handing back a recording — `stageScreen.ts`'s `playback` is `undefined` there.
    */
   readonly hasRun?: boolean | undefined;
+  /**
+   * § D1361's sentence while another tab holds the day, or `undefined`: wave AP, lane AP-D1,
+   * [§ D1448](../../../../DECISIONS.md). The control is inert with it, since the stage takes no press.
+   */
+  readonly heldBy?: string | undefined;
 }
 
 /** § 2.3's skip control, resolved: its face, its note, and whether it can still do anything. */
@@ -2010,6 +2015,7 @@ export function stageSkipViewOf(state: StageSkipState): StageSkipView {
    * after the seam stopped being reachable — arrived at from the other side. Each state that
    * disables the control says why it is disabled, and only the live one says what it does.
    */
+  if (state.heldBy !== undefined) return { label: STAGE_SKIP_COPY.label, note: state.heldBy, inert: true };
   if (state.hasRun === false) {
     return { label: STAGE_SKIP_COPY.label, note: STAGE_SKIP_COPY.pendingReason, inert: true };
   }
@@ -2939,8 +2945,15 @@ export function stagePlayControlOf(input: {
   readonly waitingOnCall?: boolean;
   /** The day has run out on the stage. */
   readonly dayEnded?: boolean;
+  /**
+   * § D1361's sentence while another tab holds the day, or `undefined`: wave AP, lane AP-D1,
+   * [§ D1448](../../../../DECISIONS.md), the post-AO panel's seat D (D7). The stage takes no press
+   * then, and *▶ Play* was drawn live over it.
+   */
+  readonly heldBy?: string | undefined;
 }): { readonly label: string; readonly disabled: boolean; readonly inert: boolean; readonly note: string | undefined } {
   const held = (label: string, note: string | undefined) => ({ label, disabled: true, inert: true, note });
+  if (input.heldBy !== undefined) return held(STAGE_PLAY_CONTROL.play, input.heldBy);
   if (!input.hasRun) return held(STAGE_PLAY_CONTROL.play, STAGE_SKIP_COPY.pendingReason);
   if (input.dayEnded === true) return held(STAGE_PLAY_CONTROL.play, STAGE_PLAY_DONE_REASON);
   if (input.playing) return { label: STAGE_PLAY_CONTROL.pause, disabled: false, inert: false, note: undefined };

@@ -232,6 +232,8 @@ function mountReportScreen(
       newerRunOnStage: report !== undefined && run.hasRun && !run.dayClosed,
       panelNames: panelNamesOf(doc),
       career: careerOnwardOf(),
+      /* Wave AP lane AP-D2 (§ D1451): a sandbox day's close says what it kept and where the week is. */
+      sandbox: data.sandboxDayLines(),
       /*
        * The close's lead reads the live week and the house's runs — wave AM, lane AM-C,
        * § D1246 to § D1249. The daily flow only: a replay's sheet and a career day's are not a
@@ -243,6 +245,7 @@ function mountReportScreen(
             house: (day: number) => data.weekHouse(day),
             /* Wave AN, lane DQ-3 (§ D1351): what decided a day no call decided, from the shell's driver run. */
             driver: (day: number) => data.weekDriverRun(day),
+            profileNameOf: (profileId: string) => data.dispatcherById(profileId)?.name,
           }
         : {}),
     });
@@ -783,6 +786,12 @@ function mountReportScreen(
       practice.style.cssText = `${QUIET};margin:10px 0 0;max-width:74ch`;
       head.append(practice);
     }
+    /* § D1451: a sandbox day's close names what it kept of the day, what it left out, and where the week is. */
+    for (const line of view.sandboxLines) {
+      const node = el(doc, 'p', 'everyday-report-sandbox', line);
+      node.style.cssText = `${QUIET};margin:6px 0 0;max-width:74ch`;
+      head.append(node);
+    }
     /*
      * The week's target, marked on the close that met it — swarm DN's Q2.2, § D1226. Where the
      * close's lead is drawn its arithmetic says the same thing in its place, so the mark is not
@@ -1160,6 +1169,7 @@ function mountReportScreen(
       ['everyday-report-close-tally', close.tally, false],
       ['everyday-report-close-call', close.call, false],
       ['everyday-report-close-arithmetic', close.arithmetic, true],
+      ['everyday-report-close-ways', close.ways, false],
     ] as const) {
       if (text === undefined) continue;
       const line = el(doc, 'p', cls, text);

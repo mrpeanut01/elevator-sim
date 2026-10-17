@@ -16,7 +16,7 @@
  *    contract hands over.
  */
 
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { BLANK_SPEC, specFromBuilding, type BuildingSpec } from '../authoring/buildingSpec.js';
 import { demandTheTemplateTakes, specFromTrafficProfile, type PatternSpec } from '../authoring/patternSpec.js';
@@ -36,12 +36,14 @@ import {
 
 import {
   sandboxBeforeOf,
-  sandboxMoves,
+  sandboxCarriedLineOf,
   sandboxPatchOf,
   sandboxRestorePatchOf,
+  sandboxWeekLineOf,
   type SandboxPresses,
 } from './sandbox.js';
 import { tunePresses, tuneStateFrom, type TuneState } from './tunerModel.js';
+import { POOL_CENSUS } from '../shift/weekPool.js';
 
 const RESOURCES = contractBuildings();
 /** Midtown Office's pinned Monday as Today's scenario plays it: the whole authored day, on c2's rung. */
@@ -123,7 +125,7 @@ describe('each control the tuner offers on the day moves the run — compared on
     const untouched = legsOf(MIDTOWN);
     for (const patch of [{ rate: 11.5 }, { dwell: 'patient' as const }, { cars: 5 }]) {
       const presses = pressesFor(MIDTOWN, patch);
-      expect(sandboxMoves(presses), JSON.stringify(patch)).toBe(true);
+      expect([presses.building, presses.pattern, presses.dwell].some((press) => press !== undefined), JSON.stringify(patch)).toBe(true);
       expect(legsOf(sandboxed(MIDTOWN, presses)), JSON.stringify(patch)).not.toBe(untouched);
     }
   });
@@ -252,5 +254,85 @@ describe('a drawn tower runs as a sandbox day over the week — § D1363', () =>
     /* The practice crowd is a different day: the legs differ from the shared crowd's in the same tower. */
     const shared = { ...during, seed: MIDTOWN.seed };
     expect(legsOf(during)).not.toBe(legsOf(shared));
+  });
+});
+
+/*
+ * Wave AP lane AP-D2, [§ D1451](../../../../DECISIONS.md), the post-AO panel's seat B (D1): week 2's
+ * Monday on Midtown Office (Shift change, car D booked out 10:30–13:00), *Open the sandbox*, 3000 lb,
+ * *Run it and watch*, and the run had no car D out and an ordinary day, so its clear read as *bigger
+ * cars fixed it*. Since lane DT-1's pool (`shift/weekPool.ts`) Midtown deals its first week's draw every week, so
+ * the case is Midtown's Tuesday: the move-in, with car D booked out. Red before: the changed tower's
+ * run was an ordinary day with no booking at all.
+ */
+describe('a sandbox day runs the day it copies, its wrinkle and its bookings — § D1451', () => {
+  /* Week 3's level is withdrawn by the pool (§ D1461); its booking is reached as the census plays it. */
+  beforeAll(() => {
+    POOL_CENSUS.measuring = true;
+  });
+  afterAll(() => {
+    POOL_CENSUS.measuring = false;
+  });
+  /* The week deals the day's wrinkle: the helper pins `campaignEventId: 'ordinary'`, which no Scenario day carries. */
+  const TUESDAY: ViewerState = { ...MIDTOWN, campaignEventId: undefined, week: { ...MIDTOWN.week, week: 1, day: 2, dayIdx: 1 } };
+  const cars = (state: ViewerState): readonly string[] =>
+    [...new Set((shiftRunConfigOf(RESOURCES, state).bookings ?? []).map((incident) => incident.car.carId))].sort();
+  const bigger = pressesFor(TUESDAY, { cap: standingOf(TUESDAY).building.ratedLoadLb + 500 });
+
+  it('keeps the day’s wrinkle and every booking on a changed tower, and the legs show it', () => {
+    const day = shiftRunConfigOf(RESOURCES, TUESDAY);
+    expect(day.event.id).toBe('move-in:past-halfway');
+    expect(cars(TUESDAY)).toEqual(['D']);
+    const during = sandboxed(TUESDAY, bigger);
+    expect(during.buildingId).not.toBe(TUESDAY.buildingId);
+    expect(shiftRunConfigOf(RESOURCES, during).event.id).toBe(day.event.id);
+    expect(cars(during)).toEqual(['D']);
+    /* Leaving the day out is the player's to do, and it reaches the run: compared on the legs. */
+    const plain = sandboxed(TUESDAY, { ...bigger, plainDay: true });
+    expect(shiftRunConfigOf(RESOURCES, plain).event.effect.changesNothing).toBe(true);
+    expect(cars(plain)).toEqual([]);
+    expect(legsOf(plain)).not.toBe(legsOf(during));
+    expect(sandboxCarriedLineOf(day, shiftRunConfigOf(RESOURCES, during), false)).toBe(
+      'This sandbox day keeps the day’s wrinkle (Move-in day) and car D booked out of passenger service as the day had.',
+    );
+    expect(sandboxCarriedLineOf(day, shiftRunConfigOf(RESOURCES, plain), true)).toBe(
+      'This sandbox day leaves out the day’s wrinkle (Move-in day) and the booking of car D, because you left the day’s wrinkle and bookings out.',
+    );
+  });
+
+  it('leaves the wrinkle and the tower’s own booking out of an untouched tower left plain, on the legs', () => {
+    /*
+     * The box alone, on the tower as it stands. Red before this lane's second pass: the week-1 draw is
+     * every tower's, so the plain copy still drew the move-in, and the tower's own rung kept car D.
+     */
+    const plain = sandboxed(TUESDAY, { ...pressesFor(TUESDAY, {}), plainDay: true });
+    expect(plain.buildingId).toBe(TUESDAY.buildingId);
+    expect(shiftRunConfigOf(RESOURCES, plain).event.effect.changesNothing).toBe(true);
+    expect(cars(plain)).toEqual([]);
+    expect(legsOf(plain)).not.toBe(legsOf(TUESDAY));
+  });
+
+  it('runs the untouched day as the day, on the legs, and counts it for nothing', () => {
+    const untouched = sandboxed(TUESDAY, pressesFor(TUESDAY, {}));
+    expect(untouched.week.contractId).toBe(SANDBOX_DAY_CONTRACT_ID);
+    expect(legsOf(untouched)).toBe(legsOf(TUESDAY));
+  });
+
+  it('leaves out a booking on a car the changed tower lost, runs, and says why', () => {
+    const fewer = sandboxed(TUESDAY, pressesFor(TUESDAY, { cars: 3 }));
+    expect(cars(fewer)).toEqual([]);
+    const plan = shiftRunConfigOf(RESOURCES, fewer);
+    expect(() => recordRun(plan.config, { recordDecisions: false, outOfServiceCarIds: plan.outOfServiceCarIds })).not.toThrow();
+    expect(sandboxCarriedLineOf(shiftRunConfigOf(RESOURCES, TUESDAY), plan, false)).toBe(
+      'This sandbox day keeps the day’s wrinkle (Move-in day). ' +
+        'It leaves out the booking of car D, because the tower you changed has no car D.',
+    );
+  });
+
+  it('says where the week it stood over is, closed day or not', () => {
+    expect(sandboxWeekLineOf(TUESDAY.week)).toBe('Your week is where you left it, on Tuesday, which you have not closed.');
+    expect(sandboxWeekLineOf({ ...TUESDAY.week, closedDay: 2 })).toBe(
+      'Your week is where you left it: Tuesday is closed as you closed it, and Wednesday is next.',
+    );
   });
 });

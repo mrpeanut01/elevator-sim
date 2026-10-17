@@ -22,11 +22,13 @@ import {
   recordsWithDateCrowd,
   weekRecordFor,
   weekRecordLineOf,
+  WEEK_HELD_AWARD_CHIMES,
   weeksHeldLineOf,
   weeksHeldOf,
   type WeekRecord,
 } from './weekRecord.js';
 import type { WeekState } from './types.js';
+import { isPoolCrowdSeed } from './weekPool.js';
 import type { WatchRecord } from '../watch/types.js';
 
 const DATE = 20_260_926n;
@@ -114,13 +116,19 @@ describe('a new week is new — § D1229', () => {
     expect(dealtCrowdOf(week, weekRecordFor([], 'c2'), DATE + 5n)).toBe(DATE);
   });
 
-  it('never re-deals a crowd this device filed, over three weeks in one sitting and then a week across dates', () => {
+  /*
+   * Since § D1459 a counted day from week 2 is dealt from the measured pool, whose need crowds are few,
+   * so a pool crowd may meet the device again by design; every other crowd is still never re-dealt.
+   */
+  it('never re-deals a crowd this device filed outside the pool, over three weeks in one sitting and then a week across dates', () => {
     let records: readonly WeekRecord[] = [];
     let week = openWeek('c2');
     const filed = new Set<string>();
+    let pooled = 0;
     const play = (date: bigint): void => {
       const crowd = dealtCrowdOf(week, weekRecordFor(records, 'c2'), date);
-      expect(filed.has(crowd.toString()), `crowd ${crowd.toString()} was dealt twice`).toBe(false);
+      if (isPoolCrowdSeed(crowd)) pooled += 1;
+      else expect(filed.has(crowd.toString()), `crowd ${crowd.toString()} was dealt twice`).toBe(false);
       filed.add(crowd.toString());
       week = fileOn(week, crowd);
       records = recordClose(records, week, crowd, date);
@@ -128,7 +136,8 @@ describe('a new week is new — § D1229', () => {
     };
     for (let day = 0; day < 21; day += 1) play(DATE);
     for (let day = 0; day < 7; day += 1) play(DATE + BigInt(day + 1));
-    expect(filed.size).toBe(28);
+    const outside = [...filed].filter((seed) => !isPoolCrowdSeed(BigInt(seed)));
+    expect(outside.length + pooled).toBe(28);
     expect(weekRecordFor(records, 'c2').closed).toBe(4);
   });
 
@@ -173,15 +182,25 @@ describe('the record carries forward and buys nothing — § D1230', () => {
     expect(weeksHeldOf(run([[4, 4], [2, 4], [4, 4]]))).toBe(1);
     /* A week with no target is never held, so it ends a run as a missed week does. */
     expect(weeksHeldOf(run([[4, 4], [0, 0]]))).toBe(0);
+    /*
+     * Wave AP lane AP-D2, the post-AO panel's seats A and D: the line said *It buys nothing* beside a
+     * held level that paid 10 chimes (§ D1402). Red before: the held arm named no award.
+     */
+    expect(WEEK_HELD_AWARD_CHIMES).toBe(10);
     expect(weeksHeldLineOf(run([[4, 4], [5, 4]]))).toBe(
-      'Weeks held on this tower: 2 in a row, each with its target met. A missed week ends the run. ' +
-        'It buys nothing, and no clock runs on it: a week counts when you close it, however long that takes.',
+      'Weeks held on this tower: 2 in a row, each with its target met. A held week pays 10 chimes the ' +
+        'first time its level of this tower’s week is held; holding that level again, or a longer run, ' +
+        'pays nothing more. A missed week ends the run, and no clock runs on it: a week counts when you ' +
+        'close it, however long that takes.',
     );
     expect(weeksHeldLineOf(run([[4, 4], [3, 4]]))).toBe(
       'Weeks held on this tower: none in a row, because the last week closed here missed its target. ' +
-        'A missed week ends the run. It buys nothing, and no clock runs on it: a week counts when you ' +
-        'close it, however long that takes.',
+        'A missed week ends the run, and no clock runs on it: a week counts when you close it, however ' +
+        'long that takes.',
     );
+    for (const line of [weeksHeldLineOf(run([[4, 4], [5, 4]])), weeksHeldLineOf(run([[4, 4], [3, 4]]))]) {
+      expect(line).not.toContain('buys nothing');
+    }
   });
 
   it('reads an older record’s run only where its counts settle it, and never overstates one', () => {

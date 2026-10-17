@@ -78,6 +78,32 @@ export interface Difficulty {
   readonly note: string;
 }
 
+/**
+ * **The missed-day allowance, in the one form every surface states it** — wave AP, lane AP-D2, the
+ * post-AO panel's seat D (D4), recorded here under [§ D405](../../../../DECISIONS.md).
+ *
+ * The Standard tier's note read *"Three missed days and the contract ends"* beside the contract's
+ * clause 4, *"More than 3 missed days and the contract is lost"*, and the terms row's *"0 of 3 used"*.
+ * {@link contractIsLost} is strictly greater, so a standard month survives its third miss and the
+ * fourth loses it: the note was the false one. This sentence is derived from the same `miss` field
+ * that function reads, and `economy.test.ts` holds it against that function at the boundary on every
+ * tier, so the words cannot say a different count from the rule.
+ */
+export function missAllowanceSentenceOf(difficulty: Pick<Difficulty, 'miss'>): string {
+  return missAllowanceSentence(difficulty.miss);
+}
+
+const MISS_COUNT_WORDS = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'] as const;
+const MISS_ORDINAL_WORDS = ['first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth', 'ninth', 'tenth'] as const;
+
+/** {@link missAllowanceSentenceOf} over the bare count, so {@link DIFFICULTIES}' own notes can say it. */
+function missAllowanceSentence(miss: number): string {
+  const count = MISS_COUNT_WORDS[miss] ?? String(miss);
+  const next = MISS_ORDINAL_WORDS[miss] ?? `${String(miss + 1)}th`;
+  if (miss === 0) return 'No missed day is allowed: the first loses the contract.';
+  return `${count} missed ${miss === 1 ? 'day is' : 'days are'} allowed: a ${next} loses the contract.`;
+}
+
 /** § 8.6's table, row for row. */
 export const DIFFICULTIES: Readonly<Record<DifficultyId, Difficulty>> = Object.freeze({
   easy: Object.freeze({
@@ -103,7 +129,13 @@ export const DIFFICULTIES: Readonly<Record<DifficultyId, Difficulty>> = Object.f
      * the sixteen contracts. Less than half is true of all sixteen, and `shaftPlan.test.ts` holds it
      * against every contract tower.
      */
-    note: 'A perfect month buys less than half the shop. Three missed days and the contract ends.',
+    /*
+     * Ended *"Three missed days and the contract ends"* until wave AP lane AP-D2, while
+     * {@link contractIsLost} keeps a standard month alive through its third miss and the contract's
+     * own clause 4 said *more than 3*: two forms of one rule on one screen, one of them false. The
+     * allowance is now {@link missAllowanceSentenceOf}'s, everywhere it is stated.
+     */
+    note: `A perfect month buys less than half the shop. ${missAllowanceSentence(3)}`,
   }),
   hard: Object.freeze({
     id: 'hard' as const,
@@ -112,7 +144,7 @@ export const DIFFICULTIES: Readonly<Record<DifficultyId, Difficulty>> = Object.f
     rates: Object.freeze([2, 3, 4, 5]) as unknown as readonly [number, number, number, number],
     miss: 1,
     tests: Object.freeze({ away: 82, worstS: 150, queue: 18, trips: 470 }),
-    note: 'One missed day allowed. You will finish the month having bought three cheap things and nothing else.',
+    note: `${missAllowanceSentence(1)} You will finish the month having bought three cheap things and nothing else.`,
   }),
   impossible: Object.freeze({
     id: 'impossible' as const,
@@ -125,7 +157,7 @@ export const DIFFICULTIES: Readonly<Record<DifficultyId, Difficulty>> = Object.f
      * It read *the whole month pays 53 units*, and 53 is § 8.1's on-hand total: the month pays 50 and
      * opens with 3 (§ D1377). `economy.test.ts` derives both from this row.
      */
-    note: 'No missed days, and a perfect month leaves 53 units on hand, the 3 it opens with among them. It has been cleared — with staggered start times bought on day one and never a wasted trip after.',
+    note: `${missAllowanceSentence(0)} A perfect month leaves 53 units on hand, the 3 it opens with among them. It has been cleared — with staggered start times bought on day one and never a wasted trip after.`,
   }),
 });
 

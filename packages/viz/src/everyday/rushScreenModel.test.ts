@@ -491,7 +491,12 @@ describe('every rush constant names the module that draws it — § D227, GitHub
      * `EverydayHost.rushStartsFitted`, which is the same derivation the claim itself comes from —
      * so the screen cannot promise a fitted tower the sitting does not get.
      */
-    RUSH_FITTED_LINE: 'rushScreen.ts',
+    /*
+     * Wave AP lane AP-D2: in-file since the device arm joined it. `rushFittedLineOf` picks one of the
+     * two on the host's reads, and `rushScreen.ts` draws what it returns.
+     */
+    RUSH_FITTED_LINE: 'rushScreenModel.ts',
+    RUSH_FITTED_DEVICE_LINE: 'rushScreenModel.ts',
   });
 
   it('declares a renderer for every exported constant, so a new one cannot arrive unclaimed', () => {

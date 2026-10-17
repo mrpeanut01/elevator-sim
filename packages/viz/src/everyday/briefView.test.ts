@@ -40,7 +40,7 @@ const TODAY: TodayRecord = {
   wrinkleName: 'Move-in day',
   wrinkleNote: 'One car is tied up for the first two thirds of the shift.',
   outOfService: { mootUnder: undefined, badge: 'car-c', sentence: 'Car car-c is out of service today.' },
-  facts: [{ label: 'Floors', value: '14 above ground' }],
+  facts: [{ label: 'Floors', value: '13 above the lobby' }],
   load: { word: '590 per working car', note: '1,180 people and 2 working cars today, as the building is configured. The day shows whether that is comfortable; this plate does not grade it.' },
   asks: ['Carry 90% of the people who turn up', 'Nobody waits longer than 120 s'],
   seedLine: 'tower chancery-house · crowd 424242 · today’s date, so everyone playing today meets this crowd',

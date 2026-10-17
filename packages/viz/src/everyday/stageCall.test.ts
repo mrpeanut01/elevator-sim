@@ -411,6 +411,37 @@ describe('the card teaches what it may before the answer — § D1432', () => {
     expect(card.facts.at(-1)).toBe('Nearest its bar: the longest wait so far is 252 s, against a bar of 380 s.');
   });
 
+  /*
+   * Wave AP, lane DT-2: seat A's W1 Thursday at 12:36. The card read *the longest of them has waited
+   * 473 s* and named the landing at 19 of 26 as nearest its bar, against a worst-wait bar of 400 s:
+   * the rail read the wait as pending because its longest was a rider still standing, and the pick
+   * skipped it. A goal already past its bar ranks first, on the rail's own reading or on the standing
+   * rider the card's own line counts.
+   */
+  it('ranks a goal already past its bar first: a rider still standing past the wait’s bar, or a reading past its bar', () => {
+    const SEAT_A = goalsForDay(1).map((goal) =>
+      goal.id === 'queue' ? { ...goal, bar: 26 } : goal.id === 'worst-wait' ? { ...goal, bar: 400 } : goal,
+    );
+    const pending = readGoals(SEAT_A, {
+      arrived: 400, carryPct: 100, minutePct: 100, peakQueue: 19, abandoned: 0, abandonedCarried: 0,
+      horizonS: 900, worstWaitS: 473, worstWaitIsCensored: true,
+    });
+    const present = { standing: 30, floors: [{ label: 'Garage', standing: 30 }], longestS: 473.4 };
+    expect(stageCallNearestBarLineOf(pending, present.longestS)).toBe(
+      'Past its bar: the longest wait so far is a rider still standing at 473 s, against a bar of 400 s.',
+    );
+    const card = stageCallCardOf(CALLS[0]!, DAY_START_S, [], undefined, present, { readings: pending });
+    expect(card.facts.at(-1)).toBe('Past its bar: the longest wait so far is a rider still standing at 473 s, against a bar of 400 s.');
+    expect(card.facts.join(' ')).not.toMatch(/deepest landing so far is 19/u);
+    /* A rider standing under the bar is still not named: the rail reads the wait as pending. */
+    expect(stageCallNearestBarLineOf(pending, 390)).toBe('Nearest its bar: the deepest landing so far is 19, against a bar of 26.');
+    /* A reading the rail already reads past its bar ranks before one nearer in share. */
+    expect(stageCallNearestBarLineOf(readingsOf(27, 370))).toBe('Past its bar: the deepest landing so far is 27, against a bar of 24.');
+    for (const line of [stageCallNearestBarLineOf(pending, 473), stageCallNearestBarLineOf(readingsOf(27, 370))]) {
+      expect(line ?? '').not.toMatch(FORWARD);
+    }
+  });
+
   it('writes each driver’s line from its own weights, heaviest first, so a moved weight moves it', async () => {
     const config = await loadConfig(DATA_DIR);
     const profiles = config.dispatcherProfiles.profiles;

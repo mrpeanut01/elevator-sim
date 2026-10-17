@@ -641,6 +641,18 @@ const TIERS: Readonly<Record<string, Tier>> = Object.freeze({
       'arithmetic on every run. About 20 to 27 minutes a profile on a contended four-core container',
     scheduled: true,
   },
+  'packages/viz/src/shift/weekPool.sweep.test.ts': {
+    gates: ['WEEK_POOL_SWEEP'],
+    reason:
+      'Wave AP lane DT-1, § D1459 to § D1462, swarm DT’s Q1 and Q2 — every cell Midtown deals from ' +
+      'week 2, on the pool’s forty crowds each, played as a player is dealt it: the two banded drivers ' +
+      'left alone, then every raised call’s answers and the other eleven drivers, tagging each crowd ' +
+      'dead, need or live into data/week-pool.json. Scheduled with WEEK_POOL_VERIFY as a rotating ' +
+      'sample of 24 crowds whose marks, calls and tags must be the pinned ones, because the dealer and ' +
+      'the gates are arithmetic over the file and a pinned census nothing re-runs goes stale unseen. ' +
+      'The full census is a detached, resumable hand run of a few hours',
+    scheduled: true,
+  },
   'packages/viz/src/everyday/sittingBot.sweep.test.ts': {
     gates: ['SITTING_BOT_SWEEP'],
     reason:

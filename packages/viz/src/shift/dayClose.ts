@@ -49,6 +49,8 @@ import type { SimTime } from '@elevator-sim/core/browser';
 import { clockAt } from '../live/timeline.js';
 
 import { carsOutLineOf, wrinkleNoteOf } from './bookedOut.js';
+import { pooledCrowdOf, poolCloseLineOf } from './poolWays.js';
+import type { PoolCrowd } from './weekPool.js';
 import { dayCallAnswerWordsOf, dayCallAnswersOf, type DayCallAnswer, type DayCallRecord } from './dayCalls.js';
 import type { WeekDayReport } from './report.js';
 import type { OnwardDay } from './tomorrow.js';
@@ -433,6 +435,8 @@ export interface DayCloseInput {
    * only where the call line needs it. Absent, the run is *still being run*.
    */
   readonly driverOf?: ((day: number) => HouseReading | undefined) | undefined;
+  /** Display names for the pool line's drivers (§ D1463); absent, the line names profile ids. */
+  readonly profileNameOf?: ((profileId: string) => string | undefined) | undefined;
 }
 
 /** Tomorrow, whole — item 4. */
@@ -466,6 +470,12 @@ export interface DayCloseView {
   readonly call: string | undefined;
   /** Item 3. `undefined` where the census does not speak for the tower. */
   readonly arithmetic: string | undefined;
+  /**
+   * **Who cleared this crowd, by name** — wave AP, lane DT-1, [§ D1463](../../../../DECISIONS.md):
+   * the pool's record of today's crowd, past tense (`poolWays.ts#poolCloseLineOf`). `undefined` on
+   * a day the pool did not deal.
+   */
+  readonly ways?: string | undefined;
   /** Item 4. */
   readonly tomorrow: DayCloseTomorrow;
 }
@@ -673,6 +683,12 @@ function tomorrowOf(input: DayCloseInput, census: WeekWay): DayCloseTomorrow {
   };
 }
 
+/** The pool's crowd today's filed day ran on, or `undefined`. */
+function todaysPooledCrowd(week: WeekState): PoolCrowd | undefined {
+  const seed = week.history.find((entry) => entry.day === week.day)?.record?.seed;
+  return seed === undefined || !/^\d+$/u.test(seed) ? undefined : pooledCrowdOf(week, week.day, BigInt(seed));
+}
+
 /**
  * **The close's lead** — see the module docstring. `undefined` on a close that has no tomorrow to
  * point at: a practice close, whose week stands on the day it did not bank, and every sheet that
@@ -688,6 +704,7 @@ export function dayCloseOf(input: DayCloseInput, census: WeekWay = WEEK_WAY): Da
     tally: speaks ? tallyOf(week, input.houseOf, census) : undefined,
     call: closeCallLineOf({ week, report, houseOf: input.houseOf, driverOf: input.driverOf }, census),
     arithmetic: speaks ? arithmeticOf(week, census) : undefined,
+    ways: poolCloseLineOf(todaysPooledCrowd(week), input.profileNameOf ?? (() => undefined)),
     tomorrow: tomorrowOf(input, census),
   };
 }

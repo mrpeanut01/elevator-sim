@@ -925,7 +925,7 @@ fix, and never phrased as "the right answer" — there is a Pareto front here, n
 Progression is by **mechanism introduced**, not by score threshold. Proposed ordering, each stage
 adding exactly one concept and each stage using a shipped building:
 
-1. **One shaft, low demand.** Garden Apartments. Teaches: a call, a car, a wait. Winnable trivially.
+1. **One shaft, low demand.** Garden Apartments. Teaches: a call, a car, a wait. Winnable trivially. Shipped as *Two cars, low demand*, because the building has two cars (GitHub issue #626).
 2. **The morning rush.** Midtown Office at a demand level *below* its ceiling. Teaches: rise-and-fall,
    the offered-vs-carried bar (§ 3.5). First encounter with a number that moves when you change
    something.

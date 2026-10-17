@@ -153,4 +153,35 @@ describe.skipIf(!HAS_BROWSER)('the career asks on its event days — § D1408', 
       await page.close();
     }
   }, 300_000);
+
+  /*
+   * Wave AP lane AP-D2, [§ D1452](../../../../DECISIONS.md), the post-AO panel's seat D (D10): a career
+   * day headed *Shift cleared* on the week's five goals while the contract's four filed it missed. At
+   * this base day 4's move-in, left as it is, is such a day (`careerCalls.test.ts` pins both
+   * verdicts on the legs). Red before: the headline read *Shift cleared*.
+   */
+  it('heads the day with the contract’s mark, the one the desk then counts', async () => {
+    const page = await coldLoadOnContractDay(4);
+    try {
+      await runContractDay(page, 4, true);
+      await skip(page);
+      await page.waitForFunction(
+        () => {
+          const leave = document.querySelector<HTMLButtonElement>(
+            '.everyday-stage-call:not([hidden]) .everyday-stage-call-answer[data-answer="leave"]',
+          );
+          leave?.click();
+          return document.querySelector('.everyday-bar-primary')?.textContent === 'Close the day';
+        },
+        undefined,
+        { timeout: 120_000, polling: 200 },
+      );
+      const sheet = await closeTheDay(page);
+      expect(await page.textContent('.everyday-report-verdict')).toBe('Missed on the contract’s four tests');
+      expect(sheet).not.toContain('Shift cleared');
+      expect(sheet).toContain('WHAT THE CONTRACT ASKED');
+    } finally {
+      await page.close();
+    }
+  }, 300_000);
 });

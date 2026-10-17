@@ -13,19 +13,20 @@
  * The three runs a call compares are whole-day runs, held only while the session asks; an attempt
  * resumed after a reload has its records and not its runs. So the record keeps, for each answer,
  * the two readings the rail folds (`live/observations.ts#observationsAt`, through
- * `shift/observations.ts#shiftObservationsOf`) at every whole minute of the run from the call, and
- * at its end: the arrivals that open the goals (capped at `WAKE_UP_ARRIVALS`, past which they open
+ * `shift/observations.ts#shiftObservationsOf`) at every instant from the call that the fold moves,
+ * and at its end ({@link dayCallMaximaOf} says which instants those are): the arrivals that open the goals (capped at `WAKE_UP_ARRIVALS`, past which they open
  * nothing), the deepest landing, and the longest wait, or `null` where the longest wait is a rider
  * still standing, which the rail reads as pending. A sample is kept only where one of the three
  * moved, so a stretch with nothing new costs nothing. Each sample is that fold at its instant,
- * exactly, which `dayCallMaxima.test.ts` holds against `observationsAt` on a shipped run.
+ * exactly, and between samples the fold does not move, which `dayCallMaxima.test.ts` holds against
+ * `observationsAt` at every event of two shipped runs and just after each.
  *
  * ## What it may say, and what not
  *
  * A reading at an instant the stage has reached is the past of that run: § D1219's footing, as the
  * counts are. The one verdict it carries is § D1168's: a maximum past its bar stays past it, so a
- * run whose reading is past its bar could no longer clear from that minute. That is said only once
- * the reading is past the bar ({@link dayCallMaximaReadingsAt}), never from a run's later minutes,
+ * run whose reading is past its bar could no longer clear from that instant. That is said only once
+ * the reading is past the bar ({@link dayCallMaximaReadingsAt}), never from a run's later instants,
  * and it amends § D1219 clause 2 for that one fact (§ D1433).
  *
  * Pure: the session computes it when a call is raised (`dev/dayCallSession.ts`), the stage's row
@@ -38,9 +39,7 @@ import type { VizRecording } from '../contract/types.js';
 
 import { readGoal } from './goals.js';
 import { WAKE_UP_ARRIVALS, type GoalObservations, type GoalReading, type ShiftGoal } from './types.js';
-
-/** How often a run is read, in simulated seconds: each whole minute, on the run's own clock. */
-export const DAY_CALL_MAXIMA_STEP_S = 60;
+import type { DayCallAnswer, DayCallRecord } from './dayCalls.js';
 
 /**
  * One reading of a run: `[atS, arrived, deepest landing, longest wait]`. `arrived` is capped at
@@ -55,18 +54,12 @@ export interface DayCallMaxima {
   readonly fromS: number;
   /** The run's end, where the last reading is taken. */
   readonly endedAt: number;
-  /** The readings, in order, each kept only where it differs from the one before. */
+  /**
+   * The readings, in order, one at each instant the fold moves: the reading at any instant is the
+   * last sample at or before it. A record written before wave AP kept them at whole minutes, and
+   * reads the same way.
+   */
   readonly samples: readonly DayCallMaximaSample[];
-}
-
-/** The instants a run is read at: each whole minute from `fromS` (itself included) to `endedAt`, which is read too. */
-function instantsOf(fromS: number, endedAt: number): readonly number[] {
-  const out = [fromS];
-  for (let t = Math.floor(fromS / DAY_CALL_MAXIMA_STEP_S + 1) * DAY_CALL_MAXIMA_STEP_S; t < endedAt; t += DAY_CALL_MAXIMA_STEP_S) {
-    out.push(t);
-  }
-  if (endedAt > fromS) out.push(endedAt);
-  return out;
 }
 
 /**
@@ -98,56 +91,129 @@ function peakRisesOf(recording: VizRecording): readonly (readonly [number, numbe
   return rises;
 }
 
+/* The next representable double either side of a time, for a crossing that falls between two. */
+const STEP_SCRATCH = new Float64Array(1);
+const STEP_BITS = new BigInt64Array(STEP_SCRATCH.buffer);
+function nextAbove(x: number): number {
+  STEP_SCRATCH[0] = x;
+  STEP_BITS[0] = (STEP_BITS[0] ?? 0n) + 1n;
+  return STEP_SCRATCH[0];
+}
+function nextBelow(x: number): number {
+  if (x <= 0) return -Infinity;
+  STEP_SCRATCH[0] = x;
+  STEP_BITS[0] = (STEP_BITS[0] ?? 0n) - 1n;
+  return STEP_SCRATCH[0];
+}
+
 /**
  * {@link DayCallMaxima} for `recording` from `fromS`: the rail's two maxima and its wake-up gate at
- * each whole minute and at the run's end, kept where they move.
+ * every instant they move — wave AP, lane DT-2, seat D's D5.
+ *
+ * ## Why every instant, not every minute
+ *
+ * Wave AO kept a reading at each whole minute, and the row read the last minute reached. The lost
+ * day's card reads the rail at the frame, so on week 1's Thursday at 08:48 the card said the deepest
+ * landing had reached 27 while the row, on the same run, said 26: the landing rose during 08:48 and
+ * the row was a minute behind. One source at one instant means the row reads the run where the rail
+ * does, so the readings are kept wherever `observationsAt`'s fold can move, and nowhere else:
+ *
+ * - **a leg arrives** (the wake-up count, a first rider standing) or **is resolved**, boarded or
+ *   turned away (the longest resolved wait, the earliest rider still standing);
+ * - **the deepest landing rises** ({@link peakRisesOf});
+ * - **a rider still standing overtakes the longest resolved wait**, which happens between events,
+ *   at `arrivedAt + longest`: from that instant the rail reads the longest wait as a wait under way.
+ *   Ties go the fold's way, to the earlier leg in record order, to the exact double.
+ *
+ * Between those instants the fold's output cannot move, so the readings are exact at every instant,
+ * which `dayCallMaxima.test.ts` holds against `observationsAt` at every event and between them.
  */
 export function dayCallMaximaOf(recording: VizRecording, fromS: number): DayCallMaxima {
   const endedAt = recording.endedAt;
   const startS = Math.min(Math.max(fromS, recording.startedAt), endedAt);
+  const legs = recording.legs;
   const rises = peakRisesOf(recording);
-  const samples: DayCallMaximaSample[] = [];
+  /* A leg is resolved, for the fold, once it has both arrived and boarded or been turned away. */
+  const resolutions: { readonly at: number; readonly index: number }[] = [];
+  for (const [index, leg] of legs.entries()) {
+    const resolvedAt = leg.boardedAt ?? leg.refusedAt;
+    if (resolvedAt !== undefined) resolutions.push({ at: Math.max(resolvedAt, leg.arrivedAt), index });
+  }
+  resolutions.sort((a, b) => a.at - b.at || a.index - b.index);
+  const instants = new Set<number>([startS, endedAt]);
+  for (const leg of legs) if (leg.arrivedAt > startS && leg.arrivedAt < endedAt) instants.add(leg.arrivedAt);
+  for (const { at } of resolutions) if (at > startS && at < endedAt) instants.add(at);
+  for (const [at] of rises) if (at > startS && at < endedAt) instants.add(at);
+  const ordered = [...instants].sort((a, b) => a - b);
+
+  const resolved = new Uint8Array(legs.length);
+  let arrived = 0;
+  let resolution = 0;
   let rise = 0;
   let peak = 0;
-  for (const raw of instantsOf(startS, endedAt)) {
-    const t = Math.min(Math.max(raw, recording.startedAt), endedAt);
+  /* The longest resolved wait and the first leg in record order that reached it. */
+  let longest: number | undefined;
+  let longestIndex = 0;
+  /* The first leg in record order that has arrived and is not resolved: the longest wait standing. */
+  let standing = 0;
+  const advanceTo = (t: number): void => {
+    while (arrived < legs.length && legs[arrived]!.arrivedAt <= t) arrived += 1;
+    while (resolution < resolutions.length && resolutions[resolution]!.at <= t) {
+      const { index } = resolutions[resolution]!;
+      resolution += 1;
+      resolved[index] = 1;
+      const leg = legs[index]!;
+      const waitS = Math.max(0, (leg.boardedAt ?? leg.refusedAt ?? leg.arrivedAt) - leg.arrivedAt);
+      if (longest === undefined || waitS > longest || (waitS === longest && index < longestIndex)) {
+        longest = waitS;
+        longestIndex = index;
+      }
+    }
+    while (standing < arrived && resolved[standing] === 1) standing += 1;
     while (rise < rises.length && rises[rise]![0] <= t) {
       peak = rises[rise]![1];
       rise += 1;
     }
-    /* `observationsAt`'s own worst-wait fold, rule for rule: strict `>` in record order, clamped at 0. */
-    let arrived = 0;
-    let worst: number | undefined;
-    let censored = false;
-    for (const leg of recording.legs) {
-      if (leg.arrivedAt > t) break;
-      arrived += 1;
-      const resolvedAt = leg.boardedAt ?? leg.refusedAt;
-      const resolved = resolvedAt !== undefined && resolvedAt <= t;
-      const waitS = Math.max(0, (resolved ? resolvedAt : t) - leg.arrivedAt);
-      if (worst === undefined || waitS > worst) {
-        worst = waitS;
-        censored = !resolved;
-      }
-    }
-    const sample: DayCallMaximaSample = [
-      raw,
-      Math.min(arrived, WAKE_UP_ARRIVALS),
-      peak,
-      censored ? null : Math.round(worst ?? 0),
-    ];
+  };
+  /* `observationsAt`'s worst-wait fold, rule for rule: the first leg in record order at the maximum. */
+  const standingOvertakes = (t: number): boolean => {
+    if (standing >= arrived) return false;
+    if (longest === undefined) return true;
+    const waitS = Math.max(0, t - legs[standing]!.arrivedAt);
+    return waitS > longest || (waitS === longest && standing < longestIndex);
+  };
+  const samples: DayCallMaximaSample[] = [];
+  const keep = (t: number): void => {
+    const worst = arrived === 0 ? 0 : standingOvertakes(t) ? null : Math.round(longest ?? 0);
+    const sample: DayCallMaximaSample = [t, Math.min(arrived, WAKE_UP_ARRIVALS), peak, worst];
     const last = samples[samples.length - 1];
     if (last === undefined || last[1] !== sample[1] || last[2] !== sample[2] || last[3] !== sample[3]) samples.push(sample);
+  };
+  for (const [position, t] of ordered.entries()) {
+    advanceTo(t);
+    keep(t);
+    /*
+     * Between this instant and the next nothing arrives, boards or rises, so the one thing that can
+     * move is a rider still standing overtaking the longest resolved wait: find the first double at
+     * which the fold says so, if it falls before the next instant.
+     */
+    const next = ordered[position + 1];
+    if (next === undefined || standingOvertakes(t) || standing >= arrived || longest === undefined) continue;
+    let crossing = Math.max(legs[standing]!.arrivedAt + longest, nextAbove(t));
+    while (!standingOvertakes(crossing)) crossing = nextAbove(crossing);
+    for (let below = nextBelow(crossing); below > t && standingOvertakes(below); below = nextBelow(crossing)) crossing = below;
+    if (crossing < next) keep(crossing);
   }
   return Object.freeze({ fromS: startS, endedAt, samples: Object.freeze(samples) });
 }
 
-/** The instant a reading at `playheadS` is true of: the last whole minute reached, or the run's end. */
+/**
+ * The instant a reading at `playheadS` is true of: the playhead itself, where the rail reads it, or
+ * the run's end past it. `undefined` before the call.
+ */
 export function dayCallMaximaInstantAt(maxima: DayCallMaxima, playheadS: number): number | undefined {
   if (playheadS < maxima.fromS) return undefined;
-  if (playheadS >= maxima.endedAt) return maxima.endedAt;
-  const minute = Math.floor(playheadS / DAY_CALL_MAXIMA_STEP_S) * DAY_CALL_MAXIMA_STEP_S;
-  return Math.max(maxima.fromS, minute);
+  return Math.min(playheadS, maxima.endedAt);
 }
 
 /** The sample standing at `atS`: the last kept at or before it. */
@@ -162,7 +228,7 @@ function sampleAt(maxima: DayCallMaxima, atS: number): DayCallMaximaSample | und
 
 /** The two final goals' readings off one answer's run at one instant, by the rail's own `readGoal`. */
 export interface DayCallMaximaReadings {
-  /** The instant they are true of — a whole minute the stage has reached, or the run's end. */
+  /** The instant they are true of: the playhead, where the rail reads it, or the run's end. */
   readonly atS: number;
   readonly queue: GoalReading | undefined;
   readonly worstWait: GoalReading | undefined;
@@ -171,6 +237,11 @@ export interface DayCallMaximaReadings {
    * {@link atS}; `undefined` while neither has. From there the run could no longer clear.
    */
   readonly pastBarFromS: number | undefined;
+  /**
+   * The readings past their bar at {@link pastBarFromS}, the crossing's own figures: what the row's
+   * lead and the close name. Empty while neither goal has crossed.
+   */
+  readonly pastBar: readonly GoalReading[];
 }
 
 /** The fields `readGoal` reads for the two goals graded on a maximum; nothing else is consulted. */
@@ -190,7 +261,7 @@ function observationsOf(sample: DayCallMaximaSample): GoalObservations {
 
 /**
  * **The readings a row prints at `playheadS`** — the queue and worst-wait goals of `goals`, read off
- * the sample standing at the last whole minute the stage has reached, by `shift/goals.ts#readGoal`,
+ * the sample standing at the playhead (the rail's own instant), by `shift/goals.ts#readGoal`,
  * so *past its bar* is the rail's own `'missed'` and nothing looser. `undefined` before the call.
  */
 export function dayCallMaximaReadingsAt(
@@ -210,12 +281,49 @@ export function dayCallMaximaReadingsAt(
   ];
   const [queue, worstWait] = readingsOf(sample);
   let pastBarFromS: number | undefined;
+  let pastBar: readonly GoalReading[] = [];
   for (const kept of maxima.samples) {
     if (kept[0] > atS) break;
-    if (readingsOf(kept).some((reading) => reading?.state === 'missed')) {
+    const missed = readingsOf(kept).filter((reading): reading is GoalReading => reading?.state === 'missed');
+    if (missed.length > 0) {
       pastBarFromS = kept[0];
+      pastBar = Object.freeze(missed);
       break;
     }
   }
-  return Object.freeze({ atS, queue, worstWait, pastBarFromS });
+  return Object.freeze({ atS, queue, worstWait, pastBarFromS, pastBar });
+}
+
+/**
+ * **A crossing in words** — wave AP, lane DT-2: *the deepest landing reached 33 against a bar of 32*,
+ * or both goals joined where both crossed at one instant. The figure is the reading at the crossing
+ * (`pastBar`), so the row's lead and the close name the same instant's figure. Nothing about why.
+ */
+export function dayCallCrossingPhraseOf(pastBar: readonly GoalReading[]): string {
+  const parts = pastBar.flatMap((reading) => {
+    if (reading.observed === null) return [];
+    const unit = reading.goal.unit;
+    const what = reading.goal.id === 'queue' ? 'the deepest landing' : 'the longest wait';
+    return [`${what} reached ${String(reading.observed)}${unit} against a bar of ${String(reading.goal.bar)}${unit}`];
+  });
+  return parts.join(' and ');
+}
+
+/**
+ * **A call's record with each answer's readings taken from its runs** — the one place § D1433's
+ * maxima are attached to a counted record, so an ordinary call (`dev/dayCallSession.ts`) and the
+ * pinned day's call (`dev/main.ts#measurePinnedCall`, wave AP's lane DT-2, [§ D1471](../../../../DECISIONS.md), swarm DT's Q3 item 4)
+ * carry the same readings and draw the same row. Taken while the runs are in hand, so a resumed
+ * attempt reads them from the record. An answer with no run is left out, and its row reads the
+ * others.
+ */
+export function dayCallRecordWithMaximaOf(
+  counted: DayCallRecord,
+  runs: Partial<Record<DayCallAnswer, VizRecording>>,
+): DayCallRecord {
+  const maxima: Partial<Record<DayCallAnswer, DayCallMaxima>> = {};
+  for (const [answer, recording] of Object.entries(runs) as [DayCallAnswer, VizRecording | undefined][]) {
+    if (recording !== undefined) maxima[answer] = dayCallMaximaOf(recording, counted.atS);
+  }
+  return Object.freeze({ ...counted, maxima: Object.freeze(maxima) });
 }

@@ -41,7 +41,7 @@ import type { WeekState } from '../shift/types.js';
 import { closeDay, outcomeOf, SANDBOX_DAY_CONTRACT_ID } from '../shift/week.js';
 import { actionBarFor } from './actionBar.js';
 import { railModel } from './rail.js';
-import { sandboxMoves, sandboxPatchOf } from './sandbox.js';
+import { sandboxPatchOf } from './sandbox.js';
 import {
   classOfSpec,
   designerClasses,
@@ -242,11 +242,18 @@ describe('move the control and the run changes — compared on the document, not
 });
 
 describe('a sandbox run is never posted, and the screen says so', () => {
-  it('reports the scored state until something moves, and the sandbox state after', () => {
-    expect(tuneSandboxStrip([]).state).toMatch(/Scored day/);
-    expect(tuneSandboxStrip([]).note).toMatch(/stops counting/);
+  /*
+   * Wave AP lane AP-D2 (§ D1451), the post-AO panel's seat D (D8): the untouched strip said *Scored
+   * day — three things are fixed* and the press began the counted attempt. Red before: the untouched
+   * strip said *Scored day* and nothing said a run from here never counts.
+   */
+  it('says a run from here is a sandbox day whether or not anything moved', () => {
+    expect(tuneSandboxStrip([]).state).not.toMatch(/Scored day/);
+    expect(tuneSandboxStrip([]).note).toMatch(/never counts/);
+    expect(tuneSandboxStrip([]).note).toMatch(/starts from its brief/);
     expect(tuneSandboxStrip(['cars']).state).toMatch(/Sandbox/);
     expect(tuneSandboxStrip(['cars']).note).toMatch(/will not be posted/);
+    expect(`${TUNER_COPY.lede} ${TUNER_COPY.stampCleanBody}`).not.toMatch(/matches everyone else/u);
   });
 
   it('picks § 3.3’s note by index rather than by restating one of its two cells', () => {
@@ -258,8 +265,9 @@ describe('a sandbox run is never posted, and the screen says so', () => {
     const variants = base.noteVariants ?? [];
     expect(variants).toHaveLength(2);
     expect(tunerNoteFor(variants, ['cars'])).toBe(variants[0]);
-    expect(tunerNoteFor(variants, [])).toBe(variants[1]);
-    expect(tunerBarModel(base, []).note).toBe(variants[1]);
+    /* § D1451: the sandbox cell whatever moved, since an untouched tuner runs a sandbox day too. */
+    expect(tunerNoteFor(variants, [])).toBe(variants[0]);
+    expect(tunerBarModel(base, []).note).toBe(variants[0]);
     expect(tunerBarModel(base, ['rate']).note).toBe(variants[0]);
   });
 
@@ -403,11 +411,11 @@ describe('opening the tuner changes nothing — the mount, over every shipped bu
     expect(snapToStep(steps.speeds, standing.speed)).toBeLessThan(9.5);
   });
 
-  it('says *Scored day* on the screen it opens, because nothing has moved', () => {
+  it('says *Nothing changed yet* on the screen it opens, because nothing has moved', () => {
     for (const file of BUILDING_FILES) {
       const at = afterMount(file);
       const moved = movedKeys(at.standing, at.snapped);
-      expect(tuneSandboxStrip(moved).state, file).toMatch(/Scored day/);
+      expect(tuneSandboxStrip(moved).state, file).toMatch(/Nothing changed yet/);
       expect(tunePresses(at.spec, DEFAULT_PATTERN, at.standing, at.snapped).building, file)
         .toBeUndefined();
     }
@@ -423,7 +431,7 @@ describe('an untouched tuner runs the standing day — GitHub issue #289', () =>
    * stood the player's own week on `SANDBOX_CONTRACT_ID` and is the post-AN panel's seat D (D3).
    */
   function pressed(state: ViewerState, presses: TunePresses): ViewerState {
-    if (!sandboxMoves(presses)) return state;
+    /* Wave AP lane AP-D2 (§ D1451): the press is `runSandbox` whatever moved, and the patch is its. */
     return { ...state, ...sandboxPatchOf(state, RESOURCES, presses) };
   }
 
@@ -485,8 +493,12 @@ describe('an untouched tuner runs the standing day — GitHub issue #289', () =>
 
     const after = pressed(state, presses);
     expect(after.buildingId).toBe(state.buildingId);
-    expect(after.week.contractId).toBe(state.week.contractId);
-    expect(after.week.contractId).not.toBe(SANDBOX_DAY_CONTRACT_ID);
+    /*
+     * § D1451 (wave AP lane AP-D2): a sandbox day over the week, dealt as the day it copies, so the
+     * run on the legs is still the one the daily loop would have made, and it counts for nothing.
+     */
+    expect(after.week.contractId).toBe(SANDBOX_DAY_CONTRACT_ID);
+    expect(after.week.sandboxOf).toEqual({ contractId: state.week.contractId, buildingId: state.buildingId, plain: false });
     // The legs, never a window statistic — `docs/05`'s standing requirement in its contrapositive.
     expect(legsOf(after)).toBe(legsOf(state));
   }, 60_000);
@@ -612,18 +624,21 @@ describe('an untouched tuner runs the standing day — GitHub issue #289', () =>
       expect(careerLine(state.week)).toMatch(/no days saved yet/);
     });
 
-    it('scores an untouched run, because an untouched run is the standing day', () => {
+    it('banks nothing from an untouched run either, which began no attempt — § D1451', () => {
       /*
-       * The other half of issue #289, read on the rail. With nothing moved the week never leaves its
-       * assignment, so the day *is* scored and the figures moving is correct — the screen said
-       * *Scored day — three things are fixed* and the state now agrees with it.
+       * The other half of issue #289, read on the rail, reversed by wave AP lane AP-D2 (§ D1451). It
+       * asserted an untouched run scored, because the press was the brief's own `playDay`; that press
+       * began the day's counted attempt with the house driving and nothing on the tuner saying so
+       * (the post-AO panel's seat D, D8). Red before: the untouched press left the week on its
+       * assignment and its close moved the streak.
        */
       const state = baseState();
       const at = standingAt(state);
-      const after = pressed(state, tunePresses(at.building, at.pattern, at.standing, at.tune));
-      expect(after.week.contractId).not.toBe(SANDBOX_DAY_CONTRACT_ID);
-      expect(careerLine(closed(after.week, 26, 'missed'))).toBe('0 days running · best 26%');
-      expect(careerLine(closed(after.week, 97, 'met'))).toBe('1 day running · best 97%');
+      const presses = tunePresses(at.building, at.pattern, at.standing, at.tune);
+      expect([presses.building, presses.pattern, presses.dwell, presses.plainDay]).toEqual([undefined, undefined, undefined, undefined]);
+      const after = pressed(state, presses);
+      expect(after.week.contractId).toBe(SANDBOX_DAY_CONTRACT_ID);
+      expect(careerLine(closed(after.week, 97, 'met'))).toBe('0 days running · best 0%');
     });
 
     it('banks neither figure from a tuned run, which is what the screen promised', () => {

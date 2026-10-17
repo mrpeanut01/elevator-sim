@@ -497,7 +497,20 @@ const WEEK_CHECKS: Readonly<Record<keyof WeekState, FieldCheck>> = Object.freeze
   // ceiling written here would be the second answer to that question.
   history: isArrayOf(isObjectOf(OUTCOME_CHECKS, 'a day outcome'), HISTORY_DAYS, 'closed days'),
   cleared: nullOr(isObjectOf(AWARD_CHECKS, 'a cleared award')),
+  /*
+   * A sandbox day's copy alone carries it (wave AP lane AP-D2, § D1451), and the save takes that
+   * copy off the pair, so a stored week never has it. Optional below, and checked when present
+   * rather than refused, so a copy that reached storage by some path not foreseen here restores as
+   * the week it is instead of quarantining the whole save.
+   */
+  sandboxOf: isObjectOf(
+    Object.freeze({ contractId: isNonEmptyString, buildingId: isNonEmptyString, plain: isBoolean }),
+    'a sandbox source',
+  ),
 });
+
+/** {@link WEEK_CHECKS}' keys whose absence is the value: every week but a sandbox day's copy. */
+const WEEK_OPTIONAL: readonly string[] = Object.freeze(['sandboxOf']);
 
 /* -------------------------------------------------------------------------- *
  * Settings and the Free Play selection
@@ -593,7 +606,7 @@ const FREE_PLAY_CHECKS: Readonly<Record<keyof FreePlaySelection, FieldCheck>> = 
  * -------------------------------------------------------------------------- */
 
 const SESSION_CHECKS: Readonly<Record<keyof SessionSnapshot, FieldCheck>> = Object.freeze({
-  week: isObjectOf(WEEK_CHECKS, 'a week'),
+  week: isObjectOf(WEEK_CHECKS, 'a week', WEEK_OPTIONAL),
   /*
    * The same table as the live week, and the same verdict — a bad field in a parked week refuses the
    * whole session rather than dropping that week.
@@ -608,7 +621,7 @@ const SESSION_CHECKS: Readonly<Record<keyof SessionSnapshot, FieldCheck>> = Obje
    * owns how many weeks are kept and a ceiling written here would be the second answer to that
    * question.
    */
-  parkedWeeks: isArrayOf(isObjectOf(WEEK_CHECKS, 'a week'), PARKED_WEEKS_MAX, 'parked weeks'),
+  parkedWeeks: isArrayOf(isObjectOf(WEEK_CHECKS, 'a week', WEEK_OPTIONAL), PARKED_WEEKS_MAX, 'parked weeks'),
   settings: isObjectOf(SETTINGS_CHECKS, 'a settings block'),
   freePlay: isObjectOf(FREE_PLAY_CHECKS, 'a free-play selection'),
 });

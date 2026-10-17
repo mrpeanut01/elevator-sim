@@ -266,6 +266,12 @@ function mountBrief(
       ].join(';');
       column.append(length);
     }
+    /* **The ways through this crowd** — § D1463: the pool's count, read from the file, no run. */
+    if (view.waysLine !== undefined) {
+      const ways = el(doc, 'p', 'everyday-brief-ways', view.waysLine);
+      ways.style.cssText = ['margin:7px 0 0', 'padding:0 2px', `font-size:12px;line-height:1.45;color:${C.warmGrey}`].join(';');
+      column.append(ways);
+    }
 
     const facts = el(doc, 'div', 'everyday-brief-facts');
     facts.style.cssText = 'display:grid;gap:0;margin-top:14px';

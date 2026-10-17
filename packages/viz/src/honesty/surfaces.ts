@@ -127,7 +127,14 @@ import {
   lockedForScore,
   raceAgainstCard,
 } from '../everyday/briefView.js';
-import { doorScreenViewOf, DAY_OFFSET_MIN, DOOR_STEPS, sameForEveryoneLine } from '../everyday/doorView.js';
+import {
+  doorScreenViewOf,
+  DAY_OFFSET_MIN,
+  DOOR_DRIVER_NOTE,
+  DOOR_DRIVER_NOTE_HELD,
+  DOOR_STEPS,
+  sameForEveryoneLine,
+} from '../everyday/doorView.js';
 import { HOST_PENDING_REASON } from '../everyday/host.js';
 import {
   BUILD_NOTES_POINTER,
@@ -155,6 +162,8 @@ import {
   RUSH_ABSENCES,
   RUSH_HOLD_LINE,
   RUSH_FITTED_LINE,
+  RUSH_FITTED_DEVICE_LINE,
+  rushFittedLineOf,
   RUSH_SCREEN_COPY,
   rushBandViews,
   rushBarModel,
@@ -221,7 +230,7 @@ import {
   type DayCloseView,
   type DayDecider,
 } from '../shift/dayClose.js';
-import { NEXT_TOWER_STAY_LABEL, nextTowerOfferOf } from '../shift/nextTower.js';
+import { NEXT_TOWER_STAY_LABEL, heldTopOnwardOf, nextTowerOfferOf } from '../shift/nextTower.js';
 import { NEXT_WEEK_LABEL, nextWeekOf, weekBookingsLineOf, weekUnderWayHarderLineOf, type BookingClock } from '../shift/nextWeek.js';
 import { weekTopOf } from '../shift/weekLevels.js';
 import { dealtWeekOrdersOf } from '../shift/weekOrders.js';
@@ -315,6 +324,7 @@ import { dayCallMaximaOf } from '../shift/dayCallMaxima.js';
 import {
   stageCallFailedRowsOf,
   stageCallRowDueAtS,
+  stageCallRowsCaveatOf,
   stageCallRowsOf,
   STAGE_CALL_ROWS_HEADING,
   stageCallWrinkleQuietDueAtS,
@@ -327,11 +337,14 @@ import {
   dayCallCountsLineOf,
   dayCallFailedRowOf,
   dayCallGapSentenceOf,
+  dayCallSplitVerdictsOf,
+  DAY_CALL_COUNT_LABEL,
   dayCallRecordOf,
   dayCallsQuietSentenceOf,
   dayCallWrinkleQuietRowOf,
   dayCallWindowEndOf,
   type DayCallDriverNames,
+  type DayCallRecord,
   type DayCallsQuiet,
 } from '../shift/dayCalls.js';
 
@@ -346,13 +359,23 @@ const DAY_CALL_FIXTURE_DRIVERS: DayCallDriverNames = Object.freeze({
 });
 import { wayThroughSentenceOf, WEEK_WAY } from '../shift/weekWay.js';
 import { admittedPressDayIds, pressDayFor } from '../shift/ladder.js';
-import { PRESS_DAY_DRIVER_HELD } from '../everyday/today.js';
+import { PRESS_DAY_DRIVER_HELD, TODAY_CHOICE_LINE_HELD } from '../everyday/today.js';
 import { actsOf, wholeDayFor } from '../shift/dayLength.js';
 import { rushTutorialWorkedAnswerOf } from '../everyday/rushScreenModel.js';
 import { WORKED_ANSWER_COPY, type WorkedAnswerFacts, type WorkedAnswerView } from '../everyday/workedAnswer.js';
-import { WEEK_START_NEXT_LABEL, driverRecordLinesOf, weekScreenViewOf } from '../everyday/weekView.js';
-import { CAREER_MARK_WORDS, careerCloseLineOf, type CareerCloseInput } from '../everyday/careerCalls.js';
+import { WEEK_START_NEXT_LABEL, WEEK_TOP_RUSH_COPY, driverRecordLinesOf, weekScreenViewOf, weekTopRushOf } from '../everyday/weekView.js';
+import {
+  CAREER_GOALS_HEADING,
+  CAREER_MARK_WORDS,
+  CAREER_VERDICT_LINES,
+  careerCloseLineOf,
+  type CareerCloseInput,
+} from '../everyday/careerCalls.js';
+import { sandboxCarriedLineOf, sandboxWeekLineOf, type SandboxDayMakeup } from '../everyday/sandbox.js';
+import type { Incident } from '../shift/incidents.js';
 import { CALL_BANDS, weekBandsLinesOf, type CallBandsCall } from '../shift/callBands.js';
+import { poolCloseLineOf, poolWaysLineOf, poolWithdrawnLineOf, weekKeepDaysLinesOf } from '../shift/poolWays.js';
+import { WEEK_POOL, type PoolCrowd } from '../shift/weekPool.js';
 import { weekOrderFor } from '../shift/weekOrders.js';
 import { percentileLine, WORLD_FIGURES_ABSENT, WORLD_FIGURES_LABEL, WORLD_FIGURES_REASON } from '../everyday/world.js';
 import { weekdayOf, type GoalObservations } from '../shift/types.js';
@@ -360,7 +383,7 @@ import { buildingView, CONTRACT_COPY, contractView, towersView, type BuildingFac
 /* Wave AN lane AP-3's region — the Career's front page, § D1301. */
 import { TOWER_CARD_COPY, contractDocumentOf, type CampaignInput } from '../everyday/campaignModel.js';
 import { mootCountClause } from '../everyday/today.js';
-import { CONTRACT_DAYS, DIFFICULTIES, DIFFICULTY_IDS } from '../campaign/economy.js';
+import { CONTRACT_DAYS, DIFFICULTIES, DIFFICULTY_IDS, missAllowanceSentenceOf } from '../campaign/economy.js';
 import type { TowerShafts } from '../campaign/economy.js';
 import {
   applyCampaignAction,
@@ -3979,6 +4002,9 @@ const SHIFT_REPORT: SurfaceAdapter = {
     'shift/dayCalls.ts#dayCallRowOf',
     /* Wave AO, lane DR-1, § D1433: the row's sentence where the count's favourite missed, seeded below. */
     'shift/dayCalls.ts#dayCallGapSentenceOf',
+    /* Wave AP, lane DT-2 (swarm DT's Q3 items 2 and 5): every answer's verdict on a split row, and the count's label. */
+    'shift/dayCalls.ts#dayCallSplitVerdictsOf',
+    'shift/dayCalls.ts#DAY_CALL_COUNT_LABEL',
     'shift/dayCalls.ts#DAY_CALL_ROW_NOTE',
     'shift/dayCalls.ts#DAY_CALL_LEAVE_LABEL',
     /*
@@ -4414,6 +4440,32 @@ const SHIFT_REPORT: SurfaceAdapter = {
               : { verdict: 'cleared', readings },
         );
         if (gap !== undefined) seeds.push({ field: `${at}.dayCalls.gap`, text: gap, role: 'observation' });
+        /*
+         * Wave AP, lane DT-2, swarm DT's Q3 item 5: the same split row naming every answer's verdict,
+         * with this run's own readings through the day, so a missed goal's clock is the run's crossing
+         * where it has one and absent where it has none.
+         */
+        const maxima = dayCallMaximaOf(recording, recording.startedAt);
+        const split = dayCallSplitVerdictsOf(
+          {
+            atS: recording.startedAt,
+            windowEndS: dayCallWindowEndOf(recording.startedAt, recording.endedAt),
+            answer: 'leave',
+            counts: { 'park-cars-lobby': 3, 'spread-cars': 9, leave: 6 },
+            observations: { 'park-cars-lobby': favoured, 'spread-cars': whole, leave: whole },
+            maxima: { 'park-cars-lobby': maxima, 'spread-cars': maxima, leave: maxima },
+          },
+          (observations) =>
+            observations === favoured
+              ? {
+                  verdict: 'missed',
+                  readings: readings.map((reading) => (reading.goal.id === 'queue' ? { ...reading, state: 'missed' as const } : reading)),
+                }
+              : { verdict: 'cleared', readings },
+          (simTimeS) => clockOf(simTimeS, DAY_START_S),
+        );
+        if (split !== undefined) seeds.push({ field: `${at}.dayCalls.split`, text: split, role: 'observation' });
+        seeds.push({ field: `${at}.dayCalls.countLabel`, text: DAY_CALL_COUNT_LABEL, role: 'prose' });
       }
       /* § D1138 clause 4's practice sheet: its note, and its streak line, which carries the same words. */
       if (entry.retried.practiceNote !== undefined) {
@@ -10176,6 +10228,8 @@ const EVERYDAY_MENU: SurfaceAdapter = {
      * declaration rather than one per string.
      */
     'everyday/sittingShape.ts#SITTING_SHAPES',
+    /* Wave AP lane AP-D2 (§ D1453): the hub row's last clause, drawn inside `SITTING_SHAPES.contractDay`. */
+    'everyday/sittingShape.ts#SCENARIO_LOSS_CLAUSE',
     'everyday/sittingShape.ts#sittingLengthPhrase',
     'everyday/rail.ts#RAIL_DRAWER_COPY',
     /* The shell's skip link, GitHub issue #404 — chrome the shell draws and does not author. */
@@ -10581,6 +10635,9 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
      * from a fixture would reach it.
      */
     'everyday/rushScreenModel.ts#RUSH_FITTED_LINE',
+    /* Wave AP lane AP-D2 (§ D1453): the same disclosure for a kit bought from this device's tally, never posted. */
+    'everyday/rushScreenModel.ts#RUSH_FITTED_DEVICE_LINE',
+    'everyday/rushScreenModel.ts#rushFittedLineOf',
     /*
      * What the rebuild between rounds is, said before the first round — GitHub issue #372, § D1295.
      * Seeded in both arms below: the standard purse, and a sitting that opens with the top-up's
@@ -10604,6 +10661,12 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
     'everyday/tunerModel.ts#TUNER_COPY',
     'everyday/tunerModel.ts#TUNE_CARDS',
     'everyday/tunerModel.ts#tuneSandboxStrip',
+    /*
+     * Wave AP lane AP-D2 (§ D1451): what a sandbox day kept of the day and left out, and where the
+     * week is, drawn on its stage and its close. Seeded below over a move-in day with car D booked.
+     */
+    'everyday/sandbox.ts#sandboxCarriedLineOf',
+    'everyday/sandbox.ts#sandboxWeekLineOf',
     'everyday/tunerModel.ts#tuneDwellChips',
     'everyday/tunerModel.ts#tuneReadout',
     /*
@@ -10668,6 +10731,17 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
      * `rush.driving` carries one line up.
      */
     seeds.push({ field: 'rush.fitted', text: RUSH_FITTED_LINE, role: 'prose' });
+    /* § D1453: the line the setup screen picks, on the account's kit and on this device's. */
+    for (const [arm, device] of [
+      ['account', false],
+      ['device', true],
+    ] as const) {
+      seeds.push({
+        field: `rush.fitted.${arm}`,
+        text: rushFittedLineOf({ rushStartsFitted: () => true, rushBoughtOnDevice: () => device }) ?? '',
+        role: 'prose',
+      });
+    }
     /* § D1295's setup line, on the standard purse and on one opened by the top-up's three steps. */
     seeds.push({ field: 'rush.rebuildLine(standard)', text: rushRebuildLineOf(RUSH_PURSE.unitsPerWaveOutlasted, 0), role: 'prose' });
     seeds.push({ field: 'rush.rebuildLine(topped)', text: rushRebuildLineOf(RUSH_PURSE.unitsPerWaveOutlasted, 15), role: 'prose' });
@@ -10969,6 +11043,24 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
         text,
         role: key === 'lede' || key.endsWith('Body') || key === 'stepsHint' ? 'prose' : 'label',
       });
+    }
+    /*
+     * § D1451: a sandbox day's carried line over a move-in day with car D booked, kept whole, with the
+     * day left out, and on a tower that lost car D; then where the week is, open and closed.
+     */
+    {
+      const bookedD = { kind: 'out-of-service', car: { bankId: 'main', carId: 'D' }, fromFraction: 0, toFraction: 0.5 } as unknown as Incident;
+      const day: SandboxDayMakeup = { event: SHIFT_EVENTS['move-in'], bookings: [bookedD] };
+      for (const [arm, sandbox, plain] of [
+        ['kept', day, false],
+        ['plain', { event: SHIFT_EVENTS.ordinary, bookings: [] }, true],
+        ['lostCar', { event: SHIFT_EVENTS['move-in'], bookings: [] }, false],
+      ] as const) {
+        seeds.push({ field: `sandbox.carried.${arm}`, text: sandboxCarriedLineOf(day, sandbox, plain) ?? '', role: 'prose' });
+      }
+      const week = { ...openWeek('c2'), day: 2, dayIdx: 1 };
+      seeds.push({ field: 'sandbox.week.open', text: sandboxWeekLineOf(week), role: 'prose' });
+      seeds.push({ field: 'sandbox.week.closed', text: sandboxWeekLineOf({ ...week, closedDay: 2 }), role: 'prose' });
     }
     const standingTune = tuneStateFrom(sized, DEFAULT_PATTERN, undefined);
     const movedTune = { ...standingTune, cars: standingTune.cars + 1, rate: standingTune.rate + 2 };
@@ -11653,6 +11745,8 @@ const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
      * career sheet's lost arm.
      */
     'campaign/career.ts#contractLostSentenceOf',
+    /* Wave AP lane AP-D2 (§ D1453): the allowance in one form, seeded for every tier below. */
+    'campaign/economy.ts#missAllowanceSentenceOf',
     'campaign/career.ts#BUILD_LABELS',
     'campaign/career.ts#openingCareer',
     'campaign/career.ts#freshTower',
@@ -12880,6 +12974,19 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
     'everyday/stageCallRow.ts#STAGE_CALL_ROWS_HEADING',
     'everyday/stageCallRow.ts#STAGE_CALL_ROW_NOTE',
     /*
+     * Wave AP, lane DT-2, swarm DT's Q3: the row's lead (the first crossing, or none yet), its
+     * readings with the answer taken first, and the caveat said once above the rows, labelling a
+     * counts-only row's count where one is drawn. Seeded below at the row's due instant and the run's
+     * end, and on a record written before the readings.
+     */
+    'everyday/stageCallRow.ts#stageCallLeadOf',
+    'everyday/stageCallRow.ts#STAGE_CALL_NO_CROSSING',
+    'everyday/stageCallRow.ts#stageCallReadingsLineOf',
+    'everyday/stageCallRow.ts#STAGE_CALL_TAKEN',
+    'everyday/stageCallRow.ts#stageCallRowsCaveatOf',
+    'everyday/stageCallRow.ts#STAGE_CALL_ROWS_CAVEAT',
+    'shift/dayCallMaxima.ts#dayCallCrossingPhraseOf',
+    /*
      * Wave AN, lane DQ-1, § D1335: a moment whose question a run that could not be made cost, on the
      * stage from the instant the playhead reaches it. Seeded below at two instants of this case's run.
      */
@@ -12905,7 +13012,6 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
     'everyday/stageCall.ts#stageCallNearestBarLineOf',
     'everyday/stageCall.ts#STAGE_LOST_COPY',
     'everyday/stageCall.ts#stageLostCardOf',
-    'everyday/stageCallRow.ts#stageCallGoalsLineOf',
     'shift/dayCallMaxima.ts#dayCallMaximaReadingsAt',
     /* Pillar 3's strip — GitHub issue #277, § D470. Driven at every sample time below. */
     'everyday/stageScreenModel.ts#stageGoalsOf',
@@ -13520,31 +13626,44 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
         /* § D1433: each answer's two final goals through the day, off this case's own run. */
         const maxima = dayCallMaximaOf(recording, callAtS);
         const record = { ...counted, maxima: { 'park-cars-lobby': maxima, 'spread-cars': maxima, leave: maxima } };
-        const rows = stageCallRowsOf({
-          records: [record],
-          playheadS: recording.endedAt,
-          endedAt: recording.endedAt,
-          log: [{ atS: callAtS + 120, change: { kind: 'park-cars-lobby' } }],
-          clockOf: (simTimeS) => clockOf(simTimeS, DAY_START_S),
-          goals: goalsForDay(1),
-        });
-        seeds.push({ field: 'stage.callRows.heading', text: STAGE_CALL_ROWS_HEADING, role: 'label' });
-        for (const row of rows) {
-          seeds.push({ field: `stage.callRows(${row.id}).heading`, text: row.heading, role: 'label' });
-          seeds.push({
-            field: `stage.callRows(${row.id}).counts`,
-            text: row.counts,
-            role: 'observation',
-            playhead: atPlayhead(recording, stageCallRowDueAtS(record, recording.endedAt)),
+        /*
+         * Wave AP, lane DT-2 (swarm DT's Q3): a row that reads goals leads with its first crossing, or
+         * says none has happened, and prints no count. Seeded at the row's due instant and at the run's
+         * end, each at its own playhead, with a later press so the note's clause is swept; and a record
+         * written before the readings, whose counts-only row the caveat labels.
+         */
+        const dueS = stageCallRowDueAtS(record, recording.endedAt);
+        const rowsAt = (playheadS: number, records: readonly DayCallRecord[]) =>
+          stageCallRowsOf({
+            records,
+            playheadS,
+            endedAt: recording.endedAt,
+            log: [{ atS: Math.min(callAtS + 120, playheadS), change: { kind: 'park-cars-lobby' } }],
+            clockOf: (simTimeS) => clockOf(simTimeS, DAY_START_S),
+            goals: goalsForDay(1),
           });
-          seeds.push({ field: `stage.callRows(${row.id}).note`, text: row.note, role: 'prose' });
-          if (row.goals !== undefined) {
-            seeds.push({
-              field: `stage.callRows(${row.id}).goals`,
-              text: row.goals,
-              role: 'observation',
-              playhead: atPlayhead(recording, recording.endedAt),
-            });
+        seeds.push({ field: 'stage.callRows.heading', text: STAGE_CALL_ROWS_HEADING, role: 'label' });
+        for (const [at, records] of [
+          ['due', [record]],
+          ['end', [record]],
+          ['counts-only', [counted]],
+        ] as const) {
+          const playheadS = at === 'end' ? recording.endedAt : dueS;
+          const rows = rowsAt(playheadS, records);
+          const playhead = atPlayhead(recording, playheadS);
+          const caveat = stageCallRowsCaveatOf(rows);
+          if (caveat !== undefined) seeds.push({ field: `stage.callRows(${at}).caveat`, text: caveat, role: 'prose' });
+          for (const row of rows) {
+            const field = `stage.callRows(${row.id},${at})`;
+            seeds.push({ field: `${field}.heading`, text: row.heading, role: 'label' });
+            for (const [part, text] of [
+              ['lead', row.lead],
+              ['goals', row.goals],
+              ['counts', row.counts],
+            ] as const) {
+              if (text !== undefined) seeds.push({ field: `${field}.${part}`, text, role: 'observation', playhead });
+            }
+            if (row.note !== undefined) seeds.push({ field: `${field}.note`, text: row.note, role: 'prose' });
           }
         }
         /* § D1335 — the failed moment's row, at two instants of this run, each drawn once it is reached. */
@@ -13558,8 +13677,8 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
           clockOf: (simTimeS) => clockOf(simTimeS, DAY_START_S),
         })) {
           seeds.push({ field: `stage.callRows(${row.id}).heading`, text: row.heading, role: 'label' });
-          seeds.push({ field: `stage.callRows(${row.id}).counts`, text: row.counts, role: 'prose' });
-          seeds.push({ field: `stage.callRows(${row.id}).note`, text: row.note, role: 'prose' });
+          if (row.counts !== undefined) seeds.push({ field: `stage.callRows(${row.id}).counts`, text: row.counts, role: 'prose' });
+          if (row.note !== undefined) seeds.push({ field: `stage.callRows(${row.id}).note`, text: row.note, role: 'prose' });
         }
         /* § D1336 — a wrinkle that raised no call, its one turned-down moment the record above. */
         const quiet = {
@@ -13573,13 +13692,15 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
           clockOf: (simTimeS) => clockOf(simTimeS, DAY_START_S),
         })) {
           seeds.push({ field: `stage.callRows(${row.id}).heading`, text: row.heading, role: 'label' });
-          seeds.push({
-            field: `stage.callRows(${row.id}).counts`,
-            text: row.counts,
-            role: 'observation',
-            playhead: atPlayhead(recording, stageCallWrinkleQuietDueAtS(quiet, recording.endedAt)),
-          });
-          seeds.push({ field: `stage.callRows(${row.id}).note`, text: row.note, role: 'prose' });
+          if (row.counts !== undefined) {
+            seeds.push({
+              field: `stage.callRows(${row.id}).counts`,
+              text: row.counts,
+              role: 'observation',
+              playhead: atPlayhead(recording, stageCallWrinkleQuietDueAtS(quiet, recording.endedAt)),
+            });
+          }
+          if (row.note !== undefined) seeds.push({ field: `stage.callRows(${row.id}).note`, text: row.note, role: 'prose' });
         }
       }
       /* Wave AL, lane AL-A: the close's question while a call is up, its consequence and its two buttons. */
@@ -13612,10 +13733,12 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
       }
       /*
        * And the pace note's two arms the sampled loop below never reaches: `call`, drawn while the
-       * card is up, and `chosen`, since § D1029 bounded to the next act boundary.
+       * card is up, and `chosen`, since § D1029 bounded to the next act boundary; and `unheld`,
+       * § D1493's line once the hold has run out with nothing to decide, which needs the stage's count
+       * of real seconds watched.
        */
       const acts = actsOf(recording.demandPhases);
-      for (const reason of ['call', 'chosen', 'yours'] as const) {
+      for (const reason of ['call', 'chosen', 'yours', 'unheld'] as const) {
         const note = stagePaceNoteOf(
           { simPerRealS: DEFAULT_STAGE_SIM_PER_REAL_S, reason },
           { acts, simTimeS: recording.startedAt },
@@ -15093,6 +15216,8 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     'everyday/today.ts#todayOf',
     /* The lede's closing sentence — H13; every seeded lede ends on it. */
     'everyday/today.ts#TODAY_CHOICE_LINE',
+    /* Wave AP lane AP-D2 (§ D1453): the brief's *Floors* row, drawn in every seeded `todayOf`'s facts. */
+    'everyday/today.ts#floorsLineOf',
     'shift/firstSession.ts#FIRST_SESSION_LINE',
     /* The line's second arm, for a first day the draw did not choose — GitHub issue #595, § D973. */
     'shift/firstSession.ts#FIRST_SESSION_LINE_CHOSEN',
@@ -15211,6 +15336,13 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
      */
     'everyday/today.ts#PRESS_DAY_DRIVER_HELD',
     /*
+     * GitHub issue #626 item 2: the lede's closing sentence and the door's driver note on that held
+     * day, and the note's other arm. Seeded by name beside the hold, for the hold's own reason.
+     */
+    'everyday/today.ts#TODAY_CHOICE_LINE_HELD',
+    'everyday/doorView.ts#DOOR_DRIVER_NOTE',
+    'everyday/doorView.ts#DOOR_DRIVER_NOTE_HELD',
+    /*
      * The week census's sentence on a day DC-10 does not admit, and its heading — § D1067. Drawn
      * only on a whole-day Scenario day at the tower's own rung, which no corpus case is, so every
      * shipped row's sentence is seeded by name below in both of its arms: measured under today's
@@ -15305,6 +15437,8 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     'shift/weekRecord.ts#weekRecordLineOf',
     /* Weeks held on this tower — lane AM-D, § D1253: the run's two arms, drawn on the sheet and the door. */
     'shift/weekRecord.ts#weeksHeldLineOf',
+    /* Wave AP lane AP-D2 (§ D1453): what a held week paid, inside the running arm of the line above. */
+    'shift/weekRecord.ts#WEEK_HELD_PAYS',
     /*
      * Wave AO, lane DR-2 (§ D1443): DC-13 on a week dealt from week 2, and this week's record with
      * each driver, on Your week. Seeded in `seedWeekStake`: Midtown's week 2 from the shipped census,
@@ -15312,6 +15446,14 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
      */
     'shift/callBands.ts#weekBandsLinesOf',
     'shift/callBands.ts#shareWordsOf',
+    /*
+     * Wave AP, lane DT-1 (§ D1462, § D1463): the brief's ways line, the close's names and DC-13 in
+     * days, seeded in `seedPoolWays` over built crowds and the shipped pool.
+     */
+    'shift/poolWays.ts#poolWaysLineOf',
+    'shift/poolWays.ts#poolCloseLineOf',
+    'shift/poolWays.ts#weekKeepDaysLinesOf',
+    'shift/poolWays.ts#poolWithdrawnLineOf',
     'everyday/weekView.ts#driverRecordLinesOf',
     /*
      * Wave AO, lane DS-2 (§ D1409): the career report's account of the day, graded on the contract's
@@ -15319,11 +15461,22 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
      */
     'everyday/careerCalls.ts#careerCloseLineOf',
     'everyday/careerCalls.ts#CAREER_MARK_WORDS',
+    /* Wave AP lane AP-D2 (§ D1452): a career day's headline and goals heading, seeded in `seedCareerClose`. */
+    'everyday/careerCalls.ts#CAREER_VERDICT_LINES',
+    'everyday/careerCalls.ts#CAREER_GOALS_HEADING',
     'everyday/continueWeek.ts#continueWeekEntryOf',
     'everyday/continueWeek.ts#CONTINUE_WEEK_TITLE',
     /* Lane AM-E (§ D1259): a held week's next tower, seeded in `seedWeekStake` for the same reason. */
     'shift/nextTower.ts#nextTowerOfferOf',
     'shift/nextTower.ts#NEXT_TOWER_STAY_LABEL',
+    /*
+     * Wave AP, lane DT-2 (swarm DT's Q4): the held top's onward tower where its ladder is harder, and
+     * the tower's Rush beside the top's primary, seeded in `seedWeekStake` for every census tower and
+     * every answer the device's best can give.
+     */
+    'shift/nextTower.ts#heldTopOnwardOf',
+    'everyday/weekView.ts#weekTopRushOf',
+    'everyday/weekView.ts#WEEK_TOP_RUSH_COPY',
     /*
      * Wave AN, lane DQ-2 (§ D1344): what a closed week's sheet deals next, held and not held, and
      * the door's line calling a week harder where the house's census fell. Seeded in `seedNextWeek`
@@ -15345,6 +15498,9 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     const seeds: TextSeed[] = [];
     const bundle = shiftBundleOf(context);
     seeds.push({ field: 'today.driverHeld', text: PRESS_DAY_DRIVER_HELD, role: 'prose' });
+    seeds.push({ field: 'today.lede.held', text: TODAY_CHOICE_LINE_HELD, role: 'prose' });
+    seeds.push({ field: 'door.driver.note', text: DOOR_DRIVER_NOTE, role: 'prose' });
+    seeds.push({ field: 'door.driver.note.held', text: DOOR_DRIVER_NOTE_HELD, role: 'prose' });
     /* Midtown's run clock, from its whole authored day: a booking's window is a fraction of that run. */
     const midtownDay = wholeDayFor(context.trafficProfiles, context.buildings.find((building) => building.id === 'midtown-office'));
     const clock: BookingClock | undefined =
@@ -16071,6 +16227,9 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
           contractLost: contractLostSentenceOf(lostTower),
         },
       });
+      for (const [tier, difficulty] of Object.entries(DIFFICULTIES)) {
+        seeds.push({ field: `career.allowance.${tier}`, text: missAllowanceSentenceOf(difficulty), role: 'prose' });
+      }
       if (lost.tomorrow !== undefined) {
         seeds.push({ field: 'career.report.lost.tomorrow.label', text: lost.tomorrow.label, role: 'label' });
         seeds.push({ field: 'career.report.lost.tomorrow.note', text: lost.tomorrow.note, role: 'reason' });
@@ -17990,6 +18149,13 @@ const EVERYDAY_STAGE_PLAY: SurfaceAdapter = {
         seeds.push({ field: `${at}.letter[${String(index)}]`, text: line, role: 'prose' });
       }
       if (view.held !== undefined) seeds.push({ field: `${at}.held`, text: view.held, role: 'reason' });
+      /* GitHub issue #626 item 1: the goals said before the press, as `stagePlayScreen.ts` draws them unless held. */
+      if (view.held === undefined) {
+        seeds.push({ field: `${at}.goals.heading`, text: view.goalsHeading, role: 'label' });
+        for (const [index, goal] of view.goals.entries()) {
+          seeds.push({ field: `${at}.goals[${String(index)}]`, text: goal, role: 'label' });
+        }
+      }
       seeds.push({ field: `${at}.budget`, text: view.budgetLine, role: 'observation' });
       if (view.refusal !== undefined) seeds.push({ field: `${at}.refusal`, text: view.refusal, role: 'reason' });
       seeds.push({ field: `${at}.setting.label`, text: view.settingLabel, role: 'label' });
@@ -18004,6 +18170,14 @@ const EVERYDAY_STAGE_PLAY: SurfaceAdapter = {
       seeds.push({ field: `${at}.runNote`, text: view.runNote, role: 'prose' });
       if (view.practice !== undefined) seeds.push({ field: `${at}.practice`, text: view.practice, role: 'prose' });
       if (view.status !== undefined) seeds.push({ field: `${at}.status`, text: view.status, role: 'prose' });
+      /* § D1496: the pair a press plays, captioned as one crowd of the many the verdict reads. */
+      if (view.watch !== undefined) {
+        seeds.push({ field: `${at}.watch.eyebrow`, text: view.watch.eyebrow, role: 'label' });
+        seeds.push({ field: `${at}.watch.note`, text: view.watch.note, role: 'prose' });
+        seeds.push({ field: `${at}.watch.skip`, text: view.watch.skip, role: 'label' });
+        seeds.push({ field: `${at}.watch.baseline`, text: view.watch.baselineCaption, role: 'label' });
+        seeds.push({ field: `${at}.watch.candidate`, text: view.watch.candidateCaption, role: 'label' });
+      }
       if (view.verdict !== undefined) {
         seeds.push({ field: `${at}.verdict.head`, text: view.verdict.head, role: 'prose' });
         if (phase.kind === 'judged' && !phase.verdict.metOnTuningSeeds) {
@@ -18589,6 +18763,7 @@ function seedWeekStake(
   profileNameOf: (profileId: string) => string | undefined = () => undefined,
 ): void {
   seedWeekBands(seeds, profileNameOf);
+  seedPoolWays(seeds, profileNameOf);
   seeds.push({ field: 'brief.week.heading', text: BRIEF_WEEK_HEADING, role: 'label' });
   seeds.push({ field: 'week.stake.short', text: WEEK_WITHOUT_COUNTED_DAYS_SHORT, role: 'reason' });
   seeds.push({ field: 'week.day.unmeasured', text: DAY_UNMEASURED_SENTENCE, role: 'reason' });
@@ -18768,6 +18943,23 @@ function seedWeekStake(
     seeds.push({ field: `week.onward.${contract.id}.line`, text: offer.line, role: 'observation' });
   }
   seeds.push({ field: 'week.onward.stay', text: NEXT_TOWER_STAY_LABEL, role: 'label' });
+  /* Wave AP, lane DT-2: the held top's onward tower, where its ladder is harder, and its Rush line. */
+  for (const contract of CONTRACTS) {
+    const deal = weekDealOf(contract.id);
+    if (deal === undefined || deal.target === 0) continue;
+    const top = heldTopOnwardOf(contract.id, { yours: deal.target, target: deal.target }, nameOf);
+    if (top !== undefined) seeds.push({ field: `week.topOnward.${contract.id}.line`, text: top.line, role: 'observation' });
+  }
+  seeds.push({ field: 'week.topRush.label', text: WEEK_TOP_RUSH_COPY.label, role: 'label' });
+  for (const [arm, best] of [
+    ['unasked', undefined],
+    ['silent', { kind: 'silent' }],
+    ['none', { kind: 'none' }],
+    ['row', { kind: 'row', heldS: 1325, roundCount: 3, modifiers: [] }],
+    ['unreplayable', { kind: 'unreplayable', reason: 'this build cannot replay it' }],
+  ] as const) {
+    seeds.push({ field: `week.topRush.${arm}`, text: weekTopRushOf(best).line, role: 'prose' });
+  }
   seedNextWeek(seeds, observations, clock);
   for (const [arm, record] of [
     ['one', { contractId: 'c2', closed: 1, met: 0, best: 3 }],
@@ -18812,6 +19004,41 @@ function seedWeekStake(
 }
 
 /**
+ * **The pool's words** — wave AP, lane DT-1, § D1462 and § D1463. The brief's count and the close's
+ * names on a crowd two drivers clear, and on one only a raised call's answer clears; DC-13 in days on
+ * the shipped pool's weeks 2 to 4, which say nothing for a level the pool does not deal.
+ */
+function seedPoolWays(seeds: TextSeed[], profileNameOf: (profileId: string) => string | undefined): void {
+  const profiles = WEEK_POOL.protocol.profiles;
+  const marksOf = (cleared: readonly string[]): string => profiles.map((id) => (cleared.includes(id) ? 'C' : 'm')).join('');
+  const crowds: readonly [string, PoolCrowd][] = [
+    ['drivers', { seed: '20260701100', tag: 'live', alone: marksOf(['fairness-first', 'collective']), calls: [] }],
+    [
+      'call',
+      {
+        seed: '20260724200',
+        tag: 'need',
+        alone: marksOf([]),
+        calls: [{ by: 'fairness-first', atS: 2648, question: 'driver', offered: ['predictive-balanced', 'capacity-aware'], clears: ['predictive-balanced'] }],
+      },
+    ],
+  ];
+  for (const [arm, crowd] of crowds) {
+    const ways = poolWaysLineOf(crowd);
+    if (ways !== undefined) seeds.push({ field: `brief.ways.${arm}`, text: ways, role: 'observation' });
+    const close = poolCloseLineOf(crowd, profileNameOf);
+    if (close !== undefined) seeds.push({ field: `report.close.ways.${arm}`, text: close, role: 'observation' });
+  }
+  for (const week of [2, 3, 4]) {
+    for (const [index, line] of weekKeepDaysLinesOf({ contractId: 'c2', week }, profileNameOf).entries()) {
+      seeds.push({ field: `week.keepDays.${String(week)}.${String(index)}`, text: line, role: 'observation' });
+    }
+    const withdrawn = poolWithdrawnLineOf('c2', week);
+    if (withdrawn !== undefined) seeds.push({ field: `week.withdrawn.${String(week)}`, text: withdrawn, role: 'observation' });
+  }
+}
+
+/**
  * **DC-13 on Your week** — wave AO, lane DR-2, § D1443. Midtown's week 2 from the shipped census, in
  * whichever arm the pinned rows take, and the passing arm over a synthetic row (keep lost 4 of 9
  * split calls, each switch on the card cleared 5 and 4), because the shipped week misses.
@@ -18851,6 +19078,10 @@ function seedCareerClose(seeds: TextSeed[]): void {
   for (const [reads, words] of Object.entries(CAREER_MARK_WORDS)) {
     seeds.push({ field: `career.close.mark.${reads}`, text: words, role: 'prose' });
   }
+  for (const [reads, words] of Object.entries(CAREER_VERDICT_LINES)) {
+    seeds.push({ field: `career.close.verdict.${reads}`, text: words, role: 'label' });
+  }
+  seeds.push({ field: 'career.close.goalsHeading', text: CAREER_GOALS_HEADING, role: 'label' });
   for (const verdict of ['cleared', 'missed'] as const) {
     const other = verdict === 'cleared' ? 'missed' : 'cleared';
     const base: CareerCloseInput = {

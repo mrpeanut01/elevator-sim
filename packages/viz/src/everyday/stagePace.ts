@@ -210,7 +210,25 @@ export type StagePaceReason =
  *   waits a minute ({@link StagePaceInput.playerChoseSpeedAtS}). A chip pressed while `watching` is
  *   the rung `watching` plays at, so it is kept for every later stretch with somebody waiting.
  */
-export type ScoredPaceReason = 'watching' | 'fast' | 'yours' | 'lost';
+export type ScoredPaceReason = 'watching' | 'fast' | 'yours' | 'lost' | 'unheld';
+
+/*
+ * `unheld` is wave AP, lane G-3, [§ D1493](../../../../DECISIONS.md), GitHub issue #626 item 5:
+ * § D1169's hold lasts at most {@link WATCH_ALLOWANCE_REAL_S} real seconds of watching with no
+ * decision in between, and after that the stage plays on at {@link BETWEEN_PEAKS_SIM_PER_REAL_S} or
+ * the player's rung, whichever is faster, drawn and never skipped, until a call is raised or answered
+ * or a chip is pressed ({@link StagePaceInput.watchedRealS}).
+ */
+
+/**
+ * **How long the stage holds the player's rung with nothing to decide**, in real seconds: wave AP,
+ * lane G-3, [§ D1493](../../../../DECISIONS.md). § D1169's hold exists to give time to decide; on
+ * Midtown's day 1 at seed n = 2 the first call came at 10:40 and a first-time player at `4×` watched
+ * 161 real seconds of it before anything was asked of them (181 to the call). Real seconds of
+ * `watching` add up across stretches and go back to nothing when a call is raised or answered or a
+ * chip is pressed. Owner-reversible: `Number.POSITIVE_INFINITY` is § D1169 as it was.
+ */
+export const WATCH_ALLOWANCE_REAL_S = 20;
 
 /*
  * `lost` is wave AO's lane DR-1, [§ D1435](../../../../DECISIONS.md), swarm DR's ruling § Q4: a goal
@@ -221,6 +239,101 @@ export type ScoredPaceReason = 'watching' | 'fast' | 'yours' | 'lost';
  * decide and nothing is left to decide; a chip the player presses after that instant is their rung
  * to the end. It narrows § D1169 clause 1 for a lost day alone.
  */
+
+/**
+ * **How finely the stage finds the instant a day was lost**, in simulated seconds: wave AP, lane
+ * AP-D1, [§ D1446](../../../../DECISIONS.md). The clock prints minutes, so a second is finer than
+ * anything the card says; it bounds the bisection in {@link firstLostInstantOf} to about seventeen
+ * reads across a ten-hour day.
+ */
+export const LOST_INSTANT_RESOLUTION_S = 1;
+
+/**
+ * **The coarse step {@link firstLostInstantOf} walks before it bisects**, in simulated seconds. Sixty
+ * reads across a ten-hour day, once per skip; a frame moves the playhead far less, so a frame costs
+ * the one read at its own instant that the stage made before.
+ */
+export const LOST_SCAN_STEP_S = 600;
+
+/**
+ * **The instants at which the worst-wait goal can begin to read missed**, ascending: wave AP, lane
+ * AP-D1, [§ D1446](../../../../DECISIONS.md), the post-AO panel's seat D (D1).
+ *
+ * The worst-wait reading is not monotone in time. `shift/goals.ts#readGoal` grades a censored
+ * maximum `pending` in either direction, and the maximum is censored whenever somebody still
+ * standing has waited longer than any wait that has ended (`live/observations.ts`). So on a day
+ * past its bar the goal reads *missed* from the instant the longest waiter boards until somebody
+ * still standing has waited longer, which in a backed-up morning is a few seconds, and then
+ * *pending* again. A frame at `600×` moves the playhead ten simulated seconds or more, so a reading
+ * at each frame's instant can step over every such window.
+ *
+ * Between two of these instants nothing can turn the reading to *missed*: the waits that have
+ * ended are fixed, and the waits still running only grow, which can censor the maximum and never
+ * uncensor it. So the reading can begin to be *missed* only where a wait ends, and only a wait
+ * past the bar can make it so. This lists the instant each such wait ended (`boardedAt`, else
+ * `refusedAt`), once each, with a second's margin under the bar for the whole-second rounding the
+ * goal row prints. It decides nothing: {@link firstLostInstantOf} reads the goals at each instant listed.
+ * The queue goal needs no list, because its maximum is never censored and only grows.
+ */
+export function worstWaitLossBeginsOf(legs: readonly VizLeg[], barS: number): readonly number[] {
+  const ends = new Set<number>();
+  for (const leg of legs) {
+    const endedAt = leg.boardedAt ?? leg.refusedAt;
+    if (endedAt !== undefined && endedAt - leg.arrivedAt > barS - 1) ends.add(endedAt);
+  }
+  return [...ends].sort((a, b) => a - b);
+}
+
+/**
+ * **The first instant in `(fromS, toS]` at which the day reads lost**, or `undefined` where none
+ * does: wave AP, lane AP-D1, [§ D1446](../../../../DECISIONS.md), the post-AO panel's seat D (D1).
+ *
+ * `readsLost` is the stage's own reading at an instant (`stageCall.ts#stageLostCardOf` over
+ * `EverydayHost.goalsAt`), so the instant answered is one at which the card has words. `fromS` is
+ * the instant the stage last read and found not lost (the previous frame's playhead); where
+ * `toS` is not after it, the one instant `toS` is read.
+ *
+ * Two searches, and the earlier answer wins. The queue goal's maximum only grows, so the stretch is
+ * walked in steps of {@link LOST_SCAN_STEP_S} to the first read that is lost and the step before it
+ * is bisected to {@link LOST_INSTANT_RESOLUTION_S}. The worst-wait goal can read lost in a window
+ * shorter than a frame, so each instant in `beginsAtS` ({@link worstWaitLossBeginsOf}) inside the
+ * stretch and before the walk's answer is read in turn.
+ *
+ * Why the stage needs it: a frame at `600×` moves the playhead ten simulated seconds at sixty frames
+ * a second and a minute or more on a loaded machine, and a skip moves it by hours. The stage stops on
+ * the instant the day was lost rather than wherever the frame or the skip landed, as § D1153 puts the
+ * stage back on a call's second.
+ */
+export function firstLostInstantOf(
+  readsLost: (atS: number) => boolean,
+  fromS: number,
+  toS: number,
+  beginsAtS: readonly number[] = [],
+): number | undefined {
+  if (!(toS > fromS)) return readsLost(toS) ? toS : undefined;
+  let walked: number | undefined;
+  let before = fromS;
+  while (before < toS) {
+    const next = Math.min(toS, before + LOST_SCAN_STEP_S);
+    if (readsLost(next)) {
+      let after = next;
+      while (after - before > LOST_INSTANT_RESOLUTION_S) {
+        const mid = before + (after - before) / 2;
+        if (readsLost(mid)) after = mid;
+        else before = mid;
+      }
+      walked = after;
+      break;
+    }
+    before = next;
+  }
+  for (const atS of beginsAtS) {
+    if (atS <= fromS) continue;
+    if (atS > toS || (walked !== undefined && atS >= walked)) break;
+    if (readsLost(atS)) return atS;
+  }
+  return walked;
+}
 
 export interface StagePace {
   readonly simPerRealS: number;
@@ -268,6 +381,14 @@ export interface StagePaceInput {
    * clear. Read only on a scored day and never ahead of the playhead.
    */
   readonly lostAtS?: number | undefined;
+  /**
+   * **Real seconds the stage has held the player's rung for `watching` since the last decision**, on
+   * a scored day — [§ D1493](../../../../DECISIONS.md): since the last call was raised or answered or a
+   * chip was pressed. At {@link WATCH_ALLOWANCE_REAL_S} or more the stage plays on (`unheld`)
+   * where it would hold. `undefined` where the allowance does not apply: an unscored run, and a chip
+   * pressed while the stage played on, which is the player's speed until the next decision.
+   */
+  readonly watchedRealS?: number | undefined;
 }
 
 /** The act boundary after `fromS` — a peak opening or closing — or `undefined` when none remains. */
@@ -312,6 +433,10 @@ export function stagePaceOf(input: StagePaceInput): StagePace {
     }
     /* § D1169: the tutorial's rule, on the present frame only. */
     if (input.longestStandingS !== undefined && input.longestStandingS >= PACE_HOLD_WAIT_S) {
+      /* § D1493: the hold is for deciding, and lasts so long with nothing to decide. */
+      if (input.watchedRealS !== undefined && input.watchedRealS >= WATCH_ALLOWANCE_REAL_S) {
+        return { simPerRealS: Math.max(watching, BETWEEN_PEAKS_SIM_PER_REAL_S), reason: 'unheld' };
+      }
       return { simPerRealS: watching, reason: 'watching' };
     }
     if (input.playerChoseSpeedAtS !== undefined && input.simTimeS >= input.playerChoseSpeedAtS) {
@@ -328,6 +453,20 @@ export function stagePaceOf(input: StagePaceInput): StagePace {
     return { simPerRealS: watching, reason: 'held' };
   }
   return { simPerRealS: Math.max(watching, BETWEEN_PEAKS_SIM_PER_REAL_S), reason: 'between' };
+}
+
+/**
+ * **The real seconds of `watching` after one frame**, for {@link StagePaceInput.watchedRealS} —
+ * [§ D1493](../../../../DECISIONS.md). The frame before held the player's rung for `watching` from
+ * `fromS` to `toS` at `simPerRealS`; anything else, or a step backwards, adds nothing. One frame adds
+ * at most a real second, so a seek made while playing is not counted as watching it.
+ */
+export function watchedRealAfter(
+  watchedRealS: number,
+  frame: { readonly reason: StagePaceReason | undefined; readonly fromS: number; readonly toS: number; readonly simPerRealS: number },
+): number {
+  if (frame.reason !== 'watching' || !(frame.toS > frame.fromS) || !(frame.simPerRealS > 0)) return watchedRealS;
+  return watchedRealS + Math.min(1, (frame.toS - frame.fromS) / frame.simPerRealS);
 }
 
 /** A rung's own chip label — § D354's rule that the label **is** the multiplier. */
@@ -389,6 +528,9 @@ export function stagePaceNoteOf(
       return `at your speed, ${rung}, while somebody on a landing has waited over a minute`;
     case 'yours':
       return `your speed, ${rung}, until somebody on a landing has waited a minute`;
+    /* § D1493: the hold has run out with nothing asked. */
+    case 'unheld':
+      return `nothing to decide yet: playing on at ${rung} though somebody has waited over a minute · pick a speed to watch`;
     /* § D1435: the line *Watch the rest* plays under. */
     case 'lost':
       return `the day can no longer clear: playing the rest at ${rung}, and no call is asked`;

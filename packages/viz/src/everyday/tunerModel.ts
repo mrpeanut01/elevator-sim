@@ -539,10 +539,18 @@ export interface TuneSandboxStrip {
  * second, disagreeing, source for the same fact.
  */
 export function tuneSandboxStrip(moved: readonly TuneKey[]): TuneSandboxStrip {
+  /*
+   * *Scored day — three things are fixed* stood here, and the untouched press began the day's
+   * counted attempt with the house driving and nothing saying so (the post-AO panel's seat D, D8).
+   * Since wave AP lane AP-D2 ([§ D1451](../../../../DECISIONS.md)) an untouched tuner runs a sandbox
+   * day too, so the strip says that: nothing pressed here counts, changed or not.
+   */
   if (moved.length === 0) {
     return {
-      state: 'Scored day — three things are fixed',
-      note: 'The tower, the machines and the crowd match everyone else. Move any of them and today stops counting.',
+      state: 'Nothing changed yet — a sandbox day all the same',
+      note:
+        'Run it and watch plays the day as it stands, as a sandbox day: it never counts, and your week ' +
+        'stays where it is. The day that counts starts from its brief.',
     };
   }
   return {
@@ -554,15 +562,27 @@ export function tuneSandboxStrip(moved: readonly TuneKey[]): TuneSandboxStrip {
 /** The screen's own chrome, beside the strip. */
 export const TUNER_COPY = Object.freeze({
   title: 'Tune the tower',
+  /* Wave AP lane AP-D2 (§ D1451): a run from here never counts, changed or not. */
   lede:
-    'Everything here is live. Change any of it and the day still runs — it just stops counting on ' +
-    'today’s board.',
+    'Everything here is live, and a day run from here is a sandbox day, changed or not: it never ' +
+    'counts, and your week stays where it is.',
   stampMoved: 'This run will be stamped “sandbox”',
   stampClean: 'Nothing changed yet',
   stampMovedBody:
     'Every figure it produces carries the changes you made, so a sandbox day can never be mistaken ' +
     'for a scored one.',
-  stampCleanBody: 'The day still matches everyone else’s. Run it whenever you are ready.',
+  /*
+   * Read *The day still matches everyone else's. Run it whenever you are ready.* over a press that
+   * began the counted attempt (the post-AO panel's seat D, D8); before the attempt a sandbox day
+   * meets a practice crowd, so it did not match either (§ D1362).
+   */
+  stampCleanBody:
+    'A run from here is still a sandbox day, which counts for nothing. The day that counts starts from its brief.',
+  /**
+   * The box that leaves the copied day's wrinkle and booked cars out of a sandbox day — wave AP lane
+   * AP-D2, [§ D1451](../../../../DECISIONS.md). Ticked by default: the sandbox runs the day you played.
+   */
+  keepDay: 'Run it with today’s wrinkle and booked cars, as the day was dealt',
   dwellLabel: 'Door dwell',
   dwellHint: 'how long the doors stay open',
   speedLabel: 'Rated speed',
@@ -588,8 +608,14 @@ export const TUNER_COPY = Object.freeze({
  * is `fixitBarModel`'s rule: a reworded § 3.3 cell moves here on the same commit.
  */
 export function tunerNoteFor(variants: readonly string[], moved: readonly TuneKey[]): string {
-  const [sandbox, scored] = variants;
-  return (moved.length > 0 ? sandbox : scored) ?? '';
+  /*
+   * The sandbox cell whatever moved, since wave AP lane AP-D2 ([§ D1451](../../../../DECISIONS.md)):
+   * an untouched tuner runs a sandbox day too, so § 3.3's *Scored day — three things are fixed.* is
+   * true of no press this screen makes. `moved` stays in the signature for the strip's reason.
+   */
+  void moved;
+  const [sandbox] = variants;
+  return sandbox ?? '';
 }
 
 /**

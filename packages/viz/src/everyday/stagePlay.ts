@@ -67,7 +67,7 @@ import {
   type StageAdmissionContext,
   type StageMove,
 } from '../campaign/stagePress.js';
-import type { StageReport } from '../campaign/judge.js';
+import { stageGoalNameOf, type StageReport } from '../campaign/judge.js';
 import type { CampaignStage } from '../campaign/types.js';
 import { emptyFixitState, parkingPriceUnits } from '../fixit/engine.js';
 import type { EditorParkingStrategy } from '../fixit/types.js';
@@ -149,6 +149,11 @@ export const STAGE_PLAY_COPY = Object.freeze({
   spendsNothing: 'As the building stands, nothing is spent.',
   refusedCannotRun: 'These settings cannot run together on this building, so the stage is not run.',
   refusedWithheld: 'This setting moves something no scenario sells, so the stage is not run.',
+  /*
+   * Issue #626 item 1: the goals were first named in the verdict, so a player ran the stage without
+   * knowing what it asked. The page now lists them before the press, in the verdict's own words.
+   */
+  goalsHeading: 'TO CLEAR THIS STAGE',
   runLabel: 'Run the stage',
   runAgainLabel: 'Run it again',
   backLabel: 'Back to the path',
@@ -199,6 +204,16 @@ export const STAGE_PLAY_COPY = Object.freeze({
   rungBuy: 'Buy it',
   rungUnmeasured: 'The census has no count at this rung, so whether it adds a way through is not known.',
   rungAboveUnbought: 'Sold once the rung below it is bought.',
+  /*
+   * GitHub issue #626 item 4, § D1496: a press plays one of the stage's crowds under both settings
+   * while the verdict is measured on all of them. No digit in any of these: the block stands over the
+   * verdict and publishes no figure (§ D644 ruling 4).
+   */
+  watchEyebrow: 'One of the stage\u2019s crowds, watched',
+  watchNote: 'The verdict is all of them, both settings on the same passengers.',
+  watchBaselineCaption: 'As the building has it',
+  watchCandidateCaption: 'With your settings',
+  watchSkip: 'Stop watching',
   labLink: 'Open this stage on the Engineer surface',
   labNote: 'The Engineer surface draws every dial the stage’s budget reaches and the full report. A clear there pays nothing.',
 });
@@ -308,6 +323,8 @@ export interface StagePlayFacts {
   readonly title: string;
   readonly teaches: string;
   readonly brief: readonly string[];
+  /** The stage's goals, named by `campaign/judge.ts#stageGoalNameOf`, the verdict's own labels. */
+  readonly goalNames: readonly string[];
   readonly buildingName: string;
   readonly statLine: string;
   readonly budgetUnits: number;
@@ -330,6 +347,12 @@ export interface StagePlayFacts {
   readonly parUnits?: number | undefined;
   /** This device holds the stage's clear, so a run here is practice (§ D1358). */
   readonly clearedBefore?: boolean | undefined;
+  /**
+   * What the clear this device keeps for the stage cost, in units (`everyday/profile.ts#fixSpentUnitsOf`,
+   * the cheapest since § D1358), or `undefined` where none is kept. Wave AP lane AP-D2: the practice
+   * line said *earns the mark* after the mark was earned (the post-AO panel's seat D, D9).
+   */
+  readonly keptSpentUnits?: number | undefined;
   /** Every rung above the base, sold or with its reason (§ D1419). Empty where none is authored. */
   readonly rungs?: readonly StageRungFacts[] | undefined;
   /** The rung this device bought for this stage, or `undefined` on the base (§ D1419). */
@@ -390,6 +413,9 @@ export interface StagePlayView {
   readonly buildingLine: string;
   readonly teaches: string;
   readonly letter: readonly string[];
+  /** The goals the verdict will judge, said before the first press (issue #626 item 1). */
+  readonly goalsHeading: string;
+  readonly goals: readonly string[];
   readonly held: string | undefined;
   readonly budgetLine: string;
   readonly refusal: string | undefined;
@@ -400,11 +426,22 @@ export interface StagePlayView {
   /** On a stage this device has cleared: that a run here is practice (§ D1358). */
   readonly practice: string | undefined;
   readonly status: string | undefined;
+  /** The pair a press plays, while it runs and after (§ D1496); absent before a press and while held. */
+  readonly watch: StageWatchView | undefined;
   readonly verdict: StagePlayVerdictView | undefined;
   /** The wider budgets, each sold from this device or with its measured reason (§ D1419). */
   readonly rungs: readonly StageRungRowView[];
   readonly labLink: string;
   readonly labNote: string;
+}
+
+/** The words on the pair a press plays (§ D1496): `caseStage.ts`'s copy and its two captions. */
+export interface StageWatchView {
+  readonly eyebrow: string;
+  readonly note: string;
+  readonly skip: string;
+  readonly baselineCaption: string;
+  readonly candidateCaption: string;
 }
 
 /** One rung as a row: a sentence, and a press where it can be bought now (§ D1419). */
@@ -511,6 +548,8 @@ export interface StageFactsInput {
   readonly parUnits?: number | undefined;
   /** {@link StagePlayFacts.clearedBefore}, passed through. */
   readonly clearedBefore?: boolean | undefined;
+  /** {@link StagePlayFacts.keptSpentUnits}, passed through. */
+  readonly keptSpentUnits?: number | undefined;
   /** The stage's row of the pinned survivor census, which decides what is sold (§ D1419). */
   readonly census?: PublishedSurvivorScenario | undefined;
   /** The rungs this device bought for this stage (§ D1419). */
@@ -569,6 +608,7 @@ export function stageFactsOf(input: StageFactsInput): StagePlayFacts {
     title: stage.name,
     teaches: stage.teaches,
     brief: stage.brief,
+    goalNames: stage.goals.map(stageGoalNameOf),
     buildingName: input.building.name,
     statLine: statLineOf(input.building),
     budgetUnits,
@@ -582,6 +622,7 @@ export function stageFactsOf(input: StageFactsInput): StagePlayFacts {
     award: input.award,
     parUnits: input.parUnits,
     clearedBefore: input.clearedBefore,
+    keptSpentUnits: input.keptSpentUnits,
     rungs,
     boughtStepId,
     balanceChimes: input.balanceChimes,
@@ -659,13 +700,19 @@ function refusalOf(facts: StagePlayFacts): string | undefined {
   }
 }
 
-function statusOf(phase: StagePlayPhase): string | undefined {
+/**
+ * The running line, counted in crowds — issue #626 item 9. The worker counts arm-runs (both settings
+ * on each crowd), so it read *"Running 35 of 100"* on a batch of fifty crowds that stops at fifty
+ * when a goal is missed. A crowd is counted once both settings have run it.
+ */
+function statusOf(phase: StagePlayPhase, replications: number): string | undefined {
   if (phase.kind === 'failed') return STAGE_PLAY_COPY.failed;
   if (phase.kind !== 'running') return undefined;
-  const done = `${String(phase.completed)} of ${String(phase.total)}`;
+  const crowds = phase.total > 0 ? Math.floor((phase.completed * replications) / phase.total) : 0;
+  const done = `${String(crowds)} of ${String(replications)}`;
   return phase.seedSet === 'tuning'
-    ? `Running ${done} runs on the stage’s own crowds, both settings on the same passengers.`
-    : `Every goal met. Now ${done} runs on crowds you could not have tuned against; these decide the clear.`;
+    ? `Running ${done} of the stage’s own crowds, both settings on the same passengers.`
+    : `Every goal met. Now ${done} crowds you could not have tuned against; these decide the clear.`;
 }
 
 function verdictViewOf(facts: StagePlayFacts, verdict: StagePlayVerdictFacts, stale: boolean): StagePlayVerdictView {
@@ -724,10 +771,18 @@ function verdictViewOf(facts: StagePlayFacts, verdict: StagePlayVerdictFacts, st
  * hub row's own reason ({@link stageParNoteOf} with nothing spent), so the line before the press, the
  * verdict after it and the row on the path give one reason for one stage.
  */
-export function stagePracticeLineOf(parUnits: number | undefined): string {
-  const par =
-    parUnits !== undefined && parUnits > 0
-      ? `A clear at or under par, ${String(parUnits)} ${parUnits === 1 ? 'unit' : 'units'}, earns the mark.`
+export function stagePracticeLineOf(parUnits: number | undefined, keptSpentUnits?: number): string {
+  const priced = parUnits !== undefined && parUnits > 0;
+  const unitsOf = (units: number): string => `${String(units)} ${units === 1 ? 'unit' : 'units'}`;
+  /*
+   * Wave AP lane AP-D2, the post-AO panel's seat D (D9): once the clear this device keeps met the par,
+   * the line still promised *earns the mark*. It says the mark is held, from the kept clear's own cost.
+   */
+  const marked = priced && keptSpentUnits !== undefined && parMarkOf(parUnits, keptSpentUnits) !== undefined;
+  const par = marked
+    ? `This stage has its mark: your clear cost ${unitsOf(keptSpentUnits)}, against a par of ${unitsOf(parUnits)}.`
+    : priced
+      ? `A clear at or under par, ${unitsOf(parUnits)}, earns the mark.`
       : (stageParNoteOf(parUnits, undefined) ?? '');
   return `${STAGE_PLAY_COPY.practice} ${par}`.trim();
 }
@@ -794,6 +849,8 @@ export function stagePlayViewOf(facts: StagePlayFacts, phase: StagePlayPhase): S
     buildingLine: `${facts.buildingName} · ${facts.statLine}`,
     teaches: facts.teaches,
     letter: facts.brief,
+    goalsHeading: STAGE_PLAY_COPY.goalsHeading,
+    goals: facts.goalNames,
     held: facts.held === undefined ? undefined : `${STAGE_PLAY_COPY.heldHead}: ${facts.held}`,
     budgetLine: budgetLineOf(facts),
     refusal: refusalOf(facts),
@@ -809,8 +866,18 @@ export function stagePlayViewOf(facts: StagePlayFacts, phase: StagePlayPhase): S
       `A run is ${String(facts.replications)} runs of ${minutesOf(facts.durationS)} of building time on this ` +
       `stage’s own crowds, your settings and the building’s on the same passengers. If every goal is met, ` +
       `${String(facts.replications)} more follow on crowds you could not have tuned against, and those decide the clear.`,
-    practice: facts.clearedBefore === true ? stagePracticeLineOf(facts.parUnits) : undefined,
-    status: statusOf(phase),
+    practice: facts.clearedBefore === true ? stagePracticeLineOf(facts.parUnits, facts.keptSpentUnits) : undefined,
+    status: statusOf(phase, facts.replications),
+    watch:
+      facts.held === undefined && (phase.kind === 'running' || phase.kind === 'judged')
+        ? {
+            eyebrow: STAGE_PLAY_COPY.watchEyebrow,
+            note: STAGE_PLAY_COPY.watchNote,
+            skip: STAGE_PLAY_COPY.watchSkip,
+            baselineCaption: STAGE_PLAY_COPY.watchBaselineCaption,
+            candidateCaption: STAGE_PLAY_COPY.watchCandidateCaption,
+          }
+        : undefined,
     verdict: phase.kind === 'judged' ? verdictViewOf(facts, phase.verdict, phase.stale) : undefined,
     rungs: (facts.rungs ?? []).map((rung) => stageRungRowOf(rung, facts.balanceChimes ?? 0)),
     labLink: STAGE_PLAY_COPY.labLink,

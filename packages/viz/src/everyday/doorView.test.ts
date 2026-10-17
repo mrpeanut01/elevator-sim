@@ -25,6 +25,8 @@ import { GLOSSARY_TERMS } from '../mode/glossary.js';
 import {
   DAY_OFFSET_MIN,
   DOOR_BACK_REFUSAL,
+  DOOR_DRIVER_NOTE,
+  DOOR_DRIVER_NOTE_HELD,
   doorScreenViewOf,
   doorWordsHeadingOf,
   DOOR_STEPS,
@@ -35,6 +37,7 @@ import {
 import { PRESS_DAY_CHOICE_COPY } from './towerChoice.js';
 import { EM_DASH } from './figures.js';
 import type { TodayRecord } from './today.js';
+import { POOL_CENSUS } from '../shift/weekPool.js';
 
 /** A day that met every bar, so its outcome is a real closed day with a real score. */
 const MET: GoalObservations = {
@@ -381,6 +384,20 @@ describe('the rest of § 6.1', () => {
     expect(view.driver.name).toBe('Steady hand');
   });
 
+  it('sends the player to the brief to change the driver only on a day the brief lets them — GitHub issue #626', () => {
+    expect(viewAt(0, false).driver.note).toBe(DOOR_DRIVER_NOTE);
+    const week = weekWith(5, [closedDay(1), closedDay(2), closedDay(3), closedDay(4)]);
+    const held = doorScreenViewOf({
+      week,
+      today: { ...TODAY, day: week.day, driverHeld: 'held' },
+      dayOffset: 0,
+      dayClosed: false,
+      nameOf: NAME_OF,
+    });
+    expect(held.driver.note).toBe(DOOR_DRIVER_NOTE_HELD);
+    expect(held.driver.note).not.toMatch(/^Change it/u);
+  });
+
   it('promises no duration the run does not have — § D733', () => {
     /*
      * Step 2 read *“The whole shift in a couple of minutes”*. Ten of the eleven contracts a first
@@ -509,7 +526,7 @@ describe('the rest of § 6.1', () => {
 
 
 describe('weeks held on this tower — lane AM-D, § D1253', () => {
-  it('is drawn once a week on the tower has closed, and says it buys nothing and runs on no clock', () => {
+  it('is drawn once a week on the tower has closed, and says what a held week pays and that it runs on no clock', () => {
     const week = weekWith(5, [closedDay(1), closedDay(2), closedDay(3), closedDay(4)]);
     const at = (record?: WeekRecord): string | undefined =>
       doorScreenViewOf({ week, today: { ...TODAY, day: week.day }, dayOffset: 0, dayClosed: false, nameOf: NAME_OF, record })
@@ -518,7 +535,10 @@ describe('weeks held on this tower — lane AM-D, § D1253', () => {
     expect(at({ contractId: 'c2', closed: 0, met: 0, best: 0 })).toBeUndefined();
     const line = at({ contractId: 'c2', closed: 3, met: 3, best: 5, held: 3 });
     expect(line).toMatch(/^Weeks held on this tower: 3 in a row/u);
-    expect(line).toContain('It buys nothing, and no clock runs on it');
+    /* Wave AP lane AP-D2: *It buys nothing* sat beside a held level that paid 10 chimes (§ D1402). */
+    expect(line).toContain('A held week pays 10 chimes the first time its level');
+    expect(line).not.toContain('buys nothing');
+    expect(line).toContain('no clock runs on it');
   });
 });
 
@@ -554,11 +574,21 @@ describe('a level’s bookings on the door — § D1400', () => {
       nameOf: NAME_OF,
     });
 
-  it('names week 3’s Monday booking as new, and nothing in week 2', () => {
-    expect(doorOn(3).weekBookings).toBe(
-      'Booked this week: car C is out of passenger service on Monday from 08:00 until 12:00, new this week.',
-    );
-    expect(doorOn(2).weekBookings).toBeUndefined();
-    expect(doorOn(3).weekBookings).not.toMatch(/harder|easier/u);
+  /* Since § D1461 the pool withdraws week 3: the shipped door names no booking, and the authored level's line is read as the census plays it. */
+  it('names no booking on week 3’s door while the pool withdraws its level', () => {
+    expect(doorOn(3).weekBookings).toBeUndefined();
+  });
+
+  it('names week 3’s Monday booking as new, and nothing in week 2, as the census plays the level', () => {
+    POOL_CENSUS.measuring = true;
+    try {
+      expect(doorOn(3).weekBookings).toBe(
+        'Booked this week: car C is out of passenger service on Monday from 08:00 until 12:00, new this week.',
+      );
+      expect(doorOn(2).weekBookings).toBeUndefined();
+      expect(doorOn(3).weekBookings).not.toMatch(/harder|easier/u);
+    } finally {
+      POOL_CENSUS.measuring = false;
+    }
   });
 });
