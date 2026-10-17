@@ -53543,5 +53543,23 @@ is over.* once the attempt has answered or skipped its pinned call (`EverydayHos
 today is banked (`doorView.ts#DOOR_DRIVER_NOTE_HELD_PAST`). Held by `briefView.test.ts` and
 `doorView.test.ts`.
 
-**Numbers spent.** This lane held **D1525 to D1533** and spent **D1525 to D1530**; D1531 to D1533
+## D1531 — the live region is emptied when a call card appears, so it never says another count beside it
+
+> **Taken 2026-10-17 by an agent session under delegated authority** (wave AR, lane AR-2, on the
+> integrator's finding from GitHub issue #633), not by the product owner. Reads the post-AI panel's
+> D7 rule (a stopped frame is said when the two-second limit lifts) unchanged.
+
+**What was found.** At Midtown's 10:40 call the card said *2 people are standing* and the live region
+said *0 legs waiting*. The two counts agree at the call second (`honesty/agreement.ts`'s
+`standing-said`, and a probe of the press day: 2 and 2). The region was stale: it held the sentence
+written at 09:46 as a skip began, and the call's own frame was scheduled for when the rate limit
+lifted, up to two seconds after the card appeared.
+
+**The ruling.** When the call card appears the region is emptied, a clearing that does not stamp the
+limit, and the call's frame is said when the limit lifts, as before. The limit is not bypassed.
+
+**What holds it.** `everyday/stagePace.browser.test.ts`, *never leaves the live region saying another
+count beside the call card* (red before: `0 legs waiting` beside the card's 2).
+
+**Numbers spent.** This lane held **D1525 to D1533** and spent **D1525 to D1531**; D1532 and D1533
 are unspent.

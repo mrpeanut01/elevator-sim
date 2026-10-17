@@ -352,4 +352,40 @@ describe.skipIf(!HAS_BROWSER)('§ D1169 — a scored day is paced by the tutoria
       await page.close();
     }
   }, 120_000);
+
+  /*
+   * Wave AR, lane AR-2 (§ D1531): at Midtown's 10:40 call the card said *2 people are standing* while
+   * the live region still said *0 legs waiting*, the sentence written at 09:46 as a skip began, held
+   * there by the two-second limit. Red before: the region read 0 beside the card's 2.
+   */
+  it('never leaves the live region saying another count beside the call card', async () => {
+    const page = await playDayOn('c2', { width: 1280, height: 800 });
+    try {
+      const read = () =>
+        page.evaluate(() => {
+          const facts = [...document.querySelectorAll('.everyday-stage-call-fact')].map((node) => node.textContent ?? '');
+          const present = facts.find((fact) => /standing|Nobody is standing/u.test(fact)) ?? '';
+          const card = /^Nobody/u.test(present) ? 0 : /^One person/u.test(present) ? 1 : Number(/^(\d+) people/u.exec(present)?.[1] ?? NaN);
+          const said = document.querySelector('.everyday-stage-description')?.textContent ?? '';
+          const legs = / (\d+) legs? waiting/u.exec(said)?.[1];
+          return { card, said, legs: legs === undefined ? undefined : Number(legs) };
+        });
+      /* The first poll at which the card is up, within 50 ms of its appearing. */
+      await page.waitForFunction(() => document.querySelector('.everyday-stage-call:not([hidden]) .everyday-stage-call-fact') !== null, undefined, {
+        timeout: 100_000,
+        polling: 50,
+      });
+      const first = await read();
+      expect(Number.isFinite(first.card)).toBe(true);
+      expect(first.said === '' || first.legs === first.card, JSON.stringify(first)).toBe(true);
+      /* And once the limit has lifted, the call's own frame is said. */
+      await page.waitForFunction(
+        (want) => new RegExp(` ${String(want)} legs? waiting`, 'u').test(document.querySelector('.everyday-stage-description')?.textContent ?? ''),
+        first.card,
+        { timeout: 5_000, polling: 100 },
+      );
+    } finally {
+      await page.close();
+    }
+  }, 120_000);
 });

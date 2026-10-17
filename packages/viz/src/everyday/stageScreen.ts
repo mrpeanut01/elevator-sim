@@ -1839,6 +1839,14 @@ function mountStage(
       skipAsk.hidden = true;
     }
     if (appearing) {
+      /*
+       * Wave AR, lane AR-2, § D1531: the live region still held the last sentence said while the
+       * stage moved (*0 legs waiting* at 09:46, before the skip that landed on the 10:40 call) beside a
+       * card saying *2 people are standing*. It is emptied as the card appears, which is a clearing
+       * and not an announcement, so the two-second limit is not stamped by it; the call's own frame is
+       * said by `announce` when the limit lifts.
+       */
+      if (description.textContent !== '') description.textContent = '';
       fitCallCardToRegion();
       callCard.scrollIntoView({ block: 'nearest', inline: 'nearest' });
       callCard.focus({ preventScroll: true });
