@@ -354,6 +354,27 @@ export const REPORT_SECONDARY = Object.freeze({ week: 'Your week', menu: 'Main m
  */
 export const REPORT_LEVERS_OPTIONAL_HEADING = 'Nothing needed today. If you want to try something anyway';
 
+/**
+ * **The sheet before this one, only where it is the same mode and the same tower** — GitHub issue
+ * #637 item 10, wave AS lane AS-3. A career close drew *The run before this one* against the Midtown
+ * scenario day filed before it, at Garden Apartments: the block refused the figures, rightly, and
+ * still spent a section saying two unrelated runs differ. A sheet from another mode or another
+ * building is not *the run before this one* to a player, so nothing is drawn; with no earlier run of
+ * the same kind, nothing is said either. `mode` is the shell context the sheet was filed under
+ * (`EverydayScreenShellContext.ctx`).
+ */
+export function comparablePreviousOf(input: {
+  readonly report: ShapedDayReport | undefined;
+  readonly mode: string;
+  readonly previous: ShapedDayReport | undefined;
+  readonly previousMode: string | undefined;
+}): ShapedDayReport | undefined {
+  const { report, previous } = input;
+  if (report === undefined || previous === undefined) return undefined;
+  if (input.previousMode !== input.mode) return undefined;
+  return previous.basis.buildingId === report.basis.buildingId ? previous : undefined;
+}
+
 /** What {@link everydayReportViewOf} is computed from. */
 export interface EverydayReportInput {
   /** `host.lastReport()` — the last filed sheet, or `undefined` before any day has closed. */

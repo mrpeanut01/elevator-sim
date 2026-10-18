@@ -10248,6 +10248,8 @@ const EVERYDAY_MENU: SurfaceAdapter = {
     'everyday/sittingShape.ts#SITTING_SHAPES',
     /* Wave AP lane AP-D2 (§ D1453): the hub row's last clause, drawn inside `SITTING_SHAPES.contractDay`. */
     'everyday/sittingShape.ts#SCENARIO_LOSS_CLAUSE',
+    /* Wave AS lane AS-3 (§ D1563): the hub row's far ends, drawn inside `SITTING_SHAPES.contractDay`. */
+    'everyday/sittingShape.ts#SITTING_LONGER_ELSEWHERE',
     'everyday/sittingShape.ts#sittingLengthPhrase',
     'everyday/rail.ts#RAIL_DRAWER_COPY',
     /* The shell's skip link, GitHub issue #404 — chrome the shell draws and does not author. */

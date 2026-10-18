@@ -171,6 +171,12 @@ export function figureCell(
 export function unavailableBand(
   doc: Document,
   band: { readonly label: string; readonly reason: string; readonly absent: readonly string[] },
+  /**
+   * A handle to fold the reason and the list under, closed — GitHub issue #637 item 7 (wave AS, lane
+   * AS-3): the front door's band was a wall of text above the day. The label stays drawn, so the
+   * absence is still labelled (§ 12.2); the rest is one press away and never moved off the page.
+   */
+  fold?: string,
 ): HTMLElement {
   const root = el(doc, 'div', 'everyday-world-absent');
   root.style.cssText = [
@@ -186,7 +192,16 @@ export function unavailableBand(
   const list = el(doc, 'ul');
   list.style.cssText = `margin:10px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:4px;${QUIET}`;
   for (const entry of band.absent) list.append(el(doc, 'li', undefined, entry));
-  root.append(label, reason, list);
+  if (fold === undefined) {
+    root.append(label, reason, list);
+    return root;
+  }
+  const more = el(doc, 'details', 'everyday-world-more');
+  more.style.cssText = 'margin:6px 0 0';
+  const handle = el(doc, 'summary', 'everyday-world-handle', fold);
+  handle.style.cssText = `${QUIET};cursor:pointer`;
+  more.append(handle, reason, list);
+  root.append(label, more);
   return root;
 }
 

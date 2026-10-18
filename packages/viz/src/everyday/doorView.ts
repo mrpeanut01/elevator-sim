@@ -622,6 +622,9 @@ export function todayIsBanked(input: Pick<DoorScreenInput, 'week'>): boolean {
   return input.week.history.some((entry) => entry.day === input.week.day);
 }
 
+/** The handle the door's world band folds its paragraph under — GitHub issue #637 item 7. */
+export const DOOR_WORLD_FOLD = 'Details';
+
 /** The *Driving today* card's note on a day whose driver the brief lets the player change. */
 export const DOOR_DRIVER_NOTE = 'Change it on the brief, which is the next screen.';
 

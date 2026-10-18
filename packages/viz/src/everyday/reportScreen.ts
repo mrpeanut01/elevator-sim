@@ -73,6 +73,7 @@ import {
 
 import {
   FIGURE_NOTE_HANDLE,
+  comparablePreviousOf,
   everydayReportViewOf,
   figureNotePartsOf,
   reportProsePartsOf,
@@ -133,6 +134,14 @@ import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.
  * which is that module's stated rule and the reason it is not `ViewerState`'s to hold.
  */
 let continuity: SheetContinuity = NOTHING_FILED_YET;
+/**
+ * The shell context each of {@link continuity}'s two sheets was filed under, rotated with it — GitHub
+ * issue #637 item 10: the delta compares only within one mode (`reportView.ts#comparablePreviousOf`).
+ */
+let continuityModes: { readonly current: string | undefined; readonly previous: string | undefined } = {
+  current: undefined,
+  previous: undefined,
+};
 
 /**
  * The last report whose verdict was filed as drawn — GitHub issue #340, `docs/26` § 7.2 E6.
@@ -225,11 +234,18 @@ function mountReportScreen(
     const report = data.lastReport();
     // Rotate before building the view, never after — `rotatedOn`'s own rule: rotating afterwards
     // makes every sheet its own predecessor on the next draw and every delta reads *nothing moved*.
-    continuity = rotatedOn(continuity, report, { kind: 'played-out' });
+    const rotated = rotatedOn(continuity, report, { kind: 'played-out' });
+    if (rotated !== continuity) continuityModes = { current: context.ctx, previous: continuityModes.current };
+    continuity = rotated;
     const run = data.runState();
     return everydayReportViewOf({
       report,
-      previous: continuity.previous,
+      previous: comparablePreviousOf({
+        report,
+        mode: context.ctx,
+        previous: continuity.previous,
+        previousMode: continuityModes.previous,
+      }),
       overnight: data.tomorrowBriefing(),
       newerRunOnStage: report !== undefined && run.hasRun && !run.dayClosed,
       panelNames: panelNamesOf(doc),

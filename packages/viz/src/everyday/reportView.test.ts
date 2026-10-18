@@ -61,6 +61,7 @@ import {
   REPORT_PROSE_BUDGET,
   reportProsePartsOf,
   REPORT_LEVERS_OPTIONAL_HEADING,
+  comparablePreviousOf,
 } from './reportView.js';
 import { PRESS_CALL_ROW_ID } from '../shift/callRow.js';
 
@@ -1043,5 +1044,30 @@ describe('§ D1543 — the levers after a cleared day are optional', () => {
     expect(viewOf().leversFolded).toBe(true);
     expect(viewOf().levers.length).toBeGreaterThan(0);
     expect(viewOf({ report: sheetOf({ verdict: 'missed' }) }).leversFolded).toBe(false);
+  });
+});
+
+/*
+ * ---- Wave AS, lane AS-3: the run before this one is the same mode's, on the same tower — GitHub issue #637 item 10 ----
+ *
+ * The career close drew *The run before this one* against the Midtown scenario day filed before it.
+ */
+describe('the delta compares only within one mode and one tower — issue #637', () => {
+  const garden = sheetOf();
+  const midtown = sheetOf({ basis: { ...garden.basis, buildingId: 'midtown-office' } });
+
+  it('keeps the earlier sheet only when both its mode and its tower match', () => {
+    expect(comparablePreviousOf({ report: garden, mode: 'career', previous: garden, previousMode: 'career' })).toBe(garden);
+    expect(comparablePreviousOf({ report: garden, mode: 'career', previous: midtown, previousMode: 'career' })).toBeUndefined();
+    expect(comparablePreviousOf({ report: garden, mode: 'career', previous: garden, previousMode: 'daily' })).toBeUndefined();
+    /* No earlier run, or one whose mode was never recorded: nothing is said. */
+    expect(comparablePreviousOf({ report: garden, mode: 'career', previous: undefined, previousMode: undefined })).toBeUndefined();
+    expect(comparablePreviousOf({ report: garden, mode: 'career', previous: garden, previousMode: undefined })).toBeUndefined();
+  });
+
+  it('draws no *run before this one* block where the earlier sheet is another mode’s or another tower’s', () => {
+    const across = comparablePreviousOf({ report: garden, mode: 'career', previous: midtown, previousMode: 'daily' });
+    expect(viewOf({ report: garden, previous: across }).sheet.delta).toBeNull();
+    expect(viewOf({ report: garden, previous: midtown }).sheet.delta?.caption).toBe('The run before this one');
   });
 });

@@ -32,13 +32,14 @@ import { CONTRACTS } from '../shift/contracts.js';
 import { wholeDayFor, wholeDayRun } from '../shift/dayLength.js';
 
 import { EVERYDAY_MODES } from './modes.js';
-import { PINNED_DAY_LENGTHS, pinnedDayLengthLineOf, pinnedDayMinutesOf } from './firstDayLength.js';
+import { PINNED_DAY_LENGTHS, pinnedDayLengthLineOf, pinnedDayMinutesOf, pinnedDayMinutesSpan } from './firstDayLength.js';
 import { scenarioHubViewOf } from './scenarioModel.js';
 import {
   SITTING_SHAPES,
   SITTING_SPANS,
   WHOLE_DAY_LONGEST,
   WHOLE_DAY_LONGEST_GAME_TOWER,
+  SITTING_LONGER_ELSEWHERE,
   pacedDayRealS,
   sittingLengthPhrase,
   sittingMinutes,
@@ -174,11 +175,15 @@ describe('every advertised length is the day the tile actually opens', () => {
     /* The long end is the longest day measured on any contract, a reference tower's. */
     const top = Math.ceil(pacedDayRealS(WHOLE_DAY_LONGEST, RUNG.simPerRealS) / 60);
     expect(top).toBeGreaterThan(90);
-    expect(SITTING_SHAPES.contractDay).toContain(`${String(Math.floor(top / 60))} h`);
+    /*
+     * GitHub issue #637 item 7, § D1563: the hub row is one line now, and says the far ends as
+     * *longer on some towers*. That clause is true only while a measured long end exceeds the span the
+     * row quotes, so both are held here.
+     */
+    expect(SITTING_SHAPES.contractDay).toContain(SITTING_LONGER_ELSEWHERE);
     expect(SITTING_SHAPES.contractDay).not.toContain('2 h 30');
-    expect(SITTING_SHAPES.contractDay).toContain(
-      `and ${String(BETWEEN_PEAKS_SIM_PER_REAL_S)}× wherever nobody on a landing has waited a minute`,
-    );
+    expect(top).toBeGreaterThan(pinnedDayMinutesSpan().high);
+    expect(Math.ceil(pacedDayRealS(WHOLE_DAY_LONGEST_GAME_TOWER, RUNG.simPerRealS) / 60)).toBeGreaterThan(pinnedDayMinutesSpan().high);
     /*
      * § D1169: every scored day is paced by the tutorial's rule, a slice included, so the short end
      * is the floor — the shortest day crossed at the fast rung — and not the slice at one rung.
@@ -186,7 +191,7 @@ describe('every advertised length is the day the tile actually opens', () => {
     const low = SITTING_SPANS.contractDay.lowSimS;
     expect(SITTING_SPANS.contractDay.scoredShortEnd).toBe(true);
     expect(watchedRealS(SITTING_SPANS.contractDay, low, RUNG.simPerRealS)).toBe(low / BETWEEN_PEAKS_SIM_PER_REAL_S);
-    expect(SITTING_SHAPES.contractDay).toContain('at most on the game’s own towers');
+    expect(SITTING_SHAPES.contractDay).not.toContain('wherever nobody on a landing');
   });
 
   /*
@@ -210,7 +215,7 @@ describe('every advertised length is the day the tile actually opens', () => {
     expect(SITTING_SHAPES.scenarioMode.startsWith(floor)).toBe(false);
     expect(SITTING_SHAPES.contractDay.startsWith(floor)).toBe(false);
     const top = Math.ceil(pacedDayRealS(WHOLE_DAY_LONGEST, RUNG.simPerRealS) / 60);
-    expect(SITTING_SHAPES.contractDay).toMatch(new RegExp(`up to ${String(Math.floor(top / 60))} h \\d\\d on a reference tower`, 'u'));
+    expect(top).toBeGreaterThan(Math.max(...minutes));
     expect(SITTING_SHAPES.scenarioMode).toContain(sittingLengthPhrase(SITTING_SPANS.fixCase, 'a case'));
   });
 

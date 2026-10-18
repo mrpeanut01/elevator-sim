@@ -316,7 +316,13 @@ describe.skipIf(!HAS_BROWSER)('the daily loop is walkable end to end', () => {
         lede: document.querySelector('.everyday-door-lede')?.textContent ?? '',
         steps: document.querySelectorAll('.everyday-door-step').length,
         seed: document.querySelector('.everyday-door-seed')?.textContent ?? '',
+        /* GitHub issue #637 item 7: the band's paragraph folds under a closed *Details*; its label stays. */
+        folded: (() => {
+          const more = document.querySelector<HTMLDetailsElement>('.everyday-world-absent details.everyday-world-more');
+          return more === null ? 'none' : `${more.open ? 'open' : 'closed'}:${more.querySelector('summary')?.textContent ?? ''}:${String(more.querySelectorAll('li').length > 0)}`;
+        })(),
       }));
+      expect(door.folded).toBe('closed:Details:true');
       expect(door.label).toBe('WORLD FIGURES UNAVAILABLE');
       expect(door.band).not.toMatch(/\b0 players\b|Loading|…$/);
       expect(door.lede.length).toBeGreaterThan(40);

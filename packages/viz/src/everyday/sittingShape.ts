@@ -93,7 +93,7 @@
 import { DEFAULT_SHIFT_LENGTH_S } from '../dev/state.js';
 import { CONTRACTS } from '../shift/contracts.js';
 
-import { DEFAULT_STAGE_SPEED_INDEX, STAGE_SPEEDS, stageSpeedAt } from './stageScreenModel.js';
+import { DEFAULT_STAGE_SPEED_INDEX, stageSpeedAt } from './stageScreenModel.js';
 import { BETWEEN_PEAKS_SIM_PER_REAL_S, pacedDayRealS, type PacedDay } from './stagePace.js';
 import { pinnedDayMinutesSpan } from './firstDayLength.js';
 
@@ -341,13 +341,6 @@ export const SITTING_SPANS = Object.freeze({
   }),
 } satisfies Readonly<Record<string, SittingSpan>>);
 
-/** The between-peaks rung's own chip label — § D354's rule that a label **is** its multiplier. */
-function betweenRungLabel(): string {
-  const rung = STAGE_SPEEDS.find((speed) => speed.simPerRealS === BETWEEN_PEAKS_SIM_PER_REAL_S);
-  if (rung === undefined) throw new Error('sittingShape: the between-peaks rung is not on the ladder');
-  return rung.label;
-}
-
 /** The rung every figure here is quoted at — the stage's shipped opening speed. */
 function openingRung(): { readonly label: string; readonly simPerRealS: number } {
   return stageSpeedAt(DEFAULT_STAGE_SPEED_INDEX);
@@ -455,14 +448,30 @@ const SCENARIO_HUB_SPAN: SittingSpan = unionOf(SITTING_SPANS.contractDay, SITTIN
  * the brief's figure is the middle of three runs a call can leave.
  */
 function typicalDayPhrase(): string {
-  const { low, high } = pinnedDayMinutesSpan();
-  const figure = low === high ? `about ${String(low)} min` : `about ${String(low)}-${String(high)} min`;
-  return `${figure} a day at ${openingRung().label} on the towers a first week can open on`;
+  return `${dayFigurePhrase()} on the towers a first week can open on`;
 }
 
-/** {@link SCENARIO_HUB_SPAN}'s long end, a reference tower's measured day, in the hub's own words. */
-function longestDayWord(): string {
-  return sittingWord(sittingMinutes(pacedDayRealS(WHOLE_DAY_LONGEST, openingRung().simPerRealS), 1));
+/** {@link typicalDayPhrase}'s figure and rung alone — *about 2-4 min a day at 4×*, say. */
+function dayFigurePhrase(): string {
+  const { low, high } = pinnedDayMinutesSpan();
+  const figure = low === high ? `about ${String(low)} min` : `about ${String(low)}-${String(high)} min`;
+  return `${figure} a day at ${openingRung().label}`;
+}
+
+/**
+ * The hub row's qualifier for the days longer than the measured span — GitHub issue #637 item 7. True
+ * while some tower's measured day runs past the span's long end, which `sittingShape.test.ts` asserts
+ * against {@link WHOLE_DAY_LONGEST_GAME_TOWER} and {@link WHOLE_DAY_LONGEST}.
+ */
+export const SITTING_LONGER_ELSEWHERE = 'longer on some towers';
+
+/** {@link SITTING_LONGER_ELSEWHERE}, said only while a measured long end runs past the quoted span's. */
+function longerElsewhereClause(): string {
+  const { high } = pinnedDayMinutesSpan();
+  const longest = Math.max(
+    ...[WHOLE_DAY_LONGEST_GAME_TOWER, WHOLE_DAY_LONGEST].map((day) => Math.ceil(pacedDayRealS(day, openingRung().simPerRealS) / 60)),
+  );
+  return longest > high ? `, ${SITTING_LONGER_ELSEWHERE}` : '';
 }
 
 /**
@@ -524,7 +533,14 @@ export const SITTING_SHAPES = Object.freeze({
    * follow it, so the far end is still said and no longer stands as the figure. Its last clause read
    * *no losing — a day is a score, not a pass* until wave AP lane AP-D2 ({@link SCENARIO_LOSS_CLAUSE}).
    */
-  contractDay: `${typicalDayPhrase()}, and ${betweenRungLabel()} wherever nobody on a landing has waited a minute, the quiet between peaks skipped; ${String(Math.ceil(pacedDayRealS(WHOLE_DAY_LONGEST_GAME_TOWER, openingRung().simPerRealS) / 60))} min at most on the game’s own towers, and up to ${longestDayWord()} on a reference tower · ${SCENARIO_LOSS_CLAUSE}`,
+  /*
+   * GitHub issue #637 item 7, wave AS lane AS-3, [§ D1563](../../../../DECISIONS.md): one plain line.
+   * It read *…, and 30× wherever nobody on a landing has waited a minute, the quiet between peaks
+   * skipped; 34 min at most on the game’s own towers, and up to 1 h 49 on a reference tower · …*, a
+   * wall a playtester skipped. The measured figure leads as § D1383 ruled; the far ends are said as
+   * {@link SITTING_LONGER_ELSEWHERE}, which the test holds true against both measured long ends.
+   */
+  contractDay: `${dayFigurePhrase()}${longerElsewhereClause()} · ${SCENARIO_LOSS_CLAUSE}`,
   /** The hub's *Fix a building* row. */
   fixCase: `${sittingLengthPhrase(SITTING_SPANS.fixCase, 'a case')}, skippable · retry as often as you like`,
 });

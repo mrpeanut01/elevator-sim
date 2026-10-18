@@ -14,7 +14,7 @@
 
 import type { ActionBarModel } from './actionBar.js';
 import { actionBarFor } from './actionBar.js';
-import { doorScreenViewOf, type DoorScreenView } from './doorView.js';
+import { DOOR_WORLD_FOLD, doorScreenViewOf, type DoorScreenView } from './doorView.js';
 import { everydayProfileStore } from './profileStore.js';
 import type { EverydayScreenModule } from './screens.js';
 import {
@@ -340,7 +340,8 @@ function mountDoor(
 
     /* ---- items 3, 4 and 7: every world figure, in one labelled absence ---- */
     const world = section(document_, 'HOW YESTERDAY’S PLAYERS DID');
-    world.body.append(unavailableBand(document_, view.world));
+    /* Issue #637 item 7: the label stays; the paragraph and the list fold under *Details*. */
+    world.body.append(unavailableBand(document_, view.world, DOOR_WORLD_FOLD));
     column.append(world.root);
 
     /* ---- item 8: the seed line, and § 6's sentence ---- */
