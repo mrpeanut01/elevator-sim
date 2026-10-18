@@ -53692,3 +53692,56 @@ that day honestly; it does not give it a decision. The options, none taken:
 - **D.** Keep a quiet first day and § D1543's short path (what ships).
 
 **Numbers spent.** This lane held **D1543 to D1551** and spent **D1543 and D1544**.
+
+## D1588 — Rush's two parking chips do not help, measured paired; a handover can
+
+> **Taken 2026-10-18 by an agent session** (wave AS, lane AS-6, for the owner's decision panel on
+> GitHub #636, ruling R5, and #635 item 1). A measurement, not a ruling: no game behaviour, chip or
+> copy moves. The chip set is the owner's.
+
+**Why an entry.** The panel asked for this figure before ruling, and it reaches past the module that
+measured it (`everyday/stageScreenModel.ts`'s chip set, `everyday/rush.ts`).
+
+**The run.** `packages/viz/src/everyday/rushChoices.sweep.test.ts` on `c33e06d` (gated on
+`RUSH_CHOICES_SWEEP=1`, unscheduled; the command is in its docstring). Midtown Office, Conventional
+collective, the player's rush path (`rushPatchOf` → `shiftRunConfigOf` → `recordRun`), survival read
+by `rushHoldAt` and the wave by `rushOutcomeOf`. **Fifty crowds, seeds 90 210 to 90 259** (the
+shipped crowd plus 49), every arm on the same crowd as its baseline. *Late* is the first 2 s bucket
+of the do-nothing run with a rider standing a minute or more (1:36 to 13:36, mean 5:29; 2:52 on the
+shipped crowd). The handover arm is the permitted target with the longest published Midtown house
+row (`fairness-first`), fixed before the run. No run was censored. Every run saturates by design, so
+`awtIsValid` is false on all 300 and no waiting-time mean is quoted; survival is the scored figure.
+
+| arm | Δ hold, s, paired-t 95 % | Δ wave | longer / same / shorter | verdict |
+|---|---|---|---|---|
+| Spread at 0:10 | +4.0 [−22.3, +30.4] | +0.02 [−0.16, +0.20] | 31 / 2 / 17 | INDISTINGUISHABLE |
+| Park at 0:10 | +8.3 [−19.7, +36.4] | +0.08 [−0.11, +0.27] | 24 / 5 / 21 | INDISTINGUISHABLE |
+| Spread, late | −6.4 [−30.7, +18.0] | −0.04 [−0.20, +0.12] | 20 / 10 / 20 | INDISTINGUISHABLE |
+| Park, late | +4.2 [−24.3, +32.8] | +0.10 [−0.08, +0.28] | 22 / 14 / 14 | INDISTINGUISHABLE |
+| Switch to Fairness first at 0:10 | **+127.8 [+103.5, +152.0]** | **+0.74 [+0.58, +0.90]** | 47 / 1 / 2 | **BETTER** |
+
+Doing nothing held 1 615.7 s on average (wave 9.44).
+
+**The shipped crowd, the only one a player meets** (`RUSH_CHOICES_SEEDS=1`, `RUSH_CHOICES_TIMES`,
+every permitted handover). These are identities on one crowd, not estimates. The playtest's three
+figures reproduce exactly: nothing 1 640 s, Spread at 0:10 1 494 s, Park at 0:10 1 536 s.
+
+- **Spread**, pressed at 0:00, 0:10, 0:30, 1:00, 1:30, 2:00, 2:30, 2:52, 3:30, 4:00, 5:00:
+  −118, −146, −188, −98, **+10**, −124, −176, −176, −176, −176, −98 s. Identical hold from 6:00 on
+  (6, 7, 8, 10, 12, 15 and 18 minutes tested).
+- **Park**, same times: −104, −104, −104, −104, −100, −102, −146, −146, −146, −146, −124 s.
+  Identical hold from 6:00 on.
+- **Handovers at 0:10**: Fairness first 0, Predictive balanced +22, Capacity aware −30, Zoned
+  up-peak −104, the rest −98 to −392. Fairness first gains +22 to +80 s at 14 of the 16 times from
+  0:30 on and loses 90 s at 4:00 and 7:00.
+
+**What it says.** Over fifty crowds neither chip moves the hold at either press time. On the shipped
+crowd both lose at every time tested before 6:00 bar one (Spread at 1:30, +10 s), and change nothing
+after. No mechanism is offered for either; none was measured ([§ D256](#d256)). The handover result
+is a dispatcher choice, not a chip: Fairness first at 0:10 is close to playing the round on it.
+
+**For the panel.** Both chips are INDISTINGUISHABLE at both press times, which is the condition the
+panel set for replacing the chip set. The only in-round press measured to help is a handover to
+Fairness first, and on the shipped crowd that help is 0 s at 0:10 and up to 80 s later.
+
+**Numbers spent.** This lane held **D1588 to D1590** and spent **D1588**.
