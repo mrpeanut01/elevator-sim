@@ -1263,6 +1263,14 @@ exceeding it. So stage 3's C2 quarter is closed to demand and open only to fabri
 `data/reference-runs.json` pins figure-for-figure and `watch/reference.test.ts` re-simulates; that is
 a wave's blast radius rather than a lane's, and it is named here rather than attempted.
 
+**Stage 3 is a named breach, owner-reversible** ([§ D1582](../DECISIONS.md), the decision panel's
+ruling R7 on #234, 2026-10-18). Re-measured from 4 to 14.5 %pop/5 min (n = 50 per seed set, common
+random numbers, the six admitted profiles), exactly one rate, 11.5, leaves no dropdown profile meeting
+every bar, and there the census finds no survivor at any rung. A witness search of 277 candidates at
+11.5 found 11 meeting every bar on the tuning crowds and none holding on the held-back crowds, so 0
+clears. The stage stays at 12 with `fairness-first` as its way through, which holds on the held-back
+crowds, and stays in `DROPDOWN_CLEARS`. A building made only for stage 3 remains open as a later lane.
+
 ### 3.3g Stages 9 and 10: each zero was a rider turned away at a landing, and demand mends one of the two
 
 GitHub issue **#234**, wave AN lane AP-1 ([§ D1288](../DECISIONS.md), [§ D1289](../DECISIONS.md)).

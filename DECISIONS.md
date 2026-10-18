@@ -53713,3 +53713,29 @@ running figure is never drawn as met. The tone (`stageFigureToneOf`) is unchange
 
 **Tests**, red before and green after: `everyday/stageScreenModel.test.ts`, *draws a running figure in
 neutral ink, never terracotta, moss or alarm*.
+
+## D1582 — stage 3 clears from the dropdown as a named breach, owner-reversible
+
+> **Taken 2026-10-18 by the owner's decision panel** (GitHub issue #234, comment 6251039583, and #636
+> comment 6251039023, ruling R7, 3–0, option (b)), built by an agent session (wave AS, lane AS-5).
+> **Owner-reversible**: delete the note on stage 3's row and this ruling's paragraph; the row itself
+> stays while `fairness-first` meets on the tuning seeds, which the deep tier checks.
+
+**Why an entry.** It registers a § D528 clause 2 breach at position three, as [§ D1288](#d1288) did for
+stage 9, which reaches `campaign/difficultyCurve.test.ts#DROPDOWN_CLEARS` and `docs/33` § 3.3f.
+
+**The measurement** (#234, 2026-10-17). From 4 to 14.5 %pop/5 min, at n = 50 per seed set
+(`tuning-20260730`, `holdout-20260731`) with common random numbers over the six admitted profiles,
+exactly one rate, 11.5, leaves no dropdown profile meeting every bar, and there the census finds 0
+survivors at every rung (0/39, 0/63, 0/63). A witness search of 277 candidates at 11.5 (239 dial
+draws extending the census's own, 38 hand-built) found 11 meeting every bar on the tuning seeds and
+none holding on the holdout, so 0 clears; the binding goal was `beat-the-baseline` on the holdout.
+Shipping 11.5 would make the stage unwinnable as measured, the trade [§ D612](#d612) refused on stage 5.
+A clear on the tuning seeds alone would reverse [§ D355](#d355).
+
+**The ruling.** Stage 3 stays at 12 %pop/5 min with `fairness-first` as a way through that holds on the
+holdout, and its `DROPDOWN_CLEARS` row is registered as a named breach. No bar, demand, seed or census
+figure moves. A building made only for stage 3 stays open as a later lane, and the ruling is revisited
+if a fabric lever specific to stage 3, or a witness at 11.5 that holds on the holdout, is measured open.
+Stage 8 is not covered.
+
