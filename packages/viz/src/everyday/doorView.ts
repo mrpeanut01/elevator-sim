@@ -239,6 +239,14 @@ export interface DoorScreenInput {
    * `EverydayHost.pinnedCallDone`, [§ D1530](../../../../DECISIONS.md). Absent reads as not.
    */
   readonly pinnedCallDone?: boolean | undefined;
+  /**
+   * **Who drove the banked day**, in the report's title words — `live/interventions.ts#driversLineOf`
+   * over the banked record's own log, so *Conventional collective, then Fairness first from 12:25*.
+   * GitHub issue #637 item 3: after the close the card still read *DRIVING TODAY Conventional
+   * collective* over a day that finished on Fairness first. Absent, or on a day not banked, the card
+   * names today's configured driver as before.
+   */
+  readonly droveLine?: string | undefined;
 }
 
 /**
@@ -643,6 +651,20 @@ export const DOOR_STEP_ONE_HELD: DoorStep = Object.freeze({
   body: 'Today the tower’s own standing order drives until the stage’s call is answered. You pick on any other day.',
 });
 
+/**
+ * {@link DOOR_STEP_ONE_HELD} once the call is behind the player — GitHub issue #637 item 3, wave AS
+ * lane AS-3. After the close, step 1 still said the standing order drives *until the stage's call is
+ * answered*. Read off the same fact as {@link DOOR_DRIVER_NOTE_HELD_PAST} (§ D1530).
+ */
+export const DOOR_STEP_ONE_HELD_PAST: DoorStep = Object.freeze({
+  n: '1',
+  head: 'Who drove',
+  body: 'Today the tower’s own standing order drove until the stage’s call. You pick on any other day.',
+});
+
+/** The driver card's heading once the day is banked and its drivers are known ({@link DoorScreenInput.droveLine}). */
+export const DOOR_DROVE_HEADING = 'DROVE TODAY';
+
 /** The § 3.3 note on today's press while its driver is held. */
 export const DOOR_PRIMARY_NOTE_HELD = 'Open the brief, then run it. The tower’s own order drives today.';
 
@@ -659,10 +681,14 @@ export function doorScreenViewOf(input: DoorScreenInput): DoorScreenView {
     input.today.crowdIsPinned,
     input.today.crowdIsDerived === true,
   );
+  const banked = todayIsBanked(input);
+  const callBehind = input.pinnedCallDone === true || banked;
+  const stepOne = callBehind ? DOOR_STEP_ONE_HELD_PAST : DOOR_STEP_ONE_HELD;
   const steps =
     input.today.driverHeld === undefined
       ? DOOR_STEPS
-      : DOOR_STEPS.map((step, index) => (index === 0 ? DOOR_STEP_ONE_HELD : step));
+      : DOOR_STEPS.map((step, index) => (index === 0 ? stepOne : step));
+  const drove = banked && input.droveLine !== undefined && input.droveLine !== '' ? input.droveLine : undefined;
   const printed = [
     DOOR_RULE,
     input.today.lede,
@@ -700,12 +726,12 @@ export function doorScreenViewOf(input: DoorScreenInput): DoorScreenView {
     stepsHeading: 'WHAT THE JOB IS',
     steps,
     driver: {
-      heading: 'DRIVING TODAY',
-      name: input.today.driver,
+      heading: drove === undefined ? 'DRIVING TODAY' : DOOR_DROVE_HEADING,
+      name: drove ?? input.today.driver,
       note:
         input.today.driverHeld === undefined
           ? DOOR_DRIVER_NOTE
-          : input.pinnedCallDone === true || todayIsBanked(input)
+          : callBehind
             ? DOOR_DRIVER_NOTE_HELD_PAST
             : DOOR_DRIVER_NOTE_HELD,
     },

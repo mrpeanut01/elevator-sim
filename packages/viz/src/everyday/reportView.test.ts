@@ -1037,4 +1037,11 @@ describe('§ D1543 — the levers after a cleared day are optional', () => {
     expect(viewOf().headings.levers).toMatch(/Nothing needed today/u);
     expect(viewOf({ report: sheetOf({ verdict: 'missed' }) }).headings.levers).not.toBe(REPORT_LEVERS_OPTIONAL_HEADING);
   });
+
+  /* GitHub issue #637 item 4: the four cards followed that heading open. They fold under it on a cleared day. */
+  it('folds the cards under that heading on a cleared day, and leaves them open as advice otherwise', () => {
+    expect(viewOf().leversFolded).toBe(true);
+    expect(viewOf().levers.length).toBeGreaterThan(0);
+    expect(viewOf({ report: sheetOf({ verdict: 'missed' }) }).leversFolded).toBe(false);
+  });
 });

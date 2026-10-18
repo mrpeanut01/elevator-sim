@@ -247,6 +247,13 @@ export interface EverydayReportView {
     readonly overnight: string;
   };
   readonly levers: readonly EverydayLeverCard[];
+  /**
+   * **Whether the levers sit folded under their heading, closed** — GitHub issue #637 item 4, wave AS
+   * lane AS-3, extending § D1543. A cleared day's heading said nothing was needed and the four cards
+   * and their buttons followed open anyway. On a cleared day the heading is the fold's handle and the
+   * cards are one press away; on any other day they stand open as advice.
+   */
+  readonly leversFolded: boolean;
   /** § 6.5's closing honesty block. */
   readonly honesty: {
     readonly title: string;
@@ -850,6 +857,7 @@ export function everydayReportViewOf(input: EverydayReportInput): EverydayReport
       delta: sheet.delta?.caption ?? '',
       overnight: 'What changed overnight',
     },
+    leversFolded: input.report?.verdict === 'cleared',
     levers: sheet.levers.map((lever) => {
       const route = EVERYDAY_LEVER_ROUTES[lever.id];
       const surface = route?.kind === 'engineer' ? route.tab : undefined;

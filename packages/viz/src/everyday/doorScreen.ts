@@ -35,6 +35,7 @@ import { dailySeedAt, isDailySeed } from '../shift/dailySeed.js';
 import { deviceNowMs } from '../shift/deviceDate.js';
 import { todayOf } from './today.js';
 import { clockOf } from '../shift/report.js';
+import { driversLineOf } from '../live/interventions.js';
 import {
   EVERYDAY_COLORS as C,
   EVERYDAY_GAPS as GAP,
@@ -65,12 +66,29 @@ function viewOf(context: EverydayScreenShellContext): DoorScreenView {
   const { host } = context;
   const selection = host.selection();
   const dayAhead = host.dayAhead();
+  /* § D1530: the held driver's note goes to the past tense once the call is behind the player. */
+  const pinnedCallDone = ((recording) => recording !== undefined && host.pinnedCallDone(recording))(host.recording());
+  /*
+   * Issue #637 item 3: who drove the banked day, off its own record's log, so the card does not keep
+   * naming the configured driver over a day the player handed on. The record outlives a reload.
+   */
+  const week = host.week();
+  const banked = week.history.find((entry) => entry.day === week.day)?.record ?? undefined;
+  const droveLine =
+    banked === undefined
+      ? undefined
+      : driversLineOf(
+          banked.interventions,
+          host.dispatcherById(banked.dispatcherId)?.name ?? banked.dispatcherId,
+          host.dayStartS() ?? dayAhead.startOfDayS,
+        );
   return doorScreenViewOf({
     week: host.week(),
     /* The run's own clock for a booking's window — wave AO, lane DS-1, § D1400. */
     bookingClock: (fraction) => clockOf(fraction * dayAhead.lengthS, dayAhead.startOfDayS),
     today: todayOf({
       week: host.week(),
+      pinnedCallDone,
       calendar: host.calendarPeriod(),
       /* The run the next press produces, and its clock — § D1039, `briefScreen.ts#factsNow`'s. */
       building: dayAhead.building,
@@ -115,8 +133,8 @@ function viewOf(context: EverydayScreenShellContext): DoorScreenView {
     alsoOnScreen: pressDayTextsOf(host.towerChoice().pressDays),
     /* Weeks held on this tower — § D1253. */
     record: host.weekRecord(),
-    /* § D1530: the held driver's note goes to the past tense once the call is behind the player. */
-    pinnedCallDone: ((recording) => recording !== undefined && host.pinnedCallDone(recording))(host.recording()),
+    pinnedCallDone,
+    droveLine,
   });
 }
 

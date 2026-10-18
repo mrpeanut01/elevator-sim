@@ -729,6 +729,22 @@ function mountReportScreen(
     return more;
   }
 
+  /**
+   * {@link section}'s shape with the heading as a closed `<details>` handle — GitHub issue #637 item 4:
+   * a cleared day's levers sit behind *Nothing needed today…*, one press away and never moved off the page.
+   */
+  function foldedSection(heading: string): { readonly root: HTMLElement; readonly body: HTMLElement } {
+    const root = el(doc, 'section', 'everyday-report-levers-section');
+    root.style.cssText = 'margin-top:26px';
+    const fold = el(doc, 'details', 'everyday-report-levers-fold');
+    const handle = el(doc, 'summary', 'everyday-report-levers-handle', heading);
+    handle.style.cssText = `${EYEBROW};font-size:11px;cursor:pointer;margin:0 0 10px`;
+    const body = el(doc, 'div');
+    fold.append(handle, body);
+    root.append(fold);
+    return { root, body };
+  }
+
   function drawSheet(view: EverydayReportView): void {
     const sheet = view.sheet;
 
@@ -984,7 +1000,7 @@ function mountReportScreen(
 
     /* ---- the levers, each with its handoff ---- */
     if (view.levers.length > 0) {
-      const levers = section(doc, view.headings.levers);
+      const levers = view.leversFolded ? foldedSection(view.headings.levers) : section(doc, view.headings.levers);
       levers.body.className = 'everyday-report-levers';
       levers.body.style.cssText = `display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:${String(GAP.row)}px`;
       for (const lever of view.levers) {

@@ -19,7 +19,8 @@
  *
  * **A later press inside the window** is named: the counts were taken with nothing pressed after
  * the call, while the run on the stage carries the player's later press, so the row says the press
- * is not in them rather than let the player's own count be read as the run they watched.
+ * is not in them rather than let the player's own count be read as the run they watched. A row that
+ * reads goals leads with {@link STAGE_CALL_WITHOUT_LATER} when it has such a press (issue #637).
  *
  * ## What the row leads with since wave AP
  *
@@ -185,6 +186,15 @@ export function stageCallLeadOf(
     .join(' ');
 }
 
+/**
+ * **What a row leads with when its runs leave out a later press** — GitHub issue #637 item 5, wave AS
+ * lane AS-3. The closed day finished at 220 s with every goal ticked, while the 12:20 row read *483 s
+ * (past its bar of 460 s) with park the cars in the lobby, your answer*: true of that run, which kept
+ * nothing pressed after 12:20, and read as a contradiction because the note saying so came last. The
+ * row now says it before any figure. Nothing measured moves: the same runs, read at the same playhead.
+ */
+export const STAGE_CALL_WITHOUT_LATER = 'Without your later presses:';
+
 /** What a row says while every answer reads the same two figures — GitHub issue #631. */
 export const STAGE_CALL_NO_DIFFERENCE = 'no answer has made a difference to these two goals yet';
 
@@ -283,11 +293,12 @@ export function stageCallRowsOf(input: {
         input.log.filter((entry) => entry.atS > record.atS && entry.atS <= input.playheadS),
         'runs',
       );
+      const lead = stageCallLeadOf(record, input.goals, input.playheadS, input.clockOf);
       rows.push({
         id,
         kind: 'call',
         heading,
-        lead: stageCallLeadOf(record, input.goals, input.playheadS, input.clockOf),
+        lead: note === '' || lead === undefined ? lead : `${STAGE_CALL_WITHOUT_LATER} ${lead}`,
         goals,
         ...(note === '' ? {} : { note }),
       });
