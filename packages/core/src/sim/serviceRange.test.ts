@@ -34,7 +34,7 @@ import { createBuilding } from '../model/building.js';
 import { LoadSensor } from '../model/car/loadSensor.js';
 
 import { DATA_DIR, fingerprint, load } from './fixtures.test-helper.js';
-import { runSimulation } from './simulation.js';
+import { Simulation, runSimulation } from './simulation.js';
 import type { SimulationConfig, SimulationResult } from './types.js';
 
 const SEED = 20_260_906;
@@ -413,4 +413,114 @@ describe('a range change strands the riders it leaves without a bank, and finish
     expect(restated.conservation.stranded).toBeUndefined();
     expect(restated.record.passengers).toEqual(control.record.passengers);
   });
+});
+
+/*
+ * **A range change that retires the call a car has just been handed** — § D1591, found by the
+ * adversarial persona (`experiments/src/fuzz/play.ts`) on `stage-1-first-call` and pinned there as
+ * `play-1000872-s12`. Restated here as a building schedule, because the defect is the engine's and
+ * needs no intervention log to reach: Garden Apartments, car A out of service at 276 s, the bank
+ * rezoned to G, 2 and 5 at 425 s while car B stands at floor 3 serving a call the rezone closes.
+ *
+ * Retiring that call frees B, the same pass hands B the up call at floor 4 that the rezone is
+ * about to retire too, and retiring *that* left B pointing up with nothing ahead. Under
+ * `collective`'s `noDirectionReversal`, B then refused the down call at floor 5 at 558.6 s for the
+ * rest of the day — an in-service car idle two floors below a servable rider, which `fuzz/` P5 reads
+ * as a deadlock. `Car.withdrawHallCall` re-points the car; the control below swaps the old
+ * behaviour back in and requires the deadlock to return, so the fix is what closes it.
+ */
+describe('a range change that retires a call a car was just handed leaves the car free to serve', () => {
+  // `replicationSeed('20260730', 33)` — replication 33 of stage 1's tuning seeds, written out
+  // because `core` may not import the runner that derives it.
+  const STAGE_ONE_REPLICATION_33 = 6_031_768_258_434_311_381n;
+
+  async function gardenWithSchedule(): Promise<SimulationConfig> {
+    const config = await load();
+    const base = config.buildingsById.get('garden-apartments');
+    if (base === undefined) throw new Error('garden-apartments is not shipped');
+    const profile = config.dispatcherProfilesById.get('collective');
+    if (profile === undefined) throw new Error('collective is not shipped');
+    return {
+      building: {
+        ...base,
+        serviceEvents: [
+          { atS: 276, bankId: 'main', carId: 'A', mode: 'out-of-service' },
+          { atS: 425, bankId: 'main', servesFloors: ['G', '2', '5'] },
+        ],
+      },
+      dispatcherProfile: profile,
+      trafficProfiles: config.trafficProfiles,
+      elevatorSpecs: config.elevatorSpecs,
+      seed: STAGE_ONE_REPLICATION_33,
+      durationS: 900,
+      onTimeout: 'report',
+      reportWindow: 'full-run',
+    };
+  }
+
+  it('delivers the rider on a still-served floor that the stale direction stranded, and drains', async () => {
+    const result = runSimulation(await gardenWithSchedule());
+    expect(result.status).toBe('completed');
+    expect(result.undelivered).toEqual([]);
+    const rider = result.record.passengers.find((leg) => leg.originFloorId === '5' && leg.arrivedAt > 558);
+    expect(rider?.boardedAt).toBeDefined();
+    expect(result.conservation.stranded).toBeGreaterThan(0);
+  });
+
+  it('deadlocks again with the old release swapped back in, so the fix is what closes it', async () => {
+    const config = await gardenWithSchedule();
+    const sim = new Simulation(config);
+    const car = sim.building.banks[0]?.cars[0];
+    if (car === undefined) throw new Error('the bank has no car');
+    const proto = Object.getPrototypeOf(car) as { withdrawHallCall: unknown; releaseHallCall: unknown };
+    const fixed = proto.withdrawHallCall;
+    proto.withdrawHallCall = proto.releaseHallCall;
+    try {
+      const result = sim.run();
+      expect(result.status).toBe('timed-out');
+      expect(result.undelivered.map((journey) => [journey.originFloorId, journey.reason])).toEqual([['5', 'waiting']]);
+    } finally {
+      proto.withdrawHallCall = fixed;
+    }
+  });
+});
+
+describe('re-pointing a car on a withdrawal moves no shipped run', () => {
+  /*
+   * § D1591's claim that the fix moves no published figure, held on a sample rather than argued:
+   * shipped buildings with no service schedule, two dispatchers, the legs compared with the fix and
+   * with the old release swapped back in. The decision entry's 494-run figure was a one-off probe on
+   * the same comparison; this is the part of it that runs on every `vitest run`.
+   */
+  it('runs the same legs with and without it on three shipped buildings under two dispatchers', async () => {
+    const config = await load();
+    for (const buildingId of ['garden-apartments', 'midtown-office', 'crown-hotel']) {
+      for (const profileId of ['collective', 'eta']) {
+        const building = config.buildingsById.get(buildingId);
+        const dispatcherProfile = config.dispatcherProfilesById.get(profileId);
+        if (building === undefined || dispatcherProfile === undefined) throw new Error(`${buildingId}/${profileId} is not shipped`);
+        const runConfig: SimulationConfig = {
+          building,
+          dispatcherProfile,
+          trafficProfiles: config.trafficProfiles,
+          elevatorSpecs: config.elevatorSpecs,
+          seed: 20_261_018,
+          durationS: 900,
+          onTimeout: 'report',
+        };
+        const fixed = runSimulation(runConfig);
+        const sim = new Simulation(runConfig);
+        const car = sim.building.banks[0]?.cars[0];
+        if (car === undefined) throw new Error('the bank has no car');
+        const proto = Object.getPrototypeOf(car) as { withdrawHallCall: unknown; releaseHallCall: unknown };
+        const withdraw = proto.withdrawHallCall;
+        proto.withdrawHallCall = proto.releaseHallCall;
+        try {
+          expect(sim.run().record.passengers, `${buildingId} under ${profileId}`).toEqual(fixed.record.passengers);
+        } finally {
+          proto.withdrawHallCall = withdraw;
+        }
+      }
+    }
+  }, 120_000);
 });

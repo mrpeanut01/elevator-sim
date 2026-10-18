@@ -40,6 +40,7 @@
 import {
   buildJourneys,
   isDestinationCallType,
+  isServiceDerateEvent,
   resolveLoadSensor,
   type DispatcherProfile,
   type ElevatorSpecs,
@@ -47,6 +48,7 @@ import {
   type PassengerRecord,
   type ResolvedBuilding,
   type ResolvedCar,
+  type ResolvedServiceEvent,
   type SimulationResult,
 } from '@elevator-sim/core';
 
@@ -57,12 +59,31 @@ import type { FuzzCase, PropertyBounds, Violation } from './types.js';
 const EPSILON = 1e-9;
 
 export interface PropertyContext {
-  readonly case: FuzzCase;
+  /**
+   * The case the run came from, as far as the properties read it: its call type, which decides
+   * whether a call carries a credential (P5, P6).
+   *
+   * Narrowed to that one field so the adversarial persona (`play.ts`) can hand a **stage session**
+   * to the same six checks: a session is not a generated building and has no `FuzzCase`, and
+   * inventing one to satisfy a type would put a building seed beside a run no seed generated. A
+   * `FuzzCase` still satisfies it unchanged.
+   */
+  readonly case: Pick<FuzzCase, 'callType'>;
   readonly building: ResolvedBuilding;
   readonly dispatcherProfile: DispatcherProfile;
   readonly elevatorSpecs: ElevatorSpecs;
   readonly result: SimulationResult;
   readonly bounds: PropertyBounds;
+  /**
+   * Service events the run carried **beyond the building's own schedule**: the effects an
+   * intervention log laid on it (an incident answer, a bought equipment or building change).
+   * Absent for a generated building, whose only schedule is `building.serviceEvents`.
+   *
+   * P3 reads the derates in it, because a derate moves the rating a car's controller admits against
+   * mid-run (§ D523) and the load cell reports its load factor against that rating, not the plate.
+   * It is an input to the run, like the building, never something the run reported.
+   */
+  readonly serviceSchedule?: readonly ResolvedServiceEvent[] | undefined;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -242,10 +263,39 @@ export function checkConservation(context: PropertyContext): Violation[] {
   }
   const accessRefused = refusedJourneys.size;
 
+  /*
+   * **The third and fifth termini** (docs/14 § 3.1, `DECISIONS.md` § D523): a journey whose rider
+   * walked out, and one the fabric left behind when a bank's range moved. Neither arrived and neither
+   * is still in the system, so, like a refusal, each belongs to neither count above.
+   *
+   * This property was blind to both until the adversarial persona (`play.ts`) generated the first
+   * mid-run range change: no building case authors patience or a range entry, so the books here
+   * balanced over three termini on every run that had ever reached them, and the first rezone that
+   * stranded a whole stage's crowd read as nineteen lost passengers. The engine's own audit counted
+   * them correctly all along.
+   *
+   * Recounted from the **record**, by the journey's last recorded leg, which is how
+   * `Simulation#reconcile` files them; the audit's own counts are then compared with the recount,
+   * so a miscount in the audit fails here rather than agreeing with itself.
+   */
+  let abandoned = 0;
+  let stranded = 0;
+  for (const legs of grouped.values()) {
+    const last = legs[legs.length - 1];
+    if (last === undefined) continue;
+    if (last.abandonedAt !== undefined) abandoned += 1;
+    else if (last.refusedAt === undefined && last.strandedAt !== undefined) stranded += 1;
+  }
+  for (const leg of result.record.passengers) {
+    if (leg.strandedAt !== undefined && leg.boardedAt !== undefined && leg.alightedAt === undefined) {
+      fail(`leg "${leg.passengerId}" was stranded at t=${String(leg.strandedAt)} while riding`, leg.passengerId);
+    }
+  }
+
   const undelivered = result.undelivered.length;
-  if (delivered + undelivered + accessRefused !== generated) {
+  if (delivered + undelivered + accessRefused + abandoned + stranded !== generated) {
     fail(
-      `books do not balance: ${String(generated)} generated, ${String(delivered)} delivered, ${String(undelivered)} named undelivered, ${String(accessRefused)} refused for want of a credential`,
+      `books do not balance: ${String(generated)} generated, ${String(delivered)} delivered, ${String(undelivered)} named undelivered, ${String(accessRefused)} refused for want of a credential, ${String(abandoned)} abandoned, ${String(stranded)} stranded by a range change`,
     );
   }
 
@@ -460,6 +510,42 @@ export function checkCapacity(context: PropertyContext): Violation[] {
     violations.push({ property: 'capacity', message, ...(subject === undefined ? {} : { subject }) });
   };
 
+  /*
+   * **The rating a car's controller admits against is a function of time** once a derate is on the
+   * schedule (§ D523): `LoadSensor#derate` replaces it, and both thresholds and the reported load
+   * factor scale from the new figure. This property read the plate for the whole run, which was
+   * true of every run it had ever seen, because no building case authors a derate; the adversarial
+   * persona's first bought derate read as a load cell misreporting its own load factor.
+   *
+   * So each car's rating is replayed from the schedule, in kernel order — the building's own events,
+   * then the carried ones — and every check below asks the rating **in force at its own instant**.
+   * At an instant a derate shares with a boarding or a sample, the record cannot say which fired
+   * first, so every rating the instant could have held is admitted (the one before, and each tie).
+   * A car with no derate on the schedule gets exactly the one rating it always had, so on every
+   * generated building this check is the check it was, line for line.
+   */
+  const derates = new Map<string, { readonly atS: number; readonly kg: number }[]>();
+  const schedule = [...(building.serviceEvents ?? []), ...(context.serviceSchedule ?? [])]
+    .map((event, order) => ({ event, order }))
+    .sort((a, b) => a.event.atS - b.event.atS || a.order - b.order);
+  for (const { event } of schedule) {
+    if (!isServiceDerateEvent(event) || event.atS > result.deadlineS) continue;
+    const key = `${event.bankId}-${event.carId}`;
+    const list = derates.get(key) ?? [];
+    list.push({ atS: event.atS, kg: event.ratedLoadKg });
+    derates.set(key, list);
+  }
+  const ratingsAt = (carId: string, plateKg: number, at: number): readonly number[] => {
+    let before = plateKg;
+    const ties: number[] = [];
+    for (const derate of derates.get(carId) ?? []) {
+      if (derate.atS < at) before = derate.kg;
+      else if (derate.atS === at) ties.push(derate.kg);
+      else break;
+    }
+    return [before, ...ties];
+  };
+
   // `Simulation` names a car `${bankId}-${carConfigId}`, so the record's car ids are not the
   // ids the building config declares. Keying by the config id looks right, finds nothing, and
   // turns every capacity check into a silent no-op.
@@ -502,6 +588,8 @@ export function checkCapacity(context: PropertyContext): Violation[] {
 
   const peakMassByCar = new Map<string, number>();
   const peakOccupantsByCar = new Map<string, number>();
+  /** Each car's boardings in time order, with the rating each was admitted against. */
+  const boardingsByCar = new Map<string, { readonly at: number; readonly ratedKg: number }[]>();
 
   for (const [carId, events] of byCar) {
     const car = carsById.get(carId);
@@ -510,8 +598,6 @@ export function checkCapacity(context: PropertyContext): Violation[] {
       continue;
     }
     const sensor = sensorFor(carId, car);
-    const designLoadKg = sensor.ratedLoadKg * sensor.designLoadFactor;
-    const overloadKg = sensor.ratedLoadKg * sensor.overloadThreshold;
 
     events.sort((a, b) => a.at - b.at || a.kind - b.kind || (a.legId < b.legId ? -1 : a.legId > b.legId ? 1 : 0));
 
@@ -523,6 +609,8 @@ export function checkCapacity(context: PropertyContext): Violation[] {
     };
     let peakMass = 0;
     let peakOccupants = 0;
+    const lastBoarding: { readonly at: number; readonly ratedKg: number }[] = [];
+    boardingsByCar.set(carId, lastBoarding);
 
     for (const event of events) {
       if (event.kind === 0) {
@@ -536,6 +624,12 @@ export function checkCapacity(context: PropertyContext): Violation[] {
       }
       aboard.set(event.legId, event.massKg);
       const after = massOf();
+      // The loosest rating this instant could have held: the property claims an overfill only when
+      // no ordering of a tied derate could have admitted it.
+      const ratedKg = Math.max(...ratingsAt(carId, sensor.ratedLoadKg, event.at));
+      const designLoadKg = ratedKg * sensor.designLoadFactor;
+      const overloadKg = ratedKg * sensor.overloadThreshold;
+      lastBoarding.push({ at: event.at, ratedKg });
 
       // Both conditions are stated in their **order-invariant** form, and that is not a
       // weakening for convenience — it is what the record can support. A stop boards several
@@ -594,17 +688,35 @@ export function checkCapacity(context: PropertyContext): Violation[] {
         sample.carId,
       );
     }
-    if (Math.abs(sample.loadFactor - sample.massKg / sensor.ratedLoadKg) > 1e-9) {
+    const ratings = ratingsAt(sample.carId, sensor.ratedLoadKg, sample.at);
+    if (!ratings.some((ratedKg) => Math.abs(sample.loadFactor - sample.massKg / ratedKg) <= 1e-9)) {
       fail(`car "${sample.carId}" reports loadFactor ${String(sample.loadFactor)} for ${String(sample.massKg)} kg`, sample.carId);
     }
-    // A hair of tolerance in the *safe* direction only: the admission rule compares masses
-    // (`mass < ratedKg x threshold`) and this compares the quotient, and the two need not agree
-    // in the last bit. Anything a real overfill produces is orders of magnitude past 1e-12.
-    if (sample.loadFactor > sensor.overloadThreshold + 1e-12) {
-      fail(
-        `car "${sample.carId}" reached load factor ${sample.loadFactor.toFixed(3)} at t=${String(sample.at)}, at or above its overload threshold of ${String(sensor.overloadThreshold)}`,
-        sample.carId,
-      );
+    if (!derates.has(sample.carId)) {
+      // A hair of tolerance in the *safe* direction only: the admission rule compares masses
+      // (`mass < ratedKg x threshold`) and this compares the quotient, and the two need not agree
+      // in the last bit. Anything a real overfill produces is orders of magnitude past 1e-12.
+      if (sample.loadFactor > sensor.overloadThreshold + 1e-12) {
+        fail(
+          `car "${sample.carId}" reached load factor ${sample.loadFactor.toFixed(3)} at t=${String(sample.at)}, at or above its overload threshold of ${String(sensor.overloadThreshold)}`,
+          sample.carId,
+        );
+      }
+    } else {
+      /*
+       * Under a derate the ceiling is the rating the car's **last boarding** was admitted against,
+       * not the rating now: a car re-rated while carrying people keeps them, so its load factor
+       * against the new figure may legitimately sit above the threshold, and what the load cell may
+       * never show is more mass than the last admission could have let in.
+       */
+      const boarded = (boardingsByCar.get(sample.carId) ?? []).filter((boarding) => boarding.at <= sample.at);
+      const ceilingKg = (boarded[boarded.length - 1]?.ratedKg ?? sensor.ratedLoadKg) * sensor.overloadThreshold;
+      if (sample.massKg > ceilingKg * (1 + 1e-12)) {
+        fail(
+          `car "${sample.carId}" read ${sample.massKg.toFixed(1)} kg at t=${String(sample.at)}, above the ${ceilingKg.toFixed(1)} kg its last admission allowed`,
+          sample.carId,
+        );
+      }
     }
     sampledPeakMass.set(sample.carId, Math.max(sampledPeakMass.get(sample.carId) ?? 0, sample.massKg));
     sampledPeakOccupants.set(

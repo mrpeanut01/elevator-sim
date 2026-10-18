@@ -19,10 +19,17 @@
  */
 
 import { loadConfig, type LoadedConfig } from '@elevator-sim/core';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import {
   CORPUS_DISPATCHER_PROFILE_IDS,
   CORPUS_TRAFFIC_PROFILE_IDS,
   HYBRID_CORPUS,
+  PLAY_REGRESSIONS,
+  PlaySessions,
+  playCaseFromPinned,
+  playContextFor,
   STANDARD_CORPUS,
   STANDARD_SPACE,
   caseFromSeed,
@@ -51,6 +58,7 @@ import {
   spaceOf,
   violationsByProperty,
 } from './fuzz.js';
+import { reportPlayCampaign } from './fuzzPlay.js';
 
 interface Run {
   readonly code: number;
@@ -430,4 +438,99 @@ describe('the pieces that decide what runs', () => {
     expect(counts.get('termination')).toBe(1);
     expect(counts.get('capacity')).toBeUndefined();
   });
+});
+
+/* -------------------------------------------------------------------------- *
+ * --scenario: the adversarial persona (DECISIONS.md § D1590)
+ * -------------------------------------------------------------------------- */
+
+describe('elevator-sim fuzz --scenario runs the adversarial persona on a stage', () => {
+  it('says first that it is an engine stress test, checks nine properties, ranks the verbs, and exits 0 when clean', { timeout: 300_000 }, async () => {
+    const { code, out } = await cli(['fuzz', '--scenario', 'stage-1-first-call', '--cases', '4']);
+    expect(code).toBe(0);
+    /* The sentence that stops a green run being read as "players cannot break stage 1". */
+    const header = out.indexOf('ENGINE STRESS TEST, NOT A PLAYTEST');
+    expect(header).toBeGreaterThan(-1);
+    expect(header).toBeLessThan(out.indexOf('What ran'));
+    expect(out).toContain('No player can press any of these seven verbs on this');
+    expect(out).toContain('Adversarial persona — stage-1-first-call');
+    /* The pinned regressions ride with the standard tier. */
+    expect(out).toMatch(/plus \d+ pinned regression\(s\) for this stage/);
+    for (const property of ['no-softlock', 'readable-verdict', 'reachable-goal', 'conservation', 'termination', 'starvation']) {
+      expect(out).toMatch(new RegExp(`${property}\\s+held`));
+    }
+    expect(out).toContain('VERDICT: ALL 9 PROPERTIES HELD');
+    expect(out).toContain('deadlock 600 s idle, starvation 900 s');
+    /* P-DESIGN-1 prints a ranking and does not fail the run on a BETTER row. */
+    expect(out).toContain('P-DESIGN-1');
+    expect(out).toMatch(/spread-cars\s+at 0 s\s+\d+\s+-?\d/);
+    expect(out).toContain('Named gaps');
+    expect(out).toContain('reproduce: elevator-sim fuzz --scenario stage-1-first-call --tier standard --cases 4');
+  });
+
+  it('refuses a stage the campaign does not declare, and names the ones it does', async () => {
+    const { code, err } = await cli(['fuzz', '--scenario', 'stage-1-first-cal']);
+    expect(code).toBe(EXIT_USAGE);
+    expect(err).toContain('no campaign stage with id "stage-1-first-cal"');
+    expect(err).toContain('did you mean "stage-1-first-call"?');
+  });
+
+  it('refuses the hybrid tier, which is a building axis, and an extended standard corpus', async () => {
+    const hybrid = await cli(['fuzz', '--scenario', 'stage-1-first-call', '--tier', 'hybrid']);
+    expect(hybrid.code).toBe(EXIT_USAGE);
+    expect(hybrid.err).toContain('--tier hybrid has no meaning with --scenario');
+    const wide = await cli(['fuzz', '--scenario', 'stage-1-first-call', '--cases', '65']);
+    expect(wide.code).toBe(EXIT_USAGE);
+    expect(wide.err).toContain('more than the standard tier has');
+    expect(wide.err).toContain('--tier deep');
+  });
+
+  it('prints a real counterexample whole, with its play seed and its log, and exits 2', async () => {
+    const config = await loadConfig(DEFAULT_DATA_DIR);
+    const read = (file: string): unknown => JSON.parse(readFileSync(join(DEFAULT_DATA_DIR, file), 'utf8')) as unknown;
+    const context = playContextFor({
+      config,
+      campaign: read('campaign.json'),
+      priceSchedule: read('price-schedule.json'),
+      stageId: 'stage-1-first-call',
+    });
+    const sessions = new PlaySessions(context);
+    const pin = PLAY_REGRESSIONS.find((entry) => entry.caseId === 'play-3000033-s7');
+    if (pin === undefined) throw new Error('the stranding pin is missing');
+    /* A real session with a real fault: a summarizer that never refuses its mean, on a day the
+       rezone stranded. P-PLAY-2 is the property that has to fire. */
+    const failing = sessions.evaluate(playCaseFromPinned(pin, context), {
+      interpose: (result) => ({ ...result, summary: { ...result.summary, awtIsValid: true } }),
+    });
+    expect(failing.violations.some((violation) => violation.property === 'readable-verdict')).toBe(true);
+
+    const out = createBufferedOutput({ color: false, columns: 120, rows: 60, env: {} });
+    const code = reportPlayCampaign(out, {
+      context,
+      tier: 'standard',
+      stats: {
+        cases: 1,
+        failures: 1,
+        entries: failing.case.log.length,
+        generatedPassengers: failing.generatedPassengers,
+        simulatedSeconds: failing.simulatedSeconds,
+        kinds: { 'answer-incident': 1 },
+        shapes: { pinned: 1 },
+        statuses: { [failing.status]: 1 },
+        refusals: 0,
+      },
+      outcomes: [failing],
+      failures: [{ original: failing, minimal: failing, steps: 0, evaluations: 0 }],
+      ranking: [],
+    });
+    const text = out.text();
+    expect(code).toBe(EXIT_INTERNAL);
+    expect(text).toMatch(/readable-verdict\s+VIOLATED/);
+    expect(text).toContain('PROPERTY VIOLATION(S)');
+    expect(text).toContain(`playSeed  ${pin.playSeed}`);
+    expect(text).toContain('playCaseFromSeed');
+    expect(text).toContain('"servesFloors"');
+    expect(text).toContain('never move a bound');
+    expect(text).not.toContain('PROPERTIES HELD');
+  }, 120_000);
 });

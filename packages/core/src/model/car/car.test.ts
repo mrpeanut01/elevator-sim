@@ -1005,6 +1005,41 @@ describe('calls', () => {
     expect(car.assignedHallCalls).toEqual([]);
   });
 
+  /*
+   * § D1591. A stationary car told a call is gone points at what it has left; a car merely handed
+   * a call back does not, yet. The second half pins the gap the decision holds, so closing it is a
+   * visible change to this test rather than a silent one.
+   */
+  it('re-points a stationary car when its only call is withdrawn, and goes directionless with nothing left', () => {
+    const car = makeCar();
+    const call = hallCall('6', 'up', 3);
+    car.assignHallCall(call);
+    expect(car.direction).toBe('up');
+
+    expect(car.withdrawHallCall(call.id)).toBe(true);
+    expect(car.assignedHallCalls).toEqual([]);
+    expect(car.direction).toBeUndefined();
+    expect(car.withdrawHallCall(call.id)).toBe(false);
+
+    // With work left behind it, the car turns round rather than going directionless.
+    const middle = makeCar({ homeFloorId: '3' });
+    const ahead = hallCall('6', 'up', 4);
+    middle.assignHallCall(ahead);
+    middle.registerCarCall('1', 5);
+    expect(middle.direction).toBe('up');
+    middle.withdrawHallCall(ahead.id);
+    expect(middle.direction).toBe('down');
+  });
+
+  it('still keeps a released call’s direction — the gap § D1591 records and does not close', () => {
+    const car = makeCar();
+    const call = hallCall('6', 'up', 3);
+    car.assignHallCall(call);
+    expect(car.releaseHallCall(call.id)).toBe(true);
+    expect(car.committedStops()).toEqual([]);
+    expect(car.direction).toBe('up');
+  });
+
   it('refuses a hall call it physically cannot serve — a safety interlock, not an opinion', () => {
     const car = makeCar({ shaft: plainShaft(11) });
     expect(() => car.assignHallCall(hallCall('15', 'up'))).toThrow(/does not serve that floor/);
