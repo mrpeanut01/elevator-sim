@@ -125,7 +125,8 @@ async function untilPace(page: Page, state: 'fast' | 'watching', rung: string, t
       const skip = document.querySelector('.everyday-stage-skip-line')?.textContent ?? '';
       if (lit !== chip) return false;
       return wanted === 'fast'
-        ? pace.startsWith(`fast-forwarding at ${chip}`) || skip.startsWith('nobody on a landing has waited a minute: skipping ahead')
+        ? /* the landings clear, not § D1525's played-on line, which stands while somebody still waits */
+          pace.startsWith(`fast-forwarding at ${chip}: nobody`) || skip.startsWith('nobody on a landing has waited a minute: skipping ahead')
         : pace.startsWith(`slowed to your speed, ${chip}`) || skip.startsWith('skipped ');
     },
     [state, rung] as const,
