@@ -96,7 +96,10 @@ import {
   switchChangesNothing,
   switchDispatcherLabelOf,
   switchNoteOf,
+  SWITCH_NEEDS_BIDDING,
+  SWITCH_NEEDS_OTHER_PANELS,
   SWITCH_PINS_NOTE,
+  SWITCH_STOPS_BIDDING,
   switchRefusalOf,
   admitWorks,
   worksKindOfTier,
@@ -1278,6 +1281,26 @@ export const STAGE_INTERVENTIONS: readonly StageInterventionRow[] = Object.freez
 ]);
 
 /**
+ * **The parking arms a stage offers: none in a Rush round, the constant everywhere else** —
+ * [§ D1589](../../../../DECISIONS.md), applying [§ D1588](../../../../DECISIONS.md)'s measurement
+ * under the decision panel's ruling R5 (GitHub issues #635 and #636). Over fifty crowds neither
+ * chip moved a rush's hold at either press time, and on the one crowd a player meets both shortened
+ * it at every time tested before 6:00 bar one; so a rush draws no chip, and its only in-round
+ * choice is the handover.
+ *
+ * **A filter, not a deletion.** {@link STAGE_INTERVENTIONS}, its labels and the two `core` kinds
+ * stay: a Scenario or Career call still offers both (`stageCall.ts`, `shift/`), and a recorded
+ * rush round carrying a press still replays and posts through
+ * `rushSitting.ts#wireRoundInterventions` and `rushDeviceBest.ts#rushDeviceReplayOf`, which are
+ * those kinds' non-test callers in a rush (invariant 5).
+ */
+export function stageParkingArmsOf(rush: boolean): readonly StageInterventionRow[] {
+  return rush ? NO_PARKING_ARMS : STAGE_INTERVENTIONS;
+}
+
+const NO_PARKING_ARMS: readonly StageInterventionRow[] = Object.freeze([]);
+
+/**
  * **What the parking row says after a press that changed nobody's trip** — GitHub issue **#588**,
  * [§ D1278](../../../../DECISIONS.md).
  *
@@ -1481,6 +1504,49 @@ export const STAGE_SWITCH_PICKER_NOTE =
 export const STAGE_SWITCH_NO_CHANGE =
   'the day already runs this way — handing it over would change no decision';
 
+/**
+ * **Why a dispatcher cannot take over a Rush round, said on its own row of the picker** —
+ * [§ D1589](../../../../DECISIONS.md), condition 4 of the decision panel's ruling R5 on GitHub
+ * issue #635. With the parking chips gone from a rush the handover is its only in-round choice, and
+ * four shipped dispatchers (the two destination ones and the two that bid) can never take over a
+ * round that opened without their panels or their bidding. Until now the reason was drawn only
+ * beside the button, after the player had picked one of them: a greyed row with its sentence
+ * somewhere else. Keyed on `live/interventions.ts#switchRefusalOf`'s three sentences, so the short
+ * form says the same thing as the long one and nothing more.
+ */
+export const STAGE_SWITCH_RUSH_OPTION_REASONS: Readonly<Record<string, string>> = Object.freeze({
+  [SWITCH_NEEDS_OTHER_PANELS]: 'can’t take over mid-round: it needs other landing panels',
+  [SWITCH_NEEDS_BIDDING]: 'can’t take over mid-round: its cars bid for every call',
+  [SWITCH_STOPS_BIDDING]: 'can’t take over mid-round: today’s cars bid for every call',
+});
+
+/** One row of the handover picker: the words drawn on it, and the whole refusal when it is greyed. */
+export interface StageSwitchOption {
+  readonly label: string;
+  /** `live/interventions.ts#switchRefusalOf`'s sentence, when this row cannot be picked. */
+  readonly refusal?: string | undefined;
+}
+
+/**
+ * The picker's row for `target` — its name, and in a Rush round, where a target the round cannot
+ * hand over to is greyed, the reason on the row itself ({@link STAGE_SWITCH_RUSH_OPTION_REASONS}).
+ * Outside a rush the row is the name alone, as it always was: the refusal is drawn beside the
+ * button there, where the parking chips still share the row. `driving` is a thunk for
+ * {@link StageSwitchTarget.driving}'s reason, and is never called outside a rush.
+ */
+export function stageSwitchOptionOf(input: {
+  readonly target: DispatcherProfile;
+  readonly driving: () => DispatcherProfile;
+  readonly rush: boolean;
+}): StageSwitchOption {
+  const name = input.target.name;
+  if (!input.rush) return { label: name };
+  const refusal = switchRefusalOf(input.target, input.driving());
+  if (refusal === undefined) return { label: name };
+  const short = STAGE_SWITCH_RUSH_OPTION_REASONS[refusal] ?? refusal;
+  return { label: `${name} · ${short}`, refusal };
+}
+
 /** The intervention control, resolved for a run and a playhead. */
 export interface StageInterventionView {
   readonly rows: readonly StageInterventionRow[];
@@ -1544,6 +1610,13 @@ export interface StageInterventionInput {
    * end besides, because it is a verdict.
    */
   readonly handoverVerdict?: StageHandoverVerdict | undefined;
+  /**
+   * **Whether the stage is a Rush round** — [§ D1589](../../../../DECISIONS.md), the decision
+   * panel's ruling R5 on GitHub issue #635. A rush offers no parking row: {@link stageParkingArmsOf}
+   * answers none, and the handover is the round's only in-round choice. Absent or `false` everywhere
+   * else, so Scenario's and Career's rows are the constant's, unchanged.
+   */
+  readonly rush?: boolean | undefined;
 }
 
 /** One mid-run purchase a screen is offering — the priced change, and what it would do. */
@@ -1734,6 +1807,8 @@ function handoverLineOf(input: StageInterventionInput): string | undefined {
  * day, and pressing the other arm, or this one again later, is a different question.
  */
 function parkingRowsOf(input: StageInterventionInput): readonly StageInterventionRow[] {
+  const arms = stageParkingArmsOf(input.rush === true);
+  if (arms.length === 0) return arms;
   const press = input.pressChangedNobody;
   const latest = input.interventions[input.interventions.length - 1];
   const standing =
@@ -1742,8 +1817,8 @@ function parkingRowsOf(input: StageInterventionInput): readonly StageInterventio
     latest.atS === press.atS &&
     latest.change.kind === press.change.kind &&
     input.simTimeS >= press.atS;
-  if (!standing) return STAGE_INTERVENTIONS;
-  return STAGE_INTERVENTIONS.map((row) =>
+  if (!standing) return arms;
+  return arms.map((row) =>
     row.change.kind === press.change.kind
       ? Object.freeze({ ...row, note: STAGE_PRESS_CHANGED_NOBODY })
       : row,

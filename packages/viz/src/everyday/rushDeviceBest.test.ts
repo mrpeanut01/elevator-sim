@@ -20,7 +20,7 @@ import { initialState, shiftRunConfigOf, withBuilding, withDispatcher, type View
 import { DATA_DIR } from '../fixtures.test-helper.js';
 import { recordRun } from '../record/recordRun.js';
 import { createEverydayHost, type EverydayHostBindings } from './host.js';
-import { RUSH_SEED, rushHoldAt } from './rush.js';
+import { RUSH_SEED, rushHoldAt, rushPatchOf } from './rush.js';
 import {
   RUSH_DEVICE_BEST_KEY,
   RUSH_DEVICE_COPY,
@@ -35,7 +35,7 @@ import {
 } from './rushDeviceBest.js';
 import { createRushDeviceStore } from './rushDeviceStore.js';
 import { createDeviceChimeStore } from './chimeStore.js';
-import { RUSH_SITTING_COPY } from './rushSitting.js';
+import { RUSH_SITTING_COPY, rushRoundRecordOf, rushSittingBodyOf } from './rushSitting.js';
 import { RUSH_FITTED_DEVICE_LINE, rushFittedLineOf } from './rushScreenModel.js';
 import { RUSH_HOUSE_TABLE, rushStandingsOf } from './rushHouse.js';
 import { browserResourcesFrom } from './rushHouse.test-helper.js';
@@ -313,4 +313,55 @@ describe('a rush pre-fit bought on the device reaches the run and is never poste
     expect(fitted.check?.check.ok === false ? fitted.check.check.reasons : []).toContain(RUSH_SITTING_COPY.boughtOnDevice);
     expect(asBuilt.check?.check.ok === false ? asBuilt.check.check.reasons : []).not.toContain(RUSH_SITTING_COPY.boughtOnDevice);
   }, 120_000);
+});
+
+/**
+ * **A round kept from before the chips left Rush still replays to its own hold** — [§ D1589](../../../../DECISIONS.md),
+ * condition 2 of the decision panel's ruling R5 on GitHub issue #635, and invariant 5. A rush no
+ * longer draws *Park the cars in the lobby* or *Spread the cars across the tower*, but a round a
+ * device or the board kept with one of those presses on it must still replay exactly. Its non-test
+ * callers are `rushSitting.ts#wireRoundInterventions`, which writes the press on the wire, and
+ * {@link rushDeviceReplayOf}, which reads it back.
+ */
+describe('a kept round with a parking press replays to the hold it was played to — § D1589', () => {
+  /*
+   * `moves`: whether the press changes the hold on this tower's crowd at all — measured on writing
+   * this, 1 142 s against the house's 1 178 s for Spread and 1 178 s for Park. The Spread case is
+   * the one that could not pass by replaying a round with its press dropped.
+   */
+  it.each([
+    ['spread-cars', true],
+    ['park-cars-lobby', false],
+  ] as const)('%s at 0:10, recorded, written, read back and replayed', (kind, moves) => {
+    const standing = withDispatcher(
+      withBuilding(initialState(resources, RUSH_SEED), resources, BUILDING),
+      resources,
+      'collective',
+    );
+    const patch = rushPatchOf(resources, standing);
+    if (patch === undefined) throw new Error('no rush on the test tower');
+    const opened = { ...standing, ...patch };
+    const bare = shiftRunConfigOf(resources, opened);
+    const startedAt = recordRun(bare.config, { recordDecisions: false, outOfServiceCarIds: bare.outOfServiceCarIds })
+      .recording.startedAt;
+    const state: ViewerState = { ...opened, interventions: [{ atS: startedAt + 10, change: { kind } }] };
+    const plan = shiftRunConfigOf(resources, state);
+    const { recording } = recordRun(plan.config, { recordDecisions: false, outOfServiceCarIds: plan.outOfServiceCarIds });
+    const holdAt = rushHoldAt(recording);
+    if (holdAt === undefined) throw new Error('the pressed round never broke');
+    const played = holdAt - recording.startedAt;
+
+    const record = rushRoundRecordOf({ state, resources, recording, endedAtS: holdAt, dispatcherName: 'Conventional collective' });
+    expect(record.unpostable).toEqual([]);
+    const body = rushSittingBodyOf({ buildingId: BUILDING, rounds: [record] });
+    expect(body.rounds[0]?.interventions).toEqual([{ atS: startedAt + 10, change: { kind } }]);
+
+    /* Through the device record's own encoding, as a reload would read it. */
+    const kept = withRushDeviceBest(emptyRushDeviceBest(), BUILDING, body, played);
+    const reread = decodeRushDeviceBest(encodeRushDeviceBest(kept)).record;
+    const keptBody = rushDeviceSittingOf(reread, BUILDING)?.body;
+    if (keptBody === undefined) throw new Error('the sitting was not kept');
+    expect(replayedHeldS(keptBody)).toBe(played);
+    expect(played !== houseHeldS(), 'whether this press moves the hold on this crowd').toBe(moves);
+  });
 });

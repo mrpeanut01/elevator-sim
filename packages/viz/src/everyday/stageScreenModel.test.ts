@@ -2398,3 +2398,74 @@ describe('the beat after an answer says what was chosen', () => {
     expect(stageHeaderSticksOf({ headerHeight: 120, regionHeight: 0, rush: false })).toBe(false);
   });
 });
+
+/* -------------------------------------------------------------------------- *
+ * § D1589 — a Rush round offers no parking chip, and says why a handover is greyed
+ * -------------------------------------------------------------------------- */
+
+import {
+  STAGE_INTERVENTIONS as PARKING_ARMS,
+  STAGE_SWITCH_RUSH_OPTION_REASONS,
+  stageInterventionsOf as interventionsOf,
+  stageParkingArmsOf,
+  stageSwitchOptionOf,
+} from './stageScreenModel.js';
+import { RUN_CONTEXTS as CONTEXTS } from './types.js';
+
+describe('§ D1589 — Rush drops the parking chips; every other stage keeps them', () => {
+  const shelf = RESOURCES.dispatcherProfiles.profiles;
+  const byId = (id: string): DispatcherProfile => {
+    const found = shelf.find((profile) => profile.id === id);
+    if (found === undefined) throw new Error(`no shipped dispatcher "${id}"`);
+    return found;
+  };
+  const rowsIn = (ctx: (typeof CONTEXTS)[number]) =>
+    interventionsOf({
+      interventions: [],
+      simTimeS: 0,
+      hasRun: true,
+      dayClosed: false,
+      recomputing: false,
+      switchTo: { target: byId('eta'), driving: () => byId('collective') },
+      rush: ctx === 'rush',
+    }).rows.map((row) => row.change.kind);
+
+  it('a rush offers the handover alone; Scenario, Career, watch and replay keep both chips', () => {
+    for (const ctx of CONTEXTS) {
+      expect(rowsIn(ctx), ctx).toEqual(
+        ctx === 'rush' ? ['adopt-dispatcher'] : ['park-cars-lobby', 'spread-cars', 'adopt-dispatcher'],
+      );
+    }
+    expect(stageParkingArmsOf(false)).toBe(PARKING_ARMS);
+    expect(stageParkingArmsOf(true)).toEqual([]);
+    /* A filter, not a deletion: the constant and its labels are untouched. */
+    expect(PARKING_ARMS.map((arm) => arm.change.kind)).toEqual(['park-cars-lobby', 'spread-cars']);
+    /* And a caller that says nothing about a rush gets the rows it always got. */
+    expect(
+      interventionsOf({ interventions: [], simTimeS: 0, hasRun: true, dayClosed: false, recomputing: false }).rows,
+    ).toEqual(PARKING_ARMS);
+  });
+
+  it('greys the four dispatchers a rush cannot hand over to, with the reason on their own row', () => {
+    const driving = () => byId('collective');
+    const greyed = shelf
+      .map((target) => ({ target, option: stageSwitchOptionOf({ target, driving, rush: true }) }))
+      .filter(({ option }) => option.refusal !== undefined);
+    expect(greyed.map(({ target }) => target.id).sort()).toEqual([
+      'auction',
+      'auction-multi-round',
+      'destination-eta',
+      'destination-panel',
+    ]);
+    for (const { target, option } of greyed) {
+      const short = STAGE_SWITCH_RUSH_OPTION_REASONS[option.refusal ?? ''];
+      expect(short, target.id).toBeDefined();
+      expect(option.label).toBe(`${target.name} · ${String(short)}`);
+      expect(option.label).not.toMatch(/—/u);
+    }
+    /* Outside a rush the rows are the names, as they were. */
+    for (const target of shelf) {
+      expect(stageSwitchOptionOf({ target, driving, rush: false })).toEqual({ label: target.name });
+    }
+  });
+});

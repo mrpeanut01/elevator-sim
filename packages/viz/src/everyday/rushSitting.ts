@@ -314,6 +314,12 @@ function wireRoundInterventions(
   const carried: WireIntervention[] = [];
   for (const entry of log) {
     const change = entry.change;
+    /*
+     * § D1589: a rush draws no parking chip since the decision panel's ruling R5 (GitHub #635), and
+     * this branch stays. A round played before then, with a press on it, is still recorded, posted
+     * and replayed (`rushDeviceBest.ts#rushDeviceReplayOf`) on its own causes, invariant 5; this is
+     * those kinds' caller in a rush, and `rushDeviceBest.test.ts` holds the replay to the round.
+     */
     if (change.kind === 'park-cars-lobby' || change.kind === 'spread-cars') {
       carried.push({ atS: entry.atS, change: { kind: change.kind } });
       continue;

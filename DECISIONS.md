@@ -53838,3 +53838,50 @@ panel set for replacing the chip set. The only in-round press measured to help i
 Fairness first, and on the shipped crowd that help is 0 s at 0:10 and up to 80 s later.
 
 **Numbers spent.** This lane held **D1588 to D1590** and spent **D1588**.
+
+## D1589 — Rush drops its two parking chips; the handover is the round's only in-round choice
+
+> **Taken 2026-10-18 by a decision panel** (3–0, ruling R5 on GitHub issue #636, posted on #635),
+> recorded by an agent session (wave AS, lane AS-7). **Applies [§ D1588](#d1588)**'s measurement.
+> The wording is the agent's; the ruling is the panel's. Owner-reversible.
+
+**Why an entry.** It moves the chip set a Rush round offers, which `everyday/stageScreen.ts`,
+`everyday/rushSitting.ts` and the honesty corpus all read, and it refuses a control
+[§ D1278](#d1278) and the parking-fault cure (GitHub issue #352) still rely on outside a rush.
+
+1. **What changes.** A Rush round draws no *Park the cars in the lobby* and no *Spread the cars
+   across the tower*: `stageScreenModel.ts#stageParkingArmsOf` answers none when
+   `StageInterventionInput.rush` is set, and the stage builds its buttons from it. The handover
+   (*Switch to*, with its picker) is the round's only in-round choice. The parking note is not drawn
+   in a rush either. § D1588 found neither chip moves the hold over fifty crowds at either press
+   time, and both shorten it on the shipped crowd at every time tested before 6:00 bar one.
+2. **A filter, not a deletion.** `STAGE_INTERVENTIONS`, its labels and the two `core` kinds stay.
+   Scenario and Career calls (`stageCall.ts`, `shift/`), the tutorial's lever and the Engineer
+   strip are unchanged, and `stageScreenModel.test.ts` holds every other run context to both chips.
+3. **Old rounds still replay and post** (invariant 5). `rushSitting.ts#wireRoundInterventions`
+   keeps its parking branch and `rushDeviceBest.ts#rushDeviceReplayOf` reads it back; those are the
+   kinds' non-test callers in a rush. `rushDeviceBest.test.ts` records a round with each press at
+   0:10, writes it through the device record and replays it to the same hold (Spread moves that
+   hold on the test crowd, so the case cannot pass on a dropped press).
+4. **A greyed handover says why on its own row.** The four shipped dispatchers a round that opened
+   on up-and-down buttons with no bidding can never hand over to (the two destination ones and the
+   two that bid) are disabled rows of the picker, each reading its name and a short form of
+   `live/interventions.ts#switchRefusalOf`'s sentence
+   (`stageScreenModel.ts#STAGE_SWITCH_RUSH_OPTION_REASONS`), with the whole sentence as the row's
+   title. Rush only; elsewhere the refusal is still drawn beside the button.
+5. **Nothing measured moves.** No call, crowd, seed, house row or published figure; no claim that
+   the change helps a player is made.
+
+**Rejected, by the panel.** A named *Fairness first* chip (0 s at 0:10 on the shipped crowd, and
+−90 s at 4:00 and 7:00), a confession line under each press, and new levers without their own
+paired sweep.
+
+**Copy.** No Rush intro or result sentence names either chip. The tutorial's *Spread the cars out*
+and the door's *park the cars, spread them out* are about a Scenario day and stay.
+
+**What holds it.** `stageScreenModel.test.ts` (§ D1589 block), `rushDeviceBest.test.ts` (§ D1589
+block), `rushPlaytest.browser.test.ts` (no parking chip on the rush stage, four greyed rows that
+say why), and the corpus seeds `stage.intervene.rushOption(…)` in `honesty/surfaces.ts`.
+
+**Numbers spent.** The integrator re-allocated **D1589 to D1590** from lane AS-6's block to this
+lane; it spent **D1589**.

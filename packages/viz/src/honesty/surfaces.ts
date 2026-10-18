@@ -275,6 +275,7 @@ import {
   stageBookedOutOf,
   stageInkFor,
   stageInterventionsOf,
+  stageSwitchOptionOf,
   stageLegend,
   stageOpeningLineOf,
   stagePlayControlOf,
@@ -12969,6 +12970,8 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
      * Engineer strip needs it as well, and one screen's model is not where both shells can read it.
      */
     'everyday/stageScreenModel.ts#STAGE_INTERVENTIONS',
+    /* § D1589: the parking arms a stage offers, none in a rush. Its words are the constant's, seeded through `stageInterventionsOf`. */
+    'everyday/stageScreenModel.ts#stageParkingArmsOf',
     'everyday/stageScreenModel.ts#STAGE_CAMERAS',
     /* Returns the chips above or none; the words are theirs, seeded below once per case. */
     'everyday/stageScreenModel.ts#stageCameraChipsOf',
@@ -12994,6 +12997,9 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
     'live/interventions.ts#SWITCH_KEEPS_FORECAST',
     'everyday/stageScreenModel.ts#STAGE_SWITCH_PICKER_LABEL',
     'everyday/stageScreenModel.ts#STAGE_SWITCH_PICKER_NOTE',
+    /* § D1589: in a Rush round a greyed handover row says why on itself. Seeded below. */
+    'everyday/stageScreenModel.ts#stageSwitchOptionOf',
+    'everyday/stageScreenModel.ts#STAGE_SWITCH_RUSH_OPTION_REASONS',
     /*
      * GitHub issue #588, § D1278: the parking row's line after a press that changed nobody's trip.
      * Seeded below through `stageInterventionsOf` with a verdict handed in, which is the one arm that
@@ -13441,6 +13447,15 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
           });
         }
       }
+    }
+    /*
+     * **A Rush round's greyed handover rows** — [§ D1589](../../../../DECISIONS.md). In a rush a
+     * target the round cannot hand over to is a greyed picker row carrying its reason, one per
+     * refusal sentence; `reason`, as the long refusal is.
+     */
+    for (const [state, switchTo] of refusedStates) {
+      const option = stageSwitchOptionOf({ target: switchTo.target, driving: switchTo.driving, rush: true });
+      seeds.push({ field: `stage.intervene.rushOption(${state})`, text: option.label, role: 'reason' });
     }
     /*
      * **The parking row's line after the fact** — GitHub issue #588, [§ D1278](../../../../DECISIONS.md).

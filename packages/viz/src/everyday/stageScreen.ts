@@ -93,6 +93,8 @@ import {
   STAGE_CAMERAS,
   STAGE_DRIVING_LABEL,
   STAGE_INTERVENTIONS,
+  stageParkingArmsOf,
+  stageSwitchOptionOf,
   STAGE_RACE_PICKER_LABEL,
   STAGE_RECOMPUTING,
   stageCallAnsweredLineOf,
@@ -1221,7 +1223,11 @@ function mountStage(
     'font-weight:600',
     'cursor:pointer',
   ].join(';');
-  const interventionButtons = STAGE_INTERVENTIONS.map((arm) => {
+  /*
+   * A rush draws no parking chip — [§ D1589](../../../../DECISIONS.md), the decision panel's ruling R5
+   * on GitHub issue #635 — so its only in-round choice is the handover below.
+   */
+  const interventionButtons = stageParkingArmsOf(context.ctx === 'rush').map((arm) => {
     const button = el(doc, 'button', 'everyday-stage-intervene', arm.label);
     button.type = 'button';
     /*
@@ -1309,20 +1315,38 @@ function mountStage(
    */
   function refreshSwitchOptions(): void {
     const latest = host.dispatchers();
-    const shelf = latest.map((profile) => `${profile.id}\u0001${profile.name}`).join('\u0000');
+    /*
+     * § D1589: in a rush a dispatcher the round cannot hand over to is a greyed row that says why
+     * on itself (`stageScreenModel.ts#stageSwitchOptionOf`). Its words are part of the key, so the
+     * rows are rebuilt when the reason moves and at no other time.
+     */
+    let drivingNow: DispatcherProfile | undefined;
+    const driving = (): DispatcherProfile => (drivingNow ??= host.drivingProfile());
+    const rows = latest.map((profile) => ({
+      profile,
+      option: stageSwitchOptionOf({ target: profile, driving, rush: context.ctx === 'rush' }),
+    }));
+    const shelf = rows
+      .map(({ profile, option }) => `${profile.id}\u0001${option.label}`)
+      .join('\u0000');
     switchable = latest;
     if (shelf === renderedShelf) return;
     renderedShelf = shelf;
     const wanted = switchPicker.value;
     switchPicker.replaceChildren(
-      ...latest.map((profile) => {
-        const option = el(doc, 'option', undefined, profile.name);
+      ...rows.map(({ profile, option: row }) => {
+        const option = el(doc, 'option', undefined, row.label);
         option.value = profile.id;
+        if (row.refusal !== undefined) {
+          option.disabled = true;
+          option.title = row.refusal;
+        }
         return option;
       }),
     );
-    const keep = latest.some((profile) => profile.id === wanted) ? wanted : host.selection().dispatcherId;
-    switchPicker.value = latest.some((profile) => profile.id === keep) ? keep : (latest[0]?.id ?? '');
+    const pickable = rows.filter(({ option }) => option.refusal === undefined).map(({ profile }) => profile.id);
+    const keep = pickable.includes(wanted) ? wanted : host.selection().dispatcherId;
+    switchPicker.value = pickable.includes(keep) ? keep : (pickable[0] ?? latest[0]?.id ?? '');
     switchPicker.hidden = latest.length === 0;
     switchButton.hidden = latest.length === 0;
     // The note is about the pair; with no shelf there is no control for it to be about.
@@ -2022,7 +2046,9 @@ function mountStage(
      */
     const rushNotes = el(doc, 'div', 'everyday-stage-rush-notes');
     rushNotes.style.cssText = `display:flex;flex-wrap:wrap;gap:${String(GAP.row)}px`;
-    rushNotes.append(switchPickerNote, interventionNote, parkingNote);
+    /* § D1589: a rush has no parking chip, so it has no parking note either. */
+    rushNotes.append(switchPickerNote, interventionNote);
+    parkingNote.remove();
     root.insertBefore(rushNotes, stageRow.nextSibling);
   }
   region.append(root);
@@ -3718,6 +3744,7 @@ function mountStage(
       ...(target === undefined ? {} : { switchTo: target }),
       ...(pressChangedNobody === undefined ? {} : { pressChangedNobody }),
       ...(handoverVerdict === undefined ? {} : { handoverVerdict }),
+      rush: context.ctx === 'rush',
     });
     applySwitchRow(view, sharedRefusalOf(view, watchingNow()) ?? callHeld());
     applyParkingRows(view);
@@ -4152,6 +4179,7 @@ function mountStage(
       ...(target === undefined ? {} : { switchTo: target }),
       ...(pressChangedNobody === undefined ? {} : { pressChangedNobody }),
       ...(handoverVerdict === undefined ? {} : { handoverVerdict }),
+      rush: context.ctx === 'rush',
     });
     /* Wave AS, lane AS-1: a rush stamps in held time, the header's clock (`rush.ts#rushInterventionStampOf`). */
     const stamp =
