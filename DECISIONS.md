@@ -53693,6 +53693,38 @@ that day honestly; it does not give it a decision. The options, none taken:
 
 **Numbers spent.** This lane held **D1543 to D1551** and spent **D1543 and D1544**.
 
+
+## D1545 — the Rush setup page states the house run on this crowd as the line to beat
+
+> **Taken 2026-10-18 by an agent session** (wave AS, lane AS-1) to carry the decision panel's ruling
+> **R5** (3–0) on GitHub issue #636. The wording is the agent's; the ruling is the panel's.
+> Owner-reversible.
+
+**Why an entry.** It puts a house figure on a screen before any round, where until now the house's
+runs were drawn only as the standings and, since wave AR, beside a finished round
+(`rushHouse.ts#rushHouseLineOf`). That reaches past the result page that line was written for.
+
+1. **What it says.** Under the driving line and above the dispatcher choice,
+   `rushHouse.ts#rushHouseToBeatLineOf`: *The house run on this crowd, <driver> with no changes,
+   holds to <m:ss>, into wave <n>. That is the time to pass.* (or *holds all 30 waves, the whole
+   climb.*), for the dispatcher standing, redrawn when the picker moves (`rushScreen.ts#syncDriver`).
+   The ruling's example said *the line to beat*; the always-on corpus's ordering check
+   (`honesty/properties.ts#ORDERING_CLAIM`) reads *beat* beside a dispatcher's name as a claim about
+   two runs, so the word was changed rather than the check.
+2. **One source.** The figures are the row `rushHouseLineOf` reads, from `RUSH_HOUSE_TABLE`, through
+   the same stream check. No second copy.
+3. **Silence where there is nothing to state.** A stale table, a tower the house has not run, or a
+   dispatcher it did not run (a saved one) draws no line.
+4. **No claim about any choice.** The line states the house run and nothing else. Whether a chip
+   helps or hurts on this crowd waits on a paired measurement (GitHub issue #635 item 1), and nothing
+   about the chips changes here.
+
+**What holds it.** `everyday/rushHouse.test.ts` (the sentence, the held arm, the three silences, no
+verdict word), `everyday/rushPhone.browser.test.ts` case 6 (drawn, and it follows the picker), and
+the corpus seeds `rush.toBeat.broke` and `rush.toBeat.held` in `honesty/surfaces.ts`.
+
+**Numbers spent.** This lane held **D1545 to D1553** and spent **D1545**.
+
 ## D1563 — the hub's *Today's scenario* line is one line, and its far ends are said as *longer on some towers*
 
 > **Taken 2026-10-18 by an agent session under delegated authority** (wave AS, lane AS-3, GitHub

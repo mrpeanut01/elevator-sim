@@ -82,7 +82,7 @@ import {
 import type { LiveObservations } from '../live/types.js';
 import type { GoalState } from '../shift/types.js';
 import { actionBarFor, type ActionBarModel } from './actionBar.js';
-import { RUSH_NOT_LANDED, rushStageHeaderOf } from './rush.js';
+import { RUSH_LOSS_HOLD_MS, RUSH_NOT_LANDED, rushCompactHudOf, rushInterventionStampOf, rushLossLineOf, rushOpeningPaceOf, rushStageHeaderOf } from './rush.js';
 import { RUSH_END_ASK_COPY, RUSH_STREAM } from './rushScreenModel.js';
 import type { EverydayHost } from './host.js';
 import { SCREEN_NAMES, type EverydayScreenModule } from './screens.js';
@@ -363,6 +363,9 @@ const GOAL_INK: Readonly<Record<GoalState, string>> = Object.freeze({
  * viewport is already 60 %.
  */
 const STAGE_CANVAS_HEIGHT = '60vh';
+
+/** The shortest the rush's compact row lets the building get — wave AS, lane AS-1 ({@link syncRushCompact}). */
+const RUSH_COMPACT_MIN_CANVAS_PX = 260;
 
 /**
  * How often the stage's live region is re-announced — GitHub issue **#239**.
@@ -2055,6 +2058,8 @@ function mountStage(
     if (playback === undefined) return;
     /* § D1361: a day another tab holds is shown here no further. */
     if (heldAtS !== undefined) return;
+    /* Wave AS, lane AS-1: the round is over and the stage is only showing where. */
+    if (rushLossLine !== undefined) return;
     if (playback.state === 'playing') {
       playback.pause();
       /* § D1212: a pause stops a skip that is coming; *Play* starts a fresh beat. */
@@ -2094,6 +2099,77 @@ function mountStage(
   let headerSticks = false;
 
   /**
+   * **The loss, held on the building** — wave AS, lane AS-1 (GitHub issue #635, finding 5). When the
+   * round crosses the hold line the stage stops on that instant and says so for
+   * `rush.ts#RUSH_LOSS_HOLD_MS` before the result, which used to cut in within the same frame. The
+   * round is recorded as ended at once, so leaving during the hold loses nothing.
+   */
+  let rushLossLine: string | undefined;
+  let rushLossTimer: number | undefined;
+  function goToRushResult(): void {
+    if (rushLossTimer !== undefined) view?.clearTimeout(rushLossTimer);
+    rushLossTimer = undefined;
+    if (alive) context.go('report');
+  }
+
+  /** Whether the rush's compact phone row is up — {@link syncRushCompact}, `rush.ts#rushCompactHudOf`. */
+  let rushCompact = false;
+  /** What a folded element's inline `display` was, so unfolding puts back exactly that. */
+  const foldedDisplay = new Map<HTMLElement, string>();
+  function fold(node: HTMLElement, on: boolean): void {
+    if (on) {
+      if (!foldedDisplay.has(node)) foldedDisplay.set(node, node.style.display);
+      node.style.display = 'none';
+      return;
+    }
+    const was = foldedDisplay.get(node);
+    if (was === undefined) return;
+    foldedDisplay.delete(node);
+    node.style.display = was;
+  }
+
+  /**
+   * **The rush's compact phone row** — wave AS, lane AS-1, `rush.ts#rushCompactHudOf` says when and
+   * why. Asked on every transport change and on a resize. While it is up, the header shows the clock,
+   * the wave, the count past two minutes and *Pause*, pinned, and the building is sized to the room
+   * left under the header and the chips, so the lobby rows stay on the same screen.
+   */
+  function syncRushCompact(): void {
+    if (context.ctx !== 'rush') return;
+    const compact = rushCompactHudOf({ regionWidth: region.clientWidth, playing: playback?.state === 'playing' });
+    /* Every time, not on the edge: the transport rewrites the chips' whole style on each change. */
+    for (const node of [driving, cameras, floorJump, skipButton, ...speedButtons, switchPicker, switchButton, switchPickerNote, interventionRefusal, interventionNote]) {
+      fold(node, compact);
+    }
+    if (compact !== rushCompact) {
+      rushCompact = compact;
+      header.style.padding = compact ? '6px 12px' : '10px 14px';
+      syncHeaderStick();
+      requestFrame();
+    }
+    fitRushCanvas();
+  }
+
+  /** The canvas's height in the compact row: the room under the pinned header and the chips, never taller than the usual 60vh. */
+  function fitRushCanvas(): void {
+    if (!rushCompact) {
+      if (canvas.style.height !== STAGE_CANVAS_HEIGHT) canvas.style.height = STAGE_CANVAS_HEIGHT;
+      return;
+    }
+    const viewportBottom = view?.innerHeight ?? doc.documentElement.clientHeight;
+    const shown = region.getBoundingClientRect();
+    const bar = doc.querySelector<HTMLElement>('.everyday-bar')?.getBoundingClientRect();
+    const bottom = Math.min(viewportBottom, shown.bottom, bar !== undefined && bar.height > 0 ? bar.top : Number.POSITIVE_INFINITY);
+    const top = Math.max(0, shown.top);
+    const above = header.offsetHeight + interventions.offsetHeight + (endAsk.hidden ? 0 : endAsk.offsetHeight) + 2 * GAP.block;
+    const chrome = stageWrap.offsetHeight - canvas.offsetHeight + 2;
+    const room = Math.floor(bottom - top - above - chrome);
+    const usual = 0.6 * viewportBottom;
+    const height = `${String(Math.max(RUSH_COMPACT_MIN_CANVAS_PX, Math.min(usual, room)))}px`;
+    if (canvas.style.height !== height) canvas.style.height = height;
+  }
+
+  /**
    * **Pin the header while the building scrolls under it** — wave AR, lane AR-2,
    * [§ D1527](../../../../DECISIONS.md), `stageScreenModel.ts#stageHeaderSticksOf`. Asked when the day
    * starts playing and on a resize, never per frame, because it reads the header's laid-out height.
@@ -2101,11 +2177,13 @@ function mountStage(
    * header never covers the call it stopped for.
    */
   function syncHeaderStick(): void {
-    const sticks = stageHeaderSticksOf({
-      headerHeight: header.offsetHeight,
-      regionHeight: region.clientHeight,
-      rush: context.ctx === 'rush',
-    });
+    const sticks =
+      rushCompact ||
+      stageHeaderSticksOf({
+        headerHeight: header.offsetHeight,
+        regionHeight: region.clientHeight,
+        rush: context.ctx === 'rush',
+      });
     headerSticks = sticks;
     header.style.position = sticks ? 'sticky' : '';
     header.style.top = sticks ? '0' : '';
@@ -2129,6 +2207,13 @@ function mountStage(
    */
   function bringBuildingIntoView(): void {
     syncHeaderStick();
+    /* Wave AS, lane AS-1: the compact row fits header, chips and building together; start at the header. */
+    if (rushCompact) {
+      fitRushCanvas();
+      const at = root.getBoundingClientRect().top - region.getBoundingClientRect().top;
+      if (Math.abs(at) >= 1) region.scrollTop += at;
+      return;
+    }
     const box = canvas.getBoundingClientRect();
     const shown = region.getBoundingClientRect();
     const viewportBottom = view?.innerHeight ?? doc.documentElement.clientHeight;
@@ -2214,7 +2299,7 @@ function mountStage(
         simPerRealS: watchedFrame.simPerRealS,
       });
     }
-    const answer = stagePaceOf({
+    const paced = stagePaceOf({
       horizon: paceHorizon,
       acts: paceActs,
       simTimeS,
@@ -2227,6 +2312,16 @@ function mountStage(
       watchedRealS: watchAllowanceOff ? undefined : paceCounters.watchedRealS,
       lingerRealS: paceCounters.lingerRealS,
     });
+    /* Wave AS, lane AS-1: a rush's first wave plays fast unless a speed was pressed (`rush.ts#rushOpeningPaceOf`). */
+    const rushOpening =
+      context.ctx === 'rush'
+        ? rushOpeningPaceOf({
+            heldS: simTimeS - playback.recording.startedAt,
+            watchingSimPerRealS: stageSpeedAt(speedIndex).simPerRealS,
+            playerChoseSpeed: playerChoseSpeedAtS !== undefined,
+          })
+        : undefined;
+    const answer: StagePace = rushOpening === undefined ? paced : { simPerRealS: rushOpening.simPerRealS, reason: 'unmanaged' };
     lastPaceReason = answer.reason;
     watchedFrame = { atS: simTimeS, simPerRealS: answer.simPerRealS, pace: answer };
     /* § D1493: a call raised, or waited at, or answered, is a decision, and the allowance starts again. */
@@ -2243,7 +2338,7 @@ function mountStage(
     const waiting = answer.reason === 'call' && activeCall()?.raised === false;
     const note = waiting
       ? STAGE_CALL_COPY.waiting
-      : (stagePaceNoteOf(answer, { acts: paceActs, simTimeS, dayStartS: host.dayStartS() }) ?? '');
+      : (rushOpening?.note ?? stagePaceNoteOf(answer, { acts: paceActs, simTimeS, dayStartS: host.dayStartS() }) ?? '');
     /*
      * Wave AO, lane AO-4 — one message for one state (`stagePace.ts#stageStatusOf`): the line a skip
      * left stands while the stage stays where it landed, and goes the frame it leaves (or a call
@@ -3354,8 +3449,12 @@ function mountStage(
   }
 
   function syncTransport(): void {
-    const playing = playback?.state === 'playing';
+    /*
+     * Wave AS, lane AS-1 (GitHub issue #635, finding 2): the entry focus may press *Play* itself, so
+     * the state is read after it. Read before, an early Enter left *▶ Play* on a running round.
+     */
     focusPlayOnRushEntry();
+    const playing = playback?.state === 'playing';
     /*
      * § 3.3's row hears the day run out — GitHub issue **#287**'s fourth criterion.
      *
@@ -3413,7 +3512,7 @@ function mountStage(
           : DAY_ATTEMPT_COPY.elsewhereStage;
     const play = stagePlayControlOf({ playing, hasRun: playback !== undefined, waitingOnCall: waitingNow, dayEnded: ended, heldBy });
     playButton.textContent = play.label;
-    playButton.disabled = play.inert;
+    playButton.disabled = play.inert || rushLossLine !== undefined;
     /* A held button says why to a reader on it, in the line a sighted player reads beside it. */
     playButton.title = waitingNow ? STAGE_CALL_COPY.waiting : (play.note ?? '');
     playButton.style.opacity = play.inert && playback !== undefined ? '0.55' : '';
@@ -3427,7 +3526,7 @@ function mountStage(
     const skip = stageSkipViewOf({ dayEnded: ended, hasRun: playback !== undefined, heldBy });
     skipButton.textContent = skip.label;
     skipButton.title = skip.note;
-    skipButton.disabled = skip.inert;
+    skipButton.disabled = skip.inert || rushLossLine !== undefined;
     skipButton.style.cssText = [
       'background:transparent',
       `border:1px solid ${C.rule}`,
@@ -3464,6 +3563,8 @@ function mountStage(
         'cursor:pointer',
       ].join(';');
     }
+    /* After the chips' styles are written, so the compact row's folds stand over them. */
+    syncRushCompact();
     /*
      * § 7.3's single centred `Start`. It is up before the first press and gone after it, so the
      * overlay never sits over a moving picture; a run that has not arrived says so in the same
@@ -3483,6 +3584,14 @@ function mountStage(
     quietNote.style.display = 'none';
     quietSkip.style.display = 'none';
     startRow.style.display = 'none';
+    /* Wave AS, lane AS-1: the loss's line over the building it happened on. */
+    if (rushLossLine !== undefined) {
+      failedRow.style.display = 'none';
+      statusText.textContent = rushLossLine;
+      startButton.style.display = 'none';
+      status.style.display = 'flex';
+      return;
+    }
     if (heldAtS !== undefined) {
       failedRow.style.display = 'none';
       statusText.textContent =
@@ -3758,7 +3867,16 @@ function mountStage(
       if (session?.holdAtS !== undefined && session.endedAtS === undefined && simTimeS >= session.holdAtS) {
         playback.pause();
         host.endRush(session.holdAtS);
-        context.go('report');
+        /* Wave AS, lane AS-1: stop on the crossing itself, say so, then the result. */
+        if (view === null || view === undefined) {
+          context.go('report');
+          return;
+        }
+        rushLossLine = rushLossLineOf();
+        if (simTimeS > session.holdAtS) playback.seekTo(session.holdAtS);
+        rushLossTimer = view.setTimeout(goToRushResult, RUSH_LOSS_HOLD_MS);
+        syncTransport();
+        requestFrame();
         return;
       }
     }
@@ -3766,7 +3884,15 @@ function mountStage(
     const head =
       rushHead === undefined
         ? stageHeaderOf({ simTimeS, recording, observations, dayStartS: host.dayStartS(), driverName })
-        : { clock: rushHead.held, phase: rushHead.wave, next: undefined, drivingLabel: rushHead.drivingLabel, driverName: rushHead.driverName, figures: rushHead.figures };
+        : {
+            clock: rushHead.held,
+            phase: rushHead.wave,
+            next: undefined,
+            drivingLabel: rushHead.drivingLabel,
+            driverName: rushHead.driverName,
+            /* Wave AS, lane AS-1: the phone's compact row keeps one figure ({@link syncRushCompact}). */
+            figures: rushCompact ? [rushHead.compactFigure] : rushHead.figures,
+          };
     const watching = watchingNow();
     clock.textContent = head.clock;
     /* Wave AS, lane AS-4 (#636 item 6): the rail's subline carries this clock and where the day stands. */
@@ -4027,10 +4153,13 @@ function mountStage(
       ...(pressChangedNobody === undefined ? {} : { pressChangedNobody }),
       ...(handoverVerdict === undefined ? {} : { handoverVerdict }),
     });
+    /* Wave AS, lane AS-1: a rush stamps in held time, the header's clock (`rush.ts#rushInterventionStampOf`). */
+    const stamp =
+      context.ctx === 'rush' ? rushInterventionStampOf(host.interventions(), simTimeS, recording.startedAt) : intervention.stamp;
     /* Written only when the stamp changes — {@link stampSaid}, `AX-3`. */
-    if (intervention.stamp !== stampSaid) {
-      interventionStamp.textContent = intervention.stamp;
-      stampSaid = intervention.stamp;
+    if (stamp !== stampSaid) {
+      interventionStamp.textContent = stamp;
+      stampSaid = stamp;
     }
     /*
      * § 14.1: *"§ 7.6's intervention machinery is **disabled** while watching. A spectator who could
@@ -4556,6 +4685,7 @@ function mountStage(
 
   const unsubscribe = host.subscribe(onHostChange);
   const onResize = (): void => {
+    syncRushCompact();
     syncHeaderStick();
     requestFrame();
   };
@@ -4607,6 +4737,8 @@ function mountStage(
       alive = false;
       if (pendingSay !== undefined) view?.clearTimeout(pendingSay);
       pendingSay = undefined;
+      if (rushLossTimer !== undefined) view?.clearTimeout(rushLossTimer);
+      rushLossTimer = undefined;
       if (pendingFrame !== undefined && view !== null && view !== undefined) {
         view.cancelAnimationFrame(pendingFrame);
       }
@@ -4680,6 +4812,11 @@ function mountStage(
        * puts {@link endAsk} under the header with focus on *Keep playing*; a second press ends it.
        */
       if (context.ctx === 'rush') {
+        /* Wave AS, lane AS-1: during the loss's hold the round has ended; the press goes on to the result. */
+        if (rushLossLine !== undefined) {
+          goToRushResult();
+          return;
+        }
         if (endAsk.hidden && adopted !== undefined) {
           endAskResume = playback?.state === 'playing';
           playback?.pause();

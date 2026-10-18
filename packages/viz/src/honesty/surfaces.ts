@@ -191,7 +191,7 @@ import {
   rushRebuildViewOf,
   type RushRebuildInput,
 } from '../everyday/rushRebuild.js';
-import { RUSH_HOUSE_COPY, RUSH_HOUSE_TABLE, rushHouseLineOf, rushStandingsOf } from '../everyday/rushHouse.js';
+import { RUSH_HOUSE_COPY, RUSH_HOUSE_TABLE, rushHouseLineOf, rushHouseToBeatLineOf, rushStandingsOf } from '../everyday/rushHouse.js';
 import {
   TUNER_COPY,
   TUNE_CARDS,
@@ -282,7 +282,18 @@ import {
   type StageSwitchTarget,
 } from '../everyday/stageScreenModel.js';
 import { todayOf, type TodayRecord } from '../everyday/today.js';
-import { RUSH_NOT_LANDED, RUSH_RESULT_EMPTY_LEDE, rushDisclosureOf, rushOutcomeOf, rushResultViewOf, rushStageHeaderOf, type RushOutcome } from '../everyday/rush.js';
+import {
+  RUSH_NOT_LANDED,
+  RUSH_RESULT_EMPTY_LEDE,
+  rushDisclosureOf,
+  rushInterventionStampOf,
+  rushLossLineOf,
+  rushOpeningPaceOf,
+  rushOutcomeOf,
+  rushResultViewOf,
+  rushStageHeaderOf,
+  type RushOutcome,
+} from '../everyday/rush.js';
 import { rushPostViewOf } from '../everyday/rushPost.js';
 import { RUSH_SITTING_COPY, rushSittingOf, type RushRoundRecord } from '../everyday/rushSitting.js';
 import {
@@ -10650,6 +10661,8 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
     /* Wave AR lane AR-1: the house run on the same crowd beside the round's result, seeded below. */
     'everyday/rushHouse.ts#RUSH_HOUSE_LINE_COPY',
     'everyday/rushHouse.ts#rushHouseLineOf',
+    /* Wave AS lane AS-1, § D1545 (GitHub issue #636, R5): the setup page's line to beat, seeded below. */
+    'everyday/rushHouse.ts#rushHouseToBeatLineOf',
     /*
      * § D1420: this device's best sitting on a build with no board, its row and every line the
      * standings say about it (replayed, nothing kept, or kept and not replayable here), seeded below.
@@ -10797,6 +10810,15 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
         arms.push(['house-held', { buildingId: held.buildingId, dispatcherId: held.dispatcherId, dispatcherName: held.dispatcherId, outcome: { kind: 'broke', heldS: 600, wave: 4 } }]);
       }
       for (const [arm, input] of arms) seeds.push({ field: `rush.houseLine.${arm}`, text: rushHouseLineOf(input) ?? '', role: 'prose' });
+      /* § D1545: the line to beat, for a house run that broke and one that held every wave. */
+      seeds.push({ field: 'rush.toBeat.broke', text: rushHouseToBeatLineOf(midtown) ?? '', role: 'prose' });
+      if (held !== undefined) {
+        seeds.push({
+          field: 'rush.toBeat.held',
+          text: rushHouseToBeatLineOf({ buildingId: held.buildingId, dispatcherId: held.dispatcherId, dispatcherName: held.dispatcherId }) ?? '',
+          role: 'prose',
+        });
+      }
     }
     seeds.push({
       field: 'rush.driving',
@@ -12584,6 +12606,10 @@ const EVERYDAY_RUSH: SurfaceAdapter = {
     'everyday/rush.ts#RUSH_STAGE_COPY',
     'everyday/rush.ts#RUSH_NOT_LANDED',
     'everyday/rush.ts#RUSH_RESULT_EMPTY_LEDE',
+    /* Wave AS lane AS-1: the phone's compact figure, wave 1's pace line, the loss's line and the held-time stamp, seeded below. */
+    'everyday/rush.ts#rushOpeningPaceOf',
+    'everyday/rush.ts#rushLossLineOf',
+    'everyday/rush.ts#rushInterventionStampOf',
     /*
      * GitHub issue #372's round list and post block, under the result. Every state is driven below
      * rather than the copy table alone, on `EVERYDAY_DAILY_LOOP`'s argument for the day's block:
@@ -12675,7 +12701,20 @@ const EVERYDAY_RUSH: SurfaceAdapter = {
         seeds.push({ field: `${tag}.figure.${figure.label}.value`, text: figure.value, role: 'label' });
         seeds.push({ field: `${tag}.figure.${figure.label}.label`, text: figure.label, role: 'label' });
       }
+      seeds.push({ field: `${tag}.compact.value`, text: head.compactFigure.value, role: 'label' });
+      seeds.push({ field: `${tag}.compact.label`, text: head.compactFigure.label, role: 'label' });
     }
+    seeds.push({
+      field: 'rush.stage.openingPace',
+      text: rushOpeningPaceOf({ heldS: 0, watchingSimPerRealS: 4, playerChoseSpeed: false })?.note ?? '',
+      role: 'reason',
+    });
+    seeds.push({ field: 'rush.stage.loss', text: rushLossLineOf(), role: 'observation' });
+    seeds.push({
+      field: 'rush.stage.stamp',
+      text: rushInterventionStampOf([{ atS: mid, change: { kind: 'spread-cars' } }], mid, recording.startedAt),
+      role: 'label',
+    });
     seeds.push({ field: 'rush.bar.notLanded', text: RUSH_NOT_LANDED, role: 'reason' });
     seeds.push({ field: 'rush.result.empty', text: RUSH_RESULT_EMPTY_LEDE, role: 'reason' });
 

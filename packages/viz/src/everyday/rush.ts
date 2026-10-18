@@ -63,6 +63,7 @@ import {
   type ResolvedBuilding,
   type RushFitLevels,
   type RushPrefitClaim,
+  type RunInterventionConfig,
 } from '@elevator-sim/core/browser';
 
 import { specFromProfile } from '../authoring/dispatcherSpec.js';
@@ -82,7 +83,9 @@ import { observationsAt } from '../live/observations.js';
 import { troubleOf } from '../shift/trouble.js';
 import { RUSH_CONTRACT_ID, openRush, switchWeek } from '../shift/week.js';
 
+import { stampVerbOf } from '../live/interventions.js';
 import { EM_DASH } from './figures.js';
+import { BETWEEN_PEAKS_SIM_PER_REAL_S } from './stagePace.js';
 import {
   LAST_GENERATED_WAVE,
   RUSH_HOLD_LINE,
@@ -592,6 +595,73 @@ export interface RushStageHeaderView {
   readonly drivingLabel: string;
   readonly driverName: string;
   readonly figures: readonly RushStageFigure[];
+  /**
+   * The one figure the phone's compact row keeps while the round plays ({@link rushCompactHudOf}):
+   * the count past two minutes against the hold line, as `12/40`. The same count as `figures[1]`.
+   */
+  readonly compactFigure: RushStageFigure;
+}
+
+/**
+ * **The phone's compact row** — wave AS, lane AS-1 (GitHub issue #635, finding 3). At 390×844 the
+ * full header, the four chips and the building never fitted on one screen, so the lobby, where the
+ * queue builds, was off it or the clock was. While a round plays on a stage this narrow, the header
+ * keeps only the clock, the wave, the count past two minutes and *Pause*, pinned above the
+ * building, and the dispatcher picker with *Switch to* folds away. A pause unfolds all of it, so no
+ * control is lost, only moved one press away. Recorded here under [§ D405](../../../../DECISIONS.md).
+ */
+export const RUSH_COMPACT_MAX_WIDTH_PX = 600;
+
+export function rushCompactHudOf(input: { readonly regionWidth: number; readonly playing: boolean }): boolean {
+  return input.playing && input.regionWidth > 0 && input.regionWidth <= RUSH_COMPACT_MAX_WIDTH_PX;
+}
+
+/**
+ * **The first wave plays fast** — wave AS, lane AS-1 (GitHub issue #635, finding 4). Wave 1 is three
+ * held minutes with almost nobody standing, about 45 s of real time at the opening 4×, and nothing is
+ * at stake in it. So until the first wave change the stage plays at the live day's between-peaks rung
+ * (`stagePace.ts#BETWEEN_PEAKS_SIM_PER_REAL_S`) and says so, unless the player has pressed a speed.
+ * Only the display pace moves: the waves, the crowd, the hold and the purse read the same recording.
+ * `undefined` where nothing changes. Recorded here under [§ D405](../../../../DECISIONS.md).
+ */
+export function rushOpeningPaceOf(input: {
+  readonly heldS: number;
+  readonly watchingSimPerRealS: number;
+  readonly playerChoseSpeed: boolean;
+}): { readonly simPerRealS: number; readonly note: string } | undefined {
+  if (input.playerChoseSpeed || playerWaveAt(Math.max(0, input.heldS)) !== 1) return undefined;
+  const fast = Math.max(input.watchingSimPerRealS, BETWEEN_PEAKS_SIM_PER_REAL_S);
+  if (fast === input.watchingSimPerRealS) return undefined;
+  return { simPerRealS: fast, note: `fast-forwarding at ${String(fast)}× until wave 2 · pick a speed to watch` };
+}
+
+/**
+ * **The chip log in the round's own clock** — wave AS, lane AS-1 (GitHub issue #635, finding 6). The
+ * stage's stamp read `08:00 · spread the cars…` beside a header clock of `0:10`. In a rush it reads
+ * held time, `0:10 · spread the cars…`, as the header and the round list after it do. The latest
+ * change at or before the playhead, the later of two at one instant, or `''` with none:
+ * `live/interventions.ts#interventionStampOf`'s rule with the rush's clock.
+ */
+export function rushInterventionStampOf(
+  interventions: readonly RunInterventionConfig[],
+  simTimeS: number,
+  startedAt: number,
+): string {
+  let latest: RunInterventionConfig | undefined;
+  for (const entry of interventions) {
+    if (entry.atS <= simTimeS) latest = entry;
+  }
+  if (latest === undefined) return '';
+  return `${heldClock(latest.atS - startedAt)} · ${stampVerbOf(latest.change)}`;
+}
+
+/** How long the stage holds on the crossing before the result — wave AS, lane AS-1 (GitHub issue #635, finding 5). A display dwell; nothing reads it. */
+export const RUSH_LOSS_HOLD_MS = 2_000;
+
+/** The line drawn over the building at the crossing: `40 / 40, the building stopped draining`. */
+export function rushLossLineOf(): string {
+  const people = String(RUSH_HOLD_LINE.people);
+  return `${people} / ${people}, the building stopped draining`;
 }
 
 export const RUSH_STAGE_COPY = Object.freeze({
@@ -599,6 +669,7 @@ export const RUSH_STAGE_COPY = Object.freeze({
   heldLabel: 'held',
   standingLabel: 'standing right now',
   overLineLabel: 'past two minutes, of 40',
+  overLineShortLabel: 'past two minutes',
   longestLabel: 'longest so far',
 });
 
@@ -618,6 +689,7 @@ export function rushStageHeaderOf(input: {
   const heldS = input.simTimeS - input.recording.startedAt;
   const o = observationsAt(input.recording, input.simTimeS);
   const longest = o.worstWaitSoFarS;
+  const over = rushOverLineAt(input.recording, input.simTimeS);
   return {
     held: heldClock(heldS),
     wave: `WAVE ${String(playerWaveAt(heldS))}`,
@@ -625,12 +697,13 @@ export function rushStageHeaderOf(input: {
     driverName: input.driverName,
     figures: [
       { label: RUSH_STAGE_COPY.standingLabel, value: String(o.waitingNow) },
-      { label: RUSH_STAGE_COPY.overLineLabel, value: String(rushOverLineAt(input.recording, input.simTimeS)) },
+      { label: RUSH_STAGE_COPY.overLineLabel, value: String(over) },
       {
         label: RUSH_STAGE_COPY.longestLabel,
         value: longest === undefined ? EM_DASH : `${String(Math.round(longest))} s${o.worstWaitIsCensored ? ' and counting' : ''}`,
       },
     ],
+    compactFigure: { label: RUSH_STAGE_COPY.overLineShortLabel, value: `${String(over)}/${String(RUSH_HOLD_LINE.people)}` },
   };
 }
 

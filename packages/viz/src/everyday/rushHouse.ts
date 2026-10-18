@@ -510,6 +510,15 @@ export const RUSH_HOUSE_LINE_COPY = Object.freeze({
   houseHeld: (name: string): string =>
     `The house run on the same crowd, ${name} with no changes, held all ${String(LAST_GENERATED_WAVE)} waves.`,
   oneRunEach: 'One run of each.',
+  /*
+   * Wave AS, lane AS-1, § D1545 (#636 R5): the setup page's line to beat. Not the ruling's example
+   * word *beat*: the corpus's ordering check reads it beside a dispatcher's name as a claim about two
+   * runs, and the sentence makes none, so it says *the time to pass* instead.
+   */
+  toBeatBroke: (name: string, held: string, wave: number): string =>
+    `The house run on this crowd, ${name} with no changes, holds to ${held}, into wave ${String(wave)}. That is the time to pass.`,
+  toBeatHeld: (name: string): string =>
+    `The house run on this crowd, ${name} with no changes, holds all ${String(LAST_GENERATED_WAVE)} waves, the whole climb.`,
 });
 
 /**
@@ -543,4 +552,30 @@ export function rushHouseLineOf(input: {
       ? RUSH_HOUSE_LINE_COPY.houseHeld(input.dispatcherName)
       : RUSH_HOUSE_LINE_COPY.houseBroke(input.dispatcherName, heldClock(run.brokeAtS), playerWaveAt(run.brokeAtS));
   return `${round} ${house} ${RUSH_HOUSE_LINE_COPY.oneRunEach}`;
+}
+
+/**
+ * **The line to beat, before the round** — wave AS, lane AS-1, [§ D1545](../../../../DECISIONS.md),
+ * the panel's ruling R5 on GitHub issue #636. The setup page states the house's run on this crowd for
+ * the dispatcher standing, as a fact: how long it held and into which wave, read from the same row
+ * {@link rushHouseLineOf} reads after the round. Nothing is said about whether any choice helps or
+ * hurts; that waits on a paired measurement.
+ *
+ * `undefined`, and nothing drawn, on {@link rushHouseLineOf}'s grounds: a stale table, a tower the
+ * house has not run, or a dispatcher it did not run. Its non-test caller is
+ * `everyday/rushScreen.ts#syncDriver`.
+ */
+export function rushHouseToBeatLineOf(input: {
+  readonly buildingId: string;
+  readonly dispatcherId: string;
+  readonly dispatcherName: string;
+  readonly table?: RushHouseTable;
+}): string | undefined {
+  const table = input.table ?? RUSH_HOUSE_TABLE;
+  if (!measuredOnThisStream(table)) return undefined;
+  const run = table.runs.find((entry) => entry.buildingId === input.buildingId && entry.dispatcherId === input.dispatcherId);
+  if (run === undefined) return undefined;
+  return run.brokeAtS === null
+    ? RUSH_HOUSE_LINE_COPY.toBeatHeld(input.dispatcherName)
+    : RUSH_HOUSE_LINE_COPY.toBeatBroke(input.dispatcherName, heldClock(run.brokeAtS), playerWaveAt(run.brokeAtS));
 }
