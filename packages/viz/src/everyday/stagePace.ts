@@ -103,7 +103,7 @@ import { clockAt } from '../live/timeline.js';
 import type { DayAct } from '../shift/dayLength.js';
 import type { RunHorizon } from '../shift/types.js';
 
-import { STAGE_SPEEDS } from './stageScreenModel.js';
+import { STAGE_SKIP_COPY, STAGE_SPEEDS } from './stageScreenModel.js';
 
 /**
  * **The between-peaks rung: 30 simulated seconds per real second.** One named constant, § D991.
@@ -562,6 +562,17 @@ function rungLabelOf(simPerRealS: number): string {
 }
 
 /**
+ * **The played-on line** — `unheld`, and a `fast` frame past the allowance (§ D1525), one line for one
+ * state. [§ D1555](../../../../DECISIONS.md), wave AS, lane AS-2, on the decision panel's ruling R2
+ * (3–0) posted on GitHub issue #636: no rung above `30×`, so the line points at the control that
+ * crosses a long quiet stretch, *Skip to the end*, and says what it does here, which is § D1151's: it
+ * stops at any call the stage has not had the player's answer to. It changes no speed and no skip.
+ */
+export function stagePlayedOnLineOf(rung: string): string {
+  return `fast-forwarding at ${rung}: you have watched a while and there is nothing to decide yet · pick a speed to watch, or ${STAGE_SKIP_COPY.label}: it stops at any call to come`;
+}
+
+/**
  * **The one line beside the chips that says why the speed is what it is** — § D991's *every change
  * shows on the chip*.
  *
@@ -617,7 +628,7 @@ export function stagePaceNoteOf(
     case 'fast':
       /* § D1525: past the allowance the line is `unheld`'s, which is as true here. */
       return pace.playedOn === true
-        ? `fast-forwarding at ${rung}: you have watched a while and there is nothing to decide yet · pick a speed to watch`
+        ? stagePlayedOnLineOf(rung)
         : `fast-forwarding at ${rung}: nobody on a landing has waited a minute`;
     /*
      * § D1525: one line for the slowed rung, true while the wait stands and through the dwell after
@@ -629,7 +640,7 @@ export function stagePaceNoteOf(
       return `your speed, ${rung}, until somebody on a landing has waited a minute`;
     /* § D1493: the hold has run out with nothing asked. */
     case 'unheld':
-      return `fast-forwarding at ${rung}: you have watched a while and there is nothing to decide yet · pick a speed to watch`;
+      return stagePlayedOnLineOf(rung);
     /* § D1435: the line *Watch the rest* plays under. */
     case 'lost':
       return `the day can no longer clear: playing the rest at ${rung}, and no call is asked`;
@@ -857,32 +868,81 @@ export function stagePaceStateOf(pace: StagePace): StagePaceReason {
 }
 
 /**
- * **How long a beat has run, in real seconds, before its note is drawn past the allowance** —
- * [§ D1525](../../../../DECISIONS.md), as corrected after the integrated browser run. Half of
- * {@link SKIP_BEAT_REAL_S}: every skip is still warned for at least a real second before it lands,
- * and a beat that a waiter crossing the minute ends sooner, the flip the re-play saw at four a real
- * second, never draws its note.
+ * **How long a beat has run, in real seconds, before its note is drawn** — [§ D1525](../../../../DECISIONS.md)
+ * as [§ D1554](../../../../DECISIONS.md) amends it. Half of {@link SKIP_BEAT_REAL_S}, on every frame and
+ * not only past the allowance: the line the beat's note replaces has then stood at least a real second
+ * (a skip that lands on a peak's start re-arms on its next frame), and every skip is still warned for a
+ * real second before it lands.
  */
-export const SKIP_BEAT_SHOWN_PLAYED_ON_REAL_S = SKIP_BEAT_REAL_S / 2;
+export const SKIP_BEAT_SHOWN_REAL_S = SKIP_BEAT_REAL_S / 2;
 
 /**
- * **What the skip's span says**, for {@link stageStatusOf}'s `skip` — [§ D1525](../../../../DECISIONS.md).
- * The beat's note while a skip is coming, so a player can stop it (§ D1212, § D1266). Past the
- * allowance ({@link StagePace.playedOn}) only once the beat has run
- * {@link SKIP_BEAT_SHOWN_PLAYED_ON_REAL_S}: there a waiter crossing the minute arms and drops the beat
- * several times a real second, and a note drawn on every arming flipped the line with it. Otherwise
- * the line the last skip left, or `''`.
+ * **The skip a beat armed at `armedAtS` ends in, if the stage stays fast until it does** —
+ * [§ D1554](../../../../DECISIONS.md), wave AS, lane AS-2, GitHub issue #637 item 1 — or `undefined`
+ * when the beat will be ended first: somebody reaches a minute on a landing, or the next call comes,
+ * before the stage would seek, or the stretch left is too short to skip and runs into one of them.
+ *
+ * Read only to decide whether {@link STAGE_SKIP_BEAT_NOTE} is drawn, so a warning that *skipping ahead*
+ * is always followed by its skip. It reads the recording after the playhead for that one purpose, as
+ * {@link stageSkipOf} does to choose where to land (§ D1212), and the note still names no instant
+ * ahead. It changes no speed and no skip: the stage seeks exactly where {@link stageSkipOf} says, and
+ * this only predicts it. A pause or a chip pressed during the beat still ends it, which is what the
+ * note asks for.
+ *
+ * Where a peak's start comes first, the stage passes it still fast (a scored day's pace does not read
+ * the peaks) and the next target is read from there, which is how a stretch too short to skip on
+ * arming can still end in a skip once the playhead is past the peak's start.
+ */
+export function stageSkipLandsOf(input: StageSkipInput): StageSkip | undefined {
+  const beatSimS = SKIP_BEAT_REAL_S * input.simPerRealS;
+  const now = input.simTimeS;
+  const wait = firstMinuteWaitFrom(input.legs, now);
+  const stop = input.stopAtS !== undefined && input.stopAtS >= now ? input.stopAtS : undefined;
+  const ends = Math.min(wait ?? Number.POSITIVE_INFINITY, stop ?? Number.POSITIVE_INFINITY);
+  let atS = Math.max(now, input.armedAtS + beatSimS);
+  for (let guard = 0; guard <= input.acts.length + 1; guard += 1) {
+    if (atS > ends) return undefined;
+    const skip = stageSkipOf({ ...input, simTimeS: atS });
+    if (skip !== undefined) return skip;
+    const peak = nextPeakStartAfter(input.acts, atS);
+    if (peak === undefined || peak.startS >= ends) return undefined;
+    atS = peak.startS;
+  }
+  return undefined;
+}
+
+/**
+ * **What the skip's span says**, for {@link stageStatusOf}'s `skip`, and the line a skip left that
+ * still stands — [§ D1525](../../../../DECISIONS.md) as [§ D1554](../../../../DECISIONS.md) amends it.
+ *
+ * The beat's note is drawn once the beat has run {@link SKIP_BEAT_SHOWN_REAL_S}, or at once where the
+ * beat was armed as the chip moved, and only while {@link stageSkipLandsOf} says the beat ends in its skip, so a pause or a chip can act on every
+ * skip for a real second and *skipping ahead* is never drawn for a skip that does not come. Before
+ * § D1554 a beat that a waiter crossing the minute ended was drawn for a third of a second and the
+ * line went back to it, or to the previous skip's line.
+ *
+ * Once the beat's note has been drawn, the previous skip's line is over (`line` comes back `''`): it
+ * is never drawn again after another line replaced it. The playtest saw *skipped 17:31–17:32* come
+ * back at 17:35, after a beat that did not land.
  *
  * @param input.armedRealS real seconds since the beat was armed, or `undefined` with no beat coming.
+ * @param input.lands whether the beat ends in its skip ({@link stageSkipLandsOf}).
+ * @param input.line the line the last skip left, or `''`.
  */
 export function stageSkipSpeechOf(input: {
   readonly armedRealS: number | undefined;
-  readonly pace: StagePace | undefined;
+  readonly lands: boolean;
   readonly line: string;
-}): string {
+  /**
+   * The beat was armed on the frame the transport's rung changed, so the chip moved with the line and
+   * the note is drawn at once: the player gets the beat's whole two seconds to stop it, as before
+   * § D1525. Otherwise the line before it is kept a real second first.
+   */
+  readonly armedAtRungChange?: boolean | undefined;
+}): { readonly speech: string; readonly line: string } {
   const armed = input.armedRealS;
-  if (armed !== undefined && (input.pace?.playedOn !== true || armed >= SKIP_BEAT_SHOWN_PLAYED_ON_REAL_S)) {
-    return STAGE_SKIP_BEAT_NOTE;
+  if (armed !== undefined && input.lands && (input.armedAtRungChange === true || armed >= SKIP_BEAT_SHOWN_REAL_S - 1e-9)) {
+    return { speech: STAGE_SKIP_BEAT_NOTE, line: '' };
   }
-  return input.line;
+  return { speech: input.line, line: input.line };
 }

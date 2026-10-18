@@ -13007,6 +13007,8 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
     'everyday/stagePace.ts#stageSkipLineOf',
     /* Wave AR, lane AR-2, § D1525: which of the two the skip's span speaks, past the allowance or not. */
     'everyday/stagePace.ts#stageSkipSpeechOf',
+    /* Wave AS, lane AS-2, § D1555 (#636 R2): the played-on line, seeded through `stagePaceNoteOf`'s `unheld` and played-on arms. */
+    'everyday/stagePace.ts#stagePlayedOnLineOf',
     /*
      * § D1029's call — the card over both rules and the hold the parking presses carry before it.
      * Seeded once per case below on fixture calls on the case's own first car, the corpus building
@@ -13844,12 +13846,20 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
        */
       seeds.push({ field: 'stage.skip.beat', text: STAGE_SKIP_BEAT_NOTE, role: 'label' });
       /* Wave AR, lane AR-2, § D1525: the skip's span as the stage picks it, past the allowance and not. */
-      for (const pace of [
-        { simPerRealS: 30, reason: 'fast' as const },
-        { simPerRealS: 30, reason: 'fast' as const, playedOn: true as const },
-      ]) {
-        const text = stageSkipSpeechOf({ armedRealS: SKIP_BEAT_REAL_S, pace, line: '' });
-        if (text !== '') seeds.push({ field: `stage.skip.speech(${pace.playedOn === true ? 'playedOn' : 'fast'})`, text, role: 'label' });
+      /* Wave AS, lane AS-2, § D1554: the beat's note is drawn only for a beat that lands, on either side of the allowance. */
+      {
+        const text = stageSkipSpeechOf({ armedRealS: SKIP_BEAT_REAL_S, lands: true, line: '' }).speech;
+        if (text !== '') seeds.push({ field: 'stage.skip.speech(lands)', text, role: 'label' });
+      }
+      /* § D1555 (#636 R2): the played-on line, which points at the skip, on the `fast` arm past the allowance. */
+      {
+        const note = stagePaceNoteOf(
+          { simPerRealS: 30, reason: 'fast', playedOn: true },
+          { acts, simTimeS: recording.startedAt },
+        );
+        if (note !== undefined) {
+          seeds.push({ field: 'stage.pace(playedOn)', text: note, role: 'label', playhead: atPlayhead(recording, recording.startedAt) });
+        }
       }
       {
         const landsAtS = recording.startedAt + span / 3;

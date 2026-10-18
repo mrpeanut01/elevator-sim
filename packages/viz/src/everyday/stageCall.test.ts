@@ -552,6 +552,31 @@ describe('a placement call asked again names the order in force — § D1528', (
     expect(stageCallStandingOrderOf([parkAt(15_600), parkAt(16_000)], 15_600)).toBeUndefined();
   });
 
+  /*
+   * Wave AS, lane AS-2, § D1556 (GitHub issue #637 item 2): the 17:20 card said *Since 12:20* when the
+   * 12:20 answer only kept the order the player had pressed at 10:40. Red before: 12:20's second.
+   */
+  it('dates the order from when it began, not from the last press that kept it', () => {
+    /* Parked at 10:40 (9600), kept at 12:20 (15_600), asked again at 17:20 (33_600). */
+    expect(stageCallStandingOrderOf([parkAt(9600), parkAt(15_600)], 33_600)).toEqual({ kind: 'park-cars-lobby', atS: 9600 });
+    /* In any filing order. */
+    expect(stageCallStandingOrderOf([parkAt(15_600), parkAt(9600)], 33_600)).toEqual({ kind: 'park-cars-lobby', atS: 9600 });
+    /* A change of order starts it again, and going back starts it again from there. */
+    const spreadAt = (atS: number) => ({ atS, change: { kind: 'spread-cars' } });
+    expect(stageCallStandingOrderOf([parkAt(9600), spreadAt(12_000), spreadAt(15_600)], 33_600)).toEqual({ kind: 'spread-cars', atS: 12_000 });
+    expect(stageCallStandingOrderOf([parkAt(9600), spreadAt(12_000), parkAt(15_600), parkAt(15_900)], 33_600)).toEqual({
+      kind: 'park-cars-lobby',
+      atS: 15_600,
+    });
+    /* A driver handover between two parks does not end the order. */
+    expect(
+      stageCallStandingOrderOf([parkAt(9600), { atS: 12_000, change: { kind: 'adopt-dispatcher' } }, parkAt(15_600)], 33_600),
+    ).toEqual({ kind: 'park-cars-lobby', atS: 9600 });
+    expect(
+      stageCallCardOf(later, DAY_START_S, [], undefined, undefined, undefined, stageCallStandingOrderOf([parkAt(9600), parkAt(15_600)], 33_600)).question,
+    ).toBe('Since 10:40, idle cars wait at the lobby. Keep that, or change it?');
+  });
+
   it('asks whether to keep it, with the clock it was pressed at, and draws the same three answers', () => {
     const plain = stageCallCardOf(later, DAY_START_S, []);
     expect(plain.question).toBe(STAGE_CALL_COPY.questionAllCars);

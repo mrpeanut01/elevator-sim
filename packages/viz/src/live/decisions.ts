@@ -182,11 +182,25 @@ export function decisionRowsAt(
 
   // Ascending by `(at, callId)`, so walking backwards from the end yields newest-first directly
   // and stops as soon as it is past the playhead — no filter, no reverse, no second array.
-  for (let index = recording.decisions.length - 1; index >= 0 && rows.length < wanted; index -= 1) {
+  //
+  // Wave AS, lane AS-2, GitHub issue #637 item 11: a row that reads exactly as the one above it (same
+  // clock, head and line) is folded into it. At Midtown's 10:39 the log said *no car for 19 · no car
+  // may answer this call* four times in a row, four calls at one floor in one minute, which read as
+  // a stuck log. The kept row takes the oldest folded row's key, so a fifth identical decision does
+  // not rebuild the log, and a folded row does not count against `limit`. The record is this
+  // comment, under [§ D405](../../../../DECISIONS.md): it binds nothing outside this module.
+  for (let index = recording.decisions.length - 1; index >= 0; index -= 1) {
     const decision = recording.decisions[index];
     if (decision === undefined) continue;
     if (decision.at > t) continue;
-    rows.push(rowOf(recording, decision, dayStartS));
+    const row = rowOf(recording, decision, dayStartS);
+    const above = rows[rows.length - 1];
+    if (above !== undefined && above.t === row.t && above.head === row.head && above.why === row.why) {
+      rows[rows.length - 1] = { ...above, key: row.key };
+      continue;
+    }
+    if (rows.length >= wanted) break;
+    rows.push(row);
   }
 
   if (rows.length > 0) return rows;

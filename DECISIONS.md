@@ -53467,6 +53467,8 @@ own verbs, red on the base at 12 units), and `packages/server/src/leaderboard/ru
 
 ## D1525 — the line beside the speed chips changes only when the chip does
 
+> **Status 2026-10-18: AMENDED by [§ D1554](#d1554)** (an agent ruling). The skip's beat note is drawn on every frame only once the beat has run a real second and only for a beat that ends in its skip, and once drawn the previous skip's line is over. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-10-17 by an agent session under delegated authority** (wave AR, lane AR-2, on the
 > re-play after wave AQ, GitHub issue #633), not by the product owner, and to be read as an agent
 > ruling. **Amends [§ D1506](#d1506) clause 2.** Owner-reversible: the line, and
@@ -53520,6 +53522,8 @@ and 2, 2 and 4 times around two calls five game minutes apart.
 
 ## D1527 — the stage's header stays at the top while the building scrolls under it
 
+> **Status 2026-10-18: CORRECTED by [§ D1557](#d1557)** (an agent ruling). The cards' top margin clears the header's foot, the region's top padding included, read when a card scrolls. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-10-17 by an agent session under delegated authority** (wave AR, lane AR-2, GitHub
 > issue #633 item 3), not by the product owner. **Extends [§ D1508](#d1508).** Owner-reversible:
 > `stageScreenModel.ts#STAGE_HEADER_STICKY_SHARE` (`0` never pins it).
@@ -53537,6 +53541,8 @@ lobby rows in view together after Play, at 1280×800* (red before: the clock abo
 and `stageScreenModel.test.ts`.
 
 ## D1528 — the day's calls stay where they are, and a placement call asked again names the order in force
+
+> **Status 2026-10-18: AMENDED by [§ D1556](#d1556)** (an agent ruling). *Since* names when the order in force began, not the last press that kept it. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Taken 2026-10-17 by an agent session under delegated authority** (wave AR, lane AR-2, GitHub
 > issue #633 item 4), not by the product owner. Reads [§ D1166](#d1166) and [§ D1205](#d1205)
@@ -53692,3 +53698,63 @@ that day honestly; it does not give it a decision. The options, none taken:
 - **D.** Keep a quiet first day and § D1543's short path (what ships).
 
 **Numbers spent.** This lane held **D1543 to D1551** and spent **D1543 and D1544**.
+
+## D1554 — *skipping ahead* is drawn only for a skip that comes, and a skip's line is never drawn again once replaced
+
+> **Taken 2026-10-18 by an agent session under delegated authority** (wave AS, lane AS-2, GitHub
+> issue #637 item 1), not by the product owner, and to be read as an agent ruling. **Amends
+> [§ D1525](#d1525)**'s beat-note clause. Owner-reversible: `stagePace.ts#SKIP_BEAT_SHOWN_REAL_S`.
+
+**What was found.** Near 17:30 on Midtown's Monday the line changed ten times in about fourteen real
+seconds with `30×` lit: *skipping ahead* for 0.32 s and 0.67 s and then gone without a skip, and a
+stale *skipped 17:31–17:32* drawn again at 17:35 (also 11:40–11:50 at 11:52, 12:01–12:05 at 12:07).
+A beat armed by a quiet frame was dropped when a waiter crossed the minute; § D1525's one-second
+delay applied only past the allowance, and the dropped beat handed the span back to the last line.
+
+**The ruling.** The beat's note is drawn once the beat has run a real second, on every frame, and only
+while `stageSkipLandsOf` says the beat ends in its skip (nobody reaches a minute and no call comes
+first, read off the recording as § D1212 already reads it to choose where to land). Once drawn, the
+previous skip's line is over. **Speeds, skips and day length are unchanged**: the seek is still
+`stageSkipOf`'s.
+
+**What holds it.** `everyday/stagePaceLine.test.ts`: the playtest's day through the real transport at
+sixty frames a second, no line under a second without a chip change, no stale skip line, every
+*skipping ahead* followed by its skip. Red before: four beat notes of 0.25 to 0.63 s, one beat drawn
+2.25 s and dropped, and *skipped 08:46–08:56* drawn again.
+
+## D1555 — the played-on line points at *Skip to the end*
+
+> **Taken 2026-10-18 by an agent session under delegated authority** (wave AS, lane AS-2), on the
+> decision panel's ruling **R2 (3–0) posted on GitHub issue #636**: rungs above `30×` are refused and
+> [§ D991](#d991) stands. Amends [§ D1506](#d1506) clause 2's last line as § D1525 left it.
+> Owner-reversible: `stagePace.ts#stagePlayedOnLineOf`.
+
+The played-on line (`unheld`, and `fast` past the allowance) now reads *fast-forwarding at 30×: you
+have watched a while and there is nothing to decide yet · pick a speed to watch, or Skip to the end:
+it stops at any call to come*, which is [§ D1151](#d1151)'s rule for that control. One line for one
+state, so it cannot flicker more than the line it replaces. Speeds, skips and day length are
+unchanged. Seeded in the honesty corpus as `stage.pace(unheld)` and `stage.pace(playedOn)`.
+
+## D1556 — a placement call asked again dates the order from when it began
+
+> **Taken 2026-10-18 by an agent session under delegated authority** (wave AS, lane AS-2, GitHub
+> issue #637 item 2), not by the product owner. **Amends [§ D1528](#d1528)**'s *from the last such
+> press*. Owner-reversible: the clause.
+
+The 17:20 card said *Since 12:20* when the 12:20 answer only kept the lobby order pressed at 10:40.
+`stageCall.ts#stageCallStandingOrderOf` now dates the order in force from the first press of it since
+the other order was last pressed. No call, answer or run moves. Held by `stageCall.test.ts`, red
+before.
+
+## D1557 — a card scrolled in under the pinned header clears the header's foot
+
+> **Taken 2026-10-18 by an agent session under delegated authority** (wave AS, lane AS-2, GitHub
+> issue #637 item 8), not by the product owner. **Corrects [§ D1527](#d1527)**'s card margin.
+
+The sticky header sticks below the screen region's top padding (28 px at 1280×800) and grows once the
+day plays, while § D1527's margin was its height read at Play: the call card's *THE DAY’S CALL* sat
+under it. The margin is now the region's top padding plus the header's height plus a gap, read as
+each card scrolls, and the call card's fitted height leaves the same room. Held by
+`stagePace.browser.test.ts`, *scrolls the call card in below the pinned header*, red before.
+
+**Numbers spent.** This lane held **D1554 to D1562** and spent **D1554 to D1557**.
