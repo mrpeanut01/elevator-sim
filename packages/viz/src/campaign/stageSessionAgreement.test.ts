@@ -35,7 +35,7 @@ const fixture = useCampaignFixture();
 function resourcesOf(stage: CampaignStage): StageSessionResources {
   return {
     building: requireBuilding(fixture.config, stage.building),
-    dispatcherProfile: fixture.requireProfile(stage.dispatcher.startingProfileId),
+    openingProfile: fixture.requireProfile(stage.dispatcher.startingProfileId),
     trafficProfiles: fixture.config.trafficProfiles,
     elevatorSpecs: fixture.config.elevatorSpecs,
     dispatcherProfiles: fixture.config.dispatcherProfiles,
@@ -51,7 +51,7 @@ function demonstrationOf(stage: CampaignStage, replication: number): SimulationC
   return demonstrationConfigFor({
     stage,
     building: resources.building,
-    dispatcherProfile: resources.dispatcherProfile,
+    dispatcherProfile: resources.openingProfile,
     trafficProfiles: resources.trafficProfiles,
     elevatorSpecs: resources.elevatorSpecs,
     dispatcherProfiles: resources.dispatcherProfiles,

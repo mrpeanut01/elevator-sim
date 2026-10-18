@@ -56,7 +56,7 @@ function sizeOf(playCase: PlayCase, context: PlayContext): number {
   const handovers = playCase.log.filter(
     (entry) =>
       (entry.change.kind === 'switch-dispatcher' || entry.change.kind === 'adopt-dispatcher') &&
-      entry.change.profile !== context.resources.dispatcherProfile,
+      entry.change.profile !== context.resources.openingProfile,
   ).length;
   return (
     playCase.log.length * 10_000 +
@@ -95,7 +95,7 @@ function candidateLogs(log: Log, context: PlayContext): Log[] {
     });
   });
 
-  const opening = context.resources.dispatcherProfile;
+  const opening = context.resources.openingProfile;
   log.forEach((entry, index) => {
     const change = entry.change;
     if (change.kind === 'switch-dispatcher' && change.profile !== opening && context.switchTargets.includes(opening)) {

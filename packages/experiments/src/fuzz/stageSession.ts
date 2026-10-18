@@ -226,8 +226,17 @@ export function playStageOf(raw: unknown, stageId: string): PlayStage {
 export interface StageSessionResources {
   /** The stage's building, resolved by `loadConfig`. */
   readonly building: ResolvedBuilding;
-  /** `dispatcher.startingProfileId`, resolved: the profile the day opens on. */
-  readonly dispatcherProfile: DispatcherProfile;
+  /**
+   * `dispatcher.startingProfileId`, resolved: the profile the day opens on.
+   *
+   * Named `openingProfile` rather than `SimulationConfig`'s `dispatcherProfile` on purpose. This
+   * bundle is an argument, never a run config, and {@link stageSessionConfigFor} is the one place it
+   * becomes one (with `onTimeout: 'report'`). `validation/shippedRunConfig.test-helper.ts` tells an
+   * argument object from a config by a key the config does not declare, which is sound because a
+   * literal carrying such a key cannot be assigned to `SimulationConfig`. With the config's own
+   * name here, every literal of this type read as a config that forgot `onTimeout`.
+   */
+  readonly openingProfile: DispatcherProfile;
   readonly trafficProfiles: TrafficProfiles;
   readonly elevatorSpecs: ElevatorSpecs;
   readonly dispatcherProfiles: DispatcherProfiles;
@@ -259,7 +268,7 @@ export function stageSessionConfigFor(
   const reportWindow = reportWindowForBuilding(stage.buildingId);
   return {
     building: resources.building,
-    dispatcherProfile: resources.dispatcherProfile,
+    dispatcherProfile: resources.openingProfile,
     trafficProfiles: resources.trafficProfiles,
     elevatorSpecs: resources.elevatorSpecs,
     dispatcherProfiles: resources.dispatcherProfiles,

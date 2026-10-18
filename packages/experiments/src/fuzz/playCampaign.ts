@@ -564,7 +564,7 @@ export interface VerbRankingRow {
 
 /** The canonical instance of each verb on this stage, labelled. See the module docstring. */
 export function canonicalVerbs(context: PlayContext): readonly { kind: PlayKind; instance: string; log: RunInterventionConfig[] }[] {
-  const opening = context.resources.dispatcherProfile;
+  const opening = context.resources.openingProfile;
   const rows: { kind: PlayKind; instance: string; log: RunInterventionConfig[] }[] = [
     { kind: 'park-cars-lobby', instance: 'at 0 s', log: [{ atS: 0, change: { kind: 'park-cars-lobby' } }] },
     { kind: 'spread-cars', instance: 'at 0 s', log: [{ atS: 0, change: { kind: 'spread-cars' } }] },

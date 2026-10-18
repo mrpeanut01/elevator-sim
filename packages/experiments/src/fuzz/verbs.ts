@@ -188,7 +188,7 @@ export function playContextFor(input: PlayContextInput): PlayContext {
   }
   const resources: StageSessionResources = {
     building,
-    dispatcherProfile: opening,
+    openingProfile: opening,
     trafficProfiles: config.trafficProfiles,
     elevatorSpecs: config.elevatorSpecs,
     dispatcherProfiles: config.dispatcherProfiles,

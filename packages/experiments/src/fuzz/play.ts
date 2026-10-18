@@ -341,7 +341,7 @@ export class PlaySessions {
       };
     }
 
-    const opening = this.context.resources.dispatcherProfile;
+    const opening = this.context.resources.openingProfile;
     const propertyContext: PropertyContext = {
       case: { callType: opening.dispatch?.callType ?? DISPATCH_DEFAULTS.callType },
       building: this.context.resources.building,
