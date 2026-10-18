@@ -54021,3 +54021,92 @@ say why), and the corpus seeds `stage.intervene.rushOption(…)` in `honesty/sur
 
 **Numbers spent.** The integrator re-allocated **D1589 to D1590** from lane AS-6's block to this
 lane; it spent **D1589**.
+
+## D1590 — the adversarial persona: a fuzz family on the verb axis, with the stage run proved by an agreement test
+
+> **Taken 2026-10-18 by an agent session** (wave AT, lane AT-1, the first design cycle's
+> adversarial-persona spec). A new property family and its command; no game behaviour, bound,
+> pin or published figure moves.
+
+**Why an entry.** The family reaches past `experiments/src/fuzz/`: it puts a `fuzz/` module on the
+browser barrel, narrows `PropertyContext`, closes two blind spots in the building properties, adds
+`--scenario` to `elevator-sim fuzz`, and is held to the game's own stage run by a test in
+`packages/viz`.
+
+1. **What it is.** `elevator-sim fuzz --scenario <id>` holds a campaign stage's building, crowd and
+   opening dispatcher fixed and fuzzes the player's verb log over the seven `INTERVENTION_KINDS`
+   (`fuzz/verbs.ts`). Every payload comes from shipped data: handover targets are shipped profiles
+   that `core` itself agrees to schedule on the stage (asked by a probe, not decided here),
+   purchases are whole-change rows of the matching tier priced by `core`'s `purchaseUnits` against
+   one of the stage's own budget rungs, and service events are legal on the building. Three
+   construction rules keep the generator from authoring a dead fleet the building properties would
+   misread: every bank keeps a car that takes hall calls, no derate falls below what the heaviest
+   rider needs, and no range moves on a bank whose range is fixed. A case is one integer; a
+   counterexample is shrunk (`fuzz/playShrink.ts`), printed whole with its play seed, and exits 2.
+   Tiers are `standard` (64 pinned seeds plus every pinned regression) and `deep`; `hybrid` is
+   refused with `--scenario`, and the building fuzz without the flag is unchanged.
+2. **The properties** (`fuzz/play.ts`). P-PLAY-1 (`no-softlock`): the session reaches its horizon
+   with a readable verdict, the engine refuses no part of a legal log, and the six building
+   properties hold under the log. P-PLAY-2 (`readable-verdict`): when any of `awtIsValid`'s five
+   grounds holds, recounted from the record, no mean is published. P-PLAY-3 (`reachable-goal`): the
+   log leaves the crowd unchanged and a valid verdict carries every figure `beat-the-baseline` pairs.
+   P-DESIGN-1 is a paired-t ranking of one canonical instance per verb against the empty log, 50
+   replications on `standard` and 200 on `deep`, and never exits non-zero.
+3. **The stage run is not copied.** `fuzz/stageSession.ts` builds a stage's replication from the
+   plain fields of `data/campaign.json`, and `packages/viz/src/campaign/stageSessionAgreement.test.ts`
+   requires that, for an empty log, its config equals `demonstrationConfigFor`'s and the batch
+   baseline arm's on every stage, and its legs equal the game's on two stages. That is the module's
+   one consumer on the browser barrel, and the reason it is there.
+4. **What a clean run means, said on the command's first line.** No player can press these verbs on
+   a Scenario stage, which is played as a judged move; the verbs live on the live day screen. On a
+   Scenario stage the family is an engine stress test, and the header says so in those words.
+5. **Two building properties were blind to § D523, and are not any more.** P1 knew three termini,
+   so the first rezone that stranded a stage's crowd read as nineteen lost passengers; it now counts
+   abandoned and stranded journeys from the record, never reading them off the audit, as it already
+   counted access refusals. P3 read the plate for the whole run, so the first bought derate read as a
+   load cell misreporting its own load factor; it now asks the rating in force at each boarding and
+   sample. On every generated building both checks are the checks they were, because no building
+   case authors either event.
+6. **Named gaps.** The screen half of P-PLAY-1 (no available next verb) and the count goals' readers
+   are the viewer's and are not rebuilt. Handover targets carry no rule rows.
+
+**Numbers spent.** This lane holds **D1590 to D1594** and spends **D1590** and **D1591**.
+
+## D1591 — a withdrawn hall call re-points the car that held it; a released one still does not
+
+> **Taken 2026-10-18 by an agent session** (wave AT, lane AT-1). An engine fix found by
+> [§ D1590](#d1590)'s deep tier, and a measured gap left open for the integrator.
+
+**Why an entry.** It changes `core`'s `Car` and `Simulation`, and it records a defect it deliberately
+does not fix because the fix would move published figures.
+
+1. **The finding.** At 2 000 deep cases on `stage-1-first-call`, three sessions deadlocked (P5). The
+   smallest, `play-1000872-s12` on replication 33: car A out of service at 276 s, the bank rezoned to
+   G, 2 and 5 at 425 s while car B stood at floor 3 serving a call the rezone closed. Retiring that
+   call freed B, the same pass handed B the up call at floor 4 that the rezone was about to retire
+   too, and retiring it left B pointing up with nothing ahead. `Car.releaseHallCall` does not
+   re-settle a car's direction, so under `collective`'s `noDirectionReversal` B refused the down call
+   at floor 5 at 558.6 s for the rest of the day. It reproduces from a building schedule alone, so it
+   is the engine's and not the log's.
+2. **The fix.** `Car.withdrawHallCall` takes a call that no longer exists off a car and, when the car
+   is standing still, re-points it at the work it has left (or makes it directionless), as an arrival
+   or an assignment already does. `Simulation.#withdrawCall` uses it. Over 494 shipped runs (ten
+   buildings, every profile, two seeds, 900 s and the template's own horizon, bar `vertical-city`'s)
+   the legs are identical with it and with the old release swapped back in: no shipped run re-points
+   a car through a withdrawal. That figure is asserted by the first case of
+   `packages/experiments/src/fuzz/releaseDirection.test.ts`, which runs behind the deep fuzz tier's
+   switch (`ELEVATOR_SIM_FUZZ=deep`, about two and a half minutes). `sim/serviceRange.test.ts` holds
+   six of those comparisons (three buildings, two dispatchers) on every run, and holds the stage-1
+   case with the old release swapped back in, which deadlocks again. All three deep cases now drain
+   (they are pinned in `PLAY_REGRESSIONS`), and `elevator-sim fuzz --scenario stage-1-first-call
+   --tier deep --cases 2000` is clean.
+3. **What is held.** The same gap is in `releaseHallCall` itself, on reassignment, re-offer and
+   completion. Over 147 shipped runs (seven buildings, seven profiles, three seeds, 900 s) it leaves
+   a stationary car pointing in a direction with no committed stop ahead 88 times, 7 of them with no
+   committed stop at all, through reassignment on load (28), a re-offer (32), dispatch decisions (18)
+   and completion (10). Every one of those figures is asserted by the second case of
+   `fuzz/releaseDirection.test.ts`, behind the same switch (about twenty seconds). Closing the gap
+   there would re-point cars in shipped runs and move published figures, so it is not done here;
+   `car.test.ts` pins the current behaviour so that closing it is a visible change.
+
+**Numbers spent.** See [§ D1590](#d1590).

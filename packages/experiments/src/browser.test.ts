@@ -161,6 +161,8 @@ const ALLOWED_EXTERNALS = ['@elevator-sim/core'];
 const BROWSER_GRAPH = [
   'benchmark/matrixCells.ts',
   'browser.ts',
+  // The one `fuzz/` module on the barrel, for the viewer's stage-session agreement test (§ D1590).
+  'fuzz/stageSession.ts',
   'oracle/types.ts',
   'reports/statistics.ts',
   'reports/types.ts',

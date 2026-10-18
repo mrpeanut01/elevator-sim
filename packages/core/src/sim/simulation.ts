@@ -3166,7 +3166,9 @@ export class Simulation {
     this.#unservable.delete(active.id);
     this.#refusals.delete(active.id);
     this.#policies.get(active.bankId)?.cancel(active.id);
-    for (const carId of active.carIds) this.#carsById.get(carId)?.releaseHallCall(active.id);
+    // `withdrawHallCall`, not `releaseHallCall`: the call is gone rather than handed on, so a car
+    // standing still re-points at what it has left instead of at a landing nobody is on (§ D1591).
+    for (const carId of active.carIds) this.#carsById.get(carId)?.withdrawHallCall(active.id);
     active.carIds = Object.freeze([]);
     this.#activeCalls.delete(active.id);
     this.#syncButton(active.floorId, active.direction);

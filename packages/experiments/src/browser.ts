@@ -77,7 +77,8 @@
  * ## What is deliberately **not** here
  *
  * `oracle/` and `fuzz/` are environment-free today — measured, not assumed — and are still left
- * off. A name on this barrel is a promise the guard must keep for as long as the name exists: it
+ * off, with one module excepted: `fuzz/stageSession.ts`, for the agreement test that holds it to the
+ * game's own stage run (§ D1590). A name on this barrel is a promise the guard must keep for as long as the name exists: it
  * constrains every module that name reaches, forever. Nothing in docs/10 asks for either, and a
  * surface widened past its consumers is this repository's signature defect wearing a different
  * hat. Adding them later is a two-line edit, and `browser.test.ts` will say immediately whether
@@ -339,6 +340,33 @@ export type {
  * -------------------------------------------------------------------------- */
 
 export { MATRIX_CELLS, matrixCell, reportWindowForBuilding } from './benchmark/matrixCells.js';
+
+/* -------------------------------------------------------------------------- *
+ * fuzz/stageSession — a campaign stage read from its plain fields, and the run
+ * one replication of it is with a verb log on it (DECISIONS.md § D1590).
+ *
+ * The one `fuzz/` module on this barrel, and for one consumer: the viewer's
+ * `campaign/stageSessionAgreement.test.ts`, which holds that this builder makes,
+ * for an empty log, the run the game's own `demonstrationConfigFor` and
+ * `armConfigOf` make. That test lives in a package that may reach only this
+ * barrel. The module imports `core` types, `runner/crn.ts` and
+ * `benchmark/matrixCells.ts`, all already here, and nothing else.
+ * -------------------------------------------------------------------------- */
+
+export {
+  PlayStageError,
+  playSeedSetOf,
+  playStageIdsOf,
+  playStageOf,
+  stageSessionConfigFor,
+} from './fuzz/stageSession.js';
+
+export type {
+  PlaySeedSet,
+  PlayStage,
+  PlayStageSeedSet,
+  StageSessionResources,
+} from './fuzz/stageSession.js';
 
 export type { BudgetBasis, MatrixCell } from './benchmark/matrixCells.js';
 
