@@ -109,6 +109,7 @@ import {
   type StageCameraId,
   stageCameraWindowOf,
   type StageFigure,
+  STAGE_FIGURE_INK,
   type StageFigureTone,
   stageFigureToneOf,
   stageFloorJumpOptionsOf,
@@ -298,13 +299,8 @@ const EYEBROW = `font:500 9.5px ${TYPE.mono};letter-spacing:.14em;color:${C.labe
  * KB-15 — *no colour-only signal* — is kept by the row rather than by this table: `GOAL_GLYPHS`'
  * `✓ × ·` sits at the head of every line and the value or the em dash sits at its end.
  */
-/** § D1381: a header figure's ink by its tone — the handoff's live accent, then the palette's verdicts. */
-const FIGURE_INK: Readonly<Record<StageFigureTone, string>> = Object.freeze({
-  live: C.terracotta,
-  met: C.moss,
-  missed: C.alarm,
-  still: C.ink,
-});
+/** § D1381, amended by § D1581: a header figure's ink by its tone, neutral while the day runs. */
+const FIGURE_INK = STAGE_FIGURE_INK;
 
 const GOAL_INK: Readonly<Record<GoalState, string>> = Object.freeze({
   met: C.moss,
@@ -4317,8 +4313,8 @@ function mountStage(
       label.style.cssText = EYEBROW;
       const value = el(doc, 'span', 'everyday-stage-figure-value', figure.value);
       /*
-       * § D1381: the live accent while the day runs, the goal row's own verdict once it has run out,
-       * so a passing reading at 18:00 is not drawn in the red family beside a met goal.
+       * § D1381 and § D1581: neutral ink while the day runs, the goal row's own verdict once it has
+       * run out, so no reading is drawn in the red family beside a met goal, nor as met mid-day.
        */
       const tone = tones[index] ?? (figure.refusal === undefined ? 'live' : 'still');
       value.dataset['tone'] = tone;

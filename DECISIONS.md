@@ -51808,6 +51808,8 @@ the two runs apart, no failure kept, the bound, no storage), and on the built bu
 
 ## D1381 — once the day has run out, a header figure is drawn in its goal's verdict, and ▶ Play is inert with its reason
 
+> **Status 2026-10-18: AMENDED by [§ D1581](#d1581)** (a decision panel ruling, R3). While the day runs a header figure is drawn in neutral ink, not the live accent; moss and alarm still appear only at the verdict. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-10-10 by agent sessions under delegated authority** (wave AO, lane AO-3), not by the
 > product owner: a correction from the post-AN panel's seat B (defect 6). **Owner-reversible**: the
 > palette mapping.
@@ -53692,3 +53694,22 @@ that day honestly; it does not give it a decision. The options, none taken:
 - **D.** Keep a quiet first day and § D1543's short path (what ships).
 
 **Numbers spent.** This lane held **D1543 to D1551** and spent **D1543 and D1544**.
+
+## D1581 — a running header figure is drawn in neutral ink, and only the verdict is coloured
+
+> **Taken 2026-10-18 by the owner's decision panel** (GitHub issue #636, comment 6251039023, ruling
+> R3, 3–0), built by an agent session (wave AS, lane AS-5). It amends [§ D1381](#d1381).
+> **Owner-reversible**: `live: C.terracotta` in `everyday/stageScreenModel.ts#STAGE_FIGURE_INK`.
+
+**Why an entry.** It departs from the design handoff's *terracotta: live figures* (`everyday/tokens.ts`,
+GAMEPLAY § 19) while the figures are still live, which § D1381 kept, and the handoff wins on looks
+unless a ruling says otherwise.
+
+**The ruling.** While the day runs, a header figure is drawn in neutral ink, the ink of a figure no goal
+grades. Terracotta is in the red family beside *missed*, so a reading at the clock read as unmet at
+every playhead. Moss and alarm appear only once the strip is judged, as § D1381 has them, and a
+running figure is never drawn as met. The tone (`stageFigureToneOf`) is unchanged; its ink moved into
+`STAGE_FIGURE_INK`, which `stageScreen.ts#drawFigures` reads.
+
+**Tests**, red before and green after: `everyday/stageScreenModel.test.ts`, *draws a running figure in
+neutral ink, never terracotta, moss or alarm*.

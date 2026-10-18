@@ -399,7 +399,7 @@ export interface StageFigure {
   readonly refusal?: string | undefined;
   /**
    * The goal this figure is the reading of, where one grades it — so once the day has run out the
-   * figure is drawn in its goal's verdict rather than in the live accent ({@link stageFigureToneOf},
+   * figure is drawn in its goal's verdict rather than in running ink ({@link stageFigureToneOf},
    * [§ D1381](../../../../DECISIONS.md)). Absent on a figure no goal grades.
    */
   readonly reads?: ShiftGoal['reads'] | undefined;
@@ -411,7 +411,9 @@ export interface StageFigure {
  * playhead, so at 18:00 *93 %* against a 61 % bar and *220 s* against 460 s were drawn in the red
  * family beside goal rows reading met.
  *
- * - `live`: the day is still running. The handoff's accent, and no verdict: a reading at the clock.
+ * - `live`: the day is still running. A reading at the clock, and no verdict, so neutral ink
+ *   ([§ D1581](../../../../DECISIONS.md)): it was the handoff's terracotta, which sits in the same
+ *   red family as *missed* and so read as unmet at every playhead.
  * - `met` / `missed`: the day has run out and the goal this figure reads is judged; the goal row's
  *   own verdict, in the palette's *cleared* and *missed* colours.
  * - `still`: the day has run out and no goal grades this figure, or it carries a refusal.
@@ -419,8 +421,24 @@ export interface StageFigure {
 export type StageFigureTone = 'live' | 'met' | 'missed' | 'still';
 
 /**
+ * **A header figure's ink by its tone** — [§ D1381](../../../../DECISIONS.md) as amended by
+ * [§ D1581](../../../../DECISIONS.md) (decision panel R3, 2026-10-18, owner-reversible).
+ *
+ * While the day runs a figure is drawn in neutral ink, the same ink as a figure no goal grades:
+ * moss and alarm are verdict colours and appear only once the strip is judged, and a running figure
+ * is never drawn as met. This departs from the handoff's *terracotta: live figures*
+ * (`tokens.ts`); reverting is `live: C.terracotta` here. `stageScreen.ts#drawFigures` is the caller.
+ */
+export const STAGE_FIGURE_INK: Readonly<Record<StageFigureTone, string>> = Object.freeze({
+  live: C.ink,
+  met: C.moss,
+  missed: C.alarm,
+  still: C.ink,
+});
+
+/**
  * The tone of one header figure — the goal strip's verdict for the goal it reads, once the strip is
- * judged ({@link stageGoalsOf}'s own `judged`: the playhead at the run's end), and the live accent
+ * judged ({@link stageGoalsOf}'s own `judged`: the playhead at the run's end), and `live`
  * before. Pure, so the mount and the corpus read one answer.
  */
 export function stageFigureToneOf(

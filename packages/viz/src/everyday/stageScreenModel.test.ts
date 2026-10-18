@@ -84,6 +84,7 @@ import {
   stageGoalsOf,
   STAGE_GOALS_COPY,
   type StageGoalsView,
+  STAGE_FIGURE_INK,
   stageFigureToneOf,
   stagePlayControlOf,
   STAGE_PLAY_DONE_REASON,
@@ -1842,9 +1843,9 @@ describe('the § 7 goal strip', () => {
   /*
    * [§ D1381](../../../../DECISIONS.md), the post-AN panel's seat B (defect 6): at 18:00 the header
    * drew 93 % against a 61 % bar and 220 s against 460 s in the red family beside met goal rows.
-   * Once the strip is judged, a header figure takes its own goal's verdict; before, the live accent.
+   * Once the strip is judged, a header figure takes its own goal's verdict; before, `live`.
    */
-  it('draws a header figure in its goal’s verdict once the day has run out, and in the live accent before', () => {
+  it('draws a header figure in its goal’s verdict once the day has run out, and as running before', () => {
     const recording = spreadRun({ every: 8, waitS: 30 });
     const atEnd = shiftObservationsOf(observationsAt(recording, recording.endedAt));
     const readings = readGoals(goalsForDay(DAY), atEnd);
@@ -1869,13 +1870,36 @@ describe('the § 7 goal strip', () => {
       expect(stageFigureToneOf(figure, readings, false), figure.label).toBe('live');
     }
     expect(compared, 'no header figure reads a goal; the tone has nothing to follow').toBe(2);
-    /* A met reading is drawn in the palette's cleared colour, never the live accent. */
+    /* A met reading is drawn in the palette's cleared colour once judged. */
     const met = stageFigureToneOf(
       { label: 'away inside a minute', value: '93%', reads: 'minutePct' },
       readings.map((reading) => (reading.goal.reads === 'minutePct' ? { ...reading, state: 'met' as const } : reading)),
       true,
     );
     expect(met).toBe('met');
+  });
+
+  /*
+   * [§ D1581](../../../../DECISIONS.md), decision panel R3 (amends § D1381): while the day runs a
+   * figure was drawn in terracotta, the handoff's live accent, which sits in the red family beside
+   * *missed* and read as unmet at every playhead. Running ink is neutral now, and the verdict
+   * colours appear only once the strip is judged, so no running figure is ever drawn as met.
+   */
+  it('draws a running figure in neutral ink, never terracotta, moss or alarm', () => {
+    expect(STAGE_FIGURE_INK.live).toBe(EVERYDAY_COLORS.ink);
+    expect(STAGE_FIGURE_INK.live).not.toBe(EVERYDAY_COLORS.terracotta);
+    expect(STAGE_FIGURE_INK.live).not.toBe(STAGE_FIGURE_INK.met);
+    expect(STAGE_FIGURE_INK.live).not.toBe(STAGE_FIGURE_INK.missed);
+    expect(STAGE_FIGURE_INK.met).toBe(EVERYDAY_COLORS.moss);
+    expect(STAGE_FIGURE_INK.missed).toBe(EVERYDAY_COLORS.alarm);
+    /* Mid-day a met reading still takes the running tone: the verdict waits for the end. */
+    const reading = { label: 'away inside a minute', value: '93%', reads: 'minutePct' as const };
+    const recording = spreadRun({ every: 8, waitS: 30 });
+    const atEnd = shiftObservationsOf(observationsAt(recording, recording.endedAt));
+    const metReadings = readGoals(goalsForDay(DAY), atEnd).map((entry) =>
+      entry.goal.reads === 'minutePct' ? { ...entry, state: 'met' as const } : entry,
+    );
+    expect(STAGE_FIGURE_INK[stageFigureToneOf(reading, metReadings, false)]).toBe(EVERYDAY_COLORS.ink);
   });
 
   it('draws ▶ Play inert once the day has run out, with the reason on it', () => {
