@@ -36,16 +36,15 @@ named breach (§ D1582), and stage 2's brief corrected with the survivor census 
 
 | # | title (short) | P | pillar | next action |
 |---|---|---|---|---|
-| 628 | Census sampler and press price destination panels differently | P2 | 1 | **Fixed** on PR #624, with no published count moved. Open for the owner: should a weight that opens at its default of 0 cost 2 u? A cleaner sampler would regenerate four cells, which is a decision |
 | 232 | Building set to the content-plan target | P1 | 2, 4 | **AC4 done** on PR #624 (`buildingFieldReach.test.ts`), with three inert fields filed as #625. AC1 has 17 of 22 buildings. AC2: owner sign-off on harbour-point and ashgate |
-| 625 | Three shipped building fields change no leg | P2 | 1 | Item 1's loader warning is fixed on PR #624. Owner: fix the data or keep each field with a reason |
-| 627 | Lobby tap targets on short windows wider than 720 px | P3 | 1 | Filed from the lobby review. Buildable |
 | 639 | A rush round ended by hand is paid in full when the client omits `stoppedS` | P3 | 1 | Carried from #636 item 8. The shipped client always sends it; needs a choice among three directions listed on the issue |
+| 641 | Two owner questions left by #628 (a gate that opens at its default costs 2 u; reject over-rung census draws) | P3 | 1 | #628 itself is fixed and closed. Needs a ruling on each; either is one lane |
+| 642 | A deep link straight to the Rush setup | P3 | 1 | Carried from #635 item 7. Buildable; check against the tutorial gate |
 
 **Carried to the Tuesday playtest track** (not filed as defects, because they follow from rulings): on a 390×844 phone
 the Rush handover picker is folded away during play until the player pauses (§ D1589 with AS-1's compact HUD); Rush has
 one in-round choice now, so whether a round feels empty is the first thing to watch; the deep link straight to Rush
-(#635 item 7) is unbuilt.
+is unbuilt and filed as #642.
 
 ## Needs an owner decision
 
