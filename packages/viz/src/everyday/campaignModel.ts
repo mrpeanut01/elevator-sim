@@ -316,7 +316,30 @@ export const DAY_CENSUS_COPY = Object.freeze({
    * still stops at a call if the day raises one.
    */
   shortPath: 'Nothing today needs a decision. On the day, Skip to the end files it in seconds.',
+  /**
+   * **The stage's paused start on that same day** — wave AS, lane AS-4, GitHub issues #637 item 6
+   * and #636 R1, [§ D1572](../../../../DECISIONS.md). Drawn over § 7.3's overlay beside *Skip to the
+   * end*, only where {@link allClear} is drawn. It restates the census and promises nothing about a
+   * call: it says what the measured runs did, not that the day raises none.
+   */
+  quietStage: 'A quiet day: every driver on the list clears it with no press. Watch how the cars answer, or skip to the end.',
 } as const);
+
+/**
+ * Whether a landed census of **this** tower's **this** day covers every driver on the list and every
+ * one clears — the one reading behind {@link dayCensusLineOf} and the stage's quiet start
+ * (`everyday/campaignScreens.ts#quietCareerDayOf`), so the desk and the stage cannot disagree about
+ * which day is quiet.
+ */
+export function dayCensusAllClear(
+  census: CareerDayCensus | undefined,
+  tower: Pick<CampaignTower, 'id' | 'day'>,
+  dispatcherIds: readonly string[],
+): boolean {
+  if (census === undefined || census.towerId !== tower.id || census.towerDay !== tower.day) return false;
+  if (dispatcherIds.length === 0) return false;
+  return dispatcherIds.every((id) => census.verdicts.get(id) === 'cleared');
+}
 
 /**
  * {@link DAY_CENSUS_COPY.allClear} when a census of **this** tower's **this** day covers every
@@ -325,13 +348,8 @@ export const DAY_CENSUS_COPY = Object.freeze({
  * desk says nothing that would suggest otherwise.
  */
 export function dayCensusLineOf(input: CampaignInput, tower: CampaignTower): string | undefined {
-  const census = input.dayCensus;
-  if (census === undefined || census.towerId !== tower.id || census.towerDay !== tower.day) return undefined;
-  if (input.dispatchers.length === 0) return undefined;
-  for (const choice of input.dispatchers) {
-    if (census.verdicts.get(choice.id) !== 'cleared') return undefined;
-  }
-  return DAY_CENSUS_COPY.allClear;
+  const ids = input.dispatchers.map((choice) => choice.id);
+  return dayCensusAllClear(input.dayCensus, tower, ids) ? DAY_CENSUS_COPY.allClear : undefined;
 }
 
 /**

@@ -76,6 +76,7 @@ import { towerLoopOf, type TowerLoop } from './towerLoop.js';
 import {
   DAY_CENSUS_CONTRACT_IDS,
   DAY_CENSUS_COPY,
+  dayCensusAllClear,
   censusVerdictOf,
   type CareerDayCensus,
   type CareerIntroView,
@@ -317,6 +318,24 @@ function dayCensusOf(host: EverydayHost): CareerDayCensus | undefined {
   if (tower === undefined || censusLanded === undefined) return undefined;
   const plan = host.careerDayCensusRuns?.(tower.id);
   return plan !== undefined && plan.key === censusLanded.key ? censusLanded.census : undefined;
+}
+
+/**
+ * **Whether the career day on the stage is one the desk's census marks quiet** — wave AS, lane
+ * AS-4, GitHub issue #637 item 6, [§ D1572](../../../../DECISIONS.md). The same landed census and
+ * the same reading ({@link dayCensusAllClear}) the desk's *Watch a day here* uses, for the tower the
+ * stage latched; `false` with no career day, no census yet, or a census of another day, which is
+ * the honest default: nothing measured, nothing offered. Its one non-test caller is
+ * `everyday/stageScreen.ts#syncTransport`, for the paused start's *Skip to the end*.
+ */
+export function quietCareerDayOf(host: EverydayHost): boolean {
+  const careerDay = host.campaignDay();
+  if (careerDay === undefined) return false;
+  return dayCensusAllClear(
+    dayCensusOf(host),
+    careerDay.tower,
+    host.dispatchers().map((profile) => profile.id),
+  );
 }
 
 /**

@@ -161,7 +161,7 @@ import {
   designerWarnings,
   withShaftMachine,
 } from '../everyday/designerModel.js';
-import { RAIL_DRAWER_COPY, railModel, sublineFor } from '../everyday/rail.js';
+import { RAIL_DRAWER_COPY, railModel, stageSublineOf, sublineFor } from '../everyday/rail.js';
 import {
   RUSH_ABSENCES,
   RUSH_HOLD_LINE,
@@ -10251,6 +10251,9 @@ const EVERYDAY_MENU: SurfaceAdapter = {
     /* The shell's skip link, GitHub issue #404 — chrome the shell draws and does not author. */
     'everyday/types.ts#SHELL_SKIP_LABEL',
     'everyday/rail.ts#sublineFor',
+    /* Wave AS, lane AS-4 (#636 item 6): the played day's subline with the stage's clock. */
+    'everyday/rail.ts#stageSublineOf',
+    'everyday/rail.ts#STAGE_RAIL_PHASE_WORDS',
     'everyday/rail.ts#railGroups',
     'everyday/rail.ts#railFooter',
     'everyday/rail.ts#railModel',
@@ -10330,6 +10333,16 @@ const EVERYDAY_MENU: SurfaceAdapter = {
         seeds.push({
           field: `rail.subline.${screen}.${ctx}`,
           text: sublineFor({ screen, ctx }),
+          role: 'label',
+        });
+      }
+    }
+    /* The played day's three phases, each with a clock the stage would report. */
+    for (const ctx of ['daily', 'campaign'] as const) {
+      for (const [phase, clock] of [['before', '08:00'], ['running', '08:41'], ['over', '18:00']] as const) {
+        seeds.push({
+          field: `rail.subline.stage.${ctx}.${phase}`,
+          text: stageSublineOf({ screen: 'stage', ctx }, { clock, phase }),
           role: 'label',
         });
       }
@@ -18573,6 +18586,8 @@ const EVERYDAY_CAREER_FRONT: SurfaceAdapter = {
     /* § D1543: the bar's note under *Watch a day here* when that line is drawn. */
     if (line !== undefined) {
       seeds.push({ field: 'careerFront.desk.census.shortPath', text: DAY_CENSUS_COPY.shortPath, role: 'prose' });
+      /* § D1572: the stage's paused start on the same quiet day. */
+      seeds.push({ field: 'careerFront.stage.quietStart', text: DAY_CENSUS_COPY.quietStage, role: 'prose' });
     }
 
     /* The brief's moot count, in each of its three shapes. */
