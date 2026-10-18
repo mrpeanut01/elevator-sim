@@ -53692,3 +53692,35 @@ that day honestly; it does not give it a decision. The options, none taken:
 - **D.** Keep a quiet first day and § D1543's short path (what ships).
 
 **Numbers spent.** This lane held **D1543 to D1551** and spent **D1543 and D1544**.
+
+## D1563 — the hub's *Today's scenario* line is one line, and its far ends are said as *longer on some towers*
+
+> **Taken 2026-10-18 by an agent session under delegated authority** (wave AS, lane AS-3, GitHub
+> issue #637 item 7), not by the product owner. Amends [§ D1383](#d1383)'s hub half; reads
+> [§ D1169](#d1169), [§ D1212](#d1212) and [§ D1453](#d1453) unchanged.
+
+The row read *about 2-4 min a day at 4× on the towers a first week can open on, and 30× wherever
+nobody on a landing has waited a minute, the quiet between peaks skipped; 34 min at most on the
+game's own towers, and up to 1 h 49 on a reference tower · a day can be missed, and a week can miss
+its target*, and the playtest read it as a wall. It now reads *about 2-4 min a day at 4×, longer on
+some towers ·* and the loss clause (`everyday/sittingShape.ts#SITTING_SHAPES.contractDay`).
+
+1. **The measured figure still leads**, as § D1383 ruled, from the brief's own rows, at the rung it
+   was measured at.
+2. **The far ends are said, not quoted**: *longer on some towers*
+   (`sittingShape.ts#SITTING_LONGER_ELSEWHERE`). `sittingShape.test.ts` holds it true against both
+   measured long ends, the game towers' and the reference tower's. Neither figure moved; both stay in
+   `SITTING_SPANS` and `docs/12`.
+3. **The 30× clause leaves the row.** The rule it described (§ D1169, § D1212) is unchanged and is
+   told on the stage, where it happens.
+
+Also in this lane, each recorded in its module's docstring under [§ D405](#d405): the stage's call
+rows lead with *Without your later presses:* when the runs leave a later press out
+(`stageCallRow.ts#STAGE_CALL_WITHOUT_LATER`); the door past-tenses a held day once its call is
+behind the player and names who drove a banked day (`doorView.ts#DOOR_STEP_ONE_HELD_PAST`,
+`DOOR_DROVE_HEADING`, `today.ts#TODAY_CHOICE_LINE_HELD_PAST`), extending [§ D1530](#d1530); the
+door's world band folds under *Details*; a cleared report folds its levers, extending
+[§ D1543](#d1543); and the report's delta compares only within one mode and one tower
+(`reportView.ts#comparablePreviousOf`).
+
+**Numbers spent.** This lane held **D1563 to D1571** and spent **D1563**.

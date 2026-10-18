@@ -136,6 +136,8 @@ import {
   DOOR_DRIVER_NOTE_HELD_PAST,
   DOOR_PRIMARY_NOTE_HELD,
   DOOR_STEP_ONE_HELD,
+  DOOR_STEP_ONE_HELD_PAST,
+  DOOR_DROVE_HEADING,
   DOOR_STEPS,
   sameForEveryoneLine,
 } from '../everyday/doorView.js';
@@ -374,7 +376,7 @@ const DAY_CALL_FIXTURE_DRIVERS: DayCallDriverNames = Object.freeze({
 });
 import { wayThroughSentenceOf, WEEK_WAY } from '../shift/weekWay.js';
 import { admittedPressDayIds, pressDayFor } from '../shift/ladder.js';
-import { PRESS_DAY_DRIVER_HELD, TODAY_CHOICE_LINE_HELD } from '../everyday/today.js';
+import { PRESS_DAY_DRIVER_HELD, TODAY_CHOICE_LINE_HELD, TODAY_CHOICE_LINE_HELD_PAST } from '../everyday/today.js';
 import { actsOf, wholeDayFor } from '../shift/dayLength.js';
 import { rushTutorialWorkedAnswerOf } from '../everyday/rushScreenModel.js';
 import { WORKED_ANSWER_COPY, type WorkedAnswerFacts, type WorkedAnswerView } from '../everyday/workedAnswer.js';
@@ -10246,6 +10248,8 @@ const EVERYDAY_MENU: SurfaceAdapter = {
     'everyday/sittingShape.ts#SITTING_SHAPES',
     /* Wave AP lane AP-D2 (§ D1453): the hub row's last clause, drawn inside `SITTING_SHAPES.contractDay`. */
     'everyday/sittingShape.ts#SCENARIO_LOSS_CLAUSE',
+    /* Wave AS lane AS-3 (§ D1563): the hub row's far ends, drawn inside `SITTING_SHAPES.contractDay`. */
+    'everyday/sittingShape.ts#SITTING_LONGER_ELSEWHERE',
     'everyday/sittingShape.ts#sittingLengthPhrase',
     'everyday/rail.ts#RAIL_DRAWER_COPY',
     /* The shell's skip link, GitHub issue #404 — chrome the shell draws and does not author. */
@@ -13042,6 +13046,8 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
     'everyday/stageCallRow.ts#STAGE_CALL_NO_CROSSING',
     'everyday/stageCallRow.ts#stageCallReadingsLineOf',
     'everyday/stageCallRow.ts#STAGE_CALL_TAKEN',
+    /* Wave AS, lane AS-3 (GitHub issue #637 item 5): a row whose runs leave out a later press leads with it. */
+    'everyday/stageCallRow.ts#STAGE_CALL_WITHOUT_LATER',
     /* Wave AQ, lane AQ-4 (GitHub issue #631): the row whose answers read alike, said once. */
     'everyday/stageCallRow.ts#STAGE_CALL_NO_DIFFERENCE',
     'everyday/stageCallRow.ts#stageCallRowsCaveatOf',
@@ -15459,6 +15465,10 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     /* Wave AQ lane AQ-1: step 1 and the press's note on that held day, #626's leftover. */
     'everyday/doorView.ts#DOOR_STEP_ONE_HELD',
     'everyday/doorView.ts#DOOR_PRIMARY_NOTE_HELD',
+    /* Wave AS, lane AS-3 (GitHub issue #637 item 3): the hold's lede and step 1 once the call is behind the player, and the closed day's drivers. */
+    'everyday/today.ts#TODAY_CHOICE_LINE_HELD_PAST',
+    'everyday/doorView.ts#DOOR_STEP_ONE_HELD_PAST',
+    'everyday/doorView.ts#DOOR_DROVE_HEADING',
     /*
      * The week census's sentence on a day DC-10 does not admit, and its heading — § D1067. Drawn
      * only on a whole-day Scenario day at the tower's own rung, which no corpus case is, so every
@@ -15627,6 +15637,10 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     seeds.push({ field: 'door.step1.held.head', text: DOOR_STEP_ONE_HELD.head, role: 'label' });
     seeds.push({ field: 'door.step1.held.body', text: DOOR_STEP_ONE_HELD.body, role: 'prose' });
     seeds.push({ field: 'door.primary.note.held', text: DOOR_PRIMARY_NOTE_HELD, role: 'prose' });
+    seeds.push({ field: 'today.lede.heldPast', text: TODAY_CHOICE_LINE_HELD_PAST, role: 'prose' });
+    seeds.push({ field: 'door.step1.heldPast.head', text: DOOR_STEP_ONE_HELD_PAST.head, role: 'label' });
+    seeds.push({ field: 'door.step1.heldPast.body', text: DOOR_STEP_ONE_HELD_PAST.body, role: 'prose' });
+    seeds.push({ field: 'door.driver.droveHeading', text: DOOR_DROVE_HEADING, role: 'label' });
     /* Midtown's run clock, from its whole authored day: a booking's window is a fraction of that run. */
     const midtownDay = wholeDayFor(context.trafficProfiles, context.buildings.find((building) => building.id === 'midtown-office'));
     const clock: BookingClock | undefined =

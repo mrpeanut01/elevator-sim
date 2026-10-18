@@ -46,7 +46,7 @@ import { recordRun } from '../record/recordRun.js';
 import { plannedDayOf } from '../dev/state.js';
 
 import { EM_DASH, groupThousands } from './figures.js';
-import { PRESS_DAY_DRIVER_HELD, TODAY_CHOICE_LINE, TODAY_CHOICE_LINE_HELD, mootCountClause, todayOf, type TodayRecord } from './today.js';
+import { PRESS_DAY_DRIVER_HELD, TODAY_CHOICE_LINE, TODAY_CHOICE_LINE_HELD, TODAY_CHOICE_LINE_HELD_PAST, mootCountClause, todayOf, type TodayRecord } from './today.js';
 import { pinnedDayLengthLineOf } from './firstDayLength.js';
 import { dailySeedFor } from '../shift/dailySeed.js';
 import { FIRST_SESSION_LINE_PINNED, firstSessionContractFor } from '../shift/firstSession.js';
@@ -904,7 +904,7 @@ describe('the brief holds the driver on an admitted pinned day under its standin
     return crownRecord(overrides).driverHeld;
   }
 
-  function crownRecord(overrides: { readonly dispatcherId?: string; readonly seed?: bigint }): TodayRecord {
+  function crownRecord(overrides: { readonly dispatcherId?: string; readonly seed?: bigint; readonly pinnedCallDone?: boolean }): TodayRecord {
     const press = ladderRowFor('c7')?.pressDay;
     if (press === undefined) throw new Error('c7 pins no day');
     const resources = resourcesWith('crown-hotel');
@@ -916,6 +916,7 @@ describe('the brief holds the driver on an admitted pinned day under its standin
     };
     return todayOf({
       week: state.week,
+      ...(overrides.pinnedCallDone === undefined ? {} : { pinnedCallDone: overrides.pinnedCallDone }),
       calendar: NO_CALENDAR,
       dayStartS: undefined,
       templateVariesMix: false,
@@ -945,6 +946,16 @@ describe('the brief holds the driver on an admitted pinned day under its standin
     const free = crownRecord({ dispatcherId: 'eta' });
     expect(free.driverHeld).toBeUndefined();
     expect(free.lede).toContain(TODAY_CHOICE_LINE);
+  });
+
+  /* GitHub issue #637 item 3: after the call the lede still said the order drives until it is answered. */
+  it('says the hold in the past tense once the stage’s call is behind the player', () => {
+    const standing = ladderRowFor('c7')?.pressDay?.standingOrder ?? '';
+    const past = crownRecord({ dispatcherId: standing, pinnedCallDone: true });
+    expect(past.lede).toContain(TODAY_CHOICE_LINE_HELD_PAST);
+    expect(past.lede).not.toContain(TODAY_CHOICE_LINE_HELD);
+    expect(past.lede).not.toMatch(/\bis answered\b/u);
+    expect(crownRecord({ dispatcherId: 'eta', pinnedCallDone: true }).lede).toContain(TODAY_CHOICE_LINE);
   });
 
   it('holds it, with the reason, exactly when the driver is the standing order on the day as measured', () => {

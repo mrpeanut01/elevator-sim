@@ -28,6 +28,9 @@ import {
   DOOR_DRIVER_NOTE,
   DOOR_DRIVER_NOTE_HELD,
   DOOR_DRIVER_NOTE_HELD_PAST,
+  DOOR_DROVE_HEADING,
+  DOOR_STEP_ONE_HELD,
+  DOOR_STEP_ONE_HELD_PAST,
   doorScreenViewOf,
   doorWordsHeadingOf,
   DOOR_STEPS,
@@ -420,6 +423,31 @@ describe('the rest of § 6.1', () => {
     expect(
       doorScreenViewOf({ week, today: { ...TODAY, day: week.day }, dayOffset: 0, dayClosed: false, nameOf: NAME_OF, pinnedCallDone: true }).driver.note,
     ).toBe(DOOR_DRIVER_NOTE);
+  });
+
+  /* GitHub issue #637 item 3: after the close the door still said the call was pending, and named the starting driver. */
+  it('names who drove a banked day and puts step 1 in the past tense once the call is behind the player', () => {
+    const week = weekWith(5, [closedDay(1), closedDay(2), closedDay(3), closedDay(4)]);
+    const drove = 'Conventional collective, then Fairness first from 12:25';
+    const at = (over: { pinnedCallDone?: boolean; banked?: boolean }) =>
+      doorScreenViewOf({
+        week: over.banked === true ? { ...week, history: [...week.history, closedDay(5)] } : week,
+        today: { ...TODAY, day: week.day, driverHeld: 'held' },
+        dayOffset: 0,
+        dayClosed: over.banked === true,
+        nameOf: NAME_OF,
+        pinnedCallDone: over.pinnedCallDone,
+        droveLine: drove,
+      });
+    expect(at({}).steps[0]).toEqual(DOOR_STEP_ONE_HELD);
+    expect(at({}).driver).toMatchObject({ heading: 'DRIVING TODAY', name: TODAY.driver });
+    expect(at({ pinnedCallDone: true }).steps[0]).toEqual(DOOR_STEP_ONE_HELD_PAST);
+    /* Mid-day, the call answered: still driving, the card names who drives now through the day's own name. */
+    expect(at({ pinnedCallDone: true }).driver.heading).toBe('DRIVING TODAY');
+    const closed = at({ banked: true });
+    expect(closed.steps[0]).toEqual(DOOR_STEP_ONE_HELD_PAST);
+    expect(closed.driver).toEqual({ heading: DOOR_DROVE_HEADING, name: drove, note: DOOR_DRIVER_NOTE_HELD_PAST });
+    for (const text of [closed.steps[0]?.body ?? '', closed.driver.note]) expect(text).not.toMatch(/\bis answered\b|\bdrives until\b/u);
   });
 
   it('asks no pick of a held driver on step 1 or in the footer — #626’s leftover, wave AQ lane AQ-1', () => {

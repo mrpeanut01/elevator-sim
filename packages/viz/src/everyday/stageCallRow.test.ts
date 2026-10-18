@@ -21,6 +21,7 @@ import type { Observations, ShiftGoal } from '../shift/types.js';
 import {
   STAGE_CALL_FAILED_NOTE,
   STAGE_CALL_NO_CROSSING,
+  STAGE_CALL_WITHOUT_LATER,
   STAGE_CALL_ROWS_CAVEAT,
   STAGE_CALL_TAKEN,
   stageCallFailedRowsOf,
@@ -235,6 +236,24 @@ describe('a call’s row leads with the first crossing and reads the goals at th
     expect(rowsOf(16_000, [press(12_000)])[0]?.note).toBe(`Your press at ${clock(12_000)} is not in these runs.`);
     expect(rowsOf(16_000, [press(7200)])[0]?.note).toBeUndefined();
     expect(rowsOf(16_000, [press(16_500)])[0]?.note).toBeUndefined();
+  });
+
+  /*
+   * Issue #637 item 5: the closed day finished at 220 s with every goal ticked, while the 12:20 row read
+   * *483 s (past its bar of 460 s) with park the cars in the lobby, your answer*: those runs leave out the
+   * 12:25 press, and only a note after the readings said so. The row now leads with it.
+   */
+  it('leads a row whose runs leave out a later press with that fact, before any figure — issue #637', () => {
+    const press = (atS: number) => ({ atS, change: { kind: 'park-cars-lobby' as const } });
+    const [pressed] = rowsOf(16_700, [press(12_000)]);
+    expect(pressed?.lead).toBe(
+      `${STAGE_CALL_WITHOUT_LATER} From 04:38, the day could no longer clear with park the cars in the lobby: ` +
+        'the deepest landing reached 25 against a bar of 24.',
+    );
+    expect(rowsOf(16_000, [press(12_000)])[0]?.lead).toBe(`${STAGE_CALL_WITHOUT_LATER} ${STAGE_CALL_NO_CROSSING}`);
+    /* No later press, no prefix: the row's runs are the run the player watched up to the playhead. */
+    expect(rowsOf(16_700, [press(7200)])[0]?.lead?.startsWith(STAGE_CALL_WITHOUT_LATER)).toBe(false);
+    expect(rowsOf(16_700, [press(17_000)])[0]?.lead?.startsWith(STAGE_CALL_WITHOUT_LATER)).toBe(false);
   });
 });
 

@@ -247,6 +247,13 @@ export interface EverydayReportView {
     readonly overnight: string;
   };
   readonly levers: readonly EverydayLeverCard[];
+  /**
+   * **Whether the levers sit folded under their heading, closed** — GitHub issue #637 item 4, wave AS
+   * lane AS-3, extending § D1543. A cleared day's heading said nothing was needed and the four cards
+   * and their buttons followed open anyway. On a cleared day the heading is the fold's handle and the
+   * cards are one press away; on any other day they stand open as advice.
+   */
+  readonly leversFolded: boolean;
   /** § 6.5's closing honesty block. */
   readonly honesty: {
     readonly title: string;
@@ -346,6 +353,27 @@ export const REPORT_SECONDARY = Object.freeze({ week: 'Your week', menu: 'Main m
  * says they are optional, because a day that cleared asks for no change.
  */
 export const REPORT_LEVERS_OPTIONAL_HEADING = 'Nothing needed today. If you want to try something anyway';
+
+/**
+ * **The sheet before this one, only where it is the same mode and the same tower** — GitHub issue
+ * #637 item 10, wave AS lane AS-3. A career close drew *The run before this one* against the Midtown
+ * scenario day filed before it, at Garden Apartments: the block refused the figures, rightly, and
+ * still spent a section saying two unrelated runs differ. A sheet from another mode or another
+ * building is not *the run before this one* to a player, so nothing is drawn; with no earlier run of
+ * the same kind, nothing is said either. `mode` is the shell context the sheet was filed under
+ * (`EverydayScreenShellContext.ctx`).
+ */
+export function comparablePreviousOf(input: {
+  readonly report: ShapedDayReport | undefined;
+  readonly mode: string;
+  readonly previous: ShapedDayReport | undefined;
+  readonly previousMode: string | undefined;
+}): ShapedDayReport | undefined {
+  const { report, previous } = input;
+  if (report === undefined || previous === undefined) return undefined;
+  if (input.previousMode !== input.mode) return undefined;
+  return previous.basis.buildingId === report.basis.buildingId ? previous : undefined;
+}
 
 /** What {@link everydayReportViewOf} is computed from. */
 export interface EverydayReportInput {
@@ -850,6 +878,7 @@ export function everydayReportViewOf(input: EverydayReportInput): EverydayReport
       delta: sheet.delta?.caption ?? '',
       overnight: 'What changed overnight',
     },
+    leversFolded: input.report?.verdict === 'cleared',
     levers: sheet.levers.map((lever) => {
       const route = EVERYDAY_LEVER_ROUTES[lever.id];
       const surface = route?.kind === 'engineer' ? route.tab : undefined;
