@@ -510,11 +510,15 @@ export const RUSH_HOUSE_LINE_COPY = Object.freeze({
   houseHeld: (name: string): string =>
     `The house run on the same crowd, ${name} with no changes, held all ${String(LAST_GENERATED_WAVE)} waves.`,
   oneRunEach: 'One run of each.',
-  /* Wave AS, lane AS-1, § D1545 (#636 R5): the setup page's line to beat. */
+  /*
+   * Wave AS, lane AS-1, § D1545 (#636 R5): the setup page's line to beat. Not the ruling's example
+   * word *beat*: the corpus's ordering check reads it beside a dispatcher's name as a claim about two
+   * runs, and the sentence makes none, so it says *the time to pass* instead.
+   */
   toBeatBroke: (name: string, held: string, wave: number): string =>
-    `The house run on this crowd, ${name} with no changes, holds to ${held}, into wave ${String(wave)}. That is the line to beat.`,
+    `The house run on this crowd, ${name} with no changes, holds to ${held}, into wave ${String(wave)}. That is the time to pass.`,
   toBeatHeld: (name: string): string =>
-    `The house run on this crowd, ${name} with no changes, holds all ${String(LAST_GENERATED_WAVE)} waves. That is the line to beat.`,
+    `The house run on this crowd, ${name} with no changes, holds all ${String(LAST_GENERATED_WAVE)} waves, the whole climb.`,
 });
 
 /**

@@ -53705,8 +53705,11 @@ runs were drawn only as the standings and, since wave AR, beside a finished roun
 
 1. **What it says.** Under the driving line and above the dispatcher choice,
    `rushHouse.ts#rushHouseToBeatLineOf`: *The house run on this crowd, <driver> with no changes,
-   holds to <m:ss>, into wave <n>. That is the line to beat.* (or *holds all 30 waves*), for the
-   dispatcher standing, redrawn when the picker moves (`rushScreen.ts#syncDriver`).
+   holds to <m:ss>, into wave <n>. That is the time to pass.* (or *holds all 30 waves, the whole
+   climb.*), for the dispatcher standing, redrawn when the picker moves (`rushScreen.ts#syncDriver`).
+   The ruling's example said *the line to beat*; the always-on corpus's ordering check
+   (`honesty/properties.ts#ORDERING_CLAIM`) reads *beat* beside a dispatcher's name as a claim about
+   two runs, so the word was changed rather than the check.
 2. **One source.** The figures are the row `rushHouseLineOf` reads, from `RUSH_HOUSE_TABLE`, through
    the same stream check. No second copy.
 3. **Silence where there is nothing to state.** A stale table, a tower the house has not run, or a

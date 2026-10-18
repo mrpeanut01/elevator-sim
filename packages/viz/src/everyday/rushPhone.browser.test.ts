@@ -300,7 +300,7 @@ describe.skipIf(!HAS_BROWSER)('Rush on a phone, after the re-play — wave AR, l
       expect(order.picker, JSON.stringify(order)).toBeGreaterThan(order.firstHouseRow);
       /* § D1545 (GitHub issue #636, R5): the house run on this crowd is stated as the line to beat, for the dispatcher standing. */
       const line = (): Promise<string> => page.evaluate(() => document.querySelector('.everyday-rush-to-beat')?.textContent ?? '');
-      const pattern = /^The house run on this crowd, (.+) with no changes, holds (to \d+:\d\d, into wave \d+|all \d+ waves)\. That is the line to beat\.$/u;
+      const pattern = /^The house run on this crowd, (.+) with no changes, holds (to \d+:\d\d, into wave \d+\. That is the time to pass|all \d+ waves, the whole climb)\.$/u;
       expect(await line()).toMatch(pattern);
       const options = await page.locator('.everyday-rush-picker option').evaluateAll((nodes) =>
         nodes.map((node) => ({ value: (node as HTMLOptionElement).value, name: node.textContent ?? '' })),

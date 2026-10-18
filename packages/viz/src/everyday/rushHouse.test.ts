@@ -367,12 +367,12 @@ describe('the line to beat on the setup page — wave AS, lane AS-1, § D1545 (G
   it('states the house run from the same row the result reads, and claims nothing about a choice', () => {
     const line = rushHouseToBeatLineOf(midtown);
     expect(line).toBe(
-      'The house run on this crowd, Conventional collective with no changes, holds to 27:20, into wave 10. That is the line to beat.',
+      'The house run on this crowd, Conventional collective with no changes, holds to 27:20, into wave 10. That is the time to pass.',
     );
     /* The same row as the result's line: its house half carries the same figures. */
     const after = rushHouseLineOf({ ...midtown, outcome: { kind: 'broke', heldS: 600, wave: 4 } }) ?? '';
     expect(after).toContain('held 27:20, into wave 10.');
-    expect(line).not.toMatch(/\b(better|worse|cost|helps?|helped|hurts?|improv|win|won|should)/iu);
+    expect(line).not.toMatch(/\b(better|worse|cost|helps?|helped|hurts?|improv|win|won|should|beats?)\b/iu);
   });
 
   it('says the house held every wave when its run never broke', () => {
