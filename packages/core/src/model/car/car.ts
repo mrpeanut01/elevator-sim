@@ -1152,7 +1152,8 @@ export class Car implements CarLike {
    * counterexamples, where a range change retired a call a car had just been given (§ D1591).
    *
    * `releaseHallCall` itself is deliberately left as it is. It has the same gap, and closing it
-   * there re-points cars in shipped runs, which would move published figures; § D1591 records it.
+   * there re-points cars in shipped runs, which would move published figures; § D1591 records it,
+   * and `experiments/src/fuzz/releaseDirection.test.ts` measures it (opt-in, deep tier).
    *
    * @returns `true` if this car held it.
    */

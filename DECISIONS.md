@@ -54062,10 +54062,11 @@ browser barrel, narrows `PropertyContext`, closes two blind spots in the buildin
    Scenario stage the family is an engine stress test, and the header says so in those words.
 5. **Two building properties were blind to § D523, and are not any more.** P1 knew three termini,
    so the first rezone that stranded a stage's crowd read as nineteen lost passengers; it now counts
-   abandoned and stranded journeys from the record and checks the audit's counts against them. P3
-   read the plate for the whole run, so the first bought derate read as a load cell misreporting its
-   own load factor; it now asks the rating in force at each boarding and sample. On every generated
-   building both checks are the checks they were, because no building case authors either event.
+   abandoned and stranded journeys from the record, never reading them off the audit, as it already
+   counted access refusals. P3 read the plate for the whole run, so the first bought derate read as a
+   load cell misreporting its own load factor; it now asks the rating in force at each boarding and
+   sample. On every generated building both checks are the checks they were, because no building
+   case authors either event.
 6. **Named gaps.** The screen half of P-PLAY-1 (no available next verb) and the count goals' readers
    are the viewer's and are not rebuilt. Handover targets carry no rule rows.
 
@@ -54089,18 +54090,23 @@ does not fix because the fix would move published figures.
    is the engine's and not the log's.
 2. **The fix.** `Car.withdrawHallCall` takes a call that no longer exists off a car and, when the car
    is standing still, re-points it at the work it has left (or makes it directionless), as an arrival
-   or an assignment already does. `Simulation.#withdrawCall` uses it. A one-off probe on this
-   commit compared 494 shipped runs (ten buildings, every profile, two seeds, 900 s and the
-   template's own horizon) with and without it, and the legs were identical in every one: no
-   shipped run re-points a car through a withdrawal. `sim/serviceRange.test.ts` holds six of those comparisons (three buildings,
-   two dispatchers) on every run, and holds the stage-1 case with the old release swapped back in,
-   which deadlocks again. All three deep cases now drain, and 2 000 deep cases are clean.
+   or an assignment already does. `Simulation.#withdrawCall` uses it. Over 494 shipped runs (ten
+   buildings, every profile, two seeds, 900 s and the template's own horizon, bar `vertical-city`'s)
+   the legs are identical with it and with the old release swapped back in: no shipped run re-points
+   a car through a withdrawal. That figure is asserted by the first case of
+   `packages/experiments/src/fuzz/releaseDirection.test.ts`, which runs behind the deep fuzz tier's
+   switch (`ELEVATOR_SIM_FUZZ=deep`, about two and a half minutes). `sim/serviceRange.test.ts` holds
+   six of those comparisons (three buildings, two dispatchers) on every run, and holds the stage-1
+   case with the old release swapped back in, which deadlocks again. All three deep cases now drain
+   (they are pinned in `PLAY_REGRESSIONS`), and `elevator-sim fuzz --scenario stage-1-first-call
+   --tier deep --cases 2000` is clean.
 3. **What is held.** The same gap is in `releaseHallCall` itself, on reassignment, re-offer and
-   completion. A second one-off probe on this commit, over 147 shipped runs (seven buildings,
-   seven profiles, three seeds, 900 s), found it leaving a stationary car pointing somewhere a
-   re-settle would change 88 times, 7 of them at nothing at all, through reassignment on load (28),
-   a re-offer (32), dispatch decisions (18) and completion (10). Closing it there would re-point
-   cars in shipped runs and move published figures, so it is not done here; `car.test.ts` pins the
-   current behaviour so that closing it is a visible change.
+   completion. Over 147 shipped runs (seven buildings, seven profiles, three seeds, 900 s) it leaves
+   a stationary car pointing in a direction with no committed stop ahead 88 times, 7 of them with no
+   committed stop at all, through reassignment on load (28), a re-offer (32), dispatch decisions (18)
+   and completion (10). Every one of those figures is asserted by the second case of
+   `fuzz/releaseDirection.test.ts`, behind the same switch (about twenty seconds). Closing the gap
+   there would re-point cars in shipped runs and move published figures, so it is not done here;
+   `car.test.ts` pins the current behaviour so that closing it is a visible change.
 
 **Numbers spent.** See [§ D1590](#d1590).

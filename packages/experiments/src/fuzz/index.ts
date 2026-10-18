@@ -30,6 +30,9 @@
  * | `playShrink.ts` | a verb log reduced to the smallest one that still breaks, printed whole |
  * | `playCampaign.ts` | the persona's corpora, its pinned regressions, and the P-DESIGN-1 ranking |
  *
+ * `releaseDirection.test.ts` is a gate rather than a module: the two shipped-run measurements behind
+ * § D1591, opt-in behind `ELEVATOR_SIM_FUZZ=deep` beside `deep.test.ts`.
+ *
  * The gates are the `*.test.ts` files beside them and are not exported: `corpus.test.ts` (the
  * always-on 64), `deep.test.ts` (opt-in), `generate.test.ts` (the generator's contract *and* the
  * corpus's coverage claims), `faults.test.ts` (each property shown to fail), `shrink.test.ts`,

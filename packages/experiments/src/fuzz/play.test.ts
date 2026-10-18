@@ -234,6 +234,42 @@ describe('each P-PLAY property fails on a real session when its rule is broken',
     expect(outcome.violations.map((violation) => violation.property)).toContain('no-softlock');
   });
 
+  /*
+   * The softlock check finds an engine refusal by its own words in `result.warnings`. These two
+   * logs are ones the generator would never build (`playLogRefusal` refuses both), handed straight
+   * to the session so that the warning is `Simulation`'s and not this file's: if the engine ever
+   * rewords the refusal, this case goes red instead of the check going quiet.
+   */
+  it('no-softlock: a log the engine declines is a finding, in the engine’s own words, on both refusal paths', () => {
+    const sessions = new PlaySessions(context);
+    const logs = {
+      'an effect before its own press': [
+        {
+          atS: 300,
+          change: {
+            kind: 'answer-incident' as const,
+            option: 'x',
+            serviceEvents: [{ atS: 100, bankId: 'main', carId: 'A', mode: 'independent' as const }],
+          },
+        },
+      ],
+      'a press past the drain deadline': [{ atS: 1_000_000, change: { kind: 'spread-cars' as const } }],
+    };
+    for (const [name, log] of Object.entries(logs)) {
+      const playCase: PlayCase = { ...doNothing(), caseId: name, log };
+      expect(playLogRefusal(context, log, 4), name).toBeDefined();
+      const declined = sessions
+        .run(log, 0)
+        .warnings.filter((warning) => warning.startsWith('interventions[0]') && warning.includes('not scheduled'));
+      expect(declined, `${name}: Simulation no longer words this refusal as the check reads it`).toHaveLength(1);
+      const outcome = sessions.evaluate(playCase);
+      const softlock = outcome.violations.filter((violation) => violation.property === 'no-softlock');
+      expect(softlock.map((violation) => violation.message), name).toEqual([
+        `the engine declined part of a log the generator built as legal: ${declined[0] ?? ''}`,
+      ]);
+    }
+  });
+
   it('readable-verdict: a summary that calls a stranded day valid is caught on the record', () => {
     const playCase = pinned('play-3000033-s7');
     const sessions = new PlaySessions(context);

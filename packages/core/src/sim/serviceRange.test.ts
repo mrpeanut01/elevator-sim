@@ -489,8 +489,10 @@ describe('re-pointing a car on a withdrawal moves no shipped run', () => {
   /*
    * § D1591's claim that the fix moves no published figure, held on a sample rather than argued:
    * shipped buildings with no service schedule, two dispatchers, the legs compared with the fix and
-   * with the old release swapped back in. The decision entry's 494-run figure was a one-off probe on
-   * the same comparison; this is the part of it that runs on every `vitest run`.
+   * with the old release swapped back in. The decision entry's 494-run figure is the same comparison
+   * over every shipped profile, asserted behind the deep fuzz switch by
+   * `experiments/src/fuzz/releaseDirection.test.ts`; this is the part of it that runs on every
+   * `vitest run`.
    */
   it('runs the same legs with and without it on three shipped buildings under two dispatchers', async () => {
     const config = await load();

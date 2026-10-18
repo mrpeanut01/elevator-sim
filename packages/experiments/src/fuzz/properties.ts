@@ -275,8 +275,8 @@ export function checkConservation(context: PropertyContext): Violation[] {
    * them correctly all along.
    *
    * Recounted from the **record**, by the journey's last recorded leg, which is how
-   * `Simulation#reconcile` files them; the audit's own counts are then compared with the recount,
-   * so a miscount in the audit fails here rather than agreeing with itself.
+   * `Simulation#reconcile` files them, and never read off the audit: the access-refusal count above
+   * is taken the same way, so the balance below is a statement about the record alone.
    */
   let abandoned = 0;
   let stranded = 0;
