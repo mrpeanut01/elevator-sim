@@ -2234,11 +2234,14 @@ type DecisionReservation = {
  * is registered in `KNOWN_DECISION_HOLES`; **D1360-D1400 are free rather than holed**, since nothing
  * is written above them (§ D430), and the charter row moves to **D1360**.
  */
-const OPEN_RESERVATION = { wave: 'AS', from: 1545, to: 1590 } as DecisionReservation | null;
+const OPEN_RESERVATION = null as DecisionReservation | null;
 /*
- * **Wave AS holds D1545-D1590.** Four lanes built on the playtest after wave AR (#635, #636, #637),
- * each with a contiguous block from its dispatch brief. The wave's merge commit closes this
- * reservation and registers its unspent numbers below the highest heading.
+ * **Wave AS's reservation, D1545-D1590, is closed** in the wave's own merge commit. Seven lanes (four
+ * built on the playtest after wave AR, #635 and #637; two on the decision panel's rulings on #636; one
+ * on its follow-up ruling R5b) spent thirteen headings: D1545, D1554-D1557, D1563, D1572,
+ * D1581-D1583, D1588 and D1589. Every unspent number below the highest heading, D1589, is registered
+ * in `KNOWN_DECISION_HOLES`; **D1590 is free rather than holed** (§ D430), and the charter row moves
+ * to **D1590**.
  */
 /*
  * **Wave AR's reservation, D1516-D1560, is closed** in the wave's own merge commit. Four lanes built on
@@ -3746,6 +3749,54 @@ const KNOWN_DECISION_HOLES: ReadonlyMap<number, string> = new Map([
   [1540, "wave AR's lane AR-3's block; unspent for § 1535's reason."],
   [1541, "wave AR's lane AR-3's block; unspent for § 1535's reason."],
   [1542, "wave AR's lane AR-3's block; unspent for § 1535's reason."],
+  [
+    1546,
+    "wave AS's lane AS-1 held D1545-D1553 and spent D1545 only. Registered under D404 and D430.",
+  ],
+  [1547, "wave AS's lane AS-1's block; unspent for § 1546's reason."],
+  [1548, "wave AS's lane AS-1's block; unspent for § 1546's reason."],
+  [1549, "wave AS's lane AS-1's block; unspent for § 1546's reason."],
+  [1550, "wave AS's lane AS-1's block; unspent for § 1546's reason."],
+  [1551, "wave AS's lane AS-1's block; unspent for § 1546's reason."],
+  [1552, "wave AS's lane AS-1's block; unspent for § 1546's reason."],
+  [1553, "wave AS's lane AS-1's block; unspent for § 1546's reason."],
+  [
+    1558,
+    "wave AS's lane AS-2 held D1554-D1562 and spent D1554-D1557. Registered under D404 and D430.",
+  ],
+  [1559, "wave AS's lane AS-2's block; unspent for § 1558's reason."],
+  [1560, "wave AS's lane AS-2's block; unspent for § 1558's reason."],
+  [1561, "wave AS's lane AS-2's block; unspent for § 1558's reason."],
+  [1562, "wave AS's lane AS-2's block; unspent for § 1558's reason."],
+  [
+    1564,
+    "wave AS's lane AS-3 held D1563-D1571 and spent D1563 only. Registered under D404 and D430.",
+  ],
+  [1565, "wave AS's lane AS-3's block; unspent for § 1564's reason."],
+  [1566, "wave AS's lane AS-3's block; unspent for § 1564's reason."],
+  [1567, "wave AS's lane AS-3's block; unspent for § 1564's reason."],
+  [1568, "wave AS's lane AS-3's block; unspent for § 1564's reason."],
+  [1569, "wave AS's lane AS-3's block; unspent for § 1564's reason."],
+  [1570, "wave AS's lane AS-3's block; unspent for § 1564's reason."],
+  [1571, "wave AS's lane AS-3's block; unspent for § 1564's reason."],
+  [
+    1573,
+    "wave AS's lane AS-4 held D1572-D1580 and spent D1572 only. Registered under D404 and D430.",
+  ],
+  [1574, "wave AS's lane AS-4's block; unspent for § 1573's reason."],
+  [1575, "wave AS's lane AS-4's block; unspent for § 1573's reason."],
+  [1576, "wave AS's lane AS-4's block; unspent for § 1573's reason."],
+  [1577, "wave AS's lane AS-4's block; unspent for § 1573's reason."],
+  [1578, "wave AS's lane AS-4's block; unspent for § 1573's reason."],
+  [1579, "wave AS's lane AS-4's block; unspent for § 1573's reason."],
+  [1580, "wave AS's lane AS-4's block; unspent for § 1573's reason."],
+  [
+    1584,
+    "wave AS's lane AS-5 held D1581-D1587 and spent D1581-D1583. Registered under D404 and D430.",
+  ],
+  [1585, "wave AS's lane AS-5's block; unspent for § 1584's reason."],
+  [1586, "wave AS's lane AS-5's block; unspent for § 1584's reason."],
+  [1587, "wave AS's lane AS-5's block; unspent for § 1584's reason."],
   [
     1030,
     "wave AI's lane AI-D held D1029-D1037 and spent D1029. Registered under D404 and D430.",
