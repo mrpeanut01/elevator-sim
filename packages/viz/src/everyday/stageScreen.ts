@@ -124,6 +124,7 @@ import {
   stageMayAdopt,
   stageOpeningLineOf,
   STAGE_OVERLAY_PLAY,
+  STAGE_SKIP_COPY,
   stageBuildingScrollOf,
   stageHeaderSticksOf,
   stageLitSpeedOf,
@@ -207,7 +208,8 @@ import type { WatchingView, WatchOwner } from '../watch/view.js';
 import { driverNameAt, interventionLogOf } from '../live/interventions.js';
 import { campaignDockViewOf, type CampaignDockView } from './campaignDock.js';
 import { DIFFICULTIES } from '../campaign/economy.js';
-import { campaignTestGoals, contractAsksEyebrow } from './campaignModel.js';
+import { DAY_CENSUS_COPY, campaignTestGoals, contractAsksEyebrow } from './campaignModel.js';
+import { quietCareerDayOf } from './campaignScreens.js';
 
 /* -------------------------------------------------------------------------- *
  * The module store — what the § 3.3 refinement reads
@@ -1159,7 +1161,36 @@ function mountStage(
     context.go(stageRunFailedViewOf(context.ctx).back.screen);
   });
   failedRow.append(retryButton, backButton);
-  status.append(statusText, startButton, failedRow);
+  /*
+   * **A quiet career day offers Skip to the end beside Play, and leads with it** — wave AS, lane
+   * AS-4, GitHub issue #637 item 6, [§ D1572](../../../../DECISIONS.md). On a day the desk's census
+   * marks quiet (§ D1543), pressing *Play* ran two minutes with nothing to decide. The skip is the
+   * stage's own `skipToEnd` (so it still stops at any call the day raises) and the line above it is
+   * `DAY_CENSUS_COPY.quietStage`. Shown only on such a day; every other start is unchanged.
+   */
+  const quietNote = el(doc, 'p', 'everyday-stage-quiet-note', DAY_CENSUS_COPY.quietStage);
+  quietNote.style.cssText = `display:none;margin:0;color:${C.ink};font-size:13px;font-weight:600;max-width:44ch`;
+  const startRow = el(doc, 'div', 'everyday-stage-start-row');
+  startRow.style.cssText = 'display:flex;gap:10px;flex-wrap:wrap;justify-content:center;align-items:center';
+  const quietSkip = el(doc, 'button', 'everyday-stage-start-skip', STAGE_SKIP_COPY.label);
+  quietSkip.type = 'button';
+  quietSkip.style.cssText = startButton.style.cssText + ';display:none';
+  quietSkip.addEventListener('click', () => {
+    skipToEnd();
+  });
+  const START_PRIMARY = startButton.style.cssText;
+  const START_SECONDARY = [
+    'background:transparent',
+    `border:1px solid ${C.rule}`,
+    `border-radius:${String(R.row)}px`,
+    'padding:10px 22px',
+    `color:${C.ink}`,
+    'font-size:14px',
+    'font-weight:600',
+    'cursor:pointer',
+  ].join(';');
+  startRow.append(startButton, quietSkip);
+  status.append(statusText, quietNote, startRow, failedRow);
   stageWrap.append(canvas, description, watchPill, status);
 
   const legend = el(doc, 'div', 'everyday-stage-legend');
@@ -3448,6 +3479,10 @@ function mountStage(
      * § D1361: another tab holds this day's attempt. Above every other state, because the picture
      * under it is held and none of the controls below act; the bar's primary is the takeover.
      */
+    /* § D1572: the quiet start's row is the opening's alone; every other state below hides it. */
+    quietNote.style.display = 'none';
+    quietSkip.style.display = 'none';
+    startRow.style.display = 'none';
     if (heldAtS !== undefined) {
       failedRow.style.display = 'none';
       statusText.textContent =
@@ -3494,6 +3529,11 @@ function mountStage(
         simTimeS: playback?.simTimeS ?? adopted.startedAt,
         dayStartS: host.dayStartS(),
       });
+      const quiet = context.ctx === 'campaign' && quietCareerDayOf(host);
+      startButton.style.cssText = quiet ? START_SECONDARY : START_PRIMARY;
+      quietNote.style.display = quiet ? '' : 'none';
+      quietSkip.style.display = quiet ? '' : 'none';
+      startRow.style.display = 'flex';
       startButton.style.display = '';
       status.style.display = 'flex';
       return;
@@ -3729,6 +3769,15 @@ function mountStage(
         : { clock: rushHead.held, phase: rushHead.wave, next: undefined, drivingLabel: rushHead.drivingLabel, driverName: rushHead.driverName, figures: rushHead.figures };
     const watching = watchingNow();
     clock.textContent = head.clock;
+    /* Wave AS, lane AS-4 (#636 item 6): the rail's subline carries this clock and where the day stands. */
+    context.railClock?.({
+      clock: head.clock,
+      phase: stageShowsOpening({ started, simTimeS, recording })
+        ? 'before'
+        : simTimeS >= recording.endedAt
+          ? 'over'
+          : 'running',
+    });
     /*
      * § 14.1's identity cell: `DRIVING` + the player's dispatcher becomes `THEIR DISPATCHER` + the
      * record's. Both strings are the view's, so the band, the pill and this header cannot come to

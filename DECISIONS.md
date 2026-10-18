@@ -53724,3 +53724,32 @@ door's world band folds under *Details*; a cleared report folds its levers, exte
 (`reportView.ts#comparablePreviousOf`).
 
 **Numbers spent.** This lane held **D1563 to D1571** and spent **D1563**.
+
+## D1572 — § D1544 decided (D): the opening career day stays quiet, and its paused start offers Skip beside Play
+
+> **Taken 2026-10-18 by a decision panel** (3–0, ruling R1 on GitHub issue #636), recorded by an
+> agent session (wave AS, lane AS-4) on GitHub issue #637 item 6. **Settles [§ D1544](#d1544)** on
+> its option **D** and **extends [§ D1543](#d1543)** clause 4 from the desk to the stage.
+> Owner-reversible.
+
+**Why an entry.** It closes a question § D1544 left open, and it binds `everyday/stageScreen.ts`,
+which the career modules do not own.
+
+1. **No call is added to the opening day.** Options A to C stay unbuilt; no call, crowd, seed,
+   speed rung or published figure moves.
+2. **The stage's paused start leads with the short path on a quiet day.** Where the desk's census
+   marks the career day quiet (`campaignModel.ts#dayCensusAllClear`, the one reading behind both
+   the desk's line and `campaignScreens.ts#quietCareerDayOf`), § 7.3's overlay draws
+   `DAY_CENSUS_COPY.quietStage` — *A quiet day: every driver on the list clears it with no press.
+   Watch how the cars answer, or skip to the end.* — over *Skip to the end* as the filled button
+   beside an outlined *Play*. The skip is the stage's own `skipToEnd`, so it still stops at any
+   call the day raises.
+3. **The line promises nothing about a call.** It restates what the census measured, so it is
+   drawn only where that census landed for this tower's this day; with no census the start is
+   unchanged.
+
+**What holds it.** `everyday/campaignScreens.browser.test.ts`'s quiet-start case (red on the base:
+no `.everyday-stage-start-skip`), `everyday/careerCensus.test.ts`, and the honesty seed
+`careerFront.stage.quietStart`.
+
+**Numbers spent.** Lane AS-4 held **D1572 to D1580** and spent **D1572**.

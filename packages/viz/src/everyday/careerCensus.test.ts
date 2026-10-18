@@ -26,6 +26,7 @@ import {
   DAY_CENSUS_COPY,
   buildingView,
   censusVerdictOf,
+  dayCensusAllClear,
   type CampaignInput,
   type CareerDayCensus,
   type CensusVerdict,
@@ -177,5 +178,27 @@ describe('the Career brief’s census line — #571, § D1301', () => {
     const career: CampaignCareer = { ...openingCareer('collective'), towers: [tower], openTowerId: 'c2' };
     const census: CareerDayCensus = { towerId: 'c2', towerDay: 1, verdicts };
     expect(buildingView(inputOf(career, census, [...verdicts.keys()]))?.order.census).toBeUndefined();
+  });
+
+  /* Wave AS, lane AS-4 — § D1572: the stage's quiet start reads the same census, the same way. */
+  it('marks a day quiet only when a census of that day covers every driver and all clear', () => {
+    const tower = { id: 'c1', day: 1 };
+    const verdicts = new Map<string, CensusVerdict>([
+      ['a', 'cleared'],
+      ['b', 'cleared'],
+    ]);
+    const census: CareerDayCensus = { towerId: 'c1', towerDay: 1, verdicts };
+    expect(dayCensusAllClear(census, tower, ['a', 'b'])).toBe(true);
+    expect(dayCensusAllClear(undefined, tower, ['a', 'b'])).toBe(false);
+    expect(dayCensusAllClear(census, { id: 'c1', day: 2 }, ['a', 'b'])).toBe(false);
+    expect(dayCensusAllClear(census, { id: 'c2', day: 1 }, ['a', 'b'])).toBe(false);
+    expect(dayCensusAllClear(census, tower, ['a', 'b', 'mine'])).toBe(false);
+    expect(dayCensusAllClear(census, tower, [])).toBe(false);
+    expect(
+      dayCensusAllClear({ ...census, verdicts: new Map<string, CensusVerdict>([['a', 'cleared'], ['b', 'missed']]) }, tower, ['a', 'b']),
+    ).toBe(false);
+    /* The stage's line promises no call and names no mechanism (§ D256). */
+    expect(DAY_CENSUS_COPY.quietStage).not.toMatch(/call|because|so that|since|thanks to|means|due to/iu);
+    expect(DAY_CENSUS_COPY.quietStage).not.toMatch(/—/u);
   });
 });

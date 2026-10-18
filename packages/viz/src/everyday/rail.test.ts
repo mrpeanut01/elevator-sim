@@ -20,7 +20,7 @@ import type { WatchRecord } from '../watch/types.js';
 
 import { EM_DASH } from './figures.js';
 import { CHIME_PRICES } from './chimesPanel.js';
-import { railFooter, railGroups, railModel, sublineFor, type BankedTurn } from './rail.js';
+import { railFooter, railGroups, railModel, stageSublineOf, sublineFor, type BankedTurn } from './rail.js';
 import { EVERYDAY_SCREENS_BUILT, UNBUILT_REASONS } from './screens.js';
 import {
   ENGINEER_SWAP_NOTE,
@@ -148,6 +148,23 @@ describe('the subline says where the player actually is', () => {
     expect(sublineFor({ screen: 'stage', ctx: 'daily' })).toBe('MID-DAY');
     expect(sublineFor({ screen: 'report', ctx: 'rush' })).toBe('READING THE RUSH');
     expect(sublineFor({ screen: 'report', ctx: 'daily' })).toBe('READING THE REPORT');
+  });
+
+  it('appends the stage’s clock on a played day, and says the start and the end truly (#636 item 6)', () => {
+    const day = { screen: 'stage', ctx: 'daily' } as const;
+    expect(stageSublineOf(day, { clock: '08:00', phase: 'before' })).toBe('START OF DAY · 08:00');
+    expect(stageSublineOf(day, { clock: '08:41', phase: 'running' })).toBe('MID-DAY · 08:41');
+    expect(stageSublineOf(day, { clock: '18:00', phase: 'over' })).toBe('DAY OVER · 18:00');
+    expect(stageSublineOf({ screen: 'stage', ctx: 'campaign' }, { clock: '09:10', phase: 'running' })).toBe(
+      'MID-DAY · 09:10',
+    );
+    /* No report yet, another context, or another screen: the bare word, never a clock it has not got. */
+    expect(stageSublineOf(day, undefined)).toBe('MID-DAY');
+    expect(stageSublineOf({ screen: 'stage', ctx: 'rush' }, { clock: '08:41', phase: 'running' })).toBe('IN THE RUSH');
+    expect(stageSublineOf({ screen: 'stage', ctx: 'watch' }, { clock: '08:41', phase: 'running' })).toBe('WATCHING');
+    expect(stageSublineOf({ screen: 'report', ctx: 'daily' }, { clock: '08:41', phase: 'running' })).toBe(
+      'READING THE REPORT',
+    );
   });
 
   it('says WATCHING on a watched stage and report, and only there', () => {
