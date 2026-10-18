@@ -84,6 +84,15 @@ describe.skipIf(!HAS_BROWSER)('Rush on a phone, after the re-play — wave AR, l
       expect(widths.furthest, 'furthest round').toBeGreaterThanOrEqual(200);
       expect(widths.dispatcher, 'dispatcher choice').toBeGreaterThanOrEqual(200);
       expect(widths.scroll, 'no sideways scroll').toBeLessThanOrEqual(390);
+      /*
+       * Wave AS, lane AS-1 (GitHub issue #635, finding 8): the dispatcher choice comes before the
+       * house's runs on a phone. Red on the base: it sat under every house row, about 2 900 px down.
+       */
+      const order = await page.evaluate(() => ({
+        picker: document.querySelector('.everyday-rush-picker')?.getBoundingClientRect().top ?? Number.NaN,
+        firstHouseRow: document.querySelector('.everyday-rush-best, .everyday-rush-house-refusal')?.getBoundingClientRect().top ?? Number.NaN,
+      }));
+      expect(order.picker, JSON.stringify(order)).toBeLessThan(order.firstHouseRow);
     } finally {
       await page.close();
     }
@@ -234,6 +243,109 @@ describe.skipIf(!HAS_BROWSER)('Rush on a phone, after the re-play — wave AR, l
       const clock = await page.textContent('.everyday-stage-clock');
       await page.waitForTimeout(600);
       expect(await page.textContent('.everyday-stage-clock'), 'pressing Pause stops the clock').toBe(clock);
+    } finally {
+      await page.close();
+    }
+  });
+
+  it('5: wave 1 plays fast and says so, then the round drops to the player’s speed at wave 2 — wave AS, lane AS-1', async () => {
+    const page = await coldLoad(1280, 800);
+    try {
+      await openRushSetup(page);
+      await page.locator('.everyday-bar-primary').click();
+      await waitForWave(page);
+      await page.locator('.everyday-stage-play').click();
+      const lit = (): Promise<string> =>
+        page.evaluate(() => document.querySelector('.everyday-stage-speed[aria-pressed="true"]')?.textContent ?? '');
+      await page.waitForFunction(
+        () => (document.querySelector('.everyday-stage-pace')?.textContent ?? '') === 'fast-forwarding at 30× until wave 2 · pick a speed to watch',
+        undefined,
+        { timeout: 10_000 },
+      );
+      expect(await lit()).toBe('30×');
+      await page.waitForFunction(() => document.querySelector('.everyday-stage-phase')?.textContent === 'WAVE 2', undefined, { timeout: 30_000 });
+      await page.waitForFunction(() => document.querySelector('.everyday-stage-speed[aria-pressed="true"]')?.textContent === '4×', undefined, {
+        timeout: 5_000,
+      });
+      expect(await page.textContent('.everyday-stage-pace')).toBe('');
+    } finally {
+      await page.close();
+    }
+  });
+
+  it('5b: a speed pressed in wave 1 stands — wave AS, lane AS-1', async () => {
+    const page = await coldLoad(1280, 800);
+    try {
+      await openRushSetup(page);
+      await page.locator('.everyday-bar-primary').click();
+      await waitForWave(page);
+      await page.locator('.everyday-stage-play').click();
+      await page.locator('.everyday-stage-speed', { hasText: /^8×$/u }).click();
+      await page.waitForTimeout(800);
+      expect(await page.evaluate(() => document.querySelector('.everyday-stage-speed[aria-pressed="true"]')?.textContent)).toBe('8×');
+      expect(await page.textContent('.everyday-stage-pace')).toBe('');
+    } finally {
+      await page.close();
+    }
+  });
+
+  it('6: side by side, the handoff’s order stands: the house’s runs, then the dispatcher choice — wave AS, lane AS-1', async () => {
+    const page = await coldLoad(1280, 800);
+    try {
+      await openRushSetup(page);
+      const order = await page.evaluate(() => ({
+        picker: document.querySelector('.everyday-rush-picker')?.getBoundingClientRect().top ?? Number.NaN,
+        firstHouseRow: document.querySelector('.everyday-rush-best, .everyday-rush-house-refusal')?.getBoundingClientRect().top ?? Number.NaN,
+      }));
+      expect(order.picker, JSON.stringify(order)).toBeGreaterThan(order.firstHouseRow);
+      /* § D1545 (GitHub issue #636, R5): the house run on this crowd is stated as the line to beat, for the dispatcher standing. */
+      const line = (): Promise<string> => page.evaluate(() => document.querySelector('.everyday-rush-to-beat')?.textContent ?? '');
+      const pattern = /^The house run on this crowd, (.+) with no changes, holds (to \d+:\d\d, into wave \d+|all \d+ waves)\. That is the line to beat\.$/u;
+      expect(await line()).toMatch(pattern);
+      const options = await page.locator('.everyday-rush-picker option').evaluateAll((nodes) =>
+        nodes.map((node) => ({ value: (node as HTMLOptionElement).value, name: node.textContent ?? '' })),
+      );
+      const current = await page.locator('.everyday-rush-picker').inputValue();
+      const other = options.find((option) => option.value !== current);
+      if (other !== undefined) {
+        await page.locator('.everyday-rush-picker').selectOption(other.value);
+        await page.waitForFunction((name) => (document.querySelector('.everyday-rush-to-beat')?.textContent ?? '').includes(`, ${name} with no changes`), other.name, {
+          timeout: 5_000,
+        });
+      }
+    } finally {
+      await page.close();
+    }
+  });
+
+  it('7: at the loss the building holds on the crossing with the line, then the result — wave AS, lane AS-1', async () => {
+    const page = await coldLoad(1280, 800);
+    try {
+      await openRushSetup(page);
+      await page.locator('.everyday-bar-primary').click();
+      await waitForWave(page);
+      await page.waitForFunction(() => document.querySelector<HTMLButtonElement>('.everyday-stage-skip')?.disabled === false, undefined, {
+        timeout: 30_000,
+      });
+      await page.locator('.everyday-stage-skip').click();
+      /* Red on the base: the result cut in on the same frame and this line was never drawn. */
+      await page.waitForFunction(
+        () => (document.querySelector('.everyday-stage-status-text')?.textContent ?? '') === '40 / 40, the building stopped draining',
+        undefined,
+        { timeout: 30_000 },
+      );
+      const seenAt = Date.now();
+      const held = await page.evaluate(() => ({
+        result: document.querySelectorAll('.everyday-rush-result').length,
+        play: document.querySelector<HTMLButtonElement>('.everyday-stage-play')?.disabled ?? false,
+        over: [...document.querySelectorAll('.everyday-stage-figure')].map((node) => node.textContent ?? '').join(' '),
+      }));
+      expect(held.result).toBe(0);
+      expect(held.play, 'the round is over, so Play is not offered').toBe(true);
+      expect(held.over).toMatch(/past two minutes, of 40\s*4\d/u);
+      await page.waitForSelector('.everyday-rush-result', { timeout: 15_000 });
+      expect(Date.now() - seenAt, 'held about two seconds').toBeGreaterThanOrEqual(1_200);
+      expect(await page.locator('.everyday-rush-result').getAttribute('data-outcome')).toBe('broke');
     } finally {
       await page.close();
     }

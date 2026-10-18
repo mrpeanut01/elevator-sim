@@ -82,7 +82,7 @@ import {
 import type { LiveObservations } from '../live/types.js';
 import type { GoalState } from '../shift/types.js';
 import { actionBarFor, type ActionBarModel } from './actionBar.js';
-import { RUSH_NOT_LANDED, rushCompactHudOf, rushStageHeaderOf } from './rush.js';
+import { RUSH_LOSS_HOLD_MS, RUSH_NOT_LANDED, rushCompactHudOf, rushInterventionStampOf, rushLossLineOf, rushOpeningPaceOf, rushStageHeaderOf } from './rush.js';
 import { RUSH_END_ASK_COPY, RUSH_STREAM } from './rushScreenModel.js';
 import type { EverydayHost } from './host.js';
 import { SCREEN_NAMES, type EverydayScreenModule } from './screens.js';
@@ -2027,6 +2027,8 @@ function mountStage(
     if (playback === undefined) return;
     /* § D1361: a day another tab holds is shown here no further. */
     if (heldAtS !== undefined) return;
+    /* Wave AS, lane AS-1: the round is over and the stage is only showing where. */
+    if (rushLossLine !== undefined) return;
     if (playback.state === 'playing') {
       playback.pause();
       /* § D1212: a pause stops a skip that is coming; *Play* starts a fresh beat. */
@@ -2064,6 +2066,20 @@ function mountStage(
 
   /** Whether the header is pinned at the top of the page now — {@link syncHeaderStick}. */
   let headerSticks = false;
+
+  /**
+   * **The loss, held on the building** — wave AS, lane AS-1 (GitHub issue #635, finding 5). When the
+   * round crosses the hold line the stage stops on that instant and says so for
+   * `rush.ts#RUSH_LOSS_HOLD_MS` before the result, which used to cut in within the same frame. The
+   * round is recorded as ended at once, so leaving during the hold loses nothing.
+   */
+  let rushLossLine: string | undefined;
+  let rushLossTimer: number | undefined;
+  function goToRushResult(): void {
+    if (rushLossTimer !== undefined) view?.clearTimeout(rushLossTimer);
+    rushLossTimer = undefined;
+    if (alive) context.go('report');
+  }
 
   /** Whether the rush's compact phone row is up — {@link syncRushCompact}, `rush.ts#rushCompactHudOf`. */
   let rushCompact = false;
@@ -2252,7 +2268,7 @@ function mountStage(
         simPerRealS: watchedFrame.simPerRealS,
       });
     }
-    const answer = stagePaceOf({
+    const paced = stagePaceOf({
       horizon: paceHorizon,
       acts: paceActs,
       simTimeS,
@@ -2265,6 +2281,16 @@ function mountStage(
       watchedRealS: watchAllowanceOff ? undefined : paceCounters.watchedRealS,
       lingerRealS: paceCounters.lingerRealS,
     });
+    /* Wave AS, lane AS-1: a rush's first wave plays fast unless a speed was pressed (`rush.ts#rushOpeningPaceOf`). */
+    const rushOpening =
+      context.ctx === 'rush'
+        ? rushOpeningPaceOf({
+            heldS: simTimeS - playback.recording.startedAt,
+            watchingSimPerRealS: stageSpeedAt(speedIndex).simPerRealS,
+            playerChoseSpeed: playerChoseSpeedAtS !== undefined,
+          })
+        : undefined;
+    const answer: StagePace = rushOpening === undefined ? paced : { simPerRealS: rushOpening.simPerRealS, reason: 'unmanaged' };
     lastPaceReason = answer.reason;
     watchedFrame = { atS: simTimeS, simPerRealS: answer.simPerRealS, pace: answer };
     /* § D1493: a call raised, or waited at, or answered, is a decision, and the allowance starts again. */
@@ -2281,7 +2307,7 @@ function mountStage(
     const waiting = answer.reason === 'call' && activeCall()?.raised === false;
     const note = waiting
       ? STAGE_CALL_COPY.waiting
-      : (stagePaceNoteOf(answer, { acts: paceActs, simTimeS, dayStartS: host.dayStartS() }) ?? '');
+      : (rushOpening?.note ?? stagePaceNoteOf(answer, { acts: paceActs, simTimeS, dayStartS: host.dayStartS() }) ?? '');
     /*
      * Wave AO, lane AO-4 — one message for one state (`stagePace.ts#stageStatusOf`): the line a skip
      * left stands while the stage stays where it landed, and goes the frame it leaves (or a call
@@ -3455,7 +3481,7 @@ function mountStage(
           : DAY_ATTEMPT_COPY.elsewhereStage;
     const play = stagePlayControlOf({ playing, hasRun: playback !== undefined, waitingOnCall: waitingNow, dayEnded: ended, heldBy });
     playButton.textContent = play.label;
-    playButton.disabled = play.inert;
+    playButton.disabled = play.inert || rushLossLine !== undefined;
     /* A held button says why to a reader on it, in the line a sighted player reads beside it. */
     playButton.title = waitingNow ? STAGE_CALL_COPY.waiting : (play.note ?? '');
     playButton.style.opacity = play.inert && playback !== undefined ? '0.55' : '';
@@ -3469,7 +3495,7 @@ function mountStage(
     const skip = stageSkipViewOf({ dayEnded: ended, hasRun: playback !== undefined, heldBy });
     skipButton.textContent = skip.label;
     skipButton.title = skip.note;
-    skipButton.disabled = skip.inert;
+    skipButton.disabled = skip.inert || rushLossLine !== undefined;
     skipButton.style.cssText = [
       'background:transparent',
       `border:1px solid ${C.rule}`,
@@ -3523,6 +3549,14 @@ function mountStage(
      * § D1361: another tab holds this day's attempt. Above every other state, because the picture
      * under it is held and none of the controls below act; the bar's primary is the takeover.
      */
+    /* Wave AS, lane AS-1: the loss's line over the building it happened on. */
+    if (rushLossLine !== undefined) {
+      failedRow.style.display = 'none';
+      statusText.textContent = rushLossLine;
+      startButton.style.display = 'none';
+      status.style.display = 'flex';
+      return;
+    }
     if (heldAtS !== undefined) {
       failedRow.style.display = 'none';
       statusText.textContent =
@@ -3793,7 +3827,16 @@ function mountStage(
       if (session?.holdAtS !== undefined && session.endedAtS === undefined && simTimeS >= session.holdAtS) {
         playback.pause();
         host.endRush(session.holdAtS);
-        context.go('report');
+        /* Wave AS, lane AS-1: stop on the crossing itself, say so, then the result. */
+        if (view === null || view === undefined) {
+          context.go('report');
+          return;
+        }
+        rushLossLine = rushLossLineOf();
+        if (simTimeS > session.holdAtS) playback.seekTo(session.holdAtS);
+        rushLossTimer = view.setTimeout(goToRushResult, RUSH_LOSS_HOLD_MS);
+        syncTransport();
+        requestFrame();
         return;
       }
     }
@@ -4061,10 +4104,13 @@ function mountStage(
       ...(pressChangedNobody === undefined ? {} : { pressChangedNobody }),
       ...(handoverVerdict === undefined ? {} : { handoverVerdict }),
     });
+    /* Wave AS, lane AS-1: a rush stamps in held time, the header's clock (`rush.ts#rushInterventionStampOf`). */
+    const stamp =
+      context.ctx === 'rush' ? rushInterventionStampOf(host.interventions(), simTimeS, recording.startedAt) : intervention.stamp;
     /* Written only when the stamp changes — {@link stampSaid}, `AX-3`. */
-    if (intervention.stamp !== stampSaid) {
-      interventionStamp.textContent = intervention.stamp;
-      stampSaid = intervention.stamp;
+    if (stamp !== stampSaid) {
+      interventionStamp.textContent = stamp;
+      stampSaid = stamp;
     }
     /*
      * § 14.1: *"§ 7.6's intervention machinery is **disabled** while watching. A spectator who could
@@ -4642,6 +4688,8 @@ function mountStage(
       alive = false;
       if (pendingSay !== undefined) view?.clearTimeout(pendingSay);
       pendingSay = undefined;
+      if (rushLossTimer !== undefined) view?.clearTimeout(rushLossTimer);
+      rushLossTimer = undefined;
       if (pendingFrame !== undefined && view !== null && view !== undefined) {
         view.cancelAnimationFrame(pendingFrame);
       }
@@ -4715,6 +4763,11 @@ function mountStage(
        * puts {@link endAsk} under the header with focus on *Keep playing*; a second press ends it.
        */
       if (context.ctx === 'rush') {
+        /* Wave AS, lane AS-1: during the loss's hold the round has ended; the press goes on to the result. */
+        if (rushLossLine !== undefined) {
+          goToRushResult();
+          return;
+        }
         if (endAsk.hidden && adopted !== undefined) {
           endAskResume = playback?.state === 'playing';
           playback?.pause();
