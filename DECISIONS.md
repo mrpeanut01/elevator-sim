@@ -53918,9 +53918,9 @@ explicit, tested allowlist of the fields the census reads.
 
 **The regeneration.** `data/scenario-survivors.json` is regenerated once for this sentence
 (`ELEVATOR_SIM_SURVIVORS=deep ELEVATOR_SIM_REGENERATE_SURVIVORS=1`), on the commit that lands it.
-The lane's run was stopped at its two-hour limit before it wrote the file, so the regeneration is
-owed to the integrator: every count must come back unchanged, with only the inputs hash, the tree and
-the date moving, and a count that moves stops the ruling. No bar, demand, seed or measured figure moves.
+The lane's run was stopped at its two-hour limit before it wrote the file, so the integrator ran it
+on wave AS's head (`b0d7d09`, 2026-10-18, 6 755 s). Every count came back unchanged; only the inputs
+hash, the tree and the date moved. No bar, demand, seed or measured figure moves.
 
 ## D1588 — Rush's two parking chips do not help, measured paired; a handover can
 
