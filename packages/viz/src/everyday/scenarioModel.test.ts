@@ -361,15 +361,31 @@ describe('the Scenario hub', () => {
   });
 });
 
-describe('a first visit starts on stage 1 — wave AQ lane AQ-1', () => {
-  it('names the path’s first offered row while this device holds no clear, and nothing after one', () => {
+describe('the primary plays the next stage — wave AQ lane AQ-1, wave AR lane AR-3', () => {
+  it('names the path’s first offered row while this device holds no clear', () => {
     const first = path[0];
     expect(first?.offer).toBe('offered');
     expect(scenarioHubViewOf(path).startHere).toBe(first?.id);
-    expect(scenarioHubViewOf(path, new Set([path[3]?.id ?? ''])).startHere).toBeUndefined();
+    expect(scenarioHubViewOf(path).startHereLabel).toBe('Play stage 1');
     expect(scenarioHubViewOf().startHere).toBeUndefined();
     /* A held first row is never a primary: the bar would refuse it. */
     const held = path.map((rung, index) => (index === 0 ? { ...rung, offer: 'held' as const } : rung));
-    expect(scenarioHubViewOf(held).startHere).toBeUndefined();
+    expect(scenarioHubViewOf(held).startHere).not.toBe(first?.id);
+  });
+
+  /* GitHub issue #633: after stage 1 the primary went back to *Play today's scenario*. */
+  it('moves to the first offered row not yet cleared, and names its number', () => {
+    const offered = path.filter((rung) => rung.offer === 'offered');
+    const [one, two] = offered;
+    if (one === undefined || two === undefined) throw new Error('the path offers fewer than two stages');
+    const after = scenarioHubViewOf(path, new Set([one.id]));
+    expect(after.startHere).toBe(two.id);
+    expect(after.startHereLabel).toBe(`Play stage ${String(two.position)}`);
+    /* A later clear does not move it past an earlier stage still standing. */
+    expect(scenarioHubViewOf(path, new Set([two.id])).startHere).toBe(one.id);
+    /* Every offered stage cleared: the table's own primary, today's scenario. */
+    const all = scenarioHubViewOf(path, new Set(offered.map((rung) => rung.id)));
+    expect(all.startHere).toBeUndefined();
+    expect(all.startHereLabel).toBeUndefined();
   });
 });

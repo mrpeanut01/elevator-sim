@@ -272,3 +272,52 @@ describe('a row whose answers read alike says so once — issue #631', () => {
     expect(line).toContain('18 and 220 s with leave them');
   });
 });
+
+/*
+ * Wave AR, lane AR-2, § D1529: the re-play's 17:20 and 17:25 calls printed two blocks that said the
+ * same *No answer has crossed a bar yet* and *By 18:00, no answer has made a difference …* word for
+ * word. Neighbouring rows that say exactly that are said once, under one heading.
+ */
+describe('two calls that say the same no difference are said once — § D1529', () => {
+  const GOALS: readonly ShiftGoal[] = goalsForDay(1).map((goal) =>
+    goal.id === 'queue' ? { ...goal, bar: 32 } : goal.id === 'worst-wait' ? { ...goal, bar: 460 } : goal,
+  );
+  /* Every answer reads 16 deep and 220 s from before the call to the day's end. */
+  const flat = (atS: number): DayCallRecord => {
+    const maxima: DayCallMaxima = { fromS: atS, endedAt: 36_000, samples: [[atS, 20, 16, 220]] };
+    return {
+      atS,
+      windowEndS: atS + 600,
+      answer: 'leave',
+      counts: { 'park-cars-lobby': 3, 'spread-cars': 3, leave: 3 },
+      observations: { 'park-cars-lobby': unread, 'spread-cars': unread, leave: unread },
+      maxima: { 'park-cars-lobby': maxima, 'spread-cars': maxima, leave: maxima },
+    };
+  };
+  const rowsOf = (records: readonly DayCallRecord[], log: readonly { atS: number; change: { kind: 'park-cars-lobby' } }[] = []) =>
+    stageCallRowsOf({ records, playheadS: 36_000, endedAt: 36_000, log, clockOf: clock, goals: GOALS });
+
+  it('prints one block headed with both calls, where it printed two identical ones', () => {
+    const rows = rowsOf([flat(33_600), flat(33_900)]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.heading).toBe('The calls at 09:20 and 09:25');
+    expect(rows[0]?.lead).toBe(STAGE_CALL_NO_CROSSING);
+    expect(rows[0]?.goals).toBe(
+      'By 10:00, no answer has made a difference to these two goals yet: the deepest landing and the longest wait so far are 16 and 220 s with every answer.',
+    );
+    /* Three in a row, one block. */
+    expect(rowsOf([flat(33_000), flat(33_300), flat(33_600)])[0]?.heading).toBe('The calls at 09:10, 09:15 and 09:20');
+  });
+
+  it('keeps a row with any word of its own apart: a figure of its own, or a later press', () => {
+    const other = flat(33_900);
+    const deeper: DayCallMaxima = { fromS: 33_900, endedAt: 36_000, samples: [[33_900, 20, 18, 220]] };
+    const differs = { ...other, maxima: { ...other.maxima!, 'spread-cars': deeper } };
+    expect(rowsOf([flat(33_600), differs]).map((row) => row.heading)).toEqual(['The call at 09:20', 'The call at 09:25']);
+    /* A press at 09:24 is outside the 09:20 call's runs and inside the 09:25 call's past: the notes differ. */
+    const pressed = rowsOf([flat(33_600), flat(33_900)], [{ atS: 33_840, change: { kind: 'park-cars-lobby' } }]);
+    expect(pressed.map((row) => row.heading)).toEqual(['The call at 09:20', 'The call at 09:25']);
+    /* A single call is untouched. */
+    expect(rowsOf([flat(33_600)])[0]?.heading).toBe('The call at 09:20');
+  });
+});

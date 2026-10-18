@@ -120,3 +120,25 @@ describe('the words', () => {
     expect(view().otherLevers).toBe(CAMPAIGN_DOCK_COPY.otherLevers);
   });
 });
+
+/*
+ * ---- Wave AR, lane AR-4: the dock says the day is over — GitHub issue #633, § D1543 ----
+ *
+ * The playtest ran Garden Apartments' day 1 to its end and the dock still read NOTHING HAPPENING,
+ * so the stage never said the day was over.
+ */
+describe('once the day has run out', () => {
+  it('says the day is over and to close it, on a quiet day and over an unanswered incident', () => {
+    for (const incident of [undefined, BREAKDOWN]) {
+      const block = view({ incident, simTimeS: 3600, dayOver: true }).incident;
+      expect(block.kind).toBe('quiet');
+      expect(block.heading).toBe(CAMPAIGN_DOCK_COPY.overHeading);
+      expect(block.kind === 'quiet' ? block.note : '').toBe('The day is over. Close it to file.');
+    }
+  });
+
+  it('keeps an answered incident’s stamp, and says nothing of the kind while the day runs', () => {
+    expect(view({ dayOver: true, answeredStamp: '09:14 · answered' }).incident.kind).toBe('answered');
+    expect(view({ incident: undefined }).incident.heading).toBe(CAMPAIGN_DOCK_COPY.quietHeading);
+  });
+});

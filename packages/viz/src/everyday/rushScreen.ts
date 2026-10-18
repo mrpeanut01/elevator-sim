@@ -37,6 +37,7 @@
 import { specIsDirty } from '../authoring/selectorSpec.js';
 
 import { actionBarFor } from './actionBar.js';
+import { sideBySide } from './screenDom.js';
 import type { EverydayScreenModule } from './screens.js';
 import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.js';
 import {
@@ -67,6 +68,11 @@ import {
 
 const EYEBROW = `font:500 10.5px ${TYPE.mono};letter-spacing:.14em;color:${C.label};text-transform:uppercase`;
 
+/** The ink column's width beside the paper — the grid's old upper track. */
+const RUSH_ASIDE_PX = 340;
+/** Below this the paper has stopped being a column, so the two stack: about 700 px with the aside. */
+const RUSH_PAPER_MIN_PX = 360;
+
 /** The prototype's ink-column hairline, between the standings and the driving block. */
 const INK_RULE = '#3A342C';
 
@@ -85,9 +91,15 @@ function el<K extends keyof HTMLElementTagNameMap>(
 function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedEverydayScreen {
   const doc = host.ownerDocument;
 
+  /*
+   * **Two columns that stack on a phone** — wave AR, lane AR-1 (GitHub issue #633), on
+   * `screenDom.ts#sideBySide`, the brief screen's seat. This was a grid of `minmax(0,1fr)
+   * minmax(280px,340px)` with no breakpoint, and at 390 px the ink column took the screen and left
+   * the title, the furthest round and the dispatcher choice a 22 px column. It wraps below about
+   * 700 px (340 + 360), the ink column under the paper and as wide as it. Recorded under
+   * [§ D405](../../../../DECISIONS.md).
+   */
   const root = el(doc, 'div', 'everyday-rush');
-  root.style.cssText =
-    'display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,340px);gap:0;align-items:stretch';
 
   /* ---------------------------------------------------------------- paper */
   const paper = el(doc, 'div', 'everyday-rush-setup');
@@ -500,6 +512,10 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
   });
 
   root.append(paper, ink);
+  sideBySide(root, { fixed: ink, fluid: paper, fixedPx: RUSH_ASIDE_PX, gapPx: 0, fluidMinPx: RUSH_PAPER_MIN_PX });
+  /* The ink column runs the paper's full height beside it, and the screen's full width under it. */
+  root.style.alignItems = 'stretch';
+  ink.style.flexGrow = '1';
   host.append(root);
 
   /*

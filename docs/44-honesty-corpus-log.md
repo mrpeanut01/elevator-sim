@@ -19,6 +19,19 @@ after this split; the entries below are older than the cap and are registered th
 The always-on row is measured on the integrated head; the deep row is read from the nightly
 `corpus-figures` job in [`.github/workflows/deep-tiers.yml`](../.github/workflows/deep-tiers.yml).
 
+## Wave AR
+
+**Wave AR moves 19.00 strings a case always-on, with no new surface.** The base is wave AQ's row,
+measured on AQ's integrated head; `main` at `a9af59b` adds only the docs/12 day-length fix, which no
+case reads. Measured once on wave AR's head after all four lanes, AR-2's follow-up and the CI fix to the skip's beat merged, so the
+move is not split between lanes (§ D256); the deep tier is left to the nightly job.
+
+| tree | strings | move | per case | surfaces |
+|---|---|---|---|---|
+| base, wave AQ's row | 1 051 817 | | | 80 |
+| wave AR's head (AR-1, AR-3, AR-2, AR-4) | **1 052 748** | **+931** | **19.00** | 80, **same set** |
+| cases · simulations · failing cases | 49 · 606 · 0 | **unmoved** | | |
+
 ## Wave AQ
 
 **Wave AQ moves 149.49 strings a case always-on, with no new surface.** The base, `main` at

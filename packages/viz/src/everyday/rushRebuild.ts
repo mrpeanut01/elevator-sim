@@ -20,8 +20,8 @@
  * § D606 kept every purse figure out of this package: the one a player read was the server's reply to
  * their own post. That held while a purse bought nothing. A purse a player spends between rounds has
  * to be known **before** they post, so {@link rushPurseBeforeNextOf} counts it, with `core`'s function,
- * from the waves each round outlasted at its own hold moment (`core`'s `rushWavesOutlasted`, the reading
- * the server takes off its replay) and the price of each rebuild. **It is a count and never a claim**:
+ * from the waves each round outlasted at its own hold moment, or before the player's hand stop when that
+ * came first (`core`'s `rushWavesOutlasted`, the reading the server takes off its replay, § D1516) and the price of each rebuild. **It is a count and never a claim**:
  * nothing it returns goes on the wire, the server derives the same figure from its own replay and refuses
  * a rebuild its purse could not pay for (`rebuild-over-purse`), and `rushHoldAgreement.json` pins this
  * device's hold moments to the server's. A board row still shows no purse (§ D543 clause 5).
@@ -84,6 +84,8 @@ export const RUSH_PURSE = parseRushPurse(rushPurseDocument);
 export interface RushPurseRoundInput {
   /** The recording's own hold moment, seconds from the round's start, or `null` when it never crossed. */
   readonly holdS: number | null;
+  /** Where the player ended it by hand, seconds from its start — § D1516. Absent or `null`: no hand stop. */
+  readonly stoppedS?: number | null | undefined;
   readonly rebuild?: readonly string[] | undefined;
 }
 
@@ -101,7 +103,9 @@ export function rushPurseBeforeNextOf(input: {
   readonly schedule: PriceSchedule;
 }): number {
   const opening = rushPurseOpeningUnits(RUSH_PURSE, CHIME_PRICES, input.modifiers);
-  const waves = input.rounds.map((round) => rushWavesOutlasted(round.holdS === null ? undefined : round.holdS, 0));
+  const waves = input.rounds.map((round) =>
+    rushWavesOutlasted(round.holdS === null ? undefined : round.holdS, 0, round.stoppedS ?? undefined),
+  );
   const spends = input.rounds.map((round) => rushRebuildUnits(input.schedule, round.rebuild ?? []));
   return rushPurseRounds(RUSH_PURSE, opening, waves, spends).at(-1)?.purseAfterUnits ?? opening;
 }

@@ -16,6 +16,7 @@ import {
   parseDispatcherProfiles,
   parseElevatorSpecs,
   parseTrafficProfiles,
+  playerWaveAt,
   resolveBuilding,
   type ChimeTurn,
 } from '@elevator-sim/core/browser';
@@ -25,7 +26,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
 
 import { RUSH_SEED, RUSH_TEMPLATE_ID, rushOutcomeOf, rushPatchOf } from './rush.js';
-import { rushPurseBeforeNextOf } from './rushRebuild.js';
+import { RUSH_PURSE, rushPurseBeforeNextOf } from './rushRebuild.js';
 import { REPLAY_COPY } from './replay.js';
 import { CAREER_CONTRACT_ID, RUSH_CONTRACT_ID, REPLAY_CONTRACT_ID, openWeek } from '../shift/week.js';
 import { CONTRACTS } from '../shift/contracts.js';
@@ -2332,6 +2333,42 @@ describe('a rush sitting — GitHub issue #372', () => {
     host.leaveRush();
     host.startRush();
     expect(fitOfLastPress()).toBeUndefined();
+  });
+
+  it('pays a round ended by hand only for the waves it got through before the stop — wave AR, § D1516', () => {
+    /*
+     * The playtest's P1: a round ended by hand in wave 2 put 18 units in the purse, more than a round
+     * played out to the line in wave 9 (16). The purse read the recording's own hold moment, which
+     * lies past the stop, so a stop at wave 2 was paid every wave the round would have outlasted.
+     */
+    const h = harnessOf(base());
+    const host = createEverydayHost(h.bindings);
+    host.startRush();
+    h.state = { ...h.state, recording: rush };
+    const holdAtS = host.rush()?.holdAtS;
+    expect(holdAtS, 'the rush never crossed its line, so this case tests nothing').toBeDefined();
+    const perWave = RUSH_PURSE.unitsPerWaveOutlasted;
+    /* Stopped 200 s in: wave 2, one wave got through. */
+    host.endRush(rush.startedAt + 200);
+    const [stopped] = host.rush()?.rounds ?? [];
+    expect(stopped?.outcome.kind).toBe('stopped');
+    expect(stopped?.stoppedS).toBe(200);
+    expect(host.rushRebuild()?.purseUnits).toBe(1 * perWave);
+
+    /* Played out to the line, the same crowd pays every wave before the crossing, which is more. */
+    host.startRush();
+    h.state = { ...h.state, recording: rush };
+    host.endRush(holdAtS ?? 0);
+    const played = host.rush()?.rounds[1];
+    expect(played?.stoppedS).toBeNull();
+    const playedPays = (playerWaveAt((holdAtS ?? 0) - rush.startedAt) - 1) * perWave;
+    expect(playedPays).toBeGreaterThan(perWave);
+    expect(host.rushRebuild()?.purseUnits).toBe(perWave + playedPays);
+    /* And the wire carries the stop, so the server pays the same. */
+    const check = host.rush()?.check;
+    if (check?.ok !== true) throw new Error('the sitting should be postable');
+    expect(check.body.rounds[0]?.stoppedS).toBe(200);
+    expect(Object.hasOwn(check.body.rounds[1] ?? {}, 'stoppedS'), 'a round played to the line carries no stop').toBe(false);
   });
 
   it('ends the sitting when the rush is left, because a sitting is runs from an as-shipped start', () => {

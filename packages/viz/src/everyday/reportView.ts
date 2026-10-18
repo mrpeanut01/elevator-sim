@@ -338,6 +338,15 @@ export const REPORT_PRACTICE_AGAIN = Object.freeze({
 /** The close's two secondary presses — {@link EverydayReportView.secondary}. */
 export const REPORT_SECONDARY = Object.freeze({ week: 'Your week', menu: 'Main menu' });
 
+/**
+ * **The levers' heading on a day every goal held** — wave AR, lane AR-4, GitHub issue #633, § D1543.
+ *
+ * The playtest read *What would make tomorrow better* over *Add a car* and *Zone the tower* after a
+ * perfect day at Garden Apartments. The cards are the same four and keep their order; the heading
+ * says they are optional, because a day that cleared asks for no change.
+ */
+export const REPORT_LEVERS_OPTIONAL_HEADING = 'Nothing needed today. If you want to try something anyway';
+
 /** What {@link everydayReportViewOf} is computed from. */
 export interface EverydayReportInput {
   /** `host.lastReport()` — the last filed sheet, or `undefined` before any day has closed. */
@@ -834,7 +843,10 @@ export function everydayReportViewOf(input: EverydayReportInput): EverydayReport
        * other, where it means *keep what `index.html` authored*. This screen authors no markup, so
        * there is nothing to keep: the fallback is the guide's own § 6.5 wording for the section.
        */
-      levers: sheet.leversHeading ?? 'What would have helped',
+      levers:
+        input.report?.verdict === 'cleared'
+          ? REPORT_LEVERS_OPTIONAL_HEADING
+          : (sheet.leversHeading ?? 'What would have helped'),
       delta: sheet.delta?.caption ?? '',
       overnight: 'What changed overnight',
     },

@@ -189,4 +189,72 @@ describe.skipIf(!HAS_BROWSER)('a stage press plays one of its crowds, and the ve
       await page.close();
     }
   }, 120_000);
+  /*
+   * Wave AR lane AR-3, GitHub issue #633: the pair stopped for about 4 s on stage 1 while the fifty
+   * crowds ran, and for 4.8 s on the held-back crowds. The batch was on its worker all along; the page
+   * redrew on every progress message and each redraw asked the one check of every route on every
+   * stage again. Measured before the fix: a 3.8 s stall on this case, 4.7 s on the stage's own setting.
+   */
+  it('keeps the painting thread free while the fifty crowds run, so the pair keeps playing', async () => {
+    const page = await openPage(browser, { viewport: { width: 1280, height: 800 } });
+    try {
+      await page.goto(origin, { waitUntil: 'load' });
+      await leaveTutorialIfOffered(page);
+      await openStageOne(page);
+      await page.selectOption('.everyday-stage-play-setting-select', 'zoned-uppeak');
+      await page.evaluate(() => {
+        const w = window as unknown as { __ticks: number[] };
+        w.__ticks = [];
+        /* The playtest's own instrument: a 50 ms timer, which a busy painting thread starves. */
+        window.setInterval(() => w.__ticks.push(performance.now()), 50);
+      });
+      await page.locator('.everyday-bar-primary').click();
+      await page.waitForSelector('.everyday-stage-play-verdict', { timeout: 110_000 });
+      const longest = await page.evaluate(() => {
+        const ticks = (window as unknown as { __ticks: number[] }).__ticks;
+        let gap = 0;
+        for (let index = 1; index < ticks.length; index += 1) gap = Math.max(gap, (ticks[index] ?? 0) - (ticks[index - 1] ?? 0));
+        return gap;
+      });
+      expect(longest, 'the page did not answer for this long while the stage ran').toBeLessThan(1_000);
+    } finally {
+      await page.close();
+    }
+  }, 120_000);
+
+  /*
+   * Wave AR lane AR-3, GitHub issue #633: on stage 3, Min-wait with lobby parking after Min-wait as it
+   * stands, *your change moved no count* was drawn below the fold.
+   */
+  it('brings the moved-no-count line into view with the verdict', async () => {
+    const page = await openPage(browser, { viewport: { width: 1280, height: 800 } });
+    try {
+      await page.goto(origin, { waitUntil: 'load' });
+      await leaveTutorialIfOffered(page);
+      const stage = 'stage-3-overwhelmed';
+      await page.locator('.everyday-mode[data-screen="scenario"]').click();
+      await page.waitForSelector(`.everyday-scenario-path-card[data-stage="${stage}"]`, { timeout: 30_000 });
+      await page.locator(`.everyday-scenario-path-card[data-stage="${stage}"] .everyday-scenario-path-head`).click();
+      await page.waitForSelector('.everyday-stage-play-setting-select', { timeout: 60_000 });
+      await page.selectOption('.everyday-stage-play-setting-select', 'eta');
+      await page.locator('.everyday-bar-primary').click();
+      await page.waitForSelector('.everyday-stage-play-verdict', { timeout: 110_000 });
+      await page.selectOption('.everyday-stage-play-parking-select', 'lobby');
+      await page.locator('.everyday-bar-primary').click();
+      await page.waitForSelector('.everyday-stage-play-same-counts', { timeout: 110_000 });
+      await expect
+        .poll(
+          () =>
+            page.evaluate(() => {
+              const line = document.querySelector('.everyday-stage-play-same-counts')?.getBoundingClientRect();
+              const bar = document.querySelector('.everyday-bar')?.getBoundingClientRect().top ?? window.innerHeight;
+              return line !== undefined && line.top >= 0 && line.bottom <= Math.min(window.innerHeight, bar);
+            }),
+          { timeout: 10_000 },
+        )
+        .toBe(true);
+    } finally {
+      await page.close();
+    }
+  }, 120_000);
 });

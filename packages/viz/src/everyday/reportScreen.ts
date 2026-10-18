@@ -121,6 +121,7 @@ import {
   EVERYDAY_TYPE as TYPE,
 } from './tokens.js';
 import { RUSH_RESULT_EMPTY_LEDE, rushOutcomeOf, rushResultViewOf } from './rush.js';
+import { rushHouseLineOf } from './rushHouse.js';
 import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.js';
 
 
@@ -364,7 +365,8 @@ function mountReportScreen(
       root.append(empty);
       return;
     }
-    const view = rushResultViewOf(rushOutcomeOf(recording, session.endedAtS), session.disclosure);
+    const outcome = rushOutcomeOf(recording, session.endedAtS);
+    const view = rushResultViewOf(outcome, session.disclosure);
     const block = el(doc, 'div', 'everyday-rush-result');
     block.dataset['outcome'] = view.outcome;
     const eyebrow = el(doc, 'div', 'everyday-report-meta', view.eyebrow);
@@ -374,6 +376,22 @@ function mountReportScreen(
     const lede = el(doc, 'p', 'everyday-rush-result-lede', view.lede);
     lede.style.cssText = `${LEDE};margin:12px 0 0`;
     block.append(eyebrow, head, lede);
+    /*
+     * Wave AR, lane AR-1: the house's run on the same crowd, beside this round, as two facts and no
+     * verdict (`rushHouse.ts#rushHouseLineOf`). The round's opening dispatcher is the selection's.
+     */
+    const selection = context.host.selection();
+    const houseLine = rushHouseLineOf({
+      buildingId: selection.buildingId,
+      dispatcherId: selection.dispatcherId,
+      dispatcherName: context.host.dispatcherById(selection.dispatcherId)?.name ?? selection.dispatcherId,
+      outcome,
+    });
+    if (houseLine !== undefined) {
+      const house = el(doc, 'p', 'everyday-rush-result-house', houseLine);
+      house.style.cssText = `${BODY};margin:12px 0 0;max-width:70ch`;
+      block.append(house);
+    }
     const account = el(doc, 'ol', 'everyday-rush-result-account');
     account.style.cssText = 'margin:18px 0 0;padding-left:22px;max-width:70ch';
     for (const beat of view.account) {

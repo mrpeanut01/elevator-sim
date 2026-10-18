@@ -172,6 +172,13 @@ describe('the cheap gate — everything refused before a simulation starts', () 
         String(claimedHeldS),
       ).toContain('claimedHeldS');
     }
+    for (const stoppedS of [-1, Number.NaN, '200', null]) {
+      expect(
+        rushSittingIssues({ buildingId: BUILDING, rounds: [{ ...round, stoppedS }] }, purse).join(' '),
+        String(stoppedS),
+      ).toContain('stoppedS');
+    }
+    expect(rushSittingIssues({ buildingId: BUILDING, rounds: [{ ...round, stoppedS: 200 }] }, purse)).toEqual([]);
   });
 
   it('refuses a mid-run change that cannot travel, on the kind a single run is refused on', () => {
@@ -232,6 +239,29 @@ describe('the replay — every round re-simulated, every purse derived', () => {
     expect(second?.purseBeforeUnits).toBe(first?.purseAfterUnits);
     expect(second?.paidUnits).toBe(withSwitch.wavesOutlasted * purse.unitsPerWaveOutlasted);
     expect(second?.purseAfterUnits).toBe((first?.purseAfterUnits ?? Number.NaN) + (second?.paidUnits ?? Number.NaN));
+  }, 300_000);
+
+  it('pays a round ended by hand only for the waves before the stop, and refuses a last round ended that way — § D1516', () => {
+    /* Round one was ended by hand 200 s in, in wave 2: one wave got through, whatever its replay holds to. */
+    const stoppedFirst = { ...claimed(PLAIN, plain), stoppedS: 200 };
+    const verified = replayRushSitting({ buildingId: BUILDING, rounds: [stoppedFirst, claimed(switched, withSwitch)] }, from());
+    if (!verified.ok) throw new Error(`${verified.code}: ${verified.detail}`);
+    expect(plain.wavesOutlasted, 'the round outlasts one wave anyway, so this case tests nothing').toBeGreaterThan(1);
+    expect(verified.rounds[0]?.wavesOutlasted).toBe(1);
+    expect(verified.rounds[0]?.paidUnits).toBe(purse.unitsPerWaveOutlasted);
+    /* The stop is a cause, never a claim compared: the held time is still the replay's own. */
+    expect(verified.rounds[0]?.heldS).toBe(plain.heldS);
+    /* A stop after the round's own crossing is the line ending it, and pays as before. */
+    const late = replayRushSitting(
+      { buildingId: BUILDING, rounds: [{ ...claimed(PLAIN, plain), stoppedS: (plain.heldS ?? 0) + 60 }] },
+      from(),
+    );
+    if (!late.ok) throw new Error(`${late.code}: ${late.detail}`);
+    expect(late.rounds[0]?.wavesOutlasted).toBe(plain.wavesOutlasted);
+    /* And a last round ended by hand has no breaking point to rank. */
+    const lastStopped = replayRushSitting({ buildingId: BUILDING, rounds: [stoppedFirst] }, from());
+    expect(lastStopped.ok).toBe(false);
+    if (!lastStopped.ok) expect(lastStopped.code).toBe('no-breaking-point');
   }, 300_000);
 
   it('opens the purse at what the listed top-up bought, and at nothing on the standard board', () => {

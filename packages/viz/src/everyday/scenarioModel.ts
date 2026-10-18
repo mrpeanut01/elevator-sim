@@ -146,12 +146,16 @@ export interface ScenarioHubView {
   /** The sentence that makes the list honest. Never omitted, even when `absences` empties. */
   readonly note: string;
   /**
-   * **The stage a first visit starts on** — wave AQ lane AQ-1, the playtest's path finding. The
-   * path's first row, while it is offered and this device holds no stage's clear; `undefined`
-   * otherwise, and while no path is provided. The § 3.3 primary plays it, so a new player's one
-   * obvious press is the first stage rather than a list of three entries and ten cards.
+   * **The stage the primary plays** — wave AQ lane AQ-1, the playtest's path finding, widened by wave
+   * AR lane AR-3 (GitHub issue #633). The first row on the path that is offered and that this device
+   * has not cleared; `undefined` where every offered row is cleared, and while no path is provided.
+   * It was the first row on a first visit only, so after stage 1 the primary went back to *Play
+   * today's scenario* with stage 2 waiting. The § 3.3 primary plays it, so the one obvious press is
+   * always the next stage while one is left.
    */
   readonly startHere: string | undefined;
+  /** The primary's words for {@link startHere}: *Play stage ⟨n⟩* with the row's own position. */
+  readonly startHereLabel: string | undefined;
 }
 
 export const SCENARIO_COPY = Object.freeze({
@@ -168,8 +172,10 @@ export const SCENARIO_COPY = Object.freeze({
   note: 'Every row here says what it is and, where it is held back, why. What this list cannot reach yet is written under it.',
   /** Wave AQ lane AQ-1: a path row's budget, census and press notes, folded under this. */
   pathDetails: 'Details',
-  /** Wave AQ lane AQ-1: the § 3.3 primary on a first visit, which opens {@link ScenarioHubView.startHere}. */
-  startHere: 'Play stage 1',
+  /** Wave AR lane AR-3 (§ D1534): a held row's face, with the census's reason under Details. */
+  heldShort: 'Not open to play yet. Details says why.',
+  /** The § 3.3 primary while a stage is left to clear, which opens {@link ScenarioHubView.startHere}. */
+  startHere: (position: number): string => `Play stage ${String(position)}`,
   /** Drawn where nothing has provided the path — never an empty list, never a spinner. */
   pathAbsent:
     'The ten stages on the path are read from the campaign’s own file, and this page has not been handed it. Reload if it does not appear.',
@@ -420,6 +426,7 @@ export function scenarioHubViewOf(
 ): ScenarioHubView {
   const view = path === undefined ? undefined : pathViewOf(path, clearedIds, spentOf);
   const held = view === undefined ? undefined : heldRegisterLine(view.rows);
+  const next = view?.rows.find((row) => row.playable && !clearedIds.has(row.id));
   return Object.freeze({
     eyebrow: SCENARIO_COPY.eyebrow,
     title: SCENARIO_COPY.title,
@@ -432,7 +439,7 @@ export function scenarioHubViewOf(
       ...(view === undefined ? [SCENARIO_COPY.pathAbsent] : []),
     ]),
     note: SCENARIO_COPY.note,
-    startHere:
-      view !== undefined && clearedIds.size === 0 && view.rows[0]?.playable === true ? view.rows[0].id : undefined,
+    startHere: next?.id,
+    startHereLabel: next === undefined ? undefined : SCENARIO_COPY.startHere(next.position),
   });
 }

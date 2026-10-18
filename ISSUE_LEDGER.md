@@ -2,7 +2,7 @@
 
 One row per open issue, judged against [`GAME_PILLARS.md`](GAME_PILLARS.md). GitHub is the source of
 truth; this file is the working view. It supersedes `ISSUE_WORKER_LEDGER.md`, whose last snapshot is
-2026-08-09. Snapshot: **2026-10-17, cycle 2** (wave AQ, PR #632), against main `9af743e`. Cycle 1's triage was done
+2026-08-09. Snapshot: **2026-10-17, cycle 3** (wave AR, PR #634), against main `a9af59b`. Cycle 1's triage was done
 by three sub-agents; their evidence (file:line) is summarised in the *next action* column.
 
 Pillars: 1 playable · 2 understandable · 3 simple · 4 engaging during a run.
@@ -11,7 +11,7 @@ Pillars: 1 playable · 2 understandable · 3 simple · 4 engaging during a run.
 
 | task | issue | branch | state |
 |---|---|---|---|
-| none | | | wave AQ's four lanes are merged on PR #632 |
+| none | | | wave AR's four lanes are merged on PR #634 |
 
 ## Done this cycle
 
@@ -28,6 +28,15 @@ owner's call); a passing readout's tone while the day runs (§ D1381 forbids it)
 rail's "MID-DAY" with no clock; Rush's Lobby and Garage queues below the fold on a phone; "Switch to Engineer"
 clipped at 1280×600.
 
+## Cycle 3
+
+#626 and #631 were closed after a re-play of wave AQ confirmed them. Wave AR (PR #634) fixed #633: a hand-ended rush
+pays only for the waves it finished (it used to pay more than playing on), the Rush setup and the career desk stack on
+a phone, the rush result names the house run on the same crowd, the ticker holds with its chip, the stage header stays
+at the top, a repeated call names the order in force, the call card and screen reader agree, a stage's pair keeps
+painting and opens where the settings part, the path leads to the next stage, and a quiet career day points at Skip.
+**Owner decision opened:** § D1544, whether the opening career day should raise a call (four options recorded).
+
 ## Build now
 
 | # | title (short) | P | pillar | next action |
@@ -36,8 +45,7 @@ clipped at 1280×600.
 | 232 | Building set to the content-plan target | P1 | 2, 4 | **AC4 done** on PR #624 (`buildingFieldReach.test.ts`), with three inert fields filed as #625. AC1 has 17 of 22 buildings. AC2: owner sign-off on harbour-point and ashgate |
 | 625 | Three shipped building fields change no leg | P2 | 1 | Item 1's loader warning is fixed on PR #624. Owner: fix the data or keep each field with a reason |
 | 627 | Lobby tap targets on short windows wider than 720 px | P3 | 1 | Filed from the lobby review. Buildable |
-| 626 | Playtest: stage goal hidden before the run, nothing to watch, a 3-minute wait | P2 | 2, 4 | Wave AP fixed five of seven rows; wave AQ (#632) fixes the two "partly" rows. Close after #632 merges and a re-play confirms |
-| 631 | Playtest after wave AP: rungs flicker, Rush loses its best, the report buries its verdict | P2 | 1, 2, 4 | Wave AQ (#632) fixes most; the items under *Left open* above remain |
+| 633 | Playtest after wave AQ: Rush pays for quitting, the clock scrolls away, career day 1 is quiet | P1 | 1, 2, 4 | Wave AR (#634) fixes all but one: whether career day 1 should raise a call is an owner ruling (§ D1544) |
 
 ## Needs an owner decision
 

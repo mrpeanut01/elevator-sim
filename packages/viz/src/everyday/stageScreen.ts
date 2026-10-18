@@ -115,6 +115,7 @@ import {
   stageFilingLandsOn,
   stageGeometryOf,
   stageGoalsOf,
+  type StageGoalRow,
   stageHeaderOf,
   type StageInterventionRow,
   stageInterventionsOf,
@@ -124,6 +125,7 @@ import {
   stageOpeningLineOf,
   STAGE_OVERLAY_PLAY,
   stageBuildingScrollOf,
+  stageHeaderSticksOf,
   stageLitSpeedOf,
   stagePlayControlOf,
   stageHandoverVerdictOf,
@@ -142,10 +144,11 @@ import { actsOf, type DayAct } from '../shift/dayLength.js';
 import type { RunHorizon } from '../shift/types.js';
 import {
   firstLostInstantOf,
-  STAGE_SKIP_BEAT_NOTE,
   stagePaceNoteOf,
   stagePaceOf,
   stageSkipLineStands,
+  stageSkipSpeechOf,
+  stagePaceStateOf,
   stageStatusOf,
   stageSkipApplies,
   stageSkipLineOf,
@@ -163,6 +166,7 @@ import type { PressCall } from '../shift/pressCall.js';
 import {
   STAGE_CALL_COPY,
   stageCallCardOf,
+  stageCallStandingOrderOf,
   stageCallPresentOf,
   stageCallPhaseOf,
   stageEndDayOf,
@@ -202,6 +206,8 @@ import {
 import type { WatchingView, WatchOwner } from '../watch/view.js';
 import { driverNameAt, interventionLogOf } from '../live/interventions.js';
 import { campaignDockViewOf, type CampaignDockView } from './campaignDock.js';
+import { DIFFICULTIES } from '../campaign/economy.js';
+import { campaignTestGoals, contractAsksEyebrow } from './campaignModel.js';
 
 /* -------------------------------------------------------------------------- *
  * The module store — what the § 3.3 refinement reads
@@ -912,7 +918,20 @@ function mountStage(
    */
   const goalContract = el(doc, 'span', 'everyday-stage-goals-contract');
   goalContract.style.cssText = `font-size:11px;line-height:1.4;color:${C.inkSoft}`;
-  goals.append(goalHeading, goalContract, goalRows, goalNote);
+  /*
+   * **The week's five, folded under the contract's four on a career day** — wave AR, lane AR-4,
+   * GitHub issue #633. Closed by default: the four above are what file the day. Down everywhere else.
+   */
+  const goalWeek = el(doc, 'details', 'everyday-stage-goals-week') as HTMLDetailsElement;
+  goalWeek.style.cssText = `display:none;border-top:1px solid ${C.ruleLight};padding-top:6px`;
+  const goalWeekSummary = el(doc, 'summary', 'everyday-stage-goals-week-heading');
+  goalWeekSummary.style.cssText = `${EYEBROW};cursor:pointer`;
+  const goalWeekNote = el(doc, 'span', 'everyday-stage-goals-week-note');
+  goalWeekNote.style.cssText = `display:block;font-size:11px;line-height:1.4;color:${C.inkSoft};margin:4px 0`;
+  const goalWeekRows = el(doc, 'div', 'everyday-stage-goals-week-rows');
+  goalWeekRows.style.cssText = goalRows.style.cssText;
+  goalWeek.append(goalWeekSummary, goalWeekNote, goalWeekRows);
+  goals.append(goalHeading, goalContract, goalRows, goalNote, goalWeek);
 
   /**
    * **The alarm strip is a picture again, and its announcement moved to {@link alarmSay}** —
@@ -1818,7 +1837,8 @@ function mountStage(
     callCard.style.overflowY = '';
     const region = callCard.closest<HTMLElement>('.everyday-screen');
     if (region === null) return;
-    const room = region.clientHeight - 16;
+    /* § D1527: under a pinned header the card has the region less the header. */
+    const room = region.clientHeight - 16 - (headerSticks ? header.offsetHeight : 0);
     if (room > 0 && callCard.offsetHeight > room) {
       callCard.style.maxHeight = `${String(room)}px`;
       callCard.style.overflowY = 'auto';
@@ -1835,6 +1855,14 @@ function mountStage(
       skipAsk.hidden = true;
     }
     if (appearing) {
+      /*
+       * Wave AR, lane AR-2, § D1531: the live region still held the last sentence said while the
+       * stage moved (*0 legs waiting* at 09:46, before the skip that landed on the 10:40 call) beside a
+       * card saying *2 people are standing*. It is emptied as the card appears, which is a clearing
+       * and not an announcement, so the two-second limit is not stamped by it; the call's own frame is
+       * said by `announce` when the limit lifts.
+       */
+      if (description.textContent !== '') description.textContent = '';
       fitCallCardToRegion();
       callCard.scrollIntoView({ block: 'nearest', inline: 'nearest' });
       callCard.focus({ preventScroll: true });
@@ -1950,6 +1978,18 @@ function mountStage(
   if (context.ctx === 'rush') {
     root.insertBefore(interventions, header.nextSibling);
     root.insertBefore(endAsk, header.nextSibling);
+    /*
+     * **And the chips' notes go under the building** — wave AR, lane AR-1 (GitHub issue #633): on a
+     * 390×844 phone the header and the chips with their three notes filled the screen, so the
+     * building sat below the fold until *Play* scrolled it up and the chips off. Without the notes
+     * the chips are four short rows, and the stage starts on the first screen; *Play*'s scroll to the
+     * lobby rows (§ D1508) then leaves the chips in view. The notes keep their ids, so the picker's
+     * `aria-describedby` still names its note. Rush only. Recorded under [§ D405](../../../../DECISIONS.md).
+     */
+    const rushNotes = el(doc, 'div', 'everyday-stage-rush-notes');
+    rushNotes.style.cssText = `display:flex;flex-wrap:wrap;gap:${String(GAP.row)}px`;
+    rushNotes.append(switchPickerNote, interventionNote, parkingNote);
+    root.insertBefore(rushNotes, stageRow.nextSibling);
   }
   region.append(root);
 
@@ -2019,6 +2059,30 @@ function mountStage(
     requestFrame();
   }
 
+  /** Whether the header is pinned at the top of the page now — {@link syncHeaderStick}. */
+  let headerSticks = false;
+
+  /**
+   * **Pin the header while the building scrolls under it** — wave AR, lane AR-2,
+   * [§ D1527](../../../../DECISIONS.md), `stageScreenModel.ts#stageHeaderSticksOf`. Asked when the day
+   * starts playing and on a resize, never per frame, because it reads the header's laid-out height.
+   * The cards that scroll themselves into view keep a top margin of the header's height, so a pinned
+   * header never covers the call it stopped for.
+   */
+  function syncHeaderStick(): void {
+    const sticks = stageHeaderSticksOf({
+      headerHeight: header.offsetHeight,
+      regionHeight: region.clientHeight,
+      rush: context.ctx === 'rush',
+    });
+    headerSticks = sticks;
+    header.style.position = sticks ? 'sticky' : '';
+    header.style.top = sticks ? '0' : '';
+    header.style.zIndex = sticks ? '3' : '';
+    const margin = sticks ? `${String(header.offsetHeight + GAP.block)}px` : '';
+    for (const card of [callCard, lostCard, closeAsk, skipAsk]) card.style.scrollMarginTop = margin;
+  }
+
   /**
    * **Keep the building in view while the day plays** — wave AO, lane AO-4, the post-AN panel's seat
    * B (lost moment 9, defect 9), [§ D1385](../../../../DECISIONS.md) clause 4. Asked when a press sets the day playing: on a phone the header's
@@ -2033,10 +2097,13 @@ function mountStage(
    * card's scroll is made from a frame for the same reason.
    */
   function bringBuildingIntoView(): void {
+    syncHeaderStick();
     const box = canvas.getBoundingClientRect();
     const shown = region.getBoundingClientRect();
     const viewportBottom = view?.innerHeight ?? doc.documentElement.clientHeight;
     const seen = { top: Math.max(0, shown.top), bottom: Math.min(viewportBottom, shown.bottom) };
+    /* § D1527: a pinned header covers the top of what the player can see. */
+    if (headerSticks) seen.top = Math.max(seen.top, shown.top + header.offsetHeight);
     /* Wave AQ, lane AQ-2 (§ D1508): the lobby rows, where the day's deepest queue usually stands. */
     const by = stageBuildingScrollOf(box, seen);
     if (by !== 0) region.scrollTop += by;
@@ -2152,11 +2219,13 @@ function mountStage(
      * stops it); the pace note is drawn only where neither a stop nor a skip is speaking.
      */
     if (skipLine !== '') {
-      if (!stageSkipLineStands({ landedReason: skipLineReason, reason: answer.reason })) {
+      /* § D1525: past the allowance a waiter crossing the minute does not end the state the line names. */
+      const state = stagePaceStateOf(answer);
+      if (!stageSkipLineStands({ landedReason: skipLineReason, reason: state })) {
         skipLine = '';
         skipLineReason = undefined;
       } else if (skipLineReason === undefined) {
-        skipLineReason = answer.reason;
+        skipLineReason = state;
       }
     }
     setPace(note, answer.reason === 'call');
@@ -2263,10 +2332,16 @@ function mountStage(
     const lines = stageStatusOf({
       pace: paceText,
       stopped: paceStopped,
-      skip: skipArmedAtS !== undefined ? STAGE_SKIP_BEAT_NOTE : skipLine,
+      skip: stageSkipSpeechOf({ armedRealS: beatArmedRealS(), pace: watchedFrame?.pace, line: skipLine }),
     });
     if (paceNote.textContent !== lines.pace) paceNote.textContent = lines.pace;
     if (skipNote.textContent !== lines.skip) skipNote.textContent = lines.skip;
+  }
+
+  /** Real seconds the coming skip's beat has run, read off the transport, or `undefined` with none coming. */
+  function beatArmedRealS(): number | undefined {
+    if (skipArmedAtS === undefined || playback === undefined || !(playback.speed > 0)) return undefined;
+    return Math.max(0, (playback.simTimeS - skipArmedAtS) / playback.speed);
   }
 
   /** What the pace rule, or a call's stop, says now. */
@@ -2675,10 +2750,19 @@ function mountStage(
        * answer's line, a driver's from its own profile (the one driving now where it is the keep).
        */
       const driving = host.drivingProfile();
-      const card = stageCallCardOf(call, host.dayStartS(), bookedCars, standing.drivers, present, {
-        readings: host.goalsAt(call.atS),
-        driverOf: (name) => (driving.name === name ? driving : host.dispatchers().find((profile) => profile.name === name)),
-      });
+      const card = stageCallCardOf(
+        call,
+        host.dayStartS(),
+        bookedCars,
+        standing.drivers,
+        present,
+        {
+          readings: host.goalsAt(call.atS),
+          driverOf: (name) => (driving.name === name ? driving : host.dispatchers().find((profile) => profile.name === name)),
+        },
+        /* § D1528: a placement call after an earlier park or spread says so. */
+        stageCallStandingOrderOf(host.interventions(), call.atS),
+      );
       const heading = el(doc, 'div', 'everyday-stage-call-heading', card.heading);
       heading.style.cssText = `font:600 11px ${TYPE.mono};letter-spacing:0.08em;color:${C.label}`;
       const facts = card.facts.map((fact) => {
@@ -2771,6 +2855,8 @@ function mountStage(
       dayStartS,
       answeredStamp: answer === undefined ? undefined : interventionLogOf([answer], dayStartS)[0],
       hasRun: adopted !== undefined && !barFacts.dayClosed && !barFacts.recomputing,
+      /* § D1543: the playhead at the end of an unfiled day, the bar's own `dayEnded`. */
+      dayOver: adopted !== undefined && barFacts.dayEnded && !barFacts.dayClosed,
     });
   }
 
@@ -3121,7 +3207,28 @@ function mountStage(
     rushEntryFocusPending = false;
     const active = doc.activeElement;
     if (active === null || active === doc.body || active === doc.documentElement) playButton.focus({ preventScroll: true });
+    if (rushPlayOnArrival) {
+      rushPlayOnArrival = false;
+      if (playback?.state !== 'playing') togglePlay();
+    }
   }
+
+  /**
+   * **An Enter pressed before *Play* can take focus is kept** — wave AR, lane AR-1 (GitHub issue #633).
+   * Focus reaches *Play* only once the round's run lands, 0.6–2.1 s after *Start the rush*, and an
+   * Enter in that gap went to the page body and was lost. So while the entry focus is still owed and
+   * focus is nowhere, Enter or Space is the press of *Play*, carried out the moment *Play* can act.
+   * Rush only. Recorded under [§ D405](../../../../DECISIONS.md).
+   */
+  let rushPlayOnArrival = false;
+  function onRushEntryKey(event: KeyboardEvent): void {
+    if (!rushEntryFocusPending || (event.key !== 'Enter' && event.key !== ' ')) return;
+    const active = doc.activeElement;
+    if (active !== null && active !== doc.body && active !== doc.documentElement) return;
+    event.preventDefault();
+    rushPlayOnArrival = true;
+  }
+  if (context.ctx === 'rush') doc.addEventListener('keydown', onRushEntryKey);
 
   /**
    * **A day whose attempt another tab holds is shown here no further** — wave AO, lane AO-1,
@@ -3235,6 +3342,8 @@ function mountStage(
     if (ended !== barFacts.dayEnded) {
       barFacts.dayEnded = ended;
       context.refreshBar();
+      /* § D1543: the dock says the day is over on the same edge the bar hears it. */
+      syncDock();
       /*
        * § 7.2 E2 — `run_observed`, beat 1 of `docs/26 K2`'s chain, GitHub issue #340.
        *
@@ -3604,6 +3713,8 @@ function mountStage(
      */
     if (context.ctx === 'rush') {
       const session = host.rush();
+      /* Wave AR, lane AR-1: a round counts as running once its clock has moved, not at the press. */
+      if (session !== undefined && session.endedAtS === undefined && simTimeS > recording.startedAt) host.rushRoundPlaying();
       if (session?.holdAtS !== undefined && session.endedAtS === undefined && simTimeS >= session.holdAtS) {
         playback.pause();
         host.endRush(session.holdAtS);
@@ -3687,8 +3798,12 @@ function mountStage(
      * stopped. Wave AP, lane AP-D1: the Engineer transport follows this reach (§ D1449).
      */
     if (context.ctx === 'daily') host.noteShown(recording, playback.simTimeS);
-    /* A rush asks nothing of the day: § 9.2 has no brief and no goals to grade. */
-    goals.style.display = context.ctx === 'rush' ? 'none' : '';
+    /*
+     * A rush asks nothing of the day: § 9.2 has no brief and no goals to grade. Only the rush is
+     * written here: {@link drawGoals} owns the strip's display, and writing `''` over its `flex`
+     * dropped the column, so the heading ran into its sentence (wave AR, lane AR-4, GitHub #633).
+     */
+    if (context.ctx === 'rush') goals.style.display = 'none';
     drawWatching(watching);
 
     const alarmLine = stageAlarmOf(observations, labelOf);
@@ -4116,14 +4231,35 @@ function mountStage(
       day: week.day,
       /* The screen's own flow, never the recording's — GitHub issue #567. */
       contract: context.ctx === 'campaign',
+      /* § D1543: a career day leads with the contract's four, the tower's own, at its day. */
+      contractGoals: careerTowerGoals(),
     });
     goals.style.display = 'flex';
     goalHeading.textContent = strip.heading;
     goalContract.textContent = strip.contract;
     goalContract.style.display = strip.contract === '' ? 'none' : '';
     goalNote.textContent = strip.note;
+    drawGoalRows(goalRows, strip.rows);
+    const folded = strip.secondary;
+    goalWeek.style.display = folded === undefined ? 'none' : 'block';
+    if (folded !== undefined) {
+      if (goalWeekSummary.textContent !== folded.heading) goalWeekSummary.textContent = folded.heading;
+      if (goalWeekNote.textContent !== folded.note) goalWeekNote.textContent = folded.note;
+      drawGoalRows(goalWeekRows, folded.rows);
+    }
+  }
+
+  /** The open career tower's four tests, headed as the desk heads them, or `undefined` off a career day. */
+  function careerTowerGoals(): { readonly heading: string; readonly goals: ReturnType<typeof campaignTestGoals> } | undefined {
+    if (context.ctx !== 'campaign') return undefined;
+    const tower = host.campaignDay()?.tower;
+    if (tower === undefined) return undefined;
+    return { heading: contractAsksEyebrow(tower.day), goals: campaignTestGoals(DIFFICULTIES[tower.difficultyId]) };
+  }
+
+  function drawGoalRows(goalRows: HTMLElement, rows: readonly StageGoalRow[]): void {
     goalRows.replaceChildren();
-    for (const row of strip.rows) {
+    for (const row of rows) {
       const ink = GOAL_INK[row.state];
       const line = el(doc, 'div', 'everyday-stage-goal');
       line.dataset['goal'] = row.id;
@@ -4371,6 +4507,7 @@ function mountStage(
 
   const unsubscribe = host.subscribe(onHostChange);
   const onResize = (): void => {
+    syncHeaderStick();
     requestFrame();
   };
   view?.addEventListener('resize', onResize);
@@ -4426,6 +4563,7 @@ function mountStage(
       }
       pendingFrame = undefined;
       view?.removeEventListener('resize', onResize);
+      doc.removeEventListener('keydown', onRushEntryKey);
       unsubscribe();
       playback = undefined;
       adopted = undefined;

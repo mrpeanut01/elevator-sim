@@ -177,4 +177,23 @@ describe('a round the page closed on is said once on the way back — wave AQ, l
     expect(store.unfinished()).toBeUndefined();
     expect(hostOver(createRushDeviceStore(backing)).host.rushUnfinished()).toBeUndefined();
   });
+
+  it('marks a round running only once it has played, so a round started again and left at 0:00 is not lost — wave AR', () => {
+    const { backing } = mapBacking();
+    const store = createRushDeviceStore(backing);
+    const { host } = hostOver(store);
+    host.startRush();
+    expect(store.running(), 'the press alone plays nothing').toBeUndefined();
+    host.rushRoundPlaying();
+    expect(store.running()).toBe(BUILDING);
+    host.endRush(600);
+    expect(store.running()).toBeUndefined();
+    host.rushRoundPlaying();
+    expect(store.running(), 'an ended round is not running again').toBeUndefined();
+    /* Run the rush again: nothing is marked until the new round plays. */
+    host.startRush();
+    expect(store.running()).toBeUndefined();
+    host.rushRoundPlaying();
+    expect(store.running()).toBe(BUILDING);
+  });
 });

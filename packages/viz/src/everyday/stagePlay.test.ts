@@ -24,7 +24,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { restrictedFloorIds } from '../access/zoning.js';
 import { stageGoalNameOf } from '../campaign/judge.js';
 import { parseCampaign, type CampaignContext } from '../campaign/parse.js';
-import { batchRequestForStage, demonstrationConfigFor } from '../campaign/stageRun.js';
+import { batchRequestForStage, demonstrationConfigFor, stageWatchConfigsOf } from '../campaign/stageRun.js';
 import { admitStageMove, routeRefusalsOf, routeUnitsOf, stagePathOf, stageUnitsAt } from '../campaign/stagePress.js';
 import type { CampaignStage } from '../campaign/types.js';
 import { DATA_DIR, requireBuilding } from '../fixtures.test-helper.js';
@@ -52,6 +52,8 @@ import {
   stageWatchAfterEndOf,
   stageWatchBusy,
   stageWatchPaceOf,
+  stageWatchStartOf,
+  STAGE_WATCH_LEAD_S,
   verdictFactsOf,
   type StagePlayChoice,
   type StagePlayVerdictFacts,
@@ -813,4 +815,64 @@ describe('the verdict draws the same-counts sentence it was given — wave AQ la
     expect(drawn('shipped')).toBe(STAGE_PLAY_COPY.sameAsShipped);
     expect(drawn('previous')).toBe(STAGE_PLAY_COPY.sameAsPrevious);
   });
+});
+
+describe('the pair opens where the two settings first differ — wave AR lane AR-3, GitHub issue #633', () => {
+  /** Replication 0 under the stage's setting and under `choice`, as the page records them. */
+  function pairOf(stage: CampaignStage, choice: StagePlayChoice): readonly [VizRecording, VizRecording] {
+    const move = stageMoveOf(choice, config.dispatcherProfiles.profiles, { space });
+    const baseline = config.dispatcherProfilesById.get(stage.dispatcher.startingProfileId);
+    if (move === undefined || baseline === undefined) throw new Error('no move');
+    const admission = admitStageMove(admissionContextOf(stage), move, Math.max(stageUnitsAt(stage, null), 1_000));
+    if (admission.candidate === undefined) throw new Error(admission.sentence);
+    const configs = stageWatchConfigsOf({
+      stage,
+      building: requireBuilding(config, stage.building),
+      baseline,
+      candidate: admission.candidate,
+      trafficProfiles: config.trafficProfiles,
+      elevatorSpecs: config.elevatorSpecs,
+      dispatcherProfiles: config.dispatcherProfiles,
+    });
+    return [
+      recordRun(configs.baseline, { recordDecisions: false }).recording,
+      recordRun(configs.candidate, { recordDecisions: false }).recording,
+    ];
+  }
+
+  /** Real seconds the pair plays, from `fromS`, before its two panes first show different frames. */
+  function sameRealSecondsFrom(pair: readonly [VizRecording, VizRecording], fromS: number): number {
+    const watching = DEFAULT_STAGE_SIM_PER_REAL_S;
+    const step = 0.05;
+    let sim = fromS;
+    let real = 0;
+    while (sim < pair[0].endedAt) {
+      const frames = pair.map((pane) => frameAt(pane, sim));
+      if (JSON.stringify(frames[0]?.cars.map((car) => [car.heightM.toFixed(2), car.doorPhase, car.occupants])) !==
+        JSON.stringify(frames[1]?.cars.map((car) => [car.heightM.toFixed(2), car.doorPhase, car.occupants]))) break;
+      sim += stageWatchPaceOf({ frames, watchingSimPerRealS: watching }) * step;
+      real += step;
+    }
+    return real;
+  }
+
+  it('starts stage 2 with lobby parking just before the panes part, not on eight seconds of one picture', () => {
+    const stage = stageAt(1);
+    const pair = pairOf(stage, { profileId: stage.dispatcher.startingProfileId, parking: 'lobby' });
+    const start = stageWatchStartOf(pair[0], pair[1]);
+    /* The defect, measured from the run's start: the two panes looked alike for seconds. */
+    expect(sameRealSecondsFrom(pair, pair[0].startedAt), 'the panes part at once; this case tests nothing').toBeGreaterThan(4);
+    expect(start).toBeGreaterThan(pair[0].startedAt);
+    expect(sameRealSecondsFrom(pair, start)).toBeLessThan(3);
+    /* The lead-in is there: the start is a moment before the first difference, not on it. */
+    expect(stageWatchStartOf(pair[0], pair[1])).toBe(start);
+    expect(sameRealSecondsFrom(pair, start)).toBeGreaterThan(0);
+    expect(STAGE_WATCH_LEAD_S).toBeGreaterThan(0);
+  }, 60_000);
+
+  it('starts at the run’s start when the press moved nothing', () => {
+    const stage = stageAt(0);
+    const pair = pairOf(stage, { profileId: stage.dispatcher.startingProfileId, parking: null });
+    expect(stageWatchStartOf(pair[0], pair[1])).toBe(pair[0].startedAt);
+  }, 60_000);
 });

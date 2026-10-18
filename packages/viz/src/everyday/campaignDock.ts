@@ -47,6 +47,13 @@ export const CAMPAIGN_DOCK_COPY = Object.freeze({
   happeningNow: 'HAPPENING NOW',
   quietHeading: 'NOTHING HAPPENING',
   quietNote: 'The building is running on the order you gave it this morning. If that changes, it appears here with a clock on it.',
+  /**
+   * **Once the day has run out** — wave AR, lane AR-4, GitHub issue #633. The dock read *NOTHING
+   * HAPPENING* over a finished day, so the stage never said the day was over. The dock is drawn on a
+   * career day only, where the primary beside it is *Close the day*, so the instruction is true here.
+   */
+  overHeading: 'DAY OVER',
+  overNote: 'The day is over. Close it to file.',
   /** § 7.5's footer, verbatim. */
   footerOpen: 'Choose whenever you like — nothing changes until you do, and the day carries on without an answer.',
   /** § 7.5's footer once answered, verbatim. */
@@ -131,6 +138,11 @@ export interface CampaignDockInput {
   readonly answeredStamp: string | undefined;
   /** Whether a run is on the stage at all — the options are refused without one. */
   readonly hasRun: boolean;
+  /**
+   * Whether the stage's playhead has reached the run's end and the day is not yet filed. A quiet or
+   * unanswered dock then says the day is over; an answered one keeps its stamp.
+   */
+  readonly dayOver?: boolean | undefined;
 }
 
 function units(value: number): string {
@@ -183,6 +195,12 @@ export function campaignDockViewOf(input: CampaignDockInput): CampaignDockView {
     figures,
     otherLevers: CAMPAIGN_DOCK_COPY.otherLevers,
   };
+  if (input.dayOver === true && (incident === undefined || input.answeredStamp === undefined)) {
+    return {
+      ...base,
+      incident: { kind: 'quiet', heading: CAMPAIGN_DOCK_COPY.overHeading, note: CAMPAIGN_DOCK_COPY.overNote },
+    };
+  }
   if (incident === undefined || input.simTimeS < incident.atS) {
     return {
       ...base,

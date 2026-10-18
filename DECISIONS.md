@@ -53296,6 +53296,8 @@ hashes prose it does not read, so it is left for a lane that may regenerate or n
 
 ## D1506 — once slowed for a wait the stage stays slowed ten real seconds, and its three lines tell one story
 
+> **Status 2026-10-17: AMENDED by [§ D1525](#d1525)** (an agent ruling). Clause 2's lines: the slowed rung has one line through its dwell, *slowed to your speed, 4×, for a wait on a landing of over a minute*, and past the allowance a frame with nobody past a minute reads the played-on line, with the skip's beat drawn once it has run a real second. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-10-17 by an agent session under delegated authority** (wave AQ, lane AQ-2, on the
 > first-time-player playtest, GitHub issue #631), not by the product owner, and to be read as an
 > agent ruling. **Amends [§ D1493](#d1493)** clause 1's line and its measured press day, and reads
@@ -53430,3 +53432,263 @@ second tab's exact locked-out state was not reproduced, so the disabled chips ar
 no-run rule.
 
 **Numbers spent.** This lane held **D1515 to D1523** and spent **D1515 only**.
+
+---
+
+## D1516 — a rush round ended by hand is paid only for the waves it got through before the stop
+
+> **Taken 2026-10-17 by an agent session** (wave AR, lane AR-1, on GitHub issue #633's Rush P1), not
+> by the product owner, and to be read as an agent ruling. **Amends [§ D542](#d542) clause 3**
+> (*"a replay has no hand stop, so a round whose replay never crosses the line outlasted every
+> generated wave"*), which stays as written. Owner-reversible.
+
+**Why an entry.** It moves a recorded reading and binds `core` (`sim/rush.ts#rushWavesOutlasted`),
+the server's replay (`leaderboard/rushSitting.ts`) and the sitting's wire, none of which the rush
+screens own.
+
+1. **The defect.** The purse paid a round on its recording's hold moment, which lies past a hand
+   stop. A round ended by hand in wave 2 on Midtown Office was paid the nine waves the whole run
+   outlasts (18 units), more than a round played to the line in wave 9 (16). That contradicts the
+   setup page's *"Each wave a round outlasts pays 2 units"*, whose sentence is kept.
+2. **The rule.** A stop is read exactly like a crossing: a round stopped in wave `n` pays `n − 1`,
+   and a stop after the crossing changes nothing. `rushWavesOutlasted` takes the stop as a third
+   argument and both ends call it.
+3. **The wire carries the stop as a cause.** A round gains `stoppedS` (seconds from its start, absent
+   when the line or the run's end ended it). The server reads it and never compares it, because its
+   replay runs past the stop and cannot see it. A stop can only lower a round's pay, so a client gains
+   nothing by sending one. A client that omits it is paid as before, which no server can tell apart.
+4. **A last round with a stop before its line is refused `no-breaking-point`**, in its own words:
+   § D515's hand-stop rule, now enforced by the server as well as the client.
+
+**What holds it.** `core`'s `sim/rush.test.ts` (the arithmetic, and that a stop never raises pay),
+`packages/viz/src/everyday/host.test.ts` (a round stopped in wave 2 pays one wave through the host's
+own verbs, red on the base at 12 units), and `packages/server/src/leaderboard/rushSitting.test.ts`
+(the replay pays the stop, keeps its held time, refuses a stopped last round and a malformed stop).
+
+## D1525 — the line beside the speed chips changes only when the chip does
+
+> **Taken 2026-10-17 by an agent session under delegated authority** (wave AR, lane AR-2, on the
+> re-play after wave AQ, GitHub issue #633), not by the product owner, and to be read as an agent
+> ruling. **Amends [§ D1506](#d1506) clause 2.** Owner-reversible: the line, and
+> `stagePace.ts#StagePace.playedOn`.
+
+**What was found.** On Midtown's Monday at `4×`, at 12:27 and 17:33, the line flipped up to four
+times a real second between *nobody on a landing has waited a minute: skipping ahead…* and
+*fast-forwarding at 30×: you have watched a while…* while the `30×` chip stayed lit. Past
+[§ D1493](#d1493)'s allowance a waiter crossing the minute moves the stage between `unheld` and
+`fast` at one rung; `fast` armed the skip's beat, whose note speaks over the pace line, and `unheld`
+dropped it. Inside the allowance the slowed rung did the same between § D1506's two slowed lines.
+
+**The ruling.** A `fast` frame past the allowance carries `playedOn` and reads the `unheld` line; the
+beat's note is drawn there only once the beat has run a real second (corrected below); a skip's line stands
+across `unheld` and `fast` there (`stagePaceStateOf`). The slowed rung has one line, *slowed to your
+speed, 4×, for a wait on a landing of over a minute*, true while the wait stands and through the
+dwell. **The speed and the skip are unchanged**, so no day length or first-call figure moves. A
+ten-second dwell on the played-on rung was built and withdrawn: it moved the press day's first call
+from 63.0 to 87.2 real seconds.
+
+**Corrected on the integrated head.** The first cut drew the skip's beat note nowhere past the
+allowance, so skips there landed with no warning a pause or a chip could act on (§ D1212, § D1266),
+and the browser tier's skip case waited 480 s for a beat that never came. Past the allowance the beat
+note is now drawn once the beat has run half its length (`stagePace.ts#SKIP_BEAT_SHOWN_PLAYED_ON_REAL_S`,
+one real second), so every skip is warned for at least a second and a beat a waiter ends sooner,
+the flip, is never drawn. Beat timing is unchanged.
+
+**What holds it.** `everyday/stagePace.test.ts`, *the line holds while the rung does*: the stage's
+frame loop and status writer over a series crossing the minute every 7.5 simulated seconds changes
+the line over thirty times in ten real seconds at a lit `30×` without `playedOn` (red before) and
+never without a chip change with it.
+
+## D1526 — the chip's dwell stays at ten real seconds
+
+> **Taken 2026-10-17 by an agent session under delegated authority** (wave AR, lane AR-2, GitHub
+> issue #633 item 2), not by the product owner. **Reads [§ D1506](#d1506) and [§ D1493](#d1493)
+> unchanged.**
+
+**What was found.** The chips still moved on their own every 2 to 15 real seconds, three to five
+times in thirty, around 10:44 and 17:25: both just after a call, which restarts the allowance.
+
+**The ruling.** No longer dwell and no wait hysteresis. § D1506's bound, at most four moves between
+two decisions, holds on the real day, and the re-play's counts are that bound read across a call. A
+twenty-second dwell would make the bound two, and puts the press day's first call at 67.0 real
+seconds by `stagePace.test-helper.ts#scoredDayPlayOf` (65.0 at fifteen, which keeps the bound at
+four), against the 65-second ceiling the lane was given.
+
+**What holds it.** `everyday/stagePace.test.ts`, *how often the chip may move between two
+decisions*: Midtown's whole day through the real transport moves the chip four times with no call,
+and 2, 2 and 4 times around two calls five game minutes apart.
+
+## D1527 — the stage's header stays at the top while the building scrolls under it
+
+> **Taken 2026-10-17 by an agent session under delegated authority** (wave AR, lane AR-2, GitHub
+> issue #633 item 3), not by the product owner. **Extends [§ D1508](#d1508).** Owner-reversible:
+> `stageScreenModel.ts#STAGE_HEADER_STICKY_SHARE` (`0` never pins it).
+
+**What was found.** § D1508 scrolls to the lobby rows once the day plays, which took the clock,
+*standing right now* and *away inside a minute* off the top at 1280×800.
+
+**The ruling.** Where the header is at most 30 % of the screen region's height it is sticky at the
+top (`stageHeaderSticksOf`); never in a rush, whose chips sit under it, and not on a phone, whose
+header wraps. The call, lost, close and skip cards keep a top margin of its height when they scroll
+themselves into view, and the call card is fitted to the region less the header.
+
+**What holds it.** `everyday/stagePace.browser.test.ts`, *keeps the clock, the live readouts and the
+lobby rows in view together after Play, at 1280×800* (red before: the clock above the visible top),
+and `stageScreenModel.test.ts`.
+
+## D1528 — the day's calls stay where they are, and a placement call asked again names the order in force
+
+> **Taken 2026-10-17 by an agent session under delegated authority** (wave AR, lane AR-2, GitHub
+> issue #633 item 4), not by the product owner. Reads [§ D1166](#d1166) and [§ D1205](#d1205)
+> unchanged. Owner-reversible: the sentence.
+
+**What was found.** Calls come in pairs five game minutes apart (12:20 and 12:25, 17:20 and 17:25),
+which is [§ D1166](#d1166)'s spacing, and the 12:20 and 17:20 calls asked *What do the cars do?*
+after the player had parked them at 10:40.
+
+**Refused: moving or dropping a call.** Every raised call is a branch the call census reads
+(`data/call-bands.json`, which `callBands.sweep.test.ts` requires row for row), the call-rhythm
+tables of § D1138, § D1166 and § D1205 (`dayCalls.sweep.test.ts`), and the asks-on column of
+`firstDayLength.ts`. Merging calls under ten minutes apart, or skipping a placement call after one
+was answered, changes which runs exist and so those figures. Reported, not done.
+
+**The ruling.** A placement call after a park or spread press says *Since 10:40, idle cars wait at
+the lobby. Keep that, or change it?* (`stageCall.ts#stageCallAskedAgainOf`, from the last such press before the
+call, `stageCallStandingOrderOf`, which is `core`'s own rule for the order in force). The answers and
+the runs are unchanged. The issue's wording, *You parked the cars at 10:40*, credits the press, which
+the honesty corpus refuses without a declared attribution ([§ D1011](#d1011)), so the card states
+the order in force instead.
+
+**What holds it.** `everyday/stageCall.test.ts`, *a placement call asked again names the order in
+force*.
+
+## D1529 — calls in a row that say the same *no difference* are said once
+
+> **Taken 2026-10-17 by an agent session under delegated authority** (wave AR, lane AR-2, GitHub
+> issue #633 item 5), not by the product owner. Owner-reversible: the heading.
+
+Neighbouring call rows whose lead, readings and note are the same string and read *no answer has made
+a difference* become one row headed *The calls at 17:20 and 17:25* (`stageCallRow.ts`). A row with
+any word of its own stands alone. Held by `everyday/stageCallRow.test.ts`.
+
+## D1530 — a held day's driver cards read locked, and the door's held note goes past tense
+
+> **Taken 2026-10-17 by an agent session under delegated authority** (wave AR, lane AR-2, GitHub
+> issue #633 item 6), not by the product owner. Reads [§ D1497](#d1497) clause 6 unchanged.
+
+The brief's disabled driver cards said *tap to choose*; they now say *locked today*
+(`briefView.ts#BRIEF_DRIVER_LOCKED`). The door's driving note reads *Held for the stage's call, which
+is over.* once the attempt has answered or skipped its pinned call (`EverydayHost.pinnedCallDone`) or
+today is banked (`doorView.ts#DOOR_DRIVER_NOTE_HELD_PAST`). Held by `briefView.test.ts` and
+`doorView.test.ts`.
+
+## D1531 — the live region is emptied when a call card appears, so it never says another count beside it
+
+> **Taken 2026-10-17 by an agent session under delegated authority** (wave AR, lane AR-2, on the
+> integrator's finding from GitHub issue #633), not by the product owner. Reads the post-AI panel's
+> D7 rule (a stopped frame is said when the two-second limit lifts) unchanged.
+
+**What was found.** At Midtown's 10:40 call the card said *2 people are standing* and the live region
+said *0 legs waiting*. The two counts agree at the call second (`honesty/agreement.ts`'s
+`standing-said`, and a probe of the press day: 2 and 2). The region was stale: it held the sentence
+written at 09:46 as a skip began, and the call's own frame was scheduled for when the rate limit
+lifted, up to two seconds after the card appeared.
+
+**The ruling.** When the call card appears the region is emptied, a clearing that does not stamp the
+limit, and the call's frame is said when the limit lifts, as before. The limit is not bypassed.
+
+**What holds it.** `everyday/stagePace.browser.test.ts`, *never leaves the live region saying another
+count beside the call card* (red before: `0 legs waiting` beside the card's 2).
+
+**Numbers spent.** This lane held **D1525 to D1533** and spent **D1525 to D1531**; D1532 and D1533
+are unspent.
+
+## D1534 — a Scenario stage leads to the next stage, folds a held row's reason, and opens its pair where the settings part
+
+> **Taken 2026-10-17 by an agent session under delegated authority** (wave AR lane AR-3, on the
+> playtest after wave AQ, GitHub issue #633), not by the product owner, and to be read as an agent
+> ruling. **Amends [§ D1497](#d1497)** rulings 2 and 5, and wave AQ lane AQ-1's rule that a held path
+> row's reason stays on the card's face. Owner-reversible: every item below.
+
+**Why an entry.** It moves two parts of a recorded ruling and binds `everyday/actionBar.ts` (a leave
+cell may name its screen), `everyday/shell.ts` (which honours it), `everyday/scenarioModel.ts` and the
+honesty register.
+
+**The ruling.**
+
+1. **The path's primary plays the next stage.** `ScenarioHubView.startHere` is the first offered row
+   this device has not cleared, on every visit rather than the first, and the bar names it *Play stage
+   ⟨n⟩*. With every offered stage cleared it is the table's *Play today's scenario* as before.
+2. **A cleared stage's primary is *Next stage*,** the same next stage, opened on the page; the bar is
+   no longer inverted, so *Return to Main Menu* no longer takes the press. With nothing left it is
+   *Back to the path*.
+3. **A stage's *Leave this building* goes back to the path**, not to Modes.
+4. **A held row's reason folds under *Details*** with the census, and the face says *Not open to play
+   yet. Details says why.* A cleared row's par note (*Par is free here…*) folds too; the par mark
+   stays on the face.
+5. **The pair opens where the two runs first differ**, ten simulated seconds before
+   (`stagePlay.ts#stageWatchStartOf`), and replays from there; a press that moved nothing opens at the
+   start. On stage 2 with lobby parking the panes showed one picture for 10.5 real seconds before, 2.5
+   after. Where the pair starts only: the verdict is the fifty crowds' as before.
+6. **The moved-no-count line sits under the verdict's head**, and the reveal brings it into view.
+
+**Not a ruling, a defect.** The pair froze for seconds while the batch ran because each progress
+message redrew the page, and each redraw asked the one check of every route on every stage again. The
+stage context is now cached on the loaded data, which is all it reads, so no answer moves.
+
+**What holds it.** `scenarioModel.test.ts` (the next stage after a clear), `stagePlay.test.ts` (the
+pair's start on stage 2), `stageWatch.browser.test.ts` (no 1 s stall during the batch, measured 3.8 s
+before; the same-counts line in view), `stageClearPays.browser.test.ts` (*Next stage*, the leave to
+the path, the path's *Play stage ⟨n⟩*) and `scenarioScreen.browser.test.ts` (held reasons folded).
+
+**Numbers spent.** This lane held **D1534 to D1542** and spent **D1534 only**.
+
+## D1543 — the career day leads with the contract's four, says when it is over, and points a quiet day at Skip
+
+> **Taken 2026-10-17 by an agent session** (wave AR, lane AR-4, on GitHub issue #633's Career rows),
+> not by the product owner, and to be read as an agent ruling. **Amends [§ D1301](#d1301)**'s desk
+> census (it now leads somewhere) and **[§ D1452](#d1452)**'s two-set reading on the stage.
+> Owner-reversible: every clause.
+
+**Why an entry.** It binds `everyday/stageScreen.ts` and `everyday/reportView.ts`, which the career
+modules do not own, and moves what § 567's stage strip leads with.
+
+1. **The stage leads with the four that file the day.** On a career day the strip is headed
+   `contractAsksEyebrow(day)` over `campaignTestGoals` at the tower's difficulty, read on the same fold
+   and stood down the same way as the five (`stageScreenModel.ts#stageGoalsOf`'s `contractGoals`); the
+   week's five fold beneath, closed, saying the contract counts none of them.
+2. **The heading no longer runs into its sentence.** The frame wrote `display:''` over the strip's
+   `flex`; only a rush writes the strip's display there now.
+3. **The dock says the day is over**: *DAY OVER · The day is over. Close it to file.*, on the edge the
+   bar hears it, over a quiet or unanswered dock (`campaignDock.ts`).
+4. **A day the census says every driver clears is offered as one to watch.** The desk's primary is
+   the guide's *Watch a day here*, and its note says the day needs no decision and *Skip to the end*
+   files it in seconds. Skip still stops at any call the day raises.
+5. **A cleared day's levers are optional**: *Nothing needed today. If you want to try something
+   anyway*, over the same cards in the same order.
+6. **The building desk stacks below about 690 px** (flex-wrap sidebar), so the quiet card is never
+   behind the standing order.
+
+**What holds it.** `everyday/goalSets.test.ts`, `everyday/campaignDock.test.ts`,
+`everyday/reportView.test.ts` and three cases in `everyday/campaignScreens.browser.test.ts` (390×844,
+desktop, and the day). Red on the base: the three browser cases (the quiet card measured 38 px).
+
+**Not established.** See [§ D1544](#d1544).
+
+## D1544 — Not established: whether the opening career day should raise a call
+
+> **Opened 2026-10-17 by an agent session** (wave AR, lane AR-4) for the product owner. Nothing is
+> built on it.
+
+The playtest's day 1 at Garden Apartments had 21 riders and no call, because a call needs somebody
+to wait a minute. § 8.12 opens the career on *"one forgiving building and a trivial choice"*, and
+`campaign/calendar.ts` books nothing before day 3 under `docs/33` § 20.13. § D1543 clause 4 shortens
+that day honestly; it does not give it a decision. The options, none taken:
+
+- **A.** Open the career on a contract whose first day raises a call (none measured yet). Moves
+  § 8.12's arc and the opening purse; the economy tests would need re-deriving.
+- **B.** Book a calendar day on `c1` day 1 (a move-in). Overrides § 20.13's *nothing before day 3*.
+- **C.** Grow day 1's crowd on `c1`. Moves a measured figure (§ D1066's growth slope).
+- **D.** Keep a quiet first day and § D1543's short path (what ships).
+
+**Numbers spent.** This lane held **D1543 to D1551** and spent **D1543 and D1544**.

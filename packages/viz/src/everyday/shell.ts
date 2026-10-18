@@ -2129,7 +2129,10 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
        * rather than the table's because it is a fact about *being on* the row, not about the row.
        */
       leaveBtn.title = MENU_LEAVE_REASON;
-    } else leaveBtn.addEventListener('click', requestLeave);
+    } else {
+      const leaveTo = model.leave.screen;
+      leaveBtn.addEventListener('click', leaveTo === undefined ? requestLeave : () => go(leaveTo));
+    }
     bar.append(leaveBtn);
 
     if (model.back !== undefined) {

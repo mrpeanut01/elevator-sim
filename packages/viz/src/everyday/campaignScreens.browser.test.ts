@@ -51,8 +51,8 @@ afterAll(async () => {
 });
 
 /** A cold load, settled — the Engineer menu dismissed, so `dev/main.ts`'s boot has published a host. */
-async function coldLoad(): Promise<Page> {
-  const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
+async function coldLoad(viewport = { width: 1440, height: 900 }): Promise<Page> {
+  const page = await openPage(browser, { viewport });
   await page.goto(`${origin}?building=garden-apartments&seed=424242`, { waitUntil: 'load' });
   await page.waitForFunction(
     () => document.querySelector<HTMLElement>('.menu-overlay')?.hidden === true,
@@ -293,6 +293,113 @@ describe.skipIf(!HAS_BROWSER)('the Everyday campaign screens', () => {
     // Visible, beside a control that still works — refused, never hidden or disabled.
     expect(await page.locator('.everyday-campaign-build').isVisible()).toBe(true);
     expect(await page.locator('.everyday-campaign-build').isDisabled()).toBe(false);
+    await page.close();
+  });
+
+  /*
+   * ---- Wave AR, lane AR-4 — GitHub issue #633, § D1543 ----
+   *
+   * The playtest's career findings on the built bundle: at 390 px the desk overlapped itself, with
+   * the *Running itself* card 38 px wide behind the standing order; the day screen led with the
+   * week's five and ran its heading into the sentence under it; and a finished day never said so.
+   */
+  it('stacks the building desk at 390×844, so nothing sits behind the standing order', async () => {
+    const page = await coldLoad({ width: 390, height: 844 });
+    await enterCampaign(page);
+    await page.click('.everyday-towers-open');
+    await page.waitForSelector('.everyday-building-quiet');
+    const layout = await page.evaluate(() => {
+      const box = (node: Element | null) => node?.getBoundingClientRect();
+      const quiet = box(document.querySelector('.everyday-building-quiet'));
+      const sideCards = [...document.querySelectorAll('.everyday-building-side > *')].map((node) => node.getBoundingClientRect());
+      const main = box(document.querySelector('.everyday-building-main'));
+      const side = box(document.querySelector('.everyday-building-side'));
+      const overlaps = sideCards.filter(
+        (card) =>
+          quiet !== undefined &&
+          card.width > 0 &&
+          card.left < quiet.right &&
+          quiet.left < card.right &&
+          card.top < quiet.bottom &&
+          quiet.top < card.bottom,
+      ).length;
+      return {
+        quietWidth: quiet?.width ?? 0,
+        mainWidth: main?.width ?? 0,
+        sideBelow: side !== undefined && main !== undefined && side.top >= main.bottom,
+        overlaps,
+        scrollsSideways: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+      };
+    });
+    expect(layout.quietWidth).toBeGreaterThan(280);
+    expect(layout.mainWidth).toBeGreaterThan(280);
+    expect(layout.sideBelow).toBe(true);
+    expect(layout.overlaps).toBe(0);
+    expect(layout.scrollsSideways).toBe(false);
+    await page.close();
+  });
+
+  it('keeps the two columns side by side on a desktop', async () => {
+    const page = await coldLoad();
+    await enterCampaign(page);
+    await page.click('.everyday-towers-open');
+    await page.waitForSelector('.everyday-building-side');
+    const sideBySide = await page.evaluate(() => {
+      const main = document.querySelector('.everyday-building-main')?.getBoundingClientRect();
+      const side = document.querySelector('.everyday-building-side')?.getBoundingClientRect();
+      return main !== undefined && side !== undefined && side.left >= main.right && Math.abs(side.top - main.top) < 2;
+    });
+    expect(sideBySide).toBe(true);
+    await page.close();
+  });
+
+  it('leads the career day with the contract’s four, says what they decide on its own line, and says when the day is over', async () => {
+    const page = await coldLoad();
+    await enterCampaign(page);
+    await page.click('.everyday-towers-open');
+    await page.waitForSelector('.everyday-building');
+    /* The census lands off the main thread; once it says every driver clears, the bar says so. */
+    await page.waitForFunction(
+      () => (document.querySelector('.everyday-bar-primary')?.textContent ?? '') === 'Watch a day here',
+      undefined,
+      { timeout: 60_000 },
+    );
+    expect(await page.textContent('.everyday-bar')).toContain('Skip to the end files it in seconds');
+    await page.click('.everyday-bar-primary');
+    await page.waitForFunction(
+      () => (document.querySelector<HTMLElement>('.everyday-stage-goals')?.style.display ?? 'none') === 'flex',
+      undefined,
+      { timeout: 60_000 },
+    );
+    const strip = await page.evaluate(() => {
+      const heading = document.querySelector('.everyday-stage-goals-heading');
+      const sentence = document.querySelector('.everyday-stage-goals-contract');
+      const h = heading?.getBoundingClientRect();
+      const c = sentence?.getBoundingClientRect();
+      return {
+        heading: heading?.textContent ?? '',
+        sentence: sentence?.textContent ?? '',
+        separate: h !== undefined && c !== undefined && c.top >= h.bottom - 0.5,
+        rows: document.querySelectorAll('.everyday-stage-goals-rows > .everyday-stage-goal').length,
+        weekOpen: document.querySelector<HTMLDetailsElement>('.everyday-stage-goals-week')?.open,
+        weekRows: document.querySelectorAll('.everyday-stage-goals-week-rows > .everyday-stage-goal').length,
+      };
+    });
+    expect(strip.heading).toBe('WHAT THE CONTRACT ASKS ON DAY 1');
+    expect(strip.sentence).toContain('cleared or missed against the contract');
+    expect(strip.separate).toBe(true);
+    expect(strip.rows).toBe(4);
+    expect(strip.weekOpen).toBe(false);
+    expect(strip.weekRows).toBe(5);
+
+    /* Skip to the end — the short path the desk named — and the dock says the day is over. */
+    await page.click('.everyday-stage-skip');
+    await page.waitForFunction(
+      () => (document.querySelector('.everyday-stage-dock')?.textContent ?? '').includes('The day is over. Close it to file.'),
+      undefined,
+      { timeout: 60_000 },
+    );
+    expect(await page.textContent('.everyday-stage-dock')).not.toContain('NOTHING HAPPENING');
     await page.close();
   });
 });

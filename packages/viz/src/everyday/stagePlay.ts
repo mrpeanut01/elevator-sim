@@ -69,7 +69,8 @@ import {
 } from '../campaign/stagePress.js';
 import { stageGoalNameOf, type StageReport } from '../campaign/judge.js';
 import type { CampaignStage } from '../campaign/types.js';
-import type { Frame } from '../contract/types.js';
+import type { Frame, VizRecording } from '../contract/types.js';
+import { frameAt } from '../frame/frameAt.js';
 import { emptyFixitState, parkingPriceUnits } from '../fixit/engine.js';
 import type { EditorParkingStrategy } from '../fixit/types.js';
 import type { PriceSchedule } from '../pricing/types.js';
@@ -159,6 +160,8 @@ export const STAGE_PLAY_COPY = Object.freeze({
   runLabel: 'Run the stage',
   runAgainLabel: 'Run it again',
   backLabel: 'Back to the path',
+  /** Wave AR lane AR-3, GitHub issue #633: a cleared stage's press, while a stage is left to clear. */
+  nextStageLabel: 'Next stage',
   runningLabel: 'Running the stage…',
   runningWhy: 'The stage is running. The settings are yours to change while it does, and a change makes the verdict it returns stale.',
   loadingWhy: 'The stage is still being read.',
@@ -942,10 +945,49 @@ export function stageWatchPaceOf(input: {
     : Math.max(input.watchingSimPerRealS, TUTORIAL_QUIET_SIM_PER_REAL_S);
 }
 
+/** Seconds of the pair shown before the two runs first differ, so the moment is seen arriving. */
+export const STAGE_WATCH_LEAD_S = 10;
+
+/** Whether two frames show the same building: every car at one height, door and load, every landing's queue. */
+function sameSight(a: Frame, b: Frame): boolean {
+  if (a.cars.length !== b.cars.length || a.landings.length !== b.landings.length) return false;
+  for (let index = 0; index < a.cars.length; index += 1) {
+    const x = a.cars[index];
+    const y = b.cars[index];
+    if (x === undefined || y === undefined) return false;
+    if (Math.abs(x.heightM - y.heightM) > 0.05 || x.doorPhase !== y.doorPhase || x.occupants !== y.occupants) return false;
+  }
+  for (let index = 0; index < a.landings.length; index += 1) {
+    const x = a.landings[index];
+    const y = b.landings[index];
+    if (x === undefined || y === undefined) return false;
+    if (x.waitingUp !== y.waitingUp || x.waitingDown !== y.waitingDown) return false;
+  }
+  return true;
+}
+
+/**
+ * **Where the pair starts** — wave AR lane AR-3, GitHub issue #633: on stage 2 with lobby parking
+ * both panes showed the same picture for about eight seconds with one rider in view, because the
+ * two settings run alike until a car first does something different. The pair now starts
+ * {@link STAGE_WATCH_LEAD_S} simulated seconds before the first second at which the two runs' frames
+ * differ, and at the run's start where they never do (a press that moved nothing). Where the pair
+ * starts only; both panes stay at one minute, the replay starts at the same place, and the verdict
+ * is the fifty crowds' wherever the pair begins.
+ */
+export function stageWatchStartOf(baseline: VizRecording, candidate: VizRecording): number {
+  const from = Math.max(baseline.startedAt, candidate.startedAt);
+  const to = Math.min(baseline.endedAt, candidate.endedAt);
+  for (let t = from; t < to; t += 1) {
+    if (!sameSight(frameAt(baseline, t), frameAt(candidate, t))) return Math.max(from, t - STAGE_WATCH_LEAD_S);
+  }
+  return from;
+}
+
 /**
  * **What the pair does when it reaches its end** — the playtest's second stage finding: after a miss
  * the pair took itself away a few seconds after the verdict, leaving the verdict with nothing to
- * read it against. It plays again from its first minute whether the batch is still counting or the
+ * read it against. It plays again from where it opened (§ D1534) whether the batch is still counting or the
  * verdict is in, and only the player's skip ends it; a new press, a setting that makes the verdict
  * stale, or leaving the page replaces or removes it.
  */

@@ -246,6 +246,11 @@ export const WATCH_ALLOWANCE_REAL_S = 20;
  * chip moves at most four times before the stage plays on. Ten real seconds at `4×` is forty simulated seconds, four door cycles (9.8 s each), which is
  * also long enough to read the line once. The lingering seconds count toward the allowance, so the
  * hold is no longer than it was. Owner-reversible: `0` is the hold with no dwell.
+ *
+ * **Kept at ten after the re-play** ([§ D1526](../../../../DECISIONS.md)): the chip still moved three to
+ * five times in thirty real seconds just after a call, which is this bound read twice across a call.
+ * Twenty would make the bound two moves, and puts the press day's first call at about 67 real seconds
+ * (`scoredDayPlayOf`), past the minute § D1493 bought; fifteen keeps the bound at four.
  */
 export const RUNG_DWELL_REAL_S = 10;
 
@@ -363,6 +368,13 @@ export interface StagePace {
    * slowed for {@link RUNG_DWELL_REAL_S} after the last one who had — [§ D1506](../../../../DECISIONS.md).
    */
   readonly lingering?: true | undefined;
+  /**
+   * `true` on a `fast` frame of a scored day once § D1493's allowance has run out with nothing to
+   * decide — [§ D1525](../../../../DECISIONS.md). The rung is the one `unheld` plays at, so the line
+   * stays `unheld`'s and the skip's beat stays quiet: the line beside a chip that never moved does not
+   * flip each time a waiter crosses the minute. The skip itself is unchanged.
+   */
+  readonly playedOn?: true | undefined;
 }
 
 /** Everything {@link stagePaceOf} reads. Plain data — the mount has already folded the frame. */
@@ -476,7 +488,10 @@ export function stagePaceOf(input: StagePaceInput): StagePace {
     if (input.playerChoseSpeedAtS !== undefined && input.simTimeS >= input.playerChoseSpeedAtS) {
       return { simPerRealS: watching, reason: 'yours' };
     }
-    return { simPerRealS: Math.max(watching, BETWEEN_PEAKS_SIM_PER_REAL_S), reason: 'fast' };
+    const fast = Math.max(watching, BETWEEN_PEAKS_SIM_PER_REAL_S);
+    /* § D1525: past the allowance, `fast` and `unheld` are one rung and read as one state. */
+    if (allowanceSpent) return { simPerRealS: fast, reason: 'fast', playedOn: true };
+    return { simPerRealS: fast, reason: 'fast' };
   }
   if (input.horizon !== 'whole-day' || input.acts.length === 0) {
     return { simPerRealS: watching, reason: 'unmanaged' };
@@ -600,11 +615,16 @@ export function stagePaceNoteOf(
      * fast-forwards again; every line says the speed first and the reason second.
      */
     case 'fast':
-      return `fast-forwarding at ${rung}: nobody on a landing has waited a minute`;
+      /* § D1525: past the allowance the line is `unheld`'s, which is as true here. */
+      return pace.playedOn === true
+        ? `fast-forwarding at ${rung}: you have watched a while and there is nothing to decide yet · pick a speed to watch`
+        : `fast-forwarding at ${rung}: nobody on a landing has waited a minute`;
+    /*
+     * § D1525: one line for the slowed rung, true while the wait stands and through the dwell after
+     * it, so it does not flip each time a waiter crosses the minute while the chip stays lit.
+     */
     case 'watching':
-      return pace.lingering === true
-        ? `slowed to your speed, ${rung}, for a few seconds after a wait of over a minute`
-        : `slowed to your speed, ${rung}: somebody on a landing has waited over a minute`;
+      return `slowed to your speed, ${rung}, for a wait on a landing of over a minute`;
     case 'yours':
       return `your speed, ${rung}, until somebody on a landing has waited a minute`;
     /* § D1493: the hold has run out with nothing asked. */
@@ -825,4 +845,44 @@ export function stageSkipLineStands(input: {
 }): boolean {
   if (input.reason === 'call') return false;
   return input.landedReason === undefined || input.landedReason === input.reason;
+}
+
+/**
+ * **The state a line describes**, for {@link stageSkipLineStands} — [§ D1525](../../../../DECISIONS.md).
+ * A `fast` frame past the allowance ({@link StagePace.playedOn}) is the same state as `unheld`: one
+ * rung, one line, so a skip's line is not dropped when a waiter crosses the minute and back.
+ */
+export function stagePaceStateOf(pace: StagePace): StagePaceReason {
+  return pace.reason === 'fast' && pace.playedOn === true ? 'unheld' : pace.reason;
+}
+
+/**
+ * **How long a beat has run, in real seconds, before its note is drawn past the allowance** —
+ * [§ D1525](../../../../DECISIONS.md), as corrected after the integrated browser run. Half of
+ * {@link SKIP_BEAT_REAL_S}: every skip is still warned for at least a real second before it lands,
+ * and a beat that a waiter crossing the minute ends sooner, the flip the re-play saw at four a real
+ * second, never draws its note.
+ */
+export const SKIP_BEAT_SHOWN_PLAYED_ON_REAL_S = SKIP_BEAT_REAL_S / 2;
+
+/**
+ * **What the skip's span says**, for {@link stageStatusOf}'s `skip` — [§ D1525](../../../../DECISIONS.md).
+ * The beat's note while a skip is coming, so a player can stop it (§ D1212, § D1266). Past the
+ * allowance ({@link StagePace.playedOn}) only once the beat has run
+ * {@link SKIP_BEAT_SHOWN_PLAYED_ON_REAL_S}: there a waiter crossing the minute arms and drops the beat
+ * several times a real second, and a note drawn on every arming flipped the line with it. Otherwise
+ * the line the last skip left, or `''`.
+ *
+ * @param input.armedRealS real seconds since the beat was armed, or `undefined` with no beat coming.
+ */
+export function stageSkipSpeechOf(input: {
+  readonly armedRealS: number | undefined;
+  readonly pace: StagePace | undefined;
+  readonly line: string;
+}): string {
+  const armed = input.armedRealS;
+  if (armed !== undefined && (input.pace?.playedOn !== true || armed >= SKIP_BEAT_SHOWN_PLAYED_ON_REAL_S)) {
+    return STAGE_SKIP_BEAT_NOTE;
+  }
+  return input.line;
 }

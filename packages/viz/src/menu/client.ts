@@ -196,6 +196,8 @@ export interface RushSittingRoundWire {
    * client on an older build is told that rather than shown a number it never produced.
    */
   readonly claimedHeldS: number | null;
+  /** Where the player ended the round by hand, seconds from its start; absent otherwise (§ D1516). */
+  readonly stoppedS?: number | undefined;
 }
 
 /** A sitting on the wire — `packages/server`'s `SubmittedRushSitting`. */

@@ -198,6 +198,8 @@ const DOORS: Readonly<Record<keyof EverydayHost, Door>> = Object.freeze({
   /* § D1515: replays this device's furthest rush round off-thread, as rushDeviceBest does. */
   rushFurthest: 'watch',
   rushUnfinished: 'reads',
+  /* Wave AR lane AR-1: marks the device's rush round running; no attempt, no day. */
+  rushRoundPlaying: 'elsewhere',
   rushDisclosure: 'reads',
   rushRebuild: 'reads',
   pickRushRebuild: 'elsewhere',

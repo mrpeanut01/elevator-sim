@@ -27,6 +27,7 @@ import {
   DOOR_BACK_REFUSAL,
   DOOR_DRIVER_NOTE,
   DOOR_DRIVER_NOTE_HELD,
+  DOOR_DRIVER_NOTE_HELD_PAST,
   doorScreenViewOf,
   doorWordsHeadingOf,
   DOOR_STEPS,
@@ -397,6 +398,28 @@ describe('the rest of § 6.1', () => {
     });
     expect(held.driver.note).toBe(DOOR_DRIVER_NOTE_HELD);
     expect(held.driver.note).not.toMatch(/^Change it/u);
+  });
+
+  /* Wave AR, lane AR-2, § D1530: after the close the door still said the call was to be answered. */
+  it('says the hold in the past tense once the call is answered or the day is banked', () => {
+    const week = weekWith(5, [closedDay(1), closedDay(2), closedDay(3), closedDay(4)]);
+    const at = (over: { pinnedCallDone?: boolean; banked?: boolean }) =>
+      doorScreenViewOf({
+        week: over.banked === true ? { ...week, history: [...week.history, closedDay(5)] } : week,
+        today: { ...TODAY, day: week.day, driverHeld: 'held' },
+        dayOffset: 0,
+        dayClosed: over.banked === true,
+        nameOf: NAME_OF,
+        pinnedCallDone: over.pinnedCallDone,
+      }).driver.note;
+    expect(at({})).toBe(DOOR_DRIVER_NOTE_HELD);
+    expect(at({ pinnedCallDone: true })).toBe(DOOR_DRIVER_NOTE_HELD_PAST);
+    expect(at({ banked: true })).toBe(DOOR_DRIVER_NOTE_HELD_PAST);
+    expect(DOOR_DRIVER_NOTE_HELD_PAST).not.toMatch(/\bis answered\b|\buntil\b/u);
+    /* A day whose driver is not held is untouched. */
+    expect(
+      doorScreenViewOf({ week, today: { ...TODAY, day: week.day }, dayOffset: 0, dayClosed: false, nameOf: NAME_OF, pinnedCallDone: true }).driver.note,
+    ).toBe(DOOR_DRIVER_NOTE);
   });
 
   it('asks no pick of a held driver on step 1 or in the footer — #626’s leftover, wave AQ lane AQ-1', () => {
