@@ -12,7 +12,7 @@ Pillars: 1 playable · 2 understandable · 3 simple · 4 engaging during a run.
 
 | task | issue | branch | state |
 |---|---|---|---|
-| none | | | wave AS's seven lanes are merged on PR #638; no playtest is running |
+| none | | | wave AS merged as `f5bc344` (PR #638); #633, #635, #636 and #637 are closed; no playtest is running |
 
 ## Cycles 2 to 4, in one paragraph each
 
@@ -40,6 +40,7 @@ named breach (§ D1582), and stage 2's brief corrected with the survivor census 
 | 232 | Building set to the content-plan target | P1 | 2, 4 | **AC4 done** on PR #624 (`buildingFieldReach.test.ts`), with three inert fields filed as #625. AC1 has 17 of 22 buildings. AC2: owner sign-off on harbour-point and ashgate |
 | 625 | Three shipped building fields change no leg | P2 | 1 | Item 1's loader warning is fixed on PR #624. Owner: fix the data or keep each field with a reason |
 | 627 | Lobby tap targets on short windows wider than 720 px | P3 | 1 | Filed from the lobby review. Buildable |
+| 639 | A rush round ended by hand is paid in full when the client omits `stoppedS` | P3 | 1 | Carried from #636 item 8. The shipped client always sends it; needs a choice among three directions listed on the issue |
 
 **Carried to the Tuesday playtest track** (not filed as defects, because they follow from rulings): on a 390×844 phone
 the Rush handover picker is folded away during play until the player pauses (§ D1589 with AS-1's compact HUD); Rush has
