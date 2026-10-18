@@ -457,9 +457,20 @@ const DC2B_SHORT: ReadonlySet<string> = new Set<string>([]);
  * the same three as its only ways through. Stage 9 is position nine, which § D528 clause 2 reaches,
  * and the swarm ruled that a stage that can be won beats one that cannot be judged. Reverting the
  * demand removes the row with the breach.
+ *
+ * **Stage 3's row is a named breach, owner-reversible, since 2026-10-18** ([§ D1582](../../../../DECISIONS.md),
+ * the decision panel's ruling R7 on #234, 3–0). Its demand axis is measured in full: from 4 to
+ * 14.5 %pop/5 min at n = 50 per seed set with common random numbers, only 11.5 leaves no admitted
+ * profile meeting every bar, and there the census finds no survivor at any rung. A witness search of
+ * 277 candidates at 11.5 (239 dial draws, 38 hand-built) found 11 meeting every bar on the tuning
+ * seeds and none holding on the holdout, so 0 clears. At the shipped 12 `fairness-first` meets on
+ * the tuning seeds and holds on the holdout, so it is the stage's way through and stays here. Position
+ * three is reached by § D528 clause 2. The row leaves if a fabric lever for stage 3 alone, or a
+ * witness at 11.5 that holds on the holdout, is measured open.
  */
 const DROPDOWN_CLEARS: Readonly<Record<string, readonly string[]>> = Object.freeze({
   'stage-1-first-call': ['zoned-uppeak'],
+  /* § D1582: a named breach, owner-reversible (panel ruling R7 on #234). */
   'stage-3-overwhelmed': ['fairness-first'],
   'stage-5-credentials': ['auction', 'capacity-aware', 'energy-aware', 'eta', 'fairness-first', 'predictive-balanced'],
   'stage-7-prove-it': ['predictive-balanced'],

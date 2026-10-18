@@ -106,7 +106,7 @@
       "brief": [
         "Midtown Office at two and a half percent of its population arriving every five minutes: busy, and still under the level at which it stops coping.",
         "Two counts matter here \u2014 how many people arrived, and how many were carried \u2014 and the gap between them is the thing a dispatcher can move.",
-        "This is the first stage where a number changes when you change a setting."
+        "This is the first stage that also counts runs, and asks your setting to pass at least as many of them as the building's own."
       ],
       "building": "midtown-office",
       "traffic": {
