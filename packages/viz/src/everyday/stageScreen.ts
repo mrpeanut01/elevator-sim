@@ -3323,8 +3323,12 @@ function mountStage(
   }
 
   function syncTransport(): void {
-    const playing = playback?.state === 'playing';
+    /*
+     * Wave AS, lane AS-1 (GitHub issue #635, finding 2): the entry focus may press *Play* itself, so
+     * the state is read after it. Read before, an early Enter left *▶ Play* on a running round.
+     */
     focusPlayOnRushEntry();
+    const playing = playback?.state === 'playing';
     /*
      * § 3.3's row hears the day run out — GitHub issue **#287**'s fourth criterion.
      *

@@ -172,6 +172,20 @@ describe.skipIf(!HAS_BROWSER)('Rush on a phone, after the re-play — wave AR, l
       await page.waitForFunction(() => (document.querySelector('.everyday-stage-clock')?.textContent ?? '0:00') !== '0:00', undefined, {
         timeout: 30_000,
       });
+      /*
+       * Wave AS, lane AS-1 (GitHub issue #635, finding 2): the round plays, so the button offers
+       * *Pause*. Red on the base: it still read *▶ Play*, and pressing it paused the round.
+       */
+      await page.waitForFunction(() => /Pause/u.test(document.querySelector('.everyday-stage-play')?.textContent ?? ''), undefined, {
+        timeout: 5_000,
+      });
+      await page.locator('.everyday-stage-play').click();
+      await page.waitForFunction(() => /Play/u.test(document.querySelector('.everyday-stage-play')?.textContent ?? ''), undefined, {
+        timeout: 5_000,
+      });
+      const clock = await page.textContent('.everyday-stage-clock');
+      await page.waitForTimeout(600);
+      expect(await page.textContent('.everyday-stage-clock'), 'pressing Pause stops the clock').toBe(clock);
     } finally {
       await page.close();
     }
