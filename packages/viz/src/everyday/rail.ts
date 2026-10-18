@@ -339,6 +339,38 @@ export interface RailOptions {
 }
 
 /**
+ * Where a played day stands, as the stage reports it to the shell — wave AS, lane AS-4, GitHub
+ * issue #636 item 6. `before` is the paused start (§ 7.3's overlay up, the playhead at the first
+ * instant), `over` is the playhead at the run's end, and `running` is everything between. `clock`
+ * is the stage header's own clock text, so the rail and the stage cannot name two times.
+ */
+export interface StageRailClock {
+  readonly clock: string;
+  readonly phase: 'before' | 'running' | 'over';
+}
+
+/** The words for each phase. `running` is the handoff's `MID-DAY`; the other two are truer of it. */
+export const STAGE_RAIL_PHASE_WORDS = Object.freeze({
+  before: 'START OF DAY',
+  running: 'MID-DAY',
+  over: 'DAY OVER',
+} as const);
+
+/**
+ * § 3.2's `MID-DAY · 08:41` — the bare word {@link sublineFor} returns, with the stage's clock
+ * appended, on a played day (`daily` or `campaign`) when the stage has reported one. Any other
+ * screen or context, or no report yet, is the bare word unchanged, which is the honest answer for a
+ * rail that has no clock to show. Its one non-test caller is `everyday/shell.ts#drawRail` (and its
+ * cheap repaint of the subline when only the clock moved).
+ */
+export function stageSublineOf(state: EverydayState, live: StageRailClock | undefined): string {
+  const bare = sublineFor(state);
+  if (live === undefined || state.screen !== 'stage') return bare;
+  if (state.ctx !== 'daily' && state.ctx !== 'campaign') return bare;
+  return `${STAGE_RAIL_PHASE_WORDS[live.phase]} · ${live.clock}`;
+}
+
+/**
  * Where the player is, in the rail's voice — § 3.2's subline list.
  *
  * The guide's list carries live detail for some entries (`MID-DAY · 08:41`,

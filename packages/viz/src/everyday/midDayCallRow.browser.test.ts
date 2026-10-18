@@ -156,7 +156,10 @@ describe.skipIf(!HAS_BROWSER)('a call’s row on the stage mid-day — § D1219'
       expect(shown.dayRunning, 'the row arrived only at the day’s end').toBe(true);
       expect(minutesOf(shown.clock) - minutesOf(shown.heading), 'the row printed before the call plus 660 s').toBeGreaterThanOrEqual(11);
       expect(minutesOf(shown.heading)).toBe(firstClock);
-      expect(shown.lead).toMatch(/^(No answer has crossed a bar yet\.|From \d{2}:\d{2}, the day could no longer clear with .+\.)$/u);
+      /* Wave AS lane AS-3 (issue #637 item 5): a row whose runs leave out a later press says so first. */
+      expect(shown.lead).toMatch(
+        /^(Without your later presses: )?(No answer has crossed a bar yet\.|From \d{2}:\d{2}, the day could no longer clear with .+\.)$/u,
+      );
       /* GitHub issue #631: while every answer reads alike, the row says so once instead of three times. */
       expect(shown.goals).toMatch(
         /^By \d{2}:\d{2}, (the deepest landing and the longest wait so far: .+, your answer; .+|no answer has made a difference to these two goals yet: the deepest landing and the longest wait so far are .+ with every answer)\.$/u,

@@ -51808,6 +51808,8 @@ the two runs apart, no failure kept, the bound, no storage), and on the built bu
 
 ## D1381 — once the day has run out, a header figure is drawn in its goal's verdict, and ▶ Play is inert with its reason
 
+> **Status 2026-10-18: AMENDED by [§ D1581](#d1581)** (a decision panel ruling, R3). While the day runs a header figure is drawn in neutral ink, not the live accent; moss and alarm still appear only at the verdict. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-10-10 by agent sessions under delegated authority** (wave AO, lane AO-3), not by the
 > product owner: a correction from the post-AN panel's seat B (defect 6). **Owner-reversible**: the
 > palette mapping.
@@ -53467,6 +53469,8 @@ own verbs, red on the base at 12 units), and `packages/server/src/leaderboard/ru
 
 ## D1525 — the line beside the speed chips changes only when the chip does
 
+> **Status 2026-10-18: AMENDED by [§ D1554](#d1554)** (an agent ruling). The skip's beat note is drawn on every frame only once the beat has run a real second and only for a beat that ends in its skip, and once drawn the previous skip's line is over. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-10-17 by an agent session under delegated authority** (wave AR, lane AR-2, on the
 > re-play after wave AQ, GitHub issue #633), not by the product owner, and to be read as an agent
 > ruling. **Amends [§ D1506](#d1506) clause 2.** Owner-reversible: the line, and
@@ -53520,6 +53524,8 @@ and 2, 2 and 4 times around two calls five game minutes apart.
 
 ## D1527 — the stage's header stays at the top while the building scrolls under it
 
+> **Status 2026-10-18: CORRECTED by [§ D1557](#d1557)** (an agent ruling). The cards' top margin clears the header's foot, the region's top padding included, read when a card scrolls. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-10-17 by an agent session under delegated authority** (wave AR, lane AR-2, GitHub
 > issue #633 item 3), not by the product owner. **Extends [§ D1508](#d1508).** Owner-reversible:
 > `stageScreenModel.ts#STAGE_HEADER_STICKY_SHARE` (`0` never pins it).
@@ -53537,6 +53543,8 @@ lobby rows in view together after Play, at 1280×800* (red before: the clock abo
 and `stageScreenModel.test.ts`.
 
 ## D1528 — the day's calls stay where they are, and a placement call asked again names the order in force
+
+> **Status 2026-10-18: AMENDED by [§ D1556](#d1556)** (an agent ruling). *Since* names when the order in force began, not the last press that kept it. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Taken 2026-10-17 by an agent session under delegated authority** (wave AR, lane AR-2, GitHub
 > issue #633 item 4), not by the product owner. Reads [§ D1166](#d1166) and [§ D1205](#d1205)
@@ -53692,3 +53700,324 @@ that day honestly; it does not give it a decision. The options, none taken:
 - **D.** Keep a quiet first day and § D1543's short path (what ships).
 
 **Numbers spent.** This lane held **D1543 to D1551** and spent **D1543 and D1544**.
+
+
+## D1545 — the Rush setup page states the house run on this crowd as the line to beat
+
+> **Taken 2026-10-18 by an agent session** (wave AS, lane AS-1) to carry the decision panel's ruling
+> **R5** (3–0) on GitHub issue #636. The wording is the agent's; the ruling is the panel's.
+> Owner-reversible.
+
+**Why an entry.** It puts a house figure on a screen before any round, where until now the house's
+runs were drawn only as the standings and, since wave AR, beside a finished round
+(`rushHouse.ts#rushHouseLineOf`). That reaches past the result page that line was written for.
+
+1. **What it says.** Under the driving line and above the dispatcher choice,
+   `rushHouse.ts#rushHouseToBeatLineOf`: *The house run on this crowd, <driver> with no changes,
+   holds to <m:ss>, into wave <n>. That is the time to pass.* (or *holds all 30 waves, the whole
+   climb.*), for the dispatcher standing, redrawn when the picker moves (`rushScreen.ts#syncDriver`).
+   The ruling's example said *the line to beat*; the always-on corpus's ordering check
+   (`honesty/properties.ts#ORDERING_CLAIM`) reads *beat* beside a dispatcher's name as a claim about
+   two runs, so the word was changed rather than the check.
+2. **One source.** The figures are the row `rushHouseLineOf` reads, from `RUSH_HOUSE_TABLE`, through
+   the same stream check. No second copy.
+3. **Silence where there is nothing to state.** A stale table, a tower the house has not run, or a
+   dispatcher it did not run (a saved one) draws no line.
+4. **No claim about any choice.** The line states the house run and nothing else. Whether a chip
+   helps or hurts on this crowd waits on a paired measurement (GitHub issue #635 item 1), and nothing
+   about the chips changes here.
+
+**What holds it.** `everyday/rushHouse.test.ts` (the sentence, the held arm, the three silences, no
+verdict word), `everyday/rushPhone.browser.test.ts` case 6 (drawn, and it follows the picker), and
+the corpus seeds `rush.toBeat.broke` and `rush.toBeat.held` in `honesty/surfaces.ts`.
+
+**Numbers spent.** This lane held **D1545 to D1553** and spent **D1545**.
+
+## D1554 — *skipping ahead* is drawn only for a skip that comes, and a skip's line is never drawn again once replaced
+
+> **Taken 2026-10-18 by an agent session under delegated authority** (wave AS, lane AS-2, GitHub
+> issue #637 item 1), not by the product owner, and to be read as an agent ruling. **Amends
+> [§ D1525](#d1525)**'s beat-note clause. Owner-reversible: `stagePace.ts#SKIP_BEAT_SHOWN_REAL_S`.
+
+**What was found.** Near 17:30 on Midtown's Monday the line changed ten times in about fourteen real
+seconds with `30×` lit: *skipping ahead* for 0.32 s and 0.67 s and then gone without a skip, and a
+stale *skipped 17:31–17:32* drawn again at 17:35 (also 11:40–11:50 at 11:52, 12:01–12:05 at 12:07).
+A beat armed by a quiet frame was dropped when a waiter crossed the minute; § D1525's one-second
+delay applied only past the allowance, and the dropped beat handed the span back to the last line.
+
+**The ruling.** The beat's note is drawn once the beat has run a real second, on every frame, and only
+while `stageSkipLandsOf` says the beat ends in its skip (nobody reaches a minute and no call comes
+first, read off the recording as § D1212 already reads it to choose where to land). Once drawn, the
+previous skip's line is over. **Speeds, skips and day length are unchanged**: the seek is still
+`stageSkipOf`'s.
+
+**What holds it.** `everyday/stagePaceLine.test.ts`: the playtest's day through the real transport at
+sixty frames a second, no line under a second without a chip change, no stale skip line, every
+*skipping ahead* followed by its skip. Red before: four beat notes of 0.25 to 0.63 s, one beat drawn
+2.25 s and dropped, and *skipped 08:46–08:56* drawn again.
+
+## D1555 — the played-on line points at *Skip to the end*
+
+> **Taken 2026-10-18 by an agent session under delegated authority** (wave AS, lane AS-2), on the
+> decision panel's ruling **R2 (3–0) posted on GitHub issue #636**: rungs above `30×` are refused and
+> [§ D991](#d991) stands. Amends [§ D1506](#d1506) clause 2's last line as § D1525 left it.
+> Owner-reversible: `stagePace.ts#stagePlayedOnLineOf`.
+
+The played-on line (`unheld`, and `fast` past the allowance) now reads *fast-forwarding at 30×: you
+have watched a while and there is nothing to decide yet · pick a speed to watch, or Skip to the end:
+it stops at any call to come*, which is [§ D1151](#d1151)'s rule for that control. One line for one
+state, so it cannot flicker more than the line it replaces. Speeds, skips and day length are
+unchanged. Seeded in the honesty corpus as `stage.pace(unheld)` and `stage.pace(playedOn)`.
+
+## D1556 — a placement call asked again dates the order from when it began
+
+> **Taken 2026-10-18 by an agent session under delegated authority** (wave AS, lane AS-2, GitHub
+> issue #637 item 2), not by the product owner. **Amends [§ D1528](#d1528)**'s *from the last such
+> press*. Owner-reversible: the clause.
+
+The 17:20 card said *Since 12:20* when the 12:20 answer only kept the lobby order pressed at 10:40.
+`stageCall.ts#stageCallStandingOrderOf` now dates the order in force from the first press of it since
+the other order was last pressed. No call, answer or run moves. Held by `stageCall.test.ts`, red
+before.
+
+## D1557 — a card scrolled in under the pinned header clears the header's foot
+
+> **Taken 2026-10-18 by an agent session under delegated authority** (wave AS, lane AS-2, GitHub
+> issue #637 item 8), not by the product owner. **Corrects [§ D1527](#d1527)**'s card margin.
+
+The sticky header sticks below the screen region's top padding (28 px at 1280×800) and grows once the
+day plays, while § D1527's margin was its height read at Play: the call card's *THE DAY’S CALL* sat
+under it. The margin is now the region's top padding plus the header's height plus a gap, read as
+each card scrolls, and the call card's fitted height leaves the same room. Held by
+`stagePace.browser.test.ts`, *scrolls the call card in below the pinned header*, red before.
+
+**Numbers spent.** This lane held **D1554 to D1562** and spent **D1554 to D1557**.
+
+## D1563 — the hub's *Today's scenario* line is one line, and its far ends are said as *longer on some towers*
+
+> **Taken 2026-10-18 by an agent session under delegated authority** (wave AS, lane AS-3, GitHub
+> issue #637 item 7), not by the product owner. Amends [§ D1383](#d1383)'s hub half; reads
+> [§ D1169](#d1169), [§ D1212](#d1212) and [§ D1453](#d1453) unchanged.
+
+The row read *about 2-4 min a day at 4× on the towers a first week can open on, and 30× wherever
+nobody on a landing has waited a minute, the quiet between peaks skipped; 34 min at most on the
+game's own towers, and up to 1 h 49 on a reference tower · a day can be missed, and a week can miss
+its target*, and the playtest read it as a wall. It now reads *about 2-4 min a day at 4×, longer on
+some towers ·* and the loss clause (`everyday/sittingShape.ts#SITTING_SHAPES.contractDay`).
+
+1. **The measured figure still leads**, as § D1383 ruled, from the brief's own rows, at the rung it
+   was measured at.
+2. **The far ends are said, not quoted**: *longer on some towers*
+   (`sittingShape.ts#SITTING_LONGER_ELSEWHERE`). `sittingShape.test.ts` holds it true against both
+   measured long ends, the game towers' and the reference tower's. Neither figure moved; both stay in
+   `SITTING_SPANS` and `docs/12`.
+3. **The 30× clause leaves the row.** The rule it described (§ D1169, § D1212) is unchanged and is
+   told on the stage, where it happens.
+
+Also in this lane, each recorded in its module's docstring under [§ D405](#d405): the stage's call
+rows lead with *Without your later presses:* when the runs leave a later press out
+(`stageCallRow.ts#STAGE_CALL_WITHOUT_LATER`); the door past-tenses a held day once its call is
+behind the player and names who drove a banked day (`doorView.ts#DOOR_STEP_ONE_HELD_PAST`,
+`DOOR_DROVE_HEADING`, `today.ts#TODAY_CHOICE_LINE_HELD_PAST`), extending [§ D1530](#d1530); the
+door's world band folds under *Details*; a cleared report folds its levers, extending
+[§ D1543](#d1543); and the report's delta compares only within one mode and one tower
+(`reportView.ts#comparablePreviousOf`).
+
+**Numbers spent.** This lane held **D1563 to D1571** and spent **D1563**.
+
+## D1572 — § D1544 decided (D): the opening career day stays quiet, and its paused start offers Skip beside Play
+
+> **Taken 2026-10-18 by a decision panel** (3–0, ruling R1 on GitHub issue #636), recorded by an
+> agent session (wave AS, lane AS-4) on GitHub issue #637 item 6. **Settles [§ D1544](#d1544)** on
+> its option **D** and **extends [§ D1543](#d1543)** clause 4 from the desk to the stage.
+> Owner-reversible.
+
+**Why an entry.** It closes a question § D1544 left open, and it binds `everyday/stageScreen.ts`,
+which the career modules do not own.
+
+1. **No call is added to the opening day.** Options A to C stay unbuilt; no call, crowd, seed,
+   speed rung or published figure moves.
+2. **The stage's paused start leads with the short path on a quiet day.** Where the desk's census
+   marks the career day quiet (`campaignModel.ts#dayCensusAllClear`, the one reading behind both
+   the desk's line and `campaignScreens.ts#quietCareerDayOf`), § 7.3's overlay draws
+   `DAY_CENSUS_COPY.quietStage` — *A quiet day: every driver on the list clears it with no press.
+   Watch how the cars answer, or skip to the end.* — over *Skip to the end* as the filled button
+   beside an outlined *Play*. The skip is the stage's own `skipToEnd`, so it still stops at any
+   call the day raises.
+3. **The line promises nothing about a call.** It restates what the census measured, so it is
+   drawn only where that census landed for this tower's this day; with no census the start is
+   unchanged.
+
+**What holds it.** `everyday/campaignScreens.browser.test.ts`'s quiet-start case (red on the base:
+no `.everyday-stage-start-skip`), `everyday/careerCensus.test.ts`, and the honesty seed
+`careerFront.stage.quietStart`.
+
+**Numbers spent.** Lane AS-4 held **D1572 to D1580** and spent **D1572**.
+
+## D1581 — a running header figure is drawn in neutral ink, and only the verdict is coloured
+
+> **Taken 2026-10-18 by the owner's decision panel** (GitHub issue #636, comment 6251039023, ruling
+> R3, 3–0), built by an agent session (wave AS, lane AS-5). It amends [§ D1381](#d1381).
+> **Owner-reversible**: `live: C.terracotta` in `everyday/stageScreenModel.ts#STAGE_FIGURE_INK`.
+
+**Why an entry.** It departs from the design handoff's *terracotta: live figures* (`everyday/tokens.ts`,
+GAMEPLAY § 19) while the figures are still live, which § D1381 kept, and the handoff wins on looks
+unless a ruling says otherwise.
+
+**The ruling.** While the day runs, a header figure is drawn in neutral ink, the ink of a figure no goal
+grades. Terracotta is in the red family beside *missed*, so a reading at the clock read as unmet at
+every playhead. Moss and alarm appear only once the strip is judged, as § D1381 has them, and a
+running figure is never drawn as met. The tone (`stageFigureToneOf`) is unchanged; its ink moved into
+`STAGE_FIGURE_INK`, which `stageScreen.ts#drawFigures` reads.
+
+**Tests**, red before and green after: `everyday/stageScreenModel.test.ts`, *draws a running figure in
+neutral ink, never terracotta, moss or alarm*.
+
+## D1582 — stage 3 clears from the dropdown as a named breach, owner-reversible
+
+> **Taken 2026-10-18 by the owner's decision panel** (GitHub issue #234, comment 6251039583, and #636
+> comment 6251039023, ruling R7, 3–0, option (b)), built by an agent session (wave AS, lane AS-5).
+> **Owner-reversible**: delete the note on stage 3's row and this ruling's paragraph; the row itself
+> stays while `fairness-first` meets on the tuning seeds, which the deep tier checks.
+
+**Why an entry.** It registers a § D528 clause 2 breach at position three, as [§ D1288](#d1288) did for
+stage 9, which reaches `campaign/difficultyCurve.test.ts#DROPDOWN_CLEARS` and `docs/33` § 3.3f.
+
+**The measurement** (#234, 2026-10-17). From 4 to 14.5 %pop/5 min, at n = 50 per seed set
+(`tuning-20260730`, `holdout-20260731`) with common random numbers over the six admitted profiles,
+exactly one rate, 11.5, leaves no dropdown profile meeting every bar, and there the census finds 0
+survivors at every rung (0/39, 0/63, 0/63). A witness search of 277 candidates at 11.5 (239 dial
+draws extending the census's own, 38 hand-built) found 11 meeting every bar on the tuning seeds and
+none holding on the holdout, so 0 clears; the binding goal was `beat-the-baseline` on the holdout.
+Shipping 11.5 would make the stage unwinnable as measured, the trade [§ D612](#d612) refused on stage 5.
+A clear on the tuning seeds alone would reverse [§ D355](#d355).
+
+**The ruling.** Stage 3 stays at 12 %pop/5 min with `fairness-first` as a way through that holds on the
+holdout, and its `DROPDOWN_CLEARS` row is registered as a named breach. No bar, demand, seed or census
+figure moves. A building made only for stage 3 stays open as a later lane, and the ruling is revisited
+if a fabric lever specific to stage 3, or a witness at 11.5 that holds on the holdout, is measured open.
+Stage 8 is not covered.
+
+## D1583 — stage 2's brief says what is new there, and the survivor census is regenerated once for it
+
+> **Taken 2026-10-18 by the owner's decision panel** (GitHub issue #636, comment 6251039023, ruling
+> R8, 2–1; the steward preferred narrowing the census's input hash now), built by an agent session
+> (wave AS, lane AS-5). **Owner-reversible**: the sentence in `data/campaign.json`.
+
+**Why an entry.** It moves a survivor-census input (`data/campaign.json`) and so the census's pinned
+inputs hash, and it closes the line [§ D1497](#d1497)'s *Not established* left for a later lane.
+
+**The ruling.** Stage 2's brief read *This is the first stage where a number changes when you change a
+setting*, which is false: stage 1's numbers change too. It now reads *This is the first stage that also
+counts runs, and asks your setting to pass at least as many of them as the building's own.* That is
+true of the goals: stage 1 carries only `beat-the-baseline`, and stage 2 is the first to add count
+goals (`answer-the-demand`, `long-waits-under`), which `campaign/judge.ts` judges as passing on at least
+as many runs as the shipped setting. The census guard (`scenario/survivorInputs.test.ts`) stays as it
+is; narrowing the hash would weaken it. If prose edits keep forcing regenerations, the fallback is an
+explicit, tested allowlist of the fields the census reads.
+
+**The regeneration.** `data/scenario-survivors.json` is regenerated once for this sentence
+(`ELEVATOR_SIM_SURVIVORS=deep ELEVATOR_SIM_REGENERATE_SURVIVORS=1`), on the commit that lands it.
+The lane's run was stopped at its two-hour limit before it wrote the file, so the integrator ran it
+on wave AS's head (`b0d7d09`, 2026-10-18, 6 755 s). Every count came back unchanged; only the inputs
+hash, the tree and the date moved. No bar, demand, seed or measured figure moves.
+
+## D1588 — Rush's two parking chips do not help, measured paired; a handover can
+
+> **Taken 2026-10-18 by an agent session** (wave AS, lane AS-6, for the owner's decision panel on
+> GitHub #636, ruling R5, and #635 item 1). A measurement, not a ruling: no game behaviour, chip or
+> copy moves. The chip set is the owner's.
+
+**Why an entry.** The panel asked for this figure before ruling, and it reaches past the module that
+measured it (`everyday/stageScreenModel.ts`'s chip set, `everyday/rush.ts`).
+
+**The run.** `packages/viz/src/everyday/rushChoices.sweep.test.ts` on `c33e06d` (gated on
+`RUSH_CHOICES_SWEEP=1`, unscheduled; the command is in its docstring). Midtown Office, Conventional
+collective, the player's rush path (`rushPatchOf` → `shiftRunConfigOf` → `recordRun`), survival read
+by `rushHoldAt` and the wave by `rushOutcomeOf`. **Fifty crowds, seeds 90 210 to 90 259** (the
+shipped crowd plus 49), every arm on the same crowd as its baseline. *Late* is the first 2 s bucket
+of the do-nothing run with a rider standing a minute or more (1:36 to 13:36, mean 5:29; 2:52 on the
+shipped crowd). The handover arm is the permitted target with the longest published Midtown house
+row (`fairness-first`), fixed before the run. No run was censored. Every run saturates by design, so
+`awtIsValid` is false on all 300 and no waiting-time mean is quoted; survival is the scored figure.
+
+| arm | Δ hold, s, paired-t 95 % | Δ wave | longer / same / shorter | verdict |
+|---|---|---|---|---|
+| Spread at 0:10 | +4.0 [−22.3, +30.4] | +0.02 [−0.16, +0.20] | 31 / 2 / 17 | INDISTINGUISHABLE |
+| Park at 0:10 | +8.3 [−19.7, +36.4] | +0.08 [−0.11, +0.27] | 24 / 5 / 21 | INDISTINGUISHABLE |
+| Spread, late | −6.4 [−30.7, +18.0] | −0.04 [−0.20, +0.12] | 20 / 10 / 20 | INDISTINGUISHABLE |
+| Park, late | +4.2 [−24.3, +32.8] | +0.10 [−0.08, +0.28] | 22 / 14 / 14 | INDISTINGUISHABLE |
+| Switch to Fairness first at 0:10 | **+127.8 [+103.5, +152.0]** | **+0.74 [+0.58, +0.90]** | 47 / 1 / 2 | **BETTER** |
+
+Doing nothing held 1 615.7 s on average (wave 9.44).
+
+**The shipped crowd, the only one a player meets** (`RUSH_CHOICES_SEEDS=1`, `RUSH_CHOICES_TIMES`,
+every permitted handover). These are identities on one crowd, not estimates. The playtest's three
+figures reproduce exactly: nothing 1 640 s, Spread at 0:10 1 494 s, Park at 0:10 1 536 s.
+
+- **Spread**, pressed at 0:00, 0:10, 0:30, 1:00, 1:30, 2:00, 2:30, 2:52, 3:30, 4:00, 5:00:
+  −118, −146, −188, −98, **+10**, −124, −176, −176, −176, −176, −98 s. Identical hold from 6:00 on
+  (6, 7, 8, 10, 12, 15 and 18 minutes tested).
+- **Park**, same times: −104, −104, −104, −104, −100, −102, −146, −146, −146, −146, −124 s.
+  Identical hold from 6:00 on.
+- **Handovers at 0:10**: Fairness first 0, Predictive balanced +22, Capacity aware −30, Zoned
+  up-peak −104, the rest −98 to −392. Fairness first gains +22 to +80 s at 14 of the 16 times from
+  0:30 on and loses 90 s at 4:00 and 7:00.
+
+**What it says.** Over fifty crowds neither chip moves the hold at either press time. On the shipped
+crowd both lose at every time tested before 6:00 bar one (Spread at 1:30, +10 s), and change nothing
+after. No mechanism is offered for either; none was measured ([§ D256](#d256)). The handover result
+is a dispatcher choice, not a chip: Fairness first at 0:10 is close to playing the round on it.
+
+**For the panel.** Both chips are INDISTINGUISHABLE at both press times, which is the condition the
+panel set for replacing the chip set. The only in-round press measured to help is a handover to
+Fairness first, and on the shipped crowd that help is 0 s at 0:10 and up to 80 s later.
+
+**Numbers spent.** This lane held **D1588 to D1590** and spent **D1588**.
+
+## D1589 — Rush drops its two parking chips; the handover is the round's only in-round choice
+
+> **Taken 2026-10-18 by a decision panel** (3–0, ruling R5 on GitHub issue #636, posted on #635),
+> recorded by an agent session (wave AS, lane AS-7). **Applies [§ D1588](#d1588)**'s measurement.
+> The wording is the agent's; the ruling is the panel's. Owner-reversible.
+
+**Why an entry.** It moves the chip set a Rush round offers, which `everyday/stageScreen.ts`,
+`everyday/rushSitting.ts` and the honesty corpus all read, and it refuses a control
+[§ D1278](#d1278) and the parking-fault cure (GitHub issue #352) still rely on outside a rush.
+
+1. **What changes.** A Rush round draws no *Park the cars in the lobby* and no *Spread the cars
+   across the tower*: `stageScreenModel.ts#stageParkingArmsOf` answers none when
+   `StageInterventionInput.rush` is set, and the stage builds its buttons from it. The handover
+   (*Switch to*, with its picker) is the round's only in-round choice. The parking note is not drawn
+   in a rush either. § D1588 found neither chip moves the hold over fifty crowds at either press
+   time, and both shorten it on the shipped crowd at every time tested before 6:00 bar one.
+2. **A filter, not a deletion.** `STAGE_INTERVENTIONS`, its labels and the two `core` kinds stay.
+   Scenario and Career calls (`stageCall.ts`, `shift/`), the tutorial's lever and the Engineer
+   strip are unchanged, and `stageScreenModel.test.ts` holds every other run context to both chips.
+3. **Old rounds still replay and post** (invariant 5). `rushSitting.ts#wireRoundInterventions`
+   keeps its parking branch and `rushDeviceBest.ts#rushDeviceReplayOf` reads it back; those are the
+   kinds' non-test callers in a rush. `rushDeviceBest.test.ts` records a round with each press at
+   0:10, writes it through the device record and replays it to the same hold (Spread moves that
+   hold on the test crowd, so the case cannot pass on a dropped press).
+4. **A greyed handover says why on its own row.** The four shipped dispatchers a round that opened
+   on up-and-down buttons with no bidding can never hand over to (the two destination ones and the
+   two that bid) are disabled rows of the picker, each reading its name and a short form of
+   `live/interventions.ts#switchRefusalOf`'s sentence
+   (`stageScreenModel.ts#STAGE_SWITCH_RUSH_OPTION_REASONS`), with the whole sentence as the row's
+   title. Rush only; elsewhere the refusal is still drawn beside the button.
+5. **Nothing measured moves.** No call, crowd, seed, house row or published figure; no claim that
+   the change helps a player is made.
+
+**Rejected, by the panel.** A named *Fairness first* chip (0 s at 0:10 on the shipped crowd, and
+−90 s at 4:00 and 7:00), a confession line under each press, and new levers without their own
+paired sweep.
+
+**Copy.** No Rush intro or result sentence names either chip. The tutorial's *Spread the cars out*
+and the door's *park the cars, spread them out* are about a Scenario day and stay.
+
+**What holds it.** `stageScreenModel.test.ts` (§ D1589 block), `rushDeviceBest.test.ts` (§ D1589
+block), `rushPlaytest.browser.test.ts` (no parking chip on the rush stage, four greyed rows that
+say why), and the corpus seeds `stage.intervene.rushOption(…)` in `honesty/surfaces.ts`.
+
+**Numbers spent.** The integrator re-allocated **D1589 to D1590** from lane AS-6's block to this
+lane; it spent **D1589**.

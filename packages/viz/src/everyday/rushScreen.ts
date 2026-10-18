@@ -55,7 +55,7 @@ import {
   RUSH_SCREEN_COPY as COPY,
   type RushFurthestStanding,
 } from './rushScreenModel.js';
-import { rushStandingsOf, type RushPostedStandings, type RushYoursRowView } from './rushHouse.js';
+import { rushHouseToBeatLineOf, rushStandingsOf, type RushPostedStandings, type RushYoursRowView } from './rushHouse.js';
 import type { RushDeviceStanding } from './rushDeviceBest.js';
 import { RUSH_PURSE } from './rushRebuild.js';
 import { mountWorkedAnswer } from './tutorialScreens.js';
@@ -326,6 +326,15 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
    * empty, because an empty paragraph is a line a reader's cursor can land on and a screen reader
    * announces as nothing at all.
    */
+  /*
+   * **The line to beat** — wave AS, lane AS-1, [§ D1545](../../../../DECISIONS.md) (GitHub issue #636,
+   * ruling R5). The house's run on this crowd for the dispatcher standing, stated as a fact under the
+   * driving line and above the choice, so the player knows the mark before the round. Absent when the
+   * house has no such run, for {@link leftBehind}'s reason; redrawn by {@link syncDriver}, since it
+   * names whichever dispatcher is standing.
+   */
+  const toBeat = el(doc, 'p', 'everyday-rush-to-beat');
+  toBeat.style.cssText = `font-size:13px;line-height:1.5;color:${C.fainter};margin:9px 0 0`;
   const leftBehind = el(doc, 'p', 'everyday-rush-left-behind');
   leftBehind.style.cssText = `font-size:12px;line-height:1.5;color:${C.label};margin:9px 0 0`;
   const drivingNote = el(doc, 'p', undefined, COPY.drivingNote);
@@ -380,6 +389,17 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
     const driver = context.host.dispatcherById(selection.dispatcherId);
     driving.textContent = rushDrivingLine(driver?.name ?? selection.dispatcherId);
     pickSelect.value = selection.dispatcherId;
+    const toBeatLine = rushHouseToBeatLineOf({
+      buildingId: selection.buildingId,
+      dispatcherId: selection.dispatcherId,
+      dispatcherName: driver?.name ?? selection.dispatcherId,
+    });
+    if (toBeatLine === undefined) {
+      toBeat.remove();
+    } else {
+      toBeat.textContent = toBeatLine;
+      drivingBlock.insertBefore(toBeat, pickRow);
+    }
     const leftBehindLine = rushLeftBehindLine(context.host.groupLevers(), {
       switching:
         driver !== undefined && specIsDirty(context.host.selectorSpec(), driver, context.host.selectorContext()),
@@ -516,6 +536,24 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
   /* The ink column runs the paper's full height beside it, and the screen's full width under it. */
   root.style.alignItems = 'stretch';
   ink.style.flexGrow = '1';
+
+  /*
+   * **On a phone the dispatcher choice comes before the house's runs** — wave AS, lane AS-1 (GitHub
+   * issue #635, finding 8). Stacked, the ink column put the choice under thirteen house rows, about
+   * 2 900 px down a 390 px screen. Once the ink column sits under the paper, the driving block is
+   * drawn after the hold line and before the house's runs; side by side the handoff's order stands.
+   * Asked of the layout itself, so a rail that narrows the screen counts. Recorded here under
+   * [§ D405](../../../../DECISIONS.md).
+   */
+  function applyStack(): void {
+    const stacked = ink.getBoundingClientRect().top > paper.getBoundingClientRect().top + 1;
+    drivingBlock.style.order = stacked ? '1' : '';
+    bestsBlock.style.order = stacked ? '2' : '';
+    drivingBlock.style.marginTop = stacked ? '22px' : 'auto';
+  }
+  const Observer = doc.defaultView?.ResizeObserver;
+  const stackWatch = Observer === undefined ? undefined : new Observer(applyStack);
+  stackWatch?.observe(root);
   host.append(root);
 
   /*
@@ -536,6 +574,7 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
   return {
     unmount: () => {
       alive = false;
+      stackWatch?.disconnect();
     },
     /*
      * § 9.1's *Start the rush* — GitHub issue #220. The run first, the context second, the brief's

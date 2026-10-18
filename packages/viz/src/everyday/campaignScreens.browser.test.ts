@@ -402,4 +402,67 @@ describe.skipIf(!HAS_BROWSER)('the Everyday campaign screens', () => {
     expect(await page.textContent('.everyday-stage-dock')).not.toContain('NOTHING HAPPENING');
     await page.close();
   });
+
+  /*
+   * ---- Wave AS, lane AS-4 — GitHub issue #637 item 6, #636 R1, § D1572 ----
+   *
+   * A first-timer who pressed Play rather than Skip on the quiet day watched two minutes with
+   * nothing to decide. The paused start now says the day is quiet and offers Skip to the end beside
+   * Play, as the filled button.
+   */
+  it('offers Skip to the end beside Play on a quiet career day’s paused start, and says the day is quiet', async () => {
+    const page = await coldLoad({ width: 1280, height: 800 });
+    await enterCampaign(page);
+    await page.click('.everyday-towers-open');
+    await page.waitForSelector('.everyday-building');
+    await page.waitForFunction(
+      () => (document.querySelector('.everyday-bar-primary')?.textContent ?? '') === 'Watch a day here',
+      undefined,
+      { timeout: 60_000 },
+    );
+    await page.click('.everyday-bar-primary');
+    await page.waitForFunction(
+      () =>
+        document.querySelector<HTMLElement>('.everyday-stage-start')?.style.display === '' &&
+        document.querySelector<HTMLElement>('.everyday-stage-start-skip')?.style.display === '',
+      undefined,
+      { timeout: 60_000 },
+    );
+    await page.locator('.everyday-stage-start-skip').scrollIntoViewIfNeeded();
+    const start = await page.evaluate(() => {
+      const play = document.querySelector<HTMLElement>('.everyday-stage-start');
+      const skip = document.querySelector<HTMLElement>('.everyday-stage-start-skip');
+      const note = document.querySelector<HTMLElement>('.everyday-stage-quiet-note');
+      const p = play?.getBoundingClientRect();
+      const k = skip?.getBoundingClientRect();
+      const hit = k === undefined ? null : document.elementFromPoint(k.left + k.width / 2, k.top + k.height / 2);
+      return {
+        skipLabel: skip?.textContent ?? '',
+        note: note?.textContent ?? '',
+        noteShown: note !== null && note.getBoundingClientRect().height > 0,
+        beside: p !== undefined && k !== undefined && Math.abs(p.top - k.top) < 2 && k.left >= p.right,
+        skipFilled: skip === null ? '' : getComputedStyle(skip).backgroundColor,
+        playFilled: play === null ? '' : getComputedStyle(play).backgroundColor,
+        hit: hit !== null && skip !== null && skip.contains(hit),
+        hitWhat: hit === null ? 'nothing' : `${hit.tagName}.${hit.className}`,
+      };
+    });
+    expect(start.skipLabel).toBe('Skip to the end');
+    expect(start.note).toContain('A quiet day');
+    expect(start.noteShown).toBe(true);
+    expect(start.beside).toBe(true);
+    expect(start.hit, start.hitWhat).toBe(true);
+    /* Skip is the filled one; Play steps back to an outline. */
+    expect(start.playFilled).toBe('rgba(0, 0, 0, 0)');
+    expect(start.skipFilled).not.toBe('rgba(0, 0, 0, 0)');
+
+    await page.click('.everyday-stage-start-skip');
+    await page.waitForFunction(
+      () => (document.querySelector('.everyday-stage-dock')?.textContent ?? '').includes('The day is over. Close it to file.'),
+      undefined,
+      { timeout: 60_000 },
+    );
+    expect(await page.evaluate(() => document.querySelector<HTMLElement>('.everyday-stage-status')?.style.display)).toBe('none');
+    await page.close();
+  });
 });

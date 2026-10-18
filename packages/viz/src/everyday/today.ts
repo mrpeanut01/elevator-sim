@@ -267,6 +267,12 @@ export const PRESS_DAY_DRIVER_HELD =
 export interface TodayInput {
   readonly week: WeekState;
   /**
+   * Whether the attempt on the stage has answered or skipped its pinned call —
+   * `EverydayHost.pinnedCallDone`, [§ D1530](../../../../DECISIONS.md). With today banked, it puts a held
+   * day's lede in the past tense ({@link TODAY_CHOICE_LINE_HELD_PAST}). Absent reads as not.
+   */
+  readonly pinnedCallDone?: boolean | undefined;
+  /**
    * The calendar period the week is under, or `null` for none — `ViewerState.calendar`.
    *
    * Required rather than optional, and that is issue #135's lesson written into a signature: an
@@ -809,6 +815,16 @@ export const TODAY_CHOICE_LINE_HELD =
   'the cars do while it plays.';
 
 /**
+ * {@link TODAY_CHOICE_LINE_HELD} once the stage's call is behind the player, or today is banked —
+ * GitHub issue #637 item 3, wave AS lane AS-3, on the fact § D1530 past-tensed the door's note by
+ * ({@link TodayInput.pinnedCallDone}). After the close the lede still said the order drives *until
+ * the stage's call is answered*.
+ */
+export const TODAY_CHOICE_LINE_HELD_PAST =
+  'Today the tower’s standing order drove until the stage’s call. You choose what the cars do while ' +
+  'the day plays.';
+
+/**
  * § 6.1's lede — the building in words a stranger understands, composed from its own facts.
  *
  * Composed rather than authored, because the prototype's lede is a sentence about Chancery House
@@ -830,7 +846,7 @@ function ledeOf(
   name: string,
   note: string,
   out: readonly CarOutToday[],
-  driverHeld = false,
+  driverHeld: false | 'held' | 'past' = false,
 ): string {
   if (building === undefined) {
     return (
@@ -846,7 +862,7 @@ function ledeOf(
     `${String(building.floors.length)} floors, ` +
     `${groupThousands(building.totalPopulation)} people and ${lifts}. ` +
     `${name}: ${note} ` +
-    (driverHeld ? TODAY_CHOICE_LINE_HELD : TODAY_CHOICE_LINE)
+    (driverHeld === 'past' ? TODAY_CHOICE_LINE_HELD_PAST : driverHeld === 'held' ? TODAY_CHOICE_LINE_HELD : TODAY_CHOICE_LINE)
   );
 }
 
@@ -998,7 +1014,17 @@ export function todayOf(input: TodayInput): TodayRecord {
     /* Wave AN, lane AN-7: the week's number, where one is true of it (`weekStake.ts#weekOrdinalOf`). */
     dayLabel: `${ordinalEyebrowOf(week)}${weekday.toUpperCase()} · DAY ${String(week.day)}`,
     towerName: building?.name ?? input.buildingId,
-    lede: ledeOf(building, wrinkleName, wrinkleNote, out, driverHeld !== undefined),
+    lede: ledeOf(
+      building,
+      wrinkleName,
+      wrinkleNote,
+      out,
+      driverHeld === undefined
+        ? false
+        : input.pinnedCallDone === true || week.history.some((entry) => entry.day === week.day)
+          ? 'past'
+          : 'held',
+    ),
     wrinkle: event,
     wrinkleName,
     wrinkleNote,

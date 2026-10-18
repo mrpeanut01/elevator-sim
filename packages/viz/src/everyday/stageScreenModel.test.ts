@@ -84,6 +84,7 @@ import {
   stageGoalsOf,
   STAGE_GOALS_COPY,
   type StageGoalsView,
+  STAGE_FIGURE_INK,
   stageFigureToneOf,
   stagePlayControlOf,
   STAGE_PLAY_DONE_REASON,
@@ -1842,9 +1843,9 @@ describe('the § 7 goal strip', () => {
   /*
    * [§ D1381](../../../../DECISIONS.md), the post-AN panel's seat B (defect 6): at 18:00 the header
    * drew 93 % against a 61 % bar and 220 s against 460 s in the red family beside met goal rows.
-   * Once the strip is judged, a header figure takes its own goal's verdict; before, the live accent.
+   * Once the strip is judged, a header figure takes its own goal's verdict; before, `live`.
    */
-  it('draws a header figure in its goal’s verdict once the day has run out, and in the live accent before', () => {
+  it('draws a header figure in its goal’s verdict once the day has run out, and as running before', () => {
     const recording = spreadRun({ every: 8, waitS: 30 });
     const atEnd = shiftObservationsOf(observationsAt(recording, recording.endedAt));
     const readings = readGoals(goalsForDay(DAY), atEnd);
@@ -1869,13 +1870,36 @@ describe('the § 7 goal strip', () => {
       expect(stageFigureToneOf(figure, readings, false), figure.label).toBe('live');
     }
     expect(compared, 'no header figure reads a goal; the tone has nothing to follow').toBe(2);
-    /* A met reading is drawn in the palette's cleared colour, never the live accent. */
+    /* A met reading is drawn in the palette's cleared colour once judged. */
     const met = stageFigureToneOf(
       { label: 'away inside a minute', value: '93%', reads: 'minutePct' },
       readings.map((reading) => (reading.goal.reads === 'minutePct' ? { ...reading, state: 'met' as const } : reading)),
       true,
     );
     expect(met).toBe('met');
+  });
+
+  /*
+   * [§ D1581](../../../../DECISIONS.md), decision panel R3 (amends § D1381): while the day runs a
+   * figure was drawn in terracotta, the handoff's live accent, which sits in the red family beside
+   * *missed* and read as unmet at every playhead. Running ink is neutral now, and the verdict
+   * colours appear only once the strip is judged, so no running figure is ever drawn as met.
+   */
+  it('draws a running figure in neutral ink, never terracotta, moss or alarm', () => {
+    expect(STAGE_FIGURE_INK.live).toBe(EVERYDAY_COLORS.ink);
+    expect(STAGE_FIGURE_INK.live).not.toBe(EVERYDAY_COLORS.terracotta);
+    expect(STAGE_FIGURE_INK.live).not.toBe(STAGE_FIGURE_INK.met);
+    expect(STAGE_FIGURE_INK.live).not.toBe(STAGE_FIGURE_INK.missed);
+    expect(STAGE_FIGURE_INK.met).toBe(EVERYDAY_COLORS.moss);
+    expect(STAGE_FIGURE_INK.missed).toBe(EVERYDAY_COLORS.alarm);
+    /* Mid-day a met reading still takes the running tone: the verdict waits for the end. */
+    const reading = { label: 'away inside a minute', value: '93%', reads: 'minutePct' as const };
+    const recording = spreadRun({ every: 8, waitS: 30 });
+    const atEnd = shiftObservationsOf(observationsAt(recording, recording.endedAt));
+    const metReadings = readGoals(goalsForDay(DAY), atEnd).map((entry) =>
+      entry.goal.reads === 'minutePct' ? { ...entry, state: 'met' as const } : entry,
+    );
+    expect(STAGE_FIGURE_INK[stageFigureToneOf(reading, metReadings, false)]).toBe(EVERYDAY_COLORS.ink);
   });
 
   it('draws ▶ Play inert once the day has run out, with the reason on it', () => {
@@ -2396,5 +2420,76 @@ describe('the beat after an answer says what was chosen', () => {
     expect(stageHeaderSticksOf({ headerHeight: 330, regionHeight: 790, rush: false })).toBe(false);
     expect(stageHeaderSticksOf({ headerHeight: 0, regionHeight: 745, rush: false })).toBe(false);
     expect(stageHeaderSticksOf({ headerHeight: 120, regionHeight: 0, rush: false })).toBe(false);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * § D1589 — a Rush round offers no parking chip, and says why a handover is greyed
+ * -------------------------------------------------------------------------- */
+
+import {
+  STAGE_INTERVENTIONS as PARKING_ARMS,
+  STAGE_SWITCH_RUSH_OPTION_REASONS,
+  stageInterventionsOf as interventionsOf,
+  stageParkingArmsOf,
+  stageSwitchOptionOf,
+} from './stageScreenModel.js';
+import { RUN_CONTEXTS as CONTEXTS } from './types.js';
+
+describe('§ D1589 — Rush drops the parking chips; every other stage keeps them', () => {
+  const shelf = RESOURCES.dispatcherProfiles.profiles;
+  const byId = (id: string): DispatcherProfile => {
+    const found = shelf.find((profile) => profile.id === id);
+    if (found === undefined) throw new Error(`no shipped dispatcher "${id}"`);
+    return found;
+  };
+  const rowsIn = (ctx: (typeof CONTEXTS)[number]) =>
+    interventionsOf({
+      interventions: [],
+      simTimeS: 0,
+      hasRun: true,
+      dayClosed: false,
+      recomputing: false,
+      switchTo: { target: byId('eta'), driving: () => byId('collective') },
+      rush: ctx === 'rush',
+    }).rows.map((row) => row.change.kind);
+
+  it('a rush offers the handover alone; Scenario, Career, watch and replay keep both chips', () => {
+    for (const ctx of CONTEXTS) {
+      expect(rowsIn(ctx), ctx).toEqual(
+        ctx === 'rush' ? ['adopt-dispatcher'] : ['park-cars-lobby', 'spread-cars', 'adopt-dispatcher'],
+      );
+    }
+    expect(stageParkingArmsOf(false)).toBe(PARKING_ARMS);
+    expect(stageParkingArmsOf(true)).toEqual([]);
+    /* A filter, not a deletion: the constant and its labels are untouched. */
+    expect(PARKING_ARMS.map((arm) => arm.change.kind)).toEqual(['park-cars-lobby', 'spread-cars']);
+    /* And a caller that says nothing about a rush gets the rows it always got. */
+    expect(
+      interventionsOf({ interventions: [], simTimeS: 0, hasRun: true, dayClosed: false, recomputing: false }).rows,
+    ).toEqual(PARKING_ARMS);
+  });
+
+  it('greys the four dispatchers a rush cannot hand over to, with the reason on their own row', () => {
+    const driving = () => byId('collective');
+    const greyed = shelf
+      .map((target) => ({ target, option: stageSwitchOptionOf({ target, driving, rush: true }) }))
+      .filter(({ option }) => option.refusal !== undefined);
+    expect(greyed.map(({ target }) => target.id).sort()).toEqual([
+      'auction',
+      'auction-multi-round',
+      'destination-eta',
+      'destination-panel',
+    ]);
+    for (const { target, option } of greyed) {
+      const short = STAGE_SWITCH_RUSH_OPTION_REASONS[option.refusal ?? ''];
+      expect(short, target.id).toBeDefined();
+      expect(option.label).toBe(`${target.name} · ${String(short)}`);
+      expect(option.label).not.toMatch(/—/u);
+    }
+    /* Outside a rush the rows are the names, as they were. */
+    for (const target of shelf) {
+      expect(stageSwitchOptionOf({ target, driving, rush: false })).toEqual({ label: target.name });
+    }
   });
 });

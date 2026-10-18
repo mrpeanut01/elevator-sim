@@ -105,6 +105,15 @@ async function openTheReport(page: Page): Promise<void> {
   expect(await page.locator('.everyday-report-empty').count()).toBe(0);
 }
 
+/**
+ * Open the levers' fold where a cleared day drew one — GitHub issue #637 item 4. The cards are one press
+ * away on a cleared day, and the cases below are about what a card's press does, not about the fold.
+ */
+async function unfoldLevers(page: Page): Promise<void> {
+  const handle = page.locator('details.everyday-report-levers-fold:not([open]) > summary');
+  if ((await handle.count()) > 0) await handle.first().click();
+}
+
 const wordsIn = (text: string): number => text.split(/\s+/u).filter(Boolean).length;
 
 /** Whitespace as the DOM gives it back, so a `contains` over real copy is not defeated by wrapping. */
@@ -249,10 +258,12 @@ describe.skipIf(!HAS_BROWSER)('the figure cards are layered on the page — issu
 });
 
 describe.skipIf(!HAS_BROWSER)('the report’s lever opens what it names — issue #213', () => {
+
   it('hands the page to the Engineer surface with the panel the label named', async () => {
     const page = await coldLoad();
     try {
       await openTheReport(page);
+      await unfoldLevers(page);
       /*
        * The Engineer-routed lever, when the day's sheet emits one — GitHub issue #213 routes the
        * other levers inside this shell (`[data-screen]`), and this case is about the hand-off. A
@@ -298,6 +309,7 @@ describe.skipIf(!HAS_BROWSER)('the report’s lever opens what it names — issu
     const page = await coldLoad();
     try {
       await openTheReport(page);
+      await unfoldLevers(page);
       const go = page.locator('.everyday-report-lever-go:not([data-screen])').first();
       if ((await go.count()) === 0) return;
       await go.click();
@@ -327,6 +339,20 @@ describe.skipIf(!HAS_BROWSER)('the report’s lever opens what it names — issu
     const page = await coldLoad();
     try {
       await openTheReport(page);
+      /*
+       * GitHub issue #637 item 4: after a cleared day the four cards stood open under *Nothing needed
+       * today*. The optional heading is never an open section's: it is the fold's handle, closed, and
+       * the cards are one press away. A day that did not clear keeps its advice open.
+       */
+      expect(await page.locator('.everyday-report h2', { hasText: 'Nothing needed today' }).count()).toBe(0);
+      const fold = page.locator('details.everyday-report-levers-fold');
+      if ((await fold.count()) > 0) {
+        expect(await fold.evaluate((node) => (node as HTMLDetailsElement).open)).toBe(false);
+        expect(flat((await fold.locator('summary').textContent()) ?? '')).toMatch(/^Nothing needed today/u);
+        expect(await page.locator('.everyday-report-lever').first().isVisible()).toBe(false);
+      }
+      await unfoldLevers(page);
+      if ((await fold.count()) > 0) expect(await page.locator('.everyday-report-lever').first().isVisible()).toBe(true);
       /*
        * Every card routes (GitHub issue #213, the owner's ruling): the count is asserted from both
        * ends, and the refusal note is drawn for nothing on the shipped sheet. A dispatcher lever

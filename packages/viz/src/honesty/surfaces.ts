@@ -136,6 +136,8 @@ import {
   DOOR_DRIVER_NOTE_HELD_PAST,
   DOOR_PRIMARY_NOTE_HELD,
   DOOR_STEP_ONE_HELD,
+  DOOR_STEP_ONE_HELD_PAST,
+  DOOR_DROVE_HEADING,
   DOOR_STEPS,
   sameForEveryoneLine,
 } from '../everyday/doorView.js';
@@ -161,7 +163,7 @@ import {
   designerWarnings,
   withShaftMachine,
 } from '../everyday/designerModel.js';
-import { RAIL_DRAWER_COPY, railModel, sublineFor } from '../everyday/rail.js';
+import { RAIL_DRAWER_COPY, railModel, stageSublineOf, sublineFor } from '../everyday/rail.js';
 import {
   RUSH_ABSENCES,
   RUSH_HOLD_LINE,
@@ -189,7 +191,7 @@ import {
   rushRebuildViewOf,
   type RushRebuildInput,
 } from '../everyday/rushRebuild.js';
-import { RUSH_HOUSE_COPY, RUSH_HOUSE_TABLE, rushHouseLineOf, rushStandingsOf } from '../everyday/rushHouse.js';
+import { RUSH_HOUSE_COPY, RUSH_HOUSE_TABLE, rushHouseLineOf, rushHouseToBeatLineOf, rushStandingsOf } from '../everyday/rushHouse.js';
 import {
   TUNER_COPY,
   TUNE_CARDS,
@@ -273,6 +275,7 @@ import {
   stageBookedOutOf,
   stageInkFor,
   stageInterventionsOf,
+  stageSwitchOptionOf,
   stageLegend,
   stageOpeningLineOf,
   stagePlayControlOf,
@@ -280,7 +283,18 @@ import {
   type StageSwitchTarget,
 } from '../everyday/stageScreenModel.js';
 import { todayOf, type TodayRecord } from '../everyday/today.js';
-import { RUSH_NOT_LANDED, RUSH_RESULT_EMPTY_LEDE, rushDisclosureOf, rushOutcomeOf, rushResultViewOf, rushStageHeaderOf, type RushOutcome } from '../everyday/rush.js';
+import {
+  RUSH_NOT_LANDED,
+  RUSH_RESULT_EMPTY_LEDE,
+  rushDisclosureOf,
+  rushInterventionStampOf,
+  rushLossLineOf,
+  rushOpeningPaceOf,
+  rushOutcomeOf,
+  rushResultViewOf,
+  rushStageHeaderOf,
+  type RushOutcome,
+} from '../everyday/rush.js';
 import { rushPostViewOf } from '../everyday/rushPost.js';
 import { RUSH_SITTING_COPY, rushSittingOf, type RushRoundRecord } from '../everyday/rushSitting.js';
 import {
@@ -374,7 +388,7 @@ const DAY_CALL_FIXTURE_DRIVERS: DayCallDriverNames = Object.freeze({
 });
 import { wayThroughSentenceOf, WEEK_WAY } from '../shift/weekWay.js';
 import { admittedPressDayIds, pressDayFor } from '../shift/ladder.js';
-import { PRESS_DAY_DRIVER_HELD, TODAY_CHOICE_LINE_HELD } from '../everyday/today.js';
+import { PRESS_DAY_DRIVER_HELD, TODAY_CHOICE_LINE_HELD, TODAY_CHOICE_LINE_HELD_PAST } from '../everyday/today.js';
 import { actsOf, wholeDayFor } from '../shift/dayLength.js';
 import { rushTutorialWorkedAnswerOf } from '../everyday/rushScreenModel.js';
 import { WORKED_ANSWER_COPY, type WorkedAnswerFacts, type WorkedAnswerView } from '../everyday/workedAnswer.js';
@@ -10246,11 +10260,16 @@ const EVERYDAY_MENU: SurfaceAdapter = {
     'everyday/sittingShape.ts#SITTING_SHAPES',
     /* Wave AP lane AP-D2 (§ D1453): the hub row's last clause, drawn inside `SITTING_SHAPES.contractDay`. */
     'everyday/sittingShape.ts#SCENARIO_LOSS_CLAUSE',
+    /* Wave AS lane AS-3 (§ D1563): the hub row's far ends, drawn inside `SITTING_SHAPES.contractDay`. */
+    'everyday/sittingShape.ts#SITTING_LONGER_ELSEWHERE',
     'everyday/sittingShape.ts#sittingLengthPhrase',
     'everyday/rail.ts#RAIL_DRAWER_COPY',
     /* The shell's skip link, GitHub issue #404 — chrome the shell draws and does not author. */
     'everyday/types.ts#SHELL_SKIP_LABEL',
     'everyday/rail.ts#sublineFor',
+    /* Wave AS, lane AS-4 (#636 item 6): the played day's subline with the stage's clock. */
+    'everyday/rail.ts#stageSublineOf',
+    'everyday/rail.ts#STAGE_RAIL_PHASE_WORDS',
     'everyday/rail.ts#railGroups',
     'everyday/rail.ts#railFooter',
     'everyday/rail.ts#railModel',
@@ -10330,6 +10349,16 @@ const EVERYDAY_MENU: SurfaceAdapter = {
         seeds.push({
           field: `rail.subline.${screen}.${ctx}`,
           text: sublineFor({ screen, ctx }),
+          role: 'label',
+        });
+      }
+    }
+    /* The played day's three phases, each with a clock the stage would report. */
+    for (const ctx of ['daily', 'campaign'] as const) {
+      for (const [phase, clock] of [['before', '08:00'], ['running', '08:41'], ['over', '18:00']] as const) {
+        seeds.push({
+          field: `rail.subline.stage.${ctx}.${phase}`,
+          text: stageSublineOf({ screen: 'stage', ctx }, { clock, phase }),
           role: 'label',
         });
       }
@@ -10633,6 +10662,8 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
     /* Wave AR lane AR-1: the house run on the same crowd beside the round's result, seeded below. */
     'everyday/rushHouse.ts#RUSH_HOUSE_LINE_COPY',
     'everyday/rushHouse.ts#rushHouseLineOf',
+    /* Wave AS lane AS-1, § D1545 (GitHub issue #636, R5): the setup page's line to beat, seeded below. */
+    'everyday/rushHouse.ts#rushHouseToBeatLineOf',
     /*
      * § D1420: this device's best sitting on a build with no board, its row and every line the
      * standings say about it (replayed, nothing kept, or kept and not replayable here), seeded below.
@@ -10780,6 +10811,15 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
         arms.push(['house-held', { buildingId: held.buildingId, dispatcherId: held.dispatcherId, dispatcherName: held.dispatcherId, outcome: { kind: 'broke', heldS: 600, wave: 4 } }]);
       }
       for (const [arm, input] of arms) seeds.push({ field: `rush.houseLine.${arm}`, text: rushHouseLineOf(input) ?? '', role: 'prose' });
+      /* § D1545: the line to beat, for a house run that broke and one that held every wave. */
+      seeds.push({ field: 'rush.toBeat.broke', text: rushHouseToBeatLineOf(midtown) ?? '', role: 'prose' });
+      if (held !== undefined) {
+        seeds.push({
+          field: 'rush.toBeat.held',
+          text: rushHouseToBeatLineOf({ buildingId: held.buildingId, dispatcherId: held.dispatcherId, dispatcherName: held.dispatcherId }) ?? '',
+          role: 'prose',
+        });
+      }
     }
     seeds.push({
       field: 'rush.driving',
@@ -12567,6 +12607,10 @@ const EVERYDAY_RUSH: SurfaceAdapter = {
     'everyday/rush.ts#RUSH_STAGE_COPY',
     'everyday/rush.ts#RUSH_NOT_LANDED',
     'everyday/rush.ts#RUSH_RESULT_EMPTY_LEDE',
+    /* Wave AS lane AS-1: the phone's compact figure, wave 1's pace line, the loss's line and the held-time stamp, seeded below. */
+    'everyday/rush.ts#rushOpeningPaceOf',
+    'everyday/rush.ts#rushLossLineOf',
+    'everyday/rush.ts#rushInterventionStampOf',
     /*
      * GitHub issue #372's round list and post block, under the result. Every state is driven below
      * rather than the copy table alone, on `EVERYDAY_DAILY_LOOP`'s argument for the day's block:
@@ -12658,7 +12702,20 @@ const EVERYDAY_RUSH: SurfaceAdapter = {
         seeds.push({ field: `${tag}.figure.${figure.label}.value`, text: figure.value, role: 'label' });
         seeds.push({ field: `${tag}.figure.${figure.label}.label`, text: figure.label, role: 'label' });
       }
+      seeds.push({ field: `${tag}.compact.value`, text: head.compactFigure.value, role: 'label' });
+      seeds.push({ field: `${tag}.compact.label`, text: head.compactFigure.label, role: 'label' });
     }
+    seeds.push({
+      field: 'rush.stage.openingPace',
+      text: rushOpeningPaceOf({ heldS: 0, watchingSimPerRealS: 4, playerChoseSpeed: false })?.note ?? '',
+      role: 'reason',
+    });
+    seeds.push({ field: 'rush.stage.loss', text: rushLossLineOf(), role: 'observation' });
+    seeds.push({
+      field: 'rush.stage.stamp',
+      text: rushInterventionStampOf([{ atS: mid, change: { kind: 'spread-cars' } }], mid, recording.startedAt),
+      role: 'label',
+    });
     seeds.push({ field: 'rush.bar.notLanded', text: RUSH_NOT_LANDED, role: 'reason' });
     seeds.push({ field: 'rush.result.empty', text: RUSH_RESULT_EMPTY_LEDE, role: 'reason' });
 
@@ -12913,6 +12970,8 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
      * Engineer strip needs it as well, and one screen's model is not where both shells can read it.
      */
     'everyday/stageScreenModel.ts#STAGE_INTERVENTIONS',
+    /* § D1589: the parking arms a stage offers, none in a rush. Its words are the constant's, seeded through `stageInterventionsOf`. */
+    'everyday/stageScreenModel.ts#stageParkingArmsOf',
     'everyday/stageScreenModel.ts#STAGE_CAMERAS',
     /* Returns the chips above or none; the words are theirs, seeded below once per case. */
     'everyday/stageScreenModel.ts#stageCameraChipsOf',
@@ -12938,6 +12997,9 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
     'live/interventions.ts#SWITCH_KEEPS_FORECAST',
     'everyday/stageScreenModel.ts#STAGE_SWITCH_PICKER_LABEL',
     'everyday/stageScreenModel.ts#STAGE_SWITCH_PICKER_NOTE',
+    /* § D1589: in a Rush round a greyed handover row says why on itself. Seeded below. */
+    'everyday/stageScreenModel.ts#stageSwitchOptionOf',
+    'everyday/stageScreenModel.ts#STAGE_SWITCH_RUSH_OPTION_REASONS',
     /*
      * GitHub issue #588, § D1278: the parking row's line after a press that changed nobody's trip.
      * Seeded below through `stageInterventionsOf` with a verdict handed in, which is the one arm that
@@ -13007,6 +13069,8 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
     'everyday/stagePace.ts#stageSkipLineOf',
     /* Wave AR, lane AR-2, § D1525: which of the two the skip's span speaks, past the allowance or not. */
     'everyday/stagePace.ts#stageSkipSpeechOf',
+    /* Wave AS, lane AS-2, § D1555 (#636 R2): the played-on line, seeded through `stagePaceNoteOf`'s `unheld` and played-on arms. */
+    'everyday/stagePace.ts#stagePlayedOnLineOf',
     /*
      * § D1029's call — the card over both rules and the hold the parking presses carry before it.
      * Seeded once per case below on fixture calls on the case's own first car, the corpus building
@@ -13042,6 +13106,8 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
     'everyday/stageCallRow.ts#STAGE_CALL_NO_CROSSING',
     'everyday/stageCallRow.ts#stageCallReadingsLineOf',
     'everyday/stageCallRow.ts#STAGE_CALL_TAKEN',
+    /* Wave AS, lane AS-3 (GitHub issue #637 item 5): a row whose runs leave out a later press leads with it. */
+    'everyday/stageCallRow.ts#STAGE_CALL_WITHOUT_LATER',
     /* Wave AQ, lane AQ-4 (GitHub issue #631): the row whose answers read alike, said once. */
     'everyday/stageCallRow.ts#STAGE_CALL_NO_DIFFERENCE',
     'everyday/stageCallRow.ts#stageCallRowsCaveatOf',
@@ -13383,6 +13449,15 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
           });
         }
       }
+    }
+    /*
+     * **A Rush round's greyed handover rows** — [§ D1589](../../../../DECISIONS.md). In a rush a
+     * target the round cannot hand over to is a greyed picker row carrying its reason, one per
+     * refusal sentence; `reason`, as the long refusal is.
+     */
+    for (const [state, switchTo] of refusedStates) {
+      const option = stageSwitchOptionOf({ target: switchTo.target, driving: switchTo.driving, rush: true });
+      seeds.push({ field: `stage.intervene.rushOption(${state})`, text: option.label, role: 'reason' });
     }
     /*
      * **The parking row's line after the fact** — GitHub issue #588, [§ D1278](../../../../DECISIONS.md).
@@ -13844,12 +13919,20 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
        */
       seeds.push({ field: 'stage.skip.beat', text: STAGE_SKIP_BEAT_NOTE, role: 'label' });
       /* Wave AR, lane AR-2, § D1525: the skip's span as the stage picks it, past the allowance and not. */
-      for (const pace of [
-        { simPerRealS: 30, reason: 'fast' as const },
-        { simPerRealS: 30, reason: 'fast' as const, playedOn: true as const },
-      ]) {
-        const text = stageSkipSpeechOf({ armedRealS: SKIP_BEAT_REAL_S, pace, line: '' });
-        if (text !== '') seeds.push({ field: `stage.skip.speech(${pace.playedOn === true ? 'playedOn' : 'fast'})`, text, role: 'label' });
+      /* Wave AS, lane AS-2, § D1554: the beat's note is drawn only for a beat that lands, on either side of the allowance. */
+      {
+        const text = stageSkipSpeechOf({ armedRealS: SKIP_BEAT_REAL_S, lands: true, line: '' }).speech;
+        if (text !== '') seeds.push({ field: 'stage.skip.speech(lands)', text, role: 'label' });
+      }
+      /* § D1555 (#636 R2): the played-on line, which points at the skip, on the `fast` arm past the allowance. */
+      {
+        const note = stagePaceNoteOf(
+          { simPerRealS: 30, reason: 'fast', playedOn: true },
+          { acts, simTimeS: recording.startedAt },
+        );
+        if (note !== undefined) {
+          seeds.push({ field: 'stage.pace(playedOn)', text: note, role: 'label', playhead: atPlayhead(recording, recording.startedAt) });
+        }
       }
       {
         const landsAtS = recording.startedAt + span / 3;
@@ -15459,6 +15542,10 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     /* Wave AQ lane AQ-1: step 1 and the press's note on that held day, #626's leftover. */
     'everyday/doorView.ts#DOOR_STEP_ONE_HELD',
     'everyday/doorView.ts#DOOR_PRIMARY_NOTE_HELD',
+    /* Wave AS, lane AS-3 (GitHub issue #637 item 3): the hold's lede and step 1 once the call is behind the player, and the closed day's drivers. */
+    'everyday/today.ts#TODAY_CHOICE_LINE_HELD_PAST',
+    'everyday/doorView.ts#DOOR_STEP_ONE_HELD_PAST',
+    'everyday/doorView.ts#DOOR_DROVE_HEADING',
     /*
      * The week census's sentence on a day DC-10 does not admit, and its heading — § D1067. Drawn
      * only on a whole-day Scenario day at the tower's own rung, which no corpus case is, so every
@@ -15627,6 +15714,10 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     seeds.push({ field: 'door.step1.held.head', text: DOOR_STEP_ONE_HELD.head, role: 'label' });
     seeds.push({ field: 'door.step1.held.body', text: DOOR_STEP_ONE_HELD.body, role: 'prose' });
     seeds.push({ field: 'door.primary.note.held', text: DOOR_PRIMARY_NOTE_HELD, role: 'prose' });
+    seeds.push({ field: 'today.lede.heldPast', text: TODAY_CHOICE_LINE_HELD_PAST, role: 'prose' });
+    seeds.push({ field: 'door.step1.heldPast.head', text: DOOR_STEP_ONE_HELD_PAST.head, role: 'label' });
+    seeds.push({ field: 'door.step1.heldPast.body', text: DOOR_STEP_ONE_HELD_PAST.body, role: 'prose' });
+    seeds.push({ field: 'door.driver.droveHeading', text: DOOR_DROVE_HEADING, role: 'label' });
     /* Midtown's run clock, from its whole authored day: a booking's window is a fraction of that run. */
     const midtownDay = wholeDayFor(context.trafficProfiles, context.buildings.find((building) => building.id === 'midtown-office'));
     const clock: BookingClock | undefined =
@@ -18573,6 +18664,8 @@ const EVERYDAY_CAREER_FRONT: SurfaceAdapter = {
     /* § D1543: the bar's note under *Watch a day here* when that line is drawn. */
     if (line !== undefined) {
       seeds.push({ field: 'careerFront.desk.census.shortPath', text: DAY_CENSUS_COPY.shortPath, role: 'prose' });
+      /* § D1572: the stage's paused start on the same quiet day. */
+      seeds.push({ field: 'careerFront.stage.quietStart', text: DAY_CENSUS_COPY.quietStage, role: 'prose' });
     }
 
     /* The brief's moot count, in each of its three shapes. */

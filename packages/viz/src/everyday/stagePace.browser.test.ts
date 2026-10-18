@@ -355,6 +355,40 @@ describe.skipIf(!HAS_BROWSER)('§ D1169 — a scored day is paced by the tutoria
   }, 120_000);
 
   /*
+   * Wave AS, lane AS-2 (§ D1557, GitHub issue #637 item 8): at 1280×800 the header § D1527 pins at
+   * the top covered the call card's *THE DAY’S CALL* when the card scrolled itself into view. Red
+   * before: the heading's box sat under the header's.
+   */
+  it('scrolls the call card in below the pinned header, with its title in view, at 1280×800', async () => {
+    const page = await playDayOn('c2', { width: 1280, height: 800 });
+    try {
+      await page.waitForFunction(() => document.querySelector('.everyday-stage-call:not([hidden]) .everyday-stage-call-heading') !== null, undefined, {
+        timeout: 100_000,
+        polling: 50,
+      });
+      /* The card scrolls itself in as it appears; read it on the frames after, once the layout has settled. */
+      await page.waitForFunction(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(() => done(true)))));
+      const read = () =>
+        page.evaluate(() => {
+          const header = document.querySelector('.everyday-stage-header')?.getBoundingClientRect();
+          const heading = document.querySelector('.everyday-stage-call:not([hidden]) .everyday-stage-call-heading');
+          const box = heading?.getBoundingClientRect();
+          if (header === undefined || heading === null || heading === undefined || box === undefined) return undefined;
+          const hit = document.elementFromPoint(box.left + Math.min(20, box.width / 2), box.top + box.height / 2);
+          return {
+            sticky: getComputedStyle(document.querySelector('.everyday-stage-header')!).position === 'sticky',
+            belowHeader: box.top >= header.bottom - 1,
+            onTop: hit !== null && (hit === heading || heading.contains(hit)),
+            inViewport: box.top >= 0 && box.bottom <= innerHeight,
+          };
+        });
+      expect(await read()).toEqual({ sticky: true, belowHeader: true, onTop: true, inViewport: true });
+    } finally {
+      await page.close();
+    }
+  }, 120_000);
+
+  /*
    * Wave AR, lane AR-2 (§ D1531): at Midtown's 10:40 call the card said *2 people are standing* while
    * the live region still said *0 legs waiting*, the sentence written at 09:46 as a skip began, held
    * there by the two-second limit. Red before: the region read 0 beside the card's 2.

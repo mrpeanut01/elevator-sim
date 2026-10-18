@@ -433,14 +433,18 @@ export function stageCallCardOf(
 /** A car order an earlier answer pressed, still in force at a later call. */
 export interface StageCallStandingOrder {
   readonly kind: 'park-cars-lobby' | 'spread-cars';
-  /** The second it was pressed at. */
+  /**
+   * The second the order began: the first press of it since the other order was last pressed —
+   * [§ D1556](../../../../DECISIONS.md), wave AS, lane AS-2, GitHub issue #637 item 2. The 17:20 card read
+   * *Since 12:20* when the 12:20 answer had only kept an order standing since 10:40.
+   */
   readonly atS: number;
 }
 
 /**
  * **The car order in force at a call**, or `undefined` where nothing was pressed before it —
  * wave AR, lane AR-2, [§ D1528](../../../../DECISIONS.md). The last park or spread press filed before
- * the call second. Each writes one setting that stands until the other is pressed (`core`'s
+ * the call second, dated from when that order began ([§ D1556](../../../../DECISIONS.md)). Each writes one setting that stands until the other is pressed (`core`'s
  * `idle.parkingStrategy`), and *leave them* presses nothing, so the latest press is the order the
  * cars are under at the call.
  */
@@ -448,12 +452,14 @@ export function stageCallStandingOrderOf(
   interventions: readonly { readonly atS: number; readonly change: { readonly kind: string } }[],
   callAtS: number,
 ): StageCallStandingOrder | undefined {
+  const presses = interventions
+    .filter((entry) => (entry.change.kind === 'park-cars-lobby' || entry.change.kind === 'spread-cars') && entry.atS < callAtS)
+    .map((entry) => ({ kind: entry.change.kind as StageCallStandingOrder['kind'], atS: entry.atS }))
+    .sort((a, b) => a.atS - b.atS);
   let found: StageCallStandingOrder | undefined;
-  for (const entry of interventions) {
-    const kind = entry.change.kind;
-    if (kind !== 'park-cars-lobby' && kind !== 'spread-cars') continue;
-    if (!(entry.atS < callAtS)) continue;
-    if (found === undefined || entry.atS >= found.atS) found = { kind, atS: entry.atS };
+  /* § D1556: a press of the order already in force keeps it, so the order began at the first of the run. */
+  for (const press of presses) {
+    if (found === undefined || press.kind !== found.kind) found = press;
   }
   return found === undefined ? undefined : Object.freeze(found);
 }

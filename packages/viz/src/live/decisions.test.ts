@@ -223,6 +223,36 @@ describe('the three outcomes each say something honest', () => {
     expect(row?.color).toBe('var(--band-3)');
   });
 
+  /*
+   * Wave AS, lane AS-2, GitHub issue #637 item 11: at Midtown's 10:39 the Engineer log said *no car
+   * for 19 · no car may answer this call* four times in a row. Red before: four identical rows.
+   */
+  it('folds identical consecutive rows into one, and keeps the limit for rows that differ', () => {
+    const none = (at: number, callId: string, floorId = 'L2'): VizDecision =>
+      decision({ at, callId, floorId, outcome: 'unassigned', carId: undefined, carLabel: undefined, cost: undefined, runnerUpCost: undefined, eligibleCars: 0, terms: [] });
+    const recording = syntheticRecording({
+      decisions: [
+        decision({ at: 100, callId: 'a' }),
+        none(121, 'b'),
+        none(122, 'c'),
+        none(123, 'd'),
+        none(124, 'e'),
+        decision({ at: 130, callId: 'f' }),
+      ],
+    });
+    const rows = decisionRowsAt(recording, 300, 3);
+    expect(rows.map((row) => `${row.t} ${row.head} · ${row.why}`)).toEqual([
+      '06:02 A → Level 2 · waitTime 12.4 s won it · 0.42 clear of the next car',
+      '06:02 no car for Level 2 · no car may answer this call',
+      '06:01 A → Level 2 · waitTime 12.4 s won it · 0.42 clear of the next car',
+    ]);
+    /* The folded row keeps the oldest key, so a fifth identical decision would not rebuild the log. */
+    expect(rows[1]?.key).toBe('121-b');
+    /* Rows that differ in any word are kept: another floor is another line. */
+    const two = decisionRowsAt(syntheticRecording({ decisions: [none(121, 'b'), none(122, 'c', 'L3')] }), 300);
+    expect(two).toHaveLength(2);
+  });
+
   it('distinguishes that from cars bidding and none being able to take it', () => {
     const row = decisionRowsAt(
       syntheticRecording({

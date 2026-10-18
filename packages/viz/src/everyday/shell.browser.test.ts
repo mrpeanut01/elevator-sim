@@ -503,7 +503,8 @@ describe.skipIf(!HAS_BROWSER)("Today's tower is playable through the new shell",
       expect(shown.mainShown).toBe('grid');
       expect(shown.inset).toBe('');
       expect(shown.railWidth).toBeGreaterThan(0);
-      expect(shown.subline).toContain('MID-DAY');
+      /* Wave AS, lane AS-4 (#636 item 6): before Play it is the start of the day, not MID-DAY. */
+      expect(shown.subline).toContain('START OF DAY');
       expect(shown.engineerCovered).toBe(true);
 
       // And the stage is a stage: the day it asked for lands, and its transport says so.
@@ -656,6 +657,96 @@ describe.skipIf(!HAS_BROWSER)("Today's tower is playable through the new shell",
       await page.close();
     }
   }, 180_000);
+
+  /*
+   * ---- Wave AS, lane AS-4 — GitHub issue #636 items 6 and 7 ----
+   *
+   * The rail read MID-DAY at 08:00 with no clock, before the day had started, because the shell never
+   * appended the stage's clock the handoff draws (`MID-DAY · 08:41`). And at 1280×600 the rail's
+   * last row, *Switch to Engineer*, sat below the fold with no way to scroll to it.
+   */
+  it('says where the day stands on the rail, with the stage’s own clock beside it', async () => {
+    const page = await coldLoad();
+    try {
+      await enterEverydayStage(page);
+      const railAndClock = () => ({
+        subline: document.querySelector('.everyday-rail-subline')?.textContent ?? '',
+        clock: document.querySelector('.everyday-stage-clock')?.textContent ?? '',
+      });
+      await page.waitForFunction(
+        () =>
+          (document.querySelector('.everyday-rail-subline')?.textContent ?? '') ===
+          `START OF DAY · ${document.querySelector('.everyday-stage-clock')?.textContent ?? ''}`,
+        undefined,
+        { timeout: 30_000 },
+      );
+      const before = await page.evaluate(railAndClock);
+      expect(before.subline).toMatch(/^START OF DAY · \d{2}:\d{2}$/u);
+
+      await page.locator('.everyday-stage-start').click();
+      await page.waitForFunction(
+        (startClock) => {
+          const clock = document.querySelector('.everyday-stage-clock')?.textContent ?? '';
+          const subline = document.querySelector('.everyday-rail-subline')?.textContent ?? '';
+          return clock !== startClock && subline === `MID-DAY · ${clock}`;
+        },
+        before.clock,
+        { timeout: 60_000 },
+      );
+      expect((await page.evaluate(railAndClock)).subline).toMatch(/^MID-DAY · \d{2}:\d{2}$/u);
+    } finally {
+      await page.close();
+    }
+  });
+
+  it('keeps Switch to Engineer reachable and pressable on a 1280×600 screen', async () => {
+    const page = await openPage(browser, { viewport: { width: 1280, height: 600 } });
+    try {
+      await page.goto(`${origin}?building=garden-apartments&seed=424242`, { waitUntil: 'load' });
+      await page.waitForFunction(
+        () => document.querySelector<HTMLElement>('.menu-overlay')?.hidden === true,
+        undefined,
+        { timeout: 30_000 },
+      );
+      await leaveTutorialIfOffered(page);
+      for (const where of ['menu', 'towers', 'stage'] as const) {
+        if (where === 'towers') {
+          await page.locator('.everyday-mode[data-screen="towers"]').first().click();
+          await page.waitForSelector('.everyday-towers');
+        }
+        if (where === 'stage') {
+          await page.locator('.everyday-rail-menu').click();
+          await page.waitForSelector('.everyday-mode');
+          await enterEverydayStage(page);
+        }
+        const reach = await page.evaluate(() => {
+          const rail = document.querySelector<HTMLElement>('.everyday-rail');
+          const swap = document.querySelector<HTMLElement>('.everyday-engineer-swap');
+          if (rail === null || swap === null) return undefined;
+          /* In view as the screen opens: no scroll first, because the rail's scroll is not visible. */
+          const box = swap.getBoundingClientRect();
+          const railBox = rail.getBoundingClientRect();
+          const x = box.left + box.width / 2;
+          const y = box.top + box.height / 2;
+          const hit = document.elementFromPoint(x, y);
+          return {
+            railBottom: railBox.bottom,
+            top: box.top,
+            bottom: box.bottom,
+            innerHeight: window.innerHeight,
+            hit: hit !== null && swap.contains(hit),
+          };
+        });
+        expect(reach, where).toBeDefined();
+        expect(reach?.railBottom ?? Infinity, where).toBeLessThanOrEqual(reach?.innerHeight ?? 0);
+        expect(reach?.top ?? -1, where).toBeGreaterThanOrEqual(0);
+        expect(reach?.bottom ?? Infinity, where).toBeLessThanOrEqual(reach?.innerHeight ?? 0);
+        expect(reach?.hit, where).toBe(true);
+      }
+    } finally {
+      await page.close();
+    }
+  });
 
   it('comes back to the menu, unmounts the stage, and keeps the Engineer surface covered', async () => {
     const page = await coldLoad();
@@ -824,7 +915,8 @@ describe.skipIf(!HAS_BROWSER)('switching between the two worlds — GAMEPLAY § 
       expect(home.everydayInert).toBe(false);
       expect(home.everydayAria).toBeNull();
       expect(home.onStage).toBe(true);
-      expect(home.subline).toContain('MID-DAY');
+      /* Still paused at the start of the day, and the rail now says so (#636 item 6). */
+      expect(home.subline).toMatch(/START OF DAY · \d{2}:\d{2}/u);
       expect(home.primary).toBe('Close the day');
       /*
        * The measured half of *cover, never hide*: the canvas kept its box across a trip in which it

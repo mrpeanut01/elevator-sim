@@ -31,6 +31,7 @@ import {
   type RushHouseTable,
   RUSH_HOUSE_LINE_COPY,
   rushHouseLineOf,
+  rushHouseToBeatLineOf,
 } from './rushHouse.js';
 import { RUSH_HOUSE_COMMAND, browserResourcesFrom, measureRushHouseRun } from './rushHouse.test-helper.js';
 import { LAST_GENERATED_WAVE, RUSH_HOLD_LINE, RUSH_STREAM, playerWaveAt } from './rushScreenModel.js';
@@ -357,5 +358,35 @@ describe('the house run beside the player’s round — wave AR, lane AR-1', () 
     expect(rushHouseLineOf({ ...midtown, buildingId: 'drawn-in-the-designer', outcome })).toBeUndefined();
     const stale = { ...RUSH_HOUSE_TABLE, provenance: { ...RUSH_HOUSE_TABLE.provenance, seed: '1' } };
     expect(rushHouseLineOf({ ...midtown, outcome, table: stale })).toBeUndefined();
+  });
+});
+
+describe('the line to beat on the setup page — wave AS, lane AS-1, § D1545 (GitHub issue #636, R5)', () => {
+  const midtown = { buildingId: 'midtown-office', dispatcherId: 'collective', dispatcherName: 'Conventional collective' };
+
+  it('states the house run from the same row the result reads, and claims nothing about a choice', () => {
+    const line = rushHouseToBeatLineOf(midtown);
+    expect(line).toBe(
+      'The house run on this crowd, Conventional collective with no changes, holds to 27:20, into wave 10. That is the time to pass.',
+    );
+    /* The same row as the result's line: its house half carries the same figures. */
+    const after = rushHouseLineOf({ ...midtown, outcome: { kind: 'broke', heldS: 600, wave: 4 } }) ?? '';
+    expect(after).toContain('held 27:20, into wave 10.');
+    expect(line).not.toMatch(/\b(better|worse|cost|helps?|helped|hurts?|improv|win|won|should|beats?)\b/iu);
+  });
+
+  it('says the house held every wave when its run never broke', () => {
+    const held = RUSH_HOUSE_TABLE.runs.find((run) => run.brokeAtS === null);
+    if (held === undefined) throw new Error('no house run held every wave, so this case tests nothing');
+    expect(rushHouseToBeatLineOf({ buildingId: held.buildingId, dispatcherId: held.dispatcherId, dispatcherName: 'X' })).toBe(
+      RUSH_HOUSE_LINE_COPY.toBeatHeld('X'),
+    );
+  });
+
+  it('says nothing for a dispatcher or a tower the house did not run, or a stale table', () => {
+    expect(rushHouseToBeatLineOf({ ...midtown, dispatcherId: 'saved-on-a-device' })).toBeUndefined();
+    expect(rushHouseToBeatLineOf({ ...midtown, buildingId: 'drawn-in-the-designer' })).toBeUndefined();
+    const stale = { ...RUSH_HOUSE_TABLE, provenance: { ...RUSH_HOUSE_TABLE.provenance, seed: '1' } };
+    expect(rushHouseToBeatLineOf({ ...midtown, table: stale })).toBeUndefined();
   });
 });

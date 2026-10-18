@@ -77,7 +77,9 @@ import {
   RAIL_DRAWER_COPY,
   railFooter,
   railModel,
+  stageSublineOf,
   type BankedAnswer,
+  type StageRailClock,
   type BankedTurnState,
 } from './rail.js';
 import type { RailModel } from './rail.js';
@@ -168,6 +170,15 @@ export interface EverydayScreenShellContext extends EverydayScreenContext {
    * #337, `everyday/boardScreen.ts`'s, over a daily-board row.
    */
   enterWatch(): void;
+  /**
+   * **The stage tells the rail where the day stands** — wave AS, lane AS-4, GitHub issue #636 item
+   * 6. § 3.2's subline is `MID-DAY · 08:41` in the handoff, and `rail.ts#sublineFor` returns the bare
+   * word because the rail has no run; the stage has the run and its own clock, so it reports both
+   * here and the shell appends them (`rail.ts#stageSublineOf`). Optional, so a test context need not
+   * carry it. Its one non-test caller is `everyday/stageScreen.ts#draw`, on every frame; the shell
+   * repaints only when the text changes.
+   */
+  railClock?(live: StageRailClock | undefined): void;
   /**
    * § 9's *Start the rush*, as a call — put the § 7 stage into `ctx: 'rush'` (GitHub issue #220).
    * The run is `EverydayHost.startRush`'s and is asked for first; this is only the context, and the
@@ -1739,6 +1750,11 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     }).identity.name;
   }
 
+  /** What the mounted stage last reported for the rail — {@link EverydayScreenShellContext.railClock}. */
+  let stageRailLive: StageRailClock | undefined;
+  /** The subline element, while it shows the shell's own words rather than a watched run's. */
+  let railSubline: HTMLElement | undefined;
+
   function drawRail(): void {
     /* The drawer's dismiss survives the emptying — see {@link railClose}. It is `display:none` in
        the docked geometry, so on a desktop this appends a box with no line and draws nothing. */
@@ -1825,7 +1841,8 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
      * that read the session alone would name somebody else's day over the player's own screen.
      */
     const watchSubline = state.ctx === 'watch' ? dataHost?.watching()?.view.railSubline : undefined;
-    const sub = el(doc, 'span', 'everyday-rail-subline', watchSubline ?? model.subline);
+    const sub = el(doc, 'span', 'everyday-rail-subline', watchSubline ?? stageSublineOf(state, stageRailLive));
+    railSubline = watchSubline === undefined ? sub : undefined;
     sub.style.cssText = `display:block;font:500 9.5px ${TYPE.mono};letter-spacing:.06em;color:${onMenu ? C.ink : C.label};margin-top:1px`;
     menuText.append(menuLabel, sub);
     menuRow.append(home, menuText);
@@ -1893,9 +1910,18 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
       rail.append(block);
     }
 
-    /* § 3.2's footer: identity card, the bordered Settings row, the Engineer swap. */
-    const footer = el(doc, 'div');
-    footer.style.cssText = 'margin-top:auto;padding-top:18px';
+    /*
+     * § 3.2's footer: identity card, the bordered Settings row, the Engineer swap.
+     *
+     * **Pinned to the rail's foot** — wave AS, lane AS-4, GitHub issue #636 item 7. At 1280×600 the
+     * rail's content ran 81 px past the window (209 on the career screens), so *Switch to Engineer*
+     * sat cut off under the fold and the rail's scroll, dark on dark, did not say it was there.
+     * Sticky rather than fixed: the groups above scroll under it, it never leaves the rail, and on a
+     * rail short enough to fit it sits where it always did. The ground is the rail's own, so the
+     * rows passing under it do not show through.
+     */
+    const footer = el(doc, 'div', 'everyday-rail-footer');
+    footer.style.cssText = `margin-top:auto;padding-top:18px;position:sticky;bottom:0;background:${C.ink}`;
 
     const card = el(doc, 'div', 'everyday-identity');
     card.style.cssText = `border-radius:${String(R.well)}px;background:${RAIL_SURFACE.card};padding:11px 12px`;
@@ -2893,6 +2919,8 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
   function draw(): void {
     drewPending = false;
     unmountCurrent();
+    /* A clock is the mounted stage's to report; the next one reports its own on its first frame. */
+    stageRailLive = undefined;
     drawRail();
     const route = routeFor(state.screen);
     /**
@@ -3001,6 +3029,12 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
           enterWatch: enterWatchStage,
           enterRush: enterRushStage,
           enterReplay: enterReplayBrief,
+          /* #636 item 6: the stage's clock on the rail, repainting only the subline. */
+          railClock: (live) => {
+            if (live?.clock === stageRailLive?.clock && live?.phase === stageRailLive?.phase) return;
+            stageRailLive = live;
+            if (railSubline !== undefined) railSubline.textContent = stageSublineOf(state, live);
+          },
         };
         mounted = module.mount(screenRegion, context);
         /*

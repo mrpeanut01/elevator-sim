@@ -603,6 +603,17 @@ const TIERS: Readonly<Record<string, Tier>> = Object.freeze({
       'is re-run by hand when the skip rule, the call rule, a building or a demand template moves',
     scheduled: false,
   },
+  'packages/viz/src/everyday/rushChoices.sweep.test.ts': {
+    gates: ['RUSH_CHOICES_SWEEP'],
+    reason:
+      'Wave AS’s instrument, § D1588 — Midtown’s Endless rush under collective over fifty paired ' +
+      'crowds, with each in-round choice (spread, park, every permitted handover) pressed at 0:10 and ' +
+      'the parking pair again when the first rider passes a minute: paired-t intervals on the time ' +
+      'the line held. It produced § D1588’s table. Not scheduled because it is a compute job behind ' +
+      'a ruling rather than a check, and a nightly re-derivation would write figures nothing reads. ' +
+      'It is re-run by hand when the rush, the parking kinds, a dispatcher or Midtown moves',
+    scheduled: false,
+  },
   'packages/viz/src/everyday/callFlip.sweep.test.ts': {
     gates: ['CALL_FLIP_SWEEP'],
     reason:

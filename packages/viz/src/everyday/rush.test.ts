@@ -21,7 +21,12 @@ import {
   RUSH_SEED,
   RUSH_TEMPLATE_ID,
   heldClock,
+  RUSH_COMPACT_MAX_WIDTH_PX,
   rushBeforeOf,
+  rushCompactHudOf,
+  rushInterventionStampOf,
+  rushLossLineOf,
+  rushOpeningPaceOf,
   rushDisclosureOf,
   rushHoldAt,
   rushOutcomeOf,
@@ -266,6 +271,40 @@ describe('the hold line — forty past two minutes at once, read at the stream�
     expect(head.wave).toBe('WAVE 2');
     expect(head.figures.map((figure) => figure.label)).toContain('past two minutes, of 40');
     expect(heldClock(65)).toBe('1:05');
+    /* Wave AS, lane AS-1: the phone's compact row reads the same count against the line. */
+    expect(head.compactFigure.value).toBe(`${head.figures[1]?.value ?? ''}/${String(RUSH_HOLD_LINE.people)}`);
+  });
+
+  it('folds to the compact row only while a round plays on a narrow stage — wave AS, lane AS-1', () => {
+    expect(rushCompactHudOf({ regionWidth: 390, playing: true })).toBe(true);
+    expect(rushCompactHudOf({ regionWidth: 390, playing: false })).toBe(false);
+    expect(rushCompactHudOf({ regionWidth: RUSH_COMPACT_MAX_WIDTH_PX + 1, playing: true })).toBe(false);
+    expect(rushCompactHudOf({ regionWidth: 0, playing: true })).toBe(false);
+  });
+
+  it('stamps a change in held time, the header’s clock, not the hour — wave AS, lane AS-1', () => {
+    const log = [{ atS: 1_000 + 10, change: { kind: 'spread-cars' as const } }];
+    const stamp = rushInterventionStampOf(log, 1_000 + 30, 1_000);
+    expect(stamp).toMatch(/^0:10 · /u);
+    expect(stamp).not.toMatch(/\d\d:\d\d/u);
+    expect(rushInterventionStampOf(log, 1_000 + 9, 1_000)).toBe('');
+  });
+
+  it('says the line was reached, in the hold line’s own count — wave AS, lane AS-1', () => {
+    expect(rushLossLineOf()).toBe(`${String(RUSH_HOLD_LINE.people)} / ${String(RUSH_HOLD_LINE.people)}, the building stopped draining`);
+  });
+
+  it('plays wave 1 fast and says so, unless a speed was pressed — wave AS, lane AS-1', () => {
+    const opening = rushOpeningPaceOf({ heldS: 10, watchingSimPerRealS: 4, playerChoseSpeed: false });
+    expect(opening?.simPerRealS).toBe(30);
+    expect(opening?.note).toBe('fast-forwarding at 30× until wave 2 · pick a speed to watch');
+    const lastOfWave1 = 179;
+    expect(playerWaveAt(lastOfWave1)).toBe(1);
+    expect(rushOpeningPaceOf({ heldS: lastOfWave1, watchingSimPerRealS: 4, playerChoseSpeed: false })).toBeDefined();
+    expect(rushOpeningPaceOf({ heldS: lastOfWave1 + 1, watchingSimPerRealS: 4, playerChoseSpeed: false })).toBeUndefined();
+    expect(rushOpeningPaceOf({ heldS: 10, watchingSimPerRealS: 4, playerChoseSpeed: true })).toBeUndefined();
+    /* Already at or above the fast rung: nothing to change and nothing to say. */
+    expect(rushOpeningPaceOf({ heldS: 10, watchingSimPerRealS: 90, playerChoseSpeed: false })).toBeUndefined();
   });
 });
 
