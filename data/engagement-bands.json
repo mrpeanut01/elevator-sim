@@ -1,0 +1,33 @@
+{
+  "generatedBy": "hand-authored starting values; retune against the human ground-truth set before marking any threshold Measured",
+  "contract": "The tunable thresholds the three fun-proxy metrics read. Counts, never quotients: every rate a proxy reports is passes / n derived at read time, per docs/03 Part 5. These values are premises about people and ship as unmeasured until a calibration test cites a path:line that moved them. Anything here is data, not code (CLAUDE.md invariant 7); no DECISIONS.md number is owed for editing a value.",
+  "meaningfulChoice": {
+    "verdict": "paired-t CI on ΔTTD (seconds), computed with the choice removed vs present, common random numbers",
+    "replications": 50,
+    "ciMustExcludeZero": true,
+    "comment": "A choice counts as meaningful on a replication set when its CI excludes zero. No single-seed verdict."
+  },
+  "tensionBand": {
+    "swingMetric": "iqr-of-queue-length-samples",
+    "flatBelow": 2.0,
+    "inBandLow": 2.0,
+    "inBandHigh": 12.0,
+    "runawaySlopePerMin": 0.5,
+    "suppressWhenSaturated": true,
+    "comment": "Swing is the interquartile range of queueLengthSeries samples over the report window. Runaway = trend slope above runawaySlopePerMin at the horizon AND awtIsValid false. Band edges are the premise most in need of human calibration."
+  },
+  "masterySlope": {
+    "attempts": 8,
+    "seedSet": "holdout",
+    "verdict": "linearTrend of verdict-pass indicator over attempt index",
+    "ciMustExcludeZero": true,
+    "comment": "Run on holdout seeds so a positive slope means skill generalizes, not that a trace was memorized. Flat slope with reported comprehension gain is a scoring defect, not a player defect."
+  },
+  "scenarios": {
+    "default": { "useTopLevelBands": true },
+    "stage-1-first-call": {
+      "tensionBand": { "flatBelow": 1.0, "inBandLow": 1.0, "inBandHigh": 6.0 },
+      "comment": "Two cars, low demand: a smaller building swings less, so its in-band window sits lower. Starting guess, uncalibrated."
+    }
+  }
+}
