@@ -2234,7 +2234,14 @@ type DecisionReservation = {
  * is registered in `KNOWN_DECISION_HOLES`; **D1360-D1400 are free rather than holed**, since nothing
  * is written above them (§ D430), and the charter row moves to **D1360**.
  */
-const OPEN_RESERVATION = null as DecisionReservation | null;
+const OPEN_RESERVATION = { wave: 'AT', from: 1590, to: 1619 } as DecisionReservation | null;
+/*
+ * **Wave AT holds D1590-D1619.** The first design cycle (`docs/design-cycles/CYCLE-1.md`): a sim
+ * sweep, a persona playtest round, the design director's one or two deltas, and the build lanes
+ * that implement them. The integrator cuts each lane a contiguous block from this range at
+ * dispatch, and the lane's brief carries it. The wave's merge commit closes this reservation and
+ * registers its unspent numbers below the highest heading.
+ */
 /*
  * **Wave AS's reservation, D1545-D1590, is closed** in the wave's own merge commit. Seven lanes (four
  * built on the playtest after wave AR, #635 and #637; two on the decision panel's rulings on #636; one
