@@ -52,7 +52,8 @@ import {
   stageSkipLineStands,
   stageSkipOf,
   stageSkipSpeechOf,
-  SKIP_BEAT_SHOWN_PLAYED_ON_REAL_S,
+  SKIP_BEAT_SHOWN_REAL_S,
+  stagePlayedOnLineOf,
   stagePaceStateOf,
   stageStatusOf,
   watchedRealAfter,
@@ -824,7 +825,7 @@ describe('the hold with nothing to decide — § D1493', () => {
     /* Drawn, never skipped. */
     expect(stageSkipApplies({ horizon: 'whole-day', scored: true, acts: actsOf(day.demandPhases), simTimeS: 9000, reason: 'unheld' })).toBe(false);
     expect(stagePaceNoteOf(on, { acts: [], simTimeS: 9000 })).toBe(
-      'fast-forwarding at 30×: you have watched a while and there is nothing to decide yet · pick a speed to watch',
+      stagePlayedOnLineOf('30×'),
     );
   });
 
@@ -1013,7 +1014,7 @@ describe('the chip does not flicker — § D1506', () => {
      */
     expect([...seen].sort()).toEqual(
       [
-        'fast-forwarding at 30×: you have watched a while and there is nothing to decide yet · pick a speed to watch',
+        stagePlayedOnLineOf('30×'),
         'slowed to your speed, 4×, for a wait on a landing of over a minute',
       ].sort(),
     );
@@ -1069,7 +1070,13 @@ describe('the line holds while the rung does — § D1525', () => {
       const status = stageStatusOf({
         pace: stagePaceNoteOf(pace, { acts, simTimeS }) ?? '',
         stopped: false,
-        skip: stageSkipSpeechOf({ armedRealS: armedAtRealS === undefined ? undefined : realS - armedAtRealS, pace, line: '' }),
+        /*
+         * Before § D1525 the beat's note was drawn on every arming. No fast stretch here lasts the
+         * beat, so none lands, and § D1554 draws the note only for one that does.
+         */
+        skip: !input.fixed
+          ? armedAtRealS === undefined ? '' : STAGE_SKIP_BEAT_NOTE
+          : stageSkipSpeechOf({ armedRealS: armedAtRealS === undefined ? undefined : realS - armedAtRealS, lands: false, line: '' }).speech,
       });
       out.push({ realS, simPerRealS: pace.simPerRealS, line: status.pace || status.skip, reason: pace.reason });
       last = { pace, atS: simTimeS };
@@ -1097,7 +1104,7 @@ describe('the line holds while the rung does — § D1525', () => {
     /* Green after: the line moves only where the chip does. */
     expect(lineChangesWithoutRungChange(after)).toBe(0);
     expect(new Set(after.filter((row) => row.simPerRealS === BETWEEN_PEAKS_SIM_PER_REAL_S).map((row) => row.line))).toEqual(
-      new Set(['fast-forwarding at 30×: you have watched a while and there is nothing to decide yet · pick a speed to watch']),
+      new Set([stagePlayedOnLineOf('30×')]),
     );
   });
 
@@ -1106,22 +1113,24 @@ describe('the line holds while the rung does — § D1525', () => {
     const quiet = stagePaceOf({ ...base, longestStandingS: 10, watchedRealS: WATCH_ALLOWANCE_REAL_S });
     expect(quiet).toEqual({ simPerRealS: BETWEEN_PEAKS_SIM_PER_REAL_S, reason: 'fast', playedOn: true });
     expect(stageSkipApplies({ ...base, reason: quiet.reason })).toBe(true);
-    /* Inside the allowance nothing changes: the `fast` line and the beat's note, as § D1506 drew them. */
+    /* Inside the allowance the speed is as § D1506 had it; § D1554 draws every beat's note the same way. */
     const early = stagePaceOf({ ...base, longestStandingS: 10, watchedRealS: 3 });
     expect(early).toEqual({ simPerRealS: BETWEEN_PEAKS_SIM_PER_REAL_S, reason: 'fast' });
-    expect(stageSkipSpeechOf({ armedRealS: 0, pace: early, line: '' })).toBe(STAGE_SKIP_BEAT_NOTE);
-    /* Past the allowance a beat younger than half its length is not drawn, so a flip never draws it... */
-    expect(stageSkipSpeechOf({ armedRealS: 0.4, pace: quiet, line: 'skipped 12:20–12:30: nobody on a landing waited a minute' })).toBe(
-      'skipped 12:20–12:30: nobody on a landing waited a minute',
-    );
+    const line = 'skipped 12:20–12:30: nobody on a landing waited a minute';
+    /* A beat younger than half its length is not drawn, so a flip never draws it... */
+    expect(stageSkipSpeechOf({ armedRealS: 0.4, lands: true, line })).toEqual({ speech: line, line });
     /*
      * ...and one that will land is drawn for at least a real second before it does (§ D1212's
-     * warning, which a pause or a chip acts on). Red under the first cut of § D1525, which never
-     * drew it past the allowance and let skips land unwarned.
+     * warning, which a pause or a chip acts on), and the last skip's line is then over (§ D1554).
      */
-    expect(SKIP_BEAT_SHOWN_PLAYED_ON_REAL_S).toBeLessThanOrEqual(SKIP_BEAT_REAL_S - 1);
-    expect(stageSkipSpeechOf({ armedRealS: SKIP_BEAT_SHOWN_PLAYED_ON_REAL_S, pace: quiet, line: '' })).toBe(STAGE_SKIP_BEAT_NOTE);
-    expect(stageSkipSpeechOf({ armedRealS: undefined, pace: quiet, line: '' })).toBe('');
+    expect(SKIP_BEAT_SHOWN_REAL_S).toBeLessThanOrEqual(SKIP_BEAT_REAL_S - 1);
+    expect(stageSkipSpeechOf({ armedRealS: SKIP_BEAT_SHOWN_REAL_S, lands: true, line })).toEqual({ speech: STAGE_SKIP_BEAT_NOTE, line: '' });
+    /* § D1554: a beat armed as the chip moved is drawn at once, so it keeps its whole two seconds. */
+    expect(stageSkipSpeechOf({ armedRealS: 0, lands: true, line, armedAtRungChange: true }).speech).toBe(STAGE_SKIP_BEAT_NOTE);
+    expect(stageSkipSpeechOf({ armedRealS: 0, lands: false, line, armedAtRungChange: true }).speech).toBe(line);
+    /* § D1554: a beat that will not land is never drawn, however long it has run. */
+    expect(stageSkipSpeechOf({ armedRealS: SKIP_BEAT_REAL_S, lands: false, line })).toEqual({ speech: line, line });
+    expect(stageSkipSpeechOf({ armedRealS: undefined, lands: false, line: '' }).speech).toBe('');
     /* And a skip's line stands across the minute and back once played on, and still goes at a call. */
     expect(stagePaceStateOf(quiet)).toBe('unheld');
     expect(stageSkipLineStands({ landedReason: 'unheld', reason: stagePaceStateOf(quiet) })).toBe(true);

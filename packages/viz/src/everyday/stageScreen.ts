@@ -149,6 +149,7 @@ import {
   stagePaceOf,
   stageSkipLineStands,
   stageSkipSpeechOf,
+  stageSkipLandsOf,
   stagePaceStateOf,
   stageStatusOf,
   stageSkipApplies,
@@ -479,6 +480,8 @@ function mountStage(
    * beat; `skipLine` is the line the last skip left, which the strip keeps until the next one.
    */
   let skipArmedAtS: number | undefined;
+  /** § D1554: the beat was armed on the frame the rung changed, so its note is drawn at once. */
+  let skipArmedAtRungChange = false;
   let skipLandedAtS: number | undefined;
   let skipLine = '';
   /*
@@ -1813,6 +1816,7 @@ function mountStage(
     }
     lostFact.textContent = view.fact;
     lostCard.hidden = false;
+    syncCardMargins();
     lostCard.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     lostEnd.focus({ preventScroll: true });
     syncTransport();
@@ -1871,8 +1875,9 @@ function mountStage(
     callCard.style.overflowY = '';
     const region = callCard.closest<HTMLElement>('.everyday-screen');
     if (region === null) return;
-    /* § D1527: under a pinned header the card has the region less the header. */
-    const room = region.clientHeight - 16 - (headerSticks ? header.offsetHeight : 0);
+    /* § D1527: under a pinned header the card has the region less the header (§ D1557: and its margin). */
+    const foot = pinnedHeaderFootPx();
+    const room = region.clientHeight - 16 - (foot > 0 ? foot + GAP.block : 0);
     if (room > 0 && callCard.offsetHeight > room) {
       callCard.style.maxHeight = `${String(room)}px`;
       callCard.style.overflowY = 'auto';
@@ -1897,6 +1902,7 @@ function mountStage(
        * said by `announce` when the limit lifts.
        */
       if (description.textContent !== '') description.textContent = '';
+      syncCardMargins();
       fitCallCardToRegion();
       callCard.scrollIntoView({ block: 'nearest', inline: 'nearest' });
       callCard.focus({ preventScroll: true });
@@ -2188,7 +2194,29 @@ function mountStage(
     header.style.position = sticks ? 'sticky' : '';
     header.style.top = sticks ? '0' : '';
     header.style.zIndex = sticks ? '3' : '';
-    const margin = sticks ? `${String(header.offsetHeight + GAP.block)}px` : '';
+    syncCardMargins();
+  }
+
+  /**
+   * **Where a pinned header's foot is, from the top of the region's scrollport**, in pixels, or `0`
+   * when it is not pinned — wave AS, lane AS-2, [§ D1557](../../../../DECISIONS.md), GitHub issue #637
+   * item 8. A sticky header sticks below the region's top padding, not at its edge, and it grows once
+   * the day plays (its lines are written after the press § D1527 measured it on). Reading only its
+   * height, at Play, left the call card's *THE DAY’S CALL* 28 px under it at 1280×800.
+   */
+  function pinnedHeaderFootPx(): number {
+    if (!headerSticks) return 0;
+    const padTop = Number.parseFloat(doc.defaultView?.getComputedStyle(region).paddingTop ?? '0');
+    return (Number.isFinite(padTop) ? padTop : 0) + header.offsetHeight;
+  }
+
+  /**
+   * The cards that scroll themselves into view keep a top margin that clears a pinned header, read
+   * when one scrolls rather than only when the header was pinned — [§ D1557](../../../../DECISIONS.md).
+   */
+  function syncCardMargins(): void {
+    const foot = pinnedHeaderFootPx();
+    const margin = foot > 0 ? `${String(foot + GAP.block)}px` : '';
     for (const card of [callCard, lostCard, closeAsk, skipAsk]) card.style.scrollMarginTop = margin;
   }
 
@@ -2383,11 +2411,12 @@ function mountStage(
       syncTransport();
       return;
     }
-    if (playback.speed !== answer.simPerRealS) {
+    const rungChanged = playback.speed !== answer.simPerRealS;
+    if (rungChanged) {
       playback.setSpeed(answer.simPerRealS);
       syncTransport();
     }
-    skipBetweenPeaks(simTimeS, answer.reason);
+    skipBetweenPeaks(simTimeS, answer.reason, rungChanged);
   }
 
   /**
@@ -2404,7 +2433,7 @@ function mountStage(
    * It moves the playhead and nothing else, as *Skip to the end* does: the recording was made whole
    * before the stage drew a frame, so the report, the goals and every figure read the same run.
    */
-  function skipBetweenPeaks(simTimeS: number, reason: StagePaceReason): void {
+  function skipBetweenPeaks(simTimeS: number, reason: StagePaceReason, rungChanged = false): void {
     const recording = adopted;
     if (playback === undefined || recording === undefined) return;
     const applies =
@@ -2418,6 +2447,7 @@ function mountStage(
     }
     if (skipArmedAtS === undefined || simTimeS < skipArmedAtS) {
       skipArmedAtS = simTimeS;
+      skipArmedAtRungChange = rungChanged;
       showStatus();
       return;
     }
@@ -2455,13 +2485,42 @@ function mountStage(
    * run together.
    */
   function showStatus(): void {
-    const lines = stageStatusOf({
-      pace: paceText,
-      stopped: paceStopped,
-      skip: stageSkipSpeechOf({ armedRealS: beatArmedRealS(), pace: watchedFrame?.pace, line: skipLine }),
+    const armedRealS = beatArmedRealS();
+    /* § D1554: the beat's note only for a skip that comes, and once drawn the last skip's line is over. */
+    const said = stageSkipSpeechOf({
+      armedRealS,
+      lands: armedRealS !== undefined && beatLands(),
+      line: skipLine,
+      armedAtRungChange: skipArmedAtRungChange,
     });
+    if (said.line !== skipLine) {
+      skipLine = said.line;
+      skipLineReason = undefined;
+    }
+    const lines = stageStatusOf({ pace: paceText, stopped: paceStopped, skip: said.speech });
     if (paceNote.textContent !== lines.pace) paceNote.textContent = lines.pace;
     if (skipNote.textContent !== lines.skip) skipNote.textContent = lines.skip;
+  }
+
+  /**
+   * Whether the coming skip's beat ends in its skip — [§ D1554](../../../../DECISIONS.md),
+   * `stagePace.ts#stageSkipLandsOf`, read with exactly what {@link skipBetweenPeaks} hands
+   * `stageSkipOf`, so the note's promise and the seek agree.
+   */
+  function beatLands(): boolean {
+    const recording = adopted;
+    if (skipArmedAtS === undefined || playback === undefined || recording === undefined) return false;
+    return (
+      stageSkipLandsOf({
+        acts: paceActs,
+        legs: recording.legs,
+        simTimeS: playback.simTimeS,
+        armedAtS: skipArmedAtS,
+        simPerRealS: playback.speed,
+        stopAtS: activeCall()?.call.atS,
+        endedAt: recording.endedAt,
+      }) !== undefined
+    );
   }
 
   /** Real seconds the coming skip's beat has run, read off the transport, or `undefined` with none coming. */
@@ -4299,6 +4358,7 @@ function mountStage(
   function askBeforeClosing(): void {
     skipAsk.hidden = true;
     closeAsk.hidden = false;
+    syncCardMargins();
     closeAsk.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     closeAskBack.focus({ preventScroll: true });
   }
@@ -4313,6 +4373,7 @@ function mountStage(
     if (callCard.hidden) drawCall(simTimeS);
     closeAsk.hidden = true;
     skipAsk.hidden = false;
+    syncCardMargins();
     skipAsk.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     skipAskBack.focus({ preventScroll: true });
     syncTransport();
