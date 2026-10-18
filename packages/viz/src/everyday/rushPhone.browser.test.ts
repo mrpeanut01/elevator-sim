@@ -42,9 +42,9 @@ afterAll(async () => {
   await site?.close();
 });
 
-async function coldLoad(width: number, height: number): Promise<Page> {
+async function coldLoad(width: number, height: number, query = '?building=garden-apartments&seed=424242'): Promise<Page> {
   const page = await openPage(browser, { viewport: { width, height } });
-  await page.goto(`${origin}?building=garden-apartments&seed=424242`, { waitUntil: 'load' });
+  await page.goto(`${origin}${query}`, { waitUntil: 'load' });
   await page.waitForFunction(() => document.querySelector<HTMLElement>('.menu-overlay')?.hidden === true, undefined, {
     timeout: 30_000,
   });
@@ -89,8 +89,12 @@ describe.skipIf(!HAS_BROWSER)('Rush on a phone, after the re-play — wave AR, l
     }
   });
 
-  it('2: while a round plays on a 390×844 phone, the building is on screen above the footer and the chips stay reachable', async () => {
-    const page = await coldLoad(390, 844);
+  /* Wave AS, lane AS-1: and on the tower a first arrival meets, whose twenty floors and garage were the playtest's. */
+  it.each([
+    ['garden-apartments', '?building=garden-apartments&seed=424242'],
+    ['the first arrival’s tower', '?seed=424242'],
+  ])('2: while a round plays on a 390×844 phone (%s), the building is on screen above the footer and the chips stay reachable', async (_name, query) => {
+    const page = await coldLoad(390, 844, query);
     try {
       await openRushSetup(page);
       await page.locator('.everyday-bar-primary').click();
@@ -114,8 +118,9 @@ describe.skipIf(!HAS_BROWSER)('Rush on a phone, after the re-play — wave AR, l
           .sort((a, b) => b.width * b.height - a.width * a.height)[0];
         if (canvas === undefined) return { visiblePx: 0, chipsOk: false, dbg: {} };
         const visiblePx = Math.max(0, Math.min(canvas.bottom, floor) - Math.max(canvas.top, 0));
+        /* Wave AS, lane AS-1: the picker and *Switch to* fold away while the round plays on a phone. */
         const chipsOk = [...document.querySelectorAll<HTMLElement>('.everyday-stage-intervene, .everyday-stage-switch-pick')]
-          .filter((node) => !node.hidden)
+          .filter((node) => !node.hidden && node.getClientRects().length > 0)
           .every((node) => {
             const box = node.getBoundingClientRect();
             const at = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
@@ -130,6 +135,49 @@ describe.skipIf(!HAS_BROWSER)('Rush on a phone, after the re-play — wave AR, l
       });
       expect(seen.visiblePx, JSON.stringify(seen)).toBeGreaterThanOrEqual(200);
       expect(seen.chipsOk, JSON.stringify(seen)).toBe(true);
+      /*
+       * Wave AS, lane AS-1 (GitHub issue #635, finding 3): the compact row, the chips and the whole
+       * building, lobby rows included, are on one screen together, now and a few seconds on. Red on
+       * the base: the lobby was below the footer, or the clock was above the top.
+       */
+      for (const pause of [0, 3_000]) {
+        await page.waitForTimeout(pause);
+        const together = await page.evaluate(() => {
+          const footer = document.querySelector('.everyday-bar')?.getBoundingClientRect().top ?? window.innerHeight;
+          const floor = Math.min(footer, window.innerHeight);
+          const box = (selector: string): DOMRect | undefined => document.querySelector(selector)?.getBoundingClientRect();
+          const inView = (rect: DOMRect | undefined): boolean => rect !== undefined && rect.height > 0 && rect.top >= -0.5 && rect.bottom <= floor + 0.5;
+          const canvas = box('.everyday-stage-canvas');
+          const header = box('.everyday-stage-header');
+          const hud = {
+            clock: inView(box('.everyday-stage-clock')),
+            wave: inView(box('.everyday-stage-phase')),
+            count: inView(box('.everyday-stage-figure-value')),
+            pause: inView(box('.everyday-stage-play')) && /Pause/u.test(document.querySelector('.everyday-stage-play')?.textContent ?? ''),
+            building: inView(canvas) && header !== undefined && canvas !== undefined && canvas.top >= header.bottom - 0.5,
+            chips: [...document.querySelectorAll<HTMLElement>('.everyday-stage-intervene')]
+              .filter((node) => node.getClientRects().length > 0)
+              .every((node) => {
+                const rect = node.getBoundingClientRect();
+                const at = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+                return inView(rect) && at !== null && (at === node || node.contains(at));
+              }),
+            picker: document.querySelector<HTMLElement>('.everyday-stage-switch-pick')?.getClientRects().length ?? 0,
+          };
+          return { hud, dbg: { floor, header: header?.toJSON(), canvas: canvas?.toJSON(), count: document.querySelector('.everyday-stage-figure-value')?.textContent } };
+        });
+        const message = JSON.stringify(together);
+        expect(together.hud.clock && together.hud.wave && together.hud.count && together.hud.pause, message).toBe(true);
+        expect(together.hud.building, message).toBe(true);
+        expect(together.hud.chips, message).toBe(true);
+        expect(together.hud.picker, 'the dispatcher picker folds away while the round plays').toBe(0);
+        expect(together.dbg.count ?? '', 'the compact count reads against the line').toMatch(/^\d+\/40$/u);
+      }
+      /* A pause unfolds the picker again. */
+      await page.locator('.everyday-stage-play').click();
+      await page.waitForFunction(() => (document.querySelector<HTMLElement>('.everyday-stage-switch-pick')?.getClientRects().length ?? 0) > 0, undefined, {
+        timeout: 5_000,
+      });
     } finally {
       await page.close();
     }

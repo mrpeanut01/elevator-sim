@@ -82,7 +82,7 @@ import {
 import type { LiveObservations } from '../live/types.js';
 import type { GoalState } from '../shift/types.js';
 import { actionBarFor, type ActionBarModel } from './actionBar.js';
-import { RUSH_NOT_LANDED, rushStageHeaderOf } from './rush.js';
+import { RUSH_NOT_LANDED, rushCompactHudOf, rushStageHeaderOf } from './rush.js';
 import { RUSH_END_ASK_COPY, RUSH_STREAM } from './rushScreenModel.js';
 import type { EverydayHost } from './host.js';
 import { SCREEN_NAMES, type EverydayScreenModule } from './screens.js';
@@ -361,6 +361,9 @@ const GOAL_INK: Readonly<Record<GoalState, string>> = Object.freeze({
  * viewport is already 60 %.
  */
 const STAGE_CANVAS_HEIGHT = '60vh';
+
+/** The shortest the rush's compact row lets the building get — wave AS, lane AS-1 ({@link syncRushCompact}). */
+const RUSH_COMPACT_MIN_CANVAS_PX = 260;
 
 /**
  * How often the stage's live region is re-announced — GitHub issue **#239**.
@@ -2062,6 +2065,63 @@ function mountStage(
   /** Whether the header is pinned at the top of the page now — {@link syncHeaderStick}. */
   let headerSticks = false;
 
+  /** Whether the rush's compact phone row is up — {@link syncRushCompact}, `rush.ts#rushCompactHudOf`. */
+  let rushCompact = false;
+  /** What a folded element's inline `display` was, so unfolding puts back exactly that. */
+  const foldedDisplay = new Map<HTMLElement, string>();
+  function fold(node: HTMLElement, on: boolean): void {
+    if (on) {
+      if (!foldedDisplay.has(node)) foldedDisplay.set(node, node.style.display);
+      node.style.display = 'none';
+      return;
+    }
+    const was = foldedDisplay.get(node);
+    if (was === undefined) return;
+    foldedDisplay.delete(node);
+    node.style.display = was;
+  }
+
+  /**
+   * **The rush's compact phone row** — wave AS, lane AS-1, `rush.ts#rushCompactHudOf` says when and
+   * why. Asked on every transport change and on a resize. While it is up, the header shows the clock,
+   * the wave, the count past two minutes and *Pause*, pinned, and the building is sized to the room
+   * left under the header and the chips, so the lobby rows stay on the same screen.
+   */
+  function syncRushCompact(): void {
+    if (context.ctx !== 'rush') return;
+    const compact = rushCompactHudOf({ regionWidth: region.clientWidth, playing: playback?.state === 'playing' });
+    /* Every time, not on the edge: the transport rewrites the chips' whole style on each change. */
+    for (const node of [driving, cameras, floorJump, skipButton, ...speedButtons, switchPicker, switchButton, switchPickerNote, interventionRefusal, interventionNote]) {
+      fold(node, compact);
+    }
+    if (compact !== rushCompact) {
+      rushCompact = compact;
+      header.style.padding = compact ? '6px 12px' : '10px 14px';
+      syncHeaderStick();
+      requestFrame();
+    }
+    fitRushCanvas();
+  }
+
+  /** The canvas's height in the compact row: the room under the pinned header and the chips, never taller than the usual 60vh. */
+  function fitRushCanvas(): void {
+    if (!rushCompact) {
+      if (canvas.style.height !== STAGE_CANVAS_HEIGHT) canvas.style.height = STAGE_CANVAS_HEIGHT;
+      return;
+    }
+    const viewportBottom = view?.innerHeight ?? doc.documentElement.clientHeight;
+    const shown = region.getBoundingClientRect();
+    const bar = doc.querySelector<HTMLElement>('.everyday-bar')?.getBoundingClientRect();
+    const bottom = Math.min(viewportBottom, shown.bottom, bar !== undefined && bar.height > 0 ? bar.top : Number.POSITIVE_INFINITY);
+    const top = Math.max(0, shown.top);
+    const above = header.offsetHeight + interventions.offsetHeight + (endAsk.hidden ? 0 : endAsk.offsetHeight) + 2 * GAP.block;
+    const chrome = stageWrap.offsetHeight - canvas.offsetHeight + 2;
+    const room = Math.floor(bottom - top - above - chrome);
+    const usual = 0.6 * viewportBottom;
+    const height = `${String(Math.max(RUSH_COMPACT_MIN_CANVAS_PX, Math.min(usual, room)))}px`;
+    if (canvas.style.height !== height) canvas.style.height = height;
+  }
+
   /**
    * **Pin the header while the building scrolls under it** — wave AR, lane AR-2,
    * [§ D1527](../../../../DECISIONS.md), `stageScreenModel.ts#stageHeaderSticksOf`. Asked when the day
@@ -2070,11 +2130,13 @@ function mountStage(
    * header never covers the call it stopped for.
    */
   function syncHeaderStick(): void {
-    const sticks = stageHeaderSticksOf({
-      headerHeight: header.offsetHeight,
-      regionHeight: region.clientHeight,
-      rush: context.ctx === 'rush',
-    });
+    const sticks =
+      rushCompact ||
+      stageHeaderSticksOf({
+        headerHeight: header.offsetHeight,
+        regionHeight: region.clientHeight,
+        rush: context.ctx === 'rush',
+      });
     headerSticks = sticks;
     header.style.position = sticks ? 'sticky' : '';
     header.style.top = sticks ? '0' : '';
@@ -2098,6 +2160,13 @@ function mountStage(
    */
   function bringBuildingIntoView(): void {
     syncHeaderStick();
+    /* Wave AS, lane AS-1: the compact row fits header, chips and building together; start at the header. */
+    if (rushCompact) {
+      fitRushCanvas();
+      const at = root.getBoundingClientRect().top - region.getBoundingClientRect().top;
+      if (Math.abs(at) >= 1) region.scrollTop += at;
+      return;
+    }
     const box = canvas.getBoundingClientRect();
     const shown = region.getBoundingClientRect();
     const viewportBottom = view?.innerHeight ?? doc.documentElement.clientHeight;
@@ -3437,6 +3506,8 @@ function mountStage(
         'cursor:pointer',
       ].join(';');
     }
+    /* After the chips' styles are written, so the compact row's folds stand over them. */
+    syncRushCompact();
     /*
      * § 7.3's single centred `Start`. It is up before the first press and gone after it, so the
      * overlay never sits over a moving picture; a run that has not arrived says so in the same
@@ -3730,7 +3801,15 @@ function mountStage(
     const head =
       rushHead === undefined
         ? stageHeaderOf({ simTimeS, recording, observations, dayStartS: host.dayStartS(), driverName })
-        : { clock: rushHead.held, phase: rushHead.wave, next: undefined, drivingLabel: rushHead.drivingLabel, driverName: rushHead.driverName, figures: rushHead.figures };
+        : {
+            clock: rushHead.held,
+            phase: rushHead.wave,
+            next: undefined,
+            drivingLabel: rushHead.drivingLabel,
+            driverName: rushHead.driverName,
+            /* Wave AS, lane AS-1: the phone's compact row keeps one figure ({@link syncRushCompact}). */
+            figures: rushCompact ? [rushHead.compactFigure] : rushHead.figures,
+          };
     const watching = watchingNow();
     clock.textContent = head.clock;
     /*
@@ -4511,6 +4590,7 @@ function mountStage(
 
   const unsubscribe = host.subscribe(onHostChange);
   const onResize = (): void => {
+    syncRushCompact();
     syncHeaderStick();
     requestFrame();
   };

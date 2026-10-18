@@ -592,6 +592,25 @@ export interface RushStageHeaderView {
   readonly drivingLabel: string;
   readonly driverName: string;
   readonly figures: readonly RushStageFigure[];
+  /**
+   * The one figure the phone's compact row keeps while the round plays ({@link rushCompactHudOf}):
+   * the count past two minutes against the hold line, as `12/40`. The same count as `figures[1]`.
+   */
+  readonly compactFigure: RushStageFigure;
+}
+
+/**
+ * **The phone's compact row** — wave AS, lane AS-1 (GitHub issue #635, finding 3). At 390×844 the
+ * full header, the four chips and the building never fitted on one screen, so the lobby, where the
+ * queue builds, was off it or the clock was. While a round plays on a stage this narrow, the header
+ * keeps only the clock, the wave, the count past two minutes and *Pause*, pinned above the
+ * building, and the dispatcher picker with *Switch to* folds away. A pause unfolds all of it, so no
+ * control is lost, only moved one press away. Recorded here under [§ D405](../../../../DECISIONS.md).
+ */
+export const RUSH_COMPACT_MAX_WIDTH_PX = 600;
+
+export function rushCompactHudOf(input: { readonly regionWidth: number; readonly playing: boolean }): boolean {
+  return input.playing && input.regionWidth > 0 && input.regionWidth <= RUSH_COMPACT_MAX_WIDTH_PX;
 }
 
 export const RUSH_STAGE_COPY = Object.freeze({
@@ -599,6 +618,7 @@ export const RUSH_STAGE_COPY = Object.freeze({
   heldLabel: 'held',
   standingLabel: 'standing right now',
   overLineLabel: 'past two minutes, of 40',
+  overLineShortLabel: 'past two minutes',
   longestLabel: 'longest so far',
 });
 
@@ -618,6 +638,7 @@ export function rushStageHeaderOf(input: {
   const heldS = input.simTimeS - input.recording.startedAt;
   const o = observationsAt(input.recording, input.simTimeS);
   const longest = o.worstWaitSoFarS;
+  const over = rushOverLineAt(input.recording, input.simTimeS);
   return {
     held: heldClock(heldS),
     wave: `WAVE ${String(playerWaveAt(heldS))}`,
@@ -625,12 +646,13 @@ export function rushStageHeaderOf(input: {
     driverName: input.driverName,
     figures: [
       { label: RUSH_STAGE_COPY.standingLabel, value: String(o.waitingNow) },
-      { label: RUSH_STAGE_COPY.overLineLabel, value: String(rushOverLineAt(input.recording, input.simTimeS)) },
+      { label: RUSH_STAGE_COPY.overLineLabel, value: String(over) },
       {
         label: RUSH_STAGE_COPY.longestLabel,
         value: longest === undefined ? EM_DASH : `${String(Math.round(longest))} s${o.worstWaitIsCensored ? ' and counting' : ''}`,
       },
     ],
+    compactFigure: { label: RUSH_STAGE_COPY.overLineShortLabel, value: `${String(over)}/${String(RUSH_HOLD_LINE.people)}` },
   };
 }
 
