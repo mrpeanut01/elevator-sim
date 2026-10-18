@@ -2,8 +2,9 @@
 
 One row per open issue, judged against [`GAME_PILLARS.md`](GAME_PILLARS.md). GitHub is the source of
 truth; this file is the working view. It supersedes `ISSUE_WORKER_LEDGER.md`, whose last snapshot is
-2026-08-09. Snapshot: **2026-10-17, cycle 3** (wave AR, PR #634), against main `a9af59b`. Cycle 1's triage was done
-by three sub-agents; their evidence (file:line) is summarised in the *next action* column.
+2026-08-09. Snapshot: **2026-10-18, end of cycle 4** (wave AS, PR #638), before the owner's token freeze and the
+new playtest track starting Tuesday. Cycle 1's triage was done by three sub-agents; their evidence (file:line)
+is summarised in the *next action* column.
 
 Pillars: 1 playable · 2 understandable · 3 simple · 4 engaging during a run.
 
@@ -11,31 +12,25 @@ Pillars: 1 playable · 2 understandable · 3 simple · 4 engaging during a run.
 
 | task | issue | branch | state |
 |---|---|---|---|
-| none | | | wave AR's four lanes are merged on PR #634 |
+| none | | | wave AS's seven lanes are merged on PR #638; no playtest is running |
 
-## Done this cycle
+## Cycles 2 to 4, in one paragraph each
 
-Wave AP merged (#622): the first call in about 60 s, a day in about 4 min, a lost day that stops at every speed.
-A three-persona playtest then re-checked #626 (comment on #626) and filed #631. Wave AQ (PR #632) fixed:
-the stage's watched pair in view and kept, stage 1 moving from its first second, "your change moved no count",
-folded path cards, held-driver copy (AQ-1); steady speed rungs, the career day's quiet crossed, the lobby rows in
-view, the answer named (AQ-2); Rush's furthest kept, a lost round said, chips in view, End asks once (AQ-3);
-the report's verdict as headline, the week strip with every day and its target, identical call rows said once (AQ-4).
+**Waves AP to AR** (#622, #632, #634) took the first decision from 181 s to about 60 s, a day to about 4 min, put a
+live before/after pair on every stage run, stopped Rush paying more for quitting than for playing, made Rush and Career
+fit a phone, and made the report lead with its verdict. #626, #631 and #633 were closed after re-plays confirmed them.
 
-**Left open from the playtest:** long quiet stretches (a rung above 30× reopens § D991's refusal, so it is the
-owner's call); a passing readout's tone while the day runs (§ D1381 forbids it); stage 2's brief copy (editing
-`data/campaign.json` moves the survivor census's input hash, which covers prose the census never reads); the
-rail's "MID-DAY" with no clock; Rush's Lobby and Garage queues below the fold on a phone; "Switch to Engineer"
-clipped at 1280×600.
+**Wave AS** (#638) fixed #635 and #637: Rush's Play label, a pinned phone HUD, a fast first wave, a held loss moment and
+the house time to pass; the live day's flicker and stale skip lines at their root, the order's true start time, the call
+card clear of the header; the door and report in the past tense once a day is done, honest call rows, folded advice
+after a perfect day, like-for-like comparisons; a quiet career day with Skip beside Play, the rail's clock, and
+*Switch to Engineer* in view at 1280×600.
 
-## Cycle 3
-
-#626 and #631 were closed after a re-play of wave AQ confirmed them. Wave AR (PR #634) fixed #633: a hand-ended rush
-pays only for the waves it finished (it used to pay more than playing on), the Rush setup and the career desk stack on
-a phone, the rush result names the house run on the same crowd, the ticker holds with its chip, the stage header stays
-at the top, a repeated call names the order in force, the call card and screen reader agree, a stage's pair keeps
-painting and opens where the settings part, the path leads to the next stage, and a quiet career day points at Skip.
-**Owner decision opened:** § D1544, whether the opening career day should raise a call (four options recorded).
+**The decision panel** (three agent seats, on the owner's instruction) ruled the eight roadblocks on #636 and the
+follow-up on #635; every ruling is built: day 1 stays quiet (§ D1572), no rung above 30× (Skip is pointed at instead,
+§ D1555), running figures in neutral ink (§ D1581), the 20 s allowance kept, Rush's parking chips measured (§ D1588:
+INDISTINGUISHABLE at both press times over 50 paired crowds) and removed (§ D1589), calls left in place, stage 3 a
+named breach (§ D1582), and stage 2's brief corrected with the survivor census regenerated (§ D1583).
 
 ## Build now
 
@@ -45,13 +40,17 @@ painting and opens where the settings part, the path leads to the next stage, an
 | 232 | Building set to the content-plan target | P1 | 2, 4 | **AC4 done** on PR #624 (`buildingFieldReach.test.ts`), with three inert fields filed as #625. AC1 has 17 of 22 buildings. AC2: owner sign-off on harbour-point and ashgate |
 | 625 | Three shipped building fields change no leg | P2 | 1 | Item 1's loader warning is fixed on PR #624. Owner: fix the data or keep each field with a reason |
 | 627 | Lobby tap targets on short windows wider than 720 px | P3 | 1 | Filed from the lobby review. Buildable |
-| 633 | Playtest after wave AQ: Rush pays for quitting, the clock scrolls away, career day 1 is quiet | P1 | 1, 2, 4 | Wave AR (#634) fixes all but one: whether career day 1 should raise a call is an owner ruling (§ D1544) |
+
+**Carried to the Tuesday playtest track** (not filed as defects, because they follow from rulings): on a 390×844 phone
+the Rush handover picker is folded away during play until the player pauses (§ D1589 with AS-1's compact HUD); Rush has
+one in-round choice now, so whether a round feels empty is the first thing to watch; the deep link straight to Rush
+(#635 item 7) is unbuilt.
 
 ## Needs an owner decision
 
 | # | title (short) | P | pillar | question |
 |---|---|---|---|---|
-| 234 | No stage clears from the dropdown alone | P1 | 2, 3, 4 | Stage 3: demand cannot close it. Demand was measured from 4 to 14.5, and at 11.5, the one gap, a witness search of 277 candidates found 0 clears. Choose (a) a stage-3-only building or (b) a named, reversible breach. Stages 4, 7 and 8 are still buildable one per lane; stage 10 waits on the § D1289 ruling |
+| 234 | No stage clears from the dropdown alone | P1 | 2, 3, 4 | Stage 3 **ruled (b)** by the panel and registered as a named breach (§ D1582). Open: stage 8 (no ruling), stages 4 and 7 (buildable one per lane), stage 10 (waits on the § D1289 ruling), and option (a) for stage 3 as a later lane |
 | 571 | Dispatcher choice inert on the opening tower | P2 | 2, 4 | Both built halves have landed. Should the Career opener move to a tower where dispatch matters? Then close |
 | 582 | Four usability findings, wave AE | P3 | 1, 2 | Items 1, 3 and 4 are resolved (§ D1048, § D1357, § D1129). Item 2: does the rush's pre-run select still lose to the 600× clock? #622 has merged, so this is unblocked |
 | 439 | Congregation template, deadline goal | P2 | 4 | Which gate applies, § 17 or a new goal-kind gate? Touches `goals.ts` |
