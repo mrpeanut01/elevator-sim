@@ -4,7 +4,8 @@
  * 1. The furthest round survives a reload ([§ D1515](../../../../DECISIONS.md)): a round ended by
  *    hand, a reload, and the setup screen draws its wave as kept on this device.
  * 2. A reload mid-round says, on the way back to the rush, that the round was not kept.
- * 3. The choice chips are inside the viewport and hit-testable at 1280×600 and on a 390×844 phone.
+ * 3. The choice chips are inside the viewport and hit-testable at 1280×600 and on a 390×844 phone;
+ *    since § D1589 they are the handover alone, with no parking chip, and a greyed row says why.
  * 4. *End the rush* asks once, with focus on *Keep playing*.
  * 5. The result's loud button is *Run the rush again*, with no second *Leave the rush*.
  * 6. After *Start the rush*, keyboard focus is on *Play*.
@@ -85,6 +86,39 @@ async function chipsReach(page: Page): Promise<readonly { readonly label: string
   );
 }
 
+/**
+ * The round's one in-round choice is ready: the handover picker is enabled. Since § D1589 a rush has
+ * no parking chip, and *Switch to* stays disabled while the picker names the driver already driving,
+ * so an enabled button is no longer the signal.
+ */
+async function waitForChoice(page: Page): Promise<void> {
+  await page.waitForFunction(
+    () => document.querySelector<HTMLSelectElement>('.everyday-stage-switch-pick')?.disabled === false,
+    undefined,
+    { timeout: 30_000 },
+  );
+}
+
+/**
+ * [§ D1589](../../../../DECISIONS.md), the decision panel's ruling R5 on GitHub issue #635: no parking
+ * chip on the rush stage, and every greyed handover row says why on itself. Red on the base: two
+ * parking chips, and four greyed rows that were not greyed and carried only a name.
+ */
+async function noParkingAndGreyedSaysWhy(page: Page): Promise<{ parking: number; greyed: number; greyedSayWhy: number }> {
+  return page.evaluate(() => {
+    const greyed = [...document.querySelectorAll<HTMLOptionElement>('.everyday-stage-switch-pick option')].filter(
+      (option) => option.disabled,
+    );
+    return {
+      parking: document.querySelectorAll(
+        '[data-intervention-kind="park-cars-lobby"], [data-intervention-kind="spread-cars"]',
+      ).length,
+      greyed: greyed.length,
+      greyedSayWhy: greyed.filter((option) => /can’t take over mid-round: /u.test(option.textContent ?? '')).length,
+    };
+  });
+}
+
 describe.skipIf(!HAS_BROWSER)('Rush, after the post-AP playtest — wave AQ, lane AQ-3', () => {
   it('at 1280×600: focus on Play, chips reachable, End asks once, the result leads with the next round, and the furthest survives a reload', async () => {
     const page = await coldLoad(1280, 600);
@@ -98,13 +132,11 @@ describe.skipIf(!HAS_BROWSER)('Rush, after the post-AP playtest — wave AQ, lan
       });
 
       /* 3: every chip is inside the viewport and is what a tap at its centre lands on. */
-      await page.waitForFunction(
-        () => [...document.querySelectorAll<HTMLButtonElement>('.everyday-stage-intervene')].some((node) => !node.disabled),
-        undefined,
-        { timeout: 30_000 },
-      );
+      await waitForChoice(page);
       const chips = await chipsReach(page);
-      expect(chips.length).toBeGreaterThanOrEqual(3);
+      /* § D1589: the picker and *Switch to*, and no parking chip. */
+      expect(chips.length).toBeGreaterThanOrEqual(2);
+      expect(await noParkingAndGreyedSaysWhy(page)).toEqual({ parking: 0, greyed: 4, greyedSayWhy: 4 });
       for (const chip of chips) expect(chip, chip.label).toMatchObject({ inView: true, hit: true });
 
       /* 4: the first press asks, focus on Keep playing, and Keep playing stays on the stage. */
@@ -153,13 +185,9 @@ describe.skipIf(!HAS_BROWSER)('Rush, after the post-AP playtest — wave AQ, lan
     try {
       await openRushSetup(page);
       await startRush(page);
-      await page.waitForFunction(
-        () => [...document.querySelectorAll<HTMLButtonElement>('.everyday-stage-intervene')].some((node) => !node.disabled),
-        undefined,
-        { timeout: 30_000 },
-      );
+      await waitForChoice(page);
       const chips = await chipsReach(page);
-      expect(chips.length).toBeGreaterThanOrEqual(3);
+      expect(chips.length).toBeGreaterThanOrEqual(2);
       for (const chip of chips) expect(chip, chip.label).toMatchObject({ inView: true, hit: true });
     } finally {
       await page.close();

@@ -108,8 +108,9 @@ describe.skipIf(!HAS_BROWSER)('Rush on a phone, after the re-play — wave AR, l
       await openRushSetup(page);
       await page.locator('.everyday-bar-primary').click();
       await waitForWave(page);
+      /* § D1589: the handover picker is the round's one choice; ready when it is enabled. */
       await page.waitForFunction(
-        () => [...document.querySelectorAll<HTMLButtonElement>('.everyday-stage-intervene')].some((node) => !node.disabled),
+        () => document.querySelector<HTMLSelectElement>('.everyday-stage-switch-pick')?.disabled === false,
         undefined,
         { timeout: 30_000 },
       );
