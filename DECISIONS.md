@@ -53739,3 +53739,27 @@ figure moves. A building made only for stage 3 stays open as a later lane, and t
 if a fabric lever specific to stage 3, or a witness at 11.5 that holds on the holdout, is measured open.
 Stage 8 is not covered.
 
+## D1583 — stage 2's brief says what is new there, and the survivor census is regenerated once for it
+
+> **Taken 2026-10-18 by the owner's decision panel** (GitHub issue #636, comment 6251039023, ruling
+> R8, 2–1; the steward preferred narrowing the census's input hash now), built by an agent session
+> (wave AS, lane AS-5). **Owner-reversible**: the sentence in `data/campaign.json`.
+
+**Why an entry.** It moves a survivor-census input (`data/campaign.json`) and so the census's pinned
+inputs hash, and it closes the line [§ D1497](#d1497)'s *Not established* left for a later lane.
+
+**The ruling.** Stage 2's brief read *This is the first stage where a number changes when you change a
+setting*, which is false: stage 1's numbers change too. It now reads *This is the first stage that also
+counts runs, and asks your setting to pass at least as many of them as the building's own.* That is
+true of the goals: stage 1 carries only `beat-the-baseline`, and stage 2 is the first to add count
+goals (`answer-the-demand`, `long-waits-under`), which `campaign/judge.ts` judges as passing on at least
+as many runs as the shipped setting. The census guard (`scenario/survivorInputs.test.ts`) stays as it
+is; narrowing the hash would weaken it. If prose edits keep forcing regenerations, the fallback is an
+explicit, tested allowlist of the fields the census reads.
+
+**The regeneration.** `data/scenario-survivors.json` is regenerated once for this sentence
+(`ELEVATOR_SIM_SURVIVORS=deep ELEVATOR_SIM_REGENERATE_SURVIVORS=1`), on the commit that lands it.
+The lane's run was stopped at its two-hour limit before it wrote the file, so the regeneration is
+owed to the integrator: every count must come back unchanged, with only the inputs hash, the tree and
+the date moving, and a count that moves stops the ruling. No bar, demand, seed or measured figure moves.
+
