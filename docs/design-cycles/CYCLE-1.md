@@ -303,4 +303,18 @@ The same panel ruled R2 (the held release-direction defect gets a lane of its ow
   clause 2, with a `docs/39` § 2 row; § D1600 and § D1601 record R2 and R3.
 
 ### 5. Owner note
-What changed, what was deliberately left alone, the single biggest open design risk.
+Cycle 1 ran the whole loop once on `stage-1-first-call` and changed one thing a player sees: the stage
+verdict now says how much. Every "ahead" or "behind" carries its size in seconds, a result whose interval
+contains zero reads "too close to call at 50 runs", an unchanged press says it was the same run, energy
+sits on a line of its own, and the unmeasured "a fit to fifty crowds" is gone (§ D1602, ruled R1 by your
+decision panel on GitHub issue #645, 3–0, and owner-reversible). It moves no verdict, census, goal bar or
+published figure. Around it the cycle built the loop's instruments: a verb-sequence fuzzer, which found
+and fixed one engine deadlock (§ D1590, § D1591), and the three fun proxies (§ D1595). Deliberately left
+alone: stage 1's calm and its dominant mid-zone answer (C5, C6); the watched pair (X3, § D1496); the
+wider-budget contradiction (C7); the layout and front-door defects (C3, C4, C8 to C11, X4), which belong to
+the build loop; the held release-direction defect, which gets a lane of its own before cycle 2 (§ D1600);
+and mastery, which cycle 2 measures by re-judging attempts in the harness (§ D1601). The biggest open design
+risk is that stage 1, the first stage on the path, is calm by authoring: flat on 49 of 50 runs in both seed
+sets, with nobody waiting over a minute, against `docs/38` § 2.1's "visibly in trouble first". The sized
+verdict will now make that calm visible. The one lever measured to change it is § D372's failable
+building, deferred to a content lane of its own.

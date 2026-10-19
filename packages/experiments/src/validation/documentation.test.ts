@@ -2234,13 +2234,14 @@ type DecisionReservation = {
  * is registered in `KNOWN_DECISION_HOLES`; **D1360-D1400 are free rather than holed**, since nothing
  * is written above them (§ D430), and the charter row moves to **D1360**.
  */
-const OPEN_RESERVATION = { wave: 'AT', from: 1590, to: 1619 } as DecisionReservation | null;
+const OPEN_RESERVATION = null as DecisionReservation | null;
 /*
- * **Wave AT holds D1590-D1619.** The first design cycle (`docs/design-cycles/CYCLE-1.md`): a sim
- * sweep, a persona playtest round, the design director's one or two deltas, and the build lanes
- * that implement them. The integrator cuts each lane a contiguous block from this range at
- * dispatch, and the lane's brief carries it. The wave's merge commit closes this reservation and
- * registers its unspent numbers below the highest heading.
+ * **Wave AT's reservation, D1590-D1619, is closed** in the wave's own merge commit. The first design
+ * cycle (`docs/design-cycles/CYCLE-1.md`) ran three build lanes and the integrator, who recorded the
+ * owner's decision panel's rulings on GitHub issue #645, and spent six headings: D1590 and D1591
+ * (lane AT-1), D1595 (lane AT-2), D1600 and D1601 (the integrator) and D1602 (lane AT-3). Every
+ * unspent number below the highest heading, D1602, is registered in `KNOWN_DECISION_HOLES`;
+ * **D1603-D1619 are free rather than holed** (§ D430), and the charter row moves to **D1603**.
  */
 /*
  * **Wave AS's reservation, D1545-D1590, is closed** in the wave's own merge commit. Seven lanes (four
@@ -3804,6 +3805,19 @@ const KNOWN_DECISION_HOLES: ReadonlyMap<number, string> = new Map([
   [1585, "wave AS's lane AS-5's block; unspent for § 1584's reason."],
   [1586, "wave AS's lane AS-5's block; unspent for § 1584's reason."],
   [1587, "wave AS's lane AS-5's block; unspent for § 1584's reason."],
+  [
+    1592,
+    "wave AT's lane AT-1 held D1590-D1594 and spent D1590-D1591. Registered under D404 and D430.",
+  ],
+  [1593, "wave AT's lane AT-1's block; unspent for § 1592's reason."],
+  [1594, "wave AT's lane AT-1's block; unspent for § 1592's reason."],
+  [
+    1596,
+    "wave AT's lane AT-2 held D1595-D1599 and spent D1595 only. Registered under D404 and D430.",
+  ],
+  [1597, "wave AT's lane AT-2's block; unspent for § 1596's reason."],
+  [1598, "wave AT's lane AT-2's block; unspent for § 1596's reason."],
+  [1599, "wave AT's lane AT-2's block; unspent for § 1596's reason."],
   [
     1030,
     "wave AI's lane AI-D held D1029-D1037 and spent D1029. Registered under D404 and D430.",

@@ -12,7 +12,7 @@ Pillars: 1 playable · 2 understandable · 3 simple · 4 engaging during a run.
 
 | task | issue | branch | state |
 |---|---|---|---|
-| none | | | wave AS merged as `f5bc344` (PR #638); #633, #635, #636 and #637 are closed; no playtest is running |
+| none | | | wave AT (the first design cycle) is on PR #644, with auto-merge on once its CI is green; no playtest is running |
 
 ## Cycles 2 to 4, in one paragraph each
 
@@ -32,6 +32,11 @@ follow-up on #635; every ruling is built: day 1 stays quiet (§ D1572), no rung 
 INDISTINGUISHABLE at both press times over 50 paired crowds) and removed (§ D1589), calls left in place, stage 3 a
 named breach (§ D1582), and stage 2's brief corrected with the survivor census regenerated (§ D1583).
 
+**Wave AT** (#644) ran the first design cycle on stage 1: a verb-sequence fuzzer that found and fixed one engine
+deadlock (§ D1590, § D1591), the three fun proxies (§ D1595), a three-persona playtest, and the decision panel's
+rulings on #645. The stage verdict now says how much on both sets of crowds (§ D1602); the release-direction defect
+gets a lane of its own (§ D1600); mastery is re-judged in the harness (§ D1601).
+
 ## Build now
 
 | # | title (short) | P | pillar | next action |
@@ -39,6 +44,7 @@ named breach (§ D1582), and stage 2's brief corrected with the survivor census 
 | 232 | Building set to the content-plan target | P1 | 2, 4 | **AC4 done** on PR #624 (`buildingFieldReach.test.ts`), with three inert fields filed as #625. AC1 has 17 of 22 buildings. AC2: owner sign-off on harbour-point and ashgate |
 | 639 | A rush round ended by hand is paid in full when the client omits `stoppedS` | P3 | 1 | Carried from #636 item 8. The shipped client always sends it; needs a choice among three directions listed on the issue |
 | 641 | Two owner questions left by #628 (a gate that opens at its default costs 2 u; reject over-rung census draws) | P3 | 1 | #628 itself is fixed and closed. Needs a ruling on each; either is one lane |
+| 645 | Cycle 1 decisions: the sized verdict, the release-direction defect, mastery | P2 | 1, 2, 4 | R1 is built on #644 (§ D1602). Next, before cycle 2's baseline: R2's lane (§ D1600: measure, fix both releases, re-derive moved pins) and R3's harness re-judging (§ D1601) |
 | 642 | A deep link straight to the Rush setup | P3 | 1 | Carried from #635 item 7. Buildable; check against the tutorial gate |
 
 **Carried to the Tuesday playtest track** (not filed as defects, because they follow from rulings): on a 390×844 phone
