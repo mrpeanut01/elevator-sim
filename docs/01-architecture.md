@@ -295,6 +295,7 @@ packages/
 │   │   └── report/        — Pareto fronts, the held-out validation round
 │   ├── teaching/          — docs/14 § 4.2: the declared training configuration, and the round that judges a policy on traffic it has never seen
 │   ├── fuzz/              — Phase 8: randomized buildings, the six properties, shrinking
+│   ├── engagement/        — the three fun proxies over a stage's own runs, beside AWT and never a score (§ D1595)
 │   └── validation/        — the Phase 3 acceptance gate
 ├── viz/                   — web visualization, consumes core                    (Phase 4 complete)
 │   ├── access/            — access zoning made visible: the credential lens, the locked-out landing, the dispatcher compatibility check
