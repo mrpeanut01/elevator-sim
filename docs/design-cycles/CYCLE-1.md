@@ -228,7 +228,7 @@ issue #645, ruling R1.
   read from the batch's axis rows onto its own line, because `honesty/properties.ts#checkEnergyWaitBlend`
   refuses an energy figure inside a wait sentence and `CLAUDE.md` keeps energy beside AWT and WT95.
 - **Evidence:** C1, C2 and X1, each confirmed by all three personas; X6, X2, U1 and X5 in support; and
-  § 1's engine baseline, whose resolved door-to-door sizes run from −1.554 s to +6.627 s while the card
+  § 1's engine baseline, whose resolved door-to-door sizes run from −4.340 s to +6.627 s while the card
   prints all of them in one shape.
 - **How we'll know it worked:** what a seeded run can decide is decided before merge. (a) No verdict moves:
   the deep survivor census leaves `data/scenario-survivors.json` byte-identical, and
@@ -254,19 +254,53 @@ issue #645, ruling R1.
 1. Raise stage 1's demand to the residential maximum (`data/campaign.json`): in band on 3 of 50 tuning
    runs [0.021, 0.162] against 1 of 50, a forecast and not a verdict; DC-R1 caps demand there, and
    `docs/33` § 3.3a measured the goals shut over the legal range.
-2. Author § D372's tutorial building (one car), the one lever measured to move the stage: a content lane
-   with its own census, brief and pins, and it leaves C1, C2 and X1 standing.
+2. **Deferred, not rejected** (ruling R1): § D372's building, one authored so that it can be failed, the
+   one lever measured to move the stage. It is a content lane with its own census, brief and pins, and it
+   leaves C1, C2 and X1 standing. (One car on `garden-apartments` is the route § D372 measured and
+   rejected, because it leaves two of stage 1's three dials inert.)
 3. Raise stage 1's replications from 50 to 200: fixes one marginal case and makes every press four times
    longer.
 4. Move stage 1's tension-band edges: refused, because it would tune the instrument until the stage passes.
 5. Play a more typical crowd in the watched pair (X3): § D1496 rules replication 0, and a sized verdict
    beside the pair limits the misreading.
 
+**Ruling R1 (GitHub issue #645, 3–0): approved with amendments.** The owner's decision panel, three agent
+seats ruling alone, approved Delta A with these amendments, the union of the seats' own:
+
+1. The gate is the deep honesty tier (`ELEVATOR_SIM_HONESTY=deep`, 0 failing cases), because the always-on
+   corpus never draws the campaign judge.
+2. An always-on assertion that every shipped stage verdict's `met`, `held` and `cleared` are unchanged, and
+   a `judge.test.ts` case reading every printed bound back against `row.estimate` at
+   `BATCH_METRIC_PRESENTATION.places` on a real stage-1 batch for both seed sets, replace the census
+   regeneration, which hashes no code.
+3. One formatter, `batch/report.ts`'s own; a resolved bound nearest zero never prints as 0.00; a null
+   estimate keeps its refusal.
+4. "The same run" is decided from the admission (`admission.moved.length === 0`); a changed setting whose
+   paired differences are exactly zero on every crowd and every row says the change altered no run; nothing
+   else claims sameness.
+5. Each seed set's sentence stands alone: nothing says a gain shrank or survived, and the held-back crowds
+   are described by where they come from ("crowds kept apart from the stage's own"), never as crowds the
+   player "could not have tuned against".
+6. The outcome leads ("Not cleared." or "Cleared."), and the rule names no cause.
+7. A bounded figure budget: average wait first with its range, every other resolved measure with its size,
+   the unresolved rest under one clause.
+8. The energy line carries drive work and drive work per served ride, once, for the stage's own crowds,
+   higher or lower only when its interval excludes zero, never met or missed.
+9. `dev/campaignPanel.ts`, which prints the same sentences, is in scope.
+
+The same panel ruled R2 (the held release-direction defect gets a lane of its own after this wave,
+§ D1600) and R3 (mastery is measured by re-judging each persona attempt on a fresh batch in the harness,
+§ D1601).
+
 ### 4. Handoff to build loop
-- Branch / worktree: <name>
-- GitHub issue opened: #<n>
-- Required CI gates: <the binding checks>; long sim/experiment jobs: optional
-- DECISIONS.md entry needed on merge: yes/no — <D-id if known>
+- **Branch / worktree:** `wave-at-lane-3` in `.worktrees/wave-at-lane-3`, merged into `wave-at` and
+  carried on PR #644 (branch `claude/great-hamilton-9f5a8y`).
+- **GitHub issue opened:** #645 (the decisions and the panel's rulings).
+- **Required CI gates:** the guards job and the six-project run (core, experiments, viz in two shards,
+  service, browser); the nightly deep tiers stay optional, except that this delta's own gate, the deep
+  honesty tier, is run on the integrated head before the push.
+- **DECISIONS.md entry needed on merge:** yes. § D1602 records ruling R1 with its build and amends § D1159
+  clause 2, with a `docs/39` § 2 row; § D1600 and § D1601 record R2 and R3.
 
 ### 5. Owner note
 What changed, what was deliberately left alone, the single biggest open design risk.

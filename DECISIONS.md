@@ -54161,3 +54161,56 @@ holdout runs they read are held to the game's own.
    the last one.
 
 **Numbers spent.** This lane holds **D1595 to D1599** and spends **D1595**.
+
+## D1600 — the held release-direction defect gets a lane of its own, after this wave and before cycle 2's baseline
+
+> **Taken 2026-10-19 by the owner's decision panel** (GitHub issue #645, ruling R2, 3–0), recorded by
+> the integrator of wave AT. It settles what [§ D1591](#d1591) clause 3 left open. **Owner-reversible.**
+
+**Why an entry.** It binds work this wave does not own: a later lane in `core`, the published pins it will
+move, and the order cycle 2 runs in.
+
+1. **Not accepted as behaviour.** The releases that leave a stationary car pointing at no committed stop
+   are the condition behind the deadlock § D1591 fixed on the withdrawal path, and pillar 1 ranks a
+   softlock above any feature. `car.test.ts` pins today's behaviour so that closing it is a visible
+   change, never so that it reads as the specification.
+2. **Not fixed in this wave.** A seat's scratch replay, on tuning and non-shipped seeds only, found the
+   legs change in a few shipped runs, among them Midtown runs on the `collective` baseline of Phase 6's
+   published gate, so pins will move. Those figures are unpinned and are not this entry's evidence; the
+   lane measures and pins its own. Fixing it here would also blur wave AT's proof that no verdict moves.
+3. **The lane, in order:** measure whether any wrong direction delays or strands a rider; fix both
+   `releaseHallCall` and `releaseAllHallCalls`; run the benchmark tier before merge; regenerate the pins,
+   read the diff, and treat each moved pin as a finding to re-derive, never a value to edit; then
+   republish the survivor census and `docs/design-cycles/CYCLE-1.md` § 1 with the commit they are true of.
+4. **When.** After wave AT merges and before cycle 2's § 1 baseline and playtest, so cycle 2 measures one
+   engine and does not test two changes at once.
+
+**Numbers spent.** The integrator holds **D1600 to D1601** from wave AT's reservation and spends both.
+
+## D1601 — mastery is measured by re-judging each persona attempt on a fresh batch in the harness, and the game is unchanged
+
+> **Taken 2026-10-19 by the owner's decision panel** (GitHub issue #645, ruling R3, 3–0), recorded by
+> the integrator of wave AT. It settles the gap [§ D1595](#d1595) clause 6 names. **Owner-reversible.**
+
+**Why an entry.** It binds the playtest harness and cycle 2's design, which no module of this wave owns,
+and it refuses a change to how the game judges a stage.
+
+1. **The game is not changed.** Judging each attempt on a fresh batch would let a player clear a marginal
+   setting by re-pressing until a batch favoured it, would stop a press replaying from stage id, move and
+   rung, and would leave the survivor census describing a different stage from the one played.
+2. **The game's own series is not enough.** Every attempt meets the same held-back batch and its verdict
+   is feedback the player sees, so a slope over it alone cannot tell skill from learning that batch.
+3. **The harness re-judges, on these conditions.** Fresh master seeds are declared before cycle 2 from a
+   named stream and checked for collisions against both stage seed sets. Attempt *k* uses batch *k* for
+   every persona, at 50 replications, and each persona makes at least the bands file's 8 attempts. Each
+   attempt is judged by the game's own judge with only a harness copy of the stage record's
+   `holdoutSeeds` swapped, because `judgeStage` refuses a mismatched seed. The fresh verdicts are never
+   shown to a persona. The game's fixed-batch verdict is reported beside each fresh one, and the two series
+   are compared only through `engagement/mastery.ts#pairedMasterySlope`. A persona's series stops at the
+   first attempt after it reads the tree, and the slope is labelled agent evidence
+   (`docs/23-audiences-and-core-loop.md` § 1.5).
+4. **Scope.** This works on `stage-1-first-call` as the tree stands, because its one goal is
+   `beat-the-baseline`. From stage 2 on, each count goal's bar must first be measured on the fresh seed set,
+   since `judgeCountGoal` refuses a goal with no published count for its seeds.
+
+**Numbers spent.** See [§ D1600](#d1600).
