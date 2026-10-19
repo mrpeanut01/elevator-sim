@@ -64,7 +64,9 @@ import {
   SimulationError,
   StreamSet,
   bankRangeIsFixed,
+  isServiceDerateEvent,
   isServiceModeEvent,
+  isServiceRangeEvent,
   parsePriceSchedule,
   purchaseUnits,
   resolveLoadSensor,
@@ -419,7 +421,7 @@ export function playLogRefusal(
       if (effect.atS < entry.atS || effect.atS > durationS) {
         return `${at} carries an effect at ${String(effect.atS)} s, outside [${String(entry.atS)}, ${String(durationS)}] s`;
       }
-      if ('servesFloors' in effect) {
+      if (isServiceRangeEvent(effect)) {
         const bank = context.rangeBanks.find((candidate) => candidate.bankId === effect.bankId);
         if (bank === undefined) return `${at} moves the range of bank "${effect.bankId}", which may not move`;
         if (effect.servesFloors.length === 0 || effect.servesFloors.some((floor) => !bank.servesFloors.includes(floor))) {
@@ -430,7 +432,7 @@ export function playLogRefusal(
       }
       const car = context.cars.find((candidate) => candidate.bankId === effect.bankId && candidate.carId === effect.carId);
       if (car === undefined) return `${at} names car "${effect.bankId}/${effect.carId}", which this building does not build`;
-      if ('ratedLoadKg' in effect) {
+      if (isServiceDerateEvent(effect)) {
         if (
           !(effect.ratedLoadKg > 0) ||
           effect.ratedLoadLb > car.ratedLoadLb ||
