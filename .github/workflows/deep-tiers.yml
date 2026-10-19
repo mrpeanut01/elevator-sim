@@ -410,7 +410,7 @@ jobs:
       - name: Deep fuzz campaign
         env:
           ELEVATOR_SIM_FUZZ: deep
-        run: npx vitest run --passWithNoTests=false --project experiments --testTimeout=600000 src/fuzz/deep.test.ts src/fuzz/hybrid.test.ts
+        run: npx vitest run --passWithNoTests=false --project experiments --testTimeout=600000 src/fuzz/deep.test.ts src/fuzz/hybrid.test.ts src/fuzz/releaseDirection.test.ts
 
   # ---------------------------------------------------------------------------
   # Byte-identical replay, at 6 goldens rather than 4, plus the replay from a bare node process.
