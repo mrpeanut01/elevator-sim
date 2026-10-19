@@ -31,7 +31,9 @@
  * With `--scenario <id>` the command runs the adversarial persona instead (`fuzzPlay.ts`,
  * `DECISIONS.md` § D1590): the campaign stage's building held fixed and the player's verb log
  * fuzzed. This file reads the two raw files that family needs and hands over; without the flag
- * nothing here runs differently.
+ * nothing here runs differently. With `--engagement` beside it no campaign runs: the same stage is
+ * read, `data/engagement-bands.json` is read too, and the three fun proxies are printed instead
+ * (`fuzzEngagement.ts`, § D1595).
  *
  * ## Tiers are flags here, not environment
  *
@@ -83,6 +85,7 @@ import { count, num } from '../format.js';
 import { BINARY, printCommandHelp, wrap, type CommandHelp } from '../help.js';
 import { field, heading, padColumn, type Output } from '../output.js';
 
+import { runEngagement } from './fuzzEngagement.js';
 import { runPlayFuzz } from './fuzzPlay.js';
 
 /* -------------------------------------------------------------------------- *
@@ -219,6 +222,12 @@ export const FUZZ_FLAGS: readonly FlagSpec[] = [
     summary:
       'hold a campaign stage’s building fixed and fuzz the player’s verb log over the seven intervention kinds (the adversarial persona)',
   },
+  {
+    name: 'engagement',
+    kind: 'boolean',
+    summary:
+      'with --scenario: compute the three fun proxies on the stage (unmeasured premises about people) instead of fuzzing it',
+  },
   { name: 'data', kind: 'string', placeholder: '<dir>', summary: 'data directory to read' },
   { name: 'no-color', kind: 'boolean', summary: 'never emit ANSI colour' },
   { name: 'help', kind: 'boolean', aliases: ['h'], summary: 'show this help' },
@@ -229,7 +238,7 @@ export const FUZZ_HELP: CommandHelp = {
   // Derived from FUZZ_TIERS rather than spelled out: this line was written `standard|deep` and
   // went stale the moment a third tier landed, which is the shape of staleness a one-line
   // derivation removes for good (GitHub issue #534).
-  usage: `${BINARY} fuzz [--tier ${FUZZ_TIERS.join('|')}] [--cases <n>] [--from <n>] [--scenario <id>]`,
+  usage: `${BINARY} fuzz [--tier ${FUZZ_TIERS.join('|')}] [--cases <n>] [--from <n>] [--scenario <id> [--engagement]]`,
   summary: 'generate random buildings and check the six run properties on every one',
   description: [
     'Randomized buildings, not just randomized seeds. Every case is generated through the real ' +
@@ -251,6 +260,12 @@ export const FUZZ_HELP: CommandHelp = {
       'six: no softlock, no unreadable verdict, and a session that can still be paired against the ' +
       'stage’s own setting. No player can press these verbs on a Scenario stage, so that run is an ' +
       'engine stress test and says so. It also prints a dominant-verb ranking, which never fails a run.',
+    'With --scenario <id> --engagement no campaign runs. It computes the three fun proxies on the stage ' +
+      'from data/engagement-bands.json, every one an unmeasured premise about people: the tension band of ' +
+      'the stage’s own setting on its tuning and holdout seeds, the meaningful-choice rate (a player ' +
+      'session on a Scenario stage has nothing to judge, so an engine-level baseline of canonical presses ' +
+      'is printed beside it), and the mastery slope, which has no attempts until the playtest phase. Every ' +
+      'rate is k of n with its interval, every comparison is paired on the same seeds, and it exits 0.',
   ],
   flags: FUZZ_FLAGS,
   examples: [
@@ -260,6 +275,7 @@ export const FUZZ_HELP: CommandHelp = {
     `${BINARY} fuzz --tier deep --cases 2000 --shrink-budget 200`,
     `${BINARY} fuzz --scenario stage-1-first-call`,
     `${BINARY} fuzz --scenario stage-1-first-call --tier deep`,
+    `${BINARY} fuzz --scenario stage-1-first-call --engagement`,
   ],
 };
 
@@ -279,10 +295,26 @@ export async function fuzzCommand(out: Output, argv: readonly string[]): Promise
    * without the flag nothing below this line changes, so the building fuzz is the run it always was.
    */
   if (stringFlag(parsed, 'scenario') !== undefined) {
-    return runPlayFuzz(out, config, parsed, {
+    const play = {
       campaign: await readDataJson(dataDir, 'campaign.json'),
       priceSchedule: await readDataJson(dataDir, 'price-schedule.json'),
-    });
+    };
+    /*
+     * `--engagement` computes the fun proxies instead (`fuzzEngagement.ts`, § D1595): the same stage
+     * context, the bands file read here beside the other two, and no property campaign.
+     */
+    if (booleanFlag(parsed, 'engagement')) {
+      return runEngagement(out, config, parsed, argv, {
+        ...play,
+        engagementBands: await readDataJson(dataDir, 'engagement-bands.json'),
+      });
+    }
+    return runPlayFuzz(out, config, parsed, play);
+  }
+  if (booleanFlag(parsed, 'engagement')) {
+    throw new UsageError('--engagement needs --scenario <id>: the proxies are read on a campaign stage.', [
+      `try: ${BINARY} fuzz --scenario stage-1-first-call --engagement`,
+    ]);
   }
   return runFuzz(out, config, parsed);
 }
@@ -295,7 +327,7 @@ async function readDataJson(dataDir: string, file: string): Promise<unknown> {
   } catch (error) {
     throw new UsageError(
       `could not read "${path}": ${error instanceof Error ? error.message : String(error)}`,
-      ['--scenario reads the campaign and the price schedule from the data directory; pass --data <dir> to point at a different one'],
+      ['--scenario reads the campaign and the price schedule (and, with --engagement, the engagement bands) from the data directory; pass --data <dir> to point at a different one'],
     );
   }
 }

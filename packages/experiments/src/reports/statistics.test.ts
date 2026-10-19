@@ -22,6 +22,7 @@ import {
   sampleStdDevOf,
   studentTCdf,
   studentTQuantile,
+  wilsonScoreInterval,
 } from './statistics.js';
 import { ReportsError, intervalContainsZero } from './types.js';
 
@@ -448,5 +449,57 @@ describe('intervalContainsZero', () => {
     // n = 1: unknown, not "no difference". Treating an absent interval as containing zero would
     // report every single-replication comparison as indistinguishable.
     expect(intervalContainsZero(estimateMean([3]))).toBe(false);
+  });
+});
+
+describe('wilsonScoreInterval', () => {
+  /*
+   * R. G. Newcombe, "Two-sided confidence intervals for the single proportion: comparison of seven
+   * methods", Statistics in Medicine 17 (1998) 857-872, Table II, method 3 (the score interval
+   * without continuity correction), at 95 %. Four of the paper's worked examples, at its printed
+   * four decimal places, so the check is against a published table and not this implementation.
+   */
+  const NEWCOMBE_TABLE_II: readonly (readonly [number, number, number, number])[] = [
+    [81, 263, 0.2553, 0.3662],
+    [15, 148, 0.0624, 0.1605],
+    [0, 20, 0.0, 0.1611],
+    [1, 29, 0.0061, 0.1718],
+  ];
+
+  it('reproduces Newcombe (1998) Table II, method 3', () => {
+    for (const [k, n, lower, upper] of NEWCOMBE_TABLE_II) {
+      const interval = wilsonScoreInterval(k, n);
+      expect(interval.lower, `${String(k)}/${String(n)} lower`).toBeCloseTo(lower, 4);
+      expect(interval.upper, `${String(k)}/${String(n)} upper`).toBeCloseTo(upper, 4);
+      expect(interval).toMatchObject({ k, n, confidence: DEFAULT_CONFIDENCE, method: 'wilson-score' });
+    }
+  });
+
+  it('never collapses at 0 or n, stays inside [0, 1], and is symmetric under k → n − k', () => {
+    for (const n of [1, 2, 5, 50, 200]) {
+      for (let k = 0; k <= n; k += 1) {
+        const interval = wilsonScoreInterval(k, n);
+        expect(interval.lower).toBeGreaterThanOrEqual(0);
+        expect(interval.upper).toBeLessThanOrEqual(1);
+        expect(interval.upper - interval.lower, `${String(k)} of ${String(n)}`).toBeGreaterThan(0);
+        const mirror = wilsonScoreInterval(n - k, n);
+        expect(interval.lower).toBeCloseTo(1 - mirror.upper, 12);
+      }
+    }
+    // The textbook interval would be [0, 0] here: zero width from fifty trials.
+    expect(wilsonScoreInterval(0, 50).upper).toBeGreaterThan(0.05);
+  });
+
+  it('widens with confidence, and has no interval on nothing', () => {
+    expect(wilsonScoreInterval(10, 50, { confidence: 0.99 }).upper).toBeGreaterThan(wilsonScoreInterval(10, 50).upper);
+    const empty = wilsonScoreInterval(0, 0);
+    expect(Number.isNaN(empty.lower) && Number.isNaN(empty.upper)).toBe(true);
+  });
+
+  it('refuses counts that are not counts', () => {
+    expect(() => wilsonScoreInterval(3, 2)).toThrow(ReportsError);
+    expect(() => wilsonScoreInterval(-1, 2)).toThrow(ReportsError);
+    expect(() => wilsonScoreInterval(0.5, 2)).toThrow(ReportsError);
+    expect(() => wilsonScoreInterval(1, 2, { confidence: 95 })).toThrow(ReportsError);
   });
 });
