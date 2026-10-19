@@ -3307,16 +3307,24 @@ const CAMPAIGN: SurfaceAdapter = {
     const baselineProfile = context.profiles.find((entry) => entry.id === stage.dispatcher.startingProfileId);
     const candidateId = context.batch.arms[1]?.dispatcherProfileId;
     const candidateProfile = context.profiles.find((entry) => entry.id === candidateId);
-    if (baselineProfile !== undefined && candidateProfile !== undefined) {
-      const admission = admitStageMove(
-        { space: context.space, schedule: shippedPriceSchedule(), baseline: baselineProfile },
-        { profile: candidateProfile },
-        stageUnitsAt(stage, null),
-      );
+    const admission =
+      baselineProfile === undefined || candidateProfile === undefined
+        ? undefined
+        : admitStageMove(
+            { space: context.space, schedule: shippedPriceSchedule(), baseline: baselineProfile },
+            { profile: candidateProfile },
+            stageUnitsAt(stage, null),
+          );
+    if (admission !== undefined) {
       seeds.push({ field: 'admission.sentence', text: admission.sentence, role: 'prose' });
     }
 
-    const verdict = judgeStage({ stage, published, result: context.batch, report: context.report });
+    /*
+     * The admission is handed to the judge as the stage page hands it (§ D1602): it is the only
+     * ground on which the verdict may say *the same run*, so a case whose two arms run one setting
+     * reaches that sentence here and every other case reaches the sized one.
+     */
+    const verdict = judgeStage({ stage, published, result: context.batch, report: context.report, admission });
     /*
      * The headline is an **observation**, not a goal claim — narrowed from `role: 'goal'` after the
      * deep tier reported `goal-without-rate` against it (§ D186).
@@ -3350,6 +3358,20 @@ const CAMPAIGN: SurfaceAdapter = {
       declaredCount: headlineSeeds,
       countShown: verdict.headline.includes(String(headlineSeeds)),
     });
+    /*
+     * Ruling R1, amendment 8 (§ D1602): drive work on a line of its own, declared as the energy axis
+     * so `energy-wait-blend`'s structural half holds it to naming no wait.
+     */
+    if (verdict.energy !== null) {
+      seeds.push({
+        field: 'judge.energy',
+        text: verdict.energy,
+        role: 'observation',
+        energyAxis: true,
+        declaredCount: headlineSeeds,
+        countShown: verdict.energy.includes(String(headlineSeeds)),
+      });
+    }
     for (const goal of verdict.goals) {
       const replications = context.batch.arms[0]?.replications.length ?? 0;
       seeds.push({
@@ -18412,6 +18434,9 @@ const EVERYDAY_STAGE_PLAY: SurfaceAdapter = {
       }
       if (view.verdict !== undefined) {
         seeds.push({ field: `${at}.verdict.head`, text: view.verdict.head, role: 'prose' });
+        if (view.verdict.energy !== undefined) {
+          seeds.push({ field: `${at}.verdict.energy`, text: view.verdict.energy, role: 'observation', energyAxis: true });
+        }
         if (phase.kind === 'judged' && !phase.verdict.metOnTuningSeeds) {
           seeds.push({ field: `${at}.verdict.holdout`, text: view.verdict.holdout, role: 'reason' });
         }

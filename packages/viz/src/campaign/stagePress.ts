@@ -302,6 +302,8 @@ export async function pressStage(input: StagePressInput): Promise<StagePress> {
     candidateProfileId: input.move.profile.id,
     edit,
     run: input.run,
+    /* The verdict's *the same run* is this admission's to say, never the figures' (§ D1602). */
+    admission,
   });
   return { kind: 'judged', admission, outcome };
 }

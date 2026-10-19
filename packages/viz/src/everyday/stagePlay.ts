@@ -167,7 +167,11 @@ export const STAGE_PLAY_COPY = Object.freeze({
   loadingWhy: 'The stage is still being read.',
   heldWhy: 'This stage is held back, so there is nothing here to run.',
   refusedWhy: 'This setting is refused at this budget, so there is nothing to run until it fits.',
-  noteReady: 'Judged on the stage’s own goals, then again on crowds you did not tune against.',
+  /*
+   * The held-back crowds are named by where they come from, never as crowds the player *could not
+   * have tuned against* — ruling R1, amendment 5 ([§ D1602](../../../../DECISIONS.md)).
+   */
+  noteReady: 'Judged on the stage’s own crowds, then again on crowds kept apart from them.',
   noteSolved: 'Cleared. A stage pays once, and a clear unlocks nothing.',
   /*
    * A stage this device has cleared, opened again — [§ D1358](../../../../DECISIONS.md). The run is
@@ -181,7 +185,12 @@ export const STAGE_PLAY_COPY = Object.freeze({
   practice: 'Cleared on this device. Running it again is practice: it pays nothing new.',
   notePractice: 'Practice: the same judge on the same crowds, and a stage pays once.',
   clearedHead: 'Cleared.',
-  metNotHeldHead: 'Every goal met on the stage’s own crowds, and not on the ones held back.',
+  /*
+   * The outcome leads — ruling R1, amendment 6 ([§ D1602](../../../../DECISIONS.md)). It read
+   * *Every goal met on the stage's own crowds, and not on the ones held back* above a refusal, and
+   * the playtest's three personas read a win and then *nearly there* (finding X1).
+   */
+  metNotHeldHead: 'Not cleared. Met on the stage’s own crowds, and not on the crowds kept apart from them.',
   missedHead: 'Not cleared.',
   goalMet: 'met',
   goalMissed: 'missed',
@@ -388,6 +397,11 @@ export interface StagePlayVerdictFacts {
     readonly counts?: { readonly yours: number; readonly shipped: number; readonly runs: number } | undefined;
   }[];
   readonly holdoutSentence: string | null;
+  /**
+   * The judge's drive-work line for the stage's own crowds (`judge.ts#StageReport.energy`), passed
+   * through unchanged; absent or `null` where the judge wrote none.
+   */
+  readonly energySentence?: string | null | undefined;
   readonly metOnTuningSeeds: boolean;
   readonly cleared: boolean;
   /** `first` when this clear banked the award, `again` when the stage had paid before. */
@@ -413,6 +427,9 @@ export interface StagePlayVerdictView {
   readonly head: string;
   readonly headline: string;
   readonly goals: readonly { readonly label: string; readonly mark: string; readonly sentence: string }[];
+  /** Drive work on the stage's own crowds, on a line of its own and never part of a goal (§ D1602). */
+  readonly energy: string | undefined;
+  /** The held-back crowds' sentence, printed once: the headline no longer repeats it (§ D1602). */
   readonly holdout: string;
   readonly pay: string | undefined;
   /** On a clear: the par mark, or why the clear earns none (§ D1358). */
@@ -672,6 +689,7 @@ export function verdictFactsOf(
       ...(goal.counts === undefined ? {} : { counts: goal.counts }),
     })),
     holdoutSentence: report.holdout?.sentence ?? null,
+    energySentence: report.energy,
     metOnTuningSeeds: report.metOnTuningSeeds,
     cleared: report.cleared,
     paid,
@@ -729,9 +747,14 @@ function statusOf(phase: StagePlayPhase, replications: number): string | undefin
   if (phase.kind !== 'running') return undefined;
   const crowds = phase.total > 0 ? Math.floor((phase.completed * replications) / phase.total) : 0;
   const done = `${String(crowds)} of ${String(replications)}`;
+  /*
+   * The held-back half says what was met and where the next crowds come from — ruling R1
+   * ([§ D1602](../../../../DECISIONS.md)). It read *Every goal met.* while the batch that decides the
+   * clear was still running, which the playtest read as a win before the refusal (finding X1).
+   */
   return phase.seedSet === 'tuning'
     ? `Running ${done} of the stage’s own crowds, both settings on the same passengers.`
-    : `Every goal met. Now ${done} crowds you could not have tuned against; these decide the clear.`;
+    : `Met on the stage’s own crowds. Now ${done} crowds kept apart from them; these decide the clear.`;
 }
 
 function verdictViewOf(facts: StagePlayFacts, verdict: StagePlayVerdictFacts, stale: boolean): StagePlayVerdictView {
@@ -770,6 +793,7 @@ function verdictViewOf(facts: StagePlayFacts, verdict: StagePlayVerdictFacts, st
               : STAGE_PLAY_COPY.goalMissed,
       sentence: goal.sentence,
     })),
+    energy: verdict.energySentence ?? undefined,
     holdout: verdict.holdoutSentence ?? STAGE_PLAY_COPY.holdoutNotRun,
     pay,
     /* § D1358: the par this clear meets, or why it earns no mark, in the hub row's own words. */
@@ -890,7 +914,7 @@ export function stagePlayViewOf(facts: StagePlayFacts, phase: StagePlayPhase): S
     runNote:
       `A run is ${String(facts.replications)} runs of ${minutesOf(facts.durationS)} of building time on this ` +
       `stage’s own crowds, your settings and the building’s on the same passengers. If every goal is met, ` +
-      `${String(facts.replications)} more follow on crowds you could not have tuned against, and those decide the clear.`,
+      `${String(facts.replications)} more follow on crowds kept apart from the stage’s own, and those decide the clear.`,
     practice: facts.clearedBefore === true ? stagePracticeLineOf(facts.parUnits, facts.keptSpentUnits) : undefined,
     status: statusOf(phase, facts.replications),
     watch:

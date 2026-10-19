@@ -806,8 +806,12 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
    * the holdout batch cannot differ in anything but their seed set, and a pre-flight that also
    * built one of them would be the second construction of a request that `campaign/stageRun.ts`
    * exists to prevent.
+   *
+   * It returns the admission itself, or `undefined` where the stage is refused, because the verdict
+   * may say *the same run* only on the admission's word (`campaign/judge.ts#JudgeStageInput.admission`,
+   * [§ D1602](../../../../DECISIONS.md)).
    */
-  function admitted(stage: CampaignStage): boolean {
+  function admitted(stage: CampaignStage): StageAdmission | undefined {
     /*
      * The shelf, admitted before the stage is — `dev/batchPanel.ts#start`'s argument, placed here
      * because this panel's single gate is `admitted` and a second refusal path would be a second
@@ -816,17 +820,17 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
     const library = batchLibraryOf(resources.dispatcherProfiles, options.savedProfiles());
     if (!library.ok) {
       fail(library.reason);
-      return false;
+      return undefined;
     }
     const baseline = profileById(stage.dispatcher.startingProfileId);
     if (baseline === undefined) {
       fail('this build’s data/ does not carry one of the two dispatcher profiles this stage needs.');
-      return false;
+      return undefined;
     }
     const outcome = candidateProfileFor(stage);
     if (!outcome.ok) {
       fail(outcome.reason);
-      return false;
+      return undefined;
     }
     /*
      * The admission is asked of the **resolved** dispatcher, edited or not. That is the point of
@@ -837,9 +841,9 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
     const admission = stageAdmissionOf(stage, outcome.profile);
     if (admission === undefined || !admission.admitted) {
       fail(admission?.sentence ?? 'this build’s data/ does not carry the stage’s own starting profile.');
-      return false;
+      return undefined;
     }
-    return true;
+    return admission;
   }
 
   /* ------------------------------------------------------------------ *
@@ -866,13 +870,13 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
       return (
         `running ${String(total)} replications on ${seeds.name} — both settings, the same ` +
         `passengers… If every goal is met here, a second batch of ${String(total)} follows on ` +
-        `${stageSeedSetOf(stage, 'holdout').name}, because a stage is cleared on seeds it was not ` +
-        'tuned against.'
+        `${stageSeedSetOf(stage, 'holdout').name}, because a stage is cleared on seeds kept apart ` +
+        'from its own as well.'
       );
     }
     return (
       `every goal met on the runs you made — now running ${String(total)} replications on ` +
-      `${seeds.name}, seeds this setting was not tuned against. This second batch decides whether ` +
+      `${seeds.name}, seeds kept apart from the stage’s own. This second batch decides whether ` +
       'the stage is cleared; it adds no figure to the rows you are about to read.'
     );
   }
@@ -886,7 +890,7 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
     const done = `${String(completed)} of ${String(total)} replications on ${stageSeedSetOf(stage, seedSet).name}`;
     return seedSet === 'tuning'
       ? `${done} — the page is still yours while this runs.`
-      : `${done} — the second batch, on seeds you could not have tuned against.`;
+      : `${done} — the second batch, on seeds kept apart from the stage’s own.`;
   }
 
   /**
@@ -903,7 +907,7 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
     if (outcome.verdict.holdout === null) {
       return (
         `${per} on ${tuning} in ${took}. The holdout batch was not run: a goal missed on the runs ` +
-        'you made cannot be recovered on seeds you did not tune against.'
+        'you made cannot be recovered on seeds kept apart from them.'
       );
     }
     return `${per} on ${tuning}, and again on ${stageSeedSetOf(stage, 'holdout').name} — ${took} for both batches.`;
@@ -973,7 +977,8 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
   function start(): void {
     const stage = currentStage();
     if (stage === undefined) return;
-    if (!admitted(stage)) return;
+    const admission = admitted(stage);
+    if (admission === undefined) return;
     const published = loaded.published.scenarios.find((entry) => entry.id === stage.id);
     if (published === undefined) {
       fail(`stage "${stage.id}" has no published goal table entry, so nothing can be judged.`);
@@ -996,6 +1001,7 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
       published,
       candidateProfileId: ui.profile.value,
       edit: editFor(stage),
+      admission,
       run: async (request, seedSet) => {
         const result = await runOneBatch(stage, request, seedSet);
         elapsedMs += result.elapsedMs;
@@ -1012,6 +1018,7 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
           outcome.verdict,
           outcome.report,
           failStates(stage, outcome.result.arms[1]?.replications ?? []),
+          admission,
         );
       },
       () => {
@@ -1113,9 +1120,12 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
    * configuration of theirs could have passed, and that is a false thing to teach even though
    * every word in the sentence is true.
    *
-   * The identical case is detected on the **resolved** ids, so an edited `collective` against
-   * shipped `collective` is correctly two settings rather than one — `runBatch` puts the resolved
-   * profile's id on the arm for that reason.
+   * **The identical case is the admission's to say** — ruling R1, amendment 4
+   * ([§ D1602](../../../../DECISIONS.md)): a press whose `moved` is empty runs the stage's own
+   * setting in both arms, on every setting live on this building, so the two arms are one run. It
+   * was detected on the resolved ids, which agree with the admission wherever the ids are equal and
+   * say *two settings* about a saved copy that changes nothing live here; the judge's sentence and
+   * this row now answer from one check.
    *
    * And the control is **read**, not assumed. Two identical arms see identical passengers and
    * produce identical numbers, so every paired difference is exactly zero and no row may exclude
@@ -1127,12 +1137,12 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
     stage: CampaignStage,
     verdict: StageReport,
     report: BatchReport,
+    admission: StageAdmission,
   ): HTMLElement {
     const provenance =
       `seed ${verdict.seed} — every one of these ${String(verdict.replications)} runs replays ` +
       `from it. ${report.crnSentence}`;
-    const ids = new Set(report.arms.map((arm) => arm.dispatcherProfileId));
-    if (report.arms.length < 2 || ids.size > 1) {
+    if (report.arms.length < 2 || admission.moved.length > 0) {
       return row(
         verdict.cleared ? 'stage cleared' : 'stage not cleared',
         verdict.headline,
@@ -1147,7 +1157,8 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
     if (separated.length > 0) {
       return row(
         'the control did not hold — report this',
-        `Both arms ran ${name}, so every paired difference should have been exactly zero, and ` +
+        `Both arms ran the same system, ${name}, on every setting live on this building, so ` +
+          'every paired difference should have been exactly zero, and ' +
           `${String(separated.length)} of the measures below came back with an interval that ` +
           'excludes it. Two identical settings cannot differ unless the two arms saw different ' +
           `passengers or a run is not reproducible. ${verdict.headline}`,
@@ -1157,8 +1168,9 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
     }
     return row(
       'control run — the two settings are the same',
-      `Both arms ran ${name}. They are identical by construction, so no measure can separate ` +
-        'them and “beat the baseline” is unreachable here however long it runs — this is not a ' +
+      `Both arms ran the same system, ${name}, on every setting live on this building. They are ` +
+        'identical by construction, so no measure can separate them and “beat the baseline” is ' +
+        'unreachable here however long it runs — this is not a ' +
         'stage you failed, it is the check this surface is built to survive, and it held. ' +
         `${verdict.headline} ${wayOutOf(stage)}`,
       provenance,
@@ -1173,7 +1185,7 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
    * `judgeStage`'s `goals` are the **tuning** batch — the runs the player made — and they are what
    * every goal row's sentence has always been, deliberately: feedback a player cannot see is not
    * feedback, and a stage refused on a count they can go and look at is a stage they can play
-   * again. `holdout.goals` are the same goals over a sample they could not have tuned against, and
+   * again. `holdout.goals` are the same goals over crowds kept apart from the stage's own, and
    * they decide `cleared` and nothing else. Printing the two lists one after another with the same
    * labels would be the confusion the whole split exists to prevent, so each list gets a caption
    * naming its seed set and every holdout row carries the set on its own label — a reader who
@@ -1182,7 +1194,7 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
    * The holdout half is drawn whether it held or not. Drawing it only when it refused would report
    * the unflattering half of a measurement and hide the other, which is the shape this repository
    * refuses everywhere else; and a player who cleared a stage is owed the evidence that they
-   * cleared it on runs they had never seen.
+   * cleared it on crowds kept apart from the ones they tuned on.
    */
   function seedSetBlocks(stage: CampaignStage, verdict: StageReport): readonly HTMLElement[] {
     const tuning = stageSeedSetOf(stage, 'tuning');
@@ -1200,6 +1212,21 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
         'figure-observation',
       ),
       ...verdict.goals.map((goal) => row(goal.label, goal.sentence, goal.note, goalClass(goal.met))),
+      /*
+       * Drive work on the runs above, the judge's own line and the Casual card's (§ D1602): beside
+       * the goals and never one of them, so it carries no met-or-missed class.
+       */
+      ...(verdict.energy === null
+        ? []
+        : [
+            row(
+              'drive work, beside the verdict',
+              verdict.energy,
+              'An axis and never a score: the setting that drives least is often the one that carried ' +
+                'fewest people, so this line is read beside the waits and orders nothing.',
+              'figure-observation',
+            ),
+          ]),
     ];
 
     const holdout = verdict.holdout;
@@ -1208,7 +1235,7 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
         row(
           'the holdout seeds — not run',
           `${holdoutSeeds.name} (seed ${holdoutSeeds.seed}) was not run, because a goal missed on ` +
-            'the runs above cannot be recovered on seeds this setting was not tuned against. A ' +
+            'the runs above cannot be recovered on seeds kept apart from them. A ' +
             'stage is cleared on both batches or on neither, and nothing here was measured about ' +
             'this one.',
           undefined,
@@ -1220,7 +1247,9 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
 
     nodes.push(
       row(
-        holdout.held ? 'the runs you could not tune against' : 'the runs you could not tune against — refused',
+        holdout.held
+          ? 'the held-back runs, kept apart from the stage’s own'
+          : 'the held-back runs, kept apart from the stage’s own — refused',
         holdout.sentence,
         `A second batch of the same two settings over ${holdout.seedSetName}, run after the batch ` +
           'above met every goal. It decides whether the stage is cleared and it changes no figure ' +
@@ -1244,9 +1273,10 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
     verdict: StageReport,
     report: BatchReport,
     states: readonly FailStateReport[],
+    admission: StageAdmission,
   ): void {
     ui.output.replaceChildren();
-    ui.output.append(controlOrVerdictRow(stage, verdict, report));
+    ui.output.append(controlOrVerdictRow(stage, verdict, report, admission));
     if (report.budgetNote !== null) {
       ui.output.append(row('replication budget', report.budgetNote, undefined, 'figure-warning'));
     }

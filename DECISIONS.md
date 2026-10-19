@@ -46591,6 +46591,8 @@ false routes to the composed arm with *What it did* and without the disclaimer.
 
 > **Status 2026-09-26: AMENDED by [§ D1185](#d1185).** On the stage page a per-run goal is marked *bar reached* or *bar not reached*, never a bare *met*. See [`docs/39`](docs/39-decisions-in-force.md).
 
+> **Status 2026-10-19: AMENDED by [§ D1602](#d1602)** (a decision panel ruling, R1). Clause 2's held-back sentence names those crowds as kept apart from the stage's own, sizes the comparison on them, and gives no cause for a refusal. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-09-26 by an agent session under delegated authority** (wave AK, lane AK-C), not by
 > the product owner, on the post-AJ panel's seats A (D10), C (D7, D8) and D (H9). Lane AK-B's
 > entry in this wave names each goal kind in words on every surface (`scenario/goals.ts#GOAL_NAMES`);
@@ -54214,3 +54216,64 @@ and it refuses a change to how the game judges a stage.
    since `judgeCountGoal` refuses a goal with no published count for its seeds.
 
 **Numbers spent.** See [§ D1600](#d1600).
+
+## D1602 — the stage verdict says how much on both sets of crowds, says the same run only from the admission, and leads with the outcome
+
+> **Taken 2026-10-19 by the owner's decision panel** (GitHub issue #645, ruling R1, 3–0), built by an
+> agent session (wave AT, lane AT-3). **Amends [§ D1159](#d1159) clause 2.** **Owner-reversible**: the
+> wording in `campaign/judge.ts` and `everyday/stagePlay.ts#STAGE_PLAY_COPY`, which one revert restores.
+
+**Why an entry.** It moves a recorded rule's wording (§ D1159 clause 2's held-back sentence), it binds
+modules the judge does not own (`everyday/stagePlay.ts`, `everyday/stagePlayScreen.ts`,
+`dev/campaignPanel.ts` and `batch/report.ts`'s formatter), and it gives the stage sequence a new input.
+
+**What was wrong.** CYCLE-1's playtest (`docs/design-cycles/CYCLE-1.md` § 2) found that no verdict said
+how much (C1), that an unchanged press could not be told from a change that did nothing (C2), and that
+forecast parking read as a win and then a refusal, with one paragraph printed twice (X1). The held-back
+sentence explained a refusal as *a fit to fifty crowds*, a mechanism nobody measured (X6).
+
+**The ruling, as built.**
+
+1. **How much.** `campaign/judge.ts#comparisonSentence` prints average wait first with its range, every
+   other resolved measure with its size, and the unresolved rest under one clause that names none of
+   them. A resolved interval reads *shorter* or *longer by between a and b seconds*, the bound nearer zero
+   first; an interval containing zero reads *too close to call at 50 runs* with its range. Each seed set's
+   sentence stands alone, and `holdoutSentenceOf` carries the held-back set's after its tally.
+2. **One formatter.** Every figure goes through `batch/report.ts#batchFigureOf`, which the batch report's
+   own rows now print with as well. A figure that is not zero is widened until a digit shows, so a
+   resolved bound nearest zero never prints as 0.00. A row with no number keeps its refusal.
+3. **The same run.** `JudgeStageInput.admission`, which `stagePress.ts#pressStage` and the Engineer
+   panel pass, is the only ground for *the same run*: an admission whose `moved` is empty. A changed
+   setting whose every paired difference is exactly zero on every crowd and every row says the change
+   altered nothing measured. With no admission a verdict claims neither. The Engineer panel's control row
+   is decided from the same admission rather than from the arms' ids.
+4. **Where the held-back crowds come from.** They are *crowds kept apart from the stage's own* on the
+   card, the running line, the run note and the Engineer panel, and never crowds the player *could not
+   have tuned against*.
+5. **The outcome leads.** `STAGE_PLAY_COPY.metNotHeldHead` opens with *Not cleared.*, and the running
+   line on the held-back batch opens with *Met on the stage's own crowds.* The headline states the rule
+   with no cause, *a stage clears only when the held-back crowds agree as well*, and no longer carries
+   the held-back sentence, which the card and the panel each print once.
+6. **Energy on a line of its own.** `StageReport.energy` gives drive work and drive work per ride
+   delivered for the stage's own crowds, higher or lower only where the interval excludes zero, never met
+   or missed, and inside no goal sentence ([§ D106](#d106)).
+
+**What § D1159 clause 2 now says.** The held-back sentence still opens *The held-back crowds agree* or
+*do not agree* and names the goals they did not reach. It then sizes the comparison on those crowds,
+and it no longer says why a gain failed there. The Engineer panel keeps its seeds.
+
+**What it does not touch.** No `met`, `held` or `cleared`, no census, goal bar or `data/*.json` file,
+and no published figure moves.
+
+**Held by** `campaign/judge.test.ts`, which reads every printed bound back against `row.estimate` at
+`BATCH_METRIC_PRESENTATION.places` on real stage-1 batches on both seed sets, for the playtest's six
+presses and a changed setting that ties on every crowd, and fails a tampered sentence;
+`campaign/stageVerdictsHold.test.ts`, always on, which presses every shipped stage through
+`pressStage` and holds `met`, `held` and `cleared` to the census and to the record taken before the
+words changed; and `everyday/stagePlay.test.ts`, which holds the card: the outcome first, the held-back
+sentence once and the energy line once. The gate is the deep honesty tier at 0 failing cases.
+
+**Reversal.** One revert restores the old sentences. If cycle 2 finds a reader losing the verdict among
+the figures, CYCLE-1 § 3 names the fallback: the head and one sized line for average wait.
+
+**Numbers spent.** Lane AT-3 holds **D1602 to D1609** and spends **D1602**.

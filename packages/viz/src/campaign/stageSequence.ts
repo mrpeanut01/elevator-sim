@@ -57,7 +57,7 @@ import type { BatchRequest, BatchResult } from '../batch/types.js';
 import type { EditedVector } from '../controls/editedProfile.js';
 import type { PublishedScenario } from '../scenario/published.js';
 
-import { judgeStage, type StageReport } from './judge.js';
+import { judgeStage, type JudgeStageInput, type StageReport } from './judge.js';
 import { batchRequestForStage, type StageSeedSet } from './stageRun.js';
 import type { CampaignStage } from './types.js';
 
@@ -85,6 +85,12 @@ export interface StageSequenceInput {
   /** The player's edited weight vector, or absent to run `candidateProfileId` as shipped. */
   readonly edit?: EditedVector | undefined;
   readonly run: StageBatchRunner;
+  /**
+   * What the one admission check said about this press, handed to both judgements unchanged — the
+   * only ground on which a verdict may say *the same run* (`judge.ts#JudgeStageInput.admission`,
+   * [§ D1602](../../../../DECISIONS.md)). It moves words only; the sequence and its skip do not read it.
+   */
+  readonly admission?: JudgeStageInput['admission'];
 }
 
 export interface StageSequenceOutcome {
@@ -112,11 +118,11 @@ export interface StageSequenceOutcome {
 export async function runStageToVerdict(
   input: StageSequenceInput,
 ): Promise<StageSequenceOutcome> {
-  const { stage, published, candidateProfileId, edit, run } = input;
+  const { stage, published, candidateProfileId, edit, run, admission } = input;
 
   const result = await run(batchRequestForStage(stage, candidateProfileId, edit), 'tuning');
   const report = batchReport(result);
-  const onTuning = judgeStage({ stage, published, result, report });
+  const onTuning = judgeStage({ stage, published, result, report, admission });
   if (!onTuning.metOnTuningSeeds) return { result, report, verdict: onTuning };
 
   const holdoutResult = await run(
@@ -127,6 +133,6 @@ export async function runStageToVerdict(
   return {
     result,
     report,
-    verdict: judgeStage({ stage, published, result, report, holdout }),
+    verdict: judgeStage({ stage, published, result, report, holdout, admission }),
   };
 }
