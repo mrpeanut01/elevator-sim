@@ -53,8 +53,10 @@ describe('stage 4, played — a setting that buys one thing by spending another'
       witnesses += 1;
       const comparison = played.verdict.goals.find((goal) => goal.kind === 'beat-the-baseline');
       expect(comparison?.met).toBe(false);
-      expect(comparison?.sentence).toContain('ahead on');
-      expect(comparison?.sentence).toContain('behind on');
+      /* Each resolved row with its size (§ D1602): the ones it came out ahead on and behind on alike. */
+      for (const row of rows.filter((entry) => entry.favours !== null)) {
+        expect(comparison?.sentence).toMatch(new RegExp(`${row.label} (?:was|were) [a-z]+ by between`, 'u'));
+      }
       expect(comparison?.sentence).toContain('a move along the front rather than a win');
     }
     expect(witnesses, 'no shipped profile lands on the front on stage 4').toBeGreaterThan(0);

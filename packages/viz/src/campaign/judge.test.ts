@@ -43,20 +43,29 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { loadConfig, type LoadedConfig } from '@elevator-sim/core';
-import { collectSearchSpace } from '@elevator-sim/experiments/browser';
+import { collectSearchSpace, intervalContainsZero } from '@elevator-sim/experiments/browser';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { restrictedFloorIds } from '../access/zoning.js';
 import { plural } from '../mode/disclosure.js';
-import { batchReport } from '../batch/report.js';
-import type { BatchResult } from '../batch/types.js';
-import { DATA_DIR, requireBuilding } from '../fixtures.test-helper.js';
+import { batchReport, type BatchComparisonRow, type BatchReport } from '../batch/report.js';
+import { runBatch } from '../batch/runBatch.js';
+import {
+  BATCH_METRICS,
+  BATCH_METRIC_CLASS,
+  BATCH_METRIC_PRESENTATION,
+  type BatchMetric,
+  type BatchResult,
+} from '../batch/types.js';
+import { parkedMoveOf } from '../everyday/stagePlay.js';
+import { DATA_DIR, requireBuilding, requireDispatcher } from '../fixtures.test-helper.js';
 import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
 import { GOAL_KINDS, goalLabel } from '../scenario/goals.js';
 import type { PublishedGoalRates, PublishedScenario } from '../scenario/published.js';
 
-import { holdoutSentenceOf, judgeStage, stageGoalNameOf } from './judge.js';
+import { holdoutSentenceOf, judgeStage, stageGoalNameOf, type StageReport } from './judge.js';
 import { parseCampaign, type CampaignContext } from './parse.js';
+import { admitStageMove, stageUnitsAt, type StageAdmission, type StageMove } from './stagePress.js';
 import {
   batchRequestForStage,
   stageReplicationSeed,
@@ -530,5 +539,407 @@ describe('a campaign goal is named for what it grades, in plain words — § D11
     expect(divergence?.tuning?.passes).toBe(0);
     expect(divergence?.holdout?.passes).toBe(0);
     expect(divergence?.tuning?.n).toBe(stage.replications);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * How much, read back — ruling R1 on GitHub issue #645, § D1602
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The presses CYCLE-1's playtest replayed on stage 1, by what they change, and one more: mid-zone
+ * parking with a 30 s deadband, which `stageOneParking.test.ts` finds byte-identical on the legs to
+ * the stage's own setting. It is the changed setting that ties on every crowd and every row, the one
+ * amendment 4 needs a run of rather than an argument.
+ */
+const STAGE_ONE_PRESSES = [
+  'unchanged',
+  'collective-enroute',
+  'lobby',
+  'forecast',
+  'mid-zone',
+  'nearest-car',
+  'mid-zone with a deadband',
+] as const;
+type StageOnePress = (typeof STAGE_ONE_PRESSES)[number];
+
+/** Every row of a report's comparison is exactly zero on every pair: the two arms tied throughout. */
+function everyRowIsZero(report: BatchReport): boolean {
+  const rows = report.comparisons[0]?.rows ?? [];
+  return rows.length > 0 && rows.every((row) => row.estimate?.min === 0 && row.estimate.max === 0);
+}
+
+/** One press, both seed sets run, judged with the holdout supplied so both sentences exist. */
+interface ReadBackCase {
+  readonly admission: StageAdmission;
+  readonly tuning: BatchReport;
+  readonly holdout: BatchReport;
+  readonly verdict: StageReport;
+}
+
+/** A row's label, escaped for a pattern; longest first, so no label is read as part of another. */
+const LABEL = BATCH_METRICS.map((metric) => BATCH_METRIC_PRESENTATION[metric].label)
+  .sort((left, right) => right.length - left.length)
+  .map((label) => label.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&'))
+  .join('|');
+const UNIT = '(?: seconds| percentage points| kJ)?';
+const FIGURE = '(\\d+(?:\\.\\d+)?)';
+const SIZED = new RegExp(
+  `(${LABEL}) (?:was|were) (shorter|longer|lower|higher) by between ${FIGURE} and ${FIGURE}${UNIT}`,
+  'gu',
+);
+const CLOSE = new RegExp(
+  `(${LABEL}) (?:was|were) too close to call at (\\d+) runs, between ` +
+    `(?:no difference|${FIGURE}${UNIT} (shorter|lower)) and (?:no difference|${FIGURE}${UNIT} (longer|higher))`,
+  'gu',
+);
+const SAME = new RegExp(`(${LABEL}) did not differ on any crowd`, 'gu');
+
+function metricLabelled(label: string): BatchMetric {
+  const metric = BATCH_METRICS.find((candidate) => BATCH_METRIC_PRESENTATION[candidate].label === label);
+  if (metric === undefined) throw new Error(`no metric is labelled "${label}"`);
+  return metric;
+}
+
+/**
+ * **A printed figure read back against the bound it claims to be**, at
+ * `BATCH_METRIC_PRESENTATION.places`: printed to at least the metric's places, equal to the bound
+ * rounded where it is printed, widened past those places only where they would have printed a
+ * non-zero bound as zero, and never zero for a bound that is not.
+ */
+function readBackProblems(printed: string, bound: number, metric: BatchMetric, where: string): string[] {
+  const places = BATCH_METRIC_PRESENTATION[metric].places;
+  const decimals = printed.split('.')[1]?.length ?? 0;
+  const magnitude = Math.abs(bound);
+  const problems: string[] = [];
+  if (decimals < places) problems.push(`${where}: ${printed} has ${String(decimals)} places, under ${String(places)}`);
+  if (magnitude !== 0 && Number(printed) === 0) problems.push(`${where}: a bound of ${String(bound)} printed as ${printed}`);
+  if (Math.abs(Number(printed) - magnitude) > 0.5 * 10 ** -decimals + 1e-12) {
+    problems.push(`${where}: ${printed} is not ${String(magnitude)} at ${String(decimals)} places`);
+  }
+  if (decimals > places && Number(magnitude.toFixed(places)) !== 0) {
+    problems.push(`${where}: ${printed} widened past ${String(places)} places although they print ${magnitude.toFixed(places)}`);
+  }
+  return problems;
+}
+
+/**
+ * Every clause of one sentence, read back against the comparison rows it claims to describe.
+ *
+ * `scope` is the rows the sentence may name: the orderable rows for a goal sentence, the two axis
+ * rows for the energy line. A clause naming a row outside its scope is a problem, which is how
+ * *energy inside a wait sentence* and *a wait inside the energy line* both fail here.
+ */
+function sentenceProblems(
+  sentence: string,
+  report: BatchReport,
+  scope: 'orderable' | 'axis',
+): string[] {
+  const rows = report.comparisons[0]?.rows ?? [];
+  const byMetric = new Map(rows.map((row) => [row.metric, row] as const));
+  const inScope = (row: BatchComparisonRow): boolean =>
+    scope === 'axis' ? row.metricClass === 'axis' : row.metricClass !== 'axis';
+  const problems: string[] = [];
+  const read = new Map<BatchMetric, number>();
+  const rowOf = (label: string): BatchComparisonRow | undefined => {
+    const metric = metricLabelled(label);
+    read.set(metric, (read.get(metric) ?? 0) + 1);
+    const row = byMetric.get(metric);
+    if (row === undefined) problems.push(`"${label}" is named and the report has no such row`);
+    else if (!inScope(row)) problems.push(`"${label}" is named in a sentence about the ${scope} rows`);
+    return row;
+  };
+
+  for (const match of sentence.matchAll(SIZED)) {
+    const [, label = '', word = '', near = '', far = ''] = match;
+    const row = rowOf(label);
+    const estimate = row?.estimate ?? null;
+    if (row === undefined) continue;
+    if (estimate === null) {
+      problems.push(`${label}: sized with no interval behind it`);
+      continue;
+    }
+    if (intervalContainsZero(estimate)) problems.push(`${label}: "${word}" over [${String(estimate.lower)}, ${String(estimate.upper)}], which contains zero`);
+    if (scope === 'orderable' && row.verdict !== 'resolved') problems.push(`${label}: sized on a ${row.verdict} row`);
+    const time = BATCH_METRIC_PRESENTATION[row.metric].unit.trim() === 's';
+    const expected = estimate.upper < 0 ? (time ? 'shorter' : 'lower') : time ? 'longer' : 'higher';
+    if (word !== expected) problems.push(`${label}: "${word}" over an interval whose words are "${expected}"`);
+    const [low, high] = [Math.abs(estimate.lower), Math.abs(estimate.upper)].sort((a, b) => a - b);
+    problems.push(...readBackProblems(near, low ?? Number.NaN, row.metric, `${label} near bound`));
+    problems.push(...readBackProblems(far, high ?? Number.NaN, row.metric, `${label} far bound`));
+  }
+  for (const match of sentence.matchAll(CLOSE)) {
+    const [, label = '', runs = '', from, , to] = match;
+    const row = rowOf(label);
+    const estimate = row?.estimate ?? null;
+    if (row === undefined) continue;
+    if (estimate === null) {
+      problems.push(`${label}: called too close with no interval behind it`);
+      continue;
+    }
+    if (!intervalContainsZero(estimate)) problems.push(`${label}: "too close to call" over [${String(estimate.lower)}, ${String(estimate.upper)}], which excludes zero`);
+    if (Number(runs) !== report.replications) problems.push(`${label}: "at ${runs} runs" on a batch of ${String(report.replications)}`);
+    if ((from === undefined) !== (estimate.lower === 0)) problems.push(`${label}: lower bound ${String(estimate.lower)} said as ${from ?? 'no difference'}`);
+    if ((to === undefined) !== (estimate.upper === 0)) problems.push(`${label}: upper bound ${String(estimate.upper)} said as ${to ?? 'no difference'}`);
+    if (from !== undefined) problems.push(...readBackProblems(from, estimate.lower, row.metric, `${label} lower bound`));
+    if (to !== undefined) problems.push(...readBackProblems(to, estimate.upper, row.metric, `${label} upper bound`));
+  }
+  for (const match of sentence.matchAll(SAME)) {
+    const [, label = ''] = match;
+    const estimate = rowOf(label)?.estimate ?? null;
+    if (estimate === null || estimate.lower !== 0 || estimate.upper !== 0) {
+      problems.push(`${label}: "did not differ on any crowd" over an interval that is not zero`);
+    }
+  }
+
+  /* Coverage, the figure budget (amendment 7): what must be said, and what must go unnamed. */
+  for (const row of rows.filter(inScope)) {
+    const times = read.get(row.metric) ?? 0;
+    const said = sentence.includes(row.label);
+    if (scope === 'axis' || row.metric === 'awtS') {
+      if (row.estimate !== null && times !== 1) problems.push(`${row.label}: read ${String(times)} times, not once`);
+    } else if (row.verdict === 'resolved') {
+      if (times !== 1) problems.push(`${row.label}: resolved and read ${String(times)} times, not once`);
+    } else if (said) {
+      problems.push(`${row.label}: unresolved and named, where the rest go unnamed under one clause`);
+    }
+  }
+  if (scope === 'orderable' && rows.some((row) => row.metricClass === 'axis' && sentence.includes(row.label))) {
+    problems.push('an energy row is named inside the goal sentence');
+  }
+  return problems;
+}
+
+describe('every printed bound is the run’s own interval, on both seed sets — ruling R1, § D1602', () => {
+  const cases = new Map<StageOnePress, ReadBackCase>();
+
+  beforeAll(() => {
+    const stage = stageAt(0);
+    expect(stage.building, 'stage 1 still runs the sparse residential building').toBe('garden-apartments');
+    const space = collectSearchSpace();
+    const building = requireBuilding(config, stage.building);
+    const baseline = requireDispatcher(config, stage.dispatcher.startingProfileId);
+    const resources = {
+      building,
+      dispatcherProfiles: config.dispatcherProfiles,
+      trafficProfiles: config.trafficProfiles,
+      elevatorSpecs: config.elevatorSpecs,
+    };
+    const context = { space, schedule: shippedPriceSchedule(), baseline, building, elevatorSpecs: config.elevatorSpecs };
+    const collective = requireDispatcher(config, 'collective');
+    const moves: Readonly<Record<StageOnePress, StageMove>> = {
+      unchanged: { profile: collective },
+      'collective-enroute': { profile: requireDispatcher(config, 'collective-enroute') },
+      lobby: parkedMoveOf(collective, 'lobby', space),
+      forecast: parkedMoveOf(collective, 'predicted-demand', space),
+      'mid-zone': parkedMoveOf(collective, 'zone-center', space),
+      'nearest-car': { profile: requireDispatcher(config, 'nearest-car') },
+      'mid-zone with a deadband': {
+        profile: collective,
+        edit: {
+          baseProfileId: collective.id,
+          profileId: 'collective-parked-zone-center-deadband-30',
+          values: { 'idle.parkingStrategy': 'zone-center', 'idle.repositionThresholdS': 30 },
+        },
+      },
+    };
+    for (const press of STAGE_ONE_PRESSES) {
+      const move = moves[press];
+      const admission = admitStageMove(context, move, stageUnitsAt(stage, null));
+      expect(admission.admitted, `${press}: ${admission.sentence}`).toBe(true);
+      const tuningResult = runBatch(batchRequestForStage(stage, move.profile.id, move.edit, 'tuning'), resources);
+      const holdoutResult = runBatch(batchRequestForStage(stage, move.profile.id, move.edit, 'holdout'), resources);
+      const tuning = batchReport(tuningResult);
+      const holdout = batchReport(holdoutResult);
+      const verdict = judgeStage({
+        stage,
+        published: publishedFor(stage),
+        result: tuningResult,
+        report: tuning,
+        holdout: { result: holdoutResult, report: holdout },
+        admission,
+      });
+      cases.set(press, { admission, tuning, holdout, verdict });
+    }
+  }, 240_000);
+
+  function caseOf(press: StageOnePress): ReadBackCase {
+    const found = cases.get(press);
+    if (found === undefined) throw new Error(`${press} was not played`);
+    return found;
+  }
+
+  /** The comparison goal on each seed set, and the batch it is about. */
+  function comparisonsOf(press: StageOnePress) {
+    const { verdict, tuning, holdout } = caseOf(press);
+    const onTuning = verdict.goals.find((goal) => goal.kind === 'beat-the-baseline');
+    const onHoldout = verdict.holdout?.goals.find((goal) => goal.kind === 'beat-the-baseline');
+    if (onTuning === undefined || onHoldout === undefined) throw new Error(`${press}: no comparison goal on both sets`);
+    return [
+      { set: 'tuning', goal: onTuning, report: tuning },
+      { set: 'holdout', goal: onHoldout, report: holdout },
+    ] as const;
+  }
+
+  it.each(STAGE_ONE_PRESSES)('%s: every bound in both comparison sentences reads back', (press) => {
+    for (const { set, goal, report } of comparisonsOf(press)) {
+      const where = `${press} on ${set}: ${goal.sentence}`;
+      if (everyRowIsZero(report)) {
+        /* Two arms that tied on every crowd and row: nothing to size, and no figure but the run count. */
+        expect([...goal.sentence.matchAll(SIZED), ...goal.sentence.matchAll(CLOSE)], where).toEqual([]);
+        expect(goal.sentence.match(/\d+(?:\.\d+)?/gu), where).toEqual(['50']);
+      } else {
+        expect(sentenceProblems(goal.sentence, report, 'orderable'), where).toEqual([]);
+      }
+      /* The closing clause is the verdict's, chosen by the same rows `met` is. */
+      expect(/the bar is reached\.$/u.test(goal.sentence), where).toBe(goal.met === true);
+      expect(/[Tt]he bar is not reached\.$/u.test(goal.sentence), where).toBe(goal.met === false);
+    }
+  });
+
+  it.each(STAGE_ONE_PRESSES)('%s: the energy line reads back, once, and is never met or missed', (press) => {
+    const { verdict, tuning } = caseOf(press);
+    const energy = verdict.energy;
+    expect(energy, press).not.toBeNull();
+    if (energy === null) return;
+    expect(sentenceProblems(energy, tuning, 'axis'), `${press}: ${energy}`).toEqual([]);
+    expect(energy).toContain('the stage’s own crowds');
+    expect(energy).not.toMatch(/\b(?:met|missed|better|worse|bar|wait|waits)\b/u);
+    /* Never inside a wait sentence, on either seed set. */
+    for (const { goal } of comparisonsOf(press)) {
+      expect(goal.sentence).not.toMatch(/\bkJ\b|drive work/u);
+    }
+  });
+
+  it.each(STAGE_ONE_PRESSES)('%s: each seed set’s sentence stands alone, and the held-back one prints once', (press) => {
+    const { verdict } = caseOf(press);
+    const [tuning, holdout] = comparisonsOf(press);
+    expect(tuning.goal.sentence).toContain('on the stage’s own crowds');
+    expect(holdout.goal.sentence).toContain('on the crowds kept apart from the stage’s own');
+    /* Amendment 5: nothing compares the two sets, and the held-back crowds are named by where they come from. */
+    const sentences = [verdict.headline, tuning.goal.sentence, verdict.holdout?.sentence ?? '', verdict.energy ?? ''];
+    for (const sentence of sentences) {
+      expect(sentence).not.toMatch(/shr[a-z]*nk|surviv|smaller on|tuned against|fit to fifty/u);
+    }
+    const held = verdict.holdout?.sentence ?? '';
+    expect(held.split(holdout.goal.sentence).length - 1, held).toBe(1);
+    expect(verdict.headline).not.toContain(holdout.goal.sentence);
+  });
+
+  it('says “the same run” from the admission, and only there — amendment 4', () => {
+    for (const press of STAGE_ONE_PRESSES) {
+      const { admission } = caseOf(press);
+      for (const { set, goal } of comparisonsOf(press)) {
+        expect(goal.sentence.includes('the same run'), `${press} on ${set}: ${goal.sentence}`).toBe(admission.moved.length === 0);
+      }
+    }
+    /* The changed setting that ties on every crowd and row: a change that altered nothing, never the same run. */
+    const tie = caseOf('mid-zone with a deadband');
+    expect(tie.admission.moved.length).toBeGreaterThan(0);
+    for (const { goal, report } of comparisonsOf('mid-zone with a deadband')) {
+      expect(everyRowIsZero(report)).toBe(true);
+      expect(goal.sentence).toContain('your change altered nothing measured on any run');
+    }
+    /* And `collective-enroute`, which ties on most crowds and not all, claims neither. */
+    for (const { goal } of comparisonsOf('collective-enroute')) {
+      expect(goal.sentence).not.toMatch(/same run|altered nothing/u);
+      expect(goal.sentence).toContain('too close to call at 50 runs');
+    }
+  });
+
+  it('moves no verdict: `met`, `held` and `cleared` are what they were before the words changed', () => {
+    /*
+     * The six playtest presses measured on `96f83c9`, the tree before this change, each judged
+     * against a supplied holdout so `held` is defined for all of them (the shipped press skips the
+     * holdout after a miss, and `stageVerdictsHold.test.ts` holds that path). The deadband press is
+     * a tie on both sets, so nothing resolves ahead on either and the rule leaves it unmet.
+     */
+    const before: Readonly<Record<StageOnePress, readonly [boolean, boolean, boolean]>> = {
+      unchanged: [false, false, false],
+      'collective-enroute': [false, false, false],
+      lobby: [false, false, false],
+      forecast: [true, false, false],
+      'mid-zone': [true, true, true],
+      'nearest-car': [false, false, false],
+      'mid-zone with a deadband': [false, false, false],
+    };
+    for (const press of STAGE_ONE_PRESSES) {
+      const { verdict } = caseOf(press);
+      expect([verdict.metOnTuningSeeds, verdict.holdout?.held, verdict.cleared], press).toEqual(before[press]);
+    }
+  });
+
+  /**
+   * The standing requirement in both directions: the words change when the run changes, and the
+   * checker that holds them to the run can fail. Lobby parking and `nearest-car` printed the same
+   * sentence shape with no size (finding C1); they now differ in their figures.
+   */
+  it('changes its words when the run changes, and the read-back refuses a size the run did not produce', () => {
+    const sentences = STAGE_ONE_PRESSES.map((press) => comparisonsOf(press)[0].goal.sentence);
+    expect(new Set(sentences).size).toBe(sentences.length);
+    const lobby = comparisonsOf('lobby')[0];
+    const nearest = comparisonsOf('nearest-car')[0];
+    expect(lobby.goal.sentence).not.toBe(nearest.goal.sentence);
+
+    /* The guard on the guard: three ways to claim what the run did not produce, each caught. */
+    const forecast = comparisonsOf('forecast')[0];
+    const sentence = forecast.goal.sentence;
+    const wrongWay = sentence.replace('average wait was shorter', 'average wait was longer');
+    const wrongBound = sentence.replace(/by between (\d+)\.(\d)/u, (_whole, units: string, tenth: string) => `by between ${units}.${String((Number(tenth) + 3) % 10)}`);
+    const calledClose = comparisonsOf('mid-zone')[1].goal.sentence.replace(
+      /average wait was shorter by between ([\d.]+) and ([\d.]+) seconds/u,
+      'average wait was too close to call at 50 runs, between $2 seconds shorter and $1 seconds longer',
+    );
+    const midZoneHeld = comparisonsOf('mid-zone')[1];
+    for (const [what, original, tampered, report] of [
+      ['the wrong direction', sentence, wrongWay, forecast.report],
+      ['a moved bound', sentence, wrongBound, forecast.report],
+      ['too close to call over an interval that excludes zero', midZoneHeld.goal.sentence, calledClose, midZoneHeld.report],
+    ] as const) {
+      expect(sentenceProblems(original, report, 'orderable'), what).toEqual([]);
+      expect(tampered, what).not.toBe(original);
+      expect(sentenceProblems(tampered, report, 'orderable').length, what).toBeGreaterThan(0);
+    }
+  });
+
+  /**
+   * Forecast parking, the most natural first pick (finding X1), pinned whole: its words, and its
+   * figures as this run produced them on `tuning-20260730` and `holdout-20260731`.
+   */
+  it('pins forecast parking’s verdict, the one the playtest read as a win and then a refusal', () => {
+    const { verdict } = caseOf('forecast');
+    expect(verdict.headline).toBe(
+      'Two cars, low demand: 1 of 1 goal reached over 50 runs on the stage’s own crowds. A stage clears ' +
+        'only when the held-back crowds agree as well, and they do not. That is a statement about these ' +
+        'runs on these passenger populations, and not a ranking of dispatchers.',
+    );
+    expect(verdict.goals[0]?.sentence).toBe(
+      'Over 50 runs on the stage’s own crowds, average wait was shorter by between 0.34 and 2.03 seconds, ' +
+        'and 95th-percentile wait was shorter by between 0.47 and 2.38 seconds. The remaining measures were ' +
+        'too close to call at 50 runs. Nothing came out against your setting, so the bar is reached.',
+    );
+    expect(verdict.energy).toBe(
+      'Beside the verdict and never part of it: over 50 runs on the stage’s own crowds, with your settings ' +
+        'drive work (proxy) was higher by between 32.4 and 63.2 kJ, and drive work per ride delivered was ' +
+        'higher by between 2.780 and 4.874 kJ.',
+    );
+    expect(verdict.holdout?.sentence).toBe(
+      'The held-back crowds do not agree: 0 of 1 goal reached. The one they did not reach: Measurably ahead ' +
+        'of the shipped setting. Over 50 runs on the crowds kept apart from the stage’s own, average wait was ' +
+        'too close to call at 50 runs, between 1.20 seconds shorter and 0.20 seconds longer. The other ' +
+        'measures were too close to call as well. No measure separated the two settings, so the bar is not reached.',
+    );
+  });
+});
+
+describe('the read-back’s own pieces', () => {
+  it('knows every row label, and no label hides inside another', () => {
+    const labels = BATCH_METRICS.map((metric) => BATCH_METRIC_PRESENTATION[metric].label);
+    expect(new Set(labels).size).toBe(labels.length);
+    for (const label of labels) {
+      expect(metricLabelled(label)).toBeDefined();
+      for (const other of labels) if (other !== label) expect(other.includes(label), `${label} in ${other}`).toBe(false);
+    }
+    expect(BATCH_METRICS.filter((metric) => BATCH_METRIC_CLASS[metric] === 'axis')).toHaveLength(2);
   });
 });

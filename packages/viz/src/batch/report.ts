@@ -1142,7 +1142,41 @@ function runs(n: number): string {
 }
 
 function format(value: number, places: number): string {
-  return value.toFixed(places);
+  return figureAt(value, places);
+}
+
+/** How far {@link figureAt} widens a figure before it gives up on fixed places altogether. */
+const WIDEST_PLACES = 20;
+
+/**
+ * **A figure that is not zero never prints as zero** — the decision panel's ruling R1 on GitHub
+ * issue #645, amendment 3 ([§ D1602](../../../../DECISIONS.md)).
+ *
+ * At a metric's own places a bound of 0.004 s prints as *0.00*, and *"shorter by between 0.00 and
+ * 1.20 seconds"* reads as an interval that touches zero over one that excludes it. So a non-zero
+ * value is widened one place at a time until a digit shows, and only a value that is exactly zero
+ * prints as zero. Unsigned: the caller says the direction, in a sign or in a word.
+ */
+function figureAt(value: number, places: number): string {
+  const magnitude = Math.abs(value);
+  let text = magnitude.toFixed(places);
+  for (let widened = places + 1; magnitude !== 0 && Number(text) === 0 && widened <= WIDEST_PLACES; widened += 1) {
+    text = magnitude.toFixed(widened);
+  }
+  return Number(text) === 0 && magnitude !== 0 ? magnitude.toPrecision(2) : text;
+}
+
+/**
+ * **One figure of a row, as every surface prints it** — a bound, a mean or a magnitude of `metric`,
+ * unsigned, at {@link BATCH_METRIC_PRESENTATION}'s places for it and widened only where those
+ * places would print a non-zero value as zero ({@link figureAt}).
+ *
+ * The one formatter ruling R1 asks for ([§ D1602](../../../../DECISIONS.md), amendment 3): this
+ * module's own sentences print through it, and so does `campaign/judge.ts`, so the stage card and
+ * the Engineer row put the same digits on the same interval.
+ */
+export function batchFigureOf(metric: BatchMetric, value: number): string {
+  return figureAt(value, BATCH_METRIC_PRESENTATION[metric].places);
 }
 
 /* -------------------------------------------------------------------------- *
@@ -1255,7 +1289,7 @@ export function populationLineOf(
 }
 
 function signed(value: number, places: number): string {
-  const text = Math.abs(value).toFixed(places);
+  const text = figureAt(value, places);
   return `${value < 0 ? '−' : '+'}${text}`;
 }
 
