@@ -275,6 +275,15 @@ const TIERS: Readonly<Record<string, Tier>> = Object.freeze({
       'a hybrid run at all, so a red here is the only place that finding exists',
     scheduled: true,
   },
+  'packages/experiments/src/fuzz/releaseDirection.test.ts': {
+    gates: ['ELEVATOR_SIM_FUZZ'],
+    reason:
+      'the run that pins § D1591’s two figures: a withdrawn hall call re-points its car on 494 ' +
+      'shipped runs with no leg moved, and a released one leaves 88 stale directions on 147. About ' +
+      '165 s, on the gate and in the job deep.test.ts already uses, so a change that moves either ' +
+      'figure goes red the night it lands rather than in somebody’s next decision entry',
+    scheduled: true,
+  },
   'packages/experiments/src/oracle/deepCampaign.test.ts': {
     gates: ['ELEVATOR_SIM_DEEP'],
     reason: "CLAUDE.md's correctness oracle at full width — every measurable bank",

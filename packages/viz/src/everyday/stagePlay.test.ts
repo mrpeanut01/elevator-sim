@@ -22,10 +22,24 @@ import { collectSearchSpace, type SearchSpace } from '@elevator-sim/experiments/
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { restrictedFloorIds } from '../access/zoning.js';
-import { stageGoalNameOf } from '../campaign/judge.js';
+import { batchFigureOf, batchReport, type BatchReport } from '../batch/report.js';
+import { runBatch } from '../batch/runBatch.js';
+import { stageGoalNameOf, type StageReport } from '../campaign/judge.js';
 import { parseCampaign, type CampaignContext } from '../campaign/parse.js';
-import { batchRequestForStage, demonstrationConfigFor, stageWatchConfigsOf } from '../campaign/stageRun.js';
-import { admitStageMove, routeRefusalsOf, routeUnitsOf, stagePathOf, stageUnitsAt } from '../campaign/stagePress.js';
+import {
+  batchRequestForStage,
+  demonstrationConfigFor,
+  stageWatchConfigsOf,
+  type StageSeedSet,
+} from '../campaign/stageRun.js';
+import {
+  admitStageMove,
+  pressStage,
+  routeRefusalsOf,
+  routeUnitsOf,
+  stagePathOf,
+  stageUnitsAt,
+} from '../campaign/stagePress.js';
 import type { CampaignStage } from '../campaign/types.js';
 import { DATA_DIR, requireBuilding } from '../fixtures.test-helper.js';
 import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
@@ -57,6 +71,7 @@ import {
   verdictFactsOf,
   type StagePlayChoice,
   type StagePlayVerdictFacts,
+  type StagePlayVerdictView,
 } from './stagePlay.js';
 
 let config: LoadedConfig;
@@ -875,4 +890,180 @@ describe('the pair opens where the two settings first differ — wave AR lane AR
     const pair = pairOf(stage, { profileId: stage.dispatcher.startingProfileId, parking: null });
     expect(stageWatchStartOf(pair[0], pair[1])).toBe(pair[0].startedAt);
   }, 60_000);
+});
+
+/* -------------------------------------------------------------------------- *
+ * The verdict says how much, and the held-back sentence once — ruling R1, § D1602
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **The card a press draws, on stage 1's real batches** — the decision panel's ruling R1 on GitHub
+ * issue #645 ([§ D1602](../../../../DECISIONS.md)), findings C1, C2 and X1.
+ *
+ * Four of the presses the playtest replayed, each pressed the way this page presses it (its own
+ * choice, `stageMoveOf`, then `pressStage`) and drawn through `verdictFactsOf` and
+ * `stagePlayViewOf`. The judge's words are read back bound by bound in `campaign/judge.test.ts`; what
+ * is held here is the card: the outcome leads, the held-back sentence is printed once, the energy
+ * line is drawn once and apart from the goals, and the average wait it prints is the batch's own
+ * interval on each seed set.
+ */
+describe('the stage card leads with the outcome and says how much — ruling R1, § D1602', () => {
+  const CHOICES = {
+    unchanged: { profileId: 'collective', parking: null },
+    lobby: { profileId: 'collective', parking: 'lobby' },
+    forecast: { profileId: 'collective', parking: 'predicted-demand' },
+    'mid-zone': { profileId: 'collective', parking: 'zone-center' },
+  } as const satisfies Readonly<Record<string, StagePlayChoice>>;
+  type Press = keyof typeof CHOICES;
+  const drawn = new Map<
+    Press,
+    { readonly view: StagePlayVerdictView; readonly verdict: StageReport; readonly reports: Partial<Record<StageSeedSet, BatchReport>> }
+  >();
+
+  beforeAll(async () => {
+    const stage = stageAt(0);
+    const published = (
+      JSON.parse(await readFile(join(DATA_DIR, 'scenario-goals.json'), 'utf8')) as PublishedGoalRates
+    ).scenarios.find((entry) => entry.id === stage.id);
+    if (published === undefined) throw new Error('stage 1 has no published goal row');
+    const resources = {
+      building: requireBuilding(config, stage.building),
+      dispatcherProfiles: config.dispatcherProfiles,
+      trafficProfiles: config.trafficProfiles,
+      elevatorSpecs: config.elevatorSpecs,
+    };
+    for (const press of Object.keys(CHOICES) as Press[]) {
+      const choice = CHOICES[press];
+      const move = stageMoveOf(choice, config.dispatcherProfiles.profiles, { space });
+      if (move === undefined) throw new Error(`${press}: no move`);
+      const reports: Partial<Record<StageSeedSet, BatchReport>> = {};
+      const pressed = await pressStage({
+        stage,
+        published,
+        context: admissionContextOf(stage),
+        move,
+        budgetUnits: stageUnitsAt(stage, null),
+        run: (request, seedSet) => {
+          const result = runBatch(request, resources);
+          reports[seedSet] = batchReport(result);
+          return result;
+        },
+      });
+      if (pressed.kind === 'refused') throw new Error(`${press}: ${pressed.admission.sentence}`);
+      const verdict = pressed.outcome.verdict;
+      const view = stagePlayViewOf(factsOf(stage, choice), {
+        kind: 'judged',
+        verdict: verdictFactsOf(verdict, undefined),
+        stale: false,
+      }).verdict;
+      if (view === undefined) throw new Error(`${press}: no verdict drawn`);
+      drawn.set(press, { view, verdict, reports });
+    }
+  }, 240_000);
+
+  function drawnOf(press: Press) {
+    const found = drawn.get(press);
+    if (found === undefined) throw new Error(`${press} was not pressed`);
+    return found;
+  }
+
+  /** Every string the card draws for a verdict, in the order `stagePlayScreen.ts` mounts them. */
+  function cardOf(view: StagePlayVerdictView): readonly string[] {
+    return [
+      view.head,
+      view.headline,
+      ...view.goals.map((goal) => `${goal.label} · ${goal.mark}. ${goal.sentence}`),
+      ...(view.energy === undefined ? [] : [view.energy]),
+      view.holdout,
+    ];
+  }
+
+  it('leads with the outcome: forecast parking reads Not cleared first, and only a clear reads Cleared', () => {
+    expect(drawnOf('forecast').view.head).toBe(STAGE_PLAY_COPY.metNotHeldHead);
+    expect(STAGE_PLAY_COPY.metNotHeldHead.startsWith(`${STAGE_PLAY_COPY.missedHead} `)).toBe(true);
+    expect(drawnOf('mid-zone').view.head).toBe(STAGE_PLAY_COPY.clearedHead);
+    expect(drawnOf('lobby').view.head).toBe(STAGE_PLAY_COPY.missedHead);
+    expect(drawnOf('unchanged').view.head).toBe(STAGE_PLAY_COPY.missedHead);
+    /* And moved no verdict: the head is chosen by the same three fields it always was. */
+    expect(drawnOf('forecast').verdict.metOnTuningSeeds).toBe(true);
+    expect(drawnOf('forecast').verdict.cleared).toBe(false);
+    expect(drawnOf('mid-zone').verdict.cleared).toBe(true);
+  });
+
+  it('prints the held-back crowds’ sentence once, wherever they were run', () => {
+    for (const press of ['forecast', 'mid-zone'] as const) {
+      const { view, verdict } = drawnOf(press);
+      const held = verdict.holdout?.sentence;
+      expect(held, press).toBeDefined();
+      if (held === undefined) continue;
+      const card = cardOf(view).join('\n');
+      expect(card.split(held).length - 1, `${press}: ${card}`).toBe(1);
+      expect(view.headline).not.toContain(held);
+    }
+    /* A miss on the stage's own crowds runs no holdout, and the card says so rather than drawing one. */
+    expect(drawnOf('lobby').view.holdout).toBe(STAGE_PLAY_COPY.holdoutNotRun);
+  });
+
+  it('draws the judge’s sentences unchanged, and drive work once, on its own line and in no goal', () => {
+    for (const press of Object.keys(CHOICES) as Press[]) {
+      const { view, verdict } = drawnOf(press);
+      expect(view.goals.map((goal) => goal.sentence)).toEqual(verdict.goals.map((goal) => goal.sentence));
+      expect(view.energy).toBe(verdict.energy ?? undefined);
+      expect(view.energy, press).toBeDefined();
+      const card = cardOf(view);
+      expect(card.filter((line) => /drive work/u.test(line)), press).toHaveLength(1);
+      for (const goal of view.goals) expect(goal.sentence).not.toMatch(/drive work|\bkJ\b/u);
+    }
+  });
+
+  it('prints the average wait each seed set’s own interval gave it, sized or too close to call', () => {
+    const awtOf = (report: BatchReport | undefined) => {
+      const row = report?.comparisons[0]?.rows.find((entry) => entry.metric === 'awtS');
+      if (row?.estimate === undefined || row.estimate === null) throw new Error('no average-wait interval');
+      return row.estimate;
+    };
+    const figure = (value: number): string => batchFigureOf('awtS', value);
+    /* Forecast parking: shorter on the stage's own crowds, too close to call on the held-back ones (X1). */
+    const forecast = drawnOf('forecast');
+    const own = awtOf(forecast.reports.tuning);
+    expect(own.upper).toBeLessThan(0);
+    expect(forecast.view.goals[0]?.sentence).toContain(
+      `average wait was shorter by between ${figure(own.upper)} and ${figure(own.lower)} seconds`,
+    );
+    const apart = awtOf(forecast.reports.holdout);
+    expect(apart.lower).toBeLessThan(0);
+    expect(apart.upper).toBeGreaterThan(0);
+    expect(forecast.view.holdout).toContain(
+      `average wait was too close to call at 50 runs, between ${figure(apart.lower)} seconds shorter and ` +
+        `${figure(apart.upper)} seconds longer`,
+    );
+    /* Lobby parking: longer, by its own figures, where it used to share nearest-car's size-free sentence (C1). */
+    const lobby = awtOf(drawnOf('lobby').reports.tuning);
+    expect(lobby.lower).toBeGreaterThan(0);
+    expect(drawnOf('lobby').view.goals[0]?.sentence).toContain(
+      `average wait was longer by between ${figure(lobby.lower)} and ${figure(lobby.upper)} seconds`,
+    );
+    /* The unchanged press: the same run, from the admission, and no figure but the run count (C2). */
+    const unchanged = drawnOf('unchanged').view.goals[0]?.sentence ?? '';
+    expect(unchanged).toContain('the same run');
+    expect(unchanged.match(/\d+(?:\.\d+)?/gu)).toEqual(['50']);
+  });
+
+  it('names the held-back crowds by where they come from, before a press, during one and after', () => {
+    const stage = stageAt(0);
+    const facts = factsOf(stage, CHOICES.unchanged);
+    const lines = [
+      stagePlayViewOf(facts, { kind: 'idle' }).runNote,
+      STAGE_PLAY_COPY.noteReady,
+      stagePlayViewOf(facts, { kind: 'running', seedSet: 'holdout', completed: 20, total: 100 }).status ?? '',
+      ...[...drawn.values()].flatMap(({ view }) => cardOf(view)),
+    ];
+    for (const line of lines) {
+      expect(line).not.toMatch(/tuned? against|tune against|fit to fifty|Every goal met/u);
+    }
+    const holdoutStatus = stagePlayViewOf(facts, { kind: 'running', seedSet: 'holdout', completed: 20, total: 100 }).status;
+    expect(holdoutStatus?.startsWith('Met on the stage’s own crowds.')).toBe(true);
+    expect(holdoutStatus).toContain('kept apart');
+    expect(stagePlayViewOf(facts, { kind: 'idle' }).runNote).toContain('crowds kept apart from the stage’s own');
+  });
 });

@@ -46591,6 +46591,8 @@ false routes to the composed arm with *What it did* and without the disclaimer.
 
 > **Status 2026-09-26: AMENDED by [§ D1185](#d1185).** On the stage page a per-run goal is marked *bar reached* or *bar not reached*, never a bare *met*. See [`docs/39`](docs/39-decisions-in-force.md).
 
+> **Status 2026-10-19: AMENDED by [§ D1602](#d1602)** (a decision panel ruling, R1). Clause 2's held-back sentence names those crowds as kept apart from the stage's own, sizes the comparison on them, and gives no cause for a refusal. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-09-26 by an agent session under delegated authority** (wave AK, lane AK-C), not by
 > the product owner, on the post-AJ panel's seats A (D10), C (D7, D8) and D (H9). Lane AK-B's
 > entry in this wave names each goal kind in words on every surface (`scenario/goals.ts#GOAL_NAMES`);
@@ -54021,3 +54023,257 @@ say why), and the corpus seeds `stage.intervene.rushOption(…)` in `honesty/sur
 
 **Numbers spent.** The integrator re-allocated **D1589 to D1590** from lane AS-6's block to this
 lane; it spent **D1589**.
+
+## D1590 — the adversarial persona: a fuzz family on the verb axis, with the stage run proved by an agreement test
+
+> **Taken 2026-10-18 by an agent session** (wave AT, lane AT-1, the first design cycle's
+> adversarial-persona spec). A new property family and its command; no game behaviour, bound,
+> pin or published figure moves.
+
+**Why an entry.** The family reaches past `experiments/src/fuzz/`: it puts a `fuzz/` module on the
+browser barrel, narrows `PropertyContext`, closes two blind spots in the building properties, adds
+`--scenario` to `elevator-sim fuzz`, and is held to the game's own stage run by a test in
+`packages/viz`.
+
+1. **What it is.** `elevator-sim fuzz --scenario <id>` holds a campaign stage's building, crowd and
+   opening dispatcher fixed and fuzzes the player's verb log over the seven `INTERVENTION_KINDS`
+   (`fuzz/verbs.ts`). Every payload comes from shipped data: handover targets are shipped profiles
+   that `core` itself agrees to schedule on the stage (asked by a probe, not decided here),
+   purchases are whole-change rows of the matching tier priced by `core`'s `purchaseUnits` against
+   one of the stage's own budget rungs, and service events are legal on the building. Three
+   construction rules keep the generator from authoring a dead fleet the building properties would
+   misread: every bank keeps a car that takes hall calls, no derate falls below what the heaviest
+   rider needs, and no range moves on a bank whose range is fixed. A case is one integer; a
+   counterexample is shrunk (`fuzz/playShrink.ts`), printed whole with its play seed, and exits 2.
+   Tiers are `standard` (64 pinned seeds plus every pinned regression) and `deep`; `hybrid` is
+   refused with `--scenario`, and the building fuzz without the flag is unchanged.
+2. **The properties** (`fuzz/play.ts`). P-PLAY-1 (`no-softlock`): the session reaches its horizon
+   with a readable verdict, the engine refuses no part of a legal log, and the six building
+   properties hold under the log. P-PLAY-2 (`readable-verdict`): when any of `awtIsValid`'s five
+   grounds holds, recounted from the record, no mean is published. P-PLAY-3 (`reachable-goal`): the
+   log leaves the crowd unchanged and a valid verdict carries every figure `beat-the-baseline` pairs.
+   P-DESIGN-1 is a paired-t ranking of one canonical instance per verb against the empty log, 50
+   replications on `standard` and 200 on `deep`, and never exits non-zero.
+3. **The stage run is not copied.** `fuzz/stageSession.ts` builds a stage's replication from the
+   plain fields of `data/campaign.json`, and `packages/viz/src/campaign/stageSessionAgreement.test.ts`
+   requires that, for an empty log, its config equals `demonstrationConfigFor`'s and the batch
+   baseline arm's on every stage, and its legs equal the game's on two stages. That is the module's
+   one consumer on the browser barrel, and the reason it is there.
+4. **What a clean run means, said on the command's first line.** No player can press these verbs on
+   a Scenario stage, which is played as a judged move; the verbs live on the live day screen. On a
+   Scenario stage the family is an engine stress test, and the header says so in those words.
+5. **Two building properties were blind to § D523, and are not any more.** P1 knew three termini,
+   so the first rezone that stranded a stage's crowd read as nineteen lost passengers; it now counts
+   abandoned and stranded journeys from the record, never reading them off the audit, as it already
+   counted access refusals. P3 read the plate for the whole run, so the first bought derate read as a
+   load cell misreporting its own load factor; it now asks the rating in force at each boarding and
+   sample. On every generated building both checks are the checks they were, because no building
+   case authors either event.
+6. **Named gaps.** The screen half of P-PLAY-1 (no available next verb) and the count goals' readers
+   are the viewer's and are not rebuilt. Handover targets carry no rule rows.
+
+**Numbers spent.** This lane holds **D1590 to D1594** and spends **D1590** and **D1591**.
+
+## D1591 — a withdrawn hall call re-points the car that held it; a released one still does not
+
+> **Taken 2026-10-18 by an agent session** (wave AT, lane AT-1). An engine fix found by
+> [§ D1590](#d1590)'s deep tier, and a measured gap left open for the integrator.
+
+**Why an entry.** It changes `core`'s `Car` and `Simulation`, and it records a defect it deliberately
+does not fix because the fix would move published figures.
+
+1. **The finding.** At 2 000 deep cases on `stage-1-first-call`, three sessions deadlocked (P5). The
+   smallest, `play-1000872-s12` on replication 33: car A out of service at 276 s, the bank rezoned to
+   G, 2 and 5 at 425 s while car B stood at floor 3 serving a call the rezone closed. Retiring that
+   call freed B, the same pass handed B the up call at floor 4 that the rezone was about to retire
+   too, and retiring it left B pointing up with nothing ahead. `Car.releaseHallCall` does not
+   re-settle a car's direction, so under `collective`'s `noDirectionReversal` B refused the down call
+   at floor 5 at 558.6 s for the rest of the day. It reproduces from a building schedule alone, so it
+   is the engine's and not the log's.
+2. **The fix.** `Car.withdrawHallCall` takes a call that no longer exists off a car and, when the car
+   is standing still, re-points it at the work it has left (or makes it directionless), as an arrival
+   or an assignment already does. `Simulation.#withdrawCall` uses it. Over 494 shipped runs (ten
+   buildings, every profile, two seeds, 900 s and the template's own horizon, bar `vertical-city`'s)
+   the legs are identical with it and with the old release swapped back in: no shipped run re-points
+   a car through a withdrawal. That figure is asserted by the first case of
+   `packages/experiments/src/fuzz/releaseDirection.test.ts`, which runs behind the deep fuzz tier's
+   switch (`ELEVATOR_SIM_FUZZ=deep`, about two and a half minutes). `sim/serviceRange.test.ts` holds
+   six of those comparisons (three buildings, two dispatchers) on every run, and holds the stage-1
+   case with the old release swapped back in, which deadlocks again. All three deep cases now drain
+   (they are pinned in `PLAY_REGRESSIONS`), and `elevator-sim fuzz --scenario stage-1-first-call
+   --tier deep --cases 2000` is clean.
+3. **What is held.** The same gap is in `releaseHallCall` itself, on reassignment, re-offer and
+   completion. Over 147 shipped runs (seven buildings, seven profiles, three seeds, 900 s) it leaves
+   a stationary car pointing in a direction with no committed stop ahead 88 times, 7 of them with no
+   committed stop at all, through reassignment on load (28), a re-offer (32), dispatch decisions (18)
+   and completion (10). Every one of those figures is asserted by the second case of
+   `fuzz/releaseDirection.test.ts`, behind the same switch (about twenty seconds). Closing the gap
+   there would re-point cars in shipped runs and move published figures, so it is not done here;
+   `car.test.ts` pins the current behaviour so that closing it is a visible change.
+
+**Numbers spent.** See [§ D1590](#d1590).
+
+## D1595 — the three fun proxies: counts beside AWT, a Wilson interval for k of n, and a flag on fuzz
+
+> **Taken 2026-10-19 by an agent session** (wave AT, lane AT-2, the first design cycle's fun-proxy
+> spec). New measurement code and its command; no game behaviour, bound, pin or published figure
+> moves.
+
+**Why an entry.** The proxies reach past `packages/experiments/src/engagement/`: they add a proportion
+interval to `reports/statistics.ts`, give `normalQuantile` the production caller § D7's record says it
+lacked, add `--engagement` to `elevator-sim fuzz`, and extend a test in `packages/viz` so that the
+holdout runs they read are held to the game's own.
+
+1. **What they are.** `engagement/` computes the spec's three proxies from a run's own record and
+   summary, with every threshold read from `data/engagement-bands.json` by a parser that refuses an
+   unknown key, an unknown swing metric, a replication count outside 50 to 200, and any value of
+   `ciMustExcludeZero` or `suppressWhenSaturated` other than `true`. The tension band classifies each
+   replication of a stage's own setting as flat, below band, in band, above band, runaway or
+   suppressed, on its tuning and its holdout seeds separately. The meaningful-choice rate judges each
+   entry of a log against the log without it on the bands file's 50 tuning replications, by
+   P-DESIGN-1's own pairing rule, and the engine baseline it prints is `rankVerbs`'s canonical presses;
+   a test holds the two to the same interval on every replayable press. The mastery slope fits
+   `linearTrend` to supplied pass verdicts with the slope's t interval, and never computes a verdict:
+   every stage judge is the viewer's.
+2. **Denominators.** A rate is stored as `k` and `n` and printed as `k of n` with its interval. A
+   flagged run in the tension band and a suppressed choice stay in `n` and never count in `k`, on
+   § D158's argument that dropping them selects on the outcome. A refused mastery verdict suppresses the
+   slope, because a fit needs a value at every attempt. A kind `core`'s `interventionKindRefusal`
+   refuses (`answer-incident`, `equipment-change`, `building-change`) is reported with that refusal and
+   kept out of both sides of the choice rate.
+3. **The Wilson score interval.** `reports/statistics.ts#wilsonScoreInterval` is the package's one
+   proportion interval, pinned against Newcombe (1998) Table II. It is for a single-arm `k of n` and is
+   never a comparison: every comparison of two arms in the proxies is `pairedDifferenceEstimate` on
+   per-replication values or 0/1 indicators. Its `z` is `normalQuantile`'s, so that function now has a
+   production caller. Its two older reasons for staying exported still hold and its docstring keeps
+   them; the experiments dead-code register drops its entry, 25 to 24.
+4. **The queue series follows the summary.** The brief named `queueLengthSeries`; the proxies read
+   whichever series `summarizeRun` fitted its saturation trend on (`summary.saturation.source`), which
+   for every shipped stage run is the recorded samples, so both halves of the runaway clause are
+   measured on one series. The window is the summary's, because a stage record's own `reportWindow` is
+   the template band while the stage summarises over the full run on Garden Apartments.
+5. **A flag, not a seventh command.** `elevator-sim fuzz --scenario <id> --engagement` already holds the
+   stage context the proxies need; it runs no property campaign and refuses the campaign's flags by
+   name. A new command would have moved the command count `CLAUDE.md`, `README.md` and the CLI's own
+   docstring state, and that was not needed for a report this size.
+6. **Named gaps.** Every proxy is an unmeasured premise about people. On a Scenario stage no player
+   presses a verb, so a player session has nothing to judge; persona beliefs and narration do not exist
+   until the playtest phase; and the game judges every attempt at a stage on one fixed holdout batch,
+   where the spec asks for fresh, disjoint holdout seeds in order. No seed scheme is invented to close
+   the last one.
+
+**Numbers spent.** This lane holds **D1595 to D1599** and spends **D1595**.
+
+## D1600 — the held release-direction defect gets a lane of its own, after this wave and before cycle 2's baseline
+
+> **Taken 2026-10-19 by the owner's decision panel** (GitHub issue #645, ruling R2, 3–0), recorded by
+> the integrator of wave AT. It settles what [§ D1591](#d1591) clause 3 left open. **Owner-reversible.**
+
+**Why an entry.** It binds work this wave does not own: a later lane in `core`, the published pins it will
+move, and the order cycle 2 runs in.
+
+1. **Not accepted as behaviour.** The releases that leave a stationary car pointing at no committed stop
+   are the condition behind the deadlock § D1591 fixed on the withdrawal path, and pillar 1 ranks a
+   softlock above any feature. `car.test.ts` pins today's behaviour so that closing it is a visible
+   change, never so that it reads as the specification.
+2. **Not fixed in this wave.** A seat's scratch replay, on tuning and non-shipped seeds only, found the
+   legs change in a few shipped runs, among them Midtown runs on the `collective` baseline of Phase 6's
+   published gate, so pins will move. Those figures are unpinned and are not this entry's evidence; the
+   lane measures and pins its own. Fixing it here would also blur wave AT's proof that no verdict moves.
+3. **The lane, in order:** measure whether any wrong direction delays or strands a rider; fix both
+   `releaseHallCall` and `releaseAllHallCalls`; run the benchmark tier before merge; regenerate the pins,
+   read the diff, and treat each moved pin as a finding to re-derive, never a value to edit; then
+   republish the survivor census and `docs/design-cycles/CYCLE-1.md` § 1 with the commit they are true of.
+4. **When.** After wave AT merges and before cycle 2's § 1 baseline and playtest, so cycle 2 measures one
+   engine and does not test two changes at once.
+
+**Numbers spent.** The integrator holds **D1600 to D1601** from wave AT's reservation and spends both.
+
+## D1601 — mastery is measured by re-judging each persona attempt on a fresh batch in the harness, and the game is unchanged
+
+> **Taken 2026-10-19 by the owner's decision panel** (GitHub issue #645, ruling R3, 3–0), recorded by
+> the integrator of wave AT. It settles the gap [§ D1595](#d1595) clause 6 names. **Owner-reversible.**
+
+**Why an entry.** It binds the playtest harness and cycle 2's design, which no module of this wave owns,
+and it refuses a change to how the game judges a stage.
+
+1. **The game is not changed.** Judging each attempt on a fresh batch would let a player clear a marginal
+   setting by re-pressing until a batch favoured it, would stop a press replaying from stage id, move and
+   rung, and would leave the survivor census describing a different stage from the one played.
+2. **The game's own series is not enough.** Every attempt meets the same held-back batch and its verdict
+   is feedback the player sees, so a slope over it alone cannot tell skill from learning that batch.
+3. **The harness re-judges, on these conditions.** Fresh master seeds are declared before cycle 2 from a
+   named stream and checked for collisions against both stage seed sets. Attempt *k* uses batch *k* for
+   every persona, at 50 replications, and each persona makes at least the bands file's 8 attempts. Each
+   attempt is judged by the game's own judge with only a harness copy of the stage record's
+   `holdoutSeeds` swapped, because `judgeStage` refuses a mismatched seed. The fresh verdicts are never
+   shown to a persona. The game's fixed-batch verdict is reported beside each fresh one, and the two series
+   are compared only through `engagement/mastery.ts#pairedMasterySlope`. A persona's series stops at the
+   first attempt after it reads the tree, and the slope is labelled agent evidence
+   (`docs/23-audiences-and-core-loop.md` § 1.5).
+4. **Scope.** This works on `stage-1-first-call` as the tree stands, because its one goal is
+   `beat-the-baseline`. From stage 2 on, each count goal's bar must first be measured on the fresh seed set,
+   since `judgeCountGoal` refuses a goal with no published count for its seeds.
+
+**Numbers spent.** See [§ D1600](#d1600).
+
+## D1602 — the stage verdict says how much on both sets of crowds, says the same run only from the admission, and leads with the outcome
+
+> **Taken 2026-10-19 by the owner's decision panel** (GitHub issue #645, ruling R1, 3–0), built by an
+> agent session (wave AT, lane AT-3). **Amends [§ D1159](#d1159) clause 2.** **Owner-reversible**: the
+> wording in `campaign/judge.ts` and `everyday/stagePlay.ts#STAGE_PLAY_COPY`, which one revert restores.
+
+**Why an entry.** It moves a recorded rule's wording (§ D1159 clause 2's held-back sentence), it binds
+modules the judge does not own (`everyday/stagePlay.ts`, `everyday/stagePlayScreen.ts`,
+`dev/campaignPanel.ts` and `batch/report.ts`'s formatter), and it gives the stage sequence a new input.
+
+**What was wrong.** CYCLE-1's playtest (`docs/design-cycles/CYCLE-1.md` § 2) found that no verdict said
+how much (C1), that an unchanged press could not be told from a change that did nothing (C2), and that
+forecast parking read as a win and then a refusal, with one paragraph printed twice (X1). The held-back
+sentence explained a refusal as *a fit to fifty crowds*, a mechanism nobody measured (X6).
+
+**The ruling, as built.**
+
+1. **How much.** `campaign/judge.ts#comparisonSentence` prints average wait first with its range, every
+   other resolved measure with its size, and the unresolved rest under one clause that names none of
+   them. A resolved interval reads *shorter* or *longer by between a and b seconds*, the bound nearer zero
+   first; an interval containing zero reads *too close to call at 50 runs* with its range. Each seed set's
+   sentence stands alone, and `holdoutSentenceOf` carries the held-back set's after its tally.
+2. **One formatter.** Every figure goes through `batch/report.ts#batchFigureOf`, which the batch report's
+   own rows now print with as well. A figure that is not zero is widened until a digit shows, so a
+   resolved bound nearest zero never prints as 0.00. A row with no number keeps its refusal.
+3. **The same run.** `JudgeStageInput.admission`, which `stagePress.ts#pressStage` and the Engineer
+   panel pass, is the only ground for *the same run*: an admission whose `moved` is empty. A changed
+   setting whose every paired difference is exactly zero on every crowd and every row says the change
+   altered nothing measured. With no admission a verdict claims neither. The Engineer panel's control row
+   is decided from the same admission rather than from the arms' ids.
+4. **Where the held-back crowds come from.** They are *crowds kept apart from the stage's own* on the
+   card, the running line, the run note and the Engineer panel, and never crowds the player *could not
+   have tuned against*.
+5. **The outcome leads.** `STAGE_PLAY_COPY.metNotHeldHead` opens with *Not cleared.*, and the running
+   line on the held-back batch opens with *Met on the stage's own crowds.* The headline states the rule
+   with no cause, *a stage clears only when the held-back crowds agree as well*, and no longer carries
+   the held-back sentence, which the card and the panel each print once.
+6. **Energy on a line of its own.** `StageReport.energy` gives drive work and drive work per ride
+   delivered for the stage's own crowds, higher or lower only where the interval excludes zero, never met
+   or missed, and inside no goal sentence ([§ D106](#d106)).
+
+**What § D1159 clause 2 now says.** The held-back sentence still opens *The held-back crowds agree* or
+*do not agree* and names the goals they did not reach. It then sizes the comparison on those crowds,
+and it no longer says why a gain failed there. The Engineer panel keeps its seeds.
+
+**What it does not touch.** No `met`, `held` or `cleared`, no census, goal bar or `data/*.json` file,
+and no published figure moves.
+
+**Held by** `campaign/judge.test.ts`, which reads every printed bound back against `row.estimate` at
+`BATCH_METRIC_PRESENTATION.places` on real stage-1 batches on both seed sets, for the playtest's six
+presses and a changed setting that ties on every crowd, and fails a tampered sentence;
+`campaign/stageVerdictsHold.test.ts`, always on, which presses every shipped stage through
+`pressStage` and holds `met`, `held` and `cleared` to the census and to the record taken before the
+words changed; and `everyday/stagePlay.test.ts`, which holds the card: the outcome first, the held-back
+sentence once and the energy line once. The gate is the deep honesty tier at 0 failing cases.
+
+**Reversal.** One revert restores the old sentences. If cycle 2 finds a reader losing the verdict among
+the figures, CYCLE-1 § 3 names the fallback: the head and one sized line for average wait.
+
+**Numbers spent.** Lane AT-3 holds **D1602 to D1609** and spends **D1602**.

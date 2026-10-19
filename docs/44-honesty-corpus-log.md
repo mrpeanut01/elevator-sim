@@ -19,6 +19,21 @@ after this split; the entries below are older than the cap and are registered th
 The always-on row is measured on the integrated head; the deep row is read from the nightly
 `corpus-figures` job in [`.github/workflows/deep-tiers.yml`](../.github/workflows/deep-tiers.yml).
 
+## Wave AT
+
+**Wave AT moves no string always-on, and adds no surface.** The base is wave AS's row, re-measured on
+`main` (`c9579b2`) before this wave's lanes and reproduced exactly. Measured once more on wave AT's head
+after all three lanes merged, so the move is not split between lanes (§ D256); lanes AT-1 and AT-2 alone,
+measured before AT-3 merged, read the same. Delta A's sentences (§ D1602) are spoken by
+`campaign/judge.ts#judgeStage`, which only the deep tier draws, so this row cannot see them; the deep tier
+is left to the nightly job.
+
+| tree | strings | move | per case | surfaces |
+|---|---|---|---|---|
+| base, wave AS's row (re-measured on `c9579b2`) | 1 053 971 | | | 80 |
+| wave AT's head (AT-1 to AT-3) | **1 053 971** | **0** | **0.00** | 80, **same set** |
+| cases · simulations · failing cases | 49 · 606 · 0 | **unmoved** | | |
+
 ## Wave AS
 
 **Wave AS moves 24.96 strings a case always-on, with no new surface.** The base is wave AR's row,

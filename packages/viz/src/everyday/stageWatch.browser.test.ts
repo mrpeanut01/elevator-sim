@@ -113,7 +113,7 @@ describe.skipIf(!HAS_BROWSER)('a stage press plays one of its crowds, and the ve
         ),
         text: document.querySelector('.everyday-stage-play-watch')?.textContent ?? '',
       }));
-      expect(during.status, 'the pair arrived after the counter stopped').toMatch(/^(Running|Every goal met)/u);
+      expect(during.status, 'the pair arrived after the counter stopped').toMatch(/^(Running|Met on the stage)/u);
       expect(during.verdicts).toBe(0);
       /* Reading order: the pair, then the counter under it. */
       expect(during.order).toEqual(['everyday-stage-play-watch', 'everyday-stage-play-status']);

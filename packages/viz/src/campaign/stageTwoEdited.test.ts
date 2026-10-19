@@ -130,10 +130,14 @@ describe('stage 2, played on an edited weight vector — the thing a dropdown co
     /*
      * The player is told which of the two seed sets refused it, in the headline, in words, and
      * never by the set's id (§ D1159, the post-AJ panel's seat C: `holdout-20260731 (seed …)` was
-     * the one sentence on the page a player could not read).
+     * the one sentence on the page a player could not read). Since § D1602 the headline states the
+     * rule and whether the held-back crowds agreed, with no cause, and leaves their sentence to the
+     * one place it is printed.
      */
-    expect(played.verdict.headline).toContain('Not cleared');
-    expect(played.verdict.headline).toContain('held-back crowds');
+    expect(played.verdict.headline).toContain(
+      'A stage clears only when the held-back crowds agree as well, and they do not.',
+    );
+    expect(played.verdict.headline).not.toContain(holdout.sentence);
     expect(played.verdict.headline).not.toContain(stage.holdoutSeeds.name);
     expect(played.verdict.headline).toContain('not a ranking of dispatchers');
 
@@ -155,8 +159,9 @@ describe('stage 2, played on an edited weight vector — the thing a dropdown co
     expect(unvalidated.metOnTuningSeeds).toBe(true);
     expect(unvalidated.holdout).toBeNull();
     expect(unvalidated.cleared).toBe(false);
-    expect(unvalidated.headline).toContain('Not cleared');
-    expect(unvalidated.headline).toContain('the runs this setting was tuned against');
+    expect(unvalidated.headline).toContain(
+      'A stage clears only when the held-back crowds agree as well, and this batch did not run them.',
+    );
   }, 600_000);
 
   it('runs a profile `data/` does not contain, and the report names the thing that ran', () => {

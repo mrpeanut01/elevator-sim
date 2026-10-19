@@ -158,11 +158,11 @@ export function sampleStdDevOf(values: readonly number[], mean = meanOf(values))
  * 1e-15 across the range this module uses. Reproduces the doc's z table exactly at the printed
  * precision: 1.04, 1.28, 1.65, 1.96, 2.58 for 70/80/90/95/99% two-sided.
  *
- * **This function has no production caller, and that is a claim rather than an oversight**
- * (docs/05-roadmap.md § *Standing requirement*). Deleting `halfWidthQuantile` — see the module
- * docstring and DECISIONS.md § D7 — removed the last one, because no interval this package
- * publishes or stops on is a normal-theory interval any more. It is kept for two reasons, both
- * checkable:
+ * **Its production caller is {@link wilsonScoreInterval}** (§ D1595), whose `z` it supplies. It had
+ * none from DECISIONS.md § D7, when deleting `halfWidthQuantile` removed the last one, until the fun
+ * proxies needed a proportion interval in 2026-10. No interval this package publishes *on a mean*,
+ * or stops on, is a normal-theory interval, and that is unchanged: Wilson's interval is on a
+ * proportion. The two reasons it was kept with no caller still hold, and both are still checkable:
  *
  * 1. It is the **reference the t quantile is validated against.** `studentTQuantile(p, 1e6)` must
  *    converge on it, and `estimateMean`'s interval must stay strictly wider than it past n = 25 —
@@ -175,7 +175,9 @@ export function sampleStdDevOf(values: readonly number[], mean = meanOf(values))
  *    `statistics.test.ts` asserts `normalQuantile(0.975)` against that same literal, so the two
  *    cannot drift apart silently.
  *
- * If either reason lapses, delete this rather than widening the justification.
+ * Were Wilson's interval ever removed, this would be back to those two reasons alone, and the rule
+ * that went with them would apply again: if either lapses, delete this rather than widening the
+ * justification.
  */
 export function normalQuantile(p: number): number {
   if (!(p > 0 && p < 1)) {
@@ -433,6 +435,85 @@ export function pairedDifferenceEstimate(
   }
   const differences = candidate.map((value, index) => value - (baseline[index] as number));
   return estimateMean(differences, options);
+}
+
+/* -------------------------------------------------------------------------- *
+ * Proportions
+ * -------------------------------------------------------------------------- */
+
+/**
+ * A two-sided interval on a proportion, kept beside the counts it was taken from.
+ *
+ * There is no point estimate field on purpose. docs/03 Part 5 and the engagement bands file's own
+ * `contract` say counts, never quotients: `k` and `n` are what is stored, and a reader derives the
+ * rate from them at read time, so the rate can never travel without its denominator.
+ */
+export interface ProportionInterval {
+  /** Successes. */
+  readonly k: number;
+  /** Trials. */
+  readonly n: number;
+  readonly confidence: number;
+  readonly method: 'wilson-score';
+  /** `NaN` when `n` is `0`: there is no proportion of nothing. */
+  readonly lower: number;
+  readonly upper: number;
+}
+
+/**
+ * **The Wilson score interval for `k` successes in `n` trials**, the package's one proportion interval.
+ *
+ * ```
+ * centre    = (p + z²/2n) / (1 + z²/n)
+ * halfWidth = z · sqrt(p(1 − p)/n + z²/4n²) / (1 + z²/n)        p = k/n,  z = Φ⁻¹(1 − α/2)
+ * ```
+ *
+ * Source: E. B. Wilson, *Probable inference, the law of succession, and statistical inference*,
+ * Journal of the American Statistical Association 22 (1927) 209–212; the reference values the test
+ * pins are method 3 of R. G. Newcombe, *Two-sided confidence intervals for the single proportion:
+ * comparison of seven methods*, Statistics in Medicine 17 (1998) 857–872, Table II.
+ *
+ * **Why Wilson and not the textbook `p ± z·sqrt(p(1 − p)/n)`.** The fun proxies count rare and
+ * common events in fifty trials (a stage whose runs land in band once in fifty, a verb that matters in
+ * none of its presses), and at `k = 0` or `k = n` the textbook interval has zero width, which reads as
+ * certainty from a sample of fifty. Wilson's never collapses, stays inside `[0, 1]` without clipping,
+ * and Newcombe measured its coverage close to nominal where the textbook interval's is not.
+ *
+ * **What it is for, and what it is not for.** A single-arm `k of n`, printed with its interval. It is
+ * never a comparison: two arms are compared by {@link pairedDifferenceEstimate} on per-replication
+ * indicators under common random numbers, and comparing two Wilson intervals by overlap is the fallacy
+ * CLAUDE.md § Statistical discipline names.
+ *
+ * Its `z` is {@link normalQuantile}'s, so this is that function's production caller.
+ *
+ * @throws ReportsError when `k` or `n` is not a whole number, `k > n`, or the confidence is not a fraction.
+ */
+export function wilsonScoreInterval(k: number, n: number, options: EstimateOptions = {}): ProportionInterval {
+  if (!Number.isSafeInteger(k) || !Number.isSafeInteger(n) || k < 0 || n < 0 || k > n) {
+    throw new ReportsError(
+      `wilsonScoreInterval: k and n must be whole numbers with 0 <= k <= n; received k = ${String(k)}, n = ${String(n)}`,
+    );
+  }
+  const confidence = options.confidence ?? DEFAULT_CONFIDENCE;
+  assertConfidence(confidence);
+  if (n === 0) {
+    return Object.freeze({ k, n, confidence, method: 'wilson-score', lower: Number.NaN, upper: Number.NaN });
+  }
+  const z = normalQuantile(1 - (1 - confidence) / 2);
+  const p = k / n;
+  const zz = z * z;
+  const denominator = 1 + zz / n;
+  const centre = (p + zz / (2 * n)) / denominator;
+  const halfWidth = (z * Math.sqrt((p * (1 - p)) / n + zz / (4 * n * n))) / denominator;
+  // The bounds lie inside [0, 1] exactly; the clamp only absorbs the last bit of rounding at k = 0 and k = n.
+  return Object.freeze({
+    k,
+    n,
+    confidence,
+    method: 'wilson-score',
+    lower: Math.max(0, centre - halfWidth),
+    upper: Math.min(1, centre + halfWidth),
+  });
 }
 
 /* -------------------------------------------------------------------------- *

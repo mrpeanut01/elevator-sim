@@ -56,7 +56,7 @@ verdict:
   to be corrected ([§ D186](DECISIONS.md)); and mode parity is **derived from the code**, proved
   against a fail state the product deliberately does not ship.
 
-  **The honesty corpus: the always-on row is wave AS's, measured 2026-10-18 on the integrated tree;
+  **The honesty corpus: the always-on row is wave AT's, measured 2026-10-19 on the integrated tree;
   the deep row is still wave AL's (`eff454b`), because the nightly job's figures could not be read
   from an agent session until wave AN made it emit them as annotations.**
   Every earlier wave's move, its decomposition and what it taught are in

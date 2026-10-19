@@ -69,7 +69,7 @@
  * the runs the player made, and where each goal row's sentence comes from, because feedback a
  * player cannot see is not feedback. {@link JudgeStageInput.holdout} is the same two arms over
  * `stage.holdoutSeeds`, and {@link StageReport.cleared} requires **both**: every goal met on the
- * runs the player made *and* every goal met on the runs they could not have tuned against.
+ * runs the player made *and* every goal met on crowds kept apart from the stage's own.
  *
  * Three properties of that rule are worth stating, because each of them was a way to get it wrong:
  *
@@ -104,8 +104,10 @@
  * sentence a paired-t interval over fifty paired replications entitles the project to say.
  */
 
-import type { BatchComparisonRow, BatchReport } from '../batch/report.js';
-import type { BatchResult } from '../batch/types.js';
+import { intervalContainsZero } from '@elevator-sim/experiments/browser';
+
+import { batchFigureOf, type BatchComparisonRow, type BatchReport } from '../batch/report.js';
+import { BATCH_METRIC_PRESENTATION, type BatchMetric, type BatchResult } from '../batch/types.js';
 import {
   asPerReplicationGoal,
   measureGoalRate,
@@ -116,6 +118,7 @@ import {
 } from '../scenario/goals.js';
 import type { PublishedGoalRecord, PublishedRate, PublishedScenario } from '../scenario/published.js';
 import { stageSeedSetOf, type StageSeedSet } from './stageRun.js';
+import type { StageAdmission } from './stagePress.js';
 import type { CampaignStage } from './types.js';
 import { glossaryFor, type GlossaryTerm } from '../mode/glossary.js';
 import { plural } from '../mode/disclosure.js';
@@ -146,7 +149,7 @@ export interface StageGoalVerdict {
 }
 
 /**
- * The stage judged a second time, on seeds the player could not have tuned against.
+ * The stage judged a second time, on crowds kept apart from the stage's own.
  *
  * A *whole* verdict rather than a boolean, because the reason a holdout refused a stage is the
  * interesting part: a vector that meets every count goal on both sets and loses `beat-the-baseline`
@@ -192,12 +195,24 @@ export interface StageReport {
    */
   readonly holdout: StageHoldoutVerdict | null;
   /**
-   * Every goal met on the runs the player made **and** on the runs they could not have tuned
-   * against. `false` whenever any goal is `null`, because unjudged is not passed — and `false`
+   * Every goal met on the runs the player made **and** on crowds kept apart from the stage's own.
+   * `false` whenever any goal is `null`, because unjudged is not passed — and `false`
    * whenever {@link holdout} is `null`, because unvalidated is not passed either.
    */
   readonly cleared: boolean;
   readonly headline: string;
+  /**
+   * **Drive work, on a line of its own, for the stage's own crowds** — ruling R1, amendment 8
+   * ([§ D1602](../../../../DECISIONS.md)), or `null` when the tuning batch has no comparison.
+   *
+   * Read off the tuning report's two `axis` rows, drive work and drive work per ride delivered, and
+   * worded *higher* or *lower* only where the row's paired interval excludes zero, *too close to
+   * call* otherwise. It is never met or missed and enters no goal: `beat-the-baseline` reads
+   * `favours`, which is `null` on every axis row (R11), and nothing here is read by
+   * {@link StageReport.cleared}. A line of its own because `honesty/properties.ts#checkEnergyWaitBlend`
+   * refuses an energy figure inside a wait sentence, and `CLAUDE.md` keeps energy beside the waits.
+   */
+  readonly energy: string | null;
   /**
    * The words this verdict used, explained — issue #22.
    *
@@ -237,6 +252,28 @@ export interface JudgeStageInput {
    * verdict that certifies the shortcut `docs/33` § 7 O7 describes.
    */
   readonly holdout?: JudgedBatch | undefined;
+  /**
+   * **What the one admission check said about the press** (`campaign/stagePress.ts#admitStageMove`),
+   * or absent where the caller asked none — ruling R1, amendment 4 ([§ D1602](../../../../DECISIONS.md)).
+   *
+   * It is the only thing that lets a verdict say *the same run*: a press whose `moved` is empty runs
+   * the stage's own setting in both arms, so the two arms are one run on every crowd. Sameness is
+   * never inferred from the figures, because a different setting can tie on every one of them
+   * (`collective-enroute` matches the stage's own setting on 43 of stage 1's 50 tuning crowds). It
+   * changes words only: no `met`, `held` or `cleared` reads it.
+   */
+  readonly admission?: Pick<StageAdmission, 'moved'> | undefined;
+}
+
+/**
+ * Whether the press changed the stage's setting, as {@link JudgeStageInput.admission} answered it:
+ * `unknown` where no admission was handed over, which claims neither sameness nor change.
+ */
+type StageSameness = 'unchanged' | 'changed' | 'unknown';
+
+function samenessOf(admission: JudgeStageInput['admission']): StageSameness {
+  if (admission === undefined) return 'unknown';
+  return admission.moved.length === 0 ? 'unchanged' : 'changed';
 }
 
 /**
@@ -250,13 +287,15 @@ export function judgeStage(input: JudgeStageInput): StageReport {
   const baselineArm = result.arms[0];
   const candidateArm = result.arms[1] ?? result.arms[0];
 
-  const goals = judgeGoalsOf(stage, published, result, report, 'tuning');
-  const holdout = holdoutVerdictFor(stage, published, input.holdout);
+  const sameness = samenessOf(input.admission);
+  const goals = judgeGoalsOf(stage, published, result, report, 'tuning', sameness);
+  const holdout = holdoutVerdictFor(stage, published, input.holdout, sameness);
 
   const met = goals.filter((goal) => goal.met === true).length;
   const metOnTuningSeeds = goals.length > 0 && met === goals.length;
   const cleared = metOnTuningSeeds && holdout !== null && holdout.held;
   const headline = headlineFor(stage, goals, met, cleared, report.replications, holdout);
+  const energy = energySentenceOf(report);
   return {
     stageId: stage.id,
     stageName: stage.name,
@@ -269,6 +308,7 @@ export function judgeStage(input: JudgeStageInput): StageReport {
     holdout,
     cleared,
     headline,
+    energy,
     /*
      * The verdict's own strings only — **not** `report`'s.
      *
@@ -279,6 +319,7 @@ export function judgeStage(input: JudgeStageInput): StageReport {
      */
     glossary: glossaryFor([
       headline,
+      ...(energy === null ? [] : [energy]),
       ...goals.flatMap((goal) => [goal.label, goal.sentence, goal.note]),
       ...(holdout === null
         ? []
@@ -305,6 +346,7 @@ function judgeGoalsOf(
   result: BatchResult,
   report: BatchReport,
   seedSet: StageSeedSet,
+  sameness: StageSameness,
 ): readonly StageGoalVerdict[] {
   const baselineArm = result.arms[0];
   const candidateArm = result.arms[1] ?? result.arms[0];
@@ -331,7 +373,7 @@ function judgeGoalsOf(
           'refused at load for this, so seeing it here means the stage was assembled in memory.',
       };
     }
-    return judgeComparisonGoal(spec, report);
+    return judgeComparisonGoal(spec, report, seedSet, sameness);
   });
 }
 
@@ -348,6 +390,7 @@ function holdoutVerdictFor(
   stage: CampaignStage,
   published: PublishedScenario,
   batch: JudgedBatch | undefined,
+  sameness: StageSameness,
 ): StageHoldoutVerdict | null {
   if (batch === undefined) return null;
   const seeds = stageSeedSetOf(stage, 'holdout');
@@ -359,12 +402,12 @@ function holdoutVerdictFor(
       held: false,
       sentence:
         `Not validated: the second batch replays from seed ${batch.result.seed} and this stage’s ` +
-        `holdout set ${seeds.name} is seed ${seeds.seed}. A stage is cleared on runs the settings ` +
-        'were not tuned against, so a batch that is not that set validates nothing.',
+        `holdout set ${seeds.name} is seed ${seeds.seed}. A stage is cleared on crowds kept apart ` +
+        'from the stage’s own, so a batch that is not that set validates nothing.',
     };
   }
 
-  const goals = judgeGoalsOf(stage, published, batch.result, batch.report, 'holdout');
+  const goals = judgeGoalsOf(stage, published, batch.result, batch.report, 'holdout', sameness);
   return {
     seedSetName: seeds.name,
     seed: seeds.seed,
@@ -383,6 +426,16 @@ function holdoutVerdictFor(
  * missed, because unjudged is neither passed nor failed. Exported so the sentence can be held on
  * goal verdicts directly; {@link holdoutVerdictFor} is its one caller. The decision reaches no further
  * than this module, so this docstring is its record ([§ D405](../../../../DECISIONS.md)).
+ *
+ * ## And how much, on those crowds alone — ruling R1 ([§ D1602](../../../../DECISIONS.md))
+ *
+ * The tally is followed by the comparison goal's own sentence for this seed set, which sizes every
+ * resolved measure on the held-back crowds and says *too close to call* where an interval contains
+ * zero. It stands alone: nothing compares it with the stage's own crowds, so nothing says a gain
+ * shrank, survived or was smaller there (amendment 5). The crowds are named by where they come
+ * from, *kept apart from the stage's own*. The sentence that explained a refusal as *a fit to fifty
+ * crowds* is gone, because nobody measured that cause (finding X6); the rule is stated once, with no
+ * cause, in the headline. With no comparison goal to carry the count, the tally carries it.
  */
 export function holdoutSentenceOf(goals: readonly StageGoalVerdict[], replications: number): string {
   const met = goals.filter((goal) => goal.met === true).length;
@@ -390,12 +443,12 @@ export function holdoutSentenceOf(goals: readonly StageGoalVerdict[], replicatio
   const unjudged = goals.filter((goal) => goal.met === null).length;
   const missed = goals.filter((goal) => goal.met === false).map((goal) => goal.label);
   const runs = `${String(replications)} ${plural(replications, 'run', 'runs')}`;
+  const sized = goals.find((goal) => goal.kind === 'beat-the-baseline')?.sentence ?? '';
+  const over = sized === '' ? ` over ${runs} on ${crowdsOf('holdout')}` : '';
+  const how = sized === '' ? '' : ` ${sized}`;
+  const goalWord = plural(goals.length, 'goal', 'goals');
   if (held) {
-    return (
-      `The held-back crowds agree: all ${String(goals.length)} ` +
-      `${plural(goals.length, 'goal', 'goals')} reached over ${runs} this setting was not tuned ` +
-      'against.'
-    );
+    return `The held-back crowds agree: all ${String(goals.length)} ${goalWord} reached${over}.${how}`;
   }
   const named =
     missed.length === 0
@@ -407,12 +460,18 @@ export function holdoutSentenceOf(goals: readonly StageGoalVerdict[], replicatio
       ? ''
       : ` ${String(unjudged)} of them could not be judged there, and an unjudged goal is not a passed one.`;
   return (
-    `The held-back crowds do not agree: ${String(met)} of ` +
-    `${String(goals.length)} ${plural(goals.length, 'goal', 'goals')} reached over ${runs} ` +
-    'this setting was not tuned against.' +
-    `${named}${tail} A gain that does not survive crowds it was not tuned against is a fit to fifty ` +
-    'crowds rather than a better way of running the building.'
+    `The held-back crowds do not agree: ${String(met)} of ${String(goals.length)} ${goalWord} ` +
+    `reached${over}.${named}${tail}${how}`
   );
+}
+
+/**
+ * The crowds a sentence is about, named by where they come from — ruling R1, amendment 5
+ * ([§ D1602](../../../../DECISIONS.md)). Never *crowds you could not have tuned against*: a player
+ * who presses again after a refusal has seen how the held-back crowds answered.
+ */
+function crowdsOf(seedSet: StageSeedSet): string {
+  return seedSet === 'tuning' ? 'the stage’s own crowds' : 'the crowds kept apart from the stage’s own';
 }
 
 /**
@@ -593,8 +652,8 @@ function judgeCountGoal(
       `measurably better, which needs an interval that excludes zero.${
         seedSet === 'tuning'
           ? ''
-          : ' These are the runs your setting was not tuned against, which is the half that ' +
-            'decides whether the stage is cleared.'
+          : ' These runs are on crowds kept apart from the stage’s own, the half that decides ' +
+            'whether the stage is cleared.'
       }`,
   };
 }
@@ -616,8 +675,15 @@ function rateOf(spec: PerReplicationGoalSpec, arm: Arm): GoalRate | null {
  * ahead on door-to-door time and behind on the 95th-percentile wait has not beaten anything; it
  * has moved along the front, and § D158 measured exactly that pair of outcomes on one pair of arms.
  * Energy is not in the test at all, because `favours` is `null` on every `axis` row (**R11**).
+ *
+ * The verdict (`met`) reads `favours` and nothing else; `seedSet` and `sameness` move words only.
  */
-function judgeComparisonGoal(spec: GoalSpec, report: BatchReport): StageGoalVerdict {
+function judgeComparisonGoal(
+  spec: GoalSpec,
+  report: BatchReport,
+  seedSet: StageSeedSet,
+  sameness: StageSameness,
+): StageGoalVerdict {
   const label = stageGoalNameOf(spec);
   const comparison = report.comparisons[0];
   if (comparison === undefined) {
@@ -652,7 +718,15 @@ function judgeComparisonGoal(spec: GoalSpec, report: BatchReport): StageGoalVerd
     label,
     met,
     reproduced: null,
-    sentence: comparisonSentence(report.replications, ahead, behind, underBudget),
+    sentence: comparisonSentence({
+      replications: report.replications,
+      rows: comparison.rows,
+      ahead,
+      behind,
+      underBudget,
+      seedSet,
+      sameness,
+    }),
     note:
       `${suppressionClause(suppressed, report.replications)} Energy is not in this test: it is an ` +
       'axis and never a score, and the arm that spends least is routinely the arm that carried ' +
@@ -660,48 +734,250 @@ function judgeComparisonGoal(spec: GoalSpec, report: BatchReport): StageGoalVerd
   };
 }
 
-function comparisonSentence(
-  replications: number,
-  ahead: readonly BatchComparisonRow[],
-  behind: readonly BatchComparisonRow[],
-  underBudget: readonly BatchComparisonRow[],
-): string {
+/** What {@link comparisonSentence} is handed: the rows, already sorted by what they may say. */
+interface ComparisonWords {
+  readonly replications: number;
+  /** Every row of the comparison, `axis` rows included, for the exactly-zero test. */
+  readonly rows: readonly BatchComparisonRow[];
+  readonly ahead: readonly BatchComparisonRow[];
+  readonly behind: readonly BatchComparisonRow[];
+  readonly underBudget: readonly BatchComparisonRow[];
+  readonly seedSet: StageSeedSet;
+  readonly sameness: StageSameness;
+}
+
+/**
+ * **The comparison goal's sentence, with how much** — ruling R1 on GitHub issue #645
+ * ([§ D1602](../../../../DECISIONS.md)), finding C1: *"behind"* and *"ahead"* carried no size, so
+ * lobby parking at +1.49 s and `nearest-car` at +2.95 s read alike.
+ *
+ * Average wait comes first, with its range whichever way its interval fell (amendment 7). Every
+ * other measure that resolved follows with its size, and the ones that did not go unnamed under one
+ * clause. A resolved interval is said *shorter* or *longer* (*lower* or *higher* off the time axis),
+ * *by between* its two bounds with the one nearer zero first; an interval containing zero is *too
+ * close to call* at the batch's run count, with its range said both ways. Every figure goes through
+ * `batch/report.ts#batchFigureOf`, the formatter the Engineer row prints with (amendment 3). A row
+ * with no number keeps its refusal.
+ *
+ * **Sameness is the admission's to say, never the figures'** (amendment 4). An unchanged press is
+ * the same run in both arms and says so; a changed setting whose every paired difference is exactly
+ * zero, on every crowd and every row, says the change altered nothing measured; and a press with no
+ * admission behind it says only what the figures were. Nothing here touches `met`: the closing
+ * clause is chosen by the same `ahead` and `behind` the verdict is.
+ */
+function comparisonSentence(input: ComparisonWords): string {
+  const { replications, rows, ahead, behind, underBudget, seedSet, sameness } = input;
   const runs = `${String(replications)} ${plural(replications, 'run', 'runs')}`;
-  const names = (rows: readonly BatchComparisonRow[]): string =>
-    rows.map((row) => row.label).join(', ');
+  const crowds = crowdsOf(seedSet);
+  const separated = ahead.length + behind.length + underBudget.length > 0;
+
+  if (sameness === 'unchanged' && !separated) {
+    return (
+      `Your settings are the building’s own, so over ${runs} on ${crowds}, your run and the ` +
+      'building’s were the same run every time, and there is nothing to separate. The bar is not reached.'
+    );
+  }
+  if (sameness !== 'unchanged' && !separated && everyDifferenceIsZero(rows)) {
+    return sameness === 'changed'
+      ? `Over ${runs} on ${crowds}, your change altered nothing measured on any run: every measure ` +
+          'came out exactly the same under both settings, crowd by crowd. The bar is not reached.'
+      : `Over ${runs} on ${crowds}, every measure came out exactly the same under both settings, ` +
+          'crowd by crowd. The bar is not reached.';
+  }
+
+  const orderable = rows.filter((row) => row.metricClass !== 'axis');
+  const wait = orderable.find((row) => row.metric === 'awtS');
+  const others = orderable.filter((row) => row !== wait);
+  const sized = others.filter((row) => row.verdict === 'resolved');
+  const close = others.filter((row) => row.verdict === 'unresolved');
+  const unnumbered = others.filter((row) => row.verdict === 'suppressed' || row.verdict === 'unmeasured');
+  const clauses = [
+    ...(wait === undefined ? [] : [rowClauseOf(wait, runs)]),
+    ...sized.map((row) => rowClauseOf(row, runs)),
+  ];
+  const body =
+    clauses.length === 0
+      ? `Over ${runs} on ${crowds}, no measure had an interval to read.`
+      : `Over ${runs} on ${crowds}, ${listOf(clauses)}.`;
+
+  /* The rest, unnamed (amendment 7): *as well* only where average wait was itself too close. */
+  const waitTooClose = wait !== undefined && tooCloseToCall(wait);
+  const restNoun =
+    close.length === others.length
+      ? plural(close.length, 'The other measure was', 'The other measures were')
+      : plural(close.length, 'The remaining measure was', 'The remaining measures were');
+  const restClause =
+    close.length === 0 ? '' : ` ${restNoun} too close to call${waitTooClose ? ' as well' : ` at ${runs}`}.`;
+  const unnumberedClause =
+    unnumbered.length === 0
+      ? ''
+      : ` ${String(unnumbered.length)} other ${plural(unnumbered.length, 'measure', 'measures')} could not ` +
+        'be compared at all, because at least one paired run refused to stand behind its own number.';
   /*
-   * Named rather than folded into *"had no number"*: these rows **have** a number.
-   *
-   * Only the first branch below can carry it, and that is arithmetic rather than an oversight —
-   * every row that forms an interval forms it over the same `n`, so a report with an
-   * `under-budget` row has no `resolved` row and therefore nothing ahead and nothing behind.
+   * Named rather than folded into the rest: these rows **have** a number, and it orders nothing.
+   * Every row that forms an interval forms it over the same `n`, so a report with an `under-budget`
+   * row has no `resolved` row, and this clause sits only beside *no measure separated*.
    */
   const budgetClause =
     underBudget.length === 0
       ? ''
-      : ` The interval on ${names(underBudget)} excludes zero and is drawn, and it orders ` +
-        'nothing: this batch is below the project’s replication budget.';
-  if (ahead.length === 0 && behind.length === 0) {
-    return (
-      `In ${runs}, no measure separated the two settings — every interval on the difference ` +
-      `included zero, or had no number to form one. The two are not ordered.${budgetClause}`
-    );
-  }
-  if (behind.length === 0) {
-    return (
-      `In ${runs}, your setting came out ahead on ${names(ahead)} — the interval on the ` +
-      'difference excludes zero — and no measure resolved against it. The bar is reached.'
-    );
-  }
-  if (ahead.length === 0) {
-    return (
-      `In ${runs}, your setting came out behind on ${names(behind)}, and ahead on nothing that ` +
-      'resolved. The bar is not reached.'
-    );
-  }
+      : ` The interval on ${underBudget.map((row) => row.label).join(', ')} excludes zero and is ` +
+        'drawn, and it orders nothing: this batch is below the project’s replication budget.';
+  const verdict =
+    ahead.length > 0 && behind.length === 0
+      ? 'Nothing came out against your setting, so the bar is reached.'
+      : ahead.length === 0 && behind.length > 0
+        ? 'Your setting came out behind and ahead on nothing, so the bar is not reached.'
+        : ahead.length > 0
+          ? 'That is a move along the front rather than a win, so the bar is not reached.'
+          : 'No measure separated the two settings, so the bar is not reached.';
+  /* Two arms that ran one setting cannot differ; one that did is the apparatus, said so. */
+  const fault =
+    sameness === 'unchanged'
+      ? ' Both runs used the building’s own settings, so a measure that separated them is a fault in ' +
+        'the run rather than a result, and worth reporting.'
+      : '';
+  return `${body}${restClause}${unnumberedClause}${budgetClause} ${verdict}${fault}`;
+}
+
+/**
+ * Every row's every paired difference is exactly zero: each row carries an interval over all its
+ * pairs, and the smallest and largest difference are both zero. Read off the rows the report
+ * already took, so it can only be true of a batch whose two arms tied on every crowd and every
+ * measure. It decides words, and only for a press the admission says changed something.
+ */
+function everyDifferenceIsZero(rows: readonly BatchComparisonRow[]): boolean {
   return (
-    `In ${runs}, your setting came out ahead on ${names(ahead)} and behind on ${names(behind)}. ` +
-    'That is a move along the front rather than a win, so the bar is not reached.'
+    rows.length > 0 &&
+    rows.every(
+      (row) =>
+        row.estimate !== null &&
+        row.totalPairs > 0 &&
+        row.estimate.n === row.totalPairs &&
+        row.estimate.min === 0 &&
+        row.estimate.max === 0,
+    )
+  );
+}
+
+/** An interval that contains zero and is not simply zero on every crowd. */
+function tooCloseToCall(row: BatchComparisonRow): boolean {
+  const estimate = row.estimate;
+  return (
+    row.verdict === 'unresolved' &&
+    estimate !== null &&
+    Number.isFinite(estimate.lower) &&
+    Number.isFinite(estimate.upper) &&
+    !(estimate.lower === 0 && estimate.upper === 0)
+  );
+}
+
+/** `a`, `a and b`, `a, b, and c` — clauses that each carry their own verb. */
+function listOf(clauses: readonly string[]): string {
+  if (clauses.length <= 1) return clauses[0] ?? '';
+  if (clauses.length === 2) return `${String(clauses[0])}, and ${String(clauses[1])}`;
+  return `${clauses.slice(0, -1).join(', ')}, and ${String(clauses[clauses.length - 1])}`;
+}
+
+/** A metric's unit, in words where the words are plain: a figure may be re-united (`docs/23` § 1.4). */
+function unitWordsOf(metric: BatchMetric): string {
+  switch (BATCH_METRIC_PRESENTATION[metric].unit.trim()) {
+    case 's':
+      return ' seconds';
+    case '%':
+      return ' percentage points';
+    case '':
+      return '';
+    default:
+      return BATCH_METRIC_PRESENTATION[metric].unit;
+  }
+}
+
+/**
+ * The rows whose label is a plural noun (*rides over the long-wait threshold*, *people carried per
+ * 5 min*), so the clause agrees with it. Keyed by metric rather than read off the label's first
+ * word, so a relabelled row keeps its grammar or fails the read-back test, never a guess.
+ */
+const PLURAL_LABELS: ReadonlySet<BatchMetric> = new Set<BatchMetric>([
+  'pctOverLongWait',
+  'personsPer5Min',
+  'unservedFraction',
+]);
+
+/** The two directions of a metric's axis, in words: *shorter* and *longer* for a time. */
+function directionsOf(metric: BatchMetric): { readonly down: string; readonly up: string } {
+  return BATCH_METRIC_PRESENTATION[metric].unit.trim() === 's'
+    ? { down: 'shorter', up: 'longer' }
+    : { down: 'lower', up: 'higher' };
+}
+
+/**
+ * **One row, said with its size** — the one clause shape for every row this module prints, a wait
+ * or drive work alike, so a figure means the same thing wherever it lands.
+ *
+ * - An interval excluding zero: *"was shorter by between 0.34 and 2.03 seconds"*, the bound nearer
+ *   zero first. *Shorter* is the measurement; which arm that favours is the verdict's to say, and on
+ *   an `axis` row nothing is.
+ * - An interval containing zero: *"was too close to call at 50 runs, between 1.20 seconds shorter
+ *   and 0.20 seconds longer"*; one exactly zero on every crowd *"did not differ on any crowd"*.
+ * - No interval: the row's refusal, kept (amendment 3).
+ */
+function rowClauseOf(row: BatchComparisonRow, runs: string): string {
+  const estimate = row.estimate;
+  if (estimate === null) return refusalClauseOf(row);
+  if (!Number.isFinite(estimate.lower) || !Number.isFinite(estimate.upper)) {
+    return `${row.label} has no interval to read over ${runs}`;
+  }
+  const { down, up } = directionsOf(row.metric);
+  const unit = unitWordsOf(row.metric);
+  const was = PLURAL_LABELS.has(row.metric) ? 'were' : 'was';
+  const figure = (value: number): string => `${batchFigureOf(row.metric, value)}${unit}`;
+  if (estimate.lower === 0 && estimate.upper === 0) return `${row.label} did not differ on any crowd`;
+  if (!intervalContainsZero(estimate)) {
+    const [near, far] = [Math.abs(estimate.lower), Math.abs(estimate.upper)].sort((a, b) => a - b);
+    return (
+      `${row.label} ${was} ${estimate.upper < 0 ? down : up} by between ` +
+      `${batchFigureOf(row.metric, near ?? 0)} and ${batchFigureOf(row.metric, far ?? 0)}${unit}`
+    );
+  }
+  const from = estimate.lower === 0 ? 'no difference' : `${figure(estimate.lower)} ${down}`;
+  const to = estimate.upper === 0 ? 'no difference' : `${figure(estimate.upper)} ${up}`;
+  return `${row.label} ${was} too close to call at ${runs}, between ${from} and ${to}`;
+}
+
+/** A row with no number, said in its own refusal's terms rather than as a blank. */
+function refusalClauseOf(row: BatchComparisonRow): string {
+  switch (row.verdict) {
+    case 'suppressed':
+      return row.suppressedPairs > 0
+        ? `there is no ${row.label} to compare, because ${String(row.suppressedPairs)} of ` +
+            `${String(row.totalPairs)} paired runs had a setting whose own summary refuses to quote a mean`
+        : `no ${row.label} comparison is made, because the two settings did not see the same passengers`;
+    case 'unmeasured':
+      return (
+        `${row.label} was never measured on ${String(row.unmeasuredPairs)} of ` +
+        `${String(row.totalPairs)} paired runs, so there is nothing to compare`
+      );
+    default:
+      return `${row.label} has no interval, because a single run has no measurable spread`;
+  }
+}
+
+/**
+ * **Drive work, on its own line, for the stage's own crowds** — ruling R1, amendment 8
+ * ([§ D1602](../../../../DECISIONS.md)). See {@link StageReport.energy}.
+ *
+ * Both `axis` rows of the tuning report, in {@link rowClauseOf}'s shape: *higher* or *lower* only
+ * where the paired interval excludes zero. No word in it is a wait, and none is *met*, *missed*,
+ * *better* or *worse*: an axis names no arm ahead (`CLAUDE.md`, [§ D106](../../../../DECISIONS.md)).
+ */
+function energySentenceOf(report: BatchReport): string | null {
+  const rows = report.comparisons[0]?.rows.filter((row) => row.metricClass === 'axis') ?? [];
+  if (rows.length === 0) return null;
+  const runs = `${String(report.replications)} ${plural(report.replications, 'run', 'runs')}`;
+  return (
+    `Beside the verdict and never part of it: over ${runs} on ${crowdsOf('tuning')}, with your ` +
+    `settings ${listOf(rows.map((row) => rowClauseOf(row, runs)))}.`
   );
 }
 
@@ -771,13 +1047,19 @@ function suppressionClause(
  *
  * A player who meets every bar on the runs they made and is told *"not cleared"* with no reason is
  * being refused by an invisible rule, which is the shape this file refuses everywhere else (a bar
- * that does not reproduce says so; a suppressed measure says so). So the holdout's answer rides on
- * this line, in the same tally sentence, on all three of its branches — met-and-held, met-and-not-
- * held, and met-and-never-asked.
+ * that does not reproduce says so; a suppressed measure says so). So the rule rides on this line,
+ * on all three of its branches — met-and-held, met-and-not-held, and met-and-never-asked.
  *
- * It adds **no numeral of its own** on the branch that has none to add. The *not validated* clause
- * is words only, so the string's numerals stay exactly what they were: the goal tally and the
- * replication count R13 reads.
+ * **The rule, and not the held-back crowds' sentence** — ruling R1, amendments 5 and 6
+ * ([§ D1602](../../../../DECISIONS.md)). This line used to carry {@link StageHoldoutVerdict.sentence}
+ * whole, and both surfaces print that sentence beside it, so the stage card read one paragraph
+ * twice (finding X1). It now says that *a stage clears only when the held-back crowds agree as
+ * well* and whether they did, with no cause: the sentence that explained a refusal as *a fit to
+ * fifty crowds* stated a mechanism nobody measured (X6). Where the held-back crowds are named
+ * beside the stage's own, the tally says which crowds it is over.
+ *
+ * It adds **no numeral of its own**. The rule is words only, so the string's numerals stay exactly
+ * what they were: the goal tally and the replication count R13 reads.
  */
 function headlineFor(
   stage: CampaignStage,
@@ -810,8 +1092,9 @@ function headlineFor(
    */
   const scope =
     ' That is a statement about these runs on these passenger populations, and not a ranking of dispatchers.';
+  const own = 'on the stage’s own crowds';
   if (cleared) {
-    return `${stage.name}: all ${String(total)} ${goalWord} reached over ${String(replications)} ${runWord}, and again on the holdout seeds.${scope}`;
+    return `${stage.name}: all ${String(total)} ${goalWord} reached over ${String(replications)} ${runWord} ${own}, and again on the held-back crowds.${scope}`;
   }
   /*
    * Said only when the tuning half is the half that passed. On a batch that missed a bar the
@@ -819,14 +1102,17 @@ function headlineFor(
    * yet would bury it — the same argument `dev/campaignPanel.ts` makes for labelling a control run
    * as a control before printing the verdict over it.
    */
+  const rule = ' A stage clears only when the held-back crowds agree as well';
   const holdoutClause =
     met < total
       ? ''
       : holdout === null
-        ? ' Not cleared: these are the runs this setting was tuned against, and a stage is cleared ' +
-          'on the holdout seeds as well — which this batch did not run.'
+        ? `${rule}, and this batch did not run them.`
         : holdout.held
           ? ''
-          : ` Not cleared: ${holdout.sentence}`;
-  return `${stage.name}: ${String(met)} of ${String(total)} ${goalWord} reached over ${String(replications)} ${runWord}.${tail}${holdoutClause}${scope}`;
+          : holdout.goals.length === 0
+            ? `${rule}, and the second batch was not those crowds.`
+            : `${rule}, and they do not.`;
+  const over = holdoutClause === '' ? '' : ` ${own}`;
+  return `${stage.name}: ${String(met)} of ${String(total)} ${goalWord} reached over ${String(replications)} ${runWord}${over}.${tail}${holdoutClause}${scope}`;
 }

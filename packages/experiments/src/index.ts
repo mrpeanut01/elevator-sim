@@ -88,14 +88,15 @@
 /* -------------------------------------------------------------------------- *
  * stats — the interval arithmetic (`reports/statistics.ts`).
  *
- * Sample moments, the t and normal quantiles, and the paired difference interval.
- * Every interval this package produces — published or consulted by the sequential stopping rule —
- * is Student-t at `n - 1`, at every `n` (docs/03-traffic-and-statistics.md § Part 4), and every
- * estimate records the family it used. There is no `n`-dependent crossover to a normal quantile
- * any more; see `reports/statistics.ts` § "One quantile" and DECISIONS.md § D7. `normalQuantile`
- * remains exported with **no production caller**, deliberately and for the two checkable reasons
- * its own docstring gives: it is the reference `studentTQuantile` is validated against, and it pins
- * the `Z_95` literal `benchmark/verdict.ts` hard-codes for replication planning.
+ * Sample moments, the t and normal quantiles, the paired difference interval, and one proportion
+ * interval. Every interval on a **mean** this package produces — published or consulted by the
+ * sequential stopping rule — is Student-t at `n - 1`, at every `n` (docs/03-traffic-and-statistics.md
+ * § Part 4), and every estimate records the family it used. There is no `n`-dependent crossover to a
+ * normal quantile any more; see `reports/statistics.ts` § "One quantile" and DECISIONS.md § D7.
+ * `wilsonScoreInterval` is the interval on a **proportion**, a single-arm `k of n` and never a
+ * comparison (§ D1595), and it is `normalQuantile`'s one production caller; the two checkable reasons
+ * that function was kept with none still hold: it is the reference `studentTQuantile` is validated
+ * against, and it pins the `Z_95` literal `benchmark/verdict.ts` hard-codes for replication planning.
  * All pure functions: no RNG (CLAUDE.md invariant 2), no clock (3), no mutation of an input.
  * -------------------------------------------------------------------------- */
 
@@ -109,9 +110,10 @@ export {
   sampleStdDevOf,
   studentTCdf,
   studentTQuantile,
+  wilsonScoreInterval,
 } from './reports/statistics.js';
 
-export type { EstimateOptions, PublishedMeanEstimate } from './reports/statistics.js';
+export type { EstimateOptions, ProportionInterval, PublishedMeanEstimate } from './reports/statistics.js';
 
 /* -------------------------------------------------------------------------- *
  * runner/ — N replications of a (building, dispatcher, traffic) configuration:
@@ -952,6 +954,41 @@ export {
   withCallType,
   withNegativeWait,
   withOverfilledCar,
+  /* The adversarial persona: the verb-sequence axis on a fixed stage (`fuzz/verbs.ts`,
+     `fuzz/play.ts`, `fuzz/playShrink.ts`, `fuzz/playCampaign.ts`, `fuzz/stageSession.ts`). */
+  DEEP_PLAY_SPACE,
+  PLAY_PROPERTIES,
+  PLAY_REGRESSIONS,
+  PLAY_SHAPES,
+  PlaySessions,
+  PlayStageError,
+  STANDARD_PLAY_CORPUS,
+  STANDARD_PLAY_SPACE,
+  canonicalVerbs,
+  checkNoSoftlock,
+  checkReachableGoal,
+  checkReadableVerdict,
+  deepPlaySeeds,
+  describePlayEntry,
+  formatPlayCase,
+  formatPlayOutcome,
+  formatPlayStats,
+  isPlayFailure,
+  playCaseFromPinned,
+  playCaseFromSeed,
+  playContextFor,
+  playLogJson,
+  playLogRefusal,
+  playLogSpend,
+  playRegressionsFor,
+  playSeedSetOf,
+  playStageIdsOf,
+  playStageOf,
+  rankVerbs,
+  refusalGroundsOf,
+  runPlayCampaign,
+  shrinkPlayCase,
+  stageSessionConfigFor,
 } from './fuzz/index.js';
 
 export type {
@@ -973,4 +1010,99 @@ export type {
   ShrinkOptions,
   ShrinkResult,
   Violation,
+  PinnedPlayCase,
+  PlayCampaignOptions,
+  PlayCampaignResult,
+  PlayCampaignStats,
+  PlayCar,
+  PlayCase,
+  PlayContext,
+  PlayContextInput,
+  PlayFaults,
+  PlayKind,
+  PlayOutcome,
+  PlayProperty,
+  PlayPurchase,
+  PlayRangeBank,
+  PlaySeedSet,
+  PlayShape,
+  PlayShrinkResult,
+  PlaySpace,
+  PlayStage,
+  PlayStageSeedSet,
+  PlayViolation,
+  StageSessionResources,
+  VerbRankingRow,
+  VerbVerdict,
 } from './fuzz/index.js';
+
+/* -------------------------------------------------------------------------- *
+ * engagement/ — the three fun proxies (§ D1595): the meaningful-choice rate,
+ * the tension band and the mastery slope, read off a run's own series against
+ * the thresholds in `data/engagement-bands.json`.
+ *
+ * Every proxy is an unmeasured premise about people, an axis printed beside AWT
+ * and WT95 and never summed into a score, and every comparison of two arms is a
+ * paired-t interval on common random numbers. The non-test caller is
+ * `elevator-sim fuzz --scenario <id> --engagement`, which reads the data files
+ * and hands them in; nothing here reads a file, a clock or a random stream.
+ * -------------------------------------------------------------------------- */
+
+export {
+  EngagementBandsError,
+  MAX_ENGAGEMENT_REPLICATIONS,
+  SWING_METRICS,
+  TENSION_CLASSES,
+  beliefDisagreements,
+  engineBaselineChoices,
+  formatKOfN,
+  judgeChoice,
+  masterySlopeOf,
+  meaningfulChoiceRate,
+  measureChoices,
+  notYetReplayable,
+  pairedComparison,
+  pairedMasterySlope,
+  pairedTension,
+  parseEngagementBands,
+  stageBaselineRuns,
+  tallyTension,
+  tensionBandFor,
+  tensionMismatches,
+  tensionOf,
+  tensionSeriesOf,
+  waitFiguresOf,
+} from './engagement/index.js';
+
+export type {
+  BeliefDisagreements,
+  ChoiceArms,
+  ChoiceBelief,
+  ChoiceRate,
+  ChoiceStatus,
+  ChoiceVerdict,
+  EngagementBands,
+  FeltRun,
+  FeltTension,
+  KOfN,
+  MasteryAttempt,
+  MasterySlope,
+  MasterySlopeBands,
+  MasteryVerdict,
+  MeaningfulChoiceBands,
+  PairedComparison,
+  PairedMasterySlope,
+  PairedVerdict,
+  ResolvedTensionBand,
+  SwingMetric,
+  TensionBand,
+  TensionBandEdges,
+  TensionClass,
+  TensionMismatches,
+  TensionReading,
+  TensionRecord,
+  TensionSeries,
+  TensionSummary,
+  TensionTally,
+  WaitFigures,
+} from './engagement/index.js';

@@ -845,6 +845,10 @@ export function mountStagePlay(host: HTMLElement, context: EverydayScreenShellCo
         goals.append(item);
       }
       verdict.append(goals);
+      /* Drive work on a line of its own, beside the goals and never one of them (§ D1602). */
+      if (view.verdict.energy !== undefined) {
+        verdict.append(para(doc, 'everyday-stage-play-energy', view.verdict.energy, `font-size:13px;line-height:1.5;color:${C.inkSoft}`));
+      }
       verdict.append(para(doc, 'everyday-stage-play-holdout', view.verdict.holdout, `font-size:13px;line-height:1.5;color:${C.inkSoft}`));
       if (view.verdict.pay !== undefined) {
         verdict.append(para(doc, 'everyday-stage-play-pay', view.verdict.pay, `font-size:14px;font-weight:600;color:${C.ink}`));

@@ -24,6 +24,14 @@
  * | `shrink.ts` | a 40-floor counterexample reduced to one somebody can read |
  * | `campaign.ts` | many cases, the always-on corpus, and what it cost |
  * | `faults.ts` | the deliberate breakages that prove each property can fail |
+ * | `stageSession.ts` | a campaign stage read from its plain fields, and one replication of it (§ D1590) |
+ * | `verbs.ts` | the adversarial persona's generator: a seeded verb log over the seven intervention kinds |
+ * | `play.ts` | P-PLAY-1 to P-PLAY-3 over a finished session, beside the six above |
+ * | `playShrink.ts` | a verb log reduced to the smallest one that still breaks, printed whole |
+ * | `playCampaign.ts` | the persona's corpora, its pinned regressions, and the P-DESIGN-1 ranking |
+ *
+ * `releaseDirection.test.ts` is a gate rather than a module: the two shipped-run measurements behind
+ * § D1591, opt-in behind `ELEVATOR_SIM_FUZZ=deep` beside `deep.test.ts`.
  *
  * The gates are the `*.test.ts` files beside them and are not exported: `corpus.test.ts` (the
  * always-on 64), `deep.test.ts` (opt-in), `generate.test.ts` (the generator's contract *and* the
@@ -115,3 +123,83 @@ export type {
   PropertyBounds,
   Violation,
 } from './types.js';
+
+/*
+ * The adversarial persona — the verb-sequence axis. A stage's building held fixed, the player's log of
+ * the seven intervention kinds fuzzed. `cli/src/commands/fuzz.ts` is its named non-test caller, through
+ * `elevator-sim fuzz --scenario <id>`.
+ */
+export {
+  PLAY_REGRESSIONS,
+  STANDARD_PLAY_CORPUS,
+  canonicalVerbs,
+  deepPlaySeeds,
+  formatPlayStats,
+  playCaseFromPinned,
+  playRegressionsFor,
+  rankVerbs,
+  runPlayCampaign,
+} from './playCampaign.js';
+export type {
+  PinnedPlayCase,
+  PlayCampaignOptions,
+  PlayCampaignResult,
+  PlayCampaignStats,
+  VerbRankingRow,
+  VerbVerdict,
+} from './playCampaign.js';
+
+export {
+  PLAY_PROPERTIES,
+  PlaySessions,
+  checkNoSoftlock,
+  checkReachableGoal,
+  checkReadableVerdict,
+  isPlayFailure,
+  refusalGroundsOf,
+} from './play.js';
+export type { PlayFaults, PlayOutcome, PlayProperty, PlayViolation } from './play.js';
+
+export {
+  describePlayEntry,
+  formatPlayCase,
+  formatPlayOutcome,
+  playLogJson,
+  shrinkPlayCase,
+} from './playShrink.js';
+export type { PlayShrinkResult } from './playShrink.js';
+
+export {
+  PlayStageError,
+  playSeedSetOf,
+  playStageIdsOf,
+  playStageOf,
+  stageSessionConfigFor,
+} from './stageSession.js';
+export type {
+  PlaySeedSet,
+  PlayStage,
+  PlayStageSeedSet,
+  StageSessionResources,
+} from './stageSession.js';
+
+export {
+  DEEP_PLAY_SPACE,
+  PLAY_SHAPES,
+  STANDARD_PLAY_SPACE,
+  playCaseFromSeed,
+  playContextFor,
+  playLogRefusal,
+  playLogSpend,
+} from './verbs.js';
+export type {
+  PlayCar,
+  PlayCase,
+  PlayContext,
+  PlayContextInput,
+  PlayKind,
+  PlayPurchase,
+  PlayRangeBank,
+  PlayShape,
+  PlaySpace,
+} from './verbs.js';

@@ -43,9 +43,9 @@
  * nothing outside the package can reach is false*). So they are split by a property that was
  * **measured rather than judged** — how far each symbol can actually be reached:
  *
- * - {@link PACKAGE_SURFACE} (25) — on `experiments/src/index.ts` or `browser.ts`, so a consumer
- *   outside this package *can* import it. That is reachability, and **reachability is not use**;
- *   these are recorded, not absolved.
+ * - {@link PACKAGE_SURFACE} (25 at the widening, 24 since § D1595) — on `experiments/src/index.ts`
+ *   or `browser.ts`, so a consumer outside this package *can* import it. That is reachability,
+ *   and **reachability is not use**; these are recorded, not absolved.
  * - {@link SUITE_ONLY} (52) — on no package barrel, so nothing outside `experiments` can reach it
  *   at all, and every reference it has is a `*.test.ts` in this package.
  * - {@link DEAD_CANDIDATES} (6) — no reference anywhere in the tree. Not a barrel, not a test.
@@ -243,7 +243,11 @@ const PACKAGE_SURFACE: Readonly<Record<string, string>> = Object.freeze({
   /* -- Comparison and statistics surface. */
   'reports/comparisonReportFromRunSet': 'builds a comparison report from a persisted run set',
   'reports/formatComparisonReport': 'renders a comparison report; no driver prints it',
-  'reports/normalQuantile': 'the normal quantile; the published estimators use Student’s t',
+  /*
+   * `reports/normalQuantile` stood here until § D1595: *"the normal quantile; the published
+   * estimators use Student's t"*. It is disposed of by a caller rather than by deletion:
+   * `wilsonScoreInterval`, the proportion interval the fun proxies print, takes its `z` from it.
+   */
 });
 
 /**
@@ -424,9 +428,12 @@ describe('every export of the rest of experiments/ has a caller or a recorded re
       [...DERIVED_SCOPE].sort(),
     );
 
-    // The four this widening brought in, named, because they are the whole point of it.
+    // The four this widening brought in, named, because they are the whole point of it, and the
+    // first directory to arrive after it: `engagement/` (§ D1595), audited here from its first
+    // commit with no list edited to cover it but this one.
     expect([...AUDITED_MODULES].sort()).toEqual([
       'experiments/src/benchmark',
+      'experiments/src/engagement',
       'experiments/src/oracle',
       'experiments/src/reports',
       'experiments/src/validation',
@@ -501,7 +508,7 @@ describe('every export of the rest of experiments/ has a caller or a recorded re
    */
   it('names every finding, and the three counts are the ones recorded', () => {
     for (const [label, register, size] of [
-      ['PACKAGE_SURFACE', PACKAGE_SURFACE, 25],
+      ['PACKAGE_SURFACE', PACKAGE_SURFACE, 24],
       ['SUITE_ONLY', SUITE_ONLY, 52],
       ['DEAD_CANDIDATES', DEAD_CANDIDATES, 6],
     ] as const) {
@@ -514,7 +521,8 @@ describe('every export of the rest of experiments/ has a caller or a recorded re
     }
     // And the total, so that a finding moved between registers is visible as a move rather than as
     // two independent edits that happen to cancel.
-    expect(uncalled.length, 'the widening opened 83 findings across the four new directories').toBe(83);
+    // 83 at the widening; 82 since § D1595 gave `normalQuantile` a caller.
+    expect(uncalled.length, 'the widening opened 83 findings across the four new directories').toBe(82);
   });
 
   it('keeps the registers honest: no entry may outlive the condition that justified it', () => {
@@ -534,8 +542,8 @@ describe('every export of the rest of experiments/ has a caller or a recorded re
 
   it('counts a barrel re-export as reachability and never as a caller', () => {
     // The distinction the whole file turns on, and `experiments` is where it bites hardest: every
-    // one of PACKAGE_SURFACE's twenty-five keys is on `index.ts` or `browser.ts`, and all
-    // twenty-five are uncalled. If a barrel counted, this register would be empty and the audit
+    // one of PACKAGE_SURFACE's twenty-four keys is on `index.ts` or `browser.ts`, and all
+    // twenty-four are uncalled. If a barrel counted, this register would be empty and the audit
     // would report a clean sweep over the package's published surface.
     for (const key of Object.keys(PACKAGE_SURFACE)) {
       expect(uncalled.map((symbol) => symbol.key), key).toContain(key);
