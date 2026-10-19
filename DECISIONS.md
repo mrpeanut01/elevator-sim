@@ -54110,3 +54110,54 @@ does not fix because the fix would move published figures.
    `car.test.ts` pins the current behaviour so that closing it is a visible change.
 
 **Numbers spent.** See [§ D1590](#d1590).
+
+## D1595 — the three fun proxies: counts beside AWT, a Wilson interval for k of n, and a flag on fuzz
+
+> **Taken 2026-10-19 by an agent session** (wave AT, lane AT-2, the first design cycle's fun-proxy
+> spec). New measurement code and its command; no game behaviour, bound, pin or published figure
+> moves.
+
+**Why an entry.** The proxies reach past `packages/experiments/src/engagement/`: they add a proportion
+interval to `reports/statistics.ts`, give `normalQuantile` the production caller § D7's record says it
+lacked, add `--engagement` to `elevator-sim fuzz`, and extend a test in `packages/viz` so that the
+holdout runs they read are held to the game's own.
+
+1. **What they are.** `engagement/` computes the spec's three proxies from a run's own record and
+   summary, with every threshold read from `data/engagement-bands.json` by a parser that refuses an
+   unknown key, an unknown swing metric, a replication count outside 50 to 200, and any value of
+   `ciMustExcludeZero` or `suppressWhenSaturated` other than `true`. The tension band classifies each
+   replication of a stage's own setting as flat, below band, in band, above band, runaway or
+   suppressed, on its tuning and its holdout seeds separately. The meaningful-choice rate judges each
+   entry of a log against the log without it on the bands file's 50 tuning replications, by
+   P-DESIGN-1's own pairing rule, and the engine baseline it prints is `rankVerbs`'s canonical presses;
+   a test holds the two to the same interval on every replayable press. The mastery slope fits
+   `linearTrend` to supplied pass verdicts with the slope's t interval, and never computes a verdict:
+   every stage judge is the viewer's.
+2. **Denominators.** A rate is stored as `k` and `n` and printed as `k of n` with its interval. A
+   flagged run in the tension band and a suppressed choice stay in `n` and never count in `k`, on
+   § D158's argument that dropping them selects on the outcome. A refused mastery verdict suppresses the
+   slope, because a fit needs a value at every attempt. A kind `core`'s `interventionKindRefusal`
+   refuses (`answer-incident`, `equipment-change`, `building-change`) is reported with that refusal and
+   kept out of both sides of the choice rate.
+3. **The Wilson score interval.** `reports/statistics.ts#wilsonScoreInterval` is the package's one
+   proportion interval, pinned against Newcombe (1998) Table II. It is for a single-arm `k of n` and is
+   never a comparison: every comparison of two arms in the proxies is `pairedDifferenceEstimate` on
+   per-replication values or 0/1 indicators. Its `z` is `normalQuantile`'s, so that function now has a
+   production caller. Its two older reasons for staying exported still hold and its docstring keeps
+   them; the experiments dead-code register drops its entry, 25 to 24.
+4. **The queue series follows the summary.** The brief named `queueLengthSeries`; the proxies read
+   whichever series `summarizeRun` fitted its saturation trend on (`summary.saturation.source`), which
+   for every shipped stage run is the recorded samples, so both halves of the runaway clause are
+   measured on one series. The window is the summary's, because a stage record's own `reportWindow` is
+   the template band while the stage summarises over the full run on Garden Apartments.
+5. **A flag, not a seventh command.** `elevator-sim fuzz --scenario <id> --engagement` already holds the
+   stage context the proxies need; it runs no property campaign and refuses the campaign's flags by
+   name. A new command would have moved the command count `CLAUDE.md`, `README.md` and the CLI's own
+   docstring state, and that was not needed for a report this size.
+6. **Named gaps.** Every proxy is an unmeasured premise about people. On a Scenario stage no player
+   presses a verb, so a player session has nothing to judge; persona beliefs and narration do not exist
+   until the playtest phase; and the game judges every attempt at a stage on one fixed holdout batch,
+   where the spec asks for fresh, disjoint holdout seeds in order. No seed scheme is invented to close
+   the last one.
+
+**Numbers spent.** This lane holds **D1595 to D1599** and spends **D1595**.

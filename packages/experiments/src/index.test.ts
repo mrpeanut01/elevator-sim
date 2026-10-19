@@ -18,6 +18,7 @@ import { describe, expect, it } from 'vitest';
 
 import * as barrel from './index.js';
 import * as benchmarkModule from './benchmark/index.js';
+import * as engagementModule from './engagement/index.js';
 import * as fuzzModule from './fuzz/index.js';
 import * as oracleModule from './oracle/index.js';
 import * as reportsModule from './reports/index.js';
@@ -44,6 +45,7 @@ const submodules = {
   tuning: tuningModule,
   teaching: teachingModule,
   fuzz: fuzzModule,
+  engagement: engagementModule,
 } satisfies Record<string, Record<string, unknown>>;
 
 /**

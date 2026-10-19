@@ -10,6 +10,11 @@
  * and the one `batch/runBatch.ts#armConfigOf` builds for the batch's baseline arm, and on the
  * stages cheap enough to run the legs agree too (the standing requirement's comparison).
  *
+ * **The holdout seed set is held too** (§ D1595). The fun proxies' tension band runs the stage's own
+ * setting on its holdout seeds through the same builder with `'holdout'` named, so that config is
+ * required to equal the baseline arm of `batchRequestForStage(…, 'holdout')`, the batch
+ * `campaign/judge.ts` clears a stage on, and its legs to equal the game's on stage 1.
+ *
  * The control is the other half: a verb on the log must change the legs, or the session would be
  * ignoring the thing it exists to fuzz.
  */
@@ -27,7 +32,7 @@ import {
 import { armConfigOf } from '../batch/runBatch.js';
 import { requireBuilding } from '../fixtures.test-helper.js';
 import { useCampaignFixture } from './campaign.test-helper.js';
-import { batchRequestForStage, demonstrationConfigFor } from './stageRun.js';
+import { batchRequestForStage, demonstrationConfigFor, type StageSeedSet } from './stageRun.js';
 import type { CampaignStage } from './types.js';
 
 const fixture = useCampaignFixture();
@@ -42,8 +47,13 @@ function resourcesOf(stage: CampaignStage): StageSessionResources {
   };
 }
 
-function sessionOf(stage: CampaignStage, replication: number, log: SimulationConfig['interventions'] = []): SimulationConfig {
-  return stageSessionConfigFor(playStageOf(fixture.raw, stage.id), resourcesOf(stage), replication, log ?? []);
+function sessionOf(
+  stage: CampaignStage,
+  replication: number,
+  log: SimulationConfig['interventions'] = [],
+  seedSet: StageSeedSet = 'tuning',
+): SimulationConfig {
+  return stageSessionConfigFor(playStageOf(fixture.raw, stage.id), resourcesOf(stage), replication, log ?? [], seedSet);
 }
 
 function demonstrationOf(stage: CampaignStage, replication: number): SimulationConfig {
@@ -59,8 +69,8 @@ function demonstrationOf(stage: CampaignStage, replication: number): SimulationC
   });
 }
 
-function baselineArmOf(stage: CampaignStage, replication: number): SimulationConfig {
-  const request = batchRequestForStage(stage, stage.dispatcher.startingProfileId);
+function baselineArmOf(stage: CampaignStage, replication: number, seedSet: StageSeedSet = 'tuning'): SimulationConfig {
+  const request = batchRequestForStage(stage, stage.dispatcher.startingProfileId, undefined, seedSet);
   const arm = request.arms[0];
   if (arm === undefined) throw new Error('a stage batch has no baseline arm');
   return {
@@ -83,6 +93,28 @@ describe('the persona’s stage session is the stage run the game builds', () =>
           baselineArmOf(stage, replication),
         );
       }
+    }
+  });
+
+  it('reads every stage’s holdout set the way the game does: the same config as the holdout batch’s baseline arm', () => {
+    for (const stage of fixture.campaign.stages) {
+      for (const replication of [0, 7, stage.holdoutSeeds.replications - 1]) {
+        const session = sessionOf(stage, replication, [], 'holdout');
+        expect(session, `${stage.id} holdout replication ${String(replication)}`).toEqual(baselineArmOf(stage, replication, 'holdout'));
+        // And it is the holdout set rather than the tuning set relabelled: the seed moved.
+        expect(session.seed).not.toEqual(sessionOf(stage, replication).seed);
+      }
+    }
+  });
+
+  it('runs the same legs as the game’s holdout replication on stage 1', () => {
+    const stage = fixture.campaign.stages.find((candidate) => candidate.id === 'stage-1-first-call');
+    if (stage === undefined) throw new Error('the campaign has no stage-1-first-call');
+    for (const replication of [0, 7]) {
+      const session = runSimulation(sessionOf(stage, replication, [], 'holdout'));
+      const game = runSimulation(baselineArmOf(stage, replication, 'holdout'));
+      expect(session.record.passengers.length).toBeGreaterThan(0);
+      expect(session.record.passengers, `holdout replication ${String(replication)}`).toEqual(game.record.passengers);
     }
   });
 
