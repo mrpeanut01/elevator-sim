@@ -72,7 +72,13 @@ describe('a stage played — the bar reproduces and standing still clears nothin
     expect(unchanged.verdict.cleared).toBe(false);
     const comparison = unchanged.verdict.goals.find((goal) => goal.kind === 'beat-the-baseline');
     expect(comparison?.met).toBe(false);
-    expect(comparison?.sentence).toContain('not ordered');
+    /*
+     * § D1602: the two arms tied on every crowd and row, and the sentence says so as a fact about
+     * the figures. `playStage` hands the judge no admission, so the sentence claims neither *the
+     * same run* nor a change; only the one admission check may say the two are one setting.
+     */
+    expect(comparison?.sentence).toContain('every measure came out exactly the same under both settings');
+    expect(comparison?.sentence).not.toMatch(/same run|your change/u);
   });
 
   it('scores every count goal exactly level against its own bar', () => {
