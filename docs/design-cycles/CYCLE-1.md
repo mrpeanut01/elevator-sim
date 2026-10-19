@@ -87,110 +87,110 @@ is unmeasured (`docs/23-audiences-and-core-loop.md` § 1.5). The phone persona r
 clearing move before its third session, so its later picks were not blind.
 
 **Confirmed** (report agrees with telemetry)
-- [all three] **No verdict says how much.** "Behind" and "ahead" carry no size, and no wait appears in
+- **C1** [all three] **No verdict says how much.** "Behind" and "ahead" carry no size, and no wait appears in
   seconds anywhere on the Casual stage screen. Lobby parking (+1.49 s on a 16.88 s mean wait) and
   `nearest-car` (+2.95 s, and +7.11 s at the 95th percentile) get the same sentence shape, and
   "Cleared." reads the same for mid-zone parking (holdout upper bound −1.94 s) as for a marginal clear
   (−0.01 s). Read against `docs/23` § 1.4, where a figure may be reworded and may not be lost. Seed:
   both sets. Pillar 2, medium.
-- [all three] **An unchanged press cannot be told from a change that did nothing.** It prints "no
+- **C2** [all three] **An unchanged press cannot be told from a change that did nothing.** It prints "no
   measure separated the two settings", while both arms are the same run (every difference exactly
   0.000). `collective-enroute` prints the same sentence, and an unchanged re-run returns a
   byte-identical verdict with no notice. The on-arrival primary, "Run the stage", makes this the
   likeliest first press (phone). Seed: tuning. Pillar 2, medium to high.
-- [all three] **The consent card covers the game until it is answered.** At 1280 × 800 it pushes the
+- **C3** [all three] **The consent card covers the game until it is answered.** At 1280 × 800 it pushes the
   parking select, the control the brief points to, behind the run bar. At 390 × 844 it is 40 % of the
   screen, and at 360 × 740 it is 50 % with its own third paragraph clipped. That is a launch layout
   commitment at phone width (`docs/31-support-matrix.md` § 2). Every control stays reachable by
   scrolling. Pillar 1 and 2, medium.
-- [all three] **The retry loop runs through a long scroll.** After a press the page jumps to the verdict,
+- **C4** [all three] **The retry loop runs through a long scroll.** After a press the page jumps to the verdict,
   and the dials sit about 670 px above on a desktop and 1 200 to 1 500 px above on a phone, with only
   the verdict's heading above the bar on arrival. Pillar 4, medium.
-- [all three] **One parking choice dominates, and most standing orders are inert or worse.** Mid-zone
+- **C5** [all three] **One parking choice dominates, and most standing orders are inert or worse.** Mid-zone
   parking clears under 7 of 7 in-budget standing orders and lobby parking under 0 of 7 (the curious
   player's census, which reproduces the page's "12 ways through at 4 u"). `zoned-uppeak` at 2 u beats
   every other in-budget dispatcher on both sets, under a label that gives no hint. `eta` and
   `fairness-first` are bit-identical on tuning, so the extra 2 u buy nothing; § 1's engine baseline
   shows the same tie. `nearest-car`, the plainest name on the list, loses on all three measures.
   Pillar 3, medium.
-- [curious player, five-minutes-phone] **The stage is calm before anything changes, and reads that
+- **C6** [curious player, five-minutes-phone] **The stage is calm before anything changes, and reads that
   way.** "Nothing looks wrong" and "mostly empty, nothing builds" agree with the tension band: the
   watched crowd's queue has an interquartile swing of 0 (flat, below the 1.0 edge), and the baseline is
   flat on 49 of 50 runs in both sets (§ 1). No boarded rider waited over a minute at baseline (0 of 665
   tuning, 0 of 619 holdout), and a run carries about 13 riders against the "120 people" the page lists.
   The building is not drawn at all before the first press. Seed: both sets, watched crowd as above.
   Pillar 4, medium.
-- [number-averse, confirmed in source] **Two screens disagree about buying a wider budget, and the
+- **C7** [number-averse, confirmed in source] **Two screens disagree about buying a wider budget, and the
   purchase is out of reach.** The stage page sells the 24 u rung for 20 chimes ("Short by 14 chimes"
   after a clear) while the hub's footnote says "Nothing here sells a stage a wider budget yet"
   (`packages/viz/src/everyday/scenarioModel.ts:335`). One clear pays 6 chimes, and the stage needs no
   wider rung, since 12 ways through exist at 4 u. Pillar 1 for the unreachable verb, pillar 2 for the
   contradiction.
-- [curious player, five-minutes-phone] **The watched demonstration carries no clock and no wait
+- **C8** [curious player, five-minutes-phone] **The watched demonstration carries no clock and no wait
   readout.** On a phone the two panes stack into an 887 px block, so both are never on screen at once.
   Pillar 4 and 2, medium.
-- [five-minutes-phone] **"Start playing" does not start playing.** It opens a walkthrough, then a mode
+- **C9** [five-minutes-phone] **"Start playing" does not start playing.** It opens a walkthrough, then a mode
   list: four screens and five taps, against one tap on the lobby's "Main menu", a 68 × 26 px text link.
   Pillar 2, medium.
-- [five-minutes-phone] **On the lobby's CALL route the door sequence is most of the way to a first
+- **C10** [five-minutes-phone] **On the lobby's CALL route the door sequence is most of the way to a first
   verdict**: a countdown, a floor panel and an extra "Step out" tap, seven inputs against six by the
   menu link. Pillar 4 and 1, medium.
-- [five-minutes-phone] **The selects' current values are clipped** at 360 and 390 wide ("Conventional
+- **C11** [five-minutes-phone] **The selects' current values are clipped** at 360 and 390 wide ("Conventional
   collective, as the buildi…"). A layout commitment. Pillar 2, low.
-- [all three] **What holds.** Every verdict is true by its own rule. Both running totals reach their
+- **C12** [all three] **What holds.** Every verdict is true by its own rule. Both running totals reach their
   batch's 50 (the holdout line is replaced by the verdict at 46 to 49). The over-budget refusal reads
   clearly, and a free clear exists. No internal identifier reaches the player's text. Nothing overflows
   horizontally at 320, 360 or 390 wide, and no session logged a page error. Pillar 1, 2 and 4, positive.
 
 **Contradicted** (felt ≠ measured, usually a feedback or UI defect)
-- [all three] **The mixed verdict reads as a contradiction while the engine is consistent.** For forecast
+- **X1** [all three] **The mixed verdict reads as a contradiction while the engine is consistent.** For forecast
   parking, "Every goal met on the stage's own crowds, and not on the ones held back." sits above "Not
   cleared", and one paragraph is printed twice; while the holdout batch runs, the status line already
   says "Every goal met". The persona felt a win, then "nearly there". The numbers: better on tuning (mean
   wait −1.187 s [−2.034, −0.339]), the same direction but unresolved on holdout (−0.499 s [−1.198,
   0.199]). It is the verdict for the most natural first pick. Seed: both sets. Pillar 2, high.
-- [curious player, number-averse] **"Cleared" hides what the clear cost.** Mid-zone parking spends
+- **X2** [curious player, number-averse] **"Cleared" hides what the clear cost.** Mid-zone parking spends
   +142.6 kJ [+113.8, +171.4] more energy on tuning (+43 %), and `zoned-uppeak` +99.7 kJ (+30 %). The tail
   also lengthens: riders over a minute go from 0 to 2 on tuning and 0 to 1 on holdout, and the longest
   wait from 58.3 to 67.4 s. None of this is on the Casual page. The engine's own intervals do not
   resolve against the move, so the verdict is true by its rule, and energy stays an axis. Pillar 2,
   medium.
-- [curious player, number-averse] **The watched crowd misleads in both directions.** For
+- **X3** [curious player, number-averse] **The watched crowd misleads in both directions.** For
   `fairness-first` the two panes were identical in 146 of 146 samples, because replication 0 comes out
   the same in both arms, while over 50 crowds door-to-door is +1.90 s [+0.82, +2.99]. For the clearing
   moves replication 0 is the 5th most favourable of 50 (−9.12 s of mean wait against a mean of −2.71 s).
   For forecast parking the 95th-percentile wait is 29.31 s in both panes. Seed: tuning replication 0.
   Pillar 2 and 4, medium.
-- [five-minutes-phone] **"No sign of progress" while the progress line exists.** "Running k of 50" is in
+- **X4** [five-minutes-phone] **"No sign of progress" while the progress line exists.** "Running k of 50" is in
   the page throughout the run, but on a phone its top is at 951 px against a visible window of 50 to
   689 px. Pillar 4 and 2, medium.
-- [five-minutes-phone] **The persona credited the standing-order switch for a clear the switch did not
+- **X5** [five-minutes-phone] **The persona credited the standing-order switch for a clear the switch did not
   make.** `eta` alone is not ahead on mean wait (−0.28 s [−0.96, +0.40]) and is behind on door-to-door
   time. With parking held at forecast, the switch's own effect on mean wait is unresolved on both sets
   (−0.58 s [−1.24, +0.09] tuning, −0.26 s [−0.54, +0.02] holdout), and on holdout it is behind on
   door-to-door time (+1.34 s). The page offers no per-dial attribution. Rests on the persona's reasoning. Pillar 2, medium.
-- [curious player] **"A fit to fifty crowds" states a mechanism nobody measured.** The holdout rule
+- **X6** [curious player] **"A fit to fifty crowds" states a mechanism nobody measured.** The holdout rule
   stands; the sentence explaining a holdout miss does not. Pooled over both sets (post hoc, not the
   page's rule, no verdict drawn), forecast parking's mean-wait gain is −0.843 s [−1.387, −0.299].
   Pillar 2, medium.
-- [curious player, five-minutes-phone] **Time labels read as the player's time.** "13-23 min a case" and
+- **X7** [curious player, five-minutes-phone] **Time labels read as the player's time.** "13-23 min a case" and
   "2-4 min a day" sit on the Scenario floor and hub, while a stage-1 press answers in seconds.
   Premise-dependent. Pillar 1 and 4, low.
 
 **Unverifiable** (taste; weight low)
-- [all three] The vocabulary load: "shipped setting", "census", "par", "held-back crowds",
+- **U1** [all three] The vocabulary load: "shipped setting", "census", "par", "held-back crowds",
   "95th-percentile wait", "the interval on the difference excludes zero". The curious player's scan
   found fourteen such terms on the pre-run page. The plain spine phrases `docs/23` § 1.4 names ("away
   inside a minute", "the longest anybody stood") appear on no stage-1 screen.
-- [all three] The lift lobby as the front door: charming to two personas, in the way of the phone.
-- [curious player, number-averse] "6 chimes" and "It unlocks nothing" gave no felt reward.
-- [number-averse] The stage page reads like a form, with nothing that feels like a game before Run.
-- [curious player] The tutorial teaches "spread the cars out" and the stage calls the same change "in
+- **U2** [all three] The lift lobby as the front door: charming to two personas, in the way of the phone.
+- **U3** [curious player, number-averse] "6 chimes" and "It unlocks nothing" gave no felt reward.
+- **U4** [number-averse] The stage page reads like a form, with nothing that feels like a game before Run.
+- **U5** [curious player] The tutorial teaches "spread the cars out" and the stage calls the same change "in
   the middle of its own zone"; whether a real player links them is untested.
-- [curious player] "Most of the wait is decided before anyone presses a button" is a mechanism
+- **U6** [curious player] "Most of the wait is decided before anyone presses a button" is a mechanism
   sentence nobody measured.
-- [five-minutes-phone] The hub says "read the letter", and stage 1 has no letter.
-- [five-minutes-phone] Touch targets of 27 to 35 px tall, untested, because touch is out of scope.
+- **U7** [five-minutes-phone] The hub says "read the letter", and stage 1 has no letter.
+- **U8** [five-minutes-phone] Touch targets of 27 to 35 px tall, untested, because touch is out of scope.
 
 **For the meaningful-choice proxy.** One persona belief is on record: the phone persona believed the
 standing-order switch mattered, and it did not resolve. That is one *felt but null* entry. No persona
