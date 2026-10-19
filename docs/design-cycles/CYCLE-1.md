@@ -197,16 +197,70 @@ standing-order switch mattered, and it did not resolve. That is one *felt but nu
 pressed a verb, so § 1's player-session rate stays 0 of 0.
 
 ### 3. Design deltas  (outer loop, design-director)
-One or two only. Each is issue-shaped and ready for implementation subagents.
+One delta this cycle, as the quickstart's step 15 asks. The design-director subagent sized its candidates
+on tuning-20260730 only and read no holdout figure beyond those already in § 2. The decision is GitHub
+issue #645, ruling R1.
 
-#### Delta A — <imperative title>
-- Pillar served + how a player notices:
-- Simplicity budget (3 answers):
-- Track:
-- The change (prefer a `data/*.json` move; name any `packages/` module if code):
-- Evidence (finding id / sweep metric):
-- How we'll know it worked (metric + seeded comparison, verdict must carry a CI that excludes 0):
-- Reversibility:
+#### Delta A: make the stage verdict say how much, on both sets of crowds
+- **Pillar served and how a player notices:** pillar 2, Understandable. After a press, every "ahead" and
+  "behind" carries its size ("average wait shorter by between 0.34 and 2.03 seconds"). An interval that
+  contains zero reads "too close to call at 50 runs" with its range, on the held-back crowds as well as
+  the stage's own. A press identical to the building's own setting says the two runs were the same run.
+  Energy gets a line of its own, worded as higher or lower and never as better or worse.
+- **Simplicity budget:** (1) pillar 2, as above; forecast parking, the most natural first pick (X1),
+  stops reading as a win followed by a refusal. (2) It adds no verb, rule, control or screen, and moves
+  no judge rule: a clear is still beat-the-baseline on tuning-20260730 and again on holdout-20260731. On
+  the existing card it replaces the size-free sentence and the holdout's "do not agree … a fit to fifty
+  crowds" with the intervals in plain words, prints the held-back sentence once, and makes the running
+  line read "Met on the stage's own crowds." instead of "Every goal met." (3) Understood without a
+  tutorial step: the wording is the permitted column of `docs/23` § 1.4's table, and it removes two of
+  U1's jargon strings.
+- **Track:** Casual. The Engineer campaign panel prints the judge's sentences word for word, where the
+  change says more and never less.
+- **The change:** code, no `data/*.json` move, because the figures already exist: every
+  `BatchComparisonRow.estimate` carries the paired-t interval over 50 common-random-number replications,
+  and `packages/viz/src/campaign/judge.ts#comparisonSentence` drops it. In that file,
+  `comparisonSentence` and `holdoutSentenceOf` print the sizes through `BATCH_METRIC_PRESENTATION`, so the
+  card and the Engineer row print the same figure; the identity case is the one `elevator-sim compare`
+  already reports as IDENTICAL; and the unmeasured "a fit to fifty crowds" sentence goes (X6), amending
+  the owner-reversible wording of § D1159 clause 2. In `packages/viz/src/everyday/stagePlay.ts`, the
+  held-back status line, `STAGE_PLAY_COPY.metNotHeldHead` and `verdictViewOf` change as above. Energy is
+  read from the batch's axis rows onto its own line, because `honesty/properties.ts#checkEnergyWaitBlend`
+  refuses an energy figure inside a wait sentence and `CLAUDE.md` keeps energy beside AWT and WT95.
+- **Evidence:** C1, C2 and X1, each confirmed by all three personas; X6, X2, U1 and X5 in support; and
+  § 1's engine baseline, whose resolved door-to-door sizes run from −1.554 s to +6.627 s while the card
+  prints all of them in one shape.
+- **How we'll know it worked:** what a seeded run can decide is decided before merge. (a) No verdict moves:
+  the deep survivor census leaves `data/scenario-survivors.json` byte-identical, and
+  `elevator-sim fuzz --scenario stage-1-first-call --engagement` reprints § 1 unchanged. (b) Every printed
+  number is the run's own interval: `campaign/judge.test.ts` and `everyday/stagePlay.test.ts` pin the
+  bounds and words to `BatchComparisonRow.estimate` on both seed sets for the unchanged press,
+  `collective-enroute`, lobby, forecast and mid-zone parking, and `nearest-car`; "shorter" or "longer"
+  over an interval containing zero fails, and so does "too close to call" over one excluding it. (c) The
+  always-on honesty corpus stays at 0 failing cases. Whether people read a size correctly is a fact about
+  people that no simulation measures, so no paired-t interval can judge that half. Cycle 2's playtest
+  judges it against a pass written now: no persona reconfirms C1, C2 or X1; every persona that presses
+  forecast parking reports it as helping on the stage's own crowds and too close to call on the held-back
+  ones; and the felt-but-null count is 0 (cycle 1 had 1, X5). That is persona evidence about legibility,
+  weighted as such.
+- **Blast radius:** no `data/*.json` file, census, goal bar or published figure moves. Test strings and the
+  honesty seeds move, the always-on corpus row is re-measured, and one `DECISIONS.md` entry with a
+  `docs/39` § 2 row is owed.
+- **Reversibility:** one revert restores the old sentences; nothing depends on the words. If cycle 2 finds
+  the number-averse persona losing the verdict among the figures, the fallback is the head plus one sized
+  line for average wait, which still meets § 1.4.
+
+**Candidates considered and rejected,** in the design director's ranking:
+1. Raise stage 1's demand to the residential maximum (`data/campaign.json`): in band on 3 of 50 tuning
+   runs [0.021, 0.162] against 1 of 50, a forecast and not a verdict; DC-R1 caps demand there, and
+   `docs/33` § 3.3a measured the goals shut over the legal range.
+2. Author § D372's tutorial building (one car), the one lever measured to move the stage: a content lane
+   with its own census, brief and pins, and it leaves C1, C2 and X1 standing.
+3. Raise stage 1's replications from 50 to 200: fixes one marginal case and makes every press four times
+   longer.
+4. Move stage 1's tension-band edges: refused, because it would tune the instrument until the stage passes.
+5. Play a more typical crowd in the watched pair (X3): § D1496 rules replication 0, and a sized verdict
+   beside the pair limits the misreading.
 
 ### 4. Handoff to build loop
 - Branch / worktree: <name>
