@@ -150,17 +150,23 @@ const ALLOWED_EXTERNALS = ['@elevator-sim/core'];
 /**
  * Every module a browser bundle of `src/browser.ts` contains. Asserted by equality.
  *
- * Fourteen files: the barrel, the five of `tuning/space`, `reports/statistics.ts` and the
+ * Eighteen files: the barrel, the six of `tuning/space`, `reports/statistics.ts` and the
  * `reports/types.ts` it is declared against, the four pure `runner/` modules, `oracle/types.ts`
  * — which is here only because `runner/types.ts` imports one type from it, and which is the module
- * most likely to surprise a reader — and `benchmark/matrixCells.ts`, the experiment matrix's
+ * most likely to surprise a reader — `benchmark/matrixCells.ts`, the experiment matrix's
  * fixture data, split out of `matrix.ts` (whose graph reaches `node:url`) so Everyday Mode's suite
- * can import the cells rather than retype them. If this list changes, one of two things happened
+ * can import the cells rather than retype them, `fuzz/stageSession.ts`, and the two `engagement/`
+ * modules the viewer's mastery harness reads. The count read *fourteen* until the mastery harness
+ * landed, two files behind the list it described. If this list changes, one of two things happened
  * and both want a human: the barrel's surface moved, or the walk stopped following an edge.
  */
 const BROWSER_GRAPH = [
   'benchmark/matrixCells.ts',
   'browser.ts',
+  // The bands reader and the mastery slope, for the viewer's mastery harness (§ D1601). The floor
+  // `bands.ts` reads moved into `reports/statistics.ts` so that neither reaches `compare.ts`.
+  'engagement/bands.ts',
+  'engagement/mastery.ts',
   // The one `fuzz/` module on the barrel, for the viewer's stage-session agreement test (§ D1590).
   'fuzz/stageSession.ts',
   'oracle/types.ts',

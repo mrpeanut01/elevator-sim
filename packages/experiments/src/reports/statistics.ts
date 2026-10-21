@@ -104,6 +104,21 @@ export const DEFAULT_CONFIDENCE = 0.95;
 export const PUBLISHED_INTERVAL_FAMILY = 't' as const;
 
 /**
+ * Replications below which a report carries a warning.
+ *
+ * docs/03-traffic-and-statistics.md § Part 3: "Budget 50–200 replications per configuration, not
+ * 10." CIBSE's recommended ~10 runs reported ~5.6 s against a converged ~5.0 s in Peters & Abbi's
+ * measurement — a 12% error, larger than the gap between two decent dispatch algorithms. A report
+ * built on fewer than this says so, next to the numbers.
+ *
+ * Declared here rather than in `compare.ts`, which re-exports it unchanged, so that
+ * `engagement/bands.ts` can read the floor without reaching `compare.ts`'s persistence imports:
+ * the bands parser is on the environment-free barrel for the viewer's mastery harness
+ * (`DECISIONS.md` § D1601), and a module there may reach no Node builtin (`browser.test.ts`).
+ */
+export const RECOMMENDED_MIN_REPLICATIONS = 50;
+
+/**
  * A {@link MeanEstimate} whose family label is pinned to {@link PUBLISHED_INTERVAL_FAMILY}.
  *
  * `MeanEstimate.method` is typed `IntervalMethod`, the two-member union, because a *stored* run set

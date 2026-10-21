@@ -41,6 +41,13 @@
  * inventing a seed scheme; it counts the distinct seed sets it was handed, reports
  * `seedSetsDisjoint: false` when any repeats, and leaves the scheme to the owner.
  *
+ * The owner's decision panel settled it outside the game (§ D1601): the game keeps its fixed batch,
+ * and a harness re-judges each attempt with the game's own judge on a fresh batch of its own, batch
+ * *k* for attempt *k*. That harness is the viewer's `campaign/masteryHarness.ts`, because the judge
+ * lives there, and it hands both series here: each through {@link masterySlopeOf}, and the two
+ * together only through {@link pairedMasterySlope}. The fresh batches are declared in
+ * `data/mastery-seeds.json`. This module still invents no seed scheme and judges no attempt.
+ *
  * Pure. The decisions bind nothing outside `engagement/` (§ D405); the proxies are § D1595.
  */
 

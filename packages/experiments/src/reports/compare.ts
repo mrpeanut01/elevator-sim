@@ -44,6 +44,7 @@ import {
   pairedDifferenceEstimate,
   DEFAULT_CONFIDENCE,
   PUBLISHED_INTERVAL_FAMILY,
+  RECOMMENDED_MIN_REPLICATIONS,
 } from './statistics.js';
 import {
   ReportsError,
@@ -140,14 +141,11 @@ export const REPORT_METRICS: readonly MetricSpec[] = Object.freeze([
 export const HEADLINE_METRIC_ID = 'awt';
 
 /**
- * Replications below which a report carries a warning.
- *
- * docs/03-traffic-and-statistics.md § Part 3: "Budget 50–200 replications per configuration, not
- * 10." CIBSE's recommended ~10 runs reported ~5.6 s against a converged ~5.0 s in Peters & Abbi's
- * measurement — a 12% error, larger than the gap between two decent dispatch algorithms. A report
- * built on fewer than this says so, next to the numbers.
+ * Replications below which a report carries a warning. `statistics.ts` declares it, and its
+ * docstring there carries the argument and the reason it moved. Re-exported so that this module
+ * stays the name's home on the package's Node surface.
  */
-export const RECOMMENDED_MIN_REPLICATIONS = 50;
+export { RECOMMENDED_MIN_REPLICATIONS };
 
 /* -------------------------------------------------------------------------- *
  * Candidate reports
