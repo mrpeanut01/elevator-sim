@@ -18,7 +18,9 @@
  *
  * The named non-test caller is `elevator-sim fuzz --scenario <id> --engagement`
  * (`packages/cli/src/commands/fuzzEngagement.ts`), which reads `data/` itself so that everything here
- * stays a function of its arguments.
+ * stays a function of its arguments. `bands.ts` and `mastery.ts` have a second caller through the
+ * environment-free barrel: the viewer's mastery harness (`campaign/masteryHarness.ts`, § D1601),
+ * whose own consumer is a gated deriver rather than a shipped path.
  */
 
 export {

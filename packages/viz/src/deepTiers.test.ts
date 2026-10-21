@@ -575,6 +575,16 @@ const TIERS: Readonly<Record<string, Tier>> = Object.freeze({
       'building moves',
     scheduled: false,
   },
+  'packages/viz/src/campaign/measure.mastery.test.ts': {
+    gates: ['MASTERY_ATTEMPTS', 'MASTERY_OUT'],
+    reason:
+      '§ D1601’s mastery harness: every persona attempt in the playtest’s attempt file re-judged by ' +
+      'the stage’s own judge, once on the held-back batch the persona was shown and once on fresh ' +
+      'batch k from data/mastery-seeds.json, with the slopes over both series written to MASTERY_OUT. ' +
+      'Not scheduled because its input is a playtest’s own attempt file, which no workflow has; the ' +
+      'integrator runs it once per playtest. masteryHarness.test.ts holds the harness on every run',
+    scheduled: false,
+  },
   'packages/viz/src/campaign/shopTiers.sweep.test.ts': {
     gates: ['CAREER_SHOP_SWEEP'],
     reason:

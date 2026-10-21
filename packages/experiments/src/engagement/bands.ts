@@ -27,7 +27,9 @@
  * ## The budget is the repository's, not the file's
  *
  * `meaningfulChoice.replications` must sit in CLAUDE.md's 50 to 200 budget
- * (`RECOMMENDED_MIN_REPLICATIONS` is the floor `reports/compare.ts` already states). A mastery slope
+ * (`RECOMMENDED_MIN_REPLICATIONS` is the floor `reports/compare.ts` already states, declared in
+ * `reports/statistics.ts` so that this module reaches no Node builtin and can sit on the
+ * environment-free barrel for the viewer's mastery harness, § D1601). A mastery slope
  * needs at least three attempts, because `linearTrend` has no residual degrees of freedom below that
  * and its standard error is infinite.
  *
@@ -44,7 +46,7 @@
  */
 
 import type { PlaySeedSet } from '../fuzz/stageSession.js';
-import { RECOMMENDED_MIN_REPLICATIONS } from '../reports/compare.js';
+import { RECOMMENDED_MIN_REPLICATIONS } from '../reports/statistics.js';
 
 /** Raised when the bands file says something this module refuses to read. */
 export class EngagementBandsError extends Error {

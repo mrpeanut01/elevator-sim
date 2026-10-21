@@ -92,6 +92,26 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'The mastery harness, § D1601. `campaign/masteryHarness.ts` re-judges a playtest’s attempts on ' +
+        'fresh batches for the integrator, and its words are the deriver’s file and table, a refusal of ' +
+        'an attempt file or a seed declaration, and the agent-evidence label those outputs carry. No ' +
+        'surface draws any of them, and none may: clause 3 shows no fresh verdict to a persona, and ' +
+        'clause 1 leaves the game unchanged. The verdicts it reads are `judgeStage`’s, whose adapter ' +
+        'drives them by name.',
+      ids: [
+        'campaign/masteryHarness.ts#MASTERY_EVIDENCE_LABEL',
+        'campaign/masteryHarness.ts#formatMasteryReport',
+        'campaign/masteryHarness.ts#freshSeedCollisions',
+        'campaign/masteryHarness.ts#harnessStageOf',
+        'campaign/masteryHarness.ts#masteryReportOf',
+        'campaign/masteryHarness.ts#parseFreshSeeds',
+        'campaign/masteryHarness.ts#parseMasteryAttempts',
+        'campaign/masteryHarness.ts#planMasteryRejudge',
+        'campaign/masteryHarness.ts#rejudgeAttempt',
+      ],
+    },
+    {
+      reason:
         'The stage press — wave AJ lane AJ-K, § D1129. `campaign/stagePress.ts#pressStage` is the one ' +
         'admission check followed by the shipped sequence, and it is derived only through ' +
         '`admitStageMove`, whose prose it returns inside `StagePress.admission` untouched. Every ' +

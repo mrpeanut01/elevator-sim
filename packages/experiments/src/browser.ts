@@ -371,6 +371,36 @@ export type {
 export type { BudgetBasis, MatrixCell } from './benchmark/matrixCells.js';
 
 /* -------------------------------------------------------------------------- *
+ * engagement/{bands,mastery}: the bands file's reader and the mastery slope
+ * (DECISIONS.md § D1595 proxy 3, carried out under § D1601).
+ *
+ * For one consumer: the viewer's mastery harness, `campaign/masteryHarness.ts`,
+ * which re-judges each playtest attempt on a fresh batch through the game's own
+ * judge and must fit the slope here rather than a copy of it, because a second
+ * statement of the slope's rules is a second source of truth. The judge lives in
+ * the viewer and `experiments` may not import it, so the harness has to live
+ * there, and the viewer reaches this package only through this barrel.
+ *
+ * `bands.ts` reaches `reports/statistics.ts` for its replication floor and
+ * nothing else that is not already here; `mastery.ts` reaches `core`'s
+ * `linearTrend`, which `core`'s browser barrel exports. The other proxies stay
+ * on the Node barrel: nothing in the viewer asks for them.
+ * -------------------------------------------------------------------------- */
+
+export { EngagementBandsError, parseEngagementBands } from './engagement/bands.js';
+
+export type { EngagementBands, MasterySlopeBands } from './engagement/bands.js';
+
+export { masterySlopeOf, pairedMasterySlope } from './engagement/mastery.js';
+
+export type {
+  MasteryAttempt,
+  MasterySlope,
+  MasteryVerdict,
+  PairedMasterySlope,
+} from './engagement/mastery.js';
+
+/* -------------------------------------------------------------------------- *
  * runner/types.ts — only the types the values above need in their signatures.
  *
  * Deliberately not the whole module: most of what it declares describes the
