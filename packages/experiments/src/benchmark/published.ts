@@ -192,7 +192,9 @@ export interface PinnedEstimate {
  * `3e-4` **relative**, and the smallest effect the apparatus can resolve at all is a `1.9 s`
  * limit on a `~30 s` statistic — `6e-2` relative, two hundred times larger. A drift this size
  * cannot move a verdict, and no published rendering changes: `docs/05` § Phase 5 prints
- * `−0.0139 [−0.0317, +0.0038]` at 4 dp from either value.
+ * `−0.0139 [−0.0317, +0.0038]` at 4 dp from either value. (That pair is the tree before § D1603.
+ * The fixed release moves the run itself, to `-0.013891260712850448` on x64, which prints
+ * `−0.0139 [−0.0317, +0.0039]`; that is a change of the run, not of the machine.)
  *
  * ## The two bounds
  *
@@ -1647,7 +1649,7 @@ export const PINNED_ESTIMATES: Readonly<
     "8/wt95S": { n: 60, mean: -9.468464251426326, standardError: 1.5691425049296572, lower: -12.608311151352416, upper: -6.328617351500236 },
   }),
   "forecast-causality": Object.freeze({
-    "partialCorrelationWithFutureGivenPast": { n: 100, mean: -0.01394223164765208, standardError: 0.008955159208326503, lower: -0.03171121035296866, upper: 0.0038267470576644966 },
+    "partialCorrelationWithFutureGivenPast": { n: 100, mean: -0.013891260712850448, standardError: 0.008979396226663706, lower: -0.03170833092080762, upper: 0.003925809495106718 },
   }),
   "destination-disclosure": Object.freeze({
     "control/garden-residential/ttdMeanS": { n: 30, mean: -0.010298960627877088, standardError: 0.01029896062787709, lower: -0.03136270018716893, upper: 0.010764778931414755 },

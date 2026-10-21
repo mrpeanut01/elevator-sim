@@ -108,6 +108,11 @@ const DISPATCHER_IDS = ['nearest-car', 'eta', 'collective'] as const;
  * leg; it can say only that one machine reported a value. Anyone who needs the three-machine
  * argument again has to obtain it some other way, and a pin regenerated without it is an assumption
  * wearing an equality assertion, which is the § D201 defect exactly.
+ *
+ * **And again for § D1603, one cell, regenerated with `transportIdentity.test.ts`'s pin in the same
+ * run.** A released hall call now re-points the standing car that held it; on this seed only
+ * `vertical-city|collective` moves (it was `7f9b3a5a…`), and the other fourteen came back identical.
+ * One machine reported it, so this is the caveat above and not the three-machine argument.
  */
 const SUPERSEDED_STRUCTURAL: Readonly<Record<string, string>> = {
   'garden-apartments|nearest-car':
@@ -128,7 +133,7 @@ const SUPERSEDED_STRUCTURAL: Readonly<Record<string, string>> = {
   'secure-tower|collective': '13bce7a771756549df8c2432798fbd064014ed0dfd44b2dfb572fba5d72f1e36',
   'vertical-city|nearest-car': '40c925c5e7af9bb70cfafc5c1349b89cb49bca9814bbb96ad437e0d41d0bbf11',
   'vertical-city|eta': 'dc8d212732994a2b45b870440045309b850827809bf7f061bc89f3cc28c97a02',
-  'vertical-city|collective': '7f9b3a5adeeeb7ceb82d866bbe93c2e73346fc9401548f3dd4d4b19b261fef01',
+  'vertical-city|collective': '722d94b678ecf78421b739b8f24e2143ed23c327b7c869d3deb46f425077aa41',
 };
 
 /**
