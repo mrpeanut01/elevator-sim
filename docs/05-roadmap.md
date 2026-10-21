@@ -652,10 +652,12 @@ Seven measurements the headline hides, all of them results rather than opinions:
   samples, first movement at 2100 s (+300 s, exactly one bucket) and an argmax flip at 2400 s
   (+600 s). `auditForecastCausalityInRun` closes the half that study cannot reach — which arrivals the
   *run loop* hands the model — over 100 real replications of Midtown Office under mixed traffic:
-  **0 of 34 422** forecast queries ran backwards, `corr(forecast, preceding 300 s)` is 0.614 against
+  **0 of 34 435** forecast queries ran backwards, `corr(forecast, preceding 300 s)` is 0.614 against
   `corr(forecast, following 300 s)` 0.324, and the partial correlation with the future **given every
-  arrival the run had already produced** is **−0.0139 [−0.0317, +0.0038]** — zero, over replications
+  arrival the run had already produced** is **−0.0139 [−0.0317, +0.0039]** — zero, over replications
   rather than over queries. A forecast that leaked the trace would keep predictive power there.
+  (Re-measured on `f4c915a` for § D1603, which re-points a car on a released hall call: it was 0 of
+  34 422 and an upper bound of +0.0038, and the verdict is unchanged.)
 - **`nearest-car` is too weak a baseline to separate anything.** Unchanged: it loses by 27–30 % on
   the up-peak buildings and is the only profile that saturates inside the measured budget, capping
   Midtown Office at **n = 287**. `zoned-uppeak` is now the only other arm that ever loses its AWT in

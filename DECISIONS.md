@@ -54362,8 +54362,8 @@ behaviour back for a control.
      [−0.0317, +0.0038] to −0.0139 [−0.0317, +0.0039]. The interval still holds zero, so the finding
      that the predictor reads no future stands. Re-derived with `regeneratePins.ts`'s own expression
      for that study; on this container the unfixed tree gives −0.013946…, the x64 value the pin's
-     note already records, and the fixed tree −0.013891…. Republished in `benchmark/index.ts` § 6,
-     `predictorLag.test.ts`'s header and `docs/05-roadmap.md` § Phase 5.
+     note already records, and the fixed tree, `f4c915a`, −0.013891…. Republished in
+     `benchmark/index.ts` § 6, `predictorLag.test.ts`'s header and `docs/05-roadmap.md` § Phase 5.
    The three `core` pins were re-derived by running those files' own measuring functions on the
    lane's tree, which reproduced every unmoved cell exactly.
 5. **Stopped: published verdicts move, and they are the panel's.** The always-on `viz` suite goes red
@@ -54398,7 +54398,10 @@ behaviour back for a control.
      rows) and `record/burjOperator.test.ts` (the 57-lift bracket) move figures.
    Whether R2's fix stands with these verdicts moved, or is held until they are re-authored, is not
    the lane's to decide.
-6. **What is held.** `Car.setMode` drops a car's hall calls when it leaves service and does not
+6. **`docs/design-cycles/CYCLE-1.md` § 1.** `elevator-sim fuzz --scenario stage-1-first-call
+   --engagement` prints the same output on `f4c915a` as on `ae255db`, so § 1 gains one sentence saying
+   so and nothing in it moves.
+7. **What is held.** `Car.setMode` drops a car's hall calls when it leaves service and does not
    re-settle it either. R2 names the two releases, so it is not changed here. A scratch probe over
    the 2 000 deep sessions of `stage-1-first-call` on this lane's tree counted 7 864 mode changes,
    20 of which left a standing car pointing past its work (5 of them a return to service), and
