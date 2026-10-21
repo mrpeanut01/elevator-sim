@@ -54367,7 +54367,10 @@ behaviour back for a control.
    The three `core` pins were re-derived by running those files' own measuring functions on the
    lane's tree, which reproduced every unmoved cell exactly.
 5. **Stopped: published verdicts move, and they are the panel's.** The always-on `viz` suite goes red
-   in 16 files (33 cases), and among them are verdict words. They are not re-published here; each
+   in 16 files (33 cases), `server` in one (3 cases, the server's half of the same rush hold table)
+   and `viz-browser` in two (`everyday/stageWatch.browser.test.ts`'s moved-no-count line and
+   `everyday/fixitHint.browser.test.ts`'s not-fixed check, which wait for screens the moved runs no
+   longer produce; both pass with the old `car.ts` swapped back in), and among them are verdict words. They are not re-published here; each
    pin is left as it was, so the red is the record:
    - **Scenario stages.** `campaign/stageVerdictsHold.test.ts`: the census's way through
      `stage-3-overwhelmed` (`fairness-first`) goes from met, held and cleared to not met;
@@ -54376,8 +54379,9 @@ behaviour back for a control.
      `campaign/stageFiveClears.test.ts`, `campaign/judgeCleared.test.ts` and
      `campaign/stageSequence.test.ts`: no shipped profile clears `stage-5-credentials` from the
      dropdown any more. `scenario/goalRates.test.ts`: `data/scenario-goals.json`'s counts move
-     (`stage-3-overwhelmed`'s `nobody-abandoned`, 28 and 29 of 50 to 29 and 30 of 50, among others),
-     and `everyday/stageSameCounts.test.ts` no longer finds its stage-3 case, lobby parking under
+     (`stage-3-overwhelmed`'s `nobody-abandoned`, 28 and 29 of 50 to 29 and 30 of 50; the test stops
+     at the first scenario that differs, so the stages after it are unread), and
+     `everyday/stageSameCounts.test.ts` no longer finds its stage-3 case, lobby parking under
      Min-wait giving the counts Min-wait gave.
    - **Fix-a-building.** `bed-cars-locked-out`'s diagnosed repair no longer clears (the complaint
      falls 50 %, under the 80 % bar; the ruled judge reads `not-enough`), its as-built letter moves
@@ -54396,6 +54400,13 @@ behaviour back for a control.
      c7's day 1 is legible on 6 of the first ten seeds, not 7. `everyday/firstDayLength.test.ts`
      (call timings), `everyday/rushHandover.test.ts`, `everyday/rushHoldAgreement.test.ts` (three
      rows) and `record/burjOperator.test.ts` (the 57-lift bracket) move figures.
+   - **Two censuses checked here, both moved.** `everyday/rushHouseSweep.test.ts`
+     (`ELEVATOR_SIM_RUSH_HOUSE=deep`): 6 of 17 buildings' house rows in `data/rush-house-runs.json`
+     no longer reproduce. `fixit/asBuiltMornings.sweep.test.ts` (`ELEVATOR_SIM_FIXIT_MORNINGS=deep`):
+     13 of 18 cases' forty-nine mornings in `data/fixit-as-built-mornings.json` no longer reproduce.
+     The shipped press reads that file, so until it is regenerated a press pairs as-built readings
+     from the old engine with after-runs from the new one; the always-on suite runs both live and
+     does not see it. Neither file is regenerated here.
    Whether R2's fix stands with these verdicts moved, or is held until they are re-authored, is not
    the lane's to decide.
 6. **`docs/design-cycles/CYCLE-1.md` § 1.** `elevator-sim fuzz --scenario stage-1-first-call
