@@ -1158,6 +1158,52 @@ describe('service mode', () => {
     expect(car.setMode('in-service')).toEqual([]);
     expect(car.assignedHallCalls).toHaveLength(1);
   });
+
+  /*
+   * § D1603, the owner's decision panel's ruling R6. A stationary car whose calls a mode change
+   * drops points at what it has left, as on a release; until R6 it kept the dropped calls' direction
+   * and carried it back into service.
+   */
+  it('re-points a stationary car when a mode change drops its calls', () => {
+    const car = makeCar();
+    car.assignHallCall(hallCall('6', 'up', 3));
+    expect(car.direction).toBe('up');
+    car.setMode('independent');
+    expect(car.direction).toBeUndefined();
+    car.setMode('in-service');
+    expect(car.direction).toBeUndefined();
+
+    // Independent service keeps the car calls, so a car with one behind it turns round.
+    const middle = makeCar({ homeFloorId: '3' });
+    middle.assignHallCall(hallCall('6', 'up', 4));
+    middle.registerCarCall('1', 5);
+    expect(middle.direction).toBe('up');
+    middle.setMode('independent');
+    expect(middle.direction).toBe('down');
+
+    // Out of service drops the car calls too, and a car left with nothing goes directionless.
+    const recalled = makeCar({ homeFloorId: '3' });
+    recalled.registerCarCall('8', 5);
+    expect(recalled.direction).toBe('up');
+    recalled.setMode('out-of-service');
+    expect(recalled.direction).toBeUndefined();
+  });
+
+  it('leaves a stationary car alone when a mode change drops nothing, and a moving car until it arrives', () => {
+    const idle = makeCar({ homeFloorId: '3' });
+    idle.registerCarCall('8', 5);
+    idle.setMode('independent');
+    expect(idle.direction).toBe('up');
+
+    const clock = clockAt(0);
+    const moving = makeCar({ clock });
+    moving.assignHallCall(hallCall('6', 'up', 0));
+    const motion = moving.departFor('6', 0);
+    moving.setMode('independent');
+    expect(moving.direction).toBe('up');
+    moving.completeArrival(motion.arrivesAt);
+    expect(moving.direction).toBeUndefined();
+  });
 });
 
 /* -------------------------------------------------------------------------- *

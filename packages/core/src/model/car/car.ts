@@ -402,6 +402,13 @@ export class Car implements CarLike {
    * as well as `in-service` — that is, going to `fire-recall` or `out-of-service` — also
    * drops its car calls, since it is no longer carrying anyone.
    *
+   * A car standing still that loses calls this way re-points at the work it has left
+   * (`#settleIfStanding`), as a released or withdrawn call makes it, and goes directionless when it
+   * has none. Until the owner's decision panel's ruling R6 folded it into § D1603, a mode change
+   * left the car pointing where its dropped calls had been, which is the state § D1600 clause 1
+   * refused, and a car returned to service carried it back. A moving car keeps its direction and
+   * settles on arrival.
+   *
    * @returns the hall calls released, so the caller can hand them back to the dispatcher.
    */
   setMode(mode: ServiceMode): readonly HallCall[] {
@@ -409,13 +416,17 @@ export class Car implements CarLike {
     this.#mode = mode;
 
     let released: readonly HallCall[] = [];
+    let dropped = false;
     if (!acceptsHallCalls(mode)) {
       released = [...this.#hallCalls.values()];
+      dropped = released.length > 0;
       this.#hallCalls.clear();
     }
     if (!acceptsCarCalls(mode)) {
+      dropped ||= this.#carCalls.size > 0;
       this.#carCalls.clear();
     }
+    if (dropped) this.#settleIfStanding();
     return released;
   }
 
@@ -1760,7 +1771,8 @@ export class Car implements CarLike {
 
   /**
    * Re-point a car that is standing still, after its committed work changed under it: a call
-   * assigned, a car call registered, a hall call released, withdrawn or handed back with the rest.
+   * assigned, a car call registered, a hall call released, withdrawn or handed back with the rest,
+   * or calls dropped by a change of service mode.
    * A moving car is left alone, because its direction is the move it is committed to, and
    * {@link completeArrival} settles it on arrival.
    */

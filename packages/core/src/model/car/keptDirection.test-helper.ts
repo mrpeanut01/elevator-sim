@@ -1,29 +1,33 @@
 /**
  * **A hand-back as it was before § D1591 and § D1603**, for a test that has to put the old one back.
  *
- * `Car.releaseHallCall`, `Car.withdrawHallCall` and `Car.releaseAllHallCalls` re-point a car that
- * is standing still through `#settleDirection`, and that method reads the car's stops through
- * `this.committedStops()`. So the old behaviour, in which the car kept its direction whatever it
- * had left, is the current method run with the instance's `committedStops` shadowed for the length
- * of the call by one stop infinitely far ahead in the car's direction, or by none for a car with
- * no direction: the re-settle then keeps whatever the car had. Nothing else inside those three
- * methods reads `committedStops`, so the call takes exactly the same hall calls off the car.
+ * `Car.releaseHallCall`, `Car.withdrawHallCall`, `Car.releaseAllHallCalls` and `Car.setMode`
+ * re-point a car that is standing still through `#settleDirection`, and that method reads the car's
+ * stops through `this.committedStops()`. So the old behaviour, in which the car kept its direction
+ * whatever it had left, is the current method run with the instance's `committedStops` shadowed for
+ * the length of the call by one stop infinitely far ahead in the car's direction, or by none for a
+ * car with no direction: the re-settle then keeps whatever the car had. Nothing else inside those
+ * four methods reads `committedStops`, so the call takes exactly the same calls off the car.
  *
  * Until § D1603 a test put the old withdrawal back by assigning `releaseHallCall` over it. That no
  * longer works, because the release re-settles too.
  *
  * **The control checks itself.** Every test that uses it requires the old figures to come back (the
- * deadlock in `sim/serviceRange.test.ts`, the stale releases in `sim/releaseDirection.test.ts`), so
- * a change to how `#settleDirection` reads the stops shows up there as a red, never as a silent
- * pass. `experiments/src/fuzz/releaseDirection.test.ts` carries its own copy, because a test
- * helper is not on `core`'s barrel.
+ * deadlock in `sim/serviceRange.test.ts`, the stale releases and stale mode changes in
+ * `sim/releaseDirection.test.ts`), so a change to how `#settleDirection` reads the stops shows up
+ * there as a red, never as a silent pass. `experiments/src/fuzz/releaseDirection.test.ts` carries
+ * its own copy, because a test helper is not on `core`'s barrel.
  */
 
 import type { Car } from './car.js';
 import type { CommittedStop } from './types.js';
 
-/** The three hand-backs a test can put the old behaviour back on. */
-export type HandBack = 'releaseHallCall' | 'withdrawHallCall' | 'releaseAllHallCalls';
+/**
+ * The methods a test can put the old behaviour back on: the three hand-backs, and `setMode`, which
+ * re-settles a standing car when it drops calls since the owner's decision panel's ruling R6 (§ D1603).
+ * Each can be put back on its own, so each change is measured with the others held fixed.
+ */
+export type HandBack = 'releaseHallCall' | 'withdrawHallCall' | 'releaseAllHallCalls' | 'setMode';
 
 /** `method`, run with the car's direction held where it was. */
 export function keepingDirection<A extends unknown[], R>(

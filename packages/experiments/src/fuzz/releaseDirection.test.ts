@@ -5,9 +5,9 @@
  * § D1591 fixed one path by which a stationary car is left pointing at work it no longer has
  * (`Car.withdrawHallCall`, used by `Simulation.#withdrawCall`) and held the same gap in
  * `Car.releaseHallCall` and `Car.releaseAllHallCalls`. § D1603 closed it there, carrying out the
- * owner's decision panel's ruling R2 (§ D1600). Each half rests on counts over shipped runs, and
- * CLAUDE.md's rule is that a published number is pinned to the run that produced it. These are
- * those runs.
+ * owner's decision panel's ruling R2 (§ D1600), and in `Car.setMode` by the panel's ruling R6. Each
+ * part rests on counts over runs, and CLAUDE.md's rule is that a published number is pinned to the
+ * run that produced it. These are those runs.
  *
  * - **494 runs** (ten shipped buildings, every shipped profile, two seeds, a 900 s horizon and the
  *   demand template's own, bar `vertical-city`'s, the costliest), each run three times: as shipped,
@@ -19,10 +19,14 @@
  *   one, and the two runs whose legs move.
  * - **The Phase 6 gate cell**: Mixed-Use High-Rise at up-peak 4 %, n = 200, every arm the gate study
  *   runs there, as shipped and with the old release put back. No leg moves.
+ * - **The 2 000 sessions `elevator-sim fuzz --scenario stage-1-first-call --tier deep` plays**, as
+ *   built and with the old `setMode` alone put back, the release fixed in both arms: R6's fold
+ *   measured on its own. No shipped run above changes a car's service mode, so these verb logs are
+ *   where it can act. It moves one session.
  *
- * A release is **stale** when it leaves a car that is standing still with a direction and no
- * committed stop ahead in it, and it points **at nothing** when the car has no committed stop at
- * all. Each stale release is attributed to the `Simulation` method that made it, read off the stack,
+ * A release (or a mode change) is **stale** when it leaves a car that is standing still with a
+ * direction and no committed stop ahead in it, and it points **at nothing** when the car has no
+ * committed stop at all. Each stale release is attributed to the `Simulation` method that made it, read off the stack,
  * because § D1591 argued the gap per path. A **stale refusal** is what such a car costs a rider:
  * `noDirectionReversal` refusing it a call while it stands in that state, read off the dispatch
  * decision's own rejected list. What a rider paid where the legs move is read per journey: its
@@ -56,6 +60,7 @@ import {
   type SimulationConfig,
   type SimulationResult,
 } from '@elevator-sim/core';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { beforeAll, describe, expect, it } from 'vitest';
 
@@ -73,6 +78,9 @@ import { planExperiment, replicationSeed, simulationConfigFor } from '../runner/
 import { withProfiles } from '../validation/harness.js';
 
 import { deepCampaignRequested } from './campaign.js';
+import { PlaySessions } from './play.js';
+import { deepPlaySeeds } from './playCampaign.js';
+import { DEEP_PLAY_SPACE, playCaseFromSeed, playContextFor } from './verbs.js';
 
 const DATA_DIR = fileURLToPath(new URL('../../../../data', import.meta.url));
 
@@ -87,12 +95,13 @@ beforeAll(async () => {
  * The controls
  * -------------------------------------------------------------------------- */
 
-/** The three hand-backs, on the prototype every car of a run shares. */
-type HandBack = 'withdrawHallCall' | 'releaseHallCall' | 'releaseAllHallCalls';
+/** The three hand-backs and `setMode`, on the prototype every car of a run shares. */
+type HandBack = 'withdrawHallCall' | 'releaseHallCall' | 'releaseAllHallCalls' | 'setMode';
 type CarPrototype = Record<HandBack, (this: ProbedCar, ...args: unknown[]) => unknown>;
 
 /** A car's state, as the probe reads it. Public getters only. */
 interface ProbedCar {
+  readonly mode: string;
   readonly isMoving: boolean;
   readonly direction: 'up' | 'down' | undefined;
   readonly floorIndex: number;
@@ -176,10 +185,14 @@ interface Tally {
   refusedCalls: number;
   /** Runs with at least one such refusal. */
   refusingRuns: number;
+  /** Service-mode changes (`Car.setMode` calls that changed the mode). */
+  modeChanges: number;
+  /** Mode changes that left a standing car with a direction and no committed stop ahead in it. */
+  staleModeChanges: number;
 }
 
 function emptyTally(): Tally {
-  return { stale: 0, atNothing: 0, byPath: {}, refusals: 0, refusedCalls: 0, refusingRuns: 0 };
+  return { stale: 0, atNothing: 0, byPath: {}, refusals: 0, refusedCalls: 0, refusingRuns: 0, modeChanges: 0, staleModeChanges: 0 };
 }
 
 /** A standing car whose direction points at no committed stop ahead: `'nothing'` when it has none. */
@@ -195,11 +208,15 @@ function staleness(car: {
   return car.stops.length === 0 ? 'nothing' : 'past';
 }
 
-/** One run, with every release and every `noDirectionReversal` refusal read into `into`. */
+/**
+ * One run, with every release, every mode change and every `noDirectionReversal` refusal read into
+ * `into`.
+ */
 function probed(sim: Simulation, into: Tally): SimulationResult {
   const proto = prototypeOf(sim);
   const release = proto.releaseHallCall;
   const releaseAll = proto.releaseAllHallCalls;
+  const setMode = proto.setMode;
   const policy = WeightedCostDispatchPolicy.prototype;
   const dispatch = policy.dispatch;
   const refused = new Set<string>();
@@ -224,6 +241,16 @@ function probed(sim: Simulation, into: Tally): SimulationResult {
     read(this, Array.isArray(out) && out.length > 0, new Error().stack ?? '');
     return out;
   };
+  proto.setMode = function (this: ProbedCar, ...args: unknown[]): unknown {
+    const before = this.mode;
+    const out = setMode.apply(this, args);
+    if (this.mode === before) return out;
+    into.modeChanges += 1;
+    if (staleness({ moving: this.isMoving, direction: this.direction, floorIndex: this.floorIndex, stops: this.committedStops() }) !== undefined) {
+      into.staleModeChanges += 1;
+    }
+    return out;
+  };
   policy.dispatch = function (this: WeightedCostDispatchPolicy, ...args: Parameters<WeightedCostDispatchPolicy['dispatch']>) {
     const decision = dispatch.apply(this, args);
     for (const verdict of decision.rejected) {
@@ -241,6 +268,7 @@ function probed(sim: Simulation, into: Tally): SimulationResult {
   } finally {
     proto.releaseHallCall = release;
     proto.releaseAllHallCalls = releaseAll;
+    proto.setMode = setMode;
     policy.dispatch = dispatch;
     into.refusals += refusals;
     into.refusedCalls += refused.size;
@@ -370,7 +398,11 @@ describe.skipIf(!deepCampaignRequested())('§ D1591 and § D1603, measured on sh
       refusals: 683,
       refusedCalls: 60,
       refusingRuns: 11,
+      modeChanges: 0,
+      staleModeChanges: 0,
     });
+    // `modeChanges: 0` in both arms: no run here changes a car's service mode, so the re-settle the
+    // ruling R6 folded into `setMode` cannot move one of them.
     expect(tally.fixed).toEqual(emptyTally());
     expect(releaseMoves).toEqual(RELEASE_MOVES_494);
     expect({ ...effect, totalS: Number(effect.totalS.toFixed(3)) }).toEqual(RIDERS_494);
@@ -419,8 +451,11 @@ describe.skipIf(!deepCampaignRequested())('§ D1591 and § D1603, measured on sh
       refusals: 15,
       refusedCalls: 6,
       refusingRuns: 2,
+      modeChanges: 0,
+      staleModeChanges: 0,
     });
     // § D1603: no release leaves a standing car pointing past its work, and nothing is refused for it.
+    // No run here changes a car's service mode either (`modeChanges: 0`), so R6's `setMode` moves none.
     expect(tally.fixed).toEqual(emptyTally());
     // The fix is what moves these two runs, and only these two.
     expect(moves).toEqual(['midtown-office/zoned-uppeak/2', 'crown-hotel/collective/2']);
@@ -473,10 +508,54 @@ describe.skipIf(!deepCampaignRequested())('§ D1591 and § D1603, measured on sh
     expect(arms).toEqual(['nearest-car', 'eta', 'collective', 'destination-eta-unpriced', 'destination-eta+ride1', 'destination-panel']);
     expect(runs).toBe(1_200);
     expect(moves).toEqual([]);
+    // No replication changes a car's service mode (`modeChanges: 0`), so R6's `setMode` moves none.
     expect(fixed).toEqual(emptyTally());
     expect(Object.fromEntries(Object.entries(old).filter(([, tally]) => tally.stale > 0))).toEqual({
       'destination-panel': { ...emptyTally(), stale: 91, atNothing: 91, byPath: { 're-offer': 91 } },
     });
+  }, 3_600_000);
+
+  /*
+   * R6's fold, measured alone (§ D1603): every session the deep play tier plays on stage 1, built
+   * exactly as `elevator-sim fuzz --scenario stage-1-first-call --tier deep --cases 2000` builds it,
+   * run on the fixed engine and again with the old `setMode` put back. The release is fixed in both
+   * arms, so whatever moves is the mode change's re-settle and nothing else.
+   */
+  it('on the 2 000 deep stage-1 sessions, the mode change’s re-settle removes 16 stale cars and 2 refusals and moves one session', () => {
+    const campaign = JSON.parse(readFileSync(`${DATA_DIR}/campaign.json`, 'utf8')) as unknown;
+    const priceSchedule = JSON.parse(readFileSync(`${DATA_DIR}/price-schedule.json`, 'utf8')) as unknown;
+    const context = playContextFor({ config, campaign, priceSchedule, stageId: 'stage-1-first-call' });
+    const sessions = new PlaySessions(context);
+    const tally = { old: emptyTally(), fixed: emptyTally() };
+    const effect = emptyEffect();
+    const moves: number[] = [];
+    let played = 0;
+    for (const seed of deepPlaySeeds(2_000, 1_000_001)) {
+      const playCase = playCaseFromSeed(seed, context, DEEP_PLAY_SPACE);
+      const runConfig = sessions.configFor(playCase.log, playCase.replication);
+      const fixed = probed(new Simulation(runConfig), tally.fixed);
+      const sim = new Simulation(runConfig);
+      const old = withOldHandBack(prototypeOf(sim), ['setMode'], () => probed(sim, tally.old));
+      played += 1;
+      if (legsOf(old) !== legsOf(fixed)) {
+        moves.push(seed);
+        addEffect(effect, old, fixed);
+      }
+    }
+    console.log(
+      `\n§ D1603 R6 on ${String(played)} stage-1 sessions: the old setMode ${JSON.stringify(tally.old)}; the fixed ${JSON.stringify(tally.fixed)}; ` +
+        `legs move on ${JSON.stringify(moves)}; riders ${JSON.stringify(effect)}\n`,
+    );
+    expect(played).toBe(2_000);
+    // The old `setMode`: 16 mode changes left a standing car pointing past its work (14 of them at
+    // nothing, 5 of them a return to service), and `noDirectionReversal` refused such a car 2 calls,
+    // in one session. No release left one, since the release is fixed in both arms.
+    expect(tally.old).toEqual({ ...emptyTally(), modeChanges: 5_059, staleModeChanges: 16, refusals: 2, refusedCalls: 2, refusingRuns: 1 });
+    // With the fold: the same 5 059 mode changes, none of them stale, and no such refusal.
+    expect(tally.fixed).toEqual({ ...emptyTally(), modeChanges: 5_059 });
+    // The fold moves one session, `core/src/sim/releaseDirection.test.ts`'s always-on case.
+    expect(moves).toEqual([1_000_611]);
+    expect({ ...effect, totalS: Number(effect.totalS.toFixed(3)) }).toEqual(RIDERS_STAGE_ONE);
   }, 3_600_000);
 });
 
@@ -537,4 +616,20 @@ const RIDERS_147: RiderEffect = {
   undeliveredUnderOneOnly: 0,
   abandoned: 0,
   stranded: 0,
+};
+
+/**
+ * The riders of the one stage-1 session the mode change's re-settle moves, fixed minus old: every
+ * journey delivered or not alike under both, the same two stranded under both, and the moved
+ * door-to-door times split both ways.
+ */
+const RIDERS_STAGE_ONE: RiderEffect = {
+  journeys: 15,
+  moved: 5,
+  later: 3,
+  sooner: 2,
+  totalS: -12.397,
+  undeliveredUnderOneOnly: 0,
+  abandoned: 0,
+  stranded: 2,
 };
