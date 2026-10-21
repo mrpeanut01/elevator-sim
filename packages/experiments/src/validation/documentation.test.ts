@@ -2234,9 +2234,10 @@ type DecisionReservation = {
  * is registered in `KNOWN_DECISION_HOLES`; **D1360-D1400 are free rather than holed**, since nothing
  * is written above them (§ D430), and the charter row moves to **D1360**.
  */
-const OPEN_RESERVATION = { wave: 'AU', from: 1603, to: 1619 } as DecisionReservation | null;
+const OPEN_RESERVATION = { wave: 'AU', from: 1603, to: 1629 } as DecisionReservation | null;
 /*
- * **Wave AU holds D1603-D1619.** The release-direction lane the owner's decision panel ruled must land
+ * **Wave AU holds D1603-D1629** (opened as D1603-D1619 and extended before any lane passed D1619, when
+ * the fix's moved content needed four more lanes). The release-direction lane the owner's decision panel ruled must land
  * after wave AT and before the second design cycle measures anything (§ D1600): measure what a wrong
  * direction costs a rider, fix `releaseHallCall` and `releaseAllHallCalls`, run the deep tiers, and
  * re-derive every pin that moves. The integrator cuts the lane a contiguous block from this range at
