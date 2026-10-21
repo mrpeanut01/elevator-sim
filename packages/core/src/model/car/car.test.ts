@@ -1006,9 +1006,9 @@ describe('calls', () => {
   });
 
   /*
-   * § D1591. A stationary car told a call is gone points at what it has left; a car merely handed
-   * a call back does not, yet. The second half pins the gap the decision holds, so closing it is a
-   * visible change to this test rather than a silent one.
+   * § D1591 and § D1603. A stationary car that loses a hall call, whether the call is gone
+   * (withdrawn) or handed back to the group (released, alone or with the rest), points at what it
+   * has left. Until § D1603 a release kept the call's direction; the cases below pin the change.
    */
   it('re-points a stationary car when its only call is withdrawn, and goes directionless with nothing left', () => {
     const car = makeCar();
@@ -1031,13 +1031,61 @@ describe('calls', () => {
     expect(middle.direction).toBe('down');
   });
 
-  it('still keeps a released call’s direction — the gap § D1591 records and does not close', () => {
+  it('re-points a stationary car when a call is released, as on a withdrawal — the gap § D1591 held, closed by § D1603', () => {
     const car = makeCar();
     const call = hallCall('6', 'up', 3);
     car.assignHallCall(call);
+    expect(car.direction).toBe('up');
     expect(car.releaseHallCall(call.id)).toBe(true);
     expect(car.committedStops()).toEqual([]);
+    expect(car.direction).toBeUndefined();
+    // A release of a call the car does not hold changes nothing.
+    expect(car.releaseHallCall(call.id)).toBe(false);
+    expect(car.direction).toBeUndefined();
+
+    // With work left behind it, the car turns round rather than going directionless.
+    const middle = makeCar({ homeFloorId: '3' });
+    const ahead = hallCall('6', 'up', 4);
+    middle.assignHallCall(ahead);
+    middle.registerCarCall('1', 5);
+    expect(middle.direction).toBe('up');
+    middle.releaseHallCall(ahead.id);
+    expect(middle.direction).toBe('down');
+
+    // With a stop still ahead, the release leaves the direction alone.
+    const onward = makeCar({ homeFloorId: '3' });
+    const near = hallCall('5', 'up', 6);
+    onward.assignHallCall(near);
+    onward.assignHallCall(hallCall('8', 'up', 7));
+    onward.releaseHallCall(near.id);
+    expect(onward.direction).toBe('up');
+  });
+
+  it('re-points a stationary car when it hands every call back, and only when it held one', () => {
+    const car = makeCar({ homeFloorId: '3' });
+    car.assignHallCall(hallCall('6', 'up', 3));
+    car.assignHallCall(hallCall('9', 'down', 4));
+    car.registerCarCall('1', 5);
     expect(car.direction).toBe('up');
+    expect(car.releaseAllHallCalls()).toHaveLength(2);
+    expect(car.direction).toBe('down');
+
+    // Nothing held, nothing released, nothing re-settled.
+    expect(car.releaseAllHallCalls()).toEqual([]);
+    expect(car.direction).toBe('down');
+  });
+
+  it('leaves a moving car’s direction alone on a release, and settles it on arrival', () => {
+    const clock = clockAt(0);
+    const car = makeCar({ clock });
+    const call = hallCall('6', 'up', 0);
+    car.assignHallCall(call);
+    const motion = car.departFor('6', 0);
+    expect(car.direction).toBe('up');
+    expect(car.releaseHallCall(call.id)).toBe(true);
+    expect(car.direction).toBe('up');
+    car.completeArrival(motion.arrivesAt);
+    expect(car.direction).toBeUndefined();
   });
 
   it('refuses a hall call it physically cannot serve — a safety interlock, not an opinion', () => {

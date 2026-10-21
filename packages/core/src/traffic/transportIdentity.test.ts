@@ -196,11 +196,20 @@ const BASELINE_STRUCTURAL: Readonly<Record<string, string>> = {
  * CI's linux leg, CI's macOS leg and the local run reported these three character for character.
  * That measurement stands as a record; the macOS leg it used is gone (§ D462), so see
  * {@link BASELINE_STRUCTURAL}'s note on what a regeneration can and cannot claim from here.
+ *
+ * **Re-pinned for § D1603, one cell of fifteen.** A released hall call now re-points the standing car
+ * that held it, and on this seed that moves `vertical-city|collective` alone: its digest was
+ * `522ee3ff…`, and its headline moves on `ttdMeanS` only, 183.5741 s to 183.7631 s, with the other
+ * seven figures identical to the last place. `transportHops` is 292 in all three arms before and
+ * after, so the escalator riders are the same riders. The other fourteen cells, here and in
+ * {@link BASELINE_STRUCTURAL}, did not move by one bit, which is the control. Re-derived by running
+ * this file's own `measure` on the lane's tree, which reproduced the two unmoved `vertical-city`
+ * digests and headlines exactly; one machine, so § D462's caveat applies.
  */
 const MOVED_STRUCTURAL: Readonly<Record<string, string>> = {
   'vertical-city|nearest-car': 'c27d5005cd0753365ec12f2a7ce73a6903f34d04343db7594287bf0b95b8b151',
   'vertical-city|eta': '11935af9e94650a804295699dc304e06eaf620f2195ef0d5fd6c2c3830b13fc2',
-  'vertical-city|collective': '522ee3ff6efb10bfc5a79a707ad263bf18cd363ec4dfbd95ad4e30455bed4c89',
+  'vertical-city|collective': '67a4df08d2444d34beb31ed00b574a89a278c8aaeae64800290f832661ff803c',
 };
 
 /**
@@ -287,7 +296,7 @@ const BASELINE_HEADLINE: Readonly<Record<string, Readonly<Record<string, number>
   'secure-tower|collective': { waitMeanS: 28.077489232750207, waitP95S: 103.06062675292485, rideMeanS: 95.86154920637641, ttdMeanS: 127.06784142193546, workKJ: 6714.034768258036, workPerLegKJ: 49.73359087598545, handlingPct: 11.088709677419354, longestWaitS: 166.82792671858385 },
   'vertical-city|nearest-car': { waitMeanS: 97.13014568650004, waitP95S: 337.25608353894995, rideMeanS: 82.74957073652443, ttdMeanS: 308.15939581212535, workKJ: 56214.400543239244, workPerLegKJ: 63.233296449088016, handlingPct: 12.461632903621854, longestWaitS: 507.52118017113503 },
   'vertical-city|eta': { waitMeanS: 23.152778551459914, waitP95S: 66.97290344311216, rideMeanS: 81.27008148592162, ttdMeanS: 181.66679441775838, workKJ: 64522.176112578585, workPerLegKJ: 74.24876422621242, handlingPct: 12.482095355023532, longestWaitS: 137.6494509933474 },
-  'vertical-city|collective': { waitMeanS: 27.225913682314914, waitP95S: 97.11772561190551, rideMeanS: 78.78784705110202, ttdMeanS: 183.5741238700387, workKJ: 71945.19279067186, workPerLegKJ: 80.47560714840253, handlingPct: 12.318395743810107, longestWaitS: 148.6349797575955 },
+  'vertical-city|collective': { waitMeanS: 27.225913682314914, waitP95S: 97.11772561190551, rideMeanS: 78.78784705110202, ttdMeanS: 183.763102071069, workKJ: 71945.19279067186, workPerLegKJ: 80.47560714840253, handlingPct: 12.318395743810107, longestWaitS: 148.6349797575955 },
 };
 
 /** The eight reported figures, and where each lives in a summary. */

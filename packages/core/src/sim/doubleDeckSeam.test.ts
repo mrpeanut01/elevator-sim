@@ -243,11 +243,16 @@ describe('a stop at a floor pair serves both floors, and a run can see it', () =
      * — which does not look ahead — spends the new eligibility on extra journeys instead. It is
      * recorded rather than acted on; a one-move margin is not a claim about anything, and the
      * `saved === 3` line below now says so.
+     *
+     * **Re-measured for § D1603: one cell.** A released hall call now re-points the standing car
+     * that held it, and on this seed that moves `collective`'s paired arm only, **287 → 282**. Its
+     * control arm stays at 309 and both other dispatchers are unchanged in both arms. `saved` is
+     * still 3. Why the five moves went the way they did is unmeasured.
      */
     const CENSUS: Readonly<Record<string, readonly [number, number]>> = {
       'nearest-car': [261, 262],
       eta: [265, 299],
-      collective: [287, 309],
+      collective: [282, 309],
     };
 
     let saved = 0;

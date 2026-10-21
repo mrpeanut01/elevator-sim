@@ -54277,3 +54277,132 @@ sentence once and the energy line once. The gate is the deep honesty tier at 0 f
 the figures, CYCLE-1 § 3 names the fallback: the head and one sized line for average wait.
 
 **Numbers spent.** Lane AT-3 holds **D1602 to D1609** and spends **D1602**.
+
+## D1603 — a released hall call re-points the car that held it, as a withdrawn one does
+
+> **Taken 2026-10-21 by an agent session** (wave AU, lane AU-1), carrying out the owner's decision
+> panel's ruling R2 (GitHub issue #645, [§ D1600](#d1600)). It closes in the engine the gap
+> [§ D1591](#d1591) clause 3 held, and stops short of re-publishing the verdicts that fix moves
+> (clause 5), which are the panel's.
+
+**Why an entry.** It changes `core`'s `Car`, closes the gap § D1591 held and `car.test.ts` pinned,
+moves pins in files this lane does not own, and changes how `core` and `experiments` put the old
+behaviour back for a control.
+
+1. **The measurement, taken before the fix.** A release is *stale* when it leaves a car standing
+   still with a direction and no committed stop ahead in it, and *at nothing* when the car has no
+   committed stop at all. A *stale refusal* is what that costs a rider: `noDirectionReversal`
+   refusing such a car a call, read off the dispatch decision's own rejected list. Each figure below
+   is asserted by `experiments/src/fuzz/releaseDirection.test.ts` (the deep fuzz tier), with the old
+   release put back on the fixed engine; a scratch build of the unfixed tree, `ae255db`, gave the
+   same legs as that control on every one of these runs.
+   - **The 147 runs § D1591 counted** (seven buildings, seven profiles, three seeds, 900 s): 88
+     stale releases, 7 at nothing, by the same four paths, which is § D1591's figure reproduced.
+     They cost 15 stale refusals of 6 calls, in 2 runs. The fix moves the legs of 2 runs:
+     `crown-hotel` under `collective`, seed 2, where one completion left a car pointing at nothing
+     and it was refused for five calls, and `midtown-office` under `zoned-uppeak`, seed 2, where no
+     car was refused. Over their 636 journeys, 123 change door-to-door time, 47 later and 76
+     sooner, −153.7 s in all.
+   - **The 494 runs § D1591's first figure is measured on** (ten buildings, every profile, two
+     seeds, 900 s and the template's own horizon): 591 stale releases, 111 at nothing, and 683
+     stale refusals of 60 calls, in 11 runs. The fix moves the legs of 24 runs, listed in the test.
+     Over their 12 144 journeys, 5 536 change door-to-door time, 2 651 later and 2 885 sooner,
+     −18 770.8 s in all.
+   - **Phase 6's gate cell** (Mixed-Use High-Rise at up-peak 4 %, n = 200, the six arms
+     `benchmark/mixedUseHighRise.ts` runs there): 91 stale releases, every one at nothing and every
+     one a re-offer in `destination-panel`'s arm, and no stale refusal. **No leg of the 1 200
+     replications moves**, so no figure of the gate can, and [§ D100](#d100)'s verdict stands.
+   - **Nobody is stranded either way.** In every run whose legs move, no journey is delivered under
+     one engine and not the other, and none is abandoned or stranded under either. So on these runs
+     a wrong direction delayed riders, through the refusals, and stranded none. Under the fix the
+     riders of the moved runs split both ways; why a given run moved one way rather than the other
+     is unmeasured.
+2. **The fix.** `Car.releaseHallCall` and `Car.releaseAllHallCalls` re-settle a car that is standing
+   still, as `withdrawHallCall`, an arrival and an assignment already did, through one private helper
+   (`Car#settleIfStanding`) that all five now share. A moving car keeps its direction, which is the
+   move it cannot abandon, and settles on arrival. `Car.estimateCost()` is untouched and still pure:
+   it reads a snapshot and calls none of these. Each call site, and whether the car can be moving
+   there:
+   - `Simulation.#applyDecision`, for a dispatch decision and for reassignment on load. The car the
+     call leaves can be moving (a call taken from a car on its way) or standing (a full car after its
+     doors shut). A standing car re-points, and `changed` is set, so the pass drops its snapshots
+     before it prices the next call.
+   - `#completeCall`, from `#finishStop` once the doors shut and from `#dispatchBank` when a landing
+     empties. The car that served the call is standing; another holder can be moving.
+   - `#reofferCall`. The refusing car is standing at the landing on an overflow, a bypass on arrival
+     or a stop nobody would board. On a service-mode change or a derate its calls are already gone
+     (`setMode`, `derate`), so its own release finds nothing and changes nothing. Other holders can
+     be moving.
+   - `#serveHere`, for a call the runner no longer tracks and for `not-assigned`. The car is standing
+     with its doors shut, and it re-points before the stop is decided, so `#boardingDirections` reads
+     the new direction.
+   - `releaseAllHallCalls` has one caller, `Car.derate`, so only a derate service event reaches it,
+     and the car can be moving or standing. The load sensor's bypass reaches the release path through
+     the re-offer, one call at a time. No shipped building declares a derate.
+3. **The controls.** Until now a test put the old withdrawal back by assigning `releaseHallCall`
+   over it, which reproduces nothing once the release re-settles too.
+   `model/car/keptDirection.test-helper.ts`, and a copy in the experiments test, runs the current
+   method with the car's `committedStops` shadowed for the length of the call, which holds its
+   direction. It checks itself: § D1591's counts and the stage-1 deadlock in
+   `sim/serviceRange.test.ts` have to come back under it. `core/src/sim/releaseDirection.test.ts`
+   runs on every `vitest run`: the Crown Hotel run changes, 21 legs sooner and none later, and a
+   Garden Apartments run with no stale release is byte-identical.
+4. **Every pin that moved under an unmoved verdict, each re-derived by the tool that produced it.**
+   - `core/src/traffic/transportIdentity.test.ts`, `vertical-city|collective` at seed 20 260 726: the
+     structural digest (`522ee3ff…` to `67a4df08…`) and one headline figure, time to destination,
+     183.574 s to 183.763 s. The other seven headline figures, the escalator hop count (292) and the
+     other fourteen cells did not move.
+   - `core/src/traffic/dayStartIdentity.test.ts`: the same cell's superseded digest, regenerated
+     with it (`7f9b3a5a…` to `722d94b6…`).
+   - `core/src/sim/doubleDeckSeam.test.ts`: `collective`'s paired shuttle moves on `vertical-city`,
+     287 to 282. Its control arm (309) and the other two dispatchers did not move, and three of
+     three dispatchers still save moves when the decks are paired.
+   - `experiments/src/benchmark/published.ts`, the forecast-causality audit (`predictorLag.test.ts`,
+     always on): forecasts served 34 422 to 34 435, and the partial correlation −0.0139
+     [−0.0317, +0.0038] to −0.0139 [−0.0317, +0.0039]. The interval still holds zero, so the finding
+     that the predictor reads no future stands. Re-derived with `regeneratePins.ts`'s own expression
+     for that study; on this container the unfixed tree gives −0.013946…, the x64 value the pin's
+     note already records, and the fixed tree −0.013891…. Republished in `benchmark/index.ts` § 6,
+     `predictorLag.test.ts`'s header and `docs/05-roadmap.md` § Phase 5.
+   The three `core` pins were re-derived by running those files' own measuring functions on the
+   lane's tree, which reproduced every unmoved cell exactly.
+5. **Stopped: published verdicts move, and they are the panel's.** The always-on `viz` suite goes red
+   in 16 files (33 cases), and among them are verdict words. They are not re-published here; each
+   pin is left as it was, so the red is the record:
+   - **Scenario stages.** `campaign/stageVerdictsHold.test.ts`: the census's way through
+     `stage-3-overwhelmed` (`fairness-first`) goes from met, held and cleared to not met;
+     `stage-5-credentials` (`predictive-balanced`) and `stage-7-prove-it`
+     (`predictive-balanced-parked-zone-center`) go from met, held and cleared to met only.
+     `campaign/stageFiveClears.test.ts`, `campaign/judgeCleared.test.ts` and
+     `campaign/stageSequence.test.ts`: no shipped profile clears `stage-5-credentials` from the
+     dropdown any more. `scenario/goalRates.test.ts`: `data/scenario-goals.json`'s counts move
+     (`stage-3-overwhelmed`'s `nobody-abandoned`, 28 and 29 of 50 to 29 and 30 of 50, among others),
+     and `everyday/stageSameCounts.test.ts` no longer finds its stage-3 case, lobby parking under
+     Min-wait giving the counts Min-wait gave.
+   - **Fix-a-building.** `bed-cars-locked-out`'s diagnosed repair no longer clears (the complaint
+     falls 50 %, under the 80 % bar; the ruled judge reads `not-enough`), its as-built letter moves
+     from 11 to 4 long waits, and its second answer `quicker-bed-car-doors` stops clearing.
+     `every-deck-calls-itself-full`'s as-built complaint falls from 8 long waits to 1, so the letter
+     no longer describes the day, and `regear-the-shuttles` starts clearing.
+     `every-letter-says-nine/split-the-group` starts clearing. `car-park-nobody-serves` still clears
+     with its figures moved (21 to 17 long waits, 322 s to 172 s worst), and the promise of
+     `regear-the-garage-car` breaks (the worst wait goes 172 s to 195 s).
+     `deliveries-on-the-passenger-group` still clears, its after-figure 2 to 0. Following from those:
+     `fixit/families.test.ts` (the editor's answer for `bed-cars-locked-out`),
+     `theAnswerIsNotPrinted.test.ts` (the role-blind search finds no route for `bed-cars-locked-out`
+     where it found `zone:1`) and `verdictNamesTheOrder.test.ts` (a route on
+     `every-deck-calls-itself-full` that cleared now reads `building-worse`).
+   - **Shift and Everyday.** `shift/firstSession.test.ts` and `shift/legibility.test.ts`: contract
+     c7's day 1 is legible on 6 of the first ten seeds, not 7. `everyday/firstDayLength.test.ts`
+     (call timings), `everyday/rushHandover.test.ts`, `everyday/rushHoldAgreement.test.ts` (three
+     rows) and `record/burjOperator.test.ts` (the 57-lift bracket) move figures.
+   Whether R2's fix stands with these verdicts moved, or is held until they are re-authored, is not
+   the lane's to decide.
+6. **What is held.** `Car.setMode` drops a car's hall calls when it leaves service and does not
+   re-settle it either. R2 names the two releases, so it is not changed here. A scratch probe over
+   the 2 000 deep sessions of `stage-1-first-call` on this lane's tree counted 7 864 mode changes,
+   20 of which left a standing car pointing past its work (5 of them a return to service), and
+   `noDirectionReversal` refused a car standing in that state twice. All nine properties held, so
+   no session softlocked. The probe pins nothing.
+
+**Numbers spent.** This lane holds **D1603 to D1612** and spends **D1603**.

@@ -31,6 +31,8 @@ import { summarizeWaiting } from '../metrics/summarize.js';
 import type { PassengerRecord } from '../metrics/types.js';
 import { Bank } from '../model/bank.js';
 import { createBuilding } from '../model/building.js';
+import { Car } from '../model/car/car.js';
+import { withOldHandBack } from '../model/car/keptDirection.test-helper.js';
 import { LoadSensor } from '../model/car/loadSensor.js';
 
 import { DATA_DIR, fingerprint, load } from './fixtures.test-helper.js';
@@ -426,8 +428,10 @@ describe('a range change strands the riders it leaves without a bank, and finish
  * about to retire too, and retiring *that* left B pointing up with nothing ahead. Under
  * `collective`'s `noDirectionReversal`, B then refused the down call at floor 5 at 558.6 s for the
  * rest of the day — an in-service car idle two floors below a servable rider, which `fuzz/` P5 reads
- * as a deadlock. `Car.withdrawHallCall` re-points the car; the control below swaps the old
- * behaviour back in and requires the deadlock to return, so the fix is what closes it.
+ * as a deadlock. `Car.withdrawHallCall` re-points the car; the control below puts the old
+ * withdrawal back (`model/car/keptDirection.test-helper.ts`) and requires the deadlock to return,
+ * so the fix is what closes it. The release is the fixed one in both arms (§ D1603): this is the
+ * withdrawal path's own control.
  */
 describe('a range change that retires a call a car was just handed leaves the car free to serve', () => {
   // `replicationSeed('20260730', 33)` — replication 33 of stage 1's tuning seeds, written out
@@ -467,21 +471,11 @@ describe('a range change that retires a call a car was just handed leaves the ca
     expect(result.conservation.stranded).toBeGreaterThan(0);
   });
 
-  it('deadlocks again with the old release swapped back in, so the fix is what closes it', async () => {
-    const config = await gardenWithSchedule();
-    const sim = new Simulation(config);
-    const car = sim.building.banks[0]?.cars[0];
-    if (car === undefined) throw new Error('the bank has no car');
-    const proto = Object.getPrototypeOf(car) as { withdrawHallCall: unknown; releaseHallCall: unknown };
-    const fixed = proto.withdrawHallCall;
-    proto.withdrawHallCall = proto.releaseHallCall;
-    try {
-      const result = sim.run();
-      expect(result.status).toBe('timed-out');
-      expect(result.undelivered.map((journey) => [journey.originFloorId, journey.reason])).toEqual([['5', 'waiting']]);
-    } finally {
-      proto.withdrawHallCall = fixed;
-    }
+  it('deadlocks again with the old withdrawal put back, so the fix is what closes it', async () => {
+    const sim = new Simulation(await gardenWithSchedule());
+    const result = withOldHandBack(Car.prototype, ['withdrawHallCall'], () => sim.run());
+    expect(result.status).toBe('timed-out');
+    expect(result.undelivered.map((journey) => [journey.originFloorId, journey.reason])).toEqual([['5', 'waiting']]);
   });
 });
 
@@ -489,10 +483,10 @@ describe('re-pointing a car on a withdrawal moves no shipped run', () => {
   /*
    * § D1591's claim that the fix moves no published figure, held on a sample rather than argued:
    * shipped buildings with no service schedule, two dispatchers, the legs compared with the fix and
-   * with the old release swapped back in. The decision entry's 494-run figure is the same comparison
+   * with the old withdrawal put back. The decision entry's 494-run figure is the same comparison
    * over every shipped profile, asserted behind the deep fuzz switch by
    * `experiments/src/fuzz/releaseDirection.test.ts`; this is the part of it that runs on every
-   * `vitest run`.
+   * `vitest run`. Since § D1603 both arms carry the fixed release.
    */
   it('runs the same legs with and without it on three shipped buildings under two dispatchers', async () => {
     const config = await load();
@@ -511,17 +505,8 @@ describe('re-pointing a car on a withdrawal moves no shipped run', () => {
           onTimeout: 'report',
         };
         const fixed = runSimulation(runConfig);
-        const sim = new Simulation(runConfig);
-        const car = sim.building.banks[0]?.cars[0];
-        if (car === undefined) throw new Error('the bank has no car');
-        const proto = Object.getPrototypeOf(car) as { withdrawHallCall: unknown; releaseHallCall: unknown };
-        const withdraw = proto.withdrawHallCall;
-        proto.withdrawHallCall = proto.releaseHallCall;
-        try {
-          expect(sim.run().record.passengers, `${buildingId} under ${profileId}`).toEqual(fixed.record.passengers);
-        } finally {
-          proto.withdrawHallCall = withdraw;
-        }
+        const old = withOldHandBack(Car.prototype, ['withdrawHallCall'], () => runSimulation(runConfig));
+        expect(old.record.passengers, `${buildingId} under ${profileId}`).toEqual(fixed.record.passengers);
       }
     }
   }, 120_000);
