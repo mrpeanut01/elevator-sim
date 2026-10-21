@@ -43,13 +43,13 @@ the withdrawn H-ACCESS-1 destination beside its withdrawal in the last section.
   **That verdict now has a second building rather than a second seed, and half of it did not
   reproduce** ([§ D595](../DECISIONS.md), GitHub issue #428). Measured on `one-wtc-class-reference` at
   the same apparatus — `eta` baseline, n = 200 under common random numbers, TTD the gate — at *that
-  tower's* highest quotable rate, which is 2 % rather than Midtown's 4 % and is censused at the
+  tower's* highest quotable rate, which is 2 % rather than Mixed-Use High-Rise's 4 % and is censused at the
   budget the run spends: **`destination-eta` is INDISTINGUISHABLE**, ΔTTD `−0.092 [−0.804, +0.619]`
   with `requiredReplications` of **11 704** against a budget of 200, while **`destination-panel` is
   BETTER**, `−1.293 [−2.069, −0.517]`, resolvable at n = 1. So the Level-0 arm that carries § D100's
   accepted result does nothing on the second tower and the Level-1 panel does — **the reverse of the
   shape above** — and what the pair establishes is that the effect is **building-dependent**. The
-  verdict is not moved: Midtown's interval is still Midtown's, this one is still this one, and
+  verdict is not moved: Mixed-Use High-Rise's interval is still its own, this one is still this one, and
   § D100's criterion is the criterion's own to restate. The costs are the same shape on both arms
   (AWT and WT95 **WORSE**), and **no mechanism is offered** for the split. 6c (learned control) is **no longer deferred — it is implemented, measured, and NOT
   ACCEPTED**: ΔTTD `−0.213 [−0.440, +0.014]` against `collective` at n = 200 on a disjoint seed, an

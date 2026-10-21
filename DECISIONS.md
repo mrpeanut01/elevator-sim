@@ -54454,4 +54454,100 @@ behaviour back for a control.
      and 18 on the other ten. That was compared for equality only, and no verdict on it is drawn
      here.
 
-**Numbers spent.** This lane holds **D1603 to D1612** and spends **D1603**.
+**Numbers spent.** This lane held **D1603 to D1612** and spent **D1603**; the integrator re-cut the rest of that block once the lane reported (D1604 to D1606 for the panel's rulings, the remainder to wave AU's content lanes).
+
+## D1604 — the release-direction fix lands, and the content it moves is re-derived on the fixed engine
+
+> **Taken 2026-10-21 by the owner's decision panel** (GitHub issue #645, ruling R4: the full fix 3–0,
+> re-authoring in this wave 2–1), recorded by the integrator of wave AU. It settles what
+> [§ D1603](#d1603) clause 5 stopped on. **Owner-reversible.**
+
+**Why an entry.** It binds content lanes, censuses and published verdicts across the game layer that no
+module of the fix owns, and it refuses a narrower fix and a further deferral.
+
+1. **The engine.** The full fix of § D1603, with [§ D1606](#d1606)'s fold. The narrow variant (only a car
+   left with no stop at all re-settles) is refused: it leaves 76 refusals in the 494 shipped runs, the
+   state [§ D1600](#d1600) clause 1 refused, and moves almost the same content. Holding the fix again is
+   refused: a deferral with no date accepts the behaviour, and every census pinned meanwhile is one more
+   to re-derive.
+2. **The benchmark tier comes first.** It runs on the fixed head and every moved pin is read; if a research
+   verdict moves, the wave stops and returns to the panel.
+3. **Regenerate once, on the final engine.** Every census the fix moves is regenerated on one commit, each
+   by its own tool, before any content lane re-authors anything, and each diff is listed. The as-built
+   mornings and the rush house runs never reach `main` apart from the engine, because a press reads them
+   beside runs it simulates live.
+4. **Figures follow the run.** Every moved figure (letters, diagnoses, `docs/10` § M30, Rush, the Burj
+   record, first-day length, contract c7) is re-derived by its own tool and pinned to the run.
+5. **A decoy order's sentence follows the run**, as `theAnswerIsNotPrinted.test.ts` already names for
+   #568 and § D1011 did before: `regear-the-shuttles`, `regear-the-garage-car`, `split-the-group`,
+   `quicker-bed-car-doors` and the `verdictNamesTheOrder` route. A decoy that starts clearing counts as a
+   second answer and is not authored away.
+6. **A witness is never re-worded.** `bed-cars-locked-out`'s diagnosed repair, `every-deck-calls-itself-full`'s
+   letter and the ways through stages 3, 5 and 7 keep their words, and no bar, judge, seed, horizon,
+   threshold, morning count or interval rule moves.
+7. **Re-author in this wave, or hold.** A broken witness is re-authored in demand, fabric or morning with
+   its bars unchanged ([§ D1076](#d1076)), its candidates chosen on the tuning seeds only and every
+   candidate registered, so the held-back crowds judge each once. If the search finds nothing, the case or
+   stage is held with its reason in the register that already exists for it, its test is inverted to pin
+   the measured negative (as [§ D267](#d267) did), it comes off the player's list, and the engine fix
+   still lands. Seat 2 dissented: hold every broken witness now and re-author in a later content lane,
+   because several moved goal rows moved by exactly one run of fifty and a search until green risks
+   fitting content to noise.
+8. **Stages.** `stageFiveClears`' floor moves to wherever the census finds a dropdown clear (§ D267: a
+   search with a stated floor), since stage 5 needs a way through in the census and not a dropdown clear.
+   A regenerated count of exactly one way through a first-hour stage breaches [§ D528](#d528) clause 6 and
+   is fixed before merge. A stage left with none is held under `scenario/ladder.ts`'s existing rule.
+9. **Fix-a-building cases offered to a player** clear by their diagnosed repair on the letter's morning
+   and over fifty mornings at the unchanged 80 % bar, name in their hint a change measured to clear, and
+   print in their letter and reasoning only figures from the fixed engine.
+10. **No copy says why a verdict moved.** The mechanism is unmeasured.
+
+**Corrections the panel found, carried here.** [§ D265](#d265) names no stage; the stage-5 clear case moved
+there under § D267, and § D528 clause 2 counts stage 5's dropdown clear as a breach. `regear-the-shuttles`
+says the worst wait does not shorten and on the fixed engine it does; `regear-the-garage-car` says it
+shortens and it lengthens. Phase 6's gate figures live in `benchmark/mixedUseHighRise.ts`, on Mixed-Use
+High-Rise: `CLAUDE.md`, `docs/05-roadmap.md` § 6, `docs/45-status-record.md` and
+`destinationSecondBuilding.test.ts` called that cell Midtown's and are corrected on this wave; § D595 and
+§ D1600, which do the same, are left as written.
+
+**Numbers spent.** The integrator holds **D1604 to D1606** from wave AU's reservation and spends all three.
+
+## D1605 — cycle 2 may run on `main` if stage 1 is identical on the fresh batches, and it was not, so cycle 2 waits
+
+> **Taken 2026-10-21 by the owner's decision panel** (GitHub issue #645, ruling R5, 3–0), recorded by the
+> integrator of wave AU. It amends [§ D1600](#d1600) clause 4. **Owner-reversible.**
+
+**Why an entry.** It changes the order § D1600 set for the second design cycle, which neither wave owns.
+
+1. **The amendment.** Clause 4 exists so that the second cycle measures one engine, and on
+   `stage-1-first-call` the engines were measured identical: the six presses cycle 1's playtest made, on
+   both seed sets, batch by batch; the stage's survivor-census rows at every rung; and the fun proxies. So
+   the cycle may proceed on one named `main` commit, on four conditions: the commit serves the whole
+   playtest; before it, the twelve fresh batches of `data/mastery-seeds.json` ([§ D1601](#d1601)) are run
+   across stage 1's admitted configurations on `main` and on the fixed engine and compared for equality
+   only, **and any difference means the cycle waits**; a finding that rests on a simulated outcome outside
+   stage 1 carries its commit and enters no design delta until it is seen again on the merged engine; and
+   once the fix merges, every persona attempt is replayed on the merged head.
+2. **The outcome.** Lane AU-1 ran 88 configurations (every one the stage-1 census judges at any rung, and
+   the six presses) on the twelve batches: 1 056 comparisons. Against `ae255db` the fixed engine differs in
+   **194**, every one from the release fix and none from § D1606's fold ([§ D1603](#d1603) clause 7). The
+   condition fails, so **the second cycle waits for wave AU to merge** and plays on the fixed engine, which
+   restores clause 4 as written.
+
+**Numbers spent.** See [§ D1604](#d1604).
+
+## D1606 — a mode change that drops a standing car's calls re-points it, folded into the release fix
+
+> **Taken 2026-10-21 by the owner's decision panel** (GitHub issue #645, ruling R6, 3–0), recorded by the
+> integrator of wave AU and built by lane AU-1 ([§ D1603](#d1603) clause 7). **Owner-reversible.**
+
+**Why an entry.** It widens § D1600's scope, which named the two release methods only.
+
+`Car.setMode` drops a car's calls when it leaves service and did not re-settle its direction: the state
+§ D1600 clause 1 refused, through a third method. It is folded into the fix so that the content § D1604
+re-derives is re-derived once, measured first with its own control, and its moved legs are reported apart
+from the release fix's. The panel's split rule (if it moved anything on stage 1, it would leave for a lane
+of its own after cycle 2's playtest) did not fire: on stage 1 as the game judges it, fresh batches
+included, the fold moves nothing.
+
+**Numbers spent.** See [§ D1604](#d1604).

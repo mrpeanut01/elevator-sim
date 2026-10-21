@@ -911,7 +911,7 @@ published with verdicts. See § *Phase 6 on the building the criterion names* ab
 > `requiredReplications` of **11 704** against a budget of 200; `destination-panel` reads
 > **−1.293 [−2.069, −0.517]**, **BETTER**, resolvable at n = 1. So the arm that carries this
 > phase's accepted result does nothing there and the Level-1 panel does — the reverse of the shape
-> Midtown shows. **The verdict above is not moved**: Midtown's interval is still Midtown's, and what
+> Mixed-Use High-Rise shows. **The verdict above is not moved**: Mixed-Use High-Rise's interval is still its own, and what
 > the pair establishes is that the effect is **building-dependent**, which is what a second building
 > is for and what a second seed could never have shown.
 > `packages/experiments/src/benchmark/destinationSecondBuilding.test.ts` carries the run.

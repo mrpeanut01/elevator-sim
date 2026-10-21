@@ -25,7 +25,7 @@ verdict:
 - **Phase 6**: 6a (destination *disclosure*) and 6b (destination *dispatch*) are accepted against a
   **raised** criterion, measured on the building that criterion names ([§ D100](DECISIONS.md)).
   Since the Level-1 panel's promise to `carIds[0]` was given a capacity bound
-  ([§ D333](DECISIONS.md)), **the gate is met by both arms** at Midtown's heavy point: at
+  ([§ D333](DECISIONS.md)), **the gate is met by both arms** at Mixed-Use High-Rise's heavy point: at
   `up-peak-4pct`, n = 200, ΔTTD `−1.598 [−2.575, −0.621]` against `eta` and
   `−1.642 [−2.620, −0.663]` against `collective`, both **BETTER**. Say the shape with the verdict:
   the two light points stay INDISTINGUISHABLE, and AWT and WT95 are **WORSE** against `eta` there.
