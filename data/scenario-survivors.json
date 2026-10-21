@@ -4,8 +4,8 @@
   "provenance": {
     "kind": "measured",
     "command": "ELEVATOR_SIM_SURVIVORS=deep ELEVATOR_SIM_REGENERATE_SURVIVORS=1 npx vitest run --project viz src/scenario/survivorSweep.test.ts",
-    "tree": "b0d7d09",
-    "measuredAt": "2026-10-18",
+    "tree": "847e96a",
+    "measuredAt": "2026-10-21",
     "masterSeed": 20260910,
     "sampleSize": 12,
     "scope": "Every configuration is an edit of the scenario's own baseline dispatcher or a shipped profile picked in its place, alone or with idle cars parked where the stage page offers, priced by data/price-schedule.json. 10 of 37 priced changes can reach a scenario run at all — the rest price shafts, machines and fittings that campaign/stageRun.ts cannot apply — and 47 of 60 declared dimensions are priced and therefore varied — weights.dutyMismatch only on stage-10-the-bed-and-the-visitor, whose building declares a duty, because a dial its building gives nothing to act on is not drawn (DECISIONS.md § D549, § D1290) — and 13 are withheld from every scenario by data/price-schedule.json and varied by no configuration. A configuration differing only on an unpriced dimension is reachable at every rung, so counting it would make the budget inert.",
@@ -489,24 +489,19 @@
           "units": 4,
           "chimesSpent": 0,
           "examined": 39,
-          "survivors": 4,
-          "survivorNames": [
-            "fairness-first",
-            "fairness-first-parked-lobby",
-            "fairness-first-parked-zone-center",
-            "fairness-first-parked-predicted-demand"
-          ],
-          "unjudged": 0,
+          "survivors": 0,
+          "survivorNames": [],
+          "unjudged": 39,
           "suppressed": 39,
           "unbuildable": 0,
-          "metOnTuning": 4,
+          "metOnTuning": 0,
           "dropdown": {
             "examined": 6,
-            "survivors": 1
+            "survivors": 0
           },
           "page": {
             "examined": 21,
-            "survivors": 3
+            "survivors": 0
           },
           "dials": {
             "examined": 12,
@@ -515,7 +510,7 @@
           "perTier": {
             "dispatcher": {
               "examined": 37,
-              "survivors": 4
+              "survivors": 0
             },
             "equipment": {
               "examined": 2,
@@ -540,24 +535,19 @@
           "units": 24,
           "chimesSpent": 20,
           "examined": 63,
-          "survivors": 4,
-          "survivorNames": [
-            "fairness-first",
-            "fairness-first-parked-lobby",
-            "fairness-first-parked-zone-center",
-            "fairness-first-parked-predicted-demand"
-          ],
-          "unjudged": 0,
+          "survivors": 0,
+          "survivorNames": [],
+          "unjudged": 63,
           "suppressed": 63,
           "unbuildable": 0,
-          "metOnTuning": 4,
+          "metOnTuning": 0,
           "dropdown": {
             "examined": 12,
-            "survivors": 1
+            "survivors": 0
           },
           "page": {
             "examined": 39,
-            "survivors": 3
+            "survivors": 0
           },
           "dials": {
             "examined": 12,
@@ -566,7 +556,7 @@
           "perTier": {
             "dispatcher": {
               "examined": 45,
-              "survivors": 4
+              "survivors": 0
             },
             "equipment": {
               "examined": 18,
@@ -591,24 +581,19 @@
           "units": 54,
           "chimesSpent": 50,
           "examined": 63,
-          "survivors": 4,
-          "survivorNames": [
-            "fairness-first",
-            "fairness-first-parked-lobby",
-            "fairness-first-parked-zone-center",
-            "fairness-first-parked-predicted-demand"
-          ],
-          "unjudged": 0,
+          "survivors": 0,
+          "survivorNames": [],
+          "unjudged": 63,
           "suppressed": 63,
           "unbuildable": 0,
-          "metOnTuning": 4,
+          "metOnTuning": 0,
           "dropdown": {
             "examined": 12,
-            "survivors": 1
+            "survivors": 0
           },
           "page": {
             "examined": 39,
-            "survivors": 3
+            "survivors": 0
           },
           "dials": {
             "examined": 12,
@@ -617,7 +602,7 @@
           "perTier": {
             "dispatcher": {
               "examined": 45,
-              "survivors": 4
+              "survivors": 0
             },
             "equipment": {
               "examined": 18,
@@ -826,22 +811,19 @@
           "units": 15,
           "chimesSpent": 0,
           "examined": 62,
-          "survivors": 2,
-          "survivorNames": [
-            "predictive-balanced",
-            "predictive-balanced-parked-stay"
-          ],
+          "survivors": 0,
+          "survivorNames": [],
           "unjudged": 0,
           "suppressed": 62,
           "unbuildable": 1,
           "metOnTuning": 22,
           "dropdown": {
             "examined": 12,
-            "survivors": 1
+            "survivors": 0
           },
           "page": {
             "examined": 39,
-            "survivors": 1
+            "survivors": 0
           },
           "dials": {
             "examined": 11,
@@ -850,7 +832,7 @@
           "perTier": {
             "dispatcher": {
               "examined": 53,
-              "survivors": 2
+              "survivors": 0
             },
             "equipment": {
               "examined": 9,
@@ -875,22 +857,19 @@
           "units": 24,
           "chimesSpent": 9,
           "examined": 63,
-          "survivors": 2,
-          "survivorNames": [
-            "predictive-balanced",
-            "predictive-balanced-parked-stay"
-          ],
+          "survivors": 0,
+          "survivorNames": [],
           "unjudged": 0,
           "suppressed": 63,
           "unbuildable": 0,
-          "metOnTuning": 24,
+          "metOnTuning": 23,
           "dropdown": {
             "examined": 12,
-            "survivors": 1
+            "survivors": 0
           },
           "page": {
             "examined": 39,
-            "survivors": 1
+            "survivors": 0
           },
           "dials": {
             "examined": 12,
@@ -899,7 +878,7 @@
           "perTier": {
             "dispatcher": {
               "examined": 46,
-              "survivors": 2
+              "survivors": 0
             },
             "equipment": {
               "examined": 17,
@@ -924,22 +903,19 @@
           "units": 54,
           "chimesSpent": 39,
           "examined": 63,
-          "survivors": 2,
-          "survivorNames": [
-            "predictive-balanced",
-            "predictive-balanced-parked-stay"
-          ],
+          "survivors": 0,
+          "survivorNames": [],
           "unjudged": 0,
           "suppressed": 63,
           "unbuildable": 0,
           "metOnTuning": 21,
           "dropdown": {
             "examined": 12,
-            "survivors": 1
+            "survivors": 0
           },
           "page": {
             "examined": 39,
-            "survivors": 1
+            "survivors": 0
           },
           "dials": {
             "examined": 12,
@@ -948,7 +924,7 @@
           "perTier": {
             "dispatcher": {
               "examined": 49,
-              "survivors": 2
+              "survivors": 0
             },
             "equipment": {
               "examined": 14,
@@ -1169,11 +1145,8 @@
           "units": 15,
           "chimesSpent": 0,
           "examined": 63,
-          "survivors": 2,
-          "survivorNames": [
-            "predictive-balanced-parked-zone-center",
-            "destination-eta-parked-lobby"
-          ],
+          "survivors": 0,
+          "survivorNames": [],
           "unjudged": 1,
           "suppressed": 17,
           "unbuildable": 0,
@@ -1184,7 +1157,7 @@
           },
           "page": {
             "examined": 39,
-            "survivors": 2
+            "survivors": 0
           },
           "dials": {
             "examined": 12,
@@ -1193,11 +1166,11 @@
           "perTier": {
             "dispatcher": {
               "examined": 46,
-              "survivors": 1
+              "survivors": 0
             },
             "equipment": {
               "examined": 17,
-              "survivors": 1
+              "survivors": 0
             }
           },
           "sampling": {
@@ -1218,11 +1191,8 @@
           "units": 24,
           "chimesSpent": 9,
           "examined": 63,
-          "survivors": 2,
-          "survivorNames": [
-            "predictive-balanced-parked-zone-center",
-            "destination-eta-parked-lobby"
-          ],
+          "survivors": 0,
+          "survivorNames": [],
           "unjudged": 0,
           "suppressed": 19,
           "unbuildable": 0,
@@ -1233,7 +1203,7 @@
           },
           "page": {
             "examined": 39,
-            "survivors": 2
+            "survivors": 0
           },
           "dials": {
             "examined": 12,
@@ -1242,11 +1212,11 @@
           "perTier": {
             "dispatcher": {
               "examined": 48,
-              "survivors": 1
+              "survivors": 0
             },
             "equipment": {
               "examined": 15,
-              "survivors": 1
+              "survivors": 0
             }
           },
           "sampling": {
@@ -1267,11 +1237,8 @@
           "units": 54,
           "chimesSpent": 39,
           "examined": 63,
-          "survivors": 2,
-          "survivorNames": [
-            "predictive-balanced-parked-zone-center",
-            "destination-eta-parked-lobby"
-          ],
+          "survivors": 0,
+          "survivorNames": [],
           "unjudged": 0,
           "suppressed": 20,
           "unbuildable": 0,
@@ -1282,7 +1249,7 @@
           },
           "page": {
             "examined": 39,
-            "survivors": 2
+            "survivors": 0
           },
           "dials": {
             "examined": 12,
@@ -1291,11 +1258,11 @@
           "perTier": {
             "dispatcher": {
               "examined": 45,
-              "survivors": 1
+              "survivors": 0
             },
             "equipment": {
               "examined": 18,
-              "survivors": 1
+              "survivors": 0
             }
           },
           "sampling": {
@@ -1533,11 +1500,12 @@
           "units": 15,
           "chimesSpent": 0,
           "examined": 63,
-          "survivors": 3,
+          "survivors": 4,
           "survivorNames": [
             "auction",
             "auction-multi-round",
-            "destination-panel"
+            "destination-panel",
+            "destination-panel-parked-predicted-demand"
           ],
           "unjudged": 0,
           "suppressed": 3,
@@ -1549,7 +1517,7 @@
           },
           "page": {
             "examined": 39,
-            "survivors": 0
+            "survivors": 1
           },
           "dials": {
             "examined": 12,
@@ -1562,7 +1530,7 @@
             },
             "equipment": {
               "examined": 11,
-              "survivors": 1
+              "survivors": 2
             }
           },
           "sampling": {
@@ -1583,11 +1551,12 @@
           "units": 24,
           "chimesSpent": 9,
           "examined": 63,
-          "survivors": 3,
+          "survivors": 4,
           "survivorNames": [
             "auction",
             "auction-multi-round",
-            "destination-panel"
+            "destination-panel",
+            "destination-panel-parked-predicted-demand"
           ],
           "unjudged": 0,
           "suppressed": 5,
@@ -1599,7 +1568,7 @@
           },
           "page": {
             "examined": 39,
-            "survivors": 0
+            "survivors": 1
           },
           "dials": {
             "examined": 12,
@@ -1612,7 +1581,7 @@
             },
             "equipment": {
               "examined": 16,
-              "survivors": 1
+              "survivors": 2
             }
           },
           "sampling": {
@@ -1633,11 +1602,13 @@
           "units": 54,
           "chimesSpent": 39,
           "examined": 63,
-          "survivors": 3,
+          "survivors": 5,
           "survivorNames": [
             "auction",
             "auction-multi-round",
-            "destination-panel"
+            "destination-panel",
+            "destination-panel-parked-predicted-demand",
+            "edit-6"
           ],
           "unjudged": 0,
           "suppressed": 4,
@@ -1649,11 +1620,11 @@
           },
           "page": {
             "examined": 39,
-            "survivors": 0
+            "survivors": 1
           },
           "dials": {
             "examined": 12,
-            "survivors": 0
+            "survivors": 1
           },
           "perTier": {
             "dispatcher": {
@@ -1662,7 +1633,7 @@
             },
             "equipment": {
               "examined": 15,
-              "survivors": 1
+              "survivors": 3
             }
           },
           "sampling": {
