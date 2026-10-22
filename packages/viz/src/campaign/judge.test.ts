@@ -43,7 +43,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { loadConfig, type LoadedConfig } from '@elevator-sim/core';
-import { collectSearchSpace, intervalContainsZero } from '@elevator-sim/experiments/browser';
+import { collectSearchSpace, intervalContainsZero, pairedDifferenceEstimate } from '@elevator-sim/experiments/browser';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { restrictedFloorIds } from '../access/zoning.js';
@@ -57,13 +57,13 @@ import {
   type BatchMetric,
   type BatchResult,
 } from '../batch/types.js';
-import { parkedMoveOf } from '../everyday/stagePlay.js';
+import { parkedMoveOf, runStageSplit, stageSplitPlanOf } from '../everyday/stagePlay.js';
 import { DATA_DIR, requireBuilding, requireDispatcher } from '../fixtures.test-helper.js';
 import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
 import { GOAL_KINDS, goalLabel } from '../scenario/goals.js';
 import type { PublishedGoalRates, PublishedScenario } from '../scenario/published.js';
 
-import { holdoutSentenceOf, judgeStage, stageGoalNameOf, type StageReport } from './judge.js';
+import { holdoutSentenceOf, judgeStage, stageGoalNameOf, type StageReport, type StageSplit, type StageSplitLine } from './judge.js';
 import { parseCampaign, type CampaignContext } from './parse.js';
 import { admitStageMove, stageUnitsAt, type StageAdmission, type StageMove } from './stagePress.js';
 import {
@@ -929,6 +929,176 @@ describe('every printed bound is the run’s own interval, on both seed sets —
         'too close to call at 50 runs, between 1.20 seconds shorter and 0.20 seconds longer. The other ' +
         'measures were too close to call as well. No measure separated the two settings, so the bar is not reached.',
     );
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The split, read back: ruling R10 on GitHub issue #645, § D1622
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The two-change presses behind the findings the split answers: X1's (`eta` with forecast parking,
+ * the phone persona's attempt 10), the phone persona's attempt 4 (`eta` parked mid-zone) and the
+ * curious player's attempt 11 (zoning with forecast parking).
+ */
+const SPLIT_PRESSES = ['eta with forecast parking', 'eta parked mid-zone', 'zoning with forecast parking'] as const;
+type SplitPress = (typeof SPLIT_PRESSES)[number];
+
+/** A bar word, or the verdict's own closing: a split line never reads as a second verdict (amendment 2). */
+const BAR_WORD = /\b(?:ahead|behind|met|reached|bar|cleared)\b/iu;
+
+/** Every problem with one split line: the read-back of every figure, and no bar word in it. */
+function splitLineProblems(sentence: string, report: BatchReport, scope: 'orderable' | 'axis'): string[] {
+  return [
+    ...sentenceProblems(sentence, report, scope),
+    ...(BAR_WORD.test(sentence) ? [`a bar word in "${sentence}"`] : []),
+  ];
+}
+
+describe('every split bound is the paired-t estimate of its two named arms (ruling R10, § D1622)', () => {
+  const splits = new Map<SplitPress, { readonly split: StageSplit; readonly result: BatchResult }>();
+
+  beforeAll(async () => {
+    const stage = stageAt(0);
+    const space = collectSearchSpace();
+    const building = requireBuilding(config, stage.building);
+    const baseline = requireDispatcher(config, stage.dispatcher.startingProfileId);
+    const resources = {
+      building,
+      dispatcherProfiles: config.dispatcherProfiles,
+      trafficProfiles: config.trafficProfiles,
+      elevatorSpecs: config.elevatorSpecs,
+    };
+    const context = { space, schedule: shippedPriceSchedule(), baseline, building, elevatorSpecs: config.elevatorSpecs };
+    const eta = requireDispatcher(config, 'eta');
+    const zoning = requireDispatcher(config, 'zoned-uppeak');
+    const moves: Readonly<Record<SplitPress, StageMove>> = {
+      'eta with forecast parking': parkedMoveOf(eta, 'predicted-demand', space),
+      'eta parked mid-zone': parkedMoveOf(eta, 'zone-center', space),
+      'zoning with forecast parking': parkedMoveOf(zoning, 'predicted-demand', space),
+    };
+    for (const press of SPLIT_PRESSES) {
+      const move = moves[press];
+      const plan = stageSplitPlanOf({ stageId: stage.id, context, move, budgetUnits: stageUnitsAt(stage, null) });
+      if (plan === undefined) throw new Error(`${press} is not split`);
+      const verdict = runBatch(batchRequestForStage(stage, move.profile.id, move.edit, 'tuning'), resources);
+      let ran: BatchResult | undefined;
+      const split = await runStageSplit({
+        stage,
+        plan,
+        verdict,
+        holdoutRan: true,
+        run: (request) => (ran = runBatch(request, resources)),
+      });
+      if (split === undefined || ran === undefined) throw new Error(`${press}: the judge drew no split`);
+      splits.set(press, { split, result: ran });
+    }
+  }, 240_000);
+
+  function splitOf(press: SplitPress): { readonly split: StageSplit; readonly result: BatchResult } {
+    const found = splits.get(press);
+    if (found === undefined) throw new Error(`${press} was not split`);
+    return found;
+  }
+
+  /** The arm a line's change is reverted on: the shipped order for the order's line, the shipped parking for the parking's. */
+  function keptArmOf(result: BatchResult, line: StageSplitLine) {
+    const arm = result.arms[line.change === 'standing-order' ? 1 : 2];
+    if (arm === undefined) throw new Error('the split batch has no such arm');
+    return arm;
+  }
+
+  it.each(SPLIT_PRESSES)('%s: every row is the paired-t estimate of the press and the arm its line names', (press) => {
+    const { split, result } = splitOf(press);
+    const pressArm = result.arms[0];
+    expect(pressArm).toBeDefined();
+    if (pressArm === undefined) return;
+    for (const line of split.lines) {
+      const kept = keptArmOf(result, line);
+      const rows = line.report.comparisons[0]?.rows ?? [];
+      expect(rows.map((row) => row.metric)).toEqual([...BATCH_METRICS]);
+      for (const row of rows) {
+        /* Taken here from the two arms' own figures, never from the report under test. */
+        const gated = BATCH_METRIC_CLASS[row.metric] === 'estimate';
+        const pairs = pressArm.replications.flatMap((mine, index) => {
+          const theirs = kept.replications[index];
+          const [a, b] = [mine.metrics[row.metric], theirs?.metrics[row.metric] ?? null];
+          if (theirs === undefined || a === null || b === null) return [];
+          return gated && !(mine.awtIsValid && theirs.awtIsValid) ? [] : [[a, b] as const];
+        });
+        const estimate = pairedDifferenceEstimate(pairs.map(([a]) => a), pairs.map(([, b]) => b));
+        expect(row.estimate?.lower, `${press}, ${line.change}, ${row.metric}`).toBe(estimate.lower);
+        expect(row.estimate?.upper, `${press}, ${line.change}, ${row.metric}`).toBe(estimate.upper);
+      }
+      expect(splitLineProblems(line.sentence, line.report, 'orderable'), `${press}: ${line.sentence}`).toEqual([]);
+      if (line.energy !== null) {
+        expect(splitLineProblems(line.energy, line.report, 'axis'), `${press}: ${line.energy}`).toEqual([]);
+        /* A profile's own name may carry a wait word (*Minimum estimated wait*); the line's own words may not. */
+        const names = config.dispatcherProfiles.profiles.map((profile) => profile.name).sort((a, b) => b.length - a.length);
+        const ownWords = names.reduce((text, name) => text.split(name).join('·'), line.energy);
+        expect(ownWords).not.toMatch(/\b(?:wait|waits|met|missed|better|worse)\b/u);
+      }
+      /* Energy is never inside a wait sentence (§ D106). */
+      expect(line.sentence).not.toMatch(/\bkJ\b|drive work/u);
+    }
+  });
+
+  it.each(SPLIT_PRESSES)('%s: each line names its change and what was kept, and says nothing a split cannot', (press) => {
+    const { split, result } = splitOf(press);
+    const [order, parking] = split.lines;
+    const pressName = result.arms[0]?.dispatcherProfileName ?? '';
+    expect(order.change).toBe('standing-order');
+    expect(parking.change).toBe('parking');
+    expect(order.sentence).toMatch(/^Changing the standing order to .+, with .+ parking kept: average wait /u);
+    expect(parking.sentence).toMatch(/^Changing to .+ parking, with the standing order kept at .+: average wait /u);
+    expect(pressName).not.toBe('');
+    expect(split.heading).toBe(
+      'Your two changes, each with the other kept, over 50 runs on the stage’s own crowds. The crowds kept ' +
+        'apart from the stage’s own judged your two changes only together, so nothing here says which of the ' +
+        'two decided their answer.',
+    );
+    for (const text of [split.heading, ...split.lines.flatMap((line) => [line.sentence, line.energy ?? ''])]) {
+      expect(text, text).not.toMatch(BAR_WORD);
+      /* Amendment 2, and the delta's own list: no "alone", no cause, no sum, no other crowds. */
+      expect(text, text).not.toMatch(/on its own|\balone\b|because|thanks to|due to|add up|together they|in total|other crowds/u);
+    }
+    expect(split.credits).toEqual(['standing-order', 'parking']);
+    expect(split.carried).toEqual(['standing-order', 'parking']);
+  });
+
+  it('pins X1’s split: the order’s own effect on average wait is too close to call, and the 95th percentile resolves', () => {
+    const [order] = splitOf('eta with forecast parking').split.lines;
+    expect(order.sentence).toBe(
+      'Changing the standing order to Minimum estimated wait, with forecast parking kept: average wait was too ' +
+        'close to call at 50 runs, between 1.24 seconds shorter and 0.09 seconds longer, and 95th-percentile wait ' +
+        'was shorter by between 0.62 and 5.02 seconds. The remaining measures were too close to call as well.',
+    );
+  });
+
+  it('changes its lines when the press changes, and the read-back refuses what the run did not produce', () => {
+    const texts = SPLIT_PRESSES.flatMap((press) => splitOf(press).split.lines.map((line) => line.sentence));
+    expect(new Set(texts).size).toBe(texts.length);
+
+    const [order] = splitOf('eta with forecast parking').split.lines;
+    const wrongBound = order.sentence.replace(/by between (\d+)\.(\d)/u, (_whole, units: string, tenth: string) => `by between ${units}.${String((Number(tenth) + 3) % 10)}`);
+    const sizedOverZero = order.sentence.replace(
+      /average wait was too close to call at 50 runs, between ([\d.]+) seconds shorter and ([\d.]+) seconds longer/u,
+      'average wait was shorter by between $2 and $1 seconds',
+    );
+    const closeOverResolved = order.sentence.replace(
+      /95th-percentile wait was shorter by between ([\d.]+) and ([\d.]+) seconds/u,
+      '95th-percentile wait was too close to call at 50 runs, between $2 seconds shorter and $1 seconds longer',
+    );
+    const barWord = `${order.sentence} Nothing came out against your setting, so the bar is reached.`;
+    for (const [what, tampered] of [
+      ['a moved bound', wrongBound],
+      ['“shorter” over an interval containing zero', sizedOverZero],
+      ['“too close to call” over an interval excluding zero', closeOverResolved],
+      ['a bar word', barWord],
+    ] as const) {
+      expect(tampered, what).not.toBe(order.sentence);
+      expect(splitLineProblems(tampered, order.report, 'orderable').length, what).toBeGreaterThan(0);
+    }
   });
 });
 

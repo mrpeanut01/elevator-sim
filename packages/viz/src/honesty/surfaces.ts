@@ -427,7 +427,7 @@ import {
 } from '../campaign/career.js';
 import { CAREER_LOAD_NOTICES } from '../campaign/careerPersist.js';
 import { failStateCounts, failStateReports, evidenceFrom, type DemonstrationEvidence } from '../campaign/failStates.js';
-import { judgeStage } from '../campaign/judge.js';
+import { judgeStage, stageSplitOf } from '../campaign/judge.js';
 import { playerFacingStrings } from '../campaign/parse.js';
 import { admitStageMove, stageUnitsAt } from '../campaign/stagePress.js';
 import { playerSafeDescription } from '../campaign/words.js';
@@ -437,8 +437,11 @@ import {
   stageRungRowOf,
   STAGE_PLAY_COPY,
   stageFactsOf,
+  stagePageMovesOf,
   stagePlayViewOf,
   stagePracticeLineOf,
+  stageSplitPlanOf,
+  stageSplitViewOf,
   verdictFactsOf,
   type StagePlayChoice,
   type StagePlayPhase,
@@ -2558,6 +2561,8 @@ function batchText(surfaceId: string, seeds: readonly (TextSeed & { readonly com
       comparison: seed.comparison,
       goal: seed.goal,
       energyAxis: seed.energyAxis,
+      /* § D1622: the stage page's split credits two acts, and `unbacked-attribution` holds them to the press. */
+      attribution: seed.attribution,
     }));
 }
 
@@ -18333,6 +18338,13 @@ const EVERYDAY_STAGE_PLAY: SurfaceAdapter = {
     'everyday/stagePlay.ts#stageRungsOf',
     /* § D1417: the sentence every par line ends with, read inside each verdict's par line. */
     'scenario/par.ts#PAR_PAYS_LINE',
+    /*
+     * § D1622: the split of a two-change press. The card's view of it, the plan that decides it is
+     * drawn, and the judge's own words for it, seeded below over this case's batch.
+     */
+    'everyday/stagePlay.ts#stageSplitViewOf',
+    'everyday/stagePlay.ts#stageSplitPlanOf',
+    'campaign/judge.ts#stageSplitOf',
   ],
   render(this: SurfaceAdapter, context) {
     const seeds: TextSeed[] = [];
@@ -18492,9 +18504,77 @@ const EVERYDAY_STAGE_PLAY: SurfaceAdapter = {
     /* `verdictFactsOf` is the screen's only way to a verdict; touched so its claim is checked by compile. */
     void verdictFactsOf;
     void STAGE_PLAY_COPY.loading;
-    return singleRun(this.id, seeds);
+    return [...singleRun(this.id, seeds), ...splitTextsOf(this.id, context, stage, admission)];
   },
 };
+
+/**
+ * **The split of a two-change press, as the stage card draws it**: ruling R10,
+ * [§ D1622](../../../../DECISIONS.md), seeded so `unbacked-attribution` (§ D1011) holds its credits.
+ *
+ * The two lines with no figure, pending and failed, then the block itself: the stage's first
+ * two-change press on its page (`stageSplitPlanOf`, so the admission decides it and the names are the
+ * page's), worded by the judge over **this case's own batch**, its candidate arm as the press and its
+ * baseline arm as both one-change arms. So every figure is a real paired interval over real crowds,
+ * at the case's own replication count and on its own rows, suppressed and under-budget included,
+ * and the words are the ones the card prints. It is a stage page's split judged on a batch that is
+ * not that stage's, the shape the fix-it adapter uses for its verdict words, and it is there for the
+ * words: whether a split's rows hold on the held-back crowds is `everyday/stageSplitHolds.test.ts`'s
+ * question. Each string declares the acts it credits and the acts the press carried, both by the
+ * plan's own `changed`. Both heading arms are seeded, with the held-back crowds run and without.
+ */
+function splitTextsOf(
+  surfaceId: string,
+  context: HonestyContext,
+  stage: CampaignStage,
+  admission: Parameters<typeof stageSplitPlanOf>[0]['context'],
+): readonly RenderedText[] {
+  const seeds: TextSeed[] = [];
+  for (const kind of ['pending', 'failed'] as const) {
+    const view = stageSplitViewOf({ kind });
+    for (const [index, line] of view.lines.entries()) {
+      seeds.push({ field: `stagePlay.split.${kind}[${String(index)}]`, text: line, role: 'prose' });
+    }
+  }
+  const budgetUnits = stageUnitsAt(stage, null);
+  const moves = [
+    ...context.profiles.map((profile) => ({ profile })),
+    ...stagePageMovesOf(context.profiles, context.space, shippedPriceSchedule()).map((entry) => entry.move),
+  ];
+  const plan = moves
+    .map((move) => stageSplitPlanOf({ stageId: stage.id, context: admission, move, budgetUnits }))
+    .find((found) => found !== undefined);
+  const kept = context.batch.arms[0];
+  const press = context.batch.arms[1] ?? kept;
+  const replications = kept?.replications.length ?? 0;
+  if (plan !== undefined && kept !== undefined && press !== undefined) {
+    for (const holdoutRan of [false, true]) {
+      const split = stageSplitOf({
+        result: { ...context.batch, arms: [press, kept, kept] },
+        verdict: { ...context.batch, arms: [kept, press] },
+        changed: plan.changed,
+        orderName: plan.orderName,
+        parkingName: plan.parkingName,
+        holdoutRan,
+      });
+      if (split === undefined) continue;
+      const attribution = { credits: split.credits, carried: split.carried };
+      const at = `stagePlay.split.${holdoutRan ? 'heldBackRan' : 'heldBackNotRun'}`;
+      const counted = { declaredCount: replications, countShown: split.heading.includes(String(replications)), attribution };
+      seeds.push({ field: `${at}.heading`, text: split.heading, role: 'observation', ...counted });
+      for (const line of split.lines) {
+        seeds.push({ field: `${at}.${line.change}`, text: line.sentence, role: 'observation', ...counted });
+        if (line.energy !== null) {
+          seeds.push({ field: `${at}.${line.change}.energy`, text: line.energy, role: 'observation', energyAxis: true, ...counted });
+        }
+      }
+    }
+  }
+  return [
+    ...singleRun(surfaceId, seeds.filter((seed) => seed.field.startsWith('stagePlay.split.pending') || seed.field.startsWith('stagePlay.split.failed'))),
+    ...batchText(surfaceId, seeds.filter((seed) => !seed.field.startsWith('stagePlay.split.pending') && !seed.field.startsWith('stagePlay.split.failed'))),
+  ];
+}
 
 /**
  * The words a player meets when they are asked whether the game may count how it is going — GitHub

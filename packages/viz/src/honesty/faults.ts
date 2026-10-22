@@ -513,6 +513,19 @@ export const pressClaimUndeclared: TextFault = (texts) =>
   );
 
 /**
+ * § D1622: **the split's line for a change the press did not make**, the stage card's line for the
+ * standing order, drawn over a press whose admission moved only the parking. The line keeps its
+ * words and its credit, and what the press carried loses the order, which is the state a split drawn
+ * from the selects rather than from the admission would reach (ruling R10, amendment 1).
+ */
+export const splitCreditedOnOneChange: TextFault = (texts) =>
+  replaceFirst(
+    texts,
+    (text) => text.attribution !== undefined && /^stagePlay\.split\..+\.standing-order$/u.test(text.field),
+    (text) => ({ ...text, attribution: { credits: text.attribution?.credits ?? [], carried: ['parking'] } }),
+  );
+
+/**
  * One fault per property, so the suite can iterate rather than list.
  *
  * Three of them carry a second, and in every case because the property has two halves a fault for
@@ -598,5 +611,7 @@ export const FAULTS: Readonly<
       { name: 'authoredResultOnForeignRun', fault: authoredResultOnForeignRun },
       { name: 'pressCreditedFromAnotherDay', fault: pressCreditedFromAnotherDay },
       { name: 'pressClaimUndeclared', fault: pressClaimUndeclared },
+      /* § D1622: the stage card's split, crediting a standing order the press never changed. */
+      { name: 'splitCreditedOnOneChange', fault: splitCreditedOnOneChange },
     ],
   });
