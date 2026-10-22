@@ -211,30 +211,27 @@ describe('the offer list, derived from the census — § D1442', () => {
   });
 });
 
-describe('the shipped census — § D1441', () => {
-  it('measures every order dealt from week 2 under its two strongest profiles, over well-formed rows', () => {
+describe('the shipped census — § D1441, held by § D1616', () => {
+  /*
+   * The census measures every order dealt from week 2. On the fixed engine Midtown deals none, its one
+   * admitted order held by § D1616, so the command run on that tree measures no row and the file
+   * carries none; the derived offer is then the protocol's candidates in order. The rows' checks run
+   * on a real dealt order in `callBands.preD1603.test.ts`, on the census as measured before the fix.
+   */
+  it('measures no row, because no order is dealt from week 2, and finds nothing wrong with that', () => {
+    const dealt = dealtWeekOrdersOf(CALL_BANDS.protocol.contractId);
+    expect(dealt).toEqual([undefined]);
+    expect(CALL_BANDS.rows).toEqual([]);
     expect(
       callBandsIssues(
         CALL_BANDS,
-        dealtWeekOrdersOf(CALL_BANDS.protocol.contractId),
+        dealt,
         SHIPPED_PROFILES,
         (order) => bandedProfilesOf(CALL_BANDS.protocol.contractId, order),
         WEEK_WAY.protocol.heldOutCount,
       ),
     ).toEqual([]);
-  });
-
-  it('names a stale or missing row', () => {
-    const dealt = dealtWeekOrdersOf(CALL_BANDS.protocol.contractId);
-    const issues = callBandsIssues(
-      { ...CALL_BANDS, rows: [] },
-      dealt,
-      SHIPPED_PROFILES,
-      (order) => bandedProfilesOf(CALL_BANDS.protocol.contractId, order),
-      WEEK_WAY.protocol.heldOutCount,
-    );
-    expect(dealt.length).toBeGreaterThan(1);
-    expect(issues.some((issue) => issue.includes('has no row under'))).toBe(true);
+    expect(DAY_CALL_DRIVER_OFFER).toEqual(CALL_BANDS.protocol.candidates);
   });
 });
 

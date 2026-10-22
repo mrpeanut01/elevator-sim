@@ -19,14 +19,10 @@ import {
   weekOrderIssues,
 } from './weekOrders.js';
 import { WEEK_DOMINANCE, type WeekDominance } from './weekDominance.js';
-import { dc10Of, WEEK_WAY, weekWayRowFor, type WeekWay, type WeekWayRow } from './weekWay.js';
+import { WEEK_WAY, type WeekWay, type WeekWayRow } from './weekWay.js';
 import { closeDay, nextDay, openWeek, outcomeOf } from './week.js';
 import type { WeekState } from './types.js';
 import { weekDealOf } from './weekStake.js';
-import { contractDayState } from './contractDay.test-helper.js';
-import { WEEK_WAY_RESOURCES } from './weekWay.test-helper.js';
-import { wholeDayFor, wholeDayRun } from './dayLength.js';
-import { buildingConfigOf, shiftRunConfigOf } from '../dev/state.js';
 
 /** The shipped ladder with `orders` authored on Midtown Office's rung. */
 function ladderWith(orders: readonly ContractWeekOrder[]): ContractLadder {
@@ -211,46 +207,51 @@ describe('week 1 is dealt exactly as before', () => {
   });
 });
 
-/** The one order DC-10 and DC-11 admit on Midtown — § D1345. */
-const ADMITTED_ORDER_ID = 'midtown-early-lift';
+/** The one order DC-10 and DC-11 admitted on Midtown until § D1616 held it. */
+const HELD_ORDER_ID = 'midtown-early-lift';
 
 /** Midtown's week `week`, Monday to Friday, as the product deals it: the one composition every run reads. */
 function dealtWeekdays(week: number): readonly string[] {
   return [1, 2, 3, 4, 5].map((day) => scheduledEventFor(null, day, day - 1, 'whole-day', { contractId: 'c2', week }).id);
 }
 
-describe('the next week is new — Midtown Office, swarm DO § 2', () => {
+/** Midtown's authored order by id. */
+function authored(id: string): ContractWeekOrder | undefined {
+  return CONTRACT_LADDER.rows.find((row) => row.contractId === 'c2')?.weekOrders.find((order) => order.id === id);
+}
+
+describe('the next week is new — Midtown Office, swarm DO § 2, and on the fixed engine it is not', () => {
   /*
-   * Wave AN, lane DQ-2 (§ D1343, § D1345): under DC-11 one authored order is admitted on Midtown,
-   * the order the lane authored after the screen refused § D1254's three, and every week from the
-   * second deals it. Before the screen, weeks 2 to 4 dealt § D1254's three orders, which one
-   * profile left alone holds.
+   * Wave AN, lane DQ-2 (§ D1343, § D1345) admitted one authored order on Midtown, and every week from
+   * the second dealt it. On the engine § D1603 fixed, the week census refuses its Thursday and Friday
+   * (11 of 20 crowds each under the census's chosen play, under DC-10's lower bound of a third), the
+   * re-author search § D1616 registers found no replacement, and the order is held: authored, not
+   * dealt, its refusal readable here. So Midtown deals week 1's draw every week. The admission, the
+   * deal and the run seam are tested on a real dealt order in `weekOrders.preD1603.test.ts`.
    */
-  it('admits exactly one authored order, by both the day census and the one-profile screen, and deals it from week 2', () => {
-    const authored = CONTRACT_LADDER.rows.find((row) => row.contractId === 'c2')?.weekOrders ?? [];
-    expect(authored.length).toBeGreaterThanOrEqual(6);
-    const dealt = dealtWeekOrdersOf('c2');
-    expect(dealt.map((order) => order?.id)).toEqual([undefined, ADMITTED_ORDER_ID]);
-    const order = dealt[1];
+  it('admits no authored order, because DC-10 refuses the held order’s Thursday and Friday', () => {
+    const order = authored(HELD_ORDER_ID);
+    expect(order).toBeDefined();
     if (order === undefined) return;
+    expect(dealtWeekOrdersOf('c2')).toEqual([undefined]);
     const admission = weekOrderAdmissionOf('c2', order);
-    expect(admission.days.every((day) => day.reason === 'admitted')).toBe(true);
-    expect(admission.dominance.verdict).toBe('admitted');
-    expect(admission.dominance.strongest?.held ?? 99).toBeLessThanOrEqual(admission.dominance.atMost);
-    expect(admission.admitted).toBe(true);
+    expect(admission.days.map((day) => [day.day, day.reason])).toEqual([
+      [1, 'admitted'],
+      [2, 'admitted'],
+      [3, 'admitted'],
+      [4, 'refused'],
+      [5, 'refused'],
+    ]);
+    expect(
+      admission.days.filter((day) => day.reason === 'refused').map((day) => day.row?.chosenVerdicts.split('').filter((mark) => mark === 'C').length),
+    ).toEqual([11, 11]);
+    expect(admission.admitted).toBe(false);
   });
 
-  it('deals week 2 a different wrinkle from week 1 on every weekday, each census-admitted, and week 3 the same as week 2', () => {
-    const [one, two, three] = [1, 2, 3].map(dealtWeekdays);
-    expect(two).toEqual(dealtWeekOrdersOf('c2')[1]?.days);
-    expect(three).toEqual(two);
-    for (let day = 0; day < 5; day += 1) expect(two?.[day], `day ${String(day + 1)}`).not.toBe(one?.[day]);
-    (two ?? []).forEach((eventId, dayIndex) => {
-      const day = dayIndex + 1;
-      const row = weekWayRowFor('c2', day, eventId, 'whole-day');
-      expect(row?.eventId, `week 2 day ${String(day)} has its own census row`).toBe(eventId);
-      expect(row === undefined ? false : dc10Of(row, WEEK_WAY.protocol).admitted).toBe(true);
-    });
+  it('deals week 1’s draw on every weekday of weeks 2 and 3', () => {
+    expect(dealtWeekdays(2)).toEqual(dealtWeekdays(1));
+    expect(dealtWeekdays(3)).toEqual(dealtWeekdays(1));
+    expect(dealtWeekdays(2)).not.toEqual(authored(HELD_ORDER_ID)?.days);
   });
 
   it('reaches week 2 by holding week 1: the roll deals the next order, and a week not held deals itself again', () => {
@@ -287,10 +288,11 @@ describe('the next week is new — Midtown Office, swarm DO § 2', () => {
     expect(deal?.target).toBe(Math.max(1, (deal?.counted ?? 0) - 1));
   });
 
-  it('does not deal the two orders the census refused, and names the days each was refused on', () => {
+  it('does not deal the orders the census refuses day by day, and names the days each was refused on', () => {
     for (const [id, days] of [
-      ['midtown-lift-service', [2, 5]],
-      ['midtown-audit-friday', [5]],
+      /* Re-derived on the fixed engine (§ D1616): each gains Thursday's goods-inward, 11 of 20. */
+      ['midtown-lift-service', [2, 4, 5]],
+      ['midtown-audit-friday', [4, 5]],
     ] as const) {
       const refused = CONTRACT_LADDER.rows.find((row) => row.contractId === 'c2')?.weekOrders.find(
         (order) => order.id === id,
@@ -312,13 +314,12 @@ describe('the next week is new — Midtown Office, swarm DO § 2', () => {
    * admitted by DC-10 on every day and refused by the one-profile screen, because Predictive
    * balanced left alone holds each on more than half the census crowds. They stay authored, undealt.
    */
-  it('refuses the three orders DC-10 admits day by day where one profile left alone holds the week', () => {
+  it('refuses two orders DC-10 admits day by day where one profile left alone holds the week, and the third on its Thursday', () => {
     for (const [id, held] of [
       ['midtown-week-2', 15],
       ['midtown-week-3', 16],
-      ['midtown-week-4', 17],
     ] as const) {
-      const order = CONTRACT_LADDER.rows.find((row) => row.contractId === 'c2')?.weekOrders.find((entry) => entry.id === id);
+      const order = authored(id);
       expect(order, id).toBeDefined();
       if (order === undefined) continue;
       const admission = weekOrderAdmissionOf('c2', order);
@@ -329,6 +330,19 @@ describe('the next week is new — Midtown Office, swarm DO § 2', () => {
       expect(admission.admitted, id).toBe(false);
       expect(dealtWeekOrdersOf('c2')).not.toContain(order);
     }
+    /*
+     * `midtown-week-4` was the third of these, Predictive balanced holding it on 17. On the fixed
+     * engine DC-10 refuses its Thursday, `goods-inward`, at 11 of 20 (§ D1616), so the week counts
+     * four days with a target of three, and Predictive balanced holds that on all twenty.
+     */
+    const four = authored('midtown-week-4');
+    expect(four).toBeDefined();
+    if (four === undefined) return;
+    const admission = weekOrderAdmissionOf('c2', four);
+    expect(admission.days.map((day) => day.reason)).toEqual(['admitted', 'admitted', 'admitted', 'refused', 'admitted']);
+    expect(admission.dominance.target).toBe(3);
+    expect(admission.dominance.strongest).toEqual({ profileId: 'predictive-balanced', held: 20, n: 20 });
+    expect(admission.admitted).toBe(false);
   });
 
   it('from week 2 cycles round the admitted orders, and never back to week 1’s draw', () => {
@@ -340,28 +354,5 @@ describe('the next week is new — Midtown Office, swarm DO § 2', () => {
     }
     expect(dealtWeekdays(cycle + 1)).toEqual(dealtWeekdays(2));
     for (let week = 2; week <= 2 * cycle; week += 1) expect(dealtWeekdays(week)).not.toEqual(dealtWeekdays(1));
-  });
-
-  it('runs exactly the day the census measured: an order’s day built from the week is the census cell’s run', () => {
-    const resources = WEEK_WAY_RESOURCES;
-    const authoredBuilding = buildingConfigOf(resources, [], 'midtown-office');
-    const whole = wholeDayFor(resources.trafficProfiles, authoredBuilding);
-    const horizon = whole === undefined ? {} : wholeDayRun(whole);
-    const text = (value: unknown): string => JSON.stringify(value, (_key, v: unknown) => (typeof v === 'bigint' ? String(v) : v));
-    for (const [index, order] of dealtWeekOrdersOf('c2').entries()) {
-      if (order === undefined) continue;
-      order.days.forEach((eventId, dayIndex) => {
-        const day = dayIndex + 1;
-        const base = { ...horizon, week: { ...openWeek('c2'), day, dayIdx: dayIndex } };
-        const dealt = contractDayState('c2', {
-          seed: 20_261_001n,
-          over: { ...base, week: { ...base.week, week: index + 1 }, campaignEventId: undefined },
-        });
-        const census = contractDayState('c2', { seed: 20_261_001n, over: { ...base, campaignEventId: eventId } });
-        expect(text(shiftRunConfigOf(resources, dealt).config), `${order.id} day ${String(day)}`).toBe(
-          text(shiftRunConfigOf(resources, census).config),
-        );
-      });
-    }
   });
 });
