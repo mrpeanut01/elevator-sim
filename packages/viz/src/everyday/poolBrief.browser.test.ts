@@ -1,12 +1,15 @@
 /**
- * **A week-2 brief is dealt a pool crowd and counts its ways through** — wave AP, lane DT-1,
- * [§ D1460](../../../../DECISIONS.md) and [§ D1463](../../../../DECISIONS.md), on the shipped bundle.
+ * **A week-2 brief is dealt the date's crowd, because Midtown pools no week** — wave AP, lane DT-1,
+ * [§ D1460](../../../../DECISIONS.md) and [§ D1463](../../../../DECISIONS.md), on the shipped bundle,
+ * held by [§ D1616](../../../../DECISIONS.md).
  *
  * The control is the stored week's number, moved on the page's own saved session and nothing else.
- * Week 1's brief runs the date's crowd and draws no ways line; once the stored week is 2 the brief's
- * crowd is one of `data/week-pool.json`'s, its seed line says so, and the ways line reads the pool's
- * record of that crowd, naming no driver. Red before: week 2's brief ran a crowd derived from the
- * date and drew no ways line.
+ * Until § D1616 a week-2 brief's crowd was one of `data/week-pool.json`'s, its seed line said so and a
+ * ways line read the pool's record of that crowd. On the fixed engine Midtown's one dealt order is
+ * held, so the pool has no cell, and the brief must say nothing of a pool: week 2 runs the date's
+ * crowd and draws no ways line, as week 1 does. The pool's brief lines are tested on real cells in
+ * `shift/weekPool.preD1603.test.ts`, on the census as measured before the fix; this bundle carries
+ * the shipped files only.
  *
  * Gate: without `ELEVATOR_SIM_CHROMIUM` the case skips; read the case count, not the word *passed*.
  */
@@ -50,10 +53,10 @@ async function toBrief(page: Page): Promise<void> {
   await page.waitForSelector('.everyday-brief', { timeout: 15_000 });
 }
 
-describe.skipIf(!HAS_BROWSER)('a week-2 brief is dealt from the pool (§ D1460, § D1463)', () => {
-  it('names the pool as the crowd’s source and counts the ways through, naming no driver', async () => {
-    /* Midtown's pool reaches week 2 (§ D1461); a tree that withdrew it would leave nothing to see here. */
-    expect(weekTopOf('c2'), 'Midtown deals no week 2 on this tree').toBeGreaterThanOrEqual(2);
+describe.skipIf(!HAS_BROWSER)('a week-2 brief is dealt no pool crowd while Midtown’s order is held (§ D1460, § D1616)', () => {
+  it('names no pool and draws no ways line on week 2, as on week 1', async () => {
+    /* § D1616: Midtown's top is week 1, so a stored week 2 is dealt as week 1 was. */
+    expect(weekTopOf('c2')).toBe(1);
     const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
     try {
       await coldLoad(page);
@@ -81,12 +84,10 @@ describe.skipIf(!HAS_BROWSER)('a week-2 brief is dealt from the pool (§ D1460, 
       await toBrief(page);
       expect(await textOf(page, '.everyday-brief-eyebrow')).toMatch(/^WEEK 2 · MONDAY/u);
       const seedLine = await textOf(page, '.everyday-brief-seed');
-      expect(seedLine).toContain('from this weekday’s measured pool');
+      expect(seedLine).not.toContain('measured pool');
       const crowd = /crowd (\d+)/u.exec(seedLine)?.[1];
-      expect(crowd !== undefined && isPoolCrowdSeed(BigInt(crowd)), seedLine).toBe(true);
-      const ways = await textOf(page, '.everyday-brief-ways');
-      expect(ways).toMatch(/^Ways through, measured on this crowd: /u);
-      for (const name of ['Fairness first', 'Predictive balanced', 'Collective']) expect(ways).not.toContain(name);
+      expect(crowd !== undefined && isPoolCrowdSeed(BigInt(crowd)), seedLine).toBe(false);
+      expect(await page.locator('.everyday-brief-ways').count(), 'week 2 drew a ways line').toBe(0);
     } finally {
       await page.close();
     }

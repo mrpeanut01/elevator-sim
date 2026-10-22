@@ -402,6 +402,13 @@ export class Car implements CarLike {
    * as well as `in-service` — that is, going to `fire-recall` or `out-of-service` — also
    * drops its car calls, since it is no longer carrying anyone.
    *
+   * A car standing still that loses calls this way re-points at the work it has left
+   * (`#settleIfStanding`), as a released or withdrawn call makes it, and goes directionless when it
+   * has none. Until the owner's decision panel's ruling R6 folded it into § D1603, a mode change
+   * left the car pointing where its dropped calls had been, which is the state § D1600 clause 1
+   * refused, and a car returned to service carried it back. A moving car keeps its direction and
+   * settles on arrival.
+   *
    * @returns the hall calls released, so the caller can hand them back to the dispatcher.
    */
   setMode(mode: ServiceMode): readonly HallCall[] {
@@ -409,13 +416,17 @@ export class Car implements CarLike {
     this.#mode = mode;
 
     let released: readonly HallCall[] = [];
+    let dropped = false;
     if (!acceptsHallCalls(mode)) {
       released = [...this.#hallCalls.values()];
+      dropped = released.length > 0;
       this.#hallCalls.clear();
     }
     if (!acceptsCarCalls(mode)) {
+      dropped ||= this.#carCalls.size > 0;
       this.#carCalls.clear();
     }
+    if (dropped) this.#settleIfStanding();
     return released;
   }
 
@@ -1096,7 +1107,7 @@ export class Car implements CarLike {
       registeredAt: at,
     });
     this.#carCalls.set(floor.id, call);
-    if (this.#motion === undefined) this.#settleDirection();
+    this.#settleIfStanding();
     return call;
   }
 
@@ -1127,46 +1138,65 @@ export class Car implements CarLike {
       );
     }
     this.#hallCalls.set(call.id, call);
-    if (this.#motion === undefined) this.#settleDirection();
+    this.#settleIfStanding();
   }
 
   /**
-   * Hand a hall call back — reassignment, or a car crossing its bypass threshold.
+   * Hand a hall call back to the group: a reassignment, a re-offer, or the landing collected.
+   *
+   * A car standing still re-points at the work it has left, exactly as an arrival or a new
+   * assignment makes it (`#settleIfStanding`), and a car with nothing left goes
+   * directionless. A moving car keeps its direction, which is the direction of the move it cannot
+   * abandon, and settles on arrival.
+   *
+   * Until § D1603 it kept the call's direction whatever it had left. A stationary car whose last
+   * stop ahead was handed back then pointed past its work, or at nothing, and under
+   * `noDirectionReversal` it refused every call the other way until something else re-settled it:
+   * the condition behind the deadlock § D1591 fixed on the withdrawal path, closed here on the
+   * release path by the owner's decision panel's ruling (§ D1600).
    *
    * @returns `true` if this car held it.
    */
   releaseHallCall(callId: string): boolean {
-    return this.#hallCalls.delete(callId);
+    const held = this.#hallCalls.delete(callId);
+    if (held) this.#settleIfStanding();
+    return held;
   }
 
   /**
    * **A hall call that no longer exists**, taken off this car — the landing emptied, its riders
-   * were stranded or left, or a range change closed the floor. Unlike a {@link releaseHallCall},
-   * nobody else is about to be handed the call, so a car standing still re-points at the work it
-   * has left exactly as an arrival or a new assignment would make it (`#settleDirection`), and a
-   * car with nothing left goes directionless.
+   * were stranded or left, or a range change closed the floor. Nobody else is about to be handed
+   * the call. A car standing still re-points at the work it has left, as on a
+   * {@link releaseHallCall}.
    *
    * Without the re-settle, a stationary car whose only call was withdrawn kept that call's
    * direction with nothing ahead of it, and under `noDirectionReversal` it then refused every call
    * the other way for the rest of the run: the adversarial persona's `stage-1-first-call`
    * counterexamples, where a range change retired a call a car had just been given (§ D1591).
    *
-   * `releaseHallCall` itself is deliberately left as it is. It has the same gap, and closing it
-   * there re-points cars in shipped runs, which would move published figures; § D1591 records it,
-   * and `experiments/src/fuzz/releaseDirection.test.ts` measures it (opt-in, deep tier).
+   * It does to the car exactly what a release does, and stays a method of its own because the two
+   * mean different things to the runner, and because each is measured with the other's re-settle
+   * held fixed: `experiments/src/fuzz/releaseDirection.test.ts` puts the old behaviour back on one
+   * of them at a time (§ D1603).
    *
    * @returns `true` if this car held it.
    */
   withdrawHallCall(callId: string): boolean {
     const held = this.#hallCalls.delete(callId);
-    if (held && this.#motion === undefined) this.#settleDirection();
+    if (held) this.#settleIfStanding();
     return held;
   }
 
-  /** Hand back every assigned hall call, e.g. when the load sensor trips bypass. */
+  /**
+   * Hand back every assigned hall call. Its one caller is {@link derate}, when a new rating puts the
+   * car at or past its bypass threshold; a car that crosses the threshold under load hands its calls
+   * back one at a time, through the runner's re-offer and {@link releaseHallCall}. A car standing
+   * still re-points at what it has left, as on a release (§ D1603).
+   */
   releaseAllHallCalls(): readonly HallCall[] {
     const released = [...this.#hallCalls.values()];
     this.#hallCalls.clear();
+    if (released.length > 0) this.#settleIfStanding();
     return released;
   }
 
@@ -1737,6 +1767,17 @@ export class Car implements CarLike {
         split === undefined ? boarding : Math.max(split.boarding[0], split.boarding[1]),
       transferSeconds: movers * this.passengerTransferS,
     };
+  }
+
+  /**
+   * Re-point a car that is standing still, after its committed work changed under it: a call
+   * assigned, a car call registered, a hall call released, withdrawn or handed back with the rest,
+   * or calls dropped by a change of service mode.
+   * A moving car is left alone, because its direction is the move it is committed to, and
+   * {@link completeArrival} settles it on arrival.
+   */
+  #settleIfStanding(): void {
+    if (this.#motion === undefined) this.#settleDirection();
   }
 
   /**

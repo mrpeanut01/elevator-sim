@@ -200,33 +200,37 @@ describe('the screen’s own checks', () => {
 });
 
 /*
- * The shipped screen, pinned — § D1345: the one order DC-10 and DC-11 both admit on Midtown, every
- * profile measured, and Predictive balanced holding it on exactly half the crowds, which DC-11 admits
- * (refused only above half).
+ * The shipped screen, pinned — § D1345, held by § D1616. On the fixed engine DC-10 refuses the
+ * order's Thursday and Friday, so the week counts Monday to Wednesday with a target of two, and on
+ * that week every strong profile left alone holds it on most crowds. The reading is the measured
+ * negative; the order is not dealt either way, and `weekDominance.preD1603.test.ts` keeps the pin
+ * this case carried, on the screen as measured before the fix.
  */
-describe('Midtown’s admitted order, as the screen measured it', () => {
-  it('holds midtown-early-lift under the line for every shipped profile', () => {
+describe('Midtown’s held order, as the screen measured it on the fixed engine', () => {
+  it('reads midtown-early-lift over three counted days, where Predictive balanced holds it on every crowd', () => {
     const order = ordersOf('c2')?.find((entry) => entry.id === 'midtown-early-lift');
     expect(order).toBeDefined();
     if (order === undefined) return;
     const reading = weekDominanceOf('c2', order);
-    expect(reading.verdict).toBe('admitted');
+    expect(reading.counted).toEqual([1, 2, 3]);
+    expect(reading.target).toBe(2);
+    expect(reading.verdict).toBe('refused');
     expect(reading.missing).toEqual([]);
     expect(Object.fromEntries(reading.holds.map((hold) => [hold.profileId, hold.held]))).toEqual({
       'nearest-car': 0,
-      eta: 2,
-      collective: 0,
-      'collective-enroute': 0,
-      'energy-aware': 3,
-      'fairness-first': 9,
-      'capacity-aware': 6,
-      'predictive-balanced': 10,
-      auction: 8,
-      'auction-multi-round': 7,
-      'zoned-uppeak': 1,
-      'destination-eta': 4,
-      'destination-panel': 0,
+      eta: 14,
+      collective: 1,
+      'collective-enroute': 6,
+      'energy-aware': 14,
+      'fairness-first': 19,
+      'capacity-aware': 16,
+      'predictive-balanced': 20,
+      auction: 17,
+      'auction-multi-round': 14,
+      'zoned-uppeak': 12,
+      'destination-eta': 13,
+      'destination-panel': 13,
     });
-    expect(reading.strongest).toEqual({ profileId: 'predictive-balanced', held: 10, n: 20 });
+    expect(reading.strongest).toEqual({ profileId: 'predictive-balanced', held: 20, n: 20 });
   });
 });

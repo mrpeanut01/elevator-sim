@@ -16,10 +16,11 @@
  * ## What this is **not** a claim about
  *
  * `DECISIONS.md` § D145 and § D156 refused the **learned** selector: a contextual policy that
- * searched for a weight-set schedule did not beat `collective` — ΔTTD `−0.213 [−0.440, +0.014]` at
- * § D145's cell, NOT ACCEPTED at all five PRIMARY cells of § D151's sweep, and refused a third time
- * on `lunch-two-way` (§ D169). What this file exposes is the **hand-authored** map in `data/`, which
- * is shipped and works. **Nothing here says switching helps.** No copy below claims a wait, an
+ * searched for a weight-set schedule was not resolvably better than `collective` — ΔTTD
+ * `−0.222 [−0.441, −0.004]` on `f60048d` at § D145's cell, below the 1.90 s resolution limit and
+ * NOT ACCEPTED (§ D1620), NOT ACCEPTED at all five PRIMARY cells of § D151's sweep, and refused a
+ * third time on `lunch-two-way` (§ D169). What this file exposes is the **hand-authored** map in
+ * `data/`, which is shipped and works. **Nothing here says switching helps.** No copy below claims a wait, an
  * energy figure or a comparison; the pattern lines describe what a regime *is*, which is a fact
  * about traffic, not a performance claim. If a line in this file ever asserts an outcome, it needs a
  * paired-t interval behind it or it is the failure mode CLAUDE.md § *Statistical discipline* names.

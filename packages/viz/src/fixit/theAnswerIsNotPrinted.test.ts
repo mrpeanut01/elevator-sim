@@ -283,13 +283,16 @@ function tellsIn(entries: readonly FixitCase[], atLeast: number): readonly strin
  * - **The count is a floor and the search is a sample**, which § D525 clause 3 requires this row to
  *   say. It stops at the first route that holds, and it tries each family one move at a time.
  *
- * **What the two `NOT_REPLICATED` rows are.** `every-letter-says-nine`'s three-metre roof raise is
- * one of the two wins § D1000 § 3 itself named as the single pair's noise; the other, zone-centre
- * parking on `every-deck-calls-itself-full`, is the decision agents' own zone-centre finding. Neither
- * holds, and each case's first route that does is a different one. A third row,
- * `let-faster-than-the-lifts`' fixed floor at the top, left the table when GitHub issue #601
- * (§ D1076) re-authored that case at 7.0 %: on the re-authored letter's morning that route no longer
- * clears even once. **`every-deck-calls-itself-full`'s zoning step was refused rather than
+ * **What the `NOT_REPLICATED` row is.** `every-letter-says-nine`'s three-metre roof raise is one of
+ * the two wins § D1000 § 3 itself named as the single pair's noise. It does not hold, and the case's
+ * first route that does is a different one. Two rows have left the table, each when its case was
+ * re-authored, because on the re-authored letter's morning the route no longer clears even once:
+ * `let-faster-than-the-lifts`' fixed floor at the top, when GitHub issue #601 (§ D1076) re-authored
+ * that case at 7.0 %, and zone-centre parking on `every-deck-calls-itself-full`, the decision agents'
+ * own zone-centre finding, when [§ D1611](../../../../DECISIONS.md) re-authored that case at 4.95 %
+ * (the route reads `not-enough` there; on the release fix's engine at 4.5 it read `building-worse`).
+ * Every `SOLVED_BY` row reproduced on that tree, `bed-cars-locked-out`'s `zone:1` on the case as
+ * § D1611 re-authored it. **`every-deck-calls-itself-full`'s zoning step was refused rather than
  * judged until GitHub issue #605** (§ D1075): the surfaces' own crowd check (GitHub issue #350) read
  * an escalator hop the overlap removed as a change of crowd, so the press failed, and before wave AI
  * a player pressing it saw *Running the day…* for good (§ D1020). The generator's crowd was identical
@@ -323,7 +326,6 @@ const SOLVED_BY: readonly (readonly [string, string])[] = Object.freeze([
 /** Routes that cleared the letter's morning and did not hold over fifty mornings, before the winner. */
 const NOT_REPLICATED: readonly (readonly [string, string])[] = Object.freeze([
   ['every-letter-says-nine', 'raise:3'],
-  ['every-deck-calls-itself-full', 'parking:zone-center'],
 ]);
 
 /** The shipped press, synchronously in this process — `cases.test.ts#judgedPress`'s shape. */

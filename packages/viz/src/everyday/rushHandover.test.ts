@@ -173,7 +173,7 @@ describe('a rush dispatcher set before the run, against one handed over at 0:00'
  *
  * | arm | what it is | held |
  * |---|---|---|
- * | E | `collective` with an `adopt-dispatcher` to `predictive-balanced` at 0:00 | **2 746 s** |
+ * | E | `collective` with an `adopt-dispatcher` to `predictive-balanced` at 0:00 | **2 836 s** |
  * | F | `collective` with an `adopt-dispatcher` to `eta` at 0:00 | the `eta` house row, to the leg |
  *
  * Two arms. **E** hands the round to *Predictive balanced* at 0:00 as a whole dispatcher, and it is
@@ -222,10 +222,14 @@ describe('the whole-dispatcher handover on the rush — § D1048', () => {
 });
 
 /**
- * Arm E's hold moment, measured on this tree with the rest of this file's arms: **2 746 s**, beside
- * A's 2 766, C's 2 480 and B's 2 364. So the whole-dispatcher handover at 0:00 comes within twenty
- * seconds of the house row where the weights alone fell 402 short, and the twenty are the door timing
- * and forecast the note names. One cell and one seed; no mechanism for the size of either gap is
- * offered (§ D256).
+ * Arm E's hold moment, measured on this tree with the rest of this file's arms: **2 836 s**, beside
+ * A's 2 766, C's 2 480 and B's 2 364. So the whole-dispatcher handover at 0:00 holds seventy seconds
+ * past the house row, where the weights alone fall 402 short of it. A and E still differ on the legs,
+ * so a handed-over day is still not the row, which is the half of the note this file holds.
+ *
+ * **It was 2 746 s, twenty seconds short of the row, until the release fix** ([§ D1603](../../../../DECISIONS.md)).
+ * Re-measured on the fixed engine on `ea49e27` ([§ D1615](../../../../DECISIONS.md)); A, B, C and F
+ * did not move. One cell and one seed; no mechanism is offered for the size of either gap or for the
+ * move (§ D256).
  */
-const ADOPTED_BROKE_AT_S = 2746;
+const ADOPTED_BROKE_AT_S = 2836;

@@ -280,13 +280,16 @@ figures do not, and which run produced the published ones is not established. Se
 favourable seed for that arrangement: over seeds 376–425 it saturated at 3,198 on **16 of 50**.
 
 **Re-measured on the corrected arrangement** — same seed, window and dispatcher, every floor's
-population scaled in proportion:
+population scaled in proportion, and **re-run on the fixed engine** ([§ D1603](../DECISIONS.md),
+[§ D1615](../DECISIONS.md)) on `ea49e27`. The verdicts did not move. Before that fix the 3,198 row read
+11.4 s and 32.9 s, the 10,614 row left 30 undelivered at seed 376, and its 50-seed column read
+*undelivered on 32*; why any figure moved is unmeasured.
 
 | people | journeys | mean wait | 95th percentile | undelivered | AWT at seed 376 | saturated, seeds 376–425 |
 |---|---|---|---|---|---|---|
-| 3,198 | 989 | 11.4 s | 32.9 s | 0 | valid | 1 of 50 |
+| 3,198 | 989 | 9.5 s | 29.4 s | 0 | valid | 1 of 50 |
 | 5,307 | 1,646 | withheld | withheld | 0 | suppressed — saturated | 37 of 50 |
-| 10,614 | 3,473 | withheld | withheld | 30 | suppressed — saturated | 50 of 50, undelivered on 32 |
+| 10,614 | 3,473 | withheld | withheld | 33 | suppressed — saturated | 50 of 50, undelivered on 31 |
 
 The seed-376 rows are pinned in `burjOperator.test.ts`; the last column is
 `burjOperator.sweep.test.ts` under `BURJ_BRACKET_SWEEP=1`. **No AWT interval is published at any of

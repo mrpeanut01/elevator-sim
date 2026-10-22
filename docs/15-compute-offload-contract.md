@@ -95,7 +95,7 @@ Ranked honestly, because the weakest case is the one that sounds most appealing.
 
 | Buys | Value |
 |---|---|
-| **Higher replication budgets** — n = 200 → 800 halves a paired interval | **Highest.** The only place compute can change a *published verdict*. Phase 6c is refused partly on resolution: `−0.213 [−0.440, +0.014]` at n = 200 |
+| **Higher replication budgets** — n = 200 → 800 halves a paired interval | **Highest.** The only place compute can change a *published verdict*, and Phase 6c is no longer one it can change: on `f60048d` its interval already excludes zero at n = 200 (`−0.222 [−0.441, −0.004]`), it is refused because the effect is below the 1.90 s resolution limit, which a larger n does not move, and its cell is not a § D151 PRIMARY cell ([§ D1620](../DECISIONS.md)) |
 | **Routine pin regeneration** — currently a wave-scale event (~1 900 s) | High. Removes the § D196 staleness pressure structurally rather than by vigilance |
 | ~~Lane verification decoupled from integration verification~~ | Was Phase A's, and **is not on offer any more.** This is what broke on 2026-07-31 at load 166, and it remains unaddressed rather than solved |
 | ~~Faster unit suite~~ | Was Phase A's, and the **lowest**-value row on this table anyway. Already ~5–6× parallel at roughly one CPU-hour |
@@ -241,7 +241,7 @@ Each row names the run that asserts it. None of them is a cross-machine measurem
 It does not authorise spend. Provisioning is the project owner's decision, and this contract is what
 the work is judged against once they make it.
 
-It does not make a small effect important. A narrower interval around `−0.213` is still `−0.213`,
+It does not make a small effect important. A narrower interval around `−0.222` is still `−0.222`,
 and criterion 5 exists so that raising the budget cannot quietly convert *"we cannot resolve this"*
 into *"this is real"* without re-measuring what the apparatus can now see.
 

@@ -3023,7 +3023,7 @@ describe('a Scenario week’s days pay once, are recorded, and are dealt new cro
     expect(s.host.dayCrowd()).toBe(derivedCrowdOf(DATE, 2, 0));
   });
 
-  it('counts the closed week on the tower’s record, and deals the next week crowds of its own', () => {
+  it('counts the closed week on the tower’s record, and deals the next week crowds of its own, off the date while no week is pooled', () => {
     const s = scenario();
     const seen = new Set<string>();
     for (let day = 1; day <= 7; day += 1) {
@@ -3035,9 +3035,14 @@ describe('a Scenario week’s days pay once, are recorded, and are dealt new cro
     s.tomorrow();
     expect(s.h.state.week.day).toBe(1);
     expect(seen.has(s.h.state.seed.toString()), 'the next week re-dealt a crowd this device filed').toBe(false);
-    /* Since § D1460 week 2's counted Monday is dealt from the measured pool, by date, day and weeks closed. */
-    expect(s.h.state.seed).toBe(poolDealOf('c2', 2, 1, 1, DATE)?.seed);
-    expect(isPoolCrowdSeed(s.h.state.seed)).toBe(true);
+    /*
+     * Since § D1460 week 2's counted Monday was dealt from the measured pool. § D1616 holds Midtown's
+     * one dealt order, so the pool has no cell and week 2's Monday is a crowd of its own off the date,
+     * as week 1's days are. The pool's own dealing through `weekRecord.ts#dealtCrowdOf` is tested on
+     * real cells in `shift/weekPool.preD1603.test.ts`.
+     */
+    expect(poolDealOf('c2', 2, 1, 1, DATE)).toBeUndefined();
+    expect(isPoolCrowdSeed(s.h.state.seed)).toBe(false);
   });
 });
 

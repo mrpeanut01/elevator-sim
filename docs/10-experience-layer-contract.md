@@ -2154,11 +2154,11 @@ this paragraph named only the empty route for as long as the totals above it wer
 |---|---|---|---|---|---|---|
 | **1 first call** | `garden-apartments`, shipped | 50/50, 50/50 § | 50/50, 50/50 | 50/50, 50/50 | 50/50, 50/50 § | 50/50, 50/50 § |
 | **2 morning rush** | `midtown-office`, 2.5 % | 50/50, 50/50 | 50/50, 50/50 | 50/50, 50/50 | **24/50, 20/50** | **41/50, 45/50** |
-| **3 overwhelmed** | `midtown-office`, shipped | 50/50, 50/50 | 0/50, 0/50 | **28/50, 29/50** | 0/50, 0/50 | 0/50, 0/50 |
+| **3 overwhelmed** | `midtown-office`, shipped | 50/50, 50/50 | 0/50, 0/50 | **29/50, 30/50** | 0/50, 0/50 | 0/50, 0/50 |
 | **4 two banks** | `mixed-use-high-rise`, 1.5 % | **36/50, 34/50** | 50/50, 50/50 | 50/50, 50/50 | **19/50, 20/50** | 50/50, 50/50 |
-| **5 credentials** | `secure-tower`, shipped | **5/50, 11/50** | **45/50, 46/50** | 50/50, 50/50 | **5/50, 9/50** | **14/50, 12/50** |
+| **5 credentials** | `secure-tower`, shipped | **5/50, 11/50** | **45/50, 46/50** | 50/50, 50/50 | **5/50, 9/50** | **14/50, 13/50** |
 | **6 the tall one** | `vertical-city`, 0.5 % | **40/50, 46/50** | 50/50, 50/50 | 50/50, 50/50 | **31/50, 25/50** | 50/50, 50/50 |
-| **7 prove it** | `midtown-office`, 2.25 % ¶, `zoned-uppeak` | 50/50, 50/50 | 50/50, 50/50 | 50/50, 50/50 | **29/50, 22/50** | **36/50, 32/50** |
+| **7 prove it** | `midtown-office`, 2.25 % ¶, `zoned-uppeak` | 50/50, 50/50 | 50/50, 50/50 | 50/50, 50/50 | **29/50, 21/50** | **36/50, 31/50** |
 | **8 the headline address** | `chancery-house`, 3 %, `zoned-uppeak` | 50/50, 50/50 | 50/50, 50/50 | 50/50, 50/50 | **38/50, 40/50** | 50/50, 50/50 |
 | **9 both ways at once** | `crown-hotel`, 3.5 % ¶ | **49/50, 49/50** | 50/50, 50/50 | 50/50, 50/50 | **38/50, 39/50** | 50/50, 50/50 |
 | **10 the bed and the visitor** | `st-jude-hospital`, 2 % | **41/50, 41/50** | 50/50, 50/50 | 50/50, 50/50 | **32/50, 30/50** | 50/50, 50/50 |
@@ -2170,6 +2170,13 @@ kind of answer**: 49/50 is a variable and 50/50 is a constant-pass, and a classi
 not survive a disjoint seed set is not one to ship a level on. Row 11's long-wait cell sits exactly
 on that boundary; the hotel's two cells sat on it too, at 2.5 %, until stage 9's demand moved. `everyone-can-get-there` and `beat-the-baseline` are withheld
 on every row, the first blocked on W7 and the second because it compares two arms.
+
+**Four cells were re-measured on the engine [`DECISIONS.md`](../DECISIONS.md) § D1603 fixed**, and
+nothing else in the table moved ([§ D1607](../DECISIONS.md)). Stage 3's `nobody-abandoned` read
+**28/50, 29/50**, stage 5's `long-waits-under` **14/50, 12/50**, and stage 7's `answer-the-demand` and
+`long-waits-under` **29/50, 22/50** and **36/50, 32/50**. Each cell is the starting setting's own count
+on the same seeds, so the bar follows it and no bar, seed, horizon or threshold moved. Every cell stays
+in its bucket. M31 below is the record of its own run and keeps stage 5's earlier `14/50, 12/50`.
 
 **¶ is stage 7's demand, and it is a rebalance rather than a measurement that drifted** — GitHub
 issue **#234**, [`DECISIONS.md`](../DECISIONS.md) § D611. The stage ran at 1.5 % until 2026-09-15 and

@@ -18,6 +18,8 @@ below ran on `46ecc21`, which adds the proxies and changes no simulation.
 Source: `elevator-sim fuzz --scenario stage-1-first-call --engagement`, which reproduces every figure
 in this section. Deterministic. Every proxy is an unmeasured premise about people: no human
 ground-truth set has calibrated one yet, so none is marked Measured.
+On `f4c915a`, which carries § D1603's fix to the release direction, the command prints exactly what it
+printed on `ae255db` before the fix, so no figure it prints here moves on the fixed engine.
 
 **Baseline, the figures every sweep in this cycle compares against.** The arm is the stage's own
 setting (`collective`, parking as it stands, no verb pressed) on `garden-apartments`, 900 s. Each seed

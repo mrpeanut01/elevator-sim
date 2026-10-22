@@ -2236,6 +2236,16 @@ type DecisionReservation = {
  */
 const OPEN_RESERVATION = null as DecisionReservation | null;
 /*
+ * **Wave AU's reservation, D1603-D1629, is closed** in the wave's own merge commit. It opened as
+ * D1603-D1619 and was extended before any lane passed D1619. The release-direction fix the owner's
+ * decision panel ruled in (§ D1600) and the content it moved, re-derived on the fixed engine: five lanes
+ * and the integrator, who recorded the panel's rulings R4 to R9 on GitHub issue #645, spent eleven
+ * headings: D1603 (lane AU-1), D1604-D1606 and D1617 (the integrator), D1607-D1608 (lane AU-2), D1611
+ * (lane AU-3), D1615-D1616 (lane AU-4) and D1620 (lane AU-5). Every unspent number below the highest
+ * heading, D1620, is registered in `KNOWN_DECISION_HOLES`; **D1621-D1629 are free rather than holed**
+ * (§ D430), and the charter row moves to **D1621**.
+ */
+/*
  * **Wave AT's reservation, D1590-D1619, is closed** in the wave's own merge commit. The first design
  * cycle (`docs/design-cycles/CYCLE-1.md`) ran three build lanes and the integrator, who recorded the
  * owner's decision panel's rulings on GitHub issue #645, and spent six headings: D1590 and D1591
@@ -3818,6 +3828,22 @@ const KNOWN_DECISION_HOLES: ReadonlyMap<number, string> = new Map([
   [1597, "wave AT's lane AT-2's block; unspent for § 1596's reason."],
   [1598, "wave AT's lane AT-2's block; unspent for § 1596's reason."],
   [1599, "wave AT's lane AT-2's block; unspent for § 1596's reason."],
+  [
+    1609,
+    "wave AU's lane AU-2 held D1607-D1610 and spent D1607-D1608. Registered under D404 and D430.",
+  ],
+  [1610, "wave AU's lane AU-2's block; unspent for § 1609's reason."],
+  [
+    1612,
+    "wave AU's lane AU-3 held D1611-D1614 and spent D1611 only. Registered under D404 and D430.",
+  ],
+  [1613, "wave AU's lane AU-3's block; unspent for § 1612's reason."],
+  [1614, "wave AU's lane AU-3's block; unspent for § 1612's reason."],
+  [
+    1618,
+    "wave AU's lane AU-4 held D1615-D1619 and spent D1615-D1616; the integrator re-cut D1617. Registered under D404 and D430.",
+  ],
+  [1619, "wave AU's lane AU-4's block; unspent for § 1618's reason."],
   [
     1030,
     "wave AI's lane AI-D held D1029-D1037 and spent D1029. Registered under D404 and D430.",

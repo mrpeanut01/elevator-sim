@@ -50561,6 +50561,8 @@ to week 2* on the shipped page and reads week 2 on the brief.
 
 ## D1345 — the census of Midtown's later weeks under DC-11: § D1254's three dealt orders refused and kept, one order authored and admitted, and no second order the wrinkle library can build
 
+> **Status 2026-10-22: AMENDED by [§ D1616](#d1616).** `midtown-early-lift`, the order this entry authored and admitted, is refused by the week census on the fixed engine and held: authored, not dealt. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-10-10 by agent sessions under delegated authority**, as wave AN's lane DQ-2 under
 > [§ D1343](#d1343), not by the product owner. The measurements are the census's; which wrinkles
 > were tried, on which days, and which admitted order was authored are the lane's choices. A later
@@ -51899,6 +51901,8 @@ reference tower can run longer, which the hub says and the menu tile does not.
 
 ## D1400 — from week 3 a held week deals the next level: the same order with one more car booked out of passenger service on a named morning, dealt only where the census admits it, and a tower with no level left says so
 
+> **Status 2026-10-22: AMENDED by [§ D1616](#d1616).** The rule stands; Midtown, the one tower that authors bookings, deals no order and so no level while § D1616 holds its order. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-10-13 by agent sessions under delegated authority** (wave AO, lane DS-1, carrying out
 > swarm DS's reconciled Q1 ruling), not by the product owner. The ruling is the swarm's; the shapes
 > below that it did not fix are the lane's. A later reader weighing this against a product-owner
@@ -52991,6 +52995,8 @@ move through every need-capable weekday, and the date moves the crowd; *a differ
 changes the run* compares two crowds' legs.
 
 ## D1461 — the gates read the pool as dealt, and a level they refuse or cannot read is withdrawn
+
+> **Status 2026-10-22: AMENDED by [§ D1616](#d1616).** The gates stand; with Midtown's order held its top is week 1, not the week 2 the owner kept. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Taken 2026-10-17 by agent sessions under delegated authority, not by the product owner**: lane
 > DT-1, swarm DT's Q1 and Q2 item 3. **Amends [§ D1400](#d1400)'s admission** (the pool gates are
@@ -54277,3 +54283,935 @@ sentence once and the energy line once. The gate is the deep honesty tier at 0 f
 the figures, CYCLE-1 § 3 names the fallback: the head and one sized line for average wait.
 
 **Numbers spent.** Lane AT-3 holds **D1602 to D1609** and spends **D1602**.
+
+## D1603 — a released hall call re-points the car that held it, as a withdrawn one does
+
+> **Taken 2026-10-21 by an agent session** (wave AU, lane AU-1), carrying out the owner's decision
+> panel's ruling R2 (GitHub issue #645, [§ D1600](#d1600)) and, from its next ruling, R6 (clause 7).
+> It closes in the engine the gap [§ D1591](#d1591) clause 3 held, and stops short of re-publishing
+> the verdicts that fix moves (clause 5), which are the panel's.
+
+**Why an entry.** It changes `core`'s `Car`, closes the gap § D1591 held and `car.test.ts` pinned,
+moves pins in files this lane does not own, and changes how `core` and `experiments` put the old
+behaviour back for a control.
+
+1. **The measurement, taken before the fix.** A release is *stale* when it leaves a car standing
+   still with a direction and no committed stop ahead in it, and *at nothing* when the car has no
+   committed stop at all. A *stale refusal* is what that costs a rider: `noDirectionReversal`
+   refusing such a car a call, read off the dispatch decision's own rejected list. Each figure below
+   is asserted by `experiments/src/fuzz/releaseDirection.test.ts` (the deep fuzz tier), with the old
+   release put back on the fixed engine; a scratch build of the unfixed tree, `ae255db`, gave the
+   same legs as that control on every one of these runs.
+   - **The 147 runs § D1591 counted** (seven buildings, seven profiles, three seeds, 900 s): 88
+     stale releases, 7 at nothing, by the same four paths, which is § D1591's figure reproduced.
+     They cost 15 stale refusals of 6 calls, in 2 runs. The fix moves the legs of 2 runs:
+     `crown-hotel` under `collective`, seed 2, where one completion left a car pointing at nothing
+     and it was refused for five calls, and `midtown-office` under `zoned-uppeak`, seed 2, where no
+     car was refused. Over their 636 journeys, 123 change door-to-door time, 47 later and 76
+     sooner, −153.7 s in all.
+   - **The 494 runs § D1591's first figure is measured on** (ten buildings, every profile, two
+     seeds, 900 s and the template's own horizon): 591 stale releases, 111 at nothing, and 683
+     stale refusals of 60 calls, in 11 runs. The fix moves the legs of 24 runs, listed in the test.
+     Over their 12 144 journeys, 5 536 change door-to-door time, 2 651 later and 2 885 sooner,
+     −18 770.8 s in all.
+   - **Phase 6's gate cell** (Mixed-Use High-Rise at up-peak 4 %, n = 200, the six arms
+     `benchmark/mixedUseHighRise.ts` runs there): 91 stale releases, every one at nothing and every
+     one a re-offer in `destination-panel`'s arm, and no stale refusal. **No leg of the 1 200
+     replications moves**, so no figure of the gate can, and [§ D100](#d100)'s verdict stands.
+     The gate's figures live in `benchmark/mixedUseHighRise.ts`, on Mixed-Use High-Rise. Two
+     further cells were measured in a scratch build and are pinned by no test: Midtown at up-peak
+     4 % (five arms, n = 200) and `one-wtc-class-reference` at 2 % (four arms, n = 200). No leg of
+     their 1 000 and 800 replications moves, under this fix or under the narrower variant measured
+     for the panel, which cleared a car's direction only where a release left it no committed stop.
+   - **Nobody is stranded either way.** In every run whose legs move, no journey is delivered under
+     one engine and not the other, and none is abandoned or stranded under either. So on these runs
+     a wrong direction delayed riders, through the refusals, and stranded none. Under the fix the
+     riders of the moved runs split both ways; why a given run moved one way rather than the other
+     is unmeasured.
+2. **The fix.** `Car.releaseHallCall` and `Car.releaseAllHallCalls` re-settle a car that is standing
+   still, as `withdrawHallCall`, an arrival and an assignment already did, through one private helper
+   (`Car#settleIfStanding`) that all five now share, with `setMode` a sixth since R6 (clause 7).
+   A moving car keeps its direction, which is the move it cannot abandon, and settles on arrival.
+   `Car.estimateCost()` is untouched and still pure:
+   it reads a snapshot and calls none of these. Each call site, and whether the car can be moving
+   there:
+   - `Simulation.#applyDecision`, for a dispatch decision and for reassignment on load. The car the
+     call leaves can be moving (a call taken from a car on its way) or standing (a full car after its
+     doors shut). A standing car re-points, and `changed` is set, so the pass drops its snapshots
+     before it prices the next call.
+   - `#completeCall`, from `#finishStop` once the doors shut and from `#dispatchBank` when a landing
+     empties. The car that served the call is standing; another holder can be moving.
+   - `#reofferCall`. The refusing car is standing at the landing on an overflow, a bypass on arrival
+     or a stop nobody would board. On a service-mode change or a derate its calls are already gone
+     (`setMode`, `derate`), so its own release finds nothing and changes nothing. Other holders can
+     be moving.
+   - `#serveHere`, for a call the runner no longer tracks and for `not-assigned`. The car is standing
+     with its doors shut, and it re-points before the stop is decided, so `#boardingDirections` reads
+     the new direction.
+   - `releaseAllHallCalls` has one caller, `Car.derate`, so only a derate service event reaches it,
+     and the car can be moving or standing. The load sensor's bypass reaches the release path through
+     the re-offer, one call at a time. No shipped building declares a derate.
+3. **The controls.** Until now a test put the old withdrawal back by assigning `releaseHallCall`
+   over it, which reproduces nothing once the release re-settles too.
+   `model/car/keptDirection.test-helper.ts`, and a copy in the experiments test, runs the current
+   method with the car's `committedStops` shadowed for the length of the call, which holds its
+   direction. It checks itself: § D1591's counts and the stage-1 deadlock in
+   `sim/serviceRange.test.ts` have to come back under it. `core/src/sim/releaseDirection.test.ts`
+   runs on every `vitest run`: the Crown Hotel run changes, 21 legs sooner and none later, and a
+   Garden Apartments run with no stale release is byte-identical. Since R6 the same helper puts
+   the old `setMode` back on its own (clause 7).
+4. **Every pin that moved under an unmoved verdict, each re-derived by the tool that produced it.**
+   - `core/src/traffic/transportIdentity.test.ts`, `vertical-city|collective` at seed 20 260 726: the
+     structural digest (`522ee3ff…` to `67a4df08…`) and one headline figure, time to destination,
+     183.574 s to 183.763 s. The other seven headline figures, the escalator hop count (292) and the
+     other fourteen cells did not move.
+   - `core/src/traffic/dayStartIdentity.test.ts`: the same cell's superseded digest, regenerated
+     with it (`7f9b3a5a…` to `722d94b6…`).
+   - `core/src/sim/doubleDeckSeam.test.ts`: `collective`'s paired shuttle moves on `vertical-city`,
+     287 to 282. Its control arm (309) and the other two dispatchers did not move, and three of
+     three dispatchers still save moves when the decks are paired.
+   - `experiments/src/benchmark/published.ts`, the forecast-causality audit (`predictorLag.test.ts`,
+     always on): forecasts served 34 422 to 34 435, and the partial correlation −0.0139
+     [−0.0317, +0.0038] to −0.0139 [−0.0317, +0.0039]. The interval still holds zero, so the finding
+     that the predictor reads no future stands. Re-derived with `regeneratePins.ts`'s own expression
+     for that study; on this container the unfixed tree gives −0.013946…, the x64 value the pin's
+     note already records, and the fixed tree, `f4c915a`, −0.013891…. Republished in
+     `benchmark/index.ts` § 6, `predictorLag.test.ts`'s header and `docs/05-roadmap.md` § Phase 5.
+   The three `core` pins were re-derived by running those files' own measuring functions on the
+   lane's tree, which reproduced every unmoved cell exactly.
+5. **Stopped: published verdicts move, and they are the panel's.** The always-on `viz` suite goes red
+   in 16 files (33 cases), `server` in one (3 cases, the server's half of the same rush hold table)
+   and `viz-browser` in two (`everyday/stageWatch.browser.test.ts`'s moved-no-count line and
+   `everyday/fixitHint.browser.test.ts`'s not-fixed check, which wait for screens the moved runs no
+   longer produce; both pass with the old `car.ts` swapped back in), and among them are verdict words. They are not re-published here; each
+   pin is left as it was, so the red is the record:
+   - **Scenario stages.** `campaign/stageVerdictsHold.test.ts`: the census's way through
+     `stage-3-overwhelmed` (`fairness-first`) goes from met, held and cleared to not met;
+     `stage-5-credentials` (`predictive-balanced`) and `stage-7-prove-it`
+     (`predictive-balanced-parked-zone-center`) go from met, held and cleared to met only.
+     `campaign/stageFiveClears.test.ts`, `campaign/judgeCleared.test.ts` and
+     `campaign/stageSequence.test.ts`: no shipped profile clears `stage-5-credentials` from the
+     dropdown any more. `scenario/goalRates.test.ts`: `data/scenario-goals.json`'s counts move
+     (`stage-3-overwhelmed`'s `nobody-abandoned`, 28 and 29 of 50 to 29 and 30 of 50; the test stops
+     at the first scenario that differs, so the stages after it are unread), and
+     `everyday/stageSameCounts.test.ts` no longer finds its stage-3 case, lobby parking under
+     Min-wait giving the counts Min-wait gave.
+   - **Fix-a-building.** `bed-cars-locked-out`'s diagnosed repair no longer clears (the complaint
+     falls 50 %, under the 80 % bar; the ruled judge reads `not-enough`), its as-built letter moves
+     from 11 to 4 long waits, and its second answer `quicker-bed-car-doors` stops clearing.
+     `every-deck-calls-itself-full`'s as-built complaint falls from 8 long waits to 1, so the letter
+     no longer describes the day, and `regear-the-shuttles` starts clearing.
+     `every-letter-says-nine/split-the-group` starts clearing. `car-park-nobody-serves` still clears
+     with its figures moved (21 to 17 long waits, 322 s to 172 s worst), and the promise of
+     `regear-the-garage-car` breaks (the worst wait goes 172 s to 195 s).
+     `deliveries-on-the-passenger-group` still clears, its after-figure 2 to 0. Following from those:
+     `fixit/families.test.ts` (the editor's answer for `bed-cars-locked-out`),
+     `theAnswerIsNotPrinted.test.ts` (the role-blind search finds no route for `bed-cars-locked-out`
+     where it found `zone:1`) and `verdictNamesTheOrder.test.ts` (a route on
+     `every-deck-calls-itself-full` that cleared now reads `building-worse`).
+   - **Shift and Everyday.** `shift/firstSession.test.ts` and `shift/legibility.test.ts`: contract
+     c7's day 1 is legible on 6 of the first ten seeds, not 7. `everyday/firstDayLength.test.ts`
+     (call timings), `everyday/rushHandover.test.ts`, `everyday/rushHoldAgreement.test.ts` (three
+     rows) and `record/burjOperator.test.ts` (the 57-lift bracket) move figures.
+   - **Two censuses checked here, both moved.** `everyday/rushHouseSweep.test.ts`
+     (`ELEVATOR_SIM_RUSH_HOUSE=deep`): the house rows of 5 of 17 buildings (10 of 221 rows) in
+     `data/rush-house-runs.json` no longer reproduce. `fixit/asBuiltMornings.sweep.test.ts`
+     (`ELEVATOR_SIM_FIXIT_MORNINGS=deep`): 13 of 18 cases' forty-nine mornings in
+     `data/fixit-as-built-mornings.json` no longer reproduce. The shipped press reads that file, so
+     until it is regenerated a press pairs as-built readings from the old engine with after-runs
+     from the new one; the always-on suite runs both live and does not see it. Neither file is
+     regenerated here.
+   Whether R2's fix stands with these verdicts moved, or is held until they are re-authored, is not
+   the lane's to decide.
+6. **`docs/design-cycles/CYCLE-1.md` § 1.** `elevator-sim fuzz --scenario stage-1-first-call
+   --engagement` prints the same output on `f4c915a` as on `ae255db`, so § 1 gains one sentence saying
+   so and nothing in it moves.
+7. **`Car.setMode`, folded in by the panel's ruling R6.** `setMode` drops a car's hall calls when
+   it leaves group service, and its car calls too on recall or out of service. R2 named the two
+   releases, so this entry first held `setMode` as it was; a scratch probe then counted, over all
+   7 150 runs `elevator-sim fuzz --scenario stage-1-first-call --tier deep --cases 2000` makes
+   (its 2 000 sessions and the runs that rank its verbs), 7 864 mode changes, 20 of which left a
+   standing car pointing past its work. R6 folds it in: a car standing still that loses any call
+   to a mode change now re-settles through `#settleIfStanding`, and a moving car settles on
+   arrival. `keptDirection.test-helper.ts` puts the old `setMode` back on its own, and with it the
+   fixed engine gave the same legs as a build of `5a3c99d`, the release fix alone, on every run of
+   the first two items below. Measured alone, with the release fixed in both arms:
+   - **The 147 runs, the 494 runs, the gate cell, Midtown 4 % and One WTC 2 %.** No car changes
+     mode in any of them, so the fold moves none. The deep tier asserts that on the first three.
+   - **The 2 000 deep stage-1 sessions.** 1 181 of them change a mode, 5 059 times in all. Under
+     the old `setMode` 16 of those changes left a standing car pointing past its work, 14 of them
+     at nothing and 5 of them a return to service, in 6 sessions, and `noDirectionReversal`
+     refused such a car 2 calls, in one session. With the fold, none. That session, 1000611, is the
+     one whose legs move: car B stands at the ground floor pointing up with one hall call, a verb
+     switches it to independent service and back, and under the old `setMode` it comes back
+     pointing at nothing and is refused both down calls. Of its 15 journeys 5 change door-to-door
+     time, 3 later and 2 sooner, −12.4 s in all. None is delivered under one engine and not the
+     other, none is abandoned, and the same 2 riders are stranded at the same moment under both.
+     Why each rider moved the way it did is unmeasured. `core/src/sim/releaseDirection.test.ts`
+     pins that session on every `vitest run`, and the deep tier pins the 2 000.
+   - **Stage 1, against `ae255db`.** On this lane's head the seven stage-1 rows
+     `campaign/stageVerdictsHold.test.ts` holds, the six CYCLE-1 presses on both shipped seed sets
+     batch by batch, and `fuzz --scenario stage-1-first-call --engagement` are identical, and the
+     stage-1 survivor census reproduces its published counts and names at all three rungs. On the
+     twelve fresh batches wave AV declared for the mastery harness ([§ D1601](#d1601)), each run in
+     place of the held-back set, 88 configurations (every one the census judges at any rung, and
+     the six presses) give 1 056 whole batch results. The fold changes none of them against
+     `5a3c99d`. The release fix changes 194 of them against `ae255db`: all 88 on batches 02 and 05,
+     and 18 on the other ten. That was compared for equality only, and no verdict on it is drawn
+     here.
+
+**Numbers spent.** This lane held **D1603 to D1612** and spent **D1603**; the integrator re-cut the rest of that block once the lane reported (D1604 to D1606 for the panel's rulings, the remainder to wave AU's content lanes).
+
+## D1604 — the release-direction fix lands, and the content it moves is re-derived on the fixed engine
+
+> **Taken 2026-10-21 by the owner's decision panel** (GitHub issue #645, ruling R4: the full fix 3–0,
+> re-authoring in this wave 2–1), recorded by the integrator of wave AU. It settles what
+> [§ D1603](#d1603) clause 5 stopped on. **Owner-reversible.**
+
+**Why an entry.** It binds content lanes, censuses and published verdicts across the game layer that no
+module of the fix owns, and it refuses a narrower fix and a further deferral.
+
+1. **The engine.** The full fix of § D1603, with [§ D1606](#d1606)'s fold. The narrow variant (only a car
+   left with no stop at all re-settles) is refused: it leaves 76 refusals in the 494 shipped runs, the
+   state [§ D1600](#d1600) clause 1 refused, and moves almost the same content. Holding the fix again is
+   refused: a deferral with no date accepts the behaviour, and every census pinned meanwhile is one more
+   to re-derive.
+2. **The benchmark tier comes first.** It runs on the fixed head and every moved pin is read; if a research
+   verdict moves, the wave stops and returns to the panel.
+3. **Regenerate once, on the final engine.** Every census the fix moves is regenerated on one commit, each
+   by its own tool, before any content lane re-authors anything, and each diff is listed. The as-built
+   mornings and the rush house runs never reach `main` apart from the engine, because a press reads them
+   beside runs it simulates live.
+4. **Figures follow the run.** Every moved figure (letters, diagnoses, `docs/10` § M30, Rush, the Burj
+   record, first-day length, contract c7) is re-derived by its own tool and pinned to the run.
+5. **A decoy order's sentence follows the run**, as `theAnswerIsNotPrinted.test.ts` already names for
+   #568 and § D1011 did before: `regear-the-shuttles`, `regear-the-garage-car`, `split-the-group`,
+   `quicker-bed-car-doors` and the `verdictNamesTheOrder` route. A decoy that starts clearing counts as a
+   second answer and is not authored away.
+6. **A witness is never re-worded.** `bed-cars-locked-out`'s diagnosed repair, `every-deck-calls-itself-full`'s
+   letter and the ways through stages 3, 5 and 7 keep their words, and no bar, judge, seed, horizon,
+   threshold, morning count or interval rule moves.
+7. **Re-author in this wave, or hold.** A broken witness is re-authored in demand, fabric or morning with
+   its bars unchanged ([§ D1076](#d1076)), its candidates chosen on the tuning seeds only and every
+   candidate registered, so the held-back crowds judge each once. If the search finds nothing, the case or
+   stage is held with its reason in the register that already exists for it, its test is inverted to pin
+   the measured negative (as [§ D267](#d267) did), it comes off the player's list, and the engine fix
+   still lands. Seat 2 dissented: hold every broken witness now and re-author in a later content lane,
+   because several moved goal rows moved by exactly one run of fifty and a search until green risks
+   fitting content to noise.
+8. **Stages.** `stageFiveClears`' floor moves to wherever the census finds a dropdown clear (§ D267: a
+   search with a stated floor), since stage 5 needs a way through in the census and not a dropdown clear.
+   A regenerated count of exactly one way through a first-hour stage breaches [§ D528](#d528) clause 6 and
+   is fixed before merge. A stage left with none is held under `scenario/ladder.ts`'s existing rule.
+9. **Fix-a-building cases offered to a player** clear by their diagnosed repair on the letter's morning
+   and over fifty mornings at the unchanged 80 % bar, name in their hint a change measured to clear, and
+   print in their letter and reasoning only figures from the fixed engine.
+10. **No copy says why a verdict moved.** The mechanism is unmeasured.
+
+**Corrections the panel found, carried here.** [§ D265](#d265) names no stage; the stage-5 clear case moved
+there under § D267, and § D528 clause 2 counts stage 5's dropdown clear as a breach. `regear-the-shuttles`
+says the worst wait does not shorten and on the fixed engine it does; `regear-the-garage-car` says it
+shortens and it lengthens. Phase 6's gate figures live in `benchmark/mixedUseHighRise.ts`, on Mixed-Use
+High-Rise: `CLAUDE.md`, `docs/05-roadmap.md` § 6, `docs/45-status-record.md` and
+`destinationSecondBuilding.test.ts` called that cell Midtown's and are corrected on this wave; § D595 and
+§ D1600, which do the same, are left as written.
+
+**Numbers spent.** The integrator holds **D1604 to D1606** from wave AU's reservation and spends all three.
+
+## D1605 — cycle 2 may run on `main` if stage 1 is identical on the fresh batches, and it was not, so cycle 2 waits
+
+> **Taken 2026-10-21 by the owner's decision panel** (GitHub issue #645, ruling R5, 3–0), recorded by the
+> integrator of wave AU. It amends [§ D1600](#d1600) clause 4. **Owner-reversible.**
+
+**Why an entry.** It changes the order § D1600 set for the second design cycle, which neither wave owns.
+
+1. **The amendment.** Clause 4 exists so that the second cycle measures one engine, and on
+   `stage-1-first-call` the engines were measured identical: the six presses cycle 1's playtest made, on
+   both seed sets, batch by batch; the stage's survivor-census rows at every rung; and the fun proxies. So
+   the cycle may proceed on one named `main` commit, on four conditions: the commit serves the whole
+   playtest; before it, the twelve fresh batches of `data/mastery-seeds.json` ([§ D1601](#d1601)) are run
+   across stage 1's admitted configurations on `main` and on the fixed engine and compared for equality
+   only, **and any difference means the cycle waits**; a finding that rests on a simulated outcome outside
+   stage 1 carries its commit and enters no design delta until it is seen again on the merged engine; and
+   once the fix merges, every persona attempt is replayed on the merged head.
+2. **The outcome.** Lane AU-1 ran 88 configurations (every one the stage-1 census judges at any rung, and
+   the six presses) on the twelve batches: 1 056 comparisons. Against `ae255db` the fixed engine differs in
+   **194**, every one from the release fix and none from § D1606's fold ([§ D1603](#d1603) clause 7). The
+   condition fails, so **the second cycle waits for wave AU to merge** and plays on the fixed engine, which
+   restores clause 4 as written.
+
+**Numbers spent.** See [§ D1604](#d1604).
+
+## D1606 — a mode change that drops a standing car's calls re-points it, folded into the release fix
+
+> **Taken 2026-10-21 by the owner's decision panel** (GitHub issue #645, ruling R6, 3–0), recorded by the
+> integrator of wave AU and built by lane AU-1 ([§ D1603](#d1603) clause 7). **Owner-reversible.**
+
+**Why an entry.** It widens § D1600's scope, which named the two release methods only.
+
+`Car.setMode` drops a car's calls when it leaves service and did not re-settle its direction: the state
+§ D1600 clause 1 refused, through a third method. It is folded into the fix so that the content § D1604
+re-derives is re-derived once, measured first with its own control, and its moved legs are reported apart
+from the release fix's. The panel's split rule (if it moved anything on stage 1, it would leave for a lane
+of its own after cycle 2's playtest) did not fire: on stage 1 as the game judges it, fresh batches
+included, the fold moves nothing.
+
+**Numbers spent.** See [§ D1604](#d1604).
+
+## D1607 — the stages on the fixed engine: the goal bars are re-derived before the census, and every way through comes back
+
+> **Taken 2026-10-22 by an agent session** (wave AU, lane AU-2), carrying out the owner's decision
+> panel's ruling R4 ([§ D1604](#d1604)) clauses 3, 4 and 8 on the ten Scenario stages. Nothing here is
+> authored, so it is reversed only with the engine fix ([§ D1603](#d1603)).
+
+**Why an entry.** It republishes `data/scenario-goals.json` and `data/scenario-survivors.json`, which
+every stage verdict, the Scenario hub and five registers read, and it answers the stage half of
+§ D1603 clause 5, which reported stage verdicts as moved.
+
+1. **The stage reds § D1603 clause 5 lists come from bars that had not yet been re-derived.** A
+   count goal's bar is the starting setting's own count on the same seeds, published in
+   `data/scenario-goals.json`, and `campaign/judge.ts` judges no count goal whose baseline arm does
+   not reproduce that count (`met: null`). The fix moved four of those counts, and the census on
+   `ea49e27` was regenerated while the file still held the old engine's. Stage 3's moved cell is on
+   the tuning seeds, so all of its 39, 63 and 63 configurations went unjudged and none could meet.
+   Stages 5 and 7's moved cells are on the held-back seeds only, so their configurations met on the
+   stage's own crowds as before and none could be held. Every stage red clause 5 names has that one
+   cause: `stageVerdictsHold`'s rows for stages 3, 5 and 7, `stageFiveClears`, `judgeCleared`,
+   `stageSequence`, `goalRates`, and the moved-no-count line `stageSameCounts` and
+   `stageWatch.browser` look for, which compares counts that an unjudged goal does not carry.
+2. **The bars, re-derived first.** `ELEVATOR_SIM_REGENERATE_GOAL_RATES=1 npx vitest run --project viz
+   src/scenario/goalRates.test.ts`, 115 s, committed as `a99c573`. Four cells move and the rest of the
+   table is byte-identical: stage 3's `nobody-abandoned` 28/50, 29/50 to 29/50, 30/50; stage 5's
+   `long-waits-under` holdout 12 to 13 of 50; stage 7's `answer-the-demand` holdout 22 to 21 and its
+   `long-waits-under` holdout 32 to 31. Every cell stays in its bucket, so no goal is added to or
+   taken from a stage. `docs/10` § M30 prints them.
+3. **The census, regenerated after them.** `ELEVATOR_SIM_SURVIVORS=deep
+   ELEVATOR_SIM_REGENERATE_SURVIVORS=1 npx vitest run --maxWorkers=1 --project viz
+   src/scenario/survivorSweep.test.ts` on `47399b5`, 4 032 s, committed as `70c02bd`. Against the
+   census before the fix (`b0d7d09`), stages 1, 2, 4, 6, 8 and 10 are identical in every field, and
+   stages 3, 5 and 7 in every count and name; one field moved there, stage 5's equipment rung meeting
+   every goal on the stage's own crowds 23 times of 63, from 24. Stage 9 reads 4, 4 and 5 of 63, from
+   3 at every rung: the same three dropdown picks, the page's `destination-panel-parked-predicted-demand`
+   at every rung and a drawn dial (`edit-6`) at the building rung, as `ea49e27` already found, since
+   stage 9's goal row did not move. Against `ea49e27`, only the rows of stages 3, 5 and 7 and the
+   provenance move.
+4. **No witness is re-authored and no stage is held.** Every way through the census named before the
+   fix it names again, at every rung, so § D1604 clause 7 finds nothing to re-author and no candidate
+   was searched for or registered. Stage 3 keeps `fairness-first` and its three parked variants
+   (4 of 39 at the base rung), stage 5 `predictive-balanced` and `predictive-balanced-parked-stay`
+   (2 of 62), stage 7 `destination-eta-parked-lobby` and `predictive-balanced-parked-zone-center`
+   (2 of 63). Every stage that had a way through at its opening budget keeps one, and no stage a
+   player meets in the first hour has exactly one (stage 1 has 12 of 39, stage 2 has 5 of 39, stage 3
+   has 4 of 39, and stage 4 is held, as it was), so [§ D528](#d528) clause 6 is not breached. No
+   demand, fabric, budget, bar, judge, seed, horizon, threshold or interval rule moved.
+5. **The tests, re-run and none re-pinned.** Green on `da73cf2`, each run with one worker:
+   `stageVerdictsHold` (11 cases: the census's way through stages 3, 5 and 7 met, held and cleared,
+   `eta` on stage 5 and `predictive-balanced` on stage 7 met and refused on the held-back crowds, and
+   stage 1's seven rows as pinned), `stageFiveClears`, `judgeCleared`, `stageSequence`, `goalRates`,
+   `stageSameCounts` and `stageWatch.browser`; the deep `difficulty-curve` job (96 admitted cells,
+   387 s, both dropdown registers exactly as registered); and the deep `survivor-counts` job (the
+   sweep matches the file, and all 59 named ways through clear through the press, 4 440 s).
+   `stageFiveClears`' floor stays where the census puts it:
+   `predictive-balanced` clears stage 5 from the dropdown on both seed sets, the one stage-5 dropdown
+   way through the registers already name. `stageSameCounts`' stage-3 case is unchanged: Min-wait and
+   Min-wait with lobby parking each pass 10 of 50, now against the shipped setting's 29.
+   `carriedAnswers.test.ts`' stage-9 reason is re-worded to the census (three of its four ways through
+   are dropdown picks), with its compared fields unchanged; `docs/33` § 3.3g and `docs/39`'s stage-9
+   row carry the new count beside the old.
+6. **Stage 1 is unchanged on this lane's head**: its census rows at every rung (12 of 39, 23 of 63 and
+   23 of 63, the same names), its seven `stageVerdictsHold` rows, and `elevator-sim fuzz --scenario
+   stage-1-first-call --engagement`, whose output is byte-identical to `ae255db`'s.
+7. **Nothing here says why a count moved** ([§ D1604](#d1604) clause 10). The mechanism is unmeasured.
+
+**Numbers spent.** See [§ D1608](#d1608).
+
+## D1608 — a stage page sells a wider budget only above its base or a rung it sells
+
+> **Taken 2026-10-22 by an agent session under delegated authority** (wave AU, lane AU-2), not by the
+> product owner. It amends [§ D1419](#d1419). **Owner-reversible**: the chain rule in
+> `everyday/stagePlay.ts#stageRungsOf` and `scenario/ladder.ts#budgetLineOf`.
+
+**Why an entry.** It changes which rungs § D1419 sells and what the Scenario hub says about them, and
+binds `everyday/stagePlay.ts` and `scenario/ladder.ts`.
+
+**What the census showed.** § D1419 sells a rung whose pinned count exceeds the count at the rung below,
+and a rung is bought only from the one below it. On the census regenerated on the engine
+[§ D1603](#d1603) fixed ([§ D1607](#d1607)), stage 9 reads 4, 4 and 5 of 63: the equipment rung adds no
+way through and is not sold, and the building rung adds one. The page drew the building rung as *sold
+once the rung below it is bought* beside a rung below that is never sold, so no press could ever buy
+it, and the hub's budget line said the page sells it for 30 chimes. Both were false of the product.
+`everyday/stagePlay.test.ts` went red on it, because every sold rung it had met was buyable.
+
+**The ruling.** A rung is sold where its count exceeds the rung below's **and** the rung below is the
+base or itself sold. A rung that adds a way through above an unsold rung is drawn unsold with what the
+census found and why (*the rung below it is not sold, and a rung is bought only from the one below
+it*). A hub row whose page sells nothing, where such a rung exists, says the census finds no further
+way through at the first rung and that each is sold only from the one below it, in place of *no
+further way through at a wider budget*, which would be false. On the shipped census this changes stage
+9's two rows only; stages 1, 2 and 8 sell their equipment rung as before.
+
+**Refused.** Selling the unsold rung below as a step toward the one above, which sells a rung that
+adds no way through, the reading § D1419 refused; and selling the upper rung straight from the base,
+which would charge one step's chimes for two steps' units.
+
+**Tests**: `everyday/stagePlay.test.ts` (the sold set follows the chain rule in both directions on the
+shipped census, where stage 9 draws the new arm, and on a copy of the census both the unreachable arm
+and the legitimate *later* arm), and `scenario/ladder.test.ts` (the hub prices exactly what the page
+sells and draws the new sentence on a row it fits). Red on the base: stage 9's building rung was sold
+and its row read *sold once the rung below it is bought*.
+
+**Numbers spent.** This lane held **D1607 to D1610** and spent **D1607 and D1608**.
+
+## D1611 — two fix-a-building witnesses are re-authored on demand on the release fix's engine, and every moved figure, decoy line and census follows the run
+
+> **Taken 2026-10-22 by an agent session** (wave AU, lane AU-3), carrying out the owner's decision
+> panel's ruling R4 ([§ D1604](#d1604) clauses 3 to 5, 7 and 9) on fix-a-building. Not a
+> product-owner ruling.
+
+**Why an entry.** It re-authors two cases' demand in `data/fixit-cases.json`, moves copy and registers
+that a player's content reads, and regenerates two censuses, which § D1604 clause 7 says is owed.
+
+1. **What this content is judged on.** The *tuning data* is the letter's morning: the case seed's
+   single pair, as built and with the order. The letter, the four figures and the reasoning are
+   written about it, and it is the judge's gate (`fixit/judge.ts` clause 1). The *held-back check* is
+   the forty-nine derived mornings (`replicationSeedsOf`, the case seed plus i × 7919), judged by the
+   shipped press (`pressThroughTheJudge`, `judgeMornings`). A candidate was chosen on the first and
+   judged once on the second. The as-built mornings census holds the held-back check's as-built half,
+   so it was regenerated only after the choice.
+2. **The rule, written before any candidate ran.** Demand only, on `run.arrivalRatePctPop5min`,
+   nearest first: × 1.1, × 0.9, × 1.25, × 0.8 and × 1.5 of the shipped rate. A candidate passes the
+   tuning data when, on the letter's morning, (T2) the complaint is at least 4 long waits, the smallest
+   complaint any offered case shipped with before this wave (`express-that-stops-everywhere`, 4 of
+   100); (T3) the diagnosed repair clears the gate; (T4) the +3 cm/s placebo is refused at the gate;
+   and (T5) the pair's crowd check passes. The first candidate to pass is the only one sent to the
+   held-back check. Had it failed there the case would have been held, and no second candidate would
+   have been sent. The seed, the bars, the judge, the horizon, the threshold, the morning count, the
+   interval rule, the dispatcher, the complaint, the diagnosis, the diagnosed repair and the result
+   copy are unchanged.
+3. **`bed-cars-locked-out`** (seed 20263037). On the fixed engine at 9 the letter's morning read 4 long
+   waits of 36, and the diagnosed repair took it to 2, which is 50 %, under the bar.
+
+   | candidate | letter as built | diagnosed after | gone | rest, points | gate | placebo | tuning |
+   |---|---|---|---|---|---|---|---|
+   | 9, as shipped | 4 of 36 | 2 | 50 % | +5.3 | not-enough | not-enough | fails T3 |
+   | × 1.1 = 9.9 | 22 of 56 | 12 | 45.5 % | −1.6 | not-enough | not-enough | fails T3 |
+   | **× 0.9 = 8.1** | **5 of 36** | **1** | **80 %** | **−0.5** | **fixed** | **not-enough** | **passes** |
+   | × 1.25 = 11.25 | 11 of 63 | 17 | 0 % | −0.7 | not-enough | not-enough | fails T3 |
+   | × 0.8 = 7.2 | 5 of 47 | 5 | 0 % | 0.0 | not-enough | not-enough | fails T3 |
+   | × 1.5 = 13.5 | 21 of 59 | 23 | 0 % | −4.0 | not-enough | not-enough | fails T3 |
+
+   **8.1 is chosen.** On the held-back mornings, once: the repair removes +3.04 [+1.61, +4.48] long
+   waits a morning, lower on 35 of 49 (369 → 220), and the rest moves +0.16 [−0.83, +1.14] points. The
+   press reads *fixed*, and the placebo is refused at the gate.
+4. **`every-deck-calls-itself-full`** (seed 20260844). At 4.5 the letter's morning read 1 long wait of
+   257, a letter about nothing.
+
+   | candidate | letter as built | diagnosed after | gone | rest, points | gate | placebo | tuning |
+   |---|---|---|---|---|---|---|---|
+   | 4.5, as shipped | 1 of 257 | 0 | 100 % | +1.5 | fixed | not-enough | fails T2 |
+   | **× 1.1 = 4.95** | **11 of 257** | **0** | **100 %** | **+3.0** | **fixed** | **not-enough** | **passes** |
+   | × 0.9 = 4.05 | 0 of 232 | 0 | none to remove | +7.1 | not-enough | not-enough | fails T2, T3 |
+   | × 1.25 = 5.625 | 32 of 267 | 0 | 100 % | +8.9 | fixed | not-enough | passes |
+   | × 0.8 = 3.6 | 0 of 229 | 0 | none to remove | +5.0 | not-enough | not-enough | fails T2, T3 |
+   | × 1.5 = 6.75 | 144 of 350 | 0 | 100 % | +7.1 | fixed | not-enough | passes |
+
+   **4.95 is chosen.** On the held-back mornings, once: +19.22 [+11.63, +26.82] a morning, lower on 41
+   of 49 (942 → 0), the rest +4.88 [+4.19, +5.57] points; *fixed*, and the placebo is refused at the
+   gate. 5.625 and 6.75 also passed the tuning data and were never run on the held-back mornings.
+5. **Figures that follow the run**, each re-pinned in `cases.test.ts#PINNED` from the run and quoted
+   in the copy:
+   - `bed-cars-locked-out` at 8.1: `11 of 36 journeys`, `125 s`, `42.0 s over 36 boarded journeys`,
+     `94.7 % of 228 journeys` to `5 of 36`, `210 s`, `38.7 s over 36`, `93.0 % of 213`, and the
+     answer's pair 11 → 1 to 5 → 1. Quoted by the reasoning and two decoy lines.
+   - `every-deck-calls-itself-full` at 4.95: `8 of 257`, `77 s`, `17.3 s over 257`, `97.0 % of 867` to
+     `11 of 257`, `79 s`, `19.2 s over 257`, `96.7 % of 836`, and 8 → 0 to 11 → 0. Quoted by the
+     reasoning and one decoy line.
+   - `car-park-nobody-serves`, unchanged and still clearing (17 → 3, 82.4 %): `21 of 45`, `322 s`,
+     `70.0 s over 45`, `98.0 % of 51` to `17 of 45`, `172 s`, `59.6 s over 45`, `96.1 % of 51`. Quoted
+     by the reasoning and two decoy lines.
+   - `deliveries-on-the-passenger-group`: the answer's after-figure 2 to 0. Its copy quotes none.
+6. **Decoy lines that follow the run** ([§ D1604](#d1604) clause 5), each held by
+   `theAnswerIsNotPrinted.test.ts`'s direction check or by `cases.test.ts`'s numeral check:
+   - `car-park-nobody-serves/regear-the-garage-car`: *"The garage car cycles quicker, so the 322 s worst
+     shortens — but its queue is still half the building's arrivals on one car, and this is the whole
+     budget."* now reads *"The garage car cycles quicker, and the 172 s worst wait does not shorten.
+     Its queue is still half the building's arrivals on one car, and this is the whole budget."* On the
+     run the worst wait goes 172 s to 195 s.
+   - `every-deck-calls-itself-full/regear-the-shuttles`: *"Each climb is quicker and the worst wait does
+     not shorten: the decks still close their doors at five hundred pounds, and the queue is at the
+     doors rather than on the climb."* now reads *"Each climb is quicker, and the 79 s worst wait
+     shortens. The decks still close their doors at five hundred pounds."* On the run at 4.95 the worst
+     goes 79 s to 74 s and the complaint 11 to 4, so the clause placing the queue at the doors is
+     dropped: the run does not bear it out.
+   - `car-park-nobody-serves/quicker-garage-doors`: *"… the 70.0 s mean a little. The queue is hundreds
+     of seconds deep; the doors are not."* now reads *"… the 59.6 s mean a little. The queue is minutes
+     deep; the doors are not."* The worst wait on the run is 172 s, and the mean goes 59.6 s to 56.9 s.
+   - Figures only: `bed-cars-locked-out/dedicate-to-beds` (94.7 % to 93.0 %; the rest goes 93.0 % to
+     80.8 % on its run), `quicker-bed-car-doors` (the 125 s worst to 210 s) and
+     `every-deck-calls-itself-full/trim-shuttle-dwell` (the 17.3 s mean to 19.2 s, which it moves to
+     17.9 s).
+7. **Registers.**
+   - `cases.test.ts#SECOND_ANSWERS`. **`every-letter-says-nine/split-the-group` joins**: on the fixed
+     engine it clears the letter's morning 10 → 2, exactly 80 %, with the rest unchanged, and over the
+     forty-nine it is *cleared-once*, +0.4 [−1.3, +2.1]. Its line names no outcome and keeps its words.
+     **`bed-cars-locked-out/quicker-bed-car-doors` leaves**: at 9 on the fixed engine it took the letter
+     4 → 1 (75 %), and on the re-authored case 5 → 6. It stopped clearing; it did not start. The other
+     six entries were re-measured through the shipped press at k = 50 on this engine and read as their
+     comments say: `trim-the-dwell`, `night-working` and `replant-the-machines` *fixed*;
+     `quicker-tower-doors` and `hold-doors-longer` *cleared-once*, each stopping at the first look;
+     `borrow-a-low-car` *fixed*, +17.3 [+15.6, +18.9].
+   - `theAnswerIsNotPrinted.test.ts`. Every `SOLVED_BY` row reproduces, `bed-cars-locked-out`'s `zone:1`
+     on the re-authored case (at 9 on the fixed engine it read `none`).
+     `every-deck-calls-itself-full/parking:zone-center` leaves `NOT_REPLICATED`: it reads `not-enough`
+     on the re-authored letter's morning, and read `building-worse` at 4.5.
+   - `verdictNamesTheOrder.test.ts#FALSE_ROUTES`. The same route leaves with a note, as
+     `let-faster-than-the-lifts`' did under [§ D1076](#d1076); four rows hold the property.
+   - `fixit/held.ts#HELD_FIX_CASES` is unchanged. No case is held by this entry.
+8. **Censuses, each by its own tool.**
+   - `data/fixit-as-built-mornings.json`, by `asBuiltMornings.sweep.test.ts`'s regeneration, about
+     150 s to 170 s a run here. On the engine alone (tree `ea49e27`), 13 of 18 cases move and no input
+     digest does: `bed-cars-locked-out` 38 of 49 mornings, `every-deck-calls-itself-full` 17,
+     `every-letter-says-nine` 14, `controller-sends-every-car` 9, `deliveries-on-the-passenger-group` 8,
+     `doors-that-never-close` 7, `everyone-leaves-at-once` 6, `car-park-nobody-serves` 4,
+     `express-that-stops-everywhere` 3, `one-start-time` 2, and one each on
+     `restaurant-above-the-ballroom`, `let-faster-than-the-lifts` and `gym-on-the-top-floor`. That
+     reproduces lane AU-1's scratch regeneration row for row. Then on the re-authored cases (tree
+     `343ccd9`) the two cases move on all 49 mornings and on their digests, their as-built totals
+     equal to the held-back run's (369 and 942), and the other sixteen rows are byte-identical.
+   - The route census and par, by `routeCensus.sweep.test.ts` (`ELEVATOR_SIM_FIXIT_ROUTES=deep`) on
+     `38de98b`, 985 s with `everyLeverRuns.test.ts` on a contended box. It did not reproduce. Four rows
+     moved and are pasted into `fixit/routeCensus.ts`: `bed-cars-locked-out` 5 → 2 and
+     `every-deck-calls-itself-full` 59 → 40 clearing routes, both re-authored, and
+     `deliveries-on-the-passenger-group` 3 → 4 and `controller-sends-every-car` 17 → 18, whose inputs
+     did not change. Every route count is the same, and `express-that-stops-everywhere` alone still
+     opens with its diagnosis shown. No par moved; two judged counts did (`bed-cars-locked-out` 2 → 1,
+     `controller-sends-every-car` 1 → 2), pasted into `fixit/par.ts`. `everyLeverRuns.test.ts` is green.
+     Re-run twice more on the pasted tables, every row and par reproduces; on this shared box
+     `every-deck-calls-itself-full`'s case ran past the `viz` project's 300 s default each time (370 s
+     and 399 s) and failed on that alone. Its census costs the same at both rates (133 s and 133 s at
+     4.5, 132 s and 126 s at 4.95, alternated in one process), its par judges three routes at both,
+     and the nightly job ran the whole sweep on `main` in 3 min 16 s end to end on 2026-10-22, so no
+     annotation is raised here.
+   - `everyday/fixitHint.browser.test.ts`'s not-fixed-early journey raised the bed-car case's roof 5 m,
+     which on the re-authored case no longer clears the letter's morning (5 → 9). It now raises
+     `every-letter-says-nine`'s roof 3 m, `NOT_REPLICATED`'s row: probed through the judge, it clears
+     the letter 10 → 2 and stops at the first look, lower on 3 of 10 mornings.
+9. **Every offered case meets clause 9**, and `cases.test.ts` checks all fifteen: the diagnosed repair
+   clears the letter's morning and is *fixed* over the forty-nine with the placebo refused; the four
+   figures are pinned to this engine's run and every authored numeral is a pinned figure or a declared
+   fact; and the hint names the diagnosed repair's own schedule rows
+   (`everyday/fixitScreenModel.ts#diagnosisHintTextOf`), so the first check is what makes it a change
+   measured to clear.
+10. **What this does not establish.** Why any verdict moved: the mechanism is unmeasured and no copy
+    says it. Whether 8.1 and 4.95 are the rates an author would have picked: they are the first of a
+    ladder to pass a rule written before the search. Seat 2's dissent warned that a search until green
+    fits content to noise; each case sent one candidate to the held-back mornings, and each interval's
+    lower bound sits clear of zero there. Three docstrings quote crowd counts measured on
+    `every-deck-calls-itself-full` at 4.5 when GitHub issue #605 was found (97, 89 and 649, in
+    `contract/types.ts`, `record/crowd.ts` and `fixit/zoningKeepsTheCrowd.test.ts`); they record that
+    finding and are left as written. `every-letter-says-nine/trim-the-dwell` says it moves *the 25.4 s
+    mean a little*, and on this engine it moves it to 16.6 s; whether that line moved with the fix is
+    not measured here, and it is left for the next content pass. The dashes inside the edited copy
+    are the authored words' own.
+
+**Numbers spent.** Lane AU-3 holds **D1611 to D1614** and spends **D1611**; D1612 to D1614 are unspent.
+
+## D1615 — Shift, Everyday, Rush and the Burj record are re-derived on the fixed engine: one witness is held, and the call cadence misses a floor
+
+> **Taken 2026-10-22 by an agent session** (wave AU, lane AU-4), carrying out the owner's decision
+> panel's ruling R4 ([§ D1604](#d1604) clauses 3, 4 and 10) on the Shift, Everyday, Rush and record
+> figures [§ D1603](#d1603) clause 5 left red, and on the censuses no other lane owns. Not a
+> product-owner ruling. Nothing here is authored, so it is reversed only with the engine fix. The one
+> witness that broke, Midtown's dealt week order, is [§ D1616](#d1616).
+
+**Why an entry.** It republishes figures that live outside any one module (a building's `$comment`,
+`docs/04`, `docs/33`, the rush board's rows, the server's agreement table), regenerates shipped data a
+player reads, and says which of § D1603's moved figures were measurements and which a bar.
+
+1. **Every figure was re-derived by the tool that produced it on the engine of `ea49e27`**: the first
+   on `ea49e27` itself, and those after the week census on this lane's head, which touches no file
+   under `packages/core/`. The nightly deep tiers were green on `4ee9557` (Actions run 39697131429),
+   whose one difference on these run paths is § D1603's `car.ts`.
+2. **c7's *7 of 10* is a measurement, and it is re-pinned.** `shift/legibility.test.ts` and
+   `shift/firstSession.test.ts` pin the first ten seeds of each contract's day 1 so that a change to
+   the crowd, the bands or the union is red before the 50-seed table is stale. [§ D512](#d512)'s bar is
+   more than a third of fifty seeds on that table, and nothing rests on the ten. On the slice c7 goes 7
+   to **6** (seed 3's longest stretch 208 s to 99 s, seed 6's 238 s to 213 s), and c8's seed 3 (179 s
+   to 181 s) and c15's seed 6 (647 s to 667 s) move without a count moving. On the table c7 reads
+   **29 of 50 at a median 135 s**, where it read 30 at 147 s, and stays eligible.
+3. **The legibility table and the longest game-tower day**, by `everyday/stagePace.sweep.test.ts` over
+   the ten game towers (`STAGE_PACE_CONTRACTS=c1,…,c10`, 1 129 s): beside c7, the medians move on c2
+   (602 s to 595 s), c5 (2 069 s to 2 022 s) and c9 (228 s to 220 s) with no count moving, and the other
+   six rows reproduce. The longest game-tower day is now c5's seed 39 (36 627.473 s recorded,
+   7 460.625 s slow, 25 547.974 s skipped), 34 real minutes at 4× as before, so no hub minute moves.
+   c7's move is the fix's, since its pinned first ten seeds went red on it; for the others no run
+   between their measurement and this one separates the fix from any other change. The six reference
+   towers' rows and `WHOLE_DAY_LONGEST` were not re-run, at hours of runs; their first ten seeds
+   reproduce but for one stretch of c15's. Republished in `shift/legibility.ts` and
+   `everyday/sittingShape.ts`.
+4. **The rush house census**, regenerated by `ELEVATOR_SIM_RUSH_HOUSE=deep
+   ELEVATOR_SIM_REGENERATE_RUSH_HOUSE=1 npx vitest run --project viz src/everyday/rushHouseSweep.test.ts`
+   and verified by the same command without the regenerate flag (17 cases, 936 s, one worker). 10 of
+   221 rows move, on five towers: each in its carried count, and all but one in its hold moment and
+   its arrivals.
+
+   | tower | dispatcher | held (s), before | held (s), now |
+   |---|---|---|---|
+   | Chancery House | `predictive-balanced` | 2 926 | 2 908 |
+   | Harbour Point | `collective-enroute` | 2 428 | 2 388 |
+   | Harbour Point | `auction-multi-round` | 2 624 | 2 790 |
+   | Harbour Point | `zoned-uppeak` | 2 552 | 2 462 |
+   | Mixed-Use High-Rise | `collective` | 4 584 | 4 384 |
+   | Mixed-Use High-Rise | `collective-enroute` | 4 420 | 4 430 |
+   | Mixed-Use High-Rise | `predictive-balanced` | 4 608 | 4 816 |
+   | Secure Tower | `collective` | 2 842 | 2 908 |
+   | St Jude's | `collective-enroute` | 2 894 | 2 894 (carried 918 to 900) |
+   | St Jude's | `predictive-balanced` | 2 928 | 2 868 |
+
+5. **The rush hold agreement**, both halves re-run: three cells move, Secure Tower's `collective`
+   2 842 s to 2 908 s, Mixed-Use High-Rise's `collective` 4 584 s to 4 384 s and its `larger-cars-21`
+   rebuild 4 492 s to 4 448 s. `rushSitting.ts`'s cost table's replay column follows (held 4 384 s, outlasted
+   24; held 2 908 s, outlasted 16); its milliseconds are the dated measurement and were not re-run.
+6. **Rush handover arm E** holds at **2 836 s**, where it held at 2 746 s; A, B, C and F did not move.
+   The adopted handover now holds seventy seconds past the house row, where it held twenty seconds
+   short of it, and A and E still differ on the legs.
+7. **First-day length**, by `FIRST_DAY_LENGTH_OUT`: c2's and c6's skipped seconds move, c3's call moves
+   from 9 929.738 s to 11 729.46 s, and c10 does not move. Every row keeps its peaks and `asksOn`, and
+   no minute the brief states moves.
+8. **The Burj record's 57-lift bracket**: the three verdicts hold. At 3 198 people the mean wait goes
+   11.36 s to 9.49 s and the 95th percentile 32.87 s to 29.38 s over the same 989 journeys; at 5 307,
+   40.48 s to 40.21 s and 183.15 s to 185.94 s; at 10 614, 30 undelivered to 33, and the 50-seed sweep's
+   *undelivered on 32* to 31. Republished in `data/buildings/burj-class-reference.json`'s `$comment`
+   and `docs/04`.
+9. **The week census, the one-profile screen, the call bands and the pool** are regenerated, and
+   § D1616 takes up what they deal.
+10. **Re-run and found to reproduce**, with nothing regenerated: the seven press days' moot census
+    (`PRESS_LADDER_CENSUS=1` on each pinned seed under every shipped profile: the cleared set is each
+    day's `mootUnder`, exactly); the seven press days' call windows (`PRESS_LADDER_CALL=1`, 429 s:
+    every `call` block's window, tried count and holes); `data/reference-runs.json`
+    (`watch/reference.test.ts`, on every run); and, on the cells that flipped, the week census
+    (`WEEK_WAY_VERIFY=1` on Midtown's Thursday and Friday and Chancery House's Thursday, fourteen
+    rows, 656 s).
+11. **The wrinkle census, regenerated** by `WRINKLE_CENSUS=1` (846 s): 12 of its 320 rows move. On
+    eight the default standing order's verdict flips: it now clears six crowd-days it missed
+    (Midtown's `fire-drill` and `audit-day`, Secure Tower's `audit-day`, Chancery House's `open-day`
+    and Ashgate's `late-finish` on two crowds) and misses two it cleared (Harbour Point's
+    `weekend-event` and Ashgate's `all-hands`). The other four move in what failed or in how many
+    gave up. No `clearsAny` moves, and no shipped code reads the file, so nothing a player is dealt
+    moves.
+12. **The call cadence misses a floor, and that is a finding for a ruling.** `CALL_CADENCE_SWEEP=1` on
+    this lane's head (crowds 0, 5, 10 and 15 of Midtown's week 1, the careful policy, 637 s): the median
+    day raises 4 calls, no weekday raises none, and crowds 0, 5, 10 and 15 have an evening call on 5, 3,
+    **2** and 4 of their five weekdays, under the floor of three on crowd 10. The careful line clears 15
+    of the 20 days (16 when [§ D1440](#d1440) measured it), and crowd 10 loses its Thursday and Friday,
+    which stop where they were lost. The longest silence is 2.0 real minutes at the median and 3.1 at
+    the longest. Published and not gated: of 66 who-drives rows the count is lowest under the pair's
+    first on 16.7 %, its second on 57.6 % and *keep* on 39.4 %; 15 rows split the day and *keep* lost 9.
+    The nightly `call-cadence` job passed on `4ee9557` in that run. Week 1's deal, the careful policy
+    and every shipped driver's pair are the same on both trees ([§ D1616](#d1616) clause 5), so the run
+    differs on this path by § D1603's engine. [§ D1338](#d1338) makes a miss a finding for a ruling and
+    never a reason to change the instrument or a floor, so neither is changed, and the job will be red
+    until the panel rules.
+13. **What a player now meets, outside § D1616.** The rush board draws the house's rows above as they
+    now read, and places a player's own row among them. On Harbour Point `auction-multi-round` (2 790 s)
+    now leads, where `predictive-balanced` (2 766 s, unmoved) did; on Chancery House
+    `predictive-balanced` falls from second to third; on Mixed-Use High-Rise it rises from sixth to
+    second. On week 1's dealt days the day close's census line (*left alone, the tower's standing order
+    cleared it on N of them*) moves on Midtown (Tuesday 8 to 9 of 20, Wednesday 4 to 3), Chancery House
+    (Wednesday 8 to 9, Friday 9 to 8), Ashgate (Monday 8 to 9, Tuesday 8 to 9, Thursday 6 to 7, Friday 3
+    to 4) and Harbour Point (Monday 6 to 8), and the sentence on a day that does not count (*the best
+    standing order or press we found cleared it on N of 20 crowds*) moves on Chancery House's Friday (8
+    to 9) and Ashgate's Friday (5 to 10). No dealt day changes whether it counts, so no target moves. No
+    first-session tower, press day, press-day call window or rush rebuild a player is offered changes.
+14. **No copy says why anything moved** (§ D1604 clause 10). The mechanism is unmeasured.
+
+**Numbers spent.** This lane held **D1615 to D1619** and spent **D1615 and D1616**.
+
+## D1616 — Midtown's dealt week order is held: the week census on the fixed engine refuses two of its days, and a pre-registered search found no replacement
+
+> **Taken 2026-10-22 by an agent session** (wave AU, lane AU-4), carrying out the owner's decision
+> panel's ruling R4 ([§ D1604](#d1604) clause 7) on a witness [§ D1603](#d1603)'s fix broke, with the
+> integrator's instruction to run the search, hold if it found nothing, and regenerate the call bands
+> and the week pool on what is then dealt. Not a product-owner ruling. **Owner-reversible**: the hold,
+> and the search's rule.
+
+**Why an entry.** It holds authored content a player was dealt, regenerates four censuses other
+modules read, amends what [§ D1345](#d1345), [§ D1400](#d1400) and [§ D1461](#d1461) say Midtown
+deals, takes away the week 2 the owner kept as Midtown's top under § D1461, and inverts promise tests
+in `shift/` and `everyday/`.
+
+1. **The week census, regenerated.** Every input the census run, DC-10 and DC-11 read was checked
+   first: the buildings, the specs, the traffic and dispatcher profiles, the ladder's rungs, growth,
+   incidents and bookings, the wrinkle library and the goal bars in `shift/goals.ts` are authored,
+   and `week-way.json` and `week-dominance.json` are the only measured inputs. A census cell hands
+   its bookings to `shiftRunConfigOf` explicitly, so the dealt-level default is not read, and no
+   census run reads the call bands, the pool, the wrinkle census, the scenario goals or the
+   survivors. Lanes AU-2, AU-3 and AU-5 change none of these. All 61 rows were re-run by
+   `shift/weekWay.sweep.test.ts`, one row to an invocation, on `ea49e27`; the nightly `week-census`
+   job had passed every row on `4ee9557`, whose one difference on this path is § D1603's `car.ts`.
+   41 rows move. Three verdicts flip: Midtown's Thursday `goods-inward` (held out 15 to 11 of 20,
+   lower bound 0.315) and Friday `open-day:busy` (12 to 11) lose their way through, and Chancery
+   House's plain Thursday gains one (11 to 12). Every row on the cells that flipped re-runs to the same
+   two verdict strings under `shift/weekWay.verify.test.ts` on this lane's head (Midtown's Thursday
+   and Friday, six rows each, and Chancery House's Thursday, two rows). `docs/33` § DC-10 republishes
+   the table.
+2. **The one-profile screen, regenerated.** Every row of `week-dominance.json` was re-run by the
+   same command's profiles stage, the booked rows on their booked days with their bookings and their
+   other days copied from the order's row as the file's provenance says; 17 stored strings move.
+   Weeks 2 and 3 read as before (Predictive balanced holds them on 15 and 16 of 20, refused).
+3. **The order refused.** `midtown-early-lift` (Monday `shift-change:tight`, Tuesday
+   `evacuation-drill:all-at-once`, Wednesday `lift-service:early`, Thursday `goods-inward`, Friday
+   `open-day:busy`) is refused by DC-10 on Thursday and Friday, 11 of 20 each. With Monday to
+   Wednesday counted its target is two days, and Predictive balanced left alone holds that on all 20
+   crowds, so DC-11 refuses it as well. `midtown-week-4` loses its Thursday the same way, and
+   `midtown-lift-service` and `midtown-audit-friday` each gain a refused Thursday. No authored order
+   on Midtown is admitted.
+4. **The search, written before any candidate ran.** Replace the order's Thursday and Friday,
+   keeping its id, Monday to Wednesday, the ladder's bookings and every bar, judge, seed, horizon and
+   threshold. The candidates are fixed by authoring rule: every axis value of every whole-day weekday
+   template, less the order's own templates, week 1's (the neighbour rule), `contractors` and
+   `flu-day` (which `shift/weekOrders.ts` records as unusable on Midtown) and the two (day, id) pairs
+   just refused. Per candidate, on the 8 tuning crowds only: the census's own tuning half (the chosen
+   play's clears T and the standing order's S) and, through the census's cell runner, the four
+   profiles strongest on Midtown left alone (P, the most crowds any of them clears). The gate is
+   T ≥ 7 and S ≤ 5; rank by P, then T, then library order; take one Thursday, then one Friday of
+   another template; judge that one pair once on the held-out crowds by DC-10, DC-11 and the levels
+   rule, and try no second pair. **One Thursday passes the gate (`open-day:quiet`, T 7, S 1) and no
+   Friday does, so the search found nothing**, and no held-out crowd was read for any candidate.
+5. **The hold.** The order stays authored in `data/contract-ladder.json`, its refusal readable
+   through `shift/weekOrders.ts#weekOrderAdmissionOf`, and is not dealt. With no order admitted,
+   Midtown deals week 1's draw every week, as the module has always done for such a tower. Its three
+   week bookings stay authored, as the ladder's comment keeps a refused booking, and
+   `weekLevelIssues` names them as bookings with no order to join; no level is dealt. The call bands
+   and the pool were re-run by their own commands: no order is dealt from week 2, so the call bands
+   carry their protocol and no row, and the pool its protocol and no cell. The driver offer becomes
+   the protocol's five candidates, and every shipped driver's pair on the card is the pair it was.
+6. **What a player now meets on Midtown.** A held week 1's sheet reads *You held week 1. This tower
+   deals no further week: Start next week deals week 2 as this week was dealt, the same wrinkles, on
+   new crowds.* A week not held reads *This week’s target was not met, so Play week 1 again deals the
+   same wrinkles on new crowds. This tower deals no further week.* and offers no *Go on to week 2*.
+   Every week deals week 1's five wrinkles on its own crowds. No door or strip names a booking, no
+   week is called harder, a week-2 brief names no pool and draws no ways line, and Your week states
+   no DC-13 line. A held Midtown week pays `week-held` once, at level `c2/1`, where weeks 1 and 2 each
+   paid ([§ D1402](#d1402)). A held top on Ashgate no longer offers Midtown, since the house's census
+   does not read Midtown's week 1 harder than Ashgate's top; Chancery House still offers it.
+7. **The owner's top.** § D1461 records the owner keeping week 2 as Midtown's top. This hold takes it
+   to week 1, under the panel's ruling and not the owner's in person; re-authoring the order restores
+   it.
+8. **Chancery House, the other way.** Its plain Thursday is now admitted, but no Chancery week deals
+   the plain Thursday (week 1 deals `conference:full-floor` there), so what a Chancery week deals and
+   counts is unchanged; only the census figures its dealt days state move, as [§ D1615](#d1615)
+   lists.
+9. **The tests.** Each pin of shipped content is inverted to the measured negative:
+   `shift/weekOrders.test.ts`, `weekDominance.test.ts`, `weekLevels.test.ts`,
+   `weekBookingReachesTheRun.test.ts`, `nextWeek.test.ts`, `callBands.test.ts`, `weekPool.test.ts`,
+   `everyday/weekView.test.ts`, `doorView.test.ts`, `host.test.ts`, and in the browser tier
+   `everyday/poolBrief.browser.test.ts` and `weekSurvives.browser.test.ts`. The mechanisms those
+   files tested on the dealt order run unchanged in `*.preD1603.test.ts`, which mock
+   `week-way.json`, `week-dominance.json`, `week-pool.json` and `call-bands.json` with the files as
+   they stood on `4ee9557` (`shift/preD1603/`), where the order is dealt; each fails if its mechanism
+   breaks. The `call-bands` and `week-pool` deep jobs pin the empty census against the dealt orders
+   rather than pass on nothing.
+10. **No mechanism is offered** for any move ([§ D1604](#d1604) clause 10).
+
+**The register.** Tuning crowds 2026-08-01 to 2026-08-08. T and S of 8 from `WEEK_WAY_STAGE=screen`
+on the (day, candidate) cell; P of 8 is the most tuning crowds any of `fairness-first`,
+`predictive-balanced`, `auction` and `auction-multi-round` clears left alone, from
+`weekWay.test-helper.ts#weekWayCell`.
+
+| day | candidate | chosen on tuning | T of 8 | S of 8 | P of 8 | gate |
+|---|---|---|---|---|---|---|
+| Thu | `two-cars-down` | `fairness-first` + park at 0.2 | 0 | 0 | 0 | fails, T < 7 |
+| Thu | `caterers:before-the-rush` | `fairness-first` + spread at 0.43 | 6 | 2 | 6 | fails, T < 7 |
+| Thu | `caterers:into-the-rush` | `auction-multi-round` + spread at 0.43 | 6 | 1 | 7 | fails, T < 7 |
+| Thu | `quiet-morning:half` | `fairness-first` + spread at 0.43 | 8 | 8 | 8 | fails, S > 5 |
+| Thu | `quiet-morning:thin` | `capacity-aware` + park at 0.2 | 8 | 8 | 8 | fails, S > 5 |
+| Thu | `all-hands` | `fairness-first` + spread at 0.43 | 1 | 0 | 1 | fails, T < 7 |
+| Thu | `audit-day` | `predictive-balanced` + spread at 0.43 | 5 | 0 | 5 | fails, T < 7 |
+| Thu | `open-day:busy` | `predictive-balanced` + spread at 0.2 | 6 | 0 | 5 | fails, T < 7 |
+| Thu | `open-day:quiet` | `fairness-first` + spread at 0.2 | 7 | 1 | 6 | **passes** |
+| Thu | `late-finish` | `predictive-balanced` + spread at 0.2 | 6 | 0 | 6 | fails, T < 7 |
+| Fri | `two-cars-down` | `fairness-first` + park at 0.2 | 0 | 0 | 0 | fails, T < 7 |
+| Fri | `caterers:before-the-rush` | `fairness-first` + spread at 0.43 | 6 | 0 | 6 | fails, T < 7 |
+| Fri | `caterers:into-the-rush` | `auction-multi-round` + spread at 0.43 | 6 | 1 | 7 | fails, T < 7 |
+| Fri | `goods-inward` | `auction-multi-round` | 5 | 1 | 5 | fails, T < 7 |
+| Fri | `quiet-morning:half` | `fairness-first` + spread at 0.43 | 8 | 8 | 8 | fails, S > 5 |
+| Fri | `quiet-morning:thin` | `capacity-aware` + park at 0.2 | 8 | 8 | 8 | fails, S > 5 |
+| Fri | `all-hands` | `fairness-first` + spread at 0.43 | 1 | 0 | 1 | fails, T < 7 |
+| Fri | `audit-day` | `predictive-balanced` + spread at 0.43 | 4 | 0 | 4 | fails, T < 7 |
+| Fri | `open-day:quiet` | `fairness-first` + spread at 0.43 | 6 | 0 | 5 | fails, T < 7 |
+| Fri | `late-finish` | `predictive-balanced` + spread at 0.2 | 6 | 0 | 6 | fails, T < 7 |
+
+**Reversal.** A Thursday and Friday found on the tuning crowds and admitted by DC-10, DC-11 and the
+levels rule on the held-out crowds puts the order back, with its call bands and pool re-measured;
+the `*.preD1603.test.ts` files then fold back into their originals.
+
+**Numbers spent.** See [§ D1615](#d1615).
+
+## D1617 — the careful day's cadence miss is pinned as measured, and the hold on Midtown's week order stands and is put to the owner
+
+> **Taken 2026-10-22 by the owner's decision panel** (GitHub issue #645, rulings R8 and R9, both 3–0),
+> recorded by the integrator of wave AU. **Owner-reversible.**
+
+**Why an entry.** R8 changes what a nightly gate expects, and R9 confirms a hold that reaches into an
+owner's ruling ([§ D1461](#d1461)); both bind beyond any one lane.
+
+1. **R8.** On the fixed engine ([§ D1603](#d1603)) census crowd 10's careful week gets an evening call on 2
+   of its 5 weekdays against the floor of 3 ([§ D1338](#d1338), [§ D1440](#d1440)); crowds 0, 5 and 15 read
+   5, 3 and 4, the median day raises 4 calls, no weekday is silent, and the careful line clears 15 of 20
+   days. The floor, the crowds, the careful policy and `cadenceMissesOf` stay as they are and the miss is
+   still printed. `everyday/callCadence.sweep.test.ts` now expects exactly that one registered miss and
+   pins the evening counts per crowd, the form [§ D267](#d267) and [§ D1616](#d1616) give a held witness, so
+   any other miss, and crowd 10 recovering, turn it red and come back to a ruling. Nothing is re-authored:
+   the floor protects no authored witness, and a per-crowd count of five cannot resolve a one-day change.
+   Counting only days that reached the evening would not clear it either: crowd 10's Wednesday cleared with
+   no evening call. Whether a lost day should count against the evening floor is a question for the owner,
+   to be put with fresh measurement, never answered by moving the floor.
+2. **R9.** § D1616's hold on `midtown-early-lift` stands: DC-10 refuses its Thursday and Friday (11 of 20
+   each) and DC-11 refuses the week, and § D1461 applies on top of the gates, never in place of them.
+   Because Midtown is the only rung that authors week orders, no tower now deals a week 2, and the call
+   bands and the week pool are empty across the game. The condition: the owner is asked in person, on issue
+   #645 and on the wave's pull request, with the way back named. A Shift content lane re-authoring Midtown's
+   order, chosen on tuning crowds only with every candidate registered, is the first item for the next Shift
+   wave.
+
+**Numbers spent.** The integrator re-cut **D1617** from lane AU-4's unspent block once the lane reported.
+
+## D1620 — the research pins are republished on the fixed engine, and Phase 6c's refusal stands on its resolution clause alone
+
+> **Taken 2026-10-21 by the owner's decision panel** (GitHub issue #645, ruling R7, 3–0), built by an
+> agent session (wave AU, lane AU-5). It carries out [§ D1604](#d1604) clause 2 for the research side,
+> and it supersedes [§ D145](#d145)'s stated ground as [§ D108](#d108) superseded [§ D102](#d102).
+> **Owner-reversible.**
+
+**Why an entry.** It moves a published research verdict word, supersedes the ground a recorded
+verdict gave, and republishes figures in documents no benchmark module owns. [§ D145](#d145),
+[§ D151](#d151), [§ D156](#d156) and [§ D200](#d200) stand as written; this entry names each of their
+sentences the run no longer bears out.
+
+1. **What moved.** `node packages/experiments/dist/benchmark/regeneratePins.js` regenerated all
+   1 033 pins in `benchmark/published.ts` on `f60048d`, the engine of [§ D1603](#d1603) with
+   [§ D1606](#d1606)'s fold, in 3 676 s. 110 pins in six studies moved beyond the pin tolerance:
+   the matrix 48 (all 44 at `midtown-interfloor`, and 4 of `predictive-balanced` at
+   `vertical-city-up-peak`), the selection sweep 20, lunch two-way 20, weight-set selection 10, the
+   tail study 9 (all `zoned-uppeak` at 2.75 % and 3 %, which the tail header quotes nowhere) and
+   destination-dispatch 3. 248 more differ only in the last bits (at most 1e-14 relative). Four
+   verdict words moved, listed in clauses 2 and 6; every Holm decision, Pareto front, acceptance
+   word, saturation flag and the matrix's verdict census held, and Phase 6's gate cell did not move.
+2. **The refusal, in R7's order.** Phase 6c's gate at § D145's cell, `learned/gate/ttdMeanS`, is
+   `−0.222 [−0.441, −0.004]` against the pre-registered `collective`, n = 200 on the disjoint seed:
+   the interval excludes zero, at p = 0.046 uncorrected, where it was `−0.213 [−0.440, +0.014]`
+   (p = 0.066). 6c is **NOT ACCEPTED** because 0.222 s is below the 1.90 s structural resolution
+   limit, which [§ D140](#d140) made a gate condition before either arm ran; 178 of 200 replications
+   differ from the reference, so the structural regime applies. This is not a [§ D151](#d151)
+   PRIMARY cell, and § D151 § 6 accepts 6c *if and only if* a PRIMARY cell clears; all five PRIMARY
+   verdicts hold, so no result here could accept the phase. It is one of ten cells 6c has been
+   measured at. The costs beside the gate are WORSE: AWT `+0.433 [+0.268, +0.597]`, WT95
+   `+0.775 [+0.022, +1.528]`, energy `+4.801 [+3.633, +5.970]` kJ per served leg.
+3. **The limit, and its provenance.** 1.90 s is kept as pre-registered, with the provenance the study
+   prints: inherited from `docs/07` § 4, measured on AWT at Midtown up-peak and applied to TTD as
+   absolute seconds. This cell's own TTD limit was never measured and is not measured here. *An order
+   of magnitude below* is withdrawn. At the four Midtown Office cells with mixed traffic nearest this
+   one (interfloor-mix 1.0 % and 2.0 %, the hotel profile at 1.5 %, `lunch-two-way` at 1.5 %), the
+   TTD-measured limits on `f60048d` are 0.414 s to 0.759 s structural and 0.272 s to 0.727 s
+   near-neighbour, so 0.222 s is below them by 1.9 to 3.4 times and 1.2 to 3.3 times respectively.
+   R7 printed "1.2 to 3.4" beside the structural range; worked from the four figures, the structural
+   ratios run from 1.9.
+4. **Required replications: 192.** From the observed spread, s_D = 0.1109 × √200 = 1.568 s, so
+   ⌈(1.960 × 1.568 / 0.222)²⌉ = 192, eight under the budget. `verdict.ts` prints 1 for any interval
+   that already excludes zero; that 1 is a placeholder and is not published. Before § D1603 it was 225.
+5. **The printed reason.** `weightSetSelection.ts#selectionVerdictOf` names each clause the run
+   fails and only those, as `selectionSweep.ts`'s per-cell reason does; `weightSetSelection.test.ts`
+   holds it on every run with cells built through `compareCell`, and the benchmark tier holds it on
+   the real study. The study used to end *"the criterion requires an interval excluding zero on the
+   better side"* straight after an interval that does. Its accepted branch no longer calls the
+   reference *the best shipped profile at this point*: `collective-enroute`'s census mean here is
+   0.639 s under `collective`'s ([§ D205](#d205)). Its header cited § D126 for the criterion, and
+   § D126 is C33's interval-family entry; the header, the module's other citations of it,
+   `published.ts`'s weight-set extractor and `core/src/dispatch/selector.ts` now cite § D139, and
+   § D140 where the raised gate is meant.
+6. **The cost words, republished as measured.** In the same study ΔWT95 goes INDISTINGUISHABLE to
+   WORSE for both arms (learned above; fuzzy `+0.678 [+0.081, +1.276]`, was `+0.496 [−0.072, +1.063]`).
+   In the sweep, `midtown-hotel-1.5pct`'s learned ΔWT95 goes WORSE to INDISTINGUISHABLE
+   (`+0.324 [−0.474, +1.122]`, was `+0.766 [+0.060, +1.472]`), so § D156 § 3's PRIMARY tally is now
+   WORSE 1, INDISTINGUISHABLE 3, BETTER 1, and its gate `−0.189 [−0.389, +0.010]` (p 0.063) now ranks
+   ahead of `garden-residential-2pct` (p 0.113): their Holm α swap to 0.0167 and 0.025 and both are
+   still retained. The fuzzy arm's gate is `−0.210 [−0.404, −0.017]`, still BETTER and still below
+   the limit.
+7. **Attribution, only where a control ran.** Putting `releaseHallCall`, `releaseAllHallCalls` and
+   `setMode` back through `keptDirection.test-helper.ts`'s shape reproduces every old pin of the
+   matrix, the tail study, destination-dispatch and weight-set selection. On weight-set selection the
+   old release alone reproduces them and the old `setMode` alone does not, so the release fix moves
+   6c and § D1606's fold moves nothing there. Seat 2 ran the old release on the selection sweep, and
+   it reproduces every old printed figure, `midtown-hotel`'s WORSE included. On lunch two-way the old
+   release alone reproduces all 20 old pins, so the release fix moves it too. No copy says why
+   anything moved; the mechanism is unmeasured.
+8. **What 24 search candidates give.** Re-run on `f60048d` with `searchCandidates: 24`, the study
+   picks the same winner, candidate 21, and returns the same gate interval, so "the same at 24 and 64
+   search candidates" is re-derived rather than carried. The winner's tuning-seed ΔTTD is −0.821 s
+   (−0.710 s before § D1603).
+9. **The matrix census's declared spread.** `matrixCensus.test.ts` re-derives `midtown-interfloor`'s
+   binding spread (`nearest-car`) as 9.3994 s on `f60048d`; `matrixCells.ts` declared 9.4048.
+   With `releaseHallCall`, `releaseAllHallCalls` and `setMode` put back, the census's own
+   computation returns 9.4048 s (9.404848), the declared figure, so the engine change moves it; this
+   control does not separate the release fix from the fold. `matrixCells.ts` now declares 9.3994,
+   re-derived as: 340 replications unclamped, 200 at the band's ceiling, a 1.30 s half-width at 200,
+   the budget the matrix spends. Every ceiling reproduces.
+10. **The § D156 `vertical-city-up-peak-1pct` row, corrected and labelled pre-existing.** The whole
+   row disagrees with the tree, and this fix moves none of it: the old release gives today's values,
+   and `published.ts` has pinned `−0.128 [−0.232, −0.024]` since at least `5587148` (2026-09-11).
+   Screen: 212 preference changes and a median mix of 60.8/39.2/0.0 then, 194 and 71.1/28.9/0.0 now.
+   Limits: 106.95 s TTD scale, 0.385 → 0.077 s near-neighbour and 4.106 → 0.817 s structural then;
+   103.53 s, 0.061 → 0.012 s and 4.260 → 0.848 s now. Verdict: `+0.258 [−0.141, +0.657]`
+   INDISTINGUISHABLE (adj-p 0.2037) then, `−0.128 [−0.232, −0.024]` BETTER (adj-p 0.0159) now, NOT
+   ACCEPTED both times because 0.128 s is below 0.848 s. GitHub issue #647 finds the commit that
+   moved a published research verdict word without a stop.
+11. **The sentences that no longer hold, each left as written.**
+   - **§ D145.** The census table's `collective` 53.742 s and `predictive-balanced` 54.823 s (53.751 s
+     and 54.832 s). Both verdict-table rows: learned `−0.213 [−0.440, +0.014]` INDIST., `+0.424`,
+     `+0.675` INDIST., `+415.9` kJ, `+4.807` kJ; fuzzy `−0.212 [−0.416, −0.007]`, `+0.187`, `+0.496`
+     INDIST., `+238.9` kJ, `+2.702` kJ (clauses 2 and 6 give the new rows; energy `+417.3` and
+     `+230.4` kJ). *"The learned selector's ΔTTD interval contains zero, and the point estimate is an
+     order of magnitude below the operating point's structural resolution limit"*: the first half no
+     longer holds and the second is withdrawn (clause 3). *"−0.710 s on the tuning seed against
+     −0.213 s on the holdout"* (−0.821 s against −0.222 s). *"−0.212 s is a tenth of that"* (−0.210 s).
+   - **§ D151.** Its context's *"returned ΔTTD `−0.213 [−0.440, +0.014]`, an interval containing
+     zero, so NOT ACCEPTED"*.
+   - **§ D156.** § 1's `midtown-hotel-1.5pct` median mix 46.7/10.3/40.6 (50.0/10.0/35.0) and
+     clause 10's row. § 2's limits table: `midtown-interfloor-1.0pct` near-neighbour 1.363 → 0.271 s
+     (1.364 → 0.272 s), `midtown-interfloor-2.0pct` structural 3.090 → 0.615 s (3.092 → 0.616 s),
+     `midtown-hotel-1.5pct` 56.12 s, 1.635 → 0.325 s and 3.805 → 0.758 s (56.11 s, 1.617 → 0.322 s
+     and 3.813 → 0.759 s), and clause 10's row. § 3's rows for `midtown-interfloor-2.0pct`
+     (`−0.178 [−0.617, +0.260]`, p 0.424, adj-p 0.424), `garden-residential-2pct` (α 0.025, adj-p
+     0.227) and `midtown-hotel-1.5pct` (`−0.189 [−0.389, +0.010]`, p 0.063, α 0.0167, adj-p 0.189),
+     and its ΔWT95 tally (clause 6). § 4's `vertical-city-up-peak-1pct` row (clause 10).
+   - **§ D200.** *"learned ΔTTD −0.170 [−0.405, +0.064] INDISTINGUISHABLE, p = 0.1538, an eighth of
+     the cell's own 0.412 s limit; generalizes in sign (−0.205 → −0.170)"*: on `f60048d` it is
+     `−0.163 [−0.396, +0.070]`, p = 0.168, against a 0.414 s limit, and −0.252 → −0.163. The effect
+     is about two fifths of the limit on either engine, never an eighth, so that word is withdrawn
+     where it is republished. *"Fuzzy +0.186 [−0.026, +0.399]"* (`+0.172 [−0.043, +0.386]`). The
+     costs *"AWT +0.263 WORSE, WT95 +0.809 WORSE, energy +4.444 kJ/served leg WORSE beside the raw
+     +415.9 kJ"* (+0.266, +0.806, +4.412 and +412.7 kJ, all still WORSE). The flat control's
+     `−0.576 [−0.833, −0.319]` BETTER (`−0.592 [−0.848, −0.337]`, still BETTER and above its 0.461 s
+     limit), and the context's *"structural 0.412 s / 0.461 s"* (0.414 s and 0.461 s). *"§ D145 (one
+     cell, −0.213 [−0.440, +0.014]) ... stand unchanged beside this entry"* (clause 2). The
+     constant-override probe's `−0.720 [−0.973, −0.467]` and `−0.667 [−0.923, −0.412]` are not
+     re-measured, since no shipped code runs them; every republished copy says they are from the
+     engine before § D1603. Unchanged on `f60048d`: the census, both budgets, the regime screen
+     (66.1 %, +10.38 σ against +3.97 σ), the learned arm's weight-set shares and the deadband
+     answer, 1.691 s.
+12. **Republished, each with `f60048d` named:** `CLAUDE.md`'s Phase 6 row and its fuzzy-arm sentence;
+   `docs/05-roadmap.md` § Phase 6c, its sweep table and the `lunch-two-way` section; `docs/07`,
+   `docs/13`, `docs/14`, `docs/15` § 1 (a larger n can no longer move 6c, so compute is no longer
+   ranked as able to), `docs/45`, `GAPS.md`; `viz/src/authoring/selectorSpec.ts` (*did not beat*
+   becomes *was not resolvably better than*); the headers of `destinationDispatchContrast.ts` and
+   `lunchTwoWaySelection.ts`; and `docs/39-decisions-in-force.md`'s row for § D145.
+   `README.md:396` is about lunch two-way, whose interval still contains zero, and `WAVE6_PLAN.md`
+   is a closed record; both keep their figures. No game copy changes, because the selector is
+   withheld ([§ D535](#d535)). Two stale figures older than this fix were found on the way:
+   `weightSetSelection.test.ts` quoted `collective-enroute` at 53.506 s, which the engine before
+   § D1603 did not give either (53.125 s), and now quotes 53.112 s; and `docs/05` § Phase 6b's
+   C→D table still prints the figures from before [§ D333](#d333) (`+5.94`, `−1.02`). That table
+   is outside this ruling and is left for its owner.
+
+**Numbers spent.** This lane held **D1620 to D1623** and spent **D1620**.

@@ -25,7 +25,7 @@ verdict:
 - **Phase 6**: 6a (destination *disclosure*) and 6b (destination *dispatch*) are accepted against a
   **raised** criterion, measured on the building that criterion names ([§ D100](DECISIONS.md)).
   Since the Level-1 panel's promise to `carIds[0]` was given a capacity bound
-  ([§ D333](DECISIONS.md)), **the gate is met by both arms** at Midtown's heavy point: at
+  ([§ D333](DECISIONS.md)), **the gate is met by both arms** at Mixed-Use High-Rise's heavy point: at
   `up-peak-4pct`, n = 200, ΔTTD `−1.598 [−2.575, −0.621]` against `eta` and
   `−1.642 [−2.620, −0.663]` against `collective`, both **BETTER**. Say the shape with the verdict:
   the two light points stay INDISTINGUISHABLE, and AWT and WT95 are **WORSE** against `eta` there.
@@ -33,13 +33,16 @@ verdict:
   INDISTINGUISHABLE and `destination-panel` is BETTER, so the effect is **building-dependent**, the
   verdict is not moved, and **no mechanism is offered** ([§ D595](DECISIONS.md)). **6c (learned
   control) is implemented, measured and NOT ACCEPTED** ([§ D139](DECISIONS.md) is the criterion,
-  [§ D145](DECISIONS.md) the verdict), and the refusal held over eight pre-registered cells
-  ([§ D151](DECISIONS.md), [§ D156](DECISIONS.md)) and on `lunch-two-way`
-  ([§ D162](DECISIONS.md), [§ D169](DECISIONS.md)): what would move 6c now is a different
-  selector, not a different measurement. Double-deck operation is **simulated**
-  ([§ D131](DECISIONS.md), [§ D598](DECISIONS.md)); **no residual is published for a double-deck
-  bank**, because `oracle/upPeakCase.ts#isolateBank` drops the deck fields. The row's long form,
-  with every interval, is [`docs/45`](docs/45-status-record.md).
+  [§ D145](DECISIONS.md) the verdict, [§ D1620](DECISIONS.md) the ground it now stands on): on
+  `f60048d` its ΔTTD `−0.222 [−0.441, −0.004]` against `collective` excludes zero, and it is
+  refused because 0.222 s is below the 1.90 s resolution limit [§ D140](DECISIONS.md) made a gate
+  condition, with AWT, WT95 and energy **WORSE** beside it. The refusal held over eight
+  pre-registered cells, where no PRIMARY cell clears ([§ D151](DECISIONS.md),
+  [§ D156](DECISIONS.md)), and on `lunch-two-way` ([§ D162](DECISIONS.md), [§ D169](DECISIONS.md)):
+  what would move 6c now is a different selector, not a different measurement. Double-deck
+  operation is **simulated** ([§ D131](DECISIONS.md), [§ D598](DECISIONS.md)); **no residual is
+  published for a double-deck bank**, because `oracle/upPeakCase.ts#isolateBank` drops the deck
+  fields. The row's long form, with every interval, is [`docs/45`](docs/45-status-record.md).
 - **Phase 8** — **both blocking property violations are closed**, and neither was closed by moving a
   bound: `fuzz-1001074` by a fourth `awtIsValid` ground, `fuzz-1000384` by revoking a promise a
   withdrawn car cannot keep. The deep tier is green at 2 000 cases. **All eight tracks have landed**;
@@ -56,16 +59,16 @@ verdict:
   to be corrected ([§ D186](DECISIONS.md)); and mode parity is **derived from the code**, proved
   against a fail state the product deliberately does not ship.
 
-  **The honesty corpus: the always-on row is wave AT's, measured 2026-10-19 on the integrated tree;
-  the deep row is still wave AL's (`eff454b`), because the nightly job's figures could not be read
-  from an agent session until wave AN made it emit them as annotations.**
+  **The honesty corpus: the always-on row is wave AU's, measured 2026-10-22 on the integrated tree;
+  the deep row is the nightly job's on `4ee9557`, before wave AU's engine fix, and the first nightly
+  after wave AU merges republishes it.**
   Every earlier wave's move, its decomposition and what it taught are in
   [`docs/44`](docs/44-honesty-corpus-log.md), newest first:
 
   | tier | cases | strings | simulations | surfaces | failing cases | verdict |
   |---|---|---|---|---|---|---|
-  | always-on | 49 | **1 053 971** | **606** | **80** | **0** | **green**, and the register is empty |
-  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **1 157 486** | **4 710** | **76** | **0** | **green**, and the register is empty |
+  | always-on | 49 | **1 053 106** | **606** | **80** | **0** | **green**, and the register is empty |
+  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **1 314 700** | **4 710** | **81** | **0** | **green**, and the register is empty |
 
   **How this row is kept.** Each rule below was learned the hard way at least once, and the log says
   where. They are stated once here and nowhere else in this file ([§ D1236](DECISIONS.md)).
@@ -108,9 +111,9 @@ verdict:
 
 **No verdict is rounded up.** Wave 6 built double-deck simulation, a mid-run weight-set selector,
 Phase 7's fuzzy detector, Phase 6c and Phase 9's W4, and moved no phase verdict: the fuzzy arm's
-ΔTTD `−0.212 [−0.416, −0.007]` excludes zero and is still reported **below the resolution limit**,
-because an interval excluding zero is not a win when the effect is smaller than the apparatus can
-resolve. The long form of this section, and of each paragraph below, is
+ΔTTD `−0.210 [−0.404, −0.017]` on `f60048d` excludes zero and is still reported **below the
+resolution limit**, because an interval excluding zero is not a win when the effect is smaller than
+the apparatus can resolve. The long form of this section, and of each paragraph below, is
 [`docs/45`](docs/45-status-record.md).
 
 **Energy is an axis, never a score** ([§ D106](DECISIONS.md)). Show it **beside** AWT and WT95,

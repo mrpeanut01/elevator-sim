@@ -3,7 +3,7 @@
  * DQ-2, [§ D1344](../../../../DECISIONS.md). See `nextWeek.ts`.
  */
 
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { scheduledEventFor } from './calendar.js';
 import { goalsForDay, readGoals } from './goals.js';
@@ -99,22 +99,31 @@ describe('the roll: a held week deals the next week, and one that was not deals 
 });
 
 describe('the sheet: what it deals next, and its presses', () => {
-  it('on a held week deals the next week under the label it always had, with no second press', () => {
+  /*
+   * Held by § D1616: on the fixed engine Midtown deals no order from week 2, so its top is week 1 and
+   * a held week 1 deals week 2 as week 1 was dealt. `nextWeek.preD1603.test.ts` runs these presses on
+   * a tower that deals a next week, on the census as measured before the fix.
+   */
+  it('on a held week 1 deals week 2 as week 1 was dealt, under the label it always had, and says the tower deals no further week', () => {
     const next = nextWeekOf(midtownWeek(1, HELD));
     expect(next?.held).toBe(true);
     expect(next?.week).toBe(2);
     expect(next?.label).toBe(NEXT_WEEK_LABEL);
     expect(next?.onward).toBeUndefined();
-    expect(next?.line).toMatch(/^You held week 1, so Start next week deals week 2, with /u);
+    expect(next?.line).toBe(
+      'You held week 1. This tower deals no further week: Start next week deals week 2 as this week was dealt, the same wrinkles, on new crowds.',
+    );
   });
 
-  it('on a week that was not held plays it again, and offers the next week beside it', () => {
+  it('on a week 1 that was not held plays it again, and offers no next week beside it', () => {
     const next = nextWeekOf(midtownWeek(1, NOT_HELD));
     expect(next?.held).toBe(false);
     expect(next?.week).toBe(1);
     expect(next?.label).toBe('Play week 1 again');
-    expect(next?.onward).toEqual({ week: 2, label: 'Go on to week 2' });
-    expect(next?.line).toMatch(/^This week’s target was not met, so Play week 1 again deals the same wrinkles on new crowds\. Nothing is locked: Go on to week 2 deals the next week instead, with /u);
+    expect(next?.onward).toBeUndefined();
+    expect(next?.line).toBe(
+      'This week’s target was not met, so Play week 1 again deals the same wrinkles on new crowds. This tower deals no further week.',
+    );
   });
 
   it('says a week with no counted day had no target, rather than that it was missed', () => {
@@ -142,10 +151,10 @@ describe('the sheet: what it deals next, and its presses', () => {
     expect(nextWeekOf({ ...midtownWeek(1, HELD), contractId: 'sandbox' })).toBeUndefined();
   });
 
-  it('names the wrinkles honestly: the same ones where the next week is dealt the same order', () => {
-    const next = nextWeekOf(midtownWeek(1, HELD));
-    const same = weekOrderIndexOf({ contractId: 'c2', week: 1 }) === weekOrderIndexOf({ contractId: 'c2', week: 2 });
-    expect(next?.line.includes('the same wrinkles as this week')).toBe(same);
+  it('names the wrinkles honestly: the same ones, because week 2 is dealt week 1’s draw', () => {
+    expect(weekOrderIndexOf({ contractId: 'c2', week: 1 })).toBe(weekOrderIndexOf({ contractId: 'c2', week: 2 }));
+    expect(nextWeekOf(midtownWeek(1, HELD))?.line).toContain('the same wrinkles');
+    expect(nextWeekOf(midtownWeek(1, HELD))?.line).not.toContain('a different wrinkle');
   });
 });
 
@@ -202,98 +211,34 @@ describe('harder, only where the house’s census fell', () => {
 });
 
 /*
- * The shipped census, pinned — § D1345. Week 2 deals `midtown-early-lift`, and the house, left
- * alone, cleared 12 of its 100 weekdays on the held-out crowds against 21 of week 1's, a paired
- * interval wholly below zero; week 3 deals the same order again, so nothing calls it harder.
+ * The shipped census, pinned — § D1345, held by § D1616. Week 2 deals week 1's draw, so the house's
+ * census over week 2 is week 1's, crowd for crowd, and nothing is called harder; no week has a level,
+ * so no sheet or door names a booking. The sentences a dealt order, a harder week and a level draw are
+ * pinned on the census before the fix in `nextWeek.preD1603.test.ts`.
  */
-describe('Midtown’s next week, as the census measured it', () => {
-  const HARDER =
-    'Week 2 is harder than week 1 by the house’s measure: left alone on the same 20 crowds, the ' +
-    'house cleared 12 of week 2’s 100 weekdays, against 21 of week 1’s.';
-
-  it('calls week 2 harder than week 1, on the sheet of a held week 1 and on week 2’s door', () => {
+describe('Midtown’s next week, as the census measures it on the fixed engine', () => {
+  it('calls nothing harder: week 2’s house census is week 1’s', () => {
     const reading = weekHarderOf('c2', 1, 2);
-    expect([reading?.from.cleared, reading?.to.cleared, reading?.harder]).toEqual([21, 12, true]);
-    expect(reading?.estimate.upper ?? 0).toBeLessThan(0);
-    expect(nextWeekOf(midtownWeek(1, HELD))?.line).toBe(
-      `You held week 1, so Start next week deals week 2, with a different wrinkle on every weekday. ${HARDER}`,
-    );
-    expect(weekUnderWayHarderLineOf({ contractId: 'c2', week: 2 })).toBe(HARDER);
+    expect(reading?.to.perCrowd).toEqual(reading?.from.perCrowd);
+    expect(reading?.harder).toBe(false);
+    expect(weekHarderSentenceOf('c2', 1, 2)).toBeUndefined();
+    expect(weekUnderWayHarderLineOf({ contractId: 'c2', week: 2 })).toBeUndefined();
   });
 
-  /* Since § D1461 the pool withdraws week 3, which a held week 2's sheet now says. */
-  it('says Midtown deals no week past 2, and why the pool withdrew week 3', () => {
+  it('names no booking on any week’s door, and says Midtown deals no further week after week 1', () => {
+    for (const week of [1, 2, 3, 4, 5]) expect(weekBookingsLineOf({ contractId: 'c2', week }, WEEK_WAY, MIDTOWN_CLOCK)).toBeUndefined();
     expect(nextWeekOf(midtownWeek(2, HELD), WEEK_WAY, MIDTOWN_CLOCK)?.line).toBe(
-      'You held week 2. This tower deals no further week: Start next week deals week 3 as this week was ' +
-        'dealt, the same wrinkles, on new crowds. Week 3 is withdrawn: left alone, Contract-net auction, ' +
-        'sealed bid holds it on 5 % of weeks against 0 % of week 2’s, and no driver may hold a week more ' +
-        'often than the week below it.',
+      'You held week 2. This tower deals no further week: Start next week deals week 3 as this week was dealt, the same wrinkles, on new crowds.',
     );
   });
-});
 
-/*
- * § D1400's authored levels as the pool census plays them (`weekPool.ts#POOL_CENSUS`): the sentences
- * a level's sheet and door would say, kept under test while the pool withdraws weeks 3 and 4.
- */
-describe('Midtown’s authored levels, as the census plays them', () => {
-  beforeAll(() => {
+  it('deals no level even as the pool census plays the authored ones', () => {
     POOL_CENSUS.measuring = true;
-  });
-  afterAll(() => {
-    POOL_CENSUS.measuring = false;
-  });
-
-  /*
-   * Wave AO, lane DS-1 (§ D1400, § D1401): from week 3 a held week deals the next level, the same
-   * order with one more car out. Red before: *with the same wrinkles as this week.*, nothing new.
-   */
-  it('deals week 3 the same order with car C out on Monday morning, and calls it nothing harder', () => {
-    expect(nextWeekOf(midtownWeek(2, HELD), WEEK_WAY, MIDTOWN_CLOCK)?.line).toBe(
-      'You held week 2, so Start next week deals week 3, with the same wrinkles as this week and one ' +
-        'more car out of passenger service: car C on Monday from 08:00 until 12:00.',
-    );
-    expect(weekUnderWayHarderLineOf({ contractId: 'c2', week: 3 })).toBeUndefined();
-    /* The house fell by one crowd's Monday, an interval that holds zero: no *harder*, and no *easier*. */
-    const reading = weekHarderOf('c2', 2, 3);
-    expect([reading?.from.cleared, reading?.to.cleared, reading?.harder]).toEqual([12, 11, false]);
-  });
-
-  it('deals week 4 with Tuesday’s booking beside Monday’s, and names on the door which one is new', () => {
-    expect(nextWeekOf(midtownWeek(3, HELD), WEEK_WAY, MIDTOWN_CLOCK)?.line).toBe(
-      'You held week 3, so Start next week deals week 4, with the same wrinkles as this week and one ' +
-        'more car out of passenger service: car C on Tuesday from 08:00 until 12:00.',
-    );
-    expect(weekBookingsLineOf({ contractId: 'c2', week: 3 }, WEEK_WAY, MIDTOWN_CLOCK)).toBe(
-      'Booked this week: car C is out of passenger service on Monday from 08:00 until 12:00, new this week.',
-    );
-    expect(weekBookingsLineOf({ contractId: 'c2', week: 4 }, WEEK_WAY, MIDTOWN_CLOCK)).toBe(
-      'Booked this week: car C is out of passenger service on Monday from 08:00 until 12:00; car C is out ' +
-        'of passenger service on Tuesday from 08:00 until 12:00, new this week.',
-    );
-    expect(weekBookingsLineOf({ contractId: 'c2', week: 2 })).toBeUndefined();
-    expect(weekBookingsLineOf({ contractId: 'c1', week: 4 })).toBeUndefined();
-  });
-
-  /*
-   * The census refuses week 5 (Thursday with car C out clears 7 of 20 under the chosen play), so
-   * week 4 is Midtown's last level. Red before: *deals week 5, with the same wrinkles*.
-   */
-  it('says Midtown deals no further week after week 4, and offers no Go on beside a week 4 not held', () => {
-    const held = nextWeekOf(midtownWeek(4, HELD), WEEK_WAY, MIDTOWN_CLOCK);
-    expect(held?.line).toBe(
-      'You held week 4. This tower deals no further week: Start next week deals week 5 as this week was ' +
-        'dealt, the same wrinkles and the same cars out, on new crowds.',
-    );
-    expect(held?.week).toBe(5);
-    const missed = nextWeekOf(midtownWeek(4, NOT_HELD), WEEK_WAY, MIDTOWN_CLOCK);
-    expect(missed?.line).toBe(
-      'This week’s target was not met, so Play week 4 again deals the same wrinkles and the same cars out ' +
-        'on new crowds. This tower deals no further week.',
-    );
-    expect(missed?.onward).toBeUndefined();
-    /* Week 5 is dealt week 4: its door names the same bookings and none as new. */
-    expect(weekBookingsLineOf({ contractId: 'c2', week: 5 }, WEEK_WAY, MIDTOWN_CLOCK)).not.toContain('new this week');
+    try {
+      expect(weekBookingsLineOf({ contractId: 'c2', week: 3 }, WEEK_WAY, MIDTOWN_CLOCK)).toBeUndefined();
+    } finally {
+      POOL_CENSUS.measuring = false;
+    }
   });
 });
 

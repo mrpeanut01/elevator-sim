@@ -44,7 +44,17 @@ export const DIAGNOSIS_OPEN_BELOW = 2;
  * The measurement, per offered case — `routeCensus.sweep.test.ts`'s output, pasted rather than
  * edited: `ELEVATOR_SIM_FIXIT_ROUTES=deep FIXIT_ROUTES_OUT=<path> npx vitest run --project viz
  * src/fixit/routeCensus.sweep.test.ts`, run by lane AJ-J on 2026-09-25 on wave AJ's integration tree
- * (`42494f9` plus this lane's commits), 190 s in one vitest process at a load average near 5.
+ * (`42494f9` plus this lane's commits), 190 s in one vitest process at a load average near 5, and
+ * re-run by lane AU-3 on 2026-10-22 on `38de98b` (the release fix, § D1603, and the two cases
+ * [§ D1611](../../../../DECISIONS.md) re-authored), 985 s for this file and `everyLeverRuns.test.ts` on a
+ * contended box.
+ *
+ * **On that re-run four rows moved**, each pasted from the sweep: `bed-cars-locked-out` 5 → 2 and
+ * `every-deck-calls-itself-full` 59 → 40 clearing routes, both re-authored on their arrival rate, and
+ * `deliveries-on-the-passenger-group` 3 → 4 and `controller-sends-every-car` 17 → 18, two cases
+ * whose authored inputs did not change. Every route count is the same. The rule's answer is the same:
+ * `express` alone opens with its diagnosis shown, and three cases now sit at two clearing routes,
+ * the nearest the line.
  *
  * **S1's census on `e00c0f6` differs on four rows**, and the difference is recorded rather than
  * explained: `sleeping-sky-lobby` 46 → 51, `every-letter-says-nine` 4 → 5,
@@ -60,14 +70,14 @@ export const ROUTE_CENSUS: Readonly<Record<string, RouteCensusRow>> = Object.fre
   'doors-that-never-close': { routes: 23, clearing: 2 },
   'car-park-nobody-serves': { routes: 29, clearing: 7 },
   'express-that-stops-everywhere': { routes: 34, clearing: 1 },
-  'deliveries-on-the-passenger-group': { routes: 22, clearing: 3 },
+  'deliveries-on-the-passenger-group': { routes: 22, clearing: 4 },
   'one-start-time': { routes: 25, clearing: 4 },
   'every-letter-says-nine': { routes: 25, clearing: 5 },
-  'bed-cars-locked-out': { routes: 31, clearing: 5 },
+  'bed-cars-locked-out': { routes: 31, clearing: 2 },
   'two-cars-out-wrong-month': { routes: 33, clearing: 6 },
-  'every-deck-calls-itself-full': { routes: 234, clearing: 59 },
+  'every-deck-calls-itself-full': { routes: 234, clearing: 40 },
   'restaurant-above-the-ballroom': { routes: 23, clearing: 5 },
-  'controller-sends-every-car': { routes: 55, clearing: 17 },
+  'controller-sends-every-car': { routes: 55, clearing: 18 },
   'let-faster-than-the-lifts': { routes: 36, clearing: 2 },
 });
 

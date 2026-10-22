@@ -1105,7 +1105,7 @@
       ],
       "diagnosis": {
         "text": "Three of the four cars stop one floor short of the garage: their landing doors below were never fitted, so half the building's arrivals queue for the one car that goes all the way down.",
-        "reasoning": "Nothing about the garage car is special — same machine, same speed, same doors as the other three. It is simply the only one the contract took below the street: 21 of the 45 garage journeys waited over a minute, the mean wait to board down there is 70.0 s against a worst of 322 s, and the street-door crowd one floor up is away inside a minute on 98.0 % of its journeys."
+        "reasoning": "Nothing about the garage car is special — same machine, same speed, same doors as the other three. It is simply the only one the contract took below the street: 17 of the 45 garage journeys waited over a minute, the mean wait to board down there is 59.6 s against a worst of 172 s, and the street-door crowd one floor up is away inside a minute on 96.1 % of its journeys."
       },
       "budgetUnits": 12,
       "repairs": [
@@ -1210,7 +1210,7 @@
           "id": "regear-the-garage-car",
           "role": "costly-fix",
           "name": "Re-gear the garage car for another metre per second",
-          "effect": "The garage car cycles quicker, so the 322 s worst shortens — but its queue is still half the building's arrivals on one car, and this is the whole budget.",
+          "effect": "The garage car cycles quicker, and the 172 s worst wait does not shorten. Its queue is still half the building's arrivals on one car, and this is the whole budget.",
           "patch": {
             "building": {
               "cars": [
@@ -1230,7 +1230,7 @@
           "id": "quicker-garage-doors",
           "role": "cheap-fix",
           "name": "Shorter doors on the garage car",
-          "effect": "A second and a half off each of the garage car's stops moves the 70.0 s mean a little. The queue is hundreds of seconds deep; the doors are not.",
+          "effect": "A second and a half off each of the garage car's stops moves the 59.6 s mean a little. The queue is minutes deep; the doors are not.",
           "patch": {
             "building": {
               "cars": [
@@ -2453,7 +2453,7 @@
       "run": {
         "seed": "20263037",
         "durationS": 1800,
-        "arrivalRatePctPop5min": 9
+        "arrivalRatePctPop5min": 8.1
       },
       "asBuilt": {
         "note": "Five cars carry the hospital, and two of them are big enough for a bed.",
@@ -2580,7 +2580,7 @@
       ],
       "diagnosis": {
         "text": "The refurbishment lockout still stands: the two cars big enough for a bed serve every floor except imaging, theatres and critical care.",
-        "reasoning": "Three cars carry the surgical floors that five were meant to. 11 of 36 journeys starting there waited over a minute, one of them 125 s, while the rest of the hospital — with all five cars answering — stays away inside a minute on 94.7 % of 228 journeys. The lockout was a sensible fence around a building site. The site closed; the fence stayed."
+        "reasoning": "Three cars carry the surgical floors that five were meant to. 5 of 36 journeys starting there waited over a minute, one of them 210 s, while the rest of the hospital — with all five cars answering — stays away inside a minute on 93.0 % of 213 journeys. The lockout was a sensible fence around a building site. The site closed; the fence stayed."
       },
       "budgetUnits": 15,
       "repairs": [
@@ -2677,7 +2677,7 @@
           "id": "dedicate-to-beds",
           "role": "costly-fix",
           "name": "Dedicate the two bed cars to beds all day",
-          "effect": "The big cars serve only imaging, the entrance, theatres and critical care — and stop carrying the wards and outpatients at all. The 94.7 % everywhere else is what this spends.",
+          "effect": "The big cars serve only imaging, the entrance, theatres and critical care — and stop carrying the wards and outpatients at all. The 93.0 % everywhere else is what this spends.",
           "patch": {
             "building": {
               "banks": [
@@ -2757,7 +2757,7 @@
           "id": "quicker-bed-car-doors",
           "role": "cheap-fix",
           "name": "Quicker doors on the two bed cars",
-          "effect": "A second and a half off their stops, on the floors they still serve. The letter is about the floors they do not — and the 125 s worst is on one of those.",
+          "effect": "A second and a half off their stops, on the floors they still serve. The letter is about the floors they do not — and the 210 s worst is on one of those.",
           "patch": {
             "building": {
               "cars": [
@@ -3263,7 +3263,7 @@
       "run": {
         "seed": "20260844",
         "durationS": 1500,
-        "arrivalRatePctPop5min": 4.5
+        "arrivalRatePctPop5min": 4.95
       },
       "asBuilt": {
         "note": "Eight double-deck shuttles link the street to the sky lobbies.",
@@ -3811,7 +3811,7 @@
       ],
       "diagnosis": {
         "text": "Each deck believes it is full at five hundred pounds — the plated four thousand divided by eight cars instead of by two decks — so the shuttles run the morning at a fraction of their design load.",
-        "reasoning": "Nothing mechanical is wrong: the cars run, the doors close, the climb is quick. But a deck that carries three where thirteen fit turns the street queue over slowly. 8 of 257 shuttle journeys up from the street waited over a minute against a 77 s worst, while the local zones above — whose cars weigh correctly — stay away inside a minute on 97.0 % of 867 journeys."
+        "reasoning": "Nothing mechanical is wrong: the cars run, the doors close, the climb is quick. But a deck that carries three where thirteen fit turns the street queue over slowly. 11 of 257 shuttle journeys up from the street waited over a minute against a 79 s worst, while the local zones above — whose cars weigh correctly — stay away inside a minute on 96.7 % of 836 journeys."
       },
       "budgetUnits": 16,
       "repairs": [
@@ -4319,7 +4319,7 @@
           "id": "regear-the-shuttles",
           "role": "costly-fix",
           "name": "Re-gear the shuttles for another half metre per second",
-          "effect": "Each climb is quicker and the worst wait does not shorten: the decks still close their doors at five hundred pounds, and the queue is at the doors rather than on the climb.",
+          "effect": "Each climb is quicker, and the 79 s worst wait shortens. The decks still close their doors at five hundred pounds.",
           "patch": {
             "building": {
               "cars": [
@@ -4346,7 +4346,7 @@
           "id": "trim-shuttle-dwell",
           "role": "cheap-fix",
           "name": "Trim the shuttle door dwell",
-          "effect": "A second and a half off each stop moves the 17.3 s mean a little. The doors are not the plate.",
+          "effect": "A second and a half off each stop moves the 19.2 s mean a little. The doors are not the plate.",
           "patch": {
             "building": {
               "cars": [

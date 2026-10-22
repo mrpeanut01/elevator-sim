@@ -6,7 +6,7 @@
  * ## Why this file exists
  *
  * `CLAUDE.md` records Phase 6a/6b as accepted against § D100's raised criterion **on one building at
- * one operating point** — `midtown-office` at `up-peak-4pct`, n = 200, ΔTTD `−1.598 [−2.575, −0.621]`
+ * one operating point** — `mixed-use-high-rise` at `up-peak-4pct`, n = 200, ΔTTD `−1.598 [−2.575, −0.621]`
  * against `eta`. #428's first sentence is the honest limit of that: destination dispatch has been
  * measured where the project chose to measure it. A second building is *"the cheapest way to learn
  * whether −1.6 s TTD is a property of destination dispatch or of that one cell"*, and a second seed
@@ -52,11 +52,11 @@
  * direction on a cell nobody had run it at.
  *
  * **And the Level-1 panel is the arm that carries the effect here, which is the reverse of the
- * shape `CLAUDE.md` records for Midtown.** There the panel was the arm with the over-subscription
+ * shape `CLAUDE.md` records for Mixed-Use High-Rise.** There the panel was the arm with the over-subscription
  * defect and the disclosure was the one that worked; here the panel is BETTER by 1.293 s with an
  * interval clear of zero and `requiredReplications` of 1, and the disclosure does nothing. Stated
- * as a fact about *these two cells* rather than as a reversal of § D100: Midtown's interval is still
- * Midtown's, this one is still this one, and what the pair establishes is that **the effect is
+ * as a fact about *these two cells* rather than as a reversal of § D100: Mixed-Use High-Rise's interval is still
+ * its own, this one is still this one, and what the pair establishes is that **the effect is
  * building-dependent** — which is exactly what #428 says a second building is for and what a second
  * seed could never have shown.
  *

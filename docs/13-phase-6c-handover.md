@@ -62,7 +62,10 @@ the flat-mix control.** That would close the question § D156 opened rather than
 third time, and it is a *stronger* result than a criterion bent to fit.
 
 Two refusals already stand and neither is superseded by this work:
-[§ D145](../DECISIONS.md) (one cell, ΔTTD `−0.213 [−0.440, +0.014]`, n = 200, disjoint seed) and
+[§ D145](../DECISIONS.md) (one cell, n = 200, disjoint seed: ΔTTD `−0.222 [−0.441, −0.004]` on
+`f60048d`, BETTER by the interval, below the 1.90 s resolution limit and NOT ACCEPTED, with AWT, WT95
+and energy WORSE; `−0.213 [−0.440, +0.014]` before [§ D1603](../DECISIONS.md), and
+[§ D1620](../DECISIONS.md) supersedes the entry's stated ground) and
 [§ D156](../DECISIONS.md) (eight cells, NOT ACCEPTED at all five PRIMARY, two of which cleared
 Holm–Bonferroni and were refused anyway because the effect was a third to a half of what the
 apparatus can resolve there). **Do not restate either as weaker than it is** — § D162's own
@@ -465,7 +468,8 @@ over it, exactly as `runSelectionSweep` does at `selectionSweep.ts:1110-1120`.
 The three arms are built at `weightSetSelection.ts:1138-1143`: `reference` (the census's pick),
 `fuzzy` (Phase 7's detector, measured beside), and `learned` (Phase 6c). **The fuzzy arm is not the
 gate** — it is Phase 7's bullet, and § D145 is the standing warning about it: its interval *did*
-exclude zero (`−0.212 [−0.416, −0.007]`) and it was **still** reported below the resolution limit.
+exclude zero (`−0.212 [−0.416, −0.007]`, and `−0.210 [−0.404, −0.017]` on `f60048d`) and it was
+**still** reported below the resolution limit.
 Report it, and do not let it stand in for the learned arm.
 
 ### Step 4 — the same study, on the flat control

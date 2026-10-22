@@ -189,6 +189,17 @@ describe.runIf(process.env['CALL_CADENCE_SWEEP'] === '1')('§ D1338: the careful
     expect(days.length).toBe(CROWDS.length * 5);
     /* Non-vacuity: the published who-drives readings need rows to read. */
     expect(summary.driver.rows, lines.join('\n')).toBeGreaterThanOrEqual(10);
-    expect(misses, lines.join('\n')).toEqual([]);
+    /*
+     * One registered miss, by the owner's decision panel (GitHub issue #645, ruling R8, 3–0, § D1617). On the
+     * release fix's engine (§ D1603) crowd 10's careful week has an evening call on 2 of its 5 weekdays, under
+     * the floor of 3. The floor, the crowds, the careful policy and `cadenceMissesOf` are unchanged and the miss
+     * is still printed above; this expectation records the ruling, as an inverted test records a held witness
+     * (§ D267, § D1616). Any other miss, and crowd 10 recovering, turn it red and go back to a ruling.
+     */
+    expect(misses, lines.join('\n')).toEqual(['crowd 10 had an evening call on 2 of 5 weekdays']);
+    expect(
+      [...summary.eveningByCrowd].map(([crowd, e]) => `${String(crowd)}: ${String(e.evening)}/${String(e.days)}`).sort(),
+      lines.join('\n'),
+    ).toEqual(['0: 5/5', '10: 2/5', '15: 4/5', '5: 3/5']);
   });
 });

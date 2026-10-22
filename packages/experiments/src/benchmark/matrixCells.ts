@@ -191,7 +191,9 @@ export const MATRIX_CELLS: readonly MatrixCell[] = Object.freeze([
     replications: 200,
     budgetBasis: Object.freeze({
       bindingArmId: 'nearest-car',
-      sdOfDifference: 9.4048,
+      // 9.4048 until § D1620: re-derived by `matrixCensus.test.ts` on `f60048d`, the engine of
+      // § D1603, and the old `Car` methods put back return 9.4048. The budget it buys is unchanged.
+      sdOfDifference: 9.3994,
       unclampedReplications: 340,
       clamped: 'ceiling' as const,
     }),
