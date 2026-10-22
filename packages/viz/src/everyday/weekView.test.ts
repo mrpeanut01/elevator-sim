@@ -304,10 +304,12 @@ describe('the week’s stake on the strip, and its sheet at the close — § D11
   });
 
   /*
-   * Wave AO, lane DS-1 (§ D1400): a held week 2's sheet names the booking week 3 adds, on the run's
-   * clock the screen hands it. Red before: *with the same wrinkles as this week.*
+   * Wave AO, lane DS-1 (§ D1400): a held week 2's sheet named the booking week 3 adds, on the run's
+   * clock the screen hands it. Since § D1616 holds Midtown's order, no week deals a level, and the
+   * sheet says the tower deals no further week and names no booking; the sentence with a booking in
+   * it is pinned on the census before the fix in `weekView.preD1603.test.ts`.
    */
-  it('names the booking the next level adds, with the clock the screen hands it — § D1400', () => {
+  it('names no booking on a held week 2, and says the tower deals no further week — § D1400, § D1616', () => {
     const dealtDay = (day: number, observed: GoalObservations): DayOutcome => ({
       ...midtownDay(day, observed),
       eventId: scheduledEventFor(null, day, (day - 1) % 7, 'whole-day', { contractId: 'c2', week: 2 }).id,
@@ -321,13 +323,11 @@ describe('the week’s stake on the strip, and its sheet at the close — § D11
       bookingClock: (fraction) => clockOf(fraction * 10 * 3600, 8 * 3600),
     });
     expect(view.next?.held).toBe(true);
-    /* Since § D1461 the pool withdraws week 3, and the held week 2's sheet says why instead. */
     expect(view.next?.line).toBe(
       'You held week 2. This tower deals no further week: Start next week deals week 3 as this week was ' +
-        'dealt, the same wrinkles, on new crowds. Week 3 is withdrawn: left alone, Contract-net auction, ' +
-        'sealed bid holds it on 5 % of weeks against 0 % of week 2’s, and no driver may hold a week more ' +
-        'often than the week below it.',
+        'dealt, the same wrinkles, on new crowds.',
     );
+    expect(view.next?.line).not.toMatch(/\bcar [A-Z]\b|booked|withdrawn/u);
   });
 
   it('marks the days that do not count on their cards, and says why under the strip in the brief’s sentence', () => {
@@ -423,10 +423,11 @@ describe('the week’s stake on the strip, and its sheet at the close — § D11
     expect(missed.onward).toBeUndefined();
     /*
      * Wave AN, lane DQ-2 (§ D1344): a week that was not held plays itself again as the primary, and
-     * the next week is the second press beside it, because nothing is locked.
+     * the next week is the second press beside it, because nothing is locked. Since § D1616 Midtown
+     * deals no week past its first, so there is no next week to offer beside it.
      */
     expect(missed.primary).toBe('Play week 1 again');
-    expect(missed.next?.onward?.label).toBe('Go on to week 2');
+    expect(missed.next?.onward).toBeUndefined();
     /* The held week's label is the one the sheet always had, spelled once in each layer. */
     expect(NEXT_WEEK_LABEL).toBe(WEEK_START_NEXT_LABEL);
     const held = weekScreenViewOf({
@@ -504,15 +505,17 @@ describe('the week’s stake on the strip, and its sheet at the close — § D11
     expect(heldOn('c6', { kind: 'none' }).rush?.line).toContain(WEEK_TOP_RUSH_COPY.none);
     expect(heldOn('c6', { kind: 'silent' }).rush?.line).toBe(`${WEEK_TOP_RUSH_COPY.what} ${WEEK_TOP_RUSH_COPY.chimes}`);
     /*
-     * Ashgate's top: since lane DT-1's pool (§ D1459) Midtown's top week is its pooled week 2, and the
-     * house's census reads it harder than Ashgate's top too (the paired interval excludes zero), so
-     * Midtown is offered here as from Chancery House.
+     * Ashgate's top: under lane DT-1's pool (§ D1459) Midtown's top week was its pooled week 2, which
+     * the house's census read harder than Ashgate's top. Since § D1616 holds Midtown's order its top is
+     * week 1, the house's census does not read that harder than Ashgate's top, and so no tower is
+     * offered from Ashgate. The offer is pinned on the census before
+     * the fix in `weekView.preD1603.test.ts`.
      */
     const ashgate = heldOn('c10');
     expect(ashgate.next?.top).toBe(true);
     expect(nextAdmittedTowerAfter('c10')).toBe('c2');
-    expect(ladderHarderThanTopOf('c10', 'c2')?.harder).toBe(true);
-    expect(ashgate.onward?.contractId).toBe('c2');
+    expect(ladderHarderThanTopOf('c10', 'c2')?.harder).toBe(false);
+    expect(ashgate.onward).toBeUndefined();
     expect(ashgate.primary).toBe(WEEK_START_NEXT_LABEL);
     expect(ashgate.onwardPrimary).toBe(false);
     expect(ashgate.rush).toBeDefined();
@@ -601,22 +604,16 @@ describe('DC-13 and your record with each driver — § D1443', () => {
     weekScreenViewOf({ week, towerToday: 'Midtown Office', nameOf: NAME_OF, dayClosed: false, sheetStanding: false, profileNameOf });
 
   /* Since § D1462 DC-13 is stated in days over the pool as dealt, one sentence per banded profile. */
-  it('states DC-13 in days for Midtown’s week 2 as the pool deals it, and nothing on week 1', () => {
+  /*
+   * Since § D1616 Midtown pools no week, its order held, so DC-13 has no level to state anything
+   * about; the sentence over a pooled week is pinned in `weekView.preD1603.test.ts`.
+   */
+  it('states no DC-13 line on Midtown’s week 1 or week 2, because no week is pooled', () => {
     const week1: WeekState = { ...openWeek('c2'), day: 1, dayIdx: 0 };
     const week2: WeekState = { ...week1, week: 2 };
+    expect(poolLevelReadingOf('c2', 2)).toBeUndefined();
     expect(viewWithNames(week1).bands).toEqual([]);
-    const lines = viewWithNames(week2).bands;
-    const reading = poolLevelReadingOf('c2', 2)!;
-    expect(lines).toHaveLength(reading.keep.length);
-    reading.keep.forEach((band, index) => {
-      expect(lines[index]).toBe(
-        `With ${String(profileNameOf(band.profileId))} picked and every call kept, keeping lost on each of the ${String(band.of)} ` +
-          `need-day crowds this week can be dealt, and an answer at one of its calls cleared ${String(band.saved)} of them: ` +
-          `about ${(100 * band.share).toFixed(0)} per cent of the counted days as dealt.`,
-      );
-    });
-    /* No advice: what the census found, never what to press. */
-    expect(lines.join(' ')).not.toMatch(/\b(should|try|better|best|worse|switch to)\b/iu);
+    expect(viewWithNames(week2).bands).toEqual([]);
   });
 
   it('counts this week’s days by the driver picked at the brief, and nothing before a day closes', () => {
