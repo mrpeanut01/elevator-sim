@@ -212,7 +212,75 @@ That is three batches, an observation and not an estimate.
 so § 1's player-session rate stays 0 of 0.
 
 ### 3. Design deltas  (outer loop, design-director)
-Pending.
+One delta this cycle. The design-director subagent sized its candidates on tuning-20260730 only and read
+no holdout figure beyond those already in § 2. The decision is GitHub issue #645, ruling R10.
+
+#### Delta B: split a press that changes both settings into each change on its own
+- **Pillar served and how a player notices:** pillar 2, Understandable. After a press that changes both
+  the standing order and where idle cars wait, the verdict gains one line for each change on its own,
+  measured on the stage's own crowds with the other change kept as the player set it. The phone persona
+  asked for exactly this ("Both of the two things I changed together, I cannot split them", attempt 4).
+- **Simplicity budget:** (1) pillar 2, as above; the credit X1 gave `eta` meets a line saying what `eta`
+  did with forecast parking kept. (2) It adds one block to the existing verdict card, drawn only after a
+  press that moves both selects, and adds no verb, control, rule or screen. No judge rule moves: a clear
+  is still beat-the-baseline on tuning-20260730 and again on holdout-20260731, and the watched pair
+  (§ D1496) is untouched. (3) Each line uses the verdict's own sentence shape through the same formatter
+  and says what was held, so a new player needs no tutorial step; a player who changed one thing never
+  sees the block.
+- **Track:** Casual. The Engineer campaign panel prints `judgeStage`'s sentences, and the split is not one
+  of them.
+- **The change:** code, because no `data/*.json` value can say which of two changes did the work.
+  (1) After the verdict's own batches land, and only when the admitted move changes both selects, the
+  stage runs one more batch on tuning-20260730, 50 replications on the same crowds, with three arms: the
+  press, the shipped standing order with the player's parking, and the player's standing order with its
+  own parking (for `zoned-uppeak`, mid-zone). Each one-change arm is admitted through `admitStageMove`
+  (§ D1129). The verdict never waits for this batch, and its figures, `met`, `held`, `cleared` and CRN
+  audit stay byte-identical. (2) `campaign/judge.ts` gains one builder that prints each one-change
+  comparison by `comparisonSentence`'s rules, with one energy line worded as higher or lower only where
+  the interval excludes zero (§ D106) and "altered no run" only where every paired difference is exactly
+  zero. No line names a cause, says the parts add up to the whole, or speaks for other crowds.
+  (3) `everyday/stagePlay.ts` and `stagePlayScreen.ts` draw the block under the own-crowds sentence.
+  (4) A new honesty-corpus case covers the new strings under `unbacked-attribution` (§ D1011).
+- **Evidence:** X1, the one clause of cycle 1's pass condition still unmet, and three of X3's four
+  misreadings, which are the same question. Sizing on tuning-20260730 only (a forecast, not a verdict),
+  which reproduces § 1's baseline and § 2's figures to the printed digit: the page admits 17 two-change
+  moves at 4 u. The parking's own effect on mean wait resolves on 17 of 17, the standing order's on 11 of
+  17. Of the nine that shorten mean wait as a whole, the standing order's own effect is too close to call
+  on five and resolves on four, by at most 1.13 s against the parking's 2.87 to 3.56 s. On the phone
+  persona's attempt 10 the split would have said the standing order alone shortens the 95th-percentile
+  wait by between 0.62 and 5.02 s with mean wait too close to call, which neither the persona nor X1 read
+  in full.
+- **How we'll know it worked:** decided before merge by seeded runs. (a) No verdict moves:
+  `stageVerdictsHold.test.ts` holds `met`, `held` and `cleared` on every shipped stage, the engagement
+  report reprints § 1, and no `data/` file is in the diff. (b) `judge.test.ts` reads every split bound
+  back against the paired-t estimate of its two named arms at `BATCH_METRIC_PRESENTATION.places`, for the
+  presses behind X1 and X3, and fails a tampered sentence. (c) The held-back crowds judge the split: for
+  all 17 two-change moves (102 rows), each row's interval on holdout-20260731 is set against the same row
+  on tuning-20260730, and the test passes when no row the tuning split prints as resolved one way
+  resolves the other way on holdout; same-way agreement is reported beside it and never gated. (d) The
+  deep honesty tier at 0 failing cases. Whether people read the split correctly is a fact about people,
+  so cycle 3's pass is written now: the felt-but-null count is 0; no persona says it cannot split two
+  changes; and on every two-change press, any change a persona credits on a measure is one its split line
+  resolves on that measure.
+- **Blast radius:** no data file, census, goal bar, survivor count or published figure moves. Test strings
+  and honesty seeds move, the deep tier gains a surface, and one `DECISIONS.md` entry with a `docs/39`
+  § 2 row is owed.
+- **Reversibility:** one revert. If cycle 3 finds `number-averse` losing the verdict among the figures,
+  the fallback is the mean-wait clause alone for each change.
+
+**Candidates considered and rejected,** in the design director's ranking:
+1. § D372's failable building for stage 1 (deferred by R1, eligible now): the one lever measured to move
+   C9, and a content lane measured in days that leaves X1 and X3 standing.
+2. A paired line against the player's previous press: none of the five comparisons behind X1 and X3 was
+   between consecutive presses.
+3. Judge each attempt on a fresh held-back batch in the game: § 2's slopes are uninformative on a stage
+   cleared by the third press, and it would move every stage's judge and census.
+4. Print the shipped setting's own figures beside every size (C6): two absolute figures side by side
+   invite the separate-interval reading X3 found.
+5. Say that `eta`, `fairness-first` and `capacity-aware` run alike here (C5): a per-stage tie line needs a
+   census of ties on every stage, and the price schedule is one owner-approved table.
+
+**Ruling R10:** pending.
 
 ### 4. Handoff to build loop
 Pending.
