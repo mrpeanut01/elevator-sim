@@ -175,6 +175,16 @@ const TIERS: Readonly<Record<string, Tier>> = Object.freeze({
       'GitHub issue #234, § D520. § 6.4 measured the arm at 198 s on one worker',
     scheduled: true,
   },
+  'packages/viz/src/everyday/stageSplitHolds.test.ts': {
+    gates: ['ELEVATOR_SIM_DEEP'],
+    reason:
+      'ruling R10 amendments 6 and 7, § D1622: every row the stage card’s split can print, for every ' +
+      'two-change move the page admits, set against the same row on the stage’s held-back crowds, on ' +
+      'stage 1’s 24 u rung and the base of stages 2 to 10. The split draws on no stage this has not ' +
+      'covered; stage 1 at its base runs always-on in the same file. About 20 minutes on one worker, ' +
+      'measured before the file was written with the same arms',
+    scheduled: true,
+  },
   'packages/viz/src/scenario/survivorSweep.test.ts': {
     gates: ['ELEVATOR_SIM_SURVIVORS'],
     reason:

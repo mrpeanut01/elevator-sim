@@ -353,6 +353,7 @@ on:
           - perf-sweep
           - perf-scaling
           - difficulty-curve
+          - stage-split
           - survivor-counts
           - rush-house-runs
           - fixit-as-built-mornings
@@ -661,6 +662,32 @@ jobs:
         env:
           ELEVATOR_SIM_DEEP: '1'
         run: npx vitest run --passWithNoTests=false --project viz --testTimeout=3600000 src/campaign/difficultyCurve.test.ts
+
+  # ---------------------------------------------------------------------------
+  # The stage card's split of a two-change press — ruling R10, § D1622, amendments 6 and 7. Every row
+  # the split can print, for every two-change move the stage page admits, is set against the same row
+  # on the stage's held-back crowds, on stage 1's 24 u rung and the base of stages 2 to 10; a row
+  # printed as resolved one way whose held-back interval excludes zero the other way is red, and goes
+  # back to the decision panel rather than being fixed here. The split draws on no stage this job has
+  # not covered. Stage 1 at its base runs always-on in `ci.yml` from the same file. About 20 minutes
+  # on one worker on the lane's container; the case declares two hours as its own ceiling.
+  # ---------------------------------------------------------------------------
+  stage-split:
+    name: stage split — the held-back crowds judge each change
+    if: github.event_name == 'schedule' || inputs.tiers == 'all' || inputs.tiers == 'stage-split'
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '26'
+          cache: npm
+      - run: npm ci
+      - name: every two-change move on every covered stage, both seed sets
+        env:
+          ELEVATOR_SIM_DEEP: '1'
+        run: npx vitest run --passWithNoTests=false --project viz src/everyday/stageSplitHolds.test.ts
 
   # ---------------------------------------------------------------------------
   # The survivor counts — GitHub issue #367, § D525 clause 3. Every scenario, at every rung of the

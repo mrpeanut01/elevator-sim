@@ -362,7 +362,17 @@ const ABOVE_CEILING: ReadonlyMap<string, { readonly count: number; readonly tota
      * vitest process at load 16 to 20; **1 800 000 ms** is about 2.7× that.
      * 248 100 000 + 1 800 000 = **249 900 000**. Nothing existing was raised.
      */
-    ['viz', { count: 118, totalMs: 249_900_000 }],
+    /*
+     * **118 → 119 and 249 900 000 → 257 100 000, one case** — wave AV lane AV-2's
+     * `everyday/stageSplitHolds.test.ts`, ruling R10 amendments 6 and 7 (§ D1622): every row the stage
+     * card's split can print, for every two-change move the page admits, on stage 1's 24 u rung and
+     * the base of stages 2 to 10, set against the held-back crowds. Gated on `ELEVATOR_SIM_DEEP` and
+     * registered in `deepTiers.test.ts` with a job of its own, so the default suite pays only stage 1
+     * at its base, about 7 s. About 20 minutes on one worker on the lane's contended four-core
+     * container, stages 3 and 5 the dearest at about 300 s each; **7 200 000 ms** leaves a hosted
+     * runner room. 249 900 000 + 7 200 000 = **257 100 000**. Nothing existing was raised.
+     */
+    ['viz', { count: 119, totalMs: 257_100_000 }],
     /*
      * **67 → 70, and the three are named** — GitHub issue #240's
      * `everyday/smallScreen.browser.test.ts`. Five of that file's eight annotations sit **at** this

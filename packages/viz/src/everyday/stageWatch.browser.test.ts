@@ -223,6 +223,71 @@ describe.skipIf(!HAS_BROWSER)('a stage press plays one of its crowds, and the ve
   }, 120_000);
 
   /*
+   * Ruling R10, § D1622, amendment 4: a press that changes both the standing order and the parking is
+   * split after its verdict. The block is drawn last, below the held-back crowds' sentence; a pending
+   * line holds its place while Run stays live; and an edit takes it away. A mutation observer
+   * installed before the press records what the page drew, so a pending state shorter than a poll is
+   * still seen.
+   */
+  it('draws the split of a two-change press last, keeps Run live while it runs, and drops it on an edit', async () => {
+    const page = await openPage(browser, { viewport: { width: 1280, height: 800 } });
+    try {
+      await page.goto(origin, { waitUntil: 'load' });
+      await leaveTutorialIfOffered(page);
+      await openStageOne(page);
+      /* X1's press: Minimum estimated wait with forecast parking. */
+      await page.selectOption('.everyday-stage-play-setting-select', 'eta');
+      await page.selectOption('.everyday-stage-play-parking-select', 'predicted-demand');
+      await page.evaluate(() => {
+        const marks = { pending: 0, pendingRunDisabled: 0, splitBeforeVerdict: 0 };
+        (window as unknown as { __splitMarks: typeof marks }).__splitMarks = marks;
+        new MutationObserver(() => {
+          const split = document.querySelector('.everyday-stage-play-split');
+          if (split === null) return;
+          if (split.closest('.everyday-stage-play-verdict') === null) marks.splitBeforeVerdict += 1;
+          if (split.getAttribute('data-state') !== 'pending') return;
+          marks.pending += 1;
+          if (document.querySelector<HTMLButtonElement>('.everyday-bar-primary')?.disabled === true) marks.pendingRunDisabled += 1;
+        }).observe(document.body, { childList: true, subtree: true, attributes: true });
+      });
+      await page.locator('.everyday-bar-primary').click();
+      await page.waitForSelector('.everyday-stage-play-split[data-state="drawn"]', { timeout: 150_000 });
+
+      const marks = await page.evaluate(
+        () => (window as unknown as { __splitMarks: { pending: number; pendingRunDisabled: number; splitBeforeVerdict: number } }).__splitMarks,
+      );
+      expect(marks.pending, 'the pending line never held the split’s place').toBeGreaterThan(0);
+      expect(marks.pendingRunDisabled, 'Run was greyed while the split ran').toBe(0);
+      expect(marks.splitBeforeVerdict).toBe(0);
+      expect(await page.locator('.everyday-bar-primary').isDisabled()).toBe(false);
+
+      /* Last in the card, after the held-back crowds' sentence, never between the two crowds' sentences. */
+      const card = await page.evaluate(() =>
+        [...(document.querySelector('.everyday-stage-play-verdict')?.children ?? [])].map((node) => node.className),
+      );
+      expect(card[card.length - 1]).toBe('everyday-stage-play-split');
+      expect(card.indexOf('everyday-stage-play-holdout')).toBeGreaterThan(-1);
+      expect(card.indexOf('everyday-stage-play-holdout')).toBeLessThan(card.indexOf('everyday-stage-play-split'));
+      const block = (await page.textContent('.everyday-stage-play-split')) ?? '';
+      expect(block).toContain('Your two changes, each with the other kept');
+      expect(block).toContain('Changing the standing order to Minimum estimated wait, with forecast parking kept: ');
+      expect(block).toContain('Changing to forecast parking, with the standing order kept at Minimum estimated wait: ');
+      expect(await page.locator('.everyday-stage-play-split-line').count()).toBe(4);
+
+      /* An edit drops the batch and the block, and the verdict goes stale. */
+      await page.selectOption('.everyday-stage-play-parking-select', 'zone-center');
+      expect(await page.locator('.everyday-stage-play-split').count()).toBe(0);
+      expect(await page.locator('.everyday-stage-play-stale').count()).toBe(1);
+      /* Back to the pressed settings: the verdict is current again, and the dropped split stays dropped. */
+      await page.selectOption('.everyday-stage-play-parking-select', 'predicted-demand');
+      expect(await page.locator('.everyday-stage-play-stale').count()).toBe(0);
+      expect(await page.locator('.everyday-stage-play-split').count()).toBe(0);
+    } finally {
+      await page.close();
+    }
+  }, 180_000);
+
+  /*
    * Wave AR lane AR-3, GitHub issue #633: on stage 3, Min-wait with lobby parking after Min-wait as it
    * stands, *your change moved no count* was drawn below the fold.
    */
