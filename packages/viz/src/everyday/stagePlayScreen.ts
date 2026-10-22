@@ -462,27 +462,32 @@ function startWatch(session: Session, configs: ReturnType<typeof stageWatchConfi
 
 /*
  * The split's batch (§ D1622) on a worker of its own, so it never holds the verdict's worker, the
- * pair's, or Run: the verdict is drawn and Run given back before it starts.
+ * pair's, or Run: the verdict is drawn and Run given back before it starts. One at a time, with the
+ * session whose press it splits, so stopping it takes that session's pending line with it.
  */
-let splitWorker: Worker | undefined;
-let splitToken = 0;
+let splitWorker: { readonly worker: Worker; readonly owner: Session } | undefined;
+
+function stopSplitWorker(): void {
+  if (splitWorker === undefined) return;
+  splitWorker.worker.terminate();
+  if (splitWorker.owner.split?.kind === 'pending') splitWorker.owner.split = undefined;
+  splitWorker = undefined;
+}
 
 /** Stop the split's batch and take its block away: an edit or a new press drops it (amendment 4). */
 function dropSplit(session: Session): void {
-  splitToken += 1;
-  splitWorker?.terminate();
-  splitWorker = undefined;
+  if (splitWorker?.owner === session) stopSplitWorker();
   session.split = undefined;
 }
 
-function runSplitBatch(request: BatchRequest): Promise<BatchResult> {
+function runSplitBatch(owner: Session, request: BatchRequest): Promise<BatchResult> {
+  stopSplitWorker();
   return new Promise<BatchResult>((resolve, reject) => {
-    splitWorker?.terminate();
     const next = new Worker(new URL('../dev/batchWorker.ts', import.meta.url), { type: 'module' });
-    splitWorker = next;
+    splitWorker = { worker: next, owner };
     const stop = (): void => {
       next.terminate();
-      if (splitWorker === next) splitWorker = undefined;
+      if (splitWorker?.worker === next) splitWorker = undefined;
     };
     next.addEventListener('message', (event: MessageEvent) => {
       const message = event.data as BatchWorkerMessage;
@@ -610,23 +615,24 @@ function press(data: Loaded, stageId: string, context: EverydayScreenShellContex
          */
         const plan = stageSplitPlanOf({ stageId: found.stage.id, context: found.context, move, budgetUnits });
         if (plan !== undefined) {
-          const splitAt = splitToken;
-          session.split = { kind: 'pending' };
+          /* Only this press's own pending line may be replaced: an edit or a new press has dropped it. */
+          const pending: StagePlaySplitFacts = { kind: 'pending' };
+          session.split = pending;
           void runStageSplit({
             stage: found.stage,
             plan,
             verdict: result.outcome.result,
             holdoutRan: report.holdout !== null,
-            run: runSplitBatch,
+            run: (request) => runSplitBatch(session, request),
           }).then(
             (split) => {
-              if (splitAt !== splitToken || token !== runToken) return;
+              if (session.split !== pending || token !== runToken) return;
               /* A split the judge refuses, amendment 5's check among them, is not drawn. */
               session.split = split === undefined ? undefined : { kind: 'drawn', split };
               live?.redraw();
             },
             () => {
-              if (splitAt !== splitToken || token !== runToken) return;
+              if (session.split !== pending || token !== runToken) return;
               session.split = { kind: 'failed' };
               live?.redraw();
             },
