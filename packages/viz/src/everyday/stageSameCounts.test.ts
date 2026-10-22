@@ -7,6 +7,11 @@
  * Played through the shipped constructors (`campaign.test-helper.ts#playStage`), so the counts are
  * the judge's own (`judge.ts#StageGoalVerdict.counts`), and folded through the screen's own
  * `verdictFactsOf` and {@link sameCountsOf}.
+ *
+ * **On the engine `DECISIONS.md` § D1603 fixed** the case holds unchanged: both settings pass 10 of
+ * 50, now against the shipped setting's 29, its own count re-derived on that engine (§ D1607). The
+ * case read no count at all on that engine for as long as `data/scenario-goals.json` still held the
+ * old engine's 28, because a bar that does not reproduce is not judged and carries no count.
  */
 import { describe, expect, it } from 'vitest';
 
