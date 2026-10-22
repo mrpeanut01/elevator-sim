@@ -602,7 +602,7 @@ export function stagePageMovesOf(
 
 /**
  * **The stages and budgets the split is drawn on**, by stage id and the units a press is made at
- * (ruling R10, amendment 6 ([§ D1622](../../../../DECISIONS.md)): *"the block draws on no stage that
+ * (ruling R10, amendment 6, [§ D1622](../../../../DECISIONS.md)): *"the block draws on no stage that
  * test has not covered"*.
  *
  * The test is `everyday/stageSplitHolds.test.ts`, which sets every row the block can print on the

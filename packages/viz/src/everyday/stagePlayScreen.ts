@@ -178,8 +178,8 @@ interface Session {
   lastRun: { readonly choice: StagePlayChoice; readonly counts: StageRunCounts } | undefined;
   /**
    * The split of the last press, where it changed both the standing order and the parking (ruling
-   * R10, [§ D1622](../../../../DECISIONS.md). Of the press {@link pressed} names, dropped by an edit or
-   * a new press, and drawn by the verdict only while that verdict is not stale.
+   * R10, [§ D1622](../../../../DECISIONS.md)). It belongs to the press {@link pressed} names, is
+   * dropped by an edit or a new press, and is drawn by the verdict only while that verdict is not stale.
    */
   split: StagePlaySplitFacts | undefined;
 }

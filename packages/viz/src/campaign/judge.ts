@@ -937,7 +937,8 @@ export interface StageSplit {
  *
  * **`undefined` means the block is not drawn**: a press that did not change both, a batch that is
  * not three arms, a broken common-random-numbers audit, or a press arm that is not the verdict's own
- * candidate arm on every replication and row (amendment 5). Pure, and it decides no verdict.
+ * candidate arm on every replication and row (amendment 5). Pure, and it decides no verdict. Its
+ * caller is `everyday/stagePlay.ts#runStageSplit`, which the stage page's press runs.
  */
 export function stageSplitOf(input: StageSplitInput): StageSplit | undefined {
   const { result, verdict, changed } = input;
