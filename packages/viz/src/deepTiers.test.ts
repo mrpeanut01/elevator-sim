@@ -181,8 +181,8 @@ const TIERS: Readonly<Record<string, Tier>> = Object.freeze({
       'ruling R10 amendments 6 and 7, § D1622: every row the stage card’s split can print, for every ' +
       'two-change move the page admits, set against the same row on the stage’s held-back crowds, on ' +
       'stage 1’s 24 u rung and the base of stages 2 to 10. The split draws on no stage this has not ' +
-      'covered; stage 1 at its base runs always-on in the same file. About 20 minutes on one worker, ' +
-      'measured before the file was written with the same arms',
+      'covered; stage 1 at its base runs always-on in the same file. Measured 2026-10-22 at 1 519 s for ' +
+      'the file with the gate open, on one worker on the lane’s shared four-core container',
     scheduled: true,
   },
   'packages/viz/src/scenario/survivorSweep.test.ts': {

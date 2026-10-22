@@ -55392,7 +55392,17 @@ crowds print as resolved:
 
 | stage at budget | two-change moves | rows | printed resolved | same way held back | flips |
 |---|---|---|---|---|---|
-STAGE_SPLIT_TABLE
+| `stage-1-first-call` at 4 u | 18 | 288 | 144 | 119 | 0 |
+| `stage-1-first-call` at 24 u | 36 | 576 | 287 | 232 | 0 |
+| `stage-2-morning-rush` at 4 u | 18 | 288 | 97 | 83 | 0 |
+| `stage-3-overwhelmed` at 4 u | 18 | 288 | 54 | 49 | 0 |
+| `stage-4-two-banks` at 15 u | 36 | 576 | 250 | 134 | 0 |
+| `stage-5-credentials` at 15 u | 36 | 576 | 115 | 84 | 0 |
+| `stage-6-the-tall-one` at 15 u | 36 | 576 | 263 | 143 | 0 |
+| `stage-7-prove-it` at 15 u | 36 | 576 | 269 | 182 | 0 |
+| `stage-8-the-headline-address` at 4 u | 18 | 288 | 146 | 140 | 0 |
+| `stage-9-both-ways-at-once` at 15 u | 36 | 576 | 236 | 194 | 0 |
+| `stage-10-the-bed-and-the-visitor` at 15 u | 36 | 576 | 122 | 117 | 0 |
 
 **What it does not touch.** No `met`, `held` or `cleared`, no `data/` file, census, goal bar or
 published figure; `stageVerdictsHold.test.ts` is unchanged and green, and the engagement report for

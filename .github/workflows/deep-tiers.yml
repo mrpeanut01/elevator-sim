@@ -669,8 +669,9 @@ jobs:
   # on the stage's held-back crowds, on stage 1's 24 u rung and the base of stages 2 to 10; a row
   # printed as resolved one way whose held-back interval excludes zero the other way is red, and goes
   # back to the decision panel rather than being fixed here. The split draws on no stage this job has
-  # not covered. Stage 1 at its base runs always-on in `ci.yml` from the same file. About 20 minutes
-  # on one worker on the lane's container; the case declares two hours as its own ceiling.
+  # not covered. Stage 1 at its base runs always-on in `ci.yml` from the same file. Measured at
+  # 1 519 s on one worker on the lane's shared container; the case declares two hours as its own
+  # ceiling.
   # ---------------------------------------------------------------------------
   stage-split:
     name: stage split, the held-back crowds judge each change

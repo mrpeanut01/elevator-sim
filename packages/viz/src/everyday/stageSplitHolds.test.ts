@@ -26,9 +26,9 @@
  * shipped order under each parking, each order under the shipped parking), because every arm of a
  * batch sees the same crowds and runs alone, so an arm's figures do not depend on its neighbours; the
  * always-on case checks that against one split run through `runStageSplit`, the screen's own path.
- * Measured 2026-10-22 on the lane's four-core container before this file was written, with the same
- * arms: stage 1 at 4 u, 18 moves and 27 arms, about 6 s for both seed sets; the deep table about 20
- * minutes, stage 3 the dearest at about 310 s.
+ * Measured 2026-10-22 on the lane's shared four-core container: stage 1 at 4 u, 18 moves and 27
+ * arms, about 7 s for both seed sets; with the gate open, 1 519 s for the file, stages 3 and 5 the
+ * dearest at about 300 s each.
  */
 
 import { appendFileSync } from 'node:fs';

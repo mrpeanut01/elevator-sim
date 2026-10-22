@@ -368,9 +368,9 @@ const ABOVE_CEILING: ReadonlyMap<string, { readonly count: number; readonly tota
      * card's split can print, for every two-change move the page admits, on stage 1's 24 u rung and
      * the base of stages 2 to 10, set against the held-back crowds. Gated on `ELEVATOR_SIM_DEEP` and
      * registered in `deepTiers.test.ts` with a job of its own, so the default suite pays only stage 1
-     * at its base, about 7 s. About 20 minutes on one worker on the lane's contended four-core
-     * container, stages 3 and 5 the dearest at about 300 s each; **7 200 000 ms** leaves a hosted
-     * runner room. 249 900 000 + 7 200 000 = **257 100 000**. Nothing existing was raised.
+     * at its base, about 7 s. Measured 2026-10-22 at 1 519 s for the file with the gate open, on one
+     * worker on the lane's shared four-core container; **7 200 000 ms** is about 4.7× that and leaves
+     * a hosted runner room. 249 900 000 + 7 200 000 = **257 100 000**. Nothing existing was raised.
      */
     ['viz', { count: 119, totalMs: 257_100_000 }],
     /*
