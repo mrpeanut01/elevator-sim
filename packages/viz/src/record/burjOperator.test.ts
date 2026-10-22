@@ -167,6 +167,14 @@ describe('the Burj-class reference against its operator — issue #438', () => {
    * five grounds and a different ground would be a different finding. The legs by bank at 3 198 are
    * pinned too: they are what the restacking moves, and a stacking that changed the labels and
    * moved no leg would pass every other case in this file.
+   *
+   * **Re-measured on the fixed engine** ([§ D1603](../../../../DECISIONS.md),
+   * [§ D1615](../../../../DECISIONS.md)), by this harness on `ea49e27`. The three verdicts did not
+   * move: 3 198 people still give a valid AWT with nothing undelivered, and 5 307 and 10 614 still
+   * saturate. The figures did: at 3 198 the mean wait went 11.36 s to 9.49 s and the 95th percentile
+   * 32.87 s to 29.38 s over the same 989 journeys, and the shuttle's legs went 749 to 740 while the
+   * observation run's went 83 to 92; at 10 614, 33 journeys are left undelivered where 30 were. Why
+   * any of them moved is unmeasured.
    */
   const BRACKET = [
     {
@@ -175,8 +183,8 @@ describe('the Burj-class reference against its operator — issue #438', () => {
       undelivered: 0,
       awtIsValid: true,
       awtInvalidGround: undefined,
-      meanWaitS: 11.36,
-      wait95S: 32.87,
+      meanWaitS: 9.49,
+      wait95S: 29.38,
     },
     {
       population: 5307,
@@ -184,17 +192,17 @@ describe('the Burj-class reference against its operator — issue #438', () => {
       undelivered: 0,
       awtIsValid: false,
       awtInvalidGround: 'saturated',
-      meanWaitS: 40.48,
-      wait95S: 183.15,
+      meanWaitS: 40.21,
+      wait95S: 185.94,
     },
     {
       population: 10614,
       generated: 3473,
-      undelivered: 30,
+      undelivered: 33,
       awtIsValid: false,
       awtInvalidGround: 'saturated',
-      meanWaitS: 225.87,
-      wait95S: 540.6,
+      meanWaitS: 226.5,
+      wait95S: 519.79,
     },
   ] as const;
 
@@ -242,8 +250,8 @@ describe('the Burj-class reference against its operator — issue #438', () => {
           'local-zone1': 81,
           'local-zone2': 276,
           'local-zone3': 549,
-          observation: 83,
-          shuttle: 749,
+          observation: 92,
+          shuttle: 740,
         });
       }
     },
