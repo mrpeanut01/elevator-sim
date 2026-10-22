@@ -55048,6 +55048,35 @@ the `*.preD1603.test.ts` files then fold back into their originals.
 
 **Numbers spent.** See [§ D1615](#d1615).
 
+## D1617 — the careful day's cadence miss is pinned as measured, and the hold on Midtown's week order stands and is put to the owner
+
+> **Taken 2026-10-22 by the owner's decision panel** (GitHub issue #645, rulings R8 and R9, both 3–0),
+> recorded by the integrator of wave AU. **Owner-reversible.**
+
+**Why an entry.** R8 changes what a nightly gate expects, and R9 confirms a hold that reaches into an
+owner's ruling ([§ D1461](#d1461)); both bind beyond any one lane.
+
+1. **R8.** On the fixed engine ([§ D1603](#d1603)) census crowd 10's careful week gets an evening call on 2
+   of its 5 weekdays against the floor of 3 ([§ D1338](#d1338), [§ D1440](#d1440)); crowds 0, 5 and 15 read
+   5, 3 and 4, the median day raises 4 calls, no weekday is silent, and the careful line clears 15 of 20
+   days. The floor, the crowds, the careful policy and `cadenceMissesOf` stay as they are and the miss is
+   still printed. `everyday/callCadence.sweep.test.ts` now expects exactly that one registered miss and
+   pins the evening counts per crowd, the form [§ D267](#d267) and [§ D1616](#d1616) give a held witness, so
+   any other miss, and crowd 10 recovering, turn it red and come back to a ruling. Nothing is re-authored:
+   the floor protects no authored witness, and a per-crowd count of five cannot resolve a one-day change.
+   Counting only days that reached the evening would not clear it either: crowd 10's Wednesday cleared with
+   no evening call. Whether a lost day should count against the evening floor is a question for the owner,
+   to be put with fresh measurement, never answered by moving the floor.
+2. **R9.** § D1616's hold on `midtown-early-lift` stands: DC-10 refuses its Thursday and Friday (11 of 20
+   each) and DC-11 refuses the week, and § D1461 applies on top of the gates, never in place of them.
+   Because Midtown is the only rung that authors week orders, no tower now deals a week 2, and the call
+   bands and the week pool are empty across the game. The condition: the owner is asked in person, on issue
+   #645 and on the wave's pull request, with the way back named. A Shift content lane re-authoring Midtown's
+   order, chosen on tuning crowds only with every candidate registered, is the first item for the next Shift
+   wave.
+
+**Numbers spent.** The integrator re-cut **D1617** from lane AU-4's unspent block once the lane reported.
+
 ## D1620 — the research pins are republished on the fixed engine, and Phase 6c's refusal stands on its resolution clause alone
 
 > **Taken 2026-10-21 by the owner's decision panel** (GitHub issue #645, ruling R7, 3–0), built by an
