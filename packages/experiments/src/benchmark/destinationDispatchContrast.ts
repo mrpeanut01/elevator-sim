@@ -27,13 +27,16 @@
  * `DECISIONS.md` § D27, and here it is forced rather than chosen: `core`'s own
  * `comparabilityOf('destination-dispatch')` lists AWT and WT95 among the nine metrics whose
  * *construct* changes between the two models, so they are reported as costs rather than as the
- * ranking. Measured at seed 20260726, n = 150 under common random numbers, D − C:
+ * ranking. Measured at seed 20260726, n = 150 under common random numbers, D − C, and re-derived
+ * on `f60048d`, the engine of § D1603 (§ D1620): at the binding point the AWT, TTD and ride
+ * estimates moved, every verdict held, and the only printed digit that changed is the ride mean,
+ * −0.82 to −0.83. Putting § D1603's three `Car` methods back reproduces the old figures.
  *
  * | operating point | ΔTTD | ΔAWT | ΔWT95 | Δride | bit-identical |
  * |---|---|---|---|---|---|
  * | **Midtown interfloor-mix 1.5 %** (the contract's primary point) | `+0.11 [−0.04, +0.25]` INDIST. | `−0.01 [−0.10, +0.08]` INDIST. | `+0.15 [−0.33, +0.64]` INDIST. | `+0.12 [−0.01, +0.25]` INDIST. | 27 / 150 |
  * | Secure Tower interfloor-mix 1.5 % | `−0.04 [−0.14, +0.06]` INDIST. | `−0.06 [−0.11, −0.00]` **see below** | `−0.22 [−0.45, +0.01]` INDIST. | `+0.02 [−0.05, +0.08]` INDIST. | 41 / 150 |
- * | **Midtown interfloor-mix 4.5 %** — where the promise binds | `+5.66 [+4.28, +7.04]` **WORSE** | `+6.49 [+5.26, +7.72]` **WORSE** | `+29.94 [+24.48, +35.40]` **WORSE** | `−0.82 [−1.41, −0.24]` **BETTER** | 0 / 150 |
+ * | **Midtown interfloor-mix 4.5 %** — where the promise binds | `+5.66 [+4.28, +7.04]` **WORSE** | `+6.49 [+5.26, +7.72]` **WORSE** | `+29.94 [+24.48, +35.40]` **WORSE** | `−0.83 [−1.41, −0.24]` **BETTER** | 0 / 150 |
  *
  * **Secure Tower's ΔAWT is marked *see below* rather than given a verdict, and § D268 is why.**
  * [§ D265](../../../../DECISIONS.md)'s credential gap changed this building's population, and the
@@ -63,17 +66,17 @@
  * **Where the promise does bind, it is expensive, and the mechanism is visible in the sign split.**
  * At 4.5 % of population per 5 minutes the cars fill, the panel may not change its mind
  * (`DECISIONS.md` § D29), and passengers left behind wait for *their* car rather than the next one:
- * TTD is 5.66 s worse and WT95 30 s worse, while in-car time is **0.82 s better**. Destination
+ * TTD is 5.66 s worse and WT95 30 s worse, while in-car time is **0.83 s better**. Destination
  * grouping still does what it is for; the landing is where it is paid for, and at this load it is
  * paid for many times over. That is the "documented cost of the approach" as a measurement rather
  * than as an assumption — the same discipline § 2.3 applies to A→B.
  *
  * **Every figure in this section moved with § D333 and the sign split did not.** Bounding the
  * panel's promise takes the cost down without removing it — TTD 5.94 → 5.66 s, WT95 37 → 30 s,
- * in-car 1.02 → 0.82 s better — because an unbounded promise made the binding worse than the
- * mechanism alone requires. The prose figures are restated here rather than left rounded from the
- * old run: a bare number in a sentence is not scanned by `published.test.ts`, which is exactly why
- * it is the kind that goes stale unnoticed.
+ * in-car 1.02 → 0.82 s better (0.83 on `f60048d`) — because an unbounded promise made the
+ * binding worse than the mechanism alone requires. The prose figures are restated here rather than
+ * left rounded from the old run: a bare number in a sentence is not scanned by `published.test.ts`,
+ * which is exactly why it is the kind that goes stale unnoticed.
  *
  * ## What this module refuses to do
  *

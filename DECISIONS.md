@@ -54551,3 +54551,142 @@ of its own after cycle 2's playtest) did not fire: on stage 1 as the game judges
 included, the fold moves nothing.
 
 **Numbers spent.** See [§ D1604](#d1604).
+
+## D1620 — the research pins are republished on the fixed engine, and Phase 6c's refusal stands on its resolution clause alone
+
+> **Taken 2026-10-21 by the owner's decision panel** (GitHub issue #645, ruling R7, 3–0), built by an
+> agent session (wave AU, lane AU-5). It carries out [§ D1604](#d1604) clause 2 for the research side,
+> and it supersedes [§ D145](#d145)'s stated ground as [§ D108](#d108) superseded [§ D102](#d102).
+> **Owner-reversible.**
+
+**Why an entry.** It moves a published research verdict word, supersedes the ground a recorded
+verdict gave, and republishes figures in documents no benchmark module owns. [§ D145](#d145),
+[§ D151](#d151), [§ D156](#d156) and [§ D200](#d200) stand as written; this entry names each of their
+sentences the run no longer bears out.
+
+1. **What moved.** `node packages/experiments/dist/benchmark/regeneratePins.js` regenerated all
+   1 033 pins in `benchmark/published.ts` on `f60048d`, the engine of [§ D1603](#d1603) with
+   [§ D1606](#d1606)'s fold, in 3 676 s. 110 pins in six studies moved beyond the pin tolerance:
+   the matrix 48 (all 44 at `midtown-interfloor`, and 4 of `predictive-balanced` at
+   `vertical-city-up-peak`), the selection sweep 20, lunch two-way 20, weight-set selection 10, the
+   tail study 9 (all `zoned-uppeak` at 2.75 % and 3 %, which the tail header quotes nowhere) and
+   destination-dispatch 3. 248 more differ only in the last bits (at most 1e-14 relative). Four
+   verdict words moved, listed in clauses 2 and 6; every Holm decision, Pareto front, acceptance
+   word, saturation flag and the matrix's verdict census held, and Phase 6's gate cell did not move.
+2. **The refusal, in R7's order.** Phase 6c's gate at § D145's cell, `learned/gate/ttdMeanS`, is
+   `−0.222 [−0.441, −0.004]` against the pre-registered `collective`, n = 200 on the disjoint seed:
+   the interval excludes zero, at p = 0.046 uncorrected, where it was `−0.213 [−0.440, +0.014]`
+   (p = 0.066). 6c is **NOT ACCEPTED** because 0.222 s is below the 1.90 s structural resolution
+   limit, which [§ D140](#d140) made a gate condition before either arm ran; 178 of 200 replications
+   differ from the reference, so the structural regime applies. This is not a [§ D151](#d151)
+   PRIMARY cell, and § D151 § 6 accepts 6c *if and only if* a PRIMARY cell clears; all five PRIMARY
+   verdicts hold, so no result here could accept the phase. It is one of ten cells 6c has been
+   measured at. The costs beside the gate are WORSE: AWT `+0.433 [+0.268, +0.597]`, WT95
+   `+0.775 [+0.022, +1.528]`, energy `+4.801 [+3.633, +5.970]` kJ per served leg.
+3. **The limit, and its provenance.** 1.90 s is kept as pre-registered, with the provenance the study
+   prints: inherited from `docs/07` § 4, measured on AWT at Midtown up-peak and applied to TTD as
+   absolute seconds. This cell's own TTD limit was never measured and is not measured here. *An order
+   of magnitude below* is withdrawn. At the four Midtown Office cells with mixed traffic nearest this
+   one (interfloor-mix 1.0 % and 2.0 %, the hotel profile at 1.5 %, `lunch-two-way` at 1.5 %), the
+   TTD-measured limits on `f60048d` are 0.414 s to 0.759 s structural and 0.272 s to 0.727 s
+   near-neighbour, so 0.222 s is below them by 1.9 to 3.4 times and 1.2 to 3.3 times respectively.
+   R7 printed "1.2 to 3.4" beside the structural range; worked from the four figures, the structural
+   ratios run from 1.9.
+4. **Required replications: 192.** From the observed spread, s_D = 0.1109 × √200 = 1.568 s, so
+   ⌈(1.960 × 1.568 / 0.222)²⌉ = 192, eight under the budget. `verdict.ts` prints 1 for any interval
+   that already excludes zero; that 1 is a placeholder and is not published. Before § D1603 it was 225.
+5. **The printed reason.** `weightSetSelection.ts#selectionVerdictOf` names each clause the run
+   fails and only those, as `selectionSweep.ts`'s per-cell reason does; `weightSetSelection.test.ts`
+   holds it on every run with cells built through `compareCell`, and the benchmark tier holds it on
+   the real study. The study used to end *"the criterion requires an interval excluding zero on the
+   better side"* straight after an interval that does. Its accepted branch no longer calls the
+   reference *the best shipped profile at this point*: `collective-enroute`'s census mean here is
+   0.639 s under `collective`'s ([§ D205](#d205)). Its header cited § D126 for the criterion, and
+   § D126 is C33's interval-family entry; the header, the module's other citations of it,
+   `published.ts`'s weight-set extractor and `core/src/dispatch/selector.ts` now cite § D139, and
+   § D140 where the raised gate is meant.
+6. **The cost words, republished as measured.** In the same study ΔWT95 goes INDISTINGUISHABLE to
+   WORSE for both arms (learned above; fuzzy `+0.678 [+0.081, +1.276]`, was `+0.496 [−0.072, +1.063]`).
+   In the sweep, `midtown-hotel-1.5pct`'s learned ΔWT95 goes WORSE to INDISTINGUISHABLE
+   (`+0.324 [−0.474, +1.122]`, was `+0.766 [+0.060, +1.472]`), so § D156 § 3's PRIMARY tally is now
+   WORSE 1, INDISTINGUISHABLE 3, BETTER 1, and its gate `−0.189 [−0.389, +0.010]` (p 0.063) now ranks
+   ahead of `garden-residential-2pct` (p 0.113): their Holm α swap to 0.0167 and 0.025 and both are
+   still retained. The fuzzy arm's gate is `−0.210 [−0.404, −0.017]`, still BETTER and still below
+   the limit.
+7. **Attribution, only where a control ran.** Putting `releaseHallCall`, `releaseAllHallCalls` and
+   `setMode` back through `keptDirection.test-helper.ts`'s shape reproduces every old pin of the
+   matrix, the tail study, destination-dispatch and weight-set selection. On weight-set selection the
+   old release alone reproduces them and the old `setMode` alone does not, so the release fix moves
+   6c and § D1606's fold moves nothing there. Seat 2 ran the old release on the selection sweep, and
+   it reproduces every old printed figure, `midtown-hotel`'s WORSE included. On lunch two-way the old
+   release alone reproduces all 20 old pins, so the release fix moves it too. No copy says why
+   anything moved; the mechanism is unmeasured.
+8. **What 24 search candidates give.** Re-run on `f60048d` with `searchCandidates: 24`, the study
+   picks the same winner, candidate 21, and returns the same gate interval, so "the same at 24 and 64
+   search candidates" is re-derived rather than carried. The winner's tuning-seed ΔTTD is −0.821 s
+   (−0.710 s before § D1603).
+9. **The matrix census's declared spread.** `matrixCensus.test.ts` re-derives `midtown-interfloor`'s
+   binding spread (`nearest-car`) as 9.3994 s on `f60048d`; `matrixCells.ts` declared 9.4048.
+   With `releaseHallCall`, `releaseAllHallCalls` and `setMode` put back, the census's own
+   computation returns 9.4048 s (9.404848), the declared figure, so the engine change moves it; this
+   control does not separate the release fix from the fold. `matrixCells.ts` now declares 9.3994,
+   re-derived as: 340 replications unclamped, 200 at the band's ceiling, a 1.30 s half-width at 200,
+   the budget the matrix spends. Every ceiling reproduces.
+10. **The § D156 `vertical-city-up-peak-1pct` row, corrected and labelled pre-existing.** The whole
+   row disagrees with the tree, and this fix moves none of it: the old release gives today's values,
+   and `published.ts` has pinned `−0.128 [−0.232, −0.024]` since at least `5587148` (2026-09-11).
+   Screen: 212 preference changes and a median mix of 60.8/39.2/0.0 then, 194 and 71.1/28.9/0.0 now.
+   Limits: 106.95 s TTD scale, 0.385 → 0.077 s near-neighbour and 4.106 → 0.817 s structural then;
+   103.53 s, 0.061 → 0.012 s and 4.260 → 0.848 s now. Verdict: `+0.258 [−0.141, +0.657]`
+   INDISTINGUISHABLE (adj-p 0.2037) then, `−0.128 [−0.232, −0.024]` BETTER (adj-p 0.0159) now, NOT
+   ACCEPTED both times because 0.128 s is below 0.848 s. GitHub issue #647 finds the commit that
+   moved a published research verdict word without a stop.
+11. **The sentences that no longer hold, each left as written.**
+   - **§ D145.** The census table's `collective` 53.742 s and `predictive-balanced` 54.823 s (53.751 s
+     and 54.832 s). Both verdict-table rows: learned `−0.213 [−0.440, +0.014]` INDIST., `+0.424`,
+     `+0.675` INDIST., `+415.9` kJ, `+4.807` kJ; fuzzy `−0.212 [−0.416, −0.007]`, `+0.187`, `+0.496`
+     INDIST., `+238.9` kJ, `+2.702` kJ (clauses 2 and 6 give the new rows; energy `+417.3` and
+     `+230.4` kJ). *"The learned selector's ΔTTD interval contains zero, and the point estimate is an
+     order of magnitude below the operating point's structural resolution limit"*: the first half no
+     longer holds and the second is withdrawn (clause 3). *"−0.710 s on the tuning seed against
+     −0.213 s on the holdout"* (−0.821 s against −0.222 s). *"−0.212 s is a tenth of that"* (−0.210 s).
+   - **§ D151.** Its context's *"returned ΔTTD `−0.213 [−0.440, +0.014]`, an interval containing
+     zero, so NOT ACCEPTED"*.
+   - **§ D156.** § 1's `midtown-hotel-1.5pct` median mix 46.7/10.3/40.6 (50.0/10.0/35.0) and
+     clause 10's row. § 2's limits table: `midtown-interfloor-1.0pct` near-neighbour 1.363 → 0.271 s
+     (1.364 → 0.272 s), `midtown-interfloor-2.0pct` structural 3.090 → 0.615 s (3.092 → 0.616 s),
+     `midtown-hotel-1.5pct` 56.12 s, 1.635 → 0.325 s and 3.805 → 0.758 s (56.11 s, 1.617 → 0.322 s
+     and 3.813 → 0.759 s), and clause 10's row. § 3's rows for `midtown-interfloor-2.0pct`
+     (`−0.178 [−0.617, +0.260]`, p 0.424, adj-p 0.424), `garden-residential-2pct` (α 0.025, adj-p
+     0.227) and `midtown-hotel-1.5pct` (`−0.189 [−0.389, +0.010]`, p 0.063, α 0.0167, adj-p 0.189),
+     and its ΔWT95 tally (clause 6). § 4's `vertical-city-up-peak-1pct` row (clause 10).
+   - **§ D200.** *"learned ΔTTD −0.170 [−0.405, +0.064] INDISTINGUISHABLE, p = 0.1538, an eighth of
+     the cell's own 0.412 s limit; generalizes in sign (−0.205 → −0.170)"*: on `f60048d` it is
+     `−0.163 [−0.396, +0.070]`, p = 0.168, against a 0.414 s limit, and −0.252 → −0.163. The effect
+     is about two fifths of the limit on either engine, never an eighth, so that word is withdrawn
+     where it is republished. *"Fuzzy +0.186 [−0.026, +0.399]"* (`+0.172 [−0.043, +0.386]`). The
+     costs *"AWT +0.263 WORSE, WT95 +0.809 WORSE, energy +4.444 kJ/served leg WORSE beside the raw
+     +415.9 kJ"* (+0.266, +0.806, +4.412 and +412.7 kJ, all still WORSE). The flat control's
+     `−0.576 [−0.833, −0.319]` BETTER (`−0.592 [−0.848, −0.337]`, still BETTER and above its 0.461 s
+     limit), and the context's *"structural 0.412 s / 0.461 s"* (0.414 s and 0.461 s). *"§ D145 (one
+     cell, −0.213 [−0.440, +0.014]) ... stand unchanged beside this entry"* (clause 2). The
+     constant-override probe's `−0.720 [−0.973, −0.467]` and `−0.667 [−0.923, −0.412]` are not
+     re-measured, since no shipped code runs them; every republished copy says they are from the
+     engine before § D1603. Unchanged on `f60048d`: the census, both budgets, the regime screen
+     (66.1 %, +10.38 σ against +3.97 σ), the learned arm's weight-set shares and the deadband
+     answer, 1.691 s.
+12. **Republished, each with `f60048d` named:** `CLAUDE.md`'s Phase 6 row and its fuzzy-arm sentence;
+   `docs/05-roadmap.md` § Phase 6c, its sweep table and the `lunch-two-way` section; `docs/07`,
+   `docs/13`, `docs/14`, `docs/15` § 1 (a larger n can no longer move 6c, so compute is no longer
+   ranked as able to), `docs/45`, `GAPS.md`; `viz/src/authoring/selectorSpec.ts` (*did not beat*
+   becomes *was not resolvably better than*); the headers of `destinationDispatchContrast.ts` and
+   `lunchTwoWaySelection.ts`; and `docs/39-decisions-in-force.md`'s row for § D145.
+   `README.md:396` is about lunch two-way, whose interval still contains zero, and `WAVE6_PLAN.md`
+   is a closed record; both keep their figures. No game copy changes, because the selector is
+   withheld ([§ D535](#d535)). Two stale figures older than this fix were found on the way:
+   `weightSetSelection.test.ts` quoted `collective-enroute` at 53.506 s, which the engine before
+   § D1603 did not give either (53.125 s), and now quotes 53.112 s; and `docs/05` § Phase 6b's
+   C→D table still prints the figures from before [§ D333](#d333) (`+5.94`, `−1.02`). That table
+   is outside this ruling and is left for its owner.
+
+**Numbers spent.** This lane held **D1620 to D1623** and spent **D1620**.

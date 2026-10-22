@@ -1186,19 +1186,34 @@ a shape rather than by argument:
    nine metrics that stop being comparable across the two passenger models.
 
 **The measurement.** Midtown Office interfloor-mix, reference arm `collective` (not `nearest-car`,
-which § 4 of the handoff records as a poor reference arm), n = 200 on a **disjoint** seed under CRN:
+which § 4 of the handoff records as a poor reference arm), n = 200 on a **disjoint** seed under CRN,
+re-derived on `f60048d`, the engine of [§ D1603](../DECISIONS.md):
 
 | arm | ΔTTD (the gate) | verdict |
 |---|---|---|
-| learned selection (6c) | **−0.213 [−0.440, +0.014]** | **INDISTINGUISHABLE — the interval contains zero** |
-| fuzzy detector (Phase 7's bullet) | −0.212 [−0.416, −0.007] | excludes zero, and **still below the resolution limit** |
+| learned selection (6c) | **−0.222 [−0.441, −0.004]** BETTER by the interval | **below the resolution limit, NOT ACCEPTED**; AWT, WT95 and energy WORSE |
+| fuzzy detector (Phase 7's bullet) | −0.210 [−0.404, −0.017] BETTER by the interval | **still below the resolution limit**; AWT, WT95 and energy WORSE |
 
-Unchanged at 24 and at 64 search candidates. Costs published beside the gate and never folded into
-it: ΔAWT +0.424 WORSE, ΔWT95 +0.675 INDISTINGUISHABLE, energy +4.807 kJ per served leg WORSE.
+**The refusal, restated on what holds** ([§ D1620](../DECISIONS.md), which supersedes § D145's
+stated ground). The gate interval excludes zero, at p = 0.046 uncorrected, against the
+pre-registered `collective`. 6c is NOT ACCEPTED because 0.222 s is below the 1.90 s structural
+resolution limit, which [§ D140](../DECISIONS.md) made a gate condition before either arm ran. That
+limit is inherited from § 4, where it was measured on AWT; this cell's own TTD limit has never been
+measured. At the four Midtown Office cells with mixed traffic nearest this one, the TTD-measured
+structural limits are 0.414 s to 0.759 s, so 0.222 s is below them by 1.9 to 3.4 times. This is not
+a [§ D151](../DECISIONS.md) PRIMARY cell, so no result here could accept the phase, and it is one
+of ten cells 6c has been measured at. Worked from the observed spread, the effect needs **192**
+replications to clear zero, eight under the budget. The same interval comes out at 24 and at 64
+search candidates, which pick the same winner. On the engine before § D1603 the interval was
+`−0.213 [−0.440, +0.014]`, containing zero; putting the old release methods back reproduces it.
 
-**Both arms are in the structural regime**, whose smallest detectable effect is **1.9 s** (§ 4). An
-interval excluding zero is **not** a win when the effect is smaller than the apparatus can resolve,
-which is why the fuzzy arm is reported below the resolution limit rather than banked.
+Costs published beside the gate and never folded into it, for the learned arm: ΔAWT +0.433 WORSE,
+ΔWT95 +0.775 WORSE (INDISTINGUISHABLE before § D1603), energy +4.801 kJ per served leg WORSE. The
+fuzzy arm's ΔWT95 is WORSE too, +0.678 (also INDISTINGUISHABLE before).
+
+**Both arms are in the structural regime**, whose inherited smallest detectable effect is **1.9 s**
+(§ 4). An interval excluding zero is **not** a win when the effect is smaller than the apparatus can
+resolve, which is why both arms are reported below the resolution limit rather than banked.
 
 **The search is not what failed.** Pointed at `idle.repositionThresholdS` — the known-answer test
 whose interior optimum is 2 s while 8 s ships — the same machinery returned **1.691 s at 64
@@ -1216,10 +1231,17 @@ disjoint seed:
 | cell | ΔTTD | Holm | below this cell's own TTD limit? | verdict |
 |---|---|---|---|---|
 | Midtown interfloor-mix 1.0 % | **−0.265 [−0.429, −0.101]** | REJECT H0 at α = 0.010 | **yes**, 0.509 s | NOT ACCEPTED |
-| Midtown interfloor-mix 2.0 % | −0.114 [−0.553, +0.324] | retain | yes, 0.615 s | NOT ACCEPTED |
+| Midtown interfloor-mix 2.0 % | −0.178 [−0.617, +0.260] | retain | yes, 0.616 s | NOT ACCEPTED |
 | Garden residential 2 % | −0.111 [−0.248, +0.027] | retain | yes, 0.917 s | NOT ACCEPTED |
 | Garden down-peak 2 % | **−0.191 [−0.314, −0.069]** | REJECT H0 at α = 0.0125 | **yes**, 0.786 s | NOT ACCEPTED |
-| Midtown @ `hotel` profile 1.5 % | −0.085 [−0.262, +0.092] | retain | yes, 0.758 s | NOT ACCEPTED |
+| Midtown @ `hotel` profile 1.5 % | −0.189 [−0.389, +0.010] | retain | yes, 0.759 s | NOT ACCEPTED |
+
+Re-derived on `f60048d`, the engine of [§ D1603](../DECISIONS.md) ([§ D1620](../DECISIONS.md)): the
+two Midtown rows above moved and no Holm decision, limit verdict or acceptance word did. The hotel
+row now ranks third by p (0.063) and Garden residential fourth (0.113), so their Holm α swap to
+0.0167 and 0.025. Across the five, ΔWT95 is now WORSE at one cell, INDISTINGUISHABLE at three and
+BETTER at one; the hotel cell's WORSE became INDISTINGUISHABLE. Putting the old release methods
+back reproduces every old figure.
 
 **Two of the five clear the correction and are still refused**, and [§ D140](../DECISIONS.md)'s
 raise is the whole reason: both are a third to a half of their own cell's smallest detectable
@@ -1254,35 +1276,40 @@ commit ordering on record, the gate § D139 as raised and unchanged, and the fla
 control measured in the same run at the same seeds and equal total demand. Census at the tuning
 seed on both cells: **all twelve arms quotable, no ceiling, reference `auction-multi-round` on
 both**; budget variance-derived per `matrix.ts`'s rule on the gate metric and clamped to the band's
-ceiling of 200; resolution limits measured on TTD at each cell (structural **0.412 s** treatment,
-**0.461 s** control); n = 200 on the disjoint holdout seed under CRN; Holm within a **new declared
-family of exactly the treatment cell**, never pooled with this sweep's families.
+ceiling of 200; resolution limits measured on TTD at each cell (structural **0.414 s** treatment,
+**0.461 s** control, on `f60048d`); n = 200 on the disjoint holdout seed under CRN; Holm within a
+**new declared family of exactly the treatment cell**, never pooled with this sweep's families.
 
 | cell | learned ΔTTD vs `auction-multi-round` | verdict |
 |---|---|---|
-| `lunch-two-way` 1.5 % (mix swings 90/0/10 → 0/90/10) | **−0.170 [−0.405, +0.064]** | NOT ACCEPTED — contains zero (p = 0.1538), below the cell's own 0.412 s limit |
-| flat-mix control (same template, `mixAmplitude: 0`, same total demand) | **−0.576 [−0.833, −0.319]** | BETTER, above its own limit — **§ D162 condition 5's trigger, investigated below** |
+| `lunch-two-way` 1.5 % (mix swings 90/0/10 → 0/90/10) | **−0.163 [−0.396, +0.070]** | NOT ACCEPTED — contains zero (p = 0.1680), below the cell's own 0.414 s limit |
+| flat-mix control (same template, `mixAmplitude: 0`, same total demand) | **−0.592 [−0.848, −0.337]** | BETTER, above its own limit — **§ D162 condition 5's trigger, investigated below** |
+
+Re-derived on `f60048d`, the engine of [§ D1603](../DECISIONS.md) ([§ D1620](../DECISIONS.md)): both
+rows moved and neither verdict did (they read `−0.170 [−0.405, +0.064]`, p = 0.1538, and
+`−0.576 [−0.833, −0.319]` before). Putting the old release methods back reproduces the old figures.
 
 **The refusal is of the selector, not of the traffic.** The regime screen — fixed first by a wiring finding this measurement reported, five diagnostic
 call sites that dropped the point's `demandTemplate` (commit `0a7bb4d`; the gate experiments run
 through the runner and were never wrong) — shows the
 condition present: `two-way` is the detector's incumbent on **66.1 %** of post-warm-up observations
 (three regimes, 21 preference changes), and the trace-level split drift is **+10.38 σ** against the
-control's +3.97 σ in the same apparatus. The fitted policy generalizes in sign (−0.205 s tuning →
-−0.170 s holdout) and is still unresolvable — § D145's sentence, still true: a generalizing effect
+control's +3.97 σ in the same apparatus. The fitted policy generalizes in sign (−0.252 s tuning →
+−0.163 s holdout) and is still unresolvable — § D145's sentence, still true: a generalizing effect
 that cannot be resolved is still an effect that cannot be resolved.
 
 **The flat control's BETTER is the § D162 negative control doing exactly what it was built for.**
 Pinning `predictive-balanced`'s weight vector on the reference profile for the **whole run** — no
 selector, no switching — beats the reference by **−0.720 [−0.973, −0.467]** on the control and
 **−0.667 [−0.923, −0.412]** on the treatment at the verdict seed: *more than the learned arm
-achieves on either cell*. So the advantage is a **static weight-vector hybrid** — the auction
-dispatch stages carrying a better-for-TTD vector at this point — present at full strength where the
-mix cannot vary, and the switching *subtracts* value (−0.170 learned against −0.667 constant on the
-mix-varying cell). It is not mix exploitation, and it accepts nothing. On the treatment the learned
-arm held `interfloor` (= `eta`'s vector) 51.0 % and `two-way` 32.0 % of decisions; on the control it
+achieved on either cell*. That probe was measured on the engine before § D1603 and is not
+re-measured on `f60048d`, since no shipped code runs it. So the advantage is a **static
+weight-vector hybrid** — the auction dispatch stages carrying a better-for-TTD vector at this point
+— present at full strength where the mix cannot vary, and the switching *subtracted* value (−0.170
+learned against −0.667 constant on the mix-varying cell, both before § D1603). It is not mix
+exploitation, and it accepts nothing. On the treatment the learned arm held `interfloor` (= `eta`'s vector) 51.0 % and `two-way` 32.0 % of decisions; on the control it
 pinned `two-way` for 90.9 %. Costs beside the gate, never folded in: the treatment's learned arm is
-WORSE on AWT (+0.263), WT95 (+0.809) and energy (+4.444 kJ per served leg beside the raw figure).
+WORSE on AWT (+0.266), WT95 (+0.806) and energy (+4.412 kJ per served leg beside the raw figure).
 The deadband known-answer returned **1.691 s** in the same session, so the refusal is a fact about
 the policy and not the search. And the standing § D169 discount cuts the same way: the shipped arc
 is the **widest** amplitude its citation permits, so even these figures are measured under
@@ -1378,8 +1405,10 @@ Search the parameter space instead of hand-guessing weights. Full design in
   is repointed to `energy-aware` and `resolveWeightSets` now **throws** on a dangling name rather
   than silently missing a regime ([§ D142](../DECISIONS.md)).
 
-  **Measured, and reported below the resolution limit**: ΔTTD `−0.212 [−0.416, −0.007]` against
-  `collective` at n = 200 — an interval that **excludes zero** and is still not a win, because the
+  **Measured, and reported below the resolution limit**: ΔTTD `−0.210 [−0.404, −0.017]` against
+  `collective` at n = 200 on `f60048d` ([§ D1620](../DECISIONS.md); `−0.212 [−0.416, −0.007]` before
+  [§ D1603](../DECISIONS.md)), with AWT, WT95 and energy WORSE beside it — an interval that **excludes
+  zero** and is still not a win, because the
   effect is smaller than the ~1.9 s this structural regime can resolve
   ([§ 4](07-handoff.md), [§ D140](../DECISIONS.md)). Reporting it as a win would have been the
   wave's easiest over-claim.
@@ -2109,7 +2138,7 @@ which is exactly the distinction the standing requirement above exists to keep v
 | Item | Where it is recorded |
 |---|---|
 | **The viewer is now built to a design handoff** | Not an open item — a change of source. *Elevator Sim Reimagined* is canonical for the interface ([§ D174](../DECISIONS.md)); the requirements, the gap analysis and the five deviations are [`docs/12`](12-design-handoff.md). **No phase verdict moved and no published number was recomputed**, which is the point rather than an aside: the sheet reads `VizSummary`, which reads `RunSummary`, which is the same object the CLI and the experiment matrix read. Board: [`WAVE10_PLAN.md`](../WAVE10_PLAN.md) |
-| **Phase 6c — learned control** | § Phase 6c above. **No longer deferred: implemented, measured and NOT ACCEPTED**, the refusal broadened from one operating point to eight pre-registered cells and held ([§ D151](../DECISIONS.md) is the protocol; [§ D156](../DECISIONS.md) is the result) — **and the re-measurement on the mix-varying template is now run, under [§ D162](../DECISIONS.md)'s five conditions, and it refused a third time** (`benchmark/lunchTwoWaySelection.ts`; [§ D200](../DECISIONS.md) is the verdict): ΔTTD `−0.170 [−0.405, +0.064]` at n = 200 on the disjoint seed at `midtown-office`/`lunch-two-way` 1.5 %, below the cell's own TTD-measured limit, with the flat-mix negative control exposing the residual advantage as a static weight-vector hybrid rather than mix exploitation. The question § D156 left open is **closed, in the refusing direction**; what would move it now is a different selector, not a different measurement |
+| **Phase 6c — learned control** | § Phase 6c above. **No longer deferred: implemented, measured and NOT ACCEPTED**, the refusal broadened from one operating point to eight pre-registered cells and held ([§ D151](../DECISIONS.md) is the protocol; [§ D156](../DECISIONS.md) is the result) — **and the re-measurement on the mix-varying template is now run, under [§ D162](../DECISIONS.md)'s five conditions, and it refused a third time** (`benchmark/lunchTwoWaySelection.ts`; [§ D200](../DECISIONS.md) is the verdict): ΔTTD `−0.163 [−0.396, +0.070]` on `f60048d` (`−0.170 [−0.405, +0.064]` before [§ D1603](../DECISIONS.md)) at n = 200 on the disjoint seed at `midtown-office`/`lunch-two-way` 1.5 %, below the cell's own TTD-measured limit, with the flat-mix negative control exposing the residual advantage as a static weight-vector hybrid rather than mix exploitation. The question § D156 left open is **closed, in the refusing direction**; what would move it now is a different selector, not a different measurement |
 | **Phase 9 — the experience layer** | **No longer open: measured against [§ D163](../DECISIONS.md) and ACCEPTED WITH NAMED GAPS on 2026-07-30** — § Phase 9 above carries the verdict and the gaps, and the row and the verdict landed together as § D163 required. All nine units are built. What remains is not the phase: it is **U6**, **U7's rider models**, **Basic's curated three-dimension subset**, and clause 4 — *name the non-test caller* — which is **satisfied in prose and mechanised by nothing**, because no dead-code audit reaches `packages/viz` *(the clause-4 item closed later the same day: wave 12's `packages/viz/src/deadCode.test.ts` mechanises it, [§ D192](../DECISIONS.md) — verdict unchanged)* |
 | **The game layer, wave AF (a press that decides the day)** | **Not a phase verdict — a wave, and the figures are in [`docs/44`](44-honesty-corpus-log.md), split out of `CLAUDE.md`'s Phase 9 row.** Four lanes against the wave AE re-score, which scored the game **P1 4, P2 6, P3 6, P4 5** against a bar of 8 and answered the termination question **no**. Its diagnosis was not repetition — wave AE had fixed that — but that **nothing the player does while watching changes the verdict**, measured three ways: 13 of 13 arms miss Today's scenario, 5 of 5 clear career day 1, and 302 s of a career day at the shipped speed held no prompt and nobody standing. **That is now false of one contract** ([§ D871](../DECISIONS.md), GitHub issue [#576](https://github.com/mrpeanut01/elevator-sim/issues/576)). A fourth authorable fact on the contract ladder takes a car out of passenger service mid-shift — a **rung** rather than a wrinkle, because `shift/events.ts#eventFor` is pure in `(day, dayIdx)` so a wrinkle on day 1 books a car out on all sixteen towers and re-derives every figure pinned there. On Crown Hotel, one pinned day: as-built **Shift missed** at 303 s against a 230 s bar, *park the cars in the lobby* **Shift missed** at 311 s, *spread the cars* **Shift cleared** at 215 s — **270 of 355 legs differ and 0 of them boarded before the press**, so the prefix is bit-identical and the press is a decision taken at a moment rather than a different day. A second pinned day has **two** presses clear, so neither verb is the answer. Over fifty seeds the dominance check is answered rather than assumed: as-built misses 22, a `predictive-balanced` handover 15, and *park in the lobby* **23 — worse than pressing nothing**, which is this contract's own lesson (a hotel has no dominant direction). **No goal bar moved**; `GOAL_BARS` is byte-identical. The decision census on that day goes from the assessor's 282 s with nobody standing to **80 s**, and from eighteen days to the first consequential choice to **112.5 s**. **The Workshop's two inert levers reach the run** ([§ D886](../DECISIONS.md), issue [#575](https://github.com/mrpeanut01/elevator-sim/issues/575)) — the standing requirement failing in § D227's first polarity, on the screen where a player is taught to tune, and the cause was **traced rather than inferred**: `dev/state.ts#drivingProfileOf` read `specFromProfile(base, base.name)`, the base profile round-tripped through the editor's shape and straight back out, so the player's edits were read by nothing that builds a run. The rival explanation was **refuted on the same sitting** by putting the same weight on the profile through `savedDispatchers`, where it does move the legs. That lane's first wiring then broke `dispatcherId`, which `scope/scope.test.ts` reported as an inert control **within the minute** — the repository's own instrument catching a lane's own regression — and it **declined to ship a refusal it could not establish**, because *no weight can make this term bite under `noDirectionReversal`* is a claim about `argmin` over survivors that eligibility does not settle. **The career keeps the player** ([§ D899](../DECISIONS.md), issue [#577](https://github.com/mrpeanut01/elevator-sim/issues/577)): the onward press landed on Today's tower with the career's crumbs gone, and an assessor played **thirteen days** before noticing — and the instructive half is that **nobody's module was wrong**, three correct pieces whose *composition* swapped the mode, which is why every unit passed and why the case that pins it must drive the shipped bundle. **The day report gains a causal line that says what kind of claim it is** ([§ D900](../DECISIONS.md), issue [#581](https://github.com/mrpeanut01/elevator-sim/issues/581)), and route 1 was **rejected on this repository's own statistical rule rather than on cost**: a with/without pair on one seed is one replication, and a difference is not declared without a paired-t interval excluding zero at 50–200. The sentence says so to the player — *"the day was not run again without it, so nothing here measures the change"* — and a test fails if *moved*, *caused*, *because* or seven other causal verbs appear in that row. **The chimes loop closes** ([§ D911](../DECISIONS.md), issue [#579](https://github.com/mrpeanut01/elevator-sim/issues/579)), for the first time and with **no `apiOrigin` and no account**: clear a fix case, earn six, buy a +6 unit budget rung on another, and **129 of 200 boarding legs differ**. Both figures are **chosen, not measured**, and the data file says so. **The corpus moved exactly 128.00 strings a case in both tiers**, attributed to the string across five producers, with **all four forecasts right** — one exact term by term, and one that published a **floor** rather than a figure for two whole Settings cases and was right by six strings. **Every lane also reported something it could not fix, and two are worth more than the fixes**: issue [#583](https://github.com/mrpeanut01/elevator-sim/issues/583), the 80 kJ/ride bar was derived over 1 800 s days and is applied to Today's authored 36 000 s day, where the same building under the same dispatcher reads **35.6 kJ/leg over the peak half-hour against 151.9 over the whole day** — a bar and a run that are not the same measurement, which is why 12 of 13 arms fail it and the one that passes is the worst on waits; and issue [#584](https://github.com/mrpeanut01/elevator-sim/issues/584), `legibility.test.ts` pairs each contract's building with `week.contractId` left at `c1`, so `rungFor` returns `undefined` and the sweep measures **every tower as built rather than as its contract hands it over** — and `ELIGIBLE_FIRST_CONTRACT_IDS`, which decides what a first-time player is offered, is derived from it. **What this wave did not do is re-score the game**; that is a run, not an argument |
 | **The game layer, wave AG (a tower the player picks, and a press with its counterfactual beside it)** | **Not a phase verdict — a wave, and the figures are in [`docs/44`](44-honesty-corpus-log.md), split out of `CLAUDE.md`'s Phase 9 row.** Four build lanes and two fix lanes against the post-AF assessor, whose most valuable finding was that the day whose verdict turns on a press was **reachable only through a 37-in-365 date draw, once per device, with no player control**. **A player now chooses the contract their week runs** ([§ D912](../DECISIONS.md)): one row per shipped contract on the front door, moved through `shift/week.ts#switchWeek` with the `resume` arrival, and each row says before it is pressed whether the press parks or resumes. The mechanism had existed since issue #107; what was missing was a control in the daily loop, which is this repository's signature defect one layer up from a dead seam. Proved by pressing it on the shipped bundle rather than by a unit test. **Seven contracts carry a day whose verdict turns on a press** ([§ D914](../DECISIONS.md)), four clearing on *park in the lobby* and three on *spread the cars*, so the right verb is a property of the building. On `c6` and `c9` the arm that **clears** has the **higher** worst wait, because the goal deciding the day is the landing queue, which is why the verdicts are quoted off `dayReportOf` rather than derived from a figure. The brief asked for eight and measurement allowed seven: `c1` never misses at all over twenty seeds with a car booked out, and the count of both refused sets is pinned so an eighth fails a case. `GOAL_BARS` is byte-identical. **The day report shows the same seed run without the press** ([§ D931](../DECISIONS.md)), and it cost no simulation: `runShift` already re-runs the whole day on every mid-run press, so the recording it replaces **is** the day without that press, and it had been dropped. On the measured seed the press is the arm with **more** long waits, and the copy says so. § D900's refusal is **replaced rather than joined**, because two of its clauses stop being true beside a figure off the unpressed run. **Session lengths follow the day the tile opens** ([§ D946](../DECISIONS.md)): Career was sold at ~4 min against 15 actual, Today's scenario at 8–15 min against 150. The briefing said five office contracts run a 36 000 s day and the census through the shipped derivation says **thirteen of sixteen**. **Two measurements that were wrong about what they measured are corrected.** The energy bar was **one constant grading two window spans** ([§ D962](../DECISIONS.md), issue [#583](https://github.com/mrpeanut01/elevator-sim/issues/583)) — `peak-5min` on seven of eight contracts against a whole authored day — which on the flagship day meant **0 clean days of 325 across all thirteen dispatchers**. The whole-day bar is **350 kJ**, the tighter of two roundings, because the two-thirds point falls inside one tower's cluster where a looser figure would have been better conditioned; § D106's perverse ranking was re-checked at the new horizon and holds on the two contracts measured, with nothing claimed about the other eleven. The legibility sweep **measured sixteen towers as built** ([§ D961](../DECISIONS.md), issue [#584](https://github.com/mrpeanut01/elevator-sim/issues/584)), pairing every contract's building with a `c1` week, and in correcting it refuted a published reading: § D572 said Harbour Point holds a landing *even let at three fifths*, and the measurement had never applied the three fifths. **Two lanes built the same wrong thing and the difference between them was a run** ([§ D913](../DECISIONS.md), [§ D949](../DECISIONS.md)). Both derived that a parking press is inert under `zoned-uppeak` because the strategy it would set is already in force; one swept the predicate over thirty-six cells and found **two where the press moves the legs**, and the other withdrew its shipped refusal on that measurement. A refusal on a live control is § D177's inert-control class with its polarity reversed, and nothing reached the screen. **Integration is the finding worth keeping. Four lanes, each green on its own branch, produced nine failures together.** Six were registries and ratchets each lane had updated for its own new files only. Three were a genuine collision: one lane pinned an 800-day legibility sweep and another moved six of the rungs that sweep runs over, and neither was wrong. Re-measured on the merged tree ([§ D963](../DECISIONS.md)), **ten of sixteen rows reproduce to the second and six move, exactly the six whose rung moved**, with `c7` an unarranged control. **The first-session set grew from eleven towers to fourteen** with § D512's threshold untouched, and `FIRST_SESSION_LINE` moved on its own because the count is derived. That is § D454's lesson at its sharpest and the reason § D343 puts the corpus measurement after integration rather than on a branch. The fix lanes also caught a browser test **certifying an artifact nobody receives** (issue #281's defect reopening), cut a bound **1 414× its own job** rather than registering it, and found that the two figures in `vitest.config.ts`'s census prose that had drifted were **exactly the two the claim loop did not assert**. **The corpus moved exactly 104.00 strings a case and one surface in both tiers, and all four forecasts summed to it to the string**, with both fix lanes contributing zero. **The integrator opened this wave's decision block at D912 in error** — wave AF had already registered D912–D925 as holes — and a lane had to resolve the contradiction mid-build. The block should have opened at D926, and `CHARTER_PROGRAMME.md` now carries the rule: a wave opens above both the highest heading and the highest registered hole. **What this wave did not do is re-score the game**; that is a run, not an argument |

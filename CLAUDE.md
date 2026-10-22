@@ -33,13 +33,16 @@ verdict:
   INDISTINGUISHABLE and `destination-panel` is BETTER, so the effect is **building-dependent**, the
   verdict is not moved, and **no mechanism is offered** ([§ D595](DECISIONS.md)). **6c (learned
   control) is implemented, measured and NOT ACCEPTED** ([§ D139](DECISIONS.md) is the criterion,
-  [§ D145](DECISIONS.md) the verdict), and the refusal held over eight pre-registered cells
-  ([§ D151](DECISIONS.md), [§ D156](DECISIONS.md)) and on `lunch-two-way`
-  ([§ D162](DECISIONS.md), [§ D169](DECISIONS.md)): what would move 6c now is a different
-  selector, not a different measurement. Double-deck operation is **simulated**
-  ([§ D131](DECISIONS.md), [§ D598](DECISIONS.md)); **no residual is published for a double-deck
-  bank**, because `oracle/upPeakCase.ts#isolateBank` drops the deck fields. The row's long form,
-  with every interval, is [`docs/45`](docs/45-status-record.md).
+  [§ D145](DECISIONS.md) the verdict, [§ D1620](DECISIONS.md) the ground it now stands on): on
+  `f60048d` its ΔTTD `−0.222 [−0.441, −0.004]` against `collective` excludes zero, and it is
+  refused because 0.222 s is below the 1.90 s resolution limit [§ D140](DECISIONS.md) made a gate
+  condition, with AWT, WT95 and energy **WORSE** beside it. The refusal held over eight
+  pre-registered cells, where no PRIMARY cell clears ([§ D151](DECISIONS.md),
+  [§ D156](DECISIONS.md)), and on `lunch-two-way` ([§ D162](DECISIONS.md), [§ D169](DECISIONS.md)):
+  what would move 6c now is a different selector, not a different measurement. Double-deck
+  operation is **simulated** ([§ D131](DECISIONS.md), [§ D598](DECISIONS.md)); **no residual is
+  published for a double-deck bank**, because `oracle/upPeakCase.ts#isolateBank` drops the deck
+  fields. The row's long form, with every interval, is [`docs/45`](docs/45-status-record.md).
 - **Phase 8** — **both blocking property violations are closed**, and neither was closed by moving a
   bound: `fuzz-1001074` by a fourth `awtIsValid` ground, `fuzz-1000384` by revoking a promise a
   withdrawn car cannot keep. The deep tier is green at 2 000 cases. **All eight tracks have landed**;
@@ -108,9 +111,9 @@ verdict:
 
 **No verdict is rounded up.** Wave 6 built double-deck simulation, a mid-run weight-set selector,
 Phase 7's fuzzy detector, Phase 6c and Phase 9's W4, and moved no phase verdict: the fuzzy arm's
-ΔTTD `−0.212 [−0.416, −0.007]` excludes zero and is still reported **below the resolution limit**,
-because an interval excluding zero is not a win when the effect is smaller than the apparatus can
-resolve. The long form of this section, and of each paragraph below, is
+ΔTTD `−0.210 [−0.404, −0.017]` on `f60048d` excludes zero and is still reported **below the
+resolution limit**, because an interval excluding zero is not a win when the effect is smaller than
+the apparatus can resolve. The long form of this section, and of each paragraph below, is
 [`docs/45`](docs/45-status-record.md).
 
 **Energy is an axis, never a score** ([§ D106](DECISIONS.md)). Show it **beside** AWT and WT95,
