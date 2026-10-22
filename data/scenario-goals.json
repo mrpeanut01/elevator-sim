@@ -320,20 +320,20 @@
           "disposition": "batch",
           "tuning": {
             "n": 50,
-            "passes": 28,
-            "fails": 22,
-            "unmeasured": 0,
-            "rateClass": "variable"
-          },
-          "holdout": {
-            "n": 50,
             "passes": 29,
             "fails": 21,
             "unmeasured": 0,
             "rateClass": "variable"
           },
+          "holdout": {
+            "n": 50,
+            "passes": 30,
+            "fails": 20,
+            "unmeasured": 0,
+            "rateClass": "variable"
+          },
           "holdoutAgrees": true,
-          "reason": "nobody past the give-up line: a batch goal, judged over the scenario's replications — 28 of 50 on the tuning seeds and 29 of 50 on the holdout seeds."
+          "reason": "nobody past the give-up line: a batch goal, judged over the scenario's replications — 29 of 50 on the tuning seeds and 30 of 50 on the holdout seeds."
         },
         {
           "kind": "beat-the-baseline",
@@ -684,13 +684,13 @@
           },
           "holdout": {
             "n": 50,
-            "passes": 12,
-            "fails": 38,
+            "passes": 13,
+            "fails": 37,
             "unmeasured": 0,
             "rateClass": "variable"
           },
           "holdoutAgrees": true,
-          "reason": "long waits kept under 10 %: a batch goal, judged over the scenario's replications — 14 of 50 on the tuning seeds and 12 of 50 on the holdout seeds."
+          "reason": "long waits kept under 10 %: a batch goal, judged over the scenario's replications — 14 of 50 on the tuning seeds and 13 of 50 on the holdout seeds."
         },
         {
           "kind": "beat-the-baseline",
@@ -915,13 +915,13 @@
           },
           "holdout": {
             "n": 50,
-            "passes": 22,
-            "fails": 28,
+            "passes": 21,
+            "fails": 29,
             "unmeasured": 0,
             "rateClass": "variable"
           },
           "holdoutAgrees": true,
-          "reason": "kept up with arrivals: a batch goal, judged over the scenario's replications — 29 of 50 on the tuning seeds and 22 of 50 on the holdout seeds."
+          "reason": "kept up with arrivals: a batch goal, judged over the scenario's replications — 29 of 50 on the tuning seeds and 21 of 50 on the holdout seeds."
         },
         {
           "kind": "long-waits-under",
@@ -936,13 +936,13 @@
           },
           "holdout": {
             "n": 50,
-            "passes": 32,
-            "fails": 18,
+            "passes": 31,
+            "fails": 19,
             "unmeasured": 0,
             "rateClass": "variable"
           },
           "holdoutAgrees": true,
-          "reason": "long waits kept under 10 %: a batch goal, judged over the scenario's replications — 36 of 50 on the tuning seeds and 32 of 50 on the holdout seeds."
+          "reason": "long waits kept under 10 %: a batch goal, judged over the scenario's replications — 36 of 50 on the tuning seeds and 31 of 50 on the holdout seeds."
         },
         {
           "kind": "beat-the-baseline",
