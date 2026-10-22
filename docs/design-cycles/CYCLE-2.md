@@ -62,7 +62,154 @@ game itself still judges every attempt on the one holdout batch. Cycle 2 closes 
 the game is left as it is. The slope is in § 2.
 
 ### 2. Playtest findings  (middle loop, LLM personas)
-Pending.
+Source: playtest-director, run as three separate instances so no persona borrowed another's context:
+the curious player (1280 × 800), `five-minutes-phone` (390 × 844, also 360 × 740 and 844 × 390) and
+`number-averse` (1280 × 800, also 820 × 1180). Each played the served `dist-web/` of `c70dbf2` in the
+Casual register with only the screen's own controls, a fresh browser context per session. **Each played
+a blind series first**, reading no repository file until it ended (§ D1601): the phone persona's
+attempts 1 to 13, the curious player's 1 to 13 and `number-averse`'s 1 to 10. All three cleared by
+their third press, so most of each series is the persona seeing what else works, and the later
+attempts are the director's continuation in the persona's voice, marked as such in the record.
+
+**How every row replays.** Every press is on `stage-1-first-call` at the base rung (4 u), judged on
+tuning-20260730 (seed 20260730, 50 replications) and, when the tuning batch meets the goal, on
+holdout-20260731 (seed 20260731, 50 replications). A press replays from stage id, move and rung; the
+page itself shows no seed. The watched crowd is tuning replication 0, seed 16878484666841983707.
+
+**What the evidence is.** Each playtester re-derived its presses with `stageSessionConfigFor`, core's
+`runSimulation` and a paired t over the same 50 replications, and **every interval the page printed
+matched the re-derivation to the printed digit**: the phone persona's 12 distinct moves, the curious
+player's every press and `number-averse`'s 10 of 10. Wall-clock figures came from a contended container
+and no row rests on one. Every persona premise is unmeasured (`docs/23-audiences-and-core-loop.md`
+§ 1.5), and all of this is agent evidence about legibility, weighted as such.
+
+#### Cycle 1's pass condition, judged
+
+Written in `CYCLE-1.md` § 3 before Delta A was built. **Two of its three clauses are met, and the third
+is not.**
+
+| Clause | Result | Evidence |
+|---|---|---|
+| No persona reconfirms C1, C2 or X1 | **Met** | Every persona took a size from every press (C1 below); the unchanged press reads "the same run every time" (C2 below); all three read forecast parking's split verdict as a half pass without calling it a contradiction (`number-averse`'s doubt about its earlier clear is a different defect, X4 below) |
+| Every persona that presses forecast parking reads it as helping on the stage's own crowds and too close to call on the held-back ones | **Met, 3 of 3** | Phone attempt 1 ("no difference I can call"), curious attempt 2 ("unclear on second"), `number-averse` attempt 3 ("could be a bit better or a bit worse") |
+| Felt-but-null count 0, against cycle 1's 1 (X5) | **Not met: 1** | X1 below: the same persona, the same pair of moves and the same figures as cycle 1's X5 |
+
+So Delta A did what it promised for the size of a verdict and for the null press, and it left one
+thing where it was: a page that judges each press only against the shipped setting gives a player
+who combines two dials no way to see which one did the work.
+
+#### Mastery, re-judged on fresh crowds (§ D1601, § D1621)
+
+`measure.mastery.test.ts` re-judged each persona's attempt k with the game's own judge on fresh batch k
+of `data/mastery-seeds.json` (stream `mastery-c2`, 50 replications a batch). The declaration holds
+twelve batches, so attempts 13 and 14 of the phone persona and of the curious player are not judged;
+adding batches once the playtest had started was not done, although the seeds are a fixed function,
+because the declaration's value is that it came first. The harness cuts `number-averse` at attempt 11,
+its first after reading the tree.
+
+| Persona | Attempts judged | Slope on fresh batches, clears per attempt [95 %] | Paired against the page's own batch | Fresh verdict differs from the page's |
+|---|---|---|---|---|
+| five-minutes-phone | 1 to 12 | +0.024 [−0.075, +0.124], flat | 0.000 [0.000, 0.000], flat | 0 of 12 |
+| curious player | 1 to 12 | 0.000 [−0.102, +0.102], flat | −0.031 [−0.083, +0.020], flat | 1 of 12 |
+| number-averse | 1 to 10 | +0.018 [−0.111, +0.147], flat | −0.030 [−0.112, +0.051], flat | 1 of 10 |
+
+Every slope is flat, and on this stage that is the expected shape: each persona cleared by its third
+press, so a series of ten or twelve has almost nothing to climb, and the slope says nothing about
+learning either way. **Both differing verdicts are forecast parking under the shipped standing order**
+(curious attempt 2 on `mastery-c2-02`, `number-averse` attempt 3 on `mastery-c2-03`): it clears on those
+two fresh batches, and it does not clear on the phone persona's `mastery-c2-01` or on the page's own
+holdout-20260731. A held-back verdict on a move this marginal depends on which fifty crowds judge it.
+That is three batches, an observation and not an estimate.
+
+#### Confirmed (report agrees with telemetry)
+- **C1** [all three] **Every verdict now carries its size, and it is read.** Each persona quoted a
+  range from each press ("shorter by between 1.35 and 4.07 seconds") and every one is the run's own
+  paired interval. Pillar 2, positive; this is Delta A working.
+- **C2** [five-minutes-phone, number-averse] **A null press is named as one.** The unchanged press reads
+  "your run and the building's were the same run every time", which `number-averse` called the clearest
+  verdict on the page. Pillar 2, positive.
+- **C3** [all three] **Repeats are identical to the digit** across fresh contexts and viewports (phone
+  attempts 2, 9, 11; curious 3, 4, 12, 13; `number-averse` 2, 8, 14). Pillar 1, positive.
+- **C4** [all three] **Parking carries the clearing power, and the standing order mostly does not.**
+  Mid-zone parking clears under every in-budget standing order the personas tried; `eta` alone is
+  unresolved on average wait (−0.279 s [−0.960, +0.401]) and behind on door-to-door time (+1.904 s
+  [+0.824, +2.985]); lobby parking, the letter's "first guess", loses (+1.491 s [+0.786, +2.197]).
+  Reconfirms cycle 1's C5. Pillar 3, medium.
+- **C5** [all three] **Differently priced standing orders produce one run.** `fairness-first` (4 u) and
+  `capacity-aware` (4 u) match `eta` (2 u) bit for bit on 50 and 48 of 50 tuning replications, and with
+  mid-zone parking on 49 and 45 of 50 (average-wait difference −0.013 s [−0.040, +0.013] and +0.023 s
+  [−0.086, +0.133]). All three personas suspected the page had shown one result twice, and the page
+  does not say the orders are alike. Pillar 3, medium.
+- **C6** [all three] **A size has no base to be read against.** The page prints differences and never
+  the shipped setting's own figures (average wait 16.88 s, 27.0 kJ a ride on the tuning crowds), so
+  mid-zone parking's +142.6 kJ [+113.8, +171.4] cannot be read as the 43 % it is, and nothing lists the
+  player's earlier presses. Energy was read in the right direction by all three. Pillar 2, medium.
+- **C7** [all three] **The goal line names no measure, and the terms go undefined.** "Measurably ahead of
+  the shipped setting" is judged on average wait, 95th-percentile wait and door-to-door time, at least
+  one ahead and none behind (`campaign/judge.ts#judgeComparisonGoal`). That rule failed `eta` alone on
+  door-to-door time and cleared the curious player's attempt 11 on the 95th percentile alone. No
+  definition reaches the stage page for door-to-door time, drive work (proxy), par, census, chimes or
+  units. Pillar 2, medium.
+- **C8** [all three] **Nothing on the stage pulls a cleared player on.** A clear pays 6 chimes once,
+  later clears pay nothing, the wider rung costs 20 with no way shown to earn them, and stage 2 opens
+  without stage 1. Two personas would have left within a press or two of clearing (a premise). Pillar 4,
+  medium.
+- **C9** [all three] **The stage stays calm whatever is pressed.** The shipped setting is flat on 49 of 50
+  runs in both sets, `zoned-uppeak` on 50 of 50, lobby parking on 47 and `nearest-car` on 46 (stage 1's
+  band, uncalibrated). Reconfirms cycle 1's C6. Pillar 4, low to medium.
+- **C10** [five-minutes-phone, number-averse] **Layout.** At 360 × 740 the consent card still covers about
+  half the first screen with its end clipped (cycle 1's C3); at 390 × 844 the goal line and both
+  selects open below the fold; at 820 × 1180 the verdict heading lands under the bottom bar, below two
+  watch panes (cycle 1's C4). Nothing overflows horizontally at any width tried. Pillar 1 and 2, low to
+  medium.
+- **C11** [all three] **The watched pair is replication 0 and loops until "Stop watching"** (§ D1534).
+  There mid-zone parking cuts mean wait by 9.1 s against a 50-run mean of 2.71 s, so the picture is more
+  dramatic than the verdict. Pillar 2 and 4, low to medium.
+
+#### Contradicted (felt ≠ measured, usually a feedback or UI defect)
+- **X1** [five-minutes-phone, attempt 10, director's continuation] **Felt but null: the persona credited
+  `eta` with turning forecast parking's fail into a clear.** With parking held at forecast, the switch's
+  own effect on mean wait is unresolved on both sets (−0.58 s [−1.24, +0.09] tuning, −0.26 s
+  [−0.54, +0.02] holdout), which is cycle 1's X5 to the digit. Each press is judged only against the
+  shipped setting, so the page never compares two of the player's own moves. This is the cycle's one
+  felt-but-null entry. Pillar 2, medium to high.
+- **X2** [curious player, five-minutes-phone] **Operational zoning was credited for a gain that lives in
+  the parking built into it.** Zoning with cars left where they stopped is unresolved on mean wait
+  (−0.288 s [−1.010, +0.434]) and behind on door-to-door time (+1.694 s [+0.575, +2.813]); the only cue
+  is the relabelled parking option ("as it stands, in the middle of its own zone"). The move as pressed
+  is resolved against the shipped setting, so this is a misattribution inside one move and not felt but
+  null. Pillar 2, medium, with a pillar 3 risk.
+- **X3** [all three] **Personas ranked their own moves by comparing two separate printed intervals**, the
+  inference `CLAUDE.md` forbids, because the screen offers no paired view between presses. On the
+  paired runs the curious player's attempt 7 ranking holds (−1.348 s [−2.159, −0.538]), `number-averse`'s
+  attempt 5 holds thinly (−0.521 s [−1.031, −0.010] held-back), the curious player's "cheapest clear"
+  is unsupported, and the phone persona's "energy about the same" is wrong (−27.4 kJ [−45.7, −9.1]).
+  Pillar 2, medium.
+- **X4** [number-averse] **"Not cleared." on a stage this device has cleared** made the persona doubt its
+  clear had survived. It had; "Cleared on this device. Running it again is practice" sits screens away
+  from the heading. Pillar 2, low to medium.
+- **X5** [five-minutes-phone] **An over-budget pick greys Run** ("nothing to run until it fits") **while the
+  stale verdict's red line says "Run it again to judge them".** Pillar 2, low to medium.
+- **X6** [curious player] **"Minimum estimated wait" promises a shorter wait and alone gives none** (C4's
+  figures). Pillar 2, low.
+- **X7** [five-minutes-phone, curious player] **One "Cleared." heads a 4 s win and a clear resting on one
+  measure**, such as the phone persona's attempt 10, whose held-back average-wait bound is −0.01 s and
+  whose 95th percentile carries it (−1.88 s [−3.20, −0.55]); the persona called it "a coin flip". The
+  sizes are printed below. Pillar 2, low.
+
+#### Unverifiable (taste, weight low)
+- **U1** [all three] "It unlocks nothing; I wanted a reward." The fact is C8.
+- **U2** [five-minutes-phone, number-averse] "Behind and ahead on nothing" read as unparseable
+  (`campaign/judge.ts`); comprehension is taste.
+- **U3** [all three] The cost of the undefined terms to a lay player (C7's strings are verified).
+- **U4** [five-minutes-phone] About 10 s of lobby ride and six taps to the stage; whether that is too slow
+  for a minute's grab is a premise.
+- **U5** [number-averse] "The first pile was probably luck" about forecast parking; luck is neither shown
+  nor ruled out.
+- **U6** [curious player] Whether the watch drawings carry anything to a lay player without a key.
+
+**For the meaningful-choice proxy.** One persona belief is felt but null (X1). No persona pressed a verb,
+so § 1's player-session rate stays 0 of 0.
 
 ### 3. Design deltas  (outer loop, design-director)
 Pending.
