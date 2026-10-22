@@ -8,7 +8,7 @@
  *    car moves rather than on a mean, because `core/src/sim/seam.test.ts` records why: a mean is
  *    precisely the statistic that hides a structural difference.
  * 2. **The verdict is what the run says it is** — the gate, the costs beside it, the resolution
- *    regime, and Phase 6c's acceptance verdict, which § D126 explicitly permits to be
+ *    regime, and Phase 6c's acceptance verdict, which § D139 explicitly permits to be
  *    *implemented, measured, and not accepted*. Nothing here asserts that the selector is *good*;
  *    it asserts that the study reports what it measured.
  *
@@ -33,11 +33,13 @@ import {
   measureWeightSetSelectionLiveness,
   runDeadbandKnownAnswer,
   runWeightSetSelectionStudy,
+  selectionVerdictOf,
   toResources,
   weightSetLibrary,
   type SelectionStudy,
   type WeightSetLivenessResult,
 } from './weightSetSelection.js';
+import { compareCell, type CellComparison } from './verdict.js';
 import { loadResources, runGateExperiment } from '../validation/harness.js';
 import type { ReplicationRecord } from '../runner/types.js';
 
@@ -248,10 +250,69 @@ describe('the learned policy is four declared dimensions, not a tensor', () => {
  * The known answer
  * -------------------------------------------------------------------------- */
 
+describe('Phase 6c’s printed reason, held on every run', () => {
+  it('names in its printed reason each clause the run fails, and no clause it passes', () => {
+    // § D1620, R7 amendment 6. The reason used to end "the criterion requires an interval excluding
+    // zero on the better side" whatever the interval was, so on `f60048d` it printed that sentence
+    // straight after `−0.222 [−0.441, −0.004] BETTER`. Cells are built through `compareCell`, the
+    // same function the study grades with, from paired samples whose differences are known.
+    const cellFor = (offsets: readonly number[]): CellComparison =>
+      compareCell({
+        metric: 'ttdMeanS',
+        armId: 'learned',
+        baselineId: 'collective',
+        candidate: offsets.map((offset, index) => 50 + (index % 5) + offset),
+        baseline: offsets.map((_, index) => 50 + (index % 5)),
+        quotable: true,
+      });
+    const spread = (centre: number, width: number): number[] =>
+      Array.from({ length: 40 }, (_, index) => centre + width * (((index * 7) % 11) / 10 - 0.5));
+    const better = cellFor(spread(-0.3, 0.4));
+    const indistinguishable = cellFor(spread(-0.05, 2));
+    const identical = cellFor(Array.from({ length: 40 }, () => 0));
+    expect([better.verdict, indistinguishable.verdict, identical.verdict]).toEqual([
+      'BETTER',
+      'INDISTINGUISHABLE',
+      'IDENTICAL',
+    ]);
+    const context = { referenceProfileId: 'collective', replications: 40, limitProvenance: 'a test limit' };
+    const arm = (gate: CellComparison, belowResolutionLimit: boolean) =>
+      selectionVerdictOf(
+        { gate, belowResolutionLimit, regime: 'structural', resolutionLimitS: 1.9, identicalReplications: 0 },
+        context,
+      );
+
+    // The shape the release fix left § D145's cell in: the interval clears zero, the limit does not.
+    const belowOnly = arm(better, true);
+    expect(belowOnly.verdict).toBe('NOT ACCEPTED');
+    expect(belowOnly.reason).toContain("below this point's structural resolution limit of 1.90 s");
+    expect(belowOnly.reason).toContain('a test limit');
+    expect(belowOnly.reason).not.toContain('exclude zero');
+
+    // § D145's shape on the engine before § D1603: both clauses fail, and both are named.
+    const both = arm(indistinguishable, true);
+    expect(both.verdict).toBe('NOT ACCEPTED');
+    expect(both.reason).toContain('does not exclude zero on the better side (INDISTINGUISHABLE)');
+    expect(both.reason).toContain('below this point');
+
+    const intervalOnly = arm(indistinguishable, false);
+    expect(intervalOnly.reason).toContain('does not exclude zero on the better side');
+    expect(intervalOnly.reason).not.toContain('below this point');
+
+    expect(arm(identical, true).reason).toContain('bit-identical');
+
+    // Accepted only when both clauses pass, and never called "the best shipped profile" (§ D205).
+    const accepted = arm(better, false);
+    expect(accepted.verdict).toBe('ACCEPTED');
+    expect(accepted.reason).toContain('pre-registered reference arm');
+    expect(accepted.reason).not.toContain('best shipped profile');
+  });
+});
+
 describe.skipIf(!BENCHMARK)('the 2 s deadband — the known answer the policy cannot see', () => {
   it('rediscovers the interior optimum from the shipped 8 s, blind', async () => {
     // `docs/07` § 5: the shipped profile carries **8 s**, the interior optimum is **2 s**, and the
-    // wrong value is left shipped on purpose. § D126: *one that returns 8 s has failed, not
+    // wrong value is left shipped on purpose. § D139: *one that returns 8 s has failed, not
     // agreed*. This runs the same search that fitted Phase 6c's policy, on a different dimension,
     // a different building and a different metric, and nothing in it knows what a deadband is.
     const answer = await runDeadbandKnownAnswer();
@@ -262,7 +323,7 @@ describe.skipIf(!BENCHMARK)('the 2 s deadband — the known answer the policy ca
 
   it('reports an under-sampled search as under-sampled rather than as agreement', async () => {
     // At 32 draws over the declared `[0, 60]` only about three land below the shipped 8 s and the
-    // search returns ~4.9 s. That is **not** the failure § D126 names — it is not 8 s, and the
+    // search returns ~4.9 s. That is **not** the failure § D139 names — it is not 8 s, and the
     // sub-8 draws reproduce the published sweep's direction — but it is not the known answer
     // either, and it is what calibrated `SEARCH_CANDIDATES` to 64. Asserted so the calibration
     // cannot quietly stop being true.
@@ -297,9 +358,9 @@ describe.skipIf(!BENCHMARK)('Phase 6c, measured against the criterion written be
     const reference = result.census.rows.find(
       (row) => row.profileId === result.census.referenceProfileId,
     );
-    // Best among **candidates**. `collective-enroute` beats the reference here (53.506 s against
-    // 53.742 s) and is deliberately not eligible to become it: it post-dates the pre-registration
-    // this cell's figures were measured under. `DECISIONS.md` § D205; the exclusion is
+    // Best among **candidates**. `collective-enroute` beats the reference here (53.112 s against
+    // 53.751 s on `f60048d`, § D1620) and is deliberately not eligible to become it: it post-dates
+    // the pre-registration this cell's figures were measured under. `DECISIONS.md` § D205; the exclusion is
     // `PRE_REGISTERED_REFERENCE_CANDIDATES`, and the row is still measured and still published.
     for (const row of result.census.rows) {
       if (!row.quotable || !row.referenceCandidate) continue;
@@ -337,7 +398,7 @@ describe.skipIf(!BENCHMARK)('Phase 6c, measured against the criterion written be
   }, TIMEOUT_MS);
 
   it('does not report a bit-identical arm as a small effect', async () => {
-    // § D126: an interval of exactly `[0, 0]` with ρ = 1 is a wiring bug until proven otherwise.
+    // § D139: an interval of exactly `[0, 0]` with ρ = 1 is a wiring bug until proven otherwise.
     // Both arms differ from the reference on most replications, so neither is in that state — and
     // the count is published either way so a reader does not have to take the interval's word.
     const result = await study();
@@ -359,20 +420,28 @@ describe.skipIf(!BENCHMARK)('Phase 6c, measured against the criterion written be
   }, TIMEOUT_MS);
 
   it('reports the verdict the measurement produces, whichever way it goes', async () => {
-    // **The result, and this assertion is deliberately the shape it is.** § D126 permits
-    // *implemented, measured, and not accepted*, and that is what the run says: the learned
-    // selector's ΔTTD interval contains zero, and the effect is an order of magnitude below the
-    // point's structural resolution limit. Written as a biconditional against the arm's own cells
-    // rather than as a hard-coded verdict string, so a future run that *does* clear the gate turns
-    // this green rather than red — a test that asserted `NOT ACCEPTED` would have to be edited to
-    // let the phase pass, which is the wrong way round.
+    // **The result, and this assertion is deliberately the shape it is.** § D139 permits
+    // *implemented, measured, and not accepted*, and that is what the run says on `f60048d`: the
+    // learned selector's ΔTTD interval excludes zero on the better side, and the effect is below the
+    // point's structural resolution limit, the clause § D140 made a gate condition (§ D1620).
+    // Written as a biconditional against the arm's own cells rather than as a hard-coded verdict
+    // string, so a future run that *does* clear the gate turns this green rather than red — a test
+    // that asserted `NOT ACCEPTED` would have to be edited to let the phase pass, which is the wrong
+    // way round. The reason is held the same way: it names each clause the run fails, and only those.
     const result = await study();
     const learned = result.arms.find((arm) => arm.armId === 'learned');
     expect(learned).toBeDefined();
-    const shouldAccept =
-      learned?.gate.verdict === 'BETTER' && learned.belowResolutionLimit === false;
+    if (learned === undefined) return;
+    const better = learned.gate.verdict === 'BETTER';
+    const shouldAccept = better && !learned.belowResolutionLimit;
     expect(result.verdict).toBe(shouldAccept ? 'ACCEPTED' : 'NOT ACCEPTED');
-    expect(result.verdictReason.length).toBeGreaterThan(40);
+    expect(result.verdictReason.includes('does not exclude zero on the better side')).toBe(
+      !better && learned.gate.verdict !== 'IDENTICAL',
+    );
+    expect(result.verdictReason.includes('below this point')).toBe(
+      !shouldAccept && learned.belowResolutionLimit && learned.gate.verdict !== 'IDENTICAL',
+    );
+    expect(result.verdictReason).not.toContain('requires an interval excluding zero');
   }, TIMEOUT_MS);
 
   it('runs on the building and at the point its docstring names', async () => {

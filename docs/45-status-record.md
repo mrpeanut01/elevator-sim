@@ -43,18 +43,25 @@ the withdrawn H-ACCESS-1 destination beside its withdrawal in the last section.
   **That verdict now has a second building rather than a second seed, and half of it did not
   reproduce** ([§ D595](../DECISIONS.md), GitHub issue #428). Measured on `one-wtc-class-reference` at
   the same apparatus — `eta` baseline, n = 200 under common random numbers, TTD the gate — at *that
-  tower's* highest quotable rate, which is 2 % rather than Midtown's 4 % and is censused at the
+  tower's* highest quotable rate, which is 2 % rather than Mixed-Use High-Rise's 4 % and is censused at the
   budget the run spends: **`destination-eta` is INDISTINGUISHABLE**, ΔTTD `−0.092 [−0.804, +0.619]`
   with `requiredReplications` of **11 704** against a budget of 200, while **`destination-panel` is
   BETTER**, `−1.293 [−2.069, −0.517]`, resolvable at n = 1. So the Level-0 arm that carries § D100's
   accepted result does nothing on the second tower and the Level-1 panel does — **the reverse of the
   shape above** — and what the pair establishes is that the effect is **building-dependent**. The
-  verdict is not moved: Midtown's interval is still Midtown's, this one is still this one, and
+  verdict is not moved: Mixed-Use High-Rise's interval is still its own, this one is still this one, and
   § D100's criterion is the criterion's own to restate. The costs are the same shape on both arms
   (AWT and WT95 **WORSE**), and **no mechanism is offered** for the split. 6c (learned control) is **no longer deferred — it is implemented, measured, and NOT
-  ACCEPTED**: ΔTTD `−0.213 [−0.440, +0.014]` against `collective` at n = 200 on a disjoint seed, an
-  interval containing zero, unchanged at 24 and 64 search candidates ([§ D139](../DECISIONS.md) is the
-  criterion, dated before the code; [§ D145](../DECISIONS.md) is the verdict). **That refusal is now
+  ACCEPTED** ([§ D139](../DECISIONS.md) is the criterion, dated before the code;
+  [§ D145](../DECISIONS.md) is the verdict, and [§ D1620](../DECISIONS.md) supersedes its stated
+  ground). Re-derived on `f60048d`, the engine of [§ D1603](../DECISIONS.md): ΔTTD
+  `−0.222 [−0.441, −0.004]` against the pre-registered `collective` at n = 200 on a disjoint seed,
+  BETTER by the interval (p = 0.046 uncorrected) and the same at 24 and 64 search candidates, and
+  **below the resolution limit, NOT ACCEPTED**: 0.222 s is below the 1.90 s structural limit
+  [§ D140](../DECISIONS.md) made a gate condition, inherited from `docs/07` § 4 where it was
+  measured on AWT, with AWT, WT95 and energy WORSE beside it. The cell is not a § D151 PRIMARY cell,
+  so no result there could accept the phase. On the engine before § D1603 the interval was
+  `−0.213 [−0.440, +0.014]`, containing zero. **That refusal is now
   swept over eight pre-registered operating points and it held** — NOT ACCEPTED at all five PRIMARY
   cells under Holm–Bonferroni, with the resolution limit measured on **TTD at each cell** rather
   than inherited, and two cells that clear the correction refused anyway because the effect is a
@@ -67,10 +74,13 @@ the withdrawn H-ACCESS-1 destination beside its withdrawal in the last section.
   [§ D162](../DECISIONS.md) pre-registered has now run — and refused a third time
   (`benchmark/lunchTwoWaySelection.ts`):** at `midtown-office`/`lunch-two-way` 1.5 %, with the detector's
   `two-way` pattern the incumbent on 66.1 % of observations, the learned arm's ΔTTD is
-  `−0.170 [−0.405, +0.064]` at n = 200 on the disjoint seed — containing zero and below the cell's
-  own TTD-measured 0.412 s limit — and the flat-mix negative control's own BETTER
-  (`−0.576 [−0.833, −0.319]`) was investigated, not filed: a constant weight-vector hybrid beats
-  the reference by more on *both* cells than the selector does on either, so the advantage is
+  `−0.163 [−0.396, +0.070]` at n = 200 on the disjoint seed on `f60048d` (`−0.170 [−0.405, +0.064]`
+  before [§ D1603](../DECISIONS.md); the old release methods reproduce the old figures) — containing
+  zero and below the cell's own TTD-measured 0.414 s limit — and the flat-mix negative control's own
+  BETTER
+  (`−0.592 [−0.848, −0.337]`, `−0.576 [−0.833, −0.319]` before) was investigated, not filed: a
+  constant weight-vector hybrid beat the reference by more on *both* cells than the selector did
+  on either, on the engine before § D1603, so the advantage is
   static and the switching subtracts from it. The mix-varying question is closed in the refusing
   direction; what would move 6c now is a different selector, not a different measurement.
   Double-deck operation is
@@ -153,9 +163,12 @@ built double-deck simulation, a mid-run weight-set selector, Phase 7's undeliver
 Phase 6c, and Phase 9's W4 — and **not one phase verdict changed**, because 6c did not clear the
 criterion written before it ([§ D139](../DECISIONS.md)) and Phase 6 is
 therefore still partial. The fuzzy arm *did* return an interval excluding zero, ΔTTD
-`−0.212 [−0.416, −0.007]`, and is still reported **below the resolution limit** — both arms sit in
-the structural regime whose smallest detectable effect is 1.9 s, and an interval excluding zero is
-not a win when the effect is smaller than the apparatus can resolve.
+`−0.212 [−0.416, −0.007]` then and `−0.210 [−0.404, −0.017]` on `f60048d`
+([§ D1620](../DECISIONS.md)), and is still reported **below the resolution limit**, with AWT, WT95
+and energy WORSE beside it. Since [§ D1603](../DECISIONS.md) the learned arm's interval excludes
+zero too and is refused on the same clause. Both arms sit in the structural regime whose inherited
+smallest detectable effect is 1.9 s, and an interval excluding zero is not a win when the effect is
+smaller than the apparatus can resolve.
 
 What has moved is what the phases are *true of*: `destination-eta` weights `rideTime` at **0.5**
 ([§ D112](../DECISIONS.md)); the viewer and `elevator-sim watch` no longer print a mean the same run

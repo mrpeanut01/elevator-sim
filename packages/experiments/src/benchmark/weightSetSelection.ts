@@ -25,8 +25,8 @@
  *
  * ## The acceptance half, and the criterion it is bound to
  *
- * `DECISIONS.md` § D126 fixed Phase 6c's criterion before this code existed, and the shape of
- * this function is that document read top to bottom:
+ * `DECISIONS.md` § D139, as raised by § D140, fixed Phase 6c's criterion before this code existed,
+ * and the shape of this function is that document read top to bottom:
  *
  * - **Gate on TTD, and only TTD.** `core`'s `comparabilityOf` lists AWT and WT95 among nine
  *   metrics that stop being comparable across the two passenger models. AWT, WT95 and the energy
@@ -165,7 +165,7 @@ export const SELECTION_CELL: SelectionCell = Object.freeze({
   point: SELECTION_POINT,
 });
 
-/** The gate metric, and only the gate metric. § D126. */
+/** The gate metric, and only the gate metric. § D139. */
 export const SELECTION_GATE: ReplicationMetric = 'ttdMeanS';
 
 /**
@@ -202,7 +202,7 @@ export const STRUCTURAL_RESOLUTION_S = 1.9;
  * **The budget, fixed here and not raised after a result was seen.**
  *
  * 200 is the top of `CLAUDE.md`'s 50–200 band and `matrix.ts`'s own budget at this cell, clamped
- * by {@link censusSelectionPoint}'s ceiling if any arm ever saturates here. § D126 names *widening
+ * by {@link censusSelectionPoint}'s ceiling if any arm ever saturates here. § D139 names *widening
  * the budget until the interval excludes zero* as one of the four things that would make its
  * criterion a bad one, so these are defaults of the function rather than arguments a caller tunes,
  * and every published figure comes from `runWeightSetSelectionStudy()` with no arguments.
@@ -221,7 +221,7 @@ export const CENSUS_REPLICATIONS = 200;
  * interior optimum at all, and 24 was under-sampled.
  *
  * That calibration is deliberately taken from a dimension whose answer is known and is
- * **independent of what the learned selector measured** — § D126 names *widening the budget until
+ * **independent of what the learned selector measured** — § D139 names *widening the budget until
  * the interval excludes zero* as a way to make its criterion a bad one, and a search budget set
  * from the 6c result would be exactly that with an extra step. Both 6c runs are reported.
  */
@@ -636,7 +636,7 @@ export interface LearnedPolicy {
  * defended, for two reasons stated rather than assumed: the space is four bounded dimensions with
  * a plateau structure (`docs/07` § 4 — *weight perturbations below the decision-flip threshold
  * produce bit-identical runs*, so a finite-difference method stalls), and the honest failure mode
- * of a small budget is *no significant gain*, which § D126 explicitly permits as an outcome.
+ * of a small budget is *no significant gain*, which § D139 explicitly permits as an outcome.
  *
  * The tuning seed is **not** the seed the verdict is measured at. That separation is the whole of
  * the generalization clause, and {@link SelectionStudy.holdoutSeed} prints both.
@@ -743,7 +743,7 @@ export interface DeadbandKnownAnswer {
  *
  * `idle.repositionThresholdS` ships at **8 s** on `predictive-balanced` and the interior optimum
  * is **2 s**; the wrong value is left shipped on purpose so that an optimizer which rediscovers
- * ~2 s blind has validated itself. § D126 is explicit that *one that returns 8 s has failed, not
+ * ~2 s blind has validated itself. § D139 is explicit that *one that returns 8 s has failed, not
  * agreed*, and that it must not be hand-edited.
  *
  * This runs the **same search** {@link learnSelectionPolicy} uses — `sampleCandidate` over a
@@ -912,7 +912,7 @@ export interface SelectionCensus {
  * *"a saturation ceiling belongs to a (building, traffic, seed), not to a building"*, and
  * *"`nearest-car` is a poor reference arm"*. The reference is chosen **before** any selector arm
  * is built, on the shipped library alone, which is what stops it being chosen after seeing the
- * result — the failure § D126 names explicitly as making the criterion a bad one.
+ * result — the failure § D139 names explicitly as making the criterion a bad one.
  */
 /**
  * The profiles eligible to be **elected** the reference arm of a selection cell.
@@ -1147,7 +1147,7 @@ export interface SelectionStudy {
   readonly crnAligned: boolean;
   readonly arms: readonly SelectionArmResult[];
   readonly liveness: WeightSetLivenessResult;
-  /** The verdict, in the vocabulary § D126 permits: it may be `NOT ACCEPTED`. */
+  /** The verdict, in the vocabulary § D139 permits: it may be `NOT ACCEPTED`. */
   readonly verdict: 'ACCEPTED' | 'NOT ACCEPTED';
   readonly verdictReason: string;
   /** Did the winner generalize? Measured, not assumed. */
@@ -1193,7 +1193,7 @@ export interface SelectionStudyOptions {
 }
 
 /**
- * **Phase 6c, measured against § D126.**
+ * **Phase 6c, measured against § D139 as raised by § D140.**
  *
  * Order matters and is the criterion's: census first (so the reference arm and the budget are
  * fixed before any selector exists), then the learning on the tuning seed, then the verdict on a
@@ -1338,12 +1338,11 @@ export async function runWeightSetSelectionStudy(
       ? ('GENERALIZES' as const)
       : ('DOES NOT GENERALIZE' as const);
 
-  const accepted = learnedArm.gate.verdict === 'BETTER' && !learnedArm.belowResolutionLimit;
-  const verdictReason = accepted
-    ? `ΔTTD ${formatCell(learnedArm.gate)} against "${census.referenceProfileId}", the best shipped profile at this point, over ${String(replications)} replications under common random numbers.`
-    : learnedArm.gate.verdict === 'IDENTICAL'
-      ? `the learned arm was bit-identical to the reference on ${String(learnedArm.identicalReplications)} of ${String(replications)} replications. § D126: a bit-identical result is a wiring bug until proven otherwise, never a small effect.`
-      : `ΔTTD ${formatCell(learnedArm.gate)} — ${learnedArm.gate.verdict}${learnedArm.belowResolutionLimit ? `, and below this point's ${learnedArm.regime} resolution limit of ${learnedArm.resolutionLimitS.toFixed(2)} s` : ''}. The criterion requires an interval excluding zero on the better side.`;
+  const { verdict, reason: verdictReason } = selectionVerdictOf(learnedArm, {
+    referenceProfileId: census.referenceProfileId,
+    replications,
+    limitProvenance: resolutionLimits.provenance,
+  });
 
   const liveness = await measureWeightSetSelectionLiveness({
     seed,
@@ -1370,10 +1369,68 @@ export async function runWeightSetSelectionStudy(
     crnAligned,
     arms: Object.freeze(arms),
     liveness,
-    verdict: accepted ? ('ACCEPTED' as const) : ('NOT ACCEPTED' as const),
+    verdict,
     verdictReason,
     holdoutMeanDeltaTtdS,
     holdoutVerdict,
+  });
+}
+
+/** What {@link selectionVerdictOf} reads off the study besides the learned arm's own cells. */
+export interface SelectionVerdictContext {
+  readonly referenceProfileId: string;
+  readonly replications: number;
+  /** Where the resolution limit came from, as {@link ResolutionLimits.provenance} states it. */
+  readonly limitProvenance: string;
+}
+
+/**
+ * Phase 6c's verdict at one cell, and the sentence that says why: **every clause the run fails,
+ * and only those**, in the shape `selectionSweep.ts`'s per-cell reason already takes.
+ *
+ * Two clauses decide it, both § D139's as raised by § D140: the gate interval must exclude zero on
+ * the better side, and the effect must be at or above the point's resolution limit. Until wave AU
+ * the reason ended *"the criterion requires an interval excluding zero on the better side"* whatever
+ * the interval was, which read as the refusal's ground even once the release fix (§ D1603) moved
+ * § D145's interval to `−0.222 [−0.441, −0.004]`, an interval that does exclude zero. A reason that
+ * names a clause the run passes misstates the verdict it explains, so this one names the clauses
+ * that failed (§ D1620). Pure, so `weightSetSelection.test.ts` holds it on every run.
+ */
+export function selectionVerdictOf(
+  arm: Pick<
+    SelectionArmResult,
+    'gate' | 'belowResolutionLimit' | 'regime' | 'resolutionLimitS' | 'identicalReplications'
+  >,
+  context: SelectionVerdictContext,
+): { readonly verdict: 'ACCEPTED' | 'NOT ACCEPTED'; readonly reason: string } {
+  const better = arm.gate.verdict === 'BETTER' && arm.gate.estimate.mean < 0;
+  const limit = `${arm.regime} resolution limit of ${arm.resolutionLimitS.toFixed(2)} s (${context.limitProvenance})`;
+  if (better && !arm.belowResolutionLimit) {
+    return Object.freeze({
+      verdict: 'ACCEPTED' as const,
+      reason:
+        `ΔTTD ${formatCell(arm.gate)} against "${context.referenceProfileId}", the pre-registered reference arm (§ D205), ` +
+        `over ${String(context.replications)} replications under common random numbers: the interval excludes zero on the ` +
+        `better side and the effect is at or above this point's ${limit}.`,
+    });
+  }
+  if (arm.gate.verdict === 'IDENTICAL') {
+    return Object.freeze({
+      verdict: 'NOT ACCEPTED' as const,
+      reason:
+        `the learned arm was bit-identical to the reference on ${String(arm.identicalReplications)} of ` +
+        `${String(context.replications)} replications. § D139: a bit-identical result is a wiring bug until proven ` +
+        'otherwise, never a small effect.',
+    });
+  }
+  const failed: string[] = [];
+  if (!better) failed.push(`the interval does not exclude zero on the better side (${arm.gate.verdict})`);
+  if (arm.belowResolutionLimit) {
+    failed.push(`the effect is below this point's ${limit}, which § D140 made a gate condition`);
+  }
+  return Object.freeze({
+    verdict: 'NOT ACCEPTED' as const,
+    reason: `ΔTTD ${formatCell(arm.gate)} against "${context.referenceProfileId}" — ${failed.join('; ')}.`,
   });
 }
 
@@ -1390,7 +1447,7 @@ function formatCell(cell: CellComparison): string {
 /** The whole study as a table, for a reader reproducing a quoted figure. */
 export function formatWeightSetSelection(study: SelectionStudy): string {
   const lines: string[] = [
-    'Phase 6c — learned weight selection, measured against DECISIONS.md § D126',
+    'Phase 6c — learned weight selection, measured against DECISIONS.md § D139 as raised by § D140',
     '',
     `point            ${study.building} / ${study.point}`,
     `gate             ${study.gateMetric} (and only ${study.gateMetric})`,

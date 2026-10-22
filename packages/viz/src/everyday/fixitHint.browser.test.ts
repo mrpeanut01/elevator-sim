@@ -5,8 +5,9 @@
  * Four journeys, each the product's own run end to end — the pair on the worker, the gate, then the
  * forty-nine derived mornings on the morning pool against the as-built readings the build ships.
  * Nothing is stubbed. The routes are taken from measured tables rather than hoped for:
- * `theAnswerIsNotPrinted.test.ts#SOLVED_BY` for the two that hold, and § D1120's route probe for the
- * one that stops at the first futility look.
+ * `theAnswerIsNotPrinted.test.ts#SOLVED_BY` for the two that hold, and for the one that stops at the
+ * first futility look, that file's `NOT_REPLICATED` row, probed through the judge by
+ * [§ D1611](../../../../DECISIONS.md).
  *
  * 1. **Fixed on your own.** The case opens with its diagnosis withheld — no word of it on the page —
  *    and the as-built mornings already held, so the check is warm. A route the player chose clears,
@@ -15,9 +16,12 @@
  * 2. **Fixed with the diagnosis.** The one case the route census opens shows its hint from the start
  *    and says why; another case's hint is asked for, names the priced row and not the cause, and the
  *    fixed row reads *with the diagnosis*.
- * 3. **Not fixed, early.** A roof raise on the bed-car case clears the letter's morning and is no
- *    better on average over the first ten derived mornings, so the check stops there and says so with
- *    counts and no interval.
+ * 3. **Not fixed, early.** A three-metre roof raise on the outpatients case clears the letter's
+ *    morning and is no better on average over the first ten derived mornings, so the check stops there
+ *    and says so with counts and no interval. Until the release fix (§ D1603) this journey raised the
+ *    bed-car case's roof five metres; on the case as § D1611 re-authored it, that raise no longer
+ *    clears the letter's morning (5 → 9). Probed on that tree, the outpatients raise clears it 10 → 2
+ *    and is lower on 3 of the first 10 derived mornings, 0.9 waits a morning worse on average.
  * 4. **An edit during the check.** The pending verdict is drawn stale, the press comes back, and
  *    pressing it stops the check, which says where it stopped and that it has no verdict.
  */
@@ -201,9 +205,9 @@ describe.skipIf(!HAS_BROWSER)('a fix case as a search — § D1120', () => {
   it('stops a check that is no better on average after ten mornings, and says not fixed with counts only', async () => {
     const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
     try {
-      await openCase(page, 'The bed cars locked out of theatres');
+      await openCase(page, 'Every letter says nine');
       const up = page.locator('.everyday-fixit-stepper-elevation .everyday-fixit-step-up');
-      for (let metre = 0; metre < 5; metre += 1) await up.click();
+      for (let metre = 0; metre < 3; metre += 1) await up.click();
       await page.locator('.everyday-bar-primary').click();
       await checkingOf(page);
       expect(await settledPrimary(page)).toBe('Run it again');
@@ -217,7 +221,7 @@ describe.skipIf(!HAS_BROWSER)('a fix case as a search — § D1120', () => {
       expect(verdict.card).not.toMatch(/95 % interval/);
       expect(verdict.card).toContain('not fixed, and nothing is banked');
       expect(verdict.rows).toBe(4);
-      expect((await rowOf(page, 'The bed cars locked out')).tag).toBe('OPEN');
+      expect((await rowOf(page, 'Every letter says nine')).tag).toBe('OPEN');
     } finally {
       await page.close();
     }

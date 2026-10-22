@@ -63,7 +63,12 @@ describe.runIf(process.env['BURJ_BRACKET_SWEEP'] === '1')(
     it.each([
       { population: 3198, valid: 49, grounds: { saturated: 1 }, seedsUndelivered: 0, undelivered: 0, generated: 51393 },
       { population: 5307, valid: 13, grounds: { saturated: 37 }, seedsUndelivered: 0, undelivered: 0, generated: 85173 },
-      { population: 10614, valid: 0, grounds: { saturated: 50 }, seedsUndelivered: 32, undelivered: 724, generated: 171445 },
+      /*
+       * Re-run on the fixed engine ([§ D1603](../../../../DECISIONS.md), [§ D1615](../../../../DECISIONS.md))
+       * on `ea49e27`: the first two rows reproduced, and this one moved from 32 seeds and 724
+       * journeys undelivered to 31 and 752, every seed still saturated. Why it moved is unmeasured.
+       */
+      { population: 10614, valid: 0, grounds: { saturated: 50 }, seedsUndelivered: 31, undelivered: 752, generated: 171445 },
     ])(
       'counts the verdicts at $population people',
       (expected) => {

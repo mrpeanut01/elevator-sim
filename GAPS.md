@@ -73,11 +73,14 @@ condition selection exists to exploit did not occur anywhere. `lunch-two-way`
 
 **The measurement is now done** (`benchmark/lunchTwoWaySelection.ts`), and
 the selector does not clear the gate even under traffic whose directional mix changes within the
-run: ΔTTD `−0.170 [−0.405, +0.064]` against `auction-multi-round` at n = 200 on the disjoint seed,
-an interval containing zero, an eighth of the cell's own TTD-measured 0.412 s limit — while the
+run: ΔTTD `−0.163 [−0.396, +0.070]` against `auction-multi-round` at n = 200 on the disjoint seed
+on `f60048d` ([§ D1620](DECISIONS.md); `−0.170 [−0.405, +0.064]` before § D1603, and the old
+release methods reproduce the old figures), an interval containing zero and below the cell's own
+TTD-measured 0.414 s limit — while the
 regime screen shows `two-way` as the detector's incumbent on 66.1 % of observations, so the
 condition genuinely occurred and it is the selector that was refused. The § D162 flat-mix negative
-control earned its clause: its learned arm came back BETTER (`−0.576 [−0.833, −0.319]`) on traffic
+control earned its clause: its learned arm came back BETTER (`−0.592 [−0.848, −0.337]` on `f60048d`,
+`−0.576 [−0.833, −0.319]` before) on traffic
 whose mix cannot vary, and the constant-override probe named the mechanism — a **static
 weight-vector hybrid** the switching subtracts from, not mix exploitation.
 

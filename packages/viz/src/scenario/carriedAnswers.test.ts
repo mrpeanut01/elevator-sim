@@ -133,8 +133,9 @@ const CARRIED_ANSWERS: Readonly<Record<string, RegisteredRow>> = Object.freeze({
     carried: [],
     dropdown: ['auction', 'auction-multi-round', 'destination-panel'],
     why:
-      'A named dropdown breach, owner-reversible (§ D1288): its three ways through are three shipped ' +
-      'profiles picked by name, at the demand that let it be judged at all.',
+      'A named dropdown breach, owner-reversible (§ D1288): three of its four ways through are shipped ' +
+      'profiles picked by name, at the demand that let it be judged at all. The fourth, destination-panel ' +
+      'parked at predicted demand, arrived with the census regenerated on the engine § D1603 fixed (§ D1607).',
   },
   'stage-10-the-bed-and-the-visitor': {
     kind: 'no-way-through',

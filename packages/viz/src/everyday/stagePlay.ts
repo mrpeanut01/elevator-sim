@@ -49,6 +49,13 @@
  * the equipment rung on stages 1, 2 and 8 and nothing else. A clear at a bought rung pays exactly
  * what a clear at the base pays, once, and the verdict says which budget it was run at.
  *
+ * **A rung above a rung the page does not sell is not sold either** ([§ D1608](../../../../DECISIONS.md)).
+ * A rung is bought only from the one below it, so a rung whose count rises over an unsold rung could
+ * never be bought, and the page drew it as *sold once the rung below it is bought* beside a rung below
+ * that is never sold. The census regenerated on the engine § D1603 fixed has that shape on stage 9 (4,
+ * 4 and 5 of 63), so its top rung is drawn unsold with its reason, and the hub's budget line
+ * (`scenario/ladder.ts#budgetLineOf`) prices it nowhere.
+ *
  * ## A clear at or under a priced par pays once
  *
  * [§ D1417](../../../../DECISIONS.md): `data/chime-ledger.json`'s `scenario-at-par`, once per stage,
@@ -290,7 +297,9 @@ export interface StageRungFacts {
   readonly survivors: number | undefined;
   /** The pinned count at the rung below. */
   readonly survivorsBelow: number | undefined;
-  /** The census says this rung adds a way through, so it is sold. */
+  /** The pinned count here exceeds the count at the rung below. */
+  readonly addsWay: boolean;
+  /** It adds a way through and the rung below it is the base or sold, so a press can reach it (§ D1608). */
   readonly sold: boolean;
   /** This device bought it. */
   readonly owned: boolean;
@@ -301,11 +310,12 @@ export interface StageRungFacts {
 /**
  * **Which rungs a stage sells, read off the pinned census** — [§ D1419](../../../../DECISIONS.md).
  *
- * A rung is sold where its pinned survivor count exceeds the count at the rung below it, and on no
- * other ground. Where the census carries no row for the stage, or no count at a rung, nothing is
- * sold, because an unmeasured rung is not one this page can say adds a way through. Owned is this
- * device's record (`deviceChimes.ts#withSpend`), and a rung is bought only above the base or an owned
- * rung, so a purchase never skips a step it did not pay for.
+ * A rung is sold where its pinned survivor count exceeds the count at the rung below it and the rung
+ * below it is the base or itself sold, and on no other ground. Where the census carries no row for the
+ * stage, or no count at a rung, nothing is sold, because an unmeasured rung is not one this page can
+ * say adds a way through. Owned is this device's record (`deviceChimes.ts#withSpend`), and a rung is
+ * bought only above the base or an owned rung, so a purchase never skips a step it did not pay for;
+ * that is why a rung above an unsold rung is not sold ([§ D1608](../../../../DECISIONS.md)).
  */
 export function stageRungsOf(
   stage: CampaignStage,
@@ -314,11 +324,14 @@ export function stageRungsOf(
 ): readonly StageRungFacts[] {
   const countAt = (stepId: string | null): number | undefined =>
     census?.steps.find((step) => step.stepId === stepId)?.survivors;
+  let belowSold = true;
   return stage.budget.steps.map((step, index) => {
     const below = index === 0 ? null : (stage.budget.steps[index - 1]?.id ?? null);
     const survivors = countAt(step.id);
     const survivorsBelow = countAt(below);
-    const sold = survivors !== undefined && survivorsBelow !== undefined && survivors > survivorsBelow;
+    const addsWay = survivors !== undefined && survivorsBelow !== undefined && survivors > survivorsBelow;
+    const sold = addsWay && belowSold;
+    belowSold = sold;
     const owned = ownedStepIds.has(step.id);
     const belowHeld = below === null || ownedStepIds.has(below);
     return {
@@ -329,6 +342,7 @@ export function stageRungsOf(
       chimes: step.chimes,
       survivors,
       survivorsBelow,
+      addsWay,
       sold,
       owned,
       next: sold && !owned && belowHeld,
@@ -854,6 +868,14 @@ export function stageRungRowOf(rung: StageRungFacts, balanceChimes: number): Sta
   const found =
     `The census found ${waysText(rung.survivors)} at ${String(rung.units)} units, against ` +
     `${String(rung.survivorsBelow)} at ${String(rung.unitsBelow)}.`;
+  if (!rung.sold && rung.addsWay) {
+    return {
+      stepId: rung.stepId,
+      text: `${head} Not sold. ${found} The rung below it is not sold, and a rung is bought only from the one below it.`,
+      offer: 'not-sold',
+      buyLabel: undefined,
+    };
+  }
   if (!rung.sold) {
     return {
       stepId: rung.stepId,

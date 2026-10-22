@@ -4,8 +4,8 @@
   "provenance": {
     "kind": "measured",
     "command": "ELEVATOR_SIM_SURVIVORS=deep ELEVATOR_SIM_REGENERATE_SURVIVORS=1 npx vitest run --project viz src/scenario/survivorSweep.test.ts",
-    "tree": "b0d7d09",
-    "measuredAt": "2026-10-18",
+    "tree": "47399b5",
+    "measuredAt": "2026-10-22",
     "masterSeed": 20260910,
     "sampleSize": 12,
     "scope": "Every configuration is an edit of the scenario's own baseline dispatcher or a shipped profile picked in its place, alone or with idle cars parked where the stage page offers, priced by data/price-schedule.json. 10 of 37 priced changes can reach a scenario run at all — the rest price shafts, machines and fittings that campaign/stageRun.ts cannot apply — and 47 of 60 declared dimensions are priced and therefore varied — weights.dutyMismatch only on stage-10-the-bed-and-the-visitor, whose building declares a duty, because a dial its building gives nothing to act on is not drawn (DECISIONS.md § D549, § D1290) — and 13 are withheld from every scenario by data/price-schedule.json and varied by no configuration. A configuration differing only on an unpriced dimension is reachable at every rung, so counting it would make the budget inert.",
@@ -53,7 +53,7 @@
     "unpricedDimensionCount": 0,
     "withheldDimensionCount": 13,
     "declaredDimensionCount": 60,
-    "inputHash": "a3f6bd92fa7d3c460de21a2f269908c51f22b6b2c273ca3bd3e0f02b8e213a41"
+    "inputHash": "bf526f7bfef60f4a9fdb14b763da3eeca64380f71e93b89f39fa05343ee6014f"
   },
   "scenarios": [
     {
@@ -883,7 +883,7 @@
           "unjudged": 0,
           "suppressed": 63,
           "unbuildable": 0,
-          "metOnTuning": 24,
+          "metOnTuning": 23,
           "dropdown": {
             "examined": 12,
             "survivors": 1
@@ -1533,11 +1533,12 @@
           "units": 15,
           "chimesSpent": 0,
           "examined": 63,
-          "survivors": 3,
+          "survivors": 4,
           "survivorNames": [
             "auction",
             "auction-multi-round",
-            "destination-panel"
+            "destination-panel",
+            "destination-panel-parked-predicted-demand"
           ],
           "unjudged": 0,
           "suppressed": 3,
@@ -1549,7 +1550,7 @@
           },
           "page": {
             "examined": 39,
-            "survivors": 0
+            "survivors": 1
           },
           "dials": {
             "examined": 12,
@@ -1562,7 +1563,7 @@
             },
             "equipment": {
               "examined": 11,
-              "survivors": 1
+              "survivors": 2
             }
           },
           "sampling": {
@@ -1583,11 +1584,12 @@
           "units": 24,
           "chimesSpent": 9,
           "examined": 63,
-          "survivors": 3,
+          "survivors": 4,
           "survivorNames": [
             "auction",
             "auction-multi-round",
-            "destination-panel"
+            "destination-panel",
+            "destination-panel-parked-predicted-demand"
           ],
           "unjudged": 0,
           "suppressed": 5,
@@ -1599,7 +1601,7 @@
           },
           "page": {
             "examined": 39,
-            "survivors": 0
+            "survivors": 1
           },
           "dials": {
             "examined": 12,
@@ -1612,7 +1614,7 @@
             },
             "equipment": {
               "examined": 16,
-              "survivors": 1
+              "survivors": 2
             }
           },
           "sampling": {
@@ -1633,11 +1635,13 @@
           "units": 54,
           "chimesSpent": 39,
           "examined": 63,
-          "survivors": 3,
+          "survivors": 5,
           "survivorNames": [
             "auction",
             "auction-multi-round",
-            "destination-panel"
+            "destination-panel",
+            "destination-panel-parked-predicted-demand",
+            "edit-6"
           ],
           "unjudged": 0,
           "suppressed": 4,
@@ -1649,11 +1653,11 @@
           },
           "page": {
             "examined": 39,
-            "survivors": 0
+            "survivors": 1
           },
           "dials": {
             "examined": 12,
-            "survivors": 0
+            "survivors": 1
           },
           "perTier": {
             "dispatcher": {
@@ -1662,7 +1666,7 @@
             },
             "equipment": {
               "examined": 15,
-              "survivors": 1
+              "survivors": 3
             }
           },
           "sampling": {

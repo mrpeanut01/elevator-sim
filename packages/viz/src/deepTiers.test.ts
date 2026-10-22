@@ -278,10 +278,13 @@ const TIERS: Readonly<Record<string, Tier>> = Object.freeze({
   'packages/experiments/src/fuzz/releaseDirection.test.ts': {
     gates: ['ELEVATOR_SIM_FUZZ'],
     reason:
-      'the run that pins § D1591’s two figures: a withdrawn hall call re-points its car on 494 ' +
-      'shipped runs with no leg moved, and a released one leaves 88 stale directions on 147. About ' +
-      '165 s, on the gate and in the job deep.test.ts already uses, so a change that moves either ' +
-      'figure goes red the night it lands rather than in somebody’s next decision entry',
+      'the run that pins § D1591’s and § D1603’s figures: a withdrawn hall call re-points its car on ' +
+      '494 shipped runs with no leg moved; the old release left 88 stale directions on 147 and 591 ' +
+      'on the 494, the fixed one leaves none, and the legs it moves are listed; and the Phase 6 gate ' +
+      'cell moves on no leg. About 23 minutes on the lane’s contended four-core container, most of ' +
+      'it the 494 runs at three engines each, on the gate and in the job deep.test.ts already uses, ' +
+      'so a change that moves any of those figures goes red the night it lands rather than in ' +
+      'somebody’s next decision entry',
     scheduled: true,
   },
   'packages/experiments/src/oracle/deepCampaign.test.ts': {

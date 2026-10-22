@@ -323,6 +323,27 @@ import { isWaitingAt } from '../frame/overlay.js';
  * has three peaks where a slice has one or none, which makes more stretches *possible*; why a given
  * tower holds a landing is unmeasured here.
  *
+ * ## Re-measured on the fixed engine in wave AU ([§ D1615](../../../../DECISIONS.md))
+ *
+ * The ten game towers' rows were re-run by `everyday/stagePace.sweep.test.ts` on the engine
+ * [§ D1603](../../../../DECISIONS.md) fixed (`STAGE_PACE_CONTRACTS=c1,…,c10`, the same fifty seeds,
+ * band, window and union, 1 129 s on one worker). Six reproduce to the second and four move:
+ *
+ * | contract | building | horizon | published, of 50 | median (s) | **fixed engine, of 50** | **median (s)** |
+ * |---|---|---|---|---|---|---|
+ * | c2 | midtown-office | whole-day | 50 | 602 | 50 | **595** |
+ * | c5 | vertical-city | whole-day | 50 | 2069 | 50 | **2022** |
+ * | c7 | crown-hotel | period | 30 | 147 | **29** | **135** |
+ * | c9 | harbour-point | whole-day | 46 | 228 | 46 | **220** |
+ *
+ * c7's move is the fix's: its first ten seeds, which `legibility.test.ts` pins on every run, went
+ * red on it. For c2, c5 and c9 the first ten seeds reproduce and the median moves on the other
+ * forty, and no run between their measurement and this one separates the fix from any other change.
+ * The eligible set does not move: c7 at 29 is above § D512's threshold. The six reference towers'
+ * rows (`c11` to `c16`) are as published and were not re-run in wave AU, at hours of runs; their
+ * first ten seeds reproduce on `legibility.test.ts` but for one stretch of `c15`'s, and no count
+ * there moved. Why any figure moved is unmeasured.
+ *
  * The proportion carries its `n`, the stretch is a median, and there is no interval: no arms are
  * compared (`docs/33` § 6.5). `legibility.test.ts` pins the first ten seeds of every contract so
  * a change to the crowd, the bands or the union is red before this table is stale.
@@ -358,14 +379,14 @@ export interface LegibilitySweepRow {
  */
 export const LEGIBILITY_SWEEP: readonly LegibilitySweepRow[] = Object.freeze([
   { contractId: 'c1', horizon: 'period', buildingId: 'garden-apartments', legibleOf50: 0, medianStretchS: 0 },
-  { contractId: 'c2', horizon: 'whole-day', buildingId: 'midtown-office', legibleOf50: 50, medianStretchS: 602 },
+  { contractId: 'c2', horizon: 'whole-day', buildingId: 'midtown-office', legibleOf50: 50, medianStretchS: 595 },
   { contractId: 'c3', horizon: 'whole-day', buildingId: 'secure-tower', legibleOf50: 50, medianStretchS: 385 },
   { contractId: 'c4', horizon: 'whole-day', buildingId: 'mixed-use-high-rise', legibleOf50: 49, medianStretchS: 267 },
-  { contractId: 'c5', horizon: 'whole-day', buildingId: 'vertical-city', legibleOf50: 50, medianStretchS: 2069 },
+  { contractId: 'c5', horizon: 'whole-day', buildingId: 'vertical-city', legibleOf50: 50, medianStretchS: 2022 },
   { contractId: 'c6', horizon: 'whole-day', buildingId: 'chancery-house', legibleOf50: 50, medianStretchS: 264 },
-  { contractId: 'c7', horizon: 'period', buildingId: 'crown-hotel', legibleOf50: 30, medianStretchS: 147 },
+  { contractId: 'c7', horizon: 'period', buildingId: 'crown-hotel', legibleOf50: 29, medianStretchS: 135 },
   { contractId: 'c8', horizon: 'period', buildingId: 'st-jude-hospital', legibleOf50: 43, medianStretchS: 197 },
-  { contractId: 'c9', horizon: 'whole-day', buildingId: 'harbour-point', legibleOf50: 46, medianStretchS: 228 },
+  { contractId: 'c9', horizon: 'whole-day', buildingId: 'harbour-point', legibleOf50: 46, medianStretchS: 220 },
   { contractId: 'c10', horizon: 'whole-day', buildingId: 'ashgate', legibleOf50: 50, medianStretchS: 354 },
   { contractId: 'c11', horizon: 'whole-day', buildingId: 'ctf-class-reference', legibleOf50: 50, medianStretchS: 1503 },
   { contractId: 'c12', horizon: 'whole-day', buildingId: 'shanghai-class-reference', legibleOf50: 50, medianStretchS: 1674 },

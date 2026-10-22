@@ -442,12 +442,15 @@
  *
  * | measurement | result |
  * |---|---|
- * | observations fed / forecasts served | 11 891 / 34 422 |
+ * | observations fed / forecasts served | 11 891 / 34 435 |
  * | queries whose `fromT` preceded the newest observation | **0** |
  * | `max(lastObservedAt − queryTime)` over every query | **0.000 s** |
  * | corr(forecast, arrivals in the **preceding** 300 s) | 0.614 |
  * | corr(forecast, arrivals in the **following** 300 s) | 0.324 |
- * | **partial corr(forecast, following 300 s, given every arrival so far)** | **−0.0139 [−0.0317, +0.0038]** |
+ * | **partial corr(forecast, following 300 s, given every arrival so far)** | **−0.0139 [−0.0317, +0.0039]** |
+ *
+ * Re-measured for § D1603, which re-points a car on a released hall call: forecasts served moved
+ * 34 422 → 34 435 and the upper bound +0.0038 → +0.0039; the rest of the table reads as it did.
  *
  * The last row is the one that would catch a leak no import graph would. A causal forecast is a
  * function of the observed past, so once the past is partialled out nothing about the future may

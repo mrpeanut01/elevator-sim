@@ -61,8 +61,11 @@ export interface FixitParRow {
  * src/fixit/routeCensus.sweep.test.ts`, run by lane AK-F on 2026-09-26 on `ccceb8a`'s tree, fifteen
  * cases in 317 s in one vitest process beside the survivor regeneration. The route that set
  * each par is printed by the sweep and deliberately not written here: this module ships, and a route
- * label is the answer the fixed card must not print. Fourteen pars are the cheapest gate-clearing
- * route and held on the first judgement; `bed-cars-locked-out` and `every-deck-calls-itself-full`
+ * label is the answer the fixed card must not print. Re-run by lane AU-3 on 2026-10-22 on `38de98b`
+ * (the release fix, § D1603, and the two cases [§ D1611](../../../../DECISIONS.md) re-authored): no
+ * par moved, and two judged counts did, `bed-cars-locked-out` 2 → 1 and
+ * `controller-sends-every-car` 1 → 2. On that tree thirteen pars are the cheapest gate-clearing route
+ * and held on the first judgement; `every-deck-calls-itself-full` and `controller-sends-every-car`
  * each had a cheaper gate clear the forty-nine mornings refused. Two cases have a free par.
  */
 export const FIXIT_PAR: Readonly<Record<string, FixitParRow>> = Object.freeze({
@@ -75,11 +78,11 @@ export const FIXIT_PAR: Readonly<Record<string, FixitParRow>> = Object.freeze({
   'deliveries-on-the-passenger-group': { units: 2, judged: 1 },
   'one-start-time': { units: 2, judged: 1 },
   'every-letter-says-nine': { units: 2, judged: 1 },
-  'bed-cars-locked-out': { units: 6, judged: 2 },
+  'bed-cars-locked-out': { units: 6, judged: 1 },
   'two-cars-out-wrong-month': { units: 6, judged: 1 },
   'every-deck-calls-itself-full': { units: 6, judged: 3 },
   'restaurant-above-the-ballroom': { units: 2, judged: 1 },
-  'controller-sends-every-car': { units: 2, judged: 1 },
+  'controller-sends-every-car': { units: 2, judged: 2 },
   'let-faster-than-the-lifts': { units: 2, judged: 1 },
 });
 

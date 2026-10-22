@@ -394,7 +394,7 @@ A learned dispatcher is **implemented, measured, and NOT ACCEPTED — four times
 
 | Verdict | What was measured |
 |---|---|
-| [§ D145](../DECISIONS.md) | ΔTTD `−0.213 [−0.440, +0.014]` at n = 200 on a disjoint seed — interval contains zero |
+| [§ D145](../DECISIONS.md), its stated ground superseded by [§ D1620](../DECISIONS.md) | ΔTTD `−0.222 [−0.441, −0.004]` at n = 200 on a disjoint seed on `f60048d` — excludes zero, below the 1.90 s resolution limit, NOT ACCEPTED, AWT, WT95 and energy WORSE; `−0.213 [−0.440, +0.014]`, containing zero, before [§ D1603](../DECISIONS.md) |
 | [§ D156](../DECISIONS.md) | Swept over eight pre-registered operating points; refused at all five PRIMARY cells under Holm–Bonferroni |
 | [§ D200](../DECISIONS.md) | Re-measured on `lunch-two-way` against § D162 — refused again |
 | step 6, this document | Taught over two points under day-to-day demand variation, n = 200, held-out **traffic** with the machine held. **The interval excluded zero on the better side at both cells and the phase is still refused** — see below |

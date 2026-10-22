@@ -98,10 +98,16 @@
  * | chancery-house | 6 | 1 | 681 | held 2 820 s, outlasted 15 |
  * | crown-hotel | 5 | 1 | 735 | held 2 096 s, outlasted 11 |
  * | vertical-city | 35 | 1 | 775 | **no breaking point** |
- * | mixed-use-high-rise | 16 | 1 | 781 | held 4 584 s, outlasted 25 |
- * | secure-tower | 6 | 1 | 787 | held 2 842 s, outlasted 15 |
+ * | mixed-use-high-rise | 16 | 1 | 781 | held 4 384 s, outlasted 24 |
+ * | secure-tower | 6 | 1 | 787 | held 2 908 s, outlasted 16 |
  * | midtown-office | 4 | 1 | 933 | held 1 640 s, outlasted 9 |
  * | burj-class-reference | 57 | 1 | 1 541 | **no breaking point** |
+ *
+ * **The last column was re-derived on the fixed engine** ([§ D1603](../../../../DECISIONS.md),
+ * [§ D1615](../../../../DECISIONS.md)) by the same test on `ea49e27`, and the milliseconds were not:
+ * they are the dated measurement above. Two rows moved, Mixed-Use High-Rise from 4 584 s and 25 waves
+ * outlasted and Secure Tower from 2 842 s and 15, and the other seven reproduced. Why they moved is
+ * unmeasured.
  *
  * **And a round costs what a round costs**: on Garden Apartments a sitting of one, two and four
  * rounds took 348, 666 and 1 308 ms — 348, 333 and 327 ms a round, one simulation each. The chain

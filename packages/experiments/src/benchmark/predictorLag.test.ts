@@ -118,10 +118,14 @@ describe('Phase 5 — the demand predictor lags its cause and never leads it', (
  *
  * | measurement | result |
  * |---|---|
- * | forecast queries whose `fromT` preceded the newest observation | **0 of 34 422** |
+ * | forecast queries whose `fromT` preceded the newest observation | **0 of 34 435** |
  * | corr(forecast, arrivals in the preceding 300 s) | 0.614 |
  * | corr(forecast, arrivals in the *following* 300 s) | 0.324 |
- * | partial corr(forecast, next 300 s **given every arrival so far**) | **−0.0139 [−0.0317, +0.0038]** |
+ * | partial corr(forecast, next 300 s **given every arrival so far**) | **−0.0139 [−0.0317, +0.0039]** |
+ *
+ * Re-measured for § D1603 (a released hall call re-points its car): 34 422 queries became 34 435 and
+ * the upper bound +0.0038 became +0.0039. Still zero backward queries, and the interval still holds
+ * zero.
  *
  * The last row is the decisive one. The forecast tracks the past twice as closely as the future — a
  * lagging indicator, as a causal one must be — and once every arrival the run had already produced is

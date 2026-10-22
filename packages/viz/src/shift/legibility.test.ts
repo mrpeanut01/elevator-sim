@@ -162,8 +162,16 @@ describe('the sweep, pinned on its first ten seeds per contract', () => {
      * this. Whether *most* is still the right word is § D512's threshold question, and neither the
      * threshold nor the heading is moved to make the other read better.
      */
+    /*
+     * **Re-measured on the fixed engine** ([§ D1603](../../../../DECISIONS.md),
+     * [§ D1615](../../../../DECISIONS.md)), on `ea49e27`. `c7` goes 7 of 10 to **6**: seed 3's longest
+     * stretch falls from 208 s to 99 s, under the window, and seed 6's from 238 s to 213 s. Two more
+     * stretches move without a count moving, `c8`'s seed 3 (179 s to 181 s) and `c15`'s seed 6 (647 s
+     * to 667 s). Every other count and every other pinned stretch reproduces to the second. No rung,
+     * band, window or seed moved, and why these did is unmeasured.
+     */
     expect(counts).toEqual({
-      c1: 0, c2: 8, c3: 7, c4: 6, c5: 8, c6: 6, c7: 7, c8: 8, c9: 5, c10: 6,
+      c1: 0, c2: 8, c3: 7, c4: 6, c5: 8, c6: 6, c7: 6, c8: 8, c9: 5, c10: 6,
       c11: 10, c12: 10, c13: 10, c14: 1, c15: 8, c16: 10,
     });
     expect(stretches['c1']).toEqual([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
@@ -176,7 +184,7 @@ describe('the sweep, pinned on its first ten seeds per contract', () => {
     // rung that books out **two** cars, with its crowd raised from 8.5 % to 10.5 %. Seed 9's 119 s
     // is one second under the window and is pinned for that: a change to either would move it
     // first, and nothing here rounds it up.
-    expect(stretches['c8']).toEqual([139, 173, 182, 179, 161, 261, 147, 91, 119, 272]);
+    expect(stretches['c8']).toEqual([139, 173, 182, 181, 161, 261, 147, 91, 119, 272]);
     // **These two changed places on 2026-09-22 and then both moved again**, which is why the pair
     // is still pinned. As built, Harbour Point held a landing past the band on every seed and
     // Ashgate on two of ten; let as their contracts hand them over, it was one and seven. With a
@@ -189,7 +197,7 @@ describe('the sweep, pinned on its first ten seeds per contract', () => {
     // quiet days. Pinned because this is the flagship contract and the one a first session meets
     // most often.
     expect(stretches['c2']).toEqual([178, 213, 112, 179, 144, 415, 210, 133, 496, 90]);
-    expect(stretches['c7']).toEqual([91, 243, 104, 208, 261, 68, 238, 180, 190, 123]);
+    expect(stretches['c7']).toEqual([91, 243, 104, 99, 261, 68, 213, 180, 190, 123]);
     // One WTC is the first supertall this slice has found below the window on nine seeds of ten —
     // one landing reaches 128 s and the rest never hold anybody a full two minutes. Empire State is
     // above it on eight, and the two seeds it misses on (115 s and 99 s) are the ones worth pinning:
@@ -201,7 +209,7 @@ describe('the sweep, pinned on its first ten seeds per contract', () => {
     // One WTC's speeds were already on the ladder — and that contrast is why both are pinned here.
     // **Neither declares a rung, so neither moved again on 2026-09-22 or on the merged tree.**
     expect(stretches['c14']).toEqual([11, 1, 14, 28, 16, 128, 76, 6, 91, 0]);
-    expect(stretches['c15']).toEqual([644, 601, 199, 568, 115, 738, 647, 99, 219, 683]);
+    expect(stretches['c15']).toEqual([644, 601, 199, 568, 115, 738, 667, 99, 219, 683]);
   /*
    * **Thirteen contracts × ten seeds, and three of the thirteen are supertalls** — GitHub issues
    * #425, #424 and #430. This slice cost well inside 300 000 ms while the ladder was ten mid-rise
