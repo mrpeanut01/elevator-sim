@@ -54676,6 +54676,12 @@ that a player's content reads, and regenerates two censuses, which § D1604 clau
      did not change. Every route count is the same, and `express-that-stops-everywhere` alone still
      opens with its diagnosis shown. No par moved; two judged counts did (`bed-cars-locked-out` 2 → 1,
      `controller-sends-every-car` 1 → 2), pasted into `fixit/par.ts`. `everyLeverRuns.test.ts` is green.
+     Re-run twice more on the pasted tables, every row and par reproduces; on this shared box
+     `every-deck-calls-itself-full`'s case ran past the `viz` project's 300 s default each time (370 s
+     and 399 s) and failed on that alone. Its census costs the same at both rates (133 s and 133 s at
+     4.5, 132 s and 126 s at 4.95, alternated in one process), its par judges three routes at both,
+     and the nightly job ran the whole sweep on `main` in 3 min 16 s end to end on 2026-10-22, so no
+     annotation is raised here.
    - `everyday/fixitHint.browser.test.ts`'s not-fixed-early journey raised the bed-car case's roof 5 m,
      which on the re-authored case no longer clears the letter's morning (5 → 9). It now raises
      `every-letter-says-nine`'s roof 3 m, `NOT_REPLICATED`'s row: probed through the judge, it clears
