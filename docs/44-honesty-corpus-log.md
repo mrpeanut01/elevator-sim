@@ -19,6 +19,23 @@ after this split; the entries below are older than the cap and are registered th
 The always-on row is measured on the integrated head; the deep row is read from the nightly
 `corpus-figures` job in [`.github/workflows/deep-tiers.yml`](../.github/workflows/deep-tiers.yml).
 
+## Wave AU
+
+**Wave AU moves −17.65 strings a case always-on, with no new surface, and republishes the deep row.** The
+base is wave AT's row, reproduced by the nightly job on `main` (`4ee9557`). Measured once on wave AU's head
+after all five lanes merged, so the move is not split between lanes (§ D256); the release fix changes runs,
+so text moves without a new producer. The deep row is read from the nightly on `4ee9557` and reproduced
+locally: its set is the always-on set plus `campaign/judge.ts#judgeStage`, and since wave AL it gained the
+five surfaces waves AM, AN and AP added always-on, and lost none.
+
+| tree | strings | move | per case | surfaces |
+|---|---|---|---|---|
+| base, wave AT's row (nightly on `4ee9557`) | 1 053 971 | | | 80 |
+| wave AU's head (AU-1 to AU-5, `08f82c4`) | **1 053 106** | **−865** | **−17.65** | 80, **same set** |
+| cases · simulations · failing cases | 49 · 606 · 0 | **unmoved** | | |
+| deep, wave AL's row (`eff454b`) | 1 157 486 | | | 76 |
+| deep, nightly on `4ee9557` | **1 314 700** | **+157 214** | | **81**, +5 named above |
+
 ## Wave AT
 
 **Wave AT moves no string always-on, and adds no surface.** The base is wave AS's row, re-measured on
