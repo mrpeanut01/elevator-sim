@@ -1720,6 +1720,81 @@ queue bar is `goalsForDay`'s):
   Tuesday reproduces the plain Tuesday mark for mark on both towers.
 - The other whole-day towers are named in the file's `unmeasured` block with the reason for each.
 
+**Re-measured on the fixed engine** ([§ D1603](../DECISIONS.md), [§ D1616](../DECISIONS.md), wave AU,
+lane AU-4). Every row was re-run by the census's own command, one row to an invocation, on `ea49e27`,
+the engine with § D1603's release fix. `shift/weekWay.verify.test.ts` passed on every row on
+`4ee9557`, whose one difference on this path is that fix. 41 of the 61 rows move and three verdicts
+flip, each marked with what it was: Midtown's Thursday `goods-inward` and Friday `open-day:busy` lose
+their way through at 11 of 20, and Chancery House's plain Thursday gains one at 12 of 20. Midtown's
+week 1 and every other tower's week as dealt keep their verdicts; the standing order's marks move on
+several of them, and the brief's *left alone, the tower's standing order cleared it on N of them*
+reads the new counts. No mechanism is offered for any move. The table above is the census as first
+measured and stays as it was.
+
+| tower | day | wrinkle | slope | chosen on tuning | tuning | held out | lower bound | standing misses | queue: lowest / bar | queue-only misses | verdict |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| Midtown | 1 (Mon) | none | 0.02 | `predictive-balanced` + park at 0.43 | 7/8 | 20/20 | 0.832 | 13/20 | 11 / 32 | 0 | **admitted** |
+| Midtown | 2 (Tue) | none | 0.02 | `predictive-balanced` + spread at 0.2 | 8/8 | 20/20 | 0.832 | 11/20 | 12 / 30 | 0 | **admitted** |
+| Midtown | 2 (Tue) | move-in:past-halfway | 0.02 | `predictive-balanced` + spread at 0.2 | 8/8 | 20/20 | 0.832 | 11/20 | 12 / 30 | 0 | **admitted** |
+| Midtown | 3 (Wed) | none | 0.02 | `predictive-balanced` + spread at 0.2 | 8/8 | 20/20 | 0.832 | 12/20 | 12 / 28 | 0 | **admitted** |
+| Midtown | 3 (Wed) | fire-drill:full | 0.02 | `predictive-balanced` + spread at 0.43 | 8/8 | 17/20 | 0.621 | 17/20 | 12 / 28 | 3 | **admitted** |
+| Midtown | 4 (Thu) | none | 0.02 | `predictive-balanced` | 8/8 | 15/20 | 0.509 | 18/20 | 12 / 26 | 3 | **admitted** |
+| Midtown | 4 (Thu) | conference:full-floor | 0.02 | `auction` + spread at 0.43 | 5/8 | 13/20 | 0.408 | 20/20 | 13 / 26 | 4 | **admitted** |
+| Midtown | 5 (Fri) | none | 0.02 | `predictive-balanced` | 8/8 | 13/20 | 0.408 | 18/20 | 12 / 24 | 4 | **admitted** |
+| Midtown | 5 (Fri) | shaft-out:before-halfway | 0.02 | `predictive-balanced` | 8/8 | 13/20 | 0.408 | 18/20 | 12 / 24 | 4 | **admitted** |
+| Midtown | 6 (Sat) | weekend | 0.02 | `fairness-first` + spread at 0.43 | 8/8 | 20/20 | 0.832 | 0/20 | 6 / 22 | 0 | **admitted** (breather) |
+| Midtown | 7 (Sun) | weekend-quiet | 0.02 | `fairness-first` | 8/8 | 20/20 | 0.832 | 0/20 | 6 / 20 | 0 | fails (b) asks nothing |
+| Midtown | 1 (Mon) | audit-day | 0.02 | `fairness-first` + park at 0.2 | 8/8 | 19/20 | 0.751 | 11/20 | 10 / 32 | 0 | **admitted** |
+| Midtown | 1 (Mon) | caterers:before-the-rush | 0.02 | `fairness-first` + spread at 0.2 | 8/8 | 19/20 | 0.751 | 9/20 | 11 / 32 | 0 | **admitted** |
+| Midtown | 1 (Mon) | late-finish | 0.02 | `fairness-first` | 7/8 | 20/20 | 0.832 | 11/20 | 9 / 32 | 0 | **admitted** |
+| Midtown | 1 (Mon) | shift-change:tight | 0.02 | `fairness-first` + spread at 0.43 | 8/8 | 20/20 | 0.832 | 15/20 | 12 / 32 | 0 | **admitted** |
+| Midtown | 2 (Tue) | evacuation-drill:all-at-once | 0.02 | `fairness-first` | 8/8 | 19/20 | 0.751 | 17/20 | 11 / 30 | 0 | **admitted** |
+| Midtown | 2 (Tue) | goods-inward | 0.02 | `fairness-first` + park at 0.2 | 8/8 | 19/20 | 0.751 | 14/20 | 12 / 30 | 0 | **admitted** |
+| Midtown | 2 (Tue) | lift-service:mid-shift | 0.02 | `auction` + park at 0.2 | 0/8 | 1/20 | 0.001 | 20/20 | 33 / 30 | 0 | fails (c) queue out of reach, (a) no way through |
+| Midtown | 2 (Tue) | open-day:busy | 0.02 | `predictive-balanced` + park at 0.2 | 8/8 | 18/20 | 0.683 | 16/20 | 11 / 30 | 1 | **admitted** |
+| Midtown | 3 (Wed) | caterers:before-the-rush | 0.02 | `fairness-first` + spread at 0.2 | 7/8 | 18/20 | 0.683 | 17/20 | 11 / 28 | 1 | **admitted** |
+| Midtown | 3 (Wed) | conference:full-floor | 0.02 | `fairness-first` + spread at 0.43 | 8/8 | 17/20 | 0.621 | 17/20 | 13 / 28 | 1 | **admitted** |
+| Midtown | 3 (Wed) | evacuation-drill:all-at-once | 0.02 | `fairness-first` | 8/8 | 18/20 | 0.683 | 17/20 | 11 / 28 | 1 | **admitted** |
+| Midtown | 4 (Thu) | audit-day | 0.02 | `predictive-balanced` + spread at 0.43 | 5/8 | 13/20 | 0.408 | 18/20 | 13 / 26 | 1 | **admitted** |
+| Midtown | 4 (Thu) | fire-drill:full | 0.02 | `fairness-first` + spread at 0.43 | 7/8 | 13/20 | 0.408 | 20/20 | 12 / 26 | 2 | **admitted** |
+| Midtown | 4 (Thu) | goods-inward | 0.02 | `auction-multi-round` | 5/8 | 11/20 | 0.315 | 19/20 | 12 / 26 | 5 | fails (a) no way through (was **admitted**) |
+| Midtown | 5 (Fri) | audit-day | 0.02 | `predictive-balanced` + spread at 0.43 | 4/8 | 9/20 | 0.231 | 20/20 | 13 / 24 | 3 | fails (a) no way through |
+| Midtown | 5 (Fri) | late-finish | 0.02 | `predictive-balanced` + spread at 0.2 | 6/8 | 14/20 | 0.457 | 18/20 | 11 / 24 | 2 | **admitted** |
+| Midtown | 5 (Fri) | move-in:past-halfway | 0.02 | `predictive-balanced` | 8/8 | 13/20 | 0.408 | 18/20 | 12 / 24 | 4 | **admitted** |
+| Secure Tower | 1 (Mon) | none | 0.11 | `auction-multi-round` + spread at 0.43 | 7/8 | 10/20 | 0.272 | 14/20 | 16 / 32 | 8 | fails (a) no way through |
+| Secure Tower | 2 (Tue) | none | 0.11 | `fairness-first` + park at 0.2 | 1/8 | 6/20 | 0.119 | 19/20 | 28 / 30 | 12 | fails (a) no way through |
+| Secure Tower | 3 (Wed) | none | 0.11 | `auction-multi-round` + park at 0.2 | 0/8 | 0/20 | 0.000 | 20/20 | 34 / 28 | 15 | fails (c) queue out of reach, (a) no way through |
+| Secure Tower | 4 (Thu) | none | 0.11 | `auction-multi-round` + spread at 0.43 | 0/8 | 0/20 | 0.000 | 20/20 | 49 / 26 | 10 | fails (c) queue out of reach, (a) no way through |
+| Secure Tower | 5 (Fri) | none | 0.11 | `auction-multi-round` + park at 0.43 | 0/8 | 0/20 | 0.000 | 20/20 | 62 / 24 | 1 | fails (c) queue out of reach, (a) no way through |
+| Harbour Point | 1 (Mon) | none | 0.11 | `predictive-balanced` + park at 0.2 | 6/8 | 15/20 | 0.509 | 12/20 | 22 / 32 | 5 | **admitted** |
+| Harbour Point | 2 (Tue) | none | 0.11 | `predictive-balanced` + park at 0.43 | 3/8 | 3/20 | 0.032 | 20/20 | 42 / 30 | 17 | fails (c) queue out of reach, (a) no way through |
+| Harbour Point | 3 (Wed) | none | 0.11 | `predictive-balanced` | 2/8 | 0/20 | 0.000 | 20/20 | 29 / 28 | 20 | fails (c) queue out of reach, (a) no way through |
+| Harbour Point | 4 (Thu) | none | 0.11 | `fairness-first` | 0/8 | 0/20 | 0.000 | 20/20 | 53 / 26 | 17 | fails (c) queue out of reach, (a) no way through |
+| Harbour Point | 5 (Fri) | none | 0.11 | `predictive-balanced` + spread at 0.2 | 0/8 | 0/20 | 0.000 | 20/20 | 113 / 24 | 15 | fails (c) queue out of reach, (a) no way through |
+| Chancery House | 1 (Mon) | none | 0 | `predictive-balanced` | 8/8 | 17/20 | 0.621 | 8/20 | 14 / 32 | 3 | **admitted** |
+| Chancery House | 2 (Tue) | none | 0 | `predictive-balanced` | 7/8 | 15/20 | 0.509 | 9/20 | 14 / 30 | 5 | **admitted** |
+| Chancery House | 2 (Tue) | move-in:past-halfway | 0 | `predictive-balanced` | 7/8 | 15/20 | 0.509 | 9/20 | 14 / 30 | 5 | **admitted** |
+| Chancery House | 3 (Wed) | none | 0 | `predictive-balanced` | 7/8 | 14/20 | 0.457 | 10/20 | 14 / 28 | 6 | **admitted** |
+| Chancery House | 3 (Wed) | fire-drill:full | 0 | `fairness-first` + spread at 0.2 | 7/8 | 16/20 | 0.563 | 11/20 | 15 / 28 | 4 | **admitted** |
+| Chancery House | 4 (Thu) | none | 0 | `predictive-balanced` | 7/8 | 12/20 | 0.361 | 11/20 | 14 / 26 | 8 | **admitted** (was fails (a) no way through) |
+| Chancery House | 4 (Thu) | conference:full-floor | 0 | `fairness-first` + park at 0.2 | 6/8 | 16/20 | 0.563 | 10/20 | 16 / 26 | 4 | **admitted** |
+| Chancery House | 5 (Fri) | none | 0 | `predictive-balanced` | 6/8 | 9/20 | 0.231 | 12/20 | 14 / 24 | 11 | fails (a) no way through |
+| Chancery House | 5 (Fri) | shaft-out:before-halfway | 0 | `predictive-balanced` | 6/8 | 9/20 | 0.231 | 12/20 | 14 / 24 | 11 | fails (a) no way through |
+| Ashgate | 1 (Mon) | none | 0 | `predictive-balanced` + spread at 0.2 | 8/8 | 17/20 | 0.621 | 11/20 | 15 / 32 | 3 | **admitted** |
+| Ashgate | 2 (Tue) | none | 0 | `predictive-balanced` + spread at 0.2 | 8/8 | 16/20 | 0.563 | 11/20 | 15 / 30 | 4 | **admitted** |
+| Ashgate | 2 (Tue) | move-in:past-halfway | 0 | `predictive-balanced` + spread at 0.2 | 8/8 | 16/20 | 0.563 | 11/20 | 15 / 30 | 4 | **admitted** |
+| Ashgate | 3 (Wed) | none | 0 | `fairness-first` + spread at 0.2 | 8/8 | 15/20 | 0.509 | 13/20 | 15 / 28 | 5 | **admitted** |
+| Ashgate | 3 (Wed) | fire-drill:full | 0 | `fairness-first` + spread at 0.43 | 7/8 | 12/20 | 0.361 | 14/20 | 16 / 28 | 8 | **admitted** |
+| Ashgate | 4 (Thu) | none | 0 | `predictive-balanced` + spread at 0.2 | 7/8 | 13/20 | 0.408 | 14/20 | 15 / 26 | 7 | **admitted** |
+| Ashgate | 4 (Thu) | conference:full-floor | 0 | `fairness-first` + spread at 0.43 | 6/8 | 9/20 | 0.231 | 13/20 | 18 / 26 | 11 | fails (a) no way through |
+| Ashgate | 5 (Fri) | none | 0 | `predictive-balanced` + spread at 0.2 | 6/8 | 10/20 | 0.272 | 16/20 | 15 / 24 | 10 | fails (a) no way through |
+| Ashgate | 5 (Fri) | shaft-out:before-halfway | 0 | `predictive-balanced` + spread at 0.2 | 6/8 | 10/20 | 0.272 | 16/20 | 15 / 24 | 10 | fails (a) no way through |
+| Midtown | 3 (Wed) | lift-service:early | 0.02 | `fairness-first` + park at 0.2 | 5/8 | 12/20 | 0.361 | 16/20 | 18 / 28 | 5 | **admitted** |
+| Midtown | 5 (Fri) | open-day:busy | 0.02 | `predictive-balanced` + spread at 0.2 | 6/8 | 11/20 | 0.315 | 20/20 | 13 / 24 | 3 | fails (a) no way through (was **admitted**) |
+| Midtown | 1 (Mon) | shift-change:tight, car C out 0 to 0.4 | 0.02 | `predictive-balanced` + spread at 0.2 | 7/8 | 17/20 | 0.621 | 16/20 | 16 / 32 | 0 | **admitted** |
+| Midtown | 2 (Tue) | evacuation-drill:all-at-once, car C out 0 to 0.4 | 0.02 | `fairness-first` + park at 0.43 | 5/8 | 12/20 | 0.361 | 18/20 | 17 / 30 | 3 | **admitted** |
+| Midtown | 4 (Thu) | goods-inward, car C out 0 to 0.4 | 0.02 | `fairness-first` + spread at 0.2 | 2/8 | 7/20 | 0.154 | 19/20 | 21 / 26 | 2 | fails (a) no way through |
+
 > **DC-11.** From a tower's second week, an authored week order is **dealt** only when no single
 > shipped dispatcher profile, left alone with nothing pressed, holds the week's target on more than
 > half of DC-10's held-out crowds. *Holds* is the week sheet's own reading: on a crowd, the profile
@@ -1760,6 +1835,17 @@ fifth of the day on 12. No second order passes under the neighbour rule, because
 needs one of those two wrinkles; so `midtown-early-lift` is dealt in every week from the second, and
 a second order waits on a wrinkle the library does not have.
 
+**Re-screened on the fixed engine** ([§ D1616](../DECISIONS.md)). Every row above was re-run on
+`ea49e27`, and 17 of its stored strings move. Weeks 2 and 3 read as before, Predictive balanced
+holding them on 15 and 16 crowds, so both stay refused. Week 4 and `midtown-early-lift` each lose
+days to DC-10 before the screen is read: week 4 its Thursday `goods-inward`, and the early lift its
+Thursday `goods-inward` and Friday `open-day:busy`, 11 of 20 each. Counting Monday to Wednesday, the
+early lift's target is two days, and Predictive balanced left alone holds that on all 20 crowds.
+**No authored order is dealt on Midtown.** A re-author search, its rule written before any candidate
+ran and every candidate judged on the tuning crowds only, found no Thursday and Friday to put in their
+place, so § D1616 holds the order: it stays authored and is not dealt, and Midtown deals week 1's
+draw every week.
+
 **The levels after week 2** ([§ D1400](../DECISIONS.md), [§ D1401](../DECISIONS.md), wave AO, swarm
 DS's Q1 ruling). From week 3 a held week deals the next level: the order the cycle deals with one
 more car booked out of passenger service on a named morning (`data/contract-ladder.json`'s
@@ -1773,6 +1859,8 @@ left, reads 7 of 20 with the booking and 5 with a shorter one, and Wednesday and
 week 4 is Midtown's top and its sheet says the tower deals no further week. The house cleared 12,
 11 and 10 of weeks 2, 3 and 4's 100 weekdays, a step of one crowd each, so no level is called
 harder.
+Since [§ D1616](../DECISIONS.md) holds the order these levels are built on, no level is dealt on
+Midtown: the three bookings stay authored, as a refused booking does, and the tower's top is week 1.
 
 > **DC-13.** A week dealt from week 2 states on Your week whether it passes the call bands in play:
 > on census crowds 0, 5, 10 and 15, under each of the two profiles DC-11 shows holding the week on the
@@ -1798,6 +1886,10 @@ need days in the week pool as dealt that an answer at one of its calls clears wh
 with its pair and each answer's day verdict, and each offer candidate the card does not offer run from
 the same instant beside it. The nightly job requires the rows to be exactly the pinned ones, so a band
 that starts or stops holding arrives as a row that moved.
+Since [§ D1616](../DECISIONS.md) no order is dealt from week 2 on Midtown, so the census measures no
+row and the file carries none. The offer list is then the protocol's candidates in order, and every
+shipped driver's pair on the card is the pair it was. With no pooled week, Your week states no DC-13
+line.
 
 ### 4.4 Day one, which is what #208 is governed by
 
