@@ -519,16 +519,26 @@ describe('a per-run goal’s mark names its bar — § D1185', () => {
 describe('a stage sells a rung only where the census adds a way through — § D1419', () => {
   const censusOf = (stage: CampaignStage) => survivors.scenarios.find((entry) => entry.id === stage.id);
 
-  it('sells exactly the rungs whose pinned count exceeds the rung below, and draws every other with its reason', () => {
+  /*
+   * § D1608: a rung is bought only from the one below it, so a rung whose count rises above an unsold
+   * rung is not sold either and says why. The census regenerated on the engine § D1603 fixed has that
+   * shape on stage 9, so the third arm below is drawn on the shipped census, not only on a copy.
+   */
+  it('sells exactly the rungs whose pinned count exceeds the rung below, above the base or a sold rung, and draws every other with its reason', () => {
     let sold = 0;
     let unsold = 0;
+    let unreached = 0;
     for (const stage of stages) {
       const census = censusOf(stage);
+      let belowSold = true;
       for (const [index, rung] of stageRungsOf(stage, census, new Set()).entries()) {
         const below = index === 0 ? null : (stage.budget.steps[index - 1]?.id ?? null);
         const at = census?.steps.find((step) => step.stepId === rung.stepId)?.survivors;
         const under = census?.steps.find((step) => step.stepId === below)?.survivors;
-        expect(rung.sold, `${stage.id} ${rung.stepId}`).toBe(at !== undefined && under !== undefined && at > under);
+        const adds = at !== undefined && under !== undefined && at > under;
+        expect(rung.addsWay, `${stage.id} ${rung.stepId}`).toBe(adds);
+        expect(rung.sold, `${stage.id} ${rung.stepId}`).toBe(adds && belowSold);
+        belowSold = rung.sold;
         const row = stagePlayViewOf(
           { ...factsOf(stage, { profileId: stage.dispatcher.startingProfileId, parking: null }), rungs: [rung], balanceChimes: 999 },
           { kind: 'idle' },
@@ -543,12 +553,43 @@ describe('a stage sells a rung only where the census adds a way through — § D
           expect(row?.offer).toBe('not-sold');
           expect(row?.text).toMatch(/Not sold\./u);
           expect(row?.buyLabel).toBeUndefined();
+          if (adds) {
+            unreached += 1;
+            expect(row?.text).toContain(`The census found ${String(at)} ways through at ${String(rung.units)} units`);
+            expect(row?.text).toContain('The rung below it is not sold');
+            expect(row?.text).not.toContain(STAGE_PLAY_COPY.rungAboveUnbought);
+          } else {
+            expect(row?.text).not.toContain('The rung below it is not sold');
+          }
         }
       }
     }
     /* Non-vacuous on the shipped census: something is sold and something is refused. */
     expect(sold, 'no rung on the shipped census adds a way through').toBeGreaterThan(0);
     expect(unsold, 'every rung is sold, so the refusal arm is never drawn').toBeGreaterThan(0);
+    expect(unreached, 'no rung on the shipped census adds a way through above an unsold rung').toBeGreaterThan(0);
+  });
+
+  it('a rung above an unsold rung is not sold, on a copy of the census, and sells once the rung below it adds a way through (§ D1608)', () => {
+    const stage = stages.find((entry) => entry.budget.steps.length >= 2 && censusOf(entry) !== undefined);
+    if (stage === undefined) throw new Error('no stage with two measured rungs above its base');
+    const census = censusOf(stage)!;
+    const [first, second] = stage.budget.steps;
+    const set = (counts: Readonly<Record<string, number>>) => ({
+      ...census,
+      steps: census.steps.map((step) => ({ ...step, survivors: counts[step.stepId ?? 'base'] ?? step.survivors })),
+    });
+    const flatThenUp = stageRungsOf(stage, set({ base: 4, [first!.id]: 4, [second!.id]: 5 }), new Set());
+    expect(flatThenUp.map((rung) => [rung.addsWay, rung.sold, rung.next])).toEqual([[false, false, false], [true, false, false]]);
+    const upThenUp = stageRungsOf(stage, set({ base: 4, [first!.id]: 5, [second!.id]: 6 }), new Set());
+    expect(upThenUp.map((rung) => [rung.sold, rung.next])).toEqual([[true, true], [true, false]]);
+    /* The legitimate later arm: sold, with the rung below it sold and not yet bought. */
+    const later = stagePlayViewOf(
+      { ...factsOf(stage, { profileId: stage.dispatcher.startingProfileId, parking: null }), rungs: [upThenUp[1]!], balanceChimes: 999 },
+      { kind: 'idle' },
+    ).rungs[0];
+    expect(later?.offer).toBe('later');
+    expect(later?.text).toContain(STAGE_PLAY_COPY.rungAboveUnbought);
   });
 
   it('positive control: a count raised in a copy of the census sells that rung, and lowering it again unsells it', () => {

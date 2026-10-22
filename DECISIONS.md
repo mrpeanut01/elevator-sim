@@ -54552,6 +54552,110 @@ included, the fold moves nothing.
 
 **Numbers spent.** See [§ D1604](#d1604).
 
+## D1607 — the stages on the fixed engine: the goal bars are re-derived before the census, and every way through comes back
+
+> **Taken 2026-10-22 by an agent session** (wave AU, lane AU-2), carrying out the owner's decision
+> panel's ruling R4 ([§ D1604](#d1604)) clauses 3, 4 and 8 on the ten Scenario stages. Nothing here is
+> authored, so it is reversed only with the engine fix ([§ D1603](#d1603)).
+
+**Why an entry.** It republishes `data/scenario-goals.json` and `data/scenario-survivors.json`, which
+every stage verdict, the Scenario hub and five registers read, and it answers the stage half of
+§ D1603 clause 5, which reported stage verdicts as moved.
+
+1. **The stage reds § D1603 clause 5 lists come from bars that had not yet been re-derived.** A
+   count goal's bar is the starting setting's own count on the same seeds, published in
+   `data/scenario-goals.json`, and `campaign/judge.ts` judges no count goal whose baseline arm does
+   not reproduce that count (`met: null`). The fix moved four of those counts, and the census on
+   `ea49e27` was regenerated while the file still held the old engine's. Stage 3's moved cell is on
+   the tuning seeds, so all of its 39, 63 and 63 configurations went unjudged and none could meet.
+   Stages 5 and 7's moved cells are on the held-back seeds only, so their configurations met on the
+   stage's own crowds as before and none could be held. Every stage red clause 5 names has that one
+   cause: `stageVerdictsHold`'s rows for stages 3, 5 and 7, `stageFiveClears`, `judgeCleared`,
+   `stageSequence`, `goalRates`, and the moved-no-count line `stageSameCounts` and
+   `stageWatch.browser` look for, which compares counts that an unjudged goal does not carry.
+2. **The bars, re-derived first.** `ELEVATOR_SIM_REGENERATE_GOAL_RATES=1 npx vitest run --project viz
+   src/scenario/goalRates.test.ts`, 115 s, committed as `a99c573`. Four cells move and the rest of the
+   table is byte-identical: stage 3's `nobody-abandoned` 28/50, 29/50 to 29/50, 30/50; stage 5's
+   `long-waits-under` holdout 12 to 13 of 50; stage 7's `answer-the-demand` holdout 22 to 21 and its
+   `long-waits-under` holdout 32 to 31. Every cell stays in its bucket, so no goal is added to or
+   taken from a stage. `docs/10` § M30 prints them.
+3. **The census, regenerated after them.** `ELEVATOR_SIM_SURVIVORS=deep
+   ELEVATOR_SIM_REGENERATE_SURVIVORS=1 npx vitest run --maxWorkers=1 --project viz
+   src/scenario/survivorSweep.test.ts` on `47399b5`, 4 032 s, committed as `70c02bd`. Against the
+   census before the fix (`b0d7d09`), stages 1, 2, 4, 6, 8 and 10 are identical in every field, and
+   stages 3, 5 and 7 in every count and name; one field moved there, stage 5's equipment rung meeting
+   every goal on the stage's own crowds 23 times of 63, from 24. Stage 9 reads 4, 4 and 5 of 63, from
+   3 at every rung: the same three dropdown picks, the page's `destination-panel-parked-predicted-demand`
+   at every rung and a drawn dial (`edit-6`) at the building rung, as `ea49e27` already found, since
+   stage 9's goal row did not move. Against `ea49e27`, only the rows of stages 3, 5 and 7 and the
+   provenance move.
+4. **No witness is re-authored and no stage is held.** Every way through the census named before the
+   fix it names again, at every rung, so § D1604 clause 7 finds nothing to re-author and no candidate
+   was searched for or registered. Stage 3 keeps `fairness-first` and its three parked variants
+   (4 of 39 at the base rung), stage 5 `predictive-balanced` and `predictive-balanced-parked-stay`
+   (2 of 62), stage 7 `destination-eta-parked-lobby` and `predictive-balanced-parked-zone-center`
+   (2 of 63). Every stage that had a way through at its opening budget keeps one, and no stage a
+   player meets in the first hour has exactly one (stage 1 has 12 of 39, stage 2 has 5 of 39, stage 3
+   has 4 of 39, and stage 4 is held, as it was), so [§ D528](#d528) clause 6 is not breached. No
+   demand, fabric, budget, bar, judge, seed, horizon, threshold or interval rule moved.
+5. **The tests, re-run and none re-pinned.** Green on `da73cf2`, each run with one worker:
+   `stageVerdictsHold` (11 cases: the census's way through stages 3, 5 and 7 met, held and cleared,
+   `eta` on stage 5 and `predictive-balanced` on stage 7 met and refused on the held-back crowds, and
+   stage 1's seven rows as pinned), `stageFiveClears`, `judgeCleared`, `stageSequence`, `goalRates`,
+   `stageSameCounts` and `stageWatch.browser`; the deep `difficulty-curve` job (96 admitted cells,
+   387 s, both dropdown registers exactly as registered); and the deep `survivor-counts` job (the
+   sweep matches the file, and all 59 named ways through clear through the press, 4 440 s).
+   `stageFiveClears`' floor stays where the census puts it:
+   `predictive-balanced` clears stage 5 from the dropdown on both seed sets, the one stage-5 dropdown
+   way through the registers already name. `stageSameCounts`' stage-3 case is unchanged: Min-wait and
+   Min-wait with lobby parking each pass 10 of 50, now against the shipped setting's 29.
+   `carriedAnswers.test.ts`' stage-9 reason is re-worded to the census (three of its four ways through
+   are dropdown picks), with its compared fields unchanged; `docs/33` § 3.3g and `docs/39`'s stage-9
+   row carry the new count beside the old.
+6. **Stage 1 is unchanged on this lane's head**: its census rows at every rung (12 of 39, 23 of 63 and
+   23 of 63, the same names), its seven `stageVerdictsHold` rows, and `elevator-sim fuzz --scenario
+   stage-1-first-call --engagement`, whose output is byte-identical to `ae255db`'s.
+7. **Nothing here says why a count moved** ([§ D1604](#d1604) clause 10). The mechanism is unmeasured.
+
+**Numbers spent.** See [§ D1608](#d1608).
+
+## D1608 — a stage page sells a wider budget only above its base or a rung it sells
+
+> **Taken 2026-10-22 by an agent session under delegated authority** (wave AU, lane AU-2), not by the
+> product owner. It amends [§ D1419](#d1419). **Owner-reversible**: the chain rule in
+> `everyday/stagePlay.ts#stageRungsOf` and `scenario/ladder.ts#budgetLineOf`.
+
+**Why an entry.** It changes which rungs § D1419 sells and what the Scenario hub says about them, and
+binds `everyday/stagePlay.ts` and `scenario/ladder.ts`.
+
+**What the census showed.** § D1419 sells a rung whose pinned count exceeds the count at the rung below,
+and a rung is bought only from the one below it. On the census regenerated on the engine
+[§ D1603](#d1603) fixed ([§ D1607](#d1607)), stage 9 reads 4, 4 and 5 of 63: the equipment rung adds no
+way through and is not sold, and the building rung adds one. The page drew the building rung as *sold
+once the rung below it is bought* beside a rung below that is never sold, so no press could ever buy
+it, and the hub's budget line said the page sells it for 30 chimes. Both were false of the product.
+`everyday/stagePlay.test.ts` went red on it, because every sold rung it had met was buyable.
+
+**The ruling.** A rung is sold where its count exceeds the rung below's **and** the rung below is the
+base or itself sold. A rung that adds a way through above an unsold rung is drawn unsold with what the
+census found and why (*the rung below it is not sold, and a rung is bought only from the one below
+it*). A hub row whose page sells nothing, where such a rung exists, says the census finds no further
+way through at the first rung and that each is sold only from the one below it, in place of *no
+further way through at a wider budget*, which would be false. On the shipped census this changes stage
+9's two rows only; stages 1, 2 and 8 sell their equipment rung as before.
+
+**Refused.** Selling the unsold rung below as a step toward the one above, which sells a rung that
+adds no way through, the reading § D1419 refused; and selling the upper rung straight from the base,
+which would charge one step's chimes for two steps' units.
+
+**Tests**: `everyday/stagePlay.test.ts` (the sold set follows the chain rule in both directions on the
+shipped census, where stage 9 draws the new arm, and on a copy of the census both the unreachable arm
+and the legitimate *later* arm), and `scenario/ladder.test.ts` (the hub prices exactly what the page
+sells and draws the new sentence on a row it fits). Red on the base: stage 9's building rung was sold
+and its row read *sold once the rung below it is bought*.
+
+**Numbers spent.** This lane held **D1607 to D1610** and spent **D1607 and D1608**.
+
 ## D1611 — two fix-a-building witnesses are re-authored on demand on the release fix's engine, and every moved figure, decoy line and census follows the run
 
 > **Taken 2026-10-22 by an agent session** (wave AU, lane AU-3), carrying out the owner's decision
