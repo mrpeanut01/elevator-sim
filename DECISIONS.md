@@ -54598,7 +54598,14 @@ every stage verdict, the Scenario hub and five registers read, and it answers th
    player meets in the first hour has exactly one (stage 1 has 12 of 39, stage 2 has 5 of 39, stage 3
    has 4 of 39, and stage 4 is held, as it was), so [§ D528](#d528) clause 6 is not breached. No
    demand, fabric, budget, bar, judge, seed, horizon, threshold or interval rule moved.
-5. **The tests, re-run and none re-pinned.** `stageFiveClears`' floor stays where the census puts it:
+5. **The tests, re-run and none re-pinned.** Green on `da73cf2`, each run with one worker:
+   `stageVerdictsHold` (11 cases: the census's way through stages 3, 5 and 7 met, held and cleared,
+   `eta` on stage 5 and `predictive-balanced` on stage 7 met and refused on the held-back crowds, and
+   stage 1's seven rows as pinned), `stageFiveClears`, `judgeCleared`, `stageSequence`, `goalRates`,
+   `stageSameCounts` and `stageWatch.browser`; the deep `difficulty-curve` job (96 admitted cells,
+   387 s, both dropdown registers exactly as registered); and the deep `survivor-counts` job (the
+   sweep matches the file, and all 59 named ways through clear through the press, 4 440 s).
+   `stageFiveClears`' floor stays where the census puts it:
    `predictive-balanced` clears stage 5 from the dropdown on both seed sets, the one stage-5 dropdown
    way through the registers already name. `stageSameCounts`' stage-3 case is unchanged: Min-wait and
    Min-wait with lobby parking each pass 10 of 50, now against the shipped setting's 29.
