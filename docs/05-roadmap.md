@@ -1277,8 +1277,8 @@ control measured in the same run at the same seeds and equal total demand. Censu
 seed on both cells: **all twelve arms quotable, no ceiling, reference `auction-multi-round` on
 both**; budget variance-derived per `matrix.ts`'s rule on the gate metric and clamped to the band's
 ceiling of 200; resolution limits measured on TTD at each cell (structural **0.414 s** treatment,
-**0.461 s** control, on `f60048d`); n = 200 on the disjoint holdout seed under CRN; Holm within a **new declared
-family of exactly the treatment cell**, never pooled with this sweep's families.
+**0.461 s** control, on `f60048d`); n = 200 on the disjoint holdout seed under CRN; Holm within a
+**new declared family of exactly the treatment cell**, never pooled with this sweep's families.
 
 | cell | learned ΔTTD vs `auction-multi-round` | verdict |
 |---|---|---|
@@ -1303,11 +1303,11 @@ Pinning `predictive-balanced`'s weight vector on the reference profile for the *
 selector, no switching — beats the reference by **−0.720 [−0.973, −0.467]** on the control and
 **−0.667 [−0.923, −0.412]** on the treatment at the verdict seed: *more than the learned arm
 achieved on either cell*. That probe was measured on the engine before § D1603 and is not
-re-measured on `f60048d`, since no shipped code runs it. So the advantage is a **static weight-vector hybrid** — the auction
-dispatch stages carrying a better-for-TTD vector at this point — present at full strength where the
-mix cannot vary, and the switching *subtracted* value (−0.170 learned against −0.667 constant on the
-mix-varying cell, both before § D1603). It is not mix exploitation, and it accepts nothing. On the treatment the learned
-arm held `interfloor` (= `eta`'s vector) 51.0 % and `two-way` 32.0 % of decisions; on the control it
+re-measured on `f60048d`, since no shipped code runs it. So the advantage is a **static
+weight-vector hybrid** — the auction dispatch stages carrying a better-for-TTD vector at this point
+— present at full strength where the mix cannot vary, and the switching *subtracted* value (−0.170
+learned against −0.667 constant on the mix-varying cell, both before § D1603). It is not mix
+exploitation, and it accepts nothing. On the treatment the learned arm held `interfloor` (= `eta`'s vector) 51.0 % and `two-way` 32.0 % of decisions; on the control it
 pinned `two-way` for 90.9 %. Costs beside the gate, never folded in: the treatment's learned arm is
 WORSE on AWT (+0.266), WT95 (+0.806) and energy (+4.412 kJ per served leg beside the raw figure).
 The deadband known-answer returned **1.691 s** in the same session, so the refusal is a fact about

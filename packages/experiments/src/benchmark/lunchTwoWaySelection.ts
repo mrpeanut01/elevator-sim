@@ -93,11 +93,13 @@
  * `predictive-balanced`'s vector on the reference profile for the **whole run** — no selector, no
  * switching — beat the reference by −0.720 s on the flat control and −0.667 s on the treatment
  * at the verdict seed, **more than the learned arm achieved on either cell**, measured on the
- * engine before § D1603 and not re-measured on `f60048d`, since no shipped code runs the probe. So the advantage is
+ * engine before § D1603 and not re-measured on `f60048d`, since no shipped code runs the probe.
+ * So the advantage is
  * a *static weight-vector hybrid* — `auction-multi-round`'s dispatch stages carrying a
  * better-for-TTD vector at this operating point — present at equal strength where the mix cannot
  * vary, and the switching itself gave value back rather than adding any (−0.170 learned against
- * −0.667 constant on the mix-varying cell, both on the engine before § D1603). It is not mix exploitation, and it accepts nothing.
+ * −0.667 constant on the mix-varying cell, both on the engine before § D1603). It is not mix
+ * exploitation, and it accepts nothing.
  *
  * The deadband known-answer ran in the same session and returned 1.691 s (inside [1, 3], ΔAWT
  * −2.189 s), so the refusal is a fact about the policy, not the search machinery.

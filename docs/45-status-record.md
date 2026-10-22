@@ -75,8 +75,9 @@ the withdrawn H-ACCESS-1 destination beside its withdrawal in the last section.
   (`benchmark/lunchTwoWaySelection.ts`):** at `midtown-office`/`lunch-two-way` 1.5 %, with the detector's
   `two-way` pattern the incumbent on 66.1 % of observations, the learned arm's ΔTTD is
   `−0.163 [−0.396, +0.070]` at n = 200 on the disjoint seed on `f60048d` (`−0.170 [−0.405, +0.064]`
-  before [§ D1603](../DECISIONS.md); the old release methods reproduce the old figures) — containing zero and below the cell's
-  own TTD-measured 0.414 s limit — and the flat-mix negative control's own BETTER
+  before [§ D1603](../DECISIONS.md); the old release methods reproduce the old figures) — containing
+  zero and below the cell's own TTD-measured 0.414 s limit — and the flat-mix negative control's own
+  BETTER
   (`−0.592 [−0.848, −0.337]`, `−0.576 [−0.833, −0.319]` before) was investigated, not filed: a
   constant weight-vector hybrid beat the reference by more on *both* cells than the selector did
   on either, on the engine before § D1603, so the advantage is
