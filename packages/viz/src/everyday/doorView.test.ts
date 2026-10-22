@@ -642,19 +642,19 @@ describe('a level’s bookings on the door — § D1400', () => {
       nameOf: NAME_OF,
     });
 
-  /* Since § D1461 the pool withdraws week 3: the shipped door names no booking, and the authored level's line is read as the census plays it. */
-  it('names no booking on week 3’s door while the pool withdraws its level', () => {
+  it('names no booking on week 3’s door', () => {
     expect(doorOn(3).weekBookings).toBeUndefined();
   });
 
-  it('names week 3’s Monday booking as new, and nothing in week 2, as the census plays the level', () => {
+  /*
+   * Wave AU, lane AU-4 (§ D1616): on the fixed engine Midtown deals no order, so no level is dealt
+   * and no door names a booking even as the census plays the levels. The line as a dealt level
+   * draws it is pinned in `doorView.preD1603.test.ts`, on the census as measured before the fix.
+   */
+  it('names no booking on any week’s door even as the census plays the levels, with Midtown’s order held', () => {
     POOL_CENSUS.measuring = true;
     try {
-      expect(doorOn(3).weekBookings).toBe(
-        'Booked this week: car C is out of passenger service on Monday from 08:00 until 12:00, new this week.',
-      );
-      expect(doorOn(2).weekBookings).toBeUndefined();
-      expect(doorOn(3).weekBookings).not.toMatch(/harder|easier/u);
+      for (const number of [2, 3, 4, 5]) expect(doorOn(number).weekBookings, `week ${String(number)}`).toBeUndefined();
     } finally {
       POOL_CENSUS.measuring = false;
     }
