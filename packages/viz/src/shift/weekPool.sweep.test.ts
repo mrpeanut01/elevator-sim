@@ -266,6 +266,13 @@ describe.runIf(env('WEEK_POOL_SWEEP') === '1')('the week pool’s census', () =>
           moved.push(`${stored.key} crowd ${String(crowd)}: pinned ${JSON.stringify(pinned)}, measured ${JSON.stringify(want)}`);
         }
       }
+      /*
+       * § D1616: a pool with no cell re-runs nothing, which is right only while the tower deals no
+       * cell either. So an empty sample is checked against the dealt cells rather than passed.
+       */
+      const dealtKeys = poolCellsOf(WEEK_POOL.protocol.contractId).map((cell) => cell.key);
+      expect(WEEK_POOL.cells.map((stored) => stored.key)).toEqual(dealtKeys);
+      if (sample.length === 0) expect(dealtKeys, 'the pool is empty while the tower deals cells').toEqual([]);
       if (out !== undefined) writeFileSync(out, `${sample.length} crowds re-run\n${moved.join('\n')}\n`);
       expect(moved, moved.join('\n')).toEqual([]);
       return;

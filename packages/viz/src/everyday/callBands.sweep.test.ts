@@ -128,6 +128,18 @@ describe.runIf(process.env['CALL_BANDS_SWEEP'] === '1')('§ D1441: the call band
     const offer = driverOfferOf({ ...CALL_BANDS, rows: measured });
     summary.push(`offer list derived from these rows: ${offer.join(', ')}`);
     write(summary);
+    /*
+     * § D1616 holds Midtown's one dealt order, so no week from week 2 has a row to measure. That is
+     * pinned here as the measured negative, against the dealt orders, rather than passed as nothing:
+     * the file carries no row and the offer is the protocol's candidates in order.
+     */
+    if (dealt.every((order) => order === undefined)) {
+      expect(measured).toEqual([]);
+      expect(CALL_BANDS.rows).toEqual([]);
+      expect(offer).toEqual(protocol.candidates);
+      expect(DAY_CALL_DRIVER_OFFER).toEqual(offer);
+      return;
+    }
     expect(measured.length).toBeGreaterThan(0);
     if (NARROWED) return;
     expect(measured, summary.join('\n')).toEqual(CALL_BANDS.rows);
