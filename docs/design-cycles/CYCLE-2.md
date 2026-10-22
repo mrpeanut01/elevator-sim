@@ -145,8 +145,10 @@ That is three batches, an observation and not an estimate.
   mid-zone parking's +142.6 kJ [+113.8, +171.4] cannot be read as the 43 % it is, and nothing lists the
   player's earlier presses. Energy was read in the right direction by all three. Pillar 2, medium.
 - **C7** [all three] **The goal line names no measure, and the terms go undefined.** "Measurably ahead of
-  the shipped setting" is judged on average wait, 95th-percentile wait and door-to-door time, at least
-  one ahead and none behind (`campaign/judge.ts#judgeComparisonGoal`). That rule failed `eta` alone on
+  the shipped setting" is judged on every row the batch orders (average wait, 95th-percentile wait,
+  door-to-door time, and three observation rows: riders over a long wait, people moved per five minutes
+  and riders never served), at least one ahead and none behind (`campaign/judge.ts#judgeComparisonGoal`;
+  corrected by R10 amendment 10 from "three measures"). That rule failed `eta` alone on
   door-to-door time and cleared the curious player's attempt 11 on the 95th percentile alone. No
   definition reaches the stage page for door-to-door time, drive work (proxy), par, census, chimes or
   units. Pillar 2, medium.
@@ -241,12 +243,13 @@ no holdout figure beyond those already in § 2. The decision is GitHub issue #64
   zero. No line names a cause, says the parts add up to the whole, or speaks for other crowds.
   (3) `everyday/stagePlay.ts` and `stagePlayScreen.ts` draw the block under the own-crowds sentence.
   (4) A new honesty-corpus case covers the new strings under `unbacked-attribution` (§ D1011).
-- **Evidence:** X1, the one clause of cycle 1's pass condition still unmet, and three of X3's four
-  misreadings, which are the same question. Sizing on tuning-20260730 only (a forecast, not a verdict),
+- **Evidence:** X1, the one clause of cycle 1's pass condition still unmet, and the X3 rankings that turn
+  on which of a press's two changes did the work. Sizing on tuning-20260730 only (a forecast, not a verdict),
   which reproduces § 1's baseline and § 2's figures to the printed digit: the page admits 17 two-change
   moves at 4 u. The parking's own effect on mean wait resolves on 17 of 17, the standing order's on 11 of
   17. Of the nine that shorten mean wait as a whole, the standing order's own effect is too close to call
-  on five and resolves on four, by at most 1.13 s against the parking's 2.87 to 3.56 s. On the phone
+  on five and resolves on four. (The 17 left out zoning with cars left where they stopped; R10's
+  amendment 6 replaces the count with the page's own list.) On the phone
   persona's attempt 10 the split would have said the standing order alone shortens the 95th-percentile
   wait by between 0.62 and 5.02 s with mean wait too close to call, which neither the persona nor X1 read
   in full.
@@ -255,9 +258,10 @@ no holdout figure beyond those already in § 2. The decision is GitHub issue #64
   report reprints § 1, and no `data/` file is in the diff. (b) `judge.test.ts` reads every split bound
   back against the paired-t estimate of its two named arms at `BATCH_METRIC_PRESENTATION.places`, for the
   presses behind X1 and X3, and fails a tampered sentence. (c) The held-back crowds judge the split: for
-  all 17 two-change moves (102 rows), each row's interval on holdout-20260731 is set against the same row
-  on tuning-20260730, and the test passes when no row the tuning split prints as resolved one way
-  resolves the other way on holdout; same-way agreement is reported beside it and never gated. (d) The
+  every two-change move the page admits and every row the block can print, each row's interval on
+  holdout-20260731 is set against the same row on tuning-20260730, and the test passes when no row the
+  tuning split prints as resolved one way resolves the other way on holdout; same-way agreement is
+  reported beside it and never gated (R10 amendments 6 and 7). (d) The
   deep honesty tier at 0 failing cases. Whether people read the split correctly is a fact about people,
   so cycle 3's pass is written now: the felt-but-null count is 0; no persona says it cannot split two
   changes; and on every two-change press, any change a persona credits on a measure is one its split line
@@ -269,8 +273,8 @@ no holdout figure beyond those already in § 2. The decision is GitHub issue #64
   the fallback is the mean-wait clause alone for each change.
 
 **Candidates considered and rejected,** in the design director's ranking:
-1. § D372's failable building for stage 1 (deferred by R1, eligible now): the one lever measured to move
-   C9, and a content lane measured in days that leaves X1 and X3 standing.
+1. **Deferred again, not rejected** (R10 amendment 9): § D372's failable building for stage 1, the one
+   lever measured to move C9, and a content lane measured in days that leaves X1 and X3 standing.
 2. A paired line against the player's previous press: none of the five comparisons behind X1 and X3 was
    between consecutive presses.
 3. Judge each attempt on a fresh held-back batch in the game: § 2's slopes are uninformative on a stage
@@ -280,7 +284,54 @@ no holdout figure beyond those already in § 2. The decision is GitHub issue #64
 5. Say that `eta`, `fairness-first` and `capacity-aware` run alike here (C5): a per-stage tie line needs a
    census of ties on every stage, and the price schedule is one owner-approved table.
 
-**Ruling R10:** pending.
+**Ruling R10 (GitHub issue #645, 3–0, § D1622): approved with amendments.** The owner's decision panel,
+three agent seats ruling alone (product; statistics and cost; the player), approved Delta B with these
+amendments, the union of the seats' own:
+
+1. **The trigger is the admission, never the selects** (seats 1 and 3). The block draws only when the
+   admitted move changes both the standing order (a profile other than the stage's own) and the parking
+   (`idle.parkingStrategy` among `admission.moved`, against the shipped setting). Each one-change arm
+   reverts exactly one of the two to the shipped stage's value. So `zoned-uppeak` left at "in the middle
+   of its own zone" draws the block, with zoning and cars left where they stopped as its parking arm (X2,
+   the curious player's attempt 7), and zoning with cars left where they stopped draws none. A test pins
+   both.
+2. **Each line names the change and what was kept** (seat 3), as in "Changing the standing order to
+   Minimum estimated wait, with forecast parking kept: …", and never says "on its own" or "alone", because
+   the player may already have pressed the order alone and seen another result. A line carries size
+   clauses and the rest clause only, and no bar word ("ahead", "behind", "met", "reached"), so no line
+   reads as a second verdict.
+3. **One heading** (seats 1 and 3) names the stage's own crowds and the 50 runs once. Where the held-back
+   batch ran, it says those crowds judged the two changes only together, and that the block does not say
+   which change decided them.
+4. **Drawn last** (seats 1 and 3): below the held-back sentence, never between the two crowd sentences. A
+   pending line with no figures holds its place, Run is never greyed or delayed, an edit or a new press
+   drops the batch, the block never draws over a stale verdict or over another press's, and a failed
+   batch says so.
+5. **Common random numbers are checked** (seat 2): the split's press arm must equal the verdict's tuning
+   candidate arm on every replication and row, or the block is not drawn.
+6. **The held-back test covers every row the block can print** (seat 2): the three waits, the observation
+   rows `comparisonSentence` sizes when they resolve, and the drive-work rows, over the page's own list of
+   moves through `admitStageMove`, never a fixed count. Stage 1 at 4 u is always-on; the 24 u rung and
+   stages 2 to 10 run once before merge as a deep-tier test, and the block draws on no stage that test has
+   not covered.
+7. **A flip goes back to the panel** (seat 2): a row the tuning split prints as resolved one way whose
+   holdout interval excludes zero the other way fails the gate and returns R10 to this panel with the row
+   named. Nothing is changed to make it pass. Same-way agreement is printed and never gated.
+8. **Cycle 3's pass gains three clauses** (seats 1, 2 and 3). Every persona states the outcome correctly
+   after every two-change press, and `number-averse` and the phone persona at 390 × 844 also state the
+   measure that decided it with the block drawn; a miss takes § 3's mean-wait-only fallback without
+   another ruling. A persona's ranking of one press's two changes is checked against the paired interval
+   of the two one-change arms, and counts as an X3 misreading where that interval contains zero. A series
+   with no two-change press marks these clauses untested, never met.
+9. **The record** (seat 1): § D372's building stays deferred, as R1 amendment 10 recorded it, and § 5
+   carries C9 as the open design risk for a second cycle.
+10. **Corrections to § 3 and § 2**, made in the record: the director's 17 moves left out `stay`, so
+    zoning with cars left where they stopped was missing (amendment 6 replaces the count with the page's
+    own list); "three of X3's four misreadings" overstated it, because the paired runs uphold two of X3's
+    four rankings and `number-averse`'s attempt 5 compares held-back figures a tuning split cannot answer;
+    the sentence setting the order's split size beside the parking's compared two separate estimates,
+    X3's own inference, and is struck; and § 2's C7 named three measures where `judgeComparisonGoal`
+    orders on six rows.
 
 ### 4. Handoff to build loop
 Pending.
