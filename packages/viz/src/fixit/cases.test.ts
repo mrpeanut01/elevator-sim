@@ -58,6 +58,8 @@
  * - **`bed-cars-locked-out` scores `complaintGonePct` exactly 80 %** (5 → 1 long waits), the
  *   contract's own bar met without margin; the seed is pinned and the run is deterministic, so
  *   this is knife-edge only against future engine changes, which re-validate every case anyway.
+ *   One did: the release fix ([§ D1603](../../../../DECISIONS.md)) took the letter at 9 % to 4 → 2,
+ *   and [§ D1611](../../../../DECISIONS.md) re-authored the case at 8.1 %, where it is 5 → 1 again.
  */
 
 import { shaftPlanAreaM2 } from '@elevator-sim/core';
@@ -176,13 +178,21 @@ const SECOND_ANSWERS: ReadonlySet<string> = new Set([
    * the gate whatever the fifty mornings then say; the census is recorded beside each so the two are
    * not confused. Three hold over fifty mornings and are real second answers; three clear once and
    * do not hold, which the judge draws as `cleared-once` and never badges.
+   *
+   * **Re-measured on the release fix's engine** ([§ D1611](../../../../DECISIONS.md)), every entry
+   * through the shipped press at k = 50: each status below is that run's, and the five carried over
+   * read as they did. Two entries moved with the engine, and neither is authored away
+   * ([§ D1604](../../../../DECISIONS.md) clause 5).
    */
   'one-start-time/trim-the-dwell', // fixed at k = 50 — a real second answer
   'two-cars-out-wrong-month/night-working', // fixed at k = 50 — a real second answer
   'gym-on-the-top-floor/replant-the-machines', // fixed at k = 50 — on a case § D1020 holds
   'cars-that-always-go-home/quicker-tower-doors', // cleared-once at k = 50
   'everyone-leaves-at-once/hold-doors-longer', // cleared-once at k = 50
-  'bed-cars-locked-out/quicker-bed-car-doors', // cleared-once at k = 50
+  // Joined on the fixed engine: 10 → 2 long waits on the letter's morning, exactly 80 %.
+  'every-letter-says-nine/split-the-group', // cleared-once at k = 50
+  // `bed-cars-locked-out/quicker-bed-car-doors` left: on the fixed engine, and on the case as
+  // § D1611 re-authored it (8.1 %), the repair no longer clears the letter's morning (5 → 6).
   // `controller-sends-every-car/regear-tower-cars` left: § D1020 re-authored that case (rate ×1.25),
   // and the repair no longer clears the letter's morning (15 → 6, 60 %).
 ]);
@@ -327,13 +337,18 @@ const PINNED: readonly Pinned[] = [
   },
   {
     id: 'car-park-nobody-serves',
-    before: 21,
+    /*
+     * 21 of 45, 322 s, 70.0 s and 98.0 % until the release fix (§ D1603). The case is unchanged and
+     * still clears; its figures, its reasoning's figures and the two decoy lines that quote them
+     * were re-taken off this run (§ D1611).
+     */
+    before: 17,
     after: 3,
     figureTexts: [
-      '21 of 45 journeys',
-      '322 s',
-      '70.0 s over 45 boarded journeys',
-      '98.0 % of 51 journeys',
+      '17 of 45 journeys',
+      '172 s',
+      '59.6 s over 45 boarded journeys',
+      '96.1 % of 51 journeys',
     ],
   },
   {
@@ -350,7 +365,8 @@ const PINNED: readonly Pinned[] = [
   {
     id: 'deliveries-on-the-passenger-group',
     before: 15,
-    after: 2,
+    /* 2 until the release fix (§ D1603); the case and its copy are unchanged, and its copy quotes no after-figure. */
+    after: 0,
     figureTexts: [
       '15 of 164 journeys',
       '105 s',
@@ -397,13 +413,22 @@ const PINNED: readonly Pinned[] = [
   },
   {
     id: 'bed-cars-locked-out',
-    before: 11,
+    /*
+     * **Re-authored on demand by § D1611**: 9 → 8.1 % of the population per five minutes. On the
+     * release fix's engine (§ D1603) the letter's morning at 9 read 4 long waits and the diagnosed
+     * repair took it to 2, 50 %, under the bar. 8.1 was the first of five pre-registered rates to
+     * clear the letter's morning with the placebo refused; over the forty-nine derived mornings it
+     * removes 3.04 waits a morning (+1.61 to +4.48), the rest +0.16 points (−0.83 to +1.14). The
+     * bars, the seed and the words are unmoved; the copy's figures were re-taken off this run.
+     * Was 11 → 1 at 9 on the unfixed engine.
+     */
+    before: 5,
     after: 1,
     figureTexts: [
-      '11 of 36 journeys',
-      '125 s',
-      '42.0 s over 36 boarded journeys',
-      '94.7 % of 228 journeys',
+      '5 of 36 journeys',
+      '210 s',
+      '38.7 s over 36 boarded journeys',
+      '93.0 % of 213 journeys',
     ],
   },
   {
@@ -419,13 +444,22 @@ const PINNED: readonly Pinned[] = [
   },
   {
     id: 'every-deck-calls-itself-full',
-    before: 8,
+    /*
+     * **Re-authored on demand by § D1611**: 4.5 → 4.95 % of the population per five minutes. On the
+     * release fix's engine (§ D1603) the letter's morning at 4.5 read 1 long wait of 257, a letter
+     * about nothing. 4.95 was the first of five pre-registered rates to give the letter a complaint
+     * of at least four with the diagnosed repair clearing and the placebo refused; over the
+     * forty-nine derived mornings the repair removes 19.22 waits a morning (+11.63 to +26.82), the
+     * rest +4.88 points (+4.19 to +5.57). The bars, the seed and the words are unmoved; the copy's
+     * figures were re-taken off this run. Was 8 → 0 at 4.5 on the unfixed engine.
+     */
+    before: 11,
     after: 0,
     figureTexts: [
-      '8 of 257 journeys',
-      '77 s',
-      '17.3 s over 257 boarded journeys',
-      '97.0 % of 867 journeys',
+      '11 of 257 journeys',
+      '79 s',
+      '19.2 s over 257 boarded journeys',
+      '96.7 % of 836 journeys',
     ],
   },
   {
