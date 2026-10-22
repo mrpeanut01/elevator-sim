@@ -37,7 +37,29 @@ held-back ones; and the felt-but-null count is 0, against cycle 1's 1 (X5). It i
 legibility and is weighted as such.
 
 ### 1. Sim-sweep summary  (fast loop, no LLM)
-Pending: measured on the integrated head after the release-direction lane merges.
+Source: on `c70dbf2` (the build under test, wave AV's tree at the same engine),
+`elevator-sim fuzz --scenario stage-1-first-call` (standard tier), the same with `--tier deep --cases 2000`,
+and the same with `--engagement`. Deterministic, and every figure reproduces from those commands. Every
+proxy is still an unmeasured premise about people, so none is marked Measured.
+
+**Nothing in this section moved since cycle 1.** The standard tier and the engagement report print
+byte for byte what they printed on `4ee9557`, before wave AU's engine fix, which is what § D1605 found
+for stage 1's presses and census rows. So cycle 1's baseline tables (`CYCLE-1.md` § 1) stand as this
+cycle's baseline unchanged: tension in band 1 of 50 on each seed set, AWT 16.88 s [15.73, 18.04] and
+WT95 29.41 s [27.18, 31.64] on tuning-20260730, AWT 15.78 s [14.71, 16.85] and WT95 27.59 s
+[25.59, 29.59] on holdout-20260731, and an engine-level meaningful-choice baseline of 10 of 22
+[0.269, 0.653], none of them a player's choice.
+
+| Check | Cases | Result |
+|---|---|---|
+| Standard tier (64 pinned seeds and 7 regressions) | 71 | all 9 properties held; 0 failures |
+| Deep tier (play seeds 1000001 to 1002000, up to 40 entries a log) | 2 000 | all 9 properties held; 0 failures; 23 389 log entries; 739 sessions refused a mean |
+
+**The mastery slope is now measurable, off the screen.** The CLI still prints its named gap, because the
+game itself still judges every attempt on the one holdout batch. Cycle 2 closes that gap in a harness
+(§ D1601, § D1621): each persona's attempt k is re-judged by the game's own judge on fresh batch k from
+`data/mastery-seeds.json` (stream `mastery-c2`, twelve batches of 50, declared before the playtest), and
+the game is left as it is. The slope is in § 2.
 
 ### 2. Playtest findings  (middle loop, LLM personas)
 Pending.
