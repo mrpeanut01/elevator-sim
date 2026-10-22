@@ -334,7 +334,58 @@ amendments, the union of the seats' own:
     orders on six rows.
 
 ### 4. Handoff to build loop
-Pending.
+- **Branch / worktree:** `wave-av-lane-2` in `.worktrees/wave-av-lane-2`, merged into `wave-av` and
+  carried on PR #648 (branch `claude/great-hamilton-9f5a8y-wave-av`).
+- **GitHub issue:** #645 (the panel's rulings; R10 is this cycle's).
+- **What was built (§ D1623):** `campaign/judge.ts#stageSplitOf` words the split by the verdict's own
+  rules; `campaign/stageRun.ts#stageSplitRequestFor` builds the three-arm batch on the tuning crowds;
+  `everyday/stagePlay.ts#stageSplitPlanOf` decides the trigger from the admission, and
+  `STAGE_SPLIT_COVERAGE` names the stages and budgets the block may draw on; `everyday/stagePlayScreen.ts`
+  runs the split on its own worker after the verdict is drawn and Run is given back, and draws it last.
+- **The held-back gate (amendments 6 and 7), run before merge:** on every covered stage and budget, no
+  row the split prints as resolved on the tuning crowds resolves the other way on the held-back crowds.
+
+  | Stage at budget | Moves | Rows | Printed resolved | Same way held back | Flips |
+  |---|---|---|---|---|---|
+  | stage 1 at 4 u (always-on) | 18 | 288 | 144 | 119 | 0 |
+  | stage 1 at 24 u | 36 | 576 | 287 | 232 | 0 |
+  | stage 2 at 4 u | 18 | 288 | 97 | 83 | 0 |
+  | stage 3 at 4 u | 18 | 288 | 54 | 49 | 0 |
+  | stage 4 at 15 u | 36 | 576 | 250 | 134 | 0 |
+  | stage 5 at 15 u | 36 | 576 | 115 | 84 | 0 |
+  | stage 6 at 15 u | 36 | 576 | 263 | 143 | 0 |
+  | stage 7 at 15 u | 36 | 576 | 269 | 182 | 0 |
+  | stage 8 at 4 u | 18 | 288 | 146 | 140 | 0 |
+  | stage 9 at 15 u | 36 | 576 | 236 | 194 | 0 |
+  | stage 10 at 15 u | 36 | 576 | 122 | 117 | 0 |
+
+  Same-way agreement is reported and never gated. A stage or budget missing from the table draws no block.
+- **What did not move:** `stageVerdictsHold.test.ts` is unchanged and green, the engagement report on
+  stage 1 is byte-identical to `1a6b094`'s, and no `data/` file is in the diff.
+- **Required CI gates:** the guards job and the six-project run. The split's held-back test beyond stage 1
+  is a nightly deep tier (`stage-split` in `deep-tiers.yml`), run once on the lane before merge; the deep
+  honesty tier was run on the lane head too (0 failing cases).
+- **DECISIONS.md entries:** § D1621 (the mastery harness), § D1622 (ruling R10) and § D1623 (the build).
+  No ruling's wording in force was amended, so no `docs/39` row.
 
 ### 5. Owner note
-Pending.
+Cycle 2 replayed stage 1 on the sized verdict and the fixed engine, with three blind personas whose
+every printed interval matched an independent re-derivation to the digit. Delta A held where it
+promised: every persona took a size from every press and read the null press as a null, so two of cycle
+1's three pass clauses are met. The third is not. The felt-but-null count came back 1, cycle 1's X5 to
+the digit: a player who changes both the standing order and the parking cannot see which change did the
+work, and on stage 1 that is the common case. So this cycle changed one more thing a player sees. After
+such a press, the verdict now prints each change with the other kept, on the stage's own crowds and in
+the verdict's own words, and says that the held-back crowds judged the two only together (§ D1622, ruled
+R10 by your decision panel on GitHub issue #645, 3–0, owner-reversible; built as § D1623). It moves no
+verdict, census, goal bar, data file or published figure, and no line it prints turns the other way on
+the held-back crowds anywhere it is drawn. Mastery was measured for the first time, on fresh crowds in a
+harness (§ D1601, § D1621), and came back flat, which says nothing on a stage every persona clears by
+its third press. Deliberately left alone: § D372's failable building (deferred again, R10 amendment 9);
+the three standing orders that run alike at different prices (C5); a base figure beside each size (C6);
+what lives inside operational zoning beyond the split (X2); the layout and progression findings (C8,
+C10), which belong to the build loop; and the hold on Midtown's week order (R9), which is yours. The
+biggest open design risk is the one cycle 1 named, now sharper: stage 1 is calm by authoring (C9), flat
+on 49 of 50 runs in both seed sets, against `docs/38` § 2.1's "visibly in trouble first", and the split
+will show players that the parking does most of the work. § D372's building is still the one lever
+measured to change it. Cycle 3's pass condition is written in § 3 (R10 amendment 8).
