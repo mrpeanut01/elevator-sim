@@ -70,7 +70,7 @@
  * `comparabilityOf` lists nine of twenty-three replication metrics as non-comparable across the
  * two models — a run that changed model at t = 600 s would produce a record whose metrics are
  * not comparable with *themselves*. The acceptance question for Phase 6c
- * (`DECISIONS.md` § D126) asks for selection among *the cost-term weight vectors already
+ * (`DECISIONS.md` § D139) asks for selection among *the cost-term weight vectors already
  * shipped*, and that is exactly the surface this file switches.
  *
  * **Amended for the player's handover, and for nothing else here** —

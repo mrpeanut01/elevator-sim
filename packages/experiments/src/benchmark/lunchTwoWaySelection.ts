@@ -56,21 +56,24 @@
  *
  * ## The result (2026-07-30; tuning seed 20260726, holdout seed 20261537, n = 200 under CRN)
  *
+ * Re-derived on `f60048d`, the engine of § D1603 (§ D1620): every figure in the table moved and no
+ * verdict word did. Putting the old release methods back reproduces the old figures.
+ *
  * **NOT ACCEPTED — the third refusal, and the first on traffic whose directional mix moves.**
  * Four clauses fail independently:
  *
  * | cell | arm | ΔTTD vs `auction-multi-round` | verdict |
  * |---|---|---|---|
- * | treatment (mix swings 90/0/10 → 0/90/10) | learned | −0.170 [−0.405, +0.064] | INDISTINGUISHABLE — p = 0.1538 against the family's α = 0.05, and an eighth of the cell's own 0.412 s structural limit |
- * | treatment | fuzzy | +0.186 [−0.026, +0.399] | INDISTINGUISHABLE (Phase 7's bullet, not this gate) |
- * | flat control (mix pinned at 45/45/10) | learned | −0.576 [−0.833, −0.319] | BETTER, above the control's own 0.461 s limit — **§ D162 condition 5's trigger; investigated below** |
- * | flat control | fuzzy | −0.049 [−0.274, +0.176] | INDISTINGUISHABLE |
+ * | treatment (mix swings 90/0/10 → 0/90/10) | learned | −0.163 [−0.396, +0.070] | INDISTINGUISHABLE — p = 0.1680 against the family's α = 0.05, and below the cell's own 0.414 s structural limit |
+ * | treatment | fuzzy | +0.172 [−0.043, +0.386] | INDISTINGUISHABLE (Phase 7's bullet, not this gate) |
+ * | flat control (mix pinned at 45/45/10) | learned | −0.592 [−0.848, −0.337] | BETTER, above the control's own 0.461 s limit — **§ D162 condition 5's trigger; investigated below** |
+ * | flat control | fuzzy | −0.057 [−0.283, +0.170] | INDISTINGUISHABLE |
  *
- * The treatment's winner generalizes in sign (−0.205 s tuning → −0.170 s holdout) and is still
+ * The treatment's winner generalizes in sign (−0.252 s tuning → −0.163 s holdout) and is still
  * unresolvable; a generalizing effect that cannot be resolved is still an effect that cannot be
  * resolved (§ D145's sentence, still true here). Costs sit beside the gate, never folded in: the
- * treatment's learned arm is WORSE on AWT +0.263 [+0.124, +0.403], WT95 +0.809 [+0.343, +1.274]
- * and energy +4.444 kJ per served leg beside the raw +415.899 kJ — the honest direction for a
+ * treatment's learned arm is WORSE on AWT +0.266 [+0.127, +0.405], WT95 +0.806 [+0.344, +1.269]
+ * and energy +4.412 kJ per served leg beside the raw +412.731 kJ — the honest direction for a
  * selector that switches into heavier vectors, and § D106 keeps it an axis, never a score.
  *
  * **The regime screen saw the mix, so this refusal is a fact about the selector under the
@@ -88,12 +91,13 @@
  * **The control's BETTER is § D162 condition 5 doing exactly what it was built for, and the
  * mechanism is named rather than filed** (probe recorded in this measurement's decision entry): pinning
  * `predictive-balanced`'s vector on the reference profile for the **whole run** — no selector, no
- * switching — beats the reference by −0.720 s on the flat control and −0.667 s on the treatment
- * at the verdict seed, **more than the learned arm achieves on either cell**. So the advantage is
+ * switching — beat the reference by −0.720 s on the flat control and −0.667 s on the treatment
+ * at the verdict seed, **more than the learned arm achieved on either cell**, measured on the
+ * engine before § D1603 and not re-measured on `f60048d`, since no shipped code runs the probe. So the advantage is
  * a *static weight-vector hybrid* — `auction-multi-round`'s dispatch stages carrying a
  * better-for-TTD vector at this operating point — present at equal strength where the mix cannot
- * vary, and the switching itself gives value back rather than adding any (−0.170 learned against
- * −0.667 constant on the mix-varying cell). It is not mix exploitation, and it accepts nothing.
+ * vary, and the switching itself gave value back rather than adding any (−0.170 learned against
+ * −0.667 constant on the mix-varying cell, both on the engine before § D1603). It is not mix exploitation, and it accepts nothing.
  *
  * The deadband known-answer ran in the same session and returned 1.691 s (inside [1, 3], ΔAWT
  * −2.189 s), so the refusal is a fact about the policy, not the search machinery.
@@ -102,7 +106,7 @@
  * the shipped arc is the *widest* amplitude consistent with its citation — endpoints at exactly
  * 0 % — and a wider arc is the one a selector finds easiest to exploit, so every figure here is
  * measured under conditions *more* favourable to the selector than a real building's smoother
- * arc. That discount cuts against the control's −0.576 BETTER and against any future positive
+ * arc. That discount cuts against the control's −0.592 BETTER and against any future positive
  * reading of the treatment's negative point estimate.
  *
  * **This measurement also found and closed a wiring bug, reported rather than smoothed over:** the
@@ -114,8 +118,9 @@
  * fixed; only the screen, the learned-regime traces and the liveness diagnostics did. G11's rule
  * — a bit-identical result is a wiring bug until proven otherwise — is what caught it.
  *
- * § D145 (one cell) and § D156 (eight cells, refused at all five PRIMARY under Holm) stand
- * unchanged beside this result; neither is superseded and neither is weaker than stated there.
+ * § D145 (one cell) and § D156 (eight cells, refused at all five PRIMARY under Holm) stand beside
+ * this result. Neither verdict is weaker than stated there; § D1620 supersedes § D145's stated
+ * ground, since on `f60048d` its interval excludes zero and it is refused on the resolution limit.
  */
 
 import type { LoadedConfig } from '@elevator-sim/core';
