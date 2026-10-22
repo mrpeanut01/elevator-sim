@@ -254,12 +254,19 @@ export const WHOLE_DAY_LONGEST: PacedDay = Object.freeze({
  * **Since [§ D1493](../../../../DECISIONS.md) it is an upper bound.** The hold now lasts at most
  * twenty real seconds of watching between two decisions, and the sweep measures it uncapped, so a
  * day as the stage plays it is never longer than this figure and is usually shorter.
+ *
+ * **Re-measured on the fixed engine** ([§ D1603](../../../../DECISIONS.md),
+ * [§ D1615](../../../../DECISIONS.md)) by the same sweep over the ten game towers. The longest day is
+ * now `c5`, seed `n = 39`: 36 627.473 s recorded, 7 460.625 s slow and 25 547.974 s skipped, where it
+ * was `n = 33` at 36 198.67 s, 7 195.86 s and 23 220.401 s. Both are 34 real minutes at `4×`, so no
+ * minute the hub states moves. No run between the two separates the fix from any other change, and
+ * why the day moved is unmeasured. {@link WHOLE_DAY_LONGEST}, a reference tower's, was not re-run.
  */
 export const WHOLE_DAY_LONGEST_GAME_TOWER: PacedDay = Object.freeze({
   periodS: AUTHORED_DAY_PERIOD_S,
-  recordedS: 36198.67,
-  slowS: 7195.86,
-  skippedS: 23220.401,
+  recordedS: 36627.473,
+  slowS: 7460.625,
+  skippedS: 25547.974,
 });
 
 /**
