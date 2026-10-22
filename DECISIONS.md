@@ -50561,6 +50561,8 @@ to week 2* on the shipped page and reads week 2 on the brief.
 
 ## D1345 — the census of Midtown's later weeks under DC-11: § D1254's three dealt orders refused and kept, one order authored and admitted, and no second order the wrinkle library can build
 
+> **Status 2026-10-22: AMENDED by [§ D1616](#d1616).** `midtown-early-lift`, the order this entry authored and admitted, is refused by the week census on the fixed engine and held: authored, not dealt. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-10-10 by agent sessions under delegated authority**, as wave AN's lane DQ-2 under
 > [§ D1343](#d1343), not by the product owner. The measurements are the census's; which wrinkles
 > were tried, on which days, and which admitted order was authored are the lane's choices. A later
@@ -51899,6 +51901,8 @@ reference tower can run longer, which the hub says and the menu tile does not.
 
 ## D1400 — from week 3 a held week deals the next level: the same order with one more car booked out of passenger service on a named morning, dealt only where the census admits it, and a tower with no level left says so
 
+> **Status 2026-10-22: AMENDED by [§ D1616](#d1616).** The rule stands; Midtown, the one tower that authors bookings, deals no order and so no level while § D1616 holds its order. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-10-13 by agent sessions under delegated authority** (wave AO, lane DS-1, carrying out
 > swarm DS's reconciled Q1 ruling), not by the product owner. The ruling is the swarm's; the shapes
 > below that it did not fix are the lane's. A later reader weighing this against a product-owner
@@ -52991,6 +52995,8 @@ move through every need-capable weekday, and the date moves the crowd; *a differ
 changes the run* compares two crowds' legs.
 
 ## D1461 — the gates read the pool as dealt, and a level they refuse or cannot read is withdrawn
+
+> **Status 2026-10-22: AMENDED by [§ D1616](#d1616).** The gates stand; with Midtown's order held its top is week 1, not the week 2 the owner kept. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Taken 2026-10-17 by agent sessions under delegated authority, not by the product owner**: lane
 > DT-1, swarm DT's Q1 and Q2 item 3. **Amends [§ D1400](#d1400)'s admission** (the pool gates are
@@ -54551,3 +54557,235 @@ of its own after cycle 2's playtest) did not fire: on stage 1 as the game judges
 included, the fold moves nothing.
 
 **Numbers spent.** See [§ D1604](#d1604).
+
+## D1615 — Shift, Everyday, Rush and the Burj record are re-derived on the fixed engine: one witness is held, and the call cadence misses a floor
+
+> **Taken 2026-10-22 by an agent session** (wave AU, lane AU-4), carrying out the owner's decision
+> panel's ruling R4 ([§ D1604](#d1604) clauses 3, 4 and 10) on the Shift, Everyday, Rush and record
+> figures [§ D1603](#d1603) clause 5 left red, and on the censuses no other lane owns. Not a
+> product-owner ruling. Nothing here is authored, so it is reversed only with the engine fix. The one
+> witness that broke, Midtown's dealt week order, is [§ D1616](#d1616).
+
+**Why an entry.** It republishes figures that live outside any one module (a building's `$comment`,
+`docs/04`, `docs/33`, the rush board's rows, the server's agreement table), regenerates shipped data a
+player reads, and says which of § D1603's moved figures were measurements and which a bar.
+
+1. **Every figure was re-derived by the tool that produced it on the engine of `ea49e27`**: the first
+   on `ea49e27` itself, and those after the week census on this lane's head, which touches no file
+   under `packages/core/`. The nightly deep tiers were green on `4ee9557` (Actions run 39697131429),
+   whose one difference on these run paths is § D1603's `car.ts`.
+2. **c7's *7 of 10* is a measurement, and it is re-pinned.** `shift/legibility.test.ts` and
+   `shift/firstSession.test.ts` pin the first ten seeds of each contract's day 1 so that a change to
+   the crowd, the bands or the union is red before the 50-seed table is stale. [§ D512](#d512)'s bar is
+   more than a third of fifty seeds on that table, and nothing rests on the ten. On the slice c7 goes 7
+   to **6** (seed 3's longest stretch 208 s to 99 s, seed 6's 238 s to 213 s), and c8's seed 3 (179 s
+   to 181 s) and c15's seed 6 (647 s to 667 s) move without a count moving. On the table c7 reads
+   **29 of 50 at a median 135 s**, where it read 30 at 147 s, and stays eligible.
+3. **The legibility table and the longest game-tower day**, by `everyday/stagePace.sweep.test.ts` over
+   the ten game towers (`STAGE_PACE_CONTRACTS=c1,…,c10`, 1 129 s): beside c7, the medians move on c2
+   (602 s to 595 s), c5 (2 069 s to 2 022 s) and c9 (228 s to 220 s) with no count moving, and the other
+   six rows reproduce. The longest game-tower day is now c5's seed 39 (36 627.473 s recorded,
+   7 460.625 s slow, 25 547.974 s skipped), 34 real minutes at 4× as before, so no hub minute moves.
+   c7's move is the fix's, since its pinned first ten seeds went red on it; for the others no run
+   between their measurement and this one separates the fix from any other change. The six reference
+   towers' rows and `WHOLE_DAY_LONGEST` were not re-run, at hours of runs; their first ten seeds
+   reproduce but for one stretch of c15's. Republished in `shift/legibility.ts` and
+   `everyday/sittingShape.ts`.
+4. **The rush house census**, regenerated by `ELEVATOR_SIM_RUSH_HOUSE=deep
+   ELEVATOR_SIM_REGENERATE_RUSH_HOUSE=1 npx vitest run --project viz src/everyday/rushHouseSweep.test.ts`
+   and verified by the same command without the regenerate flag (17 cases, 936 s, one worker). 10 of
+   221 rows move, on five towers: each in its carried count, and all but one in its hold moment and
+   its arrivals.
+
+   | tower | dispatcher | held (s), before | held (s), now |
+   |---|---|---|---|
+   | Chancery House | `predictive-balanced` | 2 926 | 2 908 |
+   | Harbour Point | `collective-enroute` | 2 428 | 2 388 |
+   | Harbour Point | `auction-multi-round` | 2 624 | 2 790 |
+   | Harbour Point | `zoned-uppeak` | 2 552 | 2 462 |
+   | Mixed-Use High-Rise | `collective` | 4 584 | 4 384 |
+   | Mixed-Use High-Rise | `collective-enroute` | 4 420 | 4 430 |
+   | Mixed-Use High-Rise | `predictive-balanced` | 4 608 | 4 816 |
+   | Secure Tower | `collective` | 2 842 | 2 908 |
+   | St Jude's | `collective-enroute` | 2 894 | 2 894 (carried 918 to 900) |
+   | St Jude's | `predictive-balanced` | 2 928 | 2 868 |
+
+5. **The rush hold agreement**, both halves re-run: three cells move, Secure Tower's `collective`
+   2 842 s to 2 908 s, Mixed-Use High-Rise's `collective` 4 584 s to 4 384 s and its `larger-cars-21`
+   rebuild 4 492 s to 4 448 s. `rushSitting.ts`'s cost table's replay column follows (held 4 384 s, outlasted
+   24; held 2 908 s, outlasted 16); its milliseconds are the dated measurement and were not re-run.
+6. **Rush handover arm E** holds at **2 836 s**, where it held at 2 746 s; A, B, C and F did not move.
+   The adopted handover now holds seventy seconds past the house row, where it held twenty seconds
+   short of it, and A and E still differ on the legs.
+7. **First-day length**, by `FIRST_DAY_LENGTH_OUT`: c2's and c6's skipped seconds move, c3's call moves
+   from 9 929.738 s to 11 729.46 s, and c10 does not move. Every row keeps its peaks and `asksOn`, and
+   no minute the brief states moves.
+8. **The Burj record's 57-lift bracket**: the three verdicts hold. At 3 198 people the mean wait goes
+   11.36 s to 9.49 s and the 95th percentile 32.87 s to 29.38 s over the same 989 journeys; at 5 307,
+   40.48 s to 40.21 s and 183.15 s to 185.94 s; at 10 614, 30 undelivered to 33, and the 50-seed sweep's
+   *undelivered on 32* to 31. Republished in `data/buildings/burj-class-reference.json`'s `$comment`
+   and `docs/04`.
+9. **The week census, the one-profile screen, the call bands and the pool** are regenerated, and
+   § D1616 takes up what they deal.
+10. **Re-run and found to reproduce**, with nothing regenerated: the seven press days' moot census
+    (`PRESS_LADDER_CENSUS=1` on each pinned seed under every shipped profile: the cleared set is each
+    day's `mootUnder`, exactly); the seven press days' call windows (`PRESS_LADDER_CALL=1`, 429 s:
+    every `call` block's window, tried count and holes); `data/reference-runs.json`
+    (`watch/reference.test.ts`, on every run); and, on the cells that flipped, the week census
+    (`WEEK_WAY_VERIFY=1` on Midtown's Thursday and Friday and Chancery House's Thursday, fourteen
+    rows, 656 s).
+11. **The wrinkle census, regenerated** by `WRINKLE_CENSUS=1` (846 s): 12 of its 320 rows move. On
+    eight the default standing order's verdict flips: it now clears six crowd-days it missed
+    (Midtown's `fire-drill` and `audit-day`, Secure Tower's `audit-day`, Chancery House's `open-day`
+    and Ashgate's `late-finish` on two crowds) and misses two it cleared (Harbour Point's
+    `weekend-event` and Ashgate's `all-hands`). The other four move in what failed or in how many
+    gave up. No `clearsAny` moves, and no shipped code reads the file, so nothing a player is dealt
+    moves.
+12. **The call cadence misses a floor, and that is a finding for a ruling.** `CALL_CADENCE_SWEEP=1` on
+    this lane's head (crowds 0, 5, 10 and 15 of Midtown's week 1, the careful policy, 637 s): the median
+    day raises 4 calls, no weekday raises none, and crowds 0, 5, 10 and 15 have an evening call on 5, 3,
+    **2** and 4 of their five weekdays, under the floor of three on crowd 10. The careful line clears 15
+    of the 20 days (16 when [§ D1440](#d1440) measured it), and crowd 10 loses its Thursday and Friday,
+    which stop where they were lost. The longest silence is 2.0 real minutes at the median and 3.1 at
+    the longest. Published and not gated: of 66 who-drives rows the count is lowest under the pair's
+    first on 16.7 %, its second on 57.6 % and *keep* on 39.4 %; 15 rows split the day and *keep* lost 9.
+    The nightly `call-cadence` job passed on `4ee9557` in that run. Week 1's deal, the careful policy
+    and every shipped driver's pair are the same on both trees ([§ D1616](#d1616) clause 5), so the run
+    differs on this path by § D1603's engine. [§ D1338](#d1338) makes a miss a finding for a ruling and
+    never a reason to change the instrument or a floor, so neither is changed, and the job will be red
+    until the panel rules.
+13. **What a player now meets, outside § D1616.** The rush board draws the house's rows above as they
+    now read, and places a player's own row among them. On Harbour Point `auction-multi-round` (2 790 s)
+    now leads, where `predictive-balanced` (2 766 s, unmoved) did; on Chancery House
+    `predictive-balanced` falls from second to third; on Mixed-Use High-Rise it rises from sixth to
+    second. On week 1's dealt days the day close's census line (*left alone, the tower's standing order
+    cleared it on N of them*) moves on Midtown (Tuesday 8 to 9 of 20, Wednesday 4 to 3), Chancery House
+    (Wednesday 8 to 9, Friday 9 to 8), Ashgate (Monday 8 to 9, Tuesday 8 to 9, Thursday 6 to 7, Friday 3
+    to 4) and Harbour Point (Monday 6 to 8), and the sentence on a day that does not count (*the best
+    standing order or press we found cleared it on N of 20 crowds*) moves on Chancery House's Friday (8
+    to 9) and Ashgate's Friday (5 to 10). No dealt day changes whether it counts, so no target moves. No
+    first-session tower, press day, press-day call window or rush rebuild a player is offered changes.
+14. **No copy says why anything moved** (§ D1604 clause 10). The mechanism is unmeasured.
+
+**Numbers spent.** This lane held **D1615 to D1619** and spent **D1615 and D1616**.
+
+## D1616 — Midtown's dealt week order is held: the week census on the fixed engine refuses two of its days, and a pre-registered search found no replacement
+
+> **Taken 2026-10-22 by an agent session** (wave AU, lane AU-4), carrying out the owner's decision
+> panel's ruling R4 ([§ D1604](#d1604) clause 7) on a witness [§ D1603](#d1603)'s fix broke, with the
+> integrator's instruction to run the search, hold if it found nothing, and regenerate the call bands
+> and the week pool on what is then dealt. Not a product-owner ruling. **Owner-reversible**: the hold,
+> and the search's rule.
+
+**Why an entry.** It holds authored content a player was dealt, regenerates four censuses other
+modules read, amends what [§ D1345](#d1345), [§ D1400](#d1400) and [§ D1461](#d1461) say Midtown
+deals, takes away the week 2 the owner kept as Midtown's top under § D1461, and inverts promise tests
+in `shift/` and `everyday/`.
+
+1. **The week census, regenerated.** Every input the census run, DC-10 and DC-11 read was checked
+   first: the buildings, the specs, the traffic and dispatcher profiles, the ladder's rungs, growth,
+   incidents and bookings, the wrinkle library and the goal bars in `shift/goals.ts` are authored,
+   and `week-way.json` and `week-dominance.json` are the only measured inputs. A census cell hands
+   its bookings to `shiftRunConfigOf` explicitly, so the dealt-level default is not read, and no
+   census run reads the call bands, the pool, the wrinkle census, the scenario goals or the
+   survivors. Lanes AU-2, AU-3 and AU-5 change none of these. All 61 rows were re-run by
+   `shift/weekWay.sweep.test.ts`, one row to an invocation, on `ea49e27`; the nightly `week-census`
+   job had passed every row on `4ee9557`, whose one difference on this path is § D1603's `car.ts`.
+   41 rows move. Three verdicts flip: Midtown's Thursday `goods-inward` (held out 15 to 11 of 20,
+   lower bound 0.315) and Friday `open-day:busy` (12 to 11) lose their way through, and Chancery
+   House's plain Thursday gains one (11 to 12). Every row on the cells that flipped re-runs to the same
+   two verdict strings under `shift/weekWay.verify.test.ts` on this lane's head (Midtown's Thursday
+   and Friday, six rows each, and Chancery House's Thursday, two rows). `docs/33` § DC-10 republishes
+   the table.
+2. **The one-profile screen, regenerated.** Every row of `week-dominance.json` was re-run by the
+   same command's profiles stage, the booked rows on their booked days with their bookings and their
+   other days copied from the order's row as the file's provenance says; 17 stored strings move.
+   Weeks 2 and 3 read as before (Predictive balanced holds them on 15 and 16 of 20, refused).
+3. **The order refused.** `midtown-early-lift` (Monday `shift-change:tight`, Tuesday
+   `evacuation-drill:all-at-once`, Wednesday `lift-service:early`, Thursday `goods-inward`, Friday
+   `open-day:busy`) is refused by DC-10 on Thursday and Friday, 11 of 20 each. With Monday to
+   Wednesday counted its target is two days, and Predictive balanced left alone holds that on all 20
+   crowds, so DC-11 refuses it as well. `midtown-week-4` loses its Thursday the same way, and
+   `midtown-lift-service` and `midtown-audit-friday` each gain a refused Thursday. No authored order
+   on Midtown is admitted.
+4. **The search, written before any candidate ran.** Replace the order's Thursday and Friday,
+   keeping its id, Monday to Wednesday, the ladder's bookings and every bar, judge, seed, horizon and
+   threshold. The candidates are fixed by authoring rule: every axis value of every whole-day weekday
+   template, less the order's own templates, week 1's (the neighbour rule), `contractors` and
+   `flu-day` (which `shift/weekOrders.ts` records as unusable on Midtown) and the two (day, id) pairs
+   just refused. Per candidate, on the 8 tuning crowds only: the census's own tuning half (the chosen
+   play's clears T and the standing order's S) and, through the census's cell runner, the four
+   profiles strongest on Midtown left alone (P, the most crowds any of them clears). The gate is
+   T ≥ 7 and S ≤ 5; rank by P, then T, then library order; take one Thursday, then one Friday of
+   another template; judge that one pair once on the held-out crowds by DC-10, DC-11 and the levels
+   rule, and try no second pair. **One Thursday passes the gate (`open-day:quiet`, T 7, S 1) and no
+   Friday does, so the search found nothing**, and no held-out crowd was read for any candidate.
+5. **The hold.** The order stays authored in `data/contract-ladder.json`, its refusal readable
+   through `shift/weekOrders.ts#weekOrderAdmissionOf`, and is not dealt. With no order admitted,
+   Midtown deals week 1's draw every week, as the module has always done for such a tower. Its three
+   week bookings stay authored, as the ladder's comment keeps a refused booking, and
+   `weekLevelIssues` names them as bookings with no order to join; no level is dealt. The call bands
+   and the pool were re-run by their own commands: no order is dealt from week 2, so the call bands
+   carry their protocol and no row, and the pool its protocol and no cell. The driver offer becomes
+   the protocol's five candidates, and every shipped driver's pair on the card is the pair it was.
+6. **What a player now meets on Midtown.** A held week 1's sheet reads *You held week 1. This tower
+   deals no further week: Start next week deals week 2 as this week was dealt, the same wrinkles, on
+   new crowds.* A week not held reads *This week’s target was not met, so Play week 1 again deals the
+   same wrinkles on new crowds. This tower deals no further week.* and offers no *Go on to week 2*.
+   Every week deals week 1's five wrinkles on its own crowds. No door or strip names a booking, no
+   week is called harder, a week-2 brief names no pool and draws no ways line, and Your week states
+   no DC-13 line. A held Midtown week pays `week-held` once, at level `c2/1`, where weeks 1 and 2 each
+   paid ([§ D1402](#d1402)). A held top on Ashgate no longer offers Midtown, since the house's census
+   does not read Midtown's week 1 harder than Ashgate's top; Chancery House still offers it.
+7. **The owner's top.** § D1461 records the owner keeping week 2 as Midtown's top. This hold takes it
+   to week 1, under the panel's ruling and not the owner's in person; re-authoring the order restores
+   it.
+8. **Chancery House, the other way.** Its plain Thursday is now admitted, but no Chancery week deals
+   the plain Thursday (week 1 deals `conference:full-floor` there), so what a Chancery week deals and
+   counts is unchanged; only the census figures its dealt days state move, as [§ D1615](#d1615)
+   lists.
+9. **The tests.** Each pin of shipped content is inverted to the measured negative:
+   `shift/weekOrders.test.ts`, `weekDominance.test.ts`, `weekLevels.test.ts`,
+   `weekBookingReachesTheRun.test.ts`, `nextWeek.test.ts`, `callBands.test.ts`, `weekPool.test.ts`,
+   `everyday/weekView.test.ts`, `doorView.test.ts`, `host.test.ts`, and in the browser tier
+   `everyday/poolBrief.browser.test.ts` and `weekSurvives.browser.test.ts`. The mechanisms those
+   files tested on the dealt order run unchanged in `*.preD1603.test.ts`, which mock
+   `week-way.json`, `week-dominance.json`, `week-pool.json` and `call-bands.json` with the files as
+   they stood on `4ee9557` (`shift/preD1603/`), where the order is dealt; each fails if its mechanism
+   breaks. The `call-bands` and `week-pool` deep jobs pin the empty census against the dealt orders
+   rather than pass on nothing.
+10. **No mechanism is offered** for any move ([§ D1604](#d1604) clause 10).
+
+**The register.** Tuning crowds 2026-08-01 to 2026-08-08. T and S of 8 from `WEEK_WAY_STAGE=screen`
+on the (day, candidate) cell; P of 8 is the most tuning crowds any of `fairness-first`,
+`predictive-balanced`, `auction` and `auction-multi-round` clears left alone, from
+`weekWay.test-helper.ts#weekWayCell`.
+
+| day | candidate | chosen on tuning | T of 8 | S of 8 | P of 8 | gate |
+|---|---|---|---|---|---|---|
+| Thu | `two-cars-down` | `fairness-first` + park at 0.2 | 0 | 0 | 0 | fails, T < 7 |
+| Thu | `caterers:before-the-rush` | `fairness-first` + spread at 0.43 | 6 | 2 | 6 | fails, T < 7 |
+| Thu | `caterers:into-the-rush` | `auction-multi-round` + spread at 0.43 | 6 | 1 | 7 | fails, T < 7 |
+| Thu | `quiet-morning:half` | `fairness-first` + spread at 0.43 | 8 | 8 | 8 | fails, S > 5 |
+| Thu | `quiet-morning:thin` | `capacity-aware` + park at 0.2 | 8 | 8 | 8 | fails, S > 5 |
+| Thu | `all-hands` | `fairness-first` + spread at 0.43 | 1 | 0 | 1 | fails, T < 7 |
+| Thu | `audit-day` | `predictive-balanced` + spread at 0.43 | 5 | 0 | 5 | fails, T < 7 |
+| Thu | `open-day:busy` | `predictive-balanced` + spread at 0.2 | 6 | 0 | 5 | fails, T < 7 |
+| Thu | `open-day:quiet` | `fairness-first` + spread at 0.2 | 7 | 1 | 6 | **passes** |
+| Thu | `late-finish` | `predictive-balanced` + spread at 0.2 | 6 | 0 | 6 | fails, T < 7 |
+| Fri | `two-cars-down` | `fairness-first` + park at 0.2 | 0 | 0 | 0 | fails, T < 7 |
+| Fri | `caterers:before-the-rush` | `fairness-first` + spread at 0.43 | 6 | 0 | 6 | fails, T < 7 |
+| Fri | `caterers:into-the-rush` | `auction-multi-round` + spread at 0.43 | 6 | 1 | 7 | fails, T < 7 |
+| Fri | `goods-inward` | `auction-multi-round` | 5 | 1 | 5 | fails, T < 7 |
+| Fri | `quiet-morning:half` | `fairness-first` + spread at 0.43 | 8 | 8 | 8 | fails, S > 5 |
+| Fri | `quiet-morning:thin` | `capacity-aware` + park at 0.2 | 8 | 8 | 8 | fails, S > 5 |
+| Fri | `all-hands` | `fairness-first` + spread at 0.43 | 1 | 0 | 1 | fails, T < 7 |
+| Fri | `audit-day` | `predictive-balanced` + spread at 0.43 | 4 | 0 | 4 | fails, T < 7 |
+| Fri | `open-day:quiet` | `fairness-first` + spread at 0.43 | 6 | 0 | 5 | fails, T < 7 |
+| Fri | `late-finish` | `predictive-balanced` + spread at 0.2 | 6 | 0 | 6 | fails, T < 7 |
+
+**Reversal.** A Thursday and Friday found on the tuning crowds and admitted by DC-10, DC-11 and the
+levels rule on the held-out crowds puts the order back, with its call bands and pool re-measured;
+the `*.preD1603.test.ts` files then fold back into their originals.
+
+**Numbers spent.** See [§ D1615](#d1615).
