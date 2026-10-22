@@ -1,0 +1,3351 @@
+{
+  "version": 1,
+  "protocol": {
+    "contractId": "c2",
+    "crowdsFrom": "2026-07-01",
+    "crowdCount": 40,
+    "throughWeek": 4,
+    "placement": "leave",
+    "profiles": [
+      "nearest-car",
+      "eta",
+      "collective",
+      "collective-enroute",
+      "energy-aware",
+      "fairness-first",
+      "capacity-aware",
+      "predictive-balanced",
+      "auction",
+      "auction-multi-round",
+      "zoned-uppeak",
+      "destination-eta",
+      "destination-panel"
+    ]
+  },
+  "cells": [
+    {
+      "key": "midtown-early-lift|1|shift-change:tight|",
+      "orderId": "midtown-early-lift",
+      "day": 1,
+      "eventId": "shift-change:tight",
+      "bookings": [],
+      "banded": [
+        "predictive-balanced",
+        "fairness-first"
+      ],
+      "crowds": [
+        {
+          "seed": "20260701100",
+          "tag": "live",
+          "alone": "mCCCCCCCCCCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260702100",
+          "tag": "live",
+          "alone": "mCCCCCCCCCCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260703100",
+          "tag": "live",
+          "alone": "mCCmCCCCCCCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260704100",
+          "tag": "live",
+          "alone": "mCCCmCCCCCCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260705100",
+          "tag": "live",
+          "alone": "mmmCCCCCCCCCm",
+          "calls": []
+        },
+        {
+          "seed": "20260706100",
+          "tag": "live",
+          "alone": "mmmmCCCCCCCCm",
+          "calls": []
+        },
+        {
+          "seed": "20260707100",
+          "tag": "live",
+          "alone": "mCCCCCCCCCCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260708100",
+          "tag": "live",
+          "alone": "mmmmCCCCCCCmm",
+          "calls": []
+        },
+        {
+          "seed": "20260709100",
+          "tag": "live",
+          "alone": "mCCCCCCCCCCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260710100",
+          "tag": "live",
+          "alone": "mmmmmCCCCCmCC",
+          "calls": []
+        },
+        {
+          "seed": "20260711100",
+          "tag": "live",
+          "alone": "mCmmCCCCCCCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260712100",
+          "tag": "live",
+          "alone": "mCmmCCmCCCCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260713100",
+          "tag": "live",
+          "alone": "mCCCCCCCCCCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260714100",
+          "tag": "live",
+          "alone": "mCCmCCmCCCmCC",
+          "calls": []
+        },
+        {
+          "seed": "20260715100",
+          "tag": "live",
+          "alone": "mCmCmCCCCCCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260716100",
+          "tag": "live",
+          "alone": "mCmmCCCCCCCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260717100",
+          "tag": "live",
+          "alone": "mCCCCCCCCCCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260718100",
+          "tag": "live",
+          "alone": "mCmmCCmCmCmCC",
+          "calls": []
+        },
+        {
+          "seed": "20260719100",
+          "tag": "live",
+          "alone": "mCmCCCCCCCCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260720100",
+          "tag": "live",
+          "alone": "mCCCCCCCCCCCm",
+          "calls": []
+        },
+        {
+          "seed": "20260721100",
+          "tag": "live",
+          "alone": "mmmmCCmCCCCmC",
+          "calls": []
+        },
+        {
+          "seed": "20260722100",
+          "tag": "live",
+          "alone": "mCCCCCCCCCCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260723100",
+          "tag": "live",
+          "alone": "mCmmCCCCCCCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260724100",
+          "tag": "live",
+          "alone": "mCmCCCCCCCCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260725100",
+          "tag": "live",
+          "alone": "mCCCCCCCCCCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260726100",
+          "tag": "live",
+          "alone": "mCmmCCCCCCCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260727100",
+          "tag": "live",
+          "alone": "mmmmCmCCCCCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260728100",
+          "tag": "live",
+          "alone": "mmmmCCCCCCCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260729100",
+          "tag": "live",
+          "alone": "mCCCCCCCCCCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260730100",
+          "tag": "live",
+          "alone": "mCCmCCCCCCCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260731100",
+          "tag": "live",
+          "alone": "mCmmCCCCCCCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260801100",
+          "tag": "live",
+          "alone": "mmmmCCmCCCCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260802100",
+          "tag": "need",
+          "alone": "mmmmmmmmmmmmm",
+          "calls": [
+            {
+              "by": "predictive-balanced",
+              "atS": 2723,
+              "question": "placement",
+              "clears": [
+                "spread-cars"
+              ]
+            },
+            {
+              "by": "predictive-balanced",
+              "atS": 15601,
+              "question": "driver",
+              "offered": [
+                "fairness-first",
+                "capacity-aware"
+              ],
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2332,
+              "question": "placement",
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2669,
+              "question": "driver",
+              "offered": [
+                "predictive-balanced",
+                "capacity-aware"
+              ],
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 15653,
+              "question": "placement",
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 15961,
+              "question": "driver",
+              "offered": [
+                "predictive-balanced",
+                "capacity-aware"
+              ],
+              "clears": []
+            }
+          ]
+        },
+        {
+          "seed": "20260803100",
+          "tag": "live",
+          "alone": "mCCmCCCCCCCCm",
+          "calls": []
+        },
+        {
+          "seed": "20260804100",
+          "tag": "live",
+          "alone": "mCmmmCCCCCCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260805100",
+          "tag": "live",
+          "alone": "mCCCCCCCCCCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260806100",
+          "tag": "live",
+          "alone": "mCCCCCCCCCCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260807100",
+          "tag": "live",
+          "alone": "mCCCCCCCCCCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260808100",
+          "tag": "live",
+          "alone": "mCCCCCCCCCCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260809100",
+          "tag": "live",
+          "alone": "mCCmCCCCCCCCC",
+          "calls": []
+        }
+      ]
+    },
+    {
+      "key": "midtown-early-lift|2|evacuation-drill:all-at-once|",
+      "orderId": "midtown-early-lift",
+      "day": 2,
+      "eventId": "evacuation-drill:all-at-once",
+      "bookings": [],
+      "banded": [
+        "predictive-balanced",
+        "fairness-first"
+      ],
+      "crowds": [
+        {
+          "seed": "20260701200",
+          "tag": "live",
+          "alone": "mCCmCCCCCCCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260702200",
+          "tag": "live",
+          "alone": "mmmmCCmCmCmCm",
+          "calls": []
+        },
+        {
+          "seed": "20260703200",
+          "tag": "live",
+          "alone": "mCCmCCCCCCCCm",
+          "calls": []
+        },
+        {
+          "seed": "20260704200",
+          "tag": "live",
+          "alone": "mmmmmCmmmCmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260705200",
+          "tag": "live",
+          "alone": "mmmmCCCCCCmCm",
+          "calls": []
+        },
+        {
+          "seed": "20260706200",
+          "tag": "live",
+          "alone": "mCmmCCCCCCCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260707200",
+          "tag": "live",
+          "alone": "mmmmmCCCCmmCC",
+          "calls": []
+        },
+        {
+          "seed": "20260708200",
+          "tag": "live",
+          "alone": "mCmmCCCCCCCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260709200",
+          "tag": "live",
+          "alone": "mCmmmCCCCCCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260710200",
+          "tag": "live",
+          "alone": "mmmCmCCCmCCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260711200",
+          "tag": "live",
+          "alone": "mCmCCCCCCCCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260712200",
+          "tag": "live",
+          "alone": "mmCmmCCCCCmmC",
+          "calls": []
+        },
+        {
+          "seed": "20260713200",
+          "tag": "live",
+          "alone": "mCmmCCCCCCCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260714200",
+          "tag": "live",
+          "alone": "mmmmmCCmmCmCC",
+          "calls": []
+        },
+        {
+          "seed": "20260715200",
+          "tag": "live",
+          "alone": "mmmmmCCCCCmCm",
+          "calls": []
+        },
+        {
+          "seed": "20260716200",
+          "tag": "live",
+          "alone": "mmmmmCCCCCCCm",
+          "calls": []
+        },
+        {
+          "seed": "20260717200",
+          "tag": "live",
+          "alone": "mmmmmCCCCCmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260718200",
+          "tag": "live",
+          "alone": "mCmmCCCCCCmCC",
+          "calls": []
+        },
+        {
+          "seed": "20260719200",
+          "tag": "live",
+          "alone": "mmmmmCCCCmCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260720200",
+          "tag": "live",
+          "alone": "mCmmCCCCCCCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260721200",
+          "tag": "live",
+          "alone": "mCCCCCCCCCCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260722200",
+          "tag": "live",
+          "alone": "mCmmCCCCCCCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260723200",
+          "tag": "live",
+          "alone": "mCmmCCCCCCCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260724200",
+          "tag": "need",
+          "alone": "mmmmmmmmmmmmm",
+          "calls": [
+            {
+              "by": "predictive-balanced",
+              "atS": 2565,
+              "question": "driver",
+              "offered": [
+                "fairness-first",
+                "capacity-aware"
+              ],
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2648,
+              "question": "driver",
+              "offered": [
+                "predictive-balanced",
+                "capacity-aware"
+              ],
+              "clears": [
+                "predictive-balanced"
+              ]
+            }
+          ]
+        },
+        {
+          "seed": "20260725200",
+          "tag": "live",
+          "alone": "mmCCCCCCCCCmm",
+          "calls": []
+        },
+        {
+          "seed": "20260726200",
+          "tag": "live",
+          "alone": "mCmmCCCCCCCmC",
+          "calls": []
+        },
+        {
+          "seed": "20260727200",
+          "tag": "live",
+          "alone": "mCmmmCCCmCmCm",
+          "calls": []
+        },
+        {
+          "seed": "20260728200",
+          "tag": "need",
+          "alone": "mmmmmmCmmmmmC",
+          "calls": [
+            {
+              "by": "predictive-balanced",
+              "atS": 2689,
+              "question": "placement",
+              "clears": [
+                "spread-cars"
+              ]
+            },
+            {
+              "by": "predictive-balanced",
+              "atS": 2989,
+              "question": "driver",
+              "offered": [
+                "fairness-first",
+                "capacity-aware"
+              ],
+              "clears": []
+            },
+            {
+              "by": "predictive-balanced",
+              "atS": 15637,
+              "question": "driver",
+              "offered": [
+                "fairness-first",
+                "capacity-aware"
+              ],
+              "clears": []
+            },
+            {
+              "by": "predictive-balanced",
+              "atS": 16237,
+              "question": "driver",
+              "offered": [
+                "fairness-first",
+                "capacity-aware"
+              ],
+              "clears": [
+                "capacity-aware"
+              ]
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2537,
+              "question": "driver",
+              "offered": [
+                "predictive-balanced",
+                "capacity-aware"
+              ],
+              "clears": [
+                "capacity-aware",
+                "predictive-balanced"
+              ]
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2837,
+              "question": "placement",
+              "clears": [
+                "park-cars-lobby",
+                "spread-cars"
+              ]
+            },
+            {
+              "by": "fairness-first",
+              "atS": 15682,
+              "question": "placement",
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 15982,
+              "question": "driver",
+              "offered": [
+                "predictive-balanced",
+                "capacity-aware"
+              ],
+              "clears": []
+            }
+          ]
+        },
+        {
+          "seed": "20260729200",
+          "tag": "live",
+          "alone": "mmmmCCCCCCmCC",
+          "calls": []
+        },
+        {
+          "seed": "20260730200",
+          "tag": "live",
+          "alone": "mmmmmCmCCCmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260731200",
+          "tag": "live",
+          "alone": "mCCmCCCCCCCCm",
+          "calls": []
+        },
+        {
+          "seed": "20260801200",
+          "tag": "live",
+          "alone": "mCmmmmmCCCmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260802200",
+          "tag": "live",
+          "alone": "mmmmmCCCCmCmm",
+          "calls": []
+        },
+        {
+          "seed": "20260803200",
+          "tag": "live",
+          "alone": "mmmmCCCCCCCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260804200",
+          "tag": "live",
+          "alone": "mCCCCCCCCCCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260805200",
+          "tag": "live",
+          "alone": "mmmmCCCmCCmCm",
+          "calls": []
+        },
+        {
+          "seed": "20260806200",
+          "tag": "live",
+          "alone": "mCmmCCCCCCCCm",
+          "calls": []
+        },
+        {
+          "seed": "20260807200",
+          "tag": "live",
+          "alone": "mCmmCCCCCCCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260808200",
+          "tag": "live",
+          "alone": "mCmmmCCCCCCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260809200",
+          "tag": "live",
+          "alone": "mCmmCCCCCCCCC",
+          "calls": []
+        }
+      ]
+    },
+    {
+      "key": "midtown-early-lift|3|lift-service:early|",
+      "orderId": "midtown-early-lift",
+      "day": 3,
+      "eventId": "lift-service:early",
+      "bookings": [],
+      "banded": [
+        "predictive-balanced",
+        "fairness-first"
+      ],
+      "crowds": [
+        {
+          "seed": "20260701300",
+          "tag": "dead",
+          "alone": "mmmmmmmmmmmmm",
+          "calls": [
+            {
+              "by": "predictive-balanced",
+              "atS": 2520,
+              "question": "driver",
+              "offered": [
+                "fairness-first",
+                "capacity-aware"
+              ],
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2129,
+              "question": "placement",
+              "clears": []
+            }
+          ]
+        },
+        {
+          "seed": "20260702300",
+          "tag": "live",
+          "alone": "mmmmmCmmmmmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260703300",
+          "tag": "live",
+          "alone": "mmmmmmmCmmmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260704300",
+          "tag": "live",
+          "alone": "mmmmmCmmmmmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260705300",
+          "tag": "dead",
+          "alone": "mmmmmmmmmmmmm",
+          "calls": [
+            {
+              "by": "predictive-balanced",
+              "atS": 2240,
+              "question": "driver",
+              "offered": [
+                "fairness-first",
+                "capacity-aware"
+              ],
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2259,
+              "question": "placement",
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2559,
+              "question": "driver",
+              "offered": [
+                "predictive-balanced",
+                "capacity-aware"
+              ],
+              "clears": []
+            }
+          ]
+        },
+        {
+          "seed": "20260706300",
+          "tag": "dead",
+          "alone": "mmmmmmmmmmmmm",
+          "calls": [
+            {
+              "by": "predictive-balanced",
+              "atS": 2340,
+              "question": "placement",
+              "clears": []
+            },
+            {
+              "by": "predictive-balanced",
+              "atS": 2640,
+              "question": "driver",
+              "offered": [
+                "fairness-first",
+                "capacity-aware"
+              ],
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2256,
+              "question": "placement",
+              "clears": []
+            }
+          ]
+        },
+        {
+          "seed": "20260707300",
+          "tag": "live",
+          "alone": "mmmmmCmmmmmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260708300",
+          "tag": "live",
+          "alone": "mCmmmCCCCmmCm",
+          "calls": []
+        },
+        {
+          "seed": "20260709300",
+          "tag": "live",
+          "alone": "mmmmmCmCmmmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260710300",
+          "tag": "live",
+          "alone": "mCmmmCCCCCCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260711300",
+          "tag": "live",
+          "alone": "mmmmCCCCCmCmm",
+          "calls": []
+        },
+        {
+          "seed": "20260712300",
+          "tag": "dead",
+          "alone": "mmmmmmmmmmmmm",
+          "calls": [
+            {
+              "by": "predictive-balanced",
+              "atS": 2119,
+              "question": "placement",
+              "clears": []
+            },
+            {
+              "by": "predictive-balanced",
+              "atS": 2419,
+              "question": "driver",
+              "offered": [
+                "fairness-first",
+                "capacity-aware"
+              ],
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2268,
+              "question": "placement",
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2568,
+              "question": "driver",
+              "offered": [
+                "predictive-balanced",
+                "capacity-aware"
+              ],
+              "clears": []
+            }
+          ]
+        },
+        {
+          "seed": "20260713300",
+          "tag": "need",
+          "alone": "mmmmmmmmmmmmm",
+          "calls": [
+            {
+              "by": "predictive-balanced",
+              "atS": 2289,
+              "question": "driver",
+              "offered": [
+                "fairness-first",
+                "capacity-aware"
+              ],
+              "clears": [
+                "fairness-first"
+              ]
+            },
+            {
+              "by": "predictive-balanced",
+              "atS": 2889,
+              "question": "driver",
+              "offered": [
+                "fairness-first",
+                "capacity-aware"
+              ],
+              "clears": [
+                "fairness-first"
+              ]
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2698,
+              "question": "driver",
+              "offered": [
+                "predictive-balanced",
+                "capacity-aware"
+              ],
+              "clears": []
+            }
+          ]
+        },
+        {
+          "seed": "20260714300",
+          "tag": "live",
+          "alone": "mmmCmCCCmmCmm",
+          "calls": []
+        },
+        {
+          "seed": "20260715300",
+          "tag": "dead",
+          "alone": "mmmmmmmmmmmmm",
+          "calls": [
+            {
+              "by": "predictive-balanced",
+              "atS": 2643,
+              "question": "driver",
+              "offered": [
+                "fairness-first",
+                "capacity-aware"
+              ],
+              "clears": []
+            }
+          ]
+        },
+        {
+          "seed": "20260716300",
+          "tag": "live",
+          "alone": "mmmmmCCCmmmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260717300",
+          "tag": "dead",
+          "alone": "mmmmmmmmmmmmm",
+          "calls": [
+            {
+              "by": "predictive-balanced",
+              "atS": 2543,
+              "question": "placement",
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2277,
+              "question": "placement",
+              "clears": []
+            }
+          ]
+        },
+        {
+          "seed": "20260718300",
+          "tag": "dead",
+          "alone": "mmmmmmmmmmmmm",
+          "calls": [
+            {
+              "by": "predictive-balanced",
+              "atS": 2382,
+              "question": "driver",
+              "offered": [
+                "fairness-first",
+                "capacity-aware"
+              ],
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2383,
+              "question": "driver",
+              "offered": [
+                "predictive-balanced",
+                "capacity-aware"
+              ],
+              "clears": []
+            }
+          ]
+        },
+        {
+          "seed": "20260719300",
+          "tag": "dead",
+          "alone": "mmmmmmmmmmmmm",
+          "calls": [
+            {
+              "by": "predictive-balanced",
+              "atS": 2807,
+              "question": "driver",
+              "offered": [
+                "fairness-first",
+                "capacity-aware"
+              ],
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2535,
+              "question": "driver",
+              "offered": [
+                "predictive-balanced",
+                "capacity-aware"
+              ],
+              "clears": []
+            }
+          ]
+        },
+        {
+          "seed": "20260720300",
+          "tag": "live",
+          "alone": "mmmmmCmCmmCmm",
+          "calls": []
+        },
+        {
+          "seed": "20260721300",
+          "tag": "live",
+          "alone": "mmmmmmmCmmmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260722300",
+          "tag": "live",
+          "alone": "mmmmmCmmmmCmm",
+          "calls": []
+        },
+        {
+          "seed": "20260723300",
+          "tag": "live",
+          "alone": "mmmmmmCCmmmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260724300",
+          "tag": "live",
+          "alone": "mCmmmCmCCmmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260725300",
+          "tag": "dead",
+          "alone": "mmmmmmmmmmmmm",
+          "calls": [
+            {
+              "by": "predictive-balanced",
+              "atS": 2339,
+              "question": "driver",
+              "offered": [
+                "fairness-first",
+                "capacity-aware"
+              ],
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2154,
+              "question": "placement",
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2468,
+              "question": "driver",
+              "offered": [
+                "predictive-balanced",
+                "capacity-aware"
+              ],
+              "clears": []
+            }
+          ]
+        },
+        {
+          "seed": "20260726300",
+          "tag": "live",
+          "alone": "mmmmmCmmmmmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260727300",
+          "tag": "dead",
+          "alone": "mmmmmmmmmmmmm",
+          "calls": [
+            {
+              "by": "predictive-balanced",
+              "atS": 2359,
+              "question": "driver",
+              "offered": [
+                "fairness-first",
+                "capacity-aware"
+              ],
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2414,
+              "question": "driver",
+              "offered": [
+                "predictive-balanced",
+                "capacity-aware"
+              ],
+              "clears": []
+            }
+          ]
+        },
+        {
+          "seed": "20260728300",
+          "tag": "need",
+          "alone": "mmCCmmmmmmmmm",
+          "calls": [
+            {
+              "by": "predictive-balanced",
+              "atS": 2250,
+              "question": "driver",
+              "offered": [
+                "fairness-first",
+                "capacity-aware"
+              ],
+              "clears": [
+                "fairness-first"
+              ]
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2176,
+              "question": "placement",
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2831,
+              "question": "driver",
+              "offered": [
+                "predictive-balanced",
+                "capacity-aware"
+              ],
+              "clears": [
+                "predictive-balanced"
+              ]
+            }
+          ]
+        },
+        {
+          "seed": "20260729300",
+          "tag": "live",
+          "alone": "mmmmCCCCmmmmC",
+          "calls": []
+        },
+        {
+          "seed": "20260730300",
+          "tag": "need",
+          "alone": "mmmmmmmmmmmmm",
+          "calls": [
+            {
+              "by": "predictive-balanced",
+              "atS": 2366,
+              "question": "driver",
+              "offered": [
+                "fairness-first",
+                "capacity-aware"
+              ],
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2402,
+              "question": "driver",
+              "offered": [
+                "predictive-balanced",
+                "capacity-aware"
+              ],
+              "clears": [
+                "predictive-balanced"
+              ]
+            }
+          ]
+        },
+        {
+          "seed": "20260731300",
+          "tag": "live",
+          "alone": "mmmmmCmmmmmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260801300",
+          "tag": "live",
+          "alone": "mmmmmCmCCCCmm",
+          "calls": []
+        },
+        {
+          "seed": "20260802300",
+          "tag": "live",
+          "alone": "mmmmmCmCmmmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260803300",
+          "tag": "need",
+          "alone": "mmmmmmmmmCmmm",
+          "calls": [
+            {
+              "by": "predictive-balanced",
+              "atS": 2186,
+              "question": "placement",
+              "clears": []
+            },
+            {
+              "by": "predictive-balanced",
+              "atS": 2787,
+              "question": "driver",
+              "offered": [
+                "fairness-first",
+                "capacity-aware"
+              ],
+              "clears": [
+                "capacity-aware",
+                "fairness-first"
+              ]
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2136,
+              "question": "placement",
+              "clears": [
+                "spread-cars"
+              ]
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2436,
+              "question": "driver",
+              "offered": [
+                "predictive-balanced",
+                "capacity-aware"
+              ],
+              "clears": []
+            }
+          ]
+        },
+        {
+          "seed": "20260804300",
+          "tag": "dead",
+          "alone": "mmmmmmmmmmmmm",
+          "calls": [
+            {
+              "by": "predictive-balanced",
+              "atS": 2217,
+              "question": "placement",
+              "clears": []
+            },
+            {
+              "by": "predictive-balanced",
+              "atS": 2523,
+              "question": "driver",
+              "offered": [
+                "fairness-first",
+                "capacity-aware"
+              ],
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2549,
+              "question": "driver",
+              "offered": [
+                "predictive-balanced",
+                "capacity-aware"
+              ],
+              "clears": []
+            }
+          ]
+        },
+        {
+          "seed": "20260805300",
+          "tag": "live",
+          "alone": "mCCCCCCCCCCCm",
+          "calls": []
+        },
+        {
+          "seed": "20260806300",
+          "tag": "live",
+          "alone": "mmmmmCmmmmmCC",
+          "calls": []
+        },
+        {
+          "seed": "20260807300",
+          "tag": "dead",
+          "alone": "mmmmmmmmmmmmm",
+          "calls": [
+            {
+              "by": "predictive-balanced",
+              "atS": 2345,
+              "question": "placement",
+              "clears": []
+            },
+            {
+              "by": "predictive-balanced",
+              "atS": 2948,
+              "question": "driver",
+              "offered": [
+                "fairness-first",
+                "capacity-aware"
+              ],
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2529,
+              "question": "driver",
+              "offered": [
+                "predictive-balanced",
+                "capacity-aware"
+              ],
+              "clears": []
+            }
+          ]
+        },
+        {
+          "seed": "20260808300",
+          "tag": "dead",
+          "alone": "mmmmmmmmmmmmm",
+          "calls": [
+            {
+              "by": "predictive-balanced",
+              "atS": 2753,
+              "question": "driver",
+              "offered": [
+                "fairness-first",
+                "capacity-aware"
+              ],
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2453,
+              "question": "driver",
+              "offered": [
+                "predictive-balanced",
+                "capacity-aware"
+              ],
+              "clears": []
+            }
+          ]
+        },
+        {
+          "seed": "20260809300",
+          "tag": "dead",
+          "alone": "mmmmmmmmmmmmm",
+          "calls": [
+            {
+              "by": "predictive-balanced",
+              "atS": 2409,
+              "question": "driver",
+              "offered": [
+                "fairness-first",
+                "capacity-aware"
+              ],
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2411,
+              "question": "placement",
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2711,
+              "question": "driver",
+              "offered": [
+                "predictive-balanced",
+                "capacity-aware"
+              ],
+              "clears": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "midtown-early-lift|4|goods-inward|",
+      "orderId": "midtown-early-lift",
+      "day": 4,
+      "eventId": "goods-inward",
+      "bookings": [],
+      "banded": [
+        "predictive-balanced",
+        "fairness-first"
+      ],
+      "crowds": [
+        {
+          "seed": "20260701400",
+          "tag": "live",
+          "alone": "mmmmmCCCCCmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260702400",
+          "tag": "live",
+          "alone": "mCCCCCCCCmCCm",
+          "calls": []
+        },
+        {
+          "seed": "20260703400",
+          "tag": "live",
+          "alone": "mCmmmCCCCCCmC",
+          "calls": []
+        },
+        {
+          "seed": "20260704400",
+          "tag": "live",
+          "alone": "mmmmmCCCCCCCm",
+          "calls": []
+        },
+        {
+          "seed": "20260705400",
+          "tag": "live",
+          "alone": "mmmmmCmCmmmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260706400",
+          "tag": "live",
+          "alone": "mmmmmCmmmmmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260707400",
+          "tag": "live",
+          "alone": "mCmmCCCCmmCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260708400",
+          "tag": "live",
+          "alone": "mmmmmCCCmmCmm",
+          "calls": []
+        },
+        {
+          "seed": "20260709400",
+          "tag": "live",
+          "alone": "mCmmmCCCmmmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260710400",
+          "tag": "dead",
+          "alone": "mmmmmmmmmmmmm",
+          "calls": [
+            {
+              "by": "predictive-balanced",
+              "atS": 2355,
+              "question": "driver",
+              "offered": [
+                "fairness-first",
+                "capacity-aware"
+              ],
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2321,
+              "question": "driver",
+              "offered": [
+                "predictive-balanced",
+                "capacity-aware"
+              ],
+              "clears": []
+            }
+          ]
+        },
+        {
+          "seed": "20260711400",
+          "tag": "live",
+          "alone": "mCCCCCCCCmCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260712400",
+          "tag": "live",
+          "alone": "mmmmmCCCCmCCm",
+          "calls": []
+        },
+        {
+          "seed": "20260713400",
+          "tag": "live",
+          "alone": "mmmmmCCCCmmCm",
+          "calls": []
+        },
+        {
+          "seed": "20260714400",
+          "tag": "live",
+          "alone": "mmmmCCCCCCmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260715400",
+          "tag": "live",
+          "alone": "mCmCCCCCCCCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260716400",
+          "tag": "live",
+          "alone": "mCmmmCCCCmmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260717400",
+          "tag": "live",
+          "alone": "mCmmmCCCCCCCm",
+          "calls": []
+        },
+        {
+          "seed": "20260718400",
+          "tag": "live",
+          "alone": "mCmmCCCCCCmCm",
+          "calls": []
+        },
+        {
+          "seed": "20260719400",
+          "tag": "live",
+          "alone": "mmmmmCmmmmmCm",
+          "calls": []
+        },
+        {
+          "seed": "20260720400",
+          "tag": "live",
+          "alone": "mCmmmCmCCCmmC",
+          "calls": []
+        },
+        {
+          "seed": "20260721400",
+          "tag": "live",
+          "alone": "mmmmCCCCCCCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260722400",
+          "tag": "live",
+          "alone": "mmmmCCCCCCCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260723400",
+          "tag": "live",
+          "alone": "mmCmmCmCmmmCm",
+          "calls": []
+        },
+        {
+          "seed": "20260724400",
+          "tag": "live",
+          "alone": "mmmmmCmCmmmCm",
+          "calls": []
+        },
+        {
+          "seed": "20260725400",
+          "tag": "live",
+          "alone": "mmmmmCCCCCmCC",
+          "calls": []
+        },
+        {
+          "seed": "20260726400",
+          "tag": "live",
+          "alone": "mmmmmCmmCCmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260727400",
+          "tag": "need",
+          "alone": "mmmmmmmmmmmmm",
+          "calls": [
+            {
+              "by": "predictive-balanced",
+              "atS": 2587,
+              "question": "driver",
+              "offered": [
+                "fairness-first",
+                "capacity-aware"
+              ],
+              "clears": [
+                "fairness-first"
+              ]
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2620,
+              "question": "driver",
+              "offered": [
+                "predictive-balanced",
+                "capacity-aware"
+              ],
+              "clears": [
+                "capacity-aware"
+              ]
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2950,
+              "question": "placement",
+              "clears": [
+                "park-cars-lobby",
+                "spread-cars"
+              ]
+            },
+            {
+              "by": "fairness-first",
+              "atS": 15796,
+              "question": "driver",
+              "offered": [
+                "predictive-balanced",
+                "capacity-aware"
+              ],
+              "clears": [
+                "capacity-aware",
+                "predictive-balanced"
+              ]
+            },
+            {
+              "by": "fairness-first",
+              "atS": 16396,
+              "question": "driver",
+              "offered": [
+                "predictive-balanced",
+                "capacity-aware"
+              ],
+              "clears": [
+                "capacity-aware",
+                "predictive-balanced"
+              ]
+            }
+          ]
+        },
+        {
+          "seed": "20260728400",
+          "tag": "live",
+          "alone": "mmmmmCCmmmmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260729400",
+          "tag": "live",
+          "alone": "mmmmmCCCmmmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260730400",
+          "tag": "live",
+          "alone": "mmmmmCCmCCmCm",
+          "calls": []
+        },
+        {
+          "seed": "20260731400",
+          "tag": "live",
+          "alone": "mCCCCCCCCCCCm",
+          "calls": []
+        },
+        {
+          "seed": "20260801400",
+          "tag": "live",
+          "alone": "mmmmmmCCmCmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260802400",
+          "tag": "live",
+          "alone": "mCmmCCCCCCmmC",
+          "calls": []
+        },
+        {
+          "seed": "20260803400",
+          "tag": "live",
+          "alone": "mmmmmCmCmmmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260804400",
+          "tag": "live",
+          "alone": "mmmmmCmCCmmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260805400",
+          "tag": "live",
+          "alone": "mmmmmmmCmmCmm",
+          "calls": []
+        },
+        {
+          "seed": "20260806400",
+          "tag": "live",
+          "alone": "mCmmmCCCCCCCm",
+          "calls": []
+        },
+        {
+          "seed": "20260807400",
+          "tag": "need",
+          "alone": "mmmmmmmmmmmmm",
+          "calls": [
+            {
+              "by": "predictive-balanced",
+              "atS": 2505,
+              "question": "driver",
+              "offered": [
+                "fairness-first",
+                "capacity-aware"
+              ],
+              "clears": []
+            },
+            {
+              "by": "predictive-balanced",
+              "atS": 10098,
+              "question": "placement",
+              "clears": []
+            },
+            {
+              "by": "predictive-balanced",
+              "atS": 15393,
+              "question": "placement",
+              "clears": []
+            },
+            {
+              "by": "predictive-balanced",
+              "atS": 15693,
+              "question": "driver",
+              "offered": [
+                "fairness-first",
+                "capacity-aware"
+              ],
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2726,
+              "question": "driver",
+              "offered": [
+                "predictive-balanced",
+                "capacity-aware"
+              ],
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 3026,
+              "question": "placement",
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 10338,
+              "question": "placement",
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 15398,
+              "question": "driver",
+              "offered": [
+                "predictive-balanced",
+                "capacity-aware"
+              ],
+              "clears": [
+                "predictive-balanced"
+              ]
+            }
+          ]
+        },
+        {
+          "seed": "20260808400",
+          "tag": "live",
+          "alone": "mmmmmCmCmCmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260809400",
+          "tag": "live",
+          "alone": "mmmmmmCCmCmmm",
+          "calls": []
+        }
+      ]
+    },
+    {
+      "key": "midtown-early-lift|5|open-day:busy|",
+      "orderId": "midtown-early-lift",
+      "day": 5,
+      "eventId": "open-day:busy",
+      "bookings": [],
+      "banded": [
+        "predictive-balanced",
+        "fairness-first"
+      ],
+      "crowds": [
+        {
+          "seed": "20260701500",
+          "tag": "live",
+          "alone": "mmmmmCmCmmmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260702500",
+          "tag": "live",
+          "alone": "mCmmCCCCCmCCm",
+          "calls": []
+        },
+        {
+          "seed": "20260703500",
+          "tag": "live",
+          "alone": "mmmmmmmCmmmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260704500",
+          "tag": "live",
+          "alone": "mmmmmmmCCCmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260705500",
+          "tag": "live",
+          "alone": "mCCmCCCmCCCCm",
+          "calls": []
+        },
+        {
+          "seed": "20260706500",
+          "tag": "live",
+          "alone": "mmmmmCmCmmmCm",
+          "calls": []
+        },
+        {
+          "seed": "20260707500",
+          "tag": "live",
+          "alone": "mmmmmCCCCmCmm",
+          "calls": []
+        },
+        {
+          "seed": "20260708500",
+          "tag": "need",
+          "alone": "mmmmmmmmmmmmm",
+          "calls": [
+            {
+              "by": "predictive-balanced",
+              "atS": 2315,
+              "question": "placement",
+              "clears": [
+                "park-cars-lobby"
+              ]
+            },
+            {
+              "by": "predictive-balanced",
+              "atS": 2615,
+              "question": "driver",
+              "offered": [
+                "fairness-first",
+                "capacity-aware"
+              ],
+              "clears": []
+            },
+            {
+              "by": "predictive-balanced",
+              "atS": 5400,
+              "question": "placement",
+              "clears": [
+                "park-cars-lobby"
+              ]
+            },
+            {
+              "by": "predictive-balanced",
+              "atS": 16153,
+              "question": "driver",
+              "offered": [
+                "fairness-first",
+                "capacity-aware"
+              ],
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2315,
+              "question": "placement",
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2672,
+              "question": "driver",
+              "offered": [
+                "predictive-balanced",
+                "capacity-aware"
+              ],
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 11426,
+              "question": "placement",
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 15553,
+              "question": "driver",
+              "offered": [
+                "predictive-balanced",
+                "capacity-aware"
+              ],
+              "clears": []
+            }
+          ]
+        },
+        {
+          "seed": "20260709500",
+          "tag": "dead",
+          "alone": "mmmmmmmmmmmmm",
+          "calls": [
+            {
+              "by": "predictive-balanced",
+              "atS": 2564,
+              "question": "placement",
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2864,
+              "question": "driver",
+              "offered": [
+                "predictive-balanced",
+                "capacity-aware"
+              ],
+              "clears": []
+            }
+          ]
+        },
+        {
+          "seed": "20260710500",
+          "tag": "live",
+          "alone": "mmmmmCmmmmmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260711500",
+          "tag": "live",
+          "alone": "mmmmmmmCmmmCm",
+          "calls": []
+        },
+        {
+          "seed": "20260712500",
+          "tag": "live",
+          "alone": "mmmmCCmCCCmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260713500",
+          "tag": "live",
+          "alone": "mmmmmCmCmmmCm",
+          "calls": []
+        },
+        {
+          "seed": "20260714500",
+          "tag": "live",
+          "alone": "mmmmmCmmmmmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260715500",
+          "tag": "live",
+          "alone": "mmmmCCCCCCCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260716500",
+          "tag": "live",
+          "alone": "mCmmCCCCCCmCC",
+          "calls": []
+        },
+        {
+          "seed": "20260717500",
+          "tag": "live",
+          "alone": "mCmCCCCCCCCCm",
+          "calls": []
+        },
+        {
+          "seed": "20260718500",
+          "tag": "live",
+          "alone": "mmmmmCmmmmmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260719500",
+          "tag": "live",
+          "alone": "mmmmmCmmmCmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260720500",
+          "tag": "live",
+          "alone": "mmmmCCmCmmmCm",
+          "calls": []
+        },
+        {
+          "seed": "20260721500",
+          "tag": "live",
+          "alone": "mmmmmmCCCCmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260722500",
+          "tag": "live",
+          "alone": "mCmmmCCCCmmCm",
+          "calls": []
+        },
+        {
+          "seed": "20260723500",
+          "tag": "live",
+          "alone": "mmmmCCmmmmmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260724500",
+          "tag": "live",
+          "alone": "mCmmmCCCCmmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260725500",
+          "tag": "live",
+          "alone": "mmmmmmCCmmmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260726500",
+          "tag": "need",
+          "alone": "mmmmmmmmmmmmm",
+          "calls": [
+            {
+              "by": "predictive-balanced",
+              "atS": 2844,
+              "question": "placement",
+              "clears": []
+            },
+            {
+              "by": "predictive-balanced",
+              "atS": 3144,
+              "question": "driver",
+              "offered": [
+                "fairness-first",
+                "capacity-aware"
+              ],
+              "clears": []
+            },
+            {
+              "by": "predictive-balanced",
+              "atS": 8597,
+              "question": "placement",
+              "clears": []
+            },
+            {
+              "by": "predictive-balanced",
+              "atS": 15635,
+              "question": "driver",
+              "offered": [
+                "fairness-first",
+                "capacity-aware"
+              ],
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2550,
+              "question": "driver",
+              "offered": [
+                "predictive-balanced",
+                "capacity-aware"
+              ],
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2850,
+              "question": "placement",
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 15811,
+              "question": "driver",
+              "offered": [
+                "predictive-balanced",
+                "capacity-aware"
+              ],
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 16411,
+              "question": "driver",
+              "offered": [
+                "predictive-balanced",
+                "capacity-aware"
+              ],
+              "clears": [
+                "predictive-balanced"
+              ]
+            }
+          ]
+        },
+        {
+          "seed": "20260727500",
+          "tag": "live",
+          "alone": "mCmmmCmCmCmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260728500",
+          "tag": "live",
+          "alone": "mCCCCCCCCmmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260729500",
+          "tag": "dead",
+          "alone": "mmmmmmmmmmmmm",
+          "calls": [
+            {
+              "by": "predictive-balanced",
+              "atS": 2444,
+              "question": "placement",
+              "clears": []
+            },
+            {
+              "by": "predictive-balanced",
+              "atS": 2751,
+              "question": "driver",
+              "offered": [
+                "fairness-first",
+                "capacity-aware"
+              ],
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2720,
+              "question": "driver",
+              "offered": [
+                "predictive-balanced",
+                "capacity-aware"
+              ],
+              "clears": []
+            }
+          ]
+        },
+        {
+          "seed": "20260730500",
+          "tag": "live",
+          "alone": "mCmmCCCCCCCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260731500",
+          "tag": "dead",
+          "alone": "mmmmmmmmmmmmm",
+          "calls": [
+            {
+              "by": "predictive-balanced",
+              "atS": 2304,
+              "question": "placement",
+              "clears": []
+            },
+            {
+              "by": "predictive-balanced",
+              "atS": 2904,
+              "question": "driver",
+              "offered": [
+                "fairness-first",
+                "capacity-aware"
+              ],
+              "clears": []
+            },
+            {
+              "by": "predictive-balanced",
+              "atS": 9328,
+              "question": "placement",
+              "clears": []
+            },
+            {
+              "by": "predictive-balanced",
+              "atS": 15966,
+              "question": "driver",
+              "offered": [
+                "fairness-first",
+                "capacity-aware"
+              ],
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2304,
+              "question": "placement",
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2724,
+              "question": "driver",
+              "offered": [
+                "predictive-balanced",
+                "capacity-aware"
+              ],
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 9421,
+              "question": "placement",
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 16034,
+              "question": "driver",
+              "offered": [
+                "predictive-balanced",
+                "capacity-aware"
+              ],
+              "clears": []
+            }
+          ]
+        },
+        {
+          "seed": "20260801500",
+          "tag": "live",
+          "alone": "mCCmmCCCCCCmC",
+          "calls": []
+        },
+        {
+          "seed": "20260802500",
+          "tag": "live",
+          "alone": "mmmmmCmmCCmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260803500",
+          "tag": "live",
+          "alone": "mCmmmCCCCCCmm",
+          "calls": []
+        },
+        {
+          "seed": "20260804500",
+          "tag": "live",
+          "alone": "mmmmmCCCmCmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260805500",
+          "tag": "live",
+          "alone": "mmmCCCCCmmCmm",
+          "calls": []
+        },
+        {
+          "seed": "20260806500",
+          "tag": "live",
+          "alone": "mCmmCCCCCCCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260807500",
+          "tag": "live",
+          "alone": "mCmmCmCCCCmCm",
+          "calls": []
+        },
+        {
+          "seed": "20260808500",
+          "tag": "live",
+          "alone": "mCmmCCCCCCCmm",
+          "calls": []
+        },
+        {
+          "seed": "20260809500",
+          "tag": "live",
+          "alone": "mCmmmCCCCCCmm",
+          "calls": []
+        }
+      ]
+    },
+    {
+      "key": "midtown-early-lift|1|shift-change:tight|maintenance:main/C@0-0.4",
+      "orderId": "midtown-early-lift",
+      "day": 1,
+      "eventId": "shift-change:tight",
+      "bookings": [
+        {
+          "kind": "maintenance",
+          "bankId": "main",
+          "carId": "C",
+          "fromFraction": 0,
+          "toFraction": 0.4
+        }
+      ],
+      "banded": [
+        "predictive-balanced",
+        "fairness-first"
+      ],
+      "crowds": [
+        {
+          "seed": "20260701100",
+          "tag": "live",
+          "alone": "mmmmmCmmmmmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260702100",
+          "tag": "live",
+          "alone": "mmCCmCmCmmmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260703100",
+          "tag": "live",
+          "alone": "mCCmmCCCCCCCm",
+          "calls": []
+        },
+        {
+          "seed": "20260704100",
+          "tag": "live",
+          "alone": "mmCmmCmmmmmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260705100",
+          "tag": "live",
+          "alone": "mmmmmCmmmmmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260706100",
+          "tag": "live",
+          "alone": "mmmmCCCCCCCCm",
+          "calls": []
+        },
+        {
+          "seed": "20260707100",
+          "tag": "live",
+          "alone": "mCCCCCCCCCCCm",
+          "calls": []
+        },
+        {
+          "seed": "20260708100",
+          "tag": "dead",
+          "alone": "mmmmmmmmmmmmm",
+          "calls": [
+            {
+              "by": "predictive-balanced",
+              "atS": 2181,
+              "question": "driver",
+              "offered": [
+                "fairness-first",
+                "capacity-aware"
+              ],
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2415,
+              "question": "driver",
+              "offered": [
+                "predictive-balanced",
+                "capacity-aware"
+              ],
+              "clears": []
+            }
+          ]
+        },
+        {
+          "seed": "20260709100",
+          "tag": "live",
+          "alone": "mCCCCCCCCCCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260710100",
+          "tag": "dead",
+          "alone": "mmmmmmmmmmmmm",
+          "calls": [
+            {
+              "by": "predictive-balanced",
+              "atS": 1976,
+              "question": "placement",
+              "clears": []
+            },
+            {
+              "by": "predictive-balanced",
+              "atS": 2896,
+              "question": "driver",
+              "offered": [
+                "fairness-first",
+                "capacity-aware"
+              ],
+              "clears": []
+            }
+          ]
+        },
+        {
+          "seed": "20260711100",
+          "tag": "live",
+          "alone": "mCmmCCCCCCCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260712100",
+          "tag": "live",
+          "alone": "mCmmCCmCCCCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260713100",
+          "tag": "dead",
+          "alone": "mmmmmmmmmmmmm",
+          "calls": [
+            {
+              "by": "predictive-balanced",
+              "atS": 2751,
+              "question": "driver",
+              "offered": [
+                "fairness-first",
+                "capacity-aware"
+              ],
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2451,
+              "question": "driver",
+              "offered": [
+                "predictive-balanced",
+                "capacity-aware"
+              ],
+              "clears": []
+            }
+          ]
+        },
+        {
+          "seed": "20260714100",
+          "tag": "live",
+          "alone": "mmCmmCmCmCCmC",
+          "calls": []
+        },
+        {
+          "seed": "20260715100",
+          "tag": "dead",
+          "alone": "mmmmmmmmmmmmm",
+          "calls": [
+            {
+              "by": "predictive-balanced",
+              "atS": 2256,
+              "question": "placement",
+              "clears": []
+            },
+            {
+              "by": "predictive-balanced",
+              "atS": 2556,
+              "question": "driver",
+              "offered": [
+                "fairness-first",
+                "capacity-aware"
+              ],
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2556,
+              "question": "driver",
+              "offered": [
+                "predictive-balanced",
+                "capacity-aware"
+              ],
+              "clears": []
+            }
+          ]
+        },
+        {
+          "seed": "20260716100",
+          "tag": "dead",
+          "alone": "mmmmmmmmmmmmm",
+          "calls": [
+            {
+              "by": "predictive-balanced",
+              "atS": 2361,
+              "question": "driver",
+              "offered": [
+                "fairness-first",
+                "capacity-aware"
+              ],
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2197,
+              "question": "placement",
+              "clears": []
+            }
+          ]
+        },
+        {
+          "seed": "20260717100",
+          "tag": "live",
+          "alone": "mCCCmCCCCCCCm",
+          "calls": []
+        },
+        {
+          "seed": "20260718100",
+          "tag": "live",
+          "alone": "mCmmmCmmmCmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260719100",
+          "tag": "live",
+          "alone": "mCmCCCCCCCCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260720100",
+          "tag": "live",
+          "alone": "mmCmmCmmCmmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260721100",
+          "tag": "dead",
+          "alone": "mmmmmmmmmmmmm",
+          "calls": [
+            {
+              "by": "predictive-balanced",
+              "atS": 2524,
+              "question": "driver",
+              "offered": [
+                "fairness-first",
+                "capacity-aware"
+              ],
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2849,
+              "question": "driver",
+              "offered": [
+                "predictive-balanced",
+                "capacity-aware"
+              ],
+              "clears": []
+            }
+          ]
+        },
+        {
+          "seed": "20260722100",
+          "tag": "dead",
+          "alone": "mmmmmmmmmmmmm",
+          "calls": [
+            {
+              "by": "predictive-balanced",
+              "atS": 2259,
+              "question": "placement",
+              "clears": []
+            },
+            {
+              "by": "predictive-balanced",
+              "atS": 2559,
+              "question": "driver",
+              "offered": [
+                "fairness-first",
+                "capacity-aware"
+              ],
+              "clears": []
+            }
+          ]
+        },
+        {
+          "seed": "20260723100",
+          "tag": "live",
+          "alone": "mCmmmCCCCCCCm",
+          "calls": []
+        },
+        {
+          "seed": "20260724100",
+          "tag": "live",
+          "alone": "mCmCCCCCCCCCm",
+          "calls": []
+        },
+        {
+          "seed": "20260725100",
+          "tag": "live",
+          "alone": "mmmmmCCCmmmmC",
+          "calls": []
+        },
+        {
+          "seed": "20260726100",
+          "tag": "live",
+          "alone": "mmmmmCmCCmmCC",
+          "calls": []
+        },
+        {
+          "seed": "20260727100",
+          "tag": "live",
+          "alone": "mCmmmmCCCCCCm",
+          "calls": []
+        },
+        {
+          "seed": "20260728100",
+          "tag": "need",
+          "alone": "mmmmmmmmCmmmm",
+          "calls": [
+            {
+              "by": "predictive-balanced",
+              "atS": 2444,
+              "question": "driver",
+              "offered": [
+                "fairness-first",
+                "capacity-aware"
+              ],
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2338,
+              "question": "driver",
+              "offered": [
+                "predictive-balanced",
+                "capacity-aware"
+              ],
+              "clears": []
+            }
+          ]
+        },
+        {
+          "seed": "20260729100",
+          "tag": "live",
+          "alone": "mCmCmCCCmCmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260730100",
+          "tag": "live",
+          "alone": "mCCmCCCCCCCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260731100",
+          "tag": "live",
+          "alone": "mmmmmCCCCmmCm",
+          "calls": []
+        },
+        {
+          "seed": "20260801100",
+          "tag": "dead",
+          "alone": "mmmmmmmmmmmmm",
+          "calls": [
+            {
+              "by": "predictive-balanced",
+              "atS": 2428,
+              "question": "driver",
+              "offered": [
+                "fairness-first",
+                "capacity-aware"
+              ],
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2428,
+              "question": "driver",
+              "offered": [
+                "predictive-balanced",
+                "capacity-aware"
+              ],
+              "clears": []
+            }
+          ]
+        },
+        {
+          "seed": "20260802100",
+          "tag": "dead",
+          "alone": "mmmmmmmmmmmmm",
+          "calls": [
+            {
+              "by": "predictive-balanced",
+              "atS": 2191,
+              "question": "placement",
+              "clears": []
+            },
+            {
+              "by": "predictive-balanced",
+              "atS": 2791,
+              "question": "driver",
+              "offered": [
+                "fairness-first",
+                "capacity-aware"
+              ],
+              "clears": []
+            },
+            {
+              "by": "predictive-balanced",
+              "atS": 15601,
+              "question": "driver",
+              "offered": [
+                "fairness-first",
+                "capacity-aware"
+              ],
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2827,
+              "question": "driver",
+              "offered": [
+                "predictive-balanced",
+                "capacity-aware"
+              ],
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 15653,
+              "question": "placement",
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 15961,
+              "question": "driver",
+              "offered": [
+                "predictive-balanced",
+                "capacity-aware"
+              ],
+              "clears": []
+            }
+          ]
+        },
+        {
+          "seed": "20260803100",
+          "tag": "live",
+          "alone": "mCmmmCmmmmmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260804100",
+          "tag": "dead",
+          "alone": "mmmmmmmmmmmmm",
+          "calls": [
+            {
+              "by": "predictive-balanced",
+              "atS": 2234,
+              "question": "driver",
+              "offered": [
+                "fairness-first",
+                "capacity-aware"
+              ],
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2567,
+              "question": "driver",
+              "offered": [
+                "predictive-balanced",
+                "capacity-aware"
+              ],
+              "clears": []
+            }
+          ]
+        },
+        {
+          "seed": "20260805100",
+          "tag": "live",
+          "alone": "mCCCCCCCCCCCm",
+          "calls": []
+        },
+        {
+          "seed": "20260806100",
+          "tag": "live",
+          "alone": "mmCCCCmCmmmCm",
+          "calls": []
+        },
+        {
+          "seed": "20260807100",
+          "tag": "live",
+          "alone": "mCCCCCCCCCmCC",
+          "calls": []
+        },
+        {
+          "seed": "20260808100",
+          "tag": "live",
+          "alone": "mCmmmCmmmmmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260809100",
+          "tag": "live",
+          "alone": "mCCmmCCCmCCCm",
+          "calls": []
+        }
+      ]
+    },
+    {
+      "key": "midtown-early-lift|2|evacuation-drill:all-at-once|maintenance:main/C@0-0.4",
+      "orderId": "midtown-early-lift",
+      "day": 2,
+      "eventId": "evacuation-drill:all-at-once",
+      "bookings": [
+        {
+          "kind": "maintenance",
+          "bankId": "main",
+          "carId": "C",
+          "fromFraction": 0,
+          "toFraction": 0.4
+        }
+      ],
+      "banded": [
+        "predictive-balanced",
+        "fairness-first"
+      ],
+      "crowds": [
+        {
+          "seed": "20260701200",
+          "tag": "live",
+          "alone": "mmCmCCCmmmmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260702200",
+          "tag": "live",
+          "alone": "mmmmmCmCmCmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260703200",
+          "tag": "live",
+          "alone": "mCCmCCCCCCCCm",
+          "calls": []
+        },
+        {
+          "seed": "20260704200",
+          "tag": "live",
+          "alone": "mmmmmCmmmmmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260705200",
+          "tag": "live",
+          "alone": "mmmmCCCCCCmCm",
+          "calls": []
+        },
+        {
+          "seed": "20260706200",
+          "tag": "live",
+          "alone": "mCmmmCCCCmCmm",
+          "calls": []
+        },
+        {
+          "seed": "20260707200",
+          "tag": "dead",
+          "alone": "mmmmmmmmmmmmm",
+          "calls": [
+            {
+              "by": "predictive-balanced",
+              "atS": 2390,
+              "question": "driver",
+              "offered": [
+                "fairness-first",
+                "capacity-aware"
+              ],
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2411,
+              "question": "driver",
+              "offered": [
+                "predictive-balanced",
+                "capacity-aware"
+              ],
+              "clears": []
+            }
+          ]
+        },
+        {
+          "seed": "20260708200",
+          "tag": "live",
+          "alone": "mmmmmCCCCmmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260709200",
+          "tag": "dead",
+          "alone": "mmmmmmmmmmmmm",
+          "calls": [
+            {
+              "by": "predictive-balanced",
+              "atS": 2516,
+              "question": "driver",
+              "offered": [
+                "fairness-first",
+                "capacity-aware"
+              ],
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2567,
+              "question": "driver",
+              "offered": [
+                "predictive-balanced",
+                "capacity-aware"
+              ],
+              "clears": []
+            }
+          ]
+        },
+        {
+          "seed": "20260710200",
+          "tag": "live",
+          "alone": "mmmCmCCCmCmCm",
+          "calls": []
+        },
+        {
+          "seed": "20260711200",
+          "tag": "need",
+          "alone": "mmmmmmmmmmmmm",
+          "calls": [
+            {
+              "by": "predictive-balanced",
+              "atS": 2561,
+              "question": "driver",
+              "offered": [
+                "fairness-first",
+                "capacity-aware"
+              ],
+              "clears": [
+                "fairness-first"
+              ]
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2568,
+              "question": "driver",
+              "offered": [
+                "predictive-balanced",
+                "capacity-aware"
+              ],
+              "clears": []
+            }
+          ]
+        },
+        {
+          "seed": "20260712200",
+          "tag": "dead",
+          "alone": "mmmmmmmmmmmmm",
+          "calls": [
+            {
+              "by": "predictive-balanced",
+              "atS": 2436,
+              "question": "driver",
+              "offered": [
+                "fairness-first",
+                "capacity-aware"
+              ],
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2570,
+              "question": "driver",
+              "offered": [
+                "predictive-balanced",
+                "capacity-aware"
+              ],
+              "clears": []
+            }
+          ]
+        },
+        {
+          "seed": "20260713200",
+          "tag": "live",
+          "alone": "mmmmmmmCCmmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260714200",
+          "tag": "dead",
+          "alone": "mmmmmmmmmmmmm",
+          "calls": [
+            {
+              "by": "predictive-balanced",
+              "atS": 2206,
+              "question": "driver",
+              "offered": [
+                "fairness-first",
+                "capacity-aware"
+              ],
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2397,
+              "question": "driver",
+              "offered": [
+                "predictive-balanced",
+                "capacity-aware"
+              ],
+              "clears": []
+            }
+          ]
+        },
+        {
+          "seed": "20260715200",
+          "tag": "live",
+          "alone": "mmmmmCmCmmmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260716200",
+          "tag": "live",
+          "alone": "mmmmmCmmmmmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260717200",
+          "tag": "live",
+          "alone": "mmmmmCmmmmmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260718200",
+          "tag": "live",
+          "alone": "mmmmCCmCCCmCm",
+          "calls": []
+        },
+        {
+          "seed": "20260719200",
+          "tag": "dead",
+          "alone": "mmmmmmmmmmmmm",
+          "calls": [
+            {
+              "by": "predictive-balanced",
+              "atS": 2275,
+              "question": "placement",
+              "clears": []
+            },
+            {
+              "by": "predictive-balanced",
+              "atS": 2575,
+              "question": "driver",
+              "offered": [
+                "fairness-first",
+                "capacity-aware"
+              ],
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2492,
+              "question": "placement",
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2792,
+              "question": "driver",
+              "offered": [
+                "predictive-balanced",
+                "capacity-aware"
+              ],
+              "clears": []
+            }
+          ]
+        },
+        {
+          "seed": "20260720200",
+          "tag": "live",
+          "alone": "mmmmCCCCCCCCC",
+          "calls": []
+        },
+        {
+          "seed": "20260721200",
+          "tag": "live",
+          "alone": "mmCCmCmCmmmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260722200",
+          "tag": "dead",
+          "alone": "mmmmmmmmmmmmm",
+          "calls": [
+            {
+              "by": "predictive-balanced",
+              "atS": 2747,
+              "question": "driver",
+              "offered": [
+                "fairness-first",
+                "capacity-aware"
+              ],
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2452,
+              "question": "driver",
+              "offered": [
+                "predictive-balanced",
+                "capacity-aware"
+              ],
+              "clears": []
+            }
+          ]
+        },
+        {
+          "seed": "20260723200",
+          "tag": "live",
+          "alone": "mCmmmCmCCmCmm",
+          "calls": []
+        },
+        {
+          "seed": "20260724200",
+          "tag": "dead",
+          "alone": "mmmmmmmmmmmmm",
+          "calls": [
+            {
+              "by": "predictive-balanced",
+              "atS": 2249,
+              "question": "driver",
+              "offered": [
+                "fairness-first",
+                "capacity-aware"
+              ],
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2249,
+              "question": "placement",
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2554,
+              "question": "driver",
+              "offered": [
+                "predictive-balanced",
+                "capacity-aware"
+              ],
+              "clears": []
+            }
+          ]
+        },
+        {
+          "seed": "20260725200",
+          "tag": "live",
+          "alone": "mmCCCCCCCCCmm",
+          "calls": []
+        },
+        {
+          "seed": "20260726200",
+          "tag": "live",
+          "alone": "mCmmCCCCCmCmC",
+          "calls": []
+        },
+        {
+          "seed": "20260727200",
+          "tag": "need",
+          "alone": "mmmmmmmmmmmmm",
+          "calls": [
+            {
+              "by": "predictive-balanced",
+              "atS": 2177,
+              "question": "driver",
+              "offered": [
+                "fairness-first",
+                "capacity-aware"
+              ],
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2177,
+              "question": "placement",
+              "clears": [
+                "park-cars-lobby",
+                "spread-cars"
+              ]
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2790,
+              "question": "driver",
+              "offered": [
+                "predictive-balanced",
+                "capacity-aware"
+              ],
+              "clears": [
+                "predictive-balanced"
+              ]
+            }
+          ]
+        },
+        {
+          "seed": "20260728200",
+          "tag": "dead",
+          "alone": "mmmmmmmmmmmmm",
+          "calls": [
+            {
+              "by": "predictive-balanced",
+              "atS": 2537,
+              "question": "placement",
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2437,
+              "question": "placement",
+              "clears": []
+            }
+          ]
+        },
+        {
+          "seed": "20260729200",
+          "tag": "live",
+          "alone": "mmmmmCCCCCmCC",
+          "calls": []
+        },
+        {
+          "seed": "20260730200",
+          "tag": "live",
+          "alone": "mmmmmCmmmmmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260731200",
+          "tag": "live",
+          "alone": "mmmmmCmmmmmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260801200",
+          "tag": "live",
+          "alone": "mmmmmmmCmmmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260802200",
+          "tag": "dead",
+          "alone": "mmmmmmmmmmmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260803200",
+          "tag": "live",
+          "alone": "mmmmmCmCmmmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260804200",
+          "tag": "dead",
+          "alone": "mmmmmmmmmmmmm",
+          "calls": [
+            {
+              "by": "predictive-balanced",
+              "atS": 2018,
+              "question": "placement",
+              "clears": []
+            },
+            {
+              "by": "predictive-balanced",
+              "atS": 2318,
+              "question": "driver",
+              "offered": [
+                "fairness-first",
+                "capacity-aware"
+              ],
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2018,
+              "question": "placement",
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2346,
+              "question": "driver",
+              "offered": [
+                "predictive-balanced",
+                "capacity-aware"
+              ],
+              "clears": []
+            }
+          ]
+        },
+        {
+          "seed": "20260805200",
+          "tag": "live",
+          "alone": "mmmmmCmmmCmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260806200",
+          "tag": "live",
+          "alone": "mmmmCmCCmmmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260807200",
+          "tag": "live",
+          "alone": "mmmmmCmmmmmmm",
+          "calls": []
+        },
+        {
+          "seed": "20260808200",
+          "tag": "dead",
+          "alone": "mmmmmmmmmmmmm",
+          "calls": [
+            {
+              "by": "predictive-balanced",
+              "atS": 2480,
+              "question": "driver",
+              "offered": [
+                "fairness-first",
+                "capacity-aware"
+              ],
+              "clears": []
+            },
+            {
+              "by": "fairness-first",
+              "atS": 2529,
+              "question": "driver",
+              "offered": [
+                "predictive-balanced",
+                "capacity-aware"
+              ],
+              "clears": []
+            }
+          ]
+        },
+        {
+          "seed": "20260809200",
+          "tag": "live",
+          "alone": "mmmmmCmmmCmmm",
+          "calls": []
+        }
+      ]
+    }
+  ]
+}

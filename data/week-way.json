@@ -28,14 +28,14 @@
       "contractId": "c2",
       "day": 1,
       "eventId": "ordinary",
-      "growthPerDay": 0.11,
+      "growthPerDay": 0.02,
       "breather": false,
       "chosen": {
         "dispatcherId": "predictive-balanced",
-        "press": "spread-cars",
+        "press": "park-cars-lobby",
         "atFraction": 0.43
       },
-      "tuningClears": 8,
+      "tuningClears": 7,
       "tuningN": 8,
       "chosenVerdicts": "CCCCCCCCCCCCCCCCCCCC",
       "standingVerdicts": "CmmCmmmCmCCmmmmmmCCm",
@@ -57,7 +57,7 @@
       "tuningClears": 8,
       "tuningN": 8,
       "chosenVerdicts": "CCCCCCCCCCCCCCCCCCCC",
-      "standingVerdicts": "mmCCmmmCCmmCmCmCmmmC",
+      "standingVerdicts": "mmCCmmmCCmmCmCmCmmCC",
       "queueOnlyMisses": 0,
       "lowestPeakQueue": 12,
       "screenRuns": 130
@@ -76,7 +76,7 @@
       "tuningClears": 8,
       "tuningN": 8,
       "chosenVerdicts": "CCCCCCCCCCCCCCCCCCCC",
-      "standingVerdicts": "mmCCmmmCCmmCmCmCmmmC",
+      "standingVerdicts": "mmCCmmmCCmmCmCmCmmCC",
       "queueOnlyMisses": 0,
       "lowestPeakQueue": 12,
       "screenRuns": 130
@@ -95,7 +95,7 @@
       "tuningClears": 8,
       "tuningN": 8,
       "chosenVerdicts": "CCCCCCCCCCCCCCCCCCCC",
-      "standingVerdicts": "mmCCmmmmCmmCmCmCmmmC",
+      "standingVerdicts": "mmCCmmmmCmmCmCmCmmCC",
       "queueOnlyMisses": 0,
       "lowestPeakQueue": 12,
       "screenRuns": 130
@@ -113,9 +113,9 @@
       },
       "tuningClears": 8,
       "tuningN": 8,
-      "chosenVerdicts": "CCCCCCCCCCCCmmCCCCCC",
-      "standingVerdicts": "mmCmmCCmmmmmmmmmCmmm",
-      "queueOnlyMisses": 2,
+      "chosenVerdicts": "CCCCCCCCmCCCmmCCCCCC",
+      "standingVerdicts": "mmCmmCmmmmmmmmmmCmmm",
+      "queueOnlyMisses": 3,
       "lowestPeakQueue": 12,
       "screenRuns": 130
     },
@@ -130,7 +130,7 @@
         "press": "",
         "atFraction": 0
       },
-      "tuningClears": 7,
+      "tuningClears": 8,
       "tuningN": 8,
       "chosenVerdicts": "CCCCCCCCCmCCCmmmCCmC",
       "standingVerdicts": "CmmmCmmmmmmmmmmmmmmm",
@@ -168,7 +168,7 @@
         "press": "",
         "atFraction": 0
       },
-      "tuningClears": 7,
+      "tuningClears": 8,
       "tuningN": 8,
       "chosenVerdicts": "CCCCCCCCCmCmmmmmCCmC",
       "standingVerdicts": "CmmmCmmmmmmmmmmmmmmm",
@@ -187,7 +187,7 @@
         "press": "",
         "atFraction": 0
       },
-      "tuningClears": 7,
+      "tuningClears": 8,
       "tuningN": 8,
       "chosenVerdicts": "CCCCCCCCCmCmmmmmCCmC",
       "standingVerdicts": "CmmmCmmmmmmmmmmmmmmm",
@@ -266,7 +266,7 @@
       "tuningClears": 8,
       "tuningN": 8,
       "chosenVerdicts": "CCCCCmCCCCCCCCCCCCCC",
-      "standingVerdicts": "mCCmCmmCmCmCCmCCmmmC",
+      "standingVerdicts": "mCCmCmmCmCmCCCCCmmmC",
       "queueOnlyMisses": 0,
       "lowestPeakQueue": 11,
       "screenRuns": 130
@@ -285,7 +285,7 @@
       "tuningClears": 7,
       "tuningN": 8,
       "chosenVerdicts": "CCCCCCCCCCCCCCCCCCCC",
-      "standingVerdicts": "CmmmCmmmmCmCmCCmCCmm",
+      "standingVerdicts": "CmmmCmmmmCmCCCCmCCmm",
       "queueOnlyMisses": 0,
       "lowestPeakQueue": 9,
       "screenRuns": 130
@@ -299,7 +299,7 @@
       "chosen": {
         "dispatcherId": "fairness-first",
         "press": "spread-cars",
-        "atFraction": 0.2
+        "atFraction": 0.43
       },
       "tuningClears": 8,
       "tuningN": 8,
@@ -342,7 +342,7 @@
       "tuningClears": 8,
       "tuningN": 8,
       "chosenVerdicts": "CCCCCCCCCCmCCCCCCCCC",
-      "standingVerdicts": "mmmmCmCCmmmmmmmCmmmm",
+      "standingVerdicts": "mmmmCmCCCmmCmmmCmmmm",
       "queueOnlyMisses": 0,
       "lowestPeakQueue": 12,
       "screenRuns": 130
@@ -380,7 +380,7 @@
       "tuningClears": 8,
       "tuningN": 8,
       "chosenVerdicts": "CCCCCCCCCCCCmCmCCCCC",
-      "standingVerdicts": "mmmmmmmmmCmCmmmCmmCm",
+      "standingVerdicts": "mmmmmmmmmCmCmmmmmCCm",
       "queueOnlyMisses": 1,
       "lowestPeakQueue": 11,
       "screenRuns": 130
@@ -487,15 +487,15 @@
       "growthPerDay": 0.02,
       "breather": false,
       "chosen": {
-        "dispatcherId": "predictive-balanced",
-        "press": "spread-cars",
-        "atFraction": 0.43
+        "dispatcherId": "auction-multi-round",
+        "press": "",
+        "atFraction": 0
       },
-      "tuningClears": 6,
+      "tuningClears": 5,
       "tuningN": 8,
-      "chosenVerdicts": "CCCCCCCCCmCCmmCmCCCm",
+      "chosenVerdicts": "CCmCmCCCCmmCmmmmCCmC",
       "standingVerdicts": "mCmmmmmmmmmmmmmmmmmm",
-      "queueOnlyMisses": 3,
+      "queueOnlyMisses": 5,
       "lowestPeakQueue": 12,
       "screenRuns": 130
     },
@@ -512,9 +512,9 @@
       },
       "tuningClears": 4,
       "tuningN": 8,
-      "chosenVerdicts": "CCCmCCCCCmmmmmmCCmmm",
+      "chosenVerdicts": "CCCmmCCCCmmmmmmCCmmm",
       "standingVerdicts": "mmmmmmmmmmmmmmmmmmmm",
-      "queueOnlyMisses": 2,
+      "queueOnlyMisses": 3,
       "lowestPeakQueue": 13,
       "screenRuns": 130
     },
@@ -532,7 +532,7 @@
       "tuningClears": 6,
       "tuningN": 8,
       "chosenVerdicts": "CCCCCCCCCmCmmmCCmmCC",
-      "standingVerdicts": "mmmCmmmmmmmmmmmmmmmm",
+      "standingVerdicts": "mmmCmmmmCmmmmmmmmmmm",
       "queueOnlyMisses": 2,
       "lowestPeakQueue": 11,
       "screenRuns": 130
@@ -548,7 +548,7 @@
         "press": "",
         "atFraction": 0
       },
-      "tuningClears": 7,
+      "tuningClears": 8,
       "tuningN": 8,
       "chosenVerdicts": "CCCCCCCCCmCmmmmmCCmC",
       "standingVerdicts": "CmmmCmmmmmmmmmmmmmmm",
@@ -665,7 +665,7 @@
       "tuningClears": 6,
       "tuningN": 8,
       "chosenVerdicts": "CmCCmCCmmCCCCCCCCCCm",
-      "standingVerdicts": "mmCCmmmmmmmCCmmCCmmm",
+      "standingVerdicts": "CmCCmmmmmCmCCmmCCmmm",
       "queueOnlyMisses": 5,
       "lowestPeakQueue": 22,
       "screenRuns": 130
@@ -678,14 +678,14 @@
       "breather": false,
       "chosen": {
         "dispatcherId": "predictive-balanced",
-        "press": "",
-        "atFraction": 0
+        "press": "park-cars-lobby",
+        "atFraction": 0.43
       },
-      "tuningClears": 2,
+      "tuningClears": 3,
       "tuningN": 8,
-      "chosenVerdicts": "mmmmmmmmmCmmmmmmmmCm",
+      "chosenVerdicts": "mmmmmmmmmCmmmmmCmmCm",
       "standingVerdicts": "mmmmmmmmmmmmmmmmmmmm",
-      "queueOnlyMisses": 18,
+      "queueOnlyMisses": 17,
       "lowestPeakQueue": 42,
       "screenRuns": 130
     },
@@ -697,14 +697,14 @@
       "breather": false,
       "chosen": {
         "dispatcherId": "predictive-balanced",
-        "press": "spread-cars",
-        "atFraction": 0.2
+        "press": "",
+        "atFraction": 0
       },
-      "tuningClears": 1,
+      "tuningClears": 2,
       "tuningN": 8,
-      "chosenVerdicts": "mmmmmmmmmCmmmmmmmmmm",
+      "chosenVerdicts": "mmmmmmmmmmmmmmmmmmmm",
       "standingVerdicts": "mmmmmmmmmmmmmmmmmmmm",
-      "queueOnlyMisses": 19,
+      "queueOnlyMisses": 20,
       "lowestPeakQueue": 29,
       "screenRuns": 130
     },
@@ -735,14 +735,14 @@
       "breather": false,
       "chosen": {
         "dispatcherId": "predictive-balanced",
-        "press": "park-cars-lobby",
-        "atFraction": 0.43
+        "press": "spread-cars",
+        "atFraction": 0.2
       },
       "tuningClears": 0,
       "tuningN": 8,
       "chosenVerdicts": "mmmmmmmmmmmmmmmmmmmm",
       "standingVerdicts": "mmmmmmmmmmmmmmmmmmmm",
-      "queueOnlyMisses": 13,
+      "queueOnlyMisses": 15,
       "lowestPeakQueue": 113,
       "screenRuns": 130
     },
@@ -754,14 +754,14 @@
       "breather": false,
       "chosen": {
         "dispatcherId": "predictive-balanced",
-        "press": "park-cars-lobby",
-        "atFraction": 0.43
+        "press": "",
+        "atFraction": 0
       },
       "tuningClears": 8,
       "tuningN": 8,
-      "chosenVerdicts": "CmCCCCmCCCCCmCmCCCCC",
+      "chosenVerdicts": "CmCCCCCCCCCCmCmCCCCC",
       "standingVerdicts": "mmCCCCmCCmCmmmmCCCCC",
-      "queueOnlyMisses": 4,
+      "queueOnlyMisses": 3,
       "lowestPeakQueue": 14,
       "screenRuns": 130
     },
@@ -773,14 +773,14 @@
       "breather": false,
       "chosen": {
         "dispatcherId": "predictive-balanced",
-        "press": "park-cars-lobby",
-        "atFraction": 0.43
+        "press": "",
+        "atFraction": 0
       },
       "tuningClears": 7,
       "tuningN": 8,
-      "chosenVerdicts": "CmCCCmmCCCCCmCmCCCmC",
+      "chosenVerdicts": "CmCCCCmCCCCCmCmCCCmC",
       "standingVerdicts": "mmCCCCmCCmCmmmmmCCCC",
-      "queueOnlyMisses": 6,
+      "queueOnlyMisses": 5,
       "lowestPeakQueue": 14,
       "screenRuns": 130
     },
@@ -792,14 +792,14 @@
       "breather": false,
       "chosen": {
         "dispatcherId": "predictive-balanced",
-        "press": "park-cars-lobby",
-        "atFraction": 0.43
+        "press": "",
+        "atFraction": 0
       },
       "tuningClears": 7,
       "tuningN": 8,
-      "chosenVerdicts": "CmCCCmmCCCCCmCmCCCmC",
+      "chosenVerdicts": "CmCCCCmCCCCCmCmCCCmC",
       "standingVerdicts": "mmCCCCmCCmCmmmmmCCCC",
-      "queueOnlyMisses": 6,
+      "queueOnlyMisses": 5,
       "lowestPeakQueue": 14,
       "screenRuns": 130
     },
@@ -811,14 +811,14 @@
       "breather": false,
       "chosen": {
         "dispatcherId": "predictive-balanced",
-        "press": "park-cars-lobby",
-        "atFraction": 0.43
+        "press": "",
+        "atFraction": 0
       },
       "tuningClears": 7,
       "tuningN": 8,
-      "chosenVerdicts": "CmCCCmmCCCCCmmmCCCmC",
+      "chosenVerdicts": "CmCCCCmCCCCCmmmCCCmC",
       "standingVerdicts": "mmCCCCmCCmCmmmmmCCmC",
-      "queueOnlyMisses": 7,
+      "queueOnlyMisses": 6,
       "lowestPeakQueue": 14,
       "screenRuns": 130
     },
@@ -835,9 +835,9 @@
       },
       "tuningClears": 7,
       "tuningN": 8,
-      "chosenVerdicts": "CmCCCCCCCCCCCmmCCCCC",
-      "standingVerdicts": "CmmmmCmCCCmmmmmmCCmC",
-      "queueOnlyMisses": 3,
+      "chosenVerdicts": "CmCCCCmCCCCCCmmCCCCC",
+      "standingVerdicts": "CmmmmCmCCCmmmmmmCCCC",
+      "queueOnlyMisses": 4,
       "lowestPeakQueue": 15,
       "screenRuns": 130
     },
@@ -854,9 +854,9 @@
       },
       "tuningClears": 7,
       "tuningN": 8,
-      "chosenVerdicts": "CmCmmmmCCCCCmmmCCCmC",
+      "chosenVerdicts": "CmCmmCmCCCCCmmmCCCmC",
       "standingVerdicts": "mmCmCCmCCmCmmmmmCCmC",
-      "queueOnlyMisses": 9,
+      "queueOnlyMisses": 8,
       "lowestPeakQueue": 14,
       "screenRuns": 130
     },
@@ -892,9 +892,9 @@
       },
       "tuningClears": 6,
       "tuningN": 8,
-      "chosenVerdicts": "CmCmmmmCCCCmmmmmCCmm",
-      "standingVerdicts": "mmCmCCmCCmCmmmmmCCmC",
-      "queueOnlyMisses": 12,
+      "chosenVerdicts": "CmCmmCmCCCCmmmmmCCmm",
+      "standingVerdicts": "mmCmCCmCCmmmmmmmCCmC",
+      "queueOnlyMisses": 11,
       "lowestPeakQueue": 14,
       "screenRuns": 130
     },
@@ -911,9 +911,9 @@
       },
       "tuningClears": 6,
       "tuningN": 8,
-      "chosenVerdicts": "CmCmmmmCCCCmmmmmCCmm",
-      "standingVerdicts": "mmCmCCmCCmCmmmmmCCmC",
-      "queueOnlyMisses": 12,
+      "chosenVerdicts": "CmCmmCmCCCCmmmmmCCmm",
+      "standingVerdicts": "mmCmCCmCCmmmmmmmCCmC",
+      "queueOnlyMisses": 11,
       "lowestPeakQueue": 14,
       "screenRuns": 130
     },
@@ -931,7 +931,7 @@
       "tuningClears": 8,
       "tuningN": 8,
       "chosenVerdicts": "CCCCCCCCCCmCCmCmCCCC",
-      "standingVerdicts": "mmCCmmCmCCmCmmCmmmCm",
+      "standingVerdicts": "mmCCmmCmCCmCmmCmmmCC",
       "queueOnlyMisses": 3,
       "lowestPeakQueue": 15,
       "screenRuns": 130
@@ -950,7 +950,7 @@
       "tuningClears": 8,
       "tuningN": 8,
       "chosenVerdicts": "CCCCCCCCCCmCmmCmCCCC",
-      "standingVerdicts": "mmCCmmCmCCmCmmCmmmCm",
+      "standingVerdicts": "mmCCmmCmCCmCmmCmmmCC",
       "queueOnlyMisses": 4,
       "lowestPeakQueue": 15,
       "screenRuns": 130
@@ -969,7 +969,7 @@
       "tuningClears": 8,
       "tuningN": 8,
       "chosenVerdicts": "CCCCCCCCCCmCmmCmCCCC",
-      "standingVerdicts": "mmCCmmCmCCmCmmCmmmCm",
+      "standingVerdicts": "mmCCmmCmCCmCmmCmmmCC",
       "queueOnlyMisses": 4,
       "lowestPeakQueue": 15,
       "screenRuns": 130
@@ -982,14 +982,14 @@
       "breather": false,
       "chosen": {
         "dispatcherId": "fairness-first",
-        "press": "",
-        "atFraction": 0
+        "press": "spread-cars",
+        "atFraction": 0.2
       },
       "tuningClears": 8,
       "tuningN": 8,
-      "chosenVerdicts": "CCCCCmCCCCmCmmCmCCmC",
-      "standingVerdicts": "mmCCmmCmCCmmmmCmmmmm",
-      "queueOnlyMisses": 6,
+      "chosenVerdicts": "CCCCCCCCCCmCmmCmCCmC",
+      "standingVerdicts": "mmCCmmCmCCmmmmCmmmmC",
+      "queueOnlyMisses": 5,
       "lowestPeakQueue": 15,
       "screenRuns": 130
     },
@@ -1001,12 +1001,12 @@
       "breather": false,
       "chosen": {
         "dispatcherId": "fairness-first",
-        "press": "park-cars-lobby",
-        "atFraction": 0.2
+        "press": "spread-cars",
+        "atFraction": 0.43
       },
       "tuningClears": 7,
       "tuningN": 8,
-      "chosenVerdicts": "CmCCCCCCmCCCmmmmCmmC",
+      "chosenVerdicts": "CmCCCCCCmmCCmmCmCmmC",
       "standingVerdicts": "CmmmCCCCmmmCmmmmmmmm",
       "queueOnlyMisses": 8,
       "lowestPeakQueue": 16,
@@ -1026,7 +1026,7 @@
       "tuningClears": 7,
       "tuningN": 8,
       "chosenVerdicts": "CCCmCCCCmCmCmmCmCCmC",
-      "standingVerdicts": "mmCmmmCmCCmmmmCmmmmm",
+      "standingVerdicts": "mmCmmmCmCCmmmmCmmmmC",
       "queueOnlyMisses": 7,
       "lowestPeakQueue": 15,
       "screenRuns": 130
@@ -1045,7 +1045,7 @@
       "tuningClears": 6,
       "tuningN": 8,
       "chosenVerdicts": "CmCCmmmCmmmCmmmmCCCC",
-      "standingVerdicts": "mmmmCmmCmmmCmmCmmCmC",
+      "standingVerdicts": "mmmmCmCCmmmCmmCmmCmC",
       "queueOnlyMisses": 11,
       "lowestPeakQueue": 18,
       "screenRuns": 130
@@ -1064,7 +1064,7 @@
       "tuningClears": 6,
       "tuningN": 8,
       "chosenVerdicts": "CmCmCmCCmmmCmmCmCCmC",
-      "standingVerdicts": "mmCmmmCmCmmmmmmmmmmm",
+      "standingVerdicts": "mmCmmmCmCmmmmmmmmmmC",
       "queueOnlyMisses": 10,
       "lowestPeakQueue": 15,
       "screenRuns": 130
@@ -1076,15 +1076,15 @@
       "growthPerDay": 0,
       "breather": false,
       "chosen": {
-        "dispatcherId": "auction-multi-round",
+        "dispatcherId": "predictive-balanced",
         "press": "spread-cars",
         "atFraction": 0.2
       },
       "tuningClears": 6,
       "tuningN": 8,
-      "chosenVerdicts": "CmCmmmCmmmmCmmCmmmmm",
-      "standingVerdicts": "mmCmmmCmCmmmmmmmmmmm",
-      "queueOnlyMisses": 15,
+      "chosenVerdicts": "CmCmCmCCmmmCmmCmCCmC",
+      "standingVerdicts": "mmCmmmCmCmmmmmmmmmmC",
+      "queueOnlyMisses": 10,
       "lowestPeakQueue": 15,
       "screenRuns": 130
     },
@@ -1102,7 +1102,7 @@
       "tuningClears": 5,
       "tuningN": 8,
       "chosenVerdicts": "CCCCCCCCmmmCmmCmmCmC",
-      "standingVerdicts": "mmCmmmmmmmmCmmmmmmmC",
+      "standingVerdicts": "mmCmmmmmmmmCmmmmmmCC",
       "queueOnlyMisses": 5,
       "lowestPeakQueue": 18,
       "screenRuns": 130
@@ -1120,7 +1120,7 @@
       },
       "tuningClears": 6,
       "tuningN": 8,
-      "chosenVerdicts": "CCCCmCCCmCmmmmCCCmCm",
+      "chosenVerdicts": "CCCCmCCCmCmmmmCCmmCm",
       "standingVerdicts": "mmmmmmmmmmmmmmmmmmmm",
       "queueOnlyMisses": 3,
       "lowestPeakQueue": 13,
@@ -1142,15 +1142,15 @@
       "growthPerDay": 0.02,
       "breather": false,
       "chosen": {
-        "dispatcherId": "fairness-first",
+        "dispatcherId": "predictive-balanced",
         "press": "spread-cars",
         "atFraction": 0.2
       },
       "tuningClears": 7,
       "tuningN": 8,
-      "chosenVerdicts": "CCCCCCCmCCmCmmCmCCCC",
+      "chosenVerdicts": "CCCCCCCCCCCCmmCmCCCC",
       "standingVerdicts": "CmmmmmmmmCmmmmmmCmmC",
-      "queueOnlyMisses": 1,
+      "queueOnlyMisses": 0,
       "lowestPeakQueue": 16,
       "screenRuns": 130
     },

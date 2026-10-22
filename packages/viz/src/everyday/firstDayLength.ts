@@ -91,39 +91,46 @@ export interface PinnedDayLength {
  * of watching between two decisions, so a slow part is now 80 simulated seconds at `4×` before the
  * call and as much after it. The day's later ordinary calls are not known to this measurement, and
  * each would add up to the allowance and a beat, so *about N min* is the day with no later call.
+ *
+ * **Re-measured in wave AU on the fixed engine** ([§ D1603](../../../../DECISIONS.md),
+ * [§ D1615](../../../../DECISIONS.md)), by `FIRST_DAY_LENGTH_OUT` on `ea49e27`. Three rows moved and
+ * `c10` did not. `c3`'s call now comes at 11 729.46 s, where it came at 9 929.738 s, and its skipped
+ * seconds moved with it; `c2` and `c6` keep their calls and only their skipped seconds moved. Every
+ * row keeps its peaks, its place between them and `asksOn`, and every sentence the brief draws reads
+ * the same minutes as before, so no player-facing word moved. Why the call moved is unmeasured.
  */
 export const PINNED_DAY_LENGTHS: readonly PinnedDayLength[] = Object.freeze([
   {
     contractId: 'c2',
     callAtS: 9613.907,
     toCallSlowS: 80,
-    toCallSkippedS: 8243.364,
+    toCallSkippedS: 8324.288,
     peaks: 3,
     peaksBefore: 1,
     inPeak: false,
-    middle: { recordedS: 36000, slowS: 160, skippedS: 30317.276 },
+    middle: { recordedS: 36000, slowS: 160, skippedS: 30398.2 },
     asksOn: true,
   },
   {
     contractId: 'c3',
-    callAtS: 9929.738,
+    callAtS: 11729.46,
     toCallSlowS: 80,
-    toCallSkippedS: 8653.316,
+    toCallSkippedS: 10453.039,
     peaks: 3,
     peaksBefore: 1,
     inPeak: false,
-    middle: { recordedS: 36000, slowS: 160, skippedS: 30145.653 },
+    middle: { recordedS: 36000, slowS: 160, skippedS: 30360.523 },
     asksOn: true,
   },
   {
     contractId: 'c6',
     callAtS: 9809.566,
     toCallSlowS: 80,
-    toCallSkippedS: 9263.602,
+    toCallSkippedS: 9375.538,
     peaks: 3,
     peaksBefore: 1,
     inPeak: false,
-    middle: { recordedS: 36000, slowS: 160, skippedS: 32758.474 },
+    middle: { recordedS: 36000, slowS: 160, skippedS: 32870.41 },
     asksOn: true,
   },
   {

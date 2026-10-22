@@ -372,13 +372,19 @@ describe('AC1 and AC2, asked of every member of the set on the pinned seeds', ()
      * is below half and this case's own heading says *most* — the count is the measurement, and
      * neither it nor the heading is adjusted to flatter the other.
      */
+    /*
+     * **`c7` goes 7 of 10 to 6 on the fixed engine** ([§ D1603](../../../../DECISIONS.md),
+     * [§ D1615](../../../../DECISIONS.md)), the same move `legibility.test.ts` pins on the same runs.
+     * The count is a measurement, as `c9`'s is: § D512's bar is more than a third of fifty seeds on
+     * the table, and this walk's heading is not a bar. Why it moved is unmeasured.
+     */
     expect(Object.fromEntries(Object.entries(legibleAt).map(([id, list]) => [id, list.length]))).toEqual({
       c2: 8,
       c3: 7,
       c4: 6,
       c5: 8,
       c6: 6,
-      c7: 7,
+      c7: 6,
       c8: 8,
       c9: 5,
       c10: 6,

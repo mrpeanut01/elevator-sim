@@ -207,11 +207,10 @@ describe.skipIf(!HAS_BROWSER)('GitHub issue #593 — a Scenario week plays from 
            */
           /*
            * Wave AN, lane DQ-2 (§ D1344): a week that was not held plays itself again as the primary,
-           * *Play week 1 again*, and *Go on to week 2* sits in the sheet beside it, because nothing is
-           * locked. The press taken on that arm is the one that goes on, and the brief it opens is
-           * week 2's.
+           * *Play week 1 again*, and a next week the tower deals sits in the sheet beside it, because
+           * nothing is locked. Since § D1616 Midtown deals none past its first, so that arm presses
+           * the primary.
            */
-          let wentOn = false;
           const targetMet = !(await textOf(page, '.everyday-week-sheet-target')).includes('not met');
           if ((await page.locator('.everyday-week-sheet-onward').count()) > 0) {
             expect(await textOf(page, '.everyday-bar-primary')).toMatch(/Play .+’s week/u);
@@ -222,13 +221,15 @@ describe.skipIf(!HAS_BROWSER)('GitHub issue #593 — a Scenario week plays from 
             expect(await page.locator('.everyday-week-sheet-go-on').count()).toBe(0);
             await page.locator('.everyday-bar-primary').click();
           } else {
+            /*
+             * § D1616: Midtown's one dealt order is held, so the tower deals no week past its first
+             * and a week not held offers no *Go on to week 2* beside *Play week 1 again*.
+             */
             expect(await textOf(page, '.everyday-bar-primary')).toContain('Play week 1 again');
-            expect(await textOf(page, '.everyday-week-sheet-go-on')).toBe('Go on to week 2');
-            await page.locator('.everyday-week-sheet-go-on').click();
-            wentOn = true;
+            expect(await page.locator('.everyday-week-sheet-go-on').count()).toBe(0);
+            await page.locator('.everyday-bar-primary').click();
           }
           await page.waitForSelector('.everyday-brief', { timeout: 15_000 });
-          if (wentOn) expect(await textOf(page, '.everyday-brief-eyebrow')).toMatch(/^WEEK 2 · MONDAY/u);
         }
       } finally {
         await page.close();
@@ -237,7 +238,7 @@ describe.skipIf(!HAS_BROWSER)('GitHub issue #593 — a Scenario week plays from 
   }
 });
 
-describe.skipIf(!HAS_BROWSER)('wave AO lane DS-1 — a held week 2 deals a level with a car booked out (§ D1400), withdrawn by the pool (§ D1461)', () => {
+describe.skipIf(!HAS_BROWSER)('wave AO lane DS-1 — a held week 2 dealt a level with a car booked out (§ D1400); since § D1616 Midtown deals none', () => {
   /*
    * Wave AO, lane DS-1 (§ D1400): Midtown's week 3 is week 2's order with car C booked out of
    * passenger service on Monday from 08:00 until 12:00. The control is the stored week's number, moved
@@ -245,7 +246,7 @@ describe.skipIf(!HAS_BROWSER)('wave AO lane DS-1 — a held week 2 deals a level
    * so car C appearing there is the booking on the run the next press makes. Red before: week 3's
    * Monday read as week 2's, with no booking on the door or the strip.
    */
-  it('deals no booking on the door or the brief’s strip once the stored week is week 3, whose level the pool withdraws', async () => {
+  it('deals no booking on the door or the brief’s strip once the stored week is week 3, because no week deals a level', async () => {
     const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
     const BOOKED = 'Car C is booked out of passenger service from the start of the day until 12:00';
     try {
@@ -277,9 +278,9 @@ describe.skipIf(!HAS_BROWSER)('wave AO lane DS-1 — a held week 2 deals a level
       await coldLoad(page, `building=midtown-office&seed=${String(SEED)}`);
       await openEverydayDoor(page);
       /*
-       * Since § D1461 the week pool withdraws Midtown's week 3 (the monotone clause over the pool as
-       * dealt), so the stored week 3 is dealt as week 2: no booking on the door or the strip. The
-       * level's booking reaching the run is held as the census plays it (`weekBookingReachesTheRun.test.ts`).
+       * Since § D1616 holds Midtown's one dealt order, no week deals a level, so the stored week 3 is
+       * dealt as week 1: no booking on the door or the strip. The level's booking reaching the run is
+       * tested on the census before the fix (`shift/weekBookingReachesTheRun.preD1603.test.ts`).
        */
       expect(await page.locator('.everyday-door-week-booked').count(), 'a withdrawn level named its booking').toBe(0);
       await page.locator('.everyday-bar-primary').click();

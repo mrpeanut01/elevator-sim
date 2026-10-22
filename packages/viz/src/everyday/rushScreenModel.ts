@@ -651,7 +651,9 @@ export function rushFactViews(
  * The cost of that refusal is GitHub issue **#565**'s second defect, and it is measured rather than
  * argued ([§ D857](../../../../DECISIONS.md), `everyday/rushHandover.test.ts`). On Harbour Point at
  * the rush's own seed, `predictive-balanced` **set before the run** holds **2 766 s**, which is the
- * figure `data/rush-house-runs.json` publishes and the board ranks first. A player who could not
+ * figure `data/rush-house-runs.json` publishes. The board ranked it first then; on the fixed engine
+ * ([§ D1603](../../../../DECISIONS.md), [§ D1615](../../../../DECISIONS.md)) it is second, behind
+ * `auction-multi-round` at 2 790 s, and its own figure did not move. A player who could not
  * find that route did the only thing the product offered — handed the day over from the stage at
  * 0:00 — and held **2 364 s**, four hundred seconds short of the row they were aiming at and a
  * hundred and sixteen short of touching nothing (`collective`, **2 480 s**). The board was
