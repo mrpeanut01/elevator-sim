@@ -98,7 +98,7 @@
         "auction-multi-round": [
           "CCCCCCCmCCCCCCCmCCCC",
           "CCCCCmCCCCCCmCCCCCCC",
-          "CCCCCCCCCCCCmCmCCCCm",
+          "CCCCCCCCCCCCmCmCmCCm",
           "CCCCmCmmmmmCmmmmmmCC",
           "CCCCCCmCmmmCmmCmmCmC"
         ]
@@ -126,7 +126,7 @@
           "CCCCCCCCCCCCCCCCCCCC",
           "CCCCCmCCCCCCCCCCCCCC",
           "CCCCCCCCmCCCCCCCCCCC",
-          "CCCCCCCCCmCCmmmmCCCm",
+          "CCCCCCCCCCCCmmmmCCCm",
           "CCCCCCCCCmCmmmCCCmCC"
         ],
         "auction": [
@@ -164,7 +164,7 @@
           "mmmmmmmmmmmmmmmmmmmm"
         ],
         "eta": [
-          "CCCCCmmCmCCCmCCmCCCC",
+          "CCCCCmmCmCCCmCCmCCCm",
           "CCCCCCCCCCmCmmCmCCCC",
           "CmmmmCmmmmmCmmmmCmmC",
           "CCmCmmmmCmmmmmmmCCmm",
@@ -173,7 +173,7 @@
         "collective": [
           "CmmmmmmCmCmmmmmmCmmC",
           "mCmmCCmmmmmmmmmmmmmm",
-          "mmCmmmmmmmmCmmmmmmmC",
+          "mmCmmmmmmmmCmmmmmmCC",
           "mCmmmmmmmmmmmmmmmmmm",
           "mmmmmmmmmmmmmmmmmmmm"
         ],
@@ -181,7 +181,7 @@
           "CCCmCmmmmmCmmCCmmCmC",
           "CCCmmmmCmmmmmmmmmmmm",
           "mmmmCmmCmmmCmmmmmmmC",
-          "mCmmCCmmCmmmmmmmmCmm",
+          "mCmmCCmmCmmmCmmmmmmm",
           "CmmmmmmmmmmmmmmCmmmm"
         ],
         "energy-aware": [
@@ -209,7 +209,7 @@
           "CCCCCCCCCCCCCCCCCCCC",
           "CCCCCmCCCCCCCCCCCCCC",
           "CCCmCCmCmmmCmmCmmmmC",
-          "CCCCCCCCCmCCmmmmCCCm",
+          "CCCCCCCCCCCCmmmmCCCm",
           "CCCCmmCCmCmmmmmCCmCm"
         ],
         "auction": [
@@ -278,7 +278,7 @@
           "mmmmmmmmmmmmmmmmmmmm"
         ],
         "eta": [
-          "CmCCmmmmmCmCmmCmCCmC",
+          "CmCCmmmmmCmCmmCmCCmm",
           "CCCCCCCCCCmCmmCmCCCC",
           "CmmmmCmmmmmCmmmmCmmC",
           "CCmCmmmmCmmmmmmmCCmm",
@@ -287,7 +287,7 @@
         "collective": [
           "CmmmmmmmmCmmmmmmCmmC",
           "mCmmCCmmmmmmmmmmmmmm",
-          "mmCmmmmmmmmCmmmmmmmC",
+          "mmCmmmmmmmmCmmmmmmCC",
           "mCmmmmmmmmmmmmmmmmmm",
           "mmmmmmmmmmmmmmmmmmmm"
         ],
@@ -295,7 +295,7 @@
           "CCCmCmmmmmmmmmCmmCmC",
           "CCCmmmmCmmmmmmmmmmmm",
           "mmmmCmmCmmmCmmmmmmmC",
-          "mCmmCCmmCmmmmmmmmCmm",
+          "mCmmCCmmCmmmCmmmmmmm",
           "CmmmmmmmmmmmmmmCmmmm"
         ],
         "energy-aware": [
@@ -323,7 +323,7 @@
           "CCCCCCCCCCCCmmCmCCCC",
           "CCCCCmCCCCCCCCCCCCCC",
           "CCCmCCmCmmmCmmCmmmmC",
-          "CCCCCCCCCmCCmmmmCCCm",
+          "CCCCCCCCCCCCmmmmCCCm",
           "CCCCmmCCmCmmmmmCCmCm"
         ],
         "auction": [
@@ -400,7 +400,7 @@
           "mmmmmmmmmmmmmmmmmmmm"
         ],
         "eta": [
-          "CmCCmmmmmCmCmmCmCCmC",
+          "CmCCmmmmmCmCmmCmCCmm",
           "CCCmCmmmmmmCmmmmmmmC",
           "CmmmmCmmmmmCmmmmCmmC",
           "CCmCmmmmCmmmmmmmCCmm",
@@ -409,7 +409,7 @@
         "collective": [
           "CmmmmmmmmCmmmmmmCmmC",
           "mCmmmCmmmmmmmmmmmmmm",
-          "mmCmmmmmmmmCmmmmmmmC",
+          "mmCmmmmmmmmCmmmmmmCC",
           "mCmmmmmmmmmmmmmmmmmm",
           "mmmmmmmmmmmmmmmmmmmm"
         ],
@@ -417,7 +417,7 @@
           "CCCmCmmmmmmmmmCmmCmC",
           "CCCmmmmmmmmmmmmmmmmm",
           "mmmmCmmCmmmCmmmmmmmC",
-          "mCmmCCmmCmmmmmmmmCmm",
+          "mCmmCCmmCmmmCmmmmmmm",
           "CmmmmmmmmmmmmmmCmmmm"
         ],
         "energy-aware": [
@@ -436,7 +436,7 @@
         ],
         "capacity-aware": [
           "CCCCmCCmmCmCmmCmCmmC",
-          "CCCCmmmmmmmCmmCmCmmm",
+          "CCCCmmmmmmmCmmmmCmmm",
           "CmCmCmmCmmmCmmmmmmmC",
           "CCmCCCmCCmmmmmmmCCmC",
           "CCmCmCCCmmCmmmmmCmmm"
@@ -445,7 +445,7 @@
           "CCCCCCCCCCCCmmCmCCCC",
           "CCCCCmmmmmmCmmCmCCmC",
           "CCCmCCmCmmmCmmCmmmmC",
-          "CCCCCCCCCmCCmmmmCCCm",
+          "CCCCCCCCCCCCmmmmCCCm",
           "CCCCmmCCmCmmmmmCCmCm"
         ],
         "auction": [
@@ -457,14 +457,14 @@
         ],
         "auction-multi-round": [
           "mmmCCCCmmmmCmmCmCmmC",
-          "CmCmCCmmmmmCmmmmCmmm",
+          "CmCCCCmmmmmCmmmmCmmm",
           "CmCmmmmmmmmmmmmmmmmC",
           "CCmCmCCCCmmCmmmmCCmC",
           "CCCCmCCmmCCmmmCmCmmm"
         ],
         "zoned-uppeak": [
           "CCmCmCmmmCmCmmCmCCCC",
-          "CCCmmCmmmmmCmmmmCmmC",
+          "CmCmmCmmmmmCmmmmCmmC",
           "CmCmmmmmmmmCmmCmmmmC",
           "mCCmCmmmCmmmmmmmCCCm",
           "CmmCmmCCmmmmmmmmmmmm"
