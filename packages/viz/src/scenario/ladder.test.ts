@@ -135,16 +135,23 @@ describe('the ordered path', () => {
     const purchaseWord = /\bcan be bought\b|\bbuy\b|\bbought\b|\bprices?\b|\bcosts?\b/iu;
     let withRungs = 0;
     let rowsSelling = 0;
+    let unreachedRows = 0;
     for (const rung of ladder()) {
       const stage = campaign.stages.find((row) => row.id === rung.id);
       if (stage === undefined) throw new Error(`no stage for ${rung.id}`);
       expect(rung.budgetLine, rung.id).not.toMatch(purchaseWord);
       const census = survivors.scenarios.find((row) => row.id === stage.id);
       const countAt = (stepId: string | null) => census?.steps.find((step) => step.stepId === stepId)?.survivors;
+      /* § D1608: above the base or a sold rung only, since a rung is bought only from the one below it. */
+      let belowSold = true;
+      let addsAbove = false;
       const sold = stage.budget.steps.filter((step, index) => {
         const at = countAt(step.id);
         const below = countAt(index === 0 ? null : (stage.budget.steps[index - 1]?.id ?? null));
-        return at !== undefined && below !== undefined && at > below;
+        const adds = at !== undefined && below !== undefined && at > below;
+        if (adds && !belowSold) addsAbove = true;
+        belowSold = belowSold && adds;
+        return belowSold;
       });
       /* Every figure on the line, enumerated: the opening units, the count of rungs, and each sold price. */
       const figures = new Set([...rung.budgetLine.matchAll(/\d+/gu)].map((match) => match[0]));
@@ -155,7 +162,10 @@ describe('the ordered path', () => {
       if (stage.budget.steps.length === 0) continue;
       withRungs += 1;
       if (sold.length === 0) {
-        expect(rung.budgetLine, rung.id).toContain(SCENARIO_LADDER_COPY.rungsNotSold);
+        expect(rung.budgetLine, rung.id).toContain(
+          addsAbove ? SCENARIO_LADDER_COPY.rungsNotReached : SCENARIO_LADDER_COPY.rungsNotSold,
+        );
+        if (addsAbove) unreachedRows += 1;
         expect(rung.budgetLine, rung.id).not.toMatch(/\bchimes?\b/u);
       } else {
         rowsSelling += 1;
@@ -167,6 +177,8 @@ describe('the ordered path', () => {
     expect(withRungs).toBeGreaterThan(0);
     expect(rowsSelling, 'no row sells a rung on the shipped census').toBeGreaterThan(0);
     expect(rowsSelling, 'every row sells a rung, so the refusal is never drawn').toBeLessThan(withRungs);
+    /* § D1608: stage 9 on the census regenerated on the engine § D1603 fixed draws the third arm. */
+    expect(unreachedRows, 'no row has a rung that adds a way through above an unsold one').toBeGreaterThan(0);
   });
 
   it('never calls a held scenario unwinnable, because the dial half is a sample', () => {

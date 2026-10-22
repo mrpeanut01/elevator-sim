@@ -251,6 +251,14 @@ export const SCENARIO_LADDER_COPY = Object.freeze({
    */
   rungsNotSold:
     'Its page sells none of them: the census finds no further way through at a wider budget, so the count below is the count at the budget it opens on.',
+  /*
+   * **A row whose page sells none, where a higher rung does add a way through**, [§ D1608](../../../../DECISIONS.md).
+   * A rung is sold only above the base or a sold rung, so a count that rises above an unsold rung is
+   * one no press can reach, and {@link rungsNotSold}'s *no further way through at a wider budget* would
+   * be false of it. Stage 9 has that shape on the census regenerated on the engine § D1603 fixed.
+   */
+  rungsNotReached:
+    'Its page sells none of them: the census finds no further way through at the first of them, and each wider budget is sold only from the one below it, so the count below is the count at the budget it opens on.',
   /** The count's basis on a row whose page does sell a rung — the same clause, said once. */
   countAtBase: 'The count below is the count at the budget it opens on.',
 });
@@ -350,16 +358,24 @@ function budgetLineOf(budget: ScenarioBudget, scenario: PublishedSurvivorScenari
       : `${String(budget.steps.length)} wider budgets sit above it, in order: ${named}.`;
   /*
    * § D1419: the rungs the stage page sells, by the census's own rule (`everyday/stagePlay.ts#stageRungsOf`
-   * reads the same two counts): a rung whose pinned count exceeds the rung below's.
+   * reads the same two counts): a rung whose pinned count exceeds the rung below's, above the base or a
+   * rung that is itself sold (§ D1608), since a rung is bought only from the one below it.
    */
   const countAt = (stepId: string | null): number | undefined =>
     scenario.steps.find((step) => step.stepId === stepId)?.survivors;
+  let belowSold = true;
+  let addsAbove = false;
   const sold = budget.steps.filter((step, index) => {
     const at = countAt(step.id);
     const below = countAt(index === 0 ? null : (budget.steps[index - 1]?.id ?? null));
-    return at !== undefined && below !== undefined && at > below;
+    const adds = at !== undefined && below !== undefined && at > below;
+    if (adds && !belowSold) addsAbove = true;
+    belowSold = belowSold && adds;
+    return belowSold;
   });
-  if (sold.length === 0) return `${opens} ${ladder} ${SCENARIO_LADDER_COPY.rungsNotSold}`;
+  if (sold.length === 0) {
+    return `${opens} ${ladder} ${addsAbove ? SCENARIO_LADDER_COPY.rungsNotReached : SCENARIO_LADDER_COPY.rungsNotSold}`;
+  }
   const offers = sold.map((step) => `${step.name} for ${String(step.chimes)} ${step.chimes === 1 ? 'chime' : 'chimes'}`).join(' and ');
   return (
     `${opens} ${ladder} Its page sells ${offers} from this device's chimes, because the census finds more ` +

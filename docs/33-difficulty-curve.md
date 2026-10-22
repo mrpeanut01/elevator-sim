@@ -1312,6 +1312,12 @@ survivor census reads 3 of 63 at every rung, all three from the dropdown: `aucti
 stage page's 39 choices and none of the 12 drawn dials gets through. That is inside position 9's band,
 and it is a named breach of § D528 clause 2 in `DROPDOWN_CLEARS`, owner-reversible.
 
+**On the engine [§ D1603](../DECISIONS.md) fixed the census reads 4, 4 and 5 of 63** ([§ D1607](../DECISIONS.md)),
+with the stage's goal row unchanged. The same three dropdown picks get through, and so does one of the
+page's choices, `destination-panel` with idle cars parked at predicted demand, at every rung; at the
+building rung one drawn dial does too. The count is still inside the band. The building rung's count
+rises above the equipment rung's, which adds none, so the page sells neither ([§ D1608](../DECISIONS.md)).
+
 **Why stage 10's fabric is left as it is.** The ruling allowed a fabric change chosen from this
 classification. The refusals come from St Jude's access zoning meeting the credential gap, and
 removing them means re-drawing who may reach theatres, critical care and imaging, or zoning the
