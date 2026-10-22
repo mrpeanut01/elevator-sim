@@ -64,9 +64,11 @@ import {
   STAGE_PLAY_COPY as COPY,
   clearEarnsParOf,
   namedStageMoveOf,
+  runStageSplit,
   stageFactsOf,
   stageMoveOf,
   stagePlayViewOf,
+  stageSplitPlanOf,
   sameCountsOf,
   stageRunCountsOf,
   stageWatchAfterEndOf,
@@ -77,6 +79,7 @@ import {
   type StagePlayChoice,
   type StagePlayFacts,
   type StagePlayPhase,
+  type StagePlaySplitFacts,
   type StagePlayView,
 } from './stagePlay.js';
 import { EVERYDAY_COLORS as C, EVERYDAY_RADII as R, EVERYDAY_TYPE as TYPE } from './tokens.js';
@@ -104,6 +107,7 @@ export function openStageInFixit(stageId: string): void {
     session.phase = { kind: 'idle' };
     session.pressed = undefined;
     dropWatch(session);
+    dropSplit(session);
   }
 }
 
@@ -172,6 +176,12 @@ interface Session {
   reveal: { status: boolean; pair: boolean; verdict: boolean };
   /** The last judged run's settings and per-run counts, which the next verdict compares (wave AQ, AQ-1). */
   lastRun: { readonly choice: StagePlayChoice; readonly counts: StageRunCounts } | undefined;
+  /**
+   * The split of the last press, where it changed both the standing order and the parking — ruling
+   * R10, [§ D1622](../../../../DECISIONS.md). Of the press {@link pressed} names, dropped by an edit or
+   * a new press, and drawn by the verdict only while that verdict is not stale.
+   */
+  split: StagePlaySplitFacts | undefined;
 }
 
 const sessions = new Map<string, Session>();
@@ -192,6 +202,7 @@ function sessionOf(stage: CampaignStage): Session {
       watchStage: undefined,
       reveal: { status: false, pair: false, verdict: false },
       lastRun: undefined,
+      split: undefined,
     };
     sessions.set(stage.id, session);
   }
@@ -359,7 +370,11 @@ function viewOf(data: Loaded, stageId: string): { readonly view: StagePlayView; 
   const session = sessionOf(found.stage);
   const phase: StagePlayPhase =
     session.phase.kind === 'judged'
-      ? { ...session.phase, stale: !sameChoice(session.pressed, session.choice) }
+      ? {
+          ...session.phase,
+          verdict: session.split === undefined ? session.phase.verdict : { ...session.phase.verdict, split: session.split },
+          stale: !sameChoice(session.pressed, session.choice),
+        }
       : session.phase;
   return { view: stagePlayViewOf(facts, phase), admitted: facts.admission.admitted, held: found.held !== undefined };
 }
@@ -445,6 +460,45 @@ function startWatch(session: Session, configs: ReturnType<typeof stageWatchConfi
   });
 }
 
+/*
+ * The split's batch (§ D1622) on a worker of its own, so it never holds the verdict's worker, the
+ * pair's, or Run: the verdict is drawn and Run given back before it starts.
+ */
+let splitWorker: Worker | undefined;
+let splitToken = 0;
+
+/** Stop the split's batch and take its block away: an edit or a new press drops it (amendment 4). */
+function dropSplit(session: Session): void {
+  splitToken += 1;
+  splitWorker?.terminate();
+  splitWorker = undefined;
+  session.split = undefined;
+}
+
+function runSplitBatch(request: BatchRequest): Promise<BatchResult> {
+  return new Promise<BatchResult>((resolve, reject) => {
+    splitWorker?.terminate();
+    const next = new Worker(new URL('../dev/batchWorker.ts', import.meta.url), { type: 'module' });
+    splitWorker = next;
+    const stop = (): void => {
+      next.terminate();
+      if (splitWorker === next) splitWorker = undefined;
+    };
+    next.addEventListener('message', (event: MessageEvent) => {
+      const message = event.data as BatchWorkerMessage;
+      if (message.kind === 'progress') return;
+      stop();
+      if (message.kind === 'failed') reject(new Error(message.message));
+      else resolve(message.result);
+    });
+    next.addEventListener('error', (event: ErrorEvent) => {
+      stop();
+      reject(new Error(event.message));
+    });
+    next.postMessage({ kind: 'run', request, savedProfiles: [] } satisfies BatchWorkerRequest);
+  });
+}
+
 /** Press the stage: the one check, then its own judge on both seed sets. */
 function press(data: Loaded, stageId: string, context: EverydayScreenShellContext): void {
   const found = stageContextOf(data, stageId);
@@ -478,6 +532,8 @@ function press(data: Loaded, stageId: string, context: EverydayScreenShellContex
   }
   const token = ++runToken;
   const host = context.host;
+  /* A new press drops the last one's split (§ D1622, amendment 4). */
+  dropSplit(session);
   session.pressed = pressedChoice;
   session.reveal = { status: true, pair: true, verdict: true };
   session.phase = { kind: 'running', seedSet: 'tuning', completed: 0, total: 0 };
@@ -546,6 +602,36 @@ function press(data: Loaded, stageId: string, context: EverydayScreenShellContex
           verdict: sameCounts === undefined ? facts : { ...facts, sameCounts },
           stale: false,
         };
+        /*
+         * § D1622: a press that changed both the standing order and the parking is split into each
+         * change with the other kept, on one more batch of the stage's own crowds. The verdict above
+         * is already drawn and Run is already given back; the split holds its place with a line
+         * that carries no figure until its batch lands.
+         */
+        const plan = stageSplitPlanOf({ stageId: found.stage.id, context: found.context, move, budgetUnits });
+        if (plan !== undefined) {
+          const splitAt = splitToken;
+          session.split = { kind: 'pending' };
+          void runStageSplit({
+            stage: found.stage,
+            plan,
+            verdict: result.outcome.result,
+            holdoutRan: report.holdout !== null,
+            run: runSplitBatch,
+          }).then(
+            (split) => {
+              if (splitAt !== splitToken || token !== runToken) return;
+              /* A split the judge refuses, amendment 5's check among them, is not drawn. */
+              session.split = split === undefined ? undefined : { kind: 'drawn', split };
+              live?.redraw();
+            },
+            () => {
+              if (splitAt !== splitToken || token !== runToken) return;
+              session.split = { kind: 'failed' };
+              live?.redraw();
+            },
+          );
+        }
       }
       live?.redraw();
       live?.refreshBar();
@@ -705,6 +791,8 @@ export function mountStagePlay(host: HTMLElement, context: EverydayScreenShellCo
       const settingSelect = selectOf(doc, 'everyday-stage-play-setting-select', view.settingLabel, view.settingOptions);
       settingSelect.addEventListener('change', () => {
         session.choice = { ...session.choice, profileId: settingSelect.value };
+        /* An edit drops the split's batch (§ D1622, amendment 4). */
+        if (!sameChoice(session.pressed, session.choice)) dropSplit(session);
         render();
         context.refreshBar();
       });
@@ -725,6 +813,7 @@ export function mountStagePlay(host: HTMLElement, context: EverydayScreenShellCo
           ...session.choice,
           parking: parkingSelect.value === '' ? null : (parkingSelect.value as EditorParkingStrategy),
         };
+        if (!sameChoice(session.pressed, session.choice)) dropSplit(session);
         render();
         context.refreshBar();
       });
@@ -861,6 +950,22 @@ export function mountStagePlay(host: HTMLElement, context: EverydayScreenShellCo
       }
       if (view.verdict.unlock !== undefined) {
         verdict.append(para(doc, 'everyday-stage-play-unlock', view.verdict.unlock, `font-size:13px;color:${C.inkSoft}`));
+      }
+      /*
+       * § D1622, amendment 4: the split, drawn last, below the held-back crowds' sentence and never
+       * between the two crowds' sentences; a pending or failed batch keeps the same place with one line.
+       */
+      if (view.verdict.split !== undefined) {
+        const split = el(doc, 'section', 'everyday-stage-play-split');
+        split.dataset.state = view.verdict.split.kind;
+        split.style.cssText = `display:grid;gap:6px;padding-top:8px;border-top:1px solid ${C.rule};min-width:0`;
+        if (view.verdict.split.heading !== undefined) {
+          split.append(para(doc, 'everyday-stage-play-split-heading', view.verdict.split.heading, `font-size:13px;line-height:1.5;font-weight:600;color:${C.ink}`));
+        }
+        for (const line of view.verdict.split.lines) {
+          split.append(para(doc, 'everyday-stage-play-split-line', line, `font-size:13px;line-height:1.5;color:${C.inkSoft}`));
+        }
+        verdict.append(split);
       }
       root.append(verdict);
     }

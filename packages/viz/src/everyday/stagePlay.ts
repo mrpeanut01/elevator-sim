@@ -74,7 +74,9 @@ import {
   type StageAdmissionContext,
   type StageMove,
 } from '../campaign/stagePress.js';
-import { stageGoalNameOf, type StageReport } from '../campaign/judge.js';
+import { stageGoalNameOf, stageSplitOf, type StageReport, type StageSplit } from '../campaign/judge.js';
+import { stageSplitRequestFor, type StageSplitArm } from '../campaign/stageRun.js';
+import type { BatchRequest, BatchResult } from '../batch/types.js';
 import type { CampaignStage } from '../campaign/types.js';
 import type { Frame, VizRecording } from '../contract/types.js';
 import { frameAt } from '../frame/frameAt.js';
@@ -244,6 +246,12 @@ export const STAGE_PLAY_COPY = Object.freeze({
   sameAsPrevious: 'Every count here is the same as your last run got on other settings, so that change moved none of them on this stage.',
   labLink: 'Open this stage on the Engineer surface',
   labNote: 'The Engineer surface draws every dial the stage’s budget reaches and the full report. A clear there pays nothing.',
+  /*
+   * Ruling R10 ([§ D1622](../../../../DECISIONS.md)), amendment 4: the split's place, held while its
+   * batch runs with no figure in it, and the one line a failed batch leaves.
+   */
+  splitPending: 'Each of your two changes, with the other kept, is still running on the stage’s own crowds.',
+  splitFailed: 'The run that splits your two changes stopped before it finished, so this block has nothing to show.',
 });
 
 /** What the player has set. `parking` is `null` for *as the building has it*. */
@@ -428,6 +436,22 @@ export interface StagePlayVerdictFacts {
   readonly boughtUnits?: number | undefined;
   /** Whose counts this run's equal, where they all do: {@link sameCountsOf}. */
   readonly sameCounts?: 'shipped' | 'previous' | undefined;
+  /** Where the split of a two-change press is (§ D1622), or absent for a press that draws none. */
+  readonly split?: StagePlaySplitFacts | undefined;
+}
+
+/** The split's batch: still running, failed, or landed and drawn ([§ D1622](../../../../DECISIONS.md)). */
+export type StagePlaySplitFacts =
+  | { readonly kind: 'pending' }
+  | { readonly kind: 'failed' }
+  | { readonly kind: 'drawn'; readonly split: StageSplit };
+
+/** The split as the card draws it, last: a heading and its lines, or the one line in its place. */
+export interface StagePlaySplitView {
+  readonly kind: StagePlaySplitFacts['kind'];
+  readonly heading: string | undefined;
+  /** In the order drawn: each change's line, then its drive-work line where it has one. */
+  readonly lines: readonly string[];
 }
 
 /** Where a press is. */
@@ -454,6 +478,8 @@ export interface StagePlayVerdictView {
   readonly stale: string | undefined;
   /** That the change moved no count, against the building's setting or the last run (wave AQ, AQ-1). */
   readonly sameCounts: string | undefined;
+  /** Each of a two-change press's changes with the other kept, drawn last and never stale (§ D1622). */
+  readonly split: StagePlaySplitView | undefined;
 }
 
 export interface StagePlayView {
@@ -568,6 +594,141 @@ export function stagePageMovesOf(
     }
   }
   return [...out.values()];
+}
+
+/* -------------------------------------------------------------------------- *
+ * The split of a two-change press — ruling R10, § D1622
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **The stages and budgets the split is drawn on**, by stage id and the units a press is made at —
+ * ruling R10, amendment 6 ([§ D1622](../../../../DECISIONS.md)): *"the block draws on no stage that
+ * test has not covered"*.
+ *
+ * The test is `everyday/stageSplitHolds.test.ts`, which sets every row the block can print on the
+ * stage's held-back crowds against the same row on its own crowds, for every two-change move the
+ * page admits. It reads this table and nothing else, so what it covers and where the block draws
+ * are one list: stage 1 at its 4 u base always-on, and stage 1's 24 u rung and the base of stages 2
+ * to 10 in its deep tier. A press at any other budget, such as a rung a device bought on stage 2,
+ * runs no split batch and draws no block. Keyed by units rather than by rung, so a rung whose price
+ * moves leaves the table rather than carrying a coverage it no longer has; an always-on case holds
+ * every entry to a rung the stage's ladder has.
+ */
+export const STAGE_SPLIT_COVERAGE: Readonly<Record<string, readonly number[]>> = Object.freeze({
+  'stage-1-first-call': Object.freeze([4, 24]),
+  'stage-2-morning-rush': Object.freeze([4]),
+  'stage-3-overwhelmed': Object.freeze([4]),
+  'stage-4-two-banks': Object.freeze([15]),
+  'stage-5-credentials': Object.freeze([15]),
+  'stage-6-the-tall-one': Object.freeze([15]),
+  'stage-7-prove-it': Object.freeze([15]),
+  'stage-8-the-headline-address': Object.freeze([4]),
+  'stage-9-both-ways-at-once': Object.freeze([15]),
+  'stage-10-the-bed-and-the-visitor': Object.freeze([15]),
+});
+
+/**
+ * Where idle cars wait, as the split's lines name it: a noun phrase that reads after *changing to*
+ * and before *kept*. The select's own words (`fixitScreenModel.ts`) are a place, *where the next
+ * calls are forecast to come from*, which does not read in either position.
+ */
+const SPLIT_PARKING_NAMES: Readonly<Record<EditorParkingStrategy, string>> = Object.freeze({
+  stay: 'parking where each car last stopped',
+  lobby: 'lobby parking',
+  'zone-center': 'mid-zone parking',
+  'predicted-demand': 'forecast parking',
+  'fixed-floor': 'parking at one floor',
+});
+
+/** A press the split takes apart: the press and its two one-change arms, each admitted, and the names. */
+export interface StageSplitPlan {
+  readonly press: StageMove;
+  /** The shipped standing order with the press's parking: what changing the order did, parking kept. */
+  readonly forOrder: StageMove;
+  /** The press's standing order with the shipped parking: what changing the parking did, order kept. */
+  readonly forParking: StageMove;
+  readonly orderName: string;
+  readonly parkingName: string;
+  /** Both true on every plan: what the admission said the press changed (`judge.ts#StageSplitInput.changed`). */
+  readonly changed: { readonly standingOrder: boolean; readonly parking: boolean };
+}
+
+/**
+ * **Whether a press is split, and into what** — ruling R10, amendment 1 ([§ D1622](../../../../DECISIONS.md)).
+ *
+ * Decided from the admitted move and never from which selects were touched: the press must be
+ * admitted at this budget, its standing order a profile other than the stage's own, and
+ * `idle.parkingStrategy` among what the admission moved against the stage's own setting. Each
+ * one-change arm reverts exactly one of the two to the stage's own value, as the page would make it
+ * ({@link parkedMoveOf}), and is admitted through the same check. So `zoned-uppeak` as it stands,
+ * parked mid-zone, is split, with zoning and cars left where they stopped as its parking arm; and
+ * zoning with cars left where they stopped moves no parking against the stage's own and is not.
+ * `undefined` also where the stage and budget are not in {@link STAGE_SPLIT_COVERAGE}.
+ */
+export function stageSplitPlanOf(input: {
+  readonly stageId: string;
+  readonly context: StageAdmissionContext;
+  readonly move: StageMove;
+  readonly budgetUnits: number;
+}): StageSplitPlan | undefined {
+  const { context, move, budgetUnits } = input;
+  if (!(STAGE_SPLIT_COVERAGE[input.stageId] ?? []).includes(budgetUnits)) return undefined;
+  const admission = admitStageMove(context, move, budgetUnits);
+  if (!admission.admitted || admission.candidate === undefined) return undefined;
+  const changed = {
+    standingOrder: move.profile.id !== context.baseline.id,
+    parking: admission.moved.some((dimension) => dimension.id === PARKING_DIMENSION),
+  };
+  if (!changed.standingOrder || !changed.parking) return undefined;
+  const parking = String(valuesFromProfile(context.space, admission.candidate).get(PARKING_DIMENSION) ?? '');
+  const shipped = String(valuesFromProfile(context.space, context.baseline).get(PARKING_DIMENSION) ?? '');
+  const parkingName = (SPLIT_PARKING_NAMES as Readonly<Record<string, string>>)[parking];
+  if (parkingName === undefined || shipped === '') return undefined;
+  const forOrder = parkedMoveOf(context.baseline, parking, context.space);
+  const forParking = parkedMoveOf(move.profile, shipped, context.space);
+  if (!admitStageMove(context, forOrder, budgetUnits).admitted) return undefined;
+  if (!admitStageMove(context, forParking, budgetUnits).admitted) return undefined;
+  return { press: move, forOrder, forParking, orderName: move.profile.name ?? move.profile.id, parkingName, changed };
+}
+
+/** A move as a split arm: its shipped profile's id and the edit on it. */
+function splitArmOf(move: StageMove): StageSplitArm {
+  return { profileId: move.profile.id, ...(move.edit === undefined ? {} : { edit: move.edit }) };
+}
+
+/**
+ * **Run the split and word it** — the batch `campaign/stageRun.ts#stageSplitRequestFor` builds, on
+ * the runner the caller hands over, then `campaign/judge.ts#stageSplitOf` against the verdict's own
+ * tuning batch. `undefined` where the judge refuses the block (amendment 5's check among them).
+ *
+ * Its non-test caller is `everyday/stagePlayScreen.ts#press`, which starts it after the verdict has
+ * been drawn, on a worker of its own, and drops it on an edit or a new press. It decides no verdict:
+ * nothing it returns is read by `met`, `held` or `cleared`.
+ */
+export async function runStageSplit(input: {
+  readonly stage: CampaignStage;
+  readonly plan: StageSplitPlan;
+  /** The verdict's tuning batch (`stageSequence.ts#StageSequenceOutcome.result`). */
+  readonly verdict: BatchResult;
+  readonly holdoutRan: boolean;
+  readonly run: (request: BatchRequest) => BatchResult | Promise<BatchResult>;
+}): Promise<StageSplit | undefined> {
+  const { plan } = input;
+  const result = await input.run(
+    stageSplitRequestFor(input.stage, {
+      press: splitArmOf(plan.press),
+      forOrder: splitArmOf(plan.forOrder),
+      forParking: splitArmOf(plan.forParking),
+    }),
+  );
+  return stageSplitOf({
+    result,
+    verdict: input.verdict,
+    changed: plan.changed,
+    orderName: plan.orderName,
+    parkingName: plan.parkingName,
+    holdoutRan: input.holdoutRan,
+  });
 }
 
 function admissionFactsOf(admission: StageAdmission): StagePlayAdmissionFacts {
@@ -824,7 +985,25 @@ function verdictViewOf(facts: StagePlayFacts, verdict: StagePlayVerdictFacts, st
         : verdict.sameCounts === 'previous'
           ? STAGE_PLAY_COPY.sameAsPrevious
           : undefined,
+    /* Amendment 4: never over a stale verdict, so a moved setting takes the block with it. */
+    split: stale || verdict.split === undefined ? undefined : stageSplitViewOf(verdict.split),
   };
+}
+
+/** The split's block, in the order the card draws it (§ D1622, amendment 4). */
+export function stageSplitViewOf(split: StagePlaySplitFacts): StagePlaySplitView {
+  switch (split.kind) {
+    case 'pending':
+      return { kind: 'pending', heading: undefined, lines: [STAGE_PLAY_COPY.splitPending] };
+    case 'failed':
+      return { kind: 'failed', heading: undefined, lines: [STAGE_PLAY_COPY.splitFailed] };
+    case 'drawn':
+      return {
+        kind: 'drawn',
+        heading: split.split.heading,
+        lines: split.split.lines.flatMap((line) => (line.energy === null ? [line.sentence] : [line.sentence, line.energy])),
+      };
+  }
 }
 
 /**

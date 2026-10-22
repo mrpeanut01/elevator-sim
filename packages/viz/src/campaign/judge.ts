@@ -106,8 +106,8 @@
 
 import { intervalContainsZero } from '@elevator-sim/experiments/browser';
 
-import { batchFigureOf, type BatchComparisonRow, type BatchReport } from '../batch/report.js';
-import { BATCH_METRIC_PRESENTATION, type BatchMetric, type BatchResult } from '../batch/types.js';
+import { batchFigureOf, batchReport, type BatchComparisonRow, type BatchReport } from '../batch/report.js';
+import { BATCH_METRICS, BATCH_METRIC_PRESENTATION, type BatchMetric, type BatchResult } from '../batch/types.js';
 import {
   asPerReplicationGoal,
   measureGoalRate,
@@ -785,6 +785,42 @@ function comparisonSentence(input: ComparisonWords): string {
           'crowd by crowd. The bar is not reached.';
   }
 
+  const { clauses, rest } = measureWordsOf(rows, underBudget, runs);
+  const body =
+    clauses.length === 0
+      ? `Over ${runs} on ${crowds}, no measure had an interval to read.`
+      : `Over ${runs} on ${crowds}, ${listOf(clauses)}.`;
+  const verdict =
+    ahead.length > 0 && behind.length === 0
+      ? 'Nothing came out against your setting, so the bar is reached.'
+      : ahead.length === 0 && behind.length > 0
+        ? 'Your setting came out behind and ahead on nothing, so the bar is not reached.'
+        : ahead.length > 0
+          ? 'That is a move along the front rather than a win, so the bar is not reached.'
+          : 'No measure separated the two settings, so the bar is not reached.';
+  /* Two arms that ran one setting cannot differ; one that did is the apparatus, said so. */
+  const fault =
+    sameness === 'unchanged'
+      ? ' Both runs used the building’s own settings, so a measure that separated them is a fault in ' +
+        'the run rather than a result, and worth reporting.'
+      : '';
+  return `${body}${rest} ${verdict}${fault}`;
+}
+
+/**
+ * **The measures of one comparison, said by {@link comparisonSentence}'s rules** — the clauses and
+ * the rest, without the crowds, the run count's lead or the closing verdict, so the stage verdict
+ * and the split ({@link stageSplitOf}) print a comparison one way (ruling R10, amendment 2).
+ *
+ * Average wait first, with its range whichever way its interval fell; every other resolved
+ * measure with its size; the unresolved rest unnamed under one clause, *as well* only where
+ * average wait was itself too close; then the measures with no number, and the under-budget rows.
+ */
+function measureWordsOf(
+  rows: readonly BatchComparisonRow[],
+  underBudget: readonly BatchComparisonRow[],
+  runs: string,
+): { readonly clauses: readonly string[]; readonly rest: string } {
   const orderable = rows.filter((row) => row.metricClass !== 'axis');
   const wait = orderable.find((row) => row.metric === 'awtS');
   const others = orderable.filter((row) => row !== wait);
@@ -795,10 +831,6 @@ function comparisonSentence(input: ComparisonWords): string {
     ...(wait === undefined ? [] : [rowClauseOf(wait, runs)]),
     ...sized.map((row) => rowClauseOf(row, runs)),
   ];
-  const body =
-    clauses.length === 0
-      ? `Over ${runs} on ${crowds}, no measure had an interval to read.`
-      : `Over ${runs} on ${crowds}, ${listOf(clauses)}.`;
 
   /* The rest, unnamed (amendment 7): *as well* only where average wait was itself too close. */
   const waitTooClose = wait !== undefined && tooCloseToCall(wait);
@@ -823,21 +855,171 @@ function comparisonSentence(input: ComparisonWords): string {
       ? ''
       : ` The interval on ${underBudget.map((row) => row.label).join(', ')} excludes zero and is ` +
         'drawn, and it orders nothing: this batch is below the project’s replication budget.';
-  const verdict =
-    ahead.length > 0 && behind.length === 0
-      ? 'Nothing came out against your setting, so the bar is reached.'
-      : ahead.length === 0 && behind.length > 0
-        ? 'Your setting came out behind and ahead on nothing, so the bar is not reached.'
-        : ahead.length > 0
-          ? 'That is a move along the front rather than a win, so the bar is not reached.'
-          : 'No measure separated the two settings, so the bar is not reached.';
-  /* Two arms that ran one setting cannot differ; one that did is the apparatus, said so. */
-  const fault =
-    sameness === 'unchanged'
-      ? ' Both runs used the building’s own settings, so a measure that separated them is a fault in ' +
-        'the run rather than a result, and worth reporting.'
-      : '';
-  return `${body}${restClause}${unnumberedClause}${budgetClause} ${verdict}${fault}`;
+  return { clauses, rest: `${restClause}${unnumberedClause}${budgetClause}` };
+}
+
+/* -------------------------------------------------------------------------- *
+ * The split: each of two changes with the other kept — ruling R10, § D1622
+ * -------------------------------------------------------------------------- */
+
+/** The two acts a split names: the standing order, and where idle cars wait. */
+export type StageSplitAct = 'standing-order' | 'parking';
+
+/** What {@link stageSplitOf} is handed. */
+export interface StageSplitInput {
+  /**
+   * The split batch, `stageRun.ts#stageSplitRequestFor`: three arms on the stage's tuning crowds,
+   * **the press first**, then the shipped standing order with the press's parking, then the press's
+   * standing order with the shipped parking.
+   */
+  readonly result: BatchResult;
+  /**
+   * The verdict's own tuning batch. Its candidate arm must be the split's press arm on every
+   * replication and every row, or nothing is drawn (amendment 5).
+   */
+  readonly verdict: BatchResult;
+  /**
+   * Which of the two the admitted press changed, decided by the caller from the admission and never
+   * from the selects (amendment 1): the standing order is a profile other than the stage's own, and
+   * the parking is `idle.parkingStrategy` among the admission's `moved`. A split is drawn only where
+   * both are true, and these are the acts its lines credit.
+   */
+  readonly changed: { readonly standingOrder: boolean; readonly parking: boolean };
+  /** The press's standing order, by the name its select shows. */
+  readonly orderName: string;
+  /** The press's parking, as a noun phrase: *forecast parking*. */
+  readonly parkingName: string;
+  /** Whether the held-back crowds were run on the press, so the heading says what they judged. */
+  readonly holdoutRan: boolean;
+}
+
+/** One change, with the other kept. */
+export interface StageSplitLine {
+  readonly change: StageSplitAct;
+  /** The waits and the observation rows, by {@link comparisonSentence}'s rules and with no bar word. */
+  readonly sentence: string;
+  /** Drive work for the same change, on its own line; `null` where the change altered no run. */
+  readonly energy: string | null;
+  /** The comparison both strings were read off: the press against the arm that reverts this change. */
+  readonly report: BatchReport;
+}
+
+/** The block, drawn: one heading and one line per change, the order's first. */
+export interface StageSplit {
+  readonly heading: string;
+  readonly lines: readonly [StageSplitLine, StageSplitLine];
+  /** The acts the lines credit (§ D1011). Always both. */
+  readonly credits: readonly StageSplitAct[];
+  /** The acts the press carried, as {@link StageSplitInput.changed} said. */
+  readonly carried: readonly StageSplitAct[];
+}
+
+/**
+ * **A press that changed both the standing order and the parking, split into each change with the
+ * other kept** — ruling R10 on GitHub issue #645 ([§ D1622](../../../../DECISIONS.md)), finding X1:
+ * a player credited `eta` with turning forecast parking's fail into a clear while the switch's own
+ * effect on mean wait was too close to call.
+ *
+ * Two comparisons on one batch of the stage's own crowds: the press against the shipped standing
+ * order with the press's parking (what the order change did, the parking kept), and the press
+ * against the press's standing order with the shipped parking (what the parking change did, the
+ * order kept). Each line names the change and what was kept, and prints by
+ * {@link comparisonSentence}'s rules through the same formatter: average wait first with its range,
+ * every other resolved row with its size, the unresolved rest under one clause. It carries **no bar
+ * word** and no closing verdict, so no line reads as a second verdict (amendment 2), and no line
+ * says *on its own* or *alone*, because the player may already have pressed the order alone and
+ * seen another result. *Altered no run* is said only where every paired difference is exactly zero
+ * on every crowd and row. Drive work is a line of its own per change, *higher* or *lower* only where
+ * its interval excludes zero ([§ D106](../../../../DECISIONS.md)). No line names a cause, says the
+ * two add up to the whole, or speaks for other crowds; the one heading names the crowds and the run
+ * count once and, where the held-back crowds ran, says they judged the two changes only together
+ * (amendment 3).
+ *
+ * **`undefined` means the block is not drawn**: a press that did not change both, a batch that is
+ * not three arms, a broken common-random-numbers audit, or a press arm that is not the verdict's own
+ * candidate arm on every replication and row (amendment 5). Pure, and it decides no verdict.
+ */
+export function stageSplitOf(input: StageSplitInput): StageSplit | undefined {
+  const { result, verdict, changed } = input;
+  if (!changed.standingOrder || !changed.parking) return undefined;
+  const [press, forOrder, forParking] = result.arms;
+  const verdictCandidate = verdict.arms[1];
+  if (press === undefined || forOrder === undefined || forParking === undefined || result.arms.length !== 3) return undefined;
+  if (!result.crn.aligned || verdictCandidate === undefined || result.seed !== verdict.seed) return undefined;
+  if (!sameArmRuns(press, verdictCandidate)) return undefined;
+
+  const replications = press.replications.length;
+  const runs = `${String(replications)} ${plural(replications, 'run', 'runs')}`;
+  const against = (kept: BatchResult['arms'][number]): BatchReport => batchReport({ ...result, arms: [kept, press] });
+  const orderLead = `Changing the standing order to ${input.orderName}, with ${input.parkingName} kept`;
+  const parkingLead = `Changing to ${input.parkingName}, with the standing order kept at ${input.orderName}`;
+  const heading =
+    `Your two changes, each with the other kept, over ${runs} on ${crowdsOf('tuning')}.` +
+    (input.holdoutRan
+      ? ` ${capitalised(crowdsOf('holdout'))} judged your two changes only together, so nothing here ` +
+        'says which of the two decided their answer.'
+      : '');
+  return {
+    heading,
+    lines: [
+      splitLineOf('standing-order', orderLead, against(forOrder), runs),
+      splitLineOf('parking', parkingLead, against(forParking), runs),
+    ],
+    credits: ['standing-order', 'parking'],
+    carried: [
+      ...(changed.standingOrder ? (['standing-order'] as const) : []),
+      ...(changed.parking ? (['parking'] as const) : []),
+    ],
+  };
+}
+
+/** One change's line and its drive-work line, read off the press against the arm that reverts it. */
+function splitLineOf(change: StageSplitAct, lead: string, report: BatchReport, runs: string): StageSplitLine {
+  const rows = report.comparisons[0]?.rows ?? [];
+  const orderable = rows.filter((row) => row.metricClass !== 'axis');
+  const underBudget = orderable.filter((row) => row.verdict === 'under-budget');
+  const separated = orderable.some((row) => row.verdict === 'resolved') || underBudget.length > 0;
+  if (!separated && everyDifferenceIsZero(rows)) {
+    return {
+      change,
+      sentence: `${lead}, altered no run: every measure came out exactly the same under both, crowd by crowd.`,
+      energy: null,
+      report,
+    };
+  }
+  const { clauses, rest } = measureWordsOf(rows, underBudget, runs);
+  const axis = rows.filter((row) => row.metricClass === 'axis');
+  return {
+    change,
+    sentence: `${lead}: ${clauses.length === 0 ? 'no measure had an interval to read' : listOf(clauses)}.${rest}`,
+    energy:
+      axis.length === 0
+        ? null
+        : `Beside that line and never part of it: ${lead.charAt(0).toLowerCase()}${lead.slice(1)}, ` +
+          `${listOf(axis.map((row) => rowClauseOf(row, runs)))}.`,
+    report,
+  };
+}
+
+/**
+ * Two arms that ran the same setting on the same crowds: every replication's seed, validity and
+ * every row's figure equal, a missing figure equal only to a missing one (amendment 5).
+ */
+function sameArmRuns(a: BatchResult['arms'][number], b: BatchResult['arms'][number]): boolean {
+  if (a.replications.length !== b.replications.length || a.replications.length === 0) return false;
+  return a.replications.every((left, index) => {
+    const right = b.replications[index];
+    return (
+      right !== undefined &&
+      left.seed === right.seed &&
+      left.awtIsValid === right.awtIsValid &&
+      BATCH_METRICS.every((metric) => Object.is(left.metrics[metric], right.metrics[metric]))
+    );
+  });
+}
+
+function capitalised(text: string): string {
+  return `${text.charAt(0).toUpperCase()}${text.slice(1)}`;
 }
 
 /**
