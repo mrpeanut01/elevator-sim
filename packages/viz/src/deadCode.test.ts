@@ -404,12 +404,28 @@ const PUBLIC_API_ONLY: Readonly<Record<string, string>> = Object.freeze({
   'scenario/withheldDimensionIds':
     'what no scenario sells (#467, § D535), counted onto the table and partitioned by the guard',
   /*
-   * § D1183: the stage page's own choices, as the census's `page` stratum presses them. Read off
-   * the page's own select so the stratum and the page cannot drift; its caller is the regeneration
-   * driver, and `everyday/stagePlay.test.ts` holds it equal to what the select offers.
+   * -- `everyday/stagePageMovesOf` stood here (§ D1183: the stage page's own choices, as the
+   * census's `page` stratum presses them, with the regeneration driver as its caller). It left when
+   * `campaign/masteryHarness.ts` began building a persona's page move through it (§ D1601), so the
+   * staleness rule below went red on that commit, as it should.
    */
-  'everyday/stagePageMovesOf':
-    'the page stratum’s population (§ D1183); its caller is the regeneration driver',
+  /*
+   * -- The mastery harness (§ D1601). It re-judges a playtest's attempts on fresh batches, and the
+   * ruling forbids both shipped callers it could have: clause 1 leaves the game unchanged and clause 3
+   * shows no fresh verdict to a persona. Its consumer is the gated deriver
+   * `campaign/measure.mastery.test.ts`, which the integrator runs on a playtest's attempt file, and
+   * `masteryHarness.test.ts` holds each of these on every run.
+   */
+  'campaign/planMasteryRejudge':
+    'the mastery harness’s plan (§ D1601); its consumer is the gated deriver measure.mastery.test.ts',
+  'campaign/rejudgeAttempt':
+    'the mastery harness’s two presses (§ D1601); its consumer is the gated deriver measure.mastery.test.ts',
+  'campaign/masteryReportOf':
+    'the mastery harness’s report (§ D1601); its consumer is the gated deriver measure.mastery.test.ts',
+  'campaign/masteryReportJsonOf':
+    'the mastery harness’s file (§ D1601); its consumer is the gated deriver measure.mastery.test.ts',
+  'campaign/formatMasteryReport':
+    'the mastery harness’s table (§ D1601); its consumer is the gated deriver measure.mastery.test.ts',
   'scenario/CANDIDATE_SCENARIOS':
     'the driver’s and the guard’s shared scenario list (goalReport imports only CANDIDATE_GOALS)',
   /*

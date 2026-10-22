@@ -2236,6 +2236,14 @@ type DecisionReservation = {
  */
 const OPEN_RESERVATION = null as DecisionReservation | null;
 /*
+ * **Wave AV's reservation, D1621-D1669, is closed** in the wave's own merge commit. The second design
+ * cycle (`docs/design-cycles/CYCLE-2.md`), run on the engine wave AU fixed, spent three headings:
+ * D1621 (lane AV-1's mastery harness, numbered by the integrator), D1622 (the integrator, recording the
+ * decision panel's ruling R10 on GitHub issue #645) and D1623 (lane AV-2, Delta B's build). No number
+ * below the highest heading, D1623, went unspent, so nothing is holed; **D1624-D1669 are free rather
+ * than holed** (§ D430), and the charter row moves to **D1624**.
+ */
+/*
  * **Wave AU's reservation, D1603-D1629, is closed** in the wave's own merge commit. It opened as
  * D1603-D1619 and was extended before any lane passed D1619. The release-direction fix the owner's
  * decision panel ruled in (§ D1600) and the content it moved, re-derived on the fixed engine: five lanes

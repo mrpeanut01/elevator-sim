@@ -43,6 +43,21 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
   Object.freeze([
     {
       reason:
+        'The split of a two-change press, ruling R10, § D1622. `SPLIT_ORDER_ARM_ID` and ' +
+        '`SPLIT_PARKING_ARM_ID` are arm ids a batch request carries, which the stage card never prints, ' +
+        'and `stageSplitRequestFor` returns that request; `STAGE_SPLIT_COVERAGE` is the table of stage ' +
+        'ids and budgets the block draws on, read by `stageSplitPlanOf`. The words over the split are ' +
+        '`campaign/judge.ts#stageSplitOf`’s and `everyday/stagePlay.ts#stageSplitViewOf`’s, which the ' +
+        '`EVERYDAY_STAGE_PLAY` adapter seeds.',
+      ids: [
+        'campaign/stageRun.ts#SPLIT_ORDER_ARM_ID',
+        'campaign/stageRun.ts#SPLIT_PARKING_ARM_ID',
+        'campaign/stageRun.ts#stageSplitRequestFor',
+        'everyday/stagePlay.ts#STAGE_SPLIT_COVERAGE',
+      ],
+    },
+    {
+      reason:
         'Wave AP lane AP-D2, § D1451 and § D1453. `sandboxHandedRungOf` returns the rung a changed ' +
         'sandbox tower takes its bookings from, a config the run reads, and `WEEK_HELD_AWARD_CHIMES` is ' +
         'the ledger’s number, drawn only inside `WEEK_HELD_PAYS`, which the week adapter sweeps.',
@@ -88,6 +103,26 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'dev/engineerWindow.ts#VIEWER_KEY_ROLES',
         'dev/engineerWindow.ts#patchRemakesTheDay',
         'dev/engineerWindow.ts#watchOnlyRefusal',
+      ],
+    },
+    {
+      reason:
+        'The mastery harness, § D1601. `campaign/masteryHarness.ts` re-judges a playtest’s attempts on ' +
+        'fresh batches for the integrator, and its words are the deriver’s file and table, a refusal of ' +
+        'an attempt file or a seed declaration, and the agent-evidence label those outputs carry. No ' +
+        'surface draws any of them, and none may: clause 3 shows no fresh verdict to a persona, and ' +
+        'clause 1 leaves the game unchanged. The verdicts it reads are `judgeStage`’s, whose adapter ' +
+        'drives them by name.',
+      ids: [
+        'campaign/masteryHarness.ts#MASTERY_EVIDENCE_LABEL',
+        'campaign/masteryHarness.ts#formatMasteryReport',
+        'campaign/masteryHarness.ts#freshSeedCollisions',
+        'campaign/masteryHarness.ts#harnessStageOf',
+        'campaign/masteryHarness.ts#masteryReportOf',
+        'campaign/masteryHarness.ts#parseFreshSeeds',
+        'campaign/masteryHarness.ts#parseMasteryAttempts',
+        'campaign/masteryHarness.ts#planMasteryRejudge',
+        'campaign/masteryHarness.ts#rejudgeAttempt',
       ],
     },
     {

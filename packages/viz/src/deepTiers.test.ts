@@ -175,6 +175,16 @@ const TIERS: Readonly<Record<string, Tier>> = Object.freeze({
       'GitHub issue #234, § D520. § 6.4 measured the arm at 198 s on one worker',
     scheduled: true,
   },
+  'packages/viz/src/everyday/stageSplitHolds.test.ts': {
+    gates: ['ELEVATOR_SIM_DEEP'],
+    reason:
+      'ruling R10 amendments 6 and 7, § D1622: every row the stage card’s split can print, for every ' +
+      'two-change move the page admits, set against the same row on the stage’s held-back crowds, on ' +
+      'stage 1’s 24 u rung and the base of stages 2 to 10. The split draws on no stage this has not ' +
+      'covered; stage 1 at its base runs always-on in the same file. Measured 2026-10-22 at 1 519 s for ' +
+      'the file with the gate open, on one worker on the lane’s shared four-core container',
+    scheduled: true,
+  },
   'packages/viz/src/scenario/survivorSweep.test.ts': {
     gates: ['ELEVATOR_SIM_SURVIVORS'],
     reason:
@@ -576,6 +586,16 @@ const TIERS: Readonly<Record<string, Tier>> = Object.freeze({
       'Not scheduled because burjOperator.test.ts pins seed 376 of the same bracket on every run, ' +
       'and a nightly re-derivation would write counts nothing reads; it is re-run by hand when the ' +
       'building moves',
+    scheduled: false,
+  },
+  'packages/viz/src/campaign/measure.mastery.test.ts': {
+    gates: ['MASTERY_ATTEMPTS', 'MASTERY_OUT'],
+    reason:
+      '§ D1601’s mastery harness: every persona attempt in the playtest’s attempt file re-judged by ' +
+      'the stage’s own judge, once on the held-back batch the persona was shown and once on fresh ' +
+      'batch k from data/mastery-seeds.json, with the slopes over both series written to MASTERY_OUT. ' +
+      'Not scheduled because its input is a playtest’s own attempt file, which no workflow has; the ' +
+      'integrator runs it once per playtest. masteryHarness.test.ts holds the harness on every run',
     scheduled: false,
   },
   'packages/viz/src/campaign/shopTiers.sweep.test.ts': {

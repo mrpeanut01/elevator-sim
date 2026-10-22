@@ -55215,3 +55215,213 @@ sentences the run no longer bears out.
    is outside this ruling and is left for its owner.
 
 **Numbers spent.** This lane held **D1620 to D1623** and spent **D1620**.
+
+## D1621 — the mastery harness's fresh seeds live in `data/mastery-seeds.json`, derived from a named stream, and the environment-free barrel carries the mastery slope
+
+> **Taken 2026-10-21 by an agent session** (wave AV, lane AV-1), carrying out [§ D1601](#d1601)
+> clause 3. A new data file, a harness in the viewer and a wider `experiments` browser barrel; no game
+> behaviour, bound, pin or published figure moves.
+
+**Why an entry.** It reaches past the harness module in three places: it adds a `data/` file that every
+seed set `data/campaign.json` declares, now or later, must stay disjoint from; it moves where
+`RECOMMENDED_MIN_REPLICATIONS` is declared, from `reports/compare.ts` to `reports/statistics.ts`; and it
+puts `engagement/bands.ts` and `engagement/mastery.ts` on `experiments`' environment-free barrel, which
+`browser.test.ts` pins.
+
+1. **The seeds.** `data/mastery-seeds.json` declares stream `mastery-c2`, root `20261021` (the date the
+   batches were declared, as the stage seed sets' names are dates) and twelve batches of 50
+   replications: the bands file's eight attempts and four of headroom. Batch *k* is named
+   `mastery-c2-<k as two digits>`, and its master seed is `core`'s `deriveStreamSeed(root,
+   "mastery-c2:<k>").initState` as a decimal string, the derivation `runner/crn.ts#replicationSeed`
+   applies through its `replication:` stream. The seeds were written by that function and are never
+   typed: `campaign/masteryHarness.ts#parseFreshSeeds` re-derives each one and refuses a seed, a name
+   or a count that differs.
+2. **Collisions, and the binding they make.** `masteryHarness.test.ts` checks that no fresh master
+   equals a master of any seed set in `data/campaign.json` (all ten stages declare the same two), that
+   no replication seed of any fresh batch equals one of another fresh batch or of those sets, and that
+   no fresh master equals any of those replication seeds. Two positive controls hold the check: a
+   batch on the held-back master is caught on its master and on all fifty replication seeds, and a
+   fresh master equal to a stage replication seed is caught. The harness asks the same questions
+   before it presses anything. A stage seed set added later is held to
+   the fresh batches the same way, so a campaign author who reuses one goes red there.
+3. **A file of its own, and not a block in `data/engagement-bands.json`.** The bands file holds the
+   thresholds the three proxies read, and its parser refuses an unknown key. The seeds are no threshold,
+   only the harness reads them, and the game never does.
+4. **The barrel.** The judge lives in the viewer and `experiments` may not import it, so the harness
+   lives there too and reaches `experiments` only through `./browser`. It fits the slopes with
+   `masterySlopeOf` and `pairedMasterySlope` and reads the bands with `parseEngagementBands`, rather than
+   a second statement of either. `bands.ts` reached `reports/compare.ts`, and through it persistence's
+   `node:` imports, for one constant, so the constant is now declared in `reports/statistics.ts` and
+   `compare.ts` re-exports it: the Node barrel exports the same names as before. The browser graph grows
+   from sixteen modules to eighteen.
+5. **Readings of § D1601 the harness had to make.** *The first attempt after it reads the tree* is
+   read as the first attempt the record marks `readTreeBefore`, and that attempt is cut with every
+   later one, so no counted attempt was informed by the tree. A press the admission refuses runs
+   nothing and enters both series as `null`, which `masterySlopeOf`'s own rule turns into a suppressed
+   slope. The two presses of one attempt share their tuning batch, since the fresh press asks for a
+   request identical to the fixed press's, field for field; each press's held-back batch is its own.
+   Attempts after the cut-off are not pressed at all.
+6. **Named gaps.** Stage 1 only, by clause 4: every other shipped stage carries a count goal and is
+   refused until its bars are measured on the fresh set. The harness's figures are agent evidence
+   (`docs/23` § 1.5), and the lane's dry run was on the engine before the release-direction fix
+   (§ D1600), so none of its figures is a finding.
+
+**Numbers spent.** None were allocated to lane AV-1; the integrator numbers this entry **D1621** from wave AV's reservation.
+
+## D1622 — a press that changes both the standing order and the parking is split into each change with the other kept, on the stage's own crowds
+
+> **Taken 2026-10-22 by the owner's decision panel** (GitHub issue #645, ruling R10, 3–0), recorded by
+> the integrator of wave AV. It approves cycle 2's Delta B (`docs/design-cycles/CYCLE-2.md` § 3) with
+> amendments. **Owner-reversible.**
+
+**Why an entry.** It binds the stage sequence, `campaign/judge.ts`, both `everyday/stagePlay*.ts` files,
+the honesty register and cycle 3's pass condition, none of which the panel's lane owns.
+
+**What was approved.** Cycle 2's playtest met two of the three clauses cycle 1 wrote for [§ D1602](#d1602)'s
+sized verdict, and the third, a felt-but-null count of 0, came back 1: the phone persona credited `eta`
+for turning forecast parking's fail into a clear, while the switch's own effect on mean wait is unresolved
+on both seed sets (−0.58 s [−1.24, +0.09] tuning, −0.26 s [−0.54, +0.02] holdout). After a press that
+changes both the standing order and the parking, the stage runs one more batch on its tuning crowds,
+after the verdict and without delaying it, and prints each change with the other kept, in the verdict's
+own sentence shape. No judge rule, verdict, data file, census or published figure moves. The amendments,
+the union of the seats' own:
+
+1. **The trigger is the admission, never the selects** (seats 1 and 3). The block draws only when the
+   admitted move changes both the standing order (a profile other than the stage's own) and the parking
+   (`idle.parkingStrategy` among `admission.moved`, against the shipped setting). Each one-change arm
+   reverts exactly one of the two to the shipped stage's value. So `zoned-uppeak` left at "in the middle
+   of its own zone" draws the block, with zoning and cars left where they stopped as its parking arm (X2,
+   the curious player's attempt 7), and zoning with cars left where they stopped draws none. A test pins
+   both.
+2. **Each line names the change and what was kept** (seat 3), as in "Changing the standing order to
+   Minimum estimated wait, with forecast parking kept: …", and never says "on its own" or "alone", because
+   the player may already have pressed the order alone and seen another result. A line carries size
+   clauses and the rest clause only, and no bar word ("ahead", "behind", "met", "reached"), so no line
+   reads as a second verdict.
+3. **One heading** (seats 1 and 3) names the stage's own crowds and the 50 runs once. Where the held-back
+   batch ran, it says those crowds judged the two changes only together, and that the block does not say
+   which change decided them.
+4. **Drawn last** (seats 1 and 3): below the held-back sentence, never between the two crowd sentences. A
+   pending line with no figures holds its place, Run is never greyed or delayed, an edit or a new press
+   drops the batch, the block never draws over a stale verdict or over another press's, and a failed
+   batch says so.
+5. **Common random numbers are checked** (seat 2): the split's press arm must equal the verdict's tuning
+   candidate arm on every replication and row, or the block is not drawn.
+6. **The held-back test covers every row the block can print** (seat 2): the three waits, the observation
+   rows `comparisonSentence` sizes when they resolve, and the drive-work rows, over the page's own list of
+   moves through `admitStageMove`, never a fixed count. Stage 1 at 4 u is always-on; the 24 u rung and
+   stages 2 to 10 run once before merge as a deep-tier test, and the block draws on no stage that test has
+   not covered.
+7. **A flip goes back to the panel** (seat 2): a row the tuning split prints as resolved one way whose
+   holdout interval excludes zero the other way fails the gate and returns R10 to this panel with the row
+   named. Nothing is changed to make it pass. Same-way agreement is printed and never gated.
+8. **Cycle 3's pass gains three clauses** (seats 1, 2 and 3). Every persona states the outcome correctly
+   after every two-change press, and `number-averse` and the phone persona at 390 × 844 also state the
+   measure that decided it with the block drawn; a miss takes `CYCLE-2.md` § 3's mean-wait-only fallback without
+   another ruling. A persona's ranking of one press's two changes is checked against the paired interval
+   of the two one-change arms, and counts as an X3 misreading where that interval contains zero. A series
+   with no two-change press marks these clauses untested, never met.
+9. **The record** (seat 1): [§ D372](#d372)'s building stays deferred, as R1 amendment 10 recorded it, and `CYCLE-2.md` § 5
+   carries C9 as the open design risk for a second cycle.
+10. **Corrections to `CYCLE-2.md` § 3 and § 2**, made in the record: the director's 17 moves left out `stay`, so
+    zoning with cars left where they stopped was missing (amendment 6 replaces the count with the page's
+    own list); "three of X3's four misreadings" overstated it, because the paired runs uphold two of X3's
+    four rankings and `number-averse`'s attempt 5 compares held-back figures a tuning split cannot answer;
+    the sentence setting the order's split size beside the parking's compared two separate estimates,
+    X3's own inference, and is struck; and § 2's C7 named three measures where `judgeComparisonGoal`
+    orders on six rows.
+
+**Numbers spent.** The integrator spends **D1622** from wave AV's reservation; the build lane's block
+follows it.
+
+## D1623 — the stage card splits a press that changed both the standing order and the parking, each change with the other kept, on the stage's own crowds
+
+> **Taken 2026-10-22 by an agent session** (wave AV, lane AV-2), building ruling R10 of the owner's
+> decision panel ([§ D1622](#d1622), GitHub issue #645, three seats to none, ten amendments). **Owner-reversible**:
+> one revert removes the block and changes no other word on the card.
+
+**Why an entry.** It binds the stage page (`everyday/stagePlay.ts`, `everyday/stagePlayScreen.ts`),
+the judge (`campaign/judge.ts`), the stage run (`campaign/stageRun.ts`), the honesty register
+(`honesty/surfaces.ts`, `honesty/faults.ts`) and a deep-tier job, which no one module owns. It
+amends no ruling's wording in force, so `docs/39` § 2 gains no row.
+
+**What was built, by amendment.**
+
+1. **The trigger is the admission** (amendment 1). `everyday/stagePlay.ts#stageSplitPlanOf` splits a
+   press only when it is admitted, its standing order is a profile other than the stage's own, and
+   `idle.parkingStrategy` is among what the admission moved. Each one-change arm reverts one of the
+   two to the stage's own value, as the page's own select would make it (`parkedMoveOf`), and is
+   admitted through `admitStageMove`. `zoned-uppeak` as it stands, parked mid-zone, is split, with
+   zoning and cars left where they stopped as its parking arm; zoning with cars left where they
+   stopped is not. On stage 1 at 4 u the page admits 18 two-change moves.
+2. **The batch.** After the verdict is drawn and Run is given back, `stagePlayScreen.ts#press` runs
+   `runStageSplit` on a worker of its own: `stageRun.ts#stageSplitRequestFor`, the verdict's tuning
+   request with three arms (the press, the shipped order with the press's parking, the press's order
+   with the shipped parking), so the same crowds and one CRN audit. The verdict, `met`, `held`,
+   `cleared` and its audit are untouched, and nothing waits for this batch.
+3. **The words** (amendments 2 and 3). `campaign/judge.ts#stageSplitOf` prints each change by
+   `comparisonSentence`'s rules through the same formatter (their shared body is now
+   `measureWordsOf`, and the verdict's own sentences are byte-identical): average wait first with its
+   range, every other resolved row with its size, the unresolved rest under one clause. No line
+   carries a bar word or a closing verdict, says *on its own* or *alone*, names a cause, sums the two,
+   or speaks for other crowds; *altered no run* is said only where every paired difference is exactly
+   zero. Drive work is one line per change, higher or lower only where its interval excludes zero
+   ([§ D106](#d106)). One heading names the stage's own crowds and the 50 runs, and where the
+   held-back batch ran says those crowds judged the two changes only together. On X1's press:
+   *"Changing the standing order to Minimum estimated wait, with forecast parking kept: average wait
+   was too close to call at 50 runs, between 1.24 seconds shorter and 0.09 seconds longer, and
+   95th-percentile wait was shorter by between 0.62 and 5.02 seconds. The remaining measures were too
+   close to call as well."*
+4. **The card** (amendment 4). The block is the verdict card's last child, below the held-back
+   sentence. While its batch runs, one line with no figure holds the place; a failed batch says so in
+   one line; an edit or a new press stops the batch and takes the block away, and it is never drawn
+   over a stale verdict or another press's. The Engineer surface is unchanged.
+5. **Common random numbers are checked** (amendment 5). `stageSplitOf` draws nothing unless the
+   split's press arm equals the verdict's own candidate arm, seed, validity and every row, on every
+   replication, and the audit held.
+6. **Coverage** (amendments 6 and 7). `stagePlay.ts#STAGE_SPLIT_COVERAGE` lists the stages and
+   budgets the block draws on: stage 1 at 4 u and 24 u, and the base of stages 2 to 10. A press at
+   any other budget runs no split. `everyday/stageSplitHolds.test.ts` iterates that table and nothing
+   else, so the block draws on no stage the held-back test has not covered.
+
+**The held-back test, run before merge.** Every row the block can print (three waits, three
+observation rows, two drive-work rows), both changes, every two-change move the page admits, set
+against the same row on the stage's held-back crowds. **No row flipped anywhere.** Same-way
+agreement, printed and never gated, is rows resolved the same way held back over rows the stage's own
+crowds print as resolved:
+
+| stage at budget | two-change moves | rows | printed resolved | same way held back | flips |
+|---|---|---|---|---|---|
+| `stage-1-first-call` at 4 u | 18 | 288 | 144 | 119 | 0 |
+| `stage-1-first-call` at 24 u | 36 | 576 | 287 | 232 | 0 |
+| `stage-2-morning-rush` at 4 u | 18 | 288 | 97 | 83 | 0 |
+| `stage-3-overwhelmed` at 4 u | 18 | 288 | 54 | 49 | 0 |
+| `stage-4-two-banks` at 15 u | 36 | 576 | 250 | 134 | 0 |
+| `stage-5-credentials` at 15 u | 36 | 576 | 115 | 84 | 0 |
+| `stage-6-the-tall-one` at 15 u | 36 | 576 | 263 | 143 | 0 |
+| `stage-7-prove-it` at 15 u | 36 | 576 | 269 | 182 | 0 |
+| `stage-8-the-headline-address` at 4 u | 18 | 288 | 146 | 140 | 0 |
+| `stage-9-both-ways-at-once` at 15 u | 36 | 576 | 236 | 194 | 0 |
+| `stage-10-the-bed-and-the-visitor` at 15 u | 36 | 576 | 122 | 117 | 0 |
+
+**What it does not touch.** No `met`, `held` or `cleared`, no `data/` file, census, goal bar or
+published figure; `stageVerdictsHold.test.ts` is unchanged and green, and the engagement report for
+stage 1 prints byte for byte what it printed on `1a6b094`.
+
+**Held by** `campaign/judge.test.ts`, which reads every split bound back against the paired-t
+estimate of its two named arms for X1's press, the phone persona's attempt 4 and the curious
+player's attempt 11, and fails a moved bound, *shorter* over an interval containing zero, *too close
+to call* over one excluding it and a bar word; `everyday/stageSplit.test.ts` (the trigger both ways,
+a real stage-1 press through `pressStage` and `runStageSplit`, the CRN refusal, the card's pending,
+failed and stale arms); `everyday/stageSplitHolds.test.ts` (stage 1 at 4 u always-on, the rest of the
+table in the `stage-split` job of `.github/workflows/deep-tiers.yml`); `everyday/stageWatch.browser.test.ts`
+on the built bundle (last in the card, Run live while pending, an edit drops it); and the honesty
+corpus, where the stage page adapter seeds the block with the acts each line credits and the press
+carried, and `honesty/faults.ts#splitCreditedOnOneChange` makes `unbacked-attribution` fire on the
+order's line over a press that moved only the parking.
+
+**What it does not establish.** Whether people read the split correctly is cycle 3's to measure,
+under the three clauses amendment 8 added to its pass.
+
+**Numbers spent.** Lane AV-2 holds **D1623 to D1630** and spends **D1623**. D1624 to D1630 are
+unspent.

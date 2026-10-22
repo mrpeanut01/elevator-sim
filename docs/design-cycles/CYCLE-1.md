@@ -46,7 +46,7 @@ excludes zero, in either direction.
 |---|---|---|---|
 | `park-cars-lobby` | 1 of 1 | [0.207, 1.000] | +1.357 [+0.677, +2.036], worse |
 | `spread-cars` | 1 of 1 | [0.207, 1.000] | −4.340 [−5.704, −2.976], better |
-| `switch-dispatcher` | 1 of 12 | [0.015, 0.354] | to nearest-car +0.789 [+0.254, +1.323], worse; 9 of the 12 targets are exact ties |
+| `switch-dispatcher` | 1 of 12 | [0.015, 0.354] | to nearest-car +0.789 [+0.254, +1.323], worse; 8 of the 12 targets are exact ties (corrected 2026-10-21 from 9, a transcription error; the command printed 8) |
 | `adopt-dispatcher` | 7 of 8 | [0.529, 0.978] | to zoned-uppeak −1.554 [−3.018, −0.090], better; six targets worse, from +1.582 to +6.627 |
 
 `answer-incident`, `equipment-change` and `building-change` are not yet replayable from a session's

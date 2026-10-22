@@ -166,6 +166,49 @@ export function batchRequestForStage(
   };
 }
 
+/** The split batch's two one-change arms (ruling R10, [§ D1622](../../../../DECISIONS.md)). */
+export const SPLIT_ORDER_ARM_ID = 'shipped-order';
+export const SPLIT_PARKING_ARM_ID = 'shipped-parking';
+
+/** One arm of a split: a shipped profile by id, and the edit on it, if any. */
+export interface StageSplitArm {
+  readonly profileId: string;
+  readonly edit?: EditedVector | undefined;
+}
+
+/**
+ * **The split batch**, ruling R10 on GitHub issue #645 ([§ D1622](../../../../DECISIONS.md)): after a
+ * press that changed both the standing order and the parking, one more batch on the stage's
+ * **tuning** crowds with three arms, the press first, then the shipped order with the press's parking
+ * ({@link SPLIT_ORDER_ARM_ID}), then the press's order with the shipped parking
+ * ({@link SPLIT_PARKING_ARM_ID}).
+ *
+ * Built from {@link batchRequestForStage} and differing from the verdict's tuning batch in its arms
+ * alone: the same master seed, replications, horizon, demand and window, so the same crowds, and
+ * one CRN audit covers both comparisons because every arm is checked against the press.
+ * `campaign/judge.ts#stageSplitOf` refuses the block unless the press arm equals the verdict's own
+ * candidate arm on every replication and row.
+ */
+export function stageSplitRequestFor(
+  stage: CampaignStage,
+  arms: { readonly press: StageSplitArm; readonly forOrder: StageSplitArm; readonly forParking: StageSplitArm },
+): BatchRequest {
+  const request = batchRequestForStage(stage, arms.press.profileId, arms.press.edit, 'tuning');
+  const armOf = (armId: string, arm: StageSplitArm) => ({
+    armId,
+    dispatcherProfileId: arm.profileId,
+    ...(arm.edit === undefined ? {} : { edit: arm.edit }),
+  });
+  return {
+    ...request,
+    arms: [
+      armOf(CANDIDATE_ARM_ID, arms.press),
+      armOf(SPLIT_ORDER_ARM_ID, arms.forOrder),
+      armOf(SPLIT_PARKING_ARM_ID, arms.forParking),
+    ],
+  };
+}
+
 export interface DemonstrationInput {
   readonly stage: CampaignStage;
   readonly building: ResolvedBuilding;
