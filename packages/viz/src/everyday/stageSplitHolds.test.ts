@@ -1,5 +1,5 @@
 /**
- * **The held-back crowds judge the split** — ruling R10 on GitHub issue #645, amendments 6 and 7
+ * **The held-back crowds judge the split**: ruling R10 on GitHub issue #645, amendments 6 and 7
  * ([§ D1622](../../../../DECISIONS.md)).
  *
  * The split is measured on the stage's own crowds only, so a row it prints as resolved could be a
@@ -226,7 +226,7 @@ function summaryOf(holding: Holding): string {
   );
 }
 
-describe('stage 1 at its base: no row the split prints resolved flips on the held-back crowds — amendments 6 and 7', () => {
+describe('stage 1 at its base: no row the split prints resolved flips on the held-back crowds (amendments 6 and 7)', () => {
   let holding: Holding;
 
   beforeAll(() => {
@@ -263,7 +263,7 @@ const DEEP = Object.entries(STAGE_SPLIT_COVERAGE).flatMap(([stageId, rungs]) =>
   rungs.filter((units) => !(stageId === 'stage-1-first-call' && units === 4)).map((units) => [stageId, units] as const),
 );
 
-describe.skipIf(process.env['ELEVATOR_SIM_DEEP'] !== '1')('every other stage and budget the split draws on: no flip — amendments 6 and 7', () => {
+describe.skipIf(process.env['ELEVATOR_SIM_DEEP'] !== '1')('every other stage and budget the split draws on: no flip (amendments 6 and 7)', () => {
   it('flips no row the split prints resolved, on stage 1’s 24 u rung and the base of stages 2 to 10', () => {
     expect(DEEP.length).toBe(Object.values(STAGE_SPLIT_COVERAGE).flat().length - 1);
     const holdings = DEEP.map(([stageId, units]) => {

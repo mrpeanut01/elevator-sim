@@ -513,7 +513,7 @@ export const pressClaimUndeclared: TextFault = (texts) =>
   );
 
 /**
- * § D1622 — **the split's line for a change the press did not make**: the stage card's line for the
+ * § D1622: **the split's line for a change the press did not make**, the stage card's line for the
  * standing order, drawn over a press whose admission moved only the parking. The line keeps its
  * words and its credit, and what the press carried loses the order, which is the state a split drawn
  * from the selects rather than from the admission would reach (ruling R10, amendment 1).

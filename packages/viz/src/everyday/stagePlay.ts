@@ -597,12 +597,12 @@ export function stagePageMovesOf(
 }
 
 /* -------------------------------------------------------------------------- *
- * The split of a two-change press — ruling R10, § D1622
+ * The split of a two-change press (ruling R10, § D1622)
  * -------------------------------------------------------------------------- */
 
 /**
- * **The stages and budgets the split is drawn on**, by stage id and the units a press is made at —
- * ruling R10, amendment 6 ([§ D1622](../../../../DECISIONS.md)): *"the block draws on no stage that
+ * **The stages and budgets the split is drawn on**, by stage id and the units a press is made at
+ * (ruling R10, amendment 6 ([§ D1622](../../../../DECISIONS.md)): *"the block draws on no stage that
  * test has not covered"*.
  *
  * The test is `everyday/stageSplitHolds.test.ts`, which sets every row the block can print on the
@@ -654,7 +654,7 @@ export interface StageSplitPlan {
 }
 
 /**
- * **Whether a press is split, and into what** — ruling R10, amendment 1 ([§ D1622](../../../../DECISIONS.md)).
+ * **Whether a press is split, and into what**: ruling R10, amendment 1 ([§ D1622](../../../../DECISIONS.md)).
  *
  * Decided from the admitted move and never from which selects were touched: the press must be
  * admitted at this budget, its standing order a profile other than the stage's own, and
@@ -697,7 +697,7 @@ function splitArmOf(move: StageMove): StageSplitArm {
 }
 
 /**
- * **Run the split and word it** — the batch `campaign/stageRun.ts#stageSplitRequestFor` builds, on
+ * **Run the split and word it**: the batch `campaign/stageRun.ts#stageSplitRequestFor` builds, on
  * the runner the caller hands over, then `campaign/judge.ts#stageSplitOf` against the verdict's own
  * tuning batch. `undefined` where the judge refuses the block (amendment 5's check among them).
  *

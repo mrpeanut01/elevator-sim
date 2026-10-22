@@ -1,5 +1,5 @@
 /**
- * **The split of a two-change press: when it is made, what it runs, and how the card holds it** —
+ * **The split of a two-change press: when it is made, what it runs, and how the card holds it**,
  * ruling R10 on GitHub issue #645, [§ D1622](../../../../DECISIONS.md).
  *
  * `campaign/judge.test.ts` reads every printed bound back against its two arms, and
@@ -92,7 +92,7 @@ function parkingOf(move: StageMove): unknown {
   return move.edit?.values['idle.parkingStrategy'];
 }
 
-describe('the split is decided from the admitted move — amendment 1', () => {
+describe('the split is decided from the admitted move (amendment 1)', () => {
   it('splits zoned-uppeak parked mid-zone as it stands, with zoning and cars left where they stopped as its parking arm', () => {
     const zoning = requireDispatcher(config, 'zoned-uppeak');
     const plan = planOf({ profile: zoning });
@@ -139,7 +139,7 @@ describe('the split is decided from the admitted move — amendment 1', () => {
   });
 });
 
-describe('the split runs on the press a player makes — the standing requirement, both ways', () => {
+describe('the split runs on the press a player makes: the standing requirement, both ways', () => {
   const pressed = new Map<string, { readonly verdict: BatchResult; readonly split: StageSplit | undefined; readonly cleared: boolean }>();
 
   beforeAll(async () => {
@@ -183,7 +183,7 @@ describe('the split runs on the press a player makes — the standing requiremen
     expect(forecast?.split?.heading).toContain('judged your two changes only together');
   });
 
-  it('draws nothing where the press arm is not the verdict’s own candidate arm on every replication and row — amendment 5', () => {
+  it('draws nothing where the press arm is not the verdict’s own candidate arm on every replication and row (amendment 5)', () => {
     const forecast = pressed.get('eta with forecast parking');
     const plan = planOf(parkedMoveOf(requireDispatcher(config, 'eta'), 'predicted-demand', space));
     if (forecast === undefined || plan === undefined) throw new Error('no press');
@@ -234,7 +234,7 @@ describe('the split runs on the press a player makes — the standing requiremen
   });
 });
 
-describe('the card holds the split last, and never over a stale verdict — amendment 4', () => {
+describe('the card holds the split last, and never over a stale verdict (amendment 4)', () => {
   function viewWith(split: StagePlayVerdictFacts['split'], stale: boolean) {
     const stage = stageOne();
     const facts = stageFactsOf({

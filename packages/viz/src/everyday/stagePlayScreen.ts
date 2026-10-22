@@ -177,7 +177,7 @@ interface Session {
   /** The last judged run's settings and per-run counts, which the next verdict compares (wave AQ, AQ-1). */
   lastRun: { readonly choice: StagePlayChoice; readonly counts: StageRunCounts } | undefined;
   /**
-   * The split of the last press, where it changed both the standing order and the parking — ruling
+   * The split of the last press, where it changed both the standing order and the parking (ruling
    * R10, [§ D1622](../../../../DECISIONS.md). Of the press {@link pressed} names, dropped by an edit or
    * a new press, and drawn by the verdict only while that verdict is not stale.
    */

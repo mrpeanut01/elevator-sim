@@ -363,7 +363,7 @@ const ABOVE_CEILING: ReadonlyMap<string, { readonly count: number; readonly tota
      * 248 100 000 + 1 800 000 = **249 900 000**. Nothing existing was raised.
      */
     /*
-     * **118 → 119 and 249 900 000 → 257 100 000, one case** — wave AV lane AV-2's
+     * **118 → 119 and 249 900 000 → 257 100 000, one case**: wave AV lane AV-2's
      * `everyday/stageSplitHolds.test.ts`, ruling R10 amendments 6 and 7 (§ D1622): every row the stage
      * card's split can print, for every two-change move the page admits, on stage 1's 24 u rung and
      * the base of stages 2 to 10, set against the held-back crowds. Gated on `ELEVATOR_SIM_DEEP` and

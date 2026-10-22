@@ -251,7 +251,7 @@ describe.skipIf(!HAS_BROWSER)('a stage press plays one of its crowds, and the ve
         }).observe(document.body, { childList: true, subtree: true, attributes: true });
       });
       await page.locator('.everyday-bar-primary').click();
-      await page.waitForSelector('.everyday-stage-play-split[data-state="drawn"]', { timeout: 150_000 });
+      await page.waitForSelector('.everyday-stage-play-split[data-state="drawn"]', { timeout: 110_000 });
 
       const marks = await page.evaluate(
         () => (window as unknown as { __splitMarks: { pending: number; pendingRunDisabled: number; splitBeforeVerdict: number } }).__splitMarks,
@@ -285,7 +285,7 @@ describe.skipIf(!HAS_BROWSER)('a stage press plays one of its crowds, and the ve
     } finally {
       await page.close();
     }
-  }, 180_000);
+  }, 120_000);
 
   /*
    * Wave AR lane AR-3, GitHub issue #633: on stage 3, Min-wait with lobby parking after Min-wait as it

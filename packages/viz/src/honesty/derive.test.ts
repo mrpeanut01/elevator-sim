@@ -43,7 +43,7 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
   Object.freeze([
     {
       reason:
-        'The split of a two-change press — ruling R10, § D1622. `SPLIT_ORDER_ARM_ID` and ' +
+        'The split of a two-change press, ruling R10, § D1622. `SPLIT_ORDER_ARM_ID` and ' +
         '`SPLIT_PARKING_ARM_ID` are arm ids a batch request carries, which the stage card never prints, ' +
         'and `stageSplitRequestFor` returns that request; `STAGE_SPLIT_COVERAGE` is the table of stage ' +
         'ids and budgets the block draws on, read by `stageSplitPlanOf`. The words over the split are ' +

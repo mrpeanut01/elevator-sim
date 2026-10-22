@@ -177,7 +177,7 @@ export interface StageSplitArm {
 }
 
 /**
- * **The split batch** — ruling R10 on GitHub issue #645, [§ D1622](../../../../DECISIONS.md): after a
+ * **The split batch**, ruling R10 on GitHub issue #645 ([§ D1622](../../../../DECISIONS.md)): after a
  * press that changed both the standing order and the parking, one more batch on the stage's
  * **tuning** crowds with three arms, the press first, then the shipped order with the press's parking
  * ({@link SPLIT_ORDER_ARM_ID}), then the press's order with the shipped parking

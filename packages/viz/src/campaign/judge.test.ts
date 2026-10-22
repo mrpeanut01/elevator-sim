@@ -933,7 +933,7 @@ describe('every printed bound is the run’s own interval, on both seed sets —
 });
 
 /* -------------------------------------------------------------------------- *
- * The split, read back — ruling R10 on GitHub issue #645, § D1622
+ * The split, read back: ruling R10 on GitHub issue #645, § D1622
  * -------------------------------------------------------------------------- */
 
 /**
@@ -955,7 +955,7 @@ function splitLineProblems(sentence: string, report: BatchReport, scope: 'ordera
   ];
 }
 
-describe('every split bound is the paired-t estimate of its two named arms — ruling R10, § D1622', () => {
+describe('every split bound is the paired-t estimate of its two named arms (ruling R10, § D1622)', () => {
   const splits = new Map<SplitPress, { readonly split: StageSplit; readonly result: BatchResult }>();
 
   beforeAll(async () => {

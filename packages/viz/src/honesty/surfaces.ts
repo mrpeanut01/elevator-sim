@@ -18509,7 +18509,7 @@ const EVERYDAY_STAGE_PLAY: SurfaceAdapter = {
 };
 
 /**
- * **The split of a two-change press, as the stage card draws it** — ruling R10,
+ * **The split of a two-change press, as the stage card draws it**: ruling R10,
  * [§ D1622](../../../../DECISIONS.md), seeded so `unbacked-attribution` (§ D1011) holds its credits.
  *
  * The two lines with no figure, pending and failed, then the block itself: the stage's first

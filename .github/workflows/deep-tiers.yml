@@ -664,7 +664,7 @@ jobs:
         run: npx vitest run --passWithNoTests=false --project viz --testTimeout=3600000 src/campaign/difficultyCurve.test.ts
 
   # ---------------------------------------------------------------------------
-  # The stage card's split of a two-change press — ruling R10, § D1622, amendments 6 and 7. Every row
+  # The stage card's split of a two-change press: ruling R10, § D1622, amendments 6 and 7. Every row
   # the split can print, for every two-change move the stage page admits, is set against the same row
   # on the stage's held-back crowds, on stage 1's 24 u rung and the base of stages 2 to 10; a row
   # printed as resolved one way whose held-back interval excludes zero the other way is red, and goes
@@ -673,7 +673,7 @@ jobs:
   # on one worker on the lane's container; the case declares two hours as its own ceiling.
   # ---------------------------------------------------------------------------
   stage-split:
-    name: stage split — the held-back crowds judge each change
+    name: stage split, the held-back crowds judge each change
     if: github.event_name == 'schedule' || inputs.tiers == 'all' || inputs.tiers == 'stage-split'
     runs-on: ubuntu-latest
     timeout-minutes: 150

@@ -808,7 +808,7 @@ function comparisonSentence(input: ComparisonWords): string {
 }
 
 /**
- * **The measures of one comparison, said by {@link comparisonSentence}'s rules** — the clauses and
+ * **The measures of one comparison, said by {@link comparisonSentence}'s rules**: the clauses and
  * the rest, without the crowds, the run count's lead or the closing verdict, so the stage verdict
  * and the split ({@link stageSplitOf}) print a comparison one way (ruling R10, amendment 2).
  *
@@ -859,7 +859,7 @@ function measureWordsOf(
 }
 
 /* -------------------------------------------------------------------------- *
- * The split: each of two changes with the other kept — ruling R10, § D1622
+ * The split: each of two changes with the other kept (ruling R10, § D1622)
  * -------------------------------------------------------------------------- */
 
 /** The two acts a split names: the standing order, and where idle cars wait. */
@@ -916,7 +916,7 @@ export interface StageSplit {
 
 /**
  * **A press that changed both the standing order and the parking, split into each change with the
- * other kept** — ruling R10 on GitHub issue #645 ([§ D1622](../../../../DECISIONS.md)), finding X1:
+ * other kept**, ruling R10 on GitHub issue #645 ([§ D1622](../../../../DECISIONS.md)), for finding X1:
  * a player credited `eta` with turning forecast parking's fail into a clear while the switch's own
  * effect on mean wait was too close to call.
  *
