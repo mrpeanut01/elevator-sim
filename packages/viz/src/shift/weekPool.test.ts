@@ -34,8 +34,10 @@ describe('the shipped pool, held with its order — § D1616', () => {
     expect(weekTopOf(C2)).toBe(1);
     for (let day = 1; day <= 5; day += 1) expect(poolDealOf(C2, 2, day, 3, DATE), `day ${String(day)}`).toBeUndefined();
     const record = { ...weekRecordFor([], C2), closed: 3, dateCrowd: DATE.toString() };
-    const two = dealtCrowdOf({ ...openWeek(C2), week: 2, day: 1, dayIdx: 0 }, record, DATE);
-    const one = dealtCrowdOf({ ...openWeek(C2), week: 1, day: 1, dayIdx: 0 }, record, DATE);
+    const weekTwo = { ...openWeek(C2), week: 2, day: 1, dayIdx: 0 };
+    const weekOne = { ...openWeek(C2), week: 1, day: 1, dayIdx: 0 };
+    const two = dealtCrowdOf(weekTwo, record, DATE);
+    const one = dealtCrowdOf(weekOne, record, DATE);
     expect(two).toBe(one);
   });
 });
