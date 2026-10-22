@@ -54552,6 +54552,160 @@ included, the fold moves nothing.
 
 **Numbers spent.** See [§ D1604](#d1604).
 
+## D1611 — two fix-a-building witnesses are re-authored on demand on the release fix's engine, and every moved figure, decoy line and census follows the run
+
+> **Taken 2026-10-22 by an agent session** (wave AU, lane AU-3), carrying out the owner's decision
+> panel's ruling R4 ([§ D1604](#d1604) clauses 3 to 5, 7 and 9) on fix-a-building. Not a
+> product-owner ruling.
+
+**Why an entry.** It re-authors two cases' demand in `data/fixit-cases.json`, moves copy and registers
+that a player's content reads, and regenerates two censuses, which § D1604 clause 7 says is owed.
+
+1. **What this content is judged on.** The *tuning data* is the letter's morning: the case seed's
+   single pair, as built and with the order. The letter, the four figures and the reasoning are
+   written about it, and it is the judge's gate (`fixit/judge.ts` clause 1). The *held-back check* is
+   the forty-nine derived mornings (`replicationSeedsOf`, the case seed plus i × 7919), judged by the
+   shipped press (`pressThroughTheJudge`, `judgeMornings`). A candidate was chosen on the first and
+   judged once on the second. The as-built mornings census holds the held-back check's as-built half,
+   so it was regenerated only after the choice.
+2. **The rule, written before any candidate ran.** Demand only, on `run.arrivalRatePctPop5min`,
+   nearest first: × 1.1, × 0.9, × 1.25, × 0.8 and × 1.5 of the shipped rate. A candidate passes the
+   tuning data when, on the letter's morning, (T2) the complaint is at least 4 long waits, the smallest
+   complaint any offered case shipped with before this wave (`express-that-stops-everywhere`, 4 of
+   100); (T3) the diagnosed repair clears the gate; (T4) the +3 cm/s placebo is refused at the gate;
+   and (T5) the pair's crowd check passes. The first candidate to pass is the only one sent to the
+   held-back check. Had it failed there the case would have been held, and no second candidate would
+   have been sent. The seed, the bars, the judge, the horizon, the threshold, the morning count, the
+   interval rule, the dispatcher, the complaint, the diagnosis, the diagnosed repair and the result
+   copy are unchanged.
+3. **`bed-cars-locked-out`** (seed 20263037). On the fixed engine at 9 the letter's morning read 4 long
+   waits of 36, and the diagnosed repair took it to 2, which is 50 %, under the bar.
+
+   | candidate | letter as built | diagnosed after | gone | rest, points | gate | placebo | tuning |
+   |---|---|---|---|---|---|---|---|
+   | 9, as shipped | 4 of 36 | 2 | 50 % | +5.3 | not-enough | not-enough | fails T3 |
+   | × 1.1 = 9.9 | 22 of 56 | 12 | 45.5 % | −1.6 | not-enough | not-enough | fails T3 |
+   | **× 0.9 = 8.1** | **5 of 36** | **1** | **80 %** | **−0.5** | **fixed** | **not-enough** | **passes** |
+   | × 1.25 = 11.25 | 11 of 63 | 17 | 0 % | −0.7 | not-enough | not-enough | fails T3 |
+   | × 0.8 = 7.2 | 5 of 47 | 5 | 0 % | 0.0 | not-enough | not-enough | fails T3 |
+   | × 1.5 = 13.5 | 21 of 59 | 23 | 0 % | −4.0 | not-enough | not-enough | fails T3 |
+
+   **8.1 is chosen.** On the held-back mornings, once: the repair removes +3.04 [+1.61, +4.48] long
+   waits a morning, lower on 35 of 49 (369 → 220), and the rest moves +0.16 [−0.83, +1.14] points. The
+   press reads *fixed*, and the placebo is refused at the gate.
+4. **`every-deck-calls-itself-full`** (seed 20260844). At 4.5 the letter's morning read 1 long wait of
+   257, a letter about nothing.
+
+   | candidate | letter as built | diagnosed after | gone | rest, points | gate | placebo | tuning |
+   |---|---|---|---|---|---|---|---|
+   | 4.5, as shipped | 1 of 257 | 0 | 100 % | +1.5 | fixed | not-enough | fails T2 |
+   | **× 1.1 = 4.95** | **11 of 257** | **0** | **100 %** | **+3.0** | **fixed** | **not-enough** | **passes** |
+   | × 0.9 = 4.05 | 0 of 232 | 0 | none to remove | +7.1 | not-enough | not-enough | fails T2, T3 |
+   | × 1.25 = 5.625 | 32 of 267 | 0 | 100 % | +8.9 | fixed | not-enough | passes |
+   | × 0.8 = 3.6 | 0 of 229 | 0 | none to remove | +5.0 | not-enough | not-enough | fails T2, T3 |
+   | × 1.5 = 6.75 | 144 of 350 | 0 | 100 % | +7.1 | fixed | not-enough | passes |
+
+   **4.95 is chosen.** On the held-back mornings, once: +19.22 [+11.63, +26.82] a morning, lower on 41
+   of 49 (942 → 0), the rest +4.88 [+4.19, +5.57] points; *fixed*, and the placebo is refused at the
+   gate. 5.625 and 6.75 also passed the tuning data and were never run on the held-back mornings.
+5. **Figures that follow the run**, each re-pinned in `cases.test.ts#PINNED` from the run and quoted
+   in the copy:
+   - `bed-cars-locked-out` at 8.1: `11 of 36 journeys`, `125 s`, `42.0 s over 36 boarded journeys`,
+     `94.7 % of 228 journeys` to `5 of 36`, `210 s`, `38.7 s over 36`, `93.0 % of 213`, and the
+     answer's pair 11 → 1 to 5 → 1. Quoted by the reasoning and two decoy lines.
+   - `every-deck-calls-itself-full` at 4.95: `8 of 257`, `77 s`, `17.3 s over 257`, `97.0 % of 867` to
+     `11 of 257`, `79 s`, `19.2 s over 257`, `96.7 % of 836`, and 8 → 0 to 11 → 0. Quoted by the
+     reasoning and one decoy line.
+   - `car-park-nobody-serves`, unchanged and still clearing (17 → 3, 82.4 %): `21 of 45`, `322 s`,
+     `70.0 s over 45`, `98.0 % of 51` to `17 of 45`, `172 s`, `59.6 s over 45`, `96.1 % of 51`. Quoted
+     by the reasoning and two decoy lines.
+   - `deliveries-on-the-passenger-group`: the answer's after-figure 2 to 0. Its copy quotes none.
+6. **Decoy lines that follow the run** ([§ D1604](#d1604) clause 5), each held by
+   `theAnswerIsNotPrinted.test.ts`'s direction check or by `cases.test.ts`'s numeral check:
+   - `car-park-nobody-serves/regear-the-garage-car`: *"The garage car cycles quicker, so the 322 s worst
+     shortens — but its queue is still half the building's arrivals on one car, and this is the whole
+     budget."* now reads *"The garage car cycles quicker, and the 172 s worst wait does not shorten.
+     Its queue is still half the building's arrivals on one car, and this is the whole budget."* On the
+     run the worst wait goes 172 s to 195 s.
+   - `every-deck-calls-itself-full/regear-the-shuttles`: *"Each climb is quicker and the worst wait does
+     not shorten: the decks still close their doors at five hundred pounds, and the queue is at the
+     doors rather than on the climb."* now reads *"Each climb is quicker, and the 79 s worst wait
+     shortens. The decks still close their doors at five hundred pounds."* On the run at 4.95 the worst
+     goes 79 s to 74 s and the complaint 11 to 4, so the clause placing the queue at the doors is
+     dropped: the run does not bear it out.
+   - `car-park-nobody-serves/quicker-garage-doors`: *"… the 70.0 s mean a little. The queue is hundreds
+     of seconds deep; the doors are not."* now reads *"… the 59.6 s mean a little. The queue is minutes
+     deep; the doors are not."* The worst wait on the run is 172 s, and the mean goes 59.6 s to 56.9 s.
+   - Figures only: `bed-cars-locked-out/dedicate-to-beds` (94.7 % to 93.0 %; the rest goes 93.0 % to
+     80.8 % on its run), `quicker-bed-car-doors` (the 125 s worst to 210 s) and
+     `every-deck-calls-itself-full/trim-shuttle-dwell` (the 17.3 s mean to 19.2 s, which it moves to
+     17.9 s).
+7. **Registers.**
+   - `cases.test.ts#SECOND_ANSWERS`. **`every-letter-says-nine/split-the-group` joins**: on the fixed
+     engine it clears the letter's morning 10 → 2, exactly 80 %, with the rest unchanged, and over the
+     forty-nine it is *cleared-once*, +0.4 [−1.3, +2.1]. Its line names no outcome and keeps its words.
+     **`bed-cars-locked-out/quicker-bed-car-doors` leaves**: at 9 on the fixed engine it took the letter
+     4 → 1 (75 %), and on the re-authored case 5 → 6. It stopped clearing; it did not start. The other
+     six entries were re-measured through the shipped press at k = 50 on this engine and read as their
+     comments say: `trim-the-dwell`, `night-working` and `replant-the-machines` *fixed*;
+     `quicker-tower-doors` and `hold-doors-longer` *cleared-once*, each stopping at the first look;
+     `borrow-a-low-car` *fixed*, +17.3 [+15.6, +18.9].
+   - `theAnswerIsNotPrinted.test.ts`. Every `SOLVED_BY` row reproduces, `bed-cars-locked-out`'s `zone:1`
+     on the re-authored case (at 9 on the fixed engine it read `none`).
+     `every-deck-calls-itself-full/parking:zone-center` leaves `NOT_REPLICATED`: it reads `not-enough`
+     on the re-authored letter's morning, and read `building-worse` at 4.5.
+   - `verdictNamesTheOrder.test.ts#FALSE_ROUTES`. The same route leaves with a note, as
+     `let-faster-than-the-lifts`' did under [§ D1076](#d1076); four rows hold the property.
+   - `fixit/held.ts#HELD_FIX_CASES` is unchanged. No case is held by this entry.
+8. **Censuses, each by its own tool.**
+   - `data/fixit-as-built-mornings.json`, by `asBuiltMornings.sweep.test.ts`'s regeneration, about
+     150 s to 170 s a run here. On the engine alone (tree `ea49e27`), 13 of 18 cases move and no input
+     digest does: `bed-cars-locked-out` 38 of 49 mornings, `every-deck-calls-itself-full` 17,
+     `every-letter-says-nine` 14, `controller-sends-every-car` 9, `deliveries-on-the-passenger-group` 8,
+     `doors-that-never-close` 7, `everyone-leaves-at-once` 6, `car-park-nobody-serves` 4,
+     `express-that-stops-everywhere` 3, `one-start-time` 2, and one each on
+     `restaurant-above-the-ballroom`, `let-faster-than-the-lifts` and `gym-on-the-top-floor`. That
+     reproduces lane AU-1's scratch regeneration row for row. Then on the re-authored cases (tree
+     `343ccd9`) the two cases move on all 49 mornings and on their digests, their as-built totals
+     equal to the held-back run's (369 and 942), and the other sixteen rows are byte-identical.
+   - The route census and par, by `routeCensus.sweep.test.ts` (`ELEVATOR_SIM_FIXIT_ROUTES=deep`) on
+     `38de98b`, 985 s with `everyLeverRuns.test.ts` on a contended box. It did not reproduce. Four rows
+     moved and are pasted into `fixit/routeCensus.ts`: `bed-cars-locked-out` 5 → 2 and
+     `every-deck-calls-itself-full` 59 → 40 clearing routes, both re-authored, and
+     `deliveries-on-the-passenger-group` 3 → 4 and `controller-sends-every-car` 17 → 18, whose inputs
+     did not change. Every route count is the same, and `express-that-stops-everywhere` alone still
+     opens with its diagnosis shown. No par moved; two judged counts did (`bed-cars-locked-out` 2 → 1,
+     `controller-sends-every-car` 1 → 2), pasted into `fixit/par.ts`. `everyLeverRuns.test.ts` is green.
+     Re-run twice more on the pasted tables, every row and par reproduces; on this shared box
+     `every-deck-calls-itself-full`'s case ran past the `viz` project's 300 s default each time (370 s
+     and 399 s) and failed on that alone. Its census costs the same at both rates (133 s and 133 s at
+     4.5, 132 s and 126 s at 4.95, alternated in one process), its par judges three routes at both,
+     and the nightly job ran the whole sweep on `main` in 3 min 16 s end to end on 2026-10-22, so no
+     annotation is raised here.
+   - `everyday/fixitHint.browser.test.ts`'s not-fixed-early journey raised the bed-car case's roof 5 m,
+     which on the re-authored case no longer clears the letter's morning (5 → 9). It now raises
+     `every-letter-says-nine`'s roof 3 m, `NOT_REPLICATED`'s row: probed through the judge, it clears
+     the letter 10 → 2 and stops at the first look, lower on 3 of 10 mornings.
+9. **Every offered case meets clause 9**, and `cases.test.ts` checks all fifteen: the diagnosed repair
+   clears the letter's morning and is *fixed* over the forty-nine with the placebo refused; the four
+   figures are pinned to this engine's run and every authored numeral is a pinned figure or a declared
+   fact; and the hint names the diagnosed repair's own schedule rows
+   (`everyday/fixitScreenModel.ts#diagnosisHintTextOf`), so the first check is what makes it a change
+   measured to clear.
+10. **What this does not establish.** Why any verdict moved: the mechanism is unmeasured and no copy
+    says it. Whether 8.1 and 4.95 are the rates an author would have picked: they are the first of a
+    ladder to pass a rule written before the search. Seat 2's dissent warned that a search until green
+    fits content to noise; each case sent one candidate to the held-back mornings, and each interval's
+    lower bound sits clear of zero there. Three docstrings quote crowd counts measured on
+    `every-deck-calls-itself-full` at 4.5 when GitHub issue #605 was found (97, 89 and 649, in
+    `contract/types.ts`, `record/crowd.ts` and `fixit/zoningKeepsTheCrowd.test.ts`); they record that
+    finding and are left as written. `every-letter-says-nine/trim-the-dwell` says it moves *the 25.4 s
+    mean a little*, and on this engine it moves it to 16.6 s; whether that line moved with the fix is
+    not measured here, and it is left for the next content pass. The dashes inside the edited copy
+    are the authored words' own.
+
+**Numbers spent.** Lane AU-3 holds **D1611 to D1614** and spends **D1611**; D1612 to D1614 are unspent.
+
 ## D1620 — the research pins are republished on the fixed engine, and Phase 6c's refusal stands on its resolution clause alone
 
 > **Taken 2026-10-21 by the owner's decision panel** (GitHub issue #645, ruling R7, 3–0), built by an

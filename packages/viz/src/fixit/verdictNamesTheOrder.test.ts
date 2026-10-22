@@ -3,11 +3,11 @@
  * diagnosis's own run** — [§ D1011](../../../../DECISIONS.md), `rescore-ai` C's D1 and D's N1.
  *
  * `fixit/engine.ts#classifyOutcome` returned the case's authored `result` for **every** fixed
- * outcome. Six routes were reproduced on the shipped bundle (five still clear; see the note at the
+ * outcome. Six routes were reproduced on the shipped bundle (four still clear; see the notes at the
  * end of {@link FALSE_ROUTES}), each clearing its case by a change the
  * diagnosis does not name and each read back the diagnosis's mechanism as though the player had made
  * it — *"Four hundred letters now say half past"* over a hospital roof raised three metres, *"The
- * staggered starts … take six hundred arrivals out"* over a parking change. Every one is here, built
+ * staggered starts … take six hundred arrivals out"* over a parking change. Every one that still clears is here, built
  * by pressing the same controls in the same order through the engine's reducers, run on the case
  * seed as both surfaces run it, and judged the way both surfaces judge it: the after-run's legs
  * against the diagnosed repair's own run.
@@ -44,7 +44,6 @@ import {
   carTo,
   dial,
   doors,
-  parking,
   pressed,
   raiseTopFloor,
   type Press,
@@ -87,12 +86,6 @@ const FALSE_ROUTES: readonly {
     printed: 'The ballroom has its own car while the conference sits',
   },
   {
-    caseId: 'every-deck-calls-itself-full',
-    source: 'C D1 — where idle cars wait: in the middle of its own zone',
-    presses: [parking('zone-center')],
-    printed: 'each deck weighs against its own plate',
-  },
-  {
     caseId: 'every-letter-says-nine',
     source: 'C D1 — the top floor, buy one more step, three times',
     presses: [raiseTopFloor(3)],
@@ -115,8 +108,13 @@ const FALSE_ROUTES: readonly {
    * clause bought the morning back"* — stood here and is removed rather than kept failing. GitHub
    * issue #601 (§ D1076) re-authored that case at 7.0 % a five minutes once its answer thinned the
    * crowd instead of re-drawing it, and on the re-authored case seed the route no longer clears the
-   * letter's morning (`not-enough`), so there is no fixed verdict left for it to misattribute. The
-   * five rows above still hold the property.
+   * letter's morning (`not-enough`), so there is no fixed verdict left for it to misattribute.
+   *
+   * `every-deck-calls-itself-full`, *C D1, where idle cars wait: in the middle of its own zone*,
+   * which printed *"each deck weighs against its own plate"*, is removed the same way. On the release
+   * fix's engine (§ D1603) the route read `building-worse` on the case seed, and once
+   * [§ D1611](../../../../DECISIONS.md) re-authored the case at 4.95 % it reads `not-enough`, so it no
+   * longer clears the letter's morning. The four rows above still hold the property.
    */
 ];
 
