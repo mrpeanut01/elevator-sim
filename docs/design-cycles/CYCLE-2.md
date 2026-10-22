@@ -7,11 +7,11 @@ repo's existing discipline (no verdict without a reproducible basis).
 
 ---
 
-## CYCLE-2: stage 1 again, on the sized verdict   (2026-10-21, Eastern)
+## CYCLE-2: stage 1 again, on the sized verdict and the fixed engine   (2026-10-21 to 2026-10-22, Eastern)
 
 **Track(s):** Casual
-**Build under test:** `main` at `4ee9557` (wave AT's merge), one commit served unchanged through the
-whole playtest. The engine fix of wave AU is not in it (see below).
+**Build under test:** `main` at `c70dbf2` (wave AU's merge, which carries the engine fix), one commit
+served unchanged through the whole playtest.
 **Owner sign-off:** pending
 
 **What this cycle starts from.** [`CYCLE-1.md`](CYCLE-1.md) § 5, the owner note, and the decision
@@ -22,11 +22,10 @@ panel's rulings on GitHub issue #645. Two of them fix how this cycle runs:
   move verdicts outside stage 1 and needs content re-derived around it (wave AU). Stage 1 itself was
   measured byte-identical on the unfixed and the fixed engines: the six presses cycle 1's playtest made,
   on both seed sets, batch by batch; the stage's survivor-census rows at every rung; and the fun proxies.
-  So the panel's ruling R5 (issue #645, 3–0) amends clause 4: this cycle proceeds on `main`, on one
-  named commit, once stage 1 is also shown identical on the twelve fresh mastery batches. A finding that
-  rests on a simulated outcome outside stage 1 carries its commit and the words "unfixed engine", and
-  enters no design delta until it is seen again on the merged engine. After the fix merges, every persona
-  attempt is replayed on the merged head, and any difference reopens its finding.
+  The panel's ruling R5 (issue #645, 3–0) let this cycle proceed on the unfixed engine only if stage 1
+  were also identical on the twelve fresh mastery batches. It was not (194 of 1 056 comparisons differed,
+  every one from the release fix), so the cycle waited for wave AU and plays on the fixed engine, which
+  restores clause 4 as written (§ D1605).
 - **Mastery is re-judged in the harness.** The fresh seed batches are declared before the playtest
   (`data/mastery-seeds.json`), each persona attempt is judged by the game's own judge on its own fresh
   batch, and the game is left unchanged (§ D1601).

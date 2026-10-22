@@ -55215,3 +55215,55 @@ sentences the run no longer bears out.
    is outside this ruling and is left for its owner.
 
 **Numbers spent.** This lane held **D1620 to D1623** and spent **D1620**.
+
+## D1621 — the mastery harness's fresh seeds live in `data/mastery-seeds.json`, derived from a named stream, and the environment-free barrel carries the mastery slope
+
+> **Taken 2026-10-21 by an agent session** (wave AV, lane AV-1), carrying out [§ D1601](#d1601)
+> clause 3. A new data file, a harness in the viewer and a wider `experiments` browser barrel; no game
+> behaviour, bound, pin or published figure moves.
+
+**Why an entry.** It reaches past the harness module in three places: it adds a `data/` file that every
+seed set `data/campaign.json` declares, now or later, must stay disjoint from; it moves where
+`RECOMMENDED_MIN_REPLICATIONS` is declared, from `reports/compare.ts` to `reports/statistics.ts`; and it
+puts `engagement/bands.ts` and `engagement/mastery.ts` on `experiments`' environment-free barrel, which
+`browser.test.ts` pins.
+
+1. **The seeds.** `data/mastery-seeds.json` declares stream `mastery-c2`, root `20261021` (the date the
+   batches were declared, as the stage seed sets' names are dates) and twelve batches of 50
+   replications: the bands file's eight attempts and four of headroom. Batch *k* is named
+   `mastery-c2-<k as two digits>`, and its master seed is `core`'s `deriveStreamSeed(root,
+   "mastery-c2:<k>").initState` as a decimal string, the derivation `runner/crn.ts#replicationSeed`
+   applies through its `replication:` stream. The seeds were written by that function and are never
+   typed: `campaign/masteryHarness.ts#parseFreshSeeds` re-derives each one and refuses a seed, a name
+   or a count that differs.
+2. **Collisions, and the binding they make.** `masteryHarness.test.ts` checks that no fresh master
+   equals a master of any seed set in `data/campaign.json` (all ten stages declare the same two), that
+   no replication seed of any fresh batch equals one of another fresh batch or of those sets, and that
+   no fresh master equals any of those replication seeds. Two positive controls hold the check: a
+   batch on the held-back master is caught on its master and on all fifty replication seeds, and a
+   fresh master equal to a stage replication seed is caught. The harness asks the same questions
+   before it presses anything. A stage seed set added later is held to
+   the fresh batches the same way, so a campaign author who reuses one goes red there.
+3. **A file of its own, and not a block in `data/engagement-bands.json`.** The bands file holds the
+   thresholds the three proxies read, and its parser refuses an unknown key. The seeds are no threshold,
+   only the harness reads them, and the game never does.
+4. **The barrel.** The judge lives in the viewer and `experiments` may not import it, so the harness
+   lives there too and reaches `experiments` only through `./browser`. It fits the slopes with
+   `masterySlopeOf` and `pairedMasterySlope` and reads the bands with `parseEngagementBands`, rather than
+   a second statement of either. `bands.ts` reached `reports/compare.ts`, and through it persistence's
+   `node:` imports, for one constant, so the constant is now declared in `reports/statistics.ts` and
+   `compare.ts` re-exports it: the Node barrel exports the same names as before. The browser graph grows
+   from sixteen modules to eighteen.
+5. **Readings of § D1601 the harness had to make.** *The first attempt after it reads the tree* is
+   read as the first attempt the record marks `readTreeBefore`, and that attempt is cut with every
+   later one, so no counted attempt was informed by the tree. A press the admission refuses runs
+   nothing and enters both series as `null`, which `masterySlopeOf`'s own rule turns into a suppressed
+   slope. The two presses of one attempt share their tuning batch, since the fresh press asks for a
+   request identical to the fixed press's, field for field; each press's held-back batch is its own.
+   Attempts after the cut-off are not pressed at all.
+6. **Named gaps.** Stage 1 only, by clause 4: every other shipped stage carries a count goal and is
+   refused until its bars are measured on the fresh set. The harness's figures are agent evidence
+   (`docs/23` § 1.5), and the lane's dry run was on the engine before the release-direction fix
+   (§ D1600), so none of its figures is a finding.
+
+**Numbers spent.** None were allocated to lane AV-1; the integrator numbers this entry **D1621** from wave AV's reservation.

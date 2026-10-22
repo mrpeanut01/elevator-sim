@@ -2234,7 +2234,14 @@ type DecisionReservation = {
  * is registered in `KNOWN_DECISION_HOLES`; **D1360-D1400 are free rather than holed**, since nothing
  * is written above them (§ D430), and the charter row moves to **D1360**.
  */
-const OPEN_RESERVATION = null as DecisionReservation | null;
+const OPEN_RESERVATION = { wave: 'AV', from: 1621, to: 1669 } as DecisionReservation | null;
+/*
+ * **Wave AV holds D1621-D1669.** The second design cycle (`docs/design-cycles/CYCLE-2.md`), run on the
+ * engine wave AU fixed: the mastery harness and its fresh seeds (§ D1601), the sim sweep and the
+ * persona playtest, the decision panel's ruling on the cycle's one design change, and its build. The
+ * integrator cuts each lane a contiguous block from this range at dispatch. The wave's merge commit
+ * closes this reservation and registers its unspent numbers below the highest heading.
+ */
 /*
  * **Wave AU's reservation, D1603-D1629, is closed** in the wave's own merge commit. It opened as
  * D1603-D1619 and was extended before any lane passed D1619. The release-direction fix the owner's
