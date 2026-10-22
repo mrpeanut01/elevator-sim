@@ -110,8 +110,8 @@ const FALSE_ROUTES: readonly {
    * crowd instead of re-drawing it, and on the re-authored case seed the route no longer clears the
    * letter's morning (`not-enough`), so there is no fixed verdict left for it to misattribute.
    *
-   * `every-deck-calls-itself-full` — *C D1, where idle cars wait: in the middle of its own zone*,
-   * which printed *"each deck weighs against its own plate"* — is removed the same way. On the release
+   * `every-deck-calls-itself-full`, *C D1, where idle cars wait: in the middle of its own zone*,
+   * which printed *"each deck weighs against its own plate"*, is removed the same way. On the release
    * fix's engine (§ D1603) the route read `building-worse` on the case seed, and once
    * [§ D1611](../../../../DECISIONS.md) re-authored the case at 4.95 % it reads `not-enough`, so it no
    * longer clears the letter's morning. The four rows above still hold the property.
