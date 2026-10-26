@@ -25,14 +25,17 @@ The always-on row is measured on the integrated head; the deep row is read from 
 measured on wave AU's integrated head, whose code `main` carries unchanged at `c70dbf2`. Measured once on
 wave AV's head after both lanes merged, so the move is not split between lanes (§ D256). The surface set is
 the same 80, so the move is new text on existing producers; the split's lines (§ D1623) are seeded on the
-stage page's adapter. The deep row is unchanged: no nightly has run on `main` since wave AU merged, so it
-still names `4ee9557`.
+stage page's adapter. The deep row is republished from the first nightly after waves AU and AV merged (`c181913`,
+reproduced locally): −362 strings over the two waves, on the same 81 surfaces, the always-on set plus
+`campaign/judge.ts#judgeStage`.
 
 | tree | strings | move | per case | surfaces |
 |---|---|---|---|---|
 | base, wave AU's row (`main` at `c70dbf2`) | 1 053 106 | | | 80 |
 | wave AV's head (AV-1 and AV-2, `b81bed3`) | **1 053 654** | **+548** | **+11.18** | 80, **same set** |
 | cases · simulations · failing cases | 49 · 606 · 0 | **unmoved** | | |
+| deep, nightly on `4ee9557` | 1 314 700 | | | 81 |
+| deep, nightly on `c181913` | **1 314 338** | **−362** | | 81, **same set** |
 
 ## Wave AU
 
