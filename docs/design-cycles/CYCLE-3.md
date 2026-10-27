@@ -324,7 +324,61 @@ is built for it in this wave. The conditions, the union of the seats' own:
    below the floor came from three other candidates.
 
 ### 4. Handoff to build loop
-Pending.
+- **Branch / worktree:** `wave-aw-lane-1` in `.worktrees/wave-aw-lane-1`, merged into `wave-aw` and carried
+  on the wave's pull request (branch `claude/great-hamilton-9f5a8y`).
+- **GitHub issue:** #645 (rulings R11 and R12).
+- **What was built (§ D1626):** `campaign/judge.ts#stageSplitOf` returns a contrast with its own
+  `BatchReport`, built from the split batch's two one-change arms on the same 50 tuning crowds, worded as a
+  swap with `measureWordsOf` unchanged and the drive-work lines named as left out; the block's heading is
+  rewritten to name two differences from the building's own setting; `everyday/stagePlayScreen.ts` draws
+  the contrast as the block's last line. It costs no new run.
+- **The held-back gate (R11 amendment 4), run before merge:** no contrast row the tuning report prints as
+  resolved resolves the other way on the held-back crowds, on any covered stage or budget; the split's two
+  existing lines are pinned byte for byte and unchanged.
+
+  | Stage at budget | Contrast rows | Printed resolved | Same way held back | Flips |
+  |---|---|---|---|---|
+  | stage 1 at 4 u (always-on) | 108 | 34 | 31 | 0 |
+  | stage 1 at 24 u | 216 | 64 | 60 | 0 |
+  | stage 2 at 4 u | 108 | 35 | 27 | 0 |
+  | stage 3 at 4 u | 108 | 15 | 14 | 0 |
+  | stage 4 at 15 u | 216 | 92 | 10 | 0 |
+  | stage 5 at 15 u | 216 | 37 | 23 | 0 |
+  | stage 6 at 15 u | 216 | 75 | 25 | 0 |
+  | stage 7 at 15 u | 216 | 93 | 30 | 0 |
+  | stage 8 at 4 u | 108 | 49 | 35 | 0 |
+  | stage 9 at 15 u | 216 | 84 | 55 | 0 |
+  | stage 10 at 15 u | 216 | 3 | 3 | 0 |
+
+  Same-way agreement is reported and never gated; 313 of 581 printed-resolved rows agree that way.
+- **What did not move:** `stageVerdictsHold.test.ts` unchanged and green; the stage-1 engagement report
+  byte-identical to `4afdd45`'s; no `data/` file in the build's diff.
+- **Left as found, for a later cycle:** the split's pending and failed lines still say "your two
+  changes … with the other kept", which R11 amendment 3 did not cover; and the energy check reads the
+  "points" of "percentage points" as a score word, so the drive-work clause names "the drive-work lines
+  above" to avoid a false positive the lane did not change (§ D1626).
+- **Required CI gates:** the guards job and the six-project run; the `stage-split` deep tier and the deep
+  honesty tier ran on the lane head before merge (0 flips, 0 failing cases).
+- **DECISIONS.md entries:** § D1624 (cycle 3's fresh batches), § D1625 (rulings R11 and R12) and § D1626
+  (the build, with a `docs/39` § 2 row for the heading).
 
 ### 5. Owner note
-Pending.
+Cycle 3 replayed stage 1 with Delta B's split, and four of the five pass clauses cycle 2 wrote are met.
+The felt-but-null count is 0 for the first time, and in ten two-change presses every credit a persona
+gave a change names a measure its line resolves. Clause 5 is not met, by one ranking made from two lines
+side by side, and all three personas asked how the split's lines relate to each other and to the
+headline. So this cycle changed one more thing on that block: a last line sets the two changes against
+each other on the same 50 crowds, worded as a swap that credits neither change with "more", using runs
+the split already makes, and the heading now names two differences from the building's own setting and
+says the lines need not add up (§ D1625, ruled R11 by your decision panel on GitHub issue #645, 3–0,
+owner-reversible; built as § D1626). It moves no verdict, census, data file or published figure, and no
+contrast row turns the other way on the held-back crowds anywhere it is drawn. Mastery on cycle 3's own
+fresh batches is flat again, and every fresh verdict that differed from the page's involved forecast
+parking. Deliberately left alone: § D372's building (R12 sends it to a pre-registered search under your
+0.25 floor, merging after cycle 4's playtest, and to you in person only if that search fails); the goal
+line's unnamed measures (C6); thin clears under one headline (C7); "your two changes" on the split's
+pending and failed lines and after a zoning press (X4); standing orders that run alike at different
+prices (C4); the layout findings (C8); and Midtown's week-2 hold (R9), which is yours. The biggest open
+design risk is still stage 1's calm (C5), now for a third cycle, and two of three personas would have
+left after their first clear, so the split mostly serves the player who stays. Cycle 4's pass condition
+is written in § 3 (R11 amendment 5).
