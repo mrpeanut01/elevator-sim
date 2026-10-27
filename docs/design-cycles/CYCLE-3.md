@@ -38,7 +38,21 @@ legibility and is weighted as such.
 (`data/mastery-seeds.json`, stream `mastery-c3`, § D1624), because cycle 2's batches have been read.
 
 ### 1. Sim-sweep summary  (fast loop, no LLM)
-Pending.
+Source: on wave AW's tree (`main` at `94e0e86` plus this cycle's seed declaration, which the game never
+reads), `elevator-sim fuzz --scenario stage-1-first-call` (standard tier), the same with `--tier deep
+--cases 2000`, and the same with `--engagement`. Deterministic; every proxy is still an unmeasured premise
+about people.
+
+**Nothing in this section moved since cycle 2.** All three commands print byte for byte what they
+printed for `CYCLE-2.md` § 1 on `c70dbf2`, so cycle 1's baseline tables (`CYCLE-1.md` § 1) stand again:
+tension in band 1 of 50 on each seed set, AWT 16.88 s [15.73, 18.04] and WT95 29.41 s [27.18, 31.64] on
+tuning-20260730, and an engine-level meaningful-choice baseline of 10 of 22 [0.269, 0.653], none of them a
+player's choice. Delta B adds a batch after the verdict and changes no run the sweep makes.
+
+| Check | Cases | Result |
+|---|---|---|
+| Standard tier (64 pinned seeds and 7 regressions) | 71 | all 9 properties held; 0 failures |
+| Deep tier (play seeds 1000001 to 1002000) | 2 000 | all 9 properties held; 0 failures; 739 sessions refused a mean |
 
 ### 2. Playtest findings  (middle loop, LLM personas)
 Pending.
