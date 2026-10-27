@@ -55270,6 +55270,8 @@ puts `engagement/bands.ts` and `engagement/mastery.ts` on `experiments`' environ
 
 ## D1622 — a press that changes both the standing order and the parking is split into each change with the other kept, on the stage's own crowds
 
+> **Status 2026-10-27: AMENDED by [§ D1625](#d1625)** (a decision panel ruling, R11), built by [§ D1626](#d1626). Amendment 3's heading names two differences from the building's own setting, drops *each with the other kept* and says the lines need not add up to the result above, and a line setting the two changes against each other follows them. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-10-22 by the owner's decision panel** (GitHub issue #645, ruling R10, 3–0), recorded by
 > the integrator of wave AV. It approves cycle 2's Delta B (`docs/design-cycles/CYCLE-2.md` § 3) with
 > amendments. **Owner-reversible.**
