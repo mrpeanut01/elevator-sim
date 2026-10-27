@@ -198,9 +198,8 @@ GitHub issue #645, ruling R11; R12 asks what § D372's building needs before a l
 #### Delta C: set a two-change press's changes against each other on the same crowds, and say where each split line starts
 - **Pillar served and how a player notices:** pillar 2, Understandable. After a press that changes both
   the standing order and the parking, the split block gains one line comparing the two changes with each
-  other on the same 50 crowds (for example, "changing to forecast parking shortened door-to-door time by
-  between 1.33 and 3.99 seconds more than changing the standing order; which shortened average wait more
-  is too close to call at 50 runs"), and its heading gains a clause saying each line starts from the press
+  other on the same 50 crowds (worded as R11 amendment 1 rules, a swap between the two changes with the
+  verdict's own measure words, average wait first), and its heading gains a clause saying each line starts from the press
   with that one change undone, so the lines need not add up to the result above.
 - **Simplicity budget:** (1) pillar 2, as above; X1's ranking meets a paired line saying the average-wait
   comparison is too close to call. (2) It adds one line and one heading clause to Delta B's block, only
@@ -219,9 +218,10 @@ GitHub issue #645, ruling R11; R12 asks what § D372's building needs before a l
   the honesty corpus covers the new strings.
 - **Evidence:** X1 (clause 5 unmet by one ranking, −0.907 s [−2.015, +0.201]); X2 in all three personas;
   personas ranked the two changes on 9 of 10 two-change presses, and cycle 2's X3 was the same inference.
-  Sizing (a forecast): the contrast reproduces § 2's table to the printed digit; over 18 two-change moves
-  and six wait and observation rows, 35 of 108 contrast rows resolve on tuning, and on each fresh set none
-  resolves the other way.
+  Sizing (a forecast): the contrast reproduces § 2's table to the printed digit; on the page's own 18 two-change
+  moves and six wait and observation rows, 34 of 108 contrast rows resolve on tuning, 32 of them the same
+  way on both fresh sets and none the other way (corrected by R11 amendment 6 from a sizing over a
+  different list).
 - **How we'll know it worked:** (a) nothing judged moves: `stageVerdictsHold.test.ts` unchanged, the split's
   two existing lines byte-identical on every covered move, the engagement report reprints § 1, no `data/`
   file in the diff. (b) `judge.test.ts` reads every contrast bound back against the two one-change arms'
@@ -256,7 +256,72 @@ GitHub issue #645, ruling R11; R12 asks what § D372's building needs before a l
 5. Say that differently priced orders run alike (C4): the price schedule is owner-approved, and the ties
    disappear on a busier building.
 
-**Ruling R11:** pending. **R12:** pending.
+**Rulings R11 and R12** (GitHub issue #645, § D1625). The owner's decision panel, three agent seats ruling
+alone (product; statistics and cost; the player).
+
+**R11 (3–0): Delta C approved with amendments**, the union of the seats' own:
+
+1. **The line compares the two runs and credits neither change with "more"** (seats 1, 2 and 3). The
+   seats wrote the wording three ways, and all three refuse a clause saying one change "shortened … more
+   than" the other where the other change's own line does not resolve that measure the same way: on
+   `nearest-car` with lobby parking both changes lengthen average wait, and on `nearest-car` with mid-zone
+   the order's own line lengthens door-to-door time. The ruling takes the form all three accept, seat 3's
+   swap: "Making the change to mid-zone parking instead of the change to Nearest car, on the same 50
+   crowds:" followed by `measureWordsOf` unchanged over the contrast's own report, average wait first with
+   its range. No "more than", no "which … more", no bar word, no "alone" or "on its own", no cause.
+   `judge.test.ts` pins both `nearest-car` presses above and fails any "more than" form.
+2. **One clause says drive work is left out** (seat 3), because two arms are never ordered on energy and
+   "the remaining measures" would otherwise read as covering it.
+3. **The heading is rewritten in the page's own words** (seats 1 and 3). It names two differences from the
+   building's own setting instead of "your two changes" (which X4 met after one change of order), it drops
+   "each with the other kept" because each line's lead already says what was kept, and it says the lines
+   need not add up to the result above; the contrast line is outside "each line". No player-facing string
+   says "press".
+4. **The contrast carries its own `BatchReport`**, built from the split batch's two one-change arms, and the
+   held-back gate reads its rows from that report rather than from a difference it works out again
+   (seat 2). The gate stays a sign-flip gate over every stage and budget in `STAGE_SPLIT_COVERAGE`; a flip
+   returns R11 to this panel with the row named. Under the all-null ceiling about 2.4 flips are possible
+   over the coverage table's 1 944 contrast rows, so a lone flip is read against that.
+5. **Cycle 4's pass condition** (seats 1, 2 and 3): cycle 3's clauses 1 to 4 carry over unchanged,
+   including the deciding measure for `number-averse` and the phone persona at 390 × 844. A named measure
+   that was ahead and suffices under the judge's rule counts as correct, and a second measure that was also
+   ahead and went unnamed is reported beside it (this settles § 2's reading in advance). Clause 5 is judged
+   per measure on the six rows the contrast covers: a ranking that names no measure is read against average
+   wait, and a ranking where the contrast is too close to call is a misreading. A ranking on drive work is
+   checked off the page against the paired drive-work contrast, reported, and never counted. No persona asks
+   whether the lines should add up; the felt-but-null count stays 0. Persona-made and director-made
+   two-change presses are reported separately.
+6. **Corrections, made in the record** (seats 1, 2 and 3): the sizing's 18 moves counted `energy-aware`,
+   which is not admitted at 4 u, in place of `zoned-uppeak`'s three, R10 amendment 10's error again; on the
+   page's own list 34 of 108 contrast rows resolve on tuning, 32 of them the same way on both fresh sets and
+   none the other way. § 3's example put door-to-door before average wait. The drive-work lines still sit
+   side by side, so the page does not lose every invitation to compare two intervals. X1 and seven of the
+   ten two-change presses were the director's, made blind after the persona would have left.
+
+**R12 (3–0): option (b), a pre-registered search under the floor and replications as they stand.** Nothing
+is built for it in this wave. The conditions, the union of the seats' own:
+
+1. **Pre-register before any run** (seats 1 and 2): every candidate, its id, its report window, the seed
+   plan and one rule that picks exactly one candidate; every result is published.
+2. **Select on tuning-20260730 and at least four fresh sets declared in advance** (seat 2). A candidate
+   passes only if, on every one of those sets, its tension Δ excludes zero, its base-rung survivor share is
+   at least § D537's 0.25 read at § D736's approved prefix (seats 2 and 3), at least one press made with the
+   two selects alone clears at the base rung (seat 3), and every stage-1 control stays live (seat 1);
+   § D512's legibility, the instrument `docs/38` § 2.1 names, is measured and reported (seat 1). The floor
+   and the 50 replications stay as they are (seat 3).
+3. **The held-back set is read once**, by the chosen candidate's survivor regeneration (seats 1 and 2). A
+   miss leaves stage 1 as it is, tries no second candidate, and returns to this panel; only then is a
+   change to the floor or replications put to the owner in person, with the measured trade-off (seat 2).
+4. **One declared report window for the new building** (seats 1, 2 and 3), fixed before the search, read
+   through `benchmark/matrixCells.ts#reportWindowForBuilding` by both `stageRun.ts` call sites and
+   `server/leaderboard/verify.ts#configFor`, with a test that every `MATRIX_CELLS` building's answer,
+   `garden-apartments`' included (§ D372), and the leaderboard and challenge replays are unchanged. No
+   `MATRIX_CELLS` row is added and no pin moves. The director's sizing borrowed `garden-apartments`' window,
+   so its figures are not the new building's (seat 2).
+5. **It merges after cycle 4's playtest** (seat 1), so no cycle tests two changes at once, as R2 ruled.
+6. **Corrections** (seats 1 and 2): "cannot be bounded" overstated it, because the 336- and 360-resident
+   candidates held the floor on both fresh sets (12, 10, 10 and 10 of 39 against 10); the five censuses
+   below the floor came from three other candidates.
 
 ### 4. Handoff to build loop
 Pending.
