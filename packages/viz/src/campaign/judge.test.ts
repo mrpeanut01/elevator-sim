@@ -63,7 +63,15 @@ import { shippedPriceSchedule } from '../pricing/schedule.test-helper.js';
 import { GOAL_KINDS, goalLabel } from '../scenario/goals.js';
 import type { PublishedGoalRates, PublishedScenario } from '../scenario/published.js';
 
-import { holdoutSentenceOf, judgeStage, stageGoalNameOf, type StageReport, type StageSplit, type StageSplitLine } from './judge.js';
+import {
+  holdoutSentenceOf,
+  judgeStage,
+  stageGoalNameOf,
+  stageSplitOf,
+  type StageReport,
+  type StageSplit,
+  type StageSplitLine,
+} from './judge.js';
 import { parseCampaign, type CampaignContext } from './parse.js';
 import { admitStageMove, stageUnitsAt, type StageAdmission, type StageMove } from './stagePress.js';
 import {
@@ -939,13 +947,72 @@ describe('every printed bound is the run’s own interval, on both seed sets —
 /**
  * The two-change presses behind the findings the split answers: X1's (`eta` with forecast parking,
  * the phone persona's attempt 10), the phone persona's attempt 4 (`eta` parked mid-zone) and the
- * curious player's attempt 11 (zoning with forecast parking).
+ * curious player's attempt 11 (zoning with forecast parking). Ruling R11 ([§ D1625](../../../../DECISIONS.md))
+ * adds the two `nearest-car` presses its amendment 1 names: parked mid-zone, where the order's own
+ * line lengthens door-to-door time, and with lobby parking, where both changes lengthen average wait.
  */
-const SPLIT_PRESSES = ['eta with forecast parking', 'eta parked mid-zone', 'zoning with forecast parking'] as const;
+const SPLIT_PRESSES = [
+  'eta with forecast parking',
+  'eta parked mid-zone',
+  'zoning with forecast parking',
+  'nearest-car parked mid-zone',
+  'nearest-car with lobby parking',
+] as const;
 type SplitPress = (typeof SPLIT_PRESSES)[number];
 
 /** A bar word, or the verdict's own closing: a split line never reads as a second verdict (amendment 2). */
 const BAR_WORD = /\b(?:ahead|behind|met|reached|bar|cleared)\b/iu;
+
+/** The block's heading where the held-back crowds ran, as ruling R11 amendment 3 rewrote it (§ D1625). */
+const HEADING =
+  'Your setting differs from the building’s own in two ways, the standing order and the parking, measured ' +
+  'here over 50 runs on the stage’s own crowds. Each difference’s line sets your setting against the same ' +
+  'setting with that difference undone, so those lines need not add up to the result above, and the last ' +
+  'line sets the two differences against each other. The crowds kept apart from the stage’s own judged the ' +
+  'two differences only together, so nothing here says which of the two decided their answer.';
+
+/** The contrast lines the pin reads, verbatim (§ D1625): the parking change first on every press. */
+const CONTRASTS: Readonly<Partial<Record<string, string>>> = {
+  'eta with forecast parking':
+    'Making the change to forecast parking instead of the change to Minimum estimated wait, on ' +
+    'the same 50 crowds: average wait was too close to call at 50 runs, between 2.02 seconds ' +
+    'shorter and 0.20 seconds longer, and door-to-door time was shorter by between 1.33 and 3.99 ' +
+    'seconds. The remaining measures were too close to call as well. The drive-work lines above ' +
+    'are left out of this one.',
+  'eta parked mid-zone':
+    'Making the change to mid-zone parking instead of the change to Minimum estimated wait, on ' +
+    'the same 50 crowds: average wait was shorter by between 1.06 and 3.80 seconds, and ' +
+    'door-to-door time was shorter by between 2.77 and 5.62 seconds. The remaining measures were ' +
+    'too close to call at 50 runs. The drive-work lines above are left out of this one.',
+  'nearest-car parked mid-zone':
+    'Making the change to mid-zone parking instead of the change to Nearest car, on the same 50 ' +
+    'crowds: average wait was shorter by between 3.86 and 7.46 seconds, 95th-percentile wait was ' +
+    'shorter by between 5.20 and 12.96 seconds, and door-to-door time was shorter by between 6.89 ' +
+    'and 10.94 seconds. The remaining measures were too close to call at 50 runs. The drive-work ' +
+    'lines above are left out of this one.',
+  'nearest-car with lobby parking':
+    'Making the change to lobby parking instead of the change to Nearest car, on the same 50 ' +
+    'crowds: average wait was shorter by between 0.20 and 2.72 seconds, 95th-percentile wait was ' +
+    'shorter by between 2.91 and 9.13 seconds, and door-to-door time was shorter by between 3.61 ' +
+    'and 6.93 seconds. The remaining measures were too close to call at 50 runs. The drive-work ' +
+    'lines above are left out of this one.',
+};
+
+/** A ranking in words: *more*, *than*, *which … more*, ruling R11 amendment 1 (§ D1625). */
+const RANKING_WORD = /\b(?:more|less|than|which|better|worse)\b/iu;
+
+/**
+ * Every problem with a contrast line: the read-back of every figure against the contrast's own report
+ * (a drive-work row named in it among them), no bar word, no ranking word, and no cause.
+ */
+function contrastProblems(sentence: string, report: BatchReport): string[] {
+  return [
+    ...sentenceProblems(sentence, report, 'orderable'),
+    ...(BAR_WORD.test(sentence) ? [`a bar word in "${sentence}"`] : []),
+    ...(RANKING_WORD.test(sentence) ? [`a ranking word in "${sentence}"`] : []),
+    ...(/on its own|\balone\b|because|thanks to|due to/u.test(sentence) ? [`a cause or "alone" in "${sentence}"`] : []),
+  ];
+}
 
 /** Every problem with one split line: the read-back of every figure, and no bar word in it. */
 function splitLineProblems(sentence: string, report: BatchReport, scope: 'orderable' | 'axis'): string[] {
@@ -972,10 +1039,13 @@ describe('every split bound is the paired-t estimate of its two named arms (ruli
     const context = { space, schedule: shippedPriceSchedule(), baseline, building, elevatorSpecs: config.elevatorSpecs };
     const eta = requireDispatcher(config, 'eta');
     const zoning = requireDispatcher(config, 'zoned-uppeak');
+    const nearest = requireDispatcher(config, 'nearest-car');
     const moves: Readonly<Record<SplitPress, StageMove>> = {
       'eta with forecast parking': parkedMoveOf(eta, 'predicted-demand', space),
       'eta parked mid-zone': parkedMoveOf(eta, 'zone-center', space),
       'zoning with forecast parking': parkedMoveOf(zoning, 'predicted-demand', space),
+      'nearest-car parked mid-zone': parkedMoveOf(nearest, 'zone-center', space),
+      'nearest-car with lobby parking': parkedMoveOf(nearest, 'lobby', space),
     };
     for (const press of SPLIT_PRESSES) {
       const move = moves[press];
@@ -1052,18 +1122,137 @@ describe('every split bound is the paired-t estimate of its two named arms (ruli
     expect(order.sentence).toMatch(/^Changing the standing order to .+, with .+ parking kept: average wait /u);
     expect(parking.sentence).toMatch(/^Changing to .+ parking, with the standing order kept at .+: average wait /u);
     expect(pressName).not.toBe('');
-    expect(split.heading).toBe(
-      'Your two changes, each with the other kept, over 50 runs on the stage’s own crowds. The crowds kept ' +
-        'apart from the stage’s own judged your two changes only together, so nothing here says which of the ' +
-        'two decided their answer.',
-    );
-    for (const text of [split.heading, ...split.lines.flatMap((line) => [line.sentence, line.energy ?? ''])]) {
+    /* Ruling R11 amendment 3 (§ D1625): two differences from the building's own setting, and no "press". */
+    expect(split.heading).toBe(HEADING);
+    expect(split.heading).not.toMatch(/\bpress|your two changes|each with the other kept/iu);
+    /* The one sum the block names is the one it refuses: the heading's own clause, and only there. */
+    for (const text of [
+      split.heading.replace('need not add up to the result above', '·'),
+      ...split.lines.flatMap((line) => [line.sentence, line.energy ?? '']),
+      split.contrast.sentence,
+    ]) {
       expect(text, text).not.toMatch(BAR_WORD);
       /* Amendment 2, and the delta's own list: no "alone", no cause, no sum, no other crowds. */
       expect(text, text).not.toMatch(/on its own|\balone\b|because|thanks to|due to|add up|together they|in total|other crowds/u);
     }
     expect(split.credits).toEqual(['standing-order', 'parking']);
     expect(split.carried).toEqual(['standing-order', 'parking']);
+  });
+
+  /** The paired-t estimate of `candidate` against `baseline` on one row, from the two arms' own figures. */
+  function pairedEstimateOf(candidate: BatchResult['arms'][number], baseline: BatchResult['arms'][number], metric: BatchMetric) {
+    const gated = BATCH_METRIC_CLASS[metric] === 'estimate';
+    const pairs = candidate.replications.flatMap((mine, index) => {
+      const theirs = baseline.replications[index];
+      const [a, b] = [mine.metrics[metric], theirs?.metrics[metric] ?? null];
+      if (theirs === undefined || a === null || b === null) return [];
+      return gated && !(mine.awtIsValid && theirs.awtIsValid) ? [] : [[a, b] as const];
+    });
+    return pairedDifferenceEstimate(pairs.map(([a]) => a), pairs.map(([, b]) => b));
+  }
+
+  /** The contrast's two arms: the parking change made alone (candidate), the order change made alone (baseline). */
+  function contrastArmsOf(result: BatchResult) {
+    const [, parkingMade, orderMade] = result.arms;
+    if (parkingMade === undefined || orderMade === undefined) throw new Error('the split batch has no one-change arms');
+    return { parkingMade, orderMade };
+  }
+
+  it.each(SPLIT_PRESSES)('%s: every contrast bound is the paired-t estimate of the two one-change arms (§ D1625)', (press) => {
+    const { split, result } = splitOf(press);
+    const { parkingMade, orderMade } = contrastArmsOf(result);
+    const rows = split.contrast.report.comparisons[0]?.rows ?? [];
+    expect(rows.map((row) => row.metric)).toEqual([...BATCH_METRICS]);
+    expect(split.contrast.report.comparisons[0]?.candidateArmId).toBe(parkingMade.armId);
+    expect(split.contrast.report.comparisons[0]?.baselineArmId).toBe(orderMade.armId);
+    for (const row of rows) {
+      /* Taken here from the two arms' own figures, never from the report under test. */
+      const estimate = pairedEstimateOf(parkingMade, orderMade, row.metric);
+      expect(row.estimate?.lower, `${press}, contrast, ${row.metric}`).toBe(estimate.lower);
+      expect(row.estimate?.upper, `${press}, contrast, ${row.metric}`).toBe(estimate.upper);
+    }
+    expect(contrastProblems(split.contrast.sentence, split.contrast.report), split.contrast.sentence).toEqual([]);
+    /* The parking change first on every press, average wait first, and drive work left out in one clause. */
+    expect(split.contrast.sentence).toMatch(/^Making the change to .+ parking instead of the change to .+, on the same 50 crowds: average wait /u);
+    expect(split.contrast.sentence.endsWith(' The drive-work lines above are left out of this one.')).toBe(true);
+    expect(split.contrast.sentence).not.toMatch(/\bkJ\b|drive work \(|same run/u);
+  });
+
+  it('pins the contrasts cycle 3 and ruling R11 name, each against its own paired estimate', () => {
+    const awt = (press: SplitPress): readonly [string, string, string] => {
+      const { parkingMade, orderMade } = contrastArmsOf(splitOf(press).result);
+      const estimate = pairedEstimateOf(parkingMade, orderMade, 'awtS');
+      return [estimate.mean.toFixed(3), estimate.lower.toFixed(3), estimate.upper.toFixed(3)];
+    };
+    /* CYCLE-3.md § 2's table, to the printed digit. */
+    expect(awt('eta parked mid-zone')).toEqual(['-2.430', '-3.805', '-1.055']);
+    expect(awt('nearest-car parked mid-zone')).toEqual(['-5.662', '-7.462', '-3.862']);
+    expect(awt('eta with forecast parking')).toEqual(['-0.907', '-2.015', '0.201']);
+    /* R11 amendment 1: on `nearest-car` with lobby parking both changes lengthen average wait. */
+    const lobby = splitOf('nearest-car with lobby parking').split;
+    for (const line of lobby.lines) {
+      const wait = line.report.comparisons[0]?.rows.find((row) => row.metric === 'awtS');
+      expect(wait?.verdict, line.sentence).toBe('resolved');
+      expect(wait?.estimate?.lower, line.sentence).toBeGreaterThan(0);
+    }
+    const [, lower, upper] = awt('nearest-car with lobby parking');
+    expect([Number(lower).toFixed(2), Number(upper).toFixed(2)]).toEqual(['-2.72', '-0.20']);
+
+    const pinned = Object.keys(CONTRASTS) as SplitPress[];
+    expect(pinned).toHaveLength(4);
+    expect(Object.fromEntries(pinned.map((press) => [press, splitOf(press).split.contrast.sentence]))).toEqual(CONTRASTS);
+  });
+
+  it('says the same run only where every paired difference is exactly zero', () => {
+    const { result } = splitOf('eta with forecast parking');
+    const [press, parkingMade] = result.arms;
+    if (press === undefined || parkingMade === undefined) throw new Error('no arms');
+    const twin = stageSplitOf({
+      result: { ...result, arms: [press, parkingMade, parkingMade] },
+      verdict: { ...result, arms: [press, press] },
+      changed: { standingOrder: true, parking: true },
+      orderName: 'Minimum estimated wait',
+      parkingName: 'forecast parking',
+      holdoutRan: false,
+    });
+    expect(twin?.contrast.sentence).toBe(
+      'Making the change to forecast parking instead of the change to Minimum estimated wait made the same run ' +
+        'on each of the same 50 crowds: every measure came out exactly the same under both.',
+    );
+    for (const press of SPLIT_PRESSES) expect(splitOf(press).split.contrast.sentence).not.toContain('same run');
+  });
+
+  it('fails a tampered contrast: a moved bound, a ranking, a wrong direction or call, and a drive-work row', () => {
+    const forecast = splitOf('eta with forecast parking').split.contrast;
+    const midZone = splitOf('eta parked mid-zone').split.contrast;
+    const tampered: readonly (readonly [string, string, typeof midZone])[] = [
+      ['a moved bound', midZone.sentence.replace(/by between (\d+)\.(\d)/u, (_whole, units: string, tenth: string) => `by between ${units}.${String((Number(tenth) + 3) % 10)}`), midZone],
+      ['“more than”', midZone.sentence.replace('Making the change to mid-zone parking instead of', 'The change to mid-zone parking shortened average wait more than'), midZone],
+      ['“which … more”', `${midZone.sentence} That is which change helped more.`, midZone],
+      [
+        '“shorter” over an interval containing zero',
+        forecast.sentence.replace(
+          /average wait was too close to call at 50 runs, between ([\d.]+) seconds shorter and ([\d.]+) seconds longer/u,
+          'average wait was shorter by between $2 and $1 seconds',
+        ),
+        forecast,
+      ],
+      [
+        '“too close to call” over an interval excluding zero',
+        midZone.sentence.replace(
+          /average wait was shorter by between ([\d.]+) and ([\d.]+) seconds/u,
+          'average wait was too close to call at 50 runs, between $2 seconds shorter and $1 seconds longer',
+        ),
+        midZone,
+      ],
+      ['a drive-work row', midZone.sentence.replace(': average wait', ': drive work (proxy) was higher by between 1.0 and 2.0 kJ, and average wait'), midZone],
+    ];
+    expect(contrastProblems(midZone.sentence, midZone.report)).toEqual([]);
+    expect(contrastProblems(forecast.sentence, forecast.report)).toEqual([]);
+    for (const [what, sentence, source] of tampered) {
+      expect(sentence, what).not.toBe(source.sentence);
+      expect(contrastProblems(sentence, source.report).length, `${what}: ${sentence}`).toBeGreaterThan(0);
+    }
   });
 
   it('pins X1’s split: the order’s own effect on average wait is too close to call, and the 95th percentile resolves', () => {
@@ -1078,6 +1267,9 @@ describe('every split bound is the paired-t estimate of its two named arms (ruli
   it('changes its lines when the press changes, and the read-back refuses what the run did not produce', () => {
     const texts = SPLIT_PRESSES.flatMap((press) => splitOf(press).split.lines.map((line) => line.sentence));
     expect(new Set(texts).size).toBe(texts.length);
+    /* § D1625's standing requirement: a different two-change press changes the contrast line too. */
+    const contrasts = SPLIT_PRESSES.map((press) => splitOf(press).split.contrast.sentence);
+    expect(new Set(contrasts).size).toBe(contrasts.length);
 
     const [order] = splitOf('eta with forecast parking').split.lines;
     const wrongBound = order.sentence.replace(/by between (\d+)\.(\d)/u, (_whole, units: string, tenth: string) => `by between ${units}.${String((Number(tenth) + 3) % 10)}`);

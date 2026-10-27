@@ -1,69 +1,89 @@
 {
   "generatedBy": "derived, never typed: each seed is packages/viz/src/campaign/masteryHarness.ts#freshMasterSeedOf(root, stream, k), and masteryHarness.test.ts refuses the file if any seed, name or count differs from that derivation. To declare more batches, append rows the same function gives for the next k.",
-  "contract": "Fresh holdout batches for the mastery harness, DECISIONS.md § D1601. Attempt k of every playtest persona is re-judged by the game's own judge with batch k in place of the stage record's holdoutSeeds, in a harness copy; the game never reads this file, and no verdict judged on it is shown to a persona. Declared before cycle 2's playtest. masteryHarness.test.ts checks that no master seed here equals a master seed of any seed set in data/campaign.json, and that no replication seed of any batch here equals a replication seed of another batch here or of any seed set in data/campaign.json.",
-  "stream": "mastery-c2",
-  "root": "20261021",
+  "contract": "Fresh holdout batches for the mastery harness, DECISIONS.md § D1601. Attempt k of every playtest persona is re-judged by the game's own judge with batch k in place of the stage record's holdoutSeeds, in a harness copy; the game never reads this file, and no verdict judged on it is shown to a persona. Declared before cycle 3's playtest. Each design cycle declares its own stream before its playtest: cycle 2's was mastery-c2 (root 20261021, twelve batches, DECISIONS.md § D1621), recoverable from the derivation below, and cycle 3's is mastery-c3 (DECISIONS.md § D1624). masteryHarness.test.ts checks that no master seed here equals a master seed of any seed set in data/campaign.json, and that no replication seed of any batch here equals a replication seed of another batch here or of any seed set in data/campaign.json.",
+  "stream": "mastery-c3",
+  "root": "20261027",
   "derivation": "batch k (k = 1, 2, ...) is named <stream>-<k as two digits>, and its master seed is core's deriveStreamSeed(root, \"<stream>:<k>\").initState as a decimal string: the same derivation runner/crn.ts#replicationSeed applies through the \"replication:\" stream. The root is the date the batches were declared, as the stage seed sets' names are dates.",
   "replications": 50,
   "batches": [
     {
-      "name": "mastery-c2-01",
-      "seed": "1145347316356468505",
+      "name": "mastery-c3-01",
+      "seed": "13711881037541759331",
       "replications": 50
     },
     {
-      "name": "mastery-c2-02",
-      "seed": "14951813367019508813",
+      "name": "mastery-c3-02",
+      "seed": "17833381894999805728",
       "replications": 50
     },
     {
-      "name": "mastery-c2-03",
-      "seed": "16836161281412731174",
+      "name": "mastery-c3-03",
+      "seed": "5226766665678419408",
       "replications": 50
     },
     {
-      "name": "mastery-c2-04",
-      "seed": "3401267122837337745",
+      "name": "mastery-c3-04",
+      "seed": "3478702528500057496",
       "replications": 50
     },
     {
-      "name": "mastery-c2-05",
-      "seed": "16148369359630012146",
+      "name": "mastery-c3-05",
+      "seed": "5230115726558285356",
       "replications": 50
     },
     {
-      "name": "mastery-c2-06",
-      "seed": "9462388457543975550",
+      "name": "mastery-c3-06",
+      "seed": "1844847527406378743",
       "replications": 50
     },
     {
-      "name": "mastery-c2-07",
-      "seed": "13110867365534798657",
+      "name": "mastery-c3-07",
+      "seed": "14060071876732103913",
       "replications": 50
     },
     {
-      "name": "mastery-c2-08",
-      "seed": "3360169219367850980",
+      "name": "mastery-c3-08",
+      "seed": "12696555378282149986",
       "replications": 50
     },
     {
-      "name": "mastery-c2-09",
-      "seed": "6958590445964769932",
+      "name": "mastery-c3-09",
+      "seed": "14284909408623931235",
       "replications": 50
     },
     {
-      "name": "mastery-c2-10",
-      "seed": "5398883860759873240",
+      "name": "mastery-c3-10",
+      "seed": "8740821911043803360",
       "replications": 50
     },
     {
-      "name": "mastery-c2-11",
-      "seed": "8841859836970896151",
+      "name": "mastery-c3-11",
+      "seed": "5182731118710064343",
       "replications": 50
     },
     {
-      "name": "mastery-c2-12",
-      "seed": "7500217950148941016",
+      "name": "mastery-c3-12",
+      "seed": "4927852019787815897",
+      "replications": 50
+    },
+    {
+      "name": "mastery-c3-13",
+      "seed": "5373292455474713503",
+      "replications": 50
+    },
+    {
+      "name": "mastery-c3-14",
+      "seed": "5992768087196169810",
+      "replications": 50
+    },
+    {
+      "name": "mastery-c3-15",
+      "seed": "7182817604894205660",
+      "replications": 50
+    },
+    {
+      "name": "mastery-c3-16",
+      "seed": "2289238775511480443",
       "replications": 50
     }
   ]

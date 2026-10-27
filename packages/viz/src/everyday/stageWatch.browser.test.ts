@@ -225,7 +225,8 @@ describe.skipIf(!HAS_BROWSER)('a stage press plays one of its crowds, and the ve
   /*
    * Ruling R10, § D1622, amendment 4: a press that changes both the standing order and the parking is
    * split after its verdict. The block is drawn last, below the held-back crowds' sentence; a pending
-   * line holds its place while Run stays live; and an edit takes it away. A mutation observer
+   * line holds its place while Run stays live; ruling R11's contrast (§ D1625) is the block's last line;
+   * and an edit takes the block away, the contrast with it. A mutation observer
    * installed before the press records what the page drew, so a pending state shorter than a poll is
    * still seen.
    */
@@ -269,14 +270,25 @@ describe.skipIf(!HAS_BROWSER)('a stage press plays one of its crowds, and the ve
       expect(card.indexOf('everyday-stage-play-holdout')).toBeGreaterThan(-1);
       expect(card.indexOf('everyday-stage-play-holdout')).toBeLessThan(card.indexOf('everyday-stage-play-split'));
       const block = (await page.textContent('.everyday-stage-play-split')) ?? '';
-      expect(block).toContain('Your two changes, each with the other kept');
+      expect(block).toContain('Your setting differs from the building’s own in two ways');
+      expect(block).not.toMatch(/\bpress/iu);
       expect(block).toContain('Changing the standing order to Minimum estimated wait, with forecast parking kept: ');
       expect(block).toContain('Changing to forecast parking, with the standing order kept at Minimum estimated wait: ');
       expect(await page.locator('.everyday-stage-play-split-line').count()).toBe(4);
+      /* § D1625: the two changes set against each other, the block's last line. */
+      const blockChildren = await page.evaluate(() =>
+        [...(document.querySelector('.everyday-stage-play-split')?.children ?? [])].map((node) => node.className),
+      );
+      expect(blockChildren[blockChildren.length - 1]).toBe('everyday-stage-play-split-contrast');
+      expect(blockChildren.filter((name) => name === 'everyday-stage-play-split-contrast')).toHaveLength(1);
+      expect((await page.textContent('.everyday-stage-play-split-contrast')) ?? '').toMatch(
+        /^Making the change to forecast parking instead of the change to Minimum estimated wait, on the same 50 crowds: average wait /u,
+      );
 
-      /* An edit drops the batch and the block, and the verdict goes stale. */
+      /* An edit drops the batch and the block, the contrast with it, and the verdict goes stale. */
       await page.selectOption('.everyday-stage-play-parking-select', 'zone-center');
       expect(await page.locator('.everyday-stage-play-split').count()).toBe(0);
+      expect(await page.locator('.everyday-stage-play-split-contrast').count()).toBe(0);
       expect(await page.locator('.everyday-stage-play-stale').count()).toBe(1);
       /* Back to the pressed settings: the verdict is current again, and the dropped split stays dropped. */
       await page.selectOption('.everyday-stage-play-parking-select', 'predicted-demand');

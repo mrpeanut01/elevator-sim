@@ -526,6 +526,31 @@ export const splitCreditedOnOneChange: TextFault = (texts) =>
   );
 
 /**
+ * § D1625: **the split's contrast made into a ranking it does not back**, the stage card's line that
+ * sets a two-change press's changes against each other, rewritten as *"the change to … shortened
+ * average wait more than the change to … did"* over a line whose average-wait row is not resolved.
+ * The words now name one change ahead, so the declaration does too, and `single-run-comparative`'s
+ * batch clause fires: a direction asserted without an interval that excludes zero, the ranking ruling
+ * R11 amendment 1 refuses.
+ */
+export const contrastRankedOverUnresolvedWait: TextFault = (texts) =>
+  replaceFirst(
+    texts,
+    (text) =>
+      /^stagePlay\.split\..+\.contrast$/u.test(text.field) &&
+      text.comparison !== undefined &&
+      text.comparison.verdict !== 'resolved',
+    (text) => ({
+      ...text,
+      text: text.text.replace(
+        /^Making the change to (.+?) instead of the change to (.+?)(?:, on the same| made the same run).*$/su,
+        'The change to $1 shortened average wait more than the change to $2 did.',
+      ),
+      comparison: text.comparison === undefined ? undefined : { ...text.comparison, favours: 'candidate' },
+    }),
+  );
+
+/**
  * One fault per property, so the suite can iterate rather than list.
  *
  * Three of them carry a second, and in every case because the property has two halves a fault for
@@ -539,6 +564,10 @@ export const splitCreditedOnOneChange: TextFault = (texts) =>
  * `suppressed-mean` now carries a **third**, and it is about the corpus rather than about R3: the
  * fit-out axis put fitted runs in front of the properties for the first time (§ D437), and
  * {@link fittedTowerMeanLeak} is what says they are checked there rather than merely rendered.
+ *
+ * `single-run-comparative` carries a second for § D1625: {@link comparativeOnOneRun} breaks R2's
+ * single-run clause, and {@link contrastRankedOverUnresolvedWait} breaks its batch clause on a line
+ * the stage card words itself, which declares the row it was read off rather than drawing it.
  */
 export const FAULTS: Readonly<
   Record<
@@ -563,7 +592,11 @@ export const FAULTS: Readonly<
       { name: 'suppressedMeanInProse', fault: suppressedMeanInProse },
       { name: 'fittedTowerMeanLeak', fault: fittedTowerMeanLeak, fixture: 'fitted-suppressed' },
     ],
-    'single-run-comparative': [{ name: 'comparativeOnOneRun', fault: comparativeOnOneRun }],
+    'single-run-comparative': [
+      { name: 'comparativeOnOneRun', fault: comparativeOnOneRun },
+      /* § D1625: the stage card's contrast, ranking the two changes over an unresolved average wait. */
+      { name: 'contrastRankedOverUnresolvedWait', fault: contrastRankedOverUnresolvedWait },
+    ],
     'probability-word': [{ name: 'probabilityWordLeak', fault: probabilityWordLeak }],
     'estimate-without-n': [
       { name: 'estimateWithoutCount', fault: estimateWithoutCount },

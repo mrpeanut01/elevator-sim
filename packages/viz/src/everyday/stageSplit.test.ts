@@ -15,7 +15,8 @@
  * - **the CRN check** (amendment 5): a press arm that is not the verdict's own candidate arm on every
  *   replication and row draws nothing;
  * - **the card** (amendment 4): a pending line with no figure, a failed line, and no block over a
- *   stale verdict.
+ *   stale verdict; and ruling R11's contrast ([§ D1625](../../../../DECISIONS.md)) drawn after every
+ *   line, only on a drawn block, and changed by a different two-change press.
  */
 
 import { readFile } from 'node:fs/promises';
@@ -178,9 +179,13 @@ describe('the split runs on the press a player makes: the standing requirement, 
     for (const [a, b] of linesOf(forecast?.split).map((line, index) => [line, linesOf(midZone?.split)[index]] as const)) {
       expect(a).not.toBe(b);
     }
+    /* § D1625: the contrast is the press's too, so a different press sets different changes against each other. */
+    expect(forecast?.split?.contrast.sentence).toMatch(/^Making the change to forecast parking instead of the change to Minimum estimated wait, /u);
+    expect(midZone?.split?.contrast.sentence).toMatch(/^Making the change to mid-zone parking instead of the change to Minimum estimated wait, /u);
+    expect(forecast?.split?.contrast.sentence).not.toBe(midZone?.split?.contrast.sentence);
     /* Both cleared, so the held-back crowds ran and the heading says what they judged. */
     expect(forecast?.cleared).toBe(true);
-    expect(forecast?.split?.heading).toContain('judged your two changes only together');
+    expect(forecast?.split?.heading).toContain('judged the two differences only together');
   });
 
   it('draws nothing where the press arm is not the verdict’s own candidate arm on every replication and row (amendment 5)', () => {
@@ -264,17 +269,22 @@ describe('the card holds the split last, and never over a stale verdict (amendme
   it('holds the place with one line and no figure while the batch runs, and says so in one line when it fails', () => {
     const pending = viewWith({ kind: 'pending' }, false).verdict?.split;
     expect(pending).toEqual({ kind: 'pending', heading: undefined, lines: [STAGE_PLAY_COPY.splitPending] });
+    expect(pending?.contrast, 'no contrast while the batch runs').toBeUndefined();
     expect(STAGE_PLAY_COPY.splitPending).not.toMatch(/\d/u);
     const failed = viewWith({ kind: 'failed' }, false).verdict?.split;
     expect(failed).toEqual({ kind: 'failed', heading: undefined, lines: [STAGE_PLAY_COPY.splitFailed] });
+    expect(failed?.contrast, 'no contrast from a failed batch').toBeUndefined();
     expect(STAGE_PLAY_COPY.splitFailed).not.toMatch(/\d/u);
   });
 
-  it('draws the heading and each change’s line with its drive work, and nothing once the verdict is stale', () => {
+  it('draws the heading, each change’s line with its drive work and the contrast last, and nothing once the verdict is stale', () => {
     const split = pressedSplit();
     const drawn = viewWith({ kind: 'drawn', split }, false).verdict?.split;
     expect(drawn?.heading).toBe(split.heading);
     expect(drawn?.lines).toEqual(split.lines.flatMap((line) => [line.sentence, ...(line.energy === null ? [] : [line.energy])]));
+    /* § D1625: the contrast is its own field, which the screen draws after every line. */
+    expect(drawn?.contrast).toBe(split.contrast.sentence);
+    expect(drawn?.lines).not.toContain(split.contrast.sentence);
     for (const kind of [{ kind: 'pending' }, { kind: 'failed' }, { kind: 'drawn', split }] as const) {
       expect(viewWith(kind, true).verdict?.split, kind.kind).toBeUndefined();
     }

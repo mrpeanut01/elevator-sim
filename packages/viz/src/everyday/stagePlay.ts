@@ -452,6 +452,12 @@ export interface StagePlaySplitView {
   readonly heading: string | undefined;
   /** In the order drawn: each change's line, then its drive-work line where it has one. */
   readonly lines: readonly string[];
+  /**
+   * The two changes set against each other, drawn after every line and last in the block (ruling R11,
+   * [§ D1625](../../../../DECISIONS.md)). Only on a drawn block: a pending or failed batch has none,
+   * and a stale verdict draws no block at all.
+   */
+  readonly contrast?: string | undefined;
 }
 
 /** Where a press is. */
@@ -990,7 +996,7 @@ function verdictViewOf(facts: StagePlayFacts, verdict: StagePlayVerdictFacts, st
   };
 }
 
-/** The split's block, in the order the card draws it (§ D1622, amendment 4). */
+/** The split's block, in the order the card draws it (§ D1622, amendment 4; the contrast last, § D1625). */
 export function stageSplitViewOf(split: StagePlaySplitFacts): StagePlaySplitView {
   switch (split.kind) {
     case 'pending':
@@ -1002,6 +1008,7 @@ export function stageSplitViewOf(split: StagePlaySplitFacts): StagePlaySplitView
         kind: 'drawn',
         heading: split.split.heading,
         lines: split.split.lines.flatMap((line) => (line.energy === null ? [line.sentence] : [line.sentence, line.energy])),
+        contrast: split.split.contrast.sentence,
       };
   }
 }

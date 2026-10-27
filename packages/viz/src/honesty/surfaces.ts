@@ -427,7 +427,7 @@ import {
 } from '../campaign/career.js';
 import { CAREER_LOAD_NOTICES } from '../campaign/careerPersist.js';
 import { failStateCounts, failStateReports, evidenceFrom, type DemonstrationEvidence } from '../campaign/failStates.js';
-import { judgeStage, stageSplitOf } from '../campaign/judge.js';
+import { judgeStage, stageSplitOf, type StageSplit } from '../campaign/judge.js';
 import { playerFacingStrings } from '../campaign/parse.js';
 import { admitStageMove, stageUnitsAt } from '../campaign/stagePress.js';
 import { playerSafeDescription } from '../campaign/words.js';
@@ -18522,6 +18522,15 @@ const EVERYDAY_STAGE_PLAY: SurfaceAdapter = {
  * words: whether a split's rows hold on the held-back crowds is `everyday/stageSplitHolds.test.ts`'s
  * question. Each string declares the acts it credits and the acts the press carried, both by the
  * plan's own `changed`. Both heading arms are seeded, with the held-back crowds run and without.
+ *
+ * **The contrast** (ruling R11, [§ D1625](../../../../DECISIONS.md)) sets the two one-change arms
+ * against each other, so over `[press, kept, kept]` it is the same arm twice and says *the same
+ * run*: seeded as it falls, that arm of its words is read. Its figure-carrying arm comes from a
+ * third wording over `[press, kept, press]`, where the two one-change arms are this case's two arms,
+ * and only its contrast is seeded, since its two lines repeat words the first two already seed. Each
+ * contrast credits both changes, declares the press carried both, and declares its average-wait
+ * row's verdict and pairs with **no arm favoured**, because the line names neither change ahead:
+ * `faults.ts#contrastRankedOverUnresolvedWait` is what a line that did would look like.
  */
 function splitTextsOf(
   surfaceId: string,
@@ -18529,7 +18538,7 @@ function splitTextsOf(
   stage: CampaignStage,
   admission: Parameters<typeof stageSplitPlanOf>[0]['context'],
 ): readonly RenderedText[] {
-  const seeds: TextSeed[] = [];
+  const seeds: ComparedSeed[] = [];
   for (const kind of ['pending', 'failed'] as const) {
     const view = stageSplitViewOf({ kind });
     for (const [index, line] of view.lines.entries()) {
@@ -18568,12 +18577,39 @@ function splitTextsOf(
           seeds.push({ field: `${at}.${line.change}.energy`, text: line.energy, role: 'observation', energyAxis: true, ...counted });
         }
       }
+      seeds.push(contrastSeedOf(`${at}.contrast`, split, replications));
     }
+    const apart = stageSplitOf({
+      result: { ...context.batch, arms: [press, kept, press] },
+      verdict: { ...context.batch, arms: [kept, press] },
+      changed: plan.changed,
+      orderName: plan.orderName,
+      parkingName: plan.parkingName,
+      holdoutRan: false,
+    });
+    if (apart !== undefined) seeds.push(contrastSeedOf('stagePlay.split.armsApart.contrast', apart, replications));
   }
   return [
     ...singleRun(surfaceId, seeds.filter((seed) => seed.field.startsWith('stagePlay.split.pending') || seed.field.startsWith('stagePlay.split.failed'))),
     ...batchText(surfaceId, seeds.filter((seed) => !seed.field.startsWith('stagePlay.split.pending') && !seed.field.startsWith('stagePlay.split.failed'))),
   ];
+}
+
+/** A seed that may declare the comparison row it was read off, as {@link batchText} takes it. */
+type ComparedSeed = TextSeed & { readonly comparison?: RenderedText['comparison'] };
+
+/** One split's contrast line as a seed: both changes credited, its average-wait row declared, no arm favoured. */
+function contrastSeedOf(field: string, split: StageSplit, replications: number): ComparedSeed {
+  const wait = split.contrast.report.comparisons[0]?.rows.find((row) => row.metric === 'awtS');
+  return {
+    field,
+    text: split.contrast.sentence,
+    role: 'observation',
+    declaredCount: replications,
+    countShown: split.contrast.sentence.includes(String(replications)),
+    attribution: { credits: split.credits, carried: split.carried },
+    ...(wait === undefined ? {} : { comparison: { favours: null, verdict: wait.verdict, pairs: wait.pairs } }),
+  };
 }
 
 /**

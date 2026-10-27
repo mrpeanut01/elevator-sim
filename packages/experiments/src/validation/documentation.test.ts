@@ -2236,6 +2236,13 @@ type DecisionReservation = {
  */
 const OPEN_RESERVATION = null as DecisionReservation | null;
 /*
+ * **Wave AW's reservation, D1624-D1669, is closed** in the wave's own merge commit. The third design
+ * cycle (`docs/design-cycles/CYCLE-3.md`) spent three headings: D1624 and D1625 (the integrator: cycle 3's
+ * fresh mastery batches, and the decision panel's rulings R11 and R12 on GitHub issue #645) and D1626
+ * (lane AW-1, Delta C's build). No number below the highest heading, D1626, went unspent, so nothing is
+ * holed; **D1627-D1669 are free rather than holed** (§ D430), and the charter row moves to **D1627**.
+ */
+/*
  * **Wave AV's reservation, D1621-D1669, is closed** in the wave's own merge commit. The second design
  * cycle (`docs/design-cycles/CYCLE-2.md`), run on the engine wave AU fixed, spent three headings:
  * D1621 (lane AV-1's mastery harness, numbered by the integrator), D1622 (the integrator, recording the
