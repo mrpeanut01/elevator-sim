@@ -22,6 +22,18 @@
  * is always-on (amendment 6); the rest of the table runs under `ELEVATOR_SIM_DEEP=1`, in
  * `.github/workflows/deep-tiers.yml`'s `stage-split` job.
  *
+ * **The contrast** (ruling R11, amendment 4, [§ D1625](../../../../DECISIONS.md)) is gated the same
+ * way, reading its rows from the contrast's own `BatchReport` on each seed set rather than working a
+ * difference out again: the three waits and the three observation rows, since drive work stays out
+ * of that line. A contrast row the stage's own crowds print as resolved one way whose held-back
+ * interval excludes zero the other way fails the gate and goes back to the panel with the stage, the
+ * move and the row; same-way agreement is printed beside it and never gated.
+ *
+ * **The split's two existing lines are pinned** to what they printed on `4afdd45`, before the
+ * contrast landed: {@link EXISTING_LINES_SHA256} holds one digest per stage and budget over every
+ * move's two lines and their drive-work lines, on the stage's own crowds, so adding the contrast
+ * cannot have moved a word of them.
+ *
  * **Its cost.** One batch per seed set holds every arm the stage's splits need (the presses, the
  * shipped order under each parking, each order under the shipped parking), because every arm of a
  * batch sees the same crowds and runs alone, so an arm's figures do not depend on its neighbours; the
@@ -31,6 +43,7 @@
  * dearest at about 300 s each.
  */
 
+import { createHash } from 'node:crypto';
 import { appendFileSync } from 'node:fs';
 
 import { loadConfig, type LoadedConfig } from '@elevator-sim/core';
@@ -77,6 +90,16 @@ interface Holding {
   readonly sameWay: number;
   /** Of those, held-back intervals excluding zero the other way: the gate. */
   readonly flips: readonly string[];
+  /** The contrast's rows (§ D1625): the waits and observation rows of every move's contrast report. */
+  readonly contrastRows: number;
+  /** Contrast rows the stage's own crowds print as resolved. */
+  readonly contrastPrinted: number;
+  /** Of those, held back the same way. Printed, never gated. */
+  readonly contrastSameWay: number;
+  /** Of those, held back the other way: the gate (amendment 4). */
+  readonly contrastFlips: readonly string[];
+  /** The digest of every move's two existing lines and their drive-work lines, on the stage's own crowds. */
+  readonly linesDigest: string;
   /** The stage's own crowds' plans and splits, for the path check. */
   readonly plans: readonly StageSplitPlan[];
   readonly tuning: ReadonlyMap<StageSplitPlan, StageSplit>;
@@ -181,10 +204,34 @@ function holdingOf(stageId: string, units: number): Holding {
   let printed = 0;
   let sameWay = 0;
   const flips: string[] = [];
+  let contrastRows = 0;
+  let contrastPrinted = 0;
+  let contrastSameWay = 0;
+  const contrastFlips: string[] = [];
+  const lines: string[] = [];
   for (const plan of plans) {
     const mine = splitFrom(own, plan);
     const theirs = splitFrom(held, plan);
     tuning.set(plan, mine);
+    lines.push(`# ${keyOf(plan.press)}`, ...mine.lines.flatMap((line) => [line.sentence, line.energy ?? '(no energy line)']));
+    /* § D1625: the contrast's own rows on both seed sets; drive work is not in its line, so not here. */
+    const heldContrast = theirs.contrast.report.comparisons[0]?.rows ?? [];
+    for (const row of (mine.contrast.report.comparisons[0]?.rows ?? []).filter((entry) => entry.metricClass !== 'axis')) {
+      contrastRows += 1;
+      const way = row.verdict === 'resolved' ? signOf(row.estimate) : 0;
+      if (way === 0) continue;
+      contrastPrinted += 1;
+      const other = heldContrast.find((candidate) => candidate.metric === row.metric);
+      const heldWay = signOf(other?.estimate ?? null);
+      if (heldWay === way) contrastSameWay += 1;
+      if (heldWay === -way) {
+        contrastFlips.push(
+          `${stageId} at ${String(units)} u, ${keyOf(plan.press)}, contrast, ${row.label}: ` +
+            `[${String(row.estimate?.lower)}, ${String(row.estimate?.upper)}] on the stage’s own crowds, ` +
+            `[${String(other?.estimate?.lower)}, ${String(other?.estimate?.upper)}] held back`,
+        );
+      }
+    }
     for (const [index, line] of mine.lines.entries()) {
       const heldRows = theirs.lines[index]?.report.comparisons[0]?.rows ?? [];
       for (const row of line.report.comparisons[0]?.rows ?? []) {
@@ -206,8 +253,44 @@ function holdingOf(stageId: string, units: number): Holding {
       }
     }
   }
-  return { stageId, units, moves: plans.length, rows, printed, sameWay, flips, plans, tuning };
+  const linesDigest = createHash('sha256').update(lines.join('\n')).digest('hex');
+  return {
+    stageId,
+    units,
+    moves: plans.length,
+    rows,
+    printed,
+    sameWay,
+    flips,
+    contrastRows,
+    contrastPrinted,
+    contrastSameWay,
+    contrastFlips,
+    linesDigest,
+    plans,
+    tuning,
+  };
 }
+
+/**
+ * **The split's two existing lines as they printed on `4afdd45`**, before ruling R11's contrast
+ * ([§ D1625](../../../../DECISIONS.md)): per stage and budget, the SHA-256 of every two-change move's
+ * press key, its two lines and their drive-work lines on the stage's own crowds, in the page's own
+ * order, joined by newlines. Taken by running this file's own wording over the base commit.
+ */
+const EXISTING_LINES_SHA256: Readonly<Record<string, string>> = Object.freeze({
+  'stage-1-first-call@4': '071a4bf0e5cd9c75c5fcf75a98745c7153d424480e31b07f6bba2e21793a26a2',
+  'stage-1-first-call@24': 'a3f2e5b0791c12e8ff32d36e1633481c975139bd48ba8e3eba6b739b23d8c1d1',
+  'stage-2-morning-rush@4': 'da150c359b68df8a8e6d0f6b14d9c4db29f74c8ebedee6c854ea8c96c3b92159',
+  'stage-3-overwhelmed@4': '6642f6b50ef2feb9acf3e0fa8680215d24b8b6d28fa6fe002b725ca61818fdc5',
+  'stage-4-two-banks@15': 'f3c55e2bd318778e676629435a13243303962795194ce062bbf3c29c51b7b218',
+  'stage-5-credentials@15': 'f0a5788a9b7c4c8e623a5bd59703fea877c35a140a570420e5e5988f6bcddfb8',
+  'stage-6-the-tall-one@15': 'bbfcfcdaa2328f09a8adbbcbfa0126c126c95268f174b09fc4e75b692d9372ef',
+  'stage-7-prove-it@15': 'b44a51938099da19b37df715c5fff518a3c7a514605e1bff5672e189fc8e250b',
+  'stage-8-the-headline-address@4': 'cebe5da481e513cb1510737518c095ad4876ca161e0aa736cccc2b670d464477',
+  'stage-9-both-ways-at-once@15': '6764315c864e338c27abd41d71a747049a20b520b79e5cb254ef12be84b27324',
+  'stage-10-the-bed-and-the-visitor@15': 'a64c3658f4f833ade7469f8d0de163eb96c3debc3f395a66b2b7428148b8a08e',
+});
 
 /**
  * Each stage's tally, appended to the file `ELEVATOR_SIM_SPLIT_OUT` names, where it names one: vitest
@@ -215,14 +298,22 @@ function holdingOf(stageId: string, units: number): Holding {
  */
 function record(holding: Holding): void {
   const out = process.env['ELEVATOR_SIM_SPLIT_OUT'];
-  if (out !== undefined && out !== '') appendFileSync(out, `${summaryOf(holding)}\n${holding.flips.map((flip) => `  FLIP ${flip}\n`).join('')}`);
+  if (out !== undefined && out !== '') {
+    appendFileSync(
+      out,
+      `${summaryOf(holding)}\n${[...holding.flips, ...holding.contrastFlips].map((flip) => `  FLIP ${flip}\n`).join('')}`,
+    );
+  }
 }
 
 function summaryOf(holding: Holding): string {
   return (
     `${holding.stageId} at ${String(holding.units)} u: ${String(holding.moves)} two-change moves, ` +
     `${String(holding.rows)} rows, ${String(holding.printed)} printed as resolved, ` +
-    `${String(holding.sameWay)} resolved the same way held back, ${String(holding.flips.length)} flipped`
+    `${String(holding.sameWay)} resolved the same way held back, ${String(holding.flips.length)} flipped; ` +
+    `contrast ${String(holding.contrastRows)} rows, ${String(holding.contrastPrinted)} printed as resolved, ` +
+    `${String(holding.contrastSameWay)} the same way held back, ${String(holding.contrastFlips.length)} flipped; ` +
+    `lines ${holding.linesDigest}`
   );
 }
 
@@ -249,6 +340,20 @@ describe('stage 1 at its base: no row the split prints resolved flips on the hel
     expect(holding.flips, summaryOf(holding)).toEqual([]);
   });
 
+  it('flips no contrast row, read from the contrast’s own report on both seed sets (§ D1625, amendment 4)', () => {
+    /* The waits and observation rows of every move's contrast: drive work stays out of that line. */
+    expect(holding.contrastRows).toBe(holding.moves * 6);
+    expect(holding.contrastPrinted).toBeGreaterThan(0);
+    expect(holding.contrastFlips, summaryOf(holding)).toEqual([]);
+  });
+
+  it('leaves the split’s two existing lines byte for byte as they printed before the contrast', () => {
+    expect(holding.linesDigest, summaryOf(holding)).toBe(EXISTING_LINES_SHA256['stage-1-first-call@4']);
+    /* Every stage and budget the block draws on has its pin, and nothing else does. */
+    const covered = Object.entries(STAGE_SPLIT_COVERAGE).flatMap(([stageId, rungs]) => rungs.map((units) => `${stageId}@${String(units)}`));
+    expect(Object.keys(EXISTING_LINES_SHA256).sort()).toEqual(covered.sort());
+  });
+
   it('words each split from the same runs the screen’s own path runs', async () => {
     const stage = stageNamed('stage-1-first-call');
     const plan = holding.plans.find((entry) => keyOf(entry.press) === 'eta-parked-predicted-demand');
@@ -273,5 +378,10 @@ describe.skipIf(process.env['ELEVATOR_SIM_DEEP'] !== '1')('every other stage and
     });
     for (const holding of holdings) expect(holding.moves, summaryOf(holding)).toBeGreaterThan(0);
     expect(holdings.flatMap((holding) => holding.flips), holdings.map(summaryOf).join('\n')).toEqual([]);
+    /* § D1625, amendment 4: the contrast's own rows, and a flip goes back to the panel. */
+    expect(holdings.flatMap((holding) => holding.contrastFlips), holdings.map(summaryOf).join('\n')).toEqual([]);
+    for (const holding of holdings) {
+      expect(holding.linesDigest, summaryOf(holding)).toBe(EXISTING_LINES_SHA256[`${holding.stageId}@${String(holding.units)}`]);
+    }
   }, 7_200_000);
 });

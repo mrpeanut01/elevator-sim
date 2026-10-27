@@ -971,6 +971,10 @@ export function mountStagePlay(host: HTMLElement, context: EverydayScreenShellCo
         for (const line of view.verdict.split.lines) {
           split.append(para(doc, 'everyday-stage-play-split-line', line, `font-size:13px;line-height:1.5;color:${C.inkSoft}`));
         }
+        /* § D1625: the two changes set against each other, last in the block, in the lines' own style. */
+        if (view.verdict.split.contrast !== undefined) {
+          split.append(para(doc, 'everyday-stage-play-split-contrast', view.verdict.split.contrast, `font-size:13px;line-height:1.5;color:${C.inkSoft}`));
+        }
         verdict.append(split);
       }
       root.append(verdict);

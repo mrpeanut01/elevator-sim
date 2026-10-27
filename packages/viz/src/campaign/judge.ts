@@ -904,10 +904,31 @@ export interface StageSplitLine {
   readonly report: BatchReport;
 }
 
-/** The block, drawn: one heading and one line per change, the order's first. */
+/**
+ * The two changes set against each other on the same crowds (ruling R11, [§ D1625](../../../../DECISIONS.md)):
+ * the parking change made alone against the standing-order change made alone, each from the
+ * building's own setting.
+ */
+export interface StageSplitContrast {
+  /**
+   * The swap lead, then the waits and the observation rows by {@link comparisonSentence}'s rules, then
+   * one clause saying drive work is left out. No bar word, no *more than*, no cause.
+   */
+  readonly sentence: string;
+  /**
+   * The comparison the sentence was read off, a `BatchReport` of its own: the press's standing order
+   * with the shipped parking as the baseline, the shipped standing order with the press's parking as
+   * the candidate, so a difference below zero is lower on the parking change's arm.
+   */
+  readonly report: BatchReport;
+}
+
+/** The block, drawn: one heading, one line per change, the order's first, and the contrast last. */
 export interface StageSplit {
   readonly heading: string;
   readonly lines: readonly [StageSplitLine, StageSplitLine];
+  /** The two changes against each other, drawn after both lines (§ D1625). */
+  readonly contrast: StageSplitContrast;
   /** The acts the lines credit (§ D1011). Always both. */
   readonly credits: readonly StageSplitAct[];
   /** The acts the press carried, as {@link StageSplitInput.changed} said. */
@@ -935,6 +956,19 @@ export interface StageSplit {
  * count once and, where the held-back crowds ran, says they judged the two changes only together
  * (amendment 3).
  *
+ * **The contrast**, ruling R11 on the same issue ([§ D1625](../../../../DECISIONS.md)), for cycle 3's
+ * X1: a player ranked two lines side by side whose paired contrast was too close to call. The two
+ * one-change arms already ran on the press's crowds, so one more `BatchReport` over them sets the
+ * parking change made alone against the standing-order change made alone, paired on common random
+ * numbers, at no new run (amendments 1 and 4). The parking change always sits first, so the sign
+ * reads the same way on every press: *"Making the change to mid-zone parking instead of the change
+ * to Nearest car, on the same 50 crowds:"*, then {@link measureWordsOf} unchanged over the
+ * contrast's own rows. It says no *more than*, credits neither change with *more*, and leaves drive
+ * work out in one clause that says so, because two arms are never ordered on energy (amendment 2,
+ * [§ D106](../../../../DECISIONS.md)). *The same run* is said only where every paired difference
+ * is exactly zero. The heading names two differences from the building's own setting and says the
+ * lines need not add up to the result above (amendment 3), and nothing in it says *press*.
+ *
  * **`undefined` means the block is not drawn**: a press that did not change both, a batch that is
  * not three arms, a broken common-random-numbers audit, or a press arm that is not the verdict's own
  * candidate arm on every replication and row (amendment 5). Pure, and it decides no verdict. Its
@@ -955,9 +989,12 @@ export function stageSplitOf(input: StageSplitInput): StageSplit | undefined {
   const orderLead = `Changing the standing order to ${input.orderName}, with ${input.parkingName} kept`;
   const parkingLead = `Changing to ${input.parkingName}, with the standing order kept at ${input.orderName}`;
   const heading =
-    `Your two changes, each with the other kept, over ${runs} on ${crowdsOf('tuning')}.` +
+    `Your setting differs from the building’s own in two ways, the standing order and the parking, ` +
+    `measured here over ${runs} on ${crowdsOf('tuning')}. Each difference’s line sets your setting ` +
+    'against the same setting with that difference undone, so those lines need not add up to the ' +
+    'result above, and the last line sets the two differences against each other.' +
     (input.holdoutRan
-      ? ` ${capitalised(crowdsOf('holdout'))} judged your two changes only together, so nothing here ` +
+      ? ` ${capitalised(crowdsOf('holdout'))} judged the two differences only together, so nothing here ` +
         'says which of the two decided their answer.'
       : '');
   return {
@@ -966,6 +1003,12 @@ export function stageSplitOf(input: StageSplitInput): StageSplit | undefined {
       splitLineOf('standing-order', orderLead, against(forOrder), runs),
       splitLineOf('parking', parkingLead, against(forParking), runs),
     ],
+    contrast: splitContrastOf(
+      batchReport({ ...result, arms: [forParking, forOrder] }),
+      `Making the change to ${input.parkingName} instead of the change to ${input.orderName}`,
+      replications,
+      runs,
+    ),
     credits: ['standing-order', 'parking'],
     carried: [
       ...(changed.standingOrder ? (['standing-order'] as const) : []),
@@ -998,6 +1041,39 @@ function splitLineOf(change: StageSplitAct, lead: string, report: BatchReport, r
         ? null
         : `Beside that line and never part of it: ${lead.charAt(0).toLowerCase()}${lead.slice(1)}, ` +
           `${listOf(axis.map((row) => rowClauseOf(row, runs)))}.`,
+    report,
+  };
+}
+
+/**
+ * **The contrast's sentence**, read off its own report (ruling R11, amendments 1, 2 and 4): the swap
+ * lead and the crowds, then {@link measureWordsOf} unchanged, then the drive-work clause. Where every
+ * paired difference on every row is exactly zero the two arms were one run, and it says so instead.
+ *
+ * The clause names *the drive-work lines above* rather than saying *drive work is left out*, and
+ * the reason is the honesty corpus rather than taste: this is the first player string to hold a
+ * wait, a drive-work term and a figure in *percentage points* at once, and
+ * `honesty/properties.ts#checkEnergyWaitBlend` reads the bare phrase *drive work* as an energy
+ * quantity and the unit's *points* as a score word, so the bare form would be reported as a blend
+ * whenever a percentage row resolves. The hyphenated form points at the two lines it excludes.
+ * Its one caller is {@link stageSplitOf}, whose non-test caller is `everyday/stagePlay.ts#runStageSplit`,
+ * which `everyday/stagePlayScreen.ts#press` starts after the verdict is drawn.
+ */
+function splitContrastOf(report: BatchReport, swap: string, replications: number, runs: string): StageSplitContrast {
+  const rows = report.comparisons[0]?.rows ?? [];
+  const crowds = `${String(replications)} ${plural(replications, 'crowd', 'crowds')}`;
+  if (everyDifferenceIsZero(rows)) {
+    return {
+      sentence: `${swap} made the same run on each of the same ${crowds}: every measure came out exactly the same under both.`,
+      report,
+    };
+  }
+  const underBudget = rows.filter((row) => row.metricClass !== 'axis' && row.verdict === 'under-budget');
+  const { clauses, rest } = measureWordsOf(rows, underBudget, runs);
+  return {
+    sentence:
+      `${swap}, on the same ${crowds}: ${clauses.length === 0 ? 'no measure had an interval to read' : listOf(clauses)}.` +
+      `${rest} The drive-work lines above are left out of this one.`,
     report,
   };
 }
