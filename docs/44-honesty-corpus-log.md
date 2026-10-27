@@ -19,6 +19,20 @@ after this split; the entries below are older than the cap and are registered th
 The always-on row is measured on the integrated head; the deep row is read from the nightly
 `corpus-figures` job in [`.github/workflows/deep-tiers.yml`](../.github/workflows/deep-tiers.yml).
 
+## Wave AW
+
+**Wave AW moves +3.00 strings a case always-on, with no new surface.** The base is wave AV's row, which the
+nightly job reproduced on `main` (`c181913`); `main` at `94e0e86` adds only documents to it. Measured once
+on wave AW's head after its one lane merged. The surface set is the same 80, so the move is new text on an
+existing producer: the split block's rewritten heading and its contrast line (§ D1626), seeded on the stage
+page's adapter. The deep row still names `c181913` until the first nightly after wave AW merges.
+
+| tree | strings | move | per case | surfaces |
+|---|---|---|---|---|
+| base, wave AV's row (nightly on `c181913`) | 1 053 654 | | | 80 |
+| wave AW's head (AW-1, `c6c5a76`) | **1 053 801** | **+147** | **+3.00** | 80, **same set** |
+| cases · simulations · failing cases | 49 · 606 · 0 | **unmoved** | | |
+
 ## Wave AV
 
 **Wave AV moves +11.18 strings a case always-on, with no new surface.** The base is wave AU's row,
