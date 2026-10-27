@@ -55535,3 +55535,87 @@ is built for it in this wave. The conditions, the union of the seats' own:
 
 **Numbers spent.** The integrator spends **D1625** from wave AW's reservation; the build lane's block
 follows it.
+
+## D1626 — the stage card sets a two-change press's changes against each other on the same crowds, and its heading names two differences from the building's own setting
+
+> **Taken 2026-10-27 by an agent session** (wave AW, lane AW-1), building ruling R11 of the owner's
+> decision panel ([§ D1625](#d1625), GitHub issue #645, three seats to none, six amendments). **Owner-reversible**:
+> one revert removes the contrast line and restores the heading [§ D1623](#d1623) built.
+
+**Why an entry.** It binds the stage page (`everyday/stagePlay.ts`, `everyday/stagePlayScreen.ts`), the
+judge (`campaign/judge.ts`), the honesty register (`honesty/surfaces.ts`, `honesty/faults.ts`) and the
+`stage-split` deep tier, which no one module owns, and it amends the heading [§ D1622](#d1622) amendment 3
+set, so `docs/39` § 2 gains a row and § D1622 a status line.
+
+**What was built, by amendment.**
+
+1. **The contrast** (amendments 1 and 4). `campaign/judge.ts#stageSplitOf` builds one more `BatchReport`
+   from the split batch it already holds: the press's standing order with the shipped parking as the
+   baseline, the shipped standing order with the press's parking as the candidate, paired on the same
+   50 tuning crowds. It costs no run, draws exactly where the block draws, and inherits the block's
+   trigger, CRN check and coverage table.
+2. **The words** (amendments 1 and 2). The parking change always sits first, so a difference below zero
+   always means the parking change's arm ran shorter: *"Making the change to mid-zone parking instead of
+   the change to Nearest car, on the same 50 crowds:"*, then `measureWordsOf` unchanged over the
+   contrast's own rows, average wait first with its range. No *more*, *than* or *which*, no bar word, no
+   *alone*, no cause; *the same run* only where every paired difference on every row is exactly zero.
+   Drive work stays out, and the line ends *"The drive-work lines above are left out of this one."* The
+   bare *drive work is left out* would be read by `energy-wait-blend` as a blend wherever a percentage
+   row resolves, because its score words include the *points* of *percentage points* (a probe on the
+   check reported the bare form and passed this one); the clause names the two lines it excludes instead.
+3. **The heading** (amendment 3). It names two differences from the building's own setting, drops *each
+   with the other kept*, says each difference's line need not add up to the result above and that the
+   last line sets the two against each other, and keeps the held-back clause with *the two differences*
+   for *your two changes*. No player-facing string in the block says *press*. The pending and failed
+   lines are unchanged.
+4. **The card.** `stageSplitViewOf` carries the contrast as a field of its own and the screen draws it as
+   the block's last child; a pending, failed or stale block has none.
+5. **Honesty.** The stage page adapter seeds the contrast with both changes credited, both carried, and
+   its average-wait row's verdict and pairs with no arm favoured: its *same run* arm over `[press, kept,
+   kept]` and its figure-carrying arm over `[press, kept, press]`.
+   `honesty/faults.ts#contrastRankedOverUnresolvedWait` rewrites it as *"… shortened average wait more
+   than …"* over an unresolved row, and `single-run-comparative`'s batch clause fires.
+
+**The held-back gate, run before reporting** (amendment 4). `everyday/stageSplitHolds.test.ts` reads every
+contrast row the line can print (three waits, three observation rows) from the contrast's own report on
+both seed sets, over every two-change move the page admits on every stage and budget in
+`STAGE_SPLIT_COVERAGE`: 1 944 rows. **No contrast row flipped anywhere.** Same-way agreement, printed and
+never gated, is rows resolved the same way held back over rows the stage's own crowds print as resolved:
+
+| stage at budget | two-change moves | contrast rows | printed resolved | same way held back | flips |
+|---|---|---|---|---|---|
+| `stage-1-first-call` at 4 u | 18 | 108 | 34 | 31 | 0 |
+| `stage-1-first-call` at 24 u | 36 | 216 | 64 | 60 | 0 |
+| `stage-2-morning-rush` at 4 u | 18 | 108 | 35 | 27 | 0 |
+| `stage-3-overwhelmed` at 4 u | 18 | 108 | 15 | 14 | 0 |
+| `stage-4-two-banks` at 15 u | 36 | 216 | 92 | 10 | 0 |
+| `stage-5-credentials` at 15 u | 36 | 216 | 37 | 23 | 0 |
+| `stage-6-the-tall-one` at 15 u | 36 | 216 | 75 | 25 | 0 |
+| `stage-7-prove-it` at 15 u | 36 | 216 | 93 | 30 | 0 |
+| `stage-8-the-headline-address` at 4 u | 18 | 108 | 49 | 35 | 0 |
+| `stage-9-both-ways-at-once` at 15 u | 36 | 216 | 84 | 55 | 0 |
+| `stage-10-the-bed-and-the-visitor` at 15 u | 36 | 216 | 3 | 3 | 0 |
+
+The same run reproduced § D1623's table for the two existing lines exactly, with no flip. On
+`stage-4-two-banks` at 15 u only 10 of 92 resolved contrast rows resolve the same way held back, the
+lowest share in the table; agreement is printed and never gated.
+
+**What it does not touch.** No `met`, `held` or `cleared`, no `data/` file, census, goal bar or published
+figure. `stageVerdictsHold.test.ts` is unchanged and green; the engagement report for stage 1 prints byte
+for byte what it printed on `4afdd45`; and the split's two existing lines and their drive-work lines are
+byte-identical on every covered move, pinned per stage and budget by `stageSplitHolds.test.ts`'s
+`EXISTING_LINES_SHA256`, taken by the same wording over `4afdd45`.
+
+**Held by** `campaign/judge.test.ts`, which reads every contrast bound back against the paired-t estimate
+of the two one-change arms for five presses, pins `CYCLE-3.md` § 2's three average-wait contrasts to the
+printed digit and four contrast lines verbatim, both `nearest-car` presses among them, and fails a moved bound, *more than*, *which … more*, *shorter* over an
+interval containing zero, *too close to call* over one excluding it, and a drive-work row in the line;
+`everyday/stageSplit.test.ts` (a different press draws a different contrast; none on a pending, failed or
+stale block); `everyday/stageSplitHolds.test.ts` (the gate and the pin, stage 1 at 4 u always-on, the rest
+in the `stage-split` job); `everyday/stageWatch.browser.test.ts` (the contrast is the block's last child,
+and an edit takes it away); and the honesty corpus.
+
+**What it does not establish.** Whether people read the contrast correctly is cycle 4's to measure,
+under the pass R11 amendment 5 wrote.
+
+**Numbers spent.** Lane AW-1 holds **D1626 to D1633** and spends **D1626**.
