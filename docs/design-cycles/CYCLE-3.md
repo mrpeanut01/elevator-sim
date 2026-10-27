@@ -191,7 +191,72 @@ judge it; that is four batches across two cycles, an observation and not an esti
 player-session rate stays 0 of 0.
 
 ### 3. Design deltas  (outer loop, design-director)
-Pending.
+One delta this cycle. The design-director subagent sized its candidates on tuning-20260730 and two fresh
+seed sets of its own (fresh-77031027, fresh-88041138), and never ran holdout-20260731. The decision is
+GitHub issue #645, ruling R11; R12 asks what § D372's building needs before a later cycle.
+
+#### Delta C: set a two-change press's changes against each other on the same crowds, and say where each split line starts
+- **Pillar served and how a player notices:** pillar 2, Understandable. After a press that changes both
+  the standing order and the parking, the split block gains one line comparing the two changes with each
+  other on the same 50 crowds (for example, "changing to forecast parking shortened door-to-door time by
+  between 1.33 and 3.99 seconds more than changing the standing order; which shortened average wait more
+  is too close to call at 50 runs"), and its heading gains a clause saying each line starts from the press
+  with that one change undone, so the lines need not add up to the result above.
+- **Simplicity budget:** (1) pillar 2, as above; X1's ranking meets a paired line saying the average-wait
+  comparison is too close to call. (2) It adds one line and one heading clause to Delta B's block, only
+  where that block already draws, and adds no verb, control, rule, screen or simulation; it removes the
+  one place the page invites comparing two separate intervals. (3) It uses the verdict's sentence shape
+  and formatter, and a player who changed one thing never sees it.
+- **Track:** Casual.
+- **The change:** code. `campaign/judge.ts#stageSplitOf` gains a builder over the split batch's two
+  one-change arms, which already ran on the press's 50 tuning crowds, so the contrast is their paired t on
+  common random numbers and costs no run. It words the line by `comparisonSentence`'s rules (average wait
+  first, every other resolved wait or observation row with its size, the unresolved rest in one clause),
+  with no bar word, no "alone" or "on its own", and no cause; "the same run" only where every paired
+  difference is exactly zero. Drive work stays out of this line, because `CLAUDE.md` forbids ordering two
+  arms on energy; each change's own energy line stays. The heading of R10 amendment 3 gains its clause.
+  `everyday/stagePlay.ts` and `stagePlayScreen.ts` draw the line last, in the block's existing states, and
+  the honesty corpus covers the new strings.
+- **Evidence:** X1 (clause 5 unmet by one ranking, −0.907 s [−2.015, +0.201]); X2 in all three personas;
+  personas ranked the two changes on 9 of 10 two-change presses, and cycle 2's X3 was the same inference.
+  Sizing (a forecast): the contrast reproduces § 2's table to the printed digit; over 18 two-change moves
+  and six wait and observation rows, 35 of 108 contrast rows resolve on tuning, and on each fresh set none
+  resolves the other way.
+- **How we'll know it worked:** (a) nothing judged moves: `stageVerdictsHold.test.ts` unchanged, the split's
+  two existing lines byte-identical on every covered move, the engagement report reprints § 1, no `data/`
+  file in the diff. (b) `judge.test.ts` reads every contrast bound back against the two one-change arms'
+  paired-t estimate at `BATCH_METRIC_PRESENTATION.places` for the three pressed pairs in § 2's table, and
+  fails a tampered sentence and "more" over an interval containing zero. (c) The held-back gate of R10
+  amendments 6 and 7 extends to the contrast rows on every stage and budget in `STAGE_SPLIT_COVERAGE`:
+  no contrast row resolved one way on tuning-20260730 may resolve the other way on holdout-20260731; stage
+  1 at 4 u always-on, the rest once on the deep `stage-split` tier before merge; a flip goes back to the
+  panel. (d) The deep honesty tier at 0 failing cases. (e) Cycle 4's pass, written now: clause 5 is met
+  (every ranking of a press's two changes agrees with its contrast line, and a ranking where the line is
+  too close to call is a misreading); no persona asks whether the lines should add up; the felt-but-null
+  count stays 0; `number-averse` states the outcome after every two-change press, and a miss takes the
+  fallback (the contrast line on average wait only) without another ruling.
+- **Blast radius:** no data file, census, goal bar, survivor count or published figure moves. Test strings
+  and honesty seeds move; the always-on corpus is re-measured and the `stage-split` deep tier runs once.
+  One `DECISIONS.md` entry and a `docs/39` § 2 row are owed, because it amends R10 amendment 3's heading.
+- **Reversibility:** one revert. Fallbacks: average wait only in the contrast line; drop the heading clause
+  alone if it goes unread.
+
+**Candidates considered and rejected,** in the design director's ranking:
+1. **§ D372's failable building, deferred a third time, now for a measured reason** (question R12). On
+   busier two-car candidates sized on tuning and fresh crowds, tension moved robustly (in band on 41 of 50
+   crowds against 1 at 336 residents, Δ +0.80 [+0.69, +0.92] on tuning), but the base-rung survivor share
+   fell below the owner-approved 0.25 floor on 5 of 10 fresh-set censuses, and a building outside
+   `MATRIX_CELLS` needs a change to `benchmark/matrixCells.ts#reportWindowForBuilding`, which the
+   leaderboard replay shares. The lane cannot be bounded until stage 1's floor or replication count is
+   ruled.
+2. Name the judged measures on the goal line (C6): cheap, low to medium, and no seeded run judges it.
+3. Mark a thin clear in the headline (C7): the remedies move the judge rule or quadruple each press.
+4. Fix "your two changes" after one change (X4): the trigger is R10 amendment 1's ruling, met by one
+   persona after reading the tree.
+5. Say that differently priced orders run alike (C4): the price schedule is owner-approved, and the ties
+   disappear on a busier building.
+
+**Ruling R11:** pending. **R12:** pending.
 
 ### 4. Handoff to build loop
 Pending.
