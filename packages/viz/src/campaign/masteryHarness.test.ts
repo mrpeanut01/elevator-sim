@@ -142,11 +142,11 @@ beforeAll(async () => {
 
 describe('the fresh seeds are declared before the playtest, from a named stream (§ D1601 clause 3)', () => {
   it('re-derives every seed from its root and stream, with headroom over the eight attempts at fifty runs each', () => {
-    expect(SEEDS.stream).toBe('mastery-c2');
+    expect(SEEDS.stream).toBe('mastery-c3');
     expect(SEEDS.batches.length).toBeGreaterThanOrEqual(12);
     expect(SEEDS.batches.length).toBeGreaterThan(BANDS.attempts);
     SEEDS.batches.forEach((one, index) => {
-      expect(one.name).toBe(`mastery-c2-${String(index + 1).padStart(2, '0')}`);
+      expect(one.name).toBe(`mastery-c3-${String(index + 1).padStart(2, '0')}`);
       expect(one.seed).toBe(freshMasterSeedOf(SEEDS.root, SEEDS.stream, index + 1));
       expect(one.replications).toBe(50);
     });
@@ -160,9 +160,20 @@ describe('the fresh seeds are declared before the playtest, from a named stream 
       batches: raw.batches.map((row, at) => (at === index ? { ...row, ...change } : row)),
     });
     expect(() => parseFreshSeeds(tamper(2, { seed: '20261023' }))).toThrow(/derived, never typed/);
-    expect(() => parseFreshSeeds(tamper(2, { name: 'mastery-c2-3' }))).toThrow(/is named/);
+    expect(() => parseFreshSeeds(tamper(2, { name: 'mastery-c3-3' }))).toThrow(/is named/);
     expect(() => parseFreshSeeds(tamper(2, { replications: 49 }))).toThrow(/replications/);
     expect(() => parseFreshSeeds({ ...raw, extra: true })).toThrow(/refuses rather than ignores/);
+  });
+
+  it('collides with no batch an earlier cycle declared: cycle 2 judged its attempts on mastery-c2, and those verdicts have been seen (§ D1624)', () => {
+    const earlier = Array.from({ length: 12 }, (_, index) => ({
+      name: `mastery-c2-${String(index + 1).padStart(2, '0')}`,
+      seed: freshMasterSeedOf('20261021', 'mastery-c2', index + 1),
+      replications: 50,
+    }));
+    /* Non-vacuity: the derivation reproduces cycle 2's first batch as § D1621 recorded it. */
+    expect(earlier[0]?.seed).toBe('1145347316356468505');
+    expect(freshSeedCollisions(SEEDS, earlier)).toEqual([]);
   });
 
   it('collides with no seed set any shipped stage declares, on master seeds or on replication seeds', () => {
@@ -287,12 +298,12 @@ describe('the attempt file, the cut-off and the eight-attempt rule', () => {
     const rows = Array.from({ length: 13 }, (_, index) => attempt('a', index + 1, MID_ZONE, { readTreeBefore: index + 1 >= 3 }));
     const plan = planMasteryRejudge({ attempts: { attempts: rows }, seeds: SEEDS_RAW, bands: BANDS_RAW, resources: resources() });
     expect(plan.series).toHaveLength(1);
-    expect(plan.series[0]?.tasks.map((task) => task.batch.name)).toEqual(['mastery-c2-01', 'mastery-c2-02']);
+    expect(plan.series[0]?.tasks.map((task) => task.batch.name)).toEqual(['mastery-c3-01', 'mastery-c3-02']);
     expect(plan.series[0]?.cut.cut).toHaveLength(11);
     expect(plan.series[0]?.tasks[0]?.moveName).toBe('collective-parked-zone-center');
     expect(ran.length).toBe(before);
-    /* Thirteen kept attempts need a thirteenth batch, which the declaration does not hold. */
-    const all = rows.map((row) => ({ ...row, readTreeBefore: false }));
+    /* One kept attempt more than the declaration holds needs a batch it does not have. */
+    const all = Array.from({ length: SEEDS.batches.length + 1 }, (_, index) => attempt('a', index + 1, MID_ZONE, { readTreeBefore: false }));
     expect(() => planMasteryRejudge({ attempts: { attempts: all }, seeds: SEEDS_RAW, bands: BANDS_RAW, resources: resources() })).toThrow(
       /declare more/,
     );
@@ -373,7 +384,7 @@ describe('one attempt, re-judged on stage 1 through the game’s own press', () 
     expect(midZoneOne.fixed.metOnTuningSeeds, 'mid-zone parking meets stage 1 on its own crowds (stageVerdictsHold.test.ts)').toBe(true);
     const holdout = midZoneOne.fresh.report?.holdout;
     expect(holdout?.seed).toBe(batch(1).seed);
-    expect(holdout?.seedSetName).toBe('mastery-c2-01');
+    expect(holdout?.seedSetName).toBe('mastery-c3-01');
     expect(holdout?.goals.length).toBeGreaterThan(0);
     expect(typeof midZoneOne.fresh.held).toBe('boolean');
     const fresh = midZoneOne.batches.find((one) => one.press === 'fresh' && one.seedSet === 'holdout');

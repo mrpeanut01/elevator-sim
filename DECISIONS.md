@@ -55425,3 +55425,27 @@ under the three clauses amendment 8 added to its pass.
 
 **Numbers spent.** Lane AV-2 holds **D1623 to D1630** and spends **D1623**. D1624 to D1630 are
 unspent.
+
+## D1624 — each design cycle declares its own fresh mastery batches before its playtest, and cycle 3's are `mastery-c3`
+
+> **Taken 2026-10-27 by the integrator of wave AW**, applying [§ D1601](#d1601) (ruling R3 on GitHub issue
+> #645) to a second cycle. **Owner-reversible.**
+
+**Why an entry.** It changes `data/mastery-seeds.json`, which [§ D1621](#d1621) recorded as cycle 2's
+declaration, and it binds every later cycle's playtest.
+
+1. **Fresh means unseen.** Cycle 2 re-judged its attempts on `mastery-c2` batches 1 to 12, and the
+   integrator and the design director read those verdicts. A batch whose verdicts have been read is no
+   longer fresh for a later cycle. Cycle 3 does not reuse them, and does not append after them either,
+   because attempt *k* reads batch *k*.
+2. **The declaration.** Cycle 3's batches come from the stream `mastery-c3` at root `20261027`, the date
+   cycle 3 started: sixteen batches of 50, derived by `campaign/masteryHarness.ts#freshMasterSeedOf`
+   exactly as § D1621 describes, and declared before any persona plays. Sixteen leaves headroom, because
+   two of cycle 2's series ran to fourteen attempts and only twelve could be judged.
+3. **Cycle 2 stays reproducible.** Its batches are the same function of root `20261021` and stream
+   `mastery-c2`. `masteryHarness.test.ts` re-derives cycle 2's first batch as recorded, and checks that
+   no cycle 3 batch collides with any of cycle 2's twelve or with any shipped stage's seed sets.
+4. **Every later cycle does the same:** a stream of its own, rooted on the date it starts, declared
+   before its playtest.
+
+**Numbers spent.** The integrator spends **D1624** from wave AW's reservation.
