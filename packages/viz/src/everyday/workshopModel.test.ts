@@ -42,7 +42,6 @@ import { DISPATCHER_FAMILIES } from '../authoring/dispatcherFamilies.js';
 import { applyPlainLever } from '../mode/plainLevers.js';
 import {
   behaviourBlockOf,
-  carriedBlocksOf,
   constraintCardsOf,
   mathsDisclosureOf,
   nameplateOf,
@@ -348,7 +347,7 @@ describe('the save block — § 11.1', () => {
   });
 });
 
-describe('constraints and carried blocks — nothing unnamed reaches the screen', () => {
+describe('constraints — nothing unnamed reaches the screen', () => {
   it('reads a named constraint from core’s own words', () => {
     const cards = constraintCardsOf(profileOf('collective'));
     expect(cards.map((card) => card.name)).toEqual([
@@ -363,17 +362,6 @@ describe('constraints and carried blocks — nothing unnamed reaches the screen'
     expect(card?.unnamed).toBe(true);
     expect(card?.name).toContain('a filter no weight can buy past');
     expect(card?.name).toContain('someFutureFilter');
-  });
-
-  it('says what a profile carries that the workshop cannot draw, in words', () => {
-    const carried = carriedBlocksOf(profileOf('auction-multi-round'));
-    expect(carried.length).toBeGreaterThan(0);
-    for (const entry of carried) {
-      expect(entry.words.length).toBeGreaterThan(0);
-      // The union member is an engine word; only `words` may be drawn.
-      expect(entry.words).not.toBe(entry.block);
-    }
-    expect(carriedBlocksOf(undefined)).toHaveLength(0);
   });
 });
 

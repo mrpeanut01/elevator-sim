@@ -226,7 +226,7 @@ const BYPASS_OFF = 1;
  */
 let searchSpace: SearchSpace | undefined;
 
-function familySpace(): SearchSpace {
+export function familySpace(): SearchSpace {
   searchSpace ??= collectSearchSpace();
   return searchSpace;
 }

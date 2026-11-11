@@ -187,11 +187,6 @@ export const WORKSHOP_COPY = Object.freeze({
     'original stays on the shelf.',
   refusalEmpty: 'Give it a name first.',
   refusalTaken: 'Another dispatcher already has that name. Change the name, or save a copy.',
-  leversHeading: 'THE FOUR LEVERS',
-  leversHint:
-    'Four plain controls over the same numbers the drawer below holds. Move one and the cost line ' +
-    'changes, because it is the same weight.',
-  optimisingHeading: 'WHAT IT IS OPTIMISING',
   showEveryTerm: 'show every term',
   behavesHeading: 'HOW IT BEHAVES',
   groupHeading: 'GROUP LEVERS — APPLY TO WHOEVER IS DRIVING',
@@ -205,10 +200,6 @@ export const WORKSHOP_COPY = Object.freeze({
     'are set.',
   /** The honest name for a constraint this build carries and has no player-facing words for. */
   constraintFallbackName: 'a filter no weight can buy past',
-  carriedHeading: 'CARRIED, AND NOT DRAWN HERE',
-  carriedHint:
-    'This dispatcher was authored with settings this workshop has no control for. They travel with ' +
-    'it unchanged when you save — they are not lost, and they are not editable here.',
   switchingHeading: 'TRAFFIC-PATTERN SWITCHING',
   switchingHint:
     'The one thing that can change mid-shift: whether the dispatcher may notice the traffic has ' +
@@ -753,92 +744,6 @@ export function constraintCardsOf(profile: DispatcherProfile | undefined): reado
       }
       return Object.freeze({ id, name: words.name, effect: words.effect, unnamed: false });
     }),
-  );
-}
-
-/**
- * The blocks a profile can carry that this workshop draws no control for.
- *
- * Its own union rather than `dispatcherEditor.ts#UnauthorableBlock`, because the two screens ask
- * different questions and the shared name hid that — see {@link carriedBlocksOf}. A member leaves
- * here on the commit that draws its family, never before.
- */
-export type WorkshopCarriedBlock =
-  | 'auction'
-  | 'zoning'
-  | 'panel'
-  | 'reassignment'
-  | 'timing'
-  | 'constraints'
-  | 'selection';
-
-/**
- * The Casual sentence for each block a profile can carry that this workshop has no control for.
- *
- * A table keyed by a **closed union declared in this module**, not by an engine id — so it is not
- * the §6.3 shape: {@link WorkshopCarriedBlock} gaining a member is a compile error here, where a
- * profile gaining a section is not. The sentences exist because the alternative is worse in both
- * directions: printing the union's own members would put `auction` and `panel` on a Casual surface
- * (rule 11), and printing nothing would be §D227's silent partial editor, which
- * {@link carriedBlocksOf} exists to refuse.
- */
-const CARRIED_BLOCK_WORDS: Readonly<Record<WorkshopCarriedBlock, string>> = Object.freeze({
-  auction: 'the cars bid against each other for the call, over more than one round',
-  zoning: 'a crowd size above which the tower is split between the cars',
-  panel: 'the landing panel tells each rider which car to stand at',
-  reassignment: 'a call may be taken off one car and given to another after it was assigned',
-  timing: 'the moment the call is assigned is held back rather than taken on the press',
-  constraints: 'a filter that decides which cars may be offered the call at all',
-  selection: 'a rule for changing what it optimises part-way through the day',
-});
-
-/** One carried-but-not-drawn block, in words. */
-export interface CarriedBlock {
-  readonly block: WorkshopCarriedBlock;
-  readonly words: string;
-}
-
-/**
- * What this dispatcher carries that **this workshop** cannot draw, said in Casual words.
- *
- * ## Why the list is derived here rather than borrowed
- *
- * It used to call `dispatcherEditor.ts#unauthorableBlocksOf`, and that was right while the two
- * screens could draw the same seven blocks: neither authored them, so one list answered both.
- * `dev/familyControls.ts` then made six of the seven authorable **in the Engineer editor**, and that
- * function narrowed to `selection` alone — correctly, for its own screen.
- *
- * The workshop imports none of those controls. So the borrowed list stopped meaning *what this
- * screen is not showing* and started meaning *what the other screen is not showing*, and the two
- * had quietly become different questions. Left alone, a Casual player editing `auction-multi-round`
- * — which declares an auction and no selection — would have been told nothing at all, on the one
- * disclosure whose entire job is to say what the screen is leaving out. § D227, arriving through a
- * merge rather than through an edit, on a surface neither lane changed.
- *
- * The derivation below is the one that function carried before it narrowed, and it stays here until
- * the workshop draws these families itself — at which point a block leaves this list on the commit
- * that draws it, which is the same rule the register it came from applies one screen over.
- *
- * Derived from the profile rather than from its `role`, because `role` is free-form and three of the
- * thirteen shipped profiles declare none while carrying exactly these blocks. Empty for most of the
- * shelf; non-empty is the honest half of *full capability* — the workshop says what it is not
- * showing rather than letting a reader believe the screen is the document.
- */
-export function carriedBlocksOf(profile: DispatcherProfile | undefined): readonly CarriedBlock[] {
-  if (profile === undefined) return Object.freeze([]);
-  const dispatch = profile.dispatch;
-  const found: WorkshopCarriedBlock[] = [];
-  if (profile.auction !== undefined) found.push('auction');
-  if (dispatch?.splitThresholdPassengers !== undefined) found.push('zoning');
-  if (dispatch?.passengerAssignment !== undefined) found.push('panel');
-  if (dispatch?.reassignmentPolicy !== undefined) found.push('reassignment');
-  if (dispatch?.assignmentTiming !== undefined) found.push('timing');
-  if (profile.hardConstraints !== undefined || profile.eligibility !== undefined) {
-    found.push('constraints');
-  }
-  if (profile.selection !== undefined) found.push('selection');
-  return Object.freeze(
-    found.map((block) => Object.freeze({ block, words: CARRIED_BLOCK_WORDS[block] })),
   );
 }
 

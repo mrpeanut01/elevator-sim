@@ -105,7 +105,6 @@ import {
 } from '../everyday/benchModel.js';
 import {
   behaviourBlockOf,
-  carriedBlocksOf,
   constraintCardsOf,
   /* Aliased: `dev/leftRail.ts` and `dev/rightRail.ts` already export these two names. */
   mathsDisclosureOf as workshopMathsOf,
@@ -120,6 +119,7 @@ import {
   workshopLeversOf,
   WORKSHOP_COPY,
 } from '../everyday/workshopModel.js';
+import { JOURNEY_COPY, journeyOf } from '../everyday/workshopJourney.js';
 import { DISPATCHER_FAMILIES } from '../authoring/dispatcherFamilies.js';
 import { versionedNameOf } from '../authoring/dispatcherShelf.js';
 import {
@@ -16888,7 +16888,8 @@ const EVERYDAY_WORKSHOP: SurfaceAdapter = {
     'everyday/workshopModel.ts#mathsDisclosureOf',
     'everyday/workshopModel.ts#behaviourBlockOf',
     'everyday/workshopModel.ts#constraintCardsOf',
-    'everyday/workshopModel.ts#carriedBlocksOf',
+    'everyday/workshopJourney.ts#JOURNEY_COPY',
+    'everyday/workshopJourney.ts#journeyOf',
     'everyday/workshopModel.ts#switchingBlockOf',
     'everyday/workshopModel.ts#rulesBlockOf',
     'everyday/workshopModel.ts#nameplateOf',
@@ -17036,9 +17037,6 @@ const EVERYDAY_WORKSHOP: SurfaceAdapter = {
       for (const card of constraintCardsOf(profile)) {
         seeds.push({ field: `${label}.constraint.${card.id}`, text: `${card.name} — ${card.effect}`, role: 'reason' });
       }
-      for (const entry of carriedBlocksOf(profile)) {
-        seeds.push({ field: `${label}.carried.${entry.block}`, text: entry.words, role: 'reason', provenance: 'authored' });
-      }
     }
 
     /*
@@ -17051,10 +17049,46 @@ const EVERYDAY_WORKSHOP: SurfaceAdapter = {
       if (!card.unnamed) continue;
       seeds.push({ field: 'constraint.unnamed', text: `${card.name} — ${card.effect}`, role: 'reason' });
     }
-    /* Every carried-block sentence, over a profile that carries all of them it can. */
+    /*
+     * ---- one call, start to finish: every stage's sentence, over every shipped profile ----
+     * Every shipped profile rather than the styled ones, because the sentences branch on settings
+     * only some designs hold — an auction, a panel, a reassignment budget, a forecast.
+     */
+    for (const text of [
+      JOURNEY_COPY.heading,
+      JOURNEY_COPY.hint,
+      JOURNEY_COPY.depthLabel,
+      ...Object.values(JOURNEY_COPY.depths),
+      ...Object.values(JOURNEY_COPY.depthNotes),
+      JOURNEY_COPY.unrunnable,
+    ]) {
+      seeds.push({ field: 'journey.copy', text, role: 'prose', provenance: 'authored' });
+    }
     for (const profile of file.profiles) {
-      for (const entry of carriedBlocksOf(profile)) {
-        seeds.push({ field: `carried.${entry.block}`, text: entry.words, role: 'reason', provenance: 'authored' });
+      for (const card of journeyOf(profile)) {
+        seeds.push({ field: `journey.${profile.id}.${card.stage}.title`, text: card.title, role: 'label', provenance: 'authored' });
+        seeds.push({ field: `journey.${profile.id}.${card.stage}.readback`, text: card.readback, role: 'prose' });
+      }
+    }
+    /* The arms no shipped profile reaches, manufactured so each sentence has been rendered once. */
+    const journeyBase = file.profiles[0];
+    if (journeyBase !== undefined) {
+      const arms: readonly DispatcherProfile[] = [
+        { ...journeyBase, weights: {} },
+        { ...journeyBase, dispatch: { reassignmentPolicy: 'continuous', maxReassignmentsPerCall: 1 } },
+        { ...journeyBase, dispatch: { reassignmentPolicy: 'until-commitment', commitmentPoint: 'on-assignment' } },
+        { ...journeyBase, idle: { parkingStrategy: 'lobby' } },
+        { ...journeyBase, idle: { parkingStrategy: 'fixed-floor', parkingFloorIndex: 5 } },
+        { ...journeyBase, eligibility: { maxLoadFactorForAssignment: 0.7 } },
+        { ...journeyBase, answer: { bypassLoadThreshold: 0.8, dwellPolicy: 'adaptive' } },
+        { ...journeyBase, selection: { policy: 'fuzzy' } },
+        { ...journeyBase, selection: { policy: 'rules' }, rules: { rows: [{ when: 'shaft-out', then: 'nearest-car' }] } },
+        { ...journeyBase, engine: 'no-such-engine' },
+      ];
+      for (const [index, arm] of arms.entries()) {
+        for (const card of journeyOf(arm)) {
+          seeds.push({ field: `journey.arm${String(index)}.${card.stage}`, text: card.readback, role: 'prose' });
+        }
       }
     }
 

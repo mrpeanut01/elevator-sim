@@ -52,8 +52,16 @@
 import { RULE_ACTION_WORDS, RULE_CONDITION_WORDS } from '@elevator-sim/core/browser';
 
 import { DISPATCHER_FAMILIES } from '../authoring/dispatcherFamilies.js';
+import { builtProfileOf } from '../authoring/dispatcherShelf.js';
+import { applyControlEdit } from '../controls/controls.js';
+import { renderControls } from '../controls/render.js';
+import { familyValueFrom } from '../dev/dispatcherEditor.js';
+import { familyControlsViewOf, familyValuesOf, prunedFamilyMoves } from '../dev/familyControls.js';
+import { instantiateControlNode } from '../dev/parameterForm.js';
 import {
   DEFAULT_LEVERS,
+  familySpace,
+  profileFromSpec,
   specFromProfile,
   specIsDirty as dispatcherSpecIsDirty,
 } from '../authoring/dispatcherSpec.js';
@@ -85,8 +93,15 @@ import {
   EVERYDAY_TYPE as TYPE,
 } from './tokens.js';
 import {
+  JOURNEY_COPY as JOURNEY,
+  STAGE_FAMILIES,
+  WORKSHOP_DEPTHS,
+  journeyOf,
+  type JourneyStage,
+  type WorkshopDepth,
+} from './workshopJourney.js';
+import {
   behaviourBlockOf,
-  carriedBlocksOf,
   constraintCardsOf,
   discardQuestionOf,
   mathsDisclosureOf,
@@ -129,6 +144,12 @@ type PendingQuestion =
   | { readonly kind: 'replace' };
 let pending: PendingQuestion | undefined;
 
+/** How much of each stage card is open. Remembered across redraws and mounts, as {@link view} is. */
+let depth: WorkshopDepth = 'simple';
+
+/** A family control's refused edit, drawn under its block until the next accepted one. */
+let familyRefusal: { readonly family: string; readonly reason: string } | undefined;
+
 /** Why the last save was refused, drawn under the button until the name changes or a save lands. */
 let refusal: NameRefusal | undefined;
 
@@ -146,6 +167,8 @@ function el<K extends keyof HTMLElementTagNameMap>(
 
 const EYEBROW = `font:500 10.5px ${TYPE.mono};letter-spacing:.14em;color:${C.label};text-transform:uppercase`;
 const NOTE = `font-size:12.5px;color:${C.warmGrey};line-height:1.5;max-width:72ch`;
+/** A control inside a stage card: sunk, so the card is the object and the control is part of it. */
+const CONTROL_ROW = `border:1px solid ${C.ruleLight};border-radius:${String(R.row)}px;background:${C.cardSunk};padding:11px 13px`;
 const CARD = `border:1px solid ${C.rule};border-radius:${String(R.card)}px;background:${C.card};padding:16px 18px`;
 
 /** A `<details>` whose open state is remembered across redraws by {@link openDisclosures}. */
@@ -705,52 +728,198 @@ function mountWorkshop(
    * The column — layers 2 to 6
    * ------------------------------------------------------------------ */
 
-  function drawLevers(): HTMLElement {
-    const wrap = section(doc, COPY.leversHeading, COPY.leversHint);
+  /** One plain lever, and under it the echo of what the last press wrote. */
+  function leverNodes(id: string): HTMLElement[] {
+    const view = workshopLeversOf(api.workingSpec(), api.groupLevers()).find((lever) => lever.id === id);
+    if (view === undefined) return [];
+    const row = el(doc, 'div', 'everyday-workshop-lever');
+    row.style.cssText = `${CONTROL_ROW};display:flex;align-items:center;gap:14px`;
+    row.title = plainLeverHelp(view);
+    const text = el(doc, 'div');
+    text.style.cssText = 'min-width:0;flex:1';
+    const label = el(doc, 'div', undefined, view.label);
+    label.style.cssText = 'font-size:14px;font-weight:600';
+    const sub = el(doc, 'div', undefined, plainLeverSub(view));
+    sub.style.cssText = `font-size:12.5px;color:${C.warmGrey};line-height:1.45;margin-top:2px`;
+    text.append(label, sub);
+    if (view.serves !== undefined) {
+      const serves = el(doc, 'div', undefined, view.serves);
+      serves.style.cssText = `font:500 11px ${TYPE.mono};color:${C.label};margin-top:3px`;
+      text.append(serves);
+    }
+    row.append(text);
+    if (view.kind === 'slider') {
+      const control = slider(doc, typeof view.value === 'number' ? view.value : 0, (next) => {
+        lastLeverId = view.id;
+        api.setPlainLever(view.id, next);
+      });
+      control.setAttribute('aria-label', view.label);
+      const figure = el(doc, 'span', undefined, String(view.value));
+      figure.style.cssText = `font:500 13px ${TYPE.mono};color:${C.terracotta};width:3ch;text-align:right`;
+      row.append(control, figure);
+    } else {
+      row.append(
+        toggle(doc, view.value === true, view.value === true ? view.atFull : view.atZero, () => {
+          lastLeverId = view.id;
+          api.setPlainLever(view.id, view.value !== true);
+        }),
+      );
+    }
+    if (lastLeverId !== view.id) return [row];
+    const echo = el(doc, 'p', 'everyday-workshop-echo', plainLeverEchoOf(view));
+    echo.style.cssText = `${NOTE};margin:0;color:${C.terracotta}`;
+    return [row, echo];
+  }
+
+  /** A labelled on/off row — a behaviour flag or a group lever. */
+  function switchRow(
+    className: string,
+    words: { readonly label: string; readonly hint: string; readonly help: string; readonly on: boolean },
+    onPress: () => void,
+  ): HTMLElement {
+    const row = el(doc, 'div', className);
+    row.style.cssText = `${CONTROL_ROW};display:flex;align-items:center;gap:14px`;
+    row.title = words.help;
+    const text = el(doc, 'div');
+    text.style.cssText = 'min-width:0;flex:1';
+    const label = el(doc, 'div', undefined, words.label);
+    label.style.cssText = 'font-size:14px;font-weight:600';
+    const hint = el(doc, 'div', undefined, words.hint);
+    hint.style.cssText = `font-size:12.5px;color:${C.warmGrey};line-height:1.45;margin-top:2px`;
+    text.append(label, hint);
+    row.append(text, toggle(doc, words.on, words.on ? 'on' : 'off', onPress));
+    return row;
+  }
+
+  function flagNodes(key: 'pool' | 'zone' | 'bypass'): HTMLElement[] {
+    const flag = behaviourBlockOf(api.workingSpec(), api.groupLevers()).flags.find((row) => row.key === key);
+    if (flag === undefined) return [];
+    return [
+      switchRow('everyday-workshop-flag', flag, () => {
+        setFlag(flag.key, !flag.on);
+      }),
+    ];
+  }
+
+  function groupLeverNodes(key: string): HTMLElement[] {
+    const levers = api.groupLevers();
+    const lever = behaviourBlockOf(api.workingSpec(), levers).groupLevers.find((row) => row.key === key);
+    if (lever === undefined) return [];
+    return [
+      switchRow('everyday-workshop-group-lever', lever, () => {
+        api.setGroupLevers({ ...levers, [lever.key]: !lever.on });
+      }),
+    ];
+  }
+
+  /** The filters no weight can buy past, named — drawn in the card about which cars may answer. */
+  function constraintNodes(): HTMLElement[] {
+    const constraints = constraintCardsOf(api.editingSource());
+    if (constraints.length === 0) return [];
+    const head = el(doc, 'div', undefined, COPY.constraintsHeading);
+    head.style.cssText = EYEBROW;
+    const hint = el(doc, 'p', undefined, COPY.constraintsHint);
+    hint.style.cssText = `${NOTE};margin:0`;
+    return [
+      head,
+      hint,
+      ...constraints.map((card) => {
+        const row = el(doc, 'div', 'everyday-workshop-constraint');
+        row.style.cssText = CONTROL_ROW;
+        const name = el(doc, 'div', undefined, card.name);
+        name.style.cssText = 'font-size:13.5px;font-weight:600';
+        const effect = el(doc, 'div', undefined, card.effect);
+        effect.style.cssText = `${NOTE};margin-top:2px`;
+        row.append(name, effect);
+        return row;
+      }),
+    ];
+  }
+
+  /**
+   * The schema's own controls for the families a card owns — drawn at *Detailed* and *Engineer*.
+   *
+   * These are `dev/familyControls.ts`'s blocks, generated from the dimensions `core` declares, so a
+   * control here has the range, the default and the gate an optimizer would search — and is the
+   * same control the Engineer editor draws, over the same working copy. *Engineer* adds what that
+   * editor says beside each block: the function that reads it on a real run.
+   *
+   * An edit is validated by `controls/controls.ts#applyControlEdit` before it is written, and a
+   * refused one is said under the block with the schema's own reason. Moves are pruned on the way
+   * in (`prunedFamilyMoves`), so a control put back to what the design held leaves no trace.
+   */
+  function familyNodes(stage: JourneyStage): HTMLElement[] {
+    if (depth === 'simple') return [];
     const spec = api.workingSpec();
     const levers = api.groupLevers();
-    for (const view of workshopLeversOf(spec, levers)) {
-      const row = el(doc, 'div', 'everyday-workshop-lever');
-      row.style.cssText = `${CARD};display:flex;align-items:center;gap:14px;margin-bottom:${String(GAP.row)}px`;
-      row.title = plainLeverHelp(view);
-      const text = el(doc, 'div');
-      text.style.cssText = 'min-width:0;flex:1';
-      const label = el(doc, 'div', undefined, view.label);
-      label.style.cssText = 'font-size:14px;font-weight:600';
-      const sub = el(doc, 'div', undefined, plainLeverSub(view));
-      sub.style.cssText = `font-size:12.5px;color:${C.warmGrey};line-height:1.45;margin-top:2px`;
-      text.append(label, sub);
-      if (view.serves !== undefined) {
-        const serves = el(doc, 'div', undefined, view.serves);
-        serves.style.cssText = `font:500 11px ${TYPE.mono};color:${C.label};margin-top:3px`;
-        text.append(serves);
+    const source = api.editingSource();
+    const space = familySpace();
+    const draft = profileFromSpec(spec, { id: source?.id ?? 'draft', levers, ...(source === undefined ? {} : { base: source }) });
+    const view = familyControlsViewOf({ space, spec, levers, draft, base: source });
+    const nodes: HTMLElement[] = [];
+    for (const block of view.blocks) {
+      if (!STAGE_FAMILIES[stage].includes(block.family)) continue;
+      const box = el(doc, 'div', 'everyday-workshop-family-block');
+      box.dataset['family'] = block.family;
+      box.style.cssText = `border-top:1px dashed ${C.ruleLight};padding-top:10px;display:flex;flex-direction:column;gap:6px;min-width:0`;
+      const title = el(doc, 'div', undefined, block.title);
+      title.style.cssText = EYEBROW;
+      box.append(title);
+      if (depth === 'engineer') {
+        const caller = el(doc, 'div', 'everyday-workshop-family-caller', block.caller);
+        caller.style.cssText = `font:500 11px ${TYPE.mono};color:${C.label};overflow-wrap:anywhere`;
+        box.append(caller);
       }
-      row.append(text);
-      if (view.kind === 'slider') {
-        const control = slider(doc, typeof view.value === 'number' ? view.value : 0, (next) => {
-          lastLeverId = view.id;
-          api.setPlainLever(view.id, next);
-        });
-        control.setAttribute('aria-label', view.label);
-        const figure = el(doc, 'span', undefined, String(view.value));
-        figure.style.cssText = `font:500 13px ${TYPE.mono};color:${C.terracotta};width:3ch;text-align:right`;
-        row.append(control, figure);
-      } else {
-        row.append(
-          toggle(doc, view.value === true, view.value === true ? view.atFull : view.atZero, () => {
-            lastLeverId = view.id;
-            api.setPlainLever(view.id, view.value !== true);
-          }),
-        );
+      const controls = instantiateControlNode(doc, renderControls(block.rows.map((row) => row.control)));
+      controls.style.minWidth = '0';
+      /*
+       * The schema renderer's markup is the Engineer shell's; these are § 19's values over it, so
+       * the block reads as part of this card. The group's legend is the schema's section key —
+       * an engine word — so it is drawn only at the depth that names things the engine's way.
+       */
+      for (const group of controls.querySelectorAll<HTMLElement>('fieldset')) {
+        group.style.cssText = `border:1px solid ${C.ruleLight};border-radius:${String(R.row)}px;background:${C.cardSunk};padding:8px 12px;margin:0;min-width:0`;
       }
-      wrap.append(row);
-      if (lastLeverId === view.id) {
-        const echo = el(doc, 'p', 'everyday-workshop-echo', plainLeverEchoOf(view));
-        echo.style.cssText = `${NOTE};margin:-4px 0 ${String(GAP.row)}px;color:${C.terracotta}`;
-        wrap.append(echo);
+      for (const legend of controls.querySelectorAll<HTMLElement>('legend')) {
+        legend.style.cssText = `font:500 10.5px ${TYPE.mono};color:${C.label};padding:0 4px`;
+        legend.hidden = depth !== 'engineer';
       }
+      box.append(controls);
+      for (const row of block.rows) {
+        if (row.overriddenBy === undefined) continue;
+        const note = el(doc, 'p', undefined, `${row.control.label} — ${row.overriddenBy}`);
+        note.style.cssText = `${NOTE};margin:0;color:${C.terracotta}`;
+        box.append(note);
+      }
+      if (familyRefusal?.family === block.family) {
+        const line = el(doc, 'p', 'everyday-workshop-family-refusal', familyRefusal.reason);
+        line.setAttribute('role', 'alert');
+        line.style.cssText = `${NOTE};margin:0;color:${C.alarm}`;
+        box.append(line);
+      }
+      box.addEventListener('change', (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLInputElement) && !(target instanceof HTMLSelectElement)) return;
+        const id = target.dataset['parameter'];
+        const row = block.rows.find((candidate) => candidate.control.id === id);
+        if (id === undefined || row === undefined) return;
+        const values = familyValuesOf(space, draft, spec.families);
+        const edit = applyControlEdit(space, values, id, familyValueFrom(row.control, target));
+        if (!edit.accepted) {
+          familyRefusal = { family: block.family, reason: edit.reason };
+          render();
+          return;
+        }
+        const value = edit.values.get(id);
+        if (value === undefined) return;
+        familyRefusal = undefined;
+        if (api.setWorkingSpec({ ...spec, families: prunedFamilyMoves(space, source, { ...spec.families, [id]: value }) }) !== undefined) {
+          render();
+        }
+      });
+      nodes.push(box);
     }
-    return wrap;
+    return nodes;
   }
 
   function drawTerms(): HTMLElement {
@@ -819,83 +988,78 @@ function mountWorkshop(
     return box;
   }
 
-  function drawBehaviour(): HTMLElement {
-    const spec = api.workingSpec();
-    const levers = api.groupLevers();
-    const view = behaviourBlockOf(spec, levers);
-    const wrap = section(doc, view.heading, view.boundary);
-    for (const flag of view.flags) {
-      const row = el(doc, 'div', 'everyday-workshop-flag');
-      row.style.cssText = `${CARD};display:flex;align-items:center;gap:14px;margin-bottom:${String(GAP.row)}px`;
-      row.title = flag.help;
-      const text = el(doc, 'div');
-      text.style.cssText = 'min-width:0;flex:1';
-      const label = el(doc, 'div', undefined, flag.label);
-      label.style.cssText = 'font-size:14px;font-weight:600';
-      const hint = el(doc, 'div', undefined, flag.hint);
-      hint.style.cssText = `font-size:12.5px;color:${C.warmGrey};line-height:1.45;margin-top:2px`;
-      text.append(label, hint);
-      row.append(
-        text,
-        toggle(doc, flag.on, flag.on ? 'on' : 'off', () => {
-          setFlag(flag.key, !flag.on);
-        }),
-      );
-      wrap.append(row);
+  /** The depth switch: three ways of reading one dispatcher. */
+  function drawDepth(): HTMLElement {
+    const wrap = el(doc, 'div', 'everyday-workshop-depth');
+    wrap.style.cssText = `margin-top:${String(GAP.wide)}px;display:flex;flex-direction:column;gap:6px`;
+    const label = el(doc, 'div', undefined, JOURNEY.depthLabel);
+    label.style.cssText = EYEBROW;
+    const row = el(doc, 'div');
+    row.setAttribute('role', 'group');
+    row.setAttribute('aria-label', JOURNEY.depthLabel);
+    row.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px';
+    for (const option of WORKSHOP_DEPTHS) {
+      const pill = toggle(doc, depth === option, JOURNEY.depths[option], () => {
+        depth = option;
+        familyRefusal = undefined;
+        render();
+      });
+      pill.dataset['depth'] = option;
+      row.append(pill);
     }
-    const groupHead = el(doc, 'div', undefined, view.groupHeading);
-    groupHead.style.cssText = `${EYEBROW};margin:${String(GAP.section)}px 0 8px`;
-    wrap.append(groupHead);
-    for (const lever of view.groupLevers) {
-      const row = el(doc, 'div', 'everyday-workshop-group-lever');
-      row.style.cssText = `${CARD};display:flex;align-items:center;gap:14px;margin-bottom:${String(GAP.row)}px`;
-      row.title = lever.help;
-      const text = el(doc, 'div');
-      text.style.cssText = 'min-width:0;flex:1';
-      const label = el(doc, 'div', undefined, lever.label);
-      label.style.cssText = 'font-size:14px;font-weight:600';
-      const hint = el(doc, 'div', undefined, lever.hint);
-      hint.style.cssText = `font-size:12.5px;color:${C.warmGrey};line-height:1.45;margin-top:2px`;
-      text.append(label, hint);
-      row.append(
-        text,
-        toggle(doc, lever.on, lever.on ? 'on' : 'off', () => {
-          api.setGroupLevers({ ...levers, [lever.key]: !lever.on });
-        }),
-      );
-      wrap.append(row);
-    }
-    /* The filters the weights cannot argue with, and what this document carries and cannot draw. */
+    const note = el(doc, 'p', 'everyday-workshop-depth-note', JOURNEY.depthNotes[depth]);
+    note.style.cssText = `${NOTE};margin:0`;
+    wrap.append(label, row, note);
+    return wrap;
+  }
+
+  /**
+   * The editor: one card per stage of a call, each headed by what this dispatcher does there.
+   *
+   * Every control the page had is still here, in the card for the moment it acts on. The sentence
+   * is `workshopJourney.ts#journeyOf` over the profile a save would write, so it moves with every
+   * control on the page.
+   */
+  function drawJourney(): HTMLElement {
+    const wrap = section(doc, JOURNEY.heading, JOURNEY.hint);
     const source = api.editingSource();
-    const constraints = constraintCardsOf(source);
-    if (constraints.length > 0) {
-      const head = el(doc, 'div', undefined, COPY.constraintsHeading);
-      head.style.cssText = `${EYEBROW};margin:${String(GAP.section)}px 0 6px`;
-      const hint = el(doc, 'p', undefined, COPY.constraintsHint);
-      hint.style.cssText = `${NOTE};margin:0 0 8px`;
-      wrap.append(head, hint);
-      for (const card of constraints) {
-        const row = el(doc, 'div', 'everyday-workshop-constraint');
-        row.style.cssText = `${CARD};margin-bottom:${String(GAP.row)}px`;
-        const name = el(doc, 'div', undefined, card.name);
-        name.style.cssText = 'font-size:13.5px;font-weight:600';
-        const effect = el(doc, 'div', undefined, card.effect);
-        effect.style.cssText = `${NOTE};margin-top:2px`;
-        row.append(name, effect);
-        wrap.append(row);
+    const built = builtProfileOf(
+      { spec: api.workingSpec(), levers: api.groupLevers(), selector: api.selectorSpec(), rows: api.ruleRows() },
+      source?.id ?? 'draft',
+      source,
+    );
+    const boundary = el(doc, 'p', 'everyday-workshop-boundary', COPY.zoningBoundary);
+    boundary.style.cssText = `${NOTE};margin:0`;
+    const body: Readonly<Record<JourneyStage, () => HTMLElement[]>> = {
+      calling: () => flagNodes('pool'),
+      eligible: () => constraintNodes(),
+      priorities: () => [...leverNodes('patience'), ...leverNodes('room'), drawTerms(), drawMaths()],
+      deciding: () => [...leverNodes('spread'), ...groupLeverNodes('express'), boundary],
+      rethinking: () => [],
+      landing: () => flagNodes('bypass'),
+      idle: () => leverNodes('lobby'),
+      day: () => [drawSwitching(), drawRules()],
+    };
+    for (const card of journeyOf(built)) {
+      const node = el(doc, 'section', 'everyday-workshop-stage');
+      node.dataset['stage'] = card.stage;
+      node.style.cssText = `${CARD};display:grid;grid-template-columns:28px minmax(0,1fr);gap:4px 12px;margin-bottom:${String(GAP.block)}px`;
+      const mark = el(doc, 'div', undefined, card.mark);
+      mark.setAttribute('aria-hidden', 'true');
+      mark.style.cssText = `grid-row:1 / span 2;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:${C.ink};color:${C.paper};font:500 12px ${TYPE.mono}`;
+      const title = el(doc, 'h2', undefined, card.title);
+      title.style.cssText = `font:600 16.5px ${TYPE.heading};margin:0;align-self:center`;
+      const readback = el(doc, 'p', 'everyday-workshop-readback-stage', card.readback);
+      readback.style.cssText = `font-size:13.5px;line-height:1.5;color:${C.inkSoft};margin:0;max-width:68ch`;
+      const controls = el(doc, 'div');
+      controls.style.cssText = `grid-column:2;display:flex;flex-direction:column;gap:${String(GAP.row)}px;min-width:0`;
+      controls.append(...body[card.stage](), ...familyNodes(card.stage));
+      node.append(mark, title, readback);
+      if (controls.childElementCount > 0) {
+        controls.style.marginTop = '8px';
+        node.append(controls);
       }
-    }
-    const carried = carriedBlocksOf(source);
-    if (carried.length > 0) {
-      const head = el(doc, 'div', undefined, COPY.carriedHeading);
-      head.style.cssText = `${EYEBROW};margin:${String(GAP.section)}px 0 6px`;
-      const hint = el(doc, 'p', undefined, COPY.carriedHint);
-      hint.style.cssText = `${NOTE};margin:0 0 8px`;
-      wrap.append(head, hint);
-      const list = el(doc, 'ul', 'everyday-workshop-carried');
-      list.style.cssText = `margin:0;padding-left:18px;${NOTE}`;
-      for (const entry of carried) list.append(el(doc, 'li', undefined, entry.words));
-      wrap.append(list);
+      wrap.append(node);
     }
     return wrap;
   }
@@ -1195,11 +1359,7 @@ function mountWorkshop(
       line.style.cssText = `${NOTE};margin:12px 0 0;max-width:64ch;color:${C.ink}`;
       column.append(line);
     }
-    column.append(drawLevers());
-    const optimising = section(doc, COPY.optimisingHeading);
-    optimising.append(drawTerms(), drawMaths());
-    column.append(optimising);
-    column.append(drawBehaviour(), drawSwitching(), drawRules());
+    column.append(drawDepth(), drawJourney());
     root.append(column);
     sideBySide(root, { fixed: left, fluid: column, fixedPx: WORKSHOP_RAIL_PX, gapPx: GAP.wide });
     /*

@@ -369,6 +369,41 @@ describe.skipIf(!HAS_BROWSER)('the Everyday dispatcher workshop', () => {
     await page.close();
   }, 120_000);
 
+  /**
+   * The editor is one call, start to finish: a card per stage, each headed by what the dispatcher
+   * does there, and at *Detailed* the simulator's own controls for that stage. A control moved
+   * there has to move the sentence, or the sentence is describing some other dispatcher.
+   */
+  it('reads each stage back, and rewrites the sentence when a Detailed control moves', async () => {
+    const page = await openShelf();
+    await page.click('.everyday-workshop-industry[data-profile-id="predictive-balanced"] .everyday-workshop-open');
+    await page.waitForSelector('.everyday-workshop-stage');
+    expect(await page.locator('.everyday-workshop-stage').count()).toBe(8);
+    const deciding = '.everyday-workshop-stage[data-stage="deciding"] .everyday-workshop-readback-stage';
+    expect(await page.textContent(deciding)).toContain('holds a call for 1.5 s');
+    // Simple draws no schema block; the settings are in force and the sentences say what they are.
+    expect(await page.locator('.everyday-workshop-family-block').count()).toBe(0);
+
+    await page.click('.everyday-workshop-depth [data-depth="detailed"]');
+    await page.waitForSelector('.everyday-workshop-family-block[data-family="timing"]');
+    expect(await page.locator('.everyday-workshop-family-caller').count()).toBe(0);
+    await page.selectOption(
+      '.everyday-workshop-family-block[data-family="timing"] select[data-parameter="dispatch.assignmentTiming"]',
+      'immediate',
+    );
+    await page.waitForFunction(
+      (selector) => document.querySelector(selector)?.textContent?.includes('the moment the call is made') === true,
+      deciding,
+      { timeout: 15_000 },
+    );
+    await stateReads(page, 'Your copy — not saved yet');
+
+    // Engineer adds what reads each block on a real run.
+    await page.click('.everyday-workshop-depth [data-depth="engineer"]');
+    await page.waitForSelector('.everyday-workshop-family-caller');
+    await page.close();
+  }, 120_000);
+
   it('offers only the actions the model declares — the two § 11.5 omits are unbuildable', async () => {
     const page = await openWorkshop();
     await page.click('.everyday-workshop-rule-add');
