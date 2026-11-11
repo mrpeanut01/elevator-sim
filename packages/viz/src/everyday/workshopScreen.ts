@@ -58,6 +58,7 @@ import { batchLibraryOf, savedProfilesOf } from '../batch/library.js';
 import { batchReport, type BatchReport } from '../batch/report.js';
 import type { BatchResult, BatchWorkerMessage, BatchWorkerRequest } from '../batch/types.js';
 import { builtProfileOf } from '../authoring/dispatcherShelf.js';
+import { plainControlWordsOf } from './plainControls.js';
 import {
   FORMULA_COPY,
   FORMULA_MAX_TERMS,
@@ -126,6 +127,7 @@ import {
   testBedProfilesOf,
   testBedRequestOf,
   testBedViewOf,
+  testBedBuildingLabelOf,
   testBedWorkingProfileOf,
   type TestBedChoice,
   type TestBedRow,
@@ -805,14 +807,14 @@ function mountWorkshop(
   /** The dock's choices, defaulted the first time it is drawn and kept across redraws. */
   function bedChoice(): TestBedChoice {
     if (bed.choice !== undefined) return bed.choice;
-    const shipped = api.shippedBuildingIds();
+    const offered = api.buildingIds();
     const standing = api.selection().buildingId;
     const source = api.editingSource();
     // The natural rival is the design this one was made from: *did my changes help* is asked of it.
     const basedOn = api.savedDispatchers().find((entry) => entry.id === source?.id)?.basedOn;
     const rival = api.dispatcherById(basedOn ?? source?.id ?? '') ?? api.dispatchers()[0];
     bed.choice = {
-      buildingId: shipped.includes(standing) ? standing : (shipped[0] ?? standing),
+      buildingId: offered.includes(standing) ? standing : (offered[0] ?? standing),
       crowdId: TEST_BED_DEFAULT_CROWD,
       rivalId: rival?.id ?? '',
       replications: BENCH_DEFAULT_REPLICATIONS,
@@ -841,6 +843,9 @@ function mountWorkshop(
     const working = workingProfile();
     const profiles = testBedProfilesOf(savedProfilesOf(api.savedDispatchers()), working);
     const library = batchLibraryOf(api.dispatcherProfilesFile(), profiles);
+    const ownBuilding = api.shippedBuildingIds().includes(choice.buildingId)
+      ? undefined
+      : api.buildingById(choice.buildingId);
     stopBed();
     bedToken += 1;
     const token = bedToken;
@@ -882,6 +887,8 @@ function mountWorkshop(
       kind: 'run',
       request: testBedRequestOf(choice, api.seed()),
       savedProfiles: profiles,
+      // The player's own tower rides the message; a shipped one is loaded on the worker's side.
+      ...(ownBuilding === undefined ? {} : { savedBuilding: ownBuilding }),
     } satisfies BatchWorkerRequest);
   }
 
@@ -932,7 +939,12 @@ function mountWorkshop(
       bedSelect(
         'building',
         TEST_BED.buildingLabel,
-        api.shippedBuildingIds().map((id) => ({ value: id, label: api.buildingById(id)?.name ?? id })),
+        // Shipped towers, then the player's own, marked: a result on a tower of theirs is about
+        // that tower, and the label says which kind it is before the run rather than after.
+        api.buildingIds().map((id) => ({
+          value: id,
+          label: testBedBuildingLabelOf(api.buildingById(id)?.name ?? id, !api.shippedBuildingIds().includes(id)),
+        })),
         choice.buildingId,
         (next) => {
           pick({ buildingId: next });
@@ -1063,6 +1075,20 @@ function mountWorkshop(
     const watch = el(doc, 'p', undefined, TEST_BED.watchNote);
     watch.style.cssText = `${NOTE};margin:0`;
     wrap.append(watch);
+    /*
+     * The way on to the Test bench — the screen that runs a field of dispatchers over every proof
+     * case. This dock answers *did my change help, here*; that one answers *across the board*, for
+     * dispatchers that are saved, and the note says the difference so the press is not a surprise.
+     */
+    const wider = el(doc, 'p', undefined, TEST_BED.benchNote);
+    wider.style.cssText = `${NOTE};margin:0`;
+    const toBench = el(doc, 'button', 'everyday-workshop-bed-bench', TEST_BED.benchLink);
+    toBench.type = 'button';
+    toBench.style.cssText = `align-self:flex-start;cursor:pointer;border:1.5px solid ${C.rule};border-radius:${String(R.pill)}px;background:transparent;padding:6px 14px;font:500 12px ${TYPE.mono};color:${C.ink}`;
+    toBench.addEventListener('click', () => {
+      context.go('bench');
+    });
+    wrap.append(wider, toBench);
     return wrap;
   }
 
@@ -1226,10 +1252,29 @@ function mountWorkshop(
         legend.style.cssText = `font:500 10.5px ${TYPE.mono};color:${C.label};padding:0 4px`;
         legend.hidden = depth !== 'engineer';
       }
+      /*
+       * At *Detailed* each setting is called by its plain name — `plainControls.ts` — with the
+       * simulator's field name kept on the label's `title` for anyone matching the page against a
+       * profile. *Engineer* keeps the field name itself, which is what that depth is for.
+       */
+      if (depth === 'detailed') {
+        for (const control of controls.querySelectorAll<HTMLElement>('.control[data-parameter]')) {
+          const id = control.dataset['parameter'] ?? '';
+          const words = plainControlWordsOf(id);
+          const label = control.querySelector<HTMLElement>('.control-label');
+          if (label !== null) {
+            label.title = label.textContent ?? '';
+            label.textContent = words.name;
+          }
+          const help = control.querySelector<HTMLElement>('.control-help');
+          if (help !== null && words.effect !== undefined) help.textContent = words.effect;
+        }
+      }
       box.append(controls);
       for (const row of block.rows) {
         if (row.overriddenBy === undefined) continue;
-        const note = el(doc, 'p', undefined, `${row.control.label} — ${row.overriddenBy}`);
+        const called = depth === 'detailed' ? plainControlWordsOf(row.control.id).name : row.control.label;
+        const note = el(doc, 'p', undefined, `${called} — ${row.overriddenBy}`);
         note.style.cssText = `${NOTE};margin:0;color:${C.terracotta}`;
         box.append(note);
       }

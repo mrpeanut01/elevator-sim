@@ -1431,6 +1431,14 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'Resolves the building a batch runs in. Its one string literal is the source label it ' +
+        'hands `core`’s `parseBuilding`, which appears only inside a thrown parse error about a ' +
+        'building the designer could not have saved — and a document reaches this function only ' +
+        'from the designer’s own save. The function returns a resolved building, never text.',
+      ids: ['batch/library.ts#batchBuildingOf'],
+    },
+    {
+      reason:
         'The id the workshop’s working copy rides to the batch worker under, and the two ' +
         'functions that put it on a request. It is a key, never a sentence: the arm is reported ' +
         'under the name `testBedWorkingProfileOf` gives it, which is swept, and ' +

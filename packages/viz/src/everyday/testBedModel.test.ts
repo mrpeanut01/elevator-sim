@@ -21,6 +21,7 @@ import {
   testBedRequestOf,
   testBedVerdictWordOf,
   testBedViewOf,
+  testBedBuildingLabelOf,
   testBedWorkingProfileOf,
 } from './testBedModel.js';
 
@@ -59,6 +60,13 @@ describe('the run a press makes', () => {
   it('offers rates, opens on one of them, and falls back to the building’s own profile for an unknown id', () => {
     expect(TEST_BED_CROWDS.map((crowd) => crowd.id)).toContain(TEST_BED_DEFAULT_CROWD);
     expect(testBedRequestOf({ ...choice, crowdId: 'no-such-crowd' }, 1n).arrivalRatePctPop5min).toBeNull();
+  });
+});
+
+describe('the building list', () => {
+  it('marks a tower of the player’s own, and leaves a shipped one as it is named', () => {
+    expect(testBedBuildingLabelOf('Midtown Office', false)).toBe('Midtown Office');
+    expect(testBedBuildingLabelOf('My tower', true)).toBe('My tower (yours)');
   });
 });
 

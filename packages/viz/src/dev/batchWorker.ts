@@ -30,8 +30,8 @@
  * next batch. A terminated batch reports nothing, which is correct: it has no result.
  */
 
-import { batchLibraryOf } from '../batch/library.js';
-import type { DispatcherProfile } from '@elevator-sim/core/browser';
+import { batchBuildingOf, batchLibraryOf } from '../batch/library.js';
+import type { BuildingConfig, DispatcherProfile } from '@elevator-sim/core/browser';
 
 import { runBatch } from '../batch/runBatch.js';
 import type {
@@ -79,11 +79,12 @@ function batchResourcesFor(
   loaded: BrowserResources,
   buildingId: string,
   savedProfiles: readonly DispatcherProfile[],
+  savedBuilding: BuildingConfig | undefined,
 ): BatchResources {
-  const building = loaded.buildings.find((candidate) => candidate.id === buildingId);
+  const building = batchBuildingOf(loaded.buildings, buildingId, savedBuilding, loaded.elevatorSpecs);
   if (building === undefined) {
     throw new Error(
-      `building "${buildingId}" is not in this build's data/. The batch has nothing to run.`,
+      `building "${buildingId}" is not in this build's data/ and was not sent with the request. The batch has nothing to run.`,
     );
   }
   const library = batchLibraryOf(loaded.dispatcherProfiles, savedProfiles);
@@ -102,6 +103,7 @@ async function handle(request: BatchWorkerRequest): Promise<void> {
     loaded,
     request.request.buildingId,
     request.savedProfiles ?? [],
+    request.savedBuilding,
   );
   const result = runBatch(request.request, batchResources, {
     clock: systemClock(),

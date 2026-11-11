@@ -415,6 +415,10 @@ describe.skipIf(!HAS_BROWSER)('the Everyday dispatcher workshop', () => {
     await page.click('.everyday-workshop-depth [data-depth="detailed"]');
     await page.waitForSelector('.everyday-workshop-family-block[data-family="timing"]');
     expect(await page.locator('.everyday-workshop-family-caller').count()).toBe(0);
+    // Detailed calls a setting by a plain name and keeps the simulator's field name on its title.
+    const timing = '.everyday-workshop-family-block[data-family="timing"] .control[data-parameter="dispatch.batchWindowS"] .control-label';
+    expect(await page.textContent(timing)).not.toMatch(/[a-z][A-Z]/u);
+    expect(await page.getAttribute(timing, 'title')).toBe('batchWindowS');
     await page.selectOption(
       '.everyday-workshop-family-block[data-family="timing"] select[data-parameter="dispatch.assignmentTiming"]',
       'immediate',
@@ -429,6 +433,7 @@ describe.skipIf(!HAS_BROWSER)('the Everyday dispatcher workshop', () => {
     // Engineer adds what reads each block on a real run.
     await page.click('.everyday-workshop-depth [data-depth="engineer"]');
     await page.waitForSelector('.everyday-workshop-family-caller');
+    expect(await page.textContent(timing)).toBe('batchWindowS');
 
     /*
      * Engineer is also where a priority of the player's own is written: a formula over the same

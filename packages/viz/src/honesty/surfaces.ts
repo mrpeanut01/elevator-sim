@@ -134,6 +134,7 @@ import {
   testBedWorkingProfileOf,
 } from '../everyday/testBedModel.js';
 import { JOURNEY_COPY, journeyOf } from '../everyday/workshopJourney.js';
+import { plainControlWordsOf } from '../everyday/plainControls.js';
 import {
   FORMULA_COPY,
   FORMULA_OP_ORDER,
@@ -726,6 +727,7 @@ import {
   profileFromSpec,
   specFromProfile,
   type DispatcherSpec,
+  familySpace,
 } from '../authoring/dispatcherSpec.js';
 import {
   classesFromSpecs,
@@ -17372,6 +17374,13 @@ const EVERYDAY_WORKSHOP: SurfaceAdapter = {
       text: formulaIssueOf([{ id: 'x', name: 'X', weight: 1, expression: { term: 'no-such-term' } }]) ?? '',
       role: 'reason',
     });
+
+    /* The Detailed depth's plain name, and effect where core authors one, for every setting it draws. */
+    for (const id of familySpace().byId.keys()) {
+      const words = plainControlWordsOf(id);
+      seeds.push({ field: `plain.${id}.name`, text: words.name, role: 'label' });
+      if (words.effect !== undefined) seeds.push({ field: `plain.${id}.effect`, text: words.effect, role: 'prose' });
+    }
 
     /* The arms no shipped profile reaches, manufactured so each sentence has been rendered once. */
     const journeyBase = file.profiles[0];

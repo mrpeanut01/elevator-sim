@@ -45,8 +45,8 @@ export const TEST_BED_RUN_S = 1800;
 export const TEST_BED_COPY = Object.freeze({
   heading: 'TEST BED',
   hint:
-    'Runs what you have here, saved or not, against another dispatcher on the same riders. The ' +
-    'building stays as shipped.',
+    'Runs what you have here, saved or not, against another dispatcher on the same riders, in a ' +
+    'shipped building or one you designed.',
   buildingLabel: 'Building',
   crowdLabel: 'How busy',
   rivalLabel: 'Against',
@@ -64,6 +64,10 @@ export const TEST_BED_COPY = Object.freeze({
     'or more than the building can clear. Try a lighter or heavier flow, or another building.',
   detailSummary: 'what each line means',
   watchNote: 'To watch it work for a day, use “Test simulation” below. One day is a look, not proof.',
+  benchNote:
+    'This tests one building at one flow. The Test bench runs up to four saved dispatchers over ' +
+    'every building and every kind of crowd.',
+  benchLink: 'Open the Test bench',
   failed: 'The test bed could not run this:',
 } as const);
 
@@ -158,6 +162,11 @@ export function testBedRequestOf(choice: TestBedChoice, seed: bigint): BatchRequ
     arrivalRatePctPop5min:
       TEST_BED_CROWDS.find((crowd) => crowd.id === choice.crowdId)?.ratePctPop5min ?? null,
   };
+}
+
+/** A building's name on the dock's list, with a tower of the player's own marked as theirs. */
+export function testBedBuildingLabelOf(name: string, own: boolean): string {
+  return own ? `${name} (yours)` : name;
 }
 
 /** The working copy as a profile the worker can run, and the name it is reported under. */
