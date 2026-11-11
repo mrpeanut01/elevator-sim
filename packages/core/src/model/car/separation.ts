@@ -401,6 +401,34 @@ export function admissibleHeightRangeM(
 }
 
 /** Whether `heightM` lies within a range returned by either function above. */
+/**
+ * **A sectored car's standing range** — `docs/11` § 3.2's regime R1, declared as
+ * `ShaftConfig.sectorBoundaryFloorId`.
+ *
+ * The lower car's sector ends at the boundary; the upper car's begins **one required gap above
+ * it**. So the two sectors are disjoint by at least the gap, any stop in one is legal against any
+ * stop in the other, and no pair of commitments can cross: the reachable set is static, which is
+ * what makes deadlock impossible by construction rather than prevented by a rule.
+ *
+ * `docs/11` § 3.2 sketches R1 as *"overlapping only at k"*, and this is deliberately narrower.
+ * With both cars allowed to stop at `k` the pair can still block each other whenever the gap
+ * exceeds a floor pitch: at a 4 m pitch and a 6 m gap, the lower car one floor below `k` and the
+ * upper car one floor above it are 8 m apart and legal, each holds a stop at `k`, and each needs
+ * the other to move first. A sector that is only deadlock-free for some clearances is not R1.
+ *
+ * Always inside {@link admissibleHeightRangeM}, since the boundary is a floor of the shaft.
+ */
+export function sectorHeightRangeM(
+  role: ShaftRole,
+  boundaryHeightM: number,
+  separation: ShaftSeparation,
+  span: ShaftSpanM,
+): readonly [number, number] {
+  return role === 'lower'
+    ? [span.lowestHeightM, boundaryHeightM]
+    : [boundaryHeightM + requiredGapM(separation), span.highestHeightM];
+}
+
 export function withinRange(heightM: number, range: readonly [number, number]): boolean {
   return heightM >= range[0] && heightM <= range[1];
 }
