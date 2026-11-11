@@ -8,13 +8,14 @@ import {
   lobbyPoint,
   lobbyPress,
   lobbyTimingsFor,
-  lobbyTurnKey,
   lobbyViewOf,
 } from './lobbyModel.js';
+import { EVERYDAY_MODES } from './modes.js';
 import { isScreenBuilt } from './screens.js';
 
 /**
- * The lobby's machine — § D1445 as redrawn by [§ D1627](../../../../DECISIONS.md).
+ * The lobby's machine — § D1445 as redrawn by [§ D1627](../../../../DECISIONS.md) and made the
+ * main menu by [§ D1628](../../../../DECISIONS.md).
  *
  * The machine is small on purpose, and what these cases hold is the reason: a press is the whole
  * trip from any state, and nothing the model owns can be waited on.
@@ -35,9 +36,12 @@ describe('the lobby', () => {
     expect(lobbyViewOf(LOBBY_INITIAL, { firstVisit: true }).body).toContain(LOBBY_COPY.firstVisit);
     expect(lobbyViewOf(LOBBY_INITIAL, { firstVisit: false }).body).not.toContain(LOBBY_COPY.firstVisit);
     expect(lobbyViewOf(LOBBY_INITIAL).body).not.toContain(LOBBY_COPY.firstVisit);
-    /* And the sentence is true: the walkthrough is a room on the floor it names. */
+    /* And the button for it is offered on a first visit only, where the sentence is. */
+    expect(lobbyViewOf(LOBBY_INITIAL, { firstVisit: true }).offerWalkthrough).toBe(true);
+    expect(lobbyViewOf(LOBBY_INITIAL, { firstVisit: false }).offerWalkthrough).toBe(false);
+    expect(lobbyViewOf(LOBBY_INITIAL).offerWalkthrough).toBe(false);
+    /* The walkthrough is also a room on the lobby's own floor, for anybody who comes back for it. */
     const lobby = GAME_FLOORS.find((floor) => floor.key === 'L');
-    expect(LOBBY_COPY.firstVisit).toContain('floor L');
     expect(lobby?.rooms.map((room) => room.screen)).toContain('tutorial');
   });
 
@@ -65,44 +69,36 @@ describe('the lobby', () => {
     expect(lobbyPoint(pointed, '1')).not.toBe(pointed);
   });
 
-  it('names every room on a landing, so the player knows what is behind the door', () => {
+  it('hands every room on a landing over as its own press', () => {
     const view = lobbyViewOf(LOBBY_INITIAL);
     for (const floor of GAME_FLOORS) {
       const landing = view.landings.find((candidate) => candidate.key === floor.key);
-      for (const room of floor.rooms) expect(landing?.rooms).toContain(room.label);
-      if (floor.rooms.length === 0) expect(landing?.rooms).toBe('');
+      expect(landing?.rooms).toEqual(floor.rooms);
     }
   });
 
   /*
-   * § D1627's rule in the model's own terms. The § D1445 machine refused a floor before CALL and
-   * CLOSE with nothing chosen; this one has no state a press is refused in.
+   * § D1628: the lobby is the menu, so its own landing is where the player stands and is not a
+   * press. Every other landing opens, the three on top being the three mode tiles.
    */
-  it('lets a press step out from any state, onto the floor pressed, with no state it is refused in', () => {
-    const states = [
-      LOBBY_INITIAL,
-      lobbyTurnKey(LOBBY_INITIAL),
-      ...GAME_FLOOR_ORDER.map((key) => lobbyPoint(LOBBY_INITIAL, key)),
-    ];
-    for (const state of states) {
-      for (const floor of GAME_FLOORS) {
-        const press = lobbyPress(state, floor.key);
-        expect(press.floor).toBe(floor);
-        expect(press.engineer).toBe(state.keyOn);
-        expect(isScreenBuilt(press.floor.screen), `${floor.key} opens a built screen`).toBe(true);
-      }
-    }
+  it('opens every landing but its own, and the three on top are the modes', () => {
+    const view = lobbyViewOf(LOBBY_INITIAL);
+    expect(view.landings.filter((landing) => !landing.opens).map((landing) => landing.key)).toEqual(['L']);
+    expect(view.landings.slice(0, 3).map((landing) => landing.name)).toEqual(EVERYDAY_MODES.map((mode) => mode.title));
   });
 
-  it('turns the Engineer key both ways, and says what it does only while it is turned', () => {
-    const on = lobbyTurnKey(LOBBY_INITIAL);
-    expect(lobbyViewOf(on).keyOn).toBe(true);
-    expect(lobbyViewOf(on).keyNote).toBe(LOBBY_COPY.engineerNote);
-    const off = lobbyTurnKey(on);
-    expect(lobbyViewOf(off).keyOn).toBe(false);
-    expect(lobbyViewOf(off).keyNote).toBe('');
-    /* The key does not move the car or forget the landing. */
-    expect(lobbyTurnKey(lobbyPoint(LOBBY_INITIAL, '3')).car).toBe('3');
+  /*
+   * § D1627's rule in the model's own terms. The § D1445 machine refused a floor before CALL and
+   * CLOSE with nothing chosen; this one has no state at all behind a press.
+   */
+  it('lets a press step out onto the floor pressed, with no state it depends on', () => {
+    for (const floor of GAME_FLOORS) {
+      if (floor.key === 'L') continue;
+      const pressed = lobbyPress(floor.key);
+      expect(pressed).toBe(floor);
+      expect(isScreenBuilt(pressed.screen), `${floor.key} opens a built screen`).toBe(true);
+      for (const room of pressed.rooms) expect(isScreenBuilt(room.screen), room.label).toBe(true);
+    }
   });
 
   /*

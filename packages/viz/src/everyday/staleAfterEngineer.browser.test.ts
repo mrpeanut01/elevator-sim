@@ -41,8 +41,8 @@ import {
   enterEngineerStage,
   leaveTutorialIfOffered,
   openEverydayDoor,
+  openLandingFromLobby,
   openPage,
-  skipTheLobby,
   returnToEverydayMode,
   startShippedSite,
   type ShippedSite,
@@ -78,7 +78,6 @@ const RUN_IDLE = 'Run this shift';
  */
 async function coldLoad(): Promise<Page> {
   const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
-  await skipTheLobby(page);
   await page.goto(`${origin}?building=garden-apartments&seed=424242&duration=300`, {
     waitUntil: 'load',
   });
@@ -157,11 +156,12 @@ describe.skipIf(!HAS_BROWSER)('a screen covered while the Engineer surface has t
     const page = await coldLoad();
     try {
       /*
-       * A fresh context is a first visit, so `shell.ts#offerTutorial` puts this page up — and the
-       * call to action it draws is the first-session one, which opens the walkthrough rather than
-       * a scenario. That is the state the Engineer surface is about to invalidate.
+       * A fresh context is a first visit. Since § D1628 nothing sends it here, so the page is opened
+       * by the lobby's own *What this is* — and the call to action it draws is the first-session
+       * one, which opens the walkthrough rather than a scenario. That is the state the Engineer
+       * surface is about to invalidate.
        */
-      await page.waitForSelector('.everyday-landing', { timeout: 30_000 });
+      await openLandingFromLobby(page);
       const before = await page.evaluate(() => ({
         label: document.querySelector('.everyday-landing-cta')?.textContent ?? '',
         screen: document.querySelector<HTMLElement>('.everyday-landing-cta')?.dataset['screen'] ?? '',

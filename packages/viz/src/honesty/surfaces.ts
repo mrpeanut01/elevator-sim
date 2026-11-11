@@ -652,15 +652,7 @@ import {
 } from '../everyday/landingView.js';
 import { GAME_FLOORS } from '../everyday/floors.js';
 import { TEST_SIMULATION_LABEL } from '../everyday/types.js';
-import {
-  LOBBY_COPY,
-  LOBBY_INITIAL,
-  lobbyPoint,
-  lobbyPress,
-  lobbyTurnKey,
-  lobbyViewOf,
-  type LobbyState,
-} from '../everyday/lobbyModel.js';
+import { LOBBY_COPY, LOBBY_INITIAL, lobbyPoint, lobbyViewOf, type LobbyState } from '../everyday/lobbyModel.js';
 import {
   SURVIVOR_COPY,
   survivorSentenceFor,
@@ -11420,11 +11412,6 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
      * shipped default, so the row is never swept in one state only.
      */
     'everyday/audio.ts#SOUND_ROW_COPY',
-    /*
-     * § D1445's *Skip the lobby* row. Both faces are reached: `muted` below also carries
-     * `skipLobby: true`, and every other case draws the default.
-     */
-    'everyday/settingsView.ts#LOBBY_ROW_COPY',
   ],
   render(context) {
     void context;
@@ -11508,7 +11495,7 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
        * without it the row's `off` face would ship unswept — which is the defect `keyedPlate`
        * shipped for a whole milestone and this corpus exists to catch.
        */
-      ['muted', { profile: stored, reduceMotion: false, soundOn: false, skipLobby: true }],
+      ['muted', { profile: stored, reduceMotion: false, soundOn: false }],
       /*
        * GitHub issue #368's tally in the two arms a balance of zero cannot reach — the review of
        * PR #485, medium 8. Every case above constructs no `chimeBalance`, so `balanceLineOf` drew
@@ -18218,15 +18205,15 @@ const EVERYDAY_LANDING: SurfaceAdapter = {
  * -------------------------------------------------------------------------- */
 
 /**
- * **The hall a cold launch opens on, at every landing of its machine** — § D1445 as redrawn by
- * [§ D1627](../../../../DECISIONS.md).
+ * **The lobby, which is the main menu, at every landing of its machine** — § D1445 as redrawn by
+ * [§ D1627](../../../../DECISIONS.md) and made one screen with the menu by
+ * [§ D1628](../../../../DECISIONS.md).
  *
  * `everyday/lobbyModel.ts` carries the words and the small machine; `everyday/lobbyScreen.ts` is the
  * mount and is excluded on the DOM mounts' shared ground. The display changes with the landing the
- * car is pointed at, the key and the first-visit question, so the drive below points at every
- * landing in turn with the key each way, for a first visit and a return, and seeds each state's
- * whole view. Every landing's press is read too: the floor it names is the floor the display
- * described.
+ * car is pointed at and the first-visit question, so the drive below points at every landing in
+ * turn, for a first visit and a return, and seeds each state's whole view, every room's label
+ * among it.
  *
  * The floors themselves are `everyday/floors.ts`'s, which the tray's shaft draws as well; they are
  * claimed here because this surface draws every word of them (name, body, status and the rooms).
@@ -18259,26 +18246,21 @@ const EVERYDAY_LOBBY: SurfaceAdapter = {
       push(`lobby.${arm}.title`, view.title, 'label');
       push(`lobby.${arm}.body`, view.body, 'prose');
       push(`lobby.${arm}.status`, view.status, 'prose');
-      push(`lobby.${arm}.keyNote`, view.keyNote, 'reason');
+      if (view.offerWalkthrough) push(`lobby.${arm}.walkthrough`, LOBBY_COPY.walkthrough, 'label');
       for (const landing of view.landings) {
         push(`lobby.${arm}.landing.${landing.key}.name`, landing.name, 'label');
         push(`lobby.${arm}.landing.${landing.key}.body`, landing.body, 'prose');
-        push(`lobby.${arm}.landing.${landing.key}.status`, landing.status, 'prose');
-        push(`lobby.${arm}.landing.${landing.key}.rooms`, landing.rooms, 'label');
+        push(`lobby.${arm}.landing.${landing.key}.status`, landing.opens ? landing.status : LOBBY_COPY.here, 'prose');
+        for (const room of landing.rooms) {
+          push(`lobby.${arm}.landing.${landing.key}.room.${room.screen}`, room.label, 'label');
+        }
       }
     };
 
     for (const firstVisit of [true, false]) {
       const who = firstVisit ? 'first' : 'returning';
       seed(`${who}.welcome`, LOBBY_INITIAL, firstVisit);
-      seed(`${who}.welcome.engineerKey`, lobbyTurnKey(LOBBY_INITIAL), firstVisit);
-      for (const floor of GAME_FLOORS) {
-        const pointed = lobbyPoint(LOBBY_INITIAL, floor.key);
-        seed(`${who}.pointed.${floor.key}`, pointed, firstVisit);
-        seed(`${who}.pointed.${floor.key}.engineer`, lobbyTurnKey(pointed), firstVisit);
-        /* The press names the floor the display described, in the view the key says. */
-        push(`lobby.${who}.press.${floor.key}.name`, lobbyPress(pointed, floor.key).floor.name, 'label');
-      }
+      for (const floor of GAME_FLOORS) seed(`${who}.pointed.${floor.key}`, lobbyPoint(LOBBY_INITIAL, floor.key), firstVisit);
     }
 
     /* What the design floor calls its run: the bar's primary there, and the tray's word for its stage. */

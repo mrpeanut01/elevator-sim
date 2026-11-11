@@ -78,7 +78,7 @@ describe('the shaft is the whole building, and the car is where the player is', 
   });
 
   it('keeps every room the DESIGN and WORLD groups offered one press away, from every state', () => {
-    const always: readonly EverydayScreen[] = ['workshop', 'bench', 'designer', 'lobby', 'landing', 'week', 'board'];
+    const always: readonly EverydayScreen[] = ['workshop', 'bench', 'designer', 'tutorial', 'landing', 'week', 'board'];
     for (const ctx of RUN_CONTEXTS) {
       for (const inCampaign of [false, true]) {
         expect(screensOf(ctx, inCampaign)).toEqual(expect.arrayContaining([...always]));

@@ -99,11 +99,10 @@ export const GAME_FLOORS: readonly GameFloor[] = Object.freeze([
     key: 'L' as const,
     name: 'Lobby',
     group: 'LOBBY' as const,
-    body: 'The front desk. The main menu, the walkthrough, and what this game is.',
+    body: 'The front desk, and the main menu. Every floor starts here, with the walkthrough and what this game is.',
     status: '',
     screen: 'menu' as const,
     rooms: Object.freeze([
-      Object.freeze({ screen: 'lobby' as const, label: 'Elevator hall' }),
       Object.freeze({ screen: 'tutorial' as const, label: 'How this works' }),
       Object.freeze({ screen: 'landing' as const, label: 'What this is' }),
     ]),
@@ -144,7 +143,6 @@ export function gameFloorOf(key: GameFloorKey): GameFloor {
 export function floorOfScreen(state: EverydayState, test = false): GameFloorKey {
   switch (state.screen) {
     case 'menu':
-    case 'lobby':
     case 'landing':
     case 'tutorial':
     case 'collapse':

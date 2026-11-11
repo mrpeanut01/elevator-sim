@@ -202,7 +202,7 @@ async function coldLoad(): Promise<Page> {
  */
 
 describe.skipIf(!HAS_BROWSER)('the app opens on Everyday Mode', () => {
-  it('draws the menu, the rail and the three mode tiles — not the Engineer menu', async () => {
+  it('draws the lobby, the rail and the three mode tiles — not the Engineer menu', async () => {
     const page = await coldLoad();
     await leaveTutorialIfOffered(page);
     try {
@@ -219,7 +219,8 @@ describe.skipIf(!HAS_BROWSER)('the app opens on Everyday Mode', () => {
       expect(front.rails).toBe(1);
       // § 3.5: the front door is not overridable, and a deep link is what would override it. The
       // load above carries two query parameters and still lands here.
-      expect(front.lede).toContain('Pick a way to play');
+      /* § D1628: the front door is the lobby, and its welcome is the menu's lede now. */
+      expect(front.lede).toContain('Every floor is a way to play');
       expect(front.engineerMenuHidden).toBe(true);
     } finally {
       await page.close();

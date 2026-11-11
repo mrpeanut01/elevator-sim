@@ -388,9 +388,6 @@ export function sublineFor(state: EverydayState): string {
   switch (state.screen) {
     case 'menu':
       return 'YOU ARE HERE';
-    /* § D1445's lobby. The rail is stepped aside while it shows, so this is the word it would say. */
-    case 'lobby':
-      return 'IN THE LOBBY';
     /*
      * GitHub issue #244's landing page. Bare words for the same reason the two arms below carry
      * them: the run this page plays is its own block's, not the shell's transport, so there is no

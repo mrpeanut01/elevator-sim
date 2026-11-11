@@ -62,7 +62,6 @@ import { openTowerOf } from '../campaign/career.js';
 import type { WeekState } from '../shift/types.js';
 import { actionBarFor, confirmStripFor, testSimulationBarOf, TIMELINE_STEPS } from './actionBar.js';
 import type { ActionBarModel } from './actionBar.js';
-import { BUILD_NOTES_POINTER } from './buildNotes.js';
 import { HOST_PENDING_REASON } from './host.js';
 import type { EverydayHost, EverydayHostSlot } from './host.js';
 import { EVERYDAY_MODES, isPlayable } from './modes.js';
@@ -73,8 +72,7 @@ import { everydayProfileStore } from './profileStore.js';
 import { REDUCED_MOTION_QUERY } from '../dev/motion.js';
 import { engineerSettings } from './engineerBridge.js';
 import { floorDirection, floorOfScreen, gameFloorOf, type GameFloorKey } from './floors.js';
-import { mountLobby } from './lobbyScreen.js';
-import { everydayLobbyStore } from './lobbyStore.js';
+import { LOBBY_GROUND, mountLobby } from './lobbyScreen.js';
 import { filedDaysOf, tutorialIsDue } from './tutorialModel.js';
 import {
   RAIL_DRAWER_COPY,
@@ -111,7 +109,7 @@ import {
   EVERYDAY_RAIL_SURFACES as RAIL_SURFACE,
   EVERYDAY_TYPE as TYPE,
 } from './tokens.js';
-import type { EverydayMode, EverydayModePick, EverydayScreen, EverydayState, RunContext } from './types.js';
+import type { EverydayModePick, EverydayScreen, EverydayState, RunContext } from './types.js';
 import {
   EVERYDAY_ROOT,
   EVERYDAY_ROOT_CLASS,
@@ -363,13 +361,11 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
   // § D525: the first tile is Scenario, so it is what the shell opens selected. This read
   // `'today'` until that ruling retired the tile the pick named.
   /*
-   * **A cold launch opens the lobby** — [§ D1445](../../../../DECISIONS.md), the product owner's
-   * ruling that the elevator cold-open is the first screen for everybody, first visit included,
-   * unless Settings → *Skip the lobby* is on. With it on, the front door is exactly what it was:
-   * the menu, and on a first visit the landing page through {@link offerTutorial}.
+   * **The page opens on the lobby, which is the root** — [§ D1628](../../../../DECISIONS.md). The
+   * lobby § D1445 put in front of the menu and the menu are one screen now, so there is no cold
+   * screen to choose and no setting that chooses one.
    */
-  const coldScreen: EverydayScreen = everydayLobbyStore().skip() ? EVERYDAY_ROOT : 'lobby';
-  let state: EverydayState = { screen: coldScreen, ctx: 'daily', modePick: 'scenario' };
+  let state: EverydayState = { screen: EVERYDAY_ROOT, ctx: 'daily', modePick: 'scenario' };
 
   /** § 3.4's latch — see {@link EverydayShell.setRunOpen}. */
   let runOpen = false;
@@ -396,8 +392,8 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
   let mounted: MountedEverydayScreen | undefined;
 
   /**
-   * Whether the last paint of the screen region was one of the two waiting states —
-   * {@link drawFrontDoorPending}'s or {@link drawHostPending}'s — so {@link connectDataHost}
+   * Whether the last paint of the screen region was {@link drawHostPending}'s waiting state, so
+   * {@link connectDataHost}
    * redraws exactly what the arriving host unblocks and nothing else.
    *
    * A flag rather than re-deriving the condition, because the condition is *what was drawn* and
@@ -433,15 +429,6 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
    * docstring can say what it measures.
    */
   const sessionClock = systemClock();
-  /** Whether this shell has already asked whether the tutorial is due — see `offerTutorial`. */
-  /*
-   * Spent from the start when the page opens on the lobby: the lobby **replaces** the first-arrival
-   * offer (§ D1445), and the walkthrough is a room on its own floor (§ D1627). Without this a player
-   * who pressed the lobby's own landing before the host published would be bounced to the landing page the moment
-   * it did, which is the front door moving under a reader that § D844 exists to prevent.
-   */
-  let tutorialOffered = coldScreen === 'lobby';
-
   const root = el(doc, 'div', EVERYDAY_ROOT_CLASS);
 
   /*
@@ -789,12 +776,6 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
   /** Which geometry is on the screen, so a media change that changes nothing does nothing. */
   let narrow: boolean | undefined;
   /**
-   * Whether the lobby has the whole viewport — {@link applyChrome}. Declared here, ahead of the first
-   * {@link applyWidth} call below, because that call reads it while the shell is still being built.
-   */
-  let bare = false;
-
-  /**
    * The drawer's own dismiss, built once and re-appended by every {@link drawRail}.
    *
    * `drawRail` empties the rail on every navigation, so a close button created inside it would be a
@@ -841,12 +822,23 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
    * it repeatedly; re-applying the narrow geometry would close a drawer the player has open under
    * their finger, and re-applying the wide one would keep re-writing three `cssText`s per frame.
    */
+  /**
+   * The screen region's own skin, for this width and this screen. The lobby stands on its own dark
+   * ground edge to edge (§ D1628), so the region gives up its paper and its inset while the lobby
+   * shows; every other screen gets § 3.1's region as it was.
+   */
+  function paintRegion(): void {
+    const skin = narrow === true ? REGION_NARROW : REGION_WIDE;
+    screenRegion.style.cssText =
+      state.screen === EVERYDAY_ROOT ? `${skin};padding:0;background:${LOBBY_GROUND}` : skin;
+  }
+
   function applyWidth(isNarrow: boolean): void {
     if (narrow === isNarrow) return;
     narrow = isNarrow;
     root.style.cssText = isNarrow ? NARROW : FULL;
     narrowHeader.style.display = isNarrow ? 'flex' : 'none';
-    screenRegion.style.cssText = isNarrow ? REGION_NARROW : REGION_WIDE;
+    paintRegion();
     bar.style.cssText = isNarrow ? BAR_NARROW : BAR_SKIN;
     railClose.style.display = isNarrow ? 'flex' : 'none';
     if (isNarrow) {
@@ -858,8 +850,6 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
       drawerOpen = false;
       railToggle.setAttribute('aria-expanded', 'false');
     }
-    /* The lobby keeps the whole viewport across a width change — see {@link applyChrome}. */
-    if (bare) paintBare();
   }
 
   railClose.addEventListener('click', () => {
@@ -1811,7 +1801,7 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
   function placeRailCar(floor: GameFloorKey): void {
     if (railCar === undefined) return;
     const { car, rope, leaves, anchor } = railCar;
-    /* A tray that is not laid out (the closed drawer, the lobby's bare viewport) has no boxes to read. */
+    /* A tray that is not laid out (the closed drawer) has no boxes to read. */
     if (anchor.offsetParent === null) {
       railCarFloor = floor;
       railCarTop = undefined;
@@ -2889,56 +2879,6 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
   }
 
   /**
-   * The front door's own heading and lede — drawn by **both** of its states.
-   *
-   * Shared rather than copied because the second state is the same screen with its tiles not yet
-   * offered (see {@link draw}'s `'menu'` arm), and a waiting room that did not look like the front
-   * door would be a second screen for one moment of one screen's life.
-   */
-  function frontDoorHead(): readonly HTMLElement[] {
-    const h = el(doc, 'h1', undefined, 'Elevator Sim');
-    h.style.cssText = `margin:0 0 4px;font:700 26px ${TYPE.heading};letter-spacing:-.02em`;
-    const lede = el(
-      doc,
-      'p',
-      undefined,
-      'Pick a way to play. Every mode runs the same simulator on the same seeds — what changes is how long you are in it and what it asks of you.',
-    );
-    lede.style.cssText = `margin:0 0 22px;color:${C.inkSoft};max-width:62ch;font-size:13px;line-height:1.5`;
-    return [h, lede];
-  }
-
-  /**
-   * The front door before the first-arrival question has an answer — its own words, and the
-   * shell's standing sentence for a screen waiting on the host.
-   *
-   * {@link drawHostPending}'s shape rather than {@link drawHostPending} itself, and the difference
-   * is one line of copy: that function heads a screen with `SCREEN_NAMES`, which for this route is
-   * *Main menu*. The front door already has a name a stranger can read, and the first screen
-   * anybody sees is not the place to introduce the router's vocabulary. No sentence is invented —
-   * the heading, the lede and {@link HOST_PENDING_REASON} all ship today.
-   */
-  function drawFrontDoorPending(): void {
-    drewPending = true;
-    screenRegion.replaceChildren();
-    const waiting = el(doc, 'p', undefined, HOST_PENDING_REASON);
-    waiting.style.cssText = `color:${C.inkSoft};font-size:13px;max-width:60ch;line-height:1.5`;
-    screenRegion.append(...frontDoorHead(), waiting);
-  }
-
-  function drawMenu(): void {
-    screenRegion.replaceChildren();
-    screenRegion.append(...frontDoorHead());
-
-    const list = el(doc, 'div');
-    list.style.cssText = `display:flex;flex-direction:column;gap:${String(GAP.row + 2)}px;max-width:640px`;
-    const resume = continueWeekTile();
-    if (resume !== undefined) list.append(resume);
-    for (const mode of EVERYDAY_MODES) list.append(modeTile(mode));
-    screenRegion.append(list, buildNotesPointer());
-  }
-
-  /**
    * *Continue your week* — swarm DN's Q2.4, lane AL-F, [§ D1228](../../../../DECISIONS.md). One
    * entry above the tiles while a Scenario week is under way, derived from the week on every draw
    * (`everyday/continueWeek.ts`), so nothing is stored for it and the page still opens here (§ 3.5).
@@ -2951,6 +2891,42 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
    * the door's *Set up today*, which only navigates. So a day reached here and one reached through
    * the door cannot differ.
    */
+  /**
+   * **The lobby: the front door and the main menu, one screen** —
+   * [§ D1628](../../../../DECISIONS.md). The shell's own route, because it draws before the host
+   * publishes; `lobbyScreen.ts` is the mount and these are its ports.
+   *
+   * A play landing commits exactly as the menu's tile did — § 18's `ctx` follows the mode and is set
+   * **here** rather than inferred from the screen, because `stage` and `report` are one component
+   * per flow and § 3.3 splits their bar rows by `ctx` — and then goes to the floor's screen, on the
+   * frame of the press ([§ D1627](../../../../DECISIONS.md)).
+   *
+   * **It does not wait for the host, and it does not bounce a first visit.** § D844 held the menu's
+   * tiles back until the host published, because the first-arrival offer replaced the front door
+   * the moment it did and a press in that window landed on a removed node. § D1445 already ruled
+   * that the lobby replaces that offer, and with one screen there is nothing left to replace it:
+   * a first visit is told where the walkthrough is and handed a button for it, and the page stays
+   * where the player is looking. A landing pressed before the host arrives opens its screen's own
+   * waiting sentence ({@link drawHostPending}), which says what it is waiting for.
+   */
+  function drawLobby(): void {
+    screenRegion.replaceChildren();
+    mounted = mountLobby(screenRegion, {
+      stepOut: (floor) => {
+        if (floor.pick !== undefined) {
+          const ctx: RunContext = floor.pick === 'campaign' ? 'campaign' : floor.pick === 'rush' ? 'rush' : 'daily';
+          state = { ...state, modePick: floor.pick, ctx };
+        }
+        go(floor.screen);
+      },
+      openRoom: (screen) => {
+        go(screen);
+      },
+      firstVisit: () => (dataHost === undefined ? undefined : firstVisitOf(dataHost)),
+      continueTile,
+    });
+  }
+
   function continueWeekEntryNow(): ReturnType<typeof continueWeekEntryOf> {
     if (dataHost === undefined) return undefined;
     const host = dataHost;
@@ -2985,7 +2961,7 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     }
   }
 
-  function continueWeekTile(): HTMLElement | undefined {
+  function continueTile(): HTMLElement | undefined {
     const entry = continueWeekEntryNow();
     if (entry === undefined) return undefined;
     const tile = el(doc, 'button', 'everyday-continue-week');
@@ -3016,81 +2992,6 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
   }
 
   /**
-   * One line under the tiles saying where the build's own list of missing things is.
-   *
-   * **This replaces the register itself, and the replacement is the whole of GitHub issue #207.**
-   * The front door used to draw all five of the shell's absences here — **under** the tiles, not
-   * above them, and measured rather than guessed: at roughly 1 120 characters against the four
-   * tiles' 490 it was the largest single block of text on the screen, written in the team's
-   * vocabulary, for a player who had not asked what was missing. The register is not deleted: it
-   * is on the settings screen with the other five, where a reader who wants it goes to find it
-   * (`everyday/buildNotes.ts`).
-   *
-   * **A pointer rather than nothing, deliberately.** A register is worth the number of people who
-   * read it, and a panel nobody can find is a constant no renderer touches wearing a screen. One
-   * sentence naming where it is costs the front door a line and keeps the list reachable from the
-   * first thing anybody sees.
-   */
-  function buildNotesPointer(): HTMLElement {
-    const note = el(doc, 'p', 'everyday-menu-build-note', BUILD_NOTES_POINTER);
-    note.style.cssText = `margin:${String(GAP.wide)}px 0 0;max-width:640px;font-size:12px;color:${C.warmGrey}`;
-    return note;
-  }
-
-  function modeTile(mode: EverydayMode): HTMLElement {
-    const playable = isPlayable(mode);
-    const tile = el(doc, 'button', 'everyday-mode');
-    tile.type = 'button';
-    tile.disabled = !playable;
-    tile.setAttribute('data-screen', mode.screen);
-    tile.style.cssText = [
-      'text-align:left',
-      'display:block',
-      'width:100%',
-      'padding:14px 16px',
-      `border:1px solid ${C.rule}`,
-      `border-radius:${String(R.tile)}px`,
-      `background:${C.card}`,
-      `color:${C.ink}`,
-      'cursor:' + (playable ? 'pointer' : 'not-allowed'),
-      'opacity:' + (playable ? '1' : '.62'),
-    ].join(';');
-
-    const title = el(doc, 'div', undefined, mode.title);
-    title.style.cssText = `font:600 15px ${TYPE.heading}`;
-    const blurb = el(doc, 'div', undefined, mode.blurb);
-    blurb.style.cssText = `font-size:13px;color:${C.inkSoft};margin-top:3px`;
-    const shape = el(doc, 'div', undefined, mode.shape);
-    shape.style.cssText = `font:500 11px ${TYPE.mono};color:${C.label};margin-top:6px`;
-    tile.append(title, blurb, shape);
-
-    if (!playable) {
-      /*
-       * The refusal is drawn, not only a `title` attribute: a tooltip is not a sentence a player
-       * reads, and the handoff requires the control to *say* it does not reach the simulation.
-       */
-      const why = el(doc, 'div', undefined, mode.unavailable ?? '');
-      why.style.cssText = `font-size:11px;color:${C.terracotta};margin-top:8px`;
-      tile.append(why);
-    } else {
-      tile.addEventListener('click', () => {
-        /*
-         * § 18's `ctx` follows the mode the tile commits to, and it is set **here** rather than
-         * inferred from the screen: `stage` and `report` are one component per flow, § 3.3 splits
-         * their bar rows by `ctx`, and `rail.ts` draws the `CAMPAIGN` group only inside one. A
-         * campaign entered with `ctx: 'daily'` would put the daily timeline under § 8's screens
-         * and hide the group that navigates them.
-         */
-        const ctx: RunContext =
-          mode.pick === 'campaign' ? 'campaign' : mode.pick === 'rush' ? 'rush' : 'daily';
-        state = { ...state, modePick: mode.pick, ctx };
-        go(mode.screen);
-      });
-    }
-    return tile;
-  }
-
-  /**
    * The router's refusal screen — a sentence a player reads, never a blank region.
    *
    * The sentence is `screens.ts`'s, the same one the rail caption and the mode tiles carry, so no
@@ -3110,74 +3011,6 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     );
     back.style.cssText = `color:${C.warmGrey};font-size:12px;max-width:60ch`;
     screenRegion.append(h, p, back);
-  }
-
-  /**
-   * **The lobby** — [§ D1445](../../../../DECISIONS.md). The shell's own route, like the menu, because
-   * it draws before the host publishes; `lobbyScreen.ts` is the mount and these are its ports.
-   *
-   * A landing's press commits exactly as a menu tile does — the same `ctx` and `modePick` for a mode
-   * floor, so a Career floor puts the career's rooms up and a Rush floor the rush's — and then goes
-   * to the floor's screen, on the frame of the press ([§ D1627](../../../../DECISIONS.md)). With the key turned it then crosses to the Engineer surface, so coming back
-   * through § 3.2's swap lands on that floor rather than in the lobby.
-   */
-  function drawLobby(): void {
-    screenRegion.replaceChildren();
-    mounted = mountLobby(screenRegion, {
-      stepOut: (floor, engineer) => {
-        if (floor.pick !== undefined) {
-          const ctx: RunContext = floor.pick === 'campaign' ? 'campaign' : floor.pick === 'rush' ? 'rush' : 'daily';
-          state = { ...state, modePick: floor.pick, ctx };
-        }
-        go(floor.screen);
-        if (engineer) enterEngineer();
-      },
-      toLanding: () => {
-        go('landing');
-      },
-      firstVisit: () => (dataHost === undefined ? undefined : firstVisitOf(dataHost)),
-      resume: () => {
-        const entry = continueWeekEntryNow();
-        return entry === undefined ? undefined : { title: entry.title, line: entry.line };
-      },
-      pressResume: () => {
-        const entry = continueWeekEntryNow();
-        if (entry !== undefined) continueWeek(entry);
-      },
-    });
-  }
-
-  /**
-   * **The lobby has the whole viewport** — the handoff's *"the whole screen"*. The rail, the narrow
-   * header and the bar step aside while it shows and come back on the next screen, where the tray
-   * draws the same building at its own size.
-   *
-   * `display` on the chrome rather than on either root: the rule that neither *root* is ever hidden
-   * that way (canvases size from their laid-out box) is about `div.shell` and this shell's root, and
-   * the rail and the bar hold no canvas. The rail is hidden by exactly this property already, in the
-   * drawer's closed state.
-   */
-  function applyChrome(): void {
-    const wanted = state.screen === 'lobby';
-    if (wanted === bare) return;
-    bare = wanted;
-    if (bare) {
-      paintBare();
-      return;
-    }
-    const was = narrow ?? false;
-    narrow = undefined;
-    applyWidth(was);
-  }
-
-  function paintBare(): void {
-    root.style.cssText = COMMON + ';grid-template-columns:minmax(0,1fr)';
-    narrowHeader.style.display = 'none';
-    rail.style.display = 'none';
-    railScrim.style.display = 'none';
-    drawerOpen = false;
-    bar.style.display = 'none';
-    screenRegion.style.cssText = 'overflow-y:auto;min-width:0;padding:0;background:#2C2823';
   }
 
   /** Unmount whatever registered screen is in the region, if one is. */
@@ -3213,71 +3046,15 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
      */
     screenRegion.setAttribute('aria-label', SCREEN_NAMES[state.screen]);
     coverEngineer();
-    applyChrome();
+    paintRegion();
     drawBar();
-    /*
-     * § D1627: the tray was built while the lobby had the viewport, so its car had no box to stand
-     * on; and a floor change is drawn once the chrome is where it will be.
-     */
+    /* § D1627: a floor change is drawn over the screen it has already opened. */
     const floorNow = floorOfScreen(state, testStanding());
-    placeRailCar(floorNow);
     const floorWas = floorDrawn;
     floorDrawn = floorNow;
-    if (floorWas !== undefined && floorWas !== floorNow && route !== 'lobby') {
-      playFloorDoors(floorNow, floorDirection(floorWas, floorNow));
-    }
-    if (route === 'lobby') {
-      drawLobby();
-      return;
-    }
+    if (floorWas !== undefined && floorWas !== floorNow) playFloorDoors(floorNow, floorDirection(floorWas, floorNow));
     if (route === 'menu') {
-      /**
-       * **The front door waits for the host, and [§ D227](../../../../DECISIONS.md) is why** —
-       * [§ D844](../../../../DECISIONS.md).
-       *
-       * ## What the tiles were doing before this, measured on the built bundle
-       *
-       * This mount runs synchronously while `dev/main.ts`'s async `main()` is still fetching
-       * `data/`, so the three mode tiles were drawn from no host at all. Driven at 1280 × 800: the
-       * region and the tiles paint at **t ≈ 190 ms** and the host publishes at **t ≈ 430 ms**, and
-       * a *Scenario* press inside that window opens a screen reading
-       * {@link HOST_PENDING_REASON} (then *the simulation host has not finished booting*, in player
-       * words since § D1273), because {@link drawHostPending} below is what a registered screen
-       * gets with no host. So for a
-       * quarter of a second the front door offered three controls that could not act and said
-       * nothing about it, which is § D227's first direction on the first screen anybody sees.
-       *
-       * **And the press was not merely early; it was eaten.** The same drive, pressing the tile the
-       * way a player does: the offer replaces the front door at t ≈ 430 ms, so a press aimed at a
-       * tile in that window lands on an element the shell has already removed — reproduced as a
-       * `locator.click` timing out on a detached node while the page moved to the landing page
-       * underneath it. A control that is about to be taken away is a worse offer than no control.
-       *
-       * ## Why this is not a time-to-interactive regression
-       *
-       * `docs/31` § 3 defines interactive as a control *with its handler bound*, and
-       * `dev/recordTti.ts`'s header already names presence and an enabled state as the two things
-       * that cannot prove it. A tile that opens the shell's waiting sentence was never
-       * interactive; it only looked it. What this changes is which of those two the number
-       * measures — `builtBundle.browser.test.ts`'s `charter S9` B1 waits for the offer to be left
-       * before it reads the tile either way.
-       *
-       * The discriminator is {@link weekRailOptions}': a **slot** with no host in it is a host on
-       * its way, and **no slot at all** is a build that keeps no simulation — the standalone mount
-       * a test document makes, where the tiles are the whole product and draw at once.
-       * {@link connectDataHost} draws the real front door the moment the host lands, which is the
-       * same arm that has always covered a registered screen entered early.
-       *
-       * What the waiting state is, and why it is not a blank: {@link drawFrontDoorPending} draws
-       * this screen's own heading and lede with the shell's standing sentence for a screen waiting
-       * on the host under them. So a reload shows the front door and then its tiles, rather than a
-       * tile that is about to be withdrawn.
-       */
-      if (dataHost === undefined && options.host !== undefined) {
-        drawFrontDoorPending();
-        return;
-      }
-      drawMenu();
+      drawLobby();
       return;
     }
     if (route === 'screen') {
@@ -3351,12 +3128,8 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
    * reachable only in the first instants of a cold load. Drawn rather than blanked, in the refusal
    * screen's own shape; {@link connectDataHost} redraws the moment the host arrives.
    *
-   * **The front door has a waiting state too, and it is {@link drawFrontDoorPending} rather than
-   * this** — its tiles may not be offered before the first-arrival question has an answer (see
-   * {@link draw}'s `'menu'` arm for the § D227 measurement that put it there), and it heads itself
-   * with its own name rather than with `SCREEN_NAMES`' *Main menu*. The two share the sentence and
-   * nothing else, which is the point: this one names a screen the player asked for, and that one
-   * is the screen nobody asks for and everybody lands on.
+   * **The front door has no waiting state** (§ D1628): the lobby draws from nothing the host holds,
+   * and repaints its two host answers in place when the host arrives.
    */
   function drawHostPending(screen: EverydayScreen): void {
     drewPending = true;
@@ -3373,20 +3146,15 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
    *
    * The run-open latch is synced immediately and on every host notification, so the strip arms
    * when a run the player started lands on the stage and disarms when the day files. The redraw
-   * arm covers **both** early states {@link drawHostPending} draws: a registered screen mounted
-   * before the host existed gets its real mount the moment it does, and the front door gets its
-   * tiles. It read *the one early state* while the second did not exist.
+   * arm covers the one early state {@link drawHostPending} draws: a registered screen mounted before
+   * the host existed gets its real mount the moment it does. It is guarded on {@link drewPending},
+   * *what was last drawn*, rather than on the route or on there being no mount, because a refusal
+   * leaves `mounted` undefined and does not want repainting.
    *
-   * **{@link offerTutorial} runs before that redraw, and the order is the whole of why the front
-   * door can no longer move under a reader.** The offer navigates, and navigating draws — so a
-   * menu drawn first and replaced a line later would put the front door on the page for exactly
-   * as long as it took the offer to answer. Both happen inside this one synchronous call, so
-   * nothing paints between them and there is no state anybody, player or driver, can observe and
-   * act on. The redraw is therefore guarded on there being no mount rather than on the route: the
-   * offer's own `go` has already mounted a screen when it fired. The redraw is guarded on
-   * {@link drewPending} — *what was last drawn* — rather than on the route or on there being no
-   * mount, because a refusal and a front door that is already right both leave `mounted`
-   * undefined and neither wants repainting.
+   * **Nothing here navigates.** Until § D1628 this call also asked whether the visitor was new and
+   * sent a first visit from the menu to the landing page, which is why § D844 had to hold the menu's
+   * tiles back until it had answered. The lobby is the front door for everybody, so the host's
+   * arrival moves no one.
    *
    * **The rail is the second thing synced, and it is issue #214's other half.** The `PLAYING AS`
    * card's career line is the week's, and the week arrives here — so a rail painted before this
@@ -3415,63 +3183,16 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
        */
       const bankedMoved = bankedLineNow() !== bankedLineDrawn;
       if (careerLineNow() !== careerLineDrawn || bankedMoved) drawRail();
-      /* § D1445: the lobby's welcome line and *Continue* are the host's answers; repaint them, not the car. */
-      if (state.screen === 'lobby') mounted?.reread?.();
+      /* § D1628: the lobby's first-visit line and *Continue* are the host's answers; repaint them, not the car. */
+      if (state.screen === EVERYDAY_ROOT) mounted?.reread?.();
     };
     sync();
     dataHostUnsubscribe = next.subscribe(sync);
-    offerTutorial(next);
     if (drewPending) draw();
   }
 
   /**
-   * **The first arrival — the landing page, and then the tutorial before Scenario** —
-   * [§ D529](../../../../DECISIONS.md) clause 1, GitHub issues #380 and #244.
-   *
-   * ## What #244 changed here, and what it deliberately did not
-   *
-   * It used to `go('tutorial')`. It goes to the landing page instead, on **exactly the same
-   * condition** — the walkthrough's own gate, unmoved — and the landing page's single call to
-   * action opens the walkthrough. So the sequence a first visitor meets is *what this is*, then
-   * *how it plays*, then a scenario, and § D529 clause 1 is untouched: nothing skips the
-   * walkthrough and nothing reaches Scenario ahead of it.
-   *
-   * **The gate is the tutorial's rather than a second one**, which is the half worth reading twice.
-   * A landing page with a condition of its own would be a second answer to *is this visitor new*,
-   * and the day the two disagreed one of them would be showing a stranger the wrong screen with
-   * nothing to notice. `everyday/landingScreen.ts` asks `tutorialIsDue` too, for the same reason
-   * and from the same counts.
-   *
-   * Here rather than in the initial state, because the answer is a function of the week and the
-   * week arrives with the host. The condition is
-   * `tutorialModel.ts#tutorialIsDue` over four counts the player produced by playing, so
-   * [§ D476](../../../../DECISIONS.md)'s ruling holds unchanged: **nothing is stored and nothing
-   * survives a reload** — it is re-derived, which is what every screen that depends on progress
-   * already does, and `charter` non-goal 10 is about a remembered world rather than about a
-   * function of game state.
-   *
-   * ## Two guards, and each is load-bearing
-   *
-   * {@link tutorialOffered} is **session-local and deliberately not persisted**: without it, a player who left
-   * the tutorial for the menu without filing a day would be sent straight back, and the front door
-   * would be unreachable. **Since [§ D993](../../../../DECISIONS.md) that describes every exit** —
-   * `tutorialScreens.ts#leave` files nothing on Skip or on Start playing — so this guard is what
-   * holds § D476's amended condition within a session, and across a reload the landing page it
-   * offers carries a live route to the modes. It is not the flag § D476 forbids — a reload clears it and the question
-   * is asked again from the week, which is the behaviour that rule is protecting.
-   *
-   * The front-door guard is the other half: the offer only ever moves a player who is *on the
-   * menu*, so a host notification arriving while somebody is mid-run cannot take the page off them.
-   */
-  function offerTutorial(host: EverydayHost): void {
-    if (tutorialOffered) return;
-    tutorialOffered = true;
-    if (state.screen !== EVERYDAY_ROOT) return;
-    if (firstVisitOf(host)) go('landing');
-  }
-
-  /**
-   * *Is this visitor new* — the walkthrough's own gate, asked here by the offer above and by the
+   * *Is this visitor new* — the walkthrough's own gate, asked here for the
    * lobby's welcome line, so the two cannot disagree (§ D1445).
    */
   function firstVisitOf(host: EverydayHost): boolean {

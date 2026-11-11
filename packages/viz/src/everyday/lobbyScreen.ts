@@ -1,26 +1,35 @@
 /**
- * **The lobby, drawn** — the elevator hall a cold launch opens on,
- * [§ D1445](../../../../DECISIONS.md) as redrawn by [§ D1627](../../../../DECISIONS.md).
+ * **The lobby, drawn** — the game's front door and its main menu, one screen
+ * ([§ D1628](../../../../DECISIONS.md)).
  *
- * The hall shows the building in section: a hoistway on the left with a car in it, and six landings
- * beside it, each a button. Pointing at a landing (hover or focus) glides the car to it and the
- * display says what is on that floor; pressing one steps out onto it on the same frame. Every word
- * and the whole of the small machine are `lobbyModel.ts`'s; this file is the mount, the car's
- * motion, and one sound.
+ * The lobby shows the building in section: a hoistway on the left with a car in it, and six
+ * landings beside it. Pointing at a landing (hover or focus) glides the car to it and the display
+ * says what is on that floor; pressing one steps out onto it on the same frame, and every room on a
+ * floor is a press of its own. Every word and the whole of the small machine are `lobbyModel.ts`'s;
+ * this file is the mount, the car's motion, and one sound.
+ *
+ * ## It is the menu, so it carries what the menu carried
+ *
+ * The three play landings are the mode tiles: they keep the tiles' class and `data-screen`, and a
+ * press commits exactly as a tile's did. *Continue your week* is the shell's own tile, handed in
+ * whole through {@link LobbyPorts.continueTile} so there is one of it. The build-notes pointer sits
+ * at the foot. The screen is drawn inside the shell, with the tray, the bar and Settings where they
+ * are on every other screen.
  *
  * ## Motion is laid over the press, never in front of it
  *
- * The car's glide, the doors opening on arrival and the lantern are decoration. No handler waits on
- * a timer before it navigates, which is the difference from the § D1445 build this replaced and the
- * thing `lobby.browser.test.ts` measures. With reduced motion the car is simply drawn where it is.
+ * The car's glide, the doors opening on arrival and the lantern are decoration
+ * ([§ D1627](../../../../DECISIONS.md)). No handler waits on a timer before it navigates. With
+ * reduced motion the car is simply drawn where it is.
  *
  * ## Why the shell owns the route rather than the registry
  *
  * The lobby is the first thing on the page and it needs nothing from the simulation host to draw.
  * A registered screen is held behind the host until `dev/main.ts` publishes it
  * (`shell.ts#drawHostPending`), which would put a waiting sentence on the one screen that has
- * nothing to wait for. So the shell routes `lobby` itself, the way it routes the menu, and hands
- * this mount {@link LobbyPorts}.
+ * nothing to wait for. So the shell draws its root itself and hands this mount {@link LobbyPorts};
+ * the two things the host does answer, the first-visit line and *Continue*, are repainted by
+ * {@link MountedLobby.reread} when it arrives.
  *
  * ## Sound
  *
@@ -30,6 +39,7 @@
  */
 
 import { REDUCED_MOTION_QUERY } from '../dev/motion.js';
+import { BUILD_NOTES_POINTER } from './buildNotes.js';
 import { engineerSettings } from './engineerBridge.js';
 import { floorDirection, GAME_FLOOR_ORDER, type GameFloor, type GameFloorKey } from './floors.js';
 import {
@@ -38,7 +48,6 @@ import {
   lobbyPoint,
   lobbyPress,
   lobbyTimingsFor,
-  lobbyTurnKey,
   lobbyViewOf,
   type LobbyState,
 } from './lobbyModel.js';
@@ -50,27 +59,26 @@ import {
   EVERYDAY_RAIL_SURFACES as RAIL,
   EVERYDAY_TYPE as TYPE,
 } from './tokens.js';
+import type { EverydayScreen } from './types.js';
 
 /** What the lobby may do to the rest of the product. The shell supplies it. */
 export interface LobbyPorts {
-  /** Step out onto a floor, in the Engineer view when the key is turned. */
-  stepOut(floor: GameFloor, engineer: boolean): void;
-  /** The landing page, which the lobby replaced as the first screen and still links to. */
-  toLanding(): void;
+  /** Step out onto a floor: commit its mode as the tile did, and open its screen. */
+  stepOut(floor: GameFloor): void;
+  /** Open one room on a floor. */
+  openRoom(screen: EverydayScreen): void;
   /** Whether this is a first visit, or `undefined` while the host has not said. */
   firstVisit(): boolean | undefined;
   /**
-   * The menu's *Continue your week*, when there is one, so a returning player can resume from the
-   * lobby exactly as from the menu's tile. `undefined` when there is nothing to continue.
+   * The shell's *Continue your week* tile, built and wired by the shell, or `undefined` when there
+   * is nothing to continue. One tile, so the lobby and the tests that press it agree on what it is.
    */
-  resume(): { readonly title: string; readonly line: string } | undefined;
-  /** Press it, through the same code the menu's tile runs. */
-  pressResume(): void;
+  continueTile(): HTMLElement | undefined;
 }
 
 export interface MountedLobby {
   unmount(): void;
-  /** Redraw the host's answers (the welcome line and *Continue*) without moving the car. */
+  /** Redraw the host's answers (the first-visit line and *Continue*) without moving the car. */
   reread(): void;
 }
 
@@ -92,6 +100,9 @@ const P = Object.freeze({
   amberDim: '#C9893A',
 });
 
+/** The ground the lobby stands on. The shell paints the screen region with it while the lobby shows. */
+export const LOBBY_GROUND = '#2C2823';
+
 /** The handoff's door easing, verbatim. */
 const EASING = 'cubic-bezier(.65,0,.25,1)';
 
@@ -108,12 +119,11 @@ const MONO = (weight: number, size: number, extra = ''): string =>
   `font:${String(weight)} ${String(size)}px ${TYPE.mono};${extra}`;
 
 /* -------------------------------------------------------------------------- *
- * The sounds — the handoff's synthesis
+ * The sound — the handoff's synthesis
  * -------------------------------------------------------------------------- */
 
 interface LobbySound {
   chime(): void;
-  click(): void;
   close(): void;
 }
 
@@ -132,13 +142,13 @@ function lobbySound(): LobbySound {
     if (context.state === 'suspended') void context.resume();
     return context;
   };
-  const tone = (frequency: number, at: number, duration: number, gain: number, type: OscillatorType = 'sine'): void => {
+  const tone = (frequency: number, duration: number, gain: number): void => {
     const c = audio();
     if (c === undefined) return;
     const oscillator = c.createOscillator();
     const amp = c.createGain();
-    const t = c.currentTime + at;
-    oscillator.type = type;
+    const t = c.currentTime;
+    oscillator.type = 'sine';
     oscillator.frequency.value = frequency;
     amp.gain.setValueAtTime(0.0001, t);
     amp.gain.exponentialRampToValueAtTime(gain, t + 0.012);
@@ -150,11 +160,8 @@ function lobbySound(): LobbySound {
   };
   return {
     chime: () => {
-      tone(1318.5, 0, 0.9, 0.14);
-      tone(2637, 0, 0.3, 0.02);
-    },
-    click: () => {
-      tone(1700, 0, 0.035, 0.03, 'square');
+      tone(1318.5, 0.9, 0.14);
+      tone(2637, 0.3, 0.02);
     },
     close: () => {
       void context?.close();
@@ -195,20 +202,17 @@ export function mountLobby(region: HTMLElement, ports: LobbyPorts): MountedLobby
    * ---------------------------------------------------------------- */
 
   const root = el(doc, 'div', 'everyday-lobby');
-  root.setAttribute('role', 'region');
-  root.setAttribute('aria-label', LOBBY_COPY.regionLabel);
   root.style.cssText = [
     'box-sizing:border-box',
     'min-height:100%',
     'display:flex',
     'flex-direction:column',
     'align-items:center',
-    'justify-content:center',
-    'gap:18px',
-    'padding:26px 18px 30px',
+    'gap:16px',
+    'padding:24px 22px 26px',
     `color:${P.cream}`,
     'background:repeating-linear-gradient(90deg,transparent 0 179px,rgba(0,0,0,.22) 179px 180px),' +
-      'linear-gradient(180deg,#322D27,#26221D)',
+      `linear-gradient(180deg,#322D27,${LOBBY_GROUND})`,
     `font-family:${TYPE.body}`,
   ].join(';');
 
@@ -218,11 +222,11 @@ export function mountLobby(region: HTMLElement, ports: LobbyPorts): MountedLobby
   kicker.style.cssText = MONO(500, 10.5, `letter-spacing:.3em;color:${P.taupe}`);
   /* The screen's one level-1 heading (`docs/36` AX-15): the name over the doors. */
   const building = el(doc, 'h1', undefined, LOBBY_COPY.building);
-  building.style.cssText = `font:700 23px ${TYPE.heading};letter-spacing:.14em;color:${P.sand};margin:3px 0 0`;
+  building.style.cssText = `font:700 26px ${TYPE.heading};letter-spacing:-.01em;color:${P.sand};margin:2px 0 0`;
   nameBlock.append(kicker, building);
 
   const row = el(doc, 'div');
-  row.style.cssText = 'display:flex;align-items:stretch;justify-content:center;gap:22px;width:100%;max-width:940px';
+  row.style.cssText = 'display:flex;align-items:stretch;justify-content:center;gap:20px;width:100%;max-width:960px';
 
   /* --- The building in section: the hoistway, and the landings beside it. --- */
   const section = el(doc, 'div', 'everyday-lobby-building');
@@ -230,7 +234,7 @@ export function mountLobby(region: HTMLElement, ports: LobbyPorts): MountedLobby
     'display:flex',
     'flex:1 1 0',
     'min-width:0',
-    'max-width:580px',
+    'max-width:600px',
     `border:1px solid ${P.bezel}`,
     'border-radius:14px',
     'overflow:hidden',
@@ -238,17 +242,16 @@ export function mountLobby(region: HTMLElement, ports: LobbyPorts): MountedLobby
     `box-shadow:0 14px 30px rgba(0,0,0,.35),inset 0 0 0 1px ${P.rule}`,
   ].join(';');
 
+  const HOIST_WIDE =
+    'linear-gradient(90deg,transparent 0 13px,rgba(230,220,203,.16) 13px 14px,transparent 14px 71px,' +
+    'rgba(230,220,203,.16) 71px 72px,transparent 72px),linear-gradient(180deg,#171411,#0F0D0B)';
+  const HOIST_NARROW =
+    'linear-gradient(90deg,transparent 0 6px,rgba(230,220,203,.16) 6px 7px,transparent 7px 51px,' +
+    'rgba(230,220,203,.16) 51px 52px,transparent 52px),linear-gradient(180deg,#171411,#0F0D0B)';
   const hoist = el(doc, 'div', 'everyday-lobby-hoist');
   hoist.setAttribute('aria-hidden', 'true');
-  hoist.style.cssText = [
-    'position:relative',
-    'flex:none',
-    'width:92px',
-    /* The pit and the two guide rails: the hoistway's own drawing, behind the car. */
-    'background:linear-gradient(90deg,transparent 0 13px,rgba(230,220,203,.16) 13px 14px,transparent 14px 71px,' +
-      'rgba(230,220,203,.16) 71px 72px,transparent 72px),linear-gradient(180deg,#171411,#0F0D0B)',
-    `border-right:1px solid ${P.bezel}`,
-  ].join(';');
+  /* The pit and the two guide rails: the hoistway's own drawing, behind the car. */
+  hoist.style.cssText = `position:relative;flex:none;width:92px;border-right:1px solid ${P.bezel}`;
 
   /* The hoist rope: from the head of the shaft down to the car's crosshead. */
   const rope = el(doc, 'div');
@@ -306,7 +309,9 @@ export function mountLobby(region: HTMLElement, ports: LobbyPorts): MountedLobby
 
   interface LandingParts {
     readonly key: GameFloorKey;
-    readonly button: HTMLButtonElement;
+    readonly row: HTMLElement;
+    /** The landing's own press, or its plain box on the lobby's floor. */
+    readonly face: HTMLElement;
     readonly plate: HTMLElement;
     readonly name: HTMLElement;
     readonly body: HTMLElement;
@@ -314,12 +319,6 @@ export function mountLobby(region: HTMLElement, ports: LobbyPorts): MountedLobby
     readonly rooms: HTMLElement;
   }
   const landings: LandingParts[] = [];
-
-  const press = (key: GameFloorKey): void => {
-    const pressed = lobbyPress(state, key);
-    sound.chime();
-    ports.stepOut(pressed.floor, pressed.engineer);
-  };
 
   const point = (key: GameFloorKey): void => {
     const next = lobbyPoint(state, key);
@@ -330,30 +329,66 @@ export function mountLobby(region: HTMLElement, ports: LobbyPorts): MountedLobby
     travel(from, key);
   };
 
+  const view0 = lobbyViewOf(state);
   for (const key of GAME_FLOOR_ORDER) {
+    const landing = view0.landings.find((candidate) => candidate.key === key);
+    if (landing === undefined) continue;
+    const rowEl = el(doc, 'div', 'everyday-lobby-landing-row');
+    rowEl.dataset['floor'] = key;
+    rowEl.style.cssText = [
+      'display:flex',
+      'flex-direction:column',
+      'justify-content:center',
+      'flex:1 1 auto',
+      'min-height:76px',
+      'box-sizing:border-box',
+      /* The floor slab, running through to the hoistway. */
+      `border-bottom:${key === 'B' ? '0' : `2px solid ${P.bezel}`}`,
+    ].join(';');
+
+    const pressed = key === 'L' ? undefined : lobbyPress(key);
     /*
-     * The lobby's floor is also the way to the main menu, so it carries the class the browser tier
-     * and every earlier description of this screen knows that way by.
+     * A play landing is the mode's tile: the class and `data-screen` the menu's tiles carried, so
+     * there is one thing called a mode tile and it is this.
      */
-    const button = el(doc, 'button', key === 'L' ? 'everyday-lobby-floor-button everyday-lobby-menu' : 'everyday-lobby-floor-button');
-    button.type = 'button';
-    button.dataset['floor'] = key;
-    button.style.cssText = [
+    const face =
+      pressed === undefined
+        ? el(doc, 'div', 'everyday-lobby-here')
+        : el(doc, 'button', pressed.pick === undefined ? 'everyday-lobby-floor-button' : 'everyday-lobby-floor-button everyday-mode');
+    if (face instanceof HTMLButtonElement && pressed !== undefined) {
+      face.type = 'button';
+      face.dataset['floor'] = key;
+      if (pressed.pick !== undefined) face.setAttribute('data-screen', pressed.screen);
+      face.addEventListener('click', () => {
+        sound.chime();
+        ports.stepOut(pressed);
+      });
+      face.addEventListener('focus', () => {
+        point(key);
+      });
+      /* Up and down walk the landings that open, as the arrows on a real panel would. */
+      face.addEventListener('keydown', (event) => {
+        if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+        const faces = landings.map((parts) => parts.face).filter((node) => node instanceof HTMLButtonElement);
+        const target = faces[faces.indexOf(face) + (event.key === 'ArrowUp' ? -1 : 1)];
+        if (target === undefined) return;
+        event.preventDefault();
+        target.focus();
+      });
+    }
+    face.style.cssText = [
       'display:grid',
       'grid-template-columns:44px minmax(0,1fr)',
       'align-items:center',
       'column-gap:14px',
-      'flex:1 1 auto',
-      'min-height:76px',
+      'width:100%',
       'box-sizing:border-box',
-      'padding:10px 16px 10px 14px',
+      'padding:10px 16px 6px 14px',
       'text-align:left',
       'background:transparent',
       'border:0',
-      /* The floor slab, running through to the hoistway. */
-      `border-bottom:${key === 'B' ? '0' : `2px solid ${P.bezel}`}`,
       `color:${P.cream}`,
-      'cursor:pointer',
+      `cursor:${pressed === undefined ? 'default' : 'pointer'}`,
       `font-family:${TYPE.body}`,
     ].join(';');
 
@@ -377,38 +412,53 @@ export function mountLobby(region: HTMLElement, ports: LobbyPorts): MountedLobby
     body.style.cssText = `display:block;font-size:12.5px;line-height:1.35;color:${P.stone};margin-top:2px`;
     const status = el(doc, 'span');
     status.style.cssText = MONO(500, 10, `display:block;letter-spacing:.03em;color:${P.amberDim};margin-top:4px`);
-    const rooms = el(doc, 'span');
-    rooms.style.cssText = MONO(500, 10, `display:block;letter-spacing:.04em;color:${P.taupe};margin-top:4px`);
-    text.append(name, body, status, rooms);
-    button.append(plate, text);
+    text.append(name, body, status);
+    face.append(plate, text);
 
-    button.addEventListener('mouseenter', () => {
+    /* The rooms, each a press of its own, under the landing they are on. */
+    const rooms = el(doc, 'div');
+    rooms.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;padding:0 16px 10px 72px';
+    for (const room of landing.rooms) {
+      /* *What this is* keeps the class the landing page's own link was always found by. */
+      const chip = el(
+        doc,
+        'button',
+        room.screen === 'landing' ? 'everyday-lobby-room everyday-lobby-landing' : 'everyday-lobby-room',
+        room.label,
+      );
+      chip.type = 'button';
+      chip.dataset['screen'] = room.screen;
+      chip.style.cssText = [
+        'background:transparent',
+        `border:1px solid ${P.bezel}`,
+        'border-radius:999px',
+        'padding:4px 11px',
+        'min-height:26px',
+        'cursor:pointer',
+        MONO(500, 10.5, `letter-spacing:.04em;color:${P.stone}`),
+      ].join(';');
+      chip.addEventListener('click', () => {
+        ports.openRoom(room.screen);
+      });
+      chip.addEventListener('focus', () => {
+        point(key);
+      });
+      rooms.append(chip);
+    }
+    if (landing.rooms.length === 0) rooms.style.display = 'none';
+
+    rowEl.addEventListener('mouseenter', () => {
       point(key);
     });
-    button.addEventListener('focus', () => {
-      point(key);
-    });
-    button.addEventListener('click', () => {
-      press(key);
-    });
-    /* Up and down walk the landings, as the arrows on a real panel would. */
-    button.addEventListener('keydown', (event) => {
-      if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
-      const index = GAME_FLOOR_ORDER.indexOf(key) + (event.key === 'ArrowUp' ? -1 : 1);
-      const target = landings[index];
-      if (target === undefined) return;
-      event.preventDefault();
-      target.button.focus();
-    });
-
-    landings.push({ key, button, plate, name, body, status, rooms });
-    list.append(button);
+    rowEl.append(face, rooms);
+    landings.push({ key, row: rowEl, face, plate, name, body, status, rooms });
+    list.append(rowEl);
   }
   section.append(hoist, list);
 
-  /* --- The display beside the shaft, and the three quiet things under it. --- */
+  /* --- The display beside the shaft, and what the menu carried under it. --- */
   const side = el(doc, 'div');
-  side.style.cssText = 'display:flex;flex-direction:column;gap:12px;flex:none;width:292px';
+  side.style.cssText = 'display:flex;flex-direction:column;gap:12px;flex:none;width:300px';
 
   const indicator = el(doc, 'div', 'everyday-lobby-indicator');
   indicator.setAttribute('aria-hidden', 'true');
@@ -432,13 +482,12 @@ export function mountLobby(region: HTMLElement, ports: LobbyPorts): MountedLobby
   const display = el(doc, 'div', 'everyday-lobby-display');
   display.setAttribute('aria-live', 'polite');
   display.style.cssText = [
-    'flex:1 1 auto',
     'box-sizing:border-box',
     `background:${STEEL}`,
     `border:1px solid ${P.bezel}`,
     'border-radius:14px',
     'padding:18px 18px 20px',
-    'min-height:196px',
+    'min-height:190px',
   ].join(';');
   const displayKicker = el(doc, 'div');
   displayKicker.style.cssText = MONO(500, 10.5, `letter-spacing:.2em;color:${P.amber}`);
@@ -450,98 +499,35 @@ export function mountLobby(region: HTMLElement, ports: LobbyPorts): MountedLobby
   displayStatus.style.cssText = MONO(500, 10.5, `letter-spacing:.03em;line-height:1.5;color:${P.amberDim};margin-top:12px`);
   display.append(displayKicker, displayTitle, displayBody, displayStatus);
 
-  /* A returning player's quick way back into their week — the menu tile's words and press. */
-  const resume = el(doc, 'button', 'everyday-lobby-continue');
-  resume.type = 'button';
-  resume.style.cssText = [
+  /* A first visit's own way in: the walkthrough, by name. Drawn only when the host says so. */
+  const walkthrough = el(doc, 'button', 'everyday-lobby-walkthrough', LOBBY_COPY.walkthrough);
+  walkthrough.type = 'button';
+  walkthrough.style.cssText = [
     'display:none',
-    'flex-direction:column',
-    'align-items:flex-start',
-    'gap:2px',
     `background:${P.amber}`,
     `color:${P.ink}`,
     'border:0',
     'border-radius:10px',
-    'padding:10px 16px',
+    'padding:11px 16px',
     'cursor:pointer',
     'text-align:left',
     `font:600 14px ${TYPE.heading}`,
   ].join(';');
-  const resumeTitle = el(doc, 'span');
-  const resumeLine = el(doc, 'span');
-  resumeLine.style.cssText = MONO(500, 10.5, 'letter-spacing:.04em');
-  resume.append(resumeTitle, resumeLine);
-  resume.addEventListener('click', () => {
-    sound.click();
-    ports.pressResume();
+  walkthrough.addEventListener('click', () => {
+    ports.openRoom('tutorial');
   });
 
-  /* The Engineer key: a switch, drawn as the key plate on a car panel. */
-  const keyButton = el(doc, 'button', 'everyday-lobby-key');
-  keyButton.type = 'button';
-  keyButton.style.cssText = [
-    'display:flex',
-    'align-items:center',
-    'gap:10px',
-    'background:transparent',
-    `border:1px solid ${P.bezel}`,
-    'border-radius:10px',
-    'padding:9px 12px',
-    'cursor:pointer',
-    `color:${P.stone}`,
-    'text-align:left',
-  ].join(';');
-  const keyBarrel = el(doc, 'span');
-  keyBarrel.setAttribute('aria-hidden', 'true');
-  keyBarrel.style.cssText = [
-    'flex:none',
-    'width:26px',
-    'height:26px',
-    'border-radius:50%',
-    `border:1.5px solid ${P.bezel}`,
-    'display:flex',
-    'align-items:center',
-    'justify-content:center',
-  ].join(';');
-  const keySlot = el(doc, 'span');
-  keySlot.style.cssText = `width:3px;height:14px;border-radius:2px;background:${P.stone};transition:transform .18s ${EASING}`;
-  keyBarrel.append(keySlot);
-  const keyText = el(doc, 'span');
-  keyText.style.cssText = 'display:block;min-width:0';
-  const keyLabel = el(doc, 'span', undefined, LOBBY_COPY.engineerKey);
-  keyLabel.style.cssText = MONO(500, 10, 'display:block;letter-spacing:.16em');
-  const keyFace = el(doc, 'span');
-  keyFace.style.cssText = MONO(500, 10, `display:block;letter-spacing:.08em;margin-top:2px;color:${P.taupe}`);
-  keyText.append(keyLabel, keyFace);
-  keyButton.append(keyBarrel, keyText);
-  keyButton.addEventListener('click', () => {
-    sound.click();
-    state = lobbyTurnKey(state);
-    render();
-  });
-  const keyNote = el(doc, 'div', 'everyday-lobby-hint');
-  keyNote.setAttribute('aria-live', 'polite');
-  keyNote.style.cssText = MONO(500, 10.5, `letter-spacing:.03em;color:${P.amber};min-height:1.3em`);
+  /* Where the shell's *Continue your week* tile goes, when there is one. */
+  const resumeSlot = el(doc, 'div');
+  let resumeKey = '';
 
-  const landing = el(doc, 'button', 'everyday-lobby-landing', LOBBY_COPY.whatThisIs);
-  landing.type = 'button';
-  landing.style.cssText = [
-    'align-self:flex-start',
-    'background:transparent',
-    'border:0',
-    `border-bottom:1px solid ${P.taupe}`,
-    'padding:6px 0 2px',
-    'min-height:24px',
-    'cursor:pointer',
-    MONO(500, 11, `letter-spacing:.08em;color:${P.taupe}`),
-  ].join(';');
-  landing.addEventListener('click', () => {
-    ports.toLanding();
-  });
-
-  side.append(indicator, display, resume, keyButton, keyNote, landing);
+  side.append(indicator, display, walkthrough, resumeSlot);
   row.append(section, side);
-  root.append(nameBlock, row);
+
+  const notes = el(doc, 'p', 'everyday-menu-build-note', BUILD_NOTES_POINTER);
+  notes.style.cssText = `margin:2px 0 0;max-width:960px;width:100%;font-size:12px;color:${P.taupe}`;
+
+  root.append(nameBlock, row, notes);
   region.replaceChildren(root);
 
   /* ---------------------------------------------------------------- *
@@ -554,21 +540,22 @@ export function mountLobby(region: HTMLElement, ports: LobbyPorts): MountedLobby
     row.style.alignItems = narrow ? 'center' : 'stretch';
     section.style.flex = narrow ? 'none' : '1 1 0';
     section.style.width = narrow ? '100%' : '';
-    side.style.width = narrow ? '100%' : '292px';
-    side.style.maxWidth = narrow ? '580px' : '';
-    display.style.minHeight = narrow ? '0' : '196px';
-    root.style.justifyContent = narrow ? 'flex-start' : 'center';
-    root.style.padding = narrow ? '16px 12px 22px' : '26px 18px 30px';
+    side.style.width = narrow ? '100%' : '300px';
+    side.style.maxWidth = narrow ? '600px' : '';
+    /* On a phone the walkthrough and *Continue* come first, above the six landings. */
+    side.style.order = narrow ? '-1' : '0';
+    /* On a phone the display would sit under six landings, so the landings' own words carry it. */
+    indicator.style.display = narrow ? 'none' : 'flex';
+    display.style.display = narrow ? 'none' : 'block';
+    root.style.padding = narrow ? '14px 12px 20px' : '24px 22px 26px';
     hoist.style.width = narrow ? '64px' : '92px';
+    hoist.style.background = narrow ? HOIST_NARROW : HOIST_WIDE;
     car.style.left = narrow ? '9px' : '16px';
     car.style.width = narrow ? '40px' : '53px';
     rope.style.left = narrow ? '29px' : '42px';
-    hoist.style.backgroundImage = narrow
-      ? 'linear-gradient(90deg,transparent 0 6px,rgba(230,220,203,.16) 6px 7px,transparent 7px 51px,' +
-        'rgba(230,220,203,.16) 51px 52px,transparent 52px),linear-gradient(180deg,#171411,#0F0D0B)'
-      : '';
     weight.style.right = narrow ? '3px' : '6px';
     weight.style.width = narrow ? '6px' : '9px';
+    for (const parts of landings) parts.rooms.style.paddingLeft = narrow ? '14px' : '72px';
   };
   applyNarrow(narrowQuery?.matches === true);
   const onNarrow = (event: MediaQueryListEvent): void => {
@@ -598,8 +585,8 @@ export function mountLobby(region: HTMLElement, ports: LobbyPorts): MountedLobby
     const at = landings.find((candidate) => candidate.key === state.car);
     if (at === undefined) return;
     const glide = animated ? lobbyTimingsFor(reduced()).glideMs : 0;
-    const top = at.button.offsetTop + 8;
-    const height = Math.max(40, at.button.offsetHeight - 18);
+    const top = at.row.offsetTop + 8;
+    const height = Math.max(40, at.row.offsetHeight - 18);
     const move = glide > 0 ? `top ${String(glide)}ms ${EASING},height ${String(glide)}ms ${EASING}` : 'none';
     car.style.transition = move;
     car.style.top = `${String(top)}px`;
@@ -644,33 +631,27 @@ export function mountLobby(region: HTMLElement, ports: LobbyPorts): MountedLobby
     displayStatus.style.display = view.status === '' ? 'none' : 'block';
 
     for (const parts of landings) {
-      const landingView = view.landings.find((candidate) => candidate.key === parts.key);
-      if (landingView === undefined) continue;
-      parts.name.textContent = landingView.name;
-      parts.body.textContent = landingView.body;
-      parts.status.textContent = landingView.status;
-      parts.status.style.display = landingView.status === '' ? 'none' : 'block';
-      parts.rooms.textContent = landingView.rooms;
-      parts.rooms.style.display = landingView.rooms === '' ? 'none' : 'block';
-      parts.plate.style.background = landingView.here ? BUTTON_LIT : BUTTON_OFF;
-      parts.plate.style.color = landingView.here ? P.amberHot : P.stone;
-      parts.plate.style.borderColor = landingView.here ? P.amber : P.bezel;
-      parts.plate.style.boxShadow = landingView.here ? GLOW_LIT : 'none';
-      parts.button.style.background = landingView.here ? 'rgba(242,166,59,.07)' : 'transparent';
+      const landing = view.landings.find((candidate) => candidate.key === parts.key);
+      if (landing === undefined) continue;
+      parts.name.textContent = landing.name;
+      parts.body.textContent = landing.body;
+      parts.status.textContent = landing.opens ? landing.status : LOBBY_COPY.here;
+      parts.status.style.display = parts.status.textContent === '' ? 'none' : 'block';
+      parts.plate.style.background = landing.here ? BUTTON_LIT : BUTTON_OFF;
+      parts.plate.style.color = landing.here ? P.amberHot : P.stone;
+      parts.plate.style.borderColor = landing.here ? P.amber : P.bezel;
+      parts.plate.style.boxShadow = landing.here ? GLOW_LIT : 'none';
+      parts.row.style.background = landing.here ? 'rgba(242,166,59,.07)' : 'transparent';
     }
 
-    keyButton.setAttribute('aria-pressed', view.keyOn ? 'true' : 'false');
-    keyButton.style.borderColor = view.keyOn ? P.amber : P.bezel;
-    keySlot.style.transform = view.keyOn ? 'rotate(90deg)' : 'none';
-    keySlot.style.background = view.keyOn ? P.amber : P.stone;
-    keyFace.textContent = view.keyOn ? LOBBY_COPY.engineer : LOBBY_COPY.casual;
-    keyNote.textContent = view.keyNote;
-
-    const entry = ports.resume();
-    resume.style.display = entry === undefined ? 'none' : 'flex';
-    if (entry !== undefined) {
-      resumeTitle.textContent = entry.title;
-      resumeLine.textContent = entry.line;
+    walkthrough.style.display = view.offerWalkthrough ? 'block' : 'none';
+    /* Replaced only when what it says or does has moved, so a host notification does not take focus off it. */
+    const tile = ports.continueTile();
+    const key = tile === undefined ? '' : `${tile.dataset['goes'] ?? ''}|${tile.textContent ?? ''}`;
+    if (key !== resumeKey) {
+      resumeKey = key;
+      if (tile === undefined) resumeSlot.replaceChildren();
+      else resumeSlot.replaceChildren(tile);
     }
   }
 
