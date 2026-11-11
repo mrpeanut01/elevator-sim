@@ -26,8 +26,9 @@ import {
   type AxisObservation,
 } from '../leaderboard/distribution.js';
 import type { ClaimedMetrics, SubmittedRun } from '../leaderboard/submission.js';
-import { PgliteSql } from './pglite.test-helper.js';
 import { RacingSql } from './racingSql.test-helper.js';
+import type { Sql } from './sql.js';
+import { tablesReferencingUsers, testEngine, testSql, type UserReference } from './testSql.test-helper.js';
 import {
   BOARD_METRICS,
   HOUSE_DISPLAY_NAME,
@@ -93,13 +94,13 @@ async function fixture(): Promise<{
    * tables reference `users` — rather than being told which four they are. `Store` exposes no
    * catalog query and should not grow one for a test's benefit.
    */
-  sql: PgliteSql;
+  sql: Sql;
   tick: (ms: number) => void;
   ada: string;
   bo: string;
 }> {
   let clock = 1_770_000_000_000;
-  const sql = new PgliteSql();
+  const sql = testSql();
   const store = await Store.open({ sql, now: () => clock });
   // Every fixture is a whole PostgreSQL, and this file builds one per test. Closed when the test
   // finishes rather than at the end of the `it`, so a failing assertion does not leak the instance:
@@ -126,6 +127,25 @@ async function fixture(): Promise<{
     bo: await make('Bo'),
   };
 }
+
+/* -------------------------------------------------------------------------- *
+ * The engine — § D1629
+ * -------------------------------------------------------------------------- */
+
+describe('the engine this file runs on', () => {
+  it('is the one the importing file chose, so `store.sqlite.test.ts` really is SQLite', async () => {
+    const { sql } = await fixture();
+    expect(sql.dialect).toBe(testEngine());
+  });
+
+  it('folds a display name the way PostgreSQL does, accents included', async () => {
+    const { store } = await fixture();
+    const first = await store.createUser({ email: 'e1@example.test', displayName: 'Élan', displayNameChosen: true });
+    expect(first.ok).toBe(true);
+    const second = await store.createUser({ email: 'e2@example.test', displayName: 'éLAN', displayNameChosen: true });
+    expect(second).toEqual({ ok: false, reason: 'name-taken' });
+  });
+});
 
 /* -------------------------------------------------------------------------- *
  * Accounts
@@ -588,46 +608,18 @@ describe('a challenge board', () => {
  * Erasure
  * -------------------------------------------------------------------------- */
 
-/** One table that references `users`, as the database itself describes it. */
-interface UserReference {
-  readonly table: string;
-  readonly column: string;
-  /** `pg_constraint.confdeltype`. `'c'` is `ON DELETE CASCADE`; `'a'` is `NO ACTION`. */
-  readonly onDelete: string;
-}
-
 /**
- * Every foreign key that points at `users`, read out of PostgreSQL's own catalog.
+ * Every foreign key that points at `users`, read out of the engine's own catalog: see
+ * `testSql.test-helper.ts#tablesReferencingUsers`.
  *
  * **This is the whole point of the erasure tests below and not a convenience.** A hand-written list
  * of child tables is a list that stops being true the day someone adds a table and does not think
  * of this file — which is `DECISIONS.md` § D213's lesson and the reason `deadCode.test.ts` derives
  * its directory list off disk rather than writing one down. The catalog cannot go stale against the
  * schema, because it *is* the schema: `Store.open` applied it four lines ago.
- *
- * Possible only because `PgliteSql` is PostgreSQL rather than a stand-in for one. A test double
- * would have had to be told the answer, which is the thing being avoided.
  */
-async function tablesReferencingUsers(sql: PgliteSql): Promise<readonly UserReference[]> {
-  const result = await sql.query(
-    'SELECT child.relname AS table_name, att.attname AS column_name, con.confdeltype AS on_delete ' +
-      'FROM pg_constraint con ' +
-      'JOIN pg_class child ON child.oid = con.conrelid ' +
-      'JOIN pg_class parent ON parent.oid = con.confrelid ' +
-      'CROSS JOIN LATERAL unnest(con.conkey) AS k(attnum) ' +
-      'JOIN pg_attribute att ON att.attrelid = con.conrelid AND att.attnum = k.attnum ' +
-      "WHERE con.contype = 'f' AND parent.relname = 'users' " +
-      'ORDER BY child.relname, att.attname',
-  );
-  return result.rows.map((row) => ({
-    table: String(row['table_name']),
-    column: String(row['column_name']),
-    onDelete: String(row['on_delete']),
-  }));
-}
-
 /** How many rows of `table` point at `userId`. */
-async function rowsFor(sql: PgliteSql, reference: UserReference, userId: string): Promise<number> {
+async function rowsFor(sql: Sql, reference: UserReference, userId: string): Promise<number> {
   const result = await sql.query(
     `SELECT COUNT(*) AS n FROM ${reference.table} WHERE ${reference.column} = $1`,
     [userId],
@@ -677,7 +669,7 @@ describe('deleting an account', () => {
     // having nothing to assert about, which is how `deadCode.test.ts` guards its own scanner.
     expect(children.length, 'the catalog query found no foreign key to users').toBeGreaterThanOrEqual(4);
     expect(
-      children.filter((child) => child.onDelete !== 'c').map((child) => `${child.table}.${child.column}`),
+      children.filter((child) => child.onDelete !== 'cascade').map((child) => `${child.table}.${child.column}`),
       'these reference users without ON DELETE CASCADE, so deleting an account would either fail ' +
         'or orphan them — `Store.deleteUser` is one statement and relies on the cascade for the rest',
     ).toEqual([]);
@@ -738,7 +730,7 @@ describe('deleting an account', () => {
 async function racedFixture(fires: (text: string) => boolean): Promise<{ store: Store; ada: string }> {
   let store: Store | undefined;
   let ada = '';
-  const sql = new RacingSql(new PgliteSql(), fires, async () => {
+  const sql = new RacingSql(testSql(), fires, async () => {
     await store?.deleteUser(ada);
   });
   store = await Store.open({ sql, now: () => 1_770_000_000_000 });
@@ -812,10 +804,10 @@ describe('an account deleted underneath a submission', () => {
  */
 async function contendedFixture(options: {
   readonly fires: (text: string) => boolean;
-  readonly contend: (sql: PgliteSql) => Promise<void>;
-}): Promise<{ store: Store; sql: PgliteSql; ada: string; arm: () => void }> {
+  readonly contend: (sql: Sql) => Promise<void>;
+}): Promise<{ store: Store; sql: Sql; ada: string; arm: () => void }> {
   let armed = false;
-  const inner = new PgliteSql();
+  const inner = testSql();
   const sql = new RacingSql(
     inner,
     (text) => armed && options.fires(text),

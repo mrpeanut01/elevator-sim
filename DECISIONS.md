@@ -55783,3 +55783,77 @@ visit sees the front door and nothing else until it presses.
 
 **Numbers spent.** Wave AX took the charter row's **D1628** and moved the row to D1629; nothing is
 holed.
+
+## D1629 — the store runs on SQLite or PostgreSQL behind one seam, and the URL picks the engine
+
+> **Taken 2026-11-11 by the product owner** ("plan it and build the PR … move it to a connection
+> handler so that a change back later will not be as difficult"), after the Azure invoice for October
+> showed the PostgreSQL flexible server as the deployment's whole fixed cost. Built the same day by one
+> agent session working directly for the owner, outside any wave. **Amends [§ D361](#d361)** only in
+> that `SqliteSql` wraps `Sql.exec` in a transaction, which is not a seam `Store` can reach.
+> **Owner-reversible**: `databaseEngine=postgres` in `infra/azure/main.bicep` runs the store on
+> PostgreSQL exactly as before, and it is the template's default.
+
+**Why an entry.** It binds the store, the server's boot, the container image, the Azure template and
+the runbook, which no one module owns, and it reverses the reason `store.ts` gave for leaving
+`node:sqlite`.
+
+**The reason in one sentence.** The server cost a fixed ≈ $16 a month (`infra/README.md` § 5) for a
+leaderboard that is idle most of the day, and a SQLite file replicated to Blob Storage by Litestream
+answers the one objection that moved the store to PostgreSQL, a container filesystem that does not
+outlive the container.
+
+**What is ruled.**
+
+1. **Both engines ship, behind the existing `Sql` seam.** `SqliteSql` (`store/sqlite.ts`) joins
+   `PgSql`. `store/connect.ts#sqlFor` picks one from `ELEVATOR_SIM_DB`: `file:` is SQLite,
+   `postgres://` is PostgreSQL, anything else is refused. `main.ts` and `telemetry/dashboardMain.ts`
+   are the non-test callers.
+2. **One query text for both.** The store's SQL is written in the subset both engines parse. The five
+   best-row-per-player board queries move from `DISTINCT ON` to `ROW_NUMBER()`, with `id` as a final
+   tie-break that makes an exact tie determinate where `DISTINCT ON` picked arbitrarily;
+   `starts_with` becomes `SUBSTR`/`LENGTH`; `::` casts become `CAST`. The driver normalises only
+   transport: `$n` bound as SQLite's named parameters, booleans as `0`/`1`, `rowCount`, constraint
+   errors carrying PostgreSQL's SQLSTATE, `exec` as one transaction, and `LOWER` replaced by a Unicode
+   fold so display names collide on SQLite as they do on PostgreSQL.
+3. **The migration runner is the one reader of `Sql.dialect`.** Migrations 1, 2, 5 and 6
+   (`ADD COLUMN IF NOT EXISTS`, which SQLite cannot parse) carry an empty SQLite form, because every
+   SQLite database starts at migration 0 with those columns already in it; the version is still
+   recorded. A future column is a plain `ADD COLUMN` both engines run, and not added to `SCHEMA` too.
+4. **Both engines run the store's tests.** `store.sqlite.test.ts` and `chimes/ledger.sqlite.test.ts`
+   import the existing suites with `useTestEngine('sqlite')`, inside the `server` project that
+   `ci.yml` already runs, because a new vitest project would be named by no CI leg
+   (`ciWorkflowMatrix.test.ts`). `migrations.test.ts` stays PostgreSQL's, since it reads PostgreSQL's
+   catalogs; `sqlite.test.ts` covers the SQLite side.
+5. **The cutover copies inside the container, once.** The deployed server admits Azure services only,
+   so the copy cannot run from a laptop. `store/importer.ts` runs at boot when
+   `ELEVATOR_SIM_IMPORT_FROM` is set: only into SQLite, only into a store with no players, every table
+   in one transaction, with its table list held equal to the schema's by `importer.test.ts`.
+6. **SQLite pins one replica, and refuses to start empty by accident.** The template sets
+   `maxReplicas` to 1 on SQLite. `infra/entrypoint.sh` restores the newest replica, stops on a restore
+   error, and refuses a boot with no replica unless the cutover's import or `allowEmptyDatabase` says
+   an empty store is intended.
+7. **The replica is cheap by construction.** Locally redundant Hot storage with no blob versioning,
+   and 24 hours of Litestream retention, because crop-card measured a week of retention on
+   geo-redundant storage at about $65 a month in `ListBlobs` calls alone.
+
+**What it does not change.** The store's API, its schema, its no-transaction design for requests, the
+default engine of an existing deployment, and every other test that hands the store a `PgliteSql`.
+
+**What it costs, said plainly.** Point-in-time restore on SQLite is 24 hours, where PostgreSQL's floor
+was 7 days. One replica is the ceiling on SQLite. A cold start restores before it serves, which is
+unmeasured on Azure. Nothing copies SQLite back into PostgreSQL, so going back starts from an empty
+server, and `infra/README.md` § 8 says so. The SQLite storage bill is a forecast from another
+deployment's invoice until this one's first invoice replaces it.
+
+**Held by** `store/sqlite.test.ts` (the driver's transport promises and the migration register),
+`store/store.sqlite.test.ts` and `chimes/ledger.sqlite.test.ts` (every store and ledger case on
+SQLite, and that the engine really is SQLite), `store/importer.test.ts` (the copy, its three refusals,
+its rollback and its table list), and `store/connect.test.ts` (the URL picks the engine). Run by hand
+against the built server on 2026-11-11, with Litestream 0.3.13 against Azurite and the importer reading
+PGlite over the PostgreSQL wire protocol through `pg`: a refused empty boot, a first boot, a write
+replicated, a restore after the disk was wiped, and a cutover copy whose `BIGINT` strings landed as
+integers.
+
+**Numbers spent.** This session took the charter row's **D1629** and moved the row to D1630; nothing
+is holed.

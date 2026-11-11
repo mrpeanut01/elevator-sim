@@ -1,0 +1,27 @@
+# Litestream: the SQLite store replicated to Blob Storage — DECISIONS.md § D1629.
+#
+# Read by infra/entrypoint.sh, and only when ELEVATOR_SIM_DB is a `file:` URL and the storage
+# settings are present. The three ${…} values come from the Container App's environment
+# (infra/azure/main.bicep): the account and container names in plain text, the key as a secret.
+#
+# Every value below was chosen for cost as much as for safety, and the reason is a bill rather than
+# a guess. Litestream 0.3 begins a new generation on every cold start, and a restore lists the
+# snapshots and WAL of every generation it keeps. The sister project crop-card ran 168 h of
+# retention against about 60 cold starts a day and paid about $65 a month for the ListBlobs calls
+# alone (crop-card PR #888). This app also scales to zero, so the same arithmetic applies.
+#
+#   retention: 24h      — about one day of generations is listed per boot, not a week of them.
+#   snapshot-interval   — hourly, so a restore replays at most an hour of WAL.
+#   sync-interval: 1s   — Litestream's default: a write reaches Blob within about a second.
+
+dbs:
+  - path: ${ELEVATOR_SIM_DB_PATH}
+    replicas:
+      - type: abs
+        account-name: ${AZURE_STORAGE_ACCOUNT}
+        account-key: ${AZURE_STORAGE_KEY}
+        bucket: ${AZURE_BLOB_CONTAINER}
+        path: elevator-sim.db
+        retention: 24h
+        snapshot-interval: 1h
+        sync-interval: 1s

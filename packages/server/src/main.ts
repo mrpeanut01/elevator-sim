@@ -24,7 +24,9 @@ import {
   type PreviewOrigins,
   type StaticBundle,
 } from './http/static.js';
-import { PgSql } from './store/sql.js';
+import { sqlFor } from './store/connect.js';
+import { importOnce } from './store/importer.js';
+import type { Sql } from './store/sql.js';
 
 /**
  * The `null` origin: *"no page may call this API cross-origin"*.
@@ -108,8 +110,9 @@ function requireDatabaseUrl(env: Readonly<Record<string, string | undefined>>): 
   const url = env['ELEVATOR_SIM_DB'];
   if (url === undefined || url.trim().length === 0) {
     throw new Error(
-      'ELEVATOR_SIM_DB is not set. It is the PostgreSQL connection string, e.g. ' +
-        'postgres://user:password@host:5432/elevator_sim?sslmode=require. There is deliberately ' +
+      'ELEVATOR_SIM_DB is not set. It is the database the server uses: a SQLite file, e.g. ' +
+        'file:/data/elevator-sim.db, or a PostgreSQL connection string, e.g. ' +
+        'postgres://user:password@host:5432/elevator_sim?sslmode=require (§ D1629). There is deliberately ' +
         'no default: one pointing at localhost is how an empty database gets mistaken for a live one.',
     );
   }
@@ -383,6 +386,26 @@ export function trustedHopsFrom(env: Readonly<Record<string, string | undefined>
 }
 
 /**
+ * The one-time copy from PostgreSQL into SQLite at the cutover — § D1629, `store/importer.ts`.
+ *
+ * Runs before `bootstrap`, so no request is served on a half-copied store. Does nothing unless
+ * `ELEVATOR_SIM_IMPORT_FROM` is set, and the importer itself refuses a store that already has
+ * players, so leaving the variable set after the cutover is harmless. The outcome is logged, because
+ * it is the one line an operator reads to know the cutover worked.
+ */
+async function importOnBoot(env: Readonly<Record<string, string | undefined>>, destination: Sql): Promise<void> {
+  const from = env['ELEVATOR_SIM_IMPORT_FROM']?.trim();
+  if (from === undefined || from.length === 0) return;
+  const source = sqlFor(from);
+  try {
+    const outcome = await importOnce(source, destination, () => Date.now());
+    console.log(`[import] ${JSON.stringify(outcome)}`);
+  } finally {
+    await source.close();
+  }
+}
+
+/**
  * Read the environment, boot, listen.
  *
  * Exported and takes its environment as an argument so the wiring is testable without spawning a
@@ -402,9 +425,11 @@ export async function main(env: Readonly<Record<string, string | undefined>>): P
   // is a configuration mistake and those belong next to their cause rather than a database
   // connection away from it.
   const trustedHops = trustedHopsFrom(env);
+  const sql = sqlFor(requireDatabaseUrl(env));
+  await importOnBoot(env, sql);
   const server = await bootstrap({
     dataDir: env['ELEVATOR_SIM_DATA'] ?? fileURLToPath(new URL('../../../data/', import.meta.url)),
-    sql: new PgSql(requireDatabaseUrl(env)),
+    sql,
     env,
     publicOrigin: viewerOrigin,
   });

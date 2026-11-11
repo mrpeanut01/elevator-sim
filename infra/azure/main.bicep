@@ -1,6 +1,13 @@
-// Hosting the elevator simulator on Azure: one Container App serving the viewer and the API, a
-// PostgreSQL flexible server behind it, and Communication Services for the one mail this product
-// sends.
+// Hosting the elevator simulator on Azure: one Container App serving the viewer and the API, its
+// store behind it, and Communication Services for the one mail this product sends.
+//
+// ## The store, and the switch between its two engines (DECISIONS.md § D1629)
+//
+// `databaseEngine` picks it. `'postgres'` is a PostgreSQL flexible server, as this template has always
+// deployed; it is the default so that redeploying an existing installation changes nothing. `'sqlite'`
+// is a file on the container's disk, replicated to a locally redundant storage account by Litestream
+// (`infra/litestream.yml`, `infra/entrypoint.sh`), which removes the server's fixed ≈ $16 a month. The
+// cutover from one to the other, with the copy of every row, is `infra/README.md` § 8.
 //
 // ## What this is not
 //
@@ -45,13 +52,38 @@ Generate one with: openssl rand -base64 48
 @minLength(32)
 param appSecret string
 
+@description('''
+Which store the app runs on — DECISIONS.md § D1629. `postgres` (the default, and what every existing
+deployment runs) is a PostgreSQL flexible server. `sqlite` is a file replicated to Blob Storage by
+Litestream, at pennies a month, and pins the app to one replica, because SQLite has one writer.
+Switching an existing deployment to `sqlite` is infra/README.md § 8: do it with `importFromPostgres`.
+''')
+@allowed([
+  'postgres'
+  'sqlite'
+])
+param databaseEngine string = 'postgres'
+
+@description('''
+Only with databaseEngine `sqlite`: keep the PostgreSQL server and hand its URL to the app as
+ELEVATOR_SIM_IMPORT_FROM, so the first boot copies every row into SQLite (packages/server/src/store/importer.ts).
+Leave it true until infra/README.md § 8 says the copy is verified, then redeploy with it false and delete the server.
+''')
+param importFromPostgres bool = false
+
+@description('''
+Only with databaseEngine `sqlite`, and only for a brand new deployment with nothing to import: lets the
+first boot start on an empty store. Without it, a boot that finds no replica refuses to start rather than
+serve an empty leaderboard, because a lost replica and a new deployment look the same to the container.
+''')
+param allowEmptyDatabase bool = false
+
 @description('PostgreSQL administrator login.')
 param databaseAdminUser string = 'elevsimadmin'
 
-@description('PostgreSQL administrator password.')
+@description('PostgreSQL administrator password. Required whenever a PostgreSQL server is deployed: databaseEngine `postgres`, or `importFromPostgres`.')
 @secure()
-@minLength(12)
-param databaseAdminPassword string
+param databaseAdminPassword string = ''
 
 @description('''
 The address confirmation mail is sent from.
@@ -113,6 +145,15 @@ param logRetentionDays int = 30
 // --------------------------------------------------------------------------- names
 
 var uniqueSuffix = uniqueString(resourceGroup().id)
+var useSqlite = databaseEngine == 'sqlite'
+// The server exists while the app runs on it, and while the cutover still reads from it.
+var deployPostgres = !useSqlite || importFromPostgres
+// One writer: two replicas would be two copies of the file, each believing it is the store.
+var effectiveMaxReplicas = useSqlite ? 1 : maxReplicas
+var sqlitePath = '/data/elevator-sim.db'
+// Storage account names are 3–24 lower-case letters and digits, globally unique.
+var storageName = take('${replace(namePrefix, '-', '')}db${uniqueSuffix}', 24)
+var litestreamContainerName = 'litestream'
 var databaseName = 'elevator_sim'
 var postgresName = '${namePrefix}-pg-${uniqueSuffix}'
 var identityName = '${namePrefix}-identity'
@@ -241,7 +282,40 @@ resource commsRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
 
 // --------------------------------------------------------------------------- database
 
-resource postgres 'Microsoft.DBforPostgreSQL/flexibleServers@2023-12-01-preview' = {
+// The SQLite store's replica (§ D1629). Locally redundant and Hot: the replica is a backup of a file
+// that also lives on the container, so a second region's copy is a cost without a reader, and Cool
+// would bill every restore's reads. No blob versioning: Litestream keeps its own 24 hours of history,
+// and versions of WAL segments it deletes were most of what made crop-card's equivalent account
+// expensive to keep. Seven days of soft delete covers a container deleted by mistake.
+resource storage 'Microsoft.Storage/storageAccounts@2023-05-01' = if (useSqlite) {
+  name: storageName
+  location: location
+  sku: { name: 'Standard_LRS' }
+  kind: 'StorageV2'
+  properties: {
+    accessTier: 'Hot'
+    minimumTlsVersion: 'TLS1_2'
+    allowBlobPublicAccess: false
+    supportsHttpsTrafficOnly: true
+  }
+}
+
+resource blobService 'Microsoft.Storage/storageAccounts/blobServices@2023-05-01' = if (useSqlite) {
+  parent: storage
+  name: 'default'
+  properties: {
+    deleteRetentionPolicy: { enabled: true, days: 7 }
+    containerDeleteRetentionPolicy: { enabled: true, days: 7 }
+  }
+}
+
+resource litestreamContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' = if (useSqlite) {
+  parent: blobService
+  name: litestreamContainerName
+  properties: { publicAccess: 'None' }
+}
+
+resource postgres 'Microsoft.DBforPostgreSQL/flexibleServers@2023-12-01-preview' = if (deployPostgres) {
   name: postgresName
   location: location
   sku: {
@@ -270,7 +344,7 @@ resource postgres 'Microsoft.DBforPostgreSQL/flexibleServers@2023-12-01-preview'
   }
 }
 
-resource database 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2023-12-01-preview' = {
+resource database 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2023-12-01-preview' = if (deployPostgres) {
   parent: postgres
   name: databaseName
   properties: {
@@ -287,7 +361,7 @@ resource database 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2023-12-0
 // password is then the only thing between that reachability and the data. The fix is VNet
 // integration with a private endpoint, which is a larger topology (a VNet, two delegated subnets, a
 // private DNS zone) and roughly doubles the standing cost. See infra/README.md § 7.
-resource allowAzure 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRules@2023-12-01-preview' = {
+resource allowAzure 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRules@2023-12-01-preview' = if (deployPostgres) {
   parent: postgres
   name: 'allow-azure-services'
   properties: {
@@ -298,7 +372,12 @@ resource allowAzure 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRules@202
 
 // `sslmode=require`: the server accepts TLS and this makes the client insist on it. Without it a
 // driver that silently fell back to plaintext would carry the password across in the clear.
-var databaseUrl = 'postgres://${databaseAdminUser}:${uriComponent(databaseAdminPassword)}@${postgres.properties.fullyQualifiedDomainName}:5432/${databaseName}?sslmode=require'
+var postgresUrl = deployPostgres
+  ? 'postgres://${databaseAdminUser}:${uriComponent(databaseAdminPassword)}@${postgres!.properties.fullyQualifiedDomainName}:5432/${databaseName}?sslmode=require'
+  : ''
+// The URL picks the engine (packages/server/src/store/connect.ts). A file path is not a secret, but it
+// rides in the same secret slot so the container's environment has one shape on either engine.
+var databaseUrl = useSqlite ? 'file:${sqlitePath}' : postgresUrl
 
 // --------------------------------------------------------------------------- the app
 
@@ -336,10 +415,14 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
         allowInsecure: false
         transport: 'auto'
       }
-      secrets: [
-        { name: 'app-secret', value: appSecret }
-        { name: 'database-url', value: databaseUrl }
-      ]
+      secrets: concat(
+        [
+          { name: 'app-secret', value: appSecret }
+          { name: 'database-url', value: databaseUrl }
+        ],
+        useSqlite ? [{ name: 'storage-key', value: storage!.listKeys().keys[0].value }] : [],
+        useSqlite && importFromPostgres ? [{ name: 'import-from', value: postgresUrl }] : []
+      )
       registries: empty(containerRegistryServer) ? [] : [
         {
           server: containerRegistryServer
@@ -356,7 +439,7 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
             cpu: json('0.5')
             memory: '1Gi'
           }
-          env: [
+          env: concat([
             { name: 'NODE_ENV', value: 'production' }
             { name: 'PORT', value: '8787' }
             { name: 'ELEVATOR_SIM_SECRET', secretRef: 'app-secret' }
@@ -417,7 +500,16 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
             // The identity the ACS SDK's DefaultAzureCredential must choose. Without it, a
             // container carrying exactly one user-assigned identity still has to be told which.
             { name: 'AZURE_CLIENT_ID', value: identity.properties.clientId }
-          ]
+          ], useSqlite ? [
+            // Read by infra/litestream.yml through infra/entrypoint.sh (§ D1629).
+            { name: 'AZURE_STORAGE_ACCOUNT', value: storage!.name }
+            { name: 'AZURE_STORAGE_KEY', secretRef: 'storage-key' }
+            { name: 'AZURE_BLOB_CONTAINER', value: litestreamContainerName }
+          ] : [], useSqlite && importFromPostgres ? [
+            { name: 'ELEVATOR_SIM_IMPORT_FROM', secretRef: 'import-from' }
+          ] : [], useSqlite && allowEmptyDatabase ? [
+            { name: 'ELEVATOR_SIM_ALLOW_EMPTY_DB', value: '1' }
+          ] : [])
           probes: [
             {
               type: 'Readiness'
@@ -432,7 +524,7 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
         // **The cost model lives here.** At 0, the app bills nothing at rest — this is exactly what
         // the withdrawn Phase A template claimed and did not do.
         minReplicas: minReplicas
-        maxReplicas: maxReplicas
+        maxReplicas: effectiveMaxReplicas
         rules: [
           {
             name: 'http-concurrency'
@@ -448,7 +540,7 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
   // explicit edge, Bicep sees no dependency between the role assignment and the app — the app
   // references the *identity*, not the assignment — and is free to create the app first, which
   // fails to pull.
-  dependsOn: [database, allowAzure, commsRole, registryPull]
+  dependsOn: [database, allowAzure, litestreamContainer, commsRole, registryPull]
 }
 
 // --------------------------------------------------------------------------- outputs
@@ -468,8 +560,12 @@ output viewerUrl string = empty(viewerOrigin) ? 'https://${app.properties.config
 @description('Whether the page and the API are on one origin. False means three values have to agree — see docs/16 § 3.')
 output sameOrigin bool = empty(viewerOrigin)
 
-@description('The PostgreSQL host, for psql or a migration.')
-output postgresFqdn string = postgres.properties.fullyQualifiedDomainName
+@description('The PostgreSQL host, for psql or a migration. Empty when no PostgreSQL server is deployed.')
+output postgresFqdn string = deployPostgres ? postgres!.properties.fullyQualifiedDomainName : ''
+
+@description('Which store the app runs on, and the storage account holding its replica when that is SQLite (§ D1629).')
+output databaseEngine string = databaseEngine
+output replicaStorageAccount string = useSqlite ? storage!.name : ''
 
 @description('The verified sender the app is configured to send from.')
 output mailFromDomain string = azureManagedDomain.properties.mailFromSenderDomain
