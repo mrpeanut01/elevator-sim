@@ -407,6 +407,17 @@ describe('the drawing board is not decoration — every control moves the legs',
     expect(planFromBuilding(config, panelled.id).plan.panelByFloor).toEqual({ 0: 'destination-entry' });
     expect(planFromBuilding(config, panelled.id).notCarried).toEqual([]);
     expect(withPanel(panelled, [0], undefined)).toEqual(base);
+    expect(planAnalysisOf(panelled, SPECS).refusals).toEqual([]);
+    /*
+     * A panel changes what a call discloses, so it moves the run only under a controller that reads
+     * the destination. Under `eta` it moves nothing, and the board's hint says so.
+     */
+    expect(legsOf(panelled)).toBe(control);
+    const reader = PROFILES.profiles.find((profile) => profile.id === 'destination-eta') as DispatcherProfile;
+    /* And there the lobby already has one, so it is taking the panel away that changes the run. */
+    expect(legsOf(panelled, { dispatcherProfile: reader })).toBe(legsOf(base, { dispatcherProfile: reader }));
+    const buttoned = withPanel(base, [0], 'up-down-buttons');
+    expect(legsOf(buttoned, { dispatcherProfile: reader })).not.toBe(legsOf(base, { dispatcherProfile: reader }));
   });
 
   it('an escalator made slower changes the run where a journey has to take it', () => {

@@ -10803,6 +10803,8 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
        is seeded below all the same, because a label is still something a player reads. */
     'everyday/designerModel.ts#DESIGNER_KIND_COPY',
     'everyday/designerModel.ts#DESIGNER_PANEL_COPY',
+    /* Drawn on the group row and under the headline figures, by the `paired-one` arm below. */
+    'authoring/towerPlan.ts#TWO_CAR_FIGURES_WITHHELD',
     'everyday/designerModel.ts#designerGroupRows',
     'everyday/designerModel.ts#designerFloorFacts',
     'everyday/designerModel.ts#designerServiceLine',

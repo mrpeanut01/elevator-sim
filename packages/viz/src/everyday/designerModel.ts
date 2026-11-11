@@ -196,7 +196,7 @@ export const DESIGNER_COPY = Object.freeze({
   stairsRefused: 'A stair needs all four: a climb no quicker than the walk down, and two shares from 0 to 100.',
   panelLabel: 'Call panel on the landing',
   panelHint:
-    'What a rider presses here. A destination panel asks which floor they want before they board. It changes what the controller is told, and stops no lift and no rider.',
+    'What a rider presses here. A destination panel asks which floor they want before they board. It changes what the controller is told, and stops no lift and no rider. A run changes only where the panel differs from what the controller already uses.',
   descentLabel: 'Coming down',
   descentSame: 'As fast as going up',
   descentHint:
