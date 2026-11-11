@@ -62,7 +62,14 @@ import { batchReport, populationLineOf, type BatchReport } from '../batch/report
 import { SuiteError, suiteCellViewOf, suitePlanOf, suiteSummaryOf } from '../batch/suite.js';
 import { BATCH_METRIC_CLASS, BATCH_METRIC_PRESENTATION, BATCH_METRICS, type BatchResult, type BatchWorkerMessage } from '../batch/types.js';
 import { briefingFor } from '../campaign/brief.js';
-import { ACTION_BAR_ROWS, actionBarFor, confirmStripFor, TIMELINE_STEPS, WATCHING_NOTE_OWN } from '../everyday/actionBar.js';
+import {
+  ACTION_BAR_ROWS,
+  actionBarFor,
+  confirmStripFor,
+  testSimulationBarOf,
+  TIMELINE_STEPS,
+  WATCHING_NOTE_OWN,
+} from '../everyday/actionBar.js';
 import {
   everydayWatchingCopyOf,
   everydayWatchingStrings,
@@ -643,24 +650,15 @@ import {
   LANDING_FIRST_SESSION_CALL_TO_ACTION,
   landingViewOf,
 } from '../everyday/landingView.js';
+import { GAME_FLOORS } from '../everyday/floors.js';
+import { TEST_SIMULATION_LABEL } from '../everyday/types.js';
 import {
   LOBBY_COPY,
-  LOBBY_FLOORS,
   LOBBY_INITIAL,
-  LOBBY_WARNINGS,
-  lobbyArrived,
-  lobbyCall,
-  lobbyClose,
-  lobbyDepart,
-  lobbyFloorOf,
-  lobbyHold,
-  lobbyPick,
-  lobbyRideBack,
-  lobbyStepToward,
-  lobbyTick,
+  lobbyPoint,
+  lobbyPress,
   lobbyTurnKey,
   lobbyViewOf,
-  type LobbyFloorKey,
   type LobbyState,
 } from '../everyday/lobbyModel.js';
 import {
@@ -10297,12 +10295,15 @@ const EVERYDAY_MENU: SurfaceAdapter = {
     /* Wave AS, lane AS-4 (#636 item 6): the played day's subline with the stage's clock. */
     'everyday/rail.ts#stageSublineOf',
     'everyday/rail.ts#STAGE_RAIL_PHASE_WORDS',
-    'everyday/rail.ts#railGroups',
+    'everyday/rail.ts#railShaft',
     'everyday/rail.ts#railFooter',
     'everyday/rail.ts#railModel',
     'everyday/actionBar.ts#ACTION_BAR_ROWS',
     'everyday/actionBar.ts#actionBarFor',
     'everyday/actionBar.ts#confirmStripFor',
+    /* § D1627: a test simulation's stage and report, with the way back to the bench. */
+    'everyday/actionBar.ts#TEST_SIMULATION_LEAVE',
+    'everyday/actionBar.ts#testSimulationBarOf',
     /* § D1218 — the brief's resume and held driver, and the strip over a day whose attempt stands. */
     'shift/attempt.ts#DAY_ATTEMPT_COPY',
     'everyday/actionBar.ts#TIMELINE_STEPS',
@@ -10405,17 +10406,20 @@ const EVERYDAY_MENU: SurfaceAdapter = {
       const where = inCampaign ? 'in-campaign' : 'no-campaign';
       seeds.push({ field: `rail.${where}.brand`, text: model.brand, role: 'label' });
       seeds.push({ field: `rail.${where}.mode`, text: model.mode, role: 'label' });
-      for (const group of model.groups) {
-        seeds.push({ field: `rail.${where}.${group.title}`, text: group.title, role: 'label' });
-        for (const item of group.items) {
+      for (const floor of model.shaft.floors) {
+        seeds.push({ field: `rail.${where}.${floor.key}`, text: floor.name, role: 'label' });
+        if (floor.unavailable !== undefined) {
+          seeds.push({ field: `rail.${where}.${floor.key}.unavailable`, text: floor.unavailable, role: 'reason' });
+        }
+        for (const item of floor.rooms) {
           seeds.push({
-            field: `rail.${where}.${group.title}.${item.screen}`,
+            field: `rail.${where}.${floor.key}.${item.screen}`,
             text: item.label,
             role: 'label',
           });
           if (item.unavailable !== undefined) {
             seeds.push({
-              field: `rail.${where}.${group.title}.${item.screen}.unavailable`,
+              field: `rail.${where}.${floor.key}.${item.screen}.unavailable`,
               text: item.unavailable,
               role: 'reason',
             });
@@ -10423,6 +10427,31 @@ const EVERYDAY_MENU: SurfaceAdapter = {
         }
       }
     }
+
+    /*
+     * § D1627: a test simulation's stage and report, in the tray's voice, with and without the
+     * stage's clock. The words are the design floor's own label, so the bar and the tray agree.
+     */
+    seeds.push({
+      field: 'rail.subline.stage.test',
+      text: stageSublineOf({ screen: 'stage', ctx: 'daily' }, undefined, true),
+      role: 'label',
+    });
+    seeds.push({
+      field: 'rail.subline.stage.test.running',
+      text: stageSublineOf({ screen: 'stage', ctx: 'daily' }, { clock: '08:41', phase: 'running' }, true),
+      role: 'label',
+    });
+    for (const screen of ['stage', 'report'] as const) {
+      const tested = testSimulationBarOf(actionBarFor({ screen, ctx: 'daily' }), 'workshop');
+      seeds.push({ field: `bar.test.${screen}.leave`, text: tested.leave.label, role: 'label' });
+      seeds.push({ field: `bar.test.${screen}.primary`, text: tested.primary.label, role: 'label' });
+    }
+    seeds.push({
+      field: 'rail.subline.report.test',
+      text: stageSublineOf({ screen: 'report', ctx: 'daily' }, undefined, true),
+      role: 'label',
+    });
 
     /*
      * **The two words the small-screen drawer is worked by** — GitHub issue #240.
@@ -18189,102 +18218,74 @@ const EVERYDAY_LANDING: SurfaceAdapter = {
  * -------------------------------------------------------------------------- */
 
 /**
- * **The elevator a cold launch opens on, at every stop of its machine.**
+ * **The hall a cold launch opens on, at every landing of its machine** — § D1445 as redrawn by
+ * [§ D1627](../../../../DECISIONS.md).
  *
- * `everyday/lobbyModel.ts` carries the words and the door decisions; `everyday/lobbyScreen.ts` is
- * the mount and is excluded on the DOM mounts' shared ground. The display changes with the phase,
- * the choice, the hold, the key and the first-visit question, so the drive below rides the car the
- * way a player does: CALL, every floor chosen in turn, a warning of each kind, a hold, a departure
- * up and one down to the basement, an arrival with and without the key, and the ride back. Each
- * state's whole view is seeded, so a sentence that only one of them draws is still read.
+ * `everyday/lobbyModel.ts` carries the words and the small machine; `everyday/lobbyScreen.ts` is the
+ * mount and is excluded on the DOM mounts' shared ground. The display changes with the landing the
+ * car is pointed at, the key and the first-visit question, so the drive below points at every
+ * landing in turn with the key each way, for a first visit and a return, and seeds each state's
+ * whole view. Every landing's press is read too: the floor it names is the floor the display
+ * described.
  *
- * The play floors' words are the menu tiles' and the Scenario hub's (`modes.ts`, `scenarioModel.ts`),
- * which their own adapters already sweep; they are seeded here again because this is a second
- * surface that draws them, and `SCENARIO_ENTRIES` is claimed here because the lobby is the reader
- * that made it an export.
+ * The floors themselves are `everyday/floors.ts`'s, which the tray's shaft draws as well; they are
+ * claimed here because this surface draws every word of them (name, body, status and the rooms).
+ * The play floors' words are the menu tiles' (`modes.ts`), which `EVERYDAY_MENU` already sweeps.
+ * `SCENARIO_ENTRIES` stays claimed here from the § D1445 panel, which was the reader that made it
+ * an export; the Scenario hub draws it now, and its strings are seeded below as they were.
  */
 const EVERYDAY_LOBBY: SurfaceAdapter = {
   id: 'everyday/lobbyModel.ts#lobbyViewOf',
   covers: [
     'everyday/lobbyModel.ts#lobbyViewOf',
     'everyday/lobbyModel.ts#LOBBY_COPY',
-    'everyday/lobbyModel.ts#LOBBY_FLOORS',
-    'everyday/lobbyModel.ts#LOBBY_WARNINGS',
-    'everyday/lobbyModel.ts#lobbyFloorOf',
-    'everyday/lobbyModel.ts#lobbyPick',
-    'everyday/lobbyModel.ts#lobbyClose',
-    'everyday/lobbyModel.ts#lobbyHold',
-    'everyday/lobbyModel.ts#lobbyTick',
+    'everyday/floors.ts#GAME_FLOORS',
+    'everyday/floors.ts#gameFloorOf',
+    'everyday/types.ts#TEST_SIMULATION_LABEL',
     'everyday/scenarioModel.ts#SCENARIO_ENTRIES',
   ],
   render(this: SurfaceAdapter, context) {
     void context;
     const seeds: TextSeed[] = [];
     const seen = new Set<string>();
+    const push = (field: string, text: string, role: NonNullable<TextSeed['role']>): void => {
+      if (text === '' || seen.has(`${field.split('.').at(-1) ?? ''}:${text}`)) return;
+      seen.add(`${field.split('.').at(-1) ?? ''}:${text}`);
+      seeds.push({ field, text, role });
+    };
     const seed = (arm: string, state: LobbyState, firstVisit: boolean): void => {
       const view = lobbyViewOf(state, { firstVisit });
-      const fields: readonly (readonly [string, string, NonNullable<TextSeed['role']>])[] = [
-        ['kicker', view.kicker, 'label'],
-        ['title', view.title, 'label'],
-        ['body', view.body, 'prose'],
-        ['status', view.status, 'prose'],
-        ['statusLine', view.statusLine, 'reason'],
-        ['hint', view.hint, 'prose'],
-        ['lcdLine', view.lcdLine, 'label'],
-        ['arrivalFloor', view.arrivalFloor, 'label'],
-        ['arrivalName', view.arrivalName, 'label'],
-        ['arrivalBody', view.arrivalBody, 'prose'],
-        ['arrivalNote', view.arrivalNote, 'reason'],
-      ];
-      for (const [name, text, role] of fields) {
-        if (text === '' || seen.has(`${name}:${text}`)) continue;
-        seen.add(`${name}:${text}`);
-        seeds.push({ field: `lobby.${arm}.${name}`, text, role });
+      push(`lobby.${arm}.kicker`, view.kicker, 'label');
+      push(`lobby.${arm}.title`, view.title, 'label');
+      push(`lobby.${arm}.body`, view.body, 'prose');
+      push(`lobby.${arm}.status`, view.status, 'prose');
+      push(`lobby.${arm}.keyNote`, view.keyNote, 'reason');
+      for (const landing of view.landings) {
+        push(`lobby.${arm}.landing.${landing.key}.name`, landing.name, 'label');
+        push(`lobby.${arm}.landing.${landing.key}.body`, landing.body, 'prose');
+        push(`lobby.${arm}.landing.${landing.key}.status`, landing.status, 'prose');
+        push(`lobby.${arm}.landing.${landing.key}.rooms`, landing.rooms, 'label');
       }
-    };
-    const ride = (from: LobbyState, to: LobbyFloorKey): LobbyState => {
-      let state = from;
-      for (let guard = 0; guard < 12 && state.car !== to; guard += 1) state = lobbyStepToward(state, to);
-      return state;
     };
 
     for (const firstVisit of [true, false]) {
       const who = firstVisit ? 'first' : 'returning';
-      seed(`${who}.idle`, LOBBY_INITIAL, firstVisit);
-      seed(`${who}.idle.warned`, lobbyPick(LOBBY_INITIAL, '8').state, firstVisit);
-      seed(`${who}.idle.holdWarned`, lobbyHold(LOBBY_INITIAL).state, firstVisit);
-      const arriving = lobbyCall(LOBBY_INITIAL).state;
-      seed(`${who}.arriving`, lobbyStepToward(arriving, 'L'), firstVisit);
-      const open = lobbyArrived(ride(arriving, 'L'));
-      seed(`${who}.open`, open, firstVisit);
-      seed(`${who}.open.closeWarned`, lobbyClose(open).state, firstVisit);
-      for (const floor of LOBBY_FLOORS) {
-        const key = lobbyFloorOf(floor.key).key;
-        const picked = lobbyPick(open, key).state;
-        seed(`${who}.picked.${key}`, picked, firstVisit);
-        seed(`${who}.held.${key}`, lobbyHold(picked).state, firstVisit);
-        const closing = lobbyClose(picked).state;
-        seed(`${who}.closing.${key}`, closing, firstVisit);
-        const travel = lobbyDepart(closing).state;
-        seed(`${who}.travel.${key}`, lobbyStepToward(travel, key), firstVisit);
-        const arrived = lobbyArrived(ride(travel, key));
-        seed(`${who}.arrived.${key}`, arrived, firstVisit);
-        const keyed = lobbyArrived(ride(lobbyDepart(lobbyClose(lobbyPick(lobbyTurnKey(open).state, key).state).state).state, key));
-        seed(`${who}.arrived.${key}.engineer`, keyed, firstVisit);
-        const back = lobbyDepart(lobbyRideBack(arrived).state).state;
-        seed(`${who}.back.${key}`, lobbyStepToward(back, 'L'), firstVisit);
-      }
-      seed(`${who}.open.engineerKey`, lobbyTurnKey(open).state, firstVisit);
-      /* The auto-close counting down to its own departure, one second at a time. */
-      let counting = lobbyPick(open, '8').state;
-      for (let second = 0; second < 8 && counting.phase === 'open'; second += 1) {
-        counting = lobbyTick(counting).state;
-        seed(`${who}.countdown.${String(second)}`, counting, firstVisit);
+      seed(`${who}.welcome`, LOBBY_INITIAL, firstVisit);
+      seed(`${who}.welcome.engineerKey`, lobbyTurnKey(LOBBY_INITIAL), firstVisit);
+      for (const floor of GAME_FLOORS) {
+        const pointed = lobbyPoint(LOBBY_INITIAL, floor.key);
+        seed(`${who}.pointed.${floor.key}`, pointed, firstVisit);
+        seed(`${who}.pointed.${floor.key}.engineer`, lobbyTurnKey(pointed), firstVisit);
+        /* The press names the floor the display described, in the view the key says. */
+        push(`lobby.${who}.press.${floor.key}.name`, lobbyPress(pointed, floor.key).floor.name, 'label');
       }
     }
 
-    /* The two tables the view reads, claimed by name above and touched here, as `EVERYDAY_LANDING` does. */
-    void [LOBBY_COPY, LOBBY_WARNINGS, SCENARIO_ENTRIES].length;
+    /* What the design floor calls its run: the bar's primary there, and the tray's word for its stage. */
+    seeds.push({ field: 'lobby.design.testSimulation', text: TEST_SIMULATION_LABEL, role: 'label' });
+
+    /* The two tables claimed by name above and touched here, as `EVERYDAY_LANDING` does. */
+    void [LOBBY_COPY, SCENARIO_ENTRIES].length;
     for (const entry of SCENARIO_ENTRIES) {
       seeds.push({ field: `lobby.scenarioEntry.${entry.id}.title`, text: entry.title, role: 'label' });
       seeds.push({ field: `lobby.scenarioEntry.${entry.id}.blurb`, text: entry.blurb, role: 'prose' });

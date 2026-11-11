@@ -63,8 +63,8 @@ export const EVERYDAY_SCREENS = [
   'menu',
   /*
    * **The lobby** — the elevator cold-open, [§ D1445](../../../../DECISIONS.md). Every cold launch
-   * opens on it unless Settings says to skip it, and its car operating panel is a mode picker whose
-   * floors are screens below. Like `menu` it is the shell's own route rather than a registered
+   * opens on it unless Settings says to skip it, and its landings are `floors.ts`'s floors, each one
+   * press from its screen ([§ D1627](../../../../DECISIONS.md)). Like `menu` it is the shell's own route rather than a registered
    * module, because it draws before the host has published and has nothing to wait for.
    *
    * **Four keys past § 4's seventeen**, on the argument the landing page's entry makes: the handoff
@@ -368,3 +368,17 @@ export const ENGINEER_RETURN_TITLE =
  * depending on the shell itself.
  */
 export const EVERYDAY_ROOT_CLASS = 'everyday';
+
+/**
+ * **What the design floor calls a run started from it** — [§ D1627](../../../../DECISIONS.md),
+ * `floors.ts`. Declared here, beside the shell's other fixed words, because the action bar's table
+ * reads it and `floors.ts` reads the mode tiles, which sit downstream of that table.
+ *
+ * It is the bar's primary on the dispatcher workshop
+ * and on the drawing board, and the tray's word for the stage that follows.
+ *
+ * One label for both rooms, because it is one act: the thing on the bench is run once on the day's
+ * crowd, nothing is filed, and the player comes back to the bench. A building is *played* on the
+ * floors above the lobby.
+ */
+export const TEST_SIMULATION_LABEL = 'Test simulation';

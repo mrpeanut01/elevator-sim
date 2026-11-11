@@ -60,7 +60,7 @@
 
 import { openTowerOf } from '../campaign/career.js';
 import type { WeekState } from '../shift/types.js';
-import { actionBarFor, confirmStripFor, TIMELINE_STEPS } from './actionBar.js';
+import { actionBarFor, confirmStripFor, testSimulationBarOf, TIMELINE_STEPS } from './actionBar.js';
 import type { ActionBarModel } from './actionBar.js';
 import { BUILD_NOTES_POINTER } from './buildNotes.js';
 import { HOST_PENDING_REASON } from './host.js';
@@ -70,6 +70,9 @@ import { continueWeekEntryOf } from './continueWeek.js';
 import { contractById } from '../shift/contracts.js';
 import { everydayAccount, onEverydayAccount } from './accountPort.js';
 import { everydayProfileStore } from './profileStore.js';
+import { REDUCED_MOTION_QUERY } from '../dev/motion.js';
+import { engineerSettings } from './engineerBridge.js';
+import { floorDirection, floorOfScreen, gameFloorOf, type GameFloorKey } from './floors.js';
 import { mountLobby } from './lobbyScreen.js';
 import { everydayLobbyStore } from './lobbyStore.js';
 import { filedDaysOf, tutorialIsDue } from './tutorialModel.js';
@@ -108,7 +111,7 @@ import {
   EVERYDAY_RAIL_SURFACES as RAIL_SURFACE,
   EVERYDAY_TYPE as TYPE,
 } from './tokens.js';
-import type { EverydayMode, EverydayScreen, EverydayState, RunContext } from './types.js';
+import type { EverydayMode, EverydayModePick, EverydayScreen, EverydayState, RunContext } from './types.js';
 import {
   EVERYDAY_ROOT,
   EVERYDAY_ROOT_CLASS,
@@ -433,8 +436,8 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
   /** Whether this shell has already asked whether the tutorial is due — see `offerTutorial`. */
   /*
    * Spent from the start when the page opens on the lobby: the lobby **replaces** the first-arrival
-   * offer (§ D1445), and its basement is the walkthrough. Without this a player who pressed the
-   * lobby's *Main menu* before the host published would be bounced to the landing page the moment
+   * offer (§ D1445), and the walkthrough is a room on its own floor (§ D1627). Without this a player
+   * who pressed the lobby's own landing before the host published would be bounced to the landing page the moment
    * it did, which is the front door moving under a reader that § D844 exists to prevent.
    */
   let tutorialOffered = coldScreen === 'lobby';
@@ -591,7 +594,7 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
    * zero. The bar is still the row that cannot go below a fold.
    */
   main.style.cssText =
-    'display:grid;grid-template-rows:auto auto minmax(0,1fr) auto;overflow:hidden;min-width:0';
+    'display:grid;grid-template-rows:auto auto minmax(0,1fr) auto;overflow:hidden;min-width:0;position:relative';
 
   /*
    * GitHub issue #336's banner: always in the document, empty when there is nothing to say.
@@ -826,6 +829,7 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     railScrim.style.display = open ? 'block' : 'none';
     rail.style.display = open ? 'flex' : 'none';
     railToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (open && railCarFloor !== undefined) placeRailCar(railCarFloor);
     if (open) railClose.focus();
     else if (doc.activeElement !== null && rail.contains(doc.activeElement)) railToggle.focus();
   }
@@ -1426,6 +1430,9 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
      * forgets. A no-op unless consent is granted; the recorder's first line is that guard.
      */
     telemetry.record({ name: 'screen_entered', screenKey: screen, fromScreenKey: state.screen });
+    /* § D1627: a stage reached from a bench remembers which, for {@link testSimulationBarOf}'s way back. */
+    if (screen === 'stage' && (state.screen === 'workshop' || state.screen === 'designer')) testOrigin = state.screen;
+    else if (screen !== 'stage' && screen !== 'report') testOrigin = undefined;
     state = { ...state, screen };
     draw();
     /*
@@ -1755,6 +1762,181 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
   /** The subline element, while it shows the shell's own words rather than a watched run's. */
   let railSubline: HTMLElement | undefined;
 
+  /** The tray car's height. The floor rows are taller, so it sits centred on the row it stands at. */
+  const RAIL_CAR_PX = 24;
+  /** How long the tray's car takes between any two floors, and the doors over the screen to part. */
+  const FLOOR_MOTION_MS = 300;
+
+  /** Whether the floor-change motion is drawn at all: Settings' *Motion* and the operating system's. */
+  function motionAllowed(): boolean {
+    return !(
+      engineerSettings()?.reduceMotion() === true ||
+      doc.defaultView?.matchMedia(REDUCED_MOTION_QUERY).matches === true
+    );
+  }
+
+  /**
+   * Whether the day on the stage is a **test simulation** — § D1627. The host's to say: a sandbox
+   * day is standing (`EverydayHost.sandboxDayLines` is empty exactly when none is), which is what
+   * every press on the design floor starts and nothing else does. The tray keeps the car on **B**
+   * while it plays, and says so on the subline.
+   */
+  function testStanding(): boolean {
+    if (state.screen !== 'stage' && state.screen !== 'report') return false;
+    return (dataHost?.sandboxDayLines().length ?? 0) > 0;
+  }
+
+  /**
+   * The bench the standing test simulation was started from, which is where its bar's left button
+   * goes back to: the workshop or the drawing board. Written by {@link go} on the way onto a stage
+   * and cleared when the stage and its report are left. **Not the tuner**: *Tune the tower* is opened
+   * from a day's brief, so its sandbox day keeps the day's own row and its `‹ Brief`.
+   */
+  let testOrigin: 'workshop' | 'designer' | undefined;
+
+  /** The tray's car as last drawn, and the pixel it stood at, so the next draw can glide from there. */
+  let railCar:
+    | { car: HTMLElement; rope: HTMLElement; leaves: readonly [HTMLElement, HTMLElement]; anchor: HTMLElement }
+    | undefined;
+  let railCarTop: number | undefined;
+  let railCarFloor: GameFloorKey | undefined;
+
+  /**
+   * Stand the tray's car at its floor, gliding there when the floor has just changed.
+   *
+   * **The glide is drawn after the fact.** {@link drawRail} has already built the new tray and the
+   * screen is already mounted; this only decides whether the car is painted where it is or painted
+   * where it was and moved. So a press is never waiting on it, which is § D1627's whole rule.
+   */
+  function placeRailCar(floor: GameFloorKey): void {
+    if (railCar === undefined) return;
+    const { car, rope, leaves, anchor } = railCar;
+    /* A tray that is not laid out (the closed drawer, the lobby's bare viewport) has no boxes to read. */
+    if (anchor.offsetParent === null) {
+      railCarFloor = floor;
+      railCarTop = undefined;
+      return;
+    }
+    const top = anchor.offsetTop + Math.round((anchor.offsetHeight - RAIL_CAR_PX) / 2);
+    const from = railCarTop;
+    const moved = railCarFloor !== undefined && railCarFloor !== floor && from !== undefined;
+    railCarFloor = floor;
+    railCarTop = top;
+    if (!moved || !motionAllowed()) {
+      car.style.top = `${String(top)}px`;
+      rope.style.height = `${String(top)}px`;
+      return;
+    }
+    const ease = 'cubic-bezier(.3,.85,.3,1)';
+    car.style.top = `${String(from)}px`;
+    rope.style.height = `${String(from)}px`;
+    for (const leaf of leaves) leaf.style.transform = 'scaleX(1)';
+    /* Read a box so the starting position is committed before the transition is set. */
+    void car.offsetHeight;
+    car.style.transition = `top ${String(FLOOR_MOTION_MS)}ms ${ease}`;
+    rope.style.transition = `height ${String(FLOOR_MOTION_MS)}ms ${ease}`;
+    car.style.top = `${String(top)}px`;
+    rope.style.height = `${String(top)}px`;
+    for (const leaf of leaves) {
+      leaf.style.transition = `transform 180ms ease-out ${String(FLOOR_MOTION_MS - 60)}ms`;
+      leaf.style.transform = 'scaleX(.25)';
+    }
+  }
+
+  /** The floor the last {@link draw} was on, so the next one knows whether the floor changed. */
+  let floorDrawn: GameFloorKey | undefined;
+
+  /** The doors over the screen region, while they are parting. One at a time. */
+  let floorDoors: HTMLElement | undefined;
+
+  /**
+   * **A floor change, drawn over the screen it has already opened** — § D1627.
+   *
+   * Two door leaves part over the screen region with the floor's plate between them. The new screen
+   * is mounted underneath before this is built, the overlay takes no pointer events and is hidden
+   * from assistive technology, and it removes itself; nothing reads it, waits for it or can be
+   * blocked by it. With reduced motion it is not drawn.
+   */
+  function playFloorDoors(floor: GameFloorKey, direction: 'up' | 'down' | undefined): void {
+    floorDoors?.remove();
+    floorDoors = undefined;
+    if (!motionAllowed() || typeof main.animate !== 'function') return;
+    const overlay = el(doc, 'div', 'everyday-floor-doors');
+    overlay.setAttribute('aria-hidden', 'true');
+    /* Over the screen region only: the bar under it and the notices over it stay as they are. */
+    overlay.style.cssText = [
+      'position:absolute',
+      'left:0',
+      'right:0',
+      `top:${String(screenRegion.offsetTop)}px`,
+      `height:${String(screenRegion.offsetHeight)}px`,
+      'z-index:3',
+      'pointer-events:none',
+      'overflow:hidden',
+    ].join(';');
+    const steel =
+      'repeating-linear-gradient(90deg,rgba(0,0,0,.05) 0 1px,transparent 1px 3px),linear-gradient(180deg,#CFC4B0,#A89C87)';
+    const timing = { duration: FLOOR_MOTION_MS + 80, easing: 'cubic-bezier(.65,0,.25,1)', fill: 'forwards' as const };
+    for (const side of ['left', 'right'] as const) {
+      const leaf = el(doc, 'div');
+      leaf.style.cssText = [
+        'position:absolute',
+        'top:0',
+        'bottom:0',
+        `${side}:0`,
+        'width:50%',
+        `background:${steel}`,
+        `border-${side === 'left' ? 'right' : 'left'}:1px solid rgba(0,0,0,.4)`,
+        `transform-origin:${side} center`,
+      ].join(';');
+      overlay.append(leaf);
+      /* Each leaf narrows into its own jamb, so nothing is ever drawn or measured outside the region. */
+      leaf.animate([{ transform: 'scaleX(1)' }, { transform: 'scaleX(0)' }], timing);
+    }
+    const arrow = direction === 'up' ? '▲ ' : direction === 'down' ? '▼ ' : '';
+    const plate = el(doc, 'div', undefined, `${arrow}${floor} · ${gameFloorOf(floor).name.toUpperCase()}`);
+    plate.style.cssText = [
+      'position:absolute',
+      'left:50%',
+      'top:38%',
+      'transform:translate(-50%,-50%)',
+      'background:#120F0C',
+      'border:2px solid #3A352E',
+      'border-radius:8px',
+      'padding:8px 18px',
+      `font:500 20px ${TYPE.mono}`,
+      'letter-spacing:.08em',
+      `color:${C.sun}`,
+      'white-space:nowrap',
+    ].join(';');
+    overlay.append(plate);
+    main.append(overlay);
+    floorDoors = overlay;
+    /* The plate's fade is the last thing to finish, and its end takes the overlay with it. */
+    plate.animate([{ opacity: 1 }, { opacity: 1, offset: 0.45 }, { opacity: 0 }], timing).onfinish = () => {
+      overlay.remove();
+      if (floorDoors === overlay) floorDoors = undefined;
+    };
+  }
+
+  /**
+   * **Press a play floor** — one press from anywhere to a mode, § D1627.
+   *
+   * Exactly *leave to the lobby, then press the mode's tile*, in one act: whatever flow is standing
+   * is ended the way {@link doLeave} ends it, the context becomes the mode's as the tile's press
+   * makes it, and the mode's first screen opens. Inside the career, the Career floor is the *All
+   * buildings* row and ends nothing.
+   */
+  function rideToMode(pick: EverydayModePick, screen: EverydayScreen): void {
+    if (state.ctx === 'watch') leaveWatch();
+    if (state.ctx === 'rush') leaveRush();
+    if (state.ctx === 'replay') leaveReplay();
+    if (state.ctx === 'campaign' && pick !== 'campaign') leaveCareerFlow();
+    const ctx: RunContext = pick === 'campaign' ? 'campaign' : pick === 'rush' ? 'rush' : 'daily';
+    state = { ...state, modePick: pick, ctx };
+    go(screen);
+  }
+
   function drawRail(): void {
     /* The drawer's dismiss survives the emptying — see {@link railClose}. It is `display:none` in
        the docked geometry, so on a desktop this appends a box with no line and draws nothing. */
@@ -1764,6 +1946,7 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
       ...campaignRailOptions(),
       ...weekRailOptions(),
       ...bankedRailOptions(),
+      test: testStanding(),
       ...(stored === undefined
         ? {}
         : { profile: { name: stored.name, avatarColor: stored.avatarColor } }),
@@ -1805,91 +1988,157 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     brand.append(glyph, names);
     rail.append(brand);
 
-    /* Main menu, with § 3.2's live subline. Pressing it runs the same exit as the bar's left. */
-    const onMenu = state.screen === EVERYDAY_ROOT;
-    const menuRow = el(doc, 'button', 'everyday-rail-menu');
-    menuRow.type = 'button';
-    menuRow.style.cssText = [
-      'display:flex',
-      'align-items:center',
-      'gap:10px',
-      'text-align:left',
-      `background:${onMenu ? C.sun : 'transparent'}`,
-      `border:1px solid ${onMenu ? C.sun : RAIL_SURFACE.edge}`,
-      'border-radius:11px',
-      'padding:11px 13px',
-      `color:${onMenu ? C.ink : C.fainter}`,
-      'cursor:pointer',
-      'width:100%',
-      'box-sizing:border-box',
-    ].join(';');
-    const home = el(doc, 'span', undefined, '⌂');
-    home.style.cssText = 'flex:none;font-size:12px';
-    const menuText = el(doc, 'span');
-    menuText.style.cssText = 'min-width:0';
-    const menuLabel = el(doc, 'span', undefined, 'Main menu');
-    menuLabel.style.cssText = `display:block;font:600 15px ${TYPE.heading}`;
     /*
-     * § 14.1's rail cell is `WATCHING · <NAME>`, and `rail.ts#sublineFor` returns the bare word by
-     * design — *"the live half is not composed here: this module has no run, and inventing a name
-     * would be a figure with no source … the shell appends the name when it has one."* This is the
-     * shell having one, and it is `watch/view.ts#railSubline` rather than a `WATCHING · ` composed
-     * here, so the strip's pill, its eyebrow and this cell name the run once.
+     * **The shaft** — [§ D1627](../../../../DECISIONS.md). Every floor of `floors.ts`, top to bottom,
+     * with a hoistway drawn beside them and the car standing at the floor the player is on. A floor
+     * is one press from anywhere, and so is every room on it, which is what the `DESIGN` and `WORLD`
+     * groups gave before: the rows are the same rows, hung on floors.
      *
-     * Guarded on the ctx **and** on the session, for `stageScreen.ts#watchingNow`'s reason: the
-     * Engineer shell can be the one watching while this shell sits behind the cover, and a rail
-     * that read the session alone would name somebody else's day over the player's own screen.
+     * The lobby's floor is the old *Main menu* row and keeps its class and its exit
+     * ({@link requestLeave}), so the way home asks about a day in flight exactly as it did. The
+     * subline is drawn on whichever floor the car is at, because that is the floor it describes.
      */
     const watchSubline = state.ctx === 'watch' ? dataHost?.watching()?.view.railSubline : undefined;
-    const sub = el(doc, 'span', 'everyday-rail-subline', watchSubline ?? stageSublineOf(state, stageRailLive));
-    railSubline = watchSubline === undefined ? sub : undefined;
-    sub.style.cssText = `display:block;font:500 9.5px ${TYPE.mono};letter-spacing:.06em;color:${onMenu ? C.ink : C.label};margin-top:1px`;
-    menuText.append(menuLabel, sub);
-    menuRow.append(home, menuText);
-    menuRow.addEventListener('click', requestLeave);
-    rail.append(menuRow);
+    const sublineText = watchSubline ?? stageSublineOf(state, stageRailLive, testStanding());
+    railSubline = undefined;
 
-    /*
-     * § D673's acknowledgement — `rail.ts#RailModel.banked` carries why it is **here**, at the top
-     * of the rail where nothing numeric is drawn, rather than on the `PLAYING AS` card whose own
-     * third line is `3 days running · best 84%`.
-     *
-     * Classed for the streak line's reason: the browser tier has to be able to read exactly what a
-     * player reads, and selecting it positionally would pass over a rail that had stopped drawing
-     * it. Appended only when there is one, because an empty box is a line a screen reader
-     * announces, and outside the menu row rather than inside it because the row is a button and
-     * this is not part of what pressing it does.
-     */
-    if (model.banked !== undefined) {
-      const banked = el(doc, 'div', 'everyday-rail-banked', model.banked);
-      banked.style.cssText = `font:500 10px ${TYPE.mono};letter-spacing:.04em;color:${C.label};margin:7px 0 0 13px`;
-      rail.append(banked);
-    }
+    const shaft = el(doc, 'div', 'everyday-rail-shaft');
+    shaft.style.cssText = 'display:flex;align-items:stretch;gap:8px';
+    const hoist = el(doc, 'div');
+    hoist.setAttribute('aria-hidden', 'true');
+    hoist.style.cssText = [
+      'position:relative',
+      'flex:none',
+      'width:24px',
+      'border-radius:6px',
+      `border:1px solid ${RAIL_SURFACE.edge}`,
+      /* The two guide rails, on the pit's own dark. */
+      'background:linear-gradient(90deg,transparent 0 3px,rgba(198,183,159,.22) 3px 4px,transparent 4px 18px,' +
+        'rgba(198,183,159,.22) 18px 19px,transparent 19px),#14110E',
+      'overflow:hidden',
+    ].join(';');
+    const rope = el(doc, 'div');
+    rope.style.cssText = `position:absolute;left:10px;top:0;width:1px;height:0;background:${C.label}`;
+    const car = el(doc, 'div', 'everyday-rail-car');
+    car.style.cssText = [
+      'position:absolute',
+      'left:3px',
+      'width:16px',
+      `height:${String(RAIL_CAR_PX)}px`,
+      'top:0',
+      'box-sizing:border-box',
+      'border-radius:3px',
+      `background:${C.sun}`,
+      'box-shadow:0 0 10px rgba(242,166,59,.45)',
+      'overflow:hidden',
+    ].join(';');
+    /* The car's two door leaves: shut while it moves, open where it stands. */
+    const leaves = [el(doc, 'div'), el(doc, 'div')] as const;
+    leaves.forEach((leaf, index) => {
+      const side = index === 0 ? 'left' : 'right';
+      leaf.style.cssText = [
+        'position:absolute',
+        'top:2px',
+        'bottom:2px',
+        `${side}:2px`,
+        'width:calc(50% - 2px)',
+        `background:${C.ink}`,
+        'opacity:.82',
+        `transform-origin:${side} center`,
+        'transform:scaleX(.25)',
+      ].join(';');
+      car.append(leaf);
+    });
+    hoist.append(rope, car);
 
-    for (const group of model.groups) {
+    const floorList = el(doc, 'div');
+    floorList.style.cssText = 'position:relative;flex:1 1 0;min-width:0;display:flex;flex-direction:column;gap:4px';
+    let anchor: HTMLElement | undefined;
+    for (const floor of model.shaft.floors) {
       const block = el(doc, 'div');
-      const title = el(doc, 'div', undefined, group.title);
-      title.style.cssText = `${EYEBROW};margin:0 0 7px 4px`;
-      block.append(title);
-      for (const item of group.items) {
-        const open = item.unavailable === undefined;
-        const active = open && item.screen === state.screen;
+      const open = floor.unavailable === undefined;
+      const header = el(doc, 'button', floor.key === 'L' ? 'everyday-rail-floor everyday-rail-menu' : 'everyday-rail-floor');
+      header.type = 'button';
+      header.disabled = !open;
+      header.dataset['floor'] = floor.key;
+      if (floor.here) header.setAttribute('aria-current', 'location');
+      header.style.cssText = [
+        'display:flex',
+        'align-items:center',
+        'gap:9px',
+        'width:100%',
+        'box-sizing:border-box',
+        'text-align:left',
+        `background:${floor.here ? C.sun : 'transparent'}`,
+        `border:1px solid ${floor.here ? C.sun : RAIL_SURFACE.edge}`,
+        'border-radius:10px',
+        'padding:5px 10px 5px 6px',
+        `color:${floor.here ? C.ink : open ? C.fainter : C.warmGrey}`,
+        'cursor:' + (open ? 'pointer' : 'not-allowed'),
+      ].join(';');
+      const plate = el(doc, 'span', undefined, floor.key);
+      plate.style.cssText = [
+        'flex:none',
+        'display:flex',
+        'align-items:center',
+        'justify-content:center',
+        'width:20px',
+        'height:20px',
+        'border-radius:50%',
+        `border:1px solid ${floor.here ? C.ink : RAIL_SURFACE.edge}`,
+        `background:${floor.here ? C.ink : 'transparent'}`,
+        `color:${floor.here ? C.sun : C.fainter}`,
+        `font:500 11px ${TYPE.mono}`,
+      ].join(';');
+      const text = el(doc, 'span');
+      text.style.cssText = 'display:block;min-width:0';
+      const name = el(doc, 'span', undefined, floor.name);
+      name.style.cssText = `display:block;font:600 14px ${TYPE.heading}`;
+      text.append(name);
+      if (floor.here) {
+        const sub = el(doc, 'span', 'everyday-rail-subline', sublineText);
+        sub.style.cssText = `display:block;font:500 9.5px ${TYPE.mono};letter-spacing:.06em;color:${C.ink};margin-top:1px`;
+        text.append(sub);
+        railSubline = watchSubline === undefined ? sub : undefined;
+        anchor = header;
+      }
+      if (floor.unavailable !== undefined) {
+        const why = el(doc, 'span', undefined, floor.unavailable);
+        why.style.cssText = `display:block;font-size:10px;font-weight:400;color:${C.label};margin-top:2px`;
+        text.append(why);
+      }
+      header.append(plate, text);
+      if (open) {
+        header.addEventListener('click', () => {
+          if (floor.key === 'L') requestLeave();
+          else if (floor.pick !== undefined) rideToMode(floor.pick, floor.screen);
+          else go(floor.screen);
+        });
+      }
+      block.append(header);
+
+      for (const item of floor.rooms) {
+        const roomOpen = item.unavailable === undefined;
+        const active = roomOpen && item.screen === state.screen;
         const row = el(doc, 'button');
         row.type = 'button';
-        row.disabled = !open;
+        row.disabled = !roomOpen;
         row.style.cssText = [
           'display:block',
           'width:100%',
           'text-align:left',
-          `background:${active ? C.sun : 'transparent'}`,
+          `background:${active ? RAIL_SURFACE.card : 'transparent'}`,
           'border:0',
           `border-radius:${String(R.control)}px`,
-          'padding:8px 10px',
-          'font-size:13px',
+          'padding:4px 10px 4px 12px',
+          'min-height:24px',
+          'margin-top:1px',
+          'font-size:12.5px',
           'font-weight:600',
-          'cursor:' + (open ? 'pointer' : 'not-allowed'),
-          `color:${active ? C.ink : open ? C.fainter : C.warmGrey}`,
+          'cursor:' + (roomOpen ? 'pointer' : 'not-allowed'),
+          `color:${active ? C.sun : roomOpen ? C.fainter : C.warmGrey}`,
         ].join(';');
+        if (active) row.setAttribute('aria-current', 'page');
         const label = el(doc, 'span', undefined, item.label);
         row.append(label);
         if (item.unavailable !== undefined) {
@@ -1907,8 +2156,29 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
         }
         block.append(row);
       }
-      rail.append(block);
+      floorList.append(block);
     }
+    shaft.append(hoist, floorList);
+    rail.append(shaft);
+
+    /*
+     * § D673's acknowledgement — `rail.ts#RailModel.banked` carries why it is **here**, under the
+     * building where nothing numeric is drawn, rather than on the `PLAYING AS` card whose own third
+     * line is `3 days running · best 84%`.
+     *
+     * Classed for the streak line's reason: the browser tier has to be able to read exactly what a
+     * player reads, and selecting it positionally would pass over a rail that had stopped drawing
+     * it. Appended only when there is one, because an empty box is a line a screen reader
+     * announces.
+     */
+    if (model.banked !== undefined) {
+      const banked = el(doc, 'div', 'everyday-rail-banked', model.banked);
+      banked.style.cssText = `font:500 10px ${TYPE.mono};letter-spacing:.04em;color:${C.label};margin:0 0 0 4px`;
+      rail.append(banked);
+    }
+
+    railCar = anchor === undefined ? undefined : { car, rope, leaves, anchor };
+    placeRailCar(model.shaft.car);
 
     /*
      * § 3.2's footer: identity card, the bordered Settings row, the Engineer swap.
@@ -2140,7 +2410,10 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
      */
     const route = routeFor(state.screen);
     const module = route === 'screen' ? screenModuleFor(state.screen) : undefined;
-    const model: ActionBarModel = module?.bar?.(state) ?? actionBarFor(state);
+    const resolved: ActionBarModel = module?.bar?.(state) ?? actionBarFor(state);
+    /* § D1627: a test simulation is not a day of a mode, and its bar does not say it is. */
+    const model: ActionBarModel =
+      testOrigin !== undefined && testStanding() ? testSimulationBarOf(resolved, testOrigin) : resolved;
     const refusing = route === 'refusal';
 
     const leaveBtn = el(doc, 'button', 'everyday-bar-leave', model.leave.label);
@@ -2833,7 +3106,7 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
       doc,
       'p',
       undefined,
-      'The rail’s Main menu takes you back to the modes.',
+      'The Lobby floor on the left takes you back to the modes.',
     );
     back.style.cssText = `color:${C.warmGrey};font-size:12px;max-width:60ch`;
     screenRegion.append(h, p, back);
@@ -2843,9 +3116,9 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
    * **The lobby** — [§ D1445](../../../../DECISIONS.md). The shell's own route, like the menu, because
    * it draws before the host publishes; `lobbyScreen.ts` is the mount and these are its ports.
    *
-   * *Step out* commits exactly as a menu tile does — the same `ctx` and `modePick` for a mode floor,
-   * so a Career floor puts the career's rail group up and a Rush floor the rush's — and then goes to
-   * the floor's screen. With the key turned it then crosses to the Engineer surface, so coming back
+   * A landing's press commits exactly as a menu tile does — the same `ctx` and `modePick` for a mode
+   * floor, so a Career floor puts the career's rooms up and a Rush floor the rush's — and then goes
+   * to the floor's screen, on the frame of the press ([§ D1627](../../../../DECISIONS.md)). With the key turned it then crosses to the Engineer surface, so coming back
    * through § 3.2's swap lands on that floor rather than in the lobby.
    */
   function drawLobby(): void {
@@ -2858,9 +3131,6 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
         }
         go(floor.screen);
         if (engineer) enterEngineer();
-      },
-      toMenu: () => {
-        go(EVERYDAY_ROOT);
       },
       toLanding: () => {
         go('landing');
@@ -2879,8 +3149,8 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
 
   /**
    * **The lobby has the whole viewport** — the handoff's *"the whole screen"*. The rail, the narrow
-   * header and the bar step aside while it shows and come back on the next screen; the lobby's own
-   * *Main menu* and *What this is* are the ways past it that do not ride the car.
+   * header and the bar step aside while it shows and come back on the next screen, where the tray
+   * draws the same building at its own size.
    *
    * `display` on the chrome rather than on either root: the rule that neither *root* is ever hidden
    * that way (canvases size from their laid-out box) is about `div.shell` and this shell's root, and
@@ -2945,6 +3215,17 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     coverEngineer();
     applyChrome();
     drawBar();
+    /*
+     * § D1627: the tray was built while the lobby had the viewport, so its car had no box to stand
+     * on; and a floor change is drawn once the chrome is where it will be.
+     */
+    const floorNow = floorOfScreen(state, testStanding());
+    placeRailCar(floorNow);
+    const floorWas = floorDrawn;
+    floorDrawn = floorNow;
+    if (floorWas !== undefined && floorWas !== floorNow && route !== 'lobby') {
+      playFloorDoors(floorNow, floorDirection(floorWas, floorNow));
+    }
     if (route === 'lobby') {
       drawLobby();
       return;
@@ -3033,7 +3314,7 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
           railClock: (live) => {
             if (live?.clock === stageRailLive?.clock && live?.phase === stageRailLive?.phase) return;
             stageRailLive = live;
-            if (railSubline !== undefined) railSubline.textContent = stageSublineOf(state, live);
+            if (railSubline !== undefined) railSubline.textContent = stageSublineOf(state, live, testStanding());
           },
         };
         mounted = module.mount(screenRegion, context);

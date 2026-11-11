@@ -199,7 +199,7 @@ describe.skipIf(!HAS_BROWSER)('a dead control says why, or is not a control', ()
       /* The screen region is replaced on navigation; one frame settles the mount's first draw. */
       await page.waitForTimeout(400);
       await inspect(screen.name);
-      await page.click('nav.everyday-rail button:has-text("Main menu")');
+      await page.click('nav.everyday-rail .everyday-rail-menu');
       await leaveTutorialIfOffered(page);
       await page.waitForSelector('.everyday-mode[data-screen="scenario"]');
     }

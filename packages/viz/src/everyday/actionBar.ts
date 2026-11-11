@@ -41,7 +41,7 @@ import type {
   RunContext,
 } from './types.js';
 import { REPLAY_COPY } from './replay.js';
-import { MODE_PICKS } from './types.js';
+import { MODE_PICKS, TEST_SIMULATION_LABEL } from './types.js';
 
 /** The two flows that have a § 3.3 timeline. A rush has none, and a watched run has none. */
 export type TimelineFlow = 'daily' | 'campaign';
@@ -287,14 +287,14 @@ export const ACTION_BAR_ROWS: readonly ActionBarRow[] = Object.freeze([
    * § D1445's lobby, `guide: false` — no § 3.3 row exists for it, and the shell steps the bar aside
    * while the lobby has the viewport (`shell.ts#applyChrome`), so this row is never drawn. It is here
    * because every screen answers this table, and it says what is true if it ever were drawn: the
-   * modes list is the way past the ride, and the lobby's own panel is its primary.
+   * modes list is one way on, and the lobby's own landings are its primary (§ D1627).
    */
   row({
     screen: 'lobby',
     guide: false,
     leave: leave(MODES),
-    primary: primary(['Call the car']),
-    note: 'Press CALL, choose a floor on the panel, then close the doors.',
+    primary: primary(['Choose a floor']),
+    note: 'Every floor is a way to play. Press one and you are there.',
     inverted: false,
   }),
   /*
@@ -591,7 +591,8 @@ export const ACTION_BAR_ROWS: readonly ActionBarRow[] = Object.freeze([
   row({
     screen: 'workshop',
     leave: leave(MODES),
-    primary: primary(['Run a day with this']),
+    /* § D1627: the design floor tries things, and a building is played on the floors above the lobby. */
+    primary: primary([TEST_SIMULATION_LABEL]),
     noteVariants: ['Unsaved changes travel with the run.', 'Nothing changed yet.'],
     inverted: false,
   }),
@@ -615,7 +616,7 @@ export const ACTION_BAR_ROWS: readonly ActionBarRow[] = Object.freeze([
   row({
     screen: 'designer',
     leave: leave(MODES),
-    primary: primary(['Run a day in it']),
+    primary: primary([TEST_SIMULATION_LABEL]),
     note: 'Nothing here is scored. It is a drawing board.',
     inverted: false,
   }),
@@ -735,5 +736,40 @@ export function confirmStripFor(ctx: RunContext, attemptStanding = false): Confi
     consequence: "Today's run will not be scored, and the board keeps whatever you posted before.",
     leaveLabel: 'Leave it',
     stayLabel: 'Stay',
+  };
+}
+
+/* -------------------------------------------------------------------------- *
+ * A test simulation's bar — § D1627
+ * -------------------------------------------------------------------------- */
+
+/** The left button on a test simulation's stage and report: where it came from, not a day it abandons. */
+export const TEST_SIMULATION_LEAVE = '⤺ Back to the design floor';
+
+/**
+ * **The stage's or the report's row, as a test simulation wears it** —
+ * [§ D1627](../../../../DECISIONS.md).
+ *
+ * A run started from the workshop or the drawing board plays on § 7's stage, whose row is the daily flow's: *Leave
+ * today's tower*, `‹ Brief`, and a timeline that starts at the front door. None of the three is
+ * true of a test. It did not come through a door or a brief, and there is no day of the player's to
+ * abandon, so the left button goes back to the bench it was started from, without the leave strip,
+ * and the back cell and the timeline are not drawn. Everything else on the row is the screen's own.
+ *
+ * *Tune the tower* is the third door onto a sandbox day and is left alone: it is opened from a day's
+ * brief, so the day's own row, with its `‹ Brief`, is the true one there.
+ *
+ * Its one non-test caller is `shell.ts#drawBar`, while the host says a sandbox day is standing and
+ * the stage was entered from one of the two benches.
+ */
+export function testSimulationBarOf(model: ActionBarModel, origin: 'workshop' | 'designer'): ActionBarModel {
+  return {
+    screen: model.screen,
+    leave: { label: TEST_SIMULATION_LEAVE, inert: false, screen: origin },
+    primary: model.primary,
+    note: model.note,
+    noteVariants: model.noteVariants,
+    inverted: model.inverted,
+    wayOut: model.wayOut,
   };
 }

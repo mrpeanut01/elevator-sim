@@ -20,7 +20,17 @@ import type { WatchRecord } from '../watch/types.js';
 
 import { EM_DASH } from './figures.js';
 import { CHIME_PRICES } from './chimesPanel.js';
-import { railFooter, railGroups, railModel, stageSublineOf, sublineFor, type BankedTurn } from './rail.js';
+import { floorOfScreen, GAME_FLOOR_ORDER } from './floors.js';
+import { EVERYDAY_MODES } from './modes.js';
+import {
+  TEST_SIMULATION_SUBLINE,
+  railFooter,
+  railModel,
+  railShaft,
+  stageSublineOf,
+  sublineFor,
+  type BankedTurn,
+} from './rail.js';
 import { EVERYDAY_SCREENS_BUILT, UNBUILT_REASONS } from './screens.js';
 import {
   ENGINEER_SWAP_NOTE,
@@ -37,43 +47,93 @@ import { weekScreenViewOf } from './weekView.js';
 /** This directory, for the one case that reads a module's own source. */
 const EVERYDAY_SRC = fileURLToPath(new URL('.', import.meta.url));
 
-const titlesOf = (ctx: RunContext, inCampaign: boolean): readonly string[] =>
-  railGroups(ctx, inCampaign).map((group) => group.title);
+/** The rooms on one floor of the shaft, for a state on the main menu in `ctx`. */
+const roomsOn = (
+  key: string,
+  ctx: RunContext,
+  inCampaign: boolean,
+  openBuilding?: string,
+): readonly EverydayScreen[] =>
+  railShaft({ screen: 'menu', ctx }, inCampaign, openBuilding)
+    .floors.filter((floor) => floor.key === key)
+    .flatMap((floor) => floor.rooms.map((room) => room.screen));
 
 const screensOf = (ctx: RunContext, inCampaign: boolean, openBuilding?: string): readonly EverydayScreen[] =>
-  railGroups(ctx, inCampaign, openBuilding).flatMap((group) => group.items.map((item) => item.screen));
+  railShaft({ screen: 'menu', ctx }, inCampaign, openBuilding).floors.flatMap((floor) => [
+    floor.screen,
+    ...floor.rooms.map((room) => room.screen),
+  ]);
 
-describe('the rail offers a campaign only inside one', () => {
-  it('renders CAREER in a career and nowhere else — docs/39 § 3’s rename map', () => {
-    expect(titlesOf('campaign', true)).toContain('CAREER');
-    for (const ctx of RUN_CONTEXTS) {
-      expect(titlesOf(ctx, false), `${ctx}, not in a campaign`).not.toContain('CAREER');
-    }
-    /*
-     * Both halves of the condition, not just the flag. `railGroups` takes the context *and* whether
-     * a campaign is under way, and a reader could satisfy the case above by testing either one —
-     * so the daily context with `inCampaign` true is the arm that separates them.
-     */
-    expect(titlesOf('daily', true)).not.toContain('CAREER');
-  });
-
-  it('always offers DESIGN and WORLD', () => {
-    for (const ctx of RUN_CONTEXTS) {
-      for (const inCampaign of [false, true]) {
-        expect(titlesOf(ctx, inCampaign)).toEqual(expect.arrayContaining(['DESIGN', 'WORLD']));
+describe('the shaft is the whole building, and the car is where the player is', () => {
+  it('draws every floor, top floor first, in every state', () => {
+    for (const screen of EVERYDAY_SCREENS) {
+      for (const ctx of RUN_CONTEXTS) {
+        const shaft = railShaft({ screen, ctx }, false);
+        expect(shaft.floors.map((floor) => floor.key)).toEqual([...GAME_FLOOR_ORDER]);
+        /* Exactly one floor has the car, and it is the floor `floors.ts` puts the screen on. */
+        expect(shaft.floors.filter((floor) => floor.here).map((floor) => floor.key)).toEqual([shaft.car]);
+        expect(shaft.car).toBe(floorOfScreen({ screen, ctx }));
       }
     }
   });
 
+  it('keeps every room the DESIGN and WORLD groups offered one press away, from every state', () => {
+    const always: readonly EverydayScreen[] = ['workshop', 'bench', 'designer', 'lobby', 'landing', 'week', 'board'];
+    for (const ctx of RUN_CONTEXTS) {
+      for (const inCampaign of [false, true]) {
+        expect(screensOf(ctx, inCampaign)).toEqual(expect.arrayContaining([...always]));
+      }
+    }
+  });
+
+  it('commits a play floor exactly as its menu tile does', () => {
+    const shaft = railShaft({ screen: 'menu', ctx: 'daily' }, false);
+    for (const mode of EVERYDAY_MODES) {
+      const floor = shaft.floors.find((candidate) => candidate.pick === mode.pick);
+      expect(floor?.screen, mode.title).toBe(mode.screen);
+      expect(floor?.name).toBe(mode.title);
+      expect(floor?.unavailable).toBe(mode.unavailable);
+    }
+  });
+
+  /* § D1627: a test simulation's stage keeps the car on the design floor, and says what it is. */
+  it('stands the car on B for a test simulation, and names it on the subline', () => {
+    const state = { screen: 'stage', ctx: 'daily' } as const;
+    expect(railModel(state).shaft.car).toBe('3');
+    expect(railModel(state, { test: true }).shaft.car).toBe('B');
+    expect(stageSublineOf(state, undefined, true)).toBe(TEST_SIMULATION_SUBLINE);
+    expect(stageSublineOf(state, { clock: '08:41', phase: 'running' }, true)).toBe(`${TEST_SIMULATION_SUBLINE} · 08:41`);
+    expect(stageSublineOf({ screen: 'report', ctx: 'daily' }, undefined, true)).toBe(TEST_SIMULATION_SUBLINE);
+    /* A career day and a rush are never a test, whatever the flag says. */
+    expect(stageSublineOf({ screen: 'stage', ctx: 'rush' }, undefined, true)).toBe(sublineFor({ screen: 'stage', ctx: 'rush' }));
+    expect(stageSublineOf({ screen: 'stage', ctx: 'campaign' }, { clock: '08:41', phase: 'running' }, true)).toBe('MID-DAY · 08:41');
+  });
+});
+
+describe('the rail offers a career’s rooms only inside one', () => {
+  it('hangs them on the Career floor in a career and nowhere else — docs/39 § 3’s rename map', () => {
+    expect(roomsOn('2', 'campaign', true)).toEqual(['towers', 'contract']);
+    for (const ctx of RUN_CONTEXTS) {
+      expect(roomsOn('2', ctx, false), `${ctx}, not in a campaign`).toEqual([]);
+    }
+    /*
+     * Both halves of the condition, not just the flag. `railShaft` takes the context *and* whether
+     * a campaign is under way, and a reader could satisfy the case above by testing either one —
+     * so the daily context with `inCampaign` true is the arm that separates them.
+     */
+    expect(roomsOn('2', 'daily', true)).toEqual([]);
+  });
+
   it('draws the building desk row only when a building is open, labelled with its name', () => {
-    // § 3.2: the campaign group's middle row *is* the open building's name. No name, no row —
+    // § 3.2: the career's middle row *is* the open building's name. No name, no row —
     // a desk row with an invented label would claim a building nobody opened.
-    expect(screensOf('campaign', true)).not.toContain('building');
-    const withBuilding = railGroups('campaign', true, 'Chancery House');
-    const campaign = withBuilding.find((group) => group.title === 'CAREER');
-    const desk = campaign?.items.find((item) => item.screen === 'building');
+    expect(roomsOn('2', 'campaign', true)).not.toContain('building');
+    const career = railShaft({ screen: 'towers', ctx: 'campaign' }, true, 'Chancery House').floors.find(
+      (floor) => floor.key === '2',
+    );
+    const desk = career?.rooms.find((item) => item.screen === 'building');
     expect(desk?.label).toBe('Chancery House');
-    expect(campaign?.items.map((item) => item.screen)).toEqual(['towers', 'building', 'contract']);
+    expect(career?.rooms.map((item) => item.screen)).toEqual(['towers', 'building', 'contract']);
   });
 });
 
@@ -105,11 +165,11 @@ describe('the rail does not lie about how many places there are', () => {
      * screen opens its rail row on the same commit, and a stale refusal over a working screen
      * (§ D227) cannot ship through this rail.
      */
-    for (const group of railGroups('campaign', true, 'Chancery House')) {
-      for (const item of group.items) {
+    for (const floor of railShaft({ screen: 'towers', ctx: 'campaign' }, true, 'Chancery House').floors) {
+      for (const item of floor.rooms) {
         const built = EVERYDAY_SCREENS_BUILT.includes(item.screen);
-        if (built) expect(item.unavailable, `${group.title} · ${item.label}`).toBeUndefined();
-        else expect(item.unavailable, `${group.title} · ${item.label}`).toBe(UNBUILT_REASONS[item.screen]);
+        if (built) expect(item.unavailable, `${floor.name} · ${item.label}`).toBeUndefined();
+        else expect(item.unavailable, `${floor.name} · ${item.label}`).toBe(UNBUILT_REASONS[item.screen]);
       }
     }
   });
@@ -117,10 +177,10 @@ describe('the rail does not lie about how many places there are', () => {
   it('names a reason on every row that does not open', () => {
     // The handoff's definition of done: every control reaches the simulation *or says it does not*.
     // A `disabled` row with an empty string would satisfy the type and say nothing.
-    for (const group of railGroups('campaign', true, 'Chancery House')) {
-      for (const item of group.items) {
+    for (const floor of railShaft({ screen: 'towers', ctx: 'campaign' }, true, 'Chancery House').floors) {
+      for (const item of [floor, ...floor.rooms]) {
         if (item.unavailable === undefined) continue;
-        expect(item.unavailable.trim().length, `${group.title} · ${item.label}`).toBeGreaterThan(10);
+        expect(item.unavailable.trim().length, floor.name).toBeGreaterThan(10);
       }
     }
   });
@@ -551,8 +611,8 @@ describe('the whole model', () => {
   it('defaults to not being in a campaign', () => {
     // The default matters: it is what the shell passes today, and a default of `true` would put
     // entries into a campaign nobody started on the front door.
-    expect(railModel({ screen: 'menu', ctx: 'campaign' }).groups.map((g) => g.title))
-      .not.toContain('CAREER');
+    const career = railModel({ screen: 'menu', ctx: 'campaign' }).shaft.floors.find((floor) => floor.key === '2');
+    expect(career?.rooms).toEqual([]);
   });
 });
 
