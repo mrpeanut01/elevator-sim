@@ -7,7 +7,7 @@
  * §D301's thesis: *the mass-market draw is the non-dumbification of the settings and parameters*.
  * §D299 §2 states the test this surface has to pass — **easier to use, never saying less** — so
  * nothing here is withheld on the grounds that a Casual player *would not want it*. What Casual
- * gets is **disclosure order**, not a smaller product: six named styles, four plain levers, then
+ * gets is **disclosure order**, not a smaller product: a shelf of every design, four plain levers, then
  * the thirteen weights, the behaviour flags, the switching block and the rules editor, each behind
  * a door that announces what is behind it (§16 rule 13). A door is not a wall — every control the
  * Engineer editor can reach is reachable from this screen.
@@ -29,10 +29,11 @@
  *   §11.5 lists ten actions and `RULE_ACTIONS` declares eight; **the two it omits are unbuildable
  *   here because the offered list is derived from that array**, which is the vocabulary's refusal
  *   made once, in the model, rather than a second refusal drawn on a screen;
- * - the **six play styles** are `data/dispatcher-profiles.json`'s `playStyles` block
- *   (`core`'s `PlayStyle`), for the reason invariant 7 gives: a style is a weight vector with a
- *   name, and a renderer holding six names against six profile ids is that forbidden table with a
- *   friendlier key.
+ * - the **shelves** are `data/dispatcher-families.json` (`authoring/dispatcherFamilies.ts`), and
+ *   the play styles drawn as aliases and variations are `data/dispatcher-profiles.json`'s
+ *   `playStyles` block, for the reason invariant 7 gives: which design sits with which, and what a design is
+ *   also called, are facts about the library, and a renderer holding them against profile ids is
+ *   that forbidden table with a friendlier key.
  *
  * The one place words *are* authored here is {@link WORKSHOP_COPY} — headings, disclosure summaries
  * and the sentences the prototype writes about the screen itself. Those are the handoff's own copy,
@@ -74,9 +75,11 @@ import {
   type RuleValueOption,
 } from '@elevator-sim/core/browser';
 
+import type { DispatcherFamily } from '../authoring/dispatcherFamilies.js';
 import {
   costFunctionLine,
   inertTerms,
+  specFromProfile,
   type DispatcherSpec,
   type DutyDeclarations,
   type GroupLevers,
@@ -123,60 +126,67 @@ import { plainLeversOf, type PlainLeverView } from '../mode/plainLevers.js';
  * Every sentence the workshop authors about itself, one frozen object so the honesty sweep renders
  * all of them on every case.
  *
- * Sources, line by line: `styleHeading`, `yoursHeading`, `optimisingHeading`, `behavesHeading`,
- * `groupHeading`, `switchingHeading`, `rulesHeading`, `showEveryTerm`, `showTheMaths` and
- * `zoningBoundary` are the prototype's own cells (`docs/design/elevator-sim-casual.dc.html`, and
- * §11.4's header sentence verbatim). `libraryHeading` and `libraryHint` are this build's, because
- * the prototype's left panel offers six styles and the saved shelf and nothing else, and this
- * build ships thirteen dispatchers — §D299 §2 forbids hiding the other seven behind a card that
- * does not exist.
+ * Sources: `optimisingHeading`, `behavesHeading`, `groupHeading`, `switchingHeading`,
+ * `rulesHeading`, `showEveryTerm`, `showTheMaths` and `zoningBoundary` are the prototype's own cells
+ * (`docs/design/elevator-sim-casual.dc.html`, and §11.4's header sentence verbatim). The shelf and
+ * the save block are this build's: the prototype's left panel offered six styles and a saved list,
+ * and the product owner's 2026-11-11 direction replaced it with a shelf of every industry design
+ * and of the player's own, each saved under its own name.
  */
 export const WORKSHOP_COPY = Object.freeze({
   eyebrow: 'DISPATCHER WORKSHOP',
   title: 'Build the thing that decides',
   lede:
+    'A dispatcher is one rule, asked thousands of times a day: which car goes to this call. Pull ' +
+    'four levers, and open as much of the rest as you want. Nothing here is held back — the ' +
+    'drawers are an order to read in, not a smaller set of controls.',
+  /* ---- the shelf: the workshop's front door ---- */
+  shelfTitle: 'Your dispatchers, and the industry’s',
+  shelfLede:
     'A dispatcher is one rule, asked thousands of times a day: which car goes to this call. Start ' +
-    'from a style, pull four levers, and open as much of the rest as you want. Nothing here is ' +
-    'held back — the drawers are an order to read in, not a smaller set of controls.',
-  styleHeading: 'START FROM A STYLE',
-  styleHint:
-    'Each one is a whole dispatcher already. Pressing a card replaces what you are editing, so ' +
-    'press one first and tinker after.',
-  /** Drawn instead of the cards when the loaded library declares no styles at all. */
-  styleAbsent:
-    'This build’s dispatcher library declares no named styles, so there is nothing to start from ' +
-    'here. Every dispatcher it does ship is in the list below, under its own name.',
-  libraryHeading: 'EVERY OTHER DISPATCHER THIS BUILD SHIPS',
-  libraryHint:
-    'The styles above are six ways in, not the whole shelf. These are the rest, under the names ' +
-    'the library gives them.',
+    'from an industry design, shape a copy of your own, and save it under a name.',
   yoursHeading: 'YOURS',
-  /**
-   * The shelf's empty state — and it promised a landing place this build has no verb to reach.
-   *
-   * It read *"Nothing saved yet. Move a lever or add a rule and this is where it lands."* Nothing
-   * in `everyday/` writes `savedDispatchers`: the Engineer editor's *Save as new* is the only
-   * control in the product that files a dispatcher, so a player who moved a lever here and looked
-   * for it to land was watching for something that could not arrive. GitHub issue #296's fourth
-   * criterion, and the same class as the promise its footer used to make.
-   *
-   * The replacement says where a save comes from rather than that one is coming, which is § D227's
-   * rule pointed at a promise instead of a refusal.
-   *
-   * **Issues #228 and #167 have landed and this sentence is unchanged, which is the note worth
-   * keeping** ([§ D443](../../../../DECISIONS.md)). That lane made a saved dispatcher reach
-   * Compare, the suite, the Lab, the bench and the gauntlet — so the shelf below is now worth
-   * filling, and the route it names is now worth taking. What it did **not** build is a Save here,
-   * and it declined deliberately rather than for want of time: #180's scope transfer into #228
-   * names four behaviours § 11.1 requires of one — overwrite, save-as-a-copy, auto-versioned names,
-   * and the warning before an overwrite — and *"saves and persists"* admits an implementation that
-   * satisfies #228 and none of them. So the sentence is still true, and it stays until a lane owns
-   * all four.
-   */
+  yoursHint: 'Saved in this browser. Open one to change it, or copy it to try something else.',
+  /** Drawn where the saved cards would be. It names the route to a first save, which exists now. */
   yoursEmpty:
-    'Nothing saved yet. Saving a dispatcher of your own is the Engineer workshop’s Save as new — ' +
-    'this build has no save here yet. Your levers, switching and rules still travel with the next ' +
-    'run without being saved.',
+    'Nothing saved yet. Open an industry design below, change anything you like, and save it ' +
+    'under a name of your own.',
+  industryHeading: 'INDUSTRY DESIGNS',
+  /** The heading for shipped designs `data/dispatcher-families.json` does not shelve. */
+  unfiledHeading: 'MORE THIS BUILD SHIPS',
+  unfiledLine: 'Shipped designs the library has not put on a named shelf.',
+  /** Drawn on a design whose `role` is `baseline` — the label `nearest-car`'s own comment owes. */
+  baselineTag: 'REFERENCE',
+  baselineHint:
+    'A reference design. The studies behind this game hold these fixed and measure the others ' +
+    'against them.',
+  openTag: 'OPEN NOW',
+  aliasLead: 'Also called',
+  openIndustry: 'Make my own from this',
+  openYours: 'Open',
+  keepWorking: 'Keep working on it',
+  duplicate: 'Duplicate',
+  remove: 'Delete',
+  removeConfirm: 'Delete it',
+  removeCancel: 'Keep it',
+  discardOpen: 'Discard and open',
+  discardCancel: 'Cancel',
+  backToShelf: '← All dispatchers',
+  /* ---- the nameplate's save block ---- */
+  nameLabel: 'Name',
+  saveAsMine: 'Save as my own',
+  save: 'Save',
+  saveCopy: 'Save as a copy',
+  replaceConfirm: 'Replace it',
+  revert: 'Discard changes',
+  saveHolds:
+    'A save holds everything on this page: the levers, every weight, how it behaves, the ' +
+    'switching and the rules.',
+  industryNote:
+    'An industry design is never changed. Saving files a copy of your own beside it, and the ' +
+    'original stays on the shelf.',
+  refusalEmpty: 'Give it a name first.',
+  refusalTaken: 'Another dispatcher already has that name. Change the name, or save a copy.',
   leversHeading: 'THE FOUR LEVERS',
   leversHint:
     'Four plain controls over the same numbers the drawer below holds. Move one and the cost line ' +
@@ -226,89 +236,282 @@ export const WORKSHOP_COPY = Object.freeze({
  * Layer 1 — the named styles, and everything else on the shelf
  * -------------------------------------------------------------------------- */
 
-/** One style card, as §11.2 draws it: a name, the trade, and whether it is what is loaded. */
-export interface PlayStyleCard {
-  readonly id: string;
-  /** The style's own name from `data/`. Never a profile id — §16 rule 11. */
+/** One of a design's leading concerns, for the bars on its card. */
+export interface PriorityBar {
+  /** The term's own player name from `core` — never its engine id. */
   readonly name: string;
-  /** One plain sentence about the trade. Never a claim of quality. */
-  readonly trade: string;
-  /** True when the working copy is this style, unedited. */
-  readonly selected: boolean;
+  /** This weight over the design's largest, 0 to 1. A shape to recognise, not a figure to read. */
+  readonly share: number;
 }
 
 /**
- * The style cards, in the file's own order, with the loaded one marked.
+ * What a design weighs most, largest first — the bars on a shelf card.
  *
- * `selected` compares the **whole** starting point — the profile the style names *and* its two
- * group settings — because §6.2's `steady-hand` and `lobby-anchor` share a weight vector and
- * differ only in where the idle cars wait. Comparing the profile alone would light both cards for
- * one state, which is a screen telling a player they are somewhere they are not.
+ * Names are `core`'s `PlayerTermWords` (§16 rule 11). A term this build has not implemented falls
+ * back to its short name, as {@link mathsDisclosureOf} does. `share` is relative to the design's
+ * own largest weight, because weights are only ever compared within one dispatcher: a bar that
+ * invited comparing `0.7` on one card with `0.5` on another would be inviting a comparison the
+ * cost function does not make.
  */
-export function playStyleCardsOf(
-  file: DispatcherProfiles,
-  loadedProfileId: string,
-  levers: GroupLevers,
-  spec: DispatcherSpec,
-): readonly PlayStyleCard[] {
+export function prioritiesOf(profile: DispatcherProfile, limit = 4): readonly PriorityBar[] {
+  const weighted = Object.entries(profile.weights)
+    .filter(([, weight]) => weight > 0)
+    .sort(([, a], [, b]) => b - a);
+  const largest = weighted[0]?.[1] ?? 1;
+  const allIds = weighted.map(([termId]) => termId);
   return Object.freeze(
-    (file.playStyles ?? []).map((style) =>
+    weighted.slice(0, limit).map(([termId, weight]) =>
       Object.freeze({
-        id: style.id,
-        name: style.name,
-        trade: style.trade,
-        selected:
-          style.profileId === loadedProfileId &&
-          style.parking === levers.parking &&
-          style.zone === spec.flags.zone,
+        name: COST_TERMS_BY_ID.get(termId)?.player.name ?? shortTermNameOf(termId, allIds),
+        share: weight / largest,
       }),
     ),
   );
 }
 
-/**
- * The refusal drawn where the cards would be, or `undefined` when there are cards.
- *
- * A build whose library declares no styles is not a broken build — the styles are optional in the
- * schema — so this is a sentence rather than a blank region, and it points at the list that *does*
- * have every dispatcher in it. §D227's rule: a control that offers nothing must say so.
- */
-export function playStyleAbsenceOf(file: DispatcherProfiles): string | undefined {
-  return (file.playStyles ?? []).length === 0 ? WORKSHOP_COPY.styleAbsent : undefined;
-}
-
-/** One shipped dispatcher no style names, offered under the library's own name for it. */
-export interface LibraryCard {
-  readonly profileId: string;
+/** A named starting point that is an industry design with a lever already pulled. */
+export interface VariationCard {
+  /** The play style's id — what {@link styleSelectionOf} resolves. */
+  readonly styleId: string;
   readonly name: string;
-  readonly selected: boolean;
+  /** One plain sentence about the trade. Never a claim of quality. */
+  readonly trade: string;
+}
+
+/** One industry design on the shelf. */
+export interface IndustryCard {
+  readonly profileId: string;
+  /** The library's own name for it. Never its id. */
+  readonly name: string;
+  /** The authored line, when the library carries one. */
+  readonly blurb: string | undefined;
+  /** {@link WORKSHOP_COPY.baselineTag}, on a reference design. */
+  readonly tag: string | undefined;
+  readonly priorities: readonly PriorityBar[];
+  /** Play-style names that are this design exactly, under another name. */
+  readonly aliases: readonly string[];
+  /** Play styles that are this design with a lever pulled. */
+  readonly variations: readonly VariationCard[];
+  /** True when the working copy was read from this design. */
+  readonly open: boolean;
+}
+
+/** One named shelf of industry designs. */
+export interface FamilyShelf {
+  readonly id: string;
+  readonly name: string;
+  readonly line: string;
+  readonly cards: readonly IndustryCard[];
+}
+
+/** One of the player's own. */
+export interface YoursCard {
+  readonly id: string;
+  readonly name: string;
+  /** *based on ⟨industry design⟩*, or `undefined` when the lineage is not known. */
+  readonly basedOn: string | undefined;
+  readonly priorities: readonly PriorityBar[];
+  readonly open: boolean;
+}
+
+/** The workshop's front door: the player's own dispatchers, then every industry design. */
+export interface Shelf {
+  readonly yours: readonly YoursCard[];
+  /** Drawn instead of the cards when nothing is saved. */
+  readonly yoursEmpty: string | undefined;
+  /** The industry row's hint, with the count derived from the library. */
+  readonly industryHint: string;
+  readonly families: readonly FamilyShelf[];
+}
+
+/** The slice of a saved dispatcher the shelf reads — `dev/state.ts#SavedDispatcher`'s shape. */
+export interface ShelvedDispatcher {
+  readonly id: string;
+  readonly profile: DispatcherProfile;
+  readonly basedOn?: string | undefined;
 }
 
 /**
- * Every shipped dispatcher **no style already names**, so the shelf is complete without being
- * doubled.
+ * The shelf — every shipped design exactly once, under the library's own headings, and the
+ * player's own above them.
  *
- * This exists because of §D299 §2 rather than because the prototype asks for it: six cards over a
- * thirteen-profile library is six-thirteenths of a product, and *"the audience would not want the
- * other seven"* is exactly the reasoning that clause forbids. The card carries the profile's own
- * `name` — authored, player-facing, capped by `core`'s schema — and never its id.
+ * ## Why this replaced *start from a style*
+ *
+ * The panel this replaces drew six nicknamed style cards, then the seven shipped designs no style
+ * named under a second heading, then the saved ones — three lists answering one question, where
+ * the same design could be reached under two names and pressing either replaced the working copy.
+ * Here a design appears once, under the name the library gives it, on the shelf the library's
+ * shelves (`data/dispatcher-families.json`, through `authoring/dispatcherFamilies.ts`) put it on. The play styles are still read and nothing in them is dropped:
+ * a style that **is** a design under another name is drawn as that design's alias, and a style
+ * that is a design with a lever pulled is drawn as a variation of it.
+ *
+ * **Complete by construction** (§D299 §2): a profile no family shelves lands on a trailing shelf
+ * rather than off the page, and with no shelves declared the library is drawn as that one shelf.
+ * `authoring/dispatcherFamilies.test.ts` asserts the shipped pair needs no trailing shelf.
  */
-export function libraryCardsOf(
+export function shelfOf(
   file: DispatcherProfiles,
-  loadedProfileId: string,
-): readonly LibraryCard[] {
-  const named = new Set((file.playStyles ?? []).map((style) => style.profileId));
-  return Object.freeze(
-    file.profiles
-      .filter((profile) => !named.has(profile.id))
-      .map((profile) =>
+  shelves: readonly DispatcherFamily[],
+  saved: readonly ShelvedDispatcher[],
+  openId: string,
+): Shelf {
+  const byId = new Map(file.profiles.map((profile) => [profile.id, profile]));
+  const styles = file.playStyles ?? [];
+  const cardOf = (profile: DispatcherProfile): IndustryCard => {
+    const ownZone = specFromProfile(profile, profile.name).flags.zone;
+    const mine = styles.filter((style) => style.profileId === profile.id);
+    const isAlias = (style: PlayStyle): boolean => !style.parking && style.zone === ownZone;
+    return Object.freeze({
+      profileId: profile.id,
+      name: profile.name,
+      blurb: profile.blurb,
+      tag: profile.role === 'baseline' ? WORKSHOP_COPY.baselineTag : undefined,
+      priorities: prioritiesOf(profile),
+      aliases: Object.freeze(mine.filter(isAlias).map((style) => style.name)),
+      variations: Object.freeze(
+        mine
+          .filter((style) => !isAlias(style))
+          .map((style) => Object.freeze({ styleId: style.id, name: style.name, trade: style.trade })),
+      ),
+      open: profile.id === openId,
+    });
+  };
+
+  const shelved = new Set<string>();
+  const families: FamilyShelf[] = [];
+  for (const family of shelves) {
+    const cards: IndustryCard[] = [];
+    for (const profileId of family.profileIds) {
+      const profile = byId.get(profileId);
+      // A family naming a profile this file lost shelves nothing for it — an absence, not a stand-in.
+      if (profile === undefined || shelved.has(profileId)) continue;
+      shelved.add(profileId);
+      cards.push(cardOf(profile));
+    }
+    if (cards.length > 0) {
+      families.push(
+        Object.freeze({ id: family.id, name: family.name, line: family.line, cards: Object.freeze(cards) }),
+      );
+    }
+  }
+  const unfiled = file.profiles.filter((profile) => !shelved.has(profile.id));
+  if (unfiled.length > 0) {
+    families.push(
+      Object.freeze({
+        id: 'unfiled',
+        name: WORKSHOP_COPY.unfiledHeading,
+        line: WORKSHOP_COPY.unfiledLine,
+        cards: Object.freeze(unfiled.map(cardOf)),
+      }),
+    );
+  }
+
+  return Object.freeze({
+    yours: Object.freeze(
+      saved.map((entry) =>
         Object.freeze({
-          profileId: profile.id,
-          name: profile.name,
-          selected: profile.id === loadedProfileId,
+          id: entry.id,
+          name: entry.profile.name,
+          basedOn:
+            entry.basedOn === undefined ? undefined : byId.get(entry.basedOn)?.name,
+          priorities: prioritiesOf(entry.profile),
+          open: entry.id === openId,
         }),
       ),
-  );
+    ),
+    yoursEmpty: saved.length === 0 ? WORKSHOP_COPY.yoursEmpty : undefined,
+    industryHint:
+      `All ${String(file.profiles.length)} this build ships. They are never changed and never ` +
+      'locked — open one to make your own from it.',
+    families: Object.freeze(families),
+  });
+}
+
+/** The sentence asked before a saved dispatcher is deleted. */
+export function removeQuestionOf(name: string): string {
+  return `Delete “${name}”? It comes off this shelf and out of every picker, and it cannot be brought back.`;
+}
+
+/** The sentence asked before opening another dispatcher over unsaved changes. */
+export function discardQuestionOf(openName: string): string {
+  return `“${openName}” has changes that are not saved. Opening this one discards them.`;
+}
+
+/* -------------------------------------------------------------------------- *
+ * §11.1 — saving
+ * -------------------------------------------------------------------------- */
+
+/** What the workshop has open, as `everyday/host.ts#WorkingDispatcherStatus` reports it. */
+export interface OpenDispatcher {
+  readonly kind: 'industry' | 'yours' | 'gone';
+  readonly savedName: string | undefined;
+  readonly basedOn: string | undefined;
+  readonly unsaved: boolean;
+}
+
+/** The nameplate's save block: where this dispatcher stands, and the verbs that apply to it. */
+export interface SaveBlock {
+  /** Where it stands, in a few words. */
+  readonly state: string;
+  /** *based on ⟨industry design⟩*, when known. */
+  readonly basedOn: string | undefined;
+  /** The primary save. `replaces` is the question to ask first when it would overwrite. */
+  readonly save: { readonly label: string; readonly enabled: boolean; readonly replaces: string | undefined };
+  /** *Save as a copy* — offered only on one of the player's own; an industry save is already a copy. */
+  readonly copy: string | undefined;
+  /** *Discard changes*, enabled only while there are some. */
+  readonly revert: { readonly label: string; readonly enabled: boolean };
+  readonly notes: readonly string[];
+}
+
+/**
+ * §11.1's save rules, decided once.
+ *
+ * - An **industry design** is never written. Its one save files a copy of the player's own.
+ * - One of **the player's own** saves in place, and the replace is asked first, with what follows
+ *   from it said plainly: the id stays, so every run, bench and picker that names it gets the new
+ *   version. § 11.1's own warning names bench results and board entries; this build keeps no bench
+ *   record per dispatcher, so the sentence says what is true here instead.
+ * - **Save as a copy** leaves the saved one alone and files the next free version of the name.
+ * - A source that no longer exists can still be saved as the player's own, never discarded onto.
+ */
+export function saveBlockOf(open: OpenDispatcher): SaveBlock {
+  const C = WORKSHOP_COPY;
+  const basedOn = open.basedOn === undefined ? undefined : `based on ${open.basedOn}`;
+  if (open.kind === 'yours') {
+    return Object.freeze({
+      state: open.unsaved ? 'Yours — unsaved changes' : 'Yours — saved',
+      basedOn,
+      save: Object.freeze({
+        label: C.save,
+        enabled: open.unsaved,
+        replaces:
+          `This replaces the saved “${open.savedName ?? ''}”. Anything that uses it — a run, the ` +
+          'bench, a picker in another mode — uses the new version from then on.',
+      }),
+      copy: C.saveCopy,
+      revert: Object.freeze({ label: C.revert, enabled: open.unsaved }),
+      notes: Object.freeze([C.saveHolds]),
+    });
+  }
+  if (open.kind === 'gone') {
+    return Object.freeze({
+      state: 'The design this was read from is no longer here',
+      basedOn: undefined,
+      save: Object.freeze({ label: C.saveAsMine, enabled: true, replaces: undefined }),
+      copy: undefined,
+      revert: Object.freeze({ label: C.revert, enabled: false }),
+      notes: Object.freeze([C.saveHolds]),
+    });
+  }
+  return Object.freeze({
+    state: open.unsaved ? 'Your copy — not saved yet' : 'An industry design, as shipped',
+    basedOn: open.unsaved ? basedOn : undefined,
+    save: Object.freeze({ label: C.saveAsMine, enabled: true, replaces: undefined }),
+    copy: undefined,
+    revert: Object.freeze({ label: C.revert, enabled: open.unsaved }),
+    notes: Object.freeze([C.industryNote, C.saveHolds]),
+  });
 }
 
 /** A style resolved against the library: the profile to load, and the two levers it sets. */
@@ -946,7 +1149,7 @@ export type WorkshopWrite = (typeof WORKSHOP_WRITES)[number];
  * travel with the run* and *nothing changed yet* were the only two states that existed. This build
  * had a third field class — `viewer.dispatcherSpec` was `latent`, and `dev/state.ts#drivingProfileOf`
  * composed the run from the other three and never from it — so the two-cell table could not describe
- * two of the four states a player could actually produce. That is `WORKSHOP_COPY.libraryHeading`'s
+ * two of the four states a player could actually produce. That was the old `WORKSHOP_COPY.libraryHeading`'s
  * situation exactly (the prototype's panel offers six styles, this build ships thirteen), and it is
  * answered the same way: the guide's own sentences are kept and drawn where they are true, and this
  * build adds the ones its own shape needs.

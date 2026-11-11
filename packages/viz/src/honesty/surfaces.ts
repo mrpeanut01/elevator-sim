@@ -107,18 +107,21 @@ import {
   behaviourBlockOf,
   carriedBlocksOf,
   constraintCardsOf,
-  libraryCardsOf,
   /* Aliased: `dev/leftRail.ts` and `dev/rightRail.ts` already export these two names. */
   mathsDisclosureOf as workshopMathsOf,
   nameplateOf as workshopNameplateOf,
-  playStyleAbsenceOf,
-  playStyleCardsOf,
+  discardQuestionOf as workshopDiscardQuestionOf,
+  removeQuestionOf as workshopRemoveQuestionOf,
+  saveBlockOf as workshopSaveBlockOf,
+  shelfOf as workshopShelfOf,
   rulesBlockOf,
   switchingBlockOf,
   termDisclosureOf,
   workshopLeversOf,
   WORKSHOP_COPY,
 } from '../everyday/workshopModel.js';
+import { DISPATCHER_FAMILIES } from '../authoring/dispatcherFamilies.js';
+import { versionedNameOf } from '../authoring/dispatcherShelf.js';
 import {
   BRIEF_DRIVER_LOCKED,
   BRIEF_WAY_THROUGH_HEADING,
@@ -16875,7 +16878,12 @@ const EVERYDAY_WORKSHOP: SurfaceAdapter = {
   id: 'everyday/workshopModel.ts#WORKSHOP_COPY',
   covers: [
     'everyday/workshopModel.ts#WORKSHOP_COPY',
-    'everyday/workshopModel.ts#playStyleAbsenceOf',
+    'everyday/workshopModel.ts#shelfOf',
+    'everyday/workshopModel.ts#saveBlockOf',
+    'everyday/workshopModel.ts#removeQuestionOf',
+    'everyday/workshopModel.ts#discardQuestionOf',
+    // The names a save files — `My dispatcher`, `⟨name⟩ v2` — are read on the shelf and in every picker.
+    'authoring/dispatcherShelf.ts#versionedNameOf',
     'everyday/workshopModel.ts#termDisclosureOf',
     'everyday/workshopModel.ts#mathsDisclosureOf',
     'everyday/workshopModel.ts#behaviourBlockOf',
@@ -16885,14 +16893,11 @@ const EVERYDAY_WORKSHOP: SurfaceAdapter = {
     'everyday/workshopModel.ts#rulesBlockOf',
     'everyday/workshopModel.ts#nameplateOf',
     /*
-     * Three exports are deliberately **not** listed and are rendered anyway:
-     * `playStyleCardsOf`, `libraryCardsOf` and `workshopLeversOf`. The derivation does not find
-     * them, and it is right not to — none of them authors a phrase. The style cards carry
-     * `data/dispatcher-profiles.json`'s own `name` and `trade` (swept above, seed by seed), the
-     * library cards carry each profile's `name`, and the lever views are `mode/plainLevers.ts`'s,
-     * already driven by the editor adapter. Listing them would be a coverage claim about
-     * functions that produce no prose of their own, which is the stale-coverage half of
-     * `derive.test.ts`'s guard.
+     * `prioritiesOf` and `workshopLeversOf` are deliberately **not** listed and are rendered
+     * anyway. Neither authors a phrase: a priority bar carries `core`'s own player name for a
+     * term, and the lever views are `mode/plainLevers.ts`'s, already driven by the editor adapter.
+     * Listing them would be a coverage claim about functions that produce no prose of their own,
+     * which is the stale-coverage half of `derive.test.ts`'s guard.
      */
   ],
   render(context) {
@@ -16903,20 +16908,78 @@ const EVERYDAY_WORKSHOP: SurfaceAdapter = {
       seeds.push({ field: `copy.${key}`, text, role: 'prose', provenance: 'authored' });
     }
 
-    /* ---- the left panel: six style cards, the rest of the shelf, the nameplate ---- */
-    for (const card of playStyleCardsOf(file, 'collective', DEFAULT_LEVERS, blankSpec([]))) {
-      seeds.push({ field: `style.${card.id}.name`, text: card.name, role: 'label', provenance: 'authored' });
-      seeds.push({ field: `style.${card.id}.trade`, text: card.trade, role: 'prose', provenance: 'authored' });
+    /* ---- the shelf: the player's own, then every industry design under its family ---- */
+    const firstProfile = file.profiles[0];
+    const shelved =
+      firstProfile === undefined
+        ? []
+        : [{ id: 'yours-1', profile: { ...firstProfile, id: 'yours-1', name: 'Morning patience' }, basedOn: firstProfile.id }];
+    for (const [state, saved] of [['empty', []], ['saved', shelved]] as const) {
+      const shelf = workshopShelfOf(file, DISPATCHER_FAMILIES, saved, firstProfile?.id ?? '');
+      seeds.push({ field: `shelf.${state}.industryHint`, text: shelf.industryHint, role: 'prose', provenance: 'authored' });
+      if (shelf.yoursEmpty !== undefined) {
+        seeds.push({ field: `shelf.${state}.yoursEmpty`, text: shelf.yoursEmpty, role: 'reason', provenance: 'authored' });
+      }
+      for (const card of shelf.yours) {
+        if (card.basedOn !== undefined) {
+          seeds.push({ field: `shelf.${state}.yours.${card.id}.basedOn`, text: `based on ${card.basedOn}`, role: 'label' });
+        }
+      }
+      for (const family of shelf.families) {
+        seeds.push({ field: `shelf.${state}.${family.id}.name`, text: family.name, role: 'label', provenance: 'authored' });
+        seeds.push({ field: `shelf.${state}.${family.id}.line`, text: family.line, role: 'prose', provenance: 'authored' });
+        for (const card of family.cards) {
+          const at = `shelf.${state}.${family.id}.${card.profileId}`;
+          seeds.push({ field: `${at}.name`, text: card.name, role: 'label', provenance: 'authored' });
+          if (card.blurb !== undefined) {
+            seeds.push({ field: `${at}.blurb`, text: card.blurb, role: 'prose', provenance: 'authored' });
+          }
+          for (const alias of card.aliases) {
+            seeds.push({ field: `${at}.alias`, text: alias, role: 'label', provenance: 'authored' });
+          }
+          for (const variation of card.variations) {
+            seeds.push({ field: `${at}.${variation.styleId}.name`, text: variation.name, role: 'label', provenance: 'authored' });
+            seeds.push({ field: `${at}.${variation.styleId}.trade`, text: variation.trade, role: 'prose', provenance: 'authored' });
+          }
+          for (const bar of card.priorities) {
+            seeds.push({ field: `${at}.priority`, text: bar.name, role: 'label' });
+          }
+        }
+      }
     }
-    /* The refusal a build with no declared styles draws — reachable only through a file that has
-     * none, so it is manufactured here rather than left as a sentence no run has seen. */
-    const { playStyles: _styles, ...bare } = file;
-    const absence = playStyleAbsenceOf(bare);
-    if (absence !== undefined) {
-      seeds.push({ field: 'style.absent', text: absence, role: 'reason', provenance: 'authored' });
+    /* With no shelves declared the library is one unnamed shelf — manufactured, as the shipped file declares six. */
+    for (const family of workshopShelfOf(file, [], [], '').families) {
+      seeds.push({ field: `shelf.unfiled.${family.id}.name`, text: family.name, role: 'label', provenance: 'authored' });
+      seeds.push({ field: `shelf.unfiled.${family.id}.line`, text: family.line, role: 'prose', provenance: 'authored' });
     }
-    for (const card of libraryCardsOf(file, 'collective')) {
-      seeds.push({ field: `library.${card.profileId}`, text: card.name, role: 'label', provenance: 'authored' });
+    seeds.push(
+      { field: 'shelf.removeQuestion', text: workshopRemoveQuestionOf('Morning patience'), role: 'prose', provenance: 'authored' },
+      { field: 'shelf.discardQuestion', text: workshopDiscardQuestionOf('Morning patience'), role: 'prose', provenance: 'authored' },
+    );
+
+    for (const [field, name, taken] of [
+      ['unnamed', '', []],
+      ['copy', 'Morning patience', ['Morning patience']],
+    ] as const) {
+      seeds.push({ field: `save.name.${field}`, text: versionedNameOf(name, taken), role: 'label' });
+    }
+
+    /* ---- the save block, in every state a dispatcher can stand in ---- */
+    for (const kind of ['industry', 'yours', 'gone'] as const) {
+      for (const unsaved of [false, true]) {
+        const block = workshopSaveBlockOf({
+          kind,
+          savedName: kind === 'yours' ? 'Morning patience' : undefined,
+          basedOn: kind === 'gone' ? undefined : firstProfile?.name,
+          unsaved,
+        });
+        const at = `save.${kind}.${unsaved ? 'unsaved' : 'clean'}`;
+        seeds.push({ field: `${at}.state`, text: block.state, role: 'label', provenance: 'authored' });
+        if (block.basedOn !== undefined) seeds.push({ field: `${at}.basedOn`, text: block.basedOn, role: 'label' });
+        if (block.save.replaces !== undefined) {
+          seeds.push({ field: `${at}.replaces`, text: block.save.replaces, role: 'prose', provenance: 'authored' });
+        }
+      }
     }
 
     /* ---- the ladder, once per shipped style, so every vector is swept ---- */

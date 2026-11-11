@@ -38,17 +38,18 @@ import {
 import { defaultRuleRow } from '../authoring/ruleSpec.js';
 import { selectorContextFrom, defaultSelectorSpec } from '../authoring/selectorSpec.js';
 import { withGoodsCar } from '../fixtures.test-helper.js';
+import { DISPATCHER_FAMILIES } from '../authoring/dispatcherFamilies.js';
 import { applyPlainLever } from '../mode/plainLevers.js';
 import {
   behaviourBlockOf,
   carriedBlocksOf,
   constraintCardsOf,
-  libraryCardsOf,
   mathsDisclosureOf,
   nameplateOf,
-  playStyleAbsenceOf,
-  playStyleCardsOf,
+  prioritiesOf,
   rulesBlockOf,
+  saveBlockOf,
+  shelfOf,
   styleSelectionOf,
   switchingBlockOf,
   termDisclosureOf,
@@ -202,38 +203,91 @@ describe('§11.3 — the maths, in rule 12’s order', () => {
   });
 });
 
-describe('the play styles are data, and the shelf is complete', () => {
-  it('draws a card per declared style, with the file’s own words', () => {
-    const cards = playStyleCardsOf(FILE, 'collective', LEVERS, SPEC);
-    expect(cards).toHaveLength(FILE.playStyles?.length ?? 0);
-    expect(cards.length).toBeGreaterThan(0);
-    for (const [index, card] of cards.entries()) {
-      const style = FILE.playStyles?.[index];
-      if (style === undefined) throw new Error('the file lost a style between two reads');
-      expect(card.name).toBe(style.name);
-      expect(card.trade).toBe(style.trade);
-      // §16 rule 11: no engine identifier reaches a player-facing field.
-      expect(card.name).not.toContain(style.profileId);
-      expect(card.trade).not.toContain(style.profileId);
-      expect(card.id).toBe(style.id);
-    }
-    expect(playStyleAbsenceOf(FILE)).toBeUndefined();
+describe('the shelf is data, and it is complete', () => {
+  const SHELF = shelfOf(FILE, DISPATCHER_FAMILIES, [], 'collective');
+  const cards = SHELF.families.flatMap((family) => family.cards);
+
+  it('draws every shipped dispatcher exactly once — §D299 §2', () => {
+    expect(cards.map((card) => card.profileId).sort()).toEqual(
+      FILE.profiles.map((profile) => profile.id).sort(),
+    );
   });
 
-  it('lights exactly one of the two styles that share a vector', () => {
+  it('needs no trailing shelf: the shipped shelves hold every shipped profile', () => {
+    expect(SHELF.families.map((family) => family.id)).toEqual(DISPATCHER_FAMILIES.map((family) => family.id));
+  });
+
+  it('draws nothing for a shelved id the library lost, and lands an unshelved profile on a trailing shelf', () => {
+    const first = DISPATCHER_FAMILIES[0];
+    if (first === undefined) throw new Error('data/ ships no shelf');
+    const shelf = shelfOf(FILE, [{ ...first, profileIds: [...first.profileIds, 'no-such-design'] }], [], '');
+    expect(shelf.families[0]?.cards.map((card) => card.profileId)).toEqual(first.profileIds);
+    expect(shelf.families.at(-1)?.id).toBe('unfiled');
+    expect(shelf.families.flatMap((family) => family.cards)).toHaveLength(FILE.profiles.length);
+  });
+
+  it('carries the library’s own words, and no engine id', () => {
+    for (const card of cards) {
+      const profile = profileOf(card.profileId);
+      expect(card.name).toBe(profile.name);
+      expect(card.blurb).toBe(profile.blurb);
+      // §16 rule 11: a bar is named by `core`'s own player words, never by a table held here.
+      const playerNames = Object.keys(profile.weights).map((termId) => COST_TERMS_BY_ID.get(termId)?.player.name);
+      for (const bar of card.priorities) expect(playerNames).toContain(bar.name);
+    }
+  });
+
+  it('marks only the open design, and tags the reference designs', () => {
+    expect(cards.filter((card) => card.open).map((card) => card.profileId)).toEqual(['collective']);
+    expect(cards.filter((card) => card.tag !== undefined).map((card) => card.profileId).sort()).toEqual(
+      FILE.profiles.filter((profile) => profile.role === 'baseline').map((profile) => profile.id).sort(),
+    );
+  });
+
+  it('drops no play style: each is an alias of its design or a variation of it', () => {
+    const drawn = cards.flatMap((card) => [
+      ...card.aliases,
+      ...card.variations.map((variation) => variation.name),
+    ]);
+    expect(drawn.sort()).toEqual((FILE.playStyles ?? []).map((style) => style.name).sort());
     /*
      * `steady-hand` and `lobby-anchor` are both `collective`; they differ only in the lobby lever.
-     * A card that lit on the profile alone would light both, which is a screen telling a player
-     * they are somewhere they are not.
+     * The first is the design under another name; the second is the design with a lever pulled,
+     * and drawing it as an alias would hide the one thing it changes.
      */
-    const parked = { ...LEVERS, parking: true };
-    const lit = (levers: GroupLevers): readonly string[] =>
-      playStyleCardsOf(FILE, 'collective', levers, SPEC)
-        .filter((card) => card.selected)
-        .map((card) => card.id);
+    const collective = cards.find((card) => card.profileId === 'collective');
+    expect(collective?.aliases).toEqual(['Steady hand']);
+    expect(collective?.variations.map((variation) => variation.styleId)).toEqual(['lobby-anchor']);
+  });
 
-    expect(lit(LEVERS)).toEqual(['steady-hand']);
-    expect(lit(parked)).toEqual(['lobby-anchor']);
+  it('draws one unnamed shelf, not a blank, for a library with no families', () => {
+    const shelf = shelfOf(FILE, [], [], '');
+    expect(shelf.families).toHaveLength(1);
+    expect(shelf.families[0]?.cards).toHaveLength(FILE.profiles.length);
+  });
+
+  it('shows the player’s own with a lineage only when one is known', () => {
+    const mine = { ...COLLECTIVE, id: 'yours-1', name: 'Mine' };
+    const shelf = shelfOf(
+      FILE,
+      DISPATCHER_FAMILIES,
+      [
+        { id: 'yours-1', profile: mine, basedOn: 'collective' },
+        { id: 'yours-2', profile: { ...mine, id: 'yours-2', name: 'Older' } },
+        { id: 'yours-3', profile: { ...mine, id: 'yours-3', name: 'Orphan' }, basedOn: 'no-such-design' },
+      ],
+      'yours-2',
+    );
+    expect(shelf.yoursEmpty).toBeUndefined();
+    expect(shelf.yours.map((card) => card.basedOn)).toEqual([COLLECTIVE.name, undefined, undefined]);
+    expect(shelf.yours.map((card) => card.open)).toEqual([false, true, false]);
+    expect(shelfOf(FILE, DISPATCHER_FAMILIES, [], '').yoursEmpty).toMatch(/Nothing saved yet/);
+  });
+
+  it('scales priority bars within one design, largest first', () => {
+    const bars = prioritiesOf(profileOf('energy-aware'));
+    expect(bars[0]?.share).toBe(1);
+    expect(bars.map((bar) => bar.share)).toEqual([...bars.map((bar) => bar.share)].sort((a, b) => b - a));
   });
 
   /**
@@ -264,22 +318,33 @@ describe('the play styles are data, and the shelf is complete', () => {
     expect(styleSelectionOf(FILE, 'no-such-style')).toBeUndefined();
   });
 
-  it('offers every shipped dispatcher no style already names — §D299 §2', () => {
-    const named = new Set((FILE.playStyles ?? []).map((style) => style.profileId));
-    const library = libraryCardsOf(FILE, 'collective');
-    expect(library.map((card) => card.profileId)).toEqual(
-      FILE.profiles.filter((profile) => !named.has(profile.id)).map((profile) => profile.id),
-    );
-    // Every profile is reachable: a style card, or a library card. Nothing is withheld.
-    expect(new Set([...named, ...library.map((card) => card.profileId)]).size).toBe(
-      FILE.profiles.length,
-    );
+});
+
+describe('the save block — § 11.1', () => {
+  const open = { savedName: undefined, basedOn: 'Fairness first', unsaved: false } as const;
+
+  it('never offers to write an industry design: its save files a copy', () => {
+    for (const unsaved of [false, true]) {
+      const block = saveBlockOf({ ...open, kind: 'industry', unsaved });
+      expect(block.save.label).toBe('Save as my own');
+      expect(block.save.replaces).toBeUndefined();
+      expect(block.copy).toBeUndefined();
+      expect(block.revert.enabled).toBe(unsaved);
+    }
   });
 
-  it('draws a stated absence, not a blank, for a library with no styles', () => {
-    const { playStyles: _styles, ...bare } = FILE;
-    expect(playStyleCardsOf(bare, 'collective', LEVERS, SPEC)).toHaveLength(0);
-    expect(playStyleAbsenceOf(bare)).toMatch(/declares no named styles/);
+  it('asks before replacing one of the player’s own, and offers the copy beside it', () => {
+    const block = saveBlockOf({ kind: 'yours', savedName: 'Patience', basedOn: undefined, unsaved: true });
+    expect(block.save.enabled).toBe(true);
+    expect(block.save.replaces).toContain('Patience');
+    expect(block.copy).toBe('Save as a copy');
+    expect(saveBlockOf({ kind: 'yours', savedName: 'Patience', basedOn: undefined, unsaved: false }).save.enabled).toBe(false);
+  });
+
+  it('lets a dispatcher whose source is gone be saved, and never discarded onto nothing', () => {
+    const block = saveBlockOf({ kind: 'gone', savedName: undefined, basedOn: undefined, unsaved: true });
+    expect(block.save.enabled).toBe(true);
+    expect(block.revert.enabled).toBe(false);
   });
 });
 

@@ -51,6 +51,7 @@
 
 import { RULE_ACTION_WORDS, RULE_CONDITION_WORDS } from '@elevator-sim/core/browser';
 
+import { DISPATCHER_FAMILIES } from '../authoring/dispatcherFamilies.js';
 import {
   DEFAULT_LEVERS,
   specFromProfile,
@@ -74,6 +75,7 @@ import { actionBarFor, type ActionBarModel } from './actionBar.js';
 import { sideBySide } from './screenDom.js';
 import type { EverydayScreenModule } from './screens.js';
 import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.js';
+import type { NameRefusal } from '../dev/dispatcherEditor.js';
 import type { EverydayHost } from './host.js';
 import type { EverydayState } from './types.js';
 import {
@@ -86,12 +88,13 @@ import {
   behaviourBlockOf,
   carriedBlocksOf,
   constraintCardsOf,
-  libraryCardsOf,
+  discardQuestionOf,
   mathsDisclosureOf,
   nameplateOf,
-  playStyleAbsenceOf,
-  playStyleCardsOf,
+  removeQuestionOf,
   rulesBlockOf,
+  saveBlockOf,
+  shelfOf,
   styleSelectionOf,
   switchingBlockOf,
   termDisclosureOf,
@@ -99,6 +102,7 @@ import {
   workshopReachOf,
   workshopWriteReachesRun,
   WORKSHOP_COPY as COPY,
+  type PriorityBar,
   type WorkshopReach,
   type WorkshopWrite,
 } from './workshopModel.js';
@@ -106,8 +110,27 @@ import {
 /** Which `<details>` a player has opened. Survives the redraw the DOM cannot. */
 const openDisclosures = new Set<string>();
 
-/** The last lever pressed, so `plainLeverEchoOf` has something to echo. Cleared by a style card. */
+/** The last lever pressed, so `plainLeverEchoOf` has something to echo. Cleared by opening a design. */
 let lastLeverId: string | undefined;
+
+/**
+ * Which of the workshop's two faces is drawn: the shelf, or the editor on the open dispatcher.
+ *
+ * Module-level for {@link openDisclosures}' reason — the screen redraws whole on every host
+ * notification, and the choice has to outlive the node it was made on. It also outlives an
+ * unmount, so a player who leaves to run a day comes back to the face they left.
+ */
+let view: 'shelf' | 'edit' = 'shelf';
+
+/** A question the screen has asked and is waiting on: nothing is discarded, replaced or deleted unasked. */
+type PendingQuestion =
+  | { readonly kind: 'open'; readonly key: string }
+  | { readonly kind: 'remove'; readonly id: string }
+  | { readonly kind: 'replace' };
+let pending: PendingQuestion | undefined;
+
+/** Why the last save was refused, drawn under the button until the name changes or a save lands. */
+let refusal: NameRefusal | undefined;
 
 function el<K extends keyof HTMLElementTagNameMap>(
   doc: Document,
@@ -249,149 +272,432 @@ function mountWorkshop(
   }
 
   /* ------------------------------------------------------------------ *
-   * The left panel — § 11.1
+   * Opening, saving and deleting — the shelf's verbs
+   * ------------------------------------------------------------------ */
+
+  /** The id the working copy was read from, or `''` when that design is gone. */
+  function openId(): string {
+    return api.editingSource()?.id ?? '';
+  }
+
+  /**
+   * Load a design into the editor and show it.
+   *
+   * The group levers are set, not inherited: a design opens as itself, with the lobby lever down
+   * unless a variation pulls it, so the last design's lever does not follow the player onto this
+   * one. `zone` is the design's own flag unless a variation says otherwise.
+   */
+  function openNow(profileId: string, styleId: string | undefined): void {
+    const file = api.dispatcherProfilesFile();
+    const picked = styleId === undefined ? undefined : styleSelectionOf(file, styleId);
+    const profile = api.dispatchers().find((entry) => entry.id === profileId);
+    if (profile === undefined) return;
+    view = 'edit';
+    pending = undefined;
+    refusal = undefined;
+    lastLeverId = undefined;
+    api.startFromDispatcher(profileId, {
+      parking: picked?.parking ?? false,
+      zone: picked?.zone ?? specFromProfile(profile, profile.name).flags.zone,
+    });
+    render();
+  }
+
+  /** Open a design, asking first when that would discard changes nobody has saved. */
+  function open(profileId: string, styleId?: string): void {
+    const key = `${profileId}/${styleId ?? ''}`;
+    if (styleId === undefined && profileId === openId()) {
+      view = 'edit';
+      pending = undefined;
+      render();
+      return;
+    }
+    if (api.workingDispatcherStatus().unsaved && !(pending?.kind === 'open' && pending.key === key)) {
+      pending = { kind: 'open', key };
+      render();
+      return;
+    }
+    openNow(profileId, styleId);
+  }
+
+  function save(mode: 'save' | 'copy'): void {
+    pending = undefined;
+    // A name refusal is drawn under the button; a held attempt's sentence is the bar's already.
+    const answer = api.saveWorkingDispatcher(mode);
+    refusal = answer === 'empty' || answer === 'taken' ? answer : undefined;
+    render();
+  }
+
+  function button(
+    className: string,
+    label: string,
+    weight: 'primary' | 'plain',
+    onPress: () => void,
+  ): HTMLButtonElement {
+    const node = el(doc, 'button', className, label);
+    node.type = 'button';
+    node.style.cssText = [
+      'cursor:pointer',
+      `border:1.5px solid ${weight === 'primary' ? C.ink : C.rule}`,
+      `background:${weight === 'primary' ? C.ink : C.card}`,
+      `color:${weight === 'primary' ? C.paper : C.ink}`,
+      `border-radius:${String(R.row)}px`,
+      'padding:7px 12px',
+      `font:600 12.5px ${TYPE.body}`,
+    ].join(';');
+    node.addEventListener('click', onPress);
+    return node;
+  }
+
+  /** A card's way into the editor. The open design's is marked, because going back to it writes nothing. */
+  function openButton(isOpen: boolean, label: string, id: string): HTMLButtonElement {
+    const node = button('everyday-workshop-open', isOpen ? COPY.keepWorking : label, 'primary', () => {
+      open(id);
+    });
+    if (isOpen) node.dataset['openNow'] = '';
+    return node;
+  }
+
+  function buttonRow(...nodes: HTMLElement[]): HTMLElement {
+    const row = el(doc, 'div');
+    row.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;align-items:center';
+    row.append(...nodes);
+    return row;
+  }
+
+  /** A question and its two answers, drawn in place of the control that raised it. */
+  function question(text: string, ...answers: HTMLElement[]): HTMLElement {
+    const box = el(doc, 'div', 'everyday-workshop-question');
+    box.setAttribute('role', 'alert');
+    box.style.cssText = `border:1px solid ${C.amberEdge};background:${C.amberWash};border-radius:${String(R.row)}px;padding:10px 12px;display:flex;flex-direction:column;gap:8px`;
+    const line = el(doc, 'div', undefined, text);
+    line.style.cssText = `font-size:12.5px;line-height:1.45;color:${C.inkSoft}`;
+    box.append(line, buttonRow(...answers));
+    return box;
+  }
+
+  function cancelButton(label: string): HTMLButtonElement {
+    return button('everyday-workshop-cancel', label, 'plain', () => {
+      pending = undefined;
+      render();
+    });
+  }
+
+  /** What a design weighs most, as bars. Relative within one design — see `prioritiesOf`. */
+  function priorityBars(bars: readonly PriorityBar[]): HTMLElement {
+    const grid = el(doc, 'div', 'everyday-workshop-priorities');
+    grid.style.cssText = 'display:grid;grid-template-columns:auto minmax(0,1fr);gap:3px 9px;align-items:center';
+    for (const bar of bars) {
+      const name = el(doc, 'span', undefined, bar.name);
+      name.style.cssText = `font:500 10.5px ${TYPE.mono};color:${C.label}`;
+      const track = el(doc, 'span');
+      track.style.cssText = `display:block;height:6px;border-radius:3px;background:${C.terracotta};width:${String(Math.max(6, Math.round(bar.share * 100)))}%`;
+      grid.append(name, track);
+    }
+    return grid;
+  }
+
+  function cardShell(className: string, mine: boolean, open_: boolean): HTMLElement {
+    const card = el(doc, 'article', className);
+    card.style.cssText = [
+      `border:${mine ? '1.5px dashed' : '1px solid'} ${open_ ? C.sun : mine ? C.terracotta : C.rule}`,
+      `border-radius:${String(R.card)}px`,
+      `background:${open_ ? C.amberWash : C.card}`,
+      'padding:14px 16px',
+      'display:flex',
+      'flex-direction:column',
+      'gap:9px',
+      'min-width:0',
+    ].join(';');
+    return card;
+  }
+
+  function cardHead(name: string, ...tags: (string | undefined)[]): HTMLElement {
+    const head = el(doc, 'div');
+    head.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px 10px;align-items:baseline;justify-content:space-between';
+    const title = el(doc, 'h3', undefined, name);
+    title.style.cssText = `font:600 15.5px ${TYPE.heading};margin:0`;
+    head.append(title);
+    for (const text of tags) {
+      if (text === undefined) continue;
+      const tag = el(doc, 'span', 'everyday-workshop-tag', text);
+      tag.style.cssText = `font:500 10px ${TYPE.mono};letter-spacing:.1em;color:${C.warmGrey};border:1px solid ${C.rule};border-radius:5px;padding:2px 6px;white-space:nowrap`;
+      if (text === COPY.baselineTag) tag.title = COPY.baselineHint;
+      head.append(tag);
+    }
+    return head;
+  }
+
+  function cardGrid(): HTMLElement {
+    const grid = el(doc, 'div');
+    grid.style.cssText = `display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:${String(GAP.block)}px`;
+    return grid;
+  }
+
+  /* ------------------------------------------------------------------ *
+   * The shelf — the workshop's front door
+   * ------------------------------------------------------------------ */
+
+  function drawShelf(): HTMLElement {
+    const wrap = el(doc, 'div', 'everyday-workshop-shelf');
+    wrap.style.cssText = 'min-width:0';
+    const shelf = shelfOf(api.dispatcherProfilesFile(), DISPATCHER_FAMILIES, api.savedDispatchers(), openId());
+    const openName = api.workingSpec().name;
+
+    const eyebrow = el(doc, 'div', undefined, COPY.eyebrow);
+    eyebrow.style.cssText = `font:500 10.5px ${TYPE.mono};letter-spacing:.16em;color:${C.label}`;
+    const title = el(doc, 'h1', undefined, COPY.shelfTitle);
+    title.style.cssText = `font-family:${TYPE.heading};font-size:32px;font-weight:700;letter-spacing:-.02em;margin:10px 0 0`;
+    const lede = el(doc, 'p', undefined, COPY.shelfLede);
+    lede.style.cssText = `font-size:16px;line-height:1.55;color:${C.inkSoft};margin:12px 0 0;max-width:64ch;text-wrap:pretty`;
+    wrap.append(eyebrow, title, lede);
+
+    const discard = (key: string, profileId: string, styleId?: string): HTMLElement | undefined =>
+      pending?.kind === 'open' && pending.key === key
+        ? question(
+            discardQuestionOf(openName),
+            button('everyday-workshop-discard', COPY.discardOpen, 'primary', () => {
+              openNow(profileId, styleId);
+            }),
+            cancelButton(COPY.discardCancel),
+          )
+        : undefined;
+
+    /* ---- YOURS ---- */
+    const yours = section(doc, COPY.yoursHeading, COPY.yoursHint);
+    if (shelf.yoursEmpty !== undefined) {
+      const line = el(doc, 'p', 'everyday-workshop-yours-empty', shelf.yoursEmpty);
+      line.style.cssText = NOTE;
+      yours.append(line);
+    } else {
+      const grid = cardGrid();
+      for (const card of shelf.yours) {
+        const node = cardShell('everyday-workshop-saved', true, card.open);
+        node.dataset['dispatcherId'] = card.id;
+        node.append(cardHead(card.name, card.open ? COPY.openTag : undefined));
+        if (card.basedOn !== undefined) {
+          const line = el(doc, 'div', undefined, `based on ${card.basedOn}`);
+          line.style.cssText = `font:500 11.5px ${TYPE.mono};color:${C.label}`;
+          node.append(line);
+        }
+        node.append(priorityBars(card.priorities));
+        const asked = discard(`${card.id}/`, card.id);
+        if (pending?.kind === 'remove' && pending.id === card.id) {
+          node.append(
+            question(
+              removeQuestionOf(card.name),
+              button('everyday-workshop-remove-confirm', COPY.removeConfirm, 'primary', () => {
+                pending = undefined;
+                api.deleteSavedDispatcher(card.id);
+                render();
+              }),
+              cancelButton(COPY.removeCancel),
+            ),
+          );
+        } else if (asked !== undefined) {
+          node.append(asked);
+        } else {
+          node.append(
+            buttonRow(
+              openButton(card.open, COPY.openYours, card.id),
+              button('everyday-workshop-duplicate', COPY.duplicate, 'plain', () => {
+                view = 'edit';
+                pending = undefined;
+                api.duplicateSavedDispatcher(card.id);
+                render();
+              }),
+              button('everyday-workshop-remove', COPY.remove, 'plain', () => {
+                pending = { kind: 'remove', id: card.id };
+                render();
+              }),
+            ),
+          );
+        }
+        grid.append(node);
+      }
+      yours.append(grid);
+    }
+    wrap.append(yours);
+
+    /* ---- INDUSTRY DESIGNS ---- */
+    const industry = section(doc, COPY.industryHeading, shelf.industryHint);
+    for (const family of shelf.families) {
+      const head = el(doc, 'h2', 'everyday-workshop-family', family.name);
+      head.style.cssText = `font:600 18px ${TYPE.heading};margin:${String(GAP.block)}px 0 2px`;
+      const line = el(doc, 'p', undefined, family.line);
+      line.style.cssText = `${NOTE};margin:0 0 10px`;
+      const grid = cardGrid();
+      for (const card of family.cards) {
+        const node = cardShell('everyday-workshop-industry', false, card.open);
+        node.dataset['profileId'] = card.profileId;
+        node.append(cardHead(card.name, card.tag, card.open ? COPY.openTag : undefined));
+        if (card.aliases.length > 0) {
+          const alias = el(doc, 'div', undefined, `${COPY.aliasLead} “${card.aliases.join('”, “')}”`);
+          alias.style.cssText = `font:500 11.5px ${TYPE.mono};color:${C.label}`;
+          node.append(alias);
+        }
+        if (card.blurb !== undefined) {
+          const blurb = el(doc, 'p', undefined, card.blurb);
+          blurb.style.cssText = `font-size:12.5px;color:${C.warmGrey};line-height:1.45;margin:0`;
+          node.append(blurb);
+        }
+        node.append(priorityBars(card.priorities));
+        node.append(
+          discard(`${card.profileId}/`, card.profileId) ??
+            buttonRow(
+              openButton(card.open, COPY.openIndustry, card.profileId),
+            ),
+        );
+        for (const variation of card.variations) {
+          const box = el(doc, 'div', 'everyday-workshop-variation');
+          box.style.cssText = `border-top:1px dashed ${C.ruleLight};padding-top:9px;display:flex;flex-direction:column;gap:6px`;
+          const trade = el(doc, 'div', undefined, variation.trade);
+          trade.style.cssText = `font-size:12.5px;color:${C.warmGrey};line-height:1.45`;
+          const start = button('everyday-workshop-style', variation.name, 'plain', () => {
+            open(card.profileId, variation.styleId);
+          });
+          start.dataset['styleId'] = variation.styleId;
+          box.append(
+            discard(`${card.profileId}/${variation.styleId}`, card.profileId, variation.styleId) ??
+              buttonRow(start),
+            trade,
+          );
+          node.append(box);
+        }
+        grid.append(node);
+      }
+      industry.append(head, line, grid);
+    }
+    wrap.append(industry);
+    return wrap;
+  }
+
+  /* ------------------------------------------------------------------ *
+   * The editor's left panel — § 11.1's nameplate, with the save
    * ------------------------------------------------------------------ */
 
   function drawLeft(): HTMLElement {
     const panel = el(doc, 'aside', 'everyday-workshop-panel');
     panel.style.cssText = `position:sticky;top:0;display:flex;flex-direction:column;gap:${String(GAP.block)}px`;
 
-    const file = api.dispatcherProfilesFile();
-    const selection = api.selection();
     const levers = api.groupLevers();
     const spec = api.workingSpec();
+    const status = api.workingDispatcherStatus();
+    const block = saveBlockOf(status);
 
-    /* ---- the nameplate ---- */
+    panel.append(
+      button('everyday-workshop-back', COPY.backToShelf, 'plain', () => {
+        view = 'shelf';
+        pending = undefined;
+        render();
+      }),
+    );
+
+    /* ---- the name, and where this dispatcher stands ---- */
+    const plateCard = el(doc, 'div', 'everyday-workshop-nameplate');
+    plateCard.style.cssText = `${CARD};border-style:dashed;display:flex;flex-direction:column;gap:8px`;
+    const label = el(doc, 'label', undefined, COPY.nameLabel);
+    label.style.cssText = EYEBROW;
+    const name = el(doc, 'input', 'everyday-workshop-name');
+    name.type = 'text';
+    name.id = 'everyday-workshop-name';
+    label.htmlFor = name.id;
+    name.value = spec.name;
+    name.maxLength = 60;
+    name.style.cssText = `font:700 18px ${TYPE.heading};color:${C.ink};background:transparent;border:0;border-bottom:1.5px dashed ${C.rule};padding:2px 0;min-width:0;width:100%`;
+    // `change`, not `input`: this screen redraws whole on every host notification, and a redraw
+    // per keystroke would take the field's focus away mid-word.
+    name.addEventListener('change', () => {
+      refusal = undefined;
+      api.setWorkingSpec({ ...api.workingSpec(), name: name.value });
+    });
+    const state = el(doc, 'div', 'everyday-workshop-state', block.state);
+    state.style.cssText = `font:600 12.5px ${TYPE.body};color:${status.unsaved ? C.terracotta : C.inkSoft}`;
+    plateCard.append(label, name, state);
+
     /*
-     * The nameplate compares the working copy against **the profile it was read from with no
-     * group lever pulled**, which is what `DEFAULT_LEVERS` is. That makes *lobby anchor* read
-     * `levers moved 1 of 4` the moment it is pressed, and that is the honest reading rather than a
-     * rounding error: lobby anchor *is* the baseline vector with the lobby lever pulled, and a
-     * nameplate that reported zero would be describing a dispatcher the player is not running.
+     * The nameplate's derived rows compare the working copy against **the profile it was read from
+     * with no group lever pulled**, which is what `DEFAULT_LEVERS` is. A variation that pulls the
+     * lobby lever reads `levers moved 1 of 4` the moment it is opened, and that is the honest
+     * reading: it *is* the design with that lever pulled.
      */
     const source = api.editingSource();
     const plate = nameplateOf({
-      startedFrom: source?.name ?? spec.name,
+      startedFrom: status.basedOn ?? source?.name ?? spec.name,
       spec,
       levers,
       baseSpec: source === undefined ? spec : specFromProfile(source, source.name),
       baseLevers: DEFAULT_LEVERS,
       ruleRows: api.ruleRows(),
     });
-    const plateCard = el(doc, 'div', 'everyday-workshop-nameplate');
-    plateCard.style.cssText = `${CARD};border-style:dashed`;
-    if (plate.unchanged !== undefined) {
-      const line = el(doc, 'p', undefined, plate.unchanged);
-      line.style.cssText = `${NOTE};margin:0 0 10px`;
-      plateCard.append(line);
-    }
     for (const text of [plate.startedFrom, plate.leversMoved, plate.rules, plate.provedOnTheBench]) {
       const row = el(doc, 'div', undefined, text);
-      row.style.cssText = `font:500 11.5px ${TYPE.mono};color:${C.warmGrey};padding:3px 0`;
+      row.style.cssText = `font:500 11.5px ${TYPE.mono};color:${C.warmGrey};padding:1px 0`;
       plateCard.append(row);
     }
     panel.append(plateCard);
 
-    /* ---- START FROM A STYLE ---- */
-    const styles = section(doc, COPY.styleHeading, COPY.styleHint);
-    const absence = playStyleAbsenceOf(file);
-    if (absence !== undefined) {
-      const line = el(doc, 'p', 'everyday-workshop-style-absent', absence);
-      line.style.cssText = NOTE;
-      styles.append(line);
-    }
-    for (const card of playStyleCardsOf(file, selection.dispatcherId, levers, spec)) {
-      const button = el(doc, 'button', 'everyday-workshop-style');
-      button.type = 'button';
-      button.dataset['styleId'] = card.id;
-      button.style.cssText = [
-        'display:block',
-        'width:100%',
-        'text-align:left',
-        'cursor:pointer',
-        `border:1.5px solid ${card.selected ? C.sun : C.rule}`,
-        `border-radius:${String(R.tile)}px`,
-        `background:${card.selected ? C.amberWash : C.card}`,
-        'padding:11px 13px',
-        `margin-bottom:${String(GAP.row)}px`,
-        `font-family:${TYPE.body}`,
-        `color:${C.ink}`,
-      ].join(';');
-      const name = el(doc, 'div', undefined, card.name);
-      name.style.cssText = 'font-size:14px;font-weight:600';
-      const trade = el(doc, 'div', undefined, card.trade);
-      trade.style.cssText = `font-size:12px;color:${C.warmGrey};line-height:1.45;margin-top:3px`;
-      button.append(name, trade);
-      button.addEventListener('click', () => {
-        const picked = styleSelectionOf(file, card.id);
-        if (picked === undefined) return;
-        lastLeverId = undefined;
-        api.startFromDispatcher(picked.profile.id, {
-          parking: picked.parking,
-          zone: picked.zone,
-        });
+    /* ---- the save ---- */
+    const saveCard = el(doc, 'div', 'everyday-workshop-save');
+    saveCard.style.cssText = `display:flex;flex-direction:column;gap:${String(GAP.row)}px`;
+    if (pending?.kind === 'replace' && block.save.replaces !== undefined) {
+      saveCard.append(
+        question(
+          block.save.replaces,
+          button('everyday-workshop-replace', COPY.replaceConfirm, 'primary', () => {
+            save('save');
+          }),
+          button('everyday-workshop-save-copy', COPY.saveCopy, 'plain', () => {
+            save('copy');
+          }),
+          cancelButton(COPY.discardCancel),
+        ),
+      );
+    } else {
+      const primary = button('everyday-workshop-save-primary', block.save.label, 'primary', () => {
+        if (block.save.replaces !== undefined) {
+          pending = { kind: 'replace' };
+          render();
+          return;
+        }
+        save('save');
       });
-      styles.append(button);
+      primary.disabled = !block.save.enabled;
+      if (primary.disabled) primary.style.opacity = '0.45';
+      const row = buttonRow(primary);
+      if (block.copy !== undefined) {
+        row.append(
+          button('everyday-workshop-save-copy', block.copy, 'plain', () => {
+            save('copy');
+          }),
+        );
+      }
+      if (block.revert.enabled) {
+        row.append(
+          button('everyday-workshop-revert', block.revert.label, 'plain', () => {
+            if (source !== undefined) openNow(source.id, undefined);
+          }),
+        );
+      }
+      saveCard.append(row);
     }
-    panel.append(styles);
-
-    /* ---- the rest of the shelf — § D299 § 2 ---- */
-    const library = section(doc, COPY.libraryHeading, COPY.libraryHint);
-    for (const card of libraryCardsOf(file, selection.dispatcherId)) {
-      const button = el(doc, 'button', 'everyday-workshop-library', card.name);
-      button.type = 'button';
-      button.dataset['profileId'] = card.profileId;
-      button.style.cssText = [
-        'display:block',
-        'width:100%',
-        'text-align:left',
-        'cursor:pointer',
-        `border:1px solid ${card.selected ? C.sun : C.ruleLight}`,
-        `border-radius:${String(R.row)}px`,
-        `background:${card.selected ? C.amberWash : C.cardSunk}`,
-        'padding:8px 11px',
-        'margin-bottom:6px',
-        `font:500 12.5px ${TYPE.body}`,
-        `color:${C.ink}`,
-      ].join(';');
-      button.addEventListener('click', () => {
-        lastLeverId = undefined;
-        api.startFromDispatcher(card.profileId);
-      });
-      library.append(button);
+    if (refusal !== undefined) {
+      const line = el(
+        doc,
+        'p',
+        'everyday-workshop-refusal',
+        refusal === 'empty' ? COPY.refusalEmpty : COPY.refusalTaken,
+      );
+      line.setAttribute('role', 'alert');
+      line.style.cssText = `${NOTE};margin:0;color:${C.alarm}`;
+      saveCard.append(line);
     }
-    panel.append(library);
-
-    /* ---- YOURS ---- */
-    const yours = section(doc, COPY.yoursHeading);
-    const saved = api.savedDispatchers();
-    if (saved.length === 0) {
-      const line = el(doc, 'p', 'everyday-workshop-yours-empty', COPY.yoursEmpty);
-      line.style.cssText = NOTE;
-      yours.append(line);
+    for (const text of block.notes) {
+      const line = el(doc, 'p', undefined, text);
+      line.style.cssText = `${NOTE};margin:0`;
+      saveCard.append(line);
     }
-    for (const entry of saved) {
-      const button = el(doc, 'button', 'everyday-workshop-saved', entry.profile.name);
-      button.type = 'button';
-      button.style.cssText = [
-        'display:block',
-        'width:100%',
-        'text-align:left',
-        'cursor:pointer',
-        `border:1px dashed ${C.rule}`,
-        `border-radius:${String(R.row)}px`,
-        'background:transparent',
-        'padding:8px 11px',
-        'margin-bottom:6px',
-        `font:500 12.5px ${TYPE.body}`,
-        `color:${C.ink}`,
-      ].join(';');
-      button.addEventListener('click', () => {
-        api.startFromDispatcher(entry.id);
-      });
-      yours.append(button);
-    }
-    panel.append(yours);
+    panel.append(saveCard);
     return panel;
   }
 
@@ -848,6 +1154,23 @@ function mountWorkshop(
   function render(): void {
     if (!alive) return;
     root.replaceChildren();
+    // `sideBySide` writes the row onto the root on every editor draw, so the shelf resets it.
+    root.style.cssText = 'display:flex;flex-direction:column;min-width:0';
+    if (view === 'shelf') {
+      root.append(drawShelf());
+      /*
+       * § D1360 on the shelf: opening another design, duplicating and deleting each change who
+       * drives, and each is refused while the attempt stands — so they are drawn disabled. Going
+       * back to the design already open writes nothing and stays live.
+       */
+      if (api.attemptHold() !== undefined) {
+        for (const control of root.querySelectorAll<HTMLButtonElement>('button')) {
+          control.disabled = !control.matches('.everyday-workshop-open[data-open-now]');
+        }
+      }
+      context.refreshBar();
+      return;
+    }
     const left = drawLeft();
     root.append(left);
 
@@ -888,12 +1211,18 @@ function mountWorkshop(
       for (const control of root.querySelectorAll<HTMLInputElement | HTMLButtonElement | HTMLSelectElement | HTMLTextAreaElement>(
         'input, button, select, textarea',
       )) {
-        control.disabled = true;
+        // The way back to the shelf is not a write.
+        control.disabled = !control.matches('.everyday-workshop-back');
       }
     }
     context.refreshBar();
   }
 
+  // Somebody with work in hand is taken back to it; everybody else meets the shelf.
+  const arriving = api.workingDispatcherStatus();
+  if (arriving.kind === 'yours' || arriving.unsaved) view = 'edit';
+  pending = undefined;
+  refusal = undefined;
   render();
   const stop = api.subscribe(render);
 

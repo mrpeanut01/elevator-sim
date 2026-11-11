@@ -64,8 +64,8 @@ afterAll(async () => {
   await site?.close();
 });
 
-/** A cold load with the Engineer menu settled, then the rail row that opens § 11's screen. */
-async function openWorkshop(): Promise<Page> {
+/** A cold load with the Engineer menu settled, then the rail row that opens the workshop's shelf. */
+async function openShelf(): Promise<Page> {
   const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
   await page.goto(`${origin}?building=garden-apartments&seed=424242`, { waitUntil: 'load' });
   await page.waitForFunction(
@@ -76,8 +76,40 @@ async function openWorkshop(): Promise<Page> {
   /* § D1445: a cold launch opens the lobby, which steps the rail aside; *Main menu* brings it back. */
   await leaveLobbyIfShown(page);
   await page.click('.everyday-rail button:has-text("Dispatcher workshop")');
-  await page.waitForSelector('.everyday-workshop');
+  await page.waitForSelector('.everyday-workshop-shelf');
   return page;
+}
+
+/**
+ * The shelf, then the editor on the design that is already driving — the card marked *open now*.
+ *
+ * Every case below the first two is about the editor, and reaches it the way a player does: the
+ * workshop's front door is the shelf, and the editor is one press past it.
+ */
+async function openWorkshop(): Promise<Page> {
+  const page = await openShelf();
+  await page.click(
+    '.everyday-workshop-industry:has(.everyday-workshop-tag:text-is("OPEN NOW")) .everyday-workshop-open',
+  );
+  await page.waitForSelector('.everyday-workshop-panel');
+  return page;
+}
+
+/** Set a range input the way a drag does: write the value, then dispatch `input`. */
+async function drag(page: Page, value: string): Promise<void> {
+  await patience(page).evaluate((node, next) => {
+    (node as HTMLInputElement).value = next;
+    node.dispatchEvent(new Event('input', { bubbles: true }));
+  }, value);
+}
+
+/** Wait for the nameplate's state line to read exactly this. */
+async function stateReads(page: Page, text: string): Promise<void> {
+  await page.waitForFunction(
+    (wanted) => document.querySelector('.everyday-workshop-state')?.textContent === wanted,
+    text,
+    { timeout: 15_000 },
+  );
 }
 
 /**
@@ -100,14 +132,62 @@ async function disclose(page: Page, summary: string, body: string): Promise<void
 
 describe.skipIf(!HAS_BROWSER)('the Everyday dispatcher workshop', () => {
   it('opens from the rail with § 3.3’s workshop row under it', async () => {
-    const page = await openWorkshop();
-    expect(await page.textContent('.everyday-workshop h1')).toBe('Build the thing that decides');
+    const page = await openShelf();
+    expect(await page.textContent('.everyday-workshop h1')).toBe('Your dispatchers, and the industry’s');
     expect(await page.textContent('.everyday-bar-leave')).toBe('⌂ Modes');
     expect(await page.textContent('.everyday-bar-primary')).toBe('Run a day with this');
-    // The style cards are the shipped `playStyles` block, under their own names.
-    expect(await page.textContent('.everyday-workshop-style')).toContain('Steady hand');
-    // Nothing is withheld: the rest of the shelf is on the panel under its own heading.
-    expect(await page.locator('.everyday-workshop-library').count()).toBeGreaterThan(0);
+    // Nothing is withheld: every shipped design is on the shelf, once, and exactly one is open.
+    expect(await page.locator('.everyday-workshop-industry').count()).toBe(13);
+    expect(await page.locator('.everyday-workshop-tag:text-is("OPEN NOW")').count()).toBe(1);
+    // A play style that is a design with a lever pulled is that design's variation.
+    expect(await page.textContent('.everyday-workshop-style')).toContain('Lobby anchor');
+    expect(await page.textContent('.everyday-workshop-yours-empty')).toContain('Nothing saved yet');
+
+    // One press past the shelf is § 11's editor, under the guide's own title.
+    await page.click(
+      '.everyday-workshop-industry:has(.everyday-workshop-tag:text-is("OPEN NOW")) .everyday-workshop-open',
+    );
+    await page.waitForSelector('.everyday-workshop-panel');
+    expect(await page.textContent('.everyday-workshop h1')).toBe('Build the thing that decides');
+    await page.close();
+  }, 120_000);
+
+  /**
+   * § 11.1's save, on the page: an industry design is never written, a first save files the
+   * player's own and opens it, a replace is asked first, and a delete is asked first.
+   */
+  it('saves a copy of an industry design as the player’s own, and asks before replacing or deleting', async () => {
+    const page = await openShelf();
+    await page.click('.everyday-workshop-industry[data-profile-id="fairness-first"] .everyday-workshop-open');
+    await page.waitForSelector('.everyday-workshop-panel');
+    expect(await page.textContent('.everyday-workshop-state')).toBe('An industry design, as shipped');
+
+    await drag(page, '90');
+    await stateReads(page, 'Your copy — not saved yet');
+    await page.click('.everyday-workshop-save-primary');
+    await stateReads(page, 'Yours — saved');
+    expect(await page.inputValue('.everyday-workshop-name')).toBe('Fairness first v2');
+    expect(await page.isDisabled('.everyday-workshop-save-primary')).toBe(true);
+
+    // A further change is unsaved, and saving it over the shelf's copy is asked first.
+    await drag(page, '60');
+    await stateReads(page, 'Yours — unsaved changes');
+    await page.click('.everyday-workshop-save-primary');
+    expect(await page.textContent('.everyday-workshop-question')).toContain('This replaces the saved');
+    await page.click('.everyday-workshop-replace');
+    await stateReads(page, 'Yours — saved');
+
+    // Back on the shelf it is the player's own, with its lineage, and the original is untouched.
+    await page.click('.everyday-workshop-back');
+    await page.waitForSelector('.everyday-workshop-saved');
+    expect(await page.textContent('.everyday-workshop-saved')).toContain('based on Fairness first');
+    expect(await page.locator('.everyday-workshop-industry').count()).toBe(13);
+
+    await page.click('.everyday-workshop-saved .everyday-workshop-remove');
+    expect(await page.textContent('.everyday-workshop-question')).toContain('cannot be brought back');
+    expect(await page.locator('.everyday-workshop-saved').count()).toBe(1);
+    await page.click('.everyday-workshop-remove-confirm');
+    await page.waitForSelector('.everyday-workshop-yours-empty');
     await page.close();
   }, 120_000);
 
@@ -264,12 +344,21 @@ describe.skipIf(!HAS_BROWSER)('the Everyday dispatcher workshop', () => {
     await page.close();
   }, 120_000);
 
-  it('replaces the working copy when a style card is pressed', async () => {
+  it('opens another design from the shelf, asking first when that discards unsaved changes', async () => {
     const page = await openWorkshop();
     await disclose(page, 'show me the maths', '.everyday-workshop-cost-line');
     const before = await page.textContent('.everyday-workshop-cost-line');
 
-    await page.click('.everyday-workshop-style[data-style-id="chase-the-longest-wait"]');
+    // An unsaved change is standing, so the shelf asks before it opens anything over it.
+    await drag(page, '70');
+    await stateReads(page, 'Your copy — not saved yet');
+    await page.click('.everyday-workshop-back');
+    const fairness = '.everyday-workshop-industry[data-profile-id="fairness-first"]';
+    await page.click(`${fairness} .everyday-workshop-open`);
+    expect(await page.textContent(`${fairness} .everyday-workshop-question`)).toContain(
+      'changes that are not saved',
+    );
+    await page.click(`${fairness} .everyday-workshop-discard`);
     await page.waitForFunction(
       (was) => document.querySelector('.everyday-workshop-cost-line')?.textContent !== was,
       before,
