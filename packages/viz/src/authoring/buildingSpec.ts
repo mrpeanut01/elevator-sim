@@ -882,11 +882,6 @@ export function designMachineOf(spec: BuildingSpec): SpecMachine {
   };
 }
 
-/** Whether this shaft carries a machine of its own rather than the design's. */
-export function machineIsPinned(spec: BuildingSpec, car: number): boolean {
-  return spec.machineByCar[car] !== undefined;
-}
-
 /**
  * The pins that still have a shaft, after the shaft count moves.
  *
@@ -918,18 +913,22 @@ function sameMachine(left: SpecMachine, right: SpecMachine): boolean {
 /**
  * **How many shafts carry a machine that is not the design's** — the differences, not the pins.
  *
- * The distinction {@link machineIsPinned} deliberately does *not* make, and the one every sentence
- * about the fleet has to. A pin is a **state** a reader placed on a shaft: it survives the design's
+ * The distinction a bare *is this shaft pinned* question does not make, and the one every sentence
+ * about the fleet has to. (`machineIsPinned` asked that bare question for the Everyday drawing
+ * board's per-shaft select; it left with its only caller when that board moved onto
+ * `authoring/towerPlan.ts`, where every shaft has a machine of its own and there is no pin.) A pin is a **state** a reader placed on a shaft: it survives the design's
  * chips moving, which is the whole of what {@link machineByCar} is sparse for. Whether the machine
  * in it *differs* is a separate question, and it is the one a reader is being told the answer to
  * when a surface says a shaft carries something else.
  *
  * They come apart in both directions, and each direction has shipped a false sentence:
  *
- * - {@link withShaftMachine} snaps the shaft's own steps into the class it is handed, so picking
- *   the design's own class writes a pin byte-equal to the design. Two clicks from the shipped
- *   `blank tower` button — geared traction's ladders make both snaps identities on `BLANK_SPEC` —
- *   and the shaft carries exactly what the other three do.
+ * - A shaft handed a class has its own steps snapped into that class, so picking the design's own
+ *   class writes a pin byte-equal to the design: geared traction's ladders make both snaps
+ *   identities on `BLANK_SPEC`, and the shaft carries exactly what the other three do. (The
+ *   Everyday board's `withShaftMachine` was the writer that showed this, two clicks from its
+ *   `blank tower` button; that board draws `authoring/towerPlan.ts` now and has no pin, and the
+ *   arithmetic is unchanged for any writer of {@link BuildingSpec.machineByCar}.)
  * - A pin written while it *did* equal the design stops equalling it the moment a design chip
  *   moves, which is precisely what {@link carryLosses}'s branch is gated on.
  *
@@ -1996,7 +1995,7 @@ function deckSeparationOf(
  * opinion about a number. The reading here is already **by key out of data** rather than a `switch`,
  * so the two agree on every type; what is duplicated is the lookup, not the answer.
  */
-function transferSecondsFor(type: BuildingType, specs: ElevatorSpecs | undefined): number | undefined {
+export function transferSecondsFor(type: BuildingType, specs: ElevatorSpecs | undefined): number | undefined {
   const stopgap = TRANSFER_S_BY_TYPE[type];
   if (specs === undefined) {
     /*

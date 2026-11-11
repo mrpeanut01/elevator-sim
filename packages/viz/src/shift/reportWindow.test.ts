@@ -159,7 +159,7 @@ describe('who can move this window — the producer set, derived from disk', () 
 
   it('has exactly the registered id movers, and no further one arrives unregistered', async () => {
     /*
-     * The three wrappers together rather than `withBuilding` alone: a screen reaches the write
+     * The wrappers together rather than `withBuilding` alone: a screen reaches the write
      * through whichever of them its layer offers, and a set derived from the innermost one would
      * report `everyday/host.ts` and stay silent about the screens pressing it — which is exactly
      * the blindness that let the tuner ship.

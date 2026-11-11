@@ -1423,6 +1423,38 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'A comparison, not a sentence. `sameProfile` serialises two dispatcher profiles to ' +
+        'key-sorted JSON and answers whether they are the same document; the template literals ' +
+        'the derivation found are that serialisation’s brackets. Nothing it builds is returned, ' +
+        'let alone drawn — `everyday/host.ts#workingDispatcherStatus` reads the boolean.',
+      ids: ['authoring/dispatcherShelf.ts#sameProfile'],
+    },
+    {
+      reason:
+        'The id the workshop’s working copy rides to the batch worker under, and the two ' +
+        'functions that put it on a request. It is a key, never a sentence: the arm is reported ' +
+        'under the name `testBedWorkingProfileOf` gives it, which is swept, and ' +
+        '`batch/report.ts` draws profile names and not ids on a Casual surface.',
+      ids: [
+        'everyday/testBedModel.ts#TEST_BED_WORKING_ID',
+        'everyday/testBedModel.ts#testBedProfilesOf',
+        'everyday/testBedModel.ts#testBedRequestOf',
+      ],
+    },
+    {
+      reason:
+        'A parser’s refusals, for whoever edits `data/dispatcher-families.json` by hand. Every ' +
+        'string it authors is an `Error` message thrown at module load, before any screen exists ' +
+        'to draw it; a malformed shipped file fails `authoring/dispatcherFamilies.test.ts` and the ' +
+        'build, and reaches no player. The headings and lines it returns are the file’s own and ' +
+        'are swept through `everyday/workshopModel.ts#shelfOf`.',
+      ids: [
+        'authoring/dispatcherFamilies.ts#parseDispatcherFamilies',
+        'authoring/dispatcherFamilies.ts#DISPATCHER_FAMILIES',
+      ],
+    },
+    {
+      reason:
         'The refusal sentences `provenanceLineOf` used to author itself, moved one layer down by ' +
         '`docs/16` S5 so the leaderboard’s submit path cannot grow a second copy of them. They ' +
         'reach `#status` through `copyProvenance` exactly as before, so this inherits the exclusion ' +
@@ -1721,6 +1753,28 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'set-by-hand branch, which is what makes this an exclusion rather than a gap. ' +
         '`specIsDirty` returns a boolean and is derived only through the transitive clause.',
       ids: ['authoring/buildingSpec.ts#transportModesOf', 'authoring/buildingSpec.ts#specIsDirty'],
+    },
+    {
+      reason:
+        'The transfer time a building type must declare. `transferSecondsFor` returns a number or ' +
+        '`undefined`; its only sentence is the message of the error it throws on a building type ' +
+        'nothing has priced, which names two source files to edit and is a programming fault no ' +
+        'surface draws. It was module-private until `authoring/towerPlan.ts` needed the same rule ' +
+        'for the cars it writes, and exporting it is what made the derivation see it.',
+      ids: ['authoring/buildingSpec.ts#transferSecondsFor'],
+    },
+    {
+      reason:
+        'Ids and keys on the drawing board’s plan, never drawn. `planFromBuilding`’s strings are ' +
+        'the closed `PlanLoss` codes and the shaft keys it mints (`s1`, `s2`, …): the sentence for ' +
+        'each code is `everyday/designerModel.ts#designerLossLine`’s, which the standalone-screens ' +
+        'adapter drives on every code at once, and a key is a selection handle the screen never ' +
+        'prints. `DESIGNER_PROFILE_BY_KIND` maps a building kind to a traffic-profile id out of ' +
+        '`data/traffic-profiles.json`; what the Floors step draws is that profile’s own `name`.',
+      ids: [
+        'authoring/towerPlan.ts#planFromBuilding',
+        'everyday/designerModel.ts#DESIGNER_PROFILE_BY_KIND',
+      ],
     },
     {
       reason:

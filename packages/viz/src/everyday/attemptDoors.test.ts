@@ -103,9 +103,15 @@ const DOORS: Readonly<Record<keyof EverydayHost, Door>> = Object.freeze({
   priceSchedule: 'reads',
   careerNotice: 'reads',
   savedDispatchers: 'reads',
+  workingDispatcherStatus: 'reads',
+  shippedBuildingIds: 'reads',
+  saveWorkingDispatcher: 'held',
+  duplicateSavedDispatcher: 'held',
+  deleteSavedDispatcher: 'held',
   editedDispatcher: 'reads',
   elevatorSpecs: 'reads',
   buildingSpec: 'reads',
+  buildingPlan: 'reads',
   plainLevers: 'reads',
   dispatcherProfilesFile: 'reads',
   workingSpec: 'reads',
@@ -236,7 +242,17 @@ const DOORS: Readonly<Record<keyof EverydayHost, Door>> = Object.freeze({
  * -------------------------------------------------------------------------- */
 
 const RESOURCES: BrowserResources = contractBuildings();
-const BASE: ViewerState = initialState(RESOURCES, 20261003n);
+/** One dispatcher on the player's own shelf, unselected, so the shelf's duplicate and delete have something to act on. */
+const SHELVED_ID = 'yours-doors';
+const BASE: ViewerState = (() => {
+  const state = initialState(RESOURCES, 20261003n);
+  const shipped = RESOURCES.dispatcherProfiles.profiles[0];
+  if (shipped === undefined) throw new Error('the shipped library has no dispatcher');
+  return {
+    ...state,
+    savedDispatchers: [{ id: SHELVED_ID, profile: { ...shipped, id: SHELVED_ID, name: 'A saved one' } }],
+  };
+})();
 
 const ATTEMPT: DayAttempt = {
   contractId: BASE.week.contractId,
@@ -355,6 +371,9 @@ const HELD_PRESSES: Readonly<Record<string, (host: EverydayHost) => unknown>> = 
     if (other === undefined) throw new Error('the shipped library has one dispatcher');
     return host.startFromDispatcher(other.id, { parking: true, zone: false });
   },
+  saveWorkingDispatcher: (host) => host.saveWorkingDispatcher('copy'),
+  duplicateSavedDispatcher: (host) => host.duplicateSavedDispatcher(SHELVED_ID),
+  deleteSavedDispatcher: (host) => host.deleteSavedDispatcher(SHELVED_ID),
   startRun: (host) => host.startRun(),
   setDispatcher: (host) => {
     const other = host.dispatchers().find((profile) => profile.id !== BASE.dispatcherId);
@@ -363,15 +382,15 @@ const HELD_PRESSES: Readonly<Record<string, (host: EverydayHost) => unknown>> = 
   },
   setPlainLever: (host) => host.setPlainLever('patience', 80),
   saveBuilding: (host) => {
-    const spec = host.buildingSpec();
-    if (spec === undefined) throw new Error('the standing building has no spec');
-    return host.saveBuilding(spec);
+    const reading = host.buildingPlan();
+    if (reading === undefined) throw new Error('the standing building has no plan');
+    return host.saveBuilding(reading.plan);
   },
   /* Saved first, as a player must: with an attempt standing the save is what refuses, and nothing is played. */
   playOwnBuilding: (host) => {
-    const spec = host.buildingSpec();
-    if (spec === undefined) throw new Error('the standing building has no spec');
-    return host.playOwnBuilding(host.saveBuilding(spec));
+    const reading = host.buildingPlan();
+    if (reading === undefined) throw new Error('the standing building has no plan');
+    return host.playOwnBuilding(host.saveBuilding(reading.plan));
   },
   runSandbox: (host) => host.runSandbox({ building: undefined, pattern: undefined, dwell: { choice: 'patient' } }),
   takeCallAgain: (host) => host.takeCallAgain(),
@@ -390,6 +409,9 @@ const BEFORE_THE_ATTEMPT: Readonly<Record<string, 'practice' | 'refused' | 'writ
   setRuleRows: 'writes',
   setSelectorSpec: 'writes',
   startFromDispatcher: 'writes',
+  saveWorkingDispatcher: 'writes',
+  duplicateSavedDispatcher: 'writes',
+  deleteSavedDispatcher: 'writes',
   setDispatcher: 'writes',
   setPlainLever: 'writes',
   saveBuilding: 'writes',
