@@ -58,6 +58,24 @@ import { batchLibraryOf, savedProfilesOf } from '../batch/library.js';
 import { batchReport, type BatchReport } from '../batch/report.js';
 import type { BatchResult, BatchWorkerMessage, BatchWorkerRequest } from '../batch/types.js';
 import { builtProfileOf } from '../authoring/dispatcherShelf.js';
+import {
+  FORMULA_COPY,
+  FORMULA_MAX_TERMS,
+  FORMULA_MIN_TERMS,
+  FORMULA_OP_ORDER,
+  FORMULA_OP_WORDS,
+  canAddFormula,
+  expressionOf,
+  formulaIssueOf,
+  formulaReadbackOf,
+  formulaTermOptions,
+  simpleFormulaOf,
+  withFormulaAt,
+  withNewFormula,
+  withoutFormulaAt,
+  type FormulaSpec,
+  type SimpleFormula,
+} from '../authoring/formulaSpec.js';
 import { applyControlEdit } from '../controls/controls.js';
 import { renderControls } from '../controls/render.js';
 import { familyValueFrom } from '../dev/dispatcherEditor.js';
@@ -308,9 +326,18 @@ function mountWorkshop(
   let bedToken = 0;
 
   /** Write one weight, keeping every other field of the working copy. */
+  /** One write of the working copy, for the fields that are not one of the fourteen sliders. */
+  function setWorking(patch: Partial<ReturnType<typeof api.workingSpec>>): void {
+    api.setWorkingSpec({ ...api.workingSpec(), ...patch });
+  }
+
   function setWeight(termId: string, position: number): void {
-    const spec = api.workingSpec();
-    api.setWorkingSpec({ ...spec, weights: { ...spec.weights, [termId]: position } });
+    setWorking({ weights: { ...api.workingSpec().weights, [termId]: position } });
+  }
+
+  /** The dispatcher's own formulas: one more field of the working copy, written through its one setter. */
+  function setFormulas(next: readonly FormulaSpec[]): void {
+    setWorking({ formulas: next });
   }
 
   function setFlag(key: 'pool' | 'zone' | 'bypass', on: boolean): void {
@@ -1274,6 +1301,179 @@ function mountWorkshop(
     return box;
   }
 
+  /**
+   * The dispatcher's own formulas — `authoring/formulaSpec.ts`, over `core`'s `dispatch/formula.ts`.
+   *
+   * The editor is drawn at Engineer depth, the deepest of the three. At the other two a formula
+   * that already exists is still **said** — its name, its weight and its readback — because it is
+   * part of what this dispatcher weighs and a depth switch that hid it would hide a row of the
+   * cost. With none written and the depth below Engineer, nothing is drawn.
+   */
+  function drawFormulas(): HTMLElement[] {
+    const formulas = api.workingSpec().formulas ?? [];
+    const editing = depth === 'engineer';
+    if (!editing && formulas.length === 0) return [];
+    const wrap = section(doc, FORMULA_COPY.heading, FORMULA_COPY.hint);
+    wrap.classList.add('everyday-workshop-formulas');
+    const SELECT = `border:1.5px solid ${C.rule};border-radius:${String(R.control)}px;background:${C.paper};padding:6px 8px;font-size:12.5px`;
+    const PILL = `cursor:pointer;border:1px solid ${C.rule};border-radius:${String(R.pill)}px;background:transparent;padding:4px 11px;font:500 11.5px ${TYPE.mono};color:${C.warmGrey}`;
+
+    if (formulas.length === 0) {
+      const empty = el(doc, 'p', 'everyday-workshop-formulas-empty', FORMULA_COPY.empty);
+      empty.style.cssText = NOTE;
+      wrap.append(empty);
+    }
+    const issue = formulaIssueOf(formulas);
+    if (issue !== undefined) {
+      const refusal = el(doc, 'p', 'everyday-workshop-formula-issue', issue);
+      refusal.setAttribute('role', 'alert');
+      refusal.style.cssText = `font-size:12.5px;color:${C.alarm};line-height:1.45;margin:0 0 8px;max-width:70ch`;
+      wrap.append(refusal);
+    }
+
+    formulas.forEach((formula, index) => {
+      const ordinal = `priority ${String(index + 1)} of your own`;
+      const card = el(doc, 'div', 'everyday-workshop-formula');
+      card.style.cssText = `${CARD};margin-bottom:${String(GAP.row)}px`;
+      const position = Math.round(formula.weight * 100);
+
+      if (!editing) {
+        const title = el(doc, 'div', 'everyday-workshop-formula-name', `${formula.name} — ${String(position)}`);
+        title.style.cssText = `font-size:13.5px;font-weight:600;color:${C.ink}`;
+        card.append(title);
+      } else {
+        const head = el(doc, 'div');
+        head.style.cssText = 'display:flex;gap:10px;flex-wrap:wrap;align-items:center';
+        const name = el(doc, 'input', 'everyday-workshop-formula-name');
+        name.type = 'text';
+        name.maxLength = 60;
+        name.value = formula.name;
+        name.setAttribute('aria-label', `${FORMULA_COPY.nameLabel} of ${ordinal}`);
+        name.style.cssText = `${SELECT};flex:1;min-width:160px;font-weight:600`;
+        name.addEventListener('change', () => {
+          const next = name.value.trim();
+          setFormulas(withFormulaAt(formulas, index, { name: next === '' ? formula.name : next }));
+        });
+        const weight = slider(doc, Math.min(100, position), (next) => {
+          setFormulas(withFormulaAt(formulas, index, { weight: next / 100 }));
+        });
+        weight.classList.add('everyday-workshop-formula-weight');
+        weight.setAttribute('aria-label', `${FORMULA_COPY.weightLabel}: ${formula.name}`);
+        const figure = el(doc, 'span', undefined, String(position));
+        figure.style.cssText = `font:500 12.5px ${TYPE.mono};color:${position > 0 ? C.terracotta : C.faint};width:3ch;text-align:right`;
+        const remove = el(doc, 'button', 'everyday-workshop-formula-remove', FORMULA_COPY.remove);
+        remove.type = 'button';
+        remove.setAttribute('aria-label', `Remove ${ordinal}, ${formula.name}`);
+        remove.style.cssText = PILL;
+        remove.addEventListener('click', () => {
+          setFormulas(withoutFormulaAt(formulas, index));
+        });
+        head.append(name, weight, figure, remove);
+        card.append(head);
+
+        const simple = simpleFormulaOf(formula.expression);
+        if (simple === undefined) {
+          const note = el(doc, 'p', 'everyday-workshop-formula-hand', FORMULA_COPY.handWritten);
+          note.style.cssText = `${NOTE};margin:8px 0 0`;
+          card.append(note);
+        } else {
+          const build = el(doc, 'div');
+          build.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:9px';
+          const op = el(doc, 'select', 'everyday-workshop-formula-op');
+          op.setAttribute('aria-label', `${FORMULA_COPY.opLabel} for ${ordinal}`);
+          op.style.cssText = SELECT;
+          for (const id of FORMULA_OP_ORDER) {
+            op.append(new (doc.defaultView?.Option ?? Option)(FORMULA_OP_WORDS[id].label, id));
+          }
+          op.value = simple.op;
+          op.addEventListener('change', () => {
+            setFormulas(
+              withFormulaAt(formulas, index, {
+                expression: expressionOf({ op: op.value as SimpleFormula['op'], termIds: simple.termIds }),
+              }),
+            );
+          });
+          build.append(el(doc, 'span', undefined, FORMULA_COPY.opLabel), op);
+          simple.termIds.forEach((termId, termAt) => {
+            const term = el(doc, 'select', 'everyday-workshop-formula-term');
+            term.setAttribute('aria-label', `Thing ${String(termAt + 1)} of ${ordinal}`);
+            term.style.cssText = SELECT;
+            for (const option of formulaTermOptions()) {
+              term.append(new (doc.defaultView?.Option ?? Option)(option.name, option.id));
+            }
+            term.value = termId;
+            term.addEventListener('change', () => {
+              const termIds = simple.termIds.map((held, at) => (at === termAt ? term.value : held));
+              setFormulas(withFormulaAt(formulas, index, { expression: expressionOf({ op: simple.op, termIds }) }));
+            });
+            build.append(term);
+          });
+          if (simple.termIds.length > FORMULA_MIN_TERMS) {
+            const drop = el(doc, 'button', 'everyday-workshop-formula-drop', FORMULA_COPY.dropTerm);
+            drop.type = 'button';
+            drop.setAttribute('aria-label', `Drop the last thing from ${ordinal}`);
+            drop.style.cssText = PILL;
+            drop.addEventListener('click', () => {
+              setFormulas(
+                withFormulaAt(formulas, index, {
+                  expression: expressionOf({ op: simple.op, termIds: simple.termIds.slice(0, -1) }),
+                }),
+              );
+            });
+            build.append(drop);
+          }
+          if (simple.termIds.length < FORMULA_MAX_TERMS) {
+            const more = el(doc, 'button', 'everyday-workshop-formula-more', FORMULA_COPY.addTerm);
+            more.type = 'button';
+            more.setAttribute('aria-label', `Add another thing to ${ordinal}`);
+            more.style.cssText = PILL;
+            more.addEventListener('click', () => {
+              const unused = formulaTermOptions().find((option) => !simple.termIds.includes(option.id));
+              const added = unused?.id ?? simple.termIds[0]!;
+              setFormulas(
+                withFormulaAt(formulas, index, {
+                  expression: expressionOf({ op: simple.op, termIds: [...simple.termIds, added] }),
+                }),
+              );
+            });
+            build.append(more);
+          }
+          card.append(build);
+          const meaning = el(doc, 'div', 'everyday-workshop-formula-meaning', FORMULA_OP_WORDS[simple.op].meaning);
+          meaning.style.cssText = `font-size:12px;color:${C.warmGrey};line-height:1.45;margin-top:6px;max-width:70ch`;
+          card.append(meaning);
+        }
+      }
+
+      const readback = el(doc, 'div', 'everyday-workshop-formula-readback', formulaReadbackOf(formula));
+      readback.style.cssText = `font-size:12.5px;color:${C.inkSoft};margin-top:7px;line-height:1.45`;
+      card.append(readback);
+      if (position === 0) {
+        const quiet = el(doc, 'div', 'everyday-workshop-formula-quiet', FORMULA_COPY.unweighted);
+        quiet.style.cssText = `font-size:12px;color:${C.alarm};line-height:1.45;margin-top:4px`;
+        card.append(quiet);
+      }
+      wrap.append(card);
+    });
+
+    if (editing) {
+      if (canAddFormula(formulas)) {
+        const add = el(doc, 'button', 'everyday-workshop-formula-add', FORMULA_COPY.add);
+        add.type = 'button';
+        add.style.cssText = `cursor:pointer;border:1.5px solid ${C.rule};border-radius:${String(R.pill)}px;background:${C.cardSunk};padding:7px 15px;font:500 12px ${TYPE.mono};color:${C.ink}`;
+        add.addEventListener('click', () => {
+          setFormulas(withNewFormula(formulas));
+        });
+        wrap.append(add);
+      } else {
+        const full = el(doc, 'p', 'everyday-workshop-formulas-full', FORMULA_COPY.full);
+        full.style.cssText = NOTE;
+        wrap.append(full);
+      }
+    }
+    return [wrap];
+  }
+
   function drawMaths(): HTMLElement {
     const file = api.dispatcherProfilesFile();
     const view = mathsDisclosureOf(api.workingSpec(), file.terms);
@@ -1349,7 +1549,13 @@ function mountWorkshop(
     const body: Readonly<Record<JourneyStage, () => HTMLElement[]>> = {
       calling: () => flagNodes('pool'),
       eligible: () => constraintNodes(),
-      priorities: () => [...leverNodes('patience'), ...leverNodes('room'), drawTerms(), drawMaths()],
+      priorities: () => [
+        ...leverNodes('patience'),
+        ...leverNodes('room'),
+        drawTerms(),
+        ...drawFormulas(),
+        drawMaths(),
+      ],
       deciding: () => [...leverNodes('spread'), ...groupLeverNodes('express'), boundary],
       rethinking: () => [],
       landing: () => flagNodes('bypass'),

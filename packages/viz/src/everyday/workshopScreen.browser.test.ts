@@ -429,6 +429,31 @@ describe.skipIf(!HAS_BROWSER)('the Everyday dispatcher workshop', () => {
     // Engineer adds what reads each block on a real run.
     await page.click('.everyday-workshop-depth [data-depth="engineer"]');
     await page.waitForSelector('.everyday-workshop-family-caller');
+
+    /*
+     * Engineer is also where a priority of the player's own is written: a formula over the same
+     * terms the sliders weigh. Writing one, changing its operation and saving it is a change to
+     * the dispatcher like any other, and it is still said at Simple once it exists.
+     */
+    expect(await page.textContent('.everyday-workshop-formulas-empty')).toContain('None written');
+    await page.click('.everyday-workshop-formula-add');
+    await page.waitForSelector('.everyday-workshop-formula');
+    expect(await page.textContent('.everyday-workshop-formula-readback')).toContain(
+      'Reads as: how bad these are together:',
+    );
+    await page.selectOption('.everyday-workshop-formula-op', 'max');
+    await page.waitForFunction(
+      () =>
+        document.querySelector('.everyday-workshop-formula-readback')?.textContent?.includes('whichever is worse of') ===
+        true,
+      undefined,
+      { timeout: 15_000 },
+    );
+    await page.click('.everyday-workshop-formula-more');
+    await page.waitForFunction(() => document.querySelectorAll('.everyday-workshop-formula-term').length === 3);
+    await page.click('.everyday-workshop-depth [data-depth="simple"]');
+    await page.waitForFunction(() => document.querySelector('.everyday-workshop-formula-op') === null);
+    expect(await page.textContent('.everyday-workshop-formula-readback')).toContain('whichever is worse of');
     await page.close();
   }, 120_000);
 

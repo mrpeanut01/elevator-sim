@@ -563,7 +563,10 @@ export interface VizPatternSwitch {
 
 /** One weighted term's share of a decision. A projection of `core`'s `ScoreBreakdown`. */
 export interface VizDecisionTerm {
+  /** A library term's id, or the id of one of the dispatcher's own formulas. */
   readonly termId: string;
+  /** Present for a formula only: the name its author gave it, which is what a reader is shown. */
+  readonly name?: string | undefined;
   readonly weight: number;
   /** The term's own unit — seconds, metres, stops. */
   readonly raw: number;

@@ -348,6 +348,8 @@ function topTerms(score: CarScore): readonly VizDecisionTerm[] {
     .slice(0, TERMS_KEPT)
     .map((term) => ({
       termId: term.termId,
+      // A formula's row carries its author's name; a library term's carries none.
+      ...(term.name === undefined ? {} : { name: term.name }),
       weight: term.weight,
       raw: term.raw,
       contribution: term.contribution,

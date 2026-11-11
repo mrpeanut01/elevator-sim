@@ -298,7 +298,8 @@ function whyOf(decision: VizDecision): string {
       // `topTerms` drops terms that contributed exactly zero, so an empty array means every
       // weighted term priced this car the same as every other. The design's own fallback.
       ? "cheapest bid on the group's own cost"
-      : `${top.termId} ${formatRaw(top)} won it`,
+      // A formula of the dispatcher's own is called what its author called it.
+      : `${top.name ?? top.termId} ${formatRaw(top)} won it`,
   );
 
   const margin = marginOf(decision);
@@ -357,7 +358,7 @@ function titleOf(decision: VizDecision): string {
     const phrase = TERM_PHRASES[top.termId];
     parts.push(
       phrase === undefined
-        ? `${top.termId}: ${formatRaw(top)}`
+        ? `${top.name ?? top.termId}: ${formatRaw(top)}`
         : `${top.termId} — ${phrase.measures} (serves ${phrase.serves}): ${formatRaw(top)}`,
     );
   }

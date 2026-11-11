@@ -134,6 +134,17 @@ import {
   testBedWorkingProfileOf,
 } from '../everyday/testBedModel.js';
 import { JOURNEY_COPY, journeyOf } from '../everyday/workshopJourney.js';
+import {
+  FORMULA_COPY,
+  FORMULA_OP_ORDER,
+  FORMULA_OP_WORDS,
+  expressionOf,
+  formulaIssueOf,
+  formulaReadbackOf,
+  formulaTermOptions,
+  withFormulaAt,
+  withNewFormula,
+} from '../authoring/formulaSpec.js';
 import { DISPATCHER_FAMILIES } from '../authoring/dispatcherFamilies.js';
 import { versionedNameOf } from '../authoring/dispatcherShelf.js';
 import {
@@ -17094,6 +17105,11 @@ const EVERYDAY_WORKSHOP: SurfaceAdapter = {
     'everyday/testBedModel.ts#testBedViewOf',
     'everyday/testBedModel.ts#testBedWorkingProfileOf',
     'everyday/workshopJourney.ts#journeyOf',
+    'authoring/formulaSpec.ts#FORMULA_COPY',
+    'authoring/formulaSpec.ts#FORMULA_OP_WORDS',
+    'authoring/formulaSpec.ts#formulaReadbackOf',
+    'authoring/formulaSpec.ts#formulaIssueOf',
+    'authoring/formulaSpec.ts#withNewFormula',
     'everyday/workshopModel.ts#switchingBlockOf',
     'everyday/workshopModel.ts#rulesBlockOf',
     'everyday/workshopModel.ts#nameplateOf',
@@ -17316,6 +17332,45 @@ const EVERYDAY_WORKSHOP: SurfaceAdapter = {
           comparisons: [{ rows: [], summary: { sentence: '' } }],
         } as unknown as BatchReport)?.ran ?? '',
       role: 'label',
+    });
+
+    /*
+     * A priority of the player's own — `authoring/formulaSpec.ts`. Every authored line of the
+     * block, every operation's label and meaning, the readback over each operation and over a
+     * nested hand-written tree, a new formula's default name, and the one refusal.
+     */
+    for (const [key, text] of Object.entries(FORMULA_COPY)) {
+      seeds.push({ field: `formula.copy.${key}`, text, role: 'prose', provenance: 'authored' });
+    }
+    const formulaTerms = formulaTermOptions().map((option) => option.id);
+    for (const op of FORMULA_OP_ORDER) {
+      seeds.push({ field: `formula.op.${op}.label`, text: FORMULA_OP_WORDS[op].label, role: 'label', provenance: 'authored' });
+      seeds.push({ field: `formula.op.${op}.meaning`, text: FORMULA_OP_WORDS[op].meaning, role: 'prose', provenance: 'authored' });
+      const [made] = withFormulaAt(withNewFormula([]), 0, {
+        expression: expressionOf({ op, termIds: formulaTerms.slice(0, 3) }),
+      });
+      if (made !== undefined) {
+        seeds.push({ field: `formula.${op}.name`, text: made.name, role: 'label' });
+        seeds.push({ field: `formula.${op}.readback`, text: formulaReadbackOf(made), role: 'label' });
+      }
+    }
+    for (const option of formulaTermOptions()) {
+      seeds.push({ field: `formula.term.${option.id}`, text: option.name, role: 'label' });
+    }
+    seeds.push({
+      field: 'formula.nested.readback',
+      text: formulaReadbackOf({
+        id: 'hand',
+        name: 'Hand',
+        weight: 1,
+        expression: { op: 'multiply', of: [{ term: 'waitTime' }, { op: 'add', of: [{ term: 'loadFactor' }, { value: 1 }] }] },
+      }),
+      role: 'label',
+    });
+    seeds.push({
+      field: 'formula.issue',
+      text: formulaIssueOf([{ id: 'x', name: 'X', weight: 1, expression: { term: 'no-such-term' } }]) ?? '',
+      role: 'reason',
     });
 
     /* The arms no shipped profile reaches, manufactured so each sentence has been rendered once. */
