@@ -1031,6 +1031,9 @@ export type {
 export {
   AWT_INVALID_GROUNDS,
   diagnoseAwtValidity,
+  TRANSPORT_SATURATION_GROUNDS,
+  describeTransportSaturation,
+  summarizeTransportQueues,
   DEFAULT_DESIGN_LOAD_FACTOR,
   DEFAULT_LOAD_FACTOR_EDGES,
   DEFAULT_LONG_WAIT_THRESHOLD_S,
@@ -1126,6 +1129,10 @@ export {
 export type {
   AssignmentDetails,
   AwtInvalidGround,
+  TransportBoardingRecord,
+  TransportQueueRecord,
+  TransportQueueStatistics,
+  TransportSaturationGround,
   AwtInvalidity,
   AwtValidityEvidence,
   BoardingDetails,
