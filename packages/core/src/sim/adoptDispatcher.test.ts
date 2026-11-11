@@ -32,6 +32,8 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import type { DispatcherProfile, LoadedConfig } from '../config/types.js';
 import { aggregationOf, DISPATCH_DEFAULTS, POLICY_DEFAULTS } from '../dispatch/index.js';
 
+import { RELATIVE_TOLERANCE } from '../traffic/identity.test-helper.js';
+
 import { fingerprint, load } from './fixtures.test-helper.js';
 import { runSimulation, Simulation } from './simulation.js';
 import { SimulationError, type RunInterventionConfig, type SimulationConfig, type SimulationResult } from './types.js';
@@ -245,14 +247,54 @@ describe('switch-dispatcher replays exactly as it did before adopt-dispatcher ex
    * The digest of the legs a weights-only handover produced on `47d15b5`, the tree this kind was
    * built on, taken by running this very case there. A stored log or a posted run carrying the old
    * kind must replay bit-identically (invariant 5), and this is the run that says it does.
+   *
+   * **It is a pin of an x64 run, and it is asserted on x64 only.** The digest is over
+   * `boardedAt` and `alightedAt` at full precision, and `traffic/identity.test-helper.ts` records
+   * what that costs ([§ D196](../../../../DECISIONS.md), [§ D201](../../../../DECISIONS.md)): x64
+   * and arm64 differ in the last bits of the traffic draws, so one ULP anywhere changes the whole
+   * hash. This pin passed on CI and failed on every arm64 machine from the commit that wrote it,
+   * with the same digest each time. It is kept where it is true, because `47d15b5` cannot be
+   * re-run to take it again; the two halves below are what hold everywhere.
    */
   const PINNED_SWITCH_LEGS_SHA256 = 'ef1da57ceb5e5889efbd39c6777fe2e90649a1d81afbdfe3e48a9d5eebb6bed2';
 
-  it('produces the pinned legs for collective handed to nearest-car at 600 s', () => {
-    const result = runSimulation(
+  /**
+   * The same run as that helper splits a trace: every **decision** hashed and compared exactly,
+   * every **magnitude** summed and compared within its `RELATIVE_TOLERANCE`. Taken on the tree
+   * that added them, on arm64, where the x64 pin above cannot speak; CI's x64 run asserts all
+   * three, which is what ties these to the same legs.
+   */
+  const PINNED_SWITCH_DECISIONS_SHA256 = '383a144efac61734caafaef6b3db8bb76117511265c3cc61ba8254a628346038';
+  const PINNED_SWITCH_LEG_COUNT = 29;
+  const PINNED_SWITCH_BOARDED_AT_SUM_S = 25144.975717666977;
+  const PINNED_SWITCH_ALIGHTED_AT_SUM_S = 26096.24952719079;
+
+  const switched = (): SimulationResult =>
+    runSimulation(
       run('garden-apartments', OPENING, [{ atS: 600, change: { kind: 'switch-dispatcher', profile: profile('nearest-car') } }]),
     );
-    const digest = createHash('sha256').update(legsOf(result)).digest('hex');
+
+  it('produces the pinned decisions for collective handed to nearest-car at 600 s, on any machine', () => {
+    const legs = switched().record.passengers;
+    // Who rode, in which car, and whether they boarded and alighted at all: discrete outcomes,
+    // expected identical everywhere.
+    const decisions = JSON.stringify(
+      legs.map((leg) => [leg.passengerId, leg.carId ?? '', leg.boardedAt !== undefined, leg.alightedAt !== undefined]),
+    );
+    expect(legs).toHaveLength(PINNED_SWITCH_LEG_COUNT);
+    expect(createHash('sha256').update(decisions).digest('hex')).toBe(PINNED_SWITCH_DECISIONS_SHA256);
+
+    const sumOf = (pick: (leg: (typeof legs)[number]) => number | undefined): number =>
+      legs.reduce((total, leg) => total + (pick(leg) ?? 0), 0);
+    const within = (pinned: number): number => Math.abs(pinned) * RELATIVE_TOLERANCE;
+    const boarded = sumOf((leg) => leg.boardedAt);
+    const alighted = sumOf((leg) => leg.alightedAt);
+    expect(Math.abs(boarded - PINNED_SWITCH_BOARDED_AT_SUM_S)).toBeLessThanOrEqual(within(PINNED_SWITCH_BOARDED_AT_SUM_S));
+    expect(Math.abs(alighted - PINNED_SWITCH_ALIGHTED_AT_SUM_S)).toBeLessThanOrEqual(within(PINNED_SWITCH_ALIGHTED_AT_SUM_S));
+  }, 60_000);
+
+  it.runIf(process.arch === 'x64')('produces the pinned legs for collective handed to nearest-car at 600 s', () => {
+    const digest = createHash('sha256').update(legsOf(switched())).digest('hex');
     expect(digest).toBe(PINNED_SWITCH_LEGS_SHA256);
   }, 60_000);
 });
