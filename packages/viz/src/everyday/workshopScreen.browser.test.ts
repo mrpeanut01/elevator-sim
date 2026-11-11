@@ -415,6 +415,10 @@ describe.skipIf(!HAS_BROWSER)('the Everyday dispatcher workshop', () => {
     await page.click('.everyday-workshop-depth [data-depth="detailed"]');
     await page.waitForSelector('.everyday-workshop-family-block[data-family="timing"]');
     expect(await page.locator('.everyday-workshop-family-caller').count()).toBe(0);
+    // Detailed calls a setting by a plain name and keeps the simulator's field name on its title.
+    const timing = '.everyday-workshop-family-block[data-family="timing"] .control[data-parameter="dispatch.batchWindowS"] .control-label';
+    expect(await page.textContent(timing)).not.toMatch(/[a-z][A-Z]/u);
+    expect(await page.getAttribute(timing, 'title')).toBe('batchWindowS');
     await page.selectOption(
       '.everyday-workshop-family-block[data-family="timing"] select[data-parameter="dispatch.assignmentTiming"]',
       'immediate',
@@ -429,6 +433,32 @@ describe.skipIf(!HAS_BROWSER)('the Everyday dispatcher workshop', () => {
     // Engineer adds what reads each block on a real run.
     await page.click('.everyday-workshop-depth [data-depth="engineer"]');
     await page.waitForSelector('.everyday-workshop-family-caller');
+    expect(await page.textContent(timing)).toBe('batchWindowS');
+
+    /*
+     * Engineer is also where a priority of the player's own is written: a formula over the same
+     * terms the sliders weigh. Writing one, changing its operation and saving it is a change to
+     * the dispatcher like any other, and it is still said at Simple once it exists.
+     */
+    expect(await page.textContent('.everyday-workshop-formulas-empty')).toContain('None written');
+    await page.click('.everyday-workshop-formula-add');
+    await page.waitForSelector('.everyday-workshop-formula');
+    expect(await page.textContent('.everyday-workshop-formula-readback')).toContain(
+      'Reads as: how bad these are together:',
+    );
+    await page.selectOption('.everyday-workshop-formula-op', 'max');
+    await page.waitForFunction(
+      () =>
+        document.querySelector('.everyday-workshop-formula-readback')?.textContent?.includes('whichever is worse of') ===
+        true,
+      undefined,
+      { timeout: 15_000 },
+    );
+    await page.click('.everyday-workshop-formula-more');
+    await page.waitForFunction(() => document.querySelectorAll('.everyday-workshop-formula-term').length === 3);
+    await page.click('.everyday-workshop-depth [data-depth="simple"]');
+    await page.waitForFunction(() => document.querySelector('.everyday-workshop-formula-op') === null);
+    expect(await page.textContent('.everyday-workshop-formula-readback')).toContain('whichever is worse of');
     await page.close();
   }, 120_000);
 
@@ -479,6 +509,18 @@ describe.skipIf(!HAS_BROWSER)('the Everyday dispatcher workshop', () => {
     // Every row says what it reads as, and which lever it moves.
     expect(await page.textContent('.everyday-workshop-readback')).toContain('Reads as:');
     expect(await page.textContent('.everyday-workshop-rule-lever')).toContain('moves ');
+
+    // A row can require more than one thing: each “and…” adds a condition, up to core's bound,
+    // and the readback says the row as one sentence.
+    await page.click('.everyday-workshop-and-add');
+    await page.waitForSelector('.everyday-workshop-and');
+    expect(await page.textContent('.everyday-workshop-readback')).toMatch(/Reads as: when .+ and .+, /u);
+    await page.click('.everyday-workshop-and-add');
+    await page.waitForFunction(() => document.querySelectorAll('.everyday-workshop-and').length === 2);
+    expect(await page.locator('.everyday-workshop-and-add').count()).toBe(0);
+    await page.click('.everyday-workshop-and-drop');
+    await page.waitForFunction(() => document.querySelectorAll('.everyday-workshop-and').length === 1);
+    expect(await page.locator('.everyday-workshop-and-add').count()).toBe(1);
     await page.close();
   }, 120_000);
 

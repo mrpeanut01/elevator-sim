@@ -21,6 +21,7 @@ import {
   testBedRequestOf,
   testBedVerdictWordOf,
   testBedViewOf,
+  testBedBuildingLabelOf,
   testBedWorkingProfileOf,
 } from './testBedModel.js';
 
@@ -62,9 +63,16 @@ describe('the run a press makes', () => {
   });
 });
 
+describe('the building list', () => {
+  it('marks a tower of the player’s own, and leaves a shipped one as it is named', () => {
+    expect(testBedBuildingLabelOf('Midtown Office', false)).toBe('Midtown Office');
+    expect(testBedBuildingLabelOf('My tower', true)).toBe('My tower (yours)');
+  });
+});
+
 describe('the working copy rides unsaved', () => {
   it('is a profile the batch library admits beside the shipped ones, under a name that says whose it is', () => {
-    const working = testBedWorkingProfileOf(BUILT, SHIPPED);
+    const working = testBedWorkingProfileOf(BUILT, SHIPPED, selectorContextFrom(FILE, 900));
     expect(working.id).toBe(TEST_BED_WORKING_ID);
     expect(working.name).toBe(`Yours (${SHIPPED.name})`);
     const library = batchLibraryOf(FILE, testBedProfilesOf([], working));
@@ -72,7 +80,7 @@ describe('the working copy rides unsaved', () => {
   });
 
   it('never rides twice', () => {
-    const working = testBedWorkingProfileOf(BUILT, SHIPPED);
+    const working = testBedWorkingProfileOf(BUILT, SHIPPED, selectorContextFrom(FILE, 900));
     const profiles = testBedProfilesOf([working, { ...SHIPPED, id: 'yours-1', name: 'Mine' }], working);
     expect(profiles.map((profile) => profile.id)).toEqual(['yours-1', TEST_BED_WORKING_ID]);
   });

@@ -58,6 +58,25 @@ import { batchLibraryOf, savedProfilesOf } from '../batch/library.js';
 import { batchReport, type BatchReport } from '../batch/report.js';
 import type { BatchResult, BatchWorkerMessage, BatchWorkerRequest } from '../batch/types.js';
 import { builtProfileOf } from '../authoring/dispatcherShelf.js';
+import { plainControlWordsOf } from './plainControls.js';
+import {
+  FORMULA_COPY,
+  FORMULA_MAX_TERMS,
+  FORMULA_MIN_TERMS,
+  FORMULA_OP_ORDER,
+  FORMULA_OP_WORDS,
+  canAddFormula,
+  expressionOf,
+  formulaIssueOf,
+  formulaReadbackOf,
+  formulaTermOptions,
+  simpleFormulaOf,
+  withFormulaAt,
+  withNewFormula,
+  withoutFormulaAt,
+  type FormulaSpec,
+  type SimpleFormula,
+} from '../authoring/formulaSpec.js';
 import { applyControlEdit } from '../controls/controls.js';
 import { renderControls } from '../controls/render.js';
 import { familyValueFrom } from '../dev/dispatcherEditor.js';
@@ -73,7 +92,10 @@ import {
 import {
   defaultRuleRow,
   rowWithThen,
+  rowWithAndAt,
+  rowWithAnotherCondition,
   rowWithWhen,
+  rowWithoutAndAt,
   substituted,
   type RuleRow,
 } from '../authoring/ruleSpec.js';
@@ -105,6 +127,7 @@ import {
   testBedProfilesOf,
   testBedRequestOf,
   testBedViewOf,
+  testBedBuildingLabelOf,
   testBedWorkingProfileOf,
   type TestBedChoice,
   type TestBedRow,
@@ -305,9 +328,18 @@ function mountWorkshop(
   let bedToken = 0;
 
   /** Write one weight, keeping every other field of the working copy. */
+  /** One write of the working copy, for the fields that are not one of the fourteen sliders. */
+  function setWorking(patch: Partial<ReturnType<typeof api.workingSpec>>): void {
+    api.setWorkingSpec({ ...api.workingSpec(), ...patch });
+  }
+
   function setWeight(termId: string, position: number): void {
-    const spec = api.workingSpec();
-    api.setWorkingSpec({ ...spec, weights: { ...spec.weights, [termId]: position } });
+    setWorking({ weights: { ...api.workingSpec().weights, [termId]: position } });
+  }
+
+  /** The dispatcher's own formulas: one more field of the working copy, written through its one setter. */
+  function setFormulas(next: readonly FormulaSpec[]): void {
+    setWorking({ formulas: next });
   }
 
   function setFlag(key: 'pool' | 'zone' | 'bypass', on: boolean): void {
@@ -768,20 +800,21 @@ function mountWorkshop(
     return testBedWorkingProfileOf(
       { spec: api.workingSpec(), levers: api.groupLevers(), selector: api.selectorSpec(), rows: api.ruleRows() },
       api.editingSource(),
+      api.selectorContext(),
     );
   }
 
   /** The dock's choices, defaulted the first time it is drawn and kept across redraws. */
   function bedChoice(): TestBedChoice {
     if (bed.choice !== undefined) return bed.choice;
-    const shipped = api.shippedBuildingIds();
+    const offered = api.buildingIds();
     const standing = api.selection().buildingId;
     const source = api.editingSource();
     // The natural rival is the design this one was made from: *did my changes help* is asked of it.
     const basedOn = api.savedDispatchers().find((entry) => entry.id === source?.id)?.basedOn;
     const rival = api.dispatcherById(basedOn ?? source?.id ?? '') ?? api.dispatchers()[0];
     bed.choice = {
-      buildingId: shipped.includes(standing) ? standing : (shipped[0] ?? standing),
+      buildingId: offered.includes(standing) ? standing : (offered[0] ?? standing),
       crowdId: TEST_BED_DEFAULT_CROWD,
       rivalId: rival?.id ?? '',
       replications: BENCH_DEFAULT_REPLICATIONS,
@@ -810,6 +843,9 @@ function mountWorkshop(
     const working = workingProfile();
     const profiles = testBedProfilesOf(savedProfilesOf(api.savedDispatchers()), working);
     const library = batchLibraryOf(api.dispatcherProfilesFile(), profiles);
+    const ownBuilding = api.shippedBuildingIds().includes(choice.buildingId)
+      ? undefined
+      : api.buildingById(choice.buildingId);
     stopBed();
     bedToken += 1;
     const token = bedToken;
@@ -851,6 +887,8 @@ function mountWorkshop(
       kind: 'run',
       request: testBedRequestOf(choice, api.seed()),
       savedProfiles: profiles,
+      // The player's own tower rides the message; a shipped one is loaded on the worker's side.
+      ...(ownBuilding === undefined ? {} : { savedBuilding: ownBuilding }),
     } satisfies BatchWorkerRequest);
   }
 
@@ -901,7 +939,12 @@ function mountWorkshop(
       bedSelect(
         'building',
         TEST_BED.buildingLabel,
-        api.shippedBuildingIds().map((id) => ({ value: id, label: api.buildingById(id)?.name ?? id })),
+        // Shipped towers, then the player's own, marked: a result on a tower of theirs is about
+        // that tower, and the label says which kind it is before the run rather than after.
+        api.buildingIds().map((id) => ({
+          value: id,
+          label: testBedBuildingLabelOf(api.buildingById(id)?.name ?? id, !api.shippedBuildingIds().includes(id)),
+        })),
         choice.buildingId,
         (next) => {
           pick({ buildingId: next });
@@ -1032,6 +1075,20 @@ function mountWorkshop(
     const watch = el(doc, 'p', undefined, TEST_BED.watchNote);
     watch.style.cssText = `${NOTE};margin:0`;
     wrap.append(watch);
+    /*
+     * The way on to the Test bench — the screen that runs a field of dispatchers over every proof
+     * case. This dock answers *did my change help, here*; that one answers *across the board*, for
+     * dispatchers that are saved, and the note says the difference so the press is not a surprise.
+     */
+    const wider = el(doc, 'p', undefined, TEST_BED.benchNote);
+    wider.style.cssText = `${NOTE};margin:0`;
+    const toBench = el(doc, 'button', 'everyday-workshop-bed-bench', TEST_BED.benchLink);
+    toBench.type = 'button';
+    toBench.style.cssText = `align-self:flex-start;cursor:pointer;border:1.5px solid ${C.rule};border-radius:${String(R.pill)}px;background:transparent;padding:6px 14px;font:500 12px ${TYPE.mono};color:${C.ink}`;
+    toBench.addEventListener('click', () => {
+      context.go('bench');
+    });
+    wrap.append(wider, toBench);
     return wrap;
   }
 
@@ -1195,10 +1252,29 @@ function mountWorkshop(
         legend.style.cssText = `font:500 10.5px ${TYPE.mono};color:${C.label};padding:0 4px`;
         legend.hidden = depth !== 'engineer';
       }
+      /*
+       * At *Detailed* each setting is called by its plain name — `plainControls.ts` — with the
+       * simulator's field name kept on the label's `title` for anyone matching the page against a
+       * profile. *Engineer* keeps the field name itself, which is what that depth is for.
+       */
+      if (depth === 'detailed') {
+        for (const control of controls.querySelectorAll<HTMLElement>('.control[data-parameter]')) {
+          const id = control.dataset['parameter'] ?? '';
+          const words = plainControlWordsOf(id);
+          const label = control.querySelector<HTMLElement>('.control-label');
+          if (label !== null) {
+            label.title = label.textContent ?? '';
+            label.textContent = words.name;
+          }
+          const help = control.querySelector<HTMLElement>('.control-help');
+          if (help !== null && words.effect !== undefined) help.textContent = words.effect;
+        }
+      }
       box.append(controls);
       for (const row of block.rows) {
         if (row.overriddenBy === undefined) continue;
-        const note = el(doc, 'p', undefined, `${row.control.label} — ${row.overriddenBy}`);
+        const called = depth === 'detailed' ? plainControlWordsOf(row.control.id).name : row.control.label;
+        const note = el(doc, 'p', undefined, `${called} — ${row.overriddenBy}`);
         note.style.cssText = `${NOTE};margin:0;color:${C.terracotta}`;
         box.append(note);
       }
@@ -1270,6 +1346,181 @@ function mountWorkshop(
     return box;
   }
 
+  /**
+   * The dispatcher's own formulas — `authoring/formulaSpec.ts`, over `core`'s `dispatch/formula.ts`.
+   *
+   * The editor is drawn at Engineer depth, the deepest of the three. At the other two a formula
+   * that already exists is still **said** — its name, its weight and its readback — because it is
+   * part of what this dispatcher weighs and a depth switch that hid it would hide a row of the
+   * cost. With none written and the depth below Engineer, nothing is drawn.
+   */
+  function drawFormulas(): HTMLElement[] {
+    const formulas = api.workingSpec().formulas ?? [];
+    const editing = depth === 'engineer';
+    if (!editing && formulas.length === 0) return [];
+    const wrap = section(doc, FORMULA_COPY.heading, FORMULA_COPY.hint);
+    wrap.classList.add('everyday-workshop-formulas');
+    // The ink is set, not inherited: a form control takes the browser's own text colour, which
+    // under a dark colour scheme is light, on a background this block sets to paper.
+    const SELECT = `border:1.5px solid ${C.rule};border-radius:${String(R.control)}px;background:${C.paper};color:${C.ink};padding:6px 8px;font-size:12.5px`;
+    const PILL = `cursor:pointer;border:1px solid ${C.rule};border-radius:${String(R.pill)}px;background:transparent;padding:4px 11px;font:500 11.5px ${TYPE.mono};color:${C.warmGrey}`;
+
+    if (formulas.length === 0) {
+      const empty = el(doc, 'p', 'everyday-workshop-formulas-empty', FORMULA_COPY.empty);
+      empty.style.cssText = NOTE;
+      wrap.append(empty);
+    }
+    const issue = formulaIssueOf(formulas);
+    if (issue !== undefined) {
+      const refusal = el(doc, 'p', 'everyday-workshop-formula-issue', issue);
+      refusal.setAttribute('role', 'alert');
+      refusal.style.cssText = `font-size:12.5px;color:${C.alarm};line-height:1.45;margin:0 0 8px;max-width:70ch`;
+      wrap.append(refusal);
+    }
+
+    formulas.forEach((formula, index) => {
+      const ordinal = `priority ${String(index + 1)} of your own`;
+      const card = el(doc, 'div', 'everyday-workshop-formula');
+      card.style.cssText = `${CARD};margin-bottom:${String(GAP.row)}px`;
+      const position = Math.round(formula.weight * 100);
+
+      if (!editing) {
+        const title = el(doc, 'div', 'everyday-workshop-formula-name', `${formula.name} — ${String(position)}`);
+        title.style.cssText = `font-size:13.5px;font-weight:600;color:${C.ink}`;
+        card.append(title);
+      } else {
+        const head = el(doc, 'div');
+        head.style.cssText = 'display:flex;gap:10px;flex-wrap:wrap;align-items:center';
+        const name = el(doc, 'input', 'everyday-workshop-formula-name');
+        name.type = 'text';
+        name.maxLength = 60;
+        name.value = formula.name;
+        name.setAttribute('aria-label', `${FORMULA_COPY.nameLabel} of ${ordinal}`);
+        name.style.cssText = `${SELECT};flex:1;min-width:160px;font-weight:600`;
+        name.addEventListener('change', () => {
+          const next = name.value.trim();
+          setFormulas(withFormulaAt(formulas, index, { name: next === '' ? formula.name : next }));
+        });
+        const weight = slider(doc, Math.min(100, position), (next) => {
+          setFormulas(withFormulaAt(formulas, index, { weight: next / 100 }));
+        });
+        weight.classList.add('everyday-workshop-formula-weight');
+        weight.setAttribute('aria-label', `${FORMULA_COPY.weightLabel}: ${formula.name}`);
+        const figure = el(doc, 'span', undefined, String(position));
+        figure.style.cssText = `font:500 12.5px ${TYPE.mono};color:${position > 0 ? C.terracotta : C.faint};width:3ch;text-align:right`;
+        const remove = el(doc, 'button', 'everyday-workshop-formula-remove', FORMULA_COPY.remove);
+        remove.type = 'button';
+        remove.setAttribute('aria-label', `Remove ${ordinal}, ${formula.name}`);
+        remove.style.cssText = PILL;
+        remove.addEventListener('click', () => {
+          setFormulas(withoutFormulaAt(formulas, index));
+        });
+        head.append(name, weight, figure, remove);
+        card.append(head);
+
+        const simple = simpleFormulaOf(formula.expression);
+        if (simple === undefined) {
+          const note = el(doc, 'p', 'everyday-workshop-formula-hand', FORMULA_COPY.handWritten);
+          note.style.cssText = `${NOTE};margin:8px 0 0`;
+          card.append(note);
+        } else {
+          const build = el(doc, 'div');
+          build.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:9px';
+          const op = el(doc, 'select', 'everyday-workshop-formula-op');
+          op.setAttribute('aria-label', `${FORMULA_COPY.opLabel} for ${ordinal}`);
+          op.style.cssText = SELECT;
+          for (const id of FORMULA_OP_ORDER) {
+            op.append(new (doc.defaultView?.Option ?? Option)(FORMULA_OP_WORDS[id].label, id));
+          }
+          op.value = simple.op;
+          op.addEventListener('change', () => {
+            setFormulas(
+              withFormulaAt(formulas, index, {
+                expression: expressionOf({ op: op.value as SimpleFormula['op'], termIds: simple.termIds }),
+              }),
+            );
+          });
+          build.append(el(doc, 'span', undefined, FORMULA_COPY.opLabel), op);
+          simple.termIds.forEach((termId, termAt) => {
+            const term = el(doc, 'select', 'everyday-workshop-formula-term');
+            term.setAttribute('aria-label', `Thing ${String(termAt + 1)} of ${ordinal}`);
+            term.style.cssText = SELECT;
+            for (const option of formulaTermOptions()) {
+              term.append(new (doc.defaultView?.Option ?? Option)(option.name, option.id));
+            }
+            term.value = termId;
+            term.addEventListener('change', () => {
+              const termIds = simple.termIds.map((held, at) => (at === termAt ? term.value : held));
+              setFormulas(withFormulaAt(formulas, index, { expression: expressionOf({ op: simple.op, termIds }) }));
+            });
+            build.append(term);
+          });
+          if (simple.termIds.length > FORMULA_MIN_TERMS) {
+            const drop = el(doc, 'button', 'everyday-workshop-formula-drop', FORMULA_COPY.dropTerm);
+            drop.type = 'button';
+            drop.setAttribute('aria-label', `Drop the last thing from ${ordinal}`);
+            drop.style.cssText = PILL;
+            drop.addEventListener('click', () => {
+              setFormulas(
+                withFormulaAt(formulas, index, {
+                  expression: expressionOf({ op: simple.op, termIds: simple.termIds.slice(0, -1) }),
+                }),
+              );
+            });
+            build.append(drop);
+          }
+          if (simple.termIds.length < FORMULA_MAX_TERMS) {
+            const more = el(doc, 'button', 'everyday-workshop-formula-more', FORMULA_COPY.addTerm);
+            more.type = 'button';
+            more.setAttribute('aria-label', `Add another thing to ${ordinal}`);
+            more.style.cssText = PILL;
+            more.addEventListener('click', () => {
+              const unused = formulaTermOptions().find((option) => !simple.termIds.includes(option.id));
+              const added = unused?.id ?? simple.termIds[0]!;
+              setFormulas(
+                withFormulaAt(formulas, index, {
+                  expression: expressionOf({ op: simple.op, termIds: [...simple.termIds, added] }),
+                }),
+              );
+            });
+            build.append(more);
+          }
+          card.append(build);
+          const meaning = el(doc, 'div', 'everyday-workshop-formula-meaning', FORMULA_OP_WORDS[simple.op].meaning);
+          meaning.style.cssText = `font-size:12px;color:${C.warmGrey};line-height:1.45;margin-top:6px;max-width:70ch`;
+          card.append(meaning);
+        }
+      }
+
+      const readback = el(doc, 'div', 'everyday-workshop-formula-readback', formulaReadbackOf(formula));
+      readback.style.cssText = `font-size:12.5px;color:${C.inkSoft};margin-top:7px;line-height:1.45`;
+      card.append(readback);
+      if (position === 0) {
+        const quiet = el(doc, 'div', 'everyday-workshop-formula-quiet', FORMULA_COPY.unweighted);
+        quiet.style.cssText = `font-size:12px;color:${C.alarm};line-height:1.45;margin-top:4px`;
+        card.append(quiet);
+      }
+      wrap.append(card);
+    });
+
+    if (editing) {
+      if (canAddFormula(formulas)) {
+        const add = el(doc, 'button', 'everyday-workshop-formula-add', FORMULA_COPY.add);
+        add.type = 'button';
+        add.style.cssText = `cursor:pointer;border:1.5px solid ${C.rule};border-radius:${String(R.pill)}px;background:${C.cardSunk};padding:7px 15px;font:500 12px ${TYPE.mono};color:${C.ink}`;
+        add.addEventListener('click', () => {
+          setFormulas(withNewFormula(formulas));
+        });
+        wrap.append(add);
+      } else {
+        const full = el(doc, 'p', 'everyday-workshop-formulas-full', FORMULA_COPY.full);
+        full.style.cssText = NOTE;
+        wrap.append(full);
+      }
+    }
+    return [wrap];
+  }
+
   function drawMaths(): HTMLElement {
     const file = api.dispatcherProfilesFile();
     const view = mathsDisclosureOf(api.workingSpec(), file.terms);
@@ -1338,13 +1589,20 @@ function mountWorkshop(
       { spec: api.workingSpec(), levers: api.groupLevers(), selector: api.selectorSpec(), rows: api.ruleRows() },
       source?.id ?? 'draft',
       source,
+      api.selectorContext(),
     );
     const boundary = el(doc, 'p', 'everyday-workshop-boundary', COPY.zoningBoundary);
     boundary.style.cssText = `${NOTE};margin:0`;
     const body: Readonly<Record<JourneyStage, () => HTMLElement[]>> = {
       calling: () => flagNodes('pool'),
       eligible: () => constraintNodes(),
-      priorities: () => [...leverNodes('patience'), ...leverNodes('room'), drawTerms(), drawMaths()],
+      priorities: () => [
+        ...leverNodes('patience'),
+        ...leverNodes('room'),
+        drawTerms(),
+        ...drawFormulas(),
+        drawMaths(),
+      ],
       deciding: () => [...leverNodes('spread'), ...groupLeverNodes('express'), boundary],
       rethinking: () => [],
       landing: () => flagNodes('bypass'),
@@ -1515,6 +1773,10 @@ function mountWorkshop(
       controls.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;align-items:center';
 
       const whenSelect = el(doc, 'select', 'everyday-workshop-when');
+      // Named for a non-visual reader — WCAG SC 4.1.2, found by the editor's own sweep in
+      // `accessibilitySweep.browser.test.ts`: the words *when* and *then* beside these are sibling
+      // spans, which name nothing, so all four were announced only as *combo box*.
+      whenSelect.setAttribute('aria-label', `Condition of rule ${String(index + 1)}`);
       for (const option of view.whenOptions) {
         whenSelect.append(
           new (doc.defaultView?.Option ?? Option)(substituted(RULE_CONDITION_WORDS[option.id as keyof typeof RULE_CONDITION_WORDS], undefined), option.id),
@@ -1533,6 +1795,7 @@ function mountWorkshop(
       const whenValues = view.whenOptions.find((option) => option.id === rowView.when)?.values;
       if (whenValues !== undefined) {
         const valueSelect = el(doc, 'select', 'everyday-workshop-when-value');
+        valueSelect.setAttribute('aria-label', `Value for the condition of rule ${String(index + 1)}`);
         for (const value of whenValues) {
           valueSelect.append(
             new (doc.defaultView?.Option ?? Option)(value.label, String(value.value)),
@@ -1549,7 +1812,70 @@ function mountWorkshop(
         controls.append(valueSelect);
       }
 
+      /*
+       * The row's further conditions — every one must hold as well as the first. Each is the same
+       * two selects the first condition is, filled from the same table, with a control to drop it;
+       * *and…* adds one while `ruleSpec.ts#canAddCondition` allows. A row with two reads as one
+       * branch of a decision list, and the readback below says it as one sentence.
+       */
+      const PILL = `cursor:pointer;border:1px solid ${C.rule};border-radius:${String(R.pill)}px;background:transparent;padding:4px 11px;font:500 11.5px ${TYPE.mono};color:${C.warmGrey}`;
+      rowView.and.forEach((extra, extraAt) => {
+        const ordinal = `condition ${String(extraAt + 2)} of rule ${String(index + 1)}`;
+        const andSelect = el(doc, 'select', 'everyday-workshop-and');
+        andSelect.setAttribute('aria-label', `Further ${ordinal}`);
+        for (const option of view.whenOptions) {
+          andSelect.append(
+            new (doc.defaultView?.Option ?? Option)(substituted(RULE_CONDITION_WORDS[option.id as keyof typeof RULE_CONDITION_WORDS], undefined), option.id),
+          );
+        }
+        andSelect.value = extra.when;
+        andSelect.addEventListener('change', () => {
+          setRows(
+            rows.map((entry, at) =>
+              at === index ? rowWithAndAt(entry, extraAt, andSelect.value as RuleRow['when'], extra.whenValue) : entry,
+            ),
+          );
+        });
+        controls.append(el(doc, 'span', undefined, 'and'), andSelect);
+        const andValues = view.whenOptions.find((option) => option.id === extra.when)?.values;
+        if (andValues !== undefined) {
+          const valueSelect = el(doc, 'select', 'everyday-workshop-and-value');
+          valueSelect.setAttribute('aria-label', `Value for further ${ordinal}`);
+          for (const value of andValues) {
+            valueSelect.append(new (doc.defaultView?.Option ?? Option)(value.label, String(value.value)));
+          }
+          valueSelect.value = String(extra.whenValue);
+          valueSelect.addEventListener('change', () => {
+            const picked = andValues.find((value) => String(value.value) === valueSelect.value);
+            if (picked === undefined) return;
+            setRows(
+              rows.map((entry, at) => (at === index ? rowWithAndAt(entry, extraAt, extra.when, picked.value) : entry)),
+            );
+          });
+          controls.append(valueSelect);
+        }
+        const drop = el(doc, 'button', 'everyday-workshop-and-drop', 'drop');
+        drop.type = 'button';
+        drop.setAttribute('aria-label', `Drop ${ordinal}`);
+        drop.style.cssText = PILL;
+        drop.addEventListener('click', () => {
+          setRows(rows.map((entry, at) => (at === index ? rowWithoutAndAt(entry, extraAt) : entry)));
+        });
+        controls.append(drop);
+      });
+      if (rowView.canAddCondition) {
+        const more = el(doc, 'button', 'everyday-workshop-and-add', 'and…');
+        more.type = 'button';
+        more.setAttribute('aria-label', `Add a further condition to rule ${String(index + 1)}`);
+        more.style.cssText = PILL;
+        more.addEventListener('click', () => {
+          setRows(rows.map((entry, at) => (at === index ? rowWithAnotherCondition(entry) : entry)));
+        });
+        controls.append(more);
+      }
+
       const thenSelect = el(doc, 'select', 'everyday-workshop-then');
+      thenSelect.setAttribute('aria-label', `Action of rule ${String(index + 1)}`);
       for (const option of view.thenOptions) {
         thenSelect.append(
           new (doc.defaultView?.Option ?? Option)(substituted(RULE_ACTION_WORDS[option.id as keyof typeof RULE_ACTION_WORDS], undefined), option.id),
@@ -1568,6 +1894,7 @@ function mountWorkshop(
       const thenValues = view.thenOptions.find((option) => option.id === rowView.then)?.values;
       if (thenValues !== undefined) {
         const valueSelect = el(doc, 'select', 'everyday-workshop-then-value');
+        valueSelect.setAttribute('aria-label', `Value for the action of rule ${String(index + 1)}`);
         for (const value of thenValues) {
           valueSelect.append(
             new (doc.defaultView?.Option ?? Option)(value.label, String(value.value)),

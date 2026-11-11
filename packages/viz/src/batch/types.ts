@@ -38,6 +38,7 @@
  */
 
 import type {
+  BuildingConfig,
   DemandLevel,
   DispatcherProfile,
   DispatcherProfiles,
@@ -464,6 +465,18 @@ export interface BatchWorkerRequest {
    * dispatcher is not one of them.
    */
   readonly savedProfiles?: readonly DispatcherProfile[] | undefined;
+  /**
+   * The player's own building, when the request's `buildingId` names one — the same resolution
+   * {@link BatchWorkerRequest.savedProfiles} is for a dispatcher, for the same reason: the worker
+   * loads `data/` on its own side and a tower designed in this session is not in it.
+   *
+   * The whole document, parsed and resolved on arrival by `core`'s own `parseBuilding` and
+   * `resolveBuilding`, so a building the designer could not have saved is refused by name here
+   * rather than run. Read **only** when its id is the request's `buildingId` and no shipped
+   * building has that id: a shipped id always means the shipped building, so a published case
+   * cannot be re-pointed at a different tower by a message. Absent is every batch before it.
+   */
+  readonly savedBuilding?: BuildingConfig | undefined;
 }
 
 /** Sent back, zero or more times, then exactly one of `done` or `failed`. */

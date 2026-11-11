@@ -134,6 +134,18 @@ import {
   testBedWorkingProfileOf,
 } from '../everyday/testBedModel.js';
 import { JOURNEY_COPY, journeyOf } from '../everyday/workshopJourney.js';
+import { plainControlWordsOf } from '../everyday/plainControls.js';
+import {
+  FORMULA_COPY,
+  FORMULA_OP_ORDER,
+  FORMULA_OP_WORDS,
+  expressionOf,
+  formulaIssueOf,
+  formulaReadbackOf,
+  formulaTermOptions,
+  withFormulaAt,
+  withNewFormula,
+} from '../authoring/formulaSpec.js';
 import { DISPATCHER_FAMILIES } from '../authoring/dispatcherFamilies.js';
 import { versionedNameOf } from '../authoring/dispatcherShelf.js';
 import {
@@ -715,6 +727,7 @@ import {
   profileFromSpec,
   specFromProfile,
   type DispatcherSpec,
+  familySpace,
 } from '../authoring/dispatcherSpec.js';
 import {
   classesFromSpecs,
@@ -9491,7 +9504,51 @@ const RULES_EDITOR: SurfaceAdapter = {
         true,
       ],
       ['out-of-list', [{ when: 'call-waited', whenValue: 61, then: 'jump-queue' }], true],
+      // A row's further conditions: their own out-of-list and clockless refusals, the bound, and
+      // the whole-run ceiling that can carry none.
+      [
+        'and-out-of-list',
+        [{ when: 'shaft-out', and: [{ when: 'call-waited', whenValue: 61 }], then: 'jump-queue' }],
+        true,
+      ],
+      [
+        'and-clockless',
+        [{ when: 'shaft-out', and: [{ when: 'day-period', whenValue: 'lunch' }], then: 'jump-queue' }],
+        false,
+      ],
+      [
+        'and-too-many',
+        [
+          {
+            when: 'shaft-out',
+            and: [{ when: 'shaft-out' }, { when: 'shaft-out' }, { when: 'shaft-out' }],
+            then: 'jump-queue',
+          },
+        ],
+        true,
+      ],
+      [
+        'and-on-ceiling',
+        [{ when: 'car-fuller-than', whenValue: 0.8, and: [{ when: 'shaft-out' }], then: 'no-new-pickups' }],
+        true,
+      ],
     ];
+    // A row that asks for more than one thing, over every condition as its further one: the
+    // readback's "and" join and the provenance pill's, each from the same table.
+    RULE_CONDITIONS.forEach((when) => {
+      const value = RULE_CONDITION_WORDS[when].values?.[0]?.value;
+      const row: RuleRow = {
+        when: 'shaft-out',
+        and: [{ when, ...(value === undefined ? {} : { whenValue: value }) }],
+        then: 'jump-queue',
+      };
+      seeds.push({ field: `readback.and.${when}`, text: `Reads as: ${readbackOf(row)}`, role: 'label' });
+      seeds.push({
+        field: `provenance.and.${when}`,
+        text: ruleProvenanceName(`rule-1:shaft-out+${when}${value === undefined ? '' : `:${String(value)}`}`) ?? '',
+        role: 'label',
+      });
+    });
     for (const [name, rows, hasClock] of refusalArms) {
       for (const [index, issue] of ruleIssues(rows, { hasClock }).entries()) {
         seeds.push({
@@ -17050,6 +17107,11 @@ const EVERYDAY_WORKSHOP: SurfaceAdapter = {
     'everyday/testBedModel.ts#testBedViewOf',
     'everyday/testBedModel.ts#testBedWorkingProfileOf',
     'everyday/workshopJourney.ts#journeyOf',
+    'authoring/formulaSpec.ts#FORMULA_COPY',
+    'authoring/formulaSpec.ts#FORMULA_OP_WORDS',
+    'authoring/formulaSpec.ts#formulaReadbackOf',
+    'authoring/formulaSpec.ts#formulaIssueOf',
+    'authoring/formulaSpec.ts#withNewFormula',
     'everyday/workshopModel.ts#switchingBlockOf',
     'everyday/workshopModel.ts#rulesBlockOf',
     'everyday/workshopModel.ts#nameplateOf',
@@ -17254,6 +17316,7 @@ const EVERYDAY_WORKSHOP: SurfaceAdapter = {
             rows: [],
           },
           bedProfile,
+          selectorContextFrom(file, 900),
         ).name,
         role: 'label',
       });
@@ -17273,6 +17336,52 @@ const EVERYDAY_WORKSHOP: SurfaceAdapter = {
       role: 'label',
     });
 
+    /*
+     * A priority of the player's own — `authoring/formulaSpec.ts`. Every authored line of the
+     * block, every operation's label and meaning, the readback over each operation and over a
+     * nested hand-written tree, a new formula's default name, and the one refusal.
+     */
+    for (const [key, text] of Object.entries(FORMULA_COPY)) {
+      seeds.push({ field: `formula.copy.${key}`, text, role: 'prose', provenance: 'authored' });
+    }
+    const formulaTerms = formulaTermOptions().map((option) => option.id);
+    for (const op of FORMULA_OP_ORDER) {
+      seeds.push({ field: `formula.op.${op}.label`, text: FORMULA_OP_WORDS[op].label, role: 'label', provenance: 'authored' });
+      seeds.push({ field: `formula.op.${op}.meaning`, text: FORMULA_OP_WORDS[op].meaning, role: 'prose', provenance: 'authored' });
+      const [made] = withFormulaAt(withNewFormula([]), 0, {
+        expression: expressionOf({ op, termIds: formulaTerms.slice(0, 3) }),
+      });
+      if (made !== undefined) {
+        seeds.push({ field: `formula.${op}.name`, text: made.name, role: 'label' });
+        seeds.push({ field: `formula.${op}.readback`, text: formulaReadbackOf(made), role: 'label' });
+      }
+    }
+    for (const option of formulaTermOptions()) {
+      seeds.push({ field: `formula.term.${option.id}`, text: option.name, role: 'label' });
+    }
+    seeds.push({
+      field: 'formula.nested.readback',
+      text: formulaReadbackOf({
+        id: 'hand',
+        name: 'Hand',
+        weight: 1,
+        expression: { op: 'multiply', of: [{ term: 'waitTime' }, { op: 'add', of: [{ term: 'loadFactor' }, { value: 1 }] }] },
+      }),
+      role: 'label',
+    });
+    seeds.push({
+      field: 'formula.issue',
+      text: formulaIssueOf([{ id: 'x', name: 'X', weight: 1, expression: { term: 'no-such-term' } }]) ?? '',
+      role: 'reason',
+    });
+
+    /* The Detailed depth's plain name, and effect where core authors one, for every setting it draws. */
+    for (const id of familySpace().byId.keys()) {
+      const words = plainControlWordsOf(id);
+      seeds.push({ field: `plain.${id}.name`, text: words.name, role: 'label' });
+      if (words.effect !== undefined) seeds.push({ field: `plain.${id}.effect`, text: words.effect, role: 'prose' });
+    }
+
     /* The arms no shipped profile reaches, manufactured so each sentence has been rendered once. */
     const journeyBase = file.profiles[0];
     if (journeyBase !== undefined) {
@@ -17285,6 +17394,8 @@ const EVERYDAY_WORKSHOP: SurfaceAdapter = {
         { ...journeyBase, eligibility: { maxLoadFactorForAssignment: 0.7 } },
         { ...journeyBase, answer: { bypassLoadThreshold: 0.8, dwellPolicy: 'adaptive' } },
         { ...journeyBase, selection: { policy: 'fuzzy' } },
+        { ...journeyBase, selection: { policy: 'fuzzy' }, patternWeightSets: { 'up-peak': journeyBase.id } },
+        { ...journeyBase, selection: { policy: 'fuzzy' }, patternWeightSets: { 'up-peak': journeyBase.id, idle: journeyBase.id } },
         { ...journeyBase, selection: { policy: 'rules' }, rules: { rows: [{ when: 'shaft-out', then: 'nearest-car' }] } },
         { ...journeyBase, engine: 'no-such-engine' },
       ];

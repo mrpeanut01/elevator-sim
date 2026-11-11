@@ -79,6 +79,16 @@ describe('each card reads the dispatcher back as it would run', () => {
     const base = profileOf('eta');
     expect(sentenceOf({ ...base, idle: { parkingStrategy: 'lobby' } }, 'idle')).toContain('waits at the lobby');
     expect(sentenceOf({ ...base, selection: { policy: 'fuzzy' } }, 'day')).toContain('watches the traffic');
+    expect(sentenceOf({ ...base, selection: { policy: 'fuzzy' } }, 'day')).toContain('every shipped design');
+    expect(
+      sentenceOf({ ...base, selection: { policy: 'fuzzy' }, patternWeightSets: { 'up-peak': 'eta' } }, 'day'),
+    ).toContain('its own choice for one kind of traffic');
+    expect(
+      sentenceOf(
+        { ...base, selection: { policy: 'fuzzy' }, patternWeightSets: { 'up-peak': 'eta', idle: 'eta' } },
+        'day',
+      ),
+    ).toContain('its own choice for 2 kinds of traffic');
     expect(
       sentenceOf(
         { ...base, selection: { policy: 'rules' }, rules: { rows: [{ when: 'shaft-out', then: 'nearest-car' }] } },

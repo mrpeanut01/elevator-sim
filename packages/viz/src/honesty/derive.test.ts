@@ -1431,6 +1431,14 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'Resolves the building a batch runs in. Its one string literal is the source label it ' +
+        'hands `core`’s `parseBuilding`, which appears only inside a thrown parse error about a ' +
+        'building the designer could not have saved — and a document reaches this function only ' +
+        'from the designer’s own save. The function returns a resolved building, never text.',
+      ids: ['batch/library.ts#batchBuildingOf'],
+    },
+    {
+      reason:
         'The id the workshop’s working copy rides to the batch worker under, and the two ' +
         'functions that put it on a request. It is a key, never a sentence: the arm is reported ' +
         'under the name `testBedWorkingProfileOf` gives it, which is swept, and ' +
@@ -1556,6 +1564,14 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         // The sentences a player reads about time rules are `ruleIssues`' clock refusal and the
         // row readbacks, both driven by the RULES_EDITOR adapter.
         'authoring/ruleSpec.ts#isTimeCondition',
+        // The same reading of an id as prose, four times over: each of these compares against or
+        // reaches the action id `no-new-pickups` and returns a row or a boolean. What a player
+        // reads about that action is its template, its lever line and `ruleIssues`' refusals,
+        // all driven by the RULES_EDITOR adapter — including the row with further conditions.
+        'authoring/ruleSpec.ts#canAddCondition',
+        'authoring/ruleSpec.ts#defaultRuleRow',
+        'authoring/ruleSpec.ts#rowWithAnotherCondition',
+        'authoring/ruleSpec.ts#rowWithThen',
       ],
     },
     {
