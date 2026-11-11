@@ -1315,7 +1315,9 @@ function mountWorkshop(
     if (!editing && formulas.length === 0) return [];
     const wrap = section(doc, FORMULA_COPY.heading, FORMULA_COPY.hint);
     wrap.classList.add('everyday-workshop-formulas');
-    const SELECT = `border:1.5px solid ${C.rule};border-radius:${String(R.control)}px;background:${C.paper};padding:6px 8px;font-size:12.5px`;
+    // The ink is set, not inherited: a form control takes the browser's own text colour, which
+    // under a dark colour scheme is light, on a background this block sets to paper.
+    const SELECT = `border:1.5px solid ${C.rule};border-radius:${String(R.control)}px;background:${C.paper};color:${C.ink};padding:6px 8px;font-size:12.5px`;
     const PILL = `cursor:pointer;border:1px solid ${C.rule};border-radius:${String(R.pill)}px;background:transparent;padding:4px 11px;font:500 11.5px ${TYPE.mono};color:${C.warmGrey}`;
 
     if (formulas.length === 0) {

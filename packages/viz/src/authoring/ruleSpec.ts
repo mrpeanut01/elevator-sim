@@ -183,10 +183,16 @@ export function canAddCondition(row: RuleRow): boolean {
   return row.then !== 'no-new-pickups' && (row.and ?? []).length < MAX_RULE_AND;
 }
 
-/** The row with one more condition: the first the vocabulary lists, at its first value. */
+/**
+ * The row with one more condition: the first the vocabulary lists that the row does not already
+ * test, at its first value. Not simply the first — *when a call has waited 30 s and a call has
+ * waited 30 s* is a row that asks one thing twice, and a control whose first press writes a
+ * condition that changes nothing is the inert default this repository keeps refusing.
+ */
 export function rowWithAnotherCondition(row: RuleRow): RuleRow {
   if (!canAddCondition(row)) return row;
-  const when = RULE_CONDITIONS[0];
+  const held = new Set([row.when, ...(row.and ?? []).map((extra) => extra.when)]);
+  const when = RULE_CONDITIONS.find((candidate) => !held.has(candidate)) ?? RULE_CONDITIONS[0];
   const values = RULE_CONDITION_WORDS[when].values;
   const extra: RuleAnd = { when, ...(values === undefined ? {} : { whenValue: values[0]!.value }) };
   return ruleRowOf({ ...row, and: [...(row.and ?? []), extra] }) as RuleRow;

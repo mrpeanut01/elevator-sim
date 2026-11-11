@@ -239,6 +239,10 @@ describe('further conditions — a row that asks for more than one thing', () =>
   it('adds up to core’s bound, edits one in place with its value snapped, and drops one', () => {
     const one = rowWithAnotherCondition({ when: 'shaft-out', then: 'jump-queue' });
     expect(one.and).toHaveLength(1);
+    // A new condition is never one the row already tests, so its first press changes the row.
+    const first = RULE_CONDITIONS[0];
+    const again = rowWithAnotherCondition(rowWithAnotherCondition({ when: first, then: 'jump-queue' }));
+    expect(new Set([again.when, ...(again.and ?? []).map((extra) => extra.when)]).size).toBe(3);
     const two = rowWithAnotherCondition(one);
     expect(two.and).toHaveLength(MAX_RULE_AND);
     expect(canAddCondition(two)).toBe(false);
