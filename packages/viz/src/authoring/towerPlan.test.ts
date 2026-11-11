@@ -315,6 +315,16 @@ describe('the drawing board is not decoration — every control moves the legs',
     expect(legsOf(paired)).not.toBe(control);
   });
 
+  it('publishes no interval for the group that holds a pair, and still publishes the others', () => {
+    /* The closed form counts the pair as two free cars; measured 2026-11-11 it improved while the run did not. */
+    const before = planAnalysisOf(base, SPECS).banks;
+    expect(before.every((bank) => bank.figures !== undefined)).toBe(true);
+    const after = planAnalysisOf(withCars(base, [first(base)], 2), SPECS).banks;
+    expect(after[0]?.figures).toBeUndefined();
+    expect(after[0]?.refusal).toContain('two cars in one shaft');
+    expect(after.slice(1).map((bank) => bank.figures)).toEqual(before.slice(1).map((bank) => bank.figures));
+  });
+
   it('a second deck changes the run, on the building that has double-deck shuttles', () => {
     const tall = supertallPlan();
     const shuttles = tall.shafts.filter((shaft) => shaft.decks === 2).map((shaft) => shaft.key);

@@ -784,6 +784,26 @@ const SAID_BY_THE_BOARD: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * **Why a group with two cars in one hoistway has no interval and no handling figure.**
+ *
+ * The closed form counts cars: `analyzeUpPeak` divides one round trip by `cars.length`, and every
+ * one of those cars is assumed to leave the main lobby and reach the top. Two cars in one shaft do
+ * neither — the upper never reaches the bottom landing and the lower never reaches the top
+ * (`sim/twinShaft.test.ts`) — and the expression has no term for it, exactly as it has none for a
+ * second deck. `oracle/upPeakCase.ts#isolateBank` drops the `shafts` block, so no residual is
+ * published for such a bank either.
+ *
+ * It was measured before it was withheld (2026-11-11, `zonedTowerPlan`, 20 seeds × 1 800 s, the
+ * low group's first shaft given a second car): the closed form moved the group's interval from
+ * 40.1 s to 32.1 s, while the pair together carried fewer riders in every profile tried than the
+ * one car it replaced. A figure that improves when the run does not is the one this screen may
+ * not draw, so the group's row says why and the run is where the reader finds out.
+ */
+const TWO_CAR_FIGURES_WITHHELD =
+  'Not worked out for a group with two cars in one shaft: the round-trip sum counts every car as ' +
+  'free to reach the lobby and the top, and a pair cannot pass each other. Run it to measure it.';
+
+/**
  * **The plan through the real loader and the real closed form.**
  *
  * `buildingFromPlan → parseBuilding → resolveBuilding → analyzeUpPeak`, which is the chain
@@ -801,7 +821,11 @@ export function planAnalysisOf(plan: TowerPlan, specs: ElevatorSpecs): PlanAnaly
       advisories: resolved.warnings
         .filter((warning) => !SAID_BY_THE_BOARD.has(warning.code))
         .map((warning) => warning.message),
-      banks: upPeakBanksOf(resolved, specs),
+      banks: upPeakBanksOf(resolved, specs).map((bank, index) =>
+        resolved.banks[index]?.shafts.some((shaft) => shaft.carIds.length === 2) === true
+          ? { ...bank, figures: undefined, refusal: TWO_CAR_FIGURES_WITHHELD, line: '', reading: '', warnings: [] }
+          : bank,
+      ),
       resolved,
     };
   } catch (error) {
