@@ -52708,6 +52708,8 @@ line, raises no call, never stops on the card again, and reaches the day's end w
 
 ## D1445 — the lobby opens every cold launch, its panel follows § D525, and the tutorial is the basement
 
+> **Status 2026-11-11: AMENDED by [§ D1627](#d1627)** (the product owner). The lobby still opens every cold launch and *Skip the lobby* still restores the old front door. The ride is replaced: a landing is one press, the floors are the six of `everyday/floors.ts` with Scenario still on top, and the walkthrough is a room on the lobby's floor rather than the basement. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-10-13 by the product owner**, answering two questions put to them while the lobby
 > handoff (`docs/design/design_handoff_lobby_intro/`) was being built. **Amends
 > [§ D525](#d525)'s front door** (a screen now comes before the menu on every visit) and **moves
@@ -55619,3 +55621,93 @@ and an edit takes it away); and the honesty corpus.
 under the pass R11 amendment 5 wrote.
 
 **Numbers spent.** Lane AW-1 holds **D1626 to D1633** and spends **D1626**.
+
+## D1627 — every way to play is a floor: the tray is a shaft, a floor is one press, and motion never gates a selection
+
+> **Taken 2026-11-11 by the product owner**, as a direction to redesign the Everyday navigation, and
+> built the same day by one agent session (wave AX, a single lane). **Amends [§ D1445](#d1445)**: the lobby
+> still opens every cold launch and *Skip the lobby* still restores the old front door, and the ride
+> that § D1445 built to `docs/design/design_handoff_lobby_intro/` is replaced. **Owner-reversible**:
+> one revert restores the § D1445 lobby, the `DESIGN` and `WORLD` rail groups and the two bar labels.
+
+**Why an entry.** It binds the shell, the rail, the lobby, the action bar's table and the honesty
+register, which no one module owns; it moves a screen a design handoff specifies, so `docs/12` § 4
+gains a row; and it amends § D1445, so that entry gains a status line and `docs/39` § 2 a row.
+
+**The direction, in the owner's words.** Focus on the lobby and the flow to the other floors, and
+from each play floor to another; carry the theme of selecting floors into the left tray, as a shaft
+that shows the car at whichever floor the player is on; make changing floors intuitive and quick,
+with animation supporting the selection rather than controlling it and no countdown or travel time;
+and decouple *play a day in this building* flows to at most a test simulation, because to be played
+a building has to exist and be played as part of a mode.
+
+**What is ruled.**
+
+1. **One floor directory, `everyday/floors.ts`, and every surface that draws the building reads
+   it.** Six floors, top first: **3 Scenario, 2 Career, 1 Rush** (§ D525's modes in § D1445's
+   order, each reading its menu tile), **M Records** (your week, the boards), **L Lobby** (the main
+   menu, the elevator hall, the walkthrough, what this is) and **B Design** (the dispatcher
+   workshop, the test bench, the drawing board). `floorOfScreen` puts every screen on one floor in
+   every context; the four screens a day is played through take the floor of their flow.
+2. **The left tray is the shaft.** `rail.ts#railShaft` replaces the `DESIGN` and `WORLD` groups: a
+   hoistway, the six floors, each floor's rooms as rows under it, and a car standing at the floor
+   the player is on with the subline beside it. Every row the groups carried is still one press from
+   anywhere. A play floor's press is *leave to the lobby, then press the tile* in one act
+   (`shell.ts#rideToMode`); the lobby's floor is the old *Main menu* row and still asks about a day
+   in flight.
+3. **Motion is laid over a press and never in front of it.** The tray's car glides to its new
+   floor, and two door leaves part over the screen with the floor's plate between them, in about a
+   third of a second. Both are drawn after the screen has mounted, take no pointer events, are
+   hidden from assistive technology and are not drawn with reduced motion. No handler waits on a
+   timer before it navigates.
+4. **The lobby is the building in section, and a landing is one press.** § D1445's machine (CALL,
+   the ride down, the panel, a six-second auto-close, the ride up, *Step out*) is replaced by a
+   hall that shows the shaft and six landings: pointing at one glides the car to it and describes
+   the floor, pressing one steps out. Read off § D1445's own timings table, its shortest route from
+   a cold launch to Scenario was four presses and about ten seconds of motion; it is now one press.
+   The walkthrough moves from floor B to a room on L, because B is the design floor. The Engineer
+   key, *Continue* and *What this is* stay.
+5. **The design floor tries things, and a building is played on the floors above the lobby.** The
+   workshop's and the drawing board's primary both read *Test simulation*
+   (`types.ts#TEST_SIMULATION_LABEL`), where the handoff's § 3.3 reads *Run a day with this* and
+   *Run a day in it*. The stage that follows keeps the tray's car on B and reads
+   `TEST SIMULATION` where a played day reads `MID-DAY`. **One run changes, so that the label is
+   true.** The drawing board's press was already a sandbox day (`EverydayHost.runSandbox`,
+   § D1368). The workshop's was `startRun`, a sandbox day only while the day's attempt had not begun
+   on a crowd that counts (§ D1362) and the day's own run otherwise, which could be closed into the
+   week. It is `runSandbox` now, in every state, so no run started from the design floor can file.
+   It is still refused while a scored attempt stands (§ D1360), and the workshop's four fields still
+   travel with it, because they are written to the standing configuration by the workshop's own
+   controls and a sandbox puts back only what its own press wrote.
+6. **A test simulation started from a bench does not wear a day's bar.** While the host says a
+   sandbox day is standing and the stage was entered from the workshop or the drawing board, the
+   stage's and the report's row lose `‹ Brief` and the daily timeline, and the left button reads
+   *⤺ Back to the design floor* and returns to that bench with no leave strip, because there is no
+   day of the player's to abandon (`actionBar.ts#testSimulationBarOf`, called from
+   `shell.ts#drawBar`). *Tune the tower*'s sandbox day keeps the day's row: it is opened from a
+   brief, and `‹ Brief` is its true way back.
+
+**What it does not change.** The three modes, their tiles, the menu screen, the action bar's other
+rows, the leave strip, the tutorial, the first-arrival offer for a player who skips the lobby, and
+every figure a run produces. *Tune the tower* keeps its own primary, because it is opened from a
+day's brief and its note already says which kind of run it starts.
+
+**What is not built, and is named rather than implied.** A drawn building still cannot be entered
+from a mode's floor: `docs/38` § 2.1's *Build your own* (a scenario file with the player's own
+building, a goal and a budget) is not in Everyday. So clause 5 is true as *a bench run is only ever
+a test*, and the other half of the owner's sentence, *the building needs to exist and then be
+played as part of a mode*, is owed. The design floor's sentence says a building is played on the
+floors above the lobby and does not say this build can put the player's own there.
+
+**Held by** `everyday/floors.test.ts` (every screen on a floor in every context, a test simulation
+on B and its bar, the label on both benches and nowhere above the lobby), `everyday/rail.test.ts` (the shaft in
+every state, the play floors against the tiles), `everyday/lobbyModel.test.ts` (no state a press is
+refused in, the motion budget), `everyday/actionBar.test.ts` (the two cells as a deviation, read
+against the vendored guide both ways) and `everyday/lobby.browser.test.ts`, which measures on the
+built bundle, with motion on, that the hall is gone in the same task as the press and that the
+doors over the screen take no pointer events; and `everyday/workshopScreen.browser.test.ts`, which
+presses *Test simulation* on a day that was not a rehearsal and finds the car on B, the subline
+naming the run, and the week as it was.
+
+**Numbers spent.** Wave AX is one lane with no block reserved; it took the charter row's **D1627**
+and moved the row to D1628, so nothing is holed.

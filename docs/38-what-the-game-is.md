@@ -524,6 +524,13 @@ Named so the next lane does not discover it. None of it is built by this page.
   recorded as a handoff deviation.
 - [`25-vertical-slice.md`](25-vertical-slice.md)'s slice is unchanged in content and its mode is
   renamed: one *today's scenario*.
+- **How the modes are moved between, built 2026-11-11** ([§ D1627](../DECISIONS.md), the owner's
+  direction). The game is laid out as a building, `packages/viz/src/everyday/floors.ts`: Scenario on
+  3, Career on 2, Rush on 1, the player's records on M, the lobby on L and the design floor on B. The
+  left tray draws the shaft with a car at the player's floor, a floor is one press from anywhere, and
+  motion is drawn over a press and never waited on. A run started from the design floor is a *test
+  simulation* and files nothing; a building is played on a mode's floor. What § 2.1's *Build your
+  own* owes is unchanged by it: a drawn building is not yet entered from a mode.
 
 ## 4. What this does not change
 

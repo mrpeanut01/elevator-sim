@@ -1099,6 +1099,29 @@ whose line names the words inside.
 **What it does not change.** A day that exists is drawn exactly as § 6.1 has it, and a week on its
 seventh day draws the full seven. The definitions are `mode/glossary.ts`'s, unchanged.
 
+
+### 4.22 The tray is a shaft, a floor is one press, and the lobby no longer rides
+
+**The deviation.** Three handoff surfaces move together, on the product owner's direction of
+2026-11-11 ([§ D1627](../DECISIONS.md)). The casual-mode guide's § 3.2 rail lists its screens under
+`DESIGN` and `WORLD` beneath a *Main menu* row; this build draws a shaft instead: six floors from
+`everyday/floors.ts`, each floor's rooms under it, and a car at the floor the player is on. The
+lobby handoff (`design/design_handoff_lobby_intro/`) specifies CALL, a ride down, a car panel, an
+auto-close countdown, a ride up and *Step out*, with its timings marked final; this build shows the
+building in section and a landing is one press, with the car's glide and the doors as decoration
+that nothing waits on. And § 3.3's `workshop` and `designer` primaries, *Run a day with this* and
+*Run a day in it*, both ship as *Test simulation*.
+
+**Why.** The owner asked for floor changes that are quick and for motion that supports a selection
+rather than controlling it; read off the lobby handoff's own timings, its shortest route to
+Scenario was four presses and about ten seconds. The two primaries offered a day from a bench, and
+the owner ruled that a bench tries things while a building is played on a mode's floor.
+
+**What it does not change.** The handoff's palette, type and door easing are kept where the new
+hall draws the same things. Every rail row the two groups carried is still on the tray, under its
+floor. The rest of § 3.3's table ships as transcribed, and `actionBar.test.ts` reads the vendored
+guide to hold the two changed cells as a deviation in both directions.
+
 The refactor is done when all of the following are true, and not before.
 
 1. **Layout fidelity** — the three regions, their widths, their order and their internal card
