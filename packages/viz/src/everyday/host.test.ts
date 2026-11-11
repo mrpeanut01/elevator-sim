@@ -3256,11 +3256,12 @@ describe('the sentence a screen shows while the game loads', () => {
     expect(HOST_PENDING_REASON).not.toMatch(/\b(soon|shortly|in a moment|any second)\b/u);
   });
 
-  it('is the one sentence both of the shell\u2019s waiting screens draw, and no copy of the old one survives', () => {
+  it('is the one sentence the shell\u2019s waiting screen draws, and no copy of the old one survives', () => {
     const src = new URL('./', import.meta.url);
     const shell = readFileSync(fileURLToPath(new URL('shell.ts', src)), 'utf8');
-    // The front door's waiting state and a registered screen's: both draw the constant itself.
-    expect(shell.match(/el\(doc, 'p', undefined, HOST_PENDING_REASON\)/gu)?.length).toBe(2);
+    // A registered screen's waiting state draws the constant itself. It was two until § D1628: the
+    // front door had one as well, and the lobby that replaced it draws from nothing the host holds.
+    expect(shell.match(/el\(doc, 'p', undefined, HOST_PENDING_REASON\)/gu)?.length).toBe(1);
     // And nothing else in the shipped tree authors the old words as a string a player could read.
     const root = fileURLToPath(new URL('../', import.meta.url));
     const offenders: string[] = [];

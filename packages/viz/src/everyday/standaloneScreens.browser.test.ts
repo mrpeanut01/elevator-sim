@@ -442,7 +442,7 @@ describe.skipIf(!HAS_BROWSER)('Design a building', () => {
     expect(await page.textContent('.everyday-bar-note')).toBe(
       'Nothing here is scored. It is a drawing board.',
     );
-    expect(await page.textContent('.everyday-bar-primary')).toBe('Run a day in it');
+    expect(await page.textContent('.everyday-bar-primary')).toBe('Test simulation');
     expect(await page.$$eval('.everyday-designer-absences', (blocks) => blocks.length)).toBe(0);
 
     /*

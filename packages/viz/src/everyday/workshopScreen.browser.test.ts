@@ -103,13 +103,41 @@ describe.skipIf(!HAS_BROWSER)('the Everyday dispatcher workshop', () => {
     const page = await openWorkshop();
     expect(await page.textContent('.everyday-workshop h1')).toBe('Build the thing that decides');
     expect(await page.textContent('.everyday-bar-leave')).toBe('⌂ Modes');
-    expect(await page.textContent('.everyday-bar-primary')).toBe('Run a day with this');
+    expect(await page.textContent('.everyday-bar-primary')).toBe('Test simulation');
     // The style cards are the shipped `playStyles` block, under their own names.
     expect(await page.textContent('.everyday-workshop-style')).toContain('Steady hand');
     // Nothing is withheld: the rest of the shelf is on the panel under its own heading.
     expect(await page.locator('.everyday-workshop-library').count()).toBeGreaterThan(0);
     await page.close();
   }, 120_000);
+
+  /**
+   * § D1627 clause 5, on the page. This file's address carries `?seed=`, so the day's crowd is not
+   * the one a day counts on and the press was not a rehearsal: before the ruling it started the
+   * day's own run, which the report could close into the week. It is a sandbox day now, and the
+   * tray says so in the two ways it has: the car stays on the design floor, and the subline names
+   * the run. Walking off the stage leaves the week with no day begun.
+   */
+  it('runs a test simulation from the bar: the tray keeps the car on B, and the week is not touched', async () => {
+    const page = await openWorkshop();
+    try {
+      const career = (): Promise<string> =>
+        page.evaluate(() => document.querySelector('.everyday-rail-footer')?.textContent ?? '');
+      const before = await career();
+      await page.click('.everyday-bar-primary');
+      await page.waitForSelector('.everyday-stage', { timeout: 60_000 });
+      expect(await page.getAttribute('.everyday-rail-floor[aria-current="location"]', 'data-floor')).toBe('B');
+      expect(await page.textContent('.everyday-rail-subline')).toContain('TEST SIMULATION');
+      /* Back to the bench by its own row: the sandbox is put away and the car has not left the floor. */
+      await page.click('.everyday-rail button:has-text("Dispatcher workshop")');
+      await page.waitForSelector('.everyday-workshop');
+      expect(await page.getAttribute('.everyday-rail-floor[aria-current="location"]', 'data-floor')).toBe('B');
+      expect(await page.textContent('.everyday-rail-subline')).not.toContain('TEST SIMULATION');
+      expect(await career(), 'the PLAYING AS card reads the week it read before the press').toBe(before);
+    } finally {
+      await page.close();
+    }
+  });
 
   /**
    * The standing requirement, on the page — GitHub issues #296 and #575.

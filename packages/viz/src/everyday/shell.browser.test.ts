@@ -202,7 +202,7 @@ async function coldLoad(): Promise<Page> {
  */
 
 describe.skipIf(!HAS_BROWSER)('the app opens on Everyday Mode', () => {
-  it('draws the menu, the rail and the three mode tiles — not the Engineer menu', async () => {
+  it('draws the lobby, the rail and the three mode tiles — not the Engineer menu', async () => {
     const page = await coldLoad();
     await leaveTutorialIfOffered(page);
     try {
@@ -219,7 +219,8 @@ describe.skipIf(!HAS_BROWSER)('the app opens on Everyday Mode', () => {
       expect(front.rails).toBe(1);
       // § 3.5: the front door is not overridable, and a deep link is what would override it. The
       // load above carries two query parameters and still lands here.
-      expect(front.lede).toContain('Pick a way to play');
+      /* § D1628: the front door is the lobby, and its welcome is the menu's lede now. */
+      expect(front.lede).toContain('Every floor is a way to play');
       expect(front.engineerMenuHidden).toBe(true);
     } finally {
       await page.close();
@@ -497,7 +498,7 @@ describe.skipIf(!HAS_BROWSER)("Today's tower is playable through the new shell",
         inset: document.querySelector<HTMLElement>('.shell')?.style.marginLeft,
         railWidth: document.querySelector('.everyday-rail')?.getBoundingClientRect().width,
         // The rail says where the player now is, rather than still saying YOU ARE HERE.
-        subline: document.querySelector('.everyday-rail-menu')?.textContent ?? '',
+        subline: document.querySelector('.everyday-rail-subline')?.textContent ?? '',
         engineerCovered: document.querySelector<HTMLElement>('.shell')?.inert === true,
       }));
       expect(shown.mainShown).toBe('grid');
@@ -771,7 +772,7 @@ describe.skipIf(!HAS_BROWSER)("Today's tower is playable through the new shell",
       const back = await page.evaluate(() => ({
         mainShown: document.querySelector<HTMLElement>('.everyday-main')?.style.display,
         stageGone: document.querySelector('.everyday-stage-canvas') === null,
-        subline: document.querySelector('.everyday-rail-menu')?.textContent ?? '',
+        subline: document.querySelector('.everyday-rail-subline')?.textContent ?? '',
         /*
          * `inert` is now true for the Engineer root's whole life rather than only off-stage, so
          * this reads as *it never came off* rather than *it went back on*. It is still the case
@@ -908,7 +909,7 @@ describe.skipIf(!HAS_BROWSER)('switching between the two worlds — GAMEPLAY § 
         onStage: document.querySelector('.everyday-stage-canvas') !== null,
         canvasBox:
           document.querySelector('.everyday-stage-canvas')?.getBoundingClientRect().width ?? 0,
-        subline: document.querySelector('.everyday-rail-menu')?.textContent ?? '',
+        subline: document.querySelector('.everyday-rail-subline')?.textContent ?? '',
         primary: document.querySelector('.everyday-bar-primary')?.textContent ?? '',
       }));
       expect(home.engineerInert).toBe(true);
@@ -955,7 +956,7 @@ describe.skipIf(!HAS_BROWSER)('switching between the two worlds — GAMEPLAY § 
       // The menu is interactive, by a press that navigates rather than by an attribute.
       await page.locator('.everyday-rail-settings').click();
       await page.waitForFunction(
-        () => (document.querySelector('.everyday-rail-menu')?.textContent ?? '').includes('SETTINGS'),
+        () => (document.querySelector('.everyday-rail-subline')?.textContent ?? '').includes('SETTINGS'),
         undefined,
         { timeout: 15_000 },
       );
@@ -979,7 +980,7 @@ describe.skipIf(!HAS_BROWSER)('switching between the two worlds — GAMEPLAY § 
         tiles: document.querySelectorAll('.everyday-mode').length,
         visibility: document.querySelector<HTMLElement>('.everyday')?.style.visibility,
         engineerInert: document.querySelector<HTMLElement>('.shell')?.inert,
-        subline: document.querySelector('.everyday-rail-menu')?.textContent ?? '',
+        subline: document.querySelector('.everyday-rail-subline')?.textContent ?? '',
       }));
       expect(reloaded.tiles).toBe(3);
       expect(reloaded.visibility).toBe('');

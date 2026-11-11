@@ -1,29 +1,25 @@
 /**
- * **The lobby on the shipped bundle** — [§ D1445](../../../../DECISIONS.md).
+ * **The lobby on the shipped bundle** — the front door and the main menu, one screen
+ * ([§ D1628](../../../../DECISIONS.md), after § D1445 and [§ D1627](../../../../DECISIONS.md)).
  *
- * `lobbyModel.test.ts` holds the door machine and the floor map in the node tier. What only a
- * browser can hold is the rest: that a cold launch opens on the lobby with the shell's chrome
- * stepped aside, that the car really rides and opens, that *Step out* lands on the floor's own screen
- * with the rail back, that the basement opens the walkthrough, that the quiet *Main menu* is a way
- * past the ride, and that *Skip the lobby* restores the old front door.
+ * `lobbyModel.test.ts` holds the small machine and `floors.test.ts` the floor map, in the node tier.
+ * What only a browser can hold is the rest: that a cold launch opens on the lobby **inside the
+ * shell**, with the tray beside it and its car on L; that the three top landings are the mode
+ * tiles; that one press on a landing or a room is the whole trip and is not waiting on any motion;
+ * that the lobby is where *Main menu* comes back to; and that no setting skips it, because there is
+ * nothing behind it to skip to.
  *
- * Every page here is opened with `reducedMotion: 'reduce'`, which is the handoff's own fast path
- * (doors in 1 ms, steps in 90 ms), so a ride costs about a second rather than five. The full-motion
- * timings are the model's, and its test pins them.
+ * Most pages here are opened with `reducedMotion: 'reduce'`, because nothing they assert is about
+ * the picture. The one case that is about motion opens with it on.
  */
 
 import { chromium, type Browser, type Page } from 'playwright-core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import {
-  CHROMIUM,
-  HAS_BROWSER,
-  openPage,
-  skipTheLobby,
-  startShippedSite,
-  type ShippedSite,
-} from '../dev/browserTier.test-helper.js';
-import { LOBBY_COPY, LOBBY_FLOORS, LOBBY_WARNINGS } from './lobbyModel.js';
+import { CHROMIUM, HAS_BROWSER, openPage, startShippedSite, type ShippedSite } from '../dev/browserTier.test-helper.js';
+import { GAME_FLOORS } from './floors.js';
+import { LOBBY_COPY, LOBBY_TIMINGS } from './lobbyModel.js';
+import { EVERYDAY_MODES } from './modes.js';
 
 let site: ShippedSite;
 let browser: Browser;
@@ -41,90 +37,30 @@ afterAll(async () => {
   await site?.close();
 });
 
-async function coldLobby(): Promise<Page> {
-  const page = await openPage(browser, { viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
+async function coldLobby(viewport = { width: 1440, height: 900 }): Promise<Page> {
+  const page = await openPage(browser, { viewport, reducedMotion: 'reduce' });
   await page.goto(origin, { waitUntil: 'load' });
   await page.waitForSelector('.everyday-lobby', { timeout: 30_000 });
   return page;
 }
 
-/** CALL, and wait for the doors to open on L. */
-async function callTheCar(page: Page): Promise<void> {
-  await page.locator('.everyday-lobby-call').click();
-  await page.waitForSelector('.everyday-lobby[data-phase="open"]', { timeout: 15_000 });
-}
-
-/** Choose a floor, close the doors, and wait to arrive. */
-async function rideTo(page: Page, floor: string): Promise<void> {
-  await page.locator(`.everyday-lobby-floor-button[data-floor="${floor}"]`).click();
-  await page.locator('.everyday-lobby-close').click();
-  await page.waitForSelector('.everyday-lobby[data-phase="arrived"]', { timeout: 15_000 });
-}
+/** The floor the tray's car is standing at. */
+const trayFloor = (page: Page): Promise<string | null> =>
+  page.getAttribute('.everyday-rail-floor[aria-current="location"]', 'data-floor');
 
 /**
- * Press Tab from the top of a fresh page until CALL holds focus. `presses` counts from the last stop
- * in the consent ask when it is up (from the top when it is not), which is the player's own cost of
- * reaching the one control that does anything on a first visit; `hiddenStops` names every stop on
- * the way that sat behind the shut doors.
+ * Every control the lobby offers, and the pointer's hit area for each: the diameter of the largest
+ * circle, centred on the control, whose every sampled point lands on it. WCAG 2.2 SC 2.5.8 asks for
+ * 24 CSS px, the size `docs/36-accessibility-standard.md` § 1 names to measure.
  */
-async function tabsToCall(page: Page, limit = 30): Promise<{ presses: number; hiddenStops: string[] }> {
-  /* Tab starts from the top of the page, whatever the mount focused. */
-  await page.evaluate(() => {
-    (document.activeElement as HTMLElement | null)?.blur();
-  });
-  const hiddenStops: string[] = [];
-  let presses = 0;
-  for (let press = 1; press <= limit; press += 1) {
-    await page.keyboard.press('Tab');
-    presses += 1;
-    const stop = await page.evaluate(() => {
-      const active = document.activeElement as HTMLElement | null;
-      if (active === null) return { call: false, consent: false, behindDoors: false, name: '' };
-      const box = active.getBoundingClientRect();
-      const x = box.left + box.width / 2;
-      const y = box.top + box.height / 2;
-      const behindDoors = [...document.querySelectorAll<HTMLElement>('.everyday-lobby-door')].some((door) => {
-        const d = door.getBoundingClientRect();
-        return door.parentElement?.contains(active) === true && x >= d.left && x <= d.right && y >= d.top && y <= d.bottom;
-      });
-      return {
-        call: active.classList.contains('everyday-lobby-call'),
-        consent: active.closest('.everyday-consent') !== null,
-        behindDoors,
-        name: active.getAttribute('aria-label') ?? active.className,
-      };
-    });
-    if (stop.consent) presses = 0;
-    if (stop.behindDoors) hiddenStops.push(stop.name);
-    if (stop.call) return { presses, hiddenStops };
-  }
-  return { presses: Number.POSITIVE_INFINITY, hiddenStops };
-}
-
-/**
- * Every control the lobby offers once the doors are open, and the pointer's hit area for each: the
- * diameter of the largest circle, centred on the control, whose every sampled point lands on it.
- * WCAG 2.2 SC 2.5.8 asks for 24 CSS px, the size `docs/36-accessibility-standard.md` § 1 names to
- * measure; a 24 px circle inside the target is the criterion's own spacing test, and it is the
- * measure a round button can be held to, where a square would charge it for its corners.
- */
-const LOBBY_CONTROLS = [
-  '.everyday-lobby-call',
-  '.everyday-lobby-floor-button',
-  '.everyday-lobby-open',
-  '.everyday-lobby-close',
-  '.everyday-lobby-hold',
-  '.everyday-lobby-key',
-  '.everyday-lobby-menu',
-  '.everyday-lobby-landing',
-] as const;
+const LOBBY_CONTROLS = ['.everyday-lobby-floor-button', '.everyday-lobby-room'] as const;
 
 async function hitSquares(page: Page): Promise<{ control: string; side: number }[]> {
   return page.evaluate((selectors) => {
     const out: { control: string; side: number }[] = [];
     for (const selector of selectors) {
       for (const target of document.querySelectorAll<HTMLElement>(selector)) {
-        /* `elementFromPoint` sees only the viewport, and on a phone the open panel scrolls. */
+        /* `elementFromPoint` sees only the viewport, and on a phone the lobby scrolls. */
         target.scrollIntoView({ block: 'center', inline: 'center' });
         const box = target.getBoundingClientRect();
         const cx = box.left + box.width / 2;
@@ -139,128 +75,166 @@ async function hitSquares(page: Page): Promise<{ control: string; side: number }
         };
         let side = 0;
         for (let d = 2; d <= 60 && lands(d / 2 - 0.01); d += 1) side = d;
-        const floor = target.dataset['floor'];
-        out.push({ control: floor === undefined ? selector : `${selector}[${floor}]`, side });
+        out.push({ control: `${selector}[${target.dataset['floor'] ?? target.dataset['screen'] ?? ''}]`, side });
       }
     }
     return out;
   }, LOBBY_CONTROLS);
 }
 
-describe.skipIf(!HAS_BROWSER)('§ D1445 — the lobby', () => {
-  it('opens a cold launch on closed doors, with the rail and the bar stepped aside', async () => {
+describe.skipIf(!HAS_BROWSER)('§ D1628 — the lobby is the main menu', () => {
+  it('opens a cold launch on the lobby inside the shell, with the tray’s car on L and the bar under it', async () => {
     const page = await coldLobby();
     try {
-      expect(await page.locator('.everyday-lobby').getAttribute('data-phase')).toBe('idle');
-      expect(await page.locator('.everyday-lobby-floor').textContent()).toBe('6');
-      expect(await page.locator('.everyday-rail').isVisible()).toBe(false);
-      expect(await page.locator('.everyday-bar').isVisible()).toBe(false);
-      expect(await page.locator('.everyday-lobby-hint').textContent()).toBe('Press CALL');
-      const frame = await page.locator('.everyday-lobby').boundingBox();
-      expect(frame?.width ?? 0, 'the lobby has the whole viewport width').toBeGreaterThan(1400);
-    } finally {
-      await page.close();
-    }
-  });
-
-  it('refuses a floor before CALL, and CLOSE with nothing chosen, in words', async () => {
-    const page = await coldLobby();
-    try {
-      /* Behind shut doors neither a pointer nor Tab reaches the panel; a floor focused anyway is told why not. */
-      await page.locator('.everyday-lobby-floor-button[data-floor="8"]').focus();
-      await page.keyboard.press('Enter');
-      await expect.poll(() => page.locator('.everyday-lobby-hint').textContent()).toBe(LOBBY_WARNINGS.callFirst);
-      await callTheCar(page);
-      expect(await page.locator('.everyday-lobby-floor').textContent()).toBe('L');
-      await page.locator('.everyday-lobby-close').click();
-      await expect.poll(() => page.locator('.everyday-lobby-status').textContent()).toBe(LOBBY_WARNINGS.chooseFirst);
-    } finally {
-      await page.close();
-    }
-  });
-
-  it('rides to Scenario on 8 and steps out onto the Scenario hub, with the rail back', async () => {
-    const page = await coldLobby();
-    try {
-      await callTheCar(page);
-      await rideTo(page, '8');
-      expect(await page.locator('.everyday-lobby-floor').textContent()).toBe('8');
-      await page.locator('.everyday-lobby-step-out').click();
-      await page.waitForSelector('.everyday-scenario', { timeout: 15_000 });
       expect(await page.locator('.everyday-rail').isVisible()).toBe(true);
-      expect(await page.locator('.everyday-lobby').count()).toBe(0);
-    } finally {
-      await page.close();
-    }
-  });
-
-  it('rides down to B and opens the walkthrough', async () => {
-    const page = await coldLobby();
-    try {
-      await callTheCar(page);
-      expect(await page.locator('.everyday-lobby').textContent()).toContain('B, under the lobby');
-      await rideTo(page, 'B');
-      expect(await page.locator('.everyday-lobby-floor').textContent()).toBe('B');
-      await page.locator('.everyday-lobby-step-out').click();
-      await page.waitForSelector('.everyday-tutorial', { timeout: 30_000 });
-    } finally {
-      await page.close();
-    }
-  });
-
-  it('rides back to the lobby with the choice cleared', async () => {
-    const page = await coldLobby();
-    try {
-      await callTheCar(page);
-      await rideTo(page, '3');
-      await page.locator('.everyday-lobby-back').click();
-      await page.waitForSelector('.everyday-lobby[data-phase="open"]', { timeout: 15_000 });
-      expect(await page.locator('.everyday-lobby-floor').textContent()).toBe('L');
+      expect(await page.locator('.everyday-bar').isVisible()).toBe(true);
+      expect(await trayFloor(page)).toBe('L');
       expect(await page.locator('.everyday-lobby-title').textContent()).toBe(LOBBY_COPY.welcomeTitle);
+      expect(await page.locator('.everyday-lobby-indicator').textContent()).toContain('L');
+      expect(await page.locator('.everyday-lobby h1').textContent()).toBe(LOBBY_COPY.building);
+      /* One landing a floor, and the lobby's own is where the player stands rather than a press. */
+      expect(await page.locator('.everyday-lobby-landing-row').count()).toBe(GAME_FLOORS.length);
+      expect(await page.locator('.everyday-lobby-floor-button').count()).toBe(GAME_FLOORS.length - 1);
+      expect(await page.locator('.everyday-lobby-here').textContent()).toContain(LOBBY_COPY.here);
     } finally {
       await page.close();
     }
   });
 
-  it('leaves for the main menu without riding, and the menu is not bounced to the landing page', async () => {
+  it('draws the three modes as its three top landings, and nothing else is a mode tile', async () => {
     const page = await coldLobby();
     try {
-      await page.locator('.everyday-lobby-menu').click();
-      await page.waitForSelector('.everyday-mode[data-screen]', { timeout: 30_000 });
-      /* The host lands after the press on a cold load; the offer it would have made is spent. */
-      await page.waitForTimeout(1500);
-      expect(await page.locator('.everyday-landing').count()).toBe(0);
-      expect(await page.locator('.everyday-mode[data-screen]').count()).toBeGreaterThan(0);
+      const tiles = await page.$$eval('.everyday-mode[data-screen]', (nodes) =>
+        nodes.map((node) => ({ screen: node.getAttribute('data-screen'), inLobby: node.closest('.everyday-lobby') !== null })),
+      );
+      expect(tiles.map((tile) => tile.screen)).toEqual(EVERYDAY_MODES.map((mode) => mode.screen));
+      expect(tiles.every((tile) => tile.inLobby)).toBe(true);
     } finally {
       await page.close();
     }
   });
 
-  it('is skipped when Settings says so, and the old front door is what opens', async () => {
+  it('points the car at a landing and describes the floor, without going anywhere', async () => {
+    const page = await coldLobby();
+    try {
+      await page.locator('.everyday-lobby-floor-button[data-floor="1"]').hover();
+      await expect.poll(() => page.locator('.everyday-lobby-title').textContent()).toBe('Rush');
+      expect(await page.locator('.everyday-lobby-indicator').textContent()).toContain('1');
+      expect(await page.locator('.everyday-lobby').count(), 'still in the lobby').toBe(1);
+      expect(await trayFloor(page), 'pointing is not travelling').toBe('L');
+    } finally {
+      await page.close();
+    }
+  });
+
+  it('steps out onto the Scenario hub in one press, and the tray’s car is on 3', async () => {
+    const page = await coldLobby();
+    try {
+      await page.locator('.everyday-lobby-floor-button[data-floor="3"]').click();
+      await page.waitForSelector('.everyday-scenario', { timeout: 15_000 });
+      expect(await page.locator('.everyday-lobby').count()).toBe(0);
+      expect(await trayFloor(page)).toBe('3');
+    } finally {
+      await page.close();
+    }
+  });
+
+  it('opens a room in one press, from the landing it is on', async () => {
+    const page = await coldLobby();
+    try {
+      await page.locator('.everyday-lobby-room[data-screen="designer"]').click();
+      await page.waitForSelector('.everyday-rail-floor[aria-current="location"][data-floor="B"]', { timeout: 15_000 });
+      expect(await page.locator('.everyday-lobby').count()).toBe(0);
+      expect(await page.textContent('.everyday-bar-primary')).toBe('Test simulation');
+    } finally {
+      await page.close();
+    }
+  });
+
+  /*
+   * § D1627's rule, on the built bundle with motion **on**: the press is the trip. The lobby is
+   * asked for in the same task as the press, before any timer or frame could have run, so a handler
+   * that waited on the glide or on the doors fails here rather than in a playtest. It is a question
+   * of order and not of milliseconds, so it does not depend on the machine.
+   */
+  it('does not wait on the car or the doors: the lobby is gone in the task that pressed the landing', async () => {
+    const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
+    try {
+      await page.goto(origin, { waitUntil: 'load' });
+      await page.waitForSelector('.everyday-lobby', { timeout: 30_000 });
+      const after = await page.evaluate(() => {
+        document.querySelector<HTMLElement>('.everyday-lobby-floor-button[data-floor="3"]')?.click();
+        const doors = document.querySelector<HTMLElement>('.everyday-floor-doors');
+        return {
+          lobby: document.querySelector('.everyday-lobby') !== null,
+          floor: document.querySelector('.everyday-rail-floor[aria-current="location"]')?.getAttribute('data-floor'),
+          /* The doors that part over the new floor are up already, and take no pointer events. */
+          doors: doors === null ? 'absent' : getComputedStyle(doors).pointerEvents,
+          hidden: doors?.getAttribute('aria-hidden'),
+        };
+      });
+      expect(after.lobby, 'the lobby is left on the press, not after a ride').toBe(false);
+      expect(after.floor).toBe('3');
+      expect(after.doors).toBe('none');
+      expect(after.hidden).toBe('true');
+      /* And they take themselves away, inside the lobby's own motion budget twice over. */
+      await page.waitForSelector('.everyday-floor-doors', {
+        state: 'detached',
+        timeout: 4 * (LOBBY_TIMINGS.full.glideMs + LOBBY_TIMINGS.full.doorMs),
+      });
+      await page.waitForSelector('.everyday-scenario', { timeout: 15_000 });
+    } finally {
+      await page.close();
+    }
+  });
+
+  it('is where the tray’s Lobby floor and the bar’s leave come back to', async () => {
+    const page = await coldLobby();
+    try {
+      await page.locator('.everyday-lobby-floor-button[data-floor="M"]').click();
+      await page.waitForSelector('.everyday-rail-floor[aria-current="location"][data-floor="M"]', { timeout: 15_000 });
+      await page.locator('.everyday-rail-menu').click();
+      await page.waitForSelector('.everyday-lobby', { timeout: 15_000 });
+      expect(await trayFloor(page)).toBe('L');
+      /* Nothing is pointed at on the way back: the welcome, and the car at the lobby. */
+      expect(await page.locator('.everyday-lobby-title').textContent()).toBe(LOBBY_COPY.welcomeTitle);
+      await page.locator('.everyday-lobby-room[data-screen="board"]').click();
+      await page.waitForSelector('.everyday-rail-floor[aria-current="location"][data-floor="M"]', { timeout: 15_000 });
+      await page.locator('.everyday-bar-leave').click();
+      await page.waitForSelector('.everyday-lobby', { timeout: 15_000 });
+    } finally {
+      await page.close();
+    }
+  });
+
+  /* § D1445's *Skip the lobby* skipped to the menu. They are one screen, so the key does nothing. */
+  it('is not skipped by the retired setting’s key, and Settings offers no row for one', async () => {
     const page = await openPage(browser, { viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
     try {
-      await skipTheLobby(page);
+      await page.addInitScript(() => {
+        window.localStorage.setItem('elevator-sim.everyday.skip-lobby', '1');
+      });
       await page.goto(origin, { waitUntil: 'load' });
-      await page.waitForSelector('.everyday-landing, .everyday-mode[data-screen]', { timeout: 30_000 });
-      expect(await page.locator('.everyday-lobby').count()).toBe(0);
+      await page.waitForSelector('.everyday-lobby', { timeout: 30_000 });
+      await page.locator('.everyday-rail-settings').click();
+      await page.waitForSelector('.everyday-rail-subline:has-text("SETTINGS")', { timeout: 15_000 });
+      expect(await page.locator('.everyday-screen').textContent()).not.toMatch(/Skip the lobby/u);
     } finally {
       await page.close();
     }
   });
 
-  it('reaches CALL in two Tabs on a fresh load, and never stops behind the shut doors', async () => {
+  it('is worked from the keyboard: arrows between the landings, Enter to step out', async () => {
     const page = await coldLobby();
     try {
-      const { presses, hiddenStops } = await tabsToCall(page);
-      expect(hiddenStops, 'no Tab stop sits behind the closed doors').toEqual([]);
-      /* The screen region's own stop, then CALL; it was sixteen before the panel left the order. */
-      expect(presses, 'Tabs past the consent ask to CALL').toBeLessThanOrEqual(2);
-      /* Once the doors open, focus goes to the panel, and its ring is drawn. */
-      await page.keyboard.press('Enter');
-      await page.waitForSelector('.everyday-lobby[data-phase="open"]', { timeout: 15_000 });
-      await expect
-        .poll(() => page.evaluate(() => document.activeElement?.classList.contains('everyday-lobby-floor-button') === true))
-        .toBe(true);
+      await page.locator('.everyday-lobby-floor-button[data-floor="3"]').focus();
+      /* Focus points the car, as the pointer does. */
+      expect(await page.locator('.everyday-lobby-title').textContent()).toBe('Scenario');
+      await page.keyboard.press('ArrowDown');
+      await page.keyboard.press('ArrowDown');
+      expect(await page.evaluate(() => (document.activeElement as HTMLElement).dataset['floor'])).toBe('1');
+      await page.keyboard.press('ArrowUp');
+      expect(await page.locator('.everyday-lobby-title').textContent()).toBe('Career');
       const ring = await page.evaluate(() => {
         const active = document.activeElement as HTMLElement;
         const style = getComputedStyle(active);
@@ -269,59 +243,46 @@ describe.skipIf(!HAS_BROWSER)('§ D1445 — the lobby', () => {
       expect(ring.visible).toBe(true);
       expect(ring.outline).not.toBe('none');
       expect(ring.width).toBeGreaterThan(0);
+      await page.keyboard.press('Enter');
+      await page.waitForSelector('.everyday-rail-floor[aria-current="location"][data-floor="2"]', { timeout: 15_000 });
     } finally {
       await page.close();
     }
   });
 
   /*
-   * GitHub issue #627: the 0.75 floor held only at widths of 720 px and below, so a short window
-   * wider than that (the handoff's own 1280 × 540 check, a landscape phone) still drew the floor
-   * buttons 10 to 15 px tall. Each size is driven twice, with the consent ask standing above the
-   * lobby as it does on a first visit and with it answered, because the ask is what takes the
-   * height. CALL is pressed by a real click, so it is reachable in every case.
-   *
-   * 320 × 320 is the smallest size the lobby promises this at (`lobbyScreen.ts#MIN_SCALE`). It ran
-   * only with the ask answered until GitHub issue #630: the shell's ask was 511 px tall there and
-   * left the screen region no height at all. The ask now takes half the height at most and scrolls.
+   * GitHub issue #627 measured the § D1445 panel drawing its floor buttons 10 to 15 px tall in a
+   * short window. The lobby has no panel to scale: the landings keep their size and the region
+   * scrolls, so the same sizes are held to the same 24 px. 320 × 320 is WCAG 1.4.10's reflow width
+   * taken as both sides.
    */
   const VIEWPORTS = [
-    { width: 1440, height: 900, asks: ['up', 'answered'] },
-    { width: 1280, height: 540, asks: ['up', 'answered'] },
-    { width: 844, height: 390, asks: ['up', 'answered'] },
-    { width: 390, height: 844, asks: ['up', 'answered'] },
-    { width: 375, height: 667, asks: ['up', 'answered'] },
-    { width: 320, height: 320, asks: ['up', 'answered'] },
+    { width: 1440, height: 900 },
+    { width: 1280, height: 540 },
+    { width: 844, height: 390 },
+    { width: 390, height: 844 },
+    { width: 375, height: 667 },
+    { width: 320, height: 320 },
   ] as const;
 
-  it.each(VIEWPORTS)(
-    'gives every control a 24 px hit area at $width × $height, ask $asks (docs/36 § 1, SC 2.5.8)',
-    async ({ width, height, asks }) => {
-      const viewport = { width, height };
-      for (const ask of asks) {
-        const page = await openPage(browser, { viewport, reducedMotion: 'reduce' });
-        try {
-          await page.goto(origin, { waitUntil: 'load' });
-          await page.waitForSelector('.everyday-lobby', { timeout: 30_000 });
-          const consent = page.locator('.everyday-consent-no');
-          if (ask === 'answered') await consent.click();
-          else expect(await consent.count(), 'the ask stands on a first visit').toBe(1);
-          await callTheCar(page);
-          const squares = await hitSquares(page);
-          const label = `${String(viewport.width)} × ${String(viewport.height)}, ask ${ask}: ${JSON.stringify(squares)}`;
-          expect(squares, label).toHaveLength(LOBBY_CONTROLS.length - 1 + LOBBY_FLOORS.length);
-          expect(squares.filter((square) => square.side < 24), label).toEqual([]);
-        } finally {
-          await page.close();
-        }
-      }
-    },
-  );
+  it.each(VIEWPORTS)('gives every control a 24 px hit area at $width × $height (docs/36 § 1, SC 2.5.8)', async (viewport) => {
+    const page = await coldLobby({ ...viewport });
+    try {
+      await page.locator('.everyday-consent-no').click();
+      const squares = await hitSquares(page);
+      const label = `${String(viewport.width)} × ${String(viewport.height)}: ${JSON.stringify(squares)}`;
+      const rooms = GAME_FLOORS.reduce((sum, floor) => sum + floor.rooms.length, 0);
+      expect(squares, label).toHaveLength(GAME_FLOORS.length - 1 + rooms);
+      expect(squares.filter((square) => square.side < 24), label).toEqual([]);
+    } finally {
+      await page.close();
+    }
+  });
 
   /*
    * GitHub issue #630. The consent ask is a notice above the screen and never a gate (`docs/26`
    * § 4.4), and it owes the player all four of its paragraphs (§ 15.2). At 320 × 320 it was 511 px
-   * tall in a root that clips: CALL could not be reached while it stood, and its last paragraph
+   * tall in a root that clips: the lobby's first control could not be reached while it stood, and its last paragraph
    * could not be read at all. Each answer is given by a real click at the button's centre (no
    * scroll on the player's behalf) and by Tab and Enter, with the ask's words scrolled to the top
    * and to the bottom first, so both answers stay in reach wherever the words have been left.
@@ -363,7 +324,7 @@ describe.skipIf(!HAS_BROWSER)('§ D1445 — the lobby', () => {
     }, to);
 
   it.each(ASK_VIEWPORTS)(
-    'answers the consent ask by click and by keyboard at $width × $height, with CALL in reach after',
+    'answers the consent ask by click and by keyboard at $width × $height, with a landing in reach after',
     async ({ width, height }) => {
       for (const how of ['click', 'keyboard'] as const) {
         for (const answer of ['no', 'yes'] as const) {
@@ -410,7 +371,8 @@ describe.skipIf(!HAS_BROWSER)('§ D1445 — the lobby', () => {
                 await page.keyboard.press('Enter');
               }
               await expect.poll(() => page.locator('.everyday-consent-no').count(), { message: label }).toBe(0);
-              await callTheCar(page);
+              await page.locator('.everyday-lobby-floor-button[data-floor="3"]').click();
+              await page.waitForSelector('.everyday-scenario', { timeout: 15_000 });
             } finally {
               await page.close();
             }
@@ -420,96 +382,21 @@ describe.skipIf(!HAS_BROWSER)('§ D1445 — the lobby', () => {
     },
   );
 
-  it('keeps CALL in reach at 320 × 320 while the consent ask stands (docs/26 § 4.4)', async () => {
+  it('keeps a landing in reach at 320 × 320 while the consent ask stands (docs/26 § 4.4)', async () => {
     const page = await openPage(browser, { viewport: { width: 320, height: 320 }, reducedMotion: 'reduce' });
     try {
       await page.goto(origin, { waitUntil: 'load' });
       await page.waitForSelector('.everyday-lobby', { timeout: 30_000 });
       expect(await page.locator('.everyday-consent-no').count(), 'the ask stands on a first visit').toBe(1);
-      await page.locator('.everyday-lobby-call').evaluate((node) => {
-        node.scrollIntoView({ block: 'nearest' });
+      const top = '.everyday-lobby-floor-button[data-floor="3"]';
+      /* Centred, because the shell's header and bar share this window with the ask (§ D1628). */
+      await page.locator(top).evaluate((node) => {
+        node.scrollIntoView({ block: 'center' });
       });
-      expect(await landsOn(page, '.everyday-lobby-call'), 'CALL is in reach beside the ask').toBe(true);
-      await callTheCar(page);
+      expect(await landsOn(page, top), 'the top landing is in reach beside the ask').toBe(true);
+      await page.locator('.everyday-lobby-floor-button[data-floor="3"]').click();
+      await page.waitForSelector('.everyday-scenario', { timeout: 15_000 });
       expect(await page.locator('.everyday-consent-no').count(), 'and the ask still stands, unanswered').toBe(1);
-    } finally {
-      await page.close();
-    }
-  });
-
-  /** Every control on the car panel, in document order, with its `tabIndex` now. */
-  const panelStops = (page: Page): Promise<{ name: string; index: number }[]> =>
-    page.evaluate(() =>
-      [...document.querySelectorAll<HTMLButtonElement>('.everyday-lobby-panel button')].map((button) => ({
-        name: button.getAttribute('aria-label') ?? '',
-        index: button.tabIndex,
-      })),
-    );
-
-  /** The panel controls focus visits, starting from the focused one and pressing Tab `presses` times. */
-  async function tabThroughPanel(page: Page, presses: number): Promise<string[]> {
-    const read = (): Promise<string | null> =>
-      page.evaluate(() => {
-        const active = document.activeElement;
-        return active === null || active.closest('.everyday-lobby-panel') === null ? null : active.getAttribute('aria-label');
-      });
-    const reached: string[] = [];
-    for (let press = 0; press <= presses; press += 1) {
-      if (press > 0) await page.keyboard.press('Tab');
-      const name = await read();
-      if (name !== null) reached.push(name);
-    }
-    return reached;
-  }
-
-  /* The ten floors, then OPEN, CLOSE, HOLD and the Engineer key. */
-  const PANEL_CONTROLS = LOBBY_FLOORS.length + 4;
-
-  it('rides back to the lobby with focus on a floor and all fourteen panel controls in the Tab order', async () => {
-    const page = await coldLobby();
-    try {
-      expect(PANEL_CONTROLS).toBe(14);
-      await callTheCar(page);
-      await rideTo(page, '3');
-      await page.locator('.everyday-lobby-back').focus();
-      await page.keyboard.press('Enter');
-      await page.waitForSelector('.everyday-lobby[data-phase="open"]', { timeout: 15_000 });
-      await expect
-        .poll(() => page.evaluate(() => document.activeElement?.classList.contains('everyday-lobby-floor-button') === true))
-        .toBe(true);
-      const stops = await panelStops(page);
-      expect(stops).toHaveLength(PANEL_CONTROLS);
-      expect(stops.filter((stop) => stop.index !== 0), 'out of the Tab order').toEqual([]);
-      expect(await tabThroughPanel(page, PANEL_CONTROLS - 1)).toEqual(stops.map((stop) => stop.name));
-    } finally {
-      await page.close();
-    }
-  });
-
-  it('lets a keyboard catch the closing doors with OPEN, and keeps the panel in the Tab order', async () => {
-    /* Full motion, so the doors take 1.15 s to shut: the keyboard's window, not a race with 150 ms. */
-    const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
-    try {
-      await page.goto(origin, { waitUntil: 'load' });
-      await page.waitForSelector('.everyday-lobby', { timeout: 30_000 });
-      await callTheCar(page);
-      await page.locator('.everyday-lobby-floor-button[data-floor="8"]').click();
-      await page.locator('.everyday-lobby-close').focus();
-      await page.keyboard.press('Enter');
-      expect(await page.locator('.everyday-lobby').getAttribute('data-phase')).toBe('closing');
-      /* OPEN sits just before CLOSE; while the doors close it must still be a Tab stop. */
-      await page.keyboard.press('Shift+Tab');
-      expect(await page.evaluate(() => document.activeElement?.classList.contains('everyday-lobby-open'))).toBe(true);
-      await page.keyboard.press('Enter');
-      expect(await page.locator('.everyday-lobby').getAttribute('data-phase')).toBe('open');
-      /* Past the moment the car would have left, it is still here, with focus kept and the panel reachable. */
-      await page.waitForTimeout(1500);
-      expect(await page.locator('.everyday-lobby').getAttribute('data-phase')).toBe('open');
-      expect(await page.evaluate(() => document.activeElement?.classList.contains('everyday-lobby-open'))).toBe(true);
-      const stops = await panelStops(page);
-      expect(stops.filter((stop) => stop.index !== 0), 'out of the Tab order').toEqual([]);
-      await page.locator('.everyday-lobby-floor-button').first().focus();
-      expect(await tabThroughPanel(page, PANEL_CONTROLS - 1)).toEqual(stops.map((stop) => stop.name));
     } finally {
       await page.close();
     }

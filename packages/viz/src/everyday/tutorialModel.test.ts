@@ -239,38 +239,34 @@ describe('§ D476’s condition as § D993 amends it — leaving files nothing, 
     expect(SCREENS_SOURCE.match(/leave\(context\)/gu) ?? []).toHaveLength(2);
   });
 
-  it('is offered from the shell against the week and the profile, once per load', () => {
-    const offerOnly = /function offerTutorial\(host: EverydayHost\): void \{([\s\S]*?)\n  \}/u
-      .exec(SHELL_SOURCE)?.[1];
-    expect(offerOnly, 'offerTutorial() moved or was renamed').toBeTypeOf('string');
-    /*
-     * § D1445: the derivation moved one function down, into `firstVisitOf`, so the lobby's welcome
-     * line asks the same question from the same counts. The offer still calls it, and the two
-     * bodies together are what this case reads.
-     */
-    expect(offerOnly ?? '').toContain('firstVisitOf(host)');
+  /*
+   * § D1628: the shell no longer *sends* a first visit anywhere. The lobby is the front door for
+   * everybody, and the gate's one caller is the lobby's first-visit line and its walkthrough button.
+   * What this case held about the offer is held about that reader: it is derived on every load from
+   * records the player fills by playing, it writes nothing, and nothing navigates on its answer.
+   */
+  it('is asked from the shell against the week and the profile, for the lobby, and moves nobody', () => {
     const gate = /function firstVisitOf\(host: EverydayHost\): boolean \{([\s\S]*?)\n  \}/u
       .exec(SHELL_SOURCE)?.[1];
     expect(gate, 'firstVisitOf() moved or was renamed').toBeTypeOf('string');
-    const offer = `${offerOnly ?? ''}\n${gate ?? ''}`;
     // Derived, on every load, from the records the player fills by playing — every week's days
     // since § D1143, not the standing week's alone.
-    expect(offer ?? '').toContain('filedDaysOf([host.week(), ...host.parkedWeeks()])');
-    expect(offer ?? '').toContain('profileStore.progress()');
+    expect(gate ?? '').toContain('filedDaysOf([host.week(), ...host.parkedWeeks()])');
+    expect(gate ?? '').toContain('profileStore.progress()');
     // GitHub issue #600, § D1077: the career's own day counter, which it persists for itself.
-    expect(offer ?? '').toContain('host.campaign().today');
-    expect(offer ?? '').toContain('tutorialIsDue');
-    // And it only ever moves a player who is standing on the front door.
-    expect(offer ?? '').toContain('EVERYDAY_ROOT');
+    expect(gate ?? '').toContain('host.campaign().today');
+    expect(gate ?? '').toContain('tutorialIsDue');
     /*
      * § D993's forward rule: no field whose only reader is the first-visit gate may be stored,
-     * under any type. `offerTutorial` writes nothing — no store, no week, no progress — and its
-     * once-per-session memory is a closure `let` in the shell, never a field of persisted state.
+     * under any type. The gate writes nothing — no store, no week, no progress.
      */
-    for (const write of ['setProgress', 'localStorage', 'sessionStorage', '.save(', 'persist']) {
-      expect(offer ?? '', `offerTutorial must not ${write}`).not.toContain(write);
+    for (const write of ['setProgress', 'localStorage', 'sessionStorage', '.save(', 'persist', 'go(']) {
+      expect(gate ?? '', `firstVisitOf must not ${write}`).not.toContain(write);
     }
-    expect(SHELL_SOURCE).toMatch(/\n\s+let tutorialOffered\b/u);
+    // One reader, the lobby's port, and no offer that navigates on the answer.
+    expect(SHELL_SOURCE.match(/firstVisitOf\(dataHost\)/gu) ?? []).toHaveLength(1);
+    expect(SHELL_SOURCE).not.toMatch(/function offerTutorial\b/u);
+    expect(SHELL_SOURCE).not.toMatch(/go\('landing'\)/u);
   });
 
   /*
