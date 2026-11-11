@@ -266,10 +266,19 @@ whose leaves are the **normalized** values of library terms (or constants) and w
 `add`, `multiply`, `max` and `min`, added to the weighted sum at its own weight:
 
 ```json
-"formulas": [
-  { "id": "late-and-full", "name": "Late and full", "weight": 0.5,
-    "expression": { "op": "multiply", "of": [{ "term": "waitTime" }, { "term": "loadFactor" }] } }
-]
+{
+  "id": "late-and-full-example",
+  "name": "Wait, and worse when the car is full too",
+  "weights": { "waitTime": 1.0 },
+  "formulas": [
+    {
+      "id": "late-and-full",
+      "name": "Late and full",
+      "weight": 0.5,
+      "expression": { "op": "multiply", "of": [{ "term": "waitTime" }, { "term": "loadFactor" }] }
+    }
+  ]
+}
 ```
 
 This is still data and still not a new code path per strategy. It is not a script that picks a
