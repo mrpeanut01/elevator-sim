@@ -41393,6 +41393,8 @@ said to be unmeasured, and [§ D256](DECISIONS.md)'s refusal.
 
 ## D844 — the front door is not offered before the shell can answer who is arriving, and the landing page's run does not rebuild the page it lands on
 
+> **Status 2026-11-11: SUPERSEDED IN PART by [§ D1628](#d1628)** (the product owner). The waiting front door is gone with the first-arrival offer it waited for: the lobby is the front door for everybody and draws at once. The landing page's half stands. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Status 2026-10-10: AMENDED by [§ D1273](#d1273)** (an agent ruling). The waiting front door stands; the sentence it reuses now reads *The game has not finished loading. This screen fills in the moment it has.* See [`docs/39`](docs/39-decisions-in-force.md).
 
 **Date: 2026-09-22 · Owner: LANE-AE-FIX (wave AE integration) · Rules on:** nothing recorded is
@@ -52708,7 +52710,9 @@ line, raises no call, never stops on the card again, and reaches the day's end w
 
 ## D1445 — the lobby opens every cold launch, its panel follows § D525, and the tutorial is the basement
 
-> **Status 2026-11-11: AMENDED by [§ D1627](#d1627)** (the product owner). The lobby still opens every cold launch and *Skip the lobby* still restores the old front door. The ride is replaced: a landing is one press, the floors are the six of `everyday/floors.ts` with Scenario still on top, and the walkthrough is a room on the lobby's floor rather than the basement. See [`docs/39`](docs/39-decisions-in-force.md).
+> **Status 2026-11-11: AMENDED again by [§ D1628](#d1628)** (the product owner): the lobby and the main menu are one screen, so *Skip the lobby* is retired and nothing is offered in front of the lobby.
+>
+> **Status 2026-11-11: AMENDED by [§ D1627](#d1627)** (the product owner). The lobby still opens every cold launch and *Skip the lobby* restored the old front door until § D1628. The ride is replaced: a landing is one press, the floors are the six of `everyday/floors.ts` with Scenario still on top, and the walkthrough is a room on the lobby's floor rather than the basement. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Taken 2026-10-13 by the product owner**, answering two questions put to them while the lobby
 > handoff (`docs/design/design_handoff_lobby_intro/`) was being built. **Amends
@@ -55624,6 +55628,8 @@ under the pass R11 amendment 5 wrote.
 
 ## D1627 — every way to play is a floor: the tray is a shaft, a floor is one press, and motion never gates a selection
 
+> **Status 2026-11-11: AMENDED by [§ D1628](#d1628)** (the product owner). The floors, the shaft, the motion rule and the test simulation stand. The lobby and the main menu, which this entry kept as two screens, are one; the *Elevator hall* row, the Engineer key and *Skip the lobby* are gone. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-11-11 by the product owner**, as a direction to redesign the Everyday navigation, and
 > built the same day by one agent session (wave AX, a single lane). **Amends [§ D1445](#d1445)**: the lobby
 > still opens every cold launch and *Skip the lobby* still restores the old front door, and the ride
@@ -55711,3 +55717,69 @@ naming the run, and the week as it was.
 
 **Numbers spent.** Wave AX is one lane with no block reserved; it took the charter row's **D1627**
 and moved the row to D1628, so nothing is holed.
+
+## D1628 — the lobby and the main menu are one screen, and nothing stands in front of it
+
+> **Taken 2026-11-11 by the product owner** ("merge the lobby and the main menu into one screen"),
+> after [§ D1627](#d1627) had been built with the two kept apart, and built the same day by the same
+> session (wave AX). **Amends [§ D1627](#d1627)**, whose *What it does not change* kept the menu
+> screen and the first-arrival offer; **amends [§ D1445](#d1445)**, whose *Skip the lobby* is
+> retired; and **supersedes [§ D844](#d844)'s waiting front door**. **Owner-reversible**: one revert
+> restores the full-viewport lobby, the three-tile menu behind it and the setting between them.
+
+**Why an entry.** It retires a screen key, a setting, a store and a navigation the shell made on the
+host's arrival, and it moves what a first visit meets, which three earlier entries each ruled.
+
+**The reason in one sentence.** Once § D1627 made a landing one press, the lobby picked a mode and
+the menu behind it picked a mode, and a player who went *home* met a different screen from the one
+they had started on.
+
+**What is ruled.**
+
+1. **One screen, and it is the root.** `EverydayScreen` loses `lobby`. The `menu` key draws the
+   lobby (`shell.ts#drawLobby`, `lobbyScreen.ts`): the building in section, inside the shell, with
+   the tray, the bar and Settings where they are on every other screen. The key keeps its name,
+   because it is also a route, a rail class and a word in a dozen strings. A cold launch opens on
+   it, *Main menu* comes back to it, and the tray's car stands on L while it shows.
+2. **The three mode tiles are the three top landings.** They keep the tiles' class and
+   `data-screen`, and a press commits `ctx` and `modePick` exactly as a tile's did. *Continue your
+   week* is the shell's one tile, handed to the lobby whole. The lobby's own landing is where the
+   player stands and is not a press.
+3. **Every room is a press of its own**, as a chip under its landing: your week, the boards, the
+   walkthrough, what this is, the workshop, the bench and the drawing board. The separate *Elevator
+   hall* row is gone from the tray, because the hall is the screen the Lobby floor opens.
+4. **Nothing stands in front of it, and the host's arrival moves nobody.** § D1445 ruled that the
+   lobby replaces the first-arrival offer, and kept the offer alive behind *Skip the lobby*. With
+   one screen there is nothing to skip to, so the setting, its store (`lobbyStore.ts`) and its
+   Settings row are deleted, and so is `shell.ts#offerTutorial`, which sent a first visit from the
+   menu to the landing page when the host published. A first visit reads one sentence on the lobby
+   and is handed a button, *Start with the walkthrough*; the landing page is one press away as
+   *What this is*. The first-visit gate (`firstVisitOf`, § D476 as § D993 and § D1077 left it) is
+   unchanged and has one reader.
+5. **The front door has no waiting state.** § D844 held the menu's tiles back until the host
+   published, because the offer replaced the front door at that moment and a press in the window
+   landed on a removed node. With no offer there is no such window. The lobby draws at once from
+   nothing the host holds and repaints its two host answers in place. A landing pressed before the
+   host arrives opens its screen's own waiting sentence, which § D1273's wording still serves.
+6. **The Engineer key is not carried over.** The tray's *Switch to Engineer* is beside the lobby
+   now, so a second control for the same swap would be two answers to one question.
+
+**What it does not change.** § D1627's floors, the shaft, the motion rule and the test simulation.
+The landing page and the two-screen walkthrough themselves. The menu row of the action bar, whose
+primary still follows the selected mode.
+
+**What it costs, said plainly.** A newcomer no longer lands on the explainer page with its playing
+canvas; they land on the lobby and are offered the walkthrough by name. § D529's *tutorial before
+Scenario* is now an offer on the front door and not a sequence the product enforces. No retention
+figure exists for either arrangement, so nothing here claims one is better.
+
+**Held by** `everyday/lobbyModel.test.ts` (every landing but the lobby's opens, the three on top
+are the modes, the walkthrough is offered on a first visit only), `everyday/screens.test.ts` and
+`everyday/modes.test.ts` (one shell-owned key, no `lobby` route), `everyday/tutorialModel.test.ts`
+(the gate has one reader and nothing navigates on its answer), `everyday/settingsView.test.ts` (no
+row skips a lobby) and `everyday/lobby.browser.test.ts`, with
+`everyday/landingScreen.browser.test.ts` recording from before navigation commits that a first
+visit sees the front door and nothing else until it presses.
+
+**Numbers spent.** Wave AX took the charter row's **D1628** and moved the row to D1629; nothing is
+holed.

@@ -21,17 +21,18 @@ The always-on row is measured on the integrated head; the deep row is read from 
 
 ## Wave AX
 
-**Wave AX moves −68.00 strings a case always-on, with the surface set unchanged.** The base is wave AW's
+**Wave AX moves −132.00 strings a case always-on, with the surface set unchanged.** The base is wave AW's
 row, re-measured on `39840df` before the comparison and reproduced to the string. Measured once on wave
 AX's head, which is one lane. The same 80 surfaces speak, so the move is text on existing producers: the
-lobby's adapter now drives a machine with no phases to seed where § D1445's ride had six, and the tray's
-and the bar's adapters gain the floors and the test simulation's words ([§ D1627](../DECISIONS.md)). The
-deep row still names `c181913` until the first nightly after wave AX merges.
+lobby's adapter drives a machine with no phases to seed where § D1445's ride had six
+([§ D1627](../DECISIONS.md)), the lobby is the main menu and lost its key and its Settings row
+([§ D1628](../DECISIONS.md)), and the tray's and the bar's adapters gain the floors and the test
+simulation's words. The deep row still names `c181913` until the first nightly after wave AX merges.
 
 | tree | strings | move | per case | surfaces |
 |---|---|---|---|---|
 | base, wave AW's row (re-measured on `39840df`) | 1 053 801 | | | 80 |
-| wave AX's head (`57fc33a`) | **1 050 469** | **−3 332** | **−68.00** | 80, **same set** |
+| wave AX's head (`38fa319`) | **1 047 333** | **−6 468** | **−132.00** | 80, **same set** |
 | cases · simulations · failing cases | 49 · 606 · 0 | **unmoved** | | |
 
 ## Wave AW

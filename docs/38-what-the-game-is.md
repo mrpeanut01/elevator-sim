@@ -528,7 +528,9 @@ Named so the next lane does not discover it. None of it is built by this page.
   direction). The game is laid out as a building, `packages/viz/src/everyday/floors.ts`: Scenario on
   3, Career on 2, Rush on 1, the player's records on M, the lobby on L and the design floor on B. The
   left tray draws the shaft with a car at the player's floor, a floor is one press from anywhere, and
-  motion is drawn over a press and never waited on. A run started from the design floor is a *test
+  motion is drawn over a press and never waited on. The lobby is the main menu, one screen
+  ([§ D1628](../DECISIONS.md)): the three modes are its top landings, and a first visit is offered
+  the walkthrough there by name. A run started from the design floor is a *test
   simulation* and files nothing; a building is played on a mode's floor. What § 2.1's *Build your
   own* owes is unchanged by it: a drawn building is not yet entered from a mode.
 

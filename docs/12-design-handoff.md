@@ -1117,6 +1117,11 @@ rather than controlling it; read off the lobby handoff's own timings, its shorte
 Scenario was four presses and about ten seconds. The two primaries offered a day from a bench, and
 the owner ruled that a bench tries things while a building is played on a mode's floor.
 
+**And the lobby is the menu** ([§ D1628](../DECISIONS.md)). The lobby handoff puts a full-screen
+lobby in front of the existing Everyday menu and proposes *Skip the lobby*; the casual guide's § 4
+inventory begins at a menu of mode cards. This build has one screen for both, inside the shell:
+the mode cards are the lobby's three top landings, and there is no setting between them.
+
 **What it does not change.** The handoff's palette, type and door easing are kept where the new
 hall draws the same things. Every rail row the two groups carried is still on the tray, under its
 floor. The rest of § 3.3's table ships as transcribed, and `actionBar.test.ts` reads the vendored
