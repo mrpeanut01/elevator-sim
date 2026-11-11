@@ -39,6 +39,7 @@ import {
   type CostTerm,
   type DispatcherProfile,
   type DispatcherProfiles,
+  type FormulaNodeConfig,
   type ElevatorSpec,
   type ElevatorSpecs,
   type FloorConfig,
@@ -1179,6 +1180,26 @@ const rulesSchema = z.strictObject({
   rows: z.array(ruleRowSchema).min(1, 'a rules section with no rows switches nothing').optional(),
 });
 
+/** One node of a formula tree. Recursive, so lazy; exactly one of the three shapes. */
+const formulaNodeSchema: z.ZodType<FormulaNodeConfig> = z.lazy(() =>
+  z.union([
+    z.strictObject({ term: identifier }),
+    z.strictObject({ value: nonNegative.max(100) }),
+    z.strictObject({
+      op: z.enum(['add', 'multiply', 'max', 'min']),
+      of: z.array(formulaNodeSchema).min(2, 'an operation combines two or more things'),
+    }),
+  ]),
+);
+
+const formulaTermSchema = z.strictObject({
+  $comment: comment,
+  id: identifier,
+  name: z.string().min(1).max(60),
+  weight: nonNegative.max(100),
+  expression: formulaNodeSchema,
+});
+
 export const dispatcherProfileSchema = z.strictObject({
   $comment: comment,
   id: identifier,
@@ -1214,6 +1235,13 @@ export const dispatcherProfileSchema = z.strictObject({
    * the library it is read against.
    */
   patternWeightSets: z.record(identifier, identifier).optional(),
+  /*
+   * The profile's own formulas. The schema holds the shape; which term a leaf may read, how deep
+   * a tree may nest and how many nodes it may hold are `dispatch/formula.ts#resolveFormulas`'
+   * refusals, because `config/` is a closed module graph and the term library lives in
+   * `dispatch/` — the same split `ruleRowSchema` makes for a rule's value lists.
+   */
+  formulas: z.array(formulaTermSchema).min(1, 'an authored empty formulas list adds nothing').max(4).optional(),
 });
 
 /**

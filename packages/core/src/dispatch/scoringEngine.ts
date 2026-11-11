@@ -34,8 +34,9 @@
  * Pure throughout: no clock, no RNG, no mutation of anything passed in.
  */
 
+import { NO_FORMULAS, evaluateFormula, type ResolvedFormula } from './formula.js';
 import { normalizeTerm } from './normalize.js';
-import { COST_TERMS } from './terms/index.js';
+import { COST_TERMS, COST_TERMS_BY_ID } from './terms/index.js';
 import {
   DispatchError,
   type CarScore,
@@ -65,9 +66,13 @@ export function scoreCar(
   weights: ReadonlyMap<string, number>,
   normalization: ResolvedNormalization,
   terms: readonly CostTermDefinition[] = COST_TERMS,
+  formulas: readonly ResolvedFormula[] = NO_FORMULAS,
 ): CarScore {
   const breakdowns: ScoreBreakdown[] = [];
   let cost = 0;
+  // Normalized values by term id, kept only when a formula will read them: a profile without
+  // formulas allocates nothing here and runs the loop below exactly as it always did.
+  const seen: Map<string, number> | undefined = formulas.length === 0 ? undefined : new Map();
 
   for (const term of terms) {
     const weight = weights.get(term.id);
@@ -81,9 +86,53 @@ export function scoreCar(
     }
 
     const normalized = normalizeTerm(term, raw, normalization);
+    seen?.set(term.id, normalized);
     const contribution = weight * normalized;
     cost += contribution;
     breakdowns.push(Object.freeze({ termId: term.id, weight, raw, normalized, contribution }));
+  }
+
+  /*
+   * The profile's own formulas — `formula.ts`. After the library terms and in authored order, so
+   * the sum accumulates in one fixed sequence. A leaf is the term's normalized value: the one
+   * the loop above just computed when the profile also weights the term, and otherwise computed
+   * here, once, under the same refusal.
+   */
+  if (seen !== undefined) {
+    const valueOf = (termId: string): number => {
+      const held = seen.get(termId);
+      if (held !== undefined) return held;
+      const term = COST_TERMS_BY_ID.get(termId);
+      /* c8 ignore next 3 -- unreachable: `resolveFormulas` refused a term the registry lacks. */
+      if (term === undefined) {
+        throw new DispatchError(`A formula reads term "${termId}", which is not implemented.`);
+      }
+      const raw = term.evaluate(context);
+      if (!Number.isFinite(raw) || raw < 0) {
+        throw new DispatchError(
+          `Cost term "${term.id}" returned ${raw} for car "${context.car.carId}" on call "${context.call.id}", read by a formula. A term must return a finite, non-negative value.`,
+        );
+      }
+      const normalized = normalizeTerm(term, raw, normalization);
+      seen.set(termId, normalized);
+      return normalized;
+    };
+    for (const formula of formulas) {
+      if (formula.weight === 0) continue;
+      const value = evaluateFormula(formula.expression, valueOf);
+      const contribution = formula.weight * value;
+      cost += contribution;
+      breakdowns.push(
+        Object.freeze({
+          termId: formula.id,
+          name: formula.name,
+          weight: formula.weight,
+          raw: value,
+          normalized: value,
+          contribution,
+        }),
+      );
+    }
   }
 
   return Object.freeze({

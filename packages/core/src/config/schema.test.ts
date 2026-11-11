@@ -69,7 +69,7 @@ describe('objectSectionsOf, against the shipped dispatcher profile', () => {
     expect(objectSectionsOf(dispatcherProfileSchema)).toStrictEqual([...SHIPPED_SECTIONS]);
   });
 
-  it('excludes the three pseudo-sections and the scalars, and each for its own reason', () => {
+  it('excludes the four pseudo-sections and the scalars, and each for its own reason', () => {
     // `weights` and `hardConstraints` are real profile fields and are **not** written as
     // `profile.<section>.<key>` — `encode.ts` translates both itself, `weights` because it is an
     // open record with no fixed keys and `hardConstraints` because a set is not something a
@@ -78,7 +78,9 @@ describe('objectSectionsOf, against the shipped dispatcher profile', () => {
     // of traffic pattern to the profile whose priorities run under it. It holds no declared
     // tunable — a categorical choice per pattern over a set that is itself data — so nothing
     // samples it and `encode.ts` writes nothing under it.
-    for (const pseudo of ['weights', 'hardConstraints', 'patternWeightSets']) {
+    // `formulas` is the fourth, an array for `hardConstraints`' reason: a formula is a tree, and
+    // a search over structure is not a search over a range (`dispatch/formula.ts`).
+    for (const pseudo of ['weights', 'hardConstraints', 'patternWeightSets', 'formulas']) {
       expect(Object.hasOwn(dispatcherProfileSchema.shape, pseudo)).toBe(true);
       expect(DISPATCHER_PROFILE_OBJECT_SECTIONS).not.toContain(pseudo);
     }
@@ -96,6 +98,7 @@ describe('objectSectionsOf, against the shipped dispatcher profile', () => {
         'weights',
         'hardConstraints',
         'patternWeightSets',
+        'formulas',
         '$comment',
         'id',
         'name',

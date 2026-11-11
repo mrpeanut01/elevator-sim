@@ -985,6 +985,30 @@ export interface DispatcherProfile extends Commented {
    * that is itself data, the argument that keeps `patternSwitching` out of the search space.
    */
   readonly patternWeightSets?: Readonly<Record<string, string>> | undefined;
+  /**
+   * **Priorities this dispatcher writes for itself** — each a formula over the library's terms,
+   * added to the weighted sum at its own weight. `dispatch/formula.ts` states what a formula is,
+   * why its leaves are normalized, and the three properties `resolveFormulas` checks before a run
+   * (pure, non-negative, bounded). An array, like `hardConstraints`, and for its reason: a tree
+   * is structure, and a search over structure is not a search over a range, so none of it is a
+   * declared tunable.
+   */
+  readonly formulas?: readonly FormulaTermConfig[] | undefined;
+}
+
+/** One node of a formula: a library term's normalized value, a constant, or an operation. */
+export type FormulaNodeConfig =
+  | { readonly term: string }
+  | { readonly value: number }
+  | { readonly op: 'add' | 'multiply' | 'max' | 'min'; readonly of: readonly FormulaNodeConfig[] };
+
+/** One formula, as a profile authors it — `dispatch/formula.ts#FormulaSource`, with a comment. */
+export interface FormulaTermConfig extends Commented {
+  readonly id: string;
+  /** The author's own name for it, drawn wherever a breakdown shows its row. */
+  readonly name: string;
+  readonly weight: number;
+  readonly expression: FormulaNodeConfig;
 }
 
 /**

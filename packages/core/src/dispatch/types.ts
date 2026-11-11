@@ -66,6 +66,8 @@ import type { SimTime } from '../kernel/types.js';
 import type { CarSnapshot, CostEstimate, CostRequest } from '../model/car/types.js';
 import type { CredentialGroup, Direction } from '../model/types.js';
 
+import type { FormulaSource, ResolvedFormula } from './formula.js';
+
 import type {
   ResolvedRuleSets,
   ResolvedSelection,
@@ -563,7 +565,10 @@ export interface CostTermDefinition {
 
 /** One term's contribution to one car's cost, kept for explainability and for tests. */
 export interface ScoreBreakdown {
+  /** A library term's id, or the id of one of the profile's own formulas (`formula.ts`). */
   readonly termId: string;
+  /** Present on a formula's row only: the name its author gave it. */
+  readonly name?: string | undefined;
   readonly weight: number;
   /** The term's own unit. */
   readonly raw: number;
@@ -947,6 +952,8 @@ export interface ResolvedDispatchConfig {
    * weight whose id is not in the `terms` library.
    */
   readonly pendingWeights: ReadonlyMap<string, number>;
+  /** The profile's own formulas, checked. The one empty list on every profile without any. */
+  readonly formulas: readonly ResolvedFormula[];
   /** The `hardConstraints` array as authored, for provenance. */
   readonly declaredHardConstraints: readonly HardConstraintId[];
   readonly constraints: ResolvedConstraints;
@@ -1326,6 +1333,8 @@ export interface DispatcherProfileSource {
           | undefined;
       }
     | undefined;
+  /** The profile's own formulas — `formula.ts`. Checked by `resolveFormulas`, never trusted. */
+  readonly formulas?: readonly FormulaSource[] | undefined;
   /** The profile's own pattern-to-priorities entries — `DispatcherProfile.patternWeightSets`. */
   readonly patternWeightSets?: Readonly<Record<string, string>> | undefined;
 }

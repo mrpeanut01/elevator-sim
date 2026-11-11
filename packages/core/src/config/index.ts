@@ -324,6 +324,8 @@ export type {
   RuleActionWords,
   RuleConditionId,
   RuleConditionWords,
+  FormulaNodeConfig,
+  FormulaTermConfig,
   RuleAndConfig,
   RuleRowConfig,
   RuleRowLike,
