@@ -126,6 +126,16 @@ export interface PlanShaft {
    * that opening `ctf-class-reference` and saving it does not make its shuttle symmetric.
    */
   readonly descentSpeedMps?: number | undefined;
+  /**
+   * **Which block of its height the shaft stands in**, for shafts that stop below the roof.
+   *
+   * Absent or `0` is the first block. Shafts that share a top *and* a block number are one wing
+   * and one group; a different number is a wing of its own on the far side, with its own calls —
+   * the two arms of a mall. It is part of {@link groupsOf}'s key, so two blocks whose doors open
+   * on the same floors are written as two banks and read back as two blocks. On a shaft that
+   * reaches the roof it changes the grouping and not the drawing: the core is one structure.
+   */
+  readonly wing?: number | undefined;
 }
 
 /** The drawing board's whole state. */
@@ -251,21 +261,29 @@ const MIN_STRUCTURE_SHAFT_BAYS = 2;
  * The shafts that reach highest are the core, and the core stands to the building's full height
  * whether or not they do: a floor above every shaft is still a floor, and
  * {@link orphanFloorsOf} is what says nobody can reach it. Every other shaft joins a wing with the
- * shafts that share its top. Wings are placed tallest first and **alternate sides**, left then
+ * shafts that share its top and its block number ({@link PlanShaft.wing}), so two blocks of one
+ * height stand on opposite sides rather than as one. Wings are placed tallest first and **alternate sides**, left then
  * right, each one outboard of the last on its side — so the tallest wings sit against the core and
  * the building steps down outward, which is the shape a podium and a mall both are.
  */
 export function layoutOf(plan: TowerPlan): TowerLayout {
   const tallest = plan.shafts.reduce((best, shaft) => Math.max(best, shaft.top), Number.NEGATIVE_INFINITY);
   const core = plan.shafts.filter((shaft) => shaft.top === tallest);
-  const tops = [...new Set(plan.shafts.filter((shaft) => shaft.top !== tallest).map((shaft) => shaft.top))].sort(
-    (a, b) => b - a,
-  );
+  /* A wing is a top and a block number: tallest first, and at one height the lower number first. */
+  const wingKeys = new Map<string, { top: number; wing: number; keys: string[] }>();
+  for (const shaft of plan.shafts) {
+    if (shaft.top === tallest) continue;
+    const wing = shaft.wing ?? 0;
+    const key = [shaft.top, wing].map(String).join('|');
+    const found = wingKeys.get(key);
+    if (found === undefined) wingKeys.set(key, { top: shaft.top, wing, keys: [shaft.key] });
+    else found.keys.push(shaft.key);
+  }
+  const wings = [...wingKeys.values()].sort((a, b) => b.top - a.top || a.wing - b.wing);
   const left: { top: number; keys: string[] }[] = [];
   const right: { top: number; keys: string[] }[] = [];
-  tops.forEach((top, index) => {
-    const keys = plan.shafts.filter((shaft) => shaft.top === top).map((shaft) => shaft.key);
-    (index % 2 === 0 ? left : right).push({ top, keys });
+  wings.forEach((wing, index) => {
+    (index % 2 === 0 ? left : right).push({ top: wing.top, keys: wing.keys });
   });
   const widthOf = (count: number): number => Math.max(MIN_STRUCTURE_SHAFT_BAYS, count) + 1;
 
@@ -452,11 +470,13 @@ export interface PlanGroup {
 }
 
 /**
- * Shafts grouped by the floors they open onto and by their deck count.
+ * Shafts grouped by the floors they open onto, by their deck count and by their block.
  *
  * *The set of cars that open onto the same floors* is what `BankConfig` means, so that is the key.
  * The deck count is part of it because a bank has one `servesFloorPairs`: a single-deck car in a
- * paired bank would be a car the loader runs as if it had two decks.
+ * paired bank would be a car the loader runs as if it had two decks. The block number
+ * ({@link PlanShaft.wing}) is part of it because two wings are two lobbies' worth of call buttons:
+ * a rider at one arm of a mall is not answered by a car in the other.
  *
  * Ordered by lowest stop, then highest, then the key itself — invariant 4's rule applied to
  * authoring, so two plans that describe one building write one document.
@@ -466,7 +486,7 @@ export function groupsOf(plan: TowerPlan): readonly PlanGroup[] {
   plan.shafts.forEach((shaft, index) => {
     const stops = writtenStopsOf(plan, shaft);
     /* Joined rather than interpolated: this is a map key, and nothing here is a sentence. */
-    const key = [shaft.decks, ...stops].map(String).join('|');
+    const key = [shaft.wing ?? 0, shaft.decks, ...stops].map(String).join('|');
     const found = byKey.get(key);
     if (found === undefined) {
       byKey.set(key, { shafts: [index], stops, decks: shaft.decks, kinds: new Set([shaft.service]) });
@@ -960,6 +980,15 @@ export function withCars(plan: TowerPlan, keys: readonly string[], cars: 1 | 2):
   return withShafts(plan, keys, (shaft) => ({ ...shaft, cars, decks: cars === 2 ? 1 : shaft.decks }));
 }
 
+/** Stand shafts in a block of their own (`1`), or put them back in the first (`0`). */
+export function withWing(plan: TowerPlan, keys: readonly string[], wing: number): TowerPlan {
+  return withShafts(plan, keys, (shaft) => {
+    const { wing: _dropped, ...rest } = shaft;
+    void _dropped;
+    return wing === 0 ? rest : { ...rest, wing };
+  });
+}
+
 /**
  * Open or close one shaft's doors at one floor, by hand.
  *
@@ -1319,7 +1348,12 @@ export function planFromBuilding(config: BuildingConfig, id: string): PlanReadin
 
   const shafts: PlanShaft[] = [];
   let carIndex = 0;
+  /* Banks whose doors open on exactly the same floors are separate blocks, numbered as they come. */
+  const blocksSeen = new Map<string, number>();
   for (const bank of carried?.banks ?? []) {
+    const blockKey = [bank.cars[0]?.doubleDeck === true ? 2 : 1, ...bank.servesFloors].join('|');
+    const wing = blocksSeen.get(blockKey) ?? 0;
+    blocksSeen.set(blockKey, wing + 1);
     const stops = bank.servesFloors
       .map((floorId) => numberById.get(floorId))
       .filter((floor): floor is number => floor !== undefined)
@@ -1351,6 +1385,7 @@ export function planFromBuilding(config: BuildingConfig, id: string): PlanReadin
         duty: car.duty ?? 'passenger',
         pressurised: car.cabinPressurised === true,
         ...(car.descentSpeedMps === undefined ? {} : { descentSpeedMps: car.descentSpeedMps }),
+        ...(wing === 0 ? {} : { wing }),
       };
       shafts.push(classifiedShaft(shell, drawn, stops));
     }

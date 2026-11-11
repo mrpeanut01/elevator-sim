@@ -73,6 +73,7 @@ import {
   withShaftCopied,
   withShafts,
   withShaftsRemoved,
+  withWing,
   withSkyLobbyToggled,
   withStopToggled,
   withUse,
@@ -1089,6 +1090,16 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
     button(quick, 'everyday-designer-remove', COPY.removeShaft, 'remove', () => {
       edit(withShaftsRemoved(plan, keys));
     });
+    /* Only a shaft that stops below the roof is in a wing; the core is one structure. */
+    const roof = plan.shafts.reduce((best, shaft) => Math.max(best, shaft.top), 0);
+    if (chosen.every((shaft) => shaft.top < roof)) {
+      const apart = chosen.every((shaft) => (shaft.wing ?? 0) !== 0);
+      const wingRow = inlineRow(shafts);
+      button(wingRow, 'everyday-designer-wing', apart ? COPY.wingRejoin : COPY.wingApart, 'wing', () => {
+        edit(withWing(plan, keys, apart ? 0 : 1));
+      });
+      hint(shafts, COPY.wingHint);
+    }
   }
 
   function drawLiftsStep(): void {

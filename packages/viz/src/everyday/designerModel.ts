@@ -149,6 +149,10 @@ export const DESIGNER_COPY = Object.freeze({
   stopHint: 'Press a floor on a picked shaft to open or close its doors there.',
   addFullShaft: '+ shaft to the roof',
   addShortShaft: '+ shorter shaft',
+  wingApart: 'Stand apart, as a block on the other side',
+  wingRejoin: 'Rejoin the first block',
+  wingHint:
+    'Shafts that stop at the same floor make one block. Stood apart they are a second block across the building, with call buttons of their own.',
   copyShaft: 'Copy',
   removeShaft: 'Remove',
   selectAll: 'Pick every shaft',

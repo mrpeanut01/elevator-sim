@@ -49,6 +49,7 @@ import {
   planAnalysisOf,
   planFromBuilding,
   planTotalPopulation,
+  podiumPlan,
   rescueLobbyFor,
   shaftLabelOf,
   skyLobbyPlan,
@@ -66,6 +67,7 @@ import {
   withShafts,
   withSkyLobbyToggled,
   withStopToggled,
+  withWing,
   zonedTowerPlan,
   type PlanShaft,
   type TowerPlan,
@@ -192,6 +194,28 @@ describe('the massing rule', () => {
     expect(orphanFloorsOf(taller)).toEqual([]);
   });
 
+  it('stands two blocks of one height on opposite sides, as two groups, and reads them back', () => {
+    const podium = podiumPlan();
+    const one = layoutOf(podium).structures.filter((structure) => structure.top === 3);
+    expect(one.map((structure) => structure.shaftKeys.length)).toEqual([3]);
+
+    const split = withWing(podium, ['s5', 's9'], 1);
+    const two = layoutOf(split).structures.filter((structure) => structure.top === 3);
+    expect(two.map((structure) => [structure.side, structure.shaftKeys.length])).toEqual([
+      ['left', 1],
+      ['right', 2],
+    ]);
+    expect(groupsOf(split)).toHaveLength(groupsOf(podium).length + 1);
+    /* The floors are as wide as before: a block moved across the building is the same plate. */
+    expect(planTotalPopulation(split)).toBe(planTotalPopulation(podium));
+
+    const reopened = planFromBuilding(buildingFromPlan(split, SPECS), split.id).plan;
+    expect(layoutOf(reopened).structures.map((structure) => [structure.side, structure.top, structure.shaftKeys.length])).toEqual(
+      layoutOf(split).structures.map((structure) => [structure.side, structure.top, structure.shaftKeys.length]),
+    );
+    expect(withWing(split, ['s5', 's9'], 0)).toEqual(podium);
+  });
+
   it('labels shafts past the twenty-sixth without repeating a letter', () => {
     expect([0, 25, 26, 27, 52].map(shaftLabelOf)).toEqual(['A', 'Z', 'AA', 'AB', 'BA']);
   });
@@ -313,6 +337,11 @@ describe('the drawing board is not decoration — every control moves the legs',
     expect(shafts.filter((shaft) => shaft.carIds.length === 2)).toHaveLength(1);
     expect(shafts.find((shaft) => shaft.carIds.length === 2)?.separation).toBeDefined();
     expect(legsOf(paired)).not.toBe(control);
+  });
+
+  it('a block stood apart is a group of its own, and the run changes', () => {
+    const podium = podiumPlan();
+    expect(legsOf(withWing(podium, ['s5', 's9'], 1))).not.toBe(legsOf(podium));
   });
 
   it('publishes no interval for the group that holds a pair, and still publishes the others', () => {
