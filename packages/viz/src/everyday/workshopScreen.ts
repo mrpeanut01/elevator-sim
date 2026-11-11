@@ -1707,25 +1707,31 @@ function mountWorkshop(
       stop();
     },
     /*
-     * § 3.3's primary for this screen is *Run a day with this*. It is the same latching press the
-     * Engineer shell's **Run this shift** makes, through the host — so the run it produces may
-     * file.
+     * § 3.3's primary for this screen, shipped as *Test simulation* —
+     * [§ D1627](../../../../DECISIONS.md). **It is a sandbox day, always**: the week's day with this
+     * dispatcher driving, standing over the week and never on it (`EverydayHost.runSandbox`,
+     * § D1368), so nothing this press starts can be closed into the week.
      *
-     * **All four fields this screen writes travel with it, and this comment has said four, then
-     * three, then four again** (GitHub issues #296 and #575, § D386 and § D886). `shiftRunConfigOf`
-     * builds the run through `drivingProfileOf`, which reads `levers`, `selectorSpec`, `ruleRows`
-     * **and** `dispatcherSpec` — so the weights and the behaviour flags are carried by this press,
-     * over the profile `dispatcherId` names. The § 3.3 note above the button is derived from
-     * `scope/surface.ts` rather than written here, which is why it changed itself when the seam
-     * did; see {@link workshopBar}, and `workshopTravel.test.ts` for the measurement that keeps the
-     * note and the legs agreeing.
+     * It was `startRun`, the Engineer shell's **Run this shift**, which is a sandbox day only while
+     * the day's attempt has not begun on a crowd that counts (§ D1362) and the day's own run
+     * otherwise, so a press from this bench could be closed as the week's day. A label that says
+     * *test* over a run that may file is [§ D227](../../../../DECISIONS.md)'s defect, and the owner's
+     * rule is that a bench tries things and a day is played from a mode's floor.
+     *
+     * **All four fields this screen writes still travel with it** (GitHub issues #296 and #575,
+     * § D386 and § D886): they are written to the standing configuration by this screen's own
+     * controls, a sandbox day runs on that configuration, and the sandbox puts back only what its
+     * own press wrote, which here is nothing. The § 3.3 note above the button is derived from
+     * `scope/surface.ts` rather than written here; see {@link workshopBar}, and
+     * `workshopTravel.test.ts` for the measurement that keeps the note and the legs agreeing.
      */
     primary: () => {
       /* § D1360: a refused press stays on this screen, whose bar already says why. */
-      if (api.startRun() !== undefined) {
+      if (api.attemptHold() !== undefined) {
         context.refreshBar();
         return;
       }
+      api.runSandbox({ building: undefined, pattern: undefined, dwell: undefined });
       context.go('stage');
     },
   };
@@ -1876,7 +1882,7 @@ const SPLIT_NOTE = !workshopWriteReachesRun('viewer.dispatcherSpec')
  */
 function workshopBar(state: EverydayState): ActionBarModel {
   const base = actionBarFor(state);
-  /* § D1360: while a scored attempt stands, *Run a day with this* would run its day. Inert, with the reason. */
+  /* § D1360: while a scored attempt stands, a test simulation would play its day's crowd. Inert, with the reason. */
   const held = mountedHost?.attemptHold();
   if (held !== undefined) return { ...base, primary: { ...base.primary, inert: held } };
   const variants = base.noteVariants ?? [];

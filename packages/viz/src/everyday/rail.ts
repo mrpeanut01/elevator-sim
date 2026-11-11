@@ -46,6 +46,8 @@ import { HISTORY_DAYS } from '../shift/week.js';
 
 import { CHIME_PRICES } from './chimesPanel.js';
 import { EM_DASH, percentFigure } from './figures.js';
+import { floorOfScreen, GAME_FLOORS, type GameFloorKey } from './floors.js';
+import { EVERYDAY_MODES } from './modes.js';
 import { avatarInitialOf, DEFAULT_EVERYDAY_PROFILE, effectiveNameOf } from './profile.js';
 import { isScreenBuilt, UNBUILT_REASONS } from './screens.js';
 import { REPLAY_COPY } from './replay.js';
@@ -54,8 +56,9 @@ import {
   ENGINEER_SWAP_REPLAY_NOTE,
   ENGINEER_SWAP_RUSH_NOTE,
   ENGINEER_SWAP_WATCH_NOTE,
+  TEST_SIMULATION_LABEL,
 } from './types.js';
-import type { EverydayScreen, EverydayState, RunContext } from './types.js';
+import type { EverydayModePick, EverydayScreen, EverydayState, RunContext } from './types.js';
 
 /* -------------------------------------------------------------------------- *
  * The banked line — § 3.2's card, GitHub issue #499, § D673
@@ -177,12 +180,6 @@ export interface RailItem {
   readonly unavailable?: string | undefined;
 }
 
-/** A titled block of rows. The brand, the menu row and the footer are not groups. */
-export interface RailGroup {
-  readonly title: string;
-  readonly items: readonly RailItem[];
-}
-
 /**
  * § 3.2's footer: the identity card, the Settings row, the Engineer swap.
  *
@@ -258,13 +255,16 @@ export interface RailModel {
    * acknowledgement sits under the *Main menu* row and the figure stays where it is.
    */
   readonly banked: string | undefined;
-  readonly groups: readonly RailGroup[];
+  /** The building: every floor, its rooms, and where the car is. */
+  readonly shaft: RailShaft;
   readonly footer: RailFooter;
 }
 
 /** What the shell knows beyond the state — all optional. */
 export interface RailOptions {
-  /** Whether a campaign is under way — gates the `CAMPAIGN` group together with `ctx`. */
+  /** Whether a test simulation is standing: the host's `sandboxStanding()`, read at draw time. */
+  readonly test?: boolean | undefined;
+  /** Whether a campaign is under way — gates the Career floor's rooms together with `ctx`. */
   readonly inCampaign?: boolean;
   /** The open building's name, for the campaign group's middle row (§ 3.2: the row *is* the name). */
   readonly openBuilding?: string | undefined;
@@ -363,11 +363,16 @@ export const STAGE_RAIL_PHASE_WORDS = Object.freeze({
  * rail that has no clock to show. Its one non-test caller is `everyday/shell.ts#drawRail` (and its
  * cheap repaint of the subline when only the clock moved).
  */
-export function stageSublineOf(state: EverydayState, live: StageRailClock | undefined): string {
-  const bare = sublineFor(state);
+export function stageSublineOf(state: EverydayState, live: StageRailClock | undefined, test = false): string {
+  /*
+   * § D1627: a test simulation is not a day of any mode, so its stage and report say what it is.
+   * The clock is still the stage's own, appended exactly as on a played day.
+   */
+  const tested = test && state.ctx === 'daily' && (state.screen === 'stage' || state.screen === 'report');
+  const bare = tested ? TEST_SIMULATION_SUBLINE : sublineFor(state);
   if (live === undefined || state.screen !== 'stage') return bare;
   if (state.ctx !== 'daily' && state.ctx !== 'campaign') return bare;
-  return `${STAGE_RAIL_PHASE_WORDS[live.phase]} · ${live.clock}`;
+  return tested ? `${bare} · ${live.clock}` : `${STAGE_RAIL_PHASE_WORDS[live.phase]} · ${live.clock}`;
 }
 
 /**
@@ -383,9 +388,6 @@ export function sublineFor(state: EverydayState): string {
   switch (state.screen) {
     case 'menu':
       return 'YOU ARE HERE';
-    /* § D1445's lobby. The rail is stepped aside while it shows, so this is the word it would say. */
-    case 'lobby':
-      return 'IN THE LOBBY';
     /*
      * GitHub issue #244's landing page. Bare words for the same reason the two arms below carry
      * them: the run this page plays is its own block's, not the shell's transport, so there is no
@@ -452,69 +454,76 @@ function item(screen: EverydayScreen, label: string): RailItem {
 }
 
 /**
- * The groups, for this state.
+ * One floor of the tray's shaft, for this state — [§ D1627](../../../../DECISIONS.md).
  *
- * `DESIGN` and `WORLD` are always available; `CAMPAIGN` appears only inside a campaign, and its
- * middle row is the open building's name — no name, no row, because a desk row with an invented
- * label would be a claim about a building nobody opened. Rows whose screen has no implementation
- * carry that screen's one refusal sentence rather than being dropped, for the same argument
- * `modes.ts` makes about the fourth mode tile.
+ * The floor button is {@link ShaftFloor.screen}; the rooms under it are rows as they always were, so
+ * every screen the old `DESIGN` and `WORLD` groups reached is still one press away from anywhere.
  */
-export function railGroups(
-  ctx: RunContext,
+export interface ShaftFloor {
+  readonly key: GameFloorKey;
+  readonly name: string;
+  /** Where the floor button goes. */
+  readonly screen: EverydayScreen;
+  /** The mode a play floor commits to, exactly as its menu tile does. */
+  readonly pick?: EverydayModePick | undefined;
+  /** Whether the car is standing here. */
+  readonly here: boolean;
+  /** `undefined` when the floor opens; otherwise why it does not. */
+  readonly unavailable?: string | undefined;
+  readonly rooms: readonly RailItem[];
+}
+
+/** The shaft: every floor top to bottom, and where the car is. */
+export interface RailShaft {
+  readonly car: GameFloorKey;
+  readonly floors: readonly ShaftFloor[];
+}
+
+/**
+ * The shaft, for this state.
+ *
+ * Five floors keep the rooms `floors.ts` gives them. **Career's rooms appear only inside a career**,
+ * and the middle one is the open building's name: no name, no row, because a desk row with an
+ * invented label would be a claim about a building nobody opened. Rooms whose screen has no
+ * implementation carry that screen's one refusal sentence rather than being dropped, for the same
+ * argument `modes.ts` makes about a mode tile.
+ *
+ * `test` is whether a test simulation is standing (the host's to say), which keeps the car on the
+ * design floor while one plays: see `floors.ts#floorOfScreen`.
+ */
+export function railShaft(
+  state: EverydayState,
   inCampaign: boolean,
   openBuilding?: string,
-): readonly RailGroup[] {
-  const groups: RailGroup[] = [];
-
-  if (ctx === 'campaign' && inCampaign) {
-    groups.push({
-      title: 'CAREER',
-      items: Object.freeze([
-        item('towers', 'All buildings'),
-        ...(openBuilding === undefined ? [] : [item('building', openBuilding)]),
-        item('contract', 'Contract & works'),
-      ]),
+  test = false,
+): RailShaft {
+  const car = floorOfScreen(state, test);
+  const floors = GAME_FLOORS.map((floor): ShaftFloor => {
+    const rooms: RailItem[] = floor.rooms.map((room) => item(room.screen, room.label));
+    if (floor.pick === 'campaign' && state.ctx === 'campaign' && inCampaign) {
+      rooms.push(item('towers', 'All buildings'));
+      if (openBuilding !== undefined) rooms.push(item('building', openBuilding));
+      rooms.push(item('contract', 'Contract & works'));
+    }
+    const mode = floor.pick === undefined ? undefined : EVERYDAY_MODES.find((m) => m.pick === floor.pick);
+    return Object.freeze({
+      key: floor.key,
+      name: floor.name,
+      screen: floor.screen,
+      pick: floor.pick,
+      here: floor.key === car,
+      unavailable: mode?.unavailable ?? (isScreenBuilt(floor.screen) ? undefined : UNBUILT_REASONS[floor.screen]),
+      rooms: Object.freeze(rooms),
     });
-  }
-
-  groups.push({
-    title: 'DESIGN',
-    items: Object.freeze([
-      item('workshop', 'Dispatcher workshop'),
-      item('bench', 'Test bench'),
-      item('designer', 'Design a building'),
-    ]),
   });
-
-  groups.push({
-    title: 'WORLD',
-    items: Object.freeze([
-      /*
-       * GitHub issue #244's landing page, on the rail because a screen reachable only through the
-       * first-arrival offer is a screen nobody can get back to. It is also what makes the page's
-       * *returning player* arm reachable at all — its call to action opens the walkthrough on a
-       * first visit and Scenario afterwards, and the second of those is only ever drawn for
-       * somebody who came back here on purpose.
-       */
-      /*
-       * § D1445's lobby, so the elevator a cold launch opens on can be ridden again. *Main menu*
-       * still goes to the menu: the handoff says the lobby is not replayed on every return.
-       */
-      item('lobby', 'The lobby'),
-      item('landing', 'What this is'),
-      item('week', 'Your week'),
-      /*
-       * One entry, not two — the guide's own correction. `board` covers today's board and the
-       * dispatcher ladder as one tabbed screen; its refusal sentence (a server this build does
-       * not have) is `screens.ts`'s, where `docs/18` already records the absence.
-       */
-      item('board', 'Boards & ladder'),
-    ]),
-  });
-
-  return Object.freeze(groups);
+  return Object.freeze({ car, floors: Object.freeze(floors) });
 }
+
+/**
+ * The tray's word for a test simulation's stage and report, where {@link sublineFor} would say
+ * `MID-DAY`. The shell draws it while the host says one is standing.
+ */
+export const TEST_SIMULATION_SUBLINE = TEST_SIMULATION_LABEL.toUpperCase();
 
 /**
  * The card's third line when no day has been closed — issue #214's other half.
@@ -741,7 +750,7 @@ export function railModel(state: EverydayState, options: RailOptions = {}): Rail
     mode: 'EVERYDAY MODE',
     subline: sublineFor(state),
     banked: bankedLineOf(options.banked, state.screen),
-    groups: railGroups(state.ctx, options.inCampaign ?? false, options.openBuilding),
+    shaft: railShaft(state, options.inCampaign ?? false, options.openBuilding, options.test ?? false),
     footer: railFooter(state, options),
   };
 }

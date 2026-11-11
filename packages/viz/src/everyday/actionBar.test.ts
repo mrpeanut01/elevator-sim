@@ -30,7 +30,13 @@ import {
 } from './actionBar.js';
 import { NEVER_OPENS_THE_STAGE, primariesSharingVerb, verbOf } from './overlayVerb.test-helper.js';
 import { STAGE_OVERLAY_PLAY } from './stageScreenModel.js';
-import { EVERYDAY_SCREENS, RUN_CONTEXTS, type EverydayScreen, type RunContext } from './types.js';
+import {
+  EVERYDAY_SCREENS,
+  RUN_CONTEXTS,
+  TEST_SIMULATION_LABEL,
+  type EverydayScreen,
+  type RunContext,
+} from './types.js';
 import { firstPersonWordsIn } from '../watch/view.js';
 
 /**
@@ -78,6 +84,9 @@ interface GuideRow {
    * the stage, with the resume over a stale run on the stage. The `building` row carried one for GitHub issue #569 item 6 (*Open the day…* where the
    * guide writes *Run the day…*) until [§ D1309](../../../../DECISIONS.md) took the collision off the
    * overlay instead, and it ships the guide's cell again (GitHub issue #573).
+   *
+   * And on the `workshop` and `designer` rows, where it **replaces** the guide's cell rather than
+   * appending to it: [§ D1627](../../../../DECISIONS.md), the design floor's *Test simulation*.
    */
   readonly primaryShipsInstead?: readonly string[];
   readonly inverted: boolean;
@@ -266,6 +275,8 @@ const GUIDE_TABLE: readonly GuideRow[] = [
     back: null,
     timeline: null,
     primary: ['Run a day with this'],
+    /* § D1627 — see the deviation case below the table loop. */
+    primaryShipsInstead: [TEST_SIMULATION_LABEL],
     notes: ['Unsaved changes travel with the run.', 'Nothing changed yet.'],
     inverted: false,
   },
@@ -293,6 +304,7 @@ const GUIDE_TABLE: readonly GuideRow[] = [
     back: null,
     timeline: null,
     primary: ['Run a day in it'],
+    primaryShipsInstead: [TEST_SIMULATION_LABEL],
     notes: ['Nothing here is scored. It is a drawing board.'],
     inverted: false,
   },
@@ -361,8 +373,6 @@ describe('the table matches the guide, cell for cell', () => {
       /* GitHub issue #244's landing page — § 3.3's table begins at the menu and has no row for a
          screen that comes before it. */
       'landing',
-      /* § D1445's lobby — no § 3.3 row, and the shell steps the bar aside while it shows. */
-      'lobby',
       'report·replay',
       'report·watch',
       'scenario',
@@ -423,6 +433,34 @@ describe('the table matches the guide, cell for cell', () => {
     /* The one start stays where § D1218 anchored it, and it is the brief's. */
     expect(primariesSharingVerb('start').map((entry) => entry.key)).toContain('brief');
     expect(verbOf(STAGE_OVERLAY_PLAY)).not.toBe('start');
+  });
+
+  /**
+   * **The design floor's primary, asserted in both directions** — [§ D1627](../../../../DECISIONS.md).
+   *
+   * The guide's two cells read *Run a day with this* and *Run a day in it*, which are an invitation
+   * to play a day from a bench. The product owner ruled that a bench tries things and a building is
+   * played on a mode's floor, so both rows ship one label. As with the career's left button below,
+   * the vendored guide is read and required to still carry its own words: a revision that adopted
+   * the ruling turns this red, and the fix is to delete the deviation.
+   */
+  it('ships Test simulation where § 3.3 offers a day from the workshop and the drawing board, and nowhere else', () => {
+    const guide = readFileSync(
+      fileURLToPath(
+        new URL('../../../../docs/design/design_handoff_casual_mode/GAMEPLAY_AND_NAVIGATION.md', import.meta.url),
+      ),
+      'utf8',
+    );
+    for (const cell of ['`Run a day with this`', '`Run a day in it`']) {
+      expect(guide, 'the guide has adopted the ruling — the deviation has outlived its reason').toContain(cell);
+    }
+    const deviating = GUIDE_TABLE.filter((row) => row.primaryShipsInstead?.includes(TEST_SIMULATION_LABEL) === true);
+    expect(deviating.map((row) => row.screen)).toEqual(['workshop', 'designer']);
+    for (const row of deviating) expect(row.primaryShipsInstead).toEqual([TEST_SIMULATION_LABEL]);
+    /* And nothing the build ships on this bar still offers a day from a bench. */
+    for (const row of ACTION_BAR_ROWS) {
+      for (const variant of row.primary.variants) expect(variant, row.screen).not.toMatch(/^Run a day (with this|in it)$/);
+    }
   });
 
   /**

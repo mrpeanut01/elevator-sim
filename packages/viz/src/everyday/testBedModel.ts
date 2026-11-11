@@ -62,7 +62,7 @@ export const TEST_BED_COPY = Object.freeze({
     'A line with no figure means the runs did not settle at this flow: too few riders to measure, ' +
     'or more than the building can clear. Try a lighter or heavier flow, or another building.',
   detailSummary: 'what each line means',
-  watchNote: 'To watch it work for a day, use “Run a day with this” below. One day is a look, not proof.',
+  watchNote: 'To watch it work for a day, use “Test simulation” below. One day is a look, not proof.',
   failed: 'The test bed could not run this:',
 } as const);
 

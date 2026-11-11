@@ -23,8 +23,8 @@ import {
   CHROMIUM,
   HAS_BROWSER,
   openEverydayDoor,
+  openLandingFromLobby,
   openPage,
-  skipTheLobby,
   startShippedSite,
   type ShippedSite,
 } from '../dev/browserTier.test-helper.js';
@@ -49,8 +49,8 @@ afterAll(async () => {
 /** A first visit, into the walkthrough by the landing page's own call to action. */
 async function intoWalkthrough(): Promise<Page> {
   const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
-  await skipTheLobby(page);
   await page.goto(origin, { waitUntil: 'domcontentloaded' });
+  await openLandingFromLobby(page);
   await page.waitForSelector('.everyday-landing-cta', { timeout: 30_000 });
   await page.locator('.everyday-landing-cta').click();
   await page.waitForSelector('.everyday-tutorial', { timeout: 30_000 });
@@ -73,19 +73,21 @@ async function expectNothingFiled(page: Page): Promise<void> {
 }
 
 describe.skipIf(!HAS_BROWSER)('§ D993 — the tutorial’s exits file nothing', () => {
-  it('Skip reaches the menu with an empty week, is not re-offered, and a reload offers a cover with a live way past it', async () => {
+  it('Skip reaches the menu with an empty week, is not re-offered, and a reload offers the walkthrough on the lobby again', async () => {
     const page = await intoWalkthrough();
     try {
       await page.locator('.everyday-tutorial-skip').click();
       await expectNothingFiled(page);
 
-      /* Across a reload the player has played nothing, and meets the landing page — one press from the modes. */
+      /*
+       * Across a reload the player has played nothing, so the gate still answers *first visit*. Since
+       * § D1628 that puts no cover up: the lobby is where the reload lands, with the modes live on it
+       * and the walkthrough offered by name.
+       */
       await page.reload({ waitUntil: 'domcontentloaded' });
-      await page.waitForSelector('.everyday-landing', { timeout: 30_000 });
-      const leave = page.locator('.everyday-bar-leave');
-      expect(await leave.isDisabled()).toBe(false);
-      await leave.click();
-      await page.waitForSelector('.everyday-mode[data-screen]', { timeout: 15_000 });
+      await page.waitForSelector('.everyday-lobby-walkthrough', { state: 'visible', timeout: 30_000 });
+      expect(await page.locator('.everyday-landing, .everyday-tutorial').count()).toBe(0);
+      expect(await page.locator('.everyday-mode[data-screen]').count()).toBeGreaterThan(0);
     } finally {
       await page.close();
     }
